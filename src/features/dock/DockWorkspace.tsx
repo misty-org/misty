@@ -1,6 +1,6 @@
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import type { CSSProperties } from "react";
-import { Blocks, ExternalLink, Play, Puzzle, RefreshCcw, Terminal } from "lucide-react";
+import { ExternalLink, Play, Puzzle, RefreshCcw, Terminal } from "lucide-react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { pluginCommandRun, pluginCommandsSnapshot, pluginPanelRender } from "../../api/misty";
 import type {
@@ -11,6 +11,8 @@ import type {
   PluginPanelRenderResult,
 } from "../../api/types";
 import { errorText } from "../../shared/format";
+import { applyMistyThemeFromExtensionAction } from "../../app/useAppThemeStore";
+import { ExtensionCatalogIcon } from "../plugins/ExtensionCatalogIcon";
 import { pluginCatalogChangedEvent } from "../plugins/pluginEvents";
 import { publishPluginNotifications } from "../plugins/pluginNotifications";
 
@@ -145,7 +147,6 @@ export function DockWorkspace() {
     () => panelForRoute(snapshot.panels, dockPanels, selectedPanelId, selectedPluginId),
     [dockPanels, selectedPanelId, selectedPluginId, snapshot.panels],
   );
-  const commandsByPlugin = useMemo(() => commandsGroupedByPlugin(snapshot.commands), [snapshot.commands]);
   const commandOnlyGroups = useMemo(
     () => commandOnlyPluginGroups(snapshot.commands, dockPanels),
     [dockPanels, snapshot.commands],
@@ -217,7 +218,7 @@ export function DockWorkspace() {
                 className={`${dockStyles.panelButton} ${panel.id === selectedPanel?.id ? dockStyles.panelButtonActive : ""}`}
                 onClick={() => setSearchParams(dockPanelSearchParams(panel, selectedPath))}
               >
-                <Blocks size={17} />
+                <PluginIcon pluginId={panel.pluginId} pluginName={panel.pluginName} />
                 <span>
                   <strong className={dockStyles.panelTitle}>{panel.title}</strong>
                   <small className={dockStyles.panelSubtitle}>{panel.pluginName}</small>
@@ -231,7 +232,7 @@ export function DockWorkspace() {
                 className={`${dockStyles.panelButton} ${!selectedPanel && group.pluginId === selectedCommandGroup?.pluginId ? dockStyles.panelButtonActive : ""}`}
                 onClick={() => setSearchParams(dockCommandSearchParams(group, selectedPath))}
               >
-                <Terminal size={17} />
+                <PluginIcon pluginId={group.pluginId} pluginName={group.pluginName} />
                 <span>
                   <strong className={dockStyles.panelTitle}>{group.pluginName}</strong>
                   <small className={dockStyles.panelSubtitle}>{group.commands.length} command{group.commands.length === 1 ? "" : "s"}</small>
@@ -246,10 +247,7 @@ export function DockWorkspace() {
         {selectedPanel ? (
           <PluginPanelHost
             panel={selectedPanel}
-            commands={commandsByPlugin.get(selectedPanel.pluginId) ?? []}
-            runningCommandId={runningCommandId}
             selectedPath={selectedPath}
-            onRunCommand={runCommand}
           />
         ) : selectedCommandGroup ? (
           <PluginCommandOnlyHost
@@ -271,10 +269,7 @@ export function DockWorkspace() {
 
 const PluginPanelHost = memo(function PluginPanelHost(props: {
   panel: PluginPanelEntry;
-  commands: PluginCommandEntry[];
-  runningCommandId: string | null;
   selectedPath: string;
-  onRunCommand: (command: PluginCommandEntry) => void;
 }) {
   const [rendered, setRendered] = useState<PluginPanelRenderResult | null>(null);
   const [rendering, setRendering] = useState(false);
@@ -293,6 +288,9 @@ const PluginPanelHost = memo(function PluginPanelHost(props: {
     })
       .then((result) => {
         setRendered(result);
+        if (props.panel.pluginId === "themes" && clickedButton) {
+          applyMistyThemeFromExtensionAction(clickedButton);
+        }
         publishPluginNotifications(result.notifications);
       })
       .catch((error) => setRenderError(errorText(error)))
@@ -368,46 +366,6 @@ const PluginPanelHost = memo(function PluginPanelHost(props: {
           />
         ) : null}
       </section>
-      <dl className={dockStyles.details}>
-        <dt className={dockStyles.detailTerm}>Panel ID</dt>
-        <dd className={dockStyles.detailValue}>{props.panel.id}</dd>
-        <dt className={dockStyles.detailTerm}>Extension ID</dt>
-        <dd className={dockStyles.detailValue}>{props.panel.pluginId}</dd>
-        <dt className={dockStyles.detailTerm}>Default size</dt>
-        <dd className={dockStyles.detailValue}>{Math.round(props.panel.defaultWidth)} x {Math.round(props.panel.defaultHeight)}</dd>
-        <dt className={dockStyles.detailTerm}>Views</dt>
-        <dd className={dockStyles.detailValue}>{extensionViewLabels(props.panel.launcherViews).join(", ") || "Extensions"}</dd>
-        <dt className={dockStyles.detailTerm}>Library</dt>
-        <dd className={dockStyles.detailValue}>{props.panel.libraryPath || "No platform runtime library advertised"}</dd>
-        <dt className={dockStyles.detailTerm}>Manifest</dt>
-        <dd className={dockStyles.detailValue}>{props.panel.manifestPath || "No manifest path"}</dd>
-      </dl>
-      {props.commands.length > 0 ? (
-        <section className={dockStyles.commands}>
-          <h3 className={dockStyles.commandHeading}>Commands</h3>
-          {props.commands.map((command) => (
-            <div key={command.id} className={dockStyles.commandRow}>
-              <span className={dockStyles.commandLabel} title={command.hint}>{command.label}</span>
-              <small className={dockStyles.commandMeta}>{command.defaultShortcut || command.source}</small>
-              {pluginCommandNeedsSelection(command, props.selectedPath) ? (
-                <em className={dockStyles.commandWarning}>Select a file first</em>
-              ) : null}
-              <button
-                className={dockStyles.nativeButton}
-                type="button"
-                disabled={props.runningCommandId === command.id || pluginCommandNeedsSelection(command, props.selectedPath)}
-                onClick={() => props.onRunCommand(command)}
-                title={pluginCommandNeedsSelection(command, props.selectedPath)
-                  ? "Select a file in Explorer before running this command"
-                  : `Run ${command.label}`}
-              >
-                <Play size={13} />
-                {props.runningCommandId === command.id ? "Running" : "Run"}
-              </button>
-            </div>
-          ))}
-        </section>
-      ) : null}
       <Link className={dockStyles.link} to={`/hub/extensions?plugin=${encodeURIComponent(props.panel.pluginId)}`}>
         Manage in Hub
         <ExternalLink size={14} />
@@ -608,6 +566,18 @@ const PluginPanelLayoutNodeView = memo(function PluginPanelLayoutNodeView(props:
   );
 });
 
+function PluginIcon(props: { pluginId: string; pluginName: string }) {
+  return (
+    <ExtensionCatalogIcon
+      pluginId={props.pluginId}
+      pluginName={props.pluginName}
+      className="size-[22px]"
+      roundedClassName="rounded-md"
+      textClassName="text-[8px] font-bold text-white"
+    />
+  );
+}
+
 function buildPanelLayout(elements: PluginPanelElement[]): PluginPanelLayoutNode[] {
   return buildPanelLayoutRange(elements, 0).nodes;
 }
@@ -741,10 +711,6 @@ function pluginCommandOnlyOpensLauncher(command: PluginCommandEntry): boolean {
 
 function pluginCommandNeedsSelection(command: PluginCommandEntry, selectedPath: string): boolean {
   return command.requiresSelectedFile && !selectedPath.trim();
-}
-
-function extensionViewLabels(views: string[]): string[] {
-  return views.map((view) => view.trim().toLowerCase() === "plugins" ? "Extensions" : view);
 }
 
 function notificationLevelClass(level: string): string {

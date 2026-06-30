@@ -186,8 +186,9 @@ export const useProvidersStore = create<ProvidersStore>((set, get) => ({
             ? pruneRemoteDraftCacheToRemotes(get().remoteDraftCache, next.remotes)
             : get().remoteDraftCache,
         });
-        if (!get().draft && next.remotes.length > 0) {
-          await get().selectRemote(next.remotes[0].name, false);
+        const selectableRemote = next.remotes.find((remote) => remote.configSource !== "user");
+        if (!get().draft && selectableRemote) {
+          await get().selectRemote(selectableRemote.name, false);
         }
       } catch (error) {
         set({ error: errorText(error) });

@@ -3,13 +3,22 @@ import {
   operationQueueCancel,
   operationQueueCancelBatch,
   operationQueueClearTerminal,
+  operationQueuePause,
+  operationQueuePauseAll,
+  operationQueuePauseBatch,
   operationQueueRedo,
   operationQueueResolveConflict,
+  operationQueueResume,
+  operationQueueResumeAll,
+  operationQueueResumeBatch,
   operationQueueRetry,
+  operationQueueSetBandwidthLimit,
+  operationQueueSetPriority,
+  operationQueueSetTransferProfile,
   operationQueueSnapshot,
   operationQueueUndo,
 } from "../../api/misty";
-import type { OperationBatch, OperationConflictPolicy, OperationDescriptor, OperationEndpoint, OperationQueueSnapshot } from "../../api/types";
+import type { OperationBatch, OperationConflictPolicy, OperationDescriptor, OperationEndpoint, OperationPriority, OperationQueueSnapshot } from "../../api/types";
 import { errorText } from "../../shared/format";
 
 let silentOperationQueueLoadInFlight = false;
@@ -21,6 +30,15 @@ interface OperationQueueStore {
   load: (options?: { silent?: boolean }) => Promise<void>;
   cancel: (operationId: number) => Promise<void>;
   cancelBatch: (batchId: number) => Promise<void>;
+  pause: (operationId: number) => Promise<void>;
+  resume: (operationId: number) => Promise<void>;
+  pauseBatch: (batchId: number) => Promise<void>;
+  resumeBatch: (batchId: number) => Promise<void>;
+  pauseAll: () => Promise<void>;
+  resumeAll: () => Promise<void>;
+  setPriority: (operationId: number, priority: OperationPriority) => Promise<void>;
+  setBandwidthLimit: (limit: string) => Promise<void>;
+  setTransferProfile: (profile: { id: string; name: string; transfers: number; bandwidthLimit: string }) => Promise<void>;
   retry: (operationId: number) => Promise<void>;
   undo: (undoTokenId: number) => Promise<void>;
   redo: () => Promise<void>;
@@ -63,6 +81,112 @@ export const useOperationQueueStore = create<OperationQueueStore>((set) => ({
     set({ working: true, error: null });
     try {
       set({ snapshot: await operationQueueCancelBatch(batchId) });
+    } catch (error) {
+      set({ error: errorText(error) });
+    } finally {
+      set({ working: false });
+    }
+  },
+
+  pause: async (operationId) => {
+    set({ working: true, error: null });
+    try {
+      set({ snapshot: await operationQueuePause(operationId) });
+    } catch (error) {
+      set({ error: errorText(error) });
+    } finally {
+      set({ working: false });
+    }
+  },
+
+  resume: async (operationId) => {
+    set({ working: true, error: null });
+    try {
+      set({ snapshot: await operationQueueResume(operationId) });
+    } catch (error) {
+      set({ error: errorText(error) });
+    } finally {
+      set({ working: false });
+    }
+  },
+
+  pauseBatch: async (batchId) => {
+    set({ working: true, error: null });
+    try {
+      set({ snapshot: await operationQueuePauseBatch(batchId) });
+    } catch (error) {
+      set({ error: errorText(error) });
+    } finally {
+      set({ working: false });
+    }
+  },
+
+  resumeBatch: async (batchId) => {
+    set({ working: true, error: null });
+    try {
+      set({ snapshot: await operationQueueResumeBatch(batchId) });
+    } catch (error) {
+      set({ error: errorText(error) });
+    } finally {
+      set({ working: false });
+    }
+  },
+
+  pauseAll: async () => {
+    set({ working: true, error: null });
+    try {
+      set({ snapshot: await operationQueuePauseAll() });
+    } catch (error) {
+      set({ error: errorText(error) });
+    } finally {
+      set({ working: false });
+    }
+  },
+
+  resumeAll: async () => {
+    set({ working: true, error: null });
+    try {
+      set({ snapshot: await operationQueueResumeAll() });
+    } catch (error) {
+      set({ error: errorText(error) });
+    } finally {
+      set({ working: false });
+    }
+  },
+
+  setPriority: async (operationId, priority) => {
+    set({ working: true, error: null });
+    try {
+      set({ snapshot: await operationQueueSetPriority(operationId, priority) });
+    } catch (error) {
+      set({ error: errorText(error) });
+    } finally {
+      set({ working: false });
+    }
+  },
+
+  setBandwidthLimit: async (limit) => {
+    set({ working: true, error: null });
+    try {
+      set({ snapshot: await operationQueueSetBandwidthLimit(limit) });
+    } catch (error) {
+      set({ error: errorText(error) });
+    } finally {
+      set({ working: false });
+    }
+  },
+
+  setTransferProfile: async (profile) => {
+    set({ working: true, error: null });
+    try {
+      set({
+        snapshot: await operationQueueSetTransferProfile(
+          profile.id,
+          profile.name,
+          profile.transfers,
+          profile.bandwidthLimit,
+        ),
+      });
     } catch (error) {
       set({ error: errorText(error) });
     } finally {
@@ -136,6 +260,10 @@ function operationQueueSnapshotsEqual(left: OperationQueueSnapshot | null, right
   return left.activeCount === right.activeCount
     && left.maxConcurrent === right.maxConcurrent
     && left.redoAvailable === right.redoAvailable
+    && left.paused === right.paused
+    && left.bandwidthLimit === right.bandwidthLimit
+    && left.transferProfileId === right.transferProfileId
+    && left.transferProfileName === right.transferProfileName
     && operationConflictDialogsEqual(left.conflictDialog, right.conflictDialog)
     && arraysEqual(left.operations, right.operations, operationsEqual)
     && arraysEqual(left.batches, right.batches, batchesEqual);
@@ -158,7 +286,9 @@ function operationsEqual(left: OperationDescriptor, right: OperationDescriptor):
     && left.supportsKeepBoth === right.supportsKeepBoth
     && left.title === right.title
     && left.errorMessage === right.errorMessage
-    && left.attempt === right.attempt;
+    && left.attempt === right.attempt
+    && left.paused === right.paused
+    && left.priority === right.priority;
 }
 
 function endpointsEqual(left: OperationEndpoint, right: OperationEndpoint): boolean {

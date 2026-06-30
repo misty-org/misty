@@ -169,6 +169,10 @@ export function MobileProvidersPage() {
   };
 
   const openManageSheet = (remote: ProviderRemote) => {
+    if (remote.configSource === "user") {
+      void openRepairRemote(remote);
+      return;
+    }
     setManagedRemoteName(remote.name);
     void selectRemoteInWorkspace(mobileProviderWorkspaceId, remote.name);
   };
@@ -321,6 +325,7 @@ function MobileRemoteCard(props: {
   onManage: () => void;
 }) {
   const providerIcon = providerIconForType(props.remote.type);
+  const externalConfig = props.remote.configSource === "user";
   const healthy = !props.remote.needsReconnect && !props.remote.error;
   const issueMessage = providerIssueMessage(props.remote);
   return (
@@ -331,7 +336,7 @@ function MobileRemoteCard(props: {
         </span>
         <div className="min-w-0">
           <strong className="block truncate text-[15px] font-bold text-[#f4f0e8]">{props.remote.name}</strong>
-          <small className="block text-xs leading-[1.35] text-[#8792a0]">{props.remote.type}</small>
+          <small className="block text-xs leading-[1.35] text-[#8792a0]">{props.remote.type}{externalConfig ? " · user config" : ""}</small>
         </div>
       </div>
       <div className={`flex items-center gap-1.5 text-xs font-bold ${healthy ? "text-[#9ee6b2]" : "text-[#e9c775]"}`}>
@@ -340,17 +345,25 @@ function MobileRemoteCard(props: {
       </div>
       {issueMessage ? <p className="m-0 text-[13px] leading-[1.35] text-[#a3adba]">{issueMessage}</p> : null}
       <div className="flex flex-wrap gap-1.5">
-        <button type="button" className="inline-flex min-h-[34px] items-center gap-1.5 rounded-lg border border-white/10 bg-[#101720] px-2.5 text-xs font-bold text-[#eef3fb] disabled:opacity-50" disabled={props.disabled} onClick={props.onManage}>
-          <Wrench size={15} /> Manage
-        </button>
-        {props.remote.needsReconnect ? (
+        {externalConfig ? (
+          <button type="button" className="inline-flex min-h-[34px] items-center gap-1.5 rounded-lg border border-white/10 bg-[#101720] px-2.5 text-xs font-bold text-[#eef3fb] disabled:opacity-50" disabled={props.disabled} onClick={props.onRepair}>
+            <FolderPlus size={15} /> Import
+          </button>
+        ) : (
+          <button type="button" className="inline-flex min-h-[34px] items-center gap-1.5 rounded-lg border border-white/10 bg-[#101720] px-2.5 text-xs font-bold text-[#eef3fb] disabled:opacity-50" disabled={props.disabled} onClick={props.onManage}>
+            <Wrench size={15} /> Manage
+          </button>
+        )}
+        {!externalConfig && props.remote.needsReconnect ? (
           <button type="button" className="inline-flex min-h-[34px] items-center gap-1.5 rounded-lg border border-white/10 bg-[#101720] px-2.5 text-xs font-bold text-[#eef3fb] disabled:opacity-50" disabled={props.disabled} onClick={props.onReconnect}>
             <RefreshCcw size={15} /> Reconnect
           </button>
         ) : null}
-        <button type="button" className="inline-flex min-h-[34px] items-center gap-1.5 rounded-lg border border-white/10 bg-[#101720] px-2.5 text-xs font-bold text-[#eef3fb] disabled:opacity-50" disabled={props.disabled} onClick={props.onRepair}>
-          <Wrench size={15} /> Configure
-        </button>
+        {!externalConfig ? (
+          <button type="button" className="inline-flex min-h-[34px] items-center gap-1.5 rounded-lg border border-white/10 bg-[#101720] px-2.5 text-xs font-bold text-[#eef3fb] disabled:opacity-50" disabled={props.disabled} onClick={props.onRepair}>
+            <Wrench size={15} /> Configure
+          </button>
+        ) : null}
       </div>
     </article>
   );
@@ -945,6 +958,9 @@ function SummaryTile(props: { label: string; value: string; tone?: "good" | "war
 }
 
 function providerIssueMessage(remote: ProviderRemote): string | null {
+  if (remote.configSource === "user") {
+    return "This remote is in your user rclone config. Import it into Misty before browsing it here.";
+  }
   if (remote.needsReconnect) {
     return "Sign in again to refresh this provider.";
   }

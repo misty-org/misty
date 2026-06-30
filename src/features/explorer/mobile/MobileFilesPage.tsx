@@ -4653,6 +4653,7 @@ function mobileLibraryItemFromEntry(entry: FileEntry): ExplorerLibraryItem {
     mimeType: entry.mimeType ?? "",
     type: entry.location.kind === "remote" ? 1 : 0,
     tags: [],
+    comments: "",
   };
 }
 

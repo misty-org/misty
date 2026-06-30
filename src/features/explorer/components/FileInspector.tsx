@@ -1,8 +1,8 @@
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { File, Folder } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
-import { explorerPrepareOpenItem, explorerPreviewItem } from "../../../api/misty";
-import type { DirectoryListing, DirectorySizeRecord, FileEntry, PreparedOpenItem } from "../../../api/types";
+import { explorerPrepareOpenItem, explorerPreviewItem, fileMetadataSnapshot } from "../../../api/misty";
+import type { DirectoryListing, DirectorySizeRecord, FileEntry, FileMetadataSnapshot, PreparedOpenItem } from "../../../api/types";
 import { errorText } from "../../../shared/format";
 import { selectAppearancePreferences, useSettingsStore } from "../../settings/useSettingsStore";
 import { directorySizeRecordForPath } from "../state/useExplorerStore";
@@ -12,8 +12,11 @@ interface FileInspectorProps {
   listing: DirectoryListing | null;
   selectedEntry: FileEntry | null;
   selectedCount: number;
+  mistyTags: string[];
+  mistyComments: string;
   directorySizes: Record<string, DirectorySizeRecord>;
   onCalculateSize: (path: string) => void;
+  onSaveMetadata: (entry: FileEntry, tags: string[], comments: string) => void;
 }
 
 interface LoadedPreview {
@@ -69,6 +72,12 @@ const inspectorStyles = {
   detailRow: "grid gap-2 px-5 py-3.5",
   detailLabel: "text-[12px] font-[720] uppercase leading-none tracking-normal text-[#999aa1]",
   detailValue: "min-w-0 [overflow-wrap:anywhere] text-[17px] font-[650] leading-[1.25] text-[#d1d1d1]",
+  editorCard: "grid gap-3 border-b border-[#2c2d32] px-5 py-4",
+  editorLabel: "grid gap-1.5 text-[12px] font-[720] uppercase leading-none tracking-normal text-[#999aa1]",
+  editorInput: "min-h-9 w-full rounded-[7px] border border-[#3a3b40] bg-[#101114] px-2.5 py-2 text-sm font-medium normal-case leading-normal text-[#d8d8d8] outline-none focus:border-[#6f737c]",
+  editorTextarea: "min-h-[74px] resize-y",
+  editorActions: "flex justify-end",
+  editorButton: "h-8 rounded-[7px] border border-[#3a3b40] bg-[#222329] px-3 text-sm font-semibold text-[#e2e2e2] hover:bg-[#2b2d33] disabled:cursor-default disabled:opacity-45",
   dots: "inline-flex h-5 items-center gap-1",
   dot: "size-1.5 rounded-full bg-[#aeb0b6] motion-safe:animate-bounce",
 } as const;
@@ -86,9 +95,13 @@ export function FileInspector(props: FileInspectorProps) {
     props.selectedEntry,
     thumbnailPreviewsEnabled,
   );
+  const { metadata, metadataError } = useFileMetadata(multiple ? null : displayEntry);
   const displayDirectorySize = displayEntry?.kind === "folder"
     ? directorySizeRecordForPath(props.directorySizes, displayEntry.path)
     : undefined;
+  const [tagsDraft, setTagsDraft] = useState(props.mistyTags.join(", "));
+  const [commentsDraft, setCommentsDraft] = useState(props.mistyComments);
+  const metadataDirty = tagsDraft !== props.mistyTags.join(", ") || commentsDraft !== props.mistyComments;
   const shouldCalculateDirectorySize = Boolean(
     displayEntry
       && !multiple
@@ -100,6 +113,11 @@ export function FileInspector(props: FileInspectorProps) {
     if (!shouldCalculateDirectorySize || !displayEntry) return;
     props.onCalculateSize(displayEntry.path);
   }, [displayEntry?.path, props.onCalculateSize, shouldCalculateDirectorySize]);
+
+  useEffect(() => {
+    setTagsDraft(props.mistyTags.join(", "));
+    setCommentsDraft(props.mistyComments);
+  }, [displayEntry?.path, props.mistyComments, props.mistyTags]);
 
   return (
     <aside className={inspectorStyles.root}>
@@ -151,11 +169,96 @@ export function FileInspector(props: FileInspectorProps) {
             ) : null}
             <Detail label="Hidden" value={displayEntry?.hidden ? "Yes" : "No"} />
             <Detail label="Read Only" value={displayEntry?.readonly ? "Yes" : "No"} />
+            {metadata?.accessedMs ? <Detail label="Accessed" value={formatDate(metadata.accessedMs)} /> : null}
           </>
         )}
       </section>
+      {!multiple && displayEntry ? (
+        <section className={inspectorStyles.detailsCard} aria-label="System metadata">
+          <Detail
+            label="OS Tags"
+            value={metadata?.osTags.length ? metadata.osTags.join(", ") : "None"}
+          />
+          {metadata?.fields.map((field) => (
+            <Detail key={`field:${field.label}:${field.value}`} label={field.label} value={field.value} />
+          ))}
+          {metadata?.extracted.map((field) => (
+            <Detail key={`extracted:${field.label}:${field.value}`} label={field.label} value={field.value} />
+          ))}
+          {metadataError ? <Detail label="Metadata" value={metadataError} /> : null}
+        </section>
+      ) : null}
+      {!multiple && displayEntry ? (
+        <section className={inspectorStyles.editorCard} aria-label="Misty metadata">
+          <label className={inspectorStyles.editorLabel}>
+            <span>Misty Tags</span>
+            <input
+              className={inspectorStyles.editorInput}
+              value={tagsDraft}
+              placeholder="work, draft, invoice"
+              onChange={(event) => setTagsDraft(event.target.value)}
+            />
+          </label>
+          <label className={inspectorStyles.editorLabel}>
+            <span>Misty Comments</span>
+            <textarea
+              className={`${inspectorStyles.editorInput} ${inspectorStyles.editorTextarea}`}
+              value={commentsDraft}
+              placeholder="Notes about this item"
+              onChange={(event) => setCommentsDraft(event.target.value)}
+            />
+          </label>
+          <div className={inspectorStyles.editorActions}>
+            <button
+              className={inspectorStyles.editorButton}
+              type="button"
+              disabled={!metadataDirty}
+              onClick={() => props.onSaveMetadata(displayEntry, parseTagDraft(tagsDraft), commentsDraft)}
+            >
+              Save Metadata
+            </button>
+          </div>
+        </section>
+      ) : null}
     </aside>
   );
+}
+
+function parseTagDraft(value: string): string[] {
+  const tags: string[] = [];
+  for (const part of value.split(",")) {
+    const tag = part.trim();
+    if (!tag || tags.includes(tag)) continue;
+    tags.push(tag);
+  }
+  return tags;
+}
+
+function useFileMetadata(entry: FileEntry | null): {
+  metadata: FileMetadataSnapshot | null;
+  metadataError: string | null;
+} {
+  const [metadata, setMetadata] = useState<FileMetadataSnapshot | null>(null);
+  const [metadataError, setMetadataError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    setMetadata(null);
+    setMetadataError(null);
+    if (!entry || entry.location.kind === "remote") return () => undefined;
+    void fileMetadataSnapshot(entry.path)
+      .then((snapshot) => {
+        if (active) setMetadata(snapshot);
+      })
+      .catch((error) => {
+        if (active) setMetadataError(errorText(error));
+      });
+    return () => {
+      active = false;
+    };
+  }, [entry?.id, entry?.modifiedMs, entry?.path, entry?.readonly, entry?.sizeBytes]);
+
+  return { metadata, metadataError };
 }
 
 function useFilePreview(entry: FileEntry | null, enabled = true): {

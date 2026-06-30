@@ -23,6 +23,23 @@
   --misty-success: #22c55e;
   --misty-warning: #eab308;
   --misty-danger: #ef4444;
+  --misty-info: #38bdf8;
+  --misty-link: #93c5fd;
+  --misty-selection: rgba(147, 197, 253, 0.24);
+  --misty-code-bg: #0a0d12;
+  --misty-code-border: rgba(255, 255, 255, 0.1);
+  --misty-syntax-text: #e5e7eb;
+  --misty-syntax-comment: #7d8590;
+  --misty-syntax-keyword: #f472b6;
+  --misty-syntax-string: #86efac;
+  --misty-syntax-number: #fbbf24;
+  --misty-syntax-function: #93c5fd;
+  --misty-syntax-type: #67e8f9;
+  --misty-syntax-variable: #e5e7eb;
+  --misty-syntax-operator: #c4b5fd;
+  --misty-diff-added: rgba(34, 197, 94, 0.14);
+  --misty-diff-removed: rgba(239, 68, 68, 0.14);
+  --misty-diff-changed: rgba(234, 179, 8, 0.14);
   --misty-shadow: rgba(0, 0, 0, 0.42);
   --misty-focus-ring: rgba(244, 244, 245, 0.18);
   --misty-glass: rgba(11, 13, 15, 0.88);
@@ -82,6 +99,198 @@
   --misty-glass: rgba(255, 250, 242, 0.9);
   --misty-skeleton-base: #ece5da;
   --misty-skeleton-highlight: #f7f1e8;
+}
+
+:root[data-misty-theme="graphite"] {
+  color-scheme: dark;
+  --misty-bg: #08090a;
+  --misty-bg-soft: #0d0f10;
+  --misty-surface: #111315;
+  --misty-surface-2: #181b1d;
+  --misty-surface-3: #222629;
+  --misty-surface-hover: #2b3034;
+  --misty-border: #34383d;
+  --misty-border-strong: rgba(238, 242, 246, 0.16);
+  --misty-border-soft: rgba(238, 242, 246, 0.09);
+  --misty-text: #f3f5f7;
+  --misty-text-muted: #c7cdd3;
+  --misty-text-subtle: #8e98a1;
+  --misty-primary: #dbe3ea;
+  --misty-primary-hover: #f0f4f8;
+  --misty-primary-active: #bcc8d1;
+  --misty-primary-contrast: #08090a;
+  --misty-accent: #8bd3dd;
+  --misty-success: #52d273;
+  --misty-warning: #e2b84b;
+  --misty-danger: #f06f6f;
+  --misty-info: #79bfff;
+  --misty-link: #9bd1ff;
+  --misty-selection: rgba(139, 211, 221, 0.22);
+  --misty-code-bg: #090b0c;
+  --misty-code-border: rgba(219, 227, 234, 0.1);
+  --misty-syntax-comment: #7d8992;
+  --misty-syntax-keyword: #ff9ab5;
+  --misty-syntax-string: #9fe6b8;
+  --misty-syntax-number: #f4c56f;
+  --misty-syntax-function: #9bd1ff;
+  --misty-syntax-type: #8bd3dd;
+  --misty-syntax-operator: #d2c7ff;
+  --misty-shadow: rgba(0, 0, 0, 0.5);
+  --misty-focus-ring: rgba(139, 211, 221, 0.2);
+}
+
+:root[data-misty-theme="aurora"] {
+  color-scheme: dark;
+  --misty-bg: #071011;
+  --misty-bg-soft: #0a1718;
+  --misty-surface: #0d1b1d;
+  --misty-surface-2: #122426;
+  --misty-surface-3: #193033;
+  --misty-surface-hover: #213d41;
+  --misty-border: #28484d;
+  --misty-border-strong: rgba(211, 255, 247, 0.17);
+  --misty-border-soft: rgba(211, 255, 247, 0.1);
+  --misty-text: #effdfb;
+  --misty-text-muted: #c6e4df;
+  --misty-text-subtle: #82a6a1;
+  --misty-primary: #c9f4ef;
+  --misty-primary-hover: #e5fffb;
+  --misty-primary-active: #9edbd3;
+  --misty-primary-contrast: #071011;
+  --misty-accent: #69d2c8;
+  --misty-success: #7ddf86;
+  --misty-warning: #e6c45f;
+  --misty-danger: #ff7a82;
+  --misty-info: #7cc7ff;
+  --misty-link: #8fd7ff;
+  --misty-selection: rgba(105, 210, 200, 0.24);
+  --misty-code-bg: #071112;
+  --misty-code-border: rgba(201, 244, 239, 0.12);
+  --misty-syntax-comment: #73918e;
+  --misty-syntax-keyword: #ff91c0;
+  --misty-syntax-string: #a6e98f;
+  --misty-syntax-number: #f3ca6f;
+  --misty-syntax-function: #8fd7ff;
+  --misty-syntax-type: #69d2c8;
+  --misty-syntax-operator: #d7b8ff;
+  --misty-shadow: rgba(0, 0, 0, 0.54);
+  --misty-focus-ring: rgba(105, 210, 200, 0.22);
+}
+
+:root[data-misty-theme="copper"] {
+  color-scheme: dark;
+  --misty-bg: #120f0d;
+  --misty-bg-soft: #191411;
+  --misty-surface: #1d1713;
+  --misty-surface-2: #261e19;
+  --misty-surface-3: #332820;
+  --misty-surface-hover: #403229;
+  --misty-border: #4a3a30;
+  --misty-border-strong: rgba(255, 231, 210, 0.17);
+  --misty-border-soft: rgba(255, 231, 210, 0.1);
+  --misty-text: #fff4e8;
+  --misty-text-muted: #dfcbb9;
+  --misty-text-subtle: #a9917d;
+  --misty-primary: #f4dcc8;
+  --misty-primary-hover: #fff0df;
+  --misty-primary-active: #d6bba5;
+  --misty-primary-contrast: #120f0d;
+  --misty-accent: #e49f6a;
+  --misty-success: #8dd47e;
+  --misty-warning: #f0c45d;
+  --misty-danger: #ff7f72;
+  --misty-info: #8fc7ff;
+  --misty-link: #a9d4ff;
+  --misty-selection: rgba(228, 159, 106, 0.24);
+  --misty-code-bg: #110d0b;
+  --misty-code-border: rgba(244, 220, 200, 0.11);
+  --misty-syntax-comment: #a38d7a;
+  --misty-syntax-keyword: #ff9fb4;
+  --misty-syntax-string: #a6df90;
+  --misty-syntax-number: #f5c76c;
+  --misty-syntax-function: #a9d4ff;
+  --misty-syntax-type: #e8ad7f;
+  --misty-syntax-operator: #d8c0ff;
+  --misty-shadow: rgba(0, 0, 0, 0.55);
+  --misty-focus-ring: rgba(228, 159, 106, 0.22);
+}
+
+:root[data-misty-theme="misty-light"] {
+  --misty-code-bg: #f4efe6;
+  --misty-code-border: rgba(49, 42, 34, 0.13);
+  --misty-info: #2563eb;
+  --misty-link: #1d5fb8;
+  --misty-selection: rgba(36, 109, 197, 0.2);
+  --misty-syntax-text: #1b1a18;
+  --misty-syntax-comment: #81766a;
+  --misty-syntax-keyword: #9d3c72;
+  --misty-syntax-string: #257247;
+  --misty-syntax-number: #9a6513;
+  --misty-syntax-function: #1d5fb8;
+  --misty-syntax-type: #047481;
+  --misty-syntax-variable: #1b1a18;
+  --misty-syntax-operator: #6d5fb5;
+  --misty-diff-added: rgba(33, 116, 71, 0.13);
+  --misty-diff-removed: rgba(180, 68, 78, 0.13);
+  --misty-diff-changed: rgba(154, 106, 21, 0.14);
+}
+
+::selection {
+  background: var(--misty-selection);
+}
+
+.misty-code,
+code,
+pre {
+  background-color: var(--misty-code-bg);
+  border-color: var(--misty-code-border);
+}
+
+.misty-syntax,
+.hljs {
+  color: var(--misty-syntax-text);
+}
+
+.misty-syntax-comment,
+.hljs-comment {
+  color: var(--misty-syntax-comment);
+}
+
+.misty-syntax-keyword,
+.hljs-keyword {
+  color: var(--misty-syntax-keyword);
+}
+
+.misty-syntax-string,
+.hljs-string {
+  color: var(--misty-syntax-string);
+}
+
+.misty-syntax-number,
+.hljs-number {
+  color: var(--misty-syntax-number);
+}
+
+.misty-syntax-function,
+.hljs-title.function_,
+.hljs-function {
+  color: var(--misty-syntax-function);
+}
+
+.misty-syntax-type,
+.hljs-type,
+.hljs-built_in {
+  color: var(--misty-syntax-type);
+}
+
+.misty-syntax-variable,
+.hljs-variable {
+  color: var(--misty-syntax-variable);
+}
+
+.misty-syntax-operator,
+.hljs-operator {
+  color: var(--misty-syntax-operator);
 }
 
 :root[data-ui-scale="small"] {

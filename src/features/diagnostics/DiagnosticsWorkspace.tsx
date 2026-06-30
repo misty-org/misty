@@ -1,4 +1,7 @@
-import type { AppEnvironmentSnapshot } from "../../api/types";
+import { useEffect, useState } from "react";
+import { pluginDiagnosticsSnapshot } from "../../api/misty";
+import type { AppEnvironmentSnapshot, PluginDiagnosticsSnapshot } from "../../api/types";
+import { errorText } from "../../shared/format";
 
 const diagnosticsGridClass =
   "m-[var(--misty-route-margin)] grid min-h-[calc(100vh-(var(--misty-route-margin)*2))] grid-cols-[minmax(280px,0.8fr)_minmax(420px,1.2fr)] gap-4 max-[980px]:grid-cols-1 max-[720px]:m-0 max-[720px]:min-h-full";
@@ -23,6 +26,26 @@ export function DiagnosticsWorkspace(props: {
   proxyStatus: string;
 }) {
   const { environment, proxyStatus } = props;
+  const [pluginDiagnostics, setPluginDiagnostics] = useState<PluginDiagnosticsSnapshot | null>(null);
+  const [pluginDiagnosticsError, setPluginDiagnosticsError] = useState("");
+
+  useEffect(() => {
+    let canceled = false;
+    void pluginDiagnosticsSnapshot()
+      .then((snapshot) => {
+        if (!canceled) {
+          setPluginDiagnostics(snapshot);
+          setPluginDiagnosticsError("");
+        }
+      })
+      .catch((error) => {
+        if (!canceled) setPluginDiagnosticsError(errorText(error));
+      });
+    return () => {
+      canceled = true;
+    };
+  }, []);
+
   if (!environment) {
     return <section className={diagnosticsLoadingClass}>Loading diagnostics.</section>;
   }
@@ -83,6 +106,41 @@ export function DiagnosticsWorkspace(props: {
         <div className={kvListClass}>
           {Object.entries(environment.derivedEnv).map(([key, value]) => (
             <KeyValue key={key} label={key} value={value} />
+          ))}
+        </div>
+      </div>
+
+      <div className={`${diagnosticsPanelClass} col-span-full`}>
+        <div className={diagnosticsPanelHeaderClass}>
+          <div>
+            <h2>Extensions</h2>
+            <p>{pluginDiagnosticsError || `${pluginDiagnostics?.plugins.length ?? 0} installed extensions inspected.`}</p>
+          </div>
+          <button className="rounded-lg border border-[var(--misty-border-soft)] bg-[var(--misty-surface-2)] px-3 py-2 text-sm text-[var(--misty-text)]" type="button" onClick={() => {
+            setPluginDiagnosticsError("");
+            void pluginDiagnosticsSnapshot()
+              .then(setPluginDiagnostics)
+              .catch((error) => setPluginDiagnosticsError(errorText(error)));
+          }}>
+            Refresh
+          </button>
+        </div>
+        <div className={kvListClass}>
+          <KeyValue label="Removed extensions" value={(pluginDiagnostics?.removedIds ?? ["git", "preview-panel"]).join(", ")} />
+          {pluginDiagnostics?.plugins.length === 0 ? <KeyValue label="Installed" value="No installed extension commands or panels found." /> : null}
+          {pluginDiagnostics?.plugins.map((plugin) => (
+            <KeyValue
+              key={`${plugin.pluginId}:${plugin.pluginDir}`}
+              label={plugin.pluginName || plugin.pluginId}
+              value={[
+                plugin.enabled ? "enabled" : "disabled",
+                plugin.runtimeStatus,
+                `${plugin.commands.length} commands`,
+                `${plugin.panels.length} panels`,
+                plugin.missingDependencies.length ? `missing ${plugin.missingDependencies.join(", ")}` : "dependencies ok",
+                plugin.errors.length ? `errors: ${plugin.errors.join("; ")}` : "",
+              ].filter(Boolean).join(" · ")}
+            />
           ))}
         </div>
       </div>

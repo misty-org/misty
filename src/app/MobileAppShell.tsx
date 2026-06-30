@@ -58,6 +58,7 @@ export function MobileAppShell() {
     const root = document.documentElement;
     root.dataset.formFactor = "mobile";
     root.dataset.theme = "dark";
+    root.dataset.mistyTheme = "misty-dark";
     root.dataset.themeMode = "mobile";
     root.dataset.compactMode = "false";
     root.dataset.fontSize = "default";

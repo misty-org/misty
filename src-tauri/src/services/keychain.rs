@@ -1,4 +1,4 @@
-use std::process::Command;
+use std::{process::Command, sync::Mutex};
 
 use base64::{engine::general_purpose::STANDARD_NO_PAD, Engine as _};
 use rand::RngCore;
@@ -7,9 +7,15 @@ use crate::error::{ApiError, ApiResult};
 
 const RCLONE_CONFIG_SERVICE: &str = "misty.rclone.config";
 const RCLONE_CONFIG_ACCOUNT: &str = "default";
+static RCLONE_CONFIG_PASSWORD_CACHE: Mutex<Option<String>> = Mutex::new(None);
 
 pub fn rclone_config_password() -> Option<String> {
-    find_generic_password(RCLONE_CONFIG_SERVICE, RCLONE_CONFIG_ACCOUNT).ok()
+    if let Some(password) = cached_rclone_config_password() {
+        return Some(password);
+    }
+    let password = find_generic_password(RCLONE_CONFIG_SERVICE, RCLONE_CONFIG_ACCOUNT).ok()?;
+    cache_rclone_config_password(Some(password.clone()));
+    Some(password)
 }
 
 pub fn has_rclone_config_password() -> bool {
@@ -24,6 +30,7 @@ pub fn ensure_rclone_config_password() -> ApiResult<String> {
     }
     let password = generate_password();
     store_generic_password(RCLONE_CONFIG_SERVICE, RCLONE_CONFIG_ACCOUNT, &password)?;
+    cache_rclone_config_password(Some(password.clone()));
     Ok(password)
 }
 
@@ -33,13 +40,28 @@ pub fn store_rclone_config_password(password: &str) -> ApiResult<()> {
             "Config password cannot be empty.".to_owned(),
         ));
     }
-    store_generic_password(RCLONE_CONFIG_SERVICE, RCLONE_CONFIG_ACCOUNT, password)
+    store_generic_password(RCLONE_CONFIG_SERVICE, RCLONE_CONFIG_ACCOUNT, password)?;
+    cache_rclone_config_password(Some(password.to_owned()));
+    Ok(())
 }
 
 fn generate_password() -> String {
     let mut bytes = [0_u8; 32];
     rand::thread_rng().fill_bytes(&mut bytes);
     STANDARD_NO_PAD.encode(bytes)
+}
+
+fn cached_rclone_config_password() -> Option<String> {
+    RCLONE_CONFIG_PASSWORD_CACHE
+        .lock()
+        .ok()
+        .and_then(|cache| cache.clone())
+}
+
+fn cache_rclone_config_password(password: Option<String>) {
+    if let Ok(mut cache) = RCLONE_CONFIG_PASSWORD_CACHE.lock() {
+        *cache = password;
+    }
 }
 
 #[cfg(target_os = "macos")]

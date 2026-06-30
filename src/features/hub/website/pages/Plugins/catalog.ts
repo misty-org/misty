@@ -7,6 +7,7 @@ export const pluginCatalogBaseUrl =
   import.meta.env.VITE_EXTENSION_CATALOG_BASE_URL
   ?? import.meta.env.VITE_PLUGIN_CATALOG_BASE_URL
   ?? DEFAULT_CATALOG_BASE_URL;
+const REMOVED_PLUGIN_IDS = new Set(["git", "preview-panel", "preview_panel"]);
 
 type PluginCatalogIndexEntry = {
   id: string;
@@ -101,7 +102,9 @@ export async function loadPluginCatalog() {
     throw new Error(`Could not load extension catalog index: ${indexResponse.status}`);
   }
 
-  const index = (await indexResponse.json()) as PluginCatalogIndexEntry[];
+  const index = ((await indexResponse.json()) as PluginCatalogIndexEntry[]).filter(
+    (entry) => !REMOVED_PLUGIN_IDS.has(entry.id),
+  );
   return Promise.all(
     index.map(async (entry) => {
       const response = await fetch(catalogEntryUrl(entry));

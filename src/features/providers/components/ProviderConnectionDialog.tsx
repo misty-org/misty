@@ -1,3 +1,4 @@
+import { useMemo, useState } from "react";
 import type { ProviderWorkflow, ProviderWorkflowOption } from "../../../api/types";
 import { iconAssets, providerIconForType } from "../../../shared/assets/icons";
 import { AssetIcon } from "../../../shared/components/AssetIcon";
@@ -33,6 +34,12 @@ const providerPrimaryButtonClass =
 
 const providerWorkflowGridClass =
   "grid grid-cols-2 gap-2.5";
+
+const providerSearchClass =
+  "mb-3 grid gap-2 rounded-lg border border-[#25313a] bg-[#0a1117] p-3";
+
+const providerSearchInputClass =
+  "h-9 rounded-[7px] border border-[#303a44] bg-[#080d11] px-2.5 text-[#f0eee9] outline-none placeholder:text-[#66717d] focus:border-[#4779ae]";
 
 const providerWorkflowButtonClass =
   "grid min-w-0 grid-cols-[38px_minmax(0,1fr)_18px] items-center gap-[11px] rounded-lg border border-[#2e3943] bg-[#101820] p-3 text-left text-[#eef0f2] hover:border-[#4779ae] hover:bg-[#142536]";
@@ -194,20 +201,56 @@ function ProviderPicker(props: {
   selected: string;
   onSelect: (providerType: string) => void;
 }) {
+  const [query, setQuery] = useState("");
+  const filteredWorkflows = useMemo(
+    () => filterProviderWorkflows(props.workflows, query),
+    [props.workflows, query],
+  );
   if (props.workflows.length === 0) {
     return <div className="m-[18px] text-[var(--misty-text-muted)]">No remote workflows are available. Refresh Remotes and check the remote service connection.</div>;
   }
   return (
-    <div className={providerWorkflowGridClass}>
-      {props.workflows.map((workflow) => (
-        <ProviderWorkflowButton
-          key={workflow.type}
-          workflow={workflow}
-          selected={props.selected === workflow.type}
-          onSelect={() => props.onSelect(workflow.type)}
+    <>
+      <label className={providerSearchClass}>
+        <span className="flex items-center justify-between gap-3 text-xs text-[#8f98a4]">
+          <strong className="text-[#dce1e6]">Provider backend</strong>
+          <span>{filteredWorkflows.length} of {props.workflows.length}</span>
+        </span>
+        <input
+          className={providerSearchInputClass}
+          value={query}
+          placeholder="Search rclone backends..."
+          onChange={(event) => setQuery(event.target.value)}
         />
-      ))}
-    </div>
+      </label>
+      {filteredWorkflows.length > 0 ? (
+        <div className={providerWorkflowGridClass}>
+          {filteredWorkflows.map((workflow) => (
+            <ProviderWorkflowButton
+              key={workflow.type}
+              workflow={workflow}
+              selected={props.selected === workflow.type}
+              onSelect={() => props.onSelect(workflow.type)}
+            />
+          ))}
+        </div>
+      ) : (
+        <div className="rounded-lg border border-dashed border-[#2e3943] p-5 text-center text-sm text-[#8f98a4]">
+          No rclone backends match this search.
+        </div>
+      )}
+    </>
+  );
+}
+
+function filterProviderWorkflows(workflows: ProviderWorkflow[], query: string): ProviderWorkflow[] {
+  const needle = query.trim().toLowerCase();
+  if (!needle) return workflows;
+  return workflows.filter((workflow) =>
+    [workflow.type, workflow.name, workflow.description]
+      .join("\n")
+      .toLowerCase()
+      .includes(needle)
   );
 }
 
