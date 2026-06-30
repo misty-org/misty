@@ -4,6 +4,7 @@ import type {
   PluginBrowserTab,
   PluginDetailTab,
 } from "./types";
+import { ExtensionCatalogIcon } from "../../../../plugins/ExtensionCatalogIcon";
 
 type PluginBrowserProps = {
   title?: string;
@@ -38,15 +39,6 @@ function statusPillClass(plugin: PluginBrowserEntry) {
   return plugin.enabled
     ? "border-white/12 bg-white/[0.05] text-white"
     : "border-white/10 bg-white/[0.03] text-zinc-400";
-}
-
-function pluginInitials(plugin: PluginBrowserEntry) {
-  return plugin.name
-    .split(/[\s_-]+/)
-    .map((part) => part[0] ?? "")
-    .join("")
-    .slice(0, 2)
-    .toUpperCase();
 }
 
 function filterPlugins(
@@ -97,33 +89,15 @@ function PluginLogo({
   textClass: string;
   roundedClass: string;
 }) {
-  const [imgFailed, setImgFailed] = useState(false);
-  const [cacheBust, setCacheBust] = useState(() => Date.now().toString());
-
-  useEffect(() => {
-    setImgFailed(false);
-    setCacheBust(Date.now().toString());
-  }, [plugin.logoSrc]);
-
-  const src = plugin.logoSrc && !imgFailed
-    ? `${plugin.logoSrc}${plugin.logoSrc.includes("?") ? "&" : "?"}t=${cacheBust}`
-    : "";
-
   return (
-    <div
-      className={`flex shrink-0 items-center justify-center border border-white/8 bg-[#121416] ${sizeClass} ${roundedClass} ${textClass}`}
-    >
-      {src ? (
-        <img
-          alt={`${plugin.name} logo`}
-          className="h-[72%] w-[72%] object-contain"
-          onError={() => setImgFailed(true)}
-          src={src}
-        />
-      ) : (
-        pluginInitials(plugin)
-      )}
-    </div>
+    <ExtensionCatalogIcon
+      pluginId={plugin.id}
+      pluginName={plugin.name}
+      logoSrc={plugin.logoSrc}
+      className={sizeClass}
+      roundedClassName={roundedClass}
+      textClassName={textClass}
+    />
   );
 }
 

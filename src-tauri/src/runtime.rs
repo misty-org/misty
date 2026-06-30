@@ -6,11 +6,11 @@ use crate::services::{
     ai::AiService, claude::ClaudeService, commands::CommandService, devices::DeviceService,
     directory_size::DirectorySizeService, environment::AppEnvironmentService,
     explorer::ExplorerService, explorer_library::ExplorerLibraryService,
-    file_sync::FileSyncService, operation_queue::OperationQueueService,
-    plugin_commands::PluginCommandService, providers::ProviderService, proxy::ProxyService,
-    proxy_clipboard::ProxyClipboardClient, proxy_runtime::ProxyRuntimeService,
-    search::SearchService, settings::SettingsService, transfers::TransferService,
-    workspaces::WorkspaceService,
+    file_sync::FileSyncService, metadata::MetadataService, operation_queue::OperationQueueService,
+    plugin_commands::PluginCommandService, power_pack::PowerPackService,
+    providers::ProviderService, proxy::ProxyService, proxy_clipboard::ProxyClipboardClient,
+    proxy_runtime::ProxyRuntimeService, search::SearchService, settings::SettingsService,
+    transfers::TransferService, workspaces::WorkspaceService,
 };
 
 pub struct MistyRuntime {
@@ -27,7 +27,9 @@ pub struct MistyRuntime {
     pub commands: CommandService,
     pub devices: DeviceService,
     pub directory_size: DirectorySizeService,
+    pub metadata: MetadataService,
     pub plugin_commands: PluginCommandService,
+    pub power_pack: PowerPackService,
     pub search: SearchService,
     pub explorer: ExplorerService,
     pub explorer_library: ExplorerLibraryService,
@@ -63,6 +65,7 @@ impl MistyRuntime {
         let commands = CommandService::new(environment.clone());
         let devices = DeviceService::new();
         let directory_size = DirectorySizeService::new(environment.clone(), proxy.clone());
+        let metadata = MetadataService::new();
         let plugin_commands = PluginCommandService::new(environment.clone());
         let explorer_library = ExplorerLibraryService::new(environment.clone());
         let search = SearchService::new(environment.clone(), providers.clone(), proxy.clone());
@@ -74,6 +77,11 @@ impl MistyRuntime {
             explorer_library.clone(),
         );
         let operation_queue = OperationQueueService::new(explorer.clone(), transfers.clone());
+        let power_pack = PowerPackService::new(
+            environment.clone(),
+            explorer.clone(),
+            operation_queue.clone(),
+        );
         let ai = AiService::new();
         let claude = ClaudeService::new();
         let file_sync = FileSyncService::new(
@@ -98,7 +106,9 @@ impl MistyRuntime {
             commands,
             devices,
             directory_size,
+            metadata,
             plugin_commands,
+            power_pack,
             search,
             explorer,
             explorer_library,

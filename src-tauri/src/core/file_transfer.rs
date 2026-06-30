@@ -41,6 +41,7 @@ pub enum FileTransferType {
     Move,
     Rename,
     Delete,
+    Archive,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]

@@ -17,6 +17,7 @@ const catalogBaseUrl =
   import.meta.env.VITE_EXTENSION_CATALOG_BASE_URL
   ?? import.meta.env.VITE_PLUGIN_CATALOG_BASE_URL
   ?? DEFAULT_CATALOG_BASE_URL;
+const REMOVED_PLUGIN_IDS = new Set(["git", "preview-panel", "preview_panel"]);
 
 type PluginsStore = {
   loading: boolean;
@@ -79,7 +80,9 @@ async function readCatalogIndex() {
   if (!response.ok) {
     throw new Error(`Could not load extension catalog index.json: ${response.status}`);
   }
-  return (await response.json()) as PluginCatalogIndexEntry[];
+  return ((await response.json()) as PluginCatalogIndexEntry[]).filter(
+    (entry) => !REMOVED_PLUGIN_IDS.has(entry.id),
+  );
 }
 
 function resolveUrl(path: string) {
@@ -130,9 +133,10 @@ function normalizeCatalogEntry(
 ): PluginCatalogEntry {
   const artifactBaseName =
     raw.install?.artifact_base_name ?? indexEntry.id.replace(/_/g, "-");
+  const id = raw.manifest?.id ?? raw.id ?? indexEntry.id;
 
   return {
-    id: raw.manifest?.id ?? raw.id ?? indexEntry.id,
+    id,
     name: raw.manifest?.name ?? raw.name ?? indexEntry.name,
     version: raw.manifest?.version ?? raw.version ?? "0.0.0",
     author: raw.manifest?.author ?? raw.author ?? "Misty",
@@ -157,7 +161,7 @@ function normalizeCatalogEntry(
       open_mode: raw.launcher?.open_mode ?? "tab",
     },
     install: {
-      root: raw.install?.root ?? "public",
+      root: raw.install?.root === "private" ? "private" : "public",
       artifacts:
         raw.install?.artifacts ??
         (raw.install?.platforms ?? []).map((platform) => ({
@@ -248,7 +252,7 @@ function mergeCatalogPlugins(
   platform: string,
 ) {
   const localById = new Map(localPlugins.map((plugin) => [plugin.id, plugin]));
-  return catalogEntries.map((catalog) =>
+  return catalogEntries.filter((catalog) => !REMOVED_PLUGIN_IDS.has(catalog.id)).map((catalog) =>
     toPluginEntry(catalog, localById.get(catalog.id), platform),
   );
 }
@@ -281,7 +285,7 @@ async function scanLocalPlugins() {
     return [];
   }
   const plugins = await invoke<LocalPluginRecord[]>("scan_local_plugins");
-  return dedupeLocalPlugins(plugins);
+  return dedupeLocalPlugins(plugins.filter((plugin) => !REMOVED_PLUGIN_IDS.has(plugin.id)));
 }
 
 function localPluginPriority(plugin: LocalPluginRecord) {
@@ -365,8 +369,8 @@ async function rebuildCatalogState(
   const platform = next?.platform ?? state.platform;
   const query = next?.query ?? state.query;
   const catalogIndex = next?.catalogIndex ?? state.catalogIndex;
-  const catalogEntries = next?.catalogEntries ?? state.catalogEntries;
-  const localPlugins = next?.localPlugins ?? state.localPlugins;
+  const catalogEntries = (next?.catalogEntries ?? state.catalogEntries).filter((plugin) => !REMOVED_PLUGIN_IDS.has(plugin.id));
+  const localPlugins = (next?.localPlugins ?? state.localPlugins).filter((plugin) => !REMOVED_PLUGIN_IDS.has(plugin.id));
   const { marketplacePlugins, installedPlugins } = buildPluginViews(
     catalogEntries,
     query,
@@ -474,6 +478,8 @@ export const usePluginsStore = create<PluginsStore>((set, get) => ({
         pluginId: plugin.id,
         root: plugin.root,
         url: plugin.artifact.url,
+        platform: plugin.artifact.platform,
+        sha256: plugin.artifact.sha256,
       });
       set({ actionPluginId: "", notice: result });
       await rebuildCatalogState(set, get, {

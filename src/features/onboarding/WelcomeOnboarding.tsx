@@ -8,6 +8,7 @@ import {
 } from "../account/shared/api";
 import mistyHubImage from "../hub/media/misty-hub.png";
 import type { CurrentLicense } from "../hub/types/setup";
+import { hasTauriInternals } from "../../shared/tauri";
 
 type WelcomeMode = "welcome" | "signin" | "register";
 
@@ -143,6 +144,10 @@ export function WelcomeOnboarding(props: WelcomeOnboardingProps) {
     setError("");
     setWorking(true);
     try {
+      if (!hasTauriInternals()) {
+        await props.onSignedIn(browserPreviewUser(email), null);
+        return;
+      }
       const user = await accountSignIn(email, password);
       const license = await fetchLicenseAfterAuth();
       await props.onSignedIn(user, license);
@@ -158,6 +163,10 @@ export function WelcomeOnboarding(props: WelcomeOnboardingProps) {
     setError("");
     setWorking(true);
     try {
+      if (!hasTauriInternals()) {
+        await props.onSignedIn(browserPreviewUser(email, name), null);
+        return;
+      }
       await accountRegister(name, email, password);
       const user = await accountSignIn(email, password);
       const license = await fetchLicenseAfterAuth();
@@ -293,6 +302,18 @@ export function WelcomeOnboarding(props: WelcomeOnboardingProps) {
       </aside>
     </main>
   );
+}
+
+function browserPreviewUser(email: string, name = "") {
+  const normalizedEmail = email.trim() || "preview@misty.local";
+  const displayName = name.trim()
+    || normalizedEmail.split("@")[0]?.replace(/[._-]+/g, " ")
+    || "Browser Preview";
+  return {
+    id: "browser-preview",
+    name: displayName,
+    email: normalizedEmail,
+  };
 }
 
 function AuthHeader(props: { icon: JSX.Element; title: string }) {

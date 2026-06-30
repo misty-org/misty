@@ -1,11 +1,14 @@
 import {
-  ArrowUpDown,
-  ChevronDown,
+  ArrowDown,
+  ArrowUp,
+  Filter,
   MoreVertical,
   PanelLeftClose,
   PanelLeftOpen,
   PanelRightClose,
   PanelRightOpen,
+  Pause,
+  Play,
   RefreshCcw,
   RotateCcw,
   Search,
@@ -16,12 +19,14 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent, ReactNode } from "react";
 import { useShallow } from "zustand/react/shallow";
-import type { OperationDescriptor, TransferRecord, TransferType } from "../../api/types";
+import type { OperationDescriptor, OperationPriority, TransferRecord, TransferType } from "../../api/types";
 import { prettyLabel } from "../../shared/format";
 import { MultiPanelWorkspace } from "../../shared/multipanel/MultiPanelWorkspace";
 import type { MultiPanelClosedPane, MultiPanelTab } from "../../shared/multipanel/types";
 import { createMultiPanelStore, type MultiPanelStore } from "../../shared/multipanel/useMultiPanelStore";
 import { useProvidersStore } from "../providers/useProvidersStore";
+import { transferProfileRecords } from "../settings/transferProfiles";
+import { useSettingsStore } from "../settings/useSettingsStore";
 import { relativeTime, remoteSummary, transferProgress } from "./transferUtils";
 import { useOperationQueueStore } from "./useOperationQueueStore";
 import {
@@ -30,6 +35,8 @@ import {
   TRANSFERS_PAGE_SIZE,
   transferStatusMatchesFilter,
   transferTypes,
+  type TransferSortDirection,
+  type TransferSortKey,
   useTransfersStore,
 } from "./useTransfersStore";
 
@@ -43,6 +50,11 @@ type TransferActionMenuState = {
   y: number;
   rowId: number | null;
 } | null;
+type TransferSortMenuState = {
+  x: number;
+  y: number;
+} | null;
+type TransferSortableKey = Exclude<TransferSortKey, "none">;
 
 const transferTableColumns: TransferTableColumn[] = ["transfer", "operation", "status", "time", "remote", "actions"];
 const transferColumnLabels: Record<TransferTableColumn, string> = {
@@ -53,12 +65,18 @@ const transferColumnLabels: Record<TransferTableColumn, string> = {
   remote: "Remote",
   actions: "Actions",
 };
-const transferSortByColumn: Partial<Record<TransferTableColumn, "time" | "name" | "operation" | "status">> = {
+const transferSortByColumn: Partial<Record<TransferTableColumn, TransferSortableKey>> = {
   transfer: "name",
   operation: "operation",
   status: "status",
   time: "time",
 };
+const transferSortOptions: Array<{ key: TransferSortableKey; label: string }> = [
+  { key: "time", label: "Time" },
+  { key: "name", label: "Name" },
+  { key: "operation", label: "Operation" },
+  { key: "status", label: "Status" },
+];
 const transferDefaultColumnWidths: TransferColumnWidths = {
   transfer: 280,
   operation: 135,
@@ -87,13 +105,9 @@ const transferStyles = {
   workspace:
     "bg-[var(--misty-bg)]",
   pane:
-    "grid h-full min-h-0 min-w-0 grid-rows-[48px_minmax(0,1fr)_24px] overflow-hidden bg-[var(--misty-bg)]",
+    "grid h-full min-h-0 min-w-0 grid-rows-[48px_auto_minmax(0,1fr)_24px] overflow-hidden bg-[var(--misty-bg)]",
   header:
-    "flex min-w-0 items-center justify-between gap-3 border-b border-[var(--misty-border-soft)] px-3",
-  headerTitle:
-    "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-sm font-semibold text-[var(--misty-text-muted)]",
-  headerMeta:
-    "text-sm font-semibold text-[var(--misty-text-muted)]",
+    "flex min-w-0 items-center justify-end gap-3 border-b border-[var(--misty-border-soft)] px-3",
   toolbar: "relative flex min-w-0 items-center justify-end gap-2",
   toolbarButton:
     "inline-flex min-h-[38px] items-center gap-[7px] rounded-[10px] border border-[var(--misty-border-soft)] bg-[var(--misty-surface-2)] px-[11px] py-2 text-[var(--misty-text)]",
@@ -103,10 +117,16 @@ const transferStyles = {
     "border-[color-mix(in_srgb,var(--misty-danger)_42%,var(--misty-border))] text-[var(--misty-danger)]",
   searchBox:
     "!flex !h-8 w-[min(340px,34vw)] min-w-52 !items-center !gap-2 rounded-lg border border-[var(--misty-border)] bg-[var(--misty-surface)] px-2.5 text-[var(--misty-text-muted)] !normal-case [&>input]:!h-full [&>input]:!min-w-0 [&>input]:!flex-1 [&>input]:!rounded-none [&>input]:!border-0 [&>input]:!bg-transparent [&>input]:!p-0 [&>input]:!text-sm [&>input]:!leading-none [&>input]:!text-[var(--misty-text)] [&>input]:!shadow-none [&>input]:!outline-none [&>input]:placeholder:!text-[var(--misty-text-subtle)]",
-  sortSelect:
-    "flex h-8 min-w-[148px] items-center gap-2 rounded-lg border border-[var(--misty-border)] bg-[var(--misty-surface)] px-2.5 text-[var(--misty-text-muted)] [&>select]:min-w-0 [&>select]:flex-1 [&>select]:appearance-none [&>select]:border-0 [&>select]:bg-transparent [&>select]:p-0 [&>select]:text-sm [&>select]:text-[var(--misty-text)] [&>select]:outline-none",
-  sortDirectionButton:
-    "h-8 rounded-lg border border-[var(--misty-border-soft)] bg-[var(--misty-surface-2)] px-2.5 text-xs font-semibold text-[var(--misty-text-muted)] hover:bg-[var(--misty-surface-3)]",
+  sortMenu:
+    "fixed z-[2147483000] grid w-44 gap-1 rounded-[10px] border border-[var(--misty-border)] bg-[var(--misty-surface)] p-1.5 shadow-[0_16px_38px_rgba(0,0,0,0.38)]",
+  sortMenuLabel:
+    "px-2.5 py-1 text-[11px] font-bold uppercase text-[var(--misty-text-subtle)]",
+  sortMenuItem:
+    "flex h-8 min-w-0 items-center justify-between gap-2 rounded-lg border-0 bg-transparent px-2.5 text-left text-sm text-[var(--misty-text)] hover:bg-[var(--misty-surface-3)]",
+  sortMenuItemActive:
+    "bg-[var(--misty-surface-3)]",
+  sortMenuIcon:
+    "grid size-4 shrink-0 place-items-center text-[var(--misty-text-muted)]",
   actionMenu:
     "fixed z-[2147483000] grid w-52 gap-1 rounded-[10px] border border-[var(--misty-border)] bg-[var(--misty-surface)] p-1.5 shadow-[0_16px_38px_rgba(0,0,0,0.38)]",
   actionMenuItem:
@@ -214,6 +234,10 @@ const transferStyles = {
   operationActions: "flex min-w-0 flex-wrap items-center gap-2",
   operationButton:
     "inline-flex min-h-[30px] items-center gap-1.5 rounded-[7px] border border-[var(--misty-border-soft)] bg-[var(--misty-surface-2)] px-[9px] py-[5px] text-[var(--misty-text)] disabled:opacity-50",
+  operationInput:
+    "h-[30px] w-28 rounded-[7px] border border-[var(--misty-border-soft)] bg-[var(--misty-surface)] px-2 text-xs text-[var(--misty-text)] outline-none",
+  operationSelect:
+    "h-[30px] rounded-[7px] border border-[var(--misty-border-soft)] bg-[var(--misty-surface)] px-2 text-xs text-[var(--misty-text)] outline-none",
   conflictRow:
     "grid min-w-0 grid-cols-[minmax(220px,1fr)_auto_auto_auto_auto_auto] items-center gap-2 rounded-lg border border-[color-mix(in_srgb,var(--misty-warning)_46%,var(--misty-border))] bg-[color-mix(in_srgb,var(--misty-warning)_10%,var(--misty-surface))] p-2 max-[980px]:grid-cols-[minmax(0,1fr)_auto_auto]",
   conflictMain: "grid min-w-0 gap-[3px] max-[980px]:col-span-full",
@@ -223,7 +247,7 @@ const transferStyles = {
   conflictText: "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[var(--misty-text-subtle)]",
   operationList: "grid gap-1.5",
   operationRow:
-    "grid min-w-0 grid-cols-[minmax(160px,1fr)_150px_minmax(180px,1.1fr)_minmax(180px,1.1fr)_auto_auto] items-center gap-2 border-t border-[var(--misty-border-soft)] pt-[7px]",
+    "grid min-w-0 grid-cols-[minmax(160px,1fr)_120px_minmax(160px,1fr)_minmax(160px,1fr)_auto_auto_auto_auto] items-center gap-2 border-t border-[var(--misty-border-soft)] pt-[7px]",
   operationCell: "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[var(--misty-text-subtle)]",
   bottomBar:
     "flex min-w-0 items-center justify-between border-t border-[var(--misty-border-soft)] bg-[var(--misty-bg)] px-2",
@@ -445,6 +469,7 @@ const TransferWorkspacePane = memo(function TransferWorkspacePane(props: { works
   const [columnOrder, setColumnOrder] = useState<TransferTableColumn[]>(loadTransferColumnOrder);
   const [draggedColumn, setDraggedColumn] = useState<TransferTableColumn | null>(null);
   const [panelVisibility, setPanelVisibility] = useState(loadTransferPanelVisibility);
+  const [sortMenu, setSortMenu] = useState<TransferSortMenuState>(null);
   const filtersVisible = panelVisibility.filters;
   const detailVisible = panelVisibility.detail;
   const visibleColumnOrder = useMemo(() => columnOrder.filter((column) => column !== "remote"), [columnOrder]);
@@ -544,6 +569,13 @@ const TransferWorkspacePane = memo(function TransferWorkspacePane(props: { works
       rowId: null,
     });
   }, []);
+  const openSortMenu = useCallback((event: ReactMouseEvent<HTMLButtonElement>) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    setSortMenu({
+      x: Math.max(8, Math.min(rect.right - 176, window.innerWidth - 184)),
+      y: Math.max(8, Math.min(rect.bottom + 6, window.innerHeight - 180)),
+    });
+  }, []);
   const openRowActionMenu = useCallback((event: ReactMouseEvent, row: TransferRecord) => {
     event.preventDefault();
     event.stopPropagation();
@@ -555,6 +587,7 @@ const TransferWorkspacePane = memo(function TransferWorkspacePane(props: { works
     });
   }, [props.workspaceId, setFocusedTransfer]);
   const closeActionMenu = useCallback(() => setActionMenu(null), []);
+  const closeSortMenu = useCallback(() => setSortMenu(null), []);
   useEffect(() => {
     if (!actionMenu) return;
     const close = () => setActionMenu(null);
@@ -568,6 +601,19 @@ const TransferWorkspacePane = memo(function TransferWorkspacePane(props: { works
       window.removeEventListener("keydown", closeOnEscape);
     };
   }, [actionMenu]);
+  useEffect(() => {
+    if (!sortMenu) return;
+    const close = () => setSortMenu(null);
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") close();
+    };
+    window.addEventListener("pointerdown", close);
+    window.addEventListener("keydown", closeOnEscape);
+    return () => {
+      window.removeEventListener("pointerdown", close);
+      window.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [sortMenu]);
   const beginColumnResize = useCallback((column: TransferTableColumn, event: ReactPointerEvent) => {
     event.preventDefault();
     event.stopPropagation();
@@ -623,36 +669,21 @@ const TransferWorkspacePane = memo(function TransferWorkspacePane(props: { works
   return (
     <div className={transferStyles.pane}>
       <div className={transferStyles.header}>
-        <h2 className={transferStyles.headerTitle}>
-          <span className={transferStyles.headerMeta}>
-            {transfers ? `${filteredRows.length} visible / ${transfers.totalCount} total` : "Loading"}
-          </span>
-        </h2>
         <div className={transferStyles.toolbar}>
           <label className={transferStyles.searchBox}>
             <Search size={16} />
             <input value={search} placeholder="Search transfers" onChange={(event) => setSearch(props.workspaceId, event.target.value)} />
           </label>
-          <label className={transferStyles.sortSelect} title="Sort transfers">
-            <ArrowUpDown size={15} />
-            <select
-              value={sortKey}
-              aria-label="Sort transfers"
-              onChange={(event) => setSort(props.workspaceId, event.target.value as "time" | "name" | "operation" | "status", sortDirection)}
-            >
-              <option value="time">Time</option>
-              <option value="name">Name</option>
-              <option value="operation">Operation</option>
-              <option value="status">Status</option>
-            </select>
-            <ChevronDown size={14} />
-          </label>
           <button
-            className={transferStyles.sortDirectionButton}
+            className={transferStyles.iconToolbarButton}
             type="button"
-            onClick={() => setSort(props.workspaceId, sortKey as "time" | "name" | "operation" | "status", sortDirection === "asc" ? "desc" : "asc")}
+            aria-label="Sort transfers"
+            aria-haspopup="menu"
+            aria-expanded={Boolean(sortMenu)}
+            title="Sort transfers"
+            onClick={openSortMenu}
           >
-            {sortDirection === "asc" ? "Asc" : "Desc"}
+            <Filter size={16} />
           </button>
           <button
             className={transferStyles.iconToolbarButton}
@@ -666,6 +697,13 @@ const TransferWorkspacePane = memo(function TransferWorkspacePane(props: { works
           </button>
         </div>
       </div>
+      <TransferSortMenu
+        menu={sortMenu}
+        sortKey={sortKey}
+        sortDirection={sortDirection}
+        onClose={closeSortMenu}
+        onSort={(key) => setSort(props.workspaceId, key)}
+      />
       <TransferActionMenu
         menu={actionMenu}
         row={actionMenuTransfer}
@@ -680,6 +718,11 @@ const TransferWorkspacePane = memo(function TransferWorkspacePane(props: { works
         onDeleteRow={handleDeleteTransfer}
         onDeleteSelected={handleDeleteSelected}
         onDeleteAll={handleDeleteAll}
+      />
+      <OperationQueueStrip
+        onQueueChanged={() => {
+          void load(undefined, { silent: true });
+        }}
       />
 
       <div className={transferStyles.panelsScroll}>
@@ -867,6 +910,57 @@ function TransfersBottomBar(props: {
   );
 }
 
+function TransferSortMenu(props: {
+  menu: TransferSortMenuState;
+  sortKey: TransferSortKey;
+  sortDirection: TransferSortDirection;
+  onClose: () => void;
+  onSort: (key: TransferSortableKey) => void;
+}) {
+  if (!props.menu) return null;
+  const run = (key: TransferSortableKey) => {
+    props.onClose();
+    props.onSort(key);
+  };
+  return createPortal(
+    <div
+      className={transferStyles.sortMenu}
+      style={{ left: props.menu.x, top: props.menu.y }}
+      role="menu"
+      onPointerDown={(event) => event.stopPropagation()}
+    >
+      <span className={transferStyles.sortMenuLabel}>Sort By</span>
+      {transferSortOptions.map((option) => {
+        const active = props.sortKey === option.key;
+        const DirectionIcon = props.sortDirection === "asc" ? ArrowUp : ArrowDown;
+        const currentLabel = active
+          ? props.sortDirection === "asc" ? "sorted ascending" : "sorted descending"
+          : "not sorted";
+        const nextLabel = !active
+          ? "sort ascending"
+          : props.sortDirection === "asc" ? "sort descending" : "clear sorting";
+        return (
+          <button
+            key={option.key}
+            className={`${transferStyles.sortMenuItem} ${active ? transferStyles.sortMenuItemActive : ""}`}
+            type="button"
+            role="menuitemcheckbox"
+            aria-checked={active}
+            aria-label={`${option.label}, ${currentLabel}. Activate to ${nextLabel}.`}
+            onClick={() => run(option.key)}
+          >
+            <span>{option.label}</span>
+            <span className={transferStyles.sortMenuIcon} aria-hidden="true">
+              {active ? <DirectionIcon size={15} strokeWidth={2.4} /> : null}
+            </span>
+          </button>
+        );
+      })}
+    </div>,
+    document.body,
+  );
+}
+
 function TransferActionMenu(props: {
   menu: TransferActionMenuState;
   row: TransferRecord | null;
@@ -997,10 +1091,10 @@ const TransferSummaryCards = memo(function TransferSummaryCards(props: {
 const TransferTableHeader = memo(function TransferTableHeader(props: {
   column: TransferTableColumn;
   label: string;
-  sortKey: string;
-  sortDirection: "asc" | "desc";
+  sortKey: TransferSortKey;
+  sortDirection: TransferSortDirection;
   dragging: boolean;
-  onSort: (key: "time" | "name" | "operation" | "status") => void;
+  onSort: (key: TransferSortableKey) => void;
   onResizeStart: (column: TransferTableColumn, event: ReactPointerEvent) => void;
   onDragStart: (column: TransferTableColumn) => void;
   onDragEnd: () => void;
@@ -1186,14 +1280,14 @@ function TransferFilters(props: {
   typeFilters: Set<TransferType>;
   locationScope: string;
   statusFilter: string;
-  sortKey: string;
-  sortDirection: "asc" | "desc";
+  sortKey: TransferSortKey;
+  sortDirection: TransferSortDirection;
   activeFilterCount: number;
   onToggleProvider: (provider: string) => void;
   onToggleType: (type: TransferType) => void;
   onLocationScope: (scope: "all" | "local" | "remote") => void;
   onStatusFilter: (filter: "all" | "active" | "completed" | "failed") => void;
-  onSort: (key: "time" | "name" | "operation" | "status", direction?: "asc" | "desc") => void;
+  onSort: (key: TransferSortKey, direction?: TransferSortDirection) => void;
   onClear: () => void;
 }) {
   return (
@@ -1265,8 +1359,12 @@ function TransferFilters(props: {
         <select
           className={transferStyles.filterSelect}
           value={props.sortKey}
-          onChange={(event) => props.onSort(event.target.value as "time" | "name" | "operation" | "status", props.sortDirection)}
+          onChange={(event) => {
+            const key = event.target.value as TransferSortKey;
+            props.onSort(key, key === "none" ? undefined : props.sortDirection);
+          }}
         >
+          <option value="none">No sort</option>
           <option value="time">Time</option>
           <option value="name">Name</option>
           <option value="operation">Operation</option>
@@ -1275,15 +1373,21 @@ function TransferFilters(props: {
         <div className={transferStyles.sortDirection}>
           <button
             type="button"
-            className={`${transferStyles.smallButton} ${props.sortDirection === "asc" ? transferStyles.sortButtonSelected : ""}`}
-            onClick={() => props.onSort(props.sortKey as "time" | "name" | "operation" | "status", "asc")}
+            className={`${transferStyles.smallButton} ${props.sortKey !== "none" && props.sortDirection === "asc" ? transferStyles.sortButtonSelected : ""}`}
+            disabled={props.sortKey === "none"}
+            onClick={() => {
+              if (props.sortKey !== "none") props.onSort(props.sortKey, "asc");
+            }}
           >
             Asc
           </button>
           <button
             type="button"
-            className={`${transferStyles.smallButton} ${props.sortDirection === "desc" ? transferStyles.sortButtonSelected : ""}`}
-            onClick={() => props.onSort(props.sortKey as "time" | "name" | "operation" | "status", "desc")}
+            className={`${transferStyles.smallButton} ${props.sortKey !== "none" && props.sortDirection === "desc" ? transferStyles.sortButtonSelected : ""}`}
+            disabled={props.sortKey === "none"}
+            onClick={() => {
+              if (props.sortKey !== "none") props.onSort(props.sortKey, "desc");
+            }}
           >
             Desc
           </button>
@@ -1417,8 +1521,8 @@ function filterAndSortTransfers(
     typeFilters: Set<TransferType>;
     locationScope: string;
     statusFilter: "all" | "active" | "completed" | "failed";
-    sortKey: string;
-    sortDirection: "asc" | "desc";
+    sortKey: TransferSortKey;
+    sortDirection: TransferSortDirection;
   },
 ): TransferRecord[] {
   const filtered = rows.filter((row) => {
@@ -1431,11 +1535,13 @@ function filterAndSortTransfers(
     return true;
   });
 
+  const sortKey = filters.sortKey;
+  if (sortKey === "none") return filtered;
   const direction = filters.sortDirection === "asc" ? 1 : -1;
-  return [...filtered].sort((left, right) => direction * compareTransfers(left, right, filters.sortKey));
+  return [...filtered].sort((left, right) => direction * compareTransfers(left, right, sortKey));
 }
 
-function compareTransfers(left: TransferRecord, right: TransferRecord, key: string): number {
+function compareTransfers(left: TransferRecord, right: TransferRecord, key: TransferSortableKey): number {
   if (key === "name") return primaryTransferLabel(left).localeCompare(primaryTransferLabel(right));
   if (key === "operation") return left.transferType.localeCompare(right.transferType);
   if (key === "status") return left.status.localeCompare(right.status);
@@ -1487,7 +1593,7 @@ function timestampLabel(timestamp: number): string {
   return new Date(timestamp).toLocaleString();
 }
 
-function sortIndicator(activeKey: string, direction: string, key: string): string {
+function sortIndicator(activeKey: TransferSortKey, direction: TransferSortDirection, key: TransferSortableKey): string {
   if (activeKey !== key) return "";
   return direction === "asc" ? "↑" : "↓";
 }
@@ -1508,6 +1614,12 @@ function tableStatusLabel(status: string): string {
   if (status === "failed" || status === "canceled" || status === "interrupted") return "Failed";
   if (status === "queued" || status === "pending" || status === "in_progress" || status === "waiting_for_resolution") return "Pending";
   return prettyLabel(status);
+}
+
+function canPauseResumeOperation(operation: OperationDescriptor): boolean {
+  return operation.paused
+    || operation.status === "queued"
+    || operation.status === "waiting_for_resolution";
 }
 
 function isTransferTableColumn(value: string): value is TransferTableColumn {
@@ -1577,21 +1689,36 @@ function saveTransferPanelVisibility(visibility: { filters: boolean; detail: boo
 }
 
 function OperationQueueStrip(props: { onQueueChanged: () => void }) {
-  const { snapshot, working, error, load, cancel, cancelBatch, retry, redo, resolveConflict, clearTerminal } = useOperationQueueStore(useShallow((state) => ({
+  const { snapshot, working, error, load, cancel, cancelBatch, pause, resume, pauseBatch, resumeBatch, pauseAll, resumeAll, setPriority, setBandwidthLimit, setTransferProfile, retry, redo, resolveConflict, clearTerminal } = useOperationQueueStore(useShallow((state) => ({
     snapshot: state.snapshot,
     working: state.working,
     error: state.error,
     load: state.load,
     cancel: state.cancel,
     cancelBatch: state.cancelBatch,
+    pause: state.pause,
+    resume: state.resume,
+    pauseBatch: state.pauseBatch,
+    resumeBatch: state.resumeBatch,
+    pauseAll: state.pauseAll,
+    resumeAll: state.resumeAll,
+    setPriority: state.setPriority,
+    setBandwidthLimit: state.setBandwidthLimit,
+    setTransferProfile: state.setTransferProfile,
     retry: state.retry,
     redo: state.redo,
     resolveConflict: state.resolveConflict,
     clearTerminal: state.clearTerminal,
   })));
+  const settingsDocument = useSettingsStore((state) => state.settings?.document ?? {});
+  const transferProfiles = useMemo(() => transferProfileRecords(settingsDocument), [settingsDocument]);
   const operations = snapshot?.operations ?? [];
   const active = operations.filter((operation) => operation.status === "queued" || operation.status === "in_progress" || operation.status === "waiting_for_resolution");
   const terminal = operations.length - active.length;
+  const activeBatches = useMemo(() => {
+    const activeBatchIds = new Set(active.map((operation) => operation.batchId));
+    return (snapshot?.batches ?? []).filter((batch) => activeBatchIds.has(batch.batchId));
+  }, [active, snapshot?.batches]);
   const conflict = snapshot?.conflictDialog;
   const conflictBatch = conflict?.open ? snapshot?.batches.find((batch) => batch.batchId === conflict.batchId) : null;
   const canApplyConflictToBatch = Boolean(conflictBatch && conflictBatch.operationIds.length > 1);
@@ -1604,16 +1731,29 @@ function OperationQueueStrip(props: { onQueueChanged: () => void }) {
       )),
   );
   const [applyConflictToBatch, setApplyConflictToBatch] = useState(conflict?.applyToBatch ?? true);
+  const [bandwidthDraft, setBandwidthDraft] = useState(snapshot?.bandwidthLimit ?? "");
 
   useEffect(() => {
     if (conflict?.open) {
       setApplyConflictToBatch(conflict.applyToBatch);
     }
   }, [conflict?.operationId, conflict?.applyToBatch, conflict?.open]);
+  useEffect(() => {
+    setBandwidthDraft(snapshot?.bandwidthLimit ?? "");
+  }, [snapshot?.bandwidthLimit]);
   const runQueueMutation = useCallback(async (action: Promise<void>) => {
     await action;
     props.onQueueChanged();
-  }, [props]);
+  }, [props.onQueueChanged]);
+  const applyBandwidthLimit = useCallback(() => {
+    void runQueueMutation(setBandwidthLimit(bandwidthDraft.trim()));
+  }, [bandwidthDraft, runQueueMutation, setBandwidthLimit]);
+  const applyTransferProfile = useCallback((profileId: string) => {
+    const profile = transferProfiles.find((candidate) => candidate.id === profileId);
+    if (!profile) return;
+    setBandwidthDraft(profile.bandwidthLimit);
+    void runQueueMutation(setTransferProfile(profile));
+  }, [runQueueMutation, setTransferProfile, transferProfiles]);
 
   return (
     <section className={transferStyles.operationStrip}>
@@ -1628,6 +1768,44 @@ function OperationQueueStrip(props: { onQueueChanged: () => void }) {
         <button className={transferStyles.operationButton} type="button" onClick={() => void load()} disabled={working}>
           <RefreshCcw size={14} />
           Refresh
+        </button>
+        <button
+          className={transferStyles.operationButton}
+          type="button"
+          onClick={() => void runQueueMutation(snapshot?.paused ? resumeAll() : pauseAll())}
+          disabled={working || !snapshot}
+        >
+          {snapshot?.paused ? <Play size={14} /> : <Pause size={14} />}
+          {snapshot?.paused ? "Resume All" : "Pause All"}
+        </button>
+        <select
+          className={transferStyles.operationInput}
+          value={snapshot?.transferProfileId ?? ""}
+          aria-label="Transfer profile"
+          onChange={(event) => applyTransferProfile(event.target.value)}
+          disabled={working || !snapshot || transferProfiles.length === 0}
+        >
+          {transferProfiles.length === 0 ? (
+            <option value="">Profiles unavailable</option>
+          ) : null}
+          {transferProfiles.map((profile) => (
+            <option key={profile.id} value={profile.id}>
+              {profile.name}
+            </option>
+          ))}
+        </select>
+        <input
+          className={transferStyles.operationInput}
+          value={bandwidthDraft}
+          placeholder="Bandwidth"
+          aria-label="Bandwidth limit"
+          onChange={(event) => setBandwidthDraft(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") applyBandwidthLimit();
+          }}
+        />
+        <button className={transferStyles.operationButton} type="button" onClick={applyBandwidthLimit} disabled={working || !snapshot}>
+          Apply Limit
         </button>
         <button className={transferStyles.operationButton} type="button" onClick={() => void runQueueMutation(redo())} disabled={working || !snapshot?.redoAvailable}>
           <RotateCcw size={14} />
@@ -1687,6 +1865,33 @@ function OperationQueueStrip(props: { onQueueChanged: () => void }) {
           ) : null}
         </div>
       ) : null}
+      {activeBatches.length > 0 ? (
+        <div className={transferStyles.operationActions}>
+          {activeBatches.slice(0, 3).map((batch) => (
+            <span key={batch.batchId} className={transferStyles.operationActions}>
+              <span className={transferStyles.operationMeta}>{batch.label || `Batch ${batch.batchId}`}</span>
+              <button
+                className={transferStyles.operationButton}
+                type="button"
+                disabled={working}
+                onClick={() => void runQueueMutation(batch.paused ? resumeBatch(batch.batchId) : pauseBatch(batch.batchId))}
+              >
+                {batch.paused ? <Play size={14} /> : <Pause size={14} />}
+                {batch.paused ? "Resume Batch" : "Pause Batch"}
+              </button>
+              <button
+                className={transferStyles.operationButton}
+                type="button"
+                disabled={working}
+                onClick={() => void runQueueMutation(cancelBatch(batch.batchId))}
+              >
+                <XCircle size={14} />
+                Cancel Batch
+              </button>
+            </span>
+          ))}
+        </div>
+      ) : null}
       {operations.length > 0 ? (
         <div className={transferStyles.operationList}>
           {operations.slice(0, 5).map((operation) => (
@@ -1695,6 +1900,26 @@ function OperationQueueStrip(props: { onQueueChanged: () => void }) {
               <span className={statusBadgeClass(operation.status)}>{prettyLabel(operation.status)}</span>
               <span className={transferStyles.operationCell}>{operation.source.localPath || `${operation.source.remoteName}:${operation.source.remotePath}`}</span>
               <span className={transferStyles.operationCell}>{operation.target.localPath || `${operation.target.remoteName}:${operation.target.remotePath}`}</span>
+              <select
+                className={transferStyles.operationSelect}
+                aria-label="Operation priority"
+                value={operation.priority}
+                disabled={working}
+                onChange={(event) => void runQueueMutation(setPriority(operation.operationId, event.target.value as OperationPriority))}
+              >
+                <option value="high">High</option>
+                <option value="normal">Normal</option>
+                <option value="low">Low</option>
+              </select>
+              <button
+                className={transferStyles.operationButton}
+                type="button"
+                disabled={working || !canPauseResumeOperation(operation)}
+                onClick={() => void runQueueMutation(operation.paused ? resume(operation.operationId) : pause(operation.operationId))}
+              >
+                {operation.paused ? <Play size={14} /> : <Pause size={14} />}
+                {operation.paused ? "Resume" : "Pause"}
+              </button>
               <button className={transferStyles.operationButton} type="button" disabled={!operation.cancelable || working} onClick={() => void runQueueMutation(cancel(operation.operationId))}>
                 <XCircle size={14} />
                 Cancel

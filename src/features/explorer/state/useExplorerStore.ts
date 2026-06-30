@@ -13,6 +13,7 @@ import {
   explorerListDirectory,
   explorerLibraryRecordLastOpened,
   explorerLibraryRecordRecent,
+  explorerLibrarySetMetadata,
   explorerLibrarySetTags,
   explorerLibrarySnapshot,
   explorerOpenAssociation,
@@ -183,6 +184,7 @@ interface ExplorerStore {
   recordLibraryRecent: (entry: FileEntry) => Promise<void>;
   recordLastOpenedPath: (path: string) => Promise<void>;
   setLibraryTags: (entry: FileEntry, tags: string[]) => Promise<void>;
+  setLibraryMetadata: (entry: FileEntry, tags: string[], comments: string) => Promise<void>;
   initialize: (homePath: string) => Promise<void>;
   selectWorkspace: (workspaceId: string, homePath: string) => Promise<void>;
   createWorkspace: (title: string, homePath: string) => Promise<void>;
@@ -209,6 +211,7 @@ interface ExplorerStore {
   canCreateItem: (paneId: string, kind: CreateItemKind) => boolean;
   createItem: (paneId: string, kind: CreateItemKind, name?: string) => Promise<void>;
   renameSelected: (paneId: string, name?: string) => Promise<void>;
+  openBatchRenameDialog: (paneId: string) => void;
   deleteSelected: (paneId: string, mode?: ExplorerDeleteMode) => Promise<void>;
   downloadSelected: (paneId: string) => Promise<void>;
   copySelected: (paneId: string) => void;
@@ -224,6 +227,7 @@ interface ExplorerStore {
   closeContextMenu: () => void;
   setInlineEditValue: (value: string) => void;
   setBatchRenameValue: (paneId: string, entryId: string, value: string) => void;
+  setBatchRenameItems: (paneId: string, items: ExplorerBatchRenameItem[]) => void;
   commitInlineEdit: () => Promise<void>;
   cancelInlineEdit: () => void;
   confirmDialog: () => Promise<void>;
@@ -331,6 +335,14 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
       set({ library: await explorerLibrarySetTags(libraryItemFromEntry(entry), tags) });
     } catch (error) {
       set({ operationError: `Tag update failed: ${errorText(error)}` });
+    }
+  },
+
+  setLibraryMetadata: async (entry, tags, comments) => {
+    try {
+      set({ library: await explorerLibrarySetMetadata(libraryItemFromEntry(entry), tags, comments) });
+    } catch (error) {
+      set({ operationError: `Metadata update failed: ${errorText(error)}` });
     }
   },
 
@@ -982,6 +994,19 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
     }
   },
 
+  openBatchRenameDialog: (paneId) => {
+    const items = selectedBatchRenameItemsAcrossPanes(get().panes, paneId);
+    if (items.length === 0) return;
+    set({
+      inlineEdit: null,
+      dialog: {
+        kind: "batchRename",
+        paneId,
+        items: validateBatchRenameItems(items),
+      },
+    });
+  },
+
   deleteSelected: async (paneId, mode) => {
     const pane = get().panes[paneId];
     const permanent = deleteModeForPaneSelection(pane, mode) === "permanent";
@@ -1097,6 +1122,12 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
       dialog.items.map((item) => item.paneId === paneId && item.entryId === entryId ? { ...item, value } : item),
     );
     return { dialog: { ...dialog, items } };
+  }),
+
+  setBatchRenameItems: (paneId, items) => set((state) => {
+    const dialog = state.dialog;
+    if (dialog?.kind !== "batchRename" || dialog.paneId !== paneId) return state;
+    return { dialog: { ...dialog, items: validateBatchRenameItems(items) } };
   }),
 
   commitInlineEdit: async () => {
@@ -1602,7 +1633,7 @@ function validateRenameValue(
   return null;
 }
 
-function validateBatchRenameItems(items: ExplorerBatchRenameItem[]): ExplorerBatchRenameItem[] {
+export function validateBatchRenameItems(items: ExplorerBatchRenameItem[]): ExplorerBatchRenameItem[] {
   const targetCounts = new Map<string, number>();
   for (const item of items) {
     const effectiveName = `${item.value.trim()}${item.lockedExtension}`;
@@ -2240,6 +2271,7 @@ function libraryItemFromEntry(entry: FileEntry): ExplorerLibraryItem {
     mimeType: entry.mimeType ?? "",
     type: entry.location.kind === "remote" ? 1 : 0,
     tags: [],
+    comments: "",
   };
 }
 

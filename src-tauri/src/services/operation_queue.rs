@@ -20,11 +20,12 @@ use crate::core::{
         FileTransferConflictPolicy, FileTransferItemType, FileTransferStatus, FileTransferType,
     },
     operation_queue::{
-        ConflictPolicy, OperationDescriptor, OperationEndpoint, OperationKind, OperationQueue,
-        OperationQueueSnapshot, OperationStatus,
+        ConflictPolicy, OperationDescriptor, OperationEndpoint, OperationKind, OperationPriority,
+        OperationQueue, OperationQueueSnapshot, OperationStatus,
     },
 };
 use crate::error::{ApiError, ApiResult};
+use crate::services::power_pack::{archive_create_blocking, ArchiveCreateRequest};
 use crate::services::{explorer::ExplorerService, transfers::TransferService};
 
 #[derive(Clone)]
@@ -44,6 +45,7 @@ enum QueuedExplorerOperation {
     Rename(RenameItemRequest),
     Delete(DeleteItemsRequest),
     Paste(PasteItemsRequest),
+    ArchiveCreate(ArchiveCreateRequest),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -284,6 +286,39 @@ impl OperationQueueService {
         .await
     }
 
+    pub async fn enqueue_archive_create(
+        &self,
+        request: ArchiveCreateRequest,
+    ) -> ApiResult<OperationQueueSnapshot> {
+        if request.paths.is_empty() {
+            return Ok(self.snapshot_with_redo_state().await);
+        }
+        let archive_name = Path::new(&request.destination_path)
+            .file_name()
+            .and_then(|value| value.to_str())
+            .unwrap_or(&request.destination_path)
+            .to_string();
+        self.enqueue_operations(
+            "Create archive",
+            false,
+            vec![OperationDescriptor {
+                kind: OperationKind::Archive,
+                source: request
+                    .paths
+                    .first()
+                    .map(|path| self.endpoint_for_path(path.clone()))
+                    .unwrap_or_default(),
+                target: self.endpoint_for_path(request.destination_path.clone()),
+                supports_replace: true,
+                supports_keep_both: true,
+                title: format!("Compress {archive_name}"),
+                ..OperationDescriptor::default()
+            }],
+            vec![QueuedExplorerOperation::ArchiveCreate(request)],
+        )
+        .await
+    }
+
     async fn enqueue_operations(
         &self,
         label: impl Into<String>,
@@ -313,7 +348,10 @@ impl OperationQueueService {
             return Ok((self.snapshot_with_redo_state().await, Vec::new()));
         }
         for descriptor in &mut descriptors {
-            if matches!(descriptor.kind, OperationKind::Create | OperationKind::Rename) {
+            if matches!(
+                descriptor.kind,
+                OperationKind::Create | OperationKind::Rename | OperationKind::Archive
+            ) {
                 let transfer_id = self
                     .transfers
                     .create_transfer(transfer_record_for_operation(descriptor))
@@ -464,6 +502,88 @@ impl OperationQueueService {
         }
         self.schedule_pump();
         Ok(self.snapshot_with_redo_state().await)
+    }
+
+    pub async fn pause(&self, operation_id: u64) -> ApiResult<OperationQueueSnapshot> {
+        if !self.queue.pause_operation(operation_id).await {
+            return Err(ApiError::Message(format!(
+                "Operation {operation_id} cannot be paused."
+            )));
+        }
+        Ok(self.snapshot_with_redo_state().await)
+    }
+
+    pub async fn resume(&self, operation_id: u64) -> ApiResult<OperationQueueSnapshot> {
+        if !self.queue.resume_operation(operation_id).await {
+            return Err(ApiError::Message(format!(
+                "Operation {operation_id} cannot be resumed."
+            )));
+        }
+        self.schedule_pump();
+        Ok(self.snapshot_with_redo_state().await)
+    }
+
+    pub async fn pause_batch(&self, batch_id: u64) -> ApiResult<OperationQueueSnapshot> {
+        if !self.queue.pause_batch(batch_id).await {
+            return Err(ApiError::Message(format!(
+                "Batch {batch_id} cannot be paused."
+            )));
+        }
+        Ok(self.snapshot_with_redo_state().await)
+    }
+
+    pub async fn resume_batch(&self, batch_id: u64) -> ApiResult<OperationQueueSnapshot> {
+        if !self.queue.resume_batch(batch_id).await {
+            return Err(ApiError::Message(format!(
+                "Batch {batch_id} cannot be resumed."
+            )));
+        }
+        self.schedule_pump();
+        Ok(self.snapshot_with_redo_state().await)
+    }
+
+    pub async fn pause_all(&self) -> OperationQueueSnapshot {
+        self.queue.pause_all().await;
+        self.snapshot_with_redo_state().await
+    }
+
+    pub async fn resume_all(&self) -> OperationQueueSnapshot {
+        self.queue.resume_all().await;
+        self.schedule_pump();
+        self.snapshot_with_redo_state().await
+    }
+
+    pub async fn set_priority(
+        &self,
+        operation_id: u64,
+        priority: OperationPriority,
+    ) -> ApiResult<OperationQueueSnapshot> {
+        if !self.queue.set_priority(operation_id, priority).await {
+            return Err(ApiError::Message(format!(
+                "Operation {operation_id} priority could not be updated."
+            )));
+        }
+        self.schedule_pump();
+        Ok(self.snapshot_with_redo_state().await)
+    }
+
+    pub async fn set_bandwidth_limit(&self, limit: String) -> OperationQueueSnapshot {
+        self.queue.set_bandwidth_limit(limit).await;
+        self.snapshot_with_redo_state().await
+    }
+
+    pub async fn set_transfer_profile(
+        &self,
+        profile_id: String,
+        profile_name: String,
+        max_concurrent: usize,
+        bandwidth_limit: String,
+    ) -> OperationQueueSnapshot {
+        self.queue
+            .set_transfer_profile(profile_id, profile_name, max_concurrent, bandwidth_limit)
+            .await;
+        self.schedule_pump();
+        self.snapshot_with_redo_state().await
     }
 
     pub async fn undo(&self, undo_token_id: u64) -> ApiResult<OperationQueueSnapshot> {
@@ -1054,6 +1174,52 @@ impl OperationQueueService {
                     .paste_items_with_cancellation(request, cancellation.clone())
                     .await?;
             }
+            QueuedExplorerOperation::ArchiveCreate(mut request) => {
+                let destination = PathBuf::from(&request.destination_path);
+                if self
+                    .explorer
+                    .item_is_directory(&destination.to_string_lossy())
+                    .await?
+                    .is_some()
+                {
+                    match operation.conflict_policy {
+                        ConflictPolicy::Ask => {
+                            if !self.queue.wait_for_conflict(operation.operation_id).await {
+                                return Err(ApiError::Message(format!(
+                                    "Operation {} could not wait for conflict resolution.",
+                                    operation.operation_id
+                                )));
+                            }
+                            return Ok(ExecutionOutcome::WaitingForConflict);
+                        }
+                        ConflictPolicy::Replace => {
+                            self.explorer
+                                .delete_items_with_cancellation(
+                                    DeleteItemsRequest {
+                                        paths: vec![destination.to_string_lossy().to_string()],
+                                        permanent: true,
+                                    },
+                                    cancellation.clone(),
+                                )
+                                .await?;
+                        }
+                        ConflictPolicy::Skip => return Ok(ExecutionOutcome::Skipped),
+                        ConflictPolicy::KeepBoth => {
+                            let keep_both_destination = self
+                                .available_keep_both_destination(
+                                    &destination,
+                                    Some(cancellation.as_ref()),
+                                )
+                                .await?;
+                            request.destination_path = keep_both_destination.display().to_string();
+                        }
+                    }
+                }
+                ensure_not_canceled(&cancellation)?;
+                tokio::task::spawn_blocking(move || archive_create_blocking(request))
+                    .await
+                    .map_err(|err| ApiError::Message(format!("Archive worker failed: {err}")))??;
+            }
         }
         ensure_not_canceled(&cancellation)?;
         Ok(ExecutionOutcome::Completed)
@@ -1219,18 +1385,17 @@ fn transfer_record_for_operation(operation: &OperationDescriptor) -> FileTransfe
         OperationKind::Create => FileTransferType::Create,
         OperationKind::Rename => FileTransferType::Rename,
         OperationKind::Delete => FileTransferType::Delete,
+        OperationKind::Upload => FileTransferType::Upload,
         OperationKind::Download => FileTransferType::Download,
+        OperationKind::Archive => FileTransferType::Archive,
     };
     let item_type = if operation.source.is_remote() || operation.target.is_remote() {
         FileTransferItemType::Remote
     } else {
         FileTransferItemType::Local
     };
-    let mut record = FileTransferRecord::new(
-        transfer_type,
-        item_type,
-        operation_file_name(operation),
-    );
+    let mut record =
+        FileTransferRecord::new(transfer_type, item_type, operation_file_name(operation));
     record.status = FileTransferStatus::Queued;
     record.conflict_policy = match operation.conflict_policy {
         ConflictPolicy::Ask => FileTransferConflictPolicy::Ask,
@@ -1280,18 +1445,23 @@ fn operation_kind_for_paste(
         ClipboardOperation::Copy if source.is_remote() && !target.is_remote() => {
             OperationKind::Download
         }
+        ClipboardOperation::Copy if !source.is_remote() && target.is_remote() => {
+            OperationKind::Upload
+        }
         ClipboardOperation::Copy => OperationKind::Copy,
     }
 }
 
 fn operation_action_label(kind: OperationKind) -> &'static str {
     match kind {
+        OperationKind::Upload => "Upload",
         OperationKind::Download => "Download",
         OperationKind::Move => "Move",
         OperationKind::Create => "Create",
         OperationKind::Rename => "Rename",
         OperationKind::Delete => "Delete",
         OperationKind::Copy => "Copy",
+        OperationKind::Archive => "Archive",
     }
 }
 
@@ -1500,6 +1670,25 @@ mod tests {
             OperationKind::Download
         );
         assert_eq!(operation_action_label(OperationKind::Download), "Download");
+    }
+
+    #[test]
+    fn local_to_remote_copy_is_described_as_upload() {
+        let source = local_endpoint("/Users/misty/Desktop/report.pdf".to_string());
+        let target = endpoint_for_path(
+            "/Users/misty/.misty/mnt/drive-work/uploads/report.pdf".to_string(),
+            Some(RemoteBrowseTarget {
+                provider_type: "drive".to_string(),
+                remote_name: "drive-work".to_string(),
+                remote_path: "/uploads/report.pdf".to_string(),
+            }),
+        );
+
+        assert_eq!(
+            operation_kind_for_paste(ClipboardOperation::Copy, &source, &target),
+            OperationKind::Upload
+        );
+        assert_eq!(operation_action_label(OperationKind::Upload), "Upload");
     }
 
     #[test]
