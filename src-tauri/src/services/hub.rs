@@ -196,8 +196,10 @@ pub struct LocalPluginRecord {
 }
 
 const LOCAL_REFRESH_TOKEN_DAYS: i64 = 60;
+const LOCAL_ACCESS_TOKEN_REFRESH_WINDOW_MINUTES: i64 = 15;
 const LICENSE_REFRESH_AFTER_DAYS: i64 = 7;
 const LICENSE_VERIFIED_DAYS: i64 = 14;
+const REMOVED_PLUGIN_IDS: &[&str] = &["git", "preview-panel", "preview_panel"];
 
 #[derive(Debug, Serialize, Clone, Default)]
 pub struct MistyProcessStatus {
@@ -627,9 +629,18 @@ pub fn restart_misty(
 
 #[tauri::command]
 pub fn scan_local_plugins() -> Result<Vec<LocalPluginRecord>, String> {
+    let roots = [
+        ("private", misty_plugin_root_dir("private")?),
+        ("public", misty_plugin_root_dir("public")?),
+    ];
+    scan_local_plugins_in_roots(&roots)
+}
+
+fn scan_local_plugins_in_roots(
+    roots: &[(&str, PathBuf)],
+) -> Result<Vec<LocalPluginRecord>, String> {
     let mut plugins = Vec::new();
-    for root_kind in ["private", "public"] {
-        let root_dir = misty_plugin_root_dir(root_kind)?;
+    for (root_kind, root_dir) in roots {
         if !root_dir.exists() {
             continue;
         }
@@ -643,7 +654,15 @@ pub fn scan_local_plugins() -> Result<Vec<LocalPluginRecord>, String> {
             if !plugin_dir.is_dir() {
                 continue;
             }
+            if removed_plugin_dir(&plugin_dir) {
+                let _ = fs::remove_dir_all(&plugin_dir);
+                continue;
+            }
             if let Some(plugin) = read_local_plugin_record(&plugin_dir, root_kind)? {
+                if removed_plugin_id(&plugin.id) {
+                    let _ = fs::remove_dir_all(&plugin_dir);
+                    continue;
+                }
                 plugins.push(plugin);
             }
         }
@@ -658,9 +677,16 @@ pub async fn install_plugin_bundle(
     plugin_id: String,
     root: String,
     url: String,
+    platform: Option<String>,
+    sha256: Option<String>,
 ) -> Result<String, String> {
     if plugin_id.trim().is_empty() {
         return Err("Extension id is required.".to_string());
+    }
+    if removed_plugin_id(&plugin_id) {
+        return Err(format!(
+            "{plugin_id} has been removed from Misty's extension catalog."
+        ));
     }
     if !matches!(root.as_str(), "public" | "private") {
         return Err(format!("Unsupported extension root: {root}"));
@@ -668,8 +694,17 @@ pub async fn install_plugin_bundle(
     if url.trim().is_empty() {
         return Err("Extension artifact URL is required.".to_string());
     }
+    if !url.starts_with("https://") {
+        return Err("Extension artifact URL must use HTTPS.".to_string());
+    }
     if !url.to_ascii_lowercase().ends_with(".zip") {
         return Err("Extension install currently expects a .zip bundle.".to_string());
+    }
+    if platform
+        .as_deref()
+        .is_some_and(|value| value.trim().is_empty())
+    {
+        return Err("Extension artifact platform cannot be blank.".to_string());
     }
 
     let client = reqwest::Client::new();
@@ -682,6 +717,18 @@ pub async fn install_plugin_bundle(
         .bytes()
         .await
         .map_err(|error| format!("Could not read extension bundle: {error}"))?;
+    if let Some(expected) = sha256
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+    {
+        let actual = format!("{:x}", Sha256::digest(&bytes));
+        if !actual.eq_ignore_ascii_case(expected) {
+            return Err(format!(
+                "Extension bundle checksum mismatch. Expected {expected}, got {actual}."
+            ));
+        }
+    }
 
     let root_dir = misty_plugin_root_dir(&root)?;
     fs::create_dir_all(&root_dir).map_err(|error| {
@@ -704,6 +751,11 @@ pub fn uninstall_plugin(plugin_id: String, root: String) -> Result<String, Strin
     if plugin_id.trim().is_empty() {
         return Err("Extension id is required.".to_string());
     }
+    if removed_plugin_id(&plugin_id) {
+        return Ok(format!(
+            "Extension {plugin_id} has already been removed from Misty."
+        ));
+    }
     let plugin_dir = misty_plugin_root_dir(&root)?.join(&plugin_id);
     if !plugin_dir.exists() {
         return Err(format!(
@@ -724,6 +776,11 @@ pub fn set_plugin_enabled(
 ) -> Result<String, String> {
     if plugin_id.trim().is_empty() {
         return Err("Extension id is required.".to_string());
+    }
+    if removed_plugin_id(&plugin_id) {
+        return Err(format!(
+            "{plugin_id} has been removed from Misty's extension catalog."
+        ));
     }
 
     let manifest_path = misty_plugin_root_dir(&root)?
@@ -803,8 +860,10 @@ pub fn ensure_local_access_token() -> Result<NativeSystemInfo, String> {
     bootstrap_database(&conn)
         .map_err(|error| format!("Could not initialize Misty database: {error}"))?;
     if let Some(user) = current_user()? {
+        if has_fresh_local_access_token(&conn, &user.id)? {
+            return check_system();
+        }
         if has_active_refresh_token(&conn, &user.id)? {
-            issue_local_refresh_token(&conn, &user)?;
             issue_local_access_token(&conn, &user)?;
         } else {
             conn.execute(
@@ -1040,6 +1099,26 @@ fn has_active_refresh_token(conn: &Connection, user_id: &str) -> Result<bool, St
         Some(value) => decrypt_refresh_token(&value).map(|token| !token.is_empty()),
         None => Ok(false),
     }
+}
+
+fn has_fresh_local_access_token(conn: &Connection, user_id: &str) -> Result<bool, String> {
+    let refresh_after = (Utc::now()
+        + chrono::Duration::minutes(LOCAL_ACCESS_TOKEN_REFRESH_WINDOW_MINUTES))
+    .to_rfc3339_opts(SecondsFormat::Secs, true);
+    let count: i64 = conn
+        .query_row(
+            r#"
+            SELECT COUNT(1)
+            FROM access_tokens
+            WHERE user_id = ?1
+              AND revoked = 0
+              AND datetime(expires_at) > datetime(?2)
+            "#,
+            params![user_id, refresh_after],
+            |row| row.get(0),
+        )
+        .map_err(|error| format!("Could not inspect local access token: {error}"))?;
+    Ok(count > 0)
 }
 
 fn generate_local_refresh_token() -> String {
@@ -1332,6 +1411,19 @@ fn misty_plugin_root_dir(root: &str) -> Result<PathBuf, String> {
         "private" => misty_home_dir().map(|home| home.join("plugins").join("private")),
         _ => Err(format!("Unsupported extension root: {root}")),
     }
+}
+
+fn removed_plugin_id(plugin_id: &str) -> bool {
+    REMOVED_PLUGIN_IDS
+        .iter()
+        .any(|removed| plugin_id.trim().eq_ignore_ascii_case(removed))
+}
+
+fn removed_plugin_dir(plugin_dir: &Path) -> bool {
+    plugin_dir
+        .file_name()
+        .and_then(|name| name.to_str())
+        .is_some_and(removed_plugin_id)
 }
 
 fn read_local_plugin_record(
@@ -2050,6 +2142,25 @@ mod tests {
         path
     }
 
+    fn write_test_plugin_manifest(plugin_dir: &Path, plugin_id: &str, name: &str) {
+        fs::create_dir_all(plugin_dir).expect("plugin dir should be created");
+        fs::write(
+            plugin_dir.join("manifest.json"),
+            serde_json::to_string_pretty(&json!({
+                "enabled": true,
+                "plugin": {
+                    "id": plugin_id,
+                    "name": name,
+                    "version": "1.0.0",
+                    "overview": "Test extension.",
+                    "capabilities": ["dock"]
+                }
+            }))
+            .unwrap(),
+        )
+        .expect("manifest should be written");
+    }
+
     #[test]
     fn maps_release_roots_to_misty_home_destinations() {
         let home = PathBuf::from("/tmp/misty-home");
@@ -2124,6 +2235,67 @@ mod tests {
         assert_eq!(record.launcher.views, vec!["Dock"]);
 
         let _ = fs::remove_dir_all(home);
+    }
+
+    #[test]
+    fn scan_local_plugins_purges_removed_extensions_from_installed_lists() {
+        let home = temp_misty_home();
+        let private_root = home.join("plugins/private");
+        let public_root = home.join("plugins/public");
+        fs::create_dir_all(&private_root).expect("private root should be created");
+        fs::create_dir_all(&public_root).expect("public root should be created");
+
+        write_test_plugin_manifest(&private_root.join("git"), "git", "Git");
+        write_test_plugin_manifest(
+            &public_root.join("preview-panel"),
+            "preview-panel",
+            "Preview",
+        );
+        write_test_plugin_manifest(
+            &public_root.join("legacy-preview"),
+            "preview_panel",
+            "Preview",
+        );
+        write_test_plugin_manifest(&public_root.join("themes"), "themes", "Themes");
+
+        let roots = [
+            ("private", private_root.clone()),
+            ("public", public_root.clone()),
+        ];
+        let plugins = scan_local_plugins_in_roots(&roots).expect("plugins should scan");
+
+        assert_eq!(plugins.len(), 1);
+        assert_eq!(plugins[0].id, "themes");
+        assert_eq!(plugins[0].root, "public");
+        assert!(!private_root.join("git").exists());
+        assert!(!public_root.join("preview-panel").exists());
+        assert!(!public_root.join("legacy-preview").exists());
+        assert!(public_root.join("themes").exists());
+
+        fs::remove_dir_all(home).ok();
+    }
+
+    #[tokio::test]
+    async fn install_plugin_bundle_rejects_removed_extensions_before_download() {
+        let error = install_plugin_bundle(
+            "git".to_string(),
+            "public".to_string(),
+            "https://example.com/git.zip".to_string(),
+            Some("macos-universal".to_string()),
+            None,
+        )
+        .await
+        .expect_err("removed extension should be rejected");
+
+        assert!(error.contains("removed from Misty's extension catalog"));
+    }
+
+    #[test]
+    fn set_plugin_enabled_rejects_removed_extensions_before_manifest_read() {
+        let error = set_plugin_enabled("preview-panel".to_string(), "public".to_string(), false)
+            .expect_err("removed extension should be rejected");
+
+        assert!(error.contains("removed from Misty's extension catalog"));
     }
 
     #[test]

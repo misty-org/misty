@@ -6,6 +6,13 @@ import { fetchMe, updateDevice, updateProfile, type MeResponse } from "./api";
 import { useUserStore } from "../../store/userStore";
 import { useSetupStore } from "../../../store/useSetupStore";
 import type { CurrentLicense } from "../../../types/setup";
+import { useAppStore } from "../../../../../app/useAppStore";
+import {
+  clearClientDebugEvents,
+  clientDebugPanelEnabled,
+  readClientDebugEvents,
+  type ClientDebugEvent,
+} from "../../../../../shared/debug/clientDebug";
 
 // ─── display helpers ─────────────────────────────────────────────────────────
 
@@ -96,12 +103,13 @@ function SaveFeedback({ ok, error }: { ok: boolean; error: string }) {
 
 // ─── tabs ────────────────────────────────────────────────────────────────────
 
-type Tab = "general" | "account" | "privacy";
+type Tab = "general" | "account" | "privacy" | "diagnostics";
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "general", label: "General" },
   { id: "account", label: "Account" },
   { id: "privacy", label: "Privacy" },
+  { id: "diagnostics", label: "Diagnostics" },
 ];
 
 // ─── General ─────────────────────────────────────────────────────────────────
@@ -397,6 +405,81 @@ function PrivacyPanel() {
   );
 }
 
+// ─── Diagnostics ─────────────────────────────────────────────────────────────
+
+function DiagnosticsPanel() {
+  const app = useAppStore((state) => state.app);
+  const [events, setEvents] = useState<ClientDebugEvent[]>(() => readClientDebugEvents());
+  const serverBase = accountDebugBase(
+    import.meta.env.VITE_MISTY_SERVER_URL
+      || import.meta.env.VITE_API_BASE
+      || app?.environment.serverUrl
+      || null,
+  );
+
+  useEffect(() => {
+    function refresh() {
+      setEvents(readClientDebugEvents());
+    }
+    window.addEventListener("misty-client-debug", refresh);
+    window.addEventListener("storage", refresh);
+    return () => {
+      window.removeEventListener("misty-client-debug", refresh);
+      window.removeEventListener("storage", refresh);
+    };
+  }, []);
+
+  return (
+    <div className="flex flex-col gap-6">
+      <Section title="Runtime">
+        <Row label="Misty server API">{serverBase || "Not set"}</Row>
+        <Row label="Server env">{import.meta.env.VITE_MISTY_SERVER_URL || import.meta.env.VITE_API_BASE || "Not set"}</Row>
+        <Row label="Build target">{import.meta.env.VITE_MISTY_TARGET || "unknown"}</Row>
+        <Row label="Debug logging">{clientDebugPanelEnabled() ? "Enabled" : "Disabled"}</Row>
+      </Section>
+
+      <Section title="Client Events">
+        {events.length > 0 ? (
+          <div className="divide-y divide-border/60">
+            {events.slice(0, 12).map((event) => (
+              <article key={event.id} className="grid gap-1 py-4">
+                <div className="flex min-w-0 items-center justify-between gap-3">
+                  <strong className={`text-sm ${event.level === "error" ? "text-red-400" : event.level === "warn" ? "text-amber-400" : "text-text"}`}>
+                    {event.scope}
+                  </strong>
+                  <time className="shrink-0 text-xs text-text-muted">{new Date(event.createdAt).toLocaleTimeString()}</time>
+                </div>
+                <p className="m-0 text-sm text-text-muted">{event.message}</p>
+                {event.detail ? (
+                  <pre className="max-h-40 overflow-auto whitespace-pre-wrap rounded-lg bg-surface px-3 py-2 text-[11px] leading-relaxed text-text-muted [overflow-wrap:anywhere]">
+                    {event.detail}
+                  </pre>
+                ) : null}
+              </article>
+            ))}
+          </div>
+        ) : (
+          <div className="py-4">
+            <p className="m-0 text-sm text-text-muted">No client events recorded yet.</p>
+          </div>
+        )}
+        <div className="py-4">
+          <button
+            type="button"
+            className="rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text-muted hover:text-text"
+            onClick={() => {
+              clearClientDebugEvents();
+              setEvents([]);
+            }}
+          >
+            Clear debug events
+          </button>
+        </div>
+      </Section>
+    </div>
+  );
+}
+
 // ─── Dashboard shell ─────────────────────────────────────────────────────────
 
 export default function Dashboard() {
@@ -455,7 +538,7 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="pt-16">
+    <div className="h-full overflow-auto pt-16">
       <div className="flex max-w-4xl mx-auto">
         {/* ── Sidebar — sticky ─────────────────────────────────── */}
         <aside className="hidden md:flex w-48 shrink-0 flex-col border-r border-border px-3 py-8 gap-1 sticky top-16 self-start h-[calc(100vh-4rem)]">
@@ -511,11 +594,19 @@ export default function Dashboard() {
             )}
 
             {tab === "privacy" && <PrivacyPanel />}
+
+            {tab === "diagnostics" && <DiagnosticsPanel />}
           </div>
         </main>
       </div>
     </div>
   );
+}
+
+function accountDebugBase(base: string | null | undefined) {
+  const trimmed = typeof base === "string" ? base.trim().replace(/\/+$/, "") : "";
+  if (!trimmed) return "";
+  return /\/api$/i.test(trimmed) ? trimmed : `${trimmed}/api`;
 }
 
 function meFromLocalAccount(

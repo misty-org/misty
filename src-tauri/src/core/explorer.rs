@@ -180,6 +180,8 @@ pub struct DirectoryListing {
     pub entries: Vec<FileEntry>,
     pub total_count: usize,
     pub hidden_count: usize,
+    pub modified_ms: Option<i64>,
+    pub created_ms: Option<i64>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -283,6 +285,7 @@ pub fn list_directory(
             .then_with(|| left.name.to_lowercase().cmp(&right.name.to_lowercase()))
     });
 
+    let metadata = fs::symlink_metadata(&path).ok();
     Ok(DirectoryListing {
         parent_path: path.parent().map(display_path),
         path: display_path(&path),
@@ -290,6 +293,14 @@ pub fn list_directory(
         entries,
         total_count,
         hidden_count,
+        modified_ms: metadata
+            .as_ref()
+            .and_then(|metadata| metadata.modified().ok())
+            .and_then(system_time_ms),
+        created_ms: metadata
+            .as_ref()
+            .and_then(|metadata| metadata.created().ok())
+            .and_then(system_time_ms),
     })
 }
 

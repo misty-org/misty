@@ -1,5 +1,7 @@
 use std::{
     collections::BTreeMap,
+    env, fs,
+    path::PathBuf,
     sync::Arc,
     time::{SystemTime, UNIX_EPOCH},
 };
@@ -9,7 +11,7 @@ use tokio::sync::RwLock;
 
 use crate::error::{ApiError, ApiResult};
 
-use super::proxy::ProxyService;
+use super::proxy::{ProxyResponse, ProxyService};
 
 #[derive(Clone)]
 pub struct ProviderService {
@@ -42,6 +44,7 @@ pub struct ProviderRemote {
     pub status_label: String,
     pub needs_reconnect: bool,
     pub error: Option<String>,
+    pub config_source: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -185,6 +188,179 @@ pub struct ProviderConfigStep {
     pub poll_after_ms: u64,
     #[serde(default, alias = "field", alias = "prompt")]
     pub option: Option<ProviderWorkflowOption>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PowerToolEndpoint {
+    pub kind: String,
+    #[serde(default)]
+    pub remote: String,
+    pub path: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct TransferProfileOptions {
+    #[serde(default)]
+    pub transfers: u32,
+    #[serde(default)]
+    pub checkers: u32,
+    #[serde(default)]
+    pub bandwidth_limit: String,
+    #[serde(default)]
+    pub retries: u32,
+    #[serde(default)]
+    pub low_level_retries: u32,
+    #[serde(default)]
+    pub checksum: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct VerifyOptions {
+    #[serde(default)]
+    pub one_way: bool,
+    #[serde(default)]
+    pub download: bool,
+    #[serde(default)]
+    pub profile: TransferProfileOptions,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct VerifyStartRequest {
+    pub source: PowerToolEndpoint,
+    pub dest: PowerToolEndpoint,
+    #[serde(default)]
+    pub options: VerifyOptions,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all(serialize = "camelCase", deserialize = "snake_case"))]
+pub struct ProviderJobStart {
+    pub job_id: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all(serialize = "camelCase", deserialize = "snake_case"))]
+pub struct ProviderJobStatus {
+    pub job_id: String,
+    pub operation: String,
+    pub state: String,
+    pub phase: String,
+    pub bytes_completed: i64,
+    pub bytes_total: i64,
+    pub source_remote: Option<String>,
+    pub source_path: Option<String>,
+    pub dest_remote: Option<String>,
+    pub dest_path: Option<String>,
+    pub message: Option<String>,
+    pub result_ready: bool,
+    pub result_kind: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all(serialize = "camelCase", deserialize = "snake_case"))]
+pub struct VerifyResult {
+    pub success: bool,
+    pub status: Option<String>,
+    pub hash_type: Option<String>,
+    #[serde(default)]
+    pub missing_on_src: Vec<String>,
+    #[serde(default)]
+    pub missing_on_dst: Vec<String>,
+    #[serde(default)]
+    pub r#match: Vec<String>,
+    #[serde(default)]
+    pub differ: Vec<String>,
+    #[serde(default)]
+    pub error: Vec<String>,
+    #[serde(default)]
+    pub combined: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LinkPathRequest {
+    pub remote: String,
+    pub path: String,
+    #[serde(default)]
+    pub expire: String,
+    #[serde(default)]
+    pub link_id: String,
+    #[serde(default)]
+    pub target_id: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all(serialize = "camelCase", deserialize = "snake_case"))]
+pub struct PublicLinkRecord {
+    pub id: String,
+    pub url: String,
+    pub target_id: Option<String>,
+    pub provider: String,
+    pub path: String,
+    pub role: Option<String>,
+    pub scope: Option<String>,
+    pub kind: Option<String>,
+    pub expires_at: Option<String>,
+    pub created_at: Option<String>,
+    pub can_revoke: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all(serialize = "camelCase", deserialize = "snake_case"))]
+pub struct PublicLinkListResult {
+    pub supported: bool,
+    pub provider: String,
+    #[serde(default)]
+    pub links: Vec<PublicLinkRecord>,
+    pub message: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all(serialize = "camelCase", deserialize = "snake_case"))]
+pub struct PublicLinkActionResult {
+    pub supported: bool,
+    pub provider: String,
+    pub link: Option<PublicLinkRecord>,
+    pub message: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all(serialize = "camelCase", deserialize = "snake_case"))]
+pub struct BackendAction {
+    pub id: String,
+    pub label: String,
+    pub description: String,
+    pub provider: String,
+    pub destructive: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BackendRunRequest {
+    pub remote: String,
+    pub action_id: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all(serialize = "camelCase", deserialize = "snake_case"))]
+pub struct BackendActionResult {
+    pub action_id: String,
+    pub label: String,
+    pub result: serde_json::Value,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all(serialize = "camelCase", deserialize = "snake_case"))]
+pub struct ConfigSecurityStatus {
+    pub config_path: Option<String>,
+    pub encrypted: bool,
+    pub unlocked: bool,
+    pub password_present: bool,
+    pub message: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -417,6 +593,151 @@ impl ProviderService {
         })
     }
 
+    pub async fn start_verify(&self, request: VerifyStartRequest) -> ApiResult<ProviderJobStart> {
+        let body = serde_json::json!({
+            "source": endpoint_proxy_body(&request.source),
+            "dest": endpoint_proxy_body(&request.dest),
+            "options": {
+                "one_way": request.options.one_way,
+                "download": request.options.download,
+                "profile": transfer_profile_proxy_body(&request.options.profile),
+            }
+        });
+        self.post_json_value("/api/remote/verify/start", &body)
+            .await
+    }
+
+    pub async fn job_status(&self, job_id: String) -> ApiResult<ProviderJobStatus> {
+        let response = self
+            .inner
+            .proxy
+            .get(&format!("/api/remote/file/jobs/{job_id}"))
+            .await?;
+        parse_proxy_response(response, "Failed to load provider job status").await
+    }
+
+    pub async fn cancel_job(&self, job_id: String) -> ApiResult<serde_json::Value> {
+        let response = self
+            .inner
+            .proxy
+            .delete(&format!("/api/remote/file/jobs/{job_id}"))
+            .await?;
+        parse_proxy_response(response, "Failed to cancel provider job").await
+    }
+
+    pub async fn verify_result(&self, job_id: String) -> ApiResult<VerifyResult> {
+        self.post_json_value(
+            "/api/remote/verify/result",
+            &serde_json::json!({ "job_id": job_id }),
+        )
+        .await
+    }
+
+    pub async fn public_links(&self, request: LinkPathRequest) -> ApiResult<PublicLinkListResult> {
+        self.post_json_value(
+            "/api/remote/links/list",
+            &serde_json::json!({
+                "remote": request.remote,
+                "path": request.path,
+            }),
+        )
+        .await
+    }
+
+    pub async fn create_public_link(
+        &self,
+        request: LinkPathRequest,
+    ) -> ApiResult<PublicLinkActionResult> {
+        self.post_json_value(
+            "/api/remote/links/create",
+            &serde_json::json!({
+                "remote": request.remote,
+                "path": request.path,
+                "expire": request.expire,
+            }),
+        )
+        .await
+    }
+
+    pub async fn revoke_public_link(
+        &self,
+        request: LinkPathRequest,
+    ) -> ApiResult<PublicLinkActionResult> {
+        self.post_json_value(
+            "/api/remote/links/revoke",
+            &serde_json::json!({
+                "remote": request.remote,
+                "path": request.path,
+                "link_id": request.link_id,
+                "target_id": request.target_id,
+            }),
+        )
+        .await
+    }
+
+    pub async fn backend_actions(&self, remote: String) -> ApiResult<Vec<BackendAction>> {
+        self.post_json_value(
+            "/api/remote/backend/actions",
+            &serde_json::json!({ "remote": remote }),
+        )
+        .await
+    }
+
+    pub async fn run_backend_action(
+        &self,
+        request: BackendRunRequest,
+    ) -> ApiResult<BackendActionResult> {
+        self.post_json_value(
+            "/api/remote/backend/run",
+            &serde_json::json!({
+                "remote": request.remote,
+                "action_id": request.action_id,
+            }),
+        )
+        .await
+    }
+
+    pub async fn config_security(&self) -> ApiResult<ConfigSecurityStatus> {
+        self.post_json_value(
+            "/api/remote/config/security",
+            &serde_json::json!({
+                "password_present": crate::services::keychain::has_rclone_config_password(),
+            }),
+        )
+        .await
+    }
+
+    pub async fn harden_config(&self) -> ApiResult<ConfigSecurityStatus> {
+        let password = crate::services::keychain::ensure_rclone_config_password()?;
+        self.post_json_value(
+            "/api/remote/config/harden",
+            &serde_json::json!({
+                "current_password": "",
+                "new_password": password,
+            }),
+        )
+        .await
+    }
+
+    pub async fn repair_config_security(
+        &self,
+        password: String,
+    ) -> ApiResult<ConfigSecurityStatus> {
+        crate::services::keychain::store_rclone_config_password(password.trim())?;
+        let mut status = self.config_security().await?;
+        status.message = Some("Config unlock was repaired in macOS Keychain.".to_owned());
+        Ok(status)
+    }
+
+    async fn post_json_value<T: for<'de> Deserialize<'de>>(
+        &self,
+        path: &str,
+        body: &serde_json::Value,
+    ) -> ApiResult<T> {
+        let response = self.inner.proxy.post_json(path, body).await?;
+        parse_proxy_response(response, "Provider tool failed").await
+    }
+
     pub async fn configure_remote(
         &self,
         request: ProviderConfigRequest,
@@ -486,14 +807,15 @@ impl ProviderService {
             Ok(value) => value,
             Err(error) => return Ok(ProvidersSnapshot::unavailable(error.to_string())),
         };
-        let health = parse_health(&raw_health);
+        let mut health = parse_health(&raw_health);
 
         let mut workflows = self
             .get_json::<Vec<ProviderWorkflow>>("/api/remote/workflows")
             .await
             .unwrap_or_default();
-        if workflows.is_empty() && health.ready {
-            workflows = default_provider_workflows();
+        if health.ready {
+            workflows = merge_provider_workflows(workflows, default_provider_workflows());
+            health.available_providers = health.available_providers.max(workflows.len());
         }
         let raw_remotes = self
             .get_json::<Vec<RawRemote>>("/api/remote")
@@ -504,7 +826,7 @@ impl ProviderService {
             .await
             .unwrap_or_default();
 
-        let remotes = raw_remotes
+        let mut remotes: Vec<ProviderRemote> = raw_remotes
             .into_iter()
             .map(|remote| {
                 let status = raw_statuses
@@ -524,9 +846,11 @@ impl ProviderService {
                         .unwrap_or_else(|| "Connected".to_string()),
                     needs_reconnect: status.map(|value| value.needs_reconnect).unwrap_or(false),
                     error: status.and_then(|value| value.error.clone()),
+                    config_source: "misty".to_string(),
                 }
             })
             .collect();
+        append_external_config_remotes(&mut remotes);
 
         Ok(ProvidersSnapshot {
             health,
@@ -622,6 +946,95 @@ fn parse_health(value: &serde_json::Value) -> ProviderHealth {
     }
 }
 
+fn append_external_config_remotes(remotes: &mut Vec<ProviderRemote>) {
+    let existing_names = remotes
+        .iter()
+        .map(|remote| remote.name.to_lowercase())
+        .collect::<std::collections::BTreeSet<_>>();
+    for (name, provider_type) in read_standard_rclone_config_remotes() {
+        if existing_names.contains(&name.to_lowercase()) {
+            continue;
+        }
+        remotes.push(ProviderRemote {
+            name,
+            provider_type,
+            status_label: "Import required".to_string(),
+            needs_reconnect: true,
+            error: Some(
+                "This remote exists in the user rclone config, but Misty is not using that config. Reconnect or configure it in Misty to import it."
+                    .to_string(),
+            ),
+            config_source: "user".to_string(),
+        });
+    }
+}
+
+fn read_standard_rclone_config_remotes() -> Vec<(String, String)> {
+    let Some(path) = standard_rclone_config_path() else {
+        return Vec::new();
+    };
+    let Ok(content) = fs::read_to_string(path) else {
+        return Vec::new();
+    };
+    parse_rclone_config_sections(&content)
+}
+
+fn standard_rclone_config_path() -> Option<PathBuf> {
+    env::var_os("HOME")
+        .map(PathBuf::from)
+        .map(|home| home.join(".config").join("rclone").join("rclone.conf"))
+}
+
+fn parse_rclone_config_sections(content: &str) -> Vec<(String, String)> {
+    let mut remotes = Vec::new();
+    let mut current_name = String::new();
+    let mut current_type = String::new();
+    for raw_line in content.lines() {
+        let line = raw_line.trim();
+        if line.is_empty() || line.starts_with('#') || line.starts_with(';') {
+            continue;
+        }
+        if let Some(section) = line
+            .strip_prefix('[')
+            .and_then(|value| value.strip_suffix(']'))
+        {
+            if !current_name.is_empty() {
+                remotes.push((
+                    std::mem::take(&mut current_name),
+                    if current_type.is_empty() {
+                        "unknown".to_string()
+                    } else {
+                        std::mem::take(&mut current_type)
+                    },
+                ));
+            }
+            current_name = section.trim().to_string();
+            current_type.clear();
+            continue;
+        }
+        if current_name.is_empty() {
+            continue;
+        }
+        let Some((key, value)) = line.split_once('=') else {
+            continue;
+        };
+        if key.trim().eq_ignore_ascii_case("type") {
+            current_type = value.trim().to_string();
+        }
+    }
+    if !current_name.is_empty() {
+        remotes.push((
+            current_name,
+            if current_type.is_empty() {
+                "unknown".to_string()
+            } else {
+                current_type
+            },
+        ));
+    }
+    remotes
+}
+
 fn parse_config_map(body: &str) -> ApiResult<BTreeMap<String, String>> {
     let parsed = serde_json::from_str::<serde_json::Value>(body)?;
     let Some(object) = parsed.as_object() else {
@@ -702,37 +1115,313 @@ fn provider_config_request_body(request: &ProviderConfigRequest) -> serde_json::
 }
 
 fn default_provider_workflows() -> Vec<ProviderWorkflow> {
+    let drive_scope = vec![ProviderWorkflowOption {
+        name: "scope".to_string(),
+        label: "Scope".to_string(),
+        help: "Access scope requested from Google Drive.".to_string(),
+        default_value: "drive".to_string(),
+        required: true,
+        password: false,
+        choices: vec![ProviderWorkflowChoice {
+            value: "drive".to_string(),
+            help: "Full Google Drive access".to_string(),
+        }],
+    }];
     vec![
-        ProviderWorkflow {
-            provider_type: "drive".to_string(),
-            name: "Google Drive".to_string(),
-            description: "Connect a Google Drive remote with browser sign-in.".to_string(),
-            options: vec![ProviderWorkflowOption {
-                name: "scope".to_string(),
-                label: "Scope".to_string(),
-                help: "Access scope requested from Google Drive.".to_string(),
-                default_value: "drive".to_string(),
-                required: true,
-                password: false,
-                choices: vec![ProviderWorkflowChoice {
-                    value: "drive".to_string(),
-                    help: "Full Google Drive access".to_string(),
-                }],
-            }],
-        },
-        ProviderWorkflow {
-            provider_type: "dropbox".to_string(),
-            name: "Dropbox".to_string(),
-            description: "Connect a Dropbox remote with browser sign-in.".to_string(),
-            options: Vec::new(),
-        },
-        ProviderWorkflow {
-            provider_type: "onedrive".to_string(),
-            name: "OneDrive".to_string(),
-            description: "Connect a Microsoft OneDrive remote with browser sign-in.".to_string(),
-            options: Vec::new(),
-        },
+        provider_workflow(
+            "alias",
+            "Alias",
+            "Alias for an existing remote.",
+            Vec::new(),
+        ),
+        provider_workflow(
+            "hdfs",
+            "HDFS",
+            "Hadoop distributed file system.",
+            Vec::new(),
+        ),
+        provider_workflow("local", "Local Disk", "Local disk backend.", Vec::new()),
+        provider_workflow(
+            "storj",
+            "Storj",
+            "Storj decentralized cloud storage.",
+            Vec::new(),
+        ),
+        provider_workflow(
+            "tardigrade",
+            "Tardigrade",
+            "Storj decentralized cloud storage.",
+            Vec::new(),
+        ),
+        provider_workflow(
+            "cloudinary",
+            "Cloudinary",
+            "Cloudinary media storage.",
+            Vec::new(),
+        ),
+        provider_workflow("doi", "DOI datasets", "DOI dataset storage.", Vec::new()),
+        provider_workflow("fichier", "1Fichier", "1Fichier cloud storage.", Vec::new()),
+        provider_workflow("filelu", "FileLu", "FileLu cloud storage.", Vec::new()),
+        provider_workflow("filescom", "Files.com", "Files.com storage.", Vec::new()),
+        provider_workflow("ftp", "FTP", "FTP server.", Vec::new()),
+        provider_workflow("http", "HTTP", "HTTP remote.", Vec::new()),
+        provider_workflow(
+            "imagekit",
+            "ImageKit.io",
+            "ImageKit.io storage.",
+            Vec::new(),
+        ),
+        provider_workflow(
+            "internetarchive",
+            "Internet Archive",
+            "Internet Archive storage.",
+            Vec::new(),
+        ),
+        provider_workflow(
+            "koofr",
+            "Koofr",
+            "Koofr, Digi Storage, and Koofr-compatible storage.",
+            Vec::new(),
+        ),
+        provider_workflow("linkbox", "Linkbox", "Linkbox storage.", Vec::new()),
+        provider_workflow("mega", "Mega", "Mega cloud storage.", Vec::new()),
+        provider_workflow("opendrive", "OpenDrive", "OpenDrive storage.", Vec::new()),
+        provider_workflow(
+            "pixeldrain",
+            "Pixeldrain",
+            "Pixeldrain filesystem.",
+            Vec::new(),
+        ),
+        provider_workflow(
+            "protondrive",
+            "Proton Drive",
+            "Proton Drive storage.",
+            Vec::new(),
+        ),
+        provider_workflow("seafile", "Seafile", "Seafile storage.", Vec::new()),
+        provider_workflow("sftp", "SFTP", "SSH/SFTP remote.", Vec::new()),
+        provider_workflow("sia", "Sia", "Sia decentralized cloud storage.", Vec::new()),
+        provider_workflow("smb", "SMB / CIFS", "SMB / CIFS share.", Vec::new()),
+        provider_workflow("ulozto", "Uloz.to", "Uloz.to storage.", Vec::new()),
+        provider_workflow(
+            "azurefiles",
+            "Azure Files",
+            "Microsoft Azure Files.",
+            Vec::new(),
+        ),
+        provider_workflow(
+            "crypt",
+            "Crypt",
+            "Encrypt or decrypt another remote.",
+            Vec::new(),
+        ),
+        provider_workflow("filen", "Filen", "Filen cloud storage.", Vec::new()),
+        provider_workflow("gofile", "Gofile", "Gofile storage.", Vec::new()),
+        provider_workflow(
+            "iclouddrive",
+            "iCloud Drive",
+            "iCloud Drive and Photos.",
+            Vec::new(),
+        ),
+        provider_workflow("memory", "Memory", "In-memory object storage.", Vec::new()),
+        provider_workflow(
+            "netstorage",
+            "Akamai NetStorage",
+            "Akamai NetStorage.",
+            Vec::new(),
+        ),
+        provider_workflow(
+            "qingstor",
+            "QingStor",
+            "QingCloud Object Storage.",
+            Vec::new(),
+        ),
+        provider_workflow("webdav", "WebDAV", "WebDAV-compatible storage.", Vec::new()),
+        provider_workflow(
+            "filefabric",
+            "Enterprise File Fabric",
+            "Enterprise File Fabric.",
+            Vec::new(),
+        ),
+        provider_workflow(
+            "azureblob",
+            "Azure Blob",
+            "Microsoft Azure Blob Storage.",
+            Vec::new(),
+        ),
+        provider_workflow("drime", "Drime", "Drime storage.", Vec::new()),
+        provider_workflow("quatrix", "Quatrix", "Quatrix by Maytech.", Vec::new()),
+        provider_workflow("shade", "Shade FS", "Shade filesystem.", Vec::new()),
+        provider_workflow("b2", "Backblaze B2", "Backblaze B2 storage.", Vec::new()),
+        provider_workflow("cache", "Cache", "Cache another remote.", Vec::new()),
+        provider_workflow(
+            "chunker",
+            "Chunker",
+            "Transparently chunk or split large files.",
+            Vec::new(),
+        ),
+        provider_workflow(
+            "combine",
+            "Combine",
+            "Combine several remotes into one.",
+            Vec::new(),
+        ),
+        provider_workflow(
+            "hasher",
+            "Hasher",
+            "Better checksums for other remotes.",
+            Vec::new(),
+        ),
+        provider_workflow(
+            "oos",
+            "Oracle Object Storage",
+            "Oracle Cloud Infrastructure Object Storage.",
+            Vec::new(),
+        ),
+        provider_workflow(
+            "s3",
+            "S3",
+            "Amazon S3-compatible object storage.",
+            Vec::new(),
+        ),
+        provider_workflow("sugarsync", "SugarSync", "SugarSync storage.", Vec::new()),
+        provider_workflow(
+            "swift",
+            "OpenStack Swift",
+            "OpenStack Swift and compatible cloud files.",
+            Vec::new(),
+        ),
+        provider_workflow(
+            "union",
+            "Union",
+            "Union merges several upstream filesystems.",
+            Vec::new(),
+        ),
+        provider_workflow(
+            "compress",
+            "Compress",
+            "Compress another remote.",
+            Vec::new(),
+        ),
+        provider_workflow(
+            "dropbox",
+            "Dropbox",
+            "Dropbox storage with browser sign-in.",
+            Vec::new(),
+        ),
+        provider_workflow(
+            "gphotos",
+            "Google Photos",
+            "Google Photos storage.",
+            Vec::new(),
+        ),
+        provider_workflow("hidrive", "HiDrive", "HiDrive storage.", Vec::new()),
+        provider_workflow(
+            "huaweidrive",
+            "Huawei Drive",
+            "Huawei Drive storage.",
+            Vec::new(),
+        ),
+        provider_workflow(
+            "internxt",
+            "Internxt Drive",
+            "Internxt Drive storage.",
+            Vec::new(),
+        ),
+        provider_workflow(
+            "jottacloud",
+            "Jottacloud",
+            "Jottacloud storage.",
+            Vec::new(),
+        ),
+        provider_workflow(
+            "mailru",
+            "Mail.ru Cloud",
+            "Mail.ru Cloud storage.",
+            Vec::new(),
+        ),
+        provider_workflow("onedrive", "OneDrive", "Microsoft OneDrive.", Vec::new()),
+        provider_workflow("pcloud", "pCloud", "pCloud storage.", Vec::new()),
+        provider_workflow("pikpak", "PikPak", "PikPak storage.", Vec::new()),
+        provider_workflow(
+            "premiumizeme",
+            "premiumize.me",
+            "premiumize.me storage.",
+            Vec::new(),
+        ),
+        provider_workflow("putio", "Put.io", "Put.io storage.", Vec::new()),
+        provider_workflow(
+            "sharefile",
+            "Citrix ShareFile",
+            "Citrix ShareFile storage.",
+            Vec::new(),
+        ),
+        provider_workflow("yandex", "Yandex Disk", "Yandex Disk storage.", Vec::new()),
+        provider_workflow("zoho", "Zoho", "Zoho storage.", Vec::new()),
+        provider_workflow("box", "Box", "Box storage.", Vec::new()),
+        provider_workflow(
+            "archive",
+            "Archive",
+            "Read archive files as remotes.",
+            Vec::new(),
+        ),
+        provider_workflow(
+            "drive",
+            "Google Drive",
+            "Google Drive with browser sign-in.",
+            drive_scope,
+        ),
+        provider_workflow(
+            "gcs",
+            "Google Cloud Storage",
+            "Google Cloud Storage.",
+            Vec::new(),
+        ),
     ]
+}
+
+fn provider_workflow(
+    provider_type: &str,
+    name: &str,
+    description: &str,
+    options: Vec<ProviderWorkflowOption>,
+) -> ProviderWorkflow {
+    ProviderWorkflow {
+        provider_type: provider_type.to_string(),
+        name: name.to_string(),
+        description: description.to_string(),
+        options,
+    }
+}
+
+fn merge_provider_workflows(
+    mut primary: Vec<ProviderWorkflow>,
+    fallback: Vec<ProviderWorkflow>,
+) -> Vec<ProviderWorkflow> {
+    for workflow in fallback {
+        let exists = primary.iter().any(|candidate| {
+            candidate
+                .provider_type
+                .eq_ignore_ascii_case(&workflow.provider_type)
+        });
+        if !exists {
+            primary.push(workflow);
+        }
+    }
+    primary.sort_by(|left, right| {
+        provider_workflow_rank(&left.provider_type)
+            .cmp(&provider_workflow_rank(&right.provider_type))
+            .then_with(|| left.name.to_lowercase().cmp(&right.name.to_lowercase()))
+    });
+    primary
+}
+
+fn provider_workflow_rank(provider_type: &str) -> u8 {
+    match provider_type {
+        "drive" | "dropbox" | "onedrive" | "box" | "s3" | "sftp" | "webdav" => 0,
+        "alias" | "crypt" | "chunker" | "combine" | "compress" | "hasher" | "union" => 2,
+        _ => 1,
+    }
 }
 
 fn parse_provider_config_step(body: &str) -> ApiResult<ProviderConfigStep> {
@@ -785,6 +1474,37 @@ fn proxy_response_error(status: u16, body: &str, fallback: &str) -> ApiError {
         .or_else(|| (!body.trim().is_empty()).then(|| body.trim().to_string()))
         .unwrap_or_else(|| format!("{fallback} (HTTP {status})"));
     ApiError::Message(message)
+}
+
+async fn parse_proxy_response<T: for<'de> Deserialize<'de>>(
+    response: ProxyResponse,
+    fallback: &str,
+) -> ApiResult<T> {
+    let status = response.status();
+    let body = response.text().await.unwrap_or_default();
+    if !status.is_success() {
+        return Err(provider_operation_error(status.as_u16(), &body, fallback));
+    }
+    serde_json::from_str::<T>(&body).map_err(ApiError::from)
+}
+
+fn endpoint_proxy_body(endpoint: &PowerToolEndpoint) -> serde_json::Value {
+    serde_json::json!({
+        "kind": endpoint.kind,
+        "remote": endpoint.remote,
+        "path": endpoint.path,
+    })
+}
+
+fn transfer_profile_proxy_body(profile: &TransferProfileOptions) -> serde_json::Value {
+    serde_json::json!({
+        "transfers": profile.transfers,
+        "checkers": profile.checkers,
+        "bandwidth_limit": profile.bandwidth_limit,
+        "retries": profile.retries,
+        "low_level_retries": profile.low_level_retries,
+        "checksum": profile.checksum,
+    })
 }
 
 fn provider_operation_error(status: u16, body: &str, fallback: &str) -> ApiError {
@@ -950,7 +1670,7 @@ mod tests {
     fn default_provider_workflows_include_supported_clouds() {
         let workflows = default_provider_workflows();
 
-        assert_eq!(workflows.len(), 3);
+        assert!(workflows.len() >= 60);
         assert!(workflows
             .iter()
             .any(|workflow| workflow.provider_type == "drive"));
@@ -966,6 +1686,72 @@ mod tests {
             .unwrap();
         assert_eq!(drive.options[0].name, "scope");
         assert_eq!(drive.options[0].default_value, "drive");
+        assert!(workflows
+            .iter()
+            .any(|workflow| workflow.provider_type == "s3"));
+        assert!(workflows
+            .iter()
+            .any(|workflow| workflow.provider_type == "webdav"));
+        assert!(workflows
+            .iter()
+            .any(|workflow| workflow.provider_type == "protondrive"));
+    }
+
+    #[test]
+    fn provider_workflow_merge_preserves_backend_specific_options() {
+        let workflows = merge_provider_workflows(
+            vec![ProviderWorkflow {
+                provider_type: "drive".into(),
+                name: "Proxy Drive".into(),
+                description: "Proxy reported Drive workflow.".into(),
+                options: vec![ProviderWorkflowOption {
+                    name: "team_drive".into(),
+                    label: "Team Drive".into(),
+                    help: String::new(),
+                    default_value: String::new(),
+                    required: false,
+                    password: false,
+                    choices: Vec::new(),
+                }],
+            }],
+            default_provider_workflows(),
+        );
+        let drive = workflows
+            .iter()
+            .find(|workflow| workflow.provider_type == "drive")
+            .unwrap();
+        assert_eq!(drive.name, "Proxy Drive");
+        assert_eq!(drive.options[0].name, "team_drive");
+        assert!(workflows
+            .iter()
+            .any(|workflow| workflow.provider_type == "dropbox"));
+    }
+
+    #[test]
+    fn parses_standard_rclone_config_sections_without_secret_values() {
+        let remotes = parse_rclone_config_sections(
+            r#"
+            # user config
+            [temp]
+            type = onedrive
+            token = {"access_token":"secret"}
+
+            [drop]
+            type=dropbox
+            client_secret = secret
+
+            [legacy]
+            "#,
+        );
+
+        assert_eq!(
+            remotes,
+            vec![
+                ("temp".to_string(), "onedrive".to_string()),
+                ("drop".to_string(), "dropbox".to_string()),
+                ("legacy".to_string(), "unknown".to_string()),
+            ],
+        );
     }
 
     #[test]

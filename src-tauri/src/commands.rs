@@ -13,12 +13,12 @@ use crate::core::explorer::{
     PreparedOpenItem, RenameItemRequest, RenameItemsRequest,
 };
 use crate::core::file_sync::FileSyncPair;
-use crate::core::operation_queue::{ConflictPolicy, OperationQueueSnapshot};
+use crate::core::operation_queue::{ConflictPolicy, OperationPriority, OperationQueueSnapshot};
 use crate::core::workspace::WorkspaceDocument;
 use crate::error::{ApiError, ApiResult};
 use crate::runtime::MistyRuntime;
-use crate::services::autostart::LaunchOnLoginSnapshot;
 use crate::services::ai::{AiSendRequest, AiStatus, AiStreamEvent};
+use crate::services::autostart::LaunchOnLoginSnapshot;
 use crate::services::claude::{ClaudeSendRequest, ClaudeStatus, ClaudeStreamEvent};
 use crate::services::commands::{SaveShortcutsRequest, ShortcutsSnapshot};
 use crate::services::devices::DeviceSnapshot;
@@ -30,13 +30,25 @@ use crate::services::explorer_library::{
 use crate::services::file_sync::{
     FileSyncApplyRequest, FileSyncApplyResult, FileSyncCompareRequest,
 };
+use crate::services::metadata::FileMetadataSnapshot;
 use crate::services::plugin_commands::{
-    PluginCommandRunResult, PluginCommandsSnapshot, PluginPanelRenderResult,
-    RenderPluginPanelRequest, RunPluginCommandRequest,
+    PluginCommandRunResult, PluginCommandsSnapshot, PluginDiagnosticsSnapshot,
+    PluginPanelRenderResult, RenderPluginPanelRequest, RunPluginCommandRequest,
+};
+use crate::services::power_pack::{
+    ArchiveActionResult, ArchiveCreateRequest, ArchiveExtractRequest, ArchiveListRequest,
+    ArchiveListResult, AutomationRule, AutomationRulesSnapshot, AutomationRunResult,
+    AutomationWatchSnapshot, CompareFilesRequest, CompareFilesResult, CompareFoldersRequest,
+    CompareFoldersResult, DuplicateScanRequest, DuplicateScanResult, FileToolsActionResult,
+    FileToolsChecksumRequest, FileToolsChecksumResult, FileToolsChmodRequest,
+    FileToolsReadonlyRequest, FileToolsSymlinkRequest, FileToolsSymlinkTargetRequest,
+    FileToolsSymlinkTargetResult, SavedSearch, SavedSearchesSnapshot,
 };
 use crate::services::providers::{
-    ProviderConfigRequest, ProviderConfigStep, ProvidersSnapshot, RcloneConfigPaths,
-    RemoteEditDraft, RemoteTestResult, SaveRemoteRequest,
+    BackendAction, BackendActionResult, BackendRunRequest, ConfigSecurityStatus, LinkPathRequest,
+    ProviderConfigRequest, ProviderConfigStep, ProviderJobStart, ProviderJobStatus,
+    ProvidersSnapshot, PublicLinkActionResult, PublicLinkListResult, RcloneConfigPaths,
+    RemoteEditDraft, RemoteTestResult, SaveRemoteRequest, VerifyResult, VerifyStartRequest,
 };
 use crate::services::proxy::ProxySnapshot;
 use crate::services::proxy_runtime::ProxyRuntimeSnapshot;
@@ -127,6 +139,14 @@ pub fn claude_abort(state: State<'_, MistyRuntime>) -> ApiResult<ClaudeStatus> {
 #[tauri::command]
 pub async fn proxy_snapshot(state: State<'_, MistyRuntime>) -> ApiResult<ProxySnapshot> {
     Ok(state.proxy.snapshot().await)
+}
+
+#[tauri::command]
+pub async fn file_metadata_snapshot(
+    path: String,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<FileMetadataSnapshot> {
+    state.metadata.snapshot(path).await
 }
 
 #[tauri::command]
@@ -592,6 +612,13 @@ pub async fn plugin_panel_render(
 }
 
 #[tauri::command]
+pub async fn plugin_diagnostics_snapshot(
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<PluginDiagnosticsSnapshot> {
+    state.plugin_commands.diagnostics().await
+}
+
+#[tauri::command]
 pub async fn devices_snapshot(state: State<'_, MistyRuntime>) -> ApiResult<DeviceSnapshot> {
     let devices = state.devices.clone();
     tokio::task::spawn_blocking(move || devices.snapshot())
@@ -646,6 +673,100 @@ pub async fn providers_configure_remote(
     state: State<'_, MistyRuntime>,
 ) -> ApiResult<ProviderConfigStep> {
     state.providers.configure_remote(request).await
+}
+
+#[tauri::command]
+pub async fn providers_verify_start(
+    request: VerifyStartRequest,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<ProviderJobStart> {
+    state.providers.start_verify(request).await
+}
+
+#[tauri::command]
+pub async fn providers_job_status(
+    job_id: String,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<ProviderJobStatus> {
+    state.providers.job_status(job_id).await
+}
+
+#[tauri::command]
+pub async fn providers_job_cancel(
+    job_id: String,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<serde_json::Value> {
+    state.providers.cancel_job(job_id).await
+}
+
+#[tauri::command]
+pub async fn providers_verify_result(
+    job_id: String,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<VerifyResult> {
+    state.providers.verify_result(job_id).await
+}
+
+#[tauri::command]
+pub async fn providers_public_links(
+    request: LinkPathRequest,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<PublicLinkListResult> {
+    state.providers.public_links(request).await
+}
+
+#[tauri::command]
+pub async fn providers_create_public_link(
+    request: LinkPathRequest,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<PublicLinkActionResult> {
+    state.providers.create_public_link(request).await
+}
+
+#[tauri::command]
+pub async fn providers_revoke_public_link(
+    request: LinkPathRequest,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<PublicLinkActionResult> {
+    state.providers.revoke_public_link(request).await
+}
+
+#[tauri::command]
+pub async fn providers_backend_actions(
+    remote: String,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<Vec<BackendAction>> {
+    state.providers.backend_actions(remote).await
+}
+
+#[tauri::command]
+pub async fn providers_run_backend_action(
+    request: BackendRunRequest,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<BackendActionResult> {
+    state.providers.run_backend_action(request).await
+}
+
+#[tauri::command]
+pub async fn providers_config_security(
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<ConfigSecurityStatus> {
+    state.providers.config_security().await
+}
+
+#[tauri::command]
+pub async fn providers_harden_config(
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<ConfigSecurityStatus> {
+    state.providers.harden_config().await
+}
+
+#[tauri::command]
+pub async fn providers_repair_config_security(
+    password: String,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<ConfigSecurityStatus> {
+    state.providers.repair_config_security(password).await
 }
 
 #[tauri::command]
@@ -841,6 +962,86 @@ pub async fn operation_queue_retry(
 }
 
 #[tauri::command]
+pub async fn operation_queue_pause(
+    operation_id: u64,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<OperationQueueSnapshot> {
+    state.operation_queue.pause(operation_id).await
+}
+
+#[tauri::command]
+pub async fn operation_queue_resume(
+    operation_id: u64,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<OperationQueueSnapshot> {
+    state.operation_queue.resume(operation_id).await
+}
+
+#[tauri::command]
+pub async fn operation_queue_pause_batch(
+    batch_id: u64,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<OperationQueueSnapshot> {
+    state.operation_queue.pause_batch(batch_id).await
+}
+
+#[tauri::command]
+pub async fn operation_queue_resume_batch(
+    batch_id: u64,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<OperationQueueSnapshot> {
+    state.operation_queue.resume_batch(batch_id).await
+}
+
+#[tauri::command]
+pub async fn operation_queue_pause_all(
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<OperationQueueSnapshot> {
+    Ok(state.operation_queue.pause_all().await)
+}
+
+#[tauri::command]
+pub async fn operation_queue_resume_all(
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<OperationQueueSnapshot> {
+    Ok(state.operation_queue.resume_all().await)
+}
+
+#[tauri::command]
+pub async fn operation_queue_set_priority(
+    operation_id: u64,
+    priority: OperationPriority,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<OperationQueueSnapshot> {
+    state
+        .operation_queue
+        .set_priority(operation_id, priority)
+        .await
+}
+
+#[tauri::command]
+pub async fn operation_queue_set_bandwidth_limit(
+    limit: String,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<OperationQueueSnapshot> {
+    Ok(state.operation_queue.set_bandwidth_limit(limit).await)
+}
+
+#[tauri::command]
+pub async fn operation_queue_set_transfer_profile(
+    profile_id: String,
+    profile_name: String,
+    max_concurrent: usize,
+    bandwidth_limit: String,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<OperationQueueSnapshot> {
+    Ok(state
+        .operation_queue
+        .set_transfer_profile(profile_id, profile_name, max_concurrent, bandwidth_limit)
+        .await)
+}
+
+#[tauri::command]
 pub async fn operation_queue_undo(
     undo_token_id: u64,
     state: State<'_, MistyRuntime>,
@@ -909,6 +1110,205 @@ pub async fn file_sync_apply(
     state: State<'_, MistyRuntime>,
 ) -> ApiResult<FileSyncApplyResult> {
     state.file_sync.apply(request).await
+}
+
+#[tauri::command]
+pub async fn archive_list(
+    request: ArchiveListRequest,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<ArchiveListResult> {
+    state.power_pack.archive_list(request).await
+}
+
+#[tauri::command]
+pub async fn archive_create(
+    request: ArchiveCreateRequest,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<ArchiveActionResult> {
+    state.power_pack.archive_create(request).await
+}
+
+#[tauri::command]
+pub async fn archive_extract(
+    request: ArchiveExtractRequest,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<ArchiveActionResult> {
+    state.power_pack.archive_extract(request).await
+}
+
+#[tauri::command]
+pub async fn duplicates_scan(
+    request: DuplicateScanRequest,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<DuplicateScanResult> {
+    state.power_pack.duplicates_scan(request).await
+}
+
+#[tauri::command]
+pub async fn duplicates_cancel(scan_id: String, state: State<'_, MistyRuntime>) -> ApiResult<bool> {
+    state.power_pack.duplicates_cancel(scan_id).await
+}
+
+#[tauri::command]
+pub async fn duplicates_hash_remote_candidates(
+    scan_id: String,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<DuplicateScanResult> {
+    state
+        .power_pack
+        .duplicates_hash_remote_candidates(scan_id)
+        .await
+}
+
+#[tauri::command]
+pub async fn saved_searches_snapshot(
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<SavedSearchesSnapshot> {
+    state.power_pack.saved_searches_snapshot().await
+}
+
+#[tauri::command]
+pub async fn saved_searches_save(
+    search: SavedSearch,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<SavedSearchesSnapshot> {
+    state.power_pack.saved_searches_save(search).await
+}
+
+#[tauri::command]
+pub async fn saved_searches_delete(
+    id: String,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<SavedSearchesSnapshot> {
+    state.power_pack.saved_searches_delete(id).await
+}
+
+#[tauri::command]
+pub async fn compare_files(
+    request: CompareFilesRequest,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<CompareFilesResult> {
+    state.power_pack.compare_files(request).await
+}
+
+#[tauri::command]
+pub async fn compare_folders(
+    request: CompareFoldersRequest,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<CompareFoldersResult> {
+    state.power_pack.compare_folders(request).await
+}
+
+#[tauri::command]
+pub async fn compare_apply_text_merge(
+    merged_text: String,
+    target_path: String,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<FileToolsActionResult> {
+    state
+        .power_pack
+        .compare_apply_text_merge(merged_text, target_path)
+        .await
+}
+
+#[tauri::command]
+pub async fn file_tools_checksum(
+    request: FileToolsChecksumRequest,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<FileToolsChecksumResult> {
+    state.power_pack.file_tools_checksum(request).await
+}
+
+#[tauri::command]
+pub async fn file_tools_set_readonly(
+    request: FileToolsReadonlyRequest,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<FileToolsActionResult> {
+    state.power_pack.file_tools_set_readonly(request).await
+}
+
+#[tauri::command]
+pub async fn file_tools_chmod(
+    request: FileToolsChmodRequest,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<FileToolsActionResult> {
+    state.power_pack.file_tools_chmod(request).await
+}
+
+#[tauri::command]
+pub async fn file_tools_create_symlink(
+    request: FileToolsSymlinkRequest,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<FileToolsActionResult> {
+    state.power_pack.file_tools_create_symlink(request).await
+}
+
+#[tauri::command]
+pub async fn file_tools_read_symlink(
+    request: FileToolsSymlinkTargetRequest,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<FileToolsSymlinkTargetResult> {
+    state.power_pack.file_tools_read_symlink(request).await
+}
+
+#[tauri::command]
+pub async fn automation_rules_snapshot(
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<AutomationRulesSnapshot> {
+    state.power_pack.automation_rules_snapshot().await
+}
+
+#[tauri::command]
+pub async fn automation_watch_snapshot(
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<AutomationWatchSnapshot> {
+    Ok(state.power_pack.automation_watch_snapshot().await)
+}
+
+#[tauri::command]
+pub async fn automation_watch_start(
+    poll_interval_ms: Option<u64>,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<AutomationWatchSnapshot> {
+    state
+        .power_pack
+        .automation_watch_start(poll_interval_ms)
+        .await
+}
+
+#[tauri::command]
+pub async fn automation_watch_stop(
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<AutomationWatchSnapshot> {
+    Ok(state.power_pack.automation_watch_stop().await)
+}
+
+#[tauri::command]
+pub async fn automation_rules_save(
+    rule: AutomationRule,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<AutomationRulesSnapshot> {
+    state.power_pack.automation_rules_save(rule).await
+}
+
+#[tauri::command]
+pub async fn automation_rules_delete(
+    id: String,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<AutomationRulesSnapshot> {
+    state.power_pack.automation_rules_delete(id).await
+}
+
+#[tauri::command]
+pub async fn automation_rules_run_now(
+    id: String,
+    dry_run: Option<bool>,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<AutomationRunResult> {
+    state
+        .power_pack
+        .automation_rules_run_now(id, dry_run.unwrap_or(true))
+        .await
 }
 
 #[allow(dead_code)]

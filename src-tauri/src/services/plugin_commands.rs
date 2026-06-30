@@ -3,7 +3,9 @@ use std::{
     ffi::{c_char, c_float, c_int, c_void, CStr},
     fs,
     path::{Component, Path, PathBuf},
+    process::Command,
     ptr,
+    time::{SystemTime, UNIX_EPOCH},
 };
 
 use libloading::Library;
@@ -12,6 +14,8 @@ use serde_json::Value;
 
 use crate::error::{ApiError, ApiResult};
 use crate::services::environment::AppEnvironmentService;
+
+const REMOVED_EXTENSION_IDS: &[&str] = &["git", "preview-panel", "preview_panel"];
 
 #[derive(Debug, Clone)]
 pub struct PluginCommandService {
@@ -24,6 +28,29 @@ pub struct PluginCommandsSnapshot {
     pub roots: Vec<String>,
     pub commands: Vec<PluginCommandEntry>,
     pub panels: Vec<PluginPanelEntry>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PluginDiagnosticsSnapshot {
+    pub roots: Vec<String>,
+    pub plugins: Vec<PluginDiagnosticsEntry>,
+    pub removed_ids: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PluginDiagnosticsEntry {
+    pub plugin_id: String,
+    pub plugin_name: String,
+    pub plugin_dir: String,
+    pub installed: bool,
+    pub enabled: bool,
+    pub runtime_status: String,
+    pub commands: Vec<PluginCommandEntry>,
+    pub panels: Vec<PluginPanelEntry>,
+    pub missing_dependencies: Vec<String>,
+    pub errors: Vec<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -374,6 +401,15 @@ impl PluginCommandService {
             .await
             .map_err(|err| ApiError::Message(format!("Extension panel worker failed: {err}")))?
     }
+
+    pub async fn diagnostics(&self) -> ApiResult<PluginDiagnosticsSnapshot> {
+        let roots = self.roots.clone();
+        tokio::task::spawn_blocking(move || plugin_diagnostics_snapshot(roots))
+            .await
+            .map_err(|err| {
+                ApiError::Message(format!("Extension diagnostics worker failed: {err}"))
+            })?
+    }
 }
 
 fn render_plugin_panel(
@@ -403,6 +439,10 @@ fn render_result_for_panel(
     panel: PluginPanelEntry,
     request: RenderPluginPanelRequest,
 ) -> PluginPanelRenderResult {
+    if built_in_plugin_id(&panel.plugin_id).is_some() {
+        return render_builtin_plugin_panel(panel, request);
+    }
+
     if panel.library_path.is_empty() {
         return panel_render_failure(
             panel,
@@ -565,6 +605,10 @@ fn run_result_for_command(
             notifications: Vec::new(),
             runtime_status: "opened".to_owned(),
         };
+    }
+
+    if command.source == "builtin" {
+        return run_builtin_plugin_command(command, selected_paths);
     }
 
     if !command.library_path.is_empty() {
@@ -734,6 +778,7 @@ fn native_plugin_failure(
 }
 
 fn snapshot_plugin_commands(roots: Vec<PathBuf>) -> ApiResult<PluginCommandsSnapshot> {
+    purge_removed_extension_dirs(&roots)?;
     let mut commands = BTreeMap::<String, PluginCommandEntry>::new();
     let mut panels = BTreeMap::<String, PluginPanelEntry>::new();
     for root in &roots {
@@ -781,6 +826,12 @@ fn plugin_entries_for_plugin_dir(plugin_dir: &Path) -> ApiResult<PluginEntries> 
         .or_else(|| read_json(plugin_dir.join("detail.json")));
     let manifest = read_json(plugin_dir.join("manifest.json"));
     let metadata = plugin_metadata(plugin_dir, detail.as_ref(), manifest.as_ref());
+    if removed_extension_id(&metadata.id) {
+        return Ok(PluginEntries {
+            commands: Vec::new(),
+            panels: Vec::new(),
+        });
+    }
     if !metadata.enabled || !metadata.installed {
         return Ok(PluginEntries {
             commands: Vec::new(),
@@ -803,6 +854,8 @@ fn plugin_entries_for_plugin_dir(plugin_dir: &Path) -> ApiResult<PluginEntries> 
             panels.extend(static_panels_from_json(plugin, &metadata));
         }
     }
+    commands.extend(built_in_commands_for_plugin(&metadata));
+    panels.extend(built_in_panels_for_plugin(&metadata));
     if !metadata.library_path.is_empty() {
         if let Ok((library, native_entries)) = load_native_plugin(&metadata.library_path) {
             commands.extend(
@@ -877,6 +930,89 @@ fn plugin_entries_for_plugin_dir(plugin_dir: &Path) -> ApiResult<PluginEntries> 
         });
     }
     Ok(PluginEntries { commands, panels })
+}
+
+fn plugin_diagnostics_snapshot(roots: Vec<PathBuf>) -> ApiResult<PluginDiagnosticsSnapshot> {
+    purge_removed_extension_dirs(&roots)?;
+    let mut plugins = Vec::new();
+    for root in &roots {
+        if !root.is_dir() {
+            continue;
+        }
+        let entries = fs::read_dir(root).map_err(|err| {
+            ApiError::Message(format!(
+                "Failed to read extension root {}: {err}",
+                root.display()
+            ))
+        })?;
+        for entry in entries.flatten() {
+            let plugin_dir = entry.path();
+            if !plugin_dir.is_dir() {
+                continue;
+            }
+            let detail = read_json(plugin_dir.join("plugin.json"))
+                .or_else(|| read_json(plugin_dir.join("detail.json")));
+            let manifest = read_json(plugin_dir.join("manifest.json"));
+            let metadata = plugin_metadata(&plugin_dir, detail.as_ref(), manifest.as_ref());
+            if removed_extension_id(&metadata.id) {
+                continue;
+            }
+            let mut errors = Vec::new();
+            let entries = match plugin_entries_for_plugin_dir(&plugin_dir) {
+                Ok(entries) => entries,
+                Err(error) => {
+                    errors.push(error.to_string());
+                    PluginEntries {
+                        commands: Vec::new(),
+                        panels: Vec::new(),
+                    }
+                }
+            };
+            let runtime_status = if !metadata.enabled {
+                "disabled".to_owned()
+            } else if built_in_plugin_id(&metadata.id).is_some() {
+                "builtin_injected".to_owned()
+            } else if metadata.library_path.is_empty() {
+                "static_only".to_owned()
+            } else {
+                match load_native_plugin(&metadata.library_path) {
+                    Ok(_) => "native_loaded".to_owned(),
+                    Err(error) => {
+                        errors.push(error);
+                        "native_load_failed".to_owned()
+                    }
+                }
+            };
+            plugins.push(PluginDiagnosticsEntry {
+                plugin_id: metadata.id.clone(),
+                plugin_name: metadata.name.clone(),
+                plugin_dir: metadata.plugin_dir,
+                installed: metadata.installed,
+                enabled: metadata.enabled,
+                runtime_status,
+                commands: entries.commands,
+                panels: entries.panels,
+                missing_dependencies: missing_dependencies_for_plugin(&metadata.id),
+                errors,
+            });
+        }
+    }
+    plugins.sort_by(|left, right| {
+        left.plugin_name
+            .to_lowercase()
+            .cmp(&right.plugin_name.to_lowercase())
+    });
+    Ok(PluginDiagnosticsSnapshot {
+        roots: roots
+            .iter()
+            .map(|root| root.display().to_string())
+            .collect(),
+        plugins,
+        removed_ids: REMOVED_EXTENSION_IDS
+            .iter()
+            .map(|id| (*id).to_owned())
+            .collect(),
+    })
 }
 
 fn plugin_metadata(
@@ -1102,6 +1238,829 @@ fn action_id_for(label: &str, kind: &str) -> String {
     } else {
         slug
     }
+}
+
+fn built_in_plugin_id(plugin_id: &str) -> Option<&'static str> {
+    match plugin_id
+        .trim()
+        .to_ascii_lowercase()
+        .replace('-', "_")
+        .as_str()
+    {
+        "quick_convert" => Some("quick_convert"),
+        "themes" => Some("themes"),
+        "vault" => Some("vault"),
+        "ytdlp" | "yt_dlp" => Some("ytdlp"),
+        _ => None,
+    }
+}
+
+fn built_in_commands_for_plugin(plugin: &PluginMetadata) -> Vec<PluginCommandEntry> {
+    let Some(plugin_id) = built_in_plugin_id(&plugin.id) else {
+        return Vec::new();
+    };
+    let commands = match plugin_id {
+        "quick_convert" => vec![
+            (
+                "convert_mp4",
+                "Convert selected to MP4",
+                "convert_mp4",
+                true,
+            ),
+            (
+                "convert_mp3",
+                "Convert selected to MP3",
+                "convert_mp3",
+                true,
+            ),
+            (
+                "convert_png",
+                "Convert selected to PNG",
+                "convert_png",
+                true,
+            ),
+        ],
+        "themes" => vec![
+            ("apply_dark", "Apply Dark preset", "apply_dark", false),
+            ("apply_light", "Apply Light preset", "apply_light", false),
+            (
+                "apply_graphite",
+                "Apply Graphite preset",
+                "apply_graphite",
+                false,
+            ),
+            ("apply_aurora", "Apply Aurora preset", "apply_aurora", false),
+            ("apply_copper", "Apply Copper preset", "apply_copper", false),
+        ],
+        "vault" => vec![
+            (
+                "setup_backup",
+                "Create backup job scaffold",
+                "setup_backup",
+                false,
+            ),
+            (
+                "backup_status",
+                "Review backup status",
+                "backup_status",
+                false,
+            ),
+            (
+                "restore_plan",
+                "Prepare restore plan",
+                "restore_plan",
+                false,
+            ),
+        ],
+        "ytdlp" => vec![
+            (
+                "download_video",
+                "Download video from URL file",
+                "download_video",
+                true,
+            ),
+            (
+                "download_audio",
+                "Download audio from URL file",
+                "download_audio",
+                true,
+            ),
+        ],
+        _ => Vec::new(),
+    };
+    commands
+        .into_iter()
+        .map(
+            |(id, label, action_kind, requires_selected_file)| PluginCommandEntry {
+                id: format!("plugin.{}.builtin.{id}", plugin.id),
+                label: format!("{}: {label}", plugin.name),
+                hint: built_in_command_hint(plugin_id, action_kind),
+                plugin_id: plugin.id.clone(),
+                plugin_name: plugin.name.clone(),
+                default_shortcut: String::new(),
+                source: "builtin".to_owned(),
+                action_kind: action_kind.to_owned(),
+                launcher_open_mode: plugin.launcher_open_mode.clone(),
+                requires_selected_file,
+                plugin_dir: plugin.plugin_dir.clone(),
+                manifest_path: plugin.manifest_path.clone(),
+                library_path: plugin.library_path.clone(),
+            },
+        )
+        .collect()
+}
+
+fn built_in_command_hint(plugin_id: &str, action_kind: &str) -> String {
+    match (plugin_id, action_kind) {
+        ("quick_convert", _) => "Convert the selected media file through system FFmpeg.".to_owned(),
+        ("themes", _) => "Apply and persist a Misty theme preset.".to_owned(),
+        ("vault", "setup_backup") => {
+            "Create a Vault backup job scaffold for selected paths.".to_owned()
+        }
+        ("vault", "restore_plan") => {
+            "Write a dry-run restore plan before touching files.".to_owned()
+        }
+        ("vault", _) => "Review local Vault backup scaffolds.".to_owned(),
+        ("ytdlp", _) => {
+            "Read a URL from the selected text/.url file and run system yt-dlp.".to_owned()
+        }
+        _ => "Run built-in extension action.".to_owned(),
+    }
+}
+
+fn built_in_panels_for_plugin(plugin: &PluginMetadata) -> Vec<PluginPanelEntry> {
+    let Some(plugin_id) = built_in_plugin_id(&plugin.id) else {
+        return Vec::new();
+    };
+    vec![PluginPanelEntry {
+        id: format!("{}.builtin", plugin.id),
+        title: match plugin_id {
+            "quick_convert" => "Quick Convert",
+            "themes" => "Themes",
+            "vault" => "Vault",
+            "ytdlp" => "yt-dlp",
+            _ => &plugin.name,
+        }
+        .to_owned(),
+        plugin_id: plugin.id.clone(),
+        plugin_name: plugin.name.clone(),
+        window_type: "panel".to_owned(),
+        default_width: 420.0,
+        default_height: 520.0,
+        plugin_dir: plugin.plugin_dir.clone(),
+        manifest_path: plugin.manifest_path.clone(),
+        library_path: plugin.library_path.clone(),
+        launcher_views: plugin.launcher_views.clone(),
+    }]
+}
+
+fn run_builtin_plugin_command(
+    command: PluginCommandEntry,
+    selected_paths: Vec<String>,
+) -> PluginCommandRunResult {
+    let result = match built_in_plugin_id(&command.plugin_id) {
+        Some("quick_convert") => run_builtin_quick_convert(&command, &selected_paths),
+        Some("themes") => run_builtin_themes(&command),
+        Some("vault") => run_builtin_vault(&command, &selected_paths),
+        Some("ytdlp") => run_builtin_ytdlp(&command, &selected_paths),
+        _ => Err((
+            "unknown_builtin",
+            "Unknown built-in extension action.".to_owned(),
+        )),
+    };
+    match result {
+        Ok(message) => {
+            builtin_command_result(command, true, message, "builtin_executed", "success")
+        }
+        Err((status, message)) => builtin_command_result(command, false, message, status, "error"),
+    }
+}
+
+fn builtin_command_result(
+    command: PluginCommandEntry,
+    handled: bool,
+    message: String,
+    runtime_status: &str,
+    level: &str,
+) -> PluginCommandRunResult {
+    PluginCommandRunResult {
+        command_id: command.id,
+        plugin_id: command.plugin_id.clone(),
+        plugin_name: command.plugin_name,
+        label: command.label,
+        handled,
+        target_route: if handled {
+            String::new()
+        } else {
+            format!(
+                "/hub/extensions?plugin={}",
+                route_encode(&command.plugin_id)
+            )
+        },
+        notifications: vec![PluginPanelNotification {
+            level: level.to_owned(),
+            title: "Extension action".to_owned(),
+            message: message.clone(),
+        }],
+        message,
+        runtime_status: runtime_status.to_owned(),
+    }
+}
+
+fn run_builtin_quick_convert(
+    command: &PluginCommandEntry,
+    selected_paths: &[String],
+) -> Result<String, (&'static str, String)> {
+    run_builtin_quick_convert_action(&command.action_kind, selected_paths)
+}
+
+fn run_builtin_quick_convert_action(
+    action_kind: &str,
+    selected_paths: &[String],
+) -> Result<String, (&'static str, String)> {
+    require_command("ffmpeg", "Quick Convert")?;
+    let source = selected_file_path(selected_paths, "Quick Convert")?;
+    let extension = match action_kind {
+        "convert_mp3" => "mp3",
+        "convert_png" => "png",
+        _ => "mp4",
+    };
+    let output = output_with_extension(&source, extension);
+    let mut process = Command::new("ffmpeg");
+    process.arg("-y").arg("-i").arg(&source);
+    if extension == "mp3" {
+        process.args(["-vn", "-codec:a", "libmp3lame"]);
+    }
+    process.arg(&output);
+    run_system_command(process, "ffmpeg")?;
+    Ok(format!(
+        "Converted {} to {}.",
+        source.display(),
+        output.display()
+    ))
+}
+
+fn run_builtin_themes(command: &PluginCommandEntry) -> Result<String, (&'static str, String)> {
+    run_builtin_theme_action(&command.plugin_dir, &command.action_kind)
+}
+
+fn run_builtin_theme_action(
+    plugin_dir: &str,
+    action_kind: &str,
+) -> Result<String, (&'static str, String)> {
+    let preset = match action_kind {
+        "apply_light" => "light",
+        "apply_graphite" => "graphite",
+        "apply_aurora" => "aurora",
+        "apply_copper" => "copper",
+        _ => "dark",
+    };
+    let tokens = match preset {
+        "light" => serde_json::json!({
+            "preset": "light",
+            "tokens": {
+                "background": "#f7f7f4",
+                "foreground": "#181818",
+                "accent": "#2563eb"
+            },
+            "updatedAtMs": now_ms_for_plugin()
+        }),
+        "graphite" => serde_json::json!({
+            "preset": "graphite",
+            "tokens": {
+                "background": "#08090a",
+                "surface": "#111315",
+                "foreground": "#f3f5f7",
+                "accent": "#8bd3dd",
+                "syntax.keyword": "#ff9ab5",
+                "syntax.string": "#9fe6b8",
+                "syntax.function": "#9bd1ff"
+            },
+            "updatedAtMs": now_ms_for_plugin()
+        }),
+        "aurora" => serde_json::json!({
+            "preset": "aurora",
+            "tokens": {
+                "background": "#071011",
+                "surface": "#0d1b1d",
+                "foreground": "#effdfb",
+                "accent": "#69d2c8",
+                "syntax.keyword": "#ff91c0",
+                "syntax.string": "#a6e98f",
+                "syntax.function": "#8fd7ff"
+            },
+            "updatedAtMs": now_ms_for_plugin()
+        }),
+        "copper" => serde_json::json!({
+            "preset": "copper",
+            "tokens": {
+                "background": "#120f0d",
+                "surface": "#1d1713",
+                "foreground": "#fff4e8",
+                "accent": "#e49f6a",
+                "syntax.keyword": "#ff9fb4",
+                "syntax.string": "#a6df90",
+                "syntax.function": "#a9d4ff"
+            },
+            "updatedAtMs": now_ms_for_plugin()
+        }),
+        _ => serde_json::json!({
+            "preset": "dark",
+            "tokens": {
+                "background": "#151515",
+                "foreground": "#eeeeee",
+                "accent": "#7da2b4",
+                "syntax.keyword": "#f472b6",
+                "syntax.string": "#86efac",
+                "syntax.function": "#93c5fd"
+            },
+            "updatedAtMs": now_ms_for_plugin()
+        }),
+    };
+    let path = Path::new(plugin_dir).join("theme-tokens.json");
+    write_pretty_json(&path, &tokens)?;
+    Ok(format!("Applied and persisted the {preset} theme preset."))
+}
+
+fn run_builtin_theme_custom_accent(
+    plugin_dir: &str,
+    accent: &str,
+) -> Result<String, (&'static str, String)> {
+    let accent = accent.trim();
+    if !valid_hex_color(accent) {
+        return Err((
+            "invalid_color",
+            "Accent must be a hex color like #7da2b4.".to_owned(),
+        ));
+    }
+    let tokens = serde_json::json!({
+        "preset": "custom",
+        "tokens": {
+            "accent": accent
+        },
+        "updatedAtMs": now_ms_for_plugin()
+    });
+    let path = Path::new(plugin_dir).join("theme-tokens.json");
+    write_pretty_json(&path, &tokens)?;
+    Ok(format!("Saved custom accent token {accent}."))
+}
+
+fn run_builtin_vault(
+    command: &PluginCommandEntry,
+    selected_paths: &[String],
+) -> Result<String, (&'static str, String)> {
+    run_builtin_vault_action(&command.plugin_dir, &command.action_kind, selected_paths)
+}
+
+fn run_builtin_vault_action(
+    plugin_dir: &str,
+    action_kind: &str,
+    selected_paths: &[String],
+) -> Result<String, (&'static str, String)> {
+    let vault_dir = Path::new(plugin_dir).join("vault");
+    fs::create_dir_all(&vault_dir).map_err(|error| {
+        (
+            "io_error",
+            format!(
+                "Could not create Vault directory {}: {error}",
+                vault_dir.display()
+            ),
+        )
+    })?;
+    match action_kind {
+        "backup_status" => {
+            let jobs_dir = vault_dir.join("jobs");
+            let count = fs::read_dir(&jobs_dir)
+                .map(|entries| entries.filter_map(Result::ok).count())
+                .unwrap_or(0);
+            Ok(format!("Vault has {count} backup job scaffold(s)."))
+        }
+        "restore_plan" => {
+            let path = vault_dir.join("restore-plan.json");
+            let plan = serde_json::json!({
+                "mode": "dry_run",
+                "createdAtMs": now_ms_for_plugin(),
+                "sources": selected_paths,
+                "actions": []
+            });
+            write_pretty_json(&path, &plan)?;
+            Ok(format!("Prepared restore plan at {}.", path.display()))
+        }
+        _ => {
+            let jobs_dir = vault_dir.join("jobs");
+            fs::create_dir_all(&jobs_dir).map_err(|error| {
+                (
+                    "io_error",
+                    format!(
+                        "Could not create Vault jobs directory {}: {error}",
+                        jobs_dir.display()
+                    ),
+                )
+            })?;
+            let path = jobs_dir.join(format!("backup-job-{}.json", now_ms_for_plugin()));
+            let job = serde_json::json!({
+                "createdAtMs": now_ms_for_plugin(),
+                "sources": selected_paths,
+                "status": "scaffolded",
+                "restoreVerified": false
+            });
+            write_pretty_json(&path, &job)?;
+            Ok(format!(
+                "Created backup job scaffold at {}.",
+                path.display()
+            ))
+        }
+    }
+}
+
+fn run_builtin_ytdlp(
+    command: &PluginCommandEntry,
+    selected_paths: &[String],
+) -> Result<String, (&'static str, String)> {
+    let url = selected_url(selected_paths)?;
+    run_builtin_ytdlp_download(
+        &command.plugin_dir,
+        command.action_kind == "download_audio",
+        &url,
+    )
+}
+
+fn run_builtin_ytdlp_action(
+    plugin_dir: &str,
+    action_kind: &str,
+    inputs: &BTreeMap<String, String>,
+) -> Result<String, (&'static str, String)> {
+    let url = inputs
+        .get("url")
+        .map(String::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .ok_or((
+            "missing_url",
+            "Paste a URL before starting a yt-dlp download.".to_owned(),
+        ))?;
+    if !is_url(url) {
+        return Err((
+            "invalid_url",
+            "Paste a full http:// or https:// URL before starting a yt-dlp download.".to_owned(),
+        ));
+    }
+    run_builtin_ytdlp_download(plugin_dir, action_kind == "download_audio", url)
+}
+
+fn run_builtin_ytdlp_download(
+    plugin_dir: &str,
+    audio_only: bool,
+    url: &str,
+) -> Result<String, (&'static str, String)> {
+    require_command("yt-dlp", "yt-dlp")?;
+    require_command("ffmpeg", "yt-dlp")?;
+    let output_dir = Path::new(plugin_dir).join("downloads");
+    fs::create_dir_all(&output_dir).map_err(|error| {
+        (
+            "io_error",
+            format!(
+                "Could not create download directory {}: {error}",
+                output_dir.display()
+            ),
+        )
+    })?;
+    let mut process = Command::new("yt-dlp");
+    process.arg("-P").arg(&output_dir);
+    if audio_only {
+        process.args(["-x", "--audio-format", "mp3"]);
+    }
+    process.arg(&url);
+    run_system_command(process, "yt-dlp")?;
+    Ok(format!("Downloaded {url} to {}.", output_dir.display()))
+}
+
+fn render_builtin_plugin_panel(
+    panel: PluginPanelEntry,
+    request: RenderPluginPanelRequest,
+) -> PluginPanelRenderResult {
+    let plugin_id = built_in_plugin_id(&panel.plugin_id).unwrap_or_default();
+    let action_result = execute_builtin_panel_action(&panel, &request);
+    let elements = match plugin_id {
+        "quick_convert" => quick_convert_panel_elements(&request),
+        "themes" => themes_panel_elements(&request),
+        "vault" => vault_panel_elements(&request),
+        "ytdlp" => ytdlp_panel_elements(&request),
+        _ => Vec::new(),
+    };
+    let notifications = action_result
+        .as_ref()
+        .map(|result| {
+            vec![PluginPanelNotification {
+                level: if result.handled { "success" } else { "error" }.to_owned(),
+                title: panel.title.clone(),
+                message: result.message.clone(),
+            }]
+        })
+        .unwrap_or_default();
+    let message = action_result
+        .map(|result| result.message)
+        .unwrap_or_else(|| "Rendered built-in extension panel.".to_owned());
+    PluginPanelRenderResult {
+        panel_id: panel.id,
+        plugin_id: panel.plugin_id,
+        plugin_name: panel.plugin_name,
+        title: panel.title,
+        elements,
+        notifications,
+        message,
+        runtime_status: "native_rendered".to_owned(),
+    }
+}
+
+struct BuiltinPanelActionResult {
+    handled: bool,
+    message: String,
+}
+
+fn execute_builtin_panel_action(
+    panel: &PluginPanelEntry,
+    request: &RenderPluginPanelRequest,
+) -> Option<BuiltinPanelActionResult> {
+    let action = request.clicked_button.trim();
+    if action.is_empty() {
+        return None;
+    }
+    let plugin_id = built_in_plugin_id(&panel.plugin_id)?;
+    let result = match plugin_id {
+        "quick_convert" => run_builtin_quick_convert_action(action, &request.selected_paths),
+        "themes" if action == "save_accent" => {
+            let accent = request
+                .inputs
+                .get("accent")
+                .map(String::as_str)
+                .unwrap_or_default();
+            run_builtin_theme_custom_accent(&panel.plugin_dir, accent)
+        }
+        "themes" => run_builtin_theme_action(&panel.plugin_dir, action),
+        "vault" => run_builtin_vault_action(&panel.plugin_dir, action, &request.selected_paths),
+        "ytdlp" => run_builtin_ytdlp_action(&panel.plugin_dir, action, &request.inputs),
+        _ => Err((
+            "unknown_builtin",
+            "Unknown built-in extension action.".to_owned(),
+        )),
+    };
+    Some(match result {
+        Ok(message) => BuiltinPanelActionResult {
+            handled: true,
+            message,
+        },
+        Err((_status, message)) => BuiltinPanelActionResult {
+            handled: false,
+            message,
+        },
+    })
+}
+
+fn quick_convert_panel_elements(request: &RenderPluginPanelRequest) -> Vec<PluginPanelElement> {
+    let selected = request
+        .selected_paths
+        .first()
+        .map(String::as_str)
+        .filter(|path| !path.trim().is_empty())
+        .unwrap_or("No file selected in Files.");
+    vec![
+        panel_text("Quick Convert"),
+        panel_text("Convert the selected local image, audio, or video file through system FFmpeg."),
+        panel_text(&format!("Selection: {selected}")),
+        panel_text(&dependency_line("ffmpeg")),
+        panel_separator(),
+        panel_button("convert_mp4", "Convert to MP4"),
+        panel_button("convert_mp3", "Convert to MP3"),
+        panel_button("convert_png", "Convert to PNG"),
+    ]
+}
+
+fn themes_panel_elements(request: &RenderPluginPanelRequest) -> Vec<PluginPanelElement> {
+    let accent = request
+        .inputs
+        .get("accent")
+        .map(String::as_str)
+        .filter(|value| !value.trim().is_empty())
+        .unwrap_or("#7da2b4");
+    vec![
+        panel_text("Themes"),
+        panel_text("Apply presets or persist an edited accent token for Misty's appearance layer."),
+        panel_separator(),
+        panel_button("apply_dark", "Apply Dark"),
+        panel_button("apply_light", "Apply Light"),
+        panel_button("apply_graphite", "Graphite"),
+        panel_button("apply_aurora", "Aurora"),
+        panel_button("apply_copper", "Copper"),
+        panel_input("accent", accent),
+        panel_button("save_accent", "Save Accent"),
+    ]
+}
+
+fn vault_panel_elements(request: &RenderPluginPanelRequest) -> Vec<PluginPanelElement> {
+    let selected = if request.selected_paths.is_empty() {
+        "No selected paths. Vault will create an empty scaffold.".to_owned()
+    } else {
+        format!("Selected sources: {}", request.selected_paths.join(", "))
+    };
+    vec![
+        panel_text("Vault"),
+        panel_text(
+            "Create backup job scaffolds, review status, and prepare dry-run restore plans.",
+        ),
+        panel_text(&selected),
+        panel_separator(),
+        panel_button("setup_backup", "Create Backup Job"),
+        panel_button("backup_status", "Backup Status"),
+        panel_button("restore_plan", "Prepare Restore Plan"),
+    ]
+}
+
+fn ytdlp_panel_elements(request: &RenderPluginPanelRequest) -> Vec<PluginPanelElement> {
+    let url = request
+        .inputs
+        .get("url")
+        .map(String::as_str)
+        .filter(|value| !value.trim().is_empty())
+        .unwrap_or("https://");
+    vec![
+        panel_text("yt-dlp"),
+        panel_text(
+            "Paste a URL and download video or extracted audio through system yt-dlp and FFmpeg.",
+        ),
+        panel_text(&dependency_line("yt-dlp")),
+        panel_text(&dependency_line("ffmpeg")),
+        panel_input("url", url),
+        panel_separator(),
+        panel_button("download_video", "Download Video"),
+        panel_button("download_audio", "Download Audio"),
+    ]
+}
+
+fn panel_text(text: &str) -> PluginPanelElement {
+    PluginPanelElement {
+        kind: "textWrapped".to_owned(),
+        id: String::new(),
+        text: text.to_owned(),
+        width: 0.0,
+        height: 0.0,
+        border: false,
+    }
+}
+
+fn panel_input(id: &str, text: &str) -> PluginPanelElement {
+    PluginPanelElement {
+        kind: "inputText".to_owned(),
+        id: id.to_owned(),
+        text: text.to_owned(),
+        width: 320.0,
+        height: 0.0,
+        border: false,
+    }
+}
+
+fn panel_button(id: &str, text: &str) -> PluginPanelElement {
+    PluginPanelElement {
+        kind: "button".to_owned(),
+        id: id.to_owned(),
+        text: text.to_owned(),
+        width: 0.0,
+        height: 0.0,
+        border: false,
+    }
+}
+
+fn panel_separator() -> PluginPanelElement {
+    PluginPanelElement {
+        kind: "separator".to_owned(),
+        id: String::new(),
+        text: String::new(),
+        width: 0.0,
+        height: 0.0,
+        border: false,
+    }
+}
+
+fn dependency_line(command: &str) -> String {
+    if command_exists(command) {
+        format!("Dependency available: {command}")
+    } else {
+        format!("Missing dependency: install {command} and restart Misty.")
+    }
+}
+
+fn require_command(command: &'static str, plugin_name: &str) -> Result<(), (&'static str, String)> {
+    if command_exists(command) {
+        Ok(())
+    } else {
+        Err((
+            "missing_dependency",
+            format!("{plugin_name} requires {command}. Install {command} and restart Misty."),
+        ))
+    }
+}
+
+fn selected_file_path(
+    selected_paths: &[String],
+    plugin_name: &str,
+) -> Result<PathBuf, (&'static str, String)> {
+    let Some(path) = selected_paths
+        .iter()
+        .map(|path| path.trim())
+        .find(|path| !path.is_empty())
+    else {
+        return Err((
+            "missing_selection",
+            format!("{plugin_name} requires a selected local file."),
+        ));
+    };
+    let path = PathBuf::from(path);
+    if !path.is_file() {
+        return Err((
+            "invalid_selection",
+            format!("{} is not a local file.", path.display()),
+        ));
+    }
+    Ok(path)
+}
+
+fn selected_url(selected_paths: &[String]) -> Result<String, (&'static str, String)> {
+    let Some(value) = selected_paths
+        .iter()
+        .map(|path| path.trim())
+        .find(|path| !path.is_empty())
+    else {
+        return Err((
+            "missing_url",
+            "Select a .url or text file containing the video URL.".to_owned(),
+        ));
+    };
+    if is_url(value) {
+        return Ok(value.to_owned());
+    }
+    let text = fs::read_to_string(value).map_err(|error| {
+        (
+            "invalid_url_source",
+            format!("Could not read URL from {value}: {error}"),
+        )
+    })?;
+    text.lines()
+        .map(str::trim)
+        .find(|line| is_url(line))
+        .map(str::to_owned)
+        .ok_or_else(|| {
+            (
+                "missing_url",
+                format!("{value} does not contain an http(s) URL."),
+            )
+        })
+}
+
+fn is_url(value: &str) -> bool {
+    value.starts_with("https://") || value.starts_with("http://")
+}
+
+fn valid_hex_color(value: &str) -> bool {
+    let Some(hex) = value.strip_prefix('#') else {
+        return false;
+    };
+    matches!(hex.len(), 3 | 6 | 8) && hex.chars().all(|ch| ch.is_ascii_hexdigit())
+}
+
+fn output_with_extension(source: &Path, extension: &str) -> PathBuf {
+    let stem = source
+        .file_stem()
+        .and_then(|value| value.to_str())
+        .unwrap_or("converted");
+    source.with_file_name(format!("{stem}.misty-converted.{extension}"))
+}
+
+fn run_system_command(mut command: Command, tool_name: &str) -> Result<(), (&'static str, String)> {
+    let output = command.output().map_err(|error| {
+        (
+            "process_failed",
+            format!("{tool_name} could not be started: {error}"),
+        )
+    })?;
+    if output.status.success() {
+        Ok(())
+    } else {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        Err((
+            "process_failed",
+            format!("{tool_name} failed: {}", stderr.trim()),
+        ))
+    }
+}
+
+fn write_pretty_json(path: &Path, value: &Value) -> Result<(), (&'static str, String)> {
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).map_err(|error| {
+            (
+                "io_error",
+                format!("Could not create {}: {error}", parent.display()),
+            )
+        })?;
+    }
+    let bytes = serde_json::to_vec_pretty(value).map_err(|error| {
+        (
+            "json_error",
+            format!("Could not encode extension data: {error}"),
+        )
+    })?;
+    fs::write(path, bytes).map_err(|error| {
+        (
+            "io_error",
+            format!("Could not write {}: {error}", path.display()),
+        )
+    })
+}
+
+fn now_ms_for_plugin() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_millis() as u64)
+        .unwrap_or(0)
 }
 
 fn command_requires_selected_file(command: &Value, fallback: bool) -> bool {
@@ -1330,6 +2289,77 @@ fn dock_plugin_route(plugin_id: &str, selected_path: Option<&str>) -> String {
         route.push_str(&route_encode(selected_path));
     }
     route
+}
+
+fn removed_extension_id(plugin_id: &str) -> bool {
+    REMOVED_EXTENSION_IDS
+        .iter()
+        .any(|removed| plugin_id.trim().eq_ignore_ascii_case(removed))
+}
+
+fn purge_removed_extension_dirs(roots: &[PathBuf]) -> ApiResult<()> {
+    for root in roots {
+        if !root.is_dir() {
+            continue;
+        }
+        let entries = fs::read_dir(root).map_err(|err| {
+            ApiError::Message(format!(
+                "Failed to read extension root {}: {err}",
+                root.display()
+            ))
+        })?;
+        for entry in entries.flatten() {
+            let plugin_dir = entry.path();
+            if !plugin_dir.is_dir() {
+                continue;
+            }
+            let dir_id = plugin_dir
+                .file_name()
+                .and_then(|value| value.to_str())
+                .unwrap_or_default();
+            let detail = read_json(plugin_dir.join("plugin.json"))
+                .or_else(|| read_json(plugin_dir.join("detail.json")));
+            let manifest = read_json(plugin_dir.join("manifest.json"));
+            let metadata = plugin_metadata(&plugin_dir, detail.as_ref(), manifest.as_ref());
+            if removed_extension_id(dir_id) || removed_extension_id(&metadata.id) {
+                fs::remove_dir_all(&plugin_dir).map_err(|err| {
+                    ApiError::Message(format!(
+                        "Failed to remove retired extension {}: {err}",
+                        plugin_dir.display()
+                    ))
+                })?;
+            }
+        }
+    }
+    Ok(())
+}
+
+fn missing_dependencies_for_plugin(plugin_id: &str) -> Vec<String> {
+    let mut dependencies = Vec::new();
+    match plugin_id {
+        "quick_convert" => {
+            if !command_exists("ffmpeg") {
+                dependencies.push("ffmpeg".to_owned());
+            }
+        }
+        "ytdlp" | "yt-dlp" => {
+            if !command_exists("yt-dlp") {
+                dependencies.push("yt-dlp".to_owned());
+            }
+            if !command_exists("ffmpeg") {
+                dependencies.push("ffmpeg".to_owned());
+            }
+        }
+        _ => {}
+    }
+    dependencies
+}
+
+fn command_exists(command: &str) -> bool {
+    std::env::var_os("PATH")
+        .into_iter()
+        .flat_map(|paths| std::env::split_paths(&paths).collect::<Vec<_>>())
+        .any(|path| path.join(command).is_file())
 }
 
 fn string_field(value: Option<&Value>, key: &str) -> Option<String> {
@@ -2179,6 +3209,282 @@ mod tests {
     }
 
     #[test]
+    fn built_in_extension_panel_renders_even_with_native_library_path() {
+        for (plugin_id, title, expected_element) in [
+            ("quick_convert", "Quick Convert", "convert_mp4"),
+            ("themes", "Themes", "save_accent"),
+            ("vault", "Vault", "setup_backup"),
+            ("ytdlp", "yt-dlp", "download_video"),
+        ] {
+            let panel = PluginPanelEntry {
+                id: format!("{plugin_id}.panel"),
+                title: title.to_owned(),
+                plugin_id: plugin_id.to_owned(),
+                plugin_name: title.to_owned(),
+                window_type: "panel".to_owned(),
+                default_width: 420.0,
+                default_height: 520.0,
+                plugin_dir: format!("/tmp/{plugin_id}"),
+                manifest_path: format!("/tmp/{plugin_id}/manifest.json"),
+                library_path: format!("/tmp/{plugin_id}/variants/macos-arm64/{plugin_id}.dylib"),
+                launcher_views: vec!["Dock".to_owned()],
+            };
+
+            let rendered = render_result_for_panel(
+                panel,
+                RenderPluginPanelRequest {
+                    panel_id: format!("{plugin_id}.panel"),
+                    plugin_id: plugin_id.to_owned(),
+                    selected_paths: Vec::new(),
+                    clicked_button: String::new(),
+                    inputs: BTreeMap::new(),
+                },
+            );
+
+            assert_eq!(rendered.runtime_status, "native_rendered");
+            assert_eq!(rendered.panel_id, format!("{plugin_id}.panel"));
+            assert!(rendered
+                .elements
+                .iter()
+                .any(|element| element.id == expected_element));
+        }
+    }
+
+    #[test]
+    fn built_in_theme_panel_action_persists_custom_accent() {
+        let root = unique_test_plugin_dir("theme-panel-action-root");
+        let panel = PluginPanelEntry {
+            id: "themes.panel".to_owned(),
+            title: "Themes".to_owned(),
+            plugin_id: "themes".to_owned(),
+            plugin_name: "Themes".to_owned(),
+            window_type: "panel".to_owned(),
+            default_width: 420.0,
+            default_height: 520.0,
+            plugin_dir: root.display().to_string(),
+            manifest_path: String::new(),
+            library_path: String::new(),
+            launcher_views: vec!["Dock".to_owned()],
+        };
+        let mut inputs = BTreeMap::new();
+        inputs.insert("accent".to_owned(), "#123abc".to_owned());
+
+        let rendered = render_result_for_panel(
+            panel,
+            RenderPluginPanelRequest {
+                panel_id: "themes.panel".to_owned(),
+                plugin_id: "themes".to_owned(),
+                selected_paths: Vec::new(),
+                clicked_button: "save_accent".to_owned(),
+                inputs,
+            },
+        );
+
+        assert_eq!(rendered.runtime_status, "native_rendered");
+        assert_eq!(rendered.notifications[0].level, "success");
+        let tokens = fs::read_to_string(root.join("theme-tokens.json")).expect("tokens");
+        assert!(tokens.contains("#123abc"));
+
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn diagnostics_report_current_extensions_as_builtin_injected() {
+        let root = unique_test_plugin_dir("builtin-diagnostics-root");
+        let themes = root.join("themes");
+        fs::create_dir_all(themes.join("variants/current")).expect("themes plugin dir");
+        fs::write(
+            themes.join("variants/current/themes.dylib"),
+            b"not-a-real-library",
+        )
+        .expect("native placeholder");
+        fs::write(
+            themes.join("plugin.json"),
+            serde_json::json!({
+                "id": "themes",
+                "name": "Themes",
+                "status": "installed",
+                "launcher": { "show_in_launcher": true }
+            })
+            .to_string(),
+        )
+        .expect("themes plugin json");
+        fs::write(
+            themes.join("manifest.json"),
+            serde_json::json!({
+                "enabled": true,
+                "plugin": {
+                    "abi_version": MISTY_PLUGIN_ABI_VERSION,
+                    "variants": [{
+                        "os": current_host_os(),
+                        "arch": current_host_arch_aliases()[0],
+                        "library": "variants/current/themes.dylib"
+                    }]
+                }
+            })
+            .to_string(),
+        )
+        .expect("themes manifest");
+
+        let diagnostics = plugin_diagnostics_snapshot(vec![root.clone()]).expect("diagnostics");
+        let themes = diagnostics
+            .plugins
+            .iter()
+            .find(|plugin| plugin.plugin_id == "themes")
+            .expect("themes diagnostics");
+
+        assert_eq!(themes.runtime_status, "builtin_injected");
+        assert!(themes.errors.is_empty());
+        assert!(!themes.panels.is_empty());
+
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn installed_current_extensions_surface_injected_panels_commands_and_diagnostics() {
+        let root = unique_test_plugin_dir("current-extension-root");
+        for (plugin_id, plugin_name, views) in [
+            ("quick_convert", "Quick Convert", vec!["Files"]),
+            ("themes", "Themes", vec!["Settings", "Extensions", "Dock"]),
+            ("vault", "Vault", vec!["Dock"]),
+            ("ytdlp", "yt-dlp", vec!["Extensions", "Dock", "Files"]),
+        ] {
+            write_installed_builtin_extension(&root, plugin_id, plugin_name, &views);
+        }
+
+        let snapshot = snapshot_plugin_commands(vec![root.clone()]).expect("snapshot");
+        for plugin_id in ["quick_convert", "themes", "vault", "ytdlp"] {
+            assert!(
+                snapshot
+                    .panels
+                    .iter()
+                    .any(|panel| panel.plugin_id == plugin_id
+                        && panel.id == format!("{plugin_id}.builtin")),
+                "{plugin_id} injected panel missing"
+            );
+            assert!(
+                snapshot
+                    .commands
+                    .iter()
+                    .any(|command| command.plugin_id == plugin_id && command.source == "builtin"),
+                "{plugin_id} builtin command missing"
+            );
+            assert!(
+                snapshot
+                    .commands
+                    .iter()
+                    .any(|command| command.plugin_id == plugin_id && command.source == "launcher"),
+                "{plugin_id} launcher command missing"
+            );
+        }
+
+        let diagnostics = plugin_diagnostics_snapshot(vec![root.clone()]).expect("diagnostics");
+        for plugin_id in ["quick_convert", "themes", "vault", "ytdlp"] {
+            let plugin = diagnostics
+                .plugins
+                .iter()
+                .find(|plugin| plugin.plugin_id == plugin_id)
+                .unwrap_or_else(|| panic!("{plugin_id} diagnostics missing"));
+            assert_eq!(plugin.runtime_status, "builtin_injected");
+            assert!(plugin.errors.is_empty(), "{plugin_id} reported errors");
+            assert!(
+                plugin
+                    .panels
+                    .iter()
+                    .any(|panel| panel.id == format!("{plugin_id}.builtin")),
+                "{plugin_id} diagnostics panel missing"
+            );
+            assert!(
+                plugin
+                    .commands
+                    .iter()
+                    .any(|command| command.source == "builtin"),
+                "{plugin_id} diagnostics command missing"
+            );
+        }
+
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn removed_extensions_do_not_surface_in_commands_panels_or_diagnostics() {
+        let root = unique_test_plugin_dir("removed-extension-root");
+        let git = root.join("git");
+        let preview_panel = root.join("preview_panel");
+        let themes = root.join("themes");
+        fs::create_dir_all(&git).expect("git plugin dir");
+        fs::create_dir_all(&preview_panel).expect("preview panel plugin dir");
+        fs::create_dir_all(&themes).expect("themes plugin dir");
+        fs::write(
+            git.join("plugin.json"),
+            serde_json::json!({
+                "id": "git",
+                "name": "Git",
+                "status": "installed",
+                "launcher": { "show_in_launcher": true },
+                "panels": [{ "id": "main", "title": "Git Main" }],
+                "commands": [{ "id": "git.status", "title": "Git Status" }]
+            })
+            .to_string(),
+        )
+        .expect("git plugin json");
+        fs::write(
+            preview_panel.join("plugin.json"),
+            serde_json::json!({
+                "id": "preview-panel",
+                "name": "Preview Panel",
+                "status": "installed",
+                "launcher": { "show_in_launcher": true },
+                "panels": [{ "id": "main", "title": "Preview Main" }]
+            })
+            .to_string(),
+        )
+        .expect("preview panel plugin json");
+        fs::write(
+            themes.join("plugin.json"),
+            serde_json::json!({
+                "id": "themes",
+                "name": "Themes",
+                "status": "installed",
+                "launcher": { "show_in_launcher": true },
+                "panels": [{ "id": "main", "title": "Themes Main" }]
+            })
+            .to_string(),
+        )
+        .expect("themes plugin json");
+
+        let snapshot = snapshot_plugin_commands(vec![root.clone()]).expect("snapshot");
+        assert!(!git.exists());
+        assert!(!preview_panel.exists());
+        assert!(themes.exists());
+        assert!(snapshot
+            .commands
+            .iter()
+            .all(|command| command.plugin_id != "git"));
+        assert!(snapshot.panels.iter().all(|panel| panel.plugin_id != "git"));
+        assert!(snapshot
+            .panels
+            .iter()
+            .all(|panel| panel.plugin_id != "preview-panel"));
+        assert!(snapshot
+            .commands
+            .iter()
+            .any(|command| command.plugin_id == "themes"));
+
+        let diagnostics = plugin_diagnostics_snapshot(vec![root.clone()]).expect("diagnostics");
+        assert!(diagnostics
+            .plugins
+            .iter()
+            .all(|plugin| plugin.plugin_id != "git"));
+        assert!(diagnostics
+            .plugins
+            .iter()
+            .any(|plugin| plugin.plugin_id == "themes"));
+
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
     fn run_launcher_command_returns_dock_route() {
         let command = PluginCommandEntry {
             id: "plugin.theme tools.open".to_owned(),
@@ -2280,6 +3586,82 @@ mod tests {
         assert_eq!(result.target_route, "");
         assert_eq!(result.runtime_status, "missing_selection");
         assert!(result.message.contains("requires a selected file"));
+    }
+
+    #[test]
+    fn built_in_extension_commands_are_added_for_surviving_plugins() {
+        let detail = serde_json::json!({
+            "id": "quick_convert",
+            "name": "Quick Convert",
+            "status": "installed"
+        });
+        let metadata = plugin_metadata(Path::new("/tmp/quick_convert"), Some(&detail), None);
+        let commands = built_in_commands_for_plugin(&metadata);
+        assert!(commands
+            .iter()
+            .any(|command| command.action_kind == "convert_mp4"));
+        assert!(commands.iter().all(|command| command.source == "builtin"));
+        assert!(built_in_panels_for_plugin(&metadata)
+            .iter()
+            .any(|panel| panel.id == "quick_convert.builtin"));
+    }
+
+    #[test]
+    fn built_in_theme_command_persists_theme_tokens() {
+        let plugin_dir = unique_test_plugin_dir("themes-builtin");
+        fs::create_dir_all(&plugin_dir).unwrap();
+        let command = PluginCommandEntry {
+            id: "plugin.themes.builtin.apply_dark".to_owned(),
+            label: "Themes: Apply Dark preset".to_owned(),
+            hint: String::new(),
+            plugin_id: "themes".to_owned(),
+            plugin_name: "Themes".to_owned(),
+            default_shortcut: String::new(),
+            source: "builtin".to_owned(),
+            action_kind: "apply_dark".to_owned(),
+            launcher_open_mode: "tab".to_owned(),
+            requires_selected_file: false,
+            plugin_dir: plugin_dir.display().to_string(),
+            manifest_path: String::new(),
+            library_path: String::new(),
+        };
+
+        let result = run_result_for_command(command, Vec::new());
+
+        assert!(result.handled);
+        assert_eq!(result.runtime_status, "builtin_executed");
+        let tokens = fs::read_to_string(plugin_dir.join("theme-tokens.json")).unwrap();
+        assert!(tokens.contains("\"preset\": \"dark\""));
+    }
+
+    #[test]
+    fn built_in_quick_convert_reports_missing_ffmpeg_before_running() {
+        let command = PluginCommandEntry {
+            id: "plugin.quick_convert.builtin.convert_mp4".to_owned(),
+            label: "Quick Convert: Convert selected to MP4".to_owned(),
+            hint: String::new(),
+            plugin_id: "quick_convert".to_owned(),
+            plugin_name: "Quick Convert".to_owned(),
+            default_shortcut: String::new(),
+            source: "builtin".to_owned(),
+            action_kind: "convert_mp4".to_owned(),
+            launcher_open_mode: "split".to_owned(),
+            requires_selected_file: true,
+            plugin_dir: "/tmp/quick_convert".to_owned(),
+            manifest_path: String::new(),
+            library_path: String::new(),
+        };
+        let old_path = std::env::var_os("PATH");
+        std::env::set_var("PATH", "");
+        let result = run_result_for_command(command, vec!["/tmp/demo.mov".to_owned()]);
+        if let Some(old_path) = old_path {
+            std::env::set_var("PATH", old_path);
+        } else {
+            std::env::remove_var("PATH");
+        }
+        assert!(!result.handled);
+        assert_eq!(result.runtime_status, "missing_dependency");
+        assert!(result.message.contains("ffmpeg"));
     }
 
     #[test]
@@ -2520,5 +3902,53 @@ mod tests {
             "misty-plugin-commands-{label}-{}",
             uuid::Uuid::new_v4()
         ))
+    }
+
+    fn write_installed_builtin_extension(
+        root: &Path,
+        plugin_id: &str,
+        plugin_name: &str,
+        views: &[&str],
+    ) {
+        let plugin_dir = root.join(plugin_id);
+        let native_dir = plugin_dir.join("variants/current");
+        fs::create_dir_all(&native_dir).expect("plugin native dir");
+        fs::write(
+            native_dir.join(format!("{plugin_id}.dylib")),
+            b"not-a-real-library",
+        )
+        .expect("native placeholder");
+        fs::write(
+            plugin_dir.join("plugin.json"),
+            serde_json::json!({
+                "id": plugin_id,
+                "name": plugin_name,
+                "status": "installed",
+                "overview": format!("{plugin_name} test extension."),
+                "launcher": {
+                    "show_in_launcher": true,
+                    "views": views,
+                    "open_mode": "tab"
+                }
+            })
+            .to_string(),
+        )
+        .expect("plugin detail json");
+        fs::write(
+            plugin_dir.join("manifest.json"),
+            serde_json::json!({
+                "enabled": true,
+                "plugin": {
+                    "abi_version": MISTY_PLUGIN_ABI_VERSION,
+                    "variants": [{
+                        "os": current_host_os(),
+                        "arch": current_host_arch_aliases()[0],
+                        "library": format!("variants/current/{plugin_id}.dylib")
+                    }]
+                }
+            })
+            .to_string(),
+        )
+        .expect("plugin manifest json");
     }
 }

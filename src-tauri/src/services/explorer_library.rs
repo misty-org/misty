@@ -37,6 +37,8 @@ pub struct ExplorerLibraryItem {
     pub r#type: i64,
     #[serde(default)]
     pub tags: Vec<String>,
+    #[serde(default)]
+    pub comments: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -70,6 +72,8 @@ pub struct SetTagsRequest {
     pub item: ExplorerLibraryItem,
     #[serde(default)]
     pub tags: Vec<String>,
+    #[serde(default)]
+    pub comments: Option<String>,
 }
 
 impl ExplorerLibraryService {
@@ -120,7 +124,12 @@ impl ExplorerLibraryService {
         let path = self.path.clone();
         tokio::task::spawn_blocking(move || {
             let mut snapshot = load_snapshot(path.clone())?;
-            set_item_tags(&mut snapshot, request.item, sanitize_tags(request.tags));
+            set_item_metadata(
+                &mut snapshot,
+                request.item,
+                sanitize_tags(request.tags),
+                request.comments.map(sanitize_comment),
+            );
             save_snapshot(&path, &snapshot)?;
             load_snapshot(path)
         })
@@ -193,6 +202,7 @@ fn disk_item_json(item: &ExplorerLibraryItem) -> serde_json::Value {
         "mime_type": item.mime_type,
         "type": item.r#type,
         "tags": item.tags,
+        "comments": item.comments,
     })
 }
 
@@ -207,15 +217,26 @@ fn add_recent(snapshot: &mut ExplorerLibrarySnapshot, item: ExplorerLibraryItem)
     snapshot.recent_files.truncate(MAX_RECENT_ITEMS);
 }
 
-fn set_item_tags(
+fn set_item_metadata(
     snapshot: &mut ExplorerLibrarySnapshot,
     mut item: ExplorerLibraryItem,
     tags: Vec<String>,
+    comments: Option<String>,
 ) {
     if item.path.trim().is_empty() {
         return;
     }
     item.tags = tags.clone();
+    if let Some(comments) = comments.clone() {
+        item.comments = comments;
+    } else if let Some(existing) = snapshot
+        .recent_files
+        .iter()
+        .chain(snapshot.starred_files.iter())
+        .find(|candidate| candidate.path == item.path)
+    {
+        item.comments = existing.comments.clone();
+    }
     upsert_tagged_item(&mut snapshot.recent_files, item.clone());
     if let Some(starred) = snapshot
         .starred_files
@@ -223,6 +244,9 @@ fn set_item_tags(
         .find(|candidate| candidate.path == item.path)
     {
         starred.tags = tags;
+        if let Some(comments) = comments {
+            starred.comments = comments;
+        }
     }
 }
 
@@ -248,6 +272,10 @@ fn sanitize_tags(tags: Vec<String>) -> Vec<String> {
         normalized.push(tag);
     }
     normalized
+}
+
+fn sanitize_comment(comment: String) -> String {
+    comment.trim().chars().take(4000).collect()
 }
 
 #[cfg(test)]
@@ -299,7 +327,7 @@ mod tests {
     #[test]
     fn set_item_tags_upserts_and_deduplicates() {
         let mut snapshot = ExplorerLibrarySnapshot::default();
-        set_item_tags(
+        set_item_metadata(
             &mut snapshot,
             item("/tmp/demo.txt"),
             sanitize_tags(vec![
@@ -308,19 +336,23 @@ mod tests {
                 "".to_owned(),
                 "draft".to_owned(),
             ]),
+            Some(sanitize_comment("first note".to_owned())),
         );
 
         assert_eq!(snapshot.recent_files.len(), 1);
         assert_eq!(snapshot.recent_files[0].tags, vec!["work", "draft"]);
+        assert_eq!(snapshot.recent_files[0].comments, "first note");
 
-        set_item_tags(
+        set_item_metadata(
             &mut snapshot,
             item("/tmp/demo.txt"),
             sanitize_tags(vec!["final".to_owned()]),
+            None,
         );
 
         assert_eq!(snapshot.recent_files.len(), 1);
         assert_eq!(snapshot.recent_files[0].tags, vec!["final"]);
+        assert_eq!(snapshot.recent_files[0].comments, "first note");
     }
 
     fn item(path: &str) -> ExplorerLibraryItem {
@@ -334,6 +366,7 @@ mod tests {
             mime_type: String::new(),
             r#type: 0,
             tags: Vec::new(),
+            comments: String::new(),
         }
     }
 }

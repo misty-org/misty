@@ -8,6 +8,8 @@ import {
 } from "../../../api/misty";
 import type { SearchQueryScope, SearchResult, SearchStatus } from "../../../api/types";
 import { errorText } from "../../../shared/format";
+import { useExplorerStore } from "./useExplorerStore";
+import { mergeLibrarySearchResults } from "../utils/librarySearch";
 
 const searchDebounceMs = 180;
 const activeStatusPollMs = 500;
@@ -115,27 +117,37 @@ export const useSearchStore = create<SearchStore>((set, get) => ({
       set({ results: [], searching: false });
       return;
     }
-    if (!status || status.indexedItemCount === 0) {
-      set({ results: [], searching: false });
-      return;
-    }
     set({ searching: true, error: null });
     try {
-      const results = await searchQuery({
-        query: trimmed,
-        scope,
-        currentPath,
-        includeFiles: true,
-        includeDirectories: true,
-        includeHidden: false,
-        limit: 100,
-      });
+      const backendResults = !status || status.indexedItemCount === 0
+        ? []
+        : await searchQuery({
+            query: trimmed,
+            scope,
+            currentPath,
+            includeFiles: true,
+            includeDirectories: true,
+            includeHidden: false,
+            limit: 100,
+          });
+      const results = mergeLibrarySearchResults(
+        backendResults,
+        useExplorerStore.getState().library,
+        trimmed,
+        { scope, currentPath, limit: 100 },
+      );
       if (sequence === querySequence) {
         set({ results, searching: false, error: null });
       }
     } catch (error) {
       if (sequence === querySequence) {
-        set({ results: [], searching: false, error: errorText(error) });
+        const results = mergeLibrarySearchResults(
+          [],
+          useExplorerStore.getState().library,
+          trimmed,
+          { scope, currentPath, limit: 100 },
+        );
+        set({ results, searching: false, error: results.length > 0 ? null : errorText(error) });
       }
     }
   },
