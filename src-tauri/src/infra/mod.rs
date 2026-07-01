@@ -126,7 +126,7 @@ pub(crate) mod browser_cookie_store;
 #[cfg(any(target_os = "macos", windows))]
 mod browser_cookie_restore;
 #[cfg(any(target_os = "macos", windows))]
-mod browser_website_storage;
+pub(crate) mod browser_website_storage;
 #[cfg(any(target_os = "macos", windows))]
 mod browser_storage_restore;
 #[cfg(any(target_os = "macos", windows))]

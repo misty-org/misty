@@ -55,6 +55,8 @@ vi.mock("@/application/platform-layout", () => ({
 
 vi.mock("@/features/agents/AgentExecutionSurface", () => ({ AgentExecutionSurface: () => null }));
 
+vi.mock("@/features/spaces/SpacesRealtimeBridge", () => ({ SpacesRealtimeBridge: () => null }));
+
 vi.mock("@/features/activity/ActivityPanel", () => ({
   ActivityPanel: () => <div data-testid="activity-panel" />,
 }));

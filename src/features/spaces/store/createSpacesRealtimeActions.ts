@@ -91,8 +91,12 @@ export function createSpacesRealtimeActions(
             }
             clearRealtimeOpenTimer();
             reconnectAttempt = 0;
-            set({ realtimeConnected: true, error: null });
-            if (get().referenceOnly) void get().load({ force: true, accountId });
+            set((state) => ({
+              realtimeConnected: true,
+              error: state.snapshotReady ? null : state.error,
+            }));
+            if (!get().snapshotReady || get().referenceOnly)
+              void get().load({ force: true, accountId });
             if (currentViewingSpaceId)
               sendViewingMessage(currentViewingSpaceId, currentViewingActive);
           };

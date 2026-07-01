@@ -73,9 +73,9 @@ pub(super) fn spawn(app: tauri::AppHandle, expected: String) -> JoinHandle<()> {
             let result = reconcile(&app, active).await;
             let issue = match result {
                 Ok(issue) => issue,
-                Err(_) => {
+                Err(error) => {
                     let _ = active.handle.invalidate_browser_readiness().await;
-                    Some("Browser sign-in changes could not be captured. Existing data has been preserved.")
+                    Some(capture_issue(&error))
                 }
             };
             if issue != active.credential_issue {
@@ -89,6 +89,20 @@ pub(super) fn spawn(app: tauri::AppHandle, expected: String) -> JoinHandle<()> {
         }
     })
 }
+// Only known, static diagnostics cross into the renderer. Platform errors and
+// website storage/cookie values must never be included in status messages.
+fn capture_issue(error: &str) -> &'static str {
+    match error {
+        "Website profile could not be verified" => "Website storage could not verify this browser profile. Retrying automatically.",
+        "Website navigated during sync" | "Website changed origin during sync" => "A website navigated during capture. Retrying automatically.",
+        "This website's storage could not be transferred" => "A website's storage could not be read. Retrying automatically.",
+        "Website storage connection timed out" | "Website storage preparation timed out" => "Website storage preparation timed out. Retrying automatically.",
+        "Unsupported website storage" | "Website storage exceeds the sync limit" => "A website's storage is unsupported or exceeds the sync limit. Existing data has been preserved.",
+        "Could not capture this browser's cookie attributes without losing information." | "Native cookie observation failed" => "Website cookies could not be captured without losing their attributes. Existing data has been preserved.",
+        _ => "Browser sign-in changes could not be captured. Existing data has been preserved.",
+    }
+}
+
 async fn reconcile(
     app: &tauri::AppHandle,
     active: &mut Session,
