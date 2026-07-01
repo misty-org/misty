@@ -1,3 +1,4 @@
+import { Button } from "@/shared/ui/button";
 import { ArrowDownUp, SlidersHorizontal, ChevronUp, ChevronDown, Check } from "lucide-react";
 import {
   DropdownMenu,
@@ -76,9 +77,9 @@ export function DiscoverViewControls({
     <>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <button type="button" className="discover-refresh" aria-label="Sort by" title="Sort by">
+          <Button variant="ghost" size="icon-sm" className="discover-refresh" aria-label="Sort by" title="Sort by">
             <ArrowDownUp size={16} aria-hidden="true" />
-          </button>
+          </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" side="bottom">
           <DropdownMenuLabel>Sort by</DropdownMenuLabel>
@@ -122,15 +123,16 @@ export function DiscoverViewControls({
       </DropdownMenu>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <button
-            type="button"
+          <Button
+            variant="ghost"
+            size="icon-sm"
             className="discover-refresh"
             aria-label="Filter"
             title="Filter"
             data-active={active || undefined}
           >
             <SlidersHorizontal size={16} aria-hidden="true" />
-          </button>
+          </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent
           align="end"

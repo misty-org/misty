@@ -10,6 +10,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
   cn,
+  Button,
 } from "@/shared/ui";
 import { AppWindow, ChevronDown, Plus, RotateCcw, Trash2, X } from "lucide-react";
 
@@ -34,8 +35,9 @@ export function WorkspaceWindowMenu(props: {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button
-          type="button"
+        <Button
+          variant="ghost"
+          size="none"
           className={dockActionClass}
           aria-label="Manage virtual windows"
           title="Manage virtual windows"
@@ -43,7 +45,7 @@ export function WorkspaceWindowMenu(props: {
         >
           <AppWindow className="size-4" />
           <ChevronDown className="size-3" aria-hidden="true" />
-        </button>
+        </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent
         align="end"
@@ -71,10 +73,11 @@ export function WorkspaceWindowMenu(props: {
                 <AppWindow className="size-[15px]" />
                 <span className="min-w-0 flex-1 truncate">{title}</span>
                 {canClose(workspaceWindow) ? (
-                  <button
-                    type="button"
+                  <Button
+                    variant="ghost"
+                    size="none"
                     className={cn(
-                      "grid size-[18px] shrink-0 place-items-center rounded text-cream-muted opacity-0",
+                      "grid size-[18px] shrink-0 place-items-center rounded border-0 text-cream-muted opacity-0",
                       "hover:bg-charcoal-active hover:text-cream group-hover/window:opacity-100",
                       "group-data-[highlighted]/window:opacity-100",
                       "focus:opacity-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-cream-muted",
@@ -87,7 +90,7 @@ export function WorkspaceWindowMenu(props: {
                     }}
                   >
                     <X className="size-3" />
-                  </button>
+                  </Button>
                 ) : null}
               </DropdownMenuItem>
             </Renameable>

@@ -5,7 +5,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   user: null as { id: string; email: string } | null,
-  needsOnboarding: false,
   transitioning: false,
 }));
 
@@ -15,10 +14,6 @@ vi.mock("@/features/auth", () => ({
     transitioning: mocks.transitioning,
     accounts: mocks.user ? [{ id: mocks.user.id, email: mocks.user.email, name: "Test" }] : [],
   }),
-}));
-
-vi.mock("@/features/onboarding/onboardingState", () => ({
-  accountNeedsOnboarding: () => mocks.needsOnboarding,
 }));
 
 vi.mock("@/features/spaces", () => ({
@@ -64,10 +59,6 @@ vi.mock("@/features/activity/ActivityPanel", () => ({
   ActivityPanel: () => <div data-testid="activity-panel" />,
 }));
 
-vi.mock("@/features/onboarding/OnboardingFlow", () => ({
-  OnboardingFlow: () => <div data-testid="onboarding-flow" />,
-}));
-
 vi.mock("@/features/updater/UpdateNotices", () => ({
   UpdateNotices: () => <div data-testid="update-notices" />,
 }));
@@ -100,7 +91,6 @@ describe("AppFrameLayout", () => {
     document.body.appendChild(container);
     root = createRoot(container);
     mocks.user = null;
-    mocks.needsOnboarding = false;
     mocks.transitioning = false;
     vi.clearAllMocks();
   });
@@ -191,7 +181,6 @@ describe("AppFrameLayout", () => {
     // Does NOT render background app panels
     expect(container.querySelector('[data-testid="activity-panel"]')).toBeNull();
     expect(container.querySelector('[data-testid="update-notices"]')).toBeNull();
-    expect(container.querySelector('[data-testid="onboarding-flow"]')).toBeNull();
   });
 
   it("allows unauthenticated access to /register without redirection and isolates auth route", async () => {

@@ -4,30 +4,27 @@ import type { DesktopNavItem } from "@/application/layouts/model/types";
 import { openAccountSettingsInBrowser } from "@/features/account";
 import { ActivityBridge } from "@/features/activity";
 import { AgentJobWorker } from "@/features/agents/AgentJobWorker";
-import { useAppStore, type AppTab } from "@/features/app-shell";
+import { routes, useAppStore, type AppTab } from "@/features/app-shell";
 import { useAuth } from "@/features/auth";
 import { BrowserRuntimeBridge } from "@/features/webviews/BrowserRuntimeBridge";
 import { setBrowserWebviewsSuspended } from "@/features/webviews/browserRuntime";
+import { BrowserSearchDialog } from "@/features/browser-workspace/BrowserSearchDialog";
+import { useBrowserSearchStore } from "@/features/browser-workspace/search";
 import { GlobalMisty, useGlobalSearchStore } from "@/features/global-search";
 import { useSettingsStore, type SettingsSection } from "@/features/settings";
-import {
-  canonicalSpaceRoute,
-  defaultSpaceRoute,
-  preferredDefaultSpace,
-  rememberedJournalRoute,
-  rememberedPlannerRoute,
-  socialProviderPath,
-  useSpacesStore,
-} from "@/features/spaces";
-import { SpacesRealtimeBridge } from "@/features/spaces/SpacesRealtimeBridge";
 import {
   registerShortcutHandler,
   useShortcutHandler,
   useShortcutTitle,
 } from "@/features/shortcuts";
 import { AppTour, isTourCompletedForAccount, useTourStore } from "@/features/tour";
-import { useWorkspaceStore, workspaceSurfaceFromRoute } from "@/features/workspace";
-import { cn } from "@/shared/ui";
+import {
+  activeLayoutView,
+  allLayoutViews,
+  useWorkspaceStore,
+  workspaceSurfaceFromRoute,
+} from "@/features/workspace";
+import { cn, Button } from "@/shared/ui";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { appZoomRenderScale, useAppZoomValue } from "@/shared/hooks/useAppZoom";
 import { ArrowLeft, ArrowRight, Minus, Square, X } from "lucide-react";
@@ -70,9 +67,7 @@ export function DesktopLayout(props: {
   getRouteId: (pathname: string) => AppTab;
   navItems: DesktopNavItem[];
 }) {
-  const { user, refreshUser } = useAuth();
-  const spaces = useSpacesStore((state) => state.spaces);
-  const spacesSnapshotReady = useSpacesStore((state) => state.snapshotReady);
+  const { user, refreshUser, transitioning } = useAuth();
   const {
     location,
     navigate,
@@ -98,7 +93,7 @@ export function DesktopLayout(props: {
   const appZoom = appZoomRenderScale(useAppZoomValue());
   const { app: frameApp } = useDesktopFrameStyle();
 
-  const framePacingOverlayEnabled = useDesktopShellStatus(navigate);
+  const framePacingOverlayEnabled = useDesktopShellStatus();
 
   const profileAnchorRef = useRef<HTMLButtonElement | null>(null);
   const [profileOpen, setProfileOpen] = useState(false);
@@ -185,12 +180,12 @@ export function DesktopLayout(props: {
   }, []);
 
   useEffect(() => {
-    if (!user?.id || !spacesSnapshotReady) return;
+    if (!user?.id || transitioning) return;
     const tourState = useTourStore.getState();
     if (!isTourCompletedForAccount(tourState, user.id) && !tourState.isOpen) {
       tourState.startTour();
     }
-  }, [user?.id, spacesSnapshotReady]);
+  }, [user?.id, transitioning]);
 
   useEffect(() => {
     if (!location.pathname.startsWith("/settings")) return;
@@ -228,41 +223,29 @@ export function DesktopLayout(props: {
   }, [lastAppRoute, lastNonSettingsRouteRef, location.pathname, navigate, openRemotesOverlay]);
 
   useEffect(() => {
-    if (location.pathname === "/spaces") {
-      const homeSpace = preferredDefaultSpace(spaces);
-      if (homeSpace && spacesSnapshotReady) {
-        navigate(defaultSpaceRoute(homeSpace.id), { replace: true });
+    const currentRoute = `${location.pathname}${location.search}${location.hash}`;
+    if (currentRoute === routes.newTab || currentRoute.endsWith("/new")) {
+      const state = useWorkspaceStore.getState();
+      const views = allLayoutViews(state.layout);
+      const existingPlaceholder = views.find((v) => v.placeholder);
+      if (existingPlaceholder) {
+        state.focusTab(existingPlaceholder.id);
       }
       return;
     }
-    const currentRoute = `${location.pathname}${location.search}${location.hash}`;
-    if (location.pathname.startsWith("/spaces/")) {
-      const canonicalRoute = canonicalSpaceRoute(currentRoute);
-      if (canonicalRoute !== currentRoute) {
-        navigate(canonicalRoute, { replace: true });
-        return;
-      }
-    }
-    // Provider and destination choices live in the query string. Keep the
-    // complete route on the workspace tab so opening Social cannot fall back
-    // to its default native Social destination.
     const surface = workspaceSurfaceFromRoute(currentRoute);
     if (surface) {
       const view = openWorkspaceSurface(surface);
       if (view.route !== currentRoute) navigate(view.route, { replace: true });
     }
-  }, [
-    location.pathname,
-    location.search,
-    location.hash,
-    navigate,
-    openWorkspaceSurface,
-    spaces,
-    spacesSnapshotReady,
-  ]);
+  }, [location.pathname, location.search, location.hash, navigate, openWorkspaceSurface]);
 
   useEffect(() => {
-    if (location.pathname === "/") navigate("/home", { replace: true });
+    if (location.pathname === "/") {
+      const active = activeLayoutView(useWorkspaceStore.getState().layout);
+      const target = active ? active.route : routes.newTab;
+      navigate(target, { replace: true });
+    }
   }, [location.pathname, navigate]);
 
   const openLauncher = useCallback((commandsOnly = false) => {
@@ -280,7 +263,7 @@ export function DesktopLayout(props: {
   }, []);
   useShortcutHandler(
     "search.toggle",
-    useCallback(() => openLauncher(false), [openLauncher]),
+    useCallback(() => useBrowserSearchStore.getState().toggle(), []),
   );
   useShortcutHandler(
     "app.command_palette",
@@ -297,23 +280,7 @@ export function DesktopLayout(props: {
 
   const focusTool = useCallback(
     (tool: string) => {
-      let route = `/${tool}`;
-      if (["journal", "planner", "social", "library"].includes(tool)) {
-        const availableSpaces = useSpacesStore.getState().spaces;
-        const scope = useWorkspaceStore.getState().activeScopeKey;
-        const activeSpaceId = scope.startsWith("space:")
-          ? scope.slice(6)
-          : preferredDefaultSpace(availableSpaces)?.id;
-        if (!activeSpaceId) {
-          useAppStore.getState().setError(`Create or join a Space before opening ${tool}.`);
-          return;
-        }
-        const encoded = encodeURIComponent(activeSpaceId);
-        if (tool === "journal") route = rememberedJournalRoute(user?.id ?? "", activeSpaceId);
-        else if (tool === "planner") route = rememberedPlannerRoute(user?.id ?? "", activeSpaceId);
-        else if (tool === "social") route = socialProviderPath(activeSpaceId, "misty");
-        else route = `/spaces/${encoded}/${tool}`;
-      }
+      const route = `/${tool}`;
       const request = workspaceSurfaceFromRoute(route);
       if (!request) {
         useAppStore.getState().setError(`${tool} is not available in this workspace.`);
@@ -322,22 +289,11 @@ export function DesktopLayout(props: {
       const tab = openWorkspaceSurface(request);
       navigate(tab.route);
     },
-    [navigate, openWorkspaceSurface, user?.id],
+    [navigate, openWorkspaceSurface],
   );
 
   useEffect(() => {
-    const tools = [
-      "home",
-      "journal",
-      "planner",
-      "social",
-      "inbox",
-      "library",
-      "browser",
-      "files",
-      "code",
-      "terminal",
-    ];
+    const tools = ["home", "browser", "files", "agents"];
     const unregister = tools.map((tool) =>
       registerShortcutHandler(`tool.${tool}`, () => focusTool(tool)),
     );
@@ -397,7 +353,9 @@ export function DesktopLayout(props: {
         style={
           isAuthRoute
             ? undefined
-            : { gridTemplateColumns: `${navigatorHidden ? 0 : navigatorWidth}px minmax(0, 1fr)` }
+            : {
+                gridTemplateColumns: `${navigatorHidden ? 0 : navigatorWidth}px minmax(0, 1fr)`,
+              }
         }
         data-misty-desktop-frame
         onPointerDown={(event) => {
@@ -443,8 +401,9 @@ export function DesktopLayout(props: {
                   data-misty-window-drag-block="true"
                   data-misty-desktop-navigation-history="true"
                 >
-                  <button
-                    type="button"
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
                     className={styles.desktopTitlebarNavigationButtonClass}
                     aria-label="Go back"
                     title={backTitle}
@@ -452,9 +411,10 @@ export function DesktopLayout(props: {
                     onClick={goBack}
                   >
                     <ArrowLeft size={16 * appZoom} />
-                  </button>
-                  <button
-                    type="button"
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
                     className={styles.desktopTitlebarNavigationButtonClass}
                     aria-label="Go forward"
                     title={forwardTitle}
@@ -462,7 +422,7 @@ export function DesktopLayout(props: {
                     onClick={goForward}
                   >
                     <ArrowRight size={16 * appZoom} />
-                  </button>
+                  </Button>
                 </div>
                 {shouldShowWindowsControls ? (
                   <div
@@ -482,33 +442,35 @@ export function DesktopLayout(props: {
                   transformOrigin: "top right",
                 }}
               >
-                <button
-                  type="button"
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
                   className={styles.windowsTitlebarControlButtonClass}
                   aria-label="Minimize window"
                   title="Minimize"
                   onClick={minimizeTitlebarWindow}
                 >
                   <Minus size={16} strokeWidth={1.5} />
-                </button>
-                <button
-                  type="button"
+                </Button>
+                <Button
+                  variant="ghost"
                   className={styles.windowsTitlebarControlButtonClass}
                   aria-label={isWindowMaximized ? "Restore window" : "Maximize window"}
                   title={isWindowMaximized ? "Restore" : "Maximize"}
                   onClick={() => void toggleTitlebarMaximize().catch(() => undefined)}
                 >
                   {isWindowMaximized ? <RestoreGlyph /> : <Square size={13} strokeWidth={1.5} />}
-                </button>
-                <button
-                  type="button"
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
                   className={styles.windowsTitlebarCloseButtonClass}
                   aria-label="Close window"
                   title="Close"
                   onClick={closeTitlebarWindow}
                 >
                   <X size={18} strokeWidth={1.65} />
-                </button>
+                </Button>
               </div>
             ) : null}
           </header>
@@ -653,9 +615,9 @@ export function DesktopLayout(props: {
                 }
               />
             ) : null}
+            <BrowserSearchDialog />
             <BrowserRuntimeBridge />
             <BrowserContextMenuBridge />
-            <SpacesRealtimeBridge />
             <ActivityBridge />
             <AgentJobWorker />
             <AppTour />
@@ -669,8 +631,7 @@ export function DesktopLayout(props: {
 function standaloneWorkspaceRouteTitle(pathname: string): string | null {
   if (import.meta.env.DEV && pathname === "/roadmap-preview") return "Roadmap preview";
   if (pathname === "/activity") return "Activity";
-  if (pathname.startsWith("/invite/")) return "Join Space";
-  if (pathname === "/spaces") return "Spaces";
+  if (pathname.startsWith("/invite/")) return "Space invitation";
   return null;
 }
 

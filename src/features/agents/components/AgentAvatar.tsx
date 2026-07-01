@@ -1,3 +1,4 @@
+import "./AgentAvatar.css";
 import type { AgentProfile } from "@misty/contracts";
 import { agentCloudAvatar, type agentCloudVariants } from "./agentCloudAvatars";
 

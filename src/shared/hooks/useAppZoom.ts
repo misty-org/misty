@@ -147,6 +147,12 @@ async function applyNativeZoom(zoom: number, applySequence: number): Promise<voi
     const { getCurrentWebview } = await import("@tauri-apps/api/webview");
     if (applySequence !== zoomApplySequence) return;
     await getCurrentWebview().setZoom(zoom);
+    // The first notification updates UI state before the async native call.
+    // Measure embedded views again once the renderer's CSS viewport matches
+    // the new scale; otherwise their bounds can retain the previous viewport.
+    if (applySequence === zoomApplySequence) {
+      window.dispatchEvent(new Event(appZoomChangedEvent));
+    }
   } catch (error) {
     if (applySequence === zoomApplySequence) {
       console.error("Unable to apply native app zoom", error);

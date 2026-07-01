@@ -2,6 +2,8 @@
 
 Created: 2026-09-18. Release status: **NOT READY**. This is the canonical completion ledger for the full Agents experience, not permission to deploy or publish.
 
+**2026-09-22 beta scope override:** The user approved foreground, visible autopilot for the first macOS beta. Keep all three mode labels but enable only Agent; separate/background Team execution and simultaneous desktop work are deferred from this beta. The agent must observe the whole Misty window with current Space/open-app context, act visibly, and expose Stop. This narrows the beta contract without marking the broader production rows complete. See [implementation and current evidence](visible-autopilot-beta.md): the native screenshot → Journal sidebar click → screenshot trial passed with user confirmation and independent UI verification. Native editing, Stop acceptance and the complete catalog workflow remain unverified on this new path.
+
 Initial inventory: **114 open items** — 15 checks/decisions, 24 implementation items, 70 validation items, and 5 publication items. Three are conditional platform/provider items. Use row status as authoritative; these counts are a creation-time snapshot, not a progress percentage.
 
 ## Outcome and scope

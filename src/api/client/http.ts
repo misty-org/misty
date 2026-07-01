@@ -1,5 +1,6 @@
 import type { AccountRequestInit } from "./native-account-fetch";
 import { cookieSessionFetch } from "./cookie-session";
+import { rateLimitResponse, recordRateLimit } from "./rateLimit";
 const TRANSIENT_NETWORK_PATTERNS = [
   "load failed",
   "failed to fetch",
@@ -44,7 +45,10 @@ export async function httpRequest(
     }
 
     try {
+      const coolingDown = rateLimitResponse(input, init);
+      if (coolingDown) return coolingDown;
       const response = await cookieSessionFetch(input, init);
+      recordRateLimit(input, init, response);
       if (
         isIdempotent &&
         attempt < maxAttempts &&

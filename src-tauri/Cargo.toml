@@ -30,6 +30,7 @@ dirs = "6.0.0"
 hex = "0.4"
 jsonwebtoken = "9"
 misty-credential-store = { path = "vendor/misty-credential-store" }
+misty-browser-sync = { path = "crates/browser-sync" }
 libc = "0.2"
 rand = "0.8"
 serde = { version = "1", features = ["derive"] }
@@ -80,8 +81,8 @@ core-graphics = "0.24"
 objc = "0.2.7"
 objc2 = "0.6.4"
 objc2-app-kit = { version = "0.3.2", default-features = false, features = ["std", "NSAppearance", "NSApplication", "NSBitmapImageRep", "NSImageRep", "NSEvent", "NSPasteboard", "NSResponder", "NSScrollView", "NSTrackingArea", "NSView", "NSWindow"] }
-objc2-foundation = { version = "0.3.2", default-features = false, features = ["std", "NSArray", "NSData", "NSBundle", "NSDictionary", "NSError", "NSObject", "NSProcessInfo", "NSString", "NSURL"] }
-objc2-web-kit = { version = "0.3.2", default-features = false, features = ["WKSnapshotConfiguration", "objc2-core-foundation", "WKContentWorld", "WKFrameInfo", "WKWebView", "WKWebViewConfiguration", "WKUserContentController", "block2"] }
+objc2-foundation = { version = "0.3.2", default-features = false, features = ["std", "NSArray", "NSData", "NSBundle", "NSDictionary", "NSError", "NSObject", "NSProcessInfo", "NSString", "NSURL", "NSURLResponse", "NSHTTPCookie", "NSDate"] }
+objc2-web-kit = { version = "0.3.2", default-features = false, features = ["WKSnapshotConfiguration", "objc2-core-foundation", "WKContentWorld", "WKFrameInfo", "WKWebView", "WKWebViewConfiguration", "WKUserContentController", "WKUserScript", "WKNavigationResponse", "WKNavigationDelegate", "WKHTTPCookieStore", "WKWebsiteDataStore", "block2"] }
 
 [target.'cfg(any(target_os = "macos", windows, target_os = "linux"))'.dependencies]
 tauri-plugin-single-instance = "2.4.3"

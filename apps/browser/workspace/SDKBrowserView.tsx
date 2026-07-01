@@ -2,14 +2,7 @@ import { Notification } from "@/shared/ui/notification";
 import "../../shared/browserChrome.css";
 import { WebsiteLoader } from "../../shared/WebsiteLoader";
 import "@/styles/styles.css";
-import {
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   type MistyAppSDK,
   type MistyAppCommand,
@@ -17,13 +10,7 @@ import {
   type MistyBrowserEvent,
   type MistyBrowserInspection,
 } from "@misty/sdk";
-import {
-  ArrowLeft,
-  ArrowRight,
-  RotateCw,
-  Pencil,
-  MessageCirclePlus,
-} from "lucide-react";
+import { ArrowLeft, ArrowRight, RotateCw, Pencil, MessageCirclePlus } from "lucide-react";
 import { cn, Popover, PopoverContent, PopoverTrigger } from "@/shared/ui";
 import { normalizeSdkBrowserAddress } from "./browserAddress";
 import { BrowserOmniboxView } from "@/features/browser/BrowserOmniboxView";
@@ -51,11 +38,7 @@ import {
 export type BrowserViewServices = {
   misty: MistyAppSDK;
   report(error: unknown): void;
-  register(
-    command: MistyAppCommand,
-    action: () => void,
-    enabled: () => boolean,
-  ): () => void;
+  register(command: MistyAppCommand, action: () => void, enabled: () => boolean): () => void;
 };
 type View = Awaited<ReturnType<MistyAppSDK["browser"]["create"]>>;
 type RuntimeState = Extract<MistyBrowserEvent, { type: "state" }>;
@@ -82,10 +65,7 @@ export function SDKBrowserView({
   onView,
   renderPin,
 }: {
-  renderPin?: (page: {
-    url: string;
-    title: string;
-  }) => import("react").ReactNode;
+  renderPin?: (page: { url: string; title: string }) => import("react").ReactNode;
   services: BrowserViewServices;
   context: MistyComponentContext;
   provider?: import("@misty/sdk").MistyBrowserProvider;
@@ -96,9 +76,7 @@ export function SDKBrowserView({
   const { misty } = services;
   const host = useRef<HTMLDivElement>(null);
   const refreshLayout = useRef<() => void>(() => {});
-  const controller = useRef<ReturnType<
-    typeof createSdkBrowserController
-  > | null>(null);
+  const controller = useRef<ReturnType<typeof createSdkBrowserController> | null>(null);
   const [view, setView] = useState<View | null>(null);
   const [initialLoading, setInitialLoading] = useState(true);
   const [url, setUrl] = useState(blankBrowserUrl);
@@ -197,9 +175,7 @@ export function SDKBrowserView({
               if (provider) break;
               void misty.workspace
                 .setTitle(
-                  event.title
-                    .replace(/[\u0000-\u001f\u007f]/g, "")
-                    .slice(0, 160) || "Browser",
+                  event.title.replace(/[\u0000-\u001f\u007f]/g, "").slice(0, 160) || "Browser",
                 )
                 .catch((error) => latest.current.services.report(error));
               break;
@@ -247,9 +223,7 @@ export function SDKBrowserView({
         const key = JSON.stringify(geometry);
         if (
           key !== lastGeometry &&
-          (!visible ||
-            current.viewport !== "responsive" ||
-            performance.now() >= resizeUntil)
+          (!visible || current.viewport !== "responsive" || performance.now() >= resizeUntil)
         ) {
           lastGeometry = key;
           instance.update(geometry, true);
@@ -260,8 +234,12 @@ export function SDKBrowserView({
       if (!closed && !frame) frame = requestAnimationFrame(measure);
     };
     const resize = () => {
+      // AppKit owns geometry while the user drags. DOM measurements arrive
+      // asynchronously and must not overwrite its newer native frame.
       resizeUntil = performance.now() + 120;
       lastGeometry = "";
+      cancelAnimationFrame(frame);
+      frame = 0;
       window.clearTimeout(resizeTimer);
       resizeTimer = window.setTimeout(() => {
         resizeUntil = 0;
@@ -280,11 +258,7 @@ export function SDKBrowserView({
     // display frame (including for inactive, mounted website tabs).
     const observer = new ResizeObserver(schedule);
     const attributes = new MutationObserver(schedule);
-    for (
-      let element: HTMLElement | null = host.current;
-      element;
-      element = element.parentElement
-    ) {
+    for (let element: HTMLElement | null = host.current; element; element = element.parentElement) {
       observer.observe(element);
       attributes.observe(element, {
         attributes: true,
@@ -305,10 +279,7 @@ export function SDKBrowserView({
     schedule();
     return () => {
       closed = true;
-      window.removeEventListener(
-        "misty:workspace-geometry-changed",
-        paneLayout,
-      );
+      window.removeEventListener("misty:workspace-geometry-changed", paneLayout);
       cancelAnimationFrame(frame);
       window.clearTimeout(resizeTimer);
       observer.disconnect();
@@ -321,9 +292,7 @@ export function SDKBrowserView({
       controller.current = null;
       latest.current.onView?.(null);
       refreshLayout.current = () => {};
-      void instance
-        .close()
-        .catch((error) => latest.current.services.report(error));
+      void instance.close().catch((error) => latest.current.services.report(error));
     };
     // Callback/context changes must never replace a loaded native page.
   }, [misty, provider?.id, provider?.accountId, report]);
@@ -360,9 +329,7 @@ export function SDKBrowserView({
       if (!handle) return;
       setPage(null);
       setMessage(null);
-      void misty.browser
-        .navigate(handle, normalizeSdkBrowserAddress(address))
-        .catch(report);
+      void misty.browser.navigate(handle, normalizeSdkBrowserAddress(address)).catch(report);
     },
     [handle, misty, report],
   );
@@ -397,15 +364,7 @@ export function SDKBrowserView({
       ),
     ];
     return () => remove.forEach((stop) => stop());
-  }, [
-    services,
-    misty,
-    handle,
-    runtime.canBack,
-    runtime.canForward,
-    reload,
-    report,
-  ]);
+  }, [services, misty, handle, runtime.canBack, runtime.canForward, reload, report]);
   const adapter = useMemo(
     () =>
       view
@@ -489,10 +448,7 @@ export function SDKBrowserView({
                 disabled={!handle}
                 onClick={() => void reload().catch(report)}
               >
-                <RotateCw
-                  size={16}
-                  className={runtime.loading ? "animate-spin" : undefined}
-                />
+                <RotateCw size={16} className={runtime.loading ? "animate-spin" : undefined} />
               </button>
             </div>
             <BrowserOmniboxView
@@ -504,17 +460,12 @@ export function SDKBrowserView({
               onNavigate={navigate}
             />
             <div
-              className={cn(
-                "flex shrink-0 gap-1",
-                !handle && "pointer-events-none opacity-40",
-              )}
+              className={cn("flex shrink-0 gap-1", !handle && "pointer-events-none opacity-40")}
               inert={!handle}
             >
               <button
                 className={iconClass}
-                aria-label={
-                  annotations ? "Exit annotation mode" : "Annotate page"
-                }
+                aria-label={annotations ? "Exit annotation mode" : "Annotate page"}
                 aria-pressed={annotations}
                 onClick={() => setAnnotations((value) => !value)}
               >
@@ -528,10 +479,7 @@ export function SDKBrowserView({
                 suspensionReason="viewport"
                 setOverlay={setOverlay}
               />
-              <Popover
-                open={agentMenu.open}
-                onOpenChange={agentMenu.onOpenChange}
-              >
+              <Popover open={agentMenu.open} onOpenChange={agentMenu.onOpenChange}>
                 <PopoverTrigger asChild>
                   <button
                     className={iconClass}
@@ -551,8 +499,7 @@ export function SDKBrowserView({
                       : "No active Agent run is attached to this tab."}
                   </p>
                   <p className="mt-3 text-xs text-cream-muted">
-                    Read this page once to give Misty context for your next
-                    question.
+                    Read this page once to give Misty context for your next question.
                   </p>
                   <button
                     className="mt-2 w-full rounded-md border border-charcoal-border px-3 py-2 text-xs hover:bg-charcoal-hover disabled:opacity-50"
@@ -629,18 +576,14 @@ export function SDKBrowserView({
             )}
           </Notification>
         )}
-        <div
-          className="relative min-h-0 flex-1 overflow-hidden"
-          data-browser-page-stage
-        >
+        <div className="relative min-h-0 flex-1 overflow-hidden" data-browser-page-stage>
           <div
             ref={host}
             data-browser-page-host
             data-browser-viewport={viewport}
             className={cn(
               "relative mx-auto h-full overflow-hidden",
-              viewport !== "responsive" &&
-                "rounded-xl shadow-2xl ring-1 ring-black/15",
+              viewport !== "responsive" && "rounded-xl shadow-2xl ring-1 ring-black/15",
             )}
             style={{
               width: browserViewportWidths[viewport]

@@ -12,7 +12,6 @@ import {
   AvatarFallback,
   AvatarImage,
   Badge,
-  Button,
   ContextMenu,
   ContextMenuContent,
   ContextMenuItem,
@@ -20,6 +19,7 @@ import {
   Input,
   Skeleton,
   cn,
+  Button,
 } from "@/shared/ui";
 import { ArrowRight, Pin, PinOff, Plus, RefreshCw, Search, Workflow } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -325,8 +325,8 @@ function AutomationRows(props: AutomationRowsProps) {
     return (
       <ContextMenu key={flow.id}>
         <ContextMenuTrigger asChild>
-          <button
-            type="button"
+          <Button variant="ghost"
+           
             className={cn(
               "group/automation flex min-h-14 w-full items-center gap-2.5 px-3.5 py-2 text-left outline-none transition-colors",
               selected
@@ -353,7 +353,7 @@ function AutomationRows(props: AutomationRowsProps) {
             <Badge variant={flow.status === "enabled" ? "secondary" : "outline"}>
               {flow.status === "enabled" ? "On" : flow.published ? "Off" : "Draft"}
             </Badge>
-          </button>
+          </Button>
         </ContextMenuTrigger>
         <ContextMenuContent className="w-40">
           <ContextMenuItem onSelect={() => props.onTogglePin(flow.id)}>

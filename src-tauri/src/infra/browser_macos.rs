@@ -193,18 +193,7 @@ pub(super) fn configure_browser_webview(
 }
 
 #[cfg(target_os = "macos")]
-unsafe fn configure_continuous_live_resize(view: &objc2_app_kit::NSView) {
-    use objc2_app_kit::NSViewLayerContentsRedrawPolicy;
-
-    // WKWebView is a tree of AppKit/WebKit views. Applying the policy only to
-    // its root still permits an internal tiled-content view to preserve a
-    // stale frame until live resize ends.
-    view.setLayerContentsRedrawPolicy(NSViewLayerContentsRedrawPolicy::DuringViewResize);
-    view.setNeedsDisplay(true);
-    for child in view.subviews().iter() {
-        configure_continuous_live_resize(&child);
-    }
-}
+use crate::platform::plugins::mac_rounded_corners::configure_continuous_live_resize;
 
 /// Keep Wry unmodified and apply Misty's main-renderer pointer guard after
 /// native geometry, visibility, or sibling-order changes.

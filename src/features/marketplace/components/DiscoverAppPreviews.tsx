@@ -1,5 +1,6 @@
 import type { OfficialApp } from "@/api/apps";
 import journalImage from "@/assets/discover/journal.png";
+import { Button } from "@/shared/ui/button";
 import { OfficialAppIcon } from "@/features/apps/OfficialAppIcon";
 import { ArrowUpRight } from "lucide-react";
 
@@ -27,10 +28,11 @@ export function DiscoverAppPreviews({
   return (
     <section className="discover-previews" aria-label="App previews">
       {available.map(({ app, image, description, alt }) => (
-        <button
+        <Button
           key={app.id}
-          type="button"
-          className="discover-preview"
+          variant="ghost"
+          size="none"
+          className="discover-preview h-auto w-full block border-0 p-0 text-left"
           aria-label={`Preview ${app.name}`}
           onClick={() => onSelect(app)}
         >
@@ -49,9 +51,9 @@ export function DiscoverAppPreviews({
               <strong>{app.name}</strong>
               <span>{description}</span>
             </span>
-            <ArrowUpRight size={17} aria-hidden="true" />
+            <ArrowUpRight className="size-[17px]" size={17} aria-hidden="true" />
           </span>
-        </button>
+        </Button>
       ))}
     </section>
   );

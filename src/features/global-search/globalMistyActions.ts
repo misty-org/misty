@@ -1,13 +1,6 @@
-import { useAgentsSpaces as useSpacesStore } from "@/features/agents/agentsRuntime";
-
 import type { GlobalAiActionProposal } from "./types";
 
 export function proposeAction(prompt: string): GlobalAiActionProposal {
-  const spacesState = useSpacesStore.getState();
-  const requestedSpace = spacesState.spaces.find((space) =>
-    prompt.toLocaleLowerCase().includes(space.name.toLocaleLowerCase()),
-  );
-  const space = requestedSpace ?? spacesState.spaces[0];
   const readOnly = /^(find|search|show|list|summari[sz]e|explain|review|check)\b/i.test(prompt);
   return {
     id: `proposal-${globalMistyId()}`,
@@ -19,7 +12,6 @@ export function proposeAction(prompt: string): GlobalAiActionProposal {
     risk: readOnly ? "read" : "write",
     state: "proposed",
     requiresConfirmation: !readOnly,
-    ...(space ? { spaceId: space.id, spaceName: space.name } : {}),
   };
 }
 

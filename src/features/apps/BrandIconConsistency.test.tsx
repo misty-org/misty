@@ -8,7 +8,7 @@ import { brandIconAsset, brandIcons } from "../../.././apps/shared/brandIcons";
 import { providers } from "../../.././apps/shared/providers";
 import { ProviderBrandIcon } from "../../.././apps/shared/ProviderBrandIcon";
 import { websiteIntegrations } from "../../.././apps/shared/websiteIntegrations";
-import { DestinationIcon } from "@/application/layouts/DesktopLayout/DownloadedAppNavigator";
+import { DestinationIcon } from "@/application/layouts/DesktopLayout/NavigatorDestinationIcon";
 import { WorkspaceTabGroupButton } from "@/application/layouts/DesktopLayout/WorkspaceTabGroupButton";
 import { MarketplaceCatalogIcon } from "@/features/marketplace/components/MarketplaceCatalogIcon";
 import { OfficialAppIcon } from "./OfficialAppIcon";

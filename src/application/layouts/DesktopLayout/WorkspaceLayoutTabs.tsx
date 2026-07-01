@@ -22,6 +22,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   cn,
+  Button
 } from "@/shared/ui";
 import {
   activeLayoutView,
@@ -54,8 +55,10 @@ export function WorkspaceLayoutTabs(
     dockLeaves(layout.root).find((pane) => pane.id === layout.focusedPaneId) ??
     dockLeaves(layout.root)[0];
   useEffect(() => {
+    const paneSelector =
+      typeof CSS !== "undefined" && CSS?.escape ? CSS.escape(pane.id) : pane.id;
     const element = document.querySelector<HTMLElement>(
-      `[data-workspace-pane="${CSS.escape(pane.id)}"]`,
+      `[data-workspace-pane="${paneSelector}"]`,
     );
     if (!element) return;
     const update = () => {
@@ -165,14 +168,16 @@ export function WorkspaceLayoutTabs(
                     : "border-transparent text-cream-muted hover:bg-charcoal-card/40 hover:text-cream",
                 )}
               >
-                <button
-                  type="button"
+                <Button
+                  variant="ghost"
+                  size="none"
+                  justify="start"
                   role="tab"
                   aria-selected={active}
                   tabIndex={active ? 0 : -1}
                   title={label}
                   data-reorder-handle="true"
-                  className="flex h-full min-w-0 flex-1 items-center gap-1.5 overflow-hidden pl-2 pr-1 text-left outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-cream-muted"
+                  className="flex h-full min-w-0 flex-1 items-center justify-start gap-1.5 overflow-hidden border-0 pl-2 pr-1 text-left outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-cream-muted"
                   onClick={() => select(tab.id)}
                   onKeyDown={(event) => {
                     const index = tabs.findIndex((item) => item.id === tab.id);
@@ -212,18 +217,19 @@ export function WorkspaceLayoutTabs(
                       {panes.length}
                     </span>
                   ) : null}
-                </button>
+                </Button>
                 {panes.length > 1 ? (
                   <DropdownMenu modal={false}>
                     <DropdownMenuTrigger asChild>
-                      <button
-                        type="button"
+                      <Button
+                        variant="ghost"
+                        size="none"
                         aria-label={`Show panes in ${label}`}
                         aria-description={`${panes.length} panes`}
-                        className="flex h-6 shrink-0 items-center gap-0.5 rounded px-1 text-cream-muted hover:bg-charcoal-active hover:text-cream focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-cream-muted"
+                        className="flex h-6 shrink-0 items-center gap-0.5 rounded border-0 px-1 text-cream-muted hover:bg-charcoal-active hover:text-cream focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-cream-muted"
                       >
-                        <ChevronDown size={12} />
-                      </button>
+                        <ChevronDown className="size-3" size={12} />
+                      </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="start" className="min-w-[220px]">
                       {panes.map((item) => {
@@ -268,65 +274,70 @@ export function WorkspaceLayoutTabs(
                     </DropdownMenuContent>
                   </DropdownMenu>
                 ) : (
-                  <button
-                    type="button"
+                  <Button
+                    variant="ghost"
+                    size="none"
                     aria-label={`Close tab ${label}`}
                     title={`Close tab ${label}`}
-                    className="mr-0.5 grid size-5 shrink-0 place-items-center rounded text-cream-muted hover:bg-charcoal-active hover:text-cream focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-cream-muted"
+                    className="mr-0.5 grid size-5 shrink-0 place-items-center rounded border-0 text-cream-muted hover:bg-charcoal-active hover:text-cream focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-cream-muted"
                     onClick={() => props.onCloseLayoutTab(tab.id)}
                   >
-                    <X size={12} />
-                  </button>
+                    <X className="size-3" size={12} />
+                  </Button>
                 )}
               </div>
             </Renameable>
           );
         })}
-        <button
-          type="button"
+        <Button
+          variant="ghost"
+          size="none"
           className={dockActionClass}
           aria-label="New tab"
           title="New tab"
           onClick={props.onNewTab}
         >
-          <Plus size={15} />
-        </button>
+          <Plus className="size-[15px]" size={15} />
+        </Button>
       </div>
       <div className="ml-1.5 flex h-7 shrink-0 items-center gap-1">
         {!props.windowsTitlebarControls ? (
           <>
-            <button
-              type="button"
+            <Button
+              variant="ghost"
+              size="none"
               disabled={!canRight}
               className={dockActionClass}
               aria-label="Create split right"
               title="Split right"
               onClick={() => props.onSplitPane(pane.id, "right")}
             >
-              <PanelRightDashed size={16} />
-            </button>
-            <button
-              type="button"
+              <PanelRightDashed className="size-4" size={16} />
+            </Button>
+            <Button
+              variant="ghost"
+              size="none"
               disabled={!canDown}
               className={dockActionClass}
               aria-label="Create split down"
               title="Split down"
               onClick={() => props.onSplitPane(pane.id, "down")}
             >
-              <PanelBottomDashed size={16} />
-            </button>
+              <PanelBottomDashed className="size-4" size={16} />
+            </Button>
           </>
         ) : null}
-        <button
-          type="button"
+        <Button
+          variant="ghost"
+          size="none"
           disabled={dockLeaves(layout.root).length <= 1}
           className={dockActionClass}
           aria-label="Close pane"
           title="Close pane"
           onClick={() => props.onClosePane(pane.id)}
         >
-          <ClosePaneIcon size={16} />
-        </button>
+          <ClosePaneIcon className="size-4" size={16} />
+        </Button>
         {!props.windowsTitlebarControls ? (
           <WorkspaceWindowMenu
             windows={props.virtualWindows}

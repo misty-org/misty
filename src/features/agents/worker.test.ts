@@ -1,10 +1,48 @@
 import { describe, expect, it } from "vitest";
 import {
   browserAgentExecutionRequest,
+  browserDeviceRequest,
   deviceExecutionRemaining,
   deviceContentReference,
   deviceWorkflowErrorCode,
 } from "./worker";
+
+describe("task download uploads", () => {
+  const job = {
+    id: "upload-job",
+    runId: "run",
+    nodeId: "node",
+    scopeId: "drive-scope",
+    operation: "browser.upload",
+    contextId: "context",
+    attempt: 1,
+    input: { downloadId: "download-one", sourceScopeId: "image-scope" },
+    config: {
+      agentId: "agent-one",
+      taskId: "task-one",
+      downloadUpload: { downloadId: "download-one", sourceScopeId: "image-scope" },
+    },
+  };
+  it("passes an authorized receipt to native without exposing file contents", async () => {
+    const request = await browserDeviceRequest(job);
+    expect(request.input).toMatchObject({
+      downloadId: "download-one",
+      sourceScopeId: "image-scope",
+      __mistyTaskId: "task-one",
+    });
+    expect(request.input).not.toHaveProperty("file");
+  });
+  it("rejects missing authorization, source substitution and mixed sources", async () => {
+    for (const invalid of [
+      { ...job, config: { ...job.config, downloadUpload: undefined } },
+      { ...job, config: { ...job.config, taskId: "" } },
+      { ...job, input: { ...job.input, downloadId: "another-download" } },
+      { ...job, input: { ...job.input, sourceScopeId: "another-account" } },
+      { ...job, input: { ...job.input, attachmentId: "attachment" } },
+    ])
+      await expect(browserDeviceRequest(invalid)).rejects.toThrow("invalid_task_download");
+  });
+});
 
 describe("v2 device workflow node worker", () => {
   it("accepts an opaque scope and relative content locator", () => {

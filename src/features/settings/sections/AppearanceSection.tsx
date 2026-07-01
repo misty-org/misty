@@ -23,6 +23,7 @@ import {
   SwitchControl,
 } from "../settingsControls";
 import type { SettingsContentProps } from "../settingsTypes";
+import { Button } from "@/shared/ui";
 
 const wallpaperFilters = [{ name: "Video", extensions: ["mp4", "mov", "m4v"] }];
 
@@ -87,9 +88,9 @@ export function AppearanceSection(props: SettingsContentProps) {
                 props.onSettingChange("appearance", "app_zoom", appZoomRenderScale(value));
               }}
             />
-            <button
-              type="button"
-              className={`rounded-sm text-xs text-cream-muted underline-offset-4 hover:text-cream hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cream-muted ${displayedAppZoom === appZoomDefault ? "invisible pointer-events-none" : ""}`}
+            <Button
+              variant="link"
+              className={`h-auto p-0 rounded-sm text-xs text-cream-muted hover:text-cream focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cream-muted ${displayedAppZoom === appZoomDefault ? "invisible pointer-events-none" : ""}`}
               disabled={props.working || displayedAppZoom === appZoomDefault}
               aria-hidden={displayedAppZoom === appZoomDefault}
               onClick={() => {
@@ -99,7 +100,7 @@ export function AppearanceSection(props: SettingsContentProps) {
               }}
             >
               Reset
-            </button>
+            </Button>
           </div>
         </SettingsRow>
         <SettingsRow

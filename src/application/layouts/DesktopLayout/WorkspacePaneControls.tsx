@@ -20,6 +20,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  Button
 } from "@/shared/ui";
 
 const controlClass =
@@ -96,26 +97,28 @@ export function WorkspacePaneControls({
           className="pointer-events-none fixed z-[2147483300] flex items-center gap-0.5 rounded-md border border-charcoal-border bg-charcoal-card p-0.5 opacity-0 transition-opacity data-[visible=true]:pointer-events-auto data-[visible=true]:opacity-100 hover:pointer-events-auto hover:opacity-100 has-[:focus-visible]:pointer-events-auto has-[:focus-visible]:opacity-100 [@media(hover:none)]:pointer-events-auto [@media(hover:none)]:opacity-100"
           onPointerDown={(event) => event.stopPropagation()}
         >
-          <button
-            type="button"
+          <Button
+            variant="ghost"
+            size="none"
             className={`${controlClass} cursor-grab touch-none active:cursor-grabbing`}
             data-reorder-handle
             aria-label="Drag pane"
             title="Drag pane to an edge to move, or center to swap"
             onPointerDown={drag}
           >
-            <Move size={14} />
-          </button>
+            <Move className="size-3.5" size={14} />
+          </Button>
           <DropdownMenu open={open} onOpenChange={setOpen}>
             <DropdownMenuTrigger asChild>
-              <button
-                type="button"
+              <Button
+                variant="ghost"
+                size="none"
                 className={controlClass}
                 aria-label="Arrange pane"
                 title="Arrange pane"
               >
-                <LayoutPanelTop size={14} />
-              </button>
+                <LayoutPanelTop className="size-3.5" size={14} />
+              </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuLabel>Move pane to workspace edge</DropdownMenuLabel>
@@ -154,15 +157,16 @@ export function WorkspacePaneControls({
               )}
             </DropdownMenuContent>
           </DropdownMenu>
-          <button
-            type="button"
+          <Button
+            variant="ghost"
+            size="none"
             className={controlClass}
             aria-label="Close pane"
             title="Close pane"
             onClick={onClose}
           >
-            <X size={12} />
-          </button>
+            <X className="size-3" size={12} />
+          </Button>
         </div>,
         document.body,
       )}

@@ -12,13 +12,7 @@ import tailwindcss from "@tailwindcss/vite";
 import posthog from "@posthog/rollup-plugin";
 import { publicSdkDevelopmentUpdates } from "./cli/tasks/vite-public-sdk.ts";
 import { materialIconProjection, copyMaterialIcons } from "./cli/tasks/material-icon-assets.ts";
-import {
-  createReadStream,
-  existsSync,
-  readFileSync,
-  realpathSync,
-  statSync,
-} from "node:fs";
+import { createReadStream, existsSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { createRequire } from "node:module";
 import { basename, dirname, extname, join, resolve, sep } from "node:path";
 import {
@@ -150,21 +144,27 @@ function officialAppDevelopmentAssets(
             rejectDevelopmentAsset(response, 404, "Local app asset not found.");
             return;
           }
-          void prepareApp!(relative.split("/")[0]).then((available: boolean) => {
-            if (response.destroyed) return;
-            try {
-              if (!available || !realpathSync(file).startsWith(`${realpathSync(root)}${sep}`))
-                throw new Error("Outside local build");
-            } catch {
-              rejectDevelopmentAsset(response, 404, "Local app asset not found.");
-              return;
-            }
-            serveDevelopmentAsset(request.method, response, file, assetContentType(file));
-          }).catch((error: Error) => {
-            server.config.logger.error(`Local app preparation failed: ${error.message}`);
-            if (!response.destroyed)
-              rejectDevelopmentAsset(response, 503, "Local app build failed. Fix the build error and reload to retry.");
-          });
+          void prepareApp!(relative.split("/")[0])
+            .then((available: boolean) => {
+              if (response.destroyed) return;
+              try {
+                if (!available || !realpathSync(file).startsWith(`${realpathSync(root)}${sep}`))
+                  throw new Error("Outside local build");
+              } catch {
+                rejectDevelopmentAsset(response, 404, "Local app asset not found.");
+                return;
+              }
+              serveDevelopmentAsset(request.method, response, file, assetContentType(file));
+            })
+            .catch((error: Error) => {
+              server.config.logger.error(`Local app preparation failed: ${error.message}`);
+              if (!response.destroyed)
+                rejectDevelopmentAsset(
+                  response,
+                  503,
+                  "Local app build failed. Fix the build error and reload to retry.",
+                );
+            });
           return;
         }
         if (!requestPath?.startsWith(officialAppsPublicPath)) {
@@ -260,7 +260,8 @@ export default defineConfig(({ command, mode }) => {
   const posthogProjectId = env.POSTHOG_PROJECT_ID?.trim();
   const sourceMapKey = env.POSTHOG_API_KEY?.trim();
   const publicApiUrl = (env.MISTY_PUBLIC_API_URL ?? env.VITE_MISTY_PUBLIC_API_URL)?.trim();
-  const isDev = command === "serve" || mode.includes("dev") || process.env.NODE_ENV !== "production";
+  const isDev =
+    command === "serve" || mode.includes("dev") || process.env.NODE_ENV !== "production";
   const defaultPublicUrl = isDev ? "http://localhost:5174" : "https://mistysys.com";
   const publicUrl = (env.MISTY_PUBLIC_URL ?? env.VITE_MISTY_PUBLIC_URL)?.trim() || defaultPublicUrl;
   const appsDirectory =
@@ -305,10 +306,7 @@ export default defineConfig(({ command, mode }) => {
     mode === "mobile" || mode === "android"
       ? new URL("./src/application/platform-layout.mobile.tsx", import.meta.url).pathname
       : new URL("./src/application/platform-layout.tsx", import.meta.url).pathname;
-  const storePagePath =
-    mode === "mobile" || mode === "android"
-      ? new URL("./src/application/store-page.mobile.tsx", import.meta.url).pathname
-      : new URL("./src/application/store-page.tsx", import.meta.url).pathname;
+
   return {
     envDir: false,
     plugins: [
@@ -317,49 +315,36 @@ export default defineConfig(({ command, mode }) => {
       publicSdkDevelopmentUpdates(),
       react(),
       tailwindcss(),
-      ...((mode === "mobile" || mode === "android") ? [materialIconThemeAssets()] : []),
+      ...(mode === "mobile" || mode === "android" ? [materialIconThemeAssets()] : []),
       materialIconProjection(),
       ...(mode !== "mobile" && mode !== "android"
         ? [
             {
-              name: "misty-downloaded-app-host-boundary",
+              name: "misty-native-preview-adapters",
               enforce: "pre",
               resolveId(source, importer) {
-                if (mode === "desktop" && ["darwin", "macos"].includes(process.env.TAURI_ENV_PLATFORM || process.platform) &&
-                    /(?:^|\/)FilePicker(?:\.tsx)?$/.test(source))
+                if (
+                  mode === "desktop" &&
+                  ["darwin", "macos"].includes(
+                    process.env.TAURI_ENV_PLATFORM || process.platform,
+                  ) &&
+                  /(?:^|\/)FilePicker(?:\.tsx)?$/.test(source)
+                )
                   return resolve(process.cwd(), "src/features/picker/HostFilePicker.tsx");
                 if (/(?:^|\/)FileBrowserIcons(?:\.tsx)?$/.test(source))
                   return resolve(process.cwd(), "src/features/apps/HostFileIcons.tsx");
                 if (/(?:^|\/)PhotoEditorView(?:\.tsx)?$/.test(source))
                   return resolve(process.cwd(), "src/features/apps/FilePhotoEditor.tsx");
-                if (importer?.includes("/apps/files/workspace/") &&
-                    /(?:^|\/)VideoAnnotator(?:\.tsx)?$/.test(source))
+                if (
+                  importer?.includes("/apps/files/workspace/") &&
+                  /(?:^|\/)VideoAnnotator(?:\.tsx)?$/.test(source)
+                )
                   return resolve(process.cwd(), "src/features/apps/FileVideoPreview.tsx");
-                if (importer?.includes("/apps/files/workspace/") &&
-                    /(?:^|\/)PdfViewerView(?:\.tsx)?$/.test(source))
+                if (
+                  importer?.includes("/apps/files/workspace/") &&
+                  /(?:^|\/)PdfViewerView(?:\.tsx)?$/.test(source)
+                )
                   return resolve(process.cwd(), "src/features/apps/FilePdfPreview.tsx");
-              },
-              // Space collaboration screens and Yjs are bundled with Misty.
-              // Personal app runtimes remain separately packaged.
-              generateBundle(_options, bundle) {
-                const forbidden = Object.values(bundle).flatMap((item) =>
-                  item.type === "chunk"
-                    ? Object.entries(item.modules)
-                        .filter(
-                          ([id, details]) =>
-                            details.renderedLength > 0 &&
-                            !id.endsWith("/src/features/agents/AgentsPage.tsx") &&
-                            ((mode === "desktop" && ["darwin", "macos"].includes(process.env.TAURI_ENV_PLATFORM || process.platform) && /\/node_modules\/html2canvas\//.test(id)) || /\/(?:TrustedAppSurface\.mobile|NativeAppSurface|BrowserWorkspace|PinnedBrowserWorkspace|SDKBrowserView|AgentsPage|TerminalWorkspace(?:View)?|PdfViewerView|PhotoEditorView|VideoAnnotator)\.tsx$/.test(id) ||
-                              /\/apps\/(?:files|browser)\//.test(id) ||
-                              /\/node_modules\/(?:material-icon-theme|@noble\/hashes|mammoth|jszip|react-pdf|pdfjs-dist|react-filerobot-image-editor|react-konva|konva)\//.test(id)),
-                        )
-                        .map(([id]) => id)
-                    : [],
-                );
-                if (forbidden.length)
-                  this.error(
-                    `Downloaded app screens must not ship inside the desktop Host:\n${forbidden.map(id => `${id} <- ${this.getModuleInfo(id)?.importers.join(", ")}`).join("\n")}`,
-                  );
               },
             } satisfies Plugin,
           ]
@@ -385,8 +370,14 @@ export default defineConfig(({ command, mode }) => {
         : []),
     ],
     define: {
-      "import.meta.env.MISTY_SHELL_MACOS": JSON.stringify(mode === "desktop" && ["darwin", "macos"].includes(process.env.TAURI_ENV_PLATFORM || process.platform)),
-      "import.meta.env.MISTY_NATIVE_MACOS_CAPTURE": JSON.stringify(mode === "desktop" && ["darwin", "macos"].includes(process.env.TAURI_ENV_PLATFORM || process.platform)),
+      "import.meta.env.MISTY_SHELL_MACOS": JSON.stringify(
+        mode === "desktop" &&
+          ["darwin", "macos"].includes(process.env.TAURI_ENV_PLATFORM || process.platform),
+      ),
+      "import.meta.env.MISTY_NATIVE_MACOS_CAPTURE": JSON.stringify(
+        mode === "desktop" &&
+          ["darwin", "macos"].includes(process.env.TAURI_ENV_PLATFORM || process.platform),
+      ),
       ...publicAppEnv(env),
       "import.meta.env.VITE_POSTHOG_PROJECT_TOKEN": JSON.stringify(posthogToken ?? ""),
       "import.meta.env.VITE_POSTHOG_HOST": JSON.stringify(posthogHost ?? ""),
@@ -417,21 +408,11 @@ export default defineConfig(({ command, mode }) => {
     resolve: {
       alias: {
         ...appSourceAliases(process.cwd()),
-        "@misty/browser-view": resolve(appSourceRoot(process.cwd()), "browser/workspace/SDKBrowserView.tsx"),
-        "@/features/apps/TrustedAppSurface": new URL(
-          mode === "mobile" || mode === "android"
-            ? "./src/features/apps/TrustedAppSurface.mobile.tsx"
-            : "./src/features/apps/TrustedAppSurface.tsx",
-          import.meta.url,
-        ).pathname,
-        "@/features/apps/EmbeddedPlanner": new URL(
-          mode === "mobile" || mode === "android"
-            ? "./src/features/apps/EmbeddedPlanner.mobile.tsx"
-            : "./src/features/apps/EmbeddedPlanner.tsx",
-          import.meta.url,
-        ).pathname,
+        "@misty/browser-view": resolve(
+          appSourceRoot(process.cwd()),
+          "browser/workspace/SDKBrowserView.tsx",
+        ),
         "@/application/platform-layout": platformLayoutPath,
-        "@/application/store-page": storePagePath,
         "@": new URL("./src", import.meta.url).pathname,
       },
     },
@@ -441,11 +422,7 @@ export default defineConfig(({ command, mode }) => {
     },
     server: {
       fs: {
-        allow: [
-          process.cwd(),
-          appSourceRoot(process.cwd()),
-          resolve(process.cwd(), "."),
-        ],
+        allow: [process.cwd(), appSourceRoot(process.cwd()), resolve(process.cwd(), ".")],
       },
       host: tauriDevHost ?? "127.0.0.1",
       port: desktopDevPort,

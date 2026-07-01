@@ -1,4 +1,4 @@
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger, cn } from "@/shared/ui";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger, Button, cn } from "@/shared/ui";
 import { useShortcutTitle } from "@/features/shortcuts";
 import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import type { NavigatorLayout, NavigatorVisibility } from "./navigatorMode";
@@ -28,8 +28,9 @@ export function NavigatorControls(props: {
       <TooltipProvider delayDuration={450}>
         <Tooltip>
           <TooltipTrigger asChild>
-            <button
-              type="button"
+            <Button
+              variant="ghost"
+              size="icon-sm"
               className={controlButtonClass}
               aria-pressed={sticky}
               aria-label={sticky ? "Hide sidebar" : "Show sidebar"}
@@ -40,7 +41,7 @@ export function NavigatorControls(props: {
               ) : (
                 <PanelLeftOpen size={props.iconSize ?? 18} aria-hidden="true" />
               )}
-            </button>
+            </Button>
           </TooltipTrigger>
           <TooltipContent>{title}</TooltipContent>
         </Tooltip>

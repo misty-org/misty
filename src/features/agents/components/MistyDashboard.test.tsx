@@ -14,8 +14,6 @@ vi.mock("../agentsRuntime", () => ({
   },
   runtimeAgentsApi: { cancelRun: fixture.cancelRun },
   useAgentsAuth: () => ({ user: { id: fixture.user } }),
-  useAgentsWorkspace: (select: (state: { activeScopeKey: string }) => unknown) =>
-    select({ activeScopeKey: "space:s" }),
   openAgentsMisty: fixture.openMisty,
 }));
 import { MistyDashboard } from "./MistyDashboard";
@@ -91,7 +89,7 @@ it("discards a previous account's pending activity response", async () => {
   await waitFor(() => expect(screen.getByText(/No activity yet/)).toBeTruthy());
   expect(screen.queryByText("Other account secret")).toBeNull();
 });
-it("opens Misty for the active space or specific conversation", async () => {
+it("opens Misty for the personal workspace or a specific conversation", async () => {
   fixture.activity.mockResolvedValue({
     entries: [
       {
@@ -110,13 +108,13 @@ it("opens Misty for the active space or specific conversation", async () => {
   render(<MistyDashboard onManageConnections={() => {}} />);
   const openMistyButton = await screen.findByText("Open Misty");
   fireEvent.click(openMistyButton);
-  await waitFor(() => expect(fixture.openMisty).toHaveBeenCalledWith({ spaceId: "s" }));
+  await waitFor(() => expect(fixture.openMisty).toHaveBeenCalledWith({ spaceId: "" }));
 
   const conversationButton = await screen.findByText("Conversation");
   fireEvent.click(conversationButton);
   await waitFor(() =>
     expect(fixture.openMisty).toHaveBeenCalledWith({
-      spaceId: "s",
+      spaceId: "",
       conversationId: "conversation-123",
     }),
   );
@@ -132,7 +130,7 @@ it("displays errors if opening Misty fails", async () => {
   expect(await screen.findByText(/This App does not have ai\.use permission\./)).toBeTruthy();
 });
 
-it("uses the explicit work Space instead of the main window Space", async () => {
+it("uses an explicit historical filter only when requested", async () => {
   fixture.activity.mockResolvedValue({ entries: [] });
   const view = render(
     <MistyDashboard spaceId="launch" agentId="communications" onManageConnections={() => {}} />,
@@ -144,4 +142,11 @@ it("uses the explicit work Space instead of the main window Space", async () => 
   await waitFor(() =>
     expect(fixture.activity).toHaveBeenLastCalledWith("studio", "communications"),
   );
+});
+
+it("loads personal activity without a Space", async () => {
+  fixture.activity.mockResolvedValue({ entries: [] });
+  render(<MistyDashboard onManageConnections={() => {}} />);
+  await waitFor(() => expect(fixture.activity).toHaveBeenCalledWith("", undefined));
+  expect(await screen.findByText("No activity yet. Open Misty to start a task.")).toBeTruthy();
 });

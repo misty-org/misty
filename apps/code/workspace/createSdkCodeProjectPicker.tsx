@@ -242,7 +242,16 @@ export function createSdkCodeProjectPicker(
       return cancelPending;
     }, []);
     return (
-      <div className="w-full space-y-2 text-left">
+      <div className="w-full space-y-3 text-left">
+        <Button
+          type="button"
+          disabled={state.busy}
+          onClick={() => void choose(onSelect)}
+          className="w-full justify-center gap-2"
+        >
+          <FolderOpen size={16} />
+          Choose folder…
+        </Button>
         <div className="flex items-center justify-between px-1">
           <h2 className="text-xs font-semibold uppercase tracking-wider text-cream-muted">
             Recent Projects

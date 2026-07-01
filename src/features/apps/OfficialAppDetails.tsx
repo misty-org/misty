@@ -11,6 +11,7 @@ import { useAppsStore } from "./useAppsStore";
 import type { OfficialApp, SpaceAppInstallation } from "@/api/apps";
 import { OfficialAppIcon } from "./OfficialAppIcon";
 import { appPermissionGroups, hasUnknownAppPermissions } from "./appPermissions";
+import { Button } from "@/shared/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/shared/ui/dialog";
 import {
   ArrowLeft,
@@ -143,8 +144,8 @@ function AppDetailsContent(props: Props & { app: OfficialApp }) {
   return (
     <>
       {step !== "details" && (
-        <button
-          type="button"
+        <Button
+          variant="ghost"
           className="discover-details-back"
           disabled={busy}
           aria-label="Back to details"
@@ -152,7 +153,7 @@ function AppDetailsContent(props: Props & { app: OfficialApp }) {
         >
           <ArrowLeft size={18} aria-hidden="true" />
           Back to details
-        </button>
+        </Button>
       )}
       {step === "details" ? (
         <>
@@ -193,17 +194,19 @@ function AppDetailsContent(props: Props & { app: OfficialApp }) {
               </p>
               <div className="discover-detail-primary-action">
                 {installed && (
-                  <button
+                  <Button
+                    variant="secondary"
                     className="discover-action"
                     disabled={busy}
                     onClick={() => setStep("remove")}
                   >
                     Uninstall
-                  </button>
+                  </Button>
                 )}
                 {installed && !needsReview ? (
-                  <button
-                    className="discover-action discover-action-primary"
+                  <Button
+                    variant="default"
+                    className="discover-action"
                     disabled={busy || unsupported}
                     onClick={() => {
                       props.onClose();
@@ -211,10 +214,11 @@ function AppDetailsContent(props: Props & { app: OfficialApp }) {
                     }}
                   >
                     Open
-                  </button>
+                  </Button>
                 ) : (
-                  <button
-                    className="discover-action discover-action-primary"
+                  <Button
+                    variant="default"
+                    className="discover-action"
                     disabled={busy || unsupported}
                     onClick={() => setStep("permissions")}
                   >
@@ -223,7 +227,7 @@ function AppDetailsContent(props: Props & { app: OfficialApp }) {
                       : installed
                         ? "Update"
                         : "Install"}
-                  </button>
+                  </Button>
                 )}
               </div>
             </div>
@@ -269,10 +273,11 @@ function AppDetailsContent(props: Props & { app: OfficialApp }) {
             device will be removed.
           </p>
           <footer className="discover-details-actions">
-            <button className="discover-action" disabled={busy} onClick={() => setStep("details")}>
+            <Button variant="secondary" className="discover-action" disabled={busy} onClick={() => setStep("details")}>
               Cancel
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="destructive"
               className="discover-action discover-uninstall"
               disabled={busy}
               onClick={() =>
@@ -283,7 +288,7 @@ function AppDetailsContent(props: Props & { app: OfficialApp }) {
               }
             >
               {pending ? "Uninstalling…" : "Uninstall"}
-            </button>
+            </Button>
           </footer>
         </>
       ) : (
@@ -334,16 +339,17 @@ function AppDetailsContent(props: Props & { app: OfficialApp }) {
                 {installed ? "Updating…" : "Installing…"}
               </span>
             )}
-            <button className="discover-action" disabled={busy} onClick={() => setStep("details")}>
+            <Button variant="secondary" className="discover-action" disabled={busy} onClick={() => setStep("details")}>
               Cancel
-            </button>
-            <button
-              className="discover-action discover-action-primary"
+            </Button>
+            <Button
+              variant="default"
+              className="discover-action"
               disabled={busy || unknown || unsupported || !accountId}
               onClick={() => void install()}
             >
               {installed ? "Agree and update" : "Agree and install"}
-            </button>
+            </Button>
           </footer>
         </>
       )}

@@ -274,6 +274,8 @@ const FILES: &[FileSpec] = &[
         names: &[
             "MISTY_AGENT_RUNTIME_CONTROL_SECRET",
             "MISTY_AGENT_RUNTIME_CONTROL_SECRET_PREVIOUS",
+            "MISTY_AUTH_SIGNING_KEY",
+            "MISTY_AUTH_SIGNING_KEY_PREVIOUS",
             "MISTY_COLLAB_INTERNAL_SECRET",
             "MISTY_SELF_HOST_ENTITLEMENT_KEY_ID",
             "MISTY_SELF_HOST_ENTITLEMENT_PRIVATE_KEY",
@@ -299,6 +301,7 @@ const PROD_REQUIRED: &[&str] = &[
     "DB_PASSWORD",
     "DB_USER",
     "MISTY_API_IMAGE",
+    "MISTY_AUTH_SIGNING_KEY",
     "MISTY_DEVICE_PAIRING_PEPPER",
     "MISTY_DEVICE_TICKET_PRIVATE_KEY",
     "MISTY_ENVIRONMENT",
@@ -818,6 +821,11 @@ mod tests {
             "integrations/activepieces.env"
         );
         assert_eq!(owners["JOURNAL_COLLAB_ROOM_SALT"], "crypto/journal.env");
+        assert_eq!(owners["MISTY_AUTH_SIGNING_KEY"], "crypto/services.env");
+        assert_eq!(
+            owners["MISTY_AUTH_SIGNING_KEY_PREVIOUS"],
+            "crypto/services.env"
+        );
     }
 
     #[test]

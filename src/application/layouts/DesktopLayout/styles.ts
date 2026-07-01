@@ -86,7 +86,7 @@ export const navigatorSubsectionIconClass =
 
 // Every navigation identity uses the same surface, inset, and control sizing.
 export const navigatorFloatingIslandClass = [
-  "flex min-w-0 items-center gap-0.5 rounded-xl border border-charcoal-border/60 bg-charcoal-hover p-1.25",
+  "flex min-w-0 items-center gap-0.5 rounded-xl border border-charcoal-border/60 bg-charcoal-hover px-1.25 py-0.5",
   "shadow-[0_12px_30px_rgba(0,0,0,0.5)]",
 ].join(" ");
 

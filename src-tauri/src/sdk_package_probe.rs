@@ -118,6 +118,12 @@ async fn sdk_probe_browser_rendering(
     browser::render_probe::run(app, origin).await
 }
 
+#[tauri::command]
+async fn sdk_probe_agent_files(app: tauri::AppHandle, state: tauri::State<'_, ProbeState>, nonce: String, origin: String) -> Result<String, String> {
+    if nonce != state.nonce { return Err("Invalid probe nonce".into()); }
+    browser::agent_files_probe::run(app, origin).await
+}
+
 /// Controlled synthetic content in disposable provider profiles. Never registered by the main app.
 #[tauri::command]
 async fn sdk_probe_provider_fixture(
@@ -313,6 +319,7 @@ pub fn run(mut context: tauri::Context<tauri::Wry>) {
             "sdk-gmail-signin-probe.html"
         }
         _ if names_probe => "navigation-names-probe.html",
+        _ if std::env::var("MISTY_SDK_PROBE_AGENT_FILES").as_deref() == Ok("1") => "sdk-agent-files-probe.html",
         _ if std::env::var("MISTY_SDK_PROBE_BROWSER_RENDERING").as_deref() == Ok("1") => {
             "sdk-browser-render-probe.html"
         }
@@ -385,6 +392,7 @@ pub fn run(mut context: tauri::Context<tauri::Wry>) {
     let exit_status = Arc::new(AtomicI32::new(1));
     tauri::Builder::default()
         .manage(browser::BrowserSessionState::default())
+        .manage(crate::infra::agent_workspace::AgentWorkspaceState::default())
         .manage(crate::platform::mini_app::MiniAppState::default())
         .manage(crate::platform::mini_app::permissions::MiniAppProbeDirectory(exports.clone()))
         .plugin(tauri_plugin_dialog::init())
@@ -445,6 +453,7 @@ pub fn run(mut context: tauri::Context<tauri::Wry>) {
             sdk_probe_browser_count,
             sdk_probe_oauth_popups,
             sdk_probe_browser_rendering,
+            sdk_probe_agent_files,
             crate::platform::plugins::mac_rounded_corners::reveal_main_window,
             sdk_probe_downloads,
             sdk_probe_clipboard_call,

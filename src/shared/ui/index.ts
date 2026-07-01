@@ -22,6 +22,7 @@ export * from "./input";
 export * from "./input-group";
 export * from "./label";
 export * from "./mail-provider-icon";
+export * from "./nav-island";
 export { IconButton } from "./outlined-icon-button";
 export type { IconButtonProps } from "./outlined-icon-button";
 export * from "./overflow-fade-text";

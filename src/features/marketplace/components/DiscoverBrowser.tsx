@@ -10,6 +10,7 @@ import {
   type DiscoverAccessFilter,
 } from "./DiscoverViewControls";
 import type { OfficialApp, SpaceAppInstallation } from "@/api/apps";
+import { Button, NavIsland, NavIslandItem } from "@/shared/ui";
 import { OfficialAppIcon } from "@/features/apps/OfficialAppIcon";
 import { officialAppNeedsReview } from "@/features/apps/appInstallationStatus";
 import {
@@ -173,24 +174,22 @@ export function DiscoverBrowser(props: DiscoverBrowserProps) {
   return (
     <div className="discover-surface" data-discover-layout>
       <header className="discover-search-band">
-        <nav className="discover-nav" aria-label="Discover sections">
+        <NavIsland aria-label="Discover sections">
           {sections.map(({ id, label, icon: Icon }) => (
-            <button
+            <NavIslandItem
               key={id}
-              type="button"
-              className="discover-nav-item"
-              aria-current={section === id ? "page" : undefined}
+              active={section === id}
               onClick={() => {
                 setSection(id);
                 setCategory("All");
                 setQuery("");
               }}
             >
-              <Icon size={15} strokeWidth={1.8} aria-hidden="true" />
+              <Icon size={14} strokeWidth={1.8} aria-hidden="true" />
               <span>{label}</span>
-            </button>
+            </NavIslandItem>
           ))}
-        </nav>
+        </NavIsland>
         {section !== "extensions" && (
           <div className="discover-search-controls">
             <label className="discover-search">
@@ -207,16 +206,14 @@ export function DiscoverBrowser(props: DiscoverBrowserProps) {
                 }}
               />
               {query ? (
-                <button
-                  type="button"
-                  aria-label="Clear search"
+                <Button variant="ghost" size="icon-sm" aria-label="Clear search"
                   onClick={() => {
                     setQuery("");
                     searchRef.current?.focus();
                   }}
                 >
                   <X size={15} aria-hidden="true" />
-                </button>
+                </Button>
               ) : null}
             </label>
             <DiscoverViewControls
@@ -230,9 +227,7 @@ export function DiscoverBrowser(props: DiscoverBrowserProps) {
               category={category}
               onCategory={setCategory}
             />
-            <button
-              type="button"
-              className="discover-refresh"
+            <Button variant="ghost" size="icon-sm" className="discover-refresh"
               aria-label="Refresh Discover"
               title="Refresh Discover"
               disabled={props.loading}
@@ -244,7 +239,7 @@ export function DiscoverBrowser(props: DiscoverBrowserProps) {
                 className={props.loading ? "animate-spin" : undefined}
                 aria-hidden="true"
               />
-            </button>
+            </Button>
           </div>
         )}
       </header>
@@ -271,23 +266,21 @@ export function DiscoverBrowser(props: DiscoverBrowserProps) {
             {catalog.length > 0 && (
               <div className="discover-filters" role="group" aria-label="App categories">
                 {discoverCategories.map((item) => (
-                  <button
-                    type="button"
-                    key={item}
+                  <Button variant="ghost" size="sm" key={item}
                     aria-pressed={category === item}
                     onClick={() => setCategory(item)}
                   >
                     {item}
-                  </button>
+                  </Button>
                 ))}
               </div>
             )}
             {props.error ? (
               <div className="discover-error" role="alert">
                 <p>{props.error}</p>
-                <button type="button" disabled={props.loading} onClick={props.onRefresh}>
+                <Button variant="secondary" size="sm" disabled={props.loading} onClick={props.onRefresh}>
                   Try again
-                </button>
+                </Button>
               </div>
             ) : null}
             {!props.ready && props.loading ? (
@@ -319,9 +312,7 @@ export function DiscoverBrowser(props: DiscoverBrowserProps) {
                       className="discover-app-row"
                       data-selected={app.id === props.selectedAppId || undefined}
                     >
-                      <button
-                        type="button"
-                        className="discover-app-details-button"
+                      <Button variant="ghost" className="discover-app-details-button"
                         aria-label={`View ${discoverAppName(app)} details`}
                         onClick={() => selectApp(app)}
                       >
@@ -339,10 +330,10 @@ export function DiscoverBrowser(props: DiscoverBrowserProps) {
                           </span>
                           <span className="discover-app-description">{app.description}</span>
                         </span>
-                      </button>
+                      </Button>
                       <div className="discover-action-group">
-                        <button
-                          type="button"
+                        <Button
+                          variant={actionLabel === "Get" || actionLabel === "Update" ? "default" : "secondary"}
                           className={`discover-action ${actionLabel === "Get" || actionLabel === "Update" ? "discover-action-primary" : ""}`}
                           disabled={Boolean(props.actionAppId) || action === "Unavailable"}
                           aria-label={`${actionLabel} ${discoverAppName(app)}`}
@@ -353,7 +344,7 @@ export function DiscoverBrowser(props: DiscoverBrowserProps) {
                             : action === "Unavailable"
                               ? "Unavailable"
                               : actionLabel}
-                        </button>
+                        </Button>
                       </div>
                     </li>
                   );
@@ -364,18 +355,12 @@ export function DiscoverBrowser(props: DiscoverBrowserProps) {
                 <h2>{empty.title}</h2>
                 <p>{empty.description}</p>
                 {section === "installed" && !query && category === "All" && !filtersActive ? (
-                  <button
-                    type="button"
-                    className="discover-action"
-                    onClick={() => setSection("apps")}
+                  <Button variant="secondary" className="discover-action" onClick={() => setSection("apps")}
                   >
                     Browse apps
-                  </button>
+                  </Button>
                 ) : query || category !== "All" || filtersActive ? (
-                  <button
-                    type="button"
-                    className="discover-action"
-                    onClick={() => {
+                  <Button variant="secondary" className="discover-action" onClick={() => {
                       setQuery("");
                       setCategory("All");
                       setAccessFilter("all");
@@ -383,16 +368,12 @@ export function DiscoverBrowser(props: DiscoverBrowserProps) {
                     }}
                   >
                     Clear filters
-                  </button>
+                  </Button>
                 ) : (
-                  <button
-                    type="button"
-                    className="discover-action"
-                    disabled={props.loading}
-                    onClick={props.onRefresh}
+                  <Button variant="secondary" className="discover-action" disabled={props.loading} onClick={props.onRefresh}
                   >
                     {props.loading ? "Refreshing…" : "Refresh catalog"}
-                  </button>
+                  </Button>
                 )}
               </div>
             ) : null}

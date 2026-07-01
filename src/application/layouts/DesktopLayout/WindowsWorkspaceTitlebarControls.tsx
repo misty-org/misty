@@ -1,4 +1,5 @@
 import type { WorkspaceVirtualWindow } from "@/features/workspace";
+import { Button } from "@/shared/ui";
 import { PanelBottomDashed, PanelRightDashed } from "lucide-react";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
@@ -35,26 +36,28 @@ export function WindowsWorkspaceTitlebarControls(props: {
 
   return createPortal(
     <>
-      <button
-        type="button"
+      <Button
+        variant="ghost"
+        size="none"
         disabled={!props.canSplitSideways}
         className={dockActionClass}
         aria-label="Create split right"
         title="Split right"
         onClick={() => props.onSplitPane(props.paneId, "right")}
       >
-        <PanelRightDashed size={16} />
-      </button>
-      <button
-        type="button"
+        <PanelRightDashed className="size-4" size={16} />
+      </Button>
+      <Button
+        variant="ghost"
+        size="none"
         disabled={!props.canSplitVertically}
         className={dockActionClass}
         aria-label="Create split down"
         title="Split down"
         onClick={() => props.onSplitPane(props.paneId, "down")}
       >
-        <PanelBottomDashed size={16} />
-      </button>
+        <PanelBottomDashed className="size-4" size={16} />
+      </Button>
       <WorkspaceWindowMenu
         windows={props.windows}
         activeWindowId={props.activeWindowId}

@@ -46,6 +46,18 @@
   --tw-ring-shadow: 0 0 #0000;
 }
 
+:root
+  :is(
+    [data-slot="dialog-overlay"][data-state="closed"],
+    [data-slot="sheet-overlay"][data-state="closed"],
+    [data-slot="alert-dialog-overlay"][data-state="closed"],
+    [data-slot="dialog-content"][data-state="closed"],
+    [data-slot="sheet-content"][data-state="closed"],
+    [data-slot="alert-dialog-content"][data-state="closed"]
+  ) {
+  pointer-events: none !important;
+}
+
 @theme inline {
   --color-charcoal-workspace: var(--misty-theme-workspace);
   --color-charcoal-bg: var(--misty-theme-bg);

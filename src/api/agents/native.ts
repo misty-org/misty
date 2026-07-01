@@ -1,12 +1,11 @@
 import { apiRequest } from "@/api/client";
-import type { AgentProfile, AgentProfileInput, AgentAppAssignments } from "@misty/contracts";
+import type { AgentProfile, AgentProfileInput } from "@misty/contracts";
 
 export const personalAgentsApi = {
   list: () => apiRequest<{ agents: AgentProfile[] }>("/misty/agents"),
   save: (
     input: AgentProfileInput & {
       version?: number;
-      assignment?: { space_id: string; app_ids: string[] };
     },
     id?: string,
   ) =>
@@ -16,12 +15,6 @@ export const personalAgentsApi = {
     }),
   remove: (id: string) =>
     apiRequest(`/misty/agents/${encodeURIComponent(id)}`, { method: "DELETE" }),
-  apps: (id: string, spaceId: string) => apiRequest<AgentAppAssignments>(appPath(id, spaceId)),
-  assign: (id: string, spaceId: string, appIds: string[]) =>
-    apiRequest<AgentAppAssignments>(appPath(id, spaceId), {
-      method: "PUT",
-      body: JSON.stringify({ app_ids: appIds }),
-    }),
   memories: (id: string, spaceId: string) =>
     apiRequest<{ memories: AgentMemory[] }>(
       `/ai/memories?${new URLSearchParams({ agent_id: id, space_id: spaceId })}`,
@@ -37,9 +30,6 @@ export const personalAgentsApi = {
       { method: "DELETE" },
     ),
 };
-function appPath(id: string, _spaceId: string) {
-  return `/misty/agents/${encodeURIComponent(id)}/apps`;
-}
 export interface AgentMemory {
   id: string;
   content: string;

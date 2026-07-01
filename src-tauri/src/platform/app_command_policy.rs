@@ -1,9 +1,14 @@
 //! Application commands have no implicit permission to run in content views.
 //! Plugin commands are separately checked by Tauri's per-WebView capabilities.
 pub fn allows(label: &str, command: &str) -> bool {
+    if command.starts_with("browser_sync_") || command.starts_with("browser_recovery_") {
+        return label == "main";
+    }
     match label {
-        "main" | "misty-bot-pet" => true,
-        _ if label.starts_with("misty-agent-") && uuid::Uuid::parse_str(&label[12..]).is_ok() => true,
+        "main" => true,
+        _ if label.starts_with("misty-agent-") && uuid::Uuid::parse_str(&label[12..]).is_ok() => {
+            true
+        }
         _ => label.starts_with("misty-mini-app-") && command == "mini_app_rpc",
     }
 }
@@ -11,6 +16,37 @@ pub fn allows(label: &str, command: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn vault_commands_are_main_workspace_only() {
+        for command in [
+            "browser_sync_availability",
+            "browser_sync_restore_credentials",
+            "browser_sync_capture_credentials",
+            "browser_sync_generate_secret",
+            "browser_sync_setup",
+            "browser_sync_connect",
+            "browser_sync_state",
+            "browser_sync_edit",
+            "browser_sync_resume",
+            "browser_sync_lock",
+            "browser_sync_forget_key",
+            "browser_recovery_open",
+            "browser_recovery_read",
+            "browser_recovery_write",
+            "browser_recovery_forget",
+        ] {
+            assert!(allows("main", command));
+            for label in [
+                "browser-a",
+                "misty-mini-app-a",
+                "misty-agent-01951d32-40ac-7000-8000-000000000001",
+                "main-spoof",
+            ] {
+                assert!(!allows(label, command));
+            }
+        }
+    }
 
     #[test]
     fn content_views_cannot_inherit_host_commands() {
@@ -33,7 +69,7 @@ mod tests {
             }
         }
         assert!(allows("main", "mini_app_open"));
-        assert!(allows("misty-bot-pet", "app_snapshot"));
+        assert!(!allows("misty-bot-pet", "app_snapshot"));
         assert!(allows("misty-mini-app-a", "mini_app_rpc"));
         assert!(!allows("browser-a", "mini_app_rpc"));
     }

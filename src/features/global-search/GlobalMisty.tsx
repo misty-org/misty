@@ -1,10 +1,15 @@
-import {useLocalExecution} from "@/features/agents/localExecution";
-import { AgentChatControls } from "@/features/agents/AgentChatControls";
+import { isAgentModeActive } from "./searchAvailability";
+import {
+  MistyApprovalReview,
+  MistyOverlayControls,
+  usePendingMistyApproval,
+} from "./MistyOverlayControls";
+import { routeLocalFollowup, useLocalExecution } from "@/features/agents/localExecution";
 import { readOptionalSurfaceContext } from "./optionalSurfaceContext";
 import { useMistyStore } from "@/features/misty/useMistyStore";
 import { installMistyContextBridge } from "@/features/misty/contextBridge";
-import { hasTauriInternals } from "@/shared/platform/tauri";
 import { MistyContextBar } from "@/features/misty/MistyContextBar";
+import { thinkingEffort } from "@/features/agents/thinkingMode";
 import { requestEmbeddedBrowserSuspension } from "@/shared/platform/browserSuspensionSignal";
 import { SystemErrorActivity } from "@/features/activity";
 import { useAiSurfaceStore } from "@/features/ai-surface/store";
@@ -13,9 +18,9 @@ import { invokeShortcutCommand } from "@/features/shortcuts";
 import { useWorkspaceStore } from "@/features/workspace/core";
 import { ScrollArea, cn } from "@/shared/ui";
 import { AnimatePresence, MotionConfig, motion } from "motion/react";
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
-import { GlobalMistyComposerBar, GlobalMistyVoiceIsland } from "./GlobalMistyChrome";
+import { GlobalMistyComposerBar, GlobalMistyConversationControls } from "./GlobalMistyChrome";
 import { ConversationView } from "./GlobalMistyPanelContent";
 import { captureToFile } from "./mistyImageAttachments";
 import {
@@ -44,25 +49,6 @@ const panelClass = [
   "border border-white/10 bg-charcoal-card/95 text-cream backdrop-blur-2xl",
 ].join(" ");
 const panelShadowClass = "shadow-[0_28px_90px_rgba(0,0,0,0.62)]";
-const panelViewportMargin = 16;
-
-type PanelOffset = { x: number; y: number };
-type PanelDragState = {
-  pointerId: number;
-  startX: number;
-  startY: number;
-  origin: PanelOffset;
-  minDeltaX: number;
-  maxDeltaX: number;
-  minDeltaY: number;
-  maxDeltaY: number;
-};
-
-function clamp(value: number, minimum: number, maximum: number) {
-  if (maximum < minimum) return minimum;
-  return Math.max(minimum, Math.min(maximum, value));
-}
-
 export function GlobalMistySurface(props: {
   controller?: "search" | "misty";
   accountId: string;
@@ -77,8 +63,6 @@ export function GlobalMistySurface(props: {
   onCommand?: (commandId?: string, tabId?: string) => void;
   onClosed?: () => void;
   showShadow?: boolean;
-  onRequestDrag?: () => void;
-  onSwitchToPet?: () => void;
   onContentVisibilityChange?: (visible: boolean) => void;
   onVoiceActivityChange?: (active: boolean) => void;
 }) {
@@ -90,21 +74,21 @@ export function GlobalMistySurface(props: {
     onCommand,
     onClosed,
     showShadow = true,
-    onRequestDrag,
-    onSwitchToPet,
     onContentVisibilityChange,
     onVoiceActivityChange,
   } = props;
-  const execution = useLocalExecution(s=>s.execution);
-  const taskSurface = props.controller === "misty" && !!execution;
+  const execution = useLocalExecution((s) => s.execution);
+  const pendingApproval = usePendingMistyApproval();
+  const docked = props.controller === "misty";
+  const taskSurface = docked && !!execution;
   const useController = props.controller === "misty" ? useMistyStore : useGlobalSearchStore;
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
-  const panelRef = useRef<HTMLDivElement | null>(null);
-  const panelDragRef = useRef<PanelDragState | null>(null);
-  const panelOffsetRef = useRef<PanelOffset>({ x: 0, y: 0 });
-  const [panelOffset, setPanelOffset] = useState<PanelOffset>({ x: 0, y: 0 });
+  const [showSetup, setShowSetup] = useState(false);
   const [capturingRegion, setCapturingRegion] = useState(false);
   const [voiceError, setVoiceError] = useState("");
+  const [routingFollowup, setRoutingFollowup] = useState(false);
+  const routingFollowupRef = useRef(false);
+  const [followupNotice, setFollowupNotice] = useState("");
   const {
     panel,
     mode,
@@ -118,6 +102,7 @@ export function GlobalMistySurface(props: {
     conversations,
     conversationsLoading,
     activeConversationId,
+    thinkingMode,
     filters,
     selectedCandidateId,
     setAccount,
@@ -154,6 +139,7 @@ export function GlobalMistySurface(props: {
       conversations: state.conversations,
       conversationsLoading: state.conversationsLoading,
       activeConversationId: state.activeConversationId,
+      thinkingMode: state.thinkingMode,
       filters: state.filters,
       selectedCandidateId: state.selectedCandidateId,
       setAccount: state.setAccount,
@@ -189,6 +175,8 @@ export function GlobalMistySurface(props: {
   // Optional context must never throw through the workspace render boundary.
   const surfaceSnapshot = useMemo(
     () => readOptionalSurfaceContext(includeCurrentContext ? aiRegistration?.adapter : undefined),
+    // Re-read mutable adapter context when the panel or draft changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [aiRegistration, includeCurrentContext, panel, query],
   );
   const registeredAiContext = surfaceSnapshot.context;
@@ -230,7 +218,7 @@ export function GlobalMistySurface(props: {
     candidates.findIndex((candidate) => candidate.id === selectedCandidateId),
   );
   const conversation = conversations.find((item) => item.id === activeConversationId);
-  const open = panel !== "closed";
+  const open = panel !== "closed" || taskSurface || (docked && !!pendingApproval);
   const conversationActive = panel === "answer" || panel === "agent";
   const contentVisible = hasQuery || conversationActive;
   const wasOpenRef = useRef(false);
@@ -288,13 +276,21 @@ export function GlobalMistySurface(props: {
   useEffect(() => {
     if (!open) return;
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== "Escape") return;
+      if (
+        event.defaultPrevented ||
+        event.key !== "Escape" ||
+        event.metaKey ||
+        event.ctrlKey ||
+        event.shiftKey
+      )
+        return;
       event.preventDefault();
-      closePanel();
+      if (showSetup) setShowSetup(false);
+      else closePanel();
     };
-    window.addEventListener("keydown", onKeyDown, true);
-    return () => window.removeEventListener("keydown", onKeyDown, true);
-  }, [closePanel, open]);
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [closePanel, open, showSetup]);
   useEffect(() => {
     if (!suspendBrowserWebviews || taskSurface) return;
     requestEmbeddedBrowserSuspension(open, "global-misty");
@@ -307,54 +303,29 @@ export function GlobalMistySurface(props: {
   useEffect(() => {
     if (open) onContentVisibilityChange?.(contentVisible);
   }, [contentVisible, onContentVisibilityChange, open]);
-  useEffect(() => {
-    panelOffsetRef.current = panelOffset;
-  }, [panelOffset]);
-  useEffect(() => {
-    const onPointerMove = (event: PointerEvent) => {
-      const drag = panelDragRef.current;
-      if (!drag || event.pointerId !== drag.pointerId) return;
-      const deltaX = clamp(event.clientX - drag.startX, drag.minDeltaX, drag.maxDeltaX);
-      const deltaY = clamp(event.clientY - drag.startY, drag.minDeltaY, drag.maxDeltaY);
-      setPanelOffset({ x: drag.origin.x + deltaX, y: drag.origin.y + deltaY });
-    };
-    const endPointerDrag = (event: PointerEvent) => {
-      if (panelDragRef.current?.pointerId === event.pointerId) panelDragRef.current = null;
-    };
-    window.addEventListener("pointermove", onPointerMove);
-    window.addEventListener("pointerup", endPointerDrag);
-    window.addEventListener("pointercancel", endPointerDrag);
-    return () => {
-      window.removeEventListener("pointermove", onPointerMove);
-      window.removeEventListener("pointerup", endPointerDrag);
-      window.removeEventListener("pointercancel", endPointerDrag);
-    };
-  }, []);
-
-  const requestPanelDrag = useCallback(
-    (event: React.PointerEvent) => {
-      if (onRequestDrag) {
-        onRequestDrag();
+  const sendAnswer = async (prompt: string) => {
+    if (taskSurface) {
+      if (!prompt.trim() || routingFollowupRef.current) return;
+      if (attachments.length) {
+        setVoiceError("Remove attachments to send a message to the active task.");
         return;
       }
-      const panel = panelRef.current;
-      if (event.button !== 0 || !panel) return;
-      const bounds = panel.getBoundingClientRect();
-      panelDragRef.current = {
-        pointerId: event.pointerId,
-        startX: event.clientX,
-        startY: event.clientY,
-        origin: panelOffsetRef.current,
-        minDeltaX: panelViewportMargin - bounds.left,
-        maxDeltaX: window.innerWidth - panelViewportMargin - bounds.right,
-        minDeltaY: panelViewportMargin - bounds.top,
-        maxDeltaY: window.innerHeight - panelViewportMargin - bounds.bottom,
-      };
-    },
-    [onRequestDrag],
-  );
-
-  const sendAnswer = async (prompt: string) => {
+      routingFollowupRef.current = true;
+      setRoutingFollowup(true);
+      setVoiceError("");
+      setFollowupNotice("");
+      try {
+        const notice = await routeLocalFollowup(prompt);
+        setFollowupNotice(notice);
+        if (useController.getState().query === prompt) setQuery("");
+      } catch (error) {
+        setVoiceError(error instanceof Error ? error.message : String(error));
+      } finally {
+        routingFollowupRef.current = false;
+        setRoutingFollowup(false);
+      }
+      return;
+    }
     await submitAnswer(prompt, attachmentState.attachments, registeredAiSelection ?? undefined);
     if (!useController.getState().query) attachmentState.consume();
   };
@@ -407,22 +378,32 @@ export function GlobalMistySurface(props: {
     }
   };
 
-  const onHeaderPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (event.button !== 0) return;
-    const target = event.target as Element;
-    if (target.closest("input, textarea, button, a, [role='button']")) return;
-    event.preventDefault();
-    requestPanelDrag(event);
-  };
-
   const composer = (
     <>
-      {props.controller === "misty" && <MistyContextBar />}
       <GlobalMistyComposerBar
+        headerControls={
+          docked ? (
+            <>
+              <GlobalMistyConversationControls
+                conversations={conversations}
+                activeConversationId={activeConversationId}
+                loading={conversationsLoading}
+                onSelect={selectConversation}
+                onNew={() => void newConversation()}
+                onDelete={(id) => void deleteConversation(id)}
+                onRename={(id, title) => void renameConversation(id, title)}
+              />
+            </>
+          ) : undefined
+        }
+        accountId={props.accountId}
+        reasoningEffort={conversation?.reasoningEffort || thinkingEffort(thinkingMode ?? "normal")}
+        showSettings={showSetup}
+        onToggleSettings={() => setShowSetup((visible) => !visible)}
         query={query}
         onQuery={setQuery}
         mode={activeMode}
-        conversationActive={conversationActive}
+        conversationActive={conversationActive && !!conversation?.messages.length}
         textareaRef={inputRef}
         attachments={attachments}
         onModeChange={attachmentState.changeMode}
@@ -435,22 +416,29 @@ export function GlobalMistySurface(props: {
         }}
         onKeyDown={onInputKeyDown}
         onCapture={allowCapture ? () => setCapturingRegion(true) : undefined}
-        busy={searching || working}
+        busy={taskSurface ? routingFollowup : searching || working}
         working={working}
         conversation={conversation}
         activeConversationId={activeConversationId}
         voice={voice}
         onError={setVoiceError}
         onClose={closePanel}
-        onRequestDrag={requestPanelDrag}
-        onSwitchToPet={onSwitchToPet}
-        onPointerDown={onHeaderPointerDown}
         onModelChange={(settings) =>
-          useController.setState((state) => ({
-            conversations: state.conversations.map((item) =>
-              item.id === activeConversationId ? { ...item, ...settings } : item,
-            ),
-          }))
+          useController.setState((state) =>
+            state.accountId !== props.accountId
+              ? state
+              : {
+                  thinkingMode:
+                    state.activeConversationId === activeConversationId
+                      ? settings.reasoningEffort === "xhigh"
+                        ? "deep"
+                        : "normal"
+                      : state.thinkingMode,
+                  conversations: state.conversations.map((item) =>
+                    item.id === activeConversationId ? { ...item, ...settings } : item,
+                  ),
+                },
+          )
         }
       />
     </>
@@ -458,9 +446,20 @@ export function GlobalMistySurface(props: {
 
   return (
     <div
-      className={taskSurface?"pointer-events-none fixed right-2 top-16 z-[2147482500] flex w-[424px] flex-col items-center":"pointer-events-none fixed inset-0 z-[2147482500] flex flex-col items-center pt-[9vh]"}
+      className={
+        docked
+          ? "pointer-events-none fixed inset-0 z-[2147482500] flex flex-col items-center px-4 pt-10"
+          : "pointer-events-none fixed inset-0 z-[2147482500] flex flex-col items-center pt-[9vh]"
+      }
       data-global-misty-root
     >
+      {docked && open && (
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-1 rounded-2xl border border-white/20 bg-black/10"
+          data-misty-capture-frame
+        />
+      )}
       {error || voiceError ? (
         <SystemErrorActivity
           accountId={props.accountId}
@@ -474,44 +473,46 @@ export function GlobalMistySurface(props: {
         <AnimatePresence initial={false}>
           {open ? (
             <motion.div
-              ref={panelRef}
               key="unified-misty"
-              initial={{ opacity: 0, scale: 0.94 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.94 }}
-              style={taskSurface?{width:"100%"}:{ translate: `${panelOffset.x}px ${panelOffset.y}px` }}
-              className="group/misty-window pointer-events-none flex origin-center flex-col items-center gap-2"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className={cn(
+                "pointer-events-none flex flex-col items-center",
+                docked
+                  ? "relative w-[min(600px,100%)] max-h-[calc(100dvh-140px)] overflow-hidden rounded-xl bg-charcoal-card text-cream shadow-[0_12px_40px_rgba(0,0,0,0.35)]"
+                  : "gap-2",
+              )}
               data-html2canvas-ignore="true"
             >
-              {conversationActive && !taskSurface ? (
-                <GlobalMistyVoiceIsland
-                  voice={voice}
-                  conversations={conversations}
-                  activeConversationId={activeConversationId}
-                  loading={conversationsLoading}
-                  mode={mode}
-                  onModeChange={attachmentState.changeMode}
-                  onSelect={selectConversation}
-                  onNew={() => void newConversation()}
-                  onDelete={(id) => void deleteConversation(id)}
-                  onRename={(id, title) => void renameConversation(id, title)}
-                  onClose={closePanel}
-                  onRequestDrag={requestPanelDrag}
-                  onSwitchToPet={onSwitchToPet}
-                  onPointerDown={onHeaderPointerDown}
-                />
+              {docked ? (
+                <div
+                  className="pointer-events-auto w-full shrink-0 text-cream"
+                  data-misty-top-controls
+                >
+                  {composer}
+                  <MistyApprovalReview />
+                  <MistyContextBar />
+                  {followupNotice && (
+                    <p role="status" className="px-4 pb-2 text-sm text-cream-muted">
+                      {followupNotice}
+                    </p>
+                  )}
+                </div>
               ) : null}
               <section
                 className={cn(
-                  taskSurface?"pointer-events-auto flex w-full h-[calc(100dvh-164px)] max-h-[calc(100dvh-164px)] flex-col overflow-hidden rounded-lg border border-charcoal-border bg-charcoal-card text-cream":panelClass,
-                  conversationActive && !taskSurface && "h-[min(640px,calc(100dvh-120px))]",
-                  showShadow && panelShadowClass,
+                  docked
+                    ? "pointer-events-auto flex min-h-0 w-full flex-col overflow-hidden border-t border-white/10 text-cream"
+                    : panelClass,
+                  docked && (panel === "closed" || !conversation?.messages.length) && "hidden",
+                  conversationActive && !docked && "h-[min(640px,calc(100dvh-120px))]",
+                  showShadow && !docked && panelShadowClass,
                 )}
-                aria-label="Misty Search"
+                aria-label={docked ? "Misty conversation" : "Misty Search"}
                 data-misty-conversation={conversationActive ? "true" : undefined}
                 data-misty-content={contentVisible ? "true" : "false"}
               >
-                {props.controller === "misty" ? <AgentChatControls accountId={props.accountId} /> : null}
                 {browserNotice ? (
                   <p
                     role="status"
@@ -522,15 +523,21 @@ export function GlobalMistySurface(props: {
                 ) : null}
                 {conversationActive ? (
                   <>
-                    <ContextReceipt
-                      context={context.filter((item) => item.attached)}
-                      selection={registeredAiSelection ?? undefined}
-                      onRemove={removeContext}
-                    />
-                    <div className="min-h-0 flex-1 border-b border-white/10">
-                      <ScrollArea className="h-full" data-misty-conversation-scroll>
+                    {!docked && (
+                      <ContextReceipt
+                        context={context.filter((item) => item.attached)}
+                        selection={registeredAiSelection ?? undefined}
+                        onRemove={removeContext}
+                      />
+                    )}
+                    <div className="min-h-0 flex-1">
+                      <ScrollArea
+                        className={docked ? "h-[min(320px,calc(100dvh-340px))]" : "h-full"}
+                        data-misty-conversation-scroll
+                      >
                         <ConversationView
                           conversation={conversation}
+                          approvalControlsInFooter={docked}
                           working={working}
                           onConfirm={(id) => void approveAgentTask(id)}
                           onReject={rejectAction}
@@ -538,16 +545,18 @@ export function GlobalMistySurface(props: {
                         />
                       </ScrollArea>
                     </div>
-                    {composer}
+                    {!docked && composer}
                   </>
                 ) : (
                   <>
-                    {composer}
-                    <ContextReceipt
-                      context={context}
-                      selection={registeredAiSelection ?? undefined}
-                      onRemove={removeContext}
-                    />
+                    {!docked && composer}
+                    {!docked && (
+                      <ContextReceipt
+                        context={context}
+                        selection={registeredAiSelection ?? undefined}
+                        onRemove={removeContext}
+                      />
+                    )}
                     {hasQuery ? (
                       <FilterBar
                         mode={mode}
@@ -596,6 +605,19 @@ export function GlobalMistySurface(props: {
 }
 
 export function GlobalMisty(props: Parameters<typeof GlobalMistySurface>[0]) {
+  useEffect(() => {
+    const enforceAgentMode = () => {
+      if (isAgentModeActive() && useGlobalSearchStore.getState().panel !== "closed")
+        useGlobalSearchStore.getState().closePanel();
+    };
+    enforceAgentMode();
+    const removeMisty = useMistyStore.subscribe(enforceAgentMode);
+    const removeExecution = useLocalExecution.subscribe(enforceAgentMode);
+    return () => {
+      removeMisty();
+      removeExecution();
+    };
+  }, []);
   const [bridgeError, setBridgeError] = useState("");
   useEffect(() => {
     if (props.controller === "misty") return;
@@ -625,10 +647,9 @@ export function GlobalMisty(props: Parameters<typeof GlobalMistySurface>[0]) {
           title="Misty context could not start"
         />
       )}
+      <MistyOverlayControls />
       <GlobalMistySurface {...props} />
-      {!props.controller && (
-        <GlobalMistySurface {...props} controller="misty" />
-      )}
+      {!props.controller && <GlobalMistySurface {...props} controller="misty" />}
     </>
   );
 }

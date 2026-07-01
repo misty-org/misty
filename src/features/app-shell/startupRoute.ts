@@ -11,9 +11,9 @@ import { routes } from "./routes";
  */
 const startupPreferenceKey = "misty:startup-preference:v1";
 
-export const startupViewOptions = ["Spaces", "Files", "Agents", "Code"];
+export const startupViewOptions = ["Browser", "Files", "Agents"];
 
-const startupViewRoutes = [routes.spaces, routes.files, routes.agents, routes.code];
+const startupViewRoutes = ["/browser", routes.files, routes.agents];
 
 export interface StartupPreference {
   reopenLastSession: boolean;
@@ -48,8 +48,11 @@ export function readStartupPreference(): StartupPreference {
  * `lastRoute` comes from the route-memory store, which already persists and
  * validates the last rememberable route.
  */
-export function resolveStartupRoute(lastRoute: string, fallback: string): string {
+export function resolveStartupRoute(lastRoute: string, _fallback: string): string {
   const preference = readStartupPreference();
-  if (preference.reopenLastSession) return lastRoute || fallback;
-  return startupViewRoutes[preference.startupViewIndex] ?? fallback;
+  if (preference.reopenLastSession) {
+    const path = lastRoute.split(/[?#]/)[0];
+    return /^\/(browser|files|agents)(\/|$)/.test(path) ? lastRoute : "/browser";
+  }
+  return startupViewRoutes[preference.startupViewIndex] ?? "/browser";
 }

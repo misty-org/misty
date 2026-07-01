@@ -1,36 +1,9 @@
 #import <AppKit/AppKit.h>
 #import <ScreenCaptureKit/ScreenCaptureKit.h>
-#import <Carbon/Carbon.h>
 #import <CoreGraphics/CoreGraphics.h>
 #include <stdatomic.h>
 
 static _Atomic(pid_t) mistySourcePID = 0;
-static void (*mistyToggle)(void) = NULL;
-static EventHotKeyRef mistyHotKey;
-static OSStatus MistyHotKey(EventHandlerCallRef handler, EventRef event, void *data) {
-  (void)handler; (void)event; (void)data;
-  if (mistyToggle) mistyToggle();
-  return noErr;
-}
-void misty_context_configure_window(void *pointer) {
-  NSWindow *window = (__bridge NSWindow *)pointer;
-  window.collectionBehavior = (window.collectionBehavior & ~NSWindowCollectionBehaviorFullScreenPrimary) | NSWindowCollectionBehaviorCanJoinAllSpaces | NSWindowCollectionBehaviorFullScreenAuxiliary;
-  window.hidesOnDeactivate = NO;
-}
-void misty_context_start(void (*toggle)(void)) {
-  mistyToggle = toggle;
-  NSRunningApplication *front = NSWorkspace.sharedWorkspace.frontmostApplication;
-  if (front.processIdentifier != NSProcessInfo.processInfo.processIdentifier) mistySourcePID = front.processIdentifier;
-  [NSWorkspace.sharedWorkspace.notificationCenter addObserverForName:NSWorkspaceDidActivateApplicationNotification object:nil queue:NSOperationQueue.mainQueue usingBlock:^(NSNotification *note) {
-    NSRunningApplication *app = note.userInfo[NSWorkspaceApplicationKey];
-    // Ignore only our companion activation. Main Misty workspace is resolved by SDK.
-    if (app.processIdentifier != NSProcessInfo.processInfo.processIdentifier) mistySourcePID = app.processIdentifier;
-  }];
-  EventTypeSpec spec = { kEventClassKeyboard, kEventHotKeyPressed };
-  InstallApplicationEventHandler(&MistyHotKey, 1, &spec, NULL, NULL);
-  EventHotKeyID identifier = { 'Msty', 1 };
-  RegisterEventHotKey(kVK_ANSI_K, cmdKey | shiftKey, identifier, GetApplicationEventTarget(), 0, &mistyHotKey);
-}
 static char *MistyJSON(NSDictionary *value) {
   NSData *data = [NSJSONSerialization dataWithJSONObject:value options:0 error:nil];
   return strdup([[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding].UTF8String);
@@ -41,9 +14,9 @@ char *misty_context_status(bool request) {
     if (@available(macOS 14.0, *)) {
       bool allowed = CGPreflightScreenCaptureAccess();
       if (request && !allowed) allowed = CGRequestScreenCaptureAccess();
-      return MistyJSON(@{@"supported":@YES,@"allowed":@(allowed),@"shortcutRegistered":@(mistyHotKey != NULL),@"external":@(mistySourcePID != 0)});
+      return MistyJSON(@{@"supported":@YES,@"allowed":@(allowed),@"shortcutRegistered":@NO,@"external":@(mistySourcePID != 0)});
     }
-    return MistyJSON(@{@"supported":@NO,@"allowed":@NO,@"shortcutRegistered":@(mistyHotKey != NULL),@"external":@(mistySourcePID != 0)});
+    return MistyJSON(@{@"supported":@NO,@"allowed":@NO,@"shortcutRegistered":@NO,@"external":@(mistySourcePID != 0)});
   }
 }
 // Called on a Rust blocking worker. AppKit work is dispatched to the main queue.

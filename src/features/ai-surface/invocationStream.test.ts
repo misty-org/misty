@@ -14,6 +14,27 @@ function response(...chunks: string[]) {
 const event = (id: string, type: string) => `id: ${id}\ndata: ${JSON.stringify({ id, type })}\n\n`;
 
 describe("AI response stream recovery", () => {
+  it("waits for the server cooldown before reconnecting the same invocation", async () => {
+    vi.useFakeTimers();
+    try {
+      const connect = vi
+        .fn()
+        .mockResolvedValueOnce(
+          new Response("blocked", { status: 429, headers: { "Retry-After": "120" } }),
+        )
+        .mockResolvedValueOnce(response(event("1", "invocation.completed")));
+      const pending = readInvocationStream(connect, new AbortController().signal, {
+        onEvent: vi.fn(),
+      });
+      await vi.advanceTimersByTimeAsync(119_999);
+      expect(connect).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(1);
+      await pending;
+      expect(connect).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
   it("resumes interrupted work from the last event without duplicating text", async () => {
     const connect = vi
       .fn()

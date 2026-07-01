@@ -64,12 +64,11 @@ export function useDesktopWindowChrome() {
     if (!hasTauriInternals()) return;
     let disposed = false;
     const configureWindow = async () => {
-      // Normalize the native view to the content bounds first. Tauri computes
-      // auto-resize ratios from the current frame, so this ordering guarantees
-      // a 1:1 main-webview resize instead of capturing a stale launch ratio.
       await enableModernWindowStyle(getCurrentWindow());
       if (disposed) return;
-      await getCurrentWebview().setAutoResize(true);
+      // macOS uses native AppKit autoresizing, configured by the command.
+      // Enabling Tauri's proportional sizing here adds delayed frame writes.
+      if (osPlatform() !== "macos") await getCurrentWebview().setAutoResize(true);
     };
     void configureWindow().catch(() => undefined);
     return () => {
@@ -81,6 +80,7 @@ export function useDesktopWindowChrome() {
     if (!hasTauriInternals()) return;
     let disposed = false;
     let unlistenResize: (() => void) | undefined;
+    let resizeStatusTimer: ReturnType<typeof setTimeout> | undefined;
     const window = getCurrentWindow();
     const syncMaximizedState = async () => {
       const maximized = await window.isMaximized();
@@ -88,7 +88,15 @@ export function useDesktopWindowChrome() {
     };
     void syncMaximizedState().catch(() => undefined);
     void window
-      .onResized(() => void syncMaximizedState().catch(() => undefined))
+      .onResized(() => {
+        // Only titlebar status needs this query. Keep native IPC round trips
+        // out of the live-resize hot path; AppKit sizes and paints immediately.
+        if (disposed) return;
+        clearTimeout(resizeStatusTimer);
+        resizeStatusTimer = setTimeout(() => {
+          void syncMaximizedState().catch(() => undefined);
+        }, 120);
+      })
       .then((unlisten) => {
         if (disposed) unlisten();
         else unlistenResize = unlisten;
@@ -96,6 +104,7 @@ export function useDesktopWindowChrome() {
       .catch(() => undefined);
     return () => {
       disposed = true;
+      clearTimeout(resizeStatusTimer);
       unlistenResize?.();
     };
   }, []);

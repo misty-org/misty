@@ -15,7 +15,7 @@ export function AgentJobWorker(): null {
     void readAccountAuthToken().then((token) => {
       if (canceled || !token) return;
       worker = new DesktopAgentJobWorker();
-      worker.start();
+      worker.start(user.id);
     });
     return () => {
       canceled = true;

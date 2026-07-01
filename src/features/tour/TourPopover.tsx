@@ -83,9 +83,7 @@ export function TourPopover(props: {
     };
   }, [targetSelector]);
 
-  const style = coords
-    ? { top: `${coords.top}px`, left: `${coords.left}px` }
-    : undefined;
+  const style = coords ? { top: `${coords.top}px`, left: `${coords.left}px` } : undefined;
 
   return (
     <div

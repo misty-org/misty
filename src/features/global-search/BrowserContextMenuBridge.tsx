@@ -20,6 +20,7 @@ import {
   setBrowserWebviewsSuspended,
 } from "@/features/webviews/browserRuntime";
 import {
+  Button,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -171,12 +172,13 @@ export function BrowserContextMenuBridge() {
           className="fixed right-4 top-16 z-[2147483400] max-w-sm rounded-md bg-charcoal-card p-3 text-sm text-cream shadow-md ring-1 ring-cream/10"
         >
           <p>{error}</p>
-          <button
+          <Button
+            variant="ghost"
             className="mt-2 rounded-sm px-2 py-1 text-cream-muted hover:bg-charcoal-hover focus-visible:outline"
             onClick={() => setError(null)}
           >
             Dismiss
-          </button>
+          </Button>
         </div>
       ) : null}
     </>

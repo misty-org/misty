@@ -21,7 +21,7 @@ const chromeTabTrayClass = [
 ].join(" ");
 
 const tabSelectButtonClass = [
-  "flex h-full min-w-0 flex-1 items-center gap-2 overflow-hidden border-0",
+  "flex h-full min-w-0 flex-1 items-center justify-start gap-2 overflow-hidden border-0",
   "bg-transparent py-0 pl-3 pr-1.5 text-left text-inherit focus-visible:outline-none",
   "focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-cream-muted",
 ].join(" ");
@@ -163,8 +163,10 @@ export const ChromeTabStrip = memo(function ChromeTabStrip(props: ChromeTabStrip
                     }}
                   />
                 ) : (
-                  <button
-                    type="button"
+                  <Button
+                    variant="ghost"
+                    size="none"
+                    justify="start"
                     className={tabSelectButtonClass}
                     role="tab"
                     data-reorder-handle={props.onReorderTab || props.onMoveTab ? "true" : undefined}
@@ -200,11 +202,12 @@ export const ChromeTabStrip = memo(function ChromeTabStrip(props: ChromeTabStrip
                       </span>
                     ) : null}
                     <span className="min-w-0 truncate text-[13px] font-medium">{tab.title}</span>
-                  </button>
+                  </Button>
                 )}
                 {canClose ? (
-                  <button
-                    type="button"
+                  <Button
+                    variant="ghost"
+                    size="none"
                     className={tabCloseButtonClass}
                     tabIndex={active ? 0 : -1}
                     aria-label={`Close ${tab.title}`}
@@ -222,12 +225,12 @@ export const ChromeTabStrip = memo(function ChromeTabStrip(props: ChromeTabStrip
                         >
                           •
                         </span>
-                        <X className="hidden group-hover:block" size={13} strokeWidth={2} />
+                        <X className="hidden group-hover:block size-3.5" size={13} strokeWidth={2} />
                       </>
                     ) : (
-                      <X size={13} strokeWidth={2} />
+                      <X className="size-3.5" size={13} strokeWidth={2} />
                     )}
-                  </button>
+                  </Button>
                 ) : null}
               </div>
             </Renameable>
@@ -239,13 +242,14 @@ export const ChromeTabStrip = memo(function ChromeTabStrip(props: ChromeTabStrip
           <div className="flex h-9 flex-none items-center pl-1">
             {props.addTabControl ?? (
               <Button
-                type="button"
+                variant="ghost"
+                size="none"
                 className={addTabButtonClass}
                 title="New tab"
                 aria-label="New tab"
                 onClick={props.onAddTab}
               >
-                <Plus size={17} strokeWidth={2.4} />
+                <Plus className="size-[17px]" size={17} strokeWidth={2.4} />
               </Button>
             )}
           </div>

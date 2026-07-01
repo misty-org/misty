@@ -61,6 +61,9 @@ export function useBrowserWebviewGeometry(input: BrowserGeometryInput): void {
         return;
       }
       hiddenForInvalidBounds = false;
+      // Scroll/theme/recovery events can also schedule a frame during a drag.
+      // Let AppKit keep sizing the visible child until the window settles.
+      if (macNativeLiveResize && windowResizeActive) return;
       void syncBrowserWebview({
         tab: current.tab,
         url: current.url,
@@ -89,6 +92,8 @@ export function useBrowserWebviewGeometry(input: BrowserGeometryInput): void {
     };
     const scheduleResizeSettle = () => {
       windowResizeActive = true;
+      if (frame) window.cancelAnimationFrame(frame);
+      frame = 0;
       if (settleTimer) window.clearTimeout(settleTimer);
       settleTimer = window.setTimeout(() => {
         windowResizeActive = false;

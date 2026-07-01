@@ -19,7 +19,7 @@ const pane = (id: string) => ({
 });
 beforeEach(() => {
   fixture.state = {
-    activeScopeKey: "space:s",
+    activeScopeKey: "global",
     activeVirtualWindowId: "w",
     layout: { focusedPaneId: "p" },
     windows: [
@@ -36,7 +36,7 @@ beforeEach(() => {
       paneId: "p",
       adapter: {
         getContext: () => [
-          { id: "doc", kind: "note", privacy: "private", spaceId: "s", title: "Draft" },
+          { id: "doc", kind: "note", privacy: "private", spaceId: "", title: "Draft" },
         ],
         getSelection: () => ({
           kind: "text",
@@ -50,14 +50,14 @@ beforeEach(() => {
 });
 describe("Misty workspace context", () => {
   it("uses the focused pane by default and freezes selections", () => {
-    const snapshot = resolveMistyContext("a", "s");
+    const snapshot = resolveMistyContext("a", "");
     expect(snapshot.context[0].id).toBe("doc");
     expect(snapshot.selection?.content).toBe("selected");
     fixture.registrations["a:p"].adapter.getContext = () => [];
     expect(snapshot.context).toHaveLength(1);
   });
   it("follows a renamed container and includes newly added live panes, never history", () => {
-    const target = { kind: "tab" as const, spaceId: "s", windowId: "w", tabId: "t" };
+    const target = { kind: "tab" as const, spaceId: "", windowId: "w", tabId: "t" };
     const tab = fixture.state.windows[0].layout.tabs[0];
     tab.title = "Renamed";
     tab.root = {
@@ -68,35 +68,43 @@ describe("Misty workspace context", () => {
       direction: "horizontal",
       ratio: 0.5,
     };
-    const snapshot = resolveMistyContext("a", "s", [target]);
+    const snapshot = resolveMistyContext("a", "", [target]);
     expect(snapshot.context[0].kind).toBe("workspace.scope");
     expect(
       (JSON.parse(String(snapshot.context[0].metadata?.members)) as Array<{ id: string }>).map(
         (ref) => ref.id,
       ),
     ).toEqual(["doc", "view-q"]);
-    expect(contextOptions("s").some((option) => option.label.includes("Renamed"))).toBe(true);
+    expect(contextOptions("").some((option) => option.label.includes("Renamed"))).toBe(true);
   });
   it("follows a moved pane by stable ID instead of its old parents", () => {
-    const snapshot = resolveMistyContext("a", "s", [
-      { kind: "pane", spaceId: "s", windowId: "old-window", tabId: "old-tab", paneId: "p" },
+    const snapshot = resolveMistyContext("a", "", [
+      { kind: "pane", spaceId: "", windowId: "old-window", tabId: "old-tab", paneId: "p" },
     ]);
     expect(snapshot.context[0].id).toBe("doc");
   });
   it("marks closed targets unavailable instead of substituting the focused pane", () => {
     expect(() =>
-      resolveMistyContext("a", "s", [{ kind: "pane", spaceId: "s", paneId: "missing" }]),
+      resolveMistyContext("a", "", [{ kind: "pane", spaceId: "", paneId: "missing" }]),
     ).toThrow(/closed/);
   });
-  it("rejects cross-Space attachments and never uses another account's adapter", () => {
-    expect(() => resolveMistyContext("a", "s", [{ kind: "space", spaceId: "other" }])).toThrow(
-      /selected Space/,
+  it("rejects historical attachments and never uses another account's adapter", () => {
+    expect(() => resolveMistyContext("a", "", [{ kind: "workspace", spaceId: "other" }])).toThrow(
+      /current browser workspace/,
     );
-    expect(resolveMistyContext("b", "s").context[0].id).toBe("view-p");
+    expect(resolveMistyContext("b", "").context[0].id).toBe("view-p");
   });
-  it("keeps Space attachment as retrieval scope", () => {
-    const snapshot = resolveMistyContext("a", "s", [{ kind: "space", spaceId: "s" }]);
-    expect(snapshot.context.map((ref) => ref.kind)).toEqual(["space"]);
+  it("collects the open workspace as one scoped attachment", () => {
+    const snapshot = resolveMistyContext("a", "", [{ kind: "workspace", spaceId: "" }]);
+    expect(snapshot.context.map((ref) => ref.kind)).toEqual(["workspace.scope"]);
     expect(snapshot.selection).toBeUndefined();
   });
+});
+
+it("never attaches the live workspace to historical conversations", () => {
+  expect(contextOptions("old-space")).toEqual([]);
+  expect(resolveMistyContext("a", "old-space")).toEqual({ context: [] });
+  expect(() =>
+    resolveMistyContext("a", "old-space", [{ kind: "workspace", spaceId: "old-space" }]),
+  ).toThrow(/new conversation/);
 });

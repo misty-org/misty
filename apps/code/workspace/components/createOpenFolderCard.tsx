@@ -15,7 +15,7 @@ export function createOpenFolderCard(
           <div className="mx-auto mb-5 grid size-12 place-items-center rounded-xl bg-charcoal-active text-cream-bright">
             <FolderOpen size={22} strokeWidth={1.7} />
           </div>
-          <h1 className="text-lg font-medium tracking-tight text-cream-bright">Open a project</h1>
+          <h1 className="text-lg font-medium tracking-tight text-cream-bright">Open a folder</h1>
           <p className="mt-2 text-sm leading-6 text-cream-muted">
             Point Misty at a project directory to browse files, edit them, and run{" "}
             <span className="font-mono text-[12px] text-cream">claude</span>,{" "}

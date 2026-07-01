@@ -17,6 +17,9 @@ use tauri::{
 };
 use url::Url;
 
+#[path = "browser_task_files.rs"]
+mod task_files;
+
 #[cfg(target_os = "macos")]
 #[path = "browser_focus.rs"]
 mod focus_messages;
@@ -25,6 +28,9 @@ mod focus_messages;
 #[path = "browser_popups.rs"]
 mod popups;
 #[cfg(target_os = "macos")]
+#[path = "browser_attachment_download_macos.rs"]
+mod attachment_download;
+#[cfg(target_os = "macos")]
 use popups::provider_popup;
 #[cfg(all(debug_assertions, target_os = "macos"))]
 #[path = "browser_popup_probe.rs"]
@@ -32,6 +38,9 @@ pub(crate) mod popup_probe;
 #[cfg(all(debug_assertions, target_os = "macos"))]
 #[path = "browser_render_probe.rs"]
 pub(crate) mod render_probe;
+#[cfg(all(debug_assertions, target_os = "macos"))]
+#[path = "browser_agent_files_probe.rs"]
+pub(crate) mod agent_files_probe;
 
 #[cfg(target_os = "macos")]
 #[path = "browser_context_menu.rs"]
@@ -100,6 +109,7 @@ pub struct BrowserSessionState {
 #[derive(Default)]
 struct BrowserSession {
     agent_input_locked: bool,
+    workspace_tab_id: Option<String>,
     // Native auxiliary windows stay attached to this live integration view.
     popup_parent: Option<String>,
     #[cfg(target_os = "macos")]
@@ -107,6 +117,8 @@ struct BrowserSession {
     origin_space_id: Option<String>,
     zoom_factor: Option<f64>,
     profile_id: Option<String>,
+    // Only this logical identity is included in renderer/agent observations.
+    logical_profile_id: Option<String>,
     profile_provider: Option<String>,
     provider_id: Option<String>,
     oauth_callback: Option<(super::browser_provider::OAuthCallback, std::time::Instant)>,
@@ -118,6 +130,12 @@ struct BrowserSession {
     pending_agent_download: Option<PendingAgentDownload>,
 }
 
+impl BrowserSession {
+    fn context_profile_id(&self) -> Option<&str> {
+        self.logical_profile_id.as_deref().or(self.profile_id.as_deref())
+    }
+}
+
 #[derive(Clone)]
 struct BrowserGrant {
     agent_id: String,
@@ -125,10 +143,26 @@ struct BrowserGrant {
     expires_at: DateTime<Utc>,
 }
 
+#[derive(Clone)]
 struct PendingAgentDownload {
     grant_id: String,
     agent_id: String,
+    task_id: Option<String>,
     expires_at: DateTime<Utc>,
+    popup_id: Option<String>,
+}
+
+#[cfg(any(target_os = "macos", test))]
+fn popup_download_authority(source: &BrowserSession, popup_id: &str) -> Option<(String, String, String)> {
+    let pending = source.pending_agent_download.as_ref()?;
+    let grant = source.grants.get(&pending.grant_id)?;
+    let now = Utc::now();
+    if pending.popup_id.as_deref() != Some(popup_id)
+        || pending.expires_at <= now || grant.expires_at <= now
+        || grant.agent_id != pending.agent_id || !grant.capabilities.contains("browser.click") {
+        return None;
+    }
+    Some((source.scope_id.clone(), pending.agent_id.clone(), pending.task_id.clone()?))
 }
 
 #[derive(Debug, Deserialize)]
@@ -142,6 +176,8 @@ pub struct BrowserWebviewCreateRequest {
     pub profile_provider_id: Option<String>,
     #[serde(default)]
     pub profile_id: Option<String>,
+    #[serde(default)]
+    pub workspace_tab_id: Option<String>,
     pub id: String,
     pub url: String,
     pub x: f64,
@@ -335,6 +371,10 @@ pub struct BrowserDownload {
     agent_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     grant_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    task_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    file: Option<task_files::DownloadFile>,
     #[serde(skip_serializing_if = "Option::is_none")]
     error: Option<String>,
 }
@@ -634,7 +674,7 @@ pub(crate) struct BrowserProbeDirectories {
     pub downloads: PathBuf,
 }
 
-fn browser_data_directory(app: &AppHandle, profile: Option<&str>) -> Result<PathBuf, String> {
+pub(super) fn browser_data_directory(app: &AppHandle, profile: Option<&str>) -> Result<PathBuf, String> {
     browser_profile_identifier(profile)?;
     #[cfg(all(debug_assertions, target_os = "macos"))]
     if let Some(directories) = app.try_state::<BrowserProbeDirectories>() {
@@ -646,10 +686,7 @@ fn browser_data_directory(app: &AppHandle, profile: Option<&str>) -> Result<Path
         .path()
         .app_data_dir()
         .map_err(|error| error.to_string())?;
-    let path = match profile {
-        Some(profile) => base.join("browser-profiles").join(profile),
-        None => base.join("browser-profile"),
-    };
+    let path = base.join(super::browser_profile::relative_data_directory(profile)?);
     std::fs::create_dir_all(&path).map_err(|error| error.to_string())?;
     Ok(path)
 }
@@ -722,8 +759,10 @@ pub async fn browser_webview_create(
     caller: Webview,
     app: AppHandle,
     state: State<'_, BrowserSessionState>,
-    request: BrowserWebviewCreateRequest,
+    mut request: BrowserWebviewCreateRequest,
 ) -> Result<(), String> {
+    let profile_lease = super::browser_sync::browser_profile_lease(Some(&app), request.profile_id.as_deref(), request.workspace_tab_id.as_deref().map(|id| (id, request.url.as_str()))).await?;
+    request.profile_id = profile_lease.profile_id.clone();
     let profile_identifier = browser_profile_identifier(request.profile_id.as_deref())?;
     // Integrations use Browser's navigation rules. Provider metadata identifies
     // the account and automation permissions, not where a person may browse.
@@ -747,9 +786,10 @@ pub async fn browser_webview_create(
     }
     register_session(&state, &request.id, &request.scope_id)?;
     if let Some(session) = state.sessions.lock().map_err(|_| "Browser state is unavailable.")?.get_mut(&request.id) {
+        session.workspace_tab_id = request.workspace_tab_id.clone();
         session.origin_space_id = request.origin_space_id.clone();
         session.provider_id = request.provider_id.clone();
-        if request.profile_id.is_some() { session.profile_id = request.profile_id.clone(); }
+        if request.profile_id.is_some() { session.profile_id = request.profile_id.clone(); session.logical_profile_id = profile_lease.logical_profile_id.clone(); }
         if request.profile_provider_id.is_some() || request.provider_id.is_some() { session.profile_provider = request.profile_provider_id.clone().or(request.provider_id.clone()); }
     }
     let shortcut_token = shortcut_token_for(&state, &request.id)?;
@@ -785,7 +825,9 @@ pub async fn browser_webview_create(
     let download_id = request.id.clone();
     let navigation_app = app.clone();
     let navigation_id = request.id.clone();
-    let builder = WebviewBuilder::new(label, WebviewUrl::External(external_url(&request.url)?))
+    let restoring_tab_session = profile_lease.tab_session.is_some();
+    let initial_url = if restoring_tab_session { "about:blank".parse().map_err(|_| "Invalid bootstrap URL")? } else { external_url(&request.url)? };
+    let builder = WebviewBuilder::new(label, WebviewUrl::External(initial_url))
         .background_throttling(BackgroundThrottlingPolicy::Disabled)
         .data_directory(browser_data_directory(&app, request.profile_id.as_deref())?)
         .data_store_identifier(profile_identifier)
@@ -808,6 +850,7 @@ pub async fn browser_webview_create(
             renderer(caller.window().label()).tracking,
         ))
         .on_navigation(move |url| {
+            if restoring_tab_session && url.as_str() == "about:blank" { return true; }
             #[cfg(target_os = "macos")]
             if context_menu::forward(&navigation_app, &navigation_id, url) { return false; }
             if let Some(pointer) = browser_pointer_navigation(url) {
@@ -841,6 +884,9 @@ pub async fn browser_webview_create(
             NewWindowResponse::Deny
         })
         .on_page_load(move |webview, payload| {
+            if restoring_tab_session && payload.url().as_str() == "about:blank" { return; }
+            #[cfg(any(target_os = "macos", windows))]
+            if matches!(payload.event(), tauri::webview::PageLoadEvent::Finished) { super::browser_session_storage::clear(&webview); }
             let locked = page_app.state::<BrowserSessionState>().sessions.lock().ok().and_then(|sessions|sessions.get(&page_id).map(|session|session.agent_input_locked)).unwrap_or(false);
             let _ = apply_agent_input_lock(&webview,locked);
             let _ = apply_browser_pointer_tracking(
@@ -871,6 +917,7 @@ pub async fn browser_webview_create(
             );
             if matches!(payload.event(), tauri::webview::PageLoadEvent::Finished) {
                 apply_page_zoom_policy(&webview, &page_app, &page_id);
+                let _ = webview.eval("window.__MISTY_REPORT_BACKGROUND__?.()");
                 request_browser_favicon(&webview, &page_app, &page_id);
                 request_browser_compatibility(&webview, &page_app, &page_id);
             }
@@ -894,6 +941,17 @@ pub async fn browser_webview_create(
         .map_err(|error| error.to_string())?;
     #[cfg(target_os = "macos")]
     focus_messages::install(&app, &webview, &request.id)?;
+    #[cfg(target_os = "macos")]
+    attachment_download::install(&webview)?;
+    #[cfg(any(target_os = "macos", windows))]
+    if let Some(values) = &profile_lease.tab_session {
+        let url = external_url(&request.url)?;
+        if let Err(error) = super::browser_session_storage::install(&webview, &url.origin().ascii_serialization(), values).await {
+            let _ = webview.close();
+            return Err(error);
+        }
+        webview.navigate(url).map_err(|_| "Could not open restored tab")?;
+    }
     configure_browser_frame_rate(&webview)?;
     apply_macos_webview_theme(&webview, &request.theme)?;
     configure_browser_webview(&webview, request.native_live_resize)?;
@@ -1017,13 +1075,17 @@ fn handle_download_event(app: &AppHandle, tab_id: &str, event: DownloadEvent<'_>
     };
     match event {
         DownloadEvent::Requested { url, destination } => {
-            let Some(download_dir) = browser_download_directory(app) else {
+            let agent_download = state.sessions.lock().ok().and_then(|sessions| {
+                sessions.get(tab_id).and_then(|session| session.pending_agent_download.as_ref())
+                    .map(|pending| pending.expires_at > Utc::now())
+            }).unwrap_or(false);
+            let Some(download_dir) = browser_download_directory(app, agent_download) else {
                 emit_download_failure(
                     app,
                     &state,
                     tab_id,
                     &url,
-                    "The Downloads folder is unavailable.",
+                    "The download destination is unavailable.",
                 );
                 return false;
             };
@@ -1055,10 +1117,16 @@ fn handle_download_event(app: &AppHandle, tab_id: &str, event: DownloadEvent<'_>
     }
 }
 
-fn browser_download_directory(app: &AppHandle) -> Option<PathBuf> {
+fn browser_download_directory(app: &AppHandle, agent_download: bool) -> Option<PathBuf> {
     #[cfg(all(debug_assertions, target_os = "macos"))]
     if let Some(directories) = app.try_state::<BrowserProbeDirectories>() {
         return Some(directories.downloads.clone());
+    }
+    // Agent outputs are task intermediates for verified upload, not user-managed
+    // downloads. Keep them in the app's cache rather than requiring macOS access
+    // to the user's protected Downloads folder from a WKDownload callback.
+    if agent_download {
+        return app.path().app_cache_dir().ok().map(|path| path.join("agent-downloads"));
     }
     #[cfg(target_os = "ios")]
     {
@@ -1091,6 +1159,8 @@ fn emit_download_failure(
         initiator: "human".to_owned(),
         agent_id: None,
         grant_id: None,
+        task_id: None,
+        file: None,
         error: Some(error.to_owned()),
     };
     if let Ok(mut sessions) = state.sessions.lock() {
@@ -1128,6 +1198,8 @@ fn requested_download(
         initiator: if pending.is_some() { "agent" } else { "human" }.to_owned(),
         agent_id: pending.as_ref().map(|value| value.agent_id.clone()),
         grant_id: pending.as_ref().map(|value| value.grant_id.clone()),
+        task_id: pending.as_ref().and_then(|value| value.task_id.clone()),
+        file: None,
         error: None,
     };
     session.downloads.push(record.clone());
@@ -1144,24 +1216,37 @@ fn finish_download(
     path: Option<&Path>,
     success: bool,
 ) -> BrowserDownload {
+    // Wry's macOS WKDownload delegate returns no path even on success.
+    // Recover only our uniquely recorded destination, never guess a filename.
+    let pending = {
+        let sessions = state.sessions.lock().expect("browser session mutex poisoned");
+        let matches = sessions.get(tab_id).map(|session| session.downloads.iter().filter(|item| {
+            item.url == url.as_str() && item.state == "requested" &&
+                path.is_none_or(|path| Path::new(&item.path) == path)
+        }).cloned().collect::<Vec<_>>()).unwrap_or_default();
+        if matches.len() == 1 { matches.into_iter().next() } else { None }
+    };
+    let resolved_path = pending.as_ref().map(|item| Path::new(&item.path));
+    let success=success && resolved_path.is_some_and(|path|std::fs::metadata(path).is_ok_and(|meta|meta.is_file()));
+    let file = if success { resolved_path.and_then(|path| task_files::fingerprint(path).ok()) } else { None };
     let mut sessions = state
         .sessions
         .lock()
         .expect("browser session mutex poisoned");
     let session = sessions.entry(tab_id.to_owned()).or_default();
-    let success=success && path.is_some_and(|path|std::fs::metadata(path).is_ok_and(|meta|meta.is_file()));
-    let path_text = path
+    let path_text = resolved_path
         .map(|value| value.to_string_lossy().into_owned())
         .unwrap_or_default();
     let existing = session
         .downloads
         .iter_mut()
         .rev()
-        .find(|item| item.url == url.as_str() && item.state == "requested");
+        .find(|item| pending.as_ref().is_some_and(|pending| item.download_id == pending.download_id) && item.state == "requested");
     let record = if let Some(item) = existing {
         item.path = path_text.clone();
         item.state = if success { "finished" } else { "failed" }.to_owned();
         item.success = success;
+        item.file = file;
         if !success {
             item.error = Some("The native WebView reported that the download failed.".to_owned());
         }
@@ -1177,6 +1262,8 @@ fn finish_download(
             initiator: "human".to_owned(),
             agent_id: None,
             grant_id: None,
+            task_id: None,
+            file: None,
             error: (!success)
                 .then(|| "The native WebView reported that the download failed.".to_owned()),
         }
@@ -1598,6 +1685,26 @@ pub fn browser_webviews_park_all(caller:Webview, app: AppHandle) -> Result<(), S
     }
 }
 
+/// Caller holds the browser lifecycle write lease. Enumerate real native views
+/// as well as registered sessions so failed/partial creation is also closed.
+pub(super) fn close_account_views(app: &AppHandle) -> Result<(), String> {
+    close_account_views_except(app, None)
+}
+
+/// A restored, quiescent staging view must survive closure of the old live
+/// profile until its activation receipt is committed. Caller holds write lease.
+pub(super) fn close_account_views_except(app: &AppHandle, keep_label: Option<&str>) -> Result<(), String> {
+    let state = app.state::<BrowserSessionState>();
+    let mut ids: HashSet<String> = state.sessions.lock()
+        .map_err(|_| "Browser state is unavailable.")?.keys().cloned().collect();
+    ids.extend(app.webviews().keys().filter_map(|label| label.strip_prefix("misty-browser-").map(str::to_owned)));
+    for id in ids {
+        if keep_label == Some(format!("misty-browser-{id}").as_str()) || (keep_label.is_some() && id.starts_with("storage-")) { continue; }
+        browser_webview_close(app.clone(), app.state::<BrowserSessionState>(), BrowserWebviewIdRequest { id })?;
+    }
+    Ok(())
+}
+
 #[tauri::command]
 pub fn browser_webview_close(
     app: AppHandle,
@@ -1624,6 +1731,8 @@ pub fn browser_webview_close(
     let Some(webview) = app.get_webview(&webview_label(&request.id)?) else {
         return Ok(());
     };
+    #[cfg(any(target_os = "macos", windows))]
+    super::browser_session_storage::clear(&webview);
     unregister_browser_cursor_ownership(&webview)?;
     webview.close().map_err(|error| error.to_string())?;
     Ok(())
@@ -1698,7 +1807,7 @@ pub(super) fn revoke_execution_grant(state: &BrowserSessionState, scope: &str, g
 fn is_browser_capability(value: &str) -> bool {
     matches!(
         value,
-        "browser.inspect" | "browser.visual" | "browser.navigate" | "browser.click" | "browser.type" | "browser.request" | "browser.interact" | "browser.upload" | "browser.downloads.list"
+        "browser.workspace.visual" | "browser.workspace.interact" | "browser.inspect" | "browser.visual" | "browser.navigate" | "browser.click" | "browser.type" | "browser.request" | "browser.interact" | "browser.upload" | "browser.downloads.list"
     )
 }
 
@@ -1750,6 +1859,9 @@ pub async fn browser_agent_execute(
     }
     super::agent_workspace::authorize_scope(&app,&request.scope_id,&request.agent_id,request.input.get("__mistyTaskId").and_then(Value::as_str).unwrap_or(""))?;
     let (id, agent_id) = resolve_agent_webview(&app, &state, &request)?;
+    if request.operation.starts_with("browser.workspace.") {
+        return super::workspace_autopilot::execute(&app,&request).await;
+    }
     if matches!(request.operation.as_str(), "browser.click" | "browser.type" | "browser.interact" | "browser.upload" | "browser.request") {
         let url = app.get_webview(&webview_label(&id)?).ok_or("Browser tab is not running.")?.url().map_err(|error| error.to_string())?;
         let sessions = state.sessions.lock().map_err(|_| "Browser state is unavailable.")?;
@@ -1828,15 +1940,16 @@ pub async fn browser_agent_execute(
         "browser.upload" => upload_browser(&app,&state,&id,&request).await,
         "browser.interact" => interact_browser(&app, &state, &id, &request).await,
         "browser.downloads.list" => {
+            let task = request.input.get("__mistyTaskId").and_then(Value::as_str).filter(|id| !id.is_empty());
             let sessions = state
                 .sessions
                 .lock()
                 .map_err(|_| "Browser state is unavailable.")?;
             let downloads = sessions
                 .get(&id)
-                .map(|session| session.downloads.clone())
+                .map(|session| session.downloads.iter().filter(|item| task.is_none_or(|task| item.task_id.as_deref() == Some(task))).cloned().collect::<Vec<_>>())
                 .unwrap_or_default();
-            Ok(json!({"downloads": downloads}))
+            Ok(json!({"sourceScopeId": request.scope_id, "downloads": downloads}))
         }
         _ => Err("Unsupported browser agent operation.".to_owned()),
     }
@@ -1912,7 +2025,7 @@ fn browser_target_observation(session: &BrowserSession, url: &url::Url) -> Value
     });
     let required = callback_page || super::browser_provider::authentication_required(provider, url);
     let mut target = json!({"scopeId":session.scope_id,"origin":url.origin().ascii_serialization(),"authentication":if required {"required"} else {"unknown"},"accountIdentity":"unverified","trust":"host-observation","observedAt":Utc::now().to_rfc3339()});
-    if let Some(profile) = &session.profile_id {target["profileId"] = json!(profile);}
+    if let Some(profile) = session.context_profile_id() {target["profileId"] = json!(profile);}
     if let Some(provider) = provider {target["providerId"] = json!(provider);}
     target
 }
@@ -1979,7 +2092,9 @@ async fn click_browser(
             session.pending_agent_download = Some(PendingAgentDownload {
                 grant_id: request.grant_id.clone(),
                 agent_id: agent_id.to_owned(),
+                task_id: request.input.get("__mistyTaskId").and_then(Value::as_str).filter(|id| !id.is_empty()).map(str::to_owned),
                 expires_at: Utc::now() + chrono::Duration::seconds(AGENT_DOWNLOAD_WINDOW_SECONDS),
+                popup_id: None,
             });
         }
         (
@@ -2023,6 +2138,7 @@ async fn click_browser(
             "ok": true,
             "elementRef": element_ref,
             "expectDownload": true,
+            "sourceScopeId": request.scope_id,
             "download": download
         }));
     }
@@ -2070,7 +2186,13 @@ async fn interact_browser(
         if result.get("errorCode").and_then(Value::as_str) == Some("browser_snapshot_stale") { return Err("browser_snapshot_stale: inspected content changed before dispatch".into()); }
         return Err(result.get("error").and_then(Value::as_str).unwrap_or("Browser interaction failed.").to_owned());
     }
-    Ok(json!({"attempted": true}))
+    let mut output = json!({"attempted": true});
+    for field in ["textRetained", "websiteEditVerified", "scrolled"] {
+        if let Some(value) = result.get(field).and_then(Value::as_bool) {
+            output[field] = json!(value);
+        }
+    }
+    Ok(output)
 }
 
 async fn wait_for_agent_download(
@@ -2115,6 +2237,7 @@ async fn wait_for_agent_download(
 }
 
 async fn eval_json(webview: Webview, script: String) -> Result<Value, String> {
+    let script = format!("{}\n{}", include_str!("browser_agent_cursor.js"), script);
     let (sender, receiver) = tokio::sync::oneshot::channel();
     let sender = Mutex::new(Some(sender));
     webview
@@ -2140,6 +2263,37 @@ mod tests {
     use tempfile::tempdir;
 
     #[test]
+    fn popup_download_requires_exact_live_source_authority() {
+        let fixture = || {
+            let mut source = BrowserSession::default();
+            source.scope_id = "source-scope".into();
+            source.grants.insert("grant".into(), BrowserGrant {
+                agent_id: "agent".into(), capabilities: ["browser.click".into()].into(),
+                expires_at: Utc::now() + chrono::Duration::minutes(1),
+            });
+            source.pending_agent_download = Some(PendingAgentDownload {
+                grant_id: "grant".into(), agent_id: "agent".into(), task_id: Some("task".into()),
+                expires_at: Utc::now() + chrono::Duration::seconds(30), popup_id: Some("popup".into()),
+            });
+            source
+        };
+        assert_eq!(popup_download_authority(&fixture(), "popup"), Some(("source-scope".into(), "agent".into(), "task".into())));
+        assert!(popup_download_authority(&fixture(), "other-popup").is_none());
+        for case in 0..6 {
+            let mut source = fixture();
+            match case {
+                0 => source.pending_agent_download = None,
+                1 => source.grants.clear(),
+                2 => source.pending_agent_download.as_mut().unwrap().expires_at = Utc::now() - chrono::Duration::seconds(1),
+                3 => source.grants.get_mut("grant").unwrap().expires_at = Utc::now() - chrono::Duration::seconds(1),
+                4 => source.grants.get_mut("grant").unwrap().agent_id = "other-agent".into(),
+                _ => source.grants.get_mut("grant").unwrap().capabilities.clear(),
+            }
+            assert!(popup_download_authority(&source, "popup").is_none(), "case {case}");
+        }
+    }
+
+    #[test]
     fn browser_labels_reject_unsafe_identifiers() {
         assert!(webview_label("tab-123").is_ok());
         assert!(webview_label("../main").is_err());
@@ -2163,6 +2317,18 @@ mod tests {
     fn browser_page_and_renderer_swap_sibling_order_for_overlays() {
         assert!(!browser_child_should_be_below_renderer(false));
         assert!(browser_child_should_be_below_renderer(true));
+    }
+
+    #[test]
+    fn managed_profile_observations_expose_only_logical_identity() {
+        let session = BrowserSession {
+            profile_id: Some("b".repeat(64)),
+            logical_profile_id: Some("a".repeat(64)),
+            ..Default::default()
+        };
+        let target = browser_target_observation(&session, &Url::parse("https://example.test/").unwrap());
+        assert_eq!(target["profileId"], "a".repeat(64));
+        assert!(!target.to_string().contains(&"b".repeat(64)));
     }
 
     #[test]
@@ -2211,6 +2377,38 @@ mod tests {
         let second = reserve_download_path(&state, directory.path(), "report.pdf");
         assert_eq!(first.file_name().unwrap(), "report (1).pdf");
         assert_eq!(second.file_name().unwrap(), "report (2).pdf");
+    }
+
+    #[test]
+    fn macos_download_completion_recovers_the_recorded_destination() {
+        let directory = tempdir().unwrap();
+        let path = directory.path().join("mockup.png");
+        let state = BrowserSessionState::default();
+        let url = Url::parse("https://example.test/mockup").unwrap();
+        let requested = requested_download(&state,"source",&url,&path);
+        std::fs::write(&path,b"\x89PNG\r\n\x1a\nimage").unwrap();
+        let finished = finish_download(&state,"source",&url,None,true);
+        assert!(finished.success);
+        assert_eq!(finished.path, requested.path);
+        assert_eq!(finished.download_id, requested.download_id);
+        assert!(finished.file.is_some());
+        assert!(!finish_download(&state,"source",&url,None,true).success);
+    }
+
+    #[test]
+    fn download_completion_never_guesses_between_simultaneous_identical_urls() {
+        let directory = tempdir().unwrap();
+        let state = BrowserSessionState::default();
+        let url = Url::parse("https://example.test/mockup").unwrap();
+        for name in ["one.png", "two.png"] {
+            let path=directory.path().join(name);
+            requested_download(&state,"source",&url,&path);
+            std::fs::write(&path,b"\x89PNG\r\n\x1a\nimage").unwrap();
+        }
+        assert!(!finish_download(&state,"source",&url,None,true).success);
+        let one=directory.path().join("one.png");
+        assert!(finish_download(&state,"source",&url,Some(&one),true).success);
+        assert!(finish_download(&state,"source",&url,None,true).success);
     }
 
     #[test]
@@ -2297,7 +2495,8 @@ pub fn browser_runtime_for_scope(state:State<'_,BrowserSessionState>,scope_id:St
 }
 
 fn apply_agent_input_lock(webview:&Webview,locked:bool)->Result<(),String>{
- let script=format!(r#"(()=>{{ window.__MISTY_AGENT_INPUT_LOCKED__={locked}; if(window.__MISTY_AGENT_INPUT_GUARD__)return; window.__MISTY_AGENT_INPUT_GUARD__=true; for(const type of ['pointerdown','pointerup','mousedown','mouseup','click','dblclick','keydown','keyup','beforeinput','paste','drop','wheel']) window.addEventListener(type,event=>{{if(event.isTrusted&&window.__MISTY_AGENT_INPUT_LOCKED__){{event.preventDefault();event.stopImmediatePropagation()}}}},{{capture:true,passive:false}}); }})()"#);
+ if !locked { webview.eval("window[Symbol.for('misty.browser.agent.cursor')]?.hide()").map_err(|e|e.to_string())?; }
+ let script=format!("({})({locked})",include_str!("browser_agent_input_guard.js"));
  webview.eval(&script).map_err(|e|e.to_string())
 }
 #[tauri::command]
@@ -2309,6 +2508,10 @@ pub fn browser_agent_set_locked(caller:Webview,app:AppHandle,state:State<'_,Brow
 }
 
 async fn upload_browser(app:&AppHandle,state:&BrowserSessionState,id:&str,request:&BrowserAgentExecuteRequest)->Result<Value,String>{
+ let mut input = request.input.clone();
+ if input.get("downloadId").is_some_and(|value| !value.is_null()) {
+  input["file"] = task_files::prepare_upload(app, state, request)?;
+ }
  let reference=request.input.get("elementRef").and_then(Value::as_str).ok_or("An inspected file input is required.")?;
  let target={let mut sessions=state.sessions.lock().map_err(|_|"browser_state_unavailable")?;
  let session=sessions.get_mut(id).ok_or("browser_context_closed")?;
@@ -2316,8 +2519,41 @@ async fn upload_browser(app:&AppHandle,state:&BrowserSessionState,id:&str,reques
  session.element_targets.clear();target};
  let webview=app.get_webview(&webview_label(id)?).ok_or("browser_context_closed")?;
  let origin=webview.url().map_err(|e|e.to_string())?.origin().ascii_serialization();
- let script=format!("({})({},{},{})",include_str!("browser_inspection_upload.js"),serde_json::to_string(&target).unwrap(),serde_json::to_string(&request.input).map_err(|e|e.to_string())?,serde_json::to_string(&origin).unwrap());
+ // Reading a file must not extend a revoked task or execution grant.
+ super::agent_workspace::authorize_scope(app,&request.scope_id,&request.agent_id,input.get("__mistyTaskId").and_then(Value::as_str).unwrap_or(""))?;
+ resolve_agent_webview(app,state,request)?;
+ let script=format!("({})({},{},{})",include_str!("browser_inspection_upload.js"),serde_json::to_string(&target).unwrap(),serde_json::to_string(&input).map_err(|e|e.to_string())?,serde_json::to_string(&origin).unwrap());
  let result=eval_json(webview,script).await?;
  if result["ok"]!=true{return Err(result["error"].as_str().unwrap_or("File upload failed").to_owned())}
  Ok(result)
+}
+
+pub(super) fn resume_task_downloads(app: &AppHandle, scope: &str, agent: &str, previous: &str, next: &str) -> Result<(), String> {
+ let state = app.state::<BrowserSessionState>();
+ let mut sessions = state.sessions.lock().map_err(|_| "browser_state_unavailable")?;
+ let session = sessions.values_mut().find(|session| session.scope_id == scope).ok_or("browser_context_closed")?;
+ task_files::resume_downloads(&mut session.downloads, agent, previous, next);
+ // An old delayed download is never attributed to the resumed task.
+ session.pending_agent_download = None;
+ Ok(())
+}
+
+pub(super) fn authorize_workspace_dispatch(app:&AppHandle,scope:&str,agent:&str,grant:&str,task:&str)->Result<(),String> {
+    super::agent_workspace::authorize_scope(app,scope,agent,task)?;
+    let state=app.state::<BrowserSessionState>();
+    let mut sessions=state.sessions.lock().map_err(|_|"Browser state unavailable")?;
+    let session=sessions.values_mut().find(|s|s.scope_id==scope).ok_or("Browser scope closed")?;
+    let request=BrowserAgentExecuteRequest{scope_id:scope.into(),agent_id:agent.into(),grant_id:grant.into(),operation:"browser.workspace.interact".into(),input:json!({})};
+    validate_browser_grant(session,&request)?;
+    Ok(())
+}
+
+/// Enumerate only registered website views in the actual selected native profile.
+#[cfg(any(target_os = "macos", windows))]
+pub(super) fn sync_storage_views(app: &AppHandle, physical: &str) -> Result<Vec<(String, Webview)>, String> {
+    let state = app.state::<BrowserSessionState>();
+    let sessions = state.sessions.lock().map_err(|_| "Browser state is unavailable")?;
+    let legacy = super::browser_profile::legacy_profile_identity();
+    Ok(sessions.iter().filter(|(_, session)| session.profile_id.as_deref().unwrap_or(&legacy) == physical)
+        .filter_map(|(id, session)| webview_label(id).ok().and_then(|label| app.get_webview(&label)).map(|view| (session.workspace_tab_id.clone().unwrap_or_else(|| id.clone()), view))).collect())
 }

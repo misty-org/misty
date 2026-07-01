@@ -1,0 +1,13 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>Agent file transfer verification</title>
+<p id="result">Checking native downloads, cross-page uploads, and task resume…</p>
+<script type="module">
+ import { invoke } from '@tauri-apps/api/core';
+ const nonce=new URLSearchParams(location.search).get('nonce');
+ try {
+  const message=await invoke('sdk_probe_agent_files',{nonce,origin:location.origin});
+  document.querySelector('#result').textContent=message;
+  await invoke('sdk_probe_complete',{nonce,success:true,message});
+ } catch(error) {
+  await invoke('sdk_probe_complete',{nonce,success:false,message:'FAIL native agent files: '+String(error)});
+ }
+</script></html>

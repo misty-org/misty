@@ -78,8 +78,8 @@ export function SearchResults(props: {
             key={`${result.kind}:${result.id}`}
             className="group/result grid min-h-[58px] grid-cols-[36px_minmax(0,1fr)_auto] items-center gap-3 rounded-lg px-3 py-2 hover:bg-charcoal-hover"
           >
-            <button
-              type="button"
+            <Button
+              variant="ghost"
               className="contents text-left"
               onClick={() => props.onOpen(result)}
             >
@@ -94,7 +94,7 @@ export function SearchResults(props: {
                   {result.body || result.spaceName || kindLabel(result.kind)}
                 </span>
               </span>
-            </button>
+            </Button>
             <Button
               type="button"
               variant="ghost"
@@ -112,6 +112,7 @@ export function SearchResults(props: {
 }
 
 export function ConversationView(props: {
+  approvalControlsInFooter?: boolean;
   conversation?: GlobalAiConversation;
   working: boolean;
   onConfirm: (id: string) => void;
@@ -209,6 +210,7 @@ export function ConversationView(props: {
           {message.action ? (
             <ActionProposal
               proposal={message.action}
+              approvalControlsInFooter={props.approvalControlsInFooter}
               onConfirm={() => props.onConfirm(message.action!.id)}
               onReject={() => props.onReject(message.action!.id)}
               onCancel={() => props.onCancel?.(message.action!.id)}
@@ -224,6 +226,7 @@ export function ConversationView(props: {
 }
 
 function ActionProposal(props: {
+  approvalControlsInFooter?: boolean;
   proposal: GlobalAiActionProposal;
   onConfirm: () => void;
   onReject: () => void;
@@ -251,14 +254,18 @@ function ActionProposal(props: {
       ) : null}
       {(proposal.state === "proposed" && proposal.requiresConfirmation) ||
       (proposal.state === "awaiting_approval" && proposal.approvalId) ? (
-        <div className="mt-3 flex gap-2">
-          <Button size="sm" className="h-7" onClick={props.onConfirm}>
-            <Check className="size-3.5" /> Approve
-          </Button>
-          <Button size="sm" variant="ghost" className="h-7" onClick={props.onReject}>
-            Cancel
-          </Button>
-        </div>
+        props.approvalControlsInFooter ? (
+          <p className="mt-2 text-xs text-cream-muted">Review this action in the controls below.</p>
+        ) : (
+          <div className="mt-3 flex gap-2">
+            <Button size="sm" className="h-7" onClick={props.onConfirm}>
+              <Check className="size-3.5" /> Approve
+            </Button>
+            <Button size="sm" variant="ghost" className="h-7" onClick={props.onReject}>
+              Cancel
+            </Button>
+          </div>
+        )
       ) : (
         <div className="mt-2 flex items-center gap-2">
           <p className="text-[11px] capitalize text-cream-muted">
@@ -284,6 +291,7 @@ function ActionProposal(props: {
 }
 
 export function ConversationMenu(props: {
+  compact?: boolean;
   conversations: GlobalAiConversation[];
   activeId: string;
   loading?: boolean;
@@ -310,14 +318,20 @@ export function ConversationMenu(props: {
       <DropdownMenuTrigger asChild>
         <Button
           variant="ghost"
-          size="sm"
-          className="h-7 max-w-48 gap-1.5 rounded-lg border border-white/10 bg-white/[0.035] text-xs text-cream-muted hover:bg-white/[0.07] hover:text-cream"
+          size={props.compact ? "icon-sm" : "sm"}
+          aria-label={props.compact ? "Conversation history" : undefined}
+          title={props.compact ? "Conversation history" : undefined}
+          className="max-w-48 gap-1.5 text-xs text-cream-muted"
         >
           <History className="size-3.5" />
-          <span className="truncate">
-            {active?.title ?? (props.loading ? "Loading…" : "New conversation")}
-          </span>
-          <ChevronDown className="size-3" />
+          {!props.compact && (
+            <>
+              <span className="truncate">
+                {active?.title ?? (props.loading ? "Loading…" : "New conversation")}
+              </span>
+              <ChevronDown className="size-3" />
+            </>
+          )}
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-72" data-misty-layer-portal>
@@ -378,8 +392,9 @@ export function ConversationMenu(props: {
               )}
               {renaming ? (
                 <>
-                  <button
-                    type="button"
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
                     className="rounded p-1 text-cream-muted hover:text-cream"
                     aria-label={`Save ${conversation.title}`}
                     onClick={(event) => {
@@ -389,9 +404,10 @@ export function ConversationMenu(props: {
                     }}
                   >
                     <Check className="size-3.5" />
-                  </button>
-                  <button
-                    type="button"
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
                     className="rounded p-1 text-cream-muted hover:text-cream"
                     aria-label={`Cancel renaming ${conversation.title}`}
                     onClick={(event) => {
@@ -401,12 +417,13 @@ export function ConversationMenu(props: {
                     }}
                   >
                     <X className="size-3.5" />
-                  </button>
+                  </Button>
                 </>
               ) : (
                 <>
-                  <button
-                    type="button"
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
                     className="rounded p-1 text-cream-muted hover:text-cream"
                     aria-label={`Rename ${conversation.title}`}
                     onClick={(event) => {
@@ -417,9 +434,10 @@ export function ConversationMenu(props: {
                     }}
                   >
                     <Pencil className="size-3.5" />
-                  </button>
-                  <button
-                    type="button"
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
                     className="rounded p-1 text-cream-muted hover:text-red-300"
                     aria-label={`Delete ${conversation.title}`}
                     onClick={(event) => {
@@ -429,7 +447,7 @@ export function ConversationMenu(props: {
                     }}
                   >
                     <Trash2 className="size-3.5" />
-                  </button>
+                  </Button>
                 </>
               )}
             </DropdownMenuItem>

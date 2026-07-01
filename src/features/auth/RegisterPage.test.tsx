@@ -7,7 +7,6 @@ const mocks = vi.hoisted(() => ({
   navigate: vi.fn(),
   authenticateAccount: vi.fn(),
   accountRegister: vi.fn(),
-  markAccountCreating: vi.fn(),
   fetchCurrentInstanceDescriptor: vi.fn().mockResolvedValue({
     deployment: "cloud",
     bootstrap_required: false,
@@ -32,9 +31,6 @@ vi.mock("./store/useAccountStore", () => ({
   accountRegister: mocks.accountRegister,
 }));
 
-vi.mock("@/features/onboarding", () => ({
-  markAccountCreating: mocks.markAccountCreating,
-}));
 
 vi.mock("@/api/deployment/api", () => ({
   fetchCurrentInstanceDescriptor: mocks.fetchCurrentInstanceDescriptor,
@@ -163,7 +159,6 @@ describe("RegisterPage", () => {
       "secret12345",
       "",
     );
-    expect(mocks.markAccountCreating).toHaveBeenCalledWith("acc-3");
     expect(mocks.navigate).toHaveBeenCalledWith("/spaces/main", { replace: true });
   });
 });

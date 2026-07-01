@@ -5,19 +5,28 @@ import { roadmapShortcutCommands } from "./roadmapCommands";
 export type * from "./types";
 const shellCommands: ShortcutCommandDefinition[] = [
   command("search.toggle", "Search", {
-    description: "Find apps, files, and commands.",
+    description: "Search Google or open a web address in your workspace.",
     category: "Navigation",
-    aliases: ["launcher", "search", "ask", "ai"],
+    aliases: ["search", "url", "website", "google"],
     mac: "Cmd+K",
     windows: "Ctrl+K",
     allowInEditable: true,
     nativeMenu: true,
     allowShadowing: true,
   }),
+  command("browser.edit_address", "Edit current address", {
+    description: "Reveal the focused website’s address for navigation.",
+    category: "Navigation",
+    scope: "tool:browser",
+    mac: "Cmd+L",
+    windows: "Ctrl+L",
+    allowInEditable: true,
+    allowShadowing: true,
+  }),
   command("misty.contextual_companion", "Open Misty", {
-    description: "Open the floating Misty panel from the desktop pet.",
+    description: "Open Misty in the current window.",
     category: "Misty",
-    aliases: ["desktop pet", "floating ai", "ask misty"],
+    aliases: ["assistant", "ask misty"],
     mac: "Cmd+Shift+K",
     windows: "Ctrl+Shift+K",
     allowInEditable: true,

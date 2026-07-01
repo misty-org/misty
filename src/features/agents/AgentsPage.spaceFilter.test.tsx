@@ -1,12 +1,11 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
-import { useSpacesStore } from "@/features/spaces";
-import { useAppsStore } from "@/features/apps/useAppsStore";
 import { useWorkspaceStore } from "@/features/workspace";
 
 const fixture = vi.hoisted(() => ({
   load: vi.fn(async () => {}),
+  submit: vi.fn(async () => {}),
   save: vi.fn(async () => ({ id: "communications" })),
   agent: {
     id: "communications",
@@ -46,6 +45,7 @@ import { useMistyStore } from "@/features/misty/useMistyStore";
 
 beforeEach(() => {
   fixture.save.mockClear();
+  fixture.submit.mockClear();
   fixture.agent.avatar = {};
   Element.prototype.scrollIntoView = vi.fn();
   useMistyStore.setState({
@@ -55,34 +55,19 @@ beforeEach(() => {
     working: false,
     error: null,
     loadConversations: async () => {},
-  });
-  useSpacesStore.setState({
-    spaces: ["Studio", "Launch"].map((name) => ({
-      id: name,
-      name,
-      owner_user_id: "owner",
-      role: "owner" as const,
-      member_count: 1,
-      pending_count: 0,
-      is_shared: false,
-      is_default: name === "Studio",
-      created_at: "",
-      updated_at: "",
-    })),
+    submitAnswer: fixture.submit,
   });
   useWorkspaceStore.setState({ activeScopeKey: "space:Studio" });
-  useAppsStore.setState({ catalog: [], installations: [], load: async () => {} });
 });
 afterEach(cleanup);
 
-it("keeps unsaved agent fields until a Space switch is explicitly discarded", async () => {
+it("edits a global agent without requiring a work Space", async () => {
   render(
     <MemoryRouter>
       <AgentsPage />
     </MemoryRouter>,
   );
   fireEvent.click(screen.getByRole("button", { name: /Communications/ }));
-  fireEvent.click(screen.getByRole("button", { name: "Agent details" }));
   fireEvent.click(screen.getByRole("button", { name: "Agent settings" }));
   await waitFor(() =>
     expect(
@@ -90,39 +75,13 @@ it("keeps unsaved agent fields until a Space switch is explicitly discarded", as
     ).toBe(false),
   );
   fireEvent.change(screen.getByLabelText("Name"), { target: { value: "Launch coordinator" } });
-  const filter = screen.getByLabelText("Agent work Space") as HTMLSelectElement;
-  fireEvent.change(filter, { target: { value: "Launch" } });
-  expect(filter.value).toBe("Studio");
+  expect(screen.queryByLabelText("Agent work Space")).toBeNull();
   expect((screen.getByLabelText("Name") as HTMLInputElement).value).toBe("Launch coordinator");
-  expect(screen.getByRole("alert").textContent).toContain("unsaved changes");
-  fireEvent.click(screen.getByRole("button", { name: "Keep editing" }));
-  expect(screen.queryByRole("alert")).toBeNull();
-  expect((screen.getByLabelText("Name") as HTMLInputElement).value).toBe("Launch coordinator");
-  fireEvent.change(filter, { target: { value: "Launch" } });
-  fireEvent.click(screen.getByRole("button", { name: "Discard and switch" }));
-  expect(filter.value).toBe("Launch");
-  expect((screen.getByLabelText("Name") as HTMLInputElement).value).toBe("Communications");
   expect(useWorkspaceStore.getState().activeScopeKey).toBe("space:Studio");
 });
 
-it("offers personal app assignments without a Space", async () => {
-  useSpacesStore.setState({ spaces: [] });
+it("omits model and app permission setup for a new global agent", async () => {
   useWorkspaceStore.setState({ activeScopeKey: "global" });
-  useAppsStore.setState({
-    installations: [
-      {
-        app_id: "browser",
-        state: "installed",
-        installed_version: "1",
-        permission_version: 1,
-        granted_scopes: [],
-        authority_generation: 1,
-        pin_rank: 0,
-        installed_at: "",
-        updated_at: "",
-      },
-    ],
-  });
   render(
     <MemoryRouter>
       <AgentsPage />
@@ -130,13 +89,14 @@ it("offers personal app assignments without a Space", async () => {
   );
   fireEvent.click(screen.getByRole("button", { name: "New chat" }));
   fireEvent.click(screen.getByRole("button", { name: "Create new agent" }));
-  fireEvent.click(screen.getByText("Instructions, model, and apps"));
-  expect(screen.getByRole("group", { name: "Personal apps" })).toBeTruthy();
-  expect(screen.getByRole("checkbox", { name: "browser" })).toBeTruthy();
+  fireEvent.click(screen.getByText("Instructions and memory"));
+  expect(screen.queryByRole("group", { name: "Personal apps" })).toBeNull();
+  expect(screen.queryByRole("checkbox", { name: "browser" })).toBeNull();
+  expect(screen.queryByLabelText("Model")).toBeNull();
   expect(screen.queryByText("Select a Space to assign apps.")).toBeNull();
 });
 
-it("searches agents and only the current Space's conversations, with no-match recovery", async () => {
+it("reopens historical conversations and starts new personal work without their old scope", async () => {
   useMistyStore.setState({
     conversations: [
       {
@@ -166,18 +126,49 @@ it("searches agents and only the current Space's conversations, with no-match re
       <AgentsPage />
     </MemoryRouter>,
   );
-  fireEvent.click(screen.getByRole("button", { name: "Search" }));
-  const search = screen.getByRole("combobox", { name: "Search agents and conversations" });
-  fireEvent.change(search, { target: { value: " DRAFT " } });
-  expect(screen.getByRole("option", { name: /Launch draft/ })).toBeTruthy();
-  expect(screen.queryByRole("option", { name: /Other Space/ })).toBeNull();
-  fireEvent.change(search, { target: { value: "no-such-agent" } });
-  expect(screen.getByText("No results. Try another name or conversation.")).toBeTruthy();
-  fireEvent.change(search, { target: { value: "  COMMUNICATIONS  " } });
-  await waitFor(() => expect(screen.getByRole("option", { name: "Communications" })).toBeTruthy());
-  fireEvent.keyDown(search, { key: "Enter", code: "Enter" });
-  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
-  expect(screen.getByRole("heading", { name: "Communications" })).toBeTruthy();
+  expect(screen.getByText("Launch draft")).toBeTruthy();
+  expect(screen.getByText("Other Space draft")).toBeTruthy();
+  fireEvent.click(screen.getByText("Other Space draft"));
+  fireEvent.change(screen.getByLabelText("Message Misty"), {
+    target: { value: "Continue this conversation" },
+  });
+  await act(async () => {
+    fireEvent.click(screen.getByRole("button", { name: "Send to Misty" }));
+  });
+  await waitFor(() => expect(fixture.submit).toHaveBeenCalledOnce());
+  expect(fixture.submit).toHaveBeenLastCalledWith(
+    "Continue this conversation",
+    [],
+    undefined,
+    "workspace",
+    [],
+    expect.objectContaining({ conversationId: "private" }),
+  );
+  await waitFor(() =>
+    expect((screen.getByLabelText("Message Misty") as HTMLTextAreaElement).value).toBe(""),
+  );
+  fireEvent.click(screen.getByRole("button", { name: "New chat" }));
+  fireEvent.click(
+    within(screen.getByRole("group", { name: "Choose an agent" })).getByRole("button", {
+      name: /Communications/,
+    }),
+  );
+  fireEvent.change(screen.getByLabelText("Message Misty"), {
+    target: { value: "Start personal work" },
+  });
+  await act(async () => {
+    fireEvent.click(screen.getByRole("button", { name: "Send to Misty" }));
+  });
+  await waitFor(() => expect(fixture.submit).toHaveBeenCalledTimes(2));
+  expect(fixture.submit).toHaveBeenLastCalledWith(
+    "Start personal work",
+    [],
+    undefined,
+    "workspace",
+    [],
+    { conversationId: "", context: [] },
+  );
+  expect(useMistyStore.getState().selectedSpaceId).toBe("");
 });
 
 it("preserves an unsent message until a new chat is explicitly confirmed", () => {
@@ -208,7 +199,6 @@ it("previews and saves a cloud variant while preserving unrelated avatar metadat
       <AgentsPage />
     </MemoryRouter>,
   );
-  fireEvent.click(screen.getByRole("button", { name: "Agent details" }));
   fireEvent.click(screen.getByRole("button", { name: "Agent settings" }));
   await waitFor(() =>
     expect(

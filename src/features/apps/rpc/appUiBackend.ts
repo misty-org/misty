@@ -117,11 +117,22 @@ export function createAppUiBackend(scope: AppRpcScope): AppUiBackend {
   return {
     workspaceSnapshot() {
       const { state } = ownedPane();
+      const canonicalUnsplitPaneId = allLayoutPanes(state.layout).find((pane) => {
+        const parentLayoutTab = layoutTabs(state.layout).find((tab) =>
+          dockLeaves(tab.root).some((p) => p.id === pane.id),
+        );
+        return parentLayoutTab && dockLeaves(parentLayoutTab.root).length === 1;
+      })?.id;
       const snapshot = {
-        views: allLayoutPanes(state.layout).flatMap((pane) =>
-          pane.tabs.filter(isOwned).map((tab) => ({
+        views: allLayoutPanes(state.layout).flatMap((pane) => {
+          const parentLayoutTab = layoutTabs(state.layout).find((tab) =>
+            dockLeaves(tab.root).some((p) => p.id === pane.id),
+          );
+          const isUnsplitTab = parentLayoutTab && dockLeaves(parentLayoutTab.root).length === 1;
+          const panelId = isUnsplitTab && canonicalUnsplitPaneId ? canonicalUnsplitPaneId : pane.id;
+          return pane.tabs.filter(isOwned).map((tab) => ({
             viewId: tab.id,
-            panelId: pane.id,
+            panelId,
             route: tab.route,
             title:
               Array.from(tab.title)
@@ -134,8 +145,8 @@ export function createAppUiBackend(scope: AppRpcScope): AppUiBackend {
               dockLeaves(state.layout.root).some((active) => active.id === pane.id) &&
               pane.activeTabId === tab.id,
             focused: state.layout.focusedPaneId === pane.id && pane.activeTabId === tab.id,
-          })),
-        ),
+          }));
+        }),
       };
       const content = JSON.stringify(snapshot);
       if (content !== clock.content) {

@@ -114,8 +114,8 @@ export function installOverflowFade(root: HTMLElement = document.body) {
     attributeFilter: ["class", "style", "dir"],
   });
   window.addEventListener("resize", refresh);
-  document.fonts?.addEventListener("loadingdone", refresh);
-  void document.fonts?.ready.then(() => {
+  document.fonts?.addEventListener?.("loadingdone", refresh);
+  void document.fonts?.ready?.then?.(() => {
     if (!disposed) refresh();
   });
 
@@ -125,7 +125,7 @@ export function installOverflowFade(root: HTMLElement = document.body) {
     resize?.disconnect();
     cancelAnimationFrame(frame);
     window.removeEventListener("resize", refresh);
-    document.fonts?.removeEventListener("loadingdone", refresh);
+    document.fonts?.removeEventListener?.("loadingdone", refresh);
     tracked.forEach((element) => element.removeAttribute(marker));
     tracked.clear();
     pending.clear();

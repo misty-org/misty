@@ -3,6 +3,7 @@ import type { DiscoverSort, DiscoverExtraFilters } from "./DiscoverViewControls"
 import { useEffect, useState } from "react";
 import { useSetupStore } from "@/features/installer";
 import { currentPluginPlatform, usePluginsStore, type PluginEntry } from "@/features/extensions";
+import { Button } from "@/shared/ui/button";
 import { MarketplaceDetailDialog } from "./MarketplaceDetailDialog";
 import { MarketplaceCatalogIcon } from "./MarketplaceCatalogIcon";
 import type { MarketplaceEntry } from "./types";
@@ -77,9 +78,9 @@ export function DiscoverExtensions({
       {error && (
         <div className="discover-error" role="alert">
           <p>{error}</p>
-          <button disabled={loading || !platform} onClick={() => void load(platform, true)}>
+          <Button variant="secondary" size="sm" disabled={loading || !platform} onClick={() => void load(platform, true)}>
             Try again
-          </button>
+          </Button>
         </div>
       )}
       {loading && !plugins.length ? (
@@ -90,8 +91,7 @@ export function DiscoverExtensions({
         <ul className="discover-app-list" aria-label="Extensions catalog">
           {visible.map((plugin) => (
             <li key={plugin.id} className="discover-app-row">
-              <button
-                className="discover-app-details-button"
+              <Button variant="ghost" className="discover-app-details-button"
                 aria-label={`View ${plugin.name} details`}
                 onClick={() => select(plugin.id)}
               >
@@ -105,16 +105,15 @@ export function DiscoverExtensions({
                   <span className="discover-app-name">{plugin.name}</span>
                   <span className="discover-app-description">{plugin.overview}</span>
                 </span>
-              </button>
+              </Button>
               <div className="discover-action-group">
-                <button
-                  className={`discover-action ${plugin.installed ? "" : "discover-action-primary"}`}
+                <Button variant={plugin.installed ? "secondary" : "default"} className="discover-action"
                   disabled={!!action}
                   onClick={() => select(plugin.id)}
                   aria-label={`${plugin.installed ? "Manage" : "Get"} ${plugin.name}`}
                 >
                   {action === plugin.id ? "Working…" : plugin.installed ? "Manage" : "Get"}
-                </button>
+                </Button>
               </div>
             </li>
           ))}
@@ -131,9 +130,9 @@ export function DiscoverExtensions({
                   : "Refresh to check the extension catalog again."}
             </p>
             {filtered && (
-              <button className="discover-action" onClick={onClearFilters}>
+              <Button variant="secondary" className="discover-action" onClick={onClearFilters}>
                 Clear filters
-              </button>
+              </Button>
             )}
           </div>
         )

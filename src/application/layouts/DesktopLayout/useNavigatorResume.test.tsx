@@ -41,7 +41,7 @@ it("targets the requested Space and its default route", () => {
   const { result } = navigator("/apps/planner?space=one");
   act(() => result.current.open());
   expect(state().activeScopeKey).toBe("space:one");
-  expect(result.current.location.search).toBe("?space=one");
+  expect(result.current.location.pathname).toBe("/spaces/one/planner/tasks/board");
 });
 it("preserves the current pane when unsaved work blocks navigation", () => {
   const view = state().openSurface(workspaceSurfaceFromRoute("/apps/code")!);

@@ -1,10 +1,10 @@
 import { assertMistyAvailable } from "@/features/misty/availability";
 import { initializeHostAgentsRuntime } from "@/features/agents/hostAgentsRuntime";
 import { useMistyStore } from "@/features/misty/useMistyStore";
+import { requestHostContext } from "@/features/misty/contextBridge";
 import { useGlobalSearchStore } from "./useGlobalSearchStore";
 vi.mock("@/features/misty/availability", () => ({
   assertMistyAvailable: vi.fn(async () => {}),
-  currentMistySpace: () => "work",
 }));
 vi.mock("@/features/misty/contextBridge", () => ({
   requestHostContext: vi.fn(async () => ({ context: [] })),
@@ -15,9 +15,15 @@ import { globalMistyApi } from "./globalMistyApi";
 import { beforeEach, describe, expect, it } from "vitest";
 import { vi } from "vitest";
 
-vi.mock("@/features/agents/personalAgentsStore",()=>({
- usePersonalAgentsStore:{getState:()=>({accountId:"account-a",agents:[{id:"default-misty",system_managed:true,enabled:true}],load:async()=>{}})},
- selectedPersonalAgent:()=>({id:"default-misty",system_managed:true,enabled:true}),
+vi.mock("@/features/agents/personalAgentsStore", () => ({
+  usePersonalAgentsStore: {
+    getState: () => ({
+      accountId: "account-a",
+      agents: [{ id: "default-misty", system_managed: true, enabled: true }],
+      load: async () => {},
+    }),
+  },
+  selectedPersonalAgent: () => ({ id: "default-misty", system_managed: true, enabled: true }),
 }));
 initializeHostAgentsRuntime();
 
@@ -31,7 +37,7 @@ describe("Global Misty state", () => {
       context: [],
       handoff: undefined,
       targets: [],
-      captureEnabled: false,
+      thinkingMode: "normal",
     });
     useSpacesStore.setState({ spaces: [] });
   });
@@ -74,7 +80,8 @@ describe("Global Misty state", () => {
       activeConversationId: "conversation-a",
       conversations: [
         {
-          id: "conversation-a",agentId:"default-misty",
+          id: "conversation-a",
+          agentId: "default-misty",
           title: "Misty",
           spaceId: "work",
           createdAt: "2026-09-10",
@@ -113,6 +120,120 @@ describe("Global Misty state", () => {
     useMistyStore.setState({ panel: "results", working: true });
     useMistyStore.getState().closePanel();
     expect(useMistyStore.getState()).toMatchObject({ panel: "closed", working: true });
+  });
+
+  it("keeps Deep thinking when creating the first conversation", async () => {
+    vi.spyOn(globalMistyApi, "createConversation").mockResolvedValueOnce({
+      id: "conversation-deep",
+      agentId: "default-misty",
+      title: "New conversation",
+      spaceId: "work",
+      createdAt: "2026-09-22",
+      updatedAt: "2026-09-22",
+      messages: [],
+      remote: true,
+      reasoningEffort: "high",
+    });
+    const create = vi
+      .spyOn(aiSurfaceApi, "createInvocation")
+      .mockRejectedValueOnce(new Error("stop after admission"));
+    useMistyStore.setState({
+      accountId: "account-a",
+      activeConversationId: "",
+      conversations: [],
+      selectedAgentId: "default-misty",
+      thinkingMode: "deep",
+    });
+    await useMistyStore.getState().submitAnswer("Think this through");
+    expect(create).toHaveBeenCalledWith(expect.objectContaining({ thinkingMode: "deep" }));
+    expect(useMistyStore.getState().conversations[0]?.reasoningEffort).toBe("xhigh");
+  });
+
+  it("replaces old manual context with the current view", async () => {
+    vi.mocked(requestHostContext).mockResolvedValueOnce({
+      context: [
+        {
+          id: "visible-note",
+          kind: "note",
+          title: "Visible",
+          spaceId: "work",
+          attached: true,
+          source: "current",
+          privacy: "private",
+        },
+      ],
+    });
+    const create = vi
+      .spyOn(aiSurfaceApi, "createInvocation")
+      .mockRejectedValueOnce(new Error("stop after admission"));
+    useMistyStore.setState({
+      accountId: "account-a",
+      activeConversationId: "conversation-a",
+      selectedAgentId: "default-misty",
+      targets: [{ kind: "pane", paneId: "old-pane", spaceId: "family" }],
+      context: [
+        {
+          id: "stale-note",
+          kind: "note",
+          title: "Stale",
+          spaceId: "family",
+          attached: true,
+          source: "server",
+          privacy: "private",
+        },
+      ],
+      conversations: [
+        {
+          id: "conversation-a",
+          agentId: "default-misty",
+          title: "Misty",
+          spaceId: "work",
+          createdAt: "2026-09-22",
+          updatedAt: "2026-09-22",
+          messages: [],
+          remote: true,
+        },
+      ],
+    });
+    await useMistyStore.getState().submitAnswer("Summarize this");
+    expect(requestHostContext).toHaveBeenCalledWith(expect.objectContaining({ targets: [] }));
+    const input = create.mock.calls[create.mock.calls.length - 1]?.[0];
+    expect(input?.context).toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: "visible-note" })]),
+    );
+    expect(input?.context).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: "stale-note" })]),
+    );
+  });
+
+  it("restores the conversation's agent and preserves an explicit new-agent selection", async () => {
+    const conversation = {
+      id: "research-chat",
+      agentId: "research",
+      title: "Research",
+      spaceId: "work",
+      createdAt: "2026-09-22",
+      updatedAt: "2026-09-22",
+      messages: [],
+      remote: true,
+    };
+    vi.spyOn(globalMistyApi, "conversations").mockResolvedValue({ conversations: [conversation] });
+    useMistyStore.setState({
+      accountId: "account-a",
+      activeConversationId: "",
+      selectedAgentId: undefined,
+    });
+    await useMistyStore.getState().loadConversations();
+    expect(useMistyStore.getState()).toMatchObject({
+      activeConversationId: "research-chat",
+      selectedAgentId: "research",
+    });
+    useMistyStore.setState({ activeConversationId: "", selectedAgentId: "default-misty" });
+    await useMistyStore.getState().loadConversations();
+    expect(useMistyStore.getState()).toMatchObject({
+      activeConversationId: "",
+      selectedAgentId: "default-misty",
+    });
   });
 
   it("does not install a pending browser conversation into a different account", async () => {
@@ -169,7 +290,8 @@ describe("Global Misty state", () => {
       activeConversationId: "conversation-a",
       conversations: [
         {
-          id: "conversation-a",agentId:"default-misty",
+          id: "conversation-a",
+          agentId: "default-misty",
           title: "Misty",
           spaceId: "work",
           createdAt: "2026-08-25T00:00:00.000Z",
@@ -242,7 +364,8 @@ describe("Global Misty state", () => {
       activeConversationId: "conversation-a",
       conversations: [
         {
-          id: "conversation-a",agentId:"default-misty",
+          id: "conversation-a",
+          agentId: "default-misty",
           title: "hello",
           spaceId: "work",
           createdAt: "2026-08-25T00:00:00.000Z",
@@ -283,7 +406,8 @@ describe("Global Misty state", () => {
       activeConversationId: "conversation-a",
       conversations: [
         {
-          id: "conversation-a",agentId:"default-misty",
+          id: "conversation-a",
+          agentId: "default-misty",
           title: "Misty",
           spaceId: "work",
           createdAt: "2026-08-25T00:00:00.000Z",
