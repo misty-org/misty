@@ -19,6 +19,8 @@ scripts/.signing.env
 **/src-tauri/gen/*
 !**/src-tauri/gen/apple/
 !**/src-tauri/gen/apple/**
+!**/src-tauri/gen/android/
+!**/src-tauri/gen/android/**
 
 **/config/
 **/bin/

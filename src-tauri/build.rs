@@ -14,21 +14,35 @@ fn main() {
         let lib_dir = std::env::var_os("MISTY_PROXY_GO_LIB_DIR")
             .map(|raw| resolve_go_archive_dir(&raw))
             .unwrap_or_else(default_go_archive_dir);
-        let archive_path = lib_dir.join(format!("lib{lib_name}.a"));
+        let target_os = std::env::var("CARGO_CFG_TARGET_OS").unwrap_or_default();
+        let library_path = match target_os.as_str() {
+            "android" => lib_dir.join(format!("lib{lib_name}.so")),
+            "windows" => lib_dir.join(format!("{lib_name}.dll")),
+            _ => lib_dir.join(format!("lib{lib_name}.a")),
+        };
         println!("cargo:rustc-link-search=native={}", lib_dir.display());
-        println!("cargo:rerun-if-changed={}", archive_path.display());
-        if !archive_path.exists() {
+        println!("cargo:rerun-if-changed={}", library_path.display());
+        if !library_path.exists() {
             println!(
-                "cargo:warning=embedded misty-proxy archive was not found at {}",
-                archive_path.display()
+                "cargo:warning=embedded misty-proxy library was not found at {}",
+                library_path.display()
             );
         }
-        println!("cargo:rustc-link-lib=static={lib_name}");
+        if target_os == "android" {
+            println!("cargo:rustc-link-lib=dylib={lib_name}");
+        } else if target_os != "windows" {
+            println!("cargo:rustc-link-lib=static={lib_name}");
+        }
         if std::env::var("CARGO_CFG_TARGET_VENDOR").as_deref() == Ok("apple") {
             println!("cargo:rustc-link-lib=resolv");
             if let Some(runtime_dir) = apple_clang_runtime_dir() {
                 println!("cargo:rustc-link-search=native={}", runtime_dir.display());
             }
+        }
+        if target_os == "android" {
+            println!("cargo:rustc-link-lib=log");
+            println!("cargo:rustc-link-lib=android");
+            println!("cargo:rustc-link-lib=dl");
         }
     }
     tauri_build::build();
@@ -79,6 +93,10 @@ fn default_go_archive_target() -> &'static str {
         ("ios", "sim", "aarch64") => "ios-simulator-arm64",
         ("ios", "sim", "x86_64") => "ios-simulator-amd64",
         ("ios", _, "aarch64") => "ios-arm64",
+        ("android", _, "aarch64") => "android-arm64",
+        ("android", _, "arm") => "android-armv7",
+        ("android", _, "x86") => "android-x86",
+        ("android", _, "x86_64") => "android-x86_64",
         ("macos", _, _) => "host",
         _ => "host",
     }

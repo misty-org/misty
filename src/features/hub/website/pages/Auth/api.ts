@@ -81,8 +81,18 @@ export async function signInRequest(email: string, password: string): Promise<Au
   };
 }
 
-export function registerRequest(name: string, email: string, password: string) {
-  return request("/register", { name, email, password });
+export async function registerRequest(name: string, email: string, password: string): Promise<AuthUser> {
+  const data = await request<LoginResponse>("/register", { name, email, password });
+  const id = data.user_id ?? data.id;
+  if (!id) {
+    throw new Error("Registration response did not include a user id.");
+  }
+  await saveHubAuthToken(data.token);
+  return {
+    id,
+    name: data.name,
+    email: data.email,
+  };
 }
 
 export async function forgotPasswordRequest(email: string): Promise<string> {

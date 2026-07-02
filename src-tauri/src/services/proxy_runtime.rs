@@ -123,7 +123,7 @@ fn embedded_rclone_backend() -> String {
         .ok()
         .map(|value| value.trim().to_owned())
         .filter(|value| !value.is_empty())
-        .unwrap_or_else(|| "librclone".to_owned())
+        .unwrap_or_else(|| "misty-rclone".to_owned())
 }
 
 fn start_embedded_runtime(
@@ -186,6 +186,8 @@ fn invoke_embedded_runtime(
 mod embedded_go {
     use std::ffi::{CStr, CString};
     use std::os::raw::c_char;
+    #[cfg(windows)]
+    use std::path::PathBuf;
 
     use serde::Deserialize;
 
@@ -215,12 +217,180 @@ mod embedded_go {
         error: Option<String>,
     }
 
-    extern "C" {
-        fn MistyProxyStart(config_json: *const c_char) -> *mut c_char;
-        fn MistyProxyStop() -> *mut c_char;
-        fn MistyProxySnapshot() -> *mut c_char;
-        fn MistyProxyInvoke(request_json: *const c_char) -> *mut c_char;
-        fn MistyProxyFree(value: *mut c_char);
+    #[cfg(not(windows))]
+    mod symbols {
+        use super::c_char;
+
+        extern "C" {
+            fn MistyProxyStart(config_json: *const c_char) -> *mut c_char;
+            fn MistyProxyStop() -> *mut c_char;
+            fn MistyProxySnapshot() -> *mut c_char;
+            fn MistyProxyInvoke(request_json: *const c_char) -> *mut c_char;
+            fn MistyProxyFree(value: *mut c_char);
+        }
+
+        pub unsafe fn start(config_json: *const c_char) -> Result<*mut c_char, String> {
+            Ok(MistyProxyStart(config_json))
+        }
+
+        pub unsafe fn stop() -> Result<*mut c_char, String> {
+            Ok(MistyProxyStop())
+        }
+
+        pub unsafe fn snapshot() -> Result<*mut c_char, String> {
+            Ok(MistyProxySnapshot())
+        }
+
+        pub unsafe fn invoke(request_json: *const c_char) -> Result<*mut c_char, String> {
+            Ok(MistyProxyInvoke(request_json))
+        }
+
+        pub unsafe fn free(value: *mut c_char) {
+            MistyProxyFree(value);
+        }
+    }
+
+    #[cfg(windows)]
+    mod symbols {
+        use super::{c_char, PathBuf};
+        use libloading::Library;
+        use std::env;
+        use std::sync::OnceLock;
+
+        type StartFn = unsafe extern "C" fn(*const c_char) -> *mut c_char;
+        type StopFn = unsafe extern "C" fn() -> *mut c_char;
+        type SnapshotFn = unsafe extern "C" fn() -> *mut c_char;
+        type InvokeFn = unsafe extern "C" fn(*const c_char) -> *mut c_char;
+        type FreeFn = unsafe extern "C" fn(*mut c_char);
+
+        struct ProxyLibrary {
+            _library: Library,
+            start: StartFn,
+            stop: StopFn,
+            snapshot: SnapshotFn,
+            invoke: InvokeFn,
+            free: FreeFn,
+        }
+
+        static PROXY_LIBRARY: OnceLock<Result<ProxyLibrary, String>> = OnceLock::new();
+
+        pub unsafe fn start(config_json: *const c_char) -> Result<*mut c_char, String> {
+            Ok((load()?.start)(config_json))
+        }
+
+        pub unsafe fn stop() -> Result<*mut c_char, String> {
+            Ok((load()?.stop)())
+        }
+
+        pub unsafe fn snapshot() -> Result<*mut c_char, String> {
+            Ok((load()?.snapshot)())
+        }
+
+        pub unsafe fn invoke(request_json: *const c_char) -> Result<*mut c_char, String> {
+            Ok((load()?.invoke)(request_json))
+        }
+
+        pub unsafe fn free(value: *mut c_char) {
+            if let Ok(library) = load() {
+                (library.free)(value);
+            }
+        }
+
+        fn load() -> Result<&'static ProxyLibrary, String> {
+            match PROXY_LIBRARY.get_or_init(load_library) {
+                Ok(library) => Ok(library),
+                Err(error) => Err(error.clone()),
+            }
+        }
+
+        fn load_library() -> Result<ProxyLibrary, String> {
+            let paths = proxy_library_paths();
+            let mut errors = Vec::new();
+            let mut loaded = None;
+            for path in &paths {
+                match unsafe { Library::new(path) } {
+                    Ok(library) => {
+                        loaded = Some((path.clone(), library));
+                        break;
+                    }
+                    Err(error) => errors.push(format!("{}: {error}", path.display())),
+                }
+            }
+            let Some((_path, library)) = loaded else {
+                return Err(format!(
+                    "Could not load embedded misty-proxy DLL. Tried: {}",
+                    errors.join("; ")
+                ));
+            };
+            unsafe {
+                let start: StartFn = *library
+                    .get(b"MistyProxyStart\0")
+                    .map_err(|error| format!("MistyProxyStart was not exported: {error}"))?;
+                let stop: StopFn = *library
+                    .get(b"MistyProxyStop\0")
+                    .map_err(|error| format!("MistyProxyStop was not exported: {error}"))?;
+                let snapshot: SnapshotFn = *library
+                    .get(b"MistyProxySnapshot\0")
+                    .map_err(|error| format!("MistyProxySnapshot was not exported: {error}"))?;
+                let invoke: InvokeFn = *library
+                    .get(b"MistyProxyInvoke\0")
+                    .map_err(|error| format!("MistyProxyInvoke was not exported: {error}"))?;
+                let free: FreeFn = *library
+                    .get(b"MistyProxyFree\0")
+                    .map_err(|error| format!("MistyProxyFree was not exported: {error}"))?;
+                Ok(ProxyLibrary {
+                    _library: library,
+                    start,
+                    stop,
+                    snapshot,
+                    invoke,
+                    free,
+                })
+            }
+        }
+
+        fn proxy_library_paths() -> Vec<PathBuf> {
+            let mut paths = Vec::new();
+            if let Some(dir) = env::var_os("MISTY_PROXY_GO_LIB_DIR") {
+                let dir = PathBuf::from(dir);
+                if dir.is_absolute() {
+                    paths.push(dir.join("misty_proxy.dll"));
+                } else {
+                    if let Ok(cwd) = env::current_dir() {
+                        paths.push(cwd.join(&dir).join("misty_proxy.dll"));
+                    }
+                    paths.push(
+                        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                            .parent()
+                            .unwrap_or_else(|| std::path::Path::new("."))
+                            .join(&dir)
+                            .join("misty_proxy.dll"),
+                    );
+                    paths.push(
+                        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                            .join(&dir)
+                            .join("misty_proxy.dll"),
+                    );
+                }
+            }
+            if let Ok(exe) = env::current_exe() {
+                if let Some(dir) = exe.parent() {
+                    paths.push(dir.join("misty_proxy.dll"));
+                }
+            }
+            paths.push(PathBuf::from("misty_proxy.dll"));
+            dedupe_paths(paths)
+        }
+
+        fn dedupe_paths(paths: Vec<PathBuf>) -> Vec<PathBuf> {
+            let mut deduped = Vec::new();
+            for path in paths {
+                if !deduped.iter().any(|existing| existing == &path) {
+                    deduped.push(path);
+                }
+            }
+            deduped
+        }
     }
 
     pub fn start_proxy(
@@ -258,7 +428,7 @@ mod embedded_go {
     }
 
     pub fn snapshot_proxy(mode: ProxyRuntimeMode) -> Result<ProxyRuntimeSnapshot, String> {
-        let response = unsafe { MistyProxySnapshot() };
+        let response = unsafe { symbols::snapshot()? };
         let response = decode_go_proxy_response(response, "snapshot")?;
         Ok(ProxyRuntimeSnapshot {
             mode,
@@ -269,9 +439,10 @@ mod embedded_go {
     }
 
     pub fn stop_proxy() {
-        let response = unsafe { MistyProxyStop() };
-        if !response.is_null() {
-            unsafe { MistyProxyFree(response) };
+        if let Ok(response) = unsafe { symbols::stop() } {
+            if !response.is_null() {
+                unsafe { symbols::free(response) };
+            }
         }
     }
 
@@ -288,7 +459,7 @@ mod embedded_go {
         let request_json = CString::new(request_json).map_err(|_| {
             "Embedded proxy invoke request contained an unexpected NUL byte.".to_owned()
         })?;
-        let response = unsafe { MistyProxyInvoke(request_json.as_ptr()) };
+        let response = unsafe { symbols::invoke(request_json.as_ptr())? };
         let response_json = decode_go_string_response(response, "invoke")?;
         let response: serde_json::Value = serde_json::from_str(&response_json)
             .map_err(|error| format!("Embedded proxy invoke JSON was invalid: {error}"))?;
@@ -314,7 +485,7 @@ mod embedded_go {
             .map_err(|error| format!("Could not encode embedded proxy config: {error}"))?;
         let config_json = CString::new(config_json)
             .map_err(|_| "Embedded proxy config contained an unexpected NUL byte.".to_owned())?;
-        let response = unsafe { MistyProxyStart(config_json.as_ptr()) };
+        let response = unsafe { symbols::start(config_json.as_ptr())? };
         if response.is_null() {
             return Err("Embedded misty-proxy returned no startup response.".to_owned());
         }
@@ -339,7 +510,7 @@ mod embedded_go {
         let response_json = unsafe { CStr::from_ptr(response) }
             .to_string_lossy()
             .into_owned();
-        unsafe { MistyProxyFree(response) };
+        unsafe { symbols::free(response) };
         Ok(response_json)
     }
 }
@@ -381,7 +552,7 @@ mod tests {
     fn embedded_go_runtime_invokes_remote_health() {
         let home_dir = unique_test_home("health");
         fs::create_dir_all(&home_dir).expect("create test home");
-        env::set_var("MISTY_RCLONE_BACKEND", "librclone");
+        env::set_var("MISTY_RCLONE_BACKEND", "misty-rclone");
         let environment = AppEnvironmentService::for_test_home(home_dir.clone());
 
         let snapshot = start_embedded_runtime(&environment, ProxyRuntimeMode::Embedded);
@@ -391,7 +562,7 @@ mod tests {
                 .expect("remote.health invoke");
             assert_eq!(
                 payload.get("backend").and_then(Value::as_str),
-                Some("librclone")
+                Some("misty-rclone")
             );
             assert_eq!(payload.get("ready").and_then(Value::as_bool), Some(true));
         });
