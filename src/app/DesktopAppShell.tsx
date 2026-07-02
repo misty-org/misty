@@ -17,6 +17,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { PhysicalPosition, PhysicalSize } from "@tauri-apps/api/dpi";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
+import { platform as osPlatform } from "@tauri-apps/plugin-os";
 import {
   currentMonitor,
   getCurrentWindow,
@@ -37,10 +38,13 @@ import {
   Home,
   Inbox,
   LogOut,
+  Minus,
   Puzzle,
   Repeat2,
   Settings as SettingsIcon,
+  Square,
   UserCircle,
+  X,
 } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
 import mistyLogo from "../assets/misty.png";
@@ -204,8 +208,22 @@ const desktopTitlebarDoubleClickLayerClass = "absolute inset-0 cursor-default";
 const desktopTitlebarActionsClass =
   "absolute right-2 top-0 z-[2] flex h-full min-w-0 items-center justify-end gap-1";
 
+const desktopTitlebarActionsWithWindowControlsClass =
+  "absolute right-[138px] top-0 z-[2] flex h-full min-w-0 items-center justify-end gap-1";
+
 const titlebarActivityButtonClass =
   "relative grid h-7 w-7 place-items-center rounded-md border-0 bg-transparent p-0 text-[var(--misty-text-muted)] hover:bg-[var(--misty-surface-2)] hover:text-[var(--misty-text)]";
+
+const windowsTitlebarControlsClass =
+  "absolute right-0 top-0 z-[3] grid h-full grid-cols-3";
+
+const windowsTitlebarControlButtonClass =
+  "grid h-7 w-[46px] place-items-center border-0 bg-transparent p-0 text-[var(--misty-text-muted)] transition hover:bg-[var(--misty-surface-2)] hover:text-[var(--misty-text)]";
+
+const windowsTitlebarCloseButtonClass =
+  `${windowsTitlebarControlButtonClass} hover:bg-[#c42b1c] hover:text-white`;
+
+type DesktopPlatform = "macos" | "windows" | "linux" | "browser" | "unknown";
 
 const activityEntryBaseClass =
   "relative grid grid-cols-[18px_minmax(0,1fr)_auto] items-start gap-2 rounded-md px-1.5 py-[7px]";
@@ -302,6 +320,8 @@ export function DesktopAppShell() {
   const [inboxOpen, setInboxOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [desktopPlatform, setDesktopPlatform] =
+    useState<DesktopPlatform>("unknown");
   const navItems = primaryNavItems;
   const unreadInboxCount = appInboxEntries.filter(
     (entry) => !entry.read,
@@ -475,6 +495,19 @@ export function DesktopAppShell() {
   }, []);
 
   useEffect(() => {
+    if (!hasTauriInternals()) {
+      setDesktopPlatform("browser");
+      return;
+    }
+
+    try {
+      setDesktopPlatform(osPlatform() as DesktopPlatform);
+    } catch {
+      setDesktopPlatform("unknown");
+    }
+  }, []);
+
+  useEffect(() => {
     if (!hasTauriInternals()) return;
     void invoke("enable_modern_window_style", {
       window: getCurrentWebviewWindow(),
@@ -504,16 +537,26 @@ export function DesktopAppShell() {
   );
 
   const animateWindowRect = useCallback(
-    (from: WindowRect, to: WindowRect, durationMs = 500) => {
+    async (from: WindowRect, to: WindowRect, durationMs = 500) => {
       if (!hasTauriInternals()) {
-        return Promise.resolve();
+        return;
       }
       if (customZoomAnimatingRef.current) {
-        return Promise.resolve();
+        return;
       }
 
       customZoomAnimatingRef.current = true;
       const window = getCurrentWindow();
+      if (desktopPlatform === "windows") {
+        try {
+          await window.setPosition(new PhysicalPosition(to.x, to.y));
+          await window.setSize(new PhysicalSize(to.width, to.height));
+        } finally {
+          customZoomAnimatingRef.current = false;
+        }
+        return;
+      }
+
       const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3);
 
       return new Promise<void>((resolve) => {
@@ -546,7 +589,7 @@ export function DesktopAppShell() {
         requestAnimationFrame(step);
       });
     },
-    [],
+    [desktopPlatform],
   );
 
   const togglePseudoMaximize = useCallback(async () => {
@@ -609,6 +652,23 @@ export function DesktopAppShell() {
     [togglePseudoMaximize],
   );
 
+  const minimizeTitlebarWindow = useCallback(() => {
+    if (!hasTauriInternals()) return;
+    void getCurrentWindow()
+      .minimize()
+      .catch(() => undefined);
+  }, []);
+
+  const closeTitlebarWindow = useCallback(() => {
+    if (!hasTauriInternals()) return;
+    void getCurrentWindow()
+      .close()
+      .catch(() => undefined);
+  }, []);
+
+  const shouldShowWindowsTitlebarControls =
+    desktopPlatform === "windows" || desktopPlatform === "linux";
+
   return (
     <main className={desktopFrameClass}>
       <header
@@ -621,7 +681,13 @@ export function DesktopAppShell() {
           onDoubleClick={expandTitlebarWindow}
         />
         <span className={desktopTitlebarTitleClass}>Misty</span>
-        <div className={desktopTitlebarActionsClass}>
+        <div
+          className={
+            shouldShowWindowsTitlebarControls
+              ? desktopTitlebarActionsWithWindowControlsClass
+              : desktopTitlebarActionsClass
+          }
+        >
           <TitlebarActivityButton
             ref={titlebarInboxAnchorRef}
             open={inboxOpen}
@@ -634,6 +700,37 @@ export function DesktopAppShell() {
             }}
           />
         </div>
+        {shouldShowWindowsTitlebarControls ? (
+          <div className={windowsTitlebarControlsClass}>
+            <button
+              type="button"
+              className={windowsTitlebarControlButtonClass}
+              aria-label="Minimize window"
+              title="Minimize"
+              onClick={minimizeTitlebarWindow}
+            >
+              <Minus size={15} strokeWidth={1.8} />
+            </button>
+            <button
+              type="button"
+              className={windowsTitlebarControlButtonClass}
+              aria-label="Maximize or restore window"
+              title="Maximize"
+              onClick={() => void togglePseudoMaximize().catch(() => undefined)}
+            >
+              <Square size={13} strokeWidth={1.8} />
+            </button>
+            <button
+              type="button"
+              className={windowsTitlebarCloseButtonClass}
+              aria-label="Close window"
+              title="Close"
+              onClick={closeTitlebarWindow}
+            >
+              <X size={16} strokeWidth={1.8} />
+            </button>
+          </div>
+        ) : null}
       </header>
 
       <nav className={desktopNavbarClass} aria-label="Primary">
@@ -1158,14 +1255,7 @@ const ProfileNavButton = memo(
         title={account ? `${displayName} (${email})` : "Profile"}
         onClick={props.onClick}
       >
-        {initials}
-        <span
-          className={`absolute bottom-0 right-0 h-3.5 w-3.5 rounded-full border-2 border-[var(--misty-bg)] ${
-            account
-              ? "bg-[var(--misty-success)]"
-              : "bg-[var(--misty-text-subtle)]"
-          }`}
-        />
+        {account ? initials : <UserCircle size={24} strokeWidth={1.75} />}
       </button>
     );
   }),
@@ -1273,14 +1363,7 @@ function ProfilePopover(props: {
     >
       <div className="grid grid-cols-[42px_minmax(0,1fr)] items-center gap-3 border-b border-[var(--misty-border-soft)] px-2 pb-3 pt-1">
         <span className="relative grid h-10 w-10 place-items-center rounded-full bg-[var(--misty-surface-3)] text-sm font-bold">
-          {initials}
-          <span
-            className={`absolute bottom-0 right-0 h-3.5 w-3.5 rounded-full border-2 border-[var(--misty-surface)] ${
-              account
-                ? "bg-[var(--misty-success)]"
-                : "bg-[var(--misty-text-subtle)]"
-            }`}
-          />
+          {account ? initials : <UserCircle size={24} strokeWidth={1.75} />}
         </span>
         <span className="min-w-0">
           <strong className="block truncate text-sm">{displayName}</strong>

@@ -1,0 +1,7 @@
+{
+  "build": {
+    "devUrl": "http://10.0.2.2:5173",
+    "beforeDevCommand": "npm run dev:mobile",
+    "beforeBuildCommand": "npm run build:mobile"
+  }
+}
