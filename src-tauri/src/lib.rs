@@ -70,26 +70,29 @@ pub fn run() {
         .plugin(tauri_plugin_os::init())
         .manage(MistyRuntime::new())
         .on_window_event(|window, event| {
-            if window.label() != "main" {
-                return;
+            #[cfg(not(mobile))]
+            {
+                if window.label() != "main" {
+                    return;
+                }
+
+                let tauri::WindowEvent::Resized(size) = event else {
+                    return;
+                };
+
+                let Some(webview) = window
+                    .webviews()
+                    .into_iter()
+                    .find(|webview| webview.label() == "main")
+                else {
+                    return;
+                };
+
+                let _ = webview.set_bounds(tauri::Rect {
+                    position: tauri::Position::Physical(tauri::PhysicalPosition::new(0, 0)),
+                    size: tauri::Size::Physical(*size),
+                });
             }
-
-            let tauri::WindowEvent::Resized(size) = event else {
-                return;
-            };
-
-            let Some(webview) = window
-                .webviews()
-                .into_iter()
-                .find(|webview| webview.label() == "main")
-            else {
-                return;
-            };
-
-            let _ = webview.set_bounds(tauri::Rect {
-                position: tauri::Position::Physical(tauri::PhysicalPosition::new(0, 0)),
-                size: tauri::Size::Physical(*size),
-            });
         })
         .invoke_handler(tauri::generate_handler![
             mac_rounded_corners::enable_rounded_corners,
