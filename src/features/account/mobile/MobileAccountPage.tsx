@@ -110,8 +110,7 @@ export function MobileAccountPage() {
     setMessage("");
     setWorking(true);
     try {
-      await accountRegister(name, email, password);
-      const authUser = await accountSignIn(email, password);
+      const authUser = await accountRegister(name, email, password);
       const license = await fetchLicenseAfterAuth();
       await saveAuthenticatedUser(authUser, license);
       setMessage(license ? "Your Misty account is ready." : "Your Misty account is ready. License status will refresh later.");
