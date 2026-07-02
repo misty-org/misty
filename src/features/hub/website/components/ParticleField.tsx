@@ -21,37 +21,60 @@ export function ParticleField() {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    const resizeCanvas = () => {
-      canvas.width = canvas.offsetWidth * window.devicePixelRatio;
-      canvas.height = canvas.offsetHeight * window.devicePixelRatio;
-      ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+    let width = 0;
+    let height = 0;
+    let lastDrawAt = 0;
+    const targetFrameMs = 1000 / 30;
+
+    const initializeParticles = () => {
+      const isSmall = width < 640;
+      const particleCount = isSmall ? 22 : 38;
+      particlesRef.current = Array.from({ length: particleCount }, () => ({
+        x: Math.random() * width,
+        y: Math.random() * height,
+        vx: (Math.random() - 0.5) * 0.45,
+        vy: (Math.random() - 0.5) * 0.45,
+        size: Math.random() * 1.3 + 0.45,
+        opacity: Math.random() * 0.32 + 0.08,
+      }));
     };
-    resizeCanvas();
 
-    // Initialize particles — fewer on mobile for performance
-    const isMobile = canvas.offsetWidth < 640;
-    const particleCount = isMobile ? 30 : 60;
-    particlesRef.current = Array.from({ length: particleCount }, () => ({
-      x: Math.random() * canvas.offsetWidth,
-      y: Math.random() * canvas.offsetHeight,
-      vx: (Math.random() - 0.5) * 0.75,
-      vy: (Math.random() - 0.5) * 0.75,
-      size: Math.random() * 1.5 + 0.5,
-      opacity: Math.random() * 0.4 + 0.1,
-    }));
+    const resizeCanvas = () => {
+      const nextWidth = Math.max(1, canvas.clientWidth);
+      const nextHeight = Math.max(1, canvas.clientHeight);
+      const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+      const pixelWidth = Math.round(nextWidth * dpr);
+      const pixelHeight = Math.round(nextHeight * dpr);
 
-    const animate = () => {
-      ctx.clearRect(0, 0, canvas.offsetWidth, canvas.offsetHeight);
+      if (canvas.width !== pixelWidth) canvas.width = pixelWidth;
+      if (canvas.height !== pixelHeight) canvas.height = pixelHeight;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+      const sizeChanged = width !== nextWidth || height !== nextHeight;
+      width = nextWidth;
+      height = nextHeight;
+      if (sizeChanged || particlesRef.current.length === 0) {
+        initializeParticles();
+      }
+    };
+
+    const draw = () => {
+      ctx.clearRect(0, 0, width, height);
+
+      if (reducedMotion.matches) {
+        return;
+      }
 
       const particles = particlesRef.current;
       for (const p of particles) {
         p.x += p.vx;
         p.y += p.vy;
 
-        if (p.x < 0) p.x = canvas.offsetWidth;
-        if (p.x > canvas.offsetWidth) p.x = 0;
-        if (p.y < 0) p.y = canvas.offsetHeight;
-        if (p.y > canvas.offsetHeight) p.y = 0;
+        if (p.x < 0) p.x = width;
+        if (p.x > width) p.x = 0;
+        if (p.y < 0) p.y = height;
+        if (p.y > height) p.y = 0;
 
         ctx.beginPath();
         ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
@@ -59,8 +82,7 @@ export function ParticleField() {
         ctx.fill();
       }
 
-      // Draw connections — shorter range on mobile
-      const connectionDist = canvas.offsetWidth < 640 ? 80 : 120;
+      const connectionDist = width < 640 ? 70 : 105;
       for (let i = 0; i < particles.length; i++) {
         for (let j = i + 1; j < particles.length; j++) {
           const dx = particles[i].x - particles[j].x;
@@ -77,15 +99,29 @@ export function ParticleField() {
           }
         }
       }
+    };
+
+    const animate = (now: number) => {
+      if (now - lastDrawAt >= targetFrameMs) {
+        lastDrawAt = now;
+        draw();
+      }
 
       animationRef.current = requestAnimationFrame(animate);
     };
 
-    animate();
+    resizeCanvas();
+    draw();
+    if (!reducedMotion.matches) {
+      animationRef.current = requestAnimationFrame(animate);
+    }
 
-    window.addEventListener("resize", resizeCanvas);
+    const resizeObserver = new ResizeObserver(resizeCanvas);
+    resizeObserver.observe(canvas);
+    window.addEventListener("resize", resizeCanvas, { passive: true });
     return () => {
       cancelAnimationFrame(animationRef.current);
+      resizeObserver.disconnect();
       window.removeEventListener("resize", resizeCanvas);
     };
   }, []);
