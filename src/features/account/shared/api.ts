@@ -115,8 +115,20 @@ export async function accountSignIn(email: string, password: string): Promise<Ac
   };
 }
 
-export function accountRegister(name: string, email: string, password: string): Promise<unknown> {
-  return postJson("/register", { name, email, password });
+export async function accountRegister(name: string, email: string, password: string): Promise<AccountAuthUser> {
+  const data = await postJson<LoginResponse>("/register", { name, email, password });
+  const id = data.user_id ?? data.id;
+  if (!id) {
+    throw new AccountApiError("Registration response did not include a user id.");
+  }
+  if (data.token) {
+    await saveAccountAuthToken(data.token);
+  }
+  return {
+    id,
+    name: data.name,
+    email: data.email,
+  };
 }
 
 export function accountFetchMe(): Promise<AccountMeResponse> {

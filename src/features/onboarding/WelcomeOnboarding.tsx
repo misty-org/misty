@@ -46,10 +46,10 @@ const welcomePages = [
 ] as const;
 
 const welcomeShellClass =
-  "grid min-h-dvh w-full min-w-0 grid-cols-[minmax(0,1.08fr)_minmax(340px,0.72fr)] overflow-hidden bg-[var(--misty-bg)] p-[var(--misty-safe-top)_var(--misty-safe-right)_var(--misty-safe-bottom)_var(--misty-safe-left)] text-[var(--misty-text)] max-[860px]:grid-cols-1 max-[860px]:overflow-auto max-[860px]:[scroll-padding:calc(24px+var(--misty-safe-top))_max(18px,var(--misty-safe-right))_calc(24px+var(--misty-safe-bottom))_max(18px,var(--misty-safe-left))]";
+  "grid min-h-dvh w-full min-w-0 grid-cols-[minmax(0,1.08fr)_minmax(340px,0.72fr)] overflow-hidden bg-[var(--misty-bg)] p-[var(--misty-safe-top)_var(--welcome-shell-x)_var(--misty-safe-bottom)_var(--welcome-shell-x)] text-[var(--misty-text)] [--welcome-page-x:max(18px,var(--misty-safe-left),var(--misty-safe-right))] [--welcome-shell-x:max(var(--misty-safe-left),var(--misty-safe-right))] max-[860px]:grid-cols-1 max-[860px]:overflow-auto max-[860px]:[scroll-padding:calc(24px+var(--misty-safe-top))_var(--welcome-page-x)_calc(24px+var(--misty-safe-bottom))_var(--welcome-page-x)]";
 
 const welcomeStageClass =
-  "relative grid min-h-0 min-w-0 content-center gap-7 overflow-hidden border-r border-white/10 px-[clamp(34px,6vw,76px)] py-[clamp(34px,6vw,76px)] max-[860px]:min-h-0 max-[860px]:border-b max-[860px]:border-r-0 max-[860px]:px-[max(18px,var(--misty-safe-right))] max-[860px]:pb-[26px] max-[860px]:pl-[max(18px,var(--misty-safe-left))] max-[860px]:pt-6 max-[520px]:gap-5";
+  "relative grid min-h-0 min-w-0 content-center gap-7 overflow-hidden border-r border-white/10 px-[clamp(34px,6vw,76px)] py-[clamp(34px,6vw,76px)] max-[860px]:min-h-0 max-[860px]:border-b max-[860px]:border-r-0 max-[860px]:px-[var(--welcome-page-x)] max-[860px]:pb-[26px] max-[860px]:pt-6 max-[520px]:gap-5";
 
 const welcomeStageGridClass =
   "pointer-events-none absolute inset-0 bg-[image:linear-gradient(rgba(255,255,255,0.045)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.045)_1px,transparent_1px)] bg-[length:44px_44px] [mask-image:linear-gradient(90deg,rgba(0,0,0,0.82),transparent_72%)]";
@@ -91,7 +91,7 @@ const welcomeTextButtonClass =
   "inline-flex min-h-[38px] w-fit items-center justify-center gap-2 rounded-[14px] border-0 bg-transparent p-0 font-[760] text-[#cfcfc8]";
 
 const welcomeAuthPanelClass =
-  "relative grid min-h-0 min-w-0 content-center gap-[18px] border border-[var(--misty-border-soft)] bg-[#0e1114] px-[clamp(28px,4vw,48px)] py-[clamp(28px,4vw,48px)] shadow-[0_24px_70px_rgba(0,0,0,0.38)] max-[860px]:px-[max(18px,var(--misty-safe-right))] max-[860px]:pb-[max(24px,var(--misty-safe-bottom))] max-[860px]:pl-[max(18px,var(--misty-safe-left))] max-[860px]:pt-6";
+  "relative grid min-h-0 min-w-0 content-center gap-[18px] border border-[var(--misty-border-soft)] bg-[#0e1114] px-[clamp(28px,4vw,48px)] py-[clamp(28px,4vw,48px)] shadow-[0_24px_70px_rgba(0,0,0,0.38)] max-[860px]:px-[var(--welcome-page-x)] max-[860px]:pb-[max(24px,var(--misty-safe-bottom))] max-[860px]:pt-6";
 
 const welcomeAuthIntroClass =
   "relative z-[1] grid gap-4";
@@ -167,8 +167,7 @@ export function WelcomeOnboarding(props: WelcomeOnboardingProps) {
         await props.onSignedIn(browserPreviewUser(email, name), null);
         return;
       }
-      await accountRegister(name, email, password);
-      const user = await accountSignIn(email, password);
+      const user = await accountRegister(name, email, password);
       const license = await fetchLicenseAfterAuth();
       await props.onSignedIn(user, license);
     } catch (registerError) {

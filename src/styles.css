@@ -61,6 +61,7 @@
   --misty-safe-right: env(safe-area-inset-right, 0px);
   --misty-safe-bottom: env(safe-area-inset-bottom, 0px);
   --misty-safe-left: env(safe-area-inset-left, 0px);
+  --misty-page-x: clamp(16px, 2vw, 20px);
   --misty-mobile-edge: 16px;
   --misty-mobile-page-top: 14px;
   --misty-mobile-page-bottom: 18px;

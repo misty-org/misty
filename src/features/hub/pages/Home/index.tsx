@@ -1,7 +1,7 @@
-import { ArrowRight, FileText, Play, RotateCcw, Sparkles } from "lucide-react";
+import { ArrowRight, FileText, LogIn, Play, RotateCcw, Sparkles } from "lucide-react";
 import { useEffect } from "react";
 import { FaDiscord, FaGithub, FaXTwitter } from "react-icons/fa6";
-import { Link, Navigate, useLocation } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
 import { openExternalLink } from "../../../../shared/openExternalLink";
 import { useAuth } from "../../AuthContext";
@@ -20,7 +20,6 @@ const socialLinks = [
 ];
 
 export default function HomePage() {
-  const location = useLocation();
   const {
     busy,
     installState,
@@ -77,14 +76,8 @@ export default function HomePage() {
     status?.os,
   ]);
 
-  if (!currentUser) {
-    if (!status && !systemError) {
-      return <HubHomeLoading />;
-    }
-
-    return (
-      <Navigate replace state={{ from: location.pathname }} to="/hub/signin" />
-    );
+  if (!status && !systemError) {
+    return <HubHomeLoading />;
   }
 
   const ready = Boolean(status?.ready);
@@ -106,7 +99,34 @@ export default function HomePage() {
 
   return (
     <div className="h-screen overflow-y-auto">
-      <div className="mx-auto flex w-full max-w-[1380px] flex-col gap-4 px-5 py-4 pb-8">
+      <div className="mx-auto flex w-full max-w-[1380px] flex-col gap-4 px-[var(--misty-page-x)] py-4 pb-8">
+        {!currentUser ? (
+          <section className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-white/10 bg-white/[0.04] px-5 py-4 shadow-2xl shadow-black/20">
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-text">Use Misty locally without an account.</p>
+              <p className="mt-1 text-sm leading-6 text-text-muted">
+                Sign in only when you want account settings, marketplace access, licenses, or online services.
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Link
+                className="inline-flex items-center gap-2 rounded-md border border-white/10 bg-white/[0.04] px-4 py-2.5 text-sm font-semibold text-text transition hover:border-white/20 hover:bg-white/[0.08]"
+                to="/files"
+              >
+                Open files
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+              <Link
+                className="inline-flex items-center gap-2 rounded-md bg-white px-4 py-2.5 text-sm font-semibold text-black transition hover:bg-zinc-200"
+                to="/hub/signin"
+              >
+                <LogIn className="h-4 w-4" />
+                Sign in
+              </Link>
+            </div>
+          </section>
+        ) : null}
+
         <section className="grid content-start gap-3 xl:grid-cols-2">
           <div className={topPanelClass}>
             <InstallerCard className="h-full" embedded />
@@ -251,7 +271,7 @@ function HubHomeLoading() {
   const skeletonBlockClass = "misty-skeleton rounded-md";
   return (
     <div className="h-screen overflow-y-auto">
-      <div className="mx-auto flex w-full max-w-[1380px] flex-col gap-4 px-5 py-4">
+      <div className="mx-auto flex w-full max-w-[1380px] flex-col gap-4 px-[var(--misty-page-x)] py-4">
         <section className="grid content-start gap-3 xl:grid-cols-2">
           {[0, 1, 2, 3].map((index) => (
             <div
