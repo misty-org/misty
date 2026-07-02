@@ -70,7 +70,7 @@ pub fn run() {
         .plugin(tauri_plugin_os::init())
         .manage(MistyRuntime::new())
         .on_window_event(|window, event| {
-            #[cfg(not(mobile))]
+            #[cfg(desktop)]
             {
                 if window.label() != "main" {
                     return;
