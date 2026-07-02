@@ -663,8 +663,16 @@ where
                     // credential events, including after a crash/timeout. The
                     // durable receipt, not a renderer's in-memory flag, gates
                     // capture for this profile. Workspace edits remain allowed.
-                    if let Ok(crate::document::Payload::Credentials { batch, .. }) =
-                        serde_json::from_slice(&payload)
+                    let decoded = serde_json::from_slice::<crate::document::Payload>(&payload).ok();
+                    if let Some(decoded) = &decoded {
+                        let document: crate::document::Document =
+                            serde_json::from_slice(&self.store.committed_snapshot(&self.root)?)?;
+                        if !document.can_publish(&self.store.grant().device_id, decoded) {
+                            return Err(Error::InactiveDevice);
+                        }
+                    }
+                    if let Some(crate::document::Payload::Credentials { batch, .. }) =
+                        decoded.as_ref().map(|v| v.data())
                     {
                         if self
                             .store
@@ -867,7 +875,10 @@ where
                 },
                 _ = heartbeat.tick() => {
                     let status = self.status.borrow().clone();
-                    socket.send(&ClientFrame::Heartbeat { applied_sequence: status.applied_sequence, ready: status.phase == Phase::Ready }).await?;
+                    let document = serde_json::from_slice::<crate::document::Document>(&self.store.committed_snapshot(&self.root)?).ok();
+                    let active_epoch = document.as_ref().filter(|v| v.is_active(&self.store.grant().device_id))
+                        .and_then(|v| v.active_device.as_ref()).map(|v| v.epoch.as_str());
+                    socket.send(&ClientFrame::Heartbeat { applied_sequence: status.applied_sequence, ready: status.phase == Phase::Ready, active_epoch, activation: None }).await?;
                 },
                 _ = tick.tick() => {
                     if socket.stale() || in_flight.as_ref().is_some_and(|(_, sent)| sent.elapsed() >= Duration::from_secs(20)) { return Err(Error::Network); }
@@ -875,12 +886,39 @@ where
                     // will enforce their base-version preconditions atomically.
                     if in_flight.is_none() && !self.roster.is_empty() && self.store.applied_sequence()? >= self.head {
                         if let Some(mutation) = self.store.pending(true, 1)?.into_iter().next() {
-                            socket.send(&ClientFrame::Publish { mutation: &mutation }).await?;
+                            let bytes = self.root.open_mutation(&self.scope, self.store.grant(), &mutation)?;
+                            let payload = serde_json::from_slice::<crate::document::Payload>(&bytes).ok();
+                            let status = self.status.borrow().clone();
+                            socket.send(&publication_frame(&mutation, payload.as_ref(), &status)).await?;
                             in_flight = Some((mutation.operation_id, Instant::now()));
                         }
                     }
                 },
             }
         }
+    }
+}
+
+fn publication_frame<'a>(
+    mutation: &'a Mutation,
+    payload: Option<&'a crate::document::Payload>,
+    status: &Status,
+) -> ClientFrame<'a> {
+    use crate::document::Payload;
+    match payload {
+        Some(Payload::ActiveDevice { active: true, .. }) => ClientFrame::Heartbeat {
+            applied_sequence: status.applied_sequence,
+            ready: status.phase == Phase::Ready,
+            active_epoch: None,
+            activation: Some(mutation),
+        },
+        Some(Payload::Published { active_epoch, .. }) => ClientFrame::Publish {
+            mutation,
+            active_epoch: Some(active_epoch),
+        },
+        _ => ClientFrame::Publish {
+            mutation,
+            active_epoch: None,
+        },
     }
 }

@@ -27,6 +27,100 @@ fn changes(changes: Value) -> Value {
     json!({"kind":"workspace","version":1,"changes":changes})
 }
 
+fn select(document: &Document, device: &str, active: bool) -> Document {
+    apply(
+        document,
+        json!({"kind":"active_device","version":1,"active":active,
+        "previous_epoch": document.active_device.as_ref().map(|v| &v.epoch)}),
+        device,
+    )
+}
+fn published(document: &Document, payload: Value) -> Value {
+    json!({"kind":"published","version":1,"active_epoch":document.active_device.as_ref().unwrap().epoch,"payload":payload})
+}
+
+#[test]
+fn only_the_selected_device_can_publish_and_old_tenures_never_replay() {
+    let a = select(&Document::default(), MAC, true);
+    let create = changes(
+        json!([{"action":"create","kind":"window","id":"window:one","fields":{"title":"Original","order":0}}]),
+    );
+    let initial = apply(&a, published(&a, create), MAC);
+    let change = changes(
+        json!([{"action":"patch","kind":"window","id":"window:one","fields":{"title":"Changed"}}]),
+    );
+    let echo = apply(&initial, published(&initial, change.clone()), WINDOWS);
+    assert_eq!(
+        echo.live(Kind::Window, "window:one").unwrap().values()["title"],
+        "Original"
+    );
+    let legacy_echo = apply(&echo, change.clone(), WINDOWS);
+    assert_eq!(
+        legacy_echo
+            .live(Kind::Window, "window:one")
+            .unwrap()
+            .values()["title"],
+        "Original"
+    );
+    let updated = apply(&initial, published(&initial, change.clone()), MAC);
+    assert_eq!(
+        updated.live(Kind::Window, "window:one").unwrap().values()["title"],
+        "Changed"
+    );
+    let stale = published(&initial, change.clone());
+    let b = select(&initial, WINDOWS, true);
+    assert!(b.is_active(WINDOWS));
+    let ignored = apply(&b, stale.clone(), MAC);
+    assert_eq!(
+        ignored.live(Kind::Window, "window:one").unwrap().values()["title"],
+        "Original"
+    );
+    let a_again = select(&ignored, MAC, true);
+    let ignored = apply(&a_again, stale, MAC);
+    assert_eq!(
+        ignored.live(Kind::Window, "window:one").unwrap().values()["title"],
+        "Original"
+    );
+    assert!(ignored.is_active(MAC));
+    let updated = apply(&ignored, published(&ignored, change), MAC);
+    assert_eq!(
+        updated.live(Kind::Window, "window:one").unwrap().values()["title"],
+        "Changed"
+    );
+}
+
+#[test]
+fn latest_server_ordered_claim_wins_and_only_its_owner_can_release() {
+    let first = select(&Document::default(), MAC, true);
+    let latest = apply(
+        &first,
+        json!({"kind":"active_device","version":1,"active":true,"previous_epoch":null}),
+        WINDOWS,
+    );
+    assert!(latest.is_active(WINDOWS));
+    let unauthorized = select(&latest, MAC, false);
+    assert!(unauthorized.is_active(WINDOWS));
+    let released = select(&unauthorized, WINDOWS, false);
+    assert!(released.active_device.unwrap().device_id.is_none());
+}
+
+#[test]
+fn followers_cannot_echo_credentials_or_resume_selection() {
+    let active = select(&Document::default(), MAC, true);
+    let credentials =
+        credential(json!([{"area":{"kind":"cookies"},"base_sequence":0,"payload":[]}]));
+    let resume = json!({"kind":"resume","version":1,"resume":{
+        "active_window_id":"window:one","active_layout_id":"layout:one","focused_pane_id":"pane:one","active_tab_by_pane":{}
+    }});
+    for payload in [credentials, resume] {
+        let follower = apply(&active, published(&active, payload.clone()), WINDOWS);
+        assert!(follower.credentials.is_empty());
+        assert!(follower.resumes.is_empty());
+        let sender = apply(&active, published(&active, payload), MAC);
+        assert!(!sender.credentials.is_empty() || !sender.resumes.is_empty());
+    }
+}
+
 #[test]
 fn concurrent_group_edits_merge_by_field_and_deletion_wins_over_offline_edits() {
     let initial = apply(
@@ -277,15 +371,23 @@ fn space_routes_survive_native_sync_round_trip() {
                 "url":null, "profile_id":null, "website_id":null,
                 "tool_route":"/spaces/project/planner/tasks/list", "agent_owned":false
             }
-        }])), MAC,
+        }])),
+        MAC,
     );
-    let updated = apply(&initial, changes(json!([{
-        "action":"patch", "kind":"tab", "id":"space-tab",
-        "fields":{"tool_route":"/spaces/project/library?collection=recent"}
-    }])), WINDOWS);
+    let updated = apply(
+        &initial,
+        changes(json!([{
+            "action":"patch", "kind":"tab", "id":"space-tab",
+            "fields":{"tool_route":"/spaces/project/library?collection=recent"}
+        }])),
+        WINDOWS,
+    );
     let restored: Document = serde_json::from_slice(&updated.encode().unwrap()).unwrap();
     let fields = restored.live(Kind::Tab, "space-tab").unwrap().values();
     assert_eq!(fields["surface"], "space");
-    assert_eq!(fields["tool_route"], "/spaces/project/library?collection=recent");
+    assert_eq!(
+        fields["tool_route"],
+        "/spaces/project/library?collection=recent"
+    );
     assert!(fields["profile_id"].is_null());
 }

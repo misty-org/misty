@@ -35,6 +35,8 @@ pub enum BrowserCaptureState {
 struct Pending {
     id: String,
     batch: Batch,
+    #[serde(default)]
+    active_epoch: Option<String>,
 }
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -46,6 +48,8 @@ struct Capture {
     baseline: Vec<CredentialRecord>,
     observed: Vec<BrowserObservation>,
     pending: Option<Pending>,
+    #[serde(default)]
+    active_epoch: Option<String>,
 }
 fn key(profile: &str, revision: u64) -> String {
     format!("browser-capture:v1:{profile}:{revision}")
@@ -202,6 +206,11 @@ impl Store {
         observed: Vec<BrowserObservation>,
     ) -> Result<BrowserCaptureState> {
         validate_observation(profile, &observed)?;
+        let document: Document = serde_json::from_slice(&self.committed_snapshot(root)?)?;
+        if document.active_device.is_some() && !document.is_active(&self.grant.device_id) {
+            return Err(Error::InactiveDevice);
+        }
+        let epoch = document.active_device.as_ref().map(|v| v.epoch.clone());
         let binding = self.browser_profile_binding(root, profile)?;
         let journal = self.browser_import_journal(root, profile)?;
         if binding.staged.is_some() || journal.pending.is_some() || journal.quarantined {
@@ -217,7 +226,8 @@ impl Store {
             .ok_or(Error::Recovery)?;
         let previous = self.read_capture(root, profile)?;
         let reset = previous.as_ref().is_none_or(|capture| {
-            capture.generation != generation
+            capture.active_epoch != epoch
+                || capture.generation != generation
                 || (capture.imported_sequence < applied.snapshot_sequence
                     && !browser_import::equivalent(&capture.baseline, &applied.credentials)
                         .unwrap_or(false))
@@ -239,6 +249,7 @@ impl Store {
                     baseline: applied.credentials.clone(),
                     observed: observed.clone(),
                     pending: None,
+                    active_epoch: epoch.clone(),
                 }
             }
         };
@@ -306,8 +317,24 @@ impl Store {
         }
         let document: Document = serde_json::from_slice(&self.committed_snapshot(root)?)?;
         document.validate()?;
+        if document.active_device.is_some() && !document.is_active(&self.grant.device_id) {
+            return Ok(BrowserCaptureState::Clean);
+        }
+        if capture.active_epoch != document.active_device.as_ref().map(|v| v.epoch.clone()) {
+            return Ok(BrowserCaptureState::NeedsImport);
+        }
         let target = current(&document, profile);
         if let Some(pending) = &capture.pending {
+            let discarded: bool = self.connection.query_row(
+                "SELECT EXISTS(SELECT 1 FROM sync_discarded WHERE operation_id=?1)",
+                [&pending.id],
+                |r| r.get(0),
+            )?;
+            if discarded {
+                capture.pending = None;
+                self.save_capture(root, profile, capture)?;
+                return Ok(BrowserCaptureState::NeedsImport);
+            }
             let applied: Option<u64> = self
                 .connection
                 .query_row(
@@ -380,6 +407,7 @@ impl Store {
         capture.pending = Some(Pending {
             id: uuid::Uuid::new_v4().to_string(),
             batch,
+            active_epoch: capture.active_epoch.clone(),
         });
         // Persist the stable intent ID and exact bytes before enqueue. Recovery
         // can complete either side of this boundary without another counter.
@@ -397,10 +425,15 @@ impl Store {
         device: &DeviceKey,
         pending: &Pending,
     ) -> Result<()> {
-        let bytes = Zeroizing::new(serde_json::to_vec(&Payload::Credentials {
+        let payload = Payload::Credentials {
             version: 1,
             batch: pending.batch.clone(),
-        })?);
+        };
+        let payload = match &pending.active_epoch {
+            Some(epoch) => payload.published(epoch.clone()),
+            None => payload,
+        };
+        let bytes = Zeroizing::new(serde_json::to_vec(&payload)?);
         if bytes.len() > MAX_EVENT_BYTES - 16 {
             return Err(Error::TooLarge);
         }
@@ -423,6 +456,17 @@ impl Store {
         let Some(pending) = capture.pending else {
             return Ok(false);
         };
+        if self.connection.query_row(
+            "SELECT EXISTS(SELECT 1 FROM sync_discarded WHERE operation_id=?1)",
+            [&pending.id],
+            |r| r.get::<_, bool>(0),
+        )? {
+            return Ok(false);
+        }
+        let document: Document = serde_json::from_slice(&self.committed_snapshot(root)?)?;
+        if pending.active_epoch != document.active_device.as_ref().map(|v| v.epoch.clone()) {
+            return Ok(false);
+        }
         Ok(self
             .connection
             .query_row(

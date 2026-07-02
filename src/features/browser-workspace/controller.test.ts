@@ -24,6 +24,7 @@ function native(): NativeSyncView {
     presence: [],
     pending_operation_ids: [],
     workspace: {
+      active_device: { device_id: "device:a", epoch: "epoch:a", sequence: 1 },
       version: 1,
       sequence: 3,
       resumes: {},
@@ -161,6 +162,100 @@ function harness(disk: JournalStorage = storage()) {
 }
 
 describe("workspace sync controller recovery", () => {
+  it("handles control moving between the state read and native publish", async () => {
+    const h = harness();
+    const controller = h.start();
+    await settled();
+    h.ports.publish.mockImplementationOnce(async () => {
+      h.current().workspace.active_device = {
+        device_id: "device:b",
+        epoch: "epoch:b",
+        sequence: 4,
+      };
+      throw new Error("This device is following sync");
+    });
+    h.editTitle("In-flight edit");
+    await settled();
+    expect(h.journal.pending).toHaveLength(0);
+    expect(h.ports.error).not.toHaveBeenCalled();
+    controller.stop();
+  });
+  it("does not publish follower page-load, title, or selection changes", async () => {
+    const h = harness();
+    h.current().workspace.active_device!.device_id = "device:b";
+    const publishResume = vi.fn();
+    const controller = new WorkspaceSyncController(h.current(), { ...h.ports, publishResume });
+    await settled();
+    h.editTitle("Title reported by the follower's page load");
+    await controller.flushLocal();
+    await settled();
+    expect(h.journal.pending).toHaveLength(0);
+    expect(h.ports.publish).not.toHaveBeenCalled();
+    expect(publishResume).not.toHaveBeenCalled();
+    const writes = vi.mocked(h.ports.source.write).mock.calls.length;
+    h.current().workspace.sequence++;
+    controller.refresh();
+    await settled();
+    expect(vi.mocked(h.ports.source.write).mock.calls).toHaveLength(writes);
+    expect(h.title()).toBe("Title reported by the follower's page load");
+    controller.stop();
+  });
+
+  it("retires queued edits when control moves away and does not replay them on takeover", async () => {
+    const h = harness();
+    const controller = h.start();
+    await settled();
+    h.editTitle("Queued under the old active selection");
+    h.current().workspace.active_device = { device_id: "device:b", epoch: "epoch:b", sequence: 4 };
+    await settled();
+    expect(h.ports.publish).not.toHaveBeenCalled();
+    expect(h.journal.pending).toHaveLength(0);
+    h.current().workspace.active_device = {
+      device_id: "device:a",
+      epoch: "epoch:new",
+      sequence: 5,
+    };
+    controller.refresh();
+    await settled();
+    expect(h.ports.publish).not.toHaveBeenCalled();
+    h.editTitle("New edit after taking control");
+    await settled();
+    expect(h.ports.publish).toHaveBeenCalledTimes(1);
+    expect(h.ports.publish.mock.calls[0]).toEqual([
+      "session:a",
+      expect.any(String),
+      [
+        {
+          action: "patch",
+          kind: "tab",
+          id: "tab:a",
+          fields: { title: "New edit after taking control" },
+        },
+      ],
+      "epoch:new",
+    ]);
+    controller.stop();
+  });
+
+  it("preserves an unselected new workspace until the user chooses its active device", async () => {
+    const h = harness();
+    h.current().workspace.records = [];
+    h.current().workspace.active_device = null;
+    const controller = h.start();
+    await settled();
+    expect(h.title()).toBe("Page");
+    expect(h.ports.publish).not.toHaveBeenCalled();
+    h.current().workspace.active_device = {
+      device_id: "device:a",
+      epoch: "epoch:first",
+      sequence: 4,
+    };
+    controller.refresh();
+    await settled();
+    expect(h.ports.publish).toHaveBeenCalledTimes(1);
+    expect(h.current().workspace.records.some((record) => record.id === "tab:a")).toBe(true);
+    controller.stop();
+  });
   it("does not publish or erase an edit until native recovery acknowledges it", async () => {
     let unavailable = true;
     const disk = {
@@ -413,9 +508,12 @@ describe("workspace sync controller recovery", () => {
     h.unlock(resumed);
     controller.refresh();
     await settled();
-    expect(h.ports.publish).toHaveBeenCalledExactlyOnceWith("session:unlocked", pending[0].id, [
-      { action: "patch", kind: "tab", id: "tab:a", fields: { title: "Local after lock" } },
-    ]);
+    expect(h.ports.publish).toHaveBeenCalledExactlyOnceWith(
+      "session:unlocked",
+      pending[0].id,
+      [{ action: "patch", kind: "tab", id: "tab:a", fields: { title: "Local after lock" } }],
+      "epoch:a",
+    );
     expect(h.title()).toBe("Local after lock");
     expect(h.current().workspace.records.find((record) => record.kind === "tab")?.fields.url).toBe(
       "https://changed-remotely.test",

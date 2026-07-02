@@ -139,6 +139,12 @@ pub struct EventContext {
 pub struct Receipt {
     pub operation_id: String,
     pub sequence: u64,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub discarded: bool,
+}
+
+fn is_false(value: &bool) -> bool {
+    !value
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -219,8 +225,24 @@ pub struct AccountEvent {
 #[derive(Serialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ClientFrame<'a> {
-    Authenticate { after: u64, signature: &'a str },
-    Publish { mutation: &'a Mutation },
-    Heartbeat { applied_sequence: u64, ready: bool },
-    Resume { after: u64 },
+    Authenticate {
+        after: u64,
+        signature: &'a str,
+    },
+    Publish {
+        mutation: &'a Mutation,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        active_epoch: Option<&'a str>,
+    },
+    Heartbeat {
+        applied_sequence: u64,
+        ready: bool,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        active_epoch: Option<&'a str>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        activation: Option<&'a Mutation>,
+    },
+    Resume {
+        after: u64,
+    },
 }
