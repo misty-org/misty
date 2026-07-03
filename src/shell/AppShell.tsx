@@ -3,9 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
 import { DesktopAppShell } from "./DesktopAppShell";
 import { MobileAppShell } from "./MobileAppShell";
-import { WelcomeOnboarding } from "../onboarding/WelcomeOnboarding";
 import { useSetupStore } from "../stores/useSetupStore";
-import type { CurrentLicense, CurrentUser } from "../models/setup";
 import { installMistyDeepLinkHandler } from "./deepLinks";
 import { detectAppFormFactor, subscribeAppFormFactor, type AppFormFactor } from "./platform";
 import { useAppZoom } from "./useAppZoom";
@@ -16,15 +14,9 @@ export function AppShell() {
   const appZoom = useAppZoom();
   const setupLoadStarted = useRef(false);
   const {
-    status,
-    systemError,
     loadSystem,
-    saveAuthenticatedUser,
   } = useSetupStore(useShallow((state) => ({
-    status: state.status,
-    systemError: state.systemError,
     loadSystem: state.loadSystem,
-    saveAuthenticatedUser: state.saveAuthenticatedUser,
   })));
 
   useEffect(() => subscribeAppFormFactor(setFormFactor), []);
@@ -41,23 +33,6 @@ export function AppShell() {
     setupLoadStarted.current = true;
     void loadSystem();
   }, [loadSystem]);
-
-  async function handleSignedIn(user: CurrentUser, license: CurrentLicense | null) {
-    await saveAuthenticatedUser(user, license);
-  }
-
-  if (!status?.current_user) {
-    return (
-      <>
-        <WelcomeOnboarding
-          formFactor={formFactor}
-          checkingAccount={!status && !systemError}
-          onSignedIn={handleSignedIn}
-        />
-        <AppZoomIndicator visible={appZoom.indicatorVisible} percent={appZoom.zoomPercent} />
-      </>
-    );
-  }
 
   return (
     <>

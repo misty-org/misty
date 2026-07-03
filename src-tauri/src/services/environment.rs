@@ -168,6 +168,7 @@ impl AppEnvironment {
         let misty_config_path = config_dir.join("misty.json");
         let workspaces_path = config_dir.join("workspaces.json");
         let commands_path = config_dir.join("commands.msy");
+        ensure_mobile_user_dirs(&home_dir);
         let grpc_address = settings_advanced_string(&settings_path, "server_address")
             .unwrap_or_else(|| "localhost:50051".to_owned());
         let mount_path = settings_advanced_string(&settings_path, "mount_path")
@@ -227,6 +228,7 @@ impl AppEnvironment {
         let misty_config_path = config_dir.join("misty.json");
         let workspaces_path = config_dir.join("workspaces.json");
         let commands_path = config_dir.join("commands.msy");
+        ensure_mobile_user_dirs(&home_dir);
         let grpc_address = settings_advanced_string(&settings_path, "server_address")
             .unwrap_or_else(|| "localhost:50051".to_owned());
         let mount_path = settings_advanced_string(&settings_path, "mount_path")
@@ -318,6 +320,16 @@ fn resolve_home_dir() -> Option<PathBuf> {
 fn display_path(path: &Path) -> String {
     path.display().to_string()
 }
+
+#[cfg(any(target_os = "ios", target_os = "android"))]
+fn ensure_mobile_user_dirs(home_dir: &Path) {
+    for name in ["Documents", "Downloads"] {
+        let _ = fs::create_dir_all(home_dir.join(name));
+    }
+}
+
+#[cfg(not(any(target_os = "ios", target_os = "android")))]
+fn ensure_mobile_user_dirs(_home_dir: &Path) {}
 
 #[cfg(test)]
 mod tests {
