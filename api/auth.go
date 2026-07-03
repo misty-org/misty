@@ -43,9 +43,7 @@ func Register(database *db.Database) http.HandlerFunc {
 			return
 		}
 
-		writeJSON(w, http.StatusCreated, map[string]string{
-			"user_id": user.ID,
-		})
+		writeAuthSession(w, r, database, user, http.StatusCreated)
 	}
 }
 
@@ -75,35 +73,45 @@ func Login(database *db.Database) http.HandlerFunc {
 			return
 		}
 
-		token, err := security.GenerateSecureToken()
-		if err != nil {
-			http.Error(w, "internal error", http.StatusInternalServerError)
-			return
-		}
-		tokenHash := security.HashToken(token)
-		if err := database.CreateSession(tokenHash, user.ID); err != nil {
-			http.Error(w, "internal error", http.StatusInternalServerError)
-			return
-		}
-
-		secure := r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https"
-		http.SetCookie(w, &http.Cookie{
-			Name:     sessionCookieName,
-			Value:    token,
-			Path:     "/",
-			HttpOnly: true,
-			Secure:   secure,
-			SameSite: sessionCookieSameSite(r, secure),
-			MaxAge:   int(db.SessionTTL.Seconds()),
-		})
-
-		writeJSON(w, http.StatusOK, map[string]string{
-			"user_id": user.ID,
-			"name":    user.Name,
-			"email":   user.Email,
-			"token":   token,
-		})
+		writeAuthSession(w, r, database, user, http.StatusOK)
 	}
+}
+
+func writeAuthSession(
+	w http.ResponseWriter,
+	r *http.Request,
+	database *db.Database,
+	user *db.User,
+	status int,
+) {
+	token, err := security.GenerateSecureToken()
+	if err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	tokenHash := security.HashToken(token)
+	if err := database.CreateSession(tokenHash, user.ID); err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+
+	secure := r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https"
+	http.SetCookie(w, &http.Cookie{
+		Name:     sessionCookieName,
+		Value:    token,
+		Path:     "/",
+		HttpOnly: true,
+		Secure:   secure,
+		SameSite: sessionCookieSameSite(r, secure),
+		MaxAge:   int(db.SessionTTL.Seconds()),
+	})
+
+	writeJSON(w, status, map[string]string{
+		"user_id": user.ID,
+		"name":    user.Name,
+		"email":   user.Email,
+		"token":   token,
+	})
 }
 
 func Logout(database *db.Database) http.HandlerFunc {

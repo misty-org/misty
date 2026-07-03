@@ -18,6 +18,20 @@ func TestAuthLifecycle(t *testing.T) {
 	if registerRec.Code != http.StatusCreated {
 		t.Fatalf("register status = %d, want %d, body = %q", registerRec.Code, http.StatusCreated, registerRec.Body.String())
 	}
+	registerCookie := requireCookie(t, registerRec, sessionCookieName)
+	if !registerCookie.HttpOnly {
+		t.Fatal("register session cookie should be HttpOnly")
+	}
+	registerBody := decodeJSONResponse(t, registerRec)
+	registerToken, ok := registerBody["token"].(string)
+	if !ok || registerToken == "" {
+		t.Fatalf("register response missing token: %#v", registerBody)
+	}
+
+	registerMeRec := performBearerJSONRequest(t, api.GetMe(database), http.MethodGet, "/me", nil, registerToken)
+	if registerMeRec.Code != http.StatusOK {
+		t.Fatalf("register bearer /me status = %d, want %d, body = %q", registerMeRec.Code, http.StatusOK, registerMeRec.Body.String())
+	}
 
 	loginRec := performJSONRequest(t, api.Login(database), http.MethodPost, "/login", map[string]string{
 		"email":    "ada@example.com",
