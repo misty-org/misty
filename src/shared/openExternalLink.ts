@@ -1,6 +1,6 @@
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { platform } from "@tauri-apps/plugin-os";
-import { selectGeneralPreferences, useSettingsStore } from "../features/settings/useSettingsStore";
+import { selectGeneralPreferences, useSettingsStore } from "../stores/useSettingsStore";
 import type { MouseEvent } from "react";
 import { hasTauriInternals } from "./tauri";
 

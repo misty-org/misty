@@ -15,7 +15,15 @@ use serde_json::Value;
 use crate::error::{ApiError, ApiResult};
 use crate::services::environment::AppEnvironmentService;
 
-const REMOVED_EXTENSION_IDS: &[&str] = &["git", "preview-panel", "preview_panel"];
+const REMOVED_EXTENSION_IDS: &[&str] = &[
+    "git",
+    "preview-panel",
+    "preview_panel",
+    "vault",
+    "ytdlp",
+    "yt-dlp",
+    "yt_dlp",
+];
 
 #[derive(Debug, Clone)]
 pub struct PluginCommandService {
@@ -1249,8 +1257,6 @@ fn built_in_plugin_id(plugin_id: &str) -> Option<&'static str> {
     {
         "quick_convert" => Some("quick_convert"),
         "themes" => Some("themes"),
-        "vault" => Some("vault"),
-        "ytdlp" | "yt_dlp" => Some("ytdlp"),
         _ => None,
     }
 }
@@ -1292,40 +1298,6 @@ fn built_in_commands_for_plugin(plugin: &PluginMetadata) -> Vec<PluginCommandEnt
             ("apply_aurora", "Apply Aurora preset", "apply_aurora", false),
             ("apply_copper", "Apply Copper preset", "apply_copper", false),
         ],
-        "vault" => vec![
-            (
-                "setup_backup",
-                "Create backup job scaffold",
-                "setup_backup",
-                false,
-            ),
-            (
-                "backup_status",
-                "Review backup status",
-                "backup_status",
-                false,
-            ),
-            (
-                "restore_plan",
-                "Prepare restore plan",
-                "restore_plan",
-                false,
-            ),
-        ],
-        "ytdlp" => vec![
-            (
-                "download_video",
-                "Download video from URL file",
-                "download_video",
-                true,
-            ),
-            (
-                "download_audio",
-                "Download audio from URL file",
-                "download_audio",
-                true,
-            ),
-        ],
         _ => Vec::new(),
     };
     commands
@@ -1354,16 +1326,6 @@ fn built_in_command_hint(plugin_id: &str, action_kind: &str) -> String {
     match (plugin_id, action_kind) {
         ("quick_convert", _) => "Convert the selected media file through system FFmpeg.".to_owned(),
         ("themes", _) => "Apply and persist a Misty theme preset.".to_owned(),
-        ("vault", "setup_backup") => {
-            "Create a Vault backup job scaffold for selected paths.".to_owned()
-        }
-        ("vault", "restore_plan") => {
-            "Write a dry-run restore plan before touching files.".to_owned()
-        }
-        ("vault", _) => "Review local Vault backup scaffolds.".to_owned(),
-        ("ytdlp", _) => {
-            "Read a URL from the selected text/.url file and run system yt-dlp.".to_owned()
-        }
         _ => "Run built-in extension action.".to_owned(),
     }
 }
@@ -1377,8 +1339,6 @@ fn built_in_panels_for_plugin(plugin: &PluginMetadata) -> Vec<PluginPanelEntry> 
         title: match plugin_id {
             "quick_convert" => "Quick Convert",
             "themes" => "Themes",
-            "vault" => "Vault",
-            "ytdlp" => "yt-dlp",
             _ => &plugin.name,
         }
         .to_owned(),
@@ -1401,8 +1361,6 @@ fn run_builtin_plugin_command(
     let result = match built_in_plugin_id(&command.plugin_id) {
         Some("quick_convert") => run_builtin_quick_convert(&command, &selected_paths),
         Some("themes") => run_builtin_themes(&command),
-        Some("vault") => run_builtin_vault(&command, &selected_paths),
-        Some("ytdlp") => run_builtin_ytdlp(&command, &selected_paths),
         _ => Err((
             "unknown_builtin",
             "Unknown built-in extension action.".to_owned(),
@@ -1585,136 +1543,6 @@ fn run_builtin_theme_custom_accent(
     Ok(format!("Saved custom accent token {accent}."))
 }
 
-fn run_builtin_vault(
-    command: &PluginCommandEntry,
-    selected_paths: &[String],
-) -> Result<String, (&'static str, String)> {
-    run_builtin_vault_action(&command.plugin_dir, &command.action_kind, selected_paths)
-}
-
-fn run_builtin_vault_action(
-    plugin_dir: &str,
-    action_kind: &str,
-    selected_paths: &[String],
-) -> Result<String, (&'static str, String)> {
-    let vault_dir = Path::new(plugin_dir).join("vault");
-    fs::create_dir_all(&vault_dir).map_err(|error| {
-        (
-            "io_error",
-            format!(
-                "Could not create Vault directory {}: {error}",
-                vault_dir.display()
-            ),
-        )
-    })?;
-    match action_kind {
-        "backup_status" => {
-            let jobs_dir = vault_dir.join("jobs");
-            let count = fs::read_dir(&jobs_dir)
-                .map(|entries| entries.filter_map(Result::ok).count())
-                .unwrap_or(0);
-            Ok(format!("Vault has {count} backup job scaffold(s)."))
-        }
-        "restore_plan" => {
-            let path = vault_dir.join("restore-plan.json");
-            let plan = serde_json::json!({
-                "mode": "dry_run",
-                "createdAtMs": now_ms_for_plugin(),
-                "sources": selected_paths,
-                "actions": []
-            });
-            write_pretty_json(&path, &plan)?;
-            Ok(format!("Prepared restore plan at {}.", path.display()))
-        }
-        _ => {
-            let jobs_dir = vault_dir.join("jobs");
-            fs::create_dir_all(&jobs_dir).map_err(|error| {
-                (
-                    "io_error",
-                    format!(
-                        "Could not create Vault jobs directory {}: {error}",
-                        jobs_dir.display()
-                    ),
-                )
-            })?;
-            let path = jobs_dir.join(format!("backup-job-{}.json", now_ms_for_plugin()));
-            let job = serde_json::json!({
-                "createdAtMs": now_ms_for_plugin(),
-                "sources": selected_paths,
-                "status": "scaffolded",
-                "restoreVerified": false
-            });
-            write_pretty_json(&path, &job)?;
-            Ok(format!(
-                "Created backup job scaffold at {}.",
-                path.display()
-            ))
-        }
-    }
-}
-
-fn run_builtin_ytdlp(
-    command: &PluginCommandEntry,
-    selected_paths: &[String],
-) -> Result<String, (&'static str, String)> {
-    let url = selected_url(selected_paths)?;
-    run_builtin_ytdlp_download(
-        &command.plugin_dir,
-        command.action_kind == "download_audio",
-        &url,
-    )
-}
-
-fn run_builtin_ytdlp_action(
-    plugin_dir: &str,
-    action_kind: &str,
-    inputs: &BTreeMap<String, String>,
-) -> Result<String, (&'static str, String)> {
-    let url = inputs
-        .get("url")
-        .map(String::as_str)
-        .map(str::trim)
-        .filter(|value| !value.is_empty())
-        .ok_or((
-            "missing_url",
-            "Paste a URL before starting a yt-dlp download.".to_owned(),
-        ))?;
-    if !is_url(url) {
-        return Err((
-            "invalid_url",
-            "Paste a full http:// or https:// URL before starting a yt-dlp download.".to_owned(),
-        ));
-    }
-    run_builtin_ytdlp_download(plugin_dir, action_kind == "download_audio", url)
-}
-
-fn run_builtin_ytdlp_download(
-    plugin_dir: &str,
-    audio_only: bool,
-    url: &str,
-) -> Result<String, (&'static str, String)> {
-    require_command("yt-dlp", "yt-dlp")?;
-    require_command("ffmpeg", "yt-dlp")?;
-    let output_dir = Path::new(plugin_dir).join("downloads");
-    fs::create_dir_all(&output_dir).map_err(|error| {
-        (
-            "io_error",
-            format!(
-                "Could not create download directory {}: {error}",
-                output_dir.display()
-            ),
-        )
-    })?;
-    let mut process = Command::new("yt-dlp");
-    process.arg("-P").arg(&output_dir);
-    if audio_only {
-        process.args(["-x", "--audio-format", "mp3"]);
-    }
-    process.arg(&url);
-    run_system_command(process, "yt-dlp")?;
-    Ok(format!("Downloaded {url} to {}.", output_dir.display()))
-}
-
 fn render_builtin_plugin_panel(
     panel: PluginPanelEntry,
     request: RenderPluginPanelRequest,
@@ -1724,8 +1552,6 @@ fn render_builtin_plugin_panel(
     let elements = match plugin_id {
         "quick_convert" => quick_convert_panel_elements(&request),
         "themes" => themes_panel_elements(&request),
-        "vault" => vault_panel_elements(&request),
-        "ytdlp" => ytdlp_panel_elements(&request),
         _ => Vec::new(),
     };
     let notifications = action_result
@@ -1778,8 +1604,6 @@ fn execute_builtin_panel_action(
             run_builtin_theme_custom_accent(&panel.plugin_dir, accent)
         }
         "themes" => run_builtin_theme_action(&panel.plugin_dir, action),
-        "vault" => run_builtin_vault_action(&panel.plugin_dir, action, &request.selected_paths),
-        "ytdlp" => run_builtin_ytdlp_action(&panel.plugin_dir, action, &request.inputs),
         _ => Err((
             "unknown_builtin",
             "Unknown built-in extension action.".to_owned(),
@@ -1834,46 +1658,6 @@ fn themes_panel_elements(request: &RenderPluginPanelRequest) -> Vec<PluginPanelE
         panel_button("apply_copper", "Copper"),
         panel_input("accent", accent),
         panel_button("save_accent", "Save Accent"),
-    ]
-}
-
-fn vault_panel_elements(request: &RenderPluginPanelRequest) -> Vec<PluginPanelElement> {
-    let selected = if request.selected_paths.is_empty() {
-        "No selected paths. Vault will create an empty scaffold.".to_owned()
-    } else {
-        format!("Selected sources: {}", request.selected_paths.join(", "))
-    };
-    vec![
-        panel_text("Vault"),
-        panel_text(
-            "Create backup job scaffolds, review status, and prepare dry-run restore plans.",
-        ),
-        panel_text(&selected),
-        panel_separator(),
-        panel_button("setup_backup", "Create Backup Job"),
-        panel_button("backup_status", "Backup Status"),
-        panel_button("restore_plan", "Prepare Restore Plan"),
-    ]
-}
-
-fn ytdlp_panel_elements(request: &RenderPluginPanelRequest) -> Vec<PluginPanelElement> {
-    let url = request
-        .inputs
-        .get("url")
-        .map(String::as_str)
-        .filter(|value| !value.trim().is_empty())
-        .unwrap_or("https://");
-    vec![
-        panel_text("yt-dlp"),
-        panel_text(
-            "Paste a URL and download video or extracted audio through system yt-dlp and FFmpeg.",
-        ),
-        panel_text(&dependency_line("yt-dlp")),
-        panel_text(&dependency_line("ffmpeg")),
-        panel_input("url", url),
-        panel_separator(),
-        panel_button("download_video", "Download Video"),
-        panel_button("download_audio", "Download Audio"),
     ]
 }
 
@@ -2338,14 +2122,6 @@ fn missing_dependencies_for_plugin(plugin_id: &str) -> Vec<String> {
     let mut dependencies = Vec::new();
     match plugin_id {
         "quick_convert" => {
-            if !command_exists("ffmpeg") {
-                dependencies.push("ffmpeg".to_owned());
-            }
-        }
-        "ytdlp" | "yt-dlp" => {
-            if !command_exists("yt-dlp") {
-                dependencies.push("yt-dlp".to_owned());
-            }
             if !command_exists("ffmpeg") {
                 dependencies.push("ffmpeg".to_owned());
             }

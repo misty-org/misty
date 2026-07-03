@@ -9,9 +9,7 @@ mod services;
 
 use commands::{
     ai_abort, ai_drain_events, ai_send_message, ai_status, app_environment_snapshot, app_snapshot,
-    archive_create, archive_extract, archive_list, automation_rules_delete,
-    automation_rules_run_now, automation_rules_save, automation_rules_snapshot,
-    automation_watch_snapshot, automation_watch_start, automation_watch_stop, claude_abort,
+    archive_create, archive_extract, archive_list, claude_abort,
     claude_drain_events, claude_send_message, claude_status, clipboard_apply_shared,
     clipboard_native_file_refs, clipboard_publish_image_bytes, clipboard_publish_shared,
     clipboard_set_local, clipboard_shared_image_bytes, clipboard_snapshot,
@@ -52,11 +50,10 @@ use commands::{
 use plugins::mac_rounded_corners;
 use runtime::MistyRuntime;
 use services::hub::{
-    check_system, ensure_local_access_token, ensure_misty_folders, get_clipboard_proxy_snapshot,
-    get_misty_process_status, install_misty, install_plugin_bundle, launch_misty,
-    open_external_url, probe_paths, read_misty_log, restart_misty, save_authenticated_user,
-    save_verified_license, scan_local_plugins, set_plugin_enabled, sign_out_misty, stop_misty,
-    uninstall_plugin,
+    check_system, ensure_local_access_token, ensure_misty_folders, get_misty_process_status,
+    install_misty, install_plugin_bundle, launch_misty, open_external_url, probe_paths,
+    restart_misty, save_authenticated_user, save_verified_license, scan_local_plugins,
+    set_plugin_enabled, sign_out_misty, stop_misty, uninstall_plugin,
 };
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -124,9 +121,7 @@ pub fn run() {
             install_plugin_bundle,
             set_plugin_enabled,
             uninstall_plugin,
-            get_clipboard_proxy_snapshot,
             get_misty_process_status,
-            read_misty_log,
             open_external_url,
             proxy_snapshot,
             clipboard_snapshot,
@@ -248,13 +243,6 @@ pub fn run() {
             file_tools_chmod,
             file_tools_create_symlink,
             file_tools_read_symlink,
-            automation_rules_snapshot,
-            automation_rules_save,
-            automation_rules_delete,
-            automation_rules_run_now,
-            automation_watch_snapshot,
-            automation_watch_start,
-            automation_watch_stop,
         ])
         .run(tauri::generate_context!())
         .expect("failed to run Misty Tauri app");

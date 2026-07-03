@@ -80,60 +80,6 @@ struct LocalAccessClaims {
     exp: i64,
 }
 
-#[derive(Debug, Serialize)]
-pub struct LogFileSnapshot {
-    name: String,
-    path: String,
-    exists: bool,
-    size_bytes: u64,
-    content: String,
-}
-
-#[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct ClipboardFileRef {
-    display_name: String,
-    local_path: String,
-    remote_name: String,
-    remote_path: String,
-    is_dir: bool,
-}
-
-#[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct ClipboardPayload {
-    payload_id: String,
-    kind: String,
-    source_device_id: String,
-    source_device_name: String,
-    revision: u64,
-    created_unix_ms: i64,
-    text: String,
-    #[serde(default)]
-    file_refs: Vec<ClipboardFileRef>,
-}
-
-#[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct ClipboardDevice {
-    device_id: String,
-    device_name: String,
-    last_seen_unix_ms: i64,
-    online: bool,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct ClipboardDevicesResponse {
-    #[serde(default)]
-    devices: Vec<ClipboardDevice>,
-}
-
-#[derive(Debug, Serialize)]
-pub struct ClipboardProxySnapshot {
-    proxy_running: bool,
-    proxy_url: Option<String>,
-    devices: Vec<ClipboardDevice>,
-    latest: Option<ClipboardPayload>,
-    error: Option<String>,
-}
-
 #[derive(Debug, Deserialize)]
 pub struct ReleaseManifest {
     version: String,
@@ -439,71 +385,6 @@ pub async fn install_misty(manifest_url: String, version: String) -> Result<Stri
 #[tauri::command]
 pub fn get_misty_process_status() -> MistyProcessStatus {
     current_misty_process_status()
-}
-
-#[tauri::command]
-pub async fn get_clipboard_proxy_snapshot(
-    state: tauri::State<'_, crate::runtime::MistyRuntime>,
-) -> Result<ClipboardProxySnapshot, String> {
-    let runtime = state.proxy_runtime.snapshot();
-    let proxy_running = runtime.ready;
-    if !proxy_running {
-        return Ok(ClipboardProxySnapshot {
-            proxy_running: false,
-            proxy_url: None,
-            devices: Vec::new(),
-            latest: None,
-            error: None,
-        });
-    }
-
-    let devices = state
-        .proxy
-        .get("/api/clipboard/devices")
-        .await
-        .map_err(|error| format!("Could not read embedded clipboard devices: {error}"))?;
-    if !devices.status().is_success() {
-        let status = devices.status();
-        let body = devices.text().await.unwrap_or_default();
-        return Ok(ClipboardProxySnapshot {
-            proxy_running,
-            proxy_url: None,
-            devices: Vec::new(),
-            latest: None,
-            error: Some(if body.is_empty() {
-                format!("Embedded clipboard devices failed: {}", status.as_u16())
-            } else {
-                body
-            }),
-        });
-    }
-    let devices = devices
-        .json::<ClipboardDevicesResponse>()
-        .await
-        .map_err(|error| format!("Clipboard devices JSON was invalid: {error}"))?
-        .devices;
-
-    let latest_response = state
-        .proxy
-        .get("/api/clipboard/latest")
-        .await
-        .map_err(|error| format!("Could not read embedded clipboard latest: {error}"))?;
-    let latest = if latest_response.status().is_success() {
-        latest_response
-            .json::<Option<ClipboardPayload>>()
-            .await
-            .map_err(|error| format!("Clipboard latest JSON was invalid: {error}"))?
-    } else {
-        None
-    };
-
-    Ok(ClipboardProxySnapshot {
-        proxy_running,
-        proxy_url: None,
-        devices,
-        latest,
-        error: None,
-    })
 }
 
 #[tauri::command]
@@ -2058,36 +1939,6 @@ fn append_hub_log(message: &str) {
         let timestamp = Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true);
         let _ = writeln!(file, "[{timestamp}] {message}");
     }
-}
-
-#[tauri::command]
-pub fn read_misty_log(name: String, max_bytes: Option<u64>) -> Result<LogFileSnapshot, String> {
-    let filename = component_log_filename(&name)?.to_string();
-    let path = misty_logs_dir()?.join(&filename);
-    let max_bytes = max_bytes.unwrap_or(256 * 1024).clamp(4 * 1024, 1024 * 1024);
-    if !path.exists() {
-        return Ok(LogFileSnapshot {
-            name: filename,
-            path: path.display().to_string(),
-            exists: false,
-            size_bytes: 0,
-            content: String::new(),
-        });
-    }
-
-    let metadata = fs::metadata(&path)
-        .map_err(|error| format!("Could not inspect {}: {error}", path.display()))?;
-    let bytes =
-        fs::read(&path).map_err(|error| format!("Could not read {}: {error}", path.display()))?;
-    let start = bytes.len().saturating_sub(max_bytes as usize);
-    let content = String::from_utf8_lossy(&bytes[start..]).to_string();
-    Ok(LogFileSnapshot {
-        name: filename,
-        path: path.display().to_string(),
-        exists: true,
-        size_bytes: metadata.len(),
-        content,
-    })
 }
 
 fn misty_bin_dir() -> Result<PathBuf, String> {

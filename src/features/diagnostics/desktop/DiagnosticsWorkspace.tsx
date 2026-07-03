@@ -1,1 +1,0 @@
-export { DiagnosticsWorkspace } from "../DiagnosticsWorkspace";
