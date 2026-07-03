@@ -1,14 +1,30 @@
 import { useState } from "react";
-import { NavLink, useNavigate } from "react-router-dom";
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import AuthCard from "../Auth/AuthCard";
 import AuthField from "../Auth/AuthField";
 import AuthMessage from "../Auth/AuthMessage";
 import AuthShell from "../Auth/AuthShell";
 import AuthSubmitButton from "../Auth/AuthSubmitButton";
-import { registerRequest } from "../Auth/api";
+import { useAuth } from "../../AuthContext";
+import { registerRequest, type AuthUser } from "../Auth/api";
+import { fetchMe, type MeResponse } from "../../../Account/desktop/api";
 
-export default function Register() {
+interface RegisterContext {
+  email: string;
+  password: string;
+  me: MeResponse | null;
+}
+
+interface RegisterProps {
+  onRegistered?: (user: AuthUser, context: RegisterContext) => void | Promise<void>;
+}
+
+export default function Register({ onRegistered }: RegisterProps = {}) {
   const navigate = useNavigate();
+  const location = useLocation();
+  const { setUser } = useAuth();
+  const from = (location.state as { from?: string })?.from || "/home";
+
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -21,8 +37,11 @@ export default function Register() {
     setLoading(true);
 
     try {
-      await registerRequest(name, email, password);
-      navigate("/signin");
+      const user = await registerRequest(name, email, password);
+      const me = onRegistered ? await fetchMe() : null;
+      await onRegistered?.(user, { email, password, me });
+      setUser(user);
+      navigate(from, { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not connect to server");
     } finally {

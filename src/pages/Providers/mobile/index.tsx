@@ -1,5 +1,4 @@
 import {
-  AlertCircle,
   ArrowLeft,
   CheckCircle2,
   ChevronRight,
@@ -339,8 +338,7 @@ function MobileRemoteCard(props: {
           <small className="block text-xs leading-[1.35] text-[#8792a0]">{props.remote.type}{externalConfig ? " · user config" : ""}</small>
         </div>
       </div>
-      <div className={`flex items-center gap-1.5 text-xs font-bold ${healthy ? "text-[#9ee6b2]" : "text-[#e9c775]"}`}>
-        {healthy ? <CheckCircle2 size={15} /> : <AlertCircle size={15} />}
+      <div className={`text-xs font-bold ${healthy ? "text-[#9ee6b2]" : "text-[#e9c775]"}`}>
         <span>{props.remote.statusLabel}</span>
       </div>
       {issueMessage ? <p className="m-0 text-[13px] leading-[1.35] text-[#a3adba]">{issueMessage}</p> : null}

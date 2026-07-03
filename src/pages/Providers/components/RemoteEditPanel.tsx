@@ -19,7 +19,10 @@ const staleWarningButtonClass =
   "shrink-0 rounded-[7px] border border-[color-mix(in_srgb,var(--misty-danger)_44%,var(--misty-border))] bg-[color-mix(in_srgb,var(--misty-danger)_10%,var(--misty-surface))] px-2.5 py-1.5 text-[var(--misty-danger)] disabled:opacity-55";
 
 const remoteEditPanelClass =
-  "grid min-h-0 grid-rows-[auto_minmax(0,1fr)_auto] overflow-auto";
+  "grid min-h-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden";
+
+const remoteEditBodyClass =
+  "min-h-0 overflow-auto";
 
 interface RemoteEditPanelProps {
   draft: RemoteEditDraft | null;
@@ -57,47 +60,49 @@ export function RemoteEditPanel(props: RemoteEditPanelProps) {
         </>}
       />
 
-      {loading ? (
-        <RemoteEditSkeleton />
-      ) : draft ? (
-        <>
-          {props.stale ? (
-            <div className={staleWarningClass}>
-              <span className="min-w-0 [overflow-wrap:anywhere]">This remote changed in another pane. Reload before saving.</span>
-              <button className={staleWarningButtonClass} type="button" onClick={props.onReload} disabled={props.working}>Reload</button>
-            </div>
-          ) : null}
-          <RemoteConfigForm
-            draft={draft}
-            configKeys={props.configKeys}
-            configPaths={props.configPaths}
-            tokenVisible={props.tokenVisible}
-            onDraftName={props.onDraftName}
-            onConfigField={props.onConfigField}
-            onTokenField={props.onTokenField}
-            onTokenVisible={props.onTokenVisible}
-          />
-          <RemoteEditActions
-            working={props.working}
-            dirty={props.dirty}
-            validRemoteName={props.validRemoteName}
-            stale={props.stale}
-            onTest={props.onTest}
-            onReveal={props.onReveal}
-            onSave={props.onSave}
-          />
-          <RemotePowerTools draft={draft} working={props.working} />
-        </>
-      ) : (
-        <div className="empty inline-flex max-w-[560px] items-center gap-[9px]">
-          <AssetIcon className="shrink-0 text-[var(--misty-accent)]" src={iconAssets.cloud24} size={22} />
-          <span>
-            {props.serviceError
-              ? "Start or reconnect the Misty remote service, then refresh Remotes."
-              : "Select a remote to view and edit its provider configuration."}
-          </span>
-        </div>
-      )}
+      <div className={remoteEditBodyClass}>
+        {loading ? (
+          <RemoteEditSkeleton />
+        ) : draft ? (
+          <>
+            {props.stale ? (
+              <div className={staleWarningClass}>
+                <span className="min-w-0 [overflow-wrap:anywhere]">This remote changed in another pane. Reload before saving.</span>
+                <button className={staleWarningButtonClass} type="button" onClick={props.onReload} disabled={props.working}>Reload</button>
+              </div>
+            ) : null}
+            <RemoteConfigForm
+              draft={draft}
+              configKeys={props.configKeys}
+              configPaths={props.configPaths}
+              tokenVisible={props.tokenVisible}
+              onDraftName={props.onDraftName}
+              onConfigField={props.onConfigField}
+              onTokenField={props.onTokenField}
+              onTokenVisible={props.onTokenVisible}
+            />
+            <RemoteEditActions
+              working={props.working}
+              dirty={props.dirty}
+              validRemoteName={props.validRemoteName}
+              stale={props.stale}
+              onTest={props.onTest}
+              onReveal={props.onReveal}
+              onSave={props.onSave}
+            />
+            <RemotePowerTools draft={draft} working={props.working} />
+          </>
+        ) : (
+          <div className="empty m-[18px] inline-flex max-w-[560px] items-center gap-[9px]">
+            <AssetIcon className="shrink-0 text-[var(--misty-accent)]" src={iconAssets.cloud24} size={22} />
+            <span>
+              {props.serviceError
+                ? "Start or reconnect the Misty remote service, then refresh Remotes."
+                : "Select a remote to view and edit its provider configuration."}
+            </span>
+          </div>
+        )}
+      </div>
     </Panel>
   );
 }
