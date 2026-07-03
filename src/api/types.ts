@@ -1129,62 +1129,6 @@ export interface FileToolsActionResult {
   message: string;
 }
 
-export interface AutomationRule {
-  id: string;
-  name: string;
-  enabled: boolean;
-  roots: string[];
-  conditions: SavedSearchRule[];
-  actions: string[];
-  updatedAtMs: number;
-}
-
-export interface AutomationRulesSnapshot {
-  rules: AutomationRule[];
-  activity: AutomationActivityEntry[];
-}
-
-export interface AutomationWatchSnapshot {
-  active: boolean;
-  pollIntervalMs: number;
-  watchedRuleCount: number;
-  watchedRoots: string[];
-  remoteRootCount: number;
-  lastScanMs: number;
-  lastRunMs: number;
-  lastMessage: string;
-}
-
-export interface AutomationActionResult {
-  action: string;
-  status: string;
-  message: string;
-  affectedPaths: string[];
-  queuedCount: number;
-}
-
-export interface AutomationActivityEntry {
-  id: string;
-  ruleId: string;
-  ruleName: string;
-  startedAtMs: number;
-  dryRun: boolean;
-  matchedCount: number;
-  queuedCount: number;
-  message: string;
-  actionResults: AutomationActionResult[];
-}
-
-export interface AutomationRunResult {
-  ruleId: string;
-  activityId: string;
-  dryRun: boolean;
-  matchedPaths: string[];
-  queuedCount: number;
-  actionResults: AutomationActionResult[];
-  message: string;
-}
-
 export interface PluginDiagnosticsEntry {
   pluginId: string;
   pluginName: string;

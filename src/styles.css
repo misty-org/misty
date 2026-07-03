@@ -72,7 +72,7 @@
   width: 100%;
   height: 100%;
   overflow: hidden;
-  background: transparent;
+  background: var(--misty-bg);
   color: var(--misty-text);
 }
 
@@ -329,7 +329,7 @@ body {
   min-height: 600px;
   height: 100%;
   overflow: hidden;
-  background: transparent;
+  background: var(--misty-bg);
   color: var(--misty-text);
   font-size: var(--misty-body-font-size);
 }
@@ -339,7 +339,7 @@ body {
   height: 100%;
   min-height: 0;
   overflow: hidden;
-  background: transparent;
+  background: var(--misty-bg);
 }
 
 button,

@@ -10,10 +10,6 @@ import type {
   ArchiveListResult,
   AppSnapshot,
   AppEnvironmentSnapshot,
-  AutomationRule,
-  AutomationRulesSnapshot,
-  AutomationRunResult,
-  AutomationWatchSnapshot,
   ClaudeSendRequest,
   ClaudeStatus,
   ClaudeStreamEvent,
@@ -291,24 +287,6 @@ function browserSmokeFallback<T>(command: string, args?: Record<string, unknown>
     case "saved_searches_save":
     case "saved_searches_delete":
       return Promise.resolve({ searches: [] } as T);
-    case "automation_rules_snapshot":
-    case "automation_rules_save":
-    case "automation_rules_delete":
-      return Promise.resolve({ rules: [], activity: [] } as T);
-    case "automation_watch_snapshot":
-    case "automation_watch_start":
-    case "automation_watch_stop":
-      return Promise.resolve(browserAutomationWatchSnapshot(args?.pollIntervalMs as number | undefined) as T);
-    case "automation_rules_run_now":
-      return Promise.resolve({
-        ruleId: String(args?.id ?? ""),
-        activityId: "browser",
-        dryRun: args?.dryRun !== false,
-        matchedPaths: [],
-        queuedCount: 0,
-        actionResults: [],
-        message: "Automation runs are only available in the Tauri app.",
-      } as T);
     default:
       return null;
   }
@@ -340,27 +318,6 @@ const browserPluginDefinitions = [
       ["plugin.themes.builtin.apply_graphite", "Themes: Apply Graphite preset", "apply_graphite", false],
       ["plugin.themes.builtin.apply_aurora", "Themes: Apply Aurora preset", "apply_aurora", false],
       ["plugin.themes.builtin.apply_copper", "Themes: Apply Copper preset", "apply_copper", false],
-    ],
-  },
-  {
-    id: "vault",
-    name: "Vault",
-    title: "Vault",
-    views: ["Dock"],
-    commands: [
-      ["plugin.vault.builtin.setup_backup", "Vault: Create backup job scaffold", "setup_backup", false],
-      ["plugin.vault.builtin.backup_status", "Vault: Review backup status", "backup_status", false],
-      ["plugin.vault.builtin.restore_plan", "Vault: Prepare restore plan", "restore_plan", false],
-    ],
-  },
-  {
-    id: "ytdlp",
-    name: "yt-dlp",
-    title: "yt-dlp",
-    views: ["Files", "Dock", "Extensions"],
-    commands: [
-      ["plugin.ytdlp.builtin.download_video", "yt-dlp: Download video from URL file", "download_video", true],
-      ["plugin.ytdlp.builtin.download_audio", "yt-dlp: Download audio from URL file", "download_audio", true],
     ],
   },
 ] as const;
@@ -426,7 +383,7 @@ function browserPluginCommandRun(request?: RunPluginCommandRequest): PluginComma
       pluginName: "",
       label: "",
       handled: false,
-      targetRoute: "/hub/extensions",
+      targetRoute: "/extensions",
       message: "Extension command was not found in browser smoke mode.",
       notifications: [],
       runtimeStatus: "not_found",
@@ -511,24 +468,6 @@ function browserPluginPanelElements(pluginId: string, request?: RenderPluginPane
         button("apply_copper", "Copper"),
         input("accent", request?.inputs?.accent ?? "#7da2b4"),
         button("save_accent", "Save Accent"),
-      ];
-    case "vault":
-      return [
-        text("Vault"),
-        text("Create backup job scaffolds, review status, and prepare restore plans."),
-        separator(),
-        button("setup_backup", "Create Backup Job"),
-        button("backup_status", "Backup Status"),
-        button("restore_plan", "Prepare Restore Plan"),
-      ];
-    case "ytdlp":
-      return [
-        text("yt-dlp"),
-        text("Paste a URL and download media through yt-dlp in the Tauri app."),
-        input("url", request?.inputs?.url ?? "https://"),
-        separator(),
-        button("download_video", "Download Video"),
-        button("download_audio", "Download Audio"),
       ];
     default:
       return [text("Extension panel")];
@@ -789,19 +728,6 @@ function browserOperationQueueSnapshot(): OperationQueueSnapshot {
     bandwidthLimit: "",
     transferProfileId: "balanced",
     transferProfileName: "Balanced",
-  };
-}
-
-function browserAutomationWatchSnapshot(pollIntervalMs?: number): AutomationWatchSnapshot {
-  return {
-    active: false,
-    pollIntervalMs: Math.max(1000, pollIntervalMs ?? 5000),
-    watchedRuleCount: 0,
-    watchedRoots: [],
-    remoteRootCount: 0,
-    lastScanMs: 0,
-    lastRunMs: 0,
-    lastMessage: "Automation watching is only available in the Tauri app.",
   };
 }
 
@@ -1393,34 +1319,6 @@ export function fileToolsCreateSymlink(request: FileToolsSymlinkRequest): Promis
 
 export function fileToolsReadSymlink(request: FileToolsSymlinkTargetRequest): Promise<FileToolsSymlinkTargetResult> {
   return invoke("file_tools_read_symlink", { request });
-}
-
-export function automationRulesSnapshot(): Promise<AutomationRulesSnapshot> {
-  return invoke("automation_rules_snapshot");
-}
-
-export function automationRulesSave(rule: AutomationRule): Promise<AutomationRulesSnapshot> {
-  return invoke("automation_rules_save", { rule });
-}
-
-export function automationRulesDelete(id: string): Promise<AutomationRulesSnapshot> {
-  return invoke("automation_rules_delete", { id });
-}
-
-export function automationRulesRunNow(id: string, dryRun = true): Promise<AutomationRunResult> {
-  return invoke("automation_rules_run_now", { id, dryRun });
-}
-
-export function automationWatchSnapshot(): Promise<AutomationWatchSnapshot> {
-  return invoke("automation_watch_snapshot");
-}
-
-export function automationWatchStart(pollIntervalMs?: number): Promise<AutomationWatchSnapshot> {
-  return invoke("automation_watch_start", { pollIntervalMs });
-}
-
-export function automationWatchStop(): Promise<AutomationWatchSnapshot> {
-  return invoke("automation_watch_stop");
 }
 
 export function operationQueueResolveConflict(

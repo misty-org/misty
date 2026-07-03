@@ -8,7 +8,7 @@ const tauriDevHost = process.env.TAURI_DEV_HOST;
 export default defineConfig({
   resolve: {
     alias: {
-      "@website": path.resolve(__dirname, "src/features/hub/website"),
+      "@website": path.resolve(__dirname, "src/pages/Website"),
     },
   },
   plugins: [react(), tailwindcss()],
