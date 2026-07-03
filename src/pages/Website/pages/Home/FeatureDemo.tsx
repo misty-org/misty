@@ -27,11 +27,6 @@ const tabs = [
     key: "extensions",
     images: [{ src: mistyMainImage, alt: "Misty extensions view" }],
   },
-  {
-    label: "Vault",
-    key: "vault",
-    images: [{ src: mistyMainImage, alt: "Misty vault view" }],
-  },
 ];
 
 export default function FeatureDemo() {

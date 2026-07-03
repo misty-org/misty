@@ -1748,42 +1748,6 @@ fn selected_file_path(
     Ok(path)
 }
 
-fn selected_url(selected_paths: &[String]) -> Result<String, (&'static str, String)> {
-    let Some(value) = selected_paths
-        .iter()
-        .map(|path| path.trim())
-        .find(|path| !path.is_empty())
-    else {
-        return Err((
-            "missing_url",
-            "Select a .url or text file containing the video URL.".to_owned(),
-        ));
-    };
-    if is_url(value) {
-        return Ok(value.to_owned());
-    }
-    let text = fs::read_to_string(value).map_err(|error| {
-        (
-            "invalid_url_source",
-            format!("Could not read URL from {value}: {error}"),
-        )
-    })?;
-    text.lines()
-        .map(str::trim)
-        .find(|line| is_url(line))
-        .map(str::to_owned)
-        .ok_or_else(|| {
-            (
-                "missing_url",
-                format!("{value} does not contain an http(s) URL."),
-            )
-        })
-}
-
-fn is_url(value: &str) -> bool {
-    value.starts_with("https://") || value.starts_with("http://")
-}
-
 fn valid_hex_color(value: &str) -> bool {
     let Some(hex) = value.strip_prefix('#') else {
         return false;
@@ -2989,8 +2953,6 @@ mod tests {
         for (plugin_id, title, expected_element) in [
             ("quick_convert", "Quick Convert", "convert_mp4"),
             ("themes", "Themes", "save_accent"),
-            ("vault", "Vault", "setup_backup"),
-            ("ytdlp", "yt-dlp", "download_video"),
         ] {
             let panel = PluginPanelEntry {
                 id: format!("{plugin_id}.panel"),
@@ -3122,14 +3084,12 @@ mod tests {
         for (plugin_id, plugin_name, views) in [
             ("quick_convert", "Quick Convert", vec!["Files"]),
             ("themes", "Themes", vec!["Settings", "Extensions", "Dock"]),
-            ("vault", "Vault", vec!["Dock"]),
-            ("ytdlp", "yt-dlp", vec!["Extensions", "Dock", "Files"]),
         ] {
             write_installed_builtin_extension(&root, plugin_id, plugin_name, &views);
         }
 
         let snapshot = snapshot_plugin_commands(vec![root.clone()]).expect("snapshot");
-        for plugin_id in ["quick_convert", "themes", "vault", "ytdlp"] {
+        for plugin_id in ["quick_convert", "themes"] {
             assert!(
                 snapshot
                     .panels
@@ -3155,7 +3115,7 @@ mod tests {
         }
 
         let diagnostics = plugin_diagnostics_snapshot(vec![root.clone()]).expect("diagnostics");
-        for plugin_id in ["quick_convert", "themes", "vault", "ytdlp"] {
+        for plugin_id in ["quick_convert", "themes"] {
             let plugin = diagnostics
                 .plugins
                 .iter()
@@ -3187,9 +3147,13 @@ mod tests {
         let root = unique_test_plugin_dir("removed-extension-root");
         let git = root.join("git");
         let preview_panel = root.join("preview_panel");
+        let vault = root.join("vault");
+        let ytdlp = root.join("ytdlp");
         let themes = root.join("themes");
         fs::create_dir_all(&git).expect("git plugin dir");
         fs::create_dir_all(&preview_panel).expect("preview panel plugin dir");
+        fs::create_dir_all(&vault).expect("vault plugin dir");
+        fs::create_dir_all(&ytdlp).expect("ytdlp plugin dir");
         fs::create_dir_all(&themes).expect("themes plugin dir");
         fs::write(
             git.join("plugin.json"),
@@ -3228,30 +3192,59 @@ mod tests {
             .to_string(),
         )
         .expect("themes plugin json");
+        fs::write(
+            vault.join("plugin.json"),
+            serde_json::json!({
+                "id": "vault",
+                "name": "Vault",
+                "status": "installed",
+                "launcher": { "show_in_launcher": true },
+                "panels": [{ "id": "main", "title": "Vault Main" }]
+            })
+            .to_string(),
+        )
+        .expect("vault plugin json");
+        fs::write(
+            ytdlp.join("plugin.json"),
+            serde_json::json!({
+                "id": "ytdlp",
+                "name": "yt-dlp",
+                "status": "installed",
+                "launcher": { "show_in_launcher": true },
+                "panels": [{ "id": "main", "title": "yt-dlp Main" }]
+            })
+            .to_string(),
+        )
+        .expect("ytdlp plugin json");
 
         let snapshot = snapshot_plugin_commands(vec![root.clone()]).expect("snapshot");
         assert!(!git.exists());
         assert!(!preview_panel.exists());
+        assert!(!vault.exists());
+        assert!(!ytdlp.exists());
         assert!(themes.exists());
-        assert!(snapshot
-            .commands
-            .iter()
-            .all(|command| command.plugin_id != "git"));
-        assert!(snapshot.panels.iter().all(|panel| panel.plugin_id != "git"));
-        assert!(snapshot
-            .panels
-            .iter()
-            .all(|panel| panel.plugin_id != "preview-panel"));
+        for plugin_id in ["git", "preview-panel", "vault", "ytdlp"] {
+            assert!(snapshot
+                .commands
+                .iter()
+                .all(|command| command.plugin_id != plugin_id));
+            assert!(snapshot
+                .panels
+                .iter()
+                .all(|panel| panel.plugin_id != plugin_id));
+        }
         assert!(snapshot
             .commands
             .iter()
             .any(|command| command.plugin_id == "themes"));
 
         let diagnostics = plugin_diagnostics_snapshot(vec![root.clone()]).expect("diagnostics");
-        assert!(diagnostics
-            .plugins
-            .iter()
-            .all(|plugin| plugin.plugin_id != "git"));
+        for plugin_id in ["git", "preview-panel", "vault", "ytdlp"] {
+            assert!(diagnostics
+                .plugins
+                .iter()
+                .all(|plugin| plugin.plugin_id != plugin_id));
+        }
         assert!(diagnostics
             .plugins
             .iter()
