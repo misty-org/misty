@@ -478,7 +478,7 @@ function browserPluginDiagnosticsSnapshot(): PluginDiagnosticsSnapshot {
   const snapshot = browserPluginCommandsSnapshot();
   return {
     roots: snapshot.roots,
-    removedIds: ["git", "preview-panel", "preview_panel"],
+    removedIds: ["git", "preview-panel", "preview_panel", "vault", "ytdlp", "yt-dlp", "yt_dlp"],
     plugins: browserPluginDefinitions.map((plugin) => ({
       pluginId: plugin.id,
       pluginName: plugin.name,
