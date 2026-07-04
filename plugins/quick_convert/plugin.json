@@ -41,7 +41,7 @@
   "actions": [
     {
       "label": "Open",
-      "kind": "primary"
+      "kind": "open"
     }
   ],
   "launcher": {

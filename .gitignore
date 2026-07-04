@@ -1,54 +1,18 @@
-<<<<<<< HEAD
-# Prerequisites
-*.d
+.DS_Store
+node_modules/
+build/
+dist/
 
-# Compiled Object files
-*.slo
-*.lo
+*.d
 *.o
 *.obj
-
-# Precompiled Headers
-*.gch
-*.pch
-
-# Linker files
-*.ilk
-
-# Debugger Files
-*.pdb
-
-# Compiled Dynamic libraries
+*.a
+*.lib
 *.so
 *.dylib
 *.dll
-
-# Fortran module files
-*.mod
-*.smod
-
-# Compiled Static libraries
-*.lai
-*.la
-*.a
-*.lib
-
-# Executables
 *.exe
 *.out
 *.app
 
-# debug information files
-*.dwo
-=======
-.DS_Store
-build/
-dist/
-*.o
-*.obj
-*.so
-*.dylib
-*.dll
-
 **/.cache
->>>>>>> a2c23d2 (init)

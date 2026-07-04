@@ -1,21 +1,37 @@
 {
-  "schema_version": 2,
+  "schema_version": 3,
   "id": "preview-panel",
   "name": "Preview Panel",
-  "version": "@PROJECT_VERSION@",
+  "version": "0.1.0",
   "description": "Development preview scenes for Misty panel and modal work.",
   "author": "Misty",
   "enabled": true,
-  "platforms": ["@MISTY_HOST_OS@"],
+  "platforms": ["web"],
+  "runtime": {
+    "type": "web",
+    "entry": "../../index.html?plugin=preview-panel"
+  },
+  "launcher": {
+    "views": ["Development"],
+    "show_in_launcher": false,
+    "requires_selected_file": false,
+    "open_mode": "tab"
+  },
   "plugin": {
-    "abi_version": 4,
-    "variants": [
-      {
-        "os": "@MISTY_HOST_OS@",
-        "arch": "@MISTY_HOST_ARCH@",
-        "runtime": "",
-        "library": "@MISTY_PANEL_PREVIEW_VARIANT_LIBRARY@"
+    "runtime": "web",
+    "entry": "../../index.html?plugin=preview-panel"
+  },
+  "panels": [
+    {
+      "id": "preview-panel.panel",
+      "title": "Preview Panel",
+      "window_type": "panel",
+      "default_width": 720,
+      "default_height": 520,
+      "entry": "../../index.html?plugin=preview-panel",
+      "launcher": {
+        "views": ["Development"]
       }
-    ]
-  }
+    }
+  ]
 }

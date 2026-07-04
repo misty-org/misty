@@ -1,21 +1,37 @@
 {
-  "schema_version": 2,
+  "schema_version": 3,
   "id": "themes",
   "name": "Themes",
-  "version": "@PROJECT_VERSION@",
+  "version": "0.1.0",
   "description": "Customize Misty's theme tokens and apply presets like Gruvbox.",
   "author": "Misty",
   "enabled": true,
-  "platforms": ["@MISTY_HOST_OS@"],
+  "platforms": ["web"],
+  "runtime": {
+    "type": "web",
+    "entry": "../../index.html?plugin=themes"
+  },
+  "launcher": {
+    "views": ["settings", "plugins"],
+    "show_in_launcher": true,
+    "requires_selected_file": false,
+    "open_mode": "tab"
+  },
   "plugin": {
-    "abi_version": 4,
-    "variants": [
-      {
-        "os": "@MISTY_HOST_OS@",
-        "arch": "@MISTY_HOST_ARCH@",
-        "runtime": "",
-        "library": "@MISTY_THEMES_VARIANT_LIBRARY@"
+    "runtime": "web",
+    "entry": "../../index.html?plugin=themes"
+  },
+  "panels": [
+    {
+      "id": "themes.panel",
+      "title": "Themes",
+      "window_type": "panel",
+      "default_width": 560,
+      "default_height": 620,
+      "entry": "../../index.html?plugin=themes",
+      "launcher": {
+        "views": ["settings", "plugins"]
       }
-    ]
-  }
+    }
+  ]
 }

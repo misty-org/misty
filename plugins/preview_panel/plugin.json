@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "id": "preview-panel",
+  "name": "Preview Panel",
+  "version": "0.1.0",
+  "author": "Misty",
+  "status": "installed",
+  "overview": "Preview Panel provides React-based development scenes for Misty panel and modal work.",
+  "capabilities": [
+    "Render sandbox panel scenes with React",
+    "Prototype forms and action rows without native ABI rebuilds",
+    "Mirror Misty's web plugin panel surface"
+  ],
+  "where_it_appears": [
+    "Plugin sandbox"
+  ],
+  "permissions": [
+    "Local development only"
+  ],
+  "getting_started": [
+    "Run npm run dev.",
+    "Open the Preview Panel plugin.",
+    "Use the scene selector to switch between panel prototypes."
+  ],
+  "changelog": [
+    "v0.1.0 - Rebuilt the preview sandbox as a React panel."
+  ],
+  "links": [],
+  "actions": [
+    {
+      "label": "Open",
+      "kind": "open"
+    }
+  ],
+  "launcher": {
+    "views": ["Development"],
+    "show_in_launcher": false,
+    "requires_selected_file": false,
+    "open_mode": "tab"
+  }
+}
