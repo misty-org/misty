@@ -30,7 +30,7 @@ func (s *AIService) Memories() http.HandlerFunc {
 			}
 			agentID = identity.ID
 		}
-		items, err := s.database.MistyMemories(r.Context(), userID, strings.TrimSpace(r.URL.Query().Get("space_id")), 100, agentID)
+		items, err := s.database.MistyMemories(r.Context(), userID, "", 100, agentID)
 		if err != nil {
 			TestingWriteAIError(w, err)
 			return
@@ -68,7 +68,7 @@ func (s *AIService) Memory() http.HandlerFunc {
 				http.Error(w, "Invalid preference", http.StatusBadRequest)
 				return
 			}
-			err = s.database.UpdateAgentMemory(r.Context(), userID, agentID, input.SpaceID, chi.URLParam(r, "memoryID"), input.Content)
+			err = s.database.UpdateAgentMemory(r.Context(), userID, agentID, "", chi.URLParam(r, "memoryID"), input.Content)
 		} else {
 			err = s.database.ForgetMistyMemory(r.Context(), userID, chi.URLParam(r, "memoryID"), agentID)
 		}

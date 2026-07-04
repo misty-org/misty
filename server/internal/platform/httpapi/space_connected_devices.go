@@ -2,16 +2,17 @@ package api
 
 import (
 	"errors"
+	"net/http"
+	"time"
+
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	db "github.com/kannachi323/misty/server/internal/platform/postgres"
-	"net/http"
-	"time"
 )
 
 func writeSpacePeerError(w http.ResponseWriter, err error) {
-	if errors.Is(err, db.ErrSpaceForbidden) || errors.Is(err, db.ErrAppRuntimeForbidden) || errors.Is(err, db.ErrAppNotInstalled) {
-		http.Error(w, "Files access is unavailable in this Space", http.StatusForbidden)
+	if errors.Is(err, db.ErrSpaceForbidden) || errors.Is(err, db.ErrAppRuntimeForbidden) {
+		http.Error(w, "File sharing is unavailable", http.StatusForbidden)
 		return
 	}
 	writeAgentError(w, err)
@@ -27,11 +28,13 @@ func (s *AgentsService) UpdateSpaceConnectedDevicePresence() http.HandlerFunc {
 			return
 		}
 		spaceID := db.PersonalAppDeviceScope
-		if (body.SpaceID != "" && body.SpaceID != spaceID) || !p2pEndpointIDPattern.MatchString(body.EndpointID) || body.ProtocolVersion != db.SpacePeerProtocol || body.InstalledVersion == "" || len(body.InstalledVersion) > 128 || body.AuthorityGeneration < 1 || (body.ConnectionHint != "unknown" && body.ConnectionHint != "direct" && body.ConnectionHint != "relay") || !validJSONObject(body.Addressing) || containsLocalPath(body.Addressing) || containsClipboardValue(body.Addressing) {
+		if (body.SpaceID != "" && body.SpaceID != spaceID) || !p2pEndpointIDPattern.MatchString(body.EndpointID) || body.ProtocolVersion != db.SpacePeerProtocol || (body.ConnectionHint != "unknown" && body.ConnectionHint != "direct" && body.ConnectionHint != "relay") || !validJSONObject(body.Addressing) || containsLocalPath(body.Addressing) || containsClipboardValue(body.Addressing) {
 			http.Error(w, "invalid request", http.StatusBadRequest)
 			return
 		}
 		body.SpaceID = spaceID
+		body.InstalledVersion = db.FilesPeerVersion
+		body.AuthorityGeneration = db.FilesPeerGeneration
 		if err := s.database.UpdateSpaceDevicePresence(r.Context(), userID, chi.URLParam(r, "deviceID"), body); err != nil {
 			writeSpacePeerError(w, err)
 			return

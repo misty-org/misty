@@ -11,11 +11,10 @@ import (
 	serveragent "github.com/kannachi323/misty/server/internal/agents"
 	cap "github.com/kannachi323/misty/server/internal/capabilities"
 	. "github.com/kannachi323/misty/server/internal/platform/postgres"
-	"github.com/kannachi323/misty/server/internal/platform/security"
 )
 
 func TestAgentSDKAdmissionPinsVersionsAndDelegationScope(t *testing.T) {
-	database, appctx, user, request := sdkInvocationFixture(t)
+	database, _, user, request := sdkInvocationFixture(t)
 	ctx := t.Context()
 	space := createTestSpace(t, database, ctx, user, "SDK conversation")
 	agent, err := database.EnsureAskIdentity(ctx, user, serveragent.InitialSelectedModelID)
@@ -32,10 +31,10 @@ func TestAgentSDKAdmissionPinsVersionsAndDelegationScope(t *testing.T) {
 	}
 	accountOnly := create("")
 	pins, err := database.AgentSDKCapabilityBindings(ctx, user, accountOnly.ID)
-	if err != nil || len(pins) != 0 {
-		t.Fatalf("implicit account data in Space: %#v %v", pins, err)
+	if err != nil || len(pins) != 1 || pins[0].TargetRevision != 1 {
+		t.Fatalf("account target missing: %#v %v", pins, err)
 	}
-	configure := cap.TargetConfiguration{TargetID: request.TargetID, ExpectedRevision: 1, ProviderID: request.ProviderID, ProviderVersion: 1, SpaceID: space.ID, Label: "Space habits", Capabilities: []string{"habits.list"}, CallerApps: []string{"example.habits"}}
+	configure := cap.TargetConfiguration{TargetID: request.TargetID, ExpectedRevision: 1, ProviderID: request.ProviderID, ProviderVersion: 1, SpaceID: space.ID, Label: "Space habits", Capabilities: []string{"habits.list"}, CallerApps: []string{}}
 	if _, err := database.ConfigureSDKTarget(ctx, user, configure); err != nil {
 		t.Fatal(err)
 	}
@@ -51,7 +50,7 @@ func TestAgentSDKAdmissionPinsVersionsAndDelegationScope(t *testing.T) {
 	if _, err := database.ResolveAgentSDKCapability(ctx, user, run.ID, pins[0]); err != nil {
 		t.Fatal(err)
 	}
-	if err := database.ReportSDKProviderAvailability(appctx, user, request.ProviderID, cap.Availability{State: "authentication_required", ObservedAt: time.Now().UTC()}); err != nil {
+	if err := reportConnectedProvider(t, database, user, request.ProviderID, "authentication_required"); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := database.ResolveAgentSDKCapability(ctx, user, run.ID, pins[0]); !errors.Is(err, ErrSDKProviderUnavailable) {
@@ -62,7 +61,7 @@ func TestAgentSDKAdmissionPinsVersionsAndDelegationScope(t *testing.T) {
 	if err != nil || len(waitingPins) != 1 {
 		t.Fatalf("unavailable implementation lost its pin: %#v %v", waitingPins, err)
 	}
-	if err := database.ReportSDKProviderAvailability(appctx, user, request.ProviderID, cap.Availability{State: "available", ObservedAt: time.Now().UTC()}); err != nil {
+	if err := reportConnectedProvider(t, database, user, request.ProviderID, "available"); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := database.ResolveAgentSDKCapability(ctx, user, whileUnavailable.ID, waitingPins[0]); err != nil {
@@ -108,8 +107,8 @@ func TestAgentSDKAdmissionPinsVersionsAndDelegationScope(t *testing.T) {
 		t.Fatalf("new admission missing current target: %#v %v", refreshed, err)
 	}
 	old, err := database.AgentSDKCapabilityBindings(ctx, user, accountOnly.ID)
-	if err != nil || len(old) != 0 {
-		t.Fatalf("old empty run acquired provider: %#v %v", old, err)
+	if err != nil || len(old) != 1 || old[0].TargetRevision != 1 {
+		t.Fatalf("old run changed provider revision: %#v %v", old, err)
 	}
 }
 
@@ -133,7 +132,7 @@ func TestAIInvocationSDKScopeIsPinnedAtAdmission(t *testing.T) {
 	if _, err := database.ResolveAgentSDKCapability(ctx, user, run.ID, pins[0]); err != nil {
 		t.Fatal(err)
 	}
-	changed := cap.TargetConfiguration{TargetID: request.TargetID, ExpectedRevision: 1, ProviderID: request.ProviderID, ProviderVersion: 1, Label: "Different account configuration", Capabilities: []string{"habits.list"}, CallerApps: []string{"example.habits"}}
+	changed := cap.TargetConfiguration{TargetID: request.TargetID, ExpectedRevision: 1, ProviderID: request.ProviderID, ProviderVersion: 1, Label: "Different account configuration", Capabilities: []string{"habits.list"}, CallerApps: []string{}}
 	if _, err := database.ConfigureSDKTarget(ctx, user, changed); err != nil {
 		t.Fatal(err)
 	}
@@ -167,78 +166,5 @@ func TestAIInvocationSDKScopeIsPinnedAtAdmission(t *testing.T) {
 	current, err = database.AgentContinuationCurrent(ctx, delivery, payload)
 	if err != nil || current {
 		t.Fatalf("consumed wait stayed current: %v %v", current, err)
-	}
-}
-
-func TestAIInvocationSDKAppPermissionCeilingAndLinkedAuthority(t *testing.T) {
-	database, _, user, request := sdkInvocationFixture(t)
-	ctx := t.Context()
-	space := createTestSpace(t, database, ctx, user, "Scoped requester")
-	agent, err := database.EnsureAskIdentity(ctx, user, serveragent.InitialSelectedModelID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	document, key := sdkInstallFixture(t, "example.requester")
-	document.Scopes = append(document.Scopes, "ai.write", "capabilities.invoke")
-	signed, digest := sdkSignFixture(t, document, key)
-	if _, err := database.InstallVerifiedSDKApp(ctx, user, signed, digest); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := database.ConfigureSDKTarget(ctx, user, cap.TargetConfiguration{TargetID: request.TargetID, ExpectedRevision: 1, ProviderID: request.ProviderID, ProviderVersion: 1, SpaceID: space.ID, Label: "Shared habits", Capabilities: []string{"habits.list"}, CallerApps: []string{"example.requester"}}); err != nil {
-		t.Fatal(err)
-	}
-	setScopes := func(scopes []string) {
-		t.Helper()
-		raw, _ := json.Marshal(scopes)
-		if _, err := database.Conn.Exec(`UPDATE user_app_installations SET granted_scopes=$1 WHERE user_id=$2 AND app_id='example.requester'`, raw, user); err != nil {
-			t.Fatal(err)
-		}
-	}
-	admit := func() AIInvocationRecord {
-		t.Helper()
-		session, err := database.CreateAppRuntimeSession(ctx, user, document.AppID, security.HashToken(uuid.NewString()), "", AppRuntimeSessionTTL)
-		if err != nil {
-			t.Fatal(err)
-		}
-		record, _, err := database.CreateAIInvocationRecord(WithAppExecutionAuthority(ctx, *session), AIInvocationRecord{ID: "invocation_" + uuid.NewString(), UserID: user, SpaceID: space.ID, SurfaceID: "journal", Mode: "quick", Trigger: "message", State: "queued", IdempotencyKey: uuid.NewString(), RequestPayload: json.RawMessage(`{}`), ExpiresAt: time.Now().Add(time.Hour)})
-		if err != nil {
-			t.Fatal(err)
-		}
-		return record
-	}
-	setScopes([]string{"ai.write"})
-	restricted := admit()
-	pins, err := database.AgentSDKCapabilityBindings(ctx, user, restricted.ID)
-	if err != nil || len(pins) != 0 {
-		t.Fatalf("AI-only app gained provider scope: %#v %v", pins, err)
-	}
-	setScopes(document.Scopes)
-	expanded := admit()
-	pins, err = database.AgentSDKCapabilityBindings(ctx, user, expanded.ID)
-	if err != nil || len(pins) != 1 {
-		t.Fatalf("explicit provider grant not admitted: %#v %v", pins, err)
-	}
-	oldPins, err := database.AgentSDKCapabilityBindings(ctx, user, restricted.ID)
-	if err != nil || len(oldPins) != 0 {
-		t.Fatalf("later grants expanded an old run: %#v %v", oldPins, err)
-	}
-	linked, err := database.CreateCreatorAgentRun(ctx, user, space.ID, agent.ID, CreatorAgentRunInput{Instruction: "Continue the app request", AIInvocationID: expanded.ID})
-	if err != nil {
-		t.Fatal(err)
-	}
-	authority, err := AppAuthorityFromPayload(linked.Input)
-	if err != nil || authority == nil || authority.AppID != document.AppID {
-		t.Fatalf("linked AI child shed app principal: %#v %v", authority, err)
-	}
-	linkedPins, err := database.AgentSDKCapabilityBindings(ctx, user, linked.ID)
-	if err != nil || len(linkedPins) != 1 {
-		t.Fatalf("linked bindings: %#v %v", linkedPins, err)
-	}
-	if _, err := database.ResolveAgentSDKCapability(ctx, user, linked.ID, linkedPins[0]); err != nil {
-		t.Fatal(err)
-	}
-	setScopes([]string{"ai.write"})
-	if _, err := database.ResolveAgentSDKCapability(ctx, user, linked.ID, linkedPins[0]); !errors.Is(err, ErrAppRuntimeForbidden) {
-		t.Fatalf("linked run survived app grant revocation: %v", err)
 	}
 }

@@ -51,9 +51,9 @@ func TestCompileAgentIntentOnlyGrantsExplicitSpaceWrites(t *testing.T) {
 		{"Rename this Space to Launch Operations", []string{"tasks.query"}},
 		{"Can you rename Spaces?", []string{"tasks.query"}},
 		{"Do not rename this Space to Launch Operations", []string{"tasks.query"}},
-		{"Ask the Agent to summarize the launch risks", []string{"tasks.query", "agents.delegate"}},
-		{"Ask Researcher to summarize the launch risks", []string{"tasks.query", "agents.delegate"}},
-		{"Delegate this launch summary to Researcher", []string{"tasks.query", "agents.delegate"}},
+		{"Ask the Agent to summarize the launch risks", []string{"tasks.query", "ask.delegate"}},
+		{"Ask Researcher to summarize the launch risks", []string{"tasks.query", "ask.delegate"}},
+		{"Delegate this launch summary to Researcher", []string{"tasks.query", "ask.delegate"}},
 		{"Can you delegate work to Agents?", []string{"tasks.query"}},
 		{"Do not delegate this to the Agent", []string{"tasks.query"}},
 		{"Create a note", []string{"tasks.query", "notes.create"}},
@@ -270,7 +270,7 @@ func TestPrivateSpaceToolboxRegistrationsAreCompleteAndGuardWrites(t *testing.T)
 			t.Fatalf("write tool lacks approval or audit policy: %#v", descriptor)
 		}
 	}
-	want := []string{"context.get", "members.list", "members.resolve", "messages.search", "messages.send", "library.search", "tasks.query", "calendar.query", "tasks.create", "tasks.update", "agents.list", "agents.status", "agents.delegate", "notes.search", "notes.read", "notes.create", "notes.update", "drawings.list", "drawings.read", "drawings.create", "drawings.apply", "calendar.create", "calendar.update", "roadmaps.query", "roadmaps.read", "roadmaps.create", "roadmaps.update", "library.read", "library.update", "library.promote_attachment", "memory.remember", "memory.forget"}
+	want := []string{"context.get", "members.list", "members.resolve", "messages.search", "messages.send", "library.search", "tasks.query", "calendar.query", "tasks.create", "tasks.update", "ask.delegate", "notes.search", "notes.read", "notes.create", "notes.update", "drawings.list", "drawings.read", "drawings.create", "drawings.apply", "calendar.create", "calendar.update", "roadmaps.query", "roadmaps.read", "roadmaps.create", "roadmaps.update", "library.read", "library.update", "library.promote_attachment", "memory.list", "memory.update", "memory.remember", "memory.forget", "agents.list", "agents.configure", "spaces.list", "spaces.tools", "spaces.execute"}
 	if !reflect.DeepEqual(names, want) {
 		t.Fatalf("Toolbox tools = %v, want %v", names, want)
 	}
@@ -306,7 +306,7 @@ func TestCanonicalAndProviderActionsUseToolboxDescriptors(t *testing.T) {
 		}
 	}
 	want := []string{
-		"context.get", "members.list", "members.resolve", "messages.search", "messages.send", "library.search", "tasks.query", "calendar.query", "tasks.create", "tasks.update", "notes.search", "notes.read", "notes.create", "notes.update", "drawings.list", "drawings.read", "drawings.create", "drawings.apply", "calendar.create", "calendar.update", "roadmaps.query", "roadmaps.read", "roadmaps.create", "roadmaps.update", "library.read", "library.update", "library.promote_attachment", "agents.list", "agents.status", "memory.remember", "memory.forget",
+		"context.get", "members.list", "members.resolve", "messages.search", "messages.send", "library.search", "tasks.query", "calendar.query", "tasks.create", "tasks.update", "notes.search", "notes.read", "notes.create", "notes.update", "drawings.list", "drawings.read", "drawings.create", "drawings.apply", "calendar.create", "calendar.update", "roadmaps.query", "roadmaps.read", "roadmaps.create", "roadmaps.update", "library.read", "library.update", "library.promote_attachment", "memory.list", "memory.update", "memory.remember", "memory.forget",
 		"provider.figma.query", "provider.figma.write", "provider.github.query", "provider.github.write",
 	}
 	if !reflect.DeepEqual(names, want) {

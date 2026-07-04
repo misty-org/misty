@@ -326,15 +326,50 @@ async fn restore(app: tauri::AppHandle, expected: String) -> Result<SyncView, St
         .as_mut()
         .ok_or("Unlock device sync before restoring website sign-ins.")?;
     require_session(active, &expected)?;
-    restore_current(&app, active).await?;
+    restore_current(&app, active, RestoreMode::Explicit).await?;
     view(active).await
+}
+
+#[cfg(any(target_os = "macos", windows))]
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(super) enum RestoreMode {
+    Background,
+    Explicit,
+}
+
+#[cfg(any(target_os = "macos", windows))]
+pub(super) const RESTORE_DEFERRED: &str =
+    "Website sign-in sync is deferred while browser pages are open. Your local browsing is unchanged.";
+
+#[cfg(any(target_os = "macos", windows))]
+fn check_restore_mode<'a>(
+    mode: RestoreMode,
+    labels: impl Iterator<Item = &'a str>,
+) -> Result<(), String> {
+    // Hidden capture/storage helpers are not user pages. Include all other
+    // browser views, including popups and partially registered creations.
+    if mode == RestoreMode::Background
+        && labels.into_iter().any(|label| {
+            label.starts_with("misty-browser-")
+                && !label.starts_with("misty-browser-capture-")
+                && !label.starts_with("misty-browser-storage-")
+        })
+    {
+        return Err(RESTORE_DEFERRED.into());
+    }
+    Ok(())
 }
 
 #[cfg(any(target_os = "macos", windows))]
 pub(super) async fn restore_current(
     app: &tauri::AppHandle,
     active: &mut Session,
+    mode: RestoreMode,
 ) -> Result<(), String> {
+    // The caller holds the lifecycle write lease, so no page can be created
+    // between this check and activation. Background recovery must never close
+    // or reload a page, even if the incoming restore would succeed.
+    check_restore_mode(mode, app.webviews().keys().map(String::as_str))?;
     account_api(&active.scope.deployment, &active.scope.account_id)?;
     let status = active.handle.status.borrow().clone();
     if !matches!(status.phase, Phase::CatchingUp | Phase::Ready)
@@ -392,7 +427,9 @@ pub(super) async fn restore_current(
                 physical: generation.physical_id.clone(),
             });
         }
-        let _ = app.emit_to("main", "misty:browser-profile-changed", &active.id);
+        if mode == RestoreMode::Explicit {
+            let _ = app.emit_to("main", "misty:browser-profile-changed", &active.id);
+        }
         return result.map(|_| ()).map_err(|_| {
             "Could not refresh incoming website sign-ins. Reconnect to retry.".into()
         });
@@ -431,7 +468,7 @@ pub(super) async fn restore_current(
         *selected_profile().lock().map_err(|_| "Browser profile state is unavailable")? = Some(SelectedProfile { logical: logical.clone(), physical });
         Ok(())
     }.await;
-    if closed_live_views {
+    if closed_live_views && mode == RestoreMode::Explicit {
         // Reopen only after the write lease is released. The frontend discards
         // old view handles and reconstructs visible panes from its workspace.
         let _ = app.emit_to("main", "misty:browser-profile-changed", &active.id);
@@ -451,6 +488,31 @@ pub(super) async fn restore_current(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(any(target_os = "macos", windows))]
+    #[test]
+    fn background_restore_never_replaces_open_pages() {
+        for label in [
+            "misty-browser-tab-one",
+            "misty-browser-popup-one",
+            "misty-browser-partial",
+        ] {
+            assert_eq!(
+                check_restore_mode(RestoreMode::Background, [label].into_iter()),
+                Err(RESTORE_DEFERRED.into())
+            );
+            assert!(check_restore_mode(RestoreMode::Explicit, [label].into_iter()).is_ok());
+        }
+        assert!(check_restore_mode(
+            RestoreMode::Background,
+            [
+                "main",
+                "misty-browser-capture-one",
+                "misty-browser-storage-one"
+            ]
+            .into_iter()
+        )
+        .is_ok());
+    }
     #[test]
     fn initial_capture_deduplicates_pending_data_and_never_replaces_a_received_version() {
         let profile = "a".repeat(64);

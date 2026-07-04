@@ -37,13 +37,18 @@ func (s *SpacesService) meterPersonalAgentRuntimeModel(ctx context.Context, run 
 	if model == "" {
 		model = serveragent.InitialSelectedModelID
 	}
-	_, err = serveragent.ReserveUsage(s.usageMeter, run.RequestingMemberID, run.SpaceID, personalAgentRuntimeUsageKey(run.ID), db.CreditMeterAgentAI, "ai-gateway", model, 32_000, serveragent.MaxModelOutputTokens)
+	_, err = serveragent.ReserveUsage(s.usageMeter, run.RequestingMemberID, run.SpaceID, "agent-runtime:"+run.ID+":model:"+nodeID, db.CreditMeterAgentAI, "ai-gateway", model, 32_000, serveragent.MaxModelOutputTokens)
 	return err
 }
 
 func (s *SpacesService) settlePersonalAgentRuntimeUsage(ctx context.Context, run *db.SpaceRun, status string, raw json.RawMessage) error {
 	if s.usageMeter == nil || run == nil {
 		return nil
+	}
+	if meter, ok := s.usageMeter.(interface {
+		CompleteRuntime(context.Context, string, string, serveragent.ModelUsage) error
+	}); ok {
+		return meter.CompleteRuntime(ctx, run.RequestingMemberID, run.ID, agentRuntimeModelUsage(raw))
 	}
 	membership, err := s.database.AskExecutionContext(ctx, run.RequestingMemberID, run.SpaceID, run.AgentID)
 	if err != nil {
@@ -81,13 +86,18 @@ func (s *SpacesService) meterAIInvocationRuntimeModel(ctx context.Context, recor
 		return nil
 	}
 	modelID := aiInvocationMeteredModel(record)
-	_, err := serveragent.ReserveUsage(s.usageMeter, record.UserID, record.SpaceID, aiInvocationRuntimeUsageKey(record.ID), "assistant_ai", "ai-gateway", modelID, 32_000, serveragent.MaxModelOutputTokens)
+	_, err := serveragent.ReserveUsage(s.usageMeter, record.UserID, record.SpaceID, "agent-runtime:"+record.ID+":model:"+nodeID, "assistant_ai", "ai-gateway", modelID, 32_000, serveragent.MaxModelOutputTokens)
 	return err
 }
 
 func (s *SpacesService) settleAIInvocationRuntimeUsage(record *db.AIInvocationRecord, status string, raw json.RawMessage) error {
 	if s.usageMeter == nil || record == nil {
 		return nil
+	}
+	if meter, ok := s.usageMeter.(interface {
+		CompleteRuntime(context.Context, string, string, serveragent.ModelUsage) error
+	}); ok {
+		return meter.CompleteRuntime(context.Background(), record.UserID, record.ID, agentRuntimeModelUsage(raw))
 	}
 	modelID := aiInvocationMeteredModel(record)
 	key := aiInvocationRuntimeUsageKey(record.ID)

@@ -15,15 +15,13 @@ const workflowJobPath = (deviceId: string, jobId: string) =>
   `${devicePath(deviceId)}/workflow-node-jobs/${encodeURIComponent(jobId)}`;
 
 export interface SpaceDevicePresenceInput {
-  installedVersion: string;
-  authorityGeneration: number;
   endpointId: string;
   addressing: Record<string, unknown>;
   protocolVersion: "misty-device/2";
   connectionHint: "unknown" | "direct" | "relay";
 }
 const spaceDevicePath = (deviceId: string, _spaceId: string) => {
-  return `${devicePath(deviceId)}/apps/files`;
+  return `${devicePath(deviceId)}/files`;
 };
 
 export const devicesApi = {

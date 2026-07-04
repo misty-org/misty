@@ -1,7 +1,7 @@
 import { MultiPanelWorkspace } from "./MultiPanelWorkspace";
 import { createMultiPanelStore } from "./useMultiPanelStore";
 import { act } from "react";
-import { renderExplorerBottomBar } from "@/features/files/explorer/workspace/ExplorerWorkspaceChrome";
+import { renderExplorerBottomBar } from "@/features/files/workspace/explorer/workspace/ExplorerWorkspaceChrome";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 

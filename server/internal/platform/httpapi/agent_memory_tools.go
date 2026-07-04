@@ -19,7 +19,7 @@ const (
 
 func memoryAgentToolDescriptors() []agenttools.Descriptor {
 	return []agenttools.Descriptor{
-		{Name: "memory.list", Version: 1, Description: "Review this agent's remembered preferences in this Space and personal preferences. Only these scopes are returned.", Risk: serveragent.RiskRead, InputSchema: TestingMustAPIRawJSON(map[string]any{"type": "object", "properties": map[string]any{}, "additionalProperties": false}), OutputSchema: agentToolObjectOutputSchema(), Approval: agenttools.ApprovalNone, Locality: agenttools.LocalityServer, Idempotent: true, Sources: agentToolboxSpaceSources},
+		{Name: "memory.list", Version: 1, Description: "Review this agent's account-wide remembered preferences.", Risk: serveragent.RiskRead, InputSchema: TestingMustAPIRawJSON(map[string]any{"type": "object", "properties": map[string]any{}, "additionalProperties": false}), OutputSchema: agentToolObjectOutputSchema(), Approval: agenttools.ApprovalNone, Locality: agenttools.LocalityServer, Idempotent: true, Sources: agentToolboxSpaceSources},
 		{Name: "memory.update", Version: 1, Description: "Correct a durable preference only when the user explicitly asks to change what is remembered. Preserve the existing scope. Use the memory ID from memory.list.", Risk: serveragent.RiskWrite, InputSchema: TestingMustAPIRawJSON(map[string]any{"type": "object", "required": []string{"memoryId", "content"}, "properties": map[string]any{"memoryId": map[string]any{"type": "string", "maxLength": 200}, "content": map[string]any{"type": "string", "minLength": 1, "maxLength": 1000}}, "additionalProperties": false}), OutputSchema: agentToolObjectOutputSchema(), Approval: agenttools.ApprovalExplicitIntent, Locality: agenttools.LocalityServer, Idempotent: true, Sources: agentToolboxSpaceSources, AuditEvent: "misty.memory.updated"},
 		{
 			Name: toolboxMemoryRemember, Version: 1,
@@ -30,7 +30,7 @@ func memoryAgentToolDescriptors() []agenttools.Descriptor {
 				"properties": map[string]any{
 					"content": map[string]any{"type": "string", "minLength": 1, "maxLength": 1000},
 					"kind":    map[string]any{"type": "string", "enum": []string{"fact", "preference", "instruction"}},
-					"scope":   map[string]any{"type": "string", "enum": []string{"personal", "space"}},
+					"scope":   map[string]any{"type": "string", "enum": []string{"personal"}},
 					"reason":  map[string]any{"type": "string", "maxLength": 500},
 				}, "additionalProperties": false,
 			}),
@@ -104,7 +104,7 @@ func executeAgentMemoryTool(ctx context.Context, database *db.Database, actor sp
 		return nil, true, db.ErrSpaceInvalid
 	}
 	input.Content = strings.TrimSpace(input.Content)
-	if input.Scope != "personal" && input.Scope != "space" || input.Scope == "space" && actor.spaceID == "" {
+	if input.Scope != "" && input.Scope != "personal" {
 		return nil, true, db.ErrSpaceInvalid
 	}
 	if (actor.agentID == "" && !mistyMemoryGroundedInPrompt(originalPrompt, input.Content)) || mistyMemoryLooksSensitive(input.Content) {

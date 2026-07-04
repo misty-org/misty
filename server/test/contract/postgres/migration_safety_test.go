@@ -7,7 +7,7 @@ import (
 )
 
 func TestUnifiedAgentMigrationPreservesSharedProductData(t *testing.T) {
-	raw, err := os.ReadFile("../../../internal/platform/postgres/migrations/20260831000000_unified_agent_workflows_v2.sql")
+	raw, err := os.ReadFile("../../../test/fixtures/schema-history/20260831000000_unified_agent_workflows_v2.sql")
 	if err != nil {
 		t.Fatal(err)
 	}

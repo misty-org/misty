@@ -1,4 +1,4 @@
-import { act } from "react";
+import { act, useEffect } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -27,6 +27,7 @@ vi.mock("./native", () => ({
   unlockNativeSync: mocks.unlock,
 }));
 vi.mock("./store", () => ({
+  browserSyncRetryEvent: "misty:retry-browser-sync",
   useBrowserSyncStore: { setState: mocks.setState },
 }));
 
@@ -64,6 +65,23 @@ describe("BrowserSyncStartup", () => {
       );
     });
     expect(container.textContent).toBe("Local workspace");
+  });
+
+  it("accepts a badge retry only for the active account", async () => {
+    mocks.read.mockResolvedValue(null);
+    mocks.unlock.mockRejectedValue(new Error("Unavailable"));
+    await act(async () =>
+      root.render(<BrowserSyncStartup accountId="account-1">Workspace</BrowserSyncStartup>),
+    );
+    expect(mocks.unlock).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      window.dispatchEvent(new CustomEvent("misty:retry-browser-sync", { detail: "other" }));
+    });
+    expect(mocks.unlock).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      window.dispatchEvent(new CustomEvent("misty:retry-browser-sync", { detail: "account-1" }));
+    });
+    expect(mocks.unlock).toHaveBeenCalledTimes(2);
   });
 
   it("restarts a terminal remembered session in the background", async () => {
@@ -146,13 +164,13 @@ describe("BrowserSyncStartup", () => {
     await mount();
     expect(mocks.unlock).toHaveBeenCalledTimes(1);
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(2_000);
+      await vi.advanceTimersByTimeAsync(30_000);
     });
     expect(mocks.unlock).toHaveBeenCalledTimes(2);
     expect(mocks.setState).toHaveBeenCalledWith({ session: opened, issue: null });
   });
 
-  it("retries immediately when connectivity returns and coalesces attempts", async () => {
+  it("does not bypass cooldown when connectivity flaps and coalesces attempts", async () => {
     mocks.read.mockResolvedValue(null);
     mocks.unlock.mockRejectedValueOnce(new Error("Offline"));
     await mount();
@@ -160,11 +178,66 @@ describe("BrowserSyncStartup", () => {
     await act(async () => {
       window.dispatchEvent(new Event("online"));
     });
+    expect(mocks.unlock).toHaveBeenCalledTimes(1);
     await act(async () => {
       window.dispatchEvent(new Event("online"));
       await vi.advanceTimersByTimeAsync(60_000);
     });
     expect(mocks.unlock).toHaveBeenCalledTimes(2);
+  });
+
+  it("keeps the interface and user input mounted through repeated startup failures", async () => {
+    const mounted = vi.fn();
+    const unmounted = vi.fn();
+    function Workspace() {
+      useEffect(() => {
+        mounted();
+        return unmounted;
+      }, []);
+      return <input defaultValue="Local draft" />;
+    }
+    mocks.read.mockResolvedValue(null);
+    mocks.unlock.mockRejectedValue(new Error("Sync unavailable"));
+    await act(async () =>
+      root.render(
+        <BrowserSyncStartup accountId="account-1">
+          <Workspace />
+        </BrowserSyncStartup>,
+      ),
+    );
+    const input = container.querySelector("input")!;
+    input.value = "Keep my unfinished work";
+    for (const delay of [30_000, 60_000, 120_000, 240_000, 300_000]) {
+      const attempts = mocks.unlock.mock.calls.length;
+      await act(async () => {
+        for (let i = 0; i < 20; i++) window.dispatchEvent(new Event("online"));
+        await vi.advanceTimersByTimeAsync(delay - 1);
+      });
+      expect(mocks.unlock).toHaveBeenCalledTimes(attempts);
+      await act(async () => vi.advanceTimersByTimeAsync(1));
+      expect(mocks.unlock).toHaveBeenCalledTimes(attempts + 1);
+      expect(container.querySelector("input")).toBe(input);
+      expect(input.value).toBe("Keep my unfinished work");
+    }
+    expect(mounted).toHaveBeenCalledTimes(1);
+    expect(unmounted).not.toHaveBeenCalled();
+  });
+
+  it("backs off repeated terminal exits even when a cached vault reopens successfully", async () => {
+    const existing = {
+      account_id: "account-1",
+      deployment: "https://misty.example/v1",
+      status: { phase: "attention" },
+    };
+    mocks.read.mockResolvedValue(existing);
+    mocks.unlock.mockResolvedValue({ ...existing, status: { phase: "connecting" } });
+    await mount();
+    await act(async () => vi.advanceTimersByTimeAsync(30_000));
+    expect(mocks.unlock).toHaveBeenCalledTimes(2);
+    await act(async () => vi.advanceTimersByTimeAsync(59_999));
+    expect(mocks.unlock).toHaveBeenCalledTimes(2);
+    await act(async () => vi.advanceTimersByTimeAsync(1));
+    expect(mocks.unlock).toHaveBeenCalledTimes(3);
   });
 
   it("leaves live workers to reconnect, but restarts workers that exit later", async () => {

@@ -1,26 +1,6 @@
-import { useAppsStore } from "@/features/apps";
-import { NAVIGATOR_APP_IDS, type WorkspaceTab } from "@/features/workspace";
+import type { WorkspaceTab } from "@/features/workspace";
 
-export function seedNavigatorApps() {
-  useAppsStore.setState({
-    accountId: "account-1",
-    ready: true,
-    catalog: [],
-    installations: NAVIGATOR_APP_IDS.map((id, pin_rank) => ({
-      app_id: id === "social" ? "chat" : id,
-      state: "installed" as const,
-      space_id: "space-a",
-      authority_generation: 1,
-      installed_version: "1.0.0",
-      permission_version: 1,
-      granted_scopes: [],
-      pinned: true,
-      pin_rank,
-      installed_at: "2026-01-01T00:00:00Z",
-      updated_at: "2026-01-01T00:00:00Z",
-    })),
-  });
-}
+export function seedNavigatorApps() {}
 
 export const spaceFixture = {
   id: "space-1",

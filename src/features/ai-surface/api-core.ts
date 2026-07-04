@@ -129,16 +129,16 @@ export function createAiSurfaceApi(
     memories: () => apiRequest<{ memories: AiMemoryRecord[] }>("/ai/memories"),
     forgetMemory: (memoryId: string) =>
       apiRequest<void>(`/ai/memories/${encodeURIComponent(memoryId)}`, { method: "DELETE" }),
-    activity: (spaceId: string,agentId?:string) => apiRequest<{entries: import("@/features/misty/activity").MistyActivityEntry[]}>(`/ai/activity?${new URLSearchParams({space_id:spaceId,...(agentId?{agent_id:agentId}:{})})}`),
+    activity: (spaceId: string, agentId?: string) =>
+      apiRequest<{ entries: import("@/features/misty/activity").MistyActivityEntry[] }>(
+        `/ai/activity?${new URLSearchParams({ space_id: spaceId, ...(agentId ? { agent_id: agentId } : {}) })}`,
+      ),
     conversations: () => apiRequest<{ conversations: AiConversationRecord[] }>("/ai/conversations"),
     conversation: (conversationId: string) =>
       apiRequest<AiConversationRecord>(`/ai/conversations/${encodeURIComponent(conversationId)}`),
     updatePreference: (
       surfaceId: string,
-      input: Pick<
-        AiSurfacePreferenceRecord,
-        "proactive_enabled" | "saved_actions"
-      >,
+      input: Pick<AiSurfacePreferenceRecord, "proactive_enabled" | "saved_actions">,
     ) =>
       apiRequest<{ preference: AiSurfacePreferenceRecord }>(
         `/ai/preferences/${encodeURIComponent(surfaceId)}`,
@@ -253,6 +253,19 @@ function toServerInvocation(input: AiInvocationRequest) {
     prompt: input.prompt,
     context: input.context.map(toServerContextReference),
     selection: input.selection,
+    companion_mode: input.companionMode,
+    companion_model: input.companionModel,
+    display_captures: input.displayCaptures?.map((c) => ({
+      id: c.id,
+      name: c.name,
+      mime_type: c.mimeType,
+      data_url: c.dataUrl,
+      width: c.width,
+      height: c.height,
+      content_hash: c.contentHash,
+      screen: c.screen,
+      primary: c.primary,
+    })),
     capture: input.capture
       ? {
           id: input.capture.id,
@@ -265,7 +278,10 @@ function toServerInvocation(input: AiInvocationRequest) {
         }
       : undefined,
     attachment_ids: input.attachmentIds,
-    agent_id:input.agentId,task_id:input.taskId,execution_mode:input.executionMode,window_label:input.windowLabel,
+    agent_id: input.agentId,
+    task_id: input.taskId,
+    execution_mode: input.executionMode,
+    window_label: input.windowLabel,
     device_contexts: input.deviceContexts?.map((context) => ({
       device_id: context.deviceId,
       kind: context.kind,

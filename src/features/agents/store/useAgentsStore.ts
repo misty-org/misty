@@ -1,4 +1,4 @@
-import { supportsPackagedDocuments } from "@/shared/platform/nativeServices";
+import { supportsBundledDocumentWorkers } from "@/shared/platform/nativeServices";
 import { invoke } from "@tauri-apps/api/core";
 import type {
   AgentCitation,
@@ -27,12 +27,12 @@ export async function agentsPrepareScopedDocument(
   },
   signal?: AbortSignal,
 ): Promise<PreparedAgentDocument> {
-  if (!supportsPackagedDocuments())
+  if (!supportsBundledDocumentWorkers())
     return invoke("agents_prepare_scoped_document", {
       request: { scopeId: request.scopeId, relativePath: request.relativePath },
     });
-  const { withNativeDocumentService } = await import("@/features/apps/nativeDocumentService");
-  return withNativeDocumentService(
+  const { withBuiltinService } = await import("@/features/builtin-services");
+  return withBuiltinService(
     "files",
     request.spaceId,
     (instance) =>

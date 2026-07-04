@@ -9,7 +9,7 @@ vi.mock("@/api/spaces/api", () => ({
   spaceRequest: (...args: unknown[]) => spaceRequestMock(...args),
 }));
 
-import { uploadDrawingBinaryFile } from "@/features/drawings/drawingAssets";
+import { uploadDrawingBinaryFile } from "@/features/journal/drawings/drawingAssets";
 import {
   clearJournalAssetCache,
   resolveJournalAssetUrl,

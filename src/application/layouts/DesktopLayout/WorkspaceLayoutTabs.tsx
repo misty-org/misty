@@ -1,3 +1,4 @@
+import { isSideDock, type DockPosition } from "@/features/app-shell/dockingLayout";
 import { dockPaneCloseDirection } from "@/features/workspace/dockTree";
 import { OverflowFadeText } from "@/shared/ui/overflow-fade-text";
 import {
@@ -22,7 +23,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   cn,
-  Button
+  Button,
 } from "@/shared/ui";
 import {
   activeLayoutView,
@@ -43,10 +44,13 @@ import {
 
 export function WorkspaceLayoutTabs(
   props: Omit<WorkspaceDockTreeProps, "node"> & {
+    position?: DockPosition;
     onNewTab(): void;
     onCloseLayoutTab(id: string): void;
   },
 ) {
+  const position = props.position ?? "top";
+  const vertical = isSideDock(position);
   const layout = useWorkspaceStore((state) => state.layout);
   const tabs = layoutTabs(layout);
   const ref = useRef<HTMLDivElement>(null);
@@ -55,11 +59,8 @@ export function WorkspaceLayoutTabs(
     dockLeaves(layout.root).find((pane) => pane.id === layout.focusedPaneId) ??
     dockLeaves(layout.root)[0];
   useEffect(() => {
-    const paneSelector =
-      typeof CSS !== "undefined" && CSS?.escape ? CSS.escape(pane.id) : pane.id;
-    const element = document.querySelector<HTMLElement>(
-      `[data-workspace-pane="${paneSelector}"]`,
-    );
+    const paneSelector = typeof CSS !== "undefined" && CSS?.escape ? CSS.escape(pane.id) : pane.id;
+    const element = document.querySelector<HTMLElement>(`[data-workspace-pane="${paneSelector}"]`);
     if (!element) return;
     const update = () => {
       const rect = element.getBoundingClientRect();
@@ -91,7 +92,7 @@ export function WorkspaceLayoutTabs(
     });
   const reorder = usePointerReorder({
     scope: "workspace-layout-tabs",
-    axis: "x",
+    axis: vertical ? "y" : "x",
     getDrag: (id) => {
       const tab = tabs.find((tab) => tab.id === id);
       return tab ? { id, label: layoutTabLabel(tab) } : null;
@@ -119,6 +120,24 @@ export function WorkspaceLayoutTabs(
         );
     },
   });
+  useEffect(() => {
+    ref.current
+      ?.querySelector('[aria-selected="true"]')
+      ?.scrollIntoView?.({ block: "nearest", inline: "nearest" });
+  }, [layout.activeLayoutTabId, position]);
+  const newTabButton = (
+    <Button
+      variant="ghost"
+      size="none"
+      className={cn(dockActionClass, vertical && "misty-side-new-tab")}
+      aria-label="New tab"
+      title="New tab"
+      onClick={props.onNewTab}
+    >
+      <Plus className="size-[15px]" size={15} />
+      {vertical && <span>New tab</span>}
+    </Button>
+  );
   const select = (id: string) => {
     const view = useWorkspaceStore.getState().selectLayoutTab(id);
     if (view) props.onOpen(view);
@@ -126,22 +145,34 @@ export function WorkspaceLayoutTabs(
   return (
     <header
       ref={ref}
+      data-tab-position={position}
       className={cn(
-        "flex h-[38px] min-w-0 shrink-0 items-center border-b border-charcoal-border bg-charcoal-workspace px-2",
+        "misty-workspace-tabs flex min-w-0 shrink-0 border-charcoal-border bg-charcoal-workspace",
         props.titlebarInsets?.animate && cn("transition-[padding]", navigatorMotionClass),
       )}
-      style={{
-        paddingLeft: 8 + (props.titlebarInsets?.left ?? 0),
-        paddingRight: 8 + (props.titlebarInsets?.right ?? 0),
-      }}
+      style={
+        vertical
+          ? undefined
+          : {
+              paddingLeft: 8 + (props.titlebarInsets?.left ?? 0),
+              paddingRight: 8 + (props.titlebarInsets?.right ?? 0),
+            }
+      }
       data-misty-window-titlebar-region={props.titlebarInsets ? "true" : undefined}
     >
+      {vertical && <div className="misty-side-tabs-heading">{newTabButton}</div>}
       <div
         {...reorder}
         role="tablist"
         aria-label="Window tabs"
+        aria-orientation={vertical ? "vertical" : "horizontal"}
         data-tour-target="workspace-tab-bar"
-        className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto overflow-y-hidden [scrollbar-width:none]"
+        className={cn(
+          "misty-workspace-tab-list flex min-w-0 flex-1 gap-1 [scrollbar-width:thin]",
+          vertical
+            ? "min-h-0 flex-col overflow-x-hidden overflow-y-auto"
+            : "items-center overflow-x-auto overflow-y-hidden",
+        )}
       >
         {tabs.map((tab) => {
           const active = tab.id === layout.activeLayoutTabId,
@@ -162,7 +193,10 @@ export function WorkspaceLayoutTabs(
                 data-reorder-preview="true"
                 data-misty-window-drag-block="true"
                 className={cn(
-                  "group/tab flex h-7 min-w-[80px] max-w-[160px] flex-[1_1_120px] items-center rounded-md border text-xs transition-colors duration-150 select-none focus-within:ring-1 focus-within:ring-cream-muted/50",
+                  "group/tab flex items-center rounded-md border text-xs transition-colors duration-150 select-none focus-within:ring-1 focus-within:ring-cream-muted/50",
+                  vertical
+                    ? "h-9 w-full shrink-0"
+                    : "h-7 min-w-[80px] max-w-[160px] flex-[1_1_120px]",
                   active
                     ? "border-charcoal-border/70 bg-charcoal-card text-cream-bright shadow-sm"
                     : "border-transparent text-cream-muted hover:bg-charcoal-card/40 hover:text-cream",
@@ -182,9 +216,9 @@ export function WorkspaceLayoutTabs(
                   onKeyDown={(event) => {
                     const index = tabs.findIndex((item) => item.id === tab.id);
                     const next =
-                      event.key === "ArrowRight"
+                      event.key === (vertical ? "ArrowDown" : "ArrowRight")
                         ? (index + 1) % tabs.length
-                        : event.key === "ArrowLeft"
+                        : event.key === (vertical ? "ArrowUp" : "ArrowLeft")
                           ? (index + tabs.length - 1) % tabs.length
                           : event.key === "Home"
                             ? 0
@@ -289,18 +323,14 @@ export function WorkspaceLayoutTabs(
             </Renameable>
           );
         })}
-        <Button
-          variant="ghost"
-          size="none"
-          className={dockActionClass}
-          aria-label="New tab"
-          title="New tab"
-          onClick={props.onNewTab}
-        >
-          <Plus className="size-[15px]" size={15} />
-        </Button>
+        {!vertical && newTabButton}
       </div>
-      <div className="ml-1.5 flex h-7 shrink-0 items-center gap-1">
+      <div
+        className={cn(
+          "flex shrink-0 items-center gap-1",
+          vertical ? "mt-2 border-t border-charcoal-border pt-2" : "ml-1.5 h-7",
+        )}
+      >
         {!props.windowsTitlebarControls ? (
           <>
             <Button

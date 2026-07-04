@@ -21,6 +21,7 @@ type StorageQuotaDimension struct {
 // contribution across owned and joined Spaces, rather than storage in Spaces
 // that user owns.
 type OwnerStorageUsage struct {
+	BillingAvailable   bool                     `json:"-"`
 	OwnerUserID        string                   `json:"owner_user_id,omitempty"`
 	UserID             string                   `json:"user_id,omitempty"`
 	UsedBytes          int64                    `json:"used_bytes"`
@@ -64,6 +65,7 @@ func personalStorageUsageTx(ctx context.Context, tx *sql.Tx, userID string) (Own
 		Scan(&out.UsedBytes, &out.ReservedBytes); err != nil {
 		return OwnerStorageUsage{}, err
 	}
+	out.BillingAvailable = entitlements.BillingAvailable
 	out.LimitBytes = entitlements.PersonalStorageLimitBytes
 	out.RemainingBytes = remainingStorageBytes(out.UsedBytes, out.ReservedBytes, out.LimitBytes)
 	out.OverQuota = out.UsedBytes+out.ReservedBytes > out.LimitBytes

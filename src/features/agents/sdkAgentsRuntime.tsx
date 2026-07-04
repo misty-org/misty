@@ -32,7 +32,7 @@ export async function createSdkAgentsRuntime(
   };
   const domain = <
     K extends
-      "agentsApi" | "assistantApi" | "aiSurfaceApi" | "automationsApi" | "mcpConnectionsApi",
+      "agentsApi" | "assistantApi" | "aiSurfaceApi" | "mcpConnectionsApi",
   >(
     name: K,
     prefix: string,
@@ -60,7 +60,6 @@ export async function createSdkAgentsRuntime(
     agentsApi: domain("agentsApi", "agents"),
     assistantApi: domain("assistantApi", "assistant"),
     aiSurfaceApi: domain("aiSurfaceApi", "ai"),
-    automationsApi: domain("automationsApi", "automations"),
     mcpConnectionsApi: domain("mcpConnectionsApi", "mcp"),
     useAuth: (() => ({ user: identity.user, transitioning: false })) as AgentsRuntime["useAuth"],
     useWorkspaceStore: workspace as unknown as AgentsRuntime["useWorkspaceStore"],

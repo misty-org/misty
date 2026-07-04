@@ -29,6 +29,7 @@ func joinQuotaTestSpace(t *testing.T, database *Database, ctx context.Context, o
 
 func TestPersonalStorageUsageAggregatesAcrossJoinedSpaces(t *testing.T) {
 	database := openTestDatabase(t)
+	useResourceAdapterFixture(t, database)
 	ctx := context.Background()
 	member, err := database.CreateUser("Basic Contributor", "global-storage-member@example.com", "password123")
 	if err != nil {
@@ -37,7 +38,7 @@ func TestPersonalStorageUsageAggregatesAcrossJoinedSpaces(t *testing.T) {
 	firstOwner, _ := database.CreateUser("First Max Owner", "global-storage-owner-1@example.com", "password123")
 	secondOwner, _ := database.CreateUser("Second Max Owner", "global-storage-owner-2@example.com", "password123")
 	for _, owner := range []User{*firstOwner, *secondOwner} {
-		if err := database.SetLicenseStateByID(owner.LicenseID, TierMax, LicenseStatusActive, nil); err != nil {
+		if err := setAdapterFixtureCohort(database, owner.LicenseID, TierMax, LicenseStatusActive, nil); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -62,6 +63,7 @@ func TestPersonalStorageUsageAggregatesAcrossJoinedSpaces(t *testing.T) {
 
 func TestSpaceStorageCapacityUsesOwnerPlanNotMemberPlan(t *testing.T) {
 	database := openTestDatabase(t)
+	useResourceAdapterFixture(t, database)
 	ctx := context.Background()
 	owner, err := database.CreateUser("Basic Space Owner", "space-capacity-owner@example.com", "password123")
 	if err != nil {
@@ -71,7 +73,7 @@ func TestSpaceStorageCapacityUsesOwnerPlanNotMemberPlan(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := database.SetLicenseStateByID(member.LicenseID, TierMax, LicenseStatusActive, nil); err != nil {
+	if err := setAdapterFixtureCohort(database, member.LicenseID, TierMax, LicenseStatusActive, nil); err != nil {
 		t.Fatal(err)
 	}
 	space := joinQuotaTestSpace(t, database, ctx, *owner, *member, "Basic owner capacity")
@@ -91,6 +93,7 @@ func TestSpaceStorageCapacityUsesOwnerPlanNotMemberPlan(t *testing.T) {
 
 func TestConcurrentReservationsAcrossSpacesCannotRacePersonalLimit(t *testing.T) {
 	database := openTestDatabase(t)
+	useResourceAdapterFixture(t, database)
 	ctx := context.Background()
 	member, err := database.CreateUser("Concurrent Contributor", "concurrent-storage-member@example.com", "password123")
 	if err != nil {
@@ -99,7 +102,7 @@ func TestConcurrentReservationsAcrossSpacesCannotRacePersonalLimit(t *testing.T)
 	firstOwner, _ := database.CreateUser("Concurrent Owner One", "concurrent-storage-owner-1@example.com", "password123")
 	secondOwner, _ := database.CreateUser("Concurrent Owner Two", "concurrent-storage-owner-2@example.com", "password123")
 	for _, owner := range []*User{firstOwner, secondOwner} {
-		if err := database.SetLicenseStateByID(owner.LicenseID, TierMax, LicenseStatusActive, nil); err != nil {
+		if err := setAdapterFixtureCohort(database, owner.LicenseID, TierMax, LicenseStatusActive, nil); err != nil {
 			t.Fatal(err)
 		}
 	}

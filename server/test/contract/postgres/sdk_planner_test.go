@@ -19,9 +19,6 @@ func TestSDKPlannerResolutionRequiresOriginAndPinsItsSpace(t *testing.T) {
 	}
 	first := createTestSpace(t, database, ctx, user.ID, "First")
 	second := createTestSpace(t, database, ctx, user.ID, "Second")
-	if _, err := database.InstallUserApp(ctx, user.ID, "planner", "1.1.0", 6, []string{"tasks.read", "tasks.write"}); err != nil {
-		t.Fatal(err)
-	}
 	if _, err := database.ResolveSDKTargets(ctx, user.ID, cap.TargetResolve{Capability: "tasks.create"}); !errors.Is(err, ErrSDKTargetClarification) {
 		t.Fatalf("missing Space selected an arbitrary Planner: %v", err)
 	}

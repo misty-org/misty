@@ -19,8 +19,6 @@ export function useCreateSpaceDialog(options: {
     name: string;
     template_id: string;
     integration_providers: SpaceIntegrationProvider[];
-    app_ids: string[];
-    app_permissions: Record<string, number>;
   }) => Promise<{ space: { id: string } }>;
   clearError: () => void;
 }) {
@@ -50,7 +48,6 @@ export function useCreateSpaceDialog(options: {
             name: item.name,
             description: item.description,
             version: item.version,
-            app_ids: [],
             personal: true,
             recommended_integrations: [],
             seed_summary: { task_count: 0, note_count: 0, collection_count: 0 },
@@ -102,8 +99,6 @@ export function useCreateSpaceDialog(options: {
         name: trimmed,
         template_id: templateId,
         integration_providers: [],
-        app_ids: [],
-        app_permissions: {},
       });
       setOpen(false);
       restoreDocumentInteractivityAfterModalClose();

@@ -28,7 +28,6 @@ export * from "./agents.js";
 export * from "./native-agents.js";
 export * from "./code-controls.js";
 export * from "./communications-capabilities.js";
-export * from "./routines.js";
 export * from "./task-capabilities.js";
 export * from "./space-apps.js";
 export * from "./documents.js";

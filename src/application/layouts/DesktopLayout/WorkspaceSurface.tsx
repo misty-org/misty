@@ -1,31 +1,34 @@
 import { SpaceWorkspaceSurface } from "@/features/spaces/SpaceWorkspaceSurface";
-import FilesPage from "@/features/files/explorer";
-import { BrowserWorkspace } from "@/features/browser/BrowserWorkspace";
+import FilesPage from "@/features/files/workspace/explorer";
+import { BrowserWorkspace } from "@/features/browser/workspace/BrowserWorkspace";
 import { AgentsPage } from "@/features/agents";
 import { WorkspaceTabRouteScope, type WorkspaceTab } from "@/features/workspace";
 import { migrateRetiredWorkspaceTab } from "@/features/workspace/workspaceMigrations";
 import { cn, Button } from "@/shared/ui";
 import { Plus } from "lucide-react";
+import { RenderErrorBoundary } from "../RenderErrorBoundary";
 
 export function WorkspaceSurface({ tab, active = true }: { tab: WorkspaceTab; active?: boolean }) {
   const current = migrateRetiredWorkspaceTab(tab);
   return (
-    <WorkspaceTabRouteScope tab={current}>
-      {current.surfaceId === "space" ? (
-        <SpaceWorkspaceSurface tab={current} />
-      ) : current.surfaceId === "agents" ? (
-        <AgentsPage />
-      ) : current.surfaceId === "files" ? (
-        <FilesPage
-          embedded
-          active={active}
-          workspaceId={current.id}
-          workspaceTitle={current.title}
-        />
-      ) : (
-        <BrowserWorkspace tab={current} />
-      )}
-    </WorkspaceTabRouteScope>
+    <RenderErrorBoundary key={`${current.id}:${current.surfaceId}`} scope="tab">
+      <WorkspaceTabRouteScope tab={current}>
+        {current.surfaceId === "space" ? (
+          <SpaceWorkspaceSurface tab={current} />
+        ) : current.surfaceId === "agents" ? (
+          <AgentsPage />
+        ) : current.surfaceId === "files" ? (
+          <FilesPage
+            embedded
+            active={active}
+            workspaceId={current.id}
+            workspaceTitle={current.title}
+          />
+        ) : (
+          <BrowserWorkspace tab={current} />
+        )}
+      </WorkspaceTabRouteScope>
+    </RenderErrorBoundary>
   );
 }
 

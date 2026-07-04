@@ -1,8 +1,3 @@
-import {
-  createAppNavigationRegistration,
-  useAppNavigationStore,
-} from "@/features/apps/appNavigation";
-import { createAppRpcScope } from "@/features/apps/rpc/session";
 import { useActivityStore } from "@/features/activity";
 import { useAiSurfaceStore } from "@/features/ai-surface";
 import { resetInboxAccountState, useInboxStore } from "@/features/inbox";
@@ -49,7 +44,6 @@ describe("GlobalNavigator disclosures", () => {
     });
     useWorkspaceStore.getState().reset();
     seedNavigatorApps();
-    useAppNavigationStore.setState({ entries: [], providerCache: [] });
     resetInboxAccountState();
     useNavigatorAppsStore.setState({
       appIdsByAccount: {},
@@ -159,33 +153,6 @@ describe("GlobalNavigator disclosures", () => {
     await act(async () => useInboxStore.setState({ selectedProvider: "" }));
 
     expect(useInboxStore.getState().selectedProvider).toBe("");
-  });
-
-  it("keeps native Agents navigation independent of legacy SDK registration", async () => {
-    const scope = createAppRpcScope({
-      identity: {
-        appId: "agents",
-        accountId: "account-1",
-        spaceId: "space-1",
-        instanceId: "agents-tab",
-      },
-      scopes: ["navigation.write"],
-      expiresAt: "2099-01-01T00:00:00Z",
-      isCurrentAccount: () => true,
-    });
-    createAppNavigationRegistration(scope).setItems([
-      { id: "activity", label: "Current agent activity", route: "/apps/agents" },
-    ]);
-    await renderNavigator("/discover");
-    expect(container.querySelector('a[aria-label="Agents"]')?.getAttribute("href")).toBe(
-      "/apps/agents",
-    );
-    expect(container.textContent).not.toContain("Current agent activity");
-    await act(async () => scope.close());
-    expect(container.querySelector('a[aria-label="Agents"]')?.getAttribute("href")).toBe(
-      "/apps/agents",
-    );
-    useAppNavigationStore.setState({ entries: [], providerCache: [] });
   });
 
   it("shows the current Agents Activity destination without a mounted app", async () => {

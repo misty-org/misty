@@ -22,7 +22,7 @@ func (db *Database) ValidatePersonalAgentTaskRun(ctx context.Context, userID, ru
 	return db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		var spaceID string
 		var active bool
-		if err := tx.QueryRowContext(ctx, `SELECT r.space_id,EXISTS(
+		if err := tx.QueryRowContext(ctx, `SELECT COALESCE(r.space_id,''),EXISTS(
 			SELECT 1 FROM agent_run_jobs j JOIN space_tasks t ON t.id=j.task_id
 			WHERE j.run_id=r.id AND j.state IN ('leased','dispatched') AND t.id=$2 AND t.assignee_agent_id=$3 AND t.archived_at IS NULL
 		) FROM space_runs r WHERE r.id=$1 AND r.state='running' AND r.requesting_member_id=$4`, runID, taskID, agentID, userID).Scan(&spaceID, &active); err != nil {
@@ -126,10 +126,6 @@ func (db *Database) ClaimPersonalAgentTaskRunJobs(ctx context.Context, workerID 
 					return err
 				}
 			}
-			if _, err := recordSpaceEventTx(ctx, tx, job.Run.SpaceID, job.Run.InitiatedByUserID, "agent.run.started", job.Run.ID,
-				map[string]any{"agent_id": job.Run.AgentID, "source_type": job.Run.SourceType, "task_id": job.Run.SourceTaskID, "attempt": job.Attempt}); err != nil {
-				return err
-			}
 			jobs = append(jobs, job)
 			seenAgents[candidate.agentID] = true
 		}
@@ -230,11 +226,10 @@ func (db *Database) RenewPersonalAgentTaskRunLease(ctx context.Context, runID, w
 	active := false
 	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		result, err := tx.ExecContext(ctx, `UPDATE agent_run_jobs j SET lease_expires_at=$1,updated_at=NOW()
-			FROM space_runs r,space_tasks t,misty_ask_identities a
+			FROM space_runs r,misty_ask_identities a
 			WHERE j.run_id=$2 AND j.lease_owner=$3 AND j.state='leased' AND r.id=j.run_id AND r.state='running'
-			  AND t.id=j.task_id AND t.assignee_agent_id=j.agent_id AND t.archived_at IS NULL
-			  AND a.id=j.agent_id AND a.owner_user_id=r.owner_user_id AND a.enabled AND a.deleted_at IS NULL
-			  AND EXISTS(SELECT 1 FROM space_members m WHERE m.space_id=j.space_id AND m.user_id=a.owner_user_id)`, time.Now().UTC().Add(lease), runID, workerID)
+			  AND (j.task_id IS NULL OR EXISTS(SELECT 1 FROM space_tasks t WHERE t.id=j.task_id AND t.assignee_agent_id=j.agent_id AND t.archived_at IS NULL))
+			  AND a.id=j.agent_id AND a.owner_user_id=r.owner_user_id AND a.enabled AND a.deleted_at IS NULL`, time.Now().UTC().Add(lease), runID, workerID)
 		if err != nil {
 			return err
 		}

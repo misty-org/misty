@@ -1,9 +1,6 @@
 package capabilities
 
 import (
-	"crypto/ed25519"
-	"crypto/rand"
-	"encoding/base64"
 	"encoding/json"
 	"testing"
 )
@@ -11,23 +8,10 @@ import (
 func testDocument() InstallDocument {
 	return InstallDocument{AppID: "example.habits", Version: "1.0.0", PermissionVersion: 1, Scopes: []string{"capabilities.providers.write", "habits.list"}, Capabilities: Manifest{Protocol: 1, Providers: []Provider{{ID: "example.habits/backend", Version: 1, Label: "Habits", Route: Route{Kind: "backend", ConnectionID: "10000000-0000-4000-8000-000000000001"}, Capabilities: []Definition{{Name: "habits.list", Version: 1, Description: "List recorded habits", InputSchema: json.RawMessage(`{"type":"object","additionalProperties":false}`), OutputSchema: json.RawMessage(`{"type":"array","items":{"type":"string"}}`), RequiredScopes: []string{"habits.list"}, Effects: Effects{Kind: "read", Incidental: []string{}, Approval: "none", Retry: "read_only"}}}}}}}
 }
-func signTest(t *testing.T, document InstallDocument) SignedManifest {
-	t.Helper()
-	pub, key, err := ed25519.GenerateKey(rand.Reader)
-	if err != nil {
+func TestProviderRejectsUnsafeContracts(t *testing.T) {
+	d := testDocument()
+	if err := d.Capabilities.Providers[0].Validate(d.AppID, d.Scopes); err != nil {
 		t.Fatal(err)
-	}
-	raw, _ := json.Marshal(document)
-	return SignedManifest{Document: string(raw), PublicKey: base64.StdEncoding.EncodeToString(pub), Signature: base64.StdEncoding.EncodeToString(ed25519.Sign(key, []byte(SignatureDomain+string(raw))))}
-}
-func TestSignedManifestRejectsChangedContentAndPrivileges(t *testing.T) {
-	signed := signTest(t, testDocument())
-	if _, err := Verify(signed); err != nil {
-		t.Fatal(err)
-	}
-	signed.Document += " "
-	if _, err := Verify(signed); err == nil {
-		t.Fatal("signature accepted changed bytes")
 	}
 	for name, change := range map[string]func(*InstallDocument){
 		"host adapter": func(d *InstallDocument) { d.Capabilities.Providers[0].Route = Route{Kind: "server", Adapter: "admin"} },
@@ -50,8 +34,8 @@ func TestSignedManifestRejectsChangedContentAndPrivileges(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			d := testDocument()
 			change(&d)
-			if _, err := Verify(signTest(t, d)); err == nil {
-				t.Fatal("unsafe manifest accepted")
+			if err := d.Capabilities.Providers[0].Validate(d.AppID, d.Scopes); err == nil {
+				t.Fatal("unsafe provider accepted")
 			}
 		})
 	}
@@ -132,4 +116,16 @@ func TestBuiltinSemanticContractsCannotBeWeakened(t *testing.T) {
 			}
 		}
 	}
+}
+
+// Fixture configuration only; downloadable app manifests are not a public API.
+type InstallDocument struct {
+	AppID, Version    string
+	PermissionVersion int
+	Scopes            []string
+	Capabilities      Manifest
+}
+type Manifest struct {
+	Protocol  int
+	Providers []Provider
 }

@@ -47,7 +47,7 @@ func (db *Database) CreateMCPRemoteConnection(ctx context.Context, item MCPRemot
 	if item.Provider == "" {
 		item.Provider = "custom"
 	}
-	if item.Provider != "custom" && item.Provider != "activepieces" {
+	if item.Provider != "custom" {
 		return nil, ErrSpaceInvalid
 	}
 	out := &MCPRemoteConnection{}
@@ -136,7 +136,7 @@ func (db *Database) UpdateMCPOAuthToken(ctx context.Context, item MCPOAuthCreden
 func (db *Database) MCPRemoteConnections(ctx context.Context, userID string) ([]MCPRemoteConnection, error) {
 	items := []MCPRemoteConnection{}
 	err := db.TestingWithRLSContext(ctx, userRLSSettings(userID), func(tx *sql.Tx) error {
-		rows, err := tx.QueryContext(ctx, `SELECT `+mcpConnectionColumns+` FROM mcp_remote_connections c WHERE c.owner_user_id=$1 AND c.revoked_at IS NULL ORDER BY c.updated_at DESC,c.id`, userID)
+		rows, err := tx.QueryContext(ctx, `SELECT `+mcpConnectionColumns+` FROM mcp_remote_connections c WHERE c.owner_user_id=$1 AND c.revoked_at IS NULL AND c.provider='custom' ORDER BY c.updated_at DESC,c.id`, userID)
 		if err != nil {
 			return err
 		}
@@ -156,7 +156,7 @@ func (db *Database) MCPRemoteConnections(ctx context.Context, userID string) ([]
 func (db *Database) MCPRemoteConnection(ctx context.Context, userID, connectionID string) (*MCPRemoteConnection, error) {
 	item := &MCPRemoteConnection{}
 	err := db.TestingWithRLSContext(ctx, userRLSSettings(userID), func(tx *sql.Tx) error {
-		return scanMCPConnection(tx.QueryRowContext(ctx, `SELECT `+mcpConnectionColumns+` FROM mcp_remote_connections c WHERE c.id=$1 AND c.owner_user_id=$2 AND c.revoked_at IS NULL`, connectionID, userID), item)
+		return scanMCPConnection(tx.QueryRowContext(ctx, `SELECT `+mcpConnectionColumns+` FROM mcp_remote_connections c WHERE c.id=$1 AND c.owner_user_id=$2 AND c.revoked_at IS NULL AND c.provider='custom'`, connectionID, userID), item)
 	})
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrSpaceNotFound

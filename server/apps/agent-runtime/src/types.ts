@@ -1,5 +1,6 @@
 export interface SpaceTaskContext {
- routine_execution?: import("@misty/contracts").MistyRoutineExecution;
+ /** Only retained to reject stale routine submissions. */
+ routine_execution?: unknown;
  sdk_execution?: import("./pinned-capability.js").PinnedCapabilityExecution;
   run_id: string;
   agent_id: string;
@@ -22,6 +23,8 @@ export interface SpaceTaskContext {
     status: string;
   };
   attached_sources: unknown[];
+  companion_mode?: "team" | "auto";
+  display_captures?: Array<NonNullable<SpaceTaskContext["capture"]> & { screen: string; primary: boolean }>;
   capture?: {
     id: string;
     name: string;

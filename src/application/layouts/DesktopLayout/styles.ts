@@ -143,8 +143,8 @@ export const workStatusToastDurationMs = 3500;
 // Where the top band's controls stop: traffic lights plus the shell's own
 // buttons, with a gap. The dock header keeps its tabs to the right of this,
 // minus whatever width the navigator rail already covers.
-export const desktopTitlebarControlsEnd = 240;
-export const windowsTitlebarControlsEnd = 264;
+export const desktopTitlebarControlsEnd = 272;
+export const windowsTitlebarControlsEnd = 336;
 export const desktopTitlebarNavigationInset = 84;
 export const windowsTitlebarNavigationInset = 8;
 

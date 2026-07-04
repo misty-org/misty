@@ -4,7 +4,6 @@ import type { CurrentLicense } from "@/features/installer";
 import { resetConnectionsAccountState } from "@/features/integrations";
 import { resetSpacesAccountState } from "@/features/spaces";
 import { useAppRouteMemoryStore } from "@/features/app-shell";
-import { resetAppsAccountState } from "@/features/apps";
 import { resetWorkspaceAccountState, useRecentToolsStore } from "@/features/workspace";
 import { resetProvidersAccountState } from "@/features/providers";
 import { resetAiSurfaceAccountState } from "@/features/ai-surface";
@@ -29,7 +28,6 @@ export function resetAccountScopedState(previousAccountId?: string): void {
   useActivityStore.getState().setAccount("");
   resetSpacesAccountState();
   resetConnectionsAccountState();
-  resetAppsAccountState();
   resetWorkspaceAccountState();
   useAppRouteMemoryStore.getState().resetAppRoute();
   useRecentToolsStore.getState().resetRecentTools();

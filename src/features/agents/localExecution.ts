@@ -26,6 +26,7 @@ export interface Execution {
   state: "running" | "paused" | "finished";
   views: string[];
   autopilot?: boolean;
+  normalTabs?: boolean;
   ready?: boolean;
   context: GlobalAiContextRef[];
   deviceContexts: AiInvocationDeviceContext[];
@@ -63,10 +64,12 @@ const lease = (execution: Execution) => ({
 export async function startLocalExecution(
   accountId: string,
   agentId: string,
-  spaceId: string,
+  _legacySpaceId: string,
   mode: "agent" | "team",
+  options?: { normalTabs: boolean; openWhenMissing?: boolean },
 ) {
-  if (visibleAutopilotAvailable() && mode !== "agent")
+  const spaceId = "";
+  if (!options?.normalTabs && visibleAutopilotAvailable() && mode !== "agent")
     throw new Error("Only Agent mode is available in this beta.");
   if (!hasTauriInternals() || !/Mac|Win/.test(navigator.platform))
     throw new Error("Agent execution requires Misty on macOS or Windows.");
@@ -83,7 +86,10 @@ export async function startLocalExecution(
   let previous = useLocalExecution.getState().execution;
   if (
     previous?.state === "finished" &&
-    (previous.agentId !== agentId || previous.spaceId !== spaceId || previous.mode !== mode)
+    (previous.agentId !== agentId ||
+      previous.spaceId !== spaceId ||
+      previous.mode !== mode ||
+      previous.normalTabs !== options?.normalTabs)
   ) {
     await finishLocalExecution();
     previous = null;
@@ -93,7 +99,8 @@ export async function startLocalExecution(
     (previous.accountId !== accountId ||
       previous.agentId !== agentId ||
       previous.spaceId !== spaceId ||
-      previous.mode !== mode)
+      previous.mode !== mode ||
+      previous.normalTabs !== options?.normalTabs)
   )
     throw new Error(
       "Stop the current task before changing its agent, mode, or conversation scope.",
@@ -107,8 +114,12 @@ export async function startLocalExecution(
     agentId,
     spaceId,
     mode,
+    normalTabs: options?.normalTabs,
     autopilot:
-      mode === "agent" && visibleAutopilotAvailable() && getCurrentWindow().label === "main",
+      !options?.normalTabs &&
+      mode === "agent" &&
+      visibleAutopilotAvailable() &&
+      getCurrentWindow().label === "main",
     state: "running",
     views: [...(previous?.ready ? previous.views : [])],
     context: [...(previous?.ready ? previous.context : [])],
@@ -169,6 +180,25 @@ export async function startLocalExecution(
     }, 10000);
     await (await import("./taskArtifacts")).trackTaskArtifacts(accountId);
     assertCurrent();
+    if (options?.normalTabs) {
+      const normal = await (
+        await import("./companion/normalTabs")
+      ).companionBrowserContext(assertCurrent, options.openWhenMissing);
+      assertCurrent();
+      execution.views = [];
+      execution.context = normal.context;
+      execution.deviceContexts = normal.deviceContexts;
+      for (const ref of normal.deviceContexts) {
+        await invoke("agent_workspace_bind_scope", {
+          taskId: execution.taskId,
+          scopeId: ref.opaqueRef,
+        });
+        assertCurrent();
+      }
+      execution.ready = true;
+      useLocalExecution.setState({ execution: { ...execution } });
+      return execution;
+    }
     if (previous) {
       const discarded = execution.deviceContexts.filter(
         (ref) =>

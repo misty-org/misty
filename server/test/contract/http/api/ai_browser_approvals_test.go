@@ -123,8 +123,8 @@ func TestAIInvocationBrowserApprovalResumesExactAction(t *testing.T) {
 	snapshot := json.RawMessage(`{"documentId":"` + document + `","url":"https://example.org/form","title":"Personal form","text":"A form","interactive":[{"ref":"ref-save","name":"Save <script>page hint</script>"}],"truncated":false}`)
 	execute(&mcp.CallToolParams{Name: "browser.inspect", Arguments: map[string]any{"scopeId": scope}, Meta: mcp.Meta{"misty/call_id": "inspect-first"}}, "browser.inspect", snapshot)
 	router := chi.NewRouter()
-	router.Get("/me/capability-approvals/{approvalID}", service.SDKCapabilityApprovalReview())
-	router.Post("/me/sdk-runs/{runID}/approvals/{approvalID}", service.SDKCapabilityApproval())
+	router.Get("/me/agent-approvals/{approvalID}", service.AgentBrowserApprovalReview())
+	router.Post("/me/agent-invocations/{runID}/approvals/{approvalID}", service.AgentBrowserApprovalDecision())
 	account := newConversationTestBearerToken(t, database, owner.ID)
 	other, err := database.CreateUser("Other reviewer", uniqueTestEmail("other-browser-review"), "password123")
 	if err != nil {
@@ -163,7 +163,7 @@ func TestAIInvocationBrowserApprovalResumesExactAction(t *testing.T) {
 		if job, _, err := database.ClaimWorkflowDeviceNodeJob(owner.ID, device.ID, time.Minute, 2); !errors.Is(err, db.ErrAgentJobNotFound) {
 			t.Fatalf("dispatched without approval: %#v %v", job, err)
 		}
-		reviewPath := "/me/capability-approvals/" + approval.ID
+		reviewPath := "/me/agent-approvals/" + approval.ID
 		response := performConversationRequest(t, router, http.MethodGet, reviewPath, account, nil)
 		var reviewed struct {
 			Review struct {
@@ -182,7 +182,7 @@ func TestAIInvocationBrowserApprovalResumesExactAction(t *testing.T) {
 				t.Fatalf("unauthorized review: %d %s", denied.Code, denied.Body.String())
 			}
 		}
-		decisionPath := "/me/sdk-runs/" + strings.TrimPrefix(id, "invocation_") + "/approvals/" + approval.ID
+		decisionPath := "/me/agent-invocations/" + strings.TrimPrefix(id, "invocation_") + "/approvals/" + approval.ID
 		self := performConversationRequest(t, router, http.MethodPost, decisionPath, token, map[string]any{"approved": true})
 		if self.Code != 401 && self.Code != 403 {
 			t.Fatalf("self approval: %d %s", self.Code, self.Body.String())

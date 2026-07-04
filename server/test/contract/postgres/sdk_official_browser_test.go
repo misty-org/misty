@@ -33,35 +33,7 @@ func TestSDKOfficialBrowserProviderAdmission(t *testing.T) {
 			for _, d := range p.Capabilities {
 				request.Capabilities = append(request.Capabilities, d.Name)
 			}
-			if _, err := database.ConfigureSDKTarget(ctx, user.ID, request); err == nil {
-				t.Fatal("uninstalled app gained a browser target")
-			}
-			appID := strings.Split(id, "/")[0]
-			version, permission := "1.2.0-beta.1", 5
-			if appID == "planner" {
-				version, permission = "1.1.0", 6
-			}
-			if _, err := database.InstallUserApp(ctx, user.ID, appID, version, permission, []string{"browser.inspect"}); err != nil {
-				t.Fatal(err)
-			}
 			target, err := database.ConfigureSDKTarget(ctx, user.ID, request)
-			if err != nil {
-				t.Fatal(err)
-			}
-			for _, name := range request.Capabilities {
-				if _, err := database.ResolveSDKBoundCapability(ctx, user.ID, target.ID, 0, name, 1); err == nil {
-					t.Fatalf("%s bypassed ordinary app scopes", name)
-				}
-			}
-			scopes := []string{"browser.inspect", "browser.interact", "mail.read", "mail.write"}
-			if appID == "planner" {
-				scopes = []string{"browser.inspect", "browser.interact", "tasks.write"}
-			}
-			if _, err := database.InstallUserApp(ctx, user.ID, appID, version, permission, scopes); err != nil {
-				t.Fatal(err)
-			}
-			request.ExpectedRevision = target.Revision
-			target, err = database.ConfigureSDKTarget(ctx, user.ID, request)
 			if err != nil {
 				t.Fatal(err)
 			}

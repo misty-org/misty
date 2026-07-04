@@ -65,7 +65,7 @@ export function prepareTauriDevelopment(args: string[]): string[] {
 }
 
 export function signDevelopmentBinary(binary: string, identity: string): void {
-  // Only the executable is signed. Do not modify Keychain ACLs, export keys,
+  // Sign the local dev executable or its app bundle. Do not modify Keychain ACLs, export keys,
   // or use a permissive custom requirement to conceal identity changes.
   execFileSync(
     "/usr/bin/codesign",

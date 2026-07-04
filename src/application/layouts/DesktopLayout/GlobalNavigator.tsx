@@ -1,7 +1,9 @@
 import { WebsiteGroupNavigator } from "@/features/browser-workspace/WebsiteGroupNavigator";
-import { type RefObject } from "react";
+import { useState, type RefObject } from "react";
+import { Globe, ChevronDown } from "lucide-react";
+import { isSideDock, type DockPosition } from "@/features/app-shell/dockingLayout";
 import { dockLeaves, parseBrowserTabState, useWorkspaceStore } from "@/features/workspace";
-import { cn } from "@/shared/ui";
+import { cn, Button, Popover, PopoverTrigger, PopoverContent } from "@/shared/ui";
 import {
   NavigatorHeaderHomeButton,
   NavigatorHeaderSpacesButton,
@@ -19,6 +21,7 @@ import {
 } from "./styles";
 
 export function GlobalNavigator(props: {
+  position?: DockPosition;
   profileAnchorRef: RefObject<HTMLButtonElement | null>;
   profileOpen: boolean;
   settingsOpen: boolean;
@@ -29,6 +32,8 @@ export function GlobalNavigator(props: {
   /** Present on desktop: drags (and double-click zooms) from the top band. */
   onTitlebarPointerDown?: (event: React.PointerEvent<HTMLElement>) => void;
 }) {
+  const horizontal = !isSideDock(props.position ?? "left");
+  const [groupsOpen, setGroupsOpen] = useState(false);
   const activeTab = useWorkspaceStore((state) => {
     const panes = dockLeaves(state.layout.root);
     const pane = panes.find((p) => p.id === state.layout.focusedPaneId) ?? panes[0];
@@ -38,8 +43,9 @@ export function GlobalNavigator(props: {
     <nav
       className={cn(
         "relative z-20 flex h-full min-h-0 w-full select-none flex-col items-stretch [--navigation-primary-icon-slot:24px]",
-        "overflow-hidden border-r border-charcoal-border bg-charcoal-workspace",
+        "misty-global-navigator overflow-hidden border-charcoal-border bg-charcoal-workspace",
       )}
+      data-dock-position={props.position ?? "left"}
       aria-label="Primary"
       data-tour-target="navigation"
       onPointerDown={props.onStartWindowDrag}
@@ -72,10 +78,10 @@ export function GlobalNavigator(props: {
       </div>
 
       <div
-        className="flex min-h-0 flex-1 flex-col overflow-hidden"
+        className="misty-navigator-body flex min-h-0 flex-1 flex-col overflow-hidden"
         data-misty-window-drag-block="true"
       >
-        <div className="grid content-start gap-1 overflow-y-auto px-3 pb-2">
+        <div className="misty-navigator-items grid content-start gap-1 overflow-y-auto px-3 pb-2">
           <NavigatorHeaderHomeButton
             path="/browser"
             active={
@@ -85,13 +91,37 @@ export function GlobalNavigator(props: {
           <NavigatorHeaderAgentsButton path="/agents" active={activeTab?.surfaceId === "agents"} />
           <NavigatorHeaderFilesButton path="/files" active={activeTab?.surfaceId === "files"} />
           <NavigatorHeaderSpacesButton active={activeTab?.surfaceId === "space"} />
-          <div className="mt-3">
-            <WebsiteGroupNavigator />
-          </div>
+          {horizontal ? (
+            <Popover open={groupsOpen} onOpenChange={setGroupsOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="ghost"
+                  className="shrink-0 gap-2 text-xs text-cream-muted"
+                  aria-label="Website groups"
+                >
+                  <Globe size={16} />
+                  Groups
+                  <ChevronDown size={12} />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent
+                side={props.position === "bottom" ? "top" : "bottom"}
+                align="start"
+                className="max-h-[min(520px,70vh)] w-72 overflow-y-auto p-2"
+              >
+                <WebsiteGroupNavigator onOpen={() => setGroupsOpen(false)} />
+              </PopoverContent>
+            </Popover>
+          ) : (
+            <div className="mt-3">
+              <WebsiteGroupNavigator />
+            </div>
+          )}
         </div>
       </div>
 
       <NavigatorProfileBar
+        compact={horizontal}
         profileAnchorRef={props.profileAnchorRef}
         profileOpen={props.profileOpen}
         settingsOpen={props.settingsOpen}

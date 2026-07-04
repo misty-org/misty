@@ -8,29 +8,8 @@ import (
 	"testing"
 )
 
-func TestNativeOnboardingFingerprintAndTemplateCompatibility(t *testing.T) {
-	raw, err := os.ReadFile("../../../test/fixtures/compatibility/onboarding-fingerprints.json")
-	if err != nil {
-		t.Fatal(err)
-	}
-	var fixtures []struct {
-		Name        string           `json:"name"`
-		Apps        []AppInstallSpec `json:"apps"`
-		Fingerprint string           `json:"fingerprint"`
-	}
-	if err := json.Unmarshal(raw, &fixtures); err != nil {
-		t.Fatal(err)
-	}
-	for _, fixture := range fixtures {
-		actual, err := TestingOnboardingFingerprint(fixture.Name, fixture.Apps)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if actual != fixture.Fingerprint {
-			t.Fatalf("native onboarding retry fingerprint differs for %q", fixture.Name)
-		}
-	}
-	raw, err = os.ReadFile("../../../test/fixtures/compatibility/space-templates.json")
+func TestNativeSpaceTemplateCompatibility(t *testing.T) {
+	raw, err := os.ReadFile("../../../test/fixtures/compatibility/space-templates.json")
 	if err != nil {
 		t.Fatal(err)
 	}

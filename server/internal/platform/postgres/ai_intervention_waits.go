@@ -85,7 +85,7 @@ func (db *Database) AwaitAgentUserIntervention(ctx context.Context, user, run, r
 		var contextID, device, label string
 		var expiry time.Time
 		var count int
-		err = tx.QueryRowContext(ctx, `SELECT c.id,c.device_id,c.display_name,LEAST(c.expires_at,r.expires_at,NOW()+INTERVAL '24 hours'),COUNT(*) OVER() FROM `+interventionContextsSQL+` c JOIN `+interventionRunsSQL+` r ON r.id=c.run_id AND r.user_id=c.user_id AND r.space_id=c.space_id JOIN trusted_devices d ON d.id=c.device_id AND d.user_id=c.user_id AND d.revoked_at IS NULL WHERE c.run_id=$1 AND c.user_id=$2 AND c.opaque_ref=$3 AND c.kind='browser_tab' AND c.state='attached' AND c.capabilities ? 'browser.inspect' AND c.expires_at>NOW() AND r.expires_at>NOW()`, run, user, scope).Scan(&contextID, &device, &label, &expiry, &count)
+		err = tx.QueryRowContext(ctx, `SELECT c.id,c.device_id,c.display_name,LEAST(c.expires_at,r.expires_at,NOW()+INTERVAL '24 hours'),COUNT(*) OVER() FROM `+interventionContextsSQL+` c JOIN `+interventionRunsSQL+` r ON r.id=c.run_id AND r.user_id=c.user_id JOIN trusted_devices d ON d.id=c.device_id AND d.user_id=c.user_id AND d.revoked_at IS NULL WHERE c.run_id=$1 AND c.user_id=$2 AND c.opaque_ref=$3 AND c.kind='browser_tab' AND c.state='attached' AND c.capabilities ? 'browser.inspect' AND c.expires_at>NOW() AND r.expires_at>NOW()`, run, user, scope).Scan(&contextID, &device, &label, &expiry, &count)
 		if err != nil {
 			return err
 		}
@@ -109,7 +109,7 @@ func (db *Database) AwaitAgentUserIntervention(ctx context.Context, user, run, r
 }
 func aiInterventionTargetValidTx(ctx context.Context, tx *sql.Tx, id string) (bool, error) {
 	var valid bool
-	err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM ai_intervention_waits w JOIN `+interventionRunsSQL+` r ON r.id=w.run_id AND r.user_id=w.user_id AND r.runtime_run_id=w.runtime_run_id JOIN `+interventionContextsSQL+` c ON c.id=w.context_id AND c.run_id=r.id AND c.user_id=r.user_id AND c.space_id=r.space_id AND c.device_id=w.device_id AND c.opaque_ref=w.scope_id JOIN trusted_devices d ON d.id=c.device_id AND d.user_id=c.user_id WHERE w.id=$1 AND c.kind='browser_tab' AND c.state='attached' AND c.capabilities ? 'browser.inspect' AND c.expires_at>NOW() AND d.revoked_at IS NULL AND r.expires_at>NOW())`, id).Scan(&valid)
+	err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM ai_intervention_waits w JOIN `+interventionRunsSQL+` r ON r.id=w.run_id AND r.user_id=w.user_id AND r.runtime_run_id=w.runtime_run_id JOIN `+interventionContextsSQL+` c ON c.id=w.context_id AND c.run_id=r.id AND c.user_id=r.user_id AND c.device_id=w.device_id AND c.opaque_ref=w.scope_id JOIN trusted_devices d ON d.id=c.device_id AND d.user_id=c.user_id WHERE w.id=$1 AND c.kind='browser_tab' AND c.state='attached' AND c.capabilities ? 'browser.inspect' AND c.expires_at>NOW() AND d.revoked_at IS NULL AND r.expires_at>NOW())`, id).Scan(&valid)
 	return valid, err
 }
 func (db *Database) AIUserInterventions(ctx context.Context, user string) ([]AIInterventionWait, error) {

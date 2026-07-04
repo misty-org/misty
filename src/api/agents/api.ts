@@ -1,4 +1,4 @@
-import { apiRequest } from "@/api/client";
+import { apiRequest, apiBlobRequest } from "@/api/client";
 import { createAgentsApi } from "./api-core";
 
-export const agentsApi = createAgentsApi(apiRequest);
+export const agentsApi = createAgentsApi(apiRequest, apiBlobRequest);

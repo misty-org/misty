@@ -27,24 +27,17 @@ type SpacePeerTicketSubject struct {
 	AuthorityGeneration int64
 }
 
-// The app lock is shared with install/update/remove, making generation checks
-// and presence writes atomic with changes to the environment.
-func requireSpacePeerAppTx(ctx context.Context, tx *sql.Tx, userID, spaceID string) (string, int64, error) {
-	if spaceID != PersonalAppDeviceScope {
+// File sharing is a first-party device capability. The wire version and generation
+// identify the protocol, never an app installation. Ownership, revocation, pairing
+// and freshness are checked for both endpoints when issuing a ticket.
+const FilesPeerVersion = "misty-device/2"
+const FilesPeerGeneration int64 = 1
+
+func requireSpacePeerAppTx(_ context.Context, _ *sql.Tx, userID, spaceID string) (string, int64, error) {
+	if userID == "" || spaceID != PersonalAppDeviceScope {
 		return "", 0, ErrAppRuntimeForbidden
 	}
-	if err := lockSpaceApps(ctx, tx, spaceID); err != nil {
-		return "", 0, err
-	}
-	var version string
-	var generation int64
-	err := tx.QueryRowContext(ctx, `SELECT installed_version,authority_generation FROM user_app_installations
- WHERE user_id=$1 AND app_id='files' AND state='installed' AND NOT consent_required
- AND granted_scopes @> '["files.read","connections.read"]'::jsonb`, userID).Scan(&version, &generation)
-	if errors.Is(err, sql.ErrNoRows) {
-		return "", 0, ErrAppRuntimeForbidden
-	}
-	return version, generation, err
+	return FilesPeerVersion, FilesPeerGeneration, nil
 }
 func (db *Database) UpdateSpaceDevicePresence(ctx context.Context, userID, deviceID string, presence SpaceDevicePresence) error {
 	if presence.ProtocolVersion != SpacePeerProtocol || presence.EndpointID == "" || !json.Valid(presence.Addressing) {

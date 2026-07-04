@@ -333,7 +333,7 @@ describe("WorkspaceTabGroupButton", () => {
   });
 
   it("keeps the group icon stable while a webpage loads", async () => {
-    const { useBrowserRuntimeStore } = await import("@/features/browser");
+    const { useBrowserRuntimeStore } = await import("@/features/browser/workspace");
     const browserTab: WorkspaceTab = {
       id: "tab:browser-loading",
       surfaceId: "browser",

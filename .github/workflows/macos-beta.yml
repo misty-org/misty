@@ -30,28 +30,17 @@ jobs:
         working-directory: misty
       - run: npm run sdk:check && npm run sdk:packed
         working-directory: misty
-      - name: Verify Code, app installation, and release scripts
+      - name: Verify built-in tools and release scripts
         working-directory: misty
         run: |
-          npm test -- apps/code/workspace src/features/apps/rpc/codeLspProject.test.ts src/features/apps/DownloadedAppSurface.test.tsx src/features/apps/appCompatibility.test.ts src/features/apps/appUpdateSafety.test.ts src/features/apps/runtimeInspection.test.ts
+          npm test -- src/features/updater src/features/home/HomeDashboard.test.tsx src/features/builtin-services/builtinService.test.ts src/features/workspace/unsavedChanges.test.ts
           node --test cli/tasks/release/*.test.ts
       - uses: dtolnay/rust-toolchain@1.91.0
         with:
           targets: aarch64-apple-darwin,x86_64-apple-darwin
-      - name: Build both native service architectures
+      - name: Package SDK archives
         working-directory: misty
-        run: |
-          for platform in macos-aarch64 macos-x86_64; do
-            for service in document-processing file-search file-operations backup-archive terminal code-tools peer-transport; do
-              cargo run --manifest-path cli/Cargo.toml --locked -- task apps/build-native-services "$platform" "$service"
-            done
-          done
-      - name: Package and verify signed downloadable apps
-        working-directory: misty
-        env:
-          MISTY_OFFICIAL_APP_SIGNING_PRIVATE_KEY: ${{ secrets.MISTY_OFFICIAL_APP_SIGNING_PRIVATE_KEY }}
-          GH_TOKEN: ${{ github.token }}
-        run: node cli/tasks/release/package-apps.ts
+        run: node cli/tasks/release/package-sdk.ts
       - uses: actions/upload-artifact@v4
         with:
           name: beta-packages
@@ -98,9 +87,6 @@ jobs:
           cache-on-failure: true
           key: beta-${{ matrix.target }}
       - run: npm ci
-      - name: Load public release trust
-        run: |
-          node --input-type=module -e 'import fs from "node:fs";const t=JSON.parse(fs.readFileSync("release/trust.json"));fs.appendFileSync(process.env.GITHUB_ENV,`MISTY_OFFICIAL_APP_SIGNING_KEY_ID=${t.keyId}\nMISTY_OFFICIAL_APP_PUBLIC_KEY=${t.publicKey}\n`);'
       - name: Import Developer ID certificate
         env:
           CERTIFICATE: ${{ secrets.MACOS_DEVELOPER_ID_CERT_P12 }}

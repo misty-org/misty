@@ -3,6 +3,7 @@ package db
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -39,7 +40,7 @@ func TestGlobalAskMigrationPreservesAskAndSelectivelyPurgesLegacy(t *testing.T) 
 		t.Fatal(err)
 	}
 	_, file, _, _ := runtime.Caller(0)
-	raw, err := os.ReadFile(filepath.Join(filepath.Dir(file), "../../../internal/platform/postgres/migrations/20270130000000_global_ask_identity.sql"))
+	raw, err := os.ReadFile(filepath.Join(filepath.Dir(file), "../../../test/fixtures/schema-history/20270130000000_global_ask_identity.sql"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -48,6 +49,7 @@ func TestGlobalAskMigrationPreservesAskAndSelectivelyPurgesLegacy(t *testing.T) 
 	managedConversation := "conversation_" + uuid.NewString()
 	legacyConversation := "conversation_" + uuid.NewString()
 	connectionID := "connection_" + uuid.NewString()
+	rollbackFixture := errors.New("rollback historical schema fixture")
 	err = database.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		exec := func(query string, args ...any) error { _, err := tx.ExecContext(ctx, query, args...); return err }
 		if err := exec(`CREATE TABLE space_agents(id text PRIMARY KEY, published_agent_version_id text);
@@ -70,7 +72,7 @@ CREATE TABLE space_conversation_suggestion_vetoes(id text);
 CREATE TABLE space_conversation_follow_ups(id text, agent_id text);
 ALTER TABLE ai_user_settings ADD COLUMN active_companion_agent_id text;
 ALTER TABLE ai_surface_preferences ADD COLUMN pinned_agent_id text;
-ALTER TABLE misty_ask_identities DROP CONSTRAINT misty_ask_identity_only;
+ALTER TABLE misty_ask_identities DROP CONSTRAINT IF EXISTS misty_ask_identity_only;
 ALTER TABLE misty_ask_identities ADD COLUMN source_space_agent_id text;
 ALTER TABLE misty_ask_conversations ADD COLUMN personal_agent_id text;
 ALTER TABLE misty_ask_identities RENAME TO personal_agents;
@@ -170,9 +172,9 @@ VALUES('retired-effect',$1,'retired-test-agent','retired-test-run','mail.send','
 				t.Errorf("%s: got %d, want %d", check.query, got, check.want)
 			}
 		}
-		return nil
+		return rollbackFixture
 	})
-	if err != nil {
+	if err != nil && !errors.Is(err, rollbackFixture) {
 		t.Fatal(err)
 	}
 	preserved, err := database.EnsureAskIdentity(ctx, owner.ID, ask.ModelID)

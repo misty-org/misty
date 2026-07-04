@@ -1,6 +1,6 @@
 import { flushWorkspaceRecovery } from "@/features/browser-workspace/recovery";
 import { nativeWorkspaceRecoveryEnabled } from "@/features/workspace/workspaceRecoveryPlatform";
-import { useWorkspaceRecoveryState } from "@/features/workspace/nativeWorkspaceRecovery";
+import { continueWithTemporaryWorkspace } from "@/features/workspace/nativeWorkspaceRecovery";
 import { readApiAuthToken } from "@/api/client/session";
 import { apiSessionInvalidEvent } from "@/api/client/session";
 import { useSetupStore } from "@/features/installer";
@@ -297,11 +297,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await restoreAccountWorkspace(accountId);
     })().catch((error) => {
       if (!canceled && !accountOperationActive.current)
-        useWorkspaceRecoveryState.setState({
-          accountId,
-          ready: false,
-          issue: error instanceof Error ? error.message : String(error),
-        });
+        continueWithTemporaryWorkspace(accountId, error);
     });
     return () => {
       canceled = true;

@@ -1,3 +1,4 @@
+import { companionReply } from "@/features/agents";
 import { SystemErrorActivity } from "@/features/activity";
 import {
   Button,
@@ -170,7 +171,7 @@ export function ConversationView(props: {
               </div>
               {message.content ? (
                 <div className="misty-markdown-message">
-                  <ReactMarkdown>{message.content}</ReactMarkdown>
+                  <ReactMarkdown>{companionReply(message.content).text}</ReactMarkdown>
                 </div>
               ) : (
                 <MistyActivityStatus activity={message.activity} compact />

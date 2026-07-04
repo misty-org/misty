@@ -15,10 +15,9 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
-	"github.com/kannachi323/misty/server/internal/appcatalog"
+
 	mailintegration "github.com/kannachi323/misty/server/internal/integrations/mail"
 	db "github.com/kannachi323/misty/server/internal/platform/postgres"
-	"github.com/kannachi323/misty/server/internal/platform/security"
 )
 
 type fakeMailProvider struct {
@@ -32,27 +31,13 @@ type fakeMailProvider struct {
 	threadError  error
 }
 
-func TestMailRPCPreservesOpaqueProviderIDsAndLargeDraftAttachments(t *testing.T) {
+func TestMailHTTPPreservesOpaqueProviderIDsAndLargeDraftAttachments(t *testing.T) {
 	database := openPresenceTestDatabase(t)
 	owner, err := database.CreateUserWithUsername("Mail RPC", "mail_"+uuid.NewString()[:8], uniqueTestEmail("mail-rpc"), "password123")
 	if err != nil {
 		t.Fatal(err)
 	}
-	space, err := database.CreateSpace(t.Context(), owner.ID, "Inbox")
-	if err != nil {
-		t.Fatal(err)
-	}
-	app, ok := appcatalog.Find("inbox")
-	if !ok {
-		t.Fatal("missing Inbox")
-	}
-	if _, err := database.InstallUserApp(t.Context(), owner.ID, app.ID, app.Version, app.PermissionVersion, app.Scopes); err != nil {
-		t.Fatal(err)
-	}
-	token := "mail-rpc-" + uuid.NewString()
-	if _, err := database.CreateAppRuntimeSession(t.Context(), owner.ID, app.ID, security.HashToken(token), space.ID, db.AppRuntimeSessionTTL); err != nil {
-		t.Fatal(err)
-	}
+	token := newConversationTestBearerToken(t, database, owner.ID)
 	spaces, err := NewSpacesService(database, nil, base64.StdEncoding.EncodeToString([]byte(strings.Repeat("m", 32))))
 	if err != nil {
 		t.Fatal(err)
@@ -73,10 +58,22 @@ func TestMailRPCPreservesOpaqueProviderIDsAndLargeDraftAttachments(t *testing.T)
 		return fake, nil
 	})
 	router := mailTestRouter(spaces)
-	router.Post("/app-runtime/rpc", OfficialAppRPC(database, router, ""))
 	call := func(method string, params map[string]any) map[string]any {
 		t.Helper()
-		response := performConversationRequest(t, router, "POST", "/app-runtime/rpc", token, map[string]any{"protocol": 2, "method": method, "params": params})
+		httpMethod, path := "GET", "/mail/threads"
+		switch method {
+		case "mail.threads.get":
+			path += "/" + url.PathEscape(params["path"].(map[string]string)["threadID"]) + "?connection_id=" + url.QueryEscape(connection.ID)
+		case "mail.threads.action":
+			httpMethod, path = "POST", path+"/"+url.PathEscape(params["path"].(map[string]string)["threadID"])+"/actions"
+		case "mail.drafts.update":
+			httpMethod, path = "PUT", "/mail/drafts/"+url.PathEscape(params["path"].(map[string]string)["draftID"])
+		case "mail.drafts.create":
+			httpMethod, path = "POST", "/mail/drafts"
+		default:
+			t.Fatalf("unknown test operation %s", method)
+		}
+		response := performConversationRequest(t, router, httpMethod, path, token, params["body"])
 		if response.Code < 200 || response.Code >= 300 {
 			t.Fatalf("%s status=%d body=%s", method, response.Code, response.Body.String())
 		}

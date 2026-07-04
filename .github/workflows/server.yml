@@ -1,0 +1,123 @@
+name: Server CI
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: server
+
+jobs:
+  verify:
+    name: Server Verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    services:
+      postgres:
+        image: pgvector/pgvector:0.8.2-pg17
+        env:
+          POSTGRES_USER: misty
+          POSTGRES_PASSWORD: misty-test-password
+          POSTGRES_DB: misty_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U misty -d misty_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DB_HOST: 127.0.0.1
+      DB_PORT: "5432"
+      DB_USER: misty
+      DB_PASSWORD: misty-test-password
+      DB_NAME: misty_test
+      DB_SSLMODE: disable
+      TEST_DB_HOST: 127.0.0.1
+      TEST_DB_PORT: "5432"
+      TEST_DB_USER: misty
+      TEST_DB_PASSWORD: misty-test-password
+      TEST_DB_NAME: misty_test
+      TEST_DB_SSLMODE: disable
+      STRIPE_WEBHOOK_SECRET: whsec_ci_test_secret_123
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Scan source for secrets
+        run: >-
+          docker run --rm -v "$PWD:/repo"
+          zricethezav/gitleaks@sha256:e1b35e12a8c6fa8901f060459cfb6b2fc4c484d3afbe3b029733a3bbfab07055
+          detect --source=/repo --no-git --redact --config=/repo/.gitleaks.toml
+      - uses: actions/setup-go@v6
+        with:
+          go-version: 1.25.12
+          cache: true
+          cache-dependency-path: server/go.sum
+      - name: Check Go formatting
+        run: |
+          files="$(gofmt -l .)"
+          if [ -n "$files" ]; then
+            echo "$files"
+            exit 1
+          fi
+      - run: go vet ./...
+      - run: ./scripts/check-go-file-sizes.sh
+      - name: Install pinned migration tool
+        run: go install -tags="no_clickhouse no_libsql no_mssql no_mysql no_sqlite3 no_vertica no_ydb" github.com/pressly/goose/v3/cmd/goose@v3.27.3
+      - run: ./scripts/goose.sh up
+      - name: Provision the unprivileged application role for RLS checks
+        env:
+          PGHOST: 127.0.0.1
+          PGPORT: '5432'
+          PGUSER: misty
+          PGPASSWORD: misty-test-password
+          PGDATABASE: misty_test
+          MISTY_APP_DB_USER: misty_app
+          MISTY_APP_DB_PASSWORD: misty-app-test-password
+        run: ./scripts/docker/postgres-grant-app-role.sh
+      - name: Test backend and database integration serially
+        run: go test -p 1 ./... -count=1
+      - run: ./scripts/check-container-contract.sh
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: server/apps/journal-collab/.nvmrc
+          cache: npm
+          cache-dependency-path: |
+            server/package-lock.json
+            server/apps/agent-runtime/package-lock.json
+            server/apps/journal-collab/package-lock.json
+      - name: Install SDK contract tooling
+        run: npm ci
+      - name: Server Verify Go routes against the SDK contract snapshot
+        run: npm run contracts:check
+      - run: npm ci
+        working-directory: server/apps/journal-collab
+      - run: npm run typecheck
+        working-directory: server/apps/journal-collab
+      - run: npm test
+        working-directory: server/apps/journal-collab
+      - run: npm run test:runtime
+        working-directory: server/apps/journal-collab
+      - run: npm run audit:production
+        working-directory: server/apps/journal-collab
+      - name: Install agent runtime dependencies
+        run: npm ci
+        working-directory: server/apps/agent-runtime
+      - name: Type-check agent runtime
+        run: npm run typecheck
+        working-directory: server/apps/agent-runtime
+      - name: Test agent runtime
+        run: npm test
+        working-directory: server/apps/agent-runtime
+      - name: Build agent runtime
+        run: npm run build
+        working-directory: server/apps/agent-runtime

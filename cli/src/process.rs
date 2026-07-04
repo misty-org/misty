@@ -59,6 +59,69 @@ impl CommandSpec {
         Ok(())
     }
 
+    /// Keep bounded, redacted diagnostics while showing only stage progress.
+    pub fn run_logged(&self, directory: &Path, log: &Path, secrets: &[String]) -> Result<()> {
+        use std::io::{Read, Write};
+        let mut child = self
+            .command(directory)
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .context("could not start subprocess")?;
+        fn collect(mut input: impl Read + Send + 'static) -> std::thread::JoinHandle<Vec<u8>> {
+            std::thread::spawn(move || {
+                let mut kept = Vec::new();
+                let mut buffer = [0; 8192];
+                while let Ok(count) = input.read(&mut buffer) {
+                    if count == 0 {
+                        break;
+                    }
+                    kept.extend_from_slice(&buffer[..count]);
+                    if kept.len() > 512 * 1024 {
+                        kept.drain(..kept.len() - 512 * 1024);
+                    }
+                }
+                kept
+            })
+        }
+        let stdout = collect(child.stdout.take().context("missing stdout")?);
+        let stderr = collect(child.stderr.take().context("missing stderr")?);
+        let started = std::time::Instant::now();
+        let mut next_progress = 15;
+        let status = loop {
+            if let Some(status) = child.try_wait()? {
+                break status;
+            }
+            if started.elapsed().as_secs() >= next_progress {
+                eprintln!(
+                    "Still running… {}s (capturing diagnostics)",
+                    started.elapsed().as_secs()
+                );
+                next_progress += 15;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(100));
+        };
+        let mut output = String::from_utf8_lossy(&stdout.join().unwrap_or_default()).into_owned();
+        output.push_str(&String::from_utf8_lossy(&stderr.join().unwrap_or_default()));
+        let mut ordered = secrets.to_vec();
+        ordered.sort_by_key(|value| std::cmp::Reverse(value.len()));
+        for secret in ordered.iter().filter(|value| !value.is_empty()) {
+            output = output.replace(secret, "[redacted]");
+        }
+        if let Some(parent) = log.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+        crate::artifacts::write_private(log, output.as_bytes())?;
+        if !status.success() {
+            let lines: Vec<_> = output.lines().collect();
+            for line in lines.iter().skip(lines.len().saturating_sub(20)) {
+                writeln!(std::io::stderr(), "{line}")?;
+            }
+            bail!("stage failed ({status}); diagnostics: {}", log.display());
+        }
+        Ok(())
+    }
+
     pub fn capture(&self, directory: &Path) -> Result<String> {
         let output = self
             .command(directory)
@@ -70,7 +133,7 @@ impl CommandSpec {
             let stderr = String::from_utf8_lossy(&output.stderr);
             bail!(
                 "{} exited with {}: {}",
-                self.display(),
+                self.program.to_string_lossy(),
                 output.status,
                 stderr.trim()
             );
@@ -129,6 +192,25 @@ fn display_argument(value: &OsStr) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(unix)]
+    #[test]
+    fn failed_process_logs_are_bounded_and_redacted() {
+        let tmp = tempfile::tempdir().unwrap();
+        let path = tmp.path().join("output.log");
+        let result = CommandSpec::new("sh")
+            .args(["-c", "printf 'private-token\\n' >&2; exit 7"])
+            .run_logged(tmp.path(), &path, &["private-token".into()]);
+        assert!(result.is_err());
+        let log = std::fs::read_to_string(&path).unwrap();
+        assert!(!log.contains("private-token"));
+        assert!(log.contains("[redacted]"));
+        use std::os::unix::fs::PermissionsExt;
+        assert_eq!(
+            std::fs::metadata(path).unwrap().permissions().mode() & 0o777,
+            0o600
+        );
+    }
 
     #[test]
     fn display_quotes_arguments_with_spaces() {

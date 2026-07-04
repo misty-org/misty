@@ -22,7 +22,7 @@ type Route struct {
 }
 
 func main() {
-	root := "../misty-server"
+	root := "server"
 	fset := token.NewFileSet()
 	files, _ := filepath.Glob(filepath.Join(root, "internal/app/*.go"))
 	methodsRaw, _ := os.ReadFile(filepath.Join(root, "internal/apprpc/methods.json"))

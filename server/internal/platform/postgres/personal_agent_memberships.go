@@ -36,8 +36,11 @@ func (db *Database) AskExecutionContext(ctx context.Context, userID, spaceID, id
 }
 
 func askExecutionContextTx(ctx context.Context, tx *sql.Tx, userID, spaceID, identityID string) (*AskExecutionContext, error) {
-	if _, err := requireSpaceMemberTx(ctx, tx, spaceID, userID); err != nil {
-		return nil, err
+	spaceID = "" // Agent identity does not depend on any content destination.
+	if spaceID != "" {
+		if _, err := requireSpaceMemberTx(ctx, tx, spaceID, userID); err != nil {
+			return nil, err
+		}
 	}
 	identity := &AskIdentity{}
 	err := scanPersonalAgent(tx.QueryRowContext(ctx, `SELECT `+personalAgentColumns+` FROM misty_ask_identities WHERE id=$1 AND owner_user_id=$2 AND enabled AND deleted_at IS NULL`, identityID, userID), identity)

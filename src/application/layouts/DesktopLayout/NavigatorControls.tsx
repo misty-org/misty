@@ -1,6 +1,7 @@
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger, Button, cn } from "@/shared/ui";
 import { useShortcutTitle } from "@/features/shortcuts";
 import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import type { DockPosition } from "@/features/app-shell/dockingLayout";
 import type { NavigatorLayout, NavigatorVisibility } from "./navigatorMode";
 import { navigatorFocusRingClass } from "./styles";
 
@@ -15,14 +16,21 @@ const controlButtonClass = [
  * or slides away (hidden) until the edge is hovered.
  */
 export function NavigatorControls(props: {
+  position?: DockPosition;
   iconSize?: number;
   layout?: NavigatorLayout;
   visibility?: NavigatorVisibility;
   onToggleVisibility: () => void;
   className?: string;
 }) {
+  const rotation = { left: "", right: "rotate-180", top: "rotate-90", bottom: "-rotate-90" }[
+    props.position ?? "left"
+  ];
   const sticky = (props.visibility ?? props.layout?.visibility ?? "sticky") === "sticky";
-  const title = useShortcutTitle(sticky ? "Hide sidebar" : "Show sidebar", "app.toggle_navigator");
+  const title = useShortcutTitle(
+    sticky ? "Hide navigation" : "Show navigation",
+    "app.toggle_navigator",
+  );
   return (
     <div className={cn("flex items-center", props.className)} data-misty-window-drag-block="true">
       <TooltipProvider delayDuration={450}>
@@ -33,13 +41,21 @@ export function NavigatorControls(props: {
               size="icon-sm"
               className={controlButtonClass}
               aria-pressed={sticky}
-              aria-label={sticky ? "Hide sidebar" : "Show sidebar"}
+              aria-label={sticky ? "Hide navigation" : "Show navigation"}
               onClick={props.onToggleVisibility}
             >
               {sticky ? (
-                <PanelLeftClose size={props.iconSize ?? 18} aria-hidden="true" />
+                <PanelLeftClose
+                  className={rotation}
+                  size={props.iconSize ?? 18}
+                  aria-hidden="true"
+                />
               ) : (
-                <PanelLeftOpen size={props.iconSize ?? 18} aria-hidden="true" />
+                <PanelLeftOpen
+                  className={rotation}
+                  size={props.iconSize ?? 18}
+                  aria-hidden="true"
+                />
               )}
             </Button>
           </TooltipTrigger>

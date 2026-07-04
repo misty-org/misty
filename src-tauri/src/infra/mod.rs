@@ -30,8 +30,6 @@ pub mod commands;
 #[cfg(any(desktop, target_os = "ios"))]
 pub mod connected_devices;
 pub mod credential_store;
-#[cfg(desktop)]
-mod declarative_panel;
 pub mod devices;
 mod direct_cloud;
 pub mod directory_size;
@@ -58,13 +56,10 @@ pub mod peer_files;
 #[cfg(any(desktop, target_os = "ios"))]
 pub mod peer_identity;
 #[cfg(desktop)]
-pub mod plugin_commands;
-#[cfg(desktop)]
 mod plugin_routes;
 pub mod power_pack;
 pub mod providers;
 pub mod search;
-pub mod self_host_entitlement;
 pub mod settings;
 mod settings_migration;
 pub mod smart_library;
@@ -136,3 +131,9 @@ mod browser_cookie_cdp;
 #[cfg(windows)]
 #[path = "browser_cookie_store_windows.rs"]
 pub(crate) mod browser_cookie_store;
+
+#[cfg(desktop)]
+pub mod cursor_companion;
+
+#[cfg(target_os = "macos")]
+pub mod browser_site_permissions;

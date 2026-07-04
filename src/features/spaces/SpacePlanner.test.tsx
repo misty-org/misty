@@ -36,7 +36,7 @@ vi.mock("@/api/spaces/api", () => ({
   },
 }));
 
-import { SpacePlanner } from "@/features/spaces/planner/SpacePlanner";
+import { SpacePlanner } from "@/features/planner/planner/SpacePlanner";
 import { useSpacesStore } from "./store/useSpacesStore";
 
 describe("SpacePlanner", () => {

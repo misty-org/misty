@@ -12,6 +12,7 @@ import (
 
 func TestOwnedSpaceLimitDoesNotLimitJoining(t *testing.T) {
 	database := openTestDatabase(t)
+	useResourceAdapterFixture(t, database)
 	ctx := context.Background()
 	member, err := database.CreateUser("Basic Member", "basic-space-limit@example.com", "password123")
 	if err != nil {
@@ -30,7 +31,7 @@ func TestOwnedSpaceLimitDoesNotLimitJoining(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := database.SetLicenseStateByID(owner.LicenseID, TierMax, LicenseStatusActive, nil); err != nil {
+	if err := setAdapterFixtureCohort(database, owner.LicenseID, TierMax, LicenseStatusActive, nil); err != nil {
 		t.Fatal(err)
 	}
 	for index := 0; index < BasicSpaceLimit+2; index++ {
@@ -57,12 +58,13 @@ func TestOwnedSpaceLimitDoesNotLimitJoining(t *testing.T) {
 
 func TestMaxPlanOwnedSpacesAreCappedAtTen(t *testing.T) {
 	database := openTestDatabase(t)
+	useResourceAdapterFixture(t, database)
 	ctx := context.Background()
 	user, err := database.CreateUser("Max Owner", "max-owned-limit@example.com", "password123")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := database.SetLicenseStateByID(user.LicenseID, TierMax, LicenseStatusActive, nil); err != nil {
+	if err := setAdapterFixtureCohort(database, user.LicenseID, TierMax, LicenseStatusActive, nil); err != nil {
 		t.Fatal(err)
 	}
 	for index := 0; index < MaxSpaceLimit; index++ {
@@ -77,6 +79,7 @@ func TestMaxPlanOwnedSpacesAreCappedAtTen(t *testing.T) {
 
 func TestOwnershipTransferEnforcesRecipientOwnedSpaceLimit(t *testing.T) {
 	database := openTestDatabase(t)
+	useResourceAdapterFixture(t, database)
 	ctx := context.Background()
 	recipient, err := database.CreateUser("Full Recipient", "full-transfer-recipient@example.com", "password123")
 	if err != nil {
@@ -110,12 +113,13 @@ func TestOwnershipTransferEnforcesRecipientOwnedSpaceLimit(t *testing.T) {
 
 func TestOwnershipDowngradePreservesExistingAndBlocksGrowth(t *testing.T) {
 	database := openTestDatabase(t)
+	useResourceAdapterFixture(t, database)
 	ctx := context.Background()
 	user, err := database.CreateUser("Downgrade Owner", "space-downgrade@example.com", "password123")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := database.SetLicenseStateByID(user.LicenseID, TierMax, LicenseStatusActive, nil); err != nil {
+	if err := setAdapterFixtureCohort(database, user.LicenseID, TierMax, LicenseStatusActive, nil); err != nil {
 		t.Fatal(err)
 	}
 	for index := 0; index < BasicSpaceLimit+1; index++ {
@@ -123,7 +127,7 @@ func TestOwnershipDowngradePreservesExistingAndBlocksGrowth(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if err := database.SetLicenseStateByID(user.LicenseID, TierBasic, LicenseStatusActive, nil); err != nil {
+	if err := setAdapterFixtureCohort(database, user.LicenseID, TierBasic, LicenseStatusActive, nil); err != nil {
 		t.Fatal(err)
 	}
 	spaces, err := database.ListSpaces(ctx, user.ID)
@@ -137,6 +141,7 @@ func TestOwnershipDowngradePreservesExistingAndBlocksGrowth(t *testing.T) {
 
 func TestConcurrentOwnedSpaceCreationCannotExceedLimit(t *testing.T) {
 	database := openTestDatabase(t)
+	useResourceAdapterFixture(t, database)
 	ctx := context.Background()
 	user, err := database.CreateUser("Concurrent Owner", "space-concurrent@example.com", "password123")
 	if err != nil {

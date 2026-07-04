@@ -6,6 +6,8 @@ import (
 	"errors"
 	"time"
 
+	"github.com/kannachi323/misty/server/internal/spaces"
+
 	"github.com/google/uuid"
 )
 
@@ -37,15 +39,7 @@ func (db *Database) SpaceMemberPermissions(ctx context.Context, actorUserID, spa
 }
 
 func applySpacePermissionDependencies(permissions map[string]bool) {
-	if !permissions[PermissionMessagesRead] {
-		permissions[PermissionMessagesWrite] = false
-	}
-	if !permissions[PermissionMessagesRead] || !permissions[PermissionMessagesWrite] {
-		permissions[PermissionAttachmentUpload] = false
-	}
-	if !permissions[PermissionTasksView] {
-		permissions[PermissionTasksManage] = false
-	}
+	spaces.ApplyPermissionDependencies(permissions)
 }
 
 func (db *Database) SetSpaceMemberPermission(

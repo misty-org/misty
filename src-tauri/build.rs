@@ -5,7 +5,7 @@ use std::{
 
 fn main() {
     expose_public_app_configuration();
-    require_desktop_app_signing_key_for_release();
+    build_builtin_workers();
     build_ios_browser_adapter();
     if env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("macos") {
         // Objective-C availability checks need Clang's runtime when targeting
@@ -17,7 +17,10 @@ fn main() {
             .arg("--print-runtime-dir")
             .output()
             .expect("could not locate the macOS Clang runtime");
-        assert!(runtime.status.success(), "could not locate the macOS Clang runtime");
+        assert!(
+            runtime.status.success(),
+            "could not locate the macOS Clang runtime"
+        );
         let runtime_dir = String::from_utf8(runtime.stdout).expect("invalid Clang runtime path");
         println!("cargo:rustc-link-search=native={}", runtime_dir.trim());
         println!("cargo:rustc-link-lib=static=clang_rt.osx");
@@ -68,8 +71,6 @@ fn expose_public_app_configuration() {
         "MISTY_RELEASE_CHANNEL",
         "MISTY_DEVICE_RELAY_URL",
         "MISTY_DEVICE_TICKET_PUBLIC_KEYS",
-        "MISTY_OFFICIAL_APP_SIGNING_KEY_ID",
-        "MISTY_OFFICIAL_APP_PUBLIC_KEY",
     ] {
         println!("cargo:rerun-if-env-changed={key}");
         let value = env::var(key)
@@ -78,30 +79,6 @@ fn expose_public_app_configuration() {
             .or_else(|| read_env_value(&app_env_path, key));
         if let Some(value) = value {
             println!("cargo:rustc-env={key}={value}");
-        }
-    }
-}
-
-fn require_desktop_app_signing_key_for_release() {
-    let profile = env::var("PROFILE").unwrap_or_default();
-    let target = env::var("CARGO_CFG_TARGET_OS").unwrap_or_default();
-    if profile != "release" || matches!(target.as_str(), "ios" | "android") {
-        return;
-    }
-    for key in [
-        "MISTY_OFFICIAL_APP_SIGNING_KEY_ID",
-        "MISTY_OFFICIAL_APP_PUBLIC_KEY",
-    ] {
-        if env::var(key)
-            .ok()
-            .filter(|value| !value.trim().is_empty())
-            .or_else(|| {
-                let root = PathBuf::from(env::var_os("CARGO_MANIFEST_DIR")?);
-                read_env_value(&root.parent()?.join(".env"), key)
-            })
-            .is_none()
-        {
-            panic!("{key} is required for a desktop release build");
         }
     }
 }
@@ -119,4 +96,52 @@ fn read_env_value(path: &Path, key: &str) -> Option<String> {
             .to_owned();
         (!value.is_empty()).then_some(value)
     })
+}
+
+/// Build helpers for the same target and profile as Misty, then embed their
+/// bytes. Separate target directories avoid Cargo's parent-build lock.
+fn build_builtin_workers() {
+    if env::var("CARGO_CFG_TARGET_OS").as_deref() != Ok("macos") {
+        return;
+    }
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("services");
+    let target = env::var("TARGET").expect("Cargo target");
+    let profile = env::var("PROFILE").expect("Cargo profile");
+    let mut source = String::from("match (service, protocol) {\n");
+    for (service, protocol) in [
+        ("document-processing", 5),
+        ("file-search", 1),
+        ("peer-transport", 2),
+    ] {
+        let directory = root.join(service);
+        for input in ["src", "Cargo.toml", "Cargo.lock"] {
+            println!("cargo:rerun-if-changed={}", directory.join(input).display());
+        }
+        let mut command =
+            std::process::Command::new(env::var_os("CARGO").unwrap_or_else(|| "cargo".into()));
+        command
+            .current_dir(&directory)
+            .args(["build", "--locked", "--target", &target]);
+        command.env("CARGO_TARGET_DIR", directory.join("target"));
+        if profile == "release" {
+            command.arg("--release");
+        }
+        let status = command.status().expect("could not build bundled worker");
+        assert!(status.success(), "could not build bundled {service} worker");
+        let binary = directory
+            .join("target")
+            .join(&target)
+            .join(&profile)
+            .join(format!("misty-{service}"));
+        source.push_str(&format!(
+            "({service:?}, {protocol}) => Ok(include_bytes!({:?})),\n",
+            binary
+        ));
+    }
+    source.push_str("_ => Err(\"Unknown built-in worker protocol.\".into()),\n}");
+    std::fs::write(
+        PathBuf::from(env::var_os("OUT_DIR").unwrap()).join("builtin_workers.rs"),
+        source,
+    )
+    .expect("write bundled worker map");
 }

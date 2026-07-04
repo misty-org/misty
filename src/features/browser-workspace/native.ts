@@ -2,6 +2,14 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import type { Resume, WorkspaceChange, WorkspaceView } from "./model";
 
+export interface SyncDeviceInfo {
+  device_id: string;
+  display_name: string;
+  platform: string;
+  control_version: number;
+  full_sync: boolean;
+  revoked_at?: string | null;
+}
 export interface NativeSyncView {
   session_id: string;
   deployment: string;
@@ -19,6 +27,9 @@ export interface NativeSyncView {
     pending_changes: number;
     issue: string | null;
   };
+  devices?: SyncDeviceInfo[];
+  full_sync?: boolean;
+  traffic?: { uploaded_bytes: number; downloaded_bytes: number };
   presence: { device_id: string; online: boolean; ready: boolean; applied_sequence: number }[];
   workspace: WorkspaceView;
   pending_operation_ids: string[];
@@ -47,7 +58,7 @@ export const saveNativeResume = (
 export const activateNativeDevice = (sessionId: string) =>
   invoke<string>("browser_sync_activate", { sessionId });
 export const activeDeviceEpoch = (session: NativeSyncView): string | null =>
-  session.workspace.active_device?.device_id === session.device_id
+  session.full_sync !== false && session.workspace.active_device?.device_id === session.device_id
     ? session.workspace.active_device.epoch
     : null;
 export const vaultAvailability = (account: SyncAccount) =>
@@ -70,3 +81,10 @@ export const lockNativeSync = (sessionId: string, forget = false) =>
   invoke<void>("browser_sync_lock", { sessionId, forget });
 export const forgetNativeSyncKey = (account: SyncAccount) =>
   invoke<void>("browser_sync_forget_key", { ...account });
+
+export const controlNativeDevice = (
+  sessionId: string,
+  deviceId: string,
+  fullSync: boolean | null,
+  activate = false,
+) => invoke<string>("browser_sync_control_device", { sessionId, deviceId, fullSync, activate });

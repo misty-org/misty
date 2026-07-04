@@ -10,6 +10,16 @@ afterEach(() => vi.restoreAllMocks());
 const usage = { inputTokens: { total: 10, noCache: 10, cacheRead: 0, cacheWrite: 0 }, outputTokens: { total: 5, text: 5, reasoning: 0 } };
 
 it("the pinned adapter returns after one tool turn and accepts its full transcript after a long wait", async () => {
+  // Freeze only this test's deadline clock. Cold module loading under the full
+  // suite must not expire the request before the mocked provider even starts.
+  const startedAt = Date.now();
+  vi.spyOn(Date, "now").mockReturnValue(startedAt);
+  const deadlines: AbortController[] = [];
+  vi.spyOn(AbortSignal, "timeout").mockImplementation(() => {
+    const controller = new AbortController();
+    deadlines.push(controller);
+    return controller.signal;
+  });
   let calls=0;
   const model = new MockLanguageModelV4({ doStream: async () => {
     calls++;
@@ -23,10 +33,12 @@ it("the pinned adapter returns after one tool turn and accepts its full transcri
     read_note: tool({ inputSchema: z.object({}), execute: async () => {
       // The workflow's durable wait advances its clock without keeping a model
       // request active. No real service or six-hour wall-clock delay is needed.
-      vi.spyOn(Date,"now").mockReturnValue(Date.now()+6*60*60_000);
-      // Also let the real model AbortSignal expire while only the tool is
-      // waiting. That expired signal must not turn the finished model into an abort.
-      await new Promise(resolve => setTimeout(resolve,150));
+      vi.mocked(Date.now).mockReturnValue(startedAt+6*60*60_000);
+      // Expire the model signal exactly while the tool owns control. The next
+      // test separately exercises the real operation-deadline timer.
+      expect(deadlines.length).toBeGreaterThan(0);
+      for (const deadline of deadlines) deadline.abort(new DOMException("Model deadline elapsed", "TimeoutError"));
+      await Promise.resolve();
       return { text: "walked" };
     } }),
   } });

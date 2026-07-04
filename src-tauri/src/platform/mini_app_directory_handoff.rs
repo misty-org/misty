@@ -195,8 +195,7 @@ mod tests {
                 Instance {
                     root: root.path().into(),
                     permissions,
-                    _profile: None,
-                    pending: HashMap::new(),
+
                 },
             );
         }

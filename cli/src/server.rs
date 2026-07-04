@@ -32,20 +32,38 @@ const ROOM_SALT: &str = "JOURNAL_COLLAB_ROOM_SALT";
 const DEVICE_TICKET_PRIVATE_KEY: &str = "MISTY_DEVICE_TICKET_PRIVATE_KEY";
 const DEVICE_PAIRING_PEPPER: &str = "MISTY_DEVICE_PAIRING_PEPPER";
 
-pub fn up(workspace: &Workspace, detach: bool, build: bool) -> Result<()> {
+pub fn up(workspace: &Workspace, detach: bool, build: bool, verbose: bool) -> Result<()> {
     environment::check(workspace, Target::Dev)?;
     let devices = environment::root(workspace, Target::Dev).join("crypto/devices.env");
     if ensure_connected_devices_development_config(&devices)? {
         println!("Configured Connected Devices for local development.");
     }
-    development_up_command(detach, build).run(&workspace.server)?;
-    if detach {
-        wait_for_development_worker(workspace)?;
-        println!(
-            "Server running at {}",
-            ensure_active_development_api_url(workspace)?
-        );
+    validate_development_secrets(workspace)?;
+    ports(workspace)?;
+    println!("Starting server containers…");
+    let command = development_up_command(detach, build);
+    let log = workspace.server.join(".misty/logs/startup.log");
+    let result = command.run_logged(&workspace.server, &log, &diagnostic_secrets(workspace)?);
+    if verbose && log.exists() {
+        eprintln!("{}", fs::read_to_string(&log)?);
     }
+    result?;
+    let started = Instant::now();
+    while health(workspace).is_err() {
+        if started.elapsed() > Duration::from_secs(120) {
+            status(workspace)?;
+            bail!(
+                "server was not ready within 120 seconds; run misty server logs SERVICE --tail 100"
+            );
+        }
+        thread::sleep(Duration::from_secs(2));
+    }
+    status(workspace)?;
+    println!(
+        "API: http://127.0.0.1:{}/v1",
+        env::var("MISTY_HOST_PORT").unwrap_or_else(|_| "8081".into())
+    );
+    println!("Worker deployment: misty server deploy");
     Ok(())
 }
 
@@ -59,10 +77,10 @@ pub fn initialize_development_secrets(workspace: &Workspace) -> Result<()> {
     let server_env = worker.join(".secrets/server.env");
     match (dev_vars.is_file(), server_env.is_file()) {
         (false, false) => generate_worker_secrets(workspace),
+        (false, true) => restore_development_worker_secrets(&server_env, &dev_vars),
         (true, true) => Ok(()),
-        _ => bail!(
-            "development Worker secrets are partially configured; remove both {} and {} before regenerating",
-            dev_vars.display(),
+        (true, false) => bail!(
+            "development Worker secrets are partially configured; restore {} from backup before continuing (existing Worker keys were preserved)",
             server_env.display()
         ),
     }
@@ -208,10 +226,193 @@ fn development_down_command(volumes: bool) -> CommandSpec {
     command.arg("--remove-orphans")
 }
 
-pub fn logs(workspace: &Workspace) -> Result<()> {
+pub fn logs(workspace: &Workspace, service: Option<&str>, follow: bool, tail: u32) -> Result<()> {
+    let mut command = development_compose().args(["logs", "--tail", &tail.to_string()]);
+    if follow {
+        command = command.arg("--follow");
+    }
+    if let Some(service) = service {
+        if service.starts_with('-') {
+            bail!("invalid service name");
+        }
+        command = command.arg(if service == "api" {
+            "misty-api"
+        } else {
+            service
+        });
+    }
+    command.run(&workspace.server)
+}
+
+pub fn status(workspace: &Workspace) -> Result<()> {
+    let rows = container_status(workspace)?;
+    println!("{:<27} STATUS", "SERVICE");
+    for row in &rows {
+        let service = row["Service"].as_str().unwrap_or("unknown");
+        let state = row["State"].as_str().unwrap_or("unknown");
+        let health = row["Health"].as_str().unwrap_or("");
+        let status = if state == "exited" && row["ExitCode"].as_i64() == Some(0) {
+            "complete"
+        } else if !health.is_empty() {
+            health
+        } else {
+            state
+        };
+        println!("{service:<27} {status}");
+    }
+    if rows.is_empty() {
+        println!("No containers started. Run misty server up.");
+    }
+    Ok(())
+}
+
+fn container_status(workspace: &Workspace) -> Result<Vec<serde_json::Value>> {
+    let output = development_compose()
+        .args(["ps", "--all", "--format", "json"])
+        .capture(&workspace.server)?;
+    if output.trim().starts_with('[') {
+        Ok(serde_json::from_str(&output)?)
+    } else {
+        Ok(output
+            .lines()
+            .filter(|line| !line.trim().is_empty())
+            .map(serde_json::from_str)
+            .collect::<std::result::Result<_, _>>()?)
+    }
+}
+
+pub fn validate_development_secrets(workspace: &Workspace) -> Result<()> {
+    let values = environment::read(workspace, Target::Dev)?;
+    let key = required_map_value(&values, DEVICE_TICKET_PRIVATE_KEY)?;
+    SigningKey::from_pkcs8_der(&STANDARD.decode(key)?).context("invalid device signing key")?;
+    let pepper = STANDARD.decode(required_map_value(&values, DEVICE_PAIRING_PEPPER)?)?;
+    if pepper.len() < 32 {
+        bail!("device pairing pepper must contain at least 32 bytes");
+    }
+    let server_path = workspace
+        .server
+        .join("apps/journal-collab/.secrets/server.env");
+    let worker_path = workspace.server.join("apps/journal-collab/.dev.vars");
+    require_private_file(&server_path)?;
+    require_private_file(&worker_path)?;
+    let server = read_environment(&server_path)?;
+    let worker = read_environment(&worker_path)?;
+    let signing = SigningKey::from_pkcs8_der(
+        &STANDARD.decode(required_map_value(&server, TICKET_PRIVATE_KEY)?)?,
+    )?;
+    if STANDARD.encode(VerifyingKey::from(&signing).to_bytes())
+        != required_map_value(&worker, TICKET_PUBLIC_KEY)?
+    {
+        bail!("server and Worker ticket keys do not match; restore the matching bundle");
+    }
+    for name in [CONTROL_SECRET, PROJECTION_SECRET] {
+        if required_map_value(&server, name)? != required_map_value(&worker, name)? {
+            bail!("server and Worker {name} do not match");
+        }
+    }
+    let salt = STANDARD.decode(required_map_value(&values, ROOM_SALT)?)?;
+    if salt.len() < 32 {
+        bail!("room salt must contain at least 32 bytes");
+    }
+    Ok(())
+}
+
+pub fn ports(workspace: &Workspace) -> Result<()> {
+    let values = environment::read(workspace, Target::Dev)?;
+    let rows = container_status(workspace).unwrap_or_default();
+    for (key, fallback, service) in [
+        ("MISTY_HOST_PORT", "8081", "misty-api"),
+        ("DB_PORT", "5435", "postgres"),
+    ] {
+        let port: u16 = values
+            .get(key)
+            .map(String::as_str)
+            .unwrap_or(fallback)
+            .parse()
+            .with_context(|| format!("{key} is not a valid port"))?;
+        let owned = rows
+            .iter()
+            .filter(|row| row["Service"] == service && row["State"] == "running")
+            .any(|row| {
+                row["Publishers"]
+                    .as_array()
+                    .into_iter()
+                    .flatten()
+                    .any(|p| p["PublishedPort"].as_u64() == Some(port as u64))
+            });
+        if !owned {
+            check_available_port(port)?;
+        }
+    }
+    Ok(())
+}
+fn check_available_port(port: u16) -> Result<()> {
+    if port == 0 {
+        bail!("host port must not be zero");
+    }
+    std::net::TcpListener::bind(("127.0.0.1", port)).with_context(|| format!("port {port} is occupied or unavailable; stop its owner or change the host port with misty env set"))?;
+    Ok(())
+}
+
+pub fn health(workspace: &Workspace) -> Result<()> {
+    let rows = container_status(workspace)?;
+    validate_health(&rows)
+}
+fn validate_health(rows: &[serde_json::Value]) -> Result<()> {
+    for service in ["postgres", "misty-api", "tunnel"] {
+        let row = rows
+            .iter()
+            .find(|row| row["Service"] == service)
+            .with_context(|| format!("{service} has not started"))?;
+        if row["State"] != "running" || row["Health"] != "healthy" {
+            bail!("{service} is not healthy");
+        }
+    }
+    for row in rows {
+        if row["Service"] == "cloudflare-deploy" {
+            continue;
+        }
+        if row["State"] == "exited" && row["ExitCode"].as_i64().unwrap_or(0) != 0 {
+            bail!("{} failed; inspect its service logs", row["Service"]);
+        }
+        if row["State"] == "restarting" || row["Health"] == "unhealthy" {
+            bail!("{} is unhealthy", row["Service"]);
+        }
+    }
+    Ok(())
+}
+fn diagnostic_secrets(workspace: &Workspace) -> Result<Vec<String>> {
+    let mut secrets: Vec<String> = environment::read(workspace, Target::Dev)?
+        .into_iter()
+        .filter(|(name, _)| {
+            ["TOKEN", "SECRET", "KEY", "PASSWORD", "PEPPER", "SALT"]
+                .iter()
+                .any(|part| name.contains(part))
+        })
+        .map(|(_, value)| value)
+        .collect();
+    for relative in [
+        "apps/journal-collab/.dev.vars",
+        "apps/journal-collab/.secrets/server.env",
+    ] {
+        let path = workspace.server.join(relative);
+        if path.exists() {
+            secrets.extend(read_environment(&path)?.into_values());
+        }
+    }
+    Ok(secrets)
+}
+
+pub fn deploy_development(workspace: &Workspace) -> Result<()> {
+    environment::check(workspace, Target::Dev)?;
+    println!("Deploying development collaboration Worker…");
     development_compose()
-        .args(["logs", "--follow"])
-        .run(&workspace.server)
+        .args(["run", "--rm", "--no-deps", "--build", "cloudflare-deploy"])
+        .run_logged(
+            &workspace.server,
+            &workspace.server.join(".misty/logs/deploy.log"),
+            &diagnostic_secrets(workspace)?,
+        )
 }
 
 fn development_compose() -> CommandSpec {
@@ -261,7 +462,7 @@ pub fn production_logs(workspace: &Workspace) -> Result<()> {
         .run(&workspace.server)
 }
 
-const DEFAULT_DEVELOPMENT_API_TUNNEL_HOSTNAME: &str = "dev-api.mistysys.com";
+const DEFAULT_DEVELOPMENT_API_TUNNEL_HOSTNAME: &str = "";
 
 fn development_tunnel_connection_command() -> CommandSpec {
     development_compose().args([
@@ -272,37 +473,6 @@ fn development_tunnel_connection_command() -> CommandSpec {
         "-c",
         "wget -q -O - http://127.0.0.1:20241/metrics | grep -Eq '^cloudflared_tunnel_ha_connections [1-9][0-9]*(\\.[0-9]+)?$'",
     ])
-}
-
-fn development_tunnel_refresh_command() -> CommandSpec {
-    development_compose().args(["up", "--detach", "--force-recreate", "tunnel"])
-}
-
-fn development_worker_refresh_command() -> CommandSpec {
-    development_compose().args([
-        "up",
-        "--detach",
-        "--force-recreate",
-        "--no-deps",
-        "cloudflare-deploy",
-    ])
-}
-
-fn development_worker_wait_command() -> CommandSpec {
-    CommandSpec::new("docker").args(["wait", "misty-cloudflare-deploy"])
-}
-
-fn wait_for_development_worker(workspace: &Workspace) -> Result<()> {
-    let output = development_worker_wait_command().capture(&workspace.server)?;
-    let exit_code = output.trim().parse::<i32>().with_context(|| {
-        format!("Docker returned an invalid Worker deploy exit code: {output:?}")
-    })?;
-    if exit_code != 0 {
-        bail!(
-            "development collaboration Worker deployment failed with exit code {exit_code}; run `misty server logs` for details"
-        );
-    }
-    Ok(())
 }
 
 fn development_tunnel_hostname() -> String {
@@ -318,24 +488,10 @@ fn development_api_url() -> String {
 }
 
 fn ensure_active_development_api_url(workspace: &Workspace) -> Result<String> {
-    let url = development_api_url();
-    if development_tunnel_connection_command()
-        .capture(&workspace.server)
-        .is_ok()
-    {
-        if development_tunnel_dns_is_published(workspace, &url).is_ok() {
-            return Ok(url);
-        }
-        eprintln!("Tunnel connected; waiting for Cloudflare DNS...");
-        return wait_for_development_tunnel(workspace);
+    if development_tunnel_hostname().is_empty() {
+        bail!("configure a hostname with misty setup cloudflare");
     }
-
-    eprintln!("Development tunnel is unreachable; restarting cloudflared...");
-    development_tunnel_refresh_command().run(&workspace.server)?;
-    eprintln!("Waiting for cloudflared and Cloudflare DNS...");
-    let url = wait_for_development_tunnel(workspace)?;
-    development_worker_refresh_command().run(&workspace.server)?;
-    Ok(url)
+    wait_for_development_tunnel(workspace)
 }
 
 fn wait_for_development_tunnel(workspace: &Workspace) -> Result<String> {
@@ -398,11 +554,12 @@ pub fn generate_worker_secrets(workspace: &Workspace) -> Result<()> {
     let secrets = JournalSecrets::generate(&mut random)?;
     ensure_room_salt(&development_environment, &mut random)?;
 
-    let dev_vars = secrets.worker_environment();
-    write_private(&worker.join(".dev.vars"), dev_vars.as_bytes())?;
-
     let server_env = secrets.server_environment();
     write_private(&worker.join(".secrets/server.env"), server_env.as_bytes())?;
+    restore_development_worker_secrets(
+        &worker.join(".secrets/server.env"),
+        &worker.join(".dev.vars"),
+    )?;
 
     println!("Wrote Cloudflare local secrets to:");
     println!("  {}", worker.join(".dev.vars").display());
@@ -412,8 +569,29 @@ pub fn generate_worker_secrets(workspace: &Workspace) -> Result<()> {
         development_environment.display()
     );
     println!("The private signing key was not printed.");
-    println!("Set the three public Worker values with `wrangler secret put`.");
+    println!("Deploy the Worker with `misty server deploy` after Cloudflare setup.");
     Ok(())
+}
+
+fn restore_development_worker_secrets(server_path: &Path, worker_path: &Path) -> Result<()> {
+    let values = read_environment(server_path)?;
+    let encoded = values
+        .get(TICKET_PRIVATE_KEY)
+        .context("server ticket private key is missing")?;
+    let signing = SigningKey::from_pkcs8_der(&STANDARD.decode(encoded)?)?;
+    let secrets = JournalSecrets {
+        private: encoded.clone(),
+        public: STANDARD.encode(VerifyingKey::from(&signing).to_bytes()),
+        control: values
+            .get(CONTROL_SECRET)
+            .context("server control secret is missing")?
+            .clone(),
+        projection: values
+            .get(PROJECTION_SECRET)
+            .context("server projection secret is missing")?
+            .clone(),
+    };
+    write_private(worker_path, secrets.worker_environment().as_bytes())
 }
 
 pub fn generate_production_worker_secrets(workspace: &Workspace) -> Result<()> {
@@ -969,6 +1147,32 @@ mod tests {
     use super::*;
 
     #[test]
+    fn occupied_port_is_reported_before_startup() {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = listener.local_addr().unwrap().port();
+        assert!(check_available_port(port).is_err());
+        drop(listener);
+        assert!(check_available_port(port).is_ok());
+    }
+
+    #[test]
+    fn health_rejects_failed_migrations_and_unhealthy_services() {
+        let mut rows = vec![
+            json!({"Service":"postgres","State":"running","Health":"healthy"}),
+            json!({"Service":"misty-api","State":"running","Health":"healthy"}),
+            json!({"Service":"tunnel","State":"running","Health":"healthy"}),
+            json!({"Service":"migrate","State":"exited","ExitCode":0}),
+        ];
+        assert!(validate_health(&rows).is_ok());
+        rows[3]["ExitCode"] = json!(1);
+        assert!(validate_health(&rows).is_err());
+        rows[3]["ExitCode"] = json!(0);
+        rows[1]["Health"] = json!("unhealthy");
+        assert!(validate_health(&rows).is_err());
+        assert!(validate_health(&[]).is_err());
+    }
+
+    #[test]
     fn development_commands_select_the_explicit_compose_file() {
         let up = development_up_command(true, true).display();
         assert!(up.contains("--env-file .env/dev/runtime.env"));
@@ -986,23 +1190,13 @@ mod tests {
         assert!(!development_tunnel_connection_command()
             .display()
             .contains("tunnel-url"));
-        assert!(development_tunnel_refresh_command()
-            .display()
-            .ends_with("--file compose.dev.yml up --detach --force-recreate tunnel"));
-        assert!(development_worker_refresh_command().display().ends_with(
-            "--file compose.dev.yml up --detach --force-recreate --no-deps cloudflare-deploy"
-        ));
-        assert_eq!(
-            development_worker_wait_command().display(),
-            "docker wait misty-cloudflare-deploy"
-        );
     }
 
     #[test]
     fn development_api_url_uses_the_static_tunnel_hostname_by_default() {
         assert!(env::var("MISTY_DEV_API_TUNNEL_HOSTNAME").is_err());
         assert!(env::var("MISTY_DEV_TUNNEL_HOSTNAME").is_err());
-        assert_eq!(development_api_url(), "https://dev-api.mistysys.com/v1");
+        assert_eq!(development_tunnel_hostname(), "");
     }
 
     #[test]
@@ -1133,7 +1327,7 @@ mod tests {
             misty: temporary.path().join("app"),
             server: server.clone(),
             website: temporary.path().join("website"),
-            extensions: temporary.path().join("extensions"),
+            features: temporary.path().join("src/features"),
             cli: temporary.path().join("cli"),
         };
 

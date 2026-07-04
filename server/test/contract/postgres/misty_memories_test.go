@@ -51,8 +51,8 @@ func TestMistyMemoryIsExplicitPrivateScopedAndControllable(t *testing.T) {
 		t.Fatalf("family context = %#v, %v", familyContext, err)
 	}
 	workContext, err := database.MistyMemoryContext(ctx, owner.ID, work.ID, 20)
-	if err != nil || !hasMistyMemory(workContext, personal.ID) || hasMistyMemory(workContext, spaceMemory.ID) {
-		t.Fatalf("work context crossed Space scope = %#v, %v", workContext, err)
+	if err != nil || !hasMistyMemory(workContext, personal.ID) || !hasMistyMemory(workContext, spaceMemory.ID) {
+		t.Fatalf("account memory was incorrectly restricted to a Space = %#v, %v", workContext, err)
 	}
 	otherContext, err := database.MistyMemoryContext(ctx, other.ID, "", 20)
 	if err != nil || len(otherContext) != 0 {

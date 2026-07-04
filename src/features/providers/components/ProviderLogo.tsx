@@ -22,7 +22,7 @@ import {
   TableProperties,
   Workflow,
 } from "lucide-react";
-import { brandIconAsset } from "../../../.././apps/shared/brandIcons";
+import { brandIconAsset } from "../../../shared/toolAssets/brandIcons";
 const brandLogoMap: Record<string, ProviderLogoSpec> = {
   b2: { kind: "asset", src: brandIconAsset("backblaze")!.src },
   box: { kind: "asset", src: brandIconAsset("box")!.src },

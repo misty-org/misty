@@ -21,7 +21,7 @@ import {
   cn,
   Button,
 } from "@/shared/ui";
-import mistyCompanion from "@/shared/assets/misty-cloud-expression-cycle.webp";
+import mistyCompanion from "@/shared/assets/misty-cloud-expression-cycle.webp?inline";
 import { Cable, Loader2, MessageSquarePlus, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 

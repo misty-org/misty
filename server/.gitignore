@@ -21,3 +21,14 @@
 
 # Local Cloudflare account and build cache
 .wrangler/
+
+# Python audit tooling
+__pycache__/
+*.py[cod]
+
+# The monorepo ignores local config directories; these are Go source, not secrets.
+!internal/platform/config/
+!internal/platform/config/*.go
+
+# Workstation-specific rsync helper (local paths and remote host).
+/rsync.sh

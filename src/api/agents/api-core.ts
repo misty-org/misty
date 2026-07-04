@@ -1,6 +1,6 @@
 export function createAgentsApi(
   apiRequest: <T = void>(path: string, init?: RequestInit) => Promise<T>,
-  apiBlobRequest: (path: string) => Promise<Blob> = async () => {
+  apiBlobRequest: (path: string, init?: RequestInit) => Promise<Blob> = async () => {
     throw new Error("Use the binary operation.");
   },
 ) {
@@ -15,10 +15,17 @@ export function createAgentsApi(
         `/agent-runs/${encodeURIComponent(runId)}/approvals/${encodeURIComponent(approvalId)}`,
         { method: "POST", body: JSON.stringify({ decision }) },
       ),
-    transcribeVoice: async (audio: Blob, durationMs: number) =>
+    speech: (invocationId: string, signal?: AbortSignal) =>
+      apiBlobRequest("/agent-voice/speech", {
+        method: "POST",
+        signal,
+        body: JSON.stringify({ invocation_id: invocationId }),
+      }),
+    transcribeVoice: async (audio: Blob, durationMs: number, signal?: AbortSignal) =>
       apiRequest<{ transcript: string; detected_language: string; duration_ms: number }>(
         "/agent-voice/transcriptions",
         {
+          signal,
           method: "POST",
           body: JSON.stringify({
             audio_base64: arrayBufferToBase64(await audio.arrayBuffer()),

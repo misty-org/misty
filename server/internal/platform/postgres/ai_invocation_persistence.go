@@ -35,6 +35,7 @@ type AIInvocationRecord struct {
 // CreateAIInvocationRecord makes the database idempotency journal the durable
 // authority. The returned boolean is false when a retry found the existing row.
 func (db *Database) CreateAIInvocationRecord(ctx context.Context, record AIInvocationRecord) (AIInvocationRecord, bool, error) {
+	record.SpaceID = "" // All AI admission is account-scoped; sources carry their own destinations.
 	bound, bindErr := bindAppAuthority(ctx, record.RequestPayload)
 	if bindErr != nil {
 		return AIInvocationRecord{}, false, bindErr
@@ -56,6 +57,7 @@ func (db *Database) CreateAIInvocationRecord(ctx context.Context, record AIInvoc
 // Shared by ordinary AI requests and deterministic SDK admissions. The caller
 // can commit its pinned request metadata in this same transaction.
 func createAIInvocationRecordTx(ctx context.Context, tx *sql.Tx, record AIInvocationRecord) (AIInvocationRecord, bool, error) {
+	record.SpaceID = ""
 	stored := AIInvocationRecord{}
 	created := false
 	err := func() error {
@@ -132,9 +134,9 @@ func (db *Database) AIInvocationByID(ctx context.Context, userID, invocationID s
 func (db *Database) LinkAIInvocationAgentRun(ctx context.Context, userID, invocationID, runID string) error {
 	return db.TestingWithRLSContext(ctx, userRLSSettings(userID), func(tx *sql.Tx) error {
 		result, err := tx.ExecContext(ctx, `UPDATE ai_invocations invocation SET
-			agent_run_id=$1,space_id=COALESCE(invocation.space_id,run.space_id),updated_at=NOW()
+			agent_run_id=$1,updated_at=NOW()
 			FROM space_runs run WHERE invocation.id=$2 AND invocation.user_id=$3 AND run.id=$1
-			AND (invocation.space_id IS NULL OR invocation.space_id=run.space_id)
+			AND run.owner_user_id=$3
 			AND (invocation.agent_run_id=$1 OR (invocation.state='queued' AND invocation.agent_run_id IS NULL))`, runID, invocationID, userID)
 		if err != nil {
 			return err

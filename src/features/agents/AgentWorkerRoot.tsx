@@ -6,7 +6,8 @@ import { AuthProvider, useAuth } from "@/features/auth";
 import { useDocumentAppAppearance } from "@/features/settings";
 import { useMistyStore } from "@/features/misty/useMistyStore";
 import { GlobalMistySurface } from "@/features/global-search/GlobalMisty";
-import type { MistyImageAttachment } from "@/features/global-search/types";
+import type { AiCaptureAttachment, AiSelectionSnapshot } from "@/features/ai-surface/types";
+import type { GlobalAiContextRef, MistyImageAttachment } from "@/features/global-search/types";
 import { BrowserContextMenuBridge } from "@/features/global-search/BrowserContextMenuBridge";
 import { AgentExecutionSurface } from "./AgentExecutionSurface";
 import {
@@ -19,6 +20,9 @@ import { usePersonalAgentsStore } from "./personalAgentsStore";
 
 export interface AgentWindowTask {
   queueId: string;
+  context?: GlobalAiContextRef[];
+  capture?: AiCaptureAttachment;
+  selection?: AiSelectionSnapshot;
   conversationId?: string;
   accountId: string;
   agentId: string;
@@ -52,7 +56,13 @@ function Worker() {
       busy = false,
       failed = false;
     const take = async () => {
-      if (disposed || failed || busy || useLocalExecution.getState().execution?.state === "paused")
+      if (
+        disposed ||
+        failed ||
+        busy ||
+        (useLocalExecution.getState().execution?.state === "paused" &&
+          useMistyStore.getState().working)
+      )
         return;
       busy = true;
       try {
@@ -65,41 +75,50 @@ function Worker() {
         if (task.accountId !== user.id || task.agentId !== agentId)
           throw new Error("The queued task belongs to a different agent or account.");
         if (active) {
-          if (
-            task.spaceId !== useLocalExecution.getState().execution?.spaceId ||
-            task.attachments.length
-          )
-            return;
+          if (task.attachments.length) return;
           const message = await routeLocalFollowup(task.prompt);
           await invoke("agent_window_ack_task", { queueId: task.queueId });
           setError(message);
           return;
         }
+        const assertCurrent = () => {
+          if (disposed) throw new Error("Task stopped.");
+        };
         await usePersonalAgentsStore.getState().load(user.id);
+        assertCurrent();
         if (disposed) return;
         useMistyStore.getState().setAccount(user.id);
         useMistyStore.setState({
           selectedAgentId: agentId,
-          selectedSpaceId: task.spaceId,
+          selectedSpaceId: "",
           executionMode: "team",
           activeConversationId: "",
-          handoff: { spaceId: task.spaceId, context: [] },
           panel: "answer",
         });
         if (task.conversationId) {
           await useMistyStore.getState().loadConversations();
           const conversation = useMistyStore
             .getState()
-            .conversations.find(
-              (c) =>
-                c.id === task.conversationId && c.agentId === agentId && c.spaceId === task.spaceId,
-            );
+            .conversations.find((c) => c.id === task.conversationId && c.agentId === agentId);
           if (conversation) useMistyStore.getState().selectConversation(conversation.id);
           else if (task.attachments.length)
-            throw new Error("The attachment conversation is unavailable to this agent.");
+            throw new Error(
+              "The conversation is unavailable to this agent. Reopen it and try again.",
+            );
           else useMistyStore.setState({ activeConversationId: "" });
         }
+        assertCurrent();
+        // Selecting a conversation clears old handoffs; attach this task afterward.
+        useMistyStore.setState({
+          handoff: {
+            spaceId: "",
+            context: task.context ?? [],
+            capture: task.capture,
+            selection: task.selection,
+          },
+        });
         await useMistyStore.getState().submitAnswer(task.prompt, task.attachments);
+        assertCurrent();
         if (!useMistyStore.getState().invocationId)
           throw new Error(
             useMistyStore.getState().error || "The queued task could not start. Retry when ready.",

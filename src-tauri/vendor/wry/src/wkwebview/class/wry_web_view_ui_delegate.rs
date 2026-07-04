@@ -133,7 +133,8 @@ define_class!(
       decision_handler: &Block<dyn Fn(WKPermissionDecision)>,
     ) {
       //https://developer.apple.com/documentation/webkit/wkpermissiondecision?language=objc
-      (*decision_handler).call((WKPermissionDecision::Grant,));
+      // Let WebKit ask the user. A website must never inherit an app-level grant.
+      (*decision_handler).call((WKPermissionDecision::Prompt,));
     }
 
     #[cfg(target_os = "macos")]
