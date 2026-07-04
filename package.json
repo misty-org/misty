@@ -10,6 +10,7 @@
     "dev:web": "node scripts/dev-web.mjs",
     "build": "npm run build:desktop",
     "build:desktop": "tsc && vite build --mode desktop",
+    "build:mac:test": "npm run proxy:archive && MISTY_PROXY_RUNTIME=embedded MISTY_PROXY_GO_LIB_DIR=src-tauri/target/misty-proxy/host MISTY_PROXY_GO_LIB_NAME=misty_proxy npm run tauri -- build --features=embedded-proxy-go --bundles app dmg --no-sign",
     "build:mobile": "tsc && vite build --mode mobile",
     "build:web": "node scripts/build-web.mjs",
     "preview": "vite preview --mode desktop",

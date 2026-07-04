@@ -37,8 +37,7 @@ use crate::services::plugin_commands::{
 };
 use crate::services::power_pack::{
     ArchiveActionResult, ArchiveCreateRequest, ArchiveExtractRequest, ArchiveListRequest,
-    ArchiveListResult, AutomationRule, AutomationRulesSnapshot, AutomationRunResult,
-    AutomationWatchSnapshot, CompareFilesRequest, CompareFilesResult, CompareFoldersRequest,
+    ArchiveListResult, CompareFilesRequest, CompareFilesResult, CompareFoldersRequest,
     CompareFoldersResult, DuplicateScanRequest, DuplicateScanResult, FileToolsActionResult,
     FileToolsChecksumRequest, FileToolsChecksumResult, FileToolsChmodRequest,
     FileToolsReadonlyRequest, FileToolsSymlinkRequest, FileToolsSymlinkTargetRequest,
@@ -1249,66 +1248,6 @@ pub async fn file_tools_read_symlink(
     state: State<'_, MistyRuntime>,
 ) -> ApiResult<FileToolsSymlinkTargetResult> {
     state.power_pack.file_tools_read_symlink(request).await
-}
-
-#[tauri::command]
-pub async fn automation_rules_snapshot(
-    state: State<'_, MistyRuntime>,
-) -> ApiResult<AutomationRulesSnapshot> {
-    state.power_pack.automation_rules_snapshot().await
-}
-
-#[tauri::command]
-pub async fn automation_watch_snapshot(
-    state: State<'_, MistyRuntime>,
-) -> ApiResult<AutomationWatchSnapshot> {
-    Ok(state.power_pack.automation_watch_snapshot().await)
-}
-
-#[tauri::command]
-pub async fn automation_watch_start(
-    poll_interval_ms: Option<u64>,
-    state: State<'_, MistyRuntime>,
-) -> ApiResult<AutomationWatchSnapshot> {
-    state
-        .power_pack
-        .automation_watch_start(poll_interval_ms)
-        .await
-}
-
-#[tauri::command]
-pub async fn automation_watch_stop(
-    state: State<'_, MistyRuntime>,
-) -> ApiResult<AutomationWatchSnapshot> {
-    Ok(state.power_pack.automation_watch_stop().await)
-}
-
-#[tauri::command]
-pub async fn automation_rules_save(
-    rule: AutomationRule,
-    state: State<'_, MistyRuntime>,
-) -> ApiResult<AutomationRulesSnapshot> {
-    state.power_pack.automation_rules_save(rule).await
-}
-
-#[tauri::command]
-pub async fn automation_rules_delete(
-    id: String,
-    state: State<'_, MistyRuntime>,
-) -> ApiResult<AutomationRulesSnapshot> {
-    state.power_pack.automation_rules_delete(id).await
-}
-
-#[tauri::command]
-pub async fn automation_rules_run_now(
-    id: String,
-    dry_run: Option<bool>,
-    state: State<'_, MistyRuntime>,
-) -> ApiResult<AutomationRunResult> {
-    state
-        .power_pack
-        .automation_rules_run_now(id, dry_run.unwrap_or(true))
-        .await
 }
 
 #[allow(dead_code)]
