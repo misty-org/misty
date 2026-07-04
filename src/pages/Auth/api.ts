@@ -1,3 +1,5 @@
+import { apiBase } from "../../lib/apiBase";
+
 export interface AuthUser {
   id: string;
   name: string;
@@ -13,8 +15,6 @@ interface LoginResponse {
   name: string;
   email: string;
 }
-
-const apiBase = (import.meta.env.VITE_API_BASE ?? "").replace(/\/+$/, "");
 
 async function request<T>(path: string, body: unknown): Promise<T> {
   const response = await fetch(`${apiBase}${path}`, {
