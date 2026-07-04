@@ -1,21 +1,37 @@
 {
-  "schema_version": 2,
+  "schema_version": 3,
   "id": "vault",
   "name": "Vault",
-  "version": "@PROJECT_VERSION@",
+  "version": "0.1.0",
   "description": "Restic-powered backups for Misty.",
   "author": "Misty",
   "enabled": true,
-  "platforms": ["@MISTY_HOST_OS@"],
+  "platforms": ["web"],
+  "runtime": {
+    "type": "web",
+    "entry": "../../index.html?plugin=vault"
+  },
+  "launcher": {
+    "views": ["Dock"],
+    "show_in_launcher": true,
+    "requires_selected_file": false,
+    "open_mode": "tab"
+  },
   "plugin": {
-    "abi_version": 4,
-    "variants": [
-      {
-        "os": "@MISTY_HOST_OS@",
-        "arch": "@MISTY_HOST_ARCH@",
-        "runtime": "",
-        "library": "@MISTY_VAULT_VARIANT_LIBRARY@"
+    "runtime": "web",
+    "entry": "../../index.html?plugin=vault"
+  },
+  "panels": [
+    {
+      "id": "vault.panel",
+      "title": "Vault",
+      "window_type": "panel",
+      "default_width": 720,
+      "default_height": 520,
+      "entry": "../../index.html?plugin=vault",
+      "launcher": {
+        "views": ["Dock"]
       }
-    ]
-  }
+    }
+  ]
 }
