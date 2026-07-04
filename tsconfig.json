@@ -13,7 +13,7 @@
     "moduleResolution": "Node",
     "baseUrl": ".",
     "paths": {
-      "@website/*": ["src/features/hub/website/*"]
+      "@website/*": ["src/pages/Website/*"]
     },
     "resolveJsonModule": true,
     "isolatedModules": true,

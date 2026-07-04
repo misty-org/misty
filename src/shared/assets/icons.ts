@@ -1,6 +1,8 @@
 import activityCheck from "../../../assets/icons/activity-check-svgrepo.svg?url";
 import cloud24 from "../../../assets/icons/cloud-24.svg?url";
 import dropboxColor from "../../../assets/icons/dropbox-color.svg?url";
+import eye16 from "../../../assets/icons/eye-16.svg?url";
+import eyeClosed16 from "../../../assets/icons/eye-closed-16.svg?url";
 import fileDirectoryOpenFill24 from "../../../assets/icons/file-directory-open-fill-24.svg?url";
 import gear24 from "../../../assets/icons/gear-24.svg?url";
 import googleDriveColor from "../../../assets/icons/google-drive-color.svg?url";
@@ -22,6 +24,8 @@ export const iconAssets = {
   activityCheck,
   cloud24,
   dropboxColor,
+  eye16,
+  eyeClosed16,
   fileDirectoryOpenFill24,
   gear24,
   googleDriveColor,
