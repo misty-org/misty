@@ -24,7 +24,7 @@ const providersWorkspaceClass =
   "h-full";
 
 const providersPaneWorkspaceClass =
-  "grid h-full min-h-0 min-w-0 grid-cols-[minmax(280px,0.42fr)_minmax(420px,0.58fr)] gap-px overflow-hidden bg-[#292929] max-[860px]:grid-cols-[minmax(0,1fr)]";
+  "grid h-full min-h-0 min-w-0 grid-cols-[minmax(280px,0.42fr)_minmax(420px,0.58fr)] overflow-hidden bg-[var(--misty-surface)] max-[860px]:grid-cols-[minmax(0,1fr)]";
 
 interface ProvidersMultiPanelSnapshot {
   tabs: MultiPanelTab[];
@@ -190,14 +190,12 @@ const ProvidersPane = memo(function ProvidersPane(props: { workspaceId: string }
     openRepairRemote,
     reloadWorkspaceRemote,
     requestDisconnect,
-    revealWorkspaceConfig,
     saveWorkspaceRemote,
     selectRemoteInWorkspace,
     setWorkspaceConfigField,
     setWorkspaceDraftName,
     setWorkspaceTokenField,
     setWorkspaceTokenVisible,
-    testWorkspaceConnection,
   } = useProvidersStore(useShallow((state) => ({
     loading: state.loading,
     providers: state.providers,
@@ -212,14 +210,12 @@ const ProvidersPane = memo(function ProvidersPane(props: { workspaceId: string }
     openRepairRemote: state.openRepairRemote,
     reloadWorkspaceRemote: state.reloadWorkspaceRemote,
     requestDisconnect: state.requestDisconnect,
-    revealWorkspaceConfig: state.revealWorkspaceConfig,
     saveWorkspaceRemote: state.saveWorkspaceRemote,
     selectRemoteInWorkspace: state.selectRemoteInWorkspace,
     setWorkspaceConfigField: state.setWorkspaceConfigField,
     setWorkspaceDraftName: state.setWorkspaceDraftName,
     setWorkspaceTokenField: state.setWorkspaceTokenField,
     setWorkspaceTokenVisible: state.setWorkspaceTokenVisible,
-    testWorkspaceConnection: state.testWorkspaceConnection,
   })));
   const { dirty, validRemoteName, configKeys } = useMemo(
     () => selectProviderWorkspaceDerived(workspace),
@@ -230,6 +226,9 @@ const ProvidersPane = memo(function ProvidersPane(props: { workspaceId: string }
     [remoteRevisions, remotes, workspace],
   );
   const serviceError = providers?.error ?? providers?.health.error ?? null;
+  const selectedWorkflow = workspace.draft
+    ? providers?.workflows.find((workflow) => workflow.type === workspace.draft?.providerType) ?? null
+    : null;
 
   useEffect(() => {
     ensureWorkspace(props.workspaceId);
@@ -261,6 +260,7 @@ const ProvidersPane = memo(function ProvidersPane(props: { workspaceId: string }
         draft={workspace.draft}
         configPaths={workspace.configPaths}
         configKeys={configKeys}
+        workflow={selectedWorkflow}
         dirty={dirty}
         loadingRemoteName={workspace.loadingRemoteName}
         working={working}
@@ -272,9 +272,8 @@ const ProvidersPane = memo(function ProvidersPane(props: { workspaceId: string }
         onConfigField={(key, value) => setWorkspaceConfigField(props.workspaceId, key, value)}
         onTokenField={(key, value) => setWorkspaceTokenField(props.workspaceId, key, value)}
         onTokenVisible={(visible) => setWorkspaceTokenVisible(props.workspaceId, visible)}
-        onTest={() => void testWorkspaceConnection(props.workspaceId)}
-        onReveal={() => void revealWorkspaceConfig(props.workspaceId)}
         onSave={() => void saveWorkspaceRemote(props.workspaceId)}
+        onDelete={requestDisconnect}
         onReload={() => {
           if (dirty && !window.confirm("Reload this remote and discard unsaved edits in this pane?")) return;
           void reloadWorkspaceRemote(props.workspaceId);

@@ -1,10 +1,9 @@
-import type { RcloneConfigPaths, RemoteEditDraft } from "../../../api/types";
+import type { ProviderWorkflow, RcloneConfigPaths, RemoteEditDraft } from "../../../api/types";
 import { iconAssets } from "../../../shared/assets/icons";
 import { AssetIcon } from "../../../shared/components/AssetIcon";
 import { Panel, PanelHeader } from "../../../shared/components/Panel";
 import { RemoteConfigForm } from "./RemoteConfigForm";
 import { RemoteEditActions } from "./RemoteEditActions";
-import { RemotePowerTools } from "./RemotePowerTools";
 
 const dirtyPillClass =
   "rounded-full border border-[color-mix(in_srgb,var(--misty-warning)_48%,var(--misty-border))] bg-[color-mix(in_srgb,var(--misty-warning)_12%,var(--misty-surface))] px-[9px] py-[5px] text-xs text-[var(--misty-warning)]";
@@ -19,7 +18,7 @@ const staleWarningButtonClass =
   "shrink-0 rounded-[7px] border border-[color-mix(in_srgb,var(--misty-danger)_44%,var(--misty-border))] bg-[color-mix(in_srgb,var(--misty-danger)_10%,var(--misty-surface))] px-2.5 py-1.5 text-[var(--misty-danger)] disabled:opacity-55";
 
 const remoteEditPanelClass =
-  "grid min-h-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden";
+  "grid min-h-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden !rounded-none !border-0 !bg-[var(--misty-surface)] !shadow-none [border-radius:0]";
 
 const remoteEditBodyClass =
   "min-h-0 overflow-auto";
@@ -28,6 +27,7 @@ interface RemoteEditPanelProps {
   draft: RemoteEditDraft | null;
   configPaths: RcloneConfigPaths | null;
   configKeys: string[];
+  workflow: ProviderWorkflow | null;
   dirty: boolean;
   loadingRemoteName: string | null;
   working: boolean;
@@ -39,9 +39,8 @@ interface RemoteEditPanelProps {
   onConfigField: (key: string, value: string) => void;
   onTokenField: (key: string, value: string) => void;
   onTokenVisible: (visible: boolean) => void;
-  onTest: () => void;
-  onReveal: () => void;
   onSave: () => void;
+  onDelete: (name: string) => void;
   onReload: () => void;
 }
 
@@ -74,6 +73,7 @@ export function RemoteEditPanel(props: RemoteEditPanelProps) {
             <RemoteConfigForm
               draft={draft}
               configKeys={props.configKeys}
+              workflow={props.workflow}
               configPaths={props.configPaths}
               tokenVisible={props.tokenVisible}
               onDraftName={props.onDraftName}
@@ -86,11 +86,9 @@ export function RemoteEditPanel(props: RemoteEditPanelProps) {
               dirty={props.dirty}
               validRemoteName={props.validRemoteName}
               stale={props.stale}
-              onTest={props.onTest}
-              onReveal={props.onReveal}
               onSave={props.onSave}
+              onDelete={() => props.onDelete(draft.originalName)}
             />
-            <RemotePowerTools draft={draft} working={props.working} />
           </>
         ) : (
           <div className="empty m-[18px] inline-flex max-w-[560px] items-center gap-[9px]">
@@ -128,8 +126,7 @@ function RemoteEditSkeleton() {
         <span className={`${skeletonBlockClass} h-[68px]`} />
         <span className={`${skeletonBlockClass} h-[68px]`} />
       </div>
-      <div className="mt-1 grid grid-cols-3 gap-2.5">
-        <span className={`${skeletonBlockClass} h-10`} />
+      <div className="mt-1 grid grid-cols-2 gap-2.5">
         <span className={`${skeletonBlockClass} h-10`} />
         <span className={`${skeletonBlockClass} h-10`} />
       </div>

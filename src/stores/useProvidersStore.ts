@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { invoke } from "@tauri-apps/api/core";
 import {
   providersConfigureRemote,
   providersConfigPaths,
@@ -9,6 +10,7 @@ import {
   providersSnapshot,
   providersTestRemote,
 } from "../api/misty";
+import { accountFetchMe, type AccountMeResponse } from "../pages/Account/shared/api";
 import type {
   ProviderConfigMode,
   ProviderConfigStep,
@@ -18,7 +20,10 @@ import type {
   RcloneConfigPaths,
   RemoteEditDraft,
 } from "../api/types";
+import type { CurrentLicense } from "../models/setup";
 import { errorText } from "../shared/format";
+import { hasTauriInternals } from "../shared/tauri";
+import { useSetupStore } from "./useSetupStore";
 import {
   openProviderAuthorizationLink,
   type ProviderAuthorizationOpenResult,
@@ -27,7 +32,6 @@ import {
   configPriority,
   providerOptionsForConnection,
   shouldBootstrapOneDriveRepairContinue,
-  shouldContinueExistingOneDriveRepair,
   stableConfig,
   updateTokenField,
 } from "../pages/Providers/providerUtils";
@@ -473,21 +477,33 @@ export const useProvidersStore = create<ProvidersStore>((set, get) => ({
   openAddRemote: async () => {
     connectionGeneration += 1;
     const generation = connectionGeneration;
+    set({ working: true, error: null, message: null });
     if (!get().providers) {
-      set({ working: true, error: null, message: null });
       try {
         await get().load();
       } finally {
-        if (generation === connectionGeneration) {
-          set({ working: false });
-        }
       }
-      if (generation !== connectionGeneration || !get().providers) return;
+      if (generation !== connectionGeneration || !get().providers) {
+        if (generation === connectionGeneration) set({ working: false });
+        return;
+      }
+    }
+    let remoteLimitError: string | null = null;
+    try {
+      remoteLimitError = await validateCanAddRemote(get().providers?.remotes ?? []);
+    } catch (error) {
+      remoteLimitError = `Could not verify your Misty license before adding a remote. ${errorText(error)}`;
+    }
+    if (generation !== connectionGeneration) return;
+    if (remoteLimitError) {
+      set({ error: remoteLimitError, message: null, working: false });
+      return;
     }
     set({
       connection: createConnectionSession("add"),
       error: null,
       message: null,
+      working: false,
     });
   },
 
@@ -606,18 +622,16 @@ export const useProvidersStore = create<ProvidersStore>((set, get) => ({
       },
     });
     try {
-      const pollingBrowserAuth = polling && session.step?.kind === "browser_auth";
       const bootstrapExistingConfigContinue = shouldBootstrapOneDriveRepairContinue(session);
-      const continueExistingOneDriveRepair = shouldContinueExistingOneDriveRepair(session);
       const step = await providersConfigureRemote({
         name: session.remoteName.trim(),
         providerType: session.providerType,
-        parameters: pollingBrowserAuth ? {} : session.parameters,
+        parameters: session.parameters,
         state: session.step?.state ?? "",
         result: session.step?.result ?? "",
         mode: session.mode,
         continuing: bootstrapExistingConfigContinue || session.step != null,
-        continueExisting: continueExistingOneDriveRepair,
+        continueExisting: bootstrapExistingConfigContinue,
       });
       if (generation !== connectionGeneration || !get().connection) return;
 
@@ -645,7 +659,7 @@ export const useProvidersStore = create<ProvidersStore>((set, get) => ({
       };
 
       const shouldOpenAuthorizeUrl = Boolean(step.authorizeUrl)
-        && (!pollingBrowserAuth || !current.openedAuthorizeUrl)
+        && (!polling || !current.openedAuthorizeUrl)
         && step.authorizeUrl !== current.openedAuthorizeUrl;
       if (shouldOpenAuthorizeUrl) {
         try {
@@ -680,7 +694,7 @@ export const useProvidersStore = create<ProvidersStore>((set, get) => ({
           if (generation === connectionGeneration && get().connection?.stage === "authorize") {
             void get().submitConnection(true);
           }
-        }, Math.max(500, step.pollAfterMs || 1000));
+        }, providerAuthorizationPollDelay(step.pollAfterMs));
       }
     } catch (error) {
       if (generation !== connectionGeneration) return;
@@ -693,7 +707,7 @@ export const useProvidersStore = create<ProvidersStore>((set, get) => ({
           if (generation === connectionGeneration && get().connection?.stage === "authorize") {
             void get().submitConnection(true);
           }
-        }, Math.max(1500, current.step?.pollAfterMs ?? 1000));
+        }, providerAuthorizationPollDelay(current.step?.pollAfterMs));
       }
     }
   },
@@ -754,7 +768,7 @@ export const useProvidersStore = create<ProvidersStore>((set, get) => ({
         remoteDraftCache: removeRemoteDraftCache(get().remoteDraftCache, name),
         workspaces: pruneRemoteFromWorkspaces(get().workspaces, name),
         disconnectTarget: null,
-        message: `Remote “${name}” disconnected.`,
+        message: `Remote “${name}” deleted.`,
       });
     } catch (error) {
       set({ error: errorText(error) });
@@ -930,6 +944,50 @@ function createConnectionSession(mode: ProviderConfigMode, remote?: ProviderRemo
   };
 }
 
+async function validateCanAddRemote(remotes: ProviderRemote[]): Promise<string | null> {
+  const license = await fetchVerifiedLicenseForRemoteGate();
+  if (!license) {
+    return "Sign in to Misty before adding a remote.";
+  }
+  if (!licenseAllowsRemoteManagement(license)) {
+    return "Your Misty license is not active. Update your account before adding a remote.";
+  }
+  if (license.tier === "basic" && remotes.length >= 1) {
+    return "The free tier includes one remote. Upgrade to Personal or Pro to add unlimited remotes.";
+  }
+  return null;
+}
+
+async function fetchVerifiedLicenseForRemoteGate(): Promise<CurrentLicense | null> {
+  const setup = useSetupStore.getState();
+  if (!setup.status) {
+    await setup.loadSystem();
+  }
+
+  const me = await accountFetchMe();
+  const license = licenseFromAccountMe(me);
+  if (hasTauriInternals()) {
+    await invoke("save_verified_license", { license });
+    await useSetupStore.getState().loadSystem();
+  }
+  return license;
+}
+
+function licenseFromAccountMe(me: AccountMeResponse): CurrentLicense {
+  return {
+    tier: me.tier,
+    status: me.status,
+    allows_use: me.allows_use,
+    expires_at: me.expires_at,
+    trial_started_at: me.trial_started_at,
+    license_device: me.license_device || null,
+  };
+}
+
+function licenseAllowsRemoteManagement(license: CurrentLicense): boolean {
+  return license.allows_use && (license.status === "active" || license.status === "trialing");
+}
+
 function providerConnectionErrorText(error: unknown, polling: boolean): string {
   const message = errorText(error);
   if (!polling) return message;
@@ -962,6 +1020,11 @@ function nextConnectionAfterProviderError(
 
 function providerAuthorizationTimedOutMessage(): string {
   return "Provider authorization timed out. Reopen the browser sign-in page, complete the flow, then try Connect again.";
+}
+
+function providerAuthorizationPollDelay(pollAfterMs?: number): number {
+  const requested = pollAfterMs && pollAfterMs > 0 ? pollAfterMs : 750;
+  return Math.min(Math.max(500, requested), 1500);
 }
 
 function providerFlowSuccessSuffix(mode: ProviderConfigMode): string {

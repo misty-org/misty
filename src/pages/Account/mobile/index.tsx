@@ -30,7 +30,7 @@ import {
 import { useSetupStore } from "../../../stores/useSetupStore";
 import type { CurrentLicense, CurrentUser } from "../../../models/setup";
 import { useAppStore } from "../../../stores/useAppStore";
-import { mobileErrorClass, mobilePageClass, mobileSuccessClass } from "../../../shell/mobileStyles";
+import { mobileErrorClass, mobilePageClass, mobileSuccessClass } from "../../../shared/mobileStyles";
 import {
   clearClientDebugEvents,
   clientDebugPanelEnabled,

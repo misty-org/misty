@@ -25,7 +25,7 @@ export function ProviderDisconnectDialog(props: {
   return (
     <div className={modalBackdropClass} role="presentation">
       <section className={disconnectDialogClass} role="dialog" aria-modal="true" aria-labelledby="disconnect-remote-title">
-        <h2 className="mx-5 text-xl" id="disconnect-remote-title">Disconnect Remote?</h2>
+        <h2 className="mx-5 text-xl" id="disconnect-remote-title">Delete Remote?</h2>
         <p className="mx-5 mb-5 mt-2.5 leading-normal">
           <strong>{props.remoteName}</strong> will be removed from Misty and rclone. Files stored by the provider will not be deleted.
         </p>
@@ -33,7 +33,7 @@ export function ProviderDisconnectDialog(props: {
           <button className={disconnectButtonClass} type="button" onClick={props.onCancel} disabled={props.working}>Cancel</button>
           <button className={disconnectDangerButtonClass} type="button" onClick={props.onConfirm} disabled={props.working}>
             <AssetIcon src={iconAssets.trash24} size={16} />
-            {props.working ? "Disconnecting…" : "Disconnect"}
+            {props.working ? "Deleting…" : "Delete"}
           </button>
         </footer>
       </section>

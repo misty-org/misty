@@ -32,6 +32,7 @@ pub struct NativeSystemInfo {
     legacy_install_dir: String,
     db_path: String,
     setup_path: String,
+    installed_version: Option<String>,
     current_user: Option<CurrentUser>,
     current_license: Option<CurrentLicense>,
 }
@@ -78,22 +79,6 @@ struct LocalAccessClaims {
     jti: String,
     iat: i64,
     exp: i64,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct ReleaseManifest {
-    version: String,
-    #[serde(alias = "assets", default)]
-    artifacts: Vec<ReleaseArtifact>,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct ReleaseArtifact {
-    name: String,
-    platform: String,
-    url: String,
-    #[serde(default, rename = "sha256")]
-    _sha256: String,
 }
 
 #[derive(Debug, Serialize, Clone)]
@@ -149,11 +134,30 @@ const REMOVED_PLUGIN_IDS: &[&str] = &["git", "preview-panel", "preview_panel"];
 
 #[derive(Debug, Serialize, Clone, Default)]
 pub struct MistyProcessStatus {
-    misty_hub_pid: u32,
-    misty_pid: Option<u32>,
-    misty_proxy_pid: Option<u32>,
-    misty_proxy_port: Option<u16>,
-    misty_rclone_port: Option<u16>,
+    pub misty_pid: Option<u32>,
+    pub misty_proxy_pid: Option<u32>,
+    pub misty_proxy_port: Option<u16>,
+    pub misty_rclone_port: Option<u16>,
+}
+
+#[derive(Debug, Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct ReleaseDownload {
+    name: String,
+    platform: String,
+    url: String,
+    sha256: String,
+}
+
+#[derive(Debug, Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct ReleaseCatalogEntry {
+    version: String,
+    date: String,
+    summary: String,
+    manifest_url: String,
+    changes: Vec<String>,
+    downloads: Vec<ReleaseDownload>,
 }
 
 #[cfg(target_os = "windows")]
@@ -201,12 +205,131 @@ fn current_misty_process_status() -> MistyProcessStatus {
     let misty_proxy_pid = find_running_pid("misty-proxy");
 
     MistyProcessStatus {
-        misty_hub_pid: std::process::id(),
         misty_pid,
         misty_proxy_pid,
         misty_proxy_port: misty_proxy_pid.and_then(|_| read_proxy_port_from_config()),
         misty_rclone_port: find_misty_rclone_rcd_port(),
     }
+}
+
+#[tauri::command]
+pub async fn fetch_misty_releases() -> Result<Vec<ReleaseCatalogEntry>, String> {
+    let client = reqwest::Client::new();
+    let releases = authed_get(
+        &client,
+        "https://api.github.com/repos/misty-org/misty-public/releases",
+    )
+    .header("Accept", "application/vnd.github+json")
+    .header("User-Agent", "Misty Desktop")
+    .send()
+    .await
+    .map_err(|error| format!("Could not fetch Misty releases: {error}"))?
+    .error_for_status()
+    .map_err(|error| format!("Misty releases request failed: {error}"))?
+    .json::<Vec<GithubRelease>>()
+    .await
+    .map_err(|error| format!("Misty releases JSON was invalid: {error}"))?;
+
+    Ok(releases
+        .into_iter()
+        .filter(|release| !release.draft)
+        .map(release_catalog_entry)
+        .collect())
+}
+
+#[derive(Debug, Deserialize)]
+struct GithubRelease {
+    tag_name: String,
+    name: Option<String>,
+    body: Option<String>,
+    published_at: Option<String>,
+    draft: bool,
+    assets: Vec<GithubReleaseAsset>,
+}
+
+#[derive(Debug, Deserialize)]
+struct GithubReleaseAsset {
+    name: String,
+    browser_download_url: String,
+}
+
+fn release_catalog_entry(release: GithubRelease) -> ReleaseCatalogEntry {
+    let version = release.tag_name;
+    let semver = version.trim_start_matches('v');
+    let manifest_name = format!("manifest-{semver}.json");
+    let manifest_url = release
+        .assets
+        .iter()
+        .find(|asset| asset.name == manifest_name || asset.name.starts_with("manifest-"))
+        .map(|asset| asset.browser_download_url.clone())
+        .unwrap_or_else(|| {
+            format!(
+                "https://github.com/misty-org/misty-public/releases/download/{version}/{manifest_name}"
+            )
+        });
+    let downloads = release
+        .assets
+        .into_iter()
+        .filter(|asset| asset.name != manifest_name && !asset.name.starts_with("manifest-"))
+        .map(release_download)
+        .collect();
+    let changes = release_changes(release.body.as_deref());
+    let summary = release
+        .name
+        .filter(|name| !name.trim().is_empty())
+        .or_else(|| changes.first().cloned())
+        .unwrap_or_else(|| "Misty release".to_owned());
+
+    ReleaseCatalogEntry {
+        version,
+        date: release_date_label(release.published_at.as_deref()),
+        summary,
+        manifest_url,
+        changes,
+        downloads,
+    }
+}
+
+fn release_download(asset: GithubReleaseAsset) -> ReleaseDownload {
+    ReleaseDownload {
+        platform: release_asset_platform(&asset.name),
+        sha256: String::new(),
+        name: asset.name,
+        url: asset.browser_download_url,
+    }
+}
+
+fn release_asset_platform(name: &str) -> String {
+    let lowered = name.to_ascii_lowercase();
+    for platform in [
+        "macos-aarch64",
+        "macos-x86_64",
+        "windows-x86_64",
+        "linux-x86_64",
+    ] {
+        if lowered.contains(platform) {
+            return platform.to_owned();
+        }
+    }
+    "unknown".to_owned()
+}
+
+fn release_changes(body: Option<&str>) -> Vec<String> {
+    body.unwrap_or_default()
+        .lines()
+        .map(|line| line.trim().trim_start_matches(['-', '*']).trim())
+        .filter(|line| !line.is_empty() && !line.starts_with('#'))
+        .take(8)
+        .map(ToOwned::to_owned)
+        .collect()
+}
+
+fn release_date_label(published_at: Option<&str>) -> String {
+    published_at
+        .and_then(|value| value.split('T').next())
+        .filter(|value| !value.is_empty())
+        .unwrap_or("Unpublished")
+        .to_owned()
 }
 
 #[cfg(target_os = "windows")]
@@ -272,9 +395,10 @@ pub fn check_system() -> Result<NativeSystemInfo, String> {
     let current_user = current_user()?;
     let current_license = current_license()?;
     let setup_path = std::env::current_exe()
-        .unwrap_or_else(|_| PathBuf::from("Misty Hub"))
+        .unwrap_or_else(|_| PathBuf::from("Misty"))
         .display()
         .to_string();
+    let installed_version = read_installed_version(&home)?;
 
     Ok(NativeSystemInfo {
         os: std::env::consts::OS.to_string(),
@@ -284,24 +408,10 @@ pub fn check_system() -> Result<NativeSystemInfo, String> {
         legacy_install_dir: legacy_install_dir.display().to_string(),
         db_path: db_path.display().to_string(),
         setup_path,
+        installed_version,
         current_user,
         current_license,
     })
-}
-
-#[tauri::command]
-pub fn ensure_misty_folders(folders: Vec<String>) -> Result<Vec<PathProbe>, String> {
-    let home = misty_home_dir()?;
-    let mut created = Vec::new();
-    for folder in folders {
-        let path = safe_misty_home_child(&home, &folder)
-            .ok_or_else(|| format!("Unsafe Misty folder path: {folder}"))?;
-        fs::create_dir_all(&path)
-            .map_err(|error| format!("Could not create {}: {error}", path.display()))?;
-        created.push(path);
-    }
-
-    Ok(created.iter().map(|path| probe_path(path)).collect())
 }
 
 #[tauri::command]
@@ -320,66 +430,6 @@ pub fn open_external_url(url: String) -> Result<(), String> {
 
     open_url_in_system_browser(&url)
         .map_err(|error| format!("Could not open {url} in the system browser: {error}"))
-}
-
-#[tauri::command]
-pub async fn install_misty(manifest_url: String, version: String) -> Result<String, String> {
-    ensure_database()?;
-    if current_user()?.is_none() {
-        return Err("Sign in to Misty before installing.".to_string());
-    }
-
-    let client = reqwest::Client::new();
-    let manifest = fetch_manifest(&client, &manifest_url).await?;
-    let platform = format!("{}-{}", std::env::consts::OS, std::env::consts::ARCH);
-    let home = misty_home_dir()?;
-    let install_dir = misty_bin_dir()?;
-    fs::create_dir_all(&install_dir)
-        .map_err(|error| format!("Could not create install directory: {error}"))?;
-    let matching_artifacts: Vec<_> = manifest
-        .artifacts
-        .iter()
-        .filter(|artifact| artifact.platform == platform)
-        .collect();
-
-    if matching_artifacts.is_empty() {
-        return Err(format!("No Misty artifacts found for platform {platform}"));
-    }
-
-    let artifact_count = matching_artifacts.len();
-    for artifact in matching_artifacts {
-        let artifact_debug = format!(
-            "Matched artifact platform={} name={} url={}",
-            artifact.platform, artifact.name, artifact.url
-        );
-        if !artifact_is_zip(artifact) {
-            return Err(format!(
-                "{}. Unsupported artifact type for {}. Misty Hub currently expects .zip artifacts.",
-                artifact_debug, artifact.name
-            ));
-        }
-
-        let archive = download_artifact(&client, artifact)
-            .await
-            .map_err(|error| format!("{artifact_debug}. {error}"))?;
-        extract_zip_archive(&archive, &home).map_err(|error| {
-            format!(
-                "{artifact_debug}. Could not extract {}: {error}",
-                artifact.name
-            )
-        })?;
-    }
-
-    let resolved_version = if manifest.version.trim().is_empty() {
-        version
-    } else {
-        manifest.version
-    };
-
-    Ok(format!(
-        "Installed Misty {resolved_version} for {platform} to {} from {artifact_count} artifact(s).",
-        install_dir.display()
-    ))
 }
 
 #[tauri::command]
@@ -1123,81 +1173,31 @@ fn set_user_only_file_permissions(path: &Path) -> Result<(), String> {
     Ok(())
 }
 
-async fn fetch_manifest(
-    client: &reqwest::Client,
-    manifest_url: &str,
-) -> Result<ReleaseManifest, String> {
-    authed_get(client, manifest_url)
-        .send()
-        .await
-        .map_err(|error| format!("Could not fetch manifest: {error}"))?
-        .error_for_status()
-        .map_err(|error| format!("Manifest request failed: {error}"))?
-        .json::<ReleaseManifest>()
-        .await
-        .map_err(|error| format!("Manifest JSON was invalid: {error}"))
-}
-
-async fn download_artifact(
-    client: &reqwest::Client,
-    artifact: &ReleaseArtifact,
-) -> Result<Vec<u8>, String> {
-    authed_get(client, &artifact.url)
-        .send()
-        .await
-        .map_err(|error| format!("Could not download {}: {error}", artifact.name))?
-        .error_for_status()
-        .map_err(|error| format!("Download failed for {}: {error}", artifact.name))?
-        .bytes()
-        .await
-        .map(|bytes| bytes.to_vec())
-        .map_err(|error| format!("Could not read {} download body: {error}", artifact.name))
-}
-
 fn authed_get(client: &reqwest::Client, url: &str) -> reqwest::RequestBuilder {
     let request = client.get(url);
 
-    match std::env::var("MISTY_DOWNLOAD_TOKEN") {
-        Ok(token) if !token.trim().is_empty() => request.bearer_auth(token),
-        _ => request,
+    match github_auth_token() {
+        Some(token) => request.bearer_auth(token),
+        None => request,
     }
 }
 
-fn extract_zip_archive(archive_bytes: &[u8], misty_home: &Path) -> io::Result<()> {
-    let reader = Cursor::new(archive_bytes);
-    let mut archive = ZipArchive::new(reader)?;
-
-    for index in 0..archive.len() {
-        let mut entry = archive.by_index(index)?;
-        let Some(out_path) = release_entry_destination(misty_home, entry.name()) else {
-            continue;
-        };
-
-        if entry.is_dir() {
-            fs::create_dir_all(&out_path)?;
-            continue;
-        }
-
-        if let Some(parent) = out_path.parent() {
-            fs::create_dir_all(parent)?;
-        }
-
-        let mut out_file = File::create(&out_path)?;
-        io::copy(&mut entry, &mut out_file)?;
-
-        #[cfg(unix)]
-        if let Some(mode) = entry.unix_mode() {
-            use std::os::unix::fs::PermissionsExt;
-            fs::set_permissions(&out_path, fs::Permissions::from_mode(mode))?;
+fn github_auth_token() -> Option<String> {
+    for key in [
+        "MISTY_DOWNLOAD_TOKEN",
+        "MISTY_GITHUB_TOKEN",
+        "GITHUB_TOKEN",
+        "GH_TOKEN",
+    ] {
+        if let Ok(token) = std::env::var(key) {
+            let token = token.trim();
+            if !token.is_empty() {
+                return Some(token.to_string());
+            }
         }
     }
 
-    Ok(())
-}
-
-fn artifact_is_zip(artifact: &ReleaseArtifact) -> bool {
-    artifact.name.to_ascii_lowercase().ends_with(".zip")
-        || artifact.url.to_ascii_lowercase().ends_with(".zip")
+    None
 }
 
 fn extract_plugin_zip_archive(
@@ -1610,55 +1610,6 @@ fn ensure_database() -> Result<(), String> {
         .map_err(|error| format!("Could not initialize Misty database: {error}"))
 }
 
-fn release_entry_destination(misty_home: &Path, entry_name: &str) -> Option<PathBuf> {
-    let entry_path = Path::new(entry_name);
-    if entry_path.is_absolute() {
-        return None;
-    }
-
-    let mut components = entry_path.components();
-    let first = match components.next()? {
-        Component::Normal(value) => value.to_string_lossy().to_string(),
-        _ => return None,
-    };
-
-    let mut relative = PathBuf::new();
-    for component in components {
-        match component {
-            Component::Normal(value) => relative.push(value),
-            Component::CurDir => {}
-            _ => return None,
-        }
-    }
-
-    let mut destination = match first.as_str() {
-        "bin" => misty_home.join(".local").join("bin"),
-        "assets" => misty_home.join("assets"),
-        "scripts" => misty_home.join("scripts"),
-        other => misty_home.join(other),
-    };
-    destination.push(relative);
-    Some(destination)
-}
-
-fn safe_misty_home_child(home: &Path, relative: &str) -> Option<PathBuf> {
-    let relative_path = Path::new(relative);
-    if relative_path.is_absolute() {
-        return None;
-    }
-
-    let mut safe = PathBuf::new();
-    for component in relative_path.components() {
-        match component {
-            Component::Normal(value) => safe.push(value),
-            Component::CurDir => {}
-            _ => return None,
-        }
-    }
-
-    Some(home.join(safe))
-}
-
 fn probe_path(path: &Path) -> PathProbe {
     PathProbe {
         path: path.display().to_string(),
@@ -1906,7 +1857,6 @@ fn component_log_filename(name: &str) -> Result<&'static str, String> {
         "misty" | "misty.log" => Ok("misty.log"),
         "misty-proxy" | "misty-proxy.log" => Ok("misty-proxy.log"),
         "misty-rclone" | "misty-rclone.log" => Ok("misty-rclone.log"),
-        "misty-hub" | "misty-hub.log" => Ok("misty-hub.log"),
         _ => Err(format!("Unknown Misty log: {name}")),
     }
 }
@@ -1933,14 +1883,6 @@ fn spawn_logged_process(path: &Path, log_name: &str) -> Result<(), String> {
         .map_err(|error| error.to_string())
 }
 
-fn append_hub_log(message: &str) {
-    if let Ok(mut file) = append_log_file("misty-hub") {
-        use std::io::Write;
-        let timestamp = Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true);
-        let _ = writeln!(file, "[{timestamp}] {message}");
-    }
-}
-
 fn misty_bin_dir() -> Result<PathBuf, String> {
     misty_home_dir().map(|home| home.join(".local").join("bin"))
 }
@@ -1955,6 +1897,22 @@ fn misty_db_dir() -> Result<PathBuf, String> {
 
 fn misty_db_path() -> Result<PathBuf, String> {
     misty_home_dir().map(|home| home.join("db").join("data.db"))
+}
+
+fn installed_version_path(home: &Path) -> PathBuf {
+    home.join(".version")
+}
+
+fn read_installed_version(home: &Path) -> Result<Option<String>, String> {
+    let path = installed_version_path(home);
+    if !path.exists() {
+        return Ok(None);
+    }
+    let version = fs::read_to_string(&path)
+        .map_err(|error| format!("Could not read installed Misty version: {error}"))?
+        .trim()
+        .to_string();
+    Ok((!version.is_empty()).then_some(version))
 }
 
 fn jwt_secret_path() -> Result<PathBuf, String> {
@@ -1978,17 +1936,15 @@ mod tests {
     use super::*;
     use std::{
         fs,
-        io::{Cursor, Write},
         time::{SystemTime, UNIX_EPOCH},
     };
-    use zip::{write::SimpleFileOptions, ZipWriter};
 
     fn temp_misty_home() -> PathBuf {
         let unique = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .expect("time should be available")
             .as_nanos();
-        let path = std::env::temp_dir().join(format!("misty-hub-test-{unique}"));
+        let path = std::env::temp_dir().join(format!("misty-test-{unique}"));
         fs::create_dir_all(&path).expect("temp home should be created");
         path
     }
@@ -2010,37 +1966,6 @@ mod tests {
             .unwrap(),
         )
         .expect("manifest should be written");
-    }
-
-    #[test]
-    fn maps_release_roots_to_misty_home_destinations() {
-        let home = PathBuf::from("/tmp/misty-home");
-
-        assert_eq!(
-            release_entry_destination(&home, "bin/misty").unwrap(),
-            home.join(".local/bin/misty")
-        );
-        assert_eq!(
-            release_entry_destination(&home, "assets/themes/default.css").unwrap(),
-            home.join("assets/themes/default.css")
-        );
-        assert_eq!(
-            release_entry_destination(&home, "scripts/bootstrap.sh").unwrap(),
-            home.join("scripts/bootstrap.sh")
-        );
-        assert_eq!(
-            release_entry_destination(&home, "plugins/public/example/plugin.json").unwrap(),
-            home.join("plugins/public/example/plugin.json")
-        );
-    }
-
-    #[test]
-    fn rejects_unsafe_archive_entries() {
-        let home = PathBuf::from("/tmp/misty-home");
-
-        assert!(release_entry_destination(&home, "../misty").is_none());
-        assert!(release_entry_destination(&home, "bin/../../misty").is_none());
-        assert!(release_entry_destination(&home, "/bin/misty").is_none());
     }
 
     #[test]
@@ -2147,48 +2072,6 @@ mod tests {
             .expect_err("removed extension should be rejected");
 
         assert!(error.contains("removed from Misty's extension catalog"));
-    }
-
-    #[test]
-    fn extracts_only_paths_present_in_zip() {
-        let home = temp_misty_home();
-        fs::create_dir_all(home.join("assets/themes")).expect("assets dir should exist");
-        fs::write(home.join("assets/themes/user.css"), "keep")
-            .expect("unrelated file should be written");
-        fs::write(home.join("assets/themes/default.css"), "old")
-            .expect("old release file should be written");
-
-        let mut cursor = Cursor::new(Vec::new());
-        {
-            let mut zip = ZipWriter::new(&mut cursor);
-            let options = SimpleFileOptions::default().unix_permissions(0o755);
-            zip.start_file("bin/misty", options).unwrap();
-            zip.write_all(b"misty-bin").unwrap();
-            zip.start_file("assets/themes/default.css", SimpleFileOptions::default())
-                .unwrap();
-            zip.write_all(b"new").unwrap();
-            zip.start_file("scripts/bootstrap.sh", options).unwrap();
-            zip.write_all(b"#!/bin/sh\n").unwrap();
-            zip.finish().unwrap();
-        }
-
-        extract_zip_archive(&cursor.into_inner(), &home).expect("zip should extract");
-
-        assert_eq!(
-            fs::read(home.join(".local/bin/misty")).unwrap(),
-            b"misty-bin"
-        );
-        assert_eq!(
-            fs::read_to_string(home.join("assets/themes/default.css")).unwrap(),
-            "new"
-        );
-        assert_eq!(
-            fs::read_to_string(home.join("assets/themes/user.css")).unwrap(),
-            "keep"
-        );
-        assert!(home.join("scripts/bootstrap.sh").is_file());
-
-        fs::remove_dir_all(home).ok();
     }
 
     #[test]

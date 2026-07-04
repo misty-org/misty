@@ -24,20 +24,17 @@ import {
   primaryMonitor,
 } from "@tauri-apps/api/window";
 import {
-  Navigate,
   NavLink,
+  Outlet,
   useLocation,
   useNavigate,
-  useRoutes,
 } from "react-router-dom";
 import {
   Bell,
   Folder,
-  Home,
   Inbox,
   LogOut,
   Minus,
-  Puzzle,
   Repeat2,
   Settings as SettingsIcon,
   Square,
@@ -46,7 +43,6 @@ import {
 } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
 import mistyLogo from "../assets/misty-main.png";
-import ExplorerWorkspace from "../pages/Files";
 import { useExplorerStore } from "../stores/useExplorerStore";
 import type {
   ExplorerNotification,
@@ -56,7 +52,6 @@ import { useAuth } from "../auth/AuthContext";
 import { usePluginsStore } from "../stores/usePluginsStore";
 import { useSetupStore } from "../stores/useSetupStore";
 import { useUserStore } from "../stores/useUserStore";
-import ProvidersWorkspace from "../pages/Providers";
 import { useProvidersStore } from "../stores/useProvidersStore";
 import SettingsWorkspace from "../pages/Settings/desktop";
 import {
@@ -67,20 +62,18 @@ import {
   settingsBoolean,
   useSettingsStore,
 } from "../stores/useSettingsStore";
-import TransfersWorkspace from "../pages/Transfers";
 import { useTransfersStore } from "../stores/useTransfersStore";
 import {
   isRememberableAppRoute,
   useAppRouteMemoryStore,
 } from "../stores/useAppRouteMemoryStore";
-import { mainAppRoutes } from "../pages/routes";
 import { hasTauriInternals, safeTauriAssetUrl } from "../shared/tauri";
 import { useAppStore } from "../stores/useAppStore";
 import { useAppThemeStore } from "../stores/useAppThemeStore";
-import type { AppTab } from "./types";
+import type { AppTab } from "../routing/types";
 import type { TransferRecord } from "../api/types";
 
-type DesktopNavItem = {
+export type DesktopNavItem = {
   id: string;
   label: string;
   path: string;
@@ -88,27 +81,6 @@ type DesktopNavItem = {
   exact?: boolean;
   active?: (pathname: string) => boolean;
 };
-
-const primaryNavItems = [
-  {
-    id: "home",
-    label: "Home",
-    path: "/home",
-    icon: Home,
-    active: (pathname) =>
-      pathname === "/home" || pathname.startsWith("/changelog"),
-  },
-  { id: "files", label: "Files", path: "/files", icon: Folder },
-  {
-    id: "extensions",
-    label: "Extensions",
-    path: "/extensions",
-    icon: Puzzle,
-    active: (pathname) =>
-      pathname.startsWith("/extensions") ||
-      pathname.startsWith("/plugins"),
-  },
-] satisfies DesktopNavItem[];
 
 const DEFAULT_FONT_STACK = `Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
 
@@ -224,7 +196,10 @@ const frameOverlayLevelClass: Record<FramePacingState["level"], string> = {
     "border-[color-mix(in_srgb,var(--misty-danger)_58%,var(--misty-border-soft))]",
 };
 
-export function DesktopAppShell() {
+export function DesktopLayout(props: {
+  getRouteId: (pathname: string) => AppTab;
+  navItems: DesktopNavItem[];
+}) {
   const location = useLocation();
   const navigate = useNavigate();
   const { app, loadApp } = useAppStore(
@@ -279,18 +254,7 @@ export function DesktopAppShell() {
     (state) => state.rememberAppRoute,
   );
   const lastAppRoute = useAppRouteMemoryStore((state) => state.lastAppRoute);
-  const routeId = routeIdFromPath(location.pathname);
-  const routeElement = useRoutes([
-    { path: "/", element: <StartupRedirect /> },
-    { path: "/files", element: <ExplorerWorkspace /> },
-    { path: "/providers", element: <ProvidersWorkspace /> },
-    { path: "/transfers", element: <TransfersWorkspace /> },
-    { path: "/dock", element: <Navigate to="/files" replace /> },
-    ...mainAppRoutes,
-    { path: "/activity", element: <Navigate to="/files" replace /> },
-    { path: "/settings", element: <SettingsRoutePlaceholder /> },
-    { path: "/diagnostics", element: <DiagnosticsRoute /> },
-  ]);
+  const routeId = props.getRouteId(location.pathname);
   const appLoadStarted = useRef(false);
   const loadedRoutes = useRef(new Set<AppTab>());
   const activityAnchorRef = useRef<HTMLButtonElement | null>(null);
@@ -309,7 +273,7 @@ export function DesktopAppShell() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [desktopPlatform, setDesktopPlatform] =
     useState<DesktopPlatform>("unknown");
-  const navItems = primaryNavItems;
+  const navItems = props.navItems;
   const unreadInboxCount = appInboxEntries.filter(
     (entry) => !entry.read,
   ).length;
@@ -758,7 +722,7 @@ export function DesktopAppShell() {
         <AppNoticePublisher onPublish={publishAppInboxEntry} />
         <RouteNotice routeId={routeId} />
 
-        {routeElement}
+        <Outlet />
       </section>
 
       <WorkStatusPopup />
@@ -990,45 +954,6 @@ const WorkStatusPopup = memo(function WorkStatusPopup() {
     </aside>
   );
 });
-
-function DiagnosticsRoute() {
-  return <Navigate to="/files" replace />;
-}
-
-function SettingsRoutePlaceholder() {
-  return null;
-}
-
-function StartupRedirect() {
-  const { loaded, settings } = useSettingsStore(
-    useShallow((state) => ({
-      loaded: state.loaded,
-      settings: state.settings,
-    })),
-  );
-  const lastAppRoute = useAppRouteMemoryStore((state) => state.lastAppRoute);
-
-  if (!loaded) {
-    return (
-      <section
-        className="m-[var(--misty-route-margin)] min-h-[calc(100vh-(var(--misty-route-margin)*2))]"
-        aria-label="Loading Misty"
-      >
-        <div className="m-[18px] text-[var(--misty-text-muted)]">
-          Loading...
-        </div>
-      </section>
-    );
-  }
-
-  const generalPreferences = selectGeneralPreferences(settings?.document);
-  const target =
-    generalPreferences.reopenLastSession && isRememberableAppRoute(lastAppRoute)
-      ? lastAppRoute
-      : startupRouteForIndex(generalPreferences.startupViewIndex);
-
-  return <Navigate to={target} replace />;
-}
 
 function NavGroup(props: {
   items: DesktopNavItem[];
@@ -1854,41 +1779,6 @@ function FramePacingOverlay(props: { enabled: boolean }) {
   );
 }
 
-function PlaceholderPage(props: { title: string; subtitle: string }) {
-  return (
-    <section className="m-[var(--misty-route-margin)] min-h-[calc(100vh-(var(--misty-route-margin)*2))]">
-      <div className="min-w-0 overflow-hidden rounded-xl border border-[var(--misty-border-soft)] bg-[linear-gradient(180deg,color-mix(in_srgb,var(--misty-surface-2)_92%,transparent),var(--misty-surface))] shadow-[0_18px_44px_var(--misty-shadow)]">
-        <div className="flex items-center justify-between gap-4 border-b border-[var(--misty-border-soft)] px-[18px] py-4">
-          <div>
-            <h2>{props.title}</h2>
-            <p>{props.subtitle}</p>
-          </div>
-        </div>
-        <div className="m-[18px] text-[var(--misty-text-muted)]">
-          This route is ready for its panel migration.
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function routeIdFromPath(pathname: string): AppTab {
-  if (pathname.startsWith("/transfers")) return "transfers";
-  if (pathname.startsWith("/providers")) return "providers";
-  if (pathname.startsWith("/account")) return "account";
-  if (
-    pathname.startsWith("/home") ||
-    pathname.startsWith("/extensions") ||
-    pathname.startsWith("/plugins") ||
-    pathname.startsWith("/changelog") ||
-    pathname.startsWith("/signin") ||
-    pathname.startsWith("/register")
-  ) return "home";
-  if (pathname.startsWith("/settings")) return "settings";
-  if (pathname.startsWith("/diagnostics")) return "diagnostics";
-  return "files";
-}
-
 function settingsFallbackRoute(
   previousRoute: string,
   rememberedRoute: string,
@@ -1900,15 +1790,6 @@ function settingsFallbackRoute(
       return isRememberableAppRoute(route);
     }) ?? "/files"
   );
-}
-
-function startupRouteForIndex(index: number): string {
-  if (index === 1) return "/providers";
-  if (index === 2) return "/transfers";
-  if (index === 3) return "/extensions";
-  if (index === 4) return "/home";
-  if (index === 5) return "/settings";
-  return "/files";
 }
 
 function noticeForRoute(

@@ -1,13 +1,15 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { remoteDisplayName } from "../../../api/misty";
 import type { ProviderRemote } from "../../../api/types";
-import { iconAssets, providerIconForType } from "../../../shared/assets/icons";
+import { iconAssets } from "../../../shared/assets/icons";
 import { AssetIcon } from "../../../shared/components/AssetIcon";
 import { IconButton } from "../../../shared/components/IconButton";
 import { Panel, PanelHeader } from "../../../shared/components/Panel";
+import { useMinimumSpin } from "../../../shared/hooks/useMinimumSpin";
+import { ProviderLogo } from "./ProviderLogo";
 
 const remotePanelClass =
-  "grid min-h-0 grid-rows-[auto_minmax(0,1fr)]";
+  "grid min-h-0 grid-rows-[auto_minmax(0,1fr)] !rounded-none !border-0 !bg-[var(--misty-surface)] !shadow-none [border-radius:0]";
 
 const remoteListActionsClass =
   "flex items-center gap-2";
@@ -28,10 +30,10 @@ const remoteRowSelectClass =
   "grid min-w-0 grid-cols-[28px_minmax(120px,1fr)_82px_126px] items-center gap-2.5 border-0 bg-transparent px-2 py-[11px] pl-2.5 text-left text-inherit";
 
 const remoteProviderIconClass =
-  "grid h-[26px] w-[26px] place-items-center rounded-[7px] border border-[color-mix(in_srgb,var(--misty-accent)_30%,var(--misty-border))] bg-[color-mix(in_srgb,var(--misty-accent)_10%,var(--misty-surface))] text-[var(--misty-accent)]";
+  "grid h-[26px] w-[26px] place-items-center text-[var(--misty-accent)]";
 
 const remoteProviderIconWarningClass =
-  "border-[color-mix(in_srgb,var(--misty-warning)_40%,var(--misty-border))] bg-[color-mix(in_srgb,var(--misty-warning)_12%,var(--misty-surface))] text-[var(--misty-warning)]";
+  "text-[var(--misty-warning)]";
 
 const remoteMenuTriggerClass =
   "grid h-7 w-7 place-items-center rounded-md border-0 bg-transparent text-[var(--misty-text-subtle)] hover:bg-[var(--misty-surface-3)] hover:text-[var(--misty-text)]";
@@ -57,14 +59,22 @@ interface RemoteListPanelProps {
 }
 
 export function RemoteListPanel(props: RemoteListPanelProps) {
+  const [refreshSpinning, startRefreshSpin] = useMinimumSpin(props.loading);
   return (
     <Panel as="aside" className={remotePanelClass}>
       <PanelHeader
         title="Remotes"
         subtitle={`${props.remotes.length} remotes`}
         actions={<div className={remoteListActionsClass}>
-          <IconButton onClick={props.onRefresh} disabled={props.loading || props.working} title="Refresh remotes">
-            <AssetIcon src={iconAssets.sync16} size={16} />
+          <IconButton
+            onClick={() => {
+              startRefreshSpin();
+              props.onRefresh();
+            }}
+            disabled={props.loading || props.working}
+            title="Refresh remotes"
+          >
+            <AssetIcon className={refreshSpinning ? "animate-spin" : undefined} src={iconAssets.sync16} size={16} />
           </IconButton>
           <button className={addRemoteButtonClass} type="button" onClick={props.onAdd} disabled={props.working}>
             <AssetIcon src={iconAssets.plus16} size={16} /> Add Remote
@@ -111,10 +121,30 @@ function RemoteRow(props: {
 }) {
   const { remote, selected, onSelect } = props;
   const [menuOpen, setMenuOpen] = useState(false);
-  const providerIcon = providerIconForType(remote.type);
+  const rowRef = useRef<HTMLDivElement | null>(null);
   const externalConfig = remote.configSource === "user";
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const closeOnOutsideClick = (event: PointerEvent) => {
+      if (rowRef.current?.contains(event.target as Node)) return;
+      setMenuOpen(false);
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setMenuOpen(false);
+      }
+    };
+    document.addEventListener("pointerdown", closeOnOutsideClick);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeOnOutsideClick);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [menuOpen]);
+
   return (
-    <div className={`${remoteRowClass} ${selected ? remoteRowSelectedClass : ""}`}>
+    <div ref={rowRef} className={`${remoteRowClass} ${selected ? remoteRowSelectedClass : ""}`}>
       <button
         className={remoteRowSelectClass}
         type="button"
@@ -122,7 +152,7 @@ function RemoteRow(props: {
         onClick={externalConfig ? props.onRepair : onSelect}
       >
         <span className={`${remoteProviderIconClass} ${remote.needsReconnect ? remoteProviderIconWarningClass : ""}`}>
-          <AssetIcon src={providerIcon.src} color={providerIcon.color} size={17} />
+          <ProviderLogo type={remote.type} size={19} />
         </span>
         <span className="overflow-hidden text-ellipsis whitespace-nowrap font-[580]">{remoteDisplayName(remote)}</span>
         <span className="overflow-hidden text-ellipsis whitespace-nowrap text-[var(--misty-text-muted)]">
@@ -145,12 +175,15 @@ function RemoteRow(props: {
         {menuOpen ? (
           <div className={remoteMenuClass} role="menu">
             {externalConfig ? (
-              <button className={remoteMenuButtonClass} type="button" role="menuitem" onClick={() => { setMenuOpen(false); props.onRepair(); }}><AssetIcon src={iconAssets.plus16} size={15} /> Import</button>
+              <>
+                <button className={remoteMenuButtonClass} type="button" role="menuitem" onClick={() => { setMenuOpen(false); props.onRepair(); }}><AssetIcon src={iconAssets.plus16} size={15} /> Import</button>
+                <button className={`${remoteMenuButtonClass} text-[var(--misty-danger)]`} type="button" role="menuitem" onClick={() => { setMenuOpen(false); props.onDisconnect(); }}><AssetIcon src={iconAssets.trash24} size={15} /> Delete</button>
+              </>
             ) : (
               <>
                 {remote.needsReconnect ? <button className={remoteMenuButtonClass} type="button" role="menuitem" onClick={() => { setMenuOpen(false); props.onReconnect(); }}><AssetIcon src={iconAssets.sync16} size={15} /> Reconnect</button> : null}
                 <button className={remoteMenuButtonClass} type="button" role="menuitem" onClick={() => { setMenuOpen(false); props.onRepair(); }}><AssetIcon src={iconAssets.gear24} size={15} /> Configure</button>
-                <button className={`${remoteMenuButtonClass} text-[var(--misty-danger)]`} type="button" role="menuitem" onClick={() => { setMenuOpen(false); props.onDisconnect(); }}><AssetIcon src={iconAssets.trash24} size={15} /> Disconnect</button>
+                <button className={`${remoteMenuButtonClass} text-[var(--misty-danger)]`} type="button" role="menuitem" onClick={() => { setMenuOpen(false); props.onDisconnect(); }}><AssetIcon src={iconAssets.trash24} size={15} /> Delete</button>
               </>
             )}
           </div>

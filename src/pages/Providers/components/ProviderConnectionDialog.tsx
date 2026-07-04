@@ -1,9 +1,10 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { ProviderWorkflow, ProviderWorkflowOption } from "../../../api/types";
-import { iconAssets, providerIconForType } from "../../../shared/assets/icons";
+import { iconAssets } from "../../../shared/assets/icons";
 import { AssetIcon } from "../../../shared/components/AssetIcon";
 import { providerOptionsForConnection } from "../providerUtils";
 import type { ProviderConnectionSession } from "../../../stores/useProvidersStore";
+import { ProviderLogo } from "./ProviderLogo";
 
 const modalBackdropClass =
   "fixed inset-0 z-[100] grid place-items-center bg-[rgba(3,7,10,0.72)] p-6";
@@ -48,7 +49,7 @@ const providerWorkflowButtonSelectedClass =
   "border-[#4779ae] bg-[#142536]";
 
 const providerWorkflowMarkClass =
-  "grid h-[38px] w-[38px] place-items-center rounded-[7px] bg-[#203549] font-bold text-[#9dcaff]";
+  "grid h-[38px] w-[38px] place-items-center text-[#9dcaff]";
 
 const providerFormClass =
   "mx-auto grid max-w-[560px] gap-3.5";
@@ -58,6 +59,15 @@ const providerFormHelpClass =
 
 const providerSelectClass =
   "w-full rounded-[7px] border border-[#303a44] bg-[#080d11] px-2.5 py-[9px] text-[#f0eee9]";
+
+const providerInputWrapClass =
+  "grid grid-cols-[minmax(0,1fr)_34px] items-center overflow-hidden rounded-[7px] border border-[#303a44] bg-[#080d11] focus-within:border-[#4779ae]";
+
+const providerTextInputClass =
+  "min-h-9 border-0 bg-transparent px-2.5 py-[9px] text-[#f0eee9] outline-none";
+
+const providerSecretToggleClass =
+  "grid h-[34px] w-[34px] place-items-center border-0 bg-transparent text-[#8f98a4] hover:text-[#e8eaed]";
 
 const providerSummaryClass =
   "flex items-center justify-between rounded-[7px] border border-[#25313a] bg-[#0a1117] px-3 py-2.5 text-[#8f98a4]";
@@ -100,6 +110,20 @@ export function ProviderConnectionDialog(props: ProviderConnectionDialogProps) {
     : session.mode === "reconnect"
       ? "Reconnect Remote"
       : "Configure Remote";
+
+  useEffect(() => {
+    if (session.stage !== "authorize" || session.inFlight) return;
+    const checkAuthorization = () => {
+      if (document.visibilityState === "hidden") return;
+      props.onSubmit(true);
+    };
+    window.addEventListener("focus", checkAuthorization);
+    document.addEventListener("visibilitychange", checkAuthorization);
+    return () => {
+      window.removeEventListener("focus", checkAuthorization);
+      document.removeEventListener("visibilitychange", checkAuthorization);
+    };
+  }, [props.onSubmit, session.inFlight, session.stage]);
 
   return (
     <div className={modalBackdropClass} role="presentation">
@@ -259,7 +283,6 @@ function ProviderWorkflowButton(props: {
   selected: boolean;
   onSelect: () => void;
 }) {
-  const providerIcon = providerIconForType(props.workflow.type);
   return (
     <button
       type="button"
@@ -267,7 +290,7 @@ function ProviderWorkflowButton(props: {
       onClick={props.onSelect}
     >
       <span className={providerWorkflowMarkClass}>
-        <AssetIcon src={providerIcon.src} color={providerIcon.color} size={22} />
+        <ProviderLogo type={props.workflow.type} size={23} />
       </span>
       <span>
         <strong className="block overflow-hidden text-ellipsis">{props.workflow.name || props.workflow.type}</strong>
@@ -285,14 +308,16 @@ function ProviderConfiguration(props: {
   onParameter: (key: string, value: string) => void;
 }) {
   const options = providerOptionsForConnection(props.session, props.workflow);
+  const [sensitiveVisible, setSensitiveVisible] = useState(false);
   return (
     <div className={providerFormClass}>
       <label>
         Remote name
         <input
+          className={providerSelectClass}
           value={props.session.remoteName}
           onChange={(event) => props.onName(event.target.value)}
-          readOnly={props.session.mode !== "add"}
+          readOnly={props.session.mode === "reconnect"}
           autoFocus={props.session.mode === "add"}
         />
         <small className={providerFormHelpClass}>Used in Explorer and rclone paths.</small>
@@ -306,7 +331,9 @@ function ProviderConfiguration(props: {
           key={option.name}
           option={option}
           value={props.session.parameters[option.name] ?? ""}
+          sensitiveVisible={sensitiveVisible}
           onChange={(value) => props.onParameter(option.name, value)}
+          onSensitiveVisible={setSensitiveVisible}
         />
       ))}
       {props.session.step?.instructions ? <p className={providerInstructionsClass}>{props.session.step.instructions}</p> : null}
@@ -317,9 +344,12 @@ function ProviderConfiguration(props: {
 function ProviderOptionField(props: {
   option: ProviderWorkflowOption;
   value: string;
+  sensitiveVisible: boolean;
   onChange: (value: string) => void;
+  onSensitiveVisible: (visible: boolean) => void;
 }) {
   const { option } = props;
+  const secret = option.password || isSensitiveOptionName(option.name);
   return (
     <label>
       {option.label || option.name}{option.required ? " *" : ""}
@@ -330,11 +360,26 @@ function ProviderOptionField(props: {
           ))}
         </select>
       ) : (
-        <input
-          value={props.value}
-          type={option.password ? "password" : "text"}
-          onChange={(event) => props.onChange(event.target.value)}
-        />
+        <span className={secret ? providerInputWrapClass : "block"}>
+          <input
+            className={secret ? providerTextInputClass : providerSelectClass}
+            value={props.value}
+            type={secret && !props.sensitiveVisible ? "password" : "text"}
+            onChange={(event) => props.onChange(event.target.value)}
+          />
+          {secret ? (
+            <button
+              className={providerSecretToggleClass}
+              type="button"
+              title={props.sensitiveVisible ? "Hide sensitive value" : "Show sensitive value"}
+              aria-label={props.sensitiveVisible ? "Hide sensitive value" : "Show sensitive value"}
+              aria-pressed={props.sensitiveVisible}
+              onClick={() => props.onSensitiveVisible(!props.sensitiveVisible)}
+            >
+              <AssetIcon src={props.sensitiveVisible ? iconAssets.eyeClosed16 : iconAssets.eye16} size={16} />
+            </button>
+          ) : null}
+        </span>
       )}
       {option.help ? <small className={providerFormHelpClass}>{option.help}</small> : null}
     </label>
@@ -344,16 +389,23 @@ function ProviderOptionField(props: {
 function ProgressStep(props: { label: string; active: boolean; complete: boolean }) {
   return (
     <div className={`flex items-center justify-center gap-[7px] text-xs ${props.active || props.complete ? "text-[#dce1e6]" : "text-[#707985]"}`}>
-      <span className={`grid h-[18px] w-[18px] place-items-center rounded-full border ${
-        props.complete
-          ? "border-[#397c55] bg-[#245b3a] text-[#9be0ac]"
-          : props.active
-            ? "border-[#4e90e5] shadow-[inset_0_0_0_4px_#176fd1]"
-            : "border-[#3a4650]"
-      }`}>{props.complete ? <AssetIcon src={iconAssets.verified24} size={12} /> : null}</span>
+      <span
+        className={`block h-[12px] w-[12px] shrink-0 rounded-full ${
+          props.complete || props.active
+            ? props.complete
+              ? "bg-[#5ca875]"
+              : "bg-[#4e90e5]"
+            : "border border-[#4d5964] bg-transparent"
+        }`}
+      />
       {props.label}
     </div>
   );
+}
+
+function isSensitiveOptionName(name: string): boolean {
+  const normalized = name.toLowerCase();
+  return normalized.includes("secret") || normalized.includes("password") || normalized.includes("token");
 }
 
 function workflowForType(workflows: ProviderWorkflow[], type: string): ProviderWorkflow | null {

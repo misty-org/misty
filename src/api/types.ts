@@ -774,33 +774,6 @@ export interface PublicLinkActionResult {
   message?: string | null;
 }
 
-export interface BackendAction {
-  id: string;
-  label: string;
-  description: string;
-  provider: string;
-  destructive: boolean;
-}
-
-export interface BackendRunRequest {
-  remote: string;
-  actionId: string;
-}
-
-export interface BackendActionResult {
-  actionId: string;
-  label: string;
-  result: unknown;
-}
-
-export interface ConfigSecurityStatus {
-  configPath?: string | null;
-  encrypted: boolean;
-  unlocked: boolean;
-  passwordPresent: boolean;
-  message?: string | null;
-}
-
 export type ProviderConfigMode = "add" | "reconnect" | "repair";
 
 export interface ProviderConfigRequest {

@@ -3,11 +3,9 @@ import { create } from "zustand";
 import { hasTauriInternals } from "../shared/tauri";
 import { fetchMe, type MeResponse } from "../pages/Account/desktop/api";
 import {
-  buildInstallerStatus,
+  browserTemplateEntries,
+  buildInstallerStatusFromTemplate,
   executableNameForOs,
-  mistyPath,
-  requiredMistyBinaries,
-  requiredMistyFolders,
 } from "../data/installReadiness";
 import { releases } from "../data/releases";
 import type {
@@ -16,6 +14,7 @@ import type {
   InstallEvent,
   InstallerStatus,
   InstallState,
+  MistyTemplateStatus,
   NativeSystemInfo,
   PathProbe,
   ReleaseVersion,
@@ -25,11 +24,15 @@ type SetupStore = {
   busy: boolean;
   events: InstallEvent[];
   installState: InstallState;
+  releases: ReleaseVersion[];
+  releasesError: string;
+  releasesLoading: boolean;
   selectedVersion: string;
   status: InstallerStatus | null;
   systemError: string;
   selectedRelease: () => ReleaseVersion;
   addEvent: (event: InstallEvent) => void;
+  loadReleases: () => Promise<void>;
   loadSystem: () => Promise<void>;
   refreshLocalAccessToken: () => Promise<void>;
   restartMisty: () => Promise<void>;
@@ -57,27 +60,32 @@ function browserSystemFallback(): InstallerStatus {
     install_dir: "~/.misty/.local/bin",
     legacy_install_dir: "~/.misty/local/bin",
     db_path: "~/.misty/db/data.db",
+    installed_version: null,
     current_user: null,
     current_license: null,
     ready: false,
-    folders: requiredMistyFolders.map((folder) => ({
-      name: folder,
-      path: `~/.misty/${folder}`,
-      required: true,
-      exists: false,
-      status: "missing",
-      message: "Folder readiness is only verified in the desktop app.",
-    })),
-    binaries: [
-      {
-        name: executableNameForOs(os, "misty"),
-        path: `~/.misty/.local/bin/${executableNameForOs(os, "misty")}`,
+    folders: browserTemplateEntries
+      .filter((entry) => entry.kind === "dir")
+      .map((entry) => ({
+        name: entry.relativePath,
+        path: entry.path,
+        kind: entry.kind,
         required: true,
         exists: false,
         status: "missing",
-        message: "Binary will be installed from a release archive.",
-      },
-    ],
+        message: "Template readiness is only verified in the desktop app.",
+      })),
+    binaries: browserTemplateEntries
+      .filter((entry) => entry.kind === "file")
+      .map((entry) => ({
+        name: executableNameForOs(os, entry.relativePath.split("/").pop() || "misty"),
+        path: entry.path,
+        kind: entry.kind,
+        required: true,
+        exists: false,
+        status: "missing",
+        message: "File will be restored from the Misty template.",
+      })),
     setup_update: {
       name: "Misty installer",
       path: "browser preview",
@@ -94,19 +102,12 @@ async function loadInstallerStatus(nativeOverride?: NativeSystemInfo) {
     return browserSystemFallback();
   }
   const native = nativeOverride ?? (await invoke<NativeSystemInfo>("check_system"));
-  const folderProbes = await invoke<PathProbe[]>("ensure_misty_folders", {
-    folders: requiredMistyFolders,
-  });
-  const binaryProbes = await invoke<PathProbe[]>("probe_paths", {
-    paths: requiredMistyBinaries.map((binary) =>
-      mistyPath(native.install_dir, executableNameForOs(native.os, binary)),
-    ),
-  });
+  const template = await invoke<MistyTemplateStatus>("misty_template_status");
   const [setupProbe] = await invoke<PathProbe[]>("probe_paths", {
     paths: [native.setup_path],
   });
 
-  return buildInstallerStatus(native, folderProbes, binaryProbes, setupProbe);
+  return buildInstallerStatusFromTemplate(native, template, setupProbe);
 }
 
 async function refreshLocalAccessToken() {
@@ -122,6 +123,22 @@ function licenseFromMe(me: MeResponse): CurrentLicense {
     trial_started_at: me.trial_started_at,
     license_device: me.license_device || null,
   };
+}
+
+function mergeReleases(fetched: ReleaseVersion[], fallback: ReleaseVersion[]): ReleaseVersion[] {
+  const seen = new Set<string>();
+  const merged = [...fetched, ...fallback].flatMap((release) => {
+    const version = release.version.trim();
+    if (!version || seen.has(version)) return [];
+    seen.add(version);
+    return [{
+      ...release,
+      version,
+      changes: release.changes.length > 0 ? release.changes : ["Release files are available for this version."],
+    }];
+  });
+
+  return merged.length > 0 ? merged : fallback;
 }
 
 async function refreshVerifiedLicenseIfDue(native: NativeSystemInfo) {
@@ -143,12 +160,38 @@ export const useSetupStore = create<SetupStore>((set, get) => ({
   busy: false,
   events: [],
   installState: "idle",
+  releases,
+  releasesError: "",
+  releasesLoading: false,
   selectedVersion: releases[0].version,
   status: null,
   systemError: "",
   selectedRelease: () =>
-    releases.find((release) => release.version === get().selectedVersion) ?? releases[0],
+    get().releases.find((release) => release.version === get().selectedVersion) ?? get().releases[0] ?? releases[0],
   addEvent: (event) => set((state) => ({ events: [...state.events, event] })),
+  loadReleases: async () => {
+    if (!hasTauriInternals()) {
+      set({ releases, releasesError: "", releasesLoading: false });
+      return;
+    }
+
+    set({ releasesLoading: true, releasesError: "" });
+    try {
+      const fetched = await invoke<ReleaseVersion[]>("fetch_misty_releases");
+      const available = mergeReleases(fetched, releases);
+      const selectedVersion = available.some((release) => release.version === get().selectedVersion)
+        ? get().selectedVersion
+        : available[0]?.version ?? releases[0].version;
+      set({
+        releases: available,
+        releasesError: "",
+        releasesLoading: false,
+        selectedVersion,
+      });
+    } catch (error) {
+      set({ releases, releasesError: String(error), releasesLoading: false });
+    }
+  },
   loadSystem: async () => {
     try {
       if (!hasTauriInternals()) {
@@ -295,8 +338,7 @@ export const useSetupStore = create<SetupStore>((set, get) => ({
     });
 
     try {
-      const result = await invoke<string>("install_misty", {
-        manifestUrl: release.manifestUrl,
+      const result = await invoke<string>("install_misty_template", {
         version: release.version,
       });
       const status = await loadInstallerStatus();

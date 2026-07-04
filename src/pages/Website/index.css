@@ -12,7 +12,6 @@
   --color-primary: #E4E4E7;
   --color-primary-hover: #F4F4F5;
   --color-primary-active: #D4D4D8;
-  --color-primary-glow: #E4E4E733;
   --color-success: #22C55E;
   --color-success-hover: #4ADE80;
   --color-danger: #EF4444;
@@ -73,11 +72,6 @@ body {
 }
 
 /* Animations */
-@keyframes glow-pulse {
-  0%, 100% { opacity: 0.4; }
-  50% { opacity: 0.8; }
-}
-
 @keyframes float {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-10px); }
@@ -115,10 +109,6 @@ body {
     opacity: 1;
     transform: translateY(0);
   }
-}
-
-.animate-glow-pulse {
-  animation: glow-pulse 3s ease-in-out infinite;
 }
 
 .animate-float {
@@ -159,16 +149,6 @@ body {
     linear-gradient(rgba(228, 228, 231, 0.03) 1px, transparent 1px),
     linear-gradient(90deg, rgba(228, 228, 231, 0.03) 1px, transparent 1px);
   background-size: 60px 60px;
-}
-
-/* Radial glow */
-.radial-glow {
-  background: radial-gradient(ellipse 300px 200px at 50% 0%, rgba(228, 228, 231, 0.08), transparent);
-}
-@media (min-width: 640px) {
-  .radial-glow {
-    background: radial-gradient(ellipse 600px 400px at 50% 0%, rgba(228, 228, 231, 0.08), transparent);
-  }
 }
 
 /* Disable Inter contextual alternates in inputs (fixes @ jiggle) */

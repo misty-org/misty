@@ -1,10 +1,12 @@
 import { CheckCircle2 } from "lucide-react";
-import { releases } from "../../data/releases";
 import { useSetupStore } from "../../stores/useSetupStore";
 
 export function ChangelogPanel() {
   const selectedVersion = useSetupStore((state) => state.selectedVersion);
+  const releases = useSetupStore((state) => state.releases);
   const release = releases.find((entry) => entry.version === selectedVersion) ?? releases[0];
+
+  if (!release) return null;
 
   return (
     <section className="rounded-xl border border-[#1e1e21] bg-[#0b0d0f]">

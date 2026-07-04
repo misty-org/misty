@@ -1,10 +1,11 @@
-import { Database, Loader2, RefreshCcw, Search, X } from "lucide-react";
+import { Database, Folder, Loader2, RefreshCcw, Search, X } from "lucide-react";
 import { memo, useEffect, useRef } from "react";
 import { useShallow } from "zustand/react/shallow";
 import type { SearchQueryScope, SearchResult } from "../../../api/types";
 import { formatBytes, formatDate } from "../utils/fileFormat";
 import { useSearchStore } from "../../../stores/useSearchStore";
 import { revealSearchResultInPane, searchResultNavigationTarget } from "../utils/searchNavigation";
+import { useMinimumSpin } from "../../../shared/hooks/useMinimumSpin";
 
 const scopeOptions: Array<{ value: SearchQueryScope; label: string }> = [
   { value: "everything", label: "All" },
@@ -65,6 +66,7 @@ export const DeepSearchOverlay = memo(function DeepSearchOverlay(props: DeepSear
     status: state.status,
     error: state.error,
   })));
+  const [scanSpinning, startScanSpin] = useMinimumSpin(status?.scanInProgress ?? false);
 
   useEffect(() => {
     if (!open) return;
@@ -129,8 +131,15 @@ export const DeepSearchOverlay = memo(function DeepSearchOverlay(props: DeepSear
                 <Loader2 size={15} className="animate-spin" /> Cancel
               </button>
             ) : (
-              <button className={overlayStyles.scanButton} type="button" onClick={() => void useSearchStore.getState().startScan(props.currentPath)}>
-                {indexedCount > 0 ? <RefreshCcw size={15} /> : <Database size={15} />} {indexedCount > 0 ? "Rescan" : "Index"}
+              <button
+                className={overlayStyles.scanButton}
+                type="button"
+                onClick={() => {
+                  startScanSpin();
+                  void useSearchStore.getState().startScan(props.currentPath);
+                }}
+              >
+                {indexedCount > 0 ? <RefreshCcw className={scanSpinning ? "animate-spin" : undefined} size={15} /> : <Database size={15} />} {indexedCount > 0 ? "Rescan" : "Index"}
               </button>
             )}
           </div>
@@ -183,7 +192,9 @@ function SearchResultRow(props: { result: SearchResult; activePaneId: string }) 
         useSearchStore.getState().closeSearch();
       }}
     >
-      <span className={overlayStyles.resultIcon}>{entry.kind === "folder" ? "DIR" : "FILE"}</span>
+      <span className={overlayStyles.resultIcon}>
+        {entry.kind === "folder" ? <Folder aria-hidden="true" className="h-4 w-4" /> : "FILE"}
+      </span>
       <span className={overlayStyles.resultText}>
         <span className={overlayStyles.resultName}>{entry.name}</span>
         <span className={overlayStyles.resultPath}>{entry.path}</span>

@@ -2,20 +2,11 @@ import {
   ChevronDown,
   ChevronUp,
   File,
-  FileArchive,
-  FileAudio,
-  FileCode2,
-  FileJson,
-  FileSpreadsheet,
-  FileText,
-  FileVideo,
   Folder,
-  Image,
   Download,
-  Trash2,
 } from "lucide-react";
-import { memo, useCallback, useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import type { MouseEvent, PointerEvent as ReactPointerEvent, ReactNode } from "react";
+import { memo, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import type { DragEvent, MouseEvent, PointerEvent as ReactPointerEvent, ReactNode } from "react";
 import { useShallow } from "zustand/react/shallow";
 import type { DirectoryListing, DirectorySizeRecord, FileEntry, FileSyncEndpoint, FileSyncPair } from "../../../api/types";
 import { selectAppearancePreferences, useSettingsStore } from "../../../stores/useSettingsStore";
@@ -29,6 +20,20 @@ import type {
 } from "../../../stores/useExplorerStore";
 import { useFileSyncStore } from "../../../stores/useFileSyncStore";
 import { formatBytes, formatDate } from "../utils/fileFormat";
+import {
+  beginInternalDrag,
+  canDropOnEntry,
+  dragItemsForEntry,
+  handleEntryDrop,
+  handlePaneDragOver,
+  handlePaneDrop,
+} from "./FileBrowserDrag";
+import type { FileBrowserDragItem } from "./FileBrowserDrag";
+import { compileEntryFilterMatcher, entryMatchesQuery } from "./FileBrowserFilters";
+import { FileIcon } from "./FileBrowserIcons";
+import { InlineCreateTableRow, InlineNameEditor, PassiveRenameDraftView } from "./FileBrowserInline";
+import type { PassiveRenameDraft } from "./FileBrowserInline";
+import { fileBrowserStyles } from "./FileBrowserStyles";
 
 const TABLE_ROW_HEIGHT = 44;
 const TABLE_OVERSCAN_ROWS = 10;
@@ -41,139 +46,8 @@ const TABLE_COLUMN_STORAGE_KEY = "misty.explorer.fileTable.columnWidths";
 const TABLE_COLUMN_ORDER_STORAGE_KEY = "misty.explorer.fileTable.columnOrder";
 const emptyEntries: FileEntry[] = [];
 
-type EntryFilterMatcher =
-  | { kind: "substring"; query: string }
-  | { kind: "pattern"; expression: RegExp };
-
-const fileBrowserStyles = {
-  browser:
-    "grid min-h-0 min-w-0 grid-rows-[minmax(0,1fr)_36px] overflow-hidden outline outline-0 outline-offset-[-2px]",
-  browserLoading: "bg-[#0e0e0e]",
-  tableSkeleton:
-    "min-h-0 min-w-[720px] overflow-hidden",
-  tableSkeletonLine:
-    "grid grid-cols-[minmax(240px,1fr)_220px_128px_128px] items-center gap-4 border-b border-[#262626] px-3.5",
-  tableSkeletonHeader: "h-10 bg-[#171717]",
-  tableSkeletonRow: "h-9 [[data-compact-mode=true]_&]:h-8",
-  skeletonCell:
-    "relative overflow-hidden rounded-md bg-[#171717] after:absolute after:inset-0 after:-translate-x-full after:animate-[misty-skeleton-sweep_1.15s_ease-in-out_infinite] after:bg-[linear-gradient(90deg,transparent,rgba(255,255,255,0.11),transparent)] after:content-['']",
-  tableSkeletonHeaderCell: "h-[13px]",
-  tableSkeletonCell: "h-3 first:h-4",
-  gridSkeleton:
-    "grid min-h-0 min-w-0 content-start justify-center gap-2 overflow-hidden p-3.5 [grid-template-columns:repeat(auto-fill,minmax(100px,100px))] [[data-compact-mode=true]_&]:gap-1.5 [[data-compact-mode=true]_&]:p-2.5 [[data-compact-mode=true]_&]:[grid-template-columns:repeat(auto-fill,minmax(92px,92px))]",
-  gridSkeletonCell:
-    "h-[104px] border border-[#222222] [[data-compact-mode=true]_&]:h-[92px]",
-  tableWrap:
-    "grid min-h-0 min-w-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden",
-  tableHeaderWrap:
-    "min-w-0 overflow-hidden bg-[#111111]",
-  tableScroll:
-    "min-h-0 min-w-0 overflow-auto [overscroll-behavior:contain] [scrollbar-gutter:stable] max-[720px]:[scrollbar-gutter:auto]",
-  table:
-    "w-full min-w-[720px] table-fixed border-separate border-spacing-0 max-[720px]:min-w-0 max-[720px]:[&_td:first-child]:w-[64%] max-[720px]:[&_td:nth-child(2)]:w-[36%] max-[720px]:[&_td:nth-child(n+3)]:hidden max-[720px]:[&_th:first-child]:w-[64%] max-[720px]:[&_th:nth-child(2)]:w-[36%] max-[720px]:[&_th:nth-child(n+3)]:hidden",
-  tableHeadCell:
-    "group/header relative overflow-hidden whitespace-nowrap bg-[#111111] px-3 py-1 text-left align-middle text-sm font-semibold text-[#d5d5d5] shadow-[inset_0_-1px_#202020] max-[720px]:px-2.5 max-[720px]:py-1.5 max-[720px]:text-xs",
-  tableHeadFiller:
-    "bg-[#111111] p-0 shadow-[inset_0_-1px_#202020] max-[720px]:hidden",
-  tableSort:
-    "flex min-h-7 w-full min-w-0 items-center gap-1.5 overflow-hidden border-0 bg-transparent p-0 pr-2 text-left font-[inherit] text-inherit",
-  tableSortLabel: "min-w-0 overflow-hidden text-ellipsis",
-  tableSortActive: "text-[#efefef]",
-  tableSortIndicator:
-    "inline-flex size-[13px] flex-none items-center justify-center text-[#a5a5a5]",
-  tableResizeHandle:
-    "absolute right-0 top-0 z-[2] h-full w-[8px] translate-x-1/2 cursor-col-resize after:absolute after:bottom-[8px] after:left-1/2 after:top-[8px] after:w-px after:-translate-x-1/2 after:bg-transparent after:content-[''] group-hover/header:after:bg-[#3a3a3a] max-[720px]:hidden",
-  tableRow:
-    "h-11 cursor-default select-none outline outline-0 outline-offset-[-2px] transition-[background-color,outline-color] duration-100 hover:bg-[#1e1e1e] [[data-compact-mode=true]_&]:h-9",
-  tableRowSelected: "bg-[#1e1e1e]",
-  tableRowDeleted: "text-[#a2a2a2]",
-  tableRowInlineEditing: "relative z-[3]",
-  tableCell:
-    "cursor-default select-none overflow-hidden text-ellipsis whitespace-nowrap px-2.5 py-2 text-left text-sm leading-7 [[data-compact-mode=true]_&]:py-1.5 [[data-compact-mode=true]_&]:leading-6 max-[720px]:px-2 max-[720px]:py-1.5 max-[720px]:text-xs",
-  directorySizeDots:
-    "inline-flex h-7 w-8 items-center gap-1 align-middle [[data-compact-mode=true]_&]:h-6",
-  directorySizeDot:
-    "size-1.5 rounded-full bg-[#c7c7c7] opacity-85 motion-safe:animate-bounce",
-  tableFillerCell: "p-0 max-[720px]:hidden",
-  tableNameCell:
-    "flex cursor-default select-none items-center gap-3 overflow-hidden text-ellipsis whitespace-nowrap px-2.5 py-2 text-left text-sm leading-7 [[data-compact-mode=true]_&]:gap-2 [[data-compact-mode=true]_&]:py-1.5 [[data-compact-mode=true]_&]:leading-6 max-[720px]:px-2 max-[720px]:py-1.5 max-[720px]:text-xs",
-  tableNameCellEditing: "overflow-visible",
-  tableNameText: "min-w-0 cursor-default select-none overflow-hidden text-ellipsis",
-  downloadButton:
-    "inline-grid size-6 place-items-center rounded-md border border-transparent bg-transparent text-[#a5a5a5] hover:border-[#3e3e3e] hover:bg-[#272727] hover:text-[#efefef]",
-  rowDownloadButton: "ml-2 align-middle",
-  gridDownloadButton:
-    "absolute right-[5px] top-[5px] opacity-0 group-hover/item:opacity-100 focus-visible:opacity-100",
-  tableIconSlot: "grid h-6 w-6 flex-none place-items-center",
-  folderIcon: "text-[#86b7ff]",
-  deletedIcon: "text-[#ff8f99]",
-  fileIcon: "text-[#a7c8ff]",
-  iconArchive: "text-[#d6a3ff]",
-  iconAudio: "text-[#c8a7ff]",
-  iconCode: "text-[#7dd3fc]",
-  iconImage: "text-[#79d99a]",
-  iconSpreadsheet: "text-[#85d98f]",
-  iconText: "text-[#d8e6ff]",
-  iconVideo: "text-[#f4a6d7]",
-  gridScroll:
-    "min-h-0 min-w-0 overflow-auto [contain:layout_paint] [overscroll-behavior:contain] [scrollbar-gutter:stable]",
-  gridSizer: "relative min-w-0",
-  grid:
-    "absolute left-3.5 right-3.5 grid content-start justify-center gap-2 [[data-compact-mode=true]_&]:left-2.5 [[data-compact-mode=true]_&]:right-2.5 [[data-compact-mode=true]_&]:gap-1.5",
-  gridItem:
-    "group/item relative grid min-h-[104px] min-w-0 cursor-default justify-items-center gap-2 rounded-lg border border-transparent bg-transparent px-2 py-3 text-[#d5d5d5] transition-[background-color,border-color,box-shadow] duration-100 hover:border-[#353535] hover:bg-[#1e1e1e] [[data-compact-mode=true]_&]:min-h-[92px] [[data-compact-mode=true]_&]:gap-1.5 [[data-compact-mode=true]_&]:px-[7px] [[data-compact-mode=true]_&]:py-[9px]",
-  gridItemSelected: "selected border-[#353535] bg-[#1e1e1e]",
-  gridItemDeleted: "deleted text-[#a2a2a2] [&>span:not(.inline-name-editor)]:opacity-[0.86]",
-  gridItemInlineEdit: "relative z-[2]",
-  gridNameText: "max-w-full overflow-hidden text-ellipsis whitespace-nowrap",
-  inlineEditor: "inline-name-editor relative inline-flex min-w-0 max-w-full items-center",
-  inlineEditorGrid: "w-full justify-center",
-  inlineEditorInvalid: "gap-[7px]",
-  inlineFields:
-    "inline-flex min-w-0 max-w-full items-center overflow-hidden rounded-[5px] border border-[#787878] bg-[#0d0d0d] shadow-[0_0_0_2px_rgba(120,120,120,0.18)]",
-  inlineFieldsGrid: "w-full",
-  inlineFieldsInvalid:
-    "border-[#6e6e6e] shadow-[0_0_0_2px_rgba(109,109,109,0.16)]",
-  inlineFieldsInvalidTable: "max-w-[174px]",
-  inlineInput:
-    "h-7 w-[min(210px,100%)] min-w-16 border-0 bg-transparent px-[7px] text-[#f0f0f0] outline-0",
-  lockedExtension: "flex-none py-0 pl-0 pr-[7px] text-[#a2a2a2]",
-  inlineError:
-    "absolute left-0 top-[calc(100%+5px)] z-[8] w-max max-w-[260px] whitespace-normal rounded-[5px] border border-[#3f3f3f] bg-[#191919] px-[7px] py-[5px] text-[11px] leading-[1.3] text-[#c6c6c6] shadow-[0_8px_20px_rgba(0,0,0,0.38)]",
-  inlineErrorTable:
-    "static min-w-0 flex-auto overflow-hidden text-ellipsis whitespace-nowrap border-0 bg-transparent p-0 text-[#a2a2a2] shadow-none",
-  passiveDraft:
-    "inline-flex min-w-0 max-w-full items-center gap-0 overflow-hidden rounded-[5px] border border-[#444444] bg-[#101010] px-1.5 py-[3px] text-[#e5e5e5]",
-  passiveDraftInvalid: "border-[#494949] text-[#cdcdcd]",
-  passiveDraftText: "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap",
-  passiveDraftExtension: "flex-none text-[inherit] text-[#989898]",
-  passiveDraftCaret:
-    "ml-0.5 h-4 w-px flex-none animate-[passive-rename-caret_1.1s_step-end_infinite] bg-[#b3b3b3] opacity-75",
-  footer:
-    "flex min-h-9 min-w-0 items-center justify-between gap-3 overflow-hidden border-t border-[#202020] px-3 py-1.5 text-xs text-[#949494] max-[720px]:min-h-8 max-[720px]:px-2.5 max-[720px]:py-0 max-[720px]:text-[11px]",
-  footerGroup:
-    "flex min-w-0 items-center gap-2 overflow-hidden",
-  footerRight:
-    "flex min-w-0 flex-none items-center justify-end gap-2 overflow-hidden",
-  footerItem:
-    "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap",
-  footerButton:
-    "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap border-0 bg-transparent p-0 text-[#949494] hover:text-[#eeeeee]",
-  footerButtonActive:
-    "text-[#d0d0d0]",
-  footerSeparator:
-    "h-3 w-px flex-none bg-[#303030]",
-  empty: "p-6 text-[#adadad]",
-  emptyError: "text-[#a8a8a8]",
-} as const;
-
 type FileTableColumn = ExplorerSortColumn;
 type FileTableColumnWidths = Record<FileTableColumn, number>;
-type PassiveRenameDraft = {
-  value: string;
-  lockedExtension: string;
-  error: string | null;
-};
 
 const fileTableColumns: FileTableColumn[] = ["name", "modified", "size", "type"];
 const fileTableColumnLabels: Record<FileTableColumn, string> = {
@@ -218,10 +92,13 @@ interface FileBrowserProps {
   onDownload: (entry: FileEntry) => void;
   onContextMenu: (event: MouseEvent, entry: FileEntry) => void;
   onBackgroundContextMenu: (event: MouseEvent) => void;
+  onDropItems: (items: FileBrowserDragItem[], destination: string) => void;
   onInlineEditChange: (value: string) => void;
   onInlineEditCommit: () => void;
   onInlineEditCancel: () => void;
 }
+
+export type { FileBrowserDragItem } from "./FileBrowserDrag";
 
 export const FileBrowser = memo(function FileBrowser(props: FileBrowserProps) {
   const deferredCommandQuery = useDeferredValue(props.commandQuery);
@@ -265,6 +142,8 @@ export const FileBrowser = memo(function FileBrowser(props: FileBrowserProps) {
         if (event.target === event.currentTarget) props.onClearSelection();
       }}
       onContextMenu={props.onBackgroundContextMenu}
+      onDragOver={handlePaneDragOver}
+      onDrop={(event) => handlePaneDrop(event, displayListing.path, props.onDropItems)}
     >
       {props.viewMode === "grid" ? <FileGrid {...props} listing={displayListing} /> : <FileTable {...props} listing={displayListing} />}
       <footer className={fileBrowserStyles.footer}>
@@ -396,6 +275,8 @@ function FileTable(props: FileBrowserProps & { listing: DirectoryListing }) {
   const visibleEntryIds = useMemo(() => props.listing.entries.map((entry) => entry.id), [props.listing.entries]);
   const passiveRenameDrafts = useMemo(() => passiveRenameDraftsFor(props.inlineEdit, props.paneId), [props.inlineEdit, props.paneId]);
   const activeInlineEdit = props.inlineEdit?.paneId === props.paneId ? props.inlineEdit : null;
+  const [dropTargetId, setDropTargetId] = useState<string | null>(null);
+  const [draggingEntryIds, setDraggingEntryIds] = useState<Set<string>>(() => new Set());
   const rowHeight = compactModeEnabled ? 36 : TABLE_ROW_HEIGHT;
   const rowCount = props.listing.entries.length;
   const tableWidth = columnOrder.reduce((sum, column) => sum + columnWidths[column], 0);
@@ -546,6 +427,9 @@ function FileTable(props: FileBrowserProps & { listing: DirectoryListing }) {
         ref={scrollRef}
         className={fileBrowserStyles.tableScroll}
         onScroll={handleScroll}
+        onDragLeave={(event) => {
+          if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDropTargetId(null);
+        }}
       >
         <table className={fileBrowserStyles.table} style={{ width: renderedTableWidth, minWidth: renderedTableWidth }}>
           <colgroup>
@@ -575,6 +459,25 @@ function FileTable(props: FileBrowserProps & { listing: DirectoryListing }) {
                 onOpen={props.onOpen}
                 onDownload={props.onDownload}
                 onContextMenu={props.onContextMenu}
+                dropTarget={dropTargetId === entry.id}
+                dragging={draggingEntryIds.has(entry.id)}
+                onDragStart={(event) => {
+                  const items = dragItemsForEntry(entry, props.listing.entries, selectedIds);
+                  beginInternalDrag(event, items);
+                  setDraggingEntryIds(new Set(items.map((item) => item.entryId)));
+                }}
+                onDragEnd={() => {
+                  setDraggingEntryIds(new Set());
+                  setDropTargetId(null);
+                }}
+                onDragOver={(event) => {
+                  if (!canDropOnEntry(event, entry)) return;
+                  setDropTargetId(entry.id);
+                }}
+                onDrop={(event) => {
+                  setDropTargetId(null);
+                  handleEntryDrop(event, entry, props.onDropItems);
+                }}
                 inlineEdit={activeInlineEdit?.entryId === entry.id ? activeInlineEdit : null}
                 passiveRename={passiveRenameDrafts.get(entry.id) ?? null}
                 directorySizes={props.directorySizes}
@@ -629,6 +532,12 @@ const FileTableRow = memo(function FileTableRow(props: {
   onOpen: FileBrowserProps["onOpen"];
   onDownload: FileBrowserProps["onDownload"];
   onContextMenu: FileBrowserProps["onContextMenu"];
+  dropTarget: boolean;
+  dragging: boolean;
+  onDragStart: (event: DragEvent<HTMLTableRowElement>) => void;
+  onDragEnd: () => void;
+  onDragOver: (event: DragEvent<HTMLTableRowElement>) => void;
+  onDrop: (event: DragEvent<HTMLTableRowElement>) => void;
   inlineEdit: ExplorerInlineEditState | null;
   passiveRename: PassiveRenameDraft | null;
   directorySizes: Record<string, DirectorySizeRecord>;
@@ -640,12 +549,17 @@ const FileTableRow = memo(function FileTableRow(props: {
 
   return (
     <tr
-      className={`${fileBrowserStyles.tableRow} ${props.selected ? fileBrowserStyles.tableRowSelected : ""} ${props.inlineEdit ? fileBrowserStyles.tableRowInlineEditing : ""} ${entry.isDeleted ? fileBrowserStyles.tableRowDeleted : ""}`}
+      className={`${fileBrowserStyles.tableRow} ${props.selected ? fileBrowserStyles.tableRowSelected : ""} ${props.inlineEdit ? fileBrowserStyles.tableRowInlineEditing : ""} ${entry.isDeleted ? fileBrowserStyles.tableRowDeleted : ""} ${props.dropTarget ? fileBrowserStyles.tableRowDropTarget : ""} ${props.dragging ? fileBrowserStyles.tableRowDragging : ""}`}
+      draggable={!entry.isDeleted}
       onClick={(event) => props.onSelect(entry.id, event, [])}
       onDoubleClick={() => {
         if (!entry.isDeleted) props.onOpen(entry);
       }}
       onContextMenu={(event) => props.onContextMenu(event, entry)}
+      onDragStart={props.onDragStart}
+      onDragEnd={props.onDragEnd}
+      onDragOver={props.onDragOver}
+      onDrop={props.onDrop}
     >
       {props.columns.map((column) => (
         <FileTableCell
@@ -742,6 +656,8 @@ function FileGrid(props: FileBrowserProps & { listing: DirectoryListing }) {
   const visibleEntryIds = useMemo(() => props.listing.entries.map((entry) => entry.id), [props.listing.entries]);
   const passiveRenameDrafts = useMemo(() => passiveRenameDraftsFor(props.inlineEdit, props.paneId), [props.inlineEdit, props.paneId]);
   const activeInlineEdit = props.inlineEdit?.paneId === props.paneId ? props.inlineEdit : null;
+  const [dropTargetId, setDropTargetId] = useState<string | null>(null);
+  const [draggingEntryIds, setDraggingEntryIds] = useState<Set<string>>(() => new Set());
   const createOffset = props.inlineEdit?.kind === "create" ? 1 : 0;
   const itemCount = props.listing.entries.length + createOffset;
   const gridPadding = compactModeEnabled ? 10 : GRID_PADDING;
@@ -841,7 +757,14 @@ function FileGrid(props: FileBrowserProps & { listing: DirectoryListing }) {
   );
 
   return (
-    <div ref={scrollRef} className={fileBrowserStyles.gridScroll} onScroll={handleScroll}>
+    <div
+      ref={scrollRef}
+      className={fileBrowserStyles.gridScroll}
+      onScroll={handleScroll}
+      onDragLeave={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDropTargetId(null);
+      }}
+    >
       <div className={fileBrowserStyles.gridSizer} style={{ height: totalHeight }}>
         <div
           className={fileBrowserStyles.grid}
@@ -878,6 +801,25 @@ function FileGrid(props: FileBrowserProps & { listing: DirectoryListing }) {
                 onOpen={props.onOpen}
                 onDownload={props.onDownload}
                 onContextMenu={props.onContextMenu}
+                dropTarget={dropTargetId === item.entry.id}
+                dragging={draggingEntryIds.has(item.entry.id)}
+                onDragStart={(event) => {
+                  const items = dragItemsForEntry(item.entry, props.listing.entries, selectedIds);
+                  beginInternalDrag(event, items);
+                  setDraggingEntryIds(new Set(items.map((dragItem) => dragItem.entryId)));
+                }}
+                onDragEnd={() => {
+                  setDraggingEntryIds(new Set());
+                  setDropTargetId(null);
+                }}
+                onDragOver={(event) => {
+                  if (!canDropOnEntry(event, item.entry)) return;
+                  setDropTargetId(item.entry.id);
+                }}
+                onDrop={(event) => {
+                  setDropTargetId(null);
+                  handleEntryDrop(event, item.entry, props.onDropItems);
+                }}
                 onInlineEditChange={props.onInlineEditChange}
                 onInlineEditCommit={props.onInlineEditCommit}
                 onInlineEditCancel={props.onInlineEditCancel}
@@ -899,6 +841,12 @@ const FileGridItem = memo(function FileGridItem(props: {
   onOpen: FileBrowserProps["onOpen"];
   onDownload: FileBrowserProps["onDownload"];
   onContextMenu: FileBrowserProps["onContextMenu"];
+  dropTarget: boolean;
+  dragging: boolean;
+  onDragStart: (event: DragEvent<HTMLDivElement>) => void;
+  onDragEnd: () => void;
+  onDragOver: (event: DragEvent<HTMLDivElement>) => void;
+  onDrop: (event: DragEvent<HTMLDivElement>) => void;
   onInlineEditChange: FileBrowserProps["onInlineEditChange"];
   onInlineEditCommit: FileBrowserProps["onInlineEditCommit"];
   onInlineEditCancel: FileBrowserProps["onInlineEditCancel"];
@@ -907,9 +855,10 @@ const FileGridItem = memo(function FileGridItem(props: {
 
   return (
     <div
-      className={`${fileBrowserStyles.gridItem} ${props.selected ? fileBrowserStyles.gridItemSelected : ""} ${entry.isDeleted ? fileBrowserStyles.gridItemDeleted : ""}`}
+      className={`${fileBrowserStyles.gridItem} ${props.selected ? fileBrowserStyles.gridItemSelected : ""} ${entry.isDeleted ? fileBrowserStyles.gridItemDeleted : ""} ${props.dropTarget ? fileBrowserStyles.gridItemDropTarget : ""} ${props.dragging ? fileBrowserStyles.gridItemDragging : ""}`}
       role="button"
       tabIndex={0}
+      draggable={!entry.isDeleted}
       onClick={(event) => props.onSelect(entry.id, event, [])}
       onDoubleClick={() => {
         if (!entry.isDeleted) props.onOpen(entry);
@@ -918,6 +867,10 @@ const FileGridItem = memo(function FileGridItem(props: {
         if (event.key === "Enter" && !entry.isDeleted) props.onOpen(entry);
       }}
       onContextMenu={(event) => props.onContextMenu(event, entry)}
+      onDragStart={props.onDragStart}
+      onDragEnd={props.onDragEnd}
+      onDragOver={props.onDragOver}
+      onDrop={props.onDrop}
     >
       {isDownloadableRemoteFile(entry) ? (
         <button
@@ -978,300 +931,6 @@ function DirectorySizeDots() {
       ))}
     </span>
   );
-}
-
-function InlineCreateTableRow(props: {
-  edit: ExplorerInlineEditState;
-  columns: FileTableColumn[];
-  hasFillerColumn: boolean;
-  onChange: (value: string) => void;
-  onCommit: () => void;
-  onCancel: () => void;
-}) {
-  const entry = {
-    kind: props.edit.itemKind === "folder" ? "folder" : "file",
-  } as FileEntry;
-  return (
-    <tr className={`${fileBrowserStyles.tableRow} ${fileBrowserStyles.tableRowSelected}`}>
-      {props.columns.map((column) => {
-        if (column === "name") {
-          return (
-            <td className={`${fileBrowserStyles.tableNameCell} ${fileBrowserStyles.tableNameCellEditing}`} key={column}>
-              <FileIcon entry={entry} />
-              <InlineNameEditor {...props} variant="table" />
-            </td>
-          );
-        }
-        if (column === "type") return <td className={fileBrowserStyles.tableCell} key={column}>{props.edit.itemKind === "folder" ? "Folder" : "File"}</td>;
-        return <td className={fileBrowserStyles.tableCell} key={column}>--</td>;
-      })}
-      {props.hasFillerColumn ? <td className={fileBrowserStyles.tableFillerCell} aria-hidden="true" /> : null}
-    </tr>
-  );
-}
-
-function InlineNameEditor(props: {
-  edit: ExplorerInlineEditState;
-  variant?: "table" | "grid";
-  onChange: (value: string) => void;
-  onCommit: () => void;
-  onCancel: () => void;
-}) {
-  const inputRef = useRef<HTMLInputElement | null>(null);
-  const sessionKey = `${props.edit.paneId}:${props.edit.kind}:${props.edit.entryId ?? "new"}:${props.edit.originalName}`;
-
-  useLayoutEffect(() => {
-    const input = inputRef.current;
-    if (!input) return;
-    input.focus();
-    input.setSelectionRange(0, props.edit.value.length);
-  }, [sessionKey]);
-
-  return (
-    <span
-      className={[
-        fileBrowserStyles.inlineEditor,
-        props.variant === "grid" ? fileBrowserStyles.inlineEditorGrid : "",
-        props.edit.error ? fileBrowserStyles.inlineEditorInvalid : "",
-      ].join(" ")}
-      onClick={(event) => event.stopPropagation()}
-      onDoubleClick={(event) => event.stopPropagation()}
-      onPointerDown={(event) => event.stopPropagation()}
-    >
-      <span
-        className={[
-          fileBrowserStyles.inlineFields,
-          props.variant === "grid" ? fileBrowserStyles.inlineFieldsGrid : "",
-          props.edit.error ? fileBrowserStyles.inlineFieldsInvalid : "",
-          props.edit.error && props.variant === "table" ? fileBrowserStyles.inlineFieldsInvalidTable : "",
-        ].join(" ")}
-      >
-        <input
-          className={fileBrowserStyles.inlineInput}
-          ref={inputRef}
-          aria-label={props.edit.kind === "create" ? "New item name" : "Rename item"}
-          value={props.edit.value}
-          onChange={(event) => props.onChange(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.nativeEvent.isComposing) return;
-            if (event.key === "Enter") {
-              event.preventDefault();
-              props.onCommit();
-            } else if (event.key === "Escape") {
-              event.preventDefault();
-              props.onCancel();
-            }
-          }}
-        />
-        {props.edit.lockedExtension ? <span className={fileBrowserStyles.lockedExtension}>{props.edit.lockedExtension}</span> : null}
-      </span>
-      {props.edit.error ? (
-        <span
-          className={props.variant === "table"
-            ? `${fileBrowserStyles.inlineError} ${fileBrowserStyles.inlineErrorTable}`
-            : fileBrowserStyles.inlineError}
-          title={props.edit.error}
-        >
-          {props.edit.error}
-        </span>
-      ) : null}
-    </span>
-  );
-}
-
-function PassiveRenameDraftView(props: { draft: PassiveRenameDraft }) {
-  return (
-    <span
-      className={`${fileBrowserStyles.passiveDraft} ${props.draft.error ? fileBrowserStyles.passiveDraftInvalid : ""}`}
-      title={props.draft.error ?? undefined}
-    >
-      <span className={fileBrowserStyles.passiveDraftText}>{props.draft.value || " "}</span>
-      {props.draft.lockedExtension ? <small className={fileBrowserStyles.passiveDraftExtension}>{props.draft.lockedExtension}</small> : null}
-      <i className={fileBrowserStyles.passiveDraftCaret} aria-hidden="true" />
-    </span>
-  );
-}
-
-function FileIcon(props: { entry: FileEntry; size?: number; variant?: "table" | "grid" }) {
-  const size = props.size ?? (props.variant === "table" ? 22 : 18);
-  if (props.entry.isDeleted) return <Trash2 size={size} className={fileBrowserStyles.deletedIcon} />;
-  if (props.entry.kind === "folder") return <Folder size={size} className={fileBrowserStyles.folderIcon} />;
-
-  const iconKind = fileIconKind(props.entry);
-  const className = fileIconClass(iconKind);
-  switch (iconKind) {
-    case "archive":
-      return <FileArchive size={size} className={className} />;
-    case "audio":
-      return <FileAudio size={size} className={className} />;
-    case "code":
-      return <FileCode2 size={size} className={className} />;
-    case "image":
-      return <Image size={size} className={className} />;
-    case "json":
-      return <FileJson size={size} className={className} />;
-    case "spreadsheet":
-      return <FileSpreadsheet size={size} className={className} />;
-    case "text":
-      return <FileText size={size} className={className} />;
-    case "video":
-      return <FileVideo size={size} className={className} />;
-    default:
-      return <File size={size} className={className} />;
-  }
-}
-
-type FileIconKind = "archive" | "audio" | "code" | "file" | "image" | "json" | "spreadsheet" | "text" | "video";
-
-function fileIconClass(kind: FileIconKind): string {
-  switch (kind) {
-    case "archive":
-      return fileBrowserStyles.iconArchive;
-    case "audio":
-      return fileBrowserStyles.iconAudio;
-    case "code":
-    case "json":
-      return fileBrowserStyles.iconCode;
-    case "image":
-      return fileBrowserStyles.iconImage;
-    case "spreadsheet":
-      return fileBrowserStyles.iconSpreadsheet;
-    case "text":
-      return fileBrowserStyles.iconText;
-    case "video":
-      return fileBrowserStyles.iconVideo;
-    default:
-      return fileBrowserStyles.fileIcon;
-  }
-}
-
-const archiveExtensions = new Set(["7z", "bz2", "dmg", "gz", "pkg", "rar", "tar", "tgz", "xz", "zip"]);
-const audioExtensions = new Set(["aac", "aif", "aiff", "flac", "m4a", "mp3", "ogg", "opus", "wav"]);
-const codeExtensions = new Set([
-  "c",
-  "cc",
-  "cpp",
-  "cs",
-  "css",
-  "go",
-  "h",
-  "hpp",
-  "html",
-  "java",
-  "js",
-  "jsx",
-  "kt",
-  "mjs",
-  "rs",
-  "sh",
-  "swift",
-  "toml",
-  "ts",
-  "tsx",
-  "vue",
-  "xml",
-  "yaml",
-  "yml",
-  "zsh",
-]);
-const imageExtensions = new Set(["bmp", "gif", "heic", "ico", "jpeg", "jpg", "png", "svg", "tif", "tiff", "webp"]);
-const jsonExtensions = new Set(["json", "jsonc", "lock"]);
-const spreadsheetExtensions = new Set(["csv", "numbers", "ods", "tsv", "xls", "xlsm", "xlsx"]);
-const textExtensions = new Set(["doc", "docx", "log", "md", "pdf", "rtf", "txt"]);
-const videoExtensions = new Set(["avi", "m4v", "mkv", "mov", "mp4", "mpeg", "mpg", "webm"]);
-
-function fileIconKind(entry: FileEntry): FileIconKind {
-  const extension = entry.extension.replace(/^\./, "").toLowerCase();
-  const mimeType = (entry.mimeType ?? "").toLowerCase();
-
-  if (mimeType.startsWith("image/") || imageExtensions.has(extension)) return "image";
-  if (mimeType.startsWith("video/") || videoExtensions.has(extension)) return "video";
-  if (mimeType.startsWith("audio/") || audioExtensions.has(extension)) return "audio";
-  if (mimeType.includes("json") || jsonExtensions.has(extension)) return "json";
-  if (spreadsheetExtensions.has(extension)) return "spreadsheet";
-  if (archiveExtensions.has(extension)) return "archive";
-  if (mimeType.startsWith("text/") || codeExtensions.has(extension)) return "code";
-  if (textExtensions.has(extension)) return "text";
-  return "file";
-}
-
-function compileEntryFilterMatcher(query: string): EntryFilterMatcher | null {
-  if (!query) return null;
-  const regexExpression = regexExpressionForFilterQuery(query);
-  if (regexExpression) return { kind: "pattern", expression: regexExpression };
-  if (query.includes("*") || query.includes("?")) {
-    return { kind: "pattern", expression: globExpressionForFilterQuery(query) };
-  }
-  return { kind: "substring", query: query.toLowerCase() };
-}
-
-function entryMatchesQuery(entry: FileEntry, matcher: EntryFilterMatcher): boolean {
-  const haystack = [
-    entry.name,
-    entry.extension,
-    entry.mimeType ?? "",
-    entry.kind,
-    entry.location.remoteName ?? "",
-    entry.location.providerType ?? "",
-  ].join(" ");
-  if (matcher.kind === "pattern") return matcher.expression.test(haystack);
-  return haystack.toLowerCase().includes(matcher.query);
-}
-
-function regexExpressionForFilterQuery(query: string): RegExp | null {
-  if (query.startsWith("regex:")) {
-    return safeRegex(query.slice("regex:".length), "i");
-  }
-  if (!query.startsWith("/")) return null;
-  const closingSlashIndex = lastUnescapedSlashIndex(query);
-  if (closingSlashIndex <= 0) return null;
-  const pattern = query.slice(1, closingSlashIndex);
-  const flags = query.slice(closingSlashIndex + 1) || "i";
-  return safeRegex(pattern, normalizeRegexFlags(flags));
-}
-
-function globExpressionForFilterQuery(query: string): RegExp {
-  const escaped = query
-    .split("")
-    .map((character) => {
-      if (character === "*") return ".*";
-      if (character === "?") return ".";
-      return escapeRegexCharacter(character);
-    })
-    .join("");
-  return new RegExp(escaped, "i");
-}
-
-function lastUnescapedSlashIndex(value: string): number {
-  for (let index = value.length - 1; index > 0; index -= 1) {
-    if (value[index] !== "/") continue;
-    let backslashCount = 0;
-    for (let cursor = index - 1; cursor >= 0 && value[cursor] === "\\"; cursor -= 1) {
-      backslashCount += 1;
-    }
-    if (backslashCount % 2 === 0) return index;
-  }
-  return -1;
-}
-
-function normalizeRegexFlags(flags: string): string {
-  const allowed = new Set(["d", "i", "m", "s", "u", "v"]);
-  const normalized = Array.from(flags).filter((flag, index, source) =>
-    allowed.has(flag) && source.indexOf(flag) === index,
-  );
-  return normalized.includes("i") ? normalized.join("") : `${normalized.join("")}i`;
-}
-
-function safeRegex(pattern: string, flags: string): RegExp | null {
-  try {
-    return new RegExp(pattern, flags);
-  } catch {
-    return null;
-  }
-}
-
-function escapeRegexCharacter(character: string): string {
-  return /[\\^$+?.()|[\]{}]/.test(character) ? `\\${character}` : character;
 }
 
 function passiveRenameDraftsFor(edit: ExplorerInlineEditState | null, paneId: string): Map<string, PassiveRenameDraft> {

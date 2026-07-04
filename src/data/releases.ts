@@ -1,21 +1,18 @@
 import type { ReleaseVersion } from "../models/setup";
 
-function githubManifestUrl(version: string) {
-  const semver = version.replace(/^v/, "");
-  return `https://github.com/misty-org/misty-main/releases/download/${version}/manifest-${semver}.json`;
+function githubReleaseUrl(version: string) {
+  return `https://github.com/misty-org/misty-public/releases/tag/${version}`;
 }
 
 export const releases: ReleaseVersion[] = [
   {
     version: "v0.1.0",
-    date: "December 2025",
-    summary: "Initial release",
-    manifestUrl: githubManifestUrl("v0.1.0"),
+    date: "GitHub releases",
+    summary: "Misty release",
+    manifestUrl: githubReleaseUrl("v0.1.0"),
     changes: [
-      "ImGui-based desktop client with local file browsing",
-      "Go backend proxy with gRPC communication",
-      "Basic file operations: copy, move, delete",
-      "Cross-platform builds for Windows and macOS",
+      "Release metadata is read from github.com/misty-org/misty-public.",
+      "Install files are resolved from the Misty template plan.",
     ],
   },
 ];

@@ -93,7 +93,7 @@ import {
   mobileEmptyStateClass,
   mobileErrorClass,
   mobileSuccessClass,
-} from "../../../shell/mobileStyles";
+} from "../../../shared/mobileStyles";
 import { errorText } from "../../../shared/format";
 import { selectAdvancedPreferences, selectGeneralPreferences, useSettingsStore } from "../../../stores/useSettingsStore";
 import { useProvidersStore } from "../../../stores/useProvidersStore";

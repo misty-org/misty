@@ -31,6 +31,8 @@ const result = spawnSync(
   "go",
   [
     "build",
+    "-tags",
+    "misty_carchive",
     `-buildmode=${isAndroid || isWindowsHost ? "c-shared" : "c-archive"}`,
     "-trimpath",
     "-ldflags=-s -w",

@@ -1,7 +1,7 @@
 import { memo, useEffect, useRef, useState } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { Bell } from "lucide-react";
-import { Navigate, NavLink, useLocation, useRoutes } from "react-router-dom";
+import { Bell, type LucideIcon } from "lucide-react";
+import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
 import { useExplorerStore, type ExplorerNotification } from "../stores/useExplorerStore";
 import { useProvidersStore } from "../stores/useProvidersStore";
@@ -10,17 +10,16 @@ import {
   useSettingsStore,
 } from "../stores/useSettingsStore";
 import { useAppStore } from "../stores/useAppStore";
-import {
-  mobileLastRouteStorageKey,
-  mobileNavRoutes,
-  mobileRouteIdFromPath,
-  safeMobileRoute,
-} from "./mobileRoutes";
 import { hasTauriInternals } from "../shared/tauri";
+import type { AppTab } from "../routing/types";
 
-const mobileRouteElements = Object.fromEntries(
-  mobileNavRoutes.map((route) => [route.id, route.element]),
-) as Record<(typeof mobileNavRoutes)[number]["id"], JSX.Element>;
+export type MobileNavItem = {
+  id: string;
+  label: string;
+  path: string;
+  icon: LucideIcon;
+  nav: boolean;
+};
 
 const mobileShellBaseClass = "grid h-[100dvh] min-h-0 w-full min-w-0 overflow-hidden bg-[#05070a] text-[#f4f0e8]";
 const mobileShellRowsClass = "grid-rows-[auto_minmax(0,1fr)_calc(var(--misty-mobile-tabbar-height)+var(--misty-safe-bottom))]";
@@ -33,7 +32,14 @@ const mobileTabbarClass = "relative z-40 grid h-[calc(var(--misty-mobile-tabbar-
 const mobileTabClass = "grid h-full min-w-0 place-items-center gap-[3px] rounded-none text-[10px] font-bold text-[#a3adba] no-underline";
 const mobileTabActiveClass = "bg-transparent text-[#f7f3ec]";
 
-export function MobileAppShell() {
+export function MobileLayout(props: {
+  getRouteId: (pathname: string) => AppTab;
+  lastRouteStorageKey: string;
+  navItems: MobileNavItem[];
+  normalizeRoute: (pathname: string) => string;
+  safeRoute: (pathname: string) => string;
+  titleForPath: (pathname: string) => string;
+}) {
   const location = useLocation();
   const loadApp = useAppStore((state) => state.loadApp);
   const settingsLoad = useSettingsStore((state) => state.load);
@@ -44,24 +50,8 @@ export function MobileAppShell() {
   const unreadActivityCount = useExplorerStore((state) => state.notificationHistory.filter((notification) => !notification.read).length);
   const [activityOpen, setActivityOpen] = useState(false);
   const appLoadStarted = useRef(false);
-  const routeId = mobileRouteIdFromPath(location.pathname);
-  const title = mobileTitle(location.pathname);
-  const routeElement = useRoutes([
-    { path: "/", element: <MobileStartupRedirect /> },
-    { path: "/files", element: mobileRouteElements.files },
-    { path: "/transfers", element: <Navigate to="/files" replace /> },
-    { path: "/providers", element: mobileRouteElements.providers },
-    { path: "/home/*", element: <Navigate to="/files" replace /> },
-    { path: "/extensions/*", element: <Navigate to="/files" replace /> },
-    { path: "/account", element: mobileRouteElements.account },
-    { path: "/account/signin", element: mobileRouteElements.account },
-    { path: "/account/register", element: mobileRouteElements.account },
-    { path: "/account/settings", element: mobileRouteElements.settings },
-    { path: "/settings", element: <Navigate to="/account/settings" replace /> },
-    { path: "/diagnostics", element: mobileRouteElements.diagnostics },
-    { path: "/activity", element: <Navigate to="/files" replace /> },
-    { path: "*", element: <Navigate to="/files" replace /> },
-  ]);
+  const routeId = props.getRouteId(location.pathname);
+  const title = props.titleForPath(location.pathname);
 
   useEffect(() => {
     if (appLoadStarted.current) return;
@@ -93,13 +83,13 @@ export function MobileAppShell() {
   }, [providerLoad, routeId]);
 
   useEffect(() => {
-    const normalized = safeMobileRoute(normalizeMobileRoute(location.pathname));
+    const normalized = props.safeRoute(props.normalizeRoute(location.pathname));
     try {
-      window.localStorage.setItem(mobileLastRouteStorageKey, normalized);
+      window.localStorage.setItem(props.lastRouteStorageKey, normalized);
     } catch {
       // Mobile route memory is a convenience only.
     }
-  }, [location.pathname]);
+  }, [location.pathname, props]);
 
   useEffect(() => {
     const badgeCount = notificationPreferences.badgeCountEnabled && unreadActivityCount > 0
@@ -136,11 +126,11 @@ export function MobileAppShell() {
       ) : null}
 
       <section className={mobileRouteShellClass}>
-        {routeElement}
+        <Outlet />
       </section>
 
       <nav className={`${mobileTabbarClass} ${filesRoute ? "bg-[#1b1c1f]" : "bg-[rgba(7,10,14,0.96)]"}`} aria-label="Primary">
-        {mobileNavRoutes.filter((item) => item.nav).map((item) => {
+        {props.navItems.filter((item) => item.nav).map((item) => {
           const Icon = item.icon;
           return (
             <NavLink
@@ -163,27 +153,6 @@ export function MobileAppShell() {
       <MobileActivitySheet open={activityOpen} onClose={() => setActivityOpen(false)} />
     </main>
   );
-}
-
-function MobileStartupRedirect() {
-  let target = "/files";
-  try {
-    target = safeMobileRoute(normalizeMobileRoute(window.localStorage.getItem(mobileLastRouteStorageKey) ?? "/files"));
-  } catch {
-    target = "/files";
-  }
-  return <Navigate to={target} replace />;
-}
-
-function normalizeMobileRoute(pathname: string): string {
-  if (pathname.startsWith("/transfers")) return "/files";
-  if (pathname.startsWith("/providers")) return "/providers";
-  if (pathname.startsWith("/home")) return "/files";
-  if (pathname.startsWith("/account/settings")) return "/account/settings";
-  if (pathname.startsWith("/account")) return "/account";
-  if (pathname.startsWith("/settings")) return "/account/settings";
-  if (pathname.startsWith("/files")) return "/files";
-  return pathname;
 }
 
 const MobileActivitySheet = memo(function MobileActivitySheet(props: { open: boolean; onClose: () => void }) {
@@ -261,15 +230,6 @@ function MobileActivityEntry(props: { entry: ExplorerNotification }) {
       </div>
     </article>
   );
-}
-
-function mobileTitle(pathname: string): string {
-  if (pathname.startsWith("/providers")) return "Remotes";
-  if (pathname.startsWith("/account/settings") || pathname.startsWith("/settings")) return "Settings";
-  if (pathname.startsWith("/account")) return "Account";
-  if (pathname.startsWith("/diagnostics")) return "Diagnostics";
-  if (pathname !== "/" && !pathname.startsWith("/files")) return "Desktop only";
-  return "Files";
 }
 
 function formatActivityTime(timestampMs: number): string {

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { hasTauriInternals } from "../shared/tauri";
+import { hasTauriInternals } from "../tauri";
 
 const APP_ZOOM_STORAGE_KEY = "misty.app.zoom";
 const appZoomMin = 0.5;

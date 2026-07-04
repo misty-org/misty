@@ -1,7 +1,6 @@
 import {
   Briefcase,
   ChevronDown,
-  ChevronRight,
   Clock3,
   Download,
   ExternalLink,
@@ -11,7 +10,6 @@ import {
   Home,
   Check,
   Monitor,
-  MoreHorizontal,
   Pencil,
   PinOff,
   Plus,
@@ -25,103 +23,61 @@ import {
 } from "lucide-react";
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import type { MouseEvent, ReactNode } from "react";
+import type { MouseEvent } from "react";
 import { savedSearchesDelete, savedSearchesSave, savedSearchesSnapshot } from "../../../api/misty";
-import type { ExplorerLibrarySnapshot, MountedDevice, ProviderRemote, SavedSearch, SavedSearchRule } from "../../../api/types";
+import type { ExplorerLibrarySnapshot, MountedDevice, ProviderRemote, SavedSearch } from "../../../api/types";
 import { providerIconForType } from "../../../shared/assets/icons";
 import { AssetIcon } from "../../../shared/components/AssetIcon";
 import { errorText } from "../../../shared/format";
-import { formatBytes } from "../utils/fileFormat";
+import { useMinimumSpin } from "../../../shared/hooks/useMinimumSpin";
 import type { ExplorerWorkspaceEntry } from "../../../stores/useExplorerStore";
 import { useSearchStore } from "../../../stores/useSearchStore";
+import {
+  addHiddenQuickAccessPath,
+  buildDeviceEntries,
+  buildLibraryTagViews,
+  createSmartFolderDialogState,
+  dedupePinnedPathsForQuickAccess,
+  DeviceDialog,
+  deviceCapacityLabel,
+  joinPath,
+  loadDeviceCustomization,
+  loadHiddenQuickAccessPaths,
+  loadSidebarCollapsedState,
+  normalizeDevicePath,
+  normalizeSidebarPath,
+  pathIsInside,
+  pinnedPathLabel,
+  quickAccessPathHidden,
+  quoteTagQueryValue,
+  saveDeviceCustomization,
+  saveHiddenQuickAccessPaths,
+  saveSidebarCollapsedState,
+  sidebarStyles,
+  SidebarSectionHeader,
+  SmartFolderDialog,
+  smartFolderId,
+  smartFolderMatchMode,
+  smartFolderQueryFromRules,
+  smartFolderRulesWithMode,
+  sortSavedSearches,
+  uniqueStrings,
+  visibleSmartFolderRules,
+  WorkspaceDialog,
+} from "./ExplorerSidebarSupport";
+import type {
+  DeviceCustomizationState,
+  DeviceMenuState,
+  QuickAccessMenuItem,
+  QuickAccessMenuState,
+  SidebarCollapsedState,
+  SidebarDeviceEntry,
+  SmartFolderDraft,
+  SmartFolderDialogState,
+  WorkspaceDialogState,
+  WorkspaceMenuState,
+} from "./ExplorerSidebarSupport";
 
-const DEVICE_CUSTOMIZATION_STORAGE_KEY = "misty.explorer.sidebar.devices";
-const SIDEBAR_COLLAPSE_STORAGE_KEY = "misty.explorer.sidebar.collapsed";
-const QUICK_ACCESS_HIDDEN_STORAGE_KEY = "misty.explorer.sidebar.quickAccessHidden";
-
-const sidebarStyles = {
-  root:
-    "h-full min-h-0 min-w-0 overflow-x-hidden overflow-y-auto border-r border-[#292929] bg-[#141414] px-3.5 py-4 [overscroll-behavior:contain] [scrollbar-gutter:stable] [scrollbar-width:thin] max-[980px]:hidden",
-  section: "[&+&]:mt-4",
-  sectionTitle: "mb-2.5 flex min-w-0 items-center gap-2",
-  sectionToggle:
-    "inline-flex min-w-0 items-center gap-1.5 rounded-md border-0 bg-transparent py-[3px] pl-0 pr-1 text-left text-[#d5d5d5] hover:text-[#eeeeee]",
-  sectionToggleLabel:
-    "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[15px] font-medium",
-  sectionChevron: "flex-none text-[#949494]",
-  sectionActions: "ml-auto flex flex-none items-center gap-[3px]",
-  sectionActionButton:
-    "grid size-6 place-items-center rounded-md border-0 bg-transparent p-0 text-[#949494] hover:bg-[#1f1f1f] hover:text-[#dddddd]",
-  spinning: "[&>svg]:animate-spin",
-  itemButton:
-    "flex w-full items-center gap-2.5 rounded-lg border border-transparent bg-transparent px-[11px] py-2.5 text-left text-[#d5d5d5] hover:bg-[#2b2b2b] hover:text-[#bdbdbd]",
-  itemSelected: "bg-[#2b2b2b] text-[#bdbdbd]",
-  remoteIcon: "grid size-6 flex-none place-items-center",
-  pinnedRow:
-    "group/pin flex min-w-0 items-center rounded-lg border border-transparent bg-transparent text-[#d5d5d5] hover:bg-[#2b2b2b] hover:text-[#bdbdbd]",
-  pinnedButton:
-    "flex min-w-0 flex-1 items-center gap-2.5 border-0 bg-transparent px-[11px] py-2.5 text-left text-inherit",
-  pinnedUnpinButton:
-    "mr-1 grid size-7 flex-none place-items-center rounded-lg border border-transparent bg-transparent p-0 text-[#8f8f8f] opacity-0 hover:bg-[#3a3a3a] hover:text-[#eeeeee] group-hover/pin:opacity-100 group-focus-within/pin:opacity-100",
-  workspaceSelect:
-    "flex w-full items-center gap-2.5 rounded-lg border border-[#373737] bg-[#1c1c1c] px-[11px] py-2.5 text-left text-[#d5d5d5]",
-  workspaceSelectLabel:
-    "ml-0 min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap",
-  list: "grid gap-1",
-  muted: "text-[#949494]",
-  deviceButton:
-    "flex w-full items-start gap-2.5 rounded-lg border border-transparent bg-transparent px-[11px] py-[9px] text-left text-[#d5d5d5] hover:bg-[#2b2b2b] hover:text-[#bdbdbd]",
-  deviceRow:
-    "grid min-w-0 grid-cols-[minmax(0,1fr)_28px] items-stretch gap-0.5",
-  deviceCopy: "grid min-w-0 flex-1 gap-[3px]",
-  deviceName:
-    "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap font-medium text-[#d5d5d5]",
-  deviceMeta:
-    "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-xs text-[#949494]",
-  deviceMeter:
-    "mt-0.5 h-1 overflow-hidden rounded-full bg-[#2f2f2f]",
-  deviceMeterFill: "block h-full bg-[#e2e2e2]",
-  deviceMenuButton:
-    "flex w-7 min-w-7 justify-center rounded-lg border border-transparent bg-transparent p-0 text-[#d5d5d5] opacity-0 hover:bg-[#2b2b2b] hover:text-[#bdbdbd] group-hover/device:opacity-100 group-focus-within/device:opacity-100",
-  menu:
-    "fixed z-[2147483000] grid w-44 gap-0.5 rounded-[11px] border border-[#323232] bg-[rgba(17,17,17,0.98)] p-1.5 shadow-[0_18px_40px_rgba(0,0,0,0.45)]",
-  workspaceMenu: "w-60",
-  menuButton:
-    "flex h-[34px] items-center gap-2 rounded-lg border-0 bg-transparent px-2.5 text-left text-[#dddddd] hover:bg-[#222222] hover:text-[#eeeeee] disabled:cursor-default disabled:opacity-40",
-  menuButtonSelected: "bg-[#292929] text-[#eeeeee]",
-  workspaceMenuRow:
-    "group/workspace flex h-[34px] min-w-0 items-center gap-1 rounded-lg border-0 bg-transparent text-[#dddddd] hover:bg-[#222222] hover:text-[#eeeeee]",
-  workspaceMenuSelect:
-    "flex h-full min-w-0 flex-1 items-center gap-2 border-0 bg-transparent px-2.5 text-left text-inherit",
-  workspaceMenuActions:
-    "mr-1 flex flex-none items-center gap-px opacity-0 group-hover/workspace:opacity-100 group-focus-within/workspace:opacity-100",
-  workspaceMenuIconButton:
-    "grid size-7 place-items-center rounded-md border-0 bg-transparent p-0 text-[#a9a9a9] hover:bg-[#303030] hover:text-[#eeeeee] disabled:cursor-default disabled:opacity-35 disabled:hover:bg-transparent disabled:hover:text-[#a9a9a9]",
-  menuButtonIcon: "grid size-[17px] flex-none place-items-center text-[#bdbdbd]",
-  menuButtonTruncate: "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap",
-  menuButtonCheck: "w-[17px] flex-none text-[#d8d8d8]",
-  menuSeparator: "mx-1 my-[5px] h-px bg-[#292929]",
-  dialogBackdrop: "fixed inset-0 z-[2147483200] grid place-items-center bg-[rgba(6,6,6,0.58)] p-6 backdrop-blur-[3px]",
-  dialog: "grid w-[min(380px,100%)] gap-4 rounded-[10px] border border-[#353535] bg-[#141414] p-[18px] shadow-[0_24px_64px_rgba(0,0,0,0.55)]",
-  dialogHeader: "flex items-center justify-between gap-3",
-  dialogTitle: "m-0 text-[17px] font-semibold",
-  dialogClose:
-    "grid size-[30px] place-items-center rounded-lg border-0 bg-transparent p-0 text-[#b3b3b3] hover:bg-[#252525] hover:text-[#f7f7f7]",
-  dialogLabel: "grid gap-2 text-[#b2b2b2]",
-  dialogText: "m-0 leading-normal text-[#b2b2b2]",
-  dialogInput: "h-[38px] w-full rounded-[7px] border border-[#3f3f3f] bg-[#0e0e0e] px-[11px] text-[#f0f0f0] outline-none focus:border-[#787878] focus:shadow-[0_0_0_2px_rgba(120,120,120,0.18)]",
-  dialogSelect: "h-[38px] w-full rounded-[7px] border border-[#3f3f3f] bg-[#0e0e0e] px-[9px] text-[#f0f0f0] outline-none focus:border-[#787878]",
-  dialogWide: "w-[min(620px,100%)]",
-  dialogGrid: "grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-3 max-[640px]:grid-cols-1",
-  ruleList: "grid gap-2 rounded-lg border border-[#2d2d2d] bg-[#101010] p-2.5",
-  ruleRow: "grid grid-cols-[minmax(0,1fr)_minmax(0,0.9fr)_minmax(0,1.2fr)_30px] gap-2 max-[640px]:grid-cols-1",
-  iconButton: "grid size-[30px] place-items-center rounded-lg border border-transparent bg-transparent p-0 text-[#a9a9a9] hover:bg-[#252525] hover:text-[#eeeeee]",
-  errorText: "m-0 text-sm text-[#ffb7b7]",
-  smartMeta: "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-xs text-[#969696]",
-  dialogActions: "flex justify-end gap-2",
-  dialogActionButton: "h-[34px] min-w-[82px] rounded-[7px]",
-  dialogDanger: "border-[#484848] bg-[#313131] text-[#f4f4f4]",
-} as const;
 
 interface ExplorerSidebarProps {
   homePath: string;
@@ -165,6 +121,7 @@ export const ExplorerSidebar = memo(function ExplorerSidebar(props: ExplorerSide
   const [smartFolderError, setSmartFolderError] = useState<string | null>(null);
   const [smartFoldersLoading, setSmartFoldersLoading] = useState(false);
   const [hiddenQuickAccessPaths, setHiddenQuickAccessPaths] = useState<string[]>(loadHiddenQuickAccessPaths);
+  const [devicesRefreshSpinning, startDevicesRefreshSpin] = useMinimumSpin(props.devicesLoading);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const workspaceButtonRef = useRef<HTMLButtonElement | null>(null);
   const workspaceMenuRef = useRef<HTMLDivElement | null>(null);
@@ -660,9 +617,10 @@ export const ExplorerSidebar = memo(function ExplorerSidebar(props: ExplorerSide
               <button
                 type="button"
                 title="Refresh devices"
-                className={`${sidebarStyles.sectionActionButton} ${props.devicesLoading ? sidebarStyles.spinning : ""}`}
+                className={`${sidebarStyles.sectionActionButton} ${devicesRefreshSpinning ? sidebarStyles.spinning : ""}`}
                 onClick={(event) => {
                   event.stopPropagation();
+                  startDevicesRefreshSpin();
                   props.onRefreshDevices();
                 }}
               >
@@ -691,7 +649,7 @@ export const ExplorerSidebar = memo(function ExplorerSidebar(props: ExplorerSide
                 const usedBytes = Math.max(0, device.totalBytes - device.freeBytes);
                 const usedRatio = device.totalBytes > 0 ? Math.min(100, Math.round((usedBytes / device.totalBytes) * 100)) : 0;
                 return (
-                  <div className={`${sidebarStyles.deviceRow} group/device`} key={device.id}>
+                  <div className={sidebarStyles.deviceRow} key={device.id}>
                     <button
                       type="button"
                       className={`${sidebarStyles.deviceButton} ${pathIsInside(props.activePath, device.mountPath) ? sidebarStyles.itemSelected : ""}`}
@@ -706,21 +664,6 @@ export const ExplorerSidebar = memo(function ExplorerSidebar(props: ExplorerSide
                           <span className={sidebarStyles.deviceMeter} aria-hidden="true"><i className={sidebarStyles.deviceMeterFill} style={{ width: `${usedRatio}%` }} /></span>
                         ) : null}
                       </span>
-                    </button>
-                    <button
-                      type="button"
-                      className={sidebarStyles.deviceMenuButton}
-                      aria-label={`Actions for ${device.name}`}
-                      onClick={(event) => {
-                        const rect = event.currentTarget.getBoundingClientRect();
-                        setDeviceMenu({
-                          device,
-                          left: Math.max(8, Math.min(rect.right - 176, window.innerWidth - 184)),
-                          top: Math.max(8, Math.min(rect.bottom + 6, window.innerHeight - 90)),
-                        });
-                      }}
-                    >
-                      <MoreHorizontal size={16} />
                     </button>
                   </div>
                 );
@@ -945,642 +888,3 @@ export const ExplorerSidebar = memo(function ExplorerSidebar(props: ExplorerSide
     </aside>
   );
 });
-
-function WorkspaceDialog(props: {
-  state: NonNullable<WorkspaceDialogState>;
-  value: string;
-  onChange: (value: string) => void;
-  onConfirm: () => void;
-  onCancel: () => void;
-}) {
-  const deleting = props.state.kind === "delete";
-  const title = props.state.kind === "create"
-    ? "New Workspace"
-    : props.state.kind === "rename"
-      ? "Rename Workspace"
-      : "Delete Workspace";
-  return (
-    <div className={sidebarStyles.dialogBackdrop} role="presentation" onPointerDown={props.onCancel}>
-      <form
-        className={sidebarStyles.dialog}
-        role="dialog"
-        aria-modal="true"
-        aria-label={title}
-        onPointerDown={(event) => event.stopPropagation()}
-        onSubmit={(event) => {
-          event.preventDefault();
-          props.onConfirm();
-        }}
-      >
-        <header className={sidebarStyles.dialogHeader}>
-          <h2 className={sidebarStyles.dialogTitle}>{title}</h2>
-          <button className={sidebarStyles.dialogClose} type="button" aria-label="Close" onClick={props.onCancel}><X size={16} /></button>
-        </header>
-        {deleting ? (
-          <p className={sidebarStyles.dialogText}>Delete <strong>{props.state.title}</strong>? This removes the saved layout, not any files.</p>
-        ) : (
-          <label className={sidebarStyles.dialogLabel}>
-            <span>Name</span>
-            <input
-              className={sidebarStyles.dialogInput}
-              autoFocus
-              value={props.value}
-              onChange={(event) => props.onChange(event.target.value)}
-            />
-          </label>
-        )}
-        <div className={sidebarStyles.dialogActions}>
-          <button className={sidebarStyles.dialogActionButton} type="button" onClick={props.onCancel}>Cancel</button>
-          <button className={`${sidebarStyles.dialogActionButton} ${deleting ? sidebarStyles.dialogDanger : ""}`} type="submit" disabled={!deleting && !props.value.trim()}>
-            {deleting ? "Delete" : "Save"}
-          </button>
-        </div>
-      </form>
-    </div>
-  );
-}
-
-function SmartFolderDialog(props: {
-  state: NonNullable<SmartFolderDialogState>;
-  error: string | null;
-  onSave: (draft: SmartFolderDraft) => void | Promise<void>;
-  onDelete: (id: string) => void | Promise<void>;
-  onCancel: () => void;
-}) {
-  const [draft, setDraft] = useState<SmartFolderDraft>(props.state.draft);
-  const editing = Boolean(draft.id);
-  const updateRule = (index: number, patch: Partial<SavedSearchRule>) => {
-    setDraft((current) => ({
-      ...current,
-      rules: current.rules.map((rule, ruleIndex) => ruleIndex === index ? { ...rule, ...patch } : rule),
-    }));
-  };
-  const addRule = () => {
-    setDraft((current) => ({ ...current, rules: [...current.rules, defaultSmartFolderRule()] }));
-  };
-  const removeRule = (index: number) => {
-    setDraft((current) => ({
-      ...current,
-      rules: current.rules.length <= 1 ? [defaultSmartFolderRule()] : current.rules.filter((_rule, ruleIndex) => ruleIndex !== index),
-    }));
-  };
-  return (
-    <div className={sidebarStyles.dialogBackdrop} role="presentation" onPointerDown={props.onCancel}>
-      <form
-        className={`${sidebarStyles.dialog} ${sidebarStyles.dialogWide}`}
-        role="dialog"
-        aria-modal="true"
-        aria-label={editing ? "Edit Smart Folder" : "New Smart Folder"}
-        onPointerDown={(event) => event.stopPropagation()}
-        onSubmit={(event) => {
-          event.preventDefault();
-          void props.onSave(draft);
-        }}
-      >
-        <header className={sidebarStyles.dialogHeader}>
-          <h2 className={sidebarStyles.dialogTitle}>{editing ? "Edit Smart Folder" : "New Smart Folder"}</h2>
-          <button className={sidebarStyles.dialogClose} type="button" aria-label="Close" onClick={props.onCancel}><X size={16} /></button>
-        </header>
-        <div className={sidebarStyles.dialogGrid}>
-          <label className={sidebarStyles.dialogLabel}>
-            <span>Name</span>
-            <input
-              className={sidebarStyles.dialogInput}
-              autoFocus
-              value={draft.name}
-              onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))}
-            />
-          </label>
-          <label className={sidebarStyles.dialogLabel}>
-            <span>Match</span>
-            <select
-              className={sidebarStyles.dialogSelect}
-              value={draft.matchMode}
-              onChange={(event) => setDraft((current) => ({ ...current, matchMode: event.target.value === "any" ? "any" : "all" }))}
-            >
-              <option value="all">All rules</option>
-              <option value="any">Any rule</option>
-            </select>
-          </label>
-        </div>
-        <label className={sidebarStyles.dialogLabel}>
-          <span>Query string</span>
-          <input
-            className={sidebarStyles.dialogInput}
-            value={draft.query}
-            placeholder={smartFolderQueryFromRules(draft.rules, draft.matchMode) || "invoice pdf tag:work"}
-            onChange={(event) => setDraft((current) => ({ ...current, query: event.target.value }))}
-          />
-        </label>
-        <div className={sidebarStyles.ruleList}>
-          {draft.rules.map((rule, index) => (
-            <div className={sidebarStyles.ruleRow} key={`rule:${index}`}>
-              <select
-                className={sidebarStyles.dialogSelect}
-                value={rule.field}
-                onChange={(event) => updateRule(index, { field: event.target.value })}
-                aria-label={`Rule ${index + 1} field`}
-              >
-                {smartFolderFields.map((field) => <option key={field.value} value={field.value}>{field.label}</option>)}
-              </select>
-              <select
-                className={sidebarStyles.dialogSelect}
-                value={rule.operator}
-                onChange={(event) => updateRule(index, { operator: event.target.value })}
-                aria-label={`Rule ${index + 1} operator`}
-              >
-                {smartFolderOperators.map((operator) => <option key={operator.value} value={operator.value}>{operator.label}</option>)}
-              </select>
-              <input
-                className={sidebarStyles.dialogInput}
-                value={rule.value}
-                placeholder={smartFolderValuePlaceholder(rule.field)}
-                onChange={(event) => updateRule(index, { value: event.target.value })}
-                aria-label={`Rule ${index + 1} value`}
-              />
-              <button
-                className={sidebarStyles.iconButton}
-                type="button"
-                aria-label={`Remove rule ${index + 1}`}
-                onClick={() => removeRule(index)}
-              >
-                <X size={15} />
-              </button>
-            </div>
-          ))}
-          <button className={sidebarStyles.menuButton} type="button" onClick={addRule}>
-            <Plus size={15} />
-            <span>Add Rule</span>
-          </button>
-        </div>
-        {props.error ? <p className={sidebarStyles.errorText}>{props.error}</p> : null}
-        <div className={sidebarStyles.dialogActions}>
-          {editing ? (
-            <button
-              className={`${sidebarStyles.dialogActionButton} ${sidebarStyles.dialogDanger}`}
-              type="button"
-              onClick={() => void props.onDelete(draft.id)}
-            >
-              Delete
-            </button>
-          ) : null}
-          <button className={sidebarStyles.dialogActionButton} type="button" onClick={props.onCancel}>Cancel</button>
-          <button className={sidebarStyles.dialogActionButton} type="submit" disabled={!draft.name.trim()}>Save</button>
-        </div>
-      </form>
-    </div>
-  );
-}
-
-function SidebarSectionHeader(props: {
-  title: string;
-  collapsed: boolean;
-  actions?: ReactNode;
-  onToggle: () => void;
-  onContextMenu?: (event: MouseEvent<HTMLDivElement>) => void;
-}) {
-  const Chevron = props.collapsed ? ChevronRight : ChevronDown;
-  return (
-    <div className={sidebarStyles.sectionTitle} onContextMenu={props.onContextMenu}>
-      <button type="button" className={sidebarStyles.sectionToggle} onClick={props.onToggle} aria-expanded={!props.collapsed}>
-        <span className={sidebarStyles.sectionToggleLabel}>{props.title}</span>
-        <Chevron className={sidebarStyles.sectionChevron} size={14} />
-      </button>
-      {props.actions ? <div className={sidebarStyles.sectionActions}>{props.actions}</div> : null}
-    </div>
-  );
-}
-
-function DeviceDialog(props: {
-  title: string;
-  label: string;
-  placeholder?: string;
-  value: string;
-  confirmLabel: string;
-  onChange: (value: string) => void;
-  onConfirm: () => void;
-  onCancel: () => void;
-}) {
-  return (
-    <div className={sidebarStyles.dialogBackdrop} role="presentation" onPointerDown={props.onCancel}>
-      <form
-        className={sidebarStyles.dialog}
-        role="dialog"
-        aria-modal="true"
-        aria-label={props.title}
-        onPointerDown={(event) => event.stopPropagation()}
-        onSubmit={(event) => {
-          event.preventDefault();
-          props.onConfirm();
-        }}
-      >
-        <header className={sidebarStyles.dialogHeader}>
-          <h2 className={sidebarStyles.dialogTitle}>{props.title}</h2>
-          <button className={sidebarStyles.dialogClose} type="button" aria-label="Close" onClick={props.onCancel}><X size={16} /></button>
-        </header>
-        <label className={sidebarStyles.dialogLabel}>
-          <span>{props.label}</span>
-          <input
-            className={sidebarStyles.dialogInput}
-            autoFocus
-            value={props.value}
-            placeholder={props.placeholder}
-            onChange={(event) => props.onChange(event.target.value)}
-          />
-        </label>
-        <div className={sidebarStyles.dialogActions}>
-          <button className={sidebarStyles.dialogActionButton} type="button" onClick={props.onCancel}>Cancel</button>
-          <button className={sidebarStyles.dialogActionButton} type="submit" disabled={!props.value.trim()}>{props.confirmLabel}</button>
-        </div>
-      </form>
-    </div>
-  );
-}
-
-interface DeviceCustomizationState {
-  nameOverrides: Record<string, string>;
-  hiddenPaths: string[];
-  customMountPaths: string[];
-}
-
-interface SidebarCollapsedState {
-  quickAccess: boolean;
-  smartFolders: boolean;
-  tags: boolean;
-  remote: boolean;
-  devices: boolean;
-}
-
-interface LibraryTagView {
-  key: string;
-  name: string;
-  count: number;
-}
-
-interface SidebarDeviceEntry extends MountedDevice {
-  custom: boolean;
-}
-
-type WorkspaceDialogState =
-  | { kind: "create"; workspaceId: ""; title: string }
-  | { kind: "rename"; workspaceId: string; title: string }
-  | { kind: "delete"; workspaceId: string; title: string }
-  | null;
-
-type SmartFolderMatchMode = "all" | "any";
-
-interface SmartFolderDraft {
-  id: string;
-  name: string;
-  query: string;
-  matchMode: SmartFolderMatchMode;
-  rules: SavedSearchRule[];
-}
-
-type SmartFolderDialogState = { draft: SmartFolderDraft } | null;
-
-interface WorkspaceMenuState {
-  left: number;
-  top: number;
-  width: number;
-}
-
-interface DeviceMenuState {
-  device: SidebarDeviceEntry;
-  left: number;
-  top: number;
-}
-
-type QuickAccessMenuItem = {
-  kind: "builtIn" | "pinned";
-  label: string;
-  path: string;
-};
-
-interface QuickAccessMenuState {
-  item: QuickAccessMenuItem | null;
-  mode: "item" | "checklist";
-  left: number;
-  top: number;
-  width: number;
-}
-
-const smartFolderModeField = "__match";
-
-const smartFolderFields = [
-  { value: "text", label: "Text query" },
-  { value: "path", label: "Path / source" },
-  { value: "kind", label: "File or folder" },
-  { value: "extension", label: "Extension" },
-  { value: "size", label: "Size" },
-  { value: "modified", label: "Modified date" },
-  { value: "hidden", label: "Hidden" },
-  { value: "tag", label: "Misty tag" },
-] as const;
-
-const smartFolderOperators = [
-  { value: "contains", label: "contains" },
-  { value: "is", label: "is" },
-  { value: "is_not", label: "is not" },
-  { value: "starts_with", label: "starts with" },
-  { value: "ends_with", label: "ends with" },
-  { value: "gt", label: "greater than" },
-  { value: "lt", label: "less than" },
-  { value: "after", label: "after" },
-  { value: "before", label: "before" },
-] as const;
-
-function defaultSmartFolderRule(): SavedSearchRule {
-  return { field: "text", operator: "contains", value: "" };
-}
-
-function createSmartFolderDialogState(search?: SavedSearch): SmartFolderDialogState {
-  return {
-    draft: {
-      id: search?.id ?? "",
-      name: search?.name ?? "New Smart Folder",
-      query: search?.query ?? "",
-      matchMode: search ? smartFolderMatchMode(search.rules) : "all",
-      rules: search ? visibleSmartFolderRules(search.rules) : [defaultSmartFolderRule()],
-    },
-  };
-}
-
-function smartFolderMatchMode(rules: SavedSearchRule[]): SmartFolderMatchMode {
-  return rules.find((rule) => rule.field === smartFolderModeField)?.value === "any" ? "any" : "all";
-}
-
-function visibleSmartFolderRules(rules: SavedSearchRule[]): SavedSearchRule[] {
-  const visible = rules.filter((rule) => rule.field !== smartFolderModeField);
-  return visible.length > 0 ? visible : [defaultSmartFolderRule()];
-}
-
-function smartFolderRulesWithMode(rules: SavedSearchRule[], matchMode: SmartFolderMatchMode): SavedSearchRule[] {
-  const cleaned = visibleSmartFolderRules(rules)
-    .map((rule) => ({
-      field: rule.field.trim(),
-      operator: rule.operator.trim() || "contains",
-      value: rule.value.trim(),
-    }))
-    .filter((rule) => rule.field && rule.value);
-  return [
-    { field: smartFolderModeField, operator: "mode", value: matchMode },
-    ...cleaned,
-  ];
-}
-
-function smartFolderQueryFromRules(rules: SavedSearchRule[], matchMode: SmartFolderMatchMode): string {
-  const parts = visibleSmartFolderRules(rules)
-    .filter((rule) => rule.value.trim())
-    .map(smartFolderRuleQuery)
-    .filter(Boolean);
-  return matchMode === "any" && parts.length > 1 ? parts.join(" OR ") : parts.join(" ");
-}
-
-function smartFolderRuleQuery(rule: SavedSearchRule): string {
-  const value = quoteSearchToken(rule.value.trim());
-  if (!value) return "";
-  switch (rule.field) {
-    case "path":
-      return `path:${value}`;
-    case "kind":
-      return `kind:${value}`;
-    case "extension":
-      return `ext:${value.replace(/^\./, "")}`;
-    case "size":
-      return `size${operatorSymbol(rule.operator)}${value}`;
-    case "modified":
-      return `modified${operatorSymbol(rule.operator)}${value}`;
-    case "hidden":
-      return `hidden:${value}`;
-    case "tag":
-      return `tag:${value}`;
-    case "text":
-    default:
-      return rule.operator === "is_not" ? `-${value}` : value;
-  }
-}
-
-function operatorSymbol(operator: string): string {
-  if (operator === "gt" || operator === "after") return ":>";
-  if (operator === "lt" || operator === "before") return ":<";
-  if (operator === "is_not") return ":!";
-  return ":";
-}
-
-function quoteSearchToken(value: string): string {
-  if (!value) return "";
-  return /\s/.test(value) ? `"${value.replace(/"/g, "\\\"")}"` : value;
-}
-
-function smartFolderValuePlaceholder(field: string): string {
-  switch (field) {
-    case "path":
-      return "/Users/name/Documents or remote:";
-    case "kind":
-      return "file or folder";
-    case "extension":
-      return "pdf";
-    case "size":
-      return "10MB";
-    case "modified":
-      return "2026-06-01";
-    case "hidden":
-      return "true or false";
-    case "tag":
-      return "work";
-    default:
-      return "invoice";
-  }
-}
-
-function sortSavedSearches(searches: SavedSearch[]): SavedSearch[] {
-  return [...searches].sort((left, right) => right.updatedAtMs - left.updatedAtMs || left.name.localeCompare(right.name));
-}
-
-function smartFolderId(): string {
-  return `smart_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
-}
-
-function buildDeviceEntries(devices: MountedDevice[], customization: DeviceCustomizationState): SidebarDeviceEntry[] {
-  const hidden = new Set(customization.hiddenPaths);
-  const seen = new Set<string>();
-  const entries: SidebarDeviceEntry[] = [];
-  for (const device of devices) {
-    if (hidden.has(device.mountPath)) continue;
-    seen.add(device.mountPath);
-    entries.push({
-      ...device,
-      name: customization.nameOverrides[device.mountPath] || device.name,
-      custom: false,
-    });
-  }
-  for (const path of customization.customMountPaths) {
-    if (!path || hidden.has(path) || seen.has(path)) continue;
-    entries.push({
-      id: `custom:${path}`,
-      name: customization.nameOverrides[path] || path.split("/").filter(Boolean).pop() || path,
-      mountPath: path,
-      fsType: "",
-      isRemovable: false,
-      totalBytes: 0,
-      freeBytes: 0,
-      custom: true,
-    });
-  }
-  return entries;
-}
-
-function deviceCapacityLabel(usedBytes: number, totalBytes: number, fallback: string): string {
-  if (totalBytes === 0) return fallback || "Capacity unavailable";
-  return `${formatBytes(usedBytes)} / ${formatBytes(totalBytes)} used`;
-}
-
-function pathIsInside(path: string, root: string): boolean {
-  const normalizedRoot = root.replace(/\/+$/, "") || "/";
-  if (path === normalizedRoot) return true;
-  if (normalizedRoot === "/") return false;
-  return path.startsWith(`${normalizedRoot}/`);
-}
-
-function dedupePinnedPathsForQuickAccess(paths: string[], builtInPaths: string[]): string[] {
-  const seen = new Set(builtInPaths.map(normalizeSidebarPath));
-  const pinnedPaths: string[] = [];
-  for (const path of paths) {
-    const normalized = normalizeSidebarPath(path);
-    if (!normalized || seen.has(normalized)) continue;
-    seen.add(normalized);
-    pinnedPaths.push(normalized);
-  }
-  return pinnedPaths;
-}
-
-function normalizeSidebarPath(path: string): string {
-  const trimmed = path.trim();
-  const normalized = trimmed.replace(/\/+$/, "");
-  return normalized || (trimmed === "/" ? "/" : "");
-}
-
-function pinnedPathLabel(path: string): string {
-  if (path === "misty://recent") return "Recent";
-  if (path === "misty://starred") return "Starred";
-  if (path === "misty://trash") return "Trash";
-  return path.split("/").filter(Boolean).pop() || path;
-}
-
-function quickAccessPathHidden(path: string, hiddenPaths: string[]): boolean {
-  const normalized = normalizeSidebarPath(path);
-  return hiddenPaths.some((candidate) => normalizeSidebarPath(candidate) === normalized);
-}
-
-function addHiddenQuickAccessPath(paths: string[], path: string): string[] {
-  const normalized = normalizeSidebarPath(path);
-  if (!normalized || quickAccessPathHidden(normalized, paths)) return paths;
-  return [...paths, normalized];
-}
-
-function loadHiddenQuickAccessPaths(): string[] {
-  try {
-    const parsed = JSON.parse(window.localStorage.getItem(QUICK_ACCESS_HIDDEN_STORAGE_KEY) ?? "[]");
-    if (!Array.isArray(parsed)) return [];
-    const hiddenPaths: string[] = [];
-    for (const value of parsed) {
-      if (typeof value !== "string") continue;
-      const normalized = normalizeSidebarPath(value);
-      if (!normalized || quickAccessPathHidden(normalized, hiddenPaths)) continue;
-      hiddenPaths.push(normalized);
-    }
-    return hiddenPaths;
-  } catch {
-    return [];
-  }
-}
-
-function saveHiddenQuickAccessPaths(paths: string[]): void {
-  window.localStorage.setItem(QUICK_ACCESS_HIDDEN_STORAGE_KEY, JSON.stringify(paths));
-}
-
-function loadDeviceCustomization(): DeviceCustomizationState {
-  try {
-    const parsed = JSON.parse(window.localStorage.getItem(DEVICE_CUSTOMIZATION_STORAGE_KEY) ?? "{}") as Partial<DeviceCustomizationState>;
-    return {
-      nameOverrides: parsed.nameOverrides && typeof parsed.nameOverrides === "object" && !Array.isArray(parsed.nameOverrides)
-        ? Object.fromEntries(Object.entries(parsed.nameOverrides).filter((entry): entry is [string, string] => typeof entry[1] === "string"))
-        : {},
-      hiddenPaths: Array.isArray(parsed.hiddenPaths) ? uniqueStrings(parsed.hiddenPaths.filter((value): value is string => typeof value === "string")) : [],
-      customMountPaths: Array.isArray(parsed.customMountPaths)
-        ? uniqueStrings(parsed.customMountPaths.filter((value): value is string => typeof value === "string").map(normalizeDevicePath).filter(Boolean))
-        : [],
-    };
-  } catch {
-    return { nameOverrides: {}, hiddenPaths: [], customMountPaths: [] };
-  }
-}
-
-function saveDeviceCustomization(state: DeviceCustomizationState): void {
-  window.localStorage.setItem(DEVICE_CUSTOMIZATION_STORAGE_KEY, JSON.stringify(state));
-}
-
-function loadSidebarCollapsedState(): SidebarCollapsedState {
-  try {
-    const parsed = JSON.parse(window.localStorage.getItem(SIDEBAR_COLLAPSE_STORAGE_KEY) ?? "{}") as Partial<SidebarCollapsedState>;
-    return {
-      quickAccess: parsed.quickAccess === true,
-      smartFolders: parsed.smartFolders === true,
-      tags: parsed.tags === true,
-      remote: parsed.remote === true,
-      devices: parsed.devices === true,
-    };
-  } catch {
-    return { quickAccess: false, smartFolders: false, tags: false, remote: false, devices: false };
-  }
-}
-
-function saveSidebarCollapsedState(state: SidebarCollapsedState): void {
-  window.localStorage.setItem(SIDEBAR_COLLAPSE_STORAGE_KEY, JSON.stringify(state));
-}
-
-function normalizeDevicePath(path: string): string {
-  const trimmed = path.trim();
-  if (trimmed.length <= 1) return trimmed;
-  return trimmed.replace(/\/+$/, "");
-}
-
-function uniqueStrings(values: string[]): string[] {
-  return [...new Set(values)];
-}
-
-function buildLibraryTagViews(library: ExplorerLibrarySnapshot | null): LibraryTagView[] {
-  if (!library) return [];
-  const tags = new Map<string, LibraryTagView>();
-  const seenByPath = new Map<string, Set<string>>();
-  for (const item of [...library.recentFiles, ...library.starredFiles]) {
-    const pathKey = normalizeSidebarPath(item.path);
-    if (!pathKey) continue;
-    const pathTags = seenByPath.get(pathKey) ?? new Set<string>();
-    for (const rawTag of item.tags ?? []) {
-      const name = rawTag.trim();
-      const key = name.toLowerCase();
-      if (!name || pathTags.has(key)) continue;
-      pathTags.add(key);
-      const current = tags.get(key);
-      tags.set(key, {
-        key,
-        name: current?.name ?? name,
-        count: (current?.count ?? 0) + 1,
-      });
-    }
-    seenByPath.set(pathKey, pathTags);
-  }
-  return [...tags.values()].sort((left, right) => right.count - left.count || left.name.localeCompare(right.name));
-}
-
-function quoteTagQueryValue(value: string): string {
-  const trimmed = value.replace(/"/g, "").trim();
-  return /\s/.test(trimmed) ? `"${trimmed}"` : trimmed;
-}
-
-function joinPath(...parts: string[]): string {
-  const [first, ...rest] = parts;
-  return [first.replace(/\/+$/, ""), ...rest.map((part) => part.replace(/^\/+|\/+$/g, ""))].join("/");
-}

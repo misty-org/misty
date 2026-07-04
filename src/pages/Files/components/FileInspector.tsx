@@ -1,7 +1,7 @@
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { File, Folder } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
-import { explorerPrepareOpenItem, explorerPreviewItem, fileMetadataSnapshot } from "../../../api/misty";
+import { explorerListDirectory, explorerPrepareOpenItem, explorerPreviewItem, fileMetadataSnapshot } from "../../../api/misty";
 import type { DirectoryListing, DirectorySizeRecord, FileEntry, FileMetadataSnapshot, PreparedOpenItem } from "../../../api/types";
 import { errorText } from "../../../shared/format";
 import { selectAppearancePreferences, useSettingsStore } from "../../../stores/useSettingsStore";
@@ -63,6 +63,16 @@ const inspectorStyles = {
   previewText:
     "m-0 h-full w-full overflow-auto whitespace-pre-wrap break-words p-3 text-left font-mono text-[11px] leading-[1.45] text-[#d5d5d5]",
   previewStatus: "text-sm font-medium text-[#8c8e94]",
+  folderPreview: "grid w-full gap-2 px-3",
+  folderPreviewGrid: "grid grid-cols-3 gap-2",
+  folderPreviewItem:
+    "grid min-w-0 gap-2 rounded-lg border border-[#303238] bg-[#1b1c20] p-2 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.035)]",
+  folderPreviewThumb:
+    "grid h-20 place-items-center overflow-hidden rounded-md bg-[#111216] text-xs font-semibold uppercase text-[#8f929a]",
+  folderPreviewName:
+    "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-xs font-semibold text-[#cfd0d4]",
+  folderPreviewMeta:
+    "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[11px] text-[#878991]",
   hero: "grid grid-cols-[48px_minmax(0,1fr)] items-center gap-3 border-b border-[#2c2d32] px-5 py-5",
   heroIcon: "grid size-10 place-items-center text-[#7da2b4]",
   heroTitle:
@@ -96,6 +106,7 @@ export function FileInspector(props: FileInspectorProps) {
     thumbnailPreviewsEnabled,
   );
   const { metadata, metadataError } = useFileMetadata(multiple ? null : displayEntry);
+  const folderPreview = useFolderPreview(!multiple ? displayEntry : null, props.listing);
   const displayDirectorySize = displayEntry?.kind === "folder"
     ? directorySizeRecordForPath(props.directorySizes, displayEntry.path)
     : undefined;
@@ -122,7 +133,14 @@ export function FileInspector(props: FileInspectorProps) {
   return (
     <aside className={inspectorStyles.root}>
       <div className={inspectorStyles.previewCard}>
-        {previewLoading ? <span className={inspectorStyles.previewStatus}>Loading preview...</span> : null}
+        {displayEntry?.kind === "folder" && !multiple ? (
+          <FolderContentsPreview
+            entries={folderPreview.entries}
+            error={folderPreview.error}
+            loading={folderPreview.loading}
+            fallback={<PreviewIcon entry={displayEntry} multiple={multiple} size={78} />}
+          />
+        ) : previewLoading ? <span className={inspectorStyles.previewStatus}>Loading preview...</span> : null}
         {preview?.mimeType === "application/pdf" ? (
           <object className={inspectorStyles.previewMedia} data={preview.url} type={preview.mimeType} aria-label={`Preview of ${title}`} />
         ) : preview?.text != null ? (
@@ -131,9 +149,9 @@ export function FileInspector(props: FileInspectorProps) {
           <img className={inspectorStyles.previewMedia} src={preview.url} alt={`Preview of ${title}`} />
         ) : previewError ? (
           <span className={inspectorStyles.previewStatus}>{previewError}</span>
-        ) : (
+        ) : displayEntry?.kind !== "folder" || multiple ? (
           <PreviewIcon entry={displayEntry} multiple={multiple} size={78} />
-        )}
+        ) : null}
       </div>
 
       <div className={inspectorStyles.hero}>
@@ -155,37 +173,23 @@ export function FileInspector(props: FileInspectorProps) {
               label="Size"
               valueNode={sizeDetailValue(displayEntry, displayDirectorySize)}
             />
-            <Detail label="Type" value={kindLabel(displayEntry)} />
+            <Detail label="Kind" value={kindLabel(displayEntry)} />
             <Detail label="Path" value={displayEntry?.path ?? props.listing?.path ?? "-"} />
             <Detail label="Items" value={itemsLabel(displayEntry, props.listing)} />
-            <Detail label={displayEntry?.kind === "folder" ? "Modified Contents" : "Modified"} value={formatDate(displayEntry?.remoteModified ?? displayEntry?.modifiedMs)} />
-            <Detail label="Created" value={formatDate(displayEntry?.createdMs)} />
-            <Detail label="Location" value={locationLabel(displayEntry?.location ?? props.listing?.location ?? null)} />
+            <Detail label="Modified" value={formatDate(metadata?.modifiedMs ?? displayEntry?.remoteModified ?? displayEntry?.modifiedMs)} />
+            <Detail label="Created" value={formatDate(metadata?.createdMs ?? displayEntry?.createdMs)} />
+            <Detail label="Accessed" value={formatDate(metadata?.accessedMs)} />
             {displayEntry?.kind !== "folder" ? (
               <>
-                <Detail label="Extension" value={displayEntry?.extension ? displayEntry.extension.replace(/^\./, "").toUpperCase() : "-"} />
-                <Detail label="MIME Type" value={displayEntry?.mimeType ?? "-"} />
+                <Detail label="Format" value={formatLabel(displayEntry)} />
               </>
             ) : null}
-            <Detail label="Hidden" value={displayEntry?.hidden ? "Yes" : "No"} />
-            <Detail label="Read Only" value={displayEntry?.readonly ? "Yes" : "No"} />
-            {metadata?.accessedMs ? <Detail label="Accessed" value={formatDate(metadata.accessedMs)} /> : null}
           </>
         )}
       </section>
-      {!multiple && displayEntry ? (
-        <section className={inspectorStyles.detailsCard} aria-label="System metadata">
-          <Detail
-            label="OS Tags"
-            value={metadata?.osTags.length ? metadata.osTags.join(", ") : "None"}
-          />
-          {metadata?.fields.map((field) => (
-            <Detail key={`field:${field.label}:${field.value}`} label={field.label} value={field.value} />
-          ))}
-          {metadata?.extracted.map((field) => (
-            <Detail key={`extracted:${field.label}:${field.value}`} label={field.label} value={field.value} />
-          ))}
-          {metadataError ? <Detail label="Metadata" value={metadataError} /> : null}
+      {!multiple && displayEntry && metadataError ? (
+        <section className={inspectorStyles.detailsCard} aria-label="Stat metadata">
+          <Detail label="Stat" value={metadataError} />
         </section>
       ) : null}
       {!multiple && displayEntry ? (
@@ -259,6 +263,47 @@ function useFileMetadata(entry: FileEntry | null): {
   }, [entry?.id, entry?.modifiedMs, entry?.path, entry?.readonly, entry?.sizeBytes]);
 
   return { metadata, metadataError };
+}
+
+function useFolderPreview(entry: FileEntry | null, listing: DirectoryListing | null): {
+  entries: FileEntry[];
+  loading: boolean;
+  error: string | null;
+} {
+  const [entries, setEntries] = useState<FileEntry[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    setEntries([]);
+    setError(null);
+    if (!entry || entry.kind !== "folder") {
+      setLoading(false);
+      return () => undefined;
+    }
+    if (listing?.path === entry.path) {
+      setEntries(listing.entries.filter((candidate) => !candidate.isDeleted).slice(0, 3));
+      setLoading(false);
+      return () => undefined;
+    }
+    setLoading(true);
+    void explorerListDirectory({ path: entry.path, showHidden: false })
+      .then((next) => {
+        if (active) setEntries(next.entries.filter((candidate) => !candidate.isDeleted).slice(0, 3));
+      })
+      .catch((previewError) => {
+        if (active) setError(errorText(previewError));
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [entry?.id, entry?.modifiedMs, entry?.path, entry?.remoteModified, listing?.path, listing?.entries]);
+
+  return { entries, loading, error };
 }
 
 function useFilePreview(entry: FileEntry | null, enabled = true): {
@@ -453,12 +498,45 @@ function Detail(props: { label: string; value?: string; valueNode?: ReactNode })
   );
 }
 
+function FolderContentsPreview(props: {
+  entries: FileEntry[];
+  loading: boolean;
+  error: string | null;
+  fallback: ReactNode;
+}) {
+  if (props.loading) return <span className={inspectorStyles.previewStatus}>Loading contents...</span>;
+  if (props.entries.length === 0) return props.error ? <span className={inspectorStyles.previewStatus}>{props.error}</span> : props.fallback;
+  return (
+    <div className={inspectorStyles.folderPreview}>
+      <div className={inspectorStyles.folderPreviewGrid}>
+        {props.entries.slice(0, 3).map((entry) => (
+          <div className={inspectorStyles.folderPreviewItem} key={entry.id}>
+            <div className={inspectorStyles.folderPreviewThumb}>{previewThumb(entry)}</div>
+            <span className={inspectorStyles.folderPreviewName} title={entry.name}>{entry.name}</span>
+            <span className={inspectorStyles.folderPreviewMeta}>{entry.kind === "folder" ? "Directory" : formatBytes(entry.sizeBytes)}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function PreviewIcon(props: { entry: FileEntry | null; multiple: boolean; size: number }) {
   const className = props.entry?.kind === "folder" || props.multiple ? "text-[#7899aa]" : "text-[#8f929a]";
   if (props.entry?.kind === "folder" || props.multiple) {
     return <Folder size={props.size} strokeWidth={1.7} className={className} />;
   }
   return <File size={props.size} strokeWidth={1.7} className={className} />;
+}
+
+function previewThumb(entry: FileEntry): ReactNode {
+  if (entry.kind === "folder") {
+    return <Folder aria-hidden="true" className="h-6 w-6 text-[#7899aa]" strokeWidth={1.7} />;
+  }
+  const extension = entry.extension.replace(/^\./, "").trim();
+  if (extension) return extension.slice(0, 4).toUpperCase();
+  if (entry.mimeType) return entry.mimeType.split("/").pop()?.slice(0, 4).toUpperCase() || "FILE";
+  return "FILE";
 }
 
 function sizeDetailValue(
@@ -502,12 +580,12 @@ function itemsLabel(entry: FileEntry | null, listing: DirectoryListing | null): 
   return entry.kind === "folder" ? "-" : "1 item";
 }
 
-function locationLabel(location: FileEntry["location"] | null): string {
-  if (!location) return "-";
-  if (location.kind === "local") return "Local";
-  if (location.kind === "remote_provider") return "Remote provider";
-  const remote = location.remoteName ? `: ${location.remoteName}` : "";
-  return `Remote${remote}`;
+function formatLabel(entry: FileEntry | null): string {
+  if (!entry) return "-";
+  const extension = entry.extension.replace(/^\./, "").trim();
+  const extensionLabel = extension ? extension.toUpperCase() : "";
+  if (extensionLabel && entry.mimeType) return `${extensionLabel} (${entry.mimeType})`;
+  return extensionLabel || entry.mimeType || kindLabel(entry);
 }
 
 function listingEntry(listing: DirectoryListing | null): FileEntry | null {

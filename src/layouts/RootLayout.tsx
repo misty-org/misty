@@ -1,14 +1,25 @@
 import { useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Outlet, useNavigate, useOutletContext } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
-import { DesktopAppShell } from "./DesktopAppShell";
-import { MobileAppShell } from "./MobileAppShell";
+import { AuthProvider } from "../auth/AuthContext";
+import { RenderErrorBoundary } from "../shared/components/RenderErrorBoundary";
 import { useSetupStore } from "../stores/useSetupStore";
-import { installMistyDeepLinkHandler } from "./deepLinks";
-import { detectAppFormFactor, subscribeAppFormFactor, type AppFormFactor } from "./platform";
-import { useAppZoom } from "./useAppZoom";
+import { installMistyDeepLinkHandler } from "../routing/deepLinks";
+import {
+  detectAppFormFactor,
+  subscribeAppFormFactor,
+  type AppFormFactor,
+} from "../platform/formFactor";
+import { useAppZoom } from "../shared/hooks/useAppZoom";
 
-export function AppShell() {
+type RootLayoutContext = {
+  formFactor: AppFormFactor;
+};
+
+export function RootLayout(props: {
+  isDeepLinkRouteAllowed: (route: string, formFactor: AppFormFactor) => boolean;
+  resolveAuthDeepLinkRoute: (target: "account" | "providers") => string;
+}) {
   const navigate = useNavigate();
   const [formFactor, setFormFactor] = useState<AppFormFactor>(() => detectAppFormFactor());
   const appZoom = useAppZoom();
@@ -21,7 +32,21 @@ export function AppShell() {
 
   useEffect(() => subscribeAppFormFactor(setFormFactor), []);
 
-  useEffect(() => installMistyDeepLinkHandler(formFactor, navigate), [formFactor, navigate]);
+  useEffect(
+    () =>
+      installMistyDeepLinkHandler(
+        formFactor,
+        navigate,
+        props.isDeepLinkRouteAllowed,
+        props.resolveAuthDeepLinkRoute,
+      ),
+    [
+      formFactor,
+      navigate,
+      props.isDeepLinkRouteAllowed,
+      props.resolveAuthDeepLinkRoute,
+    ],
+  );
 
   useEffect(() => {
     const root = document.documentElement;
@@ -36,10 +61,18 @@ export function AppShell() {
 
   return (
     <>
-      {formFactor === "mobile" ? <MobileAppShell /> : <DesktopAppShell />}
+      <AuthProvider>
+        <RenderErrorBoundary>
+          <Outlet context={{ formFactor } satisfies RootLayoutContext} />
+        </RenderErrorBoundary>
+      </AuthProvider>
       <AppZoomIndicator visible={appZoom.indicatorVisible} percent={appZoom.zoomPercent} />
     </>
   );
+}
+
+export function useRootLayoutContext(): RootLayoutContext {
+  return useOutletContext<RootLayoutContext>();
 }
 
 function AppZoomIndicator(props: { visible: boolean; percent: number }) {

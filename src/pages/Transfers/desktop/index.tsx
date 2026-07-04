@@ -21,6 +21,7 @@ import type { MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent, 
 import { useShallow } from "zustand/react/shallow";
 import type { OperationDescriptor, OperationPriority, TransferRecord, TransferType } from "../../../api/types";
 import { prettyLabel } from "../../../shared/format";
+import { useMinimumSpin } from "../../../shared/hooks/useMinimumSpin";
 import { MultiPanelWorkspace } from "../../../shared/multipanel/MultiPanelWorkspace";
 import type { MultiPanelClosedPane, MultiPanelTab } from "../../../shared/multipanel/types";
 import { createMultiPanelStore, type MultiPanelStore } from "../../../shared/multipanel/useMultiPanelStore";
@@ -1714,6 +1715,7 @@ function OperationQueueStrip(props: { onQueueChanged: () => void }) {
     resolveConflict: state.resolveConflict,
     clearTerminal: state.clearTerminal,
   })));
+  const [refreshSpinning, startRefreshSpin] = useMinimumSpin(working);
   const settingsDocument = useSettingsStore((state) => state.settings?.document ?? {});
   const transferProfiles = useMemo(() => transferProfileRecords(settingsDocument), [settingsDocument]);
   const operations = snapshot?.operations ?? [];
@@ -1769,8 +1771,16 @@ function OperationQueueStrip(props: { onQueueChanged: () => void }) {
       </div>
       <div className={transferStyles.operationActions}>
         {error ? <span className="error-text">{error}</span> : null}
-        <button className={transferStyles.operationButton} type="button" onClick={() => void load()} disabled={working}>
-          <RefreshCcw size={14} />
+        <button
+          className={transferStyles.operationButton}
+          type="button"
+          onClick={() => {
+            startRefreshSpin();
+            void load();
+          }}
+          disabled={working}
+        >
+          <RefreshCcw className={refreshSpinning ? "animate-spin" : undefined} size={14} />
           Refresh
         </button>
         <button

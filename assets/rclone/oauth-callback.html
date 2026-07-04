@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ if .OK }}Misty connected{{ else }}Misty sign-in needs attention{{ end }}</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #07090b;
+      --surface: #0d141a;
+      --surface-2: #111b23;
+      --border: #25313a;
+      --text: #f1eee8;
+      --muted: #9aa6b2;
+      --accent: #4e90e5;
+      --success: #5ca875;
+      --danger: #e46f7b;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      min-height: 100vh;
+      margin: 0;
+      display: grid;
+      place-items: center;
+      padding: 28px;
+      background:
+        radial-gradient(circle at 50% 0%, rgba(78, 144, 229, 0.2), transparent 32rem),
+        linear-gradient(180deg, #0b1118 0%, var(--bg) 100%);
+      color: var(--text);
+      font: 15px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    main {
+      width: min(520px, 100%);
+      border: 1px solid var(--border);
+      background: linear-gradient(180deg, var(--surface-2), var(--surface));
+      box-shadow: 0 24px 80px rgba(0, 0, 0, 0.45);
+      padding: 32px;
+    }
+
+    .mark {
+      width: 54px;
+      height: 54px;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      margin-bottom: 20px;
+      border: 1px solid {{ if .OK }}rgba(92, 168, 117, 0.42){{ else }}rgba(228, 111, 123, 0.42){{ end }};
+      background: {{ if .OK }}rgba(92, 168, 117, 0.12){{ else }}rgba(228, 111, 123, 0.12){{ end }};
+      color: {{ if .OK }}var(--success){{ else }}var(--danger){{ end }};
+    }
+
+    .mark svg {
+      width: 28px;
+      height: 28px;
+      display: block;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 25px;
+      line-height: 1.15;
+      font-weight: 760;
+      letter-spacing: 0;
+    }
+
+    p {
+      margin: 12px 0 0;
+      color: var(--muted);
+    }
+
+    .detail {
+      margin-top: 18px;
+      padding-top: 16px;
+      border-top: 1px solid var(--border);
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .detail strong {
+      color: var(--text);
+      font-weight: 650;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="mark" aria-hidden="true">
+      {{ if .OK }}
+      <svg viewBox="0 0 24 24" fill="none">
+        <path d="M20 6 9 17l-5-5" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      {{ else }}
+      <svg viewBox="0 0 24 24" fill="none">
+        <path d="M12 8v5m0 4h.01M10.3 4.3 2.8 17.3A2 2 0 0 0 4.5 20h15a2 2 0 0 0 1.7-2.7L13.7 4.3a2 2 0 0 0-3.4 0Z" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      {{ end }}
+    </div>
+
+    <h1>{{ if .OK }}You are connected to Misty.{{ else }}Misty could not finish sign-in.{{ end }}</h1>
+    <p>
+      {{ if .OK }}
+      Your provider authorized Misty successfully. You can close this browser tab and return to the Remotes tab.
+      {{ else }}
+      The provider returned an authorization error. Return to Misty and reopen the sign-in flow to try again.
+      {{ end }}
+    </p>
+
+    <div class="detail">
+      <strong>{{ .Name }}</strong>
+      {{ if .Description }}<br>{{ .Description }}{{ end }}
+      {{ if .HelpURL }}<br><a href="{{ .HelpURL }}" style="color: var(--accent)">Provider help</a>{{ end }}
+    </div>
+  </main>
+</body>
+</html>

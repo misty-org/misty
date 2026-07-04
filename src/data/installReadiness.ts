@@ -1,37 +1,27 @@
-import type { InstallCheck, InstallerStatus, NativeSystemInfo, PathProbe } from "../models/setup";
+import type { InstallCheck, InstallerStatus, MistyTemplateEntry, MistyTemplateStatus, NativeSystemInfo, PathProbe } from "../models/setup";
 
-export const requiredMistyFolders = [
-  ".local/bin",
-  "local/bin",
-  "local/plugins",
-  "assets",
-  "assets/icons",
-  "assets/logos",
-  "assets/fonts",
-  "assets/themes",
-  "assets/animations",
-  "assets/claude",
-  "config",
-  "config/sessions",
-  "db",
-  "plugins/public",
-  "plugins/private",
-  "public/plugins",
-  "public/keys",
-  "rclone",
-  "restic/passwords",
-  "tmp/transfers",
-  "tmp/downloads",
-  ".cache",
-  ".cache/trash",
-  ".cache/remotes",
-  ".cache/sessions",
-  "mnt",
-  "forms",
-  "scripts",
+export const browserTemplateEntries: MistyTemplateEntry[] = [
+  templateEntry("dir", ".local"),
+  templateEntry("dir", ".local/bin"),
+  templateEntry("file", ".local/bin/misty"),
+  templateEntry("dir", "assets"),
+  templateEntry("dir", "scripts"),
+  templateEntry("dir", "plugins/public"),
+  templateEntry("dir", "plugins/private"),
+  templateEntry("dir", "config"),
+  templateEntry("dir", "config/sessions"),
+  templateEntry("dir", "db"),
+  templateEntry("dir", "forms"),
+  templateEntry("dir", "rclone"),
+  templateEntry("dir", "tmp"),
+  templateEntry("dir", "tmp/transfers"),
+  templateEntry("dir", "tmp/downloads"),
+  templateEntry("dir", ".cache"),
+  templateEntry("dir", ".cache/trash"),
+  templateEntry("dir", ".cache/remotes"),
+  templateEntry("dir", ".cache/sessions"),
+  templateEntry("dir", "mnt"),
 ];
-
-export const requiredMistyBinaries = ["misty"];
 
 export function mistyPath(home: string, relativePath: string) {
   return `${home.replace(/\/+$/, "")}/${relativePath.replace(/^\/+/, "")}`;
@@ -41,42 +31,14 @@ export function executableNameForOs(os: string, binary: string) {
   return os === "windows" ? `${binary}.exe` : binary;
 }
 
-function normalizePath(path: string) {
-  return path.replace(/\\/g, "/");
-}
-
-export function buildInstallerStatus(
+export function buildInstallerStatusFromTemplate(
   native: NativeSystemInfo,
-  folderProbes: PathProbe[],
-  binaryProbes: PathProbe[],
+  template: MistyTemplateStatus,
   setupProbe?: PathProbe,
 ): InstallerStatus {
-  const folders = requiredMistyFolders.map((folder) => {
-    const path = mistyPath(native.misty_home, folder);
-    const probe = folderProbes.find((candidate) => normalizePath(candidate.path) === normalizePath(path));
-    return buildCheck({
-      name: folder,
-      path,
-      required: true,
-      exists: Boolean(probe?.is_dir),
-      readyMessage: "Folder is ready.",
-      missingMessage: "Folder is missing.",
-    });
-  });
-
-  const binaries = requiredMistyBinaries.map((binary) => {
-    const executableName = executableNameForOs(native.os, binary);
-    const path = mistyPath(native.install_dir, executableName);
-    const probe = binaryProbes.find((candidate) => normalizePath(candidate.path) === normalizePath(path));
-    return buildCheck({
-      name: executableName,
-      path,
-      required: true,
-      exists: Boolean(probe?.is_file),
-      readyMessage: "Binary is installed.",
-      missingMessage: "Binary will be installed from a release archive.",
-    });
-  });
+  const checks = template.entries.map(templateCheck);
+  const folders = checks.filter((check) => check.kind === "dir");
+  const binaries = checks.filter((check) => check.kind === "file");
 
   const setupUpdate: InstallCheck = {
     name: "Misty installer",
@@ -96,6 +58,7 @@ export function buildInstallerStatus(
     install_dir: native.install_dir,
     legacy_install_dir: native.legacy_install_dir,
     db_path: native.db_path,
+    installed_version: native.installed_version,
     current_user: native.current_user,
     current_license: native.current_license,
     ready: [...folders, ...binaries].every((check) => !check.required || check.exists),
@@ -105,27 +68,27 @@ export function buildInstallerStatus(
   };
 }
 
-function buildCheck({
-  name,
-  path,
-  required,
-  exists,
-  readyMessage,
-  missingMessage,
-}: {
-  name: string;
-  path: string;
-  required: boolean;
-  exists: boolean;
-  readyMessage: string;
-  missingMessage: string;
-}): InstallCheck {
+function templateCheck(entry: MistyTemplateEntry): InstallCheck {
+  const label = entry.kind === "dir" ? "Folder" : "File";
   return {
-    name,
-    path,
-    required,
-    exists,
-    status: exists ? "ready" : "missing",
-    message: exists ? readyMessage : missingMessage,
+    name: entry.relativePath,
+    path: entry.path,
+    sourcePath: entry.sourcePath,
+    kind: entry.kind,
+    required: entry.required,
+    exists: entry.exists,
+    status: entry.exists ? "ready" : "missing",
+    message: entry.exists ? `${label} is ready.` : `${label} will be restored from the Misty template.`,
+  };
+}
+
+function templateEntry(kind: "dir" | "file", relativePath: string): MistyTemplateEntry {
+  return {
+    relativePath,
+    path: `~/.misty/${relativePath}`,
+    sourcePath: null,
+    kind,
+    required: true,
+    exists: false,
   };
 }
