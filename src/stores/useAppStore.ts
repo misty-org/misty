@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { appSnapshot } from "../api/misty";
 import type { AppSnapshot } from "../api/types";
-import type { AppTab } from "../shell/types";
+import type { AppTab } from "../routing/types";
 import { errorText } from "../shared/format";
 
 interface AppStore {

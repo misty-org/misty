@@ -105,11 +105,6 @@ export function WelcomeOnboarding(props: WelcomeOnboardingProps) {
       data-form-factor={props.formFactor}
       data-mode={mode}
     >
-      <div className="pointer-events-none absolute inset-0">
-        <div className="absolute left-1/2 top-16 h-56 w-56 -translate-x-1/2 rounded-full bg-white/[0.04] blur-3xl" />
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.06),transparent_32%)]" />
-      </div>
-
       <div className="relative mx-auto flex min-h-[calc(100dvh-5rem)] max-w-md flex-col items-center justify-center py-6 sm:min-h-[calc(100dvh-7rem)] sm:py-10">
         <div className="mb-8 text-center">
           <h1 className="text-3xl font-semibold tracking-tight text-white sm:text-4xl">

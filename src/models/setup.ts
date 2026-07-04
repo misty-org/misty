@@ -25,6 +25,7 @@ export type InstallerStatus = {
   install_dir: string;
   legacy_install_dir: string;
   db_path: string;
+  installed_version: string | null;
   current_user: CurrentUser | null;
   current_license: CurrentLicense | null;
   ready: boolean;
@@ -38,6 +39,8 @@ export type CheckStatus = "ready" | "missing" | "pending" | "info";
 export type InstallCheck = {
   name: string;
   path: string;
+  sourcePath?: string | null;
+  kind?: "dir" | "file";
   required: boolean;
   exists: boolean;
   status: CheckStatus;
@@ -52,6 +55,7 @@ export type NativeSystemInfo = {
   legacy_install_dir: string;
   db_path: string;
   setup_path: string;
+  installed_version: string | null;
   current_user: CurrentUser | null;
   current_license: CurrentLicense | null;
 };
@@ -61,6 +65,24 @@ export type PathProbe = {
   exists: boolean;
   is_dir: boolean;
   is_file: boolean;
+};
+
+export type MistyTemplateEntry = {
+  relativePath: string;
+  path: string;
+  sourcePath?: string | null;
+  kind: "dir" | "file";
+  required: boolean;
+  exists: boolean;
+};
+
+export type MistyTemplateStatus = {
+  mistyHome: string;
+  templateDir: string;
+  templateArchive: string;
+  templateExists: boolean;
+  ready: boolean;
+  entries: MistyTemplateEntry[];
 };
 
 export type InstallEvent = {
@@ -77,4 +99,12 @@ export type ReleaseVersion = {
   summary: string;
   manifestUrl: string;
   changes: string[];
+  downloads?: ReleaseDownload[];
+};
+
+export type ReleaseDownload = {
+  name: string;
+  platform: string;
+  url: string;
+  sha256?: string;
 };

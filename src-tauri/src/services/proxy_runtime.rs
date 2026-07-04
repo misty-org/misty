@@ -562,7 +562,7 @@ mod tests {
                 .expect("remote.health invoke");
             assert_eq!(
                 payload.get("backend").and_then(Value::as_str),
-                Some("misty-rclone")
+                Some("librclone")
             );
             assert_eq!(payload.get("ready").and_then(Value::as_bool), Some(true));
         });

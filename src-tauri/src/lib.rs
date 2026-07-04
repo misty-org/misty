@@ -9,24 +9,23 @@ mod services;
 
 use commands::{
     ai_abort, ai_drain_events, ai_send_message, ai_status, app_environment_snapshot, app_snapshot,
-    archive_create, archive_extract, archive_list, claude_abort,
-    claude_drain_events, claude_send_message, claude_status, clipboard_apply_shared,
-    clipboard_native_file_refs, clipboard_publish_image_bytes, clipboard_publish_shared,
-    clipboard_set_local, clipboard_shared_image_bytes, clipboard_snapshot,
-    clipboard_write_file_refs, compare_apply_text_merge, compare_files, compare_folders,
-    devices_snapshot, duplicates_cancel, duplicates_hash_remote_candidates, duplicates_scan,
-    explorer_calculate_directory_sizes, explorer_create_item, explorer_delete_items,
-    explorer_directory_size_snapshot, explorer_library_record_last_opened,
-    explorer_library_record_recent, explorer_library_set_tags, explorer_library_snapshot,
-    explorer_list_directory, explorer_open_association, explorer_open_path, explorer_open_with,
-    explorer_paste_items, explorer_path_exists, explorer_path_is_directory,
-    explorer_prepare_drag_items, explorer_prepare_open_item, explorer_preview_item,
-    explorer_queue_create_item, explorer_queue_delete_items, explorer_queue_paste_blob,
-    explorer_queue_paste_items, explorer_queue_paste_text, explorer_queue_rename_item,
-    explorer_queue_rename_items, explorer_rename_item, explorer_set_open_association,
-    file_metadata_snapshot, file_sync_apply, file_sync_compare, file_sync_pair_remove,
-    file_sync_pair_save, file_sync_pairs_snapshot, file_tools_checksum, file_tools_chmod,
-    file_tools_create_symlink, file_tools_read_symlink, file_tools_set_readonly,
+    archive_create, archive_extract, archive_list, claude_abort, claude_drain_events,
+    claude_send_message, claude_status, clipboard_apply_shared, clipboard_native_file_refs,
+    clipboard_publish_image_bytes, clipboard_publish_shared, clipboard_set_local,
+    clipboard_shared_image_bytes, clipboard_snapshot, clipboard_write_file_refs,
+    compare_apply_text_merge, compare_files, compare_folders, devices_snapshot, duplicates_cancel,
+    duplicates_hash_remote_candidates, duplicates_scan, explorer_calculate_directory_sizes,
+    explorer_create_item, explorer_delete_items, explorer_directory_size_snapshot,
+    explorer_library_record_last_opened, explorer_library_record_recent, explorer_library_set_tags,
+    explorer_library_snapshot, explorer_list_directory, explorer_open_association,
+    explorer_open_path, explorer_open_with, explorer_paste_items, explorer_path_exists,
+    explorer_path_is_directory, explorer_prepare_drag_items, explorer_prepare_open_item,
+    explorer_preview_item, explorer_queue_create_item, explorer_queue_delete_items,
+    explorer_queue_paste_blob, explorer_queue_paste_items, explorer_queue_paste_text,
+    explorer_queue_rename_item, explorer_queue_rename_items, explorer_rename_item,
+    explorer_set_open_association, file_metadata_snapshot, file_sync_apply, file_sync_compare,
+    file_sync_pair_remove, file_sync_pair_save, file_sync_pairs_snapshot, file_tools_checksum,
+    file_tools_chmod, file_tools_create_symlink, file_tools_read_symlink, file_tools_set_readonly,
     open_terminal_at_path, operation_queue_cancel, operation_queue_cancel_batch,
     operation_queue_clear_terminal, operation_queue_pause, operation_queue_pause_all,
     operation_queue_pause_batch, operation_queue_redo, operation_queue_resolve_conflict,
@@ -49,12 +48,16 @@ use commands::{
 };
 use plugins::mac_rounded_corners;
 use runtime::MistyRuntime;
-use services::hub::{
-    check_system, ensure_local_access_token, ensure_misty_folders, get_misty_process_status,
-    install_misty, install_plugin_bundle, launch_misty, open_external_url, probe_paths,
-    restart_misty, save_authenticated_user, save_verified_license, scan_local_plugins,
-    set_plugin_enabled, sign_out_misty, stop_misty, uninstall_plugin,
+use services::misty::{
+    check_system, ensure_local_access_token, fetch_misty_releases, get_misty_process_status,
+    install_plugin_bundle, launch_misty, open_external_url, probe_paths, restart_misty,
+    save_authenticated_user, save_verified_license, scan_local_plugins, set_plugin_enabled,
+    sign_out_misty, stop_misty, uninstall_plugin,
 };
+use services::misty_template::{
+    build_misty_template, install_misty_template, misty_template_status,
+};
+use services::tray;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -66,6 +69,15 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_os::init())
         .manage(MistyRuntime::new())
+        .setup(|app| {
+            #[cfg(desktop)]
+            tray::setup(app).map_err(std::io::Error::other)?;
+            Ok(())
+        })
+        .on_menu_event(|app, event| {
+            #[cfg(desktop)]
+            tray::handle_menu_event(app, event.id().as_ref());
+        })
         .on_window_event(|window, event| {
             #[cfg(desktop)]
             {
@@ -107,13 +119,15 @@ pub fn run() {
             claude_drain_events,
             claude_abort,
             check_system,
-            ensure_misty_folders,
             probe_paths,
+            misty_template_status,
+            build_misty_template,
+            install_misty_template,
             ensure_local_access_token,
+            fetch_misty_releases,
             save_authenticated_user,
             save_verified_license,
             sign_out_misty,
-            install_misty,
             launch_misty,
             restart_misty,
             stop_misty,

@@ -2,6 +2,7 @@ import { memo, useCallback, useEffect } from "react";
 import type { MouseEvent, ReactNode } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { FileBrowser } from "./FileBrowser";
+import type { FileBrowserDragItem } from "./FileBrowser";
 import { useExplorerStore } from "../../../stores/useExplorerStore";
 import type { FileEntry } from "../../../api/types";
 
@@ -79,6 +80,10 @@ export const ExplorerPane = memo(function ExplorerPane(props: ExplorerPaneProps)
     useExplorerStore.getState().openContextMenu(props.paneId, event.clientX, event.clientY, null);
   }, [props.paneId]);
 
+  const handleDropItems = useCallback((items: FileBrowserDragItem[], destination: string) => {
+    void useExplorerStore.getState().dropItems(props.paneId, items, destination, "move");
+  }, [props.paneId]);
+
   const handleInlineEditCommit = useCallback(() => {
     void useExplorerStore.getState().commitInlineEdit();
   }, []);
@@ -110,6 +115,7 @@ export const ExplorerPane = memo(function ExplorerPane(props: ExplorerPaneProps)
         onDownload={handleDownload}
         onContextMenu={handleContextMenu}
         onBackgroundContextMenu={handleBackgroundContextMenu}
+        onDropItems={handleDropItems}
         onInlineEditChange={useExplorerStore.getState().setInlineEditValue}
         onInlineEditCommit={handleInlineEditCommit}
         onInlineEditCancel={useExplorerStore.getState().cancelInlineEdit}

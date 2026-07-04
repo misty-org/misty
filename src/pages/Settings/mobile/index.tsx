@@ -17,7 +17,7 @@ import {
   themeModeToSettingsIndex,
   useAppThemeStore,
 } from "../../../stores/useAppThemeStore";
-import { mobileErrorClass, mobilePageClass, mobileSuccessClass } from "../../../shell/mobileStyles";
+import { mobileErrorClass, mobilePageClass, mobileSuccessClass } from "../../../shared/mobileStyles";
 import { useSettingsStore } from "../../../stores/useSettingsStore";
 
 type SettingValue = string | number | boolean | Array<Record<string, unknown>>;

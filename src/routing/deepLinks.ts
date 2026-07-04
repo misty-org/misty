@@ -1,25 +1,17 @@
 import { getCurrent, onOpenUrl } from "@tauri-apps/plugin-deep-link";
 import type { UnlistenFn } from "@tauri-apps/api/event";
-import type { AppFormFactor } from "./platform";
+import type { AppFormFactor } from "../platform/formFactor";
 import { hasTauriInternals } from "../shared/tauri";
 
 const mistyDeepLinkScheme = "misty:";
 const ignoredMistyHosts = new Set(["recent", "starred", "trash"]);
-const mobileRoutePrefixes = ["/files", "/providers", "/account", "/diagnostics"];
-const desktopRoutePrefixes = [
-  "/transfers",
-  ...mobileRoutePrefixes,
-  "/home",
-  "/extensions",
-  "/changelog",
-  "/signin",
-  "/register",
-  "/settings",
-];
+type AuthDeepLinkTarget = "account" | "providers";
 
 export function installMistyDeepLinkHandler(
   formFactor: AppFormFactor,
   navigate: (route: string) => void,
+  isRouteAllowed: (route: string, formFactor: AppFormFactor) => boolean,
+  resolveAuthRoute: (target: AuthDeepLinkTarget) => string,
 ): () => void {
   let active = true;
   let unlisten: UnlistenFn | null = null;
@@ -27,7 +19,12 @@ export function installMistyDeepLinkHandler(
   const handleUrls = (urls: string[] | null) => {
     if (!active || !urls) return;
     for (const url of urls) {
-      const route = routeForMistyDeepLink(url, formFactor);
+      const route = routeForMistyDeepLink(
+        url,
+        formFactor,
+        isRouteAllowed,
+        resolveAuthRoute,
+      );
       if (route) {
         navigate(route);
         return;
@@ -51,7 +48,12 @@ export function installMistyDeepLinkHandler(
   };
 }
 
-export function routeForMistyDeepLink(rawUrl: string, formFactor: AppFormFactor): string | null {
+function routeForMistyDeepLink(
+  rawUrl: string,
+  formFactor: AppFormFactor,
+  isRouteAllowed: (route: string, formFactor: AppFormFactor) => boolean,
+  resolveAuthRoute: (target: AuthDeepLinkTarget) => string,
+): string | null {
   const url = parseMistyDeepLink(rawUrl);
   if (!url) return null;
 
@@ -60,13 +62,17 @@ export function routeForMistyDeepLink(rawUrl: string, formFactor: AppFormFactor)
   if (!first || ignoredMistyHosts.has(first)) return null;
 
   if (first === "open") {
-    return normalizeDeepLinkRoute(rest, formFactor);
+    return normalizeDeepLinkRoute(rest, formFactor, isRouteAllowed);
   }
   if (first === "auth") {
-    return rest[0] === "providers" || rest[0] === "provider" ? "/providers" : "/account";
+    return resolveAuthRoute(
+      rest[0] === "providers" || rest[0] === "provider"
+        ? "providers"
+        : "account",
+    );
   }
 
-  return normalizeDeepLinkRoute(parts, formFactor);
+  return normalizeDeepLinkRoute(parts, formFactor, isRouteAllowed);
 }
 
 function parseMistyDeepLink(rawUrl: string): URL | null {
@@ -87,10 +93,13 @@ function deepLinkParts(url: URL): string[] {
     .filter(Boolean);
 }
 
-function normalizeDeepLinkRoute(parts: string[], formFactor: AppFormFactor): string | null {
+function normalizeDeepLinkRoute(
+  parts: string[],
+  formFactor: AppFormFactor,
+  isRouteAllowed: (route: string, formFactor: AppFormFactor) => boolean,
+): string | null {
   const route = `/${parts.join("/")}`;
-  const allowedPrefixes = formFactor === "mobile" ? mobileRoutePrefixes : desktopRoutePrefixes;
-  if (!allowedPrefixes.some((prefix) => route === prefix || route.startsWith(`${prefix}/`))) {
+  if (!isRouteAllowed(route, formFactor)) {
     return null;
   }
   if (formFactor === "mobile" && route.startsWith("/account/")) {

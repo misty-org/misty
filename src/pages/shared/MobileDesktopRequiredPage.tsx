@@ -1,5 +1,5 @@
 import { Monitor } from "lucide-react";
-import { mobilePageClass } from "../../shell/mobileStyles";
+import { mobilePageClass } from "../../shared/mobileStyles";
 
 export function MobileDesktopRequiredPage(props: { feature: string }) {
   return (

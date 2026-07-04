@@ -5,6 +5,7 @@ import { useAuth } from "../../auth/AuthContext";
 import { PanelModal } from "./PanelModal";
 import { VersionPicker } from "./VersionPicker";
 import { useSetupStore } from "../../stores/useSetupStore";
+import { useMinimumSpin } from "../../shared/hooks/useMinimumSpin";
 import type { InstallCheck } from "../../models/setup";
 
 function countReady(checks: InstallCheck[]) {
@@ -36,6 +37,11 @@ function architectureLabel(osName: string, arch: string) {
   }
 }
 
+function sameVersion(left?: string | null, right?: string | null) {
+  const normalize = (value?: string | null) => (value ?? "").trim().replace(/^v/i, "");
+  return Boolean(normalize(left) && normalize(left) === normalize(right));
+}
+
 function CheckRow({ check }: { check: InstallCheck }) {
   return (
     <div className="grid min-w-0 grid-cols-[20px_minmax(0,1fr)_auto] items-center gap-2 px-8 py-2.5">
@@ -58,28 +64,35 @@ export function InstallerCard({
   embedded?: boolean;
 }) {
   const { user } = useAuth();
-  const { busy, loadSystem, startInstall, status, systemError } = useSetupStore(
+  const { busy, loadReleases, loadSystem, releasesLoading, startInstall, status, systemError } = useSetupStore(
     useShallow((state) => ({
       busy: state.busy,
+      loadReleases: state.loadReleases,
       loadSystem: state.loadSystem,
+      releasesLoading: state.releasesLoading,
       startInstall: state.startInstall,
       status: state.status,
       systemError: state.systemError,
     })),
   );
   const [showMissingModal, setShowMissingModal] = useState(false);
+  const [refreshSpinning, startRefreshSpin] = useMinimumSpin(busy);
+  const [updatesSpinning, startUpdatesSpin] = useMinimumSpin(releasesLoading);
+  const selectedVersion = useSetupStore((state) => state.selectedVersion);
   const currentUser = status?.current_user ?? user ?? null;
-  const canInstall = !busy && Boolean(currentUser) && !status?.ready;
+  const selectedVersionInstalled = Boolean(status?.ready && sameVersion(status.installed_version, selectedVersion));
+  const canInstall = !busy && Boolean(currentUser) && !selectedVersionInstalled;
   const osName = status?.os ?? (systemError ? "Unavailable" : "Resolving");
   const binaryType = status?.arch ?? (systemError ? "Unavailable" : "Resolving");
   const osLabel = platformLabel(osName);
   const archLabel = architectureLabel(osName, binaryType);
   const folderChecks = status?.folders ?? [];
-  const binaryChecks = status?.binaries ?? [];
+  const fileChecks = status?.binaries ?? [];
   const foldersReady = countReady(folderChecks);
-  const binariesReady = countReady(binaryChecks);
-  const missingChecks = [...folderChecks, ...binaryChecks].filter((check) => check.required && !check.exists);
-  const allFound = folderChecks.length > 0 && binaryChecks.length > 0 && missingChecks.length === 0;
+  const filesReady = countReady(fileChecks);
+  const missingChecks = [...folderChecks, ...fileChecks].filter((check) => check.required && !check.exists);
+  const allFound = folderChecks.length > 0 && fileChecks.length > 0 && missingChecks.length === 0;
+  const installLabel = selectedVersionInstalled ? "Installed" : "Install";
 
   return (
     <div
@@ -89,17 +102,35 @@ export function InstallerCard({
           : "rounded-lg border border-white/10 bg-[#0a0d10]/95 shadow-2xl shadow-black/25"
       } ${className}`}
     >
-      <div className={`flex items-center gap-3 border-b border-white/[0.08] px-4 ${embedded ? "py-3" : "py-4"}`}>
+      <div className={`flex min-w-0 flex-col gap-2 border-b border-white/[0.08] px-4 ${embedded ? "py-3" : "py-4"}`}>
         <VersionPicker />
-        <button
-          className="inline-flex h-10 shrink-0 items-center gap-2 rounded-md bg-[#f4f4f5] px-4 text-sm font-bold text-[#07090b] shadow-lg shadow-white/5 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
-          disabled={!canInstall}
-          onClick={() => void startInstall(currentUser)}
-          type="button"
-        >
-          <Download aria-hidden="true" className="h-4 w-4" />
-          {busy ? "Installing files" : status?.ready ? "Files installed" : "Install files"}
-        </button>
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
+          <button
+            className="inline-flex h-10 min-w-[116px] shrink-0 items-center justify-center gap-2 rounded-md bg-[#f4f4f5] px-3 text-sm font-bold text-[#07090b] shadow-lg shadow-white/5 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
+            disabled={!canInstall}
+            onClick={() => void startInstall(currentUser)}
+            type="button"
+          >
+            {selectedVersionInstalled ? (
+              <CheckCircle2 aria-hidden="true" className="h-4 w-4 shrink-0" />
+            ) : (
+              <Download aria-hidden="true" className="h-4 w-4 shrink-0" />
+            )}
+            <span className="whitespace-nowrap">{installLabel}</span>
+          </button>
+          <button
+            className="inline-flex h-10 min-w-[164px] shrink-0 items-center justify-center gap-2 rounded-md border border-white/10 bg-white/[0.03] px-3 text-sm font-semibold text-[#d4d4d8] transition hover:border-white/20 hover:bg-white/[0.06] hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+            disabled={busy || releasesLoading}
+            onClick={() => {
+              startUpdatesSpin();
+              void loadReleases();
+            }}
+            type="button"
+          >
+            <RefreshCw aria-hidden="true" className={`h-4 w-4 shrink-0 ${updatesSpinning ? "animate-spin" : ""}`} />
+            <span className="whitespace-nowrap">Check for updates</span>
+          </button>
+        </div>
       </div>
 
       <div className={`border-b border-white/[0.08] px-4 ${embedded ? "py-3" : "py-4"}`}>
@@ -107,17 +138,20 @@ export function InstallerCard({
           <div className="min-w-0 text-left">
             <p className="text-base font-medium text-[#f4f4f5]">{osLabel} · {archLabel}</p>
             <p className="mt-1 text-sm text-[#8f8f8f]">
-              {foldersReady}/{folderChecks.length || 0} folders · {binariesReady}/{binaryChecks.length || 0} binaries
+              {foldersReady}/{folderChecks.length || 0} folders · {filesReady}/{fileChecks.length || 0} files
             </p>
           </div>
           <button
             aria-label="Refresh install checks"
             className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-white/10 bg-white/[0.03] text-[#9aa3af] transition hover:border-white/20 hover:bg-white/[0.06] hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
             disabled={busy}
-            onClick={() => void loadSystem()}
+            onClick={() => {
+              startRefreshSpin();
+              void loadSystem();
+            }}
             type="button"
           >
-            <RefreshCw aria-hidden="true" className={`h-4 w-4 ${busy ? "animate-spin" : ""}`} />
+            <RefreshCw aria-hidden="true" className={`h-4 w-4 ${refreshSpinning ? "animate-spin" : ""}`} />
           </button>
         </div>
       </div>
@@ -143,7 +177,7 @@ export function InstallerCard({
                 View all
               </button>
             </div>
-            <div className="min-h-0 flex-1 overflow-y-auto">
+            <div className="misty-scrollbar min-h-0 flex-1 overflow-x-hidden overflow-y-scroll">
               {missingChecks.map((check) => <CheckRow check={check} key={check.path} />)}
             </div>
           </>

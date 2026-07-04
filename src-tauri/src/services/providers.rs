@@ -10,8 +10,12 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
 
 use crate::error::{ApiError, ApiResult};
+use crate::services::paths;
 
 use super::proxy::{ProxyResponse, ProxyService};
+
+const RCLONE_OAUTH_CALLBACK_TEMPLATE: &str =
+    include_str!("../../../assets/rclone/oauth-callback.html");
 
 #[derive(Clone)]
 pub struct ProviderService {
@@ -519,12 +523,12 @@ impl ProviderService {
             .post_json(
                 "/api/remote/config/update",
                 &serde_json::json!({
-                "name": request.name,
-                "parameters": request.parameters,
-                "opt": {
-                    "nonInteractive": true,
-                    "continue": true
-                }
+                    "name": request.name,
+                    "parameters": request.parameters,
+                    "opt": {
+                        "nonInteractive": true,
+                        "continue": true
+                    }
                 }),
             )
             .await?;
@@ -634,45 +638,60 @@ impl ProviderService {
     }
 
     pub async fn public_links(&self, request: LinkPathRequest) -> ApiResult<PublicLinkListResult> {
-        self.post_json_value(
-            "/api/remote/links/list",
-            &serde_json::json!({
-                "remote": request.remote,
-                "path": request.path,
-            }),
-        )
-        .await
+        let remote = request.remote.trim().to_string();
+        let response = self
+            .inner
+            .proxy
+            .post_json(
+                "/api/remote/links/list",
+                &serde_json::json!({
+                    "remote": &remote,
+                    "path": request.path,
+                }),
+            )
+            .await?;
+        parse_public_link_list_response(response, &remote).await
     }
 
     pub async fn create_public_link(
         &self,
         request: LinkPathRequest,
     ) -> ApiResult<PublicLinkActionResult> {
-        self.post_json_value(
-            "/api/remote/links/create",
-            &serde_json::json!({
-                "remote": request.remote,
-                "path": request.path,
-                "expire": request.expire,
-            }),
-        )
-        .await
+        let remote = request.remote.trim().to_string();
+        let response = self
+            .inner
+            .proxy
+            .post_json(
+                "/api/remote/links/create",
+                &serde_json::json!({
+                    "remote": &remote,
+                    "path": request.path,
+                    "expire": request.expire,
+                }),
+            )
+            .await?;
+        parse_public_link_action_response(response, &remote).await
     }
 
     pub async fn revoke_public_link(
         &self,
         request: LinkPathRequest,
     ) -> ApiResult<PublicLinkActionResult> {
-        self.post_json_value(
-            "/api/remote/links/revoke",
-            &serde_json::json!({
-                "remote": request.remote,
-                "path": request.path,
-                "link_id": request.link_id,
-                "target_id": request.target_id,
-            }),
-        )
-        .await
+        let remote = request.remote.trim().to_string();
+        let response = self
+            .inner
+            .proxy
+            .post_json(
+                "/api/remote/links/revoke",
+                &serde_json::json!({
+                    "remote": &remote,
+                    "path": request.path,
+                    "link_id": request.link_id,
+                    "target_id": request.target_id,
+                }),
+            )
+            .await?;
+        parse_public_link_action_response(response, &remote).await
     }
 
     pub async fn backend_actions(&self, remote: String) -> ApiResult<Vec<BackendAction>> {
@@ -752,7 +771,7 @@ impl ProviderService {
                 ProviderConfigMode::Repair => "/api/remote/config/repair",
             }
         };
-        let body = provider_config_request_body(&request);
+        let body = provider_config_request_body(&request)?;
         let response = self.inner.proxy.post_json(endpoint, &body).await?;
         let status = response.status();
         let body = response.text().await.unwrap_or_default();
@@ -780,10 +799,13 @@ impl ProviderService {
     }
 
     pub async fn disconnect_remote(&self, name: String) -> ApiResult<ProvidersSnapshot> {
-        if name.trim().is_empty() {
-            return Err(ApiError::Message(
-                "Choose a remote to disconnect.".to_string(),
-            ));
+        let name = name.trim().to_string();
+        if name.is_empty() {
+            return Err(ApiError::Message("Choose a remote to delete.".to_string()));
+        }
+        if self.remote_uses_user_config(&name).await && remove_standard_rclone_config_remote(&name)?
+        {
+            return self.refresh().await;
         }
         let response = self
             .inner
@@ -796,10 +818,20 @@ impl ProviderService {
             return Err(proxy_response_error(
                 status.as_u16(),
                 &body,
-                "Failed to disconnect remote",
+                "Failed to delete remote",
             ));
         }
         self.refresh().await
+    }
+
+    async fn remote_uses_user_config(&self, name: &str) -> bool {
+        self.inner
+            .snapshot
+            .read()
+            .await
+            .remotes
+            .iter()
+            .any(|remote| remote.name.eq_ignore_ascii_case(name) && remote.config_source == "user")
     }
 
     async fn refresh_inner(&self) -> ApiResult<ProvidersSnapshot> {
@@ -979,6 +1011,29 @@ fn read_standard_rclone_config_remotes() -> Vec<(String, String)> {
     parse_rclone_config_sections(&content)
 }
 
+fn remove_standard_rclone_config_remote(name: &str) -> ApiResult<bool> {
+    let Some(path) = standard_rclone_config_path() else {
+        return Ok(false);
+    };
+    let content = match fs::read_to_string(&path) {
+        Ok(content) => content,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(false),
+        Err(error) => {
+            return Err(ApiError::Message(format!(
+                "Failed to read user rclone config: {error}"
+            )));
+        }
+    };
+    let (updated, removed) = remove_rclone_config_section(&content, name);
+    if !removed {
+        return Ok(false);
+    }
+    fs::write(&path, updated).map_err(|error| {
+        ApiError::Message(format!("Failed to update user rclone config: {error}"))
+    })?;
+    Ok(true)
+}
+
 fn standard_rclone_config_path() -> Option<PathBuf> {
     env::var_os("HOME")
         .map(PathBuf::from)
@@ -1035,6 +1090,33 @@ fn parse_rclone_config_sections(content: &str) -> Vec<(String, String)> {
     remotes
 }
 
+fn remove_rclone_config_section(content: &str, name: &str) -> (String, bool) {
+    let mut lines = Vec::new();
+    let mut removing = false;
+    let mut removed = false;
+    for raw_line in content.lines() {
+        if let Some(section) = raw_line
+            .trim()
+            .strip_prefix('[')
+            .and_then(|value| value.strip_suffix(']'))
+        {
+            removing = section.trim().eq_ignore_ascii_case(name);
+            if removing {
+                removed = true;
+                continue;
+            }
+        }
+        if !removing {
+            lines.push(raw_line);
+        }
+    }
+    let mut updated = lines.join("\n");
+    if content.ends_with('\n') && !updated.is_empty() {
+        updated.push('\n');
+    }
+    (updated, removed)
+}
+
 fn parse_config_map(body: &str) -> ApiResult<BTreeMap<String, String>> {
     let parsed = serde_json::from_str::<serde_json::Value>(body)?;
     let Some(object) = parsed.as_object() else {
@@ -1081,7 +1163,7 @@ fn validate_config_request(request: &ProviderConfigRequest) -> ApiResult<()> {
     Ok(())
 }
 
-fn provider_config_request_body(request: &ProviderConfigRequest) -> serde_json::Value {
+fn provider_config_request_body(request: &ProviderConfigRequest) -> ApiResult<serde_json::Value> {
     let mut body = serde_json::Map::new();
     body.insert(
         "name".to_string(),
@@ -1093,7 +1175,7 @@ fn provider_config_request_body(request: &ProviderConfigRequest) -> serde_json::
     );
     body.insert(
         "parameters".to_string(),
-        serde_json::to_value(&request.parameters).unwrap_or_else(|_| serde_json::json!({})),
+        serde_json::to_value(provider_config_parameters(request)?)?,
     );
     if request.continuing {
         body.insert(
@@ -1111,7 +1193,43 @@ fn provider_config_request_body(request: &ProviderConfigRequest) -> serde_json::
             );
         }
     }
-    serde_json::Value::Object(body)
+    Ok(serde_json::Value::Object(body))
+}
+
+fn provider_config_parameters(
+    request: &ProviderConfigRequest,
+) -> ApiResult<BTreeMap<String, String>> {
+    let mut parameters = request.parameters.clone();
+    if !parameters.contains_key("config_template_file") {
+        if let Some(path) = ensure_rclone_oauth_callback_template()? {
+            parameters.insert(
+                "config_template_file".to_string(),
+                path.display().to_string(),
+            );
+        }
+    }
+    Ok(parameters)
+}
+
+fn ensure_rclone_oauth_callback_template() -> ApiResult<Option<PathBuf>> {
+    let Some(misty_home) = paths::misty_home_dir() else {
+        return Ok(None);
+    };
+    let path = misty_home.join("rclone").join("oauth-callback.html");
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).map_err(|error| {
+            ApiError::Message(format!(
+                "Failed to create rclone callback template directory: {error}"
+            ))
+        })?;
+    }
+    let current = fs::read_to_string(&path).unwrap_or_default();
+    if current != RCLONE_OAUTH_CALLBACK_TEMPLATE {
+        fs::write(&path, RCLONE_OAUTH_CALLBACK_TEMPLATE).map_err(|error| {
+            ApiError::Message(format!("Failed to write rclone callback template: {error}"))
+        })?;
+    }
+    Ok(Some(path))
 }
 
 fn default_provider_workflows() -> Vec<ProviderWorkflow> {
@@ -1488,6 +1606,62 @@ async fn parse_proxy_response<T: for<'de> Deserialize<'de>>(
     serde_json::from_str::<T>(&body).map_err(ApiError::from)
 }
 
+async fn parse_public_link_list_response(
+    response: ProxyResponse,
+    remote: &str,
+) -> ApiResult<PublicLinkListResult> {
+    let status = response.status();
+    let body = response.text().await.unwrap_or_default();
+    if !status.is_success() {
+        return Err(provider_operation_error(
+            status.as_u16(),
+            &body,
+            "Failed to load shared links",
+        ));
+    }
+    let result = serde_json::from_str::<PublicLinkListResult>(&body).map_err(ApiError::from)?;
+    if result.supported {
+        Ok(result)
+    } else {
+        Ok(PublicLinkListResult {
+            provider: fallback_public_link_provider(&result.provider, remote),
+            ..result
+        })
+    }
+}
+
+async fn parse_public_link_action_response(
+    response: ProxyResponse,
+    remote: &str,
+) -> ApiResult<PublicLinkActionResult> {
+    let status = response.status();
+    let body = response.text().await.unwrap_or_default();
+    if !status.is_success() {
+        return Err(provider_operation_error(
+            status.as_u16(),
+            &body,
+            "Shared link action failed",
+        ));
+    }
+    let result = serde_json::from_str::<PublicLinkActionResult>(&body).map_err(ApiError::from)?;
+    if result.supported {
+        Ok(result)
+    } else {
+        Ok(PublicLinkActionResult {
+            provider: fallback_public_link_provider(&result.provider, remote),
+            ..result
+        })
+    }
+}
+
+fn fallback_public_link_provider(provider: &str, remote: &str) -> String {
+    if provider.trim().is_empty() {
+        remote.to_string()
+    } else {
+        provider.to_string()
+    }
+}
+
 fn endpoint_proxy_body(endpoint: &PowerToolEndpoint) -> serde_json::Value {
     serde_json::json!({
         "kind": endpoint.kind,
@@ -1752,6 +1926,47 @@ mod tests {
                 ("legacy".to_string(), "unknown".to_string()),
             ],
         );
+    }
+
+    #[test]
+    fn removes_standard_rclone_config_section_by_name() {
+        let (updated, removed) = remove_rclone_config_section(
+            r#"# user config
+[keep]
+type = drive
+
+[temp]
+type = onedrive
+token = {"access_token":"secret"}
+
+[drop]
+type = dropbox
+"#,
+            "temp",
+        );
+
+        assert!(removed);
+        assert_eq!(
+            updated,
+            r#"# user config
+[keep]
+type = drive
+
+[drop]
+type = dropbox
+"#,
+        );
+    }
+
+    #[test]
+    fn remove_standard_rclone_config_section_is_case_insensitive() {
+        let (updated, removed) = remove_rclone_config_section(
+            "[Temp Remote]\ntype = onedrive\n[keep]\ntype = drive\n",
+            "temp remote",
+        );
+
+        assert!(removed);
+        assert_eq!(updated, "[keep]\ntype = drive\n");
     }
 
     #[test]

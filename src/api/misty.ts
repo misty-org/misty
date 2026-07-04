@@ -53,10 +53,6 @@ import type {
   PasteTextRequest,
   PrepareDragItemsRequest,
   PreparedDragItemsResult,
-  BackendAction,
-  BackendActionResult,
-  BackendRunRequest,
-  ConfigSecurityStatus,
   LinkPathRequest,
   PluginPanelRenderResult,
   PluginCommandRunResult,
@@ -1145,26 +1141,6 @@ export function providersCreatePublicLink(request: LinkPathRequest): Promise<Pub
 
 export function providersRevokePublicLink(request: LinkPathRequest): Promise<PublicLinkActionResult> {
   return invoke("providers_revoke_public_link", { request });
-}
-
-export function providersBackendActions(remote: string): Promise<BackendAction[]> {
-  return invoke("providers_backend_actions", { remote });
-}
-
-export function providersRunBackendAction(request: BackendRunRequest): Promise<BackendActionResult> {
-  return invoke("providers_run_backend_action", { request });
-}
-
-export function providersConfigSecurity(): Promise<ConfigSecurityStatus> {
-  return invoke("providers_config_security");
-}
-
-export function providersHardenConfig(): Promise<ConfigSecurityStatus> {
-  return invoke("providers_harden_config");
-}
-
-export function providersRepairConfigSecurity(password: string): Promise<ConfigSecurityStatus> {
-  return invoke("providers_repair_config_security", { password });
 }
 
 export function providersDisconnectRemote(name: string): Promise<ProvidersSnapshot> {

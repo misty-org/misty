@@ -545,7 +545,6 @@ impl PowerPackService {
         }
         Ok(sources)
     }
-
 }
 
 fn archive_list_blocking(request: ArchiveListRequest) -> ApiResult<ArchiveListResult> {
@@ -1082,10 +1081,7 @@ fn validate_remote_name(value: &str) -> ApiResult<&str> {
     Ok(value)
 }
 
-fn remote_root_uri_to_mount_path(
-    root: &str,
-    mount_root: &Path,
-) -> ApiResult<Option<String>> {
+fn remote_root_uri_to_mount_path(root: &str, mount_root: &Path) -> ApiResult<Option<String>> {
     let root = root.trim();
     if let Some(target) = remote_target_from_misty_uri(root)? {
         return Ok(Some(target.virtual_path(mount_root).display().to_string()));

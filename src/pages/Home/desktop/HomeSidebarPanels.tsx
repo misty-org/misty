@@ -313,7 +313,7 @@ function PanelRows({
     );
   }
 
-  return <div className="grid min-h-0 flex-1 content-start gap-1 overflow-y-auto pr-1">{children}</div>;
+  return <div className="misty-scrollbar grid min-h-0 flex-1 content-start gap-1 overflow-x-hidden overflow-y-scroll pr-1">{children}</div>;
 }
 
 function QuickAccessIcon({ icon }: { icon: HomeQuickAccessItem["icon"] }) {

@@ -1,6 +1,7 @@
 import { RefreshCcw, Trash2 } from "lucide-react";
 import type { OpenWithAssociation } from "../../../api/types";
 import { Panel, PanelHeader } from "../../../shared/components/Panel";
+import { useMinimumSpin } from "../../../shared/hooks/useMinimumSpin";
 
 interface OpenWithAssociationsPanelProps {
   associations: OpenWithAssociation[];
@@ -10,14 +11,22 @@ interface OpenWithAssociationsPanelProps {
 }
 
 export function OpenWithAssociationsPanel(props: OpenWithAssociationsPanelProps) {
+  const [refreshSpinning, startRefreshSpin] = useMinimumSpin(props.working);
   return (
     <Panel className="settings-panel open-with-panel">
       <PanelHeader
         title="Open With Associations"
         subtitle="Review remembered apps used by File Explorer."
         actions={
-          <button type="button" onClick={props.onRefresh} disabled={props.working}>
-            <RefreshCcw size={16} />
+          <button
+            type="button"
+            onClick={() => {
+              startRefreshSpin();
+              props.onRefresh();
+            }}
+            disabled={props.working}
+          >
+            <RefreshCcw className={refreshSpinning ? "animate-spin" : undefined} size={16} />
             Refresh
           </button>
         }

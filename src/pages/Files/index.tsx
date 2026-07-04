@@ -1,4 +1,4 @@
-import { detectAppFormFactor } from "../../shell/platform";
+import { detectAppFormFactor } from "../../platform/formFactor";
 import DesktopFilesPage from "./desktop";
 import MobileFilesPage from "./mobile";
 

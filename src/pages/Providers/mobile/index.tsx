@@ -14,13 +14,13 @@ import {
   Save,
   ShieldCheck,
   Trash2,
-  Unplug,
   Wrench,
   X,
 } from "lucide-react";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { useEffect, useMemo, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
+import { useMinimumSpin } from "../../../shared/hooks/useMinimumSpin";
 import type { ProviderRemote, ProviderWorkflow, ProviderWorkflowOption, RcloneConfigPaths, RemoteEditDraft } from "../../../api/types";
 import {
   mobileEmptyIconClass,
@@ -32,7 +32,7 @@ import {
   mobileSectionHeaderClass,
   mobileSectionTitleClass,
   mobileSuccessClass,
-} from "../../../shell/mobileStyles";
+} from "../../../shared/mobileStyles";
 import { providerIconForType } from "../../../shared/assets/icons";
 import { AssetIcon } from "../../../shared/components/AssetIcon";
 import { prettyLabel } from "../../../shared/format";
@@ -142,6 +142,7 @@ export function MobileProvidersPage() {
     cancelDisconnect: state.cancelDisconnect,
     confirmDisconnect: state.confirmDisconnect,
   })));
+  const [refreshSpinning, startRefreshSpin] = useMinimumSpin(loading);
   const [managedRemoteName, setManagedRemoteName] = useState<string | null>(null);
 
   useEffect(() => {
@@ -214,9 +215,12 @@ export function MobileProvidersPage() {
           type="button"
           className={secondaryActionClass}
           disabled={loading || working}
-          onClick={() => void load(true)}
+          onClick={() => {
+            startRefreshSpin();
+            void load(true);
+          }}
         >
-          <RefreshCcw className={loading ? "animate-spin" : undefined} size={17} /> Refresh
+          <RefreshCcw className={refreshSpinning ? "animate-spin" : undefined} size={17} /> Refresh
         </button>
       </div>
 
@@ -243,6 +247,7 @@ export function MobileProvidersPage() {
                 onReconnect={() => void openReconnectRemote(remote)}
                 onRepair={() => void openRepairRemote(remote)}
                 onManage={() => openManageSheet(remote)}
+                onDisconnect={() => requestDisconnect(remote.name)}
               />
             ))}
           </div>
@@ -282,6 +287,7 @@ export function MobileProvidersPage() {
           remote={managedRemote}
           workspace={workspace}
           configKeys={workspaceDerived.configKeys}
+          workflow={managedRemote ? workflowForType(workflows, managedRemote.type) : null}
           dirty={workspaceDerived.dirty}
           validRemoteName={workspaceDerived.validRemoteName}
           stale={stale}
@@ -322,6 +328,7 @@ function MobileRemoteCard(props: {
   onReconnect: () => void;
   onRepair: () => void;
   onManage: () => void;
+  onDisconnect: () => void;
 }) {
   const providerIcon = providerIconForType(props.remote.type);
   const externalConfig = props.remote.configSource === "user";
@@ -362,6 +369,9 @@ function MobileRemoteCard(props: {
             <Wrench size={15} /> Configure
           </button>
         ) : null}
+        <button type="button" className="inline-flex min-h-[34px] items-center gap-1.5 rounded-lg border border-[#ffb8bf38] bg-[#ffb8bf14] px-2.5 text-xs font-bold text-[#ffb8bf] disabled:opacity-50" disabled={props.disabled} onClick={props.onDisconnect}>
+          <Trash2 size={15} /> Delete
+        </button>
       </div>
     </article>
   );
@@ -371,6 +381,7 @@ function MobileRemoteManageSheet(props: {
   remote: ProviderRemote | null;
   workspace: ProvidersWorkspaceState;
   configKeys: string[];
+  workflow: ProviderWorkflow | null;
   dirty: boolean;
   validRemoteName: boolean;
   stale: boolean;
@@ -389,6 +400,7 @@ function MobileRemoteManageSheet(props: {
   onReload: () => void;
 }) {
   const loading = Boolean(props.workspace.loadingRemoteName);
+  const [reloadSpinning, startReloadSpin] = useMinimumSpin(loading);
   const draft = props.workspace.draft;
   const remote = props.remote;
   return (
@@ -429,6 +441,7 @@ function MobileRemoteManageSheet(props: {
             <MobileRemoteConfigForm
               draft={draft}
               configKeys={props.configKeys}
+              workflow={props.workflow}
               configPaths={props.workspace.configPaths}
               tokenVisible={props.workspace.tokenVisible}
               onDraftName={props.onDraftName}
@@ -452,8 +465,16 @@ function MobileRemoteManageSheet(props: {
               >
                 <Save size={16} /> Save
               </button>
-              <button type="button" className="inline-flex min-h-[42px] min-w-0 items-center justify-center gap-1.5 rounded-[13px] border border-white/10 bg-[#101720] px-2.5 text-xs font-bold text-[#eef3fb] disabled:opacity-50" disabled={props.working} onClick={props.onReload}>
-                <RefreshCcw size={16} /> Reload
+              <button
+                type="button"
+                className="inline-flex min-h-[42px] min-w-0 items-center justify-center gap-1.5 rounded-[13px] border border-white/10 bg-[#101720] px-2.5 text-xs font-bold text-[#eef3fb] disabled:opacity-50"
+                disabled={props.working}
+                onClick={() => {
+                  startReloadSpin();
+                  props.onReload();
+                }}
+              >
+                <RefreshCcw className={reloadSpinning ? "animate-spin" : undefined} size={16} /> Reload
               </button>
               {remote ? (
                 <>
@@ -466,7 +487,7 @@ function MobileRemoteManageSheet(props: {
                 </>
               ) : null}
               <button type="button" className="inline-flex min-h-[42px] min-w-0 items-center justify-center gap-1.5 rounded-[13px] border border-[#ffb8bf38] bg-[#ffb8bf14] px-2.5 text-xs font-bold text-[#ffb8bf] disabled:opacity-50" disabled={props.working} onClick={() => props.onDisconnect(draft.originalName)}>
-                <Unplug size={16} /> Disconnect
+                <Trash2 size={16} /> Delete
               </button>
             </div>
           </>
@@ -487,6 +508,7 @@ function MobileRemoteManageSheet(props: {
 function MobileRemoteConfigForm(props: {
   draft: RemoteEditDraft;
   configKeys: string[];
+  workflow: ProviderWorkflow | null;
   configPaths: RcloneConfigPaths | null;
   tokenVisible: boolean;
   onDraftName: (name: string) => void;
@@ -508,6 +530,7 @@ function MobileRemoteConfigForm(props: {
         <MobileRemoteConfigField
           key={key}
           configKey={key}
+          option={workflowOptionForKey(props.workflow, key)}
           value={props.draft.config[key] ?? ""}
           tokenVisible={props.tokenVisible}
           onConfigField={props.onConfigField}
@@ -528,6 +551,7 @@ function MobileRemoteConfigForm(props: {
 
 function MobileRemoteConfigField(props: {
   configKey: string;
+  option: ProviderWorkflowOption | null;
   value: string;
   tokenVisible: boolean;
   onConfigField: (key: string, value: string) => void;
@@ -564,15 +588,35 @@ function MobileRemoteConfigField(props: {
 
   return (
     <label className={inputGroupClass}>
-      <span className={inputLabelClass}>{prettyLabel(props.configKey)}</span>
-      <input
-        className={inputControlClass}
-        value={props.value}
-        type={isSecretKey(props.configKey) ? "password" : "text"}
-        onChange={(event) => props.onConfigField(props.configKey, event.target.value)}
-      />
+      <span className={inputLabelClass}>{props.option?.label || prettyLabel(props.configKey)}</span>
+      {props.option && props.option.choices.length > 0 ? (
+        <select
+          className={inputControlClass}
+          value={props.value}
+          onChange={(event) => props.onConfigField(props.configKey, event.target.value)}
+        >
+          {props.value && !props.option.choices.some((choice) => choice.value === props.value) ? (
+            <option value={props.value}>{props.value}</option>
+          ) : null}
+          {props.option.choices.map((choice) => (
+            <option key={choice.value} value={choice.value}>{choice.help || choice.value}</option>
+          ))}
+        </select>
+      ) : (
+        <input
+          className={inputControlClass}
+          value={props.value}
+          type={props.option?.password || isSecretKey(props.configKey) ? "password" : "text"}
+          onChange={(event) => props.onConfigField(props.configKey, event.target.value)}
+        />
+      )}
+      {props.option?.help ? <small className="text-xs leading-[1.35] text-[#8792a0]">{props.option.help}</small> : null}
     </label>
   );
+}
+
+function workflowOptionForKey(workflow: ProviderWorkflow | null, key: string): ProviderWorkflowOption | null {
+  return workflow?.options.find((option) => option.name === key) ?? null;
 }
 
 function MobileProviderDisconnectSheet(props: {
@@ -587,12 +631,12 @@ function MobileProviderDisconnectSheet(props: {
         className={`${sheetClass} grid gap-3`}
         role="dialog"
         aria-modal="true"
-        aria-label={`Disconnect ${props.remoteName}`}
+        aria-label={`Delete ${props.remoteName}`}
         onClick={(event) => event.stopPropagation()}
       >
         <header className={sheetHeaderClass}>
           <div>
-            <span className={sheetKickerClass}>Disconnect</span>
+            <span className={sheetKickerClass}>Delete</span>
             <h2 className={sheetTitleClass}>{props.remoteName}</h2>
           </div>
           <button type="button" className={iconButtonClass} aria-label="Close" disabled={props.working} onClick={props.onClose}>
@@ -600,11 +644,11 @@ function MobileProviderDisconnectSheet(props: {
           </button>
         </header>
         <p className={noteClass}>
-          This removes the remote from Misty. Files already on the provider are not deleted.
+          This removes the remote from Misty and rclone. Files already on the provider are not deleted.
         </p>
         <div className={actionStackClass}>
           <button type="button" className={dangerActionClass} disabled={props.working} onClick={props.onConfirm}>
-            <Trash2 size={17} /> {props.working ? "Disconnecting..." : "Disconnect"}
+            <Trash2 size={17} /> {props.working ? "Deleting..." : "Delete"}
           </button>
           <button type="button" className={secondaryActionClass} disabled={props.working} onClick={props.onClose}>
             Cancel
@@ -627,6 +671,20 @@ function MobileProviderConnectionSheet(props: {
   onOpenAuthorize: () => void;
 }) {
   const workflow = workflowForType(props.workflows, props.session.providerType);
+  useEffect(() => {
+    if (props.session.stage !== "authorize" || props.session.inFlight) return;
+    const checkAuthorization = () => {
+      if (document.visibilityState === "hidden") return;
+      props.onSubmit(true);
+    };
+    window.addEventListener("focus", checkAuthorization);
+    document.addEventListener("visibilitychange", checkAuthorization);
+    return () => {
+      window.removeEventListener("focus", checkAuthorization);
+      document.removeEventListener("visibilitychange", checkAuthorization);
+    };
+  }, [props.onSubmit, props.session.inFlight, props.session.stage]);
+
   return (
     <div className={sheetBackdropClass} role="presentation" onClick={props.onClose}>
       <section

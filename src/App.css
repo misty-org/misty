@@ -12,7 +12,6 @@
   --color-primary: #e7e1d8;
   --color-primary-hover: #f0ebe4;
   --color-primary-active: #d4cec6;
-  --color-primary-glow: #e7e1d833;
   --color-success: #22c55e;
   --color-success-hover: #4ade80;
   --color-danger: #ef4444;
@@ -75,24 +74,6 @@
   background-size: 60px 60px;
 }
 
-.radial-glow {
-  background: radial-gradient(
-    ellipse 300px 200px at 50% 0%,
-    rgba(228, 228, 231, 0.08),
-    transparent
-  );
-}
-
-@media (min-width: 640px) {
-  .radial-glow {
-    background: radial-gradient(
-      ellipse 600px 400px at 50% 0%,
-      rgba(228, 228, 231, 0.08),
-      transparent
-    );
-  }
-}
-
 .scrollbar-hide {
   -ms-overflow-style: none;
   scrollbar-width: none;
@@ -153,6 +134,34 @@
 
 .app-pages-root ::-webkit-scrollbar-thumb:hover {
   background: var(--color-text-muted);
+}
+
+.app-pages-root .misty-scrollbar {
+  --misty-scrollbar-thumb: color-mix(in srgb, var(--misty-text-muted) 36%, transparent);
+  --misty-scrollbar-thumb-hover: color-mix(in srgb, var(--misty-text-muted) 58%, transparent);
+  --misty-scrollbar-track: color-mix(in srgb, var(--misty-text-muted) 7%, transparent);
+  scrollbar-color: var(--misty-scrollbar-thumb) var(--misty-scrollbar-track);
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+}
+
+.app-pages-root .misty-scrollbar::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.app-pages-root .misty-scrollbar::-webkit-scrollbar-thumb {
+  background: var(--misty-scrollbar-thumb);
+  border-radius: 999px;
+}
+
+.app-pages-root .misty-scrollbar::-webkit-scrollbar-track {
+  background: var(--misty-scrollbar-track);
+  border-radius: 999px;
+}
+
+.app-pages-root .misty-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: var(--misty-scrollbar-thumb-hover);
 }
 
 @media (prefers-reduced-motion: reduce) {
