@@ -23,10 +23,10 @@ export const releases: Release[] = [
       { platform: "Linux", tag: "AppImage", platformKey: "linux" },
     ],
     notes: [
-      "Initial release with Windows, macOS, and Linux support",
-      "Google Drive, OneDrive, and iCloud integration",
-      "Unified file browser with search",
-      "Secure local-only proxy architecture",
+      "Free public beta build for early testers",
+      "Core file browsing, search, and transfer workflows",
+      "Provider connection flow for supported cloud backends",
+      "Rough edges expected; join Discord to report bugs and follow fixes",
     ],
   },
 ];

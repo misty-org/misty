@@ -20,12 +20,12 @@ const docs = [
     ),
   },
   {
-    title: "Backups",
-    description: "Create snapshots and restore files with encrypted Vault backups.",
-    href: "/docs/backups-overview",
+    title: "Public Beta",
+    description: "Download the free build, try the core workflows, and join Discord to report bugs.",
+    href: "/download",
     icon: (
       <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-        <path d="M5.25 14.25h13.5m-13.5 0a3 3 0 01-3-3m3 3a3 3 0 100 6h13.5a3 3 0 100-6m-16.5-3a3 3 0 013-3h13.5a3 3 0 013 3m-19.5 0a4.5 4.5 0 01.9-2.7L5.737 5.1a3.375 3.375 0 012.7-1.35h7.126c1.062 0 2.062.5 2.7 1.35l2.587 3.45a4.5 4.5 0 01.9 2.7m0 0a3 3 0 01-3 3m0 3h.008v.008h-.008v-.008zm0-6h.008v.008h-.008v-.008zm-3 6h.008v.008h-.008v-.008zm0-6h.008v.008h-.008v-.008z" />
+        <path d="M12 3v12m0 0l-4.5-4.5M12 15l4.5-4.5M4.5 18.75h15" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
     ),
   },

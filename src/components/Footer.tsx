@@ -7,7 +7,6 @@ const columns = [
     label: "Product",
     links: [
       { to: "/download", text: "Download" },
-      { to: "/pricing", text: "Pricing" },
       { to: "/changelog", text: "Changelog" },
     ],
   },
@@ -24,15 +23,15 @@ const columns = [
     label: "Support",
     links: [
       { to: "https://forms.gle/your-form-id", text: "Submit a Ticket", external: true },
-      { to: "https://discord.gg/your-invite", text: "Discord Community", external: true },
+      { to: "https://discord.gg/M3EQuWcFS", text: "Discord Community", external: true },
       { to: "mailto:hello@misty.app", text: "Contact", external: true },
     ],
   },
 ];
 
 const socials = [
-  { href: "https://discord.gg/your-invite", icon: FaDiscord, label: "Discord" },
-  { href: "https://github.com/kannachi323", icon: FaGithub, label: "GitHub" },
+  { href: "https://discord.gg/M3EQuWcFS", icon: FaDiscord, label: "Discord" },
+  { href: "https://github.com/misty-org/misty-public", icon: FaGithub, label: "GitHub" },
   { href: "mailto:hello@misty.app", icon: MdOutlineEmail, label: "Email" },
 ];
 
@@ -47,7 +46,7 @@ export default function Footer() {
             <span className="text-sm font-medium text-text-muted">Misty</span>
           </div>
           <p className="text-sm text-text-muted/60 max-w-xs">
-            All your cloud files and devices in one place. Simple, private, and fast.
+            Free public beta for local files, cloud storage, search, and transfers. Still early, and shaped with the community.
           </p>
           <div className="flex items-center gap-4 mt-2">
             {socials.map(({ href, icon: Icon, label }) => (

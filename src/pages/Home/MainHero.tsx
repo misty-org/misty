@@ -42,20 +42,20 @@ export default function MainHero() {
       </h1>
 
       <p className="mx-auto mb-5 max-w-2xl text-base leading-relaxed text-pretty text-text-muted">
-        Manage local files, cloud storage, and backups in one interface. Build powerful workflows with fully customizable plugins.
+        Misty is free for everyone while the public build is still young. Try the core file workflows now, expect rough edges, and help shape what comes next.
       </p>
 
       <div className="flex flex-wrap justify-center gap-5">
-        <NavLink to="/register">
+        <NavLink to="/download">
           <span className="inline-flex items-center justify-center rounded-full bg-white px-5 py-2 font-bold text-black shadow-lg transition-colors duration-300 hover:bg-zinc-200">
-            Get Started
+            Download Free Beta
           </span>
         </NavLink>
-        <NavLink to="/waitlist">
+        <a href="https://discord.gg/M3EQuWcFS" target="_blank" rel="noopener noreferrer">
           <span className="inline-flex items-center justify-center rounded-full bg-zinc-700 px-5 py-2 font-bold text-zinc-100 shadow-lg transition-colors duration-300 hover:bg-zinc-600">
-            Join Waitlist
+            Join Discord
           </span>
-        </NavLink>
+        </a>
       </div>
     </div>
   );
