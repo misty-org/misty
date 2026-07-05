@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { HiOutlineChevronDown } from "react-icons/hi2";
+import { apiBase } from "../../lib/apiBase";
 import { releases, type PlatformName, type ReleaseBuild } from "./data";
 
 type PlatformIconProps = {
@@ -127,8 +128,6 @@ const platformMeta: Record<PlatformName, { icon: React.ReactNode; arch: string }
     arch: "x86_64 / ARM64",
   },
 };
-const apiBase = (import.meta.env.VITE_API_BASE ?? "").replace(/\/+$/, "");
-
 function ReleaseItem({
   version,
   builds,

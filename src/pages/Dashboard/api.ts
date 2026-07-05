@@ -1,4 +1,4 @@
-const apiBase = (import.meta.env.VITE_API_BASE ?? "").replace(/\/+$/, "");
+import { apiBase } from "../../lib/apiBase";
 
 export interface MeResponse {
   id: string;

@@ -1,6 +1,5 @@
 import type { WaitlistFormState } from "./types";
-
-const apiBase = (import.meta.env.VITE_API_BASE ?? "").replace(/\/+$/, "");
+import { apiBase } from "../../lib/apiBase";
 
 export async function submitWaitlist(formData: WaitlistFormState) {
   const response = await fetch(`${apiBase}/waitlist`, {
