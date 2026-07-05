@@ -46,6 +46,7 @@ func (db *Database) Start() error {
 		log.Println("Failed to connect to database:", err)
 		return err
 	}
+	warnIfRoleBypassesRLS(conn)
 
 	db.Conn = conn
 	return nil
@@ -54,5 +55,22 @@ func (db *Database) Start() error {
 func (db *Database) Stop() {
 	if db.Conn != nil {
 		db.Conn.Close()
+	}
+}
+
+func warnIfRoleBypassesRLS(conn *sql.DB) {
+	var role string
+	var bypassesRLS bool
+	err := conn.QueryRow(`
+		SELECT rolname, rolsuper OR rolbypassrls
+		FROM pg_roles
+		WHERE rolname = current_user
+	`).Scan(&role, &bypassesRLS)
+	if err != nil {
+		log.Println("Failed to inspect database role RLS settings:", err)
+		return
+	}
+	if bypassesRLS {
+		log.Printf("WARNING: database role %q bypasses row-level security; use a non-superuser role without BYPASSRLS in production", role)
 	}
 }

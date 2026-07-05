@@ -1,6 +1,7 @@
 package db
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"log"
@@ -34,30 +35,23 @@ func (db *Database) CreateUser(name, email, password string) (*User, error) {
 	id := uuid.New().String()
 	now := time.Now()
 	licenseID := uuid.New().String()
-	tx, err := db.Conn.Begin()
-	if err != nil {
-		return nil, err
-	}
 
-	_, err = tx.Exec(
-		`INSERT INTO users (id, license_id, name, email, password_hash) VALUES ($1, $2, $3, $4, $5)`,
-		id, licenseID, name, normalizedEmail, hash,
-	)
+	var license *License
+	err = db.withRLSContext(context.Background(), registrationRLSSettings(id, licenseID, normalizedEmail), func(tx *sql.Tx) error {
+		_, err := tx.ExecContext(
+			context.Background(),
+			`INSERT INTO users (id, license_id, name, email, password_hash) VALUES ($1, $2, $3, $4, $5)`,
+			id, licenseID, name, normalizedEmail, hash,
+		)
+		if err != nil {
+			return err
+		}
+
+		license, err = createLicenseTx(tx, licenseID, id, TierBasic, LicenseStatusActive, nil)
+		return err
+	})
 	if err != nil {
-		_ = tx.Rollback()
 		log.Println("Failed to create user:", err)
-		return nil, err
-	}
-
-	license, err := createLicenseTx(tx, licenseID, id, TierBasic, LicenseStatusActive, nil)
-	if err != nil {
-		_ = tx.Rollback()
-		log.Println("Failed to create license for user:", err)
-		return nil, err
-	}
-
-	if err := tx.Commit(); err != nil {
-		log.Println("Failed to commit user creation:", err)
 		return nil, err
 	}
 
@@ -69,10 +63,13 @@ func (db *Database) GetUserByEmail(email string) (*User, string, error) {
 	var hash string
 	normalizedEmail := normalizeEmail(email)
 
-	err := db.Conn.QueryRow(
-		`SELECT id, license_id, name, email, password_hash, created_at FROM users WHERE LOWER(email) = $1`,
-		normalizedEmail,
-	).Scan(&u.ID, &u.LicenseID, &u.Name, &u.Email, &hash, &u.CreatedAt)
+	err := db.withRLSContext(context.Background(), anonymousRLSSettings(normalizedEmail), func(tx *sql.Tx) error {
+		return tx.QueryRowContext(
+			context.Background(),
+			`SELECT id, license_id, name, email, password_hash, created_at FROM users WHERE LOWER(email) = $1`,
+			normalizedEmail,
+		).Scan(&u.ID, &u.LicenseID, &u.Name, &u.Email, &hash, &u.CreatedAt)
+	})
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, "", nil
@@ -85,7 +82,10 @@ func (db *Database) GetUserByEmail(email string) (*User, string, error) {
 }
 
 func (db *Database) UpdateUserName(id, name string) error {
-	_, err := db.Conn.Exec(`UPDATE users SET name = $1 WHERE id = $2`, name, id)
+	err := db.withRLSContext(context.Background(), userRLSSettings(id), func(tx *sql.Tx) error {
+		_, err := tx.ExecContext(context.Background(), `UPDATE users SET name = $1 WHERE id = $2`, name, id)
+		return err
+	})
 	if err != nil {
 		log.Println("Failed to update user name:", err)
 	}
@@ -94,10 +94,13 @@ func (db *Database) UpdateUserName(id, name string) error {
 
 func (db *Database) GetUserByID(id string) (*User, error) {
 	var u User
-	err := db.Conn.QueryRow(
-		`SELECT id, license_id, name, email, email_updates_enabled, created_at FROM users WHERE id = $1`,
-		id,
-	).Scan(&u.ID, &u.LicenseID, &u.Name, &u.Email, &u.EmailUpdatesEnabled, &u.CreatedAt)
+	err := db.withRLSContext(context.Background(), userRLSSettings(id), func(tx *sql.Tx) error {
+		return tx.QueryRowContext(
+			context.Background(),
+			`SELECT id, license_id, name, email, email_updates_enabled, created_at FROM users WHERE id = $1`,
+			id,
+		).Scan(&u.ID, &u.LicenseID, &u.Name, &u.Email, &u.EmailUpdatesEnabled, &u.CreatedAt)
+	})
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
@@ -110,10 +113,13 @@ func (db *Database) GetUserByID(id string) (*User, error) {
 
 func (db *Database) GetUserSettingsByID(id string) (*UserSettings, error) {
 	var settings UserSettings
-	err := db.Conn.QueryRow(
-		`SELECT email_updates_enabled FROM users WHERE id = $1`,
-		id,
-	).Scan(&settings.EmailUpdatesEnabled)
+	err := db.withRLSContext(context.Background(), userRLSSettings(id), func(tx *sql.Tx) error {
+		return tx.QueryRowContext(
+			context.Background(),
+			`SELECT email_updates_enabled FROM users WHERE id = $1`,
+			id,
+		).Scan(&settings.EmailUpdatesEnabled)
+	})
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
@@ -125,11 +131,15 @@ func (db *Database) GetUserSettingsByID(id string) (*UserSettings, error) {
 }
 
 func (db *Database) UpdateUserSettings(id string, settings UserSettings) error {
-	_, err := db.Conn.Exec(
-		`UPDATE users SET email_updates_enabled = $1 WHERE id = $2`,
-		settings.EmailUpdatesEnabled,
-		id,
-	)
+	err := db.withRLSContext(context.Background(), userRLSSettings(id), func(tx *sql.Tx) error {
+		_, err := tx.ExecContext(
+			context.Background(),
+			`UPDATE users SET email_updates_enabled = $1 WHERE id = $2`,
+			settings.EmailUpdatesEnabled,
+			id,
+		)
+		return err
+	})
 	if err != nil {
 		log.Println("Failed to update user settings:", err)
 	}

@@ -1,6 +1,8 @@
 package db
 
 import (
+	"context"
+	"database/sql"
 	"log"
 
 	"github.com/google/uuid"
@@ -16,19 +18,22 @@ func (db *Database) CreateWaitlistSignup(name, email string) (bool, error) {
 	id := uuid.New().String()
 	normalizedEmail := normalizeEmail(email)
 
-	result, err := db.Conn.Exec(
-		`INSERT INTO waitlist_signups (id, name, email) VALUES ($1, $2, $3)
-		 ON CONFLICT (email) DO NOTHING`,
-		id, name, normalizedEmail,
-	)
+	var rowsAffected int64
+	err := db.withRLSContext(context.Background(), waitlistRLSSettings(normalizedEmail), func(tx *sql.Tx) error {
+		result, err := tx.ExecContext(
+			context.Background(),
+			`INSERT INTO waitlist_signups (id, name, email) VALUES ($1, $2, $3)
+			 ON CONFLICT (email) DO NOTHING`,
+			id, name, normalizedEmail,
+		)
+		if err != nil {
+			return err
+		}
+		rowsAffected, err = result.RowsAffected()
+		return err
+	})
 	if err != nil {
 		log.Println("Failed to create waitlist signup:", err)
-		return false, err
-	}
-
-	rowsAffected, err := result.RowsAffected()
-	if err != nil {
-		log.Println("Failed to inspect waitlist insert result:", err)
 		return false, err
 	}
 

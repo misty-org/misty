@@ -161,7 +161,7 @@ func (s *PasswordResetService) Start() http.HandlerFunc {
 			return
 		}
 
-		http.SetCookie(w, buildPasswordResetCookie(token, s.now().Add(security.PasswordResetTokenTTL), r.TLS != nil))
+		http.SetCookie(w, buildPasswordResetCookie(token, s.now().Add(security.PasswordResetTokenTTL), isSecureRequest(r)))
 		http.Redirect(w, r, s.redirectURL, http.StatusSeeOther)
 	}
 }

@@ -11,6 +11,8 @@ if [[ -f .env ]]; then
   set +a
 fi
 
+EXPLICIT_TEST_DB_HOST="${TEST_DB_HOST:-}"
+
 export TEST_DB_HOST="${TEST_DB_HOST:-${DB_HOST:-}}"
 export TEST_DB_PORT="${TEST_DB_PORT:-${DB_PORT:-5432}}"
 export TEST_DB_USER="${TEST_DB_USER:-${DB_USER:-}}"
@@ -25,6 +27,74 @@ if [[ -z "${TEST_DB_NAME:-}" ]]; then
       export TEST_DB_NAME="${DB_NAME}_test"
     fi
   fi
+fi
+
+BOOTSTRAP_TEST_DB="${BOOTSTRAP_TEST_DB:-auto}"
+SHOULD_BOOTSTRAP_TEST_DB="false"
+
+if [[ "$BOOTSTRAP_TEST_DB" == "1" || "$BOOTSTRAP_TEST_DB" == "true" ]]; then
+  SHOULD_BOOTSTRAP_TEST_DB="true"
+elif [[ "$BOOTSTRAP_TEST_DB" == "auto" && -z "$EXPLICIT_TEST_DB_HOST" ]]; then
+  case "${TEST_DB_HOST:-}" in
+    ""|"localhost"|"127.0.0.1"|"::1")
+      SHOULD_BOOTSTRAP_TEST_DB="true"
+      ;;
+  esac
+fi
+
+if [[ "$SHOULD_BOOTSTRAP_TEST_DB" == "true" ]]; then
+  if ! command -v docker >/dev/null 2>&1; then
+    echo "TEST_DB_HOST is not set and Docker is not available."
+    echo "Set TEST_DB_* or DB_* for an existing Postgres instance, then rerun $0."
+    exit 2
+  fi
+
+  export TEST_DB_HOST="${TEST_DB_HOST:-localhost}"
+  export TEST_DB_PORT="${TEST_DB_PORT:-5432}"
+  export TEST_DB_USER="${TEST_DB_USER:-misty}"
+  export TEST_DB_PASSWORD="${TEST_DB_PASSWORD:-misty}"
+  export TEST_DB_NAME="${TEST_DB_NAME:-misty_server_test}"
+  export TEST_DB_SSLMODE="${TEST_DB_SSLMODE:-disable}"
+
+  export DB_USER="${DB_USER:-$TEST_DB_USER}"
+  export DB_PASSWORD="${DB_PASSWORD:-$TEST_DB_PASSWORD}"
+  export DB_NAME="${DB_NAME:-misty_server}"
+  export DB_PORT="${DB_PORT:-$TEST_DB_PORT}"
+
+  docker compose up -d postgres
+
+  until docker compose exec -T postgres pg_isready -U "$DB_USER" -d "$DB_NAME" >/dev/null 2>&1; do
+    sleep 1
+  done
+
+  TEST_DB_NAME_LOWER="$(printf '%s' "$TEST_DB_NAME" | tr '[:upper:]' '[:lower:]')"
+  if [[ "$TEST_DB_NAME_LOWER" != *test* ]]; then
+    echo "Refusing to recreate non-test database: $TEST_DB_NAME"
+    exit 2
+  fi
+  case "$TEST_DB_NAME" in
+    *[!a-zA-Z0-9_]*)
+      echo "Refusing test database name with unsupported characters: $TEST_DB_NAME"
+      exit 2
+      ;;
+  esac
+
+  docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d postgres <<SQL
+SELECT pg_terminate_backend(pid)
+FROM pg_stat_activity
+WHERE datname = '${TEST_DB_NAME}' AND pid <> pg_backend_pid();
+DROP DATABASE IF EXISTS "${TEST_DB_NAME}";
+CREATE DATABASE "${TEST_DB_NAME}";
+SQL
+
+  for migration in db/migrations/*.sql; do
+    awk '
+      /^-- \+goose Up$/ { in_up = 1; next }
+      /^-- \+goose Down$/ { in_up = 0 }
+      in_up && /^-- \+goose/ { next }
+      in_up { print }
+    ' "$migration" | docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$TEST_DB_NAME"
+  done
 fi
 
 go test ./... -count=1 "$@"

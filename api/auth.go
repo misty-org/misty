@@ -1,7 +1,6 @@
 package api
 
 import (
-	"encoding/json"
 	"net/http"
 	"strings"
 
@@ -17,7 +16,7 @@ func Register(database *db.Database) http.HandlerFunc {
 			Email    string `json:"email"`
 			Password string `json:"password"`
 		}
-		if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Email == "" || body.Password == "" {
+		if err := decodeJSON(w, r, &body); err != nil || body.Email == "" || body.Password == "" {
 			http.Error(w, "email and password required", http.StatusBadRequest)
 			return
 		}
@@ -53,7 +52,7 @@ func Login(database *db.Database) http.HandlerFunc {
 			Email    string `json:"email"`
 			Password string `json:"password"`
 		}
-		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		if err := decodeJSON(w, r, &body); err != nil {
 			http.Error(w, "invalid request", http.StatusBadRequest)
 			return
 		}
@@ -74,6 +73,34 @@ func Login(database *db.Database) http.HandlerFunc {
 		}
 
 		writeAuthSession(w, r, database, user, http.StatusOK)
+		token, err := security.GenerateSecureToken()
+		if err != nil {
+			http.Error(w, "internal error", http.StatusInternalServerError)
+			return
+		}
+		tokenHash := security.HashToken(token)
+		if err := database.CreateSession(tokenHash, user.ID); err != nil {
+			http.Error(w, "internal error", http.StatusInternalServerError)
+			return
+		}
+
+		secure := isSecureRequest(r)
+		http.SetCookie(w, &http.Cookie{
+			Name:     sessionCookieName,
+			Value:    token,
+			Path:     "/",
+			HttpOnly: true,
+			Secure:   secure,
+			SameSite: sessionCookieSameSite(r, secure),
+			MaxAge:   int(db.SessionTTL.Seconds()),
+		})
+
+		writeJSON(w, http.StatusOK, map[string]string{
+			"user_id": user.ID,
+			"name":    user.Name,
+			"email":   user.Email,
+			"token":   token,
+		})
 	}
 }
 
@@ -121,7 +148,7 @@ func Logout(database *db.Database) http.HandlerFunc {
 			_ = database.DeleteSession(tokenHash)
 		}
 
-		secure := r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https"
+		secure := isSecureRequest(r)
 		http.SetCookie(w, &http.Cookie{
 			Name:     sessionCookieName,
 			Value:    "",
@@ -134,6 +161,10 @@ func Logout(database *db.Database) http.HandlerFunc {
 
 		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 	}
+}
+
+func isSecureRequest(r *http.Request) bool {
+	return r.TLS != nil || strings.EqualFold(r.Header.Get("X-Forwarded-Proto"), "https")
 }
 
 func sessionCookieSameSite(r *http.Request, secure bool) http.SameSite {

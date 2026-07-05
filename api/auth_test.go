@@ -3,6 +3,7 @@ package api
 import (
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -40,5 +41,25 @@ func TestBearerTokenFromRequestRejectsEmptyToken(t *testing.T) {
 
 	if token, ok := bearerTokenFromRequest(req); ok || token != "" {
 		t.Fatalf("bearerTokenFromRequest() = %q, %v; want empty, false", token, ok)
+	}
+}
+
+func TestIsSecureRequestHonorsForwardedProtoCaseInsensitively(t *testing.T) {
+	req := httptest.NewRequest(http.MethodPost, "/api/login", nil)
+	req.Header.Set("X-Forwarded-Proto", "HTTPS")
+
+	if !isSecureRequest(req) {
+		t.Fatal("isSecureRequest() = false, want true")
+	}
+}
+
+func TestLoginRejectsUnknownJSONFieldsBeforeDatabaseAccess(t *testing.T) {
+	req := httptest.NewRequest(http.MethodPost, "/api/login", strings.NewReader(`{"email":"user@example.com","password":"pw","extra":true}`))
+	rec := httptest.NewRecorder()
+
+	Login(nil).ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("Login status = %d, want %d", rec.Code, http.StatusBadRequest)
 	}
 }

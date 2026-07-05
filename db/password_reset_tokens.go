@@ -13,13 +13,17 @@ import (
 var ErrPasswordResetTokenInvalid = errors.New("password reset token is invalid or expired")
 
 func (db *Database) UpsertPasswordResetToken(userID, hashedToken string, expiresAt time.Time) error {
-	_, err := db.Conn.Exec(
-		`INSERT INTO password_reset_tokens (user_id, hashed_token, expires_at)
-		 VALUES ($1, $2, $3)
-		 ON CONFLICT (user_id)
-		 DO UPDATE SET hashed_token = EXCLUDED.hashed_token, expires_at = EXCLUDED.expires_at, created_at = NOW()`,
-		userID, hashedToken, expiresAt,
-	)
+	err := db.withRLSContext(context.Background(), serviceRLSSettings(), func(tx *sql.Tx) error {
+		_, err := tx.ExecContext(
+			context.Background(),
+			`INSERT INTO password_reset_tokens (user_id, hashed_token, expires_at)
+			 VALUES ($1, $2, $3)
+			 ON CONFLICT (user_id)
+			 DO UPDATE SET hashed_token = EXCLUDED.hashed_token, expires_at = EXCLUDED.expires_at, created_at = NOW()`,
+			userID, hashedToken, expiresAt,
+		)
+		return err
+	})
 	if err != nil {
 		log.Println("Failed to upsert password reset token:", err)
 		return err
@@ -32,12 +36,15 @@ func (db *Database) ValidatePasswordResetToken(hashedToken string, now time.Time
 	var userID string
 	var expiresAt time.Time
 
-	err := db.Conn.QueryRow(
-		`SELECT user_id, expires_at
-		 FROM password_reset_tokens
-		 WHERE hashed_token = $1`,
-		hashedToken,
-	).Scan(&userID, &expiresAt)
+	err := db.withRLSContext(context.Background(), serviceRLSSettings(), func(tx *sql.Tx) error {
+		return tx.QueryRowContext(
+			context.Background(),
+			`SELECT user_id, expires_at
+			 FROM password_reset_tokens
+			 WHERE hashed_token = $1`,
+			hashedToken,
+		).Scan(&userID, &expiresAt)
+	})
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return ErrPasswordResetTokenInvalid
@@ -47,7 +54,10 @@ func (db *Database) ValidatePasswordResetToken(hashedToken string, now time.Time
 	}
 
 	if !expiresAt.After(now) {
-		if _, err := db.Conn.Exec(`DELETE FROM password_reset_tokens WHERE user_id = $1`, userID); err != nil {
+		if err := db.withRLSContext(context.Background(), serviceRLSSettings(), func(tx *sql.Tx) error {
+			_, err := tx.ExecContext(context.Background(), `DELETE FROM password_reset_tokens WHERE user_id = $1`, userID)
+			return err
+		}); err != nil {
 			log.Println("Failed to delete expired password reset token:", err)
 			return err
 		}
@@ -58,80 +68,68 @@ func (db *Database) ValidatePasswordResetToken(hashedToken string, now time.Time
 }
 
 func (db *Database) ResetPasswordWithToken(hashedToken, newPassword string, now time.Time) error {
-	tx, err := db.Conn.BeginTx(context.Background(), &sql.TxOptions{})
-	if err != nil {
-		log.Println("Failed to begin password reset transaction:", err)
-		return err
-	}
-
-	committed := false
-	defer func() {
-		if !committed {
-			rollbackTx(tx)
+	var invalidTokenErr error
+	err := db.withRLSContext(context.Background(), serviceRLSSettings(), func(tx *sql.Tx) error {
+		var userID string
+		var expiresAt time.Time
+		err := tx.QueryRowContext(
+			context.Background(),
+			`SELECT user_id, expires_at
+			 FROM password_reset_tokens
+			 WHERE hashed_token = $1
+			 FOR UPDATE`,
+			hashedToken,
+		).Scan(&userID, &expiresAt)
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return ErrPasswordResetTokenInvalid
+			}
+			log.Println("Failed to fetch password reset token:", err)
+			return err
 		}
-	}()
 
-	var userID string
-	var expiresAt time.Time
-	err = tx.QueryRow(
-		`SELECT user_id, expires_at
-		 FROM password_reset_tokens
-		 WHERE hashed_token = $1
-		 FOR UPDATE`,
-		hashedToken,
-	).Scan(&userID, &expiresAt)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if !expiresAt.After(now) {
+			if _, err := tx.ExecContext(context.Background(), `DELETE FROM password_reset_tokens WHERE user_id = $1`, userID); err != nil {
+				log.Println("Failed to delete expired password reset tokens:", err)
+				return err
+			}
+			invalidTokenErr = ErrPasswordResetTokenInvalid
+			return nil
+		}
+
+		passwordHash, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
+		if err != nil {
+			return err
+		}
+
+		result, err := tx.ExecContext(context.Background(), `UPDATE users SET password_hash = $1 WHERE id = $2`, string(passwordHash), userID)
+		if err != nil {
+			log.Println("Failed to update user password:", err)
+			return err
+		}
+
+		rowsAffected, err := result.RowsAffected()
+		if err != nil {
+			log.Println("Failed to read password update result:", err)
+			return err
+		}
+		if rowsAffected != 1 {
 			return ErrPasswordResetTokenInvalid
 		}
-		log.Println("Failed to fetch password reset token:", err)
-		return err
-	}
 
-	if !expiresAt.After(now) {
-		if _, err := tx.Exec(`DELETE FROM password_reset_tokens WHERE user_id = $1`, userID); err != nil {
-			log.Println("Failed to delete expired password reset tokens:", err)
+		if _, err := tx.ExecContext(context.Background(), `DELETE FROM password_reset_tokens WHERE user_id = $1`, userID); err != nil {
+			log.Println("Failed to delete password reset tokens:", err)
 			return err
 		}
-		if err := tx.Commit(); err != nil {
-			log.Println("Failed to commit expired password reset cleanup:", err)
-			return err
-		}
-		committed = true
-		return ErrPasswordResetTokenInvalid
-	}
 
-	passwordHash, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
+		return nil
+	})
 	if err != nil {
 		return err
 	}
-
-	result, err := tx.Exec(`UPDATE users SET password_hash = $1 WHERE id = $2`, string(passwordHash), userID)
-	if err != nil {
-		log.Println("Failed to update user password:", err)
-		return err
+	if invalidTokenErr != nil {
+		return invalidTokenErr
 	}
-
-	rowsAffected, err := result.RowsAffected()
-	if err != nil {
-		log.Println("Failed to read password update result:", err)
-		return err
-	}
-	if rowsAffected != 1 {
-		return ErrPasswordResetTokenInvalid
-	}
-
-	if _, err := tx.Exec(`DELETE FROM password_reset_tokens WHERE user_id = $1`, userID); err != nil {
-		log.Println("Failed to delete password reset tokens:", err)
-		return err
-	}
-
-	if err := tx.Commit(); err != nil {
-		log.Println("Failed to commit password reset transaction:", err)
-		return err
-	}
-
-	committed = true
 	return nil
 }
 

@@ -28,6 +28,8 @@ func TestForgotPasswordRateLimiter(t *testing.T) {
 }
 
 func TestForgotPasswordRateLimitKeyUsesForwardedIP(t *testing.T) {
+	t.Setenv("TRUST_PROXY_HEADERS", "true")
+
 	req := httptest.NewRequest("POST", "/auth/forgot", nil)
 	req.RemoteAddr = "10.0.0.8:1234"
 	req.Header.Set("X-Forwarded-For", "203.0.113.5, 10.0.0.8")
@@ -35,6 +37,17 @@ func TestForgotPasswordRateLimitKeyUsesForwardedIP(t *testing.T) {
 	key := forgotPasswordRateLimitKey(req, "User@example.com")
 	if key != "203.0.113.5|user@example.com" {
 		t.Fatalf("forgotPasswordRateLimitKey() = %q", key)
+	}
+}
+
+func TestClientIPIgnoresForwardedHeadersByDefault(t *testing.T) {
+	req := httptest.NewRequest("POST", "/auth/forgot", nil)
+	req.RemoteAddr = "10.0.0.8:1234"
+	req.Header.Set("X-Forwarded-For", "203.0.113.5")
+	req.Header.Set("X-Real-IP", "203.0.113.6")
+
+	if got := clientIPFromRequest(req); got != "10.0.0.8" {
+		t.Fatalf("clientIPFromRequest() = %q, want remote address", got)
 	}
 }
 
