@@ -2,8 +2,7 @@ import Footer from "../../components/Footer";
 import FeatureDemo from "./FeatureDemo";
 import MainHero from "./MainHero";
 import ServiceProviders from "./FeaturesProviders";
-import FeaturesShowcase from "./FeaturesShowcase";
-import ExpandedFeatures from "./ExpandedFeatures";
+import ProductScrollShowcase from "./ProductScrollShowcase";
 import Docs from "./DocsSection";
 import BlogPreview from "./BlogPreview";
 import Changelog from "./Changelog";
@@ -26,11 +25,7 @@ export default function Home() {
       </section>
 
       <section>
-        <FeaturesShowcase/>
-      </section>
-
-      <section>
-        <ExpandedFeatures/>
+        <ProductScrollShowcase/>
       </section>
 
       <section>
