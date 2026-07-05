@@ -8,7 +8,9 @@ import {
 import { memo, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import type { DragEvent, MouseEvent, PointerEvent as ReactPointerEvent, ReactNode } from "react";
 import { useShallow } from "zustand/react/shallow";
+import { explorerPrepareOpenItem } from "../../../api/misty";
 import type { DirectoryListing, DirectorySizeRecord, FileEntry, FileSyncEndpoint, FileSyncPair } from "../../../api/types";
+import { safeTauriAssetUrl } from "../../../shared/tauri";
 import { selectAppearancePreferences, useSettingsStore } from "../../../stores/useSettingsStore";
 import { directorySizeRecordForPath, entrySizeBytes } from "../../../stores/useExplorerStore";
 import type {
@@ -36,12 +38,13 @@ import type { PassiveRenameDraft } from "./FileBrowserInline";
 import { fileBrowserStyles } from "./FileBrowserStyles";
 
 const TABLE_ROW_HEIGHT = 44;
-const TABLE_OVERSCAN_ROWS = 10;
+const TABLE_OVERSCAN_ROWS = 4;
 const GRID_MIN_ITEM_WIDTH = 100;
 const GRID_ITEM_HEIGHT = 104;
 const GRID_GAP = 8;
 const GRID_PADDING = 14;
-const GRID_OVERSCAN_ROWS = 4;
+const GRID_OVERSCAN_ROWS = 2;
+const GRID_THUMBNAIL_MAX_BYTES = 32 * 1024 * 1024;
 const TABLE_COLUMN_STORAGE_KEY = "misty.explorer.fileTable.columnWidths";
 const TABLE_COLUMN_ORDER_STORAGE_KEY = "misty.explorer.fileTable.columnOrder";
 const emptyEntries: FileEntry[] = [];
@@ -128,7 +131,7 @@ export const FileBrowser = memo(function FileBrowser(props: FileBrowserProps) {
 
   const queryActive = Boolean(filterMatcher);
   const displayListing = entries === props.listing.entries ? props.listing : { ...props.listing, entries };
-  const selectedEntries = props.listing.entries.filter((entry) => props.selectedIds.includes(entry.id) && !entry.isDeleted);
+  const selectedEntries = selectedEntriesForListing(props.listing.entries, props.selectedIds);
   const selectedBytes = selectedEntries.reduce((sum, entry) => sum + (entrySizeBytes(entry, props.directorySizes) ?? 0), 0);
   const selectionLabel = selectedEntries.length > 0
     ? `${selectedEntries.length} selected${selectedBytes > 0 ? ` · ${formatBytes(selectedBytes)}` : ""}`
@@ -228,6 +231,16 @@ function locationStatusLabel(listing: DirectoryListing): string {
   if (location.kind === "local") return "Local";
   if (location.remoteName) return location.providerType ? `${location.providerType} · ${location.remoteName}` : location.remoteName;
   return location.providerType ?? "Remote";
+}
+
+function selectedEntriesForListing(entries: FileEntry[], selectedIds: string[]): FileEntry[] {
+  if (selectedIds.length === 0) return [];
+  if (selectedIds.length === 1) {
+    const entry = entries.find((candidate) => candidate.id === selectedIds[0] && !candidate.isDeleted);
+    return entry ? [entry] : [];
+  }
+  const selected = new Set(selectedIds);
+  return entries.filter((entry) => selected.has(entry.id) && !entry.isDeleted);
 }
 
 function syncPairCoversListing(pair: FileSyncPair, listing: DirectoryListing): boolean {
@@ -644,6 +657,9 @@ function FileGrid(props: FileBrowserProps & { listing: DirectoryListing }) {
   const compactModeEnabled = useSettingsStore((state) =>
     selectAppearancePreferences(state.settings?.document).compactModeEnabled,
   );
+  const thumbnailPreviewsEnabled = useSettingsStore((state) =>
+    selectAppearancePreferences(state.settings?.document).thumbnailPreviewsEnabled,
+  );
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const scrollFrameRef = useRef<number | null>(null);
   const viewportHeightRef = useRef(0);
@@ -794,6 +810,7 @@ function FileGrid(props: FileBrowserProps & { listing: DirectoryListing }) {
               <FileGridItem
                 key={item.key}
                 entry={item.entry}
+                thumbnailsEnabled={thumbnailPreviewsEnabled}
                 selected={selectedIds.has(item.entry.id)}
                 inlineEdit={activeInlineEdit?.entryId === item.entry.id ? activeInlineEdit : null}
                 passiveRename={passiveRenameDrafts.get(item.entry.id) ?? null}
@@ -834,6 +851,7 @@ function FileGrid(props: FileBrowserProps & { listing: DirectoryListing }) {
 
 const FileGridItem = memo(function FileGridItem(props: {
   entry: FileEntry;
+  thumbnailsEnabled: boolean;
   selected: boolean;
   inlineEdit: ExplorerInlineEditState | null;
   passiveRename: PassiveRenameDraft | null;
@@ -887,7 +905,7 @@ const FileGridItem = memo(function FileGridItem(props: {
           <Download size={15} />
         </button>
       ) : null}
-      <FileIcon entry={entry} size={32} />
+      <GridThumbnail entry={entry} enabled={props.thumbnailsEnabled} />
       {props.inlineEdit ? (
         <InlineNameEditor
           edit={props.inlineEdit}
@@ -902,6 +920,133 @@ const FileGridItem = memo(function FileGridItem(props: {
     </div>
   );
 });
+
+function GridThumbnail(props: { entry: FileEntry; enabled: boolean }) {
+  const thumbnailUrl = useGridThumbnailUrl(props.entry, props.enabled);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    setFailed(false);
+  }, [thumbnailUrl, props.entry.id, props.entry.path]);
+
+  if (thumbnailUrl && !failed) {
+    return (
+      <span className={fileBrowserStyles.gridThumb}>
+        <img
+          className={fileBrowserStyles.gridThumbImage}
+          src={thumbnailUrl}
+          alt=""
+          draggable={false}
+          loading="lazy"
+          decoding="async"
+          onError={() => setFailed(true)}
+        />
+      </span>
+    );
+  }
+
+  return (
+    <span className={fileBrowserStyles.gridThumbIcon}>
+      <FileIcon entry={props.entry} size={32} />
+    </span>
+  );
+}
+
+function useGridThumbnailUrl(entry: FileEntry, enabled: boolean): string | null {
+  const [url, setUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    setUrl(null);
+    if (!enabled || !gridThumbnailSupported(entry)) return () => undefined;
+
+    void loadGridThumbnailUrl(entry)
+      .then((thumbnailUrl) => {
+        if (active) setUrl(thumbnailUrl);
+      })
+      .catch(() => {
+        if (active) setUrl(null);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [
+    enabled,
+    entry.extension,
+    entry.id,
+    entry.isDeleted,
+    entry.kind,
+    entry.location.kind,
+    entry.mimeType,
+    entry.modifiedMs,
+    entry.path,
+    entry.remoteModified,
+    entry.sizeBytes,
+  ]);
+
+  return url;
+}
+
+const gridThumbnailImageExtensions = new Set([
+  "png",
+  "jpg",
+  "jpeg",
+  "gif",
+  "bmp",
+  "webp",
+  "avif",
+  "ico",
+  "svg",
+]);
+const gridThumbnailUrlCache = new Map<string, string>();
+const gridThumbnailLoadPromises = new Map<string, Promise<string>>();
+
+function gridThumbnailSupported(entry: FileEntry): boolean {
+  if (entry.kind === "folder" || entry.kind === "symlink" || entry.isDeleted) return false;
+  if (entry.location.kind === "remote_provider") return false;
+  if (entry.sizeBytes != null && entry.sizeBytes > GRID_THUMBNAIL_MAX_BYTES) return false;
+  const extension = entry.extension.toLowerCase().replace(/^\./, "");
+  return gridThumbnailImageExtensions.has(extension) || (entry.mimeType ?? "").toLowerCase().startsWith("image/");
+}
+
+function gridThumbnailCacheKey(entry: FileEntry): string {
+  return [
+    entry.path,
+    entry.sizeBytes ?? "",
+    entry.modifiedMs ?? "",
+    entry.remoteModified ?? "",
+  ].join("\0");
+}
+
+function loadGridThumbnailUrl(entry: FileEntry): Promise<string> {
+  const key = gridThumbnailCacheKey(entry);
+  const cached = gridThumbnailUrlCache.get(key);
+  if (cached) return Promise.resolve(cached);
+  const pending = gridThumbnailLoadPromises.get(key);
+  if (pending) return pending;
+
+  const promise = (async () => {
+    const localPath = entry.location.kind === "remote"
+      ? (await explorerPrepareOpenItem({
+        path: entry.path,
+        sizeBytes: entry.sizeBytes,
+        remoteModified: entry.remoteModified,
+      })).localPath
+      : entry.path;
+    const url = safeTauriAssetUrl(localPath);
+    gridThumbnailUrlCache.set(key, url);
+    return url;
+  })();
+
+  gridThumbnailLoadPromises.set(key, promise);
+  void promise.finally(() => {
+    if (gridThumbnailLoadPromises.get(key) === promise) {
+      gridThumbnailLoadPromises.delete(key);
+    }
+  });
+  return promise;
+}
 
 function isDownloadableRemoteFile(entry: FileEntry): boolean {
   return entry.location.kind === "remote" && entry.kind !== "folder" && !entry.isDeleted;

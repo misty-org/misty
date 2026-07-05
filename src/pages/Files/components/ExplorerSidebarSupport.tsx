@@ -10,86 +10,86 @@ const QUICK_ACCESS_HIDDEN_STORAGE_KEY = "misty.explorer.sidebar.quickAccessHidde
 
 export const sidebarStyles = {
   root:
-    "h-full min-h-0 min-w-0 overflow-x-hidden overflow-y-auto border-r border-[#292929] bg-[#141414] px-3.5 py-4 [overscroll-behavior:contain] [scrollbar-gutter:stable] [scrollbar-width:thin] max-[980px]:hidden",
+    "h-full min-h-0 min-w-0 overflow-x-hidden overflow-y-auto border-r border-[var(--misty-border-soft)] bg-[var(--misty-bg-soft)] px-3.5 py-4 [overscroll-behavior:contain] [scrollbar-gutter:stable] [scrollbar-width:thin] max-[980px]:hidden",
   section: "[&+&]:mt-4",
   sectionTitle: "mb-2.5 flex min-w-0 items-center gap-2",
   sectionToggle:
-    "inline-flex min-w-0 items-center gap-1.5 rounded-md border-0 bg-transparent py-[3px] pl-0 pr-1 text-left text-[#d5d5d5] hover:text-[#eeeeee]",
+    "inline-flex min-w-0 items-center gap-1.5 rounded-md border-0 bg-transparent py-[3px] pl-0 pr-1 text-left text-[var(--misty-text)] hover:text-[var(--misty-primary-hover)]",
   sectionToggleLabel:
     "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[15px] font-medium",
-  sectionChevron: "flex-none text-[#949494]",
+  sectionChevron: "flex-none text-[var(--misty-text-subtle)]",
   sectionActions: "ml-auto flex flex-none items-center gap-[3px]",
   sectionActionButton:
-    "grid size-6 place-items-center rounded-md border-0 bg-transparent p-0 text-[#949494] hover:bg-[#1f1f1f] hover:text-[#dddddd]",
+    "grid size-6 place-items-center rounded-md border-0 bg-transparent p-0 text-[var(--misty-text-subtle)] hover:bg-[var(--misty-surface-hover)] hover:text-[var(--misty-text)]",
   spinning: "[&>svg]:animate-spin",
   itemButton:
-    "flex w-full items-center gap-2.5 rounded-lg border border-transparent bg-transparent px-[11px] py-2.5 text-left text-[#d5d5d5] hover:bg-[#2b2b2b] hover:text-[#bdbdbd]",
-  itemSelected: "bg-[#2b2b2b] text-[#bdbdbd]",
+    "relative flex w-full items-center gap-2.5 rounded-lg border border-transparent bg-transparent px-[11px] py-2.5 text-left text-[var(--misty-text-muted)] hover:bg-[var(--misty-surface-hover)] hover:text-[var(--misty-text)]",
+  itemSelected: "bg-[var(--misty-sidebar-selected)] text-[var(--misty-text)]",
   remoteIcon: "grid size-6 flex-none place-items-center",
   pinnedRow:
-    "group/pin flex min-w-0 items-center rounded-lg border border-transparent bg-transparent text-[#d5d5d5] hover:bg-[#2b2b2b] hover:text-[#bdbdbd]",
+    "group/pin flex min-w-0 items-center rounded-lg border border-transparent bg-transparent text-[var(--misty-text-muted)] hover:bg-[var(--misty-surface-hover)] hover:text-[var(--misty-text)]",
   pinnedButton:
     "flex min-w-0 flex-1 items-center gap-2.5 border-0 bg-transparent px-[11px] py-2.5 text-left text-inherit",
   pinnedUnpinButton:
-    "mr-1 grid size-7 flex-none place-items-center rounded-lg border border-transparent bg-transparent p-0 text-[#8f8f8f] opacity-0 hover:bg-[#3a3a3a] hover:text-[#eeeeee] group-hover/pin:opacity-100 group-focus-within/pin:opacity-100",
+    "mr-1 grid size-7 flex-none place-items-center rounded-lg border border-transparent bg-transparent p-0 text-[var(--misty-text-subtle)] opacity-0 hover:bg-[var(--misty-surface-selected)] hover:text-[var(--misty-text)] group-hover/pin:opacity-100 group-focus-within/pin:opacity-100",
   workspaceSelect:
-    "flex w-full items-center gap-2.5 rounded-lg border border-[#373737] bg-[#1c1c1c] px-[11px] py-2.5 text-left text-[#d5d5d5]",
+    "flex w-full items-center gap-2.5 rounded-lg border border-[var(--misty-border)] bg-[var(--misty-surface)] px-[11px] py-2.5 text-left text-[var(--misty-text)]",
   workspaceSelectLabel:
     "ml-0 min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap",
   list: "grid gap-1",
-  muted: "text-[#949494]",
+  muted: "text-[var(--misty-text-subtle)]",
   deviceButton:
-    "flex w-full items-start gap-2.5 rounded-lg border border-transparent bg-transparent px-[11px] py-[9px] text-left text-[#d5d5d5] hover:bg-[#2b2b2b] hover:text-[#bdbdbd]",
+    "flex w-full items-start gap-2.5 rounded-lg border border-transparent bg-transparent px-[11px] py-[9px] text-left text-[var(--misty-text-muted)] hover:bg-[var(--misty-surface-hover)] hover:text-[var(--misty-text)]",
   deviceRow:
     "grid min-w-0 grid-cols-[minmax(0,1fr)] items-stretch",
   deviceCopy: "grid min-w-0 flex-1 gap-[3px]",
   deviceName:
-    "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap font-medium text-[#d5d5d5]",
+    "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap font-medium text-[var(--misty-text)]",
   deviceMeta:
-    "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-xs text-[#949494]",
+    "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-xs text-[var(--misty-text-subtle)]",
   deviceMeter:
-    "mt-0.5 h-1 overflow-hidden rounded-full bg-[#2f2f2f]",
-  deviceMeterFill: "block h-full bg-[#e2e2e2]",
+    "mt-0.5 h-1 overflow-hidden rounded-full bg-[var(--misty-surface-3)]",
+  deviceMeterFill: "block h-full bg-[var(--misty-text-muted)]",
   deviceMenuButton:
-    "flex w-7 min-w-7 justify-center rounded-lg border border-transparent bg-transparent p-0 text-[#d5d5d5] opacity-0 hover:bg-[#2b2b2b] hover:text-[#bdbdbd] group-hover/device:opacity-100 group-focus-within/device:opacity-100",
+    "flex w-7 min-w-7 justify-center rounded-lg border border-transparent bg-transparent p-0 text-[var(--misty-text-muted)] opacity-0 hover:bg-[var(--misty-surface-hover)] hover:text-[var(--misty-text)] group-hover/device:opacity-100 group-focus-within/device:opacity-100",
   menu:
-    "fixed z-[2147483000] grid w-44 gap-0.5 rounded-[11px] border border-[#323232] bg-[rgba(17,17,17,0.98)] p-1.5 shadow-[0_18px_40px_rgba(0,0,0,0.45)]",
+    "fixed z-[2147483000] grid w-44 gap-0.5 rounded-[11px] border border-[var(--misty-border)] bg-[var(--misty-glass)] p-1.5 shadow-[0_18px_40px_var(--misty-shadow)]",
   workspaceMenu: "w-60",
   menuButton:
-    "flex h-[34px] items-center gap-2 rounded-lg border-0 bg-transparent px-2.5 text-left text-[#dddddd] hover:bg-[#222222] hover:text-[#eeeeee] disabled:cursor-default disabled:opacity-40",
-  menuButtonSelected: "bg-[#292929] text-[#eeeeee]",
+    "flex h-[34px] items-center gap-2 rounded-lg border-0 bg-transparent px-2.5 text-left text-[var(--misty-text)] hover:bg-[var(--misty-surface-hover)] hover:text-[var(--misty-primary-hover)] disabled:cursor-default disabled:opacity-40",
+  menuButtonSelected: "bg-[var(--misty-surface-selected)] text-[var(--misty-text)]",
   workspaceMenuRow:
-    "group/workspace flex h-[34px] min-w-0 items-center gap-1 rounded-lg border-0 bg-transparent text-[#dddddd] hover:bg-[#222222] hover:text-[#eeeeee]",
+    "group/workspace flex h-[34px] min-w-0 items-center gap-1 rounded-lg border-0 bg-transparent text-[var(--misty-text)] hover:bg-[var(--misty-surface-hover)] hover:text-[var(--misty-primary-hover)]",
   workspaceMenuSelect:
     "flex h-full min-w-0 flex-1 items-center gap-2 border-0 bg-transparent px-2.5 text-left text-inherit",
   workspaceMenuActions:
     "mr-1 flex flex-none items-center gap-px opacity-0 group-hover/workspace:opacity-100 group-focus-within/workspace:opacity-100",
   workspaceMenuIconButton:
-    "grid size-7 place-items-center rounded-md border-0 bg-transparent p-0 text-[#a9a9a9] hover:bg-[#303030] hover:text-[#eeeeee] disabled:cursor-default disabled:opacity-35 disabled:hover:bg-transparent disabled:hover:text-[#a9a9a9]",
-  menuButtonIcon: "grid size-[17px] flex-none place-items-center text-[#bdbdbd]",
+    "grid size-7 place-items-center rounded-md border-0 bg-transparent p-0 text-[var(--misty-text-muted)] hover:bg-[var(--misty-surface-selected)] hover:text-[var(--misty-text)] disabled:cursor-default disabled:opacity-35 disabled:hover:bg-transparent disabled:hover:text-[var(--misty-text-muted)]",
+  menuButtonIcon: "grid size-[17px] flex-none place-items-center text-[var(--misty-text-muted)]",
   menuButtonTruncate: "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap",
-  menuButtonCheck: "w-[17px] flex-none text-[#d8d8d8]",
-  menuSeparator: "mx-1 my-[5px] h-px bg-[#292929]",
+  menuButtonCheck: "w-[17px] flex-none text-[var(--misty-text)]",
+  menuSeparator: "mx-1 my-[5px] h-px bg-[var(--misty-border)]",
   dialogBackdrop: "fixed inset-0 z-[2147483200] grid place-items-center bg-[rgba(6,6,6,0.58)] p-6 backdrop-blur-[3px]",
-  dialog: "grid w-[min(380px,100%)] gap-4 rounded-[10px] border border-[#353535] bg-[#141414] p-[18px] shadow-[0_24px_64px_rgba(0,0,0,0.55)]",
+  dialog: "grid w-[min(380px,100%)] gap-4 rounded-[10px] border border-[var(--misty-border)] bg-[var(--misty-surface)] p-[18px] shadow-[0_24px_64px_rgba(0,0,0,0.48)]",
   dialogHeader: "flex items-center justify-between gap-3",
   dialogTitle: "m-0 text-[17px] font-semibold",
   dialogClose:
-    "grid size-[30px] place-items-center rounded-lg border-0 bg-transparent p-0 text-[#b3b3b3] hover:bg-[#252525] hover:text-[#f7f7f7]",
-  dialogLabel: "grid gap-2 text-[#b2b2b2]",
-  dialogText: "m-0 leading-normal text-[#b2b2b2]",
-  dialogInput: "h-[38px] w-full rounded-[7px] border border-[#3f3f3f] bg-[#0e0e0e] px-[11px] text-[#f0f0f0] outline-none focus:border-[#787878] focus:shadow-[0_0_0_2px_rgba(120,120,120,0.18)]",
-  dialogSelect: "h-[38px] w-full rounded-[7px] border border-[#3f3f3f] bg-[#0e0e0e] px-[9px] text-[#f0f0f0] outline-none focus:border-[#787878]",
+    "grid size-[30px] place-items-center rounded-lg border-0 bg-transparent p-0 text-[var(--misty-text-muted)] hover:bg-[var(--misty-surface-hover)] hover:text-[var(--misty-text)]",
+  dialogLabel: "grid gap-2 text-[var(--misty-text-muted)]",
+  dialogText: "m-0 leading-normal text-[var(--misty-text-muted)]",
+  dialogInput: "h-[38px] w-full rounded-[7px] border border-[var(--misty-border)] bg-[var(--misty-surface-2)] px-[11px] text-[var(--misty-text)] outline-none focus:border-[var(--misty-border-strong)] focus:shadow-[0_0_0_2px_rgba(241,243,244,0.08)]",
+  dialogSelect: "h-[38px] w-full rounded-[7px] border border-[var(--misty-border)] bg-[var(--misty-surface-2)] px-[9px] text-[var(--misty-text)] outline-none focus:border-[var(--misty-border-strong)]",
   dialogWide: "w-[min(620px,100%)]",
   dialogGrid: "grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-3 max-[640px]:grid-cols-1",
-  ruleList: "grid gap-2 rounded-lg border border-[#2d2d2d] bg-[#101010] p-2.5",
+  ruleList: "grid gap-2 rounded-lg border border-[var(--misty-border)] bg-[var(--misty-surface-2)] p-2.5",
   ruleRow: "grid grid-cols-[minmax(0,1fr)_minmax(0,0.9fr)_minmax(0,1.2fr)_30px] gap-2 max-[640px]:grid-cols-1",
-  iconButton: "grid size-[30px] place-items-center rounded-lg border border-transparent bg-transparent p-0 text-[#a9a9a9] hover:bg-[#252525] hover:text-[#eeeeee]",
+  iconButton: "grid size-[30px] place-items-center rounded-lg border border-transparent bg-transparent p-0 text-[var(--misty-text-muted)] hover:bg-[var(--misty-surface-hover)] hover:text-[var(--misty-text)]",
   errorText: "m-0 text-sm text-[#ffb7b7]",
-  smartMeta: "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-xs text-[#969696]",
+  smartMeta: "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-xs text-[var(--misty-text-subtle)]",
   dialogActions: "flex justify-end gap-2",
   dialogActionButton: "h-[34px] min-w-[82px] rounded-[7px]",
-  dialogDanger: "border-[#484848] bg-[#313131] text-[#f4f4f4]",
+  dialogDanger: "border-[var(--misty-border)] bg-[var(--misty-surface-selected)] text-[var(--misty-text)]",
 } as const;
 
 export function WorkspaceDialog(props: {

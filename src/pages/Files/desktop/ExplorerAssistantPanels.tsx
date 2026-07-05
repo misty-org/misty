@@ -143,13 +143,17 @@ export const assistantPanelStyles = {
   secondaryButton: "bg-transparent text-[#b3b3b3]",
 } as const;
 
+const mikaComingSoon = true;
+
 function assistantStatusText(status: AiStatus | null): string {
+  if (mikaComingSoon) return "Coming soon...";
   if (!status) return "Checking Mika...";
   if (status.configured) return `Ready (${status.provider}/${status.model})`;
-  return "Configure the Mika backend to enable assistant actions";
+  return "Coming soon...";
 }
 
 function assistantPlaceholder(configured: boolean, fallback: string): string {
+  if (mikaComingSoon) return "Mika is coming soon...";
   return configured ? fallback : "Configure Mika backend to continue";
 }
 
@@ -187,9 +191,10 @@ export const ExplorerChatOverlay = memo(function ExplorerChatOverlay() {
   const logRef = useRef<HTMLDivElement | null>(null);
   const workingDirectory = listing?.path ?? "";
   const running = status?.running ?? false;
-  const configured = status?.configured ?? false;
+  const configured = !mikaComingSoon && (status?.configured ?? false);
 
   useEffect(() => {
+    if (mikaComingSoon) return;
     void refreshStatus();
   }, [refreshStatus]);
 
@@ -199,7 +204,7 @@ export const ExplorerChatOverlay = memo(function ExplorerChatOverlay() {
 
   const submitPrompt = useCallback(() => {
     const trimmed = prompt.trim();
-    if (!trimmed || running) return;
+    if (mikaComingSoon || !trimmed || running) return;
     setPrompt("");
     void sendPrompt({
       displayPrompt: trimmed,
@@ -238,7 +243,7 @@ export const ExplorerChatOverlay = memo(function ExplorerChatOverlay() {
         <div className={cx(assistantPanelStyles.status, assistantPanelStyles.chatStatus)}>
           <p className={assistantPanelStyles.betaNotice}>
             <FlaskConical className={assistantPanelStyles.betaIcon} size={22} />
-            <span>Mika is beta and experimental. It is focused on file reorganization for now. Please review plans carefully and use cautiously.</span>
+            <span>Mika AI is coming soon. We are polishing assistant workflows before turning it on.</span>
           </p>
           <dl className={assistantPanelStyles.chatDetails}>
             <dt className={assistantPanelStyles.detailLabel}>Status</dt>
@@ -248,11 +253,11 @@ export const ExplorerChatOverlay = memo(function ExplorerChatOverlay() {
             <dt className={assistantPanelStyles.detailLabel}>Selection</dt>
             <dd className={assistantPanelStyles.chatDetailValue}>{mikaSelectionSummary(selectedPaths)}</dd>
           </dl>
-          {error ? <p className={assistantPanelStyles.errorText}>{error}</p> : null}
+          {!mikaComingSoon && error ? <p className={assistantPanelStyles.errorText}>{error}</p> : null}
         </div>
         <div ref={logRef} className={cx(assistantPanelStyles.log, assistantPanelStyles.chatLog)} aria-live="polite">
           {messages.length === 0 ? (
-            <p className={assistantPanelStyles.emptyLog}>Chat with Mika or ask for help reorganizing the active folder.</p>
+            <p className={assistantPanelStyles.emptyLog}>Mika AI is coming soon...</p>
           ) : messages.map((message) => (
             <article key={message.id} className={assistantMessageClass(message.role, "chat")}>
               <strong className={assistantPanelStyles.messageTitle}>{message.role === "user" ? "You" : message.role === "tool" ? "Tool" : message.role === "error" ? "Error" : "Mika"}</strong>
@@ -284,7 +289,7 @@ export const ExplorerChatOverlay = memo(function ExplorerChatOverlay() {
             }}
           />
           <div className={assistantPanelStyles.composerActions}>
-            <select className={assistantPanelStyles.modeSelect} value={mode} aria-label="Mika mode" onChange={(event) => setMode(event.target.value as Parameters<typeof setMode>[0])}>
+            <select className={assistantPanelStyles.modeSelect} value={mode} aria-label="Mika mode" disabled={mikaComingSoon} onChange={(event) => setMode(event.target.value as Parameters<typeof setMode>[0])}>
               <option value="ask">Ask</option>
               <option value="auto">Auto</option>
             </select>
@@ -326,9 +331,10 @@ export const ExplorerMikaPanel = memo(function ExplorerMikaPanel() {
   const contextRef = useRef<HTMLDivElement | null>(null);
   const workingDirectory = listing?.path ?? "";
   const running = status?.running ?? false;
-  const configured = status?.configured ?? false;
+  const configured = !mikaComingSoon && (status?.configured ?? false);
 
   useEffect(() => {
+    if (mikaComingSoon) return;
     void refreshStatus();
   }, [refreshStatus]);
 
@@ -356,7 +362,7 @@ export const ExplorerMikaPanel = memo(function ExplorerMikaPanel() {
 
   const submitPrompt = useCallback(() => {
     const trimmed = prompt.trim();
-    if (!trimmed || running) return;
+    if (mikaComingSoon || !trimmed || running) return;
     const requestPrompt = buildMikaPrompt(trimmed, workingDirectory, selectedPaths);
     setPrompt("");
     void sendPrompt({
@@ -368,7 +374,7 @@ export const ExplorerMikaPanel = memo(function ExplorerMikaPanel() {
   }, [prompt, running, selectedPaths, sendPrompt, workingDirectory]);
 
   return (
-    <aside className={assistantPanelStyles.mikaPanel} aria-label="Mika, Misty Intelligent Knowledge Assistant" title="Misty Intelligent Knowledge Assistant">
+    <aside className={assistantPanelStyles.mikaPanel} aria-label="Mika AI coming soon" title="Mika AI coming soon">
       <header className={cx(assistantPanelStyles.header, assistantPanelStyles.mikaHeader, assistantPanelStyles.mikaPanelHeader)}>
         <span className={cx(assistantPanelStyles.headerTitle, assistantPanelStyles.mikaHeaderTitle)}>
           <MessageSquare size={24} strokeWidth={1.9} />
@@ -401,9 +407,9 @@ export const ExplorerMikaPanel = memo(function ExplorerMikaPanel() {
         <div className={cx(assistantPanelStyles.status, assistantPanelStyles.mikaStatus)}>
           <p className={assistantPanelStyles.betaNotice}>
             <FlaskConical className={assistantPanelStyles.betaIcon} size={22} />
-            <span>Mika is beta and experimental. It is focused on file reorganization for now. Please review plans carefully and use cautiously.</span>
+            <span>Mika AI is coming soon. We are polishing assistant workflows before turning it on.</span>
           </p>
-          {error ? <p className={assistantPanelStyles.errorText}>{error}</p> : null}
+          {!mikaComingSoon && error ? <p className={assistantPanelStyles.errorText}>{error}</p> : null}
         </div>
         <div ref={logRef} className={cx(assistantPanelStyles.log, assistantPanelStyles.mikaLog)} aria-live="polite">
           {messages.length === 0 ? (
@@ -439,7 +445,7 @@ export const ExplorerMikaPanel = memo(function ExplorerMikaPanel() {
             }}
           />
           <div className={cx(assistantPanelStyles.composerActions, assistantPanelStyles.mikaComposerActions)}>
-            <select className={assistantPanelStyles.modeSelect} value={mode} aria-label="Mika mode" onChange={(event) => setMode(event.target.value as Parameters<typeof setMode>[0])}>
+            <select className={assistantPanelStyles.modeSelect} value={mode} aria-label="Mika mode" disabled={mikaComingSoon} onChange={(event) => setMode(event.target.value as Parameters<typeof setMode>[0])}>
               <option value="ask">Ask</option>
               <option value="auto">Auto</option>
             </select>
@@ -455,7 +461,7 @@ export const ExplorerMikaPanel = memo(function ExplorerMikaPanel() {
         </form>
         <footer className={assistantPanelStyles.mikaFooter}>
           <Sparkles size={15} />
-          Misty Intelligent Knowledge Assistant
+          Coming soon...
         </footer>
       </div>
     </aside>
@@ -721,8 +727,8 @@ function MikaEmptyState() {
           <MessageSquare size={42} strokeWidth={1.5} />
           <Sparkles className={assistantPanelStyles.mikaEmptySpark} size={18} />
         </span>
-        <h3 className={assistantPanelStyles.mikaEmptyTitle}>Ready to help</h3>
-        <p className={assistantPanelStyles.mikaEmptyText}>Chat with Mika or ask it to reorganize the active folder.</p>
+        <h3 className={assistantPanelStyles.mikaEmptyTitle}>Coming soon...</h3>
+        <p className={assistantPanelStyles.mikaEmptyText}>Mika AI is not available yet.</p>
       </div>
     </div>
   );

@@ -25,7 +25,7 @@ import {
 import { useSetupStore } from "../../../stores/useSetupStore";
 import { changelog } from "../../Changelog/desktop/data";
 import { posts } from "../../Website/pages/Blog/data";
-import { DesktopInstallerPanel } from "./DesktopInstallerPanel";
+import { DesktopWorkspacePanel } from "./DesktopWorkspacePanel";
 import { HomeFooter } from "./HomeFooter";
 import { HomeLoading } from "./HomeLoading";
 import {
@@ -47,9 +47,8 @@ const emptyProviderRemotes: ProviderRemote[] = [];
 export default function HomePage() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { loadReleases, status, systemError } = useSetupStore(
+  const { status, systemError } = useSetupStore(
     useShallow((state) => ({
-      loadReleases: state.loadReleases,
       status: state.status,
       systemError: state.systemError,
     })),
@@ -111,10 +110,6 @@ export default function HomePage() {
     [homePath, pinnedPaths],
   );
   const tags = useMemo(() => buildHomeTagItems(library), [library]);
-
-  useEffect(() => {
-    void loadReleases();
-  }, [loadReleases]);
 
   useEffect(() => {
     if (
@@ -248,7 +243,7 @@ export default function HomePage() {
   return (
     <div className="misty-scrollbar box-border h-full min-h-0 overflow-x-hidden overflow-y-scroll overscroll-contain p-5">
       <section className="mx-auto grid min-h-full w-full max-w-[1500px] auto-rows-min gap-4 xl:h-full xl:min-h-[680px] xl:grid-cols-12 xl:grid-rows-7 xl:auto-rows-fr">
-        <DesktopInstallerPanel />
+        <DesktopWorkspacePanel homePath={homePath} />
         <HomeSidebarPanels
           devices={devices}
           devicesLoading={devicesLoading}

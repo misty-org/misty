@@ -2,8 +2,11 @@ import { memo, useEffect, type ChangeEvent, type ReactNode } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { useShallow } from "zustand/react/shallow";
 import {
+  AppWindow,
+  ArrowLeftRight,
   Bell,
   ChevronDown,
+  Copy,
   Eye,
   Keyboard,
   Lock,
@@ -15,13 +18,14 @@ import {
   X,
   type LucideIcon,
 } from "lucide-react";
+import { InstallerCard } from "../../../components/installer/InstallerCard";
 import { useAppStore } from "../../../stores/useAppStore";
 import {
   settingsIndexToThemeMode,
   themeModeToSettingsIndex,
   useAppThemeStore,
 } from "../../../stores/useAppThemeStore";
-import type { OpenWithAssociation, ShortcutBinding } from "../../../api/types";
+import type { LaunchOnLoginSnapshot, OpenWithAssociation, ShortcutBinding } from "../../../api/types";
 import {
   fontLabelFromPath,
   selectCustomFontPreferences,
@@ -38,7 +42,7 @@ import {
   type TransferProfileRecord,
 } from "../transferProfiles";
 
-type SettingsSection = "general" | "appearance" | "privacy" | "sync" | "search" | "notifications" | "shortcuts" | "advanced";
+type SettingsSection = "general" | "app" | "appearance" | "privacy" | "sync" | "transfers" | "search" | "notifications" | "shortcuts" | "advanced";
 type SettingValue = string | number | boolean | Array<Record<string, unknown>>;
 
 interface NavItem {
@@ -49,9 +53,11 @@ interface NavItem {
 
 const appNavItems: NavItem[] = [
   { id: "general", label: "General", icon: Rows3 },
+  { id: "app", label: "App", icon: AppWindow },
   { id: "appearance", label: "Appearance", icon: Eye },
   { id: "privacy", label: "Privacy", icon: Lock },
   { id: "sync", label: "Sync", icon: RefreshCcw },
+  { id: "transfers", label: "Transfers", icon: ArrowLeftRight },
   { id: "search", label: "Search", icon: Search },
   { id: "notifications", label: "Notifications", icon: Bell },
   { id: "shortcuts", label: "Shortcuts", icon: Keyboard },
@@ -64,8 +70,6 @@ const navGroups = [
 
 const navItems = appNavItems;
 
-const startupViewOptions = ["Files", "Remotes", "Transfers", "Extensions", "Home", "Settings"];
-const releaseChannelOptions = ["Stable"];
 const defaultFileActionOptions = ["Open", "Preview", "Show Details"];
 const transferBehaviorOptions = ["Ask Every Time", "Use Default Location"];
 const themeOptions = ["System", "Dark", "Light"];
@@ -74,31 +78,31 @@ const keymapOptions = ["System", "VS Code", "Finder"];
 const conflictOptions = ["Keep Newest", "Ask Me", "Keep Both"];
 
 const settingsGridClass =
-  "grid h-screen min-h-0 min-w-0 grid-cols-[180px_1px_minmax(0,1fr)] overflow-hidden bg-[var(--misty-bg)] text-[var(--misty-text)] max-[980px]:grid-cols-[150px_1px_minmax(720px,1fr)] max-[980px]:overflow-x-auto max-[980px]:overflow-y-hidden";
+  "grid h-screen min-h-0 min-w-0 grid-cols-[180px_1px_minmax(0,1fr)] overflow-hidden bg-[#050607] text-[#f4f4f5] max-[980px]:grid-cols-[150px_1px_minmax(720px,1fr)] max-[980px]:overflow-x-auto max-[980px]:overflow-y-hidden";
 
 const settingsOverlayGridClass =
-  "grid h-full min-h-0 min-w-0 grid-cols-[214px_1px_minmax(0,1fr)] overflow-hidden bg-[#07090b] text-[var(--misty-text)] max-[980px]:grid-cols-[180px_1px_minmax(620px,1fr)] max-[980px]:overflow-x-auto max-[980px]:overflow-y-hidden";
+  "grid h-full min-h-0 min-w-0 grid-cols-[214px_1px_minmax(0,1fr)] overflow-hidden bg-[#050607] text-[#f4f4f5] max-[980px]:grid-cols-[180px_1px_minmax(620px,1fr)] max-[980px]:overflow-x-auto max-[980px]:overflow-y-hidden";
 
 const settingsSidebarClass =
-  "flex min-h-0 flex-col gap-[5px] bg-[#07090b] p-5 max-[980px]:px-2.5 max-[980px]:py-4";
+  "flex min-h-0 flex-col gap-[5px] bg-[#050607] p-5 max-[980px]:px-2.5 max-[980px]:py-4";
 
 const settingsNavItemClass =
-  "grid h-9 w-full grid-cols-[18px_minmax(0,1fr)] items-center gap-3 rounded-lg border-0 bg-transparent px-2 py-1.5 text-left text-[15px] text-[#adadad] hover:bg-[#25262a] hover:text-[#f1eee8]";
+  "grid h-9 w-full grid-cols-[18px_minmax(0,1fr)] items-center gap-3 rounded-md border border-transparent bg-transparent px-2 py-1.5 text-left text-[15px] text-[#a1a1aa] hover:border-white/10 hover:bg-white/[0.045] hover:text-[#f4f4f5]";
 
 const settingsNavItemSelectedClass =
-  "bg-[#393a41] text-white";
+  "border-white/15 bg-[#f4f4f5] text-[#07090b] hover:bg-white hover:text-[#07090b]";
 
 const settingsContentClass =
-  "min-h-0 min-w-0 overflow-auto bg-[#07090b] px-7 py-6 [scrollbar-color:#3d3d42_transparent] [scrollbar-width:thin]";
+  "misty-scrollbar min-h-0 min-w-0 overflow-auto bg-[#050607] px-7 py-6";
 
 const settingsOverlayContentShellClass =
-  "grid min-h-0 min-w-0 grid-rows-[72px_minmax(0,1fr)] bg-[#07090b]";
+  "grid min-h-0 min-w-0 grid-rows-[72px_minmax(0,1fr)] bg-[#050607]";
 
 const settingsOverlayHeaderClass =
-  "flex min-h-0 items-center justify-between gap-4 border-b border-[#1f2024] px-7";
+  "flex min-h-0 items-center justify-between gap-4 border-b border-white/10 px-7";
 
 const settingsOverlayContentClass =
-  "min-h-0 min-w-0 overflow-auto bg-[#07090b] px-7 py-5 [scrollbar-color:#3d3d42_transparent] [scrollbar-width:thin]";
+  "misty-scrollbar min-h-0 min-w-0 overflow-auto bg-[#050607] px-7 py-5";
 
 const settingsScrollSurfaceClass =
   "w-[min(100%,934px)] min-w-[720px]";
@@ -107,28 +111,22 @@ const settingsOverlayScrollSurfaceClass =
   "w-[min(100%,720px)] min-w-[560px]";
 
 const settingsOverlayCloseClass =
-  "grid size-8 place-items-center rounded-md border-0 bg-transparent p-0 text-[#8d8d8d] transition hover:bg-[#202126] hover:text-[#f1eee8]";
-
-const settingsActionStackClass =
-  "grid w-[220px] justify-items-end gap-[7px]";
+  "grid size-8 place-items-center rounded-md border border-transparent bg-transparent p-0 text-[#a1a1aa] transition hover:border-white/10 hover:bg-white/[0.045] hover:text-[#f4f4f5]";
 
 const settingsControlButtonClass =
-  "inline-flex h-8 w-[220px] items-center justify-center rounded-md border border-[#27272a] bg-[#202126] text-[15px] text-[#f1eee8] disabled:opacity-55";
+  "inline-flex h-8 w-[220px] items-center justify-center rounded-md border border-white/10 bg-white/[0.055] text-[15px] font-semibold text-[#f4f4f5] transition hover:border-white/20 hover:bg-white/[0.09] disabled:opacity-55";
 
 const settingsControlButtonCompactClass =
   `${settingsControlButtonClass} w-[100px]`;
 
 const settingsPrimaryButtonClass =
-  "inline-flex h-[34px] w-[140px] items-center justify-center rounded-md border border-[#2e75d9] bg-[#4898f7] text-[15px] text-white disabled:opacity-55";
-
-const settingsMetaClass =
-  "grid gap-0.5 text-right";
+  "inline-flex h-[34px] w-[140px] items-center justify-center rounded-md border border-[#f4f4f5] bg-[#f4f4f5] text-[15px] font-bold text-[#07090b] transition hover:bg-white disabled:opacity-55";
 
 const settingsReferenceListClass =
   "grid min-w-0";
 
 const settingsReferenceRowClass =
-  "grid min-h-[54px] grid-cols-[minmax(0,0.52fr)_minmax(220px,0.48fr)] items-center gap-[18px] border-b border-[#232429] px-7 py-[7px] text-sm text-[#f1eee8]";
+  "grid min-h-[54px] grid-cols-[minmax(0,0.52fr)_minmax(220px,0.48fr)] items-center gap-[18px] border-b border-white/[0.08] px-7 py-[7px] text-sm text-[#f4f4f5]";
 
 const settingsReferenceHeaderClass =
   "min-h-[42px] text-[15px]";
@@ -137,22 +135,22 @@ const settingsReferenceSpanClass =
   "min-w-0 [overflow-wrap:anywhere]";
 
 const settingsReferenceInputClass =
-  "h-9 w-full rounded-md border border-[#27272a] bg-[#0b0d0f] px-2.5 text-[#f1eee8] outline-none";
+  "h-9 w-full rounded-md border border-white/10 bg-[#07090b] px-2.5 text-[#f4f4f5] outline-none focus:border-white/30";
 
 const settingsIconDangerClass =
-  "grid h-[30px] w-[30px] place-items-center rounded-md border border-[#493039] bg-[#171116] text-[#ffb4b4] disabled:opacity-55";
+  "grid h-[30px] w-[30px] place-items-center rounded-md border border-white/10 bg-white/[0.045] text-[#f4f4f5] transition hover:border-[#fca5a5]/40 hover:text-[#fca5a5] disabled:opacity-55";
 
 const settingsInlineActionsClass =
   "flex items-center gap-3 px-7 py-4";
 
 const settingsEmptyClass =
-  "px-7 py-4 text-sm text-[#9e988f]";
+  "px-7 py-4 text-sm text-[#8f8f8f]";
 
 const settingsFontRowClass =
-  "grid min-h-[54px] grid-cols-[minmax(110px,0.24fr)_minmax(0,1fr)_32px] items-center gap-[18px] border-b border-[#232429] px-7 py-[7px] text-sm text-[#f1eee8]";
+  "grid min-h-[54px] grid-cols-[minmax(110px,0.24fr)_minmax(0,1fr)_32px] items-center gap-[18px] border-b border-white/[0.08] px-7 py-[7px] text-sm text-[#f4f4f5]";
 
 const settingsAssociationRowClass =
-  "grid min-h-[54px] grid-cols-[minmax(110px,0.22fr)_minmax(0,1fr)_32px] items-center gap-[18px] border-b border-[#232429] px-7 py-[7px] text-sm text-[#f1eee8]";
+  "grid min-h-[54px] grid-cols-[minmax(110px,0.22fr)_minmax(0,1fr)_32px] items-center gap-[18px] border-b border-white/[0.08] px-7 py-[7px] text-sm text-[#f4f4f5]";
 
 export const SettingsWorkspace = memo(function SettingsWorkspace(props: {
   presentation?: "page" | "overlay";
@@ -161,6 +159,7 @@ export const SettingsWorkspace = memo(function SettingsWorkspace(props: {
   const {
     activeSection,
     settings,
+    launchOnLogin,
     openWithAssociations,
     shortcuts,
     working,
@@ -173,6 +172,7 @@ export const SettingsWorkspace = memo(function SettingsWorkspace(props: {
   } = useSettingsStore(useShallow((state) => ({
     activeSection: state.activeSection,
     settings: state.settings,
+    launchOnLogin: state.launchOnLogin,
     openWithAssociations: state.openWithAssociations,
     shortcuts: state.shortcuts,
     working: state.working,
@@ -192,6 +192,7 @@ export const SettingsWorkspace = memo(function SettingsWorkspace(props: {
 
   const controlProps = {
     document,
+    launchOnLogin,
     working,
     onSettingChange: updateSetting,
     onLoad: load,
@@ -228,13 +229,13 @@ export const SettingsWorkspace = memo(function SettingsWorkspace(props: {
           </div>
         ))}
       </aside>
-      <div className="w-px bg-[#27272a]" />
+      <div className="w-px bg-white/10" />
       {overlay ? (
         <main className={settingsOverlayContentShellClass}>
           <header className={settingsOverlayHeaderClass}>
             <div className="flex min-w-0 items-center gap-3">
               <ActiveIcon size={17} strokeWidth={1.8} className="shrink-0 text-[#8d8d8d]" />
-              <h1 className="m-0 min-w-0 truncate text-[15px] font-[740] leading-tight tracking-normal text-[#f1eee8]">{title}</h1>
+              <h1 className="m-0 min-w-0 truncate text-[15px] font-[740] leading-tight tracking-normal text-[#f4f4f5]">{title}</h1>
             </div>
             <button
               type="button"
@@ -278,12 +279,14 @@ function SettingsContent(props: {
     <main className={props.className}>
       <div className={props.surfaceClassName}>
         {props.title ? (
-          <h1 className="mb-[18px] mt-1 text-[28px] font-[760] leading-[1.15] tracking-normal text-[#f1eee8]">{props.title}</h1>
+          <h1 className="mb-[18px] mt-1 text-[28px] font-[760] leading-[1.15] tracking-normal text-[#f4f4f5]">{props.title}</h1>
         ) : null}
         {props.activeSection === "general" ? <GeneralSettings {...props.controlProps} /> : null}
+        {props.activeSection === "app" ? <AppSettings {...props.controlProps} /> : null}
         {props.activeSection === "appearance" ? <AppearanceSettings {...props.controlProps} /> : null}
         {props.activeSection === "privacy" ? <PrivacySettings {...props.controlProps} /> : null}
         {props.activeSection === "sync" ? <SyncSettings {...props.controlProps} /> : null}
+        {props.activeSection === "transfers" ? <TransfersSettings {...props.controlProps} /> : null}
         {props.activeSection === "search" ? <SearchSettings {...props.controlProps} /> : null}
         {props.activeSection === "notifications" ? <NotificationsSettings {...props.controlProps} /> : null}
         {props.activeSection === "shortcuts" ? <ShortcutsSettings {...props.controlProps} /> : null}
@@ -295,6 +298,7 @@ function SettingsContent(props: {
 
 interface SettingsContentProps {
   document: Record<string, unknown>;
+  launchOnLogin: LaunchOnLoginSnapshot | null;
   working: boolean;
   onSettingChange: (section: string, key: string, value: SettingValue) => void;
   onLoad: () => Promise<void>;
@@ -307,64 +311,26 @@ interface SettingsContentProps {
 }
 
 function GeneralSettings(props: SettingsContentProps) {
+  const launchOnLoginUnsupported = props.launchOnLogin?.supported === false;
+  const launchOnLoginEnabled = props.launchOnLogin
+    ? props.launchOnLogin.enabled
+    : booleanSetting(props.document, "general", "launch_on_login", false);
+  const workspaceRoot = stringSetting(props.document, "general", "preferred_workspace_root", "");
   return (
     <>
       <SettingsSectionBlock title="Startup">
-        <SettingsRow label="Default landing view" description="Choose which screen Misty should open first.">
-          <SelectControl
-            value={numberSetting(props.document, "general", "startup_view_index", 0)}
-            options={startupViewOptions}
-            disabled={props.working}
-            onChange={(value) => props.onSettingChange("general", "startup_view_index", value)}
-          />
-        </SettingsRow>
-        <SettingsRow label="Reopen last session" description="Restore the last location and context when Misty launches.">
+        <SettingsRow
+          label="Launch on login"
+          description={launchOnLoginUnsupported
+            ? "Unavailable on this platform."
+            : "Start Misty automatically when you sign in to this device."}
+          last
+        >
           <SwitchControl
-            checked={booleanSetting(props.document, "general", "reopen_last_session", true)}
-            disabled={props.working}
-            onChange={(value) => props.onSettingChange("general", "reopen_last_session", value)}
-          />
-        </SettingsRow>
-        <SettingsRow label="Launch on login" description="Start Misty automatically when you sign in to this device." last>
-          <SwitchControl
-            checked={booleanSetting(props.document, "general", "launch_on_login", false)}
-            disabled={props.working}
+            checked={launchOnLoginEnabled}
+            disabled={props.working || launchOnLoginUnsupported}
             onChange={(value) => props.onSettingChange("general", "launch_on_login", value)}
           />
-        </SettingsRow>
-      </SettingsSectionBlock>
-
-      <SettingsSectionBlock title="Updates">
-        <SettingsRow label="Release channel" description="Choose which update track this installation should follow.">
-          <SelectControl
-            value={numberSetting(props.document, "general", "release_channel_index", 0)}
-            options={releaseChannelOptions}
-            disabled={props.working}
-            onChange={(value) => props.onSettingChange("general", "release_channel_index", value)}
-          />
-        </SettingsRow>
-        <SettingsRow label="Auto-update" description="Download and apply updates automatically when available.">
-          <SwitchControl
-            checked={booleanSetting(props.document, "general", "auto_update_enabled", true)}
-            disabled={props.working}
-            onChange={(value) => props.onSettingChange("general", "auto_update_enabled", value)}
-          />
-        </SettingsRow>
-        <SettingsRow label="Check for updates" description="Run an explicit update check right now." last>
-          <div className={settingsActionStackClass}>
-            <button
-              type="button"
-              className={settingsControlButtonClass}
-              disabled={props.working}
-              onClick={() => props.onSettingChange("general", "last_update_check_label", "Just now")}
-            >
-              Check now
-            </button>
-            <div className={settingsMetaClass}>
-              <strong className="text-[15px] font-[520] leading-[1.1] text-[#9e988f]">{stringSetting(props.document, "general", "last_update_check_label", "Never checked")}</strong>
-              <span className="text-[13px] leading-[1.1] text-[#9e988f]">Last checked</span>
-            </div>
-          </div>
         </SettingsRow>
       </SettingsSectionBlock>
 
@@ -393,47 +359,43 @@ function GeneralSettings(props: SettingsContentProps) {
         </SettingsRow>
       </SettingsSectionBlock>
 
-      <SettingsSectionBlock title="System">
+      <SettingsSectionBlock title="Defaults">
+        <SettingsRow label="Preferred workspace root" description="Choose the default starting location for file browsing." last>
+          <WorkspaceRootControl
+            value={workspaceRoot}
+            disabled={props.working}
+            onChange={(value) => props.onSettingChange("general", "preferred_workspace_root", value)}
+          />
+        </SettingsRow>
+      </SettingsSectionBlock>
+    </>
+  );
+}
+
+function AppSettings(props: SettingsContentProps) {
+  return (
+    <>
+      <SettingsSectionBlock title="Updates">
+        <div className="bg-[#07090b] p-4">
+          <InstallerCard embedded variant="compact" />
+        </div>
+      </SettingsSectionBlock>
+
+      <SettingsSectionBlock title="Support Info">
         <SettingsRow label="Remote runtime" description="Provider requests run through the embedded Misty runtime.">
           <ValueText value={props.app?.proxyRuntime.mode ?? "Loading"} muted={!props.app?.proxyRuntime.mode} />
         </SettingsRow>
         <SettingsRow label="App version" description="The installed Misty build version.">
-          <ValueText value="v0.1.0-beta" />
+          <ValueText value={props.app?.version ?? "Loading"} muted={!props.app?.version} />
         </SettingsRow>
         <SettingsRow label="Build info" description="Helpful runtime details for troubleshooting and support.">
           <ValueText value="Tauri desktop shell" muted />
         </SettingsRow>
         <SettingsRow label="Config path" description="Where Misty stores local configuration files on this device.">
-          <ValueText value={props.app?.environment.configDir ?? "Loading"} />
+          <CopyableValueText value={props.app?.environment.configDir ?? "Loading"} disabled={!props.app?.environment.configDir} />
         </SettingsRow>
         <SettingsRow label="Data path" description="Where Misty stores local app data on this device." last>
-          <ValueText value={props.app?.environment.mistyDir ?? "Loading"} />
-        </SettingsRow>
-      </SettingsSectionBlock>
-
-      <SettingsSectionBlock title="Defaults">
-        <SettingsRow label="Preferred workspace root" description="Choose the default starting location for file browsing.">
-          <TextControl
-            value={stringSetting(props.document, "general", "preferred_workspace_root", "")}
-            placeholder="Default"
-            disabled={props.working}
-            onCommit={(value) => props.onSettingChange("general", "preferred_workspace_root", value)}
-          />
-        </SettingsRow>
-        <SettingsRow label="Mount path" description="Set the default Misty mount location used for local file access.">
-          <TextControl
-            value={stringSetting(props.document, "advanced", "mount_path", ".misty/mnt")}
-            disabled={props.working}
-            onCommit={(value) => props.onSettingChange("advanced", "mount_path", value)}
-          />
-        </SettingsRow>
-        <SettingsRow label="Default transfer behavior" description="Choose how copy and download flows should behave by default." last>
-          <SelectControl
-            value={numberSetting(props.document, "general", "default_transfer_behavior_index", 0)}
-            options={transferBehaviorOptions}
-            disabled={props.working}
-            onChange={(value) => props.onSettingChange("general", "default_transfer_behavior_index", value)}
-          />
+          <CopyableValueText value={props.app?.environment.mistyDir ?? "Loading"} disabled={!props.app?.environment.mistyDir} />
         </SettingsRow>
       </SettingsSectionBlock>
     </>
@@ -566,7 +528,7 @@ function AppearanceSettings(props: SettingsContentProps) {
 function PrivacySettings(props: SettingsContentProps) {
   return (
     <>
-      <SettingsSectionBlock title="Data Handling">
+      <SettingsSectionBlock title="Data handling">
         <SettingsRow label="Process data locally" description="Keep file handling and provider orchestration local whenever possible.">
           <SwitchControl
             checked={booleanSetting(props.document, "privacy", "local_processing_only", true)}
@@ -583,7 +545,7 @@ function PrivacySettings(props: SettingsContentProps) {
         </SettingsRow>
       </SettingsSectionBlock>
 
-      <SettingsSectionBlock title="Exports & Deletion">
+      <SettingsSectionBlock title="Exports & deletion">
         <SettingsRow label="Allow data export" description="Keep account export actions available in privacy and support workflows." last>
           <SwitchControl
             checked={booleanSetting(props.document, "privacy", "export_data_enabled", true)}
@@ -684,7 +646,7 @@ function SyncSettings(props: SettingsContentProps) {
         </SettingsRow>
       </SettingsSectionBlock>
 
-      <SettingsSectionBlock title="Conflict Resolution">
+      <SettingsSectionBlock title="Conflict resolution">
         <SettingsRow label="Default strategy" description="Choose how Misty should behave when the same file changes in two places." last>
           <SelectControl
             value={numberSetting(props.document, "sync", "conflict_resolution_index", 0)}
@@ -695,7 +657,7 @@ function SyncSettings(props: SettingsContentProps) {
         </SettingsRow>
       </SettingsSectionBlock>
 
-      <SettingsSectionBlock title="Transfer Profiles">
+      <SettingsSectionBlock title="Transfer profiles">
         <SettingsRow label="Default profile" description="Choose the saved transfer behavior Misty should preselect.">
           <SelectControl
             value={defaultProfileIndex}
@@ -722,7 +684,7 @@ function SyncSettings(props: SettingsContentProps) {
                   />
                 )}
               </span>
-              <span className="grid justify-items-end gap-2 text-right text-[#9e988f]">
+              <span className="grid justify-items-end gap-2 text-right text-[#a1a1aa]">
                 <span>
                   {profile.transfers} transfers / {profile.checkers} checks{profile.bandwidthLimit ? ` · ${profile.bandwidthLimit}` : ""}
                   {profile.checksum ? " · checksum" : ""}
@@ -751,6 +713,21 @@ function SyncSettings(props: SettingsContentProps) {
         </div>
       </SettingsSectionBlock>
     </>
+  );
+}
+
+function TransfersSettings(props: SettingsContentProps) {
+  return (
+    <SettingsSectionBlock title="Defaults">
+      <SettingsRow label="Default transfer behavior" description="Choose how copy and download flows should behave by default." last>
+        <SelectControl
+          value={numberSetting(props.document, "general", "default_transfer_behavior_index", 0)}
+          options={transferBehaviorOptions}
+          disabled={props.working}
+          onChange={(value) => props.onSettingChange("general", "default_transfer_behavior_index", value)}
+        />
+      </SettingsRow>
+    </SettingsSectionBlock>
   );
 }
 
@@ -790,10 +767,10 @@ function SearchSettings(_props: SettingsContentProps) {
           <SearchStatCard label="Remotes" value={indexedRemoteNames.length.toLocaleString()} />
           <SearchStatCard label="Index size" value={formatBytes(status?.indexSizeBytes ?? 0)} />
         </div>
-        <div className="mt-3 grid min-h-[46px] grid-cols-[minmax(0,1fr)_auto] items-center gap-4 border-y border-[#27272a] py-3">
+        <div className="mt-3 grid min-h-[46px] grid-cols-[minmax(0,1fr)_auto] items-center gap-4 border-y border-white/[0.08] py-3">
           <div className="grid min-w-0 gap-1">
-            <strong className="text-[15px] font-[560] text-[#f1eee8]">Search index</strong>
-            <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-sm text-[#9e988f]">
+            <strong className="text-[15px] font-[620] text-[#f4f4f5]">Search index</strong>
+            <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-sm text-[#a1a1aa]">
               {scanActive
                 ? `${phase} · ${scanProgress.toLocaleString()} items scanned${status?.currentPath ? ` · ${status.currentPath}` : ""}`
                 : `Last indexed ${lastIndexed}`}
@@ -819,7 +796,7 @@ function SearchSettings(_props: SettingsContentProps) {
         </div>
       </SettingsSectionBlock>
 
-      <SettingsSectionBlock title="Indexed Sources">
+      <SettingsSectionBlock title="Indexed sources">
         <SettingsRow label="Local roots" description="Local drives or folders included in the most recent completed index.">
           <ValueText value={indexedLocalRoots.length ? indexedLocalRoots.join(", ") : "None indexed"} muted={!indexedLocalRoots.length} />
         </SettingsRow>
@@ -832,7 +809,7 @@ function SearchSettings(_props: SettingsContentProps) {
       </SettingsSectionBlock>
 
       {status?.scanErrors.length ? (
-        <SettingsSectionBlock title="Indexing Errors">
+        <SettingsSectionBlock title="Indexing errors">
           <div className={settingsReferenceListClass}>
             <div className={`${settingsReferenceRowClass} ${settingsReferenceHeaderClass}`}>
               <span>Source</span>
@@ -853,9 +830,9 @@ function SearchSettings(_props: SettingsContentProps) {
 
 function SearchStatCard(props: { label: string; value: string }) {
   return (
-    <div className="grid min-h-[76px] content-center gap-1 rounded-lg border border-[#27272a] bg-[#101216] px-3">
-      <strong className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[21px] font-[720] text-[#f1eee8]">{props.value}</strong>
-      <span className="text-xs text-[#9e988f]">{props.label}</span>
+    <div className="grid min-h-[76px] content-center gap-1 rounded-md border border-white/10 bg-[#07090b] px-3">
+      <strong className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[21px] font-[720] text-[#f4f4f5]">{props.value}</strong>
+      <span className="text-xs text-[#8f8f8f]">{props.label}</span>
     </div>
   );
 }
@@ -863,7 +840,7 @@ function SearchStatCard(props: { label: string; value: string }) {
 function NotificationsSettings(props: SettingsContentProps) {
   return (
     <>
-      <SettingsSectionBlock title="Activity Alerts">
+      <SettingsSectionBlock title="Activity alerts">
         <SettingsRow label="Desktop notifications" description="Show system-level notifications for important events.">
           <SwitchControl
             checked={booleanSetting(props.document, "notifications", "desktop_notifications_enabled", true)}
@@ -887,7 +864,7 @@ function NotificationsSettings(props: SettingsContentProps) {
         </SettingsRow>
       </SettingsSectionBlock>
 
-      <SettingsSectionBlock title="System Notifications">
+      <SettingsSectionBlock title="System notifications">
         <SettingsRow label="Badge count" description="Show pending activity counts where the platform supports it." last>
           <SwitchControl
             checked={booleanSetting(props.document, "notifications", "badge_count_enabled", true)}
@@ -897,7 +874,7 @@ function NotificationsSettings(props: SettingsContentProps) {
         </SettingsRow>
       </SettingsSectionBlock>
 
-      <SettingsSectionBlock title="Digest & Quiet Hours">
+      <SettingsSectionBlock title="Digest & quiet hours">
         <SettingsRow label="Quiet hours" description="Suppress non-critical notifications during focus time.">
           <SwitchControl
             checked={booleanSetting(props.document, "notifications", "quiet_hours_enabled", false)}
@@ -1027,7 +1004,7 @@ function AdvancedSettings(props: SettingsContentProps) {
         </SettingsRow>
       </SettingsSectionBlock>
 
-      <SettingsSectionBlock title="Open With Associations">
+      <SettingsSectionBlock title="Open with associations">
         <SettingsNote>Review remembered apps used by File Explorer.</SettingsNote>
         <div className={settingsReferenceListClass}>
           <div className={`${settingsAssociationRowClass} ${settingsReferenceHeaderClass}`}>
@@ -1090,8 +1067,8 @@ function AdvancedSettings(props: SettingsContentProps) {
 
 function SettingsSectionBlock(props: { title: string; children: ReactNode }) {
   return (
-    <section className="mb-3.5 overflow-hidden rounded-[10px] border border-[#202126] bg-[#111214] shadow-[0_1px_0_rgba(255,255,255,0.02)_inset]">
-      <h2 className="border-b border-[#202126] px-7 py-4 text-[11px] font-[760] uppercase leading-none tracking-normal text-[#7a7a7d]">{props.title}</h2>
+    <section className="mb-3.5 overflow-hidden rounded-lg border border-white/10 bg-[#090b0d] shadow-[0_1px_0_rgba(255,255,255,0.035)_inset]">
+      <h2 className="border-b border-white/[0.08] bg-[#0c0e10] px-7 py-4 text-[11px] font-[760] leading-none tracking-normal text-[#a1a1aa]">{props.title}</h2>
       {props.children}
     </section>
   );
@@ -1099,10 +1076,10 @@ function SettingsSectionBlock(props: { title: string; children: ReactNode }) {
 
 function SettingsRow(props: { label: string; description: string; children: ReactNode; last?: boolean }) {
   return (
-    <div className={`grid min-h-[68px] grid-cols-[minmax(0,0.52fr)_minmax(220px,0.48fr)] items-center gap-[18px] border-b border-[#202126] px-7 py-3 ${props.last ? "border-b-0" : ""}`}>
+    <div className={`grid min-h-[68px] grid-cols-[minmax(0,0.52fr)_minmax(220px,0.48fr)] items-center gap-[18px] border-b border-white/[0.08] bg-[#090b0d] px-7 py-3 ${props.last ? "border-b-0" : ""}`}>
       <div className="grid min-w-0 gap-1">
-        <strong className="text-[15px] font-[520] leading-[1.1] text-[#f1eee8]">{props.label}</strong>
-        <span className="text-[14px] leading-[1.25] text-[#77777b]">{props.description}</span>
+        <strong className="text-[15px] font-[620] leading-[1.1] text-[#f4f4f5]">{props.label}</strong>
+        <span className="text-[14px] leading-[1.25] text-[#8f8f8f]">{props.description}</span>
       </div>
       <div className="flex min-w-0 items-center justify-end">{props.children}</div>
     </div>
@@ -1110,7 +1087,55 @@ function SettingsRow(props: { label: string; description: string; children: Reac
 }
 
 function SettingsNote(props: { children: ReactNode }) {
-  return <p className="m-0 max-w-[620px] px-7 py-4 text-[14px] leading-[1.35] text-[#77777b]">{props.children}</p>;
+  return <p className="m-0 max-w-[620px] px-7 py-4 text-[14px] leading-[1.35] text-[#8f8f8f]">{props.children}</p>;
+}
+
+function WorkspaceRootControl(props: {
+  value: string;
+  disabled: boolean;
+  onChange: (value: string) => void;
+}) {
+  const pickerAvailable = hasTauriInternals();
+  const chooseFolder = async () => {
+    if (!pickerAvailable) return;
+    const selection = await open({
+      title: "Choose Workspace Root",
+      multiple: false,
+      directory: true,
+    });
+    const path = Array.isArray(selection) ? selection[0] : selection;
+    if (path) props.onChange(path);
+  };
+
+  return (
+    <div className="grid min-w-0 justify-items-end gap-2">
+      <span
+        className={`max-w-[360px] overflow-hidden text-ellipsis whitespace-nowrap text-right text-[15px] ${props.value ? "text-[#f4f4f5]" : "text-[#8f8f8f]"}`}
+        title={props.value || "Default"}
+      >
+        {props.value || "Default"}
+      </span>
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          className={settingsControlButtonCompactClass}
+          disabled={props.disabled || !pickerAvailable}
+          title={pickerAvailable ? "Choose workspace root" : "Folder picker unavailable on this platform"}
+          onClick={() => void chooseFolder()}
+        >
+          Choose
+        </button>
+        <button
+          type="button"
+          className={settingsControlButtonCompactClass}
+          disabled={props.disabled || !props.value}
+          onClick={() => props.onChange("")}
+        >
+          Reset
+        </button>
+      </div>
+    </div>
+  );
 }
 
 function SelectControl(props: {
@@ -1120,9 +1145,9 @@ function SelectControl(props: {
   onChange: (value: number) => void;
 }) {
   return (
-    <label className="relative block h-8 w-[220px] overflow-hidden rounded-md border border-[#27272a] bg-[#0b0d0f] text-[#f1eee8]">
+    <label className="relative block h-9 w-[220px] overflow-hidden rounded-md border border-white/10 bg-[#050607] text-[#f4f4f5] transition focus-within:border-white/30">
       <select
-        className="h-full w-full appearance-none border-0 bg-transparent py-0 pl-2.5 pr-[38px] text-[15px] text-inherit outline-none"
+        className="h-full w-full appearance-none border-0 bg-transparent py-0 pl-2.5 pr-[38px] text-[15px] font-semibold text-inherit outline-none"
         value={Math.min(props.value, props.options.length - 1)}
         disabled={props.disabled}
         onChange={(event) => props.onChange(Number(event.target.value))}
@@ -1133,7 +1158,7 @@ function SelectControl(props: {
           </option>
         ))}
       </select>
-      <ChevronDown className="pointer-events-none absolute right-2.5 top-[7px] text-[#f1eee8]" size={18} />
+      <ChevronDown className="pointer-events-none absolute right-2.5 top-2 text-[#f4f4f5]" size={18} />
     </label>
   );
 }
@@ -1144,10 +1169,10 @@ function SwitchControl(props: { checked: boolean; disabled: boolean; onChange: (
       type="button"
       role="switch"
       aria-checked={props.checked}
-      className={`relative h-[22px] w-[40px] rounded-full border p-0 transition-colors duration-150 disabled:opacity-50 ${
+      className={`relative h-[24px] w-[44px] rounded-full border p-0 transition-colors duration-150 disabled:opacity-50 ${
         props.checked
-          ? "border-[#6f9f76] bg-[#79ad80]"
-          : "border-[#34363d] bg-[#202126]"
+          ? "border-[#f4f4f5] bg-[#f4f4f5]"
+          : "border-white/15 bg-white/[0.055]"
       }`}
       disabled={props.disabled}
       onClick={() => props.onChange(!props.checked)}
@@ -1155,8 +1180,8 @@ function SwitchControl(props: { checked: boolean; disabled: boolean; onChange: (
       <span
         className={`absolute left-[2px] top-1/2 size-[18px] -translate-y-1/2 rounded-full transition-transform duration-150 ${
           props.checked
-            ? "translate-x-[18px] bg-[#071008] shadow-[0_1px_4px_rgba(0,0,0,0.42)]"
-            : "translate-x-0 bg-[#b9bec8] shadow-[0_1px_4px_rgba(0,0,0,0.32)]"
+            ? "translate-x-[20px] bg-[#07090b] shadow-[0_1px_4px_rgba(0,0,0,0.42)]"
+            : "translate-x-0 bg-[#d4d4d8] shadow-[0_1px_4px_rgba(0,0,0,0.32)]"
         }`}
       />
     </button>
@@ -1178,7 +1203,7 @@ function TextControl(props: {
   return (
     <input
       key={props.value}
-      className="h-9 w-[220px] rounded-md border border-[#27272a] bg-[#0b0d0f] px-2.5 text-sm text-[#f1eee8] outline-none disabled:opacity-55"
+      className="h-9 w-[220px] rounded-md border border-white/10 bg-[#050607] px-2.5 text-sm text-[#f4f4f5] outline-none transition focus:border-white/30 disabled:opacity-55"
       defaultValue={props.value}
       placeholder={props.placeholder}
       disabled={props.disabled}
@@ -1203,11 +1228,11 @@ function ProfileNumberInput(props: {
     if (next !== props.value) props.onCommit(next);
   };
   return (
-    <label className="grid gap-1 text-left text-[11px] text-[#8f8f95]">
+    <label className="grid gap-1 text-left text-[11px] text-[#a1a1aa]">
       {props.label}
       <input
         key={props.value}
-        className="h-8 w-[76px] rounded-md border border-[#27272a] bg-[#0b0d0f] px-2 text-sm text-[#f1eee8] outline-none disabled:opacity-55"
+        className="h-8 w-[76px] rounded-md border border-white/10 bg-[#050607] px-2 text-sm text-[#f4f4f5] outline-none transition focus:border-white/30 disabled:opacity-55"
         defaultValue={props.value}
         disabled={props.disabled}
         inputMode="numeric"
@@ -1232,11 +1257,11 @@ function ProfileTextInput(props: {
     if (event.currentTarget.value !== props.value) props.onCommit(event.currentTarget.value.trim());
   };
   return (
-    <label className="grid gap-1 text-left text-[11px] text-[#8f8f95]">
+    <label className="grid gap-1 text-left text-[11px] text-[#a1a1aa]">
       {props.label}
       <input
         key={props.value}
-        className="h-8 w-[92px] rounded-md border border-[#27272a] bg-[#0b0d0f] px-2 text-sm text-[#f1eee8] outline-none disabled:opacity-55"
+        className="h-8 w-[92px] rounded-md border border-white/10 bg-[#050607] px-2 text-sm text-[#f4f4f5] outline-none transition focus:border-white/30 disabled:opacity-55"
         defaultValue={props.value}
         disabled={props.disabled}
         placeholder="None"
@@ -1250,7 +1275,35 @@ function ProfileTextInput(props: {
 }
 
 function ValueText(props: { value: string; muted?: boolean }) {
-  return <span className={`max-w-[360px] overflow-hidden text-ellipsis whitespace-nowrap text-right text-[15px] ${props.muted ? "text-[#9e988f]" : "text-[#f1eee8]"}`}>{props.value}</span>;
+  return <span className={`max-w-[360px] overflow-hidden text-ellipsis whitespace-nowrap text-right text-[15px] ${props.muted ? "text-[#8f8f8f]" : "text-[#f4f4f5]"}`}>{props.value}</span>;
+}
+
+function CopyableValueText(props: { value: string; disabled?: boolean }) {
+  const copyValue = () => {
+    if (props.disabled) return;
+    void navigator.clipboard?.writeText(props.value).catch(() => undefined);
+  };
+
+  return (
+    <span className="flex min-w-0 max-w-[420px] items-center justify-end gap-2">
+      <span
+        className={`min-w-0 select-text overflow-hidden text-ellipsis whitespace-nowrap text-right text-[15px] ${props.disabled ? "text-[#8f8f8f]" : "text-[#f4f4f5]"}`}
+        title={props.value}
+      >
+        {props.value}
+      </span>
+      <button
+        type="button"
+        className="grid h-[30px] w-[30px] shrink-0 place-items-center rounded-md border border-white/10 bg-white/[0.045] text-[#f4f4f5] transition hover:border-white/20 hover:bg-white/[0.09] disabled:opacity-55"
+        disabled={props.disabled}
+        aria-label="Copy value"
+        title="Copy"
+        onClick={copyValue}
+      >
+        <Copy size={14} />
+      </button>
+    </span>
+  );
 }
 
 function sectionRecord(document: Record<string, unknown>, section: string): Record<string, unknown> {

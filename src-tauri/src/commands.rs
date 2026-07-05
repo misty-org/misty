@@ -59,6 +59,7 @@ use crate::services::transfers::{TransferFilter, TransferPage};
 #[serde(rename_all = "camelCase")]
 pub struct AppSnapshot {
     app_name: &'static str,
+    version: &'static str,
     migration_stage: &'static str,
     proxy_url: Option<String>,
     proxy_runtime: ProxyRuntimeSnapshot,
@@ -75,6 +76,7 @@ pub struct ClipboardSnapshot {
 pub async fn app_snapshot(state: State<'_, MistyRuntime>) -> ApiResult<AppSnapshot> {
     Ok(AppSnapshot {
         app_name: "Misty",
+        version: env!("CARGO_PKG_VERSION"),
         migration_stage: "Tauri migration shell",
         proxy_url: state.proxy.proxy_url(),
         proxy_runtime: state.proxy_runtime.snapshot(),

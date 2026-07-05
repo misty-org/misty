@@ -1,5 +1,4 @@
 import { convertFileSrc } from "@tauri-apps/api/core";
-import { File, Folder } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { explorerListDirectory, explorerPrepareOpenItem, explorerPreviewItem, fileMetadataSnapshot } from "../../../api/misty";
 import type { DirectoryListing, DirectorySizeRecord, FileEntry, FileMetadataSnapshot, PreparedOpenItem } from "../../../api/types";
@@ -7,6 +6,7 @@ import { errorText } from "../../../shared/format";
 import { selectAppearancePreferences, useSettingsStore } from "../../../stores/useSettingsStore";
 import { directorySizeRecordForPath } from "../../../stores/useExplorerStore";
 import { formatBytes, formatDate } from "../utils/fileFormat";
+import { FileIcon } from "./FileBrowserIcons";
 
 interface FileInspectorProps {
   listing: DirectoryListing | null;
@@ -16,6 +16,7 @@ interface FileInspectorProps {
   mistyComments: string;
   directorySizes: Record<string, DirectorySizeRecord>;
   onCalculateSize: (path: string) => void;
+  onOpenEntry: (entry: FileEntry) => void;
   onSaveMetadata: (entry: FileEntry, tags: string[], comments: string) => void;
 }
 
@@ -33,6 +34,7 @@ interface PreparedPreviewPath {
 const MAX_PREVIEW_BYTES = 32 * 1024 * 1024;
 const IMAGE_PREVIEW_LOAD_ATTEMPTS = 5;
 const IMAGE_PREVIEW_RETRY_DELAY_MS = 80;
+const FILE_METADATA_LOAD_DELAY_MS = 180;
 
 const browserImageMimeTypes: Record<string, string> = {
   png: "image/png",
@@ -56,40 +58,35 @@ const textPreviewExtensions = new Set([
 ]);
 
 const inspectorStyles = {
-  root: "h-full min-w-0 overflow-auto bg-[#17181b] px-3 py-3 text-[#d8d8d8] [scrollbar-color:#44464d_transparent] [scrollbar-width:thin]",
+  root: "h-full min-w-0 overflow-auto bg-[var(--misty-surface)] px-3 py-3 text-[var(--misty-text-muted)] [scrollbar-color:#3f3f46_transparent] [scrollbar-width:thin]",
   previewCard:
-    "grid h-[238px] place-items-center overflow-hidden rounded-[7px] bg-[linear-gradient(145deg,#202126,#191a1d)] text-[#52606a] shadow-[0_1px_0_rgba(255,255,255,0.035)_inset]",
+    "grid h-[238px] place-items-center overflow-hidden rounded-[7px] border border-[var(--misty-border)] bg-[var(--misty-surface-2)] text-[var(--misty-text-subtle)] shadow-[0_14px_34px_rgba(0,0,0,0.2)]",
   previewMedia: "h-full w-full border-0 object-contain",
   previewText:
-    "m-0 h-full w-full overflow-auto whitespace-pre-wrap break-words p-3 text-left font-mono text-[11px] leading-[1.45] text-[#d5d5d5]",
-  previewStatus: "text-sm font-medium text-[#8c8e94]",
-  folderPreview: "grid w-full gap-2 px-3",
-  folderPreviewGrid: "grid grid-cols-3 gap-2",
+    "m-0 h-full w-full overflow-auto whitespace-pre-wrap break-words p-3 text-left font-mono text-[11px] leading-[1.45] text-[var(--misty-text-muted)]",
+  previewStatus: "text-sm font-medium text-[var(--misty-text-subtle)]",
+  folderPreview: "h-full w-full overflow-y-auto overflow-x-hidden p-3 [scrollbar-color:#3f3f46_transparent] [scrollbar-width:thin]",
+  folderPreviewList: "grid min-w-0 content-start",
   folderPreviewItem:
-    "grid min-w-0 gap-2 rounded-lg border border-[#303238] bg-[#1b1c20] p-2 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.035)]",
+    "grid min-h-9 min-w-0 cursor-pointer select-none grid-cols-[28px_minmax(0,1fr)_auto] items-center gap-2 rounded-md border border-transparent bg-transparent px-2 py-1.5 text-left text-[var(--misty-text-muted)] outline-none hover:border-[var(--misty-border-soft)] hover:bg-[var(--misty-surface-hover)] focus-visible:border-[var(--misty-border-strong)] focus-visible:bg-[var(--misty-surface-hover)] focus-visible:shadow-[0_0_0_2px_rgba(241,243,244,0.08)]",
   folderPreviewThumb:
-    "grid h-20 place-items-center overflow-hidden rounded-md bg-[#111216] text-xs font-semibold uppercase text-[#8f929a]",
+    "grid size-7 place-items-center overflow-hidden",
   folderPreviewName:
-    "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-xs font-semibold text-[#cfd0d4]",
-  folderPreviewMeta:
-    "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[11px] text-[#878991]",
-  hero: "grid grid-cols-[48px_minmax(0,1fr)] items-center gap-3 border-b border-[#2c2d32] px-5 py-5",
-  heroIcon: "grid size-10 place-items-center text-[#7da2b4]",
-  heroTitle:
-    "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[18px] font-[720] leading-tight text-[#d4d4d4]",
-  heroKind: "mt-1 text-sm text-[#8f9096]",
+    "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-sm font-semibold leading-tight text-[var(--misty-text-muted)]",
+  folderPreviewSize:
+    "pl-2 text-right text-xs font-semibold text-[var(--misty-text-subtle)]",
   detailsCard: "grid",
   detailRow: "grid gap-2 px-5 py-3.5",
-  detailLabel: "text-[12px] font-[720] uppercase leading-none tracking-normal text-[#999aa1]",
-  detailValue: "min-w-0 [overflow-wrap:anywhere] text-[17px] font-[650] leading-[1.25] text-[#d1d1d1]",
-  editorCard: "grid gap-3 border-b border-[#2c2d32] px-5 py-4",
-  editorLabel: "grid gap-1.5 text-[12px] font-[720] uppercase leading-none tracking-normal text-[#999aa1]",
-  editorInput: "min-h-9 w-full rounded-[7px] border border-[#3a3b40] bg-[#101114] px-2.5 py-2 text-sm font-medium normal-case leading-normal text-[#d8d8d8] outline-none focus:border-[#6f737c]",
+  detailLabel: "text-[12px] font-[720] uppercase leading-none tracking-normal text-[var(--misty-text-subtle)]",
+  detailValue: "min-w-0 [overflow-wrap:anywhere] text-[17px] font-[650] leading-[1.25] text-[var(--misty-text)]",
+  editorCard: "grid gap-3 border-b border-[var(--misty-border-soft)] px-5 py-4",
+  editorLabel: "grid gap-1.5 text-[12px] font-[720] uppercase leading-none tracking-normal text-[var(--misty-text-subtle)]",
+  editorInput: "min-h-9 w-full rounded-[7px] border border-[var(--misty-border)] bg-[var(--misty-surface-2)] px-2.5 py-2 text-sm font-medium normal-case leading-normal text-[var(--misty-text)] outline-none focus:border-[var(--misty-border-strong)] focus:shadow-[0_0_0_2px_rgba(241,243,244,0.08)]",
   editorTextarea: "min-h-[74px] resize-y",
   editorActions: "flex justify-end",
-  editorButton: "h-8 rounded-[7px] border border-[#3a3b40] bg-[#222329] px-3 text-sm font-semibold text-[#e2e2e2] hover:bg-[#2b2d33] disabled:cursor-default disabled:opacity-45",
+  editorButton: "h-8 rounded-[7px] border border-[var(--misty-border)] bg-[var(--misty-surface-selected)] px-3 text-sm font-semibold text-[var(--misty-text)] hover:bg-[var(--misty-surface-3)] hover:border-[var(--misty-border-strong)] disabled:cursor-default disabled:opacity-45",
   dots: "inline-flex h-5 items-center gap-1",
-  dot: "size-1.5 rounded-full bg-[#aeb0b6] motion-safe:animate-bounce",
+  dot: "size-1.5 rounded-full bg-[var(--misty-text-muted)] motion-safe:animate-bounce",
 } as const;
 
 export function FileInspector(props: FileInspectorProps) {
@@ -97,7 +94,6 @@ export function FileInspector(props: FileInspectorProps) {
   const displayEntry = props.selectedEntry ?? folder;
   const multiple = props.selectedCount > 1;
   const title = multiple ? "Multiple Items" : displayEntry?.name ?? "No Selection";
-  const kind = multiple ? "Selection" : kindLabel(displayEntry);
   const thumbnailPreviewsEnabled = useSettingsStore((state) =>
     selectAppearancePreferences(state.settings?.document).thumbnailPreviewsEnabled,
   );
@@ -138,7 +134,7 @@ export function FileInspector(props: FileInspectorProps) {
             entries={folderPreview.entries}
             error={folderPreview.error}
             loading={folderPreview.loading}
-            fallback={<PreviewIcon entry={displayEntry} multiple={multiple} size={78} />}
+            onOpenEntry={props.onOpenEntry}
           />
         ) : previewLoading ? <span className={inspectorStyles.previewStatus}>Loading preview...</span> : null}
         {preview?.mimeType === "application/pdf" ? (
@@ -150,40 +146,28 @@ export function FileInspector(props: FileInspectorProps) {
         ) : previewError ? (
           <span className={inspectorStyles.previewStatus}>{previewError}</span>
         ) : displayEntry?.kind !== "folder" || multiple ? (
-          <PreviewIcon entry={displayEntry} multiple={multiple} size={78} />
+          <span className={inspectorStyles.previewStatus}>No preview available</span>
         ) : null}
-      </div>
-
-      <div className={inspectorStyles.hero}>
-        <span className={inspectorStyles.heroIcon}>
-          <PreviewIcon entry={displayEntry} multiple={multiple} size={36} />
-        </span>
-        <span className="min-w-0">
-          <strong className={inspectorStyles.heroTitle} title={title}>{title}</strong>
-          <span className={inspectorStyles.heroKind}>{kind}</span>
-        </span>
       </div>
 
       <section className={inspectorStyles.detailsCard}>
         {multiple ? (
-          <Detail label="Selection" value={`${props.selectedCount} items`} />
+          <>
+            <Detail label="Name" value={title} />
+            <Detail label="Selection" value={`${props.selectedCount} items`} />
+          </>
         ) : (
           <>
+            <Detail label="Name" value={title} />
             <Detail
               label="Size"
               valueNode={sizeDetailValue(displayEntry, displayDirectorySize)}
             />
-            <Detail label="Kind" value={kindLabel(displayEntry)} />
             <Detail label="Path" value={displayEntry?.path ?? props.listing?.path ?? "-"} />
             <Detail label="Items" value={itemsLabel(displayEntry, props.listing)} />
             <Detail label="Modified" value={formatDate(metadata?.modifiedMs ?? displayEntry?.remoteModified ?? displayEntry?.modifiedMs)} />
             <Detail label="Created" value={formatDate(metadata?.createdMs ?? displayEntry?.createdMs)} />
             <Detail label="Accessed" value={formatDate(metadata?.accessedMs)} />
-            {displayEntry?.kind !== "folder" ? (
-              <>
-                <Detail label="Format" value={formatLabel(displayEntry)} />
-              </>
-            ) : null}
           </>
         )}
       </section>
@@ -250,15 +234,18 @@ function useFileMetadata(entry: FileEntry | null): {
     setMetadata(null);
     setMetadataError(null);
     if (!entry || entry.location.kind === "remote") return () => undefined;
-    void fileMetadataSnapshot(entry.path)
-      .then((snapshot) => {
-        if (active) setMetadata(snapshot);
-      })
-      .catch((error) => {
-        if (active) setMetadataError(errorText(error));
-      });
+    const timer = window.setTimeout(() => {
+      void fileMetadataSnapshot(entry.path)
+        .then((snapshot) => {
+          if (active) setMetadata(snapshot);
+        })
+        .catch((error) => {
+          if (active) setMetadataError(errorText(error));
+        });
+    }, FILE_METADATA_LOAD_DELAY_MS);
     return () => {
       active = false;
+      window.clearTimeout(timer);
     };
   }, [entry?.id, entry?.modifiedMs, entry?.path, entry?.readonly, entry?.sizeBytes]);
 
@@ -283,14 +270,14 @@ function useFolderPreview(entry: FileEntry | null, listing: DirectoryListing | n
       return () => undefined;
     }
     if (listing?.path === entry.path) {
-      setEntries(listing.entries.filter((candidate) => !candidate.isDeleted).slice(0, 3));
+      setEntries(listing.entries.filter((candidate) => !candidate.isDeleted));
       setLoading(false);
       return () => undefined;
     }
     setLoading(true);
     void explorerListDirectory({ path: entry.path, showHidden: false })
       .then((next) => {
-        if (active) setEntries(next.entries.filter((candidate) => !candidate.isDeleted).slice(0, 3));
+        if (active) setEntries(next.entries.filter((candidate) => !candidate.isDeleted));
       })
       .catch((previewError) => {
         if (active) setError(errorText(previewError));
@@ -324,16 +311,14 @@ function useFilePreview(entry: FileEntry | null, enabled = true): {
       setPreviewLoading(false);
       return () => undefined;
     }
-    const imageMimeType = previewImageMimeType(entry);
-    if (!imageMimeType) {
-      const sizeLimitError = previewSizeLimitError(entry);
-      if (sizeLimitError) {
-        setPreviewError(sizeLimitError);
-        setPreviewLoading(false);
-        return () => undefined;
-      }
+    const sizeLimitError = previewSizeLimitError(entry);
+    if (sizeLimitError) {
+      setPreviewError(sizeLimitError);
+      setPreviewLoading(false);
+      return () => undefined;
     }
 
+    const imageMimeType = previewImageMimeType(entry);
     setPreviewLoading(true);
     if (imageMimeType) {
       void previewPathForEntry(entry)
@@ -452,10 +437,7 @@ function waitForImage(url: string): Promise<void> {
   return new Promise((resolve, reject) => {
     const image = new Image();
     image.decoding = "async";
-    image.onload = () => {
-      const decode = image.decode ? image.decode().catch(() => undefined) : Promise.resolve();
-      void decode.then(() => resolve());
-    };
+    image.onload = () => resolve();
     image.onerror = () => reject(new Error("Unable to load image preview."));
     image.src = url;
   });
@@ -481,14 +463,6 @@ function previewPayloadIsText(mimeType: string): boolean {
   return mimeType.startsWith("text/") || mimeType.startsWith("application/json");
 }
 
-function kindLabel(entry: FileEntry | null): string {
-  if (!entry) return "Folder";
-  if (entry.kind === "folder") return "Directory";
-  if (entry.kind === "symlink") return "Link";
-  const extension = entry.extension.toUpperCase().replace(/^\./, "");
-  return extension ? `${extension} File` : entry.kind === "file" ? "File" : "Item";
-}
-
 function Detail(props: { label: string; value?: string; valueNode?: ReactNode }) {
   return (
     <div className={inspectorStyles.detailRow}>
@@ -502,41 +476,34 @@ function FolderContentsPreview(props: {
   entries: FileEntry[];
   loading: boolean;
   error: string | null;
-  fallback: ReactNode;
+  onOpenEntry: (entry: FileEntry) => void;
 }) {
   if (props.loading) return <span className={inspectorStyles.previewStatus}>Loading contents...</span>;
-  if (props.entries.length === 0) return props.error ? <span className={inspectorStyles.previewStatus}>{props.error}</span> : props.fallback;
+  if (props.entries.length === 0) return props.error ? <span className={inspectorStyles.previewStatus}>{props.error}</span> : <span className={inspectorStyles.previewStatus}>Folder is empty</span>;
   return (
-    <div className={inspectorStyles.folderPreview}>
-      <div className={inspectorStyles.folderPreviewGrid}>
-        {props.entries.slice(0, 3).map((entry) => (
-          <div className={inspectorStyles.folderPreviewItem} key={entry.id}>
-            <div className={inspectorStyles.folderPreviewThumb}>{previewThumb(entry)}</div>
+    <div className={inspectorStyles.folderPreview} aria-label="Directory contents preview">
+      <div className={inspectorStyles.folderPreviewList}>
+        {props.entries.map((entry) => (
+          <button
+            className={inspectorStyles.folderPreviewItem}
+            key={entry.id}
+            type="button"
+            aria-label={entry.kind === "folder" ? `Open folder ${entry.name}` : `Open ${entry.name}`}
+            title={entry.name}
+            onClick={() => props.onOpenEntry(entry)}
+          >
+            <div className={inspectorStyles.folderPreviewThumb}>
+              <FileIcon entry={entry} size={21} variant="table" />
+            </div>
             <span className={inspectorStyles.folderPreviewName} title={entry.name}>{entry.name}</span>
-            <span className={inspectorStyles.folderPreviewMeta}>{entry.kind === "folder" ? "Directory" : formatBytes(entry.sizeBytes)}</span>
-          </div>
+            <span className={inspectorStyles.folderPreviewSize}>
+              {entry.kind === "folder" ? "" : formatBytes(entry.sizeBytes)}
+            </span>
+          </button>
         ))}
       </div>
     </div>
   );
-}
-
-function PreviewIcon(props: { entry: FileEntry | null; multiple: boolean; size: number }) {
-  const className = props.entry?.kind === "folder" || props.multiple ? "text-[#7899aa]" : "text-[#8f929a]";
-  if (props.entry?.kind === "folder" || props.multiple) {
-    return <Folder size={props.size} strokeWidth={1.7} className={className} />;
-  }
-  return <File size={props.size} strokeWidth={1.7} className={className} />;
-}
-
-function previewThumb(entry: FileEntry): ReactNode {
-  if (entry.kind === "folder") {
-    return <Folder aria-hidden="true" className="h-6 w-6 text-[#7899aa]" strokeWidth={1.7} />;
-  }
-  const extension = entry.extension.replace(/^\./, "").trim();
-  if (extension) return extension.slice(0, 4).toUpperCase();
-  if (entry.mimeType) return entry.mimeType.split("/").pop()?.slice(0, 4).toUpperCase() || "FILE";
-  return "FILE";
 }
 
 function sizeDetailValue(
@@ -578,14 +545,6 @@ function itemsLabel(entry: FileEntry | null, listing: DirectoryListing | null): 
     return `${listing.totalCount} ${listing.totalCount === 1 ? "item" : "items"}`;
   }
   return entry.kind === "folder" ? "-" : "1 item";
-}
-
-function formatLabel(entry: FileEntry | null): string {
-  if (!entry) return "-";
-  const extension = entry.extension.replace(/^\./, "").trim();
-  const extensionLabel = extension ? extension.toUpperCase() : "";
-  if (extensionLabel && entry.mimeType) return `${extensionLabel} (${entry.mimeType})`;
-  return extensionLabel || entry.mimeType || kindLabel(entry);
 }
 
 function listingEntry(listing: DirectoryListing | null): FileEntry | null {

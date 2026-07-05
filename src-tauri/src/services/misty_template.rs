@@ -1,8 +1,10 @@
 use serde::Serialize;
 use std::{
+    env,
     fs::{self, File},
     io::{self, Read, Write},
     path::{Component, Path, PathBuf},
+    process::Command,
 };
 use walkdir::WalkDir;
 use zip::{write::SimpleFileOptions, ZipArchive, ZipWriter};
@@ -167,10 +169,25 @@ pub fn install_misty_template(version: String) -> Result<String, String> {
         .map_err(|error| format!("Could not extract Misty template: {error}"))?;
     write_installed_version(&home, version)
         .map_err(|error| format!("Could not write installed Misty version: {error}"))?;
+    let app_install_message = install_current_app_bundle(&home)?;
+    let app_install_message = app_install_message
+        .map(|message| format!(" {message}"))
+        .unwrap_or_default();
     Ok(format!(
-        "Installed Misty {version} with {extracted} item(s) from {}.",
+        "Installed Misty {version} with {extracted} item(s) from {}.{app_install_message}",
         archive_path.display()
     ))
+}
+
+#[tauri::command]
+pub fn restart_misty_app(app: tauri::AppHandle) -> Result<String, String> {
+    if let Some(path) = restart_launch_path().filter(|path| path.exists()) {
+        spawn_delayed_app_launch(&path)?;
+        app.exit(0);
+    } else {
+        app.restart();
+    }
+    Ok("Restarting Misty.".to_string())
 }
 
 fn template_status(home: &Path) -> MistyTemplateStatus {
@@ -350,6 +367,149 @@ fn template_archive_path(home: &Path) -> PathBuf {
 fn write_installed_version(home: &Path, version: &str) -> io::Result<()> {
     fs::create_dir_all(home)?;
     fs::write(home.join(INSTALLED_VERSION_FILE), format!("{version}\n"))
+}
+
+#[cfg(target_os = "macos")]
+fn install_current_app_bundle(home: &Path) -> Result<Option<String>, String> {
+    let Some(source) = current_app_bundle()
+        .map_err(|error| format!("Could not locate current Misty.app bundle: {error}"))?
+    else {
+        return Ok(None);
+    };
+    let target = home.join(".local").join("bin").join("Misty.app");
+    fs::create_dir_all(target.parent().expect("Misty.app target has a parent"))
+        .map_err(|error| format!("Could not create Misty app install directory: {error}"))?;
+
+    if !paths_equivalent(&source, &target) {
+        let staging = target.with_file_name(".Misty.app.installing");
+        remove_path_if_exists(&staging)
+            .map_err(|error| format!("Could not clear staged Misty.app install: {error}"))?;
+        copy_directory(&source, &staging)
+            .map_err(|error| format!("Could not copy Misty.app into ~/.misty: {error}"))?;
+        replace_path(&staging, &target)
+            .map_err(|error| format!("Could not install Misty.app into ~/.misty: {error}"))?;
+    }
+
+    let link = user_misty_app_link_path()
+        .ok_or_else(|| "Could not resolve ~/Applications/Misty.app".to_string())?;
+    fs::create_dir_all(link.parent().expect("Misty.app link has a parent"))
+        .map_err(|error| format!("Could not create ~/Applications: {error}"))?;
+    remove_path_if_exists(&link)
+        .map_err(|error| format!("Could not replace ~/Applications/Misty.app: {error}"))?;
+    std::os::unix::fs::symlink(&target, &link)
+        .map_err(|error| format!("Could not link ~/Applications/Misty.app: {error}"))?;
+
+    Ok(Some(format!(
+        "Linked {} to {}.",
+        link.display(),
+        target.display()
+    )))
+}
+
+#[cfg(not(target_os = "macos"))]
+fn install_current_app_bundle(_home: &Path) -> Result<Option<String>, String> {
+    Ok(None)
+}
+
+#[cfg(target_os = "macos")]
+fn restart_launch_path() -> Option<PathBuf> {
+    user_misty_app_link_path()
+}
+
+#[cfg(not(target_os = "macos"))]
+fn restart_launch_path() -> Option<PathBuf> {
+    None
+}
+
+#[cfg(target_os = "macos")]
+fn spawn_delayed_app_launch(path: &Path) -> Result<(), String> {
+    Command::new("/bin/sh")
+        .arg("-c")
+        .arg("sleep 1; /usr/bin/open \"$1\"")
+        .arg("misty-restart")
+        .arg(path)
+        .spawn()
+        .map(|_| ())
+        .map_err(|error| format!("Could not schedule Misty restart: {error}"))
+}
+
+#[cfg(not(target_os = "macos"))]
+fn spawn_delayed_app_launch(_path: &Path) -> Result<(), String> {
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+fn current_app_bundle() -> io::Result<Option<PathBuf>> {
+    let exe = env::current_exe()?;
+    Ok(exe
+        .ancestors()
+        .find(|path| {
+            path.extension()
+                .and_then(|extension| extension.to_str())
+                .is_some_and(|extension| extension.eq_ignore_ascii_case("app"))
+        })
+        .map(Path::to_path_buf))
+}
+
+#[cfg(target_os = "macos")]
+fn user_misty_app_link_path() -> Option<PathBuf> {
+    paths::misty_data_root().map(|root| root.join("Applications").join("Misty.app"))
+}
+
+#[cfg(target_os = "macos")]
+fn paths_equivalent(left: &Path, right: &Path) -> bool {
+    match (left.canonicalize(), right.canonicalize()) {
+        (Ok(left), Ok(right)) => left == right,
+        _ => false,
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn replace_path(source: &Path, destination: &Path) -> io::Result<()> {
+    remove_path_if_exists(destination)?;
+    fs::rename(source, destination)
+}
+
+#[cfg(target_os = "macos")]
+fn remove_path_if_exists(path: &Path) -> io::Result<()> {
+    let Ok(metadata) = fs::symlink_metadata(path) else {
+        return Ok(());
+    };
+    if metadata.is_dir() && !metadata.file_type().is_symlink() {
+        fs::remove_dir_all(path)
+    } else {
+        fs::remove_file(path)
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn copy_directory(source: &Path, destination: &Path) -> io::Result<()> {
+    fs::create_dir_all(destination)?;
+    for entry in WalkDir::new(source).follow_links(false) {
+        let entry = entry?;
+        let path = entry.path();
+        let relative = path.strip_prefix(source).map_err(io::Error::other)?;
+        if relative.as_os_str().is_empty() {
+            continue;
+        }
+        let target = destination.join(relative);
+        let metadata = fs::symlink_metadata(path)?;
+
+        if metadata.file_type().is_symlink() {
+            let link_target = fs::read_link(path)?;
+            std::os::unix::fs::symlink(link_target, target)?;
+        } else if metadata.is_dir() {
+            fs::create_dir_all(&target)?;
+            fs::set_permissions(&target, metadata.permissions())?;
+        } else if metadata.is_file() {
+            if let Some(parent) = target.parent() {
+                fs::create_dir_all(parent)?;
+            }
+            fs::copy(path, &target)?;
+            fs::set_permissions(&target, metadata.permissions())?;
+        }
+    }
+    Ok(())
 }
 
 fn misty_home_dir() -> Result<PathBuf, String> {

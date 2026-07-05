@@ -55,7 +55,7 @@ use services::misty::{
     sign_out_misty, stop_misty, uninstall_plugin,
 };
 use services::misty_template::{
-    build_misty_template, install_misty_template, misty_template_status,
+    build_misty_template, install_misty_template, misty_template_status, restart_misty_app,
 };
 use services::tray;
 
@@ -123,6 +123,7 @@ pub fn run() {
             misty_template_status,
             build_misty_template,
             install_misty_template,
+            restart_misty_app,
             ensure_local_access_token,
             fetch_misty_releases,
             save_authenticated_user,

@@ -16,16 +16,16 @@ const explorerCompareWithEvent = "misty:explorer-compare-with";
 const emptyPinnedPaths: string[] = [];
 
 const contextMenuStyles = {
-  menu: "fixed z-[1000] w-[250px] overflow-auto rounded-[11px] border border-[#323232] bg-[rgba(17, 17, 17, 0.97)] p-1.5 shadow-[0_18px_40px_rgba(0,0,0,0.45)] backdrop-blur-xl",
-  submenu: "fixed z-[1001] w-[246px] overflow-auto rounded-[11px] border border-[#323232] bg-[rgba(17, 17, 17, 0.98)] p-1.5 shadow-[0_18px_40px_rgba(0,0,0,0.48)] backdrop-blur-xl",
+  menu: "fixed z-[1000] w-[250px] overflow-auto rounded-[11px] border border-white/10 bg-[rgba(5,6,7,0.98)] p-1.5 shadow-[0_18px_40px_rgba(0,0,0,0.45)] backdrop-blur-xl",
+  submenu: "fixed z-[1001] w-[246px] overflow-auto rounded-[11px] border border-white/10 bg-[rgba(5,6,7,0.98)] p-1.5 shadow-[0_18px_40px_rgba(0,0,0,0.48)] backdrop-blur-xl",
   item:
-    "grid h-9 w-full grid-cols-[19px_minmax(0,1fr)_auto] items-center gap-2.5 rounded-lg border-0 bg-transparent px-2.5 text-left text-[#dddddd] hover:not-disabled:bg-[#222222] hover:not-disabled:text-[#eeeeee] disabled:opacity-45 [&:hover:not(:disabled)_.context-menu-icon]:text-[#d0d0d0] [&:hover:not(:disabled)_.context-menu-shortcut]:text-[#d0d0d0]",
+    "grid h-9 w-full grid-cols-[19px_minmax(0,1fr)_auto] items-center gap-2.5 rounded-lg border-0 bg-transparent px-2.5 text-left text-[#e4e4e7] hover:not-disabled:bg-white/[0.06] hover:not-disabled:text-[#f4f4f5] disabled:opacity-45 [&:hover:not(:disabled)_.context-menu-icon]:text-[#d4d4d8] [&:hover:not(:disabled)_.context-menu-shortcut]:text-[#d4d4d8]",
   itemActive:
-    "bg-[#242424] text-[#eeeeee] [&_.context-menu-icon]:text-[#d0d0d0] [&_.context-menu-shortcut]:text-[#d0d0d0]",
-  icon: "context-menu-icon inline-flex items-center justify-center text-[#b6b6b6]",
+    "bg-white/[0.08] text-[#f4f4f5] [&_.context-menu-icon]:text-[#d4d4d8] [&_.context-menu-shortcut]:text-[#d4d4d8]",
+  icon: "context-menu-icon inline-flex items-center justify-center text-[#a1a1aa]",
   label: "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap",
   shortcut: "context-menu-shortcut text-xs text-[#898989]",
-  separator: "mx-1 my-[5px] h-px bg-[#292929]",
+  separator: "mx-1 my-[5px] h-px bg-white/10",
 } as const;
 
 const contextMenuViewportMargin = 8;
@@ -46,6 +46,8 @@ type ContextMenuBranchItem = {
   id: string;
   icon: ReactNode;
   label: string;
+  disabled?: boolean;
+  disabledReason?: string;
   items: ContextMenuLeafItem[];
 };
 
@@ -518,6 +520,26 @@ export const ExplorerContextMenu = memo(function ExplorerContextMenu() {
     },
   ];
 
+  const renameItems: ContextMenuLeafItem[] = [
+    {
+      id: "rename-inline",
+      icon: <Pencil size={17} />,
+      label: "Rename",
+      shortcut: shortcut("Enter"),
+      disabled: !hasSelection,
+      disabledReason: selectionDisabledReason,
+      onRun: () => run(() => void useExplorerStore.getState().renameSelected(paneId)),
+    },
+    {
+      id: "batch-rename",
+      icon: <Pencil size={17} />,
+      label: "Batch Rename...",
+      disabled: !hasSelection,
+      disabledReason: selectionDisabledReason,
+      onRun: () => run(() => useExplorerStore.getState().openBatchRenameDialog(paneId)),
+    },
+  ];
+
   const moreItems: ContextMenuLeafItem[] = entryId ? [
     {
       id: "pin",
@@ -552,18 +574,9 @@ export const ExplorerContextMenu = memo(function ExplorerContextMenu() {
       id: "rename",
       icon: <Pencil size={17} />,
       label: "Rename",
-      shortcut: shortcut("Enter"),
       disabled: !hasSelection,
       disabledReason: selectionDisabledReason,
-      onRun: () => run(() => void useExplorerStore.getState().renameSelected(paneId)),
-    },
-    {
-      id: "batch-rename",
-      icon: <Pencil size={17} />,
-      label: "Batch Rename...",
-      disabled: !hasSelection,
-      disabledReason: selectionDisabledReason,
-      onRun: () => run(() => useExplorerStore.getState().openBatchRenameDialog(paneId)),
+      items: renameItems,
     },
     {
       id: "compare-with",
@@ -610,12 +623,12 @@ export const ExplorerContextMenu = memo(function ExplorerContextMenu() {
             icon={item.icon}
             label={item.label}
             shortcut={isContextMenuBranch(item) ? undefined : item.shortcut}
-            disabled={isContextMenuBranch(item) ? false : item.disabled}
-            disabledReason={isContextMenuBranch(item) ? undefined : item.disabledReason}
+            disabled={item.disabled}
+            disabledReason={item.disabledReason}
             submenu={isContextMenuBranch(item)}
             active={submenu?.id === item.id}
             onPointerEnter={(event) => {
-              if (isContextMenuBranch(item)) openSubmenu(event, item);
+              if (isContextMenuBranch(item) && !item.disabled) openSubmenu(event, item);
               else setSubmenu(null);
             }}
             onRun={() => {

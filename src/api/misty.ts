@@ -494,6 +494,7 @@ function browserAppSnapshot(): AppSnapshot {
   const mistyDir = `${browserSmokeHome}/.misty`;
   return {
     appName: "Misty",
+    version: "0.1.0",
     migrationStage: "Browser smoke mode",
     proxyUrl: null,
     proxyRuntime: {

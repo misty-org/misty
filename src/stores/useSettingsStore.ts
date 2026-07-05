@@ -13,7 +13,7 @@ import type { LaunchOnLoginSnapshot, OpenWithAssociation, ShortcutsSnapshot, Set
 import { errorText } from "../shared/format";
 import { settingsIndexToThemeMode, useAppThemeStore } from "./useAppThemeStore";
 
-type SettingsSection = "general" | "appearance" | "privacy" | "sync" | "search" | "notifications" | "shortcuts" | "advanced";
+type SettingsSection = "general" | "app" | "appearance" | "privacy" | "sync" | "transfers" | "search" | "notifications" | "shortcuts" | "advanced";
 type SettingValue = string | number | boolean | Array<Record<string, unknown>>;
 
 export type SettingsScaleToken = "small" | "default" | "large";
@@ -65,6 +65,7 @@ interface SettingsStore {
   activeSection: SettingsSection;
   settings: SettingsSnapshot | null;
   settingsText: string;
+  launchOnLogin: LaunchOnLoginSnapshot | null;
   openWithAssociations: OpenWithAssociation[];
   shortcuts: ShortcutsSnapshot | null;
   loaded: boolean;
@@ -87,6 +88,7 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
   activeSection: "general",
   settings: null,
   settingsText: "{}",
+  launchOnLogin: null,
   openWithAssociations: [],
   shortcuts: null,
   loaded: false,
@@ -108,6 +110,7 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
       set({
         settings: normalizedSettings,
         settingsText: JSON.stringify(normalizedSettings.document, null, 2),
+        launchOnLogin,
         openWithAssociations,
         shortcuts,
       });
@@ -139,24 +142,25 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
     set({
       settings: current ? { ...current, document } : { path: "", document },
       settingsText: JSON.stringify(document, null, 2),
-      working: true,
       error: null,
       message: null,
     });
 
     const applyNativeSetting = section === "general" && key === "launch_on_login"
-      ? settingsApplyLaunchOnLogin(Boolean(value)).then(() => undefined)
-      : Promise.resolve();
+      ? settingsApplyLaunchOnLogin(Boolean(value))
+      : Promise.resolve<LaunchOnLoginSnapshot | null>(null);
 
     void applyNativeSetting
-      .then(() => settingsSave({ document }))
-      .then((settings) => {
+      .then((launchOnLogin) =>
+        settingsSave({ document }).then((settings) => ({ settings, launchOnLogin })),
+      )
+      .then(({ settings, launchOnLogin }) => {
         if (requestId !== settingsSaveSequence) return;
         applySettingsSideEffects(settings.document);
         set({
           settings,
           settingsText: JSON.stringify(settings.document, null, 2),
-          message: "Settings saved.",
+          ...(launchOnLogin ? { launchOnLogin } : {}),
         });
       })
       .catch((error) => {
@@ -166,9 +170,6 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
           settingsText: JSON.stringify(current?.document ?? {}, null, 2),
           error: errorText(error),
         });
-      })
-      .finally(() => {
-        if (requestId === settingsSaveSequence) set({ working: false });
       });
   },
 
