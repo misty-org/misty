@@ -36,7 +36,7 @@ export default function App() {
     <AuthProvider>
       <ScrollRestoration />
 
-      <div className="relative flex min-h-screen flex-col overflow-hidden bg-bg">
+      <div className="relative flex min-h-screen flex-col overflow-x-clip bg-bg">
         <div className="ambient-background" aria-hidden="true" />
         <Navbar />
         
