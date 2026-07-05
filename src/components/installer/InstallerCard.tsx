@@ -59,16 +59,19 @@ function CheckRow({ check }: { check: InstallCheck }) {
 export function InstallerCard({
   className = "",
   embedded = false,
+  variant = "full",
 }: {
   className?: string;
   embedded?: boolean;
+  variant?: "full" | "compact";
 }) {
   const { user } = useAuth();
-  const { busy, loadReleases, loadSystem, releasesLoading, startInstall, status, systemError } = useSetupStore(
+  const { busy, loadReleases, loadSystem, releases, releasesLoading, startInstall, status, systemError } = useSetupStore(
     useShallow((state) => ({
       busy: state.busy,
       loadReleases: state.loadReleases,
       loadSystem: state.loadSystem,
+      releases: state.releases,
       releasesLoading: state.releasesLoading,
       startInstall: state.startInstall,
       status: state.status,
@@ -79,6 +82,7 @@ export function InstallerCard({
   const [refreshSpinning, startRefreshSpin] = useMinimumSpin(busy);
   const [updatesSpinning, startUpdatesSpin] = useMinimumSpin(releasesLoading);
   const selectedVersion = useSetupStore((state) => state.selectedVersion);
+  const latestVersion = releases[0]?.version ?? selectedVersion;
   const currentUser = status?.current_user ?? user ?? null;
   const selectedVersionInstalled = Boolean(status?.ready && sameVersion(status.installed_version, selectedVersion));
   const canInstall = !busy && Boolean(currentUser) && !selectedVersionInstalled;
@@ -93,10 +97,19 @@ export function InstallerCard({
   const missingChecks = [...folderChecks, ...fileChecks].filter((check) => check.required && !check.exists);
   const allFound = folderChecks.length > 0 && fileChecks.length > 0 && missingChecks.length === 0;
   const installLabel = selectedVersionInstalled ? "Installed" : "Install";
+  const compact = variant === "compact";
+  const totalChecks = folderChecks.length + fileChecks.length;
+  const readyChecks = foldersReady + filesReady;
+  const installedVersionLabel = status?.installed_version ?? "Not installed";
+  const readinessLabel = systemError
+    ? "Unable to check install readiness"
+    : totalChecks > 0
+      ? `${readyChecks}/${totalChecks} required items ready`
+      : "Resolving install readiness";
 
   return (
     <div
-      className={`flex h-full w-full flex-col overflow-hidden ${
+      className={`flex ${compact ? "w-full" : "h-full w-full"} flex-col overflow-hidden ${
         embedded
           ? ""
           : "rounded-lg border border-white/10 bg-[#0a0d10]/95 shadow-2xl shadow-black/25"
@@ -134,12 +147,23 @@ export function InstallerCard({
       </div>
 
       <div className={`border-b border-white/[0.08] px-4 ${embedded ? "py-3" : "py-4"}`}>
-        <div className="flex min-w-0 items-center justify-between gap-4">
-          <div className="min-w-0 text-left">
+        <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-4">
+          <div className="grid min-w-0 gap-1 text-left">
             <p className="text-base font-medium text-[#f4f4f5]">{osLabel} · {archLabel}</p>
-            <p className="mt-1 text-sm text-[#8f8f8f]">
-              {foldersReady}/{folderChecks.length || 0} folders · {filesReady}/{fileChecks.length || 0} files
-            </p>
+            {compact ? (
+              <>
+                <p className="min-w-0 truncate text-sm text-[#8f8f8f]">
+                  Installed {installedVersionLabel} · Latest {latestVersion}
+                </p>
+                <p className={`min-w-0 truncate text-sm ${systemError ? "text-[#fca5a5]" : "text-[#8f8f8f]"}`}>
+                  {readinessLabel}
+                </p>
+              </>
+            ) : (
+              <p className="mt-1 text-sm text-[#8f8f8f]">
+                {foldersReady}/{folderChecks.length || 0} folders · {filesReady}/{fileChecks.length || 0} files
+              </p>
+            )}
           </div>
           <button
             aria-label="Refresh install checks"
@@ -156,31 +180,58 @@ export function InstallerCard({
         </div>
       </div>
 
-      <div className={allFound ? `px-4 ${embedded ? "py-3" : "py-4"} text-emerald-200` : "flex min-h-0 flex-1 flex-col py-2 text-xs"}>
+      <div
+        className={
+          allFound
+            ? `px-4 ${embedded ? "py-3" : "py-4"} ${compact ? "text-[#f4f4f5]" : "text-emerald-200"}`
+            : `${compact ? "" : "flex min-h-0 flex-1 flex-col"} py-2 text-xs`
+        }
+      >
         {allFound ? (
           <div className="flex min-w-0 items-center gap-3">
             <CheckCircle2 aria-hidden="true" className="shrink-0" size={16} />
             <span className="min-w-0 truncate">All required files and binaries are installed.</span>
           </div>
         ) : missingChecks.length > 0 ? (
-          <>
-            <div className="flex items-center justify-between gap-3 px-4 pb-2">
-              <p className="text-[11px] font-semibold tracking-[0.18em] text-[#8f8f8f] uppercase">
-                Missing Items
-              </p>
+          compact ? (
+            <div className="flex min-w-0 items-center justify-between gap-3 px-4 py-2">
+              <div className="min-w-0">
+                <p className="m-0 truncate text-sm font-semibold text-[#f4f4f5]">
+                  {missingChecks.length} required item{missingChecks.length === 1 ? "" : "s"} missing
+                </p>
+                <p className="m-0 mt-1 truncate text-xs text-[#8f8f8f]">
+                  Misty can restore these from the selected release.
+                </p>
+              </div>
               <button
-                className="inline-flex items-center gap-2 rounded-md border border-white/10 bg-white/[0.03] px-3 py-1.5 text-[11px] font-semibold tracking-[0.12em] text-[#d4d4d8] uppercase transition hover:border-white/20 hover:bg-white/[0.06] hover:text-white"
+                className="inline-flex shrink-0 items-center gap-2 rounded-md border border-white/10 bg-white/[0.03] px-3 py-1.5 text-[11px] font-semibold tracking-[0.12em] text-[#d4d4d8] uppercase transition hover:border-white/20 hover:bg-white/[0.06] hover:text-white"
                 onClick={() => setShowMissingModal(true)}
                 type="button"
               >
                 <Expand className="h-3.5 w-3.5" />
-                View all
+                View details
               </button>
             </div>
-            <div className="misty-scrollbar min-h-0 flex-1 overflow-x-hidden overflow-y-scroll">
-              {missingChecks.map((check) => <CheckRow check={check} key={check.path} />)}
-            </div>
-          </>
+          ) : (
+            <>
+              <div className="flex items-center justify-between gap-3 px-4 pb-2">
+                <p className="text-[11px] font-semibold tracking-[0.18em] text-[#8f8f8f] uppercase">
+                  Missing Items
+                </p>
+                <button
+                  className="inline-flex items-center gap-2 rounded-md border border-white/10 bg-white/[0.03] px-3 py-1.5 text-[11px] font-semibold tracking-[0.12em] text-[#d4d4d8] uppercase transition hover:border-white/20 hover:bg-white/[0.06] hover:text-white"
+                  onClick={() => setShowMissingModal(true)}
+                  type="button"
+                >
+                  <Expand className="h-3.5 w-3.5" />
+                  View all
+                </button>
+              </div>
+              <div className="misty-scrollbar min-h-0 flex-1 overflow-x-hidden overflow-y-scroll">
+                {missingChecks.map((check) => <CheckRow check={check} key={check.path} />)}
+              </div>
+            </>
+          )
         ) : (
           <div className="px-4 py-2 text-[#9aa3af]">Resolving install readiness.</div>
         )}

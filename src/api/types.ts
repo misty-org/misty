@@ -2,6 +2,7 @@ export type ApiResult<T> = Promise<T>;
 
 export interface AppSnapshot {
   appName: string;
+  version: string;
   migrationStage: string;
   proxyUrl: string | null;
   proxyRuntime: ProxyRuntimeSnapshot;

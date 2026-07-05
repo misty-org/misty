@@ -17,7 +17,7 @@ export function dragItemsForEntry(
   entries: FileEntry[],
   selectedIds: Set<string>,
 ): InternalDragItem[] {
-  const sourceEntries = selectedIds.has(entry.id)
+  const sourceEntries = selectedIds.has(entry.id) && selectedIds.size > 1
     ? entries.filter((candidate) => selectedIds.has(candidate.id) && !candidate.isDeleted)
     : [entry];
   return sourceEntries.map((candidate) => ({

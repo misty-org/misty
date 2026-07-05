@@ -93,6 +93,7 @@ export interface ExplorerSortState {
 
 interface PaneExplorerState {
   listing: DirectoryListing | null;
+  hasFolderEntries: boolean;
   commandQuery: string;
   commandQueryMode: ExplorerCommandQueryMode;
   selectedIds: string[];
@@ -265,6 +266,7 @@ const directorySizeRefreshIntervalMs = 30 * 60 * 1000;
 function emptyPaneState(): PaneExplorerState {
   return {
     listing: null,
+    hasFolderEntries: false,
     commandQuery: "",
     commandQueryMode: "search",
     selectedIds: [],
@@ -775,14 +777,16 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
   selectEntry: (paneId, entryId, options = {}) => {
     set((state) => {
       const pane = state.panes[paneId] ?? emptyPaneState();
+      const entries = pane.listing?.entries ?? [];
       const path = pane.listing?.path ?? "";
-      const entryIndex = pane.listing?.entries.findIndex((entry) => entry.id === entryId) ?? -1;
-      const visibleEntryIds = options.visibleEntryIds?.filter((id) => pane.listing?.entries.some((entry) => entry.id === id)) ?? [];
+      const entryIndex = entries.findIndex((entry) => entry.id === entryId);
       let selectedIds: string[];
-      if (options.range && pane.listing && entryIndex >= 0 && visibleEntryIds.length > 0) {
+      if (options.range && pane.listing && entryIndex >= 0 && options.visibleEntryIds?.length) {
+        const entryIds = new Set(entries.map((entry) => entry.id));
+        const visibleEntryIds = options.visibleEntryIds.filter((id) => entryIds.has(id));
         const targetVisibleIndex = visibleEntryIds.indexOf(entryId);
         const previousAnchor = pane.lastSelectedIndexByPath[path];
-        const anchorEntryId = previousAnchor === undefined ? entryId : pane.listing.entries[previousAnchor]?.id;
+        const anchorEntryId = previousAnchor === undefined ? entryId : entries[previousAnchor]?.id;
         const anchorVisibleIndex = anchorEntryId ? visibleEntryIds.indexOf(anchorEntryId) : -1;
         const anchor = anchorVisibleIndex >= 0 ? anchorVisibleIndex : targetVisibleIndex;
         const target = targetVisibleIndex >= 0 ? targetVisibleIndex : anchor;
@@ -793,7 +797,7 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
         const anchor = pane.lastSelectedIndexByPath[path] ?? entryIndex;
         const start = Math.min(anchor, entryIndex);
         const end = Math.max(anchor, entryIndex);
-        selectedIds = pane.listing.entries.slice(start, end + 1).map((entry) => entry.id);
+        selectedIds = entries.slice(start, end + 1).map((entry) => entry.id);
       } else if (options.toggle) {
         selectedIds = pane.selectedIds.includes(entryId)
           ? pane.selectedIds.filter((id) => id !== entryId)
@@ -1465,6 +1469,7 @@ export function selectedEntryForPane(pane: PaneExplorerState | undefined): FileE
 function paneExplorerStatesEqual(left: PaneExplorerState, right: PaneExplorerState): boolean {
   return left === right || (
     left.listing === right.listing
+    && left.hasFolderEntries === right.hasFolderEntries
     && left.commandQuery === right.commandQuery
     && left.commandQueryMode === right.commandQueryMode
     && arraysEqual(left.selectedIds, right.selectedIds)
@@ -1478,8 +1483,12 @@ function paneExplorerStatesEqual(left: PaneExplorerState, right: PaneExplorerSta
   );
 }
 
-function selectedEntriesForPane(pane: PaneExplorerState | undefined): FileEntry[] {
+export function selectedEntriesForPane(pane: PaneExplorerState | undefined): FileEntry[] {
   if (!pane?.listing || pane.selectedIds.length === 0) return [];
+  if (pane.selectedIds.length === 1) {
+    const entry = selectedEntryForPane(pane);
+    return entry ? [entry] : [];
+  }
   const selected = new Set(pane.selectedIds);
   return pane.listing.entries.filter((entry) => selected.has(entry.id));
 }
@@ -1759,6 +1768,10 @@ function canCreateItemInPane(
 export function selectedPathsForPane(pane: PaneExplorerState | undefined): string[] {
   if (!pane?.listing) return [];
   if (pane.listing.path === "misty://trash") return [];
+  if (pane.selectedIds.length === 1) {
+    const entry = selectedEntryForPane(pane);
+    return entry && isFileMasterEntry(entry) ? [entry.path] : [];
+  }
   const selected = new Set(pane.selectedIds);
   return pane.listing.entries
     .filter((entry) => selected.has(entry.id) && isFileMasterEntry(entry))
@@ -2215,6 +2228,7 @@ function applyNavigationResult(
   return {
     ...pane,
     listing,
+    hasFolderEntries: listing.entries.some((entry) => !entry.isDeleted && entry.kind === "folder"),
     selectedIds,
     selectedIdsByPath,
     backHistory,
