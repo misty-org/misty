@@ -10,7 +10,7 @@ import EndingOutro from "./EndingOutro";
 
 export default function Home() {
   return (
-    <div className="max-w-6xl mx-auto px-3 sm:px-4 pt-24 md:pt-28 flex flex-col gap-20">
+    <div className="mx-auto flex max-w-[1420px] flex-col gap-20 px-5 pt-24 sm:px-8 md:px-12 md:pt-28 lg:px-20">
       <div className="flex flex-col gap-6">
         <section>
           <MainHero/>

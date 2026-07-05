@@ -5,7 +5,6 @@ import { useUserStore } from "../store/userStore";
 
 const navItems = [
   { to: "/download", label: "Download" },
-  { to: "/pricing", label: "Pricing" },
   { to: "/docs", label: "Docs" },
 ];
 

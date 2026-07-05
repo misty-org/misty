@@ -27,6 +27,9 @@ export default defineConfig(({ command, mode }) => {
 
   return {
     plugins: [react(), tailwindcss()],
+    server: {
+      port: 5174,
+    },
     resolve: {
       preserveSymlinks: true,
     },
