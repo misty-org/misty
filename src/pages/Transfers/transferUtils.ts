@@ -1,6 +1,14 @@
 import type { TransferRecord } from "../../api/types";
 
 export function transferProgress(row: TransferRecord): string {
+  if (
+    row.transferType === "archive"
+    || row.transferType === "create"
+    || row.transferType === "rename"
+    || row.transferType === "delete"
+  ) {
+    return row.status === "completed" ? "100%" : "0%";
+  }
   if (row.totalBytes <= 0) return "--";
   const percent = Math.min(100, Math.round((row.transferredBytes / row.totalBytes) * 100));
   return `${percent}%`;

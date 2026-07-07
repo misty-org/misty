@@ -20,6 +20,8 @@ export const fileBrowserStyles = {
     "grid min-h-0 min-w-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden",
   tableHeaderWrap:
     "min-w-0 overflow-hidden bg-[var(--misty-surface-2)]",
+  tableResetButton:
+    "absolute right-2 top-1.5 z-[4] inline-grid size-7 place-items-center rounded-md border border-transparent bg-[var(--misty-surface-2)] text-[var(--misty-text-muted)] shadow-[0_0_0_1px_var(--misty-border-soft)] hover:bg-[var(--misty-surface-hover)] hover:text-[var(--misty-text)] max-[720px]:hidden",
   tableScroll:
     "min-h-0 min-w-0 overflow-auto [contain:layout_paint] [overscroll-behavior:contain] [scrollbar-gutter:stable] max-[720px]:[scrollbar-gutter:auto]",
   table:

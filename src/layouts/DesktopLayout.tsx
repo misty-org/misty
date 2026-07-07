@@ -42,7 +42,7 @@ import {
   X,
 } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
-import mistyLogo from "../assets/misty-main.png";
+import mistyLogo from "../../assets/logos/misty.png";
 import { useExplorerStore } from "../stores/useExplorerStore";
 import type {
   ExplorerNotification,
@@ -129,16 +129,17 @@ const profileMenuItemClass =
   "grid min-h-10 w-full grid-cols-[20px_minmax(0,1fr)_auto] items-center gap-2 rounded-lg border-0 bg-transparent px-2.5 py-2 text-left text-sm text-[var(--misty-text-muted)] hover:bg-[var(--misty-surface-2)] hover:text-[var(--misty-text)]";
 
 const globalBannerBaseClass =
-  "mx-[18px] mb-0 mt-3 rounded-xl border px-3.5 py-2.5 text-sm shadow-[0_14px_36px_rgba(0,0,0,0.28)]";
+  "mt-3 max-w-[min(520px,calc(100vw-48px))] rounded-xl border border-[#2f3338] bg-[#07090b] px-3.5 py-2.5 text-sm text-[#f4f4f5] shadow-[0_14px_36px_rgba(0,0,0,0.52)]";
 
 const globalNoticeLayerClass =
-  "pointer-events-none absolute inset-x-0 top-0 z-[2147482800]";
+  "pointer-events-none fixed left-1/2 top-14 z-[2147482800] grid -translate-x-1/2 justify-items-center";
 
 const workStatusPopupClass =
-  "pointer-events-none fixed right-4 top-4 z-[2147482850] grid max-w-[min(360px,calc(100vw-96px))] grid-cols-[10px_minmax(0,1fr)] items-center gap-3 rounded-lg border border-[var(--misty-border-soft)] bg-[color-mix(in_srgb,var(--misty-surface)_94%,transparent)] px-3.5 py-2.5 text-sm text-[var(--misty-text)] shadow-[0_18px_48px_var(--misty-shadow)] backdrop-blur-xl";
+  "pointer-events-none fixed left-1/2 top-4 z-[2147482850] grid max-w-[min(360px,calc(100vw-96px))] -translate-x-1/2 grid-cols-[10px_minmax(0,1fr)] items-center gap-3 rounded-lg border border-[#2f3338] bg-[#07090b] px-3.5 py-2.5 text-sm text-[#f4f4f5] shadow-[0_18px_48px_rgba(0,0,0,0.52)]";
 
 const workStatusPulseClass =
   "size-2.5 rounded-full bg-[var(--misty-success)] shadow-[0_0_18px_color-mix(in_srgb,var(--misty-success)_72%,transparent)]";
+const workStatusToastDurationMs = 3500;
 
 const activityPanelClass =
   "grid h-[min(560px,calc(100vh-24px))] w-[420px] min-h-0 grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden rounded-lg border border-[#27272a] bg-[#0b0d0f] shadow-[0_24px_64px_rgba(0,0,0,0.42)]";
@@ -678,7 +679,11 @@ export function DesktopLayout(props: {
         ) : null}
       </header>
 
-      <nav className={desktopNavbarClass} aria-label="Primary">
+      <nav
+        className={desktopNavbarClass}
+        aria-label="Primary"
+        onPointerDown={startTitlebarDrag}
+      >
         <div
           className="mb-3 grid h-[62px] w-[62px] place-items-center"
           title={app?.migrationStage ?? "Misty"}
@@ -812,14 +817,14 @@ const RouteNotice = memo(function RouteNotice(props: { routeId: AppTab }) {
     <div className={globalNoticeLayerClass}>
       {notice.error ? (
         <div
-          className={`${globalBannerBaseClass} border-[color-mix(in_srgb,var(--misty-danger)_42%,var(--misty-border-soft))] bg-[color-mix(in_srgb,var(--misty-danger)_10%,var(--misty-surface))] text-[var(--misty-danger)]`}
+          className={`${globalBannerBaseClass} border-[color-mix(in_srgb,var(--misty-danger)_42%,#2f3338)] text-[var(--misty-danger)]`}
         >
           {notice.error}
         </div>
       ) : null}
       {showMessage && notice.message ? (
         <div
-          className={`${globalBannerBaseClass} border-[color-mix(in_srgb,var(--misty-success)_38%,var(--misty-border-soft))] bg-[color-mix(in_srgb,var(--misty-success)_10%,var(--misty-surface))] text-[var(--misty-success)]`}
+          className={`${globalBannerBaseClass} border-[color-mix(in_srgb,var(--misty-success)_38%,#2f3338)] text-[var(--misty-success)]`}
         >
           {notice.message}
         </div>
@@ -923,6 +928,7 @@ const WorkStatusPopup = memo(function WorkStatusPopup() {
   const pluginInstalling = usePluginsStore((state) =>
     Boolean(state.actionPluginId),
   );
+  const [visibleSummary, setVisibleSummary] = useState<{ title: string; detail: string } | null>(null);
 
   useEffect(() => {
     let disposed = false;
@@ -938,17 +944,32 @@ const WorkStatusPopup = memo(function WorkStatusPopup() {
   }, [loadTransfers]);
 
   const summary = workStatusSummary(rows, setupInstalling || pluginInstalling);
-  if (!summary) return null;
+  const summaryTitle = summary?.title ?? "";
+  const summaryDetail = summary?.detail ?? "";
+
+  useEffect(() => {
+    if (!summaryTitle) {
+      setVisibleSummary(null);
+      return;
+    }
+    setVisibleSummary({ title: summaryTitle, detail: summaryDetail });
+    const timeout = window.setTimeout(() => {
+      setVisibleSummary(null);
+    }, workStatusToastDurationMs);
+    return () => window.clearTimeout(timeout);
+  }, [summaryTitle, summaryDetail]);
+
+  if (!visibleSummary) return null;
 
   return (
     <aside className={workStatusPopupClass} role="status" aria-live="polite">
       <span className={workStatusPulseClass} />
       <span className="min-w-0">
         <strong className="block truncate text-[13px] font-semibold leading-tight">
-          {summary.title}
+          {visibleSummary.title}
         </strong>
         <span className="block truncate text-xs leading-tight text-[var(--misty-text-muted)]">
-          {summary.detail}
+          {visibleSummary.detail}
         </span>
       </span>
     </aside>

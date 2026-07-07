@@ -7,7 +7,7 @@ import {
   searchStartScan,
 } from "../api/misty";
 import type { SearchQueryScope, SearchResult, SearchStatus } from "../api/types";
-import { errorText } from "../shared/format";
+import { userFacingErrorText } from "../shared/format";
 import { useExplorerStore } from "./useExplorerStore";
 import { mergeLibrarySearchResults } from "../pages/Files/utils/librarySearch";
 
@@ -55,7 +55,7 @@ export const useSearchStore = create<SearchStore>((set, get) => ({
       const status = get().initialized ? await searchGetStatus() : await searchInit();
       set({ initialized: true, status });
     } catch (error) {
-      set({ initialized: true, error: errorText(error) });
+      set({ initialized: true, error: userFacingErrorText(error) });
     }
   },
   openSearch: async (currentPath) => {
@@ -82,7 +82,7 @@ export const useSearchStore = create<SearchStore>((set, get) => ({
       const status = await searchGetStatus();
       set({ status, error: null });
     } catch (error) {
-      set({ error: errorText(error) });
+      set({ error: userFacingErrorText(error) });
     }
   },
   startScan: async (currentPath) => {
@@ -96,7 +96,7 @@ export const useSearchStore = create<SearchStore>((set, get) => ({
       set({ status, currentPath, error: null });
       scheduleStatusPolling();
     } catch (error) {
-      set({ error: errorText(error) });
+      set({ error: userFacingErrorText(error) });
     }
   },
   cancelScan: async () => {
@@ -105,7 +105,7 @@ export const useSearchStore = create<SearchStore>((set, get) => ({
       set({ status, error: null });
       scheduleStatusPolling();
     } catch (error) {
-      set({ error: errorText(error) });
+      set({ error: userFacingErrorText(error) });
     }
   },
   executeSearch: async () => {
@@ -147,7 +147,7 @@ export const useSearchStore = create<SearchStore>((set, get) => ({
           trimmed,
           { scope, currentPath, limit: 100 },
         );
-        set({ results, searching: false, error: results.length > 0 ? null : errorText(error) });
+        set({ results, searching: false, error: results.length > 0 ? null : userFacingErrorText(error) });
       }
     }
   },

@@ -49,6 +49,8 @@ pub struct RemoteJobStatus {
     #[serde(default)]
     pub bytes_total: i64,
     #[serde(default)]
+    pub bytes_per_second: f64,
+    #[serde(default)]
     pub source_remote: String,
     #[serde(default)]
     pub source_path: String,

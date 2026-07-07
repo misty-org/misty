@@ -19,23 +19,22 @@ interface LoginResponse {
 }
 
 async function request<T>(path: string, body: unknown): Promise<T> {
-  const response = await fetch(`${appApiBase()}${path}`, {
+  const apiBase = await appApiBase();
+  const response = await fetch(`${apiBase}${path}`, {
     method: "POST",
     headers: await appApiHeaders({ "Content-Type": "application/json" }, path !== "/login" && path !== "/register"),
     body: JSON.stringify(body),
     credentials: "include",
   });
 
-  const contentType = response.headers.get("Content-Type") ?? "";
-  const isJSON = contentType.includes("application/json");
-  const payload = isJSON ? await response.json() : await response.text();
+  const payload = await parsePayload(response, path);
 
   if (!response.ok) {
     const message =
       typeof payload === "string"
         ? payload.trim()
-        : typeof payload?.message === "string"
-          ? payload.message
+        : responseMessage(payload)
+          ? responseMessage(payload)
           : "Something went wrong";
     throw new Error(message || "Something went wrong");
   }
@@ -44,22 +43,21 @@ async function request<T>(path: string, body: unknown): Promise<T> {
 }
 
 async function getRequest<T>(path: string): Promise<T> {
-  const response = await fetch(`${appApiBase()}${path}`, {
+  const apiBase = await appApiBase();
+  const response = await fetch(`${apiBase}${path}`, {
     method: "GET",
     headers: await appApiHeaders(),
     credentials: "include",
   });
 
-  const contentType = response.headers.get("Content-Type") ?? "";
-  const isJSON = contentType.includes("application/json");
-  const payload = isJSON ? await response.json() : await response.text();
+  const payload = await parsePayload(response, path);
 
   if (!response.ok) {
     const message =
       typeof payload === "string"
         ? payload.trim()
-        : typeof payload?.message === "string"
-          ? payload.message
+        : responseMessage(payload)
+          ? responseMessage(payload)
           : "Something went wrong";
     throw new Error(message || "Something went wrong");
   }
@@ -106,4 +104,61 @@ export function validateResetTokenRequest() {
 
 export function resetPasswordRequest(newPassword: string) {
   return request("/auth/reset", { new_password: newPassword });
+}
+
+async function parsePayload(response: Response, path: string): Promise<unknown> {
+  const text = await response.text();
+  const contentType = response.headers.get("Content-Type") ?? "";
+  if (!contentType.includes("application/json")) return text;
+  if (!text.trim()) return null;
+  try {
+    return JSON.parse(text);
+  } catch (error) {
+    const firstJsonValue = firstJsonValueText(text);
+    if (firstJsonValue) return JSON.parse(firstJsonValue);
+    throw new Error(`Misty server returned malformed JSON for ${path}: ${textPreview(text)}${error instanceof Error ? ` (${error.message})` : ""}`);
+  }
+}
+
+function textPreview(value: string): string {
+  return value.replace(/\s+/g, " ").trim().slice(0, 160) || "empty response";
+}
+
+function firstJsonValueText(value: string): string | null {
+  const start = value.search(/[\[{]/);
+  if (start < 0) return null;
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+  for (let index = start; index < value.length; index += 1) {
+    const char = value[index];
+    if (inString) {
+      if (escaped) {
+        escaped = false;
+      } else if (char === "\\") {
+        escaped = true;
+      } else if (char === "\"") {
+        inString = false;
+      }
+      continue;
+    }
+    if (char === "\"") {
+      inString = true;
+      continue;
+    }
+    if (char === "{" || char === "[") {
+      depth += 1;
+    } else if (char === "}" || char === "]") {
+      depth -= 1;
+      if (depth === 0) return value.slice(start, index + 1);
+      if (depth < 0) return null;
+    }
+  }
+  return null;
+}
+
+function responseMessage(payload: unknown): string {
+  if (!payload || typeof payload !== "object") return "";
+  const message = (payload as { message?: unknown }).message;
+  return typeof message === "string" ? message : "";
 }

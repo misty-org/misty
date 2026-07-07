@@ -214,6 +214,8 @@ export interface SearchStatus {
   lastScanOutcome: SearchScanOutcome | null;
   lastScanError: string | null;
   indexedItemCount: number;
+  indexedLocalItemCount: number;
+  indexedRemoteItemCount: number;
   scanIndexedItemCount: number;
   indexSizeBytes: number;
   currentSource: string | null;
@@ -718,6 +720,7 @@ export interface ProviderJobStatus {
   phase: string;
   bytesCompleted: number;
   bytesTotal: number;
+  bytesPerSecond?: number;
   sourceRemote?: string | null;
   sourcePath?: string | null;
   destRemote?: string | null;
@@ -825,10 +828,16 @@ export type TransferStatus =
 export interface TransferRecord {
   id: number;
   jobId: number;
+  operationId: number;
+  batchId: number;
+  parentTransferId: number;
+  rootTransferId: number;
+  treeDepth: number;
   transferType: TransferType;
   itemType: "local" | "remote";
   status: TransferStatus;
   conflictPolicy: string;
+  queueTitle: string;
   fileName: string;
   localSourcePath: string;
   localDestPath: string;
@@ -838,6 +847,7 @@ export interface TransferRecord {
   remoteDestPath: string;
   totalBytes: number;
   transferredBytes: number;
+  bytesPerSecond: number;
   errorMessage: string;
   detailMessage: string;
   queuedAtMs: number;
@@ -847,6 +857,11 @@ export interface TransferRecord {
   retryable: boolean;
   undoable: boolean;
   undoTokenId: number;
+  preserveOrder: boolean;
+  paused: boolean;
+  attempt: number;
+  supportsReplace: boolean;
+  supportsKeepBoth: boolean;
 }
 
 export interface TransferFilter {
@@ -871,7 +886,6 @@ export type OperationKind =
   | "download"
   | "archive";
 export type OperationConflictPolicy = "ask" | "replace" | "skip" | "keep_both";
-export type OperationPriority = "low" | "normal" | "high";
 export type OperationStatus =
   | "queued"
   | "in_progress"
@@ -891,6 +905,9 @@ export interface OperationDescriptor {
   operationId: number;
   transferId: number;
   batchId: number;
+  parentTransferId: number;
+  rootTransferId: number;
+  treeDepth: number;
   kind: OperationKind;
   source: OperationEndpoint;
   target: OperationEndpoint;
@@ -906,7 +923,6 @@ export interface OperationDescriptor {
   errorMessage: string;
   attempt: number;
   paused: boolean;
-  priority: OperationPriority;
 }
 
 export interface OperationBatch {

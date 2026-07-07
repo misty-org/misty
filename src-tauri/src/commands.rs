@@ -13,7 +13,7 @@ use crate::core::explorer::{
     PreparedOpenItem, RenameItemRequest, RenameItemsRequest,
 };
 use crate::core::file_sync::FileSyncPair;
-use crate::core::operation_queue::{ConflictPolicy, OperationPriority, OperationQueueSnapshot};
+use crate::core::operation_queue::{ConflictPolicy, OperationQueueSnapshot};
 use crate::core::workspace::WorkspaceDocument;
 use crate::error::{ApiError, ApiResult};
 use crate::runtime::MistyRuntime;
@@ -963,6 +963,14 @@ pub async fn operation_queue_retry(
 }
 
 #[tauri::command]
+pub async fn operation_queue_retry_transfer(
+    transfer_id: u64,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<OperationQueueSnapshot> {
+    state.operation_queue.retry_transfer(transfer_id).await
+}
+
+#[tauri::command]
 pub async fn operation_queue_pause(
     operation_id: u64,
     state: State<'_, MistyRuntime>,
@@ -1006,18 +1014,6 @@ pub async fn operation_queue_resume_all(
     state: State<'_, MistyRuntime>,
 ) -> ApiResult<OperationQueueSnapshot> {
     Ok(state.operation_queue.resume_all().await)
-}
-
-#[tauri::command]
-pub async fn operation_queue_set_priority(
-    operation_id: u64,
-    priority: OperationPriority,
-    state: State<'_, MistyRuntime>,
-) -> ApiResult<OperationQueueSnapshot> {
-    state
-        .operation_queue
-        .set_priority(operation_id, priority)
-        .await
 }
 
 #[tauri::command]

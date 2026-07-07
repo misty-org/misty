@@ -34,6 +34,7 @@ import {
 } from "../../../stores/useSettingsStore";
 import { useSearchStore } from "../../../stores/useSearchStore";
 import { formatBytes, formatDate } from "../../Files/utils/fileFormat";
+import { userFacingErrorText } from "../../../shared/format";
 import { hasTauriInternals } from "../../../shared/tauri";
 import {
   defaultTransferProfileId,
@@ -751,11 +752,15 @@ function SearchSettings(_props: SettingsContentProps) {
 
   const scanActive = Boolean(status?.scanInProgress);
   const indexedItems = status?.indexedItemCount ?? 0;
+  const indexedLocalItems = status?.indexedLocalItemCount ?? 0;
+  const indexedRemoteItems = status?.indexedRemoteItemCount ?? 0;
   const indexedLocalRoots = status?.indexedLocalRoots ?? [];
   const indexedRemoteNames = status?.indexedRemoteNames ?? [];
   const scanProgress = status?.scanIndexedItemCount ?? 0;
   const lastIndexed = status?.lastScanTimeMs ? formatDate(status.lastScanTimeMs) : "Never";
   const phase = status?.scanPhase ? status.scanPhase.replace(/_/g, " ") : "idle";
+  const outcome = searchOutcomeLabel(status?.lastScanOutcome);
+  const indexHasErrors = Boolean(error || status?.lastScanError || status?.scanErrors.length);
 
   return (
     <>
@@ -763,9 +768,13 @@ function SearchSettings(_props: SettingsContentProps) {
         <SettingsNote>Misty searches file and folder names from a local metadata index. Remote scans refresh provider listings through the existing Misty remote runtime.</SettingsNote>
         <div className="mt-3 grid grid-cols-4 gap-3">
           <SearchStatCard label="Indexed items" value={indexedItems.toLocaleString()} />
-          <SearchStatCard label="Drives / roots" value={indexedLocalRoots.length.toLocaleString()} />
-          <SearchStatCard label="Remotes" value={indexedRemoteNames.length.toLocaleString()} />
+          <SearchStatCard label="Local items" value={indexedLocalItems.toLocaleString()} />
+          <SearchStatCard label="Remote items" value={indexedRemoteItems.toLocaleString()} />
           <SearchStatCard label="Index size" value={formatBytes(status?.indexSizeBytes ?? 0)} />
+        </div>
+        <div className="mt-3 grid grid-cols-2 gap-3">
+          <SearchStatCard label="Local roots" value={indexedLocalRoots.length.toLocaleString()} compact />
+          <SearchStatCard label="Remotes" value={indexedRemoteNames.length.toLocaleString()} compact />
         </div>
         <div className="mt-3 grid min-h-[46px] grid-cols-[minmax(0,1fr)_auto] items-center gap-4 border-y border-white/[0.08] py-3">
           <div className="grid min-w-0 gap-1">
@@ -773,10 +782,10 @@ function SearchSettings(_props: SettingsContentProps) {
             <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-sm text-[#a1a1aa]">
               {scanActive
                 ? `${phase} · ${scanProgress.toLocaleString()} items scanned${status?.currentPath ? ` · ${status.currentPath}` : ""}`
-                : `Last indexed ${lastIndexed}`}
+                : `${outcome} · Last indexed ${lastIndexed}`}
             </span>
             {error || status?.lastScanError ? (
-              <span className="text-sm text-[#d6a0a0]">{error || status?.lastScanError}</span>
+              <span className="text-sm text-[#d6a0a0]">{userFacingErrorText(error || status?.lastScanError)}</span>
             ) : null}
           </div>
           <div className="flex items-center gap-2">
@@ -786,7 +795,7 @@ function SearchSettings(_props: SettingsContentProps) {
               </button>
             ) : (
               <button type="button" className={settingsPrimaryButtonClass} onClick={() => void startScan("")}>
-                Reindex
+                {indexHasErrors ? "Reindex Now" : "Reindex All"}
               </button>
             )}
             <button type="button" className={settingsControlButtonCompactClass} onClick={() => void refreshStatus()}>
@@ -804,7 +813,7 @@ function SearchSettings(_props: SettingsContentProps) {
           <ValueText value={indexedRemoteNames.length ? indexedRemoteNames.join(", ") : "None indexed"} muted={!indexedRemoteNames.length} />
         </SettingsRow>
         <SettingsRow label="Last outcome" description="Result of the most recent indexing run." last>
-          <ValueText value={status?.lastScanOutcome ?? "Not run"} muted={!status?.lastScanOutcome} />
+          <ValueText value={outcome} muted={!status?.lastScanOutcome} />
         </SettingsRow>
       </SettingsSectionBlock>
 
@@ -818,7 +827,7 @@ function SearchSettings(_props: SettingsContentProps) {
             {status.scanErrors.map((scanError) => (
               <div className={settingsReferenceRowClass} key={`${scanError.source}:${scanError.message}`}>
                 <span className={settingsReferenceSpanClass}>{scanError.source}</span>
-                <span className="min-w-0 [overflow-wrap:anywhere] text-[#d6a0a0]">{scanError.message}</span>
+                <span className="min-w-0 [overflow-wrap:anywhere] text-[#d6a0a0]">{userFacingErrorText(scanError.message)}</span>
               </div>
             ))}
           </div>
@@ -828,13 +837,20 @@ function SearchSettings(_props: SettingsContentProps) {
   );
 }
 
-function SearchStatCard(props: { label: string; value: string }) {
+function SearchStatCard(props: { label: string; value: string; compact?: boolean }) {
   return (
-    <div className="grid min-h-[76px] content-center gap-1 rounded-md border border-white/10 bg-[#07090b] px-3">
-      <strong className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[21px] font-[720] text-[#f4f4f5]">{props.value}</strong>
+    <div className={`${props.compact ? "min-h-[54px]" : "min-h-[76px]"} grid content-center gap-1 rounded-md border border-white/10 bg-[#07090b] px-3`}>
+      <strong className={`min-w-0 overflow-hidden text-ellipsis whitespace-nowrap ${props.compact ? "text-[17px]" : "text-[21px]"} font-[720] text-[#f4f4f5]`}>{props.value}</strong>
       <span className="text-xs text-[#8f8f8f]">{props.label}</span>
     </div>
   );
+}
+
+function searchOutcomeLabel(outcome: string | null | undefined): string {
+  if (outcome === "completed") return "Last scan completed";
+  if (outcome === "canceled") return "Last scan canceled";
+  if (outcome === "failed") return "Last scan failed";
+  return "Not run";
 }
 
 function NotificationsSettings(props: SettingsContentProps) {

@@ -255,6 +255,8 @@ pub struct ProviderJobStatus {
     pub phase: String,
     pub bytes_completed: i64,
     pub bytes_total: i64,
+    #[serde(default)]
+    pub bytes_per_second: f64,
     pub source_remote: Option<String>,
     pub source_path: Option<String>,
     pub dest_remote: Option<String>,
@@ -1785,7 +1787,7 @@ mod tests {
             continue_existing: false,
         };
 
-        let body = provider_config_request_body(&request);
+        let body = provider_config_request_body(&request).expect("build provider config body");
 
         assert_eq!(body["name"], "drive-misty");
         assert_eq!(body["type"], "drive");
@@ -1808,7 +1810,7 @@ mod tests {
             continue_existing: true,
         };
 
-        let body = provider_config_request_body(&request);
+        let body = provider_config_request_body(&request).expect("build provider config body");
 
         assert_eq!(body["name"], "onedrive-misty");
         assert_eq!(body["type"], "onedrive");
@@ -1830,7 +1832,7 @@ mod tests {
             continue_existing: true,
         };
 
-        let body = provider_config_request_body(&request);
+        let body = provider_config_request_body(&request).expect("build provider config body");
 
         assert_eq!(body["name"], "onedrive-misty");
         assert_eq!(body["type"], "onedrive");

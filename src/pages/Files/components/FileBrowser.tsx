@@ -4,6 +4,7 @@ import {
   File,
   Folder,
   Download,
+  RotateCcw,
 } from "lucide-react";
 import { memo, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import type { DragEvent, MouseEvent, PointerEvent as ReactPointerEvent, ReactNode } from "react";
@@ -72,6 +73,13 @@ const minimumColumnWidths: FileTableColumnWidths = {
   modified: 150,
   size: 92,
   type: 120,
+};
+
+const maximumColumnWidths: FileTableColumnWidths = {
+  name: 640,
+  modified: 360,
+  size: 220,
+  type: 260,
 };
 
 interface FileBrowserProps {
@@ -303,6 +311,7 @@ function FileTable(props: FileBrowserProps & { listing: DirectoryListing }) {
   const visibleEntries = props.listing.entries.slice(startIndex, endIndex);
   const topSpacerHeight = startIndex * rowHeight;
   const bottomSpacerHeight = Math.max(0, (rowCount - endIndex) * rowHeight);
+  const columnsDirty = useMemo(() => fileTableColumns.some((column) => columnWidths[column] !== defaultColumnWidths[column]), [columnWidths]);
 
   const updateViewport = useCallback(() => {
     const element = scrollRef.current;
@@ -389,7 +398,7 @@ function FileTable(props: FileBrowserProps & { listing: DirectoryListing }) {
       setColumnWidths((current) => current[column] === pendingWidth ? current : { ...current, [column]: pendingWidth });
     };
     const onPointerMove = (moveEvent: PointerEvent) => {
-      pendingWidth = Math.max(minimumColumnWidths[column], startWidth + moveEvent.clientX - startX);
+      pendingWidth = clampColumnWidth(startWidth + moveEvent.clientX - startX, minimumColumnWidths[column], maximumColumnWidths[column]);
       if (frame === null) frame = window.requestAnimationFrame(applyWidth);
     };
     const onPointerUp = () => {
@@ -406,13 +415,30 @@ function FileTable(props: FileBrowserProps & { listing: DirectoryListing }) {
     window.addEventListener("pointerup", onPointerUp, { once: true });
   }, [columnWidths]);
 
+  const resetColumnWidths = useCallback(() => {
+    const next = { ...defaultColumnWidths };
+    setColumnWidths(next);
+    window.localStorage.removeItem(TABLE_COLUMN_STORAGE_KEY);
+  }, []);
+
   const handleSelect = useCallback(
     (entryId: string, event: MouseEvent) => props.onSelect(entryId, event, visibleEntryIds),
     [props.onSelect, visibleEntryIds],
   );
 
   return (
-    <div className={fileBrowserStyles.tableWrap}>
+    <div className={`${fileBrowserStyles.tableWrap} relative`}>
+      {columnsDirty ? (
+        <button
+          type="button"
+          className={fileBrowserStyles.tableResetButton}
+          title="Reset columns"
+          aria-label="Reset table columns"
+          onClick={resetColumnWidths}
+        >
+          <RotateCcw size={14} />
+        </button>
+      ) : null}
       <div ref={headerRef} className={fileBrowserStyles.tableHeaderWrap}>
         <table className={fileBrowserStyles.table} style={{ width: renderedTableWidth, minWidth: renderedTableWidth }}>
           <colgroup>
@@ -1096,10 +1122,10 @@ function loadColumnWidths(): FileTableColumnWidths {
   try {
     const parsed = JSON.parse(window.localStorage.getItem(TABLE_COLUMN_STORAGE_KEY) ?? "{}") as Partial<FileTableColumnWidths>;
     return {
-      name: validColumnWidth(parsed.name, defaultColumnWidths.name, minimumColumnWidths.name),
-      modified: validColumnWidth(parsed.modified, defaultColumnWidths.modified, minimumColumnWidths.modified),
-      size: validColumnWidth(parsed.size, defaultColumnWidths.size, minimumColumnWidths.size),
-      type: validColumnWidth(parsed.type, defaultColumnWidths.type, minimumColumnWidths.type),
+      name: validColumnWidth(parsed.name, defaultColumnWidths.name, minimumColumnWidths.name, maximumColumnWidths.name),
+      modified: validColumnWidth(parsed.modified, defaultColumnWidths.modified, minimumColumnWidths.modified, maximumColumnWidths.modified),
+      size: validColumnWidth(parsed.size, defaultColumnWidths.size, minimumColumnWidths.size, maximumColumnWidths.size),
+      type: validColumnWidth(parsed.type, defaultColumnWidths.type, minimumColumnWidths.type, maximumColumnWidths.type),
     };
   } catch {
     return { ...defaultColumnWidths };
@@ -1110,8 +1136,14 @@ function saveColumnWidths(widths: FileTableColumnWidths): void {
   window.localStorage.setItem(TABLE_COLUMN_STORAGE_KEY, JSON.stringify(widths));
 }
 
-function validColumnWidth(value: unknown, fallback: number, minimum: number): number {
-  return typeof value === "number" && Number.isFinite(value) ? Math.max(minimum, value) : fallback;
+function validColumnWidth(value: unknown, fallback: number, minimum: number, maximum: number): number {
+  return typeof value === "number" && Number.isFinite(value)
+    ? clampColumnWidth(value, minimum, maximum)
+    : fallback;
+}
+
+function clampColumnWidth(value: number, minimum: number, maximum: number): number {
+  return Math.min(maximum, Math.max(minimum, Math.round(value)));
 }
 
 function loadColumnOrder(): FileTableColumn[] {
