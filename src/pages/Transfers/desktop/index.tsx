@@ -1,6 +1,8 @@
 import {
   ArrowDown,
   ArrowUp,
+  ChevronDown,
+  ChevronRight,
   Filter,
   MoreVertical,
   PanelLeftClose,
@@ -15,20 +17,17 @@ import {
   Trash2,
   XCircle,
 } from "lucide-react";
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import type { MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent, ReactNode } from "react";
+import type { MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent, ReactNode, RefObject } from "react";
 import { useShallow } from "zustand/react/shallow";
-import type { OperationDescriptor, OperationPriority, TransferRecord, TransferType } from "../../../api/types";
-import { prettyLabel } from "../../../shared/format";
-import { useMinimumSpin } from "../../../shared/hooks/useMinimumSpin";
+import type { OperationDescriptor, TransferRecord, TransferType } from "../../../api/types";
+import { errorText, prettyLabel } from "../../../shared/format";
 import { MultiPanelWorkspace } from "../../../shared/multipanel/MultiPanelWorkspace";
 import type { MultiPanelClosedPane, MultiPanelTab } from "../../../shared/multipanel/types";
 import { createMultiPanelStore, type MultiPanelStore } from "../../../shared/multipanel/useMultiPanelStore";
 import { useProvidersStore } from "../../../stores/useProvidersStore";
-import { transferProfileRecords } from "../../Settings/transferProfiles";
-import { useSettingsStore } from "../../../stores/useSettingsStore";
-import { relativeTime, remoteSummary, transferProgress } from "../transferUtils";
+import { relativeTime, remoteSummary } from "../transferUtils";
 import { useOperationQueueStore } from "../../../stores/useOperationQueueStore";
 import {
   activeTransferFilterCount,
@@ -56,10 +55,31 @@ type TransferSortMenuState = {
   y: number;
 } | null;
 type TransferSortableKey = Exclude<TransferSortKey, "none">;
+type TransferTreeRow = {
+  row: TransferRecord;
+  depth: number;
+  hasChildren: boolean;
+  expanded: boolean;
+};
+type TransferProgressSnapshot = {
+  transferredBytes: number;
+  totalBytes: number;
+  bytesPerSecond: number;
+  aggregated: boolean;
+};
+type TransferActionFeedback = {
+  tone: "busy" | "success" | "error";
+  text: string;
+} | null;
+type ViewportMenuPosition = {
+  left: number;
+  top: number;
+  maxHeight: number;
+};
 
 const transferTableColumns: TransferTableColumn[] = ["transfer", "operation", "status", "time", "remote", "actions"];
 const transferColumnLabels: Record<TransferTableColumn, string> = {
-  transfer: "Transfer",
+  transfer: "Name",
   operation: "Operation",
   status: "Status",
   time: "Time",
@@ -78,13 +98,14 @@ const transferSortOptions: Array<{ key: TransferSortableKey; label: string }> = 
   { key: "operation", label: "Operation" },
   { key: "status", label: "Status" },
 ];
+const emptyQueueOperations: OperationDescriptor[] = [];
 const transferDefaultColumnWidths: TransferColumnWidths = {
   transfer: 280,
   operation: 135,
   status: 135,
   time: 130,
   remote: 180,
-  actions: 160,
+  actions: 185,
 };
 const transferMinimumColumnWidths: TransferColumnWidths = {
   transfer: 190,
@@ -92,21 +113,21 @@ const transferMinimumColumnWidths: TransferColumnWidths = {
   status: 110,
   time: 105,
   remote: 140,
-  actions: 148,
+  actions: 172,
 };
-const TRANSFER_CHECKBOX_COLUMN_WIDTH = 38;
 const TRANSFERS_MULTIPANEL_STORAGE_KEY = "misty.transfers.multipanel.v1";
 const TRANSFER_COLUMN_WIDTHS_STORAGE_KEY = "misty.transfers.table.columnWidths";
 const TRANSFER_COLUMN_ORDER_STORAGE_KEY = "misty.transfers.table.columnOrder";
 const TRANSFER_PANEL_VISIBILITY_STORAGE_KEY = "misty.transfers.panelVisibility";
 const TRANSFER_ROW_HEIGHT = 46;
 const TRANSFER_OVERSCAN_ROWS = 8;
+const VIEWPORT_MENU_MARGIN = 8;
 
 const transferStyles = {
   workspace:
     "bg-[var(--misty-bg)]",
   pane:
-    "grid h-full min-h-0 min-w-0 grid-rows-[auto_minmax(0,1fr)_24px] overflow-hidden bg-[var(--misty-bg)]",
+    "grid h-full min-h-0 min-w-0 grid-rows-[minmax(0,1fr)_24px] overflow-hidden bg-[var(--misty-bg)]",
   toolbar:
     "relative flex min-w-0 items-center justify-end gap-2 border-b border-[var(--misty-border-soft)] bg-[var(--misty-bg)] px-2 py-2",
   toolbarButton:
@@ -117,8 +138,16 @@ const transferStyles = {
     "border-[color-mix(in_srgb,var(--misty-danger)_42%,var(--misty-border))] text-[var(--misty-danger)]",
   searchBox:
     "!flex !h-8 w-[min(340px,34vw)] min-w-52 !items-center !gap-2 rounded-lg border border-[var(--misty-border)] bg-[var(--misty-surface)] px-2.5 text-[var(--misty-text-muted)] !normal-case [&>input]:!h-full [&>input]:!min-w-0 [&>input]:!flex-1 [&>input]:!rounded-none [&>input]:!border-0 [&>input]:!bg-transparent [&>input]:!p-0 [&>input]:!text-sm [&>input]:!leading-none [&>input]:!text-[var(--misty-text)] [&>input]:!shadow-none [&>input]:!outline-none [&>input]:placeholder:!text-[var(--misty-text-subtle)]",
+  actionFeedback:
+    "mr-auto min-w-0 overflow-hidden text-ellipsis whitespace-nowrap rounded-md px-2 py-1 text-xs",
+  actionFeedbackBusy:
+    "bg-[color-mix(in_srgb,var(--misty-accent)_12%,var(--misty-surface))] text-[var(--misty-accent)]",
+  actionFeedbackSuccess:
+    "bg-[color-mix(in_srgb,var(--misty-success)_12%,var(--misty-surface))] text-[var(--misty-success)]",
+  actionFeedbackError:
+    "bg-[color-mix(in_srgb,var(--misty-danger)_12%,var(--misty-surface))] text-[var(--misty-danger)]",
   sortMenu:
-    "fixed z-[2147483000] grid w-44 gap-1 rounded-[10px] border border-[var(--misty-border)] bg-[var(--misty-surface)] p-1.5 shadow-[0_16px_38px_rgba(0,0,0,0.38)]",
+    "fixed z-[2147483000] grid w-44 gap-1 overflow-y-auto rounded-[10px] border border-[var(--misty-border)] bg-[var(--misty-surface)] p-1.5 shadow-[0_16px_38px_rgba(0,0,0,0.38)]",
   sortMenuLabel:
     "px-2.5 py-1 text-[11px] font-bold uppercase text-[var(--misty-text-subtle)]",
   sortMenuItem:
@@ -128,9 +157,13 @@ const transferStyles = {
   sortMenuIcon:
     "grid size-4 shrink-0 place-items-center text-[var(--misty-text-muted)]",
   actionMenu:
-    "fixed z-[2147483000] grid w-52 gap-1 rounded-[10px] border border-[var(--misty-border)] bg-[var(--misty-surface)] p-1.5 shadow-[0_16px_38px_rgba(0,0,0,0.38)]",
+    "fixed z-[2147483000] grid w-52 gap-1 overflow-y-auto rounded-[10px] border border-[var(--misty-border)] bg-[var(--misty-surface)] p-1.5 shadow-[0_16px_38px_rgba(0,0,0,0.38)]",
   actionMenuItem:
     "flex h-8 min-w-0 items-center gap-2 rounded-lg border-0 bg-transparent px-2.5 text-left text-sm text-[var(--misty-text)] hover:bg-[var(--misty-surface-3)] disabled:opacity-45",
+  actionMenuField:
+    "grid min-w-0 gap-1 rounded-lg px-2.5 py-1.5",
+  actionMenuFieldLabel:
+    "text-[11px] font-semibold uppercase text-[var(--misty-text-subtle)]",
   actionMenuDanger:
     "text-[var(--misty-danger)]",
   actionMenuSeparator: "my-1 h-px bg-[var(--misty-border-soft)]",
@@ -181,7 +214,7 @@ const transferStyles = {
     "border-[var(--misty-accent)] bg-[color-mix(in_srgb,var(--misty-accent)_16%,var(--misty-surface))]",
   tableWrap:
     "h-full min-h-0 overflow-auto p-0 pr-3 [overscroll-behavior:contain] [scrollbar-gutter:stable_both-edges]",
-  table: "border-collapse table-fixed",
+  table: "select-none border-collapse table-fixed",
   tableHeader:
     "sticky top-0 z-[2] select-none border-b border-[var(--misty-border-soft)] bg-[var(--misty-surface-2)] px-2.5 py-2 text-left align-middle text-[13px] font-semibold leading-none text-[var(--misty-text-muted)]",
   tableHeaderDragging: "opacity-60",
@@ -190,18 +223,24 @@ const transferStyles = {
   tableResizeHandle:
     "absolute right-[-3px] top-0 z-[3] h-full w-[7px] cursor-col-resize hover:bg-[rgba(79,141,255,0.34)]",
   tableRow:
-    "group h-[46px] hover:bg-[color-mix(in_srgb,var(--misty-surface-3)_76%,transparent)]",
+    "group h-[46px] cursor-default select-none hover:bg-[color-mix(in_srgb,var(--misty-surface-3)_76%,transparent)]",
   tableRowFocused:
     "bg-[color-mix(in_srgb,var(--misty-accent)_14%,var(--misty-surface))]",
+  tableRowSelected:
+    "bg-[color-mix(in_srgb,var(--misty-accent)_18%,var(--misty-surface))]",
   tableCell:
-    "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap border-b border-[var(--misty-border-soft)] px-2.5 py-1.5 text-left align-middle text-[13px] leading-[16px]",
+    "min-w-0 select-none overflow-hidden text-ellipsis whitespace-nowrap border-b border-[var(--misty-border-soft)] px-2.5 py-1.5 text-left align-middle text-[13px] leading-[16px]",
+  nameCellContent: "flex min-w-0 items-center gap-1.5",
+  treeToggle:
+    "grid size-5 shrink-0 place-items-center rounded border-0 bg-transparent p-0 text-[var(--misty-text-muted)] hover:bg-[var(--misty-surface-3)] hover:text-[var(--misty-text)]",
+  treeSpacer: "block size-5 shrink-0",
+  nameText: "min-w-0 flex-1 overflow-hidden",
   tablePrimary: "block min-w-0 overflow-hidden text-ellipsis whitespace-nowrap font-semibold leading-[17px]",
   tableSecondary:
     "mt-px block min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[12px] leading-[15px] text-[var(--misty-text-subtle)]",
-  checkboxCell:
-    "w-[38px] min-w-[38px] max-w-[38px] border-b border-[var(--misty-border-soft)] px-2 py-1.5 text-center align-middle",
-  checkboxInput: "size-4",
-  rowActions: "flex h-full items-center gap-2 whitespace-nowrap opacity-0 transition-opacity duration-150 group-hover:opacity-100 focus-within:opacity-100",
+  rowActions:
+    "flex h-full items-center justify-end gap-2 whitespace-nowrap opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100",
+  rowActionsVisible: "opacity-100",
   rowActionGroup:
     "inline-flex h-[30px] overflow-hidden rounded-[8px] border border-[var(--misty-border-soft)] bg-[var(--misty-surface-2)]",
   rowActionIconButton:
@@ -219,6 +258,16 @@ const transferStyles = {
     "min-w-0 [overflow-wrap:anywhere] font-medium text-[var(--misty-text)]",
   detailDangerValue:
     "min-w-0 [overflow-wrap:anywhere] font-medium text-[var(--misty-danger)]",
+  progressTrack:
+    "h-2 overflow-hidden rounded-full bg-[var(--misty-surface-2)]",
+  progressFill:
+    "h-full rounded-full bg-[var(--misty-accent)] transition-[width] duration-200",
+  progressFillUnknown:
+    "w-1/3 bg-[color-mix(in_srgb,var(--misty-accent)_56%,var(--misty-surface-3))]",
+  progressMeta:
+    "flex min-w-0 items-center justify-between gap-2 text-xs text-[var(--misty-text-subtle)]",
+  progressMetaStrong:
+    "font-medium text-[var(--misty-text)]",
   statusBadge:
     "inline-flex w-fit rounded-full bg-[var(--misty-surface-2)] px-2 py-[3px] text-xs leading-4 text-[var(--misty-text-muted)] capitalize",
   statusCompleted:
@@ -227,29 +276,8 @@ const transferStyles = {
     "bg-[color-mix(in_srgb,var(--misty-danger)_14%,var(--misty-surface))] text-[var(--misty-danger)]",
   statusActive:
     "bg-[color-mix(in_srgb,var(--misty-accent)_14%,var(--misty-surface))] text-[var(--misty-accent)]",
-  operationStrip:
-    "grid min-w-[920px] gap-[9px] rounded-xl border border-[var(--misty-border-soft)] bg-[var(--misty-surface-2)] p-[11px]",
-  operationSummary: "flex min-w-0 items-center gap-2.5",
-  operationTitle: "font-semibold text-[var(--misty-text)]",
-  operationMeta: "text-[var(--misty-text-subtle)]",
-  operationActions: "flex min-w-0 flex-wrap items-center gap-2",
-  operationButton:
-    "inline-flex min-h-[30px] items-center gap-1.5 rounded-[7px] border border-[var(--misty-border-soft)] bg-[var(--misty-surface-2)] px-[9px] py-[5px] text-[var(--misty-text)] disabled:opacity-50",
-  operationInput:
-    "h-[30px] w-28 rounded-[7px] border border-[var(--misty-border-soft)] bg-[var(--misty-surface)] px-2 text-xs text-[var(--misty-text)] outline-none",
   operationSelect:
     "h-[30px] rounded-[7px] border border-[var(--misty-border-soft)] bg-[var(--misty-surface)] px-2 text-xs text-[var(--misty-text)] outline-none",
-  conflictRow:
-    "grid min-w-0 grid-cols-[minmax(220px,1fr)_auto_auto_auto_auto_auto] items-center gap-2 rounded-lg border border-[color-mix(in_srgb,var(--misty-warning)_46%,var(--misty-border))] bg-[color-mix(in_srgb,var(--misty-warning)_10%,var(--misty-surface))] p-2 max-[980px]:grid-cols-[minmax(0,1fr)_auto_auto]",
-  conflictMain: "grid min-w-0 gap-[3px] max-[980px]:col-span-full",
-  conflictApply:
-    "inline-flex min-h-[30px] items-center gap-[7px] whitespace-nowrap text-[var(--misty-text)] max-[980px]:col-span-full",
-  conflictCheckbox: "size-3.5 accent-[var(--misty-warning)]",
-  conflictText: "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[var(--misty-text-subtle)]",
-  operationList: "grid gap-1.5",
-  operationRow:
-    "grid min-w-0 grid-cols-[minmax(160px,1fr)_120px_minmax(160px,1fr)_minmax(160px,1fr)_auto_auto_auto_auto] items-center gap-2 border-t border-[var(--misty-border-soft)] pt-[7px]",
-  operationCell: "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[var(--misty-text-subtle)]",
   bottomBar:
     "flex min-w-0 items-center justify-between border-t border-[var(--misty-border-soft)] bg-[var(--misty-bg)] px-2",
   bottomBarSide: "flex min-w-0 items-center gap-1",
@@ -343,8 +371,7 @@ const TransferWorkspacePane = memo(function TransferWorkspacePane(props: { works
     load,
     ensureWorkspace,
     setSearch,
-    toggleTransfer,
-    setTransfersSelected,
+    selectTransfer,
     toggleProviderFilter,
     toggleTypeFilter,
     setLocationScope,
@@ -363,8 +390,7 @@ const TransferWorkspacePane = memo(function TransferWorkspacePane(props: { works
     load: state.load,
     ensureWorkspace: state.ensureWorkspace,
     setSearch: state.setSearch,
-    toggleTransfer: state.toggleTransfer,
-    setTransfersSelected: state.setTransfersSelected,
+    selectTransfer: state.selectTransfer,
     toggleProviderFilter: state.toggleProviderFilter,
     toggleTypeFilter: state.toggleTypeFilter,
     setLocationScope: state.setLocationScope,
@@ -396,7 +422,14 @@ const TransferWorkspacePane = memo(function TransferWorkspacePane(props: { works
   const queueSnapshot = useOperationQueueStore((state) => state.snapshot);
   const queueWorking = useOperationQueueStore((state) => state.working);
   const cancelOperation = useOperationQueueStore((state) => state.cancel);
+  const cancelBatch = useOperationQueueStore((state) => state.cancelBatch);
+  const pauseOperation = useOperationQueueStore((state) => state.pause);
+  const resumeOperation = useOperationQueueStore((state) => state.resume);
+  const pauseBatch = useOperationQueueStore((state) => state.pauseBatch);
+  const resumeBatch = useOperationQueueStore((state) => state.resumeBatch);
   const retryOperation = useOperationQueueStore((state) => state.retry);
+  const retryTransfer = useOperationQueueStore((state) => state.retryTransfer);
+  const resolveConflict = useOperationQueueStore((state) => state.resolveConflict);
   const undoOperation = useOperationQueueStore((state) => state.undo);
 
   useEffect(() => {
@@ -409,13 +442,11 @@ const TransferWorkspacePane = memo(function TransferWorkspacePane(props: { works
     if (!providerSnapshot) void loadProviders(false);
   }, [loadProviders, providerSnapshot]);
 
-  useEffect(() => {
-    const interval = window.setInterval(() => {
-      if (document.hidden) return;
-      void load(undefined, { silent: true });
-      void useOperationQueueStore.getState().load({ silent: true });
-    }, 5000);
-    return () => window.clearInterval(interval);
+  const refreshTransferViews = useCallback(async (options: { force?: boolean } = {}) => {
+    await Promise.all([
+      load(undefined, { silent: true, force: options.force }),
+      useOperationQueueStore.getState().load({ silent: true, force: options.force }),
+    ]);
   }, [load]);
 
   const rows = transfers?.rows ?? [];
@@ -436,16 +467,25 @@ const TransferWorkspacePane = memo(function TransferWorkspacePane(props: { works
     sortKey,
     sortDirection,
   }), [locationScope, providerFilters, searchedRows, sortDirection, sortKey, statusFilter, typeFilters]);
-  const pageCount = Math.max(1, Math.ceil(filteredRows.length / TRANSFERS_PAGE_SIZE));
+  const treeInputRows = useMemo(
+    () => includeTransferAncestors(filteredRows, rows),
+    [filteredRows, rows],
+  );
+  const [expandedTransferIds, setExpandedTransferIds] = useState<Set<number>>(() => new Set());
+  const treeRows = useMemo(
+    () => buildTransferTreeRows(treeInputRows, expandedTransferIds),
+    [expandedTransferIds, treeInputRows],
+  );
+  const pageCount = Math.max(1, Math.ceil(treeRows.length / TRANSFERS_PAGE_SIZE));
   const activePageIndex = Math.min(pageIndex, pageCount - 1);
-  const pageRows = filteredRows.slice(
+  const pageRows = treeRows.slice(
     activePageIndex * TRANSFERS_PAGE_SIZE,
     (activePageIndex + 1) * TRANSFERS_PAGE_SIZE,
   );
   useEffect(() => {
     if (activePageIndex !== pageIndex) setPageIndex(props.workspaceId, activePageIndex);
   }, [activePageIndex, pageIndex, props.workspaceId, setPageIndex]);
-  const focusedTransfer = filteredRows.find((row) => row.id === focusedTransferId) ?? filteredRows[0] ?? null;
+  const focusedTransfer = treeInputRows.find((row) => row.id === focusedTransferId) ?? treeInputRows[0] ?? null;
   const activeFilterCount = activeTransferFilterCount({ providerFilters, typeFilters, locationScope, statusFilter });
   const queueOperationsByTransfer = useMemo(() => {
     const operations = new Map<number, NonNullable<typeof queueSnapshot>["operations"][number]>();
@@ -454,18 +494,34 @@ const TransferWorkspacePane = memo(function TransferWorkspacePane(props: { works
     }
     return operations;
   }, [queueSnapshot?.operations]);
+  const hasLiveTransferWork = useMemo(
+    () => rows.some(isLiveTransfer) || (queueSnapshot?.activeCount ?? 0) > 0,
+    [queueSnapshot?.activeCount, rows],
+  );
+  useEffect(() => {
+    const intervalMs = hasLiveTransferWork ? 1000 : 5000;
+    const interval = window.setInterval(() => {
+      if (document.hidden) return;
+      void refreshTransferViews();
+    }, intervalMs);
+    return () => window.clearInterval(interval);
+  }, [hasLiveTransferWork, refreshTransferViews]);
   const [actionMenu, setActionMenu] = useState<TransferActionMenuState>(null);
   const actionMenuTransfer = actionMenu?.rowId ? rows.find((row) => row.id === actionMenu.rowId) ?? null : null;
   const actionMenuOperation = actionMenuTransfer ? queueOperationsByTransfer.get(actionMenuTransfer.id) : undefined;
-  const pageIds = useMemo(() => pageRows.map((row) => row.id), [pageRows]);
-  const pageSelected = pageIds.length > 0 && pageIds.every((id) => selectedIds.has(id));
+  const actionMenuBatch = actionMenuTransfer?.batchId
+    ? queueSnapshot?.batches.find((batch) => batch.batchId === actionMenuTransfer.batchId)
+    : undefined;
+  const visibleTransferIds = useMemo(() => pageRows.map((entry) => entry.row.id), [pageRows]);
   const selectedCount = selectedIds.size;
   const tableScrollRef = useRef<HTMLDivElement | null>(null);
   const tableScrollFrameRef = useRef<number | null>(null);
   const tableViewportHeightRef = useRef(0);
   const tableScrollTopRef = useRef(0);
+  const actionFeedbackTimerRef = useRef<number | null>(null);
   const [tableScrollTop, setTableScrollTop] = useState(0);
   const [tableViewportHeight, setTableViewportHeight] = useState(0);
+  const [actionFeedback, setActionFeedback] = useState<TransferActionFeedback>(null);
   const [columnWidths, setColumnWidths] = useState<TransferColumnWidths>(loadTransferColumnWidths);
   const [columnOrder, setColumnOrder] = useState<TransferTableColumn[]>(loadTransferColumnOrder);
   const [draggedColumn, setDraggedColumn] = useState<TransferTableColumn | null>(null);
@@ -474,7 +530,7 @@ const TransferWorkspacePane = memo(function TransferWorkspacePane(props: { works
   const filtersVisible = panelVisibility.filters;
   const detailVisible = panelVisibility.detail;
   const visibleColumnOrder = useMemo(() => columnOrder.filter((column) => column !== "remote"), [columnOrder]);
-  const tableWidth = TRANSFER_CHECKBOX_COLUMN_WIDTH + visibleColumnOrder.reduce((sum, column) => sum + columnWidths[column], 0);
+  const tableWidth = visibleColumnOrder.reduce((sum, column) => sum + columnWidths[column], 0);
   const panelGridStyle = useMemo(() => ({
     gridTemplateColumns: [
       filtersVisible ? "240px" : "",
@@ -519,6 +575,11 @@ const TransferWorkspacePane = memo(function TransferWorkspacePane(props: { works
       }
     };
   }, [rowCount, updateTableViewport]);
+  useEffect(() => () => {
+    if (actionFeedbackTimerRef.current !== null) {
+      window.clearTimeout(actionFeedbackTimerRef.current);
+    }
+  }, []);
   const handleTableScroll = useCallback(() => {
     if (tableScrollFrameRef.current !== null) return;
     tableScrollFrameRef.current = window.requestAnimationFrame(() => {
@@ -531,24 +592,127 @@ const TransferWorkspacePane = memo(function TransferWorkspacePane(props: { works
       }
     });
   }, []);
+  const showActionFeedback = useCallback((feedback: TransferActionFeedback, autoClearMs = 2800) => {
+    if (actionFeedbackTimerRef.current !== null) {
+      window.clearTimeout(actionFeedbackTimerRef.current);
+      actionFeedbackTimerRef.current = null;
+    }
+    setActionFeedback(feedback);
+    if (feedback && feedback.tone !== "busy" && autoClearMs > 0) {
+      actionFeedbackTimerRef.current = window.setTimeout(() => {
+        setActionFeedback(null);
+        actionFeedbackTimerRef.current = null;
+      }, autoClearMs);
+    }
+  }, []);
+  const refreshAfterQueueMutation = useCallback(async (
+    action: Promise<void>,
+    labels: { busy: string; success: string },
+  ) => {
+    showActionFeedback({ tone: "busy", text: labels.busy }, 0);
+    try {
+      await action;
+      const queueError = useOperationQueueStore.getState().error;
+      await refreshTransferViews({ force: true });
+      if (queueError) {
+        showActionFeedback({ tone: "error", text: queueError }, 6500);
+        return;
+      }
+      showActionFeedback({ tone: "success", text: labels.success });
+    } catch (error) {
+      await refreshTransferViews({ force: true });
+      showActionFeedback({ tone: "error", text: errorText(error) }, 6500);
+    }
+  }, [refreshTransferViews, showActionFeedback]);
   const handleUndo = useCallback((undoTokenId: number) => {
-    void undoOperation(undoTokenId).then(() => {
-      void load(undefined, { silent: true });
-      void useOperationQueueStore.getState().load({ silent: true });
+    void refreshAfterQueueMutation(undoOperation(undoTokenId), {
+      busy: "Undoing transfer...",
+      success: "Undo queued.",
     });
-  }, [load, undoOperation]);
-  const refreshAfterQueueMutation = useCallback(async (action: Promise<void>) => {
-    await action;
-    void load(undefined, { silent: true });
-    void useOperationQueueStore.getState().load({ silent: true });
-  }, [load]);
+  }, [refreshAfterQueueMutation, undoOperation]);
   const handleCancelOperation = useCallback(
-    (operationId: number) => refreshAfterQueueMutation(cancelOperation(operationId)),
+    (operationId: number) => refreshAfterQueueMutation(cancelOperation(operationId), {
+      busy: "Canceling transfer...",
+      success: "Cancel requested.",
+    }),
     [cancelOperation, refreshAfterQueueMutation],
   );
   const handleRetryOperation = useCallback(
-    (operationId: number) => refreshAfterQueueMutation(retryOperation(operationId)),
+    (operationId: number) => refreshAfterQueueMutation(retryOperation(operationId), {
+      busy: "Retrying transfer...",
+      success: "Retry queued.",
+    }),
     [refreshAfterQueueMutation, retryOperation],
+  );
+  const handlePauseResumeTransfer = useCallback(
+    (transfer: TransferRecord) => {
+      if (!transfer.operationId) return Promise.resolve();
+      const resuming = transfer.paused;
+      return refreshAfterQueueMutation(
+        resuming
+          ? resumeOperation(transfer.operationId)
+          : pauseOperation(transfer.operationId),
+        {
+          busy: resuming ? "Resuming transfer..." : "Pausing transfer...",
+          success: resuming ? "Transfer resumed." : "Pause requested.",
+        },
+      );
+    },
+    [pauseOperation, refreshAfterQueueMutation, resumeOperation],
+  );
+  const handlePauseResumeBatchTransfer = useCallback(
+    (transfer: TransferRecord) => {
+      if (!transfer.batchId) return Promise.resolve();
+      const batch = queueSnapshot?.batches.find((candidate) => candidate.batchId === transfer.batchId);
+      const resuming = Boolean(batch?.paused);
+      return refreshAfterQueueMutation(
+        resuming
+          ? resumeBatch(transfer.batchId)
+          : pauseBatch(transfer.batchId),
+        {
+          busy: resuming ? "Resuming batch..." : "Pausing batch...",
+          success: resuming ? "Batch resumed." : "Batch paused.",
+        },
+      );
+    },
+    [pauseBatch, queueSnapshot?.batches, refreshAfterQueueMutation, resumeBatch],
+  );
+  const handleCancelBatchTransfer = useCallback(
+    (transfer: TransferRecord) => {
+      if (!transfer.batchId) return Promise.resolve();
+      return refreshAfterQueueMutation(cancelBatch(transfer.batchId), {
+        busy: "Canceling batch...",
+        success: "Batch cancellation requested.",
+      });
+    },
+    [cancelBatch, refreshAfterQueueMutation],
+  );
+  const handleResolveConflictTransfer = useCallback(
+    (transfer: TransferRecord, policy: "replace" | "skip" | "keep_both", applyToBatch: boolean) => {
+      if (!transfer.operationId) return Promise.resolve();
+      return refreshAfterQueueMutation(resolveConflict(transfer.operationId, policy, applyToBatch), {
+        busy: "Resolving conflict...",
+        success: "Conflict resolved.",
+      });
+    },
+    [refreshAfterQueueMutation, resolveConflict],
+  );
+  const handleCancelTransfer = useCallback(
+    (transfer: TransferRecord) => {
+      if (!transfer.operationId) return Promise.resolve();
+      return handleCancelOperation(transfer.operationId);
+    },
+    [handleCancelOperation],
+  );
+  const handleRetryTransfer = useCallback(
+    (transfer: TransferRecord) => {
+      if (transfer.operationId) return handleRetryOperation(transfer.operationId);
+      return refreshAfterQueueMutation(retryTransfer(transfer.id), {
+        busy: "Retrying transfer...",
+        success: "Retry queued.",
+      });
+    },
+    [handleRetryOperation, refreshAfterQueueMutation, retryTransfer],
   );
   const handleDeleteTransfer = useCallback(
     (transferId: number) => {
@@ -587,6 +751,25 @@ const TransferWorkspacePane = memo(function TransferWorkspacePane(props: { works
       rowId: row.id,
     });
   }, [props.workspaceId, setFocusedTransfer]);
+  const toggleTransferTree = useCallback((transferId: number) => {
+    setExpandedTransferIds((current) => {
+      const next = new Set(current);
+      if (next.has(transferId)) {
+        next.delete(transferId);
+      } else {
+        next.add(transferId);
+      }
+      return next;
+    });
+  }, []);
+  const handleSelectTransfer = useCallback((row: TransferRecord, event: ReactMouseEvent) => {
+    if (event.shiftKey || event.metaKey || event.ctrlKey) event.preventDefault();
+    selectTransfer(props.workspaceId, row.id, {
+      toggle: event.metaKey || event.ctrlKey,
+      range: event.shiftKey,
+      visibleTransferIds,
+    });
+  }, [props.workspaceId, selectTransfer, visibleTransferIds]);
   const closeActionMenu = useCallback(() => setActionMenu(null), []);
   const closeSortMenu = useCallback(() => setSortMenu(null), []);
   useEffect(() => {
@@ -680,23 +863,23 @@ const TransferWorkspacePane = memo(function TransferWorkspacePane(props: { works
         menu={actionMenu}
         row={actionMenuTransfer}
         operation={actionMenuOperation}
+        batchPaused={Boolean(actionMenuBatch?.paused)}
         selectedCount={selectedCount}
         hasTransfers={Boolean(transfers && transfers.totalCount > 0)}
         historyWorking={working}
         queueWorking={queueWorking}
         onClose={closeActionMenu}
-        onCancel={handleCancelOperation}
-        onRetry={handleRetryOperation}
+        onPauseResume={handlePauseResumeTransfer}
+        onPauseResumeBatch={handlePauseResumeBatchTransfer}
+        onCancelBatch={handleCancelBatchTransfer}
+        onResolveConflict={handleResolveConflictTransfer}
+        onCancel={handleCancelTransfer}
+        onRetry={handleRetryTransfer}
+        onUndo={handleUndo}
         onDeleteRow={handleDeleteTransfer}
         onDeleteSelected={handleDeleteSelected}
         onDeleteAll={handleDeleteAll}
       />
-      <OperationQueueStrip
-        onQueueChanged={() => {
-          void load(undefined, { silent: true });
-        }}
-      />
-
       <div className={transferStyles.panelsScroll}>
         <div className={transferStyles.threePanel} style={panelGridStyle}>
           {filtersVisible ? (
@@ -722,6 +905,20 @@ const TransferWorkspacePane = memo(function TransferWorkspacePane(props: { works
 
           <main className={`${transferStyles.listPanel} ${detailVisible ? "" : transferStyles.listPanelNoRight}`}>
             <div className={transferStyles.toolbar}>
+              {actionFeedback ? (
+                <span
+                  className={[
+                    transferStyles.actionFeedback,
+                    actionFeedback.tone === "busy" ? transferStyles.actionFeedbackBusy : "",
+                    actionFeedback.tone === "success" ? transferStyles.actionFeedbackSuccess : "",
+                    actionFeedback.tone === "error" ? transferStyles.actionFeedbackError : "",
+                  ].filter(Boolean).join(" ")}
+                  role="status"
+                  aria-live="polite"
+                >
+                  {actionFeedback.text}
+                </span>
+              ) : null}
               <label className={transferStyles.searchBox}>
                 <Search size={16} />
                 <input
@@ -755,21 +952,10 @@ const TransferWorkspacePane = memo(function TransferWorkspacePane(props: { works
             <div ref={tableScrollRef} className={transferStyles.tableWrap} onScroll={handleTableScroll}>
               <table className={transferStyles.table} style={{ width: tableWidth, minWidth: "calc(100% - 12px)" }}>
                 <colgroup>
-                  <col style={{ width: TRANSFER_CHECKBOX_COLUMN_WIDTH }} />
                   {visibleColumnOrder.map((column) => <col key={column} style={{ width: columnWidths[column] }} />)}
                 </colgroup>
                 <thead>
                   <tr>
-                    <th className={transferStyles.checkboxCell}>
-                      <input
-                        className={transferStyles.checkboxInput}
-                        type="checkbox"
-                        aria-label={pageSelected ? "Deselect visible transfers" : "Select visible transfers"}
-                        checked={pageSelected}
-                        disabled={pageIds.length === 0}
-                        onChange={(event) => setTransfersSelected(props.workspaceId, pageIds, event.target.checked)}
-                      />
-                    </th>
                     {visibleColumnOrder.map((column) => (
                       <TransferTableHeader
                         key={column}
@@ -790,34 +976,42 @@ const TransferWorkspacePane = memo(function TransferWorkspacePane(props: { works
                 <tbody>
                   {topSpacerHeight > 0 ? (
                     <tr aria-hidden="true">
-                      <td colSpan={visibleColumnOrder.length + 1} style={{ height: topSpacerHeight, padding: 0 }} />
+                      <td colSpan={visibleColumnOrder.length} style={{ height: topSpacerHeight, padding: 0 }} />
                     </tr>
                   ) : null}
-                  {visibleRows.map((row) => {
+                  {visibleRows.map((entry) => {
+                    const row = entry.row;
                     const operation = queueOperationsByTransfer.get(row.id);
                     return (
                       <TransferTableRow
                         key={row.id}
                         row={row}
+                        treeDepth={entry.depth}
+                        hasChildren={entry.hasChildren}
+                        expanded={entry.expanded}
                         columnOrder={visibleColumnOrder}
                         operation={operation}
                         selected={selectedIds.has(row.id)}
                         focused={focusedTransfer?.id === row.id}
+                        actionsVisible={actionMenu?.rowId === row.id}
                         queueWorking={queueWorking}
                         historyWorking={working}
-                        onSelect={(id, checked) => toggleTransfer(props.workspaceId, id, checked)}
-                        onFocus={(id) => setFocusedTransfer(props.workspaceId, id)}
-                        onCancel={handleCancelOperation}
-                        onRetry={handleRetryOperation}
+                        onSelect={handleSelectTransfer}
+                        onPauseResume={handlePauseResumeTransfer}
+                        onResolveConflict={handleResolveConflictTransfer}
+                        onCancel={handleCancelTransfer}
+                        onRetry={handleRetryTransfer}
                         onUndo={handleUndo}
                         onDelete={handleDeleteTransfer}
+                        onToggleTree={toggleTransferTree}
+                        onOpenMenu={openRowActionMenu}
                         onContextMenu={openRowActionMenu}
                       />
                     );
                   })}
                   {bottomSpacerHeight > 0 ? (
                     <tr aria-hidden="true">
-                      <td colSpan={visibleColumnOrder.length + 1} style={{ height: bottomSpacerHeight, padding: 0 }} />
+                      <td colSpan={visibleColumnOrder.length} style={{ height: bottomSpacerHeight, padding: 0 }} />
                     </tr>
                   ) : null}
                 </tbody>
@@ -855,11 +1049,16 @@ const TransferWorkspacePane = memo(function TransferWorkspacePane(props: { works
             <aside className={transferStyles.panel}>
               <TransferDetail
                 transfer={focusedTransfer}
+                rows={rows}
                 operation={focusedTransfer ? queueOperationsByTransfer.get(focusedTransfer.id) : undefined}
                 working={queueWorking}
                 historyWorking={working}
-                onCancel={handleCancelOperation}
-                onRetry={handleRetryOperation}
+                onCancel={handleCancelTransfer}
+                onRetry={handleRetryTransfer}
+                onPauseResume={handlePauseResumeTransfer}
+                onPauseResumeBatch={handlePauseResumeBatchTransfer}
+                onCancelBatch={handleCancelBatchTransfer}
+                onResolveConflict={handleResolveConflictTransfer}
                 onUndo={handleUndo}
                 onDelete={handleDeleteTransfer}
               />
@@ -915,6 +1114,53 @@ function TransfersBottomBar(props: {
 
 export default TransfersWorkspace;
 
+function useViewportMenuPosition(
+  menu: TransferActionMenuState | TransferSortMenuState,
+  menuRef: RefObject<HTMLDivElement | null>,
+): ViewportMenuPosition {
+  const [position, setPosition] = useState<ViewportMenuPosition>(() =>
+    clampViewportMenuPosition(menu?.x ?? VIEWPORT_MENU_MARGIN, menu?.y ?? VIEWPORT_MENU_MARGIN, 0, 0));
+
+  useLayoutEffect(() => {
+    if (!menu) return;
+
+    const updatePosition = () => {
+      const rect = menuRef.current?.getBoundingClientRect();
+      setPosition(clampViewportMenuPosition(menu.x, menu.y, rect?.width ?? 0, rect?.height ?? 0));
+    };
+
+    updatePosition();
+    window.addEventListener("resize", updatePosition);
+    return () => window.removeEventListener("resize", updatePosition);
+  }, [menu?.x, menu?.y, menuRef]);
+
+  return position;
+}
+
+function clampViewportMenuPosition(x: number, y: number, width: number, height: number): ViewportMenuPosition {
+  const viewportWidth = window.innerWidth;
+  const viewportHeight = window.innerHeight;
+  const maxHeight = Math.max(96, viewportHeight - VIEWPORT_MENU_MARGIN * 2);
+  const effectiveWidth = width > 0 ? Math.min(width, viewportWidth - VIEWPORT_MENU_MARGIN * 2) : 0;
+  const effectiveHeight = height > 0 ? Math.min(height, maxHeight) : 0;
+  const maxLeft = effectiveWidth > 0
+    ? Math.max(VIEWPORT_MENU_MARGIN, viewportWidth - effectiveWidth - VIEWPORT_MENU_MARGIN)
+    : viewportWidth - VIEWPORT_MENU_MARGIN;
+  const maxTop = effectiveHeight > 0
+    ? Math.max(VIEWPORT_MENU_MARGIN, viewportHeight - effectiveHeight - VIEWPORT_MENU_MARGIN)
+    : viewportHeight - VIEWPORT_MENU_MARGIN;
+
+  return {
+    left: clampNumber(x, VIEWPORT_MENU_MARGIN, maxLeft),
+    top: clampNumber(y, VIEWPORT_MENU_MARGIN, maxTop),
+    maxHeight,
+  };
+}
+
+function clampNumber(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(value, max));
+}
+
 function TransferSortMenu(props: {
   menu: TransferSortMenuState;
   sortKey: TransferSortKey;
@@ -922,6 +1168,8 @@ function TransferSortMenu(props: {
   onClose: () => void;
   onSort: (key: TransferSortableKey) => void;
 }) {
+  const menuRef = useRef<HTMLDivElement | null>(null);
+  const position = useViewportMenuPosition(props.menu, menuRef);
   if (!props.menu) return null;
   const run = (key: TransferSortableKey) => {
     props.onClose();
@@ -929,8 +1177,9 @@ function TransferSortMenu(props: {
   };
   return createPortal(
     <div
+      ref={menuRef}
       className={transferStyles.sortMenu}
-      style={{ left: props.menu.x, top: props.menu.y }}
+      style={{ left: position.left, top: position.top, maxHeight: position.maxHeight }}
       role="menu"
       onPointerDown={(event) => event.stopPropagation()}
     >
@@ -970,54 +1219,202 @@ function TransferActionMenu(props: {
   menu: TransferActionMenuState;
   row: TransferRecord | null;
   operation?: OperationDescriptor;
+  batchPaused: boolean;
   selectedCount: number;
   hasTransfers: boolean;
   historyWorking: boolean;
   queueWorking: boolean;
   onClose: () => void;
-  onCancel: (operationId: number) => Promise<void>;
-  onRetry: (operationId: number) => Promise<void>;
+  onPauseResume: (transfer: TransferRecord) => Promise<void>;
+  onPauseResumeBatch: (transfer: TransferRecord) => Promise<void>;
+  onCancelBatch: (transfer: TransferRecord) => Promise<void>;
+  onResolveConflict: (transfer: TransferRecord, policy: "replace" | "skip" | "keep_both", applyToBatch: boolean) => Promise<void>;
+  onCancel: (transfer: TransferRecord) => Promise<void>;
+  onRetry: (transfer: TransferRecord) => Promise<void>;
+  onUndo: (undoTokenId: number) => void;
   onDeleteRow: (transferId: number) => void;
   onDeleteSelected: () => void;
   onDeleteAll: () => void;
 }) {
+  const menuRef = useRef<HTMLDivElement | null>(null);
+  const position = useViewportMenuPosition(props.menu, menuRef);
   if (!props.menu) return null;
   const run = (action: () => void) => {
     props.onClose();
     action();
   };
-  const canCancel = Boolean(props.operation?.cancelable && !props.queueWorking);
-  const canRetry = Boolean(props.operation?.retryable && props.operation.status === "failed" && !props.queueWorking);
+  const canCancel = Boolean(props.row?.operationId && props.row.cancelable && !props.queueWorking);
+  const canRetry = Boolean(props.row?.retryable && props.row.status === "failed" && !props.queueWorking);
+  const canPauseResume = Boolean(props.row && canPauseResumeTransfer(props.row) && !props.queueWorking);
+  const canResolve = Boolean(props.row?.operationId && props.row.status === "waiting_for_resolution" && !props.queueWorking);
+  const hasOperation = Boolean(props.row?.operationId);
+  const hasBatch = Boolean(props.row?.batchId);
   return createPortal(
     <div
+      ref={menuRef}
       className={transferStyles.actionMenu}
-      style={{ left: props.menu.x, top: props.menu.y }}
+      style={{ left: position.left, top: position.top, maxHeight: position.maxHeight }}
       role="menu"
       onPointerDown={(event) => event.stopPropagation()}
     >
       {props.row ? (
         <>
-          <button
-            className={transferStyles.actionMenuItem}
-            type="button"
-            role="menuitem"
-            disabled={!canCancel}
-            onClick={() => props.operation && run(() => void props.onCancel(props.operation!.operationId))}
-          >
-            <XCircle size={14} />
-            Cancel
-          </button>
-          <button
-            className={transferStyles.actionMenuItem}
-            type="button"
-            role="menuitem"
-            disabled={!canRetry}
-            onClick={() => props.operation && run(() => void props.onRetry(props.operation!.operationId))}
-          >
-            <RotateCcw size={14} />
-            Retry
-          </button>
-          <div className={transferStyles.actionMenuSeparator} />
+          {hasOperation ? (
+            <>
+              <button
+                className={transferStyles.actionMenuItem}
+                type="button"
+                role="menuitem"
+                disabled={!canPauseResume}
+                onClick={() => props.row && run(() => void props.onPauseResume(props.row!))}
+              >
+                {props.row.paused ? <Play size={14} /> : <Pause size={14} />}
+                {props.row.paused ? "Resume" : "Pause"}
+              </button>
+              {canResolve ? (
+                <>
+                  <div className={transferStyles.actionMenuSeparator} />
+                  {props.row?.supportsReplace ? (
+                    <button
+                      className={transferStyles.actionMenuItem}
+                      type="button"
+                      role="menuitem"
+                      onClick={() => props.row && run(() => void props.onResolveConflict(props.row!, "replace", false))}
+                    >
+                      Replace
+                    </button>
+                  ) : null}
+                  <button
+                    className={transferStyles.actionMenuItem}
+                    type="button"
+                    role="menuitem"
+                    onClick={() => props.row && run(() => void props.onResolveConflict(props.row!, "skip", false))}
+                  >
+                    Skip
+                  </button>
+                  {props.row?.supportsKeepBoth ? (
+                    <button
+                      className={transferStyles.actionMenuItem}
+                      type="button"
+                      role="menuitem"
+                      onClick={() => props.row && run(() => void props.onResolveConflict(props.row!, "keep_both", false))}
+                    >
+                      Keep Both
+                    </button>
+                  ) : null}
+                  {hasBatch ? (
+                    <>
+                      <div className={transferStyles.actionMenuSeparator} />
+                      {props.row?.supportsReplace ? (
+                        <button
+                          className={transferStyles.actionMenuItem}
+                          type="button"
+                          role="menuitem"
+                          onClick={() => props.row && run(() => void props.onResolveConflict(props.row!, "replace", true))}
+                        >
+                          Replace Batch
+                        </button>
+                      ) : null}
+                      <button
+                        className={transferStyles.actionMenuItem}
+                        type="button"
+                        role="menuitem"
+                        onClick={() => props.row && run(() => void props.onResolveConflict(props.row!, "skip", true))}
+                      >
+                        Skip Batch
+                      </button>
+                      {props.row?.supportsKeepBoth ? (
+                        <button
+                          className={transferStyles.actionMenuItem}
+                          type="button"
+                          role="menuitem"
+                          onClick={() => props.row && run(() => void props.onResolveConflict(props.row!, "keep_both", true))}
+                        >
+                          Keep Both Batch
+                        </button>
+                      ) : null}
+                    </>
+                  ) : null}
+                </>
+              ) : null}
+              <button
+                className={transferStyles.actionMenuItem}
+                type="button"
+                role="menuitem"
+                disabled={!canCancel}
+                onClick={() => props.row && run(() => void props.onCancel(props.row!))}
+              >
+                <XCircle size={14} />
+                Cancel
+              </button>
+              <button
+                className={transferStyles.actionMenuItem}
+                type="button"
+                role="menuitem"
+                disabled={!canRetry}
+                onClick={() => props.row && run(() => void props.onRetry(props.row!))}
+              >
+                <RotateCcw size={14} />
+                Retry
+              </button>
+              {hasBatch ? (
+                <>
+                  <div className={transferStyles.actionMenuSeparator} />
+                  <button
+                    className={transferStyles.actionMenuItem}
+                    type="button"
+                    role="menuitem"
+                    disabled={props.queueWorking}
+                    onClick={() => props.row && run(() => void props.onPauseResumeBatch(props.row!))}
+                  >
+                    {props.batchPaused ? <Play size={14} /> : <Pause size={14} />}
+                    {props.batchPaused ? "Resume Batch" : "Pause Batch"}
+                  </button>
+                  <button
+                    className={transferStyles.actionMenuItem}
+                    type="button"
+                    role="menuitem"
+                    disabled={props.queueWorking}
+                    onClick={() => props.row && run(() => void props.onCancelBatch(props.row!))}
+                  >
+                    <XCircle size={14} />
+                    Cancel Batch
+                  </button>
+                </>
+              ) : null}
+              <div className={transferStyles.actionMenuSeparator} />
+            </>
+          ) : null}
+          {!hasOperation && canRetry ? (
+            <>
+              <button
+                className={transferStyles.actionMenuItem}
+                type="button"
+                role="menuitem"
+                disabled={!canRetry}
+                onClick={() => props.row && run(() => void props.onRetry(props.row!))}
+              >
+                <RotateCcw size={14} />
+                Retry
+              </button>
+              <div className={transferStyles.actionMenuSeparator} />
+            </>
+          ) : null}
+          {!hasOperation && props.row.undoable && props.row.undoTokenId ? (
+            <>
+              <button
+                className={transferStyles.actionMenuItem}
+                type="button"
+                role="menuitem"
+                disabled={props.queueWorking}
+                onClick={() => props.row && run(() => props.onUndo(props.row!.undoTokenId))}
+              >
+                <RefreshCcw size={14} />
+                Undo
+              </button>
+              <div className={transferStyles.actionMenuSeparator} />
+            </>
+          ) : null}
           <button
             className={`${transferStyles.actionMenuItem} ${transferStyles.actionMenuDanger}`}
             type="button"
@@ -1026,7 +1423,7 @@ function TransferActionMenu(props: {
             onClick={() => run(() => props.onDeleteRow(props.row!.id))}
           >
             <Trash2 size={14} />
-            Delete history row
+            Delete row
           </button>
         </>
       ) : null}
@@ -1048,7 +1445,7 @@ function TransferActionMenu(props: {
         onClick={() => run(props.onDeleteAll)}
       >
         <Trash2 size={14} />
-        Clear all history
+        Clear all rows
       </button>
     </div>,
     document.body,
@@ -1150,46 +1547,58 @@ const TransferTableHeader = memo(function TransferTableHeader(props: {
 
 const TransferTableRow = memo(function TransferTableRow(props: {
   row: TransferRecord;
+  treeDepth: number;
+  hasChildren: boolean;
+  expanded: boolean;
   columnOrder: TransferTableColumn[];
   operation?: OperationDescriptor;
   selected: boolean;
   focused: boolean;
+  actionsVisible: boolean;
   queueWorking: boolean;
   historyWorking: boolean;
-  onSelect: (id: number, checked: boolean) => void;
-  onFocus: (id: number | null) => void;
-  onCancel: (operationId: number) => Promise<void>;
-  onRetry: (operationId: number) => Promise<void>;
+  onSelect: (row: TransferRecord, event: ReactMouseEvent) => void;
+  onPauseResume: (transfer: TransferRecord) => Promise<void>;
+  onResolveConflict: (transfer: TransferRecord, policy: "replace" | "skip" | "keep_both", applyToBatch: boolean) => Promise<void>;
+  onCancel: (transfer: TransferRecord) => Promise<void>;
+  onRetry: (transfer: TransferRecord) => Promise<void>;
   onUndo: (undoTokenId: number) => void;
   onDelete: (transferId: number) => void;
+  onToggleTree: (transferId: number) => void;
+  onOpenMenu: (event: ReactMouseEvent, row: TransferRecord) => void;
   onContextMenu: (event: ReactMouseEvent, row: TransferRecord) => void;
 }) {
   return (
     <tr
-      className={`${transferStyles.tableRow} ${props.focused ? transferStyles.tableRowFocused : ""}`}
-      onClick={() => props.onFocus(props.row.id)}
+      className={[
+        transferStyles.tableRow,
+        props.selected ? transferStyles.tableRowSelected : "",
+        props.focused ? transferStyles.tableRowFocused : "",
+      ].filter(Boolean).join(" ")}
+      aria-selected={props.selected}
+      onClick={(event) => props.onSelect(props.row, event)}
       onContextMenu={(event) => props.onContextMenu(event, props.row)}
     >
-      <td className={transferStyles.checkboxCell} onClick={(event) => event.stopPropagation()}>
-        <input
-          className={transferStyles.checkboxInput}
-          type="checkbox"
-          checked={props.selected}
-          onChange={(event) => props.onSelect(props.row.id, event.target.checked)}
-        />
-      </td>
       {props.columnOrder.map((column) => (
         <TransferTableCell
           key={column}
           column={column}
           row={props.row}
+          treeDepth={props.treeDepth}
+          hasChildren={props.hasChildren}
+          expanded={props.expanded}
           operation={props.operation}
+          actionsVisible={props.actionsVisible}
           queueWorking={props.queueWorking}
           historyWorking={props.historyWorking}
+          onPauseResume={props.onPauseResume}
+          onResolveConflict={props.onResolveConflict}
           onCancel={props.onCancel}
           onRetry={props.onRetry}
           onUndo={props.onUndo}
           onDelete={props.onDelete}
+          onToggleTree={props.onToggleTree}
+          onOpenMenu={props.onOpenMenu}
         />
       ))}
     </tr>
@@ -1199,20 +1608,48 @@ const TransferTableRow = memo(function TransferTableRow(props: {
 const TransferTableCell = memo(function TransferTableCell(props: {
   column: TransferTableColumn;
   row: TransferRecord;
+  treeDepth: number;
+  hasChildren: boolean;
+  expanded: boolean;
   operation?: OperationDescriptor;
+  actionsVisible: boolean;
   queueWorking: boolean;
   historyWorking: boolean;
-  onCancel: (operationId: number) => Promise<void>;
-  onRetry: (operationId: number) => Promise<void>;
+  onPauseResume: (transfer: TransferRecord) => Promise<void>;
+  onResolveConflict: (transfer: TransferRecord, policy: "replace" | "skip" | "keep_both", applyToBatch: boolean) => Promise<void>;
+  onCancel: (transfer: TransferRecord) => Promise<void>;
+  onRetry: (transfer: TransferRecord) => Promise<void>;
   onUndo: (undoTokenId: number) => void;
   onDelete: (transferId: number) => void;
+  onToggleTree: (transferId: number) => void;
+  onOpenMenu: (event: ReactMouseEvent, row: TransferRecord) => void;
 }) {
   switch (props.column) {
     case "transfer":
       return (
         <td className={transferStyles.tableCell}>
-          <strong className={transferStyles.tablePrimary}>{primaryTransferLabel(props.row)}</strong>
-          <span className={transferStyles.tableSecondary}>J-{props.row.jobId} · {secondaryTransferLabel(props.row)}</span>
+          <div className={transferStyles.nameCellContent} style={{ paddingLeft: Math.min(props.treeDepth, 6) * 16 }}>
+            {props.hasChildren ? (
+              <button
+                className={transferStyles.treeToggle}
+                type="button"
+                aria-label={props.expanded ? "Collapse transfer" : "Expand transfer"}
+                title={props.expanded ? "Collapse transfer" : "Expand transfer"}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  props.onToggleTree(props.row.id);
+                }}
+              >
+                {props.expanded ? <ChevronDown aria-hidden="true" size={15} /> : <ChevronRight aria-hidden="true" size={15} />}
+              </button>
+            ) : (
+              <span className={transferStyles.treeSpacer} aria-hidden="true" />
+            )}
+            <span className={transferStyles.nameText}>
+              <strong className={transferStyles.tablePrimary}>{primaryTransferLabel(props.row)}</strong>
+              <span className={transferStyles.tableSecondary}>J-{props.row.jobId} · {secondaryTransferLabel(props.row)}</span>
+            </span>
+          </div>
         </td>
       );
     case "operation":
@@ -1230,28 +1667,54 @@ const TransferTableCell = memo(function TransferTableCell(props: {
     case "actions":
       return (
         <td className={transferStyles.tableCell} onClick={(event) => event.stopPropagation()}>
-          <div className={transferStyles.rowActions}>
-            <div className={transferStyles.rowActionGroup} role="group" aria-label="Transfer operation actions">
-              <button
-                className={transferStyles.rowActionIconButton}
-                type="button"
-                aria-label="Cancel transfer"
-                title="Cancel transfer"
-                disabled={!props.operation?.cancelable || props.queueWorking}
-                onClick={() => props.operation && void props.onCancel(props.operation.operationId)}
-              >
-                <XCircle aria-hidden="true" size={14} />
-              </button>
-              <button
-                className={transferStyles.rowActionIconButton}
-                type="button"
-                aria-label="Retry transfer"
-                title="Retry transfer"
-                disabled={!props.operation?.retryable || props.operation.status !== "failed" || props.queueWorking}
-                onClick={() => props.operation && void props.onRetry(props.operation.operationId)}
-              >
-                <RotateCcw aria-hidden="true" size={14} />
-              </button>
+          <div className={`${transferStyles.rowActions} ${props.actionsVisible ? transferStyles.rowActionsVisible : ""}`}>
+            <div className={transferStyles.rowActionGroup} role="group" aria-label="Transfer actions">
+              {props.row.operationId ? (
+                <>
+                  <button
+                    className={transferStyles.rowActionIconButton}
+                    type="button"
+                    aria-label={props.row.paused ? "Resume transfer" : "Pause transfer"}
+                    title={props.row.paused ? "Resume transfer" : "Pause transfer"}
+                    disabled={!canPauseResumeTransfer(props.row) || props.queueWorking}
+                    onClick={() => void props.onPauseResume(props.row)}
+                  >
+                    {props.row.paused ? <Play aria-hidden="true" size={14} /> : <Pause aria-hidden="true" size={14} />}
+                  </button>
+                  <button
+                    className={transferStyles.rowActionIconButton}
+                    type="button"
+                    aria-label="Cancel transfer"
+                    title="Cancel transfer"
+                    disabled={!props.row.cancelable || props.queueWorking}
+                    onClick={() => void props.onCancel(props.row)}
+                  >
+                    <XCircle aria-hidden="true" size={14} />
+                  </button>
+                  <button
+                    className={transferStyles.rowActionIconButton}
+                    type="button"
+                    aria-label="Retry transfer"
+                    title="Retry transfer"
+                    disabled={!props.row.retryable || props.row.status !== "failed" || props.queueWorking}
+                    onClick={() => void props.onRetry(props.row)}
+                  >
+                    <RotateCcw aria-hidden="true" size={14} />
+                  </button>
+                </>
+              ) : null}
+              {!props.row.operationId && props.row.retryable && props.row.status === "failed" ? (
+                <button
+                  className={transferStyles.rowActionIconButton}
+                  type="button"
+                  aria-label="Retry transfer"
+                  title="Retry transfer"
+                  disabled={props.queueWorking}
+                  onClick={() => void props.onRetry(props.row)}
+                >
+                  <RotateCcw aria-hidden="true" size={14} />
+                </button>
+              ) : null}
               <button
                 className={transferStyles.rowActionIconButton}
                 type="button"
@@ -1262,17 +1725,16 @@ const TransferTableCell = memo(function TransferTableCell(props: {
               >
                 <RefreshCcw aria-hidden="true" size={14} />
               </button>
+              <button
+                className={transferStyles.rowActionIconButton}
+                type="button"
+                aria-label="More transfer actions"
+                title="More transfer actions"
+                onClick={(event) => props.onOpenMenu(event, props.row)}
+              >
+                <MoreVertical aria-hidden="true" size={14} />
+              </button>
             </div>
-            <button
-              className={transferStyles.rowActionDangerButton}
-              type="button"
-              aria-label="Delete transfer history row"
-              title="Delete transfer history row"
-              disabled={props.historyWorking}
-              onClick={() => props.onDelete(props.row.id)}
-            >
-              <Trash2 aria-hidden="true" size={14} />
-            </button>
           </div>
         </td>
       );
@@ -1413,15 +1875,24 @@ function FilterSection(props: { title: string; children: ReactNode }) {
 
 function TransferDetail(props: {
   transfer: TransferRecord | null;
+  rows: TransferRecord[];
   operation?: OperationDescriptor;
   working: boolean;
   historyWorking: boolean;
-  onCancel: (operationId: number) => Promise<void>;
-  onRetry: (operationId: number) => Promise<void>;
+  onCancel: (transfer: TransferRecord) => Promise<void>;
+  onRetry: (transfer: TransferRecord) => Promise<void>;
+  onPauseResume: (transfer: TransferRecord) => Promise<void>;
+  onPauseResumeBatch: (transfer: TransferRecord) => Promise<void>;
+  onCancelBatch: (transfer: TransferRecord) => Promise<void>;
+  onResolveConflict: (transfer: TransferRecord, policy: "replace" | "skip" | "keep_both", applyToBatch: boolean) => Promise<void>;
   onUndo: (undoTokenId: number) => void;
   onDelete: (transferId: number) => void;
 }) {
   const row = props.transfer;
+  const progress = useMemo(
+    () => row ? aggregateTransferProgress(row, props.rows) : null,
+    [props.rows, row],
+  );
   if (!row) {
     return (
       <div className={transferStyles.detailEmpty}>
@@ -1440,7 +1911,7 @@ function TransferDetail(props: {
       <DetailRow label="Provider" value={remoteSummary(row)} />
       <DetailRow label="Source" value={sourceEndpoint(row) || "--"} />
       <DetailRow label="Destination" value={targetEndpoint(row) || "--"} />
-      <DetailRow label="Progress" value={`${transferProgress(row)} · ${row.transferredBytes} / ${row.totalBytes} bytes`} />
+      <TransferProgressRow row={row} progress={progress} />
       <DetailRow label="Queued" value={timestampLabel(row.queuedAtMs)} />
       <DetailRow label="Started" value={timestampLabel(row.startedAtMs)} />
       <DetailRow label="Completed" value={timestampLabel(row.completedAtMs)} />
@@ -1448,25 +1919,87 @@ function TransferDetail(props: {
       {row.detailMessage ? <DetailRow label="Detail" value={row.detailMessage} /> : null}
       {row.errorMessage ? <DetailRow label="Error" value={row.errorMessage} danger /> : null}
       <div className={transferStyles.detailActions}>
-        {props.operation?.cancelable ? (
+        {row.operationId && canPauseResumeTransfer(row) ? (
           <button
             className={transferStyles.smallButton}
             type="button"
             disabled={props.working}
-            onClick={() => void props.onCancel(props.operation!.operationId)}
+            onClick={() => void props.onPauseResume(row)}
+          >
+            {row.paused ? "Resume" : "Pause"}
+          </button>
+        ) : null}
+        {row.operationId && row.status === "waiting_for_resolution" ? (
+          <>
+            {row.supportsReplace ? (
+              <button
+                className={transferStyles.smallButton}
+                type="button"
+                disabled={props.working}
+                onClick={() => void props.onResolveConflict(row, "replace", false)}
+              >
+                Replace
+              </button>
+            ) : null}
+            <button
+              className={transferStyles.smallButton}
+              type="button"
+              disabled={props.working}
+              onClick={() => void props.onResolveConflict(row, "skip", false)}
+            >
+              Skip
+            </button>
+            {row.supportsKeepBoth ? (
+              <button
+                className={transferStyles.smallButton}
+                type="button"
+                disabled={props.working}
+                onClick={() => void props.onResolveConflict(row, "keep_both", false)}
+              >
+                Keep Both
+              </button>
+            ) : null}
+          </>
+        ) : null}
+        {row.operationId && row.cancelable ? (
+          <button
+            className={transferStyles.smallButton}
+            type="button"
+            disabled={props.working}
+            onClick={() => void props.onCancel(row)}
           >
             Cancel
           </button>
         ) : null}
-        {props.operation?.retryable && props.operation.status === "failed" ? (
+        {row.retryable && row.status === "failed" ? (
           <button
             className={transferStyles.smallButton}
             type="button"
             disabled={props.working}
-            onClick={() => void props.onRetry(props.operation!.operationId)}
+            onClick={() => void props.onRetry(row)}
           >
             Retry
           </button>
+        ) : null}
+        {row.batchId ? (
+          <>
+            <button
+              className={transferStyles.smallButton}
+              type="button"
+              disabled={props.working}
+              onClick={() => void props.onPauseResumeBatch(row)}
+            >
+              Pause/Resume Batch
+            </button>
+            <button
+              className={transferStyles.smallButton}
+              type="button"
+              disabled={props.working}
+              onClick={() => void props.onCancelBatch(row)}
+            >
+              Cancel Batch
+            </button>
+          </>
         ) : null}
       </div>
     </div>
@@ -1480,6 +2013,95 @@ function DetailRow(props: { label: string; value: string; danger?: boolean }) {
       <strong className={props.danger ? transferStyles.detailDangerValue : transferStyles.detailValue}>{props.value}</strong>
     </div>
   );
+}
+
+function TransferProgressRow(props: { row: TransferRecord; progress: TransferProgressSnapshot | null }) {
+  const { row } = props;
+  const progress = props.progress;
+  if (isBinaryProgressTransfer(row)) {
+    const complete = row.status === "completed";
+    const percent = complete ? 100 : 0;
+    const primary = complete ? "Complete" : binaryProgressStatus(row.status);
+    const secondary = complete ? "Operation completed" : "Waiting for completion";
+
+    return (
+      <div className={transferStyles.detailRow}>
+        <span className={transferStyles.detailLabel}>Progress</span>
+        <div
+          className={transferStyles.progressTrack}
+          role="progressbar"
+          aria-label="Operation progress"
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={percent}
+          aria-valuetext={complete ? "Complete" : `${primary}, not complete`}
+        >
+          <div className={transferStyles.progressFill} style={{ width: `${percent}%` }} />
+        </div>
+        <div className={transferStyles.progressMeta}>
+          <strong className={transferStyles.progressMetaStrong}>{primary}</strong>
+          <span>{secondary}</span>
+        </div>
+      </div>
+    );
+  }
+  const transferred = Math.max(0, progress?.transferredBytes ?? row.transferredBytes);
+  const total = Math.max(0, progress?.totalBytes ?? row.totalBytes);
+  const hasTotal = total > 0;
+  const percent = hasTotal ? Math.min(100, Math.max(0, Math.round((transferred / total) * 100))) : 0;
+  const width = hasTotal ? `${percent}%` : undefined;
+  const ariaValue = hasTotal ? percent : undefined;
+  const primary = hasTotal ? `${percent}%` : "Waiting for total";
+  const speed = Math.max(0, progress?.bytesPerSecond ?? row.bytesPerSecond ?? 0);
+  const secondary = hasTotal
+    ? `${formatBytes(transferred)} / ${formatBytes(total)}`
+    : `${formatBytes(transferred)} transferred`;
+  const tertiary = [
+    progress?.aggregated ? "tree total" : "",
+    speed > 0 ? `${formatBytes(speed)}/s` : "",
+  ].filter(Boolean).join(" · ");
+
+  return (
+    <div className={transferStyles.detailRow}>
+      <span className={transferStyles.detailLabel}>Progress</span>
+      <div
+        className={transferStyles.progressTrack}
+        role="progressbar"
+        aria-label="Transfer progress"
+        aria-valuemin={0}
+        aria-valuemax={hasTotal ? 100 : undefined}
+        aria-valuenow={ariaValue}
+        aria-valuetext={hasTotal ? `${percent}% complete` : secondary}
+      >
+        <div
+          className={`${transferStyles.progressFill} ${hasTotal ? "" : transferStyles.progressFillUnknown}`}
+          style={hasTotal ? { width } : undefined}
+        />
+      </div>
+      <div className={transferStyles.progressMeta}>
+        <strong className={transferStyles.progressMetaStrong}>{primary}</strong>
+        <span>{tertiary ? `${secondary} · ${tertiary}` : secondary}</span>
+      </div>
+    </div>
+  );
+}
+
+function isBinaryProgressTransfer(row: TransferRecord): boolean {
+  return row.transferType === "create"
+    || row.transferType === "archive"
+    || row.transferType === "rename"
+    || row.transferType === "delete";
+}
+
+function binaryProgressStatus(status: TransferRecord["status"]): string {
+  if (status === "queued" || status === "pending") return "Queued";
+  if (status === "in_progress") return "In progress";
+  if (status === "waiting_for_resolution") return "Waiting for resolution";
+  if (status === "failed") return "Failed";
+  if (status === "canceled") return "Canceled";
+  if (status === "skipped") return "Skipped";
+  if (status === "interrupted") return "Interrupted";
+  return prettyLabel(status);
 }
 
 function transferProviderGroups(rows: TransferRecord[], labels: Map<string, string>): Array<{ key: string; label: string; count: number }> {
@@ -1546,6 +2168,128 @@ function filterAndSortTransfers(
   return [...filtered].sort((left, right) => direction * compareTransfers(left, right, sortKey));
 }
 
+function buildTransferTreeRows(
+  rows: TransferRecord[],
+  expandedIds: Set<number>,
+): TransferTreeRow[] {
+  const order = new Map<number, number>();
+  rows.forEach((row, index) => order.set(row.id, index));
+  const rowsById = new Map(rows.map((row) => [row.id, row]));
+  const childRows = new Map<number, TransferRecord[]>();
+  for (const row of rows) {
+    if (!row.parentTransferId || !rowsById.has(row.parentTransferId)) continue;
+    const children = childRows.get(row.parentTransferId) ?? [];
+    children.push(row);
+    childRows.set(row.parentTransferId, children);
+  }
+  for (const children of childRows.values()) {
+    children.sort((left, right) => {
+      const nameComparison = primaryTransferLabel(left).localeCompare(primaryTransferLabel(right));
+      return nameComparison || (order.get(left.id) ?? 0) - (order.get(right.id) ?? 0);
+    });
+  }
+  const result: TransferTreeRow[] = [];
+  const pushRow = (row: TransferRecord, depth: number, visited: Set<number>) => {
+    const children = childRows.get(row.id) ?? [];
+    const expanded = expandedIds.has(row.id);
+    result.push({
+      row,
+      depth,
+      hasChildren: children.length > 0,
+      expanded,
+    });
+    if (!expanded || visited.has(row.id)) return;
+    const nextVisited = new Set(visited);
+    nextVisited.add(row.id);
+    for (const child of children) {
+      pushRow(child, depth + 1, nextVisited);
+    }
+  };
+  for (const row of rows) {
+    if (row.parentTransferId && rowsById.has(row.parentTransferId)) continue;
+    pushRow(row, 0, new Set());
+  }
+  return result;
+}
+
+function includeTransferAncestors(filteredRows: TransferRecord[], allRows: TransferRecord[]): TransferRecord[] {
+  if (filteredRows.length === 0) return filteredRows;
+  const rowsById = new Map(allRows.map((row) => [row.id, row]));
+  const included = new Set(filteredRows.map((row) => row.id));
+  const result = [...filteredRows];
+  for (const row of filteredRows) {
+    let parentId = row.parentTransferId;
+    const visited = new Set<number>();
+    while (parentId && !visited.has(parentId)) {
+      visited.add(parentId);
+      const parent = rowsById.get(parentId);
+      if (!parent) break;
+      if (!included.has(parent.id)) {
+        included.add(parent.id);
+        result.push(parent);
+      }
+      parentId = parent.parentTransferId;
+    }
+  }
+  const order = new Map(allRows.map((row, index) => [row.id, index]));
+  return result.sort((left, right) => (order.get(left.id) ?? 0) - (order.get(right.id) ?? 0));
+}
+
+function aggregateTransferProgress(row: TransferRecord, rows: TransferRecord[]): TransferProgressSnapshot {
+  const childrenByParent = new Map<number, TransferRecord[]>();
+  for (const candidate of rows) {
+    if (!candidate.parentTransferId) continue;
+    const children = childrenByParent.get(candidate.parentTransferId) ?? [];
+    children.push(candidate);
+    childrenByParent.set(candidate.parentTransferId, children);
+  }
+  const descendants: TransferRecord[] = [];
+  const pending = [...(childrenByParent.get(row.id) ?? [])];
+  const visited = new Set<number>();
+  while (pending.length > 0) {
+    const current = pending.pop();
+    if (!current || visited.has(current.id)) continue;
+    visited.add(current.id);
+    descendants.push(current);
+    pending.push(...(childrenByParent.get(current.id) ?? []));
+  }
+  if (descendants.length === 0) {
+    const transferredBytes = Math.max(0, row.transferredBytes);
+    const rowTotal = Math.max(0, row.totalBytes);
+    return {
+      transferredBytes,
+      totalBytes: rowTotal || (isTerminalTransfer(row) ? transferredBytes : 0),
+      bytesPerSecond: Math.max(0, row.bytesPerSecond || 0),
+      aggregated: false,
+    };
+  }
+  if (!isTerminalTransfer(row) && row.totalBytes > 0) {
+    const transferredBytes = Math.max(0, row.transferredBytes);
+    return {
+      transferredBytes,
+      totalBytes: Math.max(0, row.totalBytes),
+      bytesPerSecond: Math.max(0, row.bytesPerSecond || 0),
+      aggregated: false,
+    };
+  }
+  let transferredBytes = 0;
+  let totalBytes = 0;
+  let bytesPerSecond = 0;
+  for (const descendant of descendants) {
+    const transferred = Math.max(0, descendant.transferredBytes);
+    const total = Math.max(0, descendant.totalBytes);
+    transferredBytes += transferred;
+    totalBytes += total || (isTerminalTransfer(descendant) ? transferred : 0);
+    bytesPerSecond += Math.max(0, descendant.bytesPerSecond || 0);
+  }
+  return {
+    transferredBytes,
+    totalBytes,
+    bytesPerSecond,
+    aggregated: true,
+  };
+}
+
 function compareTransfers(left: TransferRecord, right: TransferRecord, key: TransferSortableKey): number {
   if (key === "name") return primaryTransferLabel(left).localeCompare(primaryTransferLabel(right));
   if (key === "operation") return left.transferType.localeCompare(right.transferType);
@@ -1559,6 +2303,19 @@ function transferProviders(row: TransferRecord): string[] {
 
 function transferTime(row: TransferRecord): number {
   return row.completedAtMs || row.startedAtMs || row.queuedAtMs || 0;
+}
+
+function formatBytes(bytes: number): string {
+  const value = Math.max(0, bytes);
+  if (value < 1024) return `${value.toLocaleString()} B`;
+  const units = ["KB", "MB", "GB", "TB"];
+  let size = value / 1024;
+  let unitIndex = 0;
+  while (size >= 1024 && unitIndex < units.length - 1) {
+    size /= 1024;
+    unitIndex += 1;
+  }
+  return `${size >= 10 ? size.toFixed(1) : size.toFixed(2)} ${units[unitIndex]}`;
 }
 
 function primaryTransferLabel(row: TransferRecord): string {
@@ -1621,10 +2378,25 @@ function tableStatusLabel(status: string): string {
   return prettyLabel(status);
 }
 
-function canPauseResumeOperation(operation: OperationDescriptor): boolean {
-  return operation.paused
-    || operation.status === "queued"
-    || operation.status === "waiting_for_resolution";
+function canPauseResumeTransfer(transfer: TransferRecord): boolean {
+  return Boolean(transfer.operationId)
+    && (
+      transfer.paused
+      || transfer.status === "queued"
+      || transfer.status === "in_progress"
+      || transfer.status === "waiting_for_resolution"
+    );
+}
+
+function isLiveTransfer(transfer: TransferRecord): boolean {
+  return transfer.status === "queued"
+    || transfer.status === "pending"
+    || transfer.status === "in_progress"
+    || transfer.status === "waiting_for_resolution";
+}
+
+function isTerminalTransfer(transfer: TransferRecord): boolean {
+  return !isLiveTransfer(transfer);
 }
 
 function isTransferTableColumn(value: string): value is TransferTableColumn {
@@ -1691,261 +2463,4 @@ function saveTransferPanelVisibility(visibility: { filters: boolean; detail: boo
   } catch {
     // Transfers remains usable if localStorage is disabled.
   }
-}
-
-function OperationQueueStrip(props: { onQueueChanged: () => void }) {
-  const { snapshot, working, error, load, cancel, cancelBatch, pause, resume, pauseBatch, resumeBatch, pauseAll, resumeAll, setPriority, setBandwidthLimit, setTransferProfile, retry, redo, resolveConflict, clearTerminal } = useOperationQueueStore(useShallow((state) => ({
-    snapshot: state.snapshot,
-    working: state.working,
-    error: state.error,
-    load: state.load,
-    cancel: state.cancel,
-    cancelBatch: state.cancelBatch,
-    pause: state.pause,
-    resume: state.resume,
-    pauseBatch: state.pauseBatch,
-    resumeBatch: state.resumeBatch,
-    pauseAll: state.pauseAll,
-    resumeAll: state.resumeAll,
-    setPriority: state.setPriority,
-    setBandwidthLimit: state.setBandwidthLimit,
-    setTransferProfile: state.setTransferProfile,
-    retry: state.retry,
-    redo: state.redo,
-    resolveConflict: state.resolveConflict,
-    clearTerminal: state.clearTerminal,
-  })));
-  const [refreshSpinning, startRefreshSpin] = useMinimumSpin(working);
-  const settingsDocument = useSettingsStore((state) => state.settings?.document ?? {});
-  const transferProfiles = useMemo(() => transferProfileRecords(settingsDocument), [settingsDocument]);
-  const operations = snapshot?.operations ?? [];
-  const active = operations.filter((operation) => operation.status === "queued" || operation.status === "in_progress" || operation.status === "waiting_for_resolution");
-  const terminal = operations.length - active.length;
-  const activeBatches = useMemo(() => {
-    const activeBatchIds = new Set(active.map((operation) => operation.batchId));
-    return (snapshot?.batches ?? []).filter((batch) => activeBatchIds.has(batch.batchId));
-  }, [active, snapshot?.batches]);
-  const conflict = snapshot?.conflictDialog;
-  const conflictBatch = conflict?.open ? snapshot?.batches.find((batch) => batch.batchId === conflict.batchId) : null;
-  const canApplyConflictToBatch = Boolean(conflictBatch && conflictBatch.operationIds.length > 1);
-  const canCancelConflictBatch = Boolean(
-    conflictBatch
-      && conflictBatch.operationIds.length > 1
-      && operations.some((operation) => (
-        operation.batchId === conflictBatch.batchId
-        && operation.cancelable
-      )),
-  );
-  const [applyConflictToBatch, setApplyConflictToBatch] = useState(conflict?.applyToBatch ?? true);
-  const [bandwidthDraft, setBandwidthDraft] = useState(snapshot?.bandwidthLimit ?? "");
-
-  useEffect(() => {
-    if (conflict?.open) {
-      setApplyConflictToBatch(conflict.applyToBatch);
-    }
-  }, [conflict?.operationId, conflict?.applyToBatch, conflict?.open]);
-  useEffect(() => {
-    setBandwidthDraft(snapshot?.bandwidthLimit ?? "");
-  }, [snapshot?.bandwidthLimit]);
-  const runQueueMutation = useCallback(async (action: Promise<void>) => {
-    await action;
-    props.onQueueChanged();
-  }, [props.onQueueChanged]);
-  const applyBandwidthLimit = useCallback(() => {
-    void runQueueMutation(setBandwidthLimit(bandwidthDraft.trim()));
-  }, [bandwidthDraft, runQueueMutation, setBandwidthLimit]);
-  const applyTransferProfile = useCallback((profileId: string) => {
-    const profile = transferProfiles.find((candidate) => candidate.id === profileId);
-    if (!profile) return;
-    setBandwidthDraft(profile.bandwidthLimit);
-    void runQueueMutation(setTransferProfile(profile));
-  }, [runQueueMutation, setTransferProfile, transferProfiles]);
-
-  return (
-    <section className={transferStyles.operationStrip}>
-      <div className={transferStyles.operationSummary}>
-        <strong className={transferStyles.operationTitle}>Operation Queue</strong>
-        <span className={transferStyles.operationMeta}>
-          {snapshot ? `${active.length} active · ${terminal} finished · ${snapshot.maxConcurrent} max` : "Not loaded"}
-        </span>
-      </div>
-      <div className={transferStyles.operationActions}>
-        {error ? <span className="error-text">{error}</span> : null}
-        <button
-          className={transferStyles.operationButton}
-          type="button"
-          onClick={() => {
-            startRefreshSpin();
-            void load();
-          }}
-          disabled={working}
-        >
-          <RefreshCcw className={refreshSpinning ? "animate-spin" : undefined} size={14} />
-          Refresh
-        </button>
-        <button
-          className={transferStyles.operationButton}
-          type="button"
-          onClick={() => void runQueueMutation(snapshot?.paused ? resumeAll() : pauseAll())}
-          disabled={working || !snapshot}
-        >
-          {snapshot?.paused ? <Play size={14} /> : <Pause size={14} />}
-          {snapshot?.paused ? "Resume All" : "Pause All"}
-        </button>
-        <select
-          className={transferStyles.operationInput}
-          value={snapshot?.transferProfileId ?? ""}
-          aria-label="Transfer profile"
-          onChange={(event) => applyTransferProfile(event.target.value)}
-          disabled={working || !snapshot || transferProfiles.length === 0}
-        >
-          {transferProfiles.length === 0 ? (
-            <option value="">Profiles unavailable</option>
-          ) : null}
-          {transferProfiles.map((profile) => (
-            <option key={profile.id} value={profile.id}>
-              {profile.name}
-            </option>
-          ))}
-        </select>
-        <input
-          className={transferStyles.operationInput}
-          value={bandwidthDraft}
-          placeholder="Bandwidth"
-          aria-label="Bandwidth limit"
-          onChange={(event) => setBandwidthDraft(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === "Enter") applyBandwidthLimit();
-          }}
-        />
-        <button className={transferStyles.operationButton} type="button" onClick={applyBandwidthLimit} disabled={working || !snapshot}>
-          Apply Limit
-        </button>
-        <button className={transferStyles.operationButton} type="button" onClick={() => void runQueueMutation(redo())} disabled={working || !snapshot?.redoAvailable}>
-          <RotateCcw size={14} />
-          Redo
-        </button>
-        <button className={transferStyles.operationButton} type="button" onClick={() => void runQueueMutation(clearTerminal())} disabled={working || terminal === 0}>
-          <Trash2 size={14} />
-          Clear Finished
-        </button>
-      </div>
-      {conflict?.open ? (
-        <div className={transferStyles.conflictRow}>
-          <div className={transferStyles.conflictMain}>
-            <strong className={transferStyles.operationTitle}>{conflict.title || "Resolve conflict"}</strong>
-            <span className={transferStyles.conflictText}>{conflict.sourceLabel} → {conflict.targetLabel}</span>
-          </div>
-          <label className={transferStyles.conflictApply}>
-            <input
-              className={transferStyles.conflictCheckbox}
-              type="checkbox"
-              checked={canApplyConflictToBatch && applyConflictToBatch}
-              disabled={working || !canApplyConflictToBatch}
-              onChange={(event) => setApplyConflictToBatch(event.currentTarget.checked)}
-            />
-            <span>Apply to batch</span>
-          </label>
-          <button
-            className={transferStyles.operationButton}
-            type="button"
-            disabled={working}
-            onClick={() => void runQueueMutation(cancel(conflict.operationId))}
-          >
-            Cancel
-          </button>
-          {conflictBatch ? (
-            <button
-              className={transferStyles.operationButton}
-              type="button"
-              disabled={working || !canCancelConflictBatch}
-              onClick={() => void runQueueMutation(cancelBatch(conflictBatch.batchId))}
-            >
-              Cancel Batch
-            </button>
-          ) : null}
-          {conflict.supportsReplace ? (
-            <button className={transferStyles.operationButton} type="button" disabled={working} onClick={() => void runQueueMutation(resolveConflict(conflict.operationId, "replace", canApplyConflictToBatch && applyConflictToBatch))}>
-              Replace
-            </button>
-          ) : null}
-          <button className={transferStyles.operationButton} type="button" disabled={working} onClick={() => void runQueueMutation(resolveConflict(conflict.operationId, "skip", canApplyConflictToBatch && applyConflictToBatch))}>
-            Skip
-          </button>
-          {conflict.supportsKeepBoth ? (
-            <button className={transferStyles.operationButton} type="button" disabled={working} onClick={() => void runQueueMutation(resolveConflict(conflict.operationId, "keep_both", canApplyConflictToBatch && applyConflictToBatch))}>
-              Keep Both
-            </button>
-          ) : null}
-        </div>
-      ) : null}
-      {activeBatches.length > 0 ? (
-        <div className={transferStyles.operationActions}>
-          {activeBatches.slice(0, 3).map((batch) => (
-            <span key={batch.batchId} className={transferStyles.operationActions}>
-              <span className={transferStyles.operationMeta}>{batch.label || `Batch ${batch.batchId}`}</span>
-              <button
-                className={transferStyles.operationButton}
-                type="button"
-                disabled={working}
-                onClick={() => void runQueueMutation(batch.paused ? resumeBatch(batch.batchId) : pauseBatch(batch.batchId))}
-              >
-                {batch.paused ? <Play size={14} /> : <Pause size={14} />}
-                {batch.paused ? "Resume Batch" : "Pause Batch"}
-              </button>
-              <button
-                className={transferStyles.operationButton}
-                type="button"
-                disabled={working}
-                onClick={() => void runQueueMutation(cancelBatch(batch.batchId))}
-              >
-                <XCircle size={14} />
-                Cancel Batch
-              </button>
-            </span>
-          ))}
-        </div>
-      ) : null}
-      {operations.length > 0 ? (
-        <div className={transferStyles.operationList}>
-          {operations.slice(0, 5).map((operation) => (
-            <div key={operation.operationId} className={transferStyles.operationRow}>
-              <span className={transferStyles.operationCell}>{operation.title || prettyLabel(operation.kind)}</span>
-              <span className={statusBadgeClass(operation.status)}>{prettyLabel(operation.status)}</span>
-              <span className={transferStyles.operationCell}>{operation.source.localPath || `${operation.source.remoteName}:${operation.source.remotePath}`}</span>
-              <span className={transferStyles.operationCell}>{operation.target.localPath || `${operation.target.remoteName}:${operation.target.remotePath}`}</span>
-              <select
-                className={transferStyles.operationSelect}
-                aria-label="Operation priority"
-                value={operation.priority}
-                disabled={working}
-                onChange={(event) => void runQueueMutation(setPriority(operation.operationId, event.target.value as OperationPriority))}
-              >
-                <option value="high">High</option>
-                <option value="normal">Normal</option>
-                <option value="low">Low</option>
-              </select>
-              <button
-                className={transferStyles.operationButton}
-                type="button"
-                disabled={working || !canPauseResumeOperation(operation)}
-                onClick={() => void runQueueMutation(operation.paused ? resume(operation.operationId) : pause(operation.operationId))}
-              >
-                {operation.paused ? <Play size={14} /> : <Pause size={14} />}
-                {operation.paused ? "Resume" : "Pause"}
-              </button>
-              <button className={transferStyles.operationButton} type="button" disabled={!operation.cancelable || working} onClick={() => void runQueueMutation(cancel(operation.operationId))}>
-                <XCircle size={14} />
-                Cancel
-              </button>
-              <button className={transferStyles.operationButton} type="button" disabled={!operation.retryable || operation.status !== "failed" || working} onClick={() => void runQueueMutation(retry(operation.operationId))}>
-                <RotateCcw size={14} />
-                Retry
-              </button>
-            </div>
-          ))}
-        </div>
-      ) : null}
-    </section>
-  );
 }

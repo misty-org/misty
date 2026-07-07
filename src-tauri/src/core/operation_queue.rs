@@ -43,15 +43,6 @@ pub enum OperationStatus {
     Skipped,
 }
 
-#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
-#[serde(rename_all = "snake_case")]
-pub enum OperationPriority {
-    Low,
-    #[default]
-    Normal,
-    High,
-}
-
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct OperationEndpoint {
@@ -80,6 +71,9 @@ pub struct OperationDescriptor {
     pub operation_id: u64,
     pub transfer_id: u64,
     pub batch_id: u64,
+    pub parent_transfer_id: u64,
+    pub root_transfer_id: u64,
+    pub tree_depth: u32,
     pub kind: OperationKind,
     pub source: OperationEndpoint,
     pub target: OperationEndpoint,
@@ -95,7 +89,6 @@ pub struct OperationDescriptor {
     pub error_message: String,
     pub attempt: u32,
     pub paused: bool,
-    pub priority: OperationPriority,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
@@ -226,10 +219,15 @@ impl OperationQueue {
         }
         let available = inner.max_concurrent.saturating_sub(inner.active_count);
         let mut ready = Vec::with_capacity(available);
-        while ready.len() < available {
+        let mut active_lanes = active_lane_counts(&inner);
+        let lane_limit = max_lane_concurrent(inner.max_concurrent);
+        let pending_to_scan = inner.pending.len();
+        let mut scanned = 0;
+        while ready.len() < available && scanned < pending_to_scan {
             let Some(id) = inner.pending.pop_front() else {
                 break;
             };
+            scanned += 1;
             let Some(candidate) = inner.operations.get(&id) else {
                 continue;
             };
@@ -246,19 +244,17 @@ impl OperationQueue {
                 });
             if blocked {
                 inner.pending.push_back(id);
-                if inner.pending.iter().all(|queued| {
-                    *queued == id
-                        || ready
-                            .iter()
-                            .any(|item: &OperationDescriptor| item.operation_id == *queued)
-                }) {
-                    break;
-                }
+                continue;
+            }
+            let lane = candidate.lane_key();
+            if active_lanes.get(&lane).copied().unwrap_or_default() >= lane_limit {
+                inner.pending.push_back(id);
                 continue;
             }
             let operation = inner.operations.get_mut(&id).expect("operation exists");
             operation.status = OperationStatus::InProgress;
             operation.attempt += 1;
+            *active_lanes.entry(lane).or_insert(0) += 1;
             ready.push(operation.clone());
             inner.active_count += 1;
         }
@@ -358,7 +354,7 @@ impl OperationQueue {
             return false;
         };
         if status == OperationStatus::Canceled {
-            return true;
+            return false;
         }
         if status == OperationStatus::InProgress {
             inner.active_count = inner.active_count.saturating_sub(1);
@@ -373,6 +369,8 @@ impl OperationQueue {
             OperationStatus::Completed
         };
         operation.error_message = error.unwrap_or_default();
+        operation.cancelable = false;
+        operation.retryable = operation.status == OperationStatus::Failed;
         true
     }
 
@@ -386,7 +384,7 @@ impl OperationQueue {
             return false;
         };
         if status == OperationStatus::Canceled {
-            return true;
+            return false;
         }
         if status == OperationStatus::InProgress {
             inner.active_count = inner.active_count.saturating_sub(1);
@@ -397,6 +395,8 @@ impl OperationQueue {
             .expect("operation exists");
         operation.status = OperationStatus::Skipped;
         operation.error_message.clear();
+        operation.cancelable = false;
+        operation.retryable = false;
         true
     }
 
@@ -419,6 +419,7 @@ impl OperationQueue {
         let batch_id = operation.batch_id;
         operation.status = OperationStatus::Canceled;
         operation.cancelable = false;
+        operation.retryable = false;
         if was_active {
             inner.active_count = inner.active_count.saturating_sub(1);
         }
@@ -463,6 +464,7 @@ impl OperationQueue {
                 let was_active = operation.status == OperationStatus::InProgress;
                 operation.status = OperationStatus::Canceled;
                 operation.cancelable = false;
+                operation.retryable = false;
                 was_active
             };
             if was_active {
@@ -494,6 +496,10 @@ impl OperationQueue {
         }
         operation.status = OperationStatus::Queued;
         operation.error_message.clear();
+        operation.cancelable = true;
+        operation.retryable = true;
+        operation.paused = false;
+        inner.pending.retain(|id| *id != operation_id);
         inner.pending.push_back(operation_id);
         true
     }
@@ -505,7 +511,9 @@ impl OperationQueue {
         };
         if !matches!(
             operation.status,
-            OperationStatus::Queued | OperationStatus::WaitingForResolution
+            OperationStatus::Queued
+                | OperationStatus::InProgress
+                | OperationStatus::WaitingForResolution
         ) {
             return false;
         }
@@ -513,16 +521,38 @@ impl OperationQueue {
         true
     }
 
-    pub async fn resume_operation(&self, operation_id: u64) -> bool {
+    pub async fn requeue_paused_operation(&self, operation_id: u64) -> bool {
         let mut inner = self.inner.lock().await;
         let Some(operation) = inner.operations.get_mut(&operation_id) else {
             return false;
         };
-        operation.paused = false;
-        if operation.status == OperationStatus::Queued && !inner.pending.contains(&operation_id) {
+        if operation.status != OperationStatus::InProgress {
+            return false;
+        }
+        let paused = operation.paused;
+        operation.status = OperationStatus::Queued;
+        operation.error_message.clear();
+        operation.cancelable = true;
+        operation.retryable = true;
+        inner.active_count = inner.active_count.saturating_sub(1);
+        inner.pending.retain(|id| *id != operation_id);
+        if !paused {
             inner.pending.push_front(operation_id);
         }
         true
+    }
+
+    pub async fn resume_operation(&self, operation_id: u64) -> Option<OperationStatus> {
+        let mut inner = self.inner.lock().await;
+        let Some(operation) = inner.operations.get_mut(&operation_id) else {
+            return None;
+        };
+        operation.paused = false;
+        let status = operation.status;
+        if status == OperationStatus::Queued && !inner.pending.contains(&operation_id) {
+            inner.pending.push_front(operation_id);
+        }
+        Some(status)
     }
 
     pub async fn pause_batch(&self, batch_id: u64) -> bool {
@@ -550,28 +580,6 @@ impl OperationQueue {
 
     pub async fn resume_all(&self) {
         self.inner.lock().await.paused = false;
-    }
-
-    pub async fn set_priority(&self, operation_id: u64, priority: OperationPriority) -> bool {
-        let mut inner = self.inner.lock().await;
-        let Some(operation) = inner.operations.get_mut(&operation_id) else {
-            return false;
-        };
-        operation.priority = priority;
-        let priorities = inner
-            .operations
-            .iter()
-            .map(|(id, operation)| (*id, operation.priority))
-            .collect::<HashMap<_, _>>();
-        let mut pending = inner.pending.drain(..).collect::<Vec<_>>();
-        pending.sort_by(|left, right| {
-            priorities
-                .get(right)
-                .unwrap_or(&OperationPriority::Normal)
-                .cmp(priorities.get(left).unwrap_or(&OperationPriority::Normal))
-        });
-        inner.pending = pending.into();
-        true
     }
 
     pub async fn set_bandwidth_limit(&self, limit: String) {
@@ -624,6 +632,44 @@ impl OperationQueue {
     }
 }
 
+impl OperationDescriptor {
+    fn lane_key(&self) -> String {
+        if self.source.is_remote() && self.target.is_remote() {
+            if self.source.remote_name == self.target.remote_name {
+                return format!("remote:{}", self.source.remote_name);
+            }
+            return format!(
+                "remote:{}->{}",
+                self.source.remote_name, self.target.remote_name
+            );
+        }
+        if self.target.is_remote() {
+            return format!("remote:{}", self.target.remote_name);
+        }
+        if self.source.is_remote() {
+            return format!("remote:{}", self.source.remote_name);
+        }
+        "local".to_string()
+    }
+}
+
+fn active_lane_counts(inner: &OperationQueueInner) -> HashMap<String, usize> {
+    let mut counts = HashMap::new();
+    for operation in inner.operations.values() {
+        if operation.status == OperationStatus::InProgress {
+            *counts.entry(operation.lane_key()).or_insert(0) += 1;
+        }
+    }
+    counts
+}
+
+fn max_lane_concurrent(max_concurrent: usize) -> usize {
+    if max_concurrent <= 2 {
+        return max_concurrent.max(1);
+    }
+    (max_concurrent / 2).max(2)
+}
+
 fn terminal(status: OperationStatus) -> bool {
     matches!(
         status,
@@ -637,6 +683,7 @@ fn terminal(status: OperationStatus) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::time::Duration;
 
     fn descriptor(title: &str) -> OperationDescriptor {
         OperationDescriptor {
@@ -644,6 +691,17 @@ mod tests {
             supports_replace: true,
             supports_keep_both: true,
             ..OperationDescriptor::default()
+        }
+    }
+
+    fn remote_descriptor(title: &str, remote: &str) -> OperationDescriptor {
+        OperationDescriptor {
+            target: OperationEndpoint {
+                remote_name: remote.to_string(),
+                remote_path: format!("/{title}"),
+                ..OperationEndpoint::default()
+            },
+            ..descriptor(title)
         }
     }
 
@@ -758,8 +816,65 @@ mod tests {
         assert_eq!(snapshot.bandwidth_limit, "10M");
         assert!(snapshot.operations[0].paused);
 
-        assert!(queue.resume_operation(operation_id).await);
+        assert_eq!(
+            queue.resume_operation(operation_id).await,
+            Some(OperationStatus::Queued)
+        );
         queue.resume_all().await;
+        assert_eq!(queue.take_ready().await.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn all_paused_pending_operations_do_not_spin_take_ready() {
+        let queue = OperationQueue::new(2);
+        queue
+            .enqueue_batch("copy", false, vec![descriptor("one"), descriptor("two")])
+            .await;
+        let snapshot = queue.snapshot().await;
+        let first_id = snapshot.operations[0].operation_id;
+        let second_id = snapshot.operations[1].operation_id;
+        assert!(queue.pause_operation(first_id).await);
+        assert!(queue.pause_operation(second_id).await);
+
+        let ready = tokio::time::timeout(Duration::from_millis(100), queue.take_ready())
+            .await
+            .expect("take_ready should stop after scanning blocked pending operations");
+        assert!(ready.is_empty());
+
+        assert_eq!(
+            queue.resume_operation(second_id).await,
+            Some(OperationStatus::Queued)
+        );
+        let ready = queue.take_ready().await;
+        assert_eq!(ready.len(), 1);
+        assert_eq!(ready[0].operation_id, second_id);
+    }
+
+    #[tokio::test]
+    async fn in_progress_pause_can_requeue_as_paused() {
+        let queue = OperationQueue::new(1);
+        queue
+            .enqueue_batch("copy", false, vec![descriptor("one")])
+            .await;
+        let operation = queue.take_ready().await.remove(0);
+
+        assert!(queue.pause_operation(operation.operation_id).await);
+        assert!(queue.requeue_paused_operation(operation.operation_id).await);
+
+        let snapshot = queue.snapshot().await;
+        let row = snapshot
+            .operations
+            .iter()
+            .find(|item| item.operation_id == operation.operation_id)
+            .unwrap();
+        assert_eq!(row.status, OperationStatus::Queued);
+        assert!(row.paused);
+        assert_eq!(snapshot.active_count, 0);
+        assert!(queue.take_ready().await.is_empty());
+        assert_eq!(
+            queue.resume_operation(operation.operation_id).await,
+            Some(OperationStatus::Queued)
+        );
         assert_eq!(queue.take_ready().await.len(), 1);
     }
 
@@ -783,19 +898,36 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn priority_reorders_queued_operations() {
-        let queue = OperationQueue::new(1);
+    async fn provider_lanes_keep_one_remote_from_monopolizing_queue() {
+        let queue = OperationQueue::new(8);
         queue
-            .enqueue_batch("copy", false, vec![descriptor("one"), descriptor("two")])
+            .enqueue_batch(
+                "copy",
+                false,
+                vec![
+                    remote_descriptor("a1", "dropbox"),
+                    remote_descriptor("a2", "dropbox"),
+                    remote_descriptor("a3", "dropbox"),
+                    remote_descriptor("a4", "dropbox"),
+                    remote_descriptor("a5", "dropbox"),
+                    remote_descriptor("b1", "drive"),
+                    remote_descriptor("b2", "drive"),
+                ],
+            )
             .await;
-        let snapshot = queue.snapshot().await;
-        let first_id = snapshot.operations[0].operation_id;
-        let second_id = snapshot.operations[1].operation_id;
 
-        assert!(queue.set_priority(second_id, OperationPriority::High).await);
         let ready = queue.take_ready().await;
-        assert_eq!(ready[0].operation_id, second_id);
-        assert_ne!(ready[0].operation_id, first_id);
+        let dropbox_count = ready
+            .iter()
+            .filter(|operation| operation.target.remote_name == "dropbox")
+            .count();
+        let drive_count = ready
+            .iter()
+            .filter(|operation| operation.target.remote_name == "drive")
+            .count();
+
+        assert_eq!(dropbox_count, 4);
+        assert_eq!(drive_count, 2);
     }
 
     #[tokio::test]
@@ -806,7 +938,7 @@ mod tests {
             .await;
         let first = queue.take_ready().await.remove(0);
         assert!(queue.cancel(first.operation_id).await);
-        assert!(queue.complete(first.operation_id, None).await);
+        assert!(!queue.complete(first.operation_id, None).await);
 
         let snapshot = queue.snapshot().await;
         let operation = snapshot

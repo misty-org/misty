@@ -45,8 +45,9 @@ import type {
   NativeWorkspaceDocument,
   OpenWithAssociation,
   OperationConflictPolicy,
+  OperationDescriptor,
   OperationQueueSnapshot,
-  OperationPriority,
+  OperationStatus,
   PasteBlobRequest,
   PasteItem,
   PasteItemsRequest,
@@ -90,6 +91,7 @@ import type {
   ShortcutsSnapshot,
   TransferFilter,
   TransferPage,
+  TransferRecord,
   VerifyResult,
   VerifyStartRequest,
   CompareFilesRequest,
@@ -193,7 +195,13 @@ function browserSmokeFallback<T>(command: string, args?: Record<string, unknown>
     case "providers_refresh":
       return Promise.resolve(browserProvidersSnapshot() as T);
     case "transfers_snapshot":
-      return Promise.resolve({ rows: [], totalCount: 0, dbPath: "" } as T);
+      return Promise.resolve(browserTransferPage() as T);
+    case "operation_queue_cancel":
+    case "operation_queue_cancel_batch":
+    case "operation_queue_retry":
+    case "operation_queue_undo":
+    case "operation_queue_resolve_conflict":
+    case "operation_queue_clear_terminal":
     case "operation_queue_snapshot":
     case "operation_queue_redo":
     case "operation_queue_pause":
@@ -202,9 +210,9 @@ function browserSmokeFallback<T>(command: string, args?: Record<string, unknown>
     case "operation_queue_resume_batch":
     case "operation_queue_pause_all":
     case "operation_queue_resume_all":
-    case "operation_queue_set_priority":
     case "operation_queue_set_bandwidth_limit":
     case "operation_queue_set_transfer_profile":
+      browserApplyOperationQueueAction(command, args);
       return Promise.resolve(browserOperationQueueSnapshot() as T);
     case "file_metadata_snapshot":
       return Promise.resolve({
@@ -290,6 +298,67 @@ function browserSmokeFallback<T>(command: string, args?: Record<string, unknown>
 
 const browserSmokeHome = "/Users/misty";
 const browserSettingsStorageKey = "misty.browser-smoke.settings";
+const browserSmokeStartedAt = Date.now() - 80_000;
+
+let browserSmokeTransfers: TransferRecord[] = [
+  browserSmokeTransfer({
+    id: 1,
+    jobId: 41,
+    operationId: 101,
+    batchId: 201,
+    transferType: "upload",
+    status: "in_progress",
+    fileName: "Project Archive.zip",
+    localSourcePath: `${browserSmokeHome}/Documents/Project Archive.zip`,
+    remoteDestName: "browser-dropbox",
+    remoteDestPath: "/Project Archive.zip",
+    totalBytes: 300_000_000,
+    transferredBytes: 125_000_000,
+    bytesPerSecond: 8_200_000,
+    startedAtMs: browserSmokeStartedAt,
+    cancelable: true,
+    retryable: false,
+    paused: false,
+    detailMessage: "Uploading 125 MB of 300 MB",
+  }),
+  browserSmokeTransfer({
+    id: 2,
+    jobId: 42,
+    operationId: 102,
+    batchId: 0,
+    transferType: "upload",
+    status: "failed",
+    fileName: "Docker.app",
+    localSourcePath: "/Applications/Docker.app",
+    remoteDestName: "browser-dropbox",
+    remoteDestPath: "/Docker.app",
+    totalBytes: 635_867_136,
+    transferredBytes: 635_867_136,
+    bytesPerSecond: 0,
+    completedAtMs: browserSmokeStartedAt + 20_000,
+    cancelable: false,
+    retryable: true,
+    errorMessage: "Browser smoke failed upload",
+    detailMessage: "Retry is available",
+  }),
+  browserSmokeTransfer({
+    id: 3,
+    jobId: 43,
+    operationId: 0,
+    batchId: 0,
+    transferType: "delete",
+    status: "completed",
+    fileName: "Archive-2026-07-04.zip",
+    localSourcePath: `${browserSmokeHome}/.misty/cache/trash/Archive-2026-07-04.zip`,
+    totalBytes: 2_539_012,
+    transferredBytes: 2_539_012,
+    bytesPerSecond: 0,
+    completedAtMs: browserSmokeStartedAt + 30_000,
+    cancelable: false,
+    retryable: false,
+    detailMessage: "Completed",
+  }),
+];
 
 const browserPluginDefinitions = [
   {
@@ -702,10 +771,169 @@ function providerWorkflowRank(type: string): number {
   return 1;
 }
 
-function browserOperationQueueSnapshot(): OperationQueueSnapshot {
+function browserTransferPage(): TransferPage {
   return {
-    operations: [],
-    batches: [],
+    rows: browserSmokeTransfers,
+    totalCount: browserSmokeTransfers.length,
+    dbPath: "browser-smoke",
+  };
+}
+
+function browserSmokeTransfer(overrides: Partial<TransferRecord>): TransferRecord {
+  return {
+    id: 0,
+    jobId: 0,
+    operationId: 0,
+    batchId: 0,
+    parentTransferId: 0,
+    rootTransferId: 0,
+    treeDepth: 0,
+    transferType: "upload",
+    itemType: "local",
+    status: "queued",
+    conflictPolicy: "ask",
+    queueTitle: "",
+    fileName: "Transfer",
+    localSourcePath: "",
+    localDestPath: "",
+    remoteSourceName: "",
+    remoteSourcePath: "",
+    remoteDestName: "",
+    remoteDestPath: "",
+    totalBytes: 0,
+    transferredBytes: 0,
+    bytesPerSecond: 0,
+    errorMessage: "",
+    detailMessage: "",
+    queuedAtMs: browserSmokeStartedAt - 20_000,
+    startedAtMs: 0,
+    completedAtMs: 0,
+    cancelable: true,
+    retryable: false,
+    undoable: false,
+    undoTokenId: 0,
+    preserveOrder: false,
+    paused: false,
+    attempt: 1,
+    supportsReplace: true,
+    supportsKeepBoth: true,
+    ...overrides,
+  };
+}
+
+function browserApplyOperationQueueAction(command: string, args?: Record<string, unknown>): void {
+  const operationId = Number(args?.operationId ?? 0);
+  const batchId = Number(args?.batchId ?? 0);
+  const now = Date.now();
+  const matchingRows = browserSmokeTransfers.filter((row) => {
+    if (operationId > 0) return row.operationId === operationId;
+    if (batchId > 0) return row.batchId === batchId;
+    return false;
+  });
+  const rows = matchingRows.length > 0 ? matchingRows : browserSmokeTransfers;
+  switch (command) {
+    case "operation_queue_cancel":
+    case "operation_queue_cancel_batch":
+      for (const row of rows) {
+        if (!row.operationId || !row.cancelable) continue;
+        row.status = "canceled";
+        row.cancelable = false;
+        row.retryable = false;
+        row.paused = false;
+        row.completedAtMs = now;
+        row.detailMessage = "Operation canceled.";
+      }
+      break;
+    case "operation_queue_pause":
+    case "operation_queue_pause_batch":
+      for (const row of rows) {
+        if (!row.operationId) continue;
+        row.paused = true;
+        row.detailMessage = "Paused";
+      }
+      break;
+    case "operation_queue_resume":
+    case "operation_queue_resume_batch":
+      for (const row of rows) {
+        if (!row.operationId) continue;
+        row.paused = false;
+        if (row.status === "queued") row.status = "in_progress";
+        row.detailMessage = "Resumed";
+      }
+      break;
+    case "operation_queue_retry":
+      for (const row of rows) {
+        if (!row.operationId || !row.retryable) continue;
+        row.status = "queued";
+        row.cancelable = true;
+        row.errorMessage = "";
+        row.detailMessage = "Queued for retry";
+        row.completedAtMs = 0;
+        row.attempt += 1;
+      }
+      break;
+    case "operation_queue_retry_transfer": {
+      const transferId = Number(args?.transferId ?? 0);
+      const row = rows.find((candidate) => candidate.id === transferId);
+      if (row?.retryable) {
+        const nextId = Math.max(0, ...rows.map((candidate) => candidate.id)) + 1;
+        const nextOperationId = Math.max(100, ...rows.map((candidate) => candidate.operationId)) + 1;
+        rows.unshift({
+          ...row,
+          id: nextId,
+          jobId: nextId,
+          operationId: nextOperationId,
+          batchId: nextOperationId,
+          status: "queued",
+          cancelable: true,
+          retryable: true,
+          errorMessage: "",
+          detailMessage: "Queued for retry",
+          queuedAtMs: Date.now(),
+          startedAtMs: 0,
+          completedAtMs: 0,
+          attempt: row.attempt + 1,
+        });
+      }
+      break;
+    }
+    case "operation_queue_resolve_conflict":
+      for (const row of rows) {
+        if (row.status !== "waiting_for_resolution") continue;
+        row.status = args?.policy === "skip" ? "skipped" : "queued";
+        row.detailMessage = `Resolved with ${String(args?.policy ?? "ask")}`;
+      }
+      break;
+    case "operation_queue_clear_terminal":
+      browserSmokeTransfers = browserSmokeTransfers.filter((row) =>
+        row.status === "queued"
+        || row.status === "in_progress"
+        || row.status === "waiting_for_resolution"
+      );
+      break;
+  }
+}
+
+function browserOperationQueueSnapshot(): OperationQueueSnapshot {
+  const operations = browserSmokeTransfers
+    .filter((row) => row.operationId > 0)
+    .map(browserOperationForTransfer);
+  const batchIds = [...new Set(operations.map((operation) => operation.batchId).filter(Boolean))];
+  const activeCount = operations.filter((operation) =>
+    operation.status === "queued"
+    || operation.status === "in_progress"
+    || operation.status === "waiting_for_resolution"
+  ).length;
+  return {
+    operations,
+    batches: batchIds.map((batchId) => ({
+      batchId,
+      label: `Browser smoke batch ${batchId}`,
+      preserveOrder: false,
+      paused: operations.some((operation) => operation.batchId === batchId && operation.paused),
+      pausedOperationId: operations.find((operation) => operation.batchId === batchId && operation.paused)?.operationId ?? 0,
+      operationIds: operations.filter((operation) => operation.batchId === batchId).map((operation) => operation.operationId),
+    })),
     conflictDialog: {
       open: false,
       operationId: 0,
@@ -718,14 +946,54 @@ function browserOperationQueueSnapshot(): OperationQueueSnapshot {
       sourceLabel: "",
       targetLabel: "",
     },
-    activeCount: 0,
+    activeCount,
     maxConcurrent: 4,
-    redoAvailable: false,
-    paused: false,
+    redoAvailable: true,
+    paused: operations.length > 0 && operations.every((operation) => operation.paused),
     bandwidthLimit: "",
     transferProfileId: "balanced",
     transferProfileName: "Balanced",
   };
+}
+
+function browserOperationForTransfer(row: TransferRecord): OperationDescriptor {
+  return {
+    operationId: row.operationId,
+    transferId: row.id,
+    batchId: row.batchId,
+    parentTransferId: row.parentTransferId,
+    rootTransferId: row.rootTransferId,
+    treeDepth: row.treeDepth,
+    kind: row.transferType,
+    source: {
+      localPath: row.localSourcePath,
+      remoteName: row.remoteSourceName,
+      remotePath: row.remoteSourcePath,
+    },
+    target: {
+      localPath: row.localDestPath,
+      remoteName: row.remoteDestName,
+      remotePath: row.remoteDestPath,
+    },
+    conflictPolicy: row.conflictPolicy as OperationConflictPolicy,
+    status: browserOperationStatusForTransfer(row.status),
+    preserveOrder: row.preserveOrder,
+    retryable: row.retryable,
+    cancelable: row.cancelable,
+    undoable: row.undoable,
+    supportsReplace: row.supportsReplace,
+    supportsKeepBoth: row.supportsKeepBoth,
+    title: row.queueTitle || row.fileName,
+    errorMessage: row.errorMessage,
+    attempt: row.attempt,
+    paused: row.paused,
+  };
+}
+
+function browserOperationStatusForTransfer(status: TransferRecord["status"]): OperationStatus {
+  if (status === "pending") return "queued";
+  if (status === "interrupted") return "failed";
+  return status;
 }
 
 function browserDirectoryListing(request: ListDirectoryRequest): DirectoryListing {
@@ -1176,6 +1444,10 @@ export function operationQueueRetry(operationId: number): Promise<OperationQueue
   return invoke("operation_queue_retry", { operationId });
 }
 
+export function operationQueueRetryTransfer(transferId: number): Promise<OperationQueueSnapshot> {
+  return invoke("operation_queue_retry_transfer", { transferId });
+}
+
 export function operationQueuePause(operationId: number): Promise<OperationQueueSnapshot> {
   return invoke("operation_queue_pause", { operationId });
 }
@@ -1198,10 +1470,6 @@ export function operationQueuePauseAll(): Promise<OperationQueueSnapshot> {
 
 export function operationQueueResumeAll(): Promise<OperationQueueSnapshot> {
   return invoke("operation_queue_resume_all");
-}
-
-export function operationQueueSetPriority(operationId: number, priority: OperationPriority): Promise<OperationQueueSnapshot> {
-  return invoke("operation_queue_set_priority", { operationId, priority });
 }
 
 export function operationQueueSetBandwidthLimit(limit: string): Promise<OperationQueueSnapshot> {

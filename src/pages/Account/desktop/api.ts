@@ -14,7 +14,8 @@ export interface MeResponse {
 }
 
 async function apiFetch(path: string, init?: RequestInit) {
-  const res = await fetch(`${appApiBase()}${path}`, {
+  const apiBase = await appApiBase();
+  const res = await fetch(`${apiBase}${path}`, {
     credentials: "include",
     ...init,
     headers: await appApiHeaders(init?.headers),
@@ -49,7 +50,8 @@ export async function updateDevice(device: string): Promise<void> {
 
 export async function logoutRequest(): Promise<void> {
   try {
-    await fetch(`${appApiBase()}/logout`, {
+    const apiBase = await appApiBase();
+    await fetch(`${apiBase}/logout`, {
       method: "POST",
       credentials: "include",
       headers: await appApiHeaders(),

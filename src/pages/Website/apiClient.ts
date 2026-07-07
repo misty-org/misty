@@ -3,13 +3,17 @@ import {
   readAccountAuthToken,
   saveAccountAuthToken,
 } from "../Account/shared/authTokenStore";
+import { appSnapshot } from "../../api/misty";
 
 const legacyAuthTokenStorageKey = "misty:auth-token";
 
-export function appApiBase(): string {
+export async function appApiBase(): Promise<string> {
   const base = normalizeBaseUrl(import.meta.env.VITE_API_BASE)
-    || normalizeBaseUrl(import.meta.env.VITE_MISTY_SERVER_URL);
-  if (!base) return "";
+    || normalizeBaseUrl(import.meta.env.VITE_MISTY_SERVER_URL)
+    || normalizeBaseUrl((await loadAppSnapshotForApi())?.environment.serverUrl);
+  if (!base) {
+    throw new Error("Misty server URL is not configured. Set VITE_API_BASE or add server.url to your Misty config.");
+  }
   return /\/api$/i.test(base) ? base : `${base}/api`;
 }
 
@@ -44,4 +48,12 @@ function clearLegacyAuthToken(): void {
 function normalizeBaseUrl(value: unknown): string {
   if (typeof value !== "string") return "";
   return value.trim().replace(/\/+$/, "");
+}
+
+async function loadAppSnapshotForApi() {
+  try {
+    return await appSnapshot();
+  } catch {
+    return null;
+  }
 }

@@ -27,6 +27,7 @@ const transferBadgeStatuses = new Set<TransferRecord["status"]>([
   "failed",
   "interrupted",
 ]);
+const emptyTransferRows: TransferRecord[] = [];
 
 export function ExplorerTray(props: {
   aiOpen: boolean;
@@ -86,7 +87,7 @@ export function ExplorerTray(props: {
 function ExplorerTransfersTabButton(props: {
   onClick: () => void;
 }) {
-  const rows = useTransfersStore((state) => state.transfers?.rows ?? []);
+  const rows = useTransfersStore((state) => state.transfers?.rows ?? emptyTransferRows);
   const active = useMultiPanelStore((state) => {
     const tab = state.tabs.find((candidate) => candidate.id === state.activeTabId);
     return Boolean(tab && isTransfersTabPath(tab.path));

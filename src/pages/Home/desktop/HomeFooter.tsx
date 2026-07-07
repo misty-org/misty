@@ -28,9 +28,9 @@ const socialLinks = [
 ];
 
 const floatingFooterClass =
-  "grid min-h-0 min-w-0 gap-1 overflow-hidden rounded-xl border border-white/[0.08] bg-[#090c10] p-1.5 shadow-xl shadow-black/20 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] xl:col-span-12 xl:col-start-1 xl:row-start-7";
+  "grid min-h-0 min-w-0 items-center gap-1 overflow-hidden rounded-xl border border-white/[0.08] bg-[#090c10] p-1.5 shadow-xl shadow-black/20 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] xl:col-span-12 xl:col-start-1 xl:row-start-7";
 const dockCellClass =
-  "group min-w-0 rounded-lg px-3 py-2 text-left transition hover:bg-white/[0.045]";
+  "group grid min-h-14 min-w-0 items-center rounded-lg px-3 py-2 text-left transition hover:bg-white/[0.045]";
 const dockLinkClass =
   "group grid min-w-0 grid-cols-[18px_minmax(0,1fr)_18px] items-center gap-2 text-left";
 
@@ -69,8 +69,8 @@ export function HomeFooter({ latestChangelog, latestPost }: HomeFooterProps) {
         </Link>
       </section>
 
-      <section className={`${dockCellClass} flex items-center lg:justify-self-end`}>
-        <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+      <section className={`${dockCellClass} justify-items-center lg:justify-self-end`}>
+        <div className="flex flex-wrap items-center justify-center gap-2">
           {socialLinks.map(({ href, icon: Icon, label }) => (
             <button
               aria-label={label}

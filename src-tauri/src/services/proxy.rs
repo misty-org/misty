@@ -295,6 +295,7 @@ impl ProxyService {
             }
             "/api/remote/backend/run" | "/api/remotes/backend/run" => "remote.backend.run",
             "/api/remote/file/mkdir" | "/api/remotes/file/mkdir" => "remote.file.mkdir",
+            "/api/remote/file/create" | "/api/remotes/file/create" => "remote.file.create",
             "/api/remote/file/rename" | "/api/remotes/file/rename" => "remote.file.rename",
             "/api/remote/file/copy" | "/api/remotes/file/copy" => "remote.file.copy",
             "/api/remote/file/move" | "/api/remotes/file/move" => "remote.file.move",
@@ -390,6 +391,27 @@ impl ProxyService {
         .await
     }
 
+    pub async fn upload_directory_with_cancellation(
+        &self,
+        remote: &str,
+        remote_directory: &str,
+        local_path: &Path,
+        directory_name: &str,
+        cancellation: Option<&AtomicBool>,
+    ) -> ApiResult<ProxyResponse> {
+        ensure_not_canceled_if(cancellation)?;
+        self.invoke_embedded(
+            "remote.file.upload_directory_from_path",
+            serde_json::json!({
+                "remote": remote,
+                "path": remote_directory,
+                "source_path": local_path.display().to_string(),
+                "directory_name": directory_name,
+            }),
+        )
+        .await
+    }
+
     pub async fn start_download_to_file_with_cancellation(
         &self,
         remote: &str,
@@ -409,6 +431,22 @@ impl ProxyService {
             )
             .await?;
         Ok(Some(response))
+    }
+
+    pub async fn start_download_directory_to_path_with_cancellation(
+        &self,
+        remote: &str,
+        remote_path: &str,
+        destination: &Path,
+        cancellation: Option<&AtomicBool>,
+    ) -> ApiResult<Option<ProxyResponse>> {
+        self.start_download_to_file_with_cancellation(
+            remote,
+            remote_path,
+            destination,
+            cancellation,
+        )
+        .await
     }
 
     pub async fn download_to_file_with_cancellation(
