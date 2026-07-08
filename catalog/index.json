@@ -2,16 +2,16 @@
  {
     "id": "quick_convert",
     "name": "Quick Convert",
-    "url": "https://raw.githubusercontent.com/misty-org/misty-plugins/main/catalog/plugins/quick_convert.json"
+    "url": "https://raw.githubusercontent.com/misty-org/misty-plugins/main/catalog/quick_convert.json"
   },
   {
     "id": "themes",
     "name": "Themes",
-    "url": "https://raw.githubusercontent.com/misty-org/misty-plugins/main/catalog/plugins/themes.json"
+    "url": "https://raw.githubusercontent.com/misty-org/misty-plugins/main/catalog/themes.json"
   },
   {
     "id": "ytdlp",
     "name": "Ytdlp",
-    "url": "https://raw.githubusercontent.com/misty-org/misty-plugins/main/catalog/plugins/ytdlp.json"
+    "url": "https://raw.githubusercontent.com/misty-org/misty-plugins/main/catalog/ytdlp.json"
   },
 ]
