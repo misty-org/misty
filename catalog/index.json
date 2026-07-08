@@ -1,10 +1,5 @@
 [
-  {
-    "id": "git",
-    "name": "Git",
-    "url": "https://raw.githubusercontent.com/misty-org/misty-plugins/main/catalog/plugins/git.json"
-  },
-  {
+ {
     "id": "quick_convert",
     "name": "Quick Convert",
     "url": "https://raw.githubusercontent.com/misty-org/misty-plugins/main/catalog/plugins/quick_convert.json"
@@ -15,18 +10,8 @@
     "url": "https://raw.githubusercontent.com/misty-org/misty-plugins/main/catalog/plugins/themes.json"
   },
   {
-    "id": "vault",
-    "name": "Vault",
-    "url": "https://raw.githubusercontent.com/misty-org/misty-plugins/main/catalog/plugins/vault.json"
-  },
-  {
     "id": "ytdlp",
     "name": "Ytdlp",
     "url": "https://raw.githubusercontent.com/misty-org/misty-plugins/main/catalog/plugins/ytdlp.json"
   },
-  {
-    "id": "preview-panel",
-    "name": "Preview Panel",
-    "url": "https://raw.githubusercontent.com/misty-org/misty-plugins/main/catalog/plugins/preview-panel.json"
-  }
 ]
