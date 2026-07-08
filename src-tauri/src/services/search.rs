@@ -191,6 +191,8 @@ pub struct SearchStatus {
     pub last_scan_outcome: Option<SearchScanOutcome>,
     pub last_scan_error: Option<String>,
     pub indexed_item_count: u64,
+    pub indexed_local_item_count: u64,
+    pub indexed_remote_item_count: u64,
     pub scan_indexed_item_count: u64,
     pub index_size_bytes: u64,
     pub current_source: Option<String>,
@@ -205,6 +207,10 @@ pub struct SearchStatus {
 struct SearchMeta {
     schema_version: u32,
     indexed_item_count: u64,
+    #[serde(default)]
+    indexed_local_item_count: u64,
+    #[serde(default)]
+    indexed_remote_item_count: u64,
     last_scan_time_ms: Option<u64>,
     last_scan_outcome: Option<SearchScanOutcome>,
     last_scan_error: Option<String>,
@@ -248,6 +254,8 @@ impl SearchService {
             last_scan_outcome: None,
             last_scan_error: None,
             indexed_item_count: 0,
+            indexed_local_item_count: 0,
+            indexed_remote_item_count: 0,
             scan_indexed_item_count: 0,
             index_size_bytes: 0,
             current_source: None,
@@ -306,6 +314,8 @@ impl SearchService {
             state.status.last_scan_time_ms = meta.last_scan_time_ms;
             state.status.last_scan_outcome = meta.last_scan_outcome;
             state.status.last_scan_error = meta.last_scan_error;
+            state.status.indexed_local_item_count = meta.indexed_local_item_count;
+            state.status.indexed_remote_item_count = meta.indexed_remote_item_count;
             state.status.indexed_local_roots = meta.indexed_local_roots;
             state.status.indexed_remote_names = meta.indexed_remote_names;
         }
@@ -472,12 +482,24 @@ impl SearchService {
             SearchScanOutcome::Failed
         });
         state.status.last_scan_error = result.as_ref().err().map(ToString::to_string);
-        if let Ok((index, reader, fields, count, local_roots, remote_names)) = result {
+        if let Ok((
+            index,
+            reader,
+            fields,
+            count,
+            local_count,
+            remote_count,
+            local_roots,
+            remote_names,
+        )) = result
+        {
             state.index = Some(index);
             state.reader = Some(reader);
             state.fields = Some(fields);
             state.status.last_scan_time_ms = Some(finished);
             state.status.indexed_item_count = count;
+            state.status.indexed_local_item_count = local_count;
+            state.status.indexed_remote_item_count = remote_count;
             state.status.index_size_bytes = dir_size(&self.inner.live_index_dir);
             state.status.indexed_local_roots = local_roots;
             state.status.indexed_remote_names = remote_names;
@@ -487,6 +509,8 @@ impl SearchService {
             &SearchMeta {
                 schema_version: SEARCH_SCHEMA_VERSION,
                 indexed_item_count: state.status.indexed_item_count,
+                indexed_local_item_count: state.status.indexed_local_item_count,
+                indexed_remote_item_count: state.status.indexed_remote_item_count,
                 last_scan_time_ms: state.status.last_scan_time_ms,
                 last_scan_outcome: state.status.last_scan_outcome.clone(),
                 last_scan_error: state.status.last_scan_error.clone(),
@@ -505,6 +529,8 @@ impl SearchService {
         IndexReader,
         SearchIndexFields,
         u64,
+        u64,
+        u64,
         Vec<String>,
         Vec<String>,
     )> {
@@ -514,6 +540,8 @@ impl SearchService {
             .map_err(|error| ApiError::Message(error.to_string()))?;
         let ignored = ignored_paths(&request.ignored_paths, &self.inner.index_root);
         let mut count = 0u64;
+        let mut local_count = 0u64;
+        let mut remote_count = 0u64;
         let mut indexed_local_roots = Vec::new();
         let mut indexed_remote_names = Vec::new();
 
@@ -527,6 +555,7 @@ impl SearchService {
                 match self.scan_local_root(&root, request.max_depth, &ignored, &fields, &writer) {
                     Ok(indexed) => {
                         count += indexed;
+                        local_count += indexed;
                         indexed_local_roots.push(display_path(&root));
                         self.set_indexed_count(count);
                     }
@@ -551,6 +580,7 @@ impl SearchService {
                 {
                     Ok(indexed) => {
                         count += indexed;
+                        remote_count += indexed;
                         indexed_remote_names.push(remote.name.clone());
                         self.set_indexed_count(count);
                     }
@@ -579,6 +609,8 @@ impl SearchService {
             reader,
             fields,
             count,
+            local_count,
+            remote_count,
             indexed_local_roots,
             indexed_remote_names,
         ))

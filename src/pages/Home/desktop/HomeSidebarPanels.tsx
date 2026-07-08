@@ -15,6 +15,8 @@ import {
 } from "lucide-react";
 import type { ReactNode } from "react";
 import type { MountedDevice, ProviderRemote } from "../../../api/types";
+import { providerIconForType } from "../../../shared/assets/icons";
+import { AssetIcon } from "../../../shared/components/AssetIcon";
 import { joinPath, titleFromPath } from "./recentFileUtils";
 
 export type HomeQuickAccessItem = {
@@ -54,7 +56,7 @@ type HomeSidebarPanelsProps = {
 };
 
 const panelClass =
-  "flex min-h-0 min-w-0 flex-col overflow-hidden rounded-2xl border border-white/[0.08] bg-[#090c10]/78 p-3 shadow-xl shadow-black/20";
+  "flex min-h-0 min-w-0 flex-col overflow-hidden rounded-2xl border border-white/[0.08] bg-[rgb(9_12_16_/_var(--misty-app-panel-opacity,0.78))] p-3 shadow-xl shadow-black/20";
 const headerClass =
   "mb-2 flex shrink-0 items-center gap-2 border-b border-white/[0.06] pb-2 text-sm font-semibold text-text";
 const rowClass =
@@ -172,27 +174,30 @@ export function HomeSidebarPanels(props: HomeSidebarPanelsProps) {
           loading={props.remotesLoading}
           showEmpty={props.remotes.length === 0}
         >
-          {props.remotes.map((remote) => (
-            <button
-              className={rowClass}
-              key={`${remote.type}:${remote.name}`}
-              onClick={() => props.onOpenRemote(remote)}
-              title={`${remote.type}: ${remote.name}`}
-              type="button"
-            >
-              <span className={iconCellClass}>
-                <Server className="h-4 w-4" />
-              </span>
-              <span className="min-w-0">
-                <span className="block truncate text-sm font-semibold text-text">
-                  {remote.name}
+          {props.remotes.map((remote) => {
+            const providerIcon = providerIconForType(remote.type);
+            return (
+              <button
+                className={rowClass}
+                key={`${remote.type}:${remote.name}`}
+                onClick={() => props.onOpenRemote(remote)}
+                title={`${remote.type}: ${remote.name}`}
+                type="button"
+              >
+                <span className={iconCellClass}>
+                  <AssetIcon src={providerIcon.src} color={providerIcon.color} size={20} />
                 </span>
-                <span className="mt-0.5 block truncate text-[11px] text-text-muted">
-                  {remote.statusLabel || remote.type}
+                <span className="min-w-0">
+                  <span className="block truncate text-sm font-semibold text-text">
+                    {remote.name}
+                  </span>
+                  <span className="mt-0.5 block truncate text-[11px] text-text-muted">
+                    {remote.statusLabel || remote.type}
+                  </span>
                 </span>
-              </span>
-            </button>
-          ))}
+              </button>
+            );
+          })}
         </PanelRows>
       </SidebarPanel>
 

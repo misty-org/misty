@@ -109,7 +109,7 @@ function DetailSection({
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-2xl border border-white/8 bg-[#0b0d0f] p-4">
+    <section className="rounded-xl border border-white/8 bg-[var(--misty-app-surface-bg,#0b0d0f)] p-4">
       <p className="text-sm font-medium text-zinc-200">{title}</p>
       <div className="mt-3">{children}</div>
     </section>
@@ -159,10 +159,10 @@ function SidebarPluginCard({
 }) {
   return (
     <button
-      className={`w-full rounded-2xl border p-4 text-left transition ${
+      className={`w-full rounded-xl border p-3.5 text-left transition ${
         selected
           ? "border-white/18 bg-white/[0.04]"
-          : "border-white/8 bg-[#0b0d0f] hover:border-white/14 hover:bg-white/[0.02]"
+          : "border-white/8 bg-[var(--misty-app-surface-bg,#0b0d0f)] hover:border-white/14 hover:bg-white/[0.02]"
       }`}
       onClick={onClick}
       type="button"
@@ -170,7 +170,7 @@ function SidebarPluginCard({
       <div className="flex items-start gap-4">
         <PluginLogo
           plugin={plugin}
-          roundedClass="rounded-xl"
+          roundedClass="rounded-lg"
           sizeClass="h-16 w-16"
           textClass="text-sm font-semibold text-white"
         />
@@ -185,10 +185,10 @@ function SidebarPluginCard({
               {pluginStatus(plugin)}
             </span>
           </div>
-          <p className="mt-2 line-clamp-2 text-sm leading-6 text-zinc-400">
+          <p className="mt-2 line-clamp-2 text-sm leading-5 text-zinc-400">
             {plugin.overview}
           </p>
-          <div className="mt-3 flex items-center gap-2 text-xs text-zinc-500">
+          <div className="mt-2.5 flex items-center gap-2 text-xs text-zinc-500">
             <span>{plugin.author || "Misty"}</span>
             {plugin.verified ? <span>verified</span> : null}
           </div>
@@ -205,7 +205,7 @@ function PluginListSkeleton() {
   return (
     <div className="flex flex-col gap-4" aria-hidden="true">
       {[0, 1, 2, 3].map((index) => (
-        <div key={index} className="rounded-2xl border border-white/8 bg-[#0b0d0f] p-4">
+        <div key={index} className="rounded-2xl border border-white/8 bg-[var(--misty-app-surface-bg,#0b0d0f)] p-4">
           <div className="flex items-start gap-4">
             <span className={`${pluginSkeletonBlockClass} h-16 w-16 shrink-0`} />
             <span className="grid min-w-0 flex-1 gap-3">
@@ -227,7 +227,7 @@ function PluginListSkeleton() {
 function PluginDetailSkeleton() {
   return (
     <div className="flex min-h-0 flex-1 flex-col" aria-hidden="true">
-      <div className="shrink-0 border-b border-white/[0.07] bg-[#090b0d]/95 px-6 py-4 backdrop-blur-sm">
+      <div className="shrink-0 border-b border-white/[0.07] bg-[var(--misty-app-surface-bg,rgba(9,11,13,0.95))] px-6 py-4">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="grid min-w-[320px] gap-3">
             <span className="flex items-center gap-3">
@@ -255,7 +255,7 @@ function PluginDetailSkeleton() {
       <div className="min-h-0 flex-1 overflow-y-auto px-6 py-6">
         <div className="grid gap-5 xl:grid-cols-2">
           <div className="xl:col-span-2">
-            <section className="rounded-2xl border border-white/8 bg-[#0b0d0f] p-4">
+            <section className="rounded-2xl border border-white/8 bg-[var(--misty-app-surface-bg,#0b0d0f)] p-4">
               <span className={`${pluginSkeletonBlockClass} block h-5 w-24`} />
               <div className="mt-4 grid gap-3">
                 <span className={`${pluginSkeletonBlockClass} h-4 w-full`} />
@@ -265,7 +265,7 @@ function PluginDetailSkeleton() {
             </section>
           </div>
           {[0, 1, 2, 3].map((index) => (
-            <section key={index} className="rounded-2xl border border-white/8 bg-[#0b0d0f] p-4">
+            <section key={index} className="rounded-2xl border border-white/8 bg-[var(--misty-app-surface-bg,#0b0d0f)] p-4">
               <span className={`${pluginSkeletonBlockClass} block h-5 w-32`} />
               <div className="mt-4 grid gap-3">
                 <span className={`${pluginSkeletonBlockClass} h-4 w-5/6`} />
@@ -364,18 +364,18 @@ export function PluginBrowser({
   }, [onSelect, selectedPlugin, selectedPluginId]);
 
   return (
-    <div className="mx-auto flex h-[calc(100vh-4rem)] w-full max-w-[1440px] flex-col overflow-x-auto overflow-y-hidden px-5 py-4 sm:px-6 lg:h-screen lg:px-8 xl:px-10">
-      <div className="flex items-end justify-between gap-4 border-b border-white/[0.07] pb-4">
+    <div className="mx-auto flex h-full w-full max-w-[1440px] flex-col overflow-x-auto overflow-y-hidden px-4 py-4 sm:px-5 lg:px-6">
+      <div className="flex items-end justify-between gap-4 border-b border-white/[0.07] pb-3">
         <div>
-          <h1 className="text-[34px] font-semibold tracking-[-0.03em] text-white">{title}</h1>
+          <h1 className="text-[30px] font-semibold tracking-normal text-white">{title}</h1>
         </div>
       </div>
 
-      <div className="grid min-h-0 min-w-[1080px] flex-1 grid-cols-[360px_minmax(0,1fr)] gap-8 pt-8">
-        <aside className="flex min-h-0 flex-col overflow-hidden rounded-[28px] border border-white/8 bg-[#090b0d]/95">
-          <div className="shrink-0 border-b border-white/[0.07] bg-[#090b0d]/95 p-4 backdrop-blur-sm">
+      <div className="grid min-h-0 min-w-[1040px] flex-1 grid-cols-[360px_minmax(0,1fr)] gap-6 pt-6">
+        <aside className="flex min-h-0 flex-col overflow-hidden rounded-[20px] border border-white/8 bg-[var(--misty-app-nav-bg,rgba(9,11,13,0.95))]">
+          <div className="shrink-0 border-b border-white/[0.07] bg-[var(--misty-app-nav-bg,rgba(9,11,13,0.95))] p-3">
             <div className="flex items-center">
-              <label className="flex h-12 min-w-0 flex-1 items-center rounded-2xl border border-white/8 bg-[#0b0d0f] px-4">
+              <label className="flex h-11 min-w-0 flex-1 items-center rounded-xl border border-white/10 bg-transparent px-3.5">
                 <input
                   className="w-full bg-transparent text-[15px] text-white outline-none placeholder:text-zinc-500 disabled:cursor-progress"
                   disabled={showSkeleton}
@@ -386,7 +386,7 @@ export function PluginBrowser({
               </label>
             </div>
 
-            <div className="mt-3 grid grid-cols-2 gap-2 rounded-2xl border border-white/8 bg-[#0b0d0f] p-1">
+            <div className="mt-3 grid grid-cols-2 gap-1.5 rounded-xl border border-white/8 bg-[var(--misty-app-surface-bg,#0b0d0f)] p-1">
               {(
                 [
                   ["marketplace", "Marketplace"],
@@ -395,7 +395,7 @@ export function PluginBrowser({
               ).map(([value, label]) => (
                 <button
                   key={value}
-                  className={`rounded-xl px-3 py-2.5 text-sm font-medium transition ${
+                    className={`rounded-lg px-3 py-2 text-sm font-medium transition ${
                     browserTab === value
                       ? "bg-white text-black"
                       : "text-zinc-400 hover:bg-white/[0.04]"
@@ -409,8 +409,8 @@ export function PluginBrowser({
             </div>
           </div>
 
-          <div className="min-h-0 flex-1 overflow-y-auto p-4">
-            <div className="mb-4 flex items-center justify-between text-xs uppercase tracking-[0.16em] text-zinc-500">
+          <div className="min-h-0 flex-1 overflow-y-auto p-3">
+            <div className="mb-3 flex items-center justify-between text-xs uppercase tracking-[0.16em] text-zinc-500">
               <span>{browserTab === "installed" ? "Installed" : "Marketplace"}</span>
               <span>{showSkeleton ? "loading" : visiblePlugins.length}</span>
             </div>
@@ -418,7 +418,7 @@ export function PluginBrowser({
             {showSkeleton ? (
               <PluginListSkeleton />
             ) : (
-              <div className="flex flex-col gap-4">
+              <div className="flex flex-col gap-3">
                 {visiblePlugins.map((plugin) => (
                   <SidebarPluginCard
                     key={plugin.id}
@@ -437,16 +437,16 @@ export function PluginBrowser({
           </div>
         </aside>
 
-        <section className="flex min-h-0 flex-col overflow-hidden rounded-[28px] border border-white/8 bg-[#090b0d]/95">
+        <section className="flex min-h-0 flex-col overflow-hidden rounded-[20px] border border-white/8 bg-[var(--misty-app-surface-bg,rgba(9,11,13,0.95))]">
           {showSkeleton ? (
             <PluginDetailSkeleton />
           ) : selectedPlugin ? (
             <div className="flex min-h-0 flex-1 flex-col">
-              <div className="shrink-0 border-b border-white/[0.07] bg-[#090b0d]/95 px-6 py-4 backdrop-blur-sm">
+              <div className="shrink-0 border-b border-white/[0.07] bg-[var(--misty-app-surface-bg,rgba(9,11,13,0.95))] px-5 py-4">
                 <div className="flex flex-wrap items-center justify-between gap-4">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-3">
-                      <h2 className="truncate text-[28px] font-semibold tracking-[-0.03em] text-white">
+                      <h2 className="truncate text-[24px] font-semibold tracking-normal text-white">
                         {selectedPlugin.name}
                       </h2>
                       <span
@@ -493,7 +493,7 @@ export function PluginBrowser({
                   </div>
                 </div>
 
-                <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-white/[0.07] pt-4">
+                <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-white/[0.07] pt-3">
                   <div className="flex items-center gap-5">
                     {(
                       [
@@ -538,9 +538,9 @@ export function PluginBrowser({
                 ) : null}
               </div>
 
-              <div className="min-h-0 flex-1 overflow-y-auto px-6 py-6">
+              <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5">
                 {detailTab === "overview" ? (
-                  <div className="grid gap-5 xl:grid-cols-2">
+                  <div className="grid gap-4 xl:grid-cols-2">
                     <div className="xl:col-span-2">
                       <DetailSection title="Summary">
                         <p className="max-w-4xl text-base leading-8 text-zinc-300">
@@ -573,7 +573,7 @@ export function PluginBrowser({
                         selectedPlugin.changelog.map((item, index) => (
                           <div
                             key={`${item}-${index}`}
-                            className="rounded-2xl border border-white/8 bg-[#0b0d0f] px-4 py-4 text-sm leading-7 text-zinc-300"
+                            className="rounded-2xl border border-white/8 bg-[var(--misty-app-surface-bg,#0b0d0f)] px-4 py-4 text-sm leading-7 text-zinc-300"
                           >
                             {item}
                           </div>
@@ -624,7 +624,7 @@ export function PluginBrowser({
                           selectedPlugin.links.map((link) => (
                             <button
                               key={`${selectedPlugin.id}:${link.url}`}
-                              className="inline-flex items-center justify-between rounded-xl border border-white/8 bg-[#0b0d0f] px-3 py-3 text-left text-sm text-white transition hover:bg-white/[0.04]"
+                              className="inline-flex items-center justify-between rounded-xl border border-white/8 bg-[var(--misty-app-surface-bg,#0b0d0f)] px-3 py-3 text-left text-sm text-white transition hover:bg-white/[0.04]"
                               onClick={() => onOpenLink?.(link.url)}
                               type="button"
                             >

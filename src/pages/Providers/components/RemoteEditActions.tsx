@@ -14,7 +14,7 @@ const editActionsClass =
   "grid max-w-[760px] grid-cols-2 gap-2.5 px-[18px] pb-[18px] max-[980px]:grid-cols-1";
 
 const editButtonClass =
-  "inline-flex min-w-0 items-center justify-center gap-2 rounded-[10px] border border-[var(--misty-border-soft)] bg-[var(--misty-surface-2)] px-3 py-2.5 text-[var(--misty-text)] disabled:opacity-55";
+  "inline-flex min-w-0 items-center justify-center gap-2 rounded-[10px] border border-[var(--misty-border-soft)] bg-[var(--misty-app-surface-soft-bg,var(--misty-surface-2))] px-3 py-2.5 text-[var(--misty-text)] disabled:opacity-55";
 
 const primaryEditButtonClass =
   `${editButtonClass} border-[var(--misty-primary)] bg-[var(--misty-primary)] text-[var(--misty-primary-contrast)]`;

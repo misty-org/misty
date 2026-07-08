@@ -16,7 +16,7 @@ export default function MoreSocials() {
       >
         Download Now
       </a>
-      <div className="flex items-center gap-4 px-5 py-2.5 rounded-full border border-white/10 bg-white/5 backdrop-blur-sm">
+      <div className="flex items-center gap-4 px-5 py-2.5 rounded-full border border-white/10 bg-white/5">
         <span className="text-sm text-text-muted">Join our community</span>
         <div className="w-px h-4 bg-white/10" />
         <div className="flex items-center gap-3">

@@ -11,6 +11,8 @@ use zip::ZipArchive;
 
 use crate::error::{ApiError, ApiResult};
 
+const MAX_INLINE_METADATA_EXTRACT_BYTES: u64 = 16 * 1024 * 1024;
+
 #[derive(Clone, Default)]
 pub struct MetadataService;
 
@@ -80,7 +82,7 @@ fn metadata_snapshot_blocking(path: PathBuf) -> ApiResult<FileMetadataSnapshot> 
         }
     }
 
-    let extracted = if metadata.is_file() {
+    let extracted = if metadata.is_file() && metadata.len() <= MAX_INLINE_METADATA_EXTRACT_BYTES {
         extract_file_metadata(&path)?
     } else {
         Vec::new()
