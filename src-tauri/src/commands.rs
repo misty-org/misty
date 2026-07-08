@@ -8,12 +8,13 @@ use crate::core::clipboard::{
 };
 use crate::core::explorer::{
     CreateItemRequest, DeleteItemsRequest, DirectoryListing, ExplorerOperationResult,
-    ExplorerPreviewPayload, ListDirectoryRequest, PasteBlobRequest, PasteItem, PasteItemsRequest,
-    PasteTextRequest, PrepareDragItemsRequest, PrepareOpenItemRequest, PreparedDragItemsResult,
-    PreparedOpenItem, RenameItemRequest, RenameItemsRequest,
+    ExplorerPreviewPayload, GeneratedImageThumbnail, ListDirectoryRequest, PasteBlobRequest,
+    PasteItem, PasteItemsRequest, PasteTextRequest, PrepareDragItemsRequest,
+    PrepareOpenItemRequest, PreparedDragItemsResult, PreparedOpenItem, RenameItemRequest,
+    RenameItemsRequest,
 };
 use crate::core::file_sync::FileSyncPair;
-use crate::core::operation_queue::{ConflictPolicy, OperationPriority, OperationQueueSnapshot};
+use crate::core::operation_queue::{ConflictPolicy, OperationQueueSnapshot};
 use crate::core::workspace::WorkspaceDocument;
 use crate::error::{ApiError, ApiResult};
 use crate::runtime::MistyRuntime;
@@ -59,6 +60,7 @@ use crate::services::transfers::{TransferFilter, TransferPage};
 #[serde(rename_all = "camelCase")]
 pub struct AppSnapshot {
     app_name: &'static str,
+    version: &'static str,
     migration_stage: &'static str,
     proxy_url: Option<String>,
     proxy_runtime: ProxyRuntimeSnapshot,
@@ -75,6 +77,7 @@ pub struct ClipboardSnapshot {
 pub async fn app_snapshot(state: State<'_, MistyRuntime>) -> ApiResult<AppSnapshot> {
     Ok(AppSnapshot {
         app_name: "Misty",
+        version: env!("CARGO_PKG_VERSION"),
         migration_stage: "Tauri migration shell",
         proxy_url: state.proxy.proxy_url(),
         proxy_runtime: state.proxy_runtime.snapshot(),
@@ -365,6 +368,27 @@ pub async fn explorer_preview_item(
     state: State<'_, MistyRuntime>,
 ) -> ApiResult<ExplorerPreviewPayload> {
     state.explorer.preview_item(&path).await
+}
+
+#[tauri::command]
+pub async fn explorer_generate_image_thumbnail(
+    path: String,
+    max_dimension: u32,
+    modified_ms: Option<u64>,
+    remote_modified: Option<String>,
+    size_bytes: Option<u64>,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<GeneratedImageThumbnail> {
+    state
+        .explorer
+        .generate_image_thumbnail(
+            &path,
+            max_dimension,
+            modified_ms,
+            remote_modified.as_deref(),
+            size_bytes,
+        )
+        .await
 }
 
 #[tauri::command]
@@ -961,6 +985,14 @@ pub async fn operation_queue_retry(
 }
 
 #[tauri::command]
+pub async fn operation_queue_retry_transfer(
+    transfer_id: u64,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<OperationQueueSnapshot> {
+    state.operation_queue.retry_transfer(transfer_id).await
+}
+
+#[tauri::command]
 pub async fn operation_queue_pause(
     operation_id: u64,
     state: State<'_, MistyRuntime>,
@@ -1004,18 +1036,6 @@ pub async fn operation_queue_resume_all(
     state: State<'_, MistyRuntime>,
 ) -> ApiResult<OperationQueueSnapshot> {
     Ok(state.operation_queue.resume_all().await)
-}
-
-#[tauri::command]
-pub async fn operation_queue_set_priority(
-    operation_id: u64,
-    priority: OperationPriority,
-    state: State<'_, MistyRuntime>,
-) -> ApiResult<OperationQueueSnapshot> {
-    state
-        .operation_queue
-        .set_priority(operation_id, priority)
-        .await
 }
 
 #[tauri::command]

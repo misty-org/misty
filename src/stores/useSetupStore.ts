@@ -342,12 +342,33 @@ export const useSetupStore = create<SetupStore>((set, get) => ({
         version: release.version,
       });
       const status = await loadInstallerStatus();
+      const restartAfterChecks = status.ready;
       set((state) => ({
         busy: false,
         installState: "success",
         status,
-        events: [...state.events, { level: "info", source: "installer", message: result }],
+        events: [
+          ...state.events,
+          { level: "info", source: "installer", message: result },
+          {
+            level: restartAfterChecks ? "info" : "warn",
+            source: "installer",
+            message: restartAfterChecks
+              ? "Restarting Misty."
+              : "Misty was installed, but required checks are still incomplete. Restart skipped.",
+          },
+        ],
       }));
+      if (!restartAfterChecks) {
+        return;
+      }
+      try {
+        await invoke<string>("restart_misty_app");
+      } catch (restartError) {
+        set((state) => ({
+          events: [...state.events, { level: "error", source: "installer", message: String(restartError) }],
+        }));
+      }
     } catch (error) {
       set((state) => ({
         busy: false,

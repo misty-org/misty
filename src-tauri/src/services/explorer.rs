@@ -1,16 +1,25 @@
 use std::{
     collections::BTreeSet,
     ffi::OsStr,
-    io::Cursor,
+    fs::File,
+    io::{BufReader, BufWriter, Cursor},
     path::{Path, PathBuf},
     process::{Command, Stdio},
     sync::{
-        atomic::{AtomicBool, Ordering},
-        Arc,
+        atomic::{AtomicBool, AtomicU64, Ordering},
+        Arc, LazyLock, Mutex as StdMutex,
     },
-    time::{Duration, SystemTime, UNIX_EPOCH},
+    time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 
+use image::{
+    codecs::{
+        gif::GifDecoder,
+        png::{CompressionType, FilterType as PngFilterType, PngEncoder},
+    },
+    imageops::FilterType,
+    ImageDecoder, ImageReader, Limits,
+};
 use sha2::{Digest, Sha256};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::sync::Mutex;
@@ -19,10 +28,10 @@ use crate::core::clipboard::{ClipboardCache, ClipboardRemoteFileCacheKey};
 use crate::core::explorer::{
     list_directory, paste_items, CreateItemRequest, DeleteItemsRequest, DirectoryListing,
     ExplorerLocation, ExplorerLocationKind, ExplorerOperationResult, ExplorerPreviewPayload,
-    FileEntry, FileKind, ListDirectoryRequest, PasteBlobRequest, PasteItemsRequest,
-    PasteTextRequest, PrepareDragItemRequest, PrepareDragItemsRequest, PrepareOpenItemRequest,
-    PreparedDragItem, PreparedDragItemsResult, PreparedDragSkippedItem, PreparedOpenItem,
-    RenameItemRequest,
+    FileEntry, FileKind, GeneratedImageThumbnail, ListDirectoryRequest, PasteBlobRequest,
+    PasteItem, PasteItemsRequest, PasteTextRequest, PrepareDragItemRequest,
+    PrepareDragItemsRequest, PrepareOpenItemRequest, PreparedDragItem, PreparedDragItemsResult,
+    PreparedDragSkippedItem, PreparedOpenItem, RenameItemRequest,
 };
 use crate::core::file_master::{
     join_remote_path, normalize_remote_path, virtual_path_parts, RemoteBrowseTarget,
@@ -44,8 +53,31 @@ const VIRTUAL_PATH_RECENT: &str = "misty://recent";
 const VIRTUAL_PATH_STARRED: &str = "misty://starred";
 const VIRTUAL_PATH_TRASH: &str = "misty://trash";
 const MAX_PREVIEW_BYTES: u64 = 32 * 1024 * 1024;
+const MAX_IMAGE_PREVIEW_DIMENSION: u32 = 1600;
+const DEFAULT_IMAGE_THUMBNAIL_DIMENSION: u32 = 384;
+const MAX_GENERATED_IMAGE_THUMBNAIL_DIMENSION: u32 = 384;
+const MAX_THUMBNAIL_SOURCE_FILE_SIZE_BYTES: u64 = 128 * 1024 * 1024;
+const MAX_THUMBNAIL_SOURCE_DIMENSION: u32 = 32_768;
+const MAX_THUMBNAIL_SOURCE_PIXELS: u64 = 50_000_000;
+const MAX_THUMBNAIL_DECODE_ALLOCATION_BYTES: u64 = 192 * 1024 * 1024;
+const MAX_ORIGINAL_IMAGE_THUMBNAIL_SOURCE_SIZE_BYTES: u64 = 512 * 1024;
+const IMAGE_THUMBNAIL_RESIZE_FILTER: FilterType = FilterType::Triangle;
+const IMAGE_THUMBNAIL_PNG_COMPRESSION: CompressionType = CompressionType::Fast;
+const IMAGE_THUMBNAIL_PNG_FILTER: PngFilterType = PngFilterType::Adaptive;
 const REMOTE_INVENTORY_WAIT_ATTEMPTS: usize = 30;
 const REMOTE_INVENTORY_WAIT_INTERVAL: Duration = Duration::from_millis(100);
+const REMOTE_JOB_STALE_TIMEOUT: Duration = Duration::from_secs(30 * 60);
+const REMOTE_JOB_MAX_WAIT: Duration = Duration::from_secs(24 * 60 * 60);
+
+static IMAGE_THUMBNAIL_CACHE_FILE_LOCK: LazyLock<StdMutex<()>> =
+    LazyLock::new(|| StdMutex::new(()));
+static TEMPORARY_THUMBNAIL_COUNTER: AtomicU64 = AtomicU64::new(0);
+
+#[derive(Debug, Clone, Copy)]
+struct TransferProgress {
+    base_bytes: i64,
+    total_bytes: i64,
+}
 
 #[derive(Clone)]
 pub struct ExplorerService {
@@ -61,6 +93,7 @@ pub struct ExplorerService {
     clipboard_text_cache_dir: PathBuf,
     clipboard_blob_cache_dir: PathBuf,
     trash_dir: PathBuf,
+    image_thumbnail_cache_dir: PathBuf,
     #[cfg(test)]
     remote_job_cancellation_log: Option<Arc<Mutex<Vec<String>>>>,
 }
@@ -94,6 +127,7 @@ impl ExplorerService {
             clipboard_text_cache_dir: cache_dir.join("clipboard-paste").join("text"),
             clipboard_blob_cache_dir: cache_dir.join("clipboard-paste").join("blob"),
             trash_dir: cache_dir.join("trash"),
+            image_thumbnail_cache_dir: cache_dir.join("thumbnails").join("images").join("v1"),
             #[cfg(test)]
             remote_job_cancellation_log: None,
         }
@@ -284,7 +318,11 @@ impl ExplorerService {
                 remote_name: target.remote_name.clone(),
                 remote_path: remote_parent_path(&target.remote_path),
             };
-            let items = self.fetch_remote_items(&parent).await?;
+            let items = match self.fetch_remote_items(&parent).await {
+                Ok(items) => items,
+                Err(error) if is_remote_directory_not_found_error(&error) => return Ok(None),
+                Err(error) => return Err(error),
+            };
             return remote_item_is_directory(&parent, &target.remote_path, &items);
         }
         self.reject_virtual_mount_container(path, "inspect")?;
@@ -336,6 +374,135 @@ impl ExplorerService {
         self.preview_local_item(Path::new(path)).await
     }
 
+    pub async fn generate_image_thumbnail(
+        &self,
+        path: &str,
+        max_dimension: u32,
+        modified_ms: Option<u64>,
+        remote_modified: Option<&str>,
+        size_bytes: Option<u64>,
+    ) -> ApiResult<GeneratedImageThumbnail> {
+        if let Some(source) = self.remote_target(path) {
+            let (size_bytes, remote_modified) = if let Some(size_bytes) = size_bytes {
+                (size_bytes, remote_modified.map(str::to_string))
+            } else {
+                let parent = RemoteBrowseTarget {
+                    provider_type: source.provider_type.clone(),
+                    remote_name: source.remote_name.clone(),
+                    remote_path: remote_parent_path(&source.remote_path),
+                };
+                let items = self.fetch_remote_items(&parent).await?;
+                let Some((size_bytes, remote_modified)) =
+                    remote_preview_metadata_from_items(&parent, &source.remote_path, &items)?
+                else {
+                    return Err(ApiError::Message(format!(
+                        "Remote file {} was not found.",
+                        source.remote_path
+                    )));
+                };
+                (size_bytes, Some(remote_modified))
+            };
+            let remote_modified = if remote_modified
+                .as_deref()
+                .unwrap_or_default()
+                .trim()
+                .is_empty()
+            {
+                None
+            } else {
+                remote_modified
+            };
+            let prepared = self
+                .prepare_remote_file_for_local_use(
+                    &source,
+                    Some(size_bytes),
+                    remote_modified.as_deref(),
+                    "Preparing remote file thumbnail",
+                )
+                .await?;
+            let identity = ImageThumbnailIdentity {
+                path: path.to_string(),
+                size_bytes,
+                modified_fingerprint: remote_modified,
+            };
+            return self
+                .generate_local_image_thumbnail(
+                    Path::new(&prepared.local_path),
+                    max_dimension,
+                    Some(identity),
+                )
+                .await;
+        }
+        self.reject_virtual_mount_container(path, "thumbnail")?;
+        let identity = size_bytes.map(|size_bytes| ImageThumbnailIdentity {
+            path: path.to_string(),
+            size_bytes,
+            modified_fingerprint: modified_ms.map(|value| value.to_string()),
+        });
+        self.generate_local_image_thumbnail(Path::new(path), max_dimension, identity)
+            .await
+    }
+
+    async fn generate_local_image_thumbnail(
+        &self,
+        path: &Path,
+        max_dimension: u32,
+        identity: Option<ImageThumbnailIdentity>,
+    ) -> ApiResult<GeneratedImageThumbnail> {
+        let format = image_thumbnail_format(path).ok_or_else(|| {
+            ApiError::Message("This file type does not support image thumbnails.".to_string())
+        })?;
+        let metadata = tokio::fs::metadata(path).await.map_err(|error| {
+            ApiError::Message(format!(
+                "Failed to inspect image thumbnail file {}: {error}",
+                path.display()
+            ))
+        })?;
+        if !metadata.is_file() {
+            return Err(ApiError::Message(
+                "Only files can be thumbnailed.".to_string(),
+            ));
+        }
+        let max_dimension = normalize_image_thumbnail_dimension(max_dimension);
+        let identity = identity.unwrap_or_else(|| ImageThumbnailIdentity::from_metadata(path, &metadata));
+        let thumbnail_path = image_thumbnail_cache_path(
+            &self.image_thumbnail_cache_dir,
+            &identity,
+            max_dimension,
+        );
+        if tokio::fs::metadata(&thumbnail_path)
+            .await
+            .is_ok_and(|metadata| metadata.is_file() && metadata.len() > 0)
+        {
+            return Ok(GeneratedImageThumbnail {
+                path: display_path(&thumbnail_path),
+                mime_type: "image/png".to_string(),
+            });
+        }
+        if let Some(parent) = thumbnail_path.parent() {
+            tokio::fs::create_dir_all(parent).await.map_err(|error| {
+                ApiError::Message(format!(
+                    "Failed to create image thumbnail cache {}: {error}",
+                    parent.display()
+                ))
+            })?;
+        }
+        let source_path = path.to_path_buf();
+        let output_path = thumbnail_path.clone();
+        let rendered = tokio::task::spawn_blocking(move || {
+            render_image_thumbnail_file_blocking(
+                &source_path,
+                &output_path,
+                format,
+                identity.size_bytes,
+                max_dimension,
+            )
+        })
+        .await
+        .map_err(|error| ApiError::Message(format!("Image thumbnail worker failed: {error}")))??;
+        Ok(rendered)
+    }
+
     async fn preview_local_item(&self, path: &Path) -> ApiResult<ExplorerPreviewPayload> {
         let format = preview_format(path).ok_or_else(|| {
             ApiError::Message("This file type does not support preview.".to_string())
@@ -371,6 +538,20 @@ impl ExplorerService {
                     bytes,
                 })
             }
+            PreviewFormat::Image(image_format) => {
+                let path = path.to_path_buf();
+                let bytes = tokio::task::spawn_blocking(move || {
+                    render_image_preview_png_blocking(&path, image_format)
+                })
+                .await
+                .map_err(|error| {
+                    ApiError::Message(format!("Image preview worker failed: {error}"))
+                })??;
+                Ok(ExplorerPreviewPayload {
+                    mime_type: "image/png".to_string(),
+                    bytes,
+                })
+            }
             PreviewFormat::Direct(mime_type) => {
                 let bytes = read_preview_file(path).await?;
                 Ok(ExplorerPreviewPayload {
@@ -379,26 +560,17 @@ impl ExplorerService {
                 })
             }
             PreviewFormat::TranscodeImage(image_format) => {
-                let bytes = read_preview_file(path).await?;
-                let image =
-                    image::load_from_memory_with_format(&bytes, image_format).map_err(|error| {
-                        ApiError::Message(format!(
-                            "Failed to decode preview image {}: {error}",
-                            path.display()
-                        ))
-                    })?;
-                let mut encoded = Cursor::new(Vec::new());
-                image
-                    .write_to(&mut encoded, image::ImageFormat::Png)
-                    .map_err(|error| {
-                        ApiError::Message(format!(
-                            "Failed to encode preview image {}: {error}",
-                            path.display()
-                        ))
-                    })?;
+                let path = path.to_path_buf();
+                let bytes = tokio::task::spawn_blocking(move || {
+                    render_image_preview_png_blocking(&path, image_format)
+                })
+                .await
+                .map_err(|error| {
+                    ApiError::Message(format!("Image preview worker failed: {error}"))
+                })??;
                 Ok(ExplorerPreviewPayload {
                     mime_type: "image/png".to_string(),
-                    bytes: encoded.into_inner(),
+                    bytes,
                 })
             }
             PreviewFormat::Psd => {
@@ -637,13 +809,25 @@ impl ExplorerService {
             .lock()
             .await
             .temp_path_for(&ClipboardCache::remote_file_key(&cache_key), &file_name);
+        let mut record = FileTransferRecord::new(
+            FileTransferType::Download,
+            FileTransferItemType::Remote,
+            &file_name,
+        );
+        record.remote_source_name = source.remote_name.clone();
+        record.remote_source_path = source.remote_path.clone();
+        record.local_dest_path = display_path(&temp_path);
+        record.total_bytes = size_bytes.unwrap_or_default();
+        record.detail_message = _detail_message.to_string();
+        let transfer_id = self.begin_transfer(record).await;
         let result = self
-            .download_remote_item(source, false, &temp_path, None, None)
+            .download_remote_item(source, false, &temp_path, transfer_id, None)
             .await;
         if let Err(error) = result {
             let _ = tokio::fs::remove_file(&temp_path).await;
-            return Err(error);
+            return self.finish_transfer(transfer_id, Err(error)).await;
         }
+        let mut cache_source_path = temp_path.clone();
         if !downloaded_file_exists(&temp_path).await {
             let _ = tokio::fs::remove_file(&temp_path).await;
             let retry_temp_path = self
@@ -652,51 +836,41 @@ impl ExplorerService {
                 .await
                 .temp_path_for(&ClipboardCache::remote_file_key(&cache_key), &file_name);
             let retry_result = self
-                .download_remote_item(source, false, &retry_temp_path, None, None)
+                .download_remote_item(source, false, &retry_temp_path, transfer_id, None)
                 .await;
             if let Err(error) = retry_result {
                 let _ = tokio::fs::remove_file(&retry_temp_path).await;
-                return Err(error);
+                return self.finish_transfer(transfer_id, Err(error)).await;
             }
             if !downloaded_file_exists(&retry_temp_path).await {
                 let _ = tokio::fs::remove_file(&retry_temp_path).await;
-                return Err(ApiError::Message(format!(
+                return self.finish_transfer(
+                    transfer_id,
+                    Err(ApiError::Message(format!(
                     "Remote download completed but did not create cached file for {file_name}. source={}, cache={}, cache_hit=false",
                     source.remote_path,
                     retry_temp_path.display()
-                )));
+                    ))),
+                ).await;
             }
-            let local_path = self
-                .remote_file_cache
-                .lock()
-                .await
-                .store_remote_file(&cache_key, &retry_temp_path, &file_name)
-                .map_err(|error| {
-                    ApiError::Message(format!("Failed to cache remote file {file_name}: {error}"))
-                })?;
-            return Ok(PreparedOpenItem {
+            cache_source_path = retry_temp_path;
+        };
+        let prepared = self
+            .remote_file_cache
+            .lock()
+            .await
+            .store_remote_file(&cache_key, &cache_source_path, &file_name)
+            .map(|local_path| PreparedOpenItem {
                 local_path: display_path(&local_path),
                 cached: false,
                 source_path: Some(display_path(&final_path)),
                 cache_path: Some(display_path(&local_path)),
                 cache_hit: false,
-            });
-        };
-        let local_path = self
-            .remote_file_cache
-            .lock()
-            .await
-            .store_remote_file(&cache_key, &temp_path, &file_name)
+            })
             .map_err(|error| {
                 ApiError::Message(format!("Failed to cache remote file {file_name}: {error}"))
-            })?;
-        Ok(PreparedOpenItem {
-            local_path: display_path(&local_path),
-            cached: false,
-            source_path: Some(display_path(&final_path)),
-            cache_path: Some(display_path(&local_path)),
-            cache_hit: false,
-        })
+            });
+        self.finish_transfer(transfer_id, prepared).await
     }
 
     async fn cache_downloaded_remote_file(&self, source: &RemoteBrowseTarget, local_path: &Path) {
@@ -789,10 +963,15 @@ impl ExplorerService {
                     )
                     .await
                     .map(|_| ()),
-                crate::core::explorer::CreateItemKind::File => {
-                    self.create_empty_remote_file(&target, &name, transfer_id, cancellation)
-                        .await
-                }
+                crate::core::explorer::CreateItemKind::File => self
+                    .start_json_job(
+                        "/api/remote/file/create",
+                        serde_json::json!({ "remote": target.remote_name, "path": remote_path }),
+                        transfer_id,
+                        cancellation,
+                    )
+                    .await
+                    .map(|_| ()),
             };
             self.finish_transfer(transfer_id, operation).await?;
             self.listing_cache
@@ -857,6 +1036,7 @@ impl ExplorerService {
                 &target.remote_path,
                 name,
                 transfer_id,
+                None,
                 cancellation,
             )
             .await;
@@ -999,7 +1179,7 @@ impl ExplorerService {
         &self,
         request: DeleteItemsRequest,
     ) -> ApiResult<ExplorerOperationResult> {
-        self.delete_items_impl(request, None).await
+        self.delete_items_impl(request, None, None).await
     }
 
     pub async fn delete_items_with_cancellation(
@@ -1007,14 +1187,29 @@ impl ExplorerService {
         request: DeleteItemsRequest,
         cancellation: Arc<AtomicBool>,
     ) -> ApiResult<ExplorerOperationResult> {
-        self.delete_items_impl(request, Some(cancellation.as_ref()))
+        self.delete_items_impl(request, Some(cancellation.as_ref()), None)
             .await
+    }
+
+    pub async fn delete_items_with_cancellation_transfer(
+        &self,
+        request: DeleteItemsRequest,
+        cancellation: Arc<AtomicBool>,
+        transfer_id: u64,
+    ) -> ApiResult<ExplorerOperationResult> {
+        self.delete_items_impl(
+            request,
+            Some(cancellation.as_ref()),
+            nonzero_transfer_id(transfer_id),
+        )
+        .await
     }
 
     async fn delete_items_impl(
         &self,
         request: DeleteItemsRequest,
         cancellation: Option<&AtomicBool>,
+        existing_transfer_id: Option<u64>,
     ) -> ApiResult<ExplorerOperationResult> {
         ensure_not_canceled_if(cancellation)?;
         let permanent = request.permanent;
@@ -1047,7 +1242,11 @@ impl ExplorerService {
                 record.remote_source_name = target.remote_name.clone();
                 record.remote_source_path = target.remote_path.clone();
                 record.detail_message = "Deleting remote item".to_string();
-                let transfer_id = self.begin_transfer(record).await;
+                let transfer_id = if existing_transfer_id.is_some() {
+                    existing_transfer_id
+                } else {
+                    self.begin_transfer(record).await
+                };
                 self.finish_transfer(
                     transfer_id,
                     self.delete_remote_target(&target, transfer_id, cancellation)
@@ -1089,7 +1288,11 @@ impl ExplorerService {
             } else {
                 "Moving local item to Trash".to_string()
             };
-            let transfer_id = self.begin_transfer(record).await;
+            let transfer_id = if existing_transfer_id.is_some() {
+                existing_transfer_id
+            } else {
+                self.begin_transfer(record).await
+            };
             let local_result = if permanent {
                 delete_local_path_cancellable(Path::new(&local_path), cancellation).await
             } else {
@@ -1117,13 +1320,14 @@ impl ExplorerService {
         &self,
         request: PasteItemsRequest,
     ) -> ApiResult<ExplorerOperationResult> {
-        self.paste_items_impl(request, None).await
+        self.paste_items_impl(request, None, None).await
     }
 
     async fn paste_items_impl(
         &self,
         request: PasteItemsRequest,
         cancellation: Option<&AtomicBool>,
+        existing_transfer_id: Option<u64>,
     ) -> ApiResult<ExplorerOperationResult> {
         ensure_not_canceled_if(cancellation)?;
         if let Some(destination) = self.remote_target(&request.destination_directory) {
@@ -1144,6 +1348,9 @@ impl ExplorerService {
                             .map(ToOwned::to_owned)
                     })
                     .ok_or_else(|| ApiError::Message("Source has no file name".to_string()))?;
+                if ignored_upload_name(&source_name) {
+                    continue;
+                }
                 let source_target = self.remote_target(&item.path);
                 let transfer_type = if source_target.is_some() {
                     match request.operation {
@@ -1180,7 +1387,11 @@ impl ExplorerService {
                 } else {
                     "Uploading local item".to_string()
                 };
-                let transfer_id = self.begin_transfer(record).await;
+                let transfer_id = if existing_transfer_id.is_some() {
+                    existing_transfer_id
+                } else {
+                    self.begin_transfer(record).await
+                };
 
                 let operation = if let Some(source) = source_target {
                     let destination_path = normalize_remote_path(&join_remote_path(
@@ -1280,7 +1491,11 @@ impl ExplorerService {
                 record.remote_source_path = source.remote_path.clone();
                 record.local_dest_path = display_path(&local_path);
                 record.detail_message = "Downloading remote item".to_string();
-                let transfer_id = self.begin_transfer(record).await;
+                let transfer_id = if existing_transfer_id.is_some() {
+                    existing_transfer_id
+                } else {
+                    self.begin_transfer(record).await
+                };
                 let download = self
                     .download_remote_item(
                         &source,
@@ -1339,7 +1554,11 @@ impl ExplorerService {
                 display_path(&Path::new(&request.destination_directory).join(file_name));
             record.total_bytes = local_item_size(Path::new(&item.path), item.is_directory).await;
             record.detail_message = "Transferring local item".to_string();
-            if let Some(id) = self.begin_transfer(record).await {
+            if let Some(id) = if existing_transfer_id.is_some() {
+                existing_transfer_id
+            } else {
+                self.begin_transfer(record).await
+            } {
                 transfer_ids.push(id);
             }
         }
@@ -1362,19 +1581,48 @@ impl ExplorerService {
                 .any(|item| self.remote_target(&item.path).is_some())
         {
             let result = self
-                .paste_items_impl(request, Some(cancellation.as_ref()))
+                .paste_items_impl(request, Some(cancellation.as_ref()), None)
                 .await;
             ensure_not_canceled(cancellation.as_ref())?;
             return result;
         }
-        self.paste_local_items_with_cancellation(request, cancellation.as_ref())
+        self.paste_local_items_with_cancellation(request, cancellation.as_ref(), None)
             .await
+    }
+
+    pub async fn paste_items_with_cancellation_transfer(
+        &self,
+        request: PasteItemsRequest,
+        cancellation: Arc<AtomicBool>,
+        transfer_id: u64,
+    ) -> ApiResult<ExplorerOperationResult> {
+        ensure_not_canceled(cancellation.as_ref())?;
+        let existing_transfer_id = nonzero_transfer_id(transfer_id);
+        if self.remote_target(&request.destination_directory).is_some()
+            || request
+                .sources
+                .iter()
+                .any(|item| self.remote_target(&item.path).is_some())
+        {
+            let result = self
+                .paste_items_impl(request, Some(cancellation.as_ref()), existing_transfer_id)
+                .await;
+            ensure_not_canceled(cancellation.as_ref())?;
+            return result;
+        }
+        self.paste_local_items_with_cancellation(
+            request,
+            cancellation.as_ref(),
+            existing_transfer_id,
+        )
+        .await
     }
 
     async fn paste_local_items_with_cancellation(
         &self,
         request: PasteItemsRequest,
         cancellation: &AtomicBool,
+        existing_transfer_id: Option<u64>,
     ) -> ApiResult<ExplorerOperationResult> {
         if request.sources.is_empty() {
             return Err(ApiError::Message("Copy or cut an item first.".to_string()));
@@ -1432,7 +1680,11 @@ impl ExplorerService {
             record.local_dest_path = display_path(&destination);
             record.total_bytes = local_item_size(&source, item.is_directory).await;
             record.detail_message = "Transferring local item".to_string();
-            if let Some(id) = self.begin_transfer(record).await {
+            if let Some(id) = if existing_transfer_id.is_some() {
+                existing_transfer_id
+            } else {
+                self.begin_transfer(record).await
+            } {
                 transfer_ids.push(id);
             }
 
@@ -1789,6 +2041,18 @@ impl ExplorerService {
                 source.display()
             )));
         }
+        if ignored_upload_name(source_name) {
+            if let Some(transfer_id) = transfer_id {
+                let _ = self
+                    .transfers
+                    .update_detail(
+                        transfer_id,
+                        format!("Skipped provider-disallowed metadata item {source_name}"),
+                    )
+                    .await;
+            }
+            return Ok(());
+        }
 
         if !is_directory {
             return self
@@ -1798,71 +2062,29 @@ impl ExplorerService {
                     &destination.remote_path,
                     source_name,
                     transfer_id,
+                    Some(TransferProgress {
+                        base_bytes: 0,
+                        total_bytes: metadata.len().min(i64::MAX as u64) as i64,
+                    }),
                     cancellation,
                 )
                 .await;
         }
 
-        let root_remote_path =
-            normalize_remote_path(&join_remote_path(&destination.remote_path, source_name))?;
-        self.create_remote_directory(
+        let total_bytes = local_item_size(source, true).await;
+        self.upload_remote_directory(
+            source,
             &destination.remote_name,
-            &root_remote_path,
+            &destination.remote_path,
+            source_name,
             transfer_id,
+            Some(TransferProgress {
+                base_bytes: 0,
+                total_bytes,
+            }),
             cancellation,
         )
-        .await?;
-        let mut pending = vec![(source.to_path_buf(), root_remote_path)];
-        while let Some((local_directory, remote_directory)) = pending.pop() {
-            ensure_not_canceled_if(cancellation)?;
-            let mut children = tokio::fs::read_dir(&local_directory)
-                .await
-                .map_err(|error| {
-                    ApiError::Message(format!(
-                        "Failed to read {}: {error}",
-                        local_directory.display()
-                    ))
-                })?;
-            while let Some(child) = children.next_entry().await.map_err(|error| {
-                ApiError::Message(format!(
-                    "Failed to read {}: {error}",
-                    local_directory.display()
-                ))
-            })? {
-                let child_path = child.path();
-                ensure_not_canceled_if(cancellation)?;
-                let child_name = child.file_name().to_string_lossy().to_string();
-                let child_metadata = child.metadata().await.map_err(|error| {
-                    ApiError::Message(format!(
-                        "Failed to inspect {}: {error}",
-                        child_path.display()
-                    ))
-                })?;
-                if child_metadata.is_dir() {
-                    let child_remote_path =
-                        normalize_remote_path(&join_remote_path(&remote_directory, &child_name))?;
-                    self.create_remote_directory(
-                        &destination.remote_name,
-                        &child_remote_path,
-                        transfer_id,
-                        cancellation,
-                    )
-                    .await?;
-                    pending.push((child_path, child_remote_path));
-                } else {
-                    self.upload_remote_file(
-                        &child_path,
-                        &destination.remote_name,
-                        &remote_directory,
-                        &child_name,
-                        transfer_id,
-                        cancellation,
-                    )
-                    .await?;
-                }
-            }
-        }
-        Ok(())
+        .await
     }
 
     async fn upload_remote_file(
@@ -1872,9 +2094,22 @@ impl ExplorerService {
         remote_directory: &str,
         file_name: &str,
         transfer_id: Option<u64>,
+        progress: Option<TransferProgress>,
         cancellation: Option<&AtomicBool>,
     ) -> ApiResult<()> {
         ensure_not_canceled_if(cancellation)?;
+        if ignored_upload_name(file_name) {
+            if let Some(transfer_id) = transfer_id {
+                let _ = self
+                    .transfers
+                    .update_detail(
+                        transfer_id,
+                        format!("Skipped provider-disallowed metadata item {file_name}"),
+                    )
+                    .await;
+            }
+            return Ok(());
+        }
         let response = self
             .proxy
             .upload_file_with_cancellation(
@@ -1886,7 +2121,47 @@ impl ExplorerService {
             )
             .await?;
         let start: RemoteJobStart = response_json(response, "start remote upload").await?;
-        self.wait_for_job(&start.job_id, transfer_id, cancellation)
+        self.wait_for_job(&start.job_id, transfer_id, progress, cancellation)
+            .await?;
+        Ok(())
+    }
+
+    async fn upload_remote_directory(
+        &self,
+        local_path: &Path,
+        remote_name: &str,
+        remote_directory: &str,
+        directory_name: &str,
+        transfer_id: Option<u64>,
+        progress: Option<TransferProgress>,
+        cancellation: Option<&AtomicBool>,
+    ) -> ApiResult<()> {
+        ensure_not_canceled_if(cancellation)?;
+        if ignored_upload_name(directory_name) {
+            if let Some(transfer_id) = transfer_id {
+                let _ = self
+                    .transfers
+                    .update_detail(
+                        transfer_id,
+                        format!("Skipped provider-disallowed metadata item {directory_name}"),
+                    )
+                    .await;
+            }
+            return Ok(());
+        }
+        let response = self
+            .proxy
+            .upload_directory_with_cancellation(
+                remote_name,
+                remote_directory,
+                local_path,
+                directory_name,
+                cancellation,
+            )
+            .await?;
+        let start: RemoteJobStart =
+            response_json(response, "start remote directory upload").await?;
+        self.wait_for_job(&start.job_id, transfer_id, progress, cancellation)
             .await?;
         Ok(())
     }
@@ -1923,56 +2198,8 @@ impl ExplorerService {
                 .await;
         }
 
-        tokio::fs::create_dir(destination).await.map_err(|error| {
-            ApiError::Message(format!(
-                "Failed to create {}: {error}",
-                destination.display()
-            ))
-        })?;
-        let mut pending = vec![(source.clone(), destination.to_path_buf())];
-        while let Some((remote_directory, local_directory)) = pending.pop() {
-            ensure_not_canceled_if(cancellation)?;
-            let items = self.fetch_remote_items(&remote_directory).await?;
-            for item in items {
-                ensure_not_canceled_if(cancellation)?;
-                let remote_path = remote_directory.child_remote_path(&item)?;
-                let name = if item.name.is_empty() {
-                    Path::new(&remote_path)
-                        .file_name()
-                        .and_then(|value| value.to_str())
-                        .unwrap_or("item")
-                        .to_string()
-                } else {
-                    item.name.clone()
-                };
-                let child_target = RemoteBrowseTarget {
-                    provider_type: remote_directory.provider_type.clone(),
-                    remote_name: remote_directory.remote_name.clone(),
-                    remote_path,
-                };
-                let child_destination = local_directory.join(name);
-                if item.is_dir {
-                    tokio::fs::create_dir(&child_destination)
-                        .await
-                        .map_err(|error| {
-                            ApiError::Message(format!(
-                                "Failed to create {}: {error}",
-                                child_destination.display()
-                            ))
-                        })?;
-                    pending.push((child_target, child_destination));
-                } else {
-                    self.download_remote_file(
-                        &child_target,
-                        &child_destination,
-                        transfer_id,
-                        cancellation,
-                    )
-                    .await?;
-                }
-            }
-        }
-        Ok(())
+        self.download_remote_directory(source, destination, transfer_id, cancellation)
+            .await
     }
 
     async fn download_remote_file(
@@ -1998,7 +2225,7 @@ impl ExplorerService {
                 let direct_result = async {
                     let start: RemoteJobStart =
                         response_json(response, "start embedded remote download").await?;
-                    self.wait_for_job(&start.job_id, transfer_id, cancellation)
+                    self.wait_for_job(&start.job_id, transfer_id, None, cancellation)
                         .await?;
                     ensure_not_canceled_if(cancellation)?;
                     if downloaded_file_exists(destination).await {
@@ -2029,7 +2256,7 @@ impl ExplorerService {
             )
             .await?;
         let start: RemoteJobStart = response_json(response, "start remote download").await?;
-        self.wait_for_job(&start.job_id, transfer_id, cancellation)
+        self.wait_for_job(&start.job_id, transfer_id, None, cancellation)
             .await?;
         ensure_not_canceled_if(cancellation)?;
         self.proxy
@@ -2052,6 +2279,45 @@ impl ExplorerService {
         )))
     }
 
+    async fn download_remote_directory(
+        &self,
+        source: &RemoteBrowseTarget,
+        destination: &Path,
+        transfer_id: Option<u64>,
+        cancellation: Option<&AtomicBool>,
+    ) -> ApiResult<()> {
+        ensure_not_canceled_if(cancellation)?;
+        match self
+            .proxy
+            .start_download_directory_to_path_with_cancellation(
+                &source.remote_name,
+                &source.remote_path,
+                destination,
+                cancellation,
+            )
+            .await?
+        {
+            Some(response) => {
+                let start: RemoteJobStart =
+                    response_json(response, "start embedded remote directory download").await?;
+                self.wait_for_job(&start.job_id, transfer_id, None, cancellation)
+                    .await?;
+                ensure_not_canceled_if(cancellation)?;
+                if downloaded_directory_exists(destination).await {
+                    Ok(())
+                } else {
+                    Err(ApiError::Message(format!(
+                        "Embedded direct download completed but did not create {}",
+                        destination.display()
+                    )))
+                }
+            }
+            None => Err(ApiError::Message(
+                "Embedded direct directory download is unavailable.".to_string(),
+            )),
+        }
+    }
+
     async fn fetch_remote_items(
         &self,
         target: &RemoteBrowseTarget,
@@ -2067,7 +2333,7 @@ impl ExplorerService {
             )
             .await?;
         let start: RemoteJobStart = response_json(response, "start remote list").await?;
-        self.wait_for_job(&start.job_id, None, None).await?;
+        self.wait_for_job(&start.job_id, None, None, None).await?;
         let response = self
             .proxy
             .get(&format!(
@@ -2118,7 +2384,7 @@ impl ExplorerService {
             )
             .await?;
         let start: RemoteJobStart = response_json(response, "start remote delete").await?;
-        self.wait_for_job(&start.job_id, transfer_id, cancellation)
+        self.wait_for_job(&start.job_id, transfer_id, None, cancellation)
             .await?;
         self.listing_cache
             .clear(&target.remote_name, &target.remote_path)
@@ -2136,28 +2402,64 @@ impl ExplorerService {
         &self,
         job_id: &str,
         transfer_id: Option<u64>,
+        progress: Option<TransferProgress>,
         cancellation: Option<&AtomicBool>,
     ) -> ApiResult<RemoteJobStatus> {
-        for _ in 0..1_200 {
+        let started_at = Instant::now();
+        let mut last_activity_at = started_at;
+        let mut last_signature = String::new();
+        loop {
             if cancellation.is_some_and(|token| token.load(Ordering::SeqCst)) {
                 let _ = self.cancel_remote_job(job_id).await;
                 return Err(ApiError::Message("Operation canceled.".to_string()));
+            }
+            let elapsed = started_at.elapsed();
+            if elapsed > REMOTE_JOB_MAX_WAIT {
+                return Err(ApiError::Message(format!(
+                    "Remote operation timed out after {} hours",
+                    REMOTE_JOB_MAX_WAIT.as_secs() / 3600
+                )));
+            }
+            if last_activity_at.elapsed() > REMOTE_JOB_STALE_TIMEOUT {
+                return Err(ApiError::Message(format!(
+                    "Remote operation timed out after {} minutes without progress",
+                    REMOTE_JOB_STALE_TIMEOUT.as_secs() / 60
+                )));
             }
             let response = self
                 .proxy
                 .get(&format!("/api/remote/file/jobs/{job_id}"))
                 .await?;
             let status: RemoteJobStatus = response_json(response, "poll remote job").await?;
+            let signature = format!(
+                "{}:{}:{}:{}:{}",
+                status.state,
+                status.phase,
+                status.bytes_completed,
+                status.bytes_total,
+                status.message
+            );
+            if signature != last_signature {
+                last_signature = signature;
+                last_activity_at = Instant::now();
+            }
             if let Some(transfer_id) = transfer_id {
                 let _ = self
                     .transfers
-                    .update_progress(transfer_id, status.bytes_completed, status.bytes_total)
+                    .update_progress_with_speed(
+                        transfer_id,
+                        remote_job_transferred_bytes(&status, progress),
+                        remote_job_total_bytes(&status, progress),
+                        status.bytes_per_second,
+                    )
                     .await;
-                if !status.phase.is_empty() {
-                    let _ = self
-                        .transfers
-                        .update_detail(transfer_id, status.phase.clone())
-                        .await;
+                let detail = if status.message.is_empty() {
+                    status.phase.clone()
+                } else {
+                    status.message.clone()
+                };
+                if !detail.is_empty() {
+                    let _ = self.transfers.update_detail(transfer_id, detail).await;
                 }
             }
             match status.state.as_str() {
@@ -2173,7 +2475,6 @@ impl ExplorerService {
                 _ => tokio::time::sleep(Duration::from_millis(150)).await,
             }
         }
-        Err(ApiError::Message("Remote operation timed out".to_string()))
     }
 
     async fn cancel_remote_job(&self, job_id: &str) -> ApiResult<()> {
@@ -2215,7 +2516,7 @@ impl ExplorerService {
                 "Remote operation did not return a job id".to_string(),
             ));
         }
-        self.wait_for_job(&start.job_id, transfer_id, cancellation)
+        self.wait_for_job(&start.job_id, transfer_id, None, cancellation)
             .await
     }
 
@@ -2306,14 +2607,72 @@ impl ExplorerService {
 }
 
 async fn local_item_size(path: &Path, is_directory: bool) -> i64 {
-    if is_directory {
-        return 0;
+    if !is_directory {
+        return tokio::fs::metadata(path)
+            .await
+            .ok()
+            .map(|metadata| metadata.len().min(i64::MAX as u64) as i64)
+            .unwrap_or_default();
     }
-    tokio::fs::metadata(path)
-        .await
-        .ok()
-        .map(|metadata| metadata.len().min(i64::MAX as u64) as i64)
-        .unwrap_or_default()
+
+    let mut total = 0_i64;
+    let mut pending = vec![path.to_path_buf()];
+    while let Some(directory) = pending.pop() {
+        let mut children = match tokio::fs::read_dir(&directory).await {
+            Ok(children) => children,
+            Err(_) => continue,
+        };
+        while let Ok(Some(child)) = children.next_entry().await {
+            let child_name = child.file_name().to_string_lossy().to_string();
+            if ignored_upload_name(&child_name) {
+                continue;
+            }
+            let metadata = match child.metadata().await {
+                Ok(metadata) => metadata,
+                Err(_) => continue,
+            };
+            if metadata.is_dir() {
+                pending.push(child.path());
+            } else if metadata.is_file() {
+                total = total.saturating_add(metadata.len().min(i64::MAX as u64) as i64);
+            }
+        }
+    }
+    total
+}
+
+fn ignored_upload_name(name: &str) -> bool {
+    let lower = name.to_ascii_lowercase();
+    name.starts_with('.')
+        || name.starts_with("._")
+        || name.starts_with("~$")
+        || lower == "thumbs.db"
+        || lower == "desktop.ini"
+        || lower.ends_with(".swp")
+        || lower.ends_with(".swo")
+        || lower.ends_with(".tmp")
+        || lower.ends_with(".temp")
+        || lower.ends_with('~')
+}
+
+fn remote_job_transferred_bytes(
+    status: &RemoteJobStatus,
+    progress: Option<TransferProgress>,
+) -> i64 {
+    progress
+        .map(|progress| {
+            progress
+                .base_bytes
+                .saturating_add(status.bytes_completed.max(0))
+        })
+        .unwrap_or(status.bytes_completed)
+}
+
+fn remote_job_total_bytes(status: &RemoteJobStatus, progress: Option<TransferProgress>) -> i64 {
+    progress
+        .filter(|progress| progress.total_bytes > 0)
+        .map(|progress| progress.total_bytes)
+        .unwrap_or(status.bytes_total)
 }
 
 fn validate_remote_name(name: &str) -> ApiResult<&str> {
@@ -2352,6 +2711,11 @@ fn remote_item_is_directory(
         }
     }
     Ok(None)
+}
+
+fn is_remote_directory_not_found_error(error: &ApiError) -> bool {
+    let message = error.to_string().to_ascii_lowercase();
+    message.contains("directory not found") || message.contains("object not found")
 }
 
 fn remote_preview_metadata_from_items(
@@ -2799,6 +3163,13 @@ async fn downloaded_file_exists(destination: &Path) -> bool {
         .unwrap_or(false)
 }
 
+async fn downloaded_directory_exists(destination: &Path) -> bool {
+    tokio::fs::metadata(destination)
+        .await
+        .map(|metadata| metadata.is_dir())
+        .unwrap_or(false)
+}
+
 async fn delete_local_path_cancellable(
     path: &Path,
     cancellation: Option<&AtomicBool>,
@@ -2985,20 +3356,42 @@ fn virtual_folder_rank(kind: &FileKind) -> u8 {
     }
 }
 
+#[derive(Clone, Copy)]
 enum PreviewFormat {
+    Image(image::ImageFormat),
     Direct(&'static str),
     TranscodeImage(image::ImageFormat),
     Pdf,
     Psd,
 }
 
+struct ImageThumbnailIdentity {
+    path: String,
+    size_bytes: u64,
+    modified_fingerprint: Option<String>,
+}
+
+impl ImageThumbnailIdentity {
+    fn from_metadata(path: &Path, metadata: &std::fs::Metadata) -> Self {
+        Self {
+            path: display_path(path),
+            size_bytes: metadata.len(),
+            modified_fingerprint: metadata
+                .modified()
+                .ok()
+                .and_then(|modified| modified.duration_since(UNIX_EPOCH).ok())
+                .map(|duration| duration.as_millis().to_string()),
+        }
+    }
+}
+
 fn preview_format(path: &Path) -> Option<PreviewFormat> {
     match path.extension()?.to_str()?.to_ascii_lowercase().as_str() {
-        "png" => Some(PreviewFormat::Direct("image/png")),
-        "jpg" | "jpeg" => Some(PreviewFormat::Direct("image/jpeg")),
-        "gif" => Some(PreviewFormat::Direct("image/gif")),
-        "bmp" => Some(PreviewFormat::Direct("image/bmp")),
-        "webp" => Some(PreviewFormat::Direct("image/webp")),
+        "png" => Some(PreviewFormat::Image(image::ImageFormat::Png)),
+        "jpg" | "jpeg" => Some(PreviewFormat::Image(image::ImageFormat::Jpeg)),
+        "gif" => Some(PreviewFormat::Image(image::ImageFormat::Gif)),
+        "bmp" => Some(PreviewFormat::Image(image::ImageFormat::Bmp)),
+        "webp" => Some(PreviewFormat::Image(image::ImageFormat::WebP)),
         "svg" => Some(PreviewFormat::Direct("image/svg+xml")),
         "pdf" => Some(PreviewFormat::Pdf),
         "psd" => Some(PreviewFormat::Psd),
@@ -3018,6 +3411,381 @@ fn preview_format(path: &Path) -> Option<PreviewFormat> {
     }
 }
 
+fn image_thumbnail_format(path: &Path) -> Option<PreviewFormat> {
+    match preview_format(path)? {
+        PreviewFormat::Image(format) => Some(PreviewFormat::Image(format)),
+        PreviewFormat::TranscodeImage(format) => Some(PreviewFormat::TranscodeImage(format)),
+        PreviewFormat::Psd => Some(PreviewFormat::Psd),
+        PreviewFormat::Direct(_) | PreviewFormat::Pdf => None,
+    }
+}
+
+fn normalize_image_thumbnail_dimension(max_dimension: u32) -> u32 {
+    let dimension = if max_dimension == 0 {
+        DEFAULT_IMAGE_THUMBNAIL_DIMENSION
+    } else {
+        max_dimension
+    };
+    dimension.clamp(1, MAX_GENERATED_IMAGE_THUMBNAIL_DIMENSION)
+}
+
+fn normalize_image_preview_dimension(max_dimension: u32) -> u32 {
+    let dimension = if max_dimension == 0 {
+        MAX_IMAGE_PREVIEW_DIMENSION
+    } else {
+        max_dimension
+    };
+    dimension.clamp(1, MAX_IMAGE_PREVIEW_DIMENSION)
+}
+
+fn image_thumbnail_cache_path(
+    cache_dir: &Path,
+    identity: &ImageThumbnailIdentity,
+    max_dimension: u32,
+) -> PathBuf {
+    let mut hasher = Sha256::new();
+    hasher.update(identity.path.as_bytes());
+    hasher.update([0]);
+    hasher.update(identity.size_bytes.to_le_bytes());
+    hasher.update([0]);
+    if let Some(modified_fingerprint) = &identity.modified_fingerprint {
+        hasher.update(modified_fingerprint.as_bytes());
+    }
+    hasher.update([0]);
+    hasher.update(max_dimension.to_le_bytes());
+    let digest = hasher.finalize();
+    cache_dir.join(format!(
+        "misty-image-thumb-{}-{}.png",
+        max_dimension,
+        hex::encode(&digest[..16])
+    ))
+}
+
+fn thumbnail_decode_limits() -> Limits {
+    let mut limits = Limits::default();
+    limits.max_image_width = Some(MAX_THUMBNAIL_SOURCE_DIMENSION);
+    limits.max_image_height = Some(MAX_THUMBNAIL_SOURCE_DIMENSION);
+    limits.max_alloc = Some(MAX_THUMBNAIL_DECODE_ALLOCATION_BYTES);
+    limits
+}
+
+fn validate_image_thumbnail_source(source_size: u64, width: u32, height: u32) -> ApiResult<()> {
+    if source_size > MAX_THUMBNAIL_SOURCE_FILE_SIZE_BYTES {
+        return Err(ApiError::Message(
+            "Image is too large to thumbnail.".to_string(),
+        ));
+    }
+
+    let pixel_count = u64::from(width).saturating_mul(u64::from(height));
+    if width == 0 || height == 0 || pixel_count > MAX_THUMBNAIL_SOURCE_PIXELS {
+        return Err(ApiError::Message(
+            "Image dimensions are too large to thumbnail.".to_string(),
+        ));
+    }
+
+    Ok(())
+}
+
+fn image_dimensions(path: &Path) -> ApiResult<(u32, u32)> {
+    let mut reader = ImageReader::open(path)
+        .map_err(|error| {
+            ApiError::Message(format!(
+                "Failed to open image thumbnail source {}: {error}",
+                path.display()
+            ))
+        })?
+        .with_guessed_format()
+        .map_err(|error| {
+            ApiError::Message(format!(
+                "Failed to detect image thumbnail format {}: {error}",
+                path.display()
+            ))
+        })?;
+    reader.limits(thumbnail_decode_limits());
+    reader.into_dimensions().map_err(|error| {
+        ApiError::Message(format!(
+            "Failed to read image thumbnail dimensions {}: {error}",
+            path.display()
+        ))
+    })
+}
+
+fn is_gif_path(path: &Path) -> bool {
+    path.extension()
+        .and_then(|extension| extension.to_str())
+        .is_some_and(|extension| extension.eq_ignore_ascii_case("gif"))
+}
+
+fn is_browser_renderable_image_path(path: &Path) -> bool {
+    let Some(extension) = path.extension().and_then(|extension| extension.to_str()) else {
+        return false;
+    };
+    matches!(
+        extension.to_ascii_lowercase().as_str(),
+        "bmp" | "gif" | "ico" | "jpeg" | "jpg" | "png" | "webp"
+    )
+}
+
+fn should_use_original_image_thumbnail(
+    path: &Path,
+    source_size: u64,
+    width: u32,
+    height: u32,
+    max_dimension: u32,
+) -> bool {
+    if is_gif_path(path) {
+        return false;
+    }
+    source_size <= MAX_ORIGINAL_IMAGE_THUMBNAIL_SOURCE_SIZE_BYTES
+        && width <= max_dimension
+        && height <= max_dimension
+        && is_browser_renderable_image_path(path)
+}
+
+fn image_thumbnail_mime_type(format: PreviewFormat) -> &'static str {
+    match format {
+        PreviewFormat::Image(image::ImageFormat::Png) => "image/png",
+        PreviewFormat::Image(image::ImageFormat::Jpeg) => "image/jpeg",
+        PreviewFormat::Image(image::ImageFormat::Gif) => "image/gif",
+        PreviewFormat::Image(image::ImageFormat::Bmp) => "image/bmp",
+        PreviewFormat::Image(image::ImageFormat::WebP) => "image/webp",
+        PreviewFormat::Image(_) => "image/*",
+        PreviewFormat::TranscodeImage(_) | PreviewFormat::Psd => "image/png",
+        PreviewFormat::Direct(mime_type) => mime_type,
+        PreviewFormat::Pdf => "application/pdf",
+    }
+}
+
+fn decode_gif_first_frame(path: &Path) -> ApiResult<image::DynamicImage> {
+    let file = File::open(path).map_err(|error| {
+        ApiError::Message(format!(
+            "Failed to open GIF thumbnail source {}: {error}",
+            path.display()
+        ))
+    })?;
+    let mut decoder = GifDecoder::new(BufReader::new(file)).map_err(|error| {
+        ApiError::Message(format!(
+            "Failed to read GIF thumbnail source {}: {error}",
+            path.display()
+        ))
+    })?;
+    decoder
+        .set_limits(thumbnail_decode_limits())
+        .map_err(|error| {
+            ApiError::Message(format!(
+                "Failed to set GIF thumbnail limits {}: {error}",
+                path.display()
+            ))
+        })?;
+
+    let (screen_width, screen_height) = decoder.dimensions();
+    if screen_width == 0 || screen_height == 0 {
+        return Err(ApiError::Message("GIF dimensions are invalid.".to_string()));
+    }
+
+    let mut buffer = vec![0u8; decoder.total_bytes() as usize];
+    decoder.read_image(&mut buffer).map_err(|error| {
+        ApiError::Message(format!(
+            "Failed to decode GIF thumbnail frame {}: {error}",
+            path.display()
+        ))
+    })?;
+    let rgba_image = image::RgbaImage::from_raw(screen_width, screen_height, buffer)
+        .ok_or_else(|| ApiError::Message("GIF frame canvas size is invalid.".to_string()))?;
+    Ok(image::DynamicImage::ImageRgba8(rgba_image))
+}
+
+fn decode_image_thumbnail_source(path: &Path) -> ApiResult<image::DynamicImage> {
+    if is_gif_path(path) {
+        return decode_gif_first_frame(path);
+    }
+
+    let mut reader = ImageReader::open(path)
+        .map_err(|error| {
+            ApiError::Message(format!(
+                "Failed to open image thumbnail source {}: {error}",
+                path.display()
+            ))
+        })?
+        .with_guessed_format()
+        .map_err(|error| {
+            ApiError::Message(format!(
+                "Failed to detect image thumbnail format {}: {error}",
+                path.display()
+            ))
+        })?;
+    reader.limits(thumbnail_decode_limits());
+    reader.decode().map_err(|error| {
+        ApiError::Message(format!(
+            "Failed to decode image thumbnail source {}: {error}",
+            path.display()
+        ))
+    })
+}
+
+fn temporary_image_thumbnail_path(output_path: &Path) -> PathBuf {
+    let temporary_id = TEMPORARY_THUMBNAIL_COUNTER.fetch_add(1, Ordering::Relaxed);
+    output_path.with_extension(format!("tmp-{temporary_id}"))
+}
+
+fn write_image_thumbnail_png(
+    thumbnail: &image::DynamicImage,
+    thumbnail_path: &Path,
+) -> ApiResult<()> {
+    let file = File::create(thumbnail_path).map_err(|error| {
+        ApiError::Message(format!(
+            "Failed to create image thumbnail {}: {error}",
+            thumbnail_path.display()
+        ))
+    })?;
+    let writer = BufWriter::new(file);
+    let encoder = PngEncoder::new_with_quality(
+        writer,
+        IMAGE_THUMBNAIL_PNG_COMPRESSION,
+        IMAGE_THUMBNAIL_PNG_FILTER,
+    );
+    thumbnail.write_with_encoder(encoder).map_err(|error| {
+        ApiError::Message(format!(
+            "Failed to write image thumbnail {}: {error}",
+            thumbnail_path.display()
+        ))
+    })
+}
+
+fn render_image_thumbnail_file_blocking(
+    path: &Path,
+    output_path: &Path,
+    format: PreviewFormat,
+    source_size: u64,
+    max_dimension: u32,
+) -> ApiResult<GeneratedImageThumbnail> {
+    {
+        let _cache_file_lock = IMAGE_THUMBNAIL_CACHE_FILE_LOCK.lock().map_err(|error| {
+            ApiError::Message(format!("Failed to lock thumbnail cache: {error}"))
+        })?;
+        if output_path.exists() {
+            return Ok(GeneratedImageThumbnail {
+                path: display_path(output_path),
+                mime_type: "image/png".to_string(),
+            });
+        }
+    }
+
+    let temp_path = temporary_image_thumbnail_path(output_path);
+    match format {
+        PreviewFormat::Image(_) | PreviewFormat::TranscodeImage(_) => {
+            let (width, height) = image_dimensions(path)?;
+            validate_image_thumbnail_source(source_size, width, height)?;
+            if should_use_original_image_thumbnail(path, source_size, width, height, max_dimension)
+            {
+                return Ok(GeneratedImageThumbnail {
+                    path: display_path(path),
+                    mime_type: image_thumbnail_mime_type(format).to_string(),
+                });
+            }
+            let image = decode_image_thumbnail_source(path)?;
+            let max_dimension = normalize_image_thumbnail_dimension(max_dimension);
+            let thumbnail =
+                image.resize(max_dimension, max_dimension, IMAGE_THUMBNAIL_RESIZE_FILTER);
+            if let Err(error) = write_image_thumbnail_png(&thumbnail, &temp_path) {
+                let _ = std::fs::remove_file(&temp_path);
+                return Err(error);
+            }
+        }
+        PreviewFormat::Psd => {
+            let bytes = std::fs::read(path).map_err(|error| {
+                ApiError::Message(format!(
+                    "Failed to read PSD thumbnail {}: {error}",
+                    path.display()
+                ))
+            })?;
+            let bytes = transcode_psd_preview_png_with_dimension(&bytes, path, max_dimension)?;
+            if let Err(error) = std::fs::write(&temp_path, bytes) {
+                let _ = std::fs::remove_file(&temp_path);
+                return Err(ApiError::Message(format!(
+                    "Failed to write image thumbnail {}: {error}",
+                    temp_path.display()
+                )));
+            }
+        }
+        PreviewFormat::Direct(_) | PreviewFormat::Pdf => {
+            return Err(ApiError::Message(
+                "This file type does not support image thumbnails.".to_string(),
+            ));
+        }
+    };
+
+    {
+        let _cache_file_lock = IMAGE_THUMBNAIL_CACHE_FILE_LOCK.lock().map_err(|error| {
+            ApiError::Message(format!("Failed to lock thumbnail cache: {error}"))
+        })?;
+        if output_path.exists() {
+            let _ = std::fs::remove_file(&temp_path);
+            return Ok(GeneratedImageThumbnail {
+                path: display_path(output_path),
+                mime_type: "image/png".to_string(),
+            });
+        }
+        std::fs::rename(&temp_path, output_path).map_err(|error| {
+            let _ = std::fs::remove_file(&temp_path);
+            ApiError::Message(format!(
+                "Failed to commit image thumbnail {}: {error}",
+                output_path.display()
+            ))
+        })?;
+    }
+    Ok(GeneratedImageThumbnail {
+        path: display_path(output_path),
+        mime_type: "image/png".to_string(),
+    })
+}
+
+fn render_image_preview_png_blocking(
+    path: &Path,
+    image_format: image::ImageFormat,
+) -> ApiResult<Vec<u8>> {
+    render_image_preview_png_with_dimension_blocking(
+        path,
+        image_format,
+        MAX_IMAGE_PREVIEW_DIMENSION,
+    )
+}
+
+fn render_image_preview_png_with_dimension_blocking(
+    path: &Path,
+    _image_format: image::ImageFormat,
+    max_dimension: u32,
+) -> ApiResult<Vec<u8>> {
+    let image = decode_image_thumbnail_source(path)?;
+    encode_preview_image_png_with_dimension(image, path, max_dimension)
+}
+
+fn encode_preview_image_png(image: image::DynamicImage, path: &Path) -> ApiResult<Vec<u8>> {
+    encode_preview_image_png_with_dimension(image, path, MAX_IMAGE_PREVIEW_DIMENSION)
+}
+
+fn encode_preview_image_png_with_dimension(
+    image: image::DynamicImage,
+    path: &Path,
+    max_dimension: u32,
+) -> ApiResult<Vec<u8>> {
+    let max_dimension = normalize_image_preview_dimension(max_dimension);
+    let thumbnail = image.resize(max_dimension, max_dimension, IMAGE_THUMBNAIL_RESIZE_FILTER);
+    let mut encoded = Cursor::new(Vec::new());
+    let encoder = PngEncoder::new_with_quality(
+        &mut encoded,
+        IMAGE_THUMBNAIL_PNG_COMPRESSION,
+        IMAGE_THUMBNAIL_PNG_FILTER,
+    );
+    thumbnail.write_with_encoder(encoder).map_err(|error| {
+        ApiError::Message(format!(
+            "Failed to encode preview image {}: {error}",
+            path.display()
+        ))
+    })?;
+    Ok(encoded.into_inner())
+}
+
 async fn read_preview_file(path: &Path) -> ApiResult<Vec<u8>> {
     tokio::fs::read(path).await.map_err(|error| {
         ApiError::Message(format!(
@@ -3028,6 +3796,14 @@ async fn read_preview_file(path: &Path) -> ApiResult<Vec<u8>> {
 }
 
 fn transcode_psd_preview_png(bytes: &[u8], path: &Path) -> ApiResult<Vec<u8>> {
+    transcode_psd_preview_png_with_dimension(bytes, path, MAX_IMAGE_PREVIEW_DIMENSION)
+}
+
+fn transcode_psd_preview_png_with_dimension(
+    bytes: &[u8],
+    path: &Path,
+    max_dimension: u32,
+) -> ApiResult<Vec<u8>> {
     use zune_psd::zune_core::{bytestream::ZCursor, result::DecodingResult};
 
     let mut decoder = zune_psd::PSDDecoder::new(ZCursor::new(bytes));
@@ -3072,16 +3848,11 @@ fn transcode_psd_preview_png(bytes: &[u8], path: &Path) -> ApiResult<Vec<u8>> {
             path.display()
         ))
     })?;
-    let mut encoded = Cursor::new(Vec::new());
-    image
-        .write_to(&mut encoded, image::ImageFormat::Png)
-        .map_err(|error| {
-            ApiError::Message(format!(
-                "Failed to encode PSD preview {}: {error}",
-                path.display()
-            ))
-        })?;
-    Ok(encoded.into_inner())
+    encode_preview_image_png_with_dimension(
+        image::DynamicImage::ImageRgba8(image),
+        path,
+        max_dimension,
+    )
 }
 
 fn psd_pixels_to_rgba8(
@@ -3447,9 +4218,15 @@ mod tests {
         let text = root.join("notes.txt");
         let unsupported = root.join("payload.bin");
         tokio::fs::create_dir_all(&root).await.unwrap();
-        tokio::fs::write(&image, [0x89, b'P', b'N', b'G'])
-            .await
-            .unwrap();
+        let mut png = Cursor::new(Vec::new());
+        image::DynamicImage::ImageRgba8(image::RgbaImage::from_pixel(
+            1,
+            1,
+            image::Rgba([255, 0, 0, 255]),
+        ))
+        .write_to(&mut png, image::ImageFormat::Png)
+        .unwrap();
+        tokio::fs::write(&image, png.into_inner()).await.unwrap();
         tokio::fs::write(&svg, br#"<svg xmlns="http://www.w3.org/2000/svg"/>"#)
             .await
             .unwrap();
@@ -3463,7 +4240,7 @@ mod tests {
         let service = test_explorer_service();
         let preview = service.preview_item(&display_path(&image)).await.unwrap();
         assert_eq!(preview.mime_type, "image/png");
-        assert_eq!(preview.bytes, vec![0x89, b'P', b'N', b'G']);
+        assert!(preview.bytes.starts_with(&[0x89, b'P', b'N', b'G']));
         let svg_preview = service.preview_item(&display_path(&svg)).await.unwrap();
         assert_eq!(svg_preview.mime_type, "image/svg+xml");
         assert_eq!(
@@ -3487,11 +4264,48 @@ mod tests {
         let _ = tokio::fs::remove_dir_all(&root).await;
     }
 
+    #[tokio::test]
+    async fn generated_image_thumbnail_is_cached_and_dimensioned() {
+        let root = unique_test_dir("image-thumbnail-cache");
+        let image = root.join("wide.png");
+        tokio::fs::create_dir_all(&root).await.unwrap();
+        let mut png = Cursor::new(Vec::new());
+        image::DynamicImage::ImageRgba8(image::RgbaImage::from_pixel(
+            1000,
+            500,
+            image::Rgba([0, 128, 255, 255]),
+        ))
+        .write_to(&mut png, image::ImageFormat::Png)
+        .unwrap();
+        tokio::fs::write(&image, png.into_inner()).await.unwrap();
+
+        let service = test_explorer_service();
+        let first = service
+            .generate_image_thumbnail(&display_path(&image), 384, None, None, None)
+            .await
+            .unwrap();
+        let second = service
+            .generate_image_thumbnail(&display_path(&image), 384, None, None, None)
+            .await
+            .unwrap();
+        assert_eq!(first.mime_type, "image/png");
+        assert_eq!(first.path, second.path);
+        let thumbnail = image::open(&first.path).unwrap();
+        assert!(thumbnail.width() <= 384);
+        assert!(thumbnail.height() <= 384);
+
+        let _ = tokio::fs::remove_dir_all(&root).await;
+    }
+
     #[test]
     fn preview_format_matches_imgui_radiance_pic_support() {
         assert!(matches!(
             preview_format(Path::new("studio-lighting.pic")),
             Some(PreviewFormat::TranscodeImage(image::ImageFormat::Hdr))
+        ));
+        assert!(matches!(
+            preview_format(Path::new("photo.jpg")),
+            Some(PreviewFormat::Image(image::ImageFormat::Jpeg))
         ));
         assert!(matches!(
             preview_format(Path::new("thumbnail.psd")),
@@ -3729,6 +4543,98 @@ mod tests {
         let _ = tokio::fs::remove_dir_all(&root).await;
     }
 
+    #[test]
+    fn upload_filter_ignores_provider_disallowed_metadata() {
+        assert!(ignored_upload_name(".DS_Store"));
+        assert!(ignored_upload_name("._photo.jpg"));
+        assert!(ignored_upload_name("Thumbs.db"));
+        assert!(ignored_upload_name("desktop.ini"));
+        assert!(ignored_upload_name("notes.tmp"));
+        assert!(!ignored_upload_name("photo.jpg"));
+    }
+
+    #[test]
+    fn remote_job_progress_adds_partial_rclone_bytes_to_transfer_base() {
+        let status = test_remote_job_status(25, 25);
+        let progress = TransferProgress {
+            base_bytes: 100,
+            total_bytes: 300,
+        };
+
+        assert_eq!(remote_job_transferred_bytes(&status, Some(progress)), 125);
+        assert_eq!(remote_job_total_bytes(&status, Some(progress)), 300);
+    }
+
+    #[test]
+    fn remote_job_progress_keeps_raw_bytes_without_aggregate_context() {
+        let status = test_remote_job_status(25, 80);
+
+        assert_eq!(remote_job_transferred_bytes(&status, None), 25);
+        assert_eq!(remote_job_total_bytes(&status, None), 80);
+    }
+
+    #[tokio::test]
+    async fn directory_size_excludes_ignored_upload_metadata() {
+        let root = unique_test_dir("upload-size");
+        let folder = root.join("folder");
+        let nested = folder.join("nested");
+        tokio::fs::create_dir_all(&nested).await.unwrap();
+        tokio::fs::write(folder.join("a.bin"), vec![1_u8; 10])
+            .await
+            .unwrap();
+        tokio::fs::write(nested.join("b.bin"), vec![2_u8; 15])
+            .await
+            .unwrap();
+        tokio::fs::write(folder.join(".DS_Store"), vec![3_u8; 99])
+            .await
+            .unwrap();
+        tokio::fs::write(nested.join("._b.bin"), vec![4_u8; 99])
+            .await
+            .unwrap();
+
+        assert_eq!(local_item_size(&folder, true).await, 25);
+
+        let _ = tokio::fs::remove_dir_all(&root).await;
+    }
+
+    #[tokio::test]
+    async fn remote_to_remote_paste_skips_provider_disallowed_metadata() {
+        let home = unique_test_dir("remote-metadata-skip-home");
+        let service = test_explorer_service_for_home(home.clone());
+        let source = service.mount_root.join("source-remote").join(".DS_Store");
+        let destination = service.mount_root.join("dest-remote");
+        let before = service
+            .transfers
+            .snapshot(crate::services::transfers::TransferFilter::default())
+            .await
+            .unwrap()
+            .rows
+            .len();
+
+        let result = service
+            .paste_items(PasteItemsRequest {
+                sources: vec![PasteItem {
+                    path: display_path(&source),
+                    is_directory: false,
+                }],
+                destination_directory: display_path(&destination),
+                operation: crate::core::explorer::ClipboardOperation::Copy,
+                target_name: None,
+            })
+            .await
+            .unwrap();
+
+        assert!(result.affected_paths.is_empty());
+        let transfers = service
+            .transfers
+            .snapshot(crate::services::transfers::TransferFilter::default())
+            .await
+            .unwrap();
+        assert_eq!(transfers.rows.len(), before);
+
+        let _ = tokio::fs::remove_dir_all(&home).await;
+    }
+
     #[tokio::test]
     async fn remote_job_cancel_requests_proxy_stop() {
         let cancellations = Arc::new(Mutex::new(Vec::new()));
@@ -3737,7 +4643,7 @@ mod tests {
         let cancellation = AtomicBool::new(true);
 
         let result = service
-            .wait_for_job("job-1", None, Some(&cancellation))
+            .wait_for_job("job-1", None, None, Some(&cancellation))
             .await;
 
         assert!(result.as_ref().is_err_and(is_cancellation_error));
@@ -3776,16 +4682,27 @@ mod tests {
         }
     }
 
-    fn test_explorer_service() -> ExplorerService {
-        let environment = AppEnvironmentService::new();
-        if let Some(db_dir) = environment.misty_db_path().parent() {
-            let _ = std::fs::create_dir_all(db_dir);
+    fn test_remote_job_status(bytes_completed: i64, bytes_total: i64) -> RemoteJobStatus {
+        RemoteJobStatus {
+            job_id: String::new(),
+            operation: String::new(),
+            state: String::new(),
+            phase: String::new(),
+            bytes_completed,
+            bytes_total,
+            bytes_per_second: 0.0,
+            source_remote: String::new(),
+            source_path: String::new(),
+            dest_remote: String::new(),
+            dest_path: String::new(),
+            message: String::new(),
+            result_ready: false,
+            result_kind: String::new(),
         }
-        let proxy = ProxyService::new(environment.clone());
-        let providers = ProviderService::new(proxy.clone());
-        let transfers = TransferService::new(environment.clone());
-        let explorer_library = ExplorerLibraryService::new(environment.clone());
-        ExplorerService::new(environment, proxy, providers, transfers, explorer_library)
+    }
+
+    fn test_explorer_service() -> ExplorerService {
+        test_explorer_service_for_home(unique_test_dir("explorer-service-home"))
     }
 
     fn test_explorer_service_for_home(home_dir: PathBuf) -> ExplorerService {

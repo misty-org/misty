@@ -3,6 +3,7 @@ import cloud24 from "../../../assets/icons/cloud-24.svg?url";
 import dropboxColor from "../../../assets/icons/dropbox-color.svg?url";
 import eye16 from "../../../assets/icons/eye-16.svg?url";
 import eyeClosed16 from "../../../assets/icons/eye-closed-16.svg?url";
+import fileDirectoryFill16 from "../../../assets/icons/file-directory-fill-16.svg?url";
 import fileDirectoryOpenFill24 from "../../../assets/icons/file-directory-open-fill-24.svg?url";
 import gear24 from "../../../assets/icons/gear-24.svg?url";
 import googleDriveColor from "../../../assets/icons/google-drive-color.svg?url";
@@ -26,6 +27,7 @@ export const iconAssets = {
   dropboxColor,
   eye16,
   eyeClosed16,
+  fileDirectoryFill16,
   fileDirectoryOpenFill24,
   gear24,
   googleDriveColor,

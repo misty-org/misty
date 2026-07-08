@@ -9,7 +9,7 @@ import { useMinimumSpin } from "../../../shared/hooks/useMinimumSpin";
 import { ProviderLogo } from "./ProviderLogo";
 
 const remotePanelClass =
-  "grid min-h-0 grid-rows-[auto_minmax(0,1fr)] !rounded-none !border-0 !bg-[var(--misty-surface)] !shadow-none [border-radius:0]";
+  "grid min-h-0 grid-rows-[auto_minmax(0,1fr)] !rounded-none !border-0 !bg-transparent !shadow-none [border-radius:0]";
 
 const remoteListActionsClass =
   "flex items-center gap-2";
@@ -21,10 +21,10 @@ const addRemoteButtonClass =
   "primary compact inline-flex min-h-8 items-center justify-center gap-1.5 rounded-lg border border-[var(--misty-primary)] bg-[var(--misty-primary)] px-2.5 py-1.5 text-[13px] text-[var(--misty-primary-contrast)] disabled:opacity-55";
 
 const remoteRowClass =
-  "relative grid w-full grid-cols-[minmax(0,1fr)_30px] items-center border-b border-[var(--misty-border-soft)] bg-transparent text-[var(--misty-text)] hover:bg-[color-mix(in_srgb,var(--misty-surface-3)_76%,transparent)]";
+  "relative grid w-full grid-cols-[minmax(0,1fr)_30px] items-center border-b border-[var(--misty-border-soft)] bg-transparent text-[var(--misty-text)] hover:bg-[var(--misty-neutral-hover-bg,var(--misty-surface-hover))]";
 
 const remoteRowSelectedClass =
-  "bg-[color-mix(in_srgb,var(--misty-surface-3)_76%,transparent)] shadow-[inset_3px_0_0_var(--misty-accent)]";
+  "bg-[var(--misty-neutral-selected-bg,var(--misty-surface-selected))] shadow-[inset_3px_0_0_var(--misty-accent)]";
 
 const remoteRowSelectClass =
   "grid min-w-0 grid-cols-[28px_minmax(120px,1fr)_82px_126px] items-center gap-2.5 border-0 bg-transparent px-2 py-[11px] pl-2.5 text-left text-inherit";
@@ -36,13 +36,13 @@ const remoteProviderIconWarningClass =
   "text-[var(--misty-warning)]";
 
 const remoteMenuTriggerClass =
-  "grid h-7 w-7 place-items-center rounded-md border-0 bg-transparent text-[var(--misty-text-subtle)] hover:bg-[var(--misty-surface-3)] hover:text-[var(--misty-text)]";
+  "grid h-7 w-7 place-items-center rounded-md border-0 bg-transparent text-[var(--misty-text-subtle)] hover:bg-[var(--misty-neutral-hover-bg,var(--misty-surface-hover))] hover:text-[var(--misty-text)]";
 
 const remoteMenuClass =
-  "absolute right-0 top-8 z-30 grid w-40 gap-[3px] rounded-lg border border-[var(--misty-border)] bg-[var(--misty-surface-2)] p-[5px] shadow-[0_12px_32px_var(--misty-shadow)]";
+  "absolute right-0 top-8 z-30 grid w-40 gap-[3px] rounded-lg border border-[var(--misty-border)] bg-[var(--misty-app-surface-bg,var(--misty-surface))] p-[5px] shadow-[0_12px_32px_var(--misty-shadow)]";
 
 const remoteMenuButtonClass =
-  "flex items-center gap-2 rounded-md border-0 bg-transparent px-[9px] py-2 text-left text-[var(--misty-text)] hover:bg-[var(--misty-surface-3)]";
+  "flex items-center gap-2 rounded-md border-0 bg-transparent px-[9px] py-2 text-left text-[var(--misty-text)] hover:bg-[var(--misty-neutral-hover-bg,var(--misty-surface-hover))]";
 
 interface RemoteListPanelProps {
   remotes: ProviderRemote[];

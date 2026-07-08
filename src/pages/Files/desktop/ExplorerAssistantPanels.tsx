@@ -12,17 +12,17 @@ import { cx } from "./ExplorerDesktopShared";
 
 export const assistantPanelStyles = {
   mikaResizer:
-    "relative col-start-2 row-start-1 cursor-col-resize bg-transparent after:absolute after:bottom-0 after:left-1/2 after:top-0 after:w-px after:-translate-x-1/2 after:bg-[#222222] after:content-[''] hover:after:bg-[#3a3a3a] max-[980px]:hidden",
+    "relative col-start-2 row-start-1 cursor-col-resize bg-transparent after:absolute after:bottom-0 after:left-1/2 after:top-0 after:w-px after:-translate-x-1/2 after:bg-transparent after:content-[''] hover:after:bg-[var(--misty-neutral-hover-bg,var(--misty-surface-hover))] max-[980px]:hidden",
   mikaPanel:
-    "col-start-3 row-start-1 grid min-h-0 min-w-0 grid-rows-[54px_minmax(0,1fr)] overflow-hidden border-l border-[#242424] bg-[#090a0b] text-[#e2e2e2] shadow-[-18px_0_38px_rgba(0,0,0,0.28)] max-[980px]:absolute max-[980px]:bottom-[22px] max-[980px]:right-0 max-[980px]:top-0 max-[980px]:z-20 max-[980px]:w-[min(var(--mika-panel-width,380px),100%)]",
+    "col-start-3 row-start-1 grid min-h-0 min-w-0 grid-rows-[54px_minmax(0,1fr)] overflow-hidden border-l border-transparent bg-[var(--misty-app-pane-bg,var(--misty-surface))] text-[#e2e2e2] shadow-[-18px_0_38px_rgba(0,0,0,0.28)] max-[980px]:absolute max-[980px]:bottom-[22px] max-[980px]:right-0 max-[980px]:top-0 max-[980px]:z-20 max-[980px]:w-[min(var(--mika-panel-width,380px),100%)]",
   chatOverlay:
-    "absolute bottom-[76px] right-[18px] z-[19] grid max-h-[min(620px,calc(100vh_-_120px))] w-[min(420px,calc(100vw_-_180px))] grid-rows-[auto_minmax(0,1fr)] overflow-hidden rounded-xl border border-[#323232] bg-[rgba(17, 17, 17, 0.96)] text-[#e2e2e2] shadow-[0_18px_42px_rgba(0,0,0,0.44)] backdrop-blur-[14px]",
+    "absolute bottom-[76px] right-[18px] z-[19] grid max-h-[min(620px,calc(100vh_-_120px))] w-[min(420px,calc(100vw_-_180px))] grid-rows-[auto_minmax(0,1fr)] overflow-hidden rounded-xl border border-[#323232] bg-[rgba(17, 17, 17, 0.96)] text-[#e2e2e2] shadow-[0_18px_42px_rgba(0,0,0,0.44)]",
   header:
     "flex h-[42px] min-w-0 items-center justify-between gap-2.5 border-b border-[#292929] py-0 pr-2.5",
   chatHeader: "pl-[13px]",
   mikaHeader: "pl-3.5",
   mikaPanelHeader:
-    "relative !h-[54px] border-b border-[#242424] bg-[rgba(7,8,10,0.96)] !pl-5 pr-3",
+    "relative !h-[54px] border-b border-transparent bg-[rgba(7,8,10,0.96)] !pl-5 pr-3",
   headerTitle:
     "inline-flex min-w-0 items-center gap-2 overflow-hidden text-ellipsis whitespace-nowrap font-semibold",
   mikaHeaderTitle:
@@ -30,23 +30,23 @@ export const assistantPanelStyles = {
   headerActions: "flex flex-none items-center gap-1.5",
   runningBadge: "text-[11px] font-semibold text-[#c1c1c1]",
   headerButton:
-    "inline-flex size-[30px] flex-none items-center justify-center gap-2 rounded-lg border-0 bg-transparent p-0 text-[#b3b3b3] hover:bg-[#252525] hover:text-[#f7f7f7]",
+    "inline-flex size-[30px] flex-none items-center justify-center gap-2 rounded-lg border-0 bg-transparent p-0 text-[#b3b3b3] hover:bg-[var(--misty-neutral-hover-bg,var(--misty-surface-hover))] hover:text-[#f7f7f7]",
   mikaHeaderButton:
-    "size-9 rounded-[10px] border border-[#2f3238] bg-[#111316] text-[#b9bcc4] hover:bg-[#1c1f24] hover:text-[#f7f7f7] aria-expanded:bg-[#1c1f24] aria-expanded:text-[#f7f7f7]",
+    "size-9 rounded-[10px] border border-[var(--misty-border-soft)] bg-[var(--misty-neutral-control-bg,var(--misty-surface-2))] text-[#b9bcc4] hover:bg-[var(--misty-neutral-hover-bg,var(--misty-surface-hover))] hover:text-[#f7f7f7] aria-expanded:bg-[var(--misty-neutral-selected-bg,var(--misty-surface-selected))] aria-expanded:text-[#f7f7f7]",
   contextPopover:
-    "absolute right-3 top-[62px] z-30 grid w-[min(360px,calc(100vw_-_32px))] gap-3 rounded-xl border border-[#2c3036] bg-[rgba(9,10,12,0.98)] p-3.5 text-[#e2e2e2] shadow-[0_20px_54px_rgba(0,0,0,0.56)] backdrop-blur-xl",
+    "absolute right-3 top-[62px] z-30 grid w-[min(360px,calc(100vw_-_32px))] gap-3 rounded-xl border border-[#2c3036] bg-[rgba(9,10,12,0.98)] p-3.5 text-[#e2e2e2] shadow-[0_20px_54px_rgba(0,0,0,0.56)]",
   contextSection: "grid gap-1.5 border-b border-[#24262a] pb-3 last:border-b-0 last:pb-0",
   contextLabel: "text-[11px] font-bold uppercase tracking-normal text-[#8e929a]",
   contextValueRow: "grid grid-cols-[22px_minmax(0,1fr)_34px] items-center gap-2",
   contextValueText: "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-sm font-semibold text-[#f1f1f1]",
   contextSubText: "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-xs text-[#8f939b]",
   contextCopyButton:
-    "grid size-8 place-items-center rounded-lg border border-[#30343a] bg-[#111316] text-[#b9bcc4] hover:bg-[#1c1f24] hover:text-[#f7f7f7]",
+    "grid size-8 place-items-center rounded-lg border border-[var(--misty-border-soft)] bg-[var(--misty-neutral-control-bg,var(--misty-surface-2))] text-[#b9bcc4] hover:bg-[var(--misty-neutral-hover-bg,var(--misty-surface-hover))] hover:text-[#f7f7f7]",
   statusDot: "size-2.5 rounded-full bg-[#46d05a] shadow-[0_0_14px_rgba(70,208,90,0.48)]",
   chatBody:
     "grid min-h-0 grid-rows-[auto_minmax(90px,1fr)_auto] gap-2.5 overflow-hidden p-[13px]",
   mikaBody:
-    "grid min-h-0 min-w-0 grid-rows-[auto_minmax(0,1fr)_auto_auto] gap-3 overflow-hidden bg-[#07090b] p-5",
+    "grid min-h-0 min-w-0 grid-rows-[auto_minmax(0,1fr)_auto_auto] gap-3 overflow-hidden bg-[var(--misty-app-pane-bg,var(--misty-surface))] p-5",
   status:
     "grid border-b border-[#292929]",
   chatStatus: "gap-2 pb-2.5",
@@ -77,12 +77,12 @@ export const assistantPanelStyles = {
   mikaEmptyText: "m-0 text-sm leading-relaxed text-[#94979f]",
   emptyLog: "m-[18px] text-[var(--misty-text-muted)]",
   message:
-    "grid min-w-0 rounded-lg border border-[#292929] bg-[#161616]",
+    "grid min-w-0 rounded-lg border border-[var(--misty-border-soft)] bg-[var(--misty-neutral-control-bg,var(--misty-surface-2))]",
   chatMessage: "gap-[5px] p-[9px]",
   mikaMessage: "gap-1.5 p-2.5",
-  userMessage: "border-[#444444] bg-[#212121]",
-  toolMessage: "border-[#3f3f3f] bg-[#181818]",
-  errorMessage: "border-[#3f3f3f] bg-[#181818]",
+  userMessage: "border-[var(--misty-neutral-border,var(--misty-border-strong))] bg-[var(--misty-neutral-selected-bg,var(--misty-surface-selected))]",
+  toolMessage: "border-[var(--misty-border-soft)] bg-[var(--misty-neutral-control-bg,var(--misty-surface-2))]",
+  errorMessage: "border-[var(--misty-border-soft)] bg-[var(--misty-neutral-control-bg,var(--misty-surface-2))]",
   planDetails: "grid min-w-0 gap-2",
   planActions: "flex flex-wrap items-center gap-2",
   planTableWrap:
@@ -94,7 +94,7 @@ export const assistantPanelStyles = {
   planTableHeaderCell:
     "border-b border-[#2f2f2f] px-3 py-2",
   planTableRow:
-    "align-top text-[#d4d4d4] hover:bg-[#171717]",
+    "align-top text-[#d4d4d4] hover:bg-[var(--misty-neutral-hover-bg,var(--misty-surface-hover))]",
   planTableCell:
     "border-b border-[#242424] px-3 py-2.5 last:border-b-[#242424]",
   planTableOperation: "font-bold uppercase text-[#f0f0f0]",
@@ -143,13 +143,17 @@ export const assistantPanelStyles = {
   secondaryButton: "bg-transparent text-[#b3b3b3]",
 } as const;
 
+const mikaComingSoon = true;
+
 function assistantStatusText(status: AiStatus | null): string {
+  if (mikaComingSoon) return "Coming soon...";
   if (!status) return "Checking Mika...";
   if (status.configured) return `Ready (${status.provider}/${status.model})`;
-  return "Configure the Mika backend to enable assistant actions";
+  return "Coming soon...";
 }
 
 function assistantPlaceholder(configured: boolean, fallback: string): string {
+  if (mikaComingSoon) return "Mika is coming soon...";
   return configured ? fallback : "Configure Mika backend to continue";
 }
 
@@ -187,9 +191,10 @@ export const ExplorerChatOverlay = memo(function ExplorerChatOverlay() {
   const logRef = useRef<HTMLDivElement | null>(null);
   const workingDirectory = listing?.path ?? "";
   const running = status?.running ?? false;
-  const configured = status?.configured ?? false;
+  const configured = !mikaComingSoon && (status?.configured ?? false);
 
   useEffect(() => {
+    if (mikaComingSoon) return;
     void refreshStatus();
   }, [refreshStatus]);
 
@@ -199,7 +204,7 @@ export const ExplorerChatOverlay = memo(function ExplorerChatOverlay() {
 
   const submitPrompt = useCallback(() => {
     const trimmed = prompt.trim();
-    if (!trimmed || running) return;
+    if (mikaComingSoon || !trimmed || running) return;
     setPrompt("");
     void sendPrompt({
       displayPrompt: trimmed,
@@ -238,7 +243,7 @@ export const ExplorerChatOverlay = memo(function ExplorerChatOverlay() {
         <div className={cx(assistantPanelStyles.status, assistantPanelStyles.chatStatus)}>
           <p className={assistantPanelStyles.betaNotice}>
             <FlaskConical className={assistantPanelStyles.betaIcon} size={22} />
-            <span>Mika is beta and experimental. It is focused on file reorganization for now. Please review plans carefully and use cautiously.</span>
+            <span>Mika AI is coming soon. We are polishing assistant workflows before turning it on.</span>
           </p>
           <dl className={assistantPanelStyles.chatDetails}>
             <dt className={assistantPanelStyles.detailLabel}>Status</dt>
@@ -248,11 +253,11 @@ export const ExplorerChatOverlay = memo(function ExplorerChatOverlay() {
             <dt className={assistantPanelStyles.detailLabel}>Selection</dt>
             <dd className={assistantPanelStyles.chatDetailValue}>{mikaSelectionSummary(selectedPaths)}</dd>
           </dl>
-          {error ? <p className={assistantPanelStyles.errorText}>{error}</p> : null}
+          {!mikaComingSoon && error ? <p className={assistantPanelStyles.errorText}>{error}</p> : null}
         </div>
         <div ref={logRef} className={cx(assistantPanelStyles.log, assistantPanelStyles.chatLog)} aria-live="polite">
           {messages.length === 0 ? (
-            <p className={assistantPanelStyles.emptyLog}>Chat with Mika or ask for help reorganizing the active folder.</p>
+            <p className={assistantPanelStyles.emptyLog}>Mika AI is coming soon...</p>
           ) : messages.map((message) => (
             <article key={message.id} className={assistantMessageClass(message.role, "chat")}>
               <strong className={assistantPanelStyles.messageTitle}>{message.role === "user" ? "You" : message.role === "tool" ? "Tool" : message.role === "error" ? "Error" : "Mika"}</strong>
@@ -284,7 +289,7 @@ export const ExplorerChatOverlay = memo(function ExplorerChatOverlay() {
             }}
           />
           <div className={assistantPanelStyles.composerActions}>
-            <select className={assistantPanelStyles.modeSelect} value={mode} aria-label="Mika mode" onChange={(event) => setMode(event.target.value as Parameters<typeof setMode>[0])}>
+            <select className={assistantPanelStyles.modeSelect} value={mode} aria-label="Mika mode" disabled={mikaComingSoon} onChange={(event) => setMode(event.target.value as Parameters<typeof setMode>[0])}>
               <option value="ask">Ask</option>
               <option value="auto">Auto</option>
             </select>
@@ -326,9 +331,10 @@ export const ExplorerMikaPanel = memo(function ExplorerMikaPanel() {
   const contextRef = useRef<HTMLDivElement | null>(null);
   const workingDirectory = listing?.path ?? "";
   const running = status?.running ?? false;
-  const configured = status?.configured ?? false;
+  const configured = !mikaComingSoon && (status?.configured ?? false);
 
   useEffect(() => {
+    if (mikaComingSoon) return;
     void refreshStatus();
   }, [refreshStatus]);
 
@@ -356,7 +362,7 @@ export const ExplorerMikaPanel = memo(function ExplorerMikaPanel() {
 
   const submitPrompt = useCallback(() => {
     const trimmed = prompt.trim();
-    if (!trimmed || running) return;
+    if (mikaComingSoon || !trimmed || running) return;
     const requestPrompt = buildMikaPrompt(trimmed, workingDirectory, selectedPaths);
     setPrompt("");
     void sendPrompt({
@@ -368,7 +374,7 @@ export const ExplorerMikaPanel = memo(function ExplorerMikaPanel() {
   }, [prompt, running, selectedPaths, sendPrompt, workingDirectory]);
 
   return (
-    <aside className={assistantPanelStyles.mikaPanel} aria-label="Mika, Misty Intelligent Knowledge Assistant" title="Misty Intelligent Knowledge Assistant">
+    <aside className={assistantPanelStyles.mikaPanel} aria-label="Mika AI coming soon" title="Mika AI coming soon">
       <header className={cx(assistantPanelStyles.header, assistantPanelStyles.mikaHeader, assistantPanelStyles.mikaPanelHeader)}>
         <span className={cx(assistantPanelStyles.headerTitle, assistantPanelStyles.mikaHeaderTitle)}>
           <MessageSquare size={24} strokeWidth={1.9} />
@@ -401,9 +407,9 @@ export const ExplorerMikaPanel = memo(function ExplorerMikaPanel() {
         <div className={cx(assistantPanelStyles.status, assistantPanelStyles.mikaStatus)}>
           <p className={assistantPanelStyles.betaNotice}>
             <FlaskConical className={assistantPanelStyles.betaIcon} size={22} />
-            <span>Mika is beta and experimental. It is focused on file reorganization for now. Please review plans carefully and use cautiously.</span>
+            <span>Mika AI is coming soon. We are polishing assistant workflows before turning it on.</span>
           </p>
-          {error ? <p className={assistantPanelStyles.errorText}>{error}</p> : null}
+          {!mikaComingSoon && error ? <p className={assistantPanelStyles.errorText}>{error}</p> : null}
         </div>
         <div ref={logRef} className={cx(assistantPanelStyles.log, assistantPanelStyles.mikaLog)} aria-live="polite">
           {messages.length === 0 ? (
@@ -439,7 +445,7 @@ export const ExplorerMikaPanel = memo(function ExplorerMikaPanel() {
             }}
           />
           <div className={cx(assistantPanelStyles.composerActions, assistantPanelStyles.mikaComposerActions)}>
-            <select className={assistantPanelStyles.modeSelect} value={mode} aria-label="Mika mode" onChange={(event) => setMode(event.target.value as Parameters<typeof setMode>[0])}>
+            <select className={assistantPanelStyles.modeSelect} value={mode} aria-label="Mika mode" disabled={mikaComingSoon} onChange={(event) => setMode(event.target.value as Parameters<typeof setMode>[0])}>
               <option value="ask">Ask</option>
               <option value="auto">Auto</option>
             </select>
@@ -455,7 +461,7 @@ export const ExplorerMikaPanel = memo(function ExplorerMikaPanel() {
         </form>
         <footer className={assistantPanelStyles.mikaFooter}>
           <Sparkles size={15} />
-          Misty Intelligent Knowledge Assistant
+          Coming soon...
         </footer>
       </div>
     </aside>
@@ -721,8 +727,8 @@ function MikaEmptyState() {
           <MessageSquare size={42} strokeWidth={1.5} />
           <Sparkles className={assistantPanelStyles.mikaEmptySpark} size={18} />
         </span>
-        <h3 className={assistantPanelStyles.mikaEmptyTitle}>Ready to help</h3>
-        <p className={assistantPanelStyles.mikaEmptyText}>Chat with Mika or ask it to reorganize the active folder.</p>
+        <h3 className={assistantPanelStyles.mikaEmptyTitle}>Coming soon...</h3>
+        <p className={assistantPanelStyles.mikaEmptyText}>Mika AI is not available yet.</p>
       </div>
     </div>
   );

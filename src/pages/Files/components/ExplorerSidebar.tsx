@@ -656,7 +656,9 @@ export const ExplorerSidebar = memo(function ExplorerSidebar(props: ExplorerSide
                       onClick={() => props.onNavigate(device.mountPath)}
                       title={`${device.name} · ${device.mountPath}`}
                     >
-                      <HardDrive size={20} />
+                      <span className={sidebarStyles.deviceIcon} aria-hidden="true">
+                        <HardDrive size={20} />
+                      </span>
                       <span className={sidebarStyles.deviceCopy}>
                         <strong className={sidebarStyles.deviceName}>{device.name}</strong>
                         <small className={sidebarStyles.deviceMeta}>{deviceCapacityLabel(usedBytes, device.totalBytes, device.fsType || device.mountPath)}</small>
