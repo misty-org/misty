@@ -3,6 +3,7 @@ import {
   memo,
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
@@ -97,13 +98,13 @@ type WindowRect = {
 };
 
 const desktopFrameClass =
-  "grid h-full min-h-0 grid-cols-[72px_minmax(0,1fr)] grid-rows-[28px_minmax(0,1fr)] overflow-hidden bg-[var(--misty-bg)]";
+  "relative isolate grid h-full min-h-0 grid-cols-[72px_minmax(0,1fr)] grid-rows-[28px_minmax(0,1fr)] overflow-hidden bg-[var(--misty-app-frame-bg,var(--misty-bg))]";
 
 const desktopNavbarClass =
-  "relative col-start-1 row-start-2 flex min-h-0 flex-col items-center overflow-hidden border-r border-[var(--misty-border-soft)] bg-[var(--misty-bg)] px-1 pb-2.5 pt-2";
+  "relative z-10 col-start-1 row-start-2 flex min-h-0 flex-col items-center overflow-hidden border-r border-transparent px-1 pb-2.5 pt-2";
 
 const desktopRouteShellClass =
-  "relative col-start-2 row-start-2 min-h-0 overflow-hidden";
+  "relative z-10 col-start-2 row-start-2 min-h-0 overflow-hidden bg-transparent";
 
 const navbarGroupClass = "flex w-full flex-col items-center gap-3";
 
@@ -115,18 +116,18 @@ const navLinkBaseClass =
 const navLinkActiveClass = "text-[var(--misty-text)]";
 
 const navIconTileBaseClass =
-  "relative grid h-[52px] w-[52px] place-items-center rounded-[12px] text-[var(--misty-text)] group-hover:bg-[var(--misty-surface-2)]";
+  "relative grid h-[52px] w-[52px] place-items-center rounded-[12px] text-[var(--misty-text)] group-hover:bg-[var(--misty-neutral-hover-bg,var(--misty-surface-2))]";
 
-const navIconTileActiveClass = "bg-[var(--misty-surface-3)]";
+const navIconTileActiveClass = "bg-[var(--misty-neutral-selected-bg,var(--misty-surface-3))]";
 
 const profileDockClass =
-  "relative grid h-[48px] w-[48px] place-items-center rounded-full border border-[var(--misty-border-soft)] bg-[var(--misty-surface-2)] p-0 text-base font-bold text-[var(--misty-text)] transition hover:bg-[var(--misty-surface-3)]";
+  "relative grid h-[48px] w-[48px] place-items-center rounded-full border border-[var(--misty-border-soft)] bg-[var(--misty-neutral-control-bg,var(--misty-surface-2))] p-0 text-base font-bold text-[var(--misty-text)] transition hover:bg-[var(--misty-neutral-hover-bg,var(--misty-surface-3))]";
 
 const profilePopoverClass =
-  "fixed z-[2147482900] grid w-[286px] overflow-hidden rounded-xl border border-[var(--misty-border-soft)] bg-[color-mix(in_srgb,var(--misty-surface)_96%,transparent)] p-2 text-[var(--misty-text)] shadow-[0_18px_52px_var(--misty-shadow)] backdrop-blur-xl";
+  "fixed z-[2147482900] grid w-[286px] overflow-hidden rounded-xl border border-[var(--misty-border-soft)] bg-[color-mix(in_srgb,var(--misty-surface)_96%,transparent)] p-2 text-[var(--misty-text)] shadow-[0_18px_52px_var(--misty-shadow)]";
 
 const profileMenuItemClass =
-  "grid min-h-10 w-full grid-cols-[20px_minmax(0,1fr)_auto] items-center gap-2 rounded-lg border-0 bg-transparent px-2.5 py-2 text-left text-sm text-[var(--misty-text-muted)] hover:bg-[var(--misty-surface-2)] hover:text-[var(--misty-text)]";
+  "grid min-h-10 w-full grid-cols-[20px_minmax(0,1fr)_auto] items-center gap-2 rounded-lg border-0 bg-transparent px-2.5 py-2 text-left text-sm text-[var(--misty-text-muted)] hover:bg-[var(--misty-neutral-hover-bg,var(--misty-surface-2))] hover:text-[var(--misty-text)]";
 
 const globalBannerBaseClass =
   "mt-3 max-w-[min(520px,calc(100vw-48px))] rounded-xl border border-[#2f3338] bg-[#07090b] px-3.5 py-2.5 text-sm text-[#f4f4f5] shadow-[0_14px_36px_rgba(0,0,0,0.52)]";
@@ -150,7 +151,7 @@ const activityButtonClass =
   "min-h-7 rounded-md border border-[#303640] bg-[#121820] px-2.5 py-1 text-[13px] text-[#d8dde6] disabled:opacity-50";
 
 const desktopTitlebarClass =
-  "group/titlebar relative col-span-full row-start-1 h-7 select-none border-b border-[var(--misty-border-soft)] bg-[var(--misty-bg)]";
+  "group/titlebar relative z-10 col-span-full row-start-1 h-7 select-none border-b border-transparent bg-[var(--misty-app-nav-bg,var(--misty-bg))]";
 
 const desktopTitlebarTitleClass =
   "pointer-events-none absolute inset-x-[112px] top-0 flex h-full min-w-0 items-center justify-center truncate text-[13px] font-semibold leading-none text-[var(--misty-text-muted)]";
@@ -164,13 +165,13 @@ const desktopTitlebarActionsWithWindowControlsClass =
   "absolute right-[138px] top-0 z-[2] flex h-full min-w-0 items-center justify-end gap-1";
 
 const titlebarActivityButtonClass =
-  "relative grid h-7 w-7 place-items-center rounded-md border-0 bg-transparent p-0 text-[var(--misty-text-muted)] hover:bg-[var(--misty-surface-2)] hover:text-[var(--misty-text)]";
+  "relative grid h-7 w-7 place-items-center rounded-md border-0 bg-transparent p-0 text-[var(--misty-text-muted)] hover:bg-[var(--misty-neutral-hover-bg,var(--misty-surface-2))] hover:text-[var(--misty-text)]";
 
 const windowsTitlebarControlsClass =
   "absolute right-0 top-0 z-[3] grid h-full grid-cols-3";
 
 const windowsTitlebarControlButtonClass =
-  "grid h-7 w-[46px] place-items-center border-0 bg-transparent p-0 text-[var(--misty-text-muted)] transition hover:bg-[var(--misty-surface-2)] hover:text-[var(--misty-text)]";
+  "grid h-7 w-[46px] place-items-center border-0 bg-transparent p-0 text-[var(--misty-text-muted)] transition hover:bg-[var(--misty-neutral-hover-bg,var(--misty-surface-2))] hover:text-[var(--misty-text)]";
 
 const windowsTitlebarCloseButtonClass =
   `${windowsTitlebarControlButtonClass} hover:bg-[#c42b1c] hover:text-white`;
@@ -181,13 +182,13 @@ const activityEntryBaseClass =
   "relative grid grid-cols-[18px_minmax(0,1fr)_auto] items-start gap-2 rounded-md px-1.5 py-[7px]";
 
 const frameOverlayBaseClass =
-  "pointer-events-none fixed right-3 top-2.5 z-[90] grid min-w-36 grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-[3px] rounded-[7px] border bg-[color-mix(in_srgb,var(--misty-bg)_88%,transparent)] px-2.5 py-2 text-[11px] leading-[1.2] text-[var(--misty-text)] shadow-[0_12px_34px_var(--misty-shadow)] backdrop-blur-xl";
+  "pointer-events-none fixed right-3 top-2.5 z-[90] grid min-w-36 grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-[3px] rounded-[7px] border bg-[color-mix(in_srgb,var(--misty-bg)_88%,transparent)] px-2.5 py-2 text-[11px] leading-[1.2] text-[var(--misty-text)] shadow-[0_12px_34px_var(--misty-shadow)]";
 
 const settingsOverlayLayerClass =
-  "fixed inset-0 z-[2147482600] grid place-items-center bg-[rgba(0,0,0,0.66)] p-8 backdrop-blur-[10px]";
+  "fixed inset-0 z-[2147482600] grid place-items-center bg-[rgba(0,0,0,0.36)] p-8 backdrop-blur-[8px]";
 
 const settingsOverlayPanelClass =
-  "h-[min(760px,calc(100vh-64px))] w-[min(980px,calc(100vw-64px))] min-w-0 overflow-hidden rounded-2xl border border-[#242529] bg-[#07090b] shadow-[0_28px_90px_rgba(0,0,0,0.62)]";
+  "h-[min(760px,calc(100vh-64px))] w-[min(980px,calc(100vw-64px))] min-w-0 overflow-hidden rounded-2xl border border-[#242529] bg-[var(--misty-app-modal-bg,var(--misty-app-surface-bg,#07090b))] shadow-[0_28px_90px_rgba(0,0,0,0.62)] backdrop-blur-xl";
 
 const frameOverlayLevelClass: Record<FramePacingState["level"], string> = {
   idle: "border-[color-mix(in_srgb,var(--misty-success)_45%,var(--misty-border-soft))]",
@@ -234,6 +235,103 @@ export function DesktopLayout(props: {
     useShallow((state) =>
       selectAppearancePreferences(state.settings?.document),
     ),
+  );
+  const appWallpaperSrc = useMemo(
+    () => appearancePreferences.wallpaperPath ? safeTauriAssetUrl(appearancePreferences.wallpaperPath) : "",
+    [appearancePreferences.wallpaperPath],
+  );
+  const appWallpaperIsVideo = useMemo(
+    () => isVideoWallpaperPath(appearancePreferences.wallpaperPath),
+    [appearancePreferences.wallpaperPath],
+  );
+  const desktopFrameStyle = useMemo(() => {
+    const panelOpacity = appearancePreferences.panelOpacity;
+    const strongPanelOpacity = panelOpacity;
+    const chromePanelOpacity = panelOpacity;
+    const tabPanelOpacity = panelOpacity;
+    const activeTabPanelOpacity = panelOpacity;
+    const neutralControlOpacity = Math.min(0.14, 0.045 + panelOpacity * 0.095);
+    const neutralHoverOpacity = Math.min(0.17, 0.06 + panelOpacity * 0.12);
+    const neutralSelectedOpacity = Math.min(0.22, 0.075 + panelOpacity * 0.145);
+    const neutralStrongOpacity = Math.min(0.28, 0.105 + panelOpacity * 0.175);
+    const neutralBorderOpacity = Math.min(0.24, 0.08 + panelOpacity * 0.13);
+    const wallpaperSurfaceVars = appWallpaperSrc
+      ? {
+          "--misty-bg": `rgba(5, 6, 7, ${panelOpacity})`,
+          "--misty-bg-soft": `rgba(9, 11, 14, ${panelOpacity})`,
+          "--misty-surface": `rgba(17, 20, 24, ${panelOpacity})`,
+          "--misty-surface-2": `rgba(244, 244, 245, ${neutralControlOpacity})`,
+          "--misty-surface-3": `rgba(244, 244, 245, ${neutralSelectedOpacity})`,
+          "--misty-surface-hover": `rgba(244, 244, 245, ${neutralHoverOpacity})`,
+          "--misty-surface-selected": `rgba(244, 244, 245, ${neutralSelectedOpacity})`,
+          "--misty-sidebar-selected": `rgba(244, 244, 245, ${neutralSelectedOpacity})`,
+          "--misty-neutral-control-bg": `rgba(244, 244, 245, ${neutralControlOpacity})`,
+          "--misty-neutral-hover-bg": `rgba(244, 244, 245, ${neutralHoverOpacity})`,
+          "--misty-neutral-selected-bg": `rgba(244, 244, 245, ${neutralSelectedOpacity})`,
+          "--misty-neutral-strong-bg": `rgba(244, 244, 245, ${neutralStrongOpacity})`,
+          "--misty-neutral-border": `rgba(244, 244, 245, ${neutralBorderOpacity})`,
+          "--misty-glass": `rgba(17, 20, 24, ${panelOpacity})`,
+          "--misty-border": "transparent",
+          "--misty-border-soft": "transparent",
+          "--color-border": "transparent",
+          "--color-border-subtle": "transparent",
+          "--misty-skeleton-base": `rgba(244, 244, 245, ${neutralControlOpacity})`,
+          "--misty-skeleton-highlight": `rgba(244, 244, 245, ${neutralSelectedOpacity})`,
+          "--color-bg": `rgba(11, 13, 16, ${panelOpacity})`,
+          "--color-surface": `rgba(17, 20, 24, ${panelOpacity})`,
+          "--color-elevated": `rgba(244, 244, 245, ${neutralControlOpacity})`,
+        }
+      : {};
+    return {
+      "--misty-app-panel-opacity": String(panelOpacity),
+      "--misty-app-panel-opacity-strong": String(strongPanelOpacity),
+      "--misty-app-chrome-opacity": String(chromePanelOpacity),
+      "--misty-app-tab-opacity": String(tabPanelOpacity),
+      "--misty-app-tab-active-opacity": String(activeTabPanelOpacity),
+      "--misty-border": "transparent",
+      "--misty-border-soft": "transparent",
+      "--misty-border-strong": `rgba(244, 244, 245, ${neutralBorderOpacity})`,
+      "--color-border": "transparent",
+      "--color-border-subtle": "transparent",
+      "--misty-app-frame-bg": appWallpaperSrc ? "transparent" : "var(--misty-bg)",
+      "--misty-app-page-bg": appWallpaperSrc
+        ? `rgba(5, 6, 7, ${panelOpacity})`
+        : "var(--misty-bg)",
+      "--misty-app-shell-bg": appWallpaperSrc
+        ? `rgba(5, 6, 7, ${panelOpacity})`
+        : "var(--misty-bg)",
+      "--misty-app-nav-bg": appWallpaperSrc
+        ? `rgba(7, 9, 12, ${panelOpacity})`
+        : "var(--misty-bg)",
+      "--misty-app-route-bg": appWallpaperSrc
+        ? `rgba(5, 6, 7, ${panelOpacity})`
+        : "transparent",
+      "--misty-app-pane-bg": appWallpaperSrc
+        ? `rgba(17, 20, 24, ${panelOpacity})`
+        : "var(--misty-surface)",
+      "--misty-app-surface-bg": appWallpaperSrc
+        ? `rgba(17, 20, 24, ${panelOpacity})`
+        : "var(--misty-surface)",
+      "--misty-app-surface-soft-bg": appWallpaperSrc
+        ? `rgba(17, 20, 24, ${panelOpacity})`
+        : "var(--misty-surface-2)",
+      "--misty-app-tab-bg": appWallpaperSrc
+        ? `rgba(9, 11, 14, ${panelOpacity})`
+        : "var(--misty-bg-soft)",
+      "--misty-app-tab-active-bg": appWallpaperSrc
+        ? `rgba(20, 23, 28, ${panelOpacity})`
+        : "var(--misty-surface-2)",
+      "--misty-app-modal-bg": appWallpaperSrc
+        ? `rgba(7, 9, 12, ${Math.min(0.78, panelOpacity + 0.08)})`
+        : "var(--misty-surface)",
+      ...wallpaperSurfaceVars,
+    } as unknown as CSSProperties;
+  }, [appWallpaperSrc, appearancePreferences.panelOpacity]);
+  const desktopNavbarStyle = useMemo(
+    () => ({
+      backgroundColor: "var(--misty-app-nav-bg,var(--misty-bg))",
+    }) satisfies CSSProperties,
+    [],
   );
   const customFontSignature = useSettingsStore((state) =>
     JSON.stringify(selectCustomFontPreferences(state.settings?.document)),
@@ -368,6 +466,22 @@ export function DesktopLayout(props: {
     root.dataset.uiScale = appearancePreferences.uiScale;
     root.style.colorScheme = resolvedTheme;
   }, [appearancePreferences, resolvedTheme, themeId, themeMode]);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    const entries = Object.entries(desktopFrameStyle as Record<string, string>);
+    root.dataset.mistyWallpaperActive = appWallpaperSrc ? "true" : "false";
+    for (const [key, value] of entries) {
+      root.style.setProperty(key, value);
+    }
+
+    return () => {
+      for (const [key] of entries) {
+        root.style.removeProperty(key);
+      }
+      delete root.dataset.mistyWallpaperActive;
+    };
+  }, [appWallpaperSrc, desktopFrameStyle]);
 
   useEffect(() => {
     const badgeCount =
@@ -616,7 +730,34 @@ export function DesktopLayout(props: {
     desktopPlatform === "windows" || desktopPlatform === "linux";
 
   return (
-    <main className={desktopFrameClass}>
+    <main
+      className={desktopFrameClass}
+      data-wallpaper-active={appWallpaperSrc ? "true" : "false"}
+      style={desktopFrameStyle}
+    >
+      {appWallpaperSrc ? (
+        <div aria-hidden="true" className="pointer-events-none fixed inset-0 z-0 overflow-hidden">
+          {appWallpaperIsVideo ? (
+            <video
+              className="h-full w-full object-cover"
+              src={appWallpaperSrc}
+              autoPlay
+              loop
+              muted
+              playsInline
+              preload="auto"
+            />
+          ) : (
+            <img
+              alt=""
+              className="h-full w-full object-cover"
+              draggable={false}
+              src={appWallpaperSrc}
+            />
+          )}
+          <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(5,6,7,0.04),rgba(5,6,7,0.16))]" />
+        </div>
+      ) : null}
       <header
         className={desktopTitlebarClass}
         data-tauri-drag-region
@@ -681,6 +822,7 @@ export function DesktopLayout(props: {
 
       <nav
         className={desktopNavbarClass}
+        style={desktopNavbarStyle}
         aria-label="Primary"
         onPointerDown={startTitlebarDrag}
       >
@@ -752,7 +894,11 @@ export function DesktopLayout(props: {
         onClose={() => setProfileOpen(false)}
         onOpenSettings={openSettingsOverlay}
       />
-      <SettingsOverlay open={settingsOpen} onClose={closeSettingsOverlay} />
+      <SettingsOverlay
+        open={settingsOpen}
+        style={desktopFrameStyle}
+        onClose={closeSettingsOverlay}
+      />
     </main>
   );
 }
@@ -785,6 +931,15 @@ function cssString(value: string): string {
 
 function cssUrl(value: string): string {
   return `"${value.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
+}
+
+const videoWallpaperExtensions = new Set(["m4v", "mov", "mp4", "ogv", "webm"]);
+
+function isVideoWallpaperPath(path: string): boolean {
+  const cleanPath = path.split(/[?#]/, 1)[0] ?? "";
+  const extensionStart = cleanPath.lastIndexOf(".");
+  if (extensionStart < 0) return false;
+  return videoWallpaperExtensions.has(cleanPath.slice(extensionStart + 1).toLowerCase());
 }
 
 const RouteNotice = memo(function RouteNotice(props: { routeId: AppTab }) {
@@ -1066,7 +1221,7 @@ const TitlebarActivityButton = memo(
     return (
       <button
         ref={ref}
-        className={`${titlebarActivityButtonClass} ${props.open ? "bg-[var(--misty-surface-2)] text-[var(--misty-text)]" : ""}`}
+        className={`${titlebarActivityButtonClass} ${props.open ? "bg-[var(--misty-neutral-selected-bg,var(--misty-surface-2))] text-[var(--misty-text)]" : ""}`}
         type="button"
         aria-haspopup="dialog"
         aria-expanded={props.open}
@@ -1246,7 +1401,7 @@ function ProfilePopover(props: {
       aria-label="Profile"
     >
       <div className="grid grid-cols-[42px_minmax(0,1fr)] items-center gap-3 border-b border-[var(--misty-border-soft)] px-2 pb-3 pt-1">
-        <span className="relative grid h-10 w-10 place-items-center rounded-full bg-[var(--misty-surface-3)] text-sm font-bold">
+        <span className="relative grid h-10 w-10 place-items-center rounded-full bg-[var(--misty-neutral-selected-bg,var(--misty-surface-3))] text-sm font-bold">
           {account ? initials : <UserCircle size={24} strokeWidth={1.75} />}
         </span>
         <span className="min-w-0">
@@ -1652,7 +1807,7 @@ function InboxEntry(props: { entry: AppInboxEntry }) {
   );
 }
 
-function SettingsOverlay(props: { open: boolean; onClose: () => void }) {
+function SettingsOverlay(props: { open: boolean; style: CSSProperties; onClose: () => void }) {
   const panelRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -1668,7 +1823,8 @@ function SettingsOverlay(props: { open: boolean; onClose: () => void }) {
 
   return createPortal(
     <div
-      className={settingsOverlayLayerClass}
+      className={`app-pages-root ${settingsOverlayLayerClass}`}
+      style={props.style}
       role="presentation"
       onPointerDown={(event) => {
         if (event.target === event.currentTarget) props.onClose();
