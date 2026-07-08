@@ -26,9 +26,11 @@ export interface CustomFontPreference {
 export interface AppearancePreferences {
   compactModeEnabled: boolean;
   fontSize: SettingsScaleToken;
+  panelOpacity: number;
   reducedMotionEnabled: boolean;
   thumbnailPreviewsEnabled: boolean;
   uiScale: SettingsScaleToken;
+  wallpaperPath: string;
 }
 
 export interface NotificationPreferences {
@@ -281,9 +283,15 @@ export function selectAppearancePreferences(
   return {
     compactModeEnabled: settingsBoolean(source, "appearance", "compact_mode_enabled", false),
     fontSize: settingsScaleToken(settingsNumber(source, "appearance", "font_size_index", 1)),
+    panelOpacity: clampSettingsNumber(
+      settingsNumber(source, "appearance", "panel_opacity", settingsNumber(source, "appearance", "home_panel_opacity", 0.82)),
+      0,
+      1,
+    ),
     reducedMotionEnabled: settingsBoolean(source, "appearance", "reduced_motion_enabled", false),
     thumbnailPreviewsEnabled: settingsBoolean(source, "appearance", "thumbnail_previews_enabled", true),
     uiScale: settingsScaleToken(settingsNumber(source, "appearance", "ui_scale_index", 1)),
+    wallpaperPath: settingsString(source, "appearance", "wallpaper_path", settingsString(source, "appearance", "home_wallpaper_path", "")),
   };
 }
 
@@ -393,6 +401,10 @@ function settingsScaleToken(index: number): SettingsScaleToken {
   if (index === 0) return "small";
   if (index === 2) return "large";
   return "default";
+}
+
+function clampSettingsNumber(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
 }
 
 function settingsSectionRecord(document: Record<string, unknown>, section: string): Record<string, unknown> {

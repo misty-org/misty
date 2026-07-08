@@ -10,7 +10,7 @@ const QUICK_ACCESS_HIDDEN_STORAGE_KEY = "misty.explorer.sidebar.quickAccessHidde
 
 export const sidebarStyles = {
   root:
-    "h-full min-h-0 min-w-0 overflow-x-hidden overflow-y-auto border-r border-[var(--misty-border-soft)] bg-[var(--misty-bg-soft)] px-3.5 py-4 [overscroll-behavior:contain] [scrollbar-gutter:stable] [scrollbar-width:thin] max-[980px]:hidden",
+    "h-full min-h-0 min-w-0 overflow-x-hidden overflow-y-auto border-r border-transparent !bg-transparent px-3.5 py-4 [overscroll-behavior:contain] [scrollbar-gutter:stable] [scrollbar-width:thin] max-[980px]:hidden",
   section: "[&+&]:mt-4",
   sectionTitle: "mb-2.5 flex min-w-0 items-center gap-2",
   sectionToggle:
@@ -20,26 +20,28 @@ export const sidebarStyles = {
   sectionChevron: "flex-none text-[var(--misty-text-subtle)]",
   sectionActions: "ml-auto flex flex-none items-center gap-[3px]",
   sectionActionButton:
-    "grid size-6 place-items-center rounded-md border-0 bg-transparent p-0 text-[var(--misty-text-subtle)] hover:bg-[var(--misty-surface-hover)] hover:text-[var(--misty-text)]",
+    "grid size-6 place-items-center rounded-md border-0 bg-transparent p-0 text-[var(--misty-text-subtle)] hover:bg-[var(--misty-neutral-hover-bg,var(--misty-surface-hover))] hover:text-[var(--misty-text)]",
   spinning: "[&>svg]:animate-spin",
   itemButton:
-    "relative flex w-full items-center gap-2.5 rounded-lg border border-transparent bg-transparent px-[11px] py-2.5 text-left text-[var(--misty-text-muted)] hover:bg-[var(--misty-surface-hover)] hover:text-[var(--misty-text)]",
-  itemSelected: "bg-[var(--misty-sidebar-selected)] text-[var(--misty-text)]",
+    "relative flex w-full items-center gap-2.5 rounded-lg border border-transparent bg-transparent px-[11px] py-2.5 text-left text-[var(--misty-text-muted)] hover:bg-[var(--misty-neutral-hover-bg,var(--misty-surface-hover))] hover:text-[var(--misty-text)]",
+  itemSelected: "bg-[var(--misty-neutral-selected-bg,var(--misty-sidebar-selected))] text-[var(--misty-text)]",
   remoteIcon: "grid size-6 flex-none place-items-center",
   pinnedRow:
-    "group/pin flex min-w-0 items-center rounded-lg border border-transparent bg-transparent text-[var(--misty-text-muted)] hover:bg-[var(--misty-surface-hover)] hover:text-[var(--misty-text)]",
+    "group/pin flex min-w-0 items-center rounded-lg border border-transparent bg-transparent text-[var(--misty-text-muted)] hover:bg-[var(--misty-neutral-hover-bg,var(--misty-surface-hover))] hover:text-[var(--misty-text)]",
   pinnedButton:
     "flex min-w-0 flex-1 items-center gap-2.5 border-0 bg-transparent px-[11px] py-2.5 text-left text-inherit",
   pinnedUnpinButton:
-    "mr-1 grid size-7 flex-none place-items-center rounded-lg border border-transparent bg-transparent p-0 text-[var(--misty-text-subtle)] opacity-0 hover:bg-[var(--misty-surface-selected)] hover:text-[var(--misty-text)] group-hover/pin:opacity-100 group-focus-within/pin:opacity-100",
+    "mr-1 grid size-7 flex-none place-items-center rounded-lg border border-transparent bg-transparent p-0 text-[var(--misty-text-subtle)] opacity-0 hover:bg-[var(--misty-neutral-selected-bg,var(--misty-surface-selected))] hover:text-[var(--misty-text)] group-hover/pin:opacity-100 group-focus-within/pin:opacity-100",
   workspaceSelect:
-    "flex w-full items-center gap-2.5 rounded-lg border border-[var(--misty-border)] bg-[var(--misty-surface)] px-[11px] py-2.5 text-left text-[var(--misty-text)]",
+    "flex w-full items-center gap-2.5 rounded-lg border border-transparent bg-transparent px-[11px] py-2.5 text-left text-[var(--misty-text)] hover:bg-[var(--misty-neutral-hover-bg,var(--misty-surface-hover))]",
   workspaceSelectLabel:
     "ml-0 min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap",
   list: "grid gap-1",
   muted: "text-[var(--misty-text-subtle)]",
   deviceButton:
-    "flex w-full items-start gap-2.5 rounded-lg border border-transparent bg-transparent px-[11px] py-[9px] text-left text-[var(--misty-text-muted)] hover:bg-[var(--misty-surface-hover)] hover:text-[var(--misty-text)]",
+    "flex w-full items-start gap-2.5 rounded-lg border border-transparent bg-transparent px-[11px] py-[9px] text-left text-[var(--misty-text-muted)] hover:bg-[var(--misty-neutral-hover-bg,var(--misty-surface-hover))] hover:text-[var(--misty-text)]",
+  deviceIcon:
+    "grid size-6 flex-none place-items-center self-center",
   deviceRow:
     "grid min-w-0 grid-cols-[minmax(0,1fr)] items-stretch",
   deviceCopy: "grid min-w-0 flex-1 gap-[3px]",
@@ -51,21 +53,21 @@ export const sidebarStyles = {
     "mt-0.5 h-1 overflow-hidden rounded-full bg-[var(--misty-surface-3)]",
   deviceMeterFill: "block h-full bg-[var(--misty-text-muted)]",
   deviceMenuButton:
-    "flex w-7 min-w-7 justify-center rounded-lg border border-transparent bg-transparent p-0 text-[var(--misty-text-muted)] opacity-0 hover:bg-[var(--misty-surface-hover)] hover:text-[var(--misty-text)] group-hover/device:opacity-100 group-focus-within/device:opacity-100",
+    "flex w-7 min-w-7 justify-center rounded-lg border border-transparent bg-transparent p-0 text-[var(--misty-text-muted)] opacity-0 hover:bg-[var(--misty-neutral-hover-bg,var(--misty-surface-hover))] hover:text-[var(--misty-text)] group-hover/device:opacity-100 group-focus-within/device:opacity-100",
   menu:
-    "fixed z-[2147483000] grid w-44 gap-0.5 rounded-[11px] border border-[var(--misty-border)] bg-[var(--misty-glass)] p-1.5 shadow-[0_18px_40px_var(--misty-shadow)]",
-  workspaceMenu: "w-60",
+    "fixed z-[2147483000] grid w-44 gap-0.5 rounded-[11px] border border-transparent bg-[var(--misty-glass)] p-1.5 shadow-[0_18px_40px_var(--misty-shadow)]",
+  workspaceMenu: "w-60 !bg-[rgb(7_9_12)]",
   menuButton:
-    "flex h-[34px] items-center gap-2 rounded-lg border-0 bg-transparent px-2.5 text-left text-[var(--misty-text)] hover:bg-[var(--misty-surface-hover)] hover:text-[var(--misty-primary-hover)] disabled:cursor-default disabled:opacity-40",
-  menuButtonSelected: "bg-[var(--misty-surface-selected)] text-[var(--misty-text)]",
+    "flex h-[34px] items-center gap-2 rounded-lg border-0 bg-transparent px-2.5 text-left text-[var(--misty-text)] hover:bg-[var(--misty-neutral-hover-bg,var(--misty-surface-hover))] hover:text-[var(--misty-primary-hover)] disabled:cursor-default disabled:opacity-40",
+  menuButtonSelected: "bg-[var(--misty-neutral-selected-bg,var(--misty-surface-selected))] text-[var(--misty-text)]",
   workspaceMenuRow:
-    "group/workspace flex h-[34px] min-w-0 items-center gap-1 rounded-lg border-0 bg-transparent text-[var(--misty-text)] hover:bg-[var(--misty-surface-hover)] hover:text-[var(--misty-primary-hover)]",
+    "group/workspace flex h-[34px] min-w-0 items-center gap-1 rounded-lg border-0 bg-transparent text-[var(--misty-text)] hover:bg-[var(--misty-neutral-hover-bg,var(--misty-surface-hover))] hover:text-[var(--misty-primary-hover)]",
   workspaceMenuSelect:
     "flex h-full min-w-0 flex-1 items-center gap-2 border-0 bg-transparent px-2.5 text-left text-inherit",
   workspaceMenuActions:
     "mr-1 flex flex-none items-center gap-px opacity-0 group-hover/workspace:opacity-100 group-focus-within/workspace:opacity-100",
   workspaceMenuIconButton:
-    "grid size-7 place-items-center rounded-md border-0 bg-transparent p-0 text-[var(--misty-text-muted)] hover:bg-[var(--misty-surface-selected)] hover:text-[var(--misty-text)] disabled:cursor-default disabled:opacity-35 disabled:hover:bg-transparent disabled:hover:text-[var(--misty-text-muted)]",
+    "grid size-7 place-items-center rounded-md border-0 bg-transparent p-0 text-[var(--misty-text-muted)] hover:bg-[var(--misty-neutral-selected-bg,var(--misty-surface-selected))] hover:text-[var(--misty-text)] disabled:cursor-default disabled:opacity-35 disabled:hover:bg-transparent disabled:hover:text-[var(--misty-text-muted)]",
   menuButtonIcon: "grid size-[17px] flex-none place-items-center text-[var(--misty-text-muted)]",
   menuButtonTruncate: "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap",
   menuButtonCheck: "w-[17px] flex-none text-[var(--misty-text)]",

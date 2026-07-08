@@ -267,7 +267,7 @@ function AppPagesLayout() {
   if (formFactor === "mobile") return <Outlet />;
 
   return (
-    <div className="app-pages-root h-full min-h-0 bg-[#07090b] text-text">
+    <div className="app-pages-root h-full min-h-0 bg-[var(--misty-app-page-bg,#07090b)] text-text">
       <main className="h-full min-h-0">
         <Outlet />
       </main>

@@ -8,9 +8,10 @@ use crate::core::clipboard::{
 };
 use crate::core::explorer::{
     CreateItemRequest, DeleteItemsRequest, DirectoryListing, ExplorerOperationResult,
-    ExplorerPreviewPayload, ListDirectoryRequest, PasteBlobRequest, PasteItem, PasteItemsRequest,
-    PasteTextRequest, PrepareDragItemsRequest, PrepareOpenItemRequest, PreparedDragItemsResult,
-    PreparedOpenItem, RenameItemRequest, RenameItemsRequest,
+    ExplorerPreviewPayload, GeneratedImageThumbnail, ListDirectoryRequest, PasteBlobRequest,
+    PasteItem, PasteItemsRequest, PasteTextRequest, PrepareDragItemsRequest,
+    PrepareOpenItemRequest, PreparedDragItemsResult, PreparedOpenItem, RenameItemRequest,
+    RenameItemsRequest,
 };
 use crate::core::file_sync::FileSyncPair;
 use crate::core::operation_queue::{ConflictPolicy, OperationQueueSnapshot};
@@ -367,6 +368,27 @@ pub async fn explorer_preview_item(
     state: State<'_, MistyRuntime>,
 ) -> ApiResult<ExplorerPreviewPayload> {
     state.explorer.preview_item(&path).await
+}
+
+#[tauri::command]
+pub async fn explorer_generate_image_thumbnail(
+    path: String,
+    max_dimension: u32,
+    modified_ms: Option<u64>,
+    remote_modified: Option<String>,
+    size_bytes: Option<u64>,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<GeneratedImageThumbnail> {
+    state
+        .explorer
+        .generate_image_thumbnail(
+            &path,
+            max_dimension,
+            modified_ms,
+            remote_modified.as_deref(),
+            size_bytes,
+        )
+        .await
 }
 
 #[tauri::command]

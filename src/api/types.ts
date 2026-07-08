@@ -267,6 +267,11 @@ export interface ExplorerPreviewPayload {
   bytes: number[];
 }
 
+export interface GeneratedImageThumbnail {
+  path: string;
+  mimeType: string;
+}
+
 export interface ListDirectoryRequest {
   path?: string | null;
   showHidden?: boolean;

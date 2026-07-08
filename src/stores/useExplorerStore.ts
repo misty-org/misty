@@ -605,7 +605,7 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
           },
         };
       });
-      void get().loadDirectorySizeSnapshot(folderPathsForListing(listing), { calculateMissing: true });
+      void get().loadDirectorySizeSnapshot(folderPathsForListing(listing));
     } catch (error) {
       set((state) => ({
         panes: {
@@ -717,12 +717,6 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
       mergeDirectorySizeRecords(set, records);
     } catch {
       return;
-    }
-    const missing = records
-      .filter((record) => record.status === "unknown")
-      .map((record) => record.path);
-    if (missing.length > 0) {
-      await get().calculateDirectorySizes(missing, { force: false, notify: false });
     }
   },
 

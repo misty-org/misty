@@ -10,7 +10,7 @@ export function ChangelogPanel() {
 
   return (
     <section className="rounded-xl border border-[#1e1e21] bg-[#0b0d0f]">
-      <div className="sticky top-0 border-b border-[#1e1e21] bg-[#0b0d0f]/95 px-4 py-3 backdrop-blur">
+      <div className="sticky top-0 border-b border-[#1e1e21] bg-[#0b0d0f]/95 px-4 py-3">
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
             <h2 className="truncate text-sm font-bold text-white">{release.version}</h2>

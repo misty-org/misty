@@ -241,8 +241,8 @@ export default function HomePage() {
   };
 
   return (
-    <div className="misty-scrollbar box-border h-full min-h-0 overflow-x-hidden overflow-y-scroll overscroll-contain p-5">
-      <section className="mx-auto grid min-h-full w-full max-w-[1500px] auto-rows-min gap-4 xl:h-full xl:min-h-[680px] xl:grid-cols-12 xl:grid-rows-7 xl:auto-rows-fr">
+    <div className="misty-scrollbar relative box-border h-full min-h-0 overflow-x-hidden overflow-y-scroll overscroll-contain p-5">
+      <section className="relative z-10 mx-auto grid min-h-full w-full max-w-[1500px] auto-rows-min gap-4 xl:h-full xl:min-h-[680px] xl:grid-cols-12 xl:grid-rows-7 xl:auto-rows-fr">
         <DesktopWorkspacePanel homePath={homePath} />
         <HomeSidebarPanels
           devices={devices}

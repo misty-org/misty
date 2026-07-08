@@ -1,8 +1,18 @@
 use std::collections::HashSet;
+#[cfg(target_os = "macos")]
+use std::ffi::c_void;
 use std::path::Path;
 use std::process::Command;
+#[cfg(target_os = "macos")]
+use std::ptr;
+#[cfg(target_os = "macos")]
+use std::thread;
 
 use serde::Serialize;
+#[cfg(target_os = "macos")]
+use tauri::{Emitter, Wry};
+
+pub const DEVICES_CHANGED_EVENT: &str = "misty://devices-changed";
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -35,6 +45,79 @@ impl DeviceService {
             devices: scan_mounted_devices(),
         }
     }
+}
+
+#[cfg(target_os = "macos")]
+pub fn start_device_change_listener(app: tauri::AppHandle<Wry>) {
+    thread::Builder::new()
+        .name("misty-device-change-listener".to_owned())
+        .spawn(move || unsafe {
+            let session = DASessionCreate(ptr::null());
+            if session.is_null() {
+                return;
+            }
+
+            let context = Box::into_raw(Box::new(app)) as *mut c_void;
+            DARegisterDiskAppearedCallback(session, ptr::null(), disk_changed, context);
+            DARegisterDiskDisappearedCallback(session, ptr::null(), disk_changed, context);
+            DASessionScheduleWithRunLoop(session, CFRunLoopGetCurrent(), kCFRunLoopDefaultMode);
+            CFRunLoopRun();
+        })
+        .ok();
+}
+
+#[cfg(target_os = "macos")]
+type CFAllocatorRef = *const c_void;
+#[cfg(target_os = "macos")]
+type CFDictionaryRef = *const c_void;
+#[cfg(target_os = "macos")]
+type CFRunLoopRef = *const c_void;
+#[cfg(target_os = "macos")]
+type CFStringRef = *const c_void;
+#[cfg(target_os = "macos")]
+type DADiskRef = *const c_void;
+#[cfg(target_os = "macos")]
+type DASessionRef = *const c_void;
+
+#[cfg(target_os = "macos")]
+#[link(name = "CoreFoundation", kind = "framework")]
+extern "C" {
+    static kCFRunLoopDefaultMode: CFStringRef;
+    fn CFRunLoopGetCurrent() -> CFRunLoopRef;
+    fn CFRunLoopRun();
+}
+
+#[cfg(target_os = "macos")]
+#[link(name = "DiskArbitration", kind = "framework")]
+extern "C" {
+    fn DASessionCreate(allocator: CFAllocatorRef) -> DASessionRef;
+    fn DASessionScheduleWithRunLoop(
+        session: DASessionRef,
+        run_loop: CFRunLoopRef,
+        run_loop_mode: CFStringRef,
+    );
+    fn DARegisterDiskAppearedCallback(
+        session: DASessionRef,
+        match_: CFDictionaryRef,
+        callback: extern "C" fn(DADiskRef, *mut c_void),
+        context: *mut c_void,
+    );
+    fn DARegisterDiskDisappearedCallback(
+        session: DASessionRef,
+        match_: CFDictionaryRef,
+        callback: extern "C" fn(DADiskRef, *mut c_void),
+        context: *mut c_void,
+    );
+}
+
+#[cfg(target_os = "macos")]
+extern "C" fn disk_changed(_disk: DADiskRef, context: *mut c_void) {
+    if context.is_null() {
+        return;
+    }
+
+    let app = unsafe { &*(context as *const tauri::AppHandle<Wry>) };
+    let _ = app.emit(DEVICES_CHANGED_EVENT, ());
 }
 
 fn scan_mounted_devices() -> Vec<MountedDeviceSnapshot> {

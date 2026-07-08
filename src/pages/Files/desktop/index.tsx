@@ -39,10 +39,13 @@ import {
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { CSSProperties, PointerEvent, ReactNode } from "react";
+import { listen } from "@tauri-apps/api/event";
+import type { UnlistenFn } from "@tauri-apps/api/event";
 import { readText, writeHtml, writeImage, writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { useNavigate } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
 import { MultiPanelWorkspace } from "../../../shared/multipanel/MultiPanelWorkspace";
+import { hasTauriInternals } from "../../../shared/tauri";
 import { useAppStore } from "../../../stores/useAppStore";
 import {
   clipboardApplyShared,
@@ -172,6 +175,7 @@ const maxPreviewWidth = 420;
 const minMikaPanelWidth = 280;
 const maxMikaPanelWidth = 600;
 const transferRefreshPollMs = 12000;
+const devicesChangedEvent = "misty://devices-changed";
 const explorerSearchFocusEvent = "misty:explorer-search-focus";
 const explorerDuplicateFinderEvent = "misty:explorer-duplicate-finder";
 const explorerCompareWithEvent = "misty:explorer-compare-with";
@@ -419,10 +423,11 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
     };
   }, [shortcutPreferences.customShortcutsEnabled, shortcutPreferences.keymapIndex]);
 
-  const refreshDevices = useCallback(async () => {
+  const refreshDevices = useCallback(async (options?: { showLoading?: boolean }) => {
     if (deviceRefreshInFlightRef.current) return;
+    const showLoading = options?.showLoading ?? true;
     deviceRefreshInFlightRef.current = true;
-    if (deviceRefreshMountedRef.current) setDevicesLoading(true);
+    if (showLoading && deviceRefreshMountedRef.current) setDevicesLoading(true);
     try {
       const snapshot = await devicesSnapshot();
       if (deviceRefreshMountedRef.current) {
@@ -434,17 +439,45 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
       }
     } finally {
       deviceRefreshInFlightRef.current = false;
-      if (deviceRefreshMountedRef.current) setDevicesLoading(false);
+      if (showLoading && deviceRefreshMountedRef.current) setDevicesLoading(false);
     }
   }, []);
 
   useEffect(() => {
     deviceRefreshMountedRef.current = true;
     void refreshDevices();
-    window.addEventListener("focus", refreshDevices);
+    const refreshOnFocus = () => void refreshDevices();
+    window.addEventListener("focus", refreshOnFocus);
+    let active = true;
+    let unlisten: UnlistenFn | null = null;
+    const eventRefreshTimers = new Set<number>();
+    const refreshFromDeviceEvent = () => {
+      void refreshDevices({ showLoading: false });
+      const timer = window.setTimeout(() => {
+        eventRefreshTimers.delete(timer);
+        void refreshDevices({ showLoading: false });
+      }, 1200);
+      eventRefreshTimers.add(timer);
+    };
+    void (async () => {
+      try {
+        if (!hasTauriInternals()) return;
+        const stopListening = await listen(devicesChangedEvent, refreshFromDeviceEvent);
+        if (active) {
+          unlisten = stopListening;
+        } else {
+          void stopListening();
+        }
+      } catch {
+        // Browser smoke mode and unsupported platforms run without native device events.
+      }
+    })();
     return () => {
+      active = false;
       deviceRefreshMountedRef.current = false;
-      window.removeEventListener("focus", refreshDevices);
+      window.removeEventListener("focus", refreshOnFocus);
+      eventRefreshTimers.forEach((timer) => window.clearTimeout(timer));
+      if (unlisten) void unlisten();
     };
   }, [refreshDevices]);
 

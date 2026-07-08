@@ -125,19 +125,19 @@ const VIEWPORT_MENU_MARGIN = 8;
 
 const transferStyles = {
   workspace:
-    "bg-[var(--misty-bg)]",
+    "bg-[var(--misty-app-page-bg,var(--misty-bg))]",
   pane:
-    "grid h-full min-h-0 min-w-0 grid-rows-[minmax(0,1fr)_24px] overflow-hidden bg-[var(--misty-bg)]",
+    "grid h-full min-h-0 min-w-0 grid-rows-[minmax(0,1fr)_24px] overflow-hidden bg-transparent",
   toolbar:
-    "relative flex min-w-0 items-center justify-end gap-2 border-b border-[var(--misty-border-soft)] bg-[var(--misty-bg)] px-2 py-2",
+    "relative flex min-w-0 items-center justify-end gap-2 border-b border-transparent bg-transparent px-2 py-2",
   toolbarButton:
-    "inline-flex min-h-[38px] items-center gap-[7px] rounded-[10px] border border-[var(--misty-border-soft)] bg-[var(--misty-surface-2)] px-[11px] py-2 text-[var(--misty-text)]",
+    "inline-flex min-h-[38px] items-center gap-[7px] rounded-[10px] border border-[var(--misty-border-soft)] bg-[var(--misty-app-surface-soft-bg,var(--misty-surface-2))] px-[11px] py-2 text-[var(--misty-text)]",
   iconToolbarButton:
-    "grid size-8 place-items-center rounded-lg border border-[var(--misty-border-soft)] bg-[var(--misty-surface-2)] p-0 text-[var(--misty-text)] hover:bg-[var(--misty-surface-3)] disabled:opacity-45",
+    "grid size-8 place-items-center rounded-lg border border-[var(--misty-border-soft)] bg-[var(--misty-app-surface-soft-bg,var(--misty-surface-2))] p-0 text-[var(--misty-text)] hover:bg-[var(--misty-neutral-hover-bg,var(--misty-surface-3))] disabled:opacity-45",
   toolbarDanger:
     "border-[color-mix(in_srgb,var(--misty-danger)_42%,var(--misty-border))] text-[var(--misty-danger)]",
   searchBox:
-    "!flex !h-8 w-[min(340px,34vw)] min-w-52 !items-center !gap-2 rounded-lg border border-[var(--misty-border)] bg-[var(--misty-surface)] px-2.5 text-[var(--misty-text-muted)] !normal-case [&>input]:!h-full [&>input]:!min-w-0 [&>input]:!flex-1 [&>input]:!rounded-none [&>input]:!border-0 [&>input]:!bg-transparent [&>input]:!p-0 [&>input]:!text-sm [&>input]:!leading-none [&>input]:!text-[var(--misty-text)] [&>input]:!shadow-none [&>input]:!outline-none [&>input]:placeholder:!text-[var(--misty-text-subtle)]",
+    "!flex !h-8 w-[min(340px,34vw)] min-w-52 !items-center !gap-2 rounded-lg border border-[var(--misty-border)] bg-[var(--misty-app-surface-bg,var(--misty-surface))] px-2.5 text-[var(--misty-text-muted)] !normal-case [&>input]:!h-full [&>input]:!min-w-0 [&>input]:!flex-1 [&>input]:!rounded-none [&>input]:!border-0 [&>input]:!bg-transparent [&>input]:!p-0 [&>input]:!text-sm [&>input]:!leading-none [&>input]:!text-[var(--misty-text)] [&>input]:!shadow-none [&>input]:!outline-none [&>input]:placeholder:!text-[var(--misty-text-subtle)]",
   actionFeedback:
     "mr-auto min-w-0 overflow-hidden text-ellipsis whitespace-nowrap rounded-md px-2 py-1 text-xs",
   actionFeedbackBusy:
@@ -147,19 +147,19 @@ const transferStyles = {
   actionFeedbackError:
     "bg-[color-mix(in_srgb,var(--misty-danger)_12%,var(--misty-surface))] text-[var(--misty-danger)]",
   sortMenu:
-    "fixed z-[2147483000] grid w-44 gap-1 overflow-y-auto rounded-[10px] border border-[var(--misty-border)] bg-[var(--misty-surface)] p-1.5 shadow-[0_16px_38px_rgba(0,0,0,0.38)]",
+    "fixed z-[2147483000] grid w-44 gap-1 overflow-y-auto rounded-[10px] border border-[var(--misty-border)] bg-[var(--misty-app-surface-bg,var(--misty-surface))] p-1.5 shadow-[0_16px_38px_rgba(0,0,0,0.38)]",
   sortMenuLabel:
     "px-2.5 py-1 text-[11px] font-bold uppercase text-[var(--misty-text-subtle)]",
   sortMenuItem:
-    "flex h-8 min-w-0 items-center justify-between gap-2 rounded-lg border-0 bg-transparent px-2.5 text-left text-sm text-[var(--misty-text)] hover:bg-[var(--misty-surface-3)]",
+    "flex h-8 min-w-0 items-center justify-between gap-2 rounded-lg border-0 bg-transparent px-2.5 text-left text-sm text-[var(--misty-text)] hover:bg-[var(--misty-neutral-hover-bg,var(--misty-surface-3))]",
   sortMenuItemActive:
-    "bg-[var(--misty-surface-3)]",
+    "bg-[var(--misty-neutral-selected-bg,var(--misty-surface-3))]",
   sortMenuIcon:
     "grid size-4 shrink-0 place-items-center text-[var(--misty-text-muted)]",
   actionMenu:
-    "fixed z-[2147483000] grid w-52 gap-1 overflow-y-auto rounded-[10px] border border-[var(--misty-border)] bg-[var(--misty-surface)] p-1.5 shadow-[0_16px_38px_rgba(0,0,0,0.38)]",
+    "fixed z-[2147483000] grid w-52 gap-1 overflow-y-auto rounded-[10px] border border-[var(--misty-border)] bg-[var(--misty-app-surface-bg,var(--misty-surface))] p-1.5 shadow-[0_16px_38px_rgba(0,0,0,0.38)]",
   actionMenuItem:
-    "flex h-8 min-w-0 items-center gap-2 rounded-lg border-0 bg-transparent px-2.5 text-left text-sm text-[var(--misty-text)] hover:bg-[var(--misty-surface-3)] disabled:opacity-45",
+    "flex h-8 min-w-0 items-center gap-2 rounded-lg border-0 bg-transparent px-2.5 text-left text-sm text-[var(--misty-text)] hover:bg-[var(--misty-neutral-hover-bg,var(--misty-surface-3))] disabled:opacity-45",
   actionMenuField:
     "grid min-w-0 gap-1 rounded-lg px-2.5 py-1.5",
   actionMenuFieldLabel:
@@ -168,7 +168,7 @@ const transferStyles = {
     "text-[var(--misty-danger)]",
   actionMenuSeparator: "my-1 h-px bg-[var(--misty-border-soft)]",
   activeFilterPill:
-    "inline-flex min-h-[38px] items-center gap-[7px] whitespace-nowrap rounded-full border border-[var(--misty-border-soft)] bg-[var(--misty-surface-2)] px-[11px] py-[7px] text-[var(--misty-text-muted)]",
+    "inline-flex min-h-[38px] items-center gap-[7px] whitespace-nowrap rounded-full border border-[var(--misty-border-soft)] bg-[var(--misty-app-surface-soft-bg,var(--misty-surface-2))] px-[11px] py-[7px] text-[var(--misty-text-muted)]",
   summary: "grid grid-cols-2 gap-2",
   summaryCard:
     "grid min-w-0 gap-1 border-b border-[var(--misty-border-soft)] pb-2",
@@ -181,21 +181,21 @@ const transferStyles = {
   threePanel:
     "grid h-full min-h-0 w-full",
   panel:
-    "min-h-0 min-w-0 overflow-hidden border-r border-[var(--misty-border-soft)] bg-[var(--misty-bg)] last:border-r-0",
+    "min-h-0 min-w-0 overflow-hidden border-r border-[var(--misty-border-soft)] bg-transparent last:border-r-0",
   listPanel:
-    "grid min-h-0 min-w-0 grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden border-r border-[var(--misty-border-soft)] bg-[var(--misty-bg)]",
+    "grid min-h-0 min-w-0 grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden border-r border-[var(--misty-border-soft)] bg-transparent",
   listPanelNoRight:
     "border-r-0",
   pagination:
     "flex min-w-0 items-center justify-between gap-2 border-t border-[var(--misty-border-soft)] px-2 py-1.5 text-xs text-[var(--misty-text-muted)]",
   paginationButtons: "flex gap-1.5",
   paginationButton:
-    "min-h-[26px] rounded-[7px] border border-[var(--misty-border-soft)] bg-[var(--misty-surface-2)] px-2.5 py-1 text-[var(--misty-text)] disabled:opacity-40",
+    "min-h-[26px] rounded-[7px] border border-[var(--misty-border-soft)] bg-[var(--misty-app-surface-soft-bg,var(--misty-surface-2))] px-2.5 py-1 text-[var(--misty-text)] disabled:opacity-40",
   contentScroll: "h-full overflow-auto p-3",
   filterHeading: "mb-3 flex items-center justify-between gap-2.5",
   filterTitle: "text-sm font-semibold text-[var(--misty-text)]",
   smallButton:
-    "min-h-[30px] rounded-[9px] border border-[var(--misty-border-soft)] bg-[var(--misty-surface-2)] px-[9px] py-[5px] text-[var(--misty-text)] disabled:opacity-45",
+    "min-h-[30px] rounded-[9px] border border-[var(--misty-border-soft)] bg-[var(--misty-app-surface-soft-bg,var(--misty-surface-2))] px-[9px] py-[5px] text-[var(--misty-text)] disabled:opacity-45",
   filterSection: "grid gap-2.5 border-t border-[var(--misty-border-soft)] py-3 first:border-t-0 first:pt-0",
   filterSectionTitle: "m-0 text-[11px] font-bold uppercase tracking-[0.06em] text-[var(--misty-text-muted)]",
   filterOption:
@@ -208,7 +208,7 @@ const transferStyles = {
   filterEmpty:
     "text-sm leading-5 text-[var(--misty-text-subtle)]",
   filterSelect:
-    "w-full rounded-lg border border-[var(--misty-border)] bg-[var(--misty-surface)] px-2.5 py-2 text-[var(--misty-text)]",
+    "w-full rounded-lg border border-[var(--misty-border)] bg-[var(--misty-app-surface-bg,var(--misty-surface))] px-2.5 py-2 text-[var(--misty-text)]",
   sortDirection: "grid grid-cols-2 gap-2",
   sortButtonSelected:
     "border-[var(--misty-accent)] bg-[color-mix(in_srgb,var(--misty-accent)_16%,var(--misty-surface))]",
@@ -216,7 +216,7 @@ const transferStyles = {
     "h-full min-h-0 overflow-auto p-0 pr-3 [overscroll-behavior:contain] [scrollbar-gutter:stable_both-edges]",
   table: "select-none border-collapse table-fixed",
   tableHeader:
-    "sticky top-0 z-[2] select-none border-b border-[var(--misty-border-soft)] bg-[var(--misty-surface-2)] px-2.5 py-2 text-left align-middle text-[13px] font-semibold leading-none text-[var(--misty-text-muted)]",
+    "sticky top-0 z-[2] select-none border-b border-[var(--misty-border-soft)] bg-transparent px-2.5 py-2 text-left align-middle text-[13px] font-semibold leading-none text-[var(--misty-text-muted)]",
   tableHeaderDragging: "opacity-60",
   tableHeaderControl:
     "inline-block min-w-0 max-w-full overflow-hidden text-ellipsis whitespace-nowrap border-0 bg-transparent p-0 align-middle font-[inherit] text-inherit",
@@ -232,7 +232,7 @@ const transferStyles = {
     "min-w-0 select-none overflow-hidden text-ellipsis whitespace-nowrap border-b border-[var(--misty-border-soft)] px-2.5 py-1.5 text-left align-middle text-[13px] leading-[16px]",
   nameCellContent: "flex min-w-0 items-center gap-1.5",
   treeToggle:
-    "grid size-5 shrink-0 place-items-center rounded border-0 bg-transparent p-0 text-[var(--misty-text-muted)] hover:bg-[var(--misty-surface-3)] hover:text-[var(--misty-text)]",
+    "grid size-5 shrink-0 place-items-center rounded border-0 bg-transparent p-0 text-[var(--misty-text-muted)] hover:bg-[var(--misty-neutral-hover-bg,var(--misty-surface-3))] hover:text-[var(--misty-text)]",
   treeSpacer: "block size-5 shrink-0",
   nameText: "min-w-0 flex-1 overflow-hidden",
   tablePrimary: "block min-w-0 overflow-hidden text-ellipsis whitespace-nowrap font-semibold leading-[17px]",
@@ -242,11 +242,11 @@ const transferStyles = {
     "flex h-full items-center justify-end gap-2 whitespace-nowrap opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100",
   rowActionsVisible: "opacity-100",
   rowActionGroup:
-    "inline-flex h-[30px] overflow-hidden rounded-[8px] border border-[var(--misty-border-soft)] bg-[var(--misty-surface-2)]",
+    "inline-flex h-[30px] overflow-hidden rounded-[8px] border border-[var(--misty-border-soft)] bg-[var(--misty-app-surface-soft-bg,var(--misty-surface-2))]",
   rowActionIconButton:
-    "grid h-[28px] w-[30px] place-items-center border-0 border-r border-[var(--misty-border-soft)] bg-transparent p-0 text-[var(--misty-text)] last:border-r-0 hover:bg-[var(--misty-surface-3)] disabled:text-[var(--misty-text-subtle)] disabled:opacity-40",
+    "grid h-[28px] w-[30px] place-items-center border-0 border-r border-[var(--misty-border-soft)] bg-transparent p-0 text-[var(--misty-text)] last:border-r-0 hover:bg-[var(--misty-neutral-hover-bg,var(--misty-surface-3))] disabled:text-[var(--misty-text-subtle)] disabled:opacity-40",
   rowActionDangerButton:
-    "grid h-[30px] w-[32px] place-items-center rounded-[8px] border border-[color-mix(in_srgb,var(--misty-danger)_42%,var(--misty-border))] bg-[var(--misty-surface-2)] p-0 text-[var(--misty-danger)] hover:bg-[color-mix(in_srgb,var(--misty-danger)_12%,var(--misty-surface-2))] disabled:opacity-40",
+    "grid h-[30px] w-[32px] place-items-center rounded-[8px] border border-[color-mix(in_srgb,var(--misty-danger)_42%,var(--misty-border))] bg-[var(--misty-app-surface-soft-bg,var(--misty-surface-2))] p-0 text-[var(--misty-danger)] hover:bg-[color-mix(in_srgb,var(--misty-danger)_12%,var(--misty-surface-2))] disabled:opacity-40",
   detailContent: "grid h-full content-start gap-2.5 overflow-auto p-3.5",
   detailEmpty: "h-full overflow-auto p-3.5",
   detailHeader: "grid gap-2 border-b border-[var(--misty-border-soft)] pb-3",
@@ -259,7 +259,7 @@ const transferStyles = {
   detailDangerValue:
     "min-w-0 [overflow-wrap:anywhere] font-medium text-[var(--misty-danger)]",
   progressTrack:
-    "h-2 overflow-hidden rounded-full bg-[var(--misty-surface-2)]",
+    "h-2 overflow-hidden rounded-full bg-[var(--misty-app-surface-soft-bg,var(--misty-surface-2))]",
   progressFill:
     "h-full rounded-full bg-[var(--misty-accent)] transition-[width] duration-200",
   progressFillUnknown:
@@ -269,7 +269,7 @@ const transferStyles = {
   progressMetaStrong:
     "font-medium text-[var(--misty-text)]",
   statusBadge:
-    "inline-flex w-fit rounded-full bg-[var(--misty-surface-2)] px-2 py-[3px] text-xs leading-4 text-[var(--misty-text-muted)] capitalize",
+    "inline-flex w-fit rounded-full bg-[var(--misty-app-surface-soft-bg,var(--misty-surface-2))] px-2 py-[3px] text-xs leading-4 text-[var(--misty-text-muted)] capitalize",
   statusCompleted:
     "bg-[color-mix(in_srgb,var(--misty-success)_15%,var(--misty-surface))] text-[var(--misty-success)]",
   statusFailed:
@@ -277,14 +277,14 @@ const transferStyles = {
   statusActive:
     "bg-[color-mix(in_srgb,var(--misty-accent)_14%,var(--misty-surface))] text-[var(--misty-accent)]",
   operationSelect:
-    "h-[30px] rounded-[7px] border border-[var(--misty-border-soft)] bg-[var(--misty-surface)] px-2 text-xs text-[var(--misty-text)] outline-none",
+    "h-[30px] rounded-[7px] border border-[var(--misty-border-soft)] bg-[var(--misty-app-surface-bg,var(--misty-surface))] px-2 text-xs text-[var(--misty-text)] outline-none",
   bottomBar:
-    "flex min-w-0 items-center justify-between border-t border-[var(--misty-border-soft)] bg-[var(--misty-bg)] px-2",
+    "flex min-w-0 items-center justify-between border-t border-transparent bg-transparent px-2",
   bottomBarSide: "flex min-w-0 items-center gap-1",
   bottomButton:
-    "grid h-5 w-[22px] place-items-center rounded border-0 bg-transparent p-0 text-[var(--misty-text-muted)] hover:bg-[var(--misty-surface-2)] hover:text-[var(--misty-text)]",
+    "grid h-5 w-[22px] place-items-center rounded border-0 bg-transparent p-0 text-[var(--misty-text-muted)] hover:bg-[var(--misty-neutral-hover-bg,var(--misty-surface-2))] hover:text-[var(--misty-text)]",
   bottomButtonSelected:
-    "bg-[var(--misty-surface-2)] text-[var(--misty-text)]",
+    "bg-[var(--misty-neutral-selected-bg,var(--misty-surface-2))] text-[var(--misty-text)]",
 } as const;
 
 interface TransfersMultiPanelSnapshot {

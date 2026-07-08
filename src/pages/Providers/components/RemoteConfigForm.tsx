@@ -26,10 +26,10 @@ const labelClass =
   "grid gap-1.5 text-[var(--misty-text-muted)] capitalize";
 
 const inputClass =
-  "w-full min-w-0 rounded-lg border border-[var(--misty-border)] bg-[var(--misty-surface)] px-2.5 py-[9px] text-[var(--misty-text)]";
+  "w-full min-w-0 rounded-lg border border-[var(--misty-border)] bg-[var(--misty-app-surface-bg,var(--misty-surface))] px-2.5 py-[9px] text-[var(--misty-text)]";
 
 const secretFieldClass =
-  "grid grid-cols-[minmax(0,1fr)_34px] items-center overflow-hidden rounded-lg border border-[var(--misty-border)] bg-[var(--misty-surface)] focus-within:border-[var(--misty-accent)]";
+  "grid grid-cols-[minmax(0,1fr)_34px] items-center overflow-hidden rounded-lg border border-[var(--misty-border)] bg-[var(--misty-app-surface-bg,var(--misty-surface))] focus-within:border-[var(--misty-accent)]";
 
 const secretInputClass =
   "min-h-[38px] border-0 bg-transparent px-2.5 py-[9px] text-[var(--misty-text)] outline-none";
@@ -44,10 +44,10 @@ const tokenLegendClass =
   "flex items-center gap-2.5 px-2 text-[var(--misty-text)]";
 
 const tokenToggleClass =
-  "grid h-7 w-7 place-items-center rounded-md border border-[var(--misty-border-soft)] bg-[var(--misty-surface-2)] text-[var(--misty-accent)] hover:bg-[var(--misty-surface-3)]";
+  "grid h-7 w-7 place-items-center rounded-md border border-[var(--misty-border-soft)] bg-[var(--misty-app-surface-soft-bg,var(--misty-surface-2))] text-[var(--misty-accent)] hover:bg-[var(--misty-neutral-hover-bg,var(--misty-surface-3))]";
 
 const pathsPanelClass =
-  "mx-[18px] mb-3.5 grid max-w-[760px] gap-1.5 border border-[var(--misty-border-soft)] bg-[var(--misty-surface-2)] p-3 text-[var(--misty-text-muted)] [overflow-wrap:anywhere]";
+  "mx-[18px] mb-3.5 grid max-w-[760px] gap-1.5 border border-[var(--misty-border-soft)] bg-[var(--misty-app-surface-soft-bg,var(--misty-surface-2))] p-3 text-[var(--misty-text-muted)] [overflow-wrap:anywhere]";
 
 export function RemoteConfigForm(props: RemoteConfigFormProps) {
   const {

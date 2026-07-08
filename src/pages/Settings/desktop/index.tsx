@@ -1,4 +1,4 @@
-import { memo, useEffect, type ChangeEvent, type ReactNode } from "react";
+import { memo, useEffect, useState, type ChangeEvent, type KeyboardEvent, type PointerEvent, type ReactNode } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { useShallow } from "zustand/react/shallow";
 import {
@@ -8,6 +8,7 @@ import {
   ChevronDown,
   Copy,
   Eye,
+  Image,
   Keyboard,
   Lock,
   RefreshCcw,
@@ -79,13 +80,13 @@ const keymapOptions = ["System", "VS Code", "Finder"];
 const conflictOptions = ["Keep Newest", "Ask Me", "Keep Both"];
 
 const settingsGridClass =
-  "grid h-screen min-h-0 min-w-0 grid-cols-[180px_1px_minmax(0,1fr)] overflow-hidden bg-[#050607] text-[#f4f4f5] max-[980px]:grid-cols-[150px_1px_minmax(720px,1fr)] max-[980px]:overflow-x-auto max-[980px]:overflow-y-hidden";
+  "grid h-screen min-h-0 min-w-0 grid-cols-[180px_1px_minmax(0,1fr)] overflow-hidden bg-[var(--misty-app-shell-bg,#050607)] text-[#f4f4f5] max-[980px]:grid-cols-[150px_1px_minmax(720px,1fr)] max-[980px]:overflow-x-auto max-[980px]:overflow-y-hidden";
 
 const settingsOverlayGridClass =
-  "grid h-full min-h-0 min-w-0 grid-cols-[214px_1px_minmax(0,1fr)] overflow-hidden bg-[#050607] text-[#f4f4f5] max-[980px]:grid-cols-[180px_1px_minmax(620px,1fr)] max-[980px]:overflow-x-auto max-[980px]:overflow-y-hidden";
+  "grid h-full min-h-0 min-w-0 grid-cols-[214px_1px_minmax(0,1fr)] overflow-hidden bg-[var(--misty-app-shell-bg,#050607)] text-[#f4f4f5] max-[980px]:grid-cols-[180px_1px_minmax(620px,1fr)] max-[980px]:overflow-x-auto max-[980px]:overflow-y-hidden";
 
 const settingsSidebarClass =
-  "flex min-h-0 flex-col gap-[5px] bg-[#050607] p-5 max-[980px]:px-2.5 max-[980px]:py-4";
+  "flex min-h-0 flex-col gap-[5px] bg-[var(--misty-app-nav-bg,var(--misty-app-shell-bg,#050607))] p-5 max-[980px]:px-2.5 max-[980px]:py-4";
 
 const settingsNavItemClass =
   "grid h-9 w-full grid-cols-[18px_minmax(0,1fr)] items-center gap-3 rounded-md border border-transparent bg-transparent px-2 py-1.5 text-left text-[15px] text-[#a1a1aa] hover:border-white/10 hover:bg-white/[0.045] hover:text-[#f4f4f5]";
@@ -94,16 +95,16 @@ const settingsNavItemSelectedClass =
   "border-white/15 bg-[#f4f4f5] text-[#07090b] hover:bg-white hover:text-[#07090b]";
 
 const settingsContentClass =
-  "misty-scrollbar min-h-0 min-w-0 overflow-auto bg-[#050607] px-7 py-6";
+  "misty-scrollbar min-h-0 min-w-0 overflow-auto bg-[var(--misty-app-shell-bg,#050607)] px-7 py-6";
 
 const settingsOverlayContentShellClass =
-  "grid min-h-0 min-w-0 grid-rows-[72px_minmax(0,1fr)] bg-[#050607]";
+  "grid min-h-0 min-w-0 grid-rows-[72px_minmax(0,1fr)] bg-[var(--misty-app-shell-bg,#050607)]";
 
 const settingsOverlayHeaderClass =
   "flex min-h-0 items-center justify-between gap-4 border-b border-white/10 px-7";
 
 const settingsOverlayContentClass =
-  "misty-scrollbar min-h-0 min-w-0 overflow-auto bg-[#050607] px-7 py-5";
+  "misty-scrollbar min-h-0 min-w-0 overflow-auto bg-[var(--misty-app-shell-bg,#050607)] px-7 py-5";
 
 const settingsScrollSurfaceClass =
   "w-[min(100%,934px)] min-w-[720px]";
@@ -115,7 +116,7 @@ const settingsOverlayCloseClass =
   "grid size-8 place-items-center rounded-md border border-transparent bg-transparent p-0 text-[#a1a1aa] transition hover:border-white/10 hover:bg-white/[0.045] hover:text-[#f4f4f5]";
 
 const settingsControlButtonClass =
-  "inline-flex h-8 w-[220px] items-center justify-center rounded-md border border-white/10 bg-white/[0.055] text-[15px] font-semibold text-[#f4f4f5] transition hover:border-white/20 hover:bg-white/[0.09] disabled:opacity-55";
+  "inline-flex h-8 w-[220px] items-center justify-center gap-1.5 rounded-md border border-white/10 bg-white/[0.055] text-[15px] font-semibold text-[#f4f4f5] transition hover:border-white/20 hover:bg-white/[0.09] disabled:opacity-55";
 
 const settingsControlButtonCompactClass =
   `${settingsControlButtonClass} w-[100px]`;
@@ -454,11 +455,35 @@ function AppearanceSettings(props: SettingsContentProps) {
       </SettingsSectionBlock>
 
       <SettingsSectionBlock title="Layout">
-        <SettingsRow label="Compact mode" description="Reduce padding and spacing in file-heavy views." last>
+        <SettingsRow label="Compact mode" description="Reduce padding and spacing in file-heavy views.">
           <SwitchControl
             checked={booleanSetting(props.document, "appearance", "compact_mode_enabled", false)}
             disabled={props.working}
             onChange={(value) => props.onSettingChange("appearance", "compact_mode_enabled", value)}
+          />
+        </SettingsRow>
+        <SettingsRow label="App wallpaper" description="Choose an image, GIF, or video to show behind Misty pages.">
+          <WallpaperControl
+            value={stringSetting(
+              props.document,
+              "appearance",
+              "wallpaper_path",
+              stringSetting(props.document, "appearance", "home_wallpaper_path", ""),
+            )}
+            disabled={props.working}
+            onChange={(value) => props.onSettingChange("appearance", "wallpaper_path", value)}
+          />
+        </SettingsRow>
+        <SettingsRow label="Panel opacity" description="Lower values make app surfaces more transparent, revealing more wallpaper." last>
+          <OpacityControl
+            value={numberSetting(
+              props.document,
+              "appearance",
+              "panel_opacity",
+              numberSetting(props.document, "appearance", "home_panel_opacity", 0.82),
+            )}
+            disabled={props.working}
+            onCommit={(value) => props.onSettingChange("appearance", "panel_opacity", value)}
           />
         </SettingsRow>
       </SettingsSectionBlock>
@@ -1083,8 +1108,8 @@ function AdvancedSettings(props: SettingsContentProps) {
 
 function SettingsSectionBlock(props: { title: string; children: ReactNode }) {
   return (
-    <section className="mb-3.5 overflow-hidden rounded-lg border border-white/10 bg-[#090b0d] shadow-[0_1px_0_rgba(255,255,255,0.035)_inset]">
-      <h2 className="border-b border-white/[0.08] bg-[#0c0e10] px-7 py-4 text-[11px] font-[760] leading-none tracking-normal text-[#a1a1aa]">{props.title}</h2>
+    <section className="mb-3.5 overflow-hidden rounded-lg border border-white/10 bg-[var(--misty-app-surface-bg,#090b0d)] shadow-[0_1px_0_rgba(255,255,255,0.035)_inset]">
+      <h2 className="border-b border-white/[0.08] bg-[rgba(12,14,16,var(--misty-app-panel-opacity,1))] px-7 py-4 text-[11px] font-[760] leading-none tracking-normal text-[#a1a1aa]">{props.title}</h2>
       {props.children}
     </section>
   );
@@ -1092,12 +1117,12 @@ function SettingsSectionBlock(props: { title: string; children: ReactNode }) {
 
 function SettingsRow(props: { label: string; description: string; children: ReactNode; last?: boolean }) {
   return (
-    <div className={`grid min-h-[68px] grid-cols-[minmax(0,0.52fr)_minmax(220px,0.48fr)] items-center gap-[18px] border-b border-white/[0.08] bg-[#090b0d] px-7 py-3 ${props.last ? "border-b-0" : ""}`}>
+    <div className={`grid min-h-[68px] grid-cols-[minmax(0,0.52fr)_minmax(260px,0.48fr)] items-center gap-[18px] border-b border-white/[0.08] bg-[var(--misty-app-surface-bg,#090b0d)] px-7 py-3 ${props.last ? "border-b-0" : ""}`}>
       <div className="grid min-w-0 gap-1">
         <strong className="text-[15px] font-[620] leading-[1.1] text-[#f4f4f5]">{props.label}</strong>
         <span className="text-[14px] leading-[1.25] text-[#8f8f8f]">{props.description}</span>
       </div>
-      <div className="flex min-w-0 items-center justify-end">{props.children}</div>
+      <div className="flex min-w-0 items-center justify-end overflow-hidden">{props.children}</div>
     </div>
   );
 }
@@ -1150,6 +1175,143 @@ function WorkspaceRootControl(props: {
           Reset
         </button>
       </div>
+    </div>
+  );
+}
+
+function WallpaperControl(props: {
+  value: string;
+  disabled: boolean;
+  onChange: (value: string) => void;
+}) {
+  const pickerAvailable = hasTauriInternals();
+  const chooseWallpaper = async () => {
+    if (!pickerAvailable) return;
+    const selection = await open({
+      title: "Choose App Wallpaper",
+      multiple: false,
+      directory: false,
+      filters: [{
+        name: "Images and videos",
+        extensions: ["apng", "avif", "bmp", "gif", "jpg", "jpeg", "png", "svg", "webp", "m4v", "mov", "mp4", "ogv", "webm"],
+      }],
+    });
+    const path = Array.isArray(selection) ? selection[0] : selection;
+    if (path) props.onChange(path);
+  };
+
+  return (
+    <div className="grid w-full min-w-0 justify-items-end gap-2">
+      <span
+        className={`block w-full min-w-0 max-w-[360px] overflow-hidden text-ellipsis whitespace-nowrap text-right text-[15px] ${props.value ? "text-[#f4f4f5]" : "text-[#8f8f8f]"}`}
+        title={props.value || "None"}
+      >
+        {props.value || "None"}
+      </span>
+      <div className="grid w-full max-w-[360px] grid-cols-2 gap-2">
+        <button
+          type="button"
+          className={`${settingsControlButtonClass} w-full`}
+          disabled={props.disabled || !pickerAvailable}
+          title={pickerAvailable ? "Choose app wallpaper" : "File picker unavailable on this platform"}
+          onClick={() => void chooseWallpaper()}
+        >
+          <Image size={15} />
+          Choose
+        </button>
+        <button
+          type="button"
+          className={`${settingsControlButtonClass} w-full`}
+          disabled={props.disabled || !props.value}
+          onClick={() => props.onChange("")}
+        >
+          Reset
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function OpacityControl(props: {
+  value: number;
+  disabled: boolean;
+  onCommit: (value: number) => void;
+}) {
+  const normalizedValue = clampOpacity(props.value);
+  const [draft, setDraft] = useState(normalizedValue);
+  const draftPercent = Math.round(draft * 100);
+  const thumbLeft = `calc(${draftPercent}% - ${(draftPercent / 100) * 22}px)`;
+
+  useEffect(() => {
+    setDraft(normalizedValue);
+  }, [normalizedValue]);
+
+  const commitDraft = () => {
+    const nextValue = clampOpacity(draft);
+    if (nextValue !== normalizedValue) props.onCommit(nextValue);
+  };
+  const setDraftFromPointer = (event: PointerEvent<HTMLButtonElement>) => {
+    if (props.disabled) return;
+    const rect = event.currentTarget.getBoundingClientRect();
+    const next = rect.width > 0 ? (event.clientX - rect.left) / rect.width : 0;
+    setDraft(clampOpacity(next));
+  };
+  const handlePointerDown = (event: PointerEvent<HTMLButtonElement>) => {
+    event.currentTarget.setPointerCapture(event.pointerId);
+    setDraftFromPointer(event);
+  };
+  const handleKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
+    if (props.disabled) return;
+    const step = event.shiftKey ? 0.1 : 0.01;
+    let nextValue: number | null = null;
+    if (event.key === "ArrowLeft" || event.key === "ArrowDown") nextValue = draft - step;
+    if (event.key === "ArrowRight" || event.key === "ArrowUp") nextValue = draft + step;
+    if (event.key === "Home") nextValue = 0;
+    if (event.key === "End") nextValue = 1;
+    if (nextValue === null) return;
+    event.preventDefault();
+    setDraft(clampOpacity(nextValue));
+  };
+
+  return (
+    <div className="grid w-full min-w-0 max-w-[360px] justify-items-end gap-2">
+      <span className="text-[15px] font-semibold text-[#f4f4f5]">{draftPercent}%</span>
+      <button
+        type="button"
+        className="settings-opacity-range-wrap"
+        disabled={props.disabled}
+        role="slider"
+        aria-label="Panel opacity"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={draftPercent}
+        onBlur={commitDraft}
+        onKeyDown={handleKeyDown}
+        onKeyUp={(event) => {
+          if (event.key.startsWith("Arrow") || event.key === "Home" || event.key === "End") {
+            commitDraft();
+          }
+        }}
+        onPointerDown={handlePointerDown}
+        onPointerMove={(event) => {
+          if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+            setDraftFromPointer(event);
+          }
+        }}
+        onPointerUp={(event) => {
+          if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+            event.currentTarget.releasePointerCapture(event.pointerId);
+          }
+          commitDraft();
+        }}
+      >
+        <div className="settings-opacity-range-track" aria-hidden="true">
+          <span
+            className="settings-opacity-range-thumb"
+            style={{ left: thumbLeft }}
+          />
+        </div>
+      </button>
     </div>
   );
 }
@@ -1330,6 +1492,10 @@ function sectionRecord(document: Record<string, unknown>, section: string): Reco
 function numberSetting(document: Record<string, unknown>, section: string, key: string, fallback: number): number {
   const value = sectionRecord(document, section)[key];
   return typeof value === "number" ? value : fallback;
+}
+
+function clampOpacity(value: number): number {
+  return Math.min(1, Math.max(0, Math.round(value * 100) / 100));
 }
 
 function booleanSetting(document: Record<string, unknown>, section: string, key: string, fallback: boolean): boolean {

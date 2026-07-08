@@ -9,7 +9,7 @@ import {
 import { memo, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import type { DragEvent, MouseEvent, PointerEvent as ReactPointerEvent, ReactNode } from "react";
 import { useShallow } from "zustand/react/shallow";
-import { explorerPrepareOpenItem } from "../../../api/misty";
+import { explorerGenerateImageThumbnail } from "../../../api/misty";
 import type { DirectoryListing, DirectorySizeRecord, FileEntry, FileSyncEndpoint, FileSyncPair } from "../../../api/types";
 import { safeTauriAssetUrl } from "../../../shared/tauri";
 import { selectAppearancePreferences, useSettingsStore } from "../../../stores/useSettingsStore";
@@ -45,7 +45,11 @@ const GRID_ITEM_HEIGHT = 104;
 const GRID_GAP = 8;
 const GRID_PADDING = 14;
 const GRID_OVERSCAN_ROWS = 2;
-const GRID_THUMBNAIL_MAX_BYTES = 32 * 1024 * 1024;
+const GRID_THUMBNAIL_MAX_DIMENSION = 384;
+const GRID_THUMBNAIL_PLACEHOLDER_SIZE = 20;
+const GRID_THUMBNAIL_PLACEHOLDER_MAX_BYTES = 16 * 1024 * 1024;
+const MAX_CONCURRENT_GRID_THUMBNAILS = 3;
+const MAX_CONCURRENT_GRID_THUMBNAIL_PLACEHOLDERS = 1;
 const TABLE_COLUMN_STORAGE_KEY = "misty.explorer.fileTable.columnWidths";
 const TABLE_COLUMN_ORDER_STORAGE_KEY = "misty.explorer.fileTable.columnOrder";
 const emptyEntries: FileEntry[] = [];
@@ -567,7 +571,7 @@ const FileTableRow = memo(function FileTableRow(props: {
   columns: FileTableColumn[];
   hasFillerColumn: boolean;
   selected: boolean;
-  onSelect: FileBrowserProps["onSelect"];
+  onSelect: (entryId: string, event: MouseEvent) => void;
   onOpen: FileBrowserProps["onOpen"];
   onDownload: FileBrowserProps["onDownload"];
   onContextMenu: FileBrowserProps["onContextMenu"];
@@ -590,7 +594,7 @@ const FileTableRow = memo(function FileTableRow(props: {
     <tr
       className={`${fileBrowserStyles.tableRow} ${props.selected ? fileBrowserStyles.tableRowSelected : ""} ${props.inlineEdit ? fileBrowserStyles.tableRowInlineEditing : ""} ${entry.isDeleted ? fileBrowserStyles.tableRowDeleted : ""} ${props.dropTarget ? fileBrowserStyles.tableRowDropTarget : ""} ${props.dragging ? fileBrowserStyles.tableRowDragging : ""}`}
       draggable={!entry.isDeleted}
-      onClick={(event) => props.onSelect(entry.id, event, [])}
+      onClick={(event) => props.onSelect(entry.id, event)}
       onDoubleClick={() => {
         if (!entry.isDeleted) props.onOpen(entry);
       }}
@@ -881,7 +885,7 @@ const FileGridItem = memo(function FileGridItem(props: {
   selected: boolean;
   inlineEdit: ExplorerInlineEditState | null;
   passiveRename: PassiveRenameDraft | null;
-  onSelect: FileBrowserProps["onSelect"];
+  onSelect: (entryId: string, event: MouseEvent) => void;
   onOpen: FileBrowserProps["onOpen"];
   onDownload: FileBrowserProps["onDownload"];
   onContextMenu: FileBrowserProps["onContextMenu"];
@@ -903,7 +907,7 @@ const FileGridItem = memo(function FileGridItem(props: {
       role="button"
       tabIndex={0}
       draggable={!entry.isDeleted}
-      onClick={(event) => props.onSelect(entry.id, event, [])}
+      onClick={(event) => props.onSelect(entry.id, event)}
       onDoubleClick={() => {
         if (!entry.isDeleted) props.onOpen(entry);
       }}
@@ -948,19 +952,20 @@ const FileGridItem = memo(function FileGridItem(props: {
 });
 
 function GridThumbnail(props: { entry: FileEntry; enabled: boolean }) {
-  const thumbnailUrl = useGridThumbnailUrl(props.entry, props.enabled);
+  const { thumbnailUrl, placeholderUrl } = useGridThumbnailUrl(props.entry, props.enabled);
   const [failed, setFailed] = useState(false);
+  const displayUrl = thumbnailUrl ?? placeholderUrl;
 
   useEffect(() => {
     setFailed(false);
-  }, [thumbnailUrl, props.entry.id, props.entry.path]);
+  }, [displayUrl, props.entry.id, props.entry.path]);
 
-  if (thumbnailUrl && !failed) {
+  if (displayUrl && !failed) {
     return (
       <span className={fileBrowserStyles.gridThumb}>
         <img
-          className={fileBrowserStyles.gridThumbImage}
-          src={thumbnailUrl}
+          className={`${fileBrowserStyles.gridThumbImage} ${!thumbnailUrl ? "scale-110 blur-sm opacity-80" : ""}`}
+          src={displayUrl}
           alt=""
           draggable={false}
           loading="lazy"
@@ -978,24 +983,23 @@ function GridThumbnail(props: { entry: FileEntry; enabled: boolean }) {
   );
 }
 
-function useGridThumbnailUrl(entry: FileEntry, enabled: boolean): string | null {
-  const [url, setUrl] = useState<string | null>(null);
+function useGridThumbnailUrl(entry: FileEntry, enabled: boolean): {
+  thumbnailUrl: string | null;
+  placeholderUrl: string | null;
+} {
+  const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null);
+  const [placeholderUrl, setPlaceholderUrl] = useState<string | null>(null);
 
   useEffect(() => {
-    let active = true;
-    setUrl(null);
+    setThumbnailUrl(null);
+    setPlaceholderUrl(null);
     if (!enabled || !gridThumbnailSupported(entry)) return () => undefined;
 
-    void loadGridThumbnailUrl(entry)
-      .then((thumbnailUrl) => {
-        if (active) setUrl(thumbnailUrl);
-      })
-      .catch(() => {
-        if (active) setUrl(null);
-      });
-
+    const cancelPlaceholder = requestGridThumbnailPlaceholder(entry, setPlaceholderUrl);
+    const cancelThumbnail = requestGridThumbnail(entry, GRID_THUMBNAIL_MAX_DIMENSION, setThumbnailUrl);
     return () => {
-      active = false;
+      cancelThumbnail();
+      cancelPlaceholder();
     };
   }, [
     enabled,
@@ -1011,7 +1015,7 @@ function useGridThumbnailUrl(entry: FileEntry, enabled: boolean): string | null 
     entry.sizeBytes,
   ]);
 
-  return url;
+  return { thumbnailUrl, placeholderUrl };
 }
 
 const gridThumbnailImageExtensions = new Set([
@@ -1021,57 +1025,238 @@ const gridThumbnailImageExtensions = new Set([
   "gif",
   "bmp",
   "webp",
-  "avif",
-  "ico",
-  "svg",
+  "tga",
+  "hdr",
+  "pic",
+  "pbm",
+  "pgm",
+  "pnm",
+  "ppm",
+  "psd",
 ]);
+const gridThumbnailPlaceholderExtensions = new Set(["bmp", "ico", "jpeg", "jpg", "png", "webp"]);
 const gridThumbnailUrlCache = new Map<string, string>();
-const gridThumbnailLoadPromises = new Map<string, Promise<string>>();
+const gridThumbnailPlaceholderCache = new Map<string, string>();
+const failedGridThumbnails = new Set<string>();
+const failedGridThumbnailPlaceholders = new Set<string>();
+const gridThumbnailQueue: GridThumbnailJob[] = [];
+const gridThumbnailJobs = new Map<string, GridThumbnailJob>();
+const gridThumbnailPlaceholderQueue: GridThumbnailPlaceholderJob[] = [];
+const gridThumbnailPlaceholderJobs = new Map<string, GridThumbnailPlaceholderJob>();
+let activeGridThumbnailJobs = 0;
+let activeGridThumbnailPlaceholderJobs = 0;
+
+type GridThumbnailSubscriber = (url: string | null) => void;
+
+interface GridThumbnailJob {
+  key: string;
+  entry: FileEntry;
+  maxDimension: number;
+  subscribers: Set<GridThumbnailSubscriber>;
+  processing: boolean;
+}
+
+interface GridThumbnailPlaceholderJob {
+  key: string;
+  entry: FileEntry;
+  subscribers: Set<GridThumbnailSubscriber>;
+  processing: boolean;
+  abortController: AbortController | null;
+}
 
 function gridThumbnailSupported(entry: FileEntry): boolean {
   if (entry.kind === "folder" || entry.kind === "symlink" || entry.isDeleted) return false;
   if (entry.location.kind === "remote_provider") return false;
-  if (entry.sizeBytes != null && entry.sizeBytes > GRID_THUMBNAIL_MAX_BYTES) return false;
   const extension = entry.extension.toLowerCase().replace(/^\./, "");
-  return gridThumbnailImageExtensions.has(extension) || (entry.mimeType ?? "").toLowerCase().startsWith("image/");
+  return gridThumbnailImageExtensions.has(extension);
 }
 
-function gridThumbnailCacheKey(entry: FileEntry): string {
+function gridThumbnailPlaceholderSupported(entry: FileEntry): boolean {
+  if (entry.location.kind !== "local") return false;
+  if (entry.sizeBytes != null && entry.sizeBytes > GRID_THUMBNAIL_PLACEHOLDER_MAX_BYTES) return false;
+  if (typeof document === "undefined" || typeof fetch !== "function" || typeof createImageBitmap !== "function") return false;
+  const extension = entry.extension.toLowerCase().replace(/^\./, "");
+  return gridThumbnailPlaceholderExtensions.has(extension);
+}
+
+function gridThumbnailCacheKey(entry: FileEntry, maxDimension: number): string {
   return [
     entry.path,
     entry.sizeBytes ?? "",
     entry.modifiedMs ?? "",
     entry.remoteModified ?? "",
+    maxDimension,
   ].join("\0");
 }
 
-function loadGridThumbnailUrl(entry: FileEntry): Promise<string> {
-  const key = gridThumbnailCacheKey(entry);
+function requestGridThumbnail(
+  entry: FileEntry,
+  maxDimension: number,
+  subscriber: GridThumbnailSubscriber,
+): () => void {
+  const key = gridThumbnailCacheKey(entry, maxDimension);
   const cached = gridThumbnailUrlCache.get(key);
-  if (cached) return Promise.resolve(cached);
-  const pending = gridThumbnailLoadPromises.get(key);
-  if (pending) return pending;
+  if (cached) {
+    subscriber(cached);
+    return () => undefined;
+  }
+  if (failedGridThumbnails.has(key)) return () => undefined;
 
-  const promise = (async () => {
-    const localPath = entry.location.kind === "remote"
-      ? (await explorerPrepareOpenItem({
-        path: entry.path,
-        sizeBytes: entry.sizeBytes,
-        remoteModified: entry.remoteModified,
-      })).localPath
-      : entry.path;
-    const url = safeTauriAssetUrl(localPath);
-    gridThumbnailUrlCache.set(key, url);
-    return url;
-  })();
+  let job = gridThumbnailJobs.get(key);
+  if (!job) {
+    job = { key, entry, maxDimension, subscribers: new Set(), processing: false };
+    gridThumbnailJobs.set(key, job);
+    gridThumbnailQueue.push(job);
+    processNextGridThumbnail();
+  }
+  job.subscribers.add(subscriber);
 
-  gridThumbnailLoadPromises.set(key, promise);
-  void promise.finally(() => {
-    if (gridThumbnailLoadPromises.get(key) === promise) {
-      gridThumbnailLoadPromises.delete(key);
+  return () => {
+    job?.subscribers.delete(subscriber);
+    if (job && job.subscribers.size === 0 && !job.processing) {
+      removeQueuedGridThumbnailJob(job);
+      gridThumbnailJobs.delete(job.key);
     }
+  };
+}
+
+function requestGridThumbnailPlaceholder(
+  entry: FileEntry,
+  subscriber: GridThumbnailSubscriber,
+): () => void {
+  if (!gridThumbnailPlaceholderSupported(entry)) return () => undefined;
+  const key = gridThumbnailCacheKey(entry, GRID_THUMBNAIL_MAX_DIMENSION);
+  const cachedThumbnail = gridThumbnailUrlCache.get(key);
+  if (cachedThumbnail) return () => undefined;
+  const cachedPlaceholder = gridThumbnailPlaceholderCache.get(key);
+  if (cachedPlaceholder) {
+    subscriber(cachedPlaceholder);
+    return () => undefined;
+  }
+  if (failedGridThumbnailPlaceholders.has(key)) return () => undefined;
+
+  let job = gridThumbnailPlaceholderJobs.get(key);
+  if (!job) {
+    job = { key, entry, subscribers: new Set(), processing: false, abortController: null };
+    gridThumbnailPlaceholderJobs.set(key, job);
+    gridThumbnailPlaceholderQueue.push(job);
+    processNextGridThumbnailPlaceholder();
+  }
+  job.subscribers.add(subscriber);
+
+  return () => {
+    job?.subscribers.delete(subscriber);
+    if (!job || job.subscribers.size > 0) return;
+    if (job.processing) {
+      job.abortController?.abort();
+      return;
+    }
+    removeQueuedGridThumbnailPlaceholderJob(job);
+    gridThumbnailPlaceholderJobs.delete(job.key);
+  };
+}
+
+function processNextGridThumbnail(): void {
+  while (activeGridThumbnailJobs < MAX_CONCURRENT_GRID_THUMBNAILS) {
+    const job = gridThumbnailQueue.shift();
+    if (!job) return;
+    if (gridThumbnailUrlCache.has(job.key) || failedGridThumbnails.has(job.key)) {
+      gridThumbnailJobs.delete(job.key);
+      continue;
+    }
+    job.processing = true;
+    activeGridThumbnailJobs += 1;
+    void explorerGenerateImageThumbnail(job.entry.path, job.maxDimension, {
+      modifiedMs: job.entry.modifiedMs,
+      remoteModified: job.entry.remoteModified,
+      sizeBytes: job.entry.sizeBytes,
+    })
+      .then((payload) => {
+        const url = safeTauriAssetUrl(payload.path);
+        gridThumbnailUrlCache.set(job.key, url);
+        for (const subscriber of job.subscribers) subscriber(url);
+      })
+      .catch(() => {
+        failedGridThumbnails.add(job.key);
+        for (const subscriber of job.subscribers) subscriber(null);
+      })
+      .finally(() => {
+        job.processing = false;
+        activeGridThumbnailJobs -= 1;
+        gridThumbnailJobs.delete(job.key);
+        processNextGridThumbnail();
+      });
+  }
+}
+
+function processNextGridThumbnailPlaceholder(): void {
+  while (activeGridThumbnailPlaceholderJobs < MAX_CONCURRENT_GRID_THUMBNAIL_PLACEHOLDERS) {
+    const job = gridThumbnailPlaceholderQueue.shift();
+    if (!job) return;
+    if (
+      gridThumbnailUrlCache.has(job.key)
+      || gridThumbnailPlaceholderCache.has(job.key)
+      || failedGridThumbnailPlaceholders.has(job.key)
+    ) {
+      gridThumbnailPlaceholderJobs.delete(job.key);
+      continue;
+    }
+    job.processing = true;
+    job.abortController = typeof AbortController === "undefined" ? null : new AbortController();
+    activeGridThumbnailPlaceholderJobs += 1;
+    void createGridThumbnailPlaceholderDataUrl(job.entry, job.abortController?.signal)
+      .then((placeholderUrl) => {
+        if (!placeholderUrl || gridThumbnailUrlCache.has(job.key)) return;
+        gridThumbnailPlaceholderCache.set(job.key, placeholderUrl);
+        for (const subscriber of job.subscribers) subscriber(placeholderUrl);
+      })
+      .catch((error) => {
+        if (!abortError(error)) failedGridThumbnailPlaceholders.add(job.key);
+      })
+      .finally(() => {
+        job.processing = false;
+        job.abortController = null;
+        activeGridThumbnailPlaceholderJobs -= 1;
+        gridThumbnailPlaceholderJobs.delete(job.key);
+        processNextGridThumbnailPlaceholder();
+      });
+  }
+}
+
+async function createGridThumbnailPlaceholderDataUrl(entry: FileEntry, signal: AbortSignal | undefined): Promise<string> {
+  const response = await fetch(safeTauriAssetUrl(entry.path), { signal });
+  if (!response.ok) return "";
+  const blob = await response.blob();
+  const bitmap = await createImageBitmap(blob, {
+    resizeWidth: GRID_THUMBNAIL_PLACEHOLDER_SIZE,
+    resizeHeight: GRID_THUMBNAIL_PLACEHOLDER_SIZE,
+    resizeQuality: "low",
   });
-  return promise;
+  try {
+    const canvas = document.createElement("canvas");
+    canvas.width = GRID_THUMBNAIL_PLACEHOLDER_SIZE;
+    canvas.height = GRID_THUMBNAIL_PLACEHOLDER_SIZE;
+    const context = canvas.getContext("2d");
+    if (!context) return "";
+    context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    return canvas.toDataURL("image/jpeg", 0.35);
+  } finally {
+    bitmap.close();
+  }
+}
+
+function abortError(error: unknown): boolean {
+  return error instanceof DOMException && error.name === "AbortError";
+}
+
+function removeQueuedGridThumbnailJob(job: GridThumbnailJob): void {
+  const index = gridThumbnailQueue.indexOf(job);
+  if (index >= 0) gridThumbnailQueue.splice(index, 1);
+}
+
+function removeQueuedGridThumbnailPlaceholderJob(job: GridThumbnailPlaceholderJob): void {
+  const index = gridThumbnailPlaceholderQueue.indexOf(job);
+  if (index >= 0) gridThumbnailPlaceholderQueue.splice(index, 1);
 }
 
 function isDownloadableRemoteFile(entry: FileEntry): boolean {

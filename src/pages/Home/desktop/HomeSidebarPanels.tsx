@@ -56,7 +56,7 @@ type HomeSidebarPanelsProps = {
 };
 
 const panelClass =
-  "flex min-h-0 min-w-0 flex-col overflow-hidden rounded-2xl border border-white/[0.08] bg-[#090c10]/78 p-3 shadow-xl shadow-black/20";
+  "flex min-h-0 min-w-0 flex-col overflow-hidden rounded-2xl border border-white/[0.08] bg-[rgb(9_12_16_/_var(--misty-app-panel-opacity,0.78))] p-3 shadow-xl shadow-black/20";
 const headerClass =
   "mb-2 flex shrink-0 items-center gap-2 border-b border-white/[0.06] pb-2 text-sm font-semibold text-text";
 const rowClass =

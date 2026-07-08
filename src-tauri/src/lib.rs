@@ -16,16 +16,17 @@ use commands::{
     compare_apply_text_merge, compare_files, compare_folders, devices_snapshot, duplicates_cancel,
     duplicates_hash_remote_candidates, duplicates_scan, explorer_calculate_directory_sizes,
     explorer_create_item, explorer_delete_items, explorer_directory_size_snapshot,
-    explorer_library_record_last_opened, explorer_library_record_recent, explorer_library_set_tags,
-    explorer_library_snapshot, explorer_list_directory, explorer_open_association,
-    explorer_open_path, explorer_open_with, explorer_paste_items, explorer_path_exists,
-    explorer_path_is_directory, explorer_prepare_drag_items, explorer_prepare_open_item,
-    explorer_preview_item, explorer_queue_create_item, explorer_queue_delete_items,
-    explorer_queue_paste_blob, explorer_queue_paste_items, explorer_queue_paste_text,
-    explorer_queue_rename_item, explorer_queue_rename_items, explorer_rename_item,
-    explorer_set_open_association, file_metadata_snapshot, file_sync_apply, file_sync_compare,
-    file_sync_pair_remove, file_sync_pair_save, file_sync_pairs_snapshot, file_tools_checksum,
-    file_tools_chmod, file_tools_create_symlink, file_tools_read_symlink, file_tools_set_readonly,
+    explorer_generate_image_thumbnail, explorer_library_record_last_opened,
+    explorer_library_record_recent, explorer_library_set_tags, explorer_library_snapshot,
+    explorer_list_directory, explorer_open_association, explorer_open_path, explorer_open_with,
+    explorer_paste_items, explorer_path_exists, explorer_path_is_directory,
+    explorer_prepare_drag_items, explorer_prepare_open_item, explorer_preview_item,
+    explorer_queue_create_item, explorer_queue_delete_items, explorer_queue_paste_blob,
+    explorer_queue_paste_items, explorer_queue_paste_text, explorer_queue_rename_item,
+    explorer_queue_rename_items, explorer_rename_item, explorer_set_open_association,
+    file_metadata_snapshot, file_sync_apply, file_sync_compare, file_sync_pair_remove,
+    file_sync_pair_save, file_sync_pairs_snapshot, file_tools_checksum, file_tools_chmod,
+    file_tools_create_symlink, file_tools_read_symlink, file_tools_set_readonly,
     open_terminal_at_path, operation_queue_cancel, operation_queue_cancel_batch,
     operation_queue_clear_terminal, operation_queue_pause, operation_queue_pause_all,
     operation_queue_pause_batch, operation_queue_redo, operation_queue_resolve_conflict,
@@ -72,6 +73,8 @@ pub fn run() {
         .setup(|app| {
             #[cfg(desktop)]
             tray::setup(app).map_err(std::io::Error::other)?;
+            #[cfg(target_os = "macos")]
+            services::devices::start_device_change_listener(app.handle().clone());
             Ok(())
         })
         .on_menu_event(|app, event| {
@@ -158,6 +161,7 @@ pub fn run() {
             explorer_prepare_open_item,
             explorer_prepare_drag_items,
             explorer_preview_item,
+            explorer_generate_image_thumbnail,
             file_metadata_snapshot,
             search_init,
             search_get_status,

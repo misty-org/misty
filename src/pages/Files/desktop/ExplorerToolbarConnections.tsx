@@ -326,9 +326,6 @@ export const ConnectedFileInspector = memo(function ConnectedFileInspector() {
     };
   }));
   const mistyMetadata = selectedEntry ? libraryMetadataForEntry(selectedEntry, library) : { tags: [], comments: "" };
-  const onCalculateSize = useCallback((path: string) => {
-    void useExplorerStore.getState().calculateDirectorySizes([path], { force: false, notify: false });
-  }, []);
   const onOpenEntry = useCallback((entry: FileEntry) => {
     if (!activePaneId) return;
     void useExplorerStore.getState().openEntry(activePaneId, entry);
@@ -344,7 +341,6 @@ export const ConnectedFileInspector = memo(function ConnectedFileInspector() {
       mistyTags={mistyMetadata.tags}
       selectedEntry={selectedEntry}
       selectedCount={selectedCount}
-      onCalculateSize={onCalculateSize}
       onOpenEntry={onOpenEntry}
       onSaveMetadata={onSaveMetadata}
     />
