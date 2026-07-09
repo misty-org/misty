@@ -11,6 +11,7 @@ type Tool = {
   config: string;
   requires?: string[];
   shortConfig?: string;
+  ignorePath?: string;
 };
 
 /** One config lookup for npm, the Rust CLI, and direct task invocation. */
@@ -40,6 +41,7 @@ export function toolCommand(name: string, args: string[], root = toolingRoot) {
     return path;
   };
   const config = configuration(tool.config);
+  const ignorePath = tool.ignorePath ? configuration(tool.ignorePath) : undefined;
   for (const required of tool.requires ?? []) configuration(required);
   // Insert before the positional-only separator; filenames after it stay untouched.
   const separator = args.indexOf("--");
@@ -51,15 +53,26 @@ export function toolCommand(name: string, args: string[], root = toolingRoot) {
         (arg) =>
           arg === "--config" ||
           arg.startsWith("--config=") ||
+          (ignorePath && (arg === "--ignore-path" || arg.startsWith("--ignore-path="))) ||
           (tool.shortConfig &&
             (arg === tool.shortConfig || arg.startsWith(`${tool.shortConfig}=`))),
       )
   ) {
     throw new Error(
-      `Configure ${name} in ${config}; a separate --config override is not supported.`,
+      `Configure ${name} in ${directory}; a separate config or ignore-path override is not supported.`,
     );
   }
-  const toolArgs = [...args.slice(0, split), "--config", config, ...args.slice(split)];
+  // Explicit ignore paths replace Prettier's defaults; retain Git ignores too.
+  const ignoreArgs = ignorePath
+    ? ["--ignore-path", resolve(root, ".gitignore"), "--ignore-path", ignorePath]
+    : [];
+  const toolArgs = [
+    ...args.slice(0, split),
+    "--config",
+    config,
+    ...ignoreArgs,
+    ...args.slice(split),
+  ];
   if (tool.executable) return { program: tool.executable, args: toolArgs, cwd: root };
   if (!tool.package) throw new Error(`No executable or package configured for ${name}.`);
   const require = createRequire(resolve(root, "package.json"));

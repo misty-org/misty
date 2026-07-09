@@ -89,14 +89,16 @@ export default defineConfig(({ command, mode }) => {
   );
   const platformLayoutPath =
     mode === "mobile" || mode === "android"
-      ? new URL("../src/application/platform-layout.mobile.tsx", import.meta.url).pathname
-      : new URL("../src/application/platform-layout.tsx", import.meta.url).pathname;
+      ? new URL("../src/app/platform-layout.mobile.tsx", import.meta.url).pathname
+      : new URL("../src/app/platform-layout.tsx", import.meta.url).pathname;
 
   return {
+    root: resolve(process.cwd(), "src/app"),
+    publicDir: resolve(process.cwd(), "public"),
     envDir: false,
     plugins: [
       appEnvironmentUpdates(process.cwd()),
-      publicSdkDevelopmentUpdates(),
+      publicSdkDevelopmentUpdates(process.cwd()),
       react(),
       tailwindcss(),
       ...(mode === "mobile" || mode === "android" ? [materialIconThemeAssets()] : []),
@@ -138,7 +140,11 @@ export default defineConfig(({ command, mode }) => {
     clearScreen: false,
     // Keep each app runtime separate from other Vite servers and temporary previews.
     // Sharing optimized dependencies can invalidate imports in an already-open webview.
-    cacheDir: resolve(process.cwd(), "node_modules/.vite", `misty-${mode}`),
+    cacheDir: resolve(
+      process.cwd(),
+      "node_modules/.vite",
+      command === "serve" ? `misty-${mode}-${desktopDevPort}` : `misty-${mode}`,
+    ),
     optimizeDeps: {
       // Scan the real app (including its lazy imports), not standalone HTML
       // probes in cli/tasks/. A probe-only unresolved import aborts Vite's scan;
@@ -157,15 +163,17 @@ export default defineConfig(({ command, mode }) => {
           process.cwd(),
           "src/features/browser/workspace/SDKBrowserView.tsx",
         ),
-        "@/application/platform-layout": platformLayoutPath,
+        "@/app/platform-layout": platformLayoutPath,
         "@": new URL("../src", import.meta.url).pathname,
       },
     },
     build: {
+      outDir: resolve(process.cwd(), "dist"),
+      emptyOutDir: true,
       rollupOptions: {
         input: {
-          main: resolve(process.cwd(), "index.html"),
-          companion: resolve(process.cwd(), "companion.html"),
+          main: resolve(process.cwd(), "src/app/index.html"),
+          companion: resolve(process.cwd(), "src/app/companion.html"),
         },
       },
       assetsInlineLimit: 0,

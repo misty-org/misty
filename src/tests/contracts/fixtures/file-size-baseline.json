@@ -1,6 +1,6 @@
 {
-  "src/application/layouts/DesktopLayout/WorkspaceDockTree.tsx": 689,
-  "src/application/layouts/DesktopLayout/index.tsx": 506,
+  "src/app/layouts/DesktopLayout/WorkspaceDockTree.tsx": 689,
+  "src/app/layouts/DesktopLayout/index.tsx": 506,
   "src/features/journal/notes/components/NoteBlockEditor.tsx": 1190,
   "src/features/auth/store/useAuthTokenStore.ts": 559,
   "src/features/browser/workspace/BrowserWorkspace.tsx": 710,

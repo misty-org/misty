@@ -18,7 +18,7 @@ await fs.writeFile(
 import React, {useState} from 'react';
 import {createRoot} from 'react-dom/client';
 import '/src/styles/styles.css';
-import {WorkspaceDockTree} from '/src/application/layouts/DesktopLayout/WorkspaceDockTree';
+import {WorkspaceDockTree} from '/src/app/layouts/DesktopLayout/WorkspaceDockTree';
 import {createDockLeaf, insertDockSplit, useWorkspaceStore} from '/src/features/workspace';
 const tab = id => ({id, surfaceId:'space', groupKey:'space:fixture:journal', instanceKey:id, title:id, route:'/spaces/fixture/notes', sidebarVisible:true, state:{}, createdAt:1, lastFocusedAt:1});
 const a=createDockLeaf([tab('a'),tab('c')]), b=createDockLeaf([tab('b')]);
@@ -52,7 +52,7 @@ try {
         name: "pane-lifecycle-fixtures",
         enforce: "pre",
         async load(id) {
-          if (id === path.join(root, "src/application/layouts/DesktopLayout/WorkspaceSurface.tsx"))
+          if (id === path.join(root, "src/app/layouts/DesktopLayout/WorkspaceSurface.tsx"))
             return `import React from 'react'; export function WorkspaceSurface({tab,active}) {return <iframe title={tab.id} data-surface={tab.id} style={{width:'100%',height:'100%',border:0}} srcDoc={'<body style="background:#191919;color:#e0e0e0;font:20px system-ui"><h1>Browser '+tab.id+'</h1><input aria-label="Draft" placeholder="Keep this draft"><div style="height:1600px">Scroll stays here</div></body>'} onLoad={()=>{window.frameLoads??={};window.frameLoads[tab.id]=(window.frameLoads[tab.id]??0)+1;}}/>}`;
           if (id === path.join(root, "src/features/ai-surface/AiPaneHost.tsx"))
             return (

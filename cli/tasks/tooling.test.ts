@@ -5,6 +5,39 @@ import { join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { test } from "node:test";
 import { toolCommand, toolingRoot } from "./tooling.ts";
+import { getFileInfo } from "prettier";
+
+test("Prettier keeps generated files ignored after relocating its ignore file", async () => {
+  const command = toolCommand("prettier", ["--check", "--", "src/app/entry.ts"]);
+  const ignorePath = command.args.flatMap((arg, index) =>
+    arg === "--ignore-path" ? [command.args[index + 1]] : [],
+  );
+  assert.deepEqual(ignorePath, [
+    resolve(toolingRoot, ".gitignore"),
+    resolve(toolingRoot, ".config/prettierignore"),
+  ]);
+  for (const file of [
+    "dist/entry.js",
+    "packages/sdk/dist/entry.js",
+    "coverage/report.js",
+    "src-tauri/gen/apple/generated.ts",
+    "src/features/extensions/generated/index.ts",
+  ]) {
+    assert.equal(
+      (await getFileInfo(resolve(toolingRoot, file), { ignorePath })).ignored,
+      true,
+      file,
+    );
+  }
+  assert.equal(
+    (await getFileInfo(resolve(toolingRoot, "src/app/entry.ts"), { ignorePath })).ignored,
+    false,
+  );
+  assert.throws(
+    () => toolCommand("prettier", ["--ignore-path=other"]),
+    /override is not supported/,
+  );
+});
 
 function fixture(t, registry = { sample: { executable: "sample", config: "sample.json" } }) {
   const root = mkdtempSync(join(tmpdir(), "misty-tooling-"));

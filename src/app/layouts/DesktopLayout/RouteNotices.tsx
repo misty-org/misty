@@ -1,4 +1,4 @@
-import type { AppNoticeEntry, AppNoticeSource } from "@/application/layouts/model/types";
+import type { AppNoticeEntry, AppNoticeSource } from "@/app/layouts/model/types";
 import type { AppTab } from "@/features/app-shell";
 import { useAppStore } from "@/features/app-shell";
 import { reportSystemError } from "@/features/activity";

@@ -22,7 +22,7 @@ const protectedRoots = [
 
 const allowedSourceRoots = new Set([
   "api",
-  "application",
+  "app",
   "features",
   "native",
   "shared",

@@ -28,6 +28,7 @@ use zeroize::Zeroizing;
 
 #[cfg(any(target_os = "macos", windows))]
 mod capture;
+mod control_advertisement;
 pub mod handoff;
 
 struct Session {
@@ -794,11 +795,7 @@ async fn open_vault(
     let advertise_api = api.clone();
     let advertise_device = device_id.clone();
     let advertise_name = control_device_name(&device_id);
-    tokio::spawn(async move {
-        let _ = advertise_api
-            .advertise_controls(&advertise_device, &advertise_name)
-            .await;
-    });
+    let advertise_status = handle.status.clone();
     let task = tokio::spawn(worker.run());
     let mut status = handle.status.clone();
     let mut presence = handle.presence.clone();
@@ -806,8 +803,16 @@ async fn open_vault(
     let notify_workspace = scope.workspace_id.clone();
     let notify_app = app.clone();
     let notifications = tokio::spawn(async move {
+        let advertisement = control_advertisement::advertise(
+            advertise_status,
+            || advertise_api.advertise_controls(&advertise_device, &advertise_name),
+            std::time::Duration::from_secs(30),
+        );
+        tokio::pin!(advertisement);
+        let mut advertised = false;
         loop {
             let alive = tokio::select! {
+                _ = &mut advertisement, if !advertised => { advertised = true; continue; },
                 result = status.changed() => result.is_ok(),
                 result = presence.changed() => result.is_ok(),
                 result = devices.changed() => result.is_ok(),
@@ -938,6 +943,14 @@ fn control_device_name(device_id: &str) -> String {
     let host = host
         .filter(|v| !v.trim().is_empty())
         .unwrap_or_else(|| std::env::consts::OS.into());
+    // Development profiles are separate sync devices on the same computer.
+    // Advertise their launcher names so the control panel can distinguish them.
+    #[cfg(debug_assertions)]
+    let host = std::env::var("MISTY_DESKTOP_PROFILE")
+        .ok()
+        .filter(|profile| !profile.is_empty())
+        .map(|profile| format!("{profile} · {host}"))
+        .unwrap_or(host);
     format!(
         "{} · {}",
         host.chars().take(32).collect::<String>(),

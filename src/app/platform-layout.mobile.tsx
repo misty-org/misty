@@ -1,10 +1,10 @@
-import type { DesktopNavItem } from "@/application/layouts/model/types";
+import type { DesktopNavItem } from "@/app/layouts/model/types";
 import type { AppTab } from "@/features/app-shell";
-import { DesktopLayout } from "@/application/layouts/DesktopLayout";
+import { MobileLayout } from "@/app/layouts/MobileLayout";
 
 export default function PlatformLayout(props: {
   getRouteId: (pathname: string) => AppTab;
   navItems: DesktopNavItem[];
 }) {
-  return <DesktopLayout {...props} />;
+  return <MobileLayout getRouteId={props.getRouteId} />;
 }

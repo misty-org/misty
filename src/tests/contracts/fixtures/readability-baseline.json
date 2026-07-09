@@ -1,11 +1,11 @@
 {
-  "src/application/layouts/DesktopLayout/ActivityMenu.tsx": [
+  "src/app/layouts/DesktopLayout/ActivityMenu.tsx": [
     {
       "length": 218,
       "hash": "4cdf78067b35b51e"
     }
   ],
-  "src/application/layouts/RootLayout.tsx": [
+  "src/app/layouts/RootLayout.tsx": [
     {
       "length": 308,
       "hash": "5aab0420a6de0452"
