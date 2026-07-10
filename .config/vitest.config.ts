@@ -1,10 +1,4 @@
 import { defineConfig } from "vitest/config";
-import { createRequire } from "node:module";
-import { dirname } from "node:path";
-
-const materialIconThemeDir = dirname(
-  createRequire(import.meta.url).resolve("material-icon-theme/package.json"),
-);
 
 export default defineConfig({
   envDir: false,
@@ -17,7 +11,6 @@ export default defineConfig({
         import.meta.url,
       ).pathname,
       "@": new URL("../src", import.meta.url).pathname,
-      "#material-icon-theme": materialIconThemeDir,
     },
   },
   test: {
