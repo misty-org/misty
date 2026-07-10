@@ -1,15 +1,21 @@
 import {
   Briefcase,
+  Camera,
   ChevronDown,
   Clock3,
   Download,
   ExternalLink,
+  Film,
   FileText,
   Folder,
   HardDrive,
   Home,
+  Headphones,
+  Image,
   Check,
+  Mic2,
   Monitor,
+  Music,
   Pencil,
   PinOff,
   Plus,
@@ -25,7 +31,7 @@ import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { MouseEvent } from "react";
 import { savedSearchesDelete, savedSearchesSave, savedSearchesSnapshot } from "../../../api/misty";
-import type { ExplorerLibrarySnapshot, MountedDevice, ProviderRemote, SavedSearch } from "../../../api/types";
+import type { AndroidAllFilesAccessStatus, ExplorerLibrarySnapshot, FileEntry, MountedDevice, ProviderRemote, SavedSearch } from "../../../api/types";
 import { providerIconForType } from "../../../shared/assets/icons";
 import { AssetIcon } from "../../../shared/components/AssetIcon";
 import { errorText } from "../../../shared/format";
@@ -101,8 +107,39 @@ interface ExplorerSidebarProps {
   onOpenInNewTab: (path: string, title?: string) => void;
   onManageRemotes: () => void;
   onAddRemote: () => void;
+  androidLocal: boolean;
+  androidAllFilesAccess: AndroidAllFilesAccessStatus | null;
+  androidGrantedFolders: FileEntry[];
+  onGrantLocalFolder: (request?: AndroidLocalGrantRequest) => void;
   onUnpinPinnedPath: (path: string) => void;
 }
+
+export interface AndroidLocalGrantRequest {
+  label: string;
+  targetNames: string[];
+  initialDirectory: string;
+  grantedPath?: string;
+}
+
+type QuickAccessItem = {
+  label: string;
+  icon: typeof Folder;
+  path: string;
+  grantRequest?: AndroidLocalGrantRequest;
+};
+
+const androidSuggestedLocalFolders = [
+  { label: "Documents", icon: FileText, initialDirectory: "Documents", targetNames: ["documents"] },
+  { label: "Downloads", icon: Download, initialDirectory: "Download", targetNames: ["download", "downloads"] },
+  { label: "Pictures", icon: Image, initialDirectory: "Pictures", targetNames: ["pictures"] },
+  { label: "Camera", icon: Camera, initialDirectory: "DCIM", targetNames: ["dcim", "camera"] },
+  { label: "Movies", icon: Film, initialDirectory: "Movies", targetNames: ["movies", "videos"] },
+  { label: "Music", icon: Music, initialDirectory: "Music", targetNames: ["music"] },
+  { label: "Recordings", icon: Mic2, initialDirectory: "Recordings", targetNames: ["recordings"] },
+  { label: "Ringtones", icon: Music, initialDirectory: "Ringtones", targetNames: ["ringtones"] },
+  { label: "Audiobooks", icon: Headphones, initialDirectory: "Audiobooks", targetNames: ["audiobooks"] },
+  { label: "Podcasts", icon: Headphones, initialDirectory: "Podcasts", targetNames: ["podcasts"] },
+] satisfies Array<{ label: string; icon: typeof Folder; initialDirectory: string; targetNames: string[] }>;
 
 export const ExplorerSidebar = memo(function ExplorerSidebar(props: ExplorerSidebarProps) {
   const [collapsedSections, setCollapsedSections] = useState<SidebarCollapsedState>(loadSidebarCollapsedState);
@@ -126,15 +163,65 @@ export const ExplorerSidebar = memo(function ExplorerSidebar(props: ExplorerSide
   const workspaceButtonRef = useRef<HTMLButtonElement | null>(null);
   const workspaceMenuRef = useRef<HTMLDivElement | null>(null);
   const quickAccessMenuRef = useRef<HTMLDivElement | null>(null);
-  const quickAccess = useMemo(() => [
-    { label: "Home", icon: Home, path: props.homePath },
-    { label: "Desktop", icon: Monitor, path: `${props.homePath}/Desktop` },
-    { label: "Documents", icon: FileText, path: `${props.homePath}/Documents` },
-    { label: "Downloads", icon: Download, path: `${props.homePath}/Downloads` },
-    { label: "Recent", icon: Clock3, path: "misty://recent" },
-    { label: "Starred", icon: Star, path: "misty://starred" },
-    { label: "Trash", icon: Trash2, path: "misty://trash" },
-  ], [props.homePath]);
+  const quickAccess = useMemo<QuickAccessItem[]>(() => {
+    if (!props.androidLocal) {
+      return [
+        { label: "Home", icon: Home, path: props.homePath },
+        { label: "Desktop", icon: Monitor, path: `${props.homePath}/Desktop` },
+        { label: "Documents", icon: FileText, path: `${props.homePath}/Documents` },
+        { label: "Downloads", icon: Download, path: `${props.homePath}/Downloads` },
+        { label: "Recent", icon: Clock3, path: "misty://recent" },
+        { label: "Starred", icon: Star, path: "misty://starred" },
+        { label: "Trash", icon: Trash2, path: "misty://trash" },
+      ];
+    }
+
+    const storageRoot = props.androidAllFilesAccess?.granted && props.androidAllFilesAccess.storageRoot
+      ? props.androidAllFilesAccess.storageRoot.replace(/\/+$/, "")
+      : null;
+    if (storageRoot) {
+      return [
+        { label: "Local", icon: Folder, path: storageRoot },
+        ...androidSuggestedLocalFolders.map((item) => ({
+          label: item.label,
+          icon: item.icon,
+          path: `${storageRoot}/${item.initialDirectory}`,
+        })),
+        { label: "Recent", icon: Clock3, path: "misty://recent" },
+        { label: "Starred", icon: Star, path: "misty://starred" },
+        { label: "Trash", icon: Trash2, path: "misty://trash" },
+      ];
+    }
+
+    return [
+      {
+        label: "Local",
+        icon: Folder,
+        path: props.homePath,
+        grantRequest: { label: "Local", targetNames: [], initialDirectory: "" },
+      },
+      ...androidSuggestedLocalFolders.map((item) => {
+      const granted = props.androidGrantedFolders.find((folder) =>
+        item.targetNames.includes(normalizeAndroidLocalName(folder.name)),
+      );
+      const path = granted?.path ?? `misty://local/grant/${normalizeAndroidLocalName(item.label)}`;
+      return {
+        label: item.label,
+        icon: item.icon,
+        path,
+        grantRequest: {
+          label: item.label,
+          targetNames: item.targetNames,
+          initialDirectory: item.initialDirectory,
+          grantedPath: granted?.path,
+        },
+      };
+      }),
+      { label: "Recent", icon: Clock3, path: "misty://recent" },
+      { label: "Starred", icon: Star, path: "misty://starred" },
+      { label: "Trash", icon: Trash2, path: "misty://trash" },
+    ];
+  }, [props.androidAllFilesAccess, props.androidGrantedFolders, props.androidLocal, props.homePath]);
   const visiblePinnedPaths = useMemo(
     () => dedupePinnedPathsForQuickAccess(props.pinnedPaths, quickAccess.filter((item) => !quickAccessPathHidden(item.path, hiddenQuickAccessPaths)).map((item) => item.path)),
     [hiddenQuickAccessPaths, props.pinnedPaths, quickAccess],
@@ -393,14 +480,32 @@ export const ExplorerSidebar = memo(function ExplorerSidebar(props: ExplorerSide
           collapsed={collapsedSections.quickAccess}
           onToggle={() => toggleSection("quickAccess")}
           onContextMenu={(event) => openQuickAccessMenu(event, null)}
+          actions={props.androidLocal ? (
+            <button
+              type="button"
+              title="Add local folder"
+              aria-label="Add local folder"
+              className={sidebarStyles.sectionActionButton}
+              onClick={(event) => {
+                event.stopPropagation();
+                props.onGrantLocalFolder();
+              }}
+            >
+              <Plus size={15} />
+            </button>
+          ) : undefined}
         />
         {!collapsedSections.quickAccess ? (
           <div className={sidebarStyles.list}>
             {visibleQuickAccess.map((item) => {
               const Icon = item.icon;
+              const grantedPath = item.grantRequest?.grantedPath;
+              const selected = grantedPath
+                ? props.activePath === grantedPath || props.activePath.startsWith(`${grantedPath}/`)
+                : props.activePath === item.path;
               return (
                 <div
-                  className={`${sidebarStyles.pinnedRow} ${props.activePath === item.path ? sidebarStyles.itemSelected : ""}`}
+                  className={`${sidebarStyles.pinnedRow} ${selected ? sidebarStyles.itemSelected : ""}`}
                   key={`quick:${item.path}`}
                   onContextMenu={(event) => openQuickAccessMenu(event, {
                     kind: "builtIn",
@@ -410,21 +515,43 @@ export const ExplorerSidebar = memo(function ExplorerSidebar(props: ExplorerSide
                 >
                   <button
                     className={sidebarStyles.pinnedButton}
-                    onClick={() => props.onNavigate(item.path)}
-                    title={item.path}
+                    onClick={() => {
+                      if (item.grantRequest) {
+                        props.onGrantLocalFolder(item.grantRequest);
+                      } else {
+                        props.onNavigate(item.path);
+                      }
+                    }}
+                    title={item.grantRequest && !grantedPath ? `Grant access to ${item.label}` : item.path}
                   >
                     <Icon size={20} />
                     <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{item.label}</span>
                   </button>
-                  <button
-                    type="button"
-                    className={sidebarStyles.pinnedUnpinButton}
-                    title={`Unpin ${item.label}`}
-                    aria-label={`Unpin ${item.label} from Quick access`}
-                    onClick={() => setHiddenQuickAccessPaths((paths) => addHiddenQuickAccessPath(paths, item.path))}
-                  >
-                    <PinOff size={15} />
-                  </button>
+                  {item.grantRequest && !grantedPath ? (
+                    <button
+                      type="button"
+                      className={sidebarStyles.pinnedUnpinButton}
+                      title={`Grant access to ${item.label}`}
+                      aria-label={`Grant access to ${item.label}`}
+                      onClick={() => props.onGrantLocalFolder(item.grantRequest)}
+                    >
+                      <Plus size={15} />
+                    </button>
+                  ) : item.grantRequest ? (
+                    <span className={sidebarStyles.pinnedUnpinButton} title={`${item.label} access granted`}>
+                      <Check size={15} />
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      className={sidebarStyles.pinnedUnpinButton}
+                      title={`Unpin ${item.label}`}
+                      aria-label={`Unpin ${item.label} from Quick access`}
+                      onClick={() => setHiddenQuickAccessPaths((paths) => addHiddenQuickAccessPath(paths, item.path))}
+                    >
+                      <PinOff size={15} />
+                    </button>
+                  )}
                 </div>
               );
             })}
@@ -890,3 +1017,7 @@ export const ExplorerSidebar = memo(function ExplorerSidebar(props: ExplorerSide
     </aside>
   );
 });
+
+function normalizeAndroidLocalName(value: string): string {
+  return value.trim().toLowerCase().replace(/[\s_-]+/g, "");
+}

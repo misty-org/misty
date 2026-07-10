@@ -92,8 +92,8 @@ const notificationStyles = {
   stack:
     "pointer-events-none absolute left-1/2 top-[58px] z-30 grid w-[min(360px,calc(100%_-_48px))] -translate-x-1/2 justify-items-center gap-2",
   item:
-    "pointer-events-auto min-h-8 max-w-full overflow-hidden text-ellipsis whitespace-nowrap rounded-[10px] border border-[#525252] bg-[rgba(30, 30, 30, 0.96)] px-[13px] py-[7px] text-[#eeeeee] shadow-[0_14px_32px_rgba(0,0,0,0.35)]",
-  success: "border-[rgba(120, 120, 120, 0.9)] bg-[rgba(49, 49, 49, 0.96)]",
-  error: "border-[rgba(92, 92, 92, 0.9)] bg-[rgba(38, 38, 38, 0.96)]",
-  info: "border-[rgba(82, 82, 82, 0.9)]",
+    "pointer-events-auto min-h-8 max-w-full overflow-hidden text-ellipsis whitespace-nowrap rounded-[10px] border border-[#525252] bg-[#1e1e1e] px-[13px] py-[7px] text-[#eeeeee] shadow-[0_14px_32px_rgba(0,0,0,0.35)]",
+  success: "border-[#787878] bg-[#313131]",
+  error: "border-[#5c5c5c] bg-[#262626]",
+  info: "border-[#525252]",
 } as const;

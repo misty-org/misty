@@ -1,7 +1,14 @@
 {
+  "identifier": "com.misty.mobile",
   "build": {
     "devUrl": "http://10.0.2.2:5173",
-    "beforeDevCommand": "npm run dev:mobile",
-    "beforeBuildCommand": "npm run build:mobile"
+    "beforeDevCommand": "npm run dev:android",
+    "beforeBuildCommand": "npm run build:android"
+  },
+  "bundle": {
+    "android": {
+      "minSdkVersion": 28,
+      "autoIncrementVersionCode": false
+    }
   }
 }

@@ -16,7 +16,9 @@ export class RenderErrorBoundary extends Component<RenderErrorBoundaryProps, Ren
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
-    console.error("Workspace render failed", error, info.componentStack);
+    if (import.meta.env.DEV) {
+      console.error("Workspace render failed", error, info.componentStack);
+    }
     recoverFromHookOrderMismatch(error);
   }
 

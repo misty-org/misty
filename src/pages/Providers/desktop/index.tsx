@@ -186,7 +186,6 @@ const ProvidersPane = memo(function ProvidersPane(props: { workspaceId: string }
     ensureWorkspace,
     load,
     openAddRemote,
-    openReconnectRemote,
     openRepairRemote,
     reloadWorkspaceRemote,
     requestDisconnect,
@@ -206,7 +205,6 @@ const ProvidersPane = memo(function ProvidersPane(props: { workspaceId: string }
     ensureWorkspace: state.ensureWorkspace,
     load: state.load,
     openAddRemote: state.openAddRemote,
-    openReconnectRemote: state.openReconnectRemote,
     openRepairRemote: state.openRepairRemote,
     reloadWorkspaceRemote: state.reloadWorkspaceRemote,
     requestDisconnect: state.requestDisconnect,
@@ -251,7 +249,6 @@ const ProvidersPane = memo(function ProvidersPane(props: { workspaceId: string }
         onRefresh={() => void load(true)}
         onAdd={openAddRemote}
         onSelectRemote={(name) => void selectRemoteInWorkspace(props.workspaceId, name)}
-        onReconnect={openReconnectRemote}
         onRepair={openRepairRemote}
         onDisconnect={requestDisconnect}
       />

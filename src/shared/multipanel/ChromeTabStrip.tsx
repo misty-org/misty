@@ -26,8 +26,8 @@ const chromeTabShellClass = [
   "misty-chrome-tabs-shell",
   "flex h-[46px] min-w-0 overflow-hidden border-b border-transparent",
   "!bg-transparent",
-  "[&_.chrome-tab_.chrome-tab-background>svg_.chrome-tab-geometry]:!fill-[rgb(9_11_14_/_var(--misty-app-tab-opacity,0.14))]",
-  "[&_.chrome-tab[active]_.chrome-tab-background>svg_.chrome-tab-geometry]:!fill-[rgb(20_23_28_/_var(--misty-app-tab-active-opacity,0.28))]",
+  "[&_.chrome-tab_.chrome-tab-background>svg_.chrome-tab-geometry]:!fill-[var(--misty-app-tab-bg,var(--misty-bg-soft))]",
+  "[&_.chrome-tab[active]_.chrome-tab-background>svg_.chrome-tab-geometry]:!fill-[var(--misty-app-tab-active-bg,var(--misty-surface-2))]",
 ].join(" ");
 
 const chromeTabTrayClass = [

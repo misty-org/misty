@@ -5,10 +5,10 @@ import {
   accountSignIn,
   type AccountMeResponse,
 } from "../pages/Account/shared/api";
-import AuthCard from "../pages/Website/pages/Auth/AuthCard";
-import AuthField from "../pages/Website/pages/Auth/AuthField";
-import AuthMessage from "../pages/Website/pages/Auth/AuthMessage";
-import AuthSubmitButton from "../pages/Website/pages/Auth/AuthSubmitButton";
+import AuthCard from "../auth/components/AuthCard";
+import AuthField from "../auth/components/AuthField";
+import AuthMessage from "../auth/components/AuthMessage";
+import AuthSubmitButton from "../auth/components/AuthSubmitButton";
 import type { CurrentLicense } from "../models/setup";
 import { hasTauriInternals } from "../shared/tauri";
 import "../App.css";
@@ -49,7 +49,7 @@ export function WelcomeOnboarding(props: WelcomeOnboardingProps) {
     setError("");
     setWorking(true);
     try {
-      if (!hasTauriInternals()) {
+      if (browserPreviewAuthEnabled()) {
         await props.onSignedIn(browserPreviewUser(email), null);
         return;
       }
@@ -72,7 +72,7 @@ export function WelcomeOnboarding(props: WelcomeOnboardingProps) {
     setError("");
     setWorking(true);
     try {
-      if (!hasTauriInternals()) {
+      if (browserPreviewAuthEnabled()) {
         await props.onSignedIn(browserPreviewUser(email, name), null);
         return;
       }
@@ -273,6 +273,10 @@ function browserPreviewUser(email: string, name = "") {
     name: displayName,
     email: normalizedEmail,
   };
+}
+
+function browserPreviewAuthEnabled(): boolean {
+  return import.meta.env.DEV && !hasTauriInternals();
 }
 
 function licenseFromMe(me: AccountMeResponse): CurrentLicense {

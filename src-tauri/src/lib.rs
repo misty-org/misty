@@ -7,6 +7,11 @@ mod plugins;
 mod runtime;
 mod services;
 
+#[cfg(target_os = "android")]
+use commands::{
+    android_all_files_access_status, android_grant_local_folder,
+    android_open_all_files_access_settings,
+};
 use commands::{
     ai_abort, ai_drain_events, ai_send_message, ai_status, app_environment_snapshot, app_snapshot,
     archive_create, archive_extract, archive_list, claude_abort, claude_drain_events,
@@ -58,29 +63,49 @@ use services::misty::{
 use services::misty_template::{
     build_misty_template, install_misty_template, misty_template_status, restart_misty_app,
 };
+#[cfg(desktop)]
 use services::tray;
+use tauri::Manager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    let builder = tauri::Builder::default()
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_deep_link::init())
+        .plugin(tauri_plugin_document_tree::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_keystore::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_os::init())
-        .manage(MistyRuntime::new())
         .setup(|app| {
+            #[cfg(any(target_os = "ios", target_os = "android"))]
+            let runtime = {
+                let data_root = app
+                    .path()
+                    .app_data_dir()
+                    .ok()
+                    .map(|path| path.join("Misty"));
+                if let Some(root) = &data_root {
+                    services::paths::set_mobile_data_root(root.clone());
+                }
+                MistyRuntime::new_with_data_root(data_root)
+            };
+            #[cfg(not(any(target_os = "ios", target_os = "android")))]
+            let runtime = MistyRuntime::new();
+            app.manage(runtime);
             #[cfg(desktop)]
             tray::setup(app).map_err(std::io::Error::other)?;
             #[cfg(target_os = "macos")]
             services::devices::start_device_change_listener(app.handle().clone());
             Ok(())
-        })
-        .on_menu_event(|app, event| {
-            #[cfg(desktop)]
-            tray::handle_menu_event(app, event.id().as_ref());
-        })
+        });
+
+    #[cfg(desktop)]
+    let builder = builder.on_menu_event(|app, event| {
+        tray::handle_menu_event(app, event.id().as_ref());
+    });
+
+    builder
         .on_window_event(|window, event| {
             #[cfg(desktop)]
             {
@@ -135,9 +160,13 @@ pub fn run() {
             launch_misty,
             restart_misty,
             stop_misty,
+            #[cfg(desktop)]
             scan_local_plugins,
+            #[cfg(desktop)]
             install_plugin_bundle,
+            #[cfg(desktop)]
             set_plugin_enabled,
+            #[cfg(desktop)]
             uninstall_plugin,
             get_misty_process_status,
             open_external_url,
@@ -152,6 +181,12 @@ pub fn run() {
             clipboard_write_file_refs,
             devices_snapshot,
             explorer_list_directory,
+            #[cfg(target_os = "android")]
+            android_grant_local_folder,
+            #[cfg(target_os = "android")]
+            android_all_files_access_status,
+            #[cfg(target_os = "android")]
+            android_open_all_files_access_settings,
             explorer_directory_size_snapshot,
             explorer_calculate_directory_sizes,
             explorer_create_item,
@@ -200,9 +235,13 @@ pub fn run() {
             settings_remove_open_with_association,
             shortcuts_snapshot,
             shortcuts_save,
+            #[cfg(desktop)]
             plugin_commands_snapshot,
+            #[cfg(desktop)]
             plugin_command_run,
+            #[cfg(desktop)]
             plugin_panel_render,
+            #[cfg(desktop)]
             plugin_diagnostics_snapshot,
             providers_snapshot,
             providers_refresh,

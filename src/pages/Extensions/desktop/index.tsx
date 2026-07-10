@@ -1,10 +1,9 @@
 import { useEffect, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
-import { openExternalLink } from "../../../shared/openExternalLink";
-import { PluginBrowser } from "../../Website/pages/Plugins/PluginBrowser";
-import type { PluginBrowserEntry } from "../../Website/pages/Plugins/types";
-import { currentPluginPlatform, pluginRootLabel, usePluginsStore } from "../../../stores/usePluginsStore";
+import { PluginBrowser } from "../components/PluginBrowser";
+import type { PluginBrowserEntry } from "../components/types";
+import { currentPluginPlatform, usePluginsStore } from "../../../stores/usePluginsStore";
 import { useSetupStore } from "../../../stores/useSetupStore";
 import type { PluginEntry } from "../../../models/plugins";
 
@@ -19,14 +18,6 @@ function toBrowserEntry(plugin: PluginEntry): PluginBrowserEntry {
     enabled: plugin.enabled,
     verified: plugin.verified,
     logoSrc: plugin.logo_path,
-    rootLabel: pluginRootLabel(plugin.root),
-    capabilities: plugin.capabilities,
-    whereItAppears: plugin.where_it_appears,
-    permissions: plugin.permissions,
-    gettingStarted: plugin.getting_started,
-    changelog: plugin.changelog,
-    links: plugin.links,
-    launcher: plugin.launcher,
   };
 }
 
@@ -111,9 +102,13 @@ export default function PluginsPage() {
           void installPlugin(match);
         }
       }}
-      onOpenLink={(url) => void openExternalLink(url)}
       onQueryChange={(value) => {
         setQuery(value);
+      }}
+      onRefresh={() => {
+        if (pluginPlatform) {
+          void loadPlugins(pluginPlatform, true);
+        }
       }}
       onSelect={selectPlugin}
       onToggle={(plugin, enabled) => {

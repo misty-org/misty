@@ -1,4 +1,5 @@
 export function titleFromPath(path: string): string {
+  if (path === "misty://local") return "Local";
   if (path === "misty://recent") return "Recent";
   if (path === "misty://starred") return "Starred";
   if (path === "misty://trash") return "Trash";

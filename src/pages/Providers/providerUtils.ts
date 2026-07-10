@@ -100,18 +100,10 @@ export function providerOptionsForConnection(
   workflow: ProviderWorkflow | null,
 ): ProviderWorkflowOption[] {
   if (session.step?.option) return [session.step.option];
-  if (shouldUseOneDriveRepairOptions(session)) {
-    return visibleOneDriveRepairOptions(session.parameters);
+  if (shouldUseOneDriveSetupOptions(session)) {
+    return visibleOneDriveSetupOptions(session.parameters);
   }
   return workflow?.options ?? [];
-}
-
-export function shouldBootstrapOneDriveRepairContinue(session: ProviderConnectionLike): boolean {
-  return shouldUseOneDriveRepairOptions(session) && session.step == null;
-}
-
-export function shouldContinueExistingOneDriveRepair(session: ProviderConnectionLike): boolean {
-  return shouldUseOneDriveRepairOptions(session);
 }
 
 export function isOneDriveProviderType(value: string): boolean {
@@ -119,18 +111,18 @@ export function isOneDriveProviderType(value: string): boolean {
   return normalized.includes("onedrive") || normalized.includes("microsoft365");
 }
 
-function shouldUseOneDriveRepairOptions(session: ProviderConnectionLike): boolean {
-  return session.mode === "repair" && isOneDriveProviderType(session.providerType);
+function shouldUseOneDriveSetupOptions(session: ProviderConnectionLike): boolean {
+  return isOneDriveProviderType(session.providerType);
 }
 
-function visibleOneDriveRepairOptions(parameters: Record<string, string>): ProviderWorkflowOption[] {
+function visibleOneDriveSetupOptions(parameters: Record<string, string>): ProviderWorkflowOption[] {
   const configType = parameters.config_type || "onedrive";
-  const options = oneDriveRepairOptions();
+  const options = oneDriveSetupOptions();
   if (configType === "driveid") return options;
   return options.filter((option) => option.name !== "drive_id" && option.name !== "drive_type");
 }
 
-function oneDriveRepairOptions(): ProviderWorkflowOption[] {
+function oneDriveSetupOptions(): ProviderWorkflowOption[] {
   return [
     {
       name: "config_type",
@@ -142,8 +134,27 @@ function oneDriveRepairOptions(): ProviderWorkflowOption[] {
       choices: [
         { value: "onedrive", help: "OneDrive Personal or Business" },
         { value: "sharepoint", help: "Root SharePoint site" },
+        { value: "driveid", help: "Enter drive ID manually" },
         { value: "search", help: "Search a SharePoint site" },
       ],
+    },
+    {
+      name: "client_id",
+      label: "Client ID",
+      help: "Optional Microsoft OAuth client ID. Leave blank to use rclone's default app.",
+      defaultValue: "",
+      required: false,
+      password: false,
+      choices: [],
+    },
+    {
+      name: "client_secret",
+      label: "Client Secret",
+      help: "Optional Microsoft OAuth client secret. Leave blank to use rclone's default app.",
+      defaultValue: "",
+      required: false,
+      password: true,
+      choices: [],
     },
     {
       name: "drive_id",

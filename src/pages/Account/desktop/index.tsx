@@ -434,7 +434,6 @@ function DiagnosticsPanel() {
       <Section title="Runtime">
         <Row label="Misty server API">{serverBase || "Not set"}</Row>
         <Row label="Server env">{import.meta.env.VITE_MISTY_SERVER_URL || import.meta.env.VITE_API_BASE || "Not set"}</Row>
-        <Row label="Build target">{import.meta.env.VITE_MISTY_TARGET || "unknown"}</Row>
         <Row label="Debug logging">{clientDebugPanelEnabled() ? "Enabled" : "Disabled"}</Row>
       </Section>
 

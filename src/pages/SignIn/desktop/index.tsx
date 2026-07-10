@@ -1,12 +1,21 @@
-import { useSetupStore } from "../../../stores/useSetupStore";
-import WebsiteSignIn from "../../Website/pages/SignIn";
+import { FormEvent, useState } from "react";
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
+import AuthCard from "../../../auth/components/AuthCard";
+import AuthField from "../../../auth/components/AuthField";
+import AuthMessage from "../../../auth/components/AuthMessage";
+import AuthShell from "../../../auth/components/AuthShell";
+import AuthSubmitButton from "../../../auth/components/AuthSubmitButton";
+import { useAuth } from "../../../auth/AuthContext";
 import type { CurrentLicense } from "../../../models/setup";
-import type { MeResponse } from "../../Account/desktop/api";
+import {
+  accountFetchMe,
+  accountSignIn,
+  type AccountMeResponse,
+} from "../../Account/shared/api";
+import { useSetupStore } from "../../../stores/useSetupStore";
 
-function licenseFromMe(me: MeResponse | null): CurrentLicense | null {
-  if (!me) {
-    return null;
-  }
+function licenseFromMe(me: AccountMeResponse | null): CurrentLicense | null {
+  if (!me) return null;
   return {
     tier: me.tier,
     status: me.status,
@@ -18,12 +27,80 @@ function licenseFromMe(me: MeResponse | null): CurrentLicense | null {
 }
 
 export default function SignIn() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { setUser } = useAuth();
   const saveAuthenticatedUser = useSetupStore((state) => state.saveAuthenticatedUser);
+  const from = (location.state as { from?: string } | null)?.from || "/home";
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setError("");
+    setLoading(true);
+
+    try {
+      const user = await accountSignIn(email, password);
+      const me = await accountFetchMe().catch(() => null);
+      await saveAuthenticatedUser(user, licenseFromMe(me));
+      setUser(user);
+      navigate(from, { replace: true });
+    } catch (signInError) {
+      setError(
+        signInError instanceof Error
+          ? signInError.message
+          : "Could not sign in.",
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
 
   return (
-    <WebsiteSignIn
-      onSignedIn={(user, context) =>
-        saveAuthenticatedUser(user, licenseFromMe(context.me))}
-    />
+    <AuthShell title="Welcome back" description="Sign in to your Misty account.">
+      <AuthCard
+        footer={
+          <div className="text-center text-sm text-text-muted">
+            <NavLink to="/register" className="transition hover:text-text">
+              Don&apos;t have an account? Sign up
+            </NavLink>
+          </div>
+        }
+      >
+        <form className="flex flex-col gap-5" onSubmit={handleSubmit}>
+          <AuthField
+            id="signin-email"
+            label="Email"
+            type="email"
+            value={email}
+            autoComplete="email"
+            placeholder="you@example.com"
+            required
+            disabled={loading}
+            onChange={setEmail}
+          />
+          <AuthField
+            id="signin-password"
+            label="Password"
+            type="password"
+            value={password}
+            autoComplete="current-password"
+            placeholder="Password"
+            required
+            disabled={loading}
+            onChange={setPassword}
+          />
+          {error ? <AuthMessage tone="error" message={error} /> : null}
+          <AuthSubmitButton
+            idleLabel="Sign In"
+            loadingLabel="Signing in..."
+            loading={loading}
+          />
+        </form>
+      </AuthCard>
+    </AuthShell>
   );
 }

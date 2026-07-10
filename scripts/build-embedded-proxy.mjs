@@ -73,11 +73,14 @@ function androidEnvironment(target) {
   const sdk =
     process.env.ANDROID_HOME ??
     process.env.ANDROID_SDK_ROOT ??
+    (process.platform === "darwin" && process.env.HOME
+      ? resolve(process.env.HOME, "Library/Android/sdk")
+      : undefined) ??
     (process.env.LOCALAPPDATA
       ? resolve(process.env.LOCALAPPDATA, "Android/Sdk")
       : undefined);
   if (!sdk || !existsSync(sdk)) {
-    throw new Error("Android SDK not found. Set ANDROID_HOME or ANDROID_SDK_ROOT.");
+    throw new Error("Android SDK not found. Install it with Android Studio, or set ANDROID_HOME/ANDROID_SDK_ROOT.");
   }
 
   const ndk = androidNdk(sdk);

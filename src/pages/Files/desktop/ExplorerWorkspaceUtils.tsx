@@ -10,6 +10,7 @@ export function ExplorerBottomBar(props: {
   sidebarVisible: boolean;
   previewVisible: boolean;
   extensionsVisible: boolean;
+  extensionsEnabled?: boolean;
   onToggleSidebar: () => void;
   onTogglePreview: () => void;
   onToggleExtensions: () => void;
@@ -33,14 +34,16 @@ export function ExplorerBottomBar(props: {
         >
           <PanelRight size={15} />
         </button>
-        <button
-          type="button"
-          className={cx(explorerShellStyles.bottomButton, props.extensionsVisible && explorerShellStyles.bottomButtonSelected)}
-          title={props.extensionsVisible ? "Hide extensions" : "Show extensions"}
-          onClick={props.onToggleExtensions}
-        >
-          <Puzzle size={15} />
-        </button>
+        {props.extensionsEnabled !== false ? (
+          <button
+            type="button"
+            className={cx(explorerShellStyles.bottomButton, props.extensionsVisible && explorerShellStyles.bottomButtonSelected)}
+            title={props.extensionsVisible ? "Hide extensions" : "Show extensions"}
+            onClick={props.onToggleExtensions}
+          >
+            <Puzzle size={15} />
+          </button>
+        ) : null}
       </div>
     </footer>
   );
@@ -53,6 +56,7 @@ export function buildExplorerLocationResults(
   remotes: ProviderRemote[],
   library: ExplorerLibrarySnapshot | null,
   workspacePaths: string[],
+  androidLocal = false,
 ): ExplorerLocationResult[] {
   const results: ExplorerLocationResult[] = [];
   const seen = new Set<string>();
@@ -70,11 +74,18 @@ export function buildExplorerLocationResults(
     });
   };
 
-  add("Home", homePath, "Quick");
-  add("Desktop", joinPath(homePath, "Desktop"), "Quick");
-  add("Documents", joinPath(homePath, "Documents"), "Quick");
-  add("Downloads", joinPath(homePath, "Downloads"), "Quick");
-  add("Projects", joinPath(homePath, "Projects"), "Quick");
+  if (androidLocal) {
+    add("Local", homePath, "Quick");
+    add("Recent", "misty://recent", "Quick");
+    add("Starred", "misty://starred", "Quick");
+    add("Trash", "misty://trash", "Quick");
+  } else {
+    add("Home", homePath, "Quick");
+    add("Desktop", joinPath(homePath, "Desktop"), "Quick");
+    add("Documents", joinPath(homePath, "Documents"), "Quick");
+    add("Downloads", joinPath(homePath, "Downloads"), "Quick");
+    add("Projects", joinPath(homePath, "Projects"), "Quick");
+  }
 
   for (const path of pinnedPaths) {
     add(path.split("/").filter(Boolean).pop() || path, path, "Pinned");
@@ -188,10 +199,12 @@ function isAbsolutePath(path: string): boolean {
 }
 
 function normalizedPath(path: string): string {
+  if (path.startsWith("misty://")) return path.replace(/\/+$/, "");
   return path.replace(/\/+$/, "");
 }
 
 function titleFromPath(path: string): string {
+  if (path === "misty://local") return "Local";
   if (path === "misty://recent") return "Recent";
   if (path === "misty://starred") return "Starred";
   if (path === "misty://trash") return "Trash";
