@@ -1060,9 +1060,25 @@ fn transfer_select_columns() -> &'static str {
 
 fn transfer_search_where(search_query: &str) -> &'static str {
     if search_query.is_empty() {
-        return "";
+        return "WHERE NOT (
+            operation_id = 0 AND
+            transfer_type = 'download' AND
+            item_type = 'remote' AND
+            (
+                local_dest_path LIKE '%/.cache/remote-files/%' OR
+                local_dest_path LIKE '%/.cache/remote-open/%'
+            )
+        ) ";
     }
-    "WHERE (
+    "WHERE NOT (
+        operation_id = 0 AND
+        transfer_type = 'download' AND
+        item_type = 'remote' AND
+        (
+            local_dest_path LIKE '%/.cache/remote-files/%' OR
+            local_dest_path LIKE '%/.cache/remote-open/%'
+        )
+    ) AND (
         CAST(id AS TEXT) LIKE ? OR
         CAST(job_id AS TEXT) LIKE ? OR
         ('J-' || CAST(job_id AS TEXT)) LIKE ? OR
@@ -1607,6 +1623,61 @@ mod tests {
         assert_eq!(page.rows[0].remote_source_name, "drive");
         assert_eq!(page.rows[0].error_message, "connection reset");
         assert!(page.rows[0].retryable);
+
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[tokio::test]
+    async fn snapshot_hides_internal_remote_file_cache_downloads() {
+        let (service, root) = test_service("internal-cache-hidden");
+        let mut cache_record = TransferRecord::new(
+            TransferType::Download,
+            TransferItemType::Remote,
+            "thumb.png",
+        );
+        cache_record.remote_source_name = "drive".to_string();
+        cache_record.remote_source_path = "/thumb.png".to_string();
+        cache_record.local_dest_path =
+            "/Users/example/.misty/.cache/remote-files/v1/staging/thumb.png".to_string();
+        let cache_id = service
+            .start_transfer(cache_record)
+            .await
+            .expect("start internal cache transfer");
+        service
+            .fail_transfer(cache_id, "preview failed".to_string())
+            .await
+            .expect("fail internal cache transfer");
+
+        let mut user_record = TransferRecord::new(
+            TransferType::Download,
+            TransferItemType::Remote,
+            "photo.png",
+        );
+        user_record.remote_source_name = "drive".to_string();
+        user_record.remote_source_path = "/photo.png".to_string();
+        user_record.local_dest_path = "/Users/example/Downloads/photo.png".to_string();
+        let user_id = service
+            .start_transfer(user_record)
+            .await
+            .expect("start user transfer");
+
+        let page = service
+            .snapshot(TransferFilter::default())
+            .await
+            .expect("load transfer page");
+        assert_eq!(page.total_count, 1);
+        assert_eq!(page.rows.len(), 1);
+        assert_eq!(page.rows[0].id, user_id);
+
+        let search_page = service
+            .snapshot(TransferFilter {
+                search: Some("thumb".to_string()),
+                ..TransferFilter::default()
+            })
+            .await
+            .expect("search transfer page");
+        assert_eq!(search_page.total_count, 0);
+        assert!(search_page.rows.is_empty());
 
         let _ = fs::remove_dir_all(root);
     }

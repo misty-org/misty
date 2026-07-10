@@ -1,7 +1,12 @@
 use std::{env, path::Path, process::Command};
 
 use serde::{Deserialize, Serialize};
-use tauri::State;
+use tauri::{AppHandle, State};
+
+#[cfg(target_os = "android")]
+use sha2::{Digest, Sha256};
+#[cfg(target_os = "android")]
+use tauri_plugin_document_tree::{DocumentTreeExt, PickTreeRequest};
 
 use crate::core::clipboard::{
     ClipboardImage, ClipboardPayload, ClipboardPayloadKind, SharedClipboardClient,
@@ -263,9 +268,100 @@ pub fn clipboard_write_file_refs(items: Vec<PasteItem>) -> ApiResult<bool> {
 #[tauri::command]
 pub async fn explorer_list_directory(
     request: ListDirectoryRequest,
+    app: AppHandle,
     state: State<'_, MistyRuntime>,
 ) -> ApiResult<DirectoryListing> {
+    #[cfg(target_os = "android")]
+    if state
+        .explorer
+        .is_android_local_virtual_path(request.path.as_deref())
+    {
+        return state
+            .explorer
+            .list_android_local_directory(&app, request)
+            .await;
+    }
     state.explorer.list_directory(request).await
+}
+
+#[cfg(target_os = "android")]
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AndroidGrantedFolder {
+    pub uri: String,
+    pub name: String,
+    pub document_id: String,
+    pub can_write: bool,
+    pub path: String,
+}
+
+#[cfg(target_os = "android")]
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AndroidAllFilesAccessStatus {
+    pub granted: bool,
+    pub can_request: bool,
+    pub storage_root: Option<String>,
+}
+
+#[cfg(target_os = "android")]
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AndroidGrantLocalFolderRequest {
+    pub initial_directory: Option<String>,
+}
+
+#[cfg(target_os = "android")]
+#[tauri::command]
+pub fn android_grant_local_folder(
+    app: AppHandle,
+    request: Option<AndroidGrantLocalFolderRequest>,
+) -> ApiResult<AndroidGrantedFolder> {
+    let folder = app
+        .document_tree()
+        .pick_tree(PickTreeRequest {
+            initial_directory: request.and_then(|value| value.initial_directory),
+        })
+        .map_err(|error| ApiError::Message(error.to_string()))?;
+    let digest = Sha256::digest(folder.uri.as_bytes());
+    let location_id = hex::encode(&digest[..8]);
+    Ok(AndroidGrantedFolder {
+        uri: folder.uri,
+        name: folder.name,
+        document_id: folder.document_id,
+        can_write: folder.can_write,
+        path: format!("misty://local/{location_id}"),
+    })
+}
+
+#[cfg(target_os = "android")]
+#[tauri::command]
+pub fn android_all_files_access_status(app: AppHandle) -> ApiResult<AndroidAllFilesAccessStatus> {
+    let status = app
+        .document_tree()
+        .all_files_access_status()
+        .map_err(|error| ApiError::Message(error.to_string()))?;
+    Ok(AndroidAllFilesAccessStatus {
+        granted: status.granted,
+        can_request: status.can_request,
+        storage_root: status.storage_root,
+    })
+}
+
+#[cfg(target_os = "android")]
+#[tauri::command]
+pub fn android_open_all_files_access_settings(
+    app: AppHandle,
+) -> ApiResult<AndroidAllFilesAccessStatus> {
+    let status = app
+        .document_tree()
+        .open_all_files_access_settings()
+        .map_err(|error| ApiError::Message(error.to_string()))?;
+    Ok(AndroidAllFilesAccessStatus {
+        granted: status.granted,
+        can_request: status.can_request,
+        storage_root: status.storage_root,
+    })
 }
 
 #[tauri::command]

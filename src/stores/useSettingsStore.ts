@@ -54,6 +54,10 @@ export interface GeneralPreferences {
   startupViewIndex: number;
 }
 
+export interface PetPreferences {
+  cloudFolderEnabled: boolean;
+}
+
 export interface ShortcutPreferences {
   customShortcutsEnabled: boolean;
   keymapIndex: number;
@@ -356,6 +360,15 @@ export function selectGeneralPreferences(
     preferredWorkspaceRoot: settingsString(source, "general", "preferred_workspace_root", ""),
     reopenLastSession: settingsBoolean(source, "general", "reopen_last_session", true),
     startupViewIndex: settingsNumber(source, "general", "startup_view_index", 0),
+  };
+}
+
+export function selectPetPreferences(
+  document: Record<string, unknown> | null | undefined,
+): PetPreferences {
+  const source = document ?? {};
+  return {
+    cloudFolderEnabled: settingsBoolean(source, "pets", "cloud_folder_enabled", false),
   };
 }
 

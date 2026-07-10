@@ -404,6 +404,8 @@ impl FileSyncService {
             sources: vec![PasteItem {
                 path: source.absolute_path.clone(),
                 is_directory: source.is_dir,
+                size_bytes: None,
+                remote_modified: None,
             }],
             destination_directory: destination.join(parent).to_string_lossy().to_string(),
             operation: ClipboardOperation::Copy,

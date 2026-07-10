@@ -47,6 +47,7 @@ import { useShallow } from "zustand/react/shallow";
 import { MultiPanelWorkspace } from "../../../shared/multipanel/MultiPanelWorkspace";
 import { hasTauriInternals } from "../../../shared/tauri";
 import { isAndroidBuild } from "../../../platform/buildTarget";
+import { explorerRootForBuild } from "../../../platform/androidStorage";
 import { useAppStore } from "../../../stores/useAppStore";
 import {
   clipboardApplyShared,
@@ -65,6 +66,7 @@ import {
   duplicatesCancel,
   duplicatesHashRemoteCandidates,
   duplicatesScan,
+  explorerListDirectory,
   explorerPreviewItem,
   explorerPrepareDragItems,
   explorerQueueDeleteItems,
@@ -84,9 +86,12 @@ import {
   providersVerifyStart,
   shortcutsSnapshot,
   transfersSnapshot,
+  androidGrantLocalFolder,
+  androidAllFilesAccessStatus,
+  androidOpenAllFilesAccessSettings,
 } from "../../../api/misty";
 import { ExplorerPane } from "../components/ExplorerPane";
-import { ExplorerSidebar } from "../components/ExplorerSidebar";
+import { ExplorerSidebar, type AndroidLocalGrantRequest } from "../components/ExplorerSidebar";
 import { ExplorerPaneToolbarActions, ExplorerToolbar } from "../components/ExplorerToolbar";
 import type { ExplorerLocationResult } from "../components/ExplorerToolbar";
 import { DeepSearchOverlay } from "../components/DeepSearchOverlay";
@@ -107,6 +112,7 @@ import { maxMultiPanelPanes, useMultiPanelStore } from "../../../shared/multipan
 import { ProvidersWorkspacePanel } from "../../Providers/desktop";
 import { useProvidersStore } from "../../../stores/useProvidersStore";
 import type {
+  AndroidAllFilesAccessStatus,
   ClipboardPayload,
   ExplorerLibrarySnapshot,
   FileEntry,
@@ -272,6 +278,8 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
   const pluginCommandsRef = useRef<PluginCommandEntry[]>(emptyPluginCommands);
   const [mountedDevices, setMountedDevices] = useState<MountedDevice[]>(emptyMountedDevices);
   const [devicesLoading, setDevicesLoading] = useState(false);
+  const [androidAllFilesAccess, setAndroidAllFilesAccess] = useState<AndroidAllFilesAccessStatus | null>(null);
+  const [androidGrantedFolders, setAndroidGrantedFolders] = useState<FileEntry[]>([]);
   const [duplicateFinderPaneId, setDuplicateFinderPaneId] = useState<string | null>(null);
   const [compareDialog, setCompareDialog] = useState<CompareDialogSeed | null>(null);
   const [extensionsPanelOpen, setExtensionsPanelOpen] = useState(false);
@@ -286,8 +294,9 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
     selectShortcutPreferences(state.settings?.document),
   ));
   const environmentHomePath = app?.environment.homeDir ?? "/";
-  const homePath = resolvePreferredWorkspaceRoot(preferredWorkspaceRoot, environmentHomePath);
-  const mountRoot = resolveMountRoot(homePath, settingsMountPath || app?.environment.mountPath || ".misty/mnt");
+  const storageHomePath = resolvePreferredWorkspaceRoot(preferredWorkspaceRoot, environmentHomePath);
+  const homePath = explorerRootForBuild(storageHomePath);
+  const mountRoot = resolveMountRoot(storageHomePath, settingsMountPath || app?.environment.mountPath || ".misty/mnt");
   const activePath = useExplorerStore((state) => state.panes[activePaneId]?.listing?.path ?? homePath);
   const activeSelectedPath = useExplorerStore((state) => selectedPathsForPane(state.panes[activePaneId])[0] ?? activePath);
   const activePaneIdRef = useRef(activePaneId);
@@ -299,7 +308,7 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
     [workspacePathSignature],
   );
   const locationResults = useMemo(
-    () => buildExplorerLocationResults(homePath, mountRoot, pinnedPaths, sidebarRemotes, library, workspacePaths),
+    () => buildExplorerLocationResults(homePath, mountRoot, pinnedPaths, sidebarRemotes, library, workspacePaths, isAndroidBuild),
     [homePath, library, mountRoot, pinnedPaths, sidebarRemotes, workspacePaths],
   );
   const workspaceStyle = useMemo(() => ({
@@ -452,6 +461,50 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
       if (showLoading && deviceRefreshMountedRef.current) setDevicesLoading(false);
     }
   }, []);
+
+  const refreshAndroidGrantedFolders = useCallback(async (): Promise<FileEntry[]> => {
+    if (!isAndroidBuild) return [];
+    try {
+      const listing = await explorerListDirectory({ path: homePath, showHidden: false });
+      const folders = listing.entries.filter((entry) => entry.kind === "folder");
+      setAndroidGrantedFolders(folders);
+      return folders;
+    } catch {
+      setAndroidGrantedFolders([]);
+      return [];
+    }
+  }, [homePath]);
+
+  const refreshAndroidAllFilesAccess = useCallback(async (): Promise<AndroidAllFilesAccessStatus | null> => {
+    if (!isAndroidBuild) return null;
+    try {
+      const status = await androidAllFilesAccessStatus();
+      setAndroidAllFilesAccess(status);
+      return status;
+    } catch {
+      setAndroidAllFilesAccess(null);
+      return null;
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!isAndroidBuild) return;
+    void refreshAndroidAllFilesAccess();
+    void refreshAndroidGrantedFolders();
+    const refreshOnFocus = () => {
+      void refreshAndroidAllFilesAccess();
+      void refreshAndroidGrantedFolders();
+    };
+    const refreshOnVisibility = () => {
+      if (document.visibilityState === "visible") refreshOnFocus();
+    };
+    window.addEventListener("focus", refreshOnFocus);
+    document.addEventListener("visibilitychange", refreshOnVisibility);
+    return () => {
+      window.removeEventListener("focus", refreshOnFocus);
+      document.removeEventListener("visibilitychange", refreshOnVisibility);
+    };
+  }, [refreshAndroidAllFilesAccess, refreshAndroidGrantedFolders]);
 
   useEffect(() => {
     deviceRefreshMountedRef.current = true;
@@ -731,6 +784,48 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
     openRemotesTab();
     void useProvidersStore.getState().openAddRemote();
   }, []);
+  const handleGrantLocalFolder = useCallback((request?: AndroidLocalGrantRequest) => {
+    void (async () => {
+      const currentStatus = await refreshAndroidAllFilesAccess();
+      if (!currentStatus?.granted) {
+        try {
+          await androidOpenAllFilesAccessSettings();
+          useExplorerStore.getState().pushNotification("Enable All files access for Misty, then return to continue browsing local files.", "info");
+        } catch (error) {
+          useExplorerStore.getState().pushNotification(`Could not open Android storage settings: ${errorText(error)}`, "error");
+        }
+        return;
+      }
+      const storageRoot = currentStatus.storageRoot?.replace(/\/+$/, "");
+      if (storageRoot) {
+        const paneId = useMultiPanelStore.getState().activePaneId;
+        const targetPath = request?.initialDirectory
+          ? `${storageRoot}/${request.initialDirectory.replace(/^\/+|\/+$/g, "")}`
+          : storageRoot;
+        if (paneId) await useExplorerStore.getState().navigatePane(paneId, targetPath);
+        return;
+      }
+      if (request?.grantedPath) {
+        const paneId = useMultiPanelStore.getState().activePaneId;
+        if (paneId) await useExplorerStore.getState().navigatePane(paneId, request.grantedPath);
+        return;
+      }
+      try {
+        const folder = await androidGrantLocalFolder({
+          initialDirectory: request?.initialDirectory,
+        });
+        await refreshAndroidGrantedFolders();
+        const paneId = useMultiPanelStore.getState().activePaneId;
+        if (paneId) await useExplorerStore.getState().navigatePane(paneId, folder.path || homePath);
+        useExplorerStore.getState().pushNotification(`Added local folder ${folder.name}`, "success");
+      } catch (error) {
+        const message = errorText(error);
+        if (!/cancel/i.test(message)) {
+          useExplorerStore.getState().pushNotification(`Could not add local folder: ${message}`, "error");
+        }
+      }
+    })();
+  }, [homePath, refreshAndroidAllFilesAccess, refreshAndroidGrantedFolders]);
   const explorerSidebar = useMemo(() => (sidebarVisible ? (
     <ExplorerSidebar
       homePath={homePath}
@@ -754,18 +849,25 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
       onOpenInNewTab={openSidebarPathInNewTab}
       onManageRemotes={handleManageRemotes}
       onAddRemote={handleAddRemote}
+      androidLocal={isAndroidBuild}
+      androidAllFilesAccess={androidAllFilesAccess}
+      androidGrantedFolders={androidGrantedFolders}
+      onGrantLocalFolder={handleGrantLocalFolder}
       onUnpinPinnedPath={useExplorerStore.getState().togglePinnedPath}
     />
   ) : undefined), [
     activePath,
     activeWorkspaceId,
     activeWorkspaceTitle,
+    androidAllFilesAccess,
+    androidGrantedFolders,
     devicesLoading,
     handleCreateWorkspace,
     handleDeleteWorkspace,
     handleRenameWorkspace,
     handleSelectWorkspace,
     handleAddRemote,
+    handleGrantLocalFolder,
     handleManageRemotes,
     homePath,
     library,

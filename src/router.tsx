@@ -12,6 +12,7 @@ import ChangelogPage from "./pages/Changelog";
 import ExtensionsPage from "./pages/Extensions";
 import FilesPage from "./pages/Files";
 import HomePage from "./pages/Home";
+import CloudFolderPetOverlay from "./pages/PetOverlay/CloudFolderPetOverlay";
 import ProvidersPage from "./pages/Providers";
 import RegisterPage from "./pages/Register";
 import SettingsPage from "./pages/Settings";
@@ -22,8 +23,8 @@ import {
   MobileLayout,
   type MobileNavItem,
 } from "./layouts/MobileLayout";
-import { RootLayout, useRootLayoutContext } from "./layouts/RootLayout";
-import { detectAppFormFactor, type AppFormFactor } from "./platform/formFactor";
+import { RootLayout } from "./layouts/RootLayout";
+import { detectAppFormFactor, type AppFormFactor, useAppFormFactor } from "./platform/formFactor";
 import { isAndroidBuild, isNativeMobileBuild } from "./platform/buildTarget";
 import type { AppTab } from "./routing/types";
 import {
@@ -52,6 +53,7 @@ const routes = {
   settings: "/settings",
   signIn: "/signin",
   transfers: "/transfers",
+  cloudFolderPet: "/pet/cloud-folder",
 } as const;
 
 const isPhoneBuild = import.meta.env.MODE === "mobile";
@@ -74,7 +76,6 @@ const DesktopLayoutComponent = import.meta.env.MODE === "mobile"
   : lazy(() => import("./layouts/DesktopLayout").then((module) => ({ default: module.DesktopLayout })));
 
 const desktopNavItems = (isPhoneBuild ? [] : [
-  ...(isAndroidBuild ? [] : [
   {
     id: "home",
     label: "Home",
@@ -83,14 +84,8 @@ const desktopNavItems = (isPhoneBuild ? [] : [
     active: (pathname: string) =>
       pathname === routes.home || pathname.startsWith(routes.changelog),
   },
-  ]),
   { id: "files", label: "Files", path: routes.files, icon: Folder },
-  ...(isAndroidBuild ? [
-    { id: "providers", label: "Remotes", path: routes.providers, icon: PlugZap },
-    { id: "transfers", label: "Transfers", path: routes.transfers, icon: ArrowUpDown },
-    { id: "account", label: "Account", path: routes.account, icon: UserCircle },
-    { id: "settings", label: "Settings", path: routes.accountSettings, icon: Settings },
-  ] : [
+  ...(isAndroidBuild ? [] : [
   {
     id: "extensions",
     label: "Extensions",
@@ -138,6 +133,7 @@ export const router = createBrowserRouter([
       />
     ),
     children: [
+      { path: "pet/cloud-folder", element: <CloudFolderPetOverlay /> },
       {
         element: <AppFrameLayout />,
         children: [
@@ -156,7 +152,7 @@ export const router = createBrowserRouter([
                 path: "home",
                 element: (
                   <ResponsiveRoute
-                    desktop={isAndroidBuild ? <Navigate to={routes.files} replace /> : <HomePage />}
+                    desktop={<HomePage />}
                     mobile={<Navigate to={routes.files} replace />}
                   />
                 ),
@@ -183,7 +179,7 @@ export const router = createBrowserRouter([
                 path: "signin",
                 element: (
                   <ResponsiveRoute
-                    desktop={isAndroidBuild ? <Navigate to={routes.accountSignIn} replace /> : <SignInPage />}
+                    desktop={<SignInPage />}
                     mobile={<Navigate to={routes.accountSignIn} replace />}
                   />
                 ),
@@ -192,14 +188,30 @@ export const router = createBrowserRouter([
                 path: "register",
                 element: (
                   <ResponsiveRoute
-                    desktop={isAndroidBuild ? <Navigate to={routes.accountRegister} replace /> : <RegisterPage />}
+                    desktop={<RegisterPage />}
                     mobile={<Navigate to={routes.accountRegister} replace />}
                   />
                 ),
               },
               { path: "account", element: <AccountPage /> },
-              { path: "account/signin", element: <AccountPage /> },
-              { path: "account/register", element: <AccountPage /> },
+              {
+                path: "account/signin",
+                element: (
+                  <ResponsiveRoute
+                    desktop={<Navigate to={routes.signIn} replace />}
+                    mobile={<AccountPage />}
+                  />
+                ),
+              },
+              {
+                path: "account/register",
+                element: (
+                  <ResponsiveRoute
+                    desktop={<Navigate to={routes.register} replace />}
+                    mobile={<AccountPage />}
+                  />
+                ),
+              },
               { path: "account/settings", element: <SettingsPage /> },
             ],
           },
@@ -234,7 +246,7 @@ export function AppRouter() {
 }
 
 function AppFrameLayout() {
-  const { formFactor } = useRootLayoutContext();
+  const formFactor = useAppFormFactor();
   return formFactor === "mobile" ? (
     <MobileLayout
       getRouteId={mobileRouteIdFromPath}
@@ -256,7 +268,7 @@ function AppPagesLayout() {
   const refreshLocalAccessToken = useSetupStore(
     (state) => state.refreshLocalAccessToken,
   );
-  const { formFactor } = useRootLayoutContext();
+  const formFactor = useAppFormFactor();
 
   useEffect(() => {
     const match = [...appPageTitles.keys()]
@@ -288,7 +300,7 @@ function AppPagesLayout() {
 }
 
 function StartupRedirect() {
-  const { formFactor } = useRootLayoutContext();
+  const formFactor = useAppFormFactor();
   return formFactor === "mobile" ? (
     <MobileStartupRedirect />
   ) : (
@@ -315,9 +327,7 @@ function DesktopStartupRedirect() {
 
   const target = isRememberableAppRoute(lastAppRoute)
     ? lastAppRoute
-    : isAndroidBuild
-      ? routes.files
-      : routes.home;
+    : routes.home;
 
   return <Navigate to={target} replace />;
 }
@@ -340,7 +350,7 @@ function ResponsiveRoute(props: {
   desktop: JSX.Element | null;
   mobile: JSX.Element | null;
 }) {
-  const { formFactor } = useRootLayoutContext();
+  const formFactor = useAppFormFactor();
   return formFactor === "mobile" ? props.mobile : props.desktop;
 }
 

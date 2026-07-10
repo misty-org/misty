@@ -1175,7 +1175,12 @@ export function MobileFilesPage() {
     try {
       const destinationDirectory = chooseMobileDownloadDirectory(rootPath);
       const request = {
-        sources: downloadable.map((entry) => ({ path: entry.path, isDirectory: entry.kind === "folder" })),
+        sources: downloadable.map((entry) => ({
+          path: entry.path,
+          isDirectory: entry.kind === "folder",
+          sizeBytes: entry.sizeBytes,
+          remoteModified: entry.remoteModified,
+        })),
         destinationDirectory,
         operation: "copy",
       } as const;

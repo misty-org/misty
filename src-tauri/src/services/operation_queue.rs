@@ -974,6 +974,8 @@ impl OperationQueueService {
                     sources: vec![PasteItem {
                         path: current_path,
                         is_directory,
+                        size_bytes: None,
+                        remote_modified: None,
                     }],
                     destination_directory: original_parent,
                     operation: ClipboardOperation::Move,
@@ -1002,6 +1004,8 @@ impl OperationQueueService {
             sources: vec![PasteItem {
                 path: row.local_dest_path.clone(),
                 is_directory,
+                size_bytes: None,
+                remote_modified: None,
             }],
             destination_directory: original_parent,
             operation: ClipboardOperation::Move,
@@ -1074,6 +1078,8 @@ impl OperationQueueService {
             sources: vec![PasteItem {
                 path: row.local_source_path.clone(),
                 is_directory,
+                size_bytes: None,
+                remote_modified: None,
             }],
             destination_directory,
             operation: ClipboardOperation::Copy,
@@ -1112,6 +1118,8 @@ impl OperationQueueService {
             sources: vec![PasteItem {
                 path: source_path,
                 is_directory,
+                size_bytes: None,
+                remote_modified: None,
             }],
             destination_directory,
             operation: ClipboardOperation::Copy,
@@ -1167,6 +1175,8 @@ impl OperationQueueService {
             sources: vec![PasteItem {
                 path: source_path,
                 is_directory,
+                size_bytes: None,
+                remote_modified: None,
             }],
             destination_directory,
             operation,
@@ -1353,6 +1363,8 @@ impl OperationQueueService {
                     sources: vec![PasteItem {
                         path: current_path,
                         is_directory,
+                        size_bytes: None,
+                        remote_modified: None,
                     }],
                     destination_directory: redone_parent,
                     operation: ClipboardOperation::Move,
@@ -1381,6 +1393,8 @@ impl OperationQueueService {
             sources: vec![PasteItem {
                 path: row.local_source_path.clone(),
                 is_directory,
+                size_bytes: None,
+                remote_modified: None,
             }],
             destination_directory: redone_parent,
             operation: ClipboardOperation::Move,
@@ -2237,6 +2251,8 @@ mod tests {
             sources: vec![PasteItem {
                 path: "/tmp/current-name.txt".to_string(),
                 is_directory: false,
+                size_bytes: None,
+                remote_modified: None,
             }],
             destination_directory: "/tmp/original-parent".to_string(),
             operation: ClipboardOperation::Move,
@@ -3135,6 +3151,8 @@ mod tests {
                     sources: vec![PasteItem {
                         path: sync_source.to_string_lossy().to_string(),
                         is_directory: false,
+                        size_bytes: None,
+                        remote_modified: None,
                     }],
                     destination_directory: sync_dest_dir.to_string_lossy().to_string(),
                     operation: ClipboardOperation::Copy,
@@ -3338,6 +3356,8 @@ mod tests {
                 sources: vec![PasteItem {
                     path: source.to_string_lossy().to_string(),
                     is_directory: true,
+                    size_bytes: None,
+                    remote_modified: None,
                 }],
                 destination_directory: destination.to_string_lossy().to_string(),
                 operation: ClipboardOperation::Copy,

@@ -2,7 +2,7 @@ import { create } from "zustand";
 import { readText, writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { open } from "@tauri-apps/plugin-dialog";
 import { hasTauriInternals } from "../shared/tauri";
-import { isNativeMobileBuild } from "../platform/buildTarget";
+import { isAndroidBuild, isNativeMobileBuild } from "../platform/buildTarget";
 import { useAppStore } from "./useAppStore";
 import {
   clipboardNativeFileRefs,
@@ -49,6 +49,7 @@ import type {
   NativeWorkspaceDocument,
   NativeWorkspaceExplorerSnapshot,
   PasteItem,
+  PreparedOpenItem,
   TransferRecord,
 } from "../api/types";
 import { errorText, userFacingErrorText } from "../shared/format";
@@ -63,6 +64,7 @@ import {
 import { useOperationQueueStore } from "./useOperationQueueStore";
 import { useTransfersStore } from "./useTransfersStore";
 import { clipboardImagePng } from "../pages/Files/utils/clipboardImage";
+import { publishCloudFolderPetNotification } from "../pets/cloudFolderPet";
 
 export type ExplorerViewMode = "list" | "grid";
 export type ExplorerCommandQueryMode = "search" | "filter";
@@ -583,8 +585,9 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
       const multi = useMultiPanelStore.getState();
       const tab = multi.tabs.find((candidate) => candidate.panes.some((pane) => pane.id === paneId));
       const pane = tab?.panes.find((candidate) => candidate.id === paneId);
-      if (pane?.path !== listing.path || pane?.title !== titleFromPath(listing.path)) {
-        multi.updateActiveTabPath(paneId, listing.path, titleFromPath(listing.path));
+      const listingTitle = listing.title?.trim() || titleFromPath(listing.path);
+      if (pane?.path !== listing.path || pane?.title !== listingTitle) {
+        multi.updateActiveTabPath(paneId, listing.path, listingTitle);
       }
       set((state) => {
         const currentPane = state.panes[paneId] ?? emptyPaneState();
@@ -900,10 +903,8 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
     }
     try {
       set({ operationError: null });
-      if (isRemoteFile) {
-        get().pushNotification(`Downloading ${entry.name}...`, "info", 2500, false);
-      }
-      const localPath = await localPathForEntry(entry);
+      const prepared = await preparedOpenItemForEntry(entry);
+      const localPath = prepared.localPath;
       const applicationPath = await associationForPath(entry.path);
       if (applicationPath) {
         await explorerOpenWith(applicationPath, localPath);
@@ -911,7 +912,13 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
         await explorerOpenPath(localPath);
       }
       if (isRemoteFile) {
-        get().pushNotification(`Downloaded ${entry.name}`, "success", 2200, false);
+        const cacheHit = prepared.cacheHit ?? prepared.cached;
+        get().pushNotification(
+          cacheHit ? `Opened ${entry.name} from cache` : `Downloaded ${entry.name}`,
+          cacheHit ? "info" : "success",
+          2200,
+          false,
+        );
       }
       void get().recordLibraryRecent(entry);
     } catch (error) {
@@ -1459,6 +1466,7 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
         : state.notificationHistory,
     }));
     void publishDesktopNotification(notification, showDesktop);
+    void publishCloudFolderPetNotification(notification);
     if (playSound) {
       playNotificationSound(type);
     }
@@ -1515,7 +1523,7 @@ export function selectedEntriesForPane(pane: PaneExplorerState | undefined): Fil
 function selectedRemotePasteItemsForPane(pane: PaneExplorerState | undefined): PasteItem[] {
   return selectedEntriesForPane(pane)
     .filter((entry) => !entry.isDeleted && entry.location.kind === "remote")
-    .map((entry) => ({ path: entry.path, isDirectory: entry.kind === "folder" }));
+    .map(pasteItemForEntry);
 }
 
 function arraysEqual(left: readonly string[], right: readonly string[]): boolean {
@@ -1816,7 +1824,16 @@ export function selectedPasteItemsForPane(pane: PaneExplorerState | undefined): 
   const selected = new Set(pane.selectedIds);
   return pane.listing.entries
     .filter((entry) => selected.has(entry.id) && isFileMasterEntry(entry))
-    .map((entry) => ({ path: entry.path, isDirectory: entry.kind === "folder" }));
+    .map(pasteItemForEntry);
+}
+
+function pasteItemForEntry(entry: FileEntry): PasteItem {
+  return {
+    path: entry.path,
+    isDirectory: entry.kind === "folder",
+    sizeBytes: entry.sizeBytes,
+    remoteModified: entry.remoteModified,
+  };
 }
 
 function isFileMasterEntry(entry: FileEntry): boolean {
@@ -1843,12 +1860,24 @@ function deleteQueuedMessage(count: number, permanent: boolean): string {
 }
 
 async function localPathForEntry(entry: FileEntry): Promise<string> {
-  if (entry.location.kind === "local") return entry.path;
-  return (await explorerPrepareOpenItem({
+  return (await preparedOpenItemForEntry(entry)).localPath;
+}
+
+async function preparedOpenItemForEntry(entry: FileEntry): Promise<PreparedOpenItem> {
+  if (entry.location.kind === "local") {
+    return {
+      localPath: entry.path,
+      cached: true,
+      sourcePath: null,
+      cachePath: null,
+      cacheHit: true,
+    };
+  }
+  return explorerPrepareOpenItem({
     path: entry.path,
     sizeBytes: entry.sizeBytes,
     remoteModified: entry.remoteModified,
-  })).localPath;
+  });
 }
 
 async function associationForPath(filePath: string): Promise<string | null> {
@@ -2263,6 +2292,7 @@ function directoryListingsEqual(left: DirectoryListing, right: DirectoryListing)
   if (left === right) return true;
   if (
     left.path !== right.path
+    || left.title !== right.title
     || left.parentPath !== right.parentPath
     || left.totalCount !== right.totalCount
     || left.hiddenCount !== right.hiddenCount
@@ -2302,10 +2332,11 @@ function fileEntriesEqual(left: FileEntry, right: FileEntry): boolean {
 }
 
 function samePath(left: string, right: string): boolean {
-  return left.replace(/\/+$/, "") === right.replace(/\/+$/, "");
+  return normalizedPath(left) === normalizedPath(right);
 }
 
 function normalizedPath(path: string): string {
+  if (path.startsWith("misty://")) return path.replace(/\/+$/, "");
   const normalized = path.replace(/\/+$/, "");
   return normalized || "/";
 }
@@ -2982,8 +3013,11 @@ function parsePaneRestoreState(value: string | undefined, fallbackPath: string):
 } {
   try {
     const parsed = JSON.parse(value || "{}") as Record<string, unknown>;
+    const restoredPath = typeof parsed.current_path === "string" && parsed.current_path
+      ? parsed.current_path
+      : fallbackPath;
     return {
-      path: typeof parsed.current_path === "string" && parsed.current_path ? parsed.current_path : fallbackPath,
+      path: isAndroidBuild && !restoredPath.startsWith("misty://") ? fallbackPath : restoredPath,
       showHidden: parsed.show_hidden === true,
       gridView: parsed.grid_view === true,
       sort: parseSortState(parsed.sort_column, parsed.sort_direction),
@@ -3065,9 +3099,11 @@ function clampRatio(value: number): number {
 }
 
 function titleFromPath(path: string): string {
+  if (path.startsWith("misty://local/")) return "Local";
   if (path === "misty://recent") return "Recent";
   if (path === "misty://starred") return "Starred";
   if (path === "misty://trash") return "Trash";
+  if (path === "misty://local") return "Local";
   const clean = path.replace(/\/+$/, "");
   return clean.split("/").filter(Boolean).pop() || clean || "Home";
 }

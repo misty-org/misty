@@ -12,7 +12,8 @@ Focus: Android Studio, Tauri Android, Google Play build readiness, Play-safe met
 - Display name: `Misty`.
 - Version: `0.1.0`.
 - Version code: `1000` (Tauri mapping for `0.1.0`).
-- Packaged permissions: `android.permission.INTERNET` plus Android's app-private dynamic-receiver permission; no runtime prompt is required.
+- Packaged permissions: `android.permission.INTERNET`, Android's app-private dynamic-receiver permission, and `android.permission.MANAGE_EXTERNAL_STORAGE` for Misty's Android file-manager workflow.
+- Android local files: Misty requests Android's **All files access** special app access. This is intentional because the product's core purpose is browsing, organizing, transferring, and syncing user files across local and remote storage. Without this permission, Android 11+ blocks root shared storage and the root `Download` directory from directory grants, which breaks the expected tablet/ChromeOS file-manager UX.
 - Deep link scheme: `misty`.
 - Release cleartext traffic: disabled through `usesCleartextTraffic=false`.
 - Debug cleartext traffic: enabled for the Vite dev server.
@@ -47,6 +48,15 @@ Physical Android device dev run:
 npm run tauri:android:device -- --target=android-arm64
 ```
 
+To exercise the account flow against a local account server, proxy it through the
+development server. This is only for a local debug run; do not put a LAN URL in
+an Android release environment:
+
+```sh
+MISTY_ANDROID_ACCOUNT_API_PROXY=http://127.0.0.1:8081 \
+  npm run tauri:android:device -- --target=android-arm64
+```
+
 Before the first device run, enable **Developer options** and **USB debugging** on the Android device, connect it by USB, unlock it, and accept the RSA-debugging prompt. Confirm the connection with:
 
 ```sh
@@ -57,7 +67,7 @@ The device should show `device`, not `unauthorized`. The command above builds an
 
 The Play-installed build and the locally debug-signed build use the same application ID. Android will reject an in-place debug install because their signing certificates differ, so uninstall the Play test copy from the development device before running the command. Reinstall the Play version afterward through its testing link when needed.
 
-The device command selects one authorized physical device and refuses to fall back to an emulator. When several physical devices are attached, specify the serial shown by `adb devices`:
+The device command selects one authorized physical device through ADB, refuses to fall back to an emulator, and uses the Mac's LAN address for Vite. When several physical devices are attached, specify the serial shown by `adb devices`:
 
 ```sh
 npm run tauri:android:device -- --target=android-arm64 --device-id=<serial>
@@ -68,6 +78,7 @@ npm run tauri:android:device -- --target=android-arm64 --device-id=<serial>
 - Android phones use Misty's mobile page components.
 - Android tablets and ChromeOS windows use the same desktop layout and desktop page components as Misty desktop when both viewport dimensions are at least 600dp.
 - Extensions remain unavailable on Android. The Android desktop-style navigation includes Files, Remotes, Transfers, Account, and Settings, but does not expose Extensions.
+- Local file access on Android tablets/ChromeOS uses All files access when enabled, mapping common folders such as `Download`, `Documents`, `Pictures`, `Movies`, `Music`, `Recordings`, and `Ringtones` to shared storage paths under Android's external storage root. If access is not enabled, Misty opens Android's special app access settings for the user to grant it.
 
 Debug APK:
 
@@ -126,6 +137,17 @@ Validated QA-signed release artifacts:
 These two artifacts use a disposable local QA certificate and must not be uploaded. Re-run the release command with the real upload keystore variables to produce the Play artifact.
 
 The Google Play package includes six raw emulator captures, six no-alpha upload-ready screenshots, metadata drafts, review notes, release scripts, validation logs, and the reports in this folder. A signed AAB is added only after the upload keystore variables are supplied.
+
+## Google Play All Files Access Declaration
+
+Misty intentionally declares `MANAGE_EXTERNAL_STORAGE`. This increases Play review risk and requires the Permissions Declaration Form in Play Console.
+
+Suggested declaration framing:
+
+- Category: file management / document management.
+- Core functionality: Misty lets users browse, organize, transfer, and sync local files with configured remote storage providers from a tablet or ChromeOS device.
+- Why SAF alone is insufficient: Android 11+ prevents directory grants for shared-storage roots and the root `Download` directory. Misty's core local file manager cannot provide desktop-equivalent browsing, transfers, and sync workflows through one-folder-at-a-time grants without breaking expected user workflows.
+- Privacy mitigation: Misty uses the permission only for user-initiated local file browsing and file operations. Account tokens remain in Android Keystore-backed storage. Extension/plugin execution is not shipped on Android. The app does not sell files, credentials, or account data, and Android builds avoid purchase or external-payment prompts.
 
 ## Remaining External Inputs
 

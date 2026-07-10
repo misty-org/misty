@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-release-tree"
+description = "Enables the release_tree command without any pre-configured scope."
+commands.allow = ["release_tree"]
+
+[[permission]]
+identifier = "deny-release-tree"
+description = "Denies the release_tree command without any pre-configured scope."
+commands.deny = ["release_tree"]

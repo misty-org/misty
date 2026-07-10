@@ -49,6 +49,7 @@ type HomeSidebarPanelsProps = {
   quickAccessItems: HomeQuickAccessItem[];
   remotes: ProviderRemote[];
   remotesLoading: boolean;
+  petPanel: ReactNode;
   smartFolders: HomeSmartFolderItem[];
   smartFoldersLoading: boolean;
   tags: HomeTagItem[];
@@ -72,8 +73,11 @@ export function HomeSidebarPanels(props: HomeSidebarPanelsProps) {
         <div className="min-h-fit flex-[3_1_auto]">
           {props.workspacePanel}
         </div>
+        <div className="min-h-fit flex-[1_1_auto]">
+          {props.petPanel}
+        </div>
         <SidebarPanel
-          className="flex-[3_1_auto]"
+          className="flex-[2_1_auto]"
           icon={<HardDrive className="h-4 w-4" />}
           title="Devices"
         >
@@ -251,8 +255,14 @@ export function HomeSidebarPanels(props: HomeSidebarPanelsProps) {
 export function buildHomeQuickAccessItems(
   homePath: string,
   pinnedPaths: string[],
+  androidLocal = false,
 ): HomeQuickAccessItem[] {
-  const quickItems: HomeQuickAccessItem[] = [
+  const quickItems: HomeQuickAccessItem[] = androidLocal ? [
+    { id: "quick:local", icon: "folder", label: "Local", path: homePath },
+    { id: "quick:recent", icon: "recent", label: "Recent", path: "misty://recent" },
+    { id: "quick:starred", icon: "starred", label: "Starred", path: "misty://starred" },
+    { id: "quick:trash", icon: "trash", label: "Trash", path: "misty://trash" },
+  ] : [
     { id: "quick:home", icon: "home", label: "Home", path: homePath },
     { id: "quick:desktop", icon: "desktop", label: "Desktop", path: joinPath(homePath, "Desktop") },
     { id: "quick:documents", icon: "documents", label: "Documents", path: joinPath(homePath, "Documents") },
@@ -357,6 +367,7 @@ function QuickAccessIcon({ icon }: { icon: HomeQuickAccessItem["icon"] }) {
 
 function normalizePanelPath(path: string): string {
   const trimmed = path.trim();
+  if (trimmed.startsWith("misty://")) return trimmed.replace(/\/+$/, "");
   const normalized = trimmed.replace(/\/+$/, "");
   return normalized || (trimmed === "/" ? "/" : "");
 }

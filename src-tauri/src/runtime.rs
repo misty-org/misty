@@ -2,6 +2,8 @@ use std::{path::PathBuf, sync::Arc};
 
 use crate::core::clipboard::{ClipboardService, SharedClipboardClient};
 use crate::core::file_sync::FileSyncPairStore;
+#[cfg(desktop)]
+use crate::services::plugin_commands::PluginCommandService;
 use crate::services::{
     ai::AiService, claude::ClaudeService, commands::CommandService, devices::DeviceService,
     directory_size::DirectorySizeService, environment::AppEnvironmentService,
@@ -12,8 +14,6 @@ use crate::services::{
     search::SearchService, settings::SettingsService, transfers::TransferService,
     workspaces::WorkspaceService,
 };
-#[cfg(desktop)]
-use crate::services::plugin_commands::PluginCommandService;
 
 pub struct MistyRuntime {
     pub environment: AppEnvironmentService,

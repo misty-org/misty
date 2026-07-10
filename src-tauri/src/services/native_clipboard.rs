@@ -32,6 +32,8 @@ pub fn native_clipboard_file_refs() -> ApiResult<Vec<PasteItem>> {
                                 PasteItem {
                                     is_directory: path.is_dir(),
                                     path: path.to_string_lossy().into_owned(),
+                                    size_bytes: None,
+                                    remote_modified: None,
                                 }
                             })
                         })
