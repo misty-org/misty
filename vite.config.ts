@@ -1,17 +1,11 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
-import path from "node:path";
 
 const tauriDevHost = process.env.TAURI_DEV_HOST;
 const desktopDevPort = Number(process.env.MISTY_DESKTOP_DEV_PORT ?? 5173);
 
 export default defineConfig({
-  resolve: {
-    alias: {
-      "@website": path.resolve(__dirname, "src/pages/Website"),
-    },
-  },
   plugins: [react(), tailwindcss()],
   clearScreen: false,
   build: {
@@ -22,7 +16,7 @@ export default defineConfig({
     port: desktopDevPort,
     strictPort: true,
     watch: {
-      ignored: ["**/dist/**", "**/dist-web/**", "**/src-tauri/target/**"],
+      ignored: ["**/dist/**", "**/src-tauri/target/**"],
     },
     hmr: tauriDevHost
       ? {

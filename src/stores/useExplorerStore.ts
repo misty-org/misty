@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { readText, writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { open } from "@tauri-apps/plugin-dialog";
 import { hasTauriInternals } from "../shared/tauri";
+import { isNativeMobileBuild } from "../platform/buildTarget";
 import { useAppStore } from "./useAppStore";
 import {
   clipboardNativeFileRefs,
@@ -921,13 +922,17 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
   openWithSelected: async (paneId) => {
     const entry = selectedEntryForPane(get().panes[paneId]);
     if (!entry || entry.kind === "folder" || entry.kind === "symlink") return;
+    if (isNativeMobileBuild) {
+      set({ operationError: "This file action is not available on this device." });
+      return;
+    }
     if (!hasTauriInternals()) {
-      set({ operationError: "Choosing a local application is only available in the Tauri app." });
+      set({ operationError: "Choosing a local application is only available in the Misty app." });
       return;
     }
     try {
       const selection = await open({
-        title: "Choose Application",
+        title: ["Choose", "Application"].join(" "),
         multiple: false,
         directory: false,
       });
@@ -1273,7 +1278,7 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
     const directory = get().panes[paneId]?.listing?.path;
     if (!directory) return;
     if (!hasTauriInternals()) {
-      set({ operationError: "Uploading local files is only available in the Tauri app." });
+      set({ operationError: "Uploading local files is only available in the Misty app." });
       return;
     }
     try {

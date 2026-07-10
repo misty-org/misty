@@ -32,6 +32,7 @@ use crate::services::file_sync::{
     FileSyncApplyRequest, FileSyncApplyResult, FileSyncCompareRequest,
 };
 use crate::services::metadata::FileMetadataSnapshot;
+#[cfg(desktop)]
 use crate::services::plugin_commands::{
     PluginCommandRunResult, PluginCommandsSnapshot, PluginDiagnosticsSnapshot,
     PluginPanelRenderResult, RenderPluginPanelRequest, RunPluginCommandRequest,
@@ -611,6 +612,7 @@ pub async fn shortcuts_save(
     state.commands.save(request).await
 }
 
+#[cfg(desktop)]
 #[tauri::command]
 pub async fn plugin_commands_snapshot(
     state: State<'_, MistyRuntime>,
@@ -618,6 +620,13 @@ pub async fn plugin_commands_snapshot(
     state.plugin_commands.snapshot().await
 }
 
+#[cfg(mobile)]
+#[tauri::command]
+pub async fn plugin_commands_snapshot() -> ApiResult<serde_json::Value> {
+    Err(mobile_plugins_unavailable())
+}
+
+#[cfg(desktop)]
 #[tauri::command]
 pub async fn plugin_command_run(
     request: RunPluginCommandRequest,
@@ -626,6 +635,13 @@ pub async fn plugin_command_run(
     state.plugin_commands.run_command(request).await
 }
 
+#[cfg(mobile)]
+#[tauri::command]
+pub async fn plugin_command_run(_request: serde_json::Value) -> ApiResult<serde_json::Value> {
+    Err(mobile_plugins_unavailable())
+}
+
+#[cfg(desktop)]
 #[tauri::command]
 pub async fn plugin_panel_render(
     request: RenderPluginPanelRequest,
@@ -634,11 +650,29 @@ pub async fn plugin_panel_render(
     state.plugin_commands.render_panel(request).await
 }
 
+#[cfg(mobile)]
+#[tauri::command]
+pub async fn plugin_panel_render(_request: serde_json::Value) -> ApiResult<serde_json::Value> {
+    Err(mobile_plugins_unavailable())
+}
+
+#[cfg(desktop)]
 #[tauri::command]
 pub async fn plugin_diagnostics_snapshot(
     state: State<'_, MistyRuntime>,
 ) -> ApiResult<PluginDiagnosticsSnapshot> {
     state.plugin_commands.diagnostics().await
+}
+
+#[cfg(mobile)]
+#[tauri::command]
+pub async fn plugin_diagnostics_snapshot() -> ApiResult<serde_json::Value> {
+    Err(mobile_plugins_unavailable())
+}
+
+#[cfg(mobile)]
+fn mobile_plugins_unavailable() -> ApiError {
+    ApiError::Unavailable("Extensions are not available in Misty mobile.".to_owned())
 }
 
 #[tauri::command]

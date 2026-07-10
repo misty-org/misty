@@ -1,0 +1,14 @@
+{
+  "passed": false,
+  "testedAt": "",
+  "buildNumber": "",
+  "device": "",
+  "testFlightInstall": false,
+  "reviewerAccount": false,
+  "providerOAuthReturn": false,
+  "transferAction": false,
+  "signOut": false,
+  "restartPersistence": false,
+  "offlineFailure": false,
+  "notes": ""
+}

@@ -52,15 +52,9 @@ use crate::services::{
 const VIRTUAL_PATH_RECENT: &str = "misty://recent";
 const VIRTUAL_PATH_STARRED: &str = "misty://starred";
 const VIRTUAL_PATH_TRASH: &str = "misty://trash";
-const MAX_PREVIEW_BYTES: u64 = 32 * 1024 * 1024;
 const MAX_IMAGE_PREVIEW_DIMENSION: u32 = 1600;
 const DEFAULT_IMAGE_THUMBNAIL_DIMENSION: u32 = 384;
 const MAX_GENERATED_IMAGE_THUMBNAIL_DIMENSION: u32 = 384;
-const MAX_THUMBNAIL_SOURCE_FILE_SIZE_BYTES: u64 = 128 * 1024 * 1024;
-const MAX_THUMBNAIL_SOURCE_DIMENSION: u32 = 32_768;
-const MAX_THUMBNAIL_SOURCE_PIXELS: u64 = 50_000_000;
-const MAX_THUMBNAIL_DECODE_ALLOCATION_BYTES: u64 = 192 * 1024 * 1024;
-const MAX_ORIGINAL_IMAGE_THUMBNAIL_SOURCE_SIZE_BYTES: u64 = 512 * 1024;
 const IMAGE_THUMBNAIL_RESIZE_FILTER: FilterType = FilterType::Triangle;
 const IMAGE_THUMBNAIL_PNG_COMPRESSION: CompressionType = CompressionType::Fast;
 const IMAGE_THUMBNAIL_PNG_FILTER: PngFilterType = PngFilterType::Adaptive;
@@ -127,7 +121,7 @@ impl ExplorerService {
             clipboard_text_cache_dir: cache_dir.join("clipboard-paste").join("text"),
             clipboard_blob_cache_dir: cache_dir.join("clipboard-paste").join("blob"),
             trash_dir: cache_dir.join("trash"),
-            image_thumbnail_cache_dir: cache_dir.join("thumbnails").join("images").join("v1"),
+            image_thumbnail_cache_dir: cache_dir.join("thumbnails"),
             #[cfg(test)]
             remote_job_cancellation_log: None,
         }
@@ -383,25 +377,34 @@ impl ExplorerService {
         size_bytes: Option<u64>,
     ) -> ApiResult<GeneratedImageThumbnail> {
         if let Some(source) = self.remote_target(path) {
-            let (size_bytes, remote_modified) = if let Some(size_bytes) = size_bytes {
-                (size_bytes, remote_modified.map(str::to_string))
-            } else {
-                let parent = RemoteBrowseTarget {
-                    provider_type: source.provider_type.clone(),
-                    remote_name: source.remote_name.clone(),
-                    remote_path: remote_parent_path(&source.remote_path),
+            let (cache_size_bytes, prepare_size_bytes, remote_modified) =
+                if let Some(size_bytes) = size_bytes {
+                    (
+                        size_bytes,
+                        i64::try_from(size_bytes).ok(),
+                        remote_modified.map(str::to_string),
+                    )
+                } else {
+                    let parent = RemoteBrowseTarget {
+                        provider_type: source.provider_type.clone(),
+                        remote_name: source.remote_name.clone(),
+                        remote_path: remote_parent_path(&source.remote_path),
+                    };
+                    let items = self.fetch_remote_items(&parent).await?;
+                    let Some((size_bytes, remote_modified)) =
+                        remote_preview_metadata_from_items(&parent, &source.remote_path, &items)?
+                    else {
+                        return Err(ApiError::Message(format!(
+                            "Remote file {} was not found.",
+                            source.remote_path
+                        )));
+                    };
+                    (
+                        u64::try_from(size_bytes).unwrap_or_default(),
+                        Some(size_bytes),
+                        Some(remote_modified),
+                    )
                 };
-                let items = self.fetch_remote_items(&parent).await?;
-                let Some((size_bytes, remote_modified)) =
-                    remote_preview_metadata_from_items(&parent, &source.remote_path, &items)?
-                else {
-                    return Err(ApiError::Message(format!(
-                        "Remote file {} was not found.",
-                        source.remote_path
-                    )));
-                };
-                (size_bytes, Some(remote_modified))
-            };
             let remote_modified = if remote_modified
                 .as_deref()
                 .unwrap_or_default()
@@ -415,14 +418,14 @@ impl ExplorerService {
             let prepared = self
                 .prepare_remote_file_for_local_use(
                     &source,
-                    Some(size_bytes),
+                    prepare_size_bytes,
                     remote_modified.as_deref(),
                     "Preparing remote file thumbnail",
                 )
                 .await?;
             let identity = ImageThumbnailIdentity {
                 path: path.to_string(),
-                size_bytes,
+                size_bytes: cache_size_bytes,
                 modified_fingerprint: remote_modified,
             };
             return self
@@ -464,12 +467,10 @@ impl ExplorerService {
             ));
         }
         let max_dimension = normalize_image_thumbnail_dimension(max_dimension);
-        let identity = identity.unwrap_or_else(|| ImageThumbnailIdentity::from_metadata(path, &metadata));
-        let thumbnail_path = image_thumbnail_cache_path(
-            &self.image_thumbnail_cache_dir,
-            &identity,
-            max_dimension,
-        );
+        let identity =
+            identity.unwrap_or_else(|| ImageThumbnailIdentity::from_metadata(path, &metadata));
+        let thumbnail_path =
+            image_thumbnail_cache_path(&self.image_thumbnail_cache_dir, &identity, max_dimension);
         if tokio::fs::metadata(&thumbnail_path)
             .await
             .is_ok_and(|metadata| metadata.is_file() && metadata.len() > 0)
@@ -490,13 +491,7 @@ impl ExplorerService {
         let source_path = path.to_path_buf();
         let output_path = thumbnail_path.clone();
         let rendered = tokio::task::spawn_blocking(move || {
-            render_image_thumbnail_file_blocking(
-                &source_path,
-                &output_path,
-                format,
-                identity.size_bytes,
-                max_dimension,
-            )
+            render_image_thumbnail_file_blocking(&source_path, &output_path, format, max_dimension)
         })
         .await
         .map_err(|error| ApiError::Message(format!("Image thumbnail worker failed: {error}")))??;
@@ -517,12 +512,6 @@ impl ExplorerService {
             return Err(ApiError::Message(
                 "Only files can be previewed.".to_string(),
             ));
-        }
-        if metadata.len() > MAX_PREVIEW_BYTES {
-            return Err(ApiError::Message(format!(
-                "Preview is limited to {} MB.",
-                MAX_PREVIEW_BYTES / (1024 * 1024)
-            )));
         }
         match format {
             PreviewFormat::Pdf => {
@@ -2732,12 +2721,6 @@ fn remote_preview_metadata_from_items(
                 "Only files can be previewed.".to_string(),
             ));
         }
-        if item.size >= 0 && item.size as u64 > MAX_PREVIEW_BYTES {
-            return Err(ApiError::Message(format!(
-                "Preview is limited to {} MB.",
-                MAX_PREVIEW_BYTES / (1024 * 1024)
-            )));
-        }
         return Ok(Some((item.size, item.mod_time.clone())));
     }
     Ok(None)
@@ -3462,24 +3445,13 @@ fn image_thumbnail_cache_path(
 }
 
 fn thumbnail_decode_limits() -> Limits {
-    let mut limits = Limits::default();
-    limits.max_image_width = Some(MAX_THUMBNAIL_SOURCE_DIMENSION);
-    limits.max_image_height = Some(MAX_THUMBNAIL_SOURCE_DIMENSION);
-    limits.max_alloc = Some(MAX_THUMBNAIL_DECODE_ALLOCATION_BYTES);
-    limits
+    Limits::no_limits()
 }
 
-fn validate_image_thumbnail_source(source_size: u64, width: u32, height: u32) -> ApiResult<()> {
-    if source_size > MAX_THUMBNAIL_SOURCE_FILE_SIZE_BYTES {
+fn validate_image_thumbnail_source(width: u32, height: u32) -> ApiResult<()> {
+    if width == 0 || height == 0 {
         return Err(ApiError::Message(
-            "Image is too large to thumbnail.".to_string(),
-        ));
-    }
-
-    let pixel_count = u64::from(width).saturating_mul(u64::from(height));
-    if width == 0 || height == 0 || pixel_count > MAX_THUMBNAIL_SOURCE_PIXELS {
-        return Err(ApiError::Message(
-            "Image dimensions are too large to thumbnail.".to_string(),
+            "Image dimensions are invalid.".to_string(),
         ));
     }
 
@@ -3514,46 +3486,6 @@ fn is_gif_path(path: &Path) -> bool {
     path.extension()
         .and_then(|extension| extension.to_str())
         .is_some_and(|extension| extension.eq_ignore_ascii_case("gif"))
-}
-
-fn is_browser_renderable_image_path(path: &Path) -> bool {
-    let Some(extension) = path.extension().and_then(|extension| extension.to_str()) else {
-        return false;
-    };
-    matches!(
-        extension.to_ascii_lowercase().as_str(),
-        "bmp" | "gif" | "ico" | "jpeg" | "jpg" | "png" | "webp"
-    )
-}
-
-fn should_use_original_image_thumbnail(
-    path: &Path,
-    source_size: u64,
-    width: u32,
-    height: u32,
-    max_dimension: u32,
-) -> bool {
-    if is_gif_path(path) {
-        return false;
-    }
-    source_size <= MAX_ORIGINAL_IMAGE_THUMBNAIL_SOURCE_SIZE_BYTES
-        && width <= max_dimension
-        && height <= max_dimension
-        && is_browser_renderable_image_path(path)
-}
-
-fn image_thumbnail_mime_type(format: PreviewFormat) -> &'static str {
-    match format {
-        PreviewFormat::Image(image::ImageFormat::Png) => "image/png",
-        PreviewFormat::Image(image::ImageFormat::Jpeg) => "image/jpeg",
-        PreviewFormat::Image(image::ImageFormat::Gif) => "image/gif",
-        PreviewFormat::Image(image::ImageFormat::Bmp) => "image/bmp",
-        PreviewFormat::Image(image::ImageFormat::WebP) => "image/webp",
-        PreviewFormat::Image(_) => "image/*",
-        PreviewFormat::TranscodeImage(_) | PreviewFormat::Psd => "image/png",
-        PreviewFormat::Direct(mime_type) => mime_type,
-        PreviewFormat::Pdf => "application/pdf",
-    }
 }
 
 fn decode_gif_first_frame(path: &Path) -> ApiResult<image::DynamicImage> {
@@ -3652,11 +3584,51 @@ fn write_image_thumbnail_png(
     })
 }
 
+#[cfg(target_os = "macos")]
+fn render_image_thumbnail_with_system_tool(
+    path: &Path,
+    thumbnail_path: &Path,
+    max_dimension: u32,
+) -> ApiResult<bool> {
+    let status = Command::new("/usr/bin/sips")
+        .arg("-s")
+        .arg("format")
+        .arg("png")
+        .arg("-Z")
+        .arg(normalize_image_thumbnail_dimension(max_dimension).to_string())
+        .arg(path)
+        .arg("--out")
+        .arg(thumbnail_path)
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status();
+
+    if let Ok(status) = status {
+        if status.success()
+            && std::fs::metadata(thumbnail_path)
+                .is_ok_and(|metadata| metadata.is_file() && metadata.len() > 0)
+        {
+            return Ok(true);
+        }
+    }
+
+    let _ = std::fs::remove_file(thumbnail_path);
+    Ok(false)
+}
+
+#[cfg(not(target_os = "macos"))]
+fn render_image_thumbnail_with_system_tool(
+    _path: &Path,
+    _thumbnail_path: &Path,
+    _max_dimension: u32,
+) -> ApiResult<bool> {
+    Ok(false)
+}
+
 fn render_image_thumbnail_file_blocking(
     path: &Path,
     output_path: &Path,
     format: PreviewFormat,
-    source_size: u64,
     max_dimension: u32,
 ) -> ApiResult<GeneratedImageThumbnail> {
     {
@@ -3675,21 +3647,19 @@ fn render_image_thumbnail_file_blocking(
     match format {
         PreviewFormat::Image(_) | PreviewFormat::TranscodeImage(_) => {
             let (width, height) = image_dimensions(path)?;
-            validate_image_thumbnail_source(source_size, width, height)?;
-            if should_use_original_image_thumbnail(path, source_size, width, height, max_dimension)
-            {
-                return Ok(GeneratedImageThumbnail {
-                    path: display_path(path),
-                    mime_type: image_thumbnail_mime_type(format).to_string(),
-                });
-            }
-            let image = decode_image_thumbnail_source(path)?;
-            let max_dimension = normalize_image_thumbnail_dimension(max_dimension);
-            let thumbnail =
-                image.resize(max_dimension, max_dimension, IMAGE_THUMBNAIL_RESIZE_FILTER);
-            if let Err(error) = write_image_thumbnail_png(&thumbnail, &temp_path) {
-                let _ = std::fs::remove_file(&temp_path);
-                return Err(error);
+            validate_image_thumbnail_source(width, height)?;
+            let rendered_with_system_tool = matches!(format, PreviewFormat::Image(_))
+                && !is_gif_path(path)
+                && render_image_thumbnail_with_system_tool(path, &temp_path, max_dimension)?;
+            if !rendered_with_system_tool {
+                let image = decode_image_thumbnail_source(path)?;
+                let max_dimension = normalize_image_thumbnail_dimension(max_dimension);
+                let thumbnail =
+                    image.resize(max_dimension, max_dimension, IMAGE_THUMBNAIL_RESIZE_FILTER);
+                if let Err(error) = write_image_thumbnail_png(&thumbnail, &temp_path) {
+                    let _ = std::fs::remove_file(&temp_path);
+                    return Err(error);
+                }
             }
         }
         PreviewFormat::Psd => {
@@ -4081,7 +4051,7 @@ mod tests {
     }
 
     #[test]
-    fn remote_preview_metadata_rejects_directories_and_oversized_files() {
+    fn remote_preview_metadata_rejects_directories_without_size_cap() {
         let parent = RemoteBrowseTarget {
             provider_type: "drive".into(),
             remote_name: "work".into(),
@@ -4104,7 +4074,7 @@ mod tests {
             RemoteListItem {
                 name: "large.pdf".into(),
                 path: "large.pdf".into(),
-                size: (MAX_PREVIEW_BYTES + 1) as i64,
+                size: 512 * 1024 * 1024,
                 ..remote_list_item_default()
             },
         ];
@@ -4114,8 +4084,9 @@ mod tests {
             Some((128, "2026-06-21T00:00:00Z".into()))
         );
         assert!(remote_preview_metadata_from_items(&parent, "/Documents/Archive", &items).is_err());
-        assert!(
-            remote_preview_metadata_from_items(&parent, "/Documents/large.pdf", &items).is_err()
+        assert_eq!(
+            remote_preview_metadata_from_items(&parent, "/Documents/large.pdf", &items).unwrap(),
+            Some((512 * 1024 * 1024, "".into()))
         );
         assert_eq!(
             remote_preview_metadata_from_items(&parent, "/Documents/missing.txt", &items).unwrap(),
@@ -4290,9 +4261,46 @@ mod tests {
             .unwrap();
         assert_eq!(first.mime_type, "image/png");
         assert_eq!(first.path, second.path);
+        assert!(Path::new(&first.path).starts_with(&service.image_thumbnail_cache_dir));
+        assert_eq!(
+            service.image_thumbnail_cache_dir,
+            service
+                .home_dir
+                .join(".misty")
+                .join(".cache")
+                .join("thumbnails")
+        );
         let thumbnail = image::open(&first.path).unwrap();
         assert!(thumbnail.width() <= 384);
         assert!(thumbnail.height() <= 384);
+
+        let _ = tokio::fs::remove_dir_all(&root).await;
+    }
+
+    #[tokio::test]
+    async fn generated_image_thumbnail_writes_small_images_to_cache() {
+        let root = unique_test_dir("image-thumbnail-original");
+        let image = root.join("small.png");
+        tokio::fs::create_dir_all(&root).await.unwrap();
+        let mut png = Cursor::new(Vec::new());
+        image::DynamicImage::ImageRgba8(image::RgbaImage::from_pixel(
+            16,
+            16,
+            image::Rgba([0, 128, 255, 255]),
+        ))
+        .write_to(&mut png, image::ImageFormat::Png)
+        .unwrap();
+        tokio::fs::write(&image, png.into_inner()).await.unwrap();
+
+        let service = test_explorer_service();
+        let thumbnail = service
+            .generate_image_thumbnail(&display_path(&image), 384, None, None, None)
+            .await
+            .unwrap();
+
+        assert_eq!(thumbnail.mime_type, "image/png");
+        assert_ne!(thumbnail.path, display_path(&image));
+        assert!(Path::new(&thumbnail.path).starts_with(&service.image_thumbnail_cache_dir));
 
         let _ = tokio::fs::remove_dir_all(&root).await;
     }

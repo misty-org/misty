@@ -15,6 +15,7 @@ pub mod misty_template;
 pub mod native_clipboard;
 pub mod operation_queue;
 pub mod paths;
+#[cfg(desktop)]
 pub mod plugin_commands;
 pub mod power_pack;
 pub mod providers;
@@ -24,5 +25,6 @@ pub mod proxy_runtime;
 pub mod search;
 pub mod settings;
 pub mod transfers;
+#[cfg(desktop)]
 pub mod tray;
 pub mod workspaces;

@@ -16,6 +16,7 @@ use super::proxy::{ProxyResponse, ProxyService};
 
 const RCLONE_OAUTH_CALLBACK_TEMPLATE: &str =
     include_str!("../../../assets/rclone/oauth-callback.html");
+const PROVIDER_AUTH_CANCEL_RESULT: &str = "cancel";
 
 #[derive(Clone)]
 pub struct ProviderService {
@@ -25,6 +26,16 @@ pub struct ProviderService {
 struct ProviderInner {
     proxy: ProxyService,
     snapshot: RwLock<ProvidersSnapshot>,
+    active_config_sessions: RwLock<Vec<ActiveProviderConfigSession>>,
+}
+
+#[derive(Debug, Clone)]
+struct ActiveProviderConfigSession {
+    name: String,
+    provider_type: String,
+    parameters: BTreeMap<String, String>,
+    state: String,
+    mode: ProviderConfigMode,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -143,7 +154,6 @@ pub struct RcloneConfigPaths {
 #[serde(rename_all = "snake_case")]
 pub enum ProviderConfigMode {
     Add,
-    Reconnect,
     Repair,
 }
 
@@ -395,6 +405,7 @@ impl ProviderService {
             inner: Arc::new(ProviderInner {
                 proxy,
                 snapshot: RwLock::new(ProvidersSnapshot::empty()),
+                active_config_sessions: RwLock::new(Vec::new()),
             }),
         }
     }
@@ -759,17 +770,83 @@ impl ProviderService {
         parse_proxy_response(response, "Provider tool failed").await
     }
 
+    async fn cancel_active_config_sessions(&self) {
+        let sessions = {
+            let mut active_sessions = self.inner.active_config_sessions.write().await;
+            std::mem::take(&mut *active_sessions)
+        };
+        for session in sessions {
+            let request = ProviderConfigRequest {
+                name: session.name,
+                provider_type: session.provider_type,
+                parameters: session.parameters,
+                state: session.state,
+                result: PROVIDER_AUTH_CANCEL_RESULT.to_string(),
+                mode: session.mode,
+                continuing: true,
+                continue_existing: false,
+            };
+            let Ok(body) = provider_config_request_body(&request) else {
+                continue;
+            };
+            let _ = self
+                .inner
+                .proxy
+                .post_json("/api/remote/config/continue", &body)
+                .await;
+        }
+    }
+
+    async fn remember_config_session(
+        &self,
+        request: &ProviderConfigRequest,
+        step: &ProviderConfigStep,
+    ) {
+        let state = step.state.trim();
+        if state.is_empty()
+            || step.done
+            || step.kind == "done"
+            || step.kind == "error"
+            || !step.error.trim().is_empty()
+        {
+            return;
+        }
+        let next = ActiveProviderConfigSession {
+            name: request.name.clone(),
+            provider_type: request.provider_type.clone(),
+            parameters: request.parameters.clone(),
+            state: state.to_string(),
+            mode: request.mode,
+        };
+        let mut active_sessions = self.inner.active_config_sessions.write().await;
+        active_sessions.retain(|session| session.state != next.state);
+        active_sessions.push(next);
+    }
+
+    async fn forget_config_session_state(&self, state: &str) {
+        let state = state.trim();
+        if state.is_empty() {
+            return;
+        }
+        let mut active_sessions = self.inner.active_config_sessions.write().await;
+        active_sessions.retain(|session| session.state != state);
+    }
+
     pub async fn configure_remote(
         &self,
         request: ProviderConfigRequest,
     ) -> ApiResult<ProviderConfigStep> {
         validate_config_request(&request)?;
+        if !request.continuing {
+            self.cancel_active_config_sessions().await;
+        }
+        let is_cancel_continuation =
+            request.continuing && request.result.trim() == PROVIDER_AUTH_CANCEL_RESULT;
         let endpoint = if request.continuing {
             "/api/remote/config/continue"
         } else {
             match request.mode {
                 ProviderConfigMode::Add => "/api/remote/config/start",
-                ProviderConfigMode::Reconnect => "/api/remote/config/reconnect",
                 ProviderConfigMode::Repair => "/api/remote/config/repair",
             }
         };
@@ -778,6 +855,9 @@ impl ProviderService {
         let status = response.status();
         let body = response.text().await.unwrap_or_default();
         if !status.is_success() {
+            if is_cancel_continuation {
+                self.forget_config_session_state(&request.state).await;
+            }
             return Err(provider_operation_error(
                 status.as_u16(),
                 &body,
@@ -786,6 +866,8 @@ impl ProviderService {
         }
         let mut step = parse_provider_config_step(&body)?;
         if !step.error.is_empty() || step.kind == "error" {
+            self.forget_config_session_state(&request.state).await;
+            self.forget_config_session_state(&step.state).await;
             return Err(normalize_provider_config_error(ApiError::Message(
                 if step.error.is_empty() {
                     "Provider configuration failed.".to_string()
@@ -795,7 +877,14 @@ impl ProviderService {
             )));
         }
         if step.done || step.kind == "done" {
+            self.forget_config_session_state(&request.state).await;
+            self.forget_config_session_state(&step.state).await;
             let _ = self.refresh().await;
+        } else if is_cancel_continuation {
+            self.forget_config_session_state(&request.state).await;
+            self.forget_config_session_state(&step.state).await;
+        } else {
+            self.remember_config_session(&request, &step).await;
         }
         Ok(step)
     }
@@ -995,7 +1084,7 @@ fn append_external_config_remotes(remotes: &mut Vec<ProviderRemote>) {
             status_label: "Import required".to_string(),
             needs_reconnect: true,
             error: Some(
-                "This remote exists in the user rclone config, but Misty is not using that config. Reconnect or configure it in Misty to import it."
+                "This remote exists in the user rclone config, but Misty is not using that config. Configure it in Misty to import it."
                     .to_string(),
             ),
             config_source: "user".to_string(),

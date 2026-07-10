@@ -53,7 +53,6 @@ interface RemoteListPanelProps {
   onRefresh: () => void;
   onAdd: () => void;
   onSelectRemote: (name: string) => void;
-  onReconnect: (remote: ProviderRemote) => void;
   onRepair: (remote: ProviderRemote) => void;
   onDisconnect: (name: string) => void;
 }
@@ -89,7 +88,6 @@ export function RemoteListPanel(props: RemoteListPanelProps) {
             remote={remote}
             selected={props.selectedRemoteName === remote.name}
             onSelect={() => props.onSelectRemote(remote.name)}
-            onReconnect={() => props.onReconnect(remote)}
             onRepair={() => props.onRepair(remote)}
             onDisconnect={() => props.onDisconnect(remote.name)}
           />
@@ -115,7 +113,6 @@ function RemoteRow(props: {
   remote: ProviderRemote;
   selected: boolean;
   onSelect: () => void;
-  onReconnect: () => void;
   onRepair: () => void;
   onDisconnect: () => void;
 }) {
@@ -181,7 +178,6 @@ function RemoteRow(props: {
               </>
             ) : (
               <>
-                {remote.needsReconnect ? <button className={remoteMenuButtonClass} type="button" role="menuitem" onClick={() => { setMenuOpen(false); props.onReconnect(); }}><AssetIcon src={iconAssets.sync16} size={15} /> Reconnect</button> : null}
                 <button className={remoteMenuButtonClass} type="button" role="menuitem" onClick={() => { setMenuOpen(false); props.onRepair(); }}><AssetIcon src={iconAssets.gear24} size={15} /> Configure</button>
                 <button className={`${remoteMenuButtonClass} text-[var(--misty-danger)]`} type="button" role="menuitem" onClick={() => { setMenuOpen(false); props.onDisconnect(); }}><AssetIcon src={iconAssets.trash24} size={15} /> Delete</button>
               </>

@@ -1,7 +1,15 @@
 import ReactDOM from "react-dom/client";
-import { installClientDebugging } from "./shared/debug/clientDebug";
+import { isNativeMobileBuild } from "./platform/buildTarget";
 
-installClientDebugging();
+if (
+  import.meta.env.MODE !== "mobile" &&
+  !isNativeMobileBuild &&
+  (import.meta.env.DEV || import.meta.env.VITE_MISTY_DEBUG === "1")
+) {
+  void import("./shared/debug/clientDebug").then(({ installClientDebugging }) => {
+    installClientDebugging();
+  });
+}
 
 const root = ReactDOM.createRoot(document.getElementById("root") as HTMLElement);
 

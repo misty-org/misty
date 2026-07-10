@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import {
   createBrowserRouter,
   Navigate,
@@ -6,7 +6,7 @@ import {
   RouterProvider,
   useLocation,
 } from "react-router-dom";
-import { Folder, Home, PlugZap, Puzzle, Settings, UserCircle } from "lucide-react";
+import { ArrowUpDown, Folder, Home, PlugZap, Puzzle, Settings, UserCircle } from "lucide-react";
 import AccountPage from "./pages/Account";
 import ChangelogPage from "./pages/Changelog";
 import ExtensionsPage from "./pages/Extensions";
@@ -17,17 +17,14 @@ import RegisterPage from "./pages/Register";
 import SettingsPage from "./pages/Settings";
 import SignInPage from "./pages/SignIn";
 import TransfersPage from "./pages/Transfers";
-import { MobileDesktopRequiredPage } from "./pages/shared/MobileDesktopRequiredPage";
-import {
-  DesktopLayout,
-  type DesktopNavItem,
-} from "./layouts/DesktopLayout";
+import type { DesktopNavItem } from "./layouts/DesktopLayout";
 import {
   MobileLayout,
   type MobileNavItem,
 } from "./layouts/MobileLayout";
 import { RootLayout, useRootLayoutContext } from "./layouts/RootLayout";
 import { detectAppFormFactor, type AppFormFactor } from "./platform/formFactor";
+import { isAndroidBuild, isNativeMobileBuild } from "./platform/buildTarget";
 import type { AppTab } from "./routing/types";
 import {
   isRememberableAppRoute,
@@ -57,52 +54,70 @@ const routes = {
   transfers: "/transfers",
 } as const;
 
+const isPhoneBuild = import.meta.env.MODE === "mobile";
+
 const appPageTitles = new Map<string, string>([
-  [routes.home, "Misty - Home"],
-  [routes.extensions, "Misty - Extensions"],
-  [routes.changelog, "Misty - Changelog"],
-  [routes.signIn, "Misty - Sign In"],
-  [routes.register, "Misty - Register"],
+  ...(isPhoneBuild ? [] : [
+    [routes.home, "Misty - Home"],
+    [routes.extensions, "Misty - Extensions"],
+    [routes.changelog, "Misty - Changelog"],
+    [routes.signIn, "Misty - Sign In"],
+    [routes.register, "Misty - Register"],
+  ] as Array<[string, string]>),
   [routes.account, "Misty - Account"],
+  [routes.transfers, "Misty - Transfers"],
 ]);
 
 const mobileLastRouteStorageKey = "misty.mobile.lastRoute";
+const DesktopLayoutComponent = import.meta.env.MODE === "mobile"
+  ? null
+  : lazy(() => import("./layouts/DesktopLayout").then((module) => ({ default: module.DesktopLayout })));
 
-const desktopNavItems = [
+const desktopNavItems = (isPhoneBuild ? [] : [
+  ...(isAndroidBuild ? [] : [
   {
     id: "home",
     label: "Home",
     path: routes.home,
     icon: Home,
-    active: (pathname) =>
+    active: (pathname: string) =>
       pathname === routes.home || pathname.startsWith(routes.changelog),
   },
+  ]),
   { id: "files", label: "Files", path: routes.files, icon: Folder },
+  ...(isAndroidBuild ? [
+    { id: "providers", label: "Remotes", path: routes.providers, icon: PlugZap },
+    { id: "transfers", label: "Transfers", path: routes.transfers, icon: ArrowUpDown },
+    { id: "account", label: "Account", path: routes.account, icon: UserCircle },
+    { id: "settings", label: "Settings", path: routes.accountSettings, icon: Settings },
+  ] : [
   {
     id: "extensions",
     label: "Extensions",
     path: routes.extensions,
     icon: Puzzle,
-    active: (pathname) => pathname.startsWith(routes.extensions),
+    active: (pathname: string) => pathname.startsWith(routes.extensions),
   },
-] satisfies DesktopNavItem[];
+  ]),
+]) satisfies DesktopNavItem[];
 
 const mobileNavItems = [
   { id: "files", label: "Files", path: routes.files, icon: Folder, nav: true },
   { id: "providers", label: "Remotes", path: routes.providers, icon: PlugZap, nav: true },
+  { id: "transfers", label: "Transfers", path: routes.transfers, icon: ArrowUpDown, nav: true },
   { id: "account", label: "Account", path: routes.account, icon: UserCircle, nav: true },
   { id: "settings", label: "Settings", path: routes.accountSettings, icon: Settings, nav: false },
-  { id: "diagnostics", label: "Diagnostics", path: routes.diagnostics, icon: Settings, nav: false },
 ] satisfies MobileNavItem[];
 
 const mobileAllowedRoutes = new Set<string>(mobileNavItems.map((route) => route.path));
 const mobileDeepLinkPrefixes = [
   routes.files,
   routes.providers,
+  routes.transfers,
   routes.account,
-  routes.diagnostics,
+  routes.settings,
 ];
-const desktopDeepLinkPrefixes = [
+const desktopDeepLinkPrefixes = isPhoneBuild ? [] : [
   routes.transfers,
   ...mobileDeepLinkPrefixes,
   routes.home,
@@ -131,12 +146,7 @@ export const router = createBrowserRouter([
           { path: "providers", element: <ProvidersPage /> },
           {
             path: "transfers",
-            element: (
-              <ResponsiveRoute
-                desktop={<TransfersPage />}
-                mobile={<Navigate to={routes.files} replace />}
-              />
-            ),
+            element: <TransfersPage />,
           },
           { path: "dock", element: <Navigate to={routes.files} replace /> },
           {
@@ -146,7 +156,7 @@ export const router = createBrowserRouter([
                 path: "home",
                 element: (
                   <ResponsiveRoute
-                    desktop={<HomePage />}
+                    desktop={isAndroidBuild ? <Navigate to={routes.files} replace /> : <HomePage />}
                     mobile={<Navigate to={routes.files} replace />}
                   />
                 ),
@@ -155,7 +165,7 @@ export const router = createBrowserRouter([
                 path: "extensions",
                 element: (
                   <ResponsiveRoute
-                    desktop={<ExtensionsPage />}
+                    desktop={isAndroidBuild ? <Navigate to={routes.files} replace /> : <ExtensionsPage />}
                     mobile={<Navigate to={routes.files} replace />}
                   />
                 ),
@@ -164,7 +174,7 @@ export const router = createBrowserRouter([
                 path: "changelog",
                 element: (
                   <ResponsiveRoute
-                    desktop={<ChangelogPage />}
+                    desktop={isAndroidBuild ? <Navigate to={routes.files} replace /> : <ChangelogPage />}
                     mobile={<Navigate to={routes.files} replace />}
                   />
                 ),
@@ -173,8 +183,8 @@ export const router = createBrowserRouter([
                 path: "signin",
                 element: (
                   <ResponsiveRoute
-                    desktop={<SignInPage />}
-                    mobile={<Navigate to={routes.files} replace />}
+                    desktop={isAndroidBuild ? <Navigate to={routes.accountSignIn} replace /> : <SignInPage />}
+                    mobile={<Navigate to={routes.accountSignIn} replace />}
                   />
                 ),
               },
@@ -182,8 +192,8 @@ export const router = createBrowserRouter([
                 path: "register",
                 element: (
                   <ResponsiveRoute
-                    desktop={<RegisterPage />}
-                    mobile={<Navigate to={routes.files} replace />}
+                    desktop={isAndroidBuild ? <Navigate to={routes.accountRegister} replace /> : <RegisterPage />}
+                    mobile={<Navigate to={routes.accountRegister} replace />}
                   />
                 ),
               },
@@ -207,7 +217,7 @@ export const router = createBrowserRouter([
             element: (
               <ResponsiveRoute
                 desktop={<Navigate to={routes.files} replace />}
-                mobile={<MobileDesktopRequiredPage feature="Diagnostics" />}
+                mobile={<Navigate to={routes.accountSettings} replace />}
               />
             ),
           },
@@ -234,9 +244,11 @@ function AppFrameLayout() {
       safeRoute={safeMobileRoute}
       titleForPath={mobileTitleForPath}
     />
-  ) : (
-    <DesktopLayout getRouteId={desktopRouteIdFromPath} navItems={desktopNavItems} />
-  );
+  ) : DesktopLayoutComponent ? (
+    <Suspense fallback={null}>
+      <DesktopLayoutComponent getRouteId={desktopRouteIdFromPath} navItems={desktopNavItems} />
+    </Suspense>
+  ) : null;
 }
 
 function AppPagesLayout() {
@@ -244,7 +256,7 @@ function AppPagesLayout() {
   const refreshLocalAccessToken = useSetupStore(
     (state) => state.refreshLocalAccessToken,
   );
-  const formFactor = detectAppFormFactor();
+  const { formFactor } = useRootLayoutContext();
 
   useEffect(() => {
     const match = [...appPageTitles.keys()]
@@ -276,7 +288,8 @@ function AppPagesLayout() {
 }
 
 function StartupRedirect() {
-  return detectAppFormFactor() === "mobile" ? (
+  const { formFactor } = useRootLayoutContext();
+  return formFactor === "mobile" ? (
     <MobileStartupRedirect />
   ) : (
     <DesktopStartupRedirect />
@@ -300,7 +313,11 @@ function DesktopStartupRedirect() {
     );
   }
 
-  const target = isRememberableAppRoute(lastAppRoute) ? lastAppRoute : routes.home;
+  const target = isRememberableAppRoute(lastAppRoute)
+    ? lastAppRoute
+    : isAndroidBuild
+      ? routes.files
+      : routes.home;
 
   return <Navigate to={target} replace />;
 }
@@ -323,7 +340,8 @@ function ResponsiveRoute(props: {
   desktop: JSX.Element | null;
   mobile: JSX.Element | null;
 }) {
-  return detectAppFormFactor() === "mobile" ? props.mobile : props.desktop;
+  const { formFactor } = useRootLayoutContext();
+  return formFactor === "mobile" ? props.mobile : props.desktop;
 }
 
 function desktopRouteIdFromPath(pathname: string): AppTab {
@@ -343,21 +361,22 @@ function desktopRouteIdFromPath(pathname: string): AppTab {
 }
 
 function mobileRouteIdFromPath(pathname: string): AppTab {
+  if (pathname.startsWith(routes.transfers)) return "transfers";
   if (pathname.startsWith(routes.providers)) return "providers";
   if (pathname.startsWith(routes.account)) return "account";
   if (pathname.startsWith(routes.settings)) return "account";
-  if (pathname.startsWith(routes.diagnostics)) return "diagnostics";
   return "files";
 }
 
 function normalizeMobileRoute(pathname: string): string {
-  if (pathname.startsWith(routes.transfers)) return routes.files;
+  if (pathname.startsWith(routes.transfers)) return routes.transfers;
   if (pathname.startsWith(routes.providers)) return routes.providers;
   if (pathname.startsWith(routes.home)) return routes.files;
   if (pathname.startsWith(routes.accountSettings)) return routes.accountSettings;
   if (pathname.startsWith(routes.account)) return routes.account;
   if (pathname.startsWith(routes.settings)) return routes.accountSettings;
   if (pathname.startsWith(routes.files)) return routes.files;
+  if (pathname.startsWith(routes.diagnostics)) return routes.accountSettings;
   return pathname;
 }
 
@@ -366,22 +385,20 @@ function safeMobileRoute(pathname: string): string {
 }
 
 function mobileTitleForPath(pathname: string): string {
+  if (pathname.startsWith(routes.transfers)) return "Transfers";
   if (pathname.startsWith(routes.providers)) return "Remotes";
   if (
     pathname.startsWith(routes.accountSettings) ||
     pathname.startsWith(routes.settings)
   ) return "Settings";
   if (pathname.startsWith(routes.account)) return "Account";
-  if (pathname.startsWith(routes.diagnostics)) return "Diagnostics";
-  if (pathname !== routes.root && !pathname.startsWith(routes.files)) {
-    return "Desktop only";
-  }
   return "Files";
 }
 
 function isDeepLinkRouteAllowed(route: string, formFactor: AppFormFactor): boolean {
-  const allowedPrefixes =
-    formFactor === "mobile" ? mobileDeepLinkPrefixes : desktopDeepLinkPrefixes;
+  const allowedPrefixes = formFactor === "mobile" || isNativeMobileBuild
+    ? mobileDeepLinkPrefixes
+    : desktopDeepLinkPrefixes;
   return allowedPrefixes.some(
     (prefix) => route === prefix || route.startsWith(`${prefix}/`),
   );

@@ -66,7 +66,8 @@ impl TransferService {
             db_lock: Arc::new(Mutex::new(())),
         };
         if let Err(error) = service.recover_orphaned_queue_rows() {
-            eprintln!("SQLite transfer store recovery failed: {error}");
+            let _ = error;
+            eprintln!("SQLite transfer store recovery failed.");
         }
         service
     }

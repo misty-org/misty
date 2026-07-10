@@ -79,8 +79,12 @@ struct MistyServerConfig {
 
 impl AppEnvironmentService {
     pub fn new() -> Self {
+        Self::new_with_data_root(None)
+    }
+
+    pub fn new_with_data_root(data_root: Option<PathBuf>) -> Self {
         Self {
-            inner: Arc::new(AppEnvironment::load()),
+            inner: Arc::new(AppEnvironment::load(data_root)),
         }
     }
 
@@ -154,8 +158,8 @@ impl AppEnvironmentService {
 }
 
 impl AppEnvironment {
-    fn load() -> Self {
-        let home_dir = resolve_home_dir().unwrap_or_default();
+    fn load(data_root: Option<PathBuf>) -> Self {
+        let home_dir = data_root.or_else(resolve_home_dir).unwrap_or_default();
         let misty_dir = home_dir.join(".misty");
         let config_dir = misty_dir.join("config");
         let db_dir = misty_dir.join("db");

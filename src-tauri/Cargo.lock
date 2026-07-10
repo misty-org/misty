@@ -4911,9 +4911,7 @@ dependencies = [
 
 [[package]]
 name = "tauri-plugin-keystore"
-version = "2.1.0-alpha.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "532037dca4565060cb579aa54336a35d0f98d512a965ca38f1f65adacbec52be"
+version = "2.1.0-alpha.1-misty.1"
 dependencies = [
  "keyring",
  "serde",

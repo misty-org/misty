@@ -24,7 +24,7 @@ import {
 } from "../../../stores/useSettingsStore";
 import { useSetupStore } from "../../../stores/useSetupStore";
 import { changelog } from "../../Changelog/desktop/data";
-import { posts } from "../../Website/pages/Blog/data";
+import { posts } from "../../../data/blog";
 import { DesktopWorkspacePanel } from "./DesktopWorkspacePanel";
 import { HomeFooter } from "./HomeFooter";
 import { HomeLoading } from "./HomeLoading";
@@ -241,9 +241,8 @@ export default function HomePage() {
   };
 
   return (
-    <div className="misty-scrollbar relative box-border h-full min-h-0 overflow-x-hidden overflow-y-scroll overscroll-contain p-5">
-      <section className="relative z-10 mx-auto grid min-h-full w-full max-w-[1500px] auto-rows-min gap-4 xl:h-full xl:min-h-[680px] xl:grid-cols-12 xl:grid-rows-7 xl:auto-rows-fr">
-        <DesktopWorkspacePanel homePath={homePath} />
+    <div className="misty-scrollbar relative box-border h-full min-h-0 min-w-0 overflow-x-hidden overflow-y-auto overscroll-contain p-[clamp(0.5rem,1vw,1.25rem)]">
+      <section className="relative z-10 flex min-h-full w-full min-w-0 flex-col gap-[clamp(0.5rem,0.8vw,1rem)]">
         <HomeSidebarPanels
           devices={devices}
           devicesLoading={devicesLoading}
@@ -259,6 +258,7 @@ export default function HomePage() {
           smartFoldersLoading={smartFoldersLoading}
           tags={tags}
           tagsLoading={!library}
+          workspacePanel={<DesktopWorkspacePanel homePath={homePath} />}
         />
         <HomeFooter
           latestChangelog={latestChangelog}
