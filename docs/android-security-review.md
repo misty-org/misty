@@ -5,8 +5,8 @@ Generated: 2026-07-09T23:38:01.246Z
 ## Passes
 - high-confidence secret formats: no hits
 - Play policy and desktop-only mobile bundle strings: no hits
-- src-tauri/gen/android/app/src/main/AndroidManifest.xml: INTERNET permission only baseline
-- src-tauri/gen/android/app/src/main/AndroidManifest.xml: no broad Android runtime permissions
+- src-tauri/gen/android/app/src/main/AndroidManifest.xml: INTERNET permission baseline
+- src-tauri/gen/android/app/src/main/AndroidManifest.xml: MANAGE_EXTERNAL_STORAGE is intentionally declared for Android file-manager functionality
 - src-tauri/gen/android/app/build.gradle.kts: Android applicationId com.misty.mobile
 - src-tauri/gen/android/app/build.gradle.kts: Android namespace com.misty.mobile
 - src-tauri/gen/android/app/build.gradle.kts: release cleartext traffic disabled
@@ -24,7 +24,7 @@ Generated: 2026-07-09T23:38:01.246Z
 - marketing/google-play-metadata/en-US/play-store-listing.json: no placeholder or fake Google Play metadata URL values
 
 ## Warnings
-- None.
+- `MANAGE_EXTERNAL_STORAGE` is a high-risk Google Play permission. Misty must submit a Play Console Permissions Declaration Form and justify All files access as core file management/document management functionality. This is an intentional product decision for Android tablet/ChromeOS file browsing and transfer UX.
 
 ## Findings
 - No critical or high-severity local Android findings in this automated pass.

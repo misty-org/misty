@@ -173,6 +173,7 @@ impl AppEnvironment {
         let workspaces_path = config_dir.join("workspaces.json");
         let commands_path = config_dir.join("commands.msy");
         ensure_mobile_user_dirs(&home_dir);
+        seed_builtin_animation_assets(&assets_dir);
         let grpc_address = settings_advanced_string(&settings_path, "server_address")
             .unwrap_or_else(|| "localhost:50051".to_owned());
         let mount_path = settings_advanced_string(&settings_path, "mount_path")
@@ -233,6 +234,7 @@ impl AppEnvironment {
         let workspaces_path = config_dir.join("workspaces.json");
         let commands_path = config_dir.join("commands.msy");
         ensure_mobile_user_dirs(&home_dir);
+        seed_builtin_animation_assets(&assets_dir);
         let grpc_address = settings_advanced_string(&settings_path, "server_address")
             .unwrap_or_else(|| "localhost:50051".to_owned());
         let mount_path = settings_advanced_string(&settings_path, "mount_path")
@@ -325,14 +327,38 @@ fn display_path(path: &Path) -> String {
     path.display().to_string()
 }
 
-#[cfg(any(target_os = "ios", target_os = "android"))]
+fn seed_builtin_animation_assets(assets_dir: &Path) {
+    let animations_dir = assets_dir.join("animations");
+    if fs::create_dir_all(&animations_dir).is_err() {
+        return;
+    }
+
+    for (file_name, bytes) in [
+        (
+            "cloud-folder-idle.png",
+            include_bytes!("../../../src/assets/pets/cloud-folder/idle.png").as_slice(),
+        ),
+        (
+            "cloud-folder-sleep.png",
+            include_bytes!("../../../src/assets/pets/cloud-folder/sleep.png").as_slice(),
+        ),
+        (
+            "cloud-folder-happy.png",
+            include_bytes!("../../../src/assets/pets/cloud-folder/happy.png").as_slice(),
+        ),
+    ] {
+        let _ = fs::write(animations_dir.join(file_name), bytes);
+    }
+}
+
+#[cfg(target_os = "ios")]
 fn ensure_mobile_user_dirs(home_dir: &Path) {
     for name in ["Documents", "Downloads"] {
         let _ = fs::create_dir_all(home_dir.join(name));
     }
 }
 
-#[cfg(not(any(target_os = "ios", target_os = "android")))]
+#[cfg(not(target_os = "ios"))]
 fn ensure_mobile_user_dirs(_home_dir: &Path) {}
 
 #[cfg(test)]

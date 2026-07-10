@@ -16,6 +16,8 @@ import type {
 import { createPortal } from "react-dom";
 import { invoke } from "@tauri-apps/api/core";
 import { PhysicalPosition, PhysicalSize } from "@tauri-apps/api/dpi";
+import { listen } from "@tauri-apps/api/event";
+import type { UnlistenFn } from "@tauri-apps/api/event";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { platform as osPlatform } from "@tauri-apps/plugin-os";
@@ -60,6 +62,7 @@ import {
   selectCustomFontPreferences,
   selectGeneralPreferences,
   selectNotificationPreferences,
+  selectPetPreferences,
   settingsBoolean,
   useSettingsStore,
 } from "../stores/useSettingsStore";
@@ -72,7 +75,14 @@ import { hasTauriInternals, safeTauriAssetUrl } from "../shared/tauri";
 import { useAppStore } from "../stores/useAppStore";
 import { useAppThemeStore } from "../stores/useAppThemeStore";
 import type { AppTab } from "../routing/types";
-import type { TransferRecord } from "../api/types";
+import type { TransferRecord, TransferStatus } from "../api/types";
+import { isAndroidBuild } from "../platform/buildTarget";
+import {
+  closeCloudFolderPetWindow,
+  cloudFolderPetDismissEvent,
+  cloudFolderPetReturnToAppEvent,
+  openCloudFolderPetWindow,
+} from "../pets/cloudFolderPet";
 
 export type DesktopNavItem = {
   id: string;
@@ -99,12 +109,18 @@ type WindowRect = {
 
 const desktopFrameClass =
   "relative isolate grid h-full min-h-0 grid-cols-[72px_minmax(0,1fr)] grid-rows-[28px_minmax(0,1fr)] overflow-hidden bg-[var(--misty-app-frame-bg,var(--misty-bg))]";
+const androidDesktopFrameClass =
+  "relative isolate grid h-full min-h-0 grid-cols-[72px_minmax(0,1fr)] grid-rows-[minmax(0,1fr)] overflow-hidden bg-[var(--misty-app-frame-bg,var(--misty-bg))] pt-[max(var(--misty-safe-top),28px)] pb-[max(var(--misty-safe-bottom),24px)]";
 
 const desktopNavbarClass =
   "relative z-10 col-start-1 row-start-2 flex min-h-0 flex-col items-center overflow-hidden border-r border-transparent px-1 pb-2.5 pt-2";
+const androidDesktopNavbarClass =
+  "relative z-10 col-start-1 row-start-1 flex min-h-0 flex-col items-center overflow-hidden border-r border-transparent px-1 pb-2.5 pt-2";
 
 const desktopRouteShellClass =
   "relative z-10 col-start-2 row-start-2 min-h-0 overflow-hidden bg-transparent";
+const androidDesktopRouteShellClass =
+  "relative z-10 col-start-2 row-start-1 min-h-0 overflow-hidden bg-transparent";
 
 const navbarGroupClass = "flex w-full flex-col items-center gap-3";
 
@@ -202,6 +218,7 @@ export function DesktopLayout(props: {
   getRouteId: (pathname: string) => AppTab;
   navItems: DesktopNavItem[];
 }) {
+  const usesNativeWindowChrome = !isAndroidBuild;
   const location = useLocation();
   const navigate = useNavigate();
   const { app, loadApp } = useAppStore(
@@ -237,7 +254,9 @@ export function DesktopLayout(props: {
     ),
   );
   const appWallpaperSrc = useMemo(
-    () => appearancePreferences.wallpaperPath ? safeTauriAssetUrl(appearancePreferences.wallpaperPath) : "",
+    () => !isAndroidBuild && appearancePreferences.wallpaperPath
+      ? safeTauriAssetUrl(appearancePreferences.wallpaperPath)
+      : "",
     [appearancePreferences.wallpaperPath],
   );
   const appWallpaperIsVideo = useMemo(
@@ -332,6 +351,10 @@ export function DesktopLayout(props: {
       selectNotificationPreferences(state.settings?.document),
     ),
   );
+  const cloudFolderPetEnabled = useSettingsStore(
+    (state) => selectPetPreferences(state.settings?.document).cloudFolderEnabled,
+  );
+  const updateSetting = useSettingsStore((state) => state.updateSetting);
   const framePacingOverlayEnabled = useSettingsStore((state) =>
     settingsBoolean(
       state.settings?.document ?? {},
@@ -405,6 +428,43 @@ export function DesktopLayout(props: {
     void loadApp();
     void settingsLoad();
   }, [loadApp, settingsLoad]);
+
+  useEffect(() => {
+    if (!hasTauriInternals()) return;
+    if (cloudFolderPetEnabled) void openCloudFolderPetWindow(app?.environment.assetsDir);
+    else void closeCloudFolderPetWindow();
+  }, [app?.environment.assetsDir, cloudFolderPetEnabled]);
+
+  useEffect(() => {
+    if (!hasTauriInternals()) return;
+    let unlisten: UnlistenFn | null = null;
+    void listen(cloudFolderPetDismissEvent, () => {
+      updateSetting("pets", "cloud_folder_enabled", false);
+    }).then((listener) => {
+      unlisten = listener;
+    });
+
+    return () => {
+      if (unlisten) void unlisten();
+    };
+  }, [updateSetting]);
+
+  useEffect(() => {
+    if (!hasTauriInternals()) return;
+    let unlisten: UnlistenFn | null = null;
+    void listen(cloudFolderPetReturnToAppEvent, () => {
+      const mainWindow = getCurrentWindow();
+      void mainWindow.show().catch(() => undefined);
+      void mainWindow.unminimize().catch(() => undefined);
+      void mainWindow.setFocus().catch(() => undefined);
+    }).then((listener) => {
+      unlisten = listener;
+    });
+
+    return () => {
+      if (unlisten) void unlisten();
+    };
+  }, []);
 
   useEffect(() => {
     if (loadedRoutes.current.has(routeId)) return;
@@ -718,11 +778,14 @@ export function DesktopLayout(props: {
   }, []);
 
   const shouldShowWindowsTitlebarControls =
-    desktopPlatform === "windows" || desktopPlatform === "linux";
+    usesNativeWindowChrome && (desktopPlatform === "windows" || desktopPlatform === "linux");
+  const frameClass = usesNativeWindowChrome ? desktopFrameClass : androidDesktopFrameClass;
+  const navbarClass = usesNativeWindowChrome ? desktopNavbarClass : androidDesktopNavbarClass;
+  const routeShellClass = usesNativeWindowChrome ? desktopRouteShellClass : androidDesktopRouteShellClass;
 
   return (
     <main
-      className={desktopFrameClass}
+      className={frameClass}
       data-wallpaper-active={appWallpaperSrc ? "true" : "false"}
       style={desktopFrameStyle}
     >
@@ -749,7 +812,7 @@ export function DesktopLayout(props: {
           <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(5,6,7,0.04),rgba(5,6,7,0.16))]" />
         </div>
       ) : null}
-      <header
+      {usesNativeWindowChrome ? <header
         className={desktopTitlebarClass}
         data-tauri-drag-region
         onPointerDown={startTitlebarDrag}
@@ -809,13 +872,13 @@ export function DesktopLayout(props: {
             </button>
           </div>
         ) : null}
-      </header>
+      </header> : null}
 
       <nav
-        className={desktopNavbarClass}
+        className={navbarClass}
         style={desktopNavbarStyle}
         aria-label="Primary"
-        onPointerDown={startTitlebarDrag}
+        onPointerDown={usesNativeWindowChrome ? startTitlebarDrag : undefined}
       >
         <div
           className="mb-3 grid h-[62px] w-[62px] place-items-center"
@@ -856,7 +919,7 @@ export function DesktopLayout(props: {
         </div>
       </nav>
 
-      <section className={`${desktopRouteShellClass} route-shell`}>
+      <section className={`${routeShellClass} route-shell`}>
         <AppNoticePublisher onPublish={publishAppInboxEntry} />
         <RouteNotice routeId={routeId} />
 
@@ -864,6 +927,7 @@ export function DesktopLayout(props: {
       </section>
 
       <WorkStatusPopup />
+      <TransferCompletionNotifier />
       <FramePacingOverlay enabled={framePacingOverlayEnabled} />
       <ActivityPopover
         anchorRef={activityAnchorRef}
@@ -1120,6 +1184,48 @@ const WorkStatusPopup = memo(function WorkStatusPopup() {
       </span>
     </aside>
   );
+});
+
+const transferNotificationStatuses = new Set<TransferStatus>([
+  "completed",
+  "failed",
+  "interrupted",
+]);
+
+const TransferCompletionNotifier = memo(function TransferCompletionNotifier() {
+  const rows = useTransfersStore(
+    (state) => state.transfers?.rows ?? emptyTransferRows,
+  );
+  const readyRef = useRef(false);
+  const statusesRef = useRef<Record<number, TransferStatus>>({});
+
+  useEffect(() => {
+    const nextStatuses = Object.fromEntries(
+      rows.map((row) => [row.id, row.status]),
+    ) as Record<number, TransferStatus>;
+
+    if (!readyRef.current) {
+      statusesRef.current = nextStatuses;
+      readyRef.current = true;
+      return;
+    }
+
+    const previousStatuses = statusesRef.current;
+    const pushNotification = useExplorerStore.getState().pushNotification;
+    for (const row of rows) {
+      if (!transferNotificationStatuses.has(row.status)) continue;
+      if (previousStatuses[row.id] === row.status) continue;
+      if (row.status === "completed") {
+        pushNotification(`Transfer finished: ${transferNotificationTitle(row)}`, "success", 4200);
+      } else {
+        pushNotification(`Transfer needs attention: ${transferNotificationTitle(row)}`, "error", 5600);
+      }
+    }
+
+    statusesRef.current = nextStatuses;
+  }, [rows]);
+
+  return null;
 });
 
 function NavGroup(props: {
@@ -1992,6 +2098,12 @@ function appNoticeSourceLabel(source: AppNoticeSource): string {
 
 function appNoticeType(kind: AppNoticeKind): ExplorerNotificationType {
   return kind === "error" ? "error" : "success";
+}
+
+function transferNotificationTitle(row: TransferRecord): string {
+  const title = row.queueTitle.trim() || row.fileName.trim();
+  if (title) return title;
+  return `${row.transferType} #${row.id}`;
 }
 
 function workStatusSummary(

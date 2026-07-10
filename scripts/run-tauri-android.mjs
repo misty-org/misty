@@ -1,5 +1,6 @@
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
+import { networkInterfaces } from "node:os";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -22,7 +23,17 @@ const target =
 const buildTargets = isBuild && !targetArg
   ? ["android-arm64", "android-armv7", "android-x86", "android-x86_64"]
   : [target];
+const androidSdk = resolveAndroidSdk();
+const adbPath = androidSdk ? resolve(androidSdk, "platform-tools/adb") : null;
 const physicalDevice = isDevice ? resolvePhysicalDevice(requestedDeviceId) : null;
+const developmentPort = isDevice ? resolveDevelopmentPort() : 5173;
+const developmentHost = isDevice ? resolveDevelopmentHost(physicalDevice, developmentPort) : null;
+const accountApiProxyTarget = isDevice
+  ? process.env.MISTY_ANDROID_ACCOUNT_API_PROXY?.trim() || null
+  : null;
+const deviceDevConfig = developmentHost
+  ? JSON.stringify({ build: { devUrl: `http://${developmentHost}:${developmentPort}` } })
+  : null;
 
 for (const buildTarget of buildTargets) {
   run(npmCommand, ["run", "proxy:archive"], {
@@ -39,14 +50,22 @@ const tauriArgs = isBuild
       "--",
       "android",
       "dev",
-      ...(physicalDevice ? [physicalDevice] : []),
-      isDevice ? "--host" : "--no-dev-server-wait",
+      ...(isDevice ? ["--host", developmentHost, "--config", deviceDevConfig] : ["--no-dev-server-wait"]),
     ];
 if (isBuild && targetArg) {
   tauriArgs.push("--target", androidCargoTarget(targetArg));
 }
 
 run(npmCommand, [...tauriArgs, "--features=embedded-proxy-go"], {
+  ...(physicalDevice ? { ANDROID_SERIAL: physicalDevice } : {}),
+  ...(developmentHost ? { TAURI_DEV_HOST: developmentHost } : {}),
+  ...(isDevice ? { MISTY_DESKTOP_DEV_PORT: String(developmentPort) } : {}),
+  ...(accountApiProxyTarget
+    ? {
+        MISTY_ACCOUNT_API_PROXY_TARGET: accountApiProxyTarget,
+        VITE_MISTY_SERVER_URL: "/api",
+      }
+    : {}),
   MISTY_PROXY_RUNTIME: "embedded",
   MISTY_RCLONE_BACKEND: "misty-rclone",
   MISTY_PROXY_GO_LIB_NAME: "misty_proxy",
@@ -86,17 +105,11 @@ function androidCargoTarget(target) {
 }
 
 function resolvePhysicalDevice(requestedId) {
-  const sdk = process.env.ANDROID_HOME
-    ?? process.env.ANDROID_SDK_ROOT
-    ?? (process.platform === "darwin" && process.env.HOME
-      ? resolve(process.env.HOME, "Library/Android/sdk")
-      : undefined);
-  const adb = sdk ? resolve(sdk, "platform-tools/adb") : null;
-  if (!adb || !existsSync(adb)) {
+  if (!adbPath || !existsSync(adbPath)) {
     throw new Error("Android platform-tools were not found. Set ANDROID_HOME or install Android SDK platform-tools.");
   }
 
-  const result = spawnSync(adb, ["devices"], {
+  const result = spawnSync(adbPath, ["devices"], {
     cwd: appDir,
     encoding: "utf8",
   });
@@ -113,11 +126,70 @@ function resolvePhysicalDevice(requestedId) {
 
   if (requestedId) {
     if (physicalDevices.includes(requestedId)) return requestedId;
-    throw new Error(`Android device ${requestedId} is not connected and authorized. Run: ${adb} devices`);
+    throw new Error(`Android device ${requestedId} is not connected and authorized. Run: ${adbPath} devices`);
   }
   if (physicalDevices.length === 1) return physicalDevices[0];
   if (physicalDevices.length === 0) {
-    throw new Error(`No authorized physical Android device found. Connect and unlock the Lenovo, enable USB debugging, then confirm with: ${adb} devices`);
+    throw new Error(`No authorized physical Android device found. Connect and unlock the Lenovo, enable USB debugging, then confirm with: ${adbPath} devices`);
   }
   throw new Error(`Multiple physical Android devices found (${physicalDevices.join(", ")}). Re-run with --device-id=<serial>.`);
+}
+
+function resolveDevelopmentHost(deviceId, port) {
+  if (process.env.MISTY_ANDROID_DEV_HOST) return process.env.MISTY_ANDROID_DEV_HOST;
+
+  if (deviceId && adbPath && configureAdbReverse(deviceId, port)) {
+    return "127.0.0.1";
+  }
+
+  if (process.platform === "darwin") {
+    const defaultRoute = spawnSync("route", ["-n", "get", "default"], { encoding: "utf8" });
+    const interfaceName = defaultRoute.stdout.match(/^\s*interface:\s*(\S+)\s*$/m)?.[1];
+    if (interfaceName) {
+      const address = spawnSync("ipconfig", ["getifaddr", interfaceName], { encoding: "utf8" });
+      const host = address.stdout.trim();
+      if (host) return host;
+    }
+  }
+
+  const fallback = Object.values(networkInterfaces())
+    .flat()
+    .find((entry) => entry && entry.family === "IPv4" && !entry.internal && !entry.address.startsWith("169.254."))
+    ?.address;
+  if (fallback) return fallback;
+  throw new Error("Unable to determine the Mac's LAN address. Re-run with MISTY_ANDROID_DEV_HOST=<your-Mac-IP>.");
+}
+
+function resolveDevelopmentPort() {
+  const raw = process.env.MISTY_ANDROID_DEV_PORT
+    ?? process.env.MISTY_DESKTOP_DEV_PORT
+    ?? "5174";
+  const port = Number(raw);
+  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+    throw new Error(`Invalid Android development port: ${raw}`);
+  }
+  return port;
+}
+
+function resolveAndroidSdk() {
+  return process.env.ANDROID_HOME
+    ?? process.env.ANDROID_SDK_ROOT
+    ?? (process.platform === "darwin" && process.env.HOME
+      ? resolve(process.env.HOME, "Library/Android/sdk")
+      : undefined);
+}
+
+function configureAdbReverse(deviceId, port) {
+  const tcpPort = `tcp:${port}`;
+  const result = spawnSync(adbPath, ["-s", deviceId, "reverse", tcpPort, tcpPort], {
+    cwd: appDir,
+    encoding: "utf8",
+  });
+  if (result.status === 0) return true;
+
+  const details = (result.stderr || result.stdout || "").trim();
+  if (details) {
+    console.warn(`Unable to configure adb reverse for ${deviceId}: ${details}`);
+  }
+  return false;
 }

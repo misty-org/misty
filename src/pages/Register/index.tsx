@@ -1,6 +1,6 @@
 import { lazy, Suspense } from "react";
 
-const DesktopRegisterPage = import.meta.env.MODE === "mobile" || import.meta.env.VITE_MISTY_TARGET === "android"
+const DesktopRegisterPage = import.meta.env.MODE === "mobile"
   ? null
   : lazy(() => import("./desktop"));
 const MobileRegisterPage = import.meta.env.MODE === "mobile"

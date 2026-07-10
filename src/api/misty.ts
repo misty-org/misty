@@ -1,5 +1,7 @@
 import { invoke as tauriInvoke } from "@tauri-apps/api/core";
 import type {
+  AndroidAllFilesAccessStatus,
+  AndroidGrantedFolder,
   AiSendRequest,
   AiStatus,
   AiStreamEvent,
@@ -197,6 +199,18 @@ export function devicesSnapshot(): Promise<DeviceSnapshot> {
 
 export function explorerListDirectory(request: ListDirectoryRequest): Promise<DirectoryListing> {
   return invoke("explorer_list_directory", { request });
+}
+
+export function androidGrantLocalFolder(request?: { initialDirectory?: string | null }): Promise<AndroidGrantedFolder> {
+  return invoke("android_grant_local_folder", { request: request ?? null });
+}
+
+export function androidAllFilesAccessStatus(): Promise<AndroidAllFilesAccessStatus> {
+  return invoke("android_all_files_access_status");
+}
+
+export function androidOpenAllFilesAccessSettings(): Promise<AndroidAllFilesAccessStatus> {
+  return invoke("android_open_all_files_access_settings");
 }
 
 export function explorerDirectorySizeSnapshot(paths: string[]): Promise<DirectorySizeRecord[]> {

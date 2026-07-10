@@ -2672,6 +2672,7 @@ dependencies = [
  "tauri-plugin-clipboard-manager",
  "tauri-plugin-deep-link",
  "tauri-plugin-dialog",
+ "tauri-plugin-document-tree",
  "tauri-plugin-keystore",
  "tauri-plugin-opener",
  "tauri-plugin-os",
@@ -4883,6 +4884,16 @@ dependencies = [
  "tauri-plugin-fs",
  "thiserror 2.0.18",
  "url",
+]
+
+[[package]]
+name = "tauri-plugin-document-tree"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "tauri",
+ "tauri-plugin",
+ "thiserror 1.0.69",
 ]
 
 [[package]]

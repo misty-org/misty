@@ -47,6 +47,12 @@ export interface ProxyRuntimeSnapshot {
   error: string | null;
 }
 
+export interface AndroidAllFilesAccessStatus {
+  granted: boolean;
+  canRequest: boolean;
+  storageRoot: string | null;
+}
+
 export interface AiStatus {
   configured: boolean;
   provider: string;
@@ -165,6 +171,14 @@ export interface ExplorerLocation {
   remotePath: string | null;
 }
 
+export interface AndroidGrantedFolder {
+  uri: string;
+  name: string;
+  documentId: string;
+  canWrite: boolean;
+  path: string;
+}
+
 export interface FileEntry {
   id: string;
   name: string;
@@ -253,6 +267,7 @@ export interface SearchResult {
 
 export interface DirectoryListing {
   path: string;
+  title?: string | null;
   parentPath: string | null;
   location: ExplorerLocation;
   entries: FileEntry[];
@@ -325,6 +340,8 @@ export interface PasteBlobRequest {
 export interface PasteItem {
   path: string;
   isDirectory: boolean;
+  sizeBytes?: number | null;
+  remoteModified?: string | null;
 }
 
 export interface ExplorerOperationResult {

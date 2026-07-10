@@ -7,7 +7,7 @@
     "dev": "npm run dev:desktop",
     "dev:desktop": "vite --mode desktop",
     "dev:mobile": "vite --mode mobile --host 0.0.0.0 --port 5173",
-    "dev:android": "vite --mode android --host 0.0.0.0 --port 5173",
+    "dev:android": "vite --mode android --host 0.0.0.0",
     "build": "npm run build:desktop",
     "build:desktop": "tsc && vite build --mode desktop",
     "build:mac:test": "npm run proxy:archive && MISTY_PROXY_RUNTIME=embedded MISTY_PROXY_GO_LIB_DIR=src-tauri/target/misty-proxy/host MISTY_PROXY_GO_LIB_NAME=misty_proxy npm run tauri -- build --features=embedded-proxy-go --bundles app dmg --no-sign",

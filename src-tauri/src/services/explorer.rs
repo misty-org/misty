@@ -12,6 +12,9 @@ use std::{
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 
+#[cfg(target_os = "android")]
+use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
+
 use image::{
     codecs::{
         gif::GifDecoder,
@@ -23,6 +26,12 @@ use image::{
 use sha2::{Digest, Sha256};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::sync::Mutex;
+
+#[cfg(target_os = "android")]
+use tauri::AppHandle;
+
+#[cfg(target_os = "android")]
+use tauri_plugin_document_tree::{DocumentTreeExt, ListChildrenRequest};
 
 use crate::core::clipboard::{ClipboardCache, ClipboardRemoteFileCacheKey};
 use crate::core::explorer::{
@@ -52,6 +61,8 @@ use crate::services::{
 const VIRTUAL_PATH_RECENT: &str = "misty://recent";
 const VIRTUAL_PATH_STARRED: &str = "misty://starred";
 const VIRTUAL_PATH_TRASH: &str = "misty://trash";
+#[cfg(target_os = "android")]
+const VIRTUAL_PATH_LOCAL: &str = "misty://local";
 const MAX_IMAGE_PREVIEW_DIMENSION: u32 = 1600;
 const DEFAULT_IMAGE_THUMBNAIL_DIMENSION: u32 = 384;
 const MAX_GENERATED_IMAGE_THUMBNAIL_DIMENSION: u32 = 384;
@@ -60,6 +71,7 @@ const IMAGE_THUMBNAIL_PNG_COMPRESSION: CompressionType = CompressionType::Fast;
 const IMAGE_THUMBNAIL_PNG_FILTER: PngFilterType = PngFilterType::Adaptive;
 const REMOTE_INVENTORY_WAIT_ATTEMPTS: usize = 30;
 const REMOTE_INVENTORY_WAIT_INTERVAL: Duration = Duration::from_millis(100);
+const REMOTE_LISTING_CACHE_MAX_AGE: Duration = Duration::from_secs(5 * 60);
 const REMOTE_JOB_STALE_TIMEOUT: Duration = Duration::from_secs(30 * 60);
 const REMOTE_JOB_MAX_WAIT: Duration = Duration::from_secs(24 * 60 * 60);
 
@@ -174,6 +186,112 @@ impl ExplorerService {
             .map_err(|err| ApiError::Message(format!("Explorer worker failed: {err}")))?
     }
 
+    #[cfg(target_os = "android")]
+    pub fn is_android_local_virtual_path(&self, path: Option<&str>) -> bool {
+        path.map(|value| value.trim().is_empty() || value.starts_with(VIRTUAL_PATH_LOCAL))
+            .unwrap_or(true)
+    }
+
+    #[cfg(target_os = "android")]
+    pub async fn list_android_local_directory(
+        &self,
+        app: &AppHandle,
+        request: ListDirectoryRequest,
+    ) -> ApiResult<DirectoryListing> {
+        let path = request
+            .path
+            .as_deref()
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .unwrap_or(VIRTUAL_PATH_LOCAL);
+        let locations = app.document_tree().persisted_trees().map_err(|error| {
+            ApiError::Message(format!("Could not read granted folders: {error}"))
+        })?;
+
+        if path == VIRTUAL_PATH_LOCAL {
+            let entries = locations
+                .iter()
+                .map(|location| android_local_location_entry(location))
+                .collect::<Vec<_>>();
+            return Ok(DirectoryListing {
+                path: VIRTUAL_PATH_LOCAL.to_owned(),
+                title: Some("Local".to_owned()),
+                parent_path: None,
+                location: ExplorerLocation::local(),
+                hidden_count: 0,
+                total_count: entries.len(),
+                entries,
+                modified_ms: None,
+                created_ms: None,
+            });
+        }
+
+        let (location_id, document_id) = parse_android_local_path(path)?;
+        let location = locations
+            .iter()
+            .find(|location| android_local_location_id(&location.uri) == location_id)
+            .ok_or_else(|| {
+                ApiError::Message(
+                    "This Android folder permission is no longer available.".to_owned(),
+                )
+            })?;
+        let entries = app
+            .document_tree()
+            .list_children(ListChildrenRequest {
+                tree_uri: location.uri.clone(),
+                document_id: document_id.clone(),
+            })
+            .map_err(|error| {
+                ApiError::Message(format!("Could not list the selected folder: {error}"))
+            })?
+            .into_iter()
+            .map(|entry| {
+                let entry_path = android_local_child_path(path, &entry.document_id);
+                let name = entry.name;
+                FileEntry {
+                    id: entry_path.clone(),
+                    path: entry_path,
+                    extension: Path::new(&name)
+                        .extension()
+                        .and_then(|value| value.to_str())
+                        .unwrap_or_default()
+                        .to_owned(),
+                    mime_type: entry.mime_type,
+                    remote_modified: None,
+                    kind: if entry.is_directory {
+                        FileKind::Folder
+                    } else {
+                        FileKind::File
+                    },
+                    size_bytes: entry.size_bytes,
+                    modified_ms: entry.modified_ms,
+                    created_ms: None,
+                    readonly: !entry.can_write,
+                    hidden: name.starts_with('.'),
+                    is_deleted: false,
+                    location: ExplorerLocation::local(),
+                    name,
+                }
+            })
+            .collect::<Vec<_>>();
+        let parent_path = if document_id.is_some() {
+            path.rsplit_once('/').map(|(parent, _)| parent.to_owned())
+        } else {
+            Some(VIRTUAL_PATH_LOCAL.to_owned())
+        };
+        Ok(DirectoryListing {
+            path: path.to_owned(),
+            title: Some(location.name.clone()),
+            parent_path,
+            location: ExplorerLocation::local(),
+            hidden_count: 0,
+            total_count: entries.len(),
+            entries,
+            modified_ms: None,
+            created_ms: None,
+        })
+    }
+
     async fn list_library_virtual_directory(&self, path: &str) -> ApiResult<DirectoryListing> {
         let snapshot = self.explorer_library.snapshot().await?;
         let source_items = if path == VIRTUAL_PATH_RECENT {
@@ -193,6 +311,7 @@ impl ExplorerService {
         let total_count = entries.len();
         Ok(DirectoryListing {
             path: path.to_string(),
+            title: None,
             parent_path: None,
             location: ExplorerLocation::local(),
             hidden_count: 0,
@@ -211,6 +330,7 @@ impl ExplorerService {
         let total_count = entries.len();
         Ok(DirectoryListing {
             path: VIRTUAL_PATH_TRASH.to_string(),
+            title: Some("Trash".to_owned()),
             parent_path: None,
             location: ExplorerLocation::local(),
             hidden_count: 0,
@@ -358,6 +478,7 @@ impl ExplorerService {
                     Some(size_bytes),
                     remote_modified.as_deref(),
                     "Preparing remote file for preview",
+                    false,
                 )
                 .await?;
             return self
@@ -421,6 +542,7 @@ impl ExplorerService {
                     prepare_size_bytes,
                     remote_modified.as_deref(),
                     "Preparing remote file thumbnail",
+                    false,
                 )
                 .await?;
             let identity = ImageThumbnailIdentity {
@@ -621,6 +743,7 @@ impl ExplorerService {
             request.size_bytes,
             request.remote_modified.as_deref(),
             "Preparing remote file to open",
+            false,
         )
         .await
     }
@@ -693,6 +816,7 @@ impl ExplorerService {
                     request.size_bytes,
                     request.remote_modified.as_deref(),
                     "Preparing remote file for drag-out",
+                    true,
                 )
                 .await?;
             return Ok(PreparedDragItem {
@@ -751,6 +875,7 @@ impl ExplorerService {
         size_bytes: Option<i64>,
         remote_modified: Option<&str>,
         _detail_message: &str,
+        record_transfer: bool,
     ) -> ApiResult<PreparedOpenItem> {
         let file_name = Path::new(&source.remote_path)
             .file_name()
@@ -798,17 +923,21 @@ impl ExplorerService {
             .lock()
             .await
             .temp_path_for(&ClipboardCache::remote_file_key(&cache_key), &file_name);
-        let mut record = FileTransferRecord::new(
-            FileTransferType::Download,
-            FileTransferItemType::Remote,
-            &file_name,
-        );
-        record.remote_source_name = source.remote_name.clone();
-        record.remote_source_path = source.remote_path.clone();
-        record.local_dest_path = display_path(&temp_path);
-        record.total_bytes = size_bytes.unwrap_or_default();
-        record.detail_message = _detail_message.to_string();
-        let transfer_id = self.begin_transfer(record).await;
+        let transfer_id = if record_transfer {
+            let mut record = FileTransferRecord::new(
+                FileTransferType::Download,
+                FileTransferItemType::Remote,
+                &file_name,
+            );
+            record.remote_source_name = source.remote_name.clone();
+            record.remote_source_path = source.remote_path.clone();
+            record.local_dest_path = display_path(&temp_path);
+            record.total_bytes = size_bytes.unwrap_or_default();
+            record.detail_message = _detail_message.to_string();
+            self.begin_transfer(record).await
+        } else {
+            None
+        };
         let result = self
             .download_remote_item(source, false, &temp_path, transfer_id, None)
             .await;
@@ -862,16 +991,41 @@ impl ExplorerService {
         self.finish_transfer(transfer_id, prepared).await
     }
 
-    async fn cache_downloaded_remote_file(&self, source: &RemoteBrowseTarget, local_path: &Path) {
-        let size = tokio::fs::metadata(local_path)
+    async fn cached_remote_file_for_paste(
+        &self,
+        source: &RemoteBrowseTarget,
+        item: &PasteItem,
+    ) -> Option<PathBuf> {
+        let cache_key = ClipboardRemoteFileCacheKey {
+            remote_name: source.remote_name.clone(),
+            remote_path: source.remote_path.clone(),
+            size: item.size_bytes.unwrap_or_default(),
+            last_modified: item.remote_modified.as_deref().unwrap_or_default().to_string(),
+            is_dir: false,
+        };
+        self.remote_file_cache
+            .lock()
             .await
-            .map(|metadata| metadata.len().min(i64::MAX as u64) as i64)
-            .unwrap_or_default();
+            .lookup_remote_file(&cache_key)
+    }
+
+    async fn cache_downloaded_remote_file(
+        &self,
+        source: &RemoteBrowseTarget,
+        local_path: &Path,
+        size_bytes: Option<i64>,
+        remote_modified: Option<&str>,
+    ) {
+        let size = size_bytes.unwrap_or_else(|| {
+            std::fs::metadata(local_path)
+                .map(|metadata| metadata.len().min(i64::MAX as u64) as i64)
+                .unwrap_or_default()
+        });
         let cache_key = ClipboardRemoteFileCacheKey {
             remote_name: source.remote_name.clone(),
             remote_path: source.remote_path.clone(),
             size,
-            last_modified: String::new(),
+            last_modified: remote_modified.unwrap_or_default().to_string(),
             is_dir: false,
         };
         let file_name = Path::new(&source.remote_path)
@@ -1479,21 +1633,34 @@ impl ExplorerService {
                 record.remote_source_name = source.remote_name.clone();
                 record.remote_source_path = source.remote_path.clone();
                 record.local_dest_path = display_path(&local_path);
-                record.detail_message = "Downloading remote item".to_string();
+                let cached_remote_file = if item.is_directory {
+                    None
+                } else {
+                    self.cached_remote_file_for_paste(&source, item).await
+                };
+                record.detail_message = if cached_remote_file.is_some() {
+                    "Copying cached remote item".to_string()
+                } else {
+                    "Downloading remote item".to_string()
+                };
                 let transfer_id = if existing_transfer_id.is_some() {
                     existing_transfer_id
                 } else {
                     self.begin_transfer(record).await
                 };
-                let download = self
-                    .download_remote_item(
+                let download = if let Some(cache_path) = cached_remote_file {
+                    copy_cached_remote_file_to_destination(&cache_path, &local_path, cancellation)
+                        .await
+                } else {
+                    self.download_remote_item(
                         &source,
                         item.is_directory,
                         &local_path,
                         transfer_id,
                         cancellation,
                     )
-                    .await;
+                    .await
+                };
                 let operation = if download.is_ok()
                     && matches!(
                         request.operation,
@@ -1507,7 +1674,12 @@ impl ExplorerService {
                 self.finish_transfer(transfer_id, operation).await?;
                 ensure_not_canceled_if(cancellation)?;
                 if !item.is_directory {
-                    self.cache_downloaded_remote_file(&source, &local_path)
+                    self.cache_downloaded_remote_file(
+                        &source,
+                        &local_path,
+                        item.size_bytes,
+                        item.remote_modified.as_deref(),
+                    )
                         .await;
                 }
                 affected_paths.push(display_path(&local_path));
@@ -1735,6 +1907,8 @@ impl ExplorerService {
             sources: vec![crate::core::explorer::PasteItem {
                 path: display_path(&source_path),
                 is_directory: false,
+                size_bytes: None,
+                remote_modified: None,
             }],
             destination_directory: request.destination_directory,
             operation: crate::core::explorer::ClipboardOperation::Copy,
@@ -1775,6 +1949,8 @@ impl ExplorerService {
             sources: vec![crate::core::explorer::PasteItem {
                 path: display_path(&source_path),
                 is_directory: false,
+                size_bytes: None,
+                remote_modified: None,
             }],
             destination_directory: request.destination_directory,
             operation: crate::core::explorer::ClipboardOperation::Copy,
@@ -1864,6 +2040,7 @@ impl ExplorerService {
             .collect::<Vec<_>>();
         DirectoryListing {
             path: display_path(&self.mount_root),
+            title: None,
             parent_path: self.mount_root.parent().map(display_path),
             location: ExplorerLocation {
                 kind: ExplorerLocationKind::RemoteProvider,
@@ -1886,19 +2063,47 @@ impl ExplorerService {
         force_remote_refresh: bool,
     ) -> ApiResult<DirectoryListing> {
         if !force_remote_refresh {
-            if let Some(items) = self.load_cached_remote_items(&target).await? {
+            if let Some(items) = self.load_fresh_cached_remote_items(&target).await? {
                 return self.remote_listing_from_items(target, show_hidden, items);
             }
         }
 
         let items = match self.fetch_remote_items(&target).await {
             Ok(items) => items,
+            Err(remote_error) if is_remote_directory_not_found_error(&remote_error) => {
+                let _ = self
+                    .listing_cache
+                    .clear(&target.remote_name, &target.remote_path)
+                    .await;
+                return Err(remote_error);
+            }
             Err(remote_error) => match self.load_cached_remote_items(&target).await? {
                 Some(items) => items,
                 None => return Err(remote_error),
             },
         };
         self.remote_listing_from_items(target, show_hidden, items)
+    }
+
+    async fn load_fresh_cached_remote_items(
+        &self,
+        target: &RemoteBrowseTarget,
+    ) -> ApiResult<Option<Vec<RemoteListItem>>> {
+        let Some(last_write_time) = self
+            .listing_cache
+            .last_write_time(&target.remote_name, &target.remote_path)
+            .await?
+        else {
+            return Ok(None);
+        };
+        if last_write_time
+            .elapsed()
+            .map(|age| age > REMOTE_LISTING_CACHE_MAX_AGE)
+            .unwrap_or(true)
+        {
+            return Ok(None);
+        }
+        self.load_cached_remote_items(target).await
     }
 
     async fn load_cached_remote_items(
@@ -1996,6 +2201,7 @@ impl ExplorerService {
         let parent_path = listing_path.parent().map(display_path);
         Ok(DirectoryListing {
             path: display_path(&listing_path),
+            title: None,
             parent_path,
             location: ExplorerLocation {
                 kind: ExplorerLocationKind::Remote,
@@ -2595,6 +2801,80 @@ impl ExplorerService {
     }
 }
 
+#[cfg(target_os = "android")]
+fn android_local_location_entry(
+    location: &tauri_plugin_document_tree::DocumentTreeLocation,
+) -> FileEntry {
+    let path = format!(
+        "{VIRTUAL_PATH_LOCAL}/{}",
+        android_local_location_id(&location.uri)
+    );
+    FileEntry {
+        id: path.clone(),
+        name: location.name.clone(),
+        path,
+        extension: String::new(),
+        mime_type: None,
+        remote_modified: None,
+        kind: FileKind::Folder,
+        size_bytes: None,
+        modified_ms: None,
+        created_ms: None,
+        readonly: !location.can_write,
+        hidden: false,
+        is_deleted: false,
+        location: ExplorerLocation::local(),
+    }
+}
+
+#[cfg(target_os = "android")]
+fn android_local_location_id(uri: &str) -> String {
+    let digest = Sha256::digest(uri.as_bytes());
+    hex::encode(&digest[..8])
+}
+
+#[cfg(target_os = "android")]
+fn parse_android_local_path(path: &str) -> ApiResult<(String, Option<String>)> {
+    let remainder = path
+        .strip_prefix(VIRTUAL_PATH_LOCAL)
+        .and_then(|value| value.strip_prefix('/'))
+        .ok_or_else(|| ApiError::Message("Invalid Android local folder path.".to_owned()))?;
+    let segments = remainder
+        .split('/')
+        .filter(|segment| !segment.is_empty())
+        .collect::<Vec<_>>();
+    let location_id = segments
+        .first()
+        .filter(|value| {
+            value.len() == 16 && value.chars().all(|character| character.is_ascii_hexdigit())
+        })
+        .ok_or_else(|| ApiError::Message("Invalid Android local folder location.".to_owned()))?
+        .to_string();
+    let document_id = segments
+        .last()
+        .filter(|_| segments.len() > 1)
+        .map(|segment| {
+            URL_SAFE_NO_PAD
+                .decode(segment)
+                .map_err(|_| ApiError::Message("Invalid Android local folder entry.".to_owned()))
+                .and_then(|bytes| {
+                    String::from_utf8(bytes).map_err(|_| {
+                        ApiError::Message("Invalid Android local folder entry.".to_owned())
+                    })
+                })
+        })
+        .transpose()?;
+    Ok((location_id, document_id))
+}
+
+#[cfg(target_os = "android")]
+fn android_local_child_path(parent_path: &str, document_id: &str) -> String {
+    format!(
+        "{parent_path}/{}",
+        URL_SAFE_NO_PAD.encode(document_id.as_bytes())
+    )
+}
+
 async fn local_item_size(path: &Path, is_directory: bool) -> i64 {
     if !is_directory {
         return tokio::fs::metadata(path)
@@ -2704,7 +2984,10 @@ fn remote_item_is_directory(
 
 fn is_remote_directory_not_found_error(error: &ApiError) -> bool {
     let message = error.to_string().to_ascii_lowercase();
-    message.contains("directory not found") || message.contains("object not found")
+    message.contains("directory not found")
+        || message.contains("object not found")
+        || message.contains("invalidresourceid")
+        || message.contains("objecthandle is invalid")
 }
 
 fn remote_preview_metadata_from_items(
@@ -2893,6 +3176,23 @@ async fn copy_local_path_cancellable(
     } else {
         copy_local_file_cancellable(source, destination, cancellation).await
     }
+}
+
+async fn copy_cached_remote_file_to_destination(
+    source: &Path,
+    destination: &Path,
+    cancellation: Option<&AtomicBool>,
+) -> ApiResult<()> {
+    ensure_not_canceled_if(cancellation)?;
+    tokio::fs::copy(source, destination).await.map_err(|error| {
+        ApiError::Message(format!(
+            "Failed to copy cached remote file from {} to {}: {error}",
+            source.display(),
+            destination.display()
+        ))
+    })?;
+    ensure_not_canceled_if(cancellation)?;
+    Ok(())
 }
 
 async fn copy_local_directory_cancellable(
@@ -4624,6 +4924,8 @@ mod tests {
                 sources: vec![PasteItem {
                     path: display_path(&source),
                     is_directory: false,
+                    size_bytes: None,
+                    remote_modified: None,
                 }],
                 destination_directory: display_path(&destination),
                 operation: crate::core::explorer::ClipboardOperation::Copy,
@@ -4748,6 +5050,7 @@ mod tests {
                 Some(b"cached image".len() as i64),
                 Some("2026-06-26T21:58:36Z"),
                 "Preparing remote file to open",
+                false,
             )
             .await
             .unwrap();
@@ -4770,6 +5073,60 @@ mod tests {
             tokio::fs::read(prepared_path).await.unwrap(),
             b"cached image"
         );
+
+        let _ = tokio::fs::remove_dir_all(home).await;
+    }
+
+    #[tokio::test]
+    async fn remote_to_local_download_reuses_cached_remote_file() {
+        let home = unique_test_dir("remote-paste-cache-home");
+        let service = test_explorer_service_for_home(home.clone());
+        let source = RemoteBrowseTarget {
+            provider_type: "drive".into(),
+            remote_name: "work".into(),
+            remote_path: "/Photos/IMG_7313.PNG".into(),
+        };
+        let file_name = "IMG_7313.PNG";
+        let payload = b"cached download payload";
+        let cache_key = ClipboardRemoteFileCacheKey {
+            remote_name: source.remote_name.clone(),
+            remote_path: source.remote_path.clone(),
+            size: payload.len() as i64,
+            last_modified: "2026-06-26T21:58:36Z".into(),
+            is_dir: false,
+        };
+        let temp_path = {
+            let cache = service.remote_file_cache.lock().await;
+            cache.temp_path_for(&ClipboardCache::remote_file_key(&cache_key), file_name)
+        };
+        tokio::fs::write(&temp_path, payload).await.unwrap();
+        service
+            .remote_file_cache
+            .lock()
+            .await
+            .store_remote_file(&cache_key, &temp_path, file_name)
+            .unwrap();
+        let destination = home.join("Downloads");
+        tokio::fs::create_dir_all(&destination).await.unwrap();
+
+        let result = service
+            .paste_items(PasteItemsRequest {
+                sources: vec![PasteItem {
+                    path: display_path(&source.virtual_path(&service.mount_root)),
+                    is_directory: false,
+                    size_bytes: Some(payload.len() as i64),
+                    remote_modified: Some("2026-06-26T21:58:36Z".into()),
+                }],
+                destination_directory: display_path(&destination),
+                operation: crate::core::explorer::ClipboardOperation::Copy,
+                target_name: None,
+            })
+            .await
+            .unwrap();
+
+        let downloaded = destination.join(file_name);
+        assert_eq!(result.affected_paths, vec![display_path(&downloaded)]);
+        assert_eq!(tokio::fs::read(downloaded).await.unwrap(), payload);
 
         let _ = tokio::fs::remove_dir_all(home).await;
     }

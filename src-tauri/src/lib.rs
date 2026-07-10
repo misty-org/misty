@@ -7,6 +7,11 @@ mod plugins;
 mod runtime;
 mod services;
 
+#[cfg(target_os = "android")]
+use commands::{
+    android_all_files_access_status, android_grant_local_folder,
+    android_open_all_files_access_settings,
+};
 use commands::{
     ai_abort, ai_drain_events, ai_send_message, ai_status, app_environment_snapshot, app_snapshot,
     archive_create, archive_extract, archive_list, claude_abort, claude_drain_events,
@@ -67,6 +72,7 @@ pub fn run() {
     let builder = tauri::Builder::default()
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_deep_link::init())
+        .plugin(tauri_plugin_document_tree::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_keystore::init())
         .plugin(tauri_plugin_opener::init())
@@ -74,7 +80,11 @@ pub fn run() {
         .setup(|app| {
             #[cfg(any(target_os = "ios", target_os = "android"))]
             let runtime = {
-                let data_root = app.path().app_data_dir().ok().map(|path| path.join("Misty"));
+                let data_root = app
+                    .path()
+                    .app_data_dir()
+                    .ok()
+                    .map(|path| path.join("Misty"));
                 if let Some(root) = &data_root {
                     services::paths::set_mobile_data_root(root.clone());
                 }
@@ -171,6 +181,12 @@ pub fn run() {
             clipboard_write_file_refs,
             devices_snapshot,
             explorer_list_directory,
+            #[cfg(target_os = "android")]
+            android_grant_local_folder,
+            #[cfg(target_os = "android")]
+            android_all_files_access_status,
+            #[cfg(target_os = "android")]
+            android_open_all_files_access_settings,
             explorer_directory_size_snapshot,
             explorer_calculate_directory_sizes,
             explorer_create_item,

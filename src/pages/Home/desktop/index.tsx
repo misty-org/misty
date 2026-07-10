@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Navigate, useLocation, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
 import { devicesSnapshot, savedSearchesSnapshot } from "../../../api/misty";
 import type {
@@ -9,25 +9,24 @@ import type {
   SavedSearch,
   SavedSearchRule,
 } from "../../../api/types";
-import { useAuth } from "../../../auth/AuthContext";
 import { releases } from "../../../data/releases";
 import { useMultiPanelStore } from "../../../shared/multipanel/useMultiPanelStore";
 import { useAppStore } from "../../../stores/useAppStore";
 import { useExplorerStore } from "../../../stores/useExplorerStore";
-import { usePluginsStore } from "../../../stores/usePluginsStore";
 import { useProvidersStore } from "../../../stores/useProvidersStore";
 import { useSearchStore } from "../../../stores/useSearchStore";
+import { explorerRootForBuild } from "../../../platform/androidStorage";
+import { isAndroidBuild } from "../../../platform/buildTarget";
 import {
   selectAdvancedPreferences,
   selectGeneralPreferences,
   useSettingsStore,
 } from "../../../stores/useSettingsStore";
-import { useSetupStore } from "../../../stores/useSetupStore";
 import { changelog } from "../../Changelog/desktop/data";
 import { posts } from "../../../data/blog";
 import { DesktopWorkspacePanel } from "./DesktopWorkspacePanel";
+import { DesktopPetPanel } from "./DesktopPetPanel";
 import { HomeFooter } from "./HomeFooter";
-import { HomeLoading } from "./HomeLoading";
 import {
   buildHomeQuickAccessItems,
   HomeSidebarPanels,
@@ -45,29 +44,7 @@ import {
 const emptyProviderRemotes: ProviderRemote[] = [];
 
 export default function HomePage() {
-  const location = useLocation();
   const navigate = useNavigate();
-  const { status, systemError } = useSetupStore(
-    useShallow((state) => ({
-      status: state.status,
-      systemError: state.systemError,
-    })),
-  );
-  const { user } = useAuth();
-  const {
-    loadPlugins,
-    marketplacePluginCount,
-    installedPluginCount,
-    loading: pluginsLoading,
-  } = usePluginsStore(
-    useShallow((state) => ({
-      loadPlugins: state.loadPlugins,
-      marketplacePluginCount: state.marketplacePlugins.length,
-      installedPluginCount: state.installedPlugins.length,
-      loading: state.loading,
-    })),
-  );
-  const currentUser = status?.current_user ?? user;
   const app = useAppStore((state) => state.app);
   const { preferredWorkspaceRoot, settingsMountPath } = useSettingsStore(
     useShallow((state) => ({
@@ -97,39 +74,20 @@ export default function HomePage() {
   const [smartFoldersLoading, setSmartFoldersLoading] = useState(true);
   const [devices, setDevices] = useState<MountedDevice[]>([]);
   const [devicesLoading, setDevicesLoading] = useState(true);
-  const homePath = resolvePreferredWorkspaceRoot(
+  const storageHomePath = resolvePreferredWorkspaceRoot(
     preferredWorkspaceRoot,
     app?.environment.homeDir ?? "/",
   );
+  const homePath = explorerRootForBuild(storageHomePath);
   const mountRoot = resolveMountRoot(
-    homePath,
+    storageHomePath,
     settingsMountPath || app?.environment.mountPath || ".misty/mnt",
   );
   const quickAccessItems = useMemo(
-    () => buildHomeQuickAccessItems(homePath, pinnedPaths),
+    () => buildHomeQuickAccessItems(homePath, pinnedPaths, isAndroidBuild),
     [homePath, pinnedPaths],
   );
   const tags = useMemo(() => buildHomeTagItems(library), [library]);
-
-  useEffect(() => {
-    if (
-      !status ||
-      marketplacePluginCount > 0 ||
-      installedPluginCount > 0 ||
-      pluginsLoading
-    ) {
-      return;
-    }
-
-    void loadPlugins(`${status.os}-${status.arch}`);
-  }, [
-    installedPluginCount,
-    loadPlugins,
-    marketplacePluginCount,
-    pluginsLoading,
-    status?.arch,
-    status?.os,
-  ]);
 
   useEffect(() => {
     if (!library) void loadLibrary();
@@ -183,16 +141,6 @@ export default function HomePage() {
       disposed = true;
     };
   }, []);
-
-  if (!currentUser) {
-    if (!status && !systemError) {
-      return <HomeLoading />;
-    }
-
-    return (
-      <Navigate replace state={{ from: location.pathname }} to="/signin" />
-    );
-  }
 
   const latestChangelog = changelog[0] ?? {
     version: releases[0].version,
@@ -254,6 +202,7 @@ export default function HomePage() {
           quickAccessItems={quickAccessItems}
           remotes={remotes}
           remotesLoading={remotesLoading}
+          petPanel={<DesktopPetPanel />}
           smartFolders={smartFolders}
           smartFoldersLoading={smartFoldersLoading}
           tags={tags}

@@ -39,6 +39,7 @@ libloading = "0.8"
 zip = { version = "2", default-features = false, features = ["deflate"] }
 zune-psd = "0.5.1"
 tauri-plugin-keystore = { path = "vendor/tauri-plugin-keystore" }
+tauri-plugin-document-tree = { path = "vendor/tauri-plugin-document-tree" }
 tauri-plugin-deep-link = "2"
 
 [target.'cfg(target_os = "macos")'.dependencies]

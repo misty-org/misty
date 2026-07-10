@@ -1,4 +1,5 @@
 import { platform } from "@tauri-apps/plugin-os";
+import { useSyncExternalStore } from "react";
 import { hasTauriInternals } from "../shared/tauri";
 import { isAndroidBuild } from "./buildTarget";
 
@@ -47,4 +48,12 @@ export function subscribeAppFormFactor(callback: (formFactor: AppFormFactor) => 
     media.removeEventListener("change", listener);
     desktopAndroidMedia.removeEventListener("change", listener);
   };
+}
+
+export function useAppFormFactor(): AppFormFactor {
+  return useSyncExternalStore(
+    subscribeAppFormFactor,
+    detectAppFormFactor,
+    detectAppFormFactor,
+  );
 }

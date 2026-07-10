@@ -4,6 +4,7 @@ import tailwindcss from "@tailwindcss/vite";
 
 const tauriDevHost = process.env.TAURI_DEV_HOST;
 const desktopDevPort = Number(process.env.MISTY_DESKTOP_DEV_PORT ?? 5173);
+const accountApiProxyTarget = process.env.MISTY_ACCOUNT_API_PROXY_TARGET?.trim();
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
@@ -15,6 +16,14 @@ export default defineConfig({
     host: tauriDevHost ?? "127.0.0.1",
     port: desktopDevPort,
     strictPort: true,
+    proxy: accountApiProxyTarget
+      ? {
+          "/api": {
+            target: accountApiProxyTarget,
+            changeOrigin: true,
+          },
+        }
+      : undefined,
     watch: {
       ignored: ["**/dist/**", "**/src-tauri/target/**"],
     },

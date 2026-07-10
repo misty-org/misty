@@ -32,6 +32,7 @@ proxy/dist/
 
 # Images and large binary artifacts
 *.png
+!src/assets/pets/cloud-folder/*.png
 *.jpg
 *.jpeg
 *.gif

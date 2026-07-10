@@ -92,6 +92,10 @@ pub struct PasteBlobRequest {
 pub struct PasteItem {
     pub path: String,
     pub is_directory: bool,
+    #[serde(default)]
+    pub size_bytes: Option<i64>,
+    #[serde(default)]
+    pub remote_modified: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -182,6 +186,8 @@ pub struct ExplorerOperationResult {
 #[serde(rename_all = "camelCase")]
 pub struct DirectoryListing {
     pub path: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
     pub parent_path: Option<String>,
     pub location: ExplorerLocation,
     pub entries: Vec<FileEntry>,
@@ -296,6 +302,7 @@ pub fn list_directory(
     Ok(DirectoryListing {
         parent_path: path.parent().map(display_path),
         path: display_path(&path),
+        title: None,
         location: ExplorerLocation::local(),
         entries,
         total_count,

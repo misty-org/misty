@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-persisted-trees"
+description = "Enables the persisted_trees command without any pre-configured scope."
+commands.allow = ["persisted_trees"]
+
+[[permission]]
+identifier = "deny-persisted-trees"
+description = "Denies the persisted_trees command without any pre-configured scope."
+commands.deny = ["persisted_trees"]
