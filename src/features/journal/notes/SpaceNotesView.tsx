@@ -579,7 +579,7 @@ function NoteRows(props: NoteRowsProps) {
             </ContextMenuItem>
           ) : null}
           {note.canDelete ? (
-            <ContextMenuItem className="text-red-300" onSelect={() => props.onDelete(note)}>
+            <ContextMenuItem variant="destructive" onSelect={() => props.onDelete(note)}>
               <Trash2 />
               Delete
             </ContextMenuItem>

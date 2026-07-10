@@ -12,6 +12,7 @@ vi.mock("@/api/client/session", () => ({
   readApiAuthToken: async () => null,
   readApiSessionGeneration: () => 0,
   notifyApiSessionInvalid: mocks.notifyApiSessionInvalid,
+  isApiSignedOut: () => false,
 }));
 vi.mock("@/api/deployment/api", () => ({
   resolveApiBase: async () => "https://misty.example/v1",

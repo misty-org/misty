@@ -94,7 +94,7 @@ export function NavigatorToolDisclosure(props: {
           role="group"
           aria-label={`${sectionLabel} destinations`}
         >
-          {props.destinations.map(({ id, label, icon: Icon, path, onSelect }, index) => {
+          {props.destinations.map(({ id, label, icon: Icon, path, onSelect }) => {
             const selected = id === props.activeDestination;
             return (
               <Renameable key={id} nameKey={itemNameKey(props.appId, [id])} automatic={label}>
@@ -103,7 +103,6 @@ export function NavigatorToolDisclosure(props: {
                   icon={<Icon aria-hidden />}
                   label={navigationName(itemNameKey(props.appId, [id]), label)}
                   selected={selected}
-                  last={index === props.destinations.length - 1}
                 >
                   <Link
                     to={path}

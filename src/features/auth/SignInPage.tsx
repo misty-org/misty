@@ -10,6 +10,7 @@ import AuthField from "./components/AuthField";
 import AuthMessage from "./components/AuthMessage";
 import AuthShell from "./components/AuthShell";
 import AuthSubmitButton from "./components/AuthSubmitButton";
+import ForgotPasswordForm from "./components/ForgotPasswordForm";
 import type { SavedAccountSession } from "./model/stores/account/interfaces/useAuthTokenStore";
 import { accountSignIn } from "./store/useAccountStore";
 
@@ -18,19 +19,28 @@ export default function SignIn() {
   const location = useLocation();
   const { accounts, user, transitioning, authenticateAccount, resumeAccount, removeAccount } =
     useAuth();
-  const routeState = location.state as { from?: string; addingAccount?: boolean } | null;
+  const routeState = location.state as {
+    from?: string;
+    addingAccount?: boolean;
+    reauthenticateEmail?: string;
+  } | null;
   const rawFrom = routeState?.from;
   const from =
     rawFrom && !rawFrom.startsWith("/signin") && !rawFrom.startsWith("/register")
       ? rawFrom
       : "/browser";
   const addingAccount = Boolean(routeState?.addingAccount);
-  const [mode, setMode] = useState<"chooser" | "login">(
+  const reauthenticateEmail = routeState?.reauthenticateEmail ?? "";
+  const [mode, setMode] = useState<"chooser" | "login" | "forgot">(
     accounts.length > 0 && !addingAccount ? "chooser" : "login",
   );
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(reauthenticateEmail);
   const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
+  const [error, setError] = useState(
+    reauthenticateEmail
+      ? `Your saved sign-in for ${reauthenticateEmail} has expired. Sign in again to switch to it.`
+      : "",
+  );
   const [loading, setLoading] = useState(false);
   const [busyAccountId, setBusyAccountId] = useState("");
 
@@ -95,7 +105,6 @@ export default function SignIn() {
     return (
       <AuthShell
         title="Choose an account"
-        description="Pick a signed-in Misty account to continue, or add another."
         onBack={user ? () => navigate(from, { replace: true }) : undefined}
       >
         <AuthCard>
@@ -168,15 +177,30 @@ export default function SignIn() {
     );
   }
 
+  if (mode === "forgot") {
+    return (
+      <AuthShell title="Forgot your password?">
+        <AuthCard>
+          <ForgotPasswordForm
+            initialEmail={email}
+            onBack={() => {
+              setError("");
+              setMode("login");
+            }}
+          />
+        </AuthCard>
+      </AuthShell>
+    );
+  }
+
   return (
     <AuthShell
       title={
-        addingAccount ? "Add another account" : accounts.length > 0 ? "Sign in" : "Welcome to Misty"
-      }
-      description={
-        addingAccount
-          ? "Your current account will remain signed in on this device."
-          : "Sign in to begin."
+        reauthenticateEmail
+          ? "Sign in again"
+          : addingAccount
+            ? "Add another account"
+            : "Welcome back"
       }
       onBack={
         addingAccount
@@ -191,15 +215,13 @@ export default function SignIn() {
     >
       <AuthCard
         footer={
-          <div className="text-center text-sm text-cream-muted">
-            <NavLink
-              to="/register"
-              state={{ from, addingAccount }}
-              className="transition hover:text-cream"
-            >
-              Don&apos;t have an account? Sign up
-            </NavLink>
-          </div>
+          <NavLink
+            to="/register"
+            state={{ from, addingAccount }}
+            className="text-sm font-medium text-cream underline-offset-4 hover:underline"
+          >
+            Don&apos;t have an account? Create one
+          </NavLink>
         }
       >
         <form className="flex flex-col gap-5" onSubmit={handleSubmit}>
@@ -214,20 +236,33 @@ export default function SignIn() {
             disabled={loading || transitioning}
             onChange={setEmail}
           />
-          <AuthField
-            id="signin-password"
-            label="Password"
-            type="password"
-            value={password}
-            autoComplete="current-password"
-            placeholder="Password"
-            required
-            disabled={loading || transitioning}
-            onChange={setPassword}
-          />
+          <div className="flex flex-col gap-2">
+            <AuthField
+              id="signin-password"
+              label="Password"
+              type="password"
+              value={password}
+              autoComplete="current-password"
+              placeholder="••••••••"
+              required
+              disabled={loading || transitioning}
+              onChange={setPassword}
+            />
+            <Button
+              type="button"
+              variant="link"
+              className="h-auto self-start p-0 text-cream"
+              onClick={() => {
+                setError("");
+                setMode("forgot");
+              }}
+            >
+              Forgot your password?
+            </Button>
+          </div>
           {error ? <AuthMessage tone="error" message={error} /> : null}
           <AuthSubmitButton
-            idleLabel="Sign in"
+            idleLabel="Sign In"
             loadingLabel="Signing in..."
             loading={loading}
             disabled={transitioning}

@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Info, LockKeyhole, ShieldAlert } from "lucide-react";
 import { Button, Popover, PopoverContent, PopoverTrigger } from "@/shared/ui";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/ui/select";
+import { browserToolbarStyles } from "./browserToolbarStyles";
 import {
   type BrowserSiteInfo as SiteInfo,
   type SitePermissions,
@@ -87,65 +89,69 @@ export function BrowserSiteInfo({
           aria-label="Site information and permissions"
           title="Site information and permissions"
         >
-          <Info size={17} strokeWidth={1.7} />
+          <Info {...browserToolbarStyles.roundIcon} />
         </Button>
       </PopoverTrigger>
       <PopoverContent align="start" className="w-80 max-w-[calc(100vw-24px)] p-4">
         <h2 className="break-all text-sm font-medium">{info?.origin ?? "Site information"}</h2>
         {!info && !error ? (
-          <p role="status" className="mt-3 text-xs text-cream-muted">
+          <p role="status" className="mt-3 text-sm text-cream-muted">
             Reading site settings…
           </p>
         ) : null}
         {info ? (
           <>
-            <p className="mt-3 flex items-center gap-2 text-xs">
-              {info.secure ? <LockKeyhole size={15} /> : <ShieldAlert size={15} />}
-              {info.secure ? "Connection is encrypted" : "Connection is not fully secure"}
+            <p className="mt-3 flex items-center gap-2 text-sm text-cream-muted">
+              {info.secure ? (
+                <LockKeyhole size={16} aria-hidden />
+              ) : (
+                <ShieldAlert size={16} aria-hidden />
+              )}
+              {info.secure ? "Encrypted connection" : "Not secure"}
             </p>
-            <p className="mt-1 text-xs text-cream-muted">
-              {info.secure
-                ? "Encryption protects data in transit. Only share sensitive information with sites you trust."
-                : "Avoid entering passwords or payment information on this page."}
-            </p>
-            <div className="mt-4 border-t border-charcoal-border pt-3">
-              <h3 className="mb-2 text-xs font-medium">Permissions</h3>
+            <div className="mt-4 space-y-2 border-t border-charcoal-border pt-3">
               {(["camera", "microphone"] as const).map((kind) => (
-                <label
+                <div
                   key={kind}
                   className="flex min-h-10 items-center justify-between gap-3 text-sm"
                 >
                   <span>{kind === "camera" ? "Camera" : "Microphone"}</span>
-                  <select
-                    className="rounded-md border border-charcoal-border bg-charcoal-card px-2 py-1.5 text-xs focus-visible:outline focus-visible:outline-2 focus-visible:outline-cream-muted disabled:opacity-50"
-                    aria-label={`${kind === "camera" ? "Camera" : "Microphone"} permission`}
+                  <Select
                     disabled={busy || !info.persistent}
                     value={info.permissions[kind]}
-                    onChange={(event) =>
+                    onValueChange={(value) =>
                       void update({
                         ...info.permissions,
-                        [kind]: event.target.value as SitePermissionDecision,
+                        [kind]: value as SitePermissionDecision,
                       })
                     }
                   >
-                    {Object.entries(permissionLabels).map(([value, label]) => (
-                      <option key={value} value={value}>
-                        {label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                    <SelectTrigger
+                      className="h-8 w-28"
+                      aria-label={`${kind === "camera" ? "Camera" : "Microphone"} permission`}
+                    >
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent align="end">
+                      {Object.entries(permissionLabels).map(([value, label]) => (
+                        <SelectItem key={value} value={value}>
+                          {label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               ))}
-              <p className="mt-2 text-xs text-cream-muted">
-                {info.persistent
-                  ? "Choices stay on this device. macOS permissions still apply. Blocking or resetting stops affected capture in this browser profile."
-                  : "This temporary session asks each website for permission and does not save choices."}
-              </p>
+              {!info.persistent && (
+                <p className="text-sm text-cream-muted">
+                  Temporary session · permissions aren’t saved
+                </p>
+              )}
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
-                className="mt-3 rounded-md border border-charcoal-border px-3 py-1.5 text-xs hover:bg-charcoal-hover disabled:opacity-50"
+                className="mt-3"
                 disabled={
                   busy ||
                   !info.persistent ||
@@ -159,7 +165,7 @@ export function BrowserSiteInfo({
           </>
         ) : null}
         {error ? (
-          <p role="alert" className="mt-3 text-xs text-cream-muted">
+          <p role="alert" className="mt-3 break-words text-sm text-avatar-red">
             {error}
           </p>
         ) : null}

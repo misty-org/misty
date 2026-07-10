@@ -18,6 +18,7 @@ vi.mock("../store/useAuthTokenStore", () => ({
 vi.mock("@/api/client/session", () => ({
   readApiAuthToken: vi.fn().mockResolvedValue("account-a-token"),
   readApiSessionGeneration: () => mocks.generation,
+  isApiSignedOut: () => false,
 }));
 vi.mock("@/shared/platform/buildTarget", () => ({
   isAndroidBuild: false,

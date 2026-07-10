@@ -20,11 +20,11 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-  Button
+  Button,
 } from "@/shared/ui";
 
 const controlClass =
-  "grid size-6 shrink-0 place-items-center rounded text-cream-muted hover:bg-charcoal-hover hover:text-cream focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-cream-muted";
+  "grid size-6 shrink-0 place-items-center rounded text-cream-muted hover:text-cream focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-cream-muted";
 
 export function WorkspacePaneControls({
   pane,

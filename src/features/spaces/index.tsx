@@ -34,3 +34,4 @@ export * from "./store/reference-mode";
 export * from "./store/useSpaceAgendaPreferences";
 export * from "./store/useSpacesStore";
 export * from "./store/useSpacesTabsStore";
+export { WorkspaceSpaceNavigation } from "./components/WorkspaceSpaceNavigation";

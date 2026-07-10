@@ -7,6 +7,9 @@ import {
   Avatar,
   AvatarFallback,
   Button,
+  menuItemClass,
+  menuLabelClass,
+  menuListClass,
   Popover,
   PopoverContent,
   PopoverTrigger,
@@ -99,27 +102,16 @@ export function ChatPresencePill({ spaceId }: { spaceId: string }) {
         </Button>
       </PopoverTrigger>
 
-      <PopoverContent
-        align="end"
-        sideOffset={6}
-        className="w-48 overflow-hidden rounded-lg border border-charcoal-border/70 bg-charcoal-card p-1 shadow-md"
-      >
-        <div className="px-2 py-1 text-[11px] font-medium text-cream-muted">
-          Active now ({activeMembers.length})
-        </div>
-        <div className="grid gap-0.5">
-          {activeMembers.map((member) => (
-            <div
-              key={member.user_id}
-              className="flex items-center gap-2 rounded px-2 py-1 text-xs text-cream-bright hover:bg-charcoal-hover"
-            >
-              <span className="size-1.5 shrink-0 rounded-full bg-status-green" />
-              <span className="truncate font-medium">
-                {member.user_id === user?.id ? `${member.name} (You)` : member.name}
-              </span>
-            </div>
-          ))}
-        </div>
+      <PopoverContent align="end" sideOffset={6} className={cn("w-48", menuListClass)}>
+        <div className={menuLabelClass}>Active now ({activeMembers.length})</div>
+        {activeMembers.map((member) => (
+          <div key={member.user_id} className={menuItemClass}>
+            <span className="size-1.5 shrink-0 rounded-full bg-status-green" />
+            <span className="truncate font-medium">
+              {member.user_id === user?.id ? `${member.name} (You)` : member.name}
+            </span>
+          </div>
+        ))}
       </PopoverContent>
     </Popover>
   );

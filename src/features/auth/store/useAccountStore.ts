@@ -1,4 +1,4 @@
-import { captureAccountCookies } from "@/api/client/cookie-session";
+import { captureAccountCookies, forgetAccountCookies } from "@/api/client/cookie-session";
 import { accountApi, AccountApiError, configureAccountApi } from "@/api/account/api";
 import type {
   AccountAuthUser,
@@ -36,6 +36,21 @@ async function persistLogin(data: LoginResponse, operation: string): Promise<Acc
 
 export async function accountSignIn(email: string, password: string): Promise<AccountAuthUser> {
   return persistLogin(await accountApi.signIn(email, password), "Sign-in");
+}
+
+/** Ends the account's server session and forgets its saved cookies, so the
+ * next use of this account requires its password. Local cookies are forgotten
+ * even when the server cannot be reached; that failure is still reported. */
+export async function accountLogout(accountId: string): Promise<void> {
+  try {
+    await accountApi.logout();
+  } finally {
+    if (accountId) await forgetAccountCookies(await accountApi.resolveBase(), accountId);
+  }
+}
+
+export async function accountForgotPassword(email: string): Promise<void> {
+  await accountApi.forgotPassword(email);
 }
 
 export async function accountRegister(

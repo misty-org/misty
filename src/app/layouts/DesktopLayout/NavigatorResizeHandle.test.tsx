@@ -3,7 +3,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
 import { NavigatorResizeHandle } from "./NavigatorResizeHandle";
 
-describe("NavigatorResizeHandle", () => {
+describe.each([false, true])("NavigatorResizeHandle workspaceEdge=%s", (workspaceEdge) => {
   let container: HTMLDivElement;
   let root: Root;
   const resizing = vi.fn();
@@ -19,6 +19,7 @@ describe("NavigatorResizeHandle", () => {
       const [width, setWidth] = useState(264);
       return (
         <NavigatorResizeHandle
+          workspaceEdge={workspaceEdge}
           width={width}
           zoom={2}
           onChange={setWidth}

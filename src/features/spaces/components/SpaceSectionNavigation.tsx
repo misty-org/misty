@@ -1,3 +1,4 @@
+import { TooltipProvider } from "@/shared/ui";
 import { appIcons } from "@/shared/ui/app-icons";
 import { unreadActivityCountForSpaceSection, useActivityStore } from "@/features/activity";
 import { useAuth } from "@/features/auth";
@@ -6,15 +7,27 @@ import { rememberedJournalRoute, rememberedPlannerRoute } from "../spacesShell/s
 import { useSpacesStore } from "../store/useSpacesStore";
 import { SpaceSidebarLink } from "./spacePanel/SpaceSidebarLink";
 
-// Work surfaces only. Management controls live at the opposite end of the top bar.
+// Work surfaces only. Management controls live at the bottom of the Space rail.
 const sections = [
-  { id: "journal", label: "Journal", icon: Notebook },
-  { id: "planner", label: "Planner", icon: appIcons.planner },
   { id: "social", label: "Chat", icon: MessagesSquare },
+  { id: "planner", label: "Planner", icon: appIcons.planner },
+  { id: "journal", label: "Journal", icon: Notebook },
   { id: "library", label: "Library", icon: BookOpenText },
 ] as const;
 
-export function SpaceSectionNavigation({ spaceId, section }: { spaceId: string; section: string }) {
+export function SpaceSectionNavigation({
+  spaceId,
+  section,
+  horizontal,
+  iconOnly = false,
+  onNavigate,
+}: {
+  spaceId: string;
+  section: string;
+  horizontal?: boolean;
+  iconOnly?: boolean;
+  onNavigate?: (path: string) => void;
+}) {
   const { user } = useAuth();
   const space = useSpacesStore((state) => state.spaces.find((item) => item.id === spaceId));
   const permissions = space?.permissions;
@@ -26,23 +39,35 @@ export function SpaceSectionNavigation({ spaceId, section }: { spaceId: string; 
   const activityItems = useActivityStore((state) => state.allItems);
 
   return (
-    <nav className="grid min-w-0 gap-1" aria-label="Space sections">
-      {visibleSections.map(({ id, label, icon: Icon }) => (
-        <SpaceSidebarLink
-          key={id}
-          active={id === "journal" ? section === "notes" || section === "drawings" : section === id}
-          icon={Icon}
-          label={label}
-          badgeCount={unreadActivityCountForSpaceSection(activityItems, spaceId, id)}
-          to={
-            id === "journal"
-              ? rememberedJournalRoute(accountId, spaceId)
-              : id === "planner"
-                ? rememberedPlannerRoute(accountId, spaceId)
-                : `/spaces/${encodeURIComponent(spaceId)}/${id}`
-          }
-        />
-      ))}
-    </nav>
+    <TooltipProvider delayDuration={350}>
+      <nav
+        className={
+          horizontal ? "flex min-w-0 items-center gap-1 overflow-x-auto" : "grid min-w-0 gap-1"
+        }
+        aria-label="Space sections"
+      >
+        {visibleSections.map(({ id, label, icon: Icon }) => (
+          <SpaceSidebarLink
+            key={id}
+            horizontal={horizontal}
+            iconOnly={iconOnly}
+            active={
+              id === "journal" ? section === "notes" || section === "drawings" : section === id
+            }
+            icon={Icon}
+            label={label}
+            badgeCount={unreadActivityCountForSpaceSection(activityItems, spaceId, id)}
+            to={
+              id === "journal"
+                ? rememberedJournalRoute(accountId, spaceId)
+                : id === "planner"
+                  ? rememberedPlannerRoute(accountId, spaceId)
+                  : `/spaces/${encodeURIComponent(spaceId)}/${id}`
+            }
+            onNavigate={onNavigate}
+          />
+        ))}
+      </nav>
+    </TooltipProvider>
   );
 }

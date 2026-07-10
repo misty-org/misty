@@ -21,6 +21,7 @@ export type { IconButtonProps as PrimitiveIconButtonProps } from "./icon-button"
 export * from "./input";
 export * from "./input-group";
 export * from "./label";
+export * from "./menu-styles";
 export * from "./mail-provider-icon";
 export * from "./nav-island";
 export { IconButton } from "./outlined-icon-button";
@@ -47,7 +48,7 @@ export * from "./toggle";
 export * from "./toggle-group";
 export * from "./toolbar";
 export * from "./tooltip";
-export * from "./tree-branch";
+export * from "./navigation-tree";
 export * from "./utils";
 
 export * from "./navigation-menu";

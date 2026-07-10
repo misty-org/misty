@@ -401,32 +401,16 @@ describe("GlobalNavigator disclosures", () => {
     expect(items[1]?.getAttribute("href")).toBe("/apps/files?view=transfers");
     expect(items[1]?.getAttribute("aria-current")).toBe("page");
     expect(featureIconNames(destinations)).toEqual(["explorer", "transfers"]);
-    expect(destinations?.className).toContain("gap-[var(--navigation-tree-gap)]");
-    expect(items.every((item) => item.className.includes("h-7"))).toBe(true);
-    expect(items.every((item) => item.querySelector('[data-tree-branch="true"]'))).toBe(true);
-    expect(items.every((item) => item.querySelector('[data-tree-row-surface="true"]'))).toBe(true);
-    expect(
-      items.every((item) =>
-        item.querySelector('[data-tree-row-surface="true"]')?.className.includes("pl-1.5"),
-      ),
-    ).toBe(true);
-    expect(
-      items.every((item) =>
-        item.querySelector('[data-tree-row-surface="true"]')?.className.includes("pr-2"),
-      ),
-    ).toBe(true);
+    expect(destinations?.className).toContain("gap-1");
+    expect(items.every((item) => item.className.split(/\s+/).includes("ml-3"))).toBe(true);
+    expect(container.querySelector("[data-tree-branch]")).toBeNull();
     expect(
       items.every((item) =>
         item
           .querySelector('[data-tree-row-surface="true"]')
-          ?.className.includes("group-hover/tree-row:bg-charcoal-card"),
+          ?.className.includes("group-hover/tree-row:bg-charcoal-hover"),
       ),
     ).toBe(true);
-    expect(
-      items[items.length - 1]
-        ?.querySelector('[data-tree-branch="true"]')
-        ?.getAttribute("data-tree-branch-end"),
-    ).toBe("true");
     expect(items.find((item) => item.textContent?.includes("Explorer"))?.getAttribute("href")).toBe(
       "/apps/files",
     );

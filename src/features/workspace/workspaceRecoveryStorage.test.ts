@@ -1,12 +1,19 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { workspaceRecoveryKey, workspaceRecoveryStorage } from "./workspaceRecoveryStorage";
+import {
+  browserWorkspaceStoreVersion,
+  workspaceRecoveryKey,
+  workspaceRecoveryStorage,
+} from "./workspaceRecoveryStorage";
 
 const name = "workspace-recovery-test";
 const old = JSON.stringify({
   version: 12,
   state: { spaces: [{ id: "family", document: "Retired tab state" }] },
 });
-const current = JSON.stringify({ version: 14, state: { tabs: ["browser"] } });
+const current = JSON.stringify({
+  version: browserWorkspaceStoreVersion,
+  state: { tabs: ["browser"] },
+});
 beforeEach(() => localStorage.clear());
 describe("workspace migration recovery", () => {
   it("preserves the exact original once, before reading or overwriting it", () => {
@@ -15,7 +22,10 @@ describe("workspace migration recovery", () => {
     expect(storage.getItem(name)).toBe(old);
     expect(localStorage.getItem(workspaceRecoveryKey(name))).toBe(old);
     storage.setItem(name, current);
-    storage.setItem(name, JSON.stringify({ version: 14, state: { tabs: [] } }));
+    storage.setItem(
+      name,
+      JSON.stringify({ version: browserWorkspaceStoreVersion, state: { tabs: [] } }),
+    );
     storage.removeItem(name);
     expect(localStorage.getItem(name)).toBeNull();
     expect(localStorage.getItem(workspaceRecoveryKey(name))).toBe(old);

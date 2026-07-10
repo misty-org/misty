@@ -46,6 +46,34 @@ function mount(position: "top" | "bottom" | "left" | "right" = "top") {
     />,
   );
 }
+it("fades only the edges with tabs outside the visible scroll area", () => {
+  mount();
+  const list = screen.getByRole("tablist");
+  Object.defineProperties(list, {
+    clientWidth: { configurable: true, value: 200 },
+    scrollWidth: { configurable: true, value: 400 },
+  });
+  fireEvent.scroll(list);
+  expect(list.style.getPropertyValue("--tab-fade-start")).toBe("0px");
+  expect(list.style.getPropertyValue("--tab-fade-end")).toBe("16px");
+
+  list.scrollLeft = 100;
+  fireEvent.scroll(list);
+  expect(list.style.getPropertyValue("--tab-fade-start")).toBe("16px");
+  expect(list.style.getPropertyValue("--tab-fade-end")).toBe("16px");
+
+  list.scrollLeft = 200;
+  fireEvent.scroll(list);
+  expect(list.style.getPropertyValue("--tab-fade-start")).toBe("16px");
+  expect(list.style.getPropertyValue("--tab-fade-end")).toBe("0px");
+
+  Object.defineProperty(list, "clientWidth", { value: 400 });
+  list.scrollLeft = 0;
+  fireEvent.scroll(list);
+  expect(list.style.getPropertyValue("--tab-fade-start")).toBe("0px");
+  expect(list.style.getPropertyValue("--tab-fade-end")).toBe("0px");
+});
+
 it("shows only close for a single pane and only a dropdown for multiple panes", async () => {
   mount();
   expect(screen.getByRole("button", { name: "Close tab Google" })).toBeTruthy();

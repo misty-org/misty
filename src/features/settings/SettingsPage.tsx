@@ -137,7 +137,7 @@ export const settingsRegistry: readonly SettingsRegistryEntry[] = [
   },
   {
     id: "sync",
-    label: "Device sync",
+    label: "Sync",
     icon: RefreshCw,
     group: "system",
     Component: BrowserSyncSettings,

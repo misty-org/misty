@@ -36,7 +36,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
   cn,
-  Button
+  Button,
 } from "@/shared/ui";
 import { Blocks, ChevronDown, LoaderCircle, X, type LucideIcon } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -259,8 +259,8 @@ export function WorkspaceTabGroupButton({
           "transition-colors duration-150 select-none",
           "focus-within:ring-1 focus-within:ring-cream-muted/50",
           containsActive
-            ? "border-charcoal-border/70 bg-charcoal-card text-cream-bright shadow-sm"
-            : "border-transparent text-cream-muted hover:bg-charcoal-card/40 hover:text-cream",
+            ? "border-charcoal-border/70 text-cream-bright"
+            : "border-transparent text-cream-muted hover:text-cream-bright hover:text-cream",
         )}
       >
         <Button
@@ -302,7 +302,7 @@ export function WorkspaceTabGroupButton({
                 size="none"
                 className={cn(
                   "mr-1 grid size-6 shrink-0 place-items-center rounded border-0 text-cream-muted outline-none",
-                  "hover:bg-charcoal-active hover:text-cream focus:outline-none focus-visible:ring-1 focus-visible:ring-cream-muted",
+                  " hover:text-cream focus:outline-none focus-visible:ring-1 focus-visible:ring-cream-muted",
                 )}
                 aria-label={`Show ${displayLabel} tabs`}
                 onClick={(event) => event.stopPropagation()}
@@ -336,7 +336,7 @@ export function WorkspaceTabGroupButton({
                         onSelect={() => onOpen(tab)}
                         className={cn(
                           "flex items-center gap-2 pr-1.5",
-                          isActive && "bg-charcoal-hover text-cream-bright",
+                          isActive && "text-cream-bright",
                         )}
                       >
                         <TabIcon tab={tab} icon={Icon} size={13} isActive={isActive} />
@@ -347,7 +347,7 @@ export function WorkspaceTabGroupButton({
                             size="none"
                             className={cn(
                               "grid size-5 shrink-0 place-items-center rounded border-0 text-cream-muted/70",
-                              "hover:bg-charcoal-active hover:text-cream focus-visible:outline-none",
+                              " hover:text-cream focus-visible:outline-none",
                               "focus-visible:ring-1 focus-visible:ring-cream-muted",
                             )}
                             data-reorder-ignore="true"
@@ -376,7 +376,7 @@ export function WorkspaceTabGroupButton({
             aria-label={`Close ${displayTab ? workspaceTabDisplayTitle(displayTab, group) : displayLabel}`}
             className={cn(
               "mr-1 grid size-6 shrink-0 place-items-center rounded border-0 text-cream-muted opacity-0 outline-none",
-              "hover:bg-charcoal-active hover:text-cream focus:outline-none focus-visible:opacity-100",
+              " hover:text-cream focus:outline-none focus-visible:opacity-100",
               "focus-visible:ring-1 focus-visible:ring-cream-muted group-hover/tab:opacity-100 group-focus-within/tab:opacity-100 [@media(hover:none)]:opacity-100",
             )}
             onClick={(event) => {

@@ -307,7 +307,7 @@ enum ServerCommand {
         #[arg(long)]
         verbose: bool,
     },
-    /// Show service health and completed setup jobs.
+    /// Show service health and any unfinished or failed setup jobs.
     Status,
     /// Deploy the development collaboration Worker explicitly.
     Deploy,

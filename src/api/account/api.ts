@@ -21,6 +21,9 @@ export const accountApi = {
     requestJson<LoginResponse>("POST", "/login", { email, password }),
   register: (path: "/register" | "/self-host/bootstrap" | "/self-host/enroll", body: unknown) =>
     requestJson<LoginResponse>("POST", path, body),
+  logout: () => requestJson<{ status?: string }>("POST", "/logout"),
+  forgotPassword: (email: string) =>
+    requestJson<{ message?: string }>("POST", "/auth/forgot", { email }),
   me: () => requestJson<AccountMeResponse>("GET", "/me"),
   handoff: (path?: AccountHandoffPath) =>
     requestJson<{ url: string }>("POST", "/auth/handoff", path ? { path } : {}),
@@ -175,7 +178,14 @@ function accountClientPlatform(): "windows" | "macos" | "linux" | "android" | "i
 }
 
 function shouldAttachAuthToken(path: string): boolean {
-  return !["/login", "/register", "/self-host/bootstrap", "/self-host/enroll"].includes(path);
+  return ![
+    "/login",
+    "/register",
+    "/self-host/bootstrap",
+    "/self-host/enroll",
+    "/auth/forgot",
+    "/logout",
+  ].includes(path);
 }
 
 function recordAccountApiDebugEvent(event: {

@@ -155,10 +155,7 @@ export function TaskDatePicker({
           ) : null}
         </Button>
       </PopoverTrigger>
-      <PopoverContent
-        align="start"
-        className="w-64 p-3 bg-charcoal-card border-charcoal-border shadow-2xl"
-      >
+      <PopoverContent align="start" className="w-64">
         <div className="grid gap-2.5">
           {/* Quick presets */}
           <div className="grid gap-1">

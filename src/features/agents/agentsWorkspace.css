@@ -108,7 +108,6 @@
 }
 .agent-icon-button:hover:enabled {
   color: var(--agent-text);
-  background: var(--agent-bubble);
 }
 .agents-search {
   display: flex;
@@ -149,10 +148,10 @@
   background: transparent;
 }
 .agent-roster-row:hover:enabled {
-  background: #242424;
+  color: var(--misty-theme-text-bright, #f1f1f1);
 }
 .agent-roster-row[aria-pressed="true"] {
-  background: #2e2e2e;
+  color: var(--misty-theme-text-bright, #f1f1f1);
 }
 .agent-roster-row .agent-avatar,
 .agents-roster-list .agent-avatar {
@@ -207,7 +206,7 @@
   text-align: left;
 }
 .agent-account:hover {
-  background: var(--agent-bubble);
+  color: var(--misty-theme-text-bright, #f1f1f1);
 }
 .agent-account-avatar {
   display: grid;
@@ -342,7 +341,7 @@
   border-top: 1px solid #404040;
 }
 .agent-starter-options button:hover:enabled {
-  background: #393939;
+  color: var(--misty-theme-text-bright, #f1f1f1);
 }
 .agent-option-letter {
   display: grid;
@@ -500,7 +499,7 @@
   background: #404040;
 }
 .agent-voice-button:hover:enabled {
-  background: #505050;
+  color: var(--misty-theme-text-bright, #f1f1f1);
 }
 .agent-workspace-composer button[aria-label="Send to Misty"],
 .agent-workspace-composer button[aria-label="Stop response"] {
@@ -647,7 +646,7 @@
   color: var(--agent-muted);
 }
 .agent-workspace-preview:hover {
-  background: #232323;
+  color: var(--misty-theme-text-bright, #f1f1f1);
 }
 .agent-preview-caption {
   margin: 8px 0;
@@ -685,7 +684,7 @@
 }
 .agent-history button:hover,
 .agent-history button[aria-pressed="true"] {
-  background: var(--agent-bubble);
+  color: var(--misty-theme-text-bright, #f1f1f1);
 }
 .agent-history button span {
   overflow: hidden;
@@ -731,7 +730,7 @@
   border-radius: 7px;
 }
 .agent-recipient-results button:hover {
-  background: #454545;
+  color: var(--misty-theme-text-bright, #f1f1f1);
 }
 .agent-recipient-results .agent-avatar {
   width: 25px;

@@ -17,29 +17,32 @@ import {
   TooltipProvider,
   TooltipTrigger,
   cn,
-  NavigationChevron,
 } from "@/shared/ui";
-import { Plus } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { ChevronDown, LogOut, Plus, Trash2 } from "lucide-react";
+import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import {
+  SpaceLifecycleDialog,
+  spaceLifecycleAction,
+  type SpaceLifecycleAction,
+} from "./SpaceLifecycleDialogs";
 const navigatorHierarchyTriggerClass =
-  "flex items-center gap-2 h-auto rounded-lg border-0 bg-transparent px-2 py-2 text-left text-cream hover:bg-charcoal-hover focus-visible:ring-2 focus-visible:ring-cream-muted";
+  "flex items-center gap-2 h-8 rounded-md border-0 bg-transparent px-2 py-1 text-left text-cream hover:bg-charcoal-hover hover:text-cream-bright focus-visible:ring-2 focus-visible:ring-cream-muted";
 
 export function SpaceSwitcher(props: {
-  variant?: "default" | "pull-tab";
+  iconOnly?: boolean;
+  onNavigate?: (path: string, state?: { spaceSettingsReturnTo: string }) => void;
   activeSpace: Space | undefined;
   activeSpaceId: string;
   canAddSpace: boolean;
   spaces: Space[];
   userId: string;
 }) {
-  const pullTab = props.variant === "pull-tab";
   const navigate = useNavigate();
   const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
-  const pullStart = useRef<number | null>(null);
-  const triggerRef = useRef<HTMLButtonElement | null>(null);
-  const contentRef = useRef<HTMLDivElement | null>(null);
+  const [pendingAction, setPendingAction] = useState<SpaceLifecycleAction | null>(null);
+  const availableAction = spaceLifecycleAction(props.activeSpace);
   const activityItems = useActivityStore((state) => state.allItems);
   const activeName = props.activeSpace ? spaceNavigationName(props.activeSpace) : "Misty";
   const activeUnread = props.activeSpace
@@ -53,47 +56,12 @@ export function SpaceSwitcher(props: {
     setMenuOpen(false);
   }, [location.pathname, location.search, location.hash]);
 
-  useEffect(() => {
-    if (!menuOpen) return;
-
-    const handlePointerDown = (event: PointerEvent) => {
-      const target = event.target;
-      if (target instanceof Node) {
-        if (
-          triggerRef.current?.contains(target) ||
-          contentRef.current?.contains(target) ||
-          (target instanceof Element && target.closest('[data-slot="popover-content"]'))
-        ) {
-          return;
-        }
-      }
-      setMenuOpen(false);
-    };
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setMenuOpen(false);
-      }
-    };
-
-    const handleBlur = () => {
-      setMenuOpen(false);
-    };
-
-    window.addEventListener("pointerdown", handlePointerDown, true);
-    window.addEventListener("keydown", handleKeyDown);
-    window.addEventListener("blur", handleBlur);
-    return () => {
-      window.removeEventListener("pointerdown", handlePointerDown, true);
-      window.removeEventListener("keydown", handleKeyDown);
-      window.removeEventListener("blur", handleBlur);
-    };
-  }, [menuOpen]);
-
   const switchSpace = (space: Space) => {
     setMenuOpen(false);
     if (space.id === props.activeSpaceId) return;
-    navigate(spaceLandingRoute(space.id, props.userId, location.pathname));
+    const path = spaceLandingRoute(space.id, props.userId, location.pathname);
+    if (props.onNavigate) props.onNavigate(path);
+    else navigate(path);
   };
 
   return (
@@ -105,38 +73,25 @@ export function SpaceSwitcher(props: {
               <TooltipTrigger asChild>
                 <DropdownMenuTrigger asChild>
                   <Button
-                    ref={triggerRef}
                     type="button"
-                    onPointerDown={(event) => {
-                      if (event.button !== 0) return;
-                      event.preventDefault();
-                      event.currentTarget.focus();
-                      pullStart.current = pullTab ? event.clientX : event.clientY;
-                      event.currentTarget.setPointerCapture?.(event.pointerId);
-                    }}
-                    onPointerUp={(event) => {
-                      if (pullStart.current === null) return;
-                      const pulled =
-                        (pullTab
-                          ? pullStart.current - event.clientX
-                          : event.clientY - pullStart.current) > 16;
-                      pullStart.current = null;
-                      setMenuOpen((value) => pulled || !value);
-                    }}
-                    onPointerCancel={() => {
-                      pullStart.current = null;
-                    }}
-                    style={{ touchAction: "none" }}
-                    className={
-                      pullTab
-                        ? "space-pull-tab space-pull-avatar"
-                        : cn(navigatorHierarchyTriggerClass, "w-fit max-w-full")
-                    }
+                    variant="ghost"
+                    justify="start"
+                    className={cn(
+                      navigatorHierarchyTriggerClass,
+                      props.iconOnly
+                        ? "misty-space-rail-control misty-space-rail-avatar size-10 justify-center p-0 [@media(pointer:coarse)]:size-11"
+                        : "w-auto min-w-0 max-w-full",
+                    )}
                     aria-label={switcherLabel}
                     data-misty-window-drag-block="true"
                     data-space-menu-open={menuOpen ? "true" : "false"}
                   >
-                    <span className="relative flex size-6 shrink-0 items-center justify-center">
+                    <span
+                      className={cn(
+                        "relative flex shrink-0 items-center justify-center",
+                        props.iconOnly ? "size-7" : "size-6",
+                      )}
+                    >
                       {props.activeSpace ? (
                         <>
                           <SpaceAvatar
@@ -158,7 +113,7 @@ export function SpaceSwitcher(props: {
                         />
                       )}
                     </span>
-                    {!pullTab && (
+                    {!props.iconOnly && (
                       <span className="flex min-w-0 items-center gap-1.5">
                         <OverflowFadeText
                           className="min-w-0 max-w-[150px] overflow-hidden whitespace-nowrap text-sm font-semibold text-inherit tracking-[-0.015em]"
@@ -167,22 +122,21 @@ export function SpaceSwitcher(props: {
                         >
                           {activeName}
                         </OverflowFadeText>
-                        <NavigationChevron open={menuOpen} />
+                        <ChevronDown size={14} aria-hidden="true" />
                       </span>
                     )}
                   </Button>
                 </DropdownMenuTrigger>
               </TooltipTrigger>
-              <TooltipContent side={pullTab ? "left" : "top"}>
+              <TooltipContent side={props.iconOnly ? "right" : "top"}>
                 {activeName} · Switch Space
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>
 
           <DropdownMenuContent
-            ref={contentRef}
             align="start"
-            side={pullTab ? "left" : "bottom"}
+            side={props.iconOnly ? "right" : "bottom"}
             sideOffset={6}
             className="w-[240px] grid-cols-[minmax(0,1fr)]"
           >
@@ -201,7 +155,10 @@ export function SpaceSwitcher(props: {
                       aria-current={active ? "page" : undefined}
                       onSelect={() => switchSpace(space)}
                     >
-                      <span className="relative grid size-6 shrink-0 place-items-center">
+                      <span
+                        className="relative grid size-6 shrink-0 place-items-center"
+                        aria-hidden="true"
+                      >
                         <SpaceAvatar space={space} className="size-6 border-0 bg-transparent" />
                         {unread > 0 ? (
                           <span
@@ -239,7 +196,29 @@ export function SpaceSwitcher(props: {
               <Plus size={14} aria-hidden="true" />
               New Space
             </DropdownMenuItem>
+            {availableAction ? (
+              <DropdownMenuItem
+                onSelect={() => {
+                  setMenuOpen(false);
+                  setPendingAction(availableAction);
+                }}
+              >
+                {availableAction === "delete" ? (
+                  <Trash2 size={14} aria-hidden="true" />
+                ) : (
+                  <LogOut size={14} aria-hidden="true" />
+                )}
+                {availableAction === "delete" ? "Delete Space…" : "Leave Space…"}
+              </DropdownMenuItem>
+            ) : null}
           </DropdownMenuContent>
+          {props.activeSpace ? (
+            <SpaceLifecycleDialog
+              space={props.activeSpace}
+              action={pendingAction}
+              onClose={() => setPendingAction(null)}
+            />
+          ) : null}
         </DropdownMenu>
       )}
     </GlobalCreateSpaceDialog>

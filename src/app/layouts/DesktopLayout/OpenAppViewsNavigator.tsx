@@ -40,7 +40,7 @@ export function OpenAppViewsNavigator({ appId }: { appId: "code" | "terminal" })
       aria-label={`${appId === "code" ? "Code" : "Terminal"} destinations`}
       className="grid gap-1"
     >
-      {displayViews.map((view, index) => {
+      {displayViews.map((view) => {
         const rawTitle = view.title || (appId === "code" ? "Workspace" : "Terminal");
         const label = appId === "terminal" ? rawTitle.replace(/^Terminal · /, "") : rawTitle;
 
@@ -50,7 +50,6 @@ export function OpenAppViewsNavigator({ appId }: { appId: "code" | "terminal" })
             icon={<IconComponent size={16} className="text-cream-muted" />}
             label={label}
             selected={activeId === view.id}
-            last={index === displayViews.length - 1}
             onClick={() => {
               if (useWorkspaceStore.getState().focusTab(view.id)) navigate(view.route);
             }}

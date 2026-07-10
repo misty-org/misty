@@ -142,7 +142,7 @@ export function BrowserSyncSettings() {
   return (
     <div className="grid gap-6">
       <SettingsSection
-        title="Device sync · Preview"
+        title="Sync"
         description="Keep your tabs, splits and virtual windows in an encrypted workspace across devices."
       >
         <SettingsNote>
@@ -150,9 +150,9 @@ export function BrowserSyncSettings() {
           sign in again on a new device.
         </SettingsNote>
         {!native ? (
-          <SettingsNote>Open the Misty desktop app to set up device sync.</SettingsNote>
+          <SettingsNote>Open the Misty desktop app to set up sync.</SettingsNote>
         ) : !accountId ? (
-          <SettingsNote>Sign in to Misty before setting up device sync.</SettingsNote>
+          <SettingsNote>Sign in to Misty before setting up sync.</SettingsNote>
         ) : session?.account_id === accountId ? (
           <>
             <SettingsRow label="Active device">
