@@ -255,6 +255,12 @@ export function DesktopLayout(props: {
     const neutralSelectedOpacity = Math.min(0.22, 0.075 + panelOpacity * 0.145);
     const neutralStrongOpacity = Math.min(0.28, 0.105 + panelOpacity * 0.175);
     const neutralBorderOpacity = Math.min(0.24, 0.08 + panelOpacity * 0.13);
+    const appBodyBackground = appWallpaperSrc
+      ? `rgba(5, 6, 7, ${panelOpacity})`
+      : "var(--misty-bg)";
+    const appSurfaceBackground = appWallpaperSrc
+      ? `rgba(17, 20, 24, ${panelOpacity})`
+      : "var(--misty-surface)";
     const wallpaperSurfaceVars = appWallpaperSrc
       ? {
           "--misty-bg": `rgba(5, 6, 7, ${panelOpacity})`,
@@ -294,33 +300,18 @@ export function DesktopLayout(props: {
       "--color-border": "transparent",
       "--color-border-subtle": "transparent",
       "--misty-app-frame-bg": appWallpaperSrc ? "transparent" : "var(--misty-bg)",
-      "--misty-app-page-bg": appWallpaperSrc
-        ? `rgba(5, 6, 7, ${panelOpacity})`
-        : "var(--misty-bg)",
-      "--misty-app-shell-bg": appWallpaperSrc
-        ? `rgba(5, 6, 7, ${panelOpacity})`
-        : "var(--misty-bg)",
-      "--misty-app-nav-bg": appWallpaperSrc
-        ? `rgba(7, 9, 12, ${panelOpacity})`
-        : "var(--misty-bg)",
-      "--misty-app-route-bg": appWallpaperSrc
-        ? `rgba(5, 6, 7, ${panelOpacity})`
-        : "transparent",
-      "--misty-app-pane-bg": appWallpaperSrc
-        ? `rgba(17, 20, 24, ${panelOpacity})`
-        : "var(--misty-surface)",
-      "--misty-app-surface-bg": appWallpaperSrc
-        ? `rgba(17, 20, 24, ${panelOpacity})`
-        : "var(--misty-surface)",
+      "--misty-app-page-bg": appBodyBackground,
+      "--misty-app-shell-bg": appBodyBackground,
+      "--misty-app-nav-bg": appBodyBackground,
+      "--misty-app-route-bg": appWallpaperSrc ? appBodyBackground : "transparent",
+      "--misty-app-panel-bg": "transparent",
+      "--misty-app-pane-bg": appSurfaceBackground,
+      "--misty-app-surface-bg": appSurfaceBackground,
       "--misty-app-surface-soft-bg": appWallpaperSrc
         ? `rgba(17, 20, 24, ${panelOpacity})`
         : "var(--misty-surface-2)",
-      "--misty-app-tab-bg": appWallpaperSrc
-        ? `rgba(9, 11, 14, ${panelOpacity})`
-        : "var(--misty-bg-soft)",
-      "--misty-app-tab-active-bg": appWallpaperSrc
-        ? `rgba(20, 23, 28, ${panelOpacity})`
-        : "var(--misty-surface-2)",
+      "--misty-app-tab-bg": appBodyBackground,
+      "--misty-app-tab-active-bg": appSurfaceBackground,
       "--misty-app-modal-bg": appWallpaperSrc
         ? `rgba(7, 9, 12, ${Math.min(0.78, panelOpacity + 0.08)})`
         : "var(--misty-surface)",

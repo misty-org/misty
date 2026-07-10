@@ -272,9 +272,6 @@ impl ProxyService {
             "/api/remote/config/continue" | "/api/remotes/config/continue" => {
                 "remote.config.continue"
             }
-            "/api/remote/config/reconnect" | "/api/remotes/config/reconnect" => {
-                "remote.config.reconnect"
-            }
             "/api/remote/config/repair" | "/api/remotes/config/repair" => "remote.config.repair",
             "/api/remote/config/get" | "/api/remotes/config/get" => "remote.config.get",
             "/api/remote/config/update" | "/api/remotes/config/update" => "remote.config.update",

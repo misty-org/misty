@@ -1,0 +1,31 @@
+{
+  "packageName": "com.misty.mobile",
+  "appName": "Misty",
+  "defaultLocale": "en-US",
+  "category": "Productivity",
+  "shortDescription": "Browse files, remotes, transfers, and account settings from Misty mobile.",
+  "fullDescription": "Misty brings the core Misty file experience to Android. Browse on-device files, connect supported storage providers, review transfer activity, and manage account and privacy settings from a focused mobile interface.\n\nMisty for Android is designed as a companion/client for Misty accounts and supported storage connections. It keeps file browsing, provider setup, transfer status, and account controls close at hand without desktop extension functionality.\n\nKey features:\n\n- Browse files and connected storage locations.\n- Configure supported storage providers.\n- Track upload, download, and sync activity.\n- Manage account, privacy, notifications, and device settings.\n- Use a mobile interface built for Misty's existing file workflows.",
+  "featureGraphicNotes": "Create a 1024x500 JPEG or 24-bit PNG with no alpha. Use actual Misty UI or brand-safe abstract file organization imagery. Avoid pricing, promotional claims, Google Play badges, rankings, and time-sensitive copy.",
+  "keywordsGuidance": [
+    "file manager",
+    "cloud storage",
+    "file transfer",
+    "remote files",
+    "productivity"
+  ],
+  "requiredOwnerInputs": [
+    "Production support URL",
+    "Production privacy policy URL",
+    "Account deletion or support process",
+    "Reviewer demo credentials",
+    "Confirmation that the production account API is healthy"
+  ],
+  "reviewNotesSummary": "Misty is a file browsing and storage companion/client. It does not include in-app purchases, external purchase prompts, pricing, subscription calls to action, or extension/plugin functionality.",
+  "dataSafetyDraft": {
+    "encryptedInTransit": true,
+    "accountManagement": "Misty account sign-in is used for account/session state.",
+    "filesAndDocs": "Users may browse file names, paths, metadata, and selected file contents through Misty workflows.",
+    "deviceOrOtherIds": "No advertising ID use is expected in the local Android build.",
+    "deletionMechanism": "Not yet confirmed; the app owner must provide the production deletion or support process before submission."
+  }
+}

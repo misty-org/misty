@@ -46,6 +46,7 @@ import { useNavigate } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
 import { MultiPanelWorkspace } from "../../../shared/multipanel/MultiPanelWorkspace";
 import { hasTauriInternals } from "../../../shared/tauri";
+import { isAndroidBuild } from "../../../platform/buildTarget";
 import { useAppStore } from "../../../stores/useAppStore";
 import {
   clipboardApplyShared,
@@ -307,9 +308,10 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
     "--mika-panel-width": `${mikaPanelWidth}px`,
   } as CSSProperties), [mikaPanelWidth, previewWidth, sidebarWidth]);
   const activeTabSupportsSidePanels = !isChromeTabPath(activeTabPath);
+  const extensionsEnabled = !isAndroidBuild;
   const sidebarVisible = activeTabSupportsSidePanels && activeTabSidebarVisible;
   const previewVisible = activeTabSupportsSidePanels && activeTabPreviewVisible;
-  const extensionsVisible = activeTabSupportsSidePanels && extensionsPanelOpen;
+  const extensionsVisible = extensionsEnabled && activeTabSupportsSidePanels && extensionsPanelOpen;
 
   useEffect(() => {
     activePaneIdRef.current = activePaneId;
@@ -377,6 +379,14 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
   }, [resizeTarget]);
 
   useEffect(() => {
+    if (!extensionsEnabled) {
+      shortcutMapRef.current = defaultExplorerShortcutMap(shortcutPreferences.keymapIndex);
+      executableCommandIdsRef.current = executableShortcutCommands;
+      pluginCommandsRef.current = emptyPluginCommands;
+      setPluginCommands(emptyPluginCommands);
+      setPluginPanels(emptyPluginPanels);
+      return;
+    }
     let disposed = false;
     const loadCommandMetadata = async () => {
       try {
@@ -421,7 +431,7 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
       window.removeEventListener("focus", loadCommandMetadata);
       window.removeEventListener(pluginCatalogChangedEvent, loadCommandMetadata);
     };
-  }, [shortcutPreferences.customShortcutsEnabled, shortcutPreferences.keymapIndex]);
+  }, [extensionsEnabled, shortcutPreferences.customShortcutsEnabled, shortcutPreferences.keymapIndex]);
 
   const refreshDevices = useCallback(async (options?: { showLoading?: boolean }) => {
     if (deviceRefreshInFlightRef.current) return;
@@ -468,9 +478,7 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
         } else {
           void stopListening();
         }
-      } catch {
-        // Browser smoke mode and unsupported platforms run without native device events.
-      }
+      } catch {}
     })();
     return () => {
       active = false;
@@ -612,7 +620,7 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
   const renderToolbar = useCallback(
     (paneId: string, path: string) => {
       if (isChromeTabPath(path)) return null;
-      const pluginTab = parsePluginTabPath(path);
+      const pluginTab = extensionsEnabled ? parsePluginTabPath(path) : null;
       if (pluginTab) {
         return (
           <ExplorerPluginTabHeader
@@ -632,7 +640,7 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
         />
       );
     },
-    [locationResults, navigate, pluginCommands, pluginPanels],
+    [extensionsEnabled, locationResults, navigate, pluginCommands, pluginPanels],
   );
   const renderPane = useCallback(
     (paneId: string, path: string) => {
@@ -643,7 +651,7 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
       if (isRemotesTabPath(path)) {
         return <ProvidersWorkspacePanel workspaceId={paneId} />;
       }
-      const pluginTab = parsePluginTabPath(path);
+      const pluginTab = extensionsEnabled ? parsePluginTabPath(path) : null;
       if (pluginTab) {
         return (
           <ExplorerPluginTabContent
@@ -655,7 +663,7 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
       }
       return <ExplorerPane paneId={paneId} path={path} isActive={activePaneId === paneId} paneActions={paneActions} />;
     },
-    [activePaneId, pluginCommands, pluginPanels],
+    [activePaneId, extensionsEnabled, pluginCommands, pluginPanels],
   );
   const explorerExtensionItems = useMemo(
     () => pluginMenuItems(pluginPanels, pluginCommands, activeSelectedPath),
@@ -777,6 +785,7 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
       <ExplorerTray
         aiOpen={mikaPanelOpen}
         commands={pluginCommands}
+        extensionsEnabled={extensionsEnabled}
         panels={pluginPanels}
         selectedPath={activeSelectedPath}
         selectedExtensionPluginId={selectedExtensionPluginId}
@@ -793,6 +802,7 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
       activeSelectedPath,
       activeTabPath,
       activeTabSupportsSidePanels,
+      extensionsEnabled,
       extensionsVisible,
       handleToggleExtensionFromTray,
       mikaPanelOpen,
@@ -808,6 +818,7 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
         <ExplorerBottomBar
           sidebarVisible={tab.sidebarVisible ?? true}
           previewVisible={(tab.previewVisible ?? true) && !extensionsVisible}
+          extensionsEnabled={extensionsEnabled}
           extensionsVisible={extensionsVisible}
           onToggleSidebar={() => useMultiPanelStore.getState().setTabPanelVisibility(tab.id, { sidebarVisible: !(tab.sidebarVisible ?? true) })}
           onTogglePreview={() => {
@@ -833,7 +844,7 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
         />
       );
     },
-    [explorerExtensionItems, extensionsVisible, openExtensionPluginIds, selectedExtensionPluginId],
+    [explorerExtensionItems, extensionsEnabled, extensionsVisible, openExtensionPluginIds, selectedExtensionPluginId],
   );
 
   return (

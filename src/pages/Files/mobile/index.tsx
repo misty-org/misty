@@ -20,14 +20,12 @@ import {
   FolderOpen,
   Folder,
   FolderPlus,
-  FolderUp,
   GitCompareArrows,
   Grid2X2,
   HardDrive,
   Home,
   Info,
   List,
-  MessageSquare,
   Menu,
   MoreVertical,
   Pencil,
@@ -44,6 +42,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type ReactNode, type SetStateAction, type UIEvent } from "react";
 import { createPortal } from "react-dom";
+import { useNavigate } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
 import {
   clipboardApplyShared,
@@ -63,13 +62,13 @@ import {
   explorerListDirectory,
   explorerOpenAssociation,
   explorerOpenPath,
-  explorerSetOpenAssociation,
   explorerOpenWith,
   explorerPrepareOpenItem,
   explorerPreviewItem,
   transfersSnapshot,
 } from "../../../api/misty";
 import type {
+  AppEnvironmentSnapshot,
   ClipboardPayload,
   CreateItemKind,
   DirectoryListing,
@@ -98,12 +97,12 @@ import { errorText } from "../../../shared/format";
 import { selectAdvancedPreferences, selectGeneralPreferences, useSettingsStore } from "../../../stores/useSettingsStore";
 import { useProvidersStore } from "../../../stores/useProvidersStore";
 import { useExplorerStore } from "../../../stores/useExplorerStore";
-import { useMikaSessionStore, type AiPlanReview, type AiStatus, type AiToolApproval } from "../../../stores/useMikaSessionStore";
 import { useFileSyncStore } from "../../../stores/useFileSyncStore";
 import type { FileSyncSession } from "../../../stores/useFileSyncStore";
 import { clipboardImagePng } from "../utils/clipboardImage";
 import { formatBytes, formatDate } from "../utils/fileFormat";
 import { hasTauriInternals, safeTauriAssetUrl } from "../../../shared/tauri";
+import MobileFirstLaunchWelcome from "./MobileFirstLaunchWelcome";
 
 const mobileFilesLastPathStorageKey = "misty.mobile.files.lastPath";
 const mobileFilesTabsStorageKey = "misty.mobile.files.tabs";
@@ -116,7 +115,7 @@ const mobileStarredPath = "misty://starred";
 const mobileTrashPath = "misty://trash";
 const smokeHome = "/Users/misty";
 const EMPTY_PROVIDER_REMOTES: ProviderRemote[] = [];
-const maxMobilePreviewBytes = 32 * 1024 * 1024;
+const mobileActionDebugEnabled = import.meta.env.DEV;
 const mobileImagePreviewLoadAttempts = 5;
 const mobileImagePreviewRetryDelayMs = 80;
 const mobileBrowserImageMimeTypes: Record<string, string> = {
@@ -147,21 +146,21 @@ const mobileFileSyncActions: Array<{ value: FileSyncPlannedAction; label: string
   { value: "delete_right", label: "Delete Right" },
 ];
 const filesPageClass = "h-full min-h-0 min-w-0 overflow-auto overscroll-contain bg-[#202020] px-[max(16px,var(--misty-safe-right))] pb-[14px] pl-[max(16px,var(--misty-safe-left))] pr-[max(16px,var(--misty-safe-right))] pt-[calc(16px+var(--misty-safe-top))] [-webkit-overflow-scrolling:touch]";
-const filesSearchClass = "mb-3.5 grid h-[54px] grid-cols-[38px_minmax(0,1fr)] items-center gap-2.5 rounded-full bg-[#2e2e2e] px-4 text-[#dbdbdb]";
+const filesSearchClass = "mb-3.5 grid h-[54px] grid-cols-[44px_minmax(0,1fr)] items-center gap-2.5 rounded-full bg-[#2e2e2e] px-4 text-[#dbdbdb]";
 const filesIconButtonClass = "grid place-items-center border-0 bg-transparent text-[#cccccc]";
 const filesTabClass = "relative min-h-[46px] min-w-0 border-0 bg-transparent text-center text-[17px] font-bold text-[#c8c8c8]";
 const filesActiveTabClass = "text-[#c5c5c5] after:absolute after:bottom-[-1px] after:left-[19%] after:right-[19%] after:h-1 after:rounded-t-full after:bg-[#c5c5c5] after:content-['']";
-const filesSortButtonClass = "grid h-9 w-9 place-items-center rounded-xl border-0 bg-transparent text-[#dadada] disabled:opacity-35";
+const filesSortButtonClass = "grid h-11 w-11 place-items-center rounded-xl border-0 bg-transparent text-[#dadada] disabled:opacity-35";
 const filesMoreButtonClass = "grid h-11 w-11 flex-none place-items-center rounded-[14px] border-0 bg-transparent text-[#aeaeae] aria-expanded:bg-[#b2b2b229] aria-expanded:text-[#e5e5e5]";
 const fileListBaseClass = "grid gap-0";
 const fileListGridClass = "grid grid-cols-2 gap-2.5 pt-1.5";
 const fileRowListClass = "grid min-h-[90px] w-full min-w-0 grid-cols-[minmax(0,1fr)_44px] items-center gap-1 border-0 bg-transparent py-3 text-left text-[#f3f3f3]";
-const fileRowGridClass = "grid min-h-[132px] w-full min-w-0 grid-cols-[minmax(0,1fr)_34px] items-start gap-1 rounded-[18px] border border-white/10 bg-[#222222] p-[13px] text-left text-[#f3f3f3]";
+const fileRowGridClass = "grid min-h-[132px] w-full min-w-0 grid-cols-[minmax(0,1fr)_44px] items-start gap-1 rounded-[18px] border border-white/10 bg-[#222222] p-[13px] text-left text-[#f3f3f3]";
 const fileRowSelectedClass = "rounded-2xl bg-[#b2b2b21a] px-2";
 const fileRowGridSelectedClass = "border-[#b2b2b259] bg-[#b2b2b21f]";
 const fileRowMainListClass = "grid min-w-0 grid-cols-[52px_minmax(0,1fr)] items-center gap-4 border-0 bg-transparent p-0 text-left text-inherit";
 const fileRowMainGridClass = "grid min-w-0 grid-cols-[minmax(0,1fr)] content-start gap-3 border-0 bg-transparent p-0 text-left text-inherit";
-const fileSelectButtonClass = "grid h-[34px] w-[34px] place-items-center rounded-full border border-white/10 bg-white/[0.04] text-[#aeaeae] disabled:opacity-35";
+const fileSelectButtonClass = "grid h-11 w-11 place-items-center rounded-full border border-white/10 bg-white/[0.04] text-[#aeaeae] disabled:opacity-35";
 const fileSelectButtonSelectedClass = "border-[#b2b2b273] bg-[#e5e5e5] text-[#161616]";
 const mobileSheetBackdropClass = "fixed inset-0 z-[1000] flex items-end bg-black/60";
 const mobileSheetClass = "w-full max-h-[min(calc(100dvh-var(--misty-safe-top)-18px),680px)] overflow-auto rounded-t-[18px] border border-[var(--misty-border-soft)] bg-[var(--misty-surface)] pb-[calc(14px+var(--misty-safe-bottom))] pl-[max(var(--misty-mobile-edge),var(--misty-safe-left))] pr-[max(var(--misty-mobile-edge),var(--misty-safe-right))] pt-4 shadow-[0_-24px_70px_rgba(0,0,0,0.52)]";
@@ -306,8 +305,10 @@ interface MobileActionDebugMatch {
 }
 
 export function MobileFilesPage() {
+  const appNavigate = useNavigate();
   const app = useAppStore((state) => state.app);
-  const homeDir = app?.environment.homeDir ?? smokeHome;
+  const environment = app?.environment;
+  const homeDir = mobileEnvironmentHomeDir(environment);
   const { preferredWorkspaceRoot, mountPath } = useSettingsStore(useShallow((state) => ({
     preferredWorkspaceRoot: selectGeneralPreferences(state.settings?.document).preferredWorkspaceRoot,
     mountPath: selectAdvancedPreferences(state.settings?.document).mountPath,
@@ -351,6 +352,7 @@ export function MobileFilesPage() {
   })));
   const rootPath = resolvePreferredMobileRoot(preferredWorkspaceRoot, homeDir);
   const mountRoot = resolveMobileMountRoot(rootPath, mountPath || app?.environment.mountPath || ".misty/mnt");
+  const deviceLocationLabel = mobileDeviceLocationLabel(homeDir);
   const initialPath = initialMobilePath(rootPath);
   const [path, setPath] = useState(initialPath);
   const [mobileWorkspaces, setMobileWorkspaces] = useState<MobileFileWorkspaceState>(() => loadMobileFileWorkspaces(initialPath));
@@ -373,7 +375,6 @@ export function MobileFilesPage() {
   const [actionsSheetOpen, setActionsSheetOpen] = useState(false);
   const [syncSheetOpen, setSyncSheetOpen] = useState(false);
   const [sharedClipboardSheetOpen, setSharedClipboardSheetOpen] = useState(false);
-  const [mikaSheetOpen, setMikaSheetOpen] = useState(false);
   const [createKind, setCreateKind] = useState<CreateItemKind | null>(null);
   const [createName, setCreateName] = useState("");
   const [tagDraft, setTagDraft] = useState("");
@@ -439,21 +440,27 @@ export function MobileFilesPage() {
     } catch (loadError) {
       const message = errorText(loadError);
       if (isMissingDirectoryError(message)) {
-        setListing(emptyListing(nextPath));
-        setPath(nextPath);
-        setEmptyReason("missing-path");
         try {
           window.localStorage.removeItem(mobileFilesLastPathStorageKey);
         } catch {
           // Mobile path memory is best-effort.
         }
+        if (normalizePath(nextPath) !== normalizePath(rootPath) && !mobileRemotePathInfo(nextPath, mountRoot, remotes)) {
+          clearMobileFilesLocationStorage();
+          setMobileWorkspaces(createDefaultMobileFileWorkspaceState(rootPath));
+          setPath(rootPath);
+          return;
+        }
+        setListing(emptyListing(nextPath));
+        setPath(nextPath);
+        setEmptyReason("missing-path");
       } else {
         setError(sanitizeMobilePathText(message, homeDir));
       }
     } finally {
       setLoading(false);
     }
-  }, [homeDir, showHidden, sort]);
+  }, [homeDir, mountRoot, remotes, rootPath, showHidden, sort]);
 
   useEffect(() => {
     saveMobileFilesViewMode(viewMode);
@@ -485,9 +492,11 @@ export function MobileFilesPage() {
   }, [loadDirectory, mountRoot, path, remotes, sort]);
 
   useEffect(() => {
-    if (rootPath === smokeHome || path !== smokeHome || hasStoredMobilePath()) return;
+    if (!shouldResetToMobileRoot(path, rootPath, mountRoot, remotes)) return;
+    clearMobileFilesLocationStorage();
+    setMobileWorkspaces(createDefaultMobileFileWorkspaceState(rootPath));
     setPath(rootPath);
-  }, [rootPath, path]);
+  }, [mountRoot, path, remotes, rootPath]);
 
   const entries = useMemo(() => {
     const source = listing?.entries ?? [];
@@ -515,10 +524,6 @@ export function MobileFilesPage() {
     () => selectedEntries.filter(isDownloadableRemoteEntry),
     [selectedEntries],
   );
-  const mikaSelectedEntry = useMemo(
-    () => detailEntry ?? contextEntry ?? (selectedEntries.length === 1 ? selectedEntries[0] : null),
-    [contextEntry, detailEntry, selectedEntries],
-  );
   const detailTags = useMemo(
     () => detailEntry ? mobileLibraryTagsForEntry(detailEntry, explorerLibrary) : [],
     [detailEntry, explorerLibrary],
@@ -541,6 +546,7 @@ export function MobileFilesPage() {
 
   const beginActionDebug = (action: string, request: unknown): string => {
     const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    if (!mobileActionDebugEnabled) return id;
     setActionDebug({
       id,
       action,
@@ -555,6 +561,7 @@ export function MobileFilesPage() {
   };
 
   const finishActionDebug = (id: string, queue: OperationQueueSnapshot, match: MobileActionDebugMatch) => {
+    if (!mobileActionDebugEnabled) return;
     setActionDebug((current) => current?.id === id
       ? {
         ...current,
@@ -566,6 +573,7 @@ export function MobileFilesPage() {
   };
 
   const failActionDebug = (id: string, error: unknown) => {
+    if (!mobileActionDebugEnabled) return;
     setActionDebug((current) => current?.id === id
       ? { ...current, stage: "Request failed", error: errorText(error) }
       : current);
@@ -687,8 +695,6 @@ export function MobileFilesPage() {
     setError(null);
     try {
       if (mediaInfo.kind === "image") {
-        const sizeLimitError = mobilePreviewSizeLimitError(entry);
-        if (sizeLimitError) throw new Error(sizeLimitError);
         const localPath = await preparedPreviewPathForMobileEntry(entry);
         const url = await loadMobileImageAssetUrl(localPath);
         setMedia((current) => {
@@ -735,41 +741,6 @@ export function MobileFilesPage() {
     }
   };
 
-  const openFileWith = async (entry: FileEntry) => {
-    if (!isMobileOpenWithEntry(entry)) return;
-    if (!hasTauriInternals()) {
-      setError("Choosing a local application is only available in the Tauri app.");
-      return;
-    }
-    setOpening(true);
-    setError(null);
-    try {
-      const selection = await open({
-        title: "Choose Application",
-        multiple: false,
-        directory: false,
-      });
-      const applicationPath = Array.isArray(selection) ? selection[0] : selection;
-      if (!applicationPath) return;
-      const localPath = entry.location.kind === "local"
-        ? entry.path
-        : (await explorerPrepareOpenItem({
-          path: entry.path,
-          sizeBytes: entry.sizeBytes,
-          remoteModified: entry.remoteModified,
-        })).localPath;
-      await explorerSetOpenAssociation(entry.path, applicationPath);
-      await explorerOpenWith(applicationPath, localPath);
-      void recordMobileLibraryRecent(entry);
-      setDetailEntry(null);
-      setContextEntry(null);
-    } catch (openError) {
-      setError(sanitizeMobilePathText(`Open With failed: ${errorText(openError)}`, homeDir));
-    } finally {
-      setOpening(false);
-    }
-  };
-
   const navigateToPath = (nextPath: string, mode: MobileFilesNavigationMode = "push") => {
     const normalizedNext = normalizePath(nextPath);
     const normalizedPrevious = normalizePath(currentPath);
@@ -788,7 +759,6 @@ export function MobileFilesPage() {
     setActionsSheetOpen(false);
     setSyncSheetOpen(false);
     setSharedClipboardSheetOpen(false);
-    setMikaSheetOpen(false);
     setSelectionMode(false);
     setSelectedIds([]);
     setQuery("");
@@ -986,27 +956,27 @@ export function MobileFilesPage() {
     }
   };
 
-  const uploadIntoCurrentFolder = async (sourceKind: "files" | "folders") => {
+  const uploadIntoCurrentFolder = async () => {
     if (!canAddInCurrentFolder) return;
     if (!hasTauriInternals()) {
-      setError("Uploading local files is only available in the Tauri app.");
+      setError("Uploading local files is only available in the Misty app.");
       return;
     }
     setActionBusy(true);
     setError(null);
     let debugId: string | null = null;
     try {
-      const selection = await open({ multiple: true, directory: sourceKind === "folders" });
+      const selection = await open({ multiple: true, directory: false });
       const paths = selection == null ? [] : Array.isArray(selection) ? selection : [selection];
       if (paths.length === 0) return;
       const request = {
-        sources: paths.map((path) => ({ path, isDirectory: sourceKind === "folders" })),
+        sources: paths.map((path) => ({ path, isDirectory: false })),
         destinationDirectory: currentPath,
         operation: "copy",
       } as const;
       debugId = beginActionDebug("upload", {
         ...request,
-        sourceKind,
+        sourceKind: "files",
         location: mobileLocationLabel(currentPath, rootPath, mountRoot, remotes),
       });
       const queue = await explorerQueuePasteItems(request);
@@ -1019,7 +989,7 @@ export function MobileFilesPage() {
       setAddSheetOpen(false);
       window.setTimeout(() => void refreshCurrent(), 700);
     } catch (uploadError) {
-      failActionDebug(debugId ?? beginActionDebug("upload", { sourceKind, destinationDirectory: currentPath }), uploadError);
+      failActionDebug(debugId ?? beginActionDebug("upload", { sourceKind: "files", destinationDirectory: currentPath }), uploadError);
       setError(sanitizeMobilePathText(`Upload failed: ${errorText(uploadError)}`, homeDir));
     } finally {
       setActionBusy(false);
@@ -1424,10 +1394,11 @@ export function MobileFilesPage() {
 
   return (
     <section className={filesPageClass} onScroll={handleMobileFilePageScroll}>
+      <MobileFirstLaunchWelcome />
       <div className={filesSearchClass}>
         <button
           type="button"
-          className={`${filesIconButtonClass} h-[38px] w-[38px]`}
+          className={`${filesIconButtonClass} h-11 w-11`}
           aria-label="Files sidebar"
           aria-expanded={sidebarOpen}
           onClick={() => setSidebarOpen(true)}
@@ -1463,7 +1434,7 @@ export function MobileFilesPage() {
         </button>
       </div>
 
-      <div className="mb-1 flex min-h-[54px] items-center justify-between gap-2">
+      <div className="mb-2 flex min-h-11 items-center justify-between gap-2">
         <div className="inline-flex flex-none items-center gap-1" aria-label="Folder navigation">
           <button
             type="button"
@@ -1477,14 +1448,14 @@ export function MobileFilesPage() {
         </div>
         <button
           type="button"
-          className="flex min-w-0 flex-auto items-center gap-2.5 border-0 bg-transparent p-0 text-inherit"
+          className="flex min-h-11 min-w-0 flex-auto items-center justify-center gap-2 rounded-[14px] border border-transparent bg-transparent px-2 text-inherit active:border-white/10 active:bg-white/[0.04]"
           aria-label="Sort files"
           aria-haspopup="dialog"
           onClick={() => setSortSheetOpen(true)}
         >
-          <span className="min-w-0 overflow-hidden truncate text-xl font-extrabold text-[#f6f6f6]">{mobileSortColumnLabel(sort.column)}</span>
-          <span className="grid h-[43px] w-[43px] place-items-center rounded-full bg-[#535353] text-[#e5e5e5]">
-            <ArrowUp className={`transition-transform duration-[160ms] ease-out ${sort.direction === "desc" ? "rotate-180" : ""}`} size={28} strokeWidth={2.4} />
+          <span className="min-w-0 overflow-hidden truncate text-[20px] font-extrabold leading-none text-[#f6f6f6]">{mobileSortColumnLabel(sort.column)}</span>
+          <span className="grid h-8 w-8 flex-none place-items-center rounded-full bg-[#3a3a3a] text-[#e5e5e5]">
+            <ArrowUp className={`transition-transform duration-[160ms] ease-out ${sort.direction === "desc" ? "rotate-180" : ""}`} size={21} strokeWidth={2.35} />
           </span>
         </button>
         <button
@@ -1519,7 +1490,7 @@ export function MobileFilesPage() {
 
       {error ? <div className={mobileErrorClass}>{error}</div> : null}
       {notice ? <div className={mobileSuccessClass}>{notice}</div> : null}
-      {actionDebug ? (
+      {mobileActionDebugEnabled && actionDebug ? (
         <MobileFilesActionDebug
           debug={actionDebug}
           onClose={() => setActionDebug(null)}
@@ -1535,6 +1506,8 @@ export function MobileFilesPage() {
           <MobileFilesEmptyState
             reason={emptyReason}
             searching={Boolean(query.trim())}
+            onOpenRoot={() => navigateToPath(rootPath, "replace")}
+            onOpenRemotes={() => appNavigate("/providers")}
           />
         ) : null}
         {entries.map((entry) => {
@@ -1580,7 +1553,7 @@ export function MobileFilesPage() {
             {!selectionMode ? (
               <button
                 type="button"
-                className={viewMode === "grid" ? `${filesMoreButtonClass} h-[34px] w-[34px]` : filesMoreButtonClass}
+                className={filesMoreButtonClass}
                 aria-label={`Actions for ${entry.name}`}
                 aria-haspopup="dialog"
                 onClick={() => setContextEntry(entry)}
@@ -1617,7 +1590,7 @@ export function MobileFilesPage() {
           canPaste={canPasteInCurrentFolder}
           onClose={() => setAddSheetOpen(false)}
           onCreate={startCreate}
-          onUpload={(sourceKind) => void uploadIntoCurrentFolder(sourceKind)}
+          onUpload={() => void uploadIntoCurrentFolder()}
           onPaste={() => void pasteIntoCurrentFolder()}
         />
       ) : null}
@@ -1643,7 +1616,6 @@ export function MobileFilesPage() {
           selectionMode={selectionMode}
           syncOpen={syncSheetOpen}
           sharedClipboardOpen={sharedClipboardSheetOpen}
-          mikaOpen={mikaSheetOpen}
           refreshBusy={loading || (remoteRoot && remoteLoading)}
           onClose={() => setActionsSheetOpen(false)}
           onViewMode={(mode) => {
@@ -1665,10 +1637,6 @@ export function MobileFilesPage() {
           }}
           onSharedClipboard={() => {
             setSharedClipboardSheetOpen(true);
-            setActionsSheetOpen(false);
-          }}
-          onMika={() => {
-            setMikaSheetOpen(true);
             setActionsSheetOpen(false);
           }}
           onRefresh={() => {
@@ -1705,14 +1673,6 @@ export function MobileFilesPage() {
         />
       ) : null}
 
-      {mikaSheetOpen ? (
-        <MobileMikaSheet
-          workingDirectory={currentPath}
-          selectedPath={mikaSelectedEntry?.path ?? null}
-          onClose={() => setMikaSheetOpen(false)}
-        />
-      ) : null}
-
       {createKind ? (
         <MobileCreateItemSheet
           kind={createKind}
@@ -1739,9 +1699,8 @@ export function MobileFilesPage() {
           clipboardLabel={clipboard ? mobileClipboardLabel(clipboard) : null}
           onClose={() => setContextEntry(null)}
           onCreate={startCreate}
-          onUpload={(sourceKind) => void uploadIntoCurrentFolder(sourceKind)}
+          onUpload={() => void uploadIntoCurrentFolder()}
           onOpen={() => void openFile(contextEntry)}
-          onOpenWith={() => void openFileWith(contextEntry)}
           onPreview={() => void previewEntry(contextEntry)}
           onDetails={() => {
             setDetailEntry(contextEntry);
@@ -1878,7 +1837,7 @@ export function MobileFilesPage() {
                     <button
                       key={tag}
                       type="button"
-                      className="inline-flex min-h-[30px] min-w-0 items-center gap-1.5 rounded-full border border-[#b2b2b238] bg-[#b2b2b21f] px-[9px] text-xs font-bold text-[#e5e5e5] disabled:opacity-50"
+                      className="inline-flex min-h-11 min-w-0 items-center gap-1.5 rounded-full border border-[#b2b2b238] bg-[#b2b2b21f] px-[9px] text-xs font-bold text-[#e5e5e5] disabled:opacity-50"
                       disabled={actionBusy}
                       aria-label={`Remove ${tag}`}
                       onClick={() => void removeDetailTag(tag)}
@@ -1897,13 +1856,13 @@ export function MobileFilesPage() {
                 }}
               >
                 <input
-                  className="h-[38px] min-w-0 rounded-xl border border-white/10 bg-[#080808] px-[11px] text-[#f3f3f3] outline-none"
+                  className="h-11 min-w-0 rounded-xl border border-white/10 bg-[#080808] px-[11px] text-[#f3f3f3] outline-none"
                   value={tagDraft}
                   disabled={actionBusy}
                   placeholder="Add tag"
                   onChange={(event) => setTagDraft(event.target.value)}
                 />
-                <button type="submit" className="min-h-[38px] rounded-xl border border-white/10 bg-[#f3f3f3] px-[13px] text-xs font-extrabold text-[#161616] disabled:opacity-50" disabled={actionBusy || !tagDraft.trim()}>
+                <button type="submit" className="min-h-11 rounded-xl border border-white/10 bg-[#f3f3f3] px-[13px] text-xs font-extrabold text-[#161616] disabled:opacity-50" disabled={actionBusy || !tagDraft.trim()}>
                   Add
                 </button>
               </form>
@@ -1926,6 +1885,7 @@ export function MobileFilesPage() {
         activeTabId={mobileTabs.activeTabId}
         closedTabs={mobileTabs.closedTabs}
         rootPath={rootPath}
+        deviceLocationLabel={deviceLocationLabel}
         mountRoot={mountRoot}
         pinnedPaths={pinnedPaths}
         remotes={remotes}
@@ -1946,7 +1906,7 @@ export function MobileFilesPage() {
 }
 
 const mobileSidebarActionClass =
-  "inline-flex min-h-9 min-w-0 items-center justify-center gap-1.5 rounded-lg border border-white/10 bg-transparent px-2 text-xs font-semibold text-white/80 disabled:opacity-35";
+  "inline-flex min-h-11 min-w-0 items-center justify-center gap-1.5 rounded-lg border border-white/10 bg-transparent px-2 text-xs font-semibold text-white/80 disabled:opacity-35";
 
 function mobileSidebarRowClass(selected: boolean, extra = ""): string {
   return [
@@ -1991,6 +1951,7 @@ function MobileFilesSidebar(props: {
   activeTabId: string;
   closedTabs: MobileFileTab[];
   rootPath: string;
+  deviceLocationLabel: string;
   mountRoot: string;
   pinnedPaths: string[];
   remotes: ProviderRemote[];
@@ -2009,7 +1970,7 @@ function MobileFilesSidebar(props: {
   const [collapsed, setCollapsed] = useState<Record<MobileSidebarSection, boolean>>(() => loadMobileFilesSidebarCollapsed());
   const [workspaceDialog, setWorkspaceDialog] = useState<MobileWorkspaceDialogState | null>(null);
   const [workspaceDraft, setWorkspaceDraft] = useState("");
-  const locationItems = useMemo(() => mobileLocationItems(props.rootPath), [props.rootPath]);
+  const locationItems = useMemo(() => mobileLocationItems(props.rootPath, props.deviceLocationLabel), [props.deviceLocationLabel, props.rootPath]);
   const pinnedItems = useMemo(() => mobilePinnedSidebarItems(props.pinnedPaths), [props.pinnedPaths]);
 
   useEffect(() => {
@@ -2331,7 +2292,7 @@ function MobileSidebarSectionHeader(props: {
   return (
     <button
       type="button"
-      className="mt-1 flex min-h-7 items-center justify-between border-0 bg-transparent px-0 py-0 text-[11px] font-bold uppercase text-white/45"
+      className="mt-1 flex min-h-11 items-center justify-between border-0 bg-transparent px-0 py-0 text-[11px] font-bold uppercase text-white/45"
       aria-expanded={!props.collapsed}
       onClick={props.onToggle}
     >
@@ -2372,7 +2333,7 @@ function MobileFileAddSheet(props: {
   canPaste: boolean;
   onClose: () => void;
   onCreate: (kind: CreateItemKind) => void;
-  onUpload: (sourceKind: "files" | "folders") => void;
+  onUpload: () => void;
   onPaste: () => void;
 }) {
   return (
@@ -2405,14 +2366,7 @@ function MobileFileAddSheet(props: {
             label="Upload Files"
             disabled={!props.canAdd || props.busy}
             note={!props.canAdd ? "Open a folder before uploading." : undefined}
-            onClick={() => props.onUpload("files")}
-          />
-          <MobileFileActionButton
-            icon={FolderUp}
-            label="Upload Folder"
-            disabled={!props.canAdd || props.busy}
-            note={!props.canAdd ? "Open a folder before uploading." : undefined}
-            onClick={() => props.onUpload("folders")}
+            onClick={props.onUpload}
           />
           <MobileFileActionButton
             icon={Clipboard}
@@ -2464,152 +2418,6 @@ function MobileSharedClipboardSheet(props: {
   );
 }
 
-function mobileAssistantStatusText(status: AiStatus | null): string {
-  if (mikaComingSoon) return "Coming soon...";
-  if (!status) return "Checking Mika...";
-  if (status.configured) return `Ready (${status.provider}/${status.model})`;
-  return "Coming soon...";
-}
-
-const mikaComingSoon = true;
-
-function MobileMikaSheet(props: {
-  workingDirectory: string;
-  selectedPath: string | null;
-  onClose: () => void;
-}) {
-  const { status, mode, messages, plans, toolApprovals, error, refreshStatus, setMode, sendPrompt, abortPrompt, clearConversation, approvePlan, approveToolRequest } = useMikaSessionStore(useShallow((state) => ({
-    status: state.status,
-    mode: state.mode,
-    messages: state.messages,
-    plans: state.plans,
-    toolApprovals: state.toolApprovals,
-    error: state.error,
-    refreshStatus: state.refreshStatus,
-    setMode: state.setMode,
-    sendPrompt: state.sendPrompt,
-    abortPrompt: state.abortPrompt,
-    clearConversation: state.clearConversation,
-    approvePlan: state.approvePlan,
-    approveToolRequest: state.approveToolRequest,
-  })));
-  const [prompt, setPrompt] = useState("");
-  const logRef = useRef<HTMLDivElement | null>(null);
-  const running = status?.running ?? false;
-  const configured = !mikaComingSoon && (status?.configured ?? false);
-
-  useEffect(() => {
-    if (mikaComingSoon) return;
-    void refreshStatus();
-  }, [refreshStatus]);
-
-  useEffect(() => {
-    logRef.current?.scrollTo({ top: logRef.current.scrollHeight });
-  }, [messages]);
-
-  const submitPrompt = () => {
-    const trimmed = prompt.trim();
-    if (mikaComingSoon || !trimmed || running) return;
-    setPrompt("");
-    void sendPrompt({
-      displayPrompt: trimmed,
-      prompt: buildMobileMikaPrompt(trimmed, props.workingDirectory, props.selectedPath),
-      cwd: props.workingDirectory || null,
-      selectedPaths: props.selectedPath ? [mobileBasename(props.selectedPath)] : [],
-    });
-  };
-
-  return (
-    <div className={mobileSheetBackdropClass} role="presentation" onClick={props.onClose}>
-      <section
-        className={`${mobileSheetClass} grid max-h-[min(calc(100dvh-var(--misty-safe-top)-18px),760px)] grid-rows-[auto_auto_minmax(160px,1fr)_auto] gap-3`}
-        role="dialog"
-        aria-modal="true"
-        aria-label="Mika AI coming soon"
-        onClick={(event) => event.stopPropagation()}
-      >
-        <MobileSheetHeader eyebrow="Assistant" title="Mika" closeLabel="Close Mika" onClose={props.onClose} />
-        <div className="grid gap-2 rounded-[14px] border border-white/10 bg-[#0f0f0f] p-[11px]">
-          <p className="m-0 rounded-[10px] border border-[#4a4030] bg-[#1b1710] px-2.5 py-2 text-xs font-bold leading-normal text-[#e8d5aa]">
-            Mika AI is coming soon. We are polishing assistant workflows before turning it on.
-          </p>
-          <dl className="m-0 grid gap-2">
-            <div className="grid min-w-0 gap-[3px]">
-              <dt className="text-[11px] font-extrabold uppercase tracking-normal text-[#919191]">Status</dt>
-              <dd className="m-0 min-w-0 break-words text-[13px] leading-[1.35] text-[#f3f3f3]">{mobileAssistantStatusText(status)}</dd>
-            </div>
-            <div className="grid min-w-0 gap-[3px]">
-              <dt className="text-[11px] font-extrabold uppercase tracking-normal text-[#919191]">Folder</dt>
-              <dd className="m-0 min-w-0 break-words text-[13px] leading-[1.35] text-[#f3f3f3]">{props.workingDirectory || "No active folder"}</dd>
-            </div>
-            <div className="grid min-w-0 gap-[3px]">
-              <dt className="text-[11px] font-extrabold uppercase tracking-normal text-[#919191]">Selection</dt>
-              <dd className="m-0 min-w-0 break-words text-[13px] leading-[1.35] text-[#f3f3f3]">{props.selectedPath ?? "None"}</dd>
-            </div>
-          </dl>
-          {!mikaComingSoon && error ? <p className="m-0 rounded-[10px] bg-[#a8a8a81a] px-2.5 py-2 text-xs text-[#c8c8c8]">{error}</p> : null}
-        </div>
-        <div ref={logRef} className="grid min-h-40 content-start gap-[9px] overflow-auto rounded-[14px] border border-white/10 bg-[#080808] p-2.5 [-webkit-overflow-scrolling:touch]" aria-live="polite">
-          {messages.length === 0 ? (
-            <p className="m-0 text-[13px] leading-[1.4] text-[#919191]">Mika AI is coming soon...</p>
-          ) : messages.map((message) => (
-            <article
-              key={message.id}
-              className={[
-                "grid gap-[5px] rounded-xl border p-[9px]",
-                message.role === "user" ? "border-[#b2b2b23d] bg-[#b2b2b21a]" : "",
-                message.role === "error" ? "border-[#c8c8c842] bg-[#a8a8a814]" : "",
-                message.role !== "user" && message.role !== "error" ? "border-white/10 bg-[#0f0f0f]" : "",
-              ].filter(Boolean).join(" ")}
-            >
-              <strong className="text-xs font-extrabold text-[#f0f0f0]">{message.role === "user" ? "You" : message.role === "tool" ? "Tool" : message.role === "error" ? "Error" : "Mika"}</strong>
-              <pre className="m-0 break-words font-sans text-xs leading-[1.45] text-[#cfcfcf] [white-space:pre-wrap]">{message.text || (message.role === "assistant" && running ? "Thinking..." : "")}</pre>
-              {message.toolRequestId ? <MobileAiToolActions requestId={message.toolRequestId} approvals={toolApprovals} onApprove={approveToolRequest} /> : null}
-              {message.planId ? <MobileAiPlanActions planId={message.planId} plans={plans} onApply={approvePlan} /> : null}
-            </article>
-          ))}
-        </div>
-        <form
-          className="grid gap-[9px]"
-          onSubmit={(event) => {
-            event.preventDefault();
-            submitPrompt();
-          }}
-        >
-          <textarea
-            className="min-w-0 resize-none rounded-[14px] border border-white/10 bg-[#080808] p-3 font-inherit leading-[1.4] text-[#f0f0f0] outline-none focus:border-[#b2b2b26b] focus:shadow-[0_0_0_3px_rgba(183,183,183,0.12)] disabled:opacity-60"
-            value={prompt}
-            rows={3}
-            placeholder={mikaComingSoon ? "Mika is coming soon..." : configured ? "Ask Mika to organize this folder..." : "Configure Mika backend to continue"}
-            disabled={!configured || running}
-            onChange={(event) => setPrompt(event.target.value)}
-          />
-          <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] gap-2">
-            <select
-              className="min-h-10 rounded-[12px] border border-white/10 bg-[#080808] px-2 text-sm text-[#f0f0f0]"
-              value={mode}
-              aria-label="Mika mode"
-              disabled={mikaComingSoon}
-              onChange={(event) => setMode(event.target.value as Parameters<typeof setMode>[0])}
-            >
-              <option value="ask">Ask</option>
-              <option value="auto">Auto</option>
-            </select>
-            <button type="button" className={mobileSecondaryActionClass} disabled={messages.length === 0 || running} onClick={clearConversation}>
-              Clear
-            </button>
-            {running ? (
-              <button type="button" className={mobileDangerActionClass} onClick={abortPrompt}>Stop</button>
-            ) : (
-              <button type="submit" className={mobilePrimaryActionClass} disabled={!configured || !prompt.trim()}>Send</button>
-            )}
-          </div>
-        </form>
-      </section>
-    </div>
-  );
-}
-
 function MobileFilesSelectionBar(props: {
   selectedCount: number;
   actionableCount: number;
@@ -2626,7 +2434,7 @@ function MobileFilesSelectionBar(props: {
   onDelete: () => void;
 }) {
   const hasActionableSelection = props.actionableCount > 0;
-  const selectionActionClass = "inline-flex min-h-[34px] items-center justify-center gap-1.5 rounded-full border border-white/10 bg-[#0f0f0f] px-[11px] text-xs font-bold text-[#f3f3f3] disabled:opacity-45";
+  const selectionActionClass = "inline-flex min-h-11 items-center justify-center gap-1.5 rounded-full border border-white/10 bg-[#0f0f0f] px-[11px] text-xs font-bold text-[#f3f3f3] disabled:opacity-45";
   return (
     <section className="mb-3 grid gap-2.5 p-0" aria-label="Selected file actions">
       <header className="flex items-center justify-between gap-2.5">
@@ -2661,173 +2469,12 @@ function MobileFilesSelectionBar(props: {
   );
 }
 
-function MobileAiPlanActions(props: {
-  planId: string;
-  plans: AiPlanReview[];
-  onApply: (planId: string) => Promise<void>;
-}) {
-  const [reviewOpen, setReviewOpen] = useState(false);
-  const plan = props.plans.find((candidate) => candidate.id === props.planId);
-  if (!plan) return null;
-  const blocked = plan.blockedReasons.length > 0;
-  return (
-    <div className="grid min-w-0 gap-2">
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="text-[11px] font-bold uppercase tracking-normal text-[#919191]">
-          {plan.plan.operations.length} operations{blocked ? " blocked" : plan.applied ? " queued" : ""}
-        </span>
-        <button
-          type="button"
-          className={mobileSecondaryActionClass}
-          aria-haspopup="dialog"
-          onClick={() => setReviewOpen(true)}
-        >
-          {plan.applied ? "View" : "Review & Apply"}
-        </button>
-      </div>
-      {reviewOpen ? (
-        <MobileAiPlanReviewSheet
-          plan={plan}
-          onApply={props.onApply}
-          onClose={() => setReviewOpen(false)}
-        />
-      ) : null}
-    </div>
-  );
-}
-
-type MobilePlanOperation = AiPlanReview["plan"]["operations"][number];
-
-function mobilePlanOperationDetail(operation: MobilePlanOperation): string {
-  if (operation.type === "mkdir") return operation.path;
-  return `${operation.from} -> ${operation.to}`;
-}
-
-function MobileAiPlanReviewSheet(props: {
-  plan: AiPlanReview;
-  onApply: (planId: string) => Promise<void>;
-  onClose: () => void;
-}) {
-  const blocked = props.plan.blockedReasons.length > 0;
-  const warnings = [
-    ...props.plan.plan.warnings.map((warning) => `Warning: ${warning}`),
-    ...props.plan.blockedReasons.map((reason) => `Blocked: ${reason}`),
-  ];
-
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") props.onClose();
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [props.onClose]);
-
-  const applyPlan = async () => {
-    await props.onApply(props.plan.id);
-    props.onClose();
-  };
-
-  return createPortal(
-    <div
-      className={mobileSheetBackdropClass}
-      role="presentation"
-      style={{ zIndex: 2147483100 }}
-      onClick={props.onClose}
-    >
-      <section
-        className={`${mobileSheetClass} grid max-h-[min(calc(100dvh-var(--misty-safe-top)-18px),760px)] grid-rows-[auto_minmax(0,1fr)_auto] gap-3`}
-        role="dialog"
-        aria-modal="true"
-        aria-label="Review file operations"
-        onClick={(event) => event.stopPropagation()}
-      >
-        <MobileSheetHeader eyebrow="Mika" title="Review File Operations" onClose={props.onClose} />
-        <div className="grid min-h-0 gap-3 overflow-hidden">
-          <div className="grid gap-2">
-            <div className="grid gap-1">
-              <span className="text-[11px] font-bold uppercase tracking-normal text-[#919191]">Will do</span>
-              <p className="m-0 break-words text-sm leading-normal text-[var(--misty-text-muted)]">{props.plan.plan.summary}</p>
-            </div>
-            {props.plan.appliedSummary ? (
-              <div className="grid gap-1">
-                <span className="text-[11px] font-bold uppercase tracking-normal text-[#919191]">Queued</span>
-                <p className="m-0 break-words text-sm leading-normal text-[#d4d4d4]">{props.plan.appliedSummary}</p>
-              </div>
-            ) : null}
-          </div>
-          {warnings.length > 0 ? (
-            <p className="m-0 text-xs leading-normal text-[#f0b3b3]">{warnings.join(" ")}</p>
-          ) : null}
-          <ol className="m-0 grid min-h-0 gap-1 overflow-auto rounded-xl border border-[#3a3a3a] bg-[#171717] p-2 [-webkit-overflow-scrolling:touch]">
-            {props.plan.plan.operations.map((operation, index) => (
-              <li key={`${operation.type}-${index}-${mobilePlanOperationDetail(operation)}`} className="grid min-w-0 gap-1 rounded-lg px-2 py-2 text-xs">
-                <span className="font-bold uppercase text-[#f0f0f0]">{operation.type}</span>
-                <span className="min-w-0 break-words leading-normal text-[#cfcfcf]">{mobilePlanOperationDetail(operation)}</span>
-              </li>
-            ))}
-          </ol>
-        </div>
-        <div className="grid gap-2">
-          <span className="text-[11px] font-bold uppercase tracking-normal text-[#919191]">
-            {props.plan.plan.operations.length} operations{blocked ? " blocked" : props.plan.applied ? " queued" : ""}
-          </span>
-          <div className="grid grid-cols-2 gap-2">
-            <button type="button" className={mobileSecondaryActionClass} onClick={props.onClose}>
-              Cancel
-            </button>
-            <button
-              type="button"
-              className={mobilePrimaryActionClass}
-              disabled={blocked || props.plan.applied || props.plan.applying}
-              onClick={() => void applyPlan()}
-            >
-              {props.plan.applying ? "Queueing..." : props.plan.applied ? "Queued" : "Apply"}
-            </button>
-          </div>
-        </div>
-      </section>
-    </div>,
-    document.body,
-  );
-}
-
-function MobileAiToolActions(props: {
-  requestId: string;
-  approvals: AiToolApproval[];
-  onApprove: (requestId: string) => Promise<void>;
-}) {
-  const approval = props.approvals.find((candidate) => candidate.id === props.requestId);
-  if (!approval) return null;
-  return (
-    <div className="flex flex-wrap items-center gap-2">
-      <span className="text-[11px] font-bold uppercase tracking-normal text-[#919191]">
-        {approval.completed ? "Completed" : approval.error ? "Blocked" : "Needs approval"}
-      </span>
-      <button
-        type="button"
-        className={mobileSecondaryActionClass}
-        disabled={approval.running || approval.completed}
-        onClick={() => void props.onApprove(props.requestId)}
-      >
-        {approval.running ? "Running..." : approval.completed ? "Ran" : "Run"}
-      </button>
-    </div>
-  );
-}
-
-function mobileBasename(path: string): string {
-  const normalized = path.replace(/\\/g, "/");
-  const index = normalized.lastIndexOf("/");
-  return index === -1 ? normalized : normalized.slice(index + 1);
-}
-
 function MobileFilesActionsSheet(props: {
   viewMode: MobileFilesViewMode;
   showHidden: boolean;
   selectionMode: boolean;
   syncOpen: boolean;
   sharedClipboardOpen: boolean;
-  mikaOpen: boolean;
   refreshBusy: boolean;
   onClose: () => void;
   onViewMode: (mode: MobileFilesViewMode) => void;
@@ -2835,7 +2482,6 @@ function MobileFilesActionsSheet(props: {
   onSelection: () => void;
   onSync: () => void;
   onSharedClipboard: () => void;
-  onMika: () => void;
   onRefresh: () => void;
 }) {
   return (
@@ -2885,12 +2531,6 @@ function MobileFilesActionsSheet(props: {
             label="Shared Clipboard"
             note={props.sharedClipboardOpen ? "Already open" : undefined}
             onClick={props.onSharedClipboard}
-          />
-          <MobileFileActionButton
-            icon={MessageSquare}
-            label="Mika"
-            note={props.mikaOpen ? "Already open" : "Coming soon"}
-            onClick={props.onMika}
           />
           <MobileFileActionButton
             icon={RefreshCcw}
@@ -2980,7 +2620,7 @@ function MobileFilesSortSheet(props: {
         <label className="grid min-h-14 min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-[14px] border border-white/10 bg-transparent p-0 text-[#f3f3f3]">
           <span className="grid min-w-0 gap-[3px]">
             <strong className="truncate text-sm">Show hidden files</strong>
-            <small className="truncate text-xs text-[#919191]">{props.hiddenCount > 0 ? `${props.hiddenCount} hidden in this folder` : "Match desktop hidden file browsing"}</small>
+            <small className="truncate text-xs text-[#919191]">{props.hiddenCount > 0 ? `${props.hiddenCount} hidden in this folder` : "Includes dotfiles and hidden items"}</small>
           </span>
           <input
             className="h-[22px] w-[22px] accent-[#b2b2b2]"
@@ -3027,7 +2667,7 @@ function MobileFileSyncSheet(props: {
         <label className="grid min-w-0 gap-1.5">
           <span className="text-[11px] font-extrabold uppercase tracking-normal text-[#919191]">Pair</span>
           <select
-            className="min-h-10 w-full min-w-0 rounded-xl border border-white/10 bg-[#080808] px-[11px] text-[#f3f3f3] outline-none disabled:opacity-50"
+            className="min-h-11 w-full min-w-0 rounded-xl border border-white/10 bg-[#080808] px-[11px] text-[#f3f3f3] outline-none disabled:opacity-50"
             value={selectedPairId}
             disabled={props.loadingPairs || props.pairs.length === 0}
             onChange={(event) => {
@@ -3041,7 +2681,7 @@ function MobileFileSyncSheet(props: {
         </label>
 
         {props.pairs.length === 0 && !props.loadingPairs ? (
-          <p className="m-0 text-[13px] leading-[1.45] text-[#acacac]">No saved sync pairs yet. Create a pair from desktop compare, then run it here.</p>
+          <p className="m-0 text-[13px] leading-[1.45] text-[#acacac]">No saved sync pairs are available on this device yet.</p>
         ) : null}
 
         {props.session ? (
@@ -3052,13 +2692,13 @@ function MobileFileSyncSheet(props: {
             </div>
 
             <div className="grid grid-cols-3 gap-2">
-              <button type="button" className="min-h-10 rounded-xl border border-white/10 bg-[#161616] px-2.5 text-xs font-bold text-[#f3f3f3] disabled:opacity-50" disabled={props.session.comparing || props.session.applying} onClick={props.onSwap}>
+              <button type="button" className="min-h-11 rounded-xl border border-white/10 bg-[#161616] px-2.5 text-xs font-bold text-[#f3f3f3] disabled:opacity-50" disabled={props.session.comparing || props.session.applying} onClick={props.onSwap}>
                 Swap
               </button>
-              <button type="button" className="min-h-10 rounded-xl border border-white/10 bg-[#161616] px-2.5 text-xs font-bold text-[#f3f3f3] disabled:opacity-50" disabled={props.session.comparing || props.session.applying} onClick={props.onCompare}>
+              <button type="button" className="min-h-11 rounded-xl border border-white/10 bg-[#161616] px-2.5 text-xs font-bold text-[#f3f3f3] disabled:opacity-50" disabled={props.session.comparing || props.session.applying} onClick={props.onCompare}>
                 {props.session.comparing ? "Comparing..." : "Compare"}
               </button>
-              <button type="button" className="min-h-10 rounded-xl border border-white/10 bg-[#f3f3f3] px-2.5 text-xs font-bold text-[#161616] disabled:opacity-50" disabled={props.session.applying || plannedCount === 0} onClick={props.onApply}>
+              <button type="button" className="min-h-11 rounded-xl border border-white/10 bg-[#f3f3f3] px-2.5 text-xs font-bold text-[#161616] disabled:opacity-50" disabled={props.session.applying || plannedCount === 0} onClick={props.onApply}>
                 {props.session.applying ? "Applying..." : `Apply${plannedCount ? ` ${plannedCount}` : ""}`}
               </button>
             </div>
@@ -3092,7 +2732,7 @@ function MobileFileSyncSheet(props: {
                     <label className="grid min-w-0 gap-1.5">
                       <small className="text-[11px] font-extrabold uppercase tracking-normal text-[#919191]">Action</small>
                       <select
-                        className="min-h-10 w-full min-w-0 rounded-xl border border-white/10 bg-[#080808] px-[11px] text-[#f3f3f3] outline-none"
+                        className="min-h-11 w-full min-w-0 rounded-xl border border-white/10 bg-[#080808] px-[11px] text-[#f3f3f3] outline-none"
                         value={row.action}
                         onChange={(event) => props.onAction(row.relativePath, event.target.value as FileSyncPlannedAction)}
                       >
@@ -3226,9 +2866,8 @@ function MobileFileContextSheet(props: {
   clipboardLabel: string | null;
   onClose: () => void;
   onCreate: (kind: CreateItemKind) => void;
-  onUpload: (sourceKind: "files" | "folders") => void;
+  onUpload: () => void;
   onOpen: () => void;
-  onOpenWith: () => void;
   onPreview: () => void;
   onDetails: () => void;
   onCopy: () => void;
@@ -3245,7 +2884,6 @@ function MobileFileContextSheet(props: {
   const deletedEntry = Boolean(props.entry.isDeleted);
   const canDownload = isDownloadableRemoteEntry(props.entry);
   const canPreview = isPreviewableEntry(props.entry);
-  const canOpenWith = isMobileOpenWithEntry(props.entry);
   const canMutate = !virtualRemote && !deletedEntry;
   return (
     <div className={mobileSheetBackdropClass} role="presentation" onClick={props.onClose}>
@@ -3285,14 +2923,7 @@ function MobileFileContextSheet(props: {
             label="Upload Files"
             disabled={!props.canCreate || props.busy}
             note={!props.canCreate ? "Open a folder before uploading." : undefined}
-            onClick={() => props.onUpload("files")}
-          />
-          <MobileFileActionButton
-            icon={FolderUp}
-            label="Upload Folder"
-            disabled={!props.canCreate || props.busy}
-            note={!props.canCreate ? "Open a folder before uploading." : undefined}
-            onClick={() => props.onUpload("folders")}
+            onClick={props.onUpload}
           />
           <div className={mobileSeparatorClass} role="separator" />
           <MobileFileActionButton
@@ -3301,13 +2932,6 @@ function MobileFileContextSheet(props: {
             disabled={props.opening || deletedEntry}
             note={deletedEntry ? "Trash items cannot be opened yet." : undefined}
             onClick={props.onOpen}
-          />
-          <MobileFileActionButton
-            icon={AppWindow}
-            label="Open With..."
-            disabled={!canOpenWith || props.opening}
-            note={canOpenWith ? undefined : "Open With is available for files."}
-            onClick={props.onOpenWith}
           />
           <MobileFileActionButton
             icon={FileText}
@@ -3466,7 +3090,7 @@ function MobileBatchRenameSheet(props: {
               </span>
               <span className="grid min-h-[42px] min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center overflow-hidden rounded-xl border border-white/10 bg-[#080808]">
                 <input
-                  className="h-10 min-w-0 border-0 bg-transparent px-[11px] text-[#f0f0f0] outline-none"
+                  className="h-11 min-w-0 border-0 bg-transparent px-[11px] text-[#f0f0f0] outline-none"
                   value={item.value}
                   disabled={props.busy}
                   onChange={(event) => props.onValue(item.entry.id, event.target.value)}
@@ -3610,6 +3234,8 @@ function MobileMediaViewer(props: {
           <video
             src={props.media.url}
             controls
+            autoPlay
+            muted
             playsInline
             className="max-h-full max-w-full"
           />
@@ -3648,7 +3274,12 @@ function MobileFileActionButton(props: {
   );
 }
 
-function MobileFilesEmptyState(props: { reason: EmptyReason; searching: boolean }) {
+function MobileFilesEmptyState(props: {
+  reason: EmptyReason;
+  searching: boolean;
+  onOpenRoot: () => void;
+  onOpenRemotes: () => void;
+}) {
   const title = props.reason === "missing-path"
     ? "Folder unavailable"
     : props.reason === "no-remotes"
@@ -3669,6 +3300,16 @@ function MobileFilesEmptyState(props: { reason: EmptyReason; searching: boolean 
       </span>
       <h3>{title}</h3>
       <p>{message}</p>
+      {props.reason === "missing-path" ? (
+        <button type="button" className={`${mobileSecondaryActionClass} mt-2 max-w-[260px]`} onClick={props.onOpenRoot}>
+          <Home size={17} /> Browse On Device
+        </button>
+      ) : null}
+      {props.reason === "no-remotes" ? (
+        <button type="button" className={`${mobileSecondaryActionClass} mt-2 max-w-[260px]`} onClick={props.onOpenRemotes}>
+          <FolderPlus size={17} /> Open Remotes
+        </button>
+      ) : null}
     </div>
   );
 }
@@ -3732,12 +3373,38 @@ function initialMobilePath(homeDir: string): string {
   }
 }
 
-function hasStoredMobilePath(): boolean {
+function mobileEnvironmentHomeDir(environment: AppEnvironmentSnapshot | undefined): string {
+  return environment?.homeDir || smokeHome;
+}
+
+function mobileDeviceLocationLabel(homeDir: string): string {
+  const normalized = normalizePath(homeDir).toLowerCase();
+  if (normalized.includes("/data/user/") || normalized.includes("/data/data/")) return "On This Device";
+  if (normalized.includes("/containers/data/application/")) return "On This Device";
+  return "On This Device";
+}
+
+function shouldResetToMobileRoot(path: string, rootPath: string, mountRoot: string, remotes: ProviderRemote[]): boolean {
+  const normalizedRoot = normalizePath(rootPath);
+  const normalizedPath = normalizePath(path);
+  if (!normalizedRoot || normalizedRoot === smokeHome || normalizedPath === normalizedRoot) return false;
+  if (isVirtualLibraryPath(path) || mobileRemotePathInfo(path, mountRoot, remotes)) return false;
+  return normalizedPath === normalizePath(smokeHome) || normalizedPath.startsWith(`${normalizePath(smokeHome)}/`);
+}
+
+function clearMobileFilesLocationStorage(): void {
   try {
-    return Boolean(window.localStorage.getItem(mobileFilesLastPathStorageKey));
+    window.localStorage.removeItem(mobileFilesLastPathStorageKey);
+    window.localStorage.removeItem(mobileFilesTabsStorageKey);
+    window.localStorage.removeItem(mobileFilesWorkspacesStorageKey);
   } catch {
-    return false;
+    // Mobile path memory is best-effort.
   }
+}
+
+function createDefaultMobileFileWorkspaceState(fallbackPath: string): MobileFileWorkspaceState {
+  const workspace = createMobileFileWorkspace("Workspace 1", fallbackPath, mobileFallbackTabTitle(fallbackPath), 0);
+  return { workspaces: [workspace], activeWorkspaceId: workspace.id, nextWorkspaceIndex: 1 };
 }
 
 function loadMobileFileWorkspaces(fallbackPath: string): MobileFileWorkspaceState {
@@ -4163,9 +3830,9 @@ function saveMobileFilesShowHidden(showHidden: boolean): void {
   }
 }
 
-function mobileLocationItems(rootPath: string): MobileSidebarItem[] {
+function mobileLocationItems(rootPath: string, deviceLocationLabel: string): MobileSidebarItem[] {
   const candidates: MobileSidebarItem[] = [
-    { id: "home", label: "On My iPhone", detail: "Local files", path: rootPath, icon: Home },
+    { id: "home", label: deviceLocationLabel, detail: "Local files", path: rootPath, icon: Home },
     { id: "recent", label: "Recent", detail: "Recently opened", path: mobileRecentPath, icon: Clock3 },
     { id: "starred", label: "Starred", detail: "Saved items", path: mobileStarredPath, icon: Star },
     { id: "misty", label: "Misty", detail: "App data", path: joinMobilePath(rootPath, ".misty"), icon: HardDrive },
@@ -4251,18 +3918,6 @@ function mobileTextClipboardPayload(text: string): ClipboardPayload {
     file_refs: [],
     images: [],
   };
-}
-
-function buildMobileMikaPrompt(userPrompt: string, workingDirectory: string, selectedPath: string | null): string {
-  const context = [
-    "You are helping inside Misty, a file manager.",
-    "Mika is beta and experimental.",
-    "Your main goal is to help reorganize files. You may chat freely, but tool-assisted work should stay focused on listing, searching, validating, and proposing safe file organization plans.",
-    "Do not inspect file contents or ask for preview tools. For changes, propose a file plan with folders, moves, and renames for the user to review.",
-    workingDirectory ? `Current folder: ${workingDirectory}` : "Current folder: none",
-    selectedPath ? `Selected item: ${selectedPath}` : "Selected item: none",
-  ].join("\n");
-  return `${context}\n\nUser request:\n${userPrompt}`;
 }
 
 async function writeMobileSharedClipboardPayload(payload: ClipboardPayload, mountRoot: string): Promise<string> {
@@ -4495,10 +4150,6 @@ function isDownloadableRemoteEntry(entry: FileEntry): boolean {
   return entry.location.kind === "remote" && !isVirtualRemoteEntry(entry) && !entry.isDeleted;
 }
 
-function isMobileOpenWithEntry(entry: FileEntry): boolean {
-  return entry.kind !== "folder" && entry.kind !== "symlink" && !entry.isDeleted && !isVirtualRemoteEntry(entry);
-}
-
 function isMobileMediaEntry(entry: FileEntry): boolean {
   return mobileMediaInfo(entry) != null;
 }
@@ -4519,7 +4170,6 @@ function mobileMediaInfo(entry: FileEntry): { kind: "image" | "video"; mimeType:
 
 function isPreviewableEntry(entry: FileEntry): boolean {
   if (entry.kind === "folder" || entry.isDeleted || isVirtualRemoteEntry(entry)) return false;
-  if (mobilePreviewSizeLimitError(entry)) return false;
   const extension = entry.extension.toLowerCase().replace(/^\./, "");
   return Boolean(mobilePreviewImageMimeType(entry)) || [
     "pdf",
@@ -4597,13 +4247,6 @@ function waitForMobileImage(url: string): Promise<void> {
     image.onerror = () => reject(new Error("Unable to load image preview."));
     image.src = url;
   });
-}
-
-function mobilePreviewSizeLimitError(entry: FileEntry): string | null {
-  if (entry.kind === "folder" || entry.sizeBytes == null || entry.sizeBytes <= maxMobilePreviewBytes) {
-    return null;
-  }
-  return `Preview is limited to ${maxMobilePreviewBytes / (1024 * 1024)} MB.`;
 }
 
 function mobileCacheBustedUrl(url: string, attempt: number): string {
@@ -4873,7 +4516,7 @@ function mobileFolderTitle(path: string, rootPath: string, mountRoot: string, re
   if (virtual) return virtual;
   const remote = mobileRemotePathInfo(path, mountRoot, remotes);
   if (remote) return remote.title;
-  if (isHomePath(path, rootPath)) return "On My iPhone";
+  if (isHomePath(path, rootPath)) return "On This Device";
   const parts = visiblePathParts(relativeMobilePath(path, rootPath));
   const name = parts[parts.length - 1];
   if (!name) return "Files";
@@ -4887,8 +4530,8 @@ function mobileLocationLabel(path: string, rootPath: string, mountRoot: string, 
   const remote = mobileRemotePathInfo(path, mountRoot, remotes);
   if (remote) return remote.label;
   const parts = visiblePathParts(relativeMobilePath(path, rootPath));
-  if (parts.length === 0) return "On My iPhone";
-  return `On My iPhone › ${parts.map(displayPathPart).join(" › ")}`;
+  if (parts.length === 0) return "On This Device";
+  return `On This Device › ${parts.map(displayPathPart).join(" › ")}`;
 }
 
 function mobileVirtualLibraryLabel(path: string): string | null {
@@ -5037,11 +4680,11 @@ function sanitizeMobilePathText(message: string, homeDir: string): string {
   let sanitized = message;
   const normalizedHome = normalizePath(homeDir);
   if (normalizedHome && normalizedHome !== "/") {
-    sanitized = sanitized.split(normalizedHome).join("On My iPhone");
+    sanitized = sanitized.split(normalizedHome).join("On This Device");
   }
   return sanitized
-    .replace(/\/private\/var\/[^\s:")']+/g, "On My iPhone")
-    .replace(/\/var\/mobile\/[^\s:")']+/g, "On My iPhone")
+    .replace(/\/private\/var\/[^\s:")']+/g, "On This Device")
+    .replace(/\/var\/mobile\/[^\s:")']+/g, "On This Device")
     .replace(/Application Support/gi, "App Data");
 }
 

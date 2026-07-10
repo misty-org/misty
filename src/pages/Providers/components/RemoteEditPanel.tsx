@@ -95,7 +95,7 @@ export function RemoteEditPanel(props: RemoteEditPanelProps) {
             <AssetIcon className="shrink-0 text-[var(--misty-accent)]" src={iconAssets.cloud24} size={22} />
             <span>
               {props.serviceError
-                ? "Start or reconnect the Misty remote service, then refresh Remotes."
+                ? "Start the Misty remote service, then refresh Remotes."
                 : "Select a remote to view and edit its provider configuration."}
             </span>
           </div>

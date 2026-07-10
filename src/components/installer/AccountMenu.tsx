@@ -82,8 +82,8 @@ export function AccountMenu() {
       )}
 
       {open && account && (
-        <div className="absolute right-0 top-full pt-2" role="menu">
-          <div className="glass-card w-44 overflow-hidden rounded-xl shadow-xl shadow-bg/50">
+        <div className="absolute right-0 top-full pt-2">
+          <div className="glass-card w-44 overflow-hidden rounded-xl shadow-xl shadow-bg/50" role="menu">
             <div className="border-b border-border/50 px-4 py-3">
               <p className="truncate text-sm font-medium text-text">{displayName}</p>
               <p className="truncate text-xs text-text-muted">{account.email}</p>

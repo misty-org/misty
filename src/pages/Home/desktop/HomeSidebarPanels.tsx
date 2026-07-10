@@ -53,10 +53,11 @@ type HomeSidebarPanelsProps = {
   smartFoldersLoading: boolean;
   tags: HomeTagItem[];
   tagsLoading: boolean;
+  workspacePanel: ReactNode;
 };
 
 const panelClass =
-  "flex min-h-0 min-w-0 flex-col overflow-hidden rounded-2xl border border-white/[0.08] bg-[rgb(9_12_16_/_var(--misty-app-panel-opacity,0.78))] p-3 shadow-xl shadow-black/20";
+  "flex min-h-fit min-w-0 flex-col overflow-hidden rounded-2xl border border-white/[0.08] bg-[var(--misty-app-panel-bg,var(--misty-app-page-bg,var(--misty-bg)))] p-3 shadow-xl shadow-black/20";
 const headerClass =
   "mb-2 flex shrink-0 items-center gap-2 border-b border-white/[0.06] pb-2 text-sm font-semibold text-text";
 const rowClass =
@@ -66,175 +67,184 @@ const iconCellClass =
 
 export function HomeSidebarPanels(props: HomeSidebarPanelsProps) {
   return (
-    <>
-      <SidebarPanel
-        className="xl:col-span-4 xl:col-start-5 xl:row-span-4 xl:row-start-1"
-        icon={<Home className="h-4 w-4" />}
-        title="Quick access"
-      >
-        <PanelRows>
-          {props.quickAccessItems.map((item) => (
-            <button
-              className={rowClass}
-              key={item.id}
-              onClick={() => props.onOpenQuickAccess(item)}
-              title={item.path}
-              type="button"
-            >
-              <span className={iconCellClass}>
-                <QuickAccessIcon icon={item.icon} />
-              </span>
-              <span className="min-w-0">
-                <span className="block truncate text-sm font-semibold text-text">
-                  {item.label}
-                </span>
-                <span className="mt-0.5 block truncate text-[11px] text-text-muted">
-                  {item.path}
-                </span>
-              </span>
-            </button>
-          ))}
-        </PanelRows>
-      </SidebarPanel>
-
-      <SidebarPanel
-        className="xl:col-span-4 xl:col-start-5 xl:row-span-2 xl:row-start-5"
-        icon={<Search className="h-4 w-4" />}
-        title="Smart Folders"
-      >
-        <PanelRows
-          emptyMessage="No smart folders yet."
-          loading={props.smartFoldersLoading}
-          showEmpty={props.smartFolders.length === 0}
+    <div className="flex min-h-fit min-w-0 flex-auto gap-[clamp(0.5rem,0.8vw,1rem)]">
+      <div className="flex min-h-fit min-w-0 flex-1 flex-col gap-[clamp(0.5rem,0.8vw,1rem)]">
+        <div className="min-h-fit flex-[3_1_auto]">
+          {props.workspacePanel}
+        </div>
+        <SidebarPanel
+          className="flex-[3_1_auto]"
+          icon={<HardDrive className="h-4 w-4" />}
+          title="Devices"
         >
-          {props.smartFolders.map((smartFolder) => (
-            <button
-              className={rowClass}
-              key={smartFolder.id}
-              onClick={() => props.onOpenSmartFolder(smartFolder)}
-              title={smartFolder.query || smartFolder.name}
-              type="button"
-            >
-              <span className={iconCellClass}>
-                <Search className="h-4 w-4" />
-              </span>
-              <span className="min-w-0">
-                <span className="block truncate text-sm font-semibold text-text">
-                  {smartFolder.name}
-                </span>
-                <span className="mt-0.5 block truncate text-[11px] text-text-muted">
-                  {smartFolder.query || "Search rules"}
-                </span>
-              </span>
-            </button>
-          ))}
-        </PanelRows>
-      </SidebarPanel>
-
-      <SidebarPanel
-        className="xl:col-span-4 xl:col-start-9 xl:row-span-3 xl:row-start-4"
-        icon={<Tag className="h-4 w-4" />}
-        title="Tags"
-      >
-        <PanelRows
-          emptyMessage="No tags yet."
-          loading={props.tagsLoading}
-          showEmpty={props.tags.length === 0}
-        >
-          {props.tags.map((tag) => (
-            <button
-              className={rowClass}
-              key={tag.key}
-              onClick={() => props.onOpenTag(tag)}
-              type="button"
-            >
-              <span className={iconCellClass}>
-                <Tag className="h-4 w-4" />
-              </span>
-              <span className="min-w-0">
-                <span className="block truncate text-sm font-semibold text-text">
-                  {tag.name}
-                </span>
-                <span className="mt-0.5 block truncate text-[11px] text-text-muted">
-                  {tag.count} {tag.count === 1 ? "item" : "items"}
-                </span>
-              </span>
-            </button>
-          ))}
-        </PanelRows>
-      </SidebarPanel>
-
-      <SidebarPanel
-        className="xl:col-span-4 xl:col-start-9 xl:row-span-3 xl:row-start-1"
-        icon={<Server className="h-4 w-4" />}
-        title="Remote"
-      >
-        <PanelRows
-          emptyMessage="No remotes connected."
-          loading={props.remotesLoading}
-          showEmpty={props.remotes.length === 0}
-        >
-          {props.remotes.map((remote) => {
-            const providerIcon = providerIconForType(remote.type);
-            return (
+          <PanelRows
+            emptyMessage="No devices connected."
+            loading={props.devicesLoading}
+            showEmpty={props.devices.length === 0}
+          >
+            {props.devices.map((device) => (
               <button
                 className={rowClass}
-                key={`${remote.type}:${remote.name}`}
-                onClick={() => props.onOpenRemote(remote)}
-                title={`${remote.type}: ${remote.name}`}
+                key={device.id}
+                onClick={() => props.onOpenDevice(device)}
+                title={device.mountPath}
                 type="button"
               >
                 <span className={iconCellClass}>
-                  <AssetIcon src={providerIcon.src} color={providerIcon.color} size={20} />
+                  <HardDrive className="h-4 w-4" />
                 </span>
                 <span className="min-w-0">
                   <span className="block truncate text-sm font-semibold text-text">
-                    {remote.name}
+                    {device.name}
                   </span>
                   <span className="mt-0.5 block truncate text-[11px] text-text-muted">
-                    {remote.statusLabel || remote.type}
+                    {deviceCapacityLabel(device)}
                   </span>
                 </span>
               </button>
-            );
-          })}
-        </PanelRows>
-      </SidebarPanel>
+            ))}
+          </PanelRows>
+        </SidebarPanel>
+      </div>
 
-      <SidebarPanel
-        className="xl:col-span-4 xl:col-start-1 xl:row-span-3 xl:row-start-4"
-        icon={<HardDrive className="h-4 w-4" />}
-        title="Devices"
-      >
-        <PanelRows
-          emptyMessage="No devices connected."
-          loading={props.devicesLoading}
-          showEmpty={props.devices.length === 0}
+      <div className="flex min-h-fit min-w-0 flex-1 flex-col gap-[clamp(0.5rem,0.8vw,1rem)]">
+        <SidebarPanel
+          className="flex-[4_1_auto]"
+          icon={<Home className="h-4 w-4" />}
+          title="Quick access"
         >
-          {props.devices.map((device) => (
-            <button
-              className={rowClass}
-              key={device.id}
-              onClick={() => props.onOpenDevice(device)}
-              title={device.mountPath}
-              type="button"
-            >
-              <span className={iconCellClass}>
-                <HardDrive className="h-4 w-4" />
-              </span>
-              <span className="min-w-0">
-                <span className="block truncate text-sm font-semibold text-text">
-                  {device.name}
+          <PanelRows>
+            {props.quickAccessItems.map((item) => (
+              <button
+                className={rowClass}
+                key={item.id}
+                onClick={() => props.onOpenQuickAccess(item)}
+                title={item.path}
+                type="button"
+              >
+                <span className={iconCellClass}>
+                  <QuickAccessIcon icon={item.icon} />
                 </span>
-                <span className="mt-0.5 block truncate text-[11px] text-text-muted">
-                  {deviceCapacityLabel(device)}
+                <span className="min-w-0">
+                  <span className="block truncate text-sm font-semibold text-text">
+                    {item.label}
+                  </span>
+                  <span className="mt-0.5 block truncate text-[11px] text-text-muted">
+                    {item.path}
+                  </span>
                 </span>
-              </span>
-            </button>
-          ))}
-        </PanelRows>
-      </SidebarPanel>
-    </>
+              </button>
+            ))}
+          </PanelRows>
+        </SidebarPanel>
+
+        <SidebarPanel
+          className="flex-[2_1_auto]"
+          icon={<Search className="h-4 w-4" />}
+          title="Smart Folders"
+        >
+          <PanelRows
+            emptyMessage="No smart folders yet."
+            loading={props.smartFoldersLoading}
+            showEmpty={props.smartFolders.length === 0}
+          >
+            {props.smartFolders.map((smartFolder) => (
+              <button
+                className={rowClass}
+                key={smartFolder.id}
+                onClick={() => props.onOpenSmartFolder(smartFolder)}
+                title={smartFolder.query || smartFolder.name}
+                type="button"
+              >
+                <span className={iconCellClass}>
+                  <Search className="h-4 w-4" />
+                </span>
+                <span className="min-w-0">
+                  <span className="block truncate text-sm font-semibold text-text">
+                    {smartFolder.name}
+                  </span>
+                  <span className="mt-0.5 block truncate text-[11px] text-text-muted">
+                    {smartFolder.query || "Search rules"}
+                  </span>
+                </span>
+              </button>
+            ))}
+          </PanelRows>
+        </SidebarPanel>
+      </div>
+
+      <div className="flex min-h-fit min-w-0 flex-1 flex-col gap-[clamp(0.5rem,0.8vw,1rem)]">
+        <SidebarPanel
+          className="flex-[1_1_auto]"
+          icon={<Server className="h-4 w-4" />}
+          title="Remote"
+        >
+          <PanelRows
+            emptyMessage="No remotes connected."
+            loading={props.remotesLoading}
+            showEmpty={props.remotes.length === 0}
+          >
+            {props.remotes.map((remote) => {
+              const providerIcon = providerIconForType(remote.type);
+              return (
+                <button
+                  className={rowClass}
+                  key={`${remote.type}:${remote.name}`}
+                  onClick={() => props.onOpenRemote(remote)}
+                  title={`${remote.type}: ${remote.name}`}
+                  type="button"
+                >
+                  <span className={iconCellClass}>
+                    <AssetIcon src={providerIcon.src} color={providerIcon.color} size={20} />
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block truncate text-sm font-semibold text-text">
+                      {remote.name}
+                    </span>
+                    <span className="mt-0.5 block truncate text-[11px] text-text-muted">
+                      {remote.statusLabel || remote.type}
+                    </span>
+                  </span>
+                </button>
+              );
+            })}
+          </PanelRows>
+        </SidebarPanel>
+
+        <SidebarPanel
+          className="flex-[1_1_auto]"
+          icon={<Tag className="h-4 w-4" />}
+          title="Tags"
+        >
+          <PanelRows
+            emptyMessage="No tags yet."
+            loading={props.tagsLoading}
+            showEmpty={props.tags.length === 0}
+          >
+            {props.tags.map((tag) => (
+              <button
+                className={rowClass}
+                key={tag.key}
+                onClick={() => props.onOpenTag(tag)}
+                type="button"
+              >
+                <span className={iconCellClass}>
+                  <Tag className="h-4 w-4" />
+                </span>
+                <span className="min-w-0">
+                  <span className="block truncate text-sm font-semibold text-text">
+                    {tag.name}
+                  </span>
+                  <span className="mt-0.5 block truncate text-[11px] text-text-muted">
+                    {tag.count} {tag.count === 1 ? "item" : "items"}
+                  </span>
+                </span>
+              </button>
+            ))}
+          </PanelRows>
+        </SidebarPanel>
+      </div>
+    </div>
   );
 }
 
@@ -318,7 +328,7 @@ function PanelRows({
     );
   }
 
-  return <div className="misty-scrollbar grid min-h-0 flex-1 content-start gap-1 overflow-x-hidden overflow-y-scroll pr-1">{children}</div>;
+  return <div className="grid content-start gap-1 pr-1">{children}</div>;
 }
 
 function QuickAccessIcon({ icon }: { icon: HomeQuickAccessItem["icon"] }) {

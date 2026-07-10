@@ -38,7 +38,7 @@ image = { version = "0.25.10", default-features = false, features = ["bmp", "gif
 libloading = "0.8"
 zip = { version = "2", default-features = false, features = ["deflate"] }
 zune-psd = "0.5.1"
-tauri-plugin-keystore = "2.1.0-alpha.1"
+tauri-plugin-keystore = { path = "vendor/tauri-plugin-keystore" }
 tauri-plugin-deep-link = "2"
 
 [target.'cfg(target_os = "macos")'.dependencies]

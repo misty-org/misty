@@ -2,12 +2,14 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+  <key>ITSAppUsesNonExemptEncryption</key>
+  <false/>
   <key>NSAppTransportSecurity</key>
   <dict>
     <key>NSAllowsLocalNetworking</key>
     <true/>
   </dict>
   <key>NSLocalNetworkUsageDescription</key>
-  <string>Misty connects to local development services and the local Misty proxy on this device.</string>
+  <string>Misty uses local secure runtime services on this device to browse and transfer files.</string>
 </dict>
 </plist>

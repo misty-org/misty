@@ -774,27 +774,33 @@ const TransferWorkspacePane = memo(function TransferWorkspacePane(props: { works
   const closeSortMenu = useCallback(() => setSortMenu(null), []);
   useEffect(() => {
     if (!actionMenu) return;
-    const close = () => setActionMenu(null);
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") close();
+    const closeOnPointerDown = (event: PointerEvent) => {
+      if (event.target instanceof Element && event.target.closest("[data-transfer-action-menu]")) return;
+      setActionMenu(null);
     };
-    window.addEventListener("pointerdown", close);
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setActionMenu(null);
+    };
+    window.addEventListener("pointerdown", closeOnPointerDown);
     window.addEventListener("keydown", closeOnEscape);
     return () => {
-      window.removeEventListener("pointerdown", close);
+      window.removeEventListener("pointerdown", closeOnPointerDown);
       window.removeEventListener("keydown", closeOnEscape);
     };
   }, [actionMenu]);
   useEffect(() => {
     if (!sortMenu) return;
-    const close = () => setSortMenu(null);
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") close();
+    const closeOnPointerDown = (event: PointerEvent) => {
+      if (event.target instanceof Element && event.target.closest("[data-transfer-sort-menu]")) return;
+      setSortMenu(null);
     };
-    window.addEventListener("pointerdown", close);
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setSortMenu(null);
+    };
+    window.addEventListener("pointerdown", closeOnPointerDown);
     window.addEventListener("keydown", closeOnEscape);
     return () => {
-      window.removeEventListener("pointerdown", close);
+      window.removeEventListener("pointerdown", closeOnPointerDown);
       window.removeEventListener("keydown", closeOnEscape);
     };
   }, [sortMenu]);
@@ -1172,12 +1178,12 @@ function TransferSortMenu(props: {
   const position = useViewportMenuPosition(props.menu, menuRef);
   if (!props.menu) return null;
   const run = (key: TransferSortableKey) => {
-    props.onClose();
     props.onSort(key);
   };
   return createPortal(
     <div
       ref={menuRef}
+      data-transfer-sort-menu
       className={transferStyles.sortMenu}
       style={{ left: position.left, top: position.top, maxHeight: position.maxHeight }}
       role="menu"
@@ -1252,6 +1258,7 @@ function TransferActionMenu(props: {
   return createPortal(
     <div
       ref={menuRef}
+      data-transfer-action-menu
       className={transferStyles.actionMenu}
       style={{ left: position.left, top: position.top, maxHeight: position.maxHeight }}
       role="menu"

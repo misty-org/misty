@@ -10,6 +10,7 @@ export function ExplorerBottomBar(props: {
   sidebarVisible: boolean;
   previewVisible: boolean;
   extensionsVisible: boolean;
+  extensionsEnabled?: boolean;
   onToggleSidebar: () => void;
   onTogglePreview: () => void;
   onToggleExtensions: () => void;
@@ -33,14 +34,16 @@ export function ExplorerBottomBar(props: {
         >
           <PanelRight size={15} />
         </button>
-        <button
-          type="button"
-          className={cx(explorerShellStyles.bottomButton, props.extensionsVisible && explorerShellStyles.bottomButtonSelected)}
-          title={props.extensionsVisible ? "Hide extensions" : "Show extensions"}
-          onClick={props.onToggleExtensions}
-        >
-          <Puzzle size={15} />
-        </button>
+        {props.extensionsEnabled !== false ? (
+          <button
+            type="button"
+            className={cx(explorerShellStyles.bottomButton, props.extensionsVisible && explorerShellStyles.bottomButtonSelected)}
+            title={props.extensionsVisible ? "Hide extensions" : "Show extensions"}
+            onClick={props.onToggleExtensions}
+          >
+            <Puzzle size={15} />
+          </button>
+        ) : null}
       </div>
     </footer>
   );

@@ -1,5 +1,4 @@
 import { appSnapshot } from "../api/misty";
-import { hasTauriInternals } from "../shared/tauri";
 import { readAccountAuthToken } from "../pages/Account/shared/authTokenStore";
 
 export type AiMode = "ask" | "auto" | "full";
@@ -131,7 +130,7 @@ async function resolveServerApiBase(): Promise<string> {
   const explicitServerUrl = normalizeBaseUrl(import.meta.env.VITE_MISTY_SERVER_URL);
   const envApiBase = normalizeBaseUrl(import.meta.env.VITE_API_BASE);
   const nativeServerUrl = normalizeBaseUrl((await loadAppSnapshot())?.environment.serverUrl);
-  const localBetaServerUrl = hasTauriInternals() || import.meta.env.DEV ? "http://localhost:8080" : null;
+  const localBetaServerUrl = import.meta.env.DEV ? "http://localhost:8080" : null;
   return withApiPath(explicitServerUrl ?? envApiBase ?? nativeServerUrl ?? localBetaServerUrl);
 }
 

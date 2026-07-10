@@ -21,14 +21,14 @@ export type MobileNavItem = {
   nav: boolean;
 };
 
-const mobileShellBaseClass = "grid h-[100dvh] min-h-0 w-full min-w-0 overflow-hidden bg-[#05070a] text-[#f4f0e8]";
+const mobileShellBaseClass = "isolate grid h-[100dvh] min-h-0 w-full min-w-0 overflow-hidden bg-[#05070a] text-[#f4f0e8]";
 const mobileShellRowsClass = "grid-rows-[auto_minmax(0,1fr)_calc(var(--misty-mobile-tabbar-height)+var(--misty-safe-bottom))]";
 const mobileShellFilesRowsClass = "grid-rows-[minmax(0,1fr)_calc(var(--misty-mobile-tabbar-height)+var(--misty-safe-bottom))]";
-const mobileTopbarClass = "flex min-w-0 items-center justify-between gap-3 border-b border-white/10 bg-[rgba(5,7,10,0.94)] px-[max(var(--misty-mobile-edge),var(--misty-safe-right))] pb-2.5 pl-[max(var(--misty-mobile-edge),var(--misty-safe-left))] pt-[calc(12px+var(--misty-safe-top))]";
-const mobileIconButtonClass = "relative grid h-[38px] w-[38px] flex-none place-items-center rounded-xl border border-white/10 bg-[#101720] text-[#eef3fb] disabled:opacity-45";
+const mobileTopbarClass = "relative z-[60] flex min-w-0 items-center justify-between gap-3 border-b border-white/10 bg-[#05070a] px-[max(var(--misty-mobile-edge),var(--misty-safe-right))] pb-2.5 pl-[max(var(--misty-mobile-edge),var(--misty-safe-left))] pt-[calc(12px+var(--misty-safe-top))]";
+const mobileIconButtonClass = "relative grid h-11 w-11 flex-none place-items-center rounded-xl border border-white/10 bg-[#101720] text-[#eef3fb] disabled:opacity-45";
 const mobileBadgeClass = "absolute -right-1.5 -top-1.5 grid h-[19px] min-w-[19px] place-items-center rounded-full bg-[#e14856] px-1.5 text-[10px] font-extrabold leading-none text-white";
 const mobileRouteShellClass = "relative z-50 min-h-0 min-w-0 overflow-hidden";
-const mobileTabbarClass = "relative z-40 grid h-[calc(var(--misty-mobile-tabbar-height)+var(--misty-safe-bottom))] min-w-0 grid-cols-[repeat(auto-fit,minmax(50px,1fr))] gap-1 border-t border-white/10 px-[max(8px,var(--misty-safe-right))] pb-[calc(8px+var(--misty-safe-bottom))] pl-[max(8px,var(--misty-safe-left))] pt-[7px]";
+const mobileTabbarClass = "relative z-40 grid box-border h-[calc(var(--misty-mobile-tabbar-height)+var(--misty-safe-bottom))] w-full max-w-full min-w-0 grid-cols-[repeat(auto-fit,minmax(50px,1fr))] gap-1 overflow-hidden border-t border-white/10 px-[max(8px,var(--misty-safe-right))] pb-[calc(8px+var(--misty-safe-bottom))] pl-[max(8px,var(--misty-safe-left))] pr-[max(8px,var(--misty-safe-right))] pt-[7px]";
 const mobileTabClass = "grid h-full min-w-0 place-items-center gap-[3px] rounded-none text-[10px] font-bold text-[#a3adba] no-underline";
 const mobileTabActiveClass = "bg-transparent text-[#f7f3ec]";
 
@@ -92,16 +92,14 @@ export function MobileLayout(props: {
   }, [location.pathname, props]);
 
   useEffect(() => {
-    const badgeCount = notificationPreferences.badgeCountEnabled && unreadActivityCount > 0
+    const badgeCount = notificationPreferences.deviceNotificationsEnabled && notificationPreferences.badgeCountEnabled && unreadActivityCount > 0
       ? unreadActivityCount
       : undefined;
     try {
       if (!hasTauriInternals()) return;
-      void getCurrentWindow().setBadgeCount(badgeCount).catch(() => {});
-    } catch {
-      // Browser smoke mode and some platforms do not expose app badges.
-    }
-  }, [notificationPreferences.badgeCountEnabled, unreadActivityCount]);
+      void getCurrentWindow().setBadgeCount(badgeCount).catch(() => undefined);
+    } catch {}
+  }, [notificationPreferences.badgeCountEnabled, notificationPreferences.deviceNotificationsEnabled, unreadActivityCount]);
 
   const filesRoute = routeId === "files";
 
@@ -176,7 +174,7 @@ const MobileActivitySheet = memo(function MobileActivitySheet(props: { open: boo
       onClick={props.onClose}
     >
       <section
-        className="max-h-[min(calc(100dvh-var(--misty-safe-top)-18px),680px)] w-full overflow-auto rounded-t-[18px] border border-white/10 bg-[#0a0f15] px-[max(var(--misty-mobile-edge),var(--misty-safe-right))] pb-[calc(14px+var(--misty-safe-bottom))] pt-4 shadow-[0_-24px_70px_rgba(0,0,0,0.52)]"
+        className="max-h-[min(calc(100dvh-var(--misty-safe-top)-18px),680px)] w-full overflow-auto rounded-t-[18px] border border-white/10 bg-[#0a0f15] pb-[calc(14px+var(--misty-safe-bottom))] pl-[max(var(--misty-mobile-edge),var(--misty-safe-left))] pr-[max(var(--misty-mobile-edge),var(--misty-safe-right))] pt-4 shadow-[0_-24px_70px_rgba(0,0,0,0.52)]"
         aria-label="Activity"
         role="dialog"
         aria-modal="true"
@@ -190,7 +188,7 @@ const MobileActivitySheet = memo(function MobileActivitySheet(props: { open: boo
           <div className="flex gap-2">
             <button
               type="button"
-              className="min-h-[34px] rounded-lg border border-[var(--misty-border-soft)] bg-[var(--misty-surface-2)] px-2.5 text-[var(--misty-text)] disabled:opacity-55"
+              className="min-h-11 rounded-lg border border-[var(--misty-border-soft)] bg-[var(--misty-surface-2)] px-2.5 text-[var(--misty-text)] disabled:opacity-55"
               onClick={clearHistory}
               disabled={entries.length === 0}
             >
@@ -198,7 +196,7 @@ const MobileActivitySheet = memo(function MobileActivitySheet(props: { open: boo
             </button>
             <button
               type="button"
-              className="min-h-[34px] rounded-lg border border-[var(--misty-border-soft)] bg-[var(--misty-surface-2)] px-2.5 text-[var(--misty-text)]"
+              className="min-h-11 rounded-lg border border-[var(--misty-border-soft)] bg-[var(--misty-surface-2)] px-2.5 text-[var(--misty-text)]"
               onClick={props.onClose}
             >
               Done

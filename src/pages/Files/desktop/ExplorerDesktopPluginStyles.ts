@@ -32,20 +32,20 @@ const pluginTabMenuStyles = {
 
 const extensionsPanelStyles = {
   root:
-    "grid h-full min-h-0 w-full grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden bg-[#111111] text-[#eeeeee]",
+    "grid h-full min-h-0 w-full grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden bg-[var(--misty-app-panel-bg,var(--misty-app-page-bg,var(--misty-bg)))] text-[#eeeeee]",
   header:
-    "flex min-h-[52px] items-center justify-between gap-3 border-b border-[#292929] bg-[#101010] px-3.5",
+    "flex min-h-[52px] items-center justify-between gap-3 border-b border-[#292929] bg-[var(--misty-app-panel-bg,var(--misty-app-page-bg,var(--misty-bg)))] px-3.5",
   headerTitle:
     "flex min-w-0 items-center gap-2.5 [&_strong]:block [&_strong]:truncate [&_strong]:text-[14px] [&_span]:mt-0.5 [&_span]:block [&_span]:truncate [&_span]:text-xs [&_span]:text-[#8f8f8f]",
   iconButton:
     "grid size-8 flex-none place-items-center rounded-md border border-[var(--misty-border-soft)] bg-[var(--misty-neutral-control-bg,var(--misty-surface-2))] text-[#bdbdbd] hover:bg-[var(--misty-neutral-hover-bg,var(--misty-surface-hover))] hover:text-[#f7f7f7]",
   searchLabel: "block border-b border-[#292929] px-3 py-2.5",
   searchInput:
-    "h-8 w-full rounded-md border border-[#303030] bg-[#0c0c0c] px-2.5 text-[13px] text-[#eeeeee] outline-none placeholder:text-[#777777] focus:border-[#686868]",
+    "h-8 w-full rounded-md border border-[#303030] bg-[var(--misty-neutral-control-bg,var(--misty-surface-2))] px-2.5 text-[13px] text-[#eeeeee] outline-none placeholder:text-[#777777] focus:border-[#686868]",
   body:
     "grid min-h-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden",
   list:
-    "flex min-w-0 gap-0 overflow-x-auto border-b border-[#292929] bg-[#0d0d0d] px-2 pt-2",
+    "flex min-w-0 gap-0 overflow-x-auto border-b border-[#292929] bg-[var(--misty-app-panel-bg,var(--misty-app-page-bg,var(--misty-bg)))] px-2 pt-2",
   item:
     "relative -mb-px grid min-h-11 w-[164px] shrink-0 grid-cols-[24px_minmax(0,1fr)_22px] items-center gap-2 rounded-t-md border border-transparent border-b-[#292929] px-2 py-1.5 text-left text-[#a8a8a8] hover:bg-[var(--misty-neutral-hover-bg,var(--misty-surface-hover))] hover:text-[#f7f7f7]",
   itemSelected:
@@ -61,9 +61,9 @@ const extensionsPanelStyles = {
   selectedTitle:
     "grid min-w-0 gap-0.5 [&>span]:min-w-0 [&>span]:overflow-hidden [&>span]:text-ellipsis [&>span]:whitespace-nowrap [&>span]:text-xs [&>span]:text-[#8f8f8f] [&>strong]:min-w-0 [&>strong]:overflow-hidden [&>strong]:text-ellipsis [&>strong]:whitespace-nowrap [&>strong]:text-[15px]",
   selectionPill:
-    "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap rounded-md border border-[#303030] bg-[#151515] px-2.5 py-1.5 font-mono text-[11px] text-[#bdbdbd]",
+    "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap rounded-md border border-[#303030] bg-[var(--misty-neutral-control-bg,var(--misty-surface-2))] px-2.5 py-1.5 font-mono text-[11px] text-[#bdbdbd]",
   empty:
-    "grid justify-items-center gap-2 rounded-md border border-[#303030] bg-[#151515] px-4 py-5 text-center text-xs text-[#adadad]",
+    "grid justify-items-center gap-2 rounded-md border border-[#303030] bg-[var(--misty-neutral-control-bg,var(--misty-surface-2))] px-4 py-5 text-center text-xs text-[#adadad]",
   footerButton:
     "flex h-10 items-center justify-center gap-2 border-0 border-t border-[#292929] bg-[var(--misty-neutral-control-bg,var(--misty-surface-2))] text-xs font-semibold text-[#cfcfcf] hover:bg-[var(--misty-neutral-hover-bg,var(--misty-surface-hover))] hover:text-[#f7f7f7]",
 } as const;
@@ -79,15 +79,15 @@ const explorerTrayStyles = {
 
 const pluginTabHostStyles = {
   header:
-    "flex min-h-[92px] items-center justify-between gap-4 border-b border-[#292929] bg-[#101010] px-4 py-3",
+    "flex min-h-[92px] items-center justify-between gap-4 border-b border-[#292929] bg-[var(--misty-app-panel-bg,var(--misty-app-page-bg,var(--misty-bg)))] px-4 py-3",
   headerTitle: "flex min-w-0 items-center gap-3 [&_strong]:block [&_strong]:truncate [&_strong]:text-[15px] [&_span]:mt-1 [&_span]:block [&_span]:truncate [&_span]:text-xs [&_span]:text-[#9f9f9f]",
   statusPill:
     "shrink-0 rounded-full border border-[#363636] px-2.5 py-1.5 text-xs font-semibold text-[#9f9f9f]",
   statusPillUsable: "border-[#565656] bg-[#242424] text-[#eeeeee]",
   body:
-    "grid min-h-full content-start gap-3 overflow-auto bg-[#111111] p-4 text-[#eeeeee]",
+    "grid min-h-full content-start gap-3 overflow-auto bg-[var(--misty-app-panel-bg,var(--misty-app-page-bg,var(--misty-bg)))] p-4 text-[#eeeeee]",
   panel:
-    "grid gap-3 rounded-lg border border-[#303030] bg-[#151515] p-3.5",
+    "grid gap-3 rounded-lg border border-[#303030] bg-[var(--misty-neutral-control-bg,var(--misty-surface-2))] p-3.5",
   panelHeader:
     "flex items-center justify-between gap-3 [&_h3]:m-0 [&_h3]:text-[15px] [&_span]:mt-1 [&_span]:block [&_span]:text-xs [&_span]:text-[#9f9f9f]",
   button:
@@ -99,22 +99,22 @@ const pluginTabHostStyles = {
   separator: "my-1 w-full basis-full border-0 border-t border-[#303030]",
   spacing: "h-2 basis-full",
   image:
-    "grid min-h-12 min-w-20 place-items-center rounded-[7px] border border-[#303030] bg-[#0d0d0d] text-xs text-[#9f9f9f]",
+    "grid min-h-12 min-w-20 place-items-center rounded-[7px] border border-[#303030] bg-[var(--misty-neutral-control-bg,var(--misty-surface-2))] text-xs text-[#9f9f9f]",
   loading:
-    "rounded-lg border border-[#303030] bg-[#101010] px-3 py-2.5 text-sm text-[#9f9f9f]",
+    "rounded-lg border border-[#303030] bg-[var(--misty-neutral-control-bg,var(--misty-surface-2))] px-3 py-2.5 text-sm text-[#9f9f9f]",
   notice:
-    "grid grid-cols-[24px_minmax(0,1fr)] items-center gap-2 rounded-lg border border-[#3a3a3a] bg-[#111111] px-3 py-2.5 text-sm text-[#cfcfcf]",
+    "grid grid-cols-[24px_minmax(0,1fr)] items-center gap-2 rounded-lg border border-[#3a3a3a] bg-[var(--misty-neutral-control-bg,var(--misty-surface-2))] px-3 py-2.5 text-sm text-[#cfcfcf]",
   error:
     "rounded-lg border border-[#4b3434] bg-[#211414] px-3 py-2.5 text-sm text-[#ffb7b7]",
   message:
     "rounded-lg border border-[#354835] bg-[#142014] px-3 py-2.5 text-sm text-[#bcecbc]",
   commands:
-    "grid gap-2 rounded-lg border border-[#303030] bg-[#151515] p-3.5 [&_h3]:m-0 [&_h3]:text-[15px]",
+    "grid gap-2 rounded-lg border border-[#303030] bg-[var(--misty-neutral-control-bg,var(--misty-surface-2))] p-3.5 [&_h3]:m-0 [&_h3]:text-[15px]",
   commandRow:
     "grid grid-cols-[minmax(0,1fr)_auto_auto_auto] items-center gap-3 border-t border-[#303030] pt-2 first:border-t-0 first:pt-0 [&_em]:whitespace-nowrap [&_em]:text-xs [&_em]:not-italic [&_em]:text-[#cfcfcf] [&_small]:text-[#8f8f8f]",
   commandLabel: "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-sm",
   empty:
-    "grid min-h-full content-center justify-items-center gap-2 bg-[#111111] p-6 text-center text-[#9f9f9f] [&_h3]:m-0 [&_h3]:text-[#eeeeee] [&_p]:m-0",
+    "grid min-h-full content-center justify-items-center gap-2 bg-[var(--misty-app-panel-bg,var(--misty-app-page-bg,var(--misty-bg)))] p-6 text-center text-[#9f9f9f] [&_h3]:m-0 [&_h3]:text-[#eeeeee] [&_p]:m-0",
 } as const;
 
 export { pluginTabMenuStyles, extensionsPanelStyles, explorerTrayStyles, pluginTabHostStyles };

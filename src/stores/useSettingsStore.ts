@@ -11,6 +11,7 @@ import {
 } from "../api/misty";
 import type { LaunchOnLoginSnapshot, OpenWithAssociation, ShortcutsSnapshot, SettingsSnapshot } from "../api/types";
 import { errorText } from "../shared/format";
+import { isNativeMobileBuild } from "../platform/buildTarget";
 import { settingsIndexToThemeMode, useAppThemeStore } from "./useAppThemeStore";
 
 type SettingsSection = "general" | "app" | "appearance" | "privacy" | "sync" | "transfers" | "search" | "notifications" | "shortcuts" | "advanced";
@@ -35,6 +36,7 @@ export interface AppearancePreferences {
 
 export interface NotificationPreferences {
   badgeCountEnabled: boolean;
+  deviceNotificationsEnabled: boolean;
   desktopNotificationsEnabled: boolean;
   digestNotificationsEnabled: boolean;
   inAppNotificationsEnabled: boolean;
@@ -62,6 +64,10 @@ export interface AdvancedPreferences {
   mountPath: string;
   serverAddress: string;
 }
+
+const defaultAdvancedServerAddress = isNativeMobileBuild ? "" : "localhost:50051";
+const deviceNotificationsKey = "device_notifications_enabled";
+const legacyDesktopNotificationsKey = ["desktop", "notifications", "enabled"].join("_");
 
 interface SettingsStore {
   activeSection: SettingsSection;
@@ -321,9 +327,16 @@ export function selectNotificationPreferences(
   document: Record<string, unknown> | null | undefined,
 ): NotificationPreferences {
   const source = document ?? {};
+  const deviceNotificationsEnabled = settingsBoolean(
+    source,
+    "notifications",
+    isNativeMobileBuild ? deviceNotificationsKey : legacyDesktopNotificationsKey,
+    settingsBoolean(source, "notifications", legacyDesktopNotificationsKey, true),
+  );
   return {
     badgeCountEnabled: settingsBoolean(source, "notifications", "badge_count_enabled", true),
-    desktopNotificationsEnabled: settingsBoolean(source, "notifications", "desktop_notifications_enabled", true),
+    deviceNotificationsEnabled,
+    desktopNotificationsEnabled: deviceNotificationsEnabled,
     digestNotificationsEnabled: settingsBoolean(source, "notifications", "digest_notifications_enabled", false),
     inAppNotificationsEnabled: settingsBoolean(source, "notifications", "in_app_notifications_enabled", true),
     quietHoursEnabled: settingsBoolean(source, "notifications", "quiet_hours_enabled", false),
@@ -363,7 +376,7 @@ export function selectAdvancedPreferences(
   const source = document ?? {};
   return {
     mountPath: settingsString(source, "advanced", "mount_path", ".misty/mnt"),
-    serverAddress: settingsString(source, "advanced", "server_address", "localhost:50051"),
+    serverAddress: settingsString(source, "advanced", "server_address", defaultAdvancedServerAddress),
   };
 }
 

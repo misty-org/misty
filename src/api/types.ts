@@ -783,7 +783,7 @@ export interface PublicLinkActionResult {
   message?: string | null;
 }
 
-export type ProviderConfigMode = "add" | "reconnect" | "repair";
+export type ProviderConfigMode = "add" | "repair";
 
 export interface ProviderConfigRequest {
   name: string;

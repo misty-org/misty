@@ -1,12 +1,12 @@
 import { create } from "zustand";
-import type { MeResponse } from "../pages/Account/desktop/api";
+import type { AccountMeResponse } from "../pages/Account/shared/api";
 
 interface UserStore {
-  me: MeResponse | null;
+  me: AccountMeResponse | null;
   loading: boolean;
   error: boolean;
-  setMe: (me: MeResponse) => void;
-  patchMe: (patch: Partial<MeResponse>) => void;
+  setMe: (me: AccountMeResponse) => void;
+  patchMe: (patch: Partial<AccountMeResponse>) => void;
   setLoading: (value: boolean) => void;
   setError: (value: boolean) => void;
   clear: () => void;

@@ -1,12 +1,11 @@
 import { invoke } from "@tauri-apps/api/core";
 import { create } from "zustand";
 import { hasTauriInternals } from "../shared/tauri";
-import { fetchMe, type MeResponse } from "../pages/Account/desktop/api";
 import {
-  browserTemplateEntries,
-  buildInstallerStatusFromTemplate,
-  executableNameForOs,
-} from "../data/installReadiness";
+  accountFetchMe,
+  type AccountMeResponse,
+} from "../pages/Account/shared/api";
+import { buildInstallerStatusFromTemplate } from "../data/installReadiness";
 import { releases } from "../data/releases";
 import type {
   CurrentLicense,
@@ -43,64 +42,7 @@ type SetupStore = {
   startInstall: (userOverride?: CurrentUser | null) => Promise<void>;
 };
 
-function browserSystemFallback(): InstallerStatus {
-  const platform = navigator.platform || "desktop";
-  const os = platform.toLowerCase().includes("mac")
-    ? "macos"
-    : platform.toLowerCase().includes("win")
-      ? "windows"
-      : platform.toLowerCase().includes("linux")
-        ? "linux"
-        : "desktop";
-
-  return {
-    os,
-    arch: platform.toLowerCase().includes("arm") ? "arm64" : "x86_64",
-    misty_home: "~/.misty",
-    install_dir: "~/.misty/.local/bin",
-    legacy_install_dir: "~/.misty/local/bin",
-    db_path: "~/.misty/db/data.db",
-    installed_version: null,
-    current_user: null,
-    current_license: null,
-    ready: false,
-    folders: browserTemplateEntries
-      .filter((entry) => entry.kind === "dir")
-      .map((entry) => ({
-        name: entry.relativePath,
-        path: entry.path,
-        kind: entry.kind,
-        required: true,
-        exists: false,
-        status: "missing",
-        message: "Template readiness is only verified in the desktop app.",
-      })),
-    binaries: browserTemplateEntries
-      .filter((entry) => entry.kind === "file")
-      .map((entry) => ({
-        name: executableNameForOs(os, entry.relativePath.split("/").pop() || "misty"),
-        path: entry.path,
-        kind: entry.kind,
-        required: true,
-        exists: false,
-        status: "missing",
-        message: "File will be restored from the Misty template.",
-      })),
-    setup_update: {
-      name: "Misty installer",
-      path: "browser preview",
-      required: false,
-      exists: true,
-      status: "pending",
-      message: "Installer update check is only available in the desktop app.",
-    },
-  };
-}
-
 async function loadInstallerStatus(nativeOverride?: NativeSystemInfo) {
-  if (!hasTauriInternals()) {
-    return browserSystemFallback();
-  }
   const native = nativeOverride ?? (await invoke<NativeSystemInfo>("check_system"));
   const template = await invoke<MistyTemplateStatus>("misty_template_status");
   const [setupProbe] = await invoke<PathProbe[]>("probe_paths", {
@@ -114,7 +56,7 @@ async function refreshLocalAccessToken() {
   return invoke<NativeSystemInfo>("ensure_local_access_token");
 }
 
-function licenseFromMe(me: MeResponse): CurrentLicense {
+function licenseFromMe(me: AccountMeResponse): CurrentLicense {
   return {
     tier: me.tier,
     status: me.status,
@@ -146,7 +88,7 @@ async function refreshVerifiedLicenseIfDue(native: NativeSystemInfo) {
     return native;
   }
   try {
-    const me = await fetchMe();
+    const me = await accountFetchMe();
     return invoke<NativeSystemInfo>("save_verified_license", {
       license: licenseFromMe(me),
     });
@@ -171,7 +113,11 @@ export const useSetupStore = create<SetupStore>((set, get) => ({
   addEvent: (event) => set((state) => ({ events: [...state.events, event] })),
   loadReleases: async () => {
     if (!hasTauriInternals()) {
-      set({ releases, releasesError: "", releasesLoading: false });
+      set({
+        releases,
+        releasesError: "Release checks are only available in the Misty app.",
+        releasesLoading: false,
+      });
       return;
     }
 
@@ -195,7 +141,10 @@ export const useSetupStore = create<SetupStore>((set, get) => ({
   loadSystem: async () => {
     try {
       if (!hasTauriInternals()) {
-        set({ status: browserSystemFallback(), systemError: "" });
+        set({
+          status: null,
+          systemError: "Misty requires the native app runtime.",
+        });
         return;
       }
       let native = await invoke<NativeSystemInfo>("check_system");
@@ -206,11 +155,6 @@ export const useSetupStore = create<SetupStore>((set, get) => ({
       const status = await loadInstallerStatus(native);
       set({ status, systemError: "" });
     } catch (error) {
-      if (String(error).toLowerCase().includes("invoke")) {
-        set({ status: browserSystemFallback(), systemError: "" });
-        return;
-      }
-
       set({ systemError: String(error) });
     }
   },
@@ -230,15 +174,9 @@ export const useSetupStore = create<SetupStore>((set, get) => ({
   },
   saveAuthenticatedUser: async (user, license) => {
     if (!hasTauriInternals()) {
-      const status = {
-        ...browserSystemFallback(),
-        current_user: user,
-        current_license: license ?? null,
-      };
       set((state) => ({
-        status,
-        systemError: "",
-        events: [...state.events, { level: "info", source: "installer", message: `Signed in as ${user.email}.` }],
+        systemError: "Saving account state is only available in the Misty app.",
+        events: [...state.events, { level: "error", source: "installer", message: `Could not save account state for ${user.email}.` }],
       }));
       return;
     }
@@ -257,7 +195,7 @@ export const useSetupStore = create<SetupStore>((set, get) => ({
   launchMisty: async () => {
     try {
       if (!hasTauriInternals()) {
-        throw new Error("Launching Misty is only available in the Tauri app.");
+        throw new Error("Launching Misty is only available in the Misty app.");
       }
       const result = await invoke<string>("launch_misty");
       set((state) => ({
@@ -272,7 +210,7 @@ export const useSetupStore = create<SetupStore>((set, get) => ({
   restartMisty: async () => {
     try {
       if (!hasTauriInternals()) {
-        throw new Error("Restarting Misty is only available in the Tauri app.");
+        throw new Error("Restarting Misty is only available in the Misty app.");
       }
       const result = await invoke<string>("restart_misty");
       set((state) => ({
@@ -287,10 +225,9 @@ export const useSetupStore = create<SetupStore>((set, get) => ({
   signOut: async () => {
     try {
       if (!hasTauriInternals()) {
-        const status = browserSystemFallback();
         set((state) => ({
-          status,
-          events: [...state.events, { level: "info", source: "installer", message: "Signed out of Misty." }],
+          systemError: "Signing out is only available in the Misty app.",
+          events: [...state.events, { level: "error", source: "installer", message: "Could not sign out outside the Misty app." }],
         }));
         return;
       }
@@ -314,7 +251,7 @@ export const useSetupStore = create<SetupStore>((set, get) => ({
     if (!hasTauriInternals()) {
       set({
         installState: "error",
-        events: [{ level: "error", source: "installer", message: "Installing Misty is only available in the Tauri app." }],
+        events: [{ level: "error", source: "installer", message: "Installing Misty is only available in the Misty app." }],
       });
       return;
     }

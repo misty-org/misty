@@ -33,6 +33,7 @@ export function ExplorerTray(props: {
   aiOpen: boolean;
   commands: PluginCommandEntry[];
   panels: PluginPanelEntry[];
+  extensionsEnabled?: boolean;
   selectedPath: string;
   selectedExtensionPluginId: string | null;
   extensionsOpen: boolean;
@@ -72,14 +73,16 @@ export function ExplorerTray(props: {
       >
         <Terminal size={16} />
       </button>
-      <ExplorerPluginTabMenu
-        activePluginId={props.selectedExtensionPluginId}
-        commands={props.commands}
-        extensionsOpen={props.extensionsOpen}
-        panels={props.panels}
-        selectedPath={props.selectedPath}
-        onTogglePlugin={props.onToggleExtensionPlugin}
-      />
+      {props.extensionsEnabled !== false ? (
+        <ExplorerPluginTabMenu
+          activePluginId={props.selectedExtensionPluginId}
+          commands={props.commands}
+          extensionsOpen={props.extensionsOpen}
+          panels={props.panels}
+          selectedPath={props.selectedPath}
+          onTogglePlugin={props.onToggleExtensionPlugin}
+        />
+      ) : null}
     </>
   );
 }

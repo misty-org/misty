@@ -558,6 +558,7 @@ pub fn restart_misty(
     }
 }
 
+#[cfg(desktop)]
 #[tauri::command]
 pub fn scan_local_plugins() -> Result<Vec<LocalPluginRecord>, String> {
     let roots = [
@@ -603,6 +604,13 @@ fn scan_local_plugins_in_roots(
     Ok(plugins)
 }
 
+#[cfg(mobile)]
+#[tauri::command]
+pub fn scan_local_plugins() -> Result<Vec<LocalPluginRecord>, String> {
+    Ok(Vec::new())
+}
+
+#[cfg(desktop)]
 #[tauri::command]
 pub async fn install_plugin_bundle(
     plugin_id: String,
@@ -677,6 +685,19 @@ pub async fn install_plugin_bundle(
     ))
 }
 
+#[cfg(mobile)]
+#[tauri::command]
+pub async fn install_plugin_bundle(
+    _plugin_id: String,
+    _root: String,
+    _url: String,
+    _platform: Option<String>,
+    _sha256: Option<String>,
+) -> Result<String, String> {
+    Err("Extensions are not available in Misty mobile.".to_owned())
+}
+
+#[cfg(desktop)]
 #[tauri::command]
 pub fn uninstall_plugin(plugin_id: String, root: String) -> Result<String, String> {
     if plugin_id.trim().is_empty() {
@@ -699,6 +720,13 @@ pub fn uninstall_plugin(plugin_id: String, root: String) -> Result<String, Strin
     Ok(format!("Removed extension {plugin_id}."))
 }
 
+#[cfg(mobile)]
+#[tauri::command]
+pub fn uninstall_plugin(_plugin_id: String, _root: String) -> Result<String, String> {
+    Err("Extensions are not available in Misty mobile.".to_owned())
+}
+
+#[cfg(desktop)]
 #[tauri::command]
 pub fn set_plugin_enabled(
     plugin_id: String,
@@ -737,6 +765,16 @@ pub fn set_plugin_enabled(
         "{} extension {plugin_id}.",
         if enabled { "Enabled" } else { "Disabled" }
     ))
+}
+
+#[cfg(mobile)]
+#[tauri::command]
+pub fn set_plugin_enabled(
+    _plugin_id: String,
+    _root: String,
+    _enabled: bool,
+) -> Result<String, String> {
+    Err("Extensions are not available in Misty mobile.".to_owned())
 }
 
 #[tauri::command]
@@ -1269,8 +1307,17 @@ fn plugin_archive_relative_path(entry_name: &str, plugin_id: &str) -> Option<Pat
         return None;
     }
 
-    let slice = if components[0] == plugin_id {
+    let plugin_component = plugin_id.to_string();
+    let plugin_component_alt = plugin_id.replace('_', "-");
+    let slice = if components[0] == plugin_component || components[0] == plugin_component_alt {
         &components[1..]
+    } else if let Some(index) = components
+        .iter()
+        .position(|part| part == &plugin_component || part == &plugin_component_alt)
+    {
+        &components[index + 1..]
+    } else if components[0].ends_with("-main") {
+        return None;
     } else {
         &components[..]
     };
@@ -1966,6 +2013,24 @@ mod tests {
             .unwrap(),
         )
         .expect("manifest should be written");
+    }
+
+    #[test]
+    fn plugin_archive_relative_path_extracts_extension_subdir_from_github_archive() {
+        assert_eq!(
+            plugin_archive_relative_path(
+                "misty-extensions-main/extensions/themes/manifest.json",
+                "themes",
+            ),
+            Some(PathBuf::from("manifest.json")),
+        );
+        assert_eq!(
+            plugin_archive_relative_path(
+                "misty-extensions-main/extensions/quick_convert/plugin.json",
+                "quick_convert",
+            ),
+            Some(PathBuf::from("plugin.json")),
+        );
     }
 
     #[test]

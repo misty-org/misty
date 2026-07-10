@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{path::PathBuf, sync::Arc};
 
 use crate::core::clipboard::{ClipboardService, SharedClipboardClient};
 use crate::core::file_sync::FileSyncPairStore;
@@ -7,11 +7,13 @@ use crate::services::{
     directory_size::DirectorySizeService, environment::AppEnvironmentService,
     explorer::ExplorerService, explorer_library::ExplorerLibraryService,
     file_sync::FileSyncService, metadata::MetadataService, operation_queue::OperationQueueService,
-    plugin_commands::PluginCommandService, power_pack::PowerPackService,
-    providers::ProviderService, proxy::ProxyService, proxy_clipboard::ProxyClipboardClient,
-    proxy_runtime::ProxyRuntimeService, search::SearchService, settings::SettingsService,
-    transfers::TransferService, workspaces::WorkspaceService,
+    power_pack::PowerPackService, providers::ProviderService, proxy::ProxyService,
+    proxy_clipboard::ProxyClipboardClient, proxy_runtime::ProxyRuntimeService,
+    search::SearchService, settings::SettingsService, transfers::TransferService,
+    workspaces::WorkspaceService,
 };
+#[cfg(desktop)]
+use crate::services::plugin_commands::PluginCommandService;
 
 pub struct MistyRuntime {
     pub environment: AppEnvironmentService,
@@ -28,6 +30,7 @@ pub struct MistyRuntime {
     pub devices: DeviceService,
     pub directory_size: DirectorySizeService,
     pub metadata: MetadataService,
+    #[cfg(desktop)]
     pub plugin_commands: PluginCommandService,
     pub power_pack: PowerPackService,
     pub search: SearchService,
@@ -41,7 +44,11 @@ pub struct MistyRuntime {
 
 impl MistyRuntime {
     pub fn new() -> Self {
-        let environment = AppEnvironmentService::new();
+        Self::new_with_data_root(None)
+    }
+
+    pub fn new_with_data_root(data_root: Option<PathBuf>) -> Self {
+        let environment = AppEnvironmentService::new_with_data_root(data_root);
         let proxy_runtime = ProxyRuntimeService::start(&environment);
         let proxy_clipboard = ProxyClipboardClient::new(
             None,
@@ -66,6 +73,7 @@ impl MistyRuntime {
         let devices = DeviceService::new();
         let directory_size = DirectorySizeService::new(environment.clone(), proxy.clone());
         let metadata = MetadataService::new();
+        #[cfg(desktop)]
         let plugin_commands = PluginCommandService::new(environment.clone());
         let explorer_library = ExplorerLibraryService::new(environment.clone());
         let search = SearchService::new(environment.clone(), providers.clone(), proxy.clone());
@@ -107,6 +115,7 @@ impl MistyRuntime {
             devices,
             directory_size,
             metadata,
+            #[cfg(desktop)]
             plugin_commands,
             power_pack,
             search,

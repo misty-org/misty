@@ -13,10 +13,60 @@ import { publishPluginCatalogChanged } from "../plugins/pluginEvents";
 
 const DEFAULT_CATALOG_BASE_URL =
   "https://raw.githubusercontent.com/misty-org/misty-extensions/main/catalog";
-const catalogBaseUrl =
-  import.meta.env.VITE_EXTENSION_CATALOG_BASE_URL
-  ?? import.meta.env.VITE_PLUGIN_CATALOG_BASE_URL
-  ?? DEFAULT_CATALOG_BASE_URL;
+const catalogBaseUrl = normalizeCatalogBaseUrl(
+  import.meta.env.VITE_EXTENSIONS_URL
+    ?? import.meta.env.VITE_EXTENSION_CATALOG_BASE_URL
+    ?? import.meta.env.VITE_PLUGIN_CATALOG_BASE_URL,
+);
+const catalogSourceArchiveUrl = githubSourceArchiveUrlForCatalog(catalogBaseUrl);
+
+function normalizeCatalogBaseUrl(value: string | undefined): string {
+  const configured = value?.trim();
+  if (!configured) return DEFAULT_CATALOG_BASE_URL;
+
+  const repoSlugMatch = configured.match(/^([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)$/);
+  if (repoSlugMatch) {
+    const [, owner, repo] = repoSlugMatch;
+    return `https://raw.githubusercontent.com/${owner}/${repo}/main/catalog`;
+  }
+
+  const githubRepoMatch = configured.match(
+    /^https:\/\/github\.com\/([^/]+)\/([^/]+?)(?:\/)?$/,
+  );
+  if (githubRepoMatch) {
+    const [, owner, repo] = githubRepoMatch;
+    return `https://raw.githubusercontent.com/${owner}/${repo}/main/catalog`;
+  }
+
+  const githubTreeMatch = configured.match(
+    /^https:\/\/github\.com\/([^/]+)\/([^/]+)\/tree\/([^/]+)(?:\/(.+))?$/,
+  );
+  if (githubTreeMatch) {
+    const [, owner, repo, branch, path] = githubTreeMatch;
+    return `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${path?.replace(/\/$/, "") || "catalog"}`;
+  }
+
+  return configured.replace(/\/$/, "");
+}
+
+function githubSourceArchiveUrlForCatalog(baseUrl: string): string | null {
+  const rawMatch = baseUrl.match(
+    /^https:\/\/raw\.githubusercontent\.com\/([^/]+)\/([^/]+)\/([^/]+)(?:\/.*)?$/,
+  );
+  if (rawMatch) {
+    const [, owner, repo, branch] = rawMatch;
+    return `https://github.com/${owner}/${repo}/archive/refs/heads/${branch}.zip`;
+  }
+
+  const githubMatch = baseUrl.match(/^https:\/\/github\.com\/([^/]+)\/([^/]+)(?:\/.*)?$/);
+  if (githubMatch) {
+    const [, owner, repo] = githubMatch;
+    return `https://github.com/${owner}/${repo}/archive/refs/heads/main.zip`;
+  }
+
+  return null;
+}
+
 const REMOVED_PLUGIN_IDS = new Set(["git", "preview-panel", "preview_panel"]);
 
 type PluginsStore = {
@@ -33,7 +83,7 @@ type PluginsStore = {
   localPlugins: LocalPluginRecord[];
   lastLoadedAt: number;
   platform: string;
-  loadPlugins: (platform: string) => Promise<void>;
+  loadPlugins: (platform: string, force?: boolean) => Promise<void>;
   installPlugin: (plugin: PluginEntry) => Promise<void>;
   selectPlugin: (pluginId: string) => void;
   setPluginEnabled: (plugin: PluginEntry, enabled: boolean) => Promise<void>;
@@ -80,9 +130,13 @@ async function readCatalogIndex() {
   if (!response.ok) {
     throw new Error(`Could not load extension catalog index.json: ${response.status}`);
   }
-  return ((await response.json()) as PluginCatalogIndexEntry[]).filter(
+  return (parseCatalogJson(await response.text()) as PluginCatalogIndexEntry[]).filter(
     (entry) => !REMOVED_PLUGIN_IDS.has(entry.id),
   );
+}
+
+function parseCatalogJson(text: string): unknown {
+  return JSON.parse(text.replace(/,\s*([}\]])/g, "$1"));
 }
 
 function resolveUrl(path: string) {
@@ -111,11 +165,7 @@ function catalogEntryUrl(entry: PluginCatalogIndexEntry) {
 async function readCatalogEntries(index: PluginCatalogIndexEntry[]) {
   const responses = await Promise.all(
     index.map(async (entry) => {
-      const response = await fetch(catalogEntryUrl(entry));
-      if (!response.ok) {
-        throw new Error(`Could not load extension catalog for ${entry.id}: ${response.status}`);
-      }
-      const raw = (await response.json()) as RawPluginCatalogFile;
+      const raw = await readCatalogEntry(entry);
       return normalizeCatalogEntry(entry, raw);
     }),
   );
@@ -123,16 +173,34 @@ async function readCatalogEntries(index: PluginCatalogIndexEntry[]) {
   return responses;
 }
 
-function artifactUrl(baseName: string, platform: string) {
-  return `https://github.com/misty-org/misty-main/releases/download/plugins/${baseName}-${platform}.zip`;
+async function readCatalogEntry(entry: PluginCatalogIndexEntry): Promise<RawPluginCatalogFile> {
+  const urls = [
+    catalogEntryUrl(entry),
+    resolveUrl(`extensions/${entry.id}.json`),
+  ];
+  let lastStatus = "";
+  for (const url of Array.from(new Set(urls))) {
+    const response = await fetch(url);
+    if (response.ok) {
+      return parseCatalogJson(await response.text()) as RawPluginCatalogFile;
+    }
+    lastStatus = `${response.status} from ${url}`;
+  }
+  throw new Error(`Could not load extension catalog for ${entry.id}: ${lastStatus}`);
+}
+
+function sourceArchiveArtifact(platform: string): PluginArtifact | null {
+  if (!catalogSourceArchiveUrl) return null;
+  return {
+    platform,
+    url: catalogSourceArchiveUrl,
+  };
 }
 
 function normalizeCatalogEntry(
   indexEntry: PluginCatalogIndexEntry,
   raw: RawPluginCatalogFile,
 ): PluginCatalogEntry {
-  const artifactBaseName =
-    raw.install?.artifact_base_name ?? indexEntry.id.replace(/_/g, "-");
   const id = raw.manifest?.id ?? raw.id ?? indexEntry.id;
 
   return {
@@ -164,10 +232,9 @@ function normalizeCatalogEntry(
       root: raw.install?.root === "private" ? "private" : "public",
       artifacts:
         raw.install?.artifacts ??
-        (raw.install?.platforms ?? []).map((platform) => ({
-          platform,
-          url: artifactUrl(artifactBaseName, platform),
-        })),
+        (raw.install?.platforms ?? [])
+          .map(sourceArchiveArtifact)
+          .filter((artifact): artifact is PluginArtifact => artifact != null),
     },
   };
 }
@@ -450,14 +517,14 @@ export const usePluginsStore = create<PluginsStore>((set, get) => ({
   localPlugins: [],
   lastLoadedAt: 0,
   platform: "",
-  loadPlugins: async (platform) => {
+  loadPlugins: async (platform, force = false) => {
     const state = get();
     const hasFreshCatalog =
       state.platform === platform &&
       state.catalogEntries.length > 0 &&
       Date.now() - state.lastLoadedAt < PLUGIN_CATALOG_CACHE_TTL_MS;
 
-    if (hasFreshCatalog || state.loading) {
+    if ((!force && hasFreshCatalog) || state.loading) {
       return;
     }
 
@@ -465,7 +532,7 @@ export const usePluginsStore = create<PluginsStore>((set, get) => ({
   },
   installPlugin: async (plugin) => {
     if (!hasTauriInternals()) {
-      set({ error: "Installing extensions is only available in the Tauri app." });
+      set({ error: "Installing extensions is only available in the Misty app." });
       return;
     }
     if (!plugin.artifact?.url) {
@@ -493,7 +560,7 @@ export const usePluginsStore = create<PluginsStore>((set, get) => ({
   selectPlugin: (selectedPluginId) => set({ selectedPluginId }),
   setPluginEnabled: async (plugin, enabled) => {
     if (!hasTauriInternals()) {
-      set({ error: "Managing installed extensions is only available in the Tauri app." });
+      set({ error: "Managing installed extensions is only available in the Misty app." });
       return;
     }
     set({ actionPluginId: plugin.id, error: "", notice: "" });
@@ -517,7 +584,7 @@ export const usePluginsStore = create<PluginsStore>((set, get) => ({
   },
   uninstallPlugin: async (plugin) => {
     if (!hasTauriInternals()) {
-      set({ error: "Uninstalling extensions is only available in the Tauri app." });
+      set({ error: "Uninstalling extensions is only available in the Misty app." });
       return;
     }
     set({ actionPluginId: plugin.id, error: "", notice: "" });
