@@ -1,12 +1,23 @@
-use std::{env, path::PathBuf};
+use std::{env, path::PathBuf, sync::OnceLock};
 
 #[cfg(any(target_os = "ios", target_os = "android"))]
 const MOBILE_APP_DATA_DIR_NAME: &str = "Misty";
 
+#[cfg(any(target_os = "ios", target_os = "android"))]
+static MOBILE_DATA_ROOT: OnceLock<PathBuf> = OnceLock::new();
+
+#[cfg(any(target_os = "ios", target_os = "android"))]
+pub fn set_mobile_data_root(root: PathBuf) {
+    let _ = MOBILE_DATA_ROOT.set(root);
+}
+
 pub fn misty_data_root() -> Option<PathBuf> {
     #[cfg(any(target_os = "ios", target_os = "android"))]
     {
-        resolve_mobile_data_root()
+        MOBILE_DATA_ROOT
+            .get()
+            .cloned()
+            .or_else(resolve_mobile_data_root)
     }
 
     #[cfg(not(any(target_os = "ios", target_os = "android")))]

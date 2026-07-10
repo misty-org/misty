@@ -1,0 +1,24 @@
+# iOS Publish Checklist
+
+- Confirm Apple Developer Team owns `com.misty.mobile`.
+- Repair Xcode/App Store Connect credentials on the build machine.
+- Confirm Xcode has a valid Apple Development identity for debugging exports or Apple Distribution identity for App Store/TestFlight exports. If CI installs signing identities separately, set `MISTY_IOS_SKIP_SIGNING_PREFLIGHT=1` only after that install step is proven.
+- Confirm App Store Connect app record exists for Misty iOS.
+- Confirm version `0.1.0` and next build number.
+- Run `APPLE_DEVELOPMENT_TEAM=<team-id> npm run tauri:ios:device:preflight` before real-device development smoke testing.
+- Run `MISTY_IOS_DEVELOPMENT_TEAM=<team-id> MISTY_IOS_BUILD_NUMBER=<build> npm run tauri:ios:archive:preflight` to verify signing/export readiness without starting the long archive.
+- Run `MISTY_IOS_DEVELOPMENT_TEAM=<team-id> MISTY_IOS_BUILD_NUMBER=<build> npm run tauri:ios:archive:app-store`; `APPLE_DEVELOPMENT_TEAM=<team-id>` is also accepted.
+- Confirm archive `CFBundleIdentifier`, `CFBundleShortVersionString`, `CFBundleVersion`, icon, URL scheme, and permission strings.
+- Upload signed archive through Xcode Organizer or Transporter.
+- Upload screenshots from `marketing/app-store-screenshots/mobile/final/iphone-6-9/en-US/designed-fallback`, or from `marketing/app-store-screenshots/mobile/final/iphone-6-9/en-US/butterkit` only after producing a watermark-free Butterkit export. If needed, stage raw captures with `npm run screenshots:mobile:stage-butterkit`.
+- Enter app metadata from `app-info.md`.
+- Enter review notes from `review-notes.md`.
+- Add the missing production support and privacy policy URLs.
+- Use `app-store-connect.json` as the structured source for App Store Connect fields.
+- Use `review-notes.txt` as the paste-ready App Review notes source.
+- Use `app-store-owner-fields.env.example` as the local-only template for support/privacy URLs, App Review contact fields, and reviewer credentials; do not commit filled reviewer credentials.
+- Complete App Privacy labels using `privacy-labels-draft.md` as a starting point.
+- Add reviewer demo credentials.
+- Run `npm run app-store:owner-fields:strict` after adding support/privacy URLs, App Review contact fields, and reviewer demo credentials. The strict check rejects missing, sample, or local support/privacy URLs.
+- Confirm screenshots and metadata contain no pricing, purchase, subscription, upgrade, external-payment, or off-app account-purchase language.
+- Run TestFlight smoke on a real device: fresh install, sign-in, provider setup, file browsing, transfer action, settings, sign-out, app restart, offline/network failure, and deep-link return.

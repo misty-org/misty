@@ -6,8 +6,8 @@ import {
   explorerQueueRenameItem,
   searchQuery,
 } from "../api/misty";
-import { recordClientDebugEvent } from "../shared/debug/clientDebug";
 import { errorText } from "../shared/format";
+import { isNativeMobileBuild } from "../platform/buildTarget";
 import {
   cancelAgentSession,
   createAgentSession,
@@ -666,5 +666,13 @@ function basename(path: string): string {
 }
 
 function recordAiDebug(level: "info" | "warn" | "error", message: string, detail?: string): void {
-  recordClientDebugEvent({ level, scope: "mika", message, detail });
+  if (!aiDebugEnabled()) return;
+  void import("../shared/debug/clientDebug").then(({ recordClientDebugEvent }) => {
+    recordClientDebugEvent({ level, scope: "mika", message, detail });
+  });
+}
+
+function aiDebugEnabled(): boolean {
+  return !isNativeMobileBuild &&
+    (import.meta.env.DEV || import.meta.env.VITE_MISTY_DEBUG === "1");
 }

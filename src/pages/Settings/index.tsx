@@ -1,11 +1,16 @@
+import { lazy, Suspense } from "react";
 import { detectAppFormFactor } from "../../platform/formFactor";
-import DesktopSettingsPage from "./desktop";
 import MobileSettingsPage from "./mobile";
 
+const DesktopSettingsPage = import.meta.env.MODE === "mobile"
+  ? null
+  : lazy(() => import("./desktop"));
+
 export default function SettingsPage() {
-  return detectAppFormFactor() === "mobile" ? (
-    <MobileSettingsPage />
-  ) : (
-    <DesktopSettingsPage />
+  if (detectAppFormFactor() === "mobile" || !DesktopSettingsPage) return <MobileSettingsPage />;
+  return (
+    <Suspense fallback={null}>
+      <DesktopSettingsPage />
+    </Suspense>
   );
 }

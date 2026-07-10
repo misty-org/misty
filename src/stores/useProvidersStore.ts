@@ -22,6 +22,7 @@ import type {
 } from "../api/types";
 import type { CurrentLicense } from "../models/setup";
 import { errorText } from "../shared/format";
+import { isNativeMobileBuild } from "../platform/buildTarget";
 import { hasTauriInternals } from "../shared/tauri";
 import { useSetupStore } from "./useSetupStore";
 import {
@@ -30,13 +31,14 @@ import {
 } from "../shared/openExternalLink";
 import {
   configPriority,
+  isOneDriveProviderType,
   providerOptionsForConnection,
-  shouldBootstrapOneDriveRepairContinue,
   stableConfig,
   updateTokenField,
 } from "../pages/Providers/providerUtils";
 
-const MAX_PROVIDER_AUTH_POLL_ATTEMPTS = 90;
+const PROVIDER_AUTH_TIMEOUT_MS = 3 * 60 * 1000;
+const PROVIDER_AUTH_CANCEL_RESULT = "cancel";
 
 export interface ProviderConnectionSession {
   mode: ProviderConfigMode;
@@ -52,6 +54,7 @@ export interface ProviderConnectionSession {
   authorizeOpenResult: ProviderAuthorizationOpenResult | null;
   authorizeOpenError: string | null;
   authPollAttempts: number;
+  authDeadlineMs: number | null;
   error: string | null;
 }
 
@@ -105,7 +108,6 @@ interface ProvidersStore {
   revealConfig: () => Promise<void>;
   revealWorkspaceConfig: (workspaceId: string) => Promise<void>;
   openAddRemote: () => Promise<void>;
-  openReconnectRemote: (remote: ProviderRemote) => Promise<void>;
   openRepairRemote: (remote: ProviderRemote) => Promise<void>;
   closeConnection: () => void;
   chooseConnectionProvider: (providerType: string) => void;
@@ -180,15 +182,9 @@ export const useProvidersStore = create<ProvidersStore>((set, get) => ({
       set({ loading: true, error: null });
       try {
         const next = refresh ? await providersRefresh() : await providersSnapshot();
-        const remoteRevisions = refresh
-          ? bumpRemoteRevisions(get().remoteRevisions, next.remotes.map((remote) => remote.name))
-          : get().remoteRevisions;
         set({
           providers: next,
-          remoteRevisions,
-          remoteDraftCache: refresh
-            ? pruneRemoteDraftCacheToRemotes(get().remoteDraftCache, next.remotes)
-            : get().remoteDraftCache,
+          remoteDraftCache: pruneRemoteDraftCacheToRemotes(get().remoteDraftCache, next.remotes),
         });
         const selectableRemote = next.remotes.find((remote) => remote.configSource !== "user");
         if (!get().draft && selectableRemote) {
@@ -507,29 +503,6 @@ export const useProvidersStore = create<ProvidersStore>((set, get) => ({
     });
   },
 
-  openReconnectRemote: async (remote) => {
-    connectionGeneration += 1;
-    const generation = connectionGeneration;
-    if (!get().providers) {
-      set({ working: true, error: null, message: null });
-      try {
-        await get().load();
-      } finally {
-        if (generation === connectionGeneration) {
-          set({ working: false });
-        }
-      }
-      if (generation !== connectionGeneration || !get().providers) return;
-    }
-    const connection = createConnectionSession("reconnect", remote);
-    connection.parameters = defaultParameters(workflowForType(get().providers?.workflows ?? [], remote.type));
-    set({
-      connection,
-      error: null,
-      message: null,
-    });
-  },
-
   openRepairRemote: async (remote) => {
     connectionGeneration += 1;
     const generation = connectionGeneration;
@@ -557,8 +530,10 @@ export const useProvidersStore = create<ProvidersStore>((set, get) => ({
   },
 
   closeConnection: () => {
+    const session = get().connection;
     connectionGeneration += 1;
     set({ connection: null });
+    void cancelProviderAuthorization(session);
   },
 
   chooseConnectionProvider: (providerType) => set((state) => {
@@ -586,7 +561,7 @@ export const useProvidersStore = create<ProvidersStore>((set, get) => ({
   setConnectionParameter: (key, value) => set((state) => state.connection ? {
     connection: {
       ...state.connection,
-      parameters: { ...state.connection.parameters, [key]: value },
+      parameters: nextConnectionParameters(state.connection, key, value),
       error: null,
     },
   } : state),
@@ -600,6 +575,10 @@ export const useProvidersStore = create<ProvidersStore>((set, get) => ({
   submitConnection: async (polling = false) => {
     const session = get().connection;
     if (!session || session.inFlight) return;
+    if (session.stage === "authorize" && isProviderAuthorizationExpired(session)) {
+      void expireProviderAuthorization(get, set, connectionGeneration);
+      return;
+    }
     const validationError = validateConnectionSession(session, get().providers?.workflows ?? []);
     const duplicateName = session.mode === "add"
       && get().providers?.remotes.some((remote) => remote.name === session.remoteName.trim());
@@ -622,31 +601,31 @@ export const useProvidersStore = create<ProvidersStore>((set, get) => ({
       },
     });
     try {
-      const bootstrapExistingConfigContinue = shouldBootstrapOneDriveRepairContinue(session);
       const step = await providersConfigureRemote({
         name: session.remoteName.trim(),
         providerType: session.providerType,
-        parameters: session.parameters,
+        parameters: normalizeProviderParametersForSession(session),
         state: session.step?.state ?? "",
-        result: session.step?.result ?? "",
+        result: providerContinuationResult(session),
         mode: session.mode,
-        continuing: bootstrapExistingConfigContinue || session.step != null,
-        continueExisting: bootstrapExistingConfigContinue,
+        continuing: session.step != null,
+        continueExisting: false,
       });
       if (generation !== connectionGeneration || !get().connection) return;
 
       const current = get().connection!;
-      const parameters = { ...current.parameters };
+      const parameters = normalizeProviderParametersForSession(current);
       if (step.option && !parameters[step.option.name]) {
-        parameters[step.option.name] = step.option.defaultValue || step.option.choices[0]?.value || "";
+        parameters[step.option.name] = defaultProviderOptionValue(step.option);
       }
       const complete = step.done || step.kind === "done";
       const authorize = step.kind === "browser_auth" || Boolean(step.authorizeUrl);
       const configuringProvider = Boolean(step.option?.name);
+      const authDeadlineMs = authorize && !complete && !configuringProvider
+        ? current.authDeadlineMs ?? Date.now() + PROVIDER_AUTH_TIMEOUT_MS
+        : null;
       const authPollAttempts = authorize && polling ? current.authPollAttempts + 1 : 0;
-      const authPollingTimedOut = authorize
-        && polling
-        && authPollAttempts >= MAX_PROVIDER_AUTH_POLL_ATTEMPTS;
+      const authPollingTimedOut = authDeadlineMs != null && Date.now() >= authDeadlineMs;
       const next: ProviderConnectionSession = {
         ...current,
         stage: complete ? "complete" : configuringProvider ? "configure" : authorize ? "authorize" : "configure",
@@ -655,6 +634,7 @@ export const useProvidersStore = create<ProvidersStore>((set, get) => ({
         inFlight: false,
         polling: authorize && !complete && !configuringProvider && !authPollingTimedOut,
         authPollAttempts,
+        authDeadlineMs,
         error: authPollingTimedOut ? providerAuthorizationTimedOutMessage() : null,
       };
 
@@ -689,7 +669,14 @@ export const useProvidersStore = create<ProvidersStore>((set, get) => ({
         });
         return;
       }
+      if (authPollingTimedOut) {
+        void expireProviderAuthorization(get, set, generation);
+        return;
+      }
       if (next.polling) {
+        if (next.authDeadlineMs && next.authDeadlineMs !== current.authDeadlineMs) {
+          scheduleProviderAuthorizationTimeout(get, set, generation, next.authDeadlineMs);
+        }
         window.setTimeout(() => {
           if (generation === connectionGeneration && get().connection?.stage === "authorize") {
             void get().submitConnection(true);
@@ -702,6 +689,10 @@ export const useProvidersStore = create<ProvidersStore>((set, get) => ({
         connection: nextConnectionAfterProviderError(state.connection, error, polling),
       } : state);
       const current = get().connection;
+      if (current?.stage === "authorize" && isProviderAuthorizationExpired(current)) {
+        void expireProviderAuthorization(get, set, generation);
+        return;
+      }
       if (polling && current?.polling) {
         window.setTimeout(() => {
           if (generation === connectionGeneration && get().connection?.stage === "authorize") {
@@ -940,6 +931,7 @@ function createConnectionSession(mode: ProviderConfigMode, remote?: ProviderRemo
     authorizeOpenResult: null,
     authorizeOpenError: null,
     authPollAttempts: 0,
+    authDeadlineMs: null,
     error: null,
   };
 }
@@ -953,7 +945,10 @@ async function validateCanAddRemote(remotes: ProviderRemote[]): Promise<string |
     return "Your Misty license is not active. Update your account before adding a remote.";
   }
   if (license.tier === "basic" && remotes.length >= 1) {
-    return "The free tier includes one remote. Upgrade to Personal or Pro to add unlimited remotes.";
+    if (isNativeMobileBuild) {
+      return "This account currently includes one remote. Use an account with additional remote access before adding another remote.";
+    }
+    return "This account does not have access to another remote. Use an account with additional remote access before adding another remote.";
   }
   return null;
 }
@@ -1003,23 +998,24 @@ function nextConnectionAfterProviderError(
   polling: boolean,
 ): ProviderConnectionSession {
   const authPollAttempts = polling ? connection.authPollAttempts + 1 : connection.authPollAttempts;
+  const authPollingTimedOut = polling && isProviderAuthorizationExpired(connection);
   const recoverablePolling = polling
     && isRecoverableAuthPollingError(error)
-    && authPollAttempts < MAX_PROVIDER_AUTH_POLL_ATTEMPTS;
+    && !authPollingTimedOut;
   return {
     ...connection,
     stage: polling && connection.step ? "authorize" : connection.stage,
     inFlight: false,
     polling: recoverablePolling,
     authPollAttempts,
-    error: polling && !recoverablePolling && isRecoverableAuthPollingError(error)
+    error: authPollingTimedOut
       ? providerAuthorizationTimedOutMessage()
       : providerConnectionErrorText(error, polling),
   };
 }
 
 function providerAuthorizationTimedOutMessage(): string {
-  return "Provider authorization timed out. Reopen the browser sign-in page, complete the flow, then try Connect again.";
+  return "Provider authorization timed out after 3 minutes. Misty canceled the sign-in session; start Configure again when you're ready.";
 }
 
 function providerAuthorizationPollDelay(pollAfterMs?: number): number {
@@ -1027,10 +1023,81 @@ function providerAuthorizationPollDelay(pollAfterMs?: number): number {
   return Math.min(Math.max(500, requested), 1500);
 }
 
+function providerContinuationResult(session: ProviderConnectionSession): string {
+  if (!session.step) return "";
+  if (session.step.option) {
+    return normalizeProviderParameterValue(
+      session.step.option.name,
+      session.parameters[session.step.option.name] ?? defaultProviderOptionValue(session.step.option),
+    );
+  }
+  if (session.step.kind === "browser_auth" || session.step.authorizeUrl) {
+    return session.step.result || "true";
+  }
+  return session.step.result ?? "";
+}
+
 function providerFlowSuccessSuffix(mode: ProviderConfigMode): string {
   if (mode === "repair") return "configured.";
-  if (mode === "reconnect") return "reconnected.";
   return "connected.";
+}
+
+function isProviderAuthorizationExpired(session: ProviderConnectionSession): boolean {
+  return session.stage === "authorize"
+    && session.authDeadlineMs != null
+    && Date.now() >= session.authDeadlineMs;
+}
+
+function scheduleProviderAuthorizationTimeout(
+  get: () => ProvidersStore,
+  set: ProvidersSet,
+  generation: number,
+  deadlineMs: number,
+): void {
+  window.setTimeout(() => {
+    if (generation === connectionGeneration) {
+      void expireProviderAuthorization(get, set, generation);
+    }
+  }, Math.max(0, deadlineMs - Date.now()));
+}
+
+async function expireProviderAuthorization(
+  get: () => ProvidersStore,
+  set: ProvidersSet,
+  generation: number,
+): Promise<void> {
+  const session = get().connection;
+  if (generation !== connectionGeneration || !session || !isProviderAuthorizationExpired(session)) return;
+  connectionGeneration += 1;
+  set({
+    connection: {
+      ...session,
+      inFlight: false,
+      polling: false,
+      error: providerAuthorizationTimedOutMessage(),
+    },
+  });
+  await cancelProviderAuthorization(session);
+}
+
+async function cancelProviderAuthorization(session: ProviderConnectionSession | null): Promise<void> {
+  if (!session || session.stage !== "authorize" || !session.providerType || !session.remoteName.trim()) return;
+  if (!session.step?.state) return;
+  try {
+    await providersConfigureRemote({
+      name: session.remoteName.trim(),
+      providerType: session.providerType,
+      parameters: normalizeProviderParametersForSession(session),
+      state: session.step.state,
+      result: PROVIDER_AUTH_CANCEL_RESULT,
+      mode: session.mode,
+      continuing: true,
+      continueExisting: false,
+    });
+  } catch {
+    // Best effort: the dialog/poller is already closed locally, and rclone may have
+    // already torn down the one-time sign-in service.
+  }
 }
 
 function isRecoverableAuthPollingError(error: unknown): boolean {
@@ -1054,14 +1121,6 @@ function workflowForType(workflows: ProviderWorkflow[], providerType: string): P
     ?? null;
 }
 
-function defaultParameters(workflow: ProviderWorkflow | null): Record<string, string> {
-  if (!workflow) return {};
-  return Object.fromEntries(workflow.options.map((option) => [
-    option.name,
-    option.defaultValue || option.choices[0]?.value || "",
-  ]));
-}
-
 function defaultParametersForSession(
   session: ProviderConnectionSession,
   workflow: ProviderWorkflow | null,
@@ -1069,8 +1128,69 @@ function defaultParametersForSession(
   const options = providerOptionsForConnection(session, workflow);
   return Object.fromEntries(options.map((option) => [
     option.name,
-    option.defaultValue || option.choices[0]?.value || "",
+    defaultProviderOptionValue(option),
   ]));
+}
+
+function defaultProviderOptionValue(option: { name: string; defaultValue: string; choices: Array<{ value: string }> }): string {
+  return normalizeProviderParameterValue(option.name, option.defaultValue || option.choices[0]?.value || "");
+}
+
+function nextConnectionParameters(
+  session: ProviderConnectionSession,
+  key: string,
+  value: string,
+): Record<string, string> {
+  const parameters = {
+    ...session.parameters,
+    [key]: normalizeProviderParameterValue(key, value),
+  };
+  if (isOneDriveProviderType(session.providerType) && key === "config_type" && value !== "driveid") {
+    delete parameters.drive_id;
+    delete parameters.drive_type;
+    delete parameters.config_driveid;
+    delete parameters.config_driveid_fixed;
+  }
+  return parameters;
+}
+
+function normalizeProviderParameters(parameters: Record<string, string>): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(parameters).map(([key, value]) => [key, normalizeProviderParameterValue(key, value)]),
+  );
+}
+
+function normalizeProviderParametersForSession(session: ProviderConnectionSession): Record<string, string> {
+  const parameters = normalizeProviderParameters(session.parameters);
+  if (!isOneDriveProviderType(session.providerType)) return parameters;
+
+  const configType = parameters.config_type || "onedrive";
+  if (configType !== "driveid") {
+    delete parameters.drive_id;
+    delete parameters.drive_type;
+    delete parameters.config_driveid;
+    delete parameters.config_driveid_fixed;
+    return parameters;
+  }
+
+  const driveID = parameters.drive_id || parameters.config_driveid_fixed || parameters.config_driveid || "";
+  if (driveID.trim()) {
+    parameters.config_driveid_fixed = driveID.trim();
+    parameters.config_driveid = driveID.trim();
+  }
+  delete parameters.drive_id;
+  delete parameters.drive_type;
+  return parameters;
+}
+
+function normalizeProviderParameterValue(key: string, value: string): string {
+  if (isOAuthCredentialOptionName(key)) return value.trim();
+  return value;
+}
+
+function isOAuthCredentialOptionName(key: string): boolean {
+  const normalized = key.toLowerCase().replace(/[^a-z0-9]/g, "");
+  return normalized === "clientid" || normalized === "clientsecret";
 }
 
 function validateConnectionSession(

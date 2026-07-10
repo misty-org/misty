@@ -13,6 +13,7 @@
 		4CCD76D12F8A75A241C780BB /* assets in Resources */ = {isa = PBXBuildFile; fileRef = 8FB002DCF9B1E8218E94DC18 /* assets */; };
 		7246A1FAEE26FECFDC0585AB /* Metal.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 54CB6638BCB6B8429EFC9D2A /* Metal.framework */; };
 		84B5F7C0C9B154CBDF4644F2 /* libapp.a in Frameworks */ = {isa = PBXBuildFile; fileRef = FC9E2E778E9D446F3283ADBD /* libapp.a */; };
+		86EEA3BBCE0CBE31BEF38553 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 4FC3FF7BB10AF6AC86E3050A /* PrivacyInfo.xcprivacy */; };
 		8AB6AB380F3ACDF06D605215 /* main.mm in Sources */ = {isa = PBXBuildFile; fileRef = 7F1E6D7582916E14ED8623EA /* main.mm */; };
 		A6F79617B82699D4DE18EDF4 /* UIKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 62FA266242A492FA5D11449A /* UIKit.framework */; };
 		B47B7A162F2CD91E94FC51F4 /* MetalKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = ED94C37F449982EBDF451D60 /* MetalKit.framework */; };
@@ -23,21 +24,28 @@
 
 /* Begin PBXFileReference section */
 		02DD6500429C7AD0F724FEDC /* operation_queue.rs */ = {isa = PBXFileReference; path = operation_queue.rs; sourceTree = "<group>"; };
+		07ACE6E1D44727E624E3E227 /* libapp.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libapp.a; sourceTree = "<group>"; };
 		07BDC2D62ED6CDC97BDE3EF0 /* CoreGraphics.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreGraphics.framework; path = System/Library/Frameworks/CoreGraphics.framework; sourceTree = SDKROOT; };
+		097FDE9F2502E2B5708BF17D /* mod.rs */ = {isa = PBXFileReference; path = mod.rs; sourceTree = "<group>"; };
 		1046FD6AA7220D4D4695FA8D /* claude.rs */ = {isa = PBXFileReference; path = claude.rs; sourceTree = "<group>"; };
+		14C9464C86F0813ED537E387 /* keychain.rs */ = {isa = PBXFileReference; path = keychain.rs; sourceTree = "<group>"; };
 		1696E02883F6CBCE6DFC47DA /* plugin_commands.rs */ = {isa = PBXFileReference; path = plugin_commands.rs; sourceTree = "<group>"; };
 		16B5BC52D001D8B010212705 /* mod.rs */ = {isa = PBXFileReference; path = mod.rs; sourceTree = "<group>"; };
 		1E868B40D235244A1DB5092B /* gate.rs */ = {isa = PBXFileReference; path = gate.rs; sourceTree = "<group>"; };
 		1F638A17C51538569A97906C /* native_clipboard.rs */ = {isa = PBXFileReference; path = native_clipboard.rs; sourceTree = "<group>"; };
+		1F82CAEF1D1FEFB0AAA1A650 /* directory_size.rs */ = {isa = PBXFileReference; path = directory_size.rs; sourceTree = "<group>"; };
 		24BAEA26848C0BC3692BB50E /* explorer_library.rs */ = {isa = PBXFileReference; path = explorer_library.rs; sourceTree = "<group>"; };
 		2A9591F83797E9091F7377C3 /* proxy.rs */ = {isa = PBXFileReference; path = proxy.rs; sourceTree = "<group>"; };
 		2F20907A87CA26BA765C8B49 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		30365E58E2B2627B1A311E5D /* search.rs */ = {isa = PBXFileReference; path = search.rs; sourceTree = "<group>"; };
 		31C5FDD0C5E1A8676EEFFE1C /* mod.rs */ = {isa = PBXFileReference; path = mod.rs; sourceTree = "<group>"; };
 		396003D0B7D7D0BD16386596 /* file_master.rs */ = {isa = PBXFileReference; path = file_master.rs; sourceTree = "<group>"; };
 		3A78C08589ACB67E012E25AE /* runner.rs */ = {isa = PBXFileReference; path = runner.rs; sourceTree = "<group>"; };
 		3BA037D6876C08713F37CD0D /* misty-desktop_iOS.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "misty-desktop_iOS.entitlements"; sourceTree = "<group>"; };
 		4199E9EF44D657A14BDA12A3 /* devices.rs */ = {isa = PBXFileReference; path = devices.rs; sourceTree = "<group>"; };
+		43ACD794E71BD8128B9BB5E0 /* lib.rs */ = {isa = PBXFileReference; path = lib.rs; sourceTree = "<group>"; };
 		4EB9ACDCBC3F895D304D949E /* types.rs */ = {isa = PBXFileReference; path = types.rs; sourceTree = "<group>"; };
+		4FC3FF7BB10AF6AC86E3050A /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		510739F04E61D4445BEDFE11 /* watcher.rs */ = {isa = PBXFileReference; path = watcher.rs; sourceTree = "<group>"; };
 		53FC5C80F3B6BFCBE9E2F884 /* Security.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Security.framework; path = System/Library/Frameworks/Security.framework; sourceTree = SDKROOT; };
 		546BF8BE4CCE55757D341838 /* workspace.rs */ = {isa = PBXFileReference; path = workspace.rs; sourceTree = "<group>"; };
@@ -51,6 +59,7 @@
 		61F7899D67E7FD885C09BE0D /* mod.rs */ = {isa = PBXFileReference; path = mod.rs; sourceTree = "<group>"; };
 		62FA266242A492FA5D11449A /* UIKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = UIKit.framework; path = System/Library/Frameworks/UIKit.framework; sourceTree = SDKROOT; };
 		640CEB89DDF9B118600D8FA7 /* operation_queue.rs */ = {isa = PBXFileReference; path = operation_queue.rs; sourceTree = "<group>"; };
+		662EAF6A7931A7E2BC6C386F /* ai.rs */ = {isa = PBXFileReference; path = ai.rs; sourceTree = "<group>"; };
 		6754129544E82881D8441945 /* LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = LaunchScreen.storyboard; sourceTree = "<group>"; };
 		679AE8EC6218E0FC8EA70067 /* compare.rs */ = {isa = PBXFileReference; path = compare.rs; sourceTree = "<group>"; };
 		6B11E22A739E62E925939BE7 /* transfers.rs */ = {isa = PBXFileReference; path = transfers.rs; sourceTree = "<group>"; };
@@ -58,30 +67,37 @@
 		6C7B96D4DBF74F4B8D660A9C /* bindings.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = bindings.h; sourceTree = "<group>"; };
 		6EC7BD27AABE943D290C44CE /* WebKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WebKit.framework; path = System/Library/Frameworks/WebKit.framework; sourceTree = SDKROOT; };
 		74825B23DD730C203DD0726B /* main.rs */ = {isa = PBXFileReference; path = main.rs; sourceTree = "<group>"; };
+		7844AA35D4D762686D03D34E /* misty.rs */ = {isa = PBXFileReference; path = misty.rs; sourceTree = "<group>"; };
 		7DC7F982E86828525096963F /* types.rs */ = {isa = PBXFileReference; path = types.rs; sourceTree = "<group>"; };
 		7F1E6D7582916E14ED8623EA /* main.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = main.mm; sourceTree = "<group>"; };
 		7FC53DEAA146EBE2CEE938AC /* autostart.rs */ = {isa = PBXFileReference; path = autostart.rs; sourceTree = "<group>"; };
+		85E372C7E46965467F3C51FE /* proxy_runtime.rs */ = {isa = PBXFileReference; path = proxy_runtime.rs; sourceTree = "<group>"; };
 		8D7A0F9768F5448ECED18C5B /* file_transfer.rs */ = {isa = PBXFileReference; path = file_transfer.rs; sourceTree = "<group>"; };
 		8DEFB2982E9A94B1C5586C7A /* commands.rs */ = {isa = PBXFileReference; path = commands.rs; sourceTree = "<group>"; };
+		8F53EC76FC11365AE243B917 /* mac_rounded_corners.rs */ = {isa = PBXFileReference; path = mac_rounded_corners.rs; sourceTree = "<group>"; };
 		8FB002DCF9B1E8218E94DC18 /* assets */ = {isa = PBXFileReference; lastKnownFileType = folder; path = assets; sourceTree = SOURCE_ROOT; };
 		90A7BA3C6996B34C7C89F832 /* workspaces.rs */ = {isa = PBXFileReference; path = workspaces.rs; sourceTree = "<group>"; };
 		91CBF5678A28EEBAD32D24DD /* service.rs */ = {isa = PBXFileReference; path = service.rs; sourceTree = "<group>"; };
 		95A88EEA6753E3EA926232D6 /* misty-desktop_iOS.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = "misty-desktop_iOS.app"; sourceTree = BUILT_PRODUCTS_DIR; };
-		97D3E2F3131215CC7236540A /* hub.rs */ = {isa = PBXFileReference; path = hub.rs; sourceTree = "<group>"; };
 		A0E5DD90A3620488257B8153 /* cache.rs */ = {isa = PBXFileReference; path = cache.rs; sourceTree = "<group>"; };
+		A1C32F2E39E7A681699BC8CD /* power_pack.rs */ = {isa = PBXFileReference; path = power_pack.rs; sourceTree = "<group>"; };
 		A30882BB0D9EAA9AF08FE42A /* poller.rs */ = {isa = PBXFileReference; path = poller.rs; sourceTree = "<group>"; };
 		A8149A8273738940C71DC821 /* providers.rs */ = {isa = PBXFileReference; path = providers.rs; sourceTree = "<group>"; };
 		AA3D0111A8411397DFF64D40 /* proxy_clipboard.rs */ = {isa = PBXFileReference; path = proxy_clipboard.rs; sourceTree = "<group>"; };
+		AEA2783F7A5FF7606EE22A9F /* paths.rs */ = {isa = PBXFileReference; path = paths.rs; sourceTree = "<group>"; };
 		BE51F915B54739F580D0DC94 /* error.rs */ = {isa = PBXFileReference; path = error.rs; sourceTree = "<group>"; };
 		C41D890A5F5D235954B1B60F /* explorer.rs */ = {isa = PBXFileReference; path = explorer.rs; sourceTree = "<group>"; };
 		CFFA2AECD0496C4378127C1E /* environment.rs */ = {isa = PBXFileReference; path = environment.rs; sourceTree = "<group>"; };
+		D169E8A93FFE5B146A9EDBF8 /* metadata.rs */ = {isa = PBXFileReference; path = metadata.rs; sourceTree = "<group>"; };
 		DCD662A57C027352526A01D3 /* file_sync.rs */ = {isa = PBXFileReference; path = file_sync.rs; sourceTree = "<group>"; };
 		ED189A671772F3F676FDD2B4 /* store.rs */ = {isa = PBXFileReference; path = store.rs; sourceTree = "<group>"; };
 		ED94C37F449982EBDF451D60 /* MetalKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = MetalKit.framework; path = System/Library/Frameworks/MetalKit.framework; sourceTree = SDKROOT; };
 		EE917BBC837819579A5B4D81 /* listing_cache.rs */ = {isa = PBXFileReference; path = listing_cache.rs; sourceTree = "<group>"; };
 		F6041711430E5D943E0419EB /* commands.rs */ = {isa = PBXFileReference; path = commands.rs; sourceTree = "<group>"; };
 		F7698560F522BBBF69DF3705 /* master.rs */ = {isa = PBXFileReference; path = master.rs; sourceTree = "<group>"; };
+		F9F9CD326539BB4C1914D2D6 /* tray.rs */ = {isa = PBXFileReference; path = tray.rs; sourceTree = "<group>"; };
 		FC9E2E778E9D446F3283ADBD /* libapp.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libapp.a; sourceTree = "<group>"; };
+		FD1DA50C52650F64AF920401 /* misty_template.rs */ = {isa = PBXFileReference; path = misty_template.rs; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -122,27 +138,46 @@
 		631BCBD6835B068C51096619 /* services */ = {
 			isa = PBXGroup;
 			children = (
+				662EAF6A7931A7E2BC6C386F /* ai.rs */,
 				7FC53DEAA146EBE2CEE938AC /* autostart.rs */,
 				1046FD6AA7220D4D4695FA8D /* claude.rs */,
 				8DEFB2982E9A94B1C5586C7A /* commands.rs */,
 				4199E9EF44D657A14BDA12A3 /* devices.rs */,
+				1F82CAEF1D1FEFB0AAA1A650 /* directory_size.rs */,
 				CFFA2AECD0496C4378127C1E /* environment.rs */,
 				24BAEA26848C0BC3692BB50E /* explorer_library.rs */,
 				C41D890A5F5D235954B1B60F /* explorer.rs */,
 				DCD662A57C027352526A01D3 /* file_sync.rs */,
-				97D3E2F3131215CC7236540A /* hub.rs */,
+				14C9464C86F0813ED537E387 /* keychain.rs */,
+				D169E8A93FFE5B146A9EDBF8 /* metadata.rs */,
+				FD1DA50C52650F64AF920401 /* misty_template.rs */,
+				7844AA35D4D762686D03D34E /* misty.rs */,
 				61F7899D67E7FD885C09BE0D /* mod.rs */,
 				1F638A17C51538569A97906C /* native_clipboard.rs */,
 				02DD6500429C7AD0F724FEDC /* operation_queue.rs */,
+				AEA2783F7A5FF7606EE22A9F /* paths.rs */,
 				1696E02883F6CBCE6DFC47DA /* plugin_commands.rs */,
+				A1C32F2E39E7A681699BC8CD /* power_pack.rs */,
 				A8149A8273738940C71DC821 /* providers.rs */,
 				AA3D0111A8411397DFF64D40 /* proxy_clipboard.rs */,
+				85E372C7E46965467F3C51FE /* proxy_runtime.rs */,
 				2A9591F83797E9091F7377C3 /* proxy.rs */,
+				30365E58E2B2627B1A311E5D /* search.rs */,
 				5532F2C9D2CD6B7696717A18 /* settings.rs */,
 				6B11E22A739E62E925939BE7 /* transfers.rs */,
+				F9F9CD326539BB4C1914D2D6 /* tray.rs */,
 				90A7BA3C6996B34C7C89F832 /* workspaces.rs */,
 			);
 			path = services;
+			sourceTree = "<group>";
+		};
+		68C0CF598E0470FF35FB1F1E /* plugins */ = {
+			isa = PBXGroup;
+			children = (
+				8F53EC76FC11365AE243B917 /* mac_rounded_corners.rs */,
+				097FDE9F2502E2B5708BF17D /* mod.rs */,
+			);
+			path = plugins;
 			sourceTree = "<group>";
 		};
 		6ED0691164F5C34245955E1C /* file_sync */ = {
@@ -177,6 +212,14 @@
 			);
 			sourceTree = "<group>";
 		};
+		89A9E6EBA41D2049BB6C08B0 /* arm64 */ = {
+			isa = PBXGroup;
+			children = (
+				975B71B1D00D79060FBE7D33 /* debug */,
+			);
+			path = arm64;
+			sourceTree = "<group>";
+		};
 		936DF0929E9DD73F6E861A48 /* Products */ = {
 			isa = PBXGroup;
 			children = (
@@ -185,11 +228,20 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
+		975B71B1D00D79060FBE7D33 /* debug */ = {
+			isa = PBXGroup;
+			children = (
+				07ACE6E1D44727E624E3E227 /* libapp.a */,
+			);
+			path = debug;
+			sourceTree = "<group>";
+		};
 		9D86A96C0AD22413EDABF3B0 /* misty-desktop_iOS */ = {
 			isa = PBXGroup;
 			children = (
 				2F20907A87CA26BA765C8B49 /* Info.plist */,
 				3BA037D6876C08713F37CD0D /* misty-desktop_iOS.entitlements */,
+				4FC3FF7BB10AF6AC86E3050A /* PrivacyInfo.xcprivacy */,
 			);
 			path = "misty-desktop_iOS";
 			sourceTree = "<group>";
@@ -248,6 +300,7 @@
 		F123F153522BBD0EC2806729 /* Externals */ = {
 			isa = PBXGroup;
 			children = (
+				89A9E6EBA41D2049BB6C08B0 /* arm64 */,
 			);
 			path = Externals;
 			sourceTree = "<group>";
@@ -257,13 +310,22 @@
 			children = (
 				F6041711430E5D943E0419EB /* commands.rs */,
 				BE51F915B54739F580D0DC94 /* error.rs */,
+				43ACD794E71BD8128B9BB5E0 /* lib.rs */,
 				74825B23DD730C203DD0726B /* main.rs */,
 				608D18D52060D4DD97C5871C /* runtime.rs */,
 				CCC4D6E95E750D926B611CC3 /* core */,
+				68C0CF598E0470FF35FB1F1E /* plugins */,
 				631BCBD6835B068C51096619 /* services */,
 			);
 			name = src;
 			path = ../../src;
+			sourceTree = "<group>";
+		};
+		"TEMP_24B7549D-36E6-44CB-B271-3330EE5F3E18" /* x86_64 */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = x86_64;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -324,6 +386,7 @@
 			files = (
 				C1F3663798F2CA6DF47772F7 /* Assets.xcassets in Resources */,
 				137F22130212009C2FDA6B25 /* LaunchScreen.storyboard in Resources */,
+				86EEA3BBCE0CBE31BEF38553 /* PrivacyInfo.xcprivacy in Resources */,
 				4CCD76D12F8A75A241C780BB /* assets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -411,7 +474,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 14.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -446,10 +509,10 @@
 				"LIBRARY_SEARCH_PATHS[arch=arm64]" = "$(inherited) $(PROJECT_DIR)/Externals/arm64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME) $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/$(PLATFORM_NAME)";
 				"LIBRARY_SEARCH_PATHS[arch=x86_64]" = "$(inherited) $(PROJECT_DIR)/Externals/x86_64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME) $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/$(PLATFORM_NAME)";
 				OTHER_LDFLAGS = "$(inherited) -lresolv";
-				PRODUCT_BUNDLE_IDENTIFIER = com.misty.desktop;
+				PRODUCT_BUNDLE_IDENTIFIER = com.misty.mobile;
 				PRODUCT_NAME = "Misty";
 				SDKROOT = iphoneos;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = 1;
 				VALID_ARCHS = arm64;
 				DEVELOPMENT_TEAM = "7D6BVN4W87";
 			};
@@ -506,7 +569,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 14.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -542,10 +605,10 @@
 				"LIBRARY_SEARCH_PATHS[arch=arm64]" = "$(inherited) $(PROJECT_DIR)/Externals/arm64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME) $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/$(PLATFORM_NAME)";
 				"LIBRARY_SEARCH_PATHS[arch=x86_64]" = "$(inherited) $(PROJECT_DIR)/Externals/x86_64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME) $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/$(PLATFORM_NAME)";
 				OTHER_LDFLAGS = "$(inherited) -lresolv";
-				PRODUCT_BUNDLE_IDENTIFIER = com.misty.desktop;
+				PRODUCT_BUNDLE_IDENTIFIER = com.misty.mobile;
 				PRODUCT_NAME = "Misty";
 				SDKROOT = iphoneos;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = 1;
 				VALID_ARCHS = arm64;
 				DEVELOPMENT_TEAM = "7D6BVN4W87";
 			};

@@ -15,9 +15,14 @@ export function installMistyDeepLinkHandler(
 ): () => void {
   let active = true;
   let unlisten: UnlistenFn | null = null;
+  let lastCurrentSignature: string | null = null;
+  let currentUrlPoll: number | null = null;
 
-  const handleUrls = (urls: string[] | null) => {
+  const handleUrls = (urls: string[] | null, source: "current" | "event") => {
     if (!active || !urls) return;
+    const signature = urls.join("\n");
+    if (source === "current" && signature === lastCurrentSignature) return;
+    lastCurrentSignature = signature;
     for (const url of urls) {
       const route = routeForMistyDeepLink(
         url,
@@ -32,18 +37,38 @@ export function installMistyDeepLinkHandler(
     }
   };
 
+  const handleCurrentUrls = async () => {
+    try {
+      if (!hasTauriInternals()) return;
+      handleUrls(await getCurrent(), "current");
+    } catch {}
+  };
+
+  const handleVisibleCurrentUrls = () => {
+    if (document.visibilityState === "visible") void handleCurrentUrls();
+  };
+
   void (async () => {
     try {
       if (!hasTauriInternals()) return;
-      handleUrls(await getCurrent());
-      unlisten = await onOpenUrl(handleUrls);
-    } catch {
-      // Browser smoke mode and unsupported platforms run without deep-link internals.
-    }
+      await handleCurrentUrls();
+      unlisten = await onOpenUrl((urls) => handleUrls(urls, "event"));
+    } catch {}
   })();
+
+  window.addEventListener("focus", handleCurrentUrls);
+  document.addEventListener("visibilitychange", handleVisibleCurrentUrls);
+  if (formFactor === "mobile") {
+    currentUrlPoll = window.setInterval(() => {
+      if (document.visibilityState === "visible") void handleCurrentUrls();
+    }, 900);
+  }
 
   return () => {
     active = false;
+    window.removeEventListener("focus", handleCurrentUrls);
+    document.removeEventListener("visibilitychange", handleVisibleCurrentUrls);
+    if (currentUrlPoll !== null) window.clearInterval(currentUrlPoll);
     if (unlisten) void unlisten();
   };
 }
@@ -103,7 +128,9 @@ function normalizeDeepLinkRoute(
     return null;
   }
   if (formFactor === "mobile" && route.startsWith("/account/")) {
-    return route === "/account/signin" || route === "/account/register" ? route : "/account";
+    return route === "/account/signin" || route === "/account/register" || route === "/account/settings"
+      ? route
+      : "/account";
   }
   return route;
 }

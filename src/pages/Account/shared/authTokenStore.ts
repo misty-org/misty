@@ -1,6 +1,6 @@
 import { remove, retrieve, store } from "@impierce/tauri-plugin-keystore";
-import { recordClientDebugEvent } from "../../../shared/debug/clientDebug";
 import { hasTauriInternals } from "../../../shared/tauri";
+import { isNativeMobileBuild } from "../../../platform/buildTarget";
 
 const desktopTokenService = "com.impierce.identity-wallet";
 const desktopTokenUser = "tester";
@@ -17,7 +17,7 @@ export async function saveAccountAuthToken(token: string): Promise<void> {
     await store(token);
     writeTokenStoredMarker(true);
   } catch (error) {
-    recordClientDebugEvent({
+    recordTokenDebugEvent({
       level: "error",
       scope: "account-auth-token",
       message: "Could not store Misty auth token in the device keystore.",
@@ -39,7 +39,7 @@ export async function readAccountAuthToken(): Promise<string | null> {
   } catch (error) {
     cachedToken = null;
     writeTokenStoredMarker(false);
-    recordClientDebugEvent({
+    recordTokenDebugEvent({
       level: "error",
       scope: "account-auth-token",
       message: "Could not read Misty auth token from the device keystore.",
@@ -58,7 +58,7 @@ export async function clearAccountAuthToken(): Promise<void> {
   try {
     await remove(desktopTokenService, desktopTokenUser);
   } catch (error) {
-    recordClientDebugEvent({
+    recordTokenDebugEvent({
       level: "error",
       scope: "account-auth-token",
       message: "Could not clear Misty auth token from the device keystore.",
@@ -95,4 +95,21 @@ function errorDetail(error: unknown): string {
   } catch {
     return "";
   }
+}
+
+function recordTokenDebugEvent(event: {
+  level: "info" | "warn" | "error";
+  scope: string;
+  message: string;
+  detail?: string;
+}): void {
+  if (!tokenDebugEnabled()) return;
+  void import("../../../shared/debug/clientDebug").then(({ recordClientDebugEvent }) => {
+    recordClientDebugEvent(event);
+  });
+}
+
+function tokenDebugEnabled(): boolean {
+  return !isNativeMobileBuild &&
+    (import.meta.env.DEV || import.meta.env.VITE_MISTY_DEBUG === "1");
 }

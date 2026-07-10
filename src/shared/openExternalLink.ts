@@ -20,9 +20,7 @@ export async function openExternalLink(url: string): Promise<void> {
     try {
       await openNativeUrl(href);
       return;
-    } catch {
-      // Browser smoke mode or a native opener failure falls through to web-style opening.
-    }
+    } catch {}
   }
 
   window.open(href, "_blank", "noopener,noreferrer");
@@ -39,7 +37,6 @@ export async function openSystemExternalLink(url: string): Promise<void> {
     if (hasTauriInternals()) {
       throw error;
     }
-    // Browser smoke mode runs without Tauri internals, so keep the web fallback there.
   }
 
   window.open(href, "_blank", "noopener,noreferrer");

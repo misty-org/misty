@@ -1,0 +1,22 @@
+[package]
+name = "tauri-plugin-keystore"
+version = "2.1.0-alpha.1-misty.1"
+edition = "2021"
+rust-version = "1.77.2"
+build = "build.rs"
+links = "tauri-plugin-keystore"
+description = "Misty's device-native secure token storage plugin."
+license = "Apache-2.0"
+
+[lib]
+name = "tauri_plugin_keystore"
+path = "src/lib.rs"
+
+[dependencies]
+keyring = { version = "3", features = ["apple-native"] }
+serde = { version = "1", features = ["derive"] }
+tauri = "2.2.4"
+thiserror = "2"
+
+[build-dependencies]
+tauri-plugin = { version = "2.0.3", features = ["build"] }
