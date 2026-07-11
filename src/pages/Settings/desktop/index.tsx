@@ -5,6 +5,7 @@ import {
   AppWindow,
   ArrowLeftRight,
   Bell,
+  Bot,
   ChevronDown,
   Copy,
   Eye,
@@ -29,6 +30,7 @@ import {
 import type { LaunchOnLoginSnapshot, OpenWithAssociation, ShortcutBinding } from "../../../api/types";
 import {
   fontLabelFromPath,
+  selectAssistantPreferences,
   selectCustomFontPreferences,
   useSettingsStore,
   type CustomFontPreference,
@@ -45,8 +47,8 @@ import {
   type TransferProfileRecord,
 } from "../transferProfiles";
 
-type SettingsSection = "general" | "app" | "appearance" | "privacy" | "sync" | "transfers" | "search" | "notifications" | "shortcuts" | "advanced";
-type SettingValue = string | number | boolean | Array<Record<string, unknown>>;
+type SettingsSection = "general" | "app" | "assistant" | "appearance" | "privacy" | "sync" | "transfers" | "search" | "notifications" | "shortcuts" | "advanced";
+type SettingValue = string | number | boolean | Record<string, unknown> | Array<Record<string, unknown>>;
 
 interface NavItem {
   id: SettingsSection;
@@ -57,6 +59,7 @@ interface NavItem {
 const appNavItems: NavItem[] = [
   { id: "general", label: "General", icon: Rows3 },
   { id: "app", label: "App", icon: AppWindow },
+  { id: "assistant", label: "Assistant", icon: Bot },
   { id: "appearance", label: "Appearance", icon: Eye },
   { id: "privacy", label: "Privacy", icon: Lock },
   { id: "sync", label: "Sync", icon: RefreshCcw },
@@ -286,6 +289,7 @@ function SettingsContent(props: {
         ) : null}
         {props.activeSection === "general" ? <GeneralSettings {...props.controlProps} /> : null}
         {props.activeSection === "app" ? <AppSettings {...props.controlProps} /> : null}
+        {props.activeSection === "assistant" ? <AssistantSettings {...props.controlProps} /> : null}
         {props.activeSection === "appearance" ? <AppearanceSettings {...props.controlProps} /> : null}
         {props.activeSection === "privacy" ? <PrivacySettings {...props.controlProps} /> : null}
         {props.activeSection === "sync" ? <SyncSettings {...props.controlProps} /> : null}
@@ -399,6 +403,56 @@ function AppSettings(props: SettingsContentProps) {
         </SettingsRow>
         <SettingsRow label="Data path" description="Where Misty stores local app data on this device." last>
           <CopyableValueText value={props.app?.environment.mistyDir ?? "Loading"} disabled={!props.app?.environment.mistyDir} />
+        </SettingsRow>
+      </SettingsSectionBlock>
+    </>
+  );
+}
+
+function AssistantSettings(props: SettingsContentProps) {
+  const preferences = selectAssistantPreferences(props.document);
+  const updateScope = (key: "files_allowed" | "cleanup_allowed" | "search_allowed", value: boolean) => {
+    props.onSettingChange("assistant", "scopes", {
+      files_allowed: preferences.scopes.filesAllowed,
+      cleanup_allowed: preferences.scopes.cleanupAllowed,
+      search_allowed: preferences.scopes.searchAllowed,
+      [key]: value,
+    });
+  };
+
+  return (
+    <>
+      <SettingsSectionBlock title="Mika">
+        <SettingsRow label="Enable Mika" description="Allow the unified assistant and its desktop overlay." last>
+          <SwitchControl
+            checked={preferences.enabled}
+            disabled={props.working}
+            onChange={(value) => props.onSettingChange("assistant", "enabled", value)}
+          />
+        </SettingsRow>
+      </SettingsSectionBlock>
+
+      <SettingsSectionBlock title="Permission scopes">
+        <SettingsRow label="Files" description="Open, reveal, copy, move, rename, create, and monitor file transfers.">
+          <SwitchControl
+            checked={preferences.scopes.filesAllowed}
+            disabled={props.working || !preferences.enabled}
+            onChange={(value) => updateScope("files_allowed", value)}
+          />
+        </SettingsRow>
+        <SettingsRow label="Cleanup" description="Scan files and propose cleanup plans. Mika cannot apply cleanup changes in V1.">
+          <SwitchControl
+            checked={preferences.scopes.cleanupAllowed}
+            disabled={props.working || !preferences.enabled}
+            onChange={(value) => updateScope("cleanup_allowed", value)}
+          />
+        </SettingsRow>
+        <SettingsRow label="Search" description="Search files, libraries, tags, and paths, and suggest smart-folder queries." last>
+          <SwitchControl
+            checked={preferences.scopes.searchAllowed}
+            disabled={props.working || !preferences.enabled}
+            onChange={(value) => updateScope("search_allowed", value)}
+          />
         </SettingsRow>
       </SettingsSectionBlock>
     </>

@@ -5,10 +5,11 @@ use crate::core::file_sync::FileSyncPairStore;
 #[cfg(desktop)]
 use crate::services::plugin_commands::PluginCommandService;
 use crate::services::{
-    ai::AiService, claude::ClaudeService, commands::CommandService, devices::DeviceService,
-    directory_size::DirectorySizeService, environment::AppEnvironmentService,
-    explorer::ExplorerService, explorer_library::ExplorerLibraryService,
-    file_sync::FileSyncService, metadata::MetadataService, operation_queue::OperationQueueService,
+    ai::AiService, automations::AutomationService, claude::ClaudeService, commands::CommandService,
+    devices::DeviceService, directory_size::DirectorySizeService,
+    environment::AppEnvironmentService, explorer::ExplorerService,
+    explorer_library::ExplorerLibraryService, file_sync::FileSyncService,
+    metadata::MetadataService, operation_queue::OperationQueueService,
     power_pack::PowerPackService, providers::ProviderService, proxy::ProxyService,
     proxy_clipboard::ProxyClipboardClient, proxy_runtime::ProxyRuntimeService,
     search::SearchService, settings::SettingsService, transfers::TransferService,
@@ -39,6 +40,7 @@ pub struct MistyRuntime {
     pub workspaces: WorkspaceService,
     pub operation_queue: OperationQueueService,
     pub ai: AiService,
+    pub automations: AutomationService,
     pub claude: ClaudeService,
 }
 
@@ -91,6 +93,7 @@ impl MistyRuntime {
             operation_queue.clone(),
         );
         let ai = AiService::new();
+        let automations = AutomationService::new(environment.clone(), ai.clone());
         let claude = ClaudeService::new();
         let file_sync = FileSyncService::new(
             environment.clone(),
@@ -124,6 +127,7 @@ impl MistyRuntime {
             workspaces,
             operation_queue,
             ai,
+            automations,
             claude,
         }
     }

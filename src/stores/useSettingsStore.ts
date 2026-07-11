@@ -14,8 +14,8 @@ import { errorText } from "../shared/format";
 import { isNativeMobileBuild } from "../platform/buildTarget";
 import { settingsIndexToThemeMode, useAppThemeStore } from "./useAppThemeStore";
 
-type SettingsSection = "general" | "app" | "appearance" | "privacy" | "sync" | "transfers" | "search" | "notifications" | "shortcuts" | "advanced";
-type SettingValue = string | number | boolean | Array<Record<string, unknown>>;
+type SettingsSection = "general" | "app" | "assistant" | "appearance" | "privacy" | "sync" | "transfers" | "search" | "notifications" | "shortcuts" | "advanced";
+type SettingValue = string | number | boolean | Record<string, unknown> | Array<Record<string, unknown>>;
 
 export type SettingsScaleToken = "small" | "default" | "large";
 
@@ -54,8 +54,13 @@ export interface GeneralPreferences {
   startupViewIndex: number;
 }
 
-export interface PetPreferences {
-  cloudFolderEnabled: boolean;
+export interface AssistantPreferences {
+  enabled: boolean;
+  scopes: {
+    filesAllowed: boolean;
+    cleanupAllowed: boolean;
+    searchAllowed: boolean;
+  };
 }
 
 export interface ShortcutPreferences {
@@ -363,13 +368,39 @@ export function selectGeneralPreferences(
   };
 }
 
-export function selectPetPreferences(
+export function selectAssistantPreferences(
   document: Record<string, unknown> | null | undefined,
-): PetPreferences {
+): AssistantPreferences {
   const source = document ?? {};
+  const assistant = settingsSectionRecord(source, "assistant");
+  const scopesValue = assistant.scopes;
+  const scopes = scopesValue && typeof scopesValue === "object" && !Array.isArray(scopesValue)
+    ? scopesValue as Record<string, unknown>
+    : {};
+  const legacyBotEnabled = settingsSectionRecord(source, "bots").cloud_folder_enabled;
   return {
-    cloudFolderEnabled: settingsBoolean(source, "pets", "cloud_folder_enabled", false),
+    enabled: typeof assistant.enabled === "boolean"
+      ? assistant.enabled
+      : typeof legacyBotEnabled === "boolean"
+        ? legacyBotEnabled
+        : settingsBoolean(source, "pets", "cloud_folder_enabled", false),
+    scopes: {
+      filesAllowed: scopes.files_allowed === true,
+      cleanupAllowed: scopes.cleanup_allowed === true,
+      searchAllowed: scopes.search_allowed === true,
+    },
   };
+}
+
+/** @deprecated Use selectAssistantPreferences. */
+export function selectBotPreferences(
+  document: Record<string, unknown> | null | undefined,
+): BotPreferences {
+  return { cloudFolderEnabled: selectAssistantPreferences(document).enabled };
+}
+
+export interface BotPreferences {
+  cloudFolderEnabled: boolean;
 }
 
 export function selectShortcutPreferences(

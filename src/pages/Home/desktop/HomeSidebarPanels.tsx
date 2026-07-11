@@ -49,7 +49,7 @@ type HomeSidebarPanelsProps = {
   quickAccessItems: HomeQuickAccessItem[];
   remotes: ProviderRemote[];
   remotesLoading: boolean;
-  petPanel: ReactNode;
+  assistantPanel: ReactNode;
   smartFolders: HomeSmartFolderItem[];
   smartFoldersLoading: boolean;
   tags: HomeTagItem[];
@@ -58,7 +58,7 @@ type HomeSidebarPanelsProps = {
 };
 
 const panelClass =
-  "flex min-h-fit min-w-0 flex-col overflow-hidden rounded-2xl border border-white/[0.08] bg-[var(--misty-app-panel-bg,var(--misty-app-page-bg,var(--misty-bg)))] p-3 shadow-xl shadow-black/20";
+  "flex min-h-0 min-w-0 flex-col overflow-hidden rounded-2xl border border-white/[0.08] bg-[var(--misty-app-panel-bg,var(--misty-app-page-bg,var(--misty-bg)))] p-3 shadow-xl shadow-black/20";
 const headerClass =
   "mb-2 flex shrink-0 items-center gap-2 border-b border-white/[0.06] pb-2 text-sm font-semibold text-text";
 const rowClass =
@@ -68,16 +68,16 @@ const iconCellClass =
 
 export function HomeSidebarPanels(props: HomeSidebarPanelsProps) {
   return (
-    <div className="flex min-h-fit min-w-0 flex-auto gap-[clamp(0.5rem,0.8vw,1rem)]">
-      <div className="flex min-h-fit min-w-0 flex-1 flex-col gap-[clamp(0.5rem,0.8vw,1rem)]">
-        <div className="min-h-fit flex-[3_1_auto]">
+    <div className="flex min-h-0 min-w-0 flex-auto gap-[clamp(0.5rem,0.8vw,1rem)]">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-[clamp(0.5rem,0.8vw,1rem)]">
+        <div className="min-h-0 flex-[3_1_0]">
           {props.workspacePanel}
         </div>
-        <div className="min-h-fit flex-[1_1_auto]">
-          {props.petPanel}
+        <div className="min-h-0 flex-[2_1_0]">
+          {props.assistantPanel}
         </div>
         <SidebarPanel
-          className="flex-[2_1_auto]"
+          className="flex-[4_1_0]"
           icon={<HardDrive className="h-4 w-4" />}
           title="Devices"
         >
@@ -111,9 +111,9 @@ export function HomeSidebarPanels(props: HomeSidebarPanelsProps) {
         </SidebarPanel>
       </div>
 
-      <div className="flex min-h-fit min-w-0 flex-1 flex-col gap-[clamp(0.5rem,0.8vw,1rem)]">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-[clamp(0.5rem,0.8vw,1rem)]">
         <SidebarPanel
-          className="flex-[4_1_auto]"
+          className="flex-[4_1_0]"
           icon={<Home className="h-4 w-4" />}
           title="Quick access"
         >
@@ -143,7 +143,7 @@ export function HomeSidebarPanels(props: HomeSidebarPanelsProps) {
         </SidebarPanel>
 
         <SidebarPanel
-          className="flex-[2_1_auto]"
+          className="flex-[2_1_0]"
           icon={<Search className="h-4 w-4" />}
           title="Smart Folders"
         >
@@ -177,9 +177,9 @@ export function HomeSidebarPanels(props: HomeSidebarPanelsProps) {
         </SidebarPanel>
       </div>
 
-      <div className="flex min-h-fit min-w-0 flex-1 flex-col gap-[clamp(0.5rem,0.8vw,1rem)]">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-[clamp(0.5rem,0.8vw,1rem)]">
         <SidebarPanel
-          className="flex-[1_1_auto]"
+          className="flex-[1_1_0]"
           icon={<Server className="h-4 w-4" />}
           title="Remote"
         >
@@ -216,7 +216,7 @@ export function HomeSidebarPanels(props: HomeSidebarPanelsProps) {
         </SidebarPanel>
 
         <SidebarPanel
-          className="flex-[1_1_auto]"
+          className="flex-[1_1_0]"
           icon={<Tag className="h-4 w-4" />}
           title="Tags"
         >

@@ -139,7 +139,7 @@ const explorerCommands: ExplorerCommandPaletteEntry[] = [
   { id: "explorer.preview.toggle", label: "Toggle Preview", hint: "Show or hide the preview/details panel" },
   { id: "explorer.sidebar.toggle", label: "Toggle Sidebar", hint: "Show or hide the navigation sidebar" },
   { id: "explorer.toggle_chat", label: "Toggle Chat", hint: "Open or close the explorer chat overlay" },
-  { id: "explorer.toggle_mika", label: "Toggle Mika", hint: "Mika AI is coming soon" },
+  { id: "explorer.toggle_mika", label: "Toggle Mika", hint: "Open or close Mika Assistant" },
   { id: "explorer.next_workspace", label: "Next Workspace", hint: "Cycle to the next explorer tab" },
   { id: "explorer.tab_1", label: "Select Tab 1", hint: "Switch to tab 1" },
   { id: "explorer.tab_2", label: "Select Tab 2", hint: "Switch to tab 2" },

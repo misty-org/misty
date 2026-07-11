@@ -12,7 +12,10 @@ type DesktopWorkspacePanelProps = {
 };
 
 const panelClass =
-  "flex min-h-fit min-w-0 flex-col overflow-hidden rounded-2xl border border-white/10 bg-[var(--misty-app-panel-bg,var(--misty-app-page-bg,var(--misty-bg)))] p-4 shadow-2xl shadow-black/25";
+  "flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-2xl border border-white/[0.08] bg-[var(--misty-app-panel-bg,var(--misty-app-page-bg,var(--misty-bg)))] p-3 shadow-xl shadow-black/20";
+
+const headerClass =
+  "mb-2 flex shrink-0 items-center justify-between gap-2 border-b border-white/[0.06] pb-2 text-sm font-semibold text-text";
 
 const workspaceRowClass =
   "group/workspace grid w-full min-w-0 grid-cols-[minmax(0,1fr)_64px] items-stretch gap-1 rounded-xl border border-transparent text-left transition hover:border-white/[0.08] hover:bg-white/[0.045]";
@@ -104,19 +107,16 @@ export function DesktopWorkspacePanel({ homePath }: DesktopWorkspacePanelProps) 
 
   return (
     <div className={panelClass}>
-      <div className="mb-3 flex shrink-0 items-center justify-between gap-3 border-b border-white/[0.08] pb-3">
+      <div className={headerClass}>
         <div className="flex min-w-0 items-center gap-2">
-          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-white/[0.055] text-text-muted">
+          <span className="shrink-0 text-text-muted">
             <Briefcase className="h-4 w-4" />
           </span>
-          <div className="min-w-0">
-            <h2 className="m-0 truncate text-sm font-bold text-text">Workspaces</h2>
-            <p className="m-0 mt-0.5 truncate text-[11px] text-text-muted">{activeWorkspaceTitle || "Workspace 1"}</p>
-          </div>
+          <span className="truncate">Workspaces</span>
         </div>
         <button
           aria-label="Create workspace"
-          className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-white/10 bg-white/[0.03] text-text-muted transition hover:border-white/20 hover:bg-white/[0.06] hover:text-text disabled:opacity-50"
+          className="grid h-7 w-7 shrink-0 place-items-center rounded-lg border border-white/10 bg-white/[0.03] text-text-muted transition hover:border-white/20 hover:bg-white/[0.06] hover:text-text disabled:opacity-50"
           disabled={creating}
           onClick={() => void addWorkspace()}
           title="Create workspace"

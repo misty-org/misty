@@ -1000,7 +1000,11 @@ impl ExplorerService {
             remote_name: source.remote_name.clone(),
             remote_path: source.remote_path.clone(),
             size: item.size_bytes.unwrap_or_default(),
-            last_modified: item.remote_modified.as_deref().unwrap_or_default().to_string(),
+            last_modified: item
+                .remote_modified
+                .as_deref()
+                .unwrap_or_default()
+                .to_string(),
             is_dir: false,
         };
         self.remote_file_cache
@@ -1680,7 +1684,7 @@ impl ExplorerService {
                         item.size_bytes,
                         item.remote_modified.as_deref(),
                     )
-                        .await;
+                    .await;
                 }
                 affected_paths.push(display_path(&local_path));
             }
@@ -3184,13 +3188,15 @@ async fn copy_cached_remote_file_to_destination(
     cancellation: Option<&AtomicBool>,
 ) -> ApiResult<()> {
     ensure_not_canceled_if(cancellation)?;
-    tokio::fs::copy(source, destination).await.map_err(|error| {
-        ApiError::Message(format!(
-            "Failed to copy cached remote file from {} to {}: {error}",
-            source.display(),
-            destination.display()
-        ))
-    })?;
+    tokio::fs::copy(source, destination)
+        .await
+        .map_err(|error| {
+            ApiError::Message(format!(
+                "Failed to copy cached remote file from {} to {}: {error}",
+                source.display(),
+                destination.display()
+            ))
+        })?;
     ensure_not_canceled_if(cancellation)?;
     Ok(())
 }

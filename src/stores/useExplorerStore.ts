@@ -64,7 +64,7 @@ import {
 import { useOperationQueueStore } from "./useOperationQueueStore";
 import { useTransfersStore } from "./useTransfersStore";
 import { clipboardImagePng } from "../pages/Files/utils/clipboardImage";
-import { publishCloudFolderPetNotification } from "../pets/cloudFolderPet";
+import { publishCloudFolderBotNotification } from "../bots/cloudFolderBot";
 
 export type ExplorerViewMode = "list" | "grid";
 export type ExplorerCommandQueryMode = "search" | "filter";
@@ -1466,7 +1466,7 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
         : state.notificationHistory,
     }));
     void publishDesktopNotification(notification, showDesktop);
-    void publishCloudFolderPetNotification(notification);
+    void publishCloudFolderBotNotification(notification);
     if (playSound) {
       playNotificationSound(type);
     }

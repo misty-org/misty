@@ -24,6 +24,9 @@ use crate::core::workspace::WorkspaceDocument;
 use crate::error::{ApiError, ApiResult};
 use crate::runtime::MistyRuntime;
 use crate::services::ai::{AiSendRequest, AiStatus, AiStreamEvent};
+use crate::services::automations::{
+    AutomationRunRequest, AutomationSnapshot, AutomationValidation, AutomationWorkflow,
+};
 use crate::services::autostart::LaunchOnLoginSnapshot;
 use crate::services::claude::{ClaudeSendRequest, ClaudeStatus, ClaudeStreamEvent};
 use crate::services::commands::{SaveShortcutsRequest, ShortcutsSnapshot};
@@ -96,6 +99,55 @@ pub async fn app_environment_snapshot(
     state: State<'_, MistyRuntime>,
 ) -> ApiResult<AppEnvironmentSnapshot> {
     Ok(state.environment.snapshot())
+}
+
+#[tauri::command]
+pub async fn automations_snapshot(state: State<'_, MistyRuntime>) -> ApiResult<AutomationSnapshot> {
+    state.automations.snapshot().await
+}
+
+#[tauri::command]
+pub async fn automations_save_workflow(
+    workflow: AutomationWorkflow,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<AutomationSnapshot> {
+    state.automations.save_workflow(workflow).await
+}
+
+#[tauri::command]
+pub async fn automations_delete_workflow(
+    workflow_id: String,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<AutomationSnapshot> {
+    state.automations.delete_workflow(&workflow_id).await
+}
+
+#[tauri::command]
+pub fn automations_validate_workflow(
+    workflow: AutomationWorkflow,
+    state: State<'_, MistyRuntime>,
+) -> AutomationValidation {
+    state.automations.validate(&workflow)
+}
+
+#[tauri::command]
+pub async fn automations_run(
+    request: AutomationRunRequest,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<AutomationSnapshot> {
+    state.automations.run(request).await
+}
+
+#[tauri::command]
+pub async fn automations_resolve_approval(
+    approval_id: String,
+    approved: bool,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<AutomationSnapshot> {
+    state
+        .automations
+        .resolve_approval(&approval_id, approved)
+        .await
 }
 
 #[tauri::command]
