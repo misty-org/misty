@@ -1,4 +1,5 @@
 pub mod ai;
+pub mod automations;
 pub mod autostart;
 pub mod claude;
 pub mod commands;

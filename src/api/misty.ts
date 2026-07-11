@@ -103,6 +103,10 @@ import type {
   CompareFoldersResult,
   DuplicateScanRequest,
   DuplicateScanResult,
+  AutomationRunRequest,
+  AutomationSnapshot,
+  AutomationValidation,
+  AutomationWorkflow,
 } from "./types";
 import { hasTauriInternals } from "../shared/tauri";
 
@@ -118,6 +122,30 @@ export function appSnapshot(): Promise<AppSnapshot> {
 
 export function appEnvironmentSnapshot(): Promise<AppEnvironmentSnapshot> {
   return invoke("app_environment_snapshot");
+}
+
+export function automationsSnapshot(): Promise<AutomationSnapshot> {
+  return invoke("automations_snapshot");
+}
+
+export function automationsSaveWorkflow(workflow: AutomationWorkflow): Promise<AutomationSnapshot> {
+  return invoke("automations_save_workflow", { workflow });
+}
+
+export function automationsDeleteWorkflow(workflowId: string): Promise<AutomationSnapshot> {
+  return invoke("automations_delete_workflow", { workflowId });
+}
+
+export function automationsValidateWorkflow(workflow: AutomationWorkflow): Promise<AutomationValidation> {
+  return invoke("automations_validate_workflow", { workflow });
+}
+
+export function automationsRun(request: AutomationRunRequest): Promise<AutomationSnapshot> {
+  return invoke("automations_run", { request });
+}
+
+export function automationsResolveApproval(approvalId: string, approved: boolean): Promise<AutomationSnapshot> {
+  return invoke("automations_resolve_approval", { approvalId, approved });
 }
 
 export function proxySnapshot(): Promise<ProxySnapshot> {

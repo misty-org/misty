@@ -336,15 +336,15 @@ fn seed_builtin_animation_assets(assets_dir: &Path) {
     for (file_name, bytes) in [
         (
             "cloud-folder-idle.png",
-            include_bytes!("../../../src/assets/pets/cloud-folder/idle.png").as_slice(),
+            include_bytes!("../../../src/assets/bots/cloud-folder/idle.png").as_slice(),
         ),
         (
             "cloud-folder-sleep.png",
-            include_bytes!("../../../src/assets/pets/cloud-folder/sleep.png").as_slice(),
+            include_bytes!("../../../src/assets/bots/cloud-folder/sleep.png").as_slice(),
         ),
         (
             "cloud-folder-happy.png",
-            include_bytes!("../../../src/assets/pets/cloud-folder/happy.png").as_slice(),
+            include_bytes!("../../../src/assets/bots/cloud-folder/happy.png").as_slice(),
         ),
     ] {
         let _ = fs::write(animations_dir.join(file_name), bytes);

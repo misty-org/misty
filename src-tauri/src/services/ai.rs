@@ -218,6 +218,16 @@ impl AiService {
         Ok(self.status())
     }
 
+    pub async fn complete(&self, prompt: &str, cwd: Option<&str>) -> ApiResult<String> {
+        let prompt = prompt.trim();
+        if prompt.is_empty() {
+            return Err(ApiError::Message("AI prompt is empty.".to_owned()));
+        }
+        let config = AiConfig::from_env();
+        config.validate()?;
+        send_openai_request(&self.client, &config, prompt, cwd).await
+    }
+
     fn new_session_id(&self) -> String {
         let id = self.next_session_id.fetch_add(1, Ordering::Relaxed);
         format!("misty-ai-{id}")

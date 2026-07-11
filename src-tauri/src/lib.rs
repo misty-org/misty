@@ -7,15 +7,12 @@ mod plugins;
 mod runtime;
 mod services;
 
-#[cfg(target_os = "android")]
-use commands::{
-    android_all_files_access_status, android_grant_local_folder,
-    android_open_all_files_access_settings,
-};
 use commands::{
     ai_abort, ai_drain_events, ai_send_message, ai_status, app_environment_snapshot, app_snapshot,
-    archive_create, archive_extract, archive_list, claude_abort, claude_drain_events,
-    claude_send_message, claude_status, clipboard_apply_shared, clipboard_native_file_refs,
+    archive_create, archive_extract, archive_list, automations_delete_workflow,
+    automations_resolve_approval, automations_run, automations_save_workflow, automations_snapshot,
+    automations_validate_workflow, claude_abort, claude_drain_events, claude_send_message,
+    claude_status, clipboard_apply_shared, clipboard_native_file_refs,
     clipboard_publish_image_bytes, clipboard_publish_shared, clipboard_set_local,
     clipboard_shared_image_bytes, clipboard_snapshot, clipboard_write_file_refs,
     compare_apply_text_merge, compare_files, compare_folders, devices_snapshot, duplicates_cancel,
@@ -51,6 +48,11 @@ use commands::{
     settings_open_with_associations, settings_remove_open_with_association, settings_save,
     settings_snapshot, shortcuts_save, shortcuts_snapshot, transfers_delete_all,
     transfers_delete_selected, transfers_snapshot, workspaces_save, workspaces_snapshot,
+};
+#[cfg(target_os = "android")]
+use commands::{
+    android_all_files_access_status, android_grant_local_folder,
+    android_open_all_files_access_settings,
 };
 use plugins::mac_rounded_corners;
 use runtime::MistyRuntime;
@@ -138,6 +140,12 @@ pub fn run() {
             mac_rounded_corners::reposition_traffic_lights,
             app_snapshot,
             app_environment_snapshot,
+            automations_snapshot,
+            automations_save_workflow,
+            automations_delete_workflow,
+            automations_validate_workflow,
+            automations_run,
+            automations_resolve_approval,
             ai_status,
             ai_send_message,
             ai_drain_events,

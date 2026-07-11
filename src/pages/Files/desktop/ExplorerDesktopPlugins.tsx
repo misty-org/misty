@@ -56,8 +56,8 @@ export function ExplorerTray(props: {
       <button
         className={cx(explorerTrayStyles.trigger, props.aiOpen && explorerTrayStyles.triggerActive)}
         type="button"
-        title="Mika AI coming soon"
-        aria-label="Mika AI coming soon"
+        title="Open Mika Assistant"
+        aria-label="Open Mika Assistant"
         aria-pressed={props.aiOpen}
         onClick={props.onToggleAi}
       >
