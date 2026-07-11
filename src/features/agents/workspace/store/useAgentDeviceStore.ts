@@ -4,10 +4,7 @@ import {
   readDeploymentStorageItem,
   resolveApiBase,
 } from "@/api/deployment/api";
-import {
-  isApiSessionTransitioning,
-  readApiSessionGeneration,
-} from "@/api/client/session";
+import { isApiSessionTransitioning, readApiSessionGeneration } from "@/api/client/session";
 import { devicesApi } from "@/api/devices/api";
 import type { AgentDevice } from "../model/interfaces/types";
 import { ManagedAiRequestError } from "./useAiServerStore";
@@ -46,7 +43,7 @@ export async function ensureServerAgentDevice(
   local: AgentDevice,
   connected?: {
     endpointId: string;
-    platform: "ios" | "macos" | "windows" | "unknown";
+    platform: "macos" | "windows" | "linux" | "unknown";
     scope?: { assertCurrent(): void; signal: AbortSignal };
   },
 ): Promise<ServerTrustedDevice> {
@@ -68,10 +65,7 @@ export async function ensureServerAgentDevice(
   }
   const cachedId = readStorage(serverDevicePrefix + local.id);
   if (cachedId) {
-    if (
-      Date.now() - (lastHeartbeatByServerId.get(cachedId) ?? 0) <
-      heartbeatIntervalMs
-    ) {
+    if (Date.now() - (lastHeartbeatByServerId.get(cachedId) ?? 0) < heartbeatIntervalMs) {
       localDeviceByServerId.set(cachedId, local.id);
       return { id: cachedId, name: local.displayName };
     }
@@ -99,9 +93,7 @@ export async function ensureServerAgentDevice(
     }
   }
 
-  const list = await devicesApi
-    .list<ServerDeviceList>()
-    .catch(() => ({ devices: [] }));
+  const list = await devicesApi.list<ServerDeviceList>().catch(() => ({ devices: [] }));
   const existing = list.devices.find(
     (device) => device.publicKey === publicKey && !device.revokedAt,
   );
@@ -123,7 +115,7 @@ async function registerServerDevice(
   publicKey: string,
   connected?: {
     endpointId: string;
-    platform: "ios" | "macos" | "windows" | "unknown";
+    platform: "macos" | "windows" | "linux" | "unknown";
     scope?: { assertCurrent(): void; signal: AbortSignal };
   },
 ): Promise<ServerTrustedDevice> {
@@ -132,11 +124,7 @@ async function registerServerDevice(
   connected?.scope?.assertCurrent();
   connected?.scope?.signal.throwIfAborted();
   if (isApiSessionTransitioning() || generation !== readApiSessionGeneration()) {
-    throw new ManagedAiRequestError(
-      "Account session changed.",
-      401,
-      "account_session_changed",
-    );
+    throw new ManagedAiRequestError("Account session changed.", 401, "account_session_changed");
   }
   const registrationKey = JSON.stringify([
     apiBase,
@@ -150,34 +138,36 @@ async function registerServerDevice(
   const pending = !connected?.scope && registrationAttempts.get(registrationKey);
   if (pending) return pending;
   const attempt = (async () => {
-  try {
-    return await devicesApi.register<ServerTrustedDevice>(
-      {
-        name: local.displayName || "This Misty",
-        publicKey,
-        keyAlgorithm: "ed25519",
-        platform: connected?.platform ?? "unknown",
-        p2pEndpointId: connected?.endpointId ?? "",
-        protocolVersions: connected ? ["misty-device/1"] : [],
-        capabilities: agentDeviceCapabilities,
-      },
-      connected?.scope?.signal,
-    );
-  } catch (error) {
-    if (
-      error instanceof ManagedAiRequestError &&
-      error.status === 409 &&
-      error.code === "device_identity_conflict"
-    ) {
-      registrationConflicts.set(registrationKey, error);
+    try {
+      return await devicesApi.register<ServerTrustedDevice>(
+        {
+          name: local.displayName || "This Misty",
+          publicKey,
+          keyAlgorithm: "ed25519",
+          platform: connected?.platform ?? "unknown",
+          p2pEndpointId: connected?.endpointId ?? "",
+          protocolVersions: connected ? ["misty-device/1"] : [],
+          capabilities: agentDeviceCapabilities,
+        },
+        connected?.scope?.signal,
+      );
+    } catch (error) {
+      if (
+        error instanceof ManagedAiRequestError &&
+        error.status === 409 &&
+        error.code === "device_identity_conflict"
+      ) {
+        registrationConflicts.set(registrationKey, error);
+      }
+      throw error;
     }
-    throw error;
-  }
   })();
   if (!connected?.scope) registrationAttempts.set(registrationKey, attempt);
-  try { return await attempt; }
-  finally {
-    if (registrationAttempts.get(registrationKey) === attempt) registrationAttempts.delete(registrationKey);
+  try {
+    return await attempt;
+  } finally {
+    if (registrationAttempts.get(registrationKey) === attempt)
+      registrationAttempts.delete(registrationKey);
   }
 }
 
@@ -185,8 +175,7 @@ export async function heartbeatServerAgentDevice(
   deviceId: string,
   localDeviceId = localDeviceByServerId.get(deviceId),
 ): Promise<ServerTrustedDevice> {
-  if (!localDeviceId)
-    throw new Error("Local device signing identity is unavailable.");
+  if (!localDeviceId) throw new Error("Local device signing identity is unavailable.");
   const device = await devicesApi.heartbeat<ServerTrustedDevice>(
     signedAgentDeviceRequest,
     localDeviceId,
@@ -215,19 +204,10 @@ export async function signedAgentDeviceRequest<T>(
   crypto.getRandomValues(nonceBytes);
   const nonce = toBase64(nonceBytes);
   const bodyDigest = toHex(
-    new Uint8Array(
-      await crypto.subtle.digest("SHA-256", new TextEncoder().encode(body)),
-    ),
+    new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(body))),
   );
   const apiBasePath = new URL(await resolveApiBase()).pathname;
-  const canonical = deviceSignaturePayload(
-    method,
-    path,
-    timestamp,
-    nonce,
-    bodyDigest,
-    apiBasePath,
-  );
+  const canonical = deviceSignaturePayload(method, path, timestamp, nonce, bodyDigest, apiBasePath);
   const privateKey = await crypto.subtle.importKey(
     "pkcs8",
     fromBase64(identity.privateKey).buffer as ArrayBuffer,
@@ -254,9 +234,7 @@ export async function signedAgentDeviceRequest<T>(
   return result;
 }
 
-async function loadOrCreateDeviceIdentity(
-  localDeviceId: string,
-): Promise<StoredDeviceIdentity> {
+async function loadOrCreateDeviceIdentity(localDeviceId: string): Promise<StoredDeviceIdentity> {
   const cached = identityCache.get(localDeviceId);
   if (cached) return cached;
   const pending = identityLoadAttempts.get(localDeviceId);
@@ -281,20 +259,11 @@ async function loadOrCreateDeviceIdentity(
   return attempt;
 }
 
-async function rotateDeviceIdentity(
-  localDeviceId: string,
-): Promise<StoredDeviceIdentity> {
-  const pair = await crypto.subtle.generateKey({ name: "Ed25519" }, true, [
-    "sign",
-    "verify",
-  ]);
+async function rotateDeviceIdentity(localDeviceId: string): Promise<StoredDeviceIdentity> {
+  const pair = await crypto.subtle.generateKey({ name: "Ed25519" }, true, ["sign", "verify"]);
   const identity: StoredDeviceIdentity = {
-    publicKey: toBase64(
-      new Uint8Array(await crypto.subtle.exportKey("raw", pair.publicKey)),
-    ),
-    privateKey: toBase64(
-      new Uint8Array(await crypto.subtle.exportKey("pkcs8", pair.privateKey)),
-    ),
+    publicKey: toBase64(new Uint8Array(await crypto.subtle.exportKey("raw", pair.publicKey))),
+    privateKey: toBase64(new Uint8Array(await crypto.subtle.exportKey("pkcs8", pair.privateKey))),
   };
   await invoke("agents_device_identity_store", {
     localDeviceId,
@@ -330,9 +299,7 @@ function fromBase64(value: string): Uint8Array {
 }
 
 function toHex(bytes: Uint8Array): string {
-  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join(
-    "",
-  );
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
 function readStorage(key: string): string | null {

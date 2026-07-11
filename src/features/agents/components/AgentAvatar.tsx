@@ -1,5 +1,5 @@
 import "./AgentAvatar.css";
-import type { AgentProfile } from "@misty/contracts";
+import type { AgentProfile } from "@/shared/contracts";
 import { agentCloudAvatar, type agentCloudVariants } from "./agentCloudAvatars";
 
 export function AgentAvatar({ agent, large = false }: { agent?: AgentProfile; large?: boolean }) {

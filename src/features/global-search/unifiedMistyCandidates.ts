@@ -1,11 +1,8 @@
-import { allLayoutViews } from "@/features/workspace/layoutTabs";
-import {mistyIntent} from "./mistyIntent";
-export {mistyIntent} from "./mistyIntent";
 import { shortcutCommandRegistry } from "@/features/shortcuts";
-import { dockTabs, useWorkspaceStore } from "@/features/workspace/core";
-import { isNativeMobileBuild } from "@/shared/platform/buildTarget";
+import { useWorkspaceStore } from "@/features/workspace/core";
+import { allLayoutViews } from "@/features/workspace/layoutTabs";
 import type { GlobalSearchFilters, GlobalSearchResult, UnifiedMistyCandidate } from "./types";
-
+export { mistyIntent } from "./mistyIntent";
 const coreToolCommandIds = new Set([
   "tool.home",
   "tool.journal",
@@ -17,7 +14,6 @@ const coreToolCommandIds = new Set([
   "tool.files",
   "tool.code",
 ]);
-
 export function buildUnifiedMistyCandidates(
   query: string,
   results: GlobalSearchResult[],
@@ -28,7 +24,6 @@ export function buildUnifiedMistyCandidates(
   const navigation = /^(open|go to|take me to|show me)\b/.test(normalized);
   const objectQuery = normalized.replace(/^(open|go to|take me to|show me)\s+/, "");
   const candidates: UnifiedMistyCandidate[] = [];
-
   for (const result of results) {
     if (!matchesFilters(result, filters)) continue;
     const title = normalize(result.title);
@@ -45,11 +40,16 @@ export function buildUnifiedMistyCandidates(
       result,
     });
   }
-
-  candidates.push({id:`answer:${normalized}`,type:"answer",title:"Continue with Misty",description:query.trim(),prompt:query.trim(),score:-1,ranking:["explicit-handoff"]});
-
+  candidates.push({
+    id: `answer:${normalized}`,
+    type: "answer",
+    title: "Continue with Misty",
+    description: query.trim(),
+    prompt: query.trim(),
+    score: -1,
+    ranking: ["explicit-handoff"],
+  });
   for (const command of shortcutCommandRegistry) {
-    if (isNativeMobileBuild && !mobileCommandAllowed(command.id, command.category)) continue;
     const haystack = normalize(
       [command.label, command.description, command.category, ...command.aliases].join(" "),
     );
@@ -65,17 +65,14 @@ export function buildUnifiedMistyCandidates(
       ranking: [title === normalized ? "exact-command" : "command"],
     });
   }
-
   return candidates.sort(
     (left, right) => right.score - left.score || left.title.localeCompare(right.title),
   );
 }
-
 function emptyCandidates(): UnifiedMistyCandidate[] {
   const state = useWorkspaceStore.getState();
   const recent = (state.virtualWindowsByScope[state.activeScopeKey] ?? [])
     .flatMap((window) => allLayoutViews(window.layout))
-    .filter((tab) => !isNativeMobileBuild || !["extension", "marketplace"].includes(tab.surfaceId))
     .sort((left, right) => right.lastFocusedAt - left.lastFocusedAt)
     .slice(0, 4)
     .map<UnifiedMistyCandidate>((tab, index) => ({
@@ -88,11 +85,7 @@ function emptyCandidates(): UnifiedMistyCandidate[] {
       ranking: ["recent"],
     }));
   const tools = shortcutCommandRegistry
-    .filter(
-      (command) =>
-        coreToolCommandIds.has(command.id) &&
-        (!isNativeMobileBuild || mobileCommandAllowed(command.id, command.category)),
-    )
+    .filter((command) => coreToolCommandIds.has(command.id))
     .slice(0, 8)
     .map<UnifiedMistyCandidate>((command, index) => ({
       id: `command:${command.id}`,
@@ -105,13 +98,6 @@ function emptyCandidates(): UnifiedMistyCandidate[] {
     }));
   return [...recent, ...tools];
 }
-
-export function mobileCommandAllowed(id: string, category = ""): boolean {
-  const normalized = `${id} ${category}`.toLowerCase();
-  if (id.startsWith("workspace.")) return false;
-  return !/(extension|plugin|marketplace|store|virtual window|split pane)/.test(normalized);
-}
-
 function matchesFilters(result: GlobalSearchResult, filters: GlobalSearchFilters) {
   if (filters.kinds.length && !filters.kinds.includes(result.kind)) return false;
   if (filters.spaceId && result.spaceId !== filters.spaceId) return false;
@@ -119,8 +105,6 @@ function matchesFilters(result: GlobalSearchResult, filters: GlobalSearchFilters
   if (filters.source === "cloud" && result.source === "device") return false;
   return true;
 }
-
-
 function normalize(value: string) {
   return value
     .toLocaleLowerCase()

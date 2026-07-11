@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Globe } from "lucide-react";
-import { mistyBrowserProviders } from "@misty/sdk";
+import { mistyBrowserProviders } from "@/shared/contracts";
 import { BrandIcon } from "../../shared/toolAssets/BrandIcon";
 import { brandIconAsset } from "../../shared/toolAssets/brandIcons";
 

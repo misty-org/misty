@@ -1,5 +1,5 @@
 import { Activity, History, Plus, Settings, Unplug } from "lucide-react";
-import type { AgentProfile } from "@misty/contracts";
+import type { AgentProfile } from "@/shared/contracts";
 import type { GlobalAiConversation } from "@/features/global-search/types";
 import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from "@/shared/ui/command";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/shared/ui/dialog";

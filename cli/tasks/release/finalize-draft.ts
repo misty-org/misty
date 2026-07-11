@@ -20,7 +20,7 @@ for (const arch of ['aarch64','x86_64']) {
 }
 writeJSON(resolve(output,'release-manifest.json'),manifest);
 writeJSON(resolve(output,'latest.json'),{version:releaseVersion,notes:`Misty ${releaseVersion} beta. Save your work before installing.`,pub_date:new Date().toISOString(),platforms});
-writeFileSync(resolve(output,'RELEASE-NOTES.md'),`Misty ${releaseVersion}\n\nApple Silicon and Intel installers with built-in tools, and SDK 0.1.0 archives.\n\nUses https://dev-api.mistysys.com/v1. That development server must remain online.\n\nAutomated signing, notarization, package integrity and build gates passed. Interactive installation and a real two-version update remain explicit promotion gates in release/validation.json.\n`);
+writeFileSync(resolve(output,'RELEASE-NOTES.md'),`Misty ${releaseVersion}\n\nApple Silicon and Intel installers with built-in tools.\n\nUses https://dev-api.mistysys.com/v1. That development server must remain online.\n\nAutomated signing, notarization, package integrity and build gates passed. Interactive installation and a real two-version update remain explicit promotion gates in release/validation.json.\n`);
 checksums(output);
 const tag = `v${releaseVersion}`;
 let existing;

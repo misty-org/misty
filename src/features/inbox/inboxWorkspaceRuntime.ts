@@ -1,7 +1,6 @@
-import type { useAiSurfaceAdapter, useAiSurfaceActions } from "@/features/ai-surface/AiPaneHost";
-import type { useMobileSurfaceChrome, useSurfacePresentation } from "@/shared/mobile";
-import type { InboxStoreHook } from "./store/inboxStore";
+import type { useAiSurfaceActions, useAiSurfaceAdapter } from "@/features/ai-surface/AiPaneHost";
 import type { InboxUiRuntime } from "./inboxUiRuntime";
+import type { InboxStoreHook } from "./store/inboxStore";
 export interface InboxConnectionsState {
   accountId: string;
   authorizingProvider: string | null;
@@ -17,16 +16,24 @@ export interface InboxConnectionsState {
   clearError(): void;
 }
 export interface InboxWorkspaceRuntime {
-  identity: { user: { id: string } | null; transitioning: boolean };
+  identity: {
+    user: {
+      id: string;
+    } | null;
+    transitioning: boolean;
+  };
   store: InboxStoreHook;
   focused: boolean;
-  presentation: ReturnType<typeof useSurfacePresentation>;
   connections: InboxConnectionsState;
   ui: InboxUiRuntime;
-  openAuthorization(url: string): Promise<{ strategy?: string } | undefined>;
+  openAuthorization(url: string): Promise<
+    | {
+        strategy?: string;
+      }
+    | undefined
+  >;
   useAiSurfaceAdapter: typeof useAiSurfaceAdapter;
   useAiSurfaceActions: (
     adapter: Parameters<typeof useAiSurfaceActions>[0],
   ) => Pick<ReturnType<typeof useAiSurfaceActions>, "available" | "runAction">;
-  useMobileSurfaceChrome: typeof useMobileSurfaceChrome;
 }

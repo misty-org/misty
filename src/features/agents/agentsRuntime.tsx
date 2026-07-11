@@ -1,4 +1,4 @@
-import type { MistyActivityOperation } from "@misty/sdk";
+import type { MistyActivityOperation } from "@/shared/contracts";
 import { runtimeProperty } from "@/shared/lib/runtimeProperty";
 import type { agentsApi } from "@/api/agents/api";
 import type { assistantApi } from "@/api/assistant/api";
