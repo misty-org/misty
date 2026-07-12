@@ -12,15 +12,51 @@ const (
 	ProviderOpenAI     = "openai"
 	ProviderGemini     = "gemini"
 	ProviderGeminiREST = "gemini_rest"
+	ProviderVercelAI   = "vercel_ai_gateway"
 
-	defaultOpenAIBaseURL = "https://api.openai.com/v1"
-	defaultOpenAIModel   = "gpt-5.5"
-	defaultGeminiBaseURL = "https://generativelanguage.googleapis.com/v1beta"
-	defaultGeminiModel   = "gemini-3.5-flash"
+	defaultOpenAIBaseURL        = "https://api.openai.com/v1"
+	defaultOpenAIModel          = "gpt-5.5"
+	defaultGeminiBaseURL        = "https://generativelanguage.googleapis.com/v1beta"
+	defaultGeminiModel          = "gemini-3.5-flash"
+	defaultVercelAIBaseURL      = "https://ai-gateway.vercel.sh/v1"
+	defaultMikaLowGatewayModel  = "google/gemini-2.5-flash-lite"
+	defaultMikaMedGatewayModel  = "google/gemini-2.5-flash"
+	defaultMikaHighGatewayModel = "google/gemini-3.5-flash"
 )
 
 func NewProviderFromEnv() ModelProvider {
-	providerName := strings.ToLower(strings.TrimSpace(os.Getenv("MISTY_AI_PROVIDER")))
+	return newProviderFromEnv("", "")
+}
+
+func NewMikaProviderFromEnv() ModelProvider {
+	apiKey := firstEnv("AI_GATEWAY_API_KEY", "VERCEL_OIDC_TOKEN")
+	if apiKey == "" {
+		return NewMikaProviderRouter(MockProvider{}, MockProvider{}, MockProvider{})
+	}
+	baseURL := envOrDefault("AI_GATEWAY_BASE_URL", defaultVercelAIBaseURL)
+	provider := func(modelKey, fallback string) ModelProvider {
+		return NewOpenAIProvider(OpenAIProviderConfig{
+			APIKey:       apiKey,
+			BaseURL:      baseURL,
+			Model:        envOrDefault(modelKey, fallback),
+			ProviderName: ProviderVercelAI,
+		})
+	}
+	return NewMikaProviderRouter(
+		provider("MISTY_AI_LOW_MODEL", defaultMikaLowGatewayModel),
+		provider("MISTY_AI_MED_MODEL", defaultMikaMedGatewayModel),
+		provider("MISTY_AI_HIGH_MODEL", defaultMikaHighGatewayModel),
+	)
+}
+
+func newProviderFromEnv(providerKey, modelKey string) ModelProvider {
+	providerName := ""
+	if providerKey != "" {
+		providerName = strings.ToLower(strings.TrimSpace(os.Getenv(providerKey)))
+	}
+	if providerName == "" {
+		providerName = strings.ToLower(strings.TrimSpace(os.Getenv("MISTY_AI_PROVIDER")))
+	}
 	openAIKey := strings.TrimSpace(os.Getenv("OPENAI_API_KEY"))
 	geminiKey := firstEnv("GEMINI_API_KEY", "GOOGLE_API_KEY")
 	geminiAuthMode := strings.ToLower(strings.TrimSpace(os.Getenv("GEMINI_AUTH_MODE")))
@@ -43,7 +79,7 @@ func NewProviderFromEnv() ModelProvider {
 		return NewOpenAIProvider(OpenAIProviderConfig{
 			APIKey:  openAIKey,
 			BaseURL: envOrDefault("OPENAI_BASE_URL", defaultOpenAIBaseURL),
-			Model:   envOrDefault("MISTY_AI_MODEL", defaultOpenAIModel),
+			Model:   routeModel(modelKey, defaultOpenAIModel),
 		})
 	case ProviderGemini:
 		if geminiKey == "" && geminiAuthMode == geminiAuthAPIKey {
@@ -52,7 +88,7 @@ func NewProviderFromEnv() ModelProvider {
 		return NewADKGeminiProvider(ADKGeminiProviderConfig{
 			APIKey:   geminiKey,
 			AuthMode: envOrDefault("GEMINI_AUTH_MODE", geminiAuthAuto),
-			Model:    envOrDefault("MISTY_AI_MODEL", defaultGeminiModel),
+			Model:    routeModel(modelKey, defaultGeminiModel),
 			Project:  firstEnv("GEMINI_VERTEX_PROJECT", "GOOGLE_CLOUD_PROJECT"),
 			Location: firstEnv("GEMINI_VERTEX_LOCATION", "GOOGLE_CLOUD_LOCATION", "GOOGLE_CLOUD_REGION"),
 		})
@@ -64,7 +100,7 @@ func NewProviderFromEnv() ModelProvider {
 			APIKey:     geminiKey,
 			AuthMode:   envOrDefault("GEMINI_AUTH_MODE", geminiAuthAuto),
 			BaseURL:    envOrDefault("GEMINI_BASE_URL", defaultGeminiBaseURL),
-			Model:      envOrDefault("MISTY_AI_MODEL", defaultGeminiModel),
+			Model:      routeModel(modelKey, defaultGeminiModel),
 			OAuthScope: envOrDefault("GEMINI_OAUTH_SCOPE", defaultGeminiOAuthScope),
 		})
 	default:
@@ -72,8 +108,28 @@ func NewProviderFromEnv() ModelProvider {
 	}
 }
 
+func routeModel(modelKey, fallback string) string {
+	if modelKey != "" {
+		if value := strings.TrimSpace(os.Getenv(modelKey)); value != "" {
+			return value
+		}
+	}
+	return envOrDefault("MISTY_AI_MODEL", fallback)
+}
+
 func defaultHTTPClient() *http.Client {
-	return &http.Client{Timeout: 45 * time.Second}
+	return noRedirectHTTPClient(&http.Client{Timeout: 45 * time.Second})
+}
+
+func noRedirectHTTPClient(client *http.Client) *http.Client {
+	if client == nil {
+		client = &http.Client{Timeout: 45 * time.Second}
+	}
+	cloned := *client
+	cloned.CheckRedirect = func(_ *http.Request, _ []*http.Request) error {
+		return http.ErrUseLastResponse
+	}
+	return &cloned
 }
 
 func envOrDefault(key, fallback string) string {

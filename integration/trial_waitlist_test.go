@@ -33,8 +33,8 @@ func TestPersonalTrialLifecycle(t *testing.T) {
 	if err != nil || license == nil {
 		t.Fatalf("GetLicenseByUserID() error = %v, license = %#v", err, license)
 	}
-	if license.Tier != db.TierPersonal || license.Status != db.LicenseStatusTrialing || license.ExpiresAt == nil {
-		t.Fatalf("trial license = %#v, want personal trialing with expiry", license)
+	if license.Tier != db.TierPro || license.Status != db.LicenseStatusTrialing || license.ExpiresAt == nil {
+		t.Fatalf("trial license = %#v, want pro trialing with expiry", license)
 	}
 
 	secondRec := performJSONRequest(t, api.StartPersonalTrial(database), http.MethodPost, "/billing/trial/start", nil, cookie)

@@ -62,6 +62,8 @@ func NewGeminiProvider(config GeminiProviderConfig) *GeminiProvider {
 	client := config.Client
 	if client == nil {
 		client = defaultHTTPClient()
+	} else {
+		client = noRedirectHTTPClient(client)
 	}
 	return &GeminiProvider{
 		apiKey:      strings.TrimSpace(config.APIKey),
@@ -91,6 +93,9 @@ func (p *GeminiProvider) Next(request ModelRequest) (ModelResponse, error) {
 	body := map[string]any{
 		"model": p.model,
 		"input": buildAgentPrompt(request),
+		"generation_config": map[string]any{
+			"max_output_tokens": MaxModelOutputTokens,
+		},
 		"response_format": map[string]any{
 			"type":      "text",
 			"mime_type": "application/json",
@@ -122,7 +127,38 @@ func (p *GeminiProvider) Next(request ModelRequest) (ModelResponse, error) {
 	if err != nil {
 		return ModelResponse{}, err
 	}
-	return parseProviderJSONResponse(text)
+	response, err := parseProviderJSONResponse(text)
+	if err != nil {
+		return ModelResponse{}, err
+	}
+	response.Usage = extractGeminiUsage(responseBody)
+	return response, nil
+}
+
+func extractGeminiUsage(body []byte) ModelUsage {
+	var payload struct {
+		InteractionUsage struct {
+			InputTokens   int64 `json:"total_input_tokens"`
+			CachedTokens  int64 `json:"total_cached_tokens"`
+			OutputTokens  int64 `json:"total_output_tokens"`
+			ThoughtTokens int64 `json:"total_thought_tokens"`
+		} `json:"usage"`
+		LegacyUsage struct {
+			PromptTokens     int64 `json:"promptTokenCount"`
+			CachedTokens     int64 `json:"cachedContentTokenCount"`
+			CandidatesTokens int64 `json:"candidatesTokenCount"`
+			ThoughtsTokens   int64 `json:"thoughtsTokenCount"`
+		} `json:"usageMetadata"`
+	}
+	if json.Unmarshal(body, &payload) != nil {
+		return ModelUsage{}
+	}
+	if payload.InteractionUsage.InputTokens != 0 || payload.InteractionUsage.OutputTokens != 0 || payload.InteractionUsage.ThoughtTokens != 0 {
+		return ModelUsage{InputTokens: payload.InteractionUsage.InputTokens, CachedInputTokens: payload.InteractionUsage.CachedTokens,
+			OutputTokens: payload.InteractionUsage.OutputTokens + payload.InteractionUsage.ThoughtTokens, ReasoningTokens: payload.InteractionUsage.ThoughtTokens}
+	}
+	return ModelUsage{InputTokens: payload.LegacyUsage.PromptTokens, CachedInputTokens: payload.LegacyUsage.CachedTokens,
+		OutputTokens: payload.LegacyUsage.CandidatesTokens + payload.LegacyUsage.ThoughtsTokens, ReasoningTokens: payload.LegacyUsage.ThoughtsTokens}
 }
 
 func (p *GeminiProvider) applyAuth(request *http.Request) error {

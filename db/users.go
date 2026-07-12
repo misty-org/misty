@@ -22,7 +22,9 @@ type User struct {
 }
 
 type UserSettings struct {
-	EmailUpdatesEnabled bool
+	EmailUpdatesEnabled   bool
+	AnalyticsEnabled      bool
+	ErrorReportingEnabled bool
 }
 
 func (db *Database) CreateUser(name, email, password string) (*User, error) {
@@ -116,9 +118,9 @@ func (db *Database) GetUserSettingsByID(id string) (*UserSettings, error) {
 	err := db.withRLSContext(context.Background(), userRLSSettings(id), func(tx *sql.Tx) error {
 		return tx.QueryRowContext(
 			context.Background(),
-			`SELECT email_updates_enabled FROM users WHERE id = $1`,
+			`SELECT email_updates_enabled, analytics_enabled, error_reporting_enabled FROM users WHERE id = $1`,
 			id,
-		).Scan(&settings.EmailUpdatesEnabled)
+		).Scan(&settings.EmailUpdatesEnabled, &settings.AnalyticsEnabled, &settings.ErrorReportingEnabled)
 	})
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -134,14 +136,27 @@ func (db *Database) UpdateUserSettings(id string, settings UserSettings) error {
 	err := db.withRLSContext(context.Background(), userRLSSettings(id), func(tx *sql.Tx) error {
 		_, err := tx.ExecContext(
 			context.Background(),
-			`UPDATE users SET email_updates_enabled = $1 WHERE id = $2`,
+			`UPDATE users SET email_updates_enabled = $1, analytics_enabled = $2, error_reporting_enabled = $3 WHERE id = $4`,
 			settings.EmailUpdatesEnabled,
+			settings.AnalyticsEnabled,
+			settings.ErrorReportingEnabled,
 			id,
 		)
 		return err
 	})
 	if err != nil {
 		log.Println("Failed to update user settings:", err)
+	}
+	return err
+}
+
+func (db *Database) UpdateTelemetryPreferences(id string, analyticsEnabled, errorReportingEnabled bool) error {
+	err := db.withRLSContext(context.Background(), userRLSSettings(id), func(tx *sql.Tx) error {
+		_, err := tx.ExecContext(context.Background(), `UPDATE users SET analytics_enabled = $1, error_reporting_enabled = $2 WHERE id = $3`, analyticsEnabled, errorReportingEnabled, id)
+		return err
+	})
+	if err != nil {
+		log.Println("Failed to update telemetry preferences:", err)
 	}
 	return err
 }

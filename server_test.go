@@ -3,6 +3,7 @@ package main
 import (
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -81,6 +82,18 @@ func TestCreateServerAndMountHandlers(t *testing.T) {
 	server.Router.ServeHTTP(rec, req)
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("POST /api/login status = %d, want %d", rec.Code, http.StatusBadRequest)
+	}
+}
+
+func TestAllowedCORSOriginsRejectsWildcards(t *testing.T) {
+	t.Setenv("MISTY_ALLOWED_ORIGINS", "https://app.misty.example, https://*, http://evil.example/*")
+	origins := allowedCORSOrigins()
+	joined := strings.Join(origins, ",")
+	if !strings.Contains(joined, "https://app.misty.example") {
+		t.Fatalf("configured exact origin missing: %v", origins)
+	}
+	if strings.Contains(joined, "*") {
+		t.Fatalf("wildcard origin was accepted: %v", origins)
 	}
 }
 

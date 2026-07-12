@@ -68,6 +68,7 @@ func (p *ADKGeminiProvider) Next(request ModelRequest) (ModelResponse, error) {
 	var candidates []string
 	var partialText strings.Builder
 	var allText strings.Builder
+	var usage ModelUsage
 	for event, err := range r.Run(context.Background(), request.UserID, request.SessionID, content, agent.RunConfig{StreamingMode: agent.StreamingModeNone}) {
 		if err != nil {
 			return ModelResponse{}, err
@@ -77,6 +78,14 @@ func (p *ADKGeminiProvider) Next(request ModelRequest) (ModelResponse, error) {
 		}
 		if event.ErrorMessage != "" {
 			return ModelResponse{}, fmt.Errorf("gemini ADK request failed: %s", event.ErrorMessage)
+		}
+		if metadata := event.UsageMetadata; metadata != nil {
+			usage = ModelUsage{
+				InputTokens:       int64(metadata.PromptTokenCount),
+				CachedInputTokens: int64(metadata.CachedContentTokenCount),
+				OutputTokens:      int64(metadata.CandidatesTokenCount + metadata.ThoughtsTokenCount),
+				ReasoningTokens:   int64(metadata.ThoughtsTokenCount),
+			}
 		}
 		if text := eventText(event.Content); strings.TrimSpace(text) != "" {
 			allText.WriteString(text)
@@ -100,7 +109,12 @@ func (p *ADKGeminiProvider) Next(request ModelRequest) (ModelResponse, error) {
 	if len(candidates) == 0 {
 		return ModelResponse{}, fmt.Errorf("gemini ADK response did not contain text")
 	}
-	return parseFirstProviderJSONResponse(candidates)
+	response, err := parseFirstProviderJSONResponse(candidates)
+	if err != nil {
+		return ModelResponse{}, err
+	}
+	response.Usage = usage
+	return response, nil
 }
 
 func (p *ADKGeminiProvider) ensureRunner(ctx context.Context) (*runner.Runner, error) {
@@ -116,7 +130,7 @@ func (p *ADKGeminiProvider) newRunner(ctx context.Context) (*runner.Runner, erro
 		return nil, err
 	}
 	temperature := float32(0.2)
-	maxOutputTokens := int32(8192)
+	maxOutputTokens := int32(MaxModelOutputTokens)
 	rootAgent, err := llmagent.New(llmagent.Config{
 		Name:            "misty_file_agent",
 		Description:     "Plans safe local file organization operations for Misty Desktop.",

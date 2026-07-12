@@ -62,7 +62,7 @@ func TestPublicAccountResponsesHideLicenseID(t *testing.T) {
 	}
 }
 
-func TestGetMeExposesProUpgradeDiscountEligibility(t *testing.T) {
+func TestGetMeExposesBillingKindAndLifetimeFallback(t *testing.T) {
 	database := openIntegrationDatabase(t)
 
 	registerRec := performJSONRequest(t, api.Register(database), http.MethodPost, "/register", map[string]string{
@@ -88,8 +88,9 @@ func TestGetMeExposesProUpgradeDiscountEligibility(t *testing.T) {
 		t.Fatalf("/me status = %d, want %d, body = %q", meRec.Code, http.StatusOK, meRec.Body.String())
 	}
 	meBody := decodeJSONResponse(t, meRec)
-	if eligible, _ := meBody["pro_upgrade_discount_eligible"].(bool); eligible {
-		t.Fatalf("expected new basic user to be ineligible for pro upgrade discount: %#v", meBody)
+	billingBody, _ := meBody["billing"].(map[string]any)
+	if billingBody["kind"] != "free" {
+		t.Fatalf("expected new basic user to have free billing kind: %#v", meBody)
 	}
 
 	loginBody := decodeJSONResponse(t, loginRec)
@@ -102,8 +103,12 @@ func TestGetMeExposesProUpgradeDiscountEligibility(t *testing.T) {
 	if err != nil || user == nil {
 		t.Fatalf("GetUserByID() error = %v, user = %#v", err, user)
 	}
-	if err := database.SetLicenseStateByID(user.LicenseID, db.TierPersonal, db.LicenseStatusActive, nil); err != nil {
+	if err := database.SetLicenseStateByID(user.LicenseID, db.TierPro, db.LicenseStatusActive, nil); err != nil {
 		t.Fatalf("SetLicenseStateByID() error = %v", err)
+	}
+	legacyTier := db.TierPro
+	if err := database.SetLegacyTierByID(user.LicenseID, &legacyTier); err != nil {
+		t.Fatal(err)
 	}
 	if err := database.UpsertStripePurchase(&db.StripePurchase{
 		UserID:                  user.ID,
@@ -123,8 +128,9 @@ func TestGetMeExposesProUpgradeDiscountEligibility(t *testing.T) {
 		t.Fatalf("/me upgraded status = %d, want %d, body = %q", upgradedMeRec.Code, http.StatusOK, upgradedMeRec.Body.String())
 	}
 	upgradedMeBody := decodeJSONResponse(t, upgradedMeRec)
-	if eligible, _ := upgradedMeBody["pro_upgrade_discount_eligible"].(bool); !eligible {
-		t.Fatalf("expected purchased personal user to be eligible for pro upgrade discount: %#v", upgradedMeBody)
+	upgradedBilling, _ := upgradedMeBody["billing"].(map[string]any)
+	if upgradedBilling["kind"] != "lifetime" || upgradedMeBody["tier"] != "pro" {
+		t.Fatalf("expected grandfathered user to expose lifetime Pro billing: %#v", upgradedMeBody)
 	}
 }
 

@@ -10,8 +10,10 @@ import (
 	"github.com/go-chi/cors"
 	serveragent "github.com/kannachi323/misty/server/agent"
 	"github.com/kannachi323/misty/server/api"
+	appbilling "github.com/kannachi323/misty/server/billing"
 	"github.com/kannachi323/misty/server/db"
 	"github.com/kannachi323/misty/server/email"
+	"github.com/kannachi323/misty/server/telemetry"
 )
 
 type Server struct {
@@ -22,6 +24,7 @@ type Server struct {
 	PasswordResetStartURL     string
 	PasswordResetRedirectURL  string
 	WaitlistNotificationEmail string
+	Telemetry                 telemetry.Client
 }
 
 func CreateServer() (*Server, error) {
@@ -37,11 +40,12 @@ func CreateServer() (*Server, error) {
 	s := &Server{
 		Router:                    chi.NewRouter(),
 		Database:                  &db.Database{},
-		AIAgent:                   serveragent.NewService(nil, serveragent.NewProviderFromEnv()),
 		PasswordResetStartURL:     passwordResetStartURL,
 		PasswordResetRedirectURL:  passwordResetRedirectURL,
 		WaitlistNotificationEmail: strings.TrimSpace(os.Getenv("WAITLIST_NOTIFY_EMAIL")),
+		Telemetry:                 telemetry.NewFromEnv(),
 	}
+	s.AIAgent = serveragent.NewService(nil, serveragent.NewMikaProviderFromEnv(), serveragent.WithUsageMeter(appbilling.NewCreditMeter(s.Database)))
 
 	emailSender, err := email.NewSenderFromEnv()
 	if err != nil {
@@ -54,13 +58,9 @@ func CreateServer() (*Server, error) {
 
 func (s *Server) MountHandlers() error {
 	s.Router.Use(cors.Handler(cors.Options{
-		AllowedOrigins: []string{
-			"https://*",
-			"http://*",
-			"tauri://localhost",
-		},
+		AllowedOrigins:   allowedCORSOrigins(),
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type"},
+		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-Misty-Platform", "X-Misty-Release-Channel", "X-Misty-Session-Id", "X-Misty-Analytics-Enabled"},
 		AllowCredentials: true,
 		MaxAge:           300,
 	}))
@@ -76,7 +76,7 @@ func (s *Server) MountHandlers() error {
 	}
 	aiService := api.NewAIService(s.Database, s.AIAgent)
 
-	registerHandler := api.Register(s.Database)
+	registerHandler := api.RegisterWithTelemetry(s.Database, s.Telemetry)
 	loginHandler := api.Login(s.Database)
 	logoutHandler := api.Logout(s.Database)
 	forgotPasswordHandler := passwordResetService.Forgot()
@@ -101,8 +101,12 @@ func (s *Server) MountHandlers() error {
 	s.Router.Put("/me/device", api.UpdateDevice(s.Database))
 	s.Router.Get("/me/settings", api.GetSettings(s.Database))
 	s.Router.Put("/me/settings", api.UpdateSettings(s.Database))
+	s.Router.Put("/me/telemetry", api.UpdateTelemetryPreferences(s.Database))
 	s.Router.Post("/billing/trial/start", api.StartPersonalTrial(s.Database))
 	s.Router.Post("/billing/checkout-session", api.CreateCheckoutSession(s.Database))
+	s.Router.Post("/billing/credit-checkout-session", api.CreateCreditCheckoutSession(s.Database))
+	s.Router.Post("/billing/portal-session", api.CreatePortalSession(s.Database))
+	s.Router.Get("/billing/usage", api.GetBillingUsage(s.Database))
 	s.mountAIRoutes("/ai", aiService)
 
 	// Compatibility routes for clients configured with the /api prefix.
@@ -119,18 +123,40 @@ func (s *Server) MountHandlers() error {
 	s.Router.Put("/api/me/device", api.UpdateDevice(s.Database))
 	s.Router.Get("/api/me/settings", api.GetSettings(s.Database))
 	s.Router.Put("/api/me/settings", api.UpdateSettings(s.Database))
+	s.Router.Put("/api/me/telemetry", api.UpdateTelemetryPreferences(s.Database))
 	s.Router.Post("/api/billing/trial/start", api.StartPersonalTrial(s.Database))
 	s.Router.Post("/api/billing/checkout-session", api.CreateCheckoutSession(s.Database))
+	s.Router.Post("/api/billing/credit-checkout-session", api.CreateCreditCheckoutSession(s.Database))
+	s.Router.Post("/api/billing/portal-session", api.CreatePortalSession(s.Database))
+	s.Router.Get("/api/billing/usage", api.GetBillingUsage(s.Database))
 	s.mountAIRoutes("/api/ai", aiService)
 
 	// Stripe webhook — called by Stripe on payment events
-	s.Router.Post("/stripe/webhook", api.StripeWebhook(s.Database))
+	s.Router.Post("/stripe/webhook", api.StripeWebhookWithService(os.Getenv("STRIPE_WEBHOOK_SECRET"), appbilling.NewStripeService(s.Database, appbilling.WithTelemetry(s.Telemetry))))
 
 	return nil
 }
 
+func allowedCORSOrigins() []string {
+	origins := []string{
+		"tauri://localhost",
+		"http://tauri.localhost",
+		"https://tauri.localhost",
+		"http://localhost:5173",
+		"http://127.0.0.1:5173",
+	}
+	for _, origin := range strings.Split(os.Getenv("MISTY_ALLOWED_ORIGINS"), ",") {
+		origin = strings.TrimSpace(origin)
+		if origin != "" && !strings.Contains(origin, "*") {
+			origins = append(origins, origin)
+		}
+	}
+	return origins
+}
+
 func (s *Server) mountAIRoutes(prefix string, aiService *api.AIService) {
 	s.Router.Get(prefix+"/status", aiService.Status())
+	s.Router.Post(prefix+"/complete", aiService.Complete())
 	s.Router.Post(prefix+"/sessions", aiService.CreateSession())
 	s.Router.Post(prefix+"/sessions/{sessionID}/messages", aiService.SendMessage())
 	s.Router.Get(prefix+"/sessions/{sessionID}/events", aiService.Events())

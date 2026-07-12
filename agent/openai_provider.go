@@ -2,6 +2,7 @@ package agent
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -10,17 +11,19 @@ import (
 )
 
 type OpenAIProviderConfig struct {
-	APIKey  string
-	BaseURL string
-	Model   string
-	Client  *http.Client
+	APIKey       string
+	BaseURL      string
+	Model        string
+	ProviderName string
+	Client       *http.Client
 }
 
 type OpenAIProvider struct {
-	apiKey  string
-	baseURL string
-	model   string
-	client  *http.Client
+	apiKey       string
+	baseURL      string
+	model        string
+	providerName string
+	client       *http.Client
 }
 
 func NewOpenAIProvider(config OpenAIProviderConfig) *OpenAIProvider {
@@ -35,16 +38,22 @@ func NewOpenAIProvider(config OpenAIProviderConfig) *OpenAIProvider {
 	client := config.Client
 	if client == nil {
 		client = defaultHTTPClient()
+	} else {
+		client = noRedirectHTTPClient(client)
 	}
 	return &OpenAIProvider{
-		apiKey:  strings.TrimSpace(config.APIKey),
-		baseURL: baseURL,
-		model:   model,
-		client:  client,
+		apiKey:       strings.TrimSpace(config.APIKey),
+		baseURL:      baseURL,
+		model:        model,
+		providerName: strings.TrimSpace(config.ProviderName),
+		client:       client,
 	}
 }
 
 func (p *OpenAIProvider) ProviderName() string {
+	if p.providerName != "" {
+		return p.providerName
+	}
 	return ProviderOpenAI
 }
 
@@ -53,8 +62,12 @@ func (p *OpenAIProvider) ModelName() string {
 }
 
 func (p *OpenAIProvider) Next(request ModelRequest) (ModelResponse, error) {
+	return p.NextContext(context.Background(), request)
+}
+
+func (p *OpenAIProvider) NextContext(ctx context.Context, request ModelRequest) (ModelResponse, error) {
 	if p.apiKey == "" {
-		return ModelResponse{}, fmt.Errorf("OPENAI_API_KEY is required")
+		return ModelResponse{}, fmt.Errorf("%s API key is required", p.ProviderName())
 	}
 	body := map[string]any{
 		"model": p.model,
@@ -82,13 +95,13 @@ func (p *OpenAIProvider) Next(request ModelRequest) (ModelResponse, error) {
 				"schema": agentResponseJSONSchema(),
 			},
 		},
-		"max_output_tokens": 2200,
+		"max_output_tokens": MaxModelOutputTokens,
 	}
 	payload, err := json.Marshal(body)
 	if err != nil {
 		return ModelResponse{}, err
 	}
-	httpRequest, err := http.NewRequest(http.MethodPost, p.baseURL+"/responses", bytes.NewReader(payload))
+	httpRequest, err := http.NewRequestWithContext(ctx, http.MethodPost, p.baseURL+"/responses", bytes.NewReader(payload))
 	if err != nil {
 		return ModelResponse{}, err
 	}
@@ -101,19 +114,44 @@ func (p *OpenAIProvider) Next(request ModelRequest) (ModelResponse, error) {
 	defer httpResponse.Body.Close()
 	responseBody, _ := io.ReadAll(io.LimitReader(httpResponse.Body, 4<<20))
 	if httpResponse.StatusCode < 200 || httpResponse.StatusCode >= 300 {
-		return ModelResponse{}, fmt.Errorf("openai request failed: status %d: %s", httpResponse.StatusCode, strings.TrimSpace(string(responseBody)))
+		return ModelResponse{}, fmt.Errorf("%s request failed: status %d: %s", p.ProviderName(), httpResponse.StatusCode, strings.TrimSpace(string(responseBody)))
 	}
 	text, err := extractOpenAIText(responseBody)
 	if err != nil {
 		return ModelResponse{}, err
 	}
-	return parseProviderJSONResponse(text)
+	response, err := parseProviderJSONResponse(text)
+	if err != nil {
+		return ModelResponse{}, err
+	}
+	response.Usage = extractOpenAIUsage(responseBody)
+	return response, nil
+}
+
+func extractOpenAIUsage(body []byte) ModelUsage {
+	var payload struct {
+		Usage struct {
+			InputTokens  int64 `json:"input_tokens"`
+			OutputTokens int64 `json:"output_tokens"`
+			InputDetails struct {
+				CachedTokens int64 `json:"cached_tokens"`
+			} `json:"input_tokens_details"`
+			OutputDetails struct {
+				ReasoningTokens int64 `json:"reasoning_tokens"`
+			} `json:"output_tokens_details"`
+		} `json:"usage"`
+	}
+	if json.Unmarshal(body, &payload) != nil {
+		return ModelUsage{}
+	}
+	return ModelUsage{InputTokens: payload.Usage.InputTokens, CachedInputTokens: payload.Usage.InputDetails.CachedTokens,
+		OutputTokens: payload.Usage.OutputTokens, ReasoningTokens: payload.Usage.OutputDetails.ReasoningTokens}
 }
 
 func extractOpenAIText(body []byte) (string, error) {
 	var payload map[string]any
 	if err := json.Unmarshal(body, &payload); err != nil {
-		return "", fmt.Errorf("openai returned invalid JSON: %w", err)
+		return "", fmt.Errorf("AI provider returned invalid JSON: %w", err)
 	}
 	if text, ok := payload["output_text"].(string); ok && strings.TrimSpace(text) != "" {
 		return text, nil
@@ -124,7 +162,7 @@ func extractOpenAIText(body []byte) (string, error) {
 	if text := findTypedText(payload, "text"); text != "" {
 		return text, nil
 	}
-	return "", fmt.Errorf("openai response did not contain output text")
+	return "", fmt.Errorf("AI provider response did not contain output text")
 }
 
 func findTypedText(value any, textKey string) string {

@@ -44,8 +44,11 @@ func TestUserSettingsDefaultAndUpdate(t *testing.T) {
 	if settings.EmailUpdatesEnabled {
 		t.Fatal("EmailUpdatesEnabled = true, want false")
 	}
+	if settings.AnalyticsEnabled || settings.ErrorReportingEnabled {
+		t.Fatalf("telemetry defaults = %#v, want disabled", settings)
+	}
 
-	if err := database.UpdateUserSettings(user.ID, UserSettings{EmailUpdatesEnabled: true}); err != nil {
+	if err := database.UpdateUserSettings(user.ID, UserSettings{EmailUpdatesEnabled: true, AnalyticsEnabled: true, ErrorReportingEnabled: true}); err != nil {
 		t.Fatalf("UpdateUserSettings() error = %v", err)
 	}
 
@@ -53,7 +56,7 @@ func TestUserSettingsDefaultAndUpdate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetUserSettingsByID() after update error = %v", err)
 	}
-	if settings == nil || !settings.EmailUpdatesEnabled {
-		t.Fatalf("settings after update = %#v, want email updates enabled", settings)
+	if settings == nil || !settings.EmailUpdatesEnabled || !settings.AnalyticsEnabled || !settings.ErrorReportingEnabled {
+		t.Fatalf("settings after update = %#v, want all preferences enabled", settings)
 	}
 }

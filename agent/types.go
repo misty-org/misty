@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"context"
 	"encoding/json"
 	"time"
 )
@@ -26,6 +27,16 @@ const (
 	RiskDangerous = "dangerous"
 )
 
+const MaxModelOutputTokens int64 = 2200
+
+const (
+	MaxUserMessageBytes      = 32 << 10
+	MaxToolResultsPerRequest = 8
+	MaxToolResultBytes       = 512 << 10
+	MaxProviderRequestBytes  = 768 << 10
+	MaxProviderCallsPerTurn  = 3
+)
+
 type AgentMessageRequest struct {
 	Mode          string       `json:"mode"`
 	UserMessage   string       `json:"user_message"`
@@ -44,13 +55,15 @@ type ToolDefinition struct {
 }
 
 type AgentEvent struct {
-	Sequence     int64              `json:"sequence"`
-	Type         string             `json:"type"`
-	Text         string             `json:"text,omitempty"`
-	ToolRequests []ToolRequest      `json:"tool_requests,omitempty"`
-	FilePlan     *FileOperationPlan `json:"file_plan,omitempty"`
-	Message      string             `json:"message,omitempty"`
-	CreatedAt    time.Time          `json:"created_at"`
+	Sequence         int64              `json:"sequence"`
+	Type             string             `json:"type"`
+	Text             string             `json:"text,omitempty"`
+	ToolRequests     []ToolRequest      `json:"tool_requests,omitempty"`
+	FilePlan         *FileOperationPlan `json:"file_plan,omitempty"`
+	Message          string             `json:"message,omitempty"`
+	CreatedAt        time.Time          `json:"created_at"`
+	CreditsUsed      int64              `json:"credits_used,omitempty"`
+	CreditsRemaining int64              `json:"credits_remaining,omitempty"`
 }
 
 type ToolRequest struct {
@@ -93,6 +106,7 @@ type Message struct {
 type ModelRequest struct {
 	SessionID    string
 	UserID       string
+	MikaTier     MikaTier
 	Mode         string
 	ActiveRoot   string
 	Messages     []Message
@@ -105,10 +119,49 @@ type ModelResponse struct {
 	Text         string
 	ToolRequests []ToolRequest
 	FilePlan     *FileOperationPlan
+	Usage        ModelUsage
 }
+
+type ModelUsage struct {
+	InputTokens       int64 `json:"input_tokens"`
+	CachedInputTokens int64 `json:"cached_input_tokens"`
+	OutputTokens      int64 `json:"output_tokens"`
+	ReasoningTokens   int64 `json:"reasoning_tokens"`
+	Estimated         bool  `json:"estimated"`
+}
+
+type UsageReservation struct {
+	ID              string
+	ReservedCredits int64
+}
+
+type UsageSettlement struct {
+	CreditsUsed      int64
+	CreditsRemaining int64
+}
+
+type UsageMeter interface {
+	Reserve(userID, idempotencyKey, meter, provider, model string, estimatedInputTokens, maxOutputTokens int64) (*UsageReservation, error)
+	Settle(reservation *UsageReservation, idempotencyKey, meter, provider, model string, usage ModelUsage) (UsageSettlement, error)
+	Release(reservation *UsageReservation) error
+}
+
+type CreditsExhaustedError struct {
+	Required  int64
+	Available int64
+	ResetAt   time.Time
+}
+
+func (e CreditsExhaustedError) Error() string { return "managed AI credits exhausted" }
 
 type ModelProvider interface {
 	Next(request ModelRequest) (ModelResponse, error)
+}
+
+// ContextModelProvider is implemented by production providers so an in-flight
+// request can be canceled. ModelProvider remains for local/test compatibility.
+type ContextModelProvider interface {
+	NextContext(ctx context.Context, request ModelRequest) (ModelResponse, error)
 }
 
 type ProviderInfo interface {

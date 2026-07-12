@@ -1,12 +1,14 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/kannachi323/misty/server/agent"
@@ -18,22 +20,29 @@ const maxAIJSONBodyBytes = 2 << 20
 type AIService struct {
 	database *db.Database
 	runtime  *agent.Service
+	guard    *AIRequestGuard
 }
 
 func NewAIService(database *db.Database, runtime *agent.Service) *AIService {
-	return &AIService{database: database, runtime: runtime}
+	return &AIService{database: database, runtime: runtime, guard: NewAIRequestGuard()}
 }
 
 func (s *AIService) Status() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if _, ok := s.requireUser(w, r); !ok {
+		userID, ok := s.requireUser(w, r)
+		if !ok {
 			return
 		}
-		provider, model := s.runtime.ProviderStatus()
+		tier, err := s.mikaTierForUser(userID)
+		if err != nil {
+			http.Error(w, "internal error", http.StatusInternalServerError)
+			return
+		}
 		writeJSON(w, http.StatusOK, map[string]any{
-			"configured": true,
-			"provider":   provider,
-			"model":      model,
+			"configured": s.runtime.MikaConfigured(tier),
+			"provider":   "misty",
+			"model":      string(tier),
+			"model_name": tier.DisplayName(),
 			"running":    false,
 			"session_id": nil,
 			"error":      nil,
@@ -47,10 +56,46 @@ func (s *AIService) CreateSession() http.HandlerFunc {
 		if !ok {
 			return
 		}
+		if allowed, retryAfter := s.guard.AllowSession(userID); !allowed {
+			writeAIRateLimit(w, retryAfter)
+			return
+		}
 		session := s.runtime.CreateSession(userID)
 		writeJSON(w, http.StatusCreated, map[string]any{
 			"session_id": session.ID,
 		})
+	}
+}
+
+func (s *AIService) Complete() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userID, ok := s.requireUser(w, r)
+		if !ok {
+			return
+		}
+		var body struct {
+			Prompt string `json:"prompt"`
+		}
+		if err := decodeAIJSON(w, r, &body); err != nil {
+			http.Error(w, "invalid request", http.StatusBadRequest)
+			return
+		}
+		release, ok := s.acquireProviderCall(w, userID)
+		if !ok {
+			return
+		}
+		defer release()
+		tier, err := s.mikaTierForUser(userID)
+		if err != nil {
+			http.Error(w, "internal error", http.StatusInternalServerError)
+			return
+		}
+		text, usage, err := s.runtime.CompleteWithTierContext(r.Context(), userID, body.Prompt, db.CreditMeterAutomationAI, tier)
+		if err != nil {
+			writeAIError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"text": text, "model": string(tier), "credits_used": usage.CreditsUsed, "credits_remaining": usage.CreditsRemaining})
 	}
 }
 
@@ -66,7 +111,17 @@ func (s *AIService) SendMessage() http.HandlerFunc {
 			http.Error(w, "invalid request", http.StatusBadRequest)
 			return
 		}
-		if err := s.runtime.SendMessage(sessionID, userID, body); err != nil {
+		release, ok := s.acquireProviderCall(w, userID)
+		if !ok {
+			return
+		}
+		defer release()
+		tier, err := s.mikaTierForUser(userID)
+		if err != nil {
+			http.Error(w, "internal error", http.StatusInternalServerError)
+			return
+		}
+		if err := s.runtime.SendMessageWithTierContext(r.Context(), sessionID, userID, body, tier); err != nil {
 			writeAIError(w, err)
 			return
 		}
@@ -105,11 +160,61 @@ func (s *AIService) SubmitToolResults() http.HandlerFunc {
 			http.Error(w, "invalid request", http.StatusBadRequest)
 			return
 		}
-		if err := s.runtime.SubmitToolResults(sessionID, userID, body.Results); err != nil {
+		release, ok := s.acquireProviderCall(w, userID)
+		if !ok {
+			return
+		}
+		defer release()
+		tier, err := s.mikaTierForUser(userID)
+		if err != nil {
+			http.Error(w, "internal error", http.StatusInternalServerError)
+			return
+		}
+		if err := s.runtime.SubmitToolResultsWithTierContext(r.Context(), sessionID, userID, body.Results, tier); err != nil {
 			writeAIError(w, err)
 			return
 		}
 		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+	}
+}
+
+func (s *AIService) acquireProviderCall(w http.ResponseWriter, userID string) (func(), bool) {
+	release, retryAfter, allowed := s.guard.AcquireProviderCall(userID)
+	if !allowed {
+		writeAIRateLimit(w, retryAfter)
+		return nil, false
+	}
+	return release, true
+}
+
+func writeAIRateLimit(w http.ResponseWriter, retryAfter time.Duration) {
+	seconds := retryAfterSeconds(retryAfter)
+	w.Header().Set("Retry-After", strconv.Itoa(seconds))
+	writeJSON(w, http.StatusTooManyRequests, map[string]any{
+		"code": "rate_limited", "message": "Mika request limit reached. Try again later.",
+		"retry_after_seconds": seconds,
+	})
+}
+
+func (s *AIService) mikaTierForUser(userID string) (agent.MikaTier, error) {
+	license, err := s.database.GetLicenseByUserID(userID)
+	if err != nil {
+		return agent.MikaLow, err
+	}
+	if license == nil {
+		return agent.MikaLow, nil
+	}
+	return mikaTierForLicenseTier(license.Tier), nil
+}
+
+func mikaTierForLicenseTier(tier db.Tier) agent.MikaTier {
+	switch tier {
+	case db.TierMax:
+		return agent.MikaHigh
+	case db.TierPro:
+		return agent.MikaMed
+	default:
+		return agent.MikaLow
 	}
 }
 
@@ -155,7 +260,16 @@ func decodeAIJSON(w http.ResponseWriter, r *http.Request, dst any) error {
 }
 
 func writeAIError(w http.ResponseWriter, err error) {
+	var exhausted agent.CreditsExhaustedError
 	switch {
+	case errors.Is(err, context.Canceled):
+		writeJSON(w, 499, map[string]any{"code": "request_canceled", "message": "Mika request canceled."})
+	case errors.As(err, &exhausted):
+		writeJSON(w, http.StatusPaymentRequired, map[string]any{
+			"code": "credits_exhausted", "required_credits": exhausted.Required,
+			"available_credits": exhausted.Available, "reset_at": exhausted.ResetAt,
+			"top_up_available": true,
+		})
 	case errors.Is(err, agent.ErrSessionNotFound):
 		http.Error(w, "session not found", http.StatusNotFound)
 	case isAIInvalidRequest(err):

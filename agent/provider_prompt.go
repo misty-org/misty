@@ -26,7 +26,7 @@ func buildAgentPrompt(request ModelRequest) string {
 		"known_paths":   request.KnownPaths,
 		"allowed_ops":   []string{"mkdir", "move", "rename"},
 		"blocked_ops":   []string{"delete", "overwrite", "shell", "outside_root"},
-		"response_rule": "Return one JSON object that matches the required schema. Do not include markdown.",
+		"response_rule": "Return one JSON object that matches the required schema. Do not include markdown. When no file plan is ready, return file_plan with empty summary/completion_summary strings and empty operations/warnings arrays.",
 	}
 	encoded, _ := json.MarshalIndent(payload, "", "  ")
 	return fmt.Sprintf(`You are MistyAI, the private assistant inside Misty, a desktop file manager.
@@ -35,6 +35,7 @@ The Go server owns model calls, but it cannot touch local files. The desktop app
 
 If you need context, request tools from the provided capabilities. Use tool_requests for reads such as list_directory, search_files, and preview_file.
 If enough context is available, propose a file_plan. File plans may only use mkdir, move, and rename. Never delete, overwrite, use shell commands, use absolute paths, use path traversal, or move outside active_root.
+When no file plan is ready, return file_plan as an object with empty summary and completion_summary strings and empty operations and warnings arrays.
 
 For file organization, prefer a short inspection step first when no tool_results exist. Keep text concise and put actionable filesystem changes only in file_plan. In file_plan.summary, write a user-facing future-tense summary of what will happen before Apply. In file_plan.completion_summary, write a past-tense summary that can be shown after Misty applies the plan.
 For every operation, include all operation fields. Use an empty string for unused path/from/to fields. Use paths exactly as shown by list_directory/search_files tool results, relative to active_root. Keep a file_plan to 30 operations or fewer; if more work remains, add a warning.
@@ -77,6 +78,9 @@ func parseProviderJSONResponse(raw string) (ModelResponse, error) {
 		response.FilePlan.CompletionSummary = strings.TrimSpace(response.FilePlan.CompletionSummary)
 		if response.FilePlan.Warnings == nil {
 			response.FilePlan.Warnings = []string{}
+		}
+		if len(response.FilePlan.Operations) == 0 {
+			response.FilePlan = nil
 		}
 	}
 	return response, nil
@@ -236,7 +240,7 @@ func agentResponseJSONSchema() map[string]any {
 		"required": []string{"type", "path", "from", "to", "reason", "confidence"},
 	}
 	filePlanSchema := map[string]any{
-		"type":                 []string{"object", "null"},
+		"type":                 "object",
 		"additionalProperties": false,
 		"properties": map[string]any{
 			"summary":            map[string]any{"type": "string"},

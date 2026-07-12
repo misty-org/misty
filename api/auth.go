@@ -6,10 +6,15 @@ import (
 
 	"github.com/kannachi323/misty/server/db"
 	"github.com/kannachi323/misty/server/security"
+	"github.com/kannachi323/misty/server/telemetry"
 	"golang.org/x/crypto/bcrypt"
 )
 
 func Register(database *db.Database) http.HandlerFunc {
+	return RegisterWithTelemetry(database, telemetry.NoopClient{})
+}
+
+func RegisterWithTelemetry(database *db.Database, analytics telemetry.Client) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var body struct {
 			Name     string `json:"name"`
@@ -40,6 +45,11 @@ func Register(database *db.Database) http.HandlerFunc {
 		if err != nil {
 			http.Error(w, "failed to create user", http.StatusInternalServerError)
 			return
+		}
+		if strings.EqualFold(strings.TrimSpace(r.Header.Get("X-Misty-Analytics-Enabled")), "true") {
+			if err := database.UpdateTelemetryPreferences(user.ID, true, false); err == nil {
+				analytics.UserRegistered(user.ID, r.Header.Get("X-Misty-Platform"), r.Header.Get("X-Misty-Release-Channel"))
+			}
 		}
 
 		writeAuthSession(w, r, database, user, http.StatusCreated)
@@ -73,34 +83,6 @@ func Login(database *db.Database) http.HandlerFunc {
 		}
 
 		writeAuthSession(w, r, database, user, http.StatusOK)
-		token, err := security.GenerateSecureToken()
-		if err != nil {
-			http.Error(w, "internal error", http.StatusInternalServerError)
-			return
-		}
-		tokenHash := security.HashToken(token)
-		if err := database.CreateSession(tokenHash, user.ID); err != nil {
-			http.Error(w, "internal error", http.StatusInternalServerError)
-			return
-		}
-
-		secure := isSecureRequest(r)
-		http.SetCookie(w, &http.Cookie{
-			Name:     sessionCookieName,
-			Value:    token,
-			Path:     "/",
-			HttpOnly: true,
-			Secure:   secure,
-			SameSite: sessionCookieSameSite(r, secure),
-			MaxAge:   int(db.SessionTTL.Seconds()),
-		})
-
-		writeJSON(w, http.StatusOK, map[string]string{
-			"user_id": user.ID,
-			"name":    user.Name,
-			"email":   user.Email,
-			"token":   token,
-		})
 	}
 }
 

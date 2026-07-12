@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"context"
 	"errors"
 	"sync"
 	"time"
@@ -14,23 +15,35 @@ type SessionStore struct {
 	mu       sync.Mutex
 	now      func() time.Time
 	ttl      time.Duration
-	sessions map[string]*Session
+	sessions map[string]*sessionEntry
+}
+
+type sessionEntry struct {
+	mu       sync.Mutex
+	cancelMu sync.Mutex
+	cancel   context.CancelFunc
+	userID   string
+	session  *Session
+	active   int
 }
 
 type Session struct {
-	ID           string
-	UserID       string
-	Mode         string
-	ActiveRoot   string
-	Capabilities ToolManifest
-	Messages     []Message
-	ToolResults  []ToolResult
-	KnownPaths   map[string]struct{}
-	Events       []AgentEvent
-	nextSequence int64
-	CreatedAt    time.Time
-	UpdatedAt    time.Time
-	Canceled     bool
+	ID                    string
+	UserID                string
+	MikaTier              MikaTier
+	Mode                  string
+	ActiveRoot            string
+	Capabilities          ToolManifest
+	Messages              []Message
+	ToolResults           []ToolResult
+	KnownPaths            map[string]struct{}
+	Events                []AgentEvent
+	nextSequence          int64
+	CreatedAt             time.Time
+	UpdatedAt             time.Time
+	Canceled              bool
+	ProviderCallsThisTurn int
+	PendingToolRequests   map[string]string
 }
 
 func NewSessionStore(ttl time.Duration) *SessionStore {
@@ -40,7 +53,7 @@ func NewSessionStore(ttl time.Duration) *SessionStore {
 	return &SessionStore{
 		now:      time.Now,
 		ttl:      ttl,
-		sessions: make(map[string]*Session),
+		sessions: make(map[string]*sessionEntry),
 	}
 }
 
@@ -50,38 +63,75 @@ func (s *SessionStore) Create(userID string) *Session {
 	s.cleanupLocked()
 	now := s.now()
 	session := &Session{
-		ID:         uuid.NewString(),
-		UserID:     userID,
-		Mode:       ModeAsk,
-		KnownPaths: make(map[string]struct{}),
-		CreatedAt:  now,
-		UpdatedAt:  now,
+		ID:                  uuid.NewString(),
+		UserID:              userID,
+		MikaTier:            MikaLow,
+		Mode:                ModeAsk,
+		KnownPaths:          make(map[string]struct{}),
+		PendingToolRequests: make(map[string]string),
+		CreatedAt:           now,
+		UpdatedAt:           now,
 	}
-	s.sessions[session.ID] = session
+	s.sessions[session.ID] = &sessionEntry{userID: userID, session: session}
 	return cloneSession(session)
 }
 
 func (s *SessionStore) WithSession(id, userID string, fn func(session *Session) error) error {
+	return s.WithSessionContext(context.Background(), id, userID, func(_ context.Context, session *Session) error {
+		return fn(session)
+	})
+}
+
+func (s *SessionStore) WithSessionContext(ctx context.Context, id, userID string, fn func(context.Context, *Session) error) error {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	s.cleanupLocked()
-	session := s.sessions[id]
-	if session == nil || session.UserID != userID {
+	entry := s.sessions[id]
+	if entry != nil {
+		entry.active++
+	}
+	s.mu.Unlock()
+	if entry == nil {
 		return ErrSessionNotFound
 	}
-	if err := fn(session); err != nil {
+	defer s.releaseEntry(entry)
+	entry.mu.Lock()
+	defer entry.mu.Unlock()
+	if entry.session.UserID != userID {
+		return ErrSessionNotFound
+	}
+	requestCtx, cancel := context.WithCancel(ctx)
+	entry.cancelMu.Lock()
+	entry.cancel = cancel
+	entry.cancelMu.Unlock()
+	defer func() {
+		entry.cancelMu.Lock()
+		entry.cancel = nil
+		entry.cancelMu.Unlock()
+		cancel()
+	}()
+	if err := fn(requestCtx, entry.session); err != nil {
 		return err
 	}
-	session.UpdatedAt = s.now()
+	entry.session.UpdatedAt = s.now()
 	return nil
 }
 
 func (s *SessionStore) Events(id, userID string, after int64) ([]AgentEvent, error) {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	s.cleanupLocked()
-	session := s.sessions[id]
-	if session == nil || session.UserID != userID {
+	entry := s.sessions[id]
+	if entry != nil {
+		entry.active++
+	}
+	s.mu.Unlock()
+	if entry == nil {
+		return nil, ErrSessionNotFound
+	}
+	defer s.releaseEntry(entry)
+	entry.mu.Lock()
+	defer entry.mu.Unlock()
+	session := entry.session
+	if session.UserID != userID {
 		return nil, ErrSessionNotFound
 	}
 	events := make([]AgentEvent, 0, len(session.Events))
@@ -93,18 +143,58 @@ func (s *SessionStore) Events(id, userID string, after int64) ([]AgentEvent, err
 	return events, nil
 }
 
+func (s *SessionStore) releaseEntry(entry *sessionEntry) {
+	s.mu.Lock()
+	entry.active--
+	s.mu.Unlock()
+}
+
 func (s *SessionStore) Cancel(id, userID string) error {
-	return s.WithSession(id, userID, func(session *Session) error {
-		session.Canceled = true
-		session.appendEvent(AgentEvent{Type: EventError, Message: "session canceled"})
-		return nil
-	})
+	s.mu.Lock()
+	s.cleanupLocked()
+	entry := s.sessions[id]
+	if entry != nil {
+		entry.active++
+	}
+	s.mu.Unlock()
+	if entry == nil || entry.userID != userID {
+		if entry != nil {
+			s.releaseEntry(entry)
+		}
+		return ErrSessionNotFound
+	}
+	defer s.releaseEntry(entry)
+
+	entry.cancelMu.Lock()
+	if entry.cancel != nil {
+		entry.cancel()
+	}
+	entry.cancelMu.Unlock()
+
+	entry.mu.Lock()
+	defer entry.mu.Unlock()
+	if !entry.session.Canceled {
+		entry.session.Canceled = true
+		entry.session.appendEvent(AgentEvent{Type: EventError, Message: "session canceled"})
+	}
+	entry.session.UpdatedAt = s.now()
+	return nil
 }
 
 func (s *SessionStore) cleanupLocked() {
 	cutoff := s.now().Add(-s.ttl)
-	for id, session := range s.sessions {
-		if session.UpdatedAt.Before(cutoff) {
+	for id, entry := range s.sessions {
+		if entry.active > 0 {
+			continue
+		}
+		// An active provider call owns the entry lock. Skip it so cleanup never
+		// blocks unrelated session creation or lookups behind network latency.
+		if !entry.mu.TryLock() {
+			continue
+		}
+		expired := entry.session.UpdatedAt.Before(cutoff)
+		entry.mu.Unlock()
+		if expired {
 			delete(s.sessions, id)
 		}
 	}
@@ -125,6 +215,10 @@ func cloneSession(session *Session) *Session {
 	cloned.KnownPaths = make(map[string]struct{}, len(session.KnownPaths))
 	for path := range session.KnownPaths {
 		cloned.KnownPaths[path] = struct{}{}
+	}
+	cloned.PendingToolRequests = make(map[string]string, len(session.PendingToolRequests))
+	for id, name := range session.PendingToolRequests {
+		cloned.PendingToolRequests[id] = name
 	}
 	return &cloned
 }

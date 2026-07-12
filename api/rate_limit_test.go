@@ -59,12 +59,39 @@ func TestNormalizeRateLimitPath(t *testing.T) {
 		"/api":                   "/",
 		"":                       "/",
 		"   /api/auth/forgot   ": "/auth/forgot",
+		"/api/ai/sessions/secret-session/messages": "/ai/sessions/{sessionID}/messages",
+		"/ai/sessions/another-secret/tool-results": "/ai/sessions/{sessionID}/tool-results",
 	}
 
 	for input, want := range tests {
 		if got := normalizeRateLimitPath(input); got != want {
 			t.Fatalf("normalizeRateLimitPath(%q) = %q, want %q", input, got, want)
 		}
+	}
+}
+
+func TestAIRequestGuardLimitsConcurrencyAndRateWithoutQueueing(t *testing.T) {
+	guard := NewAIRequestGuard()
+	guard.now = func() time.Time { return time.Unix(0, 0) }
+	guard.perMinute = NewSlidingWindowLimiter(2, time.Minute)
+	guard.perHour = NewSlidingWindowLimiter(10, time.Hour)
+
+	release, _, allowed := guard.AcquireProviderCall("user")
+	if !allowed {
+		t.Fatal("first provider call should be allowed")
+	}
+	if _, _, allowed := guard.AcquireProviderCall("user"); allowed {
+		t.Fatal("concurrent provider call should be rejected, not queued")
+	}
+	release()
+
+	release, _, allowed = guard.AcquireProviderCall("user")
+	if !allowed {
+		t.Fatal("second sequential provider call should be allowed")
+	}
+	release()
+	if _, retryAfter, allowed := guard.AcquireProviderCall("user"); allowed || retryAfter <= 0 {
+		t.Fatalf("third provider call allowed=%v retryAfter=%v, want rate limit", allowed, retryAfter)
 	}
 }
 
@@ -94,5 +121,26 @@ func TestAPIRateLimiterMiddleware(t *testing.T) {
 	}
 	if secondRecorder.Header().Get("Retry-After") == "" {
 		t.Fatal("Retry-After header should be set on rate-limited responses")
+	}
+}
+
+func TestAPIRateLimiterSharesBudgetAcrossDynamicAISessionIDs(t *testing.T) {
+	limiter := NewAPIRateLimiter()
+	limiter.now = func() time.Time { return time.Unix(0, 0) }
+	limiter.routePolicies["POST /ai/sessions/{sessionID}/messages"] = RateLimitPolicy{Limit: 1, Window: time.Minute}
+	handler := limiter.Middleware(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) }))
+
+	for index, sessionID := range []string{"first", "second"} {
+		req := httptest.NewRequest(http.MethodPost, "/api/ai/sessions/"+sessionID+"/messages", nil)
+		req.RemoteAddr = "203.0.113.9:1234"
+		recorder := httptest.NewRecorder()
+		handler.ServeHTTP(recorder, req)
+		want := http.StatusOK
+		if index == 1 {
+			want = http.StatusTooManyRequests
+		}
+		if recorder.Code != want {
+			t.Fatalf("request %d status=%d, want %d", index, recorder.Code, want)
+		}
 	}
 }

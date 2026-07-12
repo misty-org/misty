@@ -1,9 +1,11 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/joho/godotenv"
 )
@@ -17,6 +19,11 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	defer func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+		server.Telemetry.Close(ctx)
+	}()
 	aiProvider, aiModel := server.AIAgent.ProviderStatus()
 	log.Printf("MistyAI provider: %s (%s)", aiProvider, aiModel)
 
