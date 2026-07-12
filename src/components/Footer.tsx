@@ -13,6 +13,7 @@ const columns = [
   {
     label: "Resources",
     links: [
+      { to: "/features", text: "Features" },
       { to: "/docs/introduction", text: "Getting Started" },
       { to: "/docs/providers-overview", text: "Cloud Providers" },
       { to: "/docs/backups-overview", text: "Backups" },
@@ -46,7 +47,7 @@ export default function Footer() {
             <span className="text-sm font-medium text-text-muted">Misty</span>
           </div>
           <p className="text-sm text-text-muted/60 max-w-xs">
-            Free public beta for local files, cloud storage, search, and transfers. Still early, and shaped with the community.
+            A unified desktop workspace for local files, cloud storage, search, and transfers.
           </p>
           <div className="flex items-center gap-4 mt-2">
             {socials.map(({ href, icon: Icon, label }) => (

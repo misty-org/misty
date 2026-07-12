@@ -24,6 +24,8 @@ interface PricingCardProps {
   ctaTo?: string;
   ctaHref?: string;
   ctaLabel?: string;
+  ctaBusy?: boolean;
+  onCtaClick?: () => void;
 }
 
 export default function PricingCard({
@@ -38,6 +40,8 @@ export default function PricingCard({
   ctaTo,
   ctaHref,
   ctaLabel,
+  ctaBusy = false,
+  onCtaClick,
 }: PricingCardProps) {
   return (
     <div className="h-full min-h-92 rounded-2xl border border-border bg-surface/50">
@@ -78,7 +82,16 @@ export default function PricingCard({
           ))}
         </ul>
 
-        {ctaHref ? (
+        {onCtaClick ? (
+          <button
+            type="button"
+            onClick={onCtaClick}
+            disabled={ctaBusy}
+            className="w-full text-center px-6 py-2.5 bg-white hover:bg-zinc-200 disabled:cursor-wait disabled:opacity-60 text-black font-medium rounded-xl transition-colors duration-300 shadow-lg cursor-pointer"
+          >
+            {ctaBusy ? "Opening checkout…" : ctaLabel}
+          </button>
+        ) : ctaHref ? (
           <a
             href={ctaHref}
             target="_blank"
