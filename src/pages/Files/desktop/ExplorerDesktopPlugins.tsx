@@ -3,14 +3,16 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { createPortal } from "react-dom";
 import type { CSSProperties } from "react";
 import { useNavigate } from "react-router-dom";
-import { openTerminalAtPath, pluginCommandRun, pluginPanelRender } from "../../../api/misty";
+import { extensionCommandRun, openTerminalAtPath, pluginCommandRun, pluginPanelRender } from "../../../api/misty";
 import type { PluginCommandEntry, PluginPanelElement, PluginPanelEntry, PluginPanelRenderResult, TransferRecord } from "../../../api/types";
 import { ExtensionCatalogIcon } from "../../../plugins/ExtensionCatalogIcon";
 import { publishPluginNotifications } from "../../../plugins/pluginNotifications";
 import { useMultiPanelStore } from "../../../shared/multipanel/useMultiPanelStore";
 import { useMinimumSpin } from "../../../shared/hooks/useMinimumSpin";
 import { errorText } from "../../../shared/format";
-import { applyMistyThemeFromExtensionAction } from "../../../stores/useAppThemeStore";
+import { applyMistyThemeFromExtensionAction, themeBaseMode, useAppThemeStore } from "../../../stores/useAppThemeStore";
+import type { MistyCustomThemeTokens, MistyThemeId } from "../../../stores/useAppThemeStore";
+import { safeTauriAssetUrl } from "../../../shared/tauri";
 import { useExplorerStore } from "../../../stores/useExplorerStore";
 import { useTransfersStore } from "../../../stores/useTransfersStore";
 import { cx } from "./ExplorerDesktopShared";
@@ -704,6 +706,14 @@ function ExplorerPluginPanelHost(props: {
   panel: PluginPanelEntry;
   selectedPath: string;
 }) {
+  if (props.panel.webEntry) return <ExplorerWebPluginPanelHost panel={props.panel} selectedPath={props.selectedPath} />;
+  return <ExplorerNativePluginPanelHost panel={props.panel} selectedPath={props.selectedPath} />;
+}
+
+function ExplorerNativePluginPanelHost(props: {
+  panel: PluginPanelEntry;
+  selectedPath: string;
+}) {
   const [rendered, setRendered] = useState<PluginPanelRenderResult | null>(null);
   const [rendering, setRendering] = useState(false);
   const [renderError, setRenderError] = useState("");
@@ -793,6 +803,139 @@ function ExplorerPluginPanelHost(props: {
       ) : null}
     </section>
   );
+}
+
+const themeTokenProperties = {
+  background: "--misty-bg", surface: "--misty-surface", foreground: "--misty-text",
+  muted: "--misty-text-muted", accent: "--misty-accent", selection: "--misty-selection",
+  success: "--misty-success", warning: "--misty-warning", danger: "--misty-danger",
+} as const;
+
+function readThemeTokens(): MistyCustomThemeTokens {
+  const styles = getComputedStyle(document.documentElement);
+  return Object.fromEntries(Object.entries(themeTokenProperties).map(([token, property]) => [token, styles.getPropertyValue(property).trim()])) as MistyCustomThemeTokens;
+}
+
+function applyThemeTokenPreview(tokens: MistyCustomThemeTokens | null) {
+  const root = document.documentElement;
+  for (const [token, property] of Object.entries(themeTokenProperties)) {
+    const value = tokens?.[token as keyof MistyCustomThemeTokens];
+    if (value) root.style.setProperty(property, value);
+    else root.style.removeProperty(property);
+  }
+}
+
+function safeThemeTokens(value: unknown): MistyCustomThemeTokens | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const result: MistyCustomThemeTokens = {};
+  for (const token of Object.keys(themeTokenProperties) as Array<keyof MistyCustomThemeTokens>) {
+    const color = (value as Record<string, unknown>)[token];
+    if (color === undefined) continue;
+    if (typeof color !== "string" || !/^#[0-9a-f]{6}$/i.test(color)) return null;
+    result[token] = color.toUpperCase();
+  }
+  return Object.keys(result).length ? result : null;
+}
+
+function isMistyThemeId(value: unknown): value is MistyThemeId {
+  return value === "misty-dark" || value === "misty-light" || value === "graphite" || value === "aurora" || value === "copper";
+}
+
+function webPanelUrl(entry: string, selectedPath: string): string {
+  const [path, query = ""] = entry.split("?", 2);
+  const params = new URLSearchParams(query);
+  params.set("hosted", "1");
+  if (selectedPath) params.append("selected", selectedPath);
+  return `${safeTauriAssetUrl(path)}?${params.toString()}`;
+}
+
+function ExplorerWebPluginPanelHost(props: { panel: PluginPanelEntry; selectedPath: string }) {
+  const iframeRef = useRef<HTMLIFrameElement | null>(null);
+  const source = useMemo(() => webPanelUrl(props.panel.webEntry, props.selectedPath), [props.panel.webEntry, props.selectedPath]);
+
+  useEffect(() => () => {
+    if (props.panel.pluginId !== "themes") return;
+    const current = useAppThemeStore.getState();
+    const root = document.documentElement;
+    root.dataset.theme = current.resolvedTheme; root.dataset.mistyTheme = current.themeId;
+    root.style.colorScheme = current.resolvedTheme;
+    applyThemeTokenPreview(current.customTokens);
+  }, [props.panel.pluginId]);
+
+  const postContext = useCallback(() => {
+    iframeRef.current?.contentWindow?.postMessage({
+      channel: "misty-host", kind: "context", pluginId: props.panel.pluginId,
+      selectedPaths: props.selectedPath ? [props.selectedPath] : [],
+    }, "*");
+  }, [props.panel.pluginId, props.selectedPath]);
+
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      if (event.source !== iframeRef.current?.contentWindow) return;
+      const request = event.data as { channel?: string; kind?: string; requestId?: string; pluginId?: string; command?: string; payload?: Record<string, unknown> } | null;
+      if (!request || request.channel !== "misty-plugin" || request.kind !== "request" || request.pluginId !== props.panel.pluginId || typeof request.requestId !== "string" || typeof request.command !== "string") return;
+      const respond = (ok: boolean, result?: unknown, error?: string) => iframeRef.current?.contentWindow?.postMessage({ channel: "misty-host", kind: "response", requestId: request.requestId, ok, result, error }, "*");
+      const payload = request.payload ?? {};
+      if (request.command === "host.selectedPaths") { respond(true, { ok: true, selectedPaths: props.selectedPath ? [props.selectedPath] : [] }); return; }
+      if (request.command === "host.notify") {
+        const level = payload.level === "success" || payload.level === "error" ? payload.level : "info";
+        const message = typeof payload.message === "string" ? payload.message.slice(0, 500) : "Extension notification";
+        useExplorerStore.getState().pushNotification(message, level, 4500); respond(true, { ok: true }); return;
+      }
+      if (props.panel.pluginId === "themes") {
+        void handleThemeWebCommand(request.command, payload).then((result) => respond(true, result)).catch((error) => respond(false, undefined, errorText(error)));
+        return;
+      }
+      void extensionCommandRun({ pluginId: props.panel.pluginId, command: request.command, payload })
+        .then((result) => respond(true, result)).catch((error) => respond(false, undefined, errorText(error)));
+    };
+    window.addEventListener("message", handleMessage);
+    return () => window.removeEventListener("message", handleMessage);
+  }, [props.panel.pluginId, props.selectedPath]);
+
+  useEffect(postContext, [postContext]);
+  return <section className={`${pluginTabHostStyles.panel} min-h-[360px] overflow-hidden p-0`}><iframe ref={iframeRef} className="h-full min-h-[420px] w-full border-0 bg-[var(--misty-bg)]" src={source} title={`${props.panel.title} extension`} sandbox="allow-scripts allow-same-origin" onLoad={postContext} /></section>;
+}
+
+async function handleThemeWebCommand(command: string, payload: Record<string, unknown>) {
+  const store = useAppThemeStore.getState();
+  if (command === "themes.snapshot") return { ok: true, themeId: store.themeId, tokens: store.customTokens ?? readThemeTokens() };
+  if (command === "themes.applyPreset") {
+    if (!isMistyThemeId(payload.preset)) throw new Error("Unsupported theme preset.");
+    const root = document.documentElement;
+    root.dataset.theme = themeBaseMode(payload.preset);
+    root.dataset.mistyTheme = payload.preset;
+    root.style.colorScheme = themeBaseMode(payload.preset);
+    applyThemeTokenPreview(null);
+    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+    return { ok: true, tokens: readThemeTokens() };
+  }
+  if (command === "themes.preview") {
+    const tokens = safeThemeTokens(payload.tokens);
+    if (!tokens) throw new Error("Theme tokens are invalid.");
+    applyThemeTokenPreview(tokens);
+    return { ok: true, tokens, message: "Preview updated. Apply to keep these colors." };
+  }
+  if (command === "themes.apply") {
+    if (!isMistyThemeId(payload.preset)) throw new Error("Unsupported theme preset.");
+    const tokens = safeThemeTokens(payload.tokens);
+    if (!tokens) throw new Error("Theme tokens are invalid.");
+    store.setThemeMode(themeBaseMode(payload.preset));
+    store.setThemeId(payload.preset);
+    store.setCustomTokens(tokens);
+    applyThemeTokenPreview(tokens);
+    return { ok: true, tokens, message: "Theme saved and applied across Misty." };
+  }
+  if (command === "themes.revert") {
+    const current = useAppThemeStore.getState();
+    const root = document.documentElement;
+    root.dataset.theme = current.resolvedTheme; root.dataset.mistyTheme = current.themeId;
+    root.style.colorScheme = current.resolvedTheme;
+    applyThemeTokenPreview(current.customTokens);
+    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+    return { ok: true, tokens: current.customTokens ?? readThemeTokens(), message: "Reverted to the saved theme." };
+  }
+  throw new Error("Theme command is not allowlisted.");
 }
 
 function PluginPanelElementView(props: {

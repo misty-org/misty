@@ -241,8 +241,9 @@ export function DesktopLayout(props: {
       state.notificationHistory.filter((notification) => !notification.read)
         .length,
   );
-  const { resolvedTheme, setSystemTheme, themeId, themeMode } = useAppThemeStore(
+  const { customTokens, resolvedTheme, setSystemTheme, themeId, themeMode } = useAppThemeStore(
     useShallow((state) => ({
+      customTokens: state.customTokens,
       resolvedTheme: state.resolvedTheme,
       setSystemTheme: state.setSystemTheme,
       themeId: state.themeId,
@@ -554,6 +555,24 @@ export function DesktopLayout(props: {
       delete root.dataset.mistyWallpaperActive;
     };
   }, [appWallpaperSrc, desktopFrameStyle]);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    const names: Record<string, string> = {
+      background: "--misty-bg", surface: "--misty-surface", foreground: "--misty-text",
+      muted: "--misty-text-muted", accent: "--misty-accent", selection: "--misty-selection",
+      success: "--misty-success", warning: "--misty-warning", danger: "--misty-danger",
+    };
+    for (const [token, property] of Object.entries(names)) {
+      const value = customTokens?.[token as keyof typeof customTokens];
+      if (value) root.style.setProperty(property, value);
+      else {
+        const frameValue = (desktopFrameStyle as Record<string, string>)[property];
+        if (frameValue) root.style.setProperty(property, frameValue);
+        else root.style.removeProperty(property);
+      }
+    }
+  }, [customTokens, desktopFrameStyle]);
 
   useEffect(() => {
     const badgeCount =

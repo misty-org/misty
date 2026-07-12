@@ -10,7 +10,13 @@ export type MistyThemeId =
   | "aurora"
   | "copper";
 
+export type MistyCustomThemeTokens = Partial<Record<
+  "background" | "surface" | "foreground" | "muted" | "accent" | "selection" | "success" | "warning" | "danger",
+  string
+>>;
+
 type AppThemeStore = {
+  customTokens: MistyCustomThemeTokens | null;
   resolvedTheme: ResolvedAppTheme;
   systemTheme: ResolvedAppTheme;
   themeId: MistyThemeId;
@@ -18,6 +24,7 @@ type AppThemeStore = {
   setSystemTheme: (theme: ResolvedAppTheme) => void;
   setThemeId: (themeId: MistyThemeId) => void;
   setThemeMode: (mode: AppThemeMode) => void;
+  setCustomTokens: (tokens: MistyCustomThemeTokens | null) => void;
 };
 
 const THEME_STORAGE_KEY = "misty:app-theme";
@@ -85,6 +92,7 @@ export function applyMistyThemeFromExtensionAction(actionId: string): boolean {
 export const useAppThemeStore = create<AppThemeStore>()(
   persist(
     (set, get) => ({
+      customTokens: null,
       resolvedTheme: "dark",
       systemTheme: "dark",
       themeId: "misty-dark",
@@ -102,19 +110,21 @@ export const useAppThemeStore = create<AppThemeStore>()(
       setThemeMode: (themeMode) => {
         const resolvedTheme = resolveTheme(themeMode, get().systemTheme);
         set({
+          customTokens: null,
           themeId: resolvedTheme === "light" ? "misty-light" : "misty-dark",
           themeMode,
           resolvedTheme,
         });
       },
       setThemeId: (themeId) => {
-        set({ themeId });
+        set({ themeId, customTokens: null });
       },
+      setCustomTokens: (customTokens) => set({ customTokens }),
     }),
     {
       name: THEME_STORAGE_KEY,
       storage: createJSONStorage(() => localStorage),
-      partialize: (state) => ({ themeMode: state.themeMode, themeId: state.themeId }),
+      partialize: (state) => ({ customTokens: state.customTokens, themeMode: state.themeMode, themeId: state.themeId }),
       merge: (persisted, current) => {
         const themeMode =
           persisted && typeof persisted === "object" && "themeMode" in persisted
@@ -124,8 +134,12 @@ export const useAppThemeStore = create<AppThemeStore>()(
           persisted && typeof persisted === "object" && "themeId" in persisted
             ? safeThemeId(persisted.themeId)
             : current.themeId;
+        const customTokens = persisted && typeof persisted === "object" && "customTokens" in persisted && persisted.customTokens && typeof persisted.customTokens === "object"
+          ? persisted.customTokens as MistyCustomThemeTokens
+          : null;
         return {
           ...current,
+          customTokens,
           themeId,
           themeMode,
           resolvedTheme: resolveTheme(themeMode, current.systemTheme),
