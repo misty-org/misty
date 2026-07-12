@@ -261,17 +261,9 @@ const providerRows: ProviderRow[] = [
       providerIcons["Google Drive"],
       providerIcons.OneDrive,
       providerIcons.Dropbox,
-      providerIcons["Amazon S3"],
-      providerIcons["Backblaze B2"],
-      providerIcons.Box,
-      providerIcons["Cloudflare R2"],
-      providerIcons["Google Cloud Storage"],
-      providerIcons["Azure Blob"],
-      providerIcons["Azure Files"],
-      providerIcons["Oracle Object Storage"],
-      providerIcons["OpenStack Swift"],
-      providerIcons.Wasabi,
-      providerIcons["DigitalOcean Spaces"],
+      providerIcons["Google Drive"],
+      providerIcons.OneDrive,
+      providerIcons.Dropbox,
     ],
     duration: 44,
     direction: "normal",
@@ -280,20 +272,12 @@ const providerRows: ProviderRow[] = [
   },
   {
     providers: [
-      providerIcons["iCloud Drive"],
-      providerIcons["Google Photos"],
-      providerIcons["Proton Drive"],
-      providerIcons["Yandex Disk"],
-      providerIcons["Zoho WorkDrive"],
-      providerIcons.Mega,
-      providerIcons.Filen,
-      providerIcons.pCloud,
-      providerIcons.Seafile,
-      providerIcons.Storj,
-      providerIcons.Jottacloud,
-      providerIcons.Koofr,
-      providerIcons.Linkbox,
-      providerIcons.Internxt,
+      providerIcons.Dropbox,
+      providerIcons.OneDrive,
+      providerIcons["Google Drive"],
+      providerIcons.Dropbox,
+      providerIcons.OneDrive,
+      providerIcons["Google Drive"],
     ],
     duration: 52,
     direction: "reverse",
@@ -302,67 +286,16 @@ const providerRows: ProviderRow[] = [
   },
   {
     providers: [
-      providerIcons["Akamai NetStorage"],
-      providerIcons["Citrix ShareFile"],
-      providerIcons.Cloudinary,
-      providerIcons["Huawei Drive"],
-      providerIcons["Internet Archive"],
-      providerIcons.IONOS,
-      providerIcons["1Fichier"],
-      providerIcons["Digi Storage"],
-      providerIcons.Drime,
-      providerIcons.FileLu,
-      providerIcons.Gofile,
-      providerIcons.HiDrive,
-      providerIcons.ImageKit,
+      providerIcons["Google Drive"],
+      providerIcons.OneDrive,
+      providerIcons.Dropbox,
+      providerIcons["Google Drive"],
+      providerIcons.OneDrive,
+      providerIcons.Dropbox,
     ],
     duration: 58,
     direction: "normal",
     offset: "-ml-10",
-    opacity: "opacity-75",
-  },
-  {
-    providers: [
-      providerIcons["Mail.ru Cloud"],
-      providerIcons.OpenDrive,
-      providerIcons.PikPak,
-      providerIcons.Pixeldrain,
-      providerIcons["premiumize.me"],
-      providerIcons["put.io"],
-      providerIcons.Quatrix,
-      providerIcons.QingStor,
-      providerIcons.SugarSync,
-      providerIcons["Uloz.to"],
-      providerIcons.HDFS,
-      providerIcons.Nextcloud,
-      providerIcons.ownCloud,
-      providerIcons.SharePoint,
-    ],
-    duration: 64,
-    direction: "reverse",
-    offset: "-ml-32",
-    opacity: "opacity-65",
-  },
-  {
-    providers: [
-      providerIcons["Alibaba Cloud OSS"],
-      providerIcons["IBM COS S3"],
-      providerIcons["Cloudflare R2"],
-      providerIcons.Wasabi,
-      providerIcons["DigitalOcean Spaces"],
-      providerIcons["Google Drive"],
-      providerIcons.OneDrive,
-      providerIcons["Amazon S3"],
-      providerIcons["Backblaze B2"],
-      providerIcons.Mega,
-      providerIcons.Filen,
-      providerIcons.Seafile,
-      providerIcons.Storj,
-      providerIcons.Nextcloud,
-    ],
-    duration: 56,
-    direction: "normal",
-    offset: "-ml-4",
     opacity: "opacity-80",
   },
 ];
@@ -420,10 +353,10 @@ export default function FeaturesProviders() {
 
       <div className="relative z-20 mx-auto mb-7 max-w-2xl px-5 text-center">
         <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.22em] text-text-muted/60">
-          Storage backends
+          Supported Remotes
         </p>
         <h2 className="text-2xl font-bold tracking-tight text-text md:text-4xl">
-          Connect the clouds, servers, and protocols you already use.
+          Connect Google Drive, OneDrive, and Dropbox.
         </h2>
       </div>
 
@@ -435,27 +368,10 @@ export default function FeaturesProviders() {
 
       <div className="relative z-20 mx-auto mt-7 flex max-w-3xl flex-col items-center gap-2 px-5">
         <p className="text-center text-sm text-text-muted">
-          Supports 70+ storage backends.{" "}
-          <a
-            href="https://rclone.org/#supported-providers"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-text underline underline-offset-4 transition-colors hover:text-white"
-          >
-            See the full compatibility list
-          </a>
-          .
+          S3-compatible storage and SFTP are planned for a future release.
         </p>
         <p className="text-center text-xs text-text-muted/55">
-          Cloud provider connectivity powered by{" "}
-          <a
-            href="https://rclone.org"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-text-muted transition-colors hover:text-white"
-          >
-            rclone
-          </a>
+          Authorize only the provider accounts you want Misty to access.
         </p>
       </div>
     </div>

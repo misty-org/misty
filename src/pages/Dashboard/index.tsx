@@ -372,9 +372,6 @@ function PrivacyPanel() {
             communication runs through a local proxy on your machine. We only store your account info
             (name, email, hashed password) and subscription status.
           </p>
-          <a href="/docs" className="text-xs text-text-muted hover:text-text underline underline-offset-2 transition-colors mt-1 w-fit">
-            Read the architecture docs →
-          </a>
         </div>
       </Section>
 

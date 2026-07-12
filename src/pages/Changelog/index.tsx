@@ -46,17 +46,21 @@ export default function Changelog() {
 
               {isOpen && (
                 <div className="px-6 pb-5 pt-1">
-                  <ul className="space-y-2">
-                    {entry.changes.map((change, i) => (
-                      <li
-                        key={i}
-                        className="flex items-start gap-3 text-sm text-text-muted"
-                      >
-                        <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-primary shrink-0" />
-                        {change}
-                      </li>
+                  <div className="space-y-5">
+                    {entry.groups.map((group) => (
+                      <section key={group.heading}>
+                        <h2 className="mb-2 text-sm font-semibold text-text">{group.heading}</h2>
+                        <ul className="space-y-2">
+                          {group.changes.map((change) => (
+                            <li key={change} className="flex items-start gap-3 text-sm text-text-muted">
+                              <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
+                              {change}
+                            </li>
+                          ))}
+                        </ul>
+                      </section>
                     ))}
-                  </ul>
+                  </div>
                 </div>
               )}
             </div>

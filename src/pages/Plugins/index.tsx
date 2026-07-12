@@ -68,7 +68,7 @@ export default function Plugins() {
       primaryActionLabel="Open Misty Hub"
       query={query}
       selectedPluginId={selectedPluginId}
-      title="Plugins"
+      title="Extensions"
     />
   );
 }

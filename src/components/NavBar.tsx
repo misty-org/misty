@@ -6,13 +6,12 @@ import { useUserStore } from "../store/userStore";
 const navItems = [
   { to: "/download", label: "Download" },
   { to: "/pricing", label: "Pricing" },
-  { to: "/docs", label: "Docs" },
 ];
 
 
 const resourcesLinks = [
   { to: "/features", label: "Features" },
-  { to: "/plugins", label: "Plugins" },
+  { to: "/plugins", label: "Extensions" },
   { to: "/changelog", label: "Changelog" },
   { to: "/blog", label: "Blog" },
   { to: "/roadmap", label: "Roadmap" },
@@ -29,7 +28,6 @@ export default function Navbar() {
   const me = useUserStore((s) => s.me);
 
   const displayName = me?.name ?? user?.name ?? "";
-  const isDocsPage = location.pathname.startsWith("/docs");
   const initials = displayName
     ? displayName.split(" ").map((w: string) => w[0]).join("").toUpperCase().slice(0, 2)
     : user?.email?.[0]?.toUpperCase() ?? "";
@@ -66,7 +64,7 @@ export default function Navbar() {
           maxWidth: location.pathname === "/" ? "1060px" : "100%",
           transition: "max-width 0.5s cubic-bezier(0.4, 0, 0.2, 1)",
         }}
-        className={`w-full mx-auto h-16 flex items-center justify-between ${isDocsPage ? "px-4" : "px-3 sm:px-4"}`}
+        className="mx-auto flex h-16 w-full items-center justify-between px-3 sm:px-4"
       >
         <NavLink to="/" className="group flex items-center gap-1">
           <img src="/misty.png" alt="Misty logo" className="w-13 h-13" />

@@ -26,16 +26,15 @@ export interface Release {
 export const releases: Release[] = [
   {
     version: "v0.1.0",
-    date: "December 2025",
+    date: "Current",
     builds: [
       { platform: "Windows", tag: "Installer", platformKey: "windows" },
       { platform: "macOS", tag: "DMG", platformKey: "macos" },
-      { platform: "Linux", tag: "AppImage", platformKey: "linux" },
     ],
     notes: [
       "Desktop build for early customers",
       "Core file browsing, search, and transfer workflows",
-      "Provider connection flow for supported cloud backends",
+      "Google Drive, OneDrive, and Dropbox Remote connections",
       "Rough edges expected; join Discord to report bugs and follow fixes",
     ],
   },
@@ -45,15 +44,15 @@ export const mobileBuilds: MobileBuild[] = [
   {
     platform: "iPhone",
     tag: "iOS",
-    availability: "App Store preparation",
+    availability: "Coming soon",
     description: "Misty for iPhone brings file browsing, connected providers, transfers, account controls, and settings into a mobile interface.",
     ctaLabel: "App Store Soon",
   },
   {
     platform: "Android",
     tag: "Android",
-    availability: "Mobile build track",
-    description: "The Android build shares the mobile Misty experience and is being prepared alongside the Tauri mobile runtime.",
+    availability: "Coming soon",
+    description: "The Android build shares Misty’s mobile Files, Remotes, Transfers, Account, and Settings experience and is in release preparation.",
     ctaLabel: "Android Soon",
   },
 ];
