@@ -1,16 +1,19 @@
 use std::{path::PathBuf, sync::Arc};
 
-use crate::core::clipboard::{ClipboardService, SharedClipboardClient};
+use crate::core::clipboard::ClipboardService;
 use crate::core::file_sync::FileSyncPairStore;
 #[cfg(desktop)]
 use crate::services::plugin_commands::PluginCommandService;
+#[cfg(desktop)]
+use crate::services::extension_runtime::ExtensionRuntimeService;
 use crate::services::{
-    ai::AiService, claude::ClaudeService, commands::CommandService, devices::DeviceService,
-    directory_size::DirectorySizeService, environment::AppEnvironmentService,
-    explorer::ExplorerService, explorer_library::ExplorerLibraryService,
-    file_sync::FileSyncService, metadata::MetadataService, operation_queue::OperationQueueService,
-    power_pack::PowerPackService, providers::ProviderService, proxy::ProxyService,
-    proxy_clipboard::ProxyClipboardClient, proxy_runtime::ProxyRuntimeService,
+    ai::AiService, automations::AutomationService, claude::ClaudeService, commands::CommandService,
+    devices::DeviceService, directory_size::DirectorySizeService,
+    environment::AppEnvironmentService, explorer::ExplorerService,
+    explorer_library::ExplorerLibraryService, file_sync::FileSyncService,
+    metadata::MetadataService, operation_queue::OperationQueueService,
+    power_pack::PowerPackService, providers::ProviderService, storage::StorageService,
+    storage_runtime::StorageRuntimeService,
     search::SearchService, settings::SettingsService, transfers::TransferService,
     workspaces::WorkspaceService,
 };
@@ -18,9 +21,8 @@ use crate::services::{
 pub struct MistyRuntime {
     pub environment: AppEnvironmentService,
     pub clipboard: Arc<ClipboardService>,
-    pub proxy_clipboard: Arc<ProxyClipboardClient>,
-    pub proxy_runtime: ProxyRuntimeService,
-    pub proxy: ProxyService,
+    pub storage_runtime: StorageRuntimeService,
+    pub storage: StorageService,
     pub providers: ProviderService,
     pub transfers: TransferService,
     pub sync_pairs: FileSyncPairStore,
@@ -32,13 +34,15 @@ pub struct MistyRuntime {
     pub metadata: MetadataService,
     #[cfg(desktop)]
     pub plugin_commands: PluginCommandService,
+    #[cfg(desktop)]
+    pub extension_runtime: ExtensionRuntimeService,
     pub power_pack: PowerPackService,
     pub search: SearchService,
     pub explorer: ExplorerService,
     pub explorer_library: ExplorerLibraryService,
     pub workspaces: WorkspaceService,
     pub operation_queue: OperationQueueService,
-    pub ai: AiService,
+    pub automations: AutomationService,
     pub claude: ClaudeService,
 }
 
@@ -49,37 +53,31 @@ impl MistyRuntime {
 
     pub fn new_with_data_root(data_root: Option<PathBuf>) -> Self {
         let environment = AppEnvironmentService::new_with_data_root(data_root);
-        let proxy_runtime = ProxyRuntimeService::start(&environment);
-        let proxy_clipboard = ProxyClipboardClient::new(
-            None,
-            Some(proxy_runtime.clone()),
-            "local".to_owned(),
-            "This Misty".to_owned(),
-        );
-        let shared_clipboard_client: Arc<dyn SharedClipboardClient> = proxy_clipboard.clone();
-        let clipboard = ClipboardService::new(None, Some(shared_clipboard_client));
+        let storage_runtime = StorageRuntimeService::start(&environment);
+        let clipboard = ClipboardService::new(None, None);
         clipboard.set_device_identity("local".to_owned(), "This Misty".to_owned());
-        proxy_clipboard.start(clipboard.clone());
-        let proxy = ProxyService::new_with_proxy_runtime(
+        let storage = StorageService::new_with_storage_runtime(
             environment.clone(),
-            Some(proxy_runtime.clone()),
+            Some(storage_runtime.clone()),
             None,
         );
-        let providers = ProviderService::new(proxy.clone());
+        let providers = ProviderService::new(storage.clone());
         let transfers = TransferService::new(environment.clone());
         let sync_pairs = FileSyncPairStore::new(environment.misty_db_path());
         let settings = SettingsService::new(environment.clone());
         let commands = CommandService::new(environment.clone());
         let devices = DeviceService::new();
-        let directory_size = DirectorySizeService::new(environment.clone(), proxy.clone());
+        let directory_size = DirectorySizeService::new(environment.clone(), storage.clone());
         let metadata = MetadataService::new();
         #[cfg(desktop)]
         let plugin_commands = PluginCommandService::new(environment.clone());
+        #[cfg(desktop)]
+        let extension_runtime = ExtensionRuntimeService::new(environment.clone());
         let explorer_library = ExplorerLibraryService::new(environment.clone());
-        let search = SearchService::new(environment.clone(), providers.clone(), proxy.clone());
+        let search = SearchService::new(environment.clone(), providers.clone(), storage.clone());
         let explorer = ExplorerService::new(
             environment.clone(),
-            proxy.clone(),
+            storage.clone(),
             providers.clone(),
             transfers.clone(),
             explorer_library.clone(),
@@ -91,6 +89,7 @@ impl MistyRuntime {
             operation_queue.clone(),
         );
         let ai = AiService::new();
+        let automations = AutomationService::new(environment.clone(), ai.clone());
         let claude = ClaudeService::new();
         let file_sync = FileSyncService::new(
             environment.clone(),
@@ -103,9 +102,8 @@ impl MistyRuntime {
         Self {
             environment,
             clipboard,
-            proxy_clipboard,
-            proxy_runtime,
-            proxy,
+            storage_runtime,
+            storage,
             providers,
             transfers,
             sync_pairs,
@@ -117,13 +115,15 @@ impl MistyRuntime {
             metadata,
             #[cfg(desktop)]
             plugin_commands,
+            #[cfg(desktop)]
+            extension_runtime,
             power_pack,
             search,
             explorer,
             explorer_library,
             workspaces,
             operation_queue,
-            ai,
+            automations,
             claude,
         }
     }

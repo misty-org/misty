@@ -8,6 +8,7 @@ import {
 } from "../api/misty";
 import { errorText } from "../shared/format";
 import { isNativeMobileBuild } from "../platform/buildTarget";
+import { selectAssistantPreferences, useSettingsStore } from "./useSettingsStore";
 import {
   cancelAgentSession,
   createAgentSession,
@@ -29,12 +30,14 @@ export type AiPanelMessage = {
   text: string;
   planId?: string;
   toolRequestId?: string;
+  creditsUsed?: number;
+  creditsRemaining?: number;
 };
 
 export interface AiStatus {
   configured: boolean;
-  provider: string;
   model: string;
+  modelName: string;
   running: boolean;
   sessionId: string | null;
   error: string | null;
@@ -47,6 +50,7 @@ export interface AiPlanReview {
   applying: boolean;
   appliedSummary: string | null;
   blockedReasons: string[];
+  scope: AssistantScope | null;
 }
 
 export interface AiToolApproval {
@@ -55,7 +59,11 @@ export interface AiToolApproval {
   running: boolean;
   completed: boolean;
   error: string | null;
+  scope: AssistantScope | null;
 }
+
+export type AssistantScope = "files" | "cleanup" | "search";
+type AssistantRequestScope = AssistantScope | "ambiguous" | null;
 
 interface SendAiPromptRequest {
   displayPrompt: string;
@@ -86,19 +94,90 @@ let nextPlanId = 1;
 let activeSessionId: string | null = null;
 let lastEventSequence = 0;
 let activeRoot: string | null = null;
+let activeRequestScope: AssistantScope | null = null;
 let drainInFlight: Promise<void> | null = null;
+let abortRequested = false;
 const processedEventSequences = new Set<number>();
 const processedToolRequestIds = new Set<string>();
 const aiToolTimeoutMs = 15000;
 
-const toolManifest: ToolManifest = {
-  tools: [
-    { name: "list_directory", risk: "read" },
-    { name: "search_files", risk: "read" },
-    { name: "validate_file_plan", risk: "read" },
-    { name: "apply_file_plan", risk: "write" },
-  ],
-};
+const toolDefinitions = {
+  list_directory: { name: "list_directory", risk: "read" },
+  search_files: { name: "search_files", risk: "read" },
+  validate_file_plan: { name: "validate_file_plan", risk: "read" },
+  apply_file_plan: { name: "apply_file_plan", risk: "write" },
+} as const;
+
+function toolManifestForScope(scope: AssistantScope | null): ToolManifest {
+  if (scope === "files") {
+    return { tools: [toolDefinitions.list_directory, toolDefinitions.validate_file_plan, toolDefinitions.apply_file_plan] };
+  }
+  if (scope === "cleanup") {
+    return { tools: [toolDefinitions.list_directory, toolDefinitions.search_files, toolDefinitions.validate_file_plan] };
+  }
+  if (scope === "search") {
+    return { tools: [toolDefinitions.list_directory, toolDefinitions.search_files] };
+  }
+  return { tools: [] };
+}
+
+function toolAllowedForScope(toolName: string, scope: AssistantScope): boolean {
+  return toolManifestForScope(scope).tools.some((tool) => tool.name === toolName);
+}
+
+function classifyAssistantRequest(prompt: string): AssistantRequestScope {
+  const normalized = prompt.toLowerCase();
+  const matches: AssistantScope[] = [];
+  if (/\b(clean(?:up)?|tidy|declutter|organize|duplicate|unused|large files?|old files?)\b/.test(normalized)) matches.push("cleanup");
+  if (/\b(search|find|locate|look for|where (?:is|are)|smart folder|query|tagged|tags?)\b/.test(normalized)) matches.push("search");
+  if (/\b(open|reveal|show in finder|copy|move|rename|create|make (?:a )?(?:file|folder)|transfer|download|upload)\b/.test(normalized)) matches.push("files");
+  const distinct = [...new Set(matches)];
+  if (distinct.length > 1) return "ambiguous";
+  return distinct[0] ?? null;
+}
+
+function assistantScopeAllowed(
+  preferences: ReturnType<typeof selectAssistantPreferences>,
+  scope: AssistantScope,
+): boolean {
+  if (!preferences.enabled) return false;
+  if (scope === "files") return preferences.scopes.filesAllowed;
+  if (scope === "cleanup") return preferences.scopes.cleanupAllowed;
+  return preferences.scopes.searchAllowed;
+}
+
+function scopedAssistantPrompt(prompt: string, scope: AssistantScope | null): string {
+  if (scope === "cleanup") {
+    return `${prompt}\n\nPermission boundary: Cleanup is enabled for scanning and planning only. Do not apply, move, rename, create, trash, delete, or otherwise modify files.`;
+  }
+  if (scope === "search") {
+    return `${prompt}\n\nPermission boundary: Search is read-only. Search files, library metadata, tags, and paths, or suggest queries. Do not modify files or perform cleanup actions.`;
+  }
+  if (scope === "files") {
+    return `${prompt}\n\nPermission boundary: Files actions are enabled. Stay within normal file operations and do not perform cleanup or search-only workflows.`;
+  }
+  return `${prompt}\n\nPermission boundary: No capability scope is active. Respond conversationally without using tools or modifying data.`;
+}
+
+function assistantScopeLabel(scope: AssistantScope): string {
+  return scope[0].toUpperCase() + scope.slice(1);
+}
+
+function appendBlockedRequest(
+  set: (partial: Partial<AiSessionStore> | ((state: AiSessionStore) => Partial<AiSessionStore>)) => void,
+  prompt: string,
+  response: string,
+): void {
+  set((state) => ({
+    error: null,
+    status: statusWithRunning(state.status, false),
+    messages: [
+      ...state.messages,
+      { id: aiMessageId("user"), role: "user", text: prompt },
+      { id: aiMessageId("assistant"), role: "assistant", text: response },
+    ],
+  }));
+}
 
 export const useMikaSessionStore = create<AiSessionStore>((set, get) => ({
   status: serverStatus(false),
@@ -126,30 +205,51 @@ export const useMikaSessionStore = create<AiSessionStore>((set, get) => ({
   sendPrompt: async ({ displayPrompt, prompt, cwd, selectedPaths }) => {
     const trimmed = displayPrompt.trim();
     if (!trimmed || get().status?.running) return;
+    const preferences = selectAssistantPreferences(useSettingsStore.getState().settings?.document);
+    if (!preferences.enabled) {
+      appendBlockedRequest(set, trimmed, "Mika is disabled. Enable Mika in Settings > Assistant to continue.");
+      return;
+    }
+    const requestScope = classifyAssistantRequest(trimmed);
+    if (requestScope === "ambiguous") {
+      appendBlockedRequest(set, trimmed, "That request crosses more than one permission scope. Please split it into separate Files, Cleanup, or Search steps.");
+      return;
+    }
+    if (requestScope && !assistantScopeAllowed(preferences, requestScope)) {
+      appendBlockedRequest(set, trimmed, `The ${assistantScopeLabel(requestScope)} scope is disabled. Allow it in Settings > Assistant to continue.`);
+      return;
+    }
     activeRoot = cwd || null;
+    activeRequestScope = requestScope;
+    abortRequested = false;
     set((state) => ({
       messages: [...state.messages, { id: aiMessageId("user"), role: "user", text: trimmed }],
       error: null,
-      status: serverStatus(true),
+      status: statusWithRunning(state.status, true),
     }));
 
     try {
-      await sendAgentMessageWithSessionRetry({
+      await sendAgentMessageOnce({
         mode: get().mode,
-        user_message: prompt,
+        user_message: scopedAssistantPrompt(prompt, requestScope),
         active_root: cwd || undefined,
         selected_paths: selectedPaths,
-        capabilities: toolManifest,
+        capabilities: toolManifestForScope(requestScope),
       });
       ensureAiPolling(set, get);
       await drainAiEvents(set, get);
     } catch (error) {
       stopAiPolling();
       const message = errorText(error);
+      if (abortRequested && message.toLowerCase().includes("canceled")) {
+        resetActiveSession();
+        set((state) => ({ error: null, status: statusWithRunning(state.status, false) }));
+        return;
+      }
       recordAiDebug("error", "Mika send failed.", message);
       set((state) => ({
         error: message,
-        status: serverStatus(false, message),
+        status: statusWithRunning(state.status, false, message),
         messages: [...state.messages, { id: aiMessageId("error"), role: "error", text: message }],
       }));
     }
@@ -160,11 +260,11 @@ export const useMikaSessionStore = create<AiSessionStore>((set, get) => ({
     const approval = get().toolApprovals.find((candidate) => candidate.id === requestId);
     if (!sessionId || !approval || approval.running || approval.completed) return;
     set((state) => ({
-      status: serverStatus(true),
+      status: statusWithRunning(state.status, true),
       toolApprovals: state.toolApprovals.map((candidate) => candidate.id === requestId ? { ...candidate, running: true, error: null } : candidate),
     }));
     try {
-      const result = await runToolRequest(approval.request);
+      const result = await runToolRequest(approval.request, approval.scope);
       await submitToolResults(sessionId, [result]);
       set((state) => ({
         toolApprovals: state.toolApprovals.map((candidate) => candidate.id === requestId ? {
@@ -181,7 +281,7 @@ export const useMikaSessionStore = create<AiSessionStore>((set, get) => ({
       recordAiDebug("error", "Mika approved tool failed.", message);
       set((state) => ({
         error: message,
-        status: serverStatus(false, message),
+        status: statusWithRunning(state.status, false, message),
         toolApprovals: state.toolApprovals.map((candidate) => candidate.id === requestId ? { ...candidate, running: false, error: message } : candidate),
         messages: [...state.messages, { id: aiMessageId("error"), role: "error", text: message }],
       }));
@@ -191,7 +291,9 @@ export const useMikaSessionStore = create<AiSessionStore>((set, get) => ({
   approvePlan: async (planId) => {
     const plan = get().plans.find((candidate) => candidate.id === planId);
     if (!plan || plan.applied || plan.applying) return;
-    const blockedReasons = validateClientPlan(plan.plan);
+    const blockedReasons = plan.scope !== "files"
+      ? [plan.scope === "cleanup" ? "Cleanup plans are review-only in V1." : "The Files scope is required to apply this plan."]
+      : validateClientPlan(plan.plan);
     if (blockedReasons.length > 0) {
       set((state) => ({
         plans: state.plans.map((candidate) => candidate.id === planId ? { ...candidate, blockedReasons } : candidate),
@@ -220,13 +322,16 @@ export const useMikaSessionStore = create<AiSessionStore>((set, get) => ({
   },
 
   abortPrompt: async () => {
+    abortRequested = true;
     try {
       if (activeSessionId) await cancelAgentSession(activeSessionId);
-      stopAiPolling();
-      drainInFlight = null;
-      set({ status: serverStatus(false) });
     } catch (error) {
       set({ error: errorText(error) });
+    } finally {
+      stopAiPolling();
+      drainInFlight = null;
+      resetActiveSession();
+      set((state) => ({ status: statusWithRunning(state.status, false) }));
     }
   },
 
@@ -237,6 +342,7 @@ export const useMikaSessionStore = create<AiSessionStore>((set, get) => ({
     drainInFlight = null;
     processedEventSequences.clear();
     processedToolRequestIds.clear();
+    activeRequestScope = null;
     set({ messages: [], plans: [], toolApprovals: [], error: null, status: serverStatus(false) });
   },
 }));
@@ -255,7 +361,7 @@ function ensureAiPolling(
       stopAiPolling();
       set((state) => ({
         error: message,
-        status: serverStatus(false, message),
+        status: statusWithRunning(state.status, false, message),
         messages: [...state.messages, { id: aiMessageId("error"), role: "error", text: message }],
       }));
     });
@@ -300,7 +406,7 @@ async function drainAiEventsOnce(
   for (const event of nextEvents) {
     lastEventSequence = Math.max(lastEventSequence, event.sequence);
     if (event.type === "assistant_message" && event.text) {
-      nextMessages.push({ id: aiMessageId("assistant"), role: "assistant", text: event.text });
+      nextMessages.push({ id: aiMessageId("assistant"), role: "assistant", text: event.text, creditsUsed: event.credits_used, creditsRemaining: event.credits_remaining });
     } else if (event.type === "error" && event.message) {
       nextMessages.push({ id: aiMessageId("error"), role: "error", text: event.message });
     } else if (event.type === "tool_request") {
@@ -315,15 +421,19 @@ async function drainAiEventsOnce(
         });
         if (!request.approval_required || get().mode === "full") {
           recordAiDebug("info", "Running Mika tool request.", `${request.name} ${request.id}`);
-          toolResults.push(await runToolRequestWithTimeout(request));
+          toolResults.push(await runToolRequestWithTimeout(request, activeRequestScope));
         } else {
-          nextToolApprovals.push({ id: request.id, request, running: false, completed: false, error: null });
+          nextToolApprovals.push({ id: request.id, request, running: false, completed: false, error: null, scope: activeRequestScope });
         }
       }
     } else if (event.type === "file_plan" && event.file_plan) {
       const planId = `plan-${Date.now()}-${nextPlanId++}`;
-      const blockedReasons = validateClientPlan(event.file_plan);
-      nextPlans.push({ id: planId, plan: event.file_plan, applied: false, applying: false, appliedSummary: null, blockedReasons });
+      const blockedReasons = activeRequestScope === "cleanup"
+        ? ["Cleanup plans are review-only in V1."]
+        : activeRequestScope === "files"
+          ? validateClientPlan(event.file_plan)
+          : ["The Files scope is required to apply this plan."];
+      nextPlans.push({ id: planId, plan: event.file_plan, applied: false, applying: false, appliedSummary: null, blockedReasons, scope: activeRequestScope });
       nextMessages.push({ id: aiMessageId("plan"), role: "plan", planId, text: planSummary(event.file_plan, blockedReasons) });
     }
   }
@@ -331,7 +441,7 @@ async function drainAiEventsOnce(
     messages: [...state.messages, ...nextMessages],
     plans: [...state.plans, ...nextPlans],
     toolApprovals: [...state.toolApprovals, ...nextToolApprovals],
-    status: serverStatus(toolResults.length > 0),
+    status: statusWithRunning(state.status, toolResults.length > 0),
   }));
   if (toolResults.length > 0) {
     await submitToolResults(sessionId, toolResults);
@@ -373,17 +483,17 @@ async function ensureSession(): Promise<string> {
   return activeSessionId;
 }
 
-async function sendAgentMessageWithSessionRetry(body: Parameters<typeof sendAgentMessage>[1]): Promise<void> {
-  let sessionId = await ensureSession();
+async function sendAgentMessageOnce(body: Parameters<typeof sendAgentMessage>[1]): Promise<void> {
+  const sessionId = await ensureSession();
+  recordAiDebug("info", "Sending message to Mika server.", `session=${sessionId} cwd=${activeRoot ?? ""}`);
   try {
-    recordAiDebug("info", "Sending message to Mika server.", `session=${sessionId} cwd=${activeRoot ?? ""}`);
     await sendAgentMessage(sessionId, body);
   } catch (error) {
-    if (!isSessionNotFoundError(error)) throw error;
-    recordAiDebug("warn", "Mika session expired; creating a new session.", sessionId);
-    resetActiveSession();
-    sessionId = await ensureSession();
-    await sendAgentMessage(sessionId, body);
+    if (isSessionNotFoundError(error)) {
+      resetActiveSession();
+      throw new Error("Mika session expired. Your request was not resent. Send it again to continue.");
+    }
+    throw error;
   }
 }
 
@@ -393,14 +503,24 @@ function resetActiveSession(): void {
   drainInFlight = null;
   processedEventSequences.clear();
   processedToolRequestIds.clear();
+  activeRequestScope = null;
 }
 
 function isSessionNotFoundError(error: unknown): boolean {
   return errorText(error).toLowerCase().includes("session not found");
 }
 
-async function runToolRequest(request: ToolRequest): Promise<ToolResult> {
+async function runToolRequest(request: ToolRequest, scope: AssistantScope | null): Promise<ToolResult> {
   try {
+    const preferences = selectAssistantPreferences(useSettingsStore.getState().settings?.document);
+    if (!scope || !assistantScopeAllowed(preferences, scope)) {
+      return toolError(request, scope
+        ? `The ${assistantScopeLabel(scope)} scope is disabled.`
+        : "This request has no allowed capability scope.");
+    }
+    if (!toolAllowedForScope(request.name, scope)) {
+      return toolError(request, `${request.name} is not allowed by the ${assistantScopeLabel(scope)} scope.`);
+    }
     const args = toolArgs(request);
     switch (request.name) {
       case "list_directory": {
@@ -448,11 +568,11 @@ async function runToolRequest(request: ToolRequest): Promise<ToolResult> {
   }
 }
 
-async function runToolRequestWithTimeout(request: ToolRequest): Promise<ToolResult> {
+async function runToolRequestWithTimeout(request: ToolRequest, scope: AssistantScope | null): Promise<ToolResult> {
   let timeoutId: number | null = null;
   try {
     return await Promise.race([
-      runToolRequest(request),
+      runToolRequest(request, scope),
       new Promise<ToolResult>((resolve) => {
         timeoutId = window.setTimeout(() => {
           resolve(toolError(request, `${request.name} timed out after ${Math.round(aiToolTimeoutMs / 1000)} seconds.`));
@@ -577,8 +697,17 @@ function pluralize(count: number, singular: string, plural: string): string {
 function serverStatus(running: boolean, error: string | null = null, configured = true): AiStatus {
   return {
     configured,
-    provider: "Misty Server",
-    model: "mock",
+    model: "mika-low",
+    modelName: "Mika Low",
+    running,
+    sessionId: activeSessionId,
+    error,
+  };
+}
+
+function statusWithRunning(status: AiStatus | null, running: boolean, error: string | null = null): AiStatus {
+  return {
+    ...(status ?? serverStatus(running)),
     running,
     sessionId: activeSessionId,
     error,
@@ -588,12 +717,27 @@ function serverStatus(running: boolean, error: string | null = null, configured 
 function serverStatusFromResponse(response: AgentStatusResponse): AiStatus {
   return {
     configured: response.configured,
-    provider: response.provider || "Misty Server",
-    model: response.model || "mock",
+    model: publicMikaModel(response.model),
+    modelName: publicMikaDisplayName(response.model, response.model_name),
     running: response.running,
     sessionId: response.session_id ?? activeSessionId,
     error: response.error,
   };
+}
+
+function publicMikaModel(model: string): string {
+  return model === "mika-med" || model === "mika-high" ? model : "mika-low";
+}
+
+function mikaModelDisplayName(model: string): string {
+  if (model === "mika-med") return "Mika Med";
+  if (model === "mika-high") return "Mika High";
+  return "Mika Low";
+}
+
+function publicMikaDisplayName(model: string, modelName?: string): string {
+  const expected = mikaModelDisplayName(model);
+  return modelName === expected ? modelName : expected;
 }
 
 function aiMessageId(prefix: string): string {

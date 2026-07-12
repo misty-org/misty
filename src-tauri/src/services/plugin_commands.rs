@@ -20,9 +20,6 @@ const REMOVED_EXTENSION_IDS: &[&str] = &[
     "preview-panel",
     "preview_panel",
     "vault",
-    "ytdlp",
-    "yt-dlp",
-    "yt_dlp",
 ];
 
 #[derive(Debug, Clone)]
@@ -114,6 +111,7 @@ pub struct PluginPanelEntry {
     pub plugin_dir: String,
     pub manifest_path: String,
     pub library_path: String,
+    pub web_entry: String,
     pub launcher_views: Vec<String>,
 }
 
@@ -862,8 +860,10 @@ fn plugin_entries_for_plugin_dir(plugin_dir: &Path) -> ApiResult<PluginEntries> 
             panels.extend(static_panels_from_json(plugin, &metadata));
         }
     }
-    commands.extend(built_in_commands_for_plugin(&metadata));
-    panels.extend(built_in_panels_for_plugin(&metadata));
+    if !panels.iter().any(|panel| !panel.web_entry.is_empty()) {
+        commands.extend(built_in_commands_for_plugin(&metadata));
+        panels.extend(built_in_panels_for_plugin(&metadata));
+    }
     if !metadata.library_path.is_empty() {
         if let Ok((library, native_entries)) = load_native_plugin(&metadata.library_path) {
             commands.extend(
@@ -906,6 +906,7 @@ fn plugin_entries_for_plugin_dir(plugin_dir: &Path) -> ApiResult<PluginEntries> 
                     plugin_dir: metadata.plugin_dir.clone(),
                     manifest_path: metadata.manifest_path.clone(),
                     library_path: metadata.library_path.clone(),
+                    web_entry: String::new(),
                     launcher_views: metadata.launcher_views.clone(),
                 }
             }));
@@ -1350,6 +1351,7 @@ fn built_in_panels_for_plugin(plugin: &PluginMetadata) -> Vec<PluginPanelEntry> 
         plugin_dir: plugin.plugin_dir.clone(),
         manifest_path: plugin.manifest_path.clone(),
         library_path: plugin.library_path.clone(),
+        web_entry: String::new(),
         launcher_views: plugin.launcher_views.clone(),
     }]
 }
@@ -1855,9 +1857,21 @@ fn static_panel_from_json(panel: &Value, plugin: &PluginMetadata) -> Option<Plug
         plugin_dir: plugin.plugin_dir.clone(),
         manifest_path: plugin.manifest_path.clone(),
         library_path: plugin.library_path.clone(),
+        web_entry: web_panel_entry(panel, plugin),
         launcher_views: panel_launcher_views(panel)
             .unwrap_or_else(|| plugin.launcher_views.clone()),
     })
+}
+
+fn web_panel_entry(panel: &Value, plugin: &PluginMetadata) -> String {
+    let Some(raw) = string_field(Some(panel), "entry") else { return String::new(); };
+    let (relative, query) = raw.split_once('?').map(|(path, query)| (path, Some(query))).unwrap_or((raw.as_str(), None));
+    let relative = Path::new(relative);
+    if !relative_plugin_library_path_is_safe(relative) { return String::new(); }
+    let path = Path::new(&plugin.plugin_dir).join(relative);
+    let mut result = path.display().to_string();
+    if let Some(query) = query.filter(|value| !value.is_empty()) { result.push('?'); result.push_str(query); }
+    result
 }
 
 fn panel_launcher_views(panel: &Value) -> Option<Vec<String>> {
@@ -2965,6 +2979,7 @@ mod tests {
                 plugin_dir: format!("/tmp/{plugin_id}"),
                 manifest_path: format!("/tmp/{plugin_id}/manifest.json"),
                 library_path: format!("/tmp/{plugin_id}/variants/macos-arm64/{plugin_id}.dylib"),
+                web_entry: String::new(),
                 launcher_views: vec!["Dock".to_owned()],
             };
 
@@ -3002,6 +3017,7 @@ mod tests {
             plugin_dir: root.display().to_string(),
             manifest_path: String::new(),
             library_path: String::new(),
+            web_entry: String::new(),
             launcher_views: vec!["Dock".to_owned()],
         };
         let mut inputs = BTreeMap::new();
@@ -3143,6 +3159,30 @@ mod tests {
     }
 
     #[test]
+    fn installed_web_panel_resolves_inside_plugin_and_suppresses_builtin_panel() {
+        let root = unique_test_plugin_dir("web-extension-root");
+        let plugin = root.join("quick_convert");
+        fs::create_dir_all(plugin.join("web")).expect("web dir");
+        fs::write(plugin.join("web/index.html"), "<!doctype html>").expect("web entry");
+        fs::write(plugin.join("plugin.json"), serde_json::json!({
+            "id": "quick_convert", "name": "Quick Convert", "status": "installed"
+        }).to_string()).expect("plugin detail");
+        fs::write(plugin.join("manifest.json"), serde_json::json!({
+            "id": "quick_convert", "enabled": true,
+            "launcher": { "show_in_launcher": true },
+            "panels": [{ "id": "quick-convert.panel", "title": "Quick Convert", "entry": "web/index.html?plugin=quick_convert" }]
+        }).to_string()).expect("manifest");
+
+        let snapshot = snapshot_plugin_commands(vec![root.clone()]).expect("snapshot");
+        let panel = snapshot.panels.iter().find(|panel| panel.plugin_id == "quick_convert").expect("web panel");
+        assert!(panel.web_entry.ends_with("web/index.html?plugin=quick_convert"));
+        assert!(snapshot.panels.iter().all(|panel| panel.id != "quick_convert.builtin"));
+        assert!(snapshot.commands.iter().all(|command| command.source != "builtin"));
+        assert!(snapshot.commands.iter().any(|command| command.source == "launcher"));
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
     fn removed_extensions_do_not_surface_in_commands_panels_or_diagnostics() {
         let root = unique_test_plugin_dir("removed-extension-root");
         let git = root.join("git");
@@ -3221,9 +3261,9 @@ mod tests {
         assert!(!git.exists());
         assert!(!preview_panel.exists());
         assert!(!vault.exists());
-        assert!(!ytdlp.exists());
+        assert!(ytdlp.exists());
         assert!(themes.exists());
-        for plugin_id in ["git", "preview-panel", "vault", "ytdlp"] {
+        for plugin_id in ["git", "preview-panel", "vault"] {
             assert!(snapshot
                 .commands
                 .iter()
@@ -3239,7 +3279,7 @@ mod tests {
             .any(|command| command.plugin_id == "themes"));
 
         let diagnostics = plugin_diagnostics_snapshot(vec![root.clone()]).expect("diagnostics");
-        for plugin_id in ["git", "preview-panel", "vault", "ytdlp"] {
+        for plugin_id in ["git", "preview-panel", "vault"] {
             assert!(diagnostics
                 .plugins
                 .iter()
@@ -3249,6 +3289,7 @@ mod tests {
             .plugins
             .iter()
             .any(|plugin| plugin.plugin_id == "themes"));
+        assert!(snapshot.panels.iter().any(|panel| panel.plugin_id == "ytdlp"));
 
         let _ = fs::remove_dir_all(root);
     }

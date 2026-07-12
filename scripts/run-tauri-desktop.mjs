@@ -1,15 +1,10 @@
 import { spawnSync } from "node:child_process";
-import { existsSync } from "node:fs";
 import net from "node:net";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const appDir = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const proxyDir = resolve(appDir, "../misty-proxy");
-const proxyArchiveScript = resolve(proxyDir, "scripts/build-carchive.sh");
-const proxyLibDir = resolve(appDir, "src-tauri/target/misty-proxy/host");
-const forceEmbedded = process.argv.includes("--embedded");
-const canBuildEmbeddedProxy = existsSync(proxyArchiveScript);
+const serviceLibDir = resolve(appDir, "src-tauri/target/misty-service/host");
 
 const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
 
@@ -26,34 +21,15 @@ if (devPort !== 5173) {
   console.warn(`Desktop dev port 5173 is busy; using ${devPort} for this Tauri session.`);
 }
 
-if (forceEmbedded || canBuildEmbeddedProxy) {
-  if (!canBuildEmbeddedProxy) {
-    console.error(
-      `Embedded proxy archive script was not found at ${proxyArchiveScript}.`,
-    );
-    process.exit(1);
-  }
-
-  run(npmCommand, ["run", "proxy:archive"]);
-  run(
-    npmCommand,
-    ["run", "tauri", "--", "dev", "--features=embedded-proxy-go", "--config", tauriDevConfig],
-    {
-      MISTY_DESKTOP_DEV_PORT: String(devPort),
-      MISTY_PROXY_RUNTIME: "embedded",
-      MISTY_PROXY_GO_LIB_DIR: proxyLibDir,
-      MISTY_PROXY_GO_LIB_NAME: "misty_proxy",
-    },
-  );
-} else {
-  console.warn(
-    `Embedded proxy archive script was not found at ${proxyArchiveScript}; starting desktop dev with the proxy runtime disabled.`,
-  );
-  run(npmCommand, ["run", "tauri", "--", "dev", "--config", tauriDevConfig], {
+run(npmCommand, ["run", "service:archive"]);
+run(
+  npmCommand,
+  ["run", "tauri", "--", "dev", "--features=embedded-storage-go", "--config", tauriDevConfig],
+  {
     MISTY_DESKTOP_DEV_PORT: String(devPort),
-    MISTY_PROXY_RUNTIME: process.env.MISTY_PROXY_RUNTIME ?? "disabled",
-  });
-}
+    MISTY_SERVICE_GO_LIB_DIR: serviceLibDir,
+  },
+);
 
 async function findAvailablePort(startPort) {
   const basePort = Number.isFinite(startPort) && startPort > 0 ? Math.floor(startPort) : 5173;

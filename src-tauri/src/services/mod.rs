@@ -1,4 +1,5 @@
 pub mod ai;
+pub mod automations;
 pub mod autostart;
 pub mod claude;
 pub mod commands;
@@ -7,6 +8,8 @@ pub mod directory_size;
 pub mod environment;
 pub mod explorer;
 pub mod explorer_library;
+#[cfg(desktop)]
+pub mod extension_runtime;
 pub mod file_sync;
 pub mod keychain;
 pub mod metadata;
@@ -19,11 +22,10 @@ pub mod paths;
 pub mod plugin_commands;
 pub mod power_pack;
 pub mod providers;
-pub mod proxy;
-pub mod proxy_clipboard;
-pub mod proxy_runtime;
 pub mod search;
 pub mod settings;
+pub mod storage;
+pub mod storage_runtime;
 pub mod transfers;
 #[cfg(desktop)]
 pub mod tray;

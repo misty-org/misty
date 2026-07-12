@@ -35,7 +35,7 @@ use crate::{
     services::{
         environment::AppEnvironmentService,
         providers::{ProviderRemote, ProviderService},
-        proxy::{ProxyResponse, ProxyService},
+        storage::{StorageResponse, StorageService},
     },
 };
 
@@ -57,7 +57,7 @@ struct SearchInner {
     mount_root: PathBuf,
     home_dir: PathBuf,
     providers: ProviderService,
-    proxy: ProxyService,
+    proxy: StorageService,
     listing_cache: ListingCache,
     state: RwLock<SearchState>,
     cancel_flag: Arc<AtomicBool>,
@@ -243,7 +243,7 @@ impl SearchService {
     pub fn new(
         environment: AppEnvironmentService,
         providers: ProviderService,
-        proxy: ProxyService,
+        proxy: StorageService,
     ) -> Self {
         let index_root = environment.cache_dir().join("search").join("v1");
         let live_index_dir = index_root.join("index");
@@ -1310,7 +1310,7 @@ fn remote_item_name(item: &RemoteListItem, remote_path: &str) -> String {
 }
 
 async fn response_json<T: serde::de::DeserializeOwned>(
-    response: ProxyResponse,
+    response: StorageResponse,
     operation: &str,
 ) -> ApiResult<T> {
     let status = response.status();

@@ -23,7 +23,9 @@ use crate::core::operation_queue::{ConflictPolicy, OperationQueueSnapshot};
 use crate::core::workspace::WorkspaceDocument;
 use crate::error::{ApiError, ApiResult};
 use crate::runtime::MistyRuntime;
-use crate::services::ai::{AiSendRequest, AiStatus, AiStreamEvent};
+use crate::services::automations::{
+    AutomationRunRequest, AutomationSnapshot, AutomationValidation, AutomationWorkflow,
+};
 use crate::services::autostart::LaunchOnLoginSnapshot;
 use crate::services::claude::{ClaudeSendRequest, ClaudeStatus, ClaudeStreamEvent};
 use crate::services::commands::{SaveShortcutsRequest, ShortcutsSnapshot};
@@ -56,8 +58,8 @@ use crate::services::providers::{
     ProvidersSnapshot, PublicLinkActionResult, PublicLinkListResult, RcloneConfigPaths,
     RemoteEditDraft, RemoteTestResult, SaveRemoteRequest, VerifyResult, VerifyStartRequest,
 };
-use crate::services::proxy::ProxySnapshot;
-use crate::services::proxy_runtime::ProxyRuntimeSnapshot;
+use crate::services::storage::StorageSnapshot;
+use crate::services::storage_runtime::StorageRuntimeSnapshot;
 use crate::services::search::{SearchQueryRequest, SearchResult, SearchScanRequest, SearchStatus};
 use crate::services::settings::{OpenWithAssociation, SaveSettingsRequest, SettingsSnapshot};
 use crate::services::transfers::{TransferFilter, TransferPage};
@@ -68,8 +70,7 @@ pub struct AppSnapshot {
     app_name: &'static str,
     version: &'static str,
     migration_stage: &'static str,
-    proxy_url: Option<String>,
-    proxy_runtime: ProxyRuntimeSnapshot,
+    storage_runtime: StorageRuntimeSnapshot,
     environment: AppEnvironmentSnapshot,
 }
 
@@ -85,8 +86,7 @@ pub async fn app_snapshot(state: State<'_, MistyRuntime>) -> ApiResult<AppSnapsh
         app_name: "Misty",
         version: env!("CARGO_PKG_VERSION"),
         migration_stage: "Tauri migration shell",
-        proxy_url: state.proxy.proxy_url(),
-        proxy_runtime: state.proxy_runtime.snapshot(),
+        storage_runtime: state.storage_runtime.snapshot(),
         environment: state.environment.snapshot(),
     })
 }
@@ -99,26 +99,61 @@ pub async fn app_environment_snapshot(
 }
 
 #[tauri::command]
-pub fn ai_status(state: State<'_, MistyRuntime>) -> AiStatus {
-    state.ai.status()
+pub async fn automations_snapshot(state: State<'_, MistyRuntime>) -> ApiResult<AutomationSnapshot> {
+    state.automations.snapshot().await
 }
 
 #[tauri::command]
-pub fn ai_send_message(
-    request: AiSendRequest,
+pub async fn automations_set_managed_ai_auth(
+    token: String,
     state: State<'_, MistyRuntime>,
-) -> ApiResult<AiStatus> {
-    state.ai.send_message(request)
+) -> ApiResult<()> {
+    state.automations.set_managed_ai_auth(token).await;
+    Ok(())
 }
 
 #[tauri::command]
-pub fn ai_drain_events(state: State<'_, MistyRuntime>) -> Vec<AiStreamEvent> {
-    state.ai.drain_events()
+pub async fn automations_save_workflow(
+    workflow: AutomationWorkflow,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<AutomationSnapshot> {
+    state.automations.save_workflow(workflow).await
 }
 
 #[tauri::command]
-pub fn ai_abort(state: State<'_, MistyRuntime>) -> ApiResult<AiStatus> {
-    state.ai.abort()
+pub async fn automations_delete_workflow(
+    workflow_id: String,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<AutomationSnapshot> {
+    state.automations.delete_workflow(&workflow_id).await
+}
+
+#[tauri::command]
+pub fn automations_validate_workflow(
+    workflow: AutomationWorkflow,
+    state: State<'_, MistyRuntime>,
+) -> AutomationValidation {
+    state.automations.validate(&workflow)
+}
+
+#[tauri::command]
+pub async fn automations_run(
+    request: AutomationRunRequest,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<AutomationSnapshot> {
+    state.automations.run(request).await
+}
+
+#[tauri::command]
+pub async fn automations_resolve_approval(
+    approval_id: String,
+    approved: bool,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<AutomationSnapshot> {
+    state
+        .automations
+        .resolve_approval(&approval_id, approved)
+        .await
 }
 
 #[tauri::command]
@@ -145,8 +180,8 @@ pub fn claude_abort(state: State<'_, MistyRuntime>) -> ApiResult<ClaudeStatus> {
 }
 
 #[tauri::command]
-pub async fn proxy_snapshot(state: State<'_, MistyRuntime>) -> ApiResult<ProxySnapshot> {
-    Ok(state.proxy.snapshot().await)
+pub async fn storage_snapshot(state: State<'_, MistyRuntime>) -> ApiResult<StorageSnapshot> {
+    Ok(state.storage.snapshot().await)
 }
 
 #[tauri::command]
@@ -236,15 +271,10 @@ pub fn clipboard_shared_image_bytes(
             "Shared clipboard image is missing a blob id.".to_owned(),
         ));
     }
-    let mut payload = state.clipboard.latest_shared();
+    let payload = state.clipboard.latest_shared();
     if payload.kind != ClipboardPayloadKind::Image || payload.images.is_empty() {
         return Err(ApiError::Message(
             "No shared clipboard image is available.".to_owned(),
-        ));
-    }
-    if !state.proxy_clipboard.hydrate_payload(&mut payload) {
-        return Err(ApiError::Message(
-            "Failed to download the shared clipboard image.".to_owned(),
         ));
     }
     payload
@@ -744,6 +774,21 @@ pub async fn plugin_panel_render(
     state: State<'_, MistyRuntime>,
 ) -> ApiResult<PluginPanelRenderResult> {
     state.plugin_commands.render_panel(request).await
+}
+
+#[cfg(desktop)]
+#[tauri::command]
+pub async fn extension_command_run(
+    request: crate::services::extension_runtime::ExtensionCommandRequest,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<serde_json::Value> {
+    state.extension_runtime.execute(request).await
+}
+
+#[cfg(mobile)]
+#[tauri::command]
+pub async fn extension_command_run(_request: serde_json::Value) -> ApiResult<serde_json::Value> {
+    Err(mobile_plugins_unavailable())
 }
 
 #[cfg(mobile)]

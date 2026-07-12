@@ -2,6 +2,7 @@ import { FolderOpen, LogIn } from "lucide-react";
 import { useCallback, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import mistyArtwork from "../../../assets/misty-main.png";
+import { trackOnboardingCompleted } from "../../../analytics/lifecycle";
 
 const welcomeStorageKey = "misty.mobile.welcome.v1";
 
@@ -16,6 +17,7 @@ export function MobileFirstLaunchWelcome() {
       // The welcome state can remain session-only when storage is unavailable.
     }
     setOpen(false);
+    void trackOnboardingCompleted();
   }, []);
 
   if (!open) return null;

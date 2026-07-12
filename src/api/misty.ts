@@ -2,9 +2,6 @@ import { invoke as tauriInvoke } from "@tauri-apps/api/core";
 import type {
   AndroidAllFilesAccessStatus,
   AndroidGrantedFolder,
-  AiSendRequest,
-  AiStatus,
-  AiStreamEvent,
   ArchiveActionResult,
   ArchiveCreateRequest,
   ArchiveExtractRequest,
@@ -62,6 +59,7 @@ import type {
   PluginCommandRunResult,
   PluginCommandsSnapshot,
   PluginDiagnosticsSnapshot,
+  ExtensionCommandRequest,
   PrepareOpenItemRequest,
   PreparedOpenItem,
   ProviderJobStart,
@@ -73,7 +71,7 @@ import type {
   ProvidersSnapshot,
   PublicLinkActionResult,
   PublicLinkListResult,
-  ProxySnapshot,
+  StorageSnapshot,
   RcloneConfigPaths,
   RemoteEditDraft,
   RemoteTestResult,
@@ -103,6 +101,10 @@ import type {
   CompareFoldersResult,
   DuplicateScanRequest,
   DuplicateScanResult,
+  AutomationRunRequest,
+  AutomationSnapshot,
+  AutomationValidation,
+  AutomationWorkflow,
 } from "./types";
 import { hasTauriInternals } from "../shared/tauri";
 
@@ -120,24 +122,32 @@ export function appEnvironmentSnapshot(): Promise<AppEnvironmentSnapshot> {
   return invoke("app_environment_snapshot");
 }
 
-export function proxySnapshot(): Promise<ProxySnapshot> {
-  return invoke("proxy_snapshot");
+export function automationsSnapshot(): Promise<AutomationSnapshot> {
+  return invoke("automations_snapshot");
 }
 
-export function aiStatus(): Promise<AiStatus> {
-  return invoke("ai_status");
+export function automationsSaveWorkflow(workflow: AutomationWorkflow): Promise<AutomationSnapshot> {
+  return invoke("automations_save_workflow", { workflow });
 }
 
-export function aiSendMessage(request: AiSendRequest): Promise<AiStatus> {
-  return invoke("ai_send_message", { request });
+export function automationsDeleteWorkflow(workflowId: string): Promise<AutomationSnapshot> {
+  return invoke("automations_delete_workflow", { workflowId });
 }
 
-export function aiDrainEvents(): Promise<AiStreamEvent[]> {
-  return invoke("ai_drain_events");
+export function automationsValidateWorkflow(workflow: AutomationWorkflow): Promise<AutomationValidation> {
+  return invoke("automations_validate_workflow", { workflow });
 }
 
-export function aiAbort(): Promise<AiStatus> {
-  return invoke("ai_abort");
+export function automationsRun(request: AutomationRunRequest): Promise<AutomationSnapshot> {
+  return invoke("automations_run", { request });
+}
+
+export function automationsResolveApproval(approvalId: string, approved: boolean): Promise<AutomationSnapshot> {
+  return invoke("automations_resolve_approval", { approvalId, approved });
+}
+
+export function storageSnapshot(): Promise<StorageSnapshot> {
+  return invoke("storage_snapshot");
 }
 
 export function claudeStatus(): Promise<ClaudeStatus> {
@@ -417,6 +427,10 @@ export function pluginCommandRun(request: RunPluginCommandRequest): Promise<Plug
 
 export function pluginPanelRender(request: RenderPluginPanelRequest): Promise<PluginPanelRenderResult> {
   return invoke("plugin_panel_render", { request });
+}
+
+export function extensionCommandRun<T = unknown>(request: ExtensionCommandRequest): Promise<T> {
+  return invoke("extension_command_run", { request });
 }
 
 export function pluginDiagnosticsSnapshot(): Promise<PluginDiagnosticsSnapshot> {

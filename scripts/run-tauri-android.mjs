@@ -18,7 +18,7 @@ const targetArg = args
 
 const target =
   targetArg ??
-  process.env.MISTY_PROXY_GO_TARGET ??
+  process.env.MISTY_SERVICE_GO_TARGET ??
   (isDevice ? "android-arm64" : "android-x86_64");
 const buildTargets = isBuild && !targetArg
   ? ["android-arm64", "android-armv7", "android-x86", "android-x86_64"]
@@ -36,9 +36,8 @@ const deviceDevConfig = developmentHost
   : null;
 
 for (const buildTarget of buildTargets) {
-  run(npmCommand, ["run", "proxy:archive"], {
-    MISTY_PROXY_GO_TARGET: buildTarget,
-    MISTY_PROXY_GO_LIB_NAME: "misty_proxy",
+  run(npmCommand, ["run", "service:archive"], {
+    MISTY_SERVICE_GO_TARGET: buildTarget,
   });
 }
 
@@ -56,7 +55,7 @@ if (isBuild && targetArg) {
   tauriArgs.push("--target", androidCargoTarget(targetArg));
 }
 
-run(npmCommand, [...tauriArgs, "--features=embedded-proxy-go"], {
+run(npmCommand, [...tauriArgs, "--features=embedded-storage-go"], {
   ...(physicalDevice ? { ANDROID_SERIAL: physicalDevice } : {}),
   ...(developmentHost ? { TAURI_DEV_HOST: developmentHost } : {}),
   ...(isDevice ? { MISTY_DESKTOP_DEV_PORT: String(developmentPort) } : {}),
@@ -66,9 +65,6 @@ run(npmCommand, [...tauriArgs, "--features=embedded-proxy-go"], {
         VITE_MISTY_SERVER_URL: "/api",
       }
     : {}),
-  MISTY_PROXY_RUNTIME: "embedded",
-  MISTY_RCLONE_BACKEND: "misty-rclone",
-  MISTY_PROXY_GO_LIB_NAME: "misty_proxy",
 });
 
 function run(command, commandArgs, env = {}) {
