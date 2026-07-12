@@ -6,6 +6,8 @@ export * from "./browserSearchEngine";
 import { blankBrowserUrl } from "./browserUrl";
 
 export { blankBrowserUrl } from "./browserUrl";
+export * from "./browserInternalUrl";
+import { browserInternalPage, browserInternalPages } from "./browserInternalUrl";
 export {
   browserHomeUrl,
   configureBrowserHomeUrl,
@@ -43,6 +45,8 @@ export interface BrowserTabState {
   profileId?: string;
   /** Saved website used to open this tab, independent of its current URL. */
   websiteId?: string;
+  /** A private tab: throwaway website data, no history, never saved or synced. */
+  private?: true;
 }
 
 export type CodeMultibufferKind =
@@ -226,6 +230,7 @@ export function parseBrowserTabState(value: unknown): BrowserTabState {
       /^[A-Za-z0-9:_.-]{1,200}$/.test(candidate.websiteId)
         ? candidate.websiteId
         : undefined,
+    private: candidate.private === true || undefined,
   };
 }
 
@@ -258,6 +263,8 @@ export function sanitizeBrowserTitle(title?: string, url?: string): string {
 
 export function browserTabTitle(url: string): string {
   if (url === blankBrowserUrl) return "New Tab";
+  const internal = browserInternalPage(url);
+  if (internal) return browserInternalPages[internal].title;
   try {
     const parsed = new URL(url);
     const query = parsed.searchParams.get("q");

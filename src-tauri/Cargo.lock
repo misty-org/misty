@@ -4390,6 +4390,7 @@ dependencies = [
  "uuid",
  "windows-sys 0.59.0",
  "zeroize",
+ "zstd",
 ]
 
 [[package]]
@@ -4475,6 +4476,7 @@ dependencies = [
  "webview2-com",
  "windows 0.61.3",
  "windows-sys 0.59.0",
+ "wry",
  "xcap",
  "zeroize",
  "zip",

@@ -68,6 +68,7 @@ import {
   type VirtualWorkspaceState,
 } from "./virtualWindows";
 import { migrateRetiredWorkspaceTabs } from "./workspaceMigrations";
+import { isPrivateBrowserTab } from "./privateBrowsing";
 import {
   canCloseWorkspaceTab,
   canCloseWorkspaceWindow,
@@ -115,6 +116,8 @@ export interface WorkspaceStore extends VirtualWorkspaceState, WebsiteNavigation
     paneId?: string;
     sourceTabId?: string;
     websiteId?: string;
+    /** Open as a private tab. Tabs opened from a private tab are private too. */
+    private?: boolean;
   }) => WorkspaceTab;
   updateBrowserTab: (tabId: string, patch: Partial<BrowserTabState> & { title?: string }) => void;
   renameTab: (tabId: string, title: string) => void;
@@ -123,7 +126,8 @@ export interface WorkspaceStore extends VirtualWorkspaceState, WebsiteNavigation
   focusPane: (paneId: string) => boolean;
   focusTab: (tabId: string) => boolean;
   closeTab: (tabId: string, paneId?: string) => boolean;
-  reopenClosedTab: () => WorkspaceTab | null;
+  /** Reopens a closed tab; the most recently closed one by default. */
+  reopenClosedTab: (index?: number) => WorkspaceTab | null;
   cycleTab: (direction: 1 | -1) => WorkspaceTab | null;
   selectTab: (index: number | "last") => WorkspaceTab | null;
   dockTabGroup: (tabIds: string[], paneId: string, zone: DockDropZone, index?: number) => boolean;
@@ -259,13 +263,26 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
       },
       openBrowserTab: (request = {}) => {
         const url = request.url?.trim() || browserHomeUrl();
+        let sourcePrivate = false;
+        if (request.sourceTabId) {
+          mapAllVirtualWorkspaceTabs(get(), (candidate) => {
+            if (candidate.id === request.sourceTabId && isPrivateBrowserTab(candidate))
+              sourcePrivate = true;
+            return candidate;
+          });
+        }
+        const isPrivate = request.private || sourcePrivate;
         const tab = get().openSurface({
           surfaceId: "browser",
           groupKey: "tool:browser",
           scopeKey: "global",
           title: browserTabTitle(url),
           route: "/browser",
-          state: { ...createBrowserTabState(url), websiteId: request.websiteId },
+          state: {
+            ...createBrowserTabState(url),
+            websiteId: request.websiteId,
+            ...(isPrivate ? { private: true } : {}),
+          },
           instancePolicy: "multiple",
           forceNew: true,
           paneId: request.paneId,
@@ -531,10 +548,11 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
         });
         return true;
       },
-      reopenClosedTab: () => {
+      reopenClosedTab: (index = 0) => {
         let current = get();
-        const [closed, ...closedTabs] = current.closedTabs;
+        const closed = current.closedTabs[index];
         if (!closed) return null;
+        const closedTabs = current.closedTabs.filter((_, position) => position !== index);
         if (
           closed.windowId !== current.activeVirtualWindowId &&
           currentVirtualWindows(current).some((window) => window.id === closed.windowId)

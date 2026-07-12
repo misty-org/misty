@@ -21,7 +21,7 @@ export function detectShortcutPlatform(): ShortcutPlatform {
       // The browser fallback below keeps tests and web previews usable.
     }
   }
-  if (/mac|iphone|ipad|ipod/i.test(navigator.platform)) return "macos";
+  if (/mac/i.test(navigator.platform)) return "macos";
   if (/win/i.test(navigator.platform)) return "windows";
   return "linux";
 }

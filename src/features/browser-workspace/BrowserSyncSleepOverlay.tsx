@@ -4,8 +4,8 @@ import { isApiSessionTransitioning, readApiSessionGeneration } from "@/api/clien
 import { setBrowserWebviewsSuspended } from "@/features/webviews/browserRuntime";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { Button } from "@/shared/ui/button";
-import misty from "@/shared/assets/misty-cloud-expression-cycle.webp?inline";
-import mistyStill from "@/shared/assets/agents/cloud-sky-poster.webp?inline";
+import misty from "@/assets/branding/misty-icon.png?inline";
+import { DeviceChooseOverlay } from "./DeviceChooseOverlay";
 import { activateNativeDevice, activeDeviceEpoch, readNativeSync } from "./native";
 import { useBrowserSyncStore } from "./store";
 
@@ -44,17 +44,14 @@ export function SyncSleepScreen({
             onClick={onWake}
             className="group mb-6 rounded-full p-3 outline-none transition-transform duration-200 hover:scale-105 active:scale-95 focus-visible:ring-2 focus-visible:ring-sky-300/80 focus-visible:ring-offset-8 focus-visible:ring-offset-transparent disabled:cursor-wait disabled:opacity-100 motion-reduce:transform-none"
           >
-            <picture>
-              <source media="(prefers-reduced-motion: reduce)" srcSet={mistyStill} />
-              <img
-                src={misty}
-                alt=""
-                width={176}
-                height={176}
-                draggable={false}
-                className="size-44 select-none object-contain"
-              />
-            </picture>
+            <img
+              src={misty}
+              alt=""
+              width={176}
+              height={176}
+              draggable={false}
+              className="size-44 select-none object-contain"
+            />
           </Button>
           <Dialog.Title className="text-xl font-medium tracking-tight">
             Misty’s resting here
@@ -97,6 +94,7 @@ export function BrowserSyncSleepOverlay({ accountId }: { accountId: string }) {
     accountId &&
     session?.account_id === accountId &&
     session.full_sync !== false &&
+    !session.trees &&
     session.workspace.active_device?.device_id &&
     (session.status.phase === "ready" || session.status.phase === "catching_up") &&
     session.status.applied_sequence >= session.status.head_sequence &&
@@ -163,6 +161,8 @@ export function BrowserSyncSleepOverlay({ accountId }: { accountId: string }) {
       }
     }
   };
+  // Tree mode replaces the resting screen with a workspace chooser.
+  if (session?.trees) return <DeviceChooseOverlay accountId={accountId} />;
   if (!sleeping) return null;
   return <SyncSleepScreen busy={busy} error={error} onWake={() => void wake()} />;
 }

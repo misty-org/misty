@@ -96,6 +96,13 @@ func browserSocketTestDatabase(t *testing.T) (*db.Database, *db.Database) {
 	if _, err = conn.Exec(strings.Split(string(activeMigration), "-- +goose Down")[0] + "\n" + strings.Split(string(controlsMigration), "-- +goose Down")[0]); err != nil {
 		t.Fatal(err)
 	}
+	treesMigration, err := os.ReadFile(filepath.Join("..", "platform", "postgres", "migrations", "20270926000000_browser_sync_trees.sql"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = conn.Exec(strings.ReplaceAll(strings.Split(string(treesMigration), "-- +goose Down")[0], "public.", "")); err != nil {
+		t.Fatal(err)
+	}
 	return a, b
 }
 func socketTestGrant(workspace string, root ed25519.PrivateKey) (SyncDeviceGrant, ed25519.PrivateKey) {

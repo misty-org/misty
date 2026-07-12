@@ -10,6 +10,9 @@ import { cn } from "@/shared/ui/utils";
 import { browserSyncRetryEvent, useBrowserSyncStore } from "./store";
 import { DeviceControlContent } from "./DeviceControlContent";
 import { syncBadgeStatus } from "./syncBadgeStatus";
+import { viewingName } from "./treeControl";
+import { useUserStore } from "@/features/auth/core";
+import { RestoreStatusList } from "./restore/RestoreStatusList";
 
 /** Account-wide status stays in the titlebar even when the navigator is hidden. */
 export function BrowserSyncBadge({
@@ -20,6 +23,7 @@ export function BrowserSyncBadge({
   onOpenSettings: () => void;
 }) {
   const recovery = useWorkspaceRecoveryState();
+  const ownerName = useUserStore((state) => state.me?.name);
   const sync = useBrowserSyncStore();
   const [open, setOpen] = useState(false);
   const [retrying, setRetrying] = useState(false);
@@ -28,6 +32,11 @@ export function BrowserSyncBadge({
     onOpenSettings();
   };
   const status = syncBadgeStatus({ accountId, recovery, ...sync });
+  // Showing another device's workspace: say whose, right in the pill.
+  const viewing =
+    sync.session?.account_id === accountId && sync.session
+      ? viewingName(sync.session, ownerName)
+      : null;
   if (!accountId || !nativeWorkspaceRecoveryEnabled()) return null;
   const retry = async () => {
     if (retrying || isApiSessionTransitioning()) return;
@@ -52,8 +61,10 @@ export function BrowserSyncBadge({
           size="none"
           data-misty-window-drag-block="true"
           data-sync-status={status.tone}
-          aria-label={`Sync: ${status.title}`}
-          title={`Sync: ${status.title}`}
+          aria-label={
+            viewing ? `Viewing ${viewing}. Sync: ${status.title}` : `Sync: ${status.title}`
+          }
+          title={viewing ? `Viewing ${viewing}` : `Sync: ${status.title}`}
           className={cn(
             "h-6 shrink-0 gap-1.5 rounded-full border px-2 text-xs font-medium focus-visible:ring-2 focus-visible:ring-cream-muted",
             status.tone === "green" &&
@@ -65,7 +76,7 @@ export function BrowserSyncBadge({
           )}
         >
           <Icon aria-hidden="true" className="size-3" />
-          Sync
+          {viewing ? <span className="max-w-40 truncate">Viewing {viewing}</span> : "Sync"}
         </Button>
       </PopoverTrigger>
       <PopoverContent
@@ -84,6 +95,7 @@ export function BrowserSyncBadge({
             onOpenSyncSettings={openSyncSettings}
           />
         )}
+        <RestoreStatusList />
         <div className="border-t border-charcoal-border pt-3">
           <div aria-live="polite" className="flex items-center gap-2 text-sm">
             {status.tone === "red" && (

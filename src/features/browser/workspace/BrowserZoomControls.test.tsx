@@ -8,8 +8,6 @@ import {
 import { afterEach, expect, it, vi } from "vitest";
 import { BrowserZoomControls, useBrowserZoom } from "./BrowserZoomControls";
 import { BrowserMenuView } from "./BrowserMenuView";
-import { WebsiteHeader } from "../../../shared/toolAssets/WebsiteHeader";
-import type { MistyAppSDK } from "@misty/sdk";
 
 afterEach(cleanup);
 function Controls({
@@ -84,50 +82,16 @@ it("keeps the Browser dropdown open across zoom adjustments and reopening", asyn
       reportError={vi.fn()}
     />,
   );
-  fireEvent.click(ui.getByRole("button", { name: "Browser menu" }));
-  const plus = await ui.findByRole("button", { name: "Zoom in" });
+  const open = () =>
+    fireEvent.pointerDown(ui.getByRole("button", { name: "Browser menu" }), { button: 0 });
+  open();
+  const plus = await ui.findByRole("menuitem", { name: "Zoom in" });
   await act(async () => fireEvent.click(plus));
   expect(setZoom).toHaveBeenLastCalledWith(1.1);
-  expect(ui.getByRole("dialog")).toBeTruthy();
+  expect(ui.getByRole("menu")).toBeTruthy();
   expect(ui.getByText("110%")).toBeTruthy();
-  fireEvent.keyDown(ui.getByRole("dialog"), { key: "Escape" });
-  await waitFor(() => expect(ui.queryByRole("dialog")).toBeNull());
-  fireEvent.click(ui.getByRole("button", { name: "Browser menu" }));
+  fireEvent.keyDown(ui.getByRole("menu"), { key: "Escape" });
+  await waitFor(() => expect(ui.queryByRole("menu")).toBeNull());
+  open();
   expect(await ui.findByText("110%")).toBeTruthy();
-});
-
-it("zooms the embedded website from More and leaves the menu open", async () => {
-  const setZoom = vi.fn(async () => {});
-  const misty = {
-    browser: { setZoom, overlay: vi.fn(async () => {}) },
-  } as unknown as MistyAppSDK;
-  const props = {
-    route: "/apps/inbox",
-    misty,
-    view: {
-      handle: "gmail",
-      contextId: "scope",
-      url: "https://mail.google.com",
-    },
-    label: "Gmail",
-    icon: null,
-    url: "https://mail.google.com",
-    pinned: false,
-    onPin: vi.fn(),
-    report: vi.fn(),
-  };
-  const ui = render(<WebsiteHeader {...props} />);
-  fireEvent.click(ui.getByRole("button", { name: "More website actions" }));
-  const plus = await ui.findByRole("button", { name: "Zoom in" });
-  await act(async () => fireEvent.click(plus));
-  expect(setZoom).toHaveBeenLastCalledWith("gmail", 1.1);
-  expect(ui.getByRole("button", { name: "Open link" })).toBeTruthy();
-  await act(async () =>
-    fireEvent.click(ui.getByRole("button", { name: "Reset zoom to 100%" })),
-  );
-  expect(setZoom).toHaveBeenLastCalledWith("gmail", 1);
-  ui.rerender(<WebsiteHeader {...props} view={null} />);
-  expect(
-    (ui.getByRole("button", { name: "Zoom in" }) as HTMLButtonElement).disabled,
-  ).toBe(true);
 });

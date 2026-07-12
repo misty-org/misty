@@ -175,6 +175,14 @@ pub struct Device {
     pub activation_request: Option<String>,
     #[serde(default)]
     pub activation_expires_at: u64,
+    #[serde(default)]
+    pub os_version: String,
+    #[serde(default)]
+    pub activation_tree_id: Option<String>,
+    #[serde(default)]
+    pub tree_last_counter: u64,
+    #[serde(default)]
+    pub created_at: Option<String>,
 }
 fn default_full_sync() -> bool {
     true
@@ -229,6 +237,42 @@ pub enum ServerFrame {
     AccountEvent {
         event: AccountEvent,
     },
+    // Tree protocol (v2).
+    Trees {
+        trees: Vec<crate::tree::protocol::Tree>,
+    },
+    TreeDelta {
+        delta: crate::tree::protocol::TreeDelta,
+    },
+    TreeSnapshot {
+        snapshot: crate::tree::protocol::TreeSnapshot,
+    },
+    /// The client's copy of a watched tree is already at `version`.
+    TreeCurrent {
+        tree_id: String,
+        version: u64,
+    },
+    TreeAck {
+        request_id: Option<String>,
+        receipt: crate::tree::protocol::TreeReceipt,
+    },
+    TreeError {
+        code: String,
+        request_id: Option<String>,
+        operation_id: Option<String>,
+        tree_id: Option<String>,
+    },
+    Slot {
+        request_id: Option<String>,
+        slot: Option<crate::tree::protocol::Slot>,
+    },
+    Blobs {
+        request_id: Option<String>,
+        blobs: Vec<crate::tree::protocol::Blob>,
+    },
+    BlobAck {
+        request_id: Option<String>,
+    },
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -260,4 +304,38 @@ pub enum ClientFrame<'a> {
     Resume {
         after: u64,
     },
+    PublishTree {
+        request_id: &'a str,
+        tree_op: &'a crate::tree::protocol::TreeOp,
+    },
+    Claim {
+        request_id: &'a str,
+        claim: &'a crate::tree::protocol::TreeClaim,
+    },
+    WatchTree {
+        tree_id: &'a str,
+        after: u64,
+    },
+    UnwatchTree {
+        tree_id: &'a str,
+    },
+    SlotGet {
+        request_id: &'a str,
+        tree_id: &'a str,
+        tab_node_id: &'a str,
+        slot: i16,
+    },
+    BlobPut {
+        request_id: &'a str,
+        blob: &'a crate::tree::protocol::Blob,
+    },
+    BlobGet {
+        request_id: &'a str,
+        #[serde(with = "crate::tree::protocol::b64::list")]
+        blob_hashes: &'a [Vec<u8>],
+    },
 }
+
+/// Wire protocol spoken by this client: per-device trees plus the
+/// account-wide credential log on the same socket.
+pub const PROTOCOL_VERSION: u8 = 2;

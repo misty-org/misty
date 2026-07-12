@@ -22,6 +22,8 @@ mod browser_capture;
 pub use browser_capture::{BrowserCaptureState, BrowserObservation};
 pub(crate) mod browser_import;
 pub use browser_import::{BrowserImportJournal, BrowserImportReceipt};
+mod trees;
+pub use trees::Desired;
 
 const MAX_PENDING_COUNT: u64 = 10_000;
 const MAX_PENDING_BYTES: u64 = 32 << 20;
@@ -101,6 +103,22 @@ fn connect(path: &Path) -> Result<Connection> {
             singleton INTEGER PRIMARY KEY CHECK(singleton=1), observed_head INTEGER NOT NULL CHECK(observed_head>=0)
         );
         INSERT OR IGNORE INTO sync_high_watermark VALUES(1,0);
+        CREATE TABLE IF NOT EXISTS sync_tree_cache (
+            tree_id TEXT PRIMARY KEY, version INTEGER NOT NULL CHECK(version>=0), snapshot TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS sync_tree_desired (
+            tree_id TEXT PRIMARY KEY, desired TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS sync_tree_inflight (
+            tree_id TEXT PRIMARY KEY, request_id TEXT NOT NULL, op TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS sync_tree_counter (
+            singleton INTEGER PRIMARY KEY CHECK(singleton=1), next_counter INTEGER NOT NULL CHECK(next_counter>0)
+        );
+        INSERT OR IGNORE INTO sync_tree_counter VALUES(1,1);
+        CREATE TABLE IF NOT EXISTS sync_tree_roster (
+            singleton INTEGER PRIMARY KEY CHECK(singleton=1), roster TEXT NOT NULL
+        );
         CREATE TABLE IF NOT EXISTS sync_vault (
             singleton INTEGER PRIMARY KEY CHECK(singleton=1),
             workspace TEXT NOT NULL,

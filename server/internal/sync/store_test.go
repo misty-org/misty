@@ -120,6 +120,15 @@ func syncTestDatabase(t *testing.T) (*Store, string) {
 	if _, err = conn.Exec(strings.Split(string(activeMigration), "-- +goose Down")[0] + "\n" + strings.Split(string(controlsMigration), "-- +goose Down")[0]); err != nil {
 		t.Fatal(err)
 	}
+	// The tree migration is schema-qualified for production; tests run it in
+	// their disposable schema.
+	treesMigration, err := os.ReadFile("../platform/postgres/migrations/20270926000000_browser_sync_trees.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = conn.Exec(strings.ReplaceAll(strings.Split(string(treesMigration), "-- +goose Down")[0], "public.", "")); err != nil {
+		t.Fatal(err)
+	}
 	return &Store{Conn: conn}, scoped
 }
 
