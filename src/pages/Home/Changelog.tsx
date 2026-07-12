@@ -1,18 +1,5 @@
 import { useState } from "react";
-
-const changelog = [
-  {
-    version: "v0.1.0",
-    date: "Dec 2025",
-    summary: "Initial release",
-    changes: [
-      "ImGui-based desktop client with local file browsing",
-      "Go backend proxy with Grpc communication",
-      "Basic file operations (copy, move, delete)",
-      "Cross-platform builds for Windows and Linux",
-    ],
-  },
-];
+import { changelog } from "../Changelog/data";
 
 export default function Changelog() {
   const [openIndex, setOpenIndex] = useState<number | null>(0);
@@ -58,8 +45,8 @@ export default function Changelog() {
               {isOpen && (
                 <div className="px-6 pb-5 pt-1">
                   <ul className="space-y-2">
-                    {entry.changes.map((change, i) => (
-                      <li key={i} className="flex items-start gap-3 text-sm text-text-muted">
+                    {entry.groups.flatMap((group) => group.changes).slice(0, 5).map((change) => (
+                      <li key={change} className="flex items-start gap-3 text-sm text-text-muted">
                         <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-primary shrink-0" />
                         {change}
                       </li>

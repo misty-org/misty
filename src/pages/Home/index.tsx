@@ -3,7 +3,6 @@ import FeatureDemo from "./FeatureDemo";
 import MainHero from "./MainHero";
 import ServiceProviders from "./FeaturesProviders";
 import ProductScrollShowcase from "./ProductScrollShowcase";
-import Docs from "./DocsSection";
 import BlogPreview from "./BlogPreview";
 import Changelog from "./Changelog";
 import EndingOutro from "./EndingOutro";
@@ -26,10 +25,6 @@ export default function Home() {
 
       <section>
         <ProductScrollShowcase/>
-      </section>
-
-      <section>
-        <Docs/>
       </section>
 
       <section>

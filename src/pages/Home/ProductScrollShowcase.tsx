@@ -224,7 +224,7 @@ export default function ProductScrollShowcase() {
           <p className="mb-4 text-[11px] uppercase tracking-[0.22em] text-text-muted/70">Main features</p>
           <h2 className="text-4xl font-bold tracking-tight text-text md:text-6xl">The pieces that make Misty useful.</h2>
           <p className="mx-auto mt-5 max-w-2xl text-pretty text-lg leading-8 text-text-muted">
-            Six core workflows work together: find files, split work into panels, connect remotes, move data, extend the app, and ask MistyAI for help.
+            Six core workflows work together: find files, split work into panels, connect Remotes, move data, extend the desktop app, and experiment with Mika.
           </p>
           <NavLink
             to="/features"

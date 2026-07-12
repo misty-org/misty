@@ -8,35 +8,43 @@ export interface RoadmapPhase {
 
 export const phases: RoadmapPhase[] = [
   {
-    label: "Shipped",
+    label: "Available",
     status: "done",
     items: [
-      "Google Drive & OneDrive integration",
-      "Unified file browser",
-      "Multi-account support",
-      "Misty clipboard",
-      "Linux support",
+      "Misty desktop for macOS and Windows",
+      "Local file browsing, tabs, workspaces, and common file operations",
+      "File previews, metadata inspection, and Deep Search",
+      "Transfer queue, progress, controls, and history",
+      "Google Drive, OneDrive, and Dropbox Remotes",
     ],
   },
   {
-    label: "In Progress",
+    label: "Preview",
     status: "active",
     items: [
-      "Dropbox & Box integration",
-      "Encrypted transfers",
-      "File preview panel",
-      "Keyboard shortcut customization",
+      "Automations workflow editor",
+      "Mika, Misty’s experimental AI assistant",
+      "Secure desktop Extensions runtime and catalog",
+    ],
+  },
+  {
+    label: "Coming next",
+    status: "active",
+    items: [
+      "iPhone and Android distribution",
+      "Production account and provider authorization hardening",
+      "Desktop and mobile release packaging",
     ],
   },
   {
     label: "Planned",
     status: "planned",
     items: [
-      "S3-compatible storage support",
-      "Shared workspaces & team accounts",
-      "Mobile companion app",
-      "Plugin / extension system",
-      "Offline mode with sync queue",
+      "S3-compatible storage and SFTP Remotes",
+      "Backups, snapshots, and restore workflows",
+      "Verified Linux distribution",
+      "Shared workspaces and team accounts",
+      "Broader offline and sync workflows",
     ],
   },
 ];

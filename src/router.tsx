@@ -8,7 +8,6 @@ import Register from "./pages/Register";
 import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
 import Waitlist from "./pages/Waitlist";
-import Docs from "./pages/Docs";
 import Settings from "./pages/Dashboard";
 import Changelog from "./pages/Changelog";
 import Blog from "./pages/Blog";
@@ -24,14 +23,13 @@ export const router = createBrowserRouter([
     element: <App />,
     children: [
       { index: true, element: <Home />, handle: { title: "Misty - Home" } },
-      { path: "docs/*", element: <Docs />, handle: { title: "Misty - Docs" } },
       { path: "settings", element: <Settings />, handle: { title: "Misty - Settings" } },
       { path: "download", element: <Download />, handle: { title: "Misty - Download" } },
       { path: "pricing", element: <Pricing />, handle: { title: "Misty - Pricing" } },
       { path: "changelog", element: <Changelog />, handle: { title: "Misty - Changelog" } },
       { path: "blog", element: <Blog />, handle: { title: "Misty - Blog" } },
       { path: "roadmap", element: <Roadmap />, handle: { title: "Misty - Roadmap" } },
-      { path: "plugins", element: <Plugins />, handle: { title: "Misty - Plugins" } },
+      { path: "plugins", element: <Plugins />, handle: { title: "Misty - Extensions" } },
       { path: "features", element: <Features />, handle: { title: "Misty - Features" } },
       { path: "waitlist", element: <Waitlist />, handle: { title: "Misty - Waitlist" } },
       { path: "signin", element: <SignIn />, handle: { title: "Misty - Sign In" } },

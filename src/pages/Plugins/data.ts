@@ -32,7 +32,6 @@ export const SAMPLE_PLUGINS: PluginBrowserEntry[] = [
       "v0.9.0 - Initial internal prototype.",
     ],
     links: [
-      { label: "Documentation", url: "https://mistysys.com/docs" },
       { label: "Source", url: "https://github.com/misty-org/misty" },
     ],
     launcher: {
@@ -70,7 +69,7 @@ export const SAMPLE_PLUGINS: PluginBrowserEntry[] = [
       "Choose an output format and destination, then start the conversion.",
     ],
     changelog: ["v0.1.0 - Initial plugin template for media conversion workflows."],
-    links: [{ label: "Documentation", url: "https://mistysys.com/docs" }],
+    links: [],
     launcher: {
       views: ["Files"],
       show_in_launcher: true,
@@ -101,7 +100,7 @@ export const SAMPLE_PLUGINS: PluginBrowserEntry[] = [
       "Apply a preset or adjust token colors.",
     ],
     changelog: ["v0.1.0 - Added the first theme builder with curated presets."],
-    links: [{ label: "Documentation", url: "https://mistysys.com/docs" }],
+    links: [],
     launcher: {
       views: ["Settings", "Plugins"],
       show_in_launcher: true,

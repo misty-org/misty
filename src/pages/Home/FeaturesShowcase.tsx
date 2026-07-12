@@ -173,10 +173,10 @@ export default function FeaturesShowcase() {
             <div className="divide-y divide-border/70 rounded-xl border border-border/60 bg-surface/10">
               <div className="px-4 py-4 md:px-5">
                 <a
-                  href="/docs/introduction"
+                  href="/features"
                   className="text-xs text-text-muted underline underline-offset-4 transition-colors hover:text-white"
                 >
-                  Learn more about how Misty works
+                  Explore Misty features
                 </a>
               </div>
               <div className="px-4 py-4 md:px-5">

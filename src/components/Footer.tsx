@@ -14,10 +14,8 @@ const columns = [
     label: "Resources",
     links: [
       { to: "/features", text: "Features" },
-      { to: "/docs/introduction", text: "Getting Started" },
-      { to: "/docs/providers-overview", text: "Cloud Providers" },
-      { to: "/docs/backups-overview", text: "Backups" },
-      { to: "/docs/plugins-overview", text: "Plugins" },
+      { to: "/plugins", text: "Extensions" },
+      { to: "/roadmap", text: "Roadmap" },
     ],
   },
   {
