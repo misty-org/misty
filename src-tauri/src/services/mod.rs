@@ -22,11 +22,10 @@ pub mod paths;
 pub mod plugin_commands;
 pub mod power_pack;
 pub mod providers;
-pub mod proxy;
-pub mod proxy_clipboard;
-pub mod proxy_runtime;
 pub mod search;
 pub mod settings;
+pub mod storage;
+pub mod storage_runtime;
 pub mod transfers;
 #[cfg(desktop)]
 pub mod tray;

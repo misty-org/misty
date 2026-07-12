@@ -4,7 +4,7 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use tokio::sync::RwLock;
 use uuid::Uuid;
 
-use crate::services::proxy::ProxyService;
+use crate::services::storage::StorageService;
 
 use super::{
     FileSyncAction, FileSyncChange, FileSyncConflict, FileSyncEntry, FileSyncEntryId,
@@ -29,7 +29,7 @@ struct EntryCache {
 
 /// Proxy-backed sync metadata boundary with a process-local hot cache.
 pub struct FileSyncEntryStore {
-    proxy: Option<ProxyService>,
+    proxy: Option<StorageService>,
     cache: RwLock<EntryCache>,
 }
 
@@ -40,7 +40,7 @@ impl Default for FileSyncEntryStore {
 }
 
 impl FileSyncEntryStore {
-    pub fn new(proxy: Option<ProxyService>) -> Self {
+    pub fn new(proxy: Option<StorageService>) -> Self {
         Self {
             proxy,
             cache: RwLock::new(EntryCache::default()),

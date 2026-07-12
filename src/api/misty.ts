@@ -2,9 +2,6 @@ import { invoke as tauriInvoke } from "@tauri-apps/api/core";
 import type {
   AndroidAllFilesAccessStatus,
   AndroidGrantedFolder,
-  AiSendRequest,
-  AiStatus,
-  AiStreamEvent,
   ArchiveActionResult,
   ArchiveCreateRequest,
   ArchiveExtractRequest,
@@ -74,7 +71,7 @@ import type {
   ProvidersSnapshot,
   PublicLinkActionResult,
   PublicLinkListResult,
-  ProxySnapshot,
+  StorageSnapshot,
   RcloneConfigPaths,
   RemoteEditDraft,
   RemoteTestResult,
@@ -149,24 +146,8 @@ export function automationsResolveApproval(approvalId: string, approved: boolean
   return invoke("automations_resolve_approval", { approvalId, approved });
 }
 
-export function proxySnapshot(): Promise<ProxySnapshot> {
-  return invoke("proxy_snapshot");
-}
-
-export function aiStatus(): Promise<AiStatus> {
-  return invoke("ai_status");
-}
-
-export function aiSendMessage(request: AiSendRequest): Promise<AiStatus> {
-  return invoke("ai_send_message", { request });
-}
-
-export function aiDrainEvents(): Promise<AiStreamEvent[]> {
-  return invoke("ai_drain_events");
-}
-
-export function aiAbort(): Promise<AiStatus> {
-  return invoke("ai_abort");
+export function storageSnapshot(): Promise<StorageSnapshot> {
+  return invoke("storage_snapshot");
 }
 
 export function claudeStatus(): Promise<ClaudeStatus> {

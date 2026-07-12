@@ -56,6 +56,8 @@ export interface AgentEvent {
   file_plan?: FileOperationPlan;
   message?: string;
   created_at: string;
+  credits_used?: number;
+  credits_remaining?: number;
 }
 
 export interface AgentEventsResponse {
@@ -70,6 +72,7 @@ export interface AgentStatusResponse {
   configured: boolean;
   provider: string;
   model: string;
+  model_name?: string;
   running: boolean;
   session_id: string | null;
   error: string | null;
@@ -119,6 +122,25 @@ async function aiRequest<T = unknown>(path: string, init?: RequestInit): Promise
   });
   if (!response.ok) {
     const text = await response.text();
+    try {
+      const payload = JSON.parse(text) as { code?: string; message?: string; available_credits?: number; reset_at?: string; retry_after_seconds?: number };
+      if (payload.code === "credits_exhausted") {
+        const reset = payload.reset_at ? new Date(payload.reset_at).toLocaleDateString() : "your next reset";
+        throw new Error(`Misty credits exhausted (${payload.available_credits ?? 0} available). Add credits or wait until ${reset}.`);
+      }
+      if (payload.code === "rate_limited") {
+        throw new Error(`Mika request limit reached. Try again in ${payload.retry_after_seconds ?? 1} seconds. Requests are never retried automatically.`);
+      }
+      if (payload.code === "request_canceled") {
+        throw new Error("Mika request canceled.");
+      }
+    } catch (error) {
+      if (error instanceof Error && (
+        error.message.startsWith("Misty credits exhausted")
+        || error.message.startsWith("Mika request limit reached")
+        || error.message === "Mika request canceled."
+      )) throw error;
+    }
     throw new Error(text.trim() || `Mika ${path} failed: ${response.status}`);
   }
   if (response.status === 204) return undefined as T;

@@ -127,7 +127,7 @@ function oneDriveSetupOptions(): ProviderWorkflowOption[] {
     {
       name: "config_type",
       label: "Type of connection",
-      help: "Choose the OneDrive connection type rclone should configure.",
+      help: "Choose the OneDrive account type Misty should configure.",
       defaultValue: "onedrive",
       required: true,
       password: false,
@@ -141,7 +141,7 @@ function oneDriveSetupOptions(): ProviderWorkflowOption[] {
     {
       name: "client_id",
       label: "Client ID",
-      help: "Optional Microsoft OAuth client ID. Leave blank to use rclone's default app.",
+      help: "Optional Microsoft OAuth client ID. Leave blank to use Misty's app.",
       defaultValue: "",
       required: false,
       password: false,
@@ -150,7 +150,7 @@ function oneDriveSetupOptions(): ProviderWorkflowOption[] {
     {
       name: "client_secret",
       label: "Client Secret",
-      help: "Optional Microsoft OAuth client secret. Leave blank to use rclone's default app.",
+      help: "Optional Microsoft OAuth client secret. Leave blank to use Misty's app.",
       defaultValue: "",
       required: false,
       password: true,
@@ -159,7 +159,7 @@ function oneDriveSetupOptions(): ProviderWorkflowOption[] {
     {
       name: "drive_id",
       label: "The ID of the drive to use",
-      help: "Enter the drive ID rclone should save for this remote.",
+      help: "Enter the drive ID Misty should save for this connection.",
       defaultValue: "",
       required: true,
       password: false,
@@ -168,7 +168,7 @@ function oneDriveSetupOptions(): ProviderWorkflowOption[] {
     {
       name: "drive_type",
       label: "The type of the drive",
-      help: "Choose the rclone drive type: personal, business, or documentLibrary.",
+      help: "Choose the drive type: personal, business, or document library.",
       defaultValue: "",
       required: true,
       password: false,

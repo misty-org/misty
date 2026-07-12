@@ -6,12 +6,11 @@ use std::{
 };
 
 fn main() {
-    println!("cargo:rerun-if-env-changed=MISTY_PROXY_GO_LIB_DIR");
-    println!("cargo:rerun-if-env-changed=MISTY_PROXY_GO_LIB_NAME");
-    if std::env::var_os("CARGO_FEATURE_EMBEDDED_PROXY_GO").is_some() {
-        let lib_name =
-            std::env::var("MISTY_PROXY_GO_LIB_NAME").unwrap_or_else(|_| "misty_proxy".to_owned());
-        let lib_dir = std::env::var_os("MISTY_PROXY_GO_LIB_DIR")
+    expose_public_telemetry_configuration();
+    println!("cargo:rerun-if-env-changed=MISTY_SERVICE_GO_LIB_DIR");
+    if std::env::var_os("CARGO_FEATURE_EMBEDDED_STORAGE_GO").is_some() {
+        let lib_name = "misty_service";
+        let lib_dir = std::env::var_os("MISTY_SERVICE_GO_LIB_DIR")
             .map(|raw| resolve_go_archive_dir(&raw))
             .unwrap_or_else(default_go_archive_dir);
         let target_os = std::env::var("CARGO_CFG_TARGET_OS").unwrap_or_default();
@@ -24,7 +23,7 @@ fn main() {
         println!("cargo:rerun-if-changed={}", library_path.display());
         if !library_path.exists() {
             println!(
-                "cargo:warning=embedded misty-proxy library was not found at {}",
+                "cargo:warning=embedded Misty storage library was not found at {}",
                 library_path.display()
             );
         }
@@ -46,6 +45,46 @@ fn main() {
         }
     }
     tauri_build::build();
+}
+
+fn expose_public_telemetry_configuration() {
+    let manifest_dir = env::var_os("CARGO_MANIFEST_DIR")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from("."));
+    let analytics_path = manifest_dir
+        .parent()
+        .unwrap_or(Path::new("."))
+        .join(".env.analytics");
+    println!("cargo:rerun-if-changed={}", analytics_path.display());
+    for key in [
+        "POSTHOG_PROJECT_TOKEN",
+        "POSTHOG_HOST",
+        "MISTY_RELEASE_CHANNEL",
+    ] {
+        println!("cargo:rerun-if-env-changed={key}");
+        let value = env::var(key)
+            .ok()
+            .filter(|value| !value.trim().is_empty())
+            .or_else(|| read_env_value(&analytics_path, key));
+        if let Some(value) = value {
+            println!("cargo:rustc-env={key}={value}");
+        }
+    }
+}
+
+fn read_env_value(path: &Path, key: &str) -> Option<String> {
+    let contents = std::fs::read_to_string(path).ok()?;
+    contents.lines().find_map(|line| {
+        let (candidate, raw) = line.split_once('=')?;
+        if candidate.trim() != key {
+            return None;
+        }
+        let value = raw
+            .trim()
+            .trim_matches(|character| character == '"' || character == '\'')
+            .to_owned();
+        (!value.is_empty()).then_some(value)
+    })
 }
 
 fn resolve_go_archive_dir(raw: &OsStr) -> PathBuf {
@@ -76,7 +115,7 @@ fn default_go_archive_dir() -> PathBuf {
         .unwrap_or_else(|| PathBuf::from("."));
     manifest_dir
         .join("target")
-        .join("misty-proxy")
+        .join("misty-service")
         .join(default_go_archive_target())
 }
 

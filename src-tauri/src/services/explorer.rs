@@ -54,7 +54,7 @@ use crate::services::{
     environment::AppEnvironmentService,
     explorer_library::{ExplorerLibraryItem, ExplorerLibraryService},
     providers::{ProviderRemote, ProviderService},
-    proxy::{ProxyResponse, ProxyService},
+    storage::{StorageResponse, StorageService},
     transfers::TransferService,
 };
 
@@ -89,7 +89,7 @@ struct TransferProgress {
 pub struct ExplorerService {
     home_dir: PathBuf,
     mount_root: PathBuf,
-    proxy: ProxyService,
+    proxy: StorageService,
     providers: ProviderService,
     transfers: TransferService,
     explorer_library: ExplorerLibraryService,
@@ -107,7 +107,7 @@ pub struct ExplorerService {
 impl ExplorerService {
     pub fn new(
         environment: AppEnvironmentService,
-        proxy: ProxyService,
+        proxy: StorageService,
         providers: ProviderService,
         transfers: TransferService,
         explorer_library: ExplorerLibraryService,
@@ -2614,12 +2614,14 @@ impl ExplorerService {
             }
             let elapsed = started_at.elapsed();
             if elapsed > REMOTE_JOB_MAX_WAIT {
+                let _ = self.cancel_remote_job(job_id).await;
                 return Err(ApiError::Message(format!(
                     "Remote operation timed out after {} hours",
                     REMOTE_JOB_MAX_WAIT.as_secs() / 3600
                 )));
             }
             if last_activity_at.elapsed() > REMOTE_JOB_STALE_TIMEOUT {
+                let _ = self.cancel_remote_job(job_id).await;
                 return Err(ApiError::Message(format!(
                     "Remote operation timed out after {} minutes without progress",
                     REMOTE_JOB_STALE_TIMEOUT.as_secs() / 60
@@ -3529,7 +3531,7 @@ async fn remove_local_path(path: &Path, is_directory: bool) -> ApiResult<()> {
         .map_err(|error| ApiError::Message(format!("Failed to remove {}: {error}", path.display())))
 }
 
-async fn response_json<T>(response: ProxyResponse, operation: &str) -> ApiResult<T>
+async fn response_json<T>(response: StorageResponse, operation: &str) -> ApiResult<T>
 where
     T: serde::de::DeserializeOwned,
 {
@@ -5026,7 +5028,7 @@ mod tests {
         if let Some(db_dir) = environment.misty_db_path().parent() {
             let _ = std::fs::create_dir_all(db_dir);
         }
-        let proxy = ProxyService::new(environment.clone());
+        let proxy = StorageService::new(environment.clone());
         let providers = ProviderService::new(proxy.clone());
         let transfers = TransferService::new(environment.clone());
         let explorer_library = ExplorerLibraryService::new(environment.clone());

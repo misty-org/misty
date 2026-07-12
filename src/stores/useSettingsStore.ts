@@ -13,6 +13,7 @@ import type { LaunchOnLoginSnapshot, OpenWithAssociation, ShortcutsSnapshot, Set
 import { errorText } from "../shared/format";
 import { isNativeMobileBuild } from "../platform/buildTarget";
 import { settingsIndexToThemeMode, useAppThemeStore } from "./useAppThemeStore";
+import { telemetryPreferencesChanged } from "../analytics/lifecycle";
 
 type SettingsSection = "general" | "app" | "assistant" | "appearance" | "privacy" | "sync" | "transfers" | "search" | "notifications" | "shortcuts" | "advanced";
 type SettingValue = string | number | boolean | Record<string, unknown> | Array<Record<string, unknown>>;
@@ -285,6 +286,10 @@ function applySettingsSideEffects(document: Record<string, unknown>): void {
   useAppThemeStore
     .getState()
     .setThemeMode(settingsIndexToThemeMode(settingsNumber(document, "appearance", "theme_index", 0)));
+  telemetryPreferencesChanged(
+    settingsBoolean(document, "privacy", "anonymous_usage_analytics_enabled", false),
+    settingsBoolean(document, "privacy", "anonymous_error_reporting_enabled", false),
+  );
 }
 
 async function applyLaunchOnLoginFromDocument(document: Record<string, unknown>): Promise<void> {

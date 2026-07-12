@@ -1,6 +1,7 @@
 import { remove, retrieve, store } from "@impierce/tauri-plugin-keystore";
 import { hasTauriInternals } from "../../../shared/tauri";
 import { isNativeMobileBuild } from "../../../platform/buildTarget";
+import { invoke } from "@tauri-apps/api/core";
 
 const desktopTokenService = "com.impierce.identity-wallet";
 const desktopTokenUser = "tester";
@@ -24,6 +25,9 @@ export async function saveAccountAuthToken(token: string): Promise<void> {
       detail: errorDetail(error),
     });
   }
+  // Keep managed automation auth in sync even if persistent keystore storage
+  // is temporarily unavailable; the interactive Mika API already uses cache.
+  await syncManagedAiToken(token);
 }
 
 export async function readAccountAuthToken(): Promise<string | null> {
@@ -36,6 +40,7 @@ export async function readAccountAuthToken(): Promise<string | null> {
 
   try {
     cachedToken = await retrieve(desktopTokenService, desktopTokenUser);
+    await syncManagedAiToken(cachedToken ?? "");
   } catch (error) {
     cachedToken = null;
     writeTokenStoredMarker(false);
@@ -54,6 +59,7 @@ export async function clearAccountAuthToken(): Promise<void> {
   const shouldClearKeystore = readTokenStoredMarker();
   writeTokenStoredMarker(false);
   if (!hasTauriInternals()) return;
+  await syncManagedAiToken("");
   if (!shouldClearKeystore) return;
   try {
     await remove(desktopTokenService, desktopTokenUser);
@@ -64,6 +70,15 @@ export async function clearAccountAuthToken(): Promise<void> {
       message: "Could not clear Misty auth token from the device keystore.",
       detail: errorDetail(error),
     });
+  }
+}
+
+async function syncManagedAiToken(token: string): Promise<void> {
+  if (!hasTauriInternals()) return;
+  try {
+    await invoke("automations_set_managed_ai_auth", { token });
+  } catch {
+    // Compatibility with native builds predating managed AI automation.
   }
 }
 

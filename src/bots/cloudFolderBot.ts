@@ -9,7 +9,10 @@ export const cloudFolderBotNotifyEvent = "misty-bot-cloud-folder-notify";
 export const cloudFolderBotDismissEvent = "misty-bot-cloud-folder-dismiss";
 export const cloudFolderBotReturnToAppEvent = "misty-bot-cloud-folder-return-to-app";
 export const cloudFolderBotOpenAssistantEvent = "misty-bot-cloud-folder-open-assistant";
+export const cloudFolderBotContextRequestEvent = "misty-bot-cloud-folder-context-request";
+export const cloudFolderBotContextEvent = "misty-bot-cloud-folder-context";
 export const cloudFolderBotWindowSize = { width: 190, height: 184 };
+export const cloudFolderBotChatWindowSize = { width: 470, height: 760 };
 export const cloudFolderBotBubbleTransitionMs = 260;
 
 export type CloudFolderBotNotificationType = "info" | "success" | "error";
@@ -19,6 +22,11 @@ export interface CloudFolderBotNotification {
   message: string;
   type: CloudFolderBotNotificationType;
   createdAtMs: number;
+}
+
+export interface CloudFolderBotContext {
+  workingDirectory: string;
+  selectedPaths: string[];
 }
 
 let botWindowOpening: Promise<WebviewWindow | null> | null = null;
@@ -66,9 +74,20 @@ export async function openMikaAssistantFromBot(): Promise<void> {
   await emitTo("main", cloudFolderBotOpenAssistantEvent, {}).catch(() => undefined);
 }
 
+export async function requestCloudFolderBotContext(): Promise<void> {
+  if (!canUseCloudFolderBotOverlay()) return;
+  await emitTo("main", cloudFolderBotContextRequestEvent, {}).catch(() => undefined);
+}
+
+export async function publishCloudFolderBotContext(context: CloudFolderBotContext): Promise<void> {
+  if (!canUseCloudFolderBotOverlay()) return;
+  await emitTo(cloudFolderBotLabel, cloudFolderBotContextEvent, context).catch(() => undefined);
+}
+
 async function openCloudFolderBotWindowInternal(assetsDir?: string): Promise<WebviewWindow | null> {
   const existing = await WebviewWindow.getByLabel(cloudFolderBotLabel).catch(() => null);
   if (existing && botWindowConfiguredInThisSession) {
+    await existing.setMaxSize(new LogicalSize(cloudFolderBotChatWindowSize.width, cloudFolderBotChatWindowSize.height)).catch(() => undefined);
     await existing.show().catch(() => undefined);
     await existing.setAlwaysOnTop(true).catch(() => undefined);
     return existing;
@@ -87,8 +106,8 @@ async function openCloudFolderBotWindowInternal(assetsDir?: string): Promise<Web
     height: cloudFolderBotWindowSize.height,
     minWidth: cloudFolderBotWindowSize.width,
     minHeight: cloudFolderBotWindowSize.height,
-    maxWidth: cloudFolderBotWindowSize.width,
-    maxHeight: cloudFolderBotWindowSize.height,
+    maxWidth: cloudFolderBotChatWindowSize.width,
+    maxHeight: cloudFolderBotChatWindowSize.height,
     x: position.x,
     y: position.y,
     resizable: false,
@@ -103,6 +122,7 @@ async function openCloudFolderBotWindowInternal(assetsDir?: string): Promise<Web
   });
 
   window.once("tauri://created", () => {
+    void window.setMaxSize(new LogicalSize(cloudFolderBotChatWindowSize.width, cloudFolderBotChatWindowSize.height)).catch(() => undefined);
     void window.setSize(new LogicalSize(cloudFolderBotWindowSize.width, cloudFolderBotWindowSize.height)).catch(() => undefined);
     void window.setAlwaysOnTop(true).catch(() => undefined);
   });

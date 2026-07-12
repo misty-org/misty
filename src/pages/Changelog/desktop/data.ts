@@ -12,7 +12,7 @@ export const changelog: ChangelogEntry[] = [
     summary: "Initial release",
     changes: [
       "ImGui-based desktop client with local file browsing",
-      "Go backend proxy with Grpc communication",
+      "Native cloud storage integration",
       "Basic file operations (copy, move, delete)",
       "Cross-platform builds for Windows and macOS",
     ],
