@@ -5,7 +5,7 @@ export const data: SectionData = {
   label: "Installation",
   category: "getting-started",
   title: "Installation",
-  prose: "Getting started takes a few minutes. Download Misty, install it, create a free account, and connect your first cloud provider.",
+  prose: "Getting started takes a few minutes. Download Misty, install it, create your account, and connect your first cloud provider.",
   steps: [
     {
       heading: "Download Misty",

@@ -42,13 +42,13 @@ export default function MainHero() {
       </h1>
 
       <p className="mx-auto mb-5 max-w-2xl text-base leading-relaxed text-pretty text-text-muted">
-        Misty is free for everyone while the public build is still young. Try the core file workflows now, expect rough edges, and help shape what comes next.
+        Misty brings local files, cloud storage, search, and transfers into one focused desktop workspace for people who need their files to move with them.
       </p>
 
       <div className="flex flex-wrap justify-center gap-5">
         <NavLink to="/download">
           <span className="inline-flex items-center justify-center rounded-full bg-white px-5 py-2 font-bold text-black shadow-lg transition-colors duration-300 hover:bg-zinc-200">
-            Download Free Beta
+            Download Misty
           </span>
         </NavLink>
         <a href="https://discord.gg/M3EQuWcFS" target="_blank" rel="noopener noreferrer">

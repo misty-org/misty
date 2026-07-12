@@ -5,11 +5,13 @@ import { useUserStore } from "../store/userStore";
 
 const navItems = [
   { to: "/download", label: "Download" },
+  { to: "/pricing", label: "Pricing" },
   { to: "/docs", label: "Docs" },
 ];
 
 
 const resourcesLinks = [
+  { to: "/features", label: "Features" },
   { to: "/plugins", label: "Plugins" },
   { to: "/changelog", label: "Changelog" },
   { to: "/blog", label: "Blog" },
@@ -169,7 +171,7 @@ export default function Navbar() {
       </div>
 
       {/* Mobile menu */}
-      <div className={`md:hidden overflow-hidden transition-all duration-300 ${menuOpen ? "max-h-64 opacity-100" : "max-h-0 opacity-0"}`}>
+      <div className={`md:hidden overflow-hidden transition-all duration-300 ${menuOpen ? "max-h-96 opacity-100" : "max-h-0 opacity-0"}`}>
         <div className="px-6 py-4 border-t border-border/50 glass">
           <div className="flex flex-col gap-1">
             {navItems.map(({ to, label }) => (

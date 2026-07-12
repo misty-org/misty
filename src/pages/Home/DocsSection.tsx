@@ -20,8 +20,8 @@ const docs = [
     ),
   },
   {
-    title: "Public Beta",
-    description: "Download the free build, try the core workflows, and join Discord to report bugs.",
+    title: "Download",
+    description: "Install Misty, try the core workflows, and join Discord for support.",
     href: "/download",
     icon: (
       <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>

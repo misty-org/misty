@@ -1,7 +1,14 @@
 import { useState } from "react";
 import { HiOutlineChevronDown } from "react-icons/hi2";
 import { apiBase } from "../../lib/apiBase";
-import { releases, type PlatformName, type ReleaseBuild } from "./data";
+import {
+  mobileBuilds,
+  releases,
+  type MobileBuild,
+  type MobilePlatformName,
+  type PlatformName,
+  type ReleaseBuild,
+} from "./data";
 
 type PlatformIconProps = {
   size?: number | string;
@@ -114,6 +121,37 @@ function LinuxIcon({
   );
 }
 
+function PhoneIcon({ size = 32, color = "currentColor" }: Pick<PlatformIconProps, "size" | "color">) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width={size}
+      height={size}
+      fill="none"
+      aria-hidden="true"
+    >
+      <rect x="7" y="2.75" width="10" height="18.5" rx="2.25" stroke={color} strokeWidth="1.7" />
+      <path d="M10.25 5.25h3.5M11 18.25h2" stroke={color} strokeWidth="1.7" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function AndroidIcon({ size = 32, color = "currentColor" }: Pick<PlatformIconProps, "size" | "color">) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width={size}
+      height={size}
+      fill="none"
+      aria-hidden="true"
+    >
+      <path d="M7 10.5h10v6.75a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2V10.5Z" stroke={color} strokeWidth="1.7" />
+      <path d="M8.75 10.5V9.25A3.25 3.25 0 0 1 12 6a3.25 3.25 0 0 1 3.25 3.25v1.25M9 4.75l1.35 1.8M15 4.75l-1.35 1.8M5 11.75v4M19 11.75v4" stroke={color} strokeWidth="1.7" strokeLinecap="round" />
+      <path d="M10.25 9h.01M13.75 9h.01" stroke={color} strokeWidth="2.2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 const platformMeta: Record<PlatformName, { icon: React.ReactNode; arch: string }> = {
   Windows: {
     icon: <Windows11Icon size={16} />,
@@ -128,6 +166,63 @@ const platformMeta: Record<PlatformName, { icon: React.ReactNode; arch: string }
     arch: "x86_64 / ARM64",
   },
 };
+
+const mobilePlatformMeta: Record<MobilePlatformName, { icon: React.ReactNode; arch: string }> = {
+  iPhone: {
+    icon: <PhoneIcon size={18} />,
+    arch: "iPhone",
+  },
+  Android: {
+    icon: <AndroidIcon size={18} />,
+    arch: "Android phones",
+  },
+};
+
+function MobileBuildCard({ build }: { build: MobileBuild }) {
+  const content = (
+    <>
+      <div className="flex items-start justify-between gap-3 mb-4">
+        <div>
+          <div className="flex items-center gap-2 text-sm font-medium text-text">
+            <span className="text-text-secondary">{mobilePlatformMeta[build.platform].icon}</span>
+            {build.platform}
+          </div>
+          <p className="mt-1 text-xs text-text-muted">{mobilePlatformMeta[build.platform].arch}</p>
+        </div>
+        <span className="rounded-full border border-border px-2 py-0.5 text-[11px] font-medium text-text-muted">
+          {build.tag}
+        </span>
+      </div>
+
+      <p className="text-sm font-medium text-text mb-2">{build.availability}</p>
+      <p className="text-sm leading-relaxed text-text-muted mb-5">{build.description}</p>
+
+      <span className="inline-flex w-full items-center justify-center rounded-xl border border-border bg-elevated px-4 py-2.5 text-sm font-medium text-text-muted">
+        {build.ctaLabel}
+      </span>
+    </>
+  );
+
+  if (build.href) {
+    return (
+      <a
+        href={build.href}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="rounded-xl border border-border bg-surface/50 p-5 transition-colors hover:border-white/20 hover:bg-white/5"
+      >
+        {content}
+      </a>
+    );
+  }
+
+  return (
+    <div className="rounded-xl border border-border bg-surface/50 p-5">
+      {content}
+    </div>
+  );
+}
+
 function ReleaseItem({
   version,
   builds,
@@ -299,6 +394,24 @@ export default function Download() {
           ))}
         </div>
       </div>
+
+      {/* Mobile */}
+      <section>
+        <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h2 className="text-lg font-semibold text-text">Mobile</h2>
+            <p className="mt-1 max-w-2xl text-sm leading-relaxed text-text-muted">
+              Misty is also being built for phones, with focused mobile access to files, providers, transfers, and account settings.
+            </p>
+          </div>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          {mobileBuilds.map((build) => (
+            <MobileBuildCard key={build.platform} build={build} />
+          ))}
+        </div>
+      </section>
     </div>
   );
 }
