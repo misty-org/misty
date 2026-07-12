@@ -1,5 +1,6 @@
 import {
   Bell,
+  Bot,
   Check,
   ChevronDown,
   Info,
@@ -18,9 +19,9 @@ import {
   useAppThemeStore,
 } from "../../../stores/useAppThemeStore";
 import { mobileErrorClass, mobilePageClass, mobileSuccessClass } from "../../../shared/mobileStyles";
-import { useSettingsStore } from "../../../stores/useSettingsStore";
+import { selectAssistantPreferences, useSettingsStore } from "../../../stores/useSettingsStore";
 
-type SettingValue = string | number | boolean | Array<Record<string, unknown>>;
+type SettingValue = string | number | boolean | Record<string, unknown> | Array<Record<string, unknown>>;
 
 const mobileVersionFallback = "0.1.0";
 const mobileBuildNumber = import.meta.env.VITE_MISTY_IOS_BUILD_NUMBER || "1";
@@ -49,6 +50,7 @@ export function MobileSettingsPage() {
   const document = settings?.document ?? {};
   const themeMode = useAppThemeStore((state) => state.themeMode);
   const setThemeMode = useAppThemeStore((state) => state.setThemeMode);
+  const assistant = selectAssistantPreferences(document);
 
   useEffect(() => {
     void load();
@@ -90,8 +92,32 @@ export function MobileSettingsPage() {
       </MobileSettingsSection>
 
       <MobileSettingsSection id="privacy" icon={Shield} title="Privacy">
+        <MobileSwitchRow label="Share anonymous usage analytics" checked={booleanSetting(document, "privacy", "anonymous_usage_analytics_enabled", false)} disabled={working} onChange={(value) => onSettingChange("privacy", "anonymous_usage_analytics_enabled", value)} />
+        <MobileSwitchRow label="Send anonymous crash reports" checked={booleanSetting(document, "privacy", "anonymous_error_reporting_enabled", false)} disabled={working} onChange={(value) => onSettingChange("privacy", "anonymous_error_reporting_enabled", value)} />
         <MobileSwitchRow label="Local processing" checked={booleanSetting(document, "privacy", "local_processing_only", true)} disabled={working} onChange={(value) => onSettingChange("privacy", "local_processing_only", value)} />
         <MobileSwitchRow label="Share diagnostics" checked={booleanSetting(document, "privacy", "diagnostics_sharing_enabled", false)} disabled={working} onChange={(value) => onSettingChange("privacy", "diagnostics_sharing_enabled", value)} />
+      </MobileSettingsSection>
+
+      <MobileSettingsSection id="assistant" icon={Bot} title="Assistant">
+        <MobileSwitchRow label="Enable Mika" checked={assistant.enabled} disabled={working} onChange={(value) => onSettingChange("assistant", "enabled", value)} />
+        <MobileSwitchRow
+          label="Files permission"
+          checked={assistant.scopes.filesAllowed}
+          disabled={working || !assistant.enabled}
+          onChange={(value) => onSettingChange("assistant", "scopes", assistantScopesPayload(assistant, "files_allowed", value))}
+        />
+        <MobileSwitchRow
+          label="Cleanup permission"
+          checked={assistant.scopes.cleanupAllowed}
+          disabled={working || !assistant.enabled}
+          onChange={(value) => onSettingChange("assistant", "scopes", assistantScopesPayload(assistant, "cleanup_allowed", value))}
+        />
+        <MobileSwitchRow
+          label="Search permission"
+          checked={assistant.scopes.searchAllowed}
+          disabled={working || !assistant.enabled}
+          onChange={(value) => onSettingChange("assistant", "scopes", assistantScopesPayload(assistant, "search_allowed", value))}
+        />
       </MobileSettingsSection>
 
       <MobileSettingsSection id="notifications" icon={Bell} title="Notifications">
@@ -108,6 +134,19 @@ export function MobileSettingsPage() {
       </MobileSettingsSection>
     </section>
   );
+}
+
+function assistantScopesPayload(
+  assistant: ReturnType<typeof selectAssistantPreferences>,
+  key: "files_allowed" | "cleanup_allowed" | "search_allowed",
+  value: boolean,
+): Record<string, unknown> {
+  return {
+    files_allowed: assistant.scopes.filesAllowed,
+    cleanup_allowed: assistant.scopes.cleanupAllowed,
+    search_allowed: assistant.scopes.searchAllowed,
+    [key]: value,
+  };
 }
 
 function MobileSettingsSection(props: { id: string; icon: LucideIcon; title: string; children: ReactNode }) {

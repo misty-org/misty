@@ -46,7 +46,7 @@ export default function SignIn() {
       const user = await accountSignIn(email, password);
       const me = await accountFetchMe().catch(() => null);
       await saveAuthenticatedUser(user, licenseFromMe(me));
-      setUser(user);
+      setUser({ ...user, accountCreatedAt: me?.created_at, currentPlan: me?.tier });
       navigate(from, { replace: true });
     } catch (signInError) {
       setError(

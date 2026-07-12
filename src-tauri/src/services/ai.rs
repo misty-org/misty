@@ -13,6 +13,10 @@ use tokio::task::JoinHandle;
 
 use crate::error::{ApiError, ApiResult};
 
+// Legacy local-provider implementation. Production Mika UI traffic uses the
+// authenticated server API, and this service is not registered as a Tauri
+// command. AutomationService retains it only as a deterministic test fallback
+// when no managed server is configured.
 const DEFAULT_OPENAI_MODEL: &str = "gpt-5.5";
 
 #[derive(Clone)]
@@ -216,6 +220,16 @@ impl AiService {
             .push(AiStreamEvent::error("MistyAI request aborted."));
         drop(state);
         Ok(self.status())
+    }
+
+    pub async fn complete(&self, prompt: &str, cwd: Option<&str>) -> ApiResult<String> {
+        let prompt = prompt.trim();
+        if prompt.is_empty() {
+            return Err(ApiError::Message("AI prompt is empty.".to_owned()));
+        }
+        let config = AiConfig::from_env();
+        config.validate()?;
+        send_openai_request(&self.client, &config, prompt, cwd).await
     }
 
     fn new_session_id(&self) -> String {

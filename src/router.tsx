@@ -6,18 +6,19 @@ import {
   RouterProvider,
   useLocation,
 } from "react-router-dom";
-import { ArrowUpDown, Folder, Home, PlugZap, Puzzle, Settings, UserCircle } from "lucide-react";
+import { ArrowUpDown, Folder, Home, PlugZap, Puzzle, Settings, UserCircle, Workflow } from "lucide-react";
 import AccountPage from "./pages/Account";
 import ChangelogPage from "./pages/Changelog";
 import ExtensionsPage from "./pages/Extensions";
 import FilesPage from "./pages/Files";
 import HomePage from "./pages/Home";
-import CloudFolderPetOverlay from "./pages/PetOverlay/CloudFolderPetOverlay";
+import CloudFolderBotOverlay from "./pages/BotOverlay/CloudFolderBotOverlay";
 import ProvidersPage from "./pages/Providers";
 import RegisterPage from "./pages/Register";
 import SettingsPage from "./pages/Settings";
 import SignInPage from "./pages/SignIn";
 import TransfersPage from "./pages/Transfers";
+import AutomationsPage from "./pages/Automations";
 import type { DesktopNavItem } from "./layouts/DesktopLayout";
 import {
   MobileLayout,
@@ -42,6 +43,7 @@ const routes = {
   accountSettings: "/account/settings",
   accountSignIn: "/account/signin",
   activity: "/activity",
+  automations: "/automations",
   changelog: "/changelog",
   diagnostics: "/diagnostics",
   dock: "/dock",
@@ -53,7 +55,7 @@ const routes = {
   settings: "/settings",
   signIn: "/signin",
   transfers: "/transfers",
-  cloudFolderPet: "/pet/cloud-folder",
+  cloudFolderBot: "/bot/cloud-folder",
 } as const;
 
 const isPhoneBuild = import.meta.env.MODE === "mobile";
@@ -85,6 +87,7 @@ const desktopNavItems = (isPhoneBuild ? [] : [
       pathname === routes.home || pathname.startsWith(routes.changelog),
   },
   { id: "files", label: "Files", path: routes.files, icon: Folder },
+  { id: "automations", label: "Automations", path: routes.automations, icon: Workflow },
   ...(isAndroidBuild ? [] : [
   {
     id: "extensions",
@@ -109,6 +112,7 @@ const mobileDeepLinkPrefixes = [
   routes.files,
   routes.providers,
   routes.transfers,
+  routes.automations,
   routes.account,
   routes.settings,
 ];
@@ -133,7 +137,8 @@ export const router = createBrowserRouter([
       />
     ),
     children: [
-      { path: "pet/cloud-folder", element: <CloudFolderPetOverlay /> },
+      { path: "bot/cloud-folder", element: <CloudFolderBotOverlay /> },
+      { path: "pet/cloud-folder", element: <Navigate to={routes.cloudFolderBot} replace /> },
       {
         element: <AppFrameLayout />,
         children: [
@@ -148,6 +153,15 @@ export const router = createBrowserRouter([
           {
             element: <AppPagesLayout />,
             children: [
+              {
+                path: "automations",
+                element: (
+                  <ResponsiveRoute
+                    desktop={isAndroidBuild ? <Navigate to={routes.files} replace /> : <AutomationsPage />}
+                    mobile={<Navigate to={routes.files} replace />}
+                  />
+                ),
+              },
               {
                 path: "home",
                 element: (
@@ -355,6 +369,7 @@ function ResponsiveRoute(props: {
 }
 
 function desktopRouteIdFromPath(pathname: string): AppTab {
+  if (pathname.startsWith(routes.automations)) return "automations";
   if (pathname.startsWith(routes.transfers)) return "transfers";
   if (pathname.startsWith(routes.providers)) return "providers";
   if (pathname.startsWith(routes.account)) return "account";

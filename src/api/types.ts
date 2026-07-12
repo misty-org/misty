@@ -4,9 +4,14 @@ export interface AppSnapshot {
   appName: string;
   version: string;
   migrationStage: string;
-  proxyUrl: string | null;
-  proxyRuntime: ProxyRuntimeSnapshot;
+  storageRuntime: StorageRuntimeSnapshot;
   environment: AppEnvironmentSnapshot;
+}
+
+export interface StorageRuntimeSnapshot {
+  ready: boolean;
+  error: string | null;
+  version: string;
 }
 
 export interface AppEnvironmentSnapshot {
@@ -23,7 +28,6 @@ export interface AppEnvironmentSnapshot {
   mistyConfigPath: string;
   workspacesPath: string;
   commandsPath: string;
-  proxyUrl: string | null;
   serverUrl: string | null;
   grpcAddress: string;
   mountPath: string;
@@ -31,19 +35,9 @@ export interface AppEnvironmentSnapshot {
   derivedEnv: Record<string, string>;
 }
 
-export interface ProxySnapshot {
-  proxyUrl: string | null;
+export interface StorageSnapshot {
   ready: boolean;
   statusCode: number | null;
-  error: string | null;
-}
-
-export type ProxyRuntimeMode = "external" | "spawn" | "embedded" | "disabled";
-
-export interface ProxyRuntimeSnapshot {
-  mode: ProxyRuntimeMode;
-  proxyUrl: string | null;
-  ready: boolean;
   error: string | null;
 }
 
@@ -51,34 +45,6 @@ export interface AndroidAllFilesAccessStatus {
   granted: boolean;
   canRequest: boolean;
   storageRoot: string | null;
-}
-
-export interface AiStatus {
-  configured: boolean;
-  provider: string;
-  model: string;
-  running: boolean;
-  sessionId: string | null;
-  error: string | null;
-}
-
-export interface AiSendRequest {
-  prompt: string;
-  cwd?: string | null;
-  resumeSession?: boolean;
-}
-
-export type AiEventKind = "system" | "text" | "tool_use" | "tool_result" | "result" | "error";
-
-export interface AiStreamEvent {
-  kind: AiEventKind;
-  sessionId: string | null;
-  text: string;
-  toolName: string;
-  toolInput: string;
-  toolUseId: string;
-  toolResult: string;
-  costUsd: number;
 }
 
 export interface ClaudeStatus {
@@ -569,7 +535,14 @@ export interface PluginPanelEntry {
   pluginDir: string;
   manifestPath: string;
   libraryPath: string;
+  webEntry: string;
   launcherViews: string[];
+}
+
+export interface ExtensionCommandRequest {
+  pluginId: string;
+  command: string;
+  payload?: Record<string, unknown>;
 }
 
 export interface PluginCommandsSnapshot {
@@ -1231,4 +1204,107 @@ export interface FileSyncApplyRequest extends FileSyncCompareRequest {
 export interface FileSyncApplyResult {
   appliedCount: number;
   affectedPaths: string[];
+}
+
+export type AutomationNodeKind =
+  | "manual_trigger"
+  | "schedule_trigger"
+  | "webhook_trigger"
+  | "select_path"
+  | "list_folder"
+  | "filter"
+  | "read_text"
+  | "read_metadata"
+  | "structured_prompt"
+  | "http_request"
+  | "write_text"
+  | "copy_path"
+  | "move_path"
+  | "rename_path"
+  | "notify";
+
+export interface AutomationPosition {
+  x: number;
+  y: number;
+}
+
+export interface AutomationNode {
+  id: string;
+  kind: AutomationNodeKind;
+  label: string;
+  position: AutomationPosition;
+  config: Record<string, unknown>;
+}
+
+export interface AutomationEdge {
+  id: string;
+  source: string;
+  target: string;
+}
+
+export interface AutomationWorkflow {
+  id: string;
+  name: string;
+  description: string;
+  enabled: boolean;
+  intervalMinutes?: number;
+  lastScheduledAt?: string;
+  nodes: AutomationNode[];
+  edges: AutomationEdge[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AutomationNodeRun {
+  nodeId: string;
+  label: string;
+  status: "completed" | "failed" | "waiting_approval" | "rejected";
+  startedAt: string;
+  finishedAt: string;
+  output: unknown;
+  error?: string;
+}
+
+export interface AutomationRun {
+  id: string;
+  workflowId: string;
+  workflowName: string;
+  trigger: string;
+  status: "running" | "completed" | "failed" | "waiting_approval" | "rejected";
+  startedAt: string;
+  finishedAt?: string;
+  nodeRuns: AutomationNodeRun[];
+  error?: string;
+}
+
+export interface AutomationApproval {
+  id: string;
+  runId: string;
+  workflowId: string;
+  nodeId: string;
+  title: string;
+  summary: string;
+  status: "pending" | "approved" | "rejected";
+  action: Record<string, unknown>;
+  createdAt: string;
+  resolvedAt?: string;
+}
+
+export interface AutomationSnapshot {
+  version: number;
+  webhookUrl: string;
+  workflows: AutomationWorkflow[];
+  runs: AutomationRun[];
+  approvals: AutomationApproval[];
+}
+
+export interface AutomationValidation {
+  valid: boolean;
+  errors: string[];
+}
+
+export interface AutomationRunRequest {
+  workflowId: string;
+  trigger: "manual" | "schedule" | "webhook";
+  input?: unknown;
 }

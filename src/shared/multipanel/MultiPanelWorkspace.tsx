@@ -1,4 +1,4 @@
-import { Columns2, PanelTopClose, Rows2 } from "lucide-react";
+import { Columns2, GripVertical, PanelTopClose, Rows2 } from "lucide-react";
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import type { CSSProperties, PointerEvent, ReactNode } from "react";
 import { useShallow } from "zustand/react/shallow";
@@ -44,11 +44,11 @@ const multiPanelStyles = {
   tools: "relative z-[2] grid min-w-0 min-h-[92px]",
   body: "grid min-h-0 min-w-0 grid-cols-[minmax(0,1fr)] overflow-hidden",
   bodyWithNavigation:
-    "grid-cols-[var(--explorer-sidebar-width,260px)_2px_minmax(0,1fr)] max-[980px]:grid-cols-[minmax(0,1fr)]",
+    "grid-cols-[var(--explorer-sidebar-width,260px)_10px_minmax(0,1fr)] max-[980px]:grid-cols-[minmax(0,1fr)]",
   bodyWithAside:
-    "grid-cols-[minmax(0,1fr)_2px_var(--preview-width,280px)] max-[980px]:grid-cols-[minmax(0,1fr)]",
+    "grid-cols-[minmax(0,1fr)_10px_var(--preview-width,280px)] max-[980px]:grid-cols-[minmax(0,1fr)]",
   bodyWithNavigationAndAside:
-    "grid-cols-[var(--explorer-sidebar-width,260px)_2px_minmax(0,1fr)_2px_var(--preview-width,280px)] max-[980px]:grid-cols-[minmax(0,1fr)]",
+    "grid-cols-[var(--explorer-sidebar-width,260px)_10px_minmax(0,1fr)_10px_var(--preview-width,280px)] max-[980px]:grid-cols-[minmax(0,1fr)]",
   panel:
     "relative grid min-h-0 min-w-0 grid-cols-[minmax(0,1fr)] grid-rows-[minmax(0,1fr)] overflow-hidden bg-transparent [contain:layout_paint]",
   lane:
@@ -63,11 +63,13 @@ const multiPanelStyles = {
   aside:
     "min-h-0 min-w-0 overflow-hidden max-[980px]:hidden",
   asideResizer:
-    "relative min-h-0 min-w-0 cursor-col-resize bg-transparent after:absolute after:bottom-0 after:left-1/2 after:top-0 after:w-px after:-translate-x-1/2 after:bg-transparent after:content-[''] hover:after:bg-[var(--misty-neutral-hover-bg,var(--misty-surface-hover))] max-[980px]:hidden",
+    "group relative grid min-h-0 min-w-0 cursor-col-resize place-items-center bg-transparent after:absolute after:bottom-0 after:left-1/2 after:top-0 after:w-px after:-translate-x-1/2 after:bg-[var(--misty-border-soft)] after:content-[''] hover:after:bg-[var(--misty-border-strong)] max-[980px]:hidden",
   navigationAside:
     "min-h-0 min-w-0 overflow-hidden max-[980px]:hidden",
   navigationAsideResizer:
-    "relative min-h-0 min-w-0 cursor-col-resize bg-transparent after:absolute after:bottom-0 after:left-1/2 after:top-0 after:w-px after:-translate-x-1/2 after:bg-transparent after:content-[''] hover:after:bg-[var(--misty-neutral-hover-bg,var(--misty-surface-hover))] max-[980px]:hidden",
+    "group relative grid min-h-0 min-w-0 cursor-col-resize place-items-center bg-transparent after:absolute after:bottom-0 after:left-1/2 after:top-0 after:w-px after:-translate-x-1/2 after:bg-[var(--misty-border-soft)] after:content-[''] hover:after:bg-[var(--misty-border-strong)] max-[980px]:hidden",
+  asideResizerGrip:
+    "relative z-[1] rounded bg-[var(--misty-app-page-bg,var(--misty-bg))] py-1 text-[var(--misty-text-subtle)] transition-colors group-hover:text-[var(--misty-text)]",
   pane:
     "grid min-h-0 min-w-0 grid-rows-[minmax(0,1fr)] overflow-hidden bg-transparent [container-type:inline-size]",
   paneActive: "",
@@ -251,7 +253,15 @@ export const MultiPanelWorkspace = memo(function MultiPanelWorkspace(props: Mult
         {renderNavigationAside ? (
           <>
             <div className={multiPanelStyles.navigationAside}>{renderNavigationAside}</div>
-            <div className={multiPanelStyles.navigationAsideResizer} onPointerDown={onNavigationAsideResizeStart} />
+            <div
+              className={multiPanelStyles.navigationAsideResizer}
+              onPointerDown={onNavigationAsideResizeStart}
+              role="separator"
+              aria-label="Resize file explorer sidebar"
+              aria-orientation="vertical"
+            >
+              <GripVertical className={multiPanelStyles.asideResizerGrip} size={14} aria-hidden="true" />
+            </div>
           </>
         ) : null}
         <div
@@ -308,7 +318,15 @@ export const MultiPanelWorkspace = memo(function MultiPanelWorkspace(props: Mult
         </div>
         {renderAside ? (
           <>
-            <div className={multiPanelStyles.asideResizer} onPointerDown={onAsideResizeStart} />
+            <div
+              className={multiPanelStyles.asideResizer}
+              onPointerDown={onAsideResizeStart}
+              role="separator"
+              aria-label="Resize preview panel"
+              aria-orientation="vertical"
+            >
+              <GripVertical className={multiPanelStyles.asideResizerGrip} size={14} aria-hidden="true" />
+            </div>
             <aside className={multiPanelStyles.aside}>{renderAside}</aside>
           </>
         ) : null}

@@ -25,7 +25,7 @@ import {
 import { changelog } from "../../Changelog/desktop/data";
 import { posts } from "../../../data/blog";
 import { DesktopWorkspacePanel } from "./DesktopWorkspacePanel";
-import { DesktopPetPanel } from "./DesktopPetPanel";
+import { DesktopAssistantPanel } from "./DesktopAssistantPanel";
 import { HomeFooter } from "./HomeFooter";
 import {
   buildHomeQuickAccessItems,
@@ -202,7 +202,7 @@ export default function HomePage() {
           quickAccessItems={quickAccessItems}
           remotes={remotes}
           remotesLoading={remotesLoading}
-          petPanel={<DesktopPetPanel />}
+          assistantPanel={<DesktopAssistantPanel />}
           smartFolders={smartFolders}
           smartFoldersLoading={smartFoldersLoading}
           tags={tags}

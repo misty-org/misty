@@ -169,7 +169,7 @@ export function ProviderConnectionDialog(props: ProviderConnectionDialogProps) {
           {session.stage === "authorize" ? (
             <div className={providerAuthorizeStateClass}>
               <div className={providerAuthorizeIconClass}>
-                <AssetIcon className={session.polling ? "animate-spin" : ""} src={session.polling ? iconAssets.sync24 : iconAssets.rclone24} size={28} />
+                <AssetIcon className={session.polling ? "animate-spin" : ""} src={session.polling ? iconAssets.sync24 : iconAssets.cloud24} size={28} />
               </div>
               <h3 className="m-0">Finish signing in with your provider</h3>
               <p className="leading-[1.55]">{session.step?.instructions || "Misty opened the authorization page in your browser and is waiting for it to finish."}</p>
@@ -180,7 +180,7 @@ export function ProviderConnectionDialog(props: ProviderConnectionDialogProps) {
               </small>
               {session.step?.authorizeUrl ? (
                 <button className={providerAuthLinkClass} type="button" onClick={props.onOpenAuthorize}>
-                  <AssetIcon src={iconAssets.rclone24} size={15} /> {session.openedAuthorizeUrl ? "Reopen authorization page" : "Open authorization page"}
+                  <AssetIcon src={iconAssets.cloud24} size={15} /> {session.openedAuthorizeUrl ? "Reopen authorization page" : "Open authorization page"}
                 </button>
               ) : null}
             </div>
@@ -247,7 +247,7 @@ function ProviderPicker(props: {
         <input
           className={providerSearchInputClass}
           value={query}
-          placeholder="Search rclone backends..."
+          placeholder="Search cloud providers..."
           onChange={(event) => setQuery(event.target.value)}
         />
       </label>

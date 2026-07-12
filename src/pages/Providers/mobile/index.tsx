@@ -1077,7 +1077,7 @@ function SummaryTile(props: { label: string; value: string; tone?: "good" | "war
 
 function providerIssueMessage(remote: ProviderRemote): string | null {
   if (remote.configSource === "user") {
-    return "This remote is in your user rclone config. Import it into Misty before browsing it here.";
+    return "This connection is in an external storage configuration. Import it into Misty before browsing it here.";
   }
   if (remote.needsReconnect) {
     return "Sign in again to refresh this provider.";

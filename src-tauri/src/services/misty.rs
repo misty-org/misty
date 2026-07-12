@@ -135,9 +135,7 @@ const REMOVED_PLUGIN_IDS: &[&str] = &["git", "preview-panel", "preview_panel"];
 #[derive(Debug, Serialize, Clone, Default)]
 pub struct MistyProcessStatus {
     pub misty_pid: Option<u32>,
-    pub misty_proxy_pid: Option<u32>,
-    pub misty_proxy_port: Option<u16>,
-    pub misty_rclone_port: Option<u16>,
+    pub storage_ready: bool,
 }
 
 #[derive(Debug, Serialize, Clone)]
@@ -202,13 +200,9 @@ fn find_running_pid(name: &str) -> Option<u32> {
 
 fn current_misty_process_status() -> MistyProcessStatus {
     let misty_pid = find_running_pid("misty");
-    let misty_proxy_pid = find_running_pid("misty-proxy");
-
     MistyProcessStatus {
         misty_pid,
-        misty_proxy_pid,
-        misty_proxy_port: misty_proxy_pid.and_then(|_| read_proxy_port_from_config()),
-        misty_rclone_port: find_misty_rclone_rcd_port(),
+        storage_ready: true,
     }
 }
 
@@ -441,7 +435,7 @@ pub fn get_misty_process_status() -> MistyProcessStatus {
 pub fn launch_misty(
     state: tauri::State<'_, crate::runtime::MistyRuntime>,
 ) -> Result<String, String> {
-    let runtime = state.proxy_runtime.snapshot();
+    let runtime = state.storage_runtime.snapshot();
     if runtime.ready {
         Ok("Embedded Misty runtime is already running.".to_string())
     } else {
@@ -529,26 +523,16 @@ fn stop_named_processes(names: &[&str]) -> Result<usize, String> {
     }
 }
 
-fn stop_services_processes() -> Result<usize, String> {
-    stop_named_processes(&["misty-proxy"])
-}
-
 #[tauri::command]
 pub fn stop_misty() -> Result<String, String> {
-    let stopped = stop_services_processes()?;
-
-    if stopped == 0 {
-        Ok("No running Misty services were found. The Misty app remains open.".to_string())
-    } else {
-        Ok("Stopped Misty services. The Misty app remains open.".to_string())
-    }
+    Ok("Storage is embedded in Misty and stops when the app exits.".to_string())
 }
 
 #[tauri::command]
 pub fn restart_misty(
     state: tauri::State<'_, crate::runtime::MistyRuntime>,
 ) -> Result<String, String> {
-    let runtime = state.proxy_runtime.snapshot();
+    let runtime = state.storage_runtime.snapshot();
     if runtime.ready {
         Ok("Embedded Misty runtime is app-managed; restart Misty to reload it.".to_string())
     } else {
@@ -1902,8 +1886,7 @@ fn misty_logs_dir() -> Result<PathBuf, String> {
 fn component_log_filename(name: &str) -> Result<&'static str, String> {
     match name {
         "misty" | "misty.log" => Ok("misty.log"),
-        "misty-proxy" | "misty-proxy.log" => Ok("misty-proxy.log"),
-        "misty-rclone" | "misty-rclone.log" => Ok("misty-rclone.log"),
+        "storage" | "storage.log" => Ok("storage.log"),
         _ => Err(format!("Unknown Misty log: {name}")),
     }
 }
@@ -2147,7 +2130,7 @@ mod tests {
 
         let home_probe = probe_path(&home);
         let binary_probe = probe_path(&home.join(".local/bin/misty"));
-        let missing_probe = probe_path(&home.join(".local/bin/misty-proxy"));
+        let missing_probe = probe_path(&home.join(".local/bin/missing-service"));
 
         assert!(home_probe.exists);
         assert!(home_probe.is_dir);

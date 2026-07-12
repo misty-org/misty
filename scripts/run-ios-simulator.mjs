@@ -63,7 +63,7 @@ function simulatorAppPath() {
 }
 
 const clang = output("xcrun", ["--sdk", "iphonesimulator", "--find", "clang"]);
-run("npm", ["run", "proxy:archive:ios-simulator"]);
+run("npm", ["run", "service:archive:ios-simulator"]);
 run("npm", [
   "run",
   "tauri",
@@ -74,15 +74,13 @@ run("npm", [
   "--target",
   "aarch64-sim",
   "--features",
-  "embedded-proxy-go",
+  "embedded-storage-go",
   "--no-sign",
   "--archive-only",
 ], {
   env: {
     SWIFT_RS_CLANG: clang,
-    MISTY_PROXY_RUNTIME: "embedded",
-    MISTY_PROXY_GO_LIB_DIR: "src-tauri/target/misty-proxy/ios-simulator-arm64",
-    MISTY_PROXY_GO_LIB_NAME: "misty_proxy",
+    MISTY_SERVICE_GO_LIB_DIR: "src-tauri/target/misty-service/ios-simulator-arm64",
     VITE_MISTY_IOS_BUILD_NUMBER: buildNumber,
   },
 });
