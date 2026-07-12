@@ -8,7 +8,6 @@ import {
 } from "../api/misty";
 import { errorText } from "../shared/format";
 import { isNativeMobileBuild } from "../platform/buildTarget";
-import { assistantDailyMessageLimit, useAssistantUsageStore } from "./useAssistantUsageStore";
 import { selectAssistantPreferences, useSettingsStore } from "./useSettingsStore";
 import {
   cancelAgentSession,
@@ -31,12 +30,14 @@ export type AiPanelMessage = {
   text: string;
   planId?: string;
   toolRequestId?: string;
+  creditsUsed?: number;
+  creditsRemaining?: number;
 };
 
 export interface AiStatus {
   configured: boolean;
-  provider: string;
   model: string;
+  modelName: string;
   running: boolean;
   sessionId: string | null;
   error: string | null;
@@ -95,6 +96,7 @@ let lastEventSequence = 0;
 let activeRoot: string | null = null;
 let activeRequestScope: AssistantScope | null = null;
 let drainInFlight: Promise<void> | null = null;
+let abortRequested = false;
 const processedEventSequences = new Set<number>();
 const processedToolRequestIds = new Set<string>();
 const aiToolTimeoutMs = 15000;
@@ -168,7 +170,7 @@ function appendBlockedRequest(
 ): void {
   set((state) => ({
     error: null,
-    status: serverStatus(false),
+    status: statusWithRunning(state.status, false),
     messages: [
       ...state.messages,
       { id: aiMessageId("user"), role: "user", text: prompt },
@@ -208,10 +210,6 @@ export const useMikaSessionStore = create<AiSessionStore>((set, get) => ({
       appendBlockedRequest(set, trimmed, "Mika is disabled. Enable Mika in Settings > Assistant to continue.");
       return;
     }
-    if (!useAssistantUsageStore.getState().consumeMessage()) {
-      appendBlockedRequest(set, trimmed, `You have used all ${assistantDailyMessageLimit} Mika messages for today. Your local limit resets tomorrow.`);
-      return;
-    }
     const requestScope = classifyAssistantRequest(trimmed);
     if (requestScope === "ambiguous") {
       appendBlockedRequest(set, trimmed, "That request crosses more than one permission scope. Please split it into separate Files, Cleanup, or Search steps.");
@@ -223,14 +221,15 @@ export const useMikaSessionStore = create<AiSessionStore>((set, get) => ({
     }
     activeRoot = cwd || null;
     activeRequestScope = requestScope;
+    abortRequested = false;
     set((state) => ({
       messages: [...state.messages, { id: aiMessageId("user"), role: "user", text: trimmed }],
       error: null,
-      status: serverStatus(true),
+      status: statusWithRunning(state.status, true),
     }));
 
     try {
-      await sendAgentMessageWithSessionRetry({
+      await sendAgentMessageOnce({
         mode: get().mode,
         user_message: scopedAssistantPrompt(prompt, requestScope),
         active_root: cwd || undefined,
@@ -242,10 +241,15 @@ export const useMikaSessionStore = create<AiSessionStore>((set, get) => ({
     } catch (error) {
       stopAiPolling();
       const message = errorText(error);
+      if (abortRequested && message.toLowerCase().includes("canceled")) {
+        resetActiveSession();
+        set((state) => ({ error: null, status: statusWithRunning(state.status, false) }));
+        return;
+      }
       recordAiDebug("error", "Mika send failed.", message);
       set((state) => ({
         error: message,
-        status: serverStatus(false, message),
+        status: statusWithRunning(state.status, false, message),
         messages: [...state.messages, { id: aiMessageId("error"), role: "error", text: message }],
       }));
     }
@@ -256,7 +260,7 @@ export const useMikaSessionStore = create<AiSessionStore>((set, get) => ({
     const approval = get().toolApprovals.find((candidate) => candidate.id === requestId);
     if (!sessionId || !approval || approval.running || approval.completed) return;
     set((state) => ({
-      status: serverStatus(true),
+      status: statusWithRunning(state.status, true),
       toolApprovals: state.toolApprovals.map((candidate) => candidate.id === requestId ? { ...candidate, running: true, error: null } : candidate),
     }));
     try {
@@ -277,7 +281,7 @@ export const useMikaSessionStore = create<AiSessionStore>((set, get) => ({
       recordAiDebug("error", "Mika approved tool failed.", message);
       set((state) => ({
         error: message,
-        status: serverStatus(false, message),
+        status: statusWithRunning(state.status, false, message),
         toolApprovals: state.toolApprovals.map((candidate) => candidate.id === requestId ? { ...candidate, running: false, error: message } : candidate),
         messages: [...state.messages, { id: aiMessageId("error"), role: "error", text: message }],
       }));
@@ -318,13 +322,16 @@ export const useMikaSessionStore = create<AiSessionStore>((set, get) => ({
   },
 
   abortPrompt: async () => {
+    abortRequested = true;
     try {
       if (activeSessionId) await cancelAgentSession(activeSessionId);
-      stopAiPolling();
-      drainInFlight = null;
-      set({ status: serverStatus(false) });
     } catch (error) {
       set({ error: errorText(error) });
+    } finally {
+      stopAiPolling();
+      drainInFlight = null;
+      resetActiveSession();
+      set((state) => ({ status: statusWithRunning(state.status, false) }));
     }
   },
 
@@ -354,7 +361,7 @@ function ensureAiPolling(
       stopAiPolling();
       set((state) => ({
         error: message,
-        status: serverStatus(false, message),
+        status: statusWithRunning(state.status, false, message),
         messages: [...state.messages, { id: aiMessageId("error"), role: "error", text: message }],
       }));
     });
@@ -399,7 +406,7 @@ async function drainAiEventsOnce(
   for (const event of nextEvents) {
     lastEventSequence = Math.max(lastEventSequence, event.sequence);
     if (event.type === "assistant_message" && event.text) {
-      nextMessages.push({ id: aiMessageId("assistant"), role: "assistant", text: event.text });
+      nextMessages.push({ id: aiMessageId("assistant"), role: "assistant", text: event.text, creditsUsed: event.credits_used, creditsRemaining: event.credits_remaining });
     } else if (event.type === "error" && event.message) {
       nextMessages.push({ id: aiMessageId("error"), role: "error", text: event.message });
     } else if (event.type === "tool_request") {
@@ -434,7 +441,7 @@ async function drainAiEventsOnce(
     messages: [...state.messages, ...nextMessages],
     plans: [...state.plans, ...nextPlans],
     toolApprovals: [...state.toolApprovals, ...nextToolApprovals],
-    status: serverStatus(toolResults.length > 0),
+    status: statusWithRunning(state.status, toolResults.length > 0),
   }));
   if (toolResults.length > 0) {
     await submitToolResults(sessionId, toolResults);
@@ -476,17 +483,17 @@ async function ensureSession(): Promise<string> {
   return activeSessionId;
 }
 
-async function sendAgentMessageWithSessionRetry(body: Parameters<typeof sendAgentMessage>[1]): Promise<void> {
-  let sessionId = await ensureSession();
+async function sendAgentMessageOnce(body: Parameters<typeof sendAgentMessage>[1]): Promise<void> {
+  const sessionId = await ensureSession();
+  recordAiDebug("info", "Sending message to Mika server.", `session=${sessionId} cwd=${activeRoot ?? ""}`);
   try {
-    recordAiDebug("info", "Sending message to Mika server.", `session=${sessionId} cwd=${activeRoot ?? ""}`);
     await sendAgentMessage(sessionId, body);
   } catch (error) {
-    if (!isSessionNotFoundError(error)) throw error;
-    recordAiDebug("warn", "Mika session expired; creating a new session.", sessionId);
-    resetActiveSession();
-    sessionId = await ensureSession();
-    await sendAgentMessage(sessionId, body);
+    if (isSessionNotFoundError(error)) {
+      resetActiveSession();
+      throw new Error("Mika session expired. Your request was not resent. Send it again to continue.");
+    }
+    throw error;
   }
 }
 
@@ -690,8 +697,17 @@ function pluralize(count: number, singular: string, plural: string): string {
 function serverStatus(running: boolean, error: string | null = null, configured = true): AiStatus {
   return {
     configured,
-    provider: "Misty Server",
-    model: "mock",
+    model: "mika-low",
+    modelName: "Mika Low",
+    running,
+    sessionId: activeSessionId,
+    error,
+  };
+}
+
+function statusWithRunning(status: AiStatus | null, running: boolean, error: string | null = null): AiStatus {
+  return {
+    ...(status ?? serverStatus(running)),
     running,
     sessionId: activeSessionId,
     error,
@@ -701,12 +717,27 @@ function serverStatus(running: boolean, error: string | null = null, configured 
 function serverStatusFromResponse(response: AgentStatusResponse): AiStatus {
   return {
     configured: response.configured,
-    provider: response.provider || "Misty Server",
-    model: response.model || "mock",
+    model: publicMikaModel(response.model),
+    modelName: publicMikaDisplayName(response.model, response.model_name),
     running: response.running,
     sessionId: response.session_id ?? activeSessionId,
     error: response.error,
   };
+}
+
+function publicMikaModel(model: string): string {
+  return model === "mika-med" || model === "mika-high" ? model : "mika-low";
+}
+
+function mikaModelDisplayName(model: string): string {
+  if (model === "mika-med") return "Mika Med";
+  if (model === "mika-high") return "Mika High";
+  return "Mika Low";
+}
+
+function publicMikaDisplayName(model: string, modelName?: string): string {
+  const expected = mikaModelDisplayName(model);
+  return modelName === expected ? modelName : expected;
 }
 
 function aiMessageId(prefix: string): string {

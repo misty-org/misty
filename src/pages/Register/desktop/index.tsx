@@ -47,7 +47,7 @@ export default function RegisterPage() {
       const user = await accountRegister(name, email, password);
       const me = await accountFetchMe().catch(() => null);
       await saveAuthenticatedUser(user, licenseFromMe(me));
-      setUser(user);
+      setUser({ ...user, accountCreatedAt: me?.created_at, currentPlan: me?.tier });
       navigate(from, { replace: true });
     } catch (registerError) {
       setError(

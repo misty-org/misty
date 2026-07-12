@@ -396,13 +396,13 @@ requireText("scripts/package-mobile-app-store.mjs", /runDiagnosticLog\("tauri-io
 requireText("scripts/package-mobile-app-store.mjs", /validation-logs\/tauri-ios-device-preflight\.txt/, "package references iOS device preflight log");
 requireText("scripts/package-mobile-app-store.mjs", /runForLog\("cargo-check-tauri", "cargo", \["check", "--manifest-path", "src-tauri\/Cargo\.toml"\]\)/, "package captures baseline Tauri cargo check");
 requireText("scripts/package-mobile-app-store.mjs", /runForLog\("cargo-check-tauri-ios-simulator", "cargo", \["check", "--manifest-path", "src-tauri\/Cargo\.toml", "--target", "aarch64-apple-ios-sim"\]\)/, "package captures iOS simulator Tauri cargo check");
-requireText("scripts/package-mobile-app-store.mjs", /runForLog\("cargo-check-tauri-embedded-proxy", "cargo", \["check", "--manifest-path", "src-tauri\/Cargo\.toml", "--features", "embedded-proxy-go"\]\)/, "package captures embedded-proxy Tauri cargo check");
+requireText("scripts/package-mobile-app-store.mjs", /runForLog\("cargo-check-tauri-embedded-storage", "cargo", \["check", "--manifest-path", "src-tauri\/Cargo\.toml", "--features", "embedded-storage-go"\]\)/, "package captures embedded-storage Tauri cargo check");
 requireText("scripts/package-mobile-app-store.mjs", /runForLog\("verify-mobile-release", "npm", \["run", "verify:mobile-release", "--", "--skip-build"\]\)/, "package verifies caller-provided fresh mobile build");
 requireText("scripts/package-mobile-app-store.mjs", /runForLog\("mobile-security-audit", "npm", \["run", "security:mobile:audit", "--", "--skip-build"\]\)/, "package audits caller-provided fresh mobile build");
 requireText("scripts/package-mobile-app-store.mjs", /runForLog\("app-store-submission-status", "npm", \["run", "app-store:submission-status"\]\)/, "package captures submission status report");
 requireText("scripts/package-mobile-app-store.mjs", /validation-logs\/cargo-check-tauri\.txt/, "package references baseline Tauri cargo check log");
 requireText("scripts/package-mobile-app-store.mjs", /validation-logs\/cargo-check-tauri-ios-simulator\.txt/, "package references iOS simulator Tauri cargo check log");
-requireText("scripts/package-mobile-app-store.mjs", /validation-logs\/cargo-check-tauri-embedded-proxy\.txt/, "package references embedded-proxy Tauri cargo check log");
+requireText("scripts/package-mobile-app-store.mjs", /validation-logs\/cargo-check-tauri-embedded-storage\.txt/, "package references embedded-storage Tauri cargo check log");
 requireText("scripts/package-mobile-app-store.mjs", /copyFileOrDir\("docs\/mobile-qa-log\.md", "docs\/mobile-qa-log\.md"\)/, "package copies mobile QA log");
 requireText("scripts/package-mobile-app-store.mjs", /"docs\/mobile-qa-log\.md"/, "package manifest references mobile QA log");
 requireText("scripts/package-mobile-app-store.mjs", /copyFileOrDir\("build\/mobile-submission-status\.json", "submission-status\.json"\)/, "package copies submission status JSON");

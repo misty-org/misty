@@ -30,7 +30,6 @@ pub struct AppEnvironment {
     pub misty_config_path: PathBuf,
     pub workspaces_path: PathBuf,
     pub commands_path: PathBuf,
-    pub proxy_url: Option<String>,
     pub server_url: Option<String>,
     pub grpc_address: String,
     pub mount_path: String,
@@ -53,7 +52,6 @@ pub struct AppEnvironmentSnapshot {
     pub misty_config_path: String,
     pub workspaces_path: String,
     pub commands_path: String,
-    pub proxy_url: Option<String>,
     pub server_url: Option<String>,
     pub grpc_address: String,
     pub mount_path: String,
@@ -63,13 +61,7 @@ pub struct AppEnvironmentSnapshot {
 
 #[derive(Debug, Deserialize)]
 struct MistyConfig {
-    proxy: Option<MistyProxyConfig>,
     server: Option<MistyServerConfig>,
-}
-
-#[derive(Debug, Deserialize)]
-struct MistyProxyConfig {
-    port: Option<u16>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -92,19 +84,11 @@ impl AppEnvironmentService {
         self.inner.snapshot()
     }
 
-    pub fn proxy_url(&self) -> Option<String> {
-        self.inner.proxy_url.clone()
-    }
-
     pub fn misty_config_path(&self) -> PathBuf {
         self.inner.misty_config_path.clone()
     }
 
     pub fn misty_db_path(&self) -> PathBuf {
-        self.inner.db_dir.join("misty.db")
-    }
-
-    pub fn proxy_token_db_path(&self) -> PathBuf {
         self.inner.db_dir.join("data.db")
     }
 
@@ -180,16 +164,6 @@ impl AppEnvironment {
             .unwrap_or_else(|| ".misty/mnt".to_owned());
 
         let parsed_config = read_misty_config(&misty_config_path);
-        let config_proxy_url = parsed_config
-            .as_ref()
-            .and_then(|config| config.proxy.as_ref())
-            .and_then(|proxy| proxy.port)
-            .map(|port| format!("http://127.0.0.1:{port}"));
-        let proxy_url = env::var("PROXY_SERVICE_URL")
-            .ok()
-            .map(|value| value.trim().to_owned())
-            .filter(|value| !value.is_empty())
-            .or(config_proxy_url);
         let server_url = parsed_config
             .as_ref()
             .and_then(|config| config.server.as_ref())
@@ -211,7 +185,6 @@ impl AppEnvironment {
             misty_config_path: misty_config_path.clone(),
             workspaces_path,
             commands_path,
-            proxy_url,
             server_url,
             grpc_address,
             mount_path,
@@ -254,7 +227,6 @@ impl AppEnvironment {
             misty_config_path,
             workspaces_path,
             commands_path,
-            proxy_url: None,
             server_url: None,
             grpc_address,
             mount_path,
@@ -264,9 +236,6 @@ impl AppEnvironment {
 
     fn snapshot(&self) -> AppEnvironmentSnapshot {
         let mut derived_env = BTreeMap::new();
-        if let Some(proxy_url) = &self.proxy_url {
-            derived_env.insert("PROXY_SERVICE_URL".to_owned(), proxy_url.clone());
-        }
         if let Some(server_url) = &self.server_url {
             derived_env.insert("MISTY_SERVER_URL".to_owned(), server_url.clone());
         }
@@ -287,7 +256,6 @@ impl AppEnvironment {
             misty_config_path: display_path(&self.misty_config_path),
             workspaces_path: display_path(&self.workspaces_path),
             commands_path: display_path(&self.commands_path),
-            proxy_url: self.proxy_url.clone(),
             server_url: self.server_url.clone(),
             grpc_address: self.grpc_address.clone(),
             mount_path: self.mount_path.clone(),
@@ -375,8 +343,8 @@ mod tests {
     }
 
     #[test]
-    fn proxy_token_database_uses_shared_data_db() {
-        let root = env::temp_dir().join("misty-env-proxy-token-db");
+    fn application_database_uses_existing_shared_data_db() {
+        let root = env::temp_dir().join("misty-env-shared-data-db");
         let service = AppEnvironmentService {
             inner: Arc::new(AppEnvironment {
                 home_dir: root.clone(),
@@ -392,7 +360,6 @@ mod tests {
                 misty_config_path: root.join(".misty/config/misty.json"),
                 workspaces_path: root.join(".misty/config/workspaces.json"),
                 commands_path: root.join(".misty/config/commands.msy"),
-                proxy_url: None,
                 server_url: None,
                 grpc_address: "localhost:50051".to_owned(),
                 mount_path: ".misty/mnt".to_owned(),
@@ -401,10 +368,10 @@ mod tests {
         };
 
         assert_eq!(
-            service.proxy_token_db_path(),
+            service.misty_db_path(),
             root.join(".misty/db/data.db")
         );
-        assert_eq!(service.misty_db_path(), root.join(".misty/db/misty.db"));
+        assert_eq!(service.misty_db_path(), root.join(".misty/db/data.db"));
     }
 
     #[test]

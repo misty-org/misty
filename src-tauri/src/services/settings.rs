@@ -220,6 +220,8 @@ fn normalize_settings_document(document: &mut Value) -> bool {
             ("local_processing_only", json!(true)),
             ("export_data_enabled", json!(true)),
             ("diagnostics_sharing_enabled", json!(false)),
+            ("anonymous_usage_analytics_enabled", json!(false)),
+            ("anonymous_error_reporting_enabled", json!(false)),
         ],
     );
     changed |= ensure_section_defaults(

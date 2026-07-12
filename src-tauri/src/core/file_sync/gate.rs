@@ -4,7 +4,7 @@ use super::{
     FileSyncAction, FileSyncChange, FileSyncConflict, FileSyncContext, FileSyncEntryStore,
     FileSyncFinalEvent, FileSyncLocalEntry, FileSyncPolicy, FileSyncRemoteEntry, FileSyncResult,
 };
-use crate::services::proxy::ProxyService;
+use crate::services::storage::StorageService;
 
 pub trait FileSyncPolicyEvaluator: Send + Sync {
     fn result(&self, context: &FileSyncContext<'_>) -> FileSyncResult;
@@ -97,7 +97,7 @@ pub struct FileSyncGate {
 }
 
 impl FileSyncGate {
-    pub fn new(mode: FileSyncPolicy, proxy: Option<ProxyService>) -> Self {
+    pub fn new(mode: FileSyncPolicy, proxy: Option<StorageService>) -> Self {
         Self {
             mode,
             policy: policy(mode),

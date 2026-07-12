@@ -10,7 +10,7 @@
     "dev:android": "vite --mode android --host 0.0.0.0",
     "build": "npm run build:desktop",
     "build:desktop": "tsc && vite build --mode desktop",
-    "build:mac:test": "npm run proxy:archive && MISTY_PROXY_RUNTIME=embedded MISTY_PROXY_GO_LIB_DIR=src-tauri/target/misty-proxy/host MISTY_PROXY_GO_LIB_NAME=misty_proxy npm run tauri -- build --features=embedded-proxy-go --bundles app dmg --no-sign",
+    "build:mac:test": "npm run service:archive && MISTY_SERVICE_GO_LIB_DIR=src-tauri/target/misty-service/host npm run tauri -- build --features=embedded-storage-go --bundles app dmg --no-sign",
     "build:mobile": "tsc && vite build --mode mobile",
     "build:android": "tsc && vite build --mode android",
     "preview": "vite preview --mode desktop",
@@ -50,21 +50,24 @@
     "tauri:ios:raw": "tauri ios dev",
     "tauri:ios:device:raw": "tauri ios dev --host",
     "diagnose:remote-cache": "node scripts/diagnose-remote-cache.mjs",
-    "proxy:archive": "node scripts/build-embedded-proxy.mjs",
-    "proxy:archive:ios": "MISTY_PROXY_GO_TARGET=ios-arm64 node scripts/build-embedded-proxy.mjs",
-    "proxy:archive:ios-simulator": "MISTY_PROXY_GO_TARGET=ios-simulator-arm64 node scripts/build-embedded-proxy.mjs",
+    "service:archive": "node scripts/build-storage-service.mjs",
+    "service:archive:ios": "MISTY_SERVICE_GO_TARGET=ios-arm64 node scripts/build-storage-service.mjs",
+    "service:archive:ios-simulator": "MISTY_SERVICE_GO_TARGET=ios-simulator-arm64 node scripts/build-storage-service.mjs",
     "tauri:ios:device:embedded": "node scripts/run-ios-device.mjs",
     "tauri:ios:device:preflight": "node scripts/run-ios-device.mjs --preflight-only",
     "tauri:ios:simulator:embedded": "node scripts/run-ios-simulator.mjs",
-    "tauri:ios:simulator:raw": "npm run proxy:archive:ios-simulator && SWIFT_RS_CLANG=$(xcrun --sdk iphonesimulator --find clang) MISTY_PROXY_RUNTIME=embedded MISTY_PROXY_GO_LIB_DIR=src-tauri/target/misty-proxy/ios-simulator-arm64 MISTY_PROXY_GO_LIB_NAME=misty_proxy npm run tauri -- ios dev \"${TAURI_IOS_SIMULATOR_DEVICE:-iPhone 17}\" --features=embedded-proxy-go",
-    "tauri:ios:build:embedded": "npm run proxy:archive:ios && SWIFT_RS_CLANG=$(xcrun --sdk iphoneos --find clang) MISTY_PROXY_RUNTIME=embedded MISTY_PROXY_GO_LIB_DIR=src-tauri/target/misty-proxy/ios-arm64 MISTY_PROXY_GO_LIB_NAME=misty_proxy npm run tauri -- ios build --features=embedded-proxy-go",
+    "tauri:ios:simulator:raw": "npm run service:archive:ios-simulator && SWIFT_RS_CLANG=$(xcrun --sdk iphonesimulator --find clang) MISTY_SERVICE_GO_LIB_DIR=src-tauri/target/misty-service/ios-simulator-arm64 npm run tauri -- ios dev \"${TAURI_IOS_SIMULATOR_DEVICE:-iPhone 17}\" --features=embedded-storage-go",
+    "tauri:ios:build:embedded": "npm run service:archive:ios && SWIFT_RS_CLANG=$(xcrun --sdk iphoneos --find clang) MISTY_SERVICE_GO_LIB_DIR=src-tauri/target/misty-service/ios-arm64 npm run tauri -- ios build --features=embedded-storage-go",
     "tauri:ios:archive:app-store": "node scripts/build-ios-release.mjs",
     "tauri:ios:archive:validate": "node scripts/build-ios-release.mjs --validate-only",
     "tauri:ios:archive:preflight": "node scripts/build-ios-release.mjs --preflight-only",
-    "notarize:mac": "node scripts/notarize-macos.mjs"
+    "notarize:mac": "node scripts/notarize-macos.mjs",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
   },
   "dependencies": {
     "@impierce/tauri-plugin-keystore": "^2.1.0-alpha.1",
+    "@posthog/react": "^1.10.3",
     "@sinm/react-chrome-tabs": "^2.6.3",
     "@tailwindcss/vite": "^4.3.1",
     "@tauri-apps/api": "^2.0.0",
@@ -75,6 +78,7 @@
     "@tauri-apps/plugin-os": "^2.3.2",
     "@xyflow/react": "^12.11.2",
     "lucide-react": "^0.468.0",
+    "posthog-js": "^1.399.2",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-icons": "^5.6.0",
@@ -82,12 +86,15 @@
     "zustand": "^5.0.14"
   },
   "devDependencies": {
+    "@posthog/rollup-plugin": "^1.4.7",
     "@tauri-apps/cli": "^2.0.0",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^4.3.3",
+    "jsdom": "^29.1.1",
     "tailwindcss": "^4.3.1",
     "typescript": "^5.6.3",
-    "vite": "^5.4.11"
+    "vite": "^5.4.11",
+    "vitest": "^4.1.10"
   }
 }

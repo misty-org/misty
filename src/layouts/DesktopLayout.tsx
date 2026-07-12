@@ -35,7 +35,6 @@ import {
 import {
   Bell,
   Folder,
-  Inbox,
   LogOut,
   Minus,
   Repeat2,
@@ -46,7 +45,7 @@ import {
 } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
 import mistyLogo from "../../assets/logos/misty.png";
-import { useExplorerStore } from "../stores/useExplorerStore";
+import { selectedPathsForPane, useExplorerStore } from "../stores/useExplorerStore";
 import type {
   ExplorerNotification,
   ExplorerNotificationType,
@@ -79,11 +78,13 @@ import type { TransferRecord, TransferStatus } from "../api/types";
 import { isAndroidBuild } from "../platform/buildTarget";
 import {
   closeCloudFolderBotWindow,
+  cloudFolderBotContextRequestEvent,
   cloudFolderBotDismissEvent,
-  cloudFolderBotOpenAssistantEvent,
   cloudFolderBotReturnToAppEvent,
   openCloudFolderBotWindow,
+  publishCloudFolderBotContext,
 } from "../bots/cloudFolderBot";
+import { useMultiPanelStore } from "../shared/multipanel/useMultiPanelStore";
 
 export type DesktopNavItem = {
   id: string;
@@ -174,15 +175,6 @@ const desktopTitlebarTitleClass =
   "pointer-events-none absolute inset-x-[112px] top-0 flex h-full min-w-0 items-center justify-center truncate text-[13px] font-semibold leading-none text-[var(--misty-text-muted)]";
 
 const desktopTitlebarDoubleClickLayerClass = "absolute inset-0 cursor-default";
-
-const desktopTitlebarActionsClass =
-  "absolute right-2 top-0 z-[2] flex h-full min-w-0 items-center justify-end gap-1";
-
-const desktopTitlebarActionsWithWindowControlsClass =
-  "absolute right-[138px] top-0 z-[2] flex h-full min-w-0 items-center justify-end gap-1";
-
-const titlebarActivityButtonClass =
-  "relative grid h-7 w-7 place-items-center rounded-md border-0 bg-transparent p-0 text-[var(--misty-text-muted)] hover:bg-[var(--misty-neutral-hover-bg,var(--misty-surface-2))] hover:text-[var(--misty-text)]";
 
 const windowsTitlebarControlsClass =
   "absolute right-0 top-0 z-[3] grid h-full grid-cols-3";
@@ -373,7 +365,6 @@ export function DesktopLayout(props: {
   const appLoadStarted = useRef(false);
   const loadedRoutes = useRef(new Set<AppTab>());
   const activityAnchorRef = useRef<HTMLButtonElement | null>(null);
-  const titlebarInboxAnchorRef = useRef<HTMLButtonElement | null>(null);
   const profileAnchorRef = useRef<HTMLButtonElement | null>(null);
   const lastNonSettingsRouteRef = useRef(
     settingsFallbackRoute("/files", lastAppRoute),
@@ -382,40 +373,11 @@ export function DesktopLayout(props: {
   const customZoomedRef = useRef(false);
   const customZoomAnimatingRef = useRef(false);
   const [activityOpen, setActivityOpen] = useState(false);
-  const [appInboxEntries, setAppInboxEntries] = useState<AppInboxEntry[]>([]);
-  const [inboxOpen, setInboxOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [desktopPlatform, setDesktopPlatform] =
     useState<DesktopPlatform>("unknown");
   const navItems = props.navItems;
-  const unreadInboxCount = appInboxEntries.filter(
-    (entry) => !entry.read,
-  ).length;
-  const publishAppInboxEntry = useCallback(
-    (entry: Omit<AppInboxEntry, "id" | "createdAtMs" | "read">) => {
-      setAppInboxEntries((current) =>
-        [
-          ...current,
-          {
-            ...entry,
-            id: nextAppInboxEntryId++,
-            createdAtMs: Date.now(),
-            read: false,
-          },
-        ].slice(-100),
-      );
-    },
-    [],
-  );
-  const markInboxRead = useCallback(() => {
-    setAppInboxEntries((current) =>
-      current.map((entry) => (entry.read ? entry : { ...entry, read: true })),
-    );
-  }, []);
-  const clearInbox = useCallback(() => {
-    setAppInboxEntries([]);
-  }, []);
   const openSettingsOverlay = useCallback(() => {
     setSettingsOpen(true);
     void settingsLoad();
@@ -471,14 +433,13 @@ export function DesktopLayout(props: {
   useEffect(() => {
     if (!hasTauriInternals()) return;
     let unlisten: UnlistenFn | null = null;
-    void listen(cloudFolderBotOpenAssistantEvent, () => {
-      setSettingsOpen(false);
-      useExplorerStore.getState().setMikaPanelOpen(true);
-      navigate("/files");
-      const mainWindow = getCurrentWindow();
-      void mainWindow.show().catch(() => undefined);
-      void mainWindow.unminimize().catch(() => undefined);
-      void mainWindow.setFocus().catch(() => undefined);
+    void listen(cloudFolderBotContextRequestEvent, () => {
+      const activePaneId = useMultiPanelStore.getState().activePaneId;
+      const pane = useExplorerStore.getState().panes[activePaneId];
+      void publishCloudFolderBotContext({
+        workingDirectory: pane?.listing?.path ?? "",
+        selectedPaths: selectedPathsForPane(pane),
+      });
     }).then((listener) => {
       unlisten = listener;
     });
@@ -486,7 +447,7 @@ export function DesktopLayout(props: {
     return () => {
       if (unlisten) void unlisten();
     };
-  }, [navigate]);
+  }, []);
 
   useEffect(() => {
     if (loadedRoutes.current.has(routeId)) return;
@@ -862,25 +823,6 @@ export function DesktopLayout(props: {
           onDoubleClick={expandTitlebarWindow}
         />
         <span className={desktopTitlebarTitleClass}>Misty</span>
-        <div
-          className={
-            shouldShowWindowsTitlebarControls
-              ? desktopTitlebarActionsWithWindowControlsClass
-              : desktopTitlebarActionsClass
-          }
-        >
-          <TitlebarActivityButton
-            ref={titlebarInboxAnchorRef}
-            open={inboxOpen}
-            badge={
-              notificationPreferences.badgeCountEnabled ? unreadInboxCount : 0
-            }
-            onClick={() => {
-              setActivityOpen(false);
-              setInboxOpen((open) => !open);
-            }}
-          />
-        </div>
         {shouldShowWindowsTitlebarControls ? (
           <div className={windowsTitlebarControlsClass}>
             <button
@@ -943,7 +885,6 @@ export function DesktopLayout(props: {
                 : 0
             }
             onClick={() => {
-              setInboxOpen(false);
               setActivityOpen((open) => !open);
             }}
           />
@@ -960,7 +901,7 @@ export function DesktopLayout(props: {
       </nav>
 
       <section className={`${routeShellClass} route-shell`}>
-        <AppNoticePublisher onPublish={publishAppInboxEntry} />
+        <AppNoticePublisher />
         <RouteNotice routeId={routeId} />
 
         <Outlet />
@@ -973,14 +914,6 @@ export function DesktopLayout(props: {
         anchorRef={activityAnchorRef}
         open={activityOpen}
         onClose={() => setActivityOpen(false)}
-      />
-      <InboxPopover
-        anchorRef={titlebarInboxAnchorRef}
-        entries={appInboxEntries}
-        open={inboxOpen}
-        onClear={clearInbox}
-        onClose={() => setInboxOpen(false)}
-        onMarkRead={markInboxRead}
       />
       <ProfilePopover
         anchorRef={profileAnchorRef}
@@ -1086,23 +1019,8 @@ const RouteNotice = memo(function RouteNotice(props: { routeId: AppTab }) {
 type AppNoticeSource = "app" | "providers" | "transfers" | "settings";
 type AppNoticeKind = "error" | "message";
 type AppNoticeEntry = readonly [AppNoticeSource, AppNoticeKind, string | null];
-type AppInboxEntry = {
-  id: number;
-  source: AppNoticeSource;
-  kind: AppNoticeKind;
-  message: string;
-  createdAtMs: number;
-  read: boolean;
-};
 
-let nextAppInboxEntryId = 1;
-
-const AppNoticePublisher = memo(function AppNoticePublisher(props: {
-  onPublish: (
-    entry: Omit<AppInboxEntry, "id" | "createdAtMs" | "read">,
-  ) => void;
-}) {
-  const { onPublish } = props;
+const AppNoticePublisher = memo(function AppNoticePublisher() {
   const appError = useAppStore((state) => state.error);
   const appMessage = useAppStore((state) => state.message);
   const providerError = useProvidersStore((state) => state.error);
@@ -1137,7 +1055,6 @@ const AppNoticePublisher = memo(function AppNoticePublisher(props: {
       const signature = `${kind}:${message}`;
       if (lastPublished.current[key] === signature) continue;
       lastPublished.current[key] = signature;
-      onPublish({ source, kind, message });
       pushNotification(
         `${appNoticeSourceLabel(source)}: ${message}`,
         appNoticeType(kind),
@@ -1148,7 +1065,6 @@ const AppNoticePublisher = memo(function AppNoticePublisher(props: {
   }, [
     appError,
     appMessage,
-    onPublish,
     providerError,
     providerMessage,
     transferError,
@@ -1341,37 +1257,6 @@ const ActivityNavButton = memo(
             </span>
           ) : null}
         </span>
-      </button>
-    );
-  }),
-);
-
-const TitlebarActivityButton = memo(
-  forwardRef<
-    HTMLButtonElement,
-    {
-      badge: number;
-      open: boolean;
-      onClick: () => void;
-    }
-  >(function TitlebarActivityButton(props, ref) {
-    return (
-      <button
-        ref={ref}
-        className={`${titlebarActivityButtonClass} ${props.open ? "bg-[var(--misty-neutral-selected-bg,var(--misty-surface-2))] text-[var(--misty-text)]" : ""}`}
-        type="button"
-        aria-haspopup="dialog"
-        aria-expanded={props.open}
-        aria-label="Inbox"
-        title="Inbox"
-        onClick={props.onClick}
-      >
-        <Inbox size={16} strokeWidth={1.9} />
-        {props.badge ? (
-          <span className="absolute right-0 top-0 grid h-[14px] min-w-[14px] place-items-center rounded-full bg-[#d83e3e] px-[3px] text-[9px] font-bold leading-none text-white shadow-[0_0_0_2px_var(--misty-bg)]">
-            {formatBadgeCount(props.badge)}
-          </span>
-        ) : null}
       </button>
     );
   }),
@@ -1760,143 +1645,6 @@ function ActivityPopover(props: {
   );
 }
 
-function InboxPopover(props: {
-  anchorRef: RefObject<HTMLButtonElement | null>;
-  entries: AppInboxEntry[];
-  open: boolean;
-  onClear: () => void;
-  onClose: () => void;
-  onMarkRead: () => void;
-}) {
-  const panelRef = useRef<HTMLDivElement | null>(null);
-  const [position, setPosition] = useState({ left: 84, top: 38 });
-  const confirmDestructiveActions = useSettingsStore(
-    (state) =>
-      selectGeneralPreferences(state.settings?.document)
-        .confirmDestructiveActions,
-  );
-  const entries = [...props.entries].reverse();
-  const hasEntries = entries.length > 0;
-
-  useEffect(() => {
-    if (!props.open) return;
-    const syncPosition = () => {
-      const rect = props.anchorRef.current?.getBoundingClientRect();
-      if (!rect) return;
-      const panelWidth = 420;
-      const panelHeight = Math.min(560, window.innerHeight - 24);
-      const left = Math.min(
-        Math.max(12, rect.right - panelWidth),
-        window.innerWidth - panelWidth - 12,
-      );
-      const top = Math.min(
-        Math.max(12, rect.bottom + 8),
-        window.innerHeight - panelHeight - 12,
-      );
-      setPosition((current) =>
-        current.left === left && current.top === top ? current : { left, top },
-      );
-    };
-    syncPosition();
-    window.addEventListener("resize", syncPosition);
-    window.addEventListener("scroll", syncPosition, true);
-    return () => {
-      window.removeEventListener("resize", syncPosition);
-      window.removeEventListener("scroll", syncPosition, true);
-    };
-  }, [props.anchorRef, props.open]);
-
-  useEffect(() => {
-    if (!props.open) return;
-    const onPointerDown = (event: globalThis.PointerEvent) => {
-      const target = event.target as Node | null;
-      if (target && panelRef.current?.contains(target)) return;
-      if (target && props.anchorRef.current?.contains(target)) return;
-      props.onClose();
-    };
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") props.onClose();
-    };
-    window.addEventListener("pointerdown", onPointerDown);
-    window.addEventListener("keydown", onKeyDown);
-    return () => {
-      window.removeEventListener("pointerdown", onPointerDown);
-      window.removeEventListener("keydown", onKeyDown);
-    };
-  }, [props.anchorRef, props.onClose, props.open]);
-
-  const clearInbox = () => {
-    if (
-      confirmDestructiveActions &&
-      !window.confirm("Clear all Inbox notifications on this device?")
-    ) {
-      return;
-    }
-    props.onClear();
-  };
-
-  if (!props.open) return null;
-
-  return createPortal(
-    <div
-      ref={panelRef}
-      className={activityPopoverClass}
-      style={{ left: position.left, top: position.top }}
-    >
-      <section className={activityPanelClass} role="dialog" aria-label="Inbox">
-        <header className="flex items-start justify-between gap-3.5 border-b border-[#333944] p-4">
-          <div>
-            <h2 className="m-0 text-lg font-semibold leading-tight text-[#f1eee8]">
-              Inbox
-            </h2>
-            <p className="mt-1.5 text-[var(--misty-text-muted)]">
-              Misty app notices, updates, and service status.
-            </p>
-          </div>
-          <div className="flex gap-2">
-            <button
-              className={activityButtonClass}
-              type="button"
-              onClick={props.onMarkRead}
-              disabled={!hasEntries}
-            >
-              Mark Read
-            </button>
-            <button
-              className={activityButtonClass}
-              type="button"
-              onClick={clearInbox}
-              disabled={!hasEntries}
-            >
-              Clear
-            </button>
-          </div>
-        </header>
-        {hasEntries ? (
-          <div className="min-h-0 overflow-auto px-4 py-3">
-            {entries.map((entry) => (
-              <InboxEntry key={entry.id} entry={entry} />
-            ))}
-          </div>
-        ) : (
-          <div className="grid content-center justify-items-center gap-2 text-center text-[#9e9890]">
-            <h3 className="m-0 text-lg font-semibold leading-tight text-[#f1eee8]">
-              Inbox clear
-            </h3>
-            <p className="mt-1.5 text-[#9e9890]">
-              Misty updates and account notices will appear here.
-            </p>
-          </div>
-        )}
-        <footer className="border-t border-[#252b33] px-4 py-[9px] text-xs text-[#9e9890]">
-          Inbox items are local to this device.
-        </footer>
-      </section>
-    </div>,
-    document.body,
-  );
-}
-
 function ActivityEntry(props: { entry: ExplorerNotification }) {
   const statusColor =
     props.entry.type === "success"
@@ -1913,29 +1661,6 @@ function ActivityEntry(props: { entry: ExplorerNotification }) {
       />
       <p className="m-0 min-w-0 [overflow-wrap:anywhere] leading-[1.35] text-[#f1eee8]">
         {props.entry.message}
-      </p>
-      <time className="whitespace-nowrap pt-px text-xs text-[#9e9890]">
-        {formatActivityTime(props.entry.createdAtMs)}
-      </time>
-    </article>
-  );
-}
-
-function InboxEntry(props: { entry: AppInboxEntry }) {
-  const statusColor =
-    props.entry.kind === "error" ? "bg-[#d15757]" : "bg-[#6bb878]";
-  return (
-    <article
-      className={`${activityEntryBaseClass} ${props.entry.read ? "" : "bg-[rgba(241,238,232,0.035)]"} [&+&]:mt-1`}
-    >
-      <span
-        className={`mx-auto mt-[7px] h-[7px] w-[7px] rounded-full ${statusColor}`}
-      />
-      <p className="m-0 min-w-0 [overflow-wrap:anywhere] leading-[1.35] text-[#f1eee8]">
-        <span className="block text-[11px] font-semibold uppercase tracking-normal text-[#9e9890]">
-          {appNoticeSourceLabel(props.entry.source)}
-        </span>
-        <span>{props.entry.message}</span>
       </p>
       <time className="whitespace-nowrap pt-px text-xs text-[#9e9890]">
         {formatActivityTime(props.entry.createdAtMs)}

@@ -12,7 +12,7 @@ use tokio::sync::RwLock;
 use crate::error::{ApiError, ApiResult};
 use crate::services::paths;
 
-use super::proxy::{ProxyResponse, ProxyService};
+use super::storage::{StorageResponse, StorageService};
 
 const RCLONE_OAUTH_CALLBACK_TEMPLATE: &str =
     include_str!("../../../assets/rclone/oauth-callback.html");
@@ -24,7 +24,7 @@ pub struct ProviderService {
 }
 
 struct ProviderInner {
-    proxy: ProxyService,
+    proxy: StorageService,
     snapshot: RwLock<ProvidersSnapshot>,
     active_config_sessions: RwLock<Vec<ActiveProviderConfigSession>>,
 }
@@ -400,7 +400,7 @@ struct RawRemoteStatus {
 }
 
 impl ProviderService {
-    pub fn new(proxy: ProxyService) -> Self {
+    pub fn new(proxy: StorageService) -> Self {
         Self {
             inner: Arc::new(ProviderInner {
                 proxy,
@@ -598,7 +598,7 @@ impl ProviderService {
             return Err(provider_operation_error(
                 status.as_u16(),
                 &body,
-                "Failed to load rclone config paths",
+                "Failed to load storage configuration paths",
             ));
         }
         let parsed = serde_json::from_str::<serde_json::Value>(&body).unwrap_or_default();
@@ -1075,6 +1075,9 @@ fn append_external_config_remotes(remotes: &mut Vec<ProviderRemote>) {
         .map(|remote| remote.name.to_lowercase())
         .collect::<std::collections::BTreeSet<_>>();
     for (name, provider_type) in read_standard_rclone_config_remotes() {
+        if !matches!(provider_type.as_str(), "drive" | "onedrive" | "dropbox") {
+            continue;
+        }
         if existing_names.contains(&name.to_lowercase()) {
             continue;
         }
@@ -1084,7 +1087,7 @@ fn append_external_config_remotes(remotes: &mut Vec<ProviderRemote>) {
             status_label: "Import required".to_string(),
             needs_reconnect: true,
             error: Some(
-                "This remote exists in the user rclone config, but Misty is not using that config. Configure it in Misty to import it."
+                "This connection exists in an external storage configuration. Configure it in Misty to import it."
                     .to_string(),
             ),
             config_source: "user".to_string(),
@@ -1111,7 +1114,7 @@ fn remove_standard_rclone_config_remote(name: &str) -> ApiResult<bool> {
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(false),
         Err(error) => {
             return Err(ApiError::Message(format!(
-                "Failed to read user rclone config: {error}"
+                "Failed to read external storage configuration: {error}"
             )));
         }
     };
@@ -1120,7 +1123,7 @@ fn remove_standard_rclone_config_remote(name: &str) -> ApiResult<bool> {
         return Ok(false);
     }
     fs::write(&path, updated).map_err(|error| {
-        ApiError::Message(format!("Failed to update user rclone config: {error}"))
+        ApiError::Message(format!("Failed to update external storage configuration: {error}"))
     })?;
     Ok(true)
 }
@@ -1212,7 +1215,7 @@ fn parse_config_map(body: &str) -> ApiResult<BTreeMap<String, String>> {
     let parsed = serde_json::from_str::<serde_json::Value>(body)?;
     let Some(object) = parsed.as_object() else {
         return Err(ApiError::Message(
-            "rclone config/get did not return an object".to_string(),
+            "Storage configuration did not return an object".to_string(),
         ));
     };
     let mut config = BTreeMap::new();
@@ -1310,20 +1313,58 @@ fn ensure_rclone_oauth_callback_template() -> ApiResult<Option<PathBuf>> {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent).map_err(|error| {
             ApiError::Message(format!(
-                "Failed to create rclone callback template directory: {error}"
+                "Failed to create authorization callback template directory: {error}"
             ))
         })?;
     }
     let current = fs::read_to_string(&path).unwrap_or_default();
     if current != RCLONE_OAUTH_CALLBACK_TEMPLATE {
         fs::write(&path, RCLONE_OAUTH_CALLBACK_TEMPLATE).map_err(|error| {
-            ApiError::Message(format!("Failed to write rclone callback template: {error}"))
+            ApiError::Message(format!("Failed to write authorization callback template: {error}"))
         })?;
     }
     Ok(Some(path))
 }
 
 fn default_provider_workflows() -> Vec<ProviderWorkflow> {
+    return vec![
+        provider_workflow(
+            "drive",
+            "Google Drive",
+            "Google Drive for personal, Workspace, Shared Drive, and service-account storage.",
+            vec![
+                ProviderWorkflowOption { name: "scope".into(), label: "Access scope".into(), help: "Choose the Google Drive access granted to Misty.".into(), default_value: "drive".into(), required: true, password: false, choices: vec![ProviderWorkflowChoice { value: "drive".into(), help: "Full Google Drive access".into() }] },
+                ProviderWorkflowOption { name: "team_drive".into(), label: "Shared Drive ID".into(), help: "Advanced: connect a specific Shared Drive.".into(), default_value: String::new(), required: false, password: false, choices: vec![] },
+                ProviderWorkflowOption { name: "root_folder_id".into(), label: "Root folder ID".into(), help: "Advanced: limit this connection to a folder.".into(), default_value: String::new(), required: false, password: false, choices: vec![] },
+                ProviderWorkflowOption { name: "service_account_file".into(), label: "Service account file".into(), help: "Advanced: use Workspace service-account credentials.".into(), default_value: String::new(), required: false, password: false, choices: vec![] },
+                ProviderWorkflowOption { name: "client_id".into(), label: "OAuth client ID".into(), help: "Advanced: use your own Google OAuth application.".into(), default_value: String::new(), required: false, password: false, choices: vec![] },
+                ProviderWorkflowOption { name: "client_secret".into(), label: "OAuth client secret".into(), help: "Advanced: secret for the custom OAuth application.".into(), default_value: String::new(), required: false, password: true, choices: vec![] },
+            ],
+        ),
+        provider_workflow(
+            "onedrive",
+            "Microsoft OneDrive",
+            "OneDrive personal, business, SharePoint sites, and document libraries.",
+            vec![
+                ProviderWorkflowOption { name: "drive_type".into(), label: "Account type".into(), help: "Personal, business, or SharePoint storage.".into(), default_value: "personal".into(), required: false, password: false, choices: vec![ProviderWorkflowChoice { value: "personal".into(), help: "Personal OneDrive".into() }, ProviderWorkflowChoice { value: "business".into(), help: "Business or SharePoint".into() }] },
+                ProviderWorkflowOption { name: "drive_id".into(), label: "Drive or library ID".into(), help: "Advanced: connect a specific drive or document library.".into(), default_value: String::new(), required: false, password: false, choices: vec![] },
+                ProviderWorkflowOption { name: "root_folder_id".into(), label: "Root folder ID".into(), help: "Advanced: limit this connection to a folder.".into(), default_value: String::new(), required: false, password: false, choices: vec![] },
+                ProviderWorkflowOption { name: "client_id".into(), label: "OAuth client ID".into(), help: "Advanced: use your own Microsoft OAuth application.".into(), default_value: String::new(), required: false, password: false, choices: vec![] },
+                ProviderWorkflowOption { name: "client_secret".into(), label: "OAuth client secret".into(), help: "Advanced: secret for the custom OAuth application.".into(), default_value: String::new(), required: false, password: true, choices: vec![] },
+            ],
+        ),
+        provider_workflow(
+            "dropbox",
+            "Dropbox",
+            "Dropbox personal, business, team spaces, and shared namespaces.",
+            vec![
+                ProviderWorkflowOption { name: "root_namespace_id".into(), label: "Root namespace ID".into(), help: "Advanced: connect a team-space or shared namespace root.".into(), default_value: String::new(), required: false, password: false, choices: vec![] },
+                ProviderWorkflowOption { name: "client_id".into(), label: "OAuth app key".into(), help: "Advanced: use your own Dropbox OAuth application.".into(), default_value: String::new(), required: false, password: false, choices: vec![] },
+                ProviderWorkflowOption { name: "client_secret".into(), label: "OAuth app secret".into(), help: "Advanced: secret for the custom OAuth application.".into(), default_value: String::new(), required: false, password: true, choices: vec![] },
+            ],
+        ),
+    ];
+    #[allow(unreachable_code)]
     let drive_scope = vec![ProviderWorkflowOption {
         name: "scope".to_string(),
         label: "Scope".to_string(),
@@ -1686,7 +1727,7 @@ fn proxy_response_error(status: u16, body: &str, fallback: &str) -> ApiError {
 }
 
 async fn parse_proxy_response<T: for<'de> Deserialize<'de>>(
-    response: ProxyResponse,
+    response: StorageResponse,
     fallback: &str,
 ) -> ApiResult<T> {
     let status = response.status();
@@ -1698,7 +1739,7 @@ async fn parse_proxy_response<T: for<'de> Deserialize<'de>>(
 }
 
 async fn parse_public_link_list_response(
-    response: ProxyResponse,
+    response: StorageResponse,
     remote: &str,
 ) -> ApiResult<PublicLinkListResult> {
     let status = response.status();
@@ -1722,7 +1763,7 @@ async fn parse_public_link_list_response(
 }
 
 async fn parse_public_link_action_response(
-    response: ProxyResponse,
+    response: StorageResponse,
     remote: &str,
 ) -> ApiResult<PublicLinkActionResult> {
     let status = response.status();
@@ -1935,7 +1976,6 @@ mod tests {
     fn default_provider_workflows_include_supported_clouds() {
         let workflows = default_provider_workflows();
 
-        assert!(workflows.len() >= 60);
         assert!(workflows
             .iter()
             .any(|workflow| workflow.provider_type == "drive"));
@@ -1951,15 +1991,8 @@ mod tests {
             .unwrap();
         assert_eq!(drive.options[0].name, "scope");
         assert_eq!(drive.options[0].default_value, "drive");
-        assert!(workflows
-            .iter()
-            .any(|workflow| workflow.provider_type == "s3"));
-        assert!(workflows
-            .iter()
-            .any(|workflow| workflow.provider_type == "webdav"));
-        assert!(workflows
-            .iter()
-            .any(|workflow| workflow.provider_type == "protondrive"));
+        assert_eq!(workflows.len(), 3);
+        assert!(workflows.iter().all(|workflow| matches!(workflow.provider_type.as_str(), "drive" | "onedrive" | "dropbox")));
     }
 
     #[test]

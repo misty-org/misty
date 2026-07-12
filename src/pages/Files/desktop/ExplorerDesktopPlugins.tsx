@@ -1,4 +1,4 @@
-import { ArrowRightLeft, ExternalLink, MessageSquare, Puzzle, RefreshCcw, Terminal, X } from "lucide-react";
+import { ArrowRightLeft, ExternalLink, Puzzle, RefreshCcw, Terminal, X } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { CSSProperties } from "react";
@@ -32,18 +32,13 @@ const transferBadgeStatuses = new Set<TransferRecord["status"]>([
 const emptyTransferRows: TransferRecord[] = [];
 
 export function ExplorerTray(props: {
-  aiOpen: boolean;
   commands: PluginCommandEntry[];
   panels: PluginPanelEntry[];
   extensionsEnabled?: boolean;
   selectedPath: string;
-  selectedExtensionPluginId: string | null;
-  extensionsOpen: boolean;
   terminalEnabled: boolean;
   terminalPath: string;
   onOpenTransfers: () => void;
-  onToggleAi: () => void;
-  onToggleExtensionPlugin: (pluginId: string) => void;
 }) {
   const openTerminal = useCallback(() => {
     if (!props.terminalEnabled) return;
@@ -56,16 +51,6 @@ export function ExplorerTray(props: {
     <>
       <ExplorerTransfersTabButton onClick={props.onOpenTransfers} />
       <button
-        className={cx(explorerTrayStyles.trigger, props.aiOpen && explorerTrayStyles.triggerActive)}
-        type="button"
-        title="Open Mika Assistant"
-        aria-label="Open Mika Assistant"
-        aria-pressed={props.aiOpen}
-        onClick={props.onToggleAi}
-      >
-        <MessageSquare size={16} />
-      </button>
-      <button
         className={explorerTrayStyles.trigger}
         type="button"
         title={props.terminalEnabled ? "Open terminal" : "Terminal unavailable for this view"}
@@ -77,12 +62,9 @@ export function ExplorerTray(props: {
       </button>
       {props.extensionsEnabled !== false ? (
         <ExplorerPluginTabMenu
-          activePluginId={props.selectedExtensionPluginId}
           commands={props.commands}
-          extensionsOpen={props.extensionsOpen}
           panels={props.panels}
           selectedPath={props.selectedPath}
-          onTogglePlugin={props.onToggleExtensionPlugin}
         />
       ) : null}
     </>
@@ -121,12 +103,9 @@ function formatTransferBadgeCount(count: number): string {
 }
 
 function ExplorerPluginTabMenu(props: {
-  activePluginId: string | null;
   commands: PluginCommandEntry[];
-  extensionsOpen: boolean;
   panels: PluginPanelEntry[];
   selectedPath: string;
-  onTogglePlugin: (pluginId: string) => void;
 }) {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
@@ -185,8 +164,8 @@ function ExplorerPluginTabMenu(props: {
 
   const togglePluginPanel = useCallback((plugin: PluginMenuItem) => {
     setOpen(false);
-    props.onTogglePlugin(plugin.pluginId);
-  }, [props.onTogglePlugin]);
+    openPluginTab(plugin, props.selectedPath);
+  }, [props.selectedPath]);
 
   const browsePlugins = useCallback(() => {
     setOpen(false);
@@ -197,7 +176,7 @@ function ExplorerPluginTabMenu(props: {
     <>
       <button
         ref={buttonRef}
-        className={cx(explorerTrayStyles.trigger, (open || props.extensionsOpen) && explorerTrayStyles.triggerActive)}
+        className={cx(explorerTrayStyles.trigger, open && explorerTrayStyles.triggerActive)}
         type="button"
         title="Extensions"
         aria-haspopup="menu"
@@ -233,7 +212,6 @@ function ExplorerPluginTabMenu(props: {
                   className={cx(
                     pluginTabMenuStyles.item,
                     plugin.usable && pluginTabMenuStyles.itemUsable,
-                    props.extensionsOpen && props.activePluginId === plugin.pluginId && pluginTabMenuStyles.itemSelected,
                   )}
                   role="menuitem"
                   onClick={() => togglePluginPanel(plugin)}
@@ -521,6 +499,21 @@ function pluginTabPathForMenuItem(plugin: PluginMenuItem, selectedPath: string):
     return `${pluginTabProtocol}//panel?${params.toString()}`;
   }
   return `${pluginTabProtocol}//commands?${params.toString()}`;
+}
+
+export function openPluginTab(plugin: PluginMenuItem, selectedPath: string): void {
+  const path = pluginTabPathForMenuItem(plugin, selectedPath);
+  const multi = useMultiPanelStore.getState();
+  const existing = multi.tabs.find((tab) => tab.path === path);
+  if (existing) {
+    multi.selectTab(existing.id);
+    return;
+  }
+  const tabId = multi.addTab(path, plugin.pluginName);
+  useMultiPanelStore.getState().setTabPanelVisibility(tabId, {
+    sidebarVisible: false,
+    previewVisible: false,
+  });
 }
 
 export function isTransfersTabPath(path: string): boolean {

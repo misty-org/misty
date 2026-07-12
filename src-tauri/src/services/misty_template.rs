@@ -325,7 +325,6 @@ fn misty_template_plan(home: &Path) -> MistyTemplatePlan {
         .dir(".local")
         .dir(".local/bin")
         .file(home, ".local/bin/misty")
-        .optional_file(home, ".local/bin/misty-proxy")
         .dir("local")
         .dir("local/bin")
         .dir("local/plugins")

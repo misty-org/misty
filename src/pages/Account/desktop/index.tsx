@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
 import { useAuth } from "../../../auth/AuthContext";
-import { fetchMe, updateDevice, updateProfile, type MeResponse } from "./api";
+import { createCheckout, createCreditCheckout, createPortalSession, fetchBillingUsage, fetchMe, updateDevice, updateProfile, type BillingUsageResponse, type MeResponse } from "./api";
 import { useUserStore } from "../../../stores/useUserStore";
 import { useSetupStore } from "../../../stores/useSetupStore";
 import type { CurrentLicense } from "../../../models/setup";
@@ -13,18 +13,19 @@ import {
   readClientDebugEvents,
   type ClientDebugEvent,
 } from "../../../shared/debug/clientDebug";
+import { openExternalLink } from "../../../shared/openExternalLink";
 
 // ─── display helpers ─────────────────────────────────────────────────────────
 
 const TIER_LABEL: Record<string, string> = {
   basic: "Basic",
-  personal: "Personal",
   pro: "Pro",
+  max: "Max",
 };
 const TIER_COLOR: Record<string, string> = {
   basic: "text-zinc-400 bg-zinc-400/10 border-zinc-400/20",
-  personal: "text-blue-400 bg-blue-400/10 border-blue-400/20",
-  pro: "text-violet-400 bg-violet-400/10 border-violet-400/20",
+  pro: "text-blue-400 bg-blue-400/10 border-blue-400/20",
+  max: "text-violet-400 bg-violet-400/10 border-violet-400/20",
 };
 const STATUS_COLOR: Record<string, string> = {
   active: "text-emerald-400 bg-emerald-400/10 border-emerald-400/20",
@@ -155,6 +156,9 @@ function AccountPanel({
   const patchMe = useUserStore((state) => state.patchMe);
   const [name, setName] = useState(me.name);
   const [device, setDevice] = useState(me.license_device);
+  const [billingUsage, setBillingUsage] = useState<BillingUsageResponse | null>(null);
+  const [billingWorking, setBillingWorking] = useState(false);
+  const [billingError, setBillingError] = useState("");
   const {
     saving: savingProfile,
     error: profileError,
@@ -164,6 +168,23 @@ function AccountPanel({
     await updateProfile(name);
     onUpdated(name);
   });
+
+  useEffect(() => {
+    void fetchBillingUsage().then(setBillingUsage).catch(() => setBillingUsage(null));
+  }, [me.tier]);
+
+  async function openBillingAction(action: () => Promise<{ url: string }>) {
+    setBillingWorking(true);
+    setBillingError("");
+    try {
+      const { url } = await action();
+      await openExternalLink(url);
+    } catch (error) {
+      setBillingError(error instanceof Error ? error.message : "Could not start billing.");
+    } finally {
+      setBillingWorking(false);
+    }
+  }
   const {
     saving: savingDevice,
     error: deviceError,
@@ -186,6 +207,16 @@ function AccountPanel({
     .join("")
     .toUpperCase()
     .slice(0, 2);
+  const creditUsedPercent = billingUsage && billingUsage.monthly_allowance > 0
+    ? Math.round((1 - billingUsage.monthly_remaining / billingUsage.monthly_allowance) * 100)
+    : 0;
+  const creditWarning = creditUsedPercent >= 100
+    ? "Managed AI is paused until you add credits or the allowance resets."
+    : creditUsedPercent >= 90
+      ? "You have used at least 90% of this month’s credits."
+      : creditUsedPercent >= 75
+        ? "You have used at least 75% of this month’s credits."
+        : "";
 
   return (
     <div className="flex flex-col gap-6">
@@ -199,7 +230,13 @@ function AccountPanel({
             cls={STATUS_COLOR[me.status] ?? STATUS_COLOR.active}
           />
         </Row>
-        <Row label="Type">{me.tier === "basic" ? "Basic account" : "Perpetual"}</Row>
+        <Row label="Type">
+          {me.billing?.kind === "lifetime"
+            ? "Lifetime"
+            : me.billing?.kind === "subscription"
+              ? `${me.billing.interval === "year" ? "Annual" : "Monthly"} subscription`
+              : me.status === "trialing" ? "Pro trial" : "Free account"}
+        </Row>
         {me.expires_at ? (
           <Row label="Expires">
             {new Date(me.expires_at).toLocaleDateString(undefined, {
@@ -208,8 +245,13 @@ function AccountPanel({
               day: "numeric",
             })}
           </Row>
-        ) : me.tier !== "basic" ? (
+        ) : me.billing?.kind === "lifetime" ? (
           <Row label="Expires">Never</Row>
+        ) : null}
+        {me.billing?.current_period_end ? (
+          <Row label={me.billing.cancel_at_period_end ? "Access until" : "Renews"}>
+            {new Date(me.billing.current_period_end).toLocaleDateString()}
+          </Row>
         ) : null}
       </Section>
 
@@ -252,7 +294,7 @@ function AccountPanel({
           <Badge label="Active" cls={STATUS_COLOR.active} />
         </div>
 
-        {me.tier === "pro" && (
+        {me.tier === "max" && (
           <div className="py-4">
             <p className="text-xs text-text-muted">
               Additional seats appear here as you activate new devices.
@@ -263,22 +305,54 @@ function AccountPanel({
         {me.tier === "basic" && (
           <div className="flex flex-col gap-3 py-4 md:flex-row md:items-center md:justify-between md:gap-6">
             <p className="text-xs text-text-muted">
-              Personal - $30 per device · Pro - $89 unlimited devices
+              Pro $9.99/month · Max $14.99/month
             </p>
-          <a href="/pricing" className="shrink-0 text-xs text-text hover:text-white underline underline-offset-2 transition-colors">
-              Upgrade
-            </a>
+            <button disabled={billingWorking} onClick={() => void openBillingAction(() => createCheckout("pro", "month"))} className="shrink-0 text-xs text-text hover:text-white underline underline-offset-2 transition-colors disabled:opacity-50">
+              Upgrade to Pro
+            </button>
           </div>
         )}
       </Section>
 
+      <Section title="Misty Credits">
+        {billingUsage ? (
+          <>
+            <Row label="Available">{billingUsage.available_credits.toLocaleString()} credits</Row>
+            <Row label="Monthly allowance">{billingUsage.monthly_remaining.toLocaleString()} of {billingUsage.monthly_allowance.toLocaleString()} remaining</Row>
+            <Row label="Purchased">{billingUsage.purchased_remaining.toLocaleString()} credits</Row>
+            <Row label="Resets">{new Date(billingUsage.next_reset_at).toLocaleDateString()}</Row>
+            <div className="py-4">
+              <div className="h-1.5 overflow-hidden rounded-full bg-elevated"><div className="h-full bg-blue-400" style={{ width: `${Math.min(100, creditUsedPercent)}%` }} /></div>
+              {creditWarning ? <p className="mt-2 text-xs text-amber-400">{creditWarning}</p> : null}
+            </div>
+            <div className="flex flex-wrap gap-2 py-4">
+              <button disabled={billingWorking} onClick={() => void openBillingAction(() => createCreditCheckout("credits_1500"))} className="rounded-lg border border-border px-3 py-2 text-xs text-text disabled:opacity-50">1,500,000 credits · $4.99</button>
+              <button disabled={billingWorking} onClick={() => void openBillingAction(() => createCreditCheckout("credits_3500"))} className="rounded-lg border border-border px-3 py-2 text-xs text-text disabled:opacity-50">3,500,000 credits · $9.99</button>
+            </div>
+          </>
+        ) : <GhostRow label="Usage" value="Loading credit balance" />}
+      </Section>
+
       <Section title="Billing">
-        <GhostRow label="Payment method" value="Not connected" />
-        <GhostRow label="Last payment" value="—" />
-        <GhostRow label="Next invoice" value="—" />
-        <div className="py-4 opacity-40">
-          <button className="text-sm text-text-muted cursor-not-allowed">Manage billing →</button>
-        </div>
+        {me.billing?.kind === "subscription" ? (
+          <>
+            <Row label="Plan">{TIER_LABEL[me.tier]} · {me.billing.interval === "year" ? "yearly" : "monthly"}</Row>
+            <div className="py-4">
+              <button disabled={billingWorking || !me.billing.customer_portal_available} onClick={() => void openBillingAction(createPortalSession)} className="text-sm text-text-muted hover:text-text disabled:opacity-40">Manage billing →</button>
+            </div>
+          </>
+        ) : (
+          <div className="grid gap-3 py-4">
+            <p className="m-0 text-sm text-text-muted">Pro includes 2,000 monthly credits. Max includes 6,000.</p>
+            <div className="flex flex-wrap gap-2">
+              <button disabled={billingWorking} onClick={() => void openBillingAction(() => createCheckout("pro", "month"))} className="rounded-lg bg-white px-3 py-2 text-xs font-semibold text-bg disabled:opacity-50">Pro · $9.99/mo</button>
+              <button disabled={billingWorking} onClick={() => void openBillingAction(() => createCheckout("max", "month"))} className="rounded-lg border border-border px-3 py-2 text-xs text-text disabled:opacity-50">Max · $14.99/mo</button>
+              <button disabled={billingWorking} onClick={() => void openBillingAction(() => createCheckout("pro", "year"))} className="rounded-lg border border-border px-3 py-2 text-xs text-text disabled:opacity-50">Pro · $99/yr</button>
+              <button disabled={billingWorking} onClick={() => void openBillingAction(() => createCheckout("max", "year"))} className="rounded-lg border border-border px-3 py-2 text-xs text-text disabled:opacity-50">Max · $149/yr</button>
+            </div>
+          </div>
+        )}
+        {billingError ? <p className="pb-4 text-xs text-red-400">{billingError}</p> : null}
       </Section>
 
       <Section title="Info">

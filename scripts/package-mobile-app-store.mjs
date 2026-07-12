@@ -118,7 +118,7 @@ mkdirSync(logsDir, { recursive: true });
 runForLog("build-mobile", "npm", ["run", "build:mobile"]);
 runForLog("cargo-check-tauri", "cargo", ["check", "--manifest-path", "src-tauri/Cargo.toml"]);
 runForLog("cargo-check-tauri-ios-simulator", "cargo", ["check", "--manifest-path", "src-tauri/Cargo.toml", "--target", "aarch64-apple-ios-sim"]);
-runForLog("cargo-check-tauri-embedded-proxy", "cargo", ["check", "--manifest-path", "src-tauri/Cargo.toml", "--features", "embedded-proxy-go"]);
+runForLog("cargo-check-tauri-embedded-storage", "cargo", ["check", "--manifest-path", "src-tauri/Cargo.toml", "--features", "embedded-storage-go"]);
 runForLog("verify-mobile-release", "npm", ["run", "verify:mobile-release", "--", "--skip-build"]);
 runForLog("mobile-security-audit", "npm", ["run", "security:mobile:audit", "--", "--skip-build"]);
 runForLog("app-store-owner-fields", "npm", ["run", "app-store:owner-fields:check"]);
@@ -295,7 +295,7 @@ const manifest = {
     "validation-logs/build-mobile.txt",
     "validation-logs/cargo-check-tauri.txt",
     "validation-logs/cargo-check-tauri-ios-simulator.txt",
-    "validation-logs/cargo-check-tauri-embedded-proxy.txt",
+    "validation-logs/cargo-check-tauri-embedded-storage.txt",
     "validation-logs/verify-mobile-release.txt",
     "validation-logs/mobile-security-audit.txt",
     "validation-logs/app-store-owner-fields.txt",
@@ -389,7 +389,7 @@ This uninstalls Misty from the selected simulator before reinstalling the curren
 - \`validation-logs/build-mobile.txt\`
 - \`validation-logs/cargo-check-tauri.txt\`
 - \`validation-logs/cargo-check-tauri-ios-simulator.txt\`
-- \`validation-logs/cargo-check-tauri-embedded-proxy.txt\`
+- \`validation-logs/cargo-check-tauri-embedded-storage.txt\`
 - \`validation-logs/verify-mobile-release.txt\`
 - \`validation-logs/mobile-security-audit.txt\`
 - \`validation-logs/app-store-owner-fields.txt\`

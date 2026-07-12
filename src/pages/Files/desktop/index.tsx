@@ -106,7 +106,6 @@ import {
   validateBatchRenameItems,
 } from "../../../stores/useExplorerStore";
 import type { ExplorerBatchRenameItem, ExplorerDialogState, ExplorerInlineEditState, ExplorerNotification, ExplorerSortColumn } from "../../../stores/useExplorerStore";
-import { useMikaSessionStore, type AiPlanReview, type AiStatus, type AiToolApproval } from "../../../stores/useMikaSessionStore";
 import { useSearchStore } from "../../../stores/useSearchStore";
 import { maxMultiPanelPanes, useMultiPanelStore } from "../../../shared/multipanel/useMultiPanelStore";
 import { ProvidersWorkspacePanel } from "../../Providers/desktop";
@@ -154,7 +153,6 @@ import { buildExplorerLocationResults, clamp, ExplorerBottomBar, mountedDevicesE
 import { ExplorerNotifications, ExplorerRenameStatus } from "./ExplorerDesktopStatus";
 import {
   canOpenTerminalPath,
-  ExplorerExtensionsPanel,
   ExplorerPluginTabContent,
   ExplorerPluginTabHeader,
   ExplorerTray,
@@ -164,23 +162,18 @@ import {
   openRemotesTab,
   openTransfersTab,
   parsePluginTabPath,
-  pluginMenuItems,
-  stringArraysEqual,
   toggleActiveTabPanelVisibility,
 } from "./ExplorerDesktopPlugins";
 import { ExplorerDialog } from "./ExplorerBatchRenameDialog";
 import { CompareDialog } from "./ExplorerCompareDialog";
 import type { CompareDialogSeed } from "./ExplorerCompareDialog";
 import { DuplicateFinderDialog } from "./ExplorerDuplicateFinderDialog";
-import { assistantPanelStyles, ExplorerChatOverlay, ExplorerMikaPanel } from "./ExplorerAssistantPanels";
 import { compareSeedForPane, ExplorerContextMenu, openCompareWith } from "./ExplorerContextMenu";
 
 const minSidebarWidth = 212;
 const maxSidebarWidth = 380;
 const minPreviewWidth = 240;
 const maxPreviewWidth = 420;
-const minMikaPanelWidth = 280;
-const maxMikaPanelWidth = 600;
 const transferRefreshPollMs = 12000;
 const devicesChangedEvent = "misty://devices-changed";
 const explorerSearchFocusEvent = "misty:explorer-search-focus";
@@ -192,7 +185,7 @@ const emptyPluginCommands: PluginCommandEntry[] = [];
 const emptyPluginPanels: PluginPanelEntry[] = [];
 const emptyMountedDevices: MountedDevice[] = [];
 
-type ResizeTarget = "sidebar" | "preview" | "mika" | null;
+type ResizeTarget = "sidebar" | "preview" | null;
 
 export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
   const navigate = useNavigate();
@@ -215,9 +208,6 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
     notifications,
     pushNotification,
     dismissNotification,
-    chatOverlayOpen,
-    mikaPanelOpen,
-    mikaPanelWidth,
   } = useExplorerStore(useShallow((state) => ({
     initialize: state.initialize,
     sidebarWidth: state.sidebarWidth,
@@ -236,9 +226,6 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
     notifications: state.notifications,
     pushNotification: state.pushNotification,
     dismissNotification: state.dismissNotification,
-    chatOverlayOpen: state.chatOverlayOpen,
-    mikaPanelOpen: state.mikaPanelOpen,
-    mikaPanelWidth: state.mikaPanelWidth,
   })));
   const { providersLoading, sidebarRemotes } = useProvidersStore(useShallow((state) => ({
     providersLoading: state.loading,
@@ -282,9 +269,6 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
   const [androidGrantedFolders, setAndroidGrantedFolders] = useState<FileEntry[]>([]);
   const [duplicateFinderPaneId, setDuplicateFinderPaneId] = useState<string | null>(null);
   const [compareDialog, setCompareDialog] = useState<CompareDialogSeed | null>(null);
-  const [extensionsPanelOpen, setExtensionsPanelOpen] = useState(false);
-  const [openExtensionPluginIds, setOpenExtensionPluginIds] = useState<string[]>([]);
-  const [selectedExtensionPluginId, setSelectedExtensionPluginId] = useState<string | null>(null);
   const { preferredWorkspaceRoot, settingsLoaded, settingsMountPath } = useSettingsStore(useShallow((state) => ({
     preferredWorkspaceRoot: selectGeneralPreferences(state.settings?.document).preferredWorkspaceRoot,
     settingsMountPath: selectAdvancedPreferences(state.settings?.document).mountPath,
@@ -314,13 +298,11 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
   const workspaceStyle = useMemo(() => ({
     "--explorer-sidebar-width": `${sidebarWidth}px`,
     "--preview-width": `${previewWidth}px`,
-    "--mika-panel-width": `${mikaPanelWidth}px`,
-  } as CSSProperties), [mikaPanelWidth, previewWidth, sidebarWidth]);
+  } as CSSProperties), [previewWidth, sidebarWidth]);
   const activeTabSupportsSidePanels = !isChromeTabPath(activeTabPath);
   const extensionsEnabled = !isAndroidBuild;
   const sidebarVisible = activeTabSupportsSidePanels && activeTabSidebarVisible;
   const previewVisible = activeTabSupportsSidePanels && activeTabPreviewVisible;
-  const extensionsVisible = extensionsEnabled && activeTabSupportsSidePanels && extensionsPanelOpen;
 
   useEffect(() => {
     activePaneIdRef.current = activePaneId;
@@ -614,9 +596,6 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
       } else if (resizeTarget === "preview") {
         const rect = mainRef.current?.getBoundingClientRect();
         if (rect) useExplorerStore.getState().setPreviewWidth(clamp(rect.right - clientX, minPreviewWidth, maxPreviewWidth));
-      } else if (resizeTarget === "mika") {
-        const rect = workspaceRef.current?.getBoundingClientRect();
-        if (rect) useExplorerStore.getState().setMikaPanelWidth(clamp(rect.right - clientX, minMikaPanelWidth, maxMikaPanelWidth));
       }
     };
 
@@ -648,10 +627,6 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
   const startPreviewResize = useCallback((event: PointerEvent<HTMLDivElement>) => {
     event.preventDefault();
     setResizeTarget("preview");
-  }, []);
-  const startMikaResize = useCallback((event: PointerEvent<HTMLDivElement>) => {
-    event.preventDefault();
-    setResizeTarget("mika");
   }, []);
   const navigateSidebar = useCallback((path: string) => {
     const paneId = useMultiPanelStore.getState().activePaneId;
@@ -718,62 +693,10 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
     },
     [activePaneId, extensionsEnabled, pluginCommands, pluginPanels],
   );
-  const explorerExtensionItems = useMemo(
-    () => pluginMenuItems(pluginPanels, pluginCommands, activeSelectedPath),
-    [activeSelectedPath, pluginCommands, pluginPanels],
+  const inspector = useMemo(
+    () => previewVisible ? <ConnectedFileInspector /> : undefined,
+    [previewVisible],
   );
-  useEffect(() => {
-    setOpenExtensionPluginIds((current) => {
-      const available = new Set(explorerExtensionItems.map((plugin) => plugin.pluginId));
-      const next = current.filter((pluginId) => available.has(pluginId));
-      return stringArraysEqual(current, next) ? current : next;
-    });
-  }, [explorerExtensionItems]);
-  useEffect(() => {
-    if (!extensionsVisible) return;
-    if (openExtensionPluginIds.length === 0) {
-      setExtensionsPanelOpen(false);
-      return;
-    }
-    if (!selectedExtensionPluginId || !openExtensionPluginIds.includes(selectedExtensionPluginId)) {
-      setSelectedExtensionPluginId(openExtensionPluginIds[0] ?? null);
-    }
-  }, [extensionsVisible, openExtensionPluginIds, selectedExtensionPluginId]);
-  const inspector = useMemo(() => {
-    if (extensionsVisible) {
-      return (
-        <ExplorerExtensionsPanel
-          openPluginIds={openExtensionPluginIds}
-          plugins={explorerExtensionItems}
-          selectedPath={activeSelectedPath}
-          selectedPluginId={selectedExtensionPluginId}
-          onSelectPlugin={setSelectedExtensionPluginId}
-          onClosePlugin={(pluginId) => {
-            setOpenExtensionPluginIds((current) => current.filter((candidate) => candidate !== pluginId));
-            setSelectedExtensionPluginId((current) => current === pluginId ? null : current);
-          }}
-          onClose={() => setExtensionsPanelOpen(false)}
-        />
-      );
-    }
-    return previewVisible ? <ConnectedFileInspector /> : undefined;
-  }, [
-    activeSelectedPath,
-    explorerExtensionItems,
-    extensionsVisible,
-    openExtensionPluginIds,
-    previewVisible,
-    selectedExtensionPluginId,
-  ]);
-  const handleToggleExtensionFromTray = useCallback((pluginId: string) => {
-    if (extensionsVisible && selectedExtensionPluginId === pluginId) {
-      setExtensionsPanelOpen(false);
-      return;
-    }
-    setOpenExtensionPluginIds((current) => current.includes(pluginId) ? current : [...current, pluginId]);
-    setSelectedExtensionPluginId(pluginId);
-    setExtensionsPanelOpen(true);
-  }, [extensionsVisible, selectedExtensionPluginId]);
   const openSidebarPathInNewTab = useCallback((path: string, title?: string) => {
     useMultiPanelStore.getState().addTab(path, title);
   }, []);
@@ -885,18 +808,13 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
   const renderTabActions = useCallback(
     () => (
       <ExplorerTray
-        aiOpen={mikaPanelOpen}
         commands={pluginCommands}
         extensionsEnabled={extensionsEnabled}
         panels={pluginPanels}
         selectedPath={activeSelectedPath}
-        selectedExtensionPluginId={selectedExtensionPluginId}
-        extensionsOpen={extensionsVisible}
         terminalEnabled={activeTabSupportsSidePanels && canOpenTerminalPath(activeTabPath) && canOpenTerminalPath(activePath)}
         terminalPath={activePath}
         onOpenTransfers={openTransfersTab}
-        onToggleAi={() => useExplorerStore.getState().toggleMikaPanel()}
-        onToggleExtensionPlugin={handleToggleExtensionFromTray}
       />
     ),
     [
@@ -905,12 +823,8 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
       activeTabPath,
       activeTabSupportsSidePanels,
       extensionsEnabled,
-      extensionsVisible,
-      handleToggleExtensionFromTray,
-      mikaPanelOpen,
       pluginCommands,
       pluginPanels,
-      selectedExtensionPluginId,
     ],
   );
   const renderBottomBar = useCallback(
@@ -919,34 +833,13 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
       return (
         <ExplorerBottomBar
           sidebarVisible={tab.sidebarVisible ?? true}
-          previewVisible={(tab.previewVisible ?? true) && !extensionsVisible}
-          extensionsEnabled={extensionsEnabled}
-          extensionsVisible={extensionsVisible}
+          previewVisible={tab.previewVisible ?? true}
           onToggleSidebar={() => useMultiPanelStore.getState().setTabPanelVisibility(tab.id, { sidebarVisible: !(tab.sidebarVisible ?? true) })}
-          onTogglePreview={() => {
-            setExtensionsPanelOpen(false);
-            useMultiPanelStore.getState().setTabPanelVisibility(tab.id, { previewVisible: !(tab.previewVisible ?? true) });
-          }}
-          onToggleExtensions={() => {
-            if (extensionsVisible) {
-              setExtensionsPanelOpen(false);
-              return;
-            }
-            const fallbackPluginId = selectedExtensionPluginId
-              ?? openExtensionPluginIds[0]
-              ?? explorerExtensionItems.find((plugin) => plugin.usable)?.pluginId
-              ?? explorerExtensionItems[0]?.pluginId
-              ?? null;
-            if (fallbackPluginId) {
-              setOpenExtensionPluginIds((current) => current.includes(fallbackPluginId) ? current : [...current, fallbackPluginId]);
-              setSelectedExtensionPluginId(fallbackPluginId);
-            }
-            setExtensionsPanelOpen(true);
-          }}
+          onTogglePreview={() => useMultiPanelStore.getState().setTabPanelVisibility(tab.id, { previewVisible: !(tab.previewVisible ?? true) })}
         />
       );
     },
-    [explorerExtensionItems, extensionsEnabled, extensionsVisible, openExtensionPluginIds, selectedExtensionPluginId],
+    [],
   );
 
   return (
@@ -954,9 +847,7 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
       ref={workspaceRef}
       className={cx(
         explorerShellStyles.workspaceBase,
-        sidebarVisible && mikaPanelOpen && explorerShellStyles.workspaceMikaOpen,
-        !sidebarVisible && !mikaPanelOpen && explorerShellStyles.workspaceCollapsed,
-        !sidebarVisible && mikaPanelOpen && explorerShellStyles.workspaceCollapsedMikaOpen,
+        !sidebarVisible && explorerShellStyles.workspaceCollapsed,
       )}
       style={workspaceStyle}
     >
@@ -974,12 +865,6 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
           renderPane={renderPane}
         />
       </main>
-      {mikaPanelOpen ? (
-        <>
-          <div className={assistantPanelStyles.mikaResizer} onPointerDown={startMikaResize} />
-          <ExplorerMikaPanel />
-        </>
-      ) : null}
       <ExplorerRenameStatus edit={inlineEdit} />
       <ExplorerNotifications notifications={notifications} onDismiss={dismissNotification} />
       <DeepSearchOverlay activePaneId={activePaneId} currentPath={activePath} />
@@ -991,7 +876,6 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
         />
       ) : null}
       {compareDialog ? <CompareDialog seed={compareDialog} onClose={() => setCompareDialog(null)} /> : null}
-      {chatOverlayOpen ? <ExplorerChatOverlay /> : null}
       <ExplorerContextMenu />
       <ExplorerDialog />
     </section>

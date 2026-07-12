@@ -944,12 +944,6 @@ async function validateCanAddRemote(remotes: ProviderRemote[]): Promise<string |
   if (!licenseAllowsRemoteManagement(license)) {
     return "Your Misty license is not active. Update your account before adding a remote.";
   }
-  if (license.tier === "basic" && remotes.length >= 1) {
-    if (isNativeMobileBuild) {
-      return "This account currently includes one remote. Use an account with additional remote access before adding another remote.";
-    }
-    return "This account does not have access to another remote. Use an account with additional remote access before adding another remote.";
-  }
   return null;
 }
 

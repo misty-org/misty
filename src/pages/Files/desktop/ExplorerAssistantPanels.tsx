@@ -12,9 +12,13 @@ import { cx } from "./ExplorerDesktopShared";
 
 export const assistantPanelStyles = {
   mikaResizer:
-    "relative col-start-2 row-start-1 cursor-col-resize bg-transparent after:absolute after:bottom-0 after:left-1/2 after:top-0 after:w-px after:-translate-x-1/2 after:bg-transparent after:content-[''] hover:after:bg-[var(--misty-neutral-hover-bg,var(--misty-surface-hover))] max-[980px]:hidden",
+    "absolute bottom-[22px] right-[var(--mika-panel-width,380px)] top-[46px] z-[21] w-[5px] cursor-col-resize bg-transparent after:absolute after:bottom-0 after:left-1/2 after:top-0 after:w-px after:-translate-x-1/2 after:bg-transparent after:content-[''] hover:after:bg-[var(--misty-neutral-hover-bg,var(--misty-surface-hover))] max-[720px]:hidden",
   mikaPanel:
-    "col-start-3 row-start-1 grid min-h-0 min-w-0 grid-rows-[54px_minmax(0,1fr)] overflow-hidden border-l border-transparent bg-[var(--misty-app-pane-bg,var(--misty-surface))] text-[#e2e2e2] shadow-[-18px_0_38px_rgba(0,0,0,0.28)] max-[980px]:absolute max-[980px]:bottom-[22px] max-[980px]:right-0 max-[980px]:top-0 max-[980px]:z-20 max-[980px]:w-[min(var(--mika-panel-width,380px),100%)]",
+    "absolute bottom-[22px] right-0 top-[46px] z-20 grid w-[min(var(--mika-panel-width,380px),calc(100%_-_48px))] min-h-0 min-w-0 grid-rows-[54px_minmax(0,1fr)] overflow-hidden border-l border-t border-[var(--misty-border-soft)] bg-[var(--misty-app-pane-bg,var(--misty-surface))] text-[#e2e2e2] shadow-[-18px_0_38px_rgba(0,0,0,0.42)] max-[720px]:top-[38px]",
+  mikaBotPanel:
+    "fixed bottom-5 right-5 top-[48px] z-[2147482500] grid w-[min(440px,calc(100vw_-_112px))] min-h-0 min-w-0 grid-rows-[54px_minmax(0,1fr)] overflow-hidden rounded-2xl border border-[var(--misty-border-soft)] bg-[var(--misty-app-pane-bg,var(--misty-surface))] text-[#e2e2e2] shadow-[0_28px_90px_rgba(0,0,0,0.62)] max-[720px]:bottom-3 max-[720px]:right-3 max-[720px]:top-10 max-[720px]:w-[calc(100vw_-_88px)]",
+  mikaBotWindowPanel:
+    "pointer-events-auto absolute bottom-[142px] left-2 right-2 top-2 z-20 grid min-h-0 min-w-0 grid-rows-[54px_minmax(0,1fr)] overflow-hidden rounded-[22px] border border-white/10 bg-[rgba(7,8,10,0.96)] text-[#e2e2e2] shadow-[0_28px_72px_rgba(0,0,0,0.58)] backdrop-blur-xl",
   chatOverlay:
     "absolute bottom-[76px] right-[18px] z-[19] grid max-h-[min(620px,calc(100vh_-_120px))] w-[min(420px,calc(100vw_-_180px))] grid-rows-[auto_minmax(0,1fr)] overflow-hidden rounded-xl border border-[#323232] bg-[rgba(17, 17, 17, 0.96)] text-[#e2e2e2] shadow-[0_18px_42px_rgba(0,0,0,0.44)]",
   header:
@@ -145,7 +149,7 @@ export const assistantPanelStyles = {
 
 function assistantStatusText(status: AiStatus | null): string {
   if (!status) return "Checking Mika...";
-  if (status.configured) return `Ready (${status.provider}/${status.model})`;
+  if (status.configured) return `Ready (${status.modelName})`;
   return "Backend unavailable";
 }
 
@@ -253,6 +257,7 @@ export const ExplorerChatOverlay = memo(function ExplorerChatOverlay() {
             <article key={message.id} className={assistantMessageClass(message.role, "chat")}>
               <strong className={assistantPanelStyles.messageTitle}>{message.role === "user" ? "You" : message.role === "tool" ? "Tool" : message.role === "error" ? "Error" : "Mika"}</strong>
               <pre className={assistantPanelStyles.messageText}>{message.text || (message.role === "assistant" && running ? "Thinking..." : "")}</pre>
+              {message.creditsUsed !== undefined ? <small className="text-[10px] text-[#858993]">{message.creditsUsed} credits · {message.creditsRemaining?.toLocaleString() ?? 0} remaining</small> : null}
               {message.toolRequestId ? <AssistantToolActions requestId={message.toolRequestId} approvals={toolApprovals} onApprove={approveToolRequest} /> : null}
               {message.planId ? <AssistantPlanActions planId={message.planId} plans={plans} onApply={approvePlan} /> : null}
             </article>
@@ -286,7 +291,7 @@ export const ExplorerChatOverlay = memo(function ExplorerChatOverlay() {
             </select>
             <button type="button" className={cx(assistantPanelStyles.composerButton, assistantPanelStyles.secondaryButton)} onClick={openPanel}>Open Panel</button>
             {running ? (
-              <button className={assistantPanelStyles.composerButton} type="button" onClick={abortPrompt}>Stop</button>
+              <button className={assistantPanelStyles.composerButton} type="button" title="Cancel the active Mika gateway request." onClick={abortPrompt}>Stop</button>
             ) : (
               <button className={assistantPanelStyles.composerButton} type="submit" disabled={!configured || !prompt.trim()}>Send</button>
             )}
@@ -297,11 +302,17 @@ export const ExplorerChatOverlay = memo(function ExplorerChatOverlay() {
   );
 });
 
-export const ExplorerMikaPanel = memo(function ExplorerMikaPanel() {
+export const ExplorerMikaPanel = memo(function ExplorerMikaPanel(props: {
+  surface?: "explorer" | "bot" | "bot-window";
+  onClose?: () => void;
+  workingDirectory?: string;
+  selectedPaths?: string[];
+}) {
   const activePaneId = useMultiPanelStore((state) => state.activePaneId);
   const panes = useExplorerStore((state) => state.panes);
   const listing = useExplorerStore((state) => state.panes[activePaneId]?.listing ?? null);
-  const selectedPaths = useMemo(() => selectedPathsAcrossPanes(panes), [panes]);
+  const explorerSelectedPaths = useMemo(() => selectedPathsAcrossPanes(panes), [panes]);
+  const selectedPaths = props.selectedPaths ?? explorerSelectedPaths;
   const { status, mode, messages, plans, toolApprovals, error, refreshStatus, setMode, sendPrompt, abortPrompt, approvePlan, approveToolRequest } = useMikaSessionStore(useShallow((state) => ({
     status: state.status,
     mode: state.mode,
@@ -320,7 +331,7 @@ export const ExplorerMikaPanel = memo(function ExplorerMikaPanel() {
   const [contextOpen, setContextOpen] = useState(false);
   const logRef = useRef<HTMLDivElement | null>(null);
   const contextRef = useRef<HTMLDivElement | null>(null);
-  const workingDirectory = listing?.path ?? "";
+  const workingDirectory = props.workingDirectory ?? listing?.path ?? "";
   const running = status?.running ?? false;
   const configured = status?.configured ?? false;
 
@@ -364,7 +375,7 @@ export const ExplorerMikaPanel = memo(function ExplorerMikaPanel() {
   }, [prompt, running, selectedPaths, sendPrompt, workingDirectory]);
 
   return (
-    <aside className={assistantPanelStyles.mikaPanel} aria-label="Mika Assistant">
+    <aside className={props.surface === "bot-window" ? assistantPanelStyles.mikaBotWindowPanel : props.surface === "bot" ? assistantPanelStyles.mikaBotPanel : assistantPanelStyles.mikaPanel} aria-label="Mika Assistant">
       <header className={cx(assistantPanelStyles.header, assistantPanelStyles.mikaHeader, assistantPanelStyles.mikaPanelHeader)}>
         <span className={cx(assistantPanelStyles.headerTitle, assistantPanelStyles.mikaHeaderTitle)}>
           <MessageSquare size={24} strokeWidth={1.9} />
@@ -381,7 +392,7 @@ export const ExplorerMikaPanel = memo(function ExplorerMikaPanel() {
           >
             <Info size={17} />
           </button>
-          <button className={cx(assistantPanelStyles.headerButton, assistantPanelStyles.mikaHeaderButton)} type="button" aria-label="Close Mika" onClick={() => useExplorerStore.getState().setMikaPanelOpen(false)}>
+          <button className={cx(assistantPanelStyles.headerButton, assistantPanelStyles.mikaHeaderButton)} type="button" aria-label="Close Mika" onClick={props.onClose ?? (() => useExplorerStore.getState().setMikaPanelOpen(false))}>
             <X size={18} />
           </button>
           {contextOpen ? (
@@ -406,6 +417,7 @@ export const ExplorerMikaPanel = memo(function ExplorerMikaPanel() {
             <article key={message.id} className={assistantMessageClass(message.role, "mika")}>
               <strong className={assistantPanelStyles.messageTitle}>{message.role === "user" ? "You" : message.role === "tool" ? "Tool" : message.role === "error" ? "Error" : "Mika"}</strong>
               <pre className={assistantPanelStyles.messageText}>{message.text || (message.role === "assistant" && running ? "Thinking..." : "")}</pre>
+              {message.creditsUsed !== undefined ? <small className="text-[10px] text-[#858993]">{message.creditsUsed} credits · {message.creditsRemaining?.toLocaleString() ?? 0} remaining</small> : null}
               {message.toolRequestId ? <AssistantToolActions requestId={message.toolRequestId} approvals={toolApprovals} onApprove={approveToolRequest} /> : null}
               {message.planId ? <AssistantPlanActions planId={message.planId} plans={plans} onApply={approvePlan} /> : null}
             </article>
@@ -438,7 +450,7 @@ export const ExplorerMikaPanel = memo(function ExplorerMikaPanel() {
               <option value="auto">Auto</option>
             </select>
             {running ? (
-              <button className={cx(assistantPanelStyles.composerButton, assistantPanelStyles.mikaComposerButton)} type="button" onClick={abortPrompt}>Stop</button>
+              <button className={cx(assistantPanelStyles.composerButton, assistantPanelStyles.mikaComposerButton)} type="button" title="Cancel the active Mika gateway request." onClick={abortPrompt}>Stop</button>
             ) : (
               <button className={cx(assistantPanelStyles.composerButton, assistantPanelStyles.mikaComposerButton, assistantPanelStyles.mikaPrimaryButton)} type="submit" disabled={!configured || !prompt.trim()}>
                 <ArrowUp size={17} />
@@ -646,7 +658,7 @@ function MikaContextPopover(props: {
   const statusLabel = props.status
     ? configured ? "Ready" : "Not configured"
     : "Checking";
-  const statusMeta = props.status && configured ? `${props.status.provider}/${props.status.model}` : "";
+  const statusMeta = props.status && configured ? props.status.modelName : "";
   const selectionText = props.selectedPaths.length > 0 ? props.selectedPaths.join("\n") : "";
   const firstSelection = props.selectedPaths[0] ?? "";
   return (

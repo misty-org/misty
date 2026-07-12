@@ -13,6 +13,10 @@ use tokio::task::JoinHandle;
 
 use crate::error::{ApiError, ApiResult};
 
+// Legacy local-provider implementation. Production Mika UI traffic uses the
+// authenticated server API, and this service is not registered as a Tauri
+// command. AutomationService retains it only as a deterministic test fallback
+// when no managed server is configured.
 const DEFAULT_OPENAI_MODEL: &str = "gpt-5.5";
 
 #[derive(Clone)]

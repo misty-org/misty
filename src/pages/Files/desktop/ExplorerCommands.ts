@@ -2,7 +2,6 @@ import { readText, writeHtml, writeImage, writeText } from "@tauri-apps/plugin-c
 import { clipboardApplyShared, clipboardPublishImageBytes, clipboardPublishShared, clipboardSetLocal, clipboardSharedImageBytes, clipboardWriteFileRefs, explorerPrepareDragItems, operationQueueRedo, operationQueueUndo, pluginCommandRun, transfersSnapshot } from "../../../api/misty";
 import type { ClipboardPayload, PluginCommandEntry, TransferRecord } from "../../../api/types";
 import { useAppStore } from "../../../stores/useAppStore";
-import { useMikaSessionStore } from "../../../stores/useMikaSessionStore";
 import { selectedPathsForPane, useExplorerStore } from "../../../stores/useExplorerStore";
 import { useOperationQueueStore } from "../../../stores/useOperationQueueStore";
 import { useSearchStore } from "../../../stores/useSearchStore";
@@ -265,11 +264,6 @@ export function runExplorerCommand(commandId: string, paneId: string, navigateRo
       toggleActiveTabPanelVisibility("sidebar");
       break;
     case "explorer.toggle_chat":
-      if (explorer.chatOverlayOpen && !useMikaSessionStore.getState().status?.running) {
-        useMikaSessionStore.getState().clearConversation();
-      }
-      explorer.toggleChatOverlay();
-      break;
     case "explorer.toggle_mika":
       explorer.toggleMikaPanel();
       break;
@@ -428,7 +422,7 @@ async function publishSharedClipboard(): Promise<void> {
     }
     if (!published) {
       useExplorerStore.setState({
-        operationError: "Shared clipboard publish failed. Check that the proxy is configured and the local clipboard has content.",
+        operationError: "Shared clipboard publish failed. Check that the local clipboard has content.",
       });
     }
   } catch (error) {
