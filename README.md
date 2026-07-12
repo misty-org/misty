@@ -9,8 +9,8 @@ Plugins are now authored with the same frontend stack as `apps/desktop`: TypeScr
 | Path | Contents |
 |------|----------|
 | `src/` | React plugin panels and shared web plugin bridge |
-| `plugins/*/manifest.json` | Local install manifests with web runtime metadata |
-| `plugins/*/plugin.json` | Hub/local plugin details used by Misty |
+| `extensions/*/manifest.json` | Local install manifests with web runtime metadata |
+| `extensions/*/plugin.json` | Hub/local plugin details used by Misty |
 | `catalog/` | Public catalog index and marketplace entries |
 | `scripts/build-plugins.mjs` | Copies plugin metadata/assets into `dist/` after Vite builds |
 
@@ -51,6 +51,8 @@ The build emits the web app plus installable plugin metadata under `dist/`:
 - `dist/plugins/<plugin>/plugin.json`
 - `dist/catalog/*`
 
+Each `dist/plugins/<plugin>/` directory is self-contained and can be zipped as an install bundle. Tagged releases build and publish `quick_convert.zip`, `themes.zip`, and `ytdlp.zip`; catalog entries point to those versioned bundles rather than an unbuilt source archive.
+
 ## Host Bridge
 
 When Misty hosts a web plugin, it can attach `window.mistyPluginHost`:
@@ -63,4 +65,4 @@ window.mistyPluginHost = {
 };
 ```
 
-Without that bridge, panels still run in browser-smoke mode so UI work can continue independently from desktop host integration.
+Hosted panels use the same typed command contract over `postMessage`; Misty validates the iframe source, plugin id, and a per-plugin command allowlist before invoking native functionality. Without a host, panels remain available in browser-smoke mode and clearly disable system actions.

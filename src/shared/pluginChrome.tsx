@@ -20,7 +20,7 @@ export function StatusLine(props: {
 }) {
   const tone = props.tone ?? "neutral";
   return (
-    <div className={`status-line ${tone}`}>
+    <div className={`status-line ${tone}`} role="status" aria-live="polite">
       {props.children}
     </div>
   );

@@ -2,7 +2,7 @@
   "schema_version": 1,
   "id": "ytdlp",
   "name": "yt-dlp",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "author": "Misty",
   "status": "installed",
   "overview": "yt-dlp brings YouTube downloading into Misty so users can grab videos, playlists, and audio conversions without leaving the app. It relies on the system yt-dlp and FFmpeg tools instead of shipping separate binaries.",
@@ -27,7 +27,8 @@
     "Paste a YouTube URL, choose MP3 or MP4, and start the download."
   ],
   "changelog": [
-    "v0.1.0 - Added a native Misty yt-dlp panel with audio and video presets."
+    "v0.2.0 - Added dependency checks, URL inspection, playlist safeguards, cancellable download jobs, bounded playlists, safe command arguments, and output reveal.",
+    "v0.1.0 - Added the initial yt-dlp panel."
   ],
   "links": [
     {

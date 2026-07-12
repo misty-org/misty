@@ -4,6 +4,8 @@ import type { LucideIcon } from "lucide-react";
 export type MistyPluginContext = {
   pluginId: string;
   selectedPaths: string[];
+  hosted: boolean;
+  refreshSelection: () => Promise<string[]>;
   notify: (level: "info" | "success" | "error", title: string, message: string) => void;
   runHostCommand: <T = unknown>(command: string, payload?: Record<string, unknown>) => Promise<T>;
 };

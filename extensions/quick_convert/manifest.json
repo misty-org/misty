@@ -2,24 +2,24 @@
   "schema_version": 3,
   "id": "quick_convert",
   "name": "Quick Convert",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Convert selected image, audio, and video files with system FFmpeg.",
   "author": "Misty",
   "enabled": true,
   "platforms": ["web"],
   "runtime": {
     "type": "web",
-    "entry": "../../index.html?plugin=quick_convert"
+    "entry": "web/index.html?plugin=quick_convert"
   },
   "launcher": {
     "views": ["Files"],
     "show_in_launcher": true,
-    "requires_selected_file": false,
+    "requires_selected_file": true,
     "open_mode": "split"
   },
   "plugin": {
     "runtime": "web",
-    "entry": "../../index.html?plugin=quick_convert"
+    "entry": "web/index.html?plugin=quick_convert"
   },
   "panels": [
     {
@@ -28,7 +28,7 @@
       "window_type": "panel",
       "default_width": 520,
       "default_height": 420,
-      "entry": "../../index.html?plugin=quick_convert",
+      "entry": "web/index.html?plugin=quick_convert",
       "launcher": {
         "views": ["Files"]
       }

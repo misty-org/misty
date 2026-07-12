@@ -2,7 +2,7 @@
   "schema_version": 1,
   "id": "quick_convert",
   "name": "Quick Convert",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "author": "Misty",
   "status": "installed",
   "overview": "Quick Convert helps users convert images, audio, and video into common formats without leaving Misty. It uses the system FFmpeg installation so the same dependency can be shared across Misty and the terminal.",
@@ -26,6 +26,7 @@
     "Use the Quick Convert panel to choose an output format."
   ],
   "changelog": [
+    "v0.2.0 - Added secure hosted conversion jobs with quality and destination controls, cancellation, collision-safe output names, and output reveal.",
     "v0.1.0 - Added a selected-file conversion panel backed by system FFmpeg."
   ],
   "links": [
@@ -47,7 +48,7 @@
   "launcher": {
     "views": ["Files"],
     "show_in_launcher": true,
-    "requires_selected_file": false,
+    "requires_selected_file": true,
     "open_mode": "split"
   }
 }
