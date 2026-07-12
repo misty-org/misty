@@ -798,6 +798,21 @@ pub async fn plugin_panel_render(
     state.plugin_commands.render_panel(request).await
 }
 
+#[cfg(desktop)]
+#[tauri::command]
+pub async fn extension_command_run(
+    request: crate::services::extension_runtime::ExtensionCommandRequest,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<serde_json::Value> {
+    state.extension_runtime.execute(request).await
+}
+
+#[cfg(mobile)]
+#[tauri::command]
+pub async fn extension_command_run(_request: serde_json::Value) -> ApiResult<serde_json::Value> {
+    Err(mobile_plugins_unavailable())
+}
+
 #[cfg(mobile)]
 #[tauri::command]
 pub async fn plugin_panel_render(_request: serde_json::Value) -> ApiResult<serde_json::Value> {

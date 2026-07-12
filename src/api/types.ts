@@ -569,7 +569,14 @@ export interface PluginPanelEntry {
   pluginDir: string;
   manifestPath: string;
   libraryPath: string;
+  webEntry: string;
   launcherViews: string[];
+}
+
+export interface ExtensionCommandRequest {
+  pluginId: string;
+  command: string;
+  payload?: Record<string, unknown>;
 }
 
 export interface PluginCommandsSnapshot {

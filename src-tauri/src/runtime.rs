@@ -4,6 +4,8 @@ use crate::core::clipboard::{ClipboardService, SharedClipboardClient};
 use crate::core::file_sync::FileSyncPairStore;
 #[cfg(desktop)]
 use crate::services::plugin_commands::PluginCommandService;
+#[cfg(desktop)]
+use crate::services::extension_runtime::ExtensionRuntimeService;
 use crate::services::{
     ai::AiService, automations::AutomationService, claude::ClaudeService, commands::CommandService,
     devices::DeviceService, directory_size::DirectorySizeService,
@@ -33,6 +35,8 @@ pub struct MistyRuntime {
     pub metadata: MetadataService,
     #[cfg(desktop)]
     pub plugin_commands: PluginCommandService,
+    #[cfg(desktop)]
+    pub extension_runtime: ExtensionRuntimeService,
     pub power_pack: PowerPackService,
     pub search: SearchService,
     pub explorer: ExplorerService,
@@ -77,6 +81,8 @@ impl MistyRuntime {
         let metadata = MetadataService::new();
         #[cfg(desktop)]
         let plugin_commands = PluginCommandService::new(environment.clone());
+        #[cfg(desktop)]
+        let extension_runtime = ExtensionRuntimeService::new(environment.clone());
         let explorer_library = ExplorerLibraryService::new(environment.clone());
         let search = SearchService::new(environment.clone(), providers.clone(), proxy.clone());
         let explorer = ExplorerService::new(
@@ -120,6 +126,8 @@ impl MistyRuntime {
             metadata,
             #[cfg(desktop)]
             plugin_commands,
+            #[cfg(desktop)]
+            extension_runtime,
             power_pack,
             search,
             explorer,

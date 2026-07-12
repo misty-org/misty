@@ -35,7 +35,7 @@ use commands::{
     operation_queue_resume, operation_queue_resume_all, operation_queue_resume_batch,
     operation_queue_retry, operation_queue_retry_transfer, operation_queue_set_bandwidth_limit,
     operation_queue_set_transfer_profile, operation_queue_snapshot, operation_queue_undo,
-    plugin_command_run, plugin_commands_snapshot, plugin_diagnostics_snapshot, plugin_panel_render,
+    extension_command_run, plugin_command_run, plugin_commands_snapshot, plugin_diagnostics_snapshot, plugin_panel_render,
     providers_backend_actions, providers_config_paths, providers_config_security,
     providers_configure_remote, providers_create_public_link, providers_disconnect_remote,
     providers_harden_config, providers_job_cancel, providers_job_status, providers_public_links,
@@ -249,6 +249,7 @@ pub fn run() {
             plugin_command_run,
             #[cfg(desktop)]
             plugin_panel_render,
+            extension_command_run,
             #[cfg(desktop)]
             plugin_diagnostics_snapshot,
             providers_snapshot,

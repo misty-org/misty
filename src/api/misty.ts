@@ -62,6 +62,7 @@ import type {
   PluginCommandRunResult,
   PluginCommandsSnapshot,
   PluginDiagnosticsSnapshot,
+  ExtensionCommandRequest,
   PrepareOpenItemRequest,
   PreparedOpenItem,
   ProviderJobStart,
@@ -445,6 +446,10 @@ export function pluginCommandRun(request: RunPluginCommandRequest): Promise<Plug
 
 export function pluginPanelRender(request: RenderPluginPanelRequest): Promise<PluginPanelRenderResult> {
   return invoke("plugin_panel_render", { request });
+}
+
+export function extensionCommandRun<T = unknown>(request: ExtensionCommandRequest): Promise<T> {
+  return invoke("extension_command_run", { request });
 }
 
 export function pluginDiagnosticsSnapshot(): Promise<PluginDiagnosticsSnapshot> {

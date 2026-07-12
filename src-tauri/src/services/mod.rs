@@ -8,6 +8,8 @@ pub mod directory_size;
 pub mod environment;
 pub mod explorer;
 pub mod explorer_library;
+#[cfg(desktop)]
+pub mod extension_runtime;
 pub mod file_sync;
 pub mod keychain;
 pub mod metadata;
