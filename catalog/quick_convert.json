@@ -1,12 +1,12 @@
 {
   "published": true,
   "featured_rank": 2,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "overview": "Quick Convert helps users convert images, audio, and video into common formats without leaving Misty.",
   "status": "available",
   "capabilities": [
     "Convert files between common image, audio, and video formats",
-    "Batch process selected assets in one pass",
+    "Convert the selected asset with collision-safe output naming",
     "Choose output format, quality, and destination before exporting"
   ],
   "where_it_appears": [
@@ -21,10 +21,11 @@
   ],
   "getting_started": [
     "Install Quick Convert.",
-    "Select one or more media files in Files.",
+    "Select a media file in Files.",
     "Choose an output format and destination, then start the conversion."
   ],
   "changelog": [
+    "v0.2.0 - Added secure conversion jobs, quality and destination controls, cancellation, and output reveal.",
     "v0.1.0 - Initial plugin template for media conversion workflows."
   ],
   "links": [
@@ -45,15 +46,17 @@
       "Files"
     ],
     "show_in_launcher": true,
-    "requires_selected_file": false,
+    "requires_selected_file": true,
     "open_mode": "split"
   },
   "install": {
     "root": "private",
-    "artifact_base_name": "quick-convert",
-    "platforms": [
-      "macos-aarch64"
+    "artifacts": [
+      { "platform": "macos-aarch64", "url": "https://github.com/misty-org/misty-extensions/releases/download/v0.2.0/quick_convert.zip" },
+      { "platform": "macos-x86_64", "url": "https://github.com/misty-org/misty-extensions/releases/download/v0.2.0/quick_convert.zip" },
+      { "platform": "windows-x86_64", "url": "https://github.com/misty-org/misty-extensions/releases/download/v0.2.0/quick_convert.zip" },
+      { "platform": "linux-x86_64", "url": "https://github.com/misty-org/misty-extensions/releases/download/v0.2.0/quick_convert.zip" }
     ]
   },
-  "logo_path": "https://raw.githubusercontent.com/misty-org/misty-plugins/main/extensions/quick_convert/assets/logo.svg"
+  "logo_path": "https://raw.githubusercontent.com/misty-org/misty-extensions/main/extensions/quick_convert/assets/logo.svg"
 }

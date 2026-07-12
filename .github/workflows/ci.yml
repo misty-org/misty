@@ -1,0 +1,24 @@
+name: Extensions CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm run validate
+      - run: npm run build
+      - name: Verify install bundles
+        run: |
+          test -f dist/plugins/quick_convert/web/index.html
+          test -f dist/plugins/themes/web/index.html
+          test -f dist/plugins/ytdlp/web/index.html

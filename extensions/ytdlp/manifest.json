@@ -2,14 +2,14 @@
   "schema_version": 3,
   "id": "ytdlp",
   "name": "yt-dlp",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Download YouTube media with yt-dlp and convert it to common audio or video formats.",
   "author": "Misty",
   "enabled": true,
   "platforms": ["web"],
   "runtime": {
     "type": "web",
-    "entry": "../../index.html?plugin=ytdlp"
+    "entry": "web/index.html?plugin=ytdlp"
   },
   "launcher": {
     "views": ["all"],
@@ -19,7 +19,7 @@
   },
   "plugin": {
     "runtime": "web",
-    "entry": "../../index.html?plugin=ytdlp"
+    "entry": "web/index.html?plugin=ytdlp"
   },
   "panels": [
     {
@@ -28,7 +28,7 @@
       "window_type": "panel",
       "default_width": 640,
       "default_height": 540,
-      "entry": "../../index.html?plugin=ytdlp",
+      "entry": "web/index.html?plugin=ytdlp",
       "launcher": {
         "views": ["all"]
       }

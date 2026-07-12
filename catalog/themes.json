@@ -1,6 +1,6 @@
 {
   "published": true,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "overview": "Themes is Misty's built-in theme builder for presets and token editing.",
   "status": "available",
   "capabilities": [
@@ -23,6 +23,7 @@
     "Apply a preset or adjust token colors."
   ],
   "changelog": [
+    "v0.2.0 - Added preview, apply and revert flows, persistent custom tokens, and accessible color controls.",
     "v0.1.0 - Added the first theme builder with curated presets."
   ],
   "links": [
@@ -49,10 +50,12 @@
   },
   "install": {
     "root": "private",
-    "artifact_base_name": "themes",
-    "platforms": [
-      "macos-aarch64"
+    "artifacts": [
+      { "platform": "macos-aarch64", "url": "https://github.com/misty-org/misty-extensions/releases/download/v0.2.0/themes.zip" },
+      { "platform": "macos-x86_64", "url": "https://github.com/misty-org/misty-extensions/releases/download/v0.2.0/themes.zip" },
+      { "platform": "windows-x86_64", "url": "https://github.com/misty-org/misty-extensions/releases/download/v0.2.0/themes.zip" },
+      { "platform": "linux-x86_64", "url": "https://github.com/misty-org/misty-extensions/releases/download/v0.2.0/themes.zip" }
     ]
   },
-  "logo_path": "https://raw.githubusercontent.com/misty-org/misty-plugins/main/extensions/themes/assets/logo.svg"
+  "logo_path": "https://raw.githubusercontent.com/misty-org/misty-extensions/main/extensions/themes/assets/logo.svg"
 }

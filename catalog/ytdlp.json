@@ -1,6 +1,6 @@
 {
   "published": true,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "overview": "yt-dlp brings YouTube downloading into Misty without leaving the app.",
   "status": "available",
   "capabilities": [
@@ -24,7 +24,8 @@
     "Open it in Misty and paste a YouTube URL."
   ],
   "changelog": [
-    "v0.1.0 - Added a native Misty yt-dlp panel with audio and video presets."
+    "v0.2.0 - Added media inspection, playlist safeguards, cancellable download jobs, and output reveal.",
+    "v0.1.0 - Added the initial yt-dlp panel."
   ],
   "links": [
     {
@@ -53,10 +54,12 @@
   },
   "install": {
     "root": "private",
-    "artifact_base_name": "ytdlp",
-    "platforms": [
-      "macos-aarch64"
+    "artifacts": [
+      { "platform": "macos-aarch64", "url": "https://github.com/misty-org/misty-extensions/releases/download/v0.2.0/ytdlp.zip" },
+      { "platform": "macos-x86_64", "url": "https://github.com/misty-org/misty-extensions/releases/download/v0.2.0/ytdlp.zip" },
+      { "platform": "windows-x86_64", "url": "https://github.com/misty-org/misty-extensions/releases/download/v0.2.0/ytdlp.zip" },
+      { "platform": "linux-x86_64", "url": "https://github.com/misty-org/misty-extensions/releases/download/v0.2.0/ytdlp.zip" }
     ]
   },
-  "logo_path": "https://raw.githubusercontent.com/misty-org/misty-plugins/main/extensions/ytdlp/assets/logo.svg"
+  "logo_path": "https://raw.githubusercontent.com/misty-org/misty-extensions/main/extensions/ytdlp/assets/logo.svg"
 }
