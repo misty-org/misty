@@ -1,13 +1,18 @@
-import { ArrowUp, Copy, File, Folder, Info, MessageSquare, Sparkles, X } from "lucide-react";
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { AlertCircle, ArrowUp, Check, ChevronDown, Cloud, Copy, File, Folder, FolderSearch, HardDrive, Images, Info, MessageSquare, Mic, Plus, RefreshCw, Search, ShieldAlert, Sparkles, Trash2, X } from "lucide-react";
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
+import { open } from "@tauri-apps/plugin-dialog";
 import { useShallow } from "zustand/react/shallow";
+import mikaAnimation from "../../../assets/bots/cloud-folder/mika.webp";
 import { selectedPathsForPane, useExplorerStore } from "../../../stores/useExplorerStore";
 import { useMikaSessionStore } from "../../../stores/useMikaSessionStore";
+import { useSmartLibraryStore } from "../../../stores/useSmartLibraryStore";
 import type { AiPlanReview, AiStatus, AiToolApproval } from "../../../stores/useMikaSessionStore";
+import type { SmartLibraryAsset } from "../../../api/types";
 import { useMultiPanelStore } from "../../../shared/multipanel/useMultiPanelStore";
 import { errorText } from "../../../shared/format";
+import { safeTauriAssetUrl } from "../../../shared/tauri";
 import { cx } from "./ExplorerDesktopShared";
 
 export const assistantPanelStyles = {
@@ -19,6 +24,8 @@ export const assistantPanelStyles = {
     "fixed bottom-5 right-5 top-[48px] z-[2147482500] grid w-[min(440px,calc(100vw_-_112px))] min-h-0 min-w-0 grid-rows-[54px_minmax(0,1fr)] overflow-hidden rounded-2xl border border-[var(--misty-border-soft)] bg-[var(--misty-app-pane-bg,var(--misty-surface))] text-[#e2e2e2] shadow-[0_28px_90px_rgba(0,0,0,0.62)] max-[720px]:bottom-3 max-[720px]:right-3 max-[720px]:top-10 max-[720px]:w-[calc(100vw_-_88px)]",
   mikaBotWindowPanel:
     "pointer-events-auto absolute bottom-[142px] left-2 right-2 top-2 z-20 grid min-h-0 min-w-0 grid-rows-[54px_minmax(0,1fr)] overflow-hidden rounded-[22px] border border-white/10 bg-[rgba(7,8,10,0.96)] text-[#e2e2e2] shadow-[0_28px_72px_rgba(0,0,0,0.58)] backdrop-blur-xl",
+  mikaChatWindowPanel:
+    "pointer-events-auto absolute inset-0 z-20 grid min-h-0 min-w-0 grid-rows-[54px_minmax(0,1fr)] overflow-hidden rounded-[22px] border border-white/10 bg-[#07080a] text-[#e2e2e2]",
   chatOverlay:
     "absolute bottom-[76px] right-[18px] z-[19] grid max-h-[min(620px,calc(100vh_-_120px))] w-[min(420px,calc(100vw_-_180px))] grid-rows-[auto_minmax(0,1fr)] overflow-hidden rounded-xl border border-[#323232] bg-[rgba(17, 17, 17, 0.96)] text-[#e2e2e2] shadow-[0_18px_42px_rgba(0,0,0,0.44)]",
   header:
@@ -50,7 +57,7 @@ export const assistantPanelStyles = {
   chatBody:
     "grid min-h-0 grid-rows-[auto_minmax(90px,1fr)_auto] gap-2.5 overflow-hidden p-[13px]",
   mikaBody:
-    "grid min-h-0 min-w-0 grid-rows-[auto_minmax(0,1fr)_auto_auto] gap-3 overflow-hidden bg-[var(--misty-app-pane-bg,var(--misty-surface))] p-5",
+    "relative grid min-h-0 min-w-0 grid-rows-[auto_minmax(0,1fr)_auto_auto] gap-3 overflow-hidden bg-[var(--misty-app-pane-bg,var(--misty-surface))] p-5",
   status:
     "grid border-b border-[#292929]",
   chatStatus: "gap-2 pb-2.5",
@@ -70,7 +77,7 @@ export const assistantPanelStyles = {
   log:
     "grid min-h-0 content-start overflow-auto pr-0.5",
   chatLog: "gap-2",
-  mikaLog: "min-w-0 gap-2.5",
+  mikaLog: "row-start-2 min-w-0 gap-2.5",
   mikaEmpty:
     "grid min-h-0 place-items-center px-3 py-8 text-center",
   mikaEmptyInner: "grid max-w-[260px] justify-items-center gap-3",
@@ -108,13 +115,13 @@ export const assistantPanelStyles = {
   reviewLayer:
     "fixed inset-0 z-[2147482600] grid place-items-center bg-[rgba(0,0,0,0.66)] p-8 text-[#e2e2e2] backdrop-blur-[10px]",
   reviewPanel:
-    "grid h-[min(720px,calc(100vh-64px))] w-[min(900px,calc(100vw-64px))] min-w-0 grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden rounded-2xl border border-[#242529] bg-[#07090b] shadow-[0_28px_90px_rgba(0,0,0,0.62)]",
+    "grid h-[min(820px,calc(100vh-64px))] w-[min(1120px,calc(100vw-64px))] min-w-0 grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden rounded-2xl border border-[#242529] bg-[#07090b] shadow-[0_28px_90px_rgba(0,0,0,0.62)]",
   reviewHeader:
     "grid grid-cols-[minmax(0,1fr)_auto] items-start gap-4 border-b border-[#242529] px-5 py-4",
   reviewTitle: "m-0 text-[18px] font-semibold leading-tight text-[#f4f4f4]",
   reviewSubtitle: "m-0 mt-1 min-w-0 break-words text-sm leading-normal text-[#9f9f9f]",
   reviewBody: "grid min-h-0 grid-rows-[auto_auto_minmax(0,1fr)] gap-3 overflow-hidden p-5",
-  reviewSummaryGrid: "grid gap-3",
+  reviewSummaryGrid: "grid gap-3 md:grid-cols-2",
   reviewSummaryBlock:
     "grid gap-1 rounded-lg border border-[#242529] bg-[#0d0f12] px-3.5 py-3",
   reviewSummaryLabel:
@@ -125,25 +132,25 @@ export const assistantPanelStyles = {
     "flex flex-wrap items-center justify-between gap-3 border-t border-[#242529] px-5 py-4",
   reviewFooterActions: "flex flex-wrap justify-end gap-2",
   modeSelect:
-    "min-h-8 rounded-lg border border-[#3f3f3f] bg-[#171717] px-2 text-[#f7f7f7] outline-none",
+    "h-10 rounded-lg border border-[#3f3f3f] bg-[#171717] px-3 py-0 text-[#f7f7f7] outline-none",
   messageTitle: "text-xs text-[#f7f7f7]",
   messageText:
     "m-0 whitespace-pre-wrap break-words font-[inherit] leading-normal text-[#d4d4d4]",
   composer:
     "grid border-t border-[#292929]",
   chatComposer: "gap-[9px] pt-2.5",
-  mikaComposer: "gap-2.5 pt-3",
+  mikaComposer: "row-start-3 gap-2.5 pt-3",
   textarea:
     "min-w-0 resize-y rounded-xl border border-[#343840] bg-[rgba(7,8,10,0.92)] px-3.5 py-3 font-[inherit] leading-snug text-[#f7f7f7] outline-none placeholder:text-[#777b84] focus:border-[#6a707c] focus:shadow-[0_0_0_3px_rgba(122,129,143,0.16)] disabled:text-[#898989]",
   composerActions: "flex justify-end gap-2",
-  mikaComposerActions: "gap-2",
+  mikaComposerActions: "items-center gap-2 pt-0.5",
   composerButton:
     "min-h-8 rounded-lg border border-[#3f3f3f] bg-[#252525] px-3 font-semibold text-[#f7f7f7] hover:not-disabled:bg-[#303030] disabled:opacity-55",
-  mikaComposerButton: "inline-flex min-h-10 items-center justify-center gap-2 rounded-xl px-3.5",
+  mikaComposerButton: "inline-flex h-10 min-h-0 items-center justify-center gap-2 rounded-xl px-3",
   mikaPrimaryButton:
     "border-[#ececec] bg-[#e8e8e8] text-[#242424] hover:not-disabled:bg-[#f5f5f5]",
   mikaFooter:
-    "flex min-h-10 items-center justify-center gap-2 border-t border-[#24262a] pt-3 text-xs font-semibold text-[#777b84]",
+    "row-start-4 flex min-h-10 items-center justify-center gap-2 border-t border-[#24262a] pt-3 text-xs font-semibold text-[#777b84]",
   secondaryButton: "bg-transparent text-[#b3b3b3]",
 } as const;
 
@@ -303,7 +310,8 @@ export const ExplorerChatOverlay = memo(function ExplorerChatOverlay() {
 });
 
 export const ExplorerMikaPanel = memo(function ExplorerMikaPanel(props: {
-  surface?: "explorer" | "bot" | "bot-window";
+  surface?: "explorer" | "bot" | "bot-window" | "bot-chat-window";
+  onHeaderDragStart?: () => void;
   onClose?: () => void;
   workingDirectory?: string;
   selectedPaths?: string[];
@@ -329,8 +337,13 @@ export const ExplorerMikaPanel = memo(function ExplorerMikaPanel(props: {
   })));
   const [prompt, setPrompt] = useState("");
   const [contextOpen, setContextOpen] = useState(false);
+  const [modeMenuOpen, setModeMenuOpen] = useState(false);
+  const [smartLibraryOpen, setSmartLibraryOpen] = useState(false);
+  const [mikaPeek, setMikaPeek] = useState(() => randomMikaPeek());
   const logRef = useRef<HTMLDivElement | null>(null);
   const contextRef = useRef<HTMLDivElement | null>(null);
+  const modeMenuRef = useRef<HTMLDivElement | null>(null);
+  const promptRef = useRef<HTMLTextAreaElement | null>(null);
   const workingDirectory = props.workingDirectory ?? listing?.path ?? "";
   const running = status?.running ?? false;
   const configured = status?.configured ?? false;
@@ -361,6 +374,58 @@ export const ExplorerMikaPanel = memo(function ExplorerMikaPanel(props: {
     };
   }, [contextOpen]);
 
+  useEffect(() => {
+    if (!modeMenuOpen) return;
+    const closeOnOutsidePointer = (event: globalThis.PointerEvent) => {
+      const target = event.target as Node | null;
+      if (target && modeMenuRef.current?.contains(target)) return;
+      setModeMenuOpen(false);
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setModeMenuOpen(false);
+    };
+    window.addEventListener("pointerdown", closeOnOutsidePointer);
+    window.addEventListener("keydown", closeOnEscape);
+    return () => {
+      window.removeEventListener("pointerdown", closeOnOutsidePointer);
+      window.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [modeMenuOpen]);
+
+  useEffect(() => {
+    if (props.surface !== "bot-chat-window") return;
+    let timer = 0;
+    let disposed = false;
+
+    const scheduleRetreat = () => {
+      timer = window.setTimeout(() => {
+        setMikaPeek((peek) => ({ ...peek, popped: false }));
+        timer = window.setTimeout(() => {
+          if (disposed) return;
+          setMikaPeek(randomMikaPeek());
+          scheduleRetreat();
+        }, randomInteger(700, 1_500));
+      }, randomInteger(3_500, 7_500));
+    };
+
+    scheduleRetreat();
+    return () => {
+      disposed = true;
+      window.clearTimeout(timer);
+    };
+  }, [props.surface]);
+
+  useLayoutEffect(() => {
+    const textarea = promptRef.current;
+    if (!textarea || props.surface !== "bot-chat-window") return;
+    const maximumHeight = 200;
+    const minimumHeight = 60;
+    textarea.style.height = "0px";
+    const contentHeight = textarea.scrollHeight;
+    textarea.style.height = `${Math.min(maximumHeight, Math.max(minimumHeight, contentHeight))}px`;
+    textarea.style.overflowY = contentHeight > maximumHeight ? "auto" : "hidden";
+  }, [prompt, props.surface]);
+
   const submitPrompt = useCallback(() => {
     const trimmed = prompt.trim();
     if (!trimmed || running) return;
@@ -375,14 +440,33 @@ export const ExplorerMikaPanel = memo(function ExplorerMikaPanel(props: {
   }, [prompt, running, selectedPaths, sendPrompt, workingDirectory]);
 
   return (
-    <aside className={props.surface === "bot-window" ? assistantPanelStyles.mikaBotWindowPanel : props.surface === "bot" ? assistantPanelStyles.mikaBotPanel : assistantPanelStyles.mikaPanel} aria-label="Mika Assistant">
-      <header className={cx(assistantPanelStyles.header, assistantPanelStyles.mikaHeader, assistantPanelStyles.mikaPanelHeader)}>
+    <aside className={props.surface === "bot-chat-window" ? assistantPanelStyles.mikaChatWindowPanel : props.surface === "bot-window" ? assistantPanelStyles.mikaBotWindowPanel : props.surface === "bot" ? assistantPanelStyles.mikaBotPanel : assistantPanelStyles.mikaPanel} aria-label="Mika Assistant">
+      <header className={cx(
+        assistantPanelStyles.header,
+        assistantPanelStyles.mikaHeader,
+        assistantPanelStyles.mikaPanelHeader,
+        props.surface === "bot-chat-window" && "cursor-grab active:cursor-grabbing [&_button]:cursor-pointer",
+      )} onPointerDown={(event) => {
+        if (event.button !== 0) return;
+        const target = event.target as HTMLElement;
+        if (target.closest("button, input, textarea, select, [role='button']")) return;
+        props.onHeaderDragStart?.();
+      }}>
         <span className={cx(assistantPanelStyles.headerTitle, assistantPanelStyles.mikaHeaderTitle)}>
-          <MessageSquare size={24} strokeWidth={1.9} />
           Mika
           {running ? <small className={assistantPanelStyles.runningBadge}>Running</small> : null}
         </span>
         <div ref={contextRef} className={assistantPanelStyles.headerActions}>
+          <button
+            className={cx(assistantPanelStyles.headerButton, assistantPanelStyles.mikaHeaderButton)}
+            type="button"
+            aria-label="Open Mika Smart Library"
+            aria-expanded={smartLibraryOpen}
+            title="Mika Smart Library"
+            onClick={() => setSmartLibraryOpen(true)}
+          >
+            <Images size={17} />
+          </button>
           <button
             className={cx(assistantPanelStyles.headerButton, assistantPanelStyles.mikaHeaderButton)}
             type="button"
@@ -412,7 +496,7 @@ export const ExplorerMikaPanel = memo(function ExplorerMikaPanel(props: {
         ) : null}
         <div ref={logRef} className={cx(assistantPanelStyles.log, assistantPanelStyles.mikaLog)} aria-live="polite">
           {messages.length === 0 ? (
-            <MikaEmptyState />
+            props.surface === "bot-chat-window" ? null : <MikaEmptyState />
           ) : messages.map((message) => (
             <article key={message.id} className={assistantMessageClass(message.role, "mika")}>
               <strong className={assistantPanelStyles.messageTitle}>{message.role === "user" ? "You" : message.role === "tool" ? "Tool" : message.role === "error" ? "Error" : "Mika"}</strong>
@@ -424,49 +508,352 @@ export const ExplorerMikaPanel = memo(function ExplorerMikaPanel(props: {
           ))}
         </div>
         <form
-          className={cx(assistantPanelStyles.composer, assistantPanelStyles.mikaComposer)}
+          className={cx(
+            assistantPanelStyles.composer,
+            assistantPanelStyles.mikaComposer,
+            props.surface === "bot-chat-window" && "relative z-10 !border-t-0 !pt-0",
+          )}
           onSubmit={(event) => {
             event.preventDefault();
             submitPrompt();
           }}
         >
-          <textarea
-            className={assistantPanelStyles.textarea}
-            value={prompt}
-            rows={3}
-            placeholder={assistantPlaceholder(configured, "Ask Mika to organize this folder...")}
-            disabled={!configured || running}
-            onChange={(event) => setPrompt(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
-                event.preventDefault();
-                submitPrompt();
-              }
-            }}
-          />
-          <div className={cx(assistantPanelStyles.composerActions, assistantPanelStyles.mikaComposerActions)}>
-            <select className={assistantPanelStyles.modeSelect} value={mode} aria-label="Mika mode" onChange={(event) => setMode(event.target.value as Parameters<typeof setMode>[0])}>
-              <option value="ask">Ask</option>
-              <option value="auto">Auto</option>
-            </select>
-            {running ? (
-              <button className={cx(assistantPanelStyles.composerButton, assistantPanelStyles.mikaComposerButton)} type="button" title="Cancel the active Mika gateway request." onClick={abortPrompt}>Stop</button>
+          {props.surface === "bot-chat-window" ? (
+            <img
+              alt=""
+              aria-hidden="true"
+              className={`pointer-events-none absolute -top-12 z-0 h-[72px] w-[88px] select-none object-contain drop-shadow-[0_10px_18px_rgba(18,92,150,0.24)] transition-[opacity,transform] duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] motion-reduce:transition-none ${mikaPeek.popped ? "opacity-100" : "opacity-0"}`}
+              draggable={false}
+              src={mikaAnimation}
+              style={{
+                left: `${mikaPeek.leftPercent}%`,
+                transform: mikaPeek.popped
+                  ? `translateX(-50%) translateY(0) scale(1) rotate(${mikaPeek.tiltDegrees}deg)`
+                  : `translateX(-50%) translateY(42px) scale(0.82) rotate(${mikaPeek.tiltDegrees}deg)`,
+              }}
+            />
+          ) : null}
+          <div className={props.surface === "bot-chat-window" ? "relative z-10 min-w-0 rounded-[24px] border border-white/10 bg-[#2a2a2a] shadow-[0_1px_0_rgba(255,255,255,0.035)_inset]" : "contents"}>
+            <textarea
+              className={cx(
+                assistantPanelStyles.textarea,
+                props.surface === "bot-chat-window" && "!w-full !min-h-[60px] !max-h-[200px] !resize-none !rounded-none !border-0 !bg-transparent !px-4 !pb-2 !pt-3.5 !shadow-none focus:!shadow-none",
+              )}
+              ref={promptRef}
+              value={prompt}
+              rows={props.surface === "bot-chat-window" ? 1 : 3}
+              placeholder={assistantPlaceholder(configured, "Ask Mika to organize this folder...")}
+              disabled={!configured || running}
+              onChange={(event) => setPrompt(event.target.value)}
+              onKeyDown={(event) => {
+                if (
+                  event.key === "Enter"
+                  && !event.shiftKey
+                  && !event.nativeEvent.isComposing
+                ) {
+                  event.preventDefault();
+                  submitPrompt();
+                }
+              }}
+            />
+            {props.surface === "bot-chat-window" ? (
+              <div className="relative z-10 flex h-[52px] min-w-0 items-center justify-between gap-3 px-3 pb-2.5">
+                <div className="flex min-w-0 items-center gap-2">
+                  <button aria-label="Add context" className="grid size-9 shrink-0 place-items-center rounded-full border-0 bg-transparent p-0 text-[#e7e7e7] transition hover:bg-white/[0.07] disabled:opacity-60" disabled title="Attachments coming soon" type="button">
+                    <Plus size={20} />
+                  </button>
+                  <div className="relative" ref={modeMenuRef}>
+                    <button
+                      aria-label="Mika permissions"
+                      aria-expanded={modeMenuOpen}
+                      aria-haspopup="menu"
+                      className={`inline-flex h-9 min-w-[128px] items-center gap-2 rounded-xl border-0 bg-transparent px-2.5 text-sm font-semibold transition hover:bg-white/[0.06] ${mode === "auto" ? "text-[#f87171]" : "text-[#e7e7e7]"}`}
+                      onClick={() => setModeMenuOpen((open) => !open)}
+                      type="button"
+                    >
+                      <ShieldAlert className="shrink-0" size={17} />
+                      <span className="min-w-0 flex-1 truncate text-left">{mode === "auto" ? "Full access" : "Ask first"}</span>
+                      <ChevronDown className={`shrink-0 transition-transform ${modeMenuOpen ? "rotate-180" : ""}`} size={15} />
+                    </button>
+                    {modeMenuOpen ? (
+                      <div className="absolute bottom-[calc(100%+8px)] left-0 z-30 grid w-40 gap-1 rounded-xl border border-white/10 bg-[#171717] p-1.5 text-sm shadow-[0_14px_36px_rgba(0,0,0,0.5)]" role="menu">
+                        {(["ask", "auto"] as const).map((option) => (
+                          <button
+                            aria-checked={mode === option}
+                            className={`rounded-lg border-0 px-3 py-2 text-left font-semibold transition hover:bg-white/[0.08] ${mode === option ? "bg-white/[0.07]" : "bg-transparent"} ${option === "auto" ? "text-[#f87171]" : "text-[#e7e7e7]"}`}
+                            key={option}
+                            onClick={() => {
+                              setMode(option);
+                              setModeMenuOpen(false);
+                            }}
+                            role="menuitemradio"
+                            type="button"
+                          >
+                            {option === "auto" ? "Full access" : "Ask first"}
+                          </button>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+                <div className="flex shrink-0 items-center gap-1.5">
+                  <span className="max-w-28 truncate px-1 text-sm font-medium text-[#ededed]" title={status?.modelName}>
+                    {status?.modelName ?? "Mika"}
+                  </span>
+                  <button aria-label="Voice input" className="grid size-9 place-items-center rounded-full border-0 bg-transparent p-0 text-[#ededed] transition hover:bg-white/[0.07] disabled:opacity-60" disabled title="Voice input coming soon" type="button">
+                    <Mic size={18} />
+                  </button>
+                  {running ? (
+                    <button aria-label="Stop Mika" className="grid size-10 place-items-center rounded-full border border-white/10 bg-[#d5d5d5] p-0 text-[#262626] transition hover:bg-white" type="button" title="Cancel the active Mika request" onClick={abortPrompt}>
+                      <X size={18} />
+                    </button>
+                  ) : (
+                    <button aria-label="Send to Mika" className="grid size-10 place-items-center rounded-full border border-white/10 bg-[#d5d5d5] p-0 text-[#262626] transition hover:bg-white disabled:bg-[#777a7f] disabled:text-[#bfc1c4] disabled:opacity-100" type="submit" disabled={!configured || !prompt.trim()}>
+                      <ArrowUp size={20} />
+                    </button>
+                  )}
+                </div>
+              </div>
             ) : (
-              <button className={cx(assistantPanelStyles.composerButton, assistantPanelStyles.mikaComposerButton, assistantPanelStyles.mikaPrimaryButton)} type="submit" disabled={!configured || !prompt.trim()}>
-                <ArrowUp size={17} />
-                Send
-              </button>
+              <div className={cx(assistantPanelStyles.composerActions, assistantPanelStyles.mikaComposerActions)}>
+                <select className={assistantPanelStyles.modeSelect} value={mode} aria-label="Mika mode" onChange={(event) => setMode(event.target.value as Parameters<typeof setMode>[0])}>
+                  <option value="ask">Ask</option>
+                  <option value="auto">Auto</option>
+                </select>
+                {running ? (
+                  <button className={cx(assistantPanelStyles.composerButton, assistantPanelStyles.mikaComposerButton)} type="button" title="Cancel the active Mika gateway request." onClick={abortPrompt}>Stop</button>
+                ) : (
+                  <button className={cx(assistantPanelStyles.composerButton, assistantPanelStyles.mikaComposerButton, assistantPanelStyles.mikaPrimaryButton)} type="submit" disabled={!configured || !prompt.trim()}>
+                    <ArrowUp size={17} />
+                    Send
+                  </button>
+                )}
+              </div>
             )}
           </div>
         </form>
-        <footer className={assistantPanelStyles.mikaFooter}>
-          <Sparkles size={15} />
-          Mika can make mistakes. Review file plans before applying them.
-        </footer>
+        {props.surface === "bot-chat-window" ? null : (
+          <footer className={assistantPanelStyles.mikaFooter}>
+            <Sparkles size={15} />
+            Mika can make mistakes. Review file plans before applying them.
+          </footer>
+        )}
       </div>
+      {smartLibraryOpen ? (
+        <SmartLibraryDialog workingDirectory={workingDirectory} onClose={() => setSmartLibraryOpen(false)} />
+      ) : null}
     </aside>
   );
 });
+
+function SmartLibraryDialog(props: { workingDirectory: string; onClose: () => void }) {
+  const {
+    loaded, phase, library, progress, estimate, searchQuery, searchResults, error,
+    load, chooseFolder, rescan, trySample, analyzeFolder, refreshProgress, search, removeLibrary,
+  } = useSmartLibraryStore(useShallow((state) => ({
+    loaded: state.loaded,
+    phase: state.phase,
+    library: state.library,
+    progress: state.progress,
+    estimate: state.estimate,
+    searchQuery: state.searchQuery,
+    searchResults: state.searchResults,
+    error: state.error,
+    load: state.load,
+    chooseFolder: state.chooseFolder,
+    rescan: state.rescan,
+    trySample: state.trySample,
+    analyzeFolder: state.analyzeFolder,
+    refreshProgress: state.refreshProgress,
+    search: state.search,
+    removeLibrary: state.removeLibrary,
+  })));
+  const [query, setQuery] = useState(searchQuery);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [confirmFullAnalysis, setConfirmFullAnalysis] = useState(false);
+
+  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    const closeOnEscape = (event: KeyboardEvent) => { if (event.key === "Escape") props.onClose(); };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [props.onClose]);
+
+  const chooseLocalFolder = async () => {
+    const selected = await open({ directory: true, multiple: false, title: "Choose one Mika Smart Library folder" });
+    if (typeof selected === "string") await chooseFolder(selected);
+  };
+  const analyzedAssets = library?.assets.filter((asset) => asset.status === "analyzed") ?? [];
+  const failedAssets = library?.assets.filter((asset) => asset.status === "failed") ?? [];
+  const visibleAssets = query.trim() ? searchResults : analyzedAssets;
+  const collections = [...new Set(analyzedAssets.flatMap((asset) => asset.collections))].sort((a, b) => a.localeCompare(b));
+  const busy = phase === "scanning" || phase === "uploading" || phase === "processing";
+
+  return createPortal(
+    <div className="fixed inset-0 z-[2147482700] grid place-items-center bg-black/75 p-6 text-[#eceef2] backdrop-blur-xl" onPointerDown={(event) => {
+      if (event.target === event.currentTarget && !busy) props.onClose();
+    }}>
+      <section className="grid h-[min(860px,calc(100vh-48px))] w-[min(1180px,calc(100vw-48px))] min-h-0 grid-rows-[76px_minmax(0,1fr)] overflow-hidden rounded-[24px] border border-white/10 bg-[#090b0e] shadow-[0_38px_120px_rgba(0,0,0,0.72)]" role="dialog" aria-modal="true" aria-labelledby="smart-library-title">
+        <header className="flex min-w-0 items-center justify-between gap-5 border-b border-white/10 px-7">
+          <div className="flex min-w-0 items-center gap-4">
+            <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-[linear-gradient(145deg,#6d5dfc,#2d8cff)] text-white shadow-[0_12px_30px_rgba(69,104,255,0.28)]"><Images size={22} /></span>
+            <div className="min-w-0">
+              <h2 className="m-0 text-xl font-bold tracking-[-0.02em]" id="smart-library-title">Mika Smart Library</h2>
+              <p className="m-0 mt-1 truncate text-sm text-[#9298a3]">One folder. Searchable descriptions, tags, and virtual collections.</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {library ? <span className="hidden max-w-72 truncate rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs font-semibold text-[#b8bdc7] md:block" title={library.rootPath}>{library.displayName} · {library.sourceKind === "cloud" ? "Cloud" : "Local"}</span> : null}
+            <button className="grid size-10 place-items-center rounded-xl border border-white/10 bg-white/[0.04] text-[#bec3cc] hover:bg-white/[0.08] hover:text-white" type="button" aria-label="Close Smart Library" disabled={busy} onClick={props.onClose}><X size={19} /></button>
+          </div>
+        </header>
+        <div className="min-h-0 overflow-auto">
+          {!loaded || phase === "scanning" ? (
+            <SmartLibraryBusy icon={<FolderSearch size={26} />} title={loaded ? "Scanning this folder" : "Loading your Smart Library"} text={loaded ? "Reading filenames, formats, dates, and fingerprints locally. This does not use AI credits." : "Opening the private device catalog…"} />
+          ) : !library ? (
+            <div className="grid min-h-full place-items-center p-8">
+              <div className="grid w-full max-w-3xl justify-items-center gap-7 text-center">
+                <div className="grid size-24 place-items-center rounded-[30px] border border-[#44506b] bg-[radial-gradient(circle_at_30%_20%,#293a68,#11151f_72%)] text-[#99b8ff] shadow-[0_26px_70px_rgba(32,67,145,0.24)]"><Sparkles size={38} /></div>
+                <div className="grid gap-3">
+                  <h3 className="m-0 text-[32px] font-bold tracking-[-0.035em]">Understand your images, not just their folders.</h3>
+                  <p className="m-0 mx-auto max-w-2xl text-base leading-relaxed text-[#9aa0aa]">Mika first scans one folder for free, then analyzes a representative 25-image sample. Originals stay where they are; organization is virtual and reversible.</p>
+                </div>
+                <div className="grid w-full grid-cols-1 gap-3 text-left sm:grid-cols-3">
+                  <SmartLibraryFeature icon={<Search size={18} />} title="Natural search" text="Find images by what they contain." />
+                  <SmartLibraryFeature icon={<Images size={18} />} title="Visual collections" text="Review AI organization before scaling." />
+                  <SmartLibraryFeature icon={<ShieldAlert size={18} />} title="Private previews" text="Paths and originals stay on device." />
+                </div>
+                {error ? <SmartLibraryError text={error} /> : null}
+                <div className="flex flex-wrap justify-center gap-3">
+                  {props.workingDirectory ? <button className="inline-flex h-11 items-center gap-2 rounded-xl bg-[#edf1f8] px-5 font-bold text-[#15181d] hover:bg-white" type="button" onClick={() => void chooseFolder(props.workingDirectory)}><Folder size={18} />Use Current Folder</button> : null}
+                  <button className="inline-flex h-11 items-center gap-2 rounded-xl border border-white/15 bg-white/[0.05] px-5 font-bold text-white hover:bg-white/[0.09]" type="button" onClick={() => void chooseLocalFolder()}><HardDrive size={18} />Choose Local Folder</button>
+                </div>
+                <span className="text-xs font-medium text-[#6f7681]">Connected-cloud folders can be selected by opening them in Files and choosing Use Current Folder.</span>
+              </div>
+            </div>
+          ) : (
+            <div className="grid min-h-full grid-rows-[auto_minmax(0,1fr)]">
+              <div className="sticky top-0 z-10 flex min-w-0 flex-wrap items-center justify-between gap-3 border-b border-white/10 bg-[rgba(9,11,14,0.94)] px-6 py-4 backdrop-blur-xl">
+                <div className="flex min-w-0 items-center gap-2">
+                  <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-bold text-[#c3c8d1]">{library.sourceKind === "cloud" ? <Cloud size={14} /> : <HardDrive size={14} />}{library.preflight.totalImages.toLocaleString()} images</span>
+                  <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-bold text-[#c3c8d1]">{analyzedAssets.length.toLocaleString()} analyzed</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button className="inline-flex h-9 items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-3 text-xs font-bold text-[#cbd0d8] hover:bg-white/[0.08]" type="button" disabled={busy} onClick={() => void rescan()}><RefreshCw size={14} />Rescan</button>
+                  {confirmDelete ? (
+                    <button className="inline-flex h-9 items-center gap-2 rounded-xl bg-[#a9363d] px-3 text-xs font-bold text-white hover:bg-[#bd4149]" type="button" onClick={() => void removeLibrary()}><Check size={14} />Remove now</button>
+                  ) : (
+                    <button className="grid size-9 place-items-center rounded-xl border border-white/10 bg-white/[0.04] text-[#aeb4be] hover:bg-[#3b1d22] hover:text-[#ff9da5]" type="button" aria-label="Remove Smart Library" disabled={busy} onClick={() => setConfirmDelete(true)}><Trash2 size={15} /></button>
+                  )}
+                </div>
+              </div>
+              <div className="min-h-0 p-6">
+                {error ? <div className="mb-4"><SmartLibraryError text={error} /></div> : null}
+                {phase === "uploading" ? (
+                  <SmartLibraryBusy icon={<Cloud size={26} />} title="Preparing private previews" text="Misty is stripping EXIF, resizing to 512px, and securely analyzing batches of eight through your existing Mika server. Keep Misty open until this run finishes." />
+                ) : phase === "processing" ? (
+                  <SmartLibraryProgressView progress={progress} onRefresh={refreshProgress} />
+                ) : analyzedAssets.length > 0 ? (
+                  <div className="grid gap-6">
+                    <section className="grid gap-4 rounded-2xl border border-white/10 bg-white/[0.025] p-5">
+                      <div className="flex flex-wrap items-end justify-between gap-4">
+                        <div><h3 className="m-0 text-xl font-bold">Sample review</h3><p className="m-0 mt-1 text-sm text-[#8f96a1]">Review descriptions, tags, confidence, and virtual collections before analyzing more.</p></div>
+                        {library.preflight.eligibleImages > 0 ? <button className="inline-flex h-10 items-center gap-2 rounded-xl bg-[#edf1f8] px-4 text-sm font-bold text-[#15181d] hover:bg-white" type="button" onClick={() => setConfirmFullAnalysis(true)}><Sparkles size={16} />Analyze This Folder</button> : null}
+                      </div>
+                      {confirmFullAnalysis ? <div className="grid gap-3 rounded-xl border border-[#65552d] bg-[#211b0d] p-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"><div><strong className="block text-sm text-[#f2dc9c]">Approve the remaining folder analysis?</strong><span className="mt-1 block text-xs leading-relaxed text-[#c5b98f]">{formatEstimate(estimate ?? library.preflight.estimate)} Only successful images are charged; this does not move or rename files.</span></div><div className="flex gap-2"><button className="h-9 rounded-lg border border-white/10 px-3 text-xs font-bold" type="button" onClick={() => setConfirmFullAnalysis(false)}>Cancel</button><button className="h-9 rounded-lg bg-[#edf1f8] px-3 text-xs font-bold text-[#15181d]" type="button" onClick={() => { setConfirmFullAnalysis(false); void analyzeFolder(); }}>Approve Analysis</button></div></div> : null}
+                      <form className="grid grid-cols-[minmax(0,1fr)_auto] gap-2" onSubmit={(event) => { event.preventDefault(); void search(query); }}>
+                        <label className="flex h-11 min-w-0 items-center gap-2 rounded-xl border border-white/10 bg-[#050608] px-3 text-[#89919d] focus-within:border-[#5b74ad]"><Search size={17} /><input className="min-w-0 flex-1 border-0 bg-transparent text-sm text-white outline-none placeholder:text-[#68707c]" value={query} placeholder="Search: sunset by the ocean, blue product photos…" onChange={(event) => setQuery(event.target.value)} /></label>
+                        <button className="h-11 rounded-xl border border-white/10 bg-white/[0.06] px-4 text-sm font-bold hover:bg-white/[0.1]" type="submit">Search</button>
+                      </form>
+                      {collections.length > 0 ? <div className="flex flex-wrap gap-2">{collections.map((collection) => <button className="rounded-full border border-[#44506b] bg-[#151b28] px-3 py-1.5 text-xs font-bold text-[#b7caff] hover:bg-[#1c263a]" key={collection} type="button" onClick={() => { setQuery(""); void search("", collection); }}>{collection}</button>)}</div> : null}
+                    </section>
+                    <SmartLibraryAssetGrid assets={visibleAssets} library={library} />
+                    {failedAssets.length > 0 ? <p className="m-0 text-sm text-[#e9a0a7]">{failedAssets.length} image{failedAssets.length === 1 ? "" : "s"} failed. Mika does not charge for failed analysis or infrastructure retries.</p> : null}
+                  </div>
+                ) : (
+                  <SmartLibraryPreflightView library={library} estimate={estimate} onTrySample={trySample} />
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      </section>
+    </div>,
+    document.body,
+  );
+}
+
+function SmartLibraryFeature(props: { icon: React.ReactNode; title: string; text: string }) {
+  return <div className="grid gap-2 rounded-2xl border border-white/10 bg-white/[0.035] p-4"><span className="text-[#91adff]">{props.icon}</span><strong className="text-sm">{props.title}</strong><span className="text-xs leading-relaxed text-[#858c97]">{props.text}</span></div>;
+}
+
+function SmartLibraryBusy(props: { icon: React.ReactNode; title: string; text: string }) {
+  return <div className="grid min-h-full place-items-center p-8"><div className="grid max-w-lg justify-items-center gap-4 text-center"><span className="grid size-16 animate-pulse place-items-center rounded-2xl border border-[#435275] bg-[#172038] text-[#9bb8ff]">{props.icon}</span><h3 className="m-0 text-2xl font-bold">{props.title}</h3><p className="m-0 text-sm leading-relaxed text-[#9299a4]">{props.text}</p></div></div>;
+}
+
+function SmartLibraryError(props: { text: string }) {
+  return <div className="flex items-start gap-3 rounded-xl border border-[#663139] bg-[#261217] px-4 py-3 text-left text-sm text-[#f2b2b8]"><AlertCircle className="mt-0.5 shrink-0" size={17} /><span>{props.text}</span></div>;
+}
+
+function SmartLibraryPreflightView(props: { library: ReturnType<typeof useSmartLibraryStore.getState>["library"] & {}; estimate: ReturnType<typeof useSmartLibraryStore.getState>["estimate"]; onTrySample: () => Promise<void> }) {
+  const { preflight } = props.library;
+  return <div className="grid gap-6">
+    <div><h3 className="m-0 text-2xl font-bold tracking-[-0.025em]">Ready to try a sample</h3><p className="m-0 mt-2 text-sm text-[#9299a4]">The scan was local and free. Mika will analyze a representative sample before asking to continue.</p></div>
+    <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+      <SmartLibraryMetric label="Discovered" value={preflight.totalImages} />
+      <SmartLibraryMetric label="Supported" value={preflight.supportedImages} tone="good" />
+      <SmartLibraryMetric label="Unsupported" value={preflight.unsupportedImages} tone={preflight.unsupportedImages ? "warn" : undefined} />
+      <SmartLibraryMetric label="New / changed" value={preflight.newImages + preflight.changedImages} />
+      <SmartLibraryMetric label="Pilot eligible" value={preflight.pilotCappedImages} suffix="max 500" />
+    </div>
+    {preflight.skippedFullOriginalImages > 0 ? <SmartLibraryError text={`${preflight.skippedFullOriginalImages} cloud images were skipped because their provider would require downloading the full original. This pilot uploads previews only.`} /> : null}
+    <div className="grid gap-4 rounded-2xl border border-[#384a73] bg-[linear-gradient(145deg,rgba(31,45,78,.72),rgba(16,21,33,.72))] p-5 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+      <div className="grid gap-2"><span className="text-xs font-bold uppercase tracking-[0.12em] text-[#91adff]">25-image trial allowance</span><strong className="text-lg">Try the sample before spending credits</strong><span className="text-sm leading-relaxed text-[#a7afbd]">{preflight.sampleAssetIds.length} images selected across subfolders, formats, and dates. {formatEstimate(props.estimate ?? preflight.estimate)}</span></div>
+      <button className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-[#edf1f8] px-5 font-bold text-[#15181d] hover:bg-white disabled:opacity-50" type="button" disabled={preflight.sampleAssetIds.length === 0} onClick={() => void props.onTrySample()}><Sparkles size={18} />Try Sample</button>
+    </div>
+    <div className="flex items-start gap-3 rounded-xl border border-white/10 bg-white/[0.025] p-4 text-sm leading-relaxed text-[#8f96a1]"><ShieldAlert className="mt-0.5 shrink-0 text-[#a9bfff]" size={18} /><span>Misty sends opaque asset IDs and EXIF-stripped 384–512px previews. Local and provider paths remain in the device SQLite catalog. Rescans always require approval.</span></div>
+  </div>;
+}
+
+function SmartLibraryMetric(props: { label: string; value: number; suffix?: string; tone?: "good" | "warn" }) {
+  return <div className="grid gap-1 rounded-2xl border border-white/10 bg-white/[0.03] p-4"><span className="text-xs font-bold text-[#858d99]">{props.label}</span><strong className={`text-2xl ${props.tone === "good" ? "text-[#8fe0af]" : props.tone === "warn" ? "text-[#f0bd72]" : "text-white"}`}>{props.value.toLocaleString()}</strong>{props.suffix ? <span className="text-[11px] text-[#747c87]">{props.suffix}</span> : null}</div>;
+}
+
+function SmartLibraryProgressView(props: { progress: ReturnType<typeof useSmartLibraryStore.getState>["progress"]; onRefresh: () => Promise<void> }) {
+  const completed = props.progress?.successfulImages ?? 0;
+  const failed = props.progress?.failedImages ?? 0;
+  const queued = props.progress?.queuedImages ?? 0;
+  const total = Math.max(1, completed + failed + queued);
+  const percent = Math.round(((completed + failed) / total) * 100);
+  return <div className="grid min-h-[500px] place-items-center"><div className="grid w-full max-w-2xl gap-5 rounded-2xl border border-white/10 bg-white/[0.03] p-6"><div className="flex items-center justify-between"><div><h3 className="m-0 text-xl font-bold">Mika is understanding your images</h3><p className="m-0 mt-1 text-sm text-[#8f96a1]">Keep Misty open while the existing Mika server processes each eight-image batch.</p></div><span className="text-2xl font-bold">{percent}%</span></div><div className="h-2 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full bg-[linear-gradient(90deg,#6d5dfc,#2d9cff)] transition-[width]" style={{ width: `${percent}%` }} /></div><div className="grid grid-cols-3 gap-3"><SmartLibraryMetric label="Completed" value={completed} tone="good" /><SmartLibraryMetric label="Remaining" value={queued} /><SmartLibraryMetric label="Failed" value={failed} tone={failed ? "warn" : undefined} /></div><button className="inline-flex h-10 items-center justify-center gap-2 justify-self-end rounded-xl border border-white/10 bg-white/[0.05] px-4 text-sm font-bold hover:bg-white/[0.09]" type="button" onClick={() => void props.onRefresh()}><RefreshCw size={15} />Refresh now</button></div></div>;
+}
+
+function SmartLibraryAssetGrid(props: { assets: SmartLibraryAsset[]; library: NonNullable<ReturnType<typeof useSmartLibraryStore.getState>["library"]> }) {
+  if (props.assets.length === 0) return <div className="grid min-h-52 place-items-center rounded-2xl border border-dashed border-white/10 text-sm text-[#7f8792]">No analyzed images match this view.</div>;
+  return <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">{props.assets.map((asset) => <SmartLibraryAssetCard key={asset.assetId} asset={asset} library={props.library} />)}</div>;
+}
+
+function SmartLibraryAssetCard(props: { asset: SmartLibraryAsset; library: NonNullable<ReturnType<typeof useSmartLibraryStore.getState>["library"]> }) {
+  const source = props.asset.sourceKind === "local" ? safeTauriAssetUrl(joinDevicePath(props.library.rootPath, props.asset.relativePath)) : null;
+  const confidence = props.asset.confidence === null ? null : Math.round(props.asset.confidence * 100);
+  return <article className="grid min-w-0 grid-rows-[190px_auto] overflow-hidden rounded-2xl border border-white/10 bg-[#101318] shadow-[0_10px_30px_rgba(0,0,0,.2)]">
+    <div className="relative overflow-hidden bg-[radial-gradient(circle_at_30%_20%,#29334a,#11141a)]">{source ? <img className="size-full object-cover" alt="" src={source} /> : <span className="grid size-full place-items-center text-[#71809e]"><Cloud size={36} /></span>}{confidence !== null ? <span className="absolute right-2 top-2 rounded-full bg-black/70 px-2 py-1 text-[10px] font-bold backdrop-blur">{confidence}% confidence</span> : null}</div>
+    <div className="grid gap-3 p-4"><div className="min-w-0"><strong className="block truncate text-sm" title={props.asset.relativePath}>{props.asset.name}</strong><span className="mt-1 block line-clamp-3 text-xs leading-relaxed text-[#a0a7b2]">{props.asset.description || "No description generated."}</span></div>{props.asset.tags.length > 0 ? <div className="flex flex-wrap gap-1.5">{props.asset.tags.slice(0, 6).map((tag) => <span className="rounded-md bg-white/[0.06] px-2 py-1 text-[10px] font-semibold text-[#b9c0ca]" key={tag}>{tag}</span>)}</div> : null}{props.asset.collections.length > 0 ? <div className="flex items-center gap-2 text-[11px] font-bold text-[#91adff]"><Images size={13} /><span className="truncate">{props.asset.collections.join(" · ")}</span></div> : null}</div>
+  </article>;
+}
+
+function joinDevicePath(root: string, relative: string): string {
+  const separator = root.includes("\\") && !root.includes("/") ? "\\" : "/";
+  return `${root.replace(/[\\/]+$/, "")}${separator}${relative.replace(/^[\\/]+/, "")}`;
+}
+
+function formatEstimate(estimate: ReturnType<typeof useSmartLibraryStore.getState>["estimate"]): string {
+  if (!estimate) return "Final credits and price will be confirmed before upload.";
+  const price = estimate.priceMinor !== null && estimate.currency
+    ? new Intl.NumberFormat(undefined, { style: "currency", currency: estimate.currency }).format(estimate.priceMinor / 100)
+    : "price confirmed by your plan";
+  return `${estimate.includedImages} included · ${estimate.billableImages} billable Mika credits · ${price}.`;
+}
 
 function AssistantPlanActions(props: {
   planId: string;
@@ -520,6 +907,21 @@ function planOperationDestination(operation: AssistantPlanOperation): string {
   return operation.to;
 }
 
+function planOperationGroup(operation: AssistantPlanOperation): string {
+  const destination = planOperationDestination(operation).replace(/[\\/]+$/, "");
+  const separator = Math.max(destination.lastIndexOf("/"), destination.lastIndexOf("\\"));
+  if (operation.type === "mkdir") return destination;
+  return separator > 0 ? destination.slice(0, separator) : "Destination";
+}
+
+function planOperationPreview(operation: AssistantPlanOperation): string | null {
+  if (operation.type === "mkdir") return null;
+  const extension = operation.from.split(".").pop()?.toLowerCase() ?? "";
+  return ["jpg", "jpeg", "png", "webp", "gif", "bmp", "tif", "tiff", "heic", "heif", "avif"].includes(extension)
+    ? safeTauriAssetUrl(operation.from)
+    : null;
+}
+
 function AssistantPlanReviewDialog(props: {
   plan: AiPlanReview;
   onApply: (planId: string) => Promise<void>;
@@ -530,6 +932,14 @@ function AssistantPlanReviewDialog(props: {
     ...props.plan.plan.warnings.map((warning) => `Warning: ${warning}`),
     ...props.plan.blockedReasons.map((reason) => `Blocked: ${reason}`),
   ];
+  const groupedOperations = useMemo(() => {
+    const groups = new Map<string, AssistantPlanOperation[]>();
+    for (const operation of props.plan.plan.operations) {
+      const group = planOperationGroup(operation);
+      groups.set(group, [...(groups.get(group) ?? []), operation]);
+    }
+    return [...groups.entries()];
+  }, [props.plan.plan.operations]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -578,27 +988,29 @@ function AssistantPlanReviewDialog(props: {
           {warnings.length > 0 ? (
             <p className={assistantPanelStyles.planWarningText}>{warnings.join(" ")}</p>
           ) : null}
-          <div className={assistantPanelStyles.planTableWrap}>
-            <table className={assistantPanelStyles.planTable}>
-              <thead className={assistantPanelStyles.planTableHead}>
-                <tr>
-                  <th className={assistantPanelStyles.planTableHeaderCell} scope="col">Operation</th>
-                  <th className={assistantPanelStyles.planTableHeaderCell} scope="col">Source</th>
-                  <th className={assistantPanelStyles.planTableHeaderCell} scope="col">Destination</th>
-                  <th className={assistantPanelStyles.planTableHeaderCell} scope="col">Reason</th>
-                </tr>
-              </thead>
-              <tbody>
-                {props.plan.plan.operations.map((operation, index) => (
-                  <tr key={`${operation.type}-${index}-${planOperationDetail(operation)}`} className={assistantPanelStyles.planTableRow}>
-                    <td className={cx(assistantPanelStyles.planTableCell, assistantPanelStyles.planTableOperation)}>{operation.type}</td>
-                    <td className={cx(assistantPanelStyles.planTableCell, assistantPanelStyles.planTablePath)}>{planOperationSource(operation)}</td>
-                    <td className={cx(assistantPanelStyles.planTableCell, assistantPanelStyles.planTablePath)}>{planOperationDestination(operation)}</td>
-                    <td className={cx(assistantPanelStyles.planTableCell, assistantPanelStyles.planTableReason)}>{operation.reason || "-"}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="grid min-h-0 gap-4 overflow-auto pr-1">
+            {groupedOperations.map(([destination, operations]) => (
+              <section className="grid gap-3 rounded-xl border border-white/10 bg-white/[0.025] p-4" key={destination}>
+                <header className="flex min-w-0 items-center justify-between gap-3 border-b border-white/10 pb-3">
+                  <div className="flex min-w-0 items-center gap-2.5"><span className="grid size-8 shrink-0 place-items-center rounded-lg bg-[#1c2433] text-[#9eb8f5]"><Folder size={16} /></span><div className="min-w-0"><span className="block text-[10px] font-bold uppercase tracking-[0.1em] text-[#7f8792]">Destination group</span><strong className="block truncate text-sm text-[#edf0f5]" title={destination}>{destination}</strong></div></div>
+                  <span className="shrink-0 rounded-full bg-white/[0.06] px-2.5 py-1 text-[11px] font-bold text-[#abb2bd]">{operations.length} item{operations.length === 1 ? "" : "s"}</span>
+                </header>
+                <div className="grid gap-3">
+                  {operations.map((operation, index) => {
+                    const preview = planOperationPreview(operation);
+                    const confidence = operation.type === "mkdir" ? null : operation.confidence;
+                    return <article className="grid min-w-0 grid-cols-[64px_minmax(0,1fr)] gap-4 rounded-xl border border-white/[0.07] bg-[#0c0f13] p-3" key={`${operation.type}-${index}-${planOperationDetail(operation)}`}>
+                      <div className="grid size-16 place-items-center overflow-hidden rounded-xl bg-[#171b22] text-[#768092]">{preview ? <img alt="" className="size-full object-cover" src={preview} /> : operation.type === "mkdir" ? <Folder size={24} /> : <File size={23} />}</div>
+                      <div className="grid min-w-0 gap-2.5">
+                        <div className="flex flex-wrap items-center gap-2"><span className="rounded-md bg-[#232a36] px-2 py-1 text-[10px] font-bold uppercase text-[#bdcae7]">{operation.type}</span>{typeof confidence === "number" ? <span className="text-[11px] font-semibold text-[#8e96a2]">{Math.round(confidence * 100)}% confidence</span> : null}</div>
+                        {operation.type === "mkdir" ? <div><span className="block text-[10px] font-bold uppercase text-[#747c88]">Create folder</span><span className="mt-1 block break-all text-xs leading-relaxed text-[#d6dae1]">{operation.path}</span></div> : <div className="grid gap-2 lg:grid-cols-2"><div className="min-w-0"><span className="block text-[10px] font-bold uppercase text-[#747c88]">From</span><span className="mt-1 block break-all text-xs leading-relaxed text-[#d6dae1]">{planOperationSource(operation)}</span></div><div className="min-w-0"><span className="block text-[10px] font-bold uppercase text-[#747c88]">To</span><span className="mt-1 block break-all text-xs leading-relaxed text-[#d6dae1]">{planOperationDestination(operation)}</span></div></div>}
+                        <p className="m-0 text-xs leading-relaxed text-[#9098a4]"><span className="font-bold text-[#b7bdc7]">Why: </span>{operation.reason || "No reason provided."}</p>
+                      </div>
+                    </article>;
+                  })}
+                </div>
+              </section>
+            ))}
           </div>
         </div>
         <footer className={assistantPanelStyles.reviewFooter}>
@@ -790,4 +1202,16 @@ function buildMikaPrompt(userPrompt: string, workingDirectory: string, selectedP
 function titleFromPath(path: string): string {
   const parts = path.split("/").filter(Boolean);
   return parts[parts.length - 1] || path || "Home";
+}
+
+function randomMikaPeek(): { leftPercent: number; tiltDegrees: number; popped: boolean } {
+  return {
+    leftPercent: randomInteger(10, 90),
+    tiltDegrees: randomInteger(-8, 8),
+    popped: true,
+  };
+}
+
+function randomInteger(min: number, max: number): number {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
 }

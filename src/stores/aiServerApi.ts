@@ -79,36 +79,36 @@ export interface AgentStatusResponse {
 }
 
 export async function fetchAgentStatus(): Promise<AgentStatusResponse> {
-  return aiRequest<AgentStatusResponse>("/ai/status");
+  return managedAiRequest<AgentStatusResponse>("/ai/status");
 }
 
 export async function createAgentSession(): Promise<CreateSessionResponse> {
-  return aiRequest<CreateSessionResponse>("/ai/sessions", { method: "POST" });
+  return managedAiRequest<CreateSessionResponse>("/ai/sessions", { method: "POST" });
 }
 
 export async function sendAgentMessage(sessionId: string, body: AgentMessageRequest): Promise<void> {
-  await aiRequest(`/ai/sessions/${encodeURIComponent(sessionId)}/messages`, {
+  await managedAiRequest(`/ai/sessions/${encodeURIComponent(sessionId)}/messages`, {
     method: "POST",
     body: JSON.stringify(body),
   });
 }
 
 export async function fetchAgentEvents(sessionId: string, after: number): Promise<AgentEventsResponse> {
-  return aiRequest<AgentEventsResponse>(`/ai/sessions/${encodeURIComponent(sessionId)}/events?after=${after}`);
+  return managedAiRequest<AgentEventsResponse>(`/ai/sessions/${encodeURIComponent(sessionId)}/events?after=${after}`);
 }
 
 export async function submitToolResults(sessionId: string, results: ToolResult[]): Promise<void> {
-  await aiRequest(`/ai/sessions/${encodeURIComponent(sessionId)}/tool-results`, {
+  await managedAiRequest(`/ai/sessions/${encodeURIComponent(sessionId)}/tool-results`, {
     method: "POST",
     body: JSON.stringify({ results }),
   });
 }
 
 export async function cancelAgentSession(sessionId: string): Promise<void> {
-  await aiRequest(`/ai/sessions/${encodeURIComponent(sessionId)}/cancel`, { method: "POST" });
+  await managedAiRequest(`/ai/sessions/${encodeURIComponent(sessionId)}/cancel`, { method: "POST" });
 }
 
-async function aiRequest<T = unknown>(path: string, init?: RequestInit): Promise<T> {
+export async function managedAiRequest<T = unknown>(path: string, init?: RequestInit): Promise<T> {
   const base = await resolveServerApiBase();
   if (!base) throw new Error("Misty server URL is not configured.");
   const token = await readAccountAuthToken();

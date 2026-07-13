@@ -71,6 +71,7 @@ export interface ShortcutPreferences {
 }
 
 export interface AdvancedPreferences {
+  extensionToolsPath: string;
   mountPath: string;
   serverAddress: string;
 }
@@ -424,6 +425,7 @@ export function selectAdvancedPreferences(
 ): AdvancedPreferences {
   const source = document ?? {};
   return {
+    extensionToolsPath: settingsString(source, "advanced", "extension_tools_path", ""),
     mountPath: settingsString(source, "advanced", "mount_path", ".misty/mnt"),
     serverAddress: settingsString(source, "advanced", "server_address", defaultAdvancedServerAddress),
   };

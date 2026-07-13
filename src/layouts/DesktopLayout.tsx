@@ -78,10 +78,16 @@ import type { TransferRecord, TransferStatus } from "../api/types";
 import { isAndroidBuild } from "../platform/buildTarget";
 import {
   closeCloudFolderBotWindow,
+  cloudFolderBotChatVisibilityEvent,
   cloudFolderBotContextRequestEvent,
   cloudFolderBotDismissEvent,
+  cloudFolderBotOpenAssistantEvent,
   cloudFolderBotReturnToAppEvent,
+  openCloudFolderBotChatWindow,
   openCloudFolderBotWindow,
+  publishCloudFolderBotChatVisibility,
+  setCloudFolderBotWindowVisible,
+  type CloudFolderBotChatVisibility,
   publishCloudFolderBotContext,
 } from "../bots/cloudFolderBot";
 import { useMultiPanelStore } from "../shared/multipanel/useMultiPanelStore";
@@ -403,7 +409,7 @@ export function DesktopLayout(props: {
     if (!hasTauriInternals()) return;
     let unlisten: UnlistenFn | null = null;
     void listen(cloudFolderBotDismissEvent, () => {
-      updateSetting("assistant", "enabled", false);
+      void closeCloudFolderBotWindow();
     }).then((listener) => {
       unlisten = listener;
     });
@@ -411,7 +417,7 @@ export function DesktopLayout(props: {
     return () => {
       if (unlisten) void unlisten();
     };
-  }, [updateSetting]);
+  }, []);
 
   useEffect(() => {
     if (!hasTauriInternals()) return;
@@ -421,6 +427,36 @@ export function DesktopLayout(props: {
       void mainWindow.show().catch(() => undefined);
       void mainWindow.unminimize().catch(() => undefined);
       void mainWindow.setFocus().catch(() => undefined);
+    }).then((listener) => {
+      unlisten = listener;
+    });
+
+    return () => {
+      if (unlisten) void unlisten();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!hasTauriInternals()) return;
+    let unlisten: UnlistenFn | null = null;
+    void listen<CloudFolderBotChatVisibility>(cloudFolderBotChatVisibilityEvent, (event) => {
+      void setCloudFolderBotWindowVisible(!event.payload.visible);
+    }).then((listener) => {
+      unlisten = listener;
+    });
+
+    return () => {
+      if (unlisten) void unlisten();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!hasTauriInternals()) return;
+    let unlisten: UnlistenFn | null = null;
+    void listen(cloudFolderBotOpenAssistantEvent, () => {
+      void openCloudFolderBotChatWindow().catch(() => {
+        void publishCloudFolderBotChatVisibility(false);
+      });
     }).then((listener) => {
       unlisten = listener;
     });
