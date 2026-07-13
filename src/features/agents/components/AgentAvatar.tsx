@@ -16,9 +16,14 @@ export function AgentAvatar({ agent, large = false }: { agent?: AgentProfile; la
 
 export function AgentCloudImage({ variant }: { variant: (typeof agentCloudVariants)[number] }) {
   return (
-    <picture className="agent-cloud-image">
-      <source media="(prefers-reduced-motion: reduce)" srcSet={variant.poster} />
-      <img src={variant.src} width={512} height={512} alt="" draggable={false} />
-    </picture>
+    <span
+      className="agent-brand-image"
+      aria-hidden="true"
+      style={{
+        backgroundColor: variant.color,
+        mask: `url("${variant.src}") center / 80% 80% no-repeat`,
+        WebkitMask: `url("${variant.src}") center / 80% 80% no-repeat`,
+      }}
+    />
   );
 }

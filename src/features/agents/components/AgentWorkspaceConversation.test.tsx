@@ -1,15 +1,16 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { MemoryRouter } from "react-router-dom";
 import { useMistyStore } from "@/features/misty/useMistyStore";
+import type { AgentProfile } from "@/shared/contracts";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { initialCompanionPresentation, useCompanionState } from "../companion/companionState";
 import { AgentWorkspaceConversation } from "./AgentWorkspaceConversation";
-import type { AgentProfile } from "@misty/contracts";
-
-vi.mock("@/features/global-search/MistyModelPicker", () => ({ MistyModelPicker: () => null }));
+vi.mock("@/features/global-search/MistyModelPicker", () => ({
+  MistyModelPicker: () => null,
+}));
 vi.mock("./AgentConversationView", () => ({
   AgentConversationView: () => <div>Conversation messages</div>,
 }));
-import { useCompanionState, initialCompanionPresentation } from "../companion/companionState";
 const finishExecutionMock = vi.fn(async () => {});
 vi.mock("@/features/agents/localExecution", () => ({
   finishLocalExecution: () => finishExecutionMock(),
@@ -46,7 +47,10 @@ beforeEach(() => {
       await finishExecutionMock();
       if (control.kind === "mode")
         useCompanionState.setState((s) => ({
-          presentation: { ...s.presentation, mode: control.mode },
+          presentation: {
+            ...s.presentation,
+            mode: control.mode,
+          },
         }));
     },
   });
@@ -68,30 +72,64 @@ beforeEach(() => {
   });
 });
 afterEach(cleanup);
-
 describe("Agents workspace conversations", () => {
   it("uses shared Team/Auto controls and removes the old User/Agent modes", async () => {
     renderWorkspace();
-    expect(screen.queryByRole("radio", { name: "User" })).toBeNull();
-    expect(screen.queryByRole("radio", { name: "Agent" })).toBeNull();
-    expect(screen.getByRole("radio", { name: "Team" }).getAttribute("aria-checked")).toBe("true");
-    fireEvent.click(screen.getByRole("radio", { name: "Auto" }));
+    expect(
+      screen.queryByRole("radio", {
+        name: "User",
+      }),
+    ).toBeNull();
+    expect(
+      screen.queryByRole("radio", {
+        name: "Agent",
+      }),
+    ).toBeNull();
+    expect(
+      screen
+        .getByRole("radio", {
+          name: "Team",
+        })
+        .getAttribute("aria-checked"),
+    ).toBe("true");
+    fireEvent.click(
+      screen.getByRole("radio", {
+        name: "Auto",
+      }),
+    );
     await waitFor(() => expect(useCompanionState.getState().presentation.mode).toBe("auto"));
     expect(finishExecutionMock).toHaveBeenCalledOnce();
-    const auto = screen.getByRole("radio", { name: "Auto" });
+    const auto = screen.getByRole("radio", {
+      name: "Auto",
+    });
     expect(auto.tabIndex).toBe(0);
-    expect(screen.getByRole("radio", { name: "Team" }).tabIndex).toBe(-1);
-    fireEvent.keyDown(auto, { key: "ArrowLeft" });
+    expect(
+      screen.getByRole("radio", {
+        name: "Team",
+      }).tabIndex,
+    ).toBe(-1);
+    fireEvent.keyDown(auto, {
+      key: "ArrowLeft",
+    });
     await waitFor(() => expect(useCompanionState.getState().presentation.mode).toBe("team"));
-    expect(document.activeElement).toBe(screen.getByRole("radio", { name: "Team" }));
+    expect(document.activeElement).toBe(
+      screen.getByRole("radio", {
+        name: "Team",
+      }),
+    );
   });
-
   it("submits to the displayed agent without binding its conversation to a Space", async () => {
     renderWorkspace();
     fireEvent.change(screen.getByLabelText("Message Misty"), {
-      target: { value: "Draft a launch note" },
+      target: {
+        value: "Draft a launch note",
+      },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Send to Misty" }));
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Send to Misty",
+      }),
+    );
     await waitFor(() => expect(submit).toHaveBeenCalledOnce());
     expect(useMistyStore.getState()).toMatchObject({
       selectedAgentId: "writer",
@@ -107,19 +145,31 @@ describe("Agents workspace conversations", () => {
         conversationId: "",
         context: [],
       },
-      { executionMode: "agent", interactionMode: "team", model: "" },
+      {
+        executionMode: "agent",
+        interactionMode: "team",
+        model: "",
+      },
     );
     expect((screen.getByLabelText("Message Misty") as HTMLTextAreaElement).value).toBe("");
   });
   it("keeps a failed draft available to retry", async () => {
     submit.mockImplementationOnce(async () => {
-      useMistyStore.setState({ error: "Connection interrupted" });
+      useMistyStore.setState({
+        error: "Connection interrupted",
+      });
     });
     renderWorkspace();
     fireEvent.change(screen.getByLabelText("Message Misty"), {
-      target: { value: "Keep this draft" },
+      target: {
+        value: "Keep this draft",
+      },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Send to Misty" }));
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Send to Misty",
+      }),
+    );
     await waitFor(() =>
       expect(screen.getByRole("alert").textContent).toContain("Connection interrupted"),
     );
@@ -129,19 +179,36 @@ describe("Agents workspace conversations", () => {
   });
   it("puts a starter into the composer for review before sending", () => {
     renderWorkspace();
-    fireEvent.click(screen.getByRole("button", { name: "Plan my next steps" }));
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Plan my next steps",
+      }),
+    );
     expect((screen.getByLabelText("Message Misty") as HTMLTextAreaElement).value).toContain(
       "practical plan",
     );
     expect(submit).not.toHaveBeenCalled();
   });
   it("does not send to a disabled agent", () => {
-    renderWorkspace({ ...agent, enabled: false });
-    fireEvent.change(screen.getByLabelText("Message Misty"), { target: { value: "Hello" } });
-    fireEvent.keyDown(screen.getByLabelText("Message Misty"), { key: "Enter" });
+    renderWorkspace({
+      ...agent,
+      enabled: false,
+    });
+    fireEvent.change(screen.getByLabelText("Message Misty"), {
+      target: {
+        value: "Hello",
+      },
+    });
+    fireEvent.keyDown(screen.getByLabelText("Message Misty"), {
+      key: "Enter",
+    });
     expect(submit).not.toHaveBeenCalled();
     expect(
-      (screen.getByRole("button", { name: "Send to Misty" }) as HTMLButtonElement).disabled,
+      (
+        screen.getByRole("button", {
+          name: "Send to Misty",
+        }) as HTMLButtonElement
+      ).disabled,
     ).toBe(true);
   });
 });

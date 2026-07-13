@@ -1,17 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { agentCloudVariants } from "./agentCloudAvatars";
-describe("bundled cloud sprite transport", () => {
-  it.each(agentCloudVariants)(
-    "embeds $name animation and reduced-motion poster without a separate asset request",
-    (variant) => {
-      for (const source of [variant.src, variant.poster]) {
-        expect(source).toMatch(/^data:image\/webp;base64,/);
-        const bytes = atob(source.split(",")[1]);
-        expect(bytes.slice(0, 4)).toBe("RIFF");
-        expect(bytes.slice(8, 12)).toBe("WEBP");
-      }
-      expect(atob(variant.src.split(",")[1])).toContain("ANIM");
-      expect(atob(variant.poster.split(",")[1])).not.toContain("ANIM");
-    },
-  );
+
+describe("bundled Misty mark transport", () => {
+  it.each(agentCloudVariants)("embeds $name without a separate asset request", (variant) => {
+    expect(variant.src).toMatch(/^data:image\/png;base64,/);
+    const bytes = atob(variant.src.split(",")[1]);
+    expect(Array.from(bytes.slice(0, 8), (byte) => byte.charCodeAt(0))).toEqual([
+      137, 80, 78, 71, 13, 10, 26, 10,
+    ]);
+  });
 });

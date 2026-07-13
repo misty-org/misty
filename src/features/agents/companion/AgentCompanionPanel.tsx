@@ -1,11 +1,11 @@
-import { useState } from "react";
-import { MousePointer2, Square } from "lucide-react";
-import { Button } from "@/shared/ui";
-import { hasTauriInternals } from "@/shared/platform/tauri";
+import sprite from "@/assets/branding/misty-icon.png?inline";
 import { useMistyStore } from "@/features/misty/useMistyStore";
-import sprite from "@/shared/assets/misty-cloud-expression-cycle.webp?inline";
-import { companionControl, useCompanionState, type CompanionControl } from "./companionState";
+import { hasTauriInternals } from "@/shared/platform/tauri";
+import { Button } from "@/shared/ui";
+import { MousePointer2, Square } from "lucide-react";
+import { useState } from "react";
 import "./agentCompanionPanel.css";
+import { companionControl, useCompanionState, type CompanionControl } from "./companionState";
 export function AgentCompanionPanel() {
   const { presentation: state, control } = useCompanionState();
   const working = useMistyStore((s) => s.working);
@@ -47,14 +47,27 @@ export function AgentCompanionPanel() {
             size="sm"
             aria-pressed={state.showCompanion ?? true}
             disabled={!control}
-            onClick={() => act({ kind: "visibility", visible: !state.showCompanion })}
+            onClick={() =>
+              act({
+                kind: "visibility",
+                visible: !state.showCompanion,
+              })
+            }
           >
             <MousePointer2 size={14} />
             {state.showCompanion ? "Cursor on" : "Cursor off"}
           </Button>
         )}
         {(working || state.phase !== "idle") && (
-          <Button variant="ghost" size="sm" onClick={() => act({ kind: "stop" })}>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() =>
+              act({
+                kind: "stop",
+              })
+            }
+          >
             <Square size={13} />
             Stop
           </Button>
@@ -90,10 +103,18 @@ export function AgentCompanionPanel() {
                 event.currentTarget.parentElement
                   ?.querySelector<HTMLButtonElement>(`[data-companion-mode="${next}"]`)
                   ?.focus();
-                act({ kind: "mode", mode: next });
+                act({
+                  kind: "mode",
+                  mode: next,
+                });
               }}
               disabled={!control}
-              onClick={() => act({ kind: "mode", mode })}
+              onClick={() =>
+                act({
+                  kind: "mode",
+                  mode,
+                })
+              }
             >
               {mode === "team" ? "Team" : "Auto"}
             </Button>
@@ -119,7 +140,12 @@ export function AgentCompanionPanel() {
             aria-label="Companion model"
             value={state.model}
             disabled={!control}
-            onChange={(e) => act({ kind: "model", model: e.target.value })}
+            onChange={(e) =>
+              act({
+                kind: "model",
+                model: e.target.value,
+              })
+            }
           >
             <option value="">OpenAI · server default</option>
             {state.models?.map((model) => (
@@ -134,7 +160,15 @@ export function AgentCompanionPanel() {
         <div className="agent-companion-error" role="alert">
           <p>{error || state.error}</p>
           {desktop && (
-            <Button variant="ghost" size="sm" onClick={() => act({ kind: "retry" })}>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() =>
+                act({
+                  kind: "retry",
+                })
+              }
+            >
               Retry companion
             </Button>
           )}
