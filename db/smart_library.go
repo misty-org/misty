@@ -56,8 +56,10 @@ type SmartLibraryAssetResult struct {
 }
 
 type SmartLibrarySearchHit struct {
-	AssetID, Description string
-	Tags, Collections    []string
+	AssetID     string   `json:"assetId"`
+	Description string   `json:"description"`
+	Tags        []string `json:"tags"`
+	Collections []string `json:"suggestedCollections"`
 }
 
 func (db *Database) RegisterSmartLibraryFolder(userID, clientID, source string) (*SmartLibraryFolder, error) {
@@ -122,13 +124,23 @@ func (db *Database) CreateSmartLibrarySample(userID, folderID string, candidates
 		return nil, err
 	}
 	defer tx.Rollback()
+	var existingSample int
+	if err = tx.QueryRow(`SELECT COUNT(*) FROM smart_library_assets WHERE folder_id=$1 AND sample_eligible=TRUE`, folderID).Scan(&existingSample); err != nil {
+		return nil, err
+	}
 	ids := make([]string, 0, len(candidates))
 	for _, candidate := range candidates {
 		if candidate.AssetID == "" || candidate.Fingerprint == "" {
 			return nil, errors.New("invalid smart library candidate")
 		}
-		_, err = tx.Exec(`INSERT INTO smart_library_assets(folder_id,asset_id,fingerprint,extension,size_bytes,modified_bucket) VALUES($1,$2,$3,$4,$5,$6)
-			ON CONFLICT(folder_id,asset_id) DO UPDATE SET fingerprint=excluded.fingerprint,extension=excluded.extension,size_bytes=excluded.size_bytes,modified_bucket=excluded.modified_bucket,updated_at=NOW()`,
+		if existingSample > 0 {
+			var eligible bool
+			if err = tx.QueryRow(`SELECT sample_eligible FROM smart_library_assets WHERE folder_id=$1 AND asset_id=$2`, folderID, candidate.AssetID).Scan(&eligible); err != nil || !eligible {
+				return nil, errors.New("the included sample is already fixed")
+			}
+		}
+		_, err = tx.Exec(`INSERT INTO smart_library_assets(folder_id,asset_id,fingerprint,extension,size_bytes,modified_bucket,sample_eligible) VALUES($1,$2,$3,$4,$5,$6,TRUE)
+			ON CONFLICT(folder_id,asset_id) DO UPDATE SET fingerprint=excluded.fingerprint,extension=excluded.extension,size_bytes=excluded.size_bytes,modified_bucket=excluded.modified_bucket,sample_eligible=TRUE,updated_at=NOW()`,
 			folderID, candidate.AssetID, candidate.Fingerprint, candidate.Extension, candidate.SizeBytes, candidate.ModifiedBucket)
 		if err != nil {
 			return nil, err
@@ -172,6 +184,9 @@ func (db *Database) SmartLibraryResults(userID, folderID string, after int64) ([
 }
 
 func (db *Database) CreateSmartLibraryBatch(userID, folderID, kind string, previews []SmartLibraryPreviewRef) (*SmartLibraryBatch, error) {
+	if kind != "sample" && kind != "full" {
+		return nil, errors.New("invalid smart library batch kind")
+	}
 	tx, err := db.Conn.Begin()
 	if err != nil {
 		return nil, err
@@ -183,20 +198,32 @@ func (db *Database) CreateSmartLibraryBatch(userID, folderID, kind string, previ
 	} else if err != nil {
 		return nil, err
 	}
-	if successful+len(previews) > 500 {
-		return nil, ErrSmartLibraryLimit
-	}
 	ids := make([]string, 0, len(previews))
+	newPotential := 0
 	for _, preview := range previews {
-		result, err := tx.Exec(`UPDATE smart_library_assets SET status='processing',failure_code=NULL,updated_at=NOW() WHERE folder_id=$1 AND asset_id=$2 AND fingerprint=$3 AND status IN ('pending','failed')`, folderID, preview.AssetID, preview.Fingerprint)
-		if err != nil {
+		var counted bool
+		var row *sql.Row
+		if kind == "sample" {
+			row = tx.QueryRow(`UPDATE smart_library_assets SET status='processing',failure_code=NULL,updated_at=NOW() WHERE folder_id=$1 AND asset_id=$2 AND fingerprint=$3 AND sample_eligible=TRUE AND status IN ('pending','failed') RETURNING counted_success`, folderID, preview.AssetID, preview.Fingerprint)
+		} else {
+			row = tx.QueryRow(`INSERT INTO smart_library_assets(folder_id,asset_id,fingerprint,extension,size_bytes,modified_bucket,status) VALUES($1,$2,$3,'',0,0,'processing')
+				ON CONFLICT(folder_id,asset_id) DO UPDATE SET fingerprint=excluded.fingerprint,status='processing',failure_code=NULL,updated_at=NOW()
+				WHERE (smart_library_assets.status IN ('pending','failed') AND (NOT smart_library_assets.sample_eligible OR smart_library_assets.counted_success)) OR (smart_library_assets.status='analyzed' AND smart_library_assets.fingerprint<>excluded.fingerprint)
+				RETURNING counted_success`, folderID, preview.AssetID, preview.Fingerprint)
+		}
+		err := row.Scan(&counted)
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, errors.New("preview does not match an eligible asset")
+		} else if err != nil {
 			return nil, err
 		}
-		count, _ := result.RowsAffected()
-		if count != 1 {
-			return nil, errors.New("preview does not match an eligible asset")
+		if !counted {
+			newPotential++
 		}
 		ids = append(ids, preview.AssetID)
+	}
+	if successful+newPotential > 500 {
+		return nil, ErrSmartLibraryLimit
 	}
 	encoded, _ := json.Marshal(ids)
 	batch := &SmartLibraryBatch{ID: "slbatch_" + uuid.NewString(), Kind: kind, Status: "processing", AssetIDs: ids}
@@ -259,6 +286,7 @@ func (db *Database) CompleteSmartLibraryBatch(userID, batchID string, completion
 		allowed[id] = true
 	}
 	seen := make(map[string]bool, len(ids))
+	newSuccesses := 0
 	for _, completion := range completions {
 		if !allowed[completion.AssetID] || seen[completion.AssetID] {
 			return nil, errors.New("analysis returned an unexpected asset")
@@ -266,13 +294,20 @@ func (db *Database) CompleteSmartLibraryBatch(userID, batchID string, completion
 		seen[completion.AssetID] = true
 		tags, _ := json.Marshal(completion.Tags)
 		collections, _ := json.Marshal(completion.Collections)
-		result, err := tx.Exec(`UPDATE smart_library_assets SET status='analyzed',description=$1,tags=$2,collections=$3,confidence=$4,failure_code=NULL,model=$5,result_sequence=nextval('smart_library_result_sequence'),analyzed_at=NOW(),updated_at=NOW() WHERE folder_id=$6 AND asset_id=$7 AND status='processing'`, completion.Description, tags, collections, completion.Confidence, completion.Model, folderID, completion.AssetID)
+		var wasCounted bool
+		if err := tx.QueryRow(`SELECT counted_success FROM smart_library_assets WHERE folder_id=$1 AND asset_id=$2 AND status='processing' FOR UPDATE`, folderID, completion.AssetID).Scan(&wasCounted); err != nil {
+			return nil, err
+		}
+		result, err := tx.Exec(`UPDATE smart_library_assets SET status='analyzed',counted_success=TRUE,description=$1,tags=$2,collections=$3,confidence=$4,failure_code=NULL,model=$5,result_sequence=nextval('smart_library_result_sequence'),analyzed_at=NOW(),updated_at=NOW() WHERE folder_id=$6 AND asset_id=$7 AND status='processing'`, completion.Description, tags, collections, completion.Confidence, completion.Model, folderID, completion.AssetID)
 		if err != nil {
 			return nil, err
 		}
 		count, _ := result.RowsAffected()
 		if count != 1 {
 			return nil, errors.New("analysis asset is no longer processing")
+		}
+		if !wasCounted {
+			newSuccesses++
 		}
 	}
 	for id, code := range failures {
@@ -306,7 +341,7 @@ func (db *Database) CompleteSmartLibraryBatch(userID, batchID string, completion
 			state = "sample_review"
 		}
 	}
-	result, err := tx.Exec(`UPDATE smart_library_folders SET state=$1,successful_images=successful_images+$2,failed_images=failed_images+$3,updated_at=NOW() WHERE id=$4 AND successful_images+$2<=500`, state, len(completions), len(failures), folderID)
+	result, err := tx.Exec(`UPDATE smart_library_folders SET state=$1,successful_images=successful_images+$2,failed_images=(SELECT COUNT(*) FROM smart_library_assets WHERE folder_id=$3 AND status='failed'),updated_at=NOW() WHERE id=$3 AND successful_images+$2<=500`, state, newSuccesses, folderID)
 	if err != nil {
 		return nil, err
 	}
@@ -345,6 +380,11 @@ func (db *Database) SearchSmartLibrary(userID, folderID, query string, limit int
 	return hits, rows.Err()
 }
 
+func (db *Database) RecordSmartLibraryCostEvent(userID, folderID, batchID, model string, batchSize int, inputTokens, outputTokens int64, success bool) error {
+	_, err := db.Conn.Exec(`INSERT INTO smart_library_cost_events(user_id,folder_id,batch_id,model,batch_size,input_tokens,output_tokens,success) VALUES($1,$2,$3,$4,$5,$6,$7,$8)`, userID, folderID, batchID, model, batchSize, inputTokens, outputTokens, success)
+	return err
+}
+
 func (db *Database) SmartLibraryBatches(userID, folderID string) ([]SmartLibraryBatch, error) {
 	if _, err := db.SmartLibraryFolder(userID, folderID); err != nil {
 		return nil, err
@@ -367,8 +407,49 @@ func (db *Database) SmartLibraryBatches(userID, folderID string) ([]SmartLibrary
 	return batches, rows.Err()
 }
 
+func (db *Database) SmartLibrarySampleAssetIDs(userID, folderID string) ([]string, error) {
+	if _, err := db.SmartLibraryFolder(userID, folderID); err != nil {
+		return nil, err
+	}
+	rows, err := db.Conn.Query(`SELECT asset_id FROM smart_library_assets WHERE folder_id=$1 AND sample_eligible=TRUE ORDER BY asset_id`, folderID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	ids := []string{}
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
+}
+
+func (db *Database) RecoverStaleSmartLibraryBatches(userID, folderID string) error {
+	tx, err := db.Conn.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if _, err = tx.Exec(`UPDATE smart_library_assets a SET status='pending',updated_at=NOW() FROM smart_library_batches b,smart_library_folders f WHERE b.folder_id=a.folder_id AND f.id=b.folder_id AND f.user_id=$1 AND f.id=$2 AND b.status='processing' AND b.updated_at<NOW()-INTERVAL '15 minutes' AND b.asset_ids ? a.asset_id AND a.status='processing'`, userID, folderID); err != nil {
+		return err
+	}
+	result, err := tx.Exec(`UPDATE smart_library_batches b SET status='failed',updated_at=NOW() FROM smart_library_folders f WHERE f.id=b.folder_id AND f.user_id=$1 AND f.id=$2 AND b.status='processing' AND b.updated_at<NOW()-INTERVAL '15 minutes'`, userID, folderID)
+	if err != nil {
+		return err
+	}
+	if count, _ := result.RowsAffected(); count > 0 {
+		if _, err = tx.Exec(`UPDATE smart_library_folders SET state=CASE WHEN EXISTS(SELECT 1 FROM smart_library_assets WHERE folder_id=$1 AND status='analyzed') THEN 'sample_review' ELSE 'preflight' END,updated_at=NOW() WHERE id=$1 AND user_id=$2`, folderID, userID); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
 func (db *Database) DeleteSmartLibraryFolder(userID, folderID string) error {
-	result, err := db.Conn.Exec(`UPDATE smart_library_folders SET deleted_at=NOW(),state='deleted',updated_at=NOW() WHERE id=$1 AND user_id=$2 AND deleted_at IS NULL`, folderID, userID)
+	result, err := db.Conn.Exec(`DELETE FROM smart_library_folders WHERE id=$1 AND user_id=$2`, folderID, userID)
 	if err != nil {
 		return err
 	}

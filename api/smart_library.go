@@ -210,6 +210,7 @@ func (s *SmartLibraryService) Approve(kind string) http.HandlerFunc {
 				failures[image.AssetID] = code
 			}
 		}
+		_ = s.database.RecordSmartLibraryCostEvent(userID, folderID, batch.ID, "smart-library-routing", len(images), analysis.Usage.InputTokens, analysis.Usage.OutputTokens, len(analysis.Results) > 0)
 		folder, err := s.database.CompleteSmartLibraryBatch(userID, batch.ID, completions, failures, body.FinalBatch)
 		if err != nil {
 			if reservation != nil {
@@ -229,6 +230,11 @@ func (s *SmartLibraryService) Approve(kind string) http.HandlerFunc {
 			}
 		}
 		batch.Status = "completed"
+		if len(completions) == 0 {
+			batch.Status = "failed"
+		} else if len(failures) > 0 {
+			batch.Status = "partially_failed"
+		}
 		batch.SuccessfulImages = len(completions)
 		batch.FailedImages = len(failures)
 		writeJSON(w, http.StatusOK, progressPayload(folder, []db.SmartLibraryBatch{*batch}))
@@ -241,7 +247,12 @@ func (s *SmartLibraryService) Progress() http.HandlerFunc {
 		if !ok {
 			return
 		}
-		folder, err := s.database.SmartLibraryFolder(userID, chi.URLParam(r, "folderID"))
+		folderID := chi.URLParam(r, "folderID")
+		if err := s.database.RecoverStaleSmartLibraryBatches(userID, folderID); err != nil {
+			http.Error(w, "internal error", 500)
+			return
+		}
+		folder, err := s.database.SmartLibraryFolder(userID, folderID)
 		if !s.writeFolderError(w, err) {
 			return
 		}
@@ -255,6 +266,12 @@ func (s *SmartLibraryService) Progress() http.HandlerFunc {
 			return
 		}
 		payload := progressPayload(folder, batches)
+		sampleAssetIDs, err := s.database.SmartLibrarySampleAssetIDs(userID, folder.ID)
+		if err != nil {
+			http.Error(w, "internal error", 500)
+			return
+		}
+		payload["sampleAssetIds"] = sampleAssetIDs
 		payload["phase"] = phase
 		writeJSON(w, 200, payload)
 	}
@@ -304,7 +321,8 @@ func (s *SmartLibraryService) Rescan() http.HandlerFunc {
 
 func (s *SmartLibraryService) Search() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if _, ok := s.requireUser(w, r); !ok {
+		userID, ok := s.requireUser(w, r)
+		if !ok {
 			return
 		}
 		var body struct {
