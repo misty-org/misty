@@ -58,10 +58,15 @@ use crate::services::providers::{
     ProvidersSnapshot, PublicLinkActionResult, PublicLinkListResult, RcloneConfigPaths,
     RemoteEditDraft, RemoteTestResult, SaveRemoteRequest, VerifyResult, VerifyStartRequest,
 };
-use crate::services::storage::StorageSnapshot;
-use crate::services::storage_runtime::StorageRuntimeSnapshot;
 use crate::services::search::{SearchQueryRequest, SearchResult, SearchScanRequest, SearchStatus};
 use crate::services::settings::{OpenWithAssociation, SaveSettingsRequest, SettingsSnapshot};
+use crate::services::smart_library::{
+    ApplySmartLibraryResultsRequest, FolderLibraryStatus, PrepareSmartLibraryPreviewsRequest,
+    PreparedSmartLibraryPreview, SmartLibraryScanRequest, SmartLibrarySearchRequest,
+    SmartLibrarySnapshot,
+};
+use crate::services::storage::StorageSnapshot;
+use crate::services::storage_runtime::StorageRuntimeSnapshot;
 use crate::services::transfers::{TransferFilter, TransferPage};
 
 #[derive(Debug, Serialize)]
@@ -564,6 +569,63 @@ pub async fn explorer_library_set_tags(
     state: State<'_, MistyRuntime>,
 ) -> ApiResult<ExplorerLibrarySnapshot> {
     state.explorer_library.set_tags(request).await
+}
+
+#[tauri::command]
+pub async fn smart_library_snapshot(
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<SmartLibrarySnapshot> {
+    state.smart_library.snapshot().await
+}
+
+#[tauri::command]
+pub async fn smart_library_scan(
+    request: SmartLibraryScanRequest,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<FolderLibraryStatus> {
+    state.smart_library.scan(request).await
+}
+
+#[tauri::command]
+pub async fn smart_library_prepare_previews(
+    request: PrepareSmartLibraryPreviewsRequest,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<Vec<PreparedSmartLibraryPreview>> {
+    state.smart_library.prepare_previews(request).await
+}
+
+#[tauri::command]
+pub async fn smart_library_apply_results(
+    request: ApplySmartLibraryResultsRequest,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<SmartLibrarySnapshot> {
+    state.smart_library.apply_results(request).await
+}
+
+#[tauri::command]
+pub async fn smart_library_set_server_folder_id(
+    server_folder_id: String,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<SmartLibrarySnapshot> {
+    state
+        .smart_library
+        .set_server_folder_id(server_folder_id)
+        .await
+}
+
+#[tauri::command]
+pub async fn smart_library_search(
+    request: SmartLibrarySearchRequest,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<Vec<crate::services::smart_library::SmartLibraryAsset>> {
+    state.smart_library.search(request).await
+}
+
+#[tauri::command]
+pub async fn smart_library_delete(
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<SmartLibrarySnapshot> {
+    state.smart_library.delete().await
 }
 
 #[tauri::command]

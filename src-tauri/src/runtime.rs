@@ -3,18 +3,18 @@ use std::{path::PathBuf, sync::Arc};
 use crate::core::clipboard::ClipboardService;
 use crate::core::file_sync::FileSyncPairStore;
 #[cfg(desktop)]
-use crate::services::plugin_commands::PluginCommandService;
-#[cfg(desktop)]
 use crate::services::extension_runtime::ExtensionRuntimeService;
+#[cfg(desktop)]
+use crate::services::plugin_commands::PluginCommandService;
 use crate::services::{
     ai::AiService, automations::AutomationService, claude::ClaudeService, commands::CommandService,
     devices::DeviceService, directory_size::DirectorySizeService,
     environment::AppEnvironmentService, explorer::ExplorerService,
     explorer_library::ExplorerLibraryService, file_sync::FileSyncService,
     metadata::MetadataService, operation_queue::OperationQueueService,
-    power_pack::PowerPackService, providers::ProviderService, storage::StorageService,
-    storage_runtime::StorageRuntimeService,
-    search::SearchService, settings::SettingsService, transfers::TransferService,
+    power_pack::PowerPackService, providers::ProviderService, search::SearchService,
+    settings::SettingsService, smart_library::SmartLibraryService, storage::StorageService,
+    storage_runtime::StorageRuntimeService, transfers::TransferService,
     workspaces::WorkspaceService,
 };
 
@@ -40,6 +40,7 @@ pub struct MistyRuntime {
     pub search: SearchService,
     pub explorer: ExplorerService,
     pub explorer_library: ExplorerLibraryService,
+    pub smart_library: SmartLibraryService,
     pub workspaces: WorkspaceService,
     pub operation_queue: OperationQueueService,
     pub automations: AutomationService,
@@ -82,6 +83,7 @@ impl MistyRuntime {
             transfers.clone(),
             explorer_library.clone(),
         );
+        let smart_library = SmartLibraryService::new(environment.clone(), explorer.clone());
         let operation_queue = OperationQueueService::new(explorer.clone(), transfers.clone());
         let power_pack = PowerPackService::new(
             environment.clone(),
@@ -121,6 +123,7 @@ impl MistyRuntime {
             search,
             explorer,
             explorer_library,
+            smart_library,
             workspaces,
             operation_queue,
             automations,

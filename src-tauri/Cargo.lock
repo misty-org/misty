@@ -2930,6 +2930,7 @@ dependencies = [
  "base64 0.22.1",
  "chrono",
  "cocoa",
+ "core-graphics 0.24.0",
  "dirs",
  "hex",
  "image",

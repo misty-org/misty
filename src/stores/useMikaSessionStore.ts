@@ -205,6 +205,8 @@ export const useMikaSessionStore = create<AiSessionStore>((set, get) => ({
   sendPrompt: async ({ displayPrompt, prompt, cwd, selectedPaths }) => {
     const trimmed = displayPrompt.trim();
     if (!trimmed || get().status?.running) return;
+    const settingsStore = useSettingsStore.getState();
+    if (!settingsStore.loaded) await settingsStore.load();
     const preferences = selectAssistantPreferences(useSettingsStore.getState().settings?.document);
     if (!preferences.enabled) {
       appendBlockedRequest(set, trimmed, "Mika is disabled. Enable Mika in Settings > Assistant to continue.");

@@ -391,6 +391,105 @@ export interface SetExplorerTagsRequest {
   comments?: string;
 }
 
+export type SmartLibrarySourceKind = "local" | "cloud";
+export type SmartLibraryAssetStatus = "pending" | "queued" | "analyzed" | "failed" | "changed" | "unsupported";
+
+export interface PilotAllowance {
+  sampleImages: number;
+  maximumAnalyzedImages: number;
+  sampleIncluded: boolean;
+  remainingImages: number;
+}
+
+export interface AnalysisEstimate {
+  eligibleImages: number;
+  includedImages: number;
+  billableImages: number;
+  creditUnits: number;
+  priceMinor: number | null;
+  currency: string | null;
+}
+
+export interface FolderPreflight {
+  totalImages: number;
+  supportedImages: number;
+  unsupportedImages: number;
+  alreadyAnalyzedImages: number;
+  changedImages: number;
+  newImages: number;
+  duplicateImages: number;
+  eligibleImages: number;
+  pilotCappedImages: number;
+  skippedFullOriginalImages: number;
+  sampleAssetIds: string[];
+  unsupportedReasons: Record<string, number>;
+  allowance: PilotAllowance;
+  estimate: AnalysisEstimate;
+}
+
+export interface SmartLibraryAsset {
+  assetId: string;
+  relativePath: string;
+  name: string;
+  mimeType: string;
+  extension: string;
+  sizeBytes: number;
+  modifiedMs: number;
+  fingerprint: string;
+  sourceKind: SmartLibrarySourceKind;
+  previewSupported: boolean;
+  unsupportedReason: string | null;
+  status: SmartLibraryAssetStatus;
+  description: string | null;
+  tags: string[];
+  collections: string[];
+  confidence: number | null;
+  failure: string | null;
+}
+
+export interface FolderLibraryStatus {
+  libraryId: string;
+  serverFolderId: string | null;
+  rootPath: string;
+  displayName: string;
+  sourceKind: SmartLibrarySourceKind;
+  createdAtMs: number;
+  lastScannedAtMs: number;
+  preflight: FolderPreflight;
+  assets: SmartLibraryAsset[];
+}
+
+export interface SmartLibrarySnapshot {
+  activeLibrary: FolderLibraryStatus | null;
+}
+
+export interface PreparedSmartLibraryPreview {
+  assetId: string;
+  fingerprint: string;
+  mimeType: string;
+  bytes: number[];
+  width: number;
+  height: number;
+}
+
+export interface AnalysisResult {
+  assetId: string;
+  status: "analyzed" | "failed";
+  description?: string | null;
+  tags?: string[];
+  suggestedCollections?: string[];
+  confidence?: number | null;
+  failure?: string | null;
+}
+
+export interface AnalysisBatch {
+  batchId: string;
+  assetIds: string[];
+  status: "pending" | "uploading" | "queued" | "processing" | "completed" | "partially_failed" | "failed";
+  completedImages: number;
+  failedImages: number;
+}
+
 export interface FileMetadataField {
   label: string;
   value: string;

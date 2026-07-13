@@ -13,6 +13,7 @@ import {
   AppWindow,
   ArrowLeftRight,
   Bell,
+  Bot,
   ChevronDown,
   Copy,
   Eye,
@@ -41,6 +42,7 @@ import type {
 } from "../../../api/types";
 import {
   fontLabelFromPath,
+  selectAssistantPreferences,
   selectCustomFontPreferences,
   useSettingsStore,
   type CustomFontPreference,
@@ -69,7 +71,7 @@ type SettingsSection =
   | "notifications"
   | "shortcuts"
   | "advanced";
-type SettingValue = string | number | boolean | Array<Record<string, unknown>>;
+type SettingValue = string | number | boolean | Record<string, unknown> | Array<Record<string, unknown>>;
 
 interface NavItem {
   id: SettingsSection;
@@ -80,6 +82,7 @@ interface NavItem {
 const appNavItems: NavItem[] = [
   { id: "general", label: "General", icon: Rows3 },
   { id: "app", label: "App", icon: AppWindow },
+  { id: "assistant", label: "Assistant", icon: Bot },
   { id: "appearance", label: "Appearance", icon: Eye },
   { id: "privacy", label: "Privacy", icon: Lock },
   { id: "sync", label: "Sync", icon: RefreshCcw },
@@ -320,6 +323,9 @@ function SettingsContent(props: {
         {props.activeSection === "app" ? (
           <AppSettings {...props.controlProps} />
         ) : null}
+        {props.activeSection === "assistant" ? (
+          <AssistantSettings {...props.controlProps} />
+        ) : null}
         {props.activeSection === "appearance" ? (
           <AppearanceSettings {...props.controlProps} />
         ) : null}
@@ -539,6 +545,87 @@ function AppSettings(props: SettingsContentProps) {
       </SettingsSectionBlock>
     </>
   );
+}
+
+function AssistantSettings(props: SettingsContentProps) {
+  const assistant = selectAssistantPreferences(props.document);
+  const updateScope = (
+    key: "files_allowed" | "cleanup_allowed" | "search_allowed",
+    value: boolean,
+  ) => {
+    props.onSettingChange(
+      "assistant",
+      "scopes",
+      assistantScopesPayload(assistant, key, value),
+    );
+  };
+
+  return (
+    <>
+      <SettingsSectionBlock title="Mika">
+        <SettingsRow
+          label="Enable Mika"
+          description="Show Mika and allow the assistant to help with files and folders."
+          last
+        >
+          <SwitchControl
+            checked={assistant.enabled}
+            disabled={props.working}
+            onChange={(value) =>
+              props.onSettingChange("assistant", "enabled", value)
+            }
+          />
+        </SettingsRow>
+      </SettingsSectionBlock>
+
+      <SettingsSectionBlock title="Permissions">
+        <SettingsRow
+          label="Files"
+          description="Allow Mika to inspect and organize files in the active workspace."
+        >
+          <SwitchControl
+            checked={assistant.scopes.filesAllowed}
+            disabled={props.working || !assistant.enabled}
+            onChange={(value) => updateScope("files_allowed", value)}
+          />
+        </SettingsRow>
+        <SettingsRow
+          label="Cleanup"
+          description="Allow Mika to identify clutter and propose cleanup actions."
+        >
+          <SwitchControl
+            checked={assistant.scopes.cleanupAllowed}
+            disabled={props.working || !assistant.enabled}
+            onChange={(value) => updateScope("cleanup_allowed", value)}
+          />
+        </SettingsRow>
+        <SettingsRow
+          label="Search"
+          description="Allow Mika to search indexed files and folders."
+          last
+        >
+          <SwitchControl
+            checked={assistant.scopes.searchAllowed}
+            disabled={props.working || !assistant.enabled}
+            onChange={(value) => updateScope("search_allowed", value)}
+          />
+        </SettingsRow>
+      </SettingsSectionBlock>
+    </>
+  );
+}
+
+function assistantScopesPayload(
+  assistant: ReturnType<typeof selectAssistantPreferences>,
+  key: "files_allowed" | "cleanup_allowed" | "search_allowed",
+  value: boolean,
+): Record<string, unknown> {
+  return {
+    files_allowed: assistant.scopes.filesAllowed,
+    cleanup_allowed: assistant.scopes.cleanupAllowed,
+    search_allowed: assistant.scopes.searchAllowed,
+    [key]: value,
+  };
 }
 
 function AppearanceSettings(props: SettingsContentProps) {
@@ -1782,6 +1869,25 @@ function AdvancedSettings(props: SettingsContentProps) {
 
       <SettingsSectionBlock title="Connection">
         <SettingsRow
+          label="Extension tools PATH"
+          description="Directories Misty searches for tools such as FFmpeg and yt-dlp. Defaults to your macOS login-shell PATH. Enter PATH directories only, separated by colons—not a shell command."
+        >
+          <TextControl
+            value={stringSetting(
+              props.document,
+              "advanced",
+              "extension_tools_path",
+              "",
+            )}
+            placeholder="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
+            disabled={props.working}
+            onCommit={(value) =>
+              props.onSettingChange("advanced", "extension_tools_path", value)
+            }
+            wide
+          />
+        </SettingsRow>
+        <SettingsRow
           label="Server address"
           description="The gRPC address Misty uses for local file operations."
         >
@@ -2261,6 +2367,7 @@ function TextControl(props: {
   placeholder?: string;
   disabled: boolean;
   onCommit: (value: string) => void;
+  wide?: boolean;
 }) {
   const handleCommit = (event: ChangeEvent<HTMLInputElement>) => {
     if (event.currentTarget.value !== props.value) {
@@ -2271,7 +2378,7 @@ function TextControl(props: {
   return (
     <input
       key={props.value}
-      className="h-9 w-[220px] rounded-md border border-white/10 bg-[#050607] px-2.5 text-sm text-[#f4f4f5] outline-none transition focus:border-white/30 disabled:opacity-55"
+      className={`h-9 rounded-md border border-white/10 bg-[#050607] px-2.5 text-sm text-[#f4f4f5] outline-none transition focus:border-white/30 disabled:opacity-55 ${props.wide ? "w-[min(520px,52vw)]" : "w-[220px]"}`}
       defaultValue={props.value}
       placeholder={props.placeholder}
       disabled={props.disabled}

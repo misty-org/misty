@@ -8,6 +8,8 @@ use serde_json::{json, Map, Value};
 
 use crate::error::{ApiError, ApiResult};
 use crate::services::environment::AppEnvironmentService;
+#[cfg(desktop)]
+use crate::services::system_dependencies::detected_login_shell_path;
 
 #[derive(Debug, Clone)]
 pub struct SettingsService {
@@ -167,6 +169,10 @@ fn normalize_settings_document(document: &mut Value) -> bool {
         changed = true;
     }
 
+    #[cfg(desktop)]
+    let default_extension_tools_path = detected_login_shell_path();
+    #[cfg(not(desktop))]
+    let default_extension_tools_path = String::new();
     changed |= ensure_section_defaults(
         root,
         "general",
@@ -315,6 +321,7 @@ fn normalize_settings_document(document: &mut Value) -> bool {
         &[
             ("server_address", json!("localhost:50051")),
             ("mount_path", json!(".misty/mnt")),
+            ("extension_tools_path", json!(default_extension_tools_path)),
             ("confirm_clear_recent", json!(false)),
             ("confirm_clear_starred", json!(false)),
             ("confirm_empty_trash", json!(false)),

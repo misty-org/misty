@@ -47,6 +47,7 @@ proxy/dist/
 *.jpeg
 *.gif
 *.webp
+!src/assets/bots/cloud-folder/mika.webp
 *.avif
 *.ico
 *.icns

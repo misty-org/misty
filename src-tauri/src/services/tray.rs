@@ -144,7 +144,11 @@ fn refresh(app: &AppHandle<Wry>) -> Result<(), String> {
             .unwrap_or_else(|| "Storage: Unavailable".to_owned())
     };
     let rclone_running = runtime.ready;
-    let rclone_label = if rclone_running { "Cloud storage: Ready" } else { "Cloud storage: Unavailable" };
+    let rclone_label = if rclone_running {
+        "Cloud storage: Ready"
+    } else {
+        "Cloud storage: Unavailable"
+    };
 
     tray.app_status_item
         .set_text(&format!("Misty: Running (pid {})", std::process::id()))

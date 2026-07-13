@@ -21,8 +21,10 @@ interface MultiPanelWorkspaceProps {
   renderContextHeader?: (tab: MultiPanelTab) => ReactNode;
   renderNavigationAside?: ReactNode;
   onNavigationAsideResizeStart?: (event: PointerEvent<HTMLDivElement>) => void;
+  navigationAsideResizing?: boolean;
   renderAside?: ReactNode;
   onAsideResizeStart?: (event: PointerEvent<HTMLDivElement>) => void;
+  asideResizing?: boolean;
   canCloseTab?: (tab: MultiPanelTab) => boolean;
   onDidCloseTab?: (tab: MultiPanelTab) => void;
   canClosePane?: (paneId: string, tab: MultiPanelTab) => boolean;
@@ -63,13 +65,15 @@ const multiPanelStyles = {
   aside:
     "min-h-0 min-w-0 overflow-hidden max-[980px]:hidden",
   asideResizer:
-    "group relative grid min-h-0 min-w-0 cursor-col-resize place-items-center bg-transparent after:absolute after:bottom-0 after:left-1/2 after:top-0 after:w-px after:-translate-x-1/2 after:bg-[var(--misty-border-soft)] after:content-[''] hover:after:bg-[var(--misty-border-strong)] max-[980px]:hidden",
+    "relative min-h-0 min-w-0 bg-transparent after:pointer-events-none after:absolute after:bottom-0 after:left-1/2 after:top-0 after:w-px after:-translate-x-1/2 after:content-[''] max-[980px]:hidden",
+  asideResizerActive: "after:bg-[var(--misty-border-strong)]",
   navigationAside:
     "min-h-0 min-w-0 overflow-hidden max-[980px]:hidden",
   navigationAsideResizer:
-    "group relative grid min-h-0 min-w-0 cursor-col-resize place-items-center bg-transparent after:absolute after:bottom-0 after:left-1/2 after:top-0 after:w-px after:-translate-x-1/2 after:bg-[var(--misty-border-soft)] after:content-[''] hover:after:bg-[var(--misty-border-strong)] max-[980px]:hidden",
+    "relative min-h-0 min-w-0 bg-transparent after:pointer-events-none after:absolute after:bottom-0 after:left-1/2 after:top-0 after:w-px after:-translate-x-1/2 after:content-[''] max-[980px]:hidden",
   asideResizerGrip:
-    "relative z-[1] rounded bg-[var(--misty-app-page-bg,var(--misty-bg))] py-1 text-[var(--misty-text-subtle)] transition-colors group-hover:text-[var(--misty-text)]",
+    "absolute left-1/2 top-1/2 z-[1] grid size-5 -translate-x-1/2 -translate-y-1/2 cursor-col-resize place-items-center rounded-md bg-[var(--misty-app-page-bg,var(--misty-bg))] text-[var(--misty-text)]",
+  asideResizerGripIcon: "pointer-events-none",
   pane:
     "grid min-h-0 min-w-0 grid-rows-[minmax(0,1fr)] overflow-hidden bg-transparent [container-type:inline-size]",
   paneActive: "",
@@ -85,6 +89,8 @@ export const MultiPanelWorkspace = memo(function MultiPanelWorkspace(props: Mult
     canClosePane,
     canCloseTab,
     className,
+    asideResizing = false,
+    navigationAsideResizing = false,
     onAsideResizeStart,
     onNavigationAsideResizeStart,
     onDidClosePane,
@@ -254,13 +260,14 @@ export const MultiPanelWorkspace = memo(function MultiPanelWorkspace(props: Mult
           <>
             <div className={multiPanelStyles.navigationAside}>{renderNavigationAside}</div>
             <div
-              className={multiPanelStyles.navigationAsideResizer}
-              onPointerDown={onNavigationAsideResizeStart}
+              className={`${multiPanelStyles.navigationAsideResizer} ${navigationAsideResizing ? multiPanelStyles.asideResizerActive : ""}`}
               role="separator"
               aria-label="Resize file explorer sidebar"
               aria-orientation="vertical"
             >
-              <GripVertical className={multiPanelStyles.asideResizerGrip} size={14} aria-hidden="true" />
+              <div className={multiPanelStyles.asideResizerGrip} onPointerDown={onNavigationAsideResizeStart}>
+                <GripVertical className={multiPanelStyles.asideResizerGripIcon} size={18} aria-hidden="true" />
+              </div>
             </div>
           </>
         ) : null}
@@ -319,13 +326,14 @@ export const MultiPanelWorkspace = memo(function MultiPanelWorkspace(props: Mult
         {renderAside ? (
           <>
             <div
-              className={multiPanelStyles.asideResizer}
-              onPointerDown={onAsideResizeStart}
+              className={`${multiPanelStyles.asideResizer} ${asideResizing ? multiPanelStyles.asideResizerActive : ""}`}
               role="separator"
               aria-label="Resize preview panel"
               aria-orientation="vertical"
             >
-              <GripVertical className={multiPanelStyles.asideResizerGrip} size={14} aria-hidden="true" />
+              <div className={multiPanelStyles.asideResizerGrip} onPointerDown={onAsideResizeStart}>
+                <GripVertical className={multiPanelStyles.asideResizerGripIcon} size={18} aria-hidden="true" />
+              </div>
             </div>
             <aside className={multiPanelStyles.aside}>{renderAside}</aside>
           </>

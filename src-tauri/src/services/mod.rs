@@ -24,8 +24,11 @@ pub mod power_pack;
 pub mod providers;
 pub mod search;
 pub mod settings;
+pub mod smart_library;
 pub mod storage;
 pub mod storage_runtime;
+#[cfg(desktop)]
+pub mod system_dependencies;
 pub mod transfers;
 #[cfg(desktop)]
 pub mod tray;

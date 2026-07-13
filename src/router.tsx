@@ -13,6 +13,7 @@ import ExtensionsPage from "./pages/Extensions";
 import FilesPage from "./pages/Files";
 import HomePage from "./pages/Home";
 import CloudFolderBotOverlay from "./pages/BotOverlay/CloudFolderBotOverlay";
+import CloudFolderBotChatOverlay from "./pages/BotOverlay/CloudFolderBotChatOverlay";
 import ProvidersPage from "./pages/Providers";
 import RegisterPage from "./pages/Register";
 import SettingsPage from "./pages/Settings";
@@ -138,6 +139,7 @@ export const router = createBrowserRouter([
     ),
     children: [
       { path: "bot/cloud-folder", element: <CloudFolderBotOverlay /> },
+      { path: "bot/cloud-folder-chat", element: <CloudFolderBotChatOverlay /> },
       { path: "pet/cloud-folder", element: <Navigate to={routes.cloudFolderBot} replace /> },
       {
         element: <AppFrameLayout />,

@@ -1123,7 +1123,9 @@ fn remove_standard_rclone_config_remote(name: &str) -> ApiResult<bool> {
         return Ok(false);
     }
     fs::write(&path, updated).map_err(|error| {
-        ApiError::Message(format!("Failed to update external storage configuration: {error}"))
+        ApiError::Message(format!(
+            "Failed to update external storage configuration: {error}"
+        ))
     })?;
     Ok(true)
 }
@@ -1320,7 +1322,9 @@ fn ensure_rclone_oauth_callback_template() -> ApiResult<Option<PathBuf>> {
     let current = fs::read_to_string(&path).unwrap_or_default();
     if current != RCLONE_OAUTH_CALLBACK_TEMPLATE {
         fs::write(&path, RCLONE_OAUTH_CALLBACK_TEMPLATE).map_err(|error| {
-            ApiError::Message(format!("Failed to write authorization callback template: {error}"))
+            ApiError::Message(format!(
+                "Failed to write authorization callback template: {error}"
+            ))
         })?;
     }
     Ok(Some(path))
@@ -1333,12 +1337,63 @@ fn default_provider_workflows() -> Vec<ProviderWorkflow> {
             "Google Drive",
             "Google Drive for personal, Workspace, Shared Drive, and service-account storage.",
             vec![
-                ProviderWorkflowOption { name: "scope".into(), label: "Access scope".into(), help: "Choose the Google Drive access granted to Misty.".into(), default_value: "drive".into(), required: true, password: false, choices: vec![ProviderWorkflowChoice { value: "drive".into(), help: "Full Google Drive access".into() }] },
-                ProviderWorkflowOption { name: "team_drive".into(), label: "Shared Drive ID".into(), help: "Advanced: connect a specific Shared Drive.".into(), default_value: String::new(), required: false, password: false, choices: vec![] },
-                ProviderWorkflowOption { name: "root_folder_id".into(), label: "Root folder ID".into(), help: "Advanced: limit this connection to a folder.".into(), default_value: String::new(), required: false, password: false, choices: vec![] },
-                ProviderWorkflowOption { name: "service_account_file".into(), label: "Service account file".into(), help: "Advanced: use Workspace service-account credentials.".into(), default_value: String::new(), required: false, password: false, choices: vec![] },
-                ProviderWorkflowOption { name: "client_id".into(), label: "OAuth client ID".into(), help: "Advanced: use your own Google OAuth application.".into(), default_value: String::new(), required: false, password: false, choices: vec![] },
-                ProviderWorkflowOption { name: "client_secret".into(), label: "OAuth client secret".into(), help: "Advanced: secret for the custom OAuth application.".into(), default_value: String::new(), required: false, password: true, choices: vec![] },
+                ProviderWorkflowOption {
+                    name: "scope".into(),
+                    label: "Access scope".into(),
+                    help: "Choose the Google Drive access granted to Misty.".into(),
+                    default_value: "drive".into(),
+                    required: true,
+                    password: false,
+                    choices: vec![ProviderWorkflowChoice {
+                        value: "drive".into(),
+                        help: "Full Google Drive access".into(),
+                    }],
+                },
+                ProviderWorkflowOption {
+                    name: "team_drive".into(),
+                    label: "Shared Drive ID".into(),
+                    help: "Advanced: connect a specific Shared Drive.".into(),
+                    default_value: String::new(),
+                    required: false,
+                    password: false,
+                    choices: vec![],
+                },
+                ProviderWorkflowOption {
+                    name: "root_folder_id".into(),
+                    label: "Root folder ID".into(),
+                    help: "Advanced: limit this connection to a folder.".into(),
+                    default_value: String::new(),
+                    required: false,
+                    password: false,
+                    choices: vec![],
+                },
+                ProviderWorkflowOption {
+                    name: "service_account_file".into(),
+                    label: "Service account file".into(),
+                    help: "Advanced: use Workspace service-account credentials.".into(),
+                    default_value: String::new(),
+                    required: false,
+                    password: false,
+                    choices: vec![],
+                },
+                ProviderWorkflowOption {
+                    name: "client_id".into(),
+                    label: "OAuth client ID".into(),
+                    help: "Advanced: use your own Google OAuth application.".into(),
+                    default_value: String::new(),
+                    required: false,
+                    password: false,
+                    choices: vec![],
+                },
+                ProviderWorkflowOption {
+                    name: "client_secret".into(),
+                    label: "OAuth client secret".into(),
+                    help: "Advanced: secret for the custom OAuth application.".into(),
+                    default_value: String::new(),
+                    required: false,
+                    password: true,
+                    choices: vec![],
+                },
             ],
         ),
         provider_workflow(
@@ -1346,11 +1401,60 @@ fn default_provider_workflows() -> Vec<ProviderWorkflow> {
             "Microsoft OneDrive",
             "OneDrive personal, business, SharePoint sites, and document libraries.",
             vec![
-                ProviderWorkflowOption { name: "drive_type".into(), label: "Account type".into(), help: "Personal, business, or SharePoint storage.".into(), default_value: "personal".into(), required: false, password: false, choices: vec![ProviderWorkflowChoice { value: "personal".into(), help: "Personal OneDrive".into() }, ProviderWorkflowChoice { value: "business".into(), help: "Business or SharePoint".into() }] },
-                ProviderWorkflowOption { name: "drive_id".into(), label: "Drive or library ID".into(), help: "Advanced: connect a specific drive or document library.".into(), default_value: String::new(), required: false, password: false, choices: vec![] },
-                ProviderWorkflowOption { name: "root_folder_id".into(), label: "Root folder ID".into(), help: "Advanced: limit this connection to a folder.".into(), default_value: String::new(), required: false, password: false, choices: vec![] },
-                ProviderWorkflowOption { name: "client_id".into(), label: "OAuth client ID".into(), help: "Advanced: use your own Microsoft OAuth application.".into(), default_value: String::new(), required: false, password: false, choices: vec![] },
-                ProviderWorkflowOption { name: "client_secret".into(), label: "OAuth client secret".into(), help: "Advanced: secret for the custom OAuth application.".into(), default_value: String::new(), required: false, password: true, choices: vec![] },
+                ProviderWorkflowOption {
+                    name: "drive_type".into(),
+                    label: "Account type".into(),
+                    help: "Personal, business, or SharePoint storage.".into(),
+                    default_value: "personal".into(),
+                    required: false,
+                    password: false,
+                    choices: vec![
+                        ProviderWorkflowChoice {
+                            value: "personal".into(),
+                            help: "Personal OneDrive".into(),
+                        },
+                        ProviderWorkflowChoice {
+                            value: "business".into(),
+                            help: "Business or SharePoint".into(),
+                        },
+                    ],
+                },
+                ProviderWorkflowOption {
+                    name: "drive_id".into(),
+                    label: "Drive or library ID".into(),
+                    help: "Advanced: connect a specific drive or document library.".into(),
+                    default_value: String::new(),
+                    required: false,
+                    password: false,
+                    choices: vec![],
+                },
+                ProviderWorkflowOption {
+                    name: "root_folder_id".into(),
+                    label: "Root folder ID".into(),
+                    help: "Advanced: limit this connection to a folder.".into(),
+                    default_value: String::new(),
+                    required: false,
+                    password: false,
+                    choices: vec![],
+                },
+                ProviderWorkflowOption {
+                    name: "client_id".into(),
+                    label: "OAuth client ID".into(),
+                    help: "Advanced: use your own Microsoft OAuth application.".into(),
+                    default_value: String::new(),
+                    required: false,
+                    password: false,
+                    choices: vec![],
+                },
+                ProviderWorkflowOption {
+                    name: "client_secret".into(),
+                    label: "OAuth client secret".into(),
+                    help: "Advanced: secret for the custom OAuth application.".into(),
+                    default_value: String::new(),
+                    required: false,
+                    password: true,
+                    choices: vec![],
+                },
             ],
         ),
         provider_workflow(
@@ -1358,9 +1462,33 @@ fn default_provider_workflows() -> Vec<ProviderWorkflow> {
             "Dropbox",
             "Dropbox personal, business, team spaces, and shared namespaces.",
             vec![
-                ProviderWorkflowOption { name: "root_namespace_id".into(), label: "Root namespace ID".into(), help: "Advanced: connect a team-space or shared namespace root.".into(), default_value: String::new(), required: false, password: false, choices: vec![] },
-                ProviderWorkflowOption { name: "client_id".into(), label: "OAuth app key".into(), help: "Advanced: use your own Dropbox OAuth application.".into(), default_value: String::new(), required: false, password: false, choices: vec![] },
-                ProviderWorkflowOption { name: "client_secret".into(), label: "OAuth app secret".into(), help: "Advanced: secret for the custom OAuth application.".into(), default_value: String::new(), required: false, password: true, choices: vec![] },
+                ProviderWorkflowOption {
+                    name: "root_namespace_id".into(),
+                    label: "Root namespace ID".into(),
+                    help: "Advanced: connect a team-space or shared namespace root.".into(),
+                    default_value: String::new(),
+                    required: false,
+                    password: false,
+                    choices: vec![],
+                },
+                ProviderWorkflowOption {
+                    name: "client_id".into(),
+                    label: "OAuth app key".into(),
+                    help: "Advanced: use your own Dropbox OAuth application.".into(),
+                    default_value: String::new(),
+                    required: false,
+                    password: false,
+                    choices: vec![],
+                },
+                ProviderWorkflowOption {
+                    name: "client_secret".into(),
+                    label: "OAuth app secret".into(),
+                    help: "Advanced: secret for the custom OAuth application.".into(),
+                    default_value: String::new(),
+                    required: false,
+                    password: true,
+                    choices: vec![],
+                },
             ],
         ),
     ];
@@ -1992,7 +2120,10 @@ mod tests {
         assert_eq!(drive.options[0].name, "scope");
         assert_eq!(drive.options[0].default_value, "drive");
         assert_eq!(workflows.len(), 3);
-        assert!(workflows.iter().all(|workflow| matches!(workflow.provider_type.as_str(), "drive" | "onedrive" | "dropbox")));
+        assert!(workflows.iter().all(|workflow| matches!(
+            workflow.provider_type.as_str(),
+            "drive" | "onedrive" | "dropbox"
+        )));
     }
 
     #[test]
