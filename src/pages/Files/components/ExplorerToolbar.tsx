@@ -13,7 +13,6 @@ import {
   Folder,
   FolderPlus,
   Grid2X2,
-  Filter,
   List,
   MoreHorizontal,
   Pencil,
@@ -28,7 +27,6 @@ import {
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { CSSProperties, ReactNode } from "react";
-import { searchQuery } from "../../../api/misty";
 import type { PluginCommandEntry, SearchResult } from "../../../api/types";
 import { useMinimumSpin } from "../../../shared/hooks/useMinimumSpin";
 import {
@@ -36,9 +34,11 @@ import {
   fuzzyIncludes,
   OverflowMenuItem,
   paneToolbarActionStyles,
-  searchResultSubtitle,
+  searchResultContext,
+  searchResultSummary,
   toolbarStyles,
 } from "./ExplorerToolbarSupport";
+import { SearchResultThumbnail } from "./SearchResultThumbnail";
 import {
   useExplorerStore,
   type ExplorerCommandQueryMode,
@@ -47,9 +47,16 @@ import {
   type ExplorerViewMode,
 } from "../../../stores/useExplorerStore";
 import { breadcrumbSegments } from "../utils/fileFormat";
-import { mergeLibrarySearchResults } from "../utils/librarySearch";
+import {
+  mergeHybridSearchResults,
+  queryIndexedExplorerSearch,
+  querySemanticExplorerSearch,
+  semanticQueryMinimumCharacters,
+  semanticSearchDebounceMs,
+} from "../utils/globalSearch";
 import { searchResultNavigationTarget } from "../utils/searchNavigation";
 import type { ExplorerSearchNavigationTarget } from "../utils/searchNavigation";
+import { useSearchStore } from "../../../stores/useSearchStore";
 
 export interface ExplorerLocationResult {
   id: string;
@@ -243,9 +250,11 @@ export const ExplorerToolbar = memo(function ExplorerToolbar(props: ExplorerTool
   const [indexedResults, setIndexedResults] = useState<SearchResult[]>([]);
   const [indexedSearching, setIndexedSearching] = useState(false);
   const [indexedError, setIndexedError] = useState<string | null>(null);
+  const indexedNativeResultsRef = useRef<SearchResult[]>([]);
+  const indexedSemanticResultsRef = useRef<SearchResult[]>([]);
   const newMenuPopupRef = useRef<HTMLDivElement | null>(null);
   const newButtonRef = useRef<HTMLButtonElement | null>(null);
-  const commandSearchRef = useRef<HTMLLabelElement | null>(null);
+  const commandSearchRef = useRef<HTMLButtonElement | null>(null);
   const commandInputRef = useRef<HTMLInputElement | null>(null);
   const commandMenuRef = useRef<HTMLDivElement | null>(null);
   const pathInputRef = useRef<HTMLInputElement | null>(null);
@@ -302,6 +311,8 @@ export const ExplorerToolbar = memo(function ExplorerToolbar(props: ExplorerTool
   useEffect(() => {
     let canceled = false;
     const query = locationFilter.trim();
+    indexedNativeResultsRef.current = [];
+    indexedSemanticResultsRef.current = [];
     if (!query) {
       setIndexedResults([]);
       setIndexedSearching(false);
@@ -310,42 +321,54 @@ export const ExplorerToolbar = memo(function ExplorerToolbar(props: ExplorerTool
     }
     setIndexedSearching(true);
     setIndexedError(null);
-    const timer = window.setTimeout(() => {
-      void searchQuery({
+    let nativeError: string | null = null;
+    let nativeFinished = false;
+    let semanticFinished = query.replace(/\s/g, "").length < semanticQueryMinimumCharacters;
+    const publish = () => {
+      if (canceled) return;
+      const results = mergeHybridSearchResults(indexedNativeResultsRef.current, indexedSemanticResultsRef.current, 8);
+      setIndexedResults(results);
+      setIndexedSearching(!nativeFinished || !semanticFinished);
+      setIndexedError(results.length > 0 || !semanticFinished ? null : nativeError);
+    };
+    const nativeTimer = window.setTimeout(() => {
+      void queryIndexedExplorerSearch(
         query,
-        scope: "everything",
-        currentPath: props.path,
-        includeFiles: true,
-        includeDirectories: true,
-        includeHidden: false,
-        limit: 8,
-      })
+        { scope: "everything", currentPath: props.path, limit: 8 },
+        useExplorerStore.getState().library,
+      )
         .then((results) => {
           if (canceled) return;
-          setIndexedResults(mergeLibrarySearchResults(
-            results,
-            useExplorerStore.getState().library,
-            query,
-            { scope: "everything", currentPath: props.path, limit: 8 },
-          ));
-          setIndexedSearching(false);
+          indexedNativeResultsRef.current = results;
+          nativeFinished = true;
+          publish();
         })
         .catch((error: unknown) => {
           if (canceled) return;
-          const results = mergeLibrarySearchResults(
-            [],
-            useExplorerStore.getState().library,
-            query,
-            { scope: "everything", currentPath: props.path, limit: 8 },
-          );
-          setIndexedResults(results);
-          setIndexedSearching(false);
-          setIndexedError(results.length > 0 ? null : error instanceof Error ? error.message : String(error));
+          nativeError = error instanceof Error ? error.message : String(error);
+          nativeFinished = true;
+          publish();
         });
     }, 160);
+    const semanticTimer = semanticFinished ? null : window.setTimeout(() => {
+      void querySemanticExplorerSearch(query, { scope: "everything", currentPath: props.path, limit: 8 })
+        .then((results) => {
+          if (canceled) return;
+          indexedSemanticResultsRef.current = results;
+          semanticFinished = true;
+          publish();
+        })
+        .catch(() => {
+          if (canceled) return;
+          // Semantic search is additive. Offline and unconfigured users keep local results.
+          semanticFinished = true;
+          publish();
+        });
+    }, semanticSearchDebounceMs);
     return () => {
       canceled = true;
-      window.clearTimeout(timer);
+      window.clearTimeout(nativeTimer);
+      if (semanticTimer !== null) window.clearTimeout(semanticTimer);
     };
   }, [locationFilter, props.path]);
 
@@ -409,15 +432,11 @@ export const ExplorerToolbar = memo(function ExplorerToolbar(props: ExplorerTool
     const onSearchFocus = (event: Event) => {
       const detail = (event as CustomEvent<{ paneId?: string; mode?: "search" | "command" }>).detail;
       if (detail?.paneId !== props.paneId) return;
-      setSearchFocused(true);
-      window.requestAnimationFrame(() => {
-        commandInputRef.current?.focus();
-        commandInputRef.current?.select();
-      });
+      void useSearchStore.getState().openSearch(props.path);
     };
     window.addEventListener("misty:explorer-search-focus", onSearchFocus);
     return () => window.removeEventListener("misty:explorer-search-focus", onSearchFocus);
-  }, [props.paneId]);
+  }, [props.paneId, props.path]);
 
   useEffect(() => {
     if (!newMenuOpen) return;
@@ -560,57 +579,16 @@ export const ExplorerToolbar = memo(function ExplorerToolbar(props: ExplorerTool
           )}
         </div>
 
-        <div className={toolbarStyles.commandSearchGroup}>
-          <label ref={commandSearchRef} className={cx(toolbarStyles.commandSearch, commandMode && toolbarStyles.commandSearchMode)}>
-            {props.commandQueryMode === "filter" && !commandMode ? <Filter size={18} /> : <Search size={18} />}
-            <input
-              ref={commandInputRef}
-              className={toolbarStyles.commandInput}
-              value={props.commandQuery}
-              placeholder={props.commandQueryMode === "filter" ? "Filter current folder" : "Search or run command"}
-              onFocus={() => setSearchFocused(true)}
-              onChange={(event) => props.onCommandQuery(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Escape") {
-                  event.preventDefault();
-                  if (commandMode) props.onCommandQuery("");
-                  else setSearchFocused(false);
-                } else if (commandMode && event.key === "Enter" && filteredCommands[0]) {
-                  event.preventDefault();
-                  runCommand(filteredCommands[0].id);
-                } else if (locationMode && event.key === "Enter" && filteredLocations[0]) {
-                  event.preventDefault();
-                  runLocation(filteredLocations[0].path);
-                } else if (locationMode && event.key === "Enter" && indexedResults[0]) {
-                  event.preventDefault();
-                  runIndexedResult(indexedResults[0]);
-                }
-              }}
-            />
-          </label>
-          <div className={toolbarStyles.searchModeToggle} aria-label="Search input mode">
-            <button
-              type="button"
-              className={cx(toolbarStyles.searchModeButton, props.commandQueryMode === "search" && toolbarStyles.searchModeButtonActive)}
-              aria-label="Search mode"
-              aria-pressed={props.commandQueryMode === "search"}
-              title="Search"
-              onClick={() => props.onCommandQueryMode("search")}
-            >
-              <Search size={15} />
-            </button>
-            <button
-              type="button"
-              className={cx(toolbarStyles.searchModeButton, props.commandQueryMode === "filter" && toolbarStyles.searchModeButtonActive)}
-              aria-label="Filter mode"
-              aria-pressed={props.commandQueryMode === "filter"}
-              title="Filter (*, ?, /regex/)"
-              onClick={() => props.onCommandQueryMode("filter")}
-            >
-              <Filter size={15} />
-            </button>
-          </div>
-        </div>
+        <button
+          ref={commandSearchRef}
+          type="button"
+          className={`${toolbarStyles.commandSearch} justify-start`}
+          onClick={() => void useSearchStore.getState().openSearch(props.path)}
+        >
+          <Search size={18} />
+          <span className="min-w-0 flex-1 truncate text-left text-[var(--misty-text-subtle)]">Search, filter, or find all</span>
+          <kbd className="rounded border border-[var(--misty-border)] px-1.5 py-0.5 text-[10px] text-[var(--misty-text-subtle)]">⌘K</kbd>
+        </button>
         {commandMode
           ? createPortal(
               <div
@@ -679,19 +657,24 @@ export const ExplorerToolbar = memo(function ExplorerToolbar(props: ExplorerTool
                 {filteredLocations.length > 0 && (indexedResults.length > 0 || indexedSearching || indexedError) ? <span className={toolbarStyles.paletteDivider} /> : null}
                 {indexedResults.length > 0 ? (
                   <>
-                    <span className={toolbarStyles.paletteSection}>Indexed Search</span>
+                    <span className={toolbarStyles.paletteSection}>Files</span>
                     {indexedResults.map((result) => (
                       <button
                         key={`${result.sourceKind}:${result.entry.path}`}
                         type="button"
                         role="menuitem"
-                        className={toolbarStyles.paletteButton}
+                        className={toolbarStyles.paletteResultButton}
                         onClick={() => runIndexedResult(result)}
                       >
-                        <Search size={16} />
+                        <SearchResultThumbnail
+                          result={result}
+                          className={toolbarStyles.paletteThumbnail}
+                          imageClassName={toolbarStyles.paletteThumbnailImage}
+                        />
                         <span className={toolbarStyles.paletteText}>
                           <strong className={toolbarStyles.paletteTitle}>{result.entry.name}</strong>
-                          <small className={toolbarStyles.paletteSubtitle}>{searchResultSubtitle(result)}</small>
+                          <span className={toolbarStyles.paletteSummary}>{searchResultSummary(result)}</span>
+                          <small className={toolbarStyles.paletteSubtitle}>{searchResultContext(result)}</small>
                         </span>
                       </button>
                     ))}

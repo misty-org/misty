@@ -4,11 +4,12 @@ use std::{
     path::{Path, PathBuf},
     sync::{
         atomic::{AtomicBool, Ordering},
-        Arc, RwLock,
+        Arc, Mutex, RwLock,
     },
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
+use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
 use tantivy::{
     collector::TopDocs,
@@ -45,6 +46,7 @@ const DEFAULT_RESULT_LIMIT: usize = 100;
 const DEFAULT_MAX_DEPTH: usize = 18;
 const DEFAULT_REMOTE_MAX_DEPTH: usize = 12;
 const REMOTE_DIRECTORY_LIMIT: usize = 20_000;
+const SEARCH_MANIFEST_FILE: &str = "manifest.sqlite3";
 
 #[derive(Clone)]
 pub struct SearchService {
@@ -136,6 +138,8 @@ pub struct SearchScanRequest {
     pub max_depth: Option<usize>,
     #[serde(default)]
     pub ignored_paths: Vec<String>,
+    #[serde(default = "default_true")]
+    pub incremental: bool,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -154,6 +158,26 @@ pub struct SearchQueryRequest {
     pub include_hidden: bool,
     #[serde(default)]
     pub limit: Option<usize>,
+    #[serde(default)]
+    pub rules: Vec<SearchQueryRule>,
+    #[serde(default)]
+    pub match_mode: SearchRuleMatchMode,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SearchQueryRule {
+    pub field: String,
+    pub operator: String,
+    pub value: String,
+}
+
+#[derive(Debug, Clone, Default, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum SearchRuleMatchMode {
+    Any,
+    #[default]
+    All,
 }
 
 #[derive(Debug, Clone, Default, Deserialize, Serialize, PartialEq, Eq)]
@@ -200,6 +224,10 @@ pub struct SearchStatus {
     pub scan_errors: Vec<SearchScanError>,
     pub indexed_local_roots: Vec<String>,
     pub indexed_remote_names: Vec<String>,
+    pub last_scan_added_item_count: u64,
+    pub last_scan_updated_item_count: u64,
+    pub last_scan_removed_item_count: u64,
+    pub last_scan_unchanged_item_count: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -216,9 +244,17 @@ struct SearchMeta {
     last_scan_error: Option<String>,
     indexed_local_roots: Vec<String>,
     indexed_remote_names: Vec<String>,
+    #[serde(default)]
+    last_scan_added_item_count: u64,
+    #[serde(default)]
+    last_scan_updated_item_count: u64,
+    #[serde(default)]
+    last_scan_removed_item_count: u64,
+    #[serde(default)]
+    last_scan_unchanged_item_count: u64,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 struct SearchDoc {
     path: String,
     name: String,
@@ -233,6 +269,26 @@ struct SearchDoc {
     size: u64,
     modified_ms: u64,
     hidden: bool,
+}
+
+#[derive(Debug, Clone, Copy, Default)]
+struct SearchScanChanges {
+    added: u64,
+    updated: u64,
+    removed: u64,
+    unchanged: u64,
+}
+
+struct CompletedSearchScan {
+    index: Index,
+    reader: IndexReader,
+    fields: SearchIndexFields,
+    count: u64,
+    local_count: u64,
+    remote_count: u64,
+    local_roots: Vec<String>,
+    remote_names: Vec<String>,
+    changes: SearchScanChanges,
 }
 
 pub fn default_true() -> bool {
@@ -263,6 +319,10 @@ impl SearchService {
             scan_errors: Vec::new(),
             indexed_local_roots: Vec::new(),
             indexed_remote_names: Vec::new(),
+            last_scan_added_item_count: 0,
+            last_scan_updated_item_count: 0,
+            last_scan_removed_item_count: 0,
+            last_scan_unchanged_item_count: 0,
         };
         Self {
             inner: Arc::new(SearchInner {
@@ -318,6 +378,10 @@ impl SearchService {
             state.status.indexed_remote_item_count = meta.indexed_remote_item_count;
             state.status.indexed_local_roots = meta.indexed_local_roots;
             state.status.indexed_remote_names = meta.indexed_remote_names;
+            state.status.last_scan_added_item_count = meta.last_scan_added_item_count;
+            state.status.last_scan_updated_item_count = meta.last_scan_updated_item_count;
+            state.status.last_scan_removed_item_count = meta.last_scan_removed_item_count;
+            state.status.last_scan_unchanged_item_count = meta.last_scan_unchanged_item_count;
         }
         Ok(state.status.clone())
     }
@@ -378,7 +442,7 @@ impl SearchService {
     pub async fn query(&self, request: SearchQueryRequest) -> ApiResult<Vec<SearchResult>> {
         self.init().await?;
         let query_text = normalize_case(&request.query);
-        if query_text.is_empty() {
+        if query_text.is_empty() && request.rules.is_empty() {
             return Ok(Vec::new());
         }
         let limit = request.limit.unwrap_or(DEFAULT_RESULT_LIMIT).clamp(1, 500);
@@ -428,8 +492,15 @@ impl SearchService {
                 {
                     continue;
                 }
-                let score = score_result(&query_text, &doc, &current_path);
-                if score < min_score(query_text.len()) {
+                if !matches_query_rules(&doc, &request.rules, &request.match_mode) {
+                    continue;
+                }
+                let score = if query_text.is_empty() {
+                    0.72
+                } else {
+                    score_result(&query_text, &doc, &current_path)
+                };
+                if !query_text.is_empty() && score < min_score(query_text.len()) {
                     continue;
                 }
                 results.push(SearchResult {
@@ -482,27 +553,21 @@ impl SearchService {
             SearchScanOutcome::Failed
         });
         state.status.last_scan_error = result.as_ref().err().map(ToString::to_string);
-        if let Ok((
-            index,
-            reader,
-            fields,
-            count,
-            local_count,
-            remote_count,
-            local_roots,
-            remote_names,
-        )) = result
-        {
-            state.index = Some(index);
-            state.reader = Some(reader);
-            state.fields = Some(fields);
+        if let Ok(completed) = result {
+            state.index = Some(completed.index);
+            state.reader = Some(completed.reader);
+            state.fields = Some(completed.fields);
             state.status.last_scan_time_ms = Some(finished);
-            state.status.indexed_item_count = count;
-            state.status.indexed_local_item_count = local_count;
-            state.status.indexed_remote_item_count = remote_count;
+            state.status.indexed_item_count = completed.count;
+            state.status.indexed_local_item_count = completed.local_count;
+            state.status.indexed_remote_item_count = completed.remote_count;
             state.status.index_size_bytes = dir_size(&self.inner.live_index_dir);
-            state.status.indexed_local_roots = local_roots;
-            state.status.indexed_remote_names = remote_names;
+            state.status.indexed_local_roots = completed.local_roots;
+            state.status.indexed_remote_names = completed.remote_names;
+            state.status.last_scan_added_item_count = completed.changes.added;
+            state.status.last_scan_updated_item_count = completed.changes.updated;
+            state.status.last_scan_removed_item_count = completed.changes.removed;
+            state.status.last_scan_unchanged_item_count = completed.changes.unchanged;
         }
         let _ = write_meta(
             &self.inner.index_root,
@@ -516,6 +581,10 @@ impl SearchService {
                 last_scan_error: state.status.last_scan_error.clone(),
                 indexed_local_roots: state.status.indexed_local_roots.clone(),
                 indexed_remote_names: state.status.indexed_remote_names.clone(),
+                last_scan_added_item_count: state.status.last_scan_added_item_count,
+                last_scan_updated_item_count: state.status.last_scan_updated_item_count,
+                last_scan_removed_item_count: state.status.last_scan_removed_item_count,
+                last_scan_unchanged_item_count: state.status.last_scan_unchanged_item_count,
             },
         );
     }
@@ -524,17 +593,35 @@ impl SearchService {
         &self,
         request: &SearchScanRequest,
         staging_dir: &Path,
-    ) -> ApiResult<(
-        Index,
-        IndexReader,
-        SearchIndexFields,
-        u64,
-        u64,
-        u64,
-        Vec<String>,
-        Vec<String>,
-    )> {
-        let (index, fields) = create_fresh_index(staging_dir)?;
+    ) -> ApiResult<CompletedSearchScan> {
+        let reuse_existing =
+            request.incremental && self.inner.live_index_dir.join("meta.json").exists();
+        let manifest_exists = self
+            .inner
+            .live_index_dir
+            .join(SEARCH_MANIFEST_FILE)
+            .exists();
+        let (index, fields, existing_reader) = if reuse_existing {
+            copy_index(&self.inner.live_index_dir, staging_dir)?;
+            let (index, reader, fields) = open_or_create_index(staging_dir)?;
+            (index, fields, Some(reader))
+        } else {
+            let (index, fields) = create_fresh_index(staging_dir)?;
+            (index, fields, None)
+        };
+        let manifest = Mutex::new(open_search_manifest(staging_dir)?);
+        begin_manifest_update(&manifest)?;
+        if reuse_existing && !manifest_exists {
+            seed_search_manifest(
+                &manifest,
+                existing_reader.as_ref().ok_or_else(|| {
+                    ApiError::Message("Existing search catalog reader is unavailable.".to_owned())
+                })?,
+                fields,
+            )?;
+        }
+        drop(existing_reader);
+        let generation = now_ms().max(1);
         let mut writer = index
             .writer_with_num_threads(1, INDEX_MEMORY_BUDGET_BYTES)
             .map_err(|error| ApiError::Message(error.to_string()))?;
@@ -544,6 +631,7 @@ impl SearchService {
         let mut remote_count = 0u64;
         let mut indexed_local_roots = Vec::new();
         let mut indexed_remote_names = Vec::new();
+        let mut changes = SearchScanChanges::default();
 
         if request.include_local {
             let roots = local_roots(request, &self.inner.home_dir);
@@ -552,7 +640,16 @@ impl SearchService {
                     return Err(ApiError::Message("Search scan canceled.".to_string()));
                 }
                 self.set_scan_progress(Some("Local".to_string()), Some(display_path(&root)));
-                match self.scan_local_root(&root, request.max_depth, &ignored, &fields, &writer) {
+                match self.scan_local_root(
+                    &root,
+                    request.max_depth,
+                    &ignored,
+                    &fields,
+                    &writer,
+                    &manifest,
+                    generation,
+                    &mut changes,
+                ) {
                     Ok(indexed) => {
                         count += indexed;
                         local_count += indexed;
@@ -575,7 +672,15 @@ impl SearchService {
                     Some("/".to_string()),
                 );
                 match self
-                    .scan_remote(&remote, request.max_depth, &fields, &writer)
+                    .scan_remote(
+                        &remote,
+                        request.max_depth,
+                        &fields,
+                        &writer,
+                        &manifest,
+                        generation,
+                        &mut changes,
+                    )
                     .await
                 {
                     Ok(indexed) => {
@@ -589,6 +694,17 @@ impl SearchService {
             }
         }
 
+        remove_missing_manifest_docs(
+            &manifest,
+            &writer,
+            &fields,
+            request,
+            generation,
+            &indexed_local_roots,
+            &indexed_remote_names,
+            &mut changes,
+        )?;
+
         {
             let mut state = self
                 .inner
@@ -600,20 +716,25 @@ impl SearchService {
         writer
             .commit()
             .map_err(|error| ApiError::Message(error.to_string()))?;
+        commit_manifest_update(&manifest)?;
         drop(writer);
         drop(index);
+        let (local_count, remote_count) = manifest_source_counts(&manifest)?;
+        drop(manifest);
         replace_index(staging_dir, &self.inner.live_index_dir)?;
         let (index, reader, fields) = open_or_create_index(&self.inner.live_index_dir)?;
-        Ok((
+        let count = reader.searcher().num_docs();
+        Ok(CompletedSearchScan {
             index,
             reader,
             fields,
             count,
             local_count,
             remote_count,
-            indexed_local_roots,
-            indexed_remote_names,
-        ))
+            local_roots: indexed_local_roots,
+            remote_names: indexed_remote_names,
+            changes,
+        })
     }
 
     fn scan_local_root(
@@ -623,6 +744,9 @@ impl SearchService {
         ignored: &[PathBuf],
         fields: &SearchIndexFields,
         writer: &IndexWriter,
+        manifest: &Mutex<Connection>,
+        generation: u64,
+        changes: &mut SearchScanChanges,
     ) -> ApiResult<u64> {
         if !root.exists() || !root.is_dir() {
             return Ok(0);
@@ -680,9 +804,8 @@ impl SearchService {
                 modified_ms: metadata_modified_ms(&metadata),
                 hidden: name.starts_with('.'),
             };
-            if add_doc(writer, fields, &doc).is_ok() {
-                count += 1;
-            }
+            upsert_search_doc(writer, fields, manifest, &doc, generation, changes)?;
+            count += 1;
         }
         Ok(count)
     }
@@ -710,6 +833,9 @@ impl SearchService {
         max_depth: Option<usize>,
         fields: &SearchIndexFields,
         writer: &IndexWriter,
+        manifest: &Mutex<Connection>,
+        generation: u64,
+        changes: &mut SearchScanChanges,
     ) -> ApiResult<u64> {
         let mut count = 0u64;
         let mut visited = HashSet::new();
@@ -775,11 +901,10 @@ impl SearchService {
                         .map(|value| value.starts_with('.'))
                         .unwrap_or(false),
                 };
-                if add_doc(writer, fields, &doc).is_ok() {
-                    count += 1;
-                    if count % 200 == 0 {
-                        self.set_indexed_count(count);
-                    }
+                upsert_search_doc(writer, fields, manifest, &doc, generation, changes)?;
+                count += 1;
+                if count % 200 == 0 {
+                    self.set_indexed_count(count);
                 }
                 if item.is_dir {
                     pending.push_back((child_remote_path, depth + 1));
@@ -988,6 +1113,282 @@ fn create_fresh_index(path: &Path) -> ApiResult<(Index, SearchIndexFields)> {
     let index =
         Index::create_in_dir(path, schema).map_err(|error| ApiError::Message(error.to_string()))?;
     Ok((index, fields))
+}
+
+fn copy_index(source: &Path, destination: &Path) -> ApiResult<()> {
+    let _ = fs::remove_dir_all(destination);
+    copy_directory(source, destination).map_err(|error| {
+        ApiError::Message(format!(
+            "Failed to prepare the previous search catalog for an incremental update: {error}"
+        ))
+    })
+}
+
+fn copy_directory(source: &Path, destination: &Path) -> std::io::Result<()> {
+    fs::create_dir_all(destination)?;
+    for entry in fs::read_dir(source)? {
+        let entry = entry?;
+        let source_path = entry.path();
+        let destination_path = destination.join(entry.file_name());
+        if entry.file_type()?.is_dir() {
+            copy_directory(&source_path, &destination_path)?;
+        } else {
+            fs::copy(source_path, destination_path)?;
+        }
+    }
+    Ok(())
+}
+
+fn open_search_manifest(index_dir: &Path) -> ApiResult<Connection> {
+    let connection =
+        Connection::open(index_dir.join(SEARCH_MANIFEST_FILE)).map_err(search_manifest_error)?;
+    connection
+        .execute_batch(
+            "PRAGMA journal_mode=DELETE;
+             PRAGMA synchronous=NORMAL;
+             CREATE TABLE IF NOT EXISTS search_docs (
+               doc_key TEXT PRIMARY KEY,
+               path TEXT NOT NULL,
+               name TEXT NOT NULL,
+               extension TEXT NOT NULL,
+               source_kind TEXT NOT NULL,
+               provider_type TEXT NOT NULL,
+               remote_name TEXT NOT NULL,
+               remote_path TEXT NOT NULL,
+               mime_type TEXT NOT NULL,
+               is_file INTEGER NOT NULL,
+               is_dir INTEGER NOT NULL,
+               size INTEGER NOT NULL,
+               modified_ms INTEGER NOT NULL,
+               hidden INTEGER NOT NULL,
+               last_seen_generation INTEGER NOT NULL
+             ) WITHOUT ROWID;
+             CREATE INDEX IF NOT EXISTS search_docs_source ON search_docs(source_kind, remote_name);",
+        )
+        .map_err(search_manifest_error)?;
+    Ok(connection)
+}
+
+fn begin_manifest_update(manifest: &Mutex<Connection>) -> ApiResult<()> {
+    manifest
+        .lock()
+        .map_err(|error| ApiError::Message(format!("Search catalog lock failed: {error}")))?
+        .execute_batch("BEGIN IMMEDIATE")
+        .map_err(search_manifest_error)
+}
+
+fn commit_manifest_update(manifest: &Mutex<Connection>) -> ApiResult<()> {
+    manifest
+        .lock()
+        .map_err(|error| ApiError::Message(format!("Search catalog lock failed: {error}")))?
+        .execute_batch("COMMIT")
+        .map_err(search_manifest_error)
+}
+
+fn seed_search_manifest(
+    manifest: &Mutex<Connection>,
+    reader: &IndexReader,
+    fields: SearchIndexFields,
+) -> ApiResult<()> {
+    let manifest = manifest
+        .lock()
+        .map_err(|error| ApiError::Message(format!("Search catalog lock failed: {error}")))?;
+    let searcher = reader.searcher();
+    for (segment_ord, segment) in searcher.segment_readers().iter().enumerate() {
+        for doc_id in 0..segment.max_doc() {
+            if segment.is_deleted(doc_id) {
+                continue;
+            }
+            let document = searcher
+                .doc::<TantivyDocument>(tantivy::DocAddress::new(segment_ord as u32, doc_id))
+                .map_err(|error| ApiError::Message(error.to_string()))?;
+            if let Some(doc) = doc_from_tantivy(fields, &document) {
+                persist_manifest_doc(&manifest, &doc, 0)?;
+            }
+        }
+    }
+    Ok(())
+}
+
+fn search_doc_key(doc: &SearchDoc) -> String {
+    match doc.source_kind {
+        SearchSourceKind::Local => format!("local\u{0}{}", doc.path),
+        SearchSourceKind::Remote => {
+            format!("remote\u{0}{}\u{0}{}", doc.remote_name, doc.remote_path)
+        }
+    }
+}
+
+fn load_manifest_doc(connection: &Connection, key: &str) -> ApiResult<Option<SearchDoc>> {
+    connection
+        .query_row(
+            "SELECT path,name,extension,source_kind,provider_type,remote_name,remote_path,mime_type,is_file,is_dir,size,modified_ms,hidden FROM search_docs WHERE doc_key=?1",
+            params![key],
+            |row| {
+                Ok(SearchDoc {
+                    path: row.get(0)?,
+                    name: row.get(1)?,
+                    extension: row.get(2)?,
+                    source_kind: if row.get::<_, String>(3)? == "remote" { SearchSourceKind::Remote } else { SearchSourceKind::Local },
+                    provider_type: row.get(4)?,
+                    remote_name: row.get(5)?,
+                    remote_path: row.get(6)?,
+                    mime_type: row.get(7)?,
+                    is_file: row.get::<_, i64>(8)? != 0,
+                    is_dir: row.get::<_, i64>(9)? != 0,
+                    size: row.get(10)?,
+                    modified_ms: row.get(11)?,
+                    hidden: row.get::<_, i64>(12)? != 0,
+                })
+            },
+        )
+        .optional()
+        .map_err(search_manifest_error)
+}
+
+fn persist_manifest_doc(
+    connection: &Connection,
+    doc: &SearchDoc,
+    generation: u64,
+) -> ApiResult<()> {
+    connection
+        .execute(
+            "INSERT INTO search_docs(doc_key,path,name,extension,source_kind,provider_type,remote_name,remote_path,mime_type,is_file,is_dir,size,modified_ms,hidden,last_seen_generation)
+             VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15)
+             ON CONFLICT(doc_key) DO UPDATE SET path=excluded.path,name=excluded.name,extension=excluded.extension,source_kind=excluded.source_kind,provider_type=excluded.provider_type,remote_name=excluded.remote_name,remote_path=excluded.remote_path,mime_type=excluded.mime_type,is_file=excluded.is_file,is_dir=excluded.is_dir,size=excluded.size,modified_ms=excluded.modified_ms,hidden=excluded.hidden,last_seen_generation=excluded.last_seen_generation",
+            params![
+                search_doc_key(doc),
+                doc.path,
+                doc.name,
+                doc.extension,
+                doc.source_kind.as_str(),
+                doc.provider_type,
+                doc.remote_name,
+                doc.remote_path,
+                doc.mime_type,
+                i64::from(doc.is_file),
+                i64::from(doc.is_dir),
+                doc.size,
+                doc.modified_ms,
+                i64::from(doc.hidden),
+                generation,
+            ],
+        )
+        .map_err(search_manifest_error)?;
+    Ok(())
+}
+
+fn upsert_search_doc(
+    writer: &IndexWriter,
+    fields: &SearchIndexFields,
+    manifest: &Mutex<Connection>,
+    doc: &SearchDoc,
+    generation: u64,
+    changes: &mut SearchScanChanges,
+) -> ApiResult<()> {
+    let manifest = manifest
+        .lock()
+        .map_err(|error| ApiError::Message(format!("Search catalog lock failed: {error}")))?;
+    let key = search_doc_key(doc);
+    match load_manifest_doc(&manifest, &key)? {
+        Some(existing) if existing == *doc => {
+            manifest
+                .execute(
+                    "UPDATE search_docs SET last_seen_generation=?1 WHERE doc_key=?2",
+                    params![generation, key],
+                )
+                .map_err(search_manifest_error)?;
+            changes.unchanged += 1;
+        }
+        Some(existing) => {
+            writer.delete_term(Term::from_field_text(fields.path, &existing.path));
+            add_doc(writer, fields, doc)?;
+            persist_manifest_doc(&manifest, doc, generation)?;
+            changes.updated += 1;
+        }
+        None => {
+            add_doc(writer, fields, doc)?;
+            persist_manifest_doc(&manifest, doc, generation)?;
+            changes.added += 1;
+        }
+    }
+    Ok(())
+}
+
+fn remove_missing_manifest_docs(
+    manifest: &Mutex<Connection>,
+    writer: &IndexWriter,
+    fields: &SearchIndexFields,
+    request: &SearchScanRequest,
+    generation: u64,
+    indexed_local_roots: &[String],
+    indexed_remote_names: &[String],
+    changes: &mut SearchScanChanges,
+) -> ApiResult<()> {
+    let manifest = manifest
+        .lock()
+        .map_err(|error| ApiError::Message(format!("Search catalog lock failed: {error}")))?;
+    let mut statement = manifest
+        .prepare("SELECT doc_key FROM search_docs WHERE last_seen_generation<>?1")
+        .map_err(search_manifest_error)?;
+    let keys = statement
+        .query_map(params![generation], |row| row.get::<_, String>(0))
+        .map_err(search_manifest_error)?
+        .collect::<rusqlite::Result<Vec<_>>>()
+        .map_err(search_manifest_error)?;
+    drop(statement);
+    let local_roots: Vec<PathBuf> = indexed_local_roots.iter().map(PathBuf::from).collect();
+    let remote_names: HashSet<&str> = indexed_remote_names.iter().map(String::as_str).collect();
+    for key in keys {
+        let Some(doc) = load_manifest_doc(&manifest, &key)? else {
+            continue;
+        };
+        let covered = match doc.source_kind {
+            SearchSourceKind::Local => {
+                request.include_local
+                    && local_roots
+                        .iter()
+                        .any(|root| Path::new(&doc.path).starts_with(root))
+            }
+            SearchSourceKind::Remote => {
+                request.include_remotes && remote_names.contains(doc.remote_name.as_str())
+            }
+        };
+        if !covered {
+            continue;
+        }
+        writer.delete_term(Term::from_field_text(fields.path, &doc.path));
+        manifest
+            .execute("DELETE FROM search_docs WHERE doc_key=?1", params![key])
+            .map_err(search_manifest_error)?;
+        changes.removed += 1;
+    }
+    Ok(())
+}
+
+fn manifest_source_counts(manifest: &Mutex<Connection>) -> ApiResult<(u64, u64)> {
+    let manifest = manifest
+        .lock()
+        .map_err(|error| ApiError::Message(format!("Search catalog lock failed: {error}")))?;
+    let local = manifest
+        .query_row(
+            "SELECT COUNT(*) FROM search_docs WHERE source_kind='local'",
+            [],
+            |row| row.get(0),
+        )
+        .map_err(search_manifest_error)?;
+    let remote = manifest
+        .query_row(
+            "SELECT COUNT(*) FROM search_docs WHERE source_kind='remote'",
+            [],
+            |row| row.get(0),
+        )
+        .map_err(search_manifest_error)?;
+    Ok((local, remote))
+}
+
+fn search_manifest_error(error: rusqlite::Error) -> ApiError {
+    ApiError::Message(format!("Search catalog database failed: {error}"))
 }
 
 fn replace_index(staging: &Path, live: &Path) -> ApiResult<()> {
@@ -1215,6 +1616,93 @@ fn matches_scope(doc: &SearchDoc, scope: &SearchQueryScope, current_path: &str) 
     }
 }
 
+fn matches_query_rules(
+    doc: &SearchDoc,
+    rules: &[SearchQueryRule],
+    mode: &SearchRuleMatchMode,
+) -> bool {
+    let rules = rules
+        .iter()
+        .filter(|rule| rule.field != "__match" && !rule.value.trim().is_empty());
+    let matches: Vec<bool> = rules.map(|rule| matches_query_rule(doc, rule)).collect();
+    if matches.is_empty() {
+        return true;
+    }
+    match mode {
+        SearchRuleMatchMode::Any => matches.into_iter().any(|value| value),
+        SearchRuleMatchMode::All => matches.into_iter().all(|value| value),
+    }
+}
+
+fn matches_query_rule(doc: &SearchDoc, rule: &SearchQueryRule) -> bool {
+    let value = normalize_case(rule.value.trim());
+    match rule.field.as_str() {
+        "text" => compare_rule_text(&normalize_case(&doc.name), &value, &rule.operator),
+        "path" => compare_rule_text(&normalize_case(&doc.path), &value, &rule.operator),
+        "kind" => compare_rule_text(
+            if doc.is_dir { "folder" } else { "file" },
+            &value,
+            &rule.operator,
+        ),
+        "extension" => compare_rule_text(
+            doc.extension.trim_start_matches('.'),
+            value.trim_start_matches('.'),
+            &rule.operator,
+        ),
+        "hidden" => doc.hidden == matches!(value.as_str(), "true" | "yes" | "1"),
+        "size" => parse_rule_size(&value)
+            .is_some_and(|target| compare_rule_number(doc.size, target, &rule.operator)),
+        "modified" => parse_rule_date_ms(&value)
+            .is_some_and(|target| compare_rule_number(doc.modified_ms, target, &rule.operator)),
+        // AI tags are evaluated after server semantic results are merged.
+        "tag" => true,
+        _ => true,
+    }
+}
+
+fn compare_rule_text(candidate: &str, value: &str, operator: &str) -> bool {
+    match operator {
+        "is" => candidate == value,
+        "is_not" => candidate != value,
+        "starts_with" => candidate.starts_with(value),
+        "ends_with" => candidate.ends_with(value),
+        _ => candidate.contains(value),
+    }
+}
+
+fn compare_rule_number(candidate: u64, target: u64, operator: &str) -> bool {
+    match operator {
+        "gt" | "after" => candidate > target,
+        "lt" | "before" => candidate < target,
+        "is_not" => candidate != target,
+        _ => candidate == target,
+    }
+}
+
+fn parse_rule_size(value: &str) -> Option<u64> {
+    let split = value
+        .find(|character: char| !character.is_ascii_digit() && character != '.')
+        .unwrap_or(value.len());
+    let number = value[..split].parse::<f64>().ok()?;
+    let multiplier = match value[split..].trim().to_ascii_lowercase().as_str() {
+        "kb" | "kib" => 1024.0,
+        "mb" | "mib" => 1024.0 * 1024.0,
+        "gb" | "gib" => 1024.0 * 1024.0 * 1024.0,
+        _ => 1.0,
+    };
+    Some((number * multiplier) as u64)
+}
+
+fn parse_rule_date_ms(value: &str) -> Option<u64> {
+    let date = chrono::NaiveDate::parse_from_str(value, "%Y-%m-%d").ok()?;
+    Some(
+        date.and_hms_opt(0, 0, 0)?
+            .and_utc()
+            .timestamp_millis()
+            .max(0) as u64,
+    )
+}
+
 fn split_tokens(value: &str) -> Vec<String> {
     value
         .split(|character: char| {
@@ -1381,4 +1869,180 @@ fn now_ms() -> u64 {
 
 fn display_path(path: &Path) -> String {
     path.to_string_lossy().to_string()
+}
+
+#[cfg(test)]
+mod rule_tests {
+    use super::*;
+
+    fn fixture() -> SearchDoc {
+        SearchDoc {
+            path: "/Users/test/Pictures/Pikachu.png".to_owned(),
+            name: "Pikachu.png".to_owned(),
+            extension: "png".to_owned(),
+            source_kind: SearchSourceKind::Local,
+            provider_type: String::new(),
+            remote_name: String::new(),
+            remote_path: String::new(),
+            mime_type: "image/png".to_owned(),
+            is_file: true,
+            is_dir: false,
+            size: 12 * 1024 * 1024,
+            modified_ms: 1_783_123_200_000,
+            hidden: false,
+        }
+    }
+
+    #[test]
+    fn structured_rules_apply_all_and_any_modes() {
+        let rules = vec![
+            SearchQueryRule {
+                field: "extension".to_owned(),
+                operator: "is".to_owned(),
+                value: "png".to_owned(),
+            },
+            SearchQueryRule {
+                field: "size".to_owned(),
+                operator: "gt".to_owned(),
+                value: "10MB".to_owned(),
+            },
+        ];
+        assert!(matches_query_rules(
+            &fixture(),
+            &rules,
+            &SearchRuleMatchMode::All
+        ));
+        let failing = vec![
+            rules[0].clone(),
+            SearchQueryRule {
+                field: "hidden".to_owned(),
+                operator: "is".to_owned(),
+                value: "true".to_owned(),
+            },
+        ];
+        assert!(!matches_query_rules(
+            &fixture(),
+            &failing,
+            &SearchRuleMatchMode::All
+        ));
+        assert!(matches_query_rules(
+            &fixture(),
+            &failing,
+            &SearchRuleMatchMode::Any
+        ));
+    }
+}
+
+#[cfg(test)]
+mod incremental_tests {
+    use super::*;
+
+    fn fixture(root: &Path) -> SearchDoc {
+        SearchDoc {
+            path: root.join("Pikachu.png").display().to_string(),
+            name: "Pikachu.png".to_owned(),
+            extension: "png".to_owned(),
+            source_kind: SearchSourceKind::Local,
+            provider_type: String::new(),
+            remote_name: String::new(),
+            remote_path: String::new(),
+            mime_type: "image/png".to_owned(),
+            is_file: true,
+            is_dir: false,
+            size: 42,
+            modified_ms: 100,
+            hidden: false,
+        }
+    }
+
+    #[test]
+    fn manifest_refresh_reuses_unchanged_docs_and_removes_missing_docs() {
+        let root = std::env::temp_dir().join(format!(
+            "misty-search-incremental-{}",
+            uuid::Uuid::new_v4().simple()
+        ));
+        let (index, fields) = create_fresh_index(&root).expect("fresh index");
+        let manifest = Mutex::new(open_search_manifest(&root).expect("manifest"));
+        let mut writer = index.writer(15_000_000).expect("writer");
+        let mut changes = SearchScanChanges::default();
+        let document = fixture(&root);
+
+        upsert_search_doc(&writer, &fields, &manifest, &document, 1, &mut changes)
+            .expect("initial insert");
+        assert_eq!(changes.added, 1);
+        upsert_search_doc(&writer, &fields, &manifest, &document, 2, &mut changes)
+            .expect("unchanged refresh");
+        assert_eq!(changes.unchanged, 1);
+
+        let mut updated = document.clone();
+        updated.size = 84;
+        upsert_search_doc(&writer, &fields, &manifest, &updated, 3, &mut changes)
+            .expect("metadata update");
+        assert_eq!(changes.updated, 1);
+
+        remove_missing_manifest_docs(
+            &manifest,
+            &writer,
+            &fields,
+            &SearchScanRequest {
+                roots: vec![root.display().to_string()],
+                include_local: true,
+                include_remotes: false,
+                remote_names: Vec::new(),
+                max_depth: None,
+                ignored_paths: Vec::new(),
+                incremental: true,
+            },
+            4,
+            &[root.display().to_string()],
+            &[],
+            &mut changes,
+        )
+        .expect("remove missing");
+        assert_eq!(changes.removed, 1);
+        assert_eq!(manifest_source_counts(&manifest).expect("counts"), (0, 0));
+        writer.commit().expect("commit");
+        drop(writer);
+        drop(manifest);
+        drop(index);
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn existing_pre_manifest_catalog_is_reused_on_the_first_incremental_refresh() {
+        let root = std::env::temp_dir().join(format!(
+            "misty-search-seed-{}",
+            uuid::Uuid::new_v4().simple()
+        ));
+        let (index, fields) = create_fresh_index(&root).expect("fresh index");
+        let mut writer = index.writer(15_000_000).expect("writer");
+        let document = fixture(&root);
+        add_doc(&writer, &fields, &document).expect("legacy document");
+        writer.commit().expect("commit legacy index");
+        drop(writer);
+        let reader = index.reader().expect("reader");
+        let manifest = Mutex::new(open_search_manifest(&root).expect("manifest"));
+        begin_manifest_update(&manifest).expect("begin seed");
+        seed_search_manifest(&manifest, &reader, fields).expect("seed manifest");
+        commit_manifest_update(&manifest).expect("commit seed");
+        assert_eq!(manifest_source_counts(&manifest).expect("counts"), (1, 0));
+
+        let mut changes = SearchScanChanges::default();
+        let mut writer = index.writer(15_000_000).expect("incremental writer");
+        upsert_search_doc(&writer, &fields, &manifest, &document, 10, &mut changes)
+            .expect("reuse seeded document");
+        assert_eq!(changes.unchanged, 1);
+        assert_eq!(changes.added, 0);
+        writer.commit().expect("commit incremental index");
+        drop(writer);
+        assert!(root.join(SEARCH_MANIFEST_FILE).exists());
+        assert_eq!(
+            manifest_source_counts(&manifest).expect("post-commit counts"),
+            (1, 0)
+        );
+        drop(manifest);
+        drop(reader);
+        drop(index);
+        let _ = fs::remove_dir_all(root);
+    }
 }

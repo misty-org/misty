@@ -145,10 +145,10 @@ export function HomeSidebarPanels(props: HomeSidebarPanelsProps) {
         <SidebarPanel
           className="flex-[2_1_0]"
           icon={<Search className="h-4 w-4" />}
-          title="Smart Folders"
+          title="Collections"
         >
           <PanelRows
-            emptyMessage="No smart folders yet."
+            emptyMessage="No collections yet."
             loading={props.smartFoldersLoading}
             showEmpty={props.smartFolders.length === 0}
           >

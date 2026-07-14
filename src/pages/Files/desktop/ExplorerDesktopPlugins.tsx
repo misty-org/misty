@@ -1,8 +1,8 @@
-import { ArrowRightLeft, ExternalLink, Puzzle, RefreshCcw, Terminal, X } from "lucide-react";
+import { ArrowLeft, ArrowRightLeft, ExternalLink, Puzzle, RefreshCcw, Sparkles, Terminal, X } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { CSSProperties } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { extensionCommandRun, openTerminalAtPath, pluginCommandRun, pluginPanelRender } from "../../../api/misty";
 import type { PluginCommandEntry, PluginPanelElement, PluginPanelEntry, PluginPanelRenderResult, TransferRecord } from "../../../api/types";
 import { ExtensionCatalogIcon } from "../../../plugins/ExtensionCatalogIcon";
@@ -12,7 +12,7 @@ import { useMinimumSpin } from "../../../shared/hooks/useMinimumSpin";
 import { errorText } from "../../../shared/format";
 import { applyMistyThemeFromExtensionAction, themeBaseMode, useAppThemeStore } from "../../../stores/useAppThemeStore";
 import type { MistyCustomThemeTokens, MistyThemeId } from "../../../stores/useAppThemeStore";
-import { safeTauriAssetUrl } from "../../../shared/tauri";
+import { hasTauriInternals } from "../../../shared/tauri";
 import { useExplorerStore } from "../../../stores/useExplorerStore";
 import { useTransfersStore } from "../../../stores/useTransfersStore";
 import { cx } from "./ExplorerDesktopShared";
@@ -20,6 +20,33 @@ import { explorerTrayStyles, extensionsPanelStyles, pluginTabHostStyles, pluginT
 
 const transfersTabPath = "misty-transfers://history";
 const remotesTabPath = "misty-remotes://manage";
+const monitoredExtensionJobs = new Map<string, number>();
+
+function monitorExtensionJob(pluginId: string, pluginName: string, jobId: string) {
+  const key = `${pluginId}:${jobId}`;
+  if (monitoredExtensionJobs.has(key)) return;
+  const poll = () => {
+    void extensionCommandRun({ pluginId, command: "jobs.status", payload: { jobId } })
+      .then((result) => {
+        const snapshot = result as { status?: string; message?: string; error?: string };
+        if (snapshot.status === "queued" || snapshot.status === "running") {
+          monitoredExtensionJobs.set(key, window.setTimeout(poll, 1_200));
+          return;
+        }
+        monitoredExtensionJobs.delete(key);
+        const successful = snapshot.status === "completed";
+        useExplorerStore.getState().pushNotification(
+          snapshot.error || snapshot.message || `${pluginName} job ${successful ? "completed" : "stopped"}.`,
+          successful ? "success" : "error",
+          5_500,
+        );
+      })
+      .catch(() => {
+        monitoredExtensionJobs.set(key, window.setTimeout(poll, 2_000));
+      });
+  };
+  monitoredExtensionJobs.set(key, window.setTimeout(poll, 800));
+}
 
 const transferBadgeStatuses = new Set<TransferRecord["status"]>([
   "queued",
@@ -38,6 +65,8 @@ export function ExplorerTray(props: {
   selectedPath: string;
   terminalEnabled: boolean;
   terminalPath: string;
+  mikaEnabled: boolean;
+  onOpenMika: () => void;
   onOpenTransfers: () => void;
 }) {
   const openTerminal = useCallback(() => {
@@ -50,6 +79,16 @@ export function ExplorerTray(props: {
   return (
     <>
       <ExplorerTransfersTabButton onClick={props.onOpenTransfers} />
+      <button
+        aria-label="Open Mika Assistant"
+        className={explorerTrayStyles.trigger}
+        disabled={!props.mikaEnabled}
+        onClick={props.onOpenMika}
+        title={props.mikaEnabled ? "Open Mika Assistant" : "Enable Mika in Settings"}
+        type="button"
+      >
+        <Sparkles size={16} />
+      </button>
       <button
         className={explorerTrayStyles.trigger}
         type="button"
@@ -108,7 +147,11 @@ function ExplorerPluginTabMenu(props: {
   selectedPath: string;
 }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const [open, setOpen] = useState(false);
+  const [selectedPluginId, setSelectedPluginId] = useState<string | null>(null);
+  const [visitedPluginIds, setVisitedPluginIds] = useState<string[]>([]);
+  const [requestedSelectedPath, setRequestedSelectedPath] = useState("");
   const [query, setQuery] = useState("");
   const [menuStyle, setMenuStyle] = useState<CSSProperties>({});
   const buttonRef = useRef<HTMLButtonElement | null>(null);
@@ -122,12 +165,34 @@ function ExplorerPluginTabMenu(props: {
     [plugins, query],
   );
   const highlightedCount = plugins.filter((plugin) => plugin.usable).length;
+  const selectedPlugin = plugins.find((plugin) => plugin.pluginId === selectedPluginId) ?? null;
+  const selectedPath = requestedSelectedPath || props.selectedPath;
+
+  const closePopup = useCallback((restoreFocus = true) => {
+    setOpen(false);
+    if (restoreFocus) window.requestAnimationFrame(() => buttonRef.current?.focus());
+  }, []);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const pluginId = params.get("extension");
+    if (!pluginId) return;
+    setSelectedPluginId(pluginId);
+    setVisitedPluginIds((current) => current.includes(pluginId) ? current : [...current, pluginId]);
+    setRequestedSelectedPath(params.get("selected") ?? "");
+    setOpen(true);
+    params.delete("extension");
+    params.delete("selected");
+    navigate({ pathname: location.pathname, search: params.toString() ? `?${params}` : "" }, { replace: true });
+  }, [location.pathname, location.search, navigate]);
 
   const updateMenuPosition = useCallback(() => {
     const button = buttonRef.current;
     if (!button) return;
     const rect = button.getBoundingClientRect();
-    const width = Math.min(380, Math.max(310, window.innerWidth - 24));
+    const preferredWidth = selectedPluginId ? 600 : 360;
+    const minimumWidth = selectedPluginId ? 420 : 320;
+    const width = Math.min(preferredWidth, Math.max(Math.min(minimumWidth, window.innerWidth - 24), window.innerWidth - 24));
     const left = Math.min(Math.max(12, rect.right - width), Math.max(12, window.innerWidth - width - 12));
     const top = Math.min(rect.bottom + 7, Math.max(12, window.innerHeight - 120));
     setMenuStyle({
@@ -136,41 +201,59 @@ function ExplorerPluginTabMenu(props: {
       width,
       maxHeight: `calc(100vh - ${top + 12}px)`,
     });
-  }, []);
+  }, [selectedPluginId]);
 
   useLayoutEffect(() => {
     if (!open) return;
     updateMenuPosition();
+    const focusFrame = window.requestAnimationFrame(() => {
+      menuRef.current?.querySelector<HTMLElement>("[data-extension-popup-initial]")?.focus();
+    });
     const handlePointerDown = (event: globalThis.PointerEvent) => {
       const target = event.target as Node | null;
       if (!target) return;
       if (buttonRef.current?.contains(target) || menuRef.current?.contains(target)) return;
-      setOpen(false);
+      closePopup(false);
     };
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setOpen(false);
+      if (event.key === "Escape") closePopup();
     };
     window.addEventListener("pointerdown", handlePointerDown, true);
     window.addEventListener("keydown", handleKeyDown);
     window.addEventListener("resize", updateMenuPosition);
     window.addEventListener("scroll", updateMenuPosition, true);
     return () => {
+      window.cancelAnimationFrame(focusFrame);
       window.removeEventListener("pointerdown", handlePointerDown, true);
       window.removeEventListener("keydown", handleKeyDown);
       window.removeEventListener("resize", updateMenuPosition);
       window.removeEventListener("scroll", updateMenuPosition, true);
     };
-  }, [open, updateMenuPosition]);
+  }, [closePopup, open, updateMenuPosition]);
 
-  const togglePluginPanel = useCallback((plugin: PluginMenuItem) => {
-    setOpen(false);
-    openPluginTab(plugin, props.selectedPath);
-  }, [props.selectedPath]);
+  const selectPlugin = useCallback((plugin: PluginMenuItem) => {
+    setSelectedPluginId(plugin.pluginId);
+    setVisitedPluginIds((current) => current.includes(plugin.pluginId) ? current : [...current, plugin.pluginId]);
+  }, []);
+
+  const handleMenuKeyDown = useCallback((event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (!(["ArrowDown", "ArrowUp", "Home", "End"] as string[]).includes(event.key)) return;
+    const items = Array.from(menuRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? [])
+      .filter((item) => !item.hasAttribute("disabled") && item.offsetParent !== null);
+    if (items.length === 0) return;
+    event.preventDefault();
+    const current = items.indexOf(document.activeElement as HTMLElement);
+    const next = event.key === "Home" ? 0
+      : event.key === "End" ? items.length - 1
+        : event.key === "ArrowUp" ? (current <= 0 ? items.length - 1 : current - 1)
+          : (current + 1) % items.length;
+    items[next]?.focus();
+  }, []);
 
   const browsePlugins = useCallback(() => {
-    setOpen(false);
+    closePopup(false);
     navigate("/extensions");
-  }, [navigate]);
+  }, [closePopup, navigate]);
 
   return (
     <>
@@ -181,29 +264,50 @@ function ExplorerPluginTabMenu(props: {
         title="Extensions"
         aria-haspopup="menu"
         aria-expanded={open}
-        onClick={() => setOpen((current) => !current)}
+        onClick={() => {
+          setRequestedSelectedPath("");
+          setOpen((current) => !current);
+        }}
       >
         <Puzzle size={16} />
       </button>
-      {open ? createPortal((
-        <div ref={menuRef} className={pluginTabMenuStyles.menu} style={menuStyle} role="menu" aria-label="Extensions">
+      {(open || visitedPluginIds.length > 0) ? createPortal((
+        <div
+          ref={menuRef}
+          className={pluginTabMenuStyles.menu}
+          style={{ ...menuStyle, display: open ? undefined : "none" }}
+          role={selectedPlugin ? "dialog" : "menu"}
+          aria-label={selectedPlugin ? `${selectedPlugin.pluginName} extension` : "Extensions"}
+          aria-hidden={!open}
+          onKeyDown={handleMenuKeyDown}
+        >
           <header className={pluginTabMenuStyles.header}>
             <span className={pluginTabMenuStyles.headerTitle}>
-              <Puzzle size={16} />
-              <strong>Extensions</strong>
+              {selectedPlugin ? (
+                <button data-extension-popup-initial className={pluginTabMenuStyles.iconButton} type="button" title="Back to extensions" onClick={() => setSelectedPluginId(null)}>
+                  <ArrowLeft size={16} />
+                </button>
+              ) : <Puzzle size={16} />}
+              {selectedPlugin ? <PluginIcon pluginId={selectedPlugin.pluginId} pluginName={selectedPlugin.pluginName} fallback={selectedPlugin.kind} size={18} /> : null}
+              <strong>{selectedPlugin?.pluginName ?? "Extensions"}</strong>
             </span>
-            <span className={pluginTabMenuStyles.headerMeta}>{highlightedCount} usable</span>
+            {selectedPlugin ? (
+              <button className={pluginTabMenuStyles.iconButton} type="button" title="Close extensions" onClick={() => closePopup()}>
+                <X size={16} />
+              </button>
+            ) : <span className={pluginTabMenuStyles.headerMeta}>{highlightedCount} usable</span>}
           </header>
-          <label className={pluginTabMenuStyles.searchLabel}>
+          {!selectedPlugin ? <label className={pluginTabMenuStyles.searchLabel}>
             <span className="sr-only">Search extensions</span>
             <input
               className={pluginTabMenuStyles.searchInput}
+              data-extension-popup-initial
               value={query}
               placeholder="Search extensions..."
               onChange={(event) => setQuery(event.target.value)}
             />
-          </label>
-          {plugins.length > 0 ? (
+          </label> : null}
+          {!selectedPlugin && plugins.length > 0 ? (
             <div className={pluginTabMenuStyles.sections}>
               {visiblePlugins.map((plugin) => (
                 <button
@@ -214,7 +318,7 @@ function ExplorerPluginTabMenu(props: {
                     plugin.usable && pluginTabMenuStyles.itemUsable,
                   )}
                   role="menuitem"
-                  onClick={() => togglePluginPanel(plugin)}
+                  onClick={() => selectPlugin(plugin)}
                 >
                   <PluginIcon pluginId={plugin.pluginId} pluginName={plugin.pluginName} fallback={plugin.kind} size={16} />
                   <span className={pluginTabMenuStyles.itemText}>
@@ -233,15 +337,39 @@ function ExplorerPluginTabMenu(props: {
                 </div>
               ) : null}
             </div>
-          ) : (
+          ) : !selectedPlugin ? (
             <div className={pluginTabMenuStyles.empty}>
               <Puzzle size={20} />
               <span>No installed extension panels or commands found.</span>
             </div>
-          )}
+          ) : null}
+          {visitedPluginIds.map((pluginId) => {
+            const plugin = plugins.find((candidate) => candidate.pluginId === pluginId);
+            if (!plugin) return null;
+            const panel = plugin.panels.find(pluginPanelUsableInCurrentArea) ?? plugin.panels[0] ?? null;
+            return (
+              <div key={pluginId} className={pluginTabMenuStyles.detail} hidden={selectedPluginId !== pluginId}>
+                <div className={pluginTabMenuStyles.selection} title={selectedPath || "No file selected"}>
+                  <span>Selected file</span>
+                  <strong>{selectedPath || "No file selected"}</strong>
+                </div>
+                {panel ? <ExplorerPluginPanelHost panel={panel} selectedPath={selectedPath} /> : null}
+                {plugin.commands.length > 0 ? (
+                  <ExplorerPluginTabContent
+                    tab={{ kind: "commands", pluginId: plugin.pluginId, panelId: "", selectedPath }}
+                    commands={plugin.commands}
+                    panels={[]}
+                  />
+                ) : null}
+                {!panel && plugin.commands.length === 0 ? (
+                  <div className={pluginTabHostStyles.empty}><Puzzle size={24} /><h3>Extension unavailable</h3><p>No supported panel or commands were found.</p></div>
+                ) : null}
+              </div>
+            );
+          })}
           <button className={pluginTabMenuStyles.footerItem} type="button" role="menuitem" onClick={browsePlugins}>
-            <Puzzle size={15} />
-            <span>Browse extensions</span>
+            <ExternalLink size={15} />
+            <span>{selectedPlugin ? "Manage extension" : "Browse extensions"}</span>
           </button>
         </div>
       ), document.body) : null}
@@ -487,33 +615,6 @@ function pluginMenuSubtitle(plugin: PluginMenuItem): string {
   if (panelCount && commandCount) return `${panelCount} panel${panelCount === 1 ? "" : "s"} · ${commandCount} command${commandCount === 1 ? "" : "s"}`;
   if (panelCount) return `${panelCount} panel${panelCount === 1 ? "" : "s"}`;
   return `${commandCount} command${commandCount === 1 ? "" : "s"}`;
-}
-
-function pluginTabPathForMenuItem(plugin: PluginMenuItem, selectedPath: string): string {
-  const usablePanel = plugin.panels.find(pluginPanelUsableInCurrentArea);
-  const panel = usablePanel ?? plugin.panels[0];
-  const params = new URLSearchParams({ plugin: plugin.pluginId });
-  if (selectedPath.trim()) params.set("selected", selectedPath);
-  if (panel) {
-    params.set("panel", panel.id);
-    return `${pluginTabProtocol}//panel?${params.toString()}`;
-  }
-  return `${pluginTabProtocol}//commands?${params.toString()}`;
-}
-
-export function openPluginTab(plugin: PluginMenuItem, selectedPath: string): void {
-  const path = pluginTabPathForMenuItem(plugin, selectedPath);
-  const multi = useMultiPanelStore.getState();
-  const existing = multi.tabs.find((tab) => tab.path === path);
-  if (existing) {
-    multi.selectTab(existing.id);
-    return;
-  }
-  const tabId = multi.addTab(path, plugin.pluginName);
-  useMultiPanelStore.getState().setTabPanelVisibility(tabId, {
-    sidebarVisible: false,
-    previewVisible: false,
-  });
 }
 
 export function isTransfersTabPath(path: string): boolean {
@@ -834,17 +935,35 @@ function isMistyThemeId(value: unknown): value is MistyThemeId {
   return value === "misty-dark" || value === "misty-light" || value === "graphite" || value === "aurora" || value === "copper";
 }
 
-function webPanelUrl(entry: string, selectedPath: string): string {
-  const [path, query = ""] = entry.split("?", 2);
+function webPanelUrl(panel: PluginPanelEntry): string {
+  const [path, query = ""] = panel.webEntry.split("?", 2);
   const params = new URLSearchParams(query);
   params.set("hosted", "1");
-  if (selectedPath) params.append("selected", selectedPath);
-  return `${safeTauriAssetUrl(path)}?${params.toString()}`;
+  if (!hasTauriInternals()) return `${path}?${params.toString()}`;
+  const pluginRoot = panel.pluginDir.replace(/\\/g, "/").replace(/\/$/, "");
+  const normalizedPath = path.replace(/\\/g, "/");
+  if (!normalizedPath.startsWith(`${pluginRoot}/`)) return "about:blank";
+  const rootKind = pluginRoot.includes("/plugins/private/") ? "private"
+    : pluginRoot.includes("/plugins/public/") ? "public"
+      : "";
+  if (!rootKind) return "about:blank";
+  const relative = normalizedPath.slice(pluginRoot.length + 1);
+  const safeSegments = relative.split("/").filter(Boolean);
+  if (safeSegments.length === 0 || safeSegments.some((segment) => segment === "." || segment === "..")) return "about:blank";
+  const route = [rootKind, panel.pluginId, ...safeSegments].map(encodeURIComponent).join("/");
+  const base = navigator.userAgent.includes("Windows")
+    ? "http://misty-extension.localhost"
+    : "misty-extension://localhost";
+  return `${base}/${route}?${params.toString()}`;
 }
 
 function ExplorerWebPluginPanelHost(props: { panel: PluginPanelEntry; selectedPath: string }) {
+  const navigate = useNavigate();
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
-  const source = useMemo(() => webPanelUrl(props.panel.webEntry, props.selectedPath), [props.panel.webEntry, props.selectedPath]);
+  const [reloadKey, setReloadKey] = useState(0);
+  const [hostState, setHostState] = useState<"loading" | "ready" | "failed">("loading");
+  const timeoutRef = useRef<number | null>(null);
+  const source = useMemo(() => webPanelUrl(props.panel), [props.panel, reloadKey]);
 
   useEffect(() => () => {
     if (props.panel.pluginId !== "themes") return;
@@ -856,17 +975,31 @@ function ExplorerWebPluginPanelHost(props: { panel: PluginPanelEntry; selectedPa
   }, [props.panel.pluginId]);
 
   const postContext = useCallback(() => {
+    if (hostState !== "ready") return;
     iframeRef.current?.contentWindow?.postMessage({
       channel: "misty-host", kind: "context", pluginId: props.panel.pluginId,
       selectedPaths: props.selectedPath ? [props.selectedPath] : [],
     }, "*");
-  }, [props.panel.pluginId, props.selectedPath]);
+  }, [hostState, props.panel.pluginId, props.selectedPath]);
+
+  const beginHandshake = useCallback(() => {
+    setHostState("loading");
+    if (timeoutRef.current !== null) window.clearTimeout(timeoutRef.current);
+    timeoutRef.current = window.setTimeout(() => setHostState("failed"), 8_000);
+  }, []);
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
       if (event.source !== iframeRef.current?.contentWindow) return;
-      const request = event.data as { channel?: string; kind?: string; requestId?: string; pluginId?: string; command?: string; payload?: Record<string, unknown> } | null;
-      if (!request || request.channel !== "misty-plugin" || request.kind !== "request" || request.pluginId !== props.panel.pluginId || typeof request.requestId !== "string" || typeof request.command !== "string") return;
+      const request = event.data as { channel?: string; kind?: string; requestId?: string; pluginId?: string; protocolVersion?: number; command?: string; payload?: Record<string, unknown> } | null;
+      if (!request || request.channel !== "misty-plugin" || request.pluginId !== props.panel.pluginId) return;
+      if (request.kind === "ready" && request.protocolVersion === 1) {
+        if (timeoutRef.current !== null) window.clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+        setHostState("ready");
+        return;
+      }
+      if (request.kind !== "request" || typeof request.requestId !== "string" || typeof request.command !== "string") return;
       const respond = (ok: boolean, result?: unknown, error?: string) => iframeRef.current?.contentWindow?.postMessage({ channel: "misty-host", kind: "response", requestId: request.requestId, ok, result, error }, "*");
       const payload = request.payload ?? {};
       if (request.command === "host.selectedPaths") { respond(true, { ok: true, selectedPaths: props.selectedPath ? [props.selectedPath] : [] }); return; }
@@ -880,14 +1013,46 @@ function ExplorerWebPluginPanelHost(props: { panel: PluginPanelEntry; selectedPa
         return;
       }
       void extensionCommandRun({ pluginId: props.panel.pluginId, command: request.command, payload })
-        .then((result) => respond(true, result)).catch((error) => respond(false, undefined, errorText(error)));
+        .then((result) => {
+          const started = result as { jobId?: string };
+          if (typeof started.jobId === "string" && started.jobId) {
+            monitorExtensionJob(props.panel.pluginId, props.panel.pluginName, started.jobId);
+          }
+          respond(true, result);
+        }).catch((error) => respond(false, undefined, errorText(error)));
     };
     window.addEventListener("message", handleMessage);
     return () => window.removeEventListener("message", handleMessage);
   }, [props.panel.pluginId, props.selectedPath]);
 
   useEffect(postContext, [postContext]);
-  return <section className={`${pluginTabHostStyles.panel} min-h-[360px] overflow-hidden p-0`}><iframe ref={iframeRef} className="h-full min-h-[420px] w-full border-0 bg-[var(--misty-bg)]" src={source} title={`${props.panel.title} extension`} sandbox="allow-scripts allow-same-origin" onLoad={postContext} /></section>;
+  useEffect(() => {
+    beginHandshake();
+    return () => {
+      if (timeoutRef.current !== null) window.clearTimeout(timeoutRef.current);
+    };
+  }, [beginHandshake, reloadKey]);
+  return (
+    <section className={`${pluginTabHostStyles.panel} relative min-h-[360px] overflow-hidden p-0`}>
+      {hostState !== "ready" ? (
+        <div className="absolute inset-0 z-10 grid content-center justify-items-center gap-3 bg-[var(--misty-bg)] p-5 text-center text-sm text-[#adadad]">
+          {hostState === "loading" ? <><RefreshCcw className="animate-spin" size={20} /><span>Loading extension…</span></> : (
+            <>
+              <Puzzle size={24} />
+              <strong className="text-[#eeeeee]">Extension did not start</strong>
+              <span>The panel bundle may be missing, outdated, or incompatible with this Misty version.</span>
+              <div className="flex flex-wrap justify-center gap-2">
+                <button className={pluginTabHostStyles.button} type="button" onClick={() => setReloadKey((value) => value + 1)}><RefreshCcw size={13} />Retry</button>
+                <button className={pluginTabHostStyles.button} type="button" onClick={() => navigate("/extensions")}><ExternalLink size={13} />Manage Extension</button>
+              </div>
+              <code className="max-w-full overflow-hidden text-ellipsis text-[10px] text-[#777]">{props.panel.webEntry}</code>
+            </>
+          )}
+        </div>
+      ) : null}
+      <iframe key={reloadKey} ref={iframeRef} className="h-full min-h-[420px] w-full border-0 bg-[var(--misty-bg)]" src={source} title={`${props.panel.title} extension`} sandbox="allow-scripts allow-same-origin" onLoad={beginHandshake} />
+    </section>
+  );
 }
 
 async function handleThemeWebCommand(command: string, payload: Record<string, unknown>) {

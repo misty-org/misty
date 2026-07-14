@@ -1,1 +1,1 @@
-export type AppTab = "files" | "transfers" | "providers" | "home" | "automations" | "activity" | "settings" | "account" | "diagnostics";
+export type AppTab = "files" | "library" | "transfers" | "providers" | "home" | "automations" | "activity" | "settings" | "account" | "diagnostics";

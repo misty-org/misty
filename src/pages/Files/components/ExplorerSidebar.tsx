@@ -588,16 +588,16 @@ export const ExplorerSidebar = memo(function ExplorerSidebar(props: ExplorerSide
         ) : null}
       </section>
 
-      <section className={sidebarStyles.section}>
+      <section className="hidden" aria-hidden="true">
         <SidebarSectionHeader
-          title="Smart Folders"
+          title="Collections"
           collapsed={collapsedSections.smartFolders}
           onToggle={() => toggleSection("smartFolders")}
           actions={(
             <button
               type="button"
-              title="New smart folder"
-              aria-label="New smart folder"
+              title="New collection"
+              aria-label="New collection"
               className={sidebarStyles.sectionActionButton}
               onClick={(event) => {
                 event.stopPropagation();
@@ -611,8 +611,8 @@ export const ExplorerSidebar = memo(function ExplorerSidebar(props: ExplorerSide
         {!collapsedSections.smartFolders ? (
           <div className={sidebarStyles.list}>
             {smartFolderError ? <p className={sidebarStyles.errorText}>{smartFolderError}</p> : null}
-            {smartFoldersLoading && savedSearches.length === 0 ? <div className={sidebarStyles.muted}>Loading smart folders...</div> : null}
-            {!smartFoldersLoading && savedSearches.length === 0 ? <div className={sidebarStyles.muted}>No smart folders yet</div> : null}
+            {smartFoldersLoading && savedSearches.length === 0 ? <div className={sidebarStyles.muted}>Loading collections...</div> : null}
+            {!smartFoldersLoading && savedSearches.length === 0 ? <div className={sidebarStyles.muted}>No collections yet</div> : null}
             {savedSearches.map((search) => {
               const query = search.query.trim() || smartFolderQueryFromRules(search.rules, smartFolderMatchMode(search.rules));
               return (
@@ -644,7 +644,7 @@ export const ExplorerSidebar = memo(function ExplorerSidebar(props: ExplorerSide
         ) : null}
       </section>
 
-      <section className={sidebarStyles.section}>
+      <section className="hidden" aria-hidden="true">
         <SidebarSectionHeader
           title="Tags"
           collapsed={collapsedSections.tags}

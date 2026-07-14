@@ -129,7 +129,7 @@ function classifyAssistantRequest(prompt: string): AssistantRequestScope {
   const normalized = prompt.toLowerCase();
   const matches: AssistantScope[] = [];
   if (/\b(clean(?:up)?|tidy|declutter|organize|duplicate|unused|large files?|old files?)\b/.test(normalized)) matches.push("cleanup");
-  if (/\b(search|find|locate|look for|where (?:is|are)|smart folder|query|tagged|tags?)\b/.test(normalized)) matches.push("search");
+  if (/\b(search|find|locate|look for|where (?:is|are)|collections?|smart folder|query|tagged|tags?)\b/.test(normalized)) matches.push("search");
   if (/\b(open|reveal|show in finder|copy|move|rename|create|make (?:a )?(?:file|folder)|transfer|download|upload)\b/.test(normalized)) matches.push("files");
   const distinct = [...new Set(matches)];
   if (distinct.length > 1) return "ambiguous";
@@ -205,6 +205,8 @@ export const useMikaSessionStore = create<AiSessionStore>((set, get) => ({
   sendPrompt: async ({ displayPrompt, prompt, cwd, selectedPaths }) => {
     const trimmed = displayPrompt.trim();
     if (!trimmed || get().status?.running) return;
+    const settingsStore = useSettingsStore.getState();
+    if (!settingsStore.loaded) await settingsStore.load();
     const preferences = selectAssistantPreferences(useSettingsStore.getState().settings?.document);
     if (!preferences.enabled) {
       appendBlockedRequest(set, trimmed, "Mika is disabled. Enable Mika in Settings > Assistant to continue.");

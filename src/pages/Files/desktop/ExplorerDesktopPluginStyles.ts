@@ -5,6 +5,8 @@ const pluginTabMenuStyles = {
     "flex h-9 items-center justify-between gap-2 border-b border-[#292929] px-2.5 text-sm",
   headerTitle: "flex min-w-0 items-center gap-2",
   headerMeta: "text-xs font-semibold text-[#8f8f8f]",
+  iconButton:
+    "grid size-7 flex-none place-items-center rounded-md border-0 bg-transparent text-[#adadad] hover:bg-[var(--misty-neutral-hover-bg,var(--misty-surface-hover))] hover:text-[#f7f7f7]",
   searchLabel: "block px-1.5 py-2",
   searchInput:
     "h-8 w-full rounded-lg border border-[#303030] bg-[#0c0c0c] px-2.5 text-[13px] text-[#eeeeee] outline-none placeholder:text-[#777777] focus:border-[#686868]",
@@ -26,6 +28,10 @@ const pluginTabMenuStyles = {
     "border-[var(--misty-neutral-border,var(--misty-border-strong))] bg-[var(--misty-neutral-selected-bg,var(--misty-surface-selected))] text-[#eeeeee]",
   empty:
     "grid justify-items-center gap-2 px-4 py-5 text-center text-xs text-[#adadad]",
+  detail:
+    "grid min-h-0 gap-3 overflow-auto p-3",
+  selection:
+    "grid min-w-0 gap-1 rounded-lg border border-[#303030] bg-[var(--misty-neutral-control-bg,var(--misty-surface-2))] px-3 py-2 [&>span]:text-[10px] [&>span]:font-bold [&>span]:uppercase [&>span]:text-[#858585] [&>strong]:overflow-hidden [&>strong]:text-ellipsis [&>strong]:whitespace-nowrap [&>strong]:font-mono [&>strong]:text-[11px] [&>strong]:font-medium [&>strong]:text-[#cfcfcf]",
   footerItem:
     "mt-1 flex h-9 w-full items-center gap-2 rounded-lg border-0 border-t border-[#292929] bg-transparent px-2.5 text-left text-xs font-semibold text-[#cfcfcf] hover:bg-[var(--misty-neutral-hover-bg,var(--misty-surface-hover))] hover:text-[#f7f7f7]",
 } as const;

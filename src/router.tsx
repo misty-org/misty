@@ -6,13 +6,15 @@ import {
   RouterProvider,
   useLocation,
 } from "react-router-dom";
-import { ArrowUpDown, Folder, Home, PlugZap, Puzzle, Settings, UserCircle, Workflow } from "lucide-react";
+import { ArrowUpDown, Folder, Home, LibraryBig, PlugZap, Puzzle, Settings, UserCircle, Workflow } from "lucide-react";
 import AccountPage from "./pages/Account";
 import ChangelogPage from "./pages/Changelog";
 import ExtensionsPage from "./pages/Extensions";
 import FilesPage from "./pages/Files";
 import HomePage from "./pages/Home";
+import LibraryPage from "./pages/Library";
 import CloudFolderBotOverlay from "./pages/BotOverlay/CloudFolderBotOverlay";
+import CloudFolderBotChatOverlay from "./pages/BotOverlay/CloudFolderBotChatOverlay";
 import ProvidersPage from "./pages/Providers";
 import RegisterPage from "./pages/Register";
 import SettingsPage from "./pages/Settings";
@@ -50,6 +52,7 @@ const routes = {
   extensions: "/extensions",
   files: "/files",
   home: "/home",
+  library: "/library",
   providers: "/providers",
   register: "/register",
   settings: "/settings",
@@ -64,6 +67,7 @@ const appPageTitles = new Map<string, string>([
   ...(isPhoneBuild ? [] : [
     [routes.home, "Misty - Home"],
     [routes.extensions, "Misty - Extensions"],
+    [routes.library, "Misty - Library"],
     [routes.changelog, "Misty - Changelog"],
     [routes.signIn, "Misty - Sign In"],
     [routes.register, "Misty - Register"],
@@ -87,6 +91,7 @@ const desktopNavItems = (isPhoneBuild ? [] : [
       pathname === routes.home || pathname.startsWith(routes.changelog),
   },
   { id: "files", label: "Files", path: routes.files, icon: Folder },
+  { id: "library", label: "Library", path: routes.library, icon: LibraryBig },
   { id: "automations", label: "Automations", path: routes.automations, icon: Workflow },
   ...(isAndroidBuild ? [] : [
   {
@@ -120,6 +125,7 @@ const desktopDeepLinkPrefixes = isPhoneBuild ? [] : [
   routes.transfers,
   ...mobileDeepLinkPrefixes,
   routes.home,
+  routes.library,
   routes.extensions,
   routes.changelog,
   routes.signIn,
@@ -138,12 +144,14 @@ export const router = createBrowserRouter([
     ),
     children: [
       { path: "bot/cloud-folder", element: <CloudFolderBotOverlay /> },
+      { path: "bot/cloud-folder-chat", element: <CloudFolderBotChatOverlay /> },
       { path: "pet/cloud-folder", element: <Navigate to={routes.cloudFolderBot} replace /> },
       {
         element: <AppFrameLayout />,
         children: [
           { index: true, element: <StartupRedirect /> },
           { path: "files", element: <FilesPage /> },
+          { path: "library", element: <LibraryPage /> },
           { path: "providers", element: <ProvidersPage /> },
           {
             path: "transfers",
@@ -369,6 +377,7 @@ function ResponsiveRoute(props: {
 }
 
 function desktopRouteIdFromPath(pathname: string): AppTab {
+  if (pathname.startsWith(routes.library)) return "library";
   if (pathname.startsWith(routes.automations)) return "automations";
   if (pathname.startsWith(routes.transfers)) return "transfers";
   if (pathname.startsWith(routes.providers)) return "providers";
