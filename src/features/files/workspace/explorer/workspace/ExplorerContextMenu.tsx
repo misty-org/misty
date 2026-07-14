@@ -9,23 +9,20 @@ export {
   extractArchiveTo,
 } from "./contextMenu/fileActions";
 export { compareSeedForPane, openCompareWith } from "./contextMenu/remoteVerification";
+import { AddFilesToSpaceDialog } from "@/features/library/library";
 import { selectShortcutPreferences, useSettingsStore } from "@/features/settings";
 import { effectiveShortcut, formatShortcutLabel } from "@/features/shortcuts";
-import { AddFilesToSpaceDialog } from "@/features/library/library";
-import { ExplorerContextMenuView } from "./ExplorerContextMenuView";
 import {
   AppWindow,
   Archive,
   ArrowRightLeft,
   Clipboard,
   Copy,
-  Download,
   Eye,
   FilePlus,
   Folder,
   FolderPlus,
   Hash,
-  Link,
   MoreHorizontal,
   PanelsTopLeft,
   Pencil,
@@ -41,11 +38,12 @@ import type {
   ContextMenuLeafItem,
 } from "../model/types/workspace/ExplorerContextMenu";
 import { useExplorerStore } from "../store";
-import { buildArchiveItems, buildFileToolsItems } from "./contextMenu/archiveToolsItems";
-import { openCompareWith, verifyExplorerRemotePath } from "./contextMenu/remoteVerification";
+import { buildArchiveItems, buildFileToolsItems } from "./contextMenu/ArchiveToolsItems";
+import { openCompareWith } from "./contextMenu/remoteVerification";
 import { calculateSelectedFolderSizes } from "./contextMenu/selectionHelpers";
 import { useContextMenuState } from "./contextMenu/useContextMenuState";
 import { clearSelectionsAcrossPanes } from "./ExplorerAgentPanels";
+import { ExplorerContextMenuView } from "./ExplorerContextMenuView";
 
 export const ExplorerContextMenu = memo(function ExplorerContextMenu() {
   const [addToSpacePaths, setAddToSpacePaths] = useState<string[]>([]);
@@ -76,8 +74,6 @@ export const ExplorerContextMenu = memo(function ExplorerContextMenu() {
     targetCanOpenWith,
     targetEntry,
     targetPinned,
-    targetRemoteName,
-    targetRemotePath,
     x,
     y,
   } = useContextMenuState();
@@ -182,31 +178,6 @@ export const ExplorerContextMenu = memo(function ExplorerContextMenu() {
     },
   ];
 
-  const remoteItems: ContextMenuLeafItem[] = [
-    {
-      id: "download",
-      icon: <Download size={17} />,
-      label: "Download",
-      disabled: !hasRemoteSelection,
-      disabledReason: "Download is available for remote files and folders.",
-      onRun: () => run(() => void useExplorerStore.getState().downloadSelected(paneId)),
-    },
-    {
-      id: "verify",
-      icon: <ArrowRightLeft size={17} />,
-      label: "Verify against...",
-      disabled: !targetRemoteName || !targetRemotePath,
-      disabledReason: "Verify is available for provider files and folders.",
-      onRun: () =>
-        run(
-          () =>
-            targetRemoteName &&
-            targetRemotePath &&
-            void verifyExplorerRemotePath(targetRemoteName, targetRemotePath),
-        ),
-    },
-  ];
-
   const archiveToolsContext = {
     hasRemoteSelection,
     hasSelection,
@@ -307,7 +278,6 @@ export const ExplorerContextMenu = memo(function ExplorerContextMenu() {
     { id: "delete", icon: <Trash2 size={17} />, label: "Delete", items: deleteItems },
     { id: "archive", icon: <Archive size={17} />, label: "Archive", items: archiveItems },
     { id: "file-tools", icon: <Hash size={17} />, label: "File Tools", items: fileToolsItems },
-    { id: "remote", icon: <Link size={17} />, label: "Remote", items: remoteItems },
     ...(entryId
       ? [
           {

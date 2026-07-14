@@ -15,7 +15,7 @@ vi.mock("@/api/search/api", () => ({
 vi.mock("@/features/library/library", () => ({
   searchSemanticAssets: mocks.searchSemanticAssets,
 }));
-vi.mock("@/features/files/workspace/search", () => ({
+vi.mock("@/features/global-search/indexing", () => ({
   ensureMediaSearchDeviceReady: (snapshot: unknown) => snapshot,
   searchMedia: mocks.searchMedia,
 }));
@@ -27,10 +27,7 @@ vi.mock("@/features/files/workspace/native", () => ({
   smartLibrarySnapshot: vi.fn().mockResolvedValue({ activeLibrary: null }),
 }));
 
-import {
-  clearSemanticExplorerSearchCache,
-  querySemanticExplorerSearch,
-} from "./globalSearch";
+import { clearSemanticExplorerSearchCache, querySemanticExplorerSearch } from "./globalSearch";
 
 describe("global media search cache resilience", () => {
   beforeEach(() => {

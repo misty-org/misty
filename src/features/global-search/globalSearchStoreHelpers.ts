@@ -2,7 +2,7 @@ import { subscribeAccountEvents } from "@/api/accountEvents";
 import {
   captureAgentActivityReporter,
   runtimeAgentsApi as agentsApi,
-} from "@/features/agents/agentsRuntime";
+} from "@/features/agents/AgentsRuntime";
 
 import type { AiCitation, AiContextReference, AiInvocationEvent } from "@/features/ai-surface";
 import { globalMistyId, normalizeActionState } from "./globalMistyActions";

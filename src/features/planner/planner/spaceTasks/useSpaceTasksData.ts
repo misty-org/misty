@@ -37,7 +37,9 @@ export function useSpaceTasksData(options: {
       try {
         const taskResult = await api.tasks(spaceId, {
           status: status === "all" ? undefined : status,
-          assigneeUserId: effectiveAssignee.startsWith("person:") ? effectiveAssignee.slice(7) : effectiveAssignee || undefined,
+          assigneeUserId: effectiveAssignee.startsWith("person:")
+            ? effectiveAssignee.slice(7)
+            : effectiveAssignee || undefined,
           priority: priority === "all" ? undefined : priority,
           search: query.trim() || undefined,
           dueFrom: dueRange?.from,

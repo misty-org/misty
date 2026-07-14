@@ -1,5 +1,5 @@
 import { expect, it, vi } from "vitest";
-import type { FileEntry } from "@/native/contracts";
+import type { FileEntry } from "@/native/ipc";
 import { createGridThumbnailQueue } from "./createGridThumbnailQueue";
 
 it("disposes stale and late thumbnail URLs without publishing them to another listing", async () => {

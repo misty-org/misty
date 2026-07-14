@@ -1,6 +1,6 @@
-import type { TransferRecord } from "@/native/contracts";
+import type { TransferRecord } from "@/native/ipc";
 import { SystemErrorActivity } from "@/features/activity";
-import type { TransferType } from "@/native/contracts/primitives";
+import type { TransferType } from "@/native/ipc/primitives";
 import { prettyLabel } from "@/shared/lib/format";
 import {
   Button,

@@ -1,6 +1,6 @@
-import { Button, Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/shared/ui";
+import { IconButton, Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/shared/ui";
 import { ClipboardPaste, Copy, CopyPlus, Maximize2, Redo2, Trash2, Undo2 } from "lucide-react";
-import { useRoadmapShortcutTitle as useShortcutTitle } from "../spaceRoadmap/roadmapRuntime";
+import { useRoadmapShortcutTitle as useShortcutTitle } from "../spaceRoadmap/RoadmapRuntime";
 
 export function GraphToolbar(props: {
   canEdit: boolean;
@@ -52,17 +52,9 @@ export function GraphToolbar(props: {
         {tools.map(({ label, icon: Icon, action, disabled }) => (
           <Tooltip key={label}>
             <TooltipTrigger asChild>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="size-7"
-                disabled={disabled}
-                aria-label={label}
-                onClick={action}
-              >
+              <IconButton label={label} tooltip={false} disabled={disabled} onClick={action}>
                 <Icon className="size-3.5" />
-              </Button>
+              </IconButton>
             </TooltipTrigger>
             <TooltipContent>{label}</TooltipContent>
           </Tooltip>

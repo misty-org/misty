@@ -5,7 +5,7 @@ import {
   explorerQueuePasteItems,
   explorerQueueRenameItem,
   explorerQueueRenameItems,
-} from "@/features/files/workspace/native";
+} from "../../../native";
 import { userFacingErrorText } from "@/shared/lib/format";
 import type { ExplorerInlineEditState, ExplorerStore } from "../../model/interfaces/store/types";
 import type { ExplorerGet, ExplorerSet } from "../../model/types/store/types";

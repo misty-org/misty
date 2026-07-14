@@ -39,16 +39,7 @@ impl ExplorerService {
             .map(PathBuf::from)
             .unwrap_or_else(|| self.home_dir.clone());
 
-        if requested == self.mount_root || requested.starts_with(&self.mount_root) {
-            return self
-                .list_virtual_directory(
-                    &requested,
-                    request.show_hidden.unwrap_or(false),
-                    request.force_remote_refresh.unwrap_or(false),
-                )
-                .await;
-        }
-
+        self.reject_virtual_mount_container(&display_path(&requested), "browse")?;
         let home_dir = self.home_dir.clone();
         tokio::task::spawn_blocking(move || list_directory(home_dir, request))
             .await
@@ -116,7 +107,7 @@ impl ExplorerService {
         if path.is_empty() {
             return None;
         }
-        if self.remote_target(path).is_none() && prune_missing_local && !Path::new(path).exists() {
+        if prune_missing_local && !Path::new(path).exists() {
             return None;
         }
         let path_buf = PathBuf::from(path);
@@ -134,16 +125,6 @@ impl ExplorerService {
         } else {
             FileKind::File
         };
-        let location = self
-            .remote_target(path)
-            .map(|target| ExplorerLocation {
-                kind: ExplorerLocationKind::Remote,
-                provider_type: Some(target.provider_type),
-                remote_name: Some(target.remote_name),
-                remote_path: Some(target.remote_path),
-                ..Default::default()
-            })
-            .unwrap_or_else(ExplorerLocation::local);
         let size_bytes = if item.size > 0 && !item.is_dir {
             Some(item.size as u64)
         } else {
@@ -185,27 +166,11 @@ impl ExplorerService {
                 .map(|value| value.starts_with('.'))
                 .unwrap_or(false),
             is_deleted: false,
-            location,
+            location: ExplorerLocation::local(),
         })
     }
 
     pub async fn item_is_directory(&self, path: &str) -> ApiResult<Option<bool>> {
-        if let Some(target) = self.remote_target(path) {
-            if target.remote_path == "/" {
-                return Ok(Some(true));
-            }
-            let parent = RemoteBrowseTarget {
-                provider_type: target.provider_type.clone(),
-                remote_name: target.remote_name.clone(),
-                remote_path: remote_parent_path(&target.remote_path),
-            };
-            let items = match self.fetch_remote_items(&parent).await {
-                Ok(items) => items,
-                Err(error) if is_remote_directory_not_found_error(&error) => return Ok(None),
-                Err(error) => return Err(error),
-            };
-            return remote_item_is_directory(&parent, &target.remote_path, &items);
-        }
         self.reject_virtual_mount_container(path, "inspect")?;
         // Match std::filesystem::is_directory in the native Explorer: the
         // decision to browse or open follows a local symlink's target.

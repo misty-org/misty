@@ -1,4 +1,4 @@
-import type { SearchResult } from "@/native/contracts";
+import type { SearchResult } from "@/native/ipc";
 export const semanticCache = new Map<string, { expiresAt: number; results: SearchResult[] }>();
 export const semanticInFlight = new Map<string, Promise<SearchResult[]>>();
 export const semanticCacheVersion = { generation: 0 };

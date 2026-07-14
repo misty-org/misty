@@ -1,4 +1,4 @@
-import type { TransferRecord } from "@/native/contracts";
+import type { TransferRecord } from "@/native/ipc";
 
 export function transferProgress(row: TransferRecord): string {
   if (

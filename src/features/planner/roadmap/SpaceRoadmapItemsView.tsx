@@ -1,4 +1,4 @@
-import { useRoadmapRuntime } from "./spaceRoadmap/roadmapRuntime";
+import { useRoadmapRuntime } from "./spaceRoadmap/RoadmapRuntime";
 import type {
   SpaceRoadmap,
   SpaceRoadmapGoal,
@@ -9,28 +9,23 @@ import type { SpaceTask } from "@/api/spaces/dto/interfaces/types";
 import { errorText } from "@/shared/lib/format";
 import {
   Button,
+  cn,
   Input,
   Popover,
   PopoverContent,
   PopoverTrigger,
+  Pressable,
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
+  Spinner,
 } from "@/shared/ui";
-import {
-  CalendarDays,
-  CheckCircle2,
-  Flag,
-  GitFork,
-  LoaderCircle,
-  Plus,
-  Target,
-} from "lucide-react";
+import { CalendarDays, CheckCircle2, Flag, GitFork, Plus, Target } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { SpaceViewModeToggle } from "@/features/spaces/components/SpaceViewModeToggle";
+import { SpaceViewModeToggle } from "@/features/spaces";
 import { ErrorBanner } from "./spaceRoadmap/RoadmapEditor";
 import { GoalForm, MilestoneForm } from "./spaceRoadmap/RoadmapInspector";
 
@@ -74,7 +69,7 @@ export function SpaceRoadmapItemsView({
     } finally {
       setLoading(false);
     }
-  }, [kind, spaceId]);
+  }, [kind, spaceId, spacesApi]);
 
   useEffect(() => {
     void load();
@@ -159,7 +154,7 @@ export function SpaceRoadmapItemsView({
           {error ? <ErrorBanner message={error} onRetry={() => void load()} /> : null}
           {loading && !snapshots.length ? (
             <div className="grid min-h-48 place-items-center">
-              <LoaderCircle className="size-5 animate-spin text-cream-muted" />
+              <Spinner size="lg" label={false} className="text-cream-muted" />
             </div>
           ) : rows.length ? (
             <div className="overflow-hidden rounded-xl border border-charcoal-border/70 bg-charcoal-card">
@@ -175,14 +170,11 @@ export function SpaceRoadmapItemsView({
                     onOpenChange={(open) => setSelectedId(open ? item.id : "")}
                   >
                     <PopoverTrigger asChild>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        className={[
-                          "h-auto w-full justify-start gap-3 rounded-none px-4 py-3 text-left",
-                          "whitespace-normal transition-colors hover:bg-charcoal-card",
-                          index ? "border-t border-charcoal-border/60" : "",
-                        ].join(" ")}
+                      <Pressable
+                        className={cn(
+                          "flex w-full items-center gap-3 px-4 py-3 hover:bg-charcoal-card",
+                          index && "border-t border-charcoal-border/60",
+                        )}
                       >
                         <StatusIcon status={status} />
                         <span className="min-w-0 flex-1">
@@ -207,7 +199,7 @@ export function SpaceRoadmapItemsView({
                             ? `${goal.progress_percentage}%`
                             : `${milestone?.goal_done ?? 0}/${milestone?.goal_total ?? 0} goals`}
                         </span>
-                      </Button>
+                      </Pressable>
                     </PopoverTrigger>
                     <PopoverContent
                       side="right"
@@ -389,11 +381,7 @@ function CreateRoadmapItem({
               setOpen(false);
             }}
           >
-            {saving ? (
-              <LoaderCircle className="size-4 animate-spin" />
-            ) : (
-              <Plus className="size-4" />
-            )}
+            {saving ? <Spinner label={false} /> : <Plus className="size-4" />}
             Create
           </Button>
         </div>

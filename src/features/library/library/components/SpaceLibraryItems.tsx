@@ -1,6 +1,6 @@
 import type { LibraryAssetStack, SpaceLibraryItem } from "@/api/spaces/dto/interfaces/types";
 import { useDropZone, usePointerDrag } from "@/features/dnd";
-import { Button, cn } from "@/shared/ui";
+import { Button, IconButton, Pressable } from "@/shared/ui";
 import { Check, EllipsisVertical, Star } from "lucide-react";
 import { Fragment, type MouseEvent as ReactMouseEvent } from "react";
 import {
@@ -240,13 +240,8 @@ function LibraryItemCard({
             : undefined
         }
       >
-        <Button
-          className={[
-            "relative grid aspect-[4/3] h-auto w-full place-items-center overflow-hidden",
-            "rounded-lg border-0 bg-charcoal-card p-0 text-cream-muted hover:bg-charcoal-card",
-          ].join(" ")}
-          variant="ghost"
-          type="button"
+        <Pressable
+          className="relative grid aspect-[4/3] w-full place-items-center overflow-hidden rounded-lg bg-charcoal-card text-cream-muted"
           onClick={(event) => {
             libraryViewerTriggerRef.current = event.currentTarget;
             setSelectedItemId(item.id);
@@ -263,7 +258,7 @@ function LibraryItemCard({
               {assetStackLabel(assetStack)}
             </span>
           ) : null}
-        </Button>
+        </Pressable>
         {selectionAvailable ? (
           <Button
             className={selectionToggleClassName(selected)}
@@ -308,28 +303,21 @@ function LibraryItemActions({
       className={`flex shrink-0 items-center gap-0.5 transition-opacity ${actionVisibility}`}
       aria-label={`Actions for ${item.display_name}`}
     >
-      <Button
-        className={cn(
-          "grid shrink-0 place-items-center rounded-lg border-0 bg-transparent text-cream-muted hover:bg-charcoal-card hover:text-cream",
-          "size-7",
-        )}
-        type="button"
+      <IconButton
+        label={`${item.favorite ? "Remove from favorites" : "Add to favorites"}: ${item.display_name}`}
+        tooltip={item.favorite ? "Remove favorite" : "Favorite"}
         onClick={() =>
           void updateItem(item, {
             favorite: !item.favorite,
           })
         }
-        title={item.favorite ? "Remove favorite" : "Favorite"}
-        aria-label={`${item.favorite ? "Remove from favorites" : "Add to favorites"}: ${item.display_name}`}
       >
         <Star size={14} fill={item.favorite ? "currentColor" : "none"} />
-      </Button>
-      <Button
-        className={cn(
-          "grid shrink-0 place-items-center rounded-lg border-0 bg-transparent text-cream-muted hover:bg-charcoal-card hover:text-cream",
-          "size-7",
-        )}
-        type="button"
+      </IconButton>
+      <IconButton
+        label={`More actions for ${item.display_name}`}
+        tooltip={false}
+        aria-haspopup="menu"
         onClick={(event) => {
           const rect = event.currentTarget.getBoundingClientRect();
           onShowMenu(
@@ -339,11 +327,9 @@ function LibraryItemActions({
             event.currentTarget,
           );
         }}
-        aria-label={`More actions for ${item.display_name}`}
-        aria-haspopup="menu"
       >
         <EllipsisVertical size={15} />
-      </Button>
+      </IconButton>
     </div>
   );
 }

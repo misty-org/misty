@@ -5,10 +5,22 @@ useDefault = true
 # public OAuth identifiers and test-only certificates. It is not linked into
 # Misty's desktop or server. Scan Misty's first-party code and configuration;
 # audit the pinned upstream distribution separately when it is updated.
-[allowlist]
-description = "Vendored upstream fixtures and local-only ignored configuration"
+[[allowlists]]
+description = "Vendored upstream fixtures"
 paths = [
   '''^service/''',
   '''^vendor/''',
-  '''^\.env\.desktop$''',
 ]
+
+[[allowlists]]
+description = "Public cross-language fixtures signed with a documented test-only key"
+condition = "AND"
+paths = ['''(?:^|/)server/test/fixtures/compatibility/self-host-proofs\.json$''']
+regexTarget = "line"
+regexes = ['''"(?:goToken|nodeToken)"''']
+
+[[rules]]
+id = "google-service-account-bound-api-key"
+description = "Google API key bound to a service account"
+regex = '''\bAQ\.[A-Za-z0-9_-]{40,}\b'''
+keywords = ["AQ."]

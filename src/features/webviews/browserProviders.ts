@@ -2,7 +2,7 @@ import {
   mistyBrowserProviders,
   MistyBrowserUrlSchema,
   type MistyBrowserProvider,
-} from "@/shared/contracts";
+} from "@/shared/schemas";
 
 export type BrowserProviderId = MistyBrowserProvider["id"];
 export const browserProviders = mistyBrowserProviders;

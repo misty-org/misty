@@ -1,4 +1,4 @@
-import type { PlannerPreferenceStorage } from "./roadmapRuntime";
+import type { PlannerPreferenceStorage } from "./RoadmapRuntime";
 import type {
   SpaceRoadmapEdgeEndpoint,
   SpaceRoadmapMilestone,

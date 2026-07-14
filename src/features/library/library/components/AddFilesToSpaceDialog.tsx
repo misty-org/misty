@@ -1,9 +1,9 @@
 import { readAccountSessionGeneration } from "@/features/auth";
-import { LibraryError as SystemErrorActivity } from "@/features/library/library/libraryRuntime";
+import { LibraryError as SystemErrorActivity } from "../LibraryRuntime";
 import { useActivityStore } from "@/features/activity/useActivityStore";
-import { useLibrarySpaces as useSpacesStore } from "@/features/library/library/libraryRuntime";
+import { useLibrarySpaces as useSpacesStore } from "../LibraryRuntime";
 import { spaceNavigationName } from "@/features/spaces/defaultSpace";
-import { libraryApi as spacesApi } from "@/features/library/library/libraryRuntime";
+import { libraryApi as spacesApi } from "../LibraryRuntime";
 import {
   Badge,
   Button,
@@ -19,8 +19,9 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  Spinner,
 } from "@/shared/ui";
-import { CheckCircle2, Copy, LoaderCircle, XCircle } from "lucide-react";
+import { CheckCircle2, Copy, XCircle } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
@@ -168,7 +169,12 @@ export function AddFilesToSpaceDialog({
         ? `${succeeded} added to ${destination}; ${failed} failed.`
         : `${succeeded} ${succeeded === 1 ? "copy" : "copies"} added to ${destination}.`;
     setMessage(summary);
-    useActivityStore.getState().ingestLocal({ title: summary, kind: failed || controller.signal.aborted ? "system" : "completion", appId: "library", spaceId });
+    useActivityStore.getState().ingestLocal({
+      title: summary,
+      kind: failed || controller.signal.aborted ? "system" : "completion",
+      appId: "library",
+      spaceId,
+    });
     if (succeeded > 0) {
       window.dispatchEvent(
         new CustomEvent("misty:space-library-event", { detail: { space_id: spaceId } }),
@@ -311,7 +317,7 @@ function JobIcon({ stage }: { stage: UploadStage }) {
   if (stage === "ready") return <CheckCircle2 className="size-4 text-sage-fg" />;
   if (stage === "failed" || stage === "canceled")
     return <XCircle className="size-4 text-cream-bright" />;
-  if (stage !== "queued") return <LoaderCircle className="size-4 animate-spin text-cream-bright" />;
+  if (stage !== "queued") return <Spinner label={false} className="text-cream-bright" />;
   return <Copy className="size-4 text-cream-muted" />;
 }
 

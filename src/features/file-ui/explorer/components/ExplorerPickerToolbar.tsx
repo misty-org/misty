@@ -1,5 +1,5 @@
 import { useMinimumSpin } from "@/shared/hooks/useMinimumSpin";
-import { Button, Input } from "@/shared/ui";
+import { Button, IconButton, Input } from "@/shared/ui";
 import { ArrowUp, ChevronLeft, ChevronRight, RefreshCcw, Search, X } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { breadcrumbSegments } from "../utils/fileFormat";
@@ -43,48 +43,36 @@ export function ExplorerPickerToolbar(props: ExplorerPickerToolbarProps) {
     <header className={toolbarStyles.root}>
       <div className={toolbarStyles.navRow}>
         <div className={toolbarStyles.navButtons} role="group" aria-label="Navigation">
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            aria-label="Back"
-            title="Back"
+          <IconButton
+            size="md"
+            label="Back"
             className={toolbarStyles.navigationButton}
             disabled={!props.canGoBack}
             onClick={props.onBack}
           >
             <ChevronLeft size={18} />
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            aria-label="Forward"
-            title="Forward"
+          </IconButton>
+          <IconButton
+            size="md"
+            label="Forward"
             className={toolbarStyles.navigationButton}
             disabled={!props.canGoForward}
             onClick={props.onForward}
           >
             <ChevronRight size={18} />
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            aria-label="Parent folder"
-            title="Parent folder"
+          </IconButton>
+          <IconButton
+            size="md"
+            label="Parent folder"
             className={toolbarStyles.navigationButton}
             disabled={!props.canGoParent}
             onClick={props.onParent}
           >
             <ArrowUp size={18} />
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            aria-label="Refresh current folder"
-            title="Refresh current folder"
+          </IconButton>
+          <IconButton
+            size="md"
+            label="Refresh current folder"
             className={toolbarStyles.navigationButton}
             onClick={() => {
               startRefreshSpin();
@@ -92,7 +80,7 @@ export function ExplorerPickerToolbar(props: ExplorerPickerToolbarProps) {
             }}
           >
             <RefreshCcw className={refreshSpinning ? "animate-spin" : undefined} size={17} />
-          </Button>
+          </IconButton>
         </div>
 
         <div
@@ -159,12 +147,8 @@ export function ExplorerPickerToolbar(props: ExplorerPickerToolbarProps) {
             }}
           />
           {props.query ? (
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-sm"
-              aria-label="Clear search"
-              title="Clear search"
+            <IconButton
+              label="Clear search"
               className={toolbarStyles.searchButton}
               onClick={() => {
                 props.onQueryChange("");
@@ -172,7 +156,7 @@ export function ExplorerPickerToolbar(props: ExplorerPickerToolbarProps) {
               }}
             >
               <X size={14} />
-            </Button>
+            </IconButton>
           ) : null}
         </label>
       </div>

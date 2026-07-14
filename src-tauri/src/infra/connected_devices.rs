@@ -274,7 +274,7 @@ impl ConnectedDevicesService {
         let keys = pinned_ticket_keys(&request.development_ticket_keys)?;
         let (relay_mode, relay_policy) = configured_relay_mode()?;
         #[cfg(not(target_os = "macos"))]
-        let endpoint = Endpoint::builder(presets::N0)
+        let endpoint = Endpoint::builder(presets::Minimal)
             .secret_key(SecretKey::from_bytes(&secret))
             .relay_mode(relay_mode)
             .alpns(vec![DEVICE_ALPN.to_vec()])
@@ -330,7 +330,11 @@ impl ConnectedDevicesService {
         };
         #[cfg(target_os = "macos")]
         if state.endpoint.is_closed() {
-            return Ok(ConnectedDevicesSnapshot { unavailable_reason:Some("The Space Files device service closed.".into()), relay_policy:"disabled".into(), ..Default::default() });
+            return Ok(ConnectedDevicesSnapshot {
+                unavailable_reason: Some("The Space Files device service closed.".into()),
+                relay_policy: "disabled".into(),
+                ..Default::default()
+            });
         }
         let peers = state
             .connections
@@ -346,7 +350,7 @@ impl ConnectedDevicesService {
                 }
                 .to_owned(),
                 #[cfg(target_os = "macos")]
-                connection_type: "unknown".into(),
+                connection_type: "direct".into(),
                 #[cfg(not(target_os = "macos"))]
                 connection_type: connection
                     .connection
@@ -403,10 +407,19 @@ impl ConnectedDevicesService {
             )
         };
         #[cfg(not(target_os = "macos"))]
-        let address: EndpointAddr = serde_json::from_value(request.address)
+        let mut address: EndpointAddr = serde_json::from_value(request.address)
             .map_err(|error| ApiError::Message(format!("Peer addressing is invalid: {error}")))?;
         #[cfg(not(target_os = "macos"))]
         let remote_endpoint_id = address.id.to_string();
+        #[cfg(not(target_os = "macos"))]
+        {
+            address.addrs.retain(|address| matches!(address, iroh::TransportAddr::Ip(socket) if crate::domain::lan::is_lan_address(socket.ip())));
+            if address.addrs.is_empty() {
+                return Err(ApiError::Message(
+                    "Connect this device to the same local network.".into(),
+                ));
+            }
+        }
         #[cfg(target_os = "macos")]
         let address = request.address;
         #[cfg(target_os = "macos")]
@@ -1376,6 +1389,11 @@ async fn handle_incoming_connection(
     context: PeerAcceptContext,
     connection: TransportConnection,
 ) -> ApiResult<()> {
+    #[cfg(not(target_os = "macos"))]
+    if !connection.paths().iter().any(|path| path.is_selected() && matches!(path.remote_addr(), iroh::TransportAddr::Ip(socket) if crate::domain::lan::is_lan_address(socket.ip()))) {
+        connection.close(0u8.into(), b"LAN files only");
+        return Err(ApiError::Message("Files connections require a local network address.".into()));
+    }
     let remote_endpoint = connection.remote_id().to_string();
     let (mut send, mut receive) = connection
         .accept_bi()
@@ -1459,7 +1477,11 @@ async fn handle_authorized_stream(
 ) -> ApiResult<()> {
     let envelope: PeerRequestEnvelope = read_frame(&mut receive).await?;
     #[cfg(target_os = "macos")]
-    if send.is_closed() { return Err(ApiError::Unavailable("The Files device session closed.".into())); }
+    if send.is_closed() {
+        return Err(ApiError::Unavailable(
+            "The Files device session closed.".into(),
+        ));
+    }
 
     if claims.exp <= unix_now() {
         return write_response(
@@ -1732,7 +1754,11 @@ async fn handle_authorized_stream(
             let revision = payload.revision;
             let converted = clipboard_offer_to_payload(&claims.source_device_id, payload);
             #[cfg(target_os = "macos")]
-            if send.is_closed() { return Err(ApiError::Unavailable("The Files device session closed.".into())); }
+            if send.is_closed() {
+                return Err(ApiError::Unavailable(
+                    "The Files device session closed.".into(),
+                ));
+            }
             if let Some(handler) = clipboard_handler.read().map_err(lock_error)?.clone() {
                 handler(converted);
             }
@@ -2115,38 +2141,8 @@ pub(crate) fn pinned_ticket_keys(
         .collect()
 }
 
-#[cfg(not(target_os = "macos"))]
 fn configured_relay_mode() -> ApiResult<(RelayMode, String)> {
-    let relay_url = option_env!("MISTY_DEVICE_RELAY_URL").unwrap_or("").trim();
-    if !relay_url.is_empty() {
-        let parsed = relay_url.parse().map_err(|_| {
-            ApiError::Message("Managed Connected Devices relay URL is invalid.".to_owned())
-        })?;
-        return Ok((RelayMode::custom([parsed]), "managed".to_owned()));
-    }
-    if cfg!(debug_assertions) {
-        Ok((RelayMode::Default, "public-development".to_owned()))
-    } else {
-        Err(ApiError::Unavailable(
-            "A managed Connected Devices relay is required in production.".to_owned(),
-        ))
-    }
-}
-
-#[cfg(target_os = "macos")]
-fn configured_relay_mode() -> ApiResult<(RelayMode, String)> {
-    let url = option_env!("MISTY_DEVICE_RELAY_URL").unwrap_or("").trim();
-    if !url.is_empty() {
-        url::Url::parse(url).map_err(|_| ApiError::Message("Invalid managed relay URL.".into()))?;
-        return Ok((RelayMode::Managed { url: url.into() }, "managed".into()));
-    }
-    if cfg!(debug_assertions) {
-        Ok((RelayMode::Default, "public-development".into()))
-    } else {
-        Err(ApiError::Unavailable(
-            "A managed Connected Devices relay is required in production.".into(),
-        ))
-    }
+    Ok((RelayMode::Disabled, "lan-only".to_owned()))
 }
 
 fn peer_error(error: PeerError) -> ApiError {

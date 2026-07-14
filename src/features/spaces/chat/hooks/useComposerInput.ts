@@ -56,7 +56,6 @@ export function useComposerInput(options: {
       draft.setText((current) => current.replace(/(^|\s)@[^\s@]*$/, "$1"));
     } else {
       draft.setText((current) => current.replace(/(^|\s)@[^\s@]*$/, `$1@${suggestion.label} `));
-
     }
     suggestions.close();
   };

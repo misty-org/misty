@@ -1,4 +1,4 @@
-import type { FileEntry } from "@/native/contracts";
+import type { FileEntry } from "@/native/ipc";
 import { describe, expect, it, vi } from "vitest";
 
 const backendMocks = vi.hoisted(() => ({

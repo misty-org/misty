@@ -2,7 +2,7 @@ import { useAuth } from "@/features/auth";
 import { SystemErrorActivity } from "@/features/activity";
 import { useSetupStore } from "./store/useSetupStore";
 import { useMinimumSpin } from "@/shared/hooks/useMinimumSpin";
-import { Button, Card } from "@/shared/ui";
+import { Button, Card, IconButton } from "@/shared/ui";
 import { CheckCircle2, CircleAlert, Download, Expand, RefreshCw } from "lucide-react";
 import { useState } from "react";
 import { useShallow } from "zustand/react/shallow";
@@ -198,24 +198,21 @@ export function InstallerCard({
               </p>
             )}
           </div>
-          <Button
-            aria-label="Refresh install checks"
-            className="shrink-0 text-cream-muted/70 shadow-none hover:text-cream"
-            size="icon"
-            title="Refresh install checks"
-            variant="ghost"
+          <IconButton
+            size="md"
+            label="Refresh install checks"
+            className="text-cream-muted/70"
             disabled={busy}
             onClick={() => {
               startRefreshSpin();
               void loadSystem();
             }}
-            type="button"
           >
             <RefreshCw
               aria-hidden="true"
               className={`h-4 w-4 ${refreshSpinning ? "animate-spin" : ""}`}
             />
-          </Button>
+          </IconButton>
         </div>
       </div>
 

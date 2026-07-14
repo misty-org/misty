@@ -18,8 +18,8 @@ vi.mock("./RoadmapSnapshotPreview", () => ({
 }));
 
 import { RoadmapHome } from "./RoadmapHome";
-import { RoadmapRuntimeProvider } from "./roadmapRuntime";
-import { roadmapTestRuntime } from "./roadmapTestRuntime";
+import { RoadmapRuntimeProvider } from "./RoadmapRuntime";
+import { roadmapTestRuntime } from "./RoadmapTestRuntime";
 
 describe("RoadmapHome preview", () => {
   let container: HTMLDivElement;

@@ -3,9 +3,7 @@ use std::path::PathBuf;
 use anyhow::Result;
 use clap::{Args, Parser, Subcommand, ValueEnum};
 
-use crate::{
-    checks, config::Settings, desktop, environment, home, release, server, website,
-};
+use crate::{checks, config::Settings, desktop, environment, home, release, server, website};
 
 #[derive(Debug, Parser)]
 #[command(name = "misty", version, about)]
@@ -418,6 +416,9 @@ pub fn dispatch(arguments: Cli, settings: Settings) -> Result<()> {
             CheckTarget::Cli => checks::cli(&settings.workspace),
             CheckTarget::All => {
                 checks::app(&settings.workspace)?;
+                crate::process::CommandSpec::new(crate::process::npm())
+                    .args(["run", "test:tasks"])
+                    .run(&settings.workspace.misty)?;
                 checks::server(&settings.workspace)?;
                 checks::website(&settings.workspace)?;
                 checks::builtin_tools(&settings.workspace)?;
@@ -713,7 +714,6 @@ mod tests {
             vec!["misty", "desktop", "build"],
             vec!["misty", "desktop", "clean", "--apply"],
             vec!["misty", "desktop", "icons", "sync"],
-
             vec!["misty", "docs", "dev"],
             vec!["misty", "website", "dev"],
             vec!["misty", "server", "up", "--detach", "--no-build"],
@@ -783,5 +783,4 @@ mod tests {
     fn docs_requires_an_explicit_subcommand() {
         assert!(Cli::try_parse_from(["misty", "docs"]).is_err());
     }
-
 }

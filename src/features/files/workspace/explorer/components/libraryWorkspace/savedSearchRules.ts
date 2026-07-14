@@ -1,4 +1,4 @@
-import type { SavedSearchRule, SearchResult, SmartLibraryAsset } from "@/native/contracts";
+import type { SavedSearchRule, SearchResult, SmartLibraryAsset } from "@/native/ipc";
 
 export function aggregateTags(assets: SmartLibraryAsset[]) {
   const counts = new Map<string, { name: string; count: number }>();

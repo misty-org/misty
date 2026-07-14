@@ -28,7 +28,8 @@ export function bookmarksProvider(deps: OmniboxDeps): OmniboxProvider {
           title: bookmark.title || described.title,
           detail: described.detail,
           target: { type: "navigate", url: bookmark.url },
-          relevance: completion !== undefined ? relevance.bookmarkPrefix : baseRelevance(quality) + 50,
+          relevance:
+            completion !== undefined ? relevance.bookmarkPrefix : baseRelevance(quality) + 50,
           allowedToBeDefault: completion !== undefined,
           inlineCompletion: completion,
           faviconUrl: described.faviconUrl,

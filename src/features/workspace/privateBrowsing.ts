@@ -3,7 +3,9 @@ import { parseBrowserTabState, type WorkspaceTab } from "./model";
 
 export const privateTabTitle = "Private tab";
 
-export function isPrivateBrowserTab(tab: Pick<WorkspaceTab, "surfaceId" | "state"> | null | undefined) {
+export function isPrivateBrowserTab(
+  tab: Pick<WorkspaceTab, "surfaceId" | "state"> | null | undefined,
+) {
   return Boolean(tab && tab.surfaceId === "browser" && parseBrowserTabState(tab.state).private);
 }
 

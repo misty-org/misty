@@ -6,7 +6,7 @@ import {
   runtimeAgentsApi as agents,
   useAgentsAuth,
   openAgentsMisty as openMisty,
-} from "../agentsRuntime";
+} from "../AgentsRuntime";
 import { activityParent, type MistyActivityEntry } from "@/features/misty/activity";
 import type { PersonalAgentRunDetail } from "../model/interfaces/personal";
 
@@ -75,16 +75,10 @@ export function MistyDashboard({
             Your private tasks, delegated work, and approvals.
           </p>
         </div>
-        <Button
-          variant="ghost"
-          className="rounded-md border border-charcoal-border px-3 py-2 text-sm"
-          onClick={onManageConnections}
-        >
+        <Button variant="outline" onClick={onManageConnections}>
           Connections
         </Button>
         <Button
-          variant="ghost"
-          className="rounded-md bg-charcoal-active px-3 py-2 text-sm"
           onClick={() => void openMisty({ spaceId }).catch((reason) => setError(String(reason)))}
         >
           Open Misty

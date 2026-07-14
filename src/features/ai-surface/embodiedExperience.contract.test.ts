@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { repositoryPath, sourcePath, walk } from "@/tests/contracts/repositoryPolicy";
+import { repositoryPath, sourcePath, walk } from "@/tests/architecture/repositoryPolicy";
 
 describe("embodied Misty contract", () => {
   it("keeps duplicate page-level launchers out while allowing contextual selection actions", () => {

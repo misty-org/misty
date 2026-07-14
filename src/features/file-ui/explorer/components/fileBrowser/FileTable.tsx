@@ -1,5 +1,13 @@
-import type { DirectoryListing } from "@/native/contracts";
-import { Button, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/shared/ui";
+import type { DirectoryListing } from "@/native/ipc";
+import {
+  IconButton,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/shared/ui";
 import { RotateCcw } from "lucide-react";
 import type { MouseEvent, PointerEvent as ReactPointerEvent } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -19,7 +27,7 @@ import {
   loadColumnWidths,
   saveColumnWidths,
 } from "./columnLayout";
-import { passiveRenameDraftsFor } from "./entryPresentation";
+import { passiveRenameDraftsFor } from "./EntryPresentation";
 import {
   TABLE_OVERSCAN_ROWS,
   defaultColumnWidths,
@@ -208,17 +216,16 @@ export function FileTable(props: FileBrowserProps & { listing: DirectoryListing 
   return (
     <div className={`${fileBrowserStyles.tableWrap} relative`}>
       {columnsDirty ? (
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-sm"
+        <IconButton
+          size="xs"
+          tooltip={false}
           className={fileBrowserStyles.tableResetButton}
           title="Reset columns"
-          aria-label="Reset table columns"
+          label="Reset table columns"
           onClick={resetColumnWidths}
         >
           <RotateCcw size={14} />
-        </Button>
+        </IconButton>
       ) : null}
       <div ref={headerRef} className={fileBrowserStyles.tableHeaderWrap}>
         <Table

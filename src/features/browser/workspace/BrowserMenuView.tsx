@@ -1,15 +1,12 @@
-import { browserToolbarStyles } from "./browserToolbarStyles";
 import { useEffect, type ReactNode } from "react";
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuSeparator,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
-  DropdownMenuTrigger,
-  menuShortcutClass,
+  MenuItem,
+  MenuSubmenu,
+  MenuTrigger,
+  toolbarIconProps,
 } from "@/shared/ui";
 import { ShortcutText } from "@/features/shortcuts";
 import {
@@ -41,10 +38,8 @@ import { BrowserZoomControls, useBrowserZoom } from "./BrowserZoomControls";
 import { useBrowserOverlay } from "./useBrowserOverlay";
 import type { BrowserPageCommands } from "./useBrowserPageCommands";
 import { BrowserHistoryMenu } from "./BrowserHistoryMenu";
-import "../../../shared/toolAssets/websiteChrome.css";
 
 export interface BrowserMenuViewProps {
-  iconButtonClass: string;
   setOverlay: (reason: string, active: boolean) => Promise<void>;
   zoomId?: string;
   setZoom?: (factor: number) => Promise<void>;
@@ -58,20 +53,16 @@ export interface BrowserMenuViewProps {
   overlayReason?: string;
 }
 
-function Item(props: {
-  icon: ReactNode;
-  label: string;
-  shortcut?: string;
-  onSelect?: () => void;
-}) {
+/** A browser command row; rows without a handler render disabled. */
+function Item(props: { icon: ReactNode; label: string; shortcut?: string; onSelect?: () => void }) {
   return (
-    <DropdownMenuItem disabled={!props.onSelect} onSelect={() => props.onSelect?.()}>
-      {props.icon}
-      <span className="flex-1">{props.label}</span>
-      {props.shortcut ? (
-        <ShortcutText commandId={props.shortcut} className={menuShortcutClass} />
-      ) : null}
-    </DropdownMenuItem>
+    <MenuItem
+      icon={props.icon}
+      label={props.label}
+      shortcut={props.shortcut ? <ShortcutText commandId={props.shortcut} /> : undefined}
+      disabled={!props.onSelect}
+      onSelect={() => props.onSelect?.()}
+    />
   );
 }
 
@@ -79,30 +70,34 @@ function Item(props: {
 export function BrowserMenuView(props: BrowserMenuViewProps) {
   const zoom = useBrowserZoom(props.zoomId, props.setZoom ?? (async () => {}), props.reportError);
   const overlay = useBrowserOverlay(props.overlayReason ?? "menu", props.setOverlay);
+  const setOverlayOpen = overlay.onOpenChange;
   useEffect(() => {
-    if (props.active === false) overlay.onOpenChange(false);
-  }, [props.active, overlay.onOpenChange]);
+    if (props.active === false) setOverlayOpen(false);
+  }, [props.active, setOverlayOpen]);
   const commands = props.commands;
   const canOpenExternal = props.canOpenExternal ?? /^https?:\/\//i.test(props.url);
   return (
     <DropdownMenu open={overlay.open} onOpenChange={overlay.onOpenChange} modal={false}>
-      <DropdownMenuTrigger asChild>
-        <button
-          type="button"
-          className={props.iconButtonClass}
-          aria-label={props.label ?? "Browser menu"}
-          title="More"
-        >
-          <MoreVertical {...browserToolbarStyles.icon} />
-        </button>
-      </DropdownMenuTrigger>
+      <MenuTrigger
+        iconOnly
+        label={props.label ?? "Browser menu"}
+        title="More"
+        icon={<MoreVertical {...toolbarIconProps} />}
+      />
       <DropdownMenuContent
         align="end"
-        className="website-header-menu max-h-[calc(100dvh-80px)] w-64 overflow-y-auto"
+        width="lg"
+        className="max-h-[calc(100dvh-80px)]"
+        data-browser-menu
       >
         {commands ? (
           <>
-            <Item icon={<Plus />} label="New tab" shortcut="workspace.new_tab" onSelect={commands.newTab} />
+            <Item
+              icon={<Plus />}
+              label="New tab"
+              shortcut="workspace.new_tab"
+              onSelect={commands.newTab}
+            />
             <Item
               icon={<AppWindow />}
               label="New window"
@@ -133,30 +128,24 @@ export function BrowserMenuView(props: BrowserMenuViewProps) {
               shortcut="browser.downloads"
               onSelect={() => commands.openPage("downloads")}
             />
-            <DropdownMenuSub>
-              <DropdownMenuSubTrigger>
-                <Bookmark />
-                Bookmarks
-              </DropdownMenuSubTrigger>
-              <DropdownMenuSubContent className="w-60">
-                <Item
-                  icon={<BookmarkPlus />}
-                  label="Bookmark this page"
-                  shortcut="browser.bookmark"
-                  onSelect={commands.bookmark}
-                />
-                <Item
-                  icon={<BookmarkCheck />}
-                  label="Bookmark all tabs"
-                  onSelect={commands.bookmarkAllTabs}
-                />
-                <Item
-                  icon={<Library />}
-                  label="Bookmark manager"
-                  onSelect={() => commands.openPage("bookmarks")}
-                />
-              </DropdownMenuSubContent>
-            </DropdownMenuSub>
+            <MenuSubmenu icon={<Bookmark />} label="Bookmarks" width="lg">
+              <Item
+                icon={<BookmarkPlus />}
+                label="Bookmark this page"
+                shortcut="browser.bookmark"
+                onSelect={commands.bookmark}
+              />
+              <Item
+                icon={<BookmarkCheck />}
+                label="Bookmark all tabs"
+                onSelect={commands.bookmarkAllTabs}
+              />
+              <Item
+                icon={<Library />}
+                label="Bookmark manager"
+                onSelect={() => commands.openPage("bookmarks")}
+              />
+            </MenuSubmenu>
             <DropdownMenuSeparator />
           </>
         ) : null}
@@ -164,40 +153,38 @@ export function BrowserMenuView(props: BrowserMenuViewProps) {
         <DropdownMenuSeparator />
         {commands ? (
           <>
-            <Item icon={<Search />} label="Find…" shortcut="browser.find" onSelect={commands.find} />
-            <Item icon={<Printer />} label="Print…" shortcut="browser.print" onSelect={commands.print} />
-            <DropdownMenuSub>
-              <DropdownMenuSubTrigger>
-                <Share2 />
-                Share
-              </DropdownMenuSubTrigger>
-              <DropdownMenuSubContent className="w-56">
-                <Item icon={<Copy />} label="Copy link" onSelect={commands.copyLink} />
-                <Item icon={<QrCode />} label="QR code…" onSelect={commands.qrCode} />
-              </DropdownMenuSubContent>
-            </DropdownMenuSub>
-            <DropdownMenuSub>
-              <DropdownMenuSubTrigger>
-                <Wrench />
-                More tools
-              </DropdownMenuSubTrigger>
-              <DropdownMenuSubContent className="w-64">
-                <Item icon={<FileDown />} label="Save page as…" onSelect={commands.savePage} />
-                <Item
-                  icon={<Eraser />}
-                  label="Clear browsing data…"
-                  shortcut="browser.clear_data"
-                  onSelect={commands.clearBrowsingData}
-                />
-                <DropdownMenuSeparator />
-                <Item
-                  icon={<Code2 />}
-                  label="Developer tools"
-                  shortcut="browser.developer_tools"
-                  onSelect={commands.developerTools}
-                />
-              </DropdownMenuSubContent>
-            </DropdownMenuSub>
+            <Item
+              icon={<Search />}
+              label="Find…"
+              shortcut="browser.find"
+              onSelect={commands.find}
+            />
+            <Item
+              icon={<Printer />}
+              label="Print…"
+              shortcut="browser.print"
+              onSelect={commands.print}
+            />
+            <MenuSubmenu icon={<Share2 />} label="Share" width="md">
+              <Item icon={<Copy />} label="Copy link" onSelect={commands.copyLink} />
+              <Item icon={<QrCode />} label="QR code…" onSelect={commands.qrCode} />
+            </MenuSubmenu>
+            <MenuSubmenu icon={<Wrench />} label="More tools" width="lg">
+              <Item icon={<FileDown />} label="Save page as…" onSelect={commands.savePage} />
+              <Item
+                icon={<Eraser />}
+                label="Clear browsing data…"
+                shortcut="browser.clear_data"
+                onSelect={commands.clearBrowsingData}
+              />
+              <DropdownMenuSeparator />
+              <Item
+                icon={<Code2 />}
+                label="Developer tools"
+                shortcut="browser.developer_tools"
+                onSelect={commands.developerTools}
+              />
+            </MenuSubmenu>
             <DropdownMenuSeparator />
           </>
         ) : null}
@@ -212,9 +199,17 @@ export function BrowserMenuView(props: BrowserMenuViewProps) {
         />
         {commands ? (
           <>
-            <Item icon={<Puzzle />} label="Extensions" onSelect={() => commands.openPage("extensions")} />
+            <Item
+              icon={<Puzzle />}
+              label="Extensions"
+              onSelect={() => commands.openPage("extensions")}
+            />
             <Item icon={<CircleHelp />} label="Help" onSelect={commands.help} />
-            <Item icon={<Settings2 />} label="Settings" onSelect={() => commands.openPage("settings")} />
+            <Item
+              icon={<Settings2 />}
+              label="Settings"
+              onSelect={() => commands.openPage("settings")}
+            />
           </>
         ) : null}
       </DropdownMenuContent>

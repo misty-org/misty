@@ -1,4 +1,3 @@
-import { createRef } from "react";
 import { MemoryRouter } from "react-router-dom";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -9,7 +8,7 @@ import { useBrowserSearchStore } from "@/features/browser-workspace/search";
 import { GlobalNavigator } from "./GlobalNavigator";
 
 vi.mock("@/features/auth", () => ({
-  useAuth: () => ({ user: { id: "account-1", email: "owner@example.com" } }),
+  useAuth: () => ({ user: { id: "account-1", email: "owner@example.com" }, accounts: [] }),
   useAccountAvatarUrl: () => null,
   useUserStore: (selector: (state: { me: null }) => unknown) => selector({ me: null }),
 }));
@@ -18,10 +17,10 @@ function renderNavigator() {
   return render(
     <MemoryRouter>
       <GlobalNavigator
-        profileAnchorRef={createRef()}
         profileOpen={false}
         settingsOpen={false}
-        onProfileClick={() => {}}
+        onProfileOpenChange={() => undefined}
+        onOpenAccountSettings={() => undefined}
         onSettingsClick={() => {}}
       />
     </MemoryRouter>,

@@ -3,6 +3,7 @@ import { act, type ReactNode, type ButtonHTMLAttributes } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { BrowserSiteInfo } from "./BrowserSiteInfo";
+import type * as UiModule from "@/shared/ui";
 const invoke = vi.hoisted(() => vi.fn());
 vi.mock("@tauri-apps/api/core", () => ({ invoke }));
 vi.mock("./useBrowserOverlayControl", async () => {
@@ -15,7 +16,8 @@ vi.mock("./useBrowserOverlayControl", async () => {
   };
 });
 // Exercise the panel lifecycle without depending on Radix pointer-event internals in jsdom.
-vi.mock("@/shared/ui", () => ({
+vi.mock("@/shared/ui", async (importOriginal) => ({
+  ...(await importOriginal<typeof UiModule>()),
   Button: ({
     variant: _variant,
     size: _size,
@@ -72,9 +74,7 @@ describe("Browser site permissions", () => {
     HTMLElement.prototype.scrollIntoView = scrollIntoView;
   });
   async function open(url = info.url) {
-    await act(async () =>
-      root.render(<BrowserSiteInfo id="tab-one" url={url} active iconButtonClass="" />),
-    );
+    await act(async () => root.render(<BrowserSiteInfo id="tab-one" url={url} active />));
     await act(async () => container.querySelector<HTMLButtonElement>("button")!.click());
   }
   async function choosePermission(kind: "Camera" | "Microphone", choice: string) {
@@ -109,9 +109,7 @@ describe("Browser site permissions", () => {
     );
     await open();
     await act(async () =>
-      root.render(
-        <BrowserSiteInfo id="tab-one" url="https://other.example" active iconButtonClass="" />,
-      ),
+      root.render(<BrowserSiteInfo id="tab-one" url="https://other.example" active />),
     );
     await act(async () => resolve(info));
     expect(container.querySelector('[data-open="false"]')).not.toBeNull();

@@ -1,4 +1,4 @@
-import type { FileEntry, ProviderRemote } from "@/native/contracts";
+import type { FileEntry } from "@/native/ipc";
 import { describe, expect, it, vi } from "vitest";
 import { preparePickerSelections } from "./preparePickerSelections";
 
@@ -23,35 +23,36 @@ const remoteEntry: FileEntry = {
   },
 };
 
-describe("provider-backed file picker preparation", () => {
-  it("downloads remotely and preserves reusable-account provenance", async () => {
-    const prepare = vi.fn().mockResolvedValue("/private/cache/plan.pdf");
-    const remotes: ProviderRemote[] = [
-      {
-        name: "Work",
-        type: "drive",
-        statusLabel: "Connected",
-        needsReconnect: false,
-        error: null,
-        configSource: "misty",
-        connectionId: "cloud-1",
-        connectionSource: "connected_account",
-        connectedAccountId: "connection-1",
+describe("local and LAN file picker preparation", () => {
+  it("rejects retired cloud locations before materializing", async () => {
+    const prepare = vi.fn();
+    await expect(preparePickerSelections([remoteEntry], prepare)).rejects.toThrow(
+      "Only local and LAN",
+    );
+    expect(prepare).not.toHaveBeenCalled();
+  });
+
+  it("materializes paired device files without a cloud connection", async () => {
+    const peer = {
+      ...remoteEntry,
+      path: "misty://device/laptop/docs/plan.pdf",
+      location: {
+        kind: "peer_device" as const,
+        peerDeviceId: "laptop",
+        peerRootId: "docs",
+        providerType: null,
+        remoteName: null,
+        remotePath: "plan.pdf",
       },
-    ];
-    await expect(preparePickerSelections([remoteEntry], remotes, prepare)).resolves.toEqual([
+    };
+    const prepare = vi.fn().mockResolvedValue("/private/cache/plan.pdf");
+    await expect(preparePickerSelections([peer], prepare)).resolves.toEqual([
       {
         localPath: "/private/cache/plan.pdf",
-        source: {
-          provider: "drive",
-          remoteName: "Work",
-          remotePath: "Documents/plan.pdf",
-          connectionId: "cloud-1",
-          connectionSource: "connected_account",
-        },
+        source: { provider: "misty_peer", remoteName: "laptop", remotePath: "plan.pdf" },
       },
     ]);
-    expect(prepare).toHaveBeenCalledWith(remoteEntry);
+    expect(prepare).toHaveBeenCalledWith(peer);
   });
 
   it("does not stage or invent provenance for local files", async () => {
@@ -61,7 +62,7 @@ describe("provider-backed file picker preparation", () => {
       location: { ...remoteEntry.location, kind: "local" as const },
     };
     const prepare = vi.fn();
-    await expect(preparePickerSelections([local], [], prepare)).resolves.toEqual([
+    await expect(preparePickerSelections([local], prepare)).resolves.toEqual([
       { localPath: "/Users/misty/plan.pdf" },
     ]);
     expect(prepare).not.toHaveBeenCalled();

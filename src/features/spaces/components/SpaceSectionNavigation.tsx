@@ -1,5 +1,4 @@
-import { TooltipProvider } from "@/shared/ui";
-import { appIcons } from "@/shared/ui/app-icons";
+import { appIcons, TooltipProvider } from "@/shared/ui";
 import { unreadActivityCountForSpaceSection, useActivityStore } from "@/features/activity";
 import { useAuth } from "@/features/auth";
 import { BookOpenText, MessagesSquare, Notebook } from "lucide-react";

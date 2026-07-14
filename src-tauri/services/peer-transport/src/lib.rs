@@ -16,6 +16,9 @@ use std::{
 };
 use tokio::sync::{watch, Mutex, OnceCell, OwnedSemaphorePermit, Semaphore};
 
+#[path = "../../../src/domain/lan.rs"]
+mod lan;
+
 pub const ALPN: &[u8] = b"misty-device/2";
 pub const MAX_CHUNK: usize = 64 * 1024;
 const MAX_CONNECTIONS: usize = 32;
@@ -123,6 +126,10 @@ impl Transport {
         connection: Connection,
         permit: OwnedSemaphorePermit,
     ) -> Result<Value, String> {
+        if !connection.paths().iter().any(|path| path.is_selected() && matches!(path.remote_addr(), iroh::TransportAddr::Ip(socket) if lan::is_lan_address(socket.ip()))) {
+            connection.close(0u8.into(), b"LAN files only");
+            return Err("Files connections require a local network address.".into());
+        }
         let id = uuid::Uuid::new_v4().to_string();
         let remote = connection.remote_id().to_string();
         let mut peers = self.peers.lock().await;
@@ -168,22 +175,16 @@ impl Transport {
         if self.endpoint.get().is_some() {
             return Err("Peer transport is already initialized.".into());
         }
-        let relay = match relay {
-            Relay::Disabled => RelayMode::Disabled,
-            Relay::Default => RelayMode::Default,
-            Relay::Managed { url } => {
-                if url.len() > 4096 {
-                    return Err("Invalid relay URL.".into());
-                }
-                RelayMode::custom([url.parse().map_err(|_| "Invalid relay URL.")?])
-            }
-        };
+        if !matches!(relay, Relay::Disabled) {
+            return Err("Files uses direct LAN connections only.".into());
+        }
+        let relay = RelayMode::Disabled;
         self.alpn
             .set(alpn)
             .map_err(|_| "Peer protocol is already selected.")?;
         self.endpoint
             .get_or_try_init(|| async {
-                Endpoint::builder(presets::N0)
+                Endpoint::builder(presets::Minimal)
                     .secret_key(SecretKey::from_bytes(&secret))
                     .relay_mode(relay)
                     .alpns(vec![alpn.to_vec()])
@@ -208,7 +209,11 @@ impl Transport {
                 self.initialize(secret, relay, b"misty-device/1").await
             }
             Command::Snapshot => self.snapshot(),
-            Command::Connect { address } => {
+            Command::Connect { mut address } => {
+                address.addrs.retain(|address| matches!(address, iroh::TransportAddr::Ip(socket) if lan::is_lan_address(socket.ip())));
+                if address.addrs.is_empty() {
+                    return Err("Connect this device to the same local network.".into());
+                }
                 let permit = self
                     .peer_slots
                     .clone()
@@ -532,6 +537,28 @@ mod tests {
         .is_err());
         right.shutdown().await;
     }
+    #[tokio::test]
+    async fn rejects_internet_addresses_and_relay_configuration() {
+        let uninitialized = Transport::default();
+        assert!(uninitialized
+            .execute(Command::Initialize {
+                secret: [9; 32],
+                relay: Relay::Default,
+            })
+            .await
+            .unwrap_err()
+            .contains("LAN"));
+        let transport = local(9).await;
+        let address = EndpointAddr::new(SecretKey::from_bytes(&[10; 32]).public())
+            .with_ip_addr("8.8.8.8:443".parse::<SocketAddr>().unwrap());
+        assert!(transport
+            .execute(Command::Connect { address })
+            .await
+            .unwrap_err()
+            .contains("local network"));
+        transport.shutdown().await;
+    }
+
     #[tokio::test]
     async fn rejects_uninitialized_endpoints_and_excessive_chunks_before_network_work() {
         let transport = Transport::default();

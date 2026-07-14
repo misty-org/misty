@@ -1,23 +1,23 @@
-import type { BrowserAskRequest } from "./browserAskContext";
-import type { MistyHandoff } from "@/features/misty/handoff";
-import type { MistyContextTarget } from "@/features/misty/context";
-import type { AiArtifact, AiCaptureAttachment } from "@/features/ai-surface/types";
+import type { DisplayCapture } from "@/features/agents";
 import type { ThinkingMode } from "@/features/agents/thinkingMode";
 import type { AiInvocationDeviceContext, AiSelectionSnapshot } from "@/features/ai-surface";
+import type { AiArtifact, AiCaptureAttachment } from "@/features/ai-surface/types";
+import type { MistyContextTarget } from "@/features/misty/context";
+import type { MistyHandoff } from "@/features/misty/handoff";
+import type { BrowserAskRequest } from "./browserAskContext";
 import type {
   GlobalAiContextRef,
   GlobalAiConversation,
   GlobalAiMode,
   GlobalSearchFilters,
   GlobalSearchResult,
-  UnifiedMistyPanel,
   MistyImageAttachment,
+  UnifiedMistyPanel,
 } from "./types";
-
 export type MistySubmissionPresentation = "panel" | "workspace";
-
 export interface GlobalSearchState {
   thinkingMode?: ThinkingMode;
+  thinkingModeExplicit?: boolean;
   selectedAgentId?: string;
   executionMode?: "user" | "agent" | "team";
   executionModeByAgent?: Record<string, "user" | "agent" | "team">;
@@ -73,13 +73,16 @@ export interface GlobalSearchState {
     selection?: AiSelectionSnapshot,
     presentation?: MistySubmissionPresentation,
     deviceContexts?: AiInvocationDeviceContext[],
-    origin?: { conversationId: string; context: GlobalAiContextRef[] },
+    origin?: {
+      conversationId: string;
+      context: GlobalAiContextRef[];
+    },
     companion?: {
       executionMode: "user" | "team" | "agent";
       turn?: number;
       interactionMode?: "team" | "auto";
       model?: string;
-      displayCaptures?: import("@/features/agents/companion/protocol").DisplayCapture[];
+      displayCaptures?: DisplayCapture[];
       capture?: AiCaptureAttachment;
     },
   ) => Promise<void>;

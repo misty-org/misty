@@ -1,9 +1,8 @@
 import { useActivityStore } from "@/features/activity";
 import { useAiSurfaceStore } from "@/features/ai-surface";
-import { resetInboxAccountState, useInboxStore } from "@/features/inbox";
 import { useSpacesStore } from "@/features/spaces";
-import { dockTabs, useNavigatorAppsStore, useWorkspaceStore } from "@/features/workspace";
-import { act, createRef } from "react";
+import { useNavigatorAppsStore, useWorkspaceStore } from "@/features/workspace";
+import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -11,7 +10,7 @@ import { GlobalNavigator } from "./GlobalNavigator";
 import { seedNavigatorApps, spaceFixture, spaceTab } from "./GlobalNavigator.testFixtures";
 
 vi.mock("@/features/auth", () => ({
-  useAuth: () => ({ user: { id: "account-1", email: "owner@example.com" } }),
+  useAuth: () => ({ user: { id: "account-1", email: "owner@example.com" }, accounts: [] }),
   useAccountAvatarUrl: () => null,
   useUserStore: (selector: (state: { me: null }) => unknown) => selector({ me: null }),
 }));
@@ -44,7 +43,6 @@ describe("GlobalNavigator disclosures", () => {
     });
     useWorkspaceStore.getState().reset();
     seedNavigatorApps();
-    resetInboxAccountState();
     useNavigatorAppsStore.setState({
       appIdsByAccount: {},
       collapsedByAccount: { "account-1": false },
@@ -75,84 +73,6 @@ describe("GlobalNavigator disclosures", () => {
       companion: { phase: "home", completedCount: 0 },
     });
     useWorkspaceStore.getState().reset();
-    resetInboxAccountState();
-  });
-
-  it("shows provider types, not individual accounts, under Inbox", async () => {
-    useInboxStore.setState({
-      accountId: "account-1",
-      loaded: true,
-      selectedProvider: "microsoft",
-      accounts: [
-        {
-          connection_id: "gmail-1",
-          provider: "google",
-          account_id: "google-account",
-          display_name: "Personal Gmail",
-          email: "personal@example.com",
-          total: 4,
-          unread: 1,
-        },
-        {
-          connection_id: "outlook-1",
-          provider: "microsoft",
-          account_id: "microsoft-account",
-          display_name: "Work Outlook",
-          email: "work@example.com",
-          total: 8,
-          unread: 2,
-        },
-      ],
-    });
-    useWorkspaceStore.setState({
-      layout: {
-        focusedPaneId: "pane-1",
-        root: {
-          type: "leaf",
-          id: "pane-1",
-          activeTabId: "inbox-tab",
-          tabs: [
-            {
-              id: "inbox-tab",
-              surfaceId: "official-app",
-              groupKey: "app:inbox",
-              instanceKey: "inbox",
-              title: "Inbox",
-              route: "/apps/inbox?provider=microsoft",
-              sidebarVisible: true,
-              state: {},
-              createdAt: 1,
-              lastFocusedAt: 1,
-            },
-          ],
-        },
-      },
-    });
-
-    await renderNavigator("/apps/inbox?provider=microsoft");
-
-    const inboxItems = [
-      ...container.querySelectorAll<HTMLAnchorElement>(
-        '[role="group"][aria-label="Inbox destinations"] a',
-      ),
-    ];
-    expect(inboxItems.map((item) => item.textContent?.trim())).toEqual(["Gmail", "Outlook"]);
-    expect(container.textContent).not.toContain("personal@example.com");
-    expect(container.textContent).not.toContain("work@example.com");
-    expect(
-      inboxItems
-        .find((item) => item.textContent?.trim() === "Outlook")
-        ?.getAttribute("aria-current"),
-    ).toBe("page");
-    expect(
-      inboxItems.map((item) =>
-        item.querySelector("[data-mail-provider-icon]")?.getAttribute("data-mail-provider-icon"),
-      ),
-    ).toEqual(["gmail", "outlook"]);
-
-    await act(async () => useInboxStore.setState({ selectedProvider: "" }));
-
-    expect(useInboxStore.getState().selectedProvider).toBe("");
   });
 
   it("shows the current Agents Activity destination without a mounted app", async () => {
@@ -217,7 +137,7 @@ describe("GlobalNavigator disclosures", () => {
     expect(trigger?.getAttribute("aria-expanded")).toBe("true");
     expect(trigger?.className).toContain("w-full");
     expect(
-      trigger?.querySelector('[data-chevron-placement]')?.getAttribute("data-chevron-placement"),
+      trigger?.querySelector("[data-chevron-placement]")?.getAttribute("data-chevron-placement"),
     ).toBe("inline");
 
     const destinations = container.querySelector(
@@ -240,7 +160,9 @@ describe("GlobalNavigator disclosures", () => {
       "/spaces/space-1/planner/tasks/board",
     );
 
-    const library = container.querySelector('[data-space-tool="library"] button[aria-label="Library"]');
+    const library = container.querySelector(
+      '[data-space-tool="library"] button[aria-label="Library"]',
+    );
     expect(
       Boolean(
         destinations &&
@@ -450,10 +372,10 @@ describe("GlobalNavigator disclosures", () => {
       root.render(
         <MemoryRouter initialEntries={[initialEntry]}>
           <GlobalNavigator
-            profileAnchorRef={createRef<HTMLButtonElement>()}
             profileOpen={false}
             settingsOpen={false}
-            onProfileClick={() => undefined}
+            onProfileOpenChange={() => undefined}
+            onOpenAccountSettings={() => undefined}
             onSettingsClick={() => undefined}
           />
         </MemoryRouter>,

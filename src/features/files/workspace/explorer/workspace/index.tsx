@@ -1,6 +1,5 @@
 import { useAiSurfaceAdapter } from "@/features/ai-surface/AiPaneHost";
 import { routes, useAppStore } from "@/features/app-shell";
-import { ProvidersWorkspacePanel, useProvidersStore } from "@/features/providers";
 import {
   selectAdvancedPreferences,
   selectFilePreferences,
@@ -20,7 +19,6 @@ import { ExplorerSidebar } from "../components/ExplorerSidebar";
 import { libraryWorkspacePath } from "../components/LibraryWorkspace";
 import { ExplorerDragProvider } from "../drag/ExplorerDragContext";
 import { useExplorerStore } from "../store";
-import { ChromeTabShell } from "./ChromeTabShell";
 import { useExplorerAgentDock } from "./ExplorerAgentDockIntegration";
 import { ExplorerDialog } from "./ExplorerBatchRenameDialog";
 import { executableShortcutCommands } from "./ExplorerCommands";
@@ -32,7 +30,6 @@ import {
   ensureFilesBrowseTab,
   ExplorerTray,
   isChromeTabPath,
-  isRemotesTabPath,
 } from "./ExplorerDesktopPlugins";
 import { cx } from "./ExplorerDesktopShared";
 import { ExplorerNotifications, ExplorerRenameStatus } from "./ExplorerDesktopStatus";
@@ -61,7 +58,6 @@ import {
 } from "./explorerWorkspace/useScopedExplorerWorkspace";
 import { useTransferRefreshPolling } from "./explorerWorkspace/useTransferRefreshPolling";
 import { resolveExplorerBottomBarRenderer } from "./ExplorerWorkspaceChrome";
-import { emptyProviderRemotes } from "./ExplorerWorkspaceConstants";
 import {
   buildExplorerLocationResults,
   resolveMountRoot,
@@ -109,12 +105,6 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace(props: Explorer
       notifications: state.notifications,
       pushNotification: state.pushNotification,
       dismissNotification: state.dismissNotification,
-    })),
-  );
-  const { providersLoading, sidebarRemotes } = useProvidersStore(
-    useShallow((state) => ({
-      providersLoading: state.loading,
-      sidebarRemotes: state.providers?.remotes ?? emptyProviderRemotes,
     })),
   );
   const {
@@ -177,7 +167,6 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace(props: Explorer
   const activePath = useExplorerStore(
     (state) => state.panes[activePaneId]?.listing?.path ?? homePath,
   );
-  const activePane = useExplorerStore((state) => state.panes[activePaneId]);
   const aiAdapter = useMemo(
     () =>
       createFilesAiAdapter({
@@ -191,7 +180,7 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace(props: Explorer
         rename: (_entry, name) => useExplorerStore.getState().renameSelected(activePaneId, name),
         trash: () => useExplorerStore.getState().deleteSelected(activePaneId, "trash"),
       }),
-    [activePane, activePaneId, props.workspaceId],
+    [activePaneId, props.workspaceId],
   );
   useAiSurfaceAdapter(aiAdapter);
   const explorerInitialized = useExplorerStore((state) => state.initialized);
@@ -234,16 +223,8 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace(props: Explorer
     [workspacePathSignature],
   );
   const locationResults = useMemo(
-    () =>
-      buildExplorerLocationResults(
-        homePath,
-        mountRoot,
-        pinnedPaths,
-        sidebarRemotes,
-        library,
-        workspacePaths,
-      ),
-    [homePath, library, mountRoot, pinnedPaths, sidebarRemotes, workspacePaths],
+    () => buildExplorerLocationResults(homePath, mountRoot, pinnedPaths, library, workspacePaths),
+    [homePath, library, mountRoot, pinnedPaths, workspacePaths],
   );
   const activeTabSupportsSidePanels = !isChromeTabPath(activeTabPath);
   const sidebarVisible = activeTabSupportsSidePanels && activeTabSidebarVisible;
@@ -295,13 +276,6 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace(props: Explorer
             <ExplorerPaneHeaderActions paneId={paneId} multiPanelStore={multiPanelStore} />
           </div>
         ) : undefined;
-      if (isRemotesTabPath(path)) {
-        return (
-          <ChromeTabShell embedded={props.embedded} label="Remotes" homePath={homePath}>
-            <ProvidersWorkspacePanel workspaceId={paneId} />
-          </ChromeTabShell>
-        );
-      }
       if (path === libraryWorkspacePath) {
         return <ComingSoonSurface feature="Smart Library" />;
       }
@@ -314,7 +288,7 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace(props: Explorer
         />
       );
     },
-    [activePaneId, homePath, multiPanelStore, props.embedded],
+    [activePaneId, multiPanelStore],
   );
   const { inspector } = useExplorerAgentDock({
     activePaneId,
@@ -323,16 +297,6 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace(props: Explorer
       <ConnectedFileInspector paneId={activePaneId} />
     ) : undefined,
   });
-  // Remotes is presented as an overlay. Navigating to /providers is the shared
-  // entry point: DesktopLayout turns it into "open the overlay and restore the
-  // previous route", the same way /settings and /account behave.
-  const handleManageRemotes = useCallback(() => {
-    navigate(routes.providers);
-  }, [navigate]);
-  const handleAddRemote = useCallback(() => {
-    navigate(routes.providers);
-    void useProvidersStore.getState().openAddRemote();
-  }, [navigate]);
   const explorerSidebar = useMemo(
     () =>
       sidebarVisible ? (
@@ -340,8 +304,6 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace(props: Explorer
           homePath={homePath}
           activePath={activePath}
           mountRoot={mountRoot}
-          remotes={sidebarRemotes}
-          remoteLoading={providersLoading}
           library={library}
           devices={mountedDevices}
           devicesLoading={devicesLoading}
@@ -349,16 +311,12 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace(props: Explorer
           onNavigate={navigateSidebar}
           onRefreshDevices={refreshDevices}
           onOpenInNewTab={openSidebarPathInNewTab}
-          onManageRemotes={handleManageRemotes}
-          onAddRemote={handleAddRemote}
           onUnpinPinnedPath={useExplorerStore.getState().togglePinnedPath}
         />
       ) : undefined,
     [
       activePath,
       devicesLoading,
-      handleAddRemote,
-      handleManageRemotes,
       homePath,
       library,
       mountRoot,
@@ -366,9 +324,7 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace(props: Explorer
       navigateSidebar,
       openSidebarPathInNewTab,
       pinnedPaths,
-      providersLoading,
       refreshDevices,
-      sidebarRemotes,
       sidebarVisible,
     ],
   );

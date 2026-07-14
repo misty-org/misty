@@ -9,13 +9,17 @@ import type { JournalImageLease } from "@/features/journal/journalAssets";
 import {
   Button,
   cn,
+  DragHandleButton,
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  IconButton,
   Input,
+  MenuItem,
   Separator,
+  SuggestionItem,
+  SuggestionList,
 } from "@/shared/ui";
 import Collaboration from "@tiptap/extension-collaboration";
 import CollaborationCaret from "@tiptap/extension-collaboration-caret";
@@ -57,7 +61,7 @@ import {
   Superscript as SuperscriptIcon,
   Trash2,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState, type ComponentType, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { Text as YText } from "yjs";
 import type { NoteBodyFormat } from "../model/types/types";
 import type { UploadNoteAssetInput } from "../noteAssets";
@@ -66,6 +70,7 @@ import { journalImage } from "./journalImage";
 import {
   NoteToolbarInlineControls,
   NoteToolbarStructureControls,
+  ToolButton,
 } from "./NoteEditorToolbarControls";
 import "./noteTiptapEditor.css";
 export type NoteEditorSession = Pick<
@@ -705,12 +710,7 @@ function SimpleEditorToolbar(props: {
       </ToolbarGroup>
       <ToolbarRule />
       <ToolbarGroup>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="misty-tiptap-tool gap-1.5 px-2"
-          onClick={props.onAddImage}
-        >
+        <Button variant="toolbar" size="sm" className="gap-1.5 px-2" onClick={props.onAddImage}>
           <ImagePlus size={17} />
           Add
         </Button>
@@ -732,29 +732,6 @@ function ToolbarGroup({ children }: { children: ReactNode }) {
 }
 function ToolbarRule() {
   return <Separator orientation="vertical" className="mx-1.5 h-6 shrink-0" />;
-}
-function ToolButton(props: {
-  label: string;
-  Icon: ComponentType<{
-    size?: number;
-  }>;
-  active?: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <Button
-      type="button"
-      variant="ghost"
-      size="icon"
-      title={props.label}
-      aria-label={props.label}
-      aria-pressed={props.active}
-      className={cn("misty-tiptap-tool", props.active && "is-active")}
-      onClick={props.onClick}
-    >
-      <props.Icon size={17} />
-    </Button>
-  );
 }
 function SearchReplacePanel(props: {
   editor: Editor;
@@ -794,9 +771,9 @@ function SearchReplacePanel(props: {
       <Button size="sm" variant="ghost" onClick={() => commands.replaceAll()}>
         All
       </Button>
-      <Button size="icon" variant="ghost" aria-label="Close search" onClick={props.onClose}>
+      <IconButton size="md" label="Close search" onClick={props.onClose}>
         <Minus size={16} />
-      </Button>
+      </IconButton>
     </div>
   );
 }
@@ -819,10 +796,8 @@ function BlockHandle(props: {
     : null;
   return (
     <div className="misty-tiptap-block-handle" data-misty-window-drag-block="true">
-      <button
-        type="button"
-        aria-label="Add block"
-        title="Add block"
+      <DragHandleButton
+        label="Add block"
         onClick={() =>
           editor
             .chain()
@@ -833,20 +808,23 @@ function BlockHandle(props: {
             .run()
         }
       >
-        <Plus size={16} />
-      </button>
+        <Plus />
+      </DragHandleButton>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <button type="button" aria-label="Block actions" title="Drag or open block actions">
-            <GripVertical size={16} />
-          </button>
+          <DragHandleButton label="Block actions" title="Drag or open block actions">
+            <GripVertical />
+          </DragHandleButton>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" side="left" className="w-52">
-          <DropdownMenuItem onSelect={() => editor.chain().focus().setParagraph().run()}>
-            <Pilcrow />
-            Turn into text
-          </DropdownMenuItem>
-          <DropdownMenuItem
+          <MenuItem
+            icon={<Pilcrow />}
+            label="Turn into text"
+            onSelect={() => editor.chain().focus().setParagraph().run()}
+          />
+          <MenuItem
+            icon={<Heading />}
+            label="Turn into heading"
             onSelect={() =>
               editor
                 .chain()
@@ -856,11 +834,10 @@ function BlockHandle(props: {
                 })
                 .run()
             }
-          >
-            <Heading />
-            Turn into heading
-          </DropdownMenuItem>
-          <DropdownMenuItem
+          />
+          <MenuItem
+            icon={<Highlighter />}
+            label="Highlight block"
             disabled={!range}
             onSelect={() =>
               range &&
@@ -873,12 +850,11 @@ function BlockHandle(props: {
                 })
                 .run()
             }
-          >
-            <Highlighter />
-            Highlight block
-          </DropdownMenuItem>
+          />
           <DropdownMenuSeparator />
-          <DropdownMenuItem
+          <MenuItem
+            icon={<Copy />}
+            label="Duplicate block"
             disabled={!node}
             onSelect={() =>
               node &&
@@ -888,36 +864,30 @@ function BlockHandle(props: {
                 .insertContentAt(pos + node.nodeSize, node.toJSON())
                 .run()
             }
-          >
-            <Copy />
-            Duplicate block
-          </DropdownMenuItem>
-          <DropdownMenuItem
+          />
+          <MenuItem
+            icon={<Copy />}
+            label="Copy to clipboard"
             disabled={!node}
             onSelect={() => node && void navigator.clipboard.writeText(node.textContent)}
-          >
-            <Copy />
-            Copy to clipboard
-          </DropdownMenuItem>
-          <DropdownMenuItem
+          />
+          <MenuItem
+            icon={<Link2 />}
+            label="Copy anchor link"
             onSelect={() =>
               void navigator.clipboard.writeText(
                 `misty://notes/${props.noteId}#${String(node?.attrs.id || `block-${pos}`)}`,
               )
             }
-          >
-            <Link2 />
-            Copy anchor link
-          </DropdownMenuItem>
+          />
           <DropdownMenuSeparator />
-          <DropdownMenuItem
+          <MenuItem
+            icon={<Trash2 />}
+            label="Delete"
             disabled={!range}
-            variant="destructive"
+            destructive
             onSelect={() => range && editor.chain().focus().deleteRange(range).run()}
-          >
-            <Trash2 />
-            Delete
-          </DropdownMenuItem>
+          />
         </DropdownMenuContent>
       </DropdownMenu>
     </div>
@@ -1018,20 +988,21 @@ function SuggestionMenu(props: {
     .filter((note) => note.title.toLowerCase().includes(props.suggestion.query.toLowerCase()))
     .slice(0, 8);
   return (
-    <div
-      className="misty-tiptap-suggestion"
+    <SuggestionList
+      className="fixed layer-menu max-h-[360px] min-w-[250px] overflow-auto"
       style={{
         left: props.suggestion.x,
         top: props.suggestion.y,
       }}
-      role="listbox"
     >
-      <p>{props.suggestion.type === "wiki" ? "Link to note" : "Insert block"}</p>
+      <p className="mx-2 mb-1.5 mt-1 text-[11px] font-semibold text-cream-muted">
+        {props.suggestion.type === "wiki" ? "Link to note" : "Insert block"}
+      </p>
       {props.suggestion.type === "slash"
         ? slashItems.map((item) => (
-            <button
+            <SuggestionItem
               key={item.label}
-              type="button"
+              selected={false}
               onClick={() => {
                 props.editor
                   .chain()
@@ -1045,14 +1016,14 @@ function SuggestionMenu(props: {
                 props.onClose();
               }}
             >
-              <item.icon size={16} />
+              <item.icon />
               {item.label}
-            </button>
+            </SuggestionItem>
           ))
         : notes.map((note) => (
-            <button
+            <SuggestionItem
               key={note.id}
-              type="button"
+              selected={false}
               onClick={() => {
                 props.editor
                   .chain()
@@ -1077,14 +1048,14 @@ function SuggestionMenu(props: {
                 props.onClose();
               }}
             >
-              <Link2 size={16} />
+              <Link2 />
               {note.title}
-            </button>
+            </SuggestionItem>
           ))}
       {props.suggestion.type === "wiki" && notes.length === 0 ? (
-        <span>No matching notes</span>
+        <span className="p-2 text-xs text-cream-muted">No matching notes</span>
       ) : null}
-    </div>
+    </SuggestionList>
   );
 }
 type FindCommands = {

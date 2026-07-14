@@ -1,42 +1,40 @@
-import { dockingGeometry } from "./dockingGeometry";
-import { isSideDock } from "@/features/app-shell/dockingLayout";
-import "./docking.css";
-import { CursorCompanionController } from "@/features/agents/companion/CursorCompanionController";
-import { NavigationNamesBoundary } from "@/features/navigation-names/NavigationNamesBoundary";
-import { BrowserContextMenuBridge } from "@/features/global-search/BrowserContextMenuBridge";
 import type { DesktopNavItem } from "@/app/layouts/model/types";
 import { openAccountSettingsInBrowser } from "@/features/account";
 import { ActivityBridge } from "@/features/activity";
 import { AgentJobWorker } from "@/features/agents/AgentJobWorker";
+import { CursorCompanionController } from "@/features/agents";
 import { routes, useAppStore, type AppTab } from "@/features/app-shell";
+import { isSideDock } from "@/features/app-shell/dockingLayout";
 import { useAuth } from "@/features/auth";
-import { BrowserRuntimeBridge } from "@/features/webviews/BrowserRuntimeBridge";
-import { setBrowserWebviewsSuspended } from "@/features/webviews/browserRuntime";
 import { BrowserSearchDialog } from "@/features/browser-workspace/BrowserSearchDialog";
+import { BrowserSyncBadge } from "@/features/browser-workspace/BrowserSyncBadge";
 import { useBrowserSearchStore } from "@/features/browser-workspace/search";
 import { GlobalMisty, useGlobalSearchStore } from "@/features/global-search";
+import { BrowserContextMenuBridge } from "@/features/global-search/BrowserContextMenuBridge";
+import { NavigationNamesBoundary } from "@/features/navigation-names/NavigationNamesBoundary";
 import { useSettingsStore, type SettingsSection } from "@/features/settings";
 import { registerShortcutHandler, useShortcutHandler } from "@/features/shortcuts";
 import { AppTour, isTourCompletedForAccount, useTourStore } from "@/features/tour";
+import { setBrowserWebviewsSuspended } from "@/features/webviews/browserRuntime";
+import { BrowserRuntimeBridge } from "@/features/webviews/BrowserRuntimeBridge";
 import {
-  useWindowDockingLayout,
   activeLayoutView,
   allLayoutViews,
+  useWindowDockingLayout,
   useWorkspaceStore,
   workspaceSurfaceFromRoute,
 } from "@/features/workspace";
-import { cn, Button } from "@/shared/ui";
-import { hasTauriInternals } from "@/shared/platform/tauri";
 import { appZoomRenderScale, useAppZoomValue } from "@/shared/hooks/useAppZoom";
+import { hasTauriInternals } from "@/shared/platform/tauri";
+import { cn, Pressable } from "@/shared/ui";
 import { Minus, Square, X } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { Outlet } from "react-router-dom";
+import "./docking.css";
+import { dockingGeometry } from "./dockingGeometry";
 import { FramePacingOverlay } from "./FramePacingOverlay";
-import { ProfilePopover } from "./ProfilePopover";
-import { BrowserSyncBadge } from "@/features/browser-workspace/BrowserSyncBadge";
 import { GlobalNavigator } from "./GlobalNavigator";
-import { WorkspaceCanvas } from "./WorkspaceCanvas";
-import { NavigatorResizeHandle } from "./NavigatorResizeHandle";
+import { settingsFallbackRoute } from "./helpers";
 import { NavigatorControls } from "./NavigatorControls";
 import {
   navigatorPixelWidth,
@@ -44,16 +42,17 @@ import {
   writeNavigatorLayout,
   type NavigatorLayout,
 } from "./navigatorMode";
+import { NavigatorResizeHandle } from "./NavigatorResizeHandle";
+import { RestoreGlyph } from "./RestoreGlyph";
 import { AppNoticePublisher, RouteNotice } from "./RouteNotices";
-import { RemotesOverlay, SettingsOverlay } from "./SettingsOverlays";
-import { TransferCompletionNotifier, WorkStatusPopup } from "./TransferStatus";
-import { settingsFallbackRoute } from "./helpers";
+import { SettingsOverlay } from "./SettingsOverlays";
 import * as styles from "./styles";
+import { TransferCompletionNotifier, WorkStatusPopup } from "./TransferStatus";
 import { useDesktopBootstrap } from "./useDesktopBootstrap";
 import { useDesktopFrameStyle } from "./useDesktopFrameStyle";
-import { useDesktopWindowChrome } from "./useDesktopWindowChrome";
 import { useDesktopShellStatus } from "./useDesktopShellStatus";
-import { RestoreGlyph } from "./RestoreGlyph";
+import { useDesktopWindowChrome } from "./useDesktopWindowChrome";
+import { WorkspaceCanvas } from "./WorkspaceCanvas";
 export type {
   AppNoticeEntry,
   AppNoticeKind,
@@ -83,7 +82,6 @@ export function DesktopLayout(props: {
     routeId,
   } = useDesktopBootstrap({ getRouteId: props.getRouteId });
   const {
-    usesNativeWindowChrome,
     shouldShowWindowsTitlebarControls,
     isWindowMaximized,
     startTitlebarDrag,
@@ -97,7 +95,6 @@ export function DesktopLayout(props: {
 
   const framePacingOverlayEnabled = useDesktopShellStatus();
 
-  const profileAnchorRef = useRef<HTMLButtonElement | null>(null);
   const [profileOpen, setProfileOpen] = useState(false);
   const docking = useWindowDockingLayout();
   const [navigatorLayout, setNavigatorLayout] = useState<NavigatorLayout>(readNavigatorLayout);
@@ -118,7 +115,6 @@ export function DesktopLayout(props: {
   }, []);
   const navigatorHidden = navigatorLayout.visibility === "hidden";
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [remotesOpen, setRemotesOpen] = useState(false);
   const openWorkspaceSurface = useWorkspaceStore((state) => state.openSurface);
   const applyNavigatorLayout = useCallback((next: NavigatorLayout) => {
     setBrowserWebviewsSuspended(true, "navigator-layout");
@@ -139,7 +135,7 @@ export function DesktopLayout(props: {
   }, [refreshUser]);
   const openSettingsOverlay = useCallback(() => {
     setSettingsOpen(true);
-    if (hasTauriInternals()) void settingsLoad();
+    if (hasTauriInternals() && !useSettingsStore.getState().loaded) void settingsLoad();
   }, [settingsLoad]);
   const closeSettingsOverlay = useCallback(() => {
     setSettingsOpen(false);
@@ -161,14 +157,6 @@ export function DesktopLayout(props: {
         );
     });
   }, []);
-  const openRemotesOverlay = useCallback(() => {
-    setSettingsOpen(false);
-    setRemotesOpen(true);
-  }, []);
-  const closeRemotesOverlay = useCallback(() => {
-    setRemotesOpen(false);
-  }, []);
-
   useEffect(() => {
     if (!user?.id || transitioning) return;
     const tourState = useTourStore.getState();
@@ -206,11 +194,10 @@ export function DesktopLayout(props: {
 
   useEffect(() => {
     if (!location.pathname.startsWith("/providers")) return;
-    openRemotesOverlay();
     navigate(settingsFallbackRoute(lastNonSettingsRouteRef.current, lastAppRoute), {
       replace: true,
     });
-  }, [lastAppRoute, lastNonSettingsRouteRef, location.pathname, navigate, openRemotesOverlay]);
+  }, [lastAppRoute, lastNonSettingsRouteRef, location.pathname, navigate]);
 
   useEffect(() => {
     const currentRoute = `${location.pathname}${location.search}${location.hash}`;
@@ -294,9 +281,9 @@ export function DesktopLayout(props: {
   }, [navigatorHidden, navigatorRevealed]);
 
   useEffect(() => {
-    setBrowserWebviewsSuspended(profileOpen || settingsOpen || remotesOpen, "shell-overlay");
+    setBrowserWebviewsSuspended(profileOpen || settingsOpen, "shell-overlay");
     return () => setBrowserWebviewsSuspended(false, "shell-overlay");
-  }, [profileOpen, remotesOpen, settingsOpen]);
+  }, [profileOpen, settingsOpen]);
 
   useEffect(() => {
     setNavigatorRevealed(false);
@@ -339,7 +326,7 @@ export function DesktopLayout(props: {
     observer.observe(controls);
     return () => observer.disconnect();
   }, [isAuthRoute]);
-  const titlebarControlsLeft = usesNativeWindowChrome ? titlebarNavigationGeometry.left : 8;
+  const titlebarControlsLeft = titlebarNavigationGeometry.left;
   const tabsFollowNavigator = docking.navigation === "left" && !navigatorHidden;
   const titlebarReservedWidth =
     titlebarControlsLeft + (titlebarControlsWidth || 112) * titlebarNavigationGeometry.scale + 16;
@@ -364,17 +351,16 @@ export function DesktopLayout(props: {
   const navigatorContent = (
     <GlobalNavigator
       position={docking.navigation}
-      profileAnchorRef={profileAnchorRef}
       profileOpen={profileOpen}
       settingsOpen={settingsOpen || location.pathname.startsWith("/settings")}
       suppressActiveTool={Boolean(standaloneRouteTitle)}
-      onProfileClick={() => {
-        setSettingsOpen(false);
-        setRemotesOpen(false);
-        setProfileOpen((open) => !open);
+      onProfileOpenChange={(open) => {
+        if (open) setSettingsOpen(false);
+        setProfileOpen(open);
       }}
+      onOpenAccountSettings={openAccountSettings}
       onSettingsClick={openSettingsOverlay}
-      onStartWindowDrag={usesNativeWindowChrome ? startTitlebarDrag : undefined}
+      onStartWindowDrag={startTitlebarDrag}
     />
   );
   return (
@@ -439,7 +425,7 @@ export function DesktopLayout(props: {
                   key={user?.id}
                   accountId={user?.id ?? ""}
                   onOpenSettings={() => {
-                    useSettingsStore.getState().setActiveSection("sync");
+                    useSettingsStore.getState().setActiveSection("browser-handoff");
                     openSettingsOverlay();
                   }}
                 />
@@ -462,35 +448,30 @@ export function DesktopLayout(props: {
                 transformOrigin: "top right",
               }}
             >
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                className={styles.windowsTitlebarControlButtonClass}
+              <Pressable
                 aria-label="Minimize window"
+                className={styles.windowsTitlebarControlButtonClass}
                 title="Minimize"
                 onClick={minimizeTitlebarWindow}
               >
                 <Minus size={16} strokeWidth={1.5} />
-              </Button>
-              <Button
-                variant="ghost"
+              </Pressable>
+              <Pressable
                 className={styles.windowsTitlebarControlButtonClass}
                 aria-label={isWindowMaximized ? "Restore window" : "Maximize window"}
                 title={isWindowMaximized ? "Restore" : "Maximize"}
                 onClick={() => void toggleTitlebarMaximize().catch(() => undefined)}
               >
                 {isWindowMaximized ? <RestoreGlyph /> : <Square size={13} strokeWidth={1.5} />}
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                className={styles.windowsTitlebarCloseButtonClass}
+              </Pressable>
+              <Pressable
                 aria-label="Close window"
+                className={styles.windowsTitlebarCloseButtonClass}
                 title="Close"
                 onClick={closeTitlebarWindow}
               >
                 <X size={18} strokeWidth={1.65} />
-              </Button>
+              </Pressable>
             </div>
           ) : null}
         </header>
@@ -580,20 +561,8 @@ export function DesktopLayout(props: {
           </>
         ) : null}
         <FramePacingOverlay enabled={!isAuthRoute && framePacingOverlayEnabled} />
-        <div
-          id="misty-shell-overlays"
-          className="pointer-events-none fixed inset-0 z-[2147482500]"
-        />
         {!isAuthRoute ? (
           <>
-            <ProfilePopover
-              anchorRef={profileAnchorRef}
-              currentPath={location.pathname}
-              open={profileOpen}
-              onClose={() => setProfileOpen(false)}
-              onOpenAccountSettings={openAccountSettings}
-            />
-            <RemotesOverlay open={remotesOpen} onClose={closeRemotesOverlay} />
             <SettingsOverlay open={settingsOpen} onClose={closeSettingsOverlay} />
             {user?.id ? (
               <GlobalMisty
@@ -620,7 +589,7 @@ export function DesktopLayout(props: {
 }
 
 function standaloneWorkspaceRouteTitle(pathname: string): string | null {
-  if (import.meta.env.DEV && pathname === "/roadmap-preview") return "Roadmap preview";
+  if (import.meta.env.DEV && pathname === "/dev/ui") return "UI gallery";
   if (pathname === "/activity") return "Activity";
   if (pathname.startsWith("/invite/")) return "Space invitation";
   return null;

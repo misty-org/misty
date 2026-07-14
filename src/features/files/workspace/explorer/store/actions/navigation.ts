@@ -1,11 +1,13 @@
-import { multiPanelStoreForPane, useMultiPanelStore } from "@/features/workspace";
+import { useAppStore } from "@/features/app-shell";
 import {
   connectedDevicesSubscribeDirectory,
   explorerCalculateDirectorySizes,
   explorerDirectorySizeSnapshot,
   explorerListDirectory,
-} from "@/features/files/workspace/native";
-import type { DirectorySizeRecord } from "@/native/contracts";
+} from "../../../native";
+import { multiPanelStoreForPane, useMultiPanelStore } from "@/features/workspace";
+import type { DirectorySizeRecord } from "@/native/ipc";
+import { isRetiredCloudLocation } from "@/shared/lib/fileLocations";
 import { errorText, userFacingErrorText } from "@/shared/lib/format";
 import type { ExplorerStore } from "../../model/interfaces/store/types";
 import type {
@@ -22,6 +24,11 @@ export function createNavigationActions(
 ): Partial<ExplorerStore> {
   return {
     loadPane: (paneId, path, mode = "push", options) => {
+      const environment = useAppStore.getState().app?.environment;
+      const legacyMount = environment
+        ? H.resolveMountRoot(environment.homeDir, environment.mountPath)
+        : undefined;
+      if (isRetiredCloudLocation(path, legacyMount)) path = environment?.homeDir || "/";
       path = H.normalizedPath(path);
       if (H.isExplorerInternalTabPath(path)) {
         set((state) => ({

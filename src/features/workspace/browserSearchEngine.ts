@@ -1,4 +1,4 @@
-import engineTable from "@/shared/contracts/browser-search-engines.json";
+import engineTable from "@/shared/schemas/browser-search-engines.json";
 
 /**
  * The search engine a typed query falls back to in the browser surface.
@@ -30,7 +30,8 @@ export function browserSearchEngine(): BrowserSearchEngine {
 
 /** Selects an engine by its stable id; unknown ids fall back to the first engine. */
 export function configureBrowserSearchEngine(id: string): void {
-  configuredEngine = browserSearchEngines.find((engine) => engine.id === id) ?? browserSearchEngines[0];
+  configuredEngine =
+    browserSearchEngines.find((engine) => engine.id === id) ?? browserSearchEngines[0];
 }
 
 let suggestionsEnabled = false;

@@ -37,8 +37,6 @@ use crate::{
     infra::{
         environment::AppEnvironmentService,
         macos_privacy::is_background_scan_excluded as privacy_excluded,
-        providers::{ProviderRemote, ProviderService},
-        storage::{StorageResponse, StorageService},
     },
 };
 
@@ -65,9 +63,6 @@ struct SearchInner {
     live_index_dir: PathBuf,
     mount_root: PathBuf,
     home_dir: PathBuf,
-    providers: ProviderService,
-    proxy: StorageService,
-    listing_cache: ListingCache,
     state: RwLock<SearchState>,
     cancel_flag: Arc<AtomicBool>,
 }
@@ -323,12 +318,8 @@ pub fn default_true() -> bool {
 }
 
 impl SearchService {
-    pub fn new(
-        environment: AppEnvironmentService,
-        providers: ProviderService,
-        proxy: StorageService,
-    ) -> Self {
-        let index_root = environment.cache_dir().join("search").join("v1");
+    pub fn new(environment: AppEnvironmentService) -> Self {
+        let index_root = environment.cache_dir().join("search").join("local-v2");
         let live_index_dir = index_root.join("index");
         let status = SearchStatus {
             scan_in_progress: false,
@@ -362,12 +353,6 @@ impl SearchService {
                 live_index_dir,
                 mount_root: environment.mount_root(),
                 home_dir: environment.home_dir(),
-                providers,
-                proxy,
-                listing_cache: ListingCache::new(
-                    environment.cache_dir().join("remotes"),
-                    environment.cache_dir().join("listings"),
-                ),
                 state: RwLock::new(SearchState {
                     status,
                     index: None,
@@ -400,9 +385,6 @@ impl SearchService {
                     index_root: root,
                     mount_root: self.inner.mount_root.clone(),
                     home_dir: self.inner.home_dir.clone(),
-                    providers: self.inner.providers.clone(),
-                    proxy: self.inner.proxy.clone(),
-                    listing_cache: self.inner.listing_cache.clone(),
                     state: RwLock::new(SearchState {
                         status: self.inner.state.read().unwrap().status.clone(),
                         index: None,
@@ -738,9 +720,9 @@ impl SearchService {
         let ignored = ignored_paths(&request.ignored_paths, &self.inner.excluded_index_root);
         let mut count = 0u64;
         let mut local_count = 0u64;
-        let mut remote_count = 0u64;
+        let remote_count = 0u64;
         let mut indexed_local_roots = Vec::new();
-        let mut indexed_remote_names = Vec::new();
+        let indexed_remote_names = Vec::new();
         let mut changes = SearchScanChanges::default();
 
         if request.include_local {
@@ -769,41 +751,6 @@ impl SearchService {
                         self.set_indexed_count(count);
                     }
                     Err(error) => self.push_scan_error(display_path(&root), error.to_string()),
-                }
-            }
-        }
-
-        if request.include_remotes {
-            let remotes = self.selected_remotes(request).await;
-            for remote in remotes {
-                if self.inner.cancel_flag.load(Ordering::SeqCst) || self.access_cancelled() {
-                    return Err(ApiError::Message("Search scan canceled.".to_string()));
-                }
-                self.set_scan_progress(
-                    Some(format!("Remote {}", remote.name)),
-                    Some("/".to_string()),
-                );
-                match self
-                    .scan_remote(
-                        &remote,
-                        request.max_depth,
-                        SearchScanContext {
-                            fields: &fields,
-                            writer: &writer,
-                            manifest: &manifest,
-                            generation,
-                            changes: &mut changes,
-                        },
-                    )
-                    .await
-                {
-                    Ok(indexed) => {
-                        count += indexed;
-                        remote_count += indexed;
-                        indexed_remote_names.push(remote.name.clone());
-                        self.set_indexed_count(count);
-                    }
-                    Err(error) => self.push_scan_error(remote.name.clone(), error.to_string()),
                 }
             }
         }
@@ -931,194 +878,6 @@ impl SearchService {
             count += 1;
         }
         Ok(count)
-    }
-
-    async fn selected_remotes(&self, request: &SearchScanRequest) -> Vec<ProviderRemote> {
-        let snapshot = match self.inner.providers.snapshot().await {
-            Ok(snapshot) if !snapshot.remotes.is_empty() || snapshot.loading => Ok(snapshot),
-            _ => self.inner.providers.refresh().await,
-        };
-        let Ok(snapshot) = snapshot else {
-            return Vec::new();
-        };
-        let selected: HashSet<String> = request.remote_names.iter().cloned().collect();
-        snapshot
-            .remotes
-            .into_iter()
-            .filter(|remote| selected.is_empty() || selected.contains(&remote.name))
-            .filter(|remote| !remote.needs_reconnect)
-            .collect()
-    }
-
-    async fn scan_remote(
-        &self,
-        remote: &ProviderRemote,
-        max_depth: Option<usize>,
-        context: SearchScanContext<'_>,
-    ) -> ApiResult<u64> {
-        let SearchScanContext {
-            fields,
-            writer,
-            manifest,
-            generation,
-            changes,
-        } = context;
-        let mut count = 0u64;
-        let mut visited = HashSet::new();
-        let mut pending = VecDeque::new();
-        pending.push_back(("/".to_string(), 0usize));
-        while let Some((remote_path, depth)) = pending.pop_front() {
-            if self.inner.cancel_flag.load(Ordering::SeqCst) || self.access_cancelled() {
-                return Err(ApiError::Message("Search scan canceled.".to_string()));
-            }
-            if depth > max_depth.unwrap_or(DEFAULT_REMOTE_MAX_DEPTH).max(1) {
-                continue;
-            }
-            if visited.len() >= REMOTE_DIRECTORY_LIMIT {
-                break;
-            }
-            let normalized = normalize_remote_path(&remote_path)?;
-            if !visited.insert(normalized.clone()) {
-                continue;
-            }
-            self.set_scan_progress(
-                Some(format!("Remote {}", remote.name)),
-                Some(normalized.clone()),
-            );
-            let target = RemoteBrowseTarget {
-                provider_type: remote.provider_type.clone(),
-                remote_name: remote.name.clone(),
-                remote_path: normalized.clone(),
-            };
-            let items = self.fetch_remote_items(&target).await?;
-            for item in items {
-                if self.inner.cancel_flag.load(Ordering::SeqCst) || self.access_cancelled() {
-                    return Err(ApiError::Message("Search scan canceled.".to_string()));
-                }
-                let child_remote_path = target.child_remote_path(&item)?;
-                let name = remote_item_name(&item, &child_remote_path);
-                let item_target = RemoteBrowseTarget {
-                    provider_type: remote.provider_type.clone(),
-                    remote_name: remote.name.clone(),
-                    remote_path: child_remote_path.clone(),
-                };
-                let virtual_path = item_target.virtual_path(&self.inner.mount_root);
-                let modified_ms = parse_remote_modified_ms(&item.mod_time);
-                let doc = SearchDoc {
-                    path: display_path(&virtual_path),
-                    name,
-                    extension: Path::new(&child_remote_path)
-                        .extension()
-                        .and_then(|value| value.to_str())
-                        .unwrap_or_default()
-                        .to_ascii_lowercase(),
-                    source_kind: SearchSourceKind::Remote,
-                    provider_type: remote.provider_type.clone(),
-                    remote_name: remote.name.clone(),
-                    remote_path: child_remote_path.clone(),
-                    mime_type: item.mime_type,
-                    is_file: !item.is_dir,
-                    is_dir: item.is_dir,
-                    size: item.size.max(0) as u64,
-                    modified_ms,
-                    hidden: Path::new(&child_remote_path)
-                        .file_name()
-                        .and_then(|value| value.to_str())
-                        .map(|value| value.starts_with('.'))
-                        .unwrap_or(false),
-                };
-                upsert_search_doc(writer, fields, manifest, &doc, generation, changes)?;
-                count += 1;
-                if count % 200 == 0 {
-                    self.set_indexed_count(count);
-                }
-                if item.is_dir {
-                    pending.push_back((child_remote_path, depth + 1));
-                }
-            }
-        }
-        Ok(count)
-    }
-
-    async fn fetch_remote_items(
-        &self,
-        target: &RemoteBrowseTarget,
-    ) -> ApiResult<Vec<RemoteListItem>> {
-        let response = self
-            .inner
-            .proxy
-            .get_with_query(
-                "/api/remote/file/list",
-                &[
-                    ("remote", target.remote_name.as_str()),
-                    ("path", target.remote_path.as_str()),
-                ],
-            )
-            .await?;
-        let start: RemoteJobStart = response_json(response, "start remote list").await?;
-        self.wait_for_remote_job(&start.job_id).await?;
-        let response = self
-            .inner
-            .proxy
-            .get(&format!(
-                "/api/remote/file/jobs/{}/result/list",
-                start.job_id
-            ))
-            .await?;
-        let status = response.status();
-        let body = response.text().await.unwrap_or_default();
-        if !status.is_success() {
-            return Err(ApiError::Message(if body.is_empty() {
-                format!(
-                    "Failed to load remote list result (HTTP {})",
-                    status.as_u16()
-                )
-            } else {
-                body
-            }));
-        }
-        let items = serde_json::from_str::<Vec<RemoteListItem>>(&body)
-            .map_err(|error| ApiError::Message(format!("Failed to parse remote list: {error}")))?;
-        let cache_body = serde_json::to_vec(&items)
-            .map_err(|error| ApiError::Message(format!("Failed to encode remote list: {error}")))?;
-        self.inner
-            .listing_cache
-            .save(&target.remote_name, &target.remote_path, &cache_body)
-            .await?;
-        Ok(items)
-    }
-
-    async fn wait_for_remote_job(&self, job_id: &str) -> ApiResult<RemoteJobStatus> {
-        for _ in 0..1_200 {
-            if self.inner.cancel_flag.load(Ordering::SeqCst) || self.access_cancelled() {
-                let _ = self
-                    .inner
-                    .proxy
-                    .delete(&format!("/api/remote/file/jobs/{job_id}"))
-                    .await;
-                return Err(ApiError::Message("Search scan canceled.".to_string()));
-            }
-            let response = self
-                .inner
-                .proxy
-                .get(&format!("/api/remote/file/jobs/{job_id}"))
-                .await?;
-            let status: RemoteJobStatus = response_json(response, "poll remote list").await?;
-            match status.state.as_str() {
-                "succeeded" => return Ok(status),
-                "failed" | "canceled" | "cancelled" => {
-                    return Err(ApiError::Message(if status.message.is_empty() {
-                        format!("Remote {} job {}", status.operation, status.state)
-                    } else {
-                        status.message
-                    }))
-                }
-                _ => tokio::time::sleep(Duration::from_millis(150)).await,
-            }
-        }
-        Err(ApiError::Message(
-            "Remote search scan timed out.".to_string(),
-        ))
     }
 
     fn set_scan_progress(&self, source: Option<String>, path: Option<String>) {
@@ -1915,40 +1674,6 @@ fn metadata_modified_ms(metadata: &fs::Metadata) -> u64 {
         .and_then(|time| time.duration_since(UNIX_EPOCH).ok())
         .map(|duration| duration.as_millis() as u64)
         .unwrap_or(0)
-}
-
-fn parse_remote_modified_ms(value: &str) -> u64 {
-    chrono::DateTime::parse_from_rfc3339(value)
-        .map(|value| value.timestamp_millis().max(0) as u64)
-        .unwrap_or(0)
-}
-
-fn remote_item_name(item: &RemoteListItem, remote_path: &str) -> String {
-    if !item.name.is_empty() {
-        return item.name.clone();
-    }
-    Path::new(remote_path)
-        .file_name()
-        .and_then(|value| value.to_str())
-        .unwrap_or(remote_path)
-        .to_string()
-}
-
-async fn response_json<T: serde::de::DeserializeOwned>(
-    response: StorageResponse,
-    operation: &str,
-) -> ApiResult<T> {
-    let status = response.status();
-    let body = response.text().await.unwrap_or_default();
-    if !status.is_success() {
-        return Err(ApiError::Message(if body.is_empty() {
-            format!("{operation} failed (HTTP {})", status.as_u16())
-        } else {
-            body
-        }));
-    }
-    serde_json::from_str::<T>(&body)
-        .map_err(|error| ApiError::Message(format!("Failed to parse {operation}: {error}")))
 }
 
 fn read_meta(index_root: &Path) -> Option<SearchMeta> {

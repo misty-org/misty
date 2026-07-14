@@ -10,7 +10,6 @@ vi.mock("./WorkspaceDockTree", () => ({
 vi.mock("./WorkspaceWindowMenu", () => ({ WorkspaceWindowMenu: () => null }));
 vi.mock("./WindowsWorkspaceTitlebarControls", () => ({
   WindowsWorkspaceTitlebarControls: () => null,
-  dockActionClass: "",
 }));
 beforeEach(() => {
   useWorkspaceStore.getState().reset();

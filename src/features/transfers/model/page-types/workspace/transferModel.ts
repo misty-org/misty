@@ -1,4 +1,4 @@
-import type { TransferRecord } from "@/native/contracts";
+import type { TransferRecord } from "@/native/ipc";
 import type { TransferSortKey } from "../../stores/transfers/types/useTransfersStore";
 
 export type TransferTableColumn =

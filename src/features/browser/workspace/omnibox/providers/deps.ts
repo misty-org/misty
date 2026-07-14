@@ -19,7 +19,10 @@ export interface OmniboxDeps {
   /** Saved websites (bookmarks), from the synced workspace. */
   bookmarks(): { url: string; title: string }[];
   /** Misty content on this device (notes, Spaces, Library items) matching the text. */
-  mistyContent(text: string, limit: number): { id: string; title: string; detail: string; route: string }[];
+  mistyContent(
+    text: string,
+    limit: number,
+  ): { id: string; title: string; detail: string; route: string }[];
   /** A web address on the clipboard, read locally; null when there is none. */
   clipboardUrl(): Promise<string | null>;
   /** Browser tabs in every window, from the synced workspace. */

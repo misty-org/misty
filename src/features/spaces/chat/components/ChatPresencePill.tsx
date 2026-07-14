@@ -1,19 +1,15 @@
-import { useSocialAuth as useAuth } from "@/features/spaces/chat/socialRuntime";
+import { useSocialAuth as useAuth } from "../SocialRuntime";
 import { personInitials } from "@/shared/lib/personInitials";
 import type { SpacePresenceViewer } from "@/features/spaces";
-import { useSocialSpaces as useSpacesStore } from "@/features/spaces/chat/socialRuntime";
+import { useSocialSpaces as useSpacesStore } from "../SocialRuntime";
 import type { SpaceMember } from "@/api/spaces/dto/interfaces/types";
 import {
   Avatar,
   AvatarFallback,
   Button,
-  menuItemClass,
-  menuLabelClass,
-  menuListClass,
   Popover,
   PopoverContent,
   PopoverTrigger,
-  cn,
 } from "@/shared/ui";
 import { useEffect, useMemo, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
@@ -67,20 +63,13 @@ export function ChatPresencePill({ spaceId }: { spaceId: string }) {
   const displayMembers = activeMembers.slice(0, 4);
   const overflowCount = activeMembers.length - displayMembers.length;
 
-  const pillClass = cn(
-    "flex h-7 items-center gap-1.5 rounded-full border border-charcoal-border/60",
-    "bg-charcoal-card px-2 py-0.5 text-xs text-cream-muted transition-colors",
-    "hover:bg-charcoal-hover hover:text-cream-bright focus:outline-none",
-    open && "bg-charcoal-hover text-cream-bright border-charcoal-border",
-  );
-
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button
-          type="button"
-          variant="ghost"
-          className={pillClass}
+          variant="chip"
+          size="chip"
+          className="px-2"
           title={`${activeMembers.length} active member${activeMembers.length > 1 ? "s" : ""}`}
         >
           <div className="flex -space-x-2 overflow-hidden">
@@ -102,10 +91,15 @@ export function ChatPresencePill({ spaceId }: { spaceId: string }) {
         </Button>
       </PopoverTrigger>
 
-      <PopoverContent align="end" sideOffset={6} className={cn("w-48", menuListClass)}>
-        <div className={menuLabelClass}>Active now ({activeMembers.length})</div>
+      <PopoverContent align="end" sideOffset={6} className="grid w-48 gap-1 p-1">
+        <div className="px-2 py-1 text-xs font-medium text-cream-muted">
+          Active now ({activeMembers.length})
+        </div>
         {activeMembers.map((member) => (
-          <div key={member.user_id} className={menuItemClass}>
+          <div
+            key={member.user_id}
+            className="flex min-h-8 items-center gap-2 rounded-md px-2 text-sm"
+          >
             <span className="size-1.5 shrink-0 rounded-full bg-status-green" />
             <span className="truncate font-medium">
               {member.user_id === user?.id ? `${member.name} (You)` : member.name}

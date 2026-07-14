@@ -2,7 +2,7 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { command } from "@/features/shortcuts/factory";
-import type { ShortcutsSnapshot } from "@/native/contracts";
+import type { ShortcutsSnapshot } from "@/native/ipc";
 import type { SettingsContentProps } from "../settingsTypes";
 import { ShortcutsSection } from "./ShortcutsSection";
 

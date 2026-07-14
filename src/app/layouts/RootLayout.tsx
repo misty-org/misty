@@ -2,7 +2,7 @@ import { RenderErrorBoundary } from "@/app/layouts/RenderErrorBoundary";
 import { AuthProvider, useAuth } from "@/features/auth";
 import { PointerDragProvider } from "@/features/dnd";
 import { useSetupStore } from "@/features/installer";
-import { useDocumentAppAppearance } from "@/features/settings";
+import { SettingsProfilesBridge, useDocumentAppAppearance } from "@/features/settings";
 import { ShortcutRuntime, useShortcutHandler } from "@/features/shortcuts";
 import { useAppZoom } from "@/shared/hooks/useAppZoom";
 import { hasTauriInternals } from "@/shared/platform/tauri";
@@ -53,6 +53,7 @@ export function RootLayout(props: {
   return (
     <>
       <AuthProvider>
+        <SettingsProfilesBridge />
         <ShortcutRuntime />
         <RenderErrorBoundary>
           <PointerDragProvider>
@@ -71,7 +72,7 @@ function AuthenticatedTreeOutlet() {
 function AppZoomIndicator(props: { visible: boolean; percent: number }) {
   return (
     <div
-      className={`pointer-events-none fixed left-1/2 top-10 z-[2147483000] -translate-x-1/2 rounded-full border border-charcoal-border bg-charcoal-card px-3 py-1.5 text-sm font-semibold text-cream shadow-xl transition duration-150 ${props.visible ? "translate-y-0 opacity-100" : "-translate-y-2 opacity-0"}`}
+      className={`pointer-events-none fixed left-1/2 top-10 layer-dialog-backdrop -translate-x-1/2 rounded-full border border-charcoal-border bg-charcoal-card px-3 py-1.5 text-sm font-semibold text-cream shadow-xl transition duration-150 ${props.visible ? "translate-y-0 opacity-100" : "-translate-y-2 opacity-0"}`}
       role="status"
       aria-live="polite"
       aria-hidden={!props.visible}

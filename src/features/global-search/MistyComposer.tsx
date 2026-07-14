@@ -1,12 +1,15 @@
 import {
-  Button,
+  cn,
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuTrigger,
-  cn,
+  FileInput,
+  IconButton,
+  MenuItem,
+  Spinner,
+  Textarea,
 } from "@/shared/ui";
-import { ArrowUp, Camera, ImagePlus, Loader2, Plus, Search, X } from "lucide-react";
+import { ArrowUp, Camera, ImagePlus, Plus, Search, X } from "lucide-react";
 import type { DragEvent, KeyboardEvent, ReactNode, RefObject } from "react";
 import { useRef, useState } from "react";
 import { SearchAskToggle } from "./GlobalMistySupport";
@@ -114,21 +117,21 @@ export function MistyComposer(props: {
                   {attachment.state === "failed" ? (
                     <span className="text-[9px] text-red-300">Failed</span>
                   ) : (
-                    <Loader2 className="size-4 animate-spin text-white" />
+                    <Spinner label={false} className="text-white" />
                   )}
                 </div>
               ) : null}
-              <Button
-                variant="ghost"
-                className={cn(
-                  "absolute right-1 top-1 grid size-5 place-items-center rounded-full bg-black/75",
-                  "text-white opacity-0 transition group-hover:opacity-100 focus:opacity-100",
-                )}
-                aria-label={`Remove ${attachment.name}`}
+              <IconButton
+                variant="overlay"
+                shape="round"
+                size="2xs"
+                label={`Remove ${attachment.name}`}
+                tooltip={false}
+                className="absolute right-1 top-1 opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
                 onClick={() => void props.onRemoveAttachment(attachment)}
               >
                 <X className="size-3" />
-              </Button>
+              </IconButton>
               {attachment.state === "uploading" ? (
                 <span className="absolute inset-x-0 bottom-0 h-0.5 bg-white/20">
                   <span
@@ -141,7 +144,8 @@ export function MistyComposer(props: {
           ))}
         </div>
       ) : null}
-      <textarea
+      <Textarea
+        variant="composer"
         ref={props.textareaRef}
         data-global-misty-launcher-input
         value={props.value}
@@ -156,7 +160,7 @@ export function MistyComposer(props: {
             : "Ask Misty anything…")
         }
         className={cn(
-          "max-h-40 min-h-12 w-full resize-none overflow-x-hidden bg-transparent px-4 pb-2.5 pt-3 text-[15px] leading-6 text-cream outline-none placeholder:text-cream-muted",
+          "max-h-40 min-h-12 px-4 pb-2.5 pt-3 text-[15px] leading-6",
           props.compact && "min-h-11 px-3.5 pb-2 pt-2.5 text-sm leading-5",
           props.inputFirst && "min-h-20 px-4 pb-3 pt-3 text-base leading-6",
         )}
@@ -167,10 +171,8 @@ export function MistyComposer(props: {
           !props.inputFirst && "border-t border-charcoal-border pt-1.5",
         )}
       >
-        <input
+        <FileInput
           ref={fileRef}
-          hidden
-          type="file"
           accept={
             props.mode === "search"
               ? "image/jpeg,image/png,image/webp"
@@ -185,39 +187,31 @@ export function MistyComposer(props: {
         {props.onCapture ? (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-sm"
-                className="text-cream-muted"
-                aria-label="Add attachments"
-                title="Add attachments"
-                disabled={props.disabled}
-              >
+              <IconButton label="Add attachments" tooltip={false} disabled={props.disabled}>
                 <Plus className="size-4" />
-              </Button>
+              </IconButton>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" data-misty-layer-portal>
-              <DropdownMenuItem onSelect={() => fileRef.current?.click()}>
-                <ImagePlus className="size-4" /> Attach files
-              </DropdownMenuItem>
-              <DropdownMenuItem onSelect={props.onCapture}>
-                <Camera className="size-4" /> Capture part of the screen
-              </DropdownMenuItem>
+              <MenuItem
+                icon={<ImagePlus className="size-4" />}
+                label="Attach files"
+                onSelect={() => fileRef.current?.click()}
+              />
+              <MenuItem
+                icon={<Camera className="size-4" />}
+                label="Capture part of the screen"
+                onSelect={props.onCapture}
+              />
             </DropdownMenuContent>
           </DropdownMenu>
         ) : (
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-sm"
-            className="text-cream-muted"
-            aria-label="Attach files"
+          <IconButton
+            label="Attach files"
             disabled={props.disabled}
             onClick={() => fileRef.current?.click()}
           >
             <Plus className="size-4" />
-          </Button>
+          </IconButton>
         )}
         {props.onModeChange ? (
           <SearchAskToggle mode={props.mode} compact onChange={props.onModeChange} />
@@ -231,25 +225,18 @@ export function MistyComposer(props: {
         )}
         <div className="min-w-0 flex-1" />
         {props.voiceControl}
-        <Button
-          type="button"
-          size="icon"
-          className="size-8 shrink-0"
+        <IconButton
+          label={props.mode === "search" ? "Search" : "Send to Misty"}
           disabled={
             props.disabled ||
             props.busy ||
             !canSend ||
             props.attachments.some((item) => item.state !== "ready")
           }
-          aria-label={props.mode === "search" ? "Search" : "Send to Misty"}
           onClick={props.onSubmit}
         >
-          {props.busy ? (
-            <Loader2 className="size-4 animate-spin" />
-          ) : (
-            <ArrowUp className="size-4" />
-          )}
-        </Button>
+          {props.busy ? <Spinner label={false} /> : <ArrowUp className="size-4" />}
+        </IconButton>
         {props.trailingControl}
       </div>
     </div>

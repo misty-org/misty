@@ -324,32 +324,20 @@ impl SmartLibraryService {
                 force_remote_refresh: Some(false),
             })
             .await?;
-        let source_kind = match first_listing.location.kind {
-            ExplorerLocationKind::Local => SmartLibrarySourceKind::Local,
-            _ => SmartLibrarySourceKind::Cloud,
-        };
-        if source_kind != SmartLibrarySourceKind::Local {
+        if !matches!(first_listing.location.kind, ExplorerLocationKind::Local) {
             return Err(ApiError::Message(
-                "Private Library only accepts files stored on this device.".to_owned(),
+                "Private Library only accepts local files.".into(),
             ));
         }
-
-        let discovered = match source_kind {
-            SmartLibrarySourceKind::Local => {
-                let root = PathBuf::from(&root_path);
-                let db_path = self.db_path.clone();
-                tokio::task::spawn_blocking(move || {
-                    let hints = load_scan_hints(&db_path)?;
-                    discover_local(&root, &hints)
-                })
-                .await
-                .map_err(worker_error)??
-            }
-            SmartLibrarySourceKind::Cloud => {
-                self.discover_cloud(root_path.clone(), first_listing)
-                    .await?
-            }
-        };
+        let source_kind = SmartLibrarySourceKind::Local;
+        let root = PathBuf::from(&root_path);
+        let db_path = self.db_path.clone();
+        let discovered = tokio::task::spawn_blocking(move || {
+            let hints = load_scan_hints(&db_path)?;
+            discover_local(&root, &hints)
+        })
+        .await
+        .map_err(worker_error)??;
         let db_path = self.db_path.clone();
         tokio::task::spawn_blocking(move || {
             persist_scan(&db_path, &root_path, source_kind, discovered)
@@ -358,72 +346,12 @@ impl SmartLibraryService {
         .map_err(worker_error)?
     }
 
-    async fn discover_cloud(
-        &self,
-        root_path: String,
-        first_listing: crate::domain::explorer::DirectoryListing,
-    ) -> ApiResult<Vec<DiscoveredAsset>> {
-        let mut queue = VecDeque::from([(root_path.clone(), Some(first_listing))]);
-        let mut discovered = Vec::new();
-        let mut visited = HashSet::new();
-        while let Some((directory, cached)) = queue.pop_front() {
-            if !visited.insert(directory.clone()) {
-                continue;
-            }
-            let listing = match cached {
-                Some(listing) => listing,
-                None => {
-                    self.explorer
-                        .list_directory(ListDirectoryRequest {
-                            path: Some(directory.clone()),
-                            show_hidden: Some(false),
-                            force_remote_refresh: Some(false),
-                        })
-                        .await?
-                }
-            };
-            for entry in listing.entries {
-                match entry.kind {
-                    FileKind::Folder => queue.push_back((entry.path, None)),
-                    FileKind::File => {
-                        let relative_path = relative_display_path(&root_path, &entry.path);
-                        let extension = normalize_extension(&entry.extension);
-                        let size_bytes = entry.size_bytes.unwrap_or_default();
-                        let classification = smart_library_ingestion::classify_with_declared_mime(
-                            &extension,
-                            size_bytes,
-                            entry.mime_type.as_deref(),
-                        );
-                        let fingerprint = metadata_fingerprint(
-                            &relative_path,
-                            size_bytes,
-                            entry.modified_ms.unwrap_or_default().max(0) as u64,
-                        );
-                        discovered.push(DiscoveredAsset {
-                            path: entry.path,
-                            relative_path,
-                            name: entry.name,
-                            extension: extension.clone(),
-                            mime_type: entry.mime_type.unwrap_or(classification.mime_type),
-                            asset_kind: classification.kind,
-                            size_bytes,
-                            modified_ms: entry.modified_ms.unwrap_or_default().max(0) as u64,
-                            fingerprint,
-                            preview_supported: classification.analysis_supported,
-                            unsupported_reason: classification.unsupported_reason,
-                        });
-                    }
-                    _ => {}
-                }
-            }
-        }
-        Ok(discovered)
-    }
-
     pub async fn prepare_previews(
         &self,
         request: PrepareSmartLibraryPreviewsRequest,
-        #[cfg(target_os = "macos")] service: std::sync::Arc<crate::infra::document_intelligence::ServiceLease>,
+        #[cfg(target_os = "macos")] service: std::sync::Arc<
+            crate::infra::document_intelligence::ServiceLease,
+        >,
     ) -> ApiResult<Vec<PreparedSmartLibraryPreview>> {
         if request.asset_ids.is_empty() {
             return Ok(Vec::new());
@@ -441,7 +369,13 @@ impl SmartLibraryService {
         tokio::time::timeout(
             PREPARE_TIMEOUT,
             tokio::task::spawn_blocking(move || {
-                prepare_previews(&db_path, &request.asset_ids, dimension, #[cfg(target_os = "macos")] Some(&service))
+                prepare_previews(
+                    &db_path,
+                    &request.asset_ids,
+                    dimension,
+                    #[cfg(target_os = "macos")]
+                    Some(&service),
+                )
             }),
         )
         .await
@@ -1291,7 +1225,12 @@ fn prepare_previews(
         if kind == SemanticAssetKind::Image
             && RENDERABLE_IMAGE_EXTENSIONS.contains(&extension.as_str())
         {
-            if let Ok(rendered) = render_private_image_preview(Path::new(&path), dimension, #[cfg(target_os = "macos")] service) {
+            if let Ok(rendered) = render_private_image_preview(
+                Path::new(&path),
+                dimension,
+                #[cfg(target_os = "macos")]
+                service,
+            ) {
                 (bytes, width, height) = rendered;
                 payload_mime = "image/jpeg".to_owned();
             } else {
@@ -1301,7 +1240,13 @@ fn prepare_previews(
                 );
             }
         } else {
-            match smart_library_ingestion::extract(Path::new(&path), &extension, kind, #[cfg(target_os = "macos")] service) {
+            match smart_library_ingestion::extract(
+                Path::new(&path),
+                &extension,
+                kind,
+                #[cfg(target_os = "macos")]
+                service,
+            ) {
                 Ok(extracted) => {
                     extracted_text = extracted.text;
                     metadata.extend(extracted.metadata);
@@ -1529,17 +1474,40 @@ fn render_private_image_preview(path: &Path, dimension: u32) -> ApiResult<(Vec<u
 }
 
 #[cfg(target_os = "macos")]
-fn render_private_image_preview(path:&Path,dimension:u32,service:Option<&crate::infra::document_intelligence::ServiceLease>)->ApiResult<(Vec<u8>,u32,u32)> {
-    let service=service.ok_or_else(||ApiError::Message("Open Library to prepare its images.".into()))?;
-    let response=service.process_image(path,dimension).map_err(ApiError::Message)?;
+fn render_private_image_preview(
+    path: &Path,
+    dimension: u32,
+    service: Option<&crate::infra::document_intelligence::ServiceLease>,
+) -> ApiResult<(Vec<u8>, u32, u32)> {
+    let service =
+        service.ok_or_else(|| ApiError::Message("Open Library to prepare its images.".into()))?;
+    let response = service
+        .process_image(path, dimension)
+        .map_err(ApiError::Message)?;
     #[derive(Deserialize)]
-    #[serde(rename_all="camelCase",deny_unknown_fields)]
-    struct Preview {bytes:Vec<u8>,width:u32,height:u32,mime_type:String}
-    let preview:Preview=serde_json::from_value(response.get("image").cloned().ok_or_else(||ApiError::Message("Missing image preview.".into()))?)?;
-    if preview.width==0 || preview.height==0 || preview.width>dimension || preview.height>dimension || preview.mime_type!="image/jpeg" || !preview.bytes.starts_with(&[0xff,0xd8]) {
+    #[serde(rename_all = "camelCase", deny_unknown_fields)]
+    struct Preview {
+        bytes: Vec<u8>,
+        width: u32,
+        height: u32,
+        mime_type: String,
+    }
+    let preview: Preview = serde_json::from_value(
+        response
+            .get("image")
+            .cloned()
+            .ok_or_else(|| ApiError::Message("Missing image preview.".into()))?,
+    )?;
+    if preview.width == 0
+        || preview.height == 0
+        || preview.width > dimension
+        || preview.height > dimension
+        || preview.mime_type != "image/jpeg"
+        || !preview.bytes.starts_with(&[0xff, 0xd8])
+    {
         return Err(ApiError::Message("Invalid image preview.".into()));
     }
-    Ok((preview.bytes,preview.width,preview.height))
+    Ok((preview.bytes, preview.width, preview.height))
 }
 
 fn open_database(path: &Path) -> ApiResult<Connection> {
@@ -1989,7 +1957,14 @@ mod tests {
         )
         .unwrap();
         let asset_id = status.assets[0].asset_id.clone();
-        let prepared = prepare_previews(&db, std::slice::from_ref(&asset_id), 512, #[cfg(target_os = "macos")] None).unwrap();
+        let prepared = prepare_previews(
+            &db,
+            std::slice::from_ref(&asset_id),
+            512,
+            #[cfg(target_os = "macos")]
+            None,
+        )
+        .unwrap();
         assert_eq!(prepared[0].asset_kind, SemanticAssetKind::Text);
         assert_eq!(
             prepared[0].extracted_text.as_deref(),

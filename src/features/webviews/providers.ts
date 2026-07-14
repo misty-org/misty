@@ -1,5 +1,5 @@
 import { websiteIntegrations, type WebsiteIntegrationId } from "./websiteIntegrations";
-import { mistyBrowserProviders, type MistyBrowserProvider } from "@/shared/contracts";
+import { mistyBrowserProviders, type MistyBrowserProvider } from "@/shared/schemas";
 import { providerLoginUrls } from "./providerLoginUrls";
 export type ProviderFamily =
   "inbox" | "chat" | "journal" | "planner" | "library" | "music" | "media";

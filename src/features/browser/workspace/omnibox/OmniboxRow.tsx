@@ -1,4 +1,4 @@
-import { cn, menuItemClass } from "@/shared/ui";
+import { Button, cn, IconButton, SuggestionItem } from "@/shared/ui";
 import { AppWindow, FileText, Globe2, History, Search, Settings2, Star, X } from "lucide-react";
 import type { OmniboxMatch } from "./types";
 
@@ -24,24 +24,21 @@ export function OmniboxRow(props: {
   const Icon = rowIcon(match);
   const detail = match.kind === "tab" ? `Switch to tab · ${match.detail}` : match.detail;
   return (
-    <div
+    <SuggestionItem
       id={match.id}
-      role="option"
-      aria-selected={props.selected}
-      className={cn(menuItemClass, "group gap-3", props.selected && "bg-charcoal-hover")}
+      selected={props.selected}
       onPointerEnter={props.onPoint}
-      // Keep focus in the address bar so choosing a row does not blur it first.
-      onPointerDown={(event) => event.preventDefault()}
       onClick={props.onChoose}
     >
       <Icon strokeWidth={1.7} className="opacity-70" />
       <span className="min-w-0 flex-1 truncate font-medium">{match.title}</span>
       <span className="max-w-[48%] truncate text-xs opacity-55">{detail}</span>
       {match.switchTabId ? (
-        <button
-          type="button"
+        <Button
+          variant="outline"
+          size="xs"
           tabIndex={-1}
-          className="shrink-0 rounded border border-current/20 px-1.5 py-0.5 text-[11px] opacity-70 hover:opacity-100"
+          className="h-5 text-[11px]"
           onPointerDown={(event) => event.preventDefault()}
           onClick={(event) => {
             event.stopPropagation();
@@ -49,16 +46,17 @@ export function OmniboxRow(props: {
           }}
         >
           Switch to tab
-        </button>
+        </Button>
       ) : null}
       {props.onRemove ? (
-        <button
-          type="button"
-          tabIndex={-1}
-          aria-label="Remove from history"
+        <IconButton
+          label="Remove from history"
+          tooltip={false}
           title="Remove from history (Shift+Delete)"
+          size="xs"
+          tabIndex={-1}
           className={cn(
-            "shrink-0 rounded p-0.5 opacity-0 hover:opacity-100 group-hover:opacity-60",
+            "opacity-0 group-hover/suggestion:opacity-60 hover:opacity-100",
             props.selected && "opacity-60",
           )}
           onPointerDown={(event) => event.preventDefault()}
@@ -68,8 +66,8 @@ export function OmniboxRow(props: {
           }}
         >
           <X className="size-3.5" />
-        </button>
+        </IconButton>
       ) : null}
-    </div>
+    </SuggestionItem>
   );
 }

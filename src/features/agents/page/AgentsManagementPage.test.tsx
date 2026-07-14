@@ -22,7 +22,6 @@ vi.mock("../components/MistyDashboard", () => ({
   ),
 }));
 
-
 describe("Agents conversation page", () => {
   afterEach(() => {
     document.body.innerHTML = "";

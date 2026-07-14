@@ -1,5 +1,5 @@
-import type { TransferRecord } from "@/native/contracts";
-import type { TransferStatus } from "@/native/contracts/primitives";
+import type { TransferRecord } from "@/native/ipc";
+import type { TransferStatus } from "@/native/ipc/primitives";
 
 export const emptyTransferCompletionTracker = (): TransferCompletionTracker => ({
   ready: false,

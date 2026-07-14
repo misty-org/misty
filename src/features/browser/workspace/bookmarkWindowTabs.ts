@@ -1,7 +1,4 @@
-import {
-  addWebsite,
-  createWebsiteGroup,
-} from "@/features/browser-workspace/navigation";
+import { addWebsite, createWebsiteGroup } from "@/features/browser-workspace/navigation";
 import {
   allLayoutViews,
   isPrivateBrowserTab,

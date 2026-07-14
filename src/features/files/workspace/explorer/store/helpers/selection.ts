@@ -1,11 +1,10 @@
 import { useAppStore } from "@/features/app-shell";
 import { selectGeneralPreferences, useSettingsStore } from "@/features/settings";
-import { useTransfersStore } from "@/features/transfers";
-import type { FileEntry, PasteItem } from "@/native/contracts";
-import type { CreateItemKind } from "@/native/contracts/primitives";
+import { useOperationQueueStore, useTransfersStore } from "@/features/transfers";
+import type { FileEntry, PasteItem } from "@/native/ipc";
+import type { CreateItemKind } from "@/native/ipc/primitives";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { open } from "@tauri-apps/plugin-dialog";
-import { useOperationQueueStore } from "..";
 
 import type {
   ExplorerBatchRenameItem,
@@ -73,7 +72,7 @@ export function selectedEntriesForPane(pane: PaneExplorerState | undefined): Fil
 
 export function selectedRemotePasteItemsForPane(pane: PaneExplorerState | undefined): PasteItem[] {
   return H.selectedEntriesForPane(pane)
-    .filter((entry) => !entry.isDeleted && entry.location.kind === "remote")
+    .filter((entry) => !entry.isDeleted && entry.location.kind === "peer_device")
     .map(H.pasteItemForEntry);
 }
 
@@ -338,9 +337,9 @@ export function deleteQueuedMessage(count: number, permanent: boolean): string {
 }
 
 export {
-  splitRenameParts,
-  validateRenameValue,
-  validateBatchRenameItems,
   renameTargetPath,
+  splitRenameParts,
+  validateBatchRenameItems,
+  validateRenameValue,
   withInlineEditValidation,
 } from "../../utils/inlineEdit";

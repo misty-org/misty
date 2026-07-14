@@ -1,14 +1,14 @@
 import type { SpaceMember } from "@/api/spaces/dto/interfaces/types";
 import type { TaskDraft } from "@/api/spaces/dto/types/SpaceTaskPrimitives";
 import {
-  Button,
+  cn,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuTrigger,
-  cn,
+  MenuItem,
+  MenuTrigger,
 } from "@/shared/ui";
-import { Bot, ChevronDown, Flag, User } from "lucide-react";
+import { Flag, User } from "lucide-react";
 import type { Dispatch, ReactNode, SetStateAction } from "react";
 import {
   statusDot,
@@ -55,25 +55,18 @@ export function TaskDrawerProperties({
         {/* Status */}
         <PropertyRow label="Status">
           <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="outline"
-                type="button"
-                disabled={!canManage}
-                className={cn(
-                  "flex h-8 w-full items-center justify-between gap-2 rounded-lg border-charcoal-border/70",
-                  "bg-charcoal-workspace/60 px-2.5 text-xs text-cream shadow-none transition-all",
-                  "hover:border-charcoal-border hover:bg-charcoal-card",
-                  "disabled:pointer-events-none disabled:opacity-50",
-                )}
-              >
-                <div className="flex items-center gap-2 truncate">
+            <MenuTrigger
+              label="Status"
+              variant="outline"
+              disabled={!canManage}
+              className="h-8 w-full justify-between rounded-lg px-2.5 text-xs"
+              value={
+                <span className="flex items-center gap-2">
                   <span className={`size-2 shrink-0 rounded-full ${statusDot(draft.status)}`} />
                   <span className="font-medium">{currentStatusLabel}</span>
-                </div>
-                <ChevronDown className="size-3.5 shrink-0 text-cream-muted" />
-              </Button>
-            </DropdownMenuTrigger>
+                </span>
+              }
+            />
             <DropdownMenuContent align="start" className="w-48">
               {taskStatusOptions.map(([statusKey, label]) => (
                 <DropdownMenuItem
@@ -92,19 +85,13 @@ export function TaskDrawerProperties({
         {/* Priority */}
         <PropertyRow label="Priority">
           <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="outline"
-                type="button"
-                disabled={!canManage}
-                className={cn(
-                  "flex h-8 w-full items-center justify-between gap-2 rounded-lg border-charcoal-border/70",
-                  "bg-charcoal-workspace/60 px-2.5 text-xs text-cream shadow-none transition-all",
-                  "hover:border-charcoal-border hover:bg-charcoal-card",
-                  "disabled:pointer-events-none disabled:opacity-50",
-                )}
-              >
-                <div className="flex items-center gap-2 truncate">
+            <MenuTrigger
+              label="Priority"
+              variant="outline"
+              disabled={!canManage}
+              className="h-8 w-full justify-between rounded-lg px-2.5 text-xs"
+              value={
+                <span className="flex items-center gap-2">
                   <Flag
                     className={cn(
                       "size-3.5 shrink-0",
@@ -116,31 +103,31 @@ export function TaskDrawerProperties({
                     )}
                   />
                   <span className="font-medium">{currentPriorityLabel}</span>
-                </div>
-                <ChevronDown className="size-3.5 shrink-0 text-cream-muted" />
-              </Button>
-            </DropdownMenuTrigger>
+                </span>
+              }
+            />
             <DropdownMenuContent align="start" className="w-44">
               {taskPriorityOptions.map(([priorityKey, label]) => (
-                <DropdownMenuItem
+                <MenuItem
+                  icon={
+                    <Flag
+                      className={cn(
+                        "size-3.5 shrink-0",
+                        priorityKey === "high"
+                          ? "text-avatar-red"
+                          : priorityKey === "low"
+                            ? "text-avatar-blue"
+                            : "text-avatar-yellow",
+                      )}
+                    />
+                  }
+                  label={label}
                   key={priorityKey}
                   onClick={() => setDraft({ ...draft, priority: priorityKey })}
                   className={cn(
                     draft.priority === priorityKey && "font-semibold text-cream-bright",
                   )}
-                >
-                  <Flag
-                    className={cn(
-                      "size-3.5 shrink-0",
-                      priorityKey === "high"
-                        ? "text-avatar-red"
-                        : priorityKey === "low"
-                          ? "text-avatar-blue"
-                          : "text-avatar-yellow",
-                    )}
-                  />
-                  {label}
-                </DropdownMenuItem>
+                />
               ))}
             </DropdownMenuContent>
           </DropdownMenu>
@@ -149,44 +136,38 @@ export function TaskDrawerProperties({
         {/* Assignee */}
         <PropertyRow label="Assignee">
           <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="outline"
-                type="button"
-                disabled={!canManage}
-                className={cn(
-                  "flex h-8 w-full items-center justify-between gap-2 rounded-lg border-charcoal-border/70",
-                  "bg-charcoal-workspace/60 px-2.5 text-xs text-cream shadow-none transition-all",
-                  "hover:border-charcoal-border hover:bg-charcoal-card",
-                  "disabled:pointer-events-none disabled:opacity-50",
-                )}
-              >
-                <div className="flex items-center gap-2 truncate">
+            <MenuTrigger
+              label="Assignee"
+              variant="outline"
+              disabled={!canManage}
+              className="h-8 w-full justify-between rounded-lg px-2.5 text-xs"
+              value={
+                <span className="flex items-center gap-2">
                   {assignedMember ? (
                     <TaskMemberAvatar member={assignedMember} size="sm" />
                   ) : (
                     <User className="size-3.5 shrink-0 text-cream-muted" />
                   )}
                   <span className="truncate font-medium">{assigneeDisplay}</span>
-                </div>
-                <ChevronDown className="size-3.5 shrink-0 text-cream-muted" />
-              </Button>
-            </DropdownMenuTrigger>
+                </span>
+              }
+            />
             <DropdownMenuContent align="start" className="w-56 max-h-60 overflow-y-auto">
-              <DropdownMenuItem
+              <MenuItem
+                icon={<User className="size-3.5 opacity-60" />}
+                label="Unassigned"
                 onClick={() => setDraft({ ...draft, assignee_user_id: "" })}
                 className="text-cream-muted"
-              >
-                <User className="size-3.5 opacity-60" />
-                Unassigned
-              </DropdownMenuItem>
+              />
               {members.length > 0 ? (
                 <>
                   <div className="px-2 py-1 text-[10px] font-semibold text-cream-faint/60">
                     Members
                   </div>
                   {members.map((member) => (
-                    <DropdownMenuItem
+                    <MenuItem
+                      icon={<TaskMemberAvatar member={member} size="sm" />}
+                      label={member.name}
                       key={member.user_id}
                       onClick={() =>
                         setDraft({
@@ -198,10 +179,7 @@ export function TaskDrawerProperties({
                         draft.assignee_user_id === member.user_id &&
                           "font-semibold text-cream-bright bg-charcoal-hover",
                       )}
-                    >
-                      <TaskMemberAvatar member={member} size="sm" />
-                      <span className="truncate">{member.name}</span>
-                    </DropdownMenuItem>
+                    />
                   ))}
                 </>
               ) : null}

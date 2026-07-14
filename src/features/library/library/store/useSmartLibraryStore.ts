@@ -1,5 +1,5 @@
 import { useWorkspaceStore } from "@/features/workspace/useWorkspaceStore";
-import type { SmartLibraryPreviewInput, SmartLibraryProgress } from "@/features/files/workspace/explorer";
+import type { SmartLibraryPreviewInput, SmartLibraryProgress } from "@/features/files/workspace";
 import { clearSemanticExplorerSearchCache } from "@/features/global-search/semanticSearchCache";
 import {
   smartLibraryApplyResults,
@@ -10,8 +10,8 @@ import {
   smartLibraryScan,
   smartLibrarySetServerFolderId,
   smartLibrarySnapshot,
-} from "@/features/files/workspace/native";
-import type { FolderLibraryStatus } from "@/native/contracts";
+} from "@/native/filesystem";
+import type { FolderLibraryStatus } from "@/native/ipc";
 import { errorText } from "@/shared/lib/format";
 import { create } from "zustand";
 import {
@@ -80,7 +80,9 @@ export const useSmartLibraryStore = create<SmartLibraryStore>((set, get) => ({
   },
 
   addFiles: async (paths) => {
-    const originSpaceId = (useWorkspaceStore.getState().activeScopeKey.startsWith("space:") ? useWorkspaceStore.getState().activeScopeKey.slice(6) : "");
+    const originSpaceId = useWorkspaceStore.getState().activeScopeKey.startsWith("space:")
+      ? useWorkspaceStore.getState().activeScopeKey.slice(6)
+      : "";
     const selected = [...new Set(paths.map((path) => path.trim()).filter(Boolean))];
     if (selected.length === 0 || get().phase === "uploading" || get().phase === "processing")
       return;
@@ -125,8 +127,10 @@ export const useSmartLibraryStore = create<SmartLibraryStore>((set, get) => ({
       const billable = eligible
         .filter((asset) => !sampleIds.has(asset.assetId) || asset.status === "changed")
         .map((asset) => asset.assetId);
-      if (included.length > 0) serverProgress = await analyzeAssets(folderId, included, "sample", originSpaceId);
-      if (billable.length > 0) serverProgress = await analyzeAssets(folderId, billable, "full", originSpaceId);
+      if (included.length > 0)
+        serverProgress = await analyzeAssets(folderId, included, "sample", originSpaceId);
+      if (billable.length > 0)
+        serverProgress = await analyzeAssets(folderId, billable, "full", originSpaceId);
       set({
         progress: serverProgress,
         phase: phaseFromProgress(serverProgress),
@@ -196,7 +200,9 @@ export const useSmartLibraryStore = create<SmartLibraryStore>((set, get) => ({
   rescan: async () => get().discoverChanges(),
 
   trySample: async () => {
-    const originSpaceId = (useWorkspaceStore.getState().activeScopeKey.startsWith("space:") ? useWorkspaceStore.getState().activeScopeKey.slice(6) : "");
+    const originSpaceId = useWorkspaceStore.getState().activeScopeKey.startsWith("space:")
+      ? useWorkspaceStore.getState().activeScopeKey.slice(6)
+      : "";
     const current = get().library;
     if (!current || current.preflight.sampleAssetIds.length === 0) return;
     set({ phase: "uploading", error: null });
@@ -231,7 +237,9 @@ export const useSmartLibraryStore = create<SmartLibraryStore>((set, get) => ({
   },
 
   analyzeFolder: async () => {
-    const originSpaceId = (useWorkspaceStore.getState().activeScopeKey.startsWith("space:") ? useWorkspaceStore.getState().activeScopeKey.slice(6) : "");
+    const originSpaceId = useWorkspaceStore.getState().activeScopeKey.startsWith("space:")
+      ? useWorkspaceStore.getState().activeScopeKey.slice(6)
+      : "";
     const current = get().library;
     if (!current) return;
     set({ phase: "uploading", error: null });
@@ -251,7 +259,8 @@ export const useSmartLibraryStore = create<SmartLibraryStore>((set, get) => ({
       let progress: SmartLibraryProgress | null = null;
       if (includedRetries.length > 0)
         progress = await analyzeAssets(folderId, includedRetries, "sample", originSpaceId);
-      if (billableIds.length > 0) progress = await analyzeAssets(folderId, billableIds, "full", originSpaceId);
+      if (billableIds.length > 0)
+        progress = await analyzeAssets(folderId, billableIds, "full", originSpaceId);
       if (!progress) throw new Error("There are no new or changed files to analyze.");
       set({ progress, phase: phaseFromProgress(progress), error: progress.message ?? null });
       await get().refreshProgress();
@@ -308,7 +317,9 @@ export const useSmartLibraryStore = create<SmartLibraryStore>((set, get) => ({
   },
 
   upgradeIndex: async () => {
-    const originSpaceId = (useWorkspaceStore.getState().activeScopeKey.startsWith("space:") ? useWorkspaceStore.getState().activeScopeKey.slice(6) : "");
+    const originSpaceId = useWorkspaceStore.getState().activeScopeKey.startsWith("space:")
+      ? useWorkspaceStore.getState().activeScopeKey.slice(6)
+      : "";
     const library = get().library;
     const folderId = library?.serverFolderId;
     if (!library || !folderId) return;

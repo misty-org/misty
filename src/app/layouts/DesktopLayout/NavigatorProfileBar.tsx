@@ -1,8 +1,17 @@
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger, Button, cn } from "@/shared/ui";
+import {
+  cn,
+  DropdownMenu,
+  DropdownMenuTrigger,
+  IconButton,
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/shared/ui";
 import { Settings } from "lucide-react";
-import type { RefObject } from "react";
 import { HelpMenu } from "./HelpMenu";
 import { ProfileNavButton } from "./NavRail";
+import { ProfileMenu } from "./ProfileMenu";
 import {
   navigatorHeaderRowClass,
   navigatorHierarchyTriggerClass,
@@ -12,10 +21,10 @@ import {
 /** Fixed account row below the navigation scroll area, styled like the Misty header row. */
 export function NavigatorProfileBar(props: {
   compact?: boolean;
-  profileAnchorRef: RefObject<HTMLButtonElement | null>;
   profileOpen: boolean;
   settingsOpen: boolean;
-  onProfileClick: () => void;
+  onProfileOpenChange: (open: boolean) => void;
+  onOpenAccountSettings: () => void;
   onSettingsClick: () => void;
 }) {
   return (
@@ -26,33 +35,40 @@ export function NavigatorProfileBar(props: {
       onPointerDown={(event) => event.stopPropagation()}
     >
       <div className={navigatorHeaderRowClass}>
-        <ProfileNavButton
-          ref={props.profileAnchorRef}
+        <DropdownMenu
           open={props.profileOpen}
-          onClick={props.onProfileClick}
-          className={cn(
-            navigatorHierarchyTriggerClass,
-            "group/profile relative min-w-0 flex-1 justify-start text-[length:var(--navigation-row-font-size,14px)] font-medium text-cream-muted",
-            props.profileOpen && "text-cream-bright",
-          )}
-          avatarClassName="border-0 bg-transparent ring-0 group-hover/profile:ring-0 [&>*]:!text-[8px]"
-          showAccountName={!props.compact}
-        />
+          onOpenChange={props.onProfileOpenChange}
+          modal={false}
+        >
+          <DropdownMenuTrigger asChild>
+            <ProfileNavButton
+              open={props.profileOpen}
+              className={cn(
+                navigatorHierarchyTriggerClass,
+                "group/profile relative min-w-0 flex-1 justify-start text-[length:var(--navigation-row-font-size,14px)] font-medium text-cream-muted",
+                props.profileOpen && "text-cream-bright",
+              )}
+              avatarClassName="border-0 bg-transparent ring-0 group-hover/profile:ring-0 [&>*]:!text-[8px]"
+              showAccountName={!props.compact}
+            />
+          </DropdownMenuTrigger>
+          <ProfileMenu
+            onClose={() => props.onProfileOpenChange(false)}
+            onOpenAccountSettings={props.onOpenAccountSettings}
+          />
+        </DropdownMenu>
         <TooltipProvider delayDuration={450}>
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                className={cn(
-                  navigatorIslandActionClass,
-                  props.settingsOpen && "bg-charcoal-hover text-cream-bright",
-                )}
-                aria-label="Settings"
+              <IconButton
+                label="Settings"
+                tooltip={false}
+                className={navigatorIslandActionClass}
+                aria-pressed={props.settingsOpen}
                 onClick={props.onSettingsClick}
               >
                 <Settings aria-hidden="true" />
-              </Button>
+              </IconButton>
             </TooltipTrigger>
             <TooltipContent>Settings</TooltipContent>
           </Tooltip>
