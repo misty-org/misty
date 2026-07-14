@@ -122,11 +122,20 @@ export async function managedAiRequest<T = unknown>(path: string, init?: Request
   });
   if (!response.ok) {
     const text = await response.text();
+    let payload: ManagedAiErrorPayload | null = null;
     try {
-      const payload = JSON.parse(text) as { code?: string; message?: string; available_credits?: number; reset_at?: string; retry_after_seconds?: number };
+      payload = JSON.parse(text) as ManagedAiErrorPayload;
+    } catch {
+      // Plain-text errors are handled below.
+    }
+    if (payload) {
       if (payload.code === "credits_exhausted") {
         const reset = payload.reset_at ? new Date(payload.reset_at).toLocaleDateString() : "your next reset";
         throw new Error(`Misty credits exhausted (${payload.available_credits ?? 0} available). Add credits or wait until ${reset}.`);
+      }
+      if (payload.code === "insufficient_credits") {
+        const required = typeof payload.requiredCredits === "number" ? ` ${payload.requiredCredits} Mika credits are required.` : "";
+        throw new Error(`${payload.message?.trim() || "Not enough Mika credits for this request."}${required}`);
       }
       if (payload.code === "rate_limited") {
         throw new Error(`Mika request limit reached. Try again in ${payload.retry_after_seconds ?? 1} seconds. Requests are never retried automatically.`);
@@ -134,18 +143,23 @@ export async function managedAiRequest<T = unknown>(path: string, init?: Request
       if (payload.code === "request_canceled") {
         throw new Error("Mika request canceled.");
       }
-    } catch (error) {
-      if (error instanceof Error && (
-        error.message.startsWith("Misty credits exhausted")
-        || error.message.startsWith("Mika request limit reached")
-        || error.message === "Mika request canceled."
-      )) throw error;
+      if (payload.message?.trim()) throw new Error(payload.message.trim());
     }
     throw new Error(text.trim() || `Mika ${path} failed: ${response.status}`);
   }
   if (response.status === 204) return undefined as T;
   const contentType = response.headers.get("Content-Type") ?? "";
   return contentType.includes("application/json") ? await response.json() as T : undefined as T;
+}
+
+interface ManagedAiErrorPayload {
+  code?: string;
+  message?: string;
+  available_credits?: number;
+  availableCredits?: number;
+  requiredCredits?: number;
+  reset_at?: string;
+  retry_after_seconds?: number;
 }
 
 async function resolveServerApiBase(): Promise<string> {

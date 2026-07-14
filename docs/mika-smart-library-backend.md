@@ -1,51 +1,89 @@
-# Mika Smart Library managed backend contract
+# Mika Smart Library and Explorer semantic search
 
-The desktop repository implements device discovery, one-root enforcement, fingerprinting, representative sampling, private preview generation, result storage, visual review, and the managed API client. The adjacent `misty-server` repository now implements the authenticated catalog, server-side constraints, estimates, durable batch records, Vercel Queue publication, and Gateway analyzer. Production analysis still requires the private Vercel Blob upload broker and a deployed Queue consumer that calls the analyzer and settles successful-image billing.
+Misty uses its existing desktop app and `misty-server`; it does not require a Vercel Blob bucket, Queue consumer, or a second Vercel deployment:
 
-## Required routes
+`Explorer search → misty-server → Vercel AI Gateway → Postgres + pgvector`
 
-All routes are under `/api/ai/smart-library`, require the existing Misty account bearer token, and scope every query by the authenticated account.
+Mika is the scan, review, and index-management surface. Search belongs to Explorer's existing global search bar. Explorer returns local filename/path matches immediately, requests semantic matches after a short debounce, fuses the two rankings, and resolves the server's opaque asset IDs to paths only on the user's device.
 
-| Route | Purpose | Required server invariant |
-| --- | --- | --- |
-| `POST /folders` | Register one opaque client library | Unique active folder per account; reject a second root |
-| `POST /folders/:id/preflight` | Return authoritative allowance and price | Clamp requested analysis to remaining capacity and 500 total successes |
-| `POST /folders/:id/sample` | Select up to 25 candidates | Stratify by extension, modified bucket, and stable candidate distribution |
-| `POST /folders/:id/preview-authorizations` | Mint short-lived private uploads | At most eight; MIME and byte limits; authorization owned by account/folder/asset |
-| `POST /folders/:id/sample/approve` | Create sample batches | Durable DB job first, queue publish second; no charge until asset succeeds |
-| `POST /folders/:id/approve` | Create full-folder batches | Recheck estimate, daily budget, duplicate fingerprint, and 500-success cap transactionally |
-| `GET /folders/:id/progress` | Return resumable job state | Does not expose generated content or paths |
-| `GET /folders/:id/results?after=N` | Incremental result sync | Monotonic sequence; account-scoped; independently retryable assets |
-| `POST /folders/:id/rescan` | Reprice new/changed work | Never starts analysis without a later approval |
-| `POST /folders/:id/search` | Semantic search over normalized metadata | Embed query only; return opaque asset IDs and scores |
-| `DELETE /folders/:id` | Delete managed catalog | Revoke jobs/uploads, delete metadata/embeddings, release one-root constraint |
+## Deployment and migration
 
-## Vercel processing
+Deploy the existing `misty-server` and apply migrations through `20260718000000_claim_semantic_reindex_assets.sql` with the database-owner migration role. PostgreSQL must have pgvector available; the migrations enable the `vector` extension and add:
 
-1. The Function records an idempotent job and asset rows before publishing a Vercel Queue message.
-2. The browser uploads directly to private Blob storage using the short-lived authorization. The Function never proxies image bytes.
-3. A queue consumer claims at most eight assets, verifies Blob ownership and expiry, and invokes Vercel AI Gateway.
-4. The primary route is `google/gemini-2.5-flash-lite` with minimal thinking and the strict schema in `src/contracts/smartLibrary.ts`.
-5. The worker retries an individual asset once with `google/gemini-3.1-flash-lite` only for a schema failure, generic/empty description, missing required metadata, or confidence below the corpus-calibrated threshold.
-6. Successful normalized description/tags are embedded with `text-embedding-3-small`. A single Gemini 3.1 Flash Lite text call names folder collections after the folder run completes.
-7. The billing transaction increments `asset_analysis_image` exactly once per successful asset. Provider/schema/infrastructure retries never increment it.
-8. Delete the Blob after success. A scheduled cleanup deletes every remaining preview within 24 hours.
+- 768-dimensional Gemini Embedding 2 vectors with an HNSW cosine index.
+- A generated weighted `tsvector` with a GIN index.
+- Tenant-denormalized asset ownership for filtered vector search and RLS.
+- Embedding model, version, fingerprint, failure, cost, explicit reindex state, and stale-safe per-asset claims that prevent replayed requests from repeating provider calls.
 
-Vercel Queues provide at-least-once delivery, so every consumer must use `(folder_id, asset_id, fingerprint)` as its idempotency key. The database job ledger is the source of truth; the queue is not the job database.
+The catalog schema is not constrained to 500 rows or one server-side root. The current desktop pilot still selects one root and analyzes a maximum of 500 files after its included sample; that root may be an entire disk, and catalog snapshots/results are paginated.
 
-## Data and privacy boundaries
+Required and optional environment variables:
 
-The server stores account ID, folder ID, opaque asset ID, fingerprint, generated metadata, embedding, model/cost telemetry, billing state, and Blob ID. It must reject fields named `path`, `rootPath`, `relativePath`, or `filename` on write endpoints. Temporary preview objects are private. Do not log request bodies, generated descriptions, tags, paths, or image URLs.
+- `AI_GATEWAY_API_KEY` — required for analysis and semantic embeddings.
+- `AI_GATEWAY_BASE_URL` — optional; defaults to Vercel AI Gateway's compatible endpoint.
+- `SMART_LIBRARY_PRIMARY_MODEL` — defaults to `google/gemini-2.5-flash-lite`.
+- `SMART_LIBRARY_FALLBACK_MODEL` — defaults to `google/gemini-3-flash`.
+- `SMART_LIBRARY_EMBEDDING_MODEL` — defaults to `google/gemini-embedding-2`.
+- `SMART_LIBRARY_SEARCH_DAILY_LIMIT` — defaults to 500 uncached semantic queries per account/day.
+- `SMART_LIBRARY_PRICE_MINOR_PER_IMAGE` and `SMART_LIBRARY_PRICE_CURRENCY` — optional customer estimate.
+- `SMART_LIBRARY_EMERGENCY_DISABLE=true` — stop new analysis and charges.
+- `SMART_LIBRARY_SEARCH_EMERGENCY_DISABLE=true` — keep lexical search while disabling query embeddings.
 
-The device SQLite database at `cache/smart-library/v1.sqlite3` is the only Smart Library store containing local/provider paths. Renamed files retain an opaque asset ID when the content fingerprint uniquely matches a missing prior path. Duplicate content remains independently addressable.
+## Private desktop ingestion
 
-## Billing and safety controls
+The desktop catalog and path resolver use `~/.misty/.cache/smart-library/v1.sqlite3`. Local paths and filenames never enter the server requests. The client sends only opaque IDs, fingerprints, bounded representations, and path-free technical metadata after explicit approval:
 
-- Server-side ceiling: 500 successful assets per active folder.
-- Meter: `asset_analysis_image`; one unit per successful image.
-- Sample: 25 units covered by trial/subscription entitlement.
-- Pricing: customer unit revenue must be at least 5× the rolling measured variable cost (models, embeddings, Blob, Queue/Function, database/vector storage, and expected retries).
-- Enforce per-user daily spend limits, account budget alerts, provider/model circuit breakers, and an emergency analysis disable before queue publication.
-- Persist actual provider cost, model, batch size, retry reason, and success/failure without paths or generated content.
+- Images: re-encoded, EXIF-free 384–512 px JPEG previews.
+- Text and source files: at most 64 KiB of text.
+- PDF, DOCX/XLSX/PPTX, OpenDocument, EPUB, and RTF: bounded extracted text; never the original file.
+- ZIP-family archives: capped member basenames and aggregate metadata, never member content or paths.
+- MP3: bounded ID3 metadata; other audio formats are metadata-only.
+- Unknown or executable binaries: size, extension, and a short magic signature only; printable strings and embedded secrets are not extracted.
+- Video: rejected by extension, MIME type, and transport-stream sniffing.
 
-Production routing remains disabled until the labeled-corpus comparison of Gemini 2.5 Flash Lite, Gemini 3.1 Flash Lite, GPT-4.1 Nano, and GPT-5.4 Nano clears the agreed tag precision, description usefulness, and search-recall thresholds. GPT-5.6 Luna/Terra are premium explicit actions only and must never be fallback targets.
+Hidden files/directories are skipped. Extraction and request sizes, archive entries, declared expansion, image dimensions, PDF size, batch size, and processing time are bounded. Corrupt or adversarial files fail individually. Unchanged fingerprints are not reopened, uploaded, charged, or reprocessed.
+
+## Analysis, embeddings, and ranking
+
+The analysis schema captures a description plus content type, primary subject, retrieval phrases, entities, fictional characters, brands, applications, objects, scenes, activities, colors, OCR text, topics, collections, and confidence. The prompt explicitly inspects both an interface and prominent background art, which covers cases such as a file manager displayed over Pikachu artwork without encoding that benchmark answer in the production prompt.
+
+The low-cost primary is retried with Gemini 3.1 Flash Lite for invalid, generic, sparse, interface-incomplete, or low-confidence metadata. Index v3 also runs that stronger visual-entity audit when an interface screenshot mentions background art or wallpaper but identifies no character or brand; the two valid metadata records are merged. Each successful asset is embedded in the same 768-dimensional multimodal space as search queries. Image vectors use the thumbnail plus normalized metadata; document and other non-image vectors use bounded extracted content, generated metadata, and safe technical metadata.
+
+Server ranking retrieves tenant-filtered lexical and approximate-nearest-neighbor candidates, then combines semantic similarity (68%) and lexical relevance (32%). When exact metadata matches exist, low-scoring visual lookalikes are pruned while all lexical matches and close semantic neighbors remain. Explorer uses reciprocal-rank fusion again when combining server results with its local index because those scores use different scales. Results appear in the existing Explorer search with local thumbnails, generated summaries, and compact source context. If the server, Gateway, or network is unavailable, Explorer silently remains usable as local-only search.
+
+## API
+
+All routes require the Misty account session and exist under both `/ai/smart-library` and `/api/ai/smart-library`:
+
+| Route | Purpose |
+| --- | --- |
+| `POST /search` | Global tenant-scoped hybrid semantic search |
+| `GET /index-status` | Count outdated or failed vectors |
+| `POST /reindex` | Create a free, explicit, paged reindex plan |
+| `POST /reindex/:jobID/complete` | Submit an approved batch and persist new vectors idempotently |
+| `POST /folders` | Register a catalog root |
+| `POST /folders/:id/preflight` | Save counts and price the pilot allowance |
+| `POST /folders/:id/sample` | Fix a representative sample |
+| `POST /folders/:id/sample/approve` | Analyze an included sample batch |
+| `POST /folders/:id/approve` | Analyze a paid batch, settling only successful files |
+| `GET /folders/:id/progress` | Sync processing and index status |
+| `GET /folders/:id/results?after=N` | Incrementally sync generated metadata |
+| `PUT /folders/:id/assets/:assetID/tags` | Add or remove tags for one analyzed file |
+| `POST /folders/:id/rescan` | Price new/changed files without invoking AI |
+| `POST /folders/:id/search` | Compatibility folder-scoped hybrid search |
+| `DELETE /folders/:id` | Delete the server catalog, vectors, jobs, and generated metadata |
+
+Global search responses never contain device paths. Requests are size-limited and schema-strict; opaque IDs are validated; queries are bounded, cached by a non-reversible hash, rate-limited, daily-limited, and not stored with usage events. RLS and explicit `user_id` predicates protect both lexical and vector branches.
+
+## Billing, reindexing, and evaluation
+
+Analysis retains the outcome-based `asset_analysis_image` meter for compatibility: the included sample is free, paid batches reserve credits, failures and provider/schema retries are absorbed, and only successful assets settle. Semantic usage is recorded separately without query or generated-content logs. Reindex planning is free and never uploads or invokes a model; completing a reindex requires an explicit user approval in Library. Index v2 added sparse legacy-caption repair; index v3 adds the focused background-art entity audit. Tags live in the managed catalog and individual user corrections update lexical search immediately.
+
+The manifest-driven quality command compares candidate metadata models and cross-modal retrieval on the same labeled corpus:
+
+```sh
+SMART_LIBRARY_EVAL_LIVE=1 go run ./cmd/smart-library-eval \
+  -live -manifest /absolute/path/to/private-eval-manifest.json
+```
+
+The example manifest is `misty-server/agent/testdata/smart_library_eval.example.json`. Keep private fixtures outside the repository. Production rollout should gate on labeled metadata term recall, recall@K, fallback rate, per-file cost, and sample-to-full conversion rather than model confidence alone.

@@ -338,7 +338,6 @@ export const ExplorerMikaPanel = memo(function ExplorerMikaPanel(props: {
   const [prompt, setPrompt] = useState("");
   const [contextOpen, setContextOpen] = useState(false);
   const [modeMenuOpen, setModeMenuOpen] = useState(false);
-  const [smartLibraryOpen, setSmartLibraryOpen] = useState(false);
   const [mikaPeek, setMikaPeek] = useState(() => randomMikaPeek());
   const logRef = useRef<HTMLDivElement | null>(null);
   const contextRef = useRef<HTMLDivElement | null>(null);
@@ -457,16 +456,6 @@ export const ExplorerMikaPanel = memo(function ExplorerMikaPanel(props: {
           {running ? <small className={assistantPanelStyles.runningBadge}>Running</small> : null}
         </span>
         <div ref={contextRef} className={assistantPanelStyles.headerActions}>
-          <button
-            className={cx(assistantPanelStyles.headerButton, assistantPanelStyles.mikaHeaderButton)}
-            type="button"
-            aria-label="Open Mika Smart Library"
-            aria-expanded={smartLibraryOpen}
-            title="Mika Smart Library"
-            onClick={() => setSmartLibraryOpen(true)}
-          >
-            <Images size={17} />
-          </button>
           <button
             className={cx(assistantPanelStyles.headerButton, assistantPanelStyles.mikaHeaderButton)}
             type="button"
@@ -639,25 +628,22 @@ export const ExplorerMikaPanel = memo(function ExplorerMikaPanel(props: {
           </footer>
         )}
       </div>
-      {smartLibraryOpen ? (
-        <SmartLibraryDialog workingDirectory={workingDirectory} onClose={() => setSmartLibraryOpen(false)} />
-      ) : null}
     </aside>
   );
 });
 
-function SmartLibraryDialog(props: { workingDirectory: string; onClose: () => void }) {
+export function SmartLibraryDialog(props: { workingDirectory: string; onClose: () => void }) {
   const {
-    loaded, phase, library, progress, estimate, searchQuery, searchResults, error,
-    load, chooseFolder, rescan, trySample, analyzeFolder, refreshProgress, search, removeLibrary,
+    loaded, phase, library, progress, estimate, reindexPlan, reindexProcessed, error,
+    load, chooseFolder, rescan, trySample, analyzeFolder, refreshProgress, checkIndexUpgrade, upgradeIndex, removeLibrary,
   } = useSmartLibraryStore(useShallow((state) => ({
     loaded: state.loaded,
     phase: state.phase,
     library: state.library,
     progress: state.progress,
     estimate: state.estimate,
-    searchQuery: state.searchQuery,
-    searchResults: state.searchResults,
+    reindexPlan: state.reindexPlan,
+    reindexProcessed: state.reindexProcessed,
     error: state.error,
     load: state.load,
     chooseFolder: state.chooseFolder,
@@ -665,12 +651,13 @@ function SmartLibraryDialog(props: { workingDirectory: string; onClose: () => vo
     trySample: state.trySample,
     analyzeFolder: state.analyzeFolder,
     refreshProgress: state.refreshProgress,
-    search: state.search,
+    checkIndexUpgrade: state.checkIndexUpgrade,
+    upgradeIndex: state.upgradeIndex,
     removeLibrary: state.removeLibrary,
   })));
-  const [query, setQuery] = useState(searchQuery);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [confirmFullAnalysis, setConfirmFullAnalysis] = useState(false);
+  const [confirmIndexUpgrade, setConfirmIndexUpgrade] = useState(false);
 
   useEffect(() => { void load(); }, [load]);
   useEffect(() => {
@@ -680,14 +667,13 @@ function SmartLibraryDialog(props: { workingDirectory: string; onClose: () => vo
   }, [props.onClose]);
 
   const chooseLocalFolder = async () => {
-    const selected = await open({ directory: true, multiple: false, title: "Choose one Mika Smart Library folder" });
+    const selected = await open({ directory: true, multiple: false, title: "Choose one Mika Library folder" });
     if (typeof selected === "string") await chooseFolder(selected);
   };
   const analyzedAssets = library?.assets.filter((asset) => asset.status === "analyzed") ?? [];
   const failedAssets = library?.assets.filter((asset) => asset.status === "failed") ?? [];
-  const visibleAssets = query.trim() ? searchResults : analyzedAssets;
-  const collections = [...new Set(analyzedAssets.flatMap((asset) => asset.collections))].sort((a, b) => a.localeCompare(b));
-  const busy = phase === "scanning" || phase === "uploading" || phase === "processing";
+  const indexStatus = progress?.indexStatus ?? progress?.reindexStatus;
+  const busy = phase === "scanning" || phase === "uploading" || phase === "processing" || phase === "reindexing";
 
   return createPortal(
     <div className="fixed inset-0 z-[2147482700] grid place-items-center bg-black/75 p-6 text-[#eceef2] backdrop-blur-xl" onPointerDown={(event) => {
@@ -698,30 +684,30 @@ function SmartLibraryDialog(props: { workingDirectory: string; onClose: () => vo
           <div className="flex min-w-0 items-center gap-4">
             <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-[linear-gradient(145deg,#6d5dfc,#2d8cff)] text-white shadow-[0_12px_30px_rgba(69,104,255,0.28)]"><Images size={22} /></span>
             <div className="min-w-0">
-              <h2 className="m-0 text-xl font-bold tracking-[-0.02em]" id="smart-library-title">Mika Smart Library</h2>
-              <p className="m-0 mt-1 truncate text-sm text-[#9298a3]">One folder. Searchable descriptions, tags, and virtual collections.</p>
+              <h2 className="m-0 text-xl font-bold tracking-[-0.02em]" id="smart-library-title">Mika Library</h2>
+              <p className="m-0 mt-1 truncate text-sm text-[#9298a3]">Scan, review, and manage semantic metadata for Explorer search.</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
             {library ? <span className="hidden max-w-72 truncate rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs font-semibold text-[#b8bdc7] md:block" title={library.rootPath}>{library.displayName} · {library.sourceKind === "cloud" ? "Cloud" : "Local"}</span> : null}
-            <button className="grid size-10 place-items-center rounded-xl border border-white/10 bg-white/[0.04] text-[#bec3cc] hover:bg-white/[0.08] hover:text-white" type="button" aria-label="Close Smart Library" disabled={busy} onClick={props.onClose}><X size={19} /></button>
+            <button className="grid size-10 place-items-center rounded-xl border border-white/10 bg-white/[0.04] text-[#bec3cc] hover:bg-white/[0.08] hover:text-white" type="button" aria-label="Close Library" disabled={busy} onClick={props.onClose}><X size={19} /></button>
           </div>
         </header>
         <div className="min-h-0 overflow-auto">
           {!loaded || phase === "scanning" ? (
-            <SmartLibraryBusy icon={<FolderSearch size={26} />} title={loaded ? "Scanning this folder" : "Loading your Smart Library"} text={loaded ? "Reading filenames, formats, dates, and fingerprints locally. This does not use AI credits." : "Opening the private device catalog…"} />
+            <SmartLibraryBusy icon={<FolderSearch size={26} />} title={loaded ? "Scanning this folder" : "Loading your Library"} text={loaded ? "Reading filenames, formats, dates, and fingerprints locally. This does not use AI credits." : "Opening the private device catalog…"} />
           ) : !library ? (
             <div className="grid min-h-full place-items-center p-8">
               <div className="grid w-full max-w-3xl justify-items-center gap-7 text-center">
                 <div className="grid size-24 place-items-center rounded-[30px] border border-[#44506b] bg-[radial-gradient(circle_at_30%_20%,#293a68,#11151f_72%)] text-[#99b8ff] shadow-[0_26px_70px_rgba(32,67,145,0.24)]"><Sparkles size={38} /></div>
                 <div className="grid gap-3">
-                  <h3 className="m-0 text-[32px] font-bold tracking-[-0.035em]">Understand your images, not just their folders.</h3>
-                  <p className="m-0 mx-auto max-w-2xl text-base leading-relaxed text-[#9aa0aa]">Mika first scans one folder for free, then analyzes a representative 25-image sample. Originals stay where they are; organization is virtual and reversible.</p>
+                  <h3 className="m-0 text-[32px] font-bold tracking-[-0.035em]">Understand your files, not just their folders.</h3>
+                  <p className="m-0 mx-auto max-w-2xl text-base leading-relaxed text-[#9aa0aa]">Mika first scans one folder for free, then analyzes a representative 25-file sample. Originals stay where they are; organization is virtual and reversible.</p>
                 </div>
                 <div className="grid w-full grid-cols-1 gap-3 text-left sm:grid-cols-3">
-                  <SmartLibraryFeature icon={<Search size={18} />} title="Natural search" text="Find images by what they contain." />
-                  <SmartLibraryFeature icon={<Images size={18} />} title="Visual collections" text="Review AI organization before scaling." />
-                  <SmartLibraryFeature icon={<ShieldAlert size={18} />} title="Private previews" text="Paths and originals stay on device." />
+                  <SmartLibraryFeature icon={<Search size={18} />} title="Natural search" text="Find files by subjects, visible text, and extracted content." />
+                  <SmartLibraryFeature icon={<Images size={18} />} title="Collections" text="Review AI organization before scaling." />
+                  <SmartLibraryFeature icon={<ShieldAlert size={18} />} title="Private analysis" text="Paths and originals stay on device." />
                 </div>
                 {error ? <SmartLibraryError text={error} /> : null}
                 <div className="flex flex-wrap justify-center gap-3">
@@ -735,7 +721,7 @@ function SmartLibraryDialog(props: { workingDirectory: string; onClose: () => vo
             <div className="grid min-h-full grid-rows-[auto_minmax(0,1fr)]">
               <div className="sticky top-0 z-10 flex min-w-0 flex-wrap items-center justify-between gap-3 border-b border-white/10 bg-[rgba(9,11,14,0.94)] px-6 py-4 backdrop-blur-xl">
                 <div className="flex min-w-0 items-center gap-2">
-                  <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-bold text-[#c3c8d1]">{library.sourceKind === "cloud" ? <Cloud size={14} /> : <HardDrive size={14} />}{library.preflight.totalImages.toLocaleString()} images</span>
+                  <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-bold text-[#c3c8d1]">{library.sourceKind === "cloud" ? <Cloud size={14} /> : <HardDrive size={14} />}{library.preflight.totalImages.toLocaleString()} files</span>
                   <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-bold text-[#c3c8d1]">{analyzedAssets.length.toLocaleString()} analyzed</span>
                 </div>
                 <div className="flex items-center gap-2">
@@ -743,14 +729,16 @@ function SmartLibraryDialog(props: { workingDirectory: string; onClose: () => vo
                   {confirmDelete ? (
                     <button className="inline-flex h-9 items-center gap-2 rounded-xl bg-[#a9363d] px-3 text-xs font-bold text-white hover:bg-[#bd4149]" type="button" onClick={() => void removeLibrary()}><Check size={14} />Remove now</button>
                   ) : (
-                    <button className="grid size-9 place-items-center rounded-xl border border-white/10 bg-white/[0.04] text-[#aeb4be] hover:bg-[#3b1d22] hover:text-[#ff9da5]" type="button" aria-label="Remove Smart Library" disabled={busy} onClick={() => setConfirmDelete(true)}><Trash2 size={15} /></button>
+                    <button className="grid size-9 place-items-center rounded-xl border border-white/10 bg-white/[0.04] text-[#aeb4be] hover:bg-[#3b1d22] hover:text-[#ff9da5]" type="button" aria-label="Remove Library" disabled={busy} onClick={() => setConfirmDelete(true)}><Trash2 size={15} /></button>
                   )}
                 </div>
               </div>
               <div className="min-h-0 p-6">
                 {error ? <div className="mb-4"><SmartLibraryError text={error} /></div> : null}
                 {phase === "uploading" ? (
-                  <SmartLibraryBusy icon={<Cloud size={26} />} title="Preparing private previews" text="Misty is stripping EXIF, resizing to 512px, and securely analyzing batches of eight through your existing Mika server. Keep Misty open until this run finishes." />
+                  <SmartLibraryBusy icon={<Cloud size={26} />} title="Preparing private analysis" text="Misty sends EXIF-stripped thumbnails for visuals or bounded extracted text and metadata for other files, in batches of eight. Paths and originals remain on your device." />
+                ) : phase === "reindexing" ? (
+                  <SmartLibraryBusy icon={<RefreshCw size={26} />} title="Improving metadata and search" text={`${reindexProcessed.toLocaleString()} assets securely refreshed. Misty repairs sparse legacy descriptions and rebuilds the semantic index from path-free previews or extracted metadata.`} />
                 ) : phase === "processing" ? (
                   <SmartLibraryProgressView progress={progress} onRefresh={refreshProgress} />
                 ) : analyzedAssets.length > 0 ? (
@@ -758,17 +746,20 @@ function SmartLibraryDialog(props: { workingDirectory: string; onClose: () => vo
                     <section className="grid gap-4 rounded-2xl border border-white/10 bg-white/[0.025] p-5">
                       <div className="flex flex-wrap items-end justify-between gap-4">
                         <div><h3 className="m-0 text-xl font-bold">Sample review</h3><p className="m-0 mt-1 text-sm text-[#8f96a1]">Review descriptions, tags, confidence, and virtual collections before analyzing more.</p></div>
-                        {library.preflight.eligibleImages > 0 ? <button className="inline-flex h-10 items-center gap-2 rounded-xl bg-[#edf1f8] px-4 text-sm font-bold text-[#15181d] hover:bg-white" type="button" onClick={() => setConfirmFullAnalysis(true)}><Sparkles size={16} />Analyze This Folder</button> : null}
+                        <div className="flex flex-wrap gap-2">
+                          {indexStatus?.upgradeNeeded ? <button className="inline-flex h-10 items-center gap-2 rounded-xl border border-[#65552d] bg-[#211b0d] px-4 text-sm font-bold text-[#f2dc9c] hover:bg-[#2b240f]" type="button" onClick={() => { void checkIndexUpgrade().then(() => setConfirmIndexUpgrade(true)); }}><RefreshCw size={15} />Improve Metadata &amp; Index</button> : indexStatus ? <span className="inline-flex h-10 items-center rounded-xl border border-[#28523e] bg-[#10251c] px-3 text-xs font-bold text-[#8fe0af]">Semantic index v{indexStatus.currentVersion} current</span> : null}
+                          {library.preflight.eligibleImages > 0 ? <button className="inline-flex h-10 items-center gap-2 rounded-xl bg-[#edf1f8] px-4 text-sm font-bold text-[#15181d] hover:bg-white" type="button" onClick={() => setConfirmFullAnalysis(true)}><Sparkles size={16} />Analyze This Folder</button> : null}
+                        </div>
                       </div>
-                      {confirmFullAnalysis ? <div className="grid gap-3 rounded-xl border border-[#65552d] bg-[#211b0d] p-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"><div><strong className="block text-sm text-[#f2dc9c]">Approve the remaining folder analysis?</strong><span className="mt-1 block text-xs leading-relaxed text-[#c5b98f]">{formatEstimate(estimate ?? library.preflight.estimate)} Only successful images are charged; this does not move or rename files.</span></div><div className="flex gap-2"><button className="h-9 rounded-lg border border-white/10 px-3 text-xs font-bold" type="button" onClick={() => setConfirmFullAnalysis(false)}>Cancel</button><button className="h-9 rounded-lg bg-[#edf1f8] px-3 text-xs font-bold text-[#15181d]" type="button" onClick={() => { setConfirmFullAnalysis(false); void analyzeFolder(); }}>Approve Analysis</button></div></div> : null}
-                      <form className="grid grid-cols-[minmax(0,1fr)_auto] gap-2" onSubmit={(event) => { event.preventDefault(); void search(query); }}>
-                        <label className="flex h-11 min-w-0 items-center gap-2 rounded-xl border border-white/10 bg-[#050608] px-3 text-[#89919d] focus-within:border-[#5b74ad]"><Search size={17} /><input className="min-w-0 flex-1 border-0 bg-transparent text-sm text-white outline-none placeholder:text-[#68707c]" value={query} placeholder="Search: sunset by the ocean, blue product photos…" onChange={(event) => setQuery(event.target.value)} /></label>
-                        <button className="h-11 rounded-xl border border-white/10 bg-white/[0.06] px-4 text-sm font-bold hover:bg-white/[0.1]" type="submit">Search</button>
-                      </form>
-                      {collections.length > 0 ? <div className="flex flex-wrap gap-2">{collections.map((collection) => <button className="rounded-full border border-[#44506b] bg-[#151b28] px-3 py-1.5 text-xs font-bold text-[#b7caff] hover:bg-[#1c263a]" key={collection} type="button" onClick={() => { setQuery(""); void search("", collection); }}>{collection}</button>)}</div> : null}
+                      {confirmFullAnalysis ? <div className="grid gap-3 rounded-xl border border-[#65552d] bg-[#211b0d] p-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"><div><strong className="block text-sm text-[#f2dc9c]">Approve the remaining folder analysis?</strong><span className="mt-1 block text-xs leading-relaxed text-[#c5b98f]">{formatEstimate(estimate ?? library.preflight.estimate)} Only successfully analyzed files are charged; this does not move or rename anything.</span></div><div className="flex gap-2"><button className="h-9 rounded-lg border border-white/10 px-3 text-xs font-bold" type="button" onClick={() => setConfirmFullAnalysis(false)}>Cancel</button><button className="h-9 rounded-lg bg-[#edf1f8] px-3 text-xs font-bold text-[#15181d]" type="button" onClick={() => { setConfirmFullAnalysis(false); void analyzeFolder(); }}>Approve Analysis</button></div></div> : null}
+                      {confirmIndexUpgrade ? <div className="grid gap-3 rounded-xl border border-[#384a73] bg-[#111827] p-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"><div><strong className="block text-sm text-[#c7d7ff]">Approve metadata and search improvements?</strong><span className="mt-1 block text-xs leading-relaxed text-[#9eb0d6]">{indexStatus?.outdatedAssets ?? reindexPlan?.assets.length ?? 0} assets need index v{reindexPlan?.targetVersion ?? "latest"}. Misty will regenerate sparse legacy labels when necessary, then rebuild embeddings with {reindexPlan?.embeddingModel ?? indexStatus?.embeddingModel ?? "the configured embedding model"}. This may resend private path-free previews and uses a small amount of Mika AI processing. It never runs automatically.</span></div><div className="flex gap-2"><button className="h-9 rounded-lg border border-white/10 px-3 text-xs font-bold" type="button" onClick={() => setConfirmIndexUpgrade(false)}>Cancel</button><button className="h-9 rounded-lg bg-[#edf1f8] px-3 text-xs font-bold text-[#15181d]" type="button" disabled={!reindexPlan} onClick={() => { setConfirmIndexUpgrade(false); void upgradeIndex(); }}>Approve Improvements</button></div></div> : null}
+                      <div className="flex items-start gap-3 rounded-xl border border-[#384a73] bg-[#111827] px-4 py-3 text-sm text-[#b7caff]">
+                        <Search className="mt-0.5 shrink-0" size={17} />
+                        <span>Metadata is ready. Search for these files from Explorer’s centered <strong>Spotlight search</strong>.</span>
+                      </div>
                     </section>
-                    <SmartLibraryAssetGrid assets={visibleAssets} library={library} />
-                    {failedAssets.length > 0 ? <p className="m-0 text-sm text-[#e9a0a7]">{failedAssets.length} image{failedAssets.length === 1 ? "" : "s"} failed. Mika does not charge for failed analysis or infrastructure retries.</p> : null}
+                    <SmartLibraryAssetGrid assets={analyzedAssets} library={library} />
+                    {failedAssets.length > 0 ? <p className="m-0 text-sm text-[#e9a0a7]">{failedAssets.length} file{failedAssets.length === 1 ? "" : "s"} failed. Mika does not charge for failed analysis or infrastructure retries.</p> : null}
                   </div>
                 ) : (
                   <SmartLibraryPreflightView library={library} estimate={estimate} onTrySample={trySample} />
@@ -806,12 +797,12 @@ function SmartLibraryPreflightView(props: { library: ReturnType<typeof useSmartL
       <SmartLibraryMetric label="New / changed" value={preflight.newImages + preflight.changedImages} />
       <SmartLibraryMetric label="Pilot eligible" value={preflight.pilotCappedImages} suffix="max 500" />
     </div>
-    {preflight.skippedFullOriginalImages > 0 ? <SmartLibraryError text={`${preflight.skippedFullOriginalImages} cloud images were skipped because their provider would require downloading the full original. This pilot uploads previews only.`} /> : null}
+    {preflight.skippedFullOriginalImages > 0 ? <SmartLibraryError text={`${preflight.skippedFullOriginalImages} cloud files were skipped because their provider would require downloading the full original. This pilot uploads previews or extracted metadata only.`} /> : null}
     <div className="grid gap-4 rounded-2xl border border-[#384a73] bg-[linear-gradient(145deg,rgba(31,45,78,.72),rgba(16,21,33,.72))] p-5 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
-      <div className="grid gap-2"><span className="text-xs font-bold uppercase tracking-[0.12em] text-[#91adff]">25-image trial allowance</span><strong className="text-lg">Try the sample before spending credits</strong><span className="text-sm leading-relaxed text-[#a7afbd]">{preflight.sampleAssetIds.length} images selected across subfolders, formats, and dates. {formatEstimate(props.estimate ?? preflight.estimate)}</span></div>
+      <div className="grid gap-2"><span className="text-xs font-bold uppercase tracking-[0.12em] text-[#91adff]">25-file trial allowance</span><strong className="text-lg">Try the sample before spending credits</strong><span className="text-sm leading-relaxed text-[#a7afbd]">{preflight.sampleAssetIds.length} files selected across subfolders, formats, and dates. {formatEstimate(props.estimate ?? preflight.estimate)}</span></div>
       <button className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-[#edf1f8] px-5 font-bold text-[#15181d] hover:bg-white disabled:opacity-50" type="button" disabled={preflight.sampleAssetIds.length === 0} onClick={() => void props.onTrySample()}><Sparkles size={18} />Try Sample</button>
     </div>
-    <div className="flex items-start gap-3 rounded-xl border border-white/10 bg-white/[0.025] p-4 text-sm leading-relaxed text-[#8f96a1]"><ShieldAlert className="mt-0.5 shrink-0 text-[#a9bfff]" size={18} /><span>Misty sends opaque asset IDs and EXIF-stripped 384–512px previews. Local and provider paths remain in the device SQLite catalog. Rescans always require approval.</span></div>
+    <div className="flex items-start gap-3 rounded-xl border border-white/10 bg-white/[0.025] p-4 text-sm leading-relaxed text-[#8f96a1]"><ShieldAlert className="mt-0.5 shrink-0 text-[#a9bfff]" size={18} /><span>Misty sends opaque asset IDs plus EXIF-stripped 384–512px previews for visual files, or bounded extracted text and metadata for other supported files. Paths and originals remain in the device catalog. Analysis and index upgrades always require approval.</span></div>
   </div>;
 }
 
@@ -825,19 +816,20 @@ function SmartLibraryProgressView(props: { progress: ReturnType<typeof useSmartL
   const queued = props.progress?.queuedImages ?? 0;
   const total = Math.max(1, completed + failed + queued);
   const percent = Math.round(((completed + failed) / total) * 100);
-  return <div className="grid min-h-[500px] place-items-center"><div className="grid w-full max-w-2xl gap-5 rounded-2xl border border-white/10 bg-white/[0.03] p-6"><div className="flex items-center justify-between"><div><h3 className="m-0 text-xl font-bold">Mika is understanding your images</h3><p className="m-0 mt-1 text-sm text-[#8f96a1]">Keep Misty open while the existing Mika server processes each eight-image batch.</p></div><span className="text-2xl font-bold">{percent}%</span></div><div className="h-2 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full bg-[linear-gradient(90deg,#6d5dfc,#2d9cff)] transition-[width]" style={{ width: `${percent}%` }} /></div><div className="grid grid-cols-3 gap-3"><SmartLibraryMetric label="Completed" value={completed} tone="good" /><SmartLibraryMetric label="Remaining" value={queued} /><SmartLibraryMetric label="Failed" value={failed} tone={failed ? "warn" : undefined} /></div><button className="inline-flex h-10 items-center justify-center gap-2 justify-self-end rounded-xl border border-white/10 bg-white/[0.05] px-4 text-sm font-bold hover:bg-white/[0.09]" type="button" onClick={() => void props.onRefresh()}><RefreshCw size={15} />Refresh now</button></div></div>;
+  return <div className="grid min-h-[500px] place-items-center"><div className="grid w-full max-w-2xl gap-5 rounded-2xl border border-white/10 bg-white/[0.03] p-6"><div className="flex items-center justify-between"><div><h3 className="m-0 text-xl font-bold">Mika is understanding your files</h3><p className="m-0 mt-1 text-sm text-[#8f96a1]">Keep Misty open while the existing Mika server processes each bounded batch.</p></div><span className="text-2xl font-bold">{percent}%</span></div><div className="h-2 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full bg-[linear-gradient(90deg,#6d5dfc,#2d9cff)] transition-[width]" style={{ width: `${percent}%` }} /></div><div className="grid grid-cols-3 gap-3"><SmartLibraryMetric label="Completed" value={completed} tone="good" /><SmartLibraryMetric label="Remaining" value={queued} /><SmartLibraryMetric label="Failed" value={failed} tone={failed ? "warn" : undefined} /></div><button className="inline-flex h-10 items-center justify-center gap-2 justify-self-end rounded-xl border border-white/10 bg-white/[0.05] px-4 text-sm font-bold hover:bg-white/[0.09]" type="button" onClick={() => void props.onRefresh()}><RefreshCw size={15} />Refresh now</button></div></div>;
 }
 
 function SmartLibraryAssetGrid(props: { assets: SmartLibraryAsset[]; library: NonNullable<ReturnType<typeof useSmartLibraryStore.getState>["library"]> }) {
-  if (props.assets.length === 0) return <div className="grid min-h-52 place-items-center rounded-2xl border border-dashed border-white/10 text-sm text-[#7f8792]">No analyzed images match this view.</div>;
+  if (props.assets.length === 0) return <div className="grid min-h-52 place-items-center rounded-2xl border border-dashed border-white/10 text-sm text-[#7f8792]">No analyzed files are available for review.</div>;
   return <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">{props.assets.map((asset) => <SmartLibraryAssetCard key={asset.assetId} asset={asset} library={props.library} />)}</div>;
 }
 
 function SmartLibraryAssetCard(props: { asset: SmartLibraryAsset; library: NonNullable<ReturnType<typeof useSmartLibraryStore.getState>["library"]> }) {
-  const source = props.asset.sourceKind === "local" ? safeTauriAssetUrl(joinDevicePath(props.library.rootPath, props.asset.relativePath)) : null;
+  const visual = props.asset.assetKind === "image" || props.asset.mimeType.startsWith("image/");
+  const source = visual && props.asset.sourceKind === "local" ? safeTauriAssetUrl(joinDevicePath(props.library.rootPath, props.asset.relativePath)) : null;
   const confidence = props.asset.confidence === null ? null : Math.round(props.asset.confidence * 100);
   return <article className="grid min-w-0 grid-rows-[190px_auto] overflow-hidden rounded-2xl border border-white/10 bg-[#101318] shadow-[0_10px_30px_rgba(0,0,0,.2)]">
-    <div className="relative overflow-hidden bg-[radial-gradient(circle_at_30%_20%,#29334a,#11141a)]">{source ? <img className="size-full object-cover" alt="" src={source} /> : <span className="grid size-full place-items-center text-[#71809e]"><Cloud size={36} /></span>}{confidence !== null ? <span className="absolute right-2 top-2 rounded-full bg-black/70 px-2 py-1 text-[10px] font-bold backdrop-blur">{confidence}% confidence</span> : null}</div>
+    <div className="relative overflow-hidden bg-[radial-gradient(circle_at_30%_20%,#29334a,#11141a)]">{source ? <img className="size-full object-cover" alt="" src={source} /> : <span className="grid size-full place-items-center gap-2 text-[#71809e]">{visual && props.asset.sourceKind === "cloud" ? <Cloud size={36} /> : <File size={36} />}<small className="font-bold uppercase tracking-[0.08em]">{props.asset.assetKind || props.asset.extension.replace(/^\./, "") || "file"}</small></span>}{confidence !== null ? <span className="absolute right-2 top-2 rounded-full bg-black/70 px-2 py-1 text-[10px] font-bold backdrop-blur">{confidence}% confidence</span> : null}</div>
     <div className="grid gap-3 p-4"><div className="min-w-0"><strong className="block truncate text-sm" title={props.asset.relativePath}>{props.asset.name}</strong><span className="mt-1 block line-clamp-3 text-xs leading-relaxed text-[#a0a7b2]">{props.asset.description || "No description generated."}</span></div>{props.asset.tags.length > 0 ? <div className="flex flex-wrap gap-1.5">{props.asset.tags.slice(0, 6).map((tag) => <span className="rounded-md bg-white/[0.06] px-2 py-1 text-[10px] font-semibold text-[#b9c0ca]" key={tag}>{tag}</span>)}</div> : null}{props.asset.collections.length > 0 ? <div className="flex items-center gap-2 text-[11px] font-bold text-[#91adff]"><Images size={13} /><span className="truncate">{props.asset.collections.join(" · ")}</span></div> : null}</div>
   </article>;
 }

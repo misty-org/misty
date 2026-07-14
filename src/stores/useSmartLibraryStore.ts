@@ -1,32 +1,37 @@
 import { create } from "zustand";
 import {
   smartLibraryApplyResults,
+  smartLibraryAssetsPage,
   smartLibraryDelete,
   smartLibraryPreparePreviews,
   smartLibraryScan,
-  smartLibrarySearch,
   smartLibrarySetServerFolderId,
   smartLibrarySnapshot,
 } from "../api/misty";
 import type { AnalysisEstimate, FolderLibraryStatus, SmartLibraryAsset } from "../api/types";
 import { errorText } from "../shared/format";
+import { clearSemanticExplorerSearchCache } from "../pages/Files/utils/globalSearch";
 import {
   approveSmartLibraryFolder,
   approveSmartLibrarySample,
   candidatesFromAssets,
+  completeSemanticReindex,
   createSmartLibrarySample,
   deleteSmartLibraryFolder,
   fetchSmartLibraryProgress,
   fetchSmartLibraryResults,
+  planSemanticReindex,
   registerSmartLibraryFolder,
-  searchSmartLibrary as searchSmartLibraryServer,
   submitSmartLibraryPreflight,
   submitSmartLibraryRescan,
+  updateSmartLibraryAssetTags,
   type SmartLibraryPreviewInput,
   type SmartLibraryProgress,
+  type SemanticReindexInput,
+  type SemanticReindexPlan,
 } from "./smartLibraryServerApi";
 
-type SmartLibraryPhase = "idle" | "scanning" | "preflight" | "uploading" | "processing" | "review" | "complete" | "error";
+type SmartLibraryPhase = "idle" | "scanning" | "preflight" | "uploading" | "processing" | "reindexing" | "review" | "complete" | "error";
 
 interface SmartLibraryStore {
   loaded: boolean;
@@ -34,16 +39,19 @@ interface SmartLibraryStore {
   library: FolderLibraryStatus | null;
   progress: SmartLibraryProgress | null;
   estimate: AnalysisEstimate | null;
-  searchQuery: string;
-  searchResults: SmartLibraryAsset[];
+  reindexPlan: SemanticReindexPlan | null;
+  reindexProcessed: number;
   error: string | null;
   load: () => Promise<void>;
   chooseFolder: (rootPath: string) => Promise<void>;
+  discoverChanges: () => Promise<void>;
   rescan: () => Promise<void>;
   trySample: () => Promise<void>;
   analyzeFolder: () => Promise<void>;
   refreshProgress: () => Promise<void>;
-  search: (query: string, collection?: string) => Promise<void>;
+  checkIndexUpgrade: () => Promise<void>;
+  upgradeIndex: () => Promise<void>;
+  setAssetTags: (assetId: string, tags: string[]) => Promise<void>;
   removeLibrary: () => Promise<void>;
 }
 
@@ -56,8 +64,8 @@ export const useSmartLibraryStore = create<SmartLibraryStore>((set, get) => ({
   library: null,
   progress: null,
   estimate: null,
-  searchQuery: "",
-  searchResults: [],
+  reindexPlan: null,
+  reindexProcessed: 0,
   error: null,
 
   load: async () => {
@@ -73,7 +81,7 @@ export const useSmartLibraryStore = create<SmartLibraryStore>((set, get) => ({
 
   chooseFolder: async (rootPath) => {
     if (!rootPath.trim() || get().phase === "scanning") return;
-    set({ phase: "scanning", error: null, searchResults: [] });
+    set({ phase: "scanning", error: null });
     try {
       const library = await smartLibraryScan(rootPath);
       set({ library, phase: "preflight", estimate: library.preflight.estimate, error: null });
@@ -82,21 +90,34 @@ export const useSmartLibraryStore = create<SmartLibraryStore>((set, get) => ({
     }
   },
 
-  rescan: async () => {
+  discoverChanges: async () => {
     const current = get().library;
     if (!current) return;
     set({ phase: "scanning", error: null });
     try {
       const library = await smartLibraryScan(current.rootPath);
       let estimate = library.preflight.estimate;
+      set({ library, estimate, phase: "preflight", error: null });
       if (library.serverFolderId) {
-        estimate = (await submitSmartLibraryRescan(library.serverFolderId, library.preflight)).estimate;
+        try {
+          estimate = (await submitSmartLibraryRescan(library.serverFolderId, library.preflight)).estimate;
+        } catch {
+          set({
+            library,
+            estimate,
+            phase: "preflight",
+            error: "New files were saved locally. Misty will refresh the account estimate when the server is available.",
+          });
+          return;
+        }
       }
       set({ library, estimate, phase: "preflight", error: null });
     } catch (error) {
       set({ phase: "error", error: errorText(error) });
     }
   },
+
+  rescan: async () => get().discoverChanges(),
 
   trySample: async () => {
     const current = get().library;
@@ -105,8 +126,12 @@ export const useSmartLibraryStore = create<SmartLibraryStore>((set, get) => ({
     try {
       const folderId = await ensureServerFolder(current);
       const currentAfterRegistration = get().library ?? current;
-      const sampleIds = new Set(currentAfterRegistration.preflight.sampleAssetIds.slice(0, 25));
-      const candidates = currentAfterRegistration.assets.filter((asset) => sampleIds.has(asset.assetId));
+      const serverProgress = await fetchSmartLibraryProgress(folderId);
+      const authoritativeSample = serverProgress.sampleAssetIds?.length
+        ? serverProgress.sampleAssetIds
+        : currentAfterRegistration.preflight.sampleAssetIds;
+      const sampleIds = new Set(authoritativeSample.slice(0, 25));
+      const candidates = (await loadAssetsByIds(sampleIds)).filter((asset) => asset.status === "pending" || asset.status === "failed" || asset.status === "changed");
       const sample = await createSmartLibrarySample(folderId, candidatesFromAssets(candidates));
       const requested = sample.assetIds.length > 0 ? sample.assetIds.slice(0, 25) : current.preflight.sampleAssetIds;
       const progress = await analyzeAssets(folderId, requested, "sample");
@@ -124,9 +149,18 @@ export const useSmartLibraryStore = create<SmartLibraryStore>((set, get) => ({
     try {
       const folderId = await ensureServerFolder(current);
       const latest = get().library ?? current;
-      const analyzed = latest.assets.filter((asset) => asset.status === "analyzed").length;
-      const ids = eligibleAssets(latest).slice(0, Math.max(0, 500 - analyzed)).map((asset) => asset.assetId);
-      const progress = await analyzeAssets(folderId, ids, "full");
+      const serverProgress = await fetchSmartLibraryProgress(folderId);
+      const sampleIds = new Set(serverProgress.sampleAssetIds ?? latest.preflight.sampleAssetIds);
+      const eligible = await loadEligibleAssets(500);
+      const includedRetries = eligible.filter((asset) => sampleIds.has(asset.assetId) && asset.status !== "changed").map((asset) => asset.assetId);
+      const billableIds = eligible
+        .filter((asset) => !sampleIds.has(asset.assetId) || asset.status === "changed")
+        .slice(0, Math.max(0, 500 - serverProgress.successfulImages - includedRetries.length))
+        .map((asset) => asset.assetId);
+      let progress: SmartLibraryProgress | null = null;
+      if (includedRetries.length > 0) progress = await analyzeAssets(folderId, includedRetries, "sample");
+      if (billableIds.length > 0) progress = await analyzeAssets(folderId, billableIds, "full");
+      if (!progress) throw new Error("There are no new or changed files to analyze.");
       set({ progress, phase: phaseFromProgress(progress), error: progress.message ?? null });
       await get().refreshProgress();
     } catch (error) {
@@ -158,22 +192,63 @@ export const useSmartLibraryStore = create<SmartLibraryStore>((set, get) => ({
     }
   },
 
-  search: async (query, collection) => {
-    const trimmed = query.trim();
-    const library = get().library;
-    set({ searchQuery: query, error: null });
-    if (!library) { set({ searchResults: [] }); return; }
+  checkIndexUpgrade: async () => {
+    const folderId = get().library?.serverFolderId;
+    if (!folderId) return;
+    set({ error: null });
     try {
-      if (library.serverFolderId && trimmed) {
-        const response = await searchSmartLibraryServer(library.serverFolderId, trimmed);
-        const byId = new Map(library.assets.map((asset) => [asset.assetId, asset]));
-        set({ searchResults: response.hits.map((hit) => byId.get(hit.assetId)).filter((asset): asset is SmartLibraryAsset => Boolean(asset)) });
-      } else {
-        set({ searchResults: await smartLibrarySearch(trimmed, collection) });
+      const reindexPlan = await planSemanticReindex({ folderId, limit: 100 });
+      set({ reindexPlan, reindexProcessed: 0 });
+    } catch (error) {
+      set({ error: errorText(error) });
+    }
+  },
+
+  upgradeIndex: async () => {
+    const library = get().library;
+    const folderId = library?.serverFolderId;
+    if (!library || !folderId) return;
+    set({ phase: "reindexing", error: null, reindexProcessed: 0 });
+    try {
+      let plan = get().reindexPlan ?? await planSemanticReindex({ folderId, limit: 100 });
+      let processed = 0;
+      const seenCursors = new Set<string>();
+      while (plan.assets.length > 0) {
+        for (let offset = 0; offset < plan.assets.length; offset += 8) {
+          const assets = plan.assets.slice(offset, offset + 8);
+          const inputs = await prepareSemanticReindexInputs(library, assets);
+          await completeSemanticReindex(plan.jobId, inputs);
+          processed += inputs.length;
+          set({ reindexProcessed: processed });
+        }
+        if (!plan.nextCursor) break;
+        if (seenCursors.has(plan.nextCursor)) throw new Error("Index upgrade stopped because the server returned a repeated page cursor.");
+        seenCursors.add(plan.nextCursor);
+        plan = await planSemanticReindex({ folderId, cursor: plan.nextCursor, limit: 100, targetVersion: plan.targetVersion });
       }
-    } catch {
-      // The device catalog remains useful while offline; semantic ranking returns when connected.
-      set({ searchResults: await smartLibrarySearch(trimmed, collection) });
+      set({ reindexPlan: null, reindexProcessed: processed, phase: "complete" });
+      await get().refreshProgress();
+      clearSemanticExplorerSearchCache();
+    } catch (error) {
+      set({ phase: "error", error: errorText(error) });
+    }
+  },
+
+  setAssetTags: async (assetId, tags) => {
+    const library = get().library;
+    const folderId = library?.serverFolderId;
+    if (!library || !folderId) return;
+    const normalized = [...new Map(tags.map((tag) => [tag.trim().toLocaleLowerCase(), tag.trim()])).values()]
+      .filter(Boolean)
+      .slice(0, 24);
+    try {
+      const response = await updateSmartLibraryAssetTags(folderId, assetId, normalized);
+      const snapshot = await smartLibraryApplyResults([response.result]);
+      set({ library: snapshot.activeLibrary, error: null });
+      clearSemanticExplorerSearchCache();
+    } catch (error) {
+      set({ error: errorText(error) });
+      throw error;
     }
   },
 
@@ -185,7 +260,7 @@ export const useSmartLibraryStore = create<SmartLibraryStore>((set, get) => ({
       const snapshot = await smartLibraryDelete();
       stopPolling();
       resultSequence = 0;
-      set({ library: snapshot.activeLibrary, progress: null, estimate: null, searchQuery: "", searchResults: [], phase: "idle", error: null });
+      set({ library: snapshot.activeLibrary, progress: null, estimate: null, reindexPlan: null, reindexProcessed: 0, phase: "idle", error: null });
     } catch (error) {
       set({ phase: "error", error: errorText(error) });
     }
@@ -205,9 +280,65 @@ async function ensureServerFolder(library: FolderLibraryStatus): Promise<string>
   return registration.folderId;
 }
 
-function eligibleAssets(library: FolderLibraryStatus): SmartLibraryAsset[] {
-  const eligible = new Set(["pending", "changed", "failed"]);
-  return library.assets.filter((asset) => asset.previewSupported && eligible.has(asset.status));
+async function loadEligibleAssets(limit: number): Promise<SmartLibraryAsset[]> {
+  const assets: SmartLibraryAsset[] = [];
+  let afterAssetId: string | null = null;
+  do {
+    const page = await smartLibraryAssetsPage({ afterAssetId, limit: Math.min(500, limit), reindexOnly: true });
+    assets.push(...page.assets.filter((asset) => asset.previewSupported && ["pending", "changed", "failed"].includes(asset.status)));
+    afterAssetId = page.nextCursor;
+  } while (afterAssetId && assets.length < limit);
+  return assets.slice(0, limit);
+}
+
+async function loadAssetsByIds(assetIds: Set<string>): Promise<SmartLibraryAsset[]> {
+  const assets: SmartLibraryAsset[] = [];
+  let afterAssetId: string | null = null;
+  do {
+    const page = await smartLibraryAssetsPage({ afterAssetId, limit: 500 });
+    for (const asset of page.assets) if (assetIds.has(asset.assetId)) assets.push(asset);
+    afterAssetId = page.nextCursor;
+  } while (afterAssetId && assets.length < assetIds.size);
+  return assets;
+}
+
+async function prepareSemanticReindexInputs(
+  library: FolderLibraryStatus,
+  planned: SemanticReindexPlan["assets"],
+): Promise<SemanticReindexInput[]> {
+  const localAssets = new Map(library.assets.map((asset) => [asset.assetId, asset]));
+  const preparedIds = planned.map((asset) => asset.assetId);
+  const previews = preparedIds.length > 0 ? await smartLibraryPreparePreviews(preparedIds, 512) : [];
+  const previewsById = new Map(previews.map((preview) => [preview.assetId, preview]));
+  return planned.map((asset) => {
+    const local = localAssets.get(asset.assetId);
+    const preview = previewsById.get(asset.assetId);
+    if (asset.requiresPreview && !preview) throw new Error(`Could not prepare a private preview for ${local?.name ?? asset.assetId}.`);
+    return {
+      assetId: asset.assetId,
+      fingerprint: asset.fingerprint,
+      assetKind: asset.assetKind,
+      mimeType: asset.requiresPreview ? preview?.mimeType ?? asset.mimeType : asset.mimeType,
+      ...(preview ? { base64: bytesToBase64(preview.bytes) } : {}),
+      ...(preview?.extractedText || local?.extractedText ? { extractedText: preview?.extractedText ?? local?.extractedText ?? undefined } : {}),
+      metadata: { ...(local ? reindexMetadata(local) : {}), ...(preview?.metadata ?? {}) },
+      ...(preview ? { truncated: preview.truncated } : {}),
+    };
+  });
+}
+
+function reindexMetadata(asset: SmartLibraryAsset): Record<string, string> {
+  const metadata: Record<string, string> = {};
+  if (asset.description) metadata.description = asset.description;
+  if (asset.tags.length > 0) metadata.tags = asset.tags.join(", ");
+  if (asset.collections.length > 0) metadata.collections = asset.collections.join(", ");
+  if (asset.generatedMetadata) {
+    for (const [key, value] of Object.entries(asset.generatedMetadata)) {
+      if (typeof value === "string" && value) metadata[key] = value;
+      else if (Array.isArray(value) && value.length > 0) metadata[key] = value.join(", ");
+    }
+  }
+  return metadata;
 }
 
 async function analyzeAssets(folderId: string, assetIds: string[], kind: "sample" | "full"): Promise<SmartLibraryProgress> {
@@ -218,8 +349,12 @@ async function analyzeAssets(folderId: string, assetIds: string[], kind: "sample
     const payload: SmartLibraryPreviewInput[] = previews.map((preview) => ({
       assetId: preview.assetId,
       fingerprint: preview.fingerprint,
-      mimeType: "image/jpeg",
-      base64: bytesToBase64(preview.bytes),
+      mimeType: preview.mimeType,
+      assetKind: preview.assetKind,
+      ...(preview.bytes.length > 0 ? { base64: bytesToBase64(preview.bytes) } : {}),
+      ...(preview.extractedText ? { extractedText: preview.extractedText } : {}),
+      metadata: preview.metadata,
+      truncated: preview.truncated,
     }));
     const finalBatch = offset + ids.length >= assetIds.length;
     progress = kind === "sample"
@@ -227,7 +362,7 @@ async function analyzeAssets(folderId: string, assetIds: string[], kind: "sample
       : await approveSmartLibraryFolder(folderId, payload, finalBatch);
     useSmartLibraryStore.setState({ progress, phase: phaseFromProgress(progress) });
   }
-  if (!progress) throw new Error("No eligible Smart Library previews were prepared.");
+  if (!progress) throw new Error("No eligible Library previews were prepared.");
   return progress;
 }
 

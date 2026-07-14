@@ -57,10 +57,16 @@ use commands::{
     settings_apply_launch_on_login, settings_launch_on_login_snapshot,
     settings_open_with_associations, settings_remove_open_with_association, settings_save,
     settings_snapshot, shortcuts_save, shortcuts_snapshot, smart_library_apply_results,
-    smart_library_delete, smart_library_prepare_previews, smart_library_scan, smart_library_search,
+    smart_library_assets_page, smart_library_delete, smart_library_prepare_previews,
+    smart_library_resolve_assets, smart_library_scan, smart_library_search,
     smart_library_set_server_folder_id, smart_library_snapshot, storage_snapshot,
     transfers_delete_all, transfers_delete_selected, transfers_snapshot, workspaces_save,
     workspaces_snapshot,
+};
+#[cfg(desktop)]
+use commands::{
+    media_search_complete, media_search_prepare_chunk, media_search_resolve_assets,
+    media_search_scan_movies, media_search_snapshot,
 };
 use plugins::mac_rounded_corners;
 use runtime::MistyRuntime;
@@ -249,7 +255,19 @@ pub fn run() {
             smart_library_apply_results,
             smart_library_set_server_folder_id,
             smart_library_search,
+            smart_library_resolve_assets,
+            smart_library_assets_page,
             smart_library_delete,
+            #[cfg(desktop)]
+            media_search_scan_movies,
+            #[cfg(desktop)]
+            media_search_snapshot,
+            #[cfg(desktop)]
+            media_search_prepare_chunk,
+            #[cfg(desktop)]
+            media_search_complete,
+            #[cfg(desktop)]
+            media_search_resolve_assets,
             explorer_queue_create_item,
             explorer_queue_rename_item,
             explorer_queue_rename_items,

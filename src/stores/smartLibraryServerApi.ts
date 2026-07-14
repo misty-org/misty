@@ -36,8 +36,12 @@ export interface SampleCandidate {
 export interface SmartLibraryPreviewInput {
   assetId: string;
   fingerprint: string;
-  mimeType: "image/jpeg";
-  base64: string;
+  mimeType: string;
+  assetKind: string;
+  base64?: string;
+  extractedText?: string;
+  metadata?: Record<string, string>;
+  truncated?: boolean;
 }
 
 export interface SmartLibraryProgress {
@@ -46,11 +50,23 @@ export interface SmartLibraryProgress {
   successfulImages: number;
   failedImages: number;
   queuedImages: number;
+  sampleAssetIds?: string[];
   batches: AnalysisBatch[];
   estimate: AnalysisEstimate;
   nextResultSequence: number;
   emergencyDisabled?: boolean;
   message?: string | null;
+  indexStatus?: SemanticReindexStatus;
+  /** Compatibility with pre-release servers. */
+  reindexStatus?: SemanticReindexStatus;
+}
+
+export interface SemanticReindexStatus {
+  currentVersion: number;
+  embeddingModel: string;
+  outdatedAssets: number;
+  failedAssets: number;
+  upgradeNeeded: boolean;
 }
 
 export interface SmartLibraryResultsResponse {
@@ -58,10 +74,83 @@ export interface SmartLibraryResultsResponse {
   nextSequence: number;
 }
 
-export interface SmartLibrarySearchHit {
+export interface SemanticSearchHit {
   assetId: string;
+  folderId?: string;
+  description: string;
+  tags: string[];
+  suggestedCollections: string[];
   score: number;
-  matchedCollections: string[];
+  semanticScore?: number;
+  lexicalScore?: number;
+  matchReasons?: string[];
+  assetKind?: string;
+  mimeType?: string;
+  metadata?: SemanticAssetMetadata;
+}
+
+export interface SemanticAssetMetadata {
+  contentType?: string;
+  primarySubject?: string;
+  searchTerms?: string[];
+  entities?: string[];
+  characters?: string[];
+  brands?: string[];
+  applications?: string[];
+  objects?: string[];
+  scenes?: string[];
+  activities?: string[];
+  colors?: string[];
+  visibleText?: string[];
+  topics?: string[];
+  extractedText?: string;
+  [key: string]: unknown;
+}
+
+export type SmartLibrarySearchHit = SemanticSearchHit;
+
+export interface SemanticSearchResponse {
+  hits: SemanticSearchHit[];
+  queryModel?: string;
+  indexVersion?: string | number;
+  semanticAvailable?: boolean;
+}
+
+export interface SemanticReindexAsset {
+  assetId: string;
+  folderId: string;
+  fingerprint: string;
+  assetKind: string;
+  mimeType: string;
+  requiresPreview: boolean;
+}
+
+export interface SemanticReindexPlan {
+  jobId: string;
+  status: string;
+  targetVersion: number;
+  embeddingModel: string;
+  nextCursor?: string | null;
+  assets: SemanticReindexAsset[];
+}
+
+export interface SemanticReindexInput {
+  assetId: string;
+  fingerprint: string;
+  assetKind: string;
+  mimeType: string;
+  base64?: string;
+  extractedText?: string;
+  metadata?: Record<string, string>;
+  truncated?: boolean;
+}
+
+export interface SemanticReindexCompletion {
+  jobId: string;
+  status: string;
+  completedAssets: number;
+  failedAssets: number;
+  failures?: Record<string, string>;
 }
 
 const basePath = "/ai/smart-library";
@@ -116,6 +205,13 @@ export function fetchSmartLibraryResults(folderId: string, after: number): Promi
   return managedAiRequest(`${basePath}/folders/${encodeURIComponent(folderId)}/results?after=${after}`);
 }
 
+export function updateSmartLibraryAssetTags(folderId: string, assetId: string, tags: string[]): Promise<{ result: AnalysisResult }> {
+  return managedAiRequest(`${basePath}/folders/${encodeURIComponent(folderId)}/assets/${encodeURIComponent(assetId)}/tags`, {
+    method: "PUT",
+    body: JSON.stringify({ tags }),
+  });
+}
+
 export function submitSmartLibraryRescan(folderId: string, preflight: FolderPreflight): Promise<{ estimate: AnalysisEstimate }> {
   return managedAiRequest(`${basePath}/folders/${encodeURIComponent(folderId)}/rescan`, {
     method: "POST",
@@ -123,7 +219,37 @@ export function submitSmartLibraryRescan(folderId: string, preflight: FolderPref
   });
 }
 
-export function searchSmartLibrary(folderId: string, query: string, limit = 100): Promise<{ hits: SmartLibrarySearchHit[] }> {
+export function searchSemanticAssets(query: string, options: { limit?: number; folderId?: string } = {}): Promise<SemanticSearchResponse> {
+  return managedAiRequest(`${basePath}/search`, {
+    method: "POST",
+    body: JSON.stringify({
+      query,
+      limit: options.limit ?? 100,
+      ...(options.folderId ? { folderId: options.folderId } : {}),
+    }),
+  });
+}
+
+export function planSemanticReindex(options: { folderId?: string; cursor?: string; limit?: number; targetVersion?: number } = {}): Promise<SemanticReindexPlan> {
+  return managedAiRequest(`${basePath}/reindex`, {
+    method: "POST",
+    body: JSON.stringify({
+      ...(options.folderId ? { folderId: options.folderId } : {}),
+      ...(options.cursor ? { cursor: options.cursor } : {}),
+      ...(options.limit ? { limit: options.limit } : {}),
+      ...(options.targetVersion ? { targetVersion: options.targetVersion } : {}),
+    }),
+  });
+}
+
+export function completeSemanticReindex(jobId: string, assets: SemanticReindexInput[]): Promise<SemanticReindexCompletion> {
+  return managedAiRequest(`${basePath}/reindex/${encodeURIComponent(jobId)}/complete`, {
+    method: "POST",
+    body: JSON.stringify({ assets }),
+  });
+}
+
+export function searchSmartLibrary(folderId: string, query: string, limit = 100): Promise<SemanticSearchResponse> {
   return managedAiRequest(`${basePath}/folders/${encodeURIComponent(folderId)}/search`, {
     method: "POST",
     body: JSON.stringify({ query, limit }),
@@ -146,6 +272,6 @@ export function candidatesFromAssets(assets: SmartLibraryAsset[]): SampleCandida
 
 function validatePreviewBatch(previews: SmartLibraryPreviewInput[]): void {
   if (previews.length === 0 || previews.length > SMART_LIBRARY_PILOT.previewBatchSize) {
-    throw new Error("Smart Library analysis batches must contain one to eight previews.");
+    throw new Error("Library analysis batches must contain one to eight previews.");
   }
 }

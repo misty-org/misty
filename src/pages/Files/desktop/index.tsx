@@ -94,7 +94,7 @@ import { ExplorerPane } from "../components/ExplorerPane";
 import { ExplorerSidebar, type AndroidLocalGrantRequest } from "../components/ExplorerSidebar";
 import { ExplorerPaneToolbarActions, ExplorerToolbar } from "../components/ExplorerToolbar";
 import type { ExplorerLocationResult } from "../components/ExplorerToolbar";
-import { DeepSearchOverlay } from "../components/DeepSearchOverlay";
+import { LibraryWorkspace, libraryWorkspacePath } from "../components/LibraryWorkspace";
 import { FileInspector } from "../components/FileInspector";
 import {
   explorerWorkspaceNeedsSave,
@@ -106,7 +106,6 @@ import {
   validateBatchRenameItems,
 } from "../../../stores/useExplorerStore";
 import type { ExplorerBatchRenameItem, ExplorerDialogState, ExplorerInlineEditState, ExplorerNotification, ExplorerSortColumn } from "../../../stores/useExplorerStore";
-import { useSearchStore } from "../../../stores/useSearchStore";
 import { maxMultiPanelPanes, useMultiPanelStore } from "../../../shared/multipanel/useMultiPanelStore";
 import { ProvidersWorkspacePanel } from "../../Providers/desktop";
 import { useProvidersStore } from "../../../stores/useProvidersStore";
@@ -596,7 +595,7 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [navigate]);
+  }, [homePath, navigate]);
 
   useEffect(() => {
     if (!resizeTarget) return;
@@ -666,7 +665,7 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
 
   const renderToolbar = useCallback(
     (paneId: string, path: string) => {
-      if (isChromeTabPath(path)) return null;
+      if (isChromeTabPath(path) || path === libraryWorkspacePath) return null;
       const pluginTab = extensionsEnabled ? parsePluginTabPath(path) : null;
       if (pluginTab) {
         return (
@@ -698,6 +697,9 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
       if (isRemotesTabPath(path)) {
         return <ProvidersWorkspacePanel workspaceId={paneId} />;
       }
+      if (path === libraryWorkspacePath) {
+        return <LibraryWorkspace paneId={paneId} workingDirectory={homePath} />;
+      }
       const pluginTab = extensionsEnabled ? parsePluginTabPath(path) : null;
       if (pluginTab) {
         return (
@@ -710,7 +712,7 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
       }
       return <ExplorerPane paneId={paneId} path={path} isActive={activePaneId === paneId} paneActions={paneActions} />;
     },
-    [activePaneId, extensionsEnabled, pluginCommands, pluginPanels],
+    [activePaneId, extensionsEnabled, homePath, pluginCommands, pluginPanels],
   );
   const inspector = useMemo(
     () => previewVisible ? <ConnectedFileInspector /> : undefined,
@@ -895,7 +897,6 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
       </main>
       <ExplorerRenameStatus edit={inlineEdit} />
       <ExplorerNotifications notifications={notifications} onDismiss={dismissNotification} />
-      <DeepSearchOverlay activePaneId={activePaneId} currentPath={activePath} />
       {duplicateFinderPaneId ? (
         <DuplicateFinderDialog
           paneId={duplicateFinderPaneId}
