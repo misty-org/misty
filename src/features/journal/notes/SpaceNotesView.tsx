@@ -1,10 +1,12 @@
 import { JournalDeleteDialog } from "@/features/journal";
+import type { useLocalPinnedIds } from "@/shared/hooks/useLocalPinnedIds";
 import { avatarColorClass, avatarInkClass } from "@/shared/lib/avatarPalette";
 import { personInitials } from "@/shared/lib/personInitials";
 import {
   Avatar,
   AvatarFallback,
   Button,
+  cn,
   ContextMenu,
   ContextMenuContent,
   ContextMenuItem,
@@ -18,7 +20,6 @@ import {
   EmptyState,
   Input,
   Skeleton,
-  cn,
 } from "@/shared/ui";
 import { MoreHorizontal, Pencil, Pin, PinOff, Plus, Search, Trash2 } from "lucide-react";
 import {
@@ -33,24 +34,27 @@ import {
 import { useSearchParams } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
 import { NotePreviewHeader } from "./components/NotePreviewHeader";
-import type { UnifiedNote } from "./model/types/types";
+import type { NotePreviewProps } from "./components/NotePreviewView";
+import type { NoteReadingPaneProps } from "./components/NoteReadingPaneView";
+import type { NewNoteDialogProps } from "./model/interfaces/components/NotesIntegrationsDialog";
 import type { SpaceNotesProps } from "./model/interfaces/SpaceNotes";
+import type { UnifiedNote } from "./model/types/types";
 import { selectVisibleNotes } from "./noteFilters";
+import type { createNotesStore } from "./store/createNotesStore";
 export type { SpaceNotesProps } from "./model/interfaces/SpaceNotes";
-
 const shellClass =
   "relative flex h-full min-h-0 flex-col bg-charcoal-bg text-cream overflow-hidden";
-import type { useMobileSurfaceChrome, useSurfacePresentation } from "@/shared/mobile";
-import type { useLocalPinnedIds } from "@/shared/hooks/useLocalPinnedIds";
-import type { createNotesStore } from "./store/createNotesStore";
-import type { NoteReadingPaneProps } from "./components/NoteReadingPaneView";
-import type { NotePreviewProps } from "./components/NotePreviewView";
-import type { NewNoteDialogProps } from "./model/interfaces/components/NotesIntegrationsDialog";
 export interface NotesViewRuntime {
-  user?: { id: string; name?: string; email?: string } | null;
-  members: readonly { user_id: string; name: string }[];
+  user?: {
+    id: string;
+    name?: string;
+    email?: string;
+  } | null;
+  members: readonly {
+    user_id: string;
+    name: string;
+  }[];
   referenceOnly: boolean;
-  presentation: ReturnType<typeof useSurfacePresentation>;
   useStore: ReturnType<typeof createNotesStore>["useStore"];
   usePinnedIds: typeof useLocalPinnedIds;
   subscribeChanges(listener: () => void): () => void;
@@ -58,17 +62,15 @@ export interface NotesViewRuntime {
   ReadingPane: ComponentType<NoteReadingPaneProps>;
   Preview: ComponentType<NotePreviewProps>;
   NewNoteDialog: ComponentType<NewNoteDialogProps>;
-  renderIntegration(input: {
-    title: string;
-    workspaceTabId?: string;
-    chrome: Parameters<typeof useMobileSurfaceChrome>[0];
-  }): ReactNode;
+  renderIntegration(input: { title: string; workspaceTabId?: string }): ReactNode;
 }
-
-export function SpaceNotesView(props: SpaceNotesProps & { runtime: NotesViewRuntime }) {
+export function SpaceNotesView(
+  props: SpaceNotesProps & {
+    runtime: NotesViewRuntime;
+  },
+) {
   const {
     user,
-    presentation,
     referenceOnly,
     members,
     useStore: useNotesStore,
@@ -77,14 +79,11 @@ export function SpaceNotesView(props: SpaceNotesProps & { runtime: NotesViewRunt
     Preview: NotePreview,
     NewNoteDialog,
   } = props.runtime;
-  const mobile = presentation !== "desktop";
-  const mobileCompact = presentation === "mobile-compact";
   const [searchParams, setSearchParams] = useSearchParams();
   const noteTarget = searchParams.get("note");
   const requestedView = searchParams.get("view");
   const view =
     requestedView === "list" ? "list" : requestedView === "doc" || noteTarget ? "doc" : "list";
-
   const store = useNotesStore(
     useShallow((state) => ({
       phase: state.phase,
@@ -114,7 +113,6 @@ export function SpaceNotesView(props: SpaceNotesProps & { runtime: NotesViewRunt
       updateNoteContent: state.updateNoteContent,
     })),
   );
-
   const [newNoteOpen, setNewNoteOpen] = useState(false);
   const [deleteNoteId, setDeleteNoteId] = useState<string | null>(null);
   const createQueryConsumedRef = useRef(false);
@@ -127,7 +125,9 @@ export function SpaceNotesView(props: SpaceNotesProps & { runtime: NotesViewRunt
     createQueryConsumedRef.current = true;
     const next = new URLSearchParams(searchParams);
     next.delete("create");
-    setSearchParams(next, { replace: true });
+    setSearchParams(next, {
+      replace: true,
+    });
     if (!referenceOnly) setNewNoteOpen(true);
   }, [referenceOnly, searchParams, setSearchParams]);
   useEffect(() => {
@@ -135,7 +135,6 @@ export function SpaceNotesView(props: SpaceNotesProps & { runtime: NotesViewRunt
       void actions.load(user.id, props.spaceId, props.spaceName).then(() => actions.syncAll());
     }
   }, [actions, props.spaceId, props.spaceName, user?.id]);
-
   useEffect(() => {
     let refreshTimer: number | null = null;
     const scheduleRefresh = () => {
@@ -151,15 +150,12 @@ export function SpaceNotesView(props: SpaceNotesProps & { runtime: NotesViewRunt
       remove();
     };
   }, [actions, props.spaceId, subscribeChanges]);
-
   const loading = store.phase === "loading" || store.phase === "idle";
-
   useEffect(() => {
     if (!store.selectedNoteId && store.notes.length > 0) {
       actions.selectNote(store.notes[0].id);
     }
   }, [actions, store.notes, store.selectedNoteId]);
-
   useEffect(() => {
     if (!noteTarget || !store.notes.length) return;
     const resolved = store.notes.find(
@@ -168,7 +164,6 @@ export function SpaceNotesView(props: SpaceNotesProps & { runtime: NotesViewRunt
     if (!resolved) return;
     actions.selectNote(resolved.id);
   }, [actions, noteTarget, store.notes]);
-
   const orderedNotes = useMemo(
     () => selectVisibleNotes(store.notes, "", Date.now(), props.spaceId),
     [store.notes, props.spaceId],
@@ -186,12 +181,10 @@ export function SpaceNotesView(props: SpaceNotesProps & { runtime: NotesViewRunt
   );
   const pinnedNotes = orderedNotes.filter((note) => pinnedIdSet.has(note.id));
   const recentNotes = orderedNotes.filter((note) => !pinnedIdSet.has(note.id));
-
   const selectedNote = store.notes.find((note) => note.id === store.selectedNoteId);
   const selectedConnector = selectedNote
     ? store.registry.forSource(selectedNote.source)
     : undefined;
-
   const rememberNoteView = useCallback(
     (nextView: "doc" | "list", note?: UnifiedNote) => {
       const next = new URLSearchParams(searchParams);
@@ -201,77 +194,53 @@ export function SpaceNotesView(props: SpaceNotesProps & { runtime: NotesViewRunt
     },
     [searchParams, setSearchParams],
   );
-
   const creatorNameForNote = (note: UnifiedNote) => {
     const creator = members.find((member) => member.user_id === note.creatorUserId);
     if (creator?.name) return creator.name;
     if (note.creatorUserId === user?.id) return user?.name || user?.email || "You";
     return "Unknown creator";
   };
-
   const openNote = (note: UnifiedNote, rename = false) => {
     actions.selectNote(note.id);
     rememberNoteView("doc", note);
     if (!rename) return;
     window.setTimeout(() => props.runtime.renameNote(note.sourceId), 0);
   };
-
   const selectFromList = (note: UnifiedNote) => {
-    if (mobileCompact) openNote(note);
-    else {
+    {
       actions.selectNote(note.id);
       rememberNoteView("list", note);
     }
   };
-
-  const chromeConfig = useMemo(
-    () => ({
-      title: view === "doc" ? selectedNote?.title || "Note" : "Journal",
-      level: view === "doc" ? ("detail" as const) : ("root" as const),
-      onBack: view === "doc" ? () => rememberNoteView("list", selectedNote) : undefined,
-      primaryAction:
-        view === "list" && !referenceOnly
-          ? { id: "new-note", label: "New note", icon: Plus, onPress: () => setNewNoteOpen(true) }
-          : undefined,
-    }),
-    [referenceOnly, rememberNoteView, selectedNote, view],
-  );
-
   return (
     <div className={shellClass}>
       {props.runtime.renderIntegration({
         title: selectedNote?.title?.trim() || "Notes",
         workspaceTabId: props.workspaceTabId,
-        chrome: chromeConfig,
       })}
       {view === "list" ? (
         <div
           className={cn(
             "grid min-h-0 flex-1 gap-5",
-            mobile ? "p-3" : "p-5 md:grid-cols-[minmax(15rem,20rem)_minmax(0,1fr)]",
-            presentation === "mobile-regular" && "grid-cols-[300px_minmax(0,1fr)]",
+            "p-5 md:grid-cols-[minmax(15rem,20rem)_minmax(0,1fr)]",
+            false,
           )}
         >
           {loading ? (
             <>
-              {!mobileCompact ? <Skeleton className="min-h-72 rounded-2xl" /> : null}
+              {<Skeleton className="min-h-72 rounded-2xl" />}
               <Skeleton className="min-h-72 rounded-2xl" />
             </>
           ) : (
             <>
               <section className="flex min-h-0 flex-col">
-                <div
-                  className={cn(
-                    "mb-2 flex shrink-0 items-center gap-2",
-                    mobile ? "min-h-11" : "h-8",
-                  )}
-                >
+                <div className={cn("mb-2 flex shrink-0 items-center gap-2", "h-8")}>
                   <h1 className="m-0 min-w-0 flex-1 truncate text-sm font-semibold text-cream-bright">
                     My Notes
                   </h1>
                   {!referenceOnly ? (
                     <Button
-                      className={cn("shrink-0 gap-1.5 px-2.5 text-xs", mobile ? "min-h-11" : "h-8")}
+                      className={cn("shrink-0 gap-1.5 px-2.5 text-xs", "h-8")}
                       type="button"
                       onClick={() => setNewNoteOpen(true)}
                     >
@@ -285,10 +254,7 @@ export function SpaceNotesView(props: SpaceNotesProps & { runtime: NotesViewRunt
                     <div className="relative">
                       <Search className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-cream-muted" />
                       <Input
-                        className={cn(
-                          "bg-charcoal-bg pl-9",
-                          mobile ? "h-11 text-base" : "h-8 text-xs",
-                        )}
+                        className={cn("bg-charcoal-bg pl-9", "h-8 text-xs")}
                         aria-label="Search notes"
                         placeholder="Search notes"
                         value={store.query}
@@ -325,7 +291,6 @@ export function SpaceNotesView(props: SpaceNotesProps & { runtime: NotesViewRunt
                         onRename={(note) => openNote(note, true)}
                         onTogglePin={togglePinned}
                         onDelete={(note) => setDeleteNoteId(note.id)}
-                        mobile={mobile}
                       />
                     ) : (
                       <div className="pb-2">
@@ -339,7 +304,6 @@ export function SpaceNotesView(props: SpaceNotesProps & { runtime: NotesViewRunt
                           onRename={(note) => openNote(note, true)}
                           onTogglePin={togglePinned}
                           onDelete={(note) => setDeleteNoteId(note.id)}
-                          mobile={mobile}
                         />
                         <NoteSection
                           title="Recently edited"
@@ -351,7 +315,6 @@ export function SpaceNotesView(props: SpaceNotesProps & { runtime: NotesViewRunt
                           onRename={(note) => openNote(note, true)}
                           onTogglePin={togglePinned}
                           onDelete={(note) => setDeleteNoteId(note.id)}
-                          mobile={mobile}
                         />
                       </div>
                     )}
@@ -359,7 +322,7 @@ export function SpaceNotesView(props: SpaceNotesProps & { runtime: NotesViewRunt
                 </div>
               </section>
 
-              <section className={cn("min-h-0 flex-col", mobileCompact ? "hidden" : "flex")}>
+              <section className={cn("min-h-0 flex-col", "flex")}>
                 {selectedNote ? (
                   <NotePreviewHeader note={selectedNote} onOpen={() => openNote(selectedNote)} />
                 ) : (
@@ -400,8 +363,7 @@ export function SpaceNotesView(props: SpaceNotesProps & { runtime: NotesViewRunt
             hasNotes={store.notes.length > 0}
             accountId={store.accountId}
             loading={loading}
-            onBack={mobile ? undefined : () => rememberNoteView("list", selectedNote)}
-            mobile={mobile}
+            onBack={() => rememberNoteView("list", selectedNote)}
             editingNoteId={store.editingNoteId}
             referenceOnly={referenceOnly}
             onEditingNoteChange={actions.setEditingNoteId}
@@ -462,14 +424,15 @@ export function SpaceNotesView(props: SpaceNotesProps & { runtime: NotesViewRunt
             const next = new URLSearchParams(searchParams);
             next.delete("note");
             next.set("view", "list");
-            setSearchParams(next, { replace: true });
+            setSearchParams(next, {
+              replace: true,
+            });
           }
         }}
       />
     </div>
   );
 }
-
 type NoteRowsProps = {
   notes: UnifiedNote[];
   selectedId?: string;
@@ -478,10 +441,13 @@ type NoteRowsProps = {
   onRename: (note: UnifiedNote) => void;
   onTogglePin: (noteId: string) => void;
   onDelete: (note: UnifiedNote) => void;
-  mobile?: boolean;
 };
-
-function NoteSection(props: NoteRowsProps & { title: string; emptyLabel: string }) {
+function NoteSection(
+  props: NoteRowsProps & {
+    title: string;
+    emptyLabel: string;
+  },
+) {
   return (
     <section aria-label={props.title}>
       <h2 className="m-0 px-3.5 pb-1.5 pt-3 text-xs font-semibold text-cream-muted">
@@ -495,7 +461,6 @@ function NoteSection(props: NoteRowsProps & { title: string; emptyLabel: string 
     </section>
   );
 }
-
 function NoteRows(props: NoteRowsProps) {
   return props.notes.map((note) => {
     const isSelected = note.id === props.selectedId;
@@ -508,7 +473,7 @@ function NoteRows(props: NoteRowsProps) {
           <div
             className={cn(
               "group/note flex items-center transition-colors",
-              props.mobile ? "min-h-14" : "h-10",
+              "h-10",
               isSelected
                 ? "bg-charcoal-hover hover:bg-charcoal-hover"
                 : "bg-transparent hover:bg-charcoal-border/65",
@@ -535,9 +500,7 @@ function NoteRows(props: NoteRowsProps) {
                   variant="ghost"
                   className={cn(
                     "mr-2 shrink-0 text-cream-muted hover:text-cream-bright aria-expanded:opacity-100",
-                    props.mobile
-                      ? "size-11 opacity-100"
-                      : "size-7 opacity-0 group-hover/note:opacity-100",
+                    "size-7 opacity-0 group-hover/note:opacity-100",
                   )}
                   aria-label={`More actions for ${title}`}
                 >
@@ -589,7 +552,6 @@ function NoteRows(props: NoteRowsProps) {
     );
   });
 }
-
 function NoteMetadata(props: { note: UnifiedNote; creatorName: string }) {
   return (
     <section
@@ -621,7 +583,6 @@ function NoteMetadata(props: { note: UnifiedNote; creatorName: string }) {
     </section>
   );
 }
-
 function MetadataField(props: { label: string; value: string }) {
   return (
     <div className="min-w-0">
@@ -632,7 +593,6 @@ function MetadataField(props: { label: string; value: string }) {
     </div>
   );
 }
-
 function formatNoteDate(value: string): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "Unknown";
@@ -642,7 +602,6 @@ function formatNoteDate(value: string): string {
     year: "numeric",
   }).format(date);
 }
-
 function noteRoleLabel(role: UnifiedNote["role"]): string {
   if (role === "creator") return "Owner";
   if (role === "editor") return "Can edit";

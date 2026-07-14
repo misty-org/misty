@@ -1,15 +1,13 @@
-import { SpaceInvitationRedemption } from "@/features/spaces/components/SpaceInvitationRedemption";
-import { resolveStartupRoute, routes, useAppRouteMemoryStore } from "@/features/app-shell";
 import { ActivityPage } from "@/features/activity";
-import { MobileProfilePage, RegisterPage, SignInPage, useAuth } from "@/features/auth";
+import { resolveStartupRoute, routes, useAppRouteMemoryStore } from "@/features/app-shell";
+import { RegisterPage, SignInPage, useAuth } from "@/features/auth";
 import { SettingsPage } from "@/features/settings";
+import { SpaceInvitationRedemption } from "@/features/spaces/components/SpaceInvitationRedemption";
 import { createBrowserRouter, Navigate, useLocation } from "react-router";
 import { AppFrameLayout } from "../layouts/AppFrameLayout";
 import { AppPagesLayout } from "../layouts/AppPagesLayout";
 import { RootLayout } from "../layouts/RootLayout";
 import { isDeepLinkRouteAllowed, resolveAuthDeepLinkRoute } from "./navigation";
-import { isNativeMobileBuild } from "@/shared/platform/buildTarget";
-
 /**
  * Honours the startup preference on the index route.
  *
@@ -25,12 +23,10 @@ function StartupRedirect() {
   const fallback = routes.home;
   return <Navigate to={resolveStartupRoute(lastAppRoute, fallback)} replace />;
 }
-
 function LegacyToolRedirect({ to }: { to: string }) {
   const { search, hash } = useLocation();
   return <Navigate to={`${to}${search}${hash}`} replace />;
 }
-
 export const router = createBrowserRouter([
   {
     path: routes.root,
@@ -44,62 +40,116 @@ export const router = createBrowserRouter([
       {
         element: <AppFrameLayout />,
         children: [
-          { index: true, element: <StartupRedirect /> },
-          { path: "providers", element: null },
+          {
+            index: true,
+            element: <StartupRedirect />,
+          },
+          {
+            path: "providers",
+            element: null,
+          },
           {
             element: <AppPagesLayout />,
             children: [
-              { path: "home", element: null },
-              { path: "new", element: null },
-              { path: "apps", element: <Navigate to={routes.home} replace /> },
+              {
+                path: "home",
+                element: null,
+              },
+              {
+                path: "new",
+                element: null,
+              },
+              {
+                path: "apps",
+                element: <Navigate to={routes.home} replace />,
+              },
               {
                 path: "activity",
                 element: <ActivityPage />,
               },
-              { path: "browser", element: null },
-              { path: "agents", element: null },
-              { path: "files", element: null },
-              { path: "apps/files", element: <LegacyToolRedirect to="/files" /> },
-              { path: "apps/agents", element: <LegacyToolRedirect to="/agents" /> },
-              { path: "apps/*", element: <Navigate to="/browser" replace /> },
-              { path: "discover", element: <Navigate to="/browser" replace /> },
-              { path: "spaces/*", element: null },
-              { path: "changelog", element: <Navigate to={routes.home} replace /> },
-              { path: "signin", element: <SignInPage /> },
-              { path: "register", element: <RegisterPage /> },
+              {
+                path: "browser",
+                element: null,
+              },
+              {
+                path: "agents",
+                element: null,
+              },
+              {
+                path: "files",
+                element: null,
+              },
+              {
+                path: "apps/files",
+                element: <LegacyToolRedirect to="/files" />,
+              },
+              {
+                path: "apps/agents",
+                element: <LegacyToolRedirect to="/agents" />,
+              },
+              {
+                path: "apps/*",
+                element: <Navigate to="/browser" replace />,
+              },
+              {
+                path: "discover",
+                element: <Navigate to="/browser" replace />,
+              },
+              {
+                path: "spaces/*",
+                element: null,
+              },
+              {
+                path: "changelog",
+                element: <Navigate to={routes.home} replace />,
+              },
+              {
+                path: "signin",
+                element: <SignInPage />,
+              },
+              {
+                path: "register",
+                element: <RegisterPage />,
+              },
               {
                 path: "profile",
-                element: isNativeMobileBuild ? (
-                  <MobileProfilePage />
-                ) : (
-                  <Navigate to={routes.account} replace />
-                ),
+                element: <Navigate to={routes.account} replace />,
               },
-              { path: "invite/:token", element: <SpaceInvitationRedemption /> },
+              {
+                path: "invite/:token",
+                element: <SpaceInvitationRedemption />,
+              },
               // Account management lives on the website now.
               {
                 path: "account",
-                element: isNativeMobileBuild ? (
-                  <Navigate to={routes.profile} replace />
-                ) : (
-                  <Navigate to={routes.home} replace />
-                ),
+                element: <Navigate to={routes.home} replace />,
               },
-              { path: "account/signin", element: <Navigate to={routes.signIn} replace /> },
-              { path: "account/register", element: <Navigate to={routes.register} replace /> },
+              {
+                path: "account/signin",
+                element: <Navigate to={routes.signIn} replace />,
+              },
+              {
+                path: "account/register",
+                element: <Navigate to={routes.register} replace />,
+              },
               {
                 path: "account/settings",
-                element: isNativeMobileBuild ? (
-                  <Navigate to={routes.profile} replace />
-                ) : (
-                  <SettingsPage />
-                ),
+                element: <SettingsPage />,
               },
             ],
           },
-          { path: "settings", element: null },
-          { path: "diagnostics", element: <Navigate to={routes.home} replace /> },
-          { path: "*", element: <Navigate to={routes.home} replace /> },
+          {
+            path: "settings",
+            element: null,
+          },
+          {
+            path: "diagnostics",
+            element: <Navigate to={routes.home} replace />,
+          },
+          {
+            path: "*",
+            element: <Navigate to={routes.home} replace />,
+          },
         ],
       },
     ],

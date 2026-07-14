@@ -2,6 +2,7 @@ import type { SpaceMember, SpaceTask } from "@/api/spaces/dto/interfaces/types";
 import type { TaskDraft } from "@/api/spaces/dto/types/SpaceTaskPrimitives";
 import {
   Button,
+  cn,
   Dialog,
   DialogContent,
   DialogFooter,
@@ -11,9 +12,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
   Input,
-  cn,
 } from "@/shared/ui";
-import { useSurfacePresentation } from "@/shared/mobile";
 import { Check, Copy, LoaderCircle, MoreHorizontal, Trash2 } from "lucide-react";
 import {
   useState,
@@ -24,36 +23,29 @@ import {
 } from "react";
 import { TaskMarkdownEditor } from "../components/TaskMarkdownEditor";
 import { TaskDrawerProperties } from "./TaskDrawerProperties";
-
 export interface SpaceTaskDrawerProps {
   draft: TaskDraft;
   setDraft: Dispatch<SetStateAction<TaskDraft>> | ((draft: TaskDraft) => void);
   editing: SpaceTask | null;
   members: SpaceMember[];
-
   busy: boolean;
   canManage: boolean;
   onClose: () => void;
   onSave: (event: FormEvent) => void;
   onArchive?: () => void;
 }
-
 export function SpaceTaskDrawer(props: SpaceTaskDrawerProps) {
-  const mobile = useSurfacePresentation() !== "desktop";
   const { draft, setDraft, editing, busy, canManage, onClose } = props;
   const [copiedKey, setCopiedKey] = useState(false);
-
   const hasProvenance = Boolean(
     editing && (editing.created_by_agent_id || editing.source_run_id || editing.source_refs.length),
   );
-
   const copyTaskKey = () => {
     if (!editing?.task_key) return;
     void navigator.clipboard.writeText(editing.task_key);
     setCopiedKey(true);
     window.setTimeout(() => setCopiedKey(false), 2000);
   };
-
   const handleFormKeyDown = (event: KeyboardEvent<HTMLFormElement>) => {
     if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
       if (draft.title.trim() && !busy && canManage) {
@@ -62,17 +54,14 @@ export function SpaceTaskDrawer(props: SpaceTaskDrawerProps) {
       }
     }
   };
-
   return (
     <Dialog open onOpenChange={(open) => !open && !busy && onClose()}>
       <DialogContent
         className={cn(
-          mobile
-            ? "inset-0 flex h-dvh max-h-dvh w-screen max-w-none translate-x-0 translate-y-0"
-            : "flex h-[min(880px,82vh)] w-[min(1200px,82vw)] min-h-[540px] max-w-[85vw]",
+          "flex h-[min(880px,82vh)] w-[min(1200px,82vw)] min-h-[540px] max-w-[85vw]",
           "flex-col gap-0 overflow-hidden rounded-2xl border border-charcoal-border",
           "bg-charcoal-card p-0 shadow-2xl",
-          mobile && "rounded-none border-0 pt-[env(safe-area-inset-top)]",
+          false,
         )}
       >
         <form
@@ -88,18 +77,11 @@ export function SpaceTaskDrawer(props: SpaceTaskDrawerProps) {
           <div
             className={cn(
               "grid min-h-0 flex-1 overflow-hidden",
-              mobile
-                ? "grid-cols-1 overflow-y-auto"
-                : "grid-cols-[minmax(0,1fr)_280px] max-sm:grid-cols-1",
+              "grid-cols-[minmax(0,1fr)_280px] max-sm:grid-cols-1",
             )}
           >
             {/* Left Content Area */}
-            <div
-              className={cn(
-                "flex min-h-0 flex-1 flex-col space-y-6 overflow-y-auto",
-                mobile ? "p-4" : "p-7",
-              )}
-            >
+            <div className={cn("flex min-h-0 flex-1 flex-col space-y-6 overflow-y-auto", "p-7")}>
               {/* Title input */}
               <div className="flex items-center gap-2 max-sm:pr-10">
                 <Input
@@ -114,7 +96,12 @@ export function SpaceTaskDrawer(props: SpaceTaskDrawerProps) {
                   required
                   placeholder="Task title..."
                   value={draft.title}
-                  onChange={(event) => setDraft({ ...draft, title: event.target.value })}
+                  onChange={(event) =>
+                    setDraft({
+                      ...draft,
+                      title: event.target.value,
+                    })
+                  }
                   aria-label="Title"
                 />
                 {editing ? (
@@ -124,10 +111,7 @@ export function SpaceTaskDrawer(props: SpaceTaskDrawerProps) {
                         size="icon"
                         variant="ghost"
                         type="button"
-                        className={cn(
-                          "shrink-0 text-cream-muted hover:text-cream",
-                          mobile ? "size-11" : "size-9",
-                        )}
+                        className={cn("shrink-0 text-cream-muted hover:text-cream", "size-9")}
                         aria-label="Task actions"
                       >
                         <MoreHorizontal className="size-4" />
@@ -163,7 +147,12 @@ export function SpaceTaskDrawer(props: SpaceTaskDrawerProps) {
                 <TaskMarkdownEditor
                   placeholder="Add notes"
                   value={draft.notes}
-                  onChange={(val) => setDraft({ ...draft, notes: val })}
+                  onChange={(val) =>
+                    setDraft({
+                      ...draft,
+                      notes: val,
+                    })
+                  }
                   disabled={!canManage}
                   minHeight={240}
                 />
@@ -178,7 +167,6 @@ export function SpaceTaskDrawer(props: SpaceTaskDrawerProps) {
               draft={draft}
               setDraft={setDraft}
               members={props.members}
-
               canManage={canManage}
             />
           </div>
@@ -188,7 +176,7 @@ export function SpaceTaskDrawer(props: SpaceTaskDrawerProps) {
             className={cn(
               "flex-row items-center justify-between border-t border-charcoal-border/70",
               "bg-charcoal-card/40 px-6 py-3.5",
-              mobile && "pb-[max(0.875rem,env(safe-area-inset-bottom))]",
+              false,
             )}
           >
             <div className="hidden text-[11px] text-cream-faint sm:block">
@@ -202,7 +190,7 @@ export function SpaceTaskDrawer(props: SpaceTaskDrawerProps) {
               <Button
                 variant="ghost"
                 size="sm"
-                className={cn(mobile && "min-h-11")}
+                className={cn(false)}
                 type="button"
                 disabled={busy}
                 onClick={onClose}
@@ -213,7 +201,7 @@ export function SpaceTaskDrawer(props: SpaceTaskDrawerProps) {
                 size="sm"
                 disabled={busy || !canManage || !draft.title.trim()}
                 type="submit"
-                className={cn("px-4", mobile && "min-h-11")}
+                className={cn("px-4", false)}
               >
                 {busy ? <LoaderCircle className="mr-1.5 size-3.5 animate-spin" /> : null}
                 {editing ? "Save changes" : "Create task"}
@@ -225,7 +213,6 @@ export function SpaceTaskDrawer(props: SpaceTaskDrawerProps) {
     </Dialog>
   );
 }
-
 function TaskProvenance({ task }: { task: SpaceTask }) {
   return (
     <div className="rounded-lg border border-charcoal-border/50 bg-charcoal-workspace/40 p-3">

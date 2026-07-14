@@ -1,11 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-
+import { accountFetchMe } from "../store/useAccountStore";
 const mocks = vi.hoisted(() => ({
   generation: 0,
   fetch: vi.fn(),
-  appSnapshot: vi.fn().mockResolvedValue({ environment: { serverUrl: "https://api.test" } }),
+  appSnapshot: vi.fn().mockResolvedValue({
+    environment: {
+      serverUrl: "https://api.test",
+    },
+  }),
 }));
-
 vi.mock("@/native", () => ({
   appSnapshot: mocks.appSnapshot,
 }));
@@ -20,23 +23,17 @@ vi.mock("@/api/client/session", () => ({
   readApiSessionGeneration: () => mocks.generation,
   isApiSignedOut: () => false,
 }));
-vi.mock("@/shared/platform/buildTarget", () => ({
-  isAndroidBuild: false,
-  isNativeMobileBuild: false,
-}));
 vi.mock("@/telemetry/client", () => ({
-  analytics: { isAnalyticsEnabled: () => false },
+  analytics: {
+    isAnalyticsEnabled: () => false,
+  },
 }));
-
-import { accountFetchMe } from "../store/useAccountStore";
-
 describe("account API generation isolation", () => {
   beforeEach(() => {
     mocks.generation = 0;
     mocks.fetch.mockReset();
     vi.stubGlobal("fetch", mocks.fetch);
   });
-
   it("rejects a response body that finishes after the active account changes", async () => {
     let resolveBody: ((value: string) => void) | undefined;
     const body = new Promise<string>((resolve) => {
@@ -47,10 +44,11 @@ describe("account API generation isolation", () => {
       status: 200,
       statusText: "OK",
       url: "https://api.test/api/me",
-      headers: new Headers({ "Content-Type": "application/json" }),
+      headers: new Headers({
+        "Content-Type": "application/json",
+      }),
       text: () => body,
     } as Response);
-
     const request = accountFetchMe();
     await vi.waitFor(() => expect(mocks.fetch).toHaveBeenCalledOnce());
     mocks.generation += 1;
@@ -61,7 +59,6 @@ describe("account API generation isolation", () => {
         email: "a@example.test",
       }),
     );
-
     await expect(request).rejects.toThrow(
       "The active Misty account changed before this request finished.",
     );

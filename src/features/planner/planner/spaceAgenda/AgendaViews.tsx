@@ -1,88 +1,33 @@
 import type { SpaceAgendaEntry } from "@/api/spaces/dto/interfaces/plannerExpansionTypes";
 import { Button, cn } from "@/shared/ui";
-import { CalendarDays, CheckSquare2, ChevronRight, GitFork } from "lucide-react";
+import { CalendarDays, CheckSquare2, GitFork } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { dayKey, groupAgendaEntries, startOfDay, startOfWeek } from "./agendaDates";
-
 export type AgendaZoomMinutes = 60 | 30 | 15;
-
 interface AgendaViewProps {
   anchor: Date;
   entries: SpaceAgendaEntry[];
   onOpen: (entry: SpaceAgendaEntry) => void;
 }
-
 interface AgendaTimelineViewProps extends AgendaViewProps {
   view: "week" | "day";
   zoomMinutes: AgendaZoomMinutes;
   onZoom: (direction: "in" | "out") => void;
 }
-
-export function MobileAgendaList({ anchor, entries, onOpen }: AgendaViewProps) {
-  const grouped = groupAgendaEntries(entries);
-  const keys = Object.keys(grouped).sort();
-  if (!keys.length) {
-    return (
-      <div className="grid min-h-64 place-items-center px-6 text-center text-sm text-cream-muted">
-        No tasks or events in this range.
-      </div>
-    );
-  }
-  return (
-    <div className="misty-scrollbar h-full overflow-y-auto px-4 py-3">
-      {keys.map((key) => {
-        const date = new Date(`${key}T12:00:00`);
-        return (
-          <section key={key} className="mb-5" aria-label={date.toDateString()}>
-            <h2 className="sticky top-0 z-10 m-0 bg-charcoal-bg py-2 text-sm font-semibold text-cream-bright">
-              {date.toLocaleDateString([], {
-                weekday: "long",
-                month: "short",
-                day: "numeric",
-                year: date.getFullYear() === anchor.getFullYear() ? undefined : "numeric",
-              })}
-            </h2>
-            <div className="overflow-hidden rounded-xl border border-charcoal-border bg-charcoal-card">
-              {(grouped[key] ?? []).map((entry) => (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  key={entry.id}
-                  className="flex h-auto min-h-16 w-full items-center justify-start gap-3 rounded-none border-b border-charcoal-border px-4 text-left hover:bg-charcoal-hover last:border-b-0"
-                  onClick={() => onOpen(entry)}
-                >
-                  <span className="w-14 shrink-0 text-xs text-cream-muted">
-                    {entry.all_day ? "All day" : formatTime(entry.starts_at)}
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-medium text-cream-bright">
-                      {entry.title}
-                    </span>
-                    <span className="mt-1 block truncate text-xs capitalize text-cream-muted">
-                      {entry.kind.replace(/_/g, " ")}
-                    </span>
-                  </span>
-                  <ChevronRight className="size-5 text-cream-muted" aria-hidden="true" />
-                </Button>
-              ))}
-            </div>
-          </section>
-        );
-      })}
-    </div>
-  );
-}
-
 export function AgendaMonthView({ anchor, entries, onOpen }: AgendaViewProps) {
   const first = new Date(anchor.getFullYear(), anchor.getMonth(), 1);
   const start = startOfWeek(first);
   const grouped = groupAgendaEntries(entries);
-  const days = Array.from({ length: 42 }, (_, index) => {
-    const day = new Date(start);
-    day.setDate(day.getDate() + index);
-    return day;
-  });
-
+  const days = Array.from(
+    {
+      length: 42,
+    },
+    (_, index) => {
+      const day = new Date(start);
+      day.setDate(day.getDate() + index);
+      return day;
+    },
+  );
   return (
     <div className="misty-transient-scrollbar h-full min-h-0 overflow-auto">
       <div className="grid min-h-full min-w-[760px] grid-rows-[auto_repeat(6,minmax(112px,1fr))] border-l border-t border-charcoal-border/60">
@@ -92,55 +37,61 @@ export function AgendaMonthView({ anchor, entries, onOpen }: AgendaViewProps) {
               className="border-r border-charcoal-border/60 px-3 py-2.5 text-center text-[11px] font-medium text-cream-muted"
               key={day.toISOString()}
             >
-              {day.toLocaleDateString(undefined, { weekday: "short" })}
+              {day.toLocaleDateString(undefined, {
+                weekday: "short",
+              })}
             </div>
           ))}
         </div>
-        {Array.from({ length: 6 }, (_, weekIndex) => (
-          <div className="grid min-h-0 grid-cols-7" key={weekIndex}>
-            {days.slice(weekIndex * 7, weekIndex * 7 + 7).map((day) => {
-              const items = grouped[dayKey(day)] ?? [];
-              const muted = day.getMonth() !== anchor.getMonth();
-              const today = isSameDay(day, new Date());
-              return (
-                <section
-                  className={cn(
-                    "min-h-0 border-b border-r border-charcoal-border/60 px-1.5 py-1.5",
-                    muted && "bg-charcoal-card text-cream-muted",
-                  )}
-                  key={day.toISOString()}
-                  aria-label={day.toDateString()}
-                >
-                  <div className="mb-1 flex h-6 items-center justify-center">
-                    <span
-                      className={cn(
-                        "grid size-6 place-items-center rounded-full text-xs",
-                        today && "bg-cream font-semibold text-charcoal-bg",
-                      )}
-                    >
-                      {day.getDate()}
-                    </span>
-                  </div>
-                  <div className="grid gap-0.5">
-                    {items.slice(0, 4).map((entry) => (
-                      <AgendaMonthChip entry={entry} key={entry.id} onOpen={onOpen} />
-                    ))}
-                    {items.length > 4 ? (
-                      <span className="px-1.5 py-0.5 text-[10px] font-medium text-cream-muted">
-                        +{items.length - 4} more
+        {Array.from(
+          {
+            length: 6,
+          },
+          (_, weekIndex) => (
+            <div className="grid min-h-0 grid-cols-7" key={weekIndex}>
+              {days.slice(weekIndex * 7, weekIndex * 7 + 7).map((day) => {
+                const items = grouped[dayKey(day)] ?? [];
+                const muted = day.getMonth() !== anchor.getMonth();
+                const today = isSameDay(day, new Date());
+                return (
+                  <section
+                    className={cn(
+                      "min-h-0 border-b border-r border-charcoal-border/60 px-1.5 py-1.5",
+                      muted && "bg-charcoal-card text-cream-muted",
+                    )}
+                    key={day.toISOString()}
+                    aria-label={day.toDateString()}
+                  >
+                    <div className="mb-1 flex h-6 items-center justify-center">
+                      <span
+                        className={cn(
+                          "grid size-6 place-items-center rounded-full text-xs",
+                          today && "bg-cream font-semibold text-charcoal-bg",
+                        )}
+                      >
+                        {day.getDate()}
                       </span>
-                    ) : null}
-                  </div>
-                </section>
-              );
-            })}
-          </div>
-        ))}
+                    </div>
+                    <div className="grid gap-0.5">
+                      {items.slice(0, 4).map((entry) => (
+                        <AgendaMonthChip entry={entry} key={entry.id} onOpen={onOpen} />
+                      ))}
+                      {items.length > 4 ? (
+                        <span className="px-1.5 py-0.5 text-[10px] font-medium text-cream-muted">
+                          +{items.length - 4} more
+                        </span>
+                      ) : null}
+                    </div>
+                  </section>
+                );
+              })}
+            </div>
+          ),
+        )}
       </div>
     </div>
   );
 }
-
 export function AgendaTimelineView({
   anchor,
   entries,
@@ -151,24 +102,38 @@ export function AgendaTimelineView({
 }: AgendaTimelineViewProps) {
   const start = view === "week" ? startOfWeek(anchor) : startOfDay(anchor);
   const dayCount = view === "week" ? 7 : 1;
-  const days = Array.from({ length: dayCount }, (_, index) => {
-    const day = new Date(start);
-    day.setDate(day.getDate() + index);
-    return day;
-  });
+  const days = Array.from(
+    {
+      length: dayCount,
+    },
+    (_, index) => {
+      const day = new Date(start);
+      day.setDate(day.getDate() + index);
+      return day;
+    },
+  );
   const grouped = groupAgendaEntries(entries);
   const slotHeight = zoomMinutes === 60 ? 36 : zoomMinutes === 30 ? 22 : 18;
   const hourHeight = slotHeight * (60 / zoomMinutes);
   const timelineHeight = hourHeight * 24;
-  const slots = Array.from({ length: (24 * 60) / zoomMinutes + 1 }, (_, index) => index);
-  const hours = Array.from({ length: 24 }, (_, index) => index);
+  const slots = Array.from(
+    {
+      length: (24 * 60) / zoomMinutes + 1,
+    },
+    (_, index) => index,
+  );
+  const hours = Array.from(
+    {
+      length: 24,
+    },
+    (_, index) => index,
+  );
   const scrollRef = useRef<HTMLDivElement>(null);
   const previousScaleRef = useRef(hourHeight);
   const previousRangeRef = useRef(`${view}:${dayKey(start)}`);
   const initialScrollHour = days.some((day) => isSameDay(day, new Date()))
     ? Math.max(0, new Date().getHours() - 1)
     : 7;
-
   useEffect(() => {
     const element = scrollRef.current;
     if (!element) return;
@@ -183,12 +148,10 @@ export function AgendaTimelineView({
     }
     previousScaleRef.current = hourHeight;
   }, [hourHeight, initialScrollHour, start, view]);
-
   const now = new Date();
   const showNow = days.some((day) => isSameDay(day, now));
   const nowTop = ((now.getHours() * 60 + now.getMinutes()) / 60) * hourHeight;
   const currentTimeLabel = formatTime(now.toISOString());
-
   return (
     <div
       ref={scrollRef}
@@ -202,12 +165,16 @@ export function AgendaTimelineView({
     >
       <div
         className="relative min-h-full border-l border-t border-charcoal-border/60"
-        style={{ minWidth: view === "week" ? 920 : 640 }}
+        style={{
+          minWidth: view === "week" ? 920 : 640,
+        }}
       >
         <div className="sticky top-0 z-30 bg-charcoal-bg ">
           <div
             className="grid min-h-14 border-b border-charcoal-border/60"
-            style={{ gridTemplateColumns: `72px repeat(${dayCount}, minmax(0, 1fr))` }}
+            style={{
+              gridTemplateColumns: `72px repeat(${dayCount}, minmax(0, 1fr))`,
+            }}
           >
             <div className="border-r border-charcoal-border/60" />
             {days.map((day) => (
@@ -216,7 +183,9 @@ export function AgendaTimelineView({
                 key={day.toISOString()}
               >
                 <span className="text-xs font-medium text-cream-muted">
-                  {day.toLocaleDateString(undefined, { weekday: "short" })}
+                  {day.toLocaleDateString(undefined, {
+                    weekday: "short",
+                  })}
                 </span>
                 <span
                   className={cn(
@@ -231,7 +200,9 @@ export function AgendaTimelineView({
           </div>
           <div
             className="grid min-h-[54px] border-b border-charcoal-border/60"
-            style={{ gridTemplateColumns: `72px repeat(${dayCount}, minmax(0, 1fr))` }}
+            style={{
+              gridTemplateColumns: `72px repeat(${dayCount}, minmax(0, 1fr))`,
+            }}
           >
             <div className="flex items-center justify-center border-r border-charcoal-border/60 text-xs text-cream-muted">
               All day
@@ -266,7 +237,9 @@ export function AgendaTimelineView({
                 <span
                   className="absolute right-3 text-[11px] text-cream-muted"
                   key={hour}
-                  style={{ top: hour * hourHeight + 8 }}
+                  style={{
+                    top: hour * hourHeight + 8,
+                  }}
                 >
                   {formatHour(hour)}
                 </span>
@@ -286,7 +259,9 @@ export function AgendaTimelineView({
                         major ? "border-charcoal-border/60" : "border-charcoal-border/30",
                       )}
                       key={slot}
-                      style={{ top: slot * slotHeight }}
+                      style={{
+                        top: slot * slotHeight,
+                      }}
                     />
                   );
                 })}
@@ -302,7 +277,9 @@ export function AgendaTimelineView({
                 {isSameDay(day, now) ? (
                   <div
                     className="pointer-events-none absolute inset-x-0 z-10"
-                    style={{ top: nowTop }}
+                    style={{
+                      top: nowTop,
+                    }}
                     data-agenda-current-time-line
                     aria-hidden="true"
                   >
@@ -319,7 +296,9 @@ export function AgendaTimelineView({
           {showNow ? (
             <div
               className="pointer-events-none absolute left-0 z-10 w-[72px] -translate-y-1/2"
-              style={{ top: nowTop }}
+              style={{
+                top: nowTop,
+              }}
               aria-label={`Current time ${currentTimeLabel}`}
               data-agenda-current-time-label
             >
@@ -333,7 +312,6 @@ export function AgendaTimelineView({
     </div>
   );
 }
-
 function AgendaMonthChip({
   entry,
   onOpen,
@@ -360,7 +338,6 @@ function AgendaMonthChip({
     </Button>
   );
 }
-
 function AgendaAllDayChip({
   entry,
   onOpen,
@@ -383,7 +360,6 @@ function AgendaAllDayChip({
     </Button>
   );
 }
-
 function AgendaTimedEvent({
   entry,
   hourHeight,
@@ -404,7 +380,6 @@ function AgendaTimedEvent({
   );
   const top = (startMinutes / 60) * hourHeight;
   const height = Math.max(40, (durationMinutes / 60) * hourHeight);
-
   return (
     <Button
       type="button"
@@ -414,7 +389,10 @@ function AgendaTimedEvent({
         "overflow-hidden rounded-md border px-2 py-1.5 text-left font-normal shadow-sm",
         kindSurface(entry.kind),
       )}
-      style={{ top, height }}
+      style={{
+        top,
+        height,
+      }}
       title={`${entry.title}, ${formatTimeRange(entry)}`}
       onClick={() => onOpen(entry)}
       data-agenda-timed-event
@@ -431,13 +409,11 @@ function AgendaTimedEvent({
     </Button>
   );
 }
-
 function EntryIcon({ entry, className }: { entry: SpaceAgendaEntry; className?: string }) {
   if (entry.kind === "task") return <CheckSquare2 className={className} />;
   if (entry.kind === "event") return <CalendarDays className={className} />;
   return <GitFork className={className} />;
 }
-
 function kindSurface(kind: SpaceAgendaEntry["kind"]) {
   return kind === "task"
     ? "border-sage-fg/30 bg-sage-bg text-sage-fg hover:bg-sage-bg"
@@ -447,23 +423,23 @@ function kindSurface(kind: SpaceAgendaEntry["kind"]) {
         ? "border-sage-fg/30 bg-sage-bg text-sage-fg hover:bg-sage-bg"
         : "border-status-green/30 bg-status-green text-sage-fg hover:bg-status-green";
 }
-
 function isSameDay(left: Date, right: Date) {
   return dayKey(left) === dayKey(right);
 }
-
 function formatHour(hour: number) {
-  return new Date(2026, 0, 1, hour).toLocaleTimeString([], { hour: "numeric" });
+  return new Date(2026, 0, 1, hour).toLocaleTimeString([], {
+    hour: "numeric",
+  });
 }
-
 function formatTime(value: string) {
-  return new Date(value).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  return new Date(value).toLocaleTimeString([], {
+    hour: "numeric",
+    minute: "2-digit",
+  });
 }
-
 function formatTimeRange(entry: SpaceAgendaEntry) {
   return `${formatTime(entry.starts_at)} – ${formatTime(entry.ends_at)}`;
 }
-
 function hourLabelOverlapsCurrentTime(hour: number, hourHeight: number, nowTop: number) {
   const hourLabelTop = hour * hourHeight + 8;
   const hourLabelBottom = hourLabelTop + 16;

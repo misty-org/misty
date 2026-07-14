@@ -1,9 +1,7 @@
-import { agentTaskDisplayState } from "@/features/agents/agentWorkState";
-import { useDropZone, usePointerDrag, type PointerDragPayload } from "@/features/dnd";
 import type { SpaceMember, SpaceTask } from "@/api/spaces/dto/interfaces/types";
 import type { SpaceTaskStatus } from "@/api/spaces/dto/types/types";
-import { Button, Card, CardContent, CardHeader, CardTitle, Input, cn } from "@/shared/ui";
-import { useSurfacePresentation } from "@/shared/mobile";
+import { useDropZone, usePointerDrag, type PointerDragPayload } from "@/features/dnd";
+import { Button, Card, CardContent, CardHeader, CardTitle, cn, Input } from "@/shared/ui";
 import {
   CheckSquare,
   GripVertical,
@@ -31,24 +29,31 @@ import {
   TaskPriorityBadge,
   taskStatusOptions,
 } from "./SpaceTaskPrimitives";
-
-const boardStatuses: Array<{ id: SpaceTaskStatus; label: string }> = [
-  { id: "todo", label: "To do" },
-  { id: "in_progress", label: "In progress" },
-  { id: "done", label: "Done" },
+const boardStatuses: Array<{
+  id: SpaceTaskStatus;
+  label: string;
+}> = [
+  {
+    id: "todo",
+    label: "To do",
+  },
+  {
+    id: "in_progress",
+    label: "In progress",
+  },
+  {
+    id: "done",
+    label: "Done",
+  },
 ];
-
 const TASK_DRAG_KIND = "space-task";
 
 /** Interactive controls inside a card own their own gestures and must not start a drag. */
 const NON_DRAGGABLE_SELECTOR = "button, input, select, textarea, [role='combobox']";
-
 const acceptsTask = (payload: PointerDragPayload) => payload.kind === TASK_DRAG_KIND;
-
 export function SpaceTaskBoard({
   tasks,
   members,
-
   totals,
   busy,
   canManage,
@@ -60,7 +65,6 @@ export function SpaceTaskBoard({
 }: {
   tasks: SpaceTask[];
   members: SpaceMember[];
-
   totals: Record<string, number>;
   busy: string;
   canManage: boolean;
@@ -70,21 +74,15 @@ export function SpaceTaskBoard({
   onCreate: (title: string, status: SpaceTaskStatus) => void;
   onOpenFullCreate?: (status: SpaceTaskStatus, initialTitle?: string) => void;
 }) {
-  const mobile = useSurfacePresentation() !== "desktop";
   const [creating, setCreating] = useState<SpaceTaskStatus>();
   const [title, setTitle] = useState("");
-
   const moveById = (taskId: string, status: SpaceTaskStatus, beforeTaskId?: string) => {
     const task = tasks.find((item) => item.id === taskId);
     if (task) onMove(task, status, beforeTaskId);
   };
-
   return (
     <div
-      className={cn(
-        "flex h-full min-h-0 gap-0 overflow-x-auto overflow-y-hidden",
-        mobile && "snap-x snap-mandatory scroll-px-3 gap-3 px-3",
-      )}
+      className={cn("flex h-full min-h-0 gap-0 overflow-x-auto overflow-y-hidden", false)}
       aria-label="Task board"
     >
       {boardStatuses.map((column) => (
@@ -95,7 +93,6 @@ export function SpaceTaskBoard({
             .filter((task) => task.status === column.id)
             .sort((left, right) => left.rank - right.rank)}
           members={members}
-
           total={totals[column.id]}
           busy={busy}
           canManage={canManage}
@@ -128,12 +125,10 @@ export function SpaceTaskBoard({
     </div>
   );
 }
-
 function BoardColumn({
   column,
   tasks,
   members,
-
   total,
   busy,
   canManage,
@@ -149,10 +144,12 @@ function BoardColumn({
   onDelete,
   onMoveById,
 }: {
-  column: { id: SpaceTaskStatus; label: string };
+  column: {
+    id: SpaceTaskStatus;
+    label: string;
+  };
   tasks: SpaceTask[];
   members: SpaceMember[];
-
   total?: number;
   busy: string;
   canManage: boolean;
@@ -168,28 +165,24 @@ function BoardColumn({
   onDelete: (task: SpaceTask) => void;
   onMoveById: (taskId: string, status: SpaceTaskStatus, beforeTaskId?: string) => void;
 }) {
-  const mobile = useSurfacePresentation() !== "desktop";
   const dropZone = useDropZone({
     id: `task-column:${column.id}`,
     accepts: acceptsTask,
     onDrop: (payload) => onMoveById(payload.id, column.id),
   });
-
   const handleInputKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Escape") {
       e.preventDefault();
       onCancelCreate();
     }
   };
-
   return (
     <section
       ref={dropZone.ref}
       className={cn(
         "flex h-full min-h-0 min-w-[264px] flex-1 basis-0 flex-col",
         "border-r border-charcoal-border/55 px-3 py-2 transition-colors last:border-r-0",
-        mobile &&
-          "w-[calc(100vw-48px)] max-w-[420px] flex-none snap-center rounded-xl border border-charcoal-border bg-charcoal-card/35",
+        false,
         dropZone.active ? "bg-charcoal-hover shadow-none" : "bg-transparent",
       )}
     >
@@ -270,7 +263,6 @@ function BoardColumn({
           <TaskCard
             task={task}
             members={members}
-
             busy={busy === task.id}
             canManage={canManage}
             onOpen={onOpen}
@@ -302,11 +294,9 @@ function BoardColumn({
     </section>
   );
 }
-
 function TaskCard({
   task,
   members,
-
   busy,
   canManage,
   onOpen,
@@ -316,7 +306,6 @@ function TaskCard({
 }: {
   task: SpaceTask;
   members: SpaceMember[];
-
   busy: boolean;
   canManage: boolean;
   onOpen: (task: SpaceTask) => void;
@@ -334,26 +323,32 @@ function TaskCard({
     accepts: (payload) => acceptsTask(payload) && payload.id !== task.id,
     onDrop: onDropBefore,
   });
-
   const checklistStats = useMemo(() => {
     if (!notes) return null;
     const matches = [...notes.matchAll(/- \[(x|X| )\]/g)];
     if (!matches.length) return null;
     const completed = matches.filter((m) => m[1].toLowerCase() === "x").length;
-    return { completed, total: matches.length };
+    return {
+      completed,
+      total: matches.length,
+    };
   }, [notes]);
-
   useEffect(() => {
     if (dragging) draggedRef.current = true;
   }, [dragging]);
-
   const beginDrag = (event: PointerEvent<HTMLElement>) => {
     if (!canManage) return;
     if ((event.target as HTMLElement).closest(NON_DRAGGABLE_SELECTOR)) return;
     draggedRef.current = false;
-    startDrag(event, { kind: TASK_DRAG_KIND, id: task.id }, <TaskDragPreview task={task} />);
+    startDrag(
+      event,
+      {
+        kind: TASK_DRAG_KIND,
+        id: task.id,
+      },
+      <TaskDragPreview task={task} />,
+    );
   };
-
   return (
     <Card
       ref={dropZone.ref}
@@ -464,7 +459,6 @@ function TaskCard({
     </Card>
   );
 }
-
 function TaskDragPreview({ task }: { task: SpaceTask }) {
   return (
     <div className="w-56 rounded-lg border border-charcoal-border bg-charcoal-card p-2.5 opacity-90 shadow-xl">

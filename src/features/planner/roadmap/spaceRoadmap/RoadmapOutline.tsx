@@ -1,29 +1,26 @@
 import type { SpaceRoadmapSnapshot } from "@/api/spaces/dto/interfaces/plannerExpansionTypes";
-import { Button, Collapsible, CollapsibleContent, CollapsibleTrigger, cn } from "@/shared/ui";
+import { Button, cn, Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/shared/ui";
 import { ChevronDown, ChevronRight, Circle, Flag, ListTree, Shapes } from "lucide-react";
 import { useState } from "react";
-
 export function RoadmapOutline({
   snapshot,
   selectedId,
   onSelect,
   onOpenTask,
-  mobile = false,
 }: {
   snapshot: SpaceRoadmapSnapshot;
   selectedId: string;
   onSelect: (id: string) => void;
   onOpenTask: (taskId: string) => void;
-  mobile?: boolean;
 }) {
-  const [open, setOpen] = useState(mobile);
+  const [open, setOpen] = useState(false);
   return (
     <Collapsible
       open={open}
       onOpenChange={setOpen}
-      className={cn("border-charcoal-border/70 bg-charcoal-bg", mobile ? "h-full" : "border-t")}
+      className={cn("border-charcoal-border/70 bg-charcoal-bg", "border-t")}
     >
-      {!mobile ? (
+      {
         <CollapsibleTrigger asChild>
           <Button
             type="button"
@@ -37,20 +34,14 @@ export function RoadmapOutline({
             />
           </Button>
         </CollapsibleTrigger>
-      ) : null}
+      }
       <CollapsibleContent>
-        <nav
-          className={cn(
-            "overflow-auto p-2",
-            mobile ? "h-full pb-[env(safe-area-inset-bottom)]" : "max-h-52 pt-0",
-          )}
-          aria-label="Roadmap outline"
-        >
+        <nav className={cn("overflow-auto p-2", "max-h-52 pt-0")} aria-label="Roadmap outline">
           {snapshot.milestones.map((milestone) => (
             <div key={milestone.id}>
               <Button
                 className={cn(
-                  mobile ? "min-h-12" : "h-8",
+                  "h-8",
                   "w-full justify-start gap-2 rounded px-2 text-left text-xs hover:bg-charcoal-card",
                   selectedId === milestone.id && "bg-charcoal-card",
                 )}
@@ -71,7 +62,7 @@ export function RoadmapOutline({
                     <Button
                       className={cn(
                         outlineItemClass,
-                        mobile && "min-h-12",
+                        false,
                         "pl-7 text-xs",
                         selectedId === goal.id && "bg-charcoal-card text-cream",
                       )}
@@ -85,7 +76,7 @@ export function RoadmapOutline({
                     </Button>
                     {goal.tasks.map((task) => (
                       <Button
-                        className={cn(outlineItemClass, mobile && "min-h-12", "pl-12 text-[11px]")}
+                        className={cn(outlineItemClass, false, "pl-12 text-[11px]")}
                         type="button"
                         variant="ghost"
                         key={task.id}
@@ -103,7 +94,7 @@ export function RoadmapOutline({
                   <Button
                     className={cn(
                       outlineItemClass,
-                      mobile && "min-h-12",
+                      false,
                       "pl-7 text-xs",
                       selectedId === node.id && "bg-charcoal-card text-cream",
                     )}
@@ -123,7 +114,7 @@ export function RoadmapOutline({
             .map((node) => (
               <Button
                 className={cn(
-                  mobile ? "min-h-12" : "h-8",
+                  "h-8",
                   "w-full justify-start gap-2 rounded px-2 text-left text-xs hover:bg-charcoal-card",
                   selectedId === node.id && "bg-charcoal-card",
                 )}
@@ -141,7 +132,6 @@ export function RoadmapOutline({
     </Collapsible>
   );
 }
-
 const outlineItemClass = [
   "h-7 w-full justify-start gap-2 rounded pr-2 text-left font-normal",
   "text-cream-muted hover:bg-charcoal-card hover:text-cream",

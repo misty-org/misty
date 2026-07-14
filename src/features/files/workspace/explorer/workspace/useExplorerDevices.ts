@@ -1,26 +1,16 @@
-import {
-  androidAllFilesAccessStatus,
-  devicesSnapshot,
-  explorerListDirectory,
-} from "@/features/files/workspace/native";
-import type { AndroidAllFilesAccessStatus, FileEntry, MountedDevice } from "@/native/contracts";
-import { isAndroidBuild } from "@/shared/platform/buildTarget";
+import { devicesSnapshot } from "@/features/files/workspace/native";
+import type { MountedDevice } from "@/native/contracts";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import type { UnlistenFn } from "@tauri-apps/api/event";
 import { listen } from "@tauri-apps/api/event";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { devicesChangedEvent, emptyMountedDevices } from "./ExplorerWorkspaceConstants";
 import { mountedDevicesEqual } from "./ExplorerWorkspaceUtils";
-
-export function useExplorerDevices(homePath: string) {
+export function useExplorerDevices() {
   const deviceRefreshInFlightRef = useRef(false);
   const deviceRefreshMountedRef = useRef(true);
   const [mountedDevices, setMountedDevices] = useState<MountedDevice[]>(emptyMountedDevices);
   const [devicesLoading, setDevicesLoading] = useState(false);
-  const [androidAllFilesAccess, setAndroidAllFilesAccess] =
-    useState<AndroidAllFilesAccessStatus | null>(null);
-  const [androidGrantedFolders, setAndroidGrantedFolders] = useState<FileEntry[]>([]);
-
   const refreshDevices = useCallback(async (options?: { showLoading?: boolean }) => {
     if (deviceRefreshInFlightRef.current) return;
     const showLoading = options?.showLoading ?? true;
@@ -42,52 +32,6 @@ export function useExplorerDevices(homePath: string) {
       if (showLoading && deviceRefreshMountedRef.current) setDevicesLoading(false);
     }
   }, []);
-
-  const refreshAndroidGrantedFolders = useCallback(async (): Promise<FileEntry[]> => {
-    if (!isAndroidBuild) return [];
-    try {
-      const listing = await explorerListDirectory({ path: homePath, showHidden: false });
-      const folders = listing.entries.filter((entry) => entry.kind === "folder");
-      setAndroidGrantedFolders(folders);
-      return folders;
-    } catch {
-      setAndroidGrantedFolders([]);
-      return [];
-    }
-  }, [homePath]);
-
-  const refreshAndroidAllFilesAccess =
-    useCallback(async (): Promise<AndroidAllFilesAccessStatus | null> => {
-      if (!isAndroidBuild) return null;
-      try {
-        const status = await androidAllFilesAccessStatus();
-        setAndroidAllFilesAccess(status);
-        return status;
-      } catch {
-        setAndroidAllFilesAccess(null);
-        return null;
-      }
-    }, []);
-
-  useEffect(() => {
-    if (!isAndroidBuild) return;
-    void refreshAndroidAllFilesAccess();
-    void refreshAndroidGrantedFolders();
-    const refreshOnFocus = () => {
-      void refreshAndroidAllFilesAccess();
-      void refreshAndroidGrantedFolders();
-    };
-    const refreshOnVisibility = () => {
-      if (document.visibilityState === "visible") refreshOnFocus();
-    };
-    window.addEventListener("focus", refreshOnFocus);
-    document.addEventListener("visibilitychange", refreshOnVisibility);
-    return () => {
-      window.removeEventListener("focus", refreshOnFocus);
-      document.removeEventListener("visibilitychange", refreshOnVisibility);
-    };
-  }, [refreshAndroidAllFilesAccess, refreshAndroidGrantedFolders]);
-
   useEffect(() => {
     deviceRefreshMountedRef.current = true;
     void refreshDevices();
@@ -97,10 +41,14 @@ export function useExplorerDevices(homePath: string) {
     let unlisten: UnlistenFn | null = null;
     const eventRefreshTimers = new Set<number>();
     const refreshFromDeviceEvent = () => {
-      void refreshDevices({ showLoading: false });
+      void refreshDevices({
+        showLoading: false,
+      });
       const timer = window.setTimeout(() => {
         eventRefreshTimers.delete(timer);
-        void refreshDevices({ showLoading: false });
+        void refreshDevices({
+          showLoading: false,
+        });
       }, 1200);
       eventRefreshTimers.add(timer);
     };
@@ -123,14 +71,9 @@ export function useExplorerDevices(homePath: string) {
       if (unlisten) void unlisten();
     };
   }, [refreshDevices]);
-
   return {
-    androidAllFilesAccess,
-    androidGrantedFolders,
     devicesLoading,
     mountedDevices,
-    refreshAndroidAllFilesAccess,
-    refreshAndroidGrantedFolders,
     refreshDevices,
   };
 }

@@ -1,3 +1,4 @@
+import type { FramePacingState } from "@/app/layouts/model/types";
 import {
   cn,
   menuItemClass,
@@ -6,21 +7,14 @@ import {
   navigationMenuPrimaryLayoutClass,
   popupSurfaceClass,
 } from "@/shared/ui";
-import type { FramePacingState } from "@/app/layouts/model/types";
 
 export const desktopFrameClass = [
   "relative isolate grid h-full min-h-0",
   "grid-rows-[36px_minmax(0,1fr)] overflow-hidden bg-charcoal-workspace text-cream",
 ].join(" ");
 
-export const tabletFrameClass = [
-  "relative isolate grid h-full min-h-0",
-  "grid-rows-[minmax(0,1fr)] overflow-hidden bg-charcoal-workspace pb-6 pt-7 text-cream",
-].join(" ");
-
 export const desktopNavbarClass =
   "relative z-10 col-start-1 row-span-2 row-start-1 min-h-0 overflow-hidden";
-export const tabletNavbarClass = "relative z-10 col-start-1 row-start-1 min-h-0 overflow-hidden";
 
 // An auto-hiding navigator floats over the workspace instead of taking a grid
 // column, so revealing it never reflows the surfaces underneath.

@@ -1,17 +1,18 @@
-import { createMistyAppSDK } from "@misty/sdk";
-import { createSDKTaskServices } from "@/features/planner/planner/spaceTasks/taskServices";
-import { createSDKRoadmapServices } from "./roadmapServices";
 import type { RoadmapRuntime } from "./roadmapRuntime";
 
 /** Explicit test runtime: an unexpected data operation fails, never uses a real account. */
 export function roadmapTestRuntime(overrides: Partial<RoadmapRuntime["api"]> = {}): RoadmapRuntime {
-  const misty = createMistyAppSDK({
-    request: async ({ method }) => {
-      if (method !== "lifecycle.ready") throw new Error(`Unexpected test request: ${method}`);
-    },
-  });
   return {
-    api: { ...createSDKTaskServices(misty), ...createSDKRoadmapServices(misty), ...overrides },
+    api: new Proxy(overrides, {
+      get(target, name) {
+        return (
+          target[name as keyof typeof target] ??
+          (() => {
+            throw new Error(`Unexpected test operation: ${String(name)}`);
+          })
+        );
+      },
+    }) as RoadmapRuntime["api"],
     userId: "user-1",
     focused: true,
     theme: "dark",

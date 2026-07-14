@@ -70,9 +70,9 @@ export default tseslint.config(
     ignores: [
       "**/node_modules/**",
       "dist/**",
-	  "dist-*/**",
+      "dist-*/**",
       "build/**",
-	  "vendor/**",
+      "vendor/**",
       "src-tauri/**",
       // Tooling and scratch trees that are not application source.
       ".config/**",
@@ -153,14 +153,7 @@ export default tseslint.config(
       "no-restricted-imports": restrict([
         MODELS_BAN,
         [
-          [
-            "@/api/*",
-            "@/app/*",
-            "@/features/*",
-            "@/native/*",
-            "@/platform/*",
-            "@/telemetry/*",
-          ],
+          ["@/api/*", "@/app/*", "@/features/*", "@/native/*", "@/platform/*", "@/telemetry/*"],
           "shared/ must not depend on any layer above it.",
         ],
       ]),
@@ -195,10 +188,7 @@ export default tseslint.config(
     rules: {
       "no-restricted-imports": restrict([
         MODELS_BAN,
-        [
-          ["@/app/*", "@/features/*"],
-          "telemetry/ must not depend on application or features.",
-        ],
+        [["@/app/*", "@/features/*"], "telemetry/ must not depend on application or features."],
       ]),
     },
   },
@@ -216,35 +206,6 @@ export default tseslint.config(
     files: ["src/app/**/*.{ts,tsx}"],
     rules: {
       "no-restricted-imports": restrict([MODELS_BAN, FEATURE_INTERNALS]),
-    },
-  },
-
-  // Mobile surfaces are a separate composition boundary. They may load a
-  // feature's dedicated entry directly, but can never reach desktop-only UI.
-  {
-    files: [
-      "src/app/layouts/MobileLayout/**/*.{ts,tsx}",
-      "src/features/**/mobile/**/*.{ts,tsx}",
-    ],
-    rules: {
-      "no-restricted-imports": restrict([
-        MODELS_BAN,
-        [
-          [
-            "@/app/layouts/DesktopLayout",
-            "@/app/layouts/DesktopLayout/*",
-            "@/features/extensions",
-            "@/features/extensions/*",
-            "@/features/marketplace",
-            "@/features/marketplace/*",
-            "@/features/terminal",
-            "@/features/terminal/*",
-            "@/features/developer-workspace",
-            "@/features/developer-workspace/*",
-          ],
-          "Mobile compositions must not import desktop layout, extension, marketplace, terminal, or code UI.",
-        ],
-      ]),
     },
   },
 

@@ -1,11 +1,11 @@
-import { mailApi } from "@/api/mail";
 import { apiErrorMessage } from "@/api/client";
+import { mailApi } from "@/api/mail";
 import { prefetchThreadHtml } from "../components/EmailBody";
-import { readInboxCache, persistInboxCache } from "./inboxCache";
+import { persistInboxCache, readInboxCache } from "./inboxCache";
 import { createInboxStoreWithRuntime, resetInboxStore, type InboxStoreHook } from "./inboxStore";
 export * from "./inboxStore";
 
-/** Existing host/mobile entry; downloaded components supply their own runtime. */
+/** Existing host entry; downloaded components supply their own runtime. */
 export function createInboxStore(): InboxStoreHook {
   return createInboxStoreWithRuntime({
     api: mailApi,

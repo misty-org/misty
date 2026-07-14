@@ -1,5 +1,5 @@
 pub mod clipboard;
-#[cfg(any(desktop, target_os = "ios"))]
+#[cfg(desktop)]
 pub mod connected_devices;
 pub mod explorer;
 pub mod file_master;

@@ -1,11 +1,10 @@
-import type { NativeNotesApi } from "../noteServices";
-import type { NoteBlockEditorProps, NoteEditorRuntime } from "./NoteBlockEditorView";
-import { Button, EmptyState, Skeleton, cn } from "@/shared/ui";
+import { Button, cn, EmptyState, Skeleton } from "@/shared/ui";
 import { ChevronLeft, ChevronRight, FileText, Link2, PanelRightClose } from "lucide-react";
 import { Suspense, useEffect, useRef, useState, type ComponentType } from "react";
 import type { Text as YText } from "yjs";
 import type { NoteBodyFormat, UnifiedNote } from "../model/types/types";
-
+import type { NativeNotesApi } from "../noteServices";
+import type { NoteBlockEditorProps, NoteEditorRuntime } from "./NoteBlockEditorView";
 export interface NoteReadingRuntime {
   useCollaborationRoom: NoteEditorRuntime["useCollaborationRoom"];
   backlinks: NativeNotesApi["backlinks"];
@@ -15,13 +14,15 @@ export interface NoteReadingRuntime {
 const paneClass = "grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] bg-charcoal-bg";
 const headerClass =
   "flex min-h-11 shrink-0 items-center gap-2 border-b border-charcoal-border bg-charcoal-bg py-1.5 pl-1 pr-3";
-
-export function NoteReadingPaneView(props: NoteReadingPaneProps & { runtime: NoteReadingRuntime }) {
+export function NoteReadingPaneView(
+  props: NoteReadingPaneProps & {
+    runtime: NoteReadingRuntime;
+  },
+) {
   const NoteBlockEditor = props.runtime.Editor;
   const { note } = props;
   const [inspector, setInspector] = useState<"backlinks" | null>(null);
   useEffect(() => setInspector(null), [note?.id]);
-
   if (props.loading) return <ReadingPaneSkeleton />;
   if (!note) {
     return (
@@ -47,16 +48,17 @@ export function NoteReadingPaneView(props: NoteReadingPaneProps & { runtime: Not
       </div>
     );
   }
-
   const collaborative = !props.referenceOnly && note.source === "misty" && Boolean(note.spaceId);
   const editable = collaborative || Boolean(props.onSaveContent || props.onSaveBody);
   const linkableNotes = (props.linkableNotes ?? [])
     .filter((candidate) => candidate.id !== note.id && candidate.source === "misty")
-    .map((candidate) => ({ id: candidate.sourceId, title: candidate.title }));
-
+    .map((candidate) => ({
+      id: candidate.sourceId,
+      title: candidate.title,
+    }));
   return (
     <article className={paneClass} aria-label={note.title}>
-      <header className={cn(headerClass, props.mobile && "min-h-14 px-3")}>
+      <header className={cn(headerClass, false)}>
         {props.onBack ? (
           <Button
             type="button"
@@ -77,7 +79,6 @@ export function NoteReadingPaneView(props: NoteReadingPaneProps & { runtime: Not
               spaceId={note.spaceId}
               noteId={note.sourceId}
               initialTitle={note.title}
-              mobile={props.mobile}
             />
           ) : (
             <h1 className="m-0 truncate text-sm font-semibold text-cream-bright">{note.title}</h1>
@@ -88,7 +89,7 @@ export function NoteReadingPaneView(props: NoteReadingPaneProps & { runtime: Not
             type="button"
             size="sm"
             variant={inspector === "backlinks" ? "secondary" : "ghost"}
-            className={cn("gap-1.5", props.mobile ? "h-11" : "h-8")}
+            className={cn("gap-1.5", "h-8")}
             aria-label="Backlinks"
             onClick={() =>
               setInspector((current) => (current === "backlinks" ? null : "backlinks"))
@@ -108,17 +109,10 @@ export function NoteReadingPaneView(props: NoteReadingPaneProps & { runtime: Not
       <div
         className={cn(
           "grid min-h-0 overflow-hidden",
-          inspector && !props.mobile
-            ? "grid-cols-[minmax(0,1fr)_minmax(300px,380px)]"
-            : "grid-cols-1",
+          inspector ? "grid-cols-[minmax(0,1fr)_minmax(300px,380px)]" : "grid-cols-1",
         )}
       >
-        <div
-          className={cn(
-            "misty-scrollbar min-h-0 overflow-auto overscroll-contain",
-            props.mobile && inspector && "hidden",
-          )}
-        >
+        <div className={cn("misty-scrollbar min-h-0 overflow-auto overscroll-contain", false)}>
           <Suspense
             fallback={
               <div className="p-8">
@@ -167,13 +161,11 @@ export function NoteReadingPaneView(props: NoteReadingPaneProps & { runtime: Not
     </article>
   );
 }
-
 function CollaborativeTitleInput(props: {
   runtime: NoteReadingRuntime;
   spaceId: string;
   noteId: string;
   initialTitle: string;
-  mobile?: boolean;
 }) {
   const { session } = props.runtime.useCollaborationRoom(props.spaceId, props.noteId);
   const [title, setTitle] = useState(props.initialTitle);
@@ -216,7 +208,7 @@ function CollaborativeTitleInput(props: {
       ref={inputRef}
       className={cn(
         "block w-full max-w-md min-w-0 rounded-md border border-charcoal-active bg-charcoal-card px-2 text-sm font-semibold",
-        props.mobile ? "h-11 text-base" : "h-8",
+        "h-8",
         "text-cream-bright shadow-none outline-none placeholder:text-cream-muted",
         "focus-visible:border-sage-fg/70 focus-visible:ring-2 focus-visible:ring-sage-fg/15",
       )}
@@ -235,7 +227,6 @@ function CollaborativeTitleInput(props: {
     />
   );
 }
-
 function JournalInspector(props: {
   runtime: NoteReadingRuntime;
   note: UnifiedNote;
@@ -253,7 +244,6 @@ function JournalInspector(props: {
     </aside>
   );
 }
-
 function InspectorHeader(props: {
   title: string;
   icon: React.ReactNode;
@@ -277,14 +267,18 @@ function InspectorHeader(props: {
     </header>
   );
 }
-
 function BacklinksInspector(props: {
   runtime: NoteReadingRuntime;
   note: UnifiedNote;
   onClose: () => void;
   onSelectNote?: (noteId: string) => void;
 }) {
-  const [links, setLinks] = useState<Array<{ id: string; title: string }>>([]);
+  const [links, setLinks] = useState<
+    Array<{
+      id: string;
+      title: string;
+    }>
+  >([]);
   const [loading, setLoading] = useState(props.note.source === "misty");
   useEffect(() => {
     let active = true;
@@ -345,7 +339,6 @@ function BacklinksInspector(props: {
     </>
   );
 }
-
 function replaceYText(text: YText, value: string) {
   if (text.toString() === value) return;
   text.doc?.transact(() => {
@@ -371,7 +364,6 @@ function ReadingPaneSkeleton() {
     </div>
   );
 }
-
 export interface NoteContentDraft {
   body: string;
   bodyFormat: NoteBodyFormat;
@@ -392,7 +384,6 @@ export interface NoteReadingPaneProps {
   onNewNote: () => void;
   linkableNotes?: UnifiedNote[];
   onSelectNote?: (noteId: string) => void;
-  mobile?: boolean;
 }
 export interface NoteConflictNoticeProps {
   note: UnifiedNote;

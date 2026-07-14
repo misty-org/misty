@@ -3,24 +3,23 @@ import type { SpaceAgendaEntry } from "@/api/spaces/dto/interfaces/plannerExpans
 import type { Space } from "@/api/spaces/dto/interfaces/types";
 import { useAuth } from "@/features/auth";
 import {
-  SpaceAvatar,
   preferredDefaultSpace,
   rememberedJournalRoute,
   rememberedPlannerRoute,
   socialProviderPath,
+  SpaceAvatar,
   useSpacesStore,
 } from "@/features/spaces";
 import {
-  WORKSPACE_TOOLS_META,
-  WorkspaceAppIcon,
   isWorkspaceToolId,
-  workspaceSurfaceFromRoute,
   useRecentToolsStore,
   useWorkspaceStore,
+  WORKSPACE_TOOLS_META,
+  WorkspaceAppIcon,
+  workspaceSurfaceFromRoute,
   type WorkspaceToolId,
 } from "@/features/workspace";
 import { Button, cn } from "@/shared/ui";
-import { useMobileSurfaceChrome, useSurfacePresentation } from "@/shared/mobile";
 import { ArrowRight, CalendarDays, Clock3, Flame, UsersRound } from "lucide-react";
 import {
   useEffect,
@@ -46,18 +45,20 @@ import {
   formatRelativeDate,
   greetingForDate,
 } from "./homeFormat";
-
 import { useHomeAgenda, type HomeAgendaEntry } from "./useHomeAgenda";
-
 const contributionWeeks = 40;
 const contributionDays = contributionWeeks * 7;
 const fallbackTools: WorkspaceToolId[] = ["journal", "planner", "social", "inbox", "files"];
-
-type HomeDashboardProps = { global: true; spaceId?: never } | { global?: false; spaceId: string };
-
+type HomeDashboardProps =
+  | {
+      global: true;
+      spaceId?: never;
+    }
+  | {
+      global?: false;
+      spaceId: string;
+    };
 export function HomeDashboard({ spaceId, global = false }: HomeDashboardProps) {
-  const presentation = useSurfacePresentation();
-  const mobile = presentation !== "desktop";
   const { user } = useAuth();
   const spaces = useSpacesStore((state) => state.spaces);
   const spacesLoading = useSpacesStore((state) => state.loading);
@@ -87,7 +88,6 @@ export function HomeDashboard({ spaceId, global = false }: HomeDashboardProps) {
   const agendaPath = agendaSpace
     ? `/spaces/${encodeURIComponent(agendaSpace.id)}/planner/agenda/day`
     : undefined;
-
   useEffect(() => {
     const todayKey = dateKey(new Date());
     const sessionKey = `misty:home-activity-session:${user?.id ?? "guest"}:${spaceId ?? "global"}:${todayKey}`;
@@ -105,7 +105,11 @@ export function HomeDashboard({ spaceId, global = false }: HomeDashboardProps) {
     void request
       .then((snapshot) => {
         if (cancelled) return;
-        setActivityResult({ scope: activityScope, activity: snapshot.activity, state: "ready" });
+        setActivityResult({
+          scope: activityScope,
+          activity: snapshot.activity,
+          state: "ready",
+        });
         cacheHomeActivity(user?.id ?? "", spaceId ?? "global", snapshot.activity);
         try {
           window.sessionStorage.setItem(sessionKey, "1");
@@ -116,19 +120,21 @@ export function HomeDashboard({ spaceId, global = false }: HomeDashboardProps) {
       })
       .catch(() => {
         if (cancelled) return;
-        setActivityResult({ scope: activityScope, activity: {}, state: "error" });
+        setActivityResult({
+          scope: activityScope,
+          activity: {},
+          state: "error",
+        });
       });
     return () => {
       cancelled = true;
     };
   }, [activityAttempt, activityScope, fallbackSpaceId, hydrateRecentTools, spaceId, user?.id]);
-
   useEffect(() => {
     const refresh = () => setActivityAttempt((value) => value + 1);
     window.addEventListener("misty:refresh-focused-tool", refresh);
     return () => window.removeEventListener("misty:refresh-focused-tool", refresh);
   }, []);
-
   const jumpTools = useMemo(() => {
     const ordered = [...recentTools, ...fallbackTools];
     const seen = new Set<WorkspaceToolId>();
@@ -145,7 +151,6 @@ export function HomeDashboard({ spaceId, global = false }: HomeDashboardProps) {
       })
       .slice(0, 4);
   }, [recentTools, space, spaces, global]);
-
   const visibleSpaces = useMemo(
     () =>
       [...spaces]
@@ -153,19 +158,15 @@ export function HomeDashboard({ spaceId, global = false }: HomeDashboardProps) {
         .slice(0, 5),
     [spaces],
   );
-
   const streak = activityStreak(activity, now);
   const overviewDates = contributionDates(now, contributionDays);
-  useMobileSurfaceChrome({ title: global ? "Home" : space?.name || "Home", level: "root" });
-
   if (!global && !space) return null;
-
   return (
     <main className="misty-transient-scrollbar h-full min-h-0 overflow-x-hidden overflow-y-auto bg-charcoal-bg text-cream selection:bg-avatar-yellow/25 selection:text-cream-bright">
       <div
         className={cn(
           "mx-auto w-full max-w-[1240px] [@media(min-width:1024px)_and_(min-height:800px)]:h-full",
-          mobile ? "px-4 py-4" : "px-5 py-6 sm:px-8 lg:px-10",
+          "px-5 py-6 sm:px-8 lg:px-10",
         )}
       >
         <header className="mb-6">
@@ -182,7 +183,7 @@ export function HomeDashboard({ spaceId, global = false }: HomeDashboardProps) {
               <div
                 className={cn(
                   "grid gap-2 rounded-2xl border border-charcoal-border bg-charcoal-card/55 p-2",
-                  mobile ? "grid-cols-2" : "sm:grid-cols-2 lg:grid-cols-4",
+                  "sm:grid-cols-2 lg:grid-cols-4",
                 )}
               >
                 {jumpTools.map((toolId) => {
@@ -219,7 +220,7 @@ export function HomeDashboard({ spaceId, global = false }: HomeDashboardProps) {
                       <ArrowRight
                         className={cn(
                           "size-4 shrink-0 text-cream-muted transition-opacity",
-                          mobile ? "opacity-100" : "opacity-0 group-hover:opacity-100",
+                          "opacity-0 group-hover:opacity-100",
                         )}
                         aria-hidden="true"
                       />
@@ -311,14 +312,12 @@ export function HomeDashboard({ spaceId, global = false }: HomeDashboardProps) {
     </main>
   );
 }
-
 function spaceToolIsAvailable(space: Space, toolId: WorkspaceToolId): boolean {
   if (toolId === "social") return space.permissions?.["messages.read"] !== false;
   if (toolId === "planner") return space.permissions?.["tasks.view"] !== false;
   if (toolId === "library") return space.permissions?.["library.view"] !== false;
   return true;
 }
-
 function CurrentDateTime() {
   const [value, setValue] = useState(() => new Date());
   useEffect(() => {
@@ -326,7 +325,6 @@ function CurrentDateTime() {
     const interval = window.setInterval(updateClock, 1_000);
     return () => window.clearInterval(interval);
   }, []);
-
   const date = formatLongDate(value);
   const time = formatClockTime(value);
   return (
@@ -342,11 +340,9 @@ function CurrentDateTime() {
     </time>
   );
 }
-
 function StreakFlame() {
   return <Flame className="size-5 shrink-0 text-cream-bright" aria-hidden="true" />;
 }
-
 function SectionHeading(props: { id: string; title: string; action?: ReactNode }) {
   return (
     <div className="mb-3 flex min-h-7 items-center justify-between gap-4 px-1">
@@ -357,7 +353,6 @@ function SectionHeading(props: { id: string; title: string; action?: ReactNode }
     </div>
   );
 }
-
 function AgendaRows(props: {
   state: "loading" | "ready" | "error";
   entries: HomeAgendaEntry[];
@@ -434,7 +429,6 @@ function AgendaRows(props: {
     </div>
   );
 }
-
 function SpaceRow(props: { space: Space }) {
   const encodedId = encodeURIComponent(props.space.id);
   return (
@@ -458,7 +452,6 @@ function SpaceRow(props: { space: Space }) {
     </DashboardLink>
   );
 }
-
 function OverviewContributions(props: { dates: Date[]; activity: HomeActivity }) {
   return (
     <div className="min-w-0 pb-1 [container-type:inline-size]">
@@ -501,7 +494,6 @@ function OverviewContributions(props: { dates: Date[]; activity: HomeActivity })
     </div>
   );
 }
-
 function DashboardLink(props: ComponentProps<typeof Link>) {
   const handleClick = (event: MouseEvent<HTMLAnchorElement>) => {
     props.onClick?.(event);
@@ -520,10 +512,8 @@ function DashboardLink(props: ComponentProps<typeof Link>) {
   };
   return <Link {...props} onClick={handleClick} />;
 }
-
 const sectionLinkClass =
   "rounded-md px-1.5 py-1 text-xs font-medium text-sage-fg outline-none underline-offset-4 hover:text-cream-bright hover:underline focus-visible:ring-2 focus-visible:ring-sage-fg/60";
-
 function routeForTool(toolId: WorkspaceToolId, space: Space, accountId: string): string | null {
   const encodedId = encodeURIComponent(space.id);
   if (toolId === "journal") return rememberedJournalRoute(accountId, space.id);
@@ -536,11 +526,9 @@ function routeForTool(toolId: WorkspaceToolId, space: Space, accountId: string):
   }
   return null;
 }
-
 function isSpaceTool(toolId: WorkspaceToolId): boolean {
   return ["journal", "planner", "social", "library"].includes(toolId);
 }
-
 function toolDescription(toolId: WorkspaceToolId): string {
   const descriptions: Partial<Record<WorkspaceToolId, string>> = {
     journal: "Notes and drawings",
@@ -557,7 +545,6 @@ function toolDescription(toolId: WorkspaceToolId): string {
   };
   return descriptions[toolId] ?? "Open workspace";
 }
-
 function agendaDotClass(kind: SpaceAgendaEntry["kind"]): string {
   if (kind === "event") return "bg-avatar-blue";
   if (kind === "task") return "bg-avatar-green";
@@ -565,22 +552,28 @@ function agendaDotClass(kind: SpaceAgendaEntry["kind"]): string {
   if (kind === "milestone") return "bg-avatar-orange";
   return "bg-agent-indigo";
 }
-
 function contributionClass(count: number): string {
   if (count >= 4) return "bg-cream-bright";
   if (count >= 2) return "bg-cream-bright/70";
   if (count >= 1) return "bg-cream-bright/40";
   return "bg-charcoal-active/75";
 }
-
-function monthLabels(dates: Date[]): { key: string; label: string }[] {
-  const labels: { key: string; label: string }[] = [];
+function monthLabels(dates: Date[]): {
+  key: string;
+  label: string;
+}[] {
+  const labels: {
+    key: string;
+    label: string;
+  }[] = [];
   for (const date of dates) {
     const key = `${date.getFullYear()}-${date.getMonth()}`;
     if (labels.some((label) => label.key === key)) continue;
     labels.push({
       key,
-      label: new Intl.DateTimeFormat(undefined, { month: "short" }).format(date),
+      label: new Intl.DateTimeFormat(undefined, {
+        month: "short",
+      }).format(date),
     });
   }
   return labels;

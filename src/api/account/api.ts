@@ -1,32 +1,48 @@
-import { resolveApiBase } from "@/api/deployment/api";
 import { httpRequest } from "@/api/client/http";
 import {
   notifyApiSessionInvalid,
   readApiAuthToken,
   readApiSessionGeneration,
 } from "@/api/client/session";
-import { isAndroidBuild, isNativeMobileBuild } from "@/shared/platform/buildTarget";
+import { resolveApiBase } from "@/api/deployment/api";
 import { addRequestCorrelation } from "@/shared/platform/requestCorrelation";
 import type { AccountHandoffPath, AccountMeResponse, LoginResponse } from "./types";
-
 type AccountMethod = "GET" | "POST" | "PUT";
 let readAnalyticsEnabled = () => false;
-
 export function configureAccountApi(context: { readAnalyticsEnabled: () => boolean }): void {
   readAnalyticsEnabled = context.readAnalyticsEnabled;
 }
-
 export const accountApi = {
   signIn: (email: string, password: string) =>
-    requestJson<LoginResponse>("POST", "/login", { email, password }),
+    requestJson<LoginResponse>("POST", "/login", {
+      email,
+      password,
+    }),
   register: (path: "/register" | "/self-host/bootstrap" | "/self-host/enroll", body: unknown) =>
     requestJson<LoginResponse>("POST", path, body),
-  logout: () => requestJson<{ status?: string }>("POST", "/logout"),
+  logout: () =>
+    requestJson<{
+      status?: string;
+    }>("POST", "/logout"),
   forgotPassword: (email: string) =>
-    requestJson<{ message?: string }>("POST", "/auth/forgot", { email }),
+    requestJson<{
+      message?: string;
+    }>("POST", "/auth/forgot", {
+      email,
+    }),
   me: () => requestJson<AccountMeResponse>("GET", "/me"),
   handoff: (path?: AccountHandoffPath) =>
-    requestJson<{ url: string }>("POST", "/auth/handoff", path ? { path } : {}),
+    requestJson<{
+      url: string;
+    }>(
+      "POST",
+      "/auth/handoff",
+      path
+        ? {
+            path,
+          }
+        : {},
+    ),
   avatar: async () => {
     const response = await accountAvatarRequest();
     return response.blob();
@@ -38,13 +54,11 @@ export const accountApi = {
     }),
   resolveBase: resolveApiBase,
 };
-
 async function requestJson<T>(method: AccountMethod, path: string, body?: unknown): Promise<T> {
   const accountGeneration = readApiSessionGeneration();
   const apiBase = await resolveRequiredAccountApiBase();
   assertAccountGeneration(accountGeneration);
   const url = `${apiBase}${path}`;
-
   try {
     const token = shouldAttachAuthToken(path) ? await readApiAuthToken() : null;
     assertAccountGeneration(accountGeneration);
@@ -79,7 +93,6 @@ async function requestJson<T>(method: AccountMethod, path: string, body?: unknow
     throw new Error(message);
   }
 }
-
 async function accountAvatarRequest(): Promise<Response> {
   const accountGeneration = readApiSessionGeneration();
   const apiBase = await resolveRequiredAccountApiBase();
@@ -103,7 +116,6 @@ async function accountAvatarRequest(): Promise<Response> {
   }
   return response;
 }
-
 async function parseResponse<T>(
   response: Response,
   method: string,
@@ -111,7 +123,6 @@ async function parseResponse<T>(
   url: string,
 ): Promise<T> {
   const payload = await parsePayload(response, method, path);
-
   if (!response.ok) {
     const message =
       typeof payload === "string"
@@ -128,10 +139,8 @@ async function parseResponse<T>(
     });
     throw new AccountApiError(errorMessage, response.status);
   }
-
   return payload as T;
 }
-
 async function parsePayload(response: Response, method: string, path: string): Promise<unknown> {
   const text = await response.text();
   const contentType = response.headers.get("Content-Type") ?? "";
@@ -148,11 +157,9 @@ async function parsePayload(response: Response, method: string, path: string): P
     );
   }
 }
-
 function assertAccountGeneration(expected: number): void {
   if (readApiSessionGeneration() !== expected) throw new AccountSessionChangedError();
 }
-
 function requestHeaders(body: unknown, token: string | null): Headers | undefined {
   if (body === undefined && !token) return undefined;
   const headers = new Headers();
@@ -167,16 +174,12 @@ function requestHeaders(body: unknown, token: string | null): Headers | undefine
   if (token) headers.set("Authorization", `Bearer ${token}`);
   return headers;
 }
-
-function accountClientPlatform(): "windows" | "macos" | "linux" | "android" | "ios" {
-  if (isAndroidBuild) return "android";
-  if (isNativeMobileBuild) return "ios";
+function accountClientPlatform(): "windows" | "macos" | "linux" {
   const platform = navigator.platform.toLowerCase();
   if (platform.includes("win")) return "windows";
   if (platform.includes("mac")) return "macos";
   return "linux";
 }
-
 function shouldAttachAuthToken(path: string): boolean {
   return ![
     "/login",
@@ -187,25 +190,22 @@ function shouldAttachAuthToken(path: string): boolean {
     "/logout",
   ].includes(path);
 }
-
 function recordAccountApiDebugEvent(event: {
   level: "info" | "warn" | "error";
   scope: string;
   message: string;
   detail?: string;
 }): void {
-  if (isNativeMobileBuild || (!import.meta.env.DEV && import.meta.env.VITE_MISTY_DEBUG !== "1")) {
+  if (!import.meta.env.DEV && import.meta.env.VITE_MISTY_DEBUG !== "1") {
     return;
   }
   void import("@/shared/platform/clientDebug").then(({ recordClientDebugEvent }) => {
     recordClientDebugEvent(event);
   });
 }
-
 function textPreview(value: string): string {
   return value.replace(/\s+/g, " ").trim().slice(0, 160) || "empty response";
 }
-
 function firstJsonValueText(value: string): string | null {
   const start = value.search(/[[{]/);
   if (start < 0) return null;
@@ -233,25 +233,29 @@ function firstJsonValueText(value: string): string | null {
   }
   return null;
 }
-
 function responseMessage(payload: unknown): string {
   if (!payload || typeof payload !== "object") return "";
-  const message = (payload as { message?: unknown }).message;
+  const message = (
+    payload as {
+      message?: unknown;
+    }
+  ).message;
   return typeof message === "string" ? message : "";
 }
-
 function responseError(payload: unknown): string {
   if (!payload || typeof payload !== "object") return "";
-  const error = (payload as { error?: unknown }).error;
+  const error = (
+    payload as {
+      error?: unknown;
+    }
+  ).error;
   return typeof error === "string" ? error : "";
 }
-
 function errorMessage(error: unknown): string {
   if (error instanceof Error && error.message) return error.message;
   if (typeof error === "string") return error;
   return "Network request failed.";
 }
-
 function payloadDetail(payload: unknown): string {
   if (typeof payload === "string") return payload.slice(0, 800);
   try {
@@ -260,16 +264,13 @@ function payloadDetail(payload: unknown): string {
     return "";
   }
 }
-
 async function resolveRequiredAccountApiBase(): Promise<string> {
   const base = await resolveApiBase();
   if (!base) throw new Error("Misty server URL is not configured.");
   return base;
 }
-
 export class AccountApiError extends Error {
   name = "AccountApiError";
-
   constructor(
     message: string,
     readonly status?: number,
@@ -277,15 +278,12 @@ export class AccountApiError extends Error {
     super(message);
   }
 }
-
 export class AccountSessionChangedError extends Error {
   name = "AccountSessionChangedError";
-
   constructor() {
     super("The active Misty account changed before this request finished. Please try again.");
   }
 }
-
 export function isAccountUnauthorizedError(error: unknown): boolean {
   return error instanceof AccountApiError && error.status === 401;
 }

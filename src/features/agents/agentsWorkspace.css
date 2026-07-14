@@ -825,9 +825,6 @@
 .agent-conversation .agent-transcript > div > div {
   margin: 0;
 }
-.agents-mobile-back {
-  display: none;
-}
 @container agents (max-width: 860px) {
   .agents-workspace--settings .agents-main {
     display: none;
@@ -845,68 +842,7 @@
     max-width: 94%;
   }
 }
-@container agents (max-width: 600px) {
-  .agents-roster {
-    display: none;
-    width: 100%;
-  }
-  .agents-workspace--list .agents-roster {
-    display: flex;
-  }
-  .agents-workspace--list .agents-main,
-  .agents-workspace--list .agent-settings-panel {
-    display: none;
-  }
-  .agents-mobile-back {
-    display: inline-flex;
-  }
-  .agent-conversation-heading,
-  .agents-roster-heading,
-  .agent-settings-panel > header {
-    height: 48px;
-  }
-  .agent-conversation-heading {
-    padding: 0 8px;
-  }
-  .agent-welcome {
-    padding-inline: 12px;
-  }
-  .agent-starters {
-    width: 100%;
-  }
-  .agent-introduction {
-    max-width: 100%;
-  }
-  .agent-compose-area {
-    padding: 8px 10px max(10px, env(safe-area-inset-bottom));
-  }
-  .agents-workspace :is(input, textarea, select) {
-    font-size: 16px;
-  }
-  .agents-workspace .agent-icon-button {
-    width: 44px;
-    height: 44px;
-  }
-  .agents-workspace button {
-    min-height: 44px;
-  }
-  .agents-workspace .agent-workspace-composer {
-    grid-template-columns: 44px minmax(0, 1fr) 44px 44px;
-    gap: 3px;
-    padding: 4px;
-  }
-  .agent-workspace-composer
-    :is(
-      .agent-voice-button,
-      button[aria-label="Attach files"],
-      button[aria-label="Send to Misty"],
-      button[aria-label="Stop response"]
-    ) {
-    width: 44px;
-    min-height: 44px;
-    height: 44px;
-  }
-}
+
 .agent-advanced-settings {
   border-top: 1px solid var(--agent-line);
   padding-top: 12px;

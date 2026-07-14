@@ -456,8 +456,6 @@ pub fn restart_misty(
 
 #[tauri::command]
 pub fn sign_out_misty(state: tauri::State<'_, MistyRuntime>) -> Result<NativeSystemInfo, String> {
-    crate::infra::mobile_cache::purge_all(&state.environment.cache_dir())
-        .map_err(|error| format!("Could not purge mobile account data: {error}"))?;
     ensure_database()?;
     let conn = Connection::open(misty_db_path()?)
         .map_err(|error| format!("Could not open Misty database: {error}"))?;

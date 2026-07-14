@@ -41,7 +41,7 @@ export function Notification({
       viewport.id = "misty-notification-viewport";
       viewport.setAttribute("aria-label", "Notifications");
       viewport.className =
-        "pointer-events-none fixed bottom-[max(16px,env(safe-area-inset-bottom))] right-[max(16px,env(safe-area-inset-right))] z-[2147482900] flex max-h-[calc(100dvh-80px)] w-[360px] max-w-[calc(100vw-32px)] flex-col gap-2 overflow-y-auto";
+        "pointer-events-none fixed bottom-4 right-4 z-[2147482900] flex max-h-[calc(100dvh-80px)] w-[360px] max-w-[calc(100vw-32px)] flex-col gap-2 overflow-y-auto";
       document.body.append(viewport);
     }
     const slot = document.createElement("div");

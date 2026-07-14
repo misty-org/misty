@@ -1,17 +1,15 @@
-import { selectGeneralPreferences, useSettingsStore } from "@/features/settings";
 import {
   explorerOpenPath,
   explorerOpenWith,
   explorerPathIsDirectory,
 } from "@/features/files/workspace/native";
+import { selectGeneralPreferences, useSettingsStore } from "@/features/settings";
 import { userFacingErrorText } from "@/shared/lib/format";
-import { isNativeMobileBuild } from "@/shared/platform/buildTarget";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { open } from "@tauri-apps/plugin-dialog";
 import type { ExplorerStore } from "../../model/interfaces/store/types";
 import type { ExplorerGet, ExplorerSet } from "../../model/types/store/types";
 import * as H from "../helpers";
-
 export function createSelectionActions(set: ExplorerSet, get: ExplorerGet): Partial<ExplorerStore> {
   return {
     selectEntry: (paneId, entryId, options = {}) => {
@@ -49,7 +47,10 @@ export function createSelectionActions(set: ExplorerSet, get: ExplorerGet): Part
         const previousAnchor = pane.lastSelectedIndexByPath[path];
         const nextLastSelectedIndexByPath =
           entryIndex >= 0 && previousAnchor !== entryIndex
-            ? { ...pane.lastSelectedIndexByPath, [path]: entryIndex }
+            ? {
+                ...pane.lastSelectedIndexByPath,
+                [path]: entryIndex,
+              }
             : pane.lastSelectedIndexByPath;
         if (
           H.arraysEqual(pane.selectedIds, selectedIds) &&
@@ -63,7 +64,10 @@ export function createSelectionActions(set: ExplorerSet, get: ExplorerGet): Part
           [paneId]: {
             ...pane,
             selectedIds,
-            selectedIdsByPath: { ...pane.selectedIdsByPath, [path]: selectedIds },
+            selectedIdsByPath: {
+              ...pane.selectedIdsByPath,
+              [path]: selectedIds,
+            },
             lastSelectedIndexByPath: nextLastSelectedIndexByPath,
           },
         };
@@ -73,7 +77,6 @@ export function createSelectionActions(set: ExplorerSet, get: ExplorerGet): Part
         };
       });
     },
-
     clearSelection: (paneId) => {
       set((state) => {
         const pane = state.panes[paneId];
@@ -85,7 +88,10 @@ export function createSelectionActions(set: ExplorerSet, get: ExplorerGet): Part
           [paneId]: {
             ...pane,
             selectedIds: [],
-            selectedIdsByPath: { ...pane.selectedIdsByPath, [path]: [] },
+            selectedIdsByPath: {
+              ...pane.selectedIdsByPath,
+              [path]: [],
+            },
           },
         };
         return {
@@ -94,7 +100,6 @@ export function createSelectionActions(set: ExplorerSet, get: ExplorerGet): Part
         };
       });
     },
-
     openEntry: async (paneId, entry) => {
       if (entry.isDeleted) {
         set({
@@ -116,7 +121,9 @@ export function createSelectionActions(set: ExplorerSet, get: ExplorerGet): Part
             return;
           }
         } catch (error) {
-          set({ operationError: `Unable to inspect link: ${userFacingErrorText(error)}` });
+          set({
+            operationError: `Unable to inspect link: ${userFacingErrorText(error)}`,
+          });
           return;
         }
       }
@@ -127,14 +134,18 @@ export function createSelectionActions(set: ExplorerSet, get: ExplorerGet): Part
       const isRemoteFile = entry.location.kind !== "local";
       if (!isRemoteFile && (defaultFileAction === 1 || defaultFileAction === 2)) {
         H.setPreviewVisibleForPane(paneId);
-        set({ operationError: null });
+        set({
+          operationError: null,
+        });
         if (defaultFileAction === 1) {
           get().pushNotification("Preview opened", "info", 1800, false);
         }
         return;
       }
       try {
-        set({ operationError: null });
+        set({
+          operationError: null,
+        });
         const prepared = await H.preparedOpenItemForEntry(entry);
         const localPath = prepared.localPath;
         const applicationPath = await H.associationForPath(entry.path);
@@ -154,19 +165,18 @@ export function createSelectionActions(set: ExplorerSet, get: ExplorerGet): Part
         }
         void get().recordLibraryRecent(entry);
       } catch (error) {
-        set({ operationError: `Unable to open file: ${userFacingErrorText(error)}` });
+        set({
+          operationError: `Unable to open file: ${userFacingErrorText(error)}`,
+        });
       }
     },
-
     openWithSelected: async (paneId) => {
       const entry = H.selectedEntryForPane(get().panes[paneId]);
       if (!entry || entry.kind === "folder" || entry.kind === "symlink") return;
-      if (isNativeMobileBuild) {
-        set({ operationError: "This file action is not available on this device." });
-        return;
-      }
       if (!hasTauriInternals()) {
-        set({ operationError: "Choosing a local application is only available in the Misty app." });
+        set({
+          operationError: "Choosing a local application is only available in the Misty app.",
+        });
         return;
       }
       try {
@@ -177,11 +187,15 @@ export function createSelectionActions(set: ExplorerSet, get: ExplorerGet): Part
         });
         const applicationPath = Array.isArray(selection) ? selection[0] : selection;
         if (!applicationPath) return;
-        set({ operationError: null });
+        set({
+          operationError: null,
+        });
         await H.setAssociationForPath(entry.path, applicationPath);
         await explorerOpenWith(applicationPath, await H.localPathForEntry(entry));
       } catch (error) {
-        set({ operationError: `Open With failed: ${userFacingErrorText(error)}` });
+        set({
+          operationError: `Open With failed: ${userFacingErrorText(error)}`,
+        });
       }
     },
   };

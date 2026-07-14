@@ -1,13 +1,11 @@
-import { useEffect } from "react";
+import { readDeploymentScope } from "@/api/deployment/api";
 import { operationQueueSnapshot } from "@/native/transfers-tools";
 import { hasTauriInternals } from "@/shared/platform/tauri";
-import { isNativeMobileBuild } from "@/shared/platform/buildTarget";
+import { useEffect } from "react";
 import { createOperationActivityObserver } from "./operationActivity";
-import { readDeploymentScope } from "@/api/deployment/api";
-
 export function useOperationActivity(accountId: string) {
   useEffect(() => {
-    if (!accountId || !hasTauriInternals() || isNativeMobileBuild) return;
+    if (!accountId || !hasTauriInternals()) return;
     let active = true,
       pending = false;
     const deployment = readDeploymentScope();

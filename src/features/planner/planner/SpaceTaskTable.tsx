@@ -11,8 +11,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/shared/ui";
-import { useSurfacePresentation } from "@/shared/mobile";
-import { CalendarClock, ChevronRight, LoaderCircle, Trash2 } from "lucide-react";
+import { LoaderCircle, Trash2 } from "lucide-react";
 import {
   TaskEmptyState,
   TaskInlineSelect,
@@ -20,11 +19,9 @@ import {
   taskStatusOptions,
   toLocalInput,
 } from "./SpaceTaskPrimitives";
-
 export function SpaceTaskList({
   tasks,
   members,
-
   busy,
   canManage,
   onOpen,
@@ -33,86 +30,13 @@ export function SpaceTaskList({
 }: {
   tasks: SpaceTask[];
   members: SpaceMember[];
-
   busy: string;
   canManage: boolean;
   onOpen: (task: SpaceTask) => void;
   onUpdate: (task: SpaceTask, patch: TaskPatch) => void;
   onDelete: (task: SpaceTask) => void;
 }) {
-  const mobile = useSurfacePresentation() !== "desktop";
   if (!tasks.length) return <TaskEmptyState />;
-
-  if (mobile) {
-    return (
-      <div className="grid gap-2" aria-label="Tasks">
-        {tasks.map((task) => {
-          const taskBusy = busy === task.id;
-          const assignee = members.find((member) => member.user_id === task.assignee_user_id)?.name;
-          return (
-            <article
-              key={task.id}
-              className="rounded-xl border border-charcoal-border bg-charcoal-card px-4 py-3"
-            >
-              <Button
-                type="button"
-                variant="ghost"
-                className="flex h-auto min-h-11 w-full items-start justify-start gap-3 rounded-none p-0 text-left hover:bg-transparent"
-                onClick={() => onOpen(task)}
-              >
-                <span className="mt-0.5 text-xs font-medium text-cream-muted">{task.task_key}</span>
-                <span className="min-w-0 flex-1">
-                  <span className="block text-sm font-medium leading-5 text-cream-bright">
-                    {task.title}
-                  </span>
-                  <span className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-cream-muted">
-                    <span>{task.status.replace(/_/g, " ")}</span>
-                    <span>{task.priority}</span>
-                    {assignee ? <span>{assignee}</span> : null}
-                  </span>
-                  {task.due_at ? (
-                    <span className="mt-1.5 flex items-center gap-1 text-xs text-cream-muted">
-                      <CalendarClock className="size-3.5" />
-                      {new Date(task.due_at).toLocaleString([], {
-                        month: "short",
-                        day: "numeric",
-                        hour: "numeric",
-                        minute: "2-digit",
-                      })}
-                    </span>
-                  ) : null}
-                </span>
-                {taskBusy ? (
-                  <LoaderCircle className="mt-1 size-4 animate-spin" />
-                ) : (
-                  <ChevronRight className="mt-1 size-5 text-cream-muted" />
-                )}
-              </Button>
-              {canManage ? (
-                <div className="mt-2 grid grid-cols-2 gap-2 border-t border-charcoal-border pt-2">
-                  <TaskInlineSelect
-                    label={`Status for ${task.title}`}
-                    disabled={taskBusy}
-                    value={task.status}
-                    onChange={(value) => onUpdate(task, { status: value as SpaceTaskStatus })}
-                    options={taskStatusOptions}
-                  />
-                  <TaskInlineSelect
-                    label={`Priority for ${task.title}`}
-                    disabled={taskBusy}
-                    value={task.priority}
-                    onChange={(value) => onUpdate(task, { priority: value as SpaceTaskPriority })}
-                    options={taskPriorityOptions}
-                  />
-                </div>
-              ) : null}
-            </article>
-          );
-        })}
-      </div>
-    );
-  }
-
   return (
     <Card className="gap-0 overflow-hidden py-0">
       <Table className="min-w-[840px]" aria-label="Tasks">
@@ -160,7 +84,11 @@ export function SpaceTaskList({
                     label={`Status for ${task.title}`}
                     disabled={!canManage || taskBusy}
                     value={task.status}
-                    onChange={(value) => onUpdate(task, { status: value as SpaceTaskStatus })}
+                    onChange={(value) =>
+                      onUpdate(task, {
+                        status: value as SpaceTaskStatus,
+                      })
+                    }
                     options={taskStatusOptions}
                   />
                 </TableCell>
@@ -169,7 +97,11 @@ export function SpaceTaskList({
                     label={`Priority for ${task.title}`}
                     disabled={!canManage || taskBusy}
                     value={task.priority}
-                    onChange={(value) => onUpdate(task, { priority: value as SpaceTaskPriority })}
+                    onChange={(value) =>
+                      onUpdate(task, {
+                        priority: value as SpaceTaskPriority,
+                      })
+                    }
                     options={taskPriorityOptions}
                   />
                 </TableCell>
@@ -231,7 +163,6 @@ export function SpaceTaskList({
     </Card>
   );
 }
-
 export type TaskPatch = Partial<
   Pick<
     SpaceTask,

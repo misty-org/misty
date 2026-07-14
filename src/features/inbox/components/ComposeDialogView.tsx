@@ -1,5 +1,4 @@
 import type { MailAccount, MailDraft, MailDraftAttachmentInput, MailDraftInput } from "@/api/mail";
-import type { InboxUiRuntime } from "../inboxUiRuntime";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -10,27 +9,32 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   Button,
+  cn,
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   Input,
   Textarea,
-  cn,
 } from "@/shared/ui";
 import { useEffect, useMemo, useRef, useState } from "react";
+import type { InboxUiRuntime } from "../inboxUiRuntime";
 import { parseAddressList, prepareReplyDraft, type InboxThread, type ReplyMode } from "../model";
 import { AttachmentChips, readFileAsDraftAttachment } from "./AttachmentChips";
 import { ComposerFormattingBar } from "./ComposerFormattingBar";
-
 export function ComposeDialogView(props: {
   runtime: InboxUiRuntime;
-  mobile?: boolean;
   open: boolean;
   accounts: MailAccount[];
   replyTo: InboxThread | null;
   replyMode?: ReplyMode;
-  initialDraft?: { to?: string; cc?: string; bcc?: string; subject?: string; text?: string };
+  initialDraft?: {
+    to?: string;
+    cc?: string;
+    bcc?: string;
+    subject?: string;
+    text?: string;
+  };
   onOpenChange: (open: boolean) => void;
   onSave: (draft: MailDraftInput, draftId?: string) => Promise<MailDraft>;
   authoringSource?: "user" | "ai";
@@ -50,22 +54,17 @@ export function ComposeDialogView(props: {
   const [busy, setBusy] = useState(false);
   const [validationError, setValidationError] = useState("");
   const [isDragging, setIsDragging] = useState(false);
-
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
-
   const selectedAccount = useMemo(
     () => props.accounts.find((acc) => acc.connection_id === connectionId) ?? props.accounts[0],
     [connectionId, props.accounts],
   );
-
   useEffect(() => {
     if (!props.open) return;
     const initialConnId = props.replyTo?.connectionId || props.accounts[0]?.connection_id || "";
     setConnectionId(initialConnId);
-
     const userEmail = props.accounts.find((a) => a.connection_id === initialConnId)?.email;
-
     if (props.replyTo) {
       const mode = props.replyMode ?? "reply";
       const prepared = prepareReplyDraft(props.replyTo, userEmail, mode);
@@ -85,12 +84,10 @@ export function ComposeDialogView(props: {
       setSubject(props.initialDraft?.subject ?? "");
       setText(props.initialDraft?.text ?? "");
     }
-
     setAttachments([]);
     setDraft(null);
     setValidationError("");
   }, [props.accounts, props.initialDraft, props.open, props.replyMode, props.replyTo]);
-
   const payload = (): MailDraftInput => ({
     connection_id: connectionId,
     thread_id: props.replyTo?.provider_id,
@@ -101,7 +98,6 @@ export function ComposeDialogView(props: {
     text,
     attachments: attachments.length ? attachments : undefined,
   });
-
   const save = async () => {
     if (!connectionId || !parseAddressList(to).length || !subject.trim()) {
       setValidationError("Choose an account and add a recipient and subject.");
@@ -118,18 +114,19 @@ export function ComposeDialogView(props: {
         error: cause,
         scope: `inbox:compose:${connectionId}:draft`,
         title: "Email draft could not be saved",
-        target: { kind: "route", href: "/inbox" },
+        target: {
+          kind: "route",
+          href: "/inbox",
+        },
       });
       return null;
     } finally {
       setBusy(false);
     }
   };
-
   const reviewSend = async () => {
     if (await save()) setConfirmOpen(true);
   };
-
   const send = async () => {
     if (!draft) return;
     setBusy(true);
@@ -143,14 +140,16 @@ export function ComposeDialogView(props: {
         error: cause,
         scope: `inbox:compose:${connectionId}:send`,
         title: "Email could not be sent",
-        target: { kind: "route", href: "/inbox" },
+        target: {
+          kind: "route",
+          href: "/inbox",
+        },
       });
       setConfirmOpen(false);
     } finally {
       setBusy(false);
     }
   };
-
   const handleFiles = async (fileList: FileList | null) => {
     if (!fileList || !fileList.length) return;
     const added: MailDraftAttachmentInput[] = [];
@@ -165,7 +164,6 @@ export function ComposeDialogView(props: {
     }
     setAttachments((prev) => [...prev, ...added]);
   };
-
   const handlePickedFiles = async (files: File[]) => {
     if (!files.length) return;
     const added: MailDraftAttachmentInput[] = [];
@@ -179,7 +177,6 @@ export function ComposeDialogView(props: {
     }
     setAttachments((prev) => [...prev, ...added]);
   };
-
   const insertSignature = () => {
     const signature = selectedAccount?.display_name
       ? `\n\n--\n${selectedAccount.display_name}`
@@ -190,7 +187,6 @@ export function ComposeDialogView(props: {
       setText((t) => t + signature);
     }
   };
-
   const dialogTitle = props.replyTo
     ? props.replyMode === "forward"
       ? "Forward email"
@@ -198,30 +194,18 @@ export function ComposeDialogView(props: {
         ? "Reply all"
         : "Reply"
     : "New email";
-
   return (
     <>
       <Dialog open={props.open} onOpenChange={(open) => !busy && props.onOpenChange(open)}>
-        <DialogContent
-          className={cn(
-            "max-w-[700px] gap-0 p-0",
-            props.mobile &&
-              "inset-0 left-0 top-0 h-dvh max-h-none w-full max-w-none translate-x-0 translate-y-0 grid-rows-[auto_minmax(0,1fr)_auto] rounded-none ring-0",
-          )}
-        >
-          <DialogHeader
-            className={cn(
-              "border-b border-charcoal-border px-5 py-4",
-              props.mobile && "min-h-14 justify-center py-2 pr-14 text-left",
-            )}
-          >
+        <DialogContent className={cn("max-w-[700px] gap-0 p-0", false)}>
+          <DialogHeader className={cn("border-b border-charcoal-border px-5 py-4", false)}>
             <DialogTitle className="text-sm">{dialogTitle}</DialogTitle>
           </DialogHeader>
 
           <div
             className={cn(
               "grid gap-3 px-5 py-4 transition-colors",
-              props.mobile && "min-h-0 content-start overflow-y-auto px-4 pb-6",
+              false,
               isDragging && "bg-sage-fg/5 outline-dashed outline-2 outline-sage-fg",
             )}
             onDragOver={(e) => {
@@ -256,12 +240,20 @@ export function ComposeDialogView(props: {
                 <span>To</span>
                 <div className="flex items-center gap-2">
                   {!showCc ? (
-                    <Button variant="link" className="h-auto p-0 text-[11px] text-cream-faint hover:text-cream" onClick={() => setShowCc(true)}>
+                    <Button
+                      variant="link"
+                      className="h-auto p-0 text-[11px] text-cream-faint hover:text-cream"
+                      onClick={() => setShowCc(true)}
+                    >
                       Cc
                     </Button>
                   ) : null}
                   {!showBcc ? (
-                    <Button variant="link" className="h-auto p-0 text-[11px] text-cream-faint hover:text-cream" onClick={() => setShowBcc(true)}>
+                    <Button
+                      variant="link"
+                      className="h-auto p-0 text-[11px] text-cream-faint hover:text-cream"
+                      onClick={() => setShowBcc(true)}
+                    >
                       Bcc
                     </Button>
                   ) : null}
@@ -295,7 +287,7 @@ export function ComposeDialogView(props: {
                 ref={textareaRef}
                 className={cn(
                   "min-h-52 resize-y border-0 bg-transparent text-sm leading-relaxed focus-visible:ring-0",
-                  props.mobile && "min-h-64 resize-none text-base",
+                  false,
                 )}
                 placeholder="Write your email here… (⌘+Enter to send)"
                 value={text}
@@ -324,8 +316,7 @@ export function ComposeDialogView(props: {
           <div
             className={cn(
               "flex items-center justify-between border-t border-charcoal-border px-5 py-3",
-              props.mobile &&
-                "grid grid-cols-[1fr_auto] gap-2 px-3 pb-[max(12px,env(safe-area-inset-bottom))]",
+              false,
             )}
           >
             <Button
@@ -338,13 +329,13 @@ export function ComposeDialogView(props: {
               Insert signature
             </Button>
 
-            <div className={cn("flex items-center gap-2", props.mobile && "justify-self-end")}>
+            <div className={cn("flex items-center gap-2", false)}>
               <Button
                 type="button"
                 size="sm"
                 variant="ghost"
                 disabled={busy}
-                className={props.mobile ? "hidden" : undefined}
+                className={undefined}
                 onClick={() => props.onOpenChange(false)}
               >
                 Cancel
@@ -353,7 +344,7 @@ export function ComposeDialogView(props: {
                 type="button"
                 size="sm"
                 variant="outline"
-                className={props.mobile ? "min-h-11" : undefined}
+                className={undefined}
                 disabled={busy}
                 onClick={() => void save()}
               >
@@ -362,7 +353,7 @@ export function ComposeDialogView(props: {
               <Button
                 type="button"
                 size="sm"
-                className={props.mobile ? "min-h-11" : undefined}
+                className={undefined}
                 disabled={busy}
                 onClick={() => void reviewSend()}
               >
@@ -410,7 +401,6 @@ export function ComposeDialogView(props: {
     </>
   );
 }
-
 function Field(props: {
   label: string;
   value: string;

@@ -1,25 +1,26 @@
-import { useSearchParams } from "react-router-dom";
 import { observeAccountChanges } from "@/api/accountEvents";
-import { useEffect, useState } from "react";
+import { personalAgentsApi, type AgentMemory } from "@/api/agents/native";
+import { useAuth } from "@/features/auth";
+import { MistyModelPicker } from "@/features/global-search/MistyModelPicker";
+import { openMisty } from "@/features/misty/handoff";
+import { useMistyStore } from "@/features/misty/useMistyStore";
+import type { AgentProfile, AgentProfileInput } from "@/shared/contracts";
 import {
+  Button,
+  cn,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-  Button,
   NavigationChevron,
   Sheet,
   SheetContent,
+  SheetDescription,
   SheetHeader,
   SheetTitle,
-  SheetDescription,
-  cn,
 } from "@/shared/ui";
-import { AgentSettingsModal, type AgentSettingsTab } from "./components/AgentSettingsModal";
-import { MistyModelPicker } from "@/features/global-search/MistyModelPicker";
 import {
   Activity,
-  ArrowLeft,
   MessageSquare,
   MoreHorizontal,
   Pencil,
@@ -28,18 +29,15 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import type { AgentProfile, AgentProfileInput } from "@misty/contracts";
-import { personalAgentsApi, type AgentMemory } from "@/api/agents/native";
-import { useAuth } from "@/features/auth";
-import { openMisty } from "@/features/misty/handoff";
-import { useMistyStore } from "@/features/misty/useMistyStore";
-import { usePersonalAgentsStore } from "./personalAgentsStore";
-import { MistyDashboard } from "./components/MistyDashboard";
-import { AgentWorkspaceConversation } from "./components/AgentWorkspaceConversation";
+import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
+import "./agentsWorkspace.css";
 import { AgentAvatar, AgentCloudImage } from "./components/AgentAvatar";
 import { agentCloudAvatar, agentCloudVariants } from "./components/agentCloudAvatars";
-import "./agentsWorkspace.css";
-
+import { AgentSettingsModal, type AgentSettingsTab } from "./components/AgentSettingsModal";
+import { AgentWorkspaceConversation } from "./components/AgentWorkspaceConversation";
+import { MistyDashboard } from "./components/MistyDashboard";
+import { usePersonalAgentsStore } from "./personalAgentsStore";
 function relativeTime(value: string | number | undefined): string {
   if (!value) return "";
   const timestamp = typeof value === "string" ? Date.parse(value) : value;
@@ -49,9 +47,11 @@ function relativeTime(value: string | number | undefined): string {
   if (elapsed < 3_600_000) return `${Math.floor(elapsed / 60_000)}m`;
   if (elapsed < 86_400_000) return `${Math.floor(elapsed / 3_600_000)}h`;
   if (elapsed < 7 * 86_400_000) return `${Math.floor(elapsed / 86_400_000)}d`;
-  return new Date(timestamp).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  return new Date(timestamp).toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+  });
 }
-
 const field =
   "w-full rounded-md border border-charcoal-border bg-charcoal-bg px-3 py-2 text-sm text-cream";
 const button =
@@ -62,13 +62,14 @@ const emptyProfile: AgentProfileInput = {
   description: "",
   instructions: "",
   icon: "sparkles",
-  avatar: { cloudVariant: "lavender" },
+  avatar: {
+    cloudVariant: "lavender",
+  },
   model_mode: "automatic",
   model_id: "",
   reasoning_effort: "",
   enabled: true,
 };
-
 export default function NativeAgentsPage() {
   const { user } = useAuth();
   // New work is personal. Historical conversations retain their saved scope when reopened.
@@ -85,10 +86,15 @@ export default function NativeAgentsPage() {
   const [activeDropdownAgentId, setActiveDropdownAgentId] = useState<string | null>(null);
   const [expandedAgents, setExpandedAgents] = useState<Record<string, boolean>>({});
   const isExpanded = (id: string) => expandedAgents[id] ?? true;
-  const [mobileList, setMobileList] = useState(false);
-  const [editorStatus, setEditorStatus] = useState({ dirty: false, busy: false });
+  const [editorStatus, setEditorStatus] = useState({
+    dirty: false,
+    busy: false,
+  });
   const [chatRevision, setChatRevision] = useState(0);
-  const [conversationStatus, setConversationStatus] = useState({ dirty: false, busy: false });
+  const [conversationStatus, setConversationStatus] = useState({
+    dirty: false,
+    busy: false,
+  });
   const [pendingChange, setPendingChange] = useState<() => void>();
   const working = useMistyStore((s) => s.working);
   const conversations = useMistyStore((s) => s.conversations);
@@ -96,7 +102,6 @@ export default function NativeAgentsPage() {
   const conversationSpaceId =
     conversations.find((c) => c.id === activeConversationId)?.spaceId ?? "";
   const scopedConversations = conversations;
-
   useEffect(() => {
     setSelected(undefined);
     setSettingsModalOpen(false);
@@ -113,7 +118,6 @@ export default function NativeAgentsPage() {
     setSelected(linkedAgentId);
     setNewChat(false);
     setActivity(false);
-    setMobileList(false);
     setChatRevision((n) => n + 1);
   }, [linkedAgentId, params]);
   const profile =
@@ -129,7 +133,6 @@ export default function NativeAgentsPage() {
       setSettingsModalMode("edit");
       setSettingsModalTab(tab);
       setSettingsModalOpen(true);
-      setMobileList(false);
     }, false);
   const showSettings = () => openSettingsModal("settings");
   const change = (action: () => void, replacesConversation = true) => {
@@ -144,9 +147,11 @@ export default function NativeAgentsPage() {
       setSelected(id);
       setNewChat(false);
       setActivity(false);
-      setMobileList(false);
       if (startNew) {
-        setExpandedAgents((prev) => ({ ...prev, [id]: true }));
+        setExpandedAgents((prev) => ({
+          ...prev,
+          [id]: true,
+        }));
       }
       useMistyStore.setState({
         selectedAgentId: id,
@@ -168,10 +173,9 @@ export default function NativeAgentsPage() {
       setSettingsModalTab("settings");
       setSettingsModalOpen(true);
       setActivity(false);
-      setMobileList(false);
     });
   return (
-    <main className={`agents-workspace${mobileList ? " agents-workspace--list" : ""}`}>
+    <main className={`agents-workspace${""}`}>
       <aside className="agents-roster" aria-label="Your agents">
         <header
           className="agents-roster-heading"
@@ -201,7 +205,6 @@ export default function NativeAgentsPage() {
                   setNewChat(true);
                   setRecipientSearch("");
                   setActivity(false);
-                  setMobileList(false);
                   setSettingsModalOpen(false);
                 })
               }
@@ -226,7 +229,6 @@ export default function NativeAgentsPage() {
               const agentConversations = scopedConversations.filter(
                 (c) => c.agentId === agent.id || (!c.agentId && agent.system_managed),
               );
-
               return (
                 <div key={agent.id} className="mb-0.5 w-full">
                   <div
@@ -245,7 +247,10 @@ export default function NativeAgentsPage() {
                       aria-pressed={isAgentSelected}
                       disabled={working || editorStatus.busy}
                       onClick={() => {
-                        setExpandedAgents((prev) => ({ ...prev, [agent.id]: !expanded }));
+                        setExpandedAgents((prev) => ({
+                          ...prev,
+                          [agent.id]: !expanded,
+                        }));
                         select(agent.id);
                       }}
                     >
@@ -359,7 +364,6 @@ export default function NativeAgentsPage() {
                                     setSelected(agent.id);
                                     setNewChat(false);
                                     setActivity(false);
-                                    setMobileList(false);
                                     useMistyStore.getState().selectConversation(c.id);
                                   });
                                 }}
@@ -409,7 +413,10 @@ export default function NativeAgentsPage() {
               onClick={() => {
                 pendingChange();
                 setPendingChange(undefined);
-                setEditorStatus({ dirty: false, busy: false });
+                setEditorStatus({
+                  dirty: false,
+                  busy: false,
+                });
               }}
             >
               Discard and switch
@@ -429,15 +436,6 @@ export default function NativeAgentsPage() {
           data-tauri-drag-region
           data-misty-window-titlebar-region="true"
         >
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            className="agent-icon-button agents-mobile-back"
-            aria-label="Show agents"
-            onClick={() => setMobileList(true)}
-          >
-            <ArrowLeft size={20} />
-          </Button>
           {newChat ? (
             <>
               <label className="agent-recipient-input">
@@ -629,7 +627,12 @@ export default function NativeAgentsPage() {
                   onChange={(changes) =>
                     useMistyStore.setState((s) => ({
                       conversations: s.conversations.map((c) =>
-                        c.id === conversation.id ? { ...c, ...changes } : c,
+                        c.id === conversation.id
+                          ? {
+                              ...c,
+                              ...changes,
+                            }
+                          : c,
                       ),
                     }))
                   }
@@ -642,7 +645,6 @@ export default function NativeAgentsPage() {
     </main>
   );
 }
-
 function AgentEditor({
   profile,
   spaceId,
@@ -675,8 +677,15 @@ function AgentEditor({
       memoryDraft !== memories.find((memory) => memory.id === editingMemory)?.content,
     );
   useEffect(() => {
-    onStatusChange({ dirty, busy });
-    return () => onStatusChange({ dirty: false, busy: false });
+    onStatusChange({
+      dirty,
+      busy,
+    });
+    return () =>
+      onStatusChange({
+        dirty: false,
+        busy: false,
+      });
   }, [dirty, busy, onStatusChange]);
   useEffect(() => {
     let canceled = false;
@@ -694,7 +703,10 @@ function AgentEditor({
     };
   }, [profileId, spaceId]);
   const update = <K extends keyof AgentProfileInput>(key: K, value: AgentProfileInput[K]) =>
-    setDraft({ ...draft, [key]: value });
+    setDraft({
+      ...draft,
+      [key]: value,
+    });
   async function save() {
     setBusy(true);
     setError("");
@@ -742,7 +754,10 @@ function AgentEditor({
       return;
     }
     try {
-      await openMisty({ spaceId, agentId: profile.id });
+      await openMisty({
+        spaceId,
+        agentId: profile.id,
+      });
     } catch (reason) {
       setError(String(reason));
     }
@@ -764,7 +779,11 @@ function AgentEditor({
         >
           <AgentAvatar
             agent={
-              { ...profile, name: draft.name || "Agent", avatar: draft.avatar } as AgentProfile
+              {
+                ...profile,
+                name: draft.name || "Agent",
+                avatar: draft.avatar,
+              } as AgentProfile
             }
             large
           />
@@ -789,7 +808,7 @@ function AgentEditor({
         <div className="rounded-xl border border-charcoal-border/70 bg-charcoal-bg/50 p-4 space-y-4">
           <div>
             <div className="text-xs font-medium text-cream-muted mb-2 uppercase tracking-wider">
-              Cloud mascot
+              Misty mark
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
               {agentCloudVariants.map((variant) => {
@@ -809,7 +828,11 @@ function AgentEditor({
                     aria-pressed={chosen}
                     disabled={busy}
                     onClick={() =>
-                      update("avatar", { ...draft.avatar, emoji: "", cloudVariant: variant.id })
+                      update("avatar", {
+                        ...draft.avatar,
+                        emoji: "",
+                        cloudVariant: variant.id,
+                      })
                     }
                     className={cn(
                       "flex flex-col items-center justify-center p-2.5 rounded-lg border transition-all text-center gap-1 cursor-pointer",
@@ -847,7 +870,12 @@ function AgentEditor({
               value={typeof draft.avatar?.emoji === "string" ? draft.avatar.emoji : ""}
               placeholder="Optional"
               disabled={busy}
-              onChange={(e) => update("avatar", { ...draft.avatar, emoji: e.target.value })}
+              onChange={(e) =>
+                update("avatar", {
+                  ...draft.avatar,
+                  emoji: e.target.value,
+                })
+              }
             />
             <span className="text-xs text-cream-muted/70">Replaces cloud avatar when set</span>
           </div>
@@ -929,7 +957,10 @@ function AgentEditor({
                                   setMemories((items) =>
                                     items.map((item) =>
                                       item.id === memory.id
-                                        ? { ...item, content: memoryDraft }
+                                        ? {
+                                            ...item,
+                                            content: memoryDraft,
+                                          }
                                         : item,
                                     ),
                                   );

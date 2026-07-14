@@ -194,7 +194,7 @@ it("preserves an unsent message until a new chat is explicitly confirmed", () =>
   expect((screen.getByLabelText("Message Misty") as HTMLTextAreaElement).value).toBe("");
 });
 
-it("previews and saves a cloud variant while preserving unrelated avatar metadata", async () => {
+it("previews and saves a mark color while preserving unrelated avatar metadata", async () => {
   fixture.agent.avatar = { emoji: "✏️", custom: "preserved" };
   render(
     <MemoryRouter>
@@ -208,8 +208,8 @@ it("previews and saves a cloud variant while preserving unrelated avatar metadat
     ).toBe(false),
   );
   fireEvent.click(screen.getByRole("button", { name: "Edit agent avatar" }));
-  fireEvent.click(screen.getByRole("button", { name: "Lavender, Wink" }));
-  expect(screen.getByRole("button", { name: "Lavender, Wink" }).getAttribute("aria-pressed")).toBe(
+  fireEvent.click(screen.getByRole("button", { name: "Lavender, Misty" }));
+  expect(screen.getByRole("button", { name: "Lavender, Misty" }).getAttribute("aria-pressed")).toBe(
     "true",
   );
   expect((screen.getByLabelText("Avatar emoji") as HTMLInputElement).value).toBe("");

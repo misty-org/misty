@@ -1,27 +1,23 @@
-import { useActivityStore } from "@/features/activity";
 import { deploymentStorageKey, readDeploymentStorageItem } from "@/api/deployment/api";
+import { useActivityStore } from "@/features/activity";
+import { resetAiSurfaceAccountState } from "@/features/ai-surface";
+import { useAppRouteMemoryStore } from "@/features/app-shell";
 import type { CurrentLicense } from "@/features/installer";
 import { resetConnectionsAccountState } from "@/features/integrations";
-import { resetSpacesAccountState } from "@/features/spaces";
-import { useAppRouteMemoryStore } from "@/features/app-shell";
-import { resetWorkspaceAccountState, useRecentToolsStore } from "@/features/workspace";
 import { resetProvidersAccountState } from "@/features/providers";
-import { resetAiSurfaceAccountState } from "@/features/ai-surface";
-import { notifyAccountScopeReset, notifyAccountScopeWillReset } from "./store/accountEvents";
-import { isNativeMobileBuild } from "@/shared/platform/buildTarget";
+import { resetSpacesAccountState } from "@/features/spaces";
+import { resetWorkspaceAccountState, useRecentToolsStore } from "@/features/workspace";
 import type { AccountMeResponse } from "./model/stores/account/interfaces/useAccountStore";
 import type { SavedAccountSession } from "./model/stores/account/interfaces/useAuthTokenStore";
+import { notifyAccountScopeReset, notifyAccountScopeWillReset } from "./store/accountEvents";
 import { isAccountUnauthorizedError } from "./store/useAccountStore";
 import { readActiveSavedAccountSession } from "./store/useAuthTokenStore";
 import { useUserStore } from "./store/useUserStore";
-
-export const shouldPersistAuthUser = !isNativeMobileBuild;
+export const shouldPersistAuthUser = true;
 const authUserStorageKey = "misty_user";
-
 function scopedAuthUserStorageKey(): string {
   return deploymentStorageKey(authUserStorageKey);
 }
-
 export function resetAccountScopedState(previousAccountId?: string): void {
   notifyAccountScopeWillReset();
   useUserStore.getState().clear();
@@ -35,7 +31,6 @@ export function resetAccountScopedState(previousAccountId?: string): void {
   resetAiSurfaceAccountState(previousAccountId);
   notifyAccountScopeReset();
 }
-
 export function authUserFromMe(me: AccountMeResponse, fallback: SavedAccountSession): AuthUser {
   return {
     id: me.id || fallback.id,
@@ -47,25 +42,20 @@ export function authUserFromMe(me: AccountMeResponse, fallback: SavedAccountSess
     currentPlan: me.tier || fallback.currentPlan,
   };
 }
-
 export function assertAccountIdentity(me: AccountMeResponse, expectedAccountId: string): void {
   if (!me.id || me.id !== expectedAccountId) {
     throw new AccountIdentityMismatchError();
   }
 }
-
 export function isInvalidAccountSessionError(error: unknown): boolean {
   return isAccountUnauthorizedError(error) || error instanceof AccountIdentityMismatchError;
 }
-
 export class AccountIdentityMismatchError extends Error {
   name = "AccountIdentityMismatchError";
-
   constructor() {
     super("The saved Misty session did not match the expected account.");
   }
 }
-
 export function licenseFromMe(me: AccountMeResponse): CurrentLicense {
   return {
     tier: me.tier,
@@ -76,7 +66,6 @@ export function licenseFromMe(me: AccountMeResponse): CurrentLicense {
     license_device: me.license_device || null,
   };
 }
-
 export function readStoredUser(): AuthUser | null {
   try {
     const stored = readDeploymentStorageItem(authUserStorageKey);
@@ -85,18 +74,20 @@ export function readStoredUser(): AuthUser | null {
     return null;
   }
 }
-
 export function readInitialUser(): AuthUser | null {
   if (!shouldPersistAuthUser) return null;
   const activeSession = readActiveSavedAccountSession();
   const storedUser = readStoredUser();
   if (!activeSession) return storedUser;
   if (storedUser?.id === activeSession.id) {
-    return { ...activeSession, ...storedUser, id: activeSession.id };
+    return {
+      ...activeSession,
+      ...storedUser,
+      id: activeSession.id,
+    };
   }
   return activeSession;
 }
-
 export function writeStoredUser(user: AuthUser | null): void {
   try {
     if (user) {
@@ -106,13 +97,11 @@ export function writeStoredUser(user: AuthUser | null): void {
     }
   } catch {}
 }
-
 export function clearStoredUser(): void {
   try {
     window.localStorage.removeItem(scopedAuthUserStorageKey());
   } catch {}
 }
-
 export interface AuthUser {
   id: string;
   name: string;
@@ -122,7 +111,6 @@ export interface AuthUser {
   accountCreatedAt?: string;
   currentPlan?: string;
 }
-
 export interface AuthContextValue {
   user: AuthUser | null;
   setUser: (user: AuthUser | null) => Promise<void>;

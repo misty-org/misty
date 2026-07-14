@@ -1,6 +1,5 @@
 import type { DesktopPlatform, WindowBounds, WindowRect } from "@/app/layouts/model/types";
 import { enableModernWindowStyle } from "@/native";
-import { isNativeMobileBuild } from "@/shared/platform/buildTarget";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { PhysicalPosition, PhysicalSize } from "@tauri-apps/api/dpi";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
@@ -8,7 +7,6 @@ import { currentMonitor, getCurrentWindow, primaryMonitor } from "@tauri-apps/ap
 import { platform as osPlatform } from "@tauri-apps/plugin-os";
 import type { PointerEvent as ReactPointerEvent } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
-
 export const WINDOW_DRAG_SUPPRESS_SELECTOR = [
   "button",
   "a",
@@ -24,12 +22,10 @@ export const WINDOW_DRAG_SUPPRESS_SELECTOR = [
   "[data-drag-handle]",
   "[data-drag-handle='true']",
 ].join(",");
-
 export function shouldSuppressWindowDrag(target: EventTarget | null) {
   const element = typeof Element === "undefined" || !(target instanceof Element) ? null : target;
   return Boolean(element?.closest(WINDOW_DRAG_SUPPRESS_SELECTOR));
 }
-
 export function windowRectsMatch(actual: WindowRect, expected: WindowRect, tolerance = 4) {
   return (
     Math.abs(actual.x - expected.x) <= tolerance &&
@@ -38,28 +34,23 @@ export function windowRectsMatch(actual: WindowRect, expected: WindowRect, toler
     Math.abs(actual.height - expected.height) <= tolerance
   );
 }
-
 export function useDesktopWindowChrome() {
-  const usesNativeWindowChrome = !isNativeMobileBuild;
   const [desktopPlatform, setDesktopPlatform] = useState<DesktopPlatform>("unknown");
   const customZoomRestoreBoundsRef = useRef<WindowBounds | null>(null);
   const customZoomAnimatingRef = useRef(false);
   const lastTitlebarPressRef = useRef(0);
   const [isWindowMaximized, setIsWindowMaximized] = useState(false);
-
   useEffect(() => {
     if (!hasTauriInternals()) {
       setDesktopPlatform("browser");
       return;
     }
-
     try {
       setDesktopPlatform(osPlatform() as DesktopPlatform);
     } catch {
       setDesktopPlatform("unknown");
     }
   }, []);
-
   useEffect(() => {
     if (!hasTauriInternals()) return;
     let disposed = false;
@@ -75,7 +66,6 @@ export function useDesktopWindowChrome() {
       disposed = true;
     };
   }, []);
-
   useEffect(() => {
     if (!hasTauriInternals()) return;
     let disposed = false;
@@ -108,23 +98,19 @@ export function useDesktopWindowChrome() {
       unlistenResize?.();
     };
   }, []);
-
   const startTitlebarDrag = useCallback((event: ReactPointerEvent<HTMLElement>) => {
     if (event.button !== 0 || event.detail > 1) {
       return;
     }
-
     if (shouldSuppressWindowDrag(event.target)) {
       return;
     }
-
     event.preventDefault();
     if (!hasTauriInternals()) return;
     void getCurrentWindow()
       .startDragging()
       .catch(() => undefined);
   }, []);
-
   const animateWindowRect = useCallback(
     async (from: WindowRect, to: WindowRect, durationMs = 500) => {
       if (!hasTauriInternals()) {
@@ -133,7 +119,6 @@ export function useDesktopWindowChrome() {
       if (customZoomAnimatingRef.current) {
         return;
       }
-
       customZoomAnimatingRef.current = true;
       const window = getCurrentWindow();
       if (desktopPlatform === "windows") {
@@ -145,12 +130,9 @@ export function useDesktopWindowChrome() {
         }
         return;
       }
-
       const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3);
-
       return new Promise<void>((resolve, reject) => {
         const start = performance.now();
-
         const step = (now: number) => {
           const progress = Math.min(1, (now - start) / durationMs);
           const eased = easeOutCubic(progress);
@@ -180,13 +162,11 @@ export function useDesktopWindowChrome() {
             },
           );
         };
-
         requestAnimationFrame(step);
       });
     },
     [desktopPlatform],
   );
-
   const togglePseudoMaximize = useCallback(async () => {
     if (!hasTauriInternals()) return;
     if (customZoomAnimatingRef.current) return;
@@ -194,13 +174,11 @@ export function useDesktopWindowChrome() {
     if (await window.isFullscreen()) {
       return;
     }
-
     const [position, size, monitor] = await Promise.all([
       window.outerPosition(),
       window.outerSize(),
       currentMonitor().then((current) => current ?? primaryMonitor()),
     ]);
-
     const currentRect = {
       x: position.x,
       y: position.y,
@@ -215,23 +193,23 @@ export function useDesktopWindowChrome() {
       height: monitor.workArea.size.height,
     };
     const isActuallyZoomed = windowRectsMatch(currentRect, workAreaRect);
-
     if (!isActuallyZoomed) {
       // A manual resize, move, monitor change, or hot reload can invalidate an
       // in-memory zoom flag. The actual frame is authoritative: any window
       // that is not filling the current work area must expand from here.
-      customZoomRestoreBoundsRef.current = { position, size };
+      customZoomRestoreBoundsRef.current = {
+        position,
+        size,
+      };
       await animateWindowRect(currentRect, workAreaRect);
       setIsWindowMaximized(true);
       return;
     }
-
     const restoreBounds = customZoomRestoreBoundsRef.current;
     if (!restoreBounds) {
       setIsWindowMaximized(true);
       return;
     }
-
     await animateWindowRect(currentRect, {
       x: restoreBounds.position.x,
       y: restoreBounds.position.y,
@@ -240,7 +218,6 @@ export function useDesktopWindowChrome() {
     });
     setIsWindowMaximized(false);
   }, [animateWindowRect]);
-
   const toggleTitlebarMaximize = useCallback(async () => {
     if (!hasTauriInternals()) return;
     if (desktopPlatform === "windows" || desktopPlatform === "linux") {
@@ -262,7 +239,6 @@ export function useDesktopWindowChrome() {
       if (shouldSuppressWindowDrag(event.target)) return;
       event.preventDefault();
       if (!hasTauriInternals()) return;
-
       const now = Date.now();
       const isDoublePress = now - lastTitlebarPressRef.current <= 500;
       lastTitlebarPressRef.current = isDoublePress ? 0 : now;
@@ -270,7 +246,6 @@ export function useDesktopWindowChrome() {
         void togglePseudoMaximize().catch(() => undefined);
         return;
       }
-
       void getCurrentWindow()
         .startDragging()
         .catch(() => undefined);
@@ -300,7 +275,6 @@ export function useDesktopWindowChrome() {
     },
     [toggleTitlebarMaximize],
   );
-
   const handleDesktopTitlebarPointerDown = useCallback(
     (event: ReactPointerEvent<HTMLElement>) => {
       if (desktopPlatform === "macos") {
@@ -320,26 +294,21 @@ export function useDesktopWindowChrome() {
       startTitlebarDrag,
     ],
   );
-
   const minimizeTitlebarWindow = useCallback(() => {
     if (!hasTauriInternals()) return;
     void getCurrentWindow()
       .minimize()
       .catch(() => undefined);
   }, []);
-
   const closeTitlebarWindow = useCallback(() => {
     if (!hasTauriInternals()) return;
     void getCurrentWindow()
       .close()
       .catch(() => undefined);
   }, []);
-
   const shouldShowWindowsTitlebarControls =
-    usesNativeWindowChrome && (desktopPlatform === "windows" || desktopPlatform === "linux");
-
+    desktopPlatform === "windows" || desktopPlatform === "linux";
   return {
-    usesNativeWindowChrome,
     desktopPlatform,
     shouldShowWindowsTitlebarControls,
     isWindowMaximized,

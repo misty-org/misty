@@ -1943,7 +1943,7 @@ impl ServiceLease {
             Ok(lease)
         }
     }
-    #[cfg(any(desktop, target_os = "ios"))]
+    #[cfg(desktop)]
     pub(crate) fn peer_identity<'a>(
         &'a self,
         device_id: &'a str,

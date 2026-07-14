@@ -17,7 +17,7 @@ const Drawings = lazy(() =>
 const Planner = lazy(() =>
   import("@/features/planner/planner/SpacePlanner").then((m) => ({ default: m.SpacePlanner })),
 );
-// Configure host services before React renders the SDK-compatible implementations.
+// Configure host services before React renders the built-in tools.
 // Their runtime hooks deliberately fail if an entry point skips this setup.
 async function loadLibrary() {
   const { initializeHostLibraryRuntime } =
