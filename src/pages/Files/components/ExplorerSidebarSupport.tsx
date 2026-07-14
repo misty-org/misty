@@ -178,7 +178,7 @@ export function SmartFolderDialog(props: {
         className={`${sidebarStyles.dialog} ${sidebarStyles.dialogWide}`}
         role="dialog"
         aria-modal="true"
-        aria-label={editing ? "Edit Smart Folder" : "New Smart Folder"}
+        aria-label={editing ? "Edit Collection" : "New Collection"}
         onPointerDown={(event) => event.stopPropagation()}
         onSubmit={(event) => {
           event.preventDefault();
@@ -186,7 +186,7 @@ export function SmartFolderDialog(props: {
         }}
       >
         <header className={sidebarStyles.dialogHeader}>
-          <h2 className={sidebarStyles.dialogTitle}>{editing ? "Edit Smart Folder" : "New Smart Folder"}</h2>
+          <h2 className={sidebarStyles.dialogTitle}>{editing ? "Edit Collection" : "New Collection"}</h2>
           <button className={sidebarStyles.dialogClose} type="button" aria-label="Close" onClick={props.onCancel}><X size={16} /></button>
         </header>
         <div className={sidebarStyles.dialogGrid}>
@@ -446,7 +446,7 @@ export function createSmartFolderDialogState(search?: SavedSearch): SmartFolderD
   return {
     draft: {
       id: search?.id ?? "",
-      name: search?.name ?? "New Smart Folder",
+      name: search?.name ?? "New Collection",
       query: search?.query ?? "",
       matchMode: search ? smartFolderMatchMode(search.rules) : "all",
       rules: search ? visibleSmartFolderRules(search.rules) : [defaultSmartFolderRule()],

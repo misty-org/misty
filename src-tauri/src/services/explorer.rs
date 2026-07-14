@@ -61,6 +61,7 @@ use crate::services::{
 const VIRTUAL_PATH_RECENT: &str = "misty://recent";
 const VIRTUAL_PATH_STARRED: &str = "misty://starred";
 const VIRTUAL_PATH_TRASH: &str = "misty://trash";
+const VIRTUAL_PATH_LIBRARY: &str = "misty://library";
 #[cfg(target_os = "android")]
 const VIRTUAL_PATH_LOCAL: &str = "misty://local";
 const MAX_IMAGE_PREVIEW_DIMENSION: u32 = 1600;
@@ -152,6 +153,19 @@ impl ExplorerService {
         if let Some(path) = request.path.as_deref().map(str::trim) {
             if path == VIRTUAL_PATH_RECENT || path == VIRTUAL_PATH_STARRED {
                 return self.list_library_virtual_directory(path).await;
+            }
+            if path == VIRTUAL_PATH_LIBRARY {
+                return Ok(DirectoryListing {
+                    path: path.to_owned(),
+                    title: Some("Library".to_owned()),
+                    parent_path: None,
+                    location: ExplorerLocation::local(),
+                    hidden_count: 0,
+                    total_count: 0,
+                    entries: Vec::new(),
+                    modified_ms: None,
+                    created_ms: None,
+                });
             }
             if path == VIRTUAL_PATH_TRASH {
                 return self.list_trash_virtual_directory().await;

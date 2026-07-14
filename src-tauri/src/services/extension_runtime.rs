@@ -9,7 +9,7 @@ use std::{
         Arc, Mutex,
     },
     thread,
-    time::{Duration, Instant},
+    time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 
 use serde::{Deserialize, Serialize};
@@ -18,7 +18,7 @@ use uuid::Uuid;
 
 use crate::{
     error::{ApiError, ApiResult},
-    services::environment::AppEnvironmentService,
+    services::{environment::AppEnvironmentService, system_dependencies::resolve_executable},
 };
 
 #[derive(Debug, Clone, Deserialize)]
@@ -34,11 +34,15 @@ pub struct ExtensionCommandRequest {
 #[serde(rename_all = "camelCase")]
 pub struct ExtensionJobSnapshot {
     pub id: String,
+    pub plugin_id: String,
     pub status: String,
     pub progress: Option<f64>,
     pub message: String,
     pub output_paths: Vec<String>,
     pub error: Option<String>,
+    pub created_at: u64,
+    pub updated_at: u64,
+    pub completed_at: Option<u64>,
 }
 
 struct ExtensionJob {
@@ -51,6 +55,7 @@ pub struct ExtensionRuntimeService {
     jobs: Arc<Mutex<HashMap<String, ExtensionJob>>>,
     home_dir: PathBuf,
     cache_dir: PathBuf,
+    settings_path: PathBuf,
 }
 
 impl ExtensionRuntimeService {
@@ -59,33 +64,41 @@ impl ExtensionRuntimeService {
             jobs: Arc::new(Mutex::new(HashMap::new())),
             home_dir: environment.home_dir(),
             cache_dir: environment.cache_dir().join("extension-jobs"),
+            settings_path: environment.settings_path(),
         }
     }
 
     pub async fn execute(&self, request: ExtensionCommandRequest) -> ApiResult<Value> {
         validate_command_scope(&request.plugin_id, &request.command)?;
         match request.command.as_str() {
-            "dependencies.check" => dependency_check(&request.payload),
-            "quick_convert.start" => self.start_quick_convert(&request.payload),
-            "ytdlp.start" => self.start_ytdlp(&request.payload),
+            "dependencies.check" => dependency_check(&request.payload, &self.settings_path),
+            "quick_convert.start" => self.start_quick_convert(&request.plugin_id, &request.payload),
+            "ytdlp.start" => self.start_ytdlp(&request.plugin_id, &request.payload),
             "ytdlp.inspect" => {
                 let payload = request.payload;
-                tokio::task::spawn_blocking(move || inspect_ytdlp(&payload))
+                let executable = resolve_executable("yt-dlp", Some(&self.settings_path))
+                    .ok_or_else(|| {
+                        ApiError::Message(
+                            "yt-dlp is not installed or could not be found.".to_owned(),
+                        )
+                    })?;
+                tokio::task::spawn_blocking(move || inspect_ytdlp(&payload, &executable))
                     .await
                     .map_err(|error| {
                         ApiError::Message(format!("yt-dlp inspector stopped: {error}"))
                     })?
             }
-            "jobs.status" => self.job_status(&request.payload),
-            "jobs.cancel" => self.cancel_job(&request.payload),
-            "host.revealOutput" => self.reveal_output(&request.payload),
+            "jobs.status" => self.job_status(&request.plugin_id, &request.payload),
+            "jobs.latest" => self.latest_job(&request.plugin_id),
+            "jobs.cancel" => self.cancel_job(&request.plugin_id, &request.payload),
+            "host.revealOutput" => self.reveal_output(&request.plugin_id, &request.payload),
             _ => Err(ApiError::Message(
                 "Extension command is not allowlisted.".to_owned(),
             )),
         }
     }
 
-    fn job_status(&self, payload: &Value) -> ApiResult<Value> {
+    fn job_status(&self, plugin_id: &str, payload: &Value) -> ApiResult<Value> {
         let id = required_string(payload, "jobId", 128)?;
         let jobs = self
             .jobs
@@ -94,10 +107,24 @@ impl ExtensionRuntimeService {
         let job = jobs
             .get(&id)
             .ok_or_else(|| ApiError::Message("Extension job was not found.".to_owned()))?;
+        require_job_owner(job, plugin_id)?;
         serde_json::to_value(&job.snapshot).map_err(|error| ApiError::Message(error.to_string()))
     }
 
-    fn cancel_job(&self, payload: &Value) -> ApiResult<Value> {
+    fn latest_job(&self, plugin_id: &str) -> ApiResult<Value> {
+        let jobs = self
+            .jobs
+            .lock()
+            .map_err(|_| ApiError::Message("Extension job state is unavailable.".to_owned()))?;
+        let latest = jobs
+            .values()
+            .filter(|job| job.snapshot.plugin_id == plugin_id)
+            .max_by_key(|job| job.snapshot.created_at)
+            .map(|job| job.snapshot.clone());
+        serde_json::to_value(latest).map_err(|error| ApiError::Message(error.to_string()))
+    }
+
+    fn cancel_job(&self, plugin_id: &str, payload: &Value) -> ApiResult<Value> {
         let id = required_string(payload, "jobId", 128)?;
         let mut jobs = self
             .jobs
@@ -106,6 +133,7 @@ impl ExtensionRuntimeService {
         let job = jobs
             .get_mut(&id)
             .ok_or_else(|| ApiError::Message("Extension job was not found.".to_owned()))?;
+        require_job_owner(job, plugin_id)?;
         if matches!(job.snapshot.status.as_str(), "queued" | "running") {
             job.cancel.store(true, Ordering::Relaxed);
             job.snapshot.message = "Cancelling…".to_owned();
@@ -113,15 +141,20 @@ impl ExtensionRuntimeService {
         Ok(json!({ "ok": true }))
     }
 
-    fn reveal_output(&self, payload: &Value) -> ApiResult<Value> {
+    fn reveal_output(&self, plugin_id: &str, payload: &Value) -> ApiResult<Value> {
         let id = required_string(payload, "jobId", 128)?;
         let jobs = self
             .jobs
             .lock()
             .map_err(|_| ApiError::Message("Extension job state is unavailable.".to_owned()))?;
-        let output = jobs
+        let job = jobs
             .get(&id)
-            .and_then(|job| job.snapshot.output_paths.first())
+            .ok_or_else(|| ApiError::Message("Extension job was not found.".to_owned()))?;
+        require_job_owner(job, plugin_id)?;
+        let output = job
+            .snapshot
+            .output_paths
+            .first()
             .ok_or_else(|| ApiError::Message("This job has no output to reveal.".to_owned()))?;
         let path = fs::canonicalize(output)
             .map_err(|_| ApiError::Message("The output no longer exists.".to_owned()))?;
@@ -129,7 +162,11 @@ impl ExtensionRuntimeService {
         Ok(json!({ "ok": true }))
     }
 
-    fn start_quick_convert(&self, payload: &Value) -> ApiResult<Value> {
+    fn start_quick_convert(&self, plugin_id: &str, payload: &Value) -> ApiResult<Value> {
+        let executable =
+            resolve_executable("ffmpeg", Some(&self.settings_path)).ok_or_else(|| {
+                ApiError::Message("FFmpeg is not installed or could not be found.".to_owned())
+            })?;
         let paths = safe_input_paths(payload)?;
         let format = allowed_string(payload, "format", QUICK_FORMATS)?;
         let quality = allowed_string(payload, "quality", &["small", "balanced", "high"])?;
@@ -138,6 +175,7 @@ impl ExtensionRuntimeService {
         let cancel = Arc::new(AtomicBool::new(false));
         self.insert_job(
             &id,
+            plugin_id,
             cancel.clone(),
             format!("Queued {} file(s)…", paths.len()),
         )?;
@@ -154,12 +192,17 @@ impl ExtensionRuntimeService {
                 quality,
                 destination,
                 home_dir,
+                executable,
             )
         });
         Ok(json!({ "ok": true, "jobId": id, "message": "Conversion queued." }))
     }
 
-    fn start_ytdlp(&self, payload: &Value) -> ApiResult<Value> {
+    fn start_ytdlp(&self, plugin_id: &str, payload: &Value) -> ApiResult<Value> {
+        let executable =
+            resolve_executable("yt-dlp", Some(&self.settings_path)).ok_or_else(|| {
+                ApiError::Message("yt-dlp is not installed or could not be found.".to_owned())
+            })?;
         let url = required_string(payload, "url", 4096)?;
         validate_http_url(&url)?;
         let format = allowed_string(payload, "format", &["mp3", "m4a", "mp4", "webm"])?;
@@ -189,7 +232,12 @@ impl ExtensionRuntimeService {
         })?;
         let output_log = self.cache_dir.join(format!("{id}.paths"));
         let cancel = Arc::new(AtomicBool::new(false));
-        self.insert_job(&id, cancel.clone(), "Download queued…".to_owned())?;
+        self.insert_job(
+            &id,
+            plugin_id,
+            cancel.clone(),
+            "Download queued…".to_owned(),
+        )?;
         let jobs = self.jobs.clone();
         let job_id = id.clone();
         thread::spawn(move || {
@@ -203,12 +251,19 @@ impl ExtensionRuntimeService {
                 staging_dir,
                 output_dir,
                 output_log,
+                executable,
             )
         });
         Ok(json!({ "ok": true, "jobId": id, "message": "Download queued." }))
     }
 
-    fn insert_job(&self, id: &str, cancel: Arc<AtomicBool>, message: String) -> ApiResult<()> {
+    fn insert_job(
+        &self,
+        id: &str,
+        plugin_id: &str,
+        cancel: Arc<AtomicBool>,
+        message: String,
+    ) -> ApiResult<()> {
         let mut jobs = self
             .jobs
             .lock()
@@ -226,16 +281,21 @@ impl ExtensionRuntimeService {
         if jobs.len() > 128 {
             jobs.retain(|_, job| matches!(job.snapshot.status.as_str(), "queued" | "running"));
         }
+        let now = unix_timestamp_ms();
         jobs.insert(
             id.to_owned(),
             ExtensionJob {
                 snapshot: ExtensionJobSnapshot {
                     id: id.to_owned(),
+                    plugin_id: plugin_id.to_owned(),
                     status: "queued".to_owned(),
                     progress: Some(0.0),
                     message,
                     output_paths: Vec::new(),
                     error: None,
+                    created_at: now,
+                    updated_at: now,
+                    completed_at: None,
                 },
                 cancel,
             },
@@ -255,6 +315,7 @@ fn validate_command_scope(plugin_id: &str, command: &str) -> ApiResult<()> {
             "dependencies.check"
                 | "quick_convert.start"
                 | "jobs.status"
+                | "jobs.latest"
                 | "jobs.cancel"
                 | "host.revealOutput"
         ),
@@ -264,6 +325,7 @@ fn validate_command_scope(plugin_id: &str, command: &str) -> ApiResult<()> {
                 | "ytdlp.start"
                 | "ytdlp.inspect"
                 | "jobs.status"
+                | "jobs.latest"
                 | "jobs.cancel"
                 | "host.revealOutput"
         ),
@@ -278,9 +340,12 @@ fn validate_command_scope(plugin_id: &str, command: &str) -> ApiResult<()> {
     }
 }
 
-fn dependency_check(payload: &Value) -> ApiResult<Value> {
+fn dependency_check(payload: &Value, settings_path: &Path) -> ApiResult<Value> {
     let requested = allowed_string(payload, "name", &["ffmpeg", "yt-dlp"])?;
-    let output = Command::new(&requested)
+    let Some(executable) = resolve_executable(&requested, Some(settings_path)) else {
+        return Ok(json!({ "ok": true, "available": false, "version": "" }));
+    };
+    let output = Command::new(&executable)
         .arg("--version")
         .stdin(Stdio::null())
         .output();
@@ -341,6 +406,25 @@ fn required_string(payload: &Value, key: &str, max: usize) -> ApiResult<String> 
     Ok(value.to_owned())
 }
 
+fn unix_timestamp_ms() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis()
+        .try_into()
+        .unwrap_or(u64::MAX)
+}
+
+fn require_job_owner(job: &ExtensionJob, plugin_id: &str) -> ApiResult<()> {
+    if job.snapshot.plugin_id == plugin_id {
+        Ok(())
+    } else {
+        Err(ApiError::Message(
+            "This extension does not own the requested job.".to_owned(),
+        ))
+    }
+}
+
 fn allowed_string(payload: &Value, key: &str, allowed: &[&str]) -> ApiResult<String> {
     let value = required_string(payload, key, 64)?;
     if allowed.contains(&value.as_str()) {
@@ -358,6 +442,14 @@ fn update_job(
     if let Ok(mut jobs) = jobs.lock() {
         if let Some(job) = jobs.get_mut(id) {
             update(&mut job.snapshot);
+            let now = unix_timestamp_ms();
+            job.snapshot.updated_at = now;
+            if matches!(
+                job.snapshot.status.as_str(),
+                "completed" | "failed" | "cancelled"
+            ) {
+                job.snapshot.completed_at.get_or_insert(now);
+            }
         }
     }
 }
@@ -371,6 +463,7 @@ fn run_quick_convert_job(
     quality: String,
     destination: String,
     home_dir: PathBuf,
+    executable: PathBuf,
 ) {
     update_job(&jobs, &id, |job| {
         job.status = "running".to_owned();
@@ -401,7 +494,7 @@ fn run_quick_convert_job(
             job.progress = Some((index as f64 / paths.len() as f64) * 100.0);
             job.message = format!("Converting {} of {}…", index + 1, paths.len());
         });
-        let mut command = Command::new("ffmpeg");
+        let mut command = Command::new(&executable);
         command
             .args(["-nostdin", "-hide_banner", "-loglevel", "error", "-y", "-i"])
             .arg(source);
@@ -535,13 +628,14 @@ fn run_ytdlp_job(
     staging_dir: PathBuf,
     output_dir: PathBuf,
     output_log: PathBuf,
+    executable: PathBuf,
 ) {
     update_job(&jobs, &id, |job| {
         job.status = "running".to_owned();
         job.progress = None;
         job.message = "Downloading media…".to_owned();
     });
-    let mut command = Command::new("yt-dlp");
+    let mut command = Command::new(executable);
     command
         .args([
             "--no-config",
@@ -849,7 +943,7 @@ fn reveal_path(path: &Path) -> ApiResult<()> {
         .map_err(|error| ApiError::Message(format!("Could not reveal output: {error}")))
 }
 
-fn inspect_ytdlp(payload: &Value) -> ApiResult<Value> {
+fn inspect_ytdlp(payload: &Value, executable: &Path) -> ApiResult<Value> {
     let url = required_string(payload, "url", 4096)?;
     validate_http_url(&url)?;
     let playlist = payload
@@ -861,7 +955,7 @@ fn inspect_ytdlp(payload: &Value) -> ApiResult<Value> {
     let output_file = fs::File::create(&output_path).map_err(|error| {
         ApiError::Message(format!("Could not prepare media inspection: {error}"))
     })?;
-    let mut command = Command::new("yt-dlp");
+    let mut command = Command::new(executable);
     command.args(["--no-config", "--dump-single-json", "--no-warnings"]);
     if playlist {
         command.args(["--flat-playlist", "--playlist-end", "100"]);
@@ -962,7 +1056,10 @@ mod tests {
     }
     #[test]
     fn quick_convert_job_converts_a_real_fixture_when_ffmpeg_is_available() {
-        if Command::new("ffmpeg")
+        let Some(executable) = resolve_executable("ffmpeg", None) else {
+            return;
+        };
+        if Command::new(&executable)
             .arg("-version")
             .output()
             .map(|output| !output.status.success())
@@ -981,11 +1078,15 @@ mod tests {
             ExtensionJob {
                 snapshot: ExtensionJobSnapshot {
                     id: id.clone(),
+                    plugin_id: "quick_convert".to_owned(),
                     status: "queued".to_owned(),
                     progress: Some(0.0),
                     message: String::new(),
                     output_paths: Vec::new(),
                     error: None,
+                    created_at: 1,
+                    updated_at: 1,
+                    completed_at: None,
                 },
                 cancel: Arc::new(AtomicBool::new(false)),
             },
@@ -999,11 +1100,37 @@ mod tests {
             "balanced".to_owned(),
             "source".to_owned(),
             root.clone(),
+            executable,
         );
         let snapshot = jobs.lock().unwrap().get(&id).unwrap().snapshot.clone();
         assert_eq!(snapshot.status, "completed");
         assert_eq!(snapshot.output_paths.len(), 1);
         assert!(Path::new(&snapshot.output_paths[0]).is_file());
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn job_access_requires_plugin_ownership_and_latest_is_scoped() {
+        let root = std::env::temp_dir().join(format!("misty-ext-runtime-{}", Uuid::new_v4()));
+        let environment = AppEnvironmentService::for_test_home(root.clone());
+        let service = ExtensionRuntimeService::new(environment);
+        let cancel = Arc::new(AtomicBool::new(false));
+        service
+            .insert_job("quick", "quick_convert", cancel.clone(), "Quick".to_owned())
+            .unwrap();
+        std::thread::sleep(Duration::from_millis(2));
+        service
+            .insert_job("download", "ytdlp", cancel, "Download".to_owned())
+            .unwrap();
+
+        assert!(service
+            .job_status("ytdlp", &json!({ "jobId": "quick" }))
+            .is_err());
+        assert!(service
+            .cancel_job("ytdlp", &json!({ "jobId": "quick" }))
+            .is_err());
+        let latest = service.latest_job("quick_convert").unwrap();
+        assert_eq!(latest.get("id").and_then(Value::as_str), Some("quick"));
         let _ = fs::remove_dir_all(root);
     }
 }

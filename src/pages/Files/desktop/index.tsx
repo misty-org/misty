@@ -94,7 +94,7 @@ import { ExplorerPane } from "../components/ExplorerPane";
 import { ExplorerSidebar, type AndroidLocalGrantRequest } from "../components/ExplorerSidebar";
 import { ExplorerPaneToolbarActions, ExplorerToolbar } from "../components/ExplorerToolbar";
 import type { ExplorerLocationResult } from "../components/ExplorerToolbar";
-import { DeepSearchOverlay } from "../components/DeepSearchOverlay";
+import { LibraryWorkspace, libraryWorkspacePath } from "../components/LibraryWorkspace";
 import { FileInspector } from "../components/FileInspector";
 import {
   explorerWorkspaceNeedsSave,
@@ -106,7 +106,6 @@ import {
   validateBatchRenameItems,
 } from "../../../stores/useExplorerStore";
 import type { ExplorerBatchRenameItem, ExplorerDialogState, ExplorerInlineEditState, ExplorerNotification, ExplorerSortColumn } from "../../../stores/useExplorerStore";
-import { useSearchStore } from "../../../stores/useSearchStore";
 import { maxMultiPanelPanes, useMultiPanelStore } from "../../../shared/multipanel/useMultiPanelStore";
 import { ProvidersWorkspacePanel } from "../../Providers/desktop";
 import { useProvidersStore } from "../../../stores/useProvidersStore";
@@ -135,7 +134,8 @@ import { useTransfersStore } from "../../../stores/useTransfersStore";
 import { TransfersWorkspacePanel } from "../../Transfers/desktop";
 import { shortcutMapFromBindings, shortcutMatchesEvent } from "../../../shared/shortcuts";
 import type { ShortcutMap } from "../../../shared/shortcuts";
-import { selectAdvancedPreferences, selectGeneralPreferences, selectShortcutPreferences, useSettingsStore } from "../../../stores/useSettingsStore";
+import { selectAdvancedPreferences, selectAssistantPreferences, selectGeneralPreferences, selectShortcutPreferences, useSettingsStore } from "../../../stores/useSettingsStore";
+import { openCloudFolderBotChatWindow, openCloudFolderBotWindow } from "../../../bots/cloudFolderBot";
 import { errorText } from "../../../shared/format";
 import { applyMistyThemeFromExtensionAction } from "../../../stores/useAppThemeStore";
 import { ExtensionCatalogIcon } from "../../../plugins/ExtensionCatalogIcon";
@@ -269,7 +269,8 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
   const [androidGrantedFolders, setAndroidGrantedFolders] = useState<FileEntry[]>([]);
   const [duplicateFinderPaneId, setDuplicateFinderPaneId] = useState<string | null>(null);
   const [compareDialog, setCompareDialog] = useState<CompareDialogSeed | null>(null);
-  const { preferredWorkspaceRoot, settingsLoaded, settingsMountPath } = useSettingsStore(useShallow((state) => ({
+  const { mikaEnabled, preferredWorkspaceRoot, settingsLoaded, settingsMountPath } = useSettingsStore(useShallow((state) => ({
+    mikaEnabled: selectAssistantPreferences(state.settings?.document).enabled,
     preferredWorkspaceRoot: selectGeneralPreferences(state.settings?.document).preferredWorkspaceRoot,
     settingsMountPath: selectAdvancedPreferences(state.settings?.document).mountPath,
     settingsLoaded: state.loaded,
@@ -282,7 +283,25 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
   const homePath = explorerRootForBuild(storageHomePath);
   const mountRoot = resolveMountRoot(storageHomePath, settingsMountPath || app?.environment.mountPath || ".misty/mnt");
   const activePath = useExplorerStore((state) => state.panes[activePaneId]?.listing?.path ?? homePath);
+  const extensionsEnabled = !isAndroidBuild;
   const activeSelectedPath = useExplorerStore((state) => selectedPathsForPane(state.panes[activePaneId])[0] ?? activePath);
+
+  useEffect(() => {
+    if (!extensionsEnabled) return;
+    const multi = useMultiPanelStore.getState();
+    const legacyTabs = multi.tabs
+      .map((tab) => ({ tab, plugin: parsePluginTabPath(tab.path) }))
+      .filter((entry): entry is { tab: MultiPanelTab; plugin: NonNullable<ReturnType<typeof parsePluginTabPath>> } => Boolean(entry.plugin));
+    if (legacyTabs.length === 0) return;
+    const activeLegacy = legacyTabs.find(({ tab }) => tab.id === multi.activeTabId) ?? legacyTabs[0];
+    for (const { tab } of legacyTabs) {
+      multi.updateActiveTabPath(tab.activePaneId, homePath, "Files");
+      multi.setTabPanelVisibility(tab.id, { sidebarVisible: true, previewVisible: true });
+    }
+    const params = new URLSearchParams({ extension: activeLegacy.plugin.pluginId });
+    if (activeLegacy.plugin.selectedPath) params.set("selected", activeLegacy.plugin.selectedPath);
+    navigate(`/files?${params.toString()}`, { replace: true });
+  }, [extensionsEnabled, homePath, navigate, workspacePathSignature]);
   const activePaneIdRef = useRef(activePaneId);
   const activePathRef = useRef(activePath);
   const shortcutMapRef = useRef<ShortcutMap>(defaultExplorerShortcutMap(shortcutPreferences.keymapIndex));
@@ -300,7 +319,6 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
     "--preview-width": `${previewWidth}px`,
   } as CSSProperties), [previewWidth, sidebarWidth]);
   const activeTabSupportsSidePanels = !isChromeTabPath(activeTabPath);
-  const extensionsEnabled = !isAndroidBuild;
   const sidebarVisible = activeTabSupportsSidePanels && activeTabSidebarVisible;
   const previewVisible = activeTabSupportsSidePanels && activeTabPreviewVisible;
 
@@ -577,7 +595,7 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [navigate]);
+  }, [homePath, navigate]);
 
   useEffect(() => {
     if (!resizeTarget) return;
@@ -647,7 +665,7 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
 
   const renderToolbar = useCallback(
     (paneId: string, path: string) => {
-      if (isChromeTabPath(path)) return null;
+      if (isChromeTabPath(path) || path === libraryWorkspacePath) return null;
       const pluginTab = extensionsEnabled ? parsePluginTabPath(path) : null;
       if (pluginTab) {
         return (
@@ -679,6 +697,9 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
       if (isRemotesTabPath(path)) {
         return <ProvidersWorkspacePanel workspaceId={paneId} />;
       }
+      if (path === libraryWorkspacePath) {
+        return <LibraryWorkspace paneId={paneId} workingDirectory={homePath} />;
+      }
       const pluginTab = extensionsEnabled ? parsePluginTabPath(path) : null;
       if (pluginTab) {
         return (
@@ -691,7 +712,7 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
       }
       return <ExplorerPane paneId={paneId} path={path} isActive={activePaneId === paneId} paneActions={paneActions} />;
     },
-    [activePaneId, extensionsEnabled, pluginCommands, pluginPanels],
+    [activePaneId, extensionsEnabled, homePath, pluginCommands, pluginPanels],
   );
   const inspector = useMemo(
     () => previewVisible ? <ConnectedFileInspector /> : undefined,
@@ -812,6 +833,11 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
         extensionsEnabled={extensionsEnabled}
         panels={pluginPanels}
         selectedPath={activeSelectedPath}
+        mikaEnabled={mikaEnabled}
+        onOpenMika={() => {
+          if (!mikaEnabled) return;
+          void openCloudFolderBotWindow(app?.environment.assetsDir).then(() => openCloudFolderBotChatWindow());
+        }}
         terminalEnabled={activeTabSupportsSidePanels && canOpenTerminalPath(activeTabPath) && canOpenTerminalPath(activePath)}
         terminalPath={activePath}
         onOpenTransfers={openTransfersTab}
@@ -823,6 +849,8 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
       activeTabPath,
       activeTabSupportsSidePanels,
       extensionsEnabled,
+      mikaEnabled,
+      app?.environment.assetsDir,
       pluginCommands,
       pluginPanels,
     ],
@@ -860,14 +888,15 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
           showDefaultPaneControls={false}
           renderNavigationAside={explorerSidebar}
           onNavigationAsideResizeStart={startSidebarResize}
+          navigationAsideResizing={resizeTarget === "sidebar"}
           renderAside={inspector}
           onAsideResizeStart={startPreviewResize}
+          asideResizing={resizeTarget === "preview"}
           renderPane={renderPane}
         />
       </main>
       <ExplorerRenameStatus edit={inlineEdit} />
       <ExplorerNotifications notifications={notifications} onDismiss={dismissNotification} />
-      <DeepSearchOverlay activePaneId={activePaneId} currentPath={activePath} />
       {duplicateFinderPaneId ? (
         <DuplicateFinderDialog
           paneId={duplicateFinderPaneId}

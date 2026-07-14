@@ -14,7 +14,7 @@ export type PluginLauncher = {
   views: string[];
   show_in_launcher: boolean;
   requires_selected_file: boolean;
-  open_mode: "inline" | "tab" | "split";
+  open_mode: "popup" | "inline" | "tab" | "split";
 };
 
 export type PluginArtifact = {

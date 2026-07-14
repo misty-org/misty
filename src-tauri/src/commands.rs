@@ -38,6 +38,11 @@ use crate::services::explorer_library::{
 use crate::services::file_sync::{
     FileSyncApplyRequest, FileSyncApplyResult, FileSyncCompareRequest,
 };
+#[cfg(desktop)]
+use crate::services::media_search::{
+    CompleteMediaAssetRequest, MediaSearchSnapshot, PrepareMediaChunkRequest, PreparedMediaChunk,
+    ResolveMediaAssetsRequest, ResolvedMediaAsset,
+};
 use crate::services::metadata::FileMetadataSnapshot;
 #[cfg(desktop)]
 use crate::services::plugin_commands::{
@@ -58,10 +63,16 @@ use crate::services::providers::{
     ProvidersSnapshot, PublicLinkActionResult, PublicLinkListResult, RcloneConfigPaths,
     RemoteEditDraft, RemoteTestResult, SaveRemoteRequest, VerifyResult, VerifyStartRequest,
 };
-use crate::services::storage::StorageSnapshot;
-use crate::services::storage_runtime::StorageRuntimeSnapshot;
 use crate::services::search::{SearchQueryRequest, SearchResult, SearchScanRequest, SearchStatus};
 use crate::services::settings::{OpenWithAssociation, SaveSettingsRequest, SettingsSnapshot};
+use crate::services::smart_library::{
+    ApplySmartLibraryResultsRequest, FolderLibraryStatus, PrepareSmartLibraryPreviewsRequest,
+    PreparedSmartLibraryPreview, ResolveSmartLibraryAssetsRequest, ResolvedSmartLibraryAsset,
+    SmartLibraryAssetsPage, SmartLibraryAssetsPageRequest, SmartLibraryScanRequest,
+    SmartLibrarySearchRequest, SmartLibrarySnapshot,
+};
+use crate::services::storage::StorageSnapshot;
+use crate::services::storage_runtime::StorageRuntimeSnapshot;
 use crate::services::transfers::{TransferFilter, TransferPage};
 
 #[derive(Debug, Serialize)]
@@ -564,6 +575,128 @@ pub async fn explorer_library_set_tags(
     state: State<'_, MistyRuntime>,
 ) -> ApiResult<ExplorerLibrarySnapshot> {
     state.explorer_library.set_tags(request).await
+}
+
+#[tauri::command]
+pub async fn smart_library_snapshot(
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<SmartLibrarySnapshot> {
+    state.smart_library.snapshot().await
+}
+
+#[tauri::command]
+pub async fn smart_library_scan(
+    request: SmartLibraryScanRequest,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<FolderLibraryStatus> {
+    state.smart_library.scan(request).await
+}
+
+#[tauri::command]
+pub async fn smart_library_prepare_previews(
+    request: PrepareSmartLibraryPreviewsRequest,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<Vec<PreparedSmartLibraryPreview>> {
+    state.smart_library.prepare_previews(request).await
+}
+
+#[tauri::command]
+pub async fn smart_library_apply_results(
+    request: ApplySmartLibraryResultsRequest,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<SmartLibrarySnapshot> {
+    state.smart_library.apply_results(request).await
+}
+
+#[tauri::command]
+pub async fn smart_library_set_server_folder_id(
+    server_folder_id: String,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<SmartLibrarySnapshot> {
+    state
+        .smart_library
+        .set_server_folder_id(server_folder_id)
+        .await
+}
+
+#[tauri::command]
+pub async fn smart_library_search(
+    request: SmartLibrarySearchRequest,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<Vec<crate::services::smart_library::SmartLibraryAsset>> {
+    state.smart_library.search(request).await
+}
+
+#[tauri::command]
+pub async fn smart_library_resolve_assets(
+    request: ResolveSmartLibraryAssetsRequest,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<Vec<ResolvedSmartLibraryAsset>> {
+    state.smart_library.resolve_assets(request).await
+}
+
+#[tauri::command]
+pub async fn smart_library_assets_page(
+    request: SmartLibraryAssetsPageRequest,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<SmartLibraryAssetsPage> {
+    state.smart_library.assets_page(request).await
+}
+
+#[tauri::command]
+pub async fn smart_library_delete(
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<SmartLibrarySnapshot> {
+    state.smart_library.delete().await
+}
+
+#[cfg(desktop)]
+#[tauri::command]
+pub async fn media_search_scan_movies(
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<MediaSearchSnapshot> {
+    let service = state.media_search.clone();
+    tokio::task::spawn_blocking(move || service.scan_movies())
+        .await
+        .map_err(|e| ApiError::Message(e.to_string()))?
+}
+
+#[cfg(desktop)]
+#[tauri::command]
+pub async fn media_search_snapshot(
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<MediaSearchSnapshot> {
+    state.media_search.snapshot()
+}
+
+#[cfg(desktop)]
+#[tauri::command]
+pub async fn media_search_prepare_chunk(
+    request: PrepareMediaChunkRequest,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<PreparedMediaChunk> {
+    let service = state.media_search.clone();
+    tokio::task::spawn_blocking(move || service.prepare_chunk(request))
+        .await
+        .map_err(|e| ApiError::Message(e.to_string()))?
+}
+
+#[cfg(desktop)]
+#[tauri::command]
+pub async fn media_search_complete(
+    request: CompleteMediaAssetRequest,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<MediaSearchSnapshot> {
+    state.media_search.complete(request)
+}
+
+#[cfg(desktop)]
+#[tauri::command]
+pub async fn media_search_resolve_assets(
+    request: ResolveMediaAssetsRequest,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<Vec<ResolvedMediaAsset>> {
+    state.media_search.resolve_assets(request)
 }
 
 #[tauri::command]

@@ -1506,7 +1506,7 @@ export function MobileFilesPage() {
         className={viewMode === "grid" ? fileListGridClass : fileListBaseClass}
         aria-busy={loading}
       >
-        {loading && !listing ? <MobileFileSkeleton /> : null}
+        {loading && !listing && mobileRemotePathInfo(path, mountRoot, remotes) ? <MobileFileSkeleton /> : null}
         {!loading && listing && entries.length === 0 ? (
           <MobileFilesEmptyState
             reason={emptyReason}

@@ -11,7 +11,7 @@ interface AppRouteMemoryStore {
 const defaultAppRoute = "/files";
 const desktopRememberableRoutes = isNativeMobileBuild
   ? []
-  : ["/home", "/extensions", "/changelog"];
+  : ["/home", "/library", "/extensions", "/changelog"];
 
 export const useAppRouteMemoryStore = create<AppRouteMemoryStore>()(
   persist(

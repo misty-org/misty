@@ -1,76 +1,53 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type {
   MouseEvent as ReactMouseEvent,
   PointerEvent as ReactPointerEvent,
 } from "react";
+import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import {
-  currentMonitor,
-  getCurrentWindow,
-  primaryMonitor,
-} from "@tauri-apps/api/window";
-import { LogicalSize, PhysicalPosition } from "@tauri-apps/api/dpi";
+import { currentMonitor, getCurrentWindow, primaryMonitor } from "@tauri-apps/api/window";
+import { PhysicalPosition } from "@tauri-apps/api/dpi";
 import type { UnlistenFn } from "@tauri-apps/api/event";
 import { AppWindow, ArrowUpRight, MessageSquare, X } from "lucide-react";
-import botHappy from "../../assets/bots/cloud-folder/happy.png";
-import botIdle from "../../assets/bots/cloud-folder/idle.png";
-import botSleep from "../../assets/bots/cloud-folder/sleep.png";
+import { motion, useMotionValue, useSpring } from "motion/react";
+import mikaAnimation from "../../assets/bots/cloud-folder/mika.webp";
 import {
-  cloudFolderBotBubbleTransitionMs,
-  cloudFolderBotChatWindowSize,
-  cloudFolderBotContextEvent,
+  cloudFolderBotChatVisibilityEvent,
   cloudFolderBotNotifyEvent,
-  cloudFolderBotWindowSize,
   dismissCloudFolderBotFromOverlay,
-  requestCloudFolderBotContext,
+  openMikaAssistantFromBot,
+  positionCloudFolderBotChatWindow,
   returnToMistyAppFromBot,
-  type CloudFolderBotContext,
   type CloudFolderBotNotification,
+  type CloudFolderBotChatVisibility,
 } from "../../bots/cloudFolderBot";
 import { hasTauriInternals, safeTauriAssetUrl } from "../../shared/tauri";
 import { useSettingsStore } from "../../stores/useSettingsStore";
-import { ExplorerMikaPanel } from "../Files/desktop/ExplorerAssistantPanels";
 
-type BotMood = "idle" | "sleep" | "happy";
 type BotContextMenu = { x: number; y: number };
-type BubblePlacement = "above" | "below";
+type MikaNativeVelocity = { velocityX: number; velocityY: number };
 
-const expressionCycleMs = 1800;
-const botContextMenuSize = { width: 156, height: 126 };
+const botContextMenuSize = { width: 156, height: 84 };
 const contextMenuClass =
   "pointer-events-auto absolute z-40 grid w-[156px] overflow-hidden rounded-[11px] border border-white/10 bg-[rgba(5,6,7,0.98)] p-1.5 text-[13px] font-medium text-[#e4e4e7] shadow-[0_18px_40px_rgba(0,0,0,0.45)]";
 const contextMenuItemClass =
   "grid h-9 w-full grid-cols-[18px_minmax(0,1fr)] items-center gap-2.5 rounded-lg border-0 bg-transparent px-2.5 text-left text-[#e4e4e7] transition hover:bg-white/[0.06] hover:text-[#f4f4f5]";
-const bubbleToggleCooldownMs = 420;
-const bubbleShowDelayMs = 140;
-const botActiveIdleMs = 2400;
-const botSpriteHeight = 122;
-const botSpriteSlotOffset = 62;
-const expressionCycle: BotMood[] = ["idle", "sleep", "idle", "happy"];
-
 export default function CloudFolderBotOverlay() {
-  const [moodIndex, setMoodIndex] = useState(0);
   const [notification, setNotification] =
     useState<CloudFolderBotNotification | null>(null);
-  const [botActive, setBotActive] = useState(false);
   const [bubbleVisible, setBubbleVisible] = useState(false);
-  const [bubbleToggleLocked, setBubbleToggleLocked] = useState(false);
-  const [bubblePlacement, setBubblePlacement] =
-    useState<BubblePlacement>("above");
+  const [chatMode, setChatMode] = useState(false);
   const [contextMenu, setContextMenu] = useState<BotContextMenu | null>(null);
-  const [chatExpanded, setChatExpanded] = useState(false);
-  const [mikaContext, setMikaContext] = useState<CloudFolderBotContext>({
-    workingDirectory: "",
-    selectedPaths: [],
-  });
-  const botAssets = useMemo(() => cloudFolderBotAssetSources(), []);
-  const bubbleToggleTimerRef = useRef<number | null>(null);
-  const bubbleSequenceTimerRef = useRef<number | null>(null);
-  const botActiveTimerRef = useRef<number | null>(null);
-  const bubblePlacementRef = useRef<BubblePlacement>("above");
-  const mood = expressionCycle[moodIndex] ?? "idle";
-  const notificationCount = notification ? 1 : 0;
-  const badgeVisible = botActive || bubbleVisible;
+  const botAsset = useMemo(() => cloudFolderBotAssetSource(), []);
+  const spriteRotationTarget = useMotionValue(0);
+  const spriteOffsetTarget = useMotionValue(0);
+  const spriteScaleXTarget = useMotionValue(1);
+  const spriteScaleYTarget = useMotionValue(1);
+  const spriteRotation = useSpring(spriteRotationTarget, { stiffness: 310, damping: 22 });
+  const spriteOffset = useSpring(spriteOffsetTarget, { stiffness: 340, damping: 25 });
+  const spriteScaleX = useSpring(spriteScaleXTarget, { stiffness: 360, damping: 26 });
+  const spriteScaleY = useSpring(spriteScaleYTarget, { stiffness: 360, damping: 26 });
+  const bubbleShown = bubbleVisible;
 
   useEffect(() => {
     const root = document.documentElement;
@@ -94,6 +71,27 @@ export default function CloudFolderBotOverlay() {
   }, []);
 
   useEffect(() => {
+    if (!hasTauriInternals()) return;
+    const botWindow = getCurrentWindow();
+    void botWindow.setResizable(false).catch(() => undefined);
+    void botWindow.setMaximizable(false).catch(() => undefined);
+  }, []);
+
+  useEffect(() => {
+    if (!hasTauriInternals()) return;
+    let unlisten: UnlistenFn | null = null;
+    void listen<CloudFolderBotChatVisibility>(
+      cloudFolderBotChatVisibilityEvent,
+      (event) => setChatMode(event.payload.visible),
+    ).then((listener) => {
+      unlisten = listener;
+    });
+    return () => {
+      if (unlisten) void unlisten();
+    };
+  }, []);
+
+  useEffect(() => {
     void useSettingsStore.getState().load();
   }, []);
 
@@ -104,6 +102,7 @@ export default function CloudFolderBotOverlay() {
       cloudFolderBotNotifyEvent,
       (event) => {
         setNotification(event.payload);
+        setBubbleVisible(true);
       },
     ).then((listener) => {
       unlisten = listener;
@@ -115,24 +114,11 @@ export default function CloudFolderBotOverlay() {
   }, []);
 
   useEffect(() => {
-    if (!hasTauriInternals()) return;
-    let unlisten: UnlistenFn | null = null;
-    void listen<CloudFolderBotContext>(cloudFolderBotContextEvent, (event) => {
-      setMikaContext(event.payload);
-    }).then((listener) => {
-      unlisten = listener;
-    });
-    return () => {
-      if (unlisten) void unlisten();
-    };
-  }, []);
-
-  useEffect(() => {
-    const interval = window.setInterval(() => {
-      setMoodIndex((current) => (current + 1) % expressionCycle.length);
-    }, expressionCycleMs);
-    return () => window.clearInterval(interval);
-  }, []);
+    const image = new Image();
+    image.decoding = "async";
+    image.src = botAsset;
+    void image.decode().catch(() => undefined);
+  }, [botAsset]);
 
   useEffect(() => {
     if (!contextMenu) return;
@@ -152,38 +138,23 @@ export default function CloudFolderBotOverlay() {
   }, [contextMenu]);
 
   useEffect(() => {
-    if (botActiveTimerRef.current !== null) {
-      window.clearTimeout(botActiveTimerRef.current);
-      botActiveTimerRef.current = null;
-    }
-    if (!botActive || bubbleVisible || contextMenu) return;
-
-    botActiveTimerRef.current = window.setTimeout(() => {
-      botActiveTimerRef.current = null;
-      deactivateBot();
-    }, botActiveIdleMs);
-
+    if (!hasTauriInternals()) return;
+    let unlisten: UnlistenFn | null = null;
+    void listen<MikaNativeVelocity>("mika-native-physics-velocity", (event) => {
+      applySpriteVelocity(event.payload.velocityX, event.payload.velocityY);
+    }).then((listener) => {
+      unlisten = listener;
+    });
     return () => {
-      if (botActiveTimerRef.current !== null) {
-        window.clearTimeout(botActiveTimerRef.current);
-        botActiveTimerRef.current = null;
-      }
-    };
-  }, [bubbleVisible, contextMenu, botActive]);
-
-  useEffect(() => {
-    return () => {
-      if (bubbleToggleTimerRef.current !== null) {
-        window.clearTimeout(bubbleToggleTimerRef.current);
-      }
-      if (bubbleSequenceTimerRef.current !== null) {
-        window.clearTimeout(bubbleSequenceTimerRef.current);
-      }
-      if (botActiveTimerRef.current !== null) {
-        window.clearTimeout(botActiveTimerRef.current);
-      }
+      if (unlisten) void unlisten();
     };
   }, []);
+
+  useEffect(() => {
+    if (!chatMode) return;
+    resetSpritePhysics();
+    if (hasTauriInternals()) void invoke("cancel_mika_momentum");
+  }, [chatMode]);
 
   useEffect(() => {
     if (!hasTauriInternals()) return;
@@ -194,11 +165,11 @@ export default function CloudFolderBotOverlay() {
       if (clampTimer !== null) window.clearTimeout(clampTimer);
       clampTimer = window.setTimeout(() => {
         clampTimer = null;
-        void settleBotWindow(bubblePlacementRef, setBubblePlacement);
+        void clampBotWindowToScreen().then(positionCloudFolderBotChatWindow);
       }, 160);
     };
 
-    void settleBotWindow(bubblePlacementRef, setBubblePlacement);
+    void clampBotWindowToScreen();
     void botWindow.onMoved(scheduleClamp).then((listener) => {
       unlisten = listener;
     });
@@ -209,70 +180,32 @@ export default function CloudFolderBotOverlay() {
     };
   }, []);
 
-  const imageSrc = useMemo(() => {
-    if (mood === "happy") return botAssets.happy;
-    if (mood === "idle") return botAssets.idle;
-    return botAssets.sleep;
-  }, [mood, botAssets.happy, botAssets.idle, botAssets.sleep]);
+  const resetSpritePhysics = () => {
+    spriteRotationTarget.set(0);
+    spriteOffsetTarget.set(0);
+    spriteScaleXTarget.set(1);
+    spriteScaleYTarget.set(1);
+  };
+
+  const applySpriteVelocity = (velocityX: number, velocityY: number) => {
+    const speed = Math.min(1, Math.hypot(velocityX, velocityY) / 4_800);
+    spriteRotationTarget.set(clampValue(velocityX / 125, -28, 28));
+    spriteOffsetTarget.set(clampValue(velocityY / 375, -8, 8));
+    spriteScaleXTarget.set(1 - speed * 0.075);
+    spriteScaleYTarget.set(1 + speed * 0.12);
+  };
 
   const startDrag = (event: ReactPointerEvent<HTMLButtonElement>) => {
     if (event.button !== 0) return;
-    activateBot();
+    event.preventDefault();
     setContextMenu(null);
     if (!hasTauriInternals()) return;
-    void getCurrentWindow()
-      .startDragging()
+    resetSpritePhysics();
+    void invoke("start_mika_drag")
+      .catch(() => undefined)
       .finally(() => {
-        void settleBotWindow(bubblePlacementRef, setBubblePlacement);
-      })
-      .catch(() => undefined);
-  };
-
-  const toggleChat = () => {
-    if (bubbleToggleLocked) return;
-    activateBot();
-    setBubbleToggleLocked(true);
-    if (bubbleSequenceTimerRef.current !== null) {
-      window.clearTimeout(bubbleSequenceTimerRef.current);
-      bubbleSequenceTimerRef.current = null;
-    }
-
-    if (bubbleVisible) {
-      setBubbleVisible(false);
-    } else {
-      setBubbleVisible(false);
-      bubbleSequenceTimerRef.current = window.setTimeout(() => {
-        bubbleSequenceTimerRef.current = null;
-        setBubbleVisible(true);
-      }, bubbleShowDelayMs);
-    }
-
-    if (bubbleToggleTimerRef.current !== null) {
-      window.clearTimeout(bubbleToggleTimerRef.current);
-    }
-    bubbleToggleTimerRef.current = window.setTimeout(() => {
-      bubbleToggleTimerRef.current = null;
-      setBubbleToggleLocked(false);
-    }, bubbleToggleCooldownMs);
-  };
-
-  const activateBot = () => {
-    setBotActive(true);
-    if (botActiveTimerRef.current !== null) {
-      window.clearTimeout(botActiveTimerRef.current);
-      botActiveTimerRef.current = null;
-    }
-  };
-
-  const deactivateBot = () => {
-    setBotActive(false);
-    setBubbleVisible(false);
-    if (bubbleSequenceTimerRef.current !== null) {
-      window.clearTimeout(bubbleSequenceTimerRef.current);
-    }
-    bubbleSequenceTimerRef.current = window.setTimeout(() => {
-      bubbleSequenceTimerRef.current = null;
-    }, cloudFolderBotBubbleTransitionMs);
+        void clampBotWindowToScreen().then(positionCloudFolderBotChatWindow);
+      });
   };
 
   const returnToApp = () => {
@@ -282,19 +215,9 @@ export default function CloudFolderBotOverlay() {
 
   const openAssistant = () => {
     setContextMenu(null);
-    if (chatExpanded) return;
-    setChatExpanded(true);
     setBubbleVisible(false);
-    setBubblePlacement("above");
-    bubblePlacementRef.current = "above";
-    void resizeBotWindow(true);
-    void requestCloudFolderBotContext();
-  };
-
-  const closeAssistant = () => {
-    setChatExpanded(false);
-    setContextMenu(null);
-    void resizeBotWindow(false);
+    setChatMode(true);
+    void openMikaAssistantFromBot();
   };
 
   const closeBot = () => {
@@ -304,7 +227,6 @@ export default function CloudFolderBotOverlay() {
 
   const openContextMenu = (event: ReactMouseEvent<HTMLButtonElement>) => {
     event.preventDefault();
-    activateBot();
     const x = Math.max(
       4,
       Math.min(event.clientX, window.innerWidth - botContextMenuSize.width - 4),
@@ -320,34 +242,35 @@ export default function CloudFolderBotOverlay() {
     <main
       className="pointer-events-none relative h-screen w-screen select-none overflow-hidden bg-transparent text-[#17202a]"
     >
-      {badgeVisible && !chatExpanded ? (
-        <button
-          aria-label={
-            bubbleVisible ? "Hide Mika notifications" : "Show Mika notifications"
-          }
-          aria-disabled={bubbleToggleLocked}
-          className={`pointer-events-auto absolute right-1 z-30 grid h-7 min-w-7 place-items-center rounded-full border border-[#a3e8ad] bg-[#79d98b] px-2 text-[13px] font-bold leading-none text-[#0d2a14] opacity-100 shadow-[0_8px_18px_rgba(0,0,0,0.24)] transition-[opacity,transform] ${bubblePlacement === "above" ? "bottom-[94px]" : "top-0"} ${bubbleToggleLocked ? "cursor-default opacity-90" : ""}`}
-          onClick={toggleChat}
-          title={bubbleToggleLocked ? undefined : bubbleVisible ? "Hide notifications" : "Show notifications"}
-          type="button"
-        >
-          {notificationCount > 0 ? (
-            formatNotificationCount(notificationCount)
-          ) : (
-            <span
-              className="grid size-1.5 place-items-center rounded-full bg-current"
-              aria-hidden="true"
-            />
-          )}
-        </button>
+      {!chatMode ? (
+        <div className="pointer-events-auto absolute right-0 top-2 z-40 flex w-6 flex-col items-center gap-1">
+          <button
+            aria-label="Open Mika chat"
+            className="grid size-5 place-items-center border-0 bg-transparent p-0 text-[#f1f3f5] transition hover:scale-110 hover:text-white"
+            onClick={openAssistant}
+            title="Open Mika chat"
+            type="button"
+          >
+            <MessageSquare aria-hidden="true" size={15} strokeWidth={2.2} />
+          </button>
+          <button
+            aria-label="Open Misty"
+            className="grid size-5 place-items-center border-0 bg-transparent p-0 text-[#f1f3f5] transition hover:scale-110 hover:text-white"
+            onClick={returnToApp}
+            title="Open Misty"
+            type="button"
+          >
+            <AppWindow aria-hidden="true" size={15} strokeWidth={2.2} />
+          </button>
+        </div>
       ) : null}
 
-      {bubbleVisible && !chatExpanded ? (
-        <aside
-          className={`pointer-events-auto absolute left-1 right-1 z-20 h-[48px] rounded-[14px] border border-white bg-white px-2.5 py-2 text-[#17202a] shadow-[0_16px_34px_rgba(0,0,0,0.24)] after:absolute after:left-1/2 after:h-3.5 after:w-3.5 after:-translate-x-1/2 after:rotate-45 after:border-white after:bg-white after:content-[''] ${bubblePlacement === "above" ? "top-0 after:bottom-[-7px] after:border-b after:border-r" : "bottom-0 after:top-[-7px] after:border-l after:border-t"}`}
-          role="log"
-          aria-live="polite"
-        >
+      <aside
+        aria-hidden={!bubbleShown || chatMode}
+        className={`absolute left-1 right-1 top-0 z-50 h-[48px] rounded-[14px] border border-white bg-white px-2.5 py-2 text-[#17202a] shadow-[0_16px_34px_rgba(0,0,0,0.24)] transition-[opacity,transform] duration-[600ms] ease-[cubic-bezier(0.22,1,0.36,1)] will-change-[opacity,transform] after:absolute after:bottom-[-7px] after:left-1/2 after:h-3.5 after:w-3.5 after:-translate-x-1/2 after:rotate-45 after:border-b after:border-r after:border-white after:bg-white after:content-[''] motion-reduce:transition-none ${bubbleShown && !chatMode ? "pointer-events-auto translate-y-0 scale-100 opacity-100" : "pointer-events-none translate-y-2 scale-[0.97] opacity-0"}`}
+        role="log"
+        aria-live={bubbleShown ? "polite" : "off"}
+      >
           <button
             aria-label="Return to Misty"
             className="absolute right-2 top-2 z-10 grid size-6 place-items-center rounded-full border-0 bg-[#e7f8ee] p-0 text-[#1f6f36] transition hover:bg-[#d2f3df]"
@@ -372,33 +295,31 @@ export default function CloudFolderBotOverlay() {
               Nothing going on.
             </div>
           )}
-        </aside>
-      ) : null}
+      </aside>
 
-      {chatExpanded ? (
-        <ExplorerMikaPanel
-          surface="bot-window"
-          workingDirectory={mikaContext.workingDirectory}
-          selectedPaths={mikaContext.selectedPaths}
-          onClose={closeAssistant}
-        />
-      ) : null}
-
-      <button
-        aria-label="Ask Mika; drag to move"
-        className={`pointer-events-auto absolute left-1/2 z-30 grid h-[122px] w-[150px] -translate-x-1/2 cursor-grab place-items-center border-0 bg-transparent p-0 active:cursor-grabbing ${chatExpanded || bubblePlacement === "above" ? "bottom-0" : "top-0"}`}
+      <motion.button
+        aria-label="Drag Mika to move"
+        aria-hidden={chatMode}
+        disabled={chatMode}
+        className={`absolute bottom-0 left-0 z-30 grid h-[101px] w-[124px] touch-none place-items-center border-0 bg-transparent p-0 [backface-visibility:hidden] [contain:layout_paint] transition-[opacity,transform] duration-[420ms] ease-[cubic-bezier(0.22,1,0.36,1)] will-change-[opacity,transform] motion-reduce:transition-none ${chatMode ? "pointer-events-none translate-y-2 scale-[0.96] cursor-default opacity-0 !transition-none" : "pointer-events-auto translate-y-0 scale-100 cursor-grab opacity-100 active:cursor-grabbing"}`}
         onPointerDown={startDrag}
-        onClick={openAssistant}
         onContextMenu={openContextMenu}
         type="button"
       >
-        <img
+        <motion.img
           alt=""
-          className="h-full w-full select-none object-contain drop-shadow-[0_10px_18px_rgba(18,92,150,0.2)]"
+          aria-hidden="true"
+          className="pointer-events-none h-full w-full select-none object-contain drop-shadow-[0_10px_18px_rgba(18,92,150,0.2)] [backface-visibility:hidden] will-change-transform"
           draggable={false}
-          src={imageSrc}
+          src={botAsset}
+          style={{
+            rotate: spriteRotation,
+            scaleX: spriteScaleX,
+            scaleY: spriteScaleY,
+            y: spriteOffset,
+          }}
         />
-      </button>
+      </motion.button>
 
       {contextMenu ? (
         <div
@@ -408,15 +329,6 @@ export default function CloudFolderBotOverlay() {
           role="menu"
           style={{ left: contextMenu.x, top: contextMenu.y }}
         >
-          <button
-            className={contextMenuItemClass}
-            onClick={openAssistant}
-            role="menuitem"
-            type="button"
-          >
-            <MessageSquare className="text-[#a1a1aa]" aria-hidden="true" size={16} />
-            <span className="truncate">Ask Mika</span>
-          </button>
           <button
             className={contextMenuItemClass}
             onClick={returnToApp}
@@ -441,54 +353,15 @@ export default function CloudFolderBotOverlay() {
   );
 }
 
-function cloudFolderBotAssetSources(): {
-  idle: string;
-  sleep: string;
-  happy: string;
-} {
+function cloudFolderBotAssetSource(): string {
   const assetsDir = new URLSearchParams(window.location.search)
     .get("assetsDir")
     ?.trim();
   if (!assetsDir) {
-    return { idle: botIdle, sleep: botSleep, happy: botHappy };
+    return mikaAnimation;
   }
   const base = assetsDir.replace(/\/+$/, "");
-  return {
-    idle: safeTauriAssetUrl(`${base}/animations/cloud-folder-idle.png`),
-    sleep: safeTauriAssetUrl(`${base}/animations/cloud-folder-sleep.png`),
-    happy: safeTauriAssetUrl(`${base}/animations/cloud-folder-happy.png`),
-  };
-}
-
-function formatNotificationCount(count: number): string {
-  return count > 99 ? "99+" : String(count);
-}
-
-async function resizeBotWindow(expanded: boolean): Promise<void> {
-  if (!hasTauriInternals()) return;
-  const botWindow = getCurrentWindow();
-  const [position, currentSize, monitor] = await Promise.all([
-    botWindow.outerPosition(),
-    botWindow.outerSize(),
-    currentMonitor().then((current) => current ?? primaryMonitor()),
-  ]);
-  const target = expanded ? cloudFolderBotChatWindowSize : cloudFolderBotWindowSize;
-  const scaleFactor = monitor?.scaleFactor ?? 1;
-  const targetWidth = Math.round(target.width * scaleFactor);
-  const targetHeight = Math.round(target.height * scaleFactor);
-  const nextPosition = new PhysicalPosition(
-    position.x + currentSize.width - targetWidth,
-    position.y + currentSize.height - targetHeight,
-  );
-
-  if (expanded) {
-    await botWindow.setPosition(nextPosition);
-    await botWindow.setSize(new LogicalSize(target.width, target.height));
-  } else {
-    await botWindow.setSize(new LogicalSize(target.width, target.height));
-    await botWindow.setPosition(nextPosition);
-  }
-  await clampBotWindowToScreen();
+  return safeTauriAssetUrl(`${base}/animations/mika.webp`);
 }
 
 async function clampBotWindowToScreen(): Promise<void> {
@@ -512,39 +385,6 @@ async function clampBotWindowToScreen(): Promise<void> {
   }
 }
 
-async function settleBotWindow(
-  placementRef: { current: BubblePlacement },
-  setPlacement: (placement: BubblePlacement) => void,
-): Promise<void> {
-  await clampBotWindowToScreen();
-
-  const botWindow = getCurrentWindow();
-  const [position, monitor] = await Promise.all([
-    botWindow.outerPosition(),
-    currentMonitor().then((current) => current ?? primaryMonitor()),
-  ]);
-  if (!monitor) return;
-
-  const scaleFactor = monitor.scaleFactor;
-  const currentPlacement = placementRef.current;
-  const currentSpriteOffset =
-    currentPlacement === "above" ? botSpriteSlotOffset : 0;
-  const spriteCenterY =
-    position.y + (currentSpriteOffset + botSpriteHeight / 2) * scaleFactor;
-  const monitorCenterY =
-    monitor.workArea.position.y + monitor.workArea.size.height / 2;
-  const nextPlacement: BubblePlacement =
-    spriteCenterY > monitorCenterY ? "above" : "below";
-  if (nextPlacement === currentPlacement) return;
-
-  const nextSpriteOffset = nextPlacement === "above" ? botSpriteSlotOffset : 0;
-  const compensatedY =
-    position.y + (currentSpriteOffset - nextSpriteOffset) * scaleFactor;
-
-  placementRef.current = nextPlacement;
-  setPlacement(nextPlacement);
-  await botWindow.setPosition(
-    new PhysicalPosition(position.x, Math.round(compensatedY)),
-  );
-  await clampBotWindowToScreen();
+function clampValue(value: number, minimum: number, maximum: number): number {
+  return Math.min(Math.max(value, minimum), maximum);
 }
