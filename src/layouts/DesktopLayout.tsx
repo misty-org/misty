@@ -62,6 +62,7 @@ import {
   selectGeneralPreferences,
   selectNotificationPreferences,
   selectAssistantPreferences,
+  selectSearchMaintenancePreferences,
   settingsBoolean,
   useSettingsStore,
 } from "../stores/useSettingsStore";
@@ -91,6 +92,10 @@ import {
   publishCloudFolderBotContext,
 } from "../bots/cloudFolderBot";
 import { useMultiPanelStore } from "../shared/multipanel/useMultiPanelStore";
+import { DeepSearchOverlay } from "../pages/Files/components/DeepSearchOverlay";
+import { MediaSearchViewer } from "../pages/Files/components/MediaSearchViewer";
+import { useSearchStore } from "../stores/useSearchStore";
+import { useSmartLibraryStore } from "../stores/useSmartLibraryStore";
 
 export type DesktopNavItem = {
   id: string;
@@ -239,6 +244,10 @@ export function DesktopLayout(props: {
       state.notificationHistory.filter((notification) => !notification.read)
         .length,
   );
+  const activePaneId = useMultiPanelStore((state) => state.activePaneId);
+  const activePanePath = useExplorerStore(
+    (state) => state.panes[activePaneId]?.listing?.path ?? "",
+  );
   const { customTokens, resolvedTheme, setSystemTheme, themeId, themeMode } = useAppThemeStore(
     useShallow((state) => ({
       customTokens: state.customTokens,
@@ -351,6 +360,11 @@ export function DesktopLayout(props: {
       selectNotificationPreferences(state.settings?.document),
     ),
   );
+  const searchMaintenancePreferences = useSettingsStore(
+    useShallow((state) =>
+      selectSearchMaintenancePreferences(state.settings?.document),
+    ),
+  );
   const cloudFolderBotEnabled = useSettingsStore(
     (state) => selectAssistantPreferences(state.settings?.document).enabled,
   );
@@ -369,6 +383,7 @@ export function DesktopLayout(props: {
   const lastAppRoute = useAppRouteMemoryStore((state) => state.lastAppRoute);
   const routeId = props.getRouteId(location.pathname);
   const appLoadStarted = useRef(false);
+  const searchMaintenanceRunningRef = useRef(false);
   const loadedRoutes = useRef(new Set<AppTab>());
   const activityAnchorRef = useRef<HTMLButtonElement | null>(null);
   const profileAnchorRef = useRef<HTMLButtonElement | null>(null);
@@ -398,6 +413,73 @@ export function DesktopLayout(props: {
     void loadApp();
     void settingsLoad();
   }, [loadApp, settingsLoad]);
+
+  useEffect(() => {
+    if (!settings || !hasTauriInternals()) return;
+    const intervalMs = searchMaintenancePreferences.discoveryIntervalMinutes * 60_000;
+    let disposed = false;
+
+    const maintainSearch = async () => {
+      if (disposed || searchMaintenanceRunningRef.current) return;
+      searchMaintenanceRunningRef.current = true;
+      try {
+        if (searchMaintenancePreferences.automaticFileDiscoveryEnabled) {
+          const search = useSearchStore.getState();
+          await search.initialize();
+          const status = useSearchStore.getState().status;
+          const stale = !status?.lastScanTimeMs || Date.now() - status.lastScanTimeMs >= intervalMs;
+          if (!status?.scanInProgress && stale) {
+            await useSearchStore.getState().startScan(app?.environment.homeDir || "");
+          }
+        }
+
+        if (searchMaintenancePreferences.automaticImageDiscoveryEnabled) {
+          await useSmartLibraryStore.getState().load();
+          const smartLibrary = useSmartLibraryStore.getState();
+          const stale = Boolean(
+            smartLibrary.library
+              && Date.now() - smartLibrary.library.lastScannedAtMs >= intervalMs,
+          );
+          const busy = ["scanning", "uploading", "processing", "reindexing"].includes(smartLibrary.phase);
+          if (stale && !busy) await smartLibrary.discoverChanges();
+        }
+      } finally {
+        searchMaintenanceRunningRef.current = false;
+      }
+    };
+
+    const initial = window.setTimeout(() => void maintainSearch(), 4_000);
+    const timer = window.setInterval(() => void maintainSearch(), intervalMs);
+    const resume = () => {
+      if (document.visibilityState === "visible") void maintainSearch();
+    };
+    window.addEventListener("online", maintainSearch);
+    document.addEventListener("visibilitychange", resume);
+    return () => {
+      disposed = true;
+      window.clearTimeout(initial);
+      window.clearInterval(timer);
+      window.removeEventListener("online", maintainSearch);
+      document.removeEventListener("visibilitychange", resume);
+    };
+  }, [
+    app?.environment.homeDir,
+    searchMaintenancePreferences.automaticFileDiscoveryEnabled,
+    searchMaintenancePreferences.automaticImageDiscoveryEnabled,
+    searchMaintenancePreferences.discoveryIntervalMinutes,
+    settings,
+  ]);
+
+  useEffect(() => {
+    const onGlobalSearchShortcut = (event: KeyboardEvent) => {
+      if (!(event.metaKey || event.ctrlKey) || event.altKey || event.key.toLocaleLowerCase() !== "k") return;
+      event.preventDefault();
+      event.stopPropagation();
+      void useSearchStore.getState().openSearch(activePanePath || app?.environment.homeDir || "");
+    };
+    window.addEventListener("keydown", onGlobalSearchShortcut, true);
+    return () => window.removeEventListener("keydown", onGlobalSearchShortcut, true);
+  }, [activePanePath, app?.environment.homeDir]);
 
   useEffect(() => {
     if (!hasTauriInternals()) return;
@@ -963,6 +1045,11 @@ export function DesktopLayout(props: {
         style={desktopFrameStyle}
         onClose={closeSettingsOverlay}
       />
+      <DeepSearchOverlay
+        activePaneId={activePaneId}
+        currentPath={activePanePath || app?.environment.homeDir || ""}
+      />
+      <MediaSearchViewer />
     </main>
   );
 }

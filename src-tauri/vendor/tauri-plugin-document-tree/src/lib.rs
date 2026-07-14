@@ -10,9 +10,9 @@ pub use error::{Error, Result};
 pub use models::*;
 
 mod error;
-mod models;
 #[cfg(target_os = "android")]
 mod mobile;
+mod models;
 
 #[cfg(target_os = "android")]
 use mobile::DocumentTree;

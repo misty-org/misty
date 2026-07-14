@@ -244,6 +244,15 @@ fn normalize_settings_document(document: &mut Value) -> bool {
     );
     changed |= ensure_section_defaults(
         root,
+        "search",
+        &[
+            ("automatic_file_discovery_enabled", json!(true)),
+            ("automatic_image_discovery_enabled", json!(true)),
+            ("discovery_interval_minutes", json!(15)),
+        ],
+    );
+    changed |= ensure_section_defaults(
+        root,
         "transfer_profiles",
         &[
             ("default_profile_id", json!("balanced")),
@@ -638,6 +647,22 @@ mod tests {
             .is_some_and(
                 |notifications| notifications.contains_key("desktop_notifications_enabled")
             ));
+        assert_eq!(
+            document
+                .get("search")
+                .and_then(Value::as_object)
+                .and_then(|search| search.get("automatic_file_discovery_enabled"))
+                .and_then(Value::as_bool),
+            Some(true),
+        );
+        assert_eq!(
+            document
+                .get("search")
+                .and_then(Value::as_object)
+                .and_then(|search| search.get("automatic_image_discovery_enabled"))
+                .and_then(Value::as_bool),
+            Some(true),
+        );
 
         let _ = fs::remove_dir_all(
             settings_path

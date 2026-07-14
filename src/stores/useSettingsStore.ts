@@ -76,6 +76,12 @@ export interface AdvancedPreferences {
   serverAddress: string;
 }
 
+export interface SearchMaintenancePreferences {
+  automaticFileDiscoveryEnabled: boolean;
+  automaticImageDiscoveryEnabled: boolean;
+  discoveryIntervalMinutes: number;
+}
+
 const defaultAdvancedServerAddress = isNativeMobileBuild ? "" : "localhost:50051";
 const deviceNotificationsKey = "device_notifications_enabled";
 const legacyDesktopNotificationsKey = ["desktop", "notifications", "enabled"].join("_");
@@ -428,6 +434,31 @@ export function selectAdvancedPreferences(
     extensionToolsPath: settingsString(source, "advanced", "extension_tools_path", ""),
     mountPath: settingsString(source, "advanced", "mount_path", ".misty/mnt"),
     serverAddress: settingsString(source, "advanced", "server_address", defaultAdvancedServerAddress),
+  };
+}
+
+export function selectSearchMaintenancePreferences(
+  document: Record<string, unknown> | null | undefined,
+): SearchMaintenancePreferences {
+  const source = document ?? {};
+  return {
+    automaticFileDiscoveryEnabled: settingsBoolean(
+      source,
+      "search",
+      "automatic_file_discovery_enabled",
+      true,
+    ),
+    automaticImageDiscoveryEnabled: settingsBoolean(
+      source,
+      "search",
+      "automatic_image_discovery_enabled",
+      true,
+    ),
+    discoveryIntervalMinutes: clampSettingsNumber(
+      settingsNumber(source, "search", "discovery_interval_minutes", 15),
+      5,
+      240,
+    ),
   };
 }
 

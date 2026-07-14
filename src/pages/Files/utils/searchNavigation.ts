@@ -1,5 +1,6 @@
 import type { SearchResult } from "../../../api/types";
 import { useExplorerStore } from "../../../stores/useExplorerStore";
+import { useMediaViewerStore } from "../../../stores/useMediaViewerStore";
 
 export interface ExplorerSearchNavigationTarget {
   result: SearchResult;
@@ -21,6 +22,7 @@ export async function revealSearchResultInPane(
   target: ExplorerSearchNavigationTarget,
 ): Promise<void> {
   await useExplorerStore.getState().navigatePane(paneId, target.path);
+  if (target.result.match?.mediaSegmentId) useMediaViewerStore.getState().open(target.result);
   const pane = useExplorerStore.getState().panes[paneId];
   if (pane?.error) {
     const message = searchResultStaleMessage(target.result);
@@ -34,9 +36,10 @@ export async function revealSearchResultInPane(
     return;
   }
   if (!target.selectEntryId) return;
-  const entryExists = pane?.listing?.entries.some((entry) => entry.id === target.selectEntryId);
-  if (entryExists) {
-    useExplorerStore.getState().selectEntry(paneId, target.selectEntryId);
+  const resolvedEntry = pane?.listing?.entries.find((entry) =>
+    entry.id === target.selectEntryId || normalizePath(entry.path) === normalizePath(target.result.entry.path));
+  if (resolvedEntry) {
+    useExplorerStore.getState().selectEntry(paneId, resolvedEntry.id);
     return;
   }
   useExplorerStore.setState({ operationError: searchResultStaleMessage(target.result) });
@@ -54,4 +57,8 @@ function parentPath(path: string): string {
   const index = normalized.lastIndexOf("/");
   if (index <= 0) return "/";
   return normalized.slice(0, index);
+}
+
+function normalizePath(path: string): string {
+  return path.replace(/\\/g, "/").replace(/\/{2,}/g, "/").replace(/\/$/, "") || "/";
 }

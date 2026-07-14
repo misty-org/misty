@@ -5,6 +5,8 @@ use crate::core::file_sync::FileSyncPairStore;
 #[cfg(desktop)]
 use crate::services::extension_runtime::ExtensionRuntimeService;
 #[cfg(desktop)]
+use crate::services::media_search::MediaSearchService;
+#[cfg(desktop)]
 use crate::services::plugin_commands::PluginCommandService;
 use crate::services::{
     ai::AiService, automations::AutomationService, claude::ClaudeService, commands::CommandService,
@@ -41,6 +43,8 @@ pub struct MistyRuntime {
     pub explorer: ExplorerService,
     pub explorer_library: ExplorerLibraryService,
     pub smart_library: SmartLibraryService,
+    #[cfg(desktop)]
+    pub media_search: MediaSearchService,
     pub workspaces: WorkspaceService,
     pub operation_queue: OperationQueueService,
     pub automations: AutomationService,
@@ -84,6 +88,8 @@ impl MistyRuntime {
             explorer_library.clone(),
         );
         let smart_library = SmartLibraryService::new(environment.clone(), explorer.clone());
+        #[cfg(desktop)]
+        let media_search = MediaSearchService::new(environment.clone());
         let operation_queue = OperationQueueService::new(explorer.clone(), transfers.clone());
         let power_pack = PowerPackService::new(
             environment.clone(),
@@ -124,6 +130,8 @@ impl MistyRuntime {
             explorer,
             explorer_library,
             smart_library,
+            #[cfg(desktop)]
+            media_search,
             workspaces,
             operation_queue,
             automations,
