@@ -79,6 +79,7 @@ func (s *Server) MountHandlers() error {
 		APIKey:  strings.TrimSpace(os.Getenv("AI_GATEWAY_API_KEY")),
 		BaseURL: strings.TrimSpace(os.Getenv("AI_GATEWAY_BASE_URL")),
 	})
+	mediaSearchService := api.NewMediaSearchService(s.Database, &serveragent.SmartLibraryAnalyzer{APIKey: strings.TrimSpace(os.Getenv("AI_GATEWAY_API_KEY")), BaseURL: strings.TrimSpace(os.Getenv("AI_GATEWAY_BASE_URL"))})
 
 	registerHandler := api.RegisterWithTelemetry(s.Database, s.Telemetry)
 	loginHandler := api.Login(s.Database)
@@ -113,6 +114,7 @@ func (s *Server) MountHandlers() error {
 	s.Router.Get("/billing/usage", api.GetBillingUsage(s.Database))
 	s.mountAIRoutes("/ai", aiService)
 	s.mountSmartLibraryRoutes("/ai/smart-library", smartLibraryService)
+	s.mountMediaSearchRoutes("/ai/media-search", mediaSearchService)
 
 	// Compatibility routes for clients configured with the /api prefix.
 	s.Router.Post("/api/register", registerHandler)
@@ -136,6 +138,7 @@ func (s *Server) MountHandlers() error {
 	s.Router.Get("/api/billing/usage", api.GetBillingUsage(s.Database))
 	s.mountAIRoutes("/api/ai", aiService)
 	s.mountSmartLibraryRoutes("/api/ai/smart-library", smartLibraryService)
+	s.mountMediaSearchRoutes("/api/ai/media-search", mediaSearchService)
 
 	// Stripe webhook — called by Stripe on payment events
 	s.Router.Post("/stripe/webhook", api.StripeWebhookWithService(os.Getenv("STRIPE_WEBHOOK_SECRET"), appbilling.NewStripeService(s.Database, appbilling.WithTelemetry(s.Telemetry))))
@@ -143,7 +146,17 @@ func (s *Server) MountHandlers() error {
 	return nil
 }
 
+func (s *Server) mountMediaSearchRoutes(prefix string, service *api.MediaSearchService) {
+	s.Router.Post(prefix+"/chunks", service.IndexChunk())
+	s.Router.Post(prefix+"/search", service.Search())
+	s.Router.Get(prefix+"/status", service.Status())
+}
+
 func (s *Server) mountSmartLibraryRoutes(prefix string, service *api.SmartLibraryService) {
+	s.Router.Post(prefix+"/search", service.GlobalSearch())
+	s.Router.Get(prefix+"/index-status", service.IndexStatus())
+	s.Router.Post(prefix+"/reindex", service.PlanReindex())
+	s.Router.Post(prefix+"/reindex/{jobID}/complete", service.CompleteReindex())
 	s.Router.Post(prefix+"/folders", service.RegisterFolder())
 	s.Router.Post(prefix+"/folders/{folderID}/preflight", service.Preflight())
 	s.Router.Post(prefix+"/folders/{folderID}/sample", service.CreateSample())
@@ -151,6 +164,7 @@ func (s *Server) mountSmartLibraryRoutes(prefix string, service *api.SmartLibrar
 	s.Router.Post(prefix+"/folders/{folderID}/approve", service.Approve("full"))
 	s.Router.Get(prefix+"/folders/{folderID}/progress", service.Progress())
 	s.Router.Get(prefix+"/folders/{folderID}/results", service.Results())
+	s.Router.Put(prefix+"/folders/{folderID}/assets/{assetID}/tags", service.SetAssetTags())
 	s.Router.Post(prefix+"/folders/{folderID}/rescan", service.Rescan())
 	s.Router.Post(prefix+"/folders/{folderID}/search", service.Search())
 	s.Router.Delete(prefix+"/folders/{folderID}", service.Delete())

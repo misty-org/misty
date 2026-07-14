@@ -23,6 +23,10 @@ func TestSmartLibraryHandlersRequireAuthentication(t *testing.T) {
 		{"results", http.MethodGet, "/ai/smart-library/folders/f/results", service.Results()},
 		{"rescan", http.MethodPost, "/ai/smart-library/folders/f/rescan", service.Rescan()},
 		{"search", http.MethodPost, "/ai/smart-library/folders/f/search", service.Search()},
+		{"global search", http.MethodPost, "/ai/smart-library/search", service.GlobalSearch()},
+		{"index status", http.MethodGet, "/ai/smart-library/index-status", service.IndexStatus()},
+		{"plan reindex", http.MethodPost, "/ai/smart-library/reindex", service.PlanReindex()},
+		{"complete reindex", http.MethodPost, "/ai/smart-library/reindex/j/complete", service.CompleteReindex()},
 		{"delete", http.MethodDelete, "/ai/smart-library/folders/f", service.Delete()},
 	}
 	for _, tt := range tests {
