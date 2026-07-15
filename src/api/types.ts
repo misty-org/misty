@@ -269,13 +269,15 @@ export interface MediaAsset {
   durationMs: number;
   sizeBytes: number;
   modifiedMs: number;
-  status: "pending" | "processing" | "indexed" | "failed" | "unsupported";
+  status: "pending" | "queued" | "processing" | "paused" | "indexed" | "failed" | "unsupported";
   indexedFingerprint: string | null;
+  approvedFingerprint: string | null;
+  nextChunkIndex: number;
   failureCode: string | null;
 }
-export interface MediaSearchSnapshot { rootPath: string; maxDurationMinutes: number; assets: MediaAsset[]; ffmpegAvailable: boolean; }
+export interface MediaSearchSnapshot { deviceId:string; legacyAdoptionPending:boolean; rootPath: string; maxDurationMinutes: number; assets: MediaAsset[]; ffmpegAvailable: boolean; removedAssetIds:string[]; }
 export interface PreparedMediaFrame { timestampMs: number; mimeType: "image/jpeg"; base64: string; }
-export interface PreparedMediaChunk { assetId: string; fingerprint: string; mediaType: "audio"|"video"; mimeType: string; durationMs: number; chunkIndex: number; startMs: number; endMs: number; audioMimeType: string|null; audioBase64: string|null; frames: PreparedMediaFrame[]; }
+export interface PreparedMediaChunk { deviceId:string; assetId: string; fingerprint: string; mediaType: "audio"|"video"; mimeType: string; durationMs: number; chunkIndex: number; startMs: number; endMs: number; audioMimeType: string|null; audioBase64: string|null; frames: PreparedMediaFrame[]; }
 export interface ResolvedMediaAsset { assetId: string; path: string; name: string; mediaType: "audio"|"video"; durationMs: number; }
 
 export interface DirectoryListing {
@@ -529,6 +531,11 @@ export interface FolderLibraryStatus {
 
 export interface SmartLibrarySnapshot {
   activeLibrary: FolderLibraryStatus | null;
+}
+
+export interface SmartLibraryImportResult {
+  library: FolderLibraryStatus;
+  importedAssetIds: string[];
 }
 
 export interface SmartLibraryAssetsPageRequest {
@@ -1417,7 +1424,13 @@ export type AutomationNodeKind =
   | "copy_path"
   | "move_path"
   | "rename_path"
-  | "notify";
+  | "notify"
+  | "create_agent";
+
+export interface AutomationNodePolicy {
+  capability: string;
+  mode: "automatic" | "approval";
+}
 
 export interface AutomationPosition {
   x: number;
@@ -1430,6 +1443,7 @@ export interface AutomationNode {
   label: string;
   position: AutomationPosition;
   config: Record<string, unknown>;
+  policy: AutomationNodePolicy[];
 }
 
 export interface AutomationEdge {
@@ -1439,7 +1453,11 @@ export interface AutomationEdge {
 }
 
 export interface AutomationWorkflow {
+  format: "misty.workflow";
+  formatVersion: 1;
   id: string;
+  revision: number;
+  profile: "automation" | "agent" | "universal";
   name: string;
   description: string;
   enabled: boolean;

@@ -3,6 +3,7 @@ import {
   smartLibraryApplyResults,
   smartLibraryAssetsPage,
   smartLibraryDelete,
+  smartLibraryImportFiles,
   smartLibraryPreparePreviews,
   smartLibraryScan,
   smartLibrarySetServerFolderId,
@@ -44,6 +45,7 @@ interface SmartLibraryStore {
   error: string | null;
   load: () => Promise<void>;
   chooseFolder: (rootPath: string) => Promise<void>;
+  addFiles: (paths: string[]) => Promise<void>;
   discoverChanges: () => Promise<void>;
   rescan: () => Promise<void>;
   trySample: () => Promise<void>;
@@ -85,6 +87,45 @@ export const useSmartLibraryStore = create<SmartLibraryStore>((set, get) => ({
     try {
       const library = await smartLibraryScan(rootPath);
       set({ library, phase: "preflight", estimate: library.preflight.estimate, error: null });
+    } catch (error) {
+      set({ phase: "error", error: errorText(error) });
+    }
+  },
+
+  addFiles: async (paths) => {
+    const selected = [...new Set(paths.map((path) => path.trim()).filter(Boolean))];
+    if (selected.length === 0 || get().phase === "uploading" || get().phase === "processing") return;
+    set({ phase: "uploading", error: null });
+    try {
+      const imported = await smartLibraryImportFiles(selected);
+      set({ loaded: true, library: imported.library, estimate: imported.library.preflight.estimate });
+      const selectedAssets = await loadAssetsByIds(new Set(imported.importedAssetIds));
+      const eligible = selectedAssets.filter((asset) => asset.previewSupported && ["pending", "changed", "failed"].includes(asset.status));
+      if (eligible.length === 0) {
+        set({ phase: phaseFromLibrary(imported.library), error: "The selected files are already analyzed or are not supported for Library analysis." });
+        return;
+      }
+
+      const folderId = await ensureServerFolder(imported.library);
+      if (imported.library.serverFolderId) {
+        await submitSmartLibraryRescan(folderId, imported.library.preflight);
+      }
+      let serverProgress = await fetchSmartLibraryProgress(folderId);
+      let sampleIds = new Set(serverProgress.sampleAssetIds ?? []);
+      if (sampleIds.size === 0 && serverProgress.successfulImages === 0) {
+        const sample = await createSmartLibrarySample(folderId, candidatesFromAssets(eligible.slice(0, 25)));
+        sampleIds = new Set(sample.assetIds);
+      }
+      const included = eligible
+        .filter((asset) => sampleIds.has(asset.assetId) && asset.status !== "changed")
+        .map((asset) => asset.assetId);
+      const billable = eligible
+        .filter((asset) => !sampleIds.has(asset.assetId) || asset.status === "changed")
+        .map((asset) => asset.assetId);
+      if (included.length > 0) serverProgress = await analyzeAssets(folderId, included, "sample");
+      if (billable.length > 0) serverProgress = await analyzeAssets(folderId, billable, "full");
+      set({ progress: serverProgress, phase: phaseFromProgress(serverProgress), error: serverProgress.message ?? null });
+      await get().refreshProgress();
     } catch (error) {
       set({ phase: "error", error: errorText(error) });
     }

@@ -1,7 +1,7 @@
 import { memo, useEffect, useRef, useState } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { Bell, type LucideIcon } from "lucide-react";
-import { NavLink, Outlet, useLocation } from "react-router-dom";
+import { Bell, CheckCheck, type LucideIcon } from "lucide-react";
+import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
 import { useExplorerStore, type ExplorerNotification } from "../stores/useExplorerStore";
 import { useProvidersStore } from "../stores/useProvidersStore";
@@ -12,6 +12,9 @@ import {
 import { useAppStore } from "../stores/useAppStore";
 import { hasTauriInternals } from "../shared/tauri";
 import type { AppTab } from "../routing/types";
+import { useSpacesStore } from "../stores/useSpacesStore";
+import { SpacesRealtimeBridge } from "../spaces/SpacesRealtimeBridge";
+import type { SpaceInboxItem } from "../spaces/types";
 
 export type MobileNavItem = {
   id: string;
@@ -47,7 +50,9 @@ export function MobileLayout(props: {
   const notificationPreferences = useSettingsStore(useShallow((state) =>
     selectNotificationPreferences(state.settings?.document),
   ));
-  const unreadActivityCount = useExplorerStore((state) => state.notificationHistory.filter((notification) => !notification.read).length);
+  const localUnreadActivityCount = useExplorerStore((state) => state.notificationHistory.filter((notification) => !notification.read).length);
+  const cloudUnreadActivityCount = useSpacesStore((state) => [...state.inbox.unreads, ...state.inbox.mentions].filter((item) => !item.seen_at).length);
+  const unreadActivityCount = localUnreadActivityCount + cloudUnreadActivityCount;
   const [activityOpen, setActivityOpen] = useState(false);
   const appLoadStarted = useRef(false);
   const routeId = props.getRouteId(location.pathname);
@@ -149,21 +154,33 @@ export function MobileLayout(props: {
       </nav>
 
       <MobileActivitySheet open={activityOpen} onClose={() => setActivityOpen(false)} />
+      <SpacesRealtimeBridge />
     </main>
   );
 }
 
 const MobileActivitySheet = memo(function MobileActivitySheet(props: { open: boolean; onClose: () => void }) {
+  const navigate = useNavigate();
+  const [tab, setTab] = useState<"unreads" | "mentions">("unreads");
   const { history, clearHistory, markRead } = useExplorerStore(useShallow((state) => ({
     history: state.notificationHistory,
     clearHistory: state.clearNotificationHistory,
     markRead: state.markNotificationsRead,
   })));
-  const entries = [...history].reverse();
+  const { inbox, loadInbox, markInboxSeen, clearInbox } = useSpacesStore(useShallow((state) => ({
+    inbox: state.inbox,
+    loadInbox: state.loadInbox,
+    markInboxSeen: state.markInboxSeen,
+    clearInbox: state.clearInbox,
+  })));
+  const entries = tab === "unreads" ? [...history].reverse() : [];
+  const cloudEntries = inbox[tab];
 
   useEffect(() => {
-    if (props.open) markRead();
-  }, [markRead, props.open]);
+    if (!props.open) return;
+    markRead();
+    void markInboxSeen().then(loadInbox);
+  }, [loadInbox, markInboxSeen, markRead, props.open]);
 
   if (!props.open) return null;
 
@@ -181,18 +198,17 @@ const MobileActivitySheet = memo(function MobileActivitySheet(props: { open: boo
         onClick={(event) => event.stopPropagation()}
       >
         <header className="mb-3.5 flex items-center justify-between gap-3">
-          <div>
-            <span className="text-[11px] font-[760] uppercase tracking-normal text-[var(--misty-text-subtle)]">Inbox</span>
-            <h2 className="m-0 text-xl leading-[1.15] text-[var(--misty-text)]">Activity</h2>
-          </div>
+          <h2 className="m-0 text-xl leading-[1.15] text-[var(--misty-text)]">Activity</h2>
           <div className="flex gap-2">
             <button
               type="button"
-              className="min-h-11 rounded-lg border border-[var(--misty-border-soft)] bg-[var(--misty-surface-2)] px-2.5 text-[var(--misty-text)] disabled:opacity-55"
-              onClick={clearHistory}
-              disabled={entries.length === 0}
+              className="grid size-11 place-items-center rounded-xl border border-[var(--misty-border-soft)] bg-[var(--misty-surface-2)] p-0 text-[var(--misty-text)] disabled:opacity-55"
+              onClick={() => { if (tab === "unreads") clearHistory(); void clearInbox(tab); }}
+              disabled={entries.length + cloudEntries.length === 0}
+              aria-label="Clear all activity"
+              title="Clear all activity"
             >
-              Clear
+              <CheckCheck size={21} strokeWidth={2} />
             </button>
             <button
               type="button"
@@ -203,14 +219,18 @@ const MobileActivitySheet = memo(function MobileActivitySheet(props: { open: boo
             </button>
           </div>
         </header>
-        {entries.length > 0 ? (
+        <div className="mb-3 grid grid-cols-2 border-b border-[var(--misty-border-soft)]">
+          {(["unreads", "mentions"] as const).map((item) => <button className={`relative h-10 border-0 bg-transparent text-xs font-semibold capitalize ${tab === item ? "text-white after:absolute after:inset-x-2 after:bottom-0 after:h-0.5 after:rounded-full after:bg-violet-400" : "text-[#8792a0]"}`} type="button" key={item} onClick={() => setTab(item)}>{item}{inbox[item].length ? <span className="ml-1.5 rounded-full bg-white/10 px-1.5 py-0.5 text-[9px]">{formatBadgeCount(inbox[item].length)}</span> : null}</button>)}
+        </div>
+        {entries.length + cloudEntries.length > 0 ? (
           <div className="grid gap-2">
+            {cloudEntries.map((entry) => <MobileCloudActivityEntry key={entry.id} entry={entry} onOpen={() => { navigate(`/spaces/${encodeURIComponent(entry.space_id)}/chat${entry.message_id ? `?message=${encodeURIComponent(entry.message_id)}` : ""}`); props.onClose(); }} />)}
             {entries.map((entry) => <MobileActivityEntry key={entry.id} entry={entry} />)}
           </div>
         ) : (
           <div className="grid min-h-[220px] place-items-center gap-1.5 text-center text-[#a3adba]">
-            <h3 className="m-0 text-lg text-[var(--misty-text)]">No activity yet</h3>
-            <p className="m-0 max-w-60">Transfer updates and local notices will appear here.</p>
+            <h3 className="m-0 text-lg text-[var(--misty-text)]">{tab === "mentions" ? "No mentions" : "You’re all caught up"}</h3>
+            <p className="m-0 max-w-60">{tab === "mentions" ? "Mentions and Agent replies will appear here." : "Space messages and local notices will appear here."}</p>
           </div>
         )}
       </section>
@@ -218,10 +238,14 @@ const MobileActivitySheet = memo(function MobileActivitySheet(props: { open: boo
   );
 });
 
+function MobileCloudActivityEntry(props: { entry: SpaceInboxItem; onOpen: () => void }) {
+  const preview = typeof props.entry.payload.preview === "string" ? props.entry.payload.preview : "";
+  return <button className="border-0 border-b border-[var(--misty-border-soft)] bg-transparent py-2.5 text-left" type="button" onClick={props.onOpen}><small className="block text-[10px] font-semibold text-violet-300">{props.entry.space_name}</small><span className="block text-sm text-[var(--misty-text)]">{preview || (props.entry.kind === "mention" ? "You were mentioned" : "New activity")}</span><time className="text-[11px] text-[var(--misty-text-subtle)]">{formatActivityTime(new Date(props.entry.created_at).getTime())}</time></button>;
+}
+
 function MobileActivityEntry(props: { entry: ExplorerNotification }) {
   return (
-    <article className="grid grid-cols-[10px_minmax(0,1fr)] gap-2.5 border-0 border-b border-[var(--misty-border-soft)] bg-transparent p-0 py-2.5">
-      <span className={`mt-1.5 h-2 w-2 rounded-full ${props.entry.type === "error" ? "bg-[var(--misty-danger)]" : "bg-[var(--misty-accent)]"}`} />
+    <article className="border-0 border-b border-[var(--misty-border-soft)] bg-transparent p-0 py-2.5">
       <div>
         <p className="m-0 text-[var(--misty-text)]">{props.entry.message}</p>
         <time className="text-[11px] text-[var(--misty-text-subtle)]">{formatActivityTime(props.entry.createdAtMs)}</time>

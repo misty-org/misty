@@ -14,6 +14,8 @@ import { useMultiPanelStore } from "../../../shared/multipanel/useMultiPanelStor
 import { errorText } from "../../../shared/format";
 import { safeTauriAssetUrl } from "../../../shared/tauri";
 import { cx } from "./ExplorerDesktopShared";
+import { AgentSources } from "../../../agents/AgentSources";
+import "../../../agents/sources.css";
 
 export const assistantPanelStyles = {
   mikaResizer:
@@ -264,6 +266,7 @@ export const ExplorerChatOverlay = memo(function ExplorerChatOverlay() {
             <article key={message.id} className={assistantMessageClass(message.role, "chat")}>
               <strong className={assistantPanelStyles.messageTitle}>{message.role === "user" ? "You" : message.role === "tool" ? "Tool" : message.role === "error" ? "Error" : "Mika"}</strong>
               <pre className={assistantPanelStyles.messageText}>{message.text || (message.role === "assistant" && running ? "Thinking..." : "")}</pre>
+              {message.citations?.length ? <AgentSources citations={message.citations} compact /> : null}
               {message.creditsUsed !== undefined ? <small className="text-[10px] text-[#858993]">{message.creditsUsed} credits · {message.creditsRemaining?.toLocaleString() ?? 0} remaining</small> : null}
               {message.toolRequestId ? <AssistantToolActions requestId={message.toolRequestId} approvals={toolApprovals} onApprove={approveToolRequest} /> : null}
               {message.planId ? <AssistantPlanActions planId={message.planId} plans={plans} onApply={approvePlan} /> : null}
@@ -490,6 +493,7 @@ export const ExplorerMikaPanel = memo(function ExplorerMikaPanel(props: {
             <article key={message.id} className={assistantMessageClass(message.role, "mika")}>
               <strong className={assistantPanelStyles.messageTitle}>{message.role === "user" ? "You" : message.role === "tool" ? "Tool" : message.role === "error" ? "Error" : "Mika"}</strong>
               <pre className={assistantPanelStyles.messageText}>{message.text || (message.role === "assistant" && running ? "Thinking..." : "")}</pre>
+              {message.citations?.length ? <AgentSources citations={message.citations} compact /> : null}
               {message.creditsUsed !== undefined ? <small className="text-[10px] text-[#858993]">{message.creditsUsed} credits · {message.creditsRemaining?.toLocaleString() ?? 0} remaining</small> : null}
               {message.toolRequestId ? <AssistantToolActions requestId={message.toolRequestId} approvals={toolApprovals} onApprove={approveToolRequest} /> : null}
               {message.planId ? <AssistantPlanActions planId={message.planId} plans={plans} onApply={approvePlan} /> : null}

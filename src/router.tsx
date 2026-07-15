@@ -12,7 +12,6 @@ import ChangelogPage from "./pages/Changelog";
 import ExtensionsPage from "./pages/Extensions";
 import FilesPage from "./pages/Files";
 import HomePage from "./pages/Home";
-import LibraryPage from "./pages/Library";
 import CloudFolderBotOverlay from "./pages/BotOverlay/CloudFolderBotOverlay";
 import CloudFolderBotChatOverlay from "./pages/BotOverlay/CloudFolderBotChatOverlay";
 import ProvidersPage from "./pages/Providers";
@@ -20,7 +19,8 @@ import RegisterPage from "./pages/Register";
 import SettingsPage from "./pages/Settings";
 import SignInPage from "./pages/SignIn";
 import TransfersPage from "./pages/Transfers";
-import AutomationsPage from "./pages/Automations";
+import SpacesShell, { PersonalSpaceRedirect, SpaceDetail } from "./pages/Spaces";
+import StudioPage from "./pages/Studio";
 import type { DesktopNavItem } from "./layouts/DesktopLayout";
 import {
   MobileLayout,
@@ -45,6 +45,7 @@ const routes = {
   accountSettings: "/account/settings",
   accountSignIn: "/account/signin",
   activity: "/activity",
+  agents: "/agents",
   automations: "/automations",
   changelog: "/changelog",
   diagnostics: "/diagnostics",
@@ -53,6 +54,11 @@ const routes = {
   files: "/files",
   home: "/home",
   library: "/library",
+  spaces: "/spaces",
+  spacePersonal: "/spaces/personal",
+  studio: "/studio",
+  studioAgents: "/studio/agents",
+  studioWorkflows: "/studio/workflows",
   providers: "/providers",
   register: "/register",
   settings: "/settings",
@@ -67,7 +73,8 @@ const appPageTitles = new Map<string, string>([
   ...(isPhoneBuild ? [] : [
     [routes.home, "Misty - Home"],
     [routes.extensions, "Misty - Extensions"],
-    [routes.library, "Misty - Library"],
+    [routes.spaces, "Misty - Spaces"],
+    [routes.studio, "Misty - Studio"],
     [routes.changelog, "Misty - Changelog"],
     [routes.signIn, "Misty - Sign In"],
     [routes.register, "Misty - Register"],
@@ -91,8 +98,8 @@ const desktopNavItems = (isPhoneBuild ? [] : [
       pathname === routes.home || pathname.startsWith(routes.changelog),
   },
   { id: "files", label: "Files", path: routes.files, icon: Folder },
-  { id: "library", label: "Library", path: routes.library, icon: LibraryBig },
-  { id: "automations", label: "Automations", path: routes.automations, icon: Workflow },
+  { id: "spaces", label: "Spaces", path: routes.spacePersonal, icon: LibraryBig, active: (pathname: string) => pathname.startsWith(routes.spaces) },
+  { id: "studio", label: "Studio", path: routes.studioAgents, icon: Workflow, active: (pathname: string) => pathname.startsWith(routes.studio) },
   ...(isAndroidBuild ? [] : [
   {
     id: "extensions",
@@ -118,6 +125,9 @@ const mobileDeepLinkPrefixes = [
   routes.providers,
   routes.transfers,
   routes.automations,
+  routes.agents,
+  routes.spaces,
+  routes.studio,
   routes.account,
   routes.settings,
 ];
@@ -125,6 +135,8 @@ const desktopDeepLinkPrefixes = isPhoneBuild ? [] : [
   routes.transfers,
   ...mobileDeepLinkPrefixes,
   routes.home,
+  routes.spaces,
+  routes.studio,
   routes.library,
   routes.extensions,
   routes.changelog,
@@ -151,7 +163,7 @@ export const router = createBrowserRouter([
         children: [
           { index: true, element: <StartupRedirect /> },
           { path: "files", element: <FilesPage /> },
-          { path: "library", element: <LibraryPage /> },
+          { path: "library", element: <Navigate to={routes.spacePersonal} replace /> },
           { path: "providers", element: <ProvidersPage /> },
           {
             path: "transfers",
@@ -161,14 +173,25 @@ export const router = createBrowserRouter([
           {
             element: <AppPagesLayout />,
             children: [
+              { path: "agents", element: <Navigate to={routes.studioAgents} replace /> },
+              { path: "automations", element: <Navigate to={routes.studioWorkflows} replace /> },
               {
-                path: "automations",
-                element: (
-                  <ResponsiveRoute
-                    desktop={isAndroidBuild ? <Navigate to={routes.files} replace /> : <AutomationsPage />}
-                    mobile={<Navigate to={routes.files} replace />}
-                  />
-                ),
+                path: "spaces",
+                element: <ResponsiveRoute desktop={isAndroidBuild ? <Navigate to={routes.files} replace /> : <SpacesShell />} mobile={<Navigate to={routes.files} replace />} />,
+                children: [
+                  { index: true, element: <Navigate to={routes.spacePersonal} replace /> },
+                  { path: "personal", element: <PersonalSpaceRedirect /> },
+                  { path: ":spaceId", element: <Navigate to="chat" replace /> },
+                  { path: ":spaceId/:section", element: <SpaceDetail /> },
+                ],
+              },
+              {
+                path: "studio/agents",
+                element: <ResponsiveRoute desktop={isAndroidBuild ? <Navigate to={routes.files} replace /> : <StudioPage kind="agents" />} mobile={<Navigate to={routes.files} replace />} />,
+              },
+              {
+                path: "studio/workflows",
+                element: <ResponsiveRoute desktop={isAndroidBuild ? <Navigate to={routes.files} replace /> : <StudioPage kind="workflows" />} mobile={<Navigate to={routes.files} replace />} />,
               },
               {
                 path: "home",
@@ -377,8 +400,8 @@ function ResponsiveRoute(props: {
 }
 
 function desktopRouteIdFromPath(pathname: string): AppTab {
-  if (pathname.startsWith(routes.library)) return "library";
-  if (pathname.startsWith(routes.automations)) return "automations";
+  if (pathname.startsWith(routes.spaces) || pathname.startsWith(routes.library)) return "spaces";
+  if (pathname.startsWith(routes.studio) || pathname.startsWith(routes.agents) || pathname.startsWith(routes.automations)) return "studio";
   if (pathname.startsWith(routes.transfers)) return "transfers";
   if (pathname.startsWith(routes.providers)) return "providers";
   if (pathname.startsWith(routes.account)) return "account";

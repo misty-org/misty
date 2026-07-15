@@ -258,7 +258,6 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
   const transferRefreshInFlightRef = useRef(false);
   const deviceRefreshInFlightRef = useRef(false);
   const deviceRefreshMountedRef = useRef(true);
-  const lastOperationErrorToastRef = useRef<string | null>(null);
   const [resizeTarget, setResizeTarget] = useState<ResizeTarget>(null);
   const [pluginCommands, setPluginCommands] = useState<PluginCommandEntry[]>(emptyPluginCommands);
   const [pluginPanels, setPluginPanels] = useState<PluginPanelEntry[]>(emptyPluginPanels);
@@ -352,13 +351,12 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
   }, [app?.environment.homeDir, homePath, initialize, settingsLoaded]);
 
   useEffect(() => {
-    if (!operationError) {
-      lastOperationErrorToastRef.current = null;
-      return;
-    }
-    if (lastOperationErrorToastRef.current === operationError) return;
-    lastOperationErrorToastRef.current = operationError;
-    pushNotification(operationError, "error", 4500);
+    if (!operationError) return;
+    const message = useExplorerStore.getState().consumeOperationError();
+    if (!message) return;
+    const recoveredWorkspace = message.startsWith("Misty reset a damaged Explorer layout")
+      || message.startsWith("Workspace layout could not be restored");
+    pushNotification(message, recoveredWorkspace ? "info" : "error", 4500);
   }, [operationError, pushNotification]);
 
   useEffect(() => {

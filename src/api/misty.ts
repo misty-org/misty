@@ -111,6 +111,7 @@ import type {
   SmartLibraryAsset,
   SmartLibraryAssetsPage,
   SmartLibraryAssetsPageRequest,
+  SmartLibraryImportResult,
   SmartLibrarySnapshot,
   ResolvedSmartLibraryAsset,
   MediaSearchSnapshot,
@@ -118,6 +119,7 @@ import type {
   ResolvedMediaAsset,
 } from "./types";
 import { hasTauriInternals } from "../shared/tauri";
+import type { MfWorkflowDocument, MfWorkflowFile } from "../workflows/mf";
 
 function invoke<T>(command: string, args?: Record<string, unknown>): Promise<T> {
   if (!hasTauriInternals()) {
@@ -155,6 +157,14 @@ export function automationsRun(request: AutomationRunRequest): Promise<Automatio
 
 export function automationsResolveApproval(approvalId: string, approved: boolean): Promise<AutomationSnapshot> {
   return invoke("automations_resolve_approval", { approvalId, approved });
+}
+
+export function workflowsWriteMf(document: MfWorkflowDocument): Promise<MfWorkflowFile> {
+  return invoke("workflows_write_mf", { document });
+}
+
+export function workflowsReadMf(path: string): Promise<MfWorkflowFile> {
+  return invoke("workflows_read_mf", { path });
 }
 
 export function storageSnapshot(): Promise<StorageSnapshot> {
@@ -348,6 +358,10 @@ export function smartLibraryScan(rootPath: string): Promise<FolderLibraryStatus>
   return invoke("smart_library_scan", { request: { rootPath } });
 }
 
+export function smartLibraryImportFiles(paths: string[]): Promise<SmartLibraryImportResult> {
+  return invoke("smart_library_import_files", { request: { paths } });
+}
+
 export function smartLibraryPreparePreviews(assetIds: string[], maxDimension = 512): Promise<PreparedSmartLibraryPreview[]> {
   return invoke("smart_library_prepare_previews", { request: { assetIds, maxDimension } });
 }
@@ -380,6 +394,12 @@ export function mediaSearchScanMovies(): Promise<MediaSearchSnapshot> { return i
 export function mediaSearchSnapshot(): Promise<MediaSearchSnapshot> { return invoke("media_search_snapshot"); }
 export function mediaSearchPrepareChunk(assetId: string, chunkIndex: number): Promise<PreparedMediaChunk> { return invoke("media_search_prepare_chunk", { request: { assetId, chunkIndex } }); }
 export function mediaSearchComplete(assetId: string, fingerprint: string, failureCode?: string | null): Promise<MediaSearchSnapshot> { return invoke("media_search_complete", { request: { assetId, fingerprint, failureCode: failureCode ?? null } }); }
+export function mediaSearchApproveAssets(assetIds:string[]):Promise<MediaSearchSnapshot>{return invoke("media_search_approve_assets",{request:{assetIds}});}
+export function mediaSearchAcknowledgeRemovedAssets(assetIds:string[]):Promise<MediaSearchSnapshot>{return invoke("media_search_acknowledge_removed_assets",{request:{assetIds}});}
+export function mediaSearchRecordChunk(assetId:string,fingerprint:string,chunkIndex:number):Promise<MediaSearchSnapshot>{return invoke("media_search_record_chunk",{request:{assetId,fingerprint,chunkIndex}});}
+export function mediaSearchSetAssetState(assetId:string,state:"paused"|"queued"|"reset"):Promise<MediaSearchSnapshot>{return invoke("media_search_set_asset_state",{request:{assetId,state}});}
+export function mediaSearchResetDeviceIndex():Promise<MediaSearchSnapshot>{return invoke("media_search_reset_device_index");}
+export function mediaSearchCompleteLegacyAdoption(ready:boolean):Promise<MediaSearchSnapshot>{return invoke("media_search_complete_legacy_adoption",{request:{ready}});}
 export function mediaSearchResolveAssets(assetIds: string[]): Promise<ResolvedMediaAsset[]> { return invoke("media_search_resolve_assets", { request: { assetIds } }); }
 
 export function explorerOpenWith(applicationPath: string, filePath: string): Promise<void> {

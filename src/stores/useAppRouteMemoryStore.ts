@@ -11,7 +11,7 @@ interface AppRouteMemoryStore {
 const defaultAppRoute = "/files";
 const desktopRememberableRoutes = isNativeMobileBuild
   ? []
-  : ["/home", "/library", "/extensions", "/changelog"];
+  : ["/home", "/spaces/personal", "/studio/agents", "/studio/workflows", "/extensions", "/changelog"];
 
 export const useAppRouteMemoryStore = create<AppRouteMemoryStore>()(
   persist(
@@ -39,13 +39,18 @@ export function isRememberableAppRoute(path: string): boolean {
     pathname === "/providers" ||
     pathname === "/transfers" ||
     pathname === "/account" ||
-    desktopRememberableRoutes.includes(pathname)
+    desktopRememberableRoutes.includes(pathname) ||
+    pathname.startsWith("/spaces/") ||
+    pathname.startsWith("/studio/")
   );
 }
 
 function normalizeRememberedRoute(path: string): string | null {
   const pathname = pathnameFromRoute(path);
   if (!isRememberableAppRoute(pathname)) return null;
+  if (pathname === "/library") return "/spaces/personal";
+  if (pathname === "/agents") return "/studio/agents";
+  if (pathname === "/automations") return "/studio/workflows";
   return pathname;
 }
 
