@@ -1,6 +1,11 @@
 package main
 
 import (
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
+	"encoding/base64"
+	"encoding/pem"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -82,6 +87,87 @@ func TestCreateServerAndMountHandlers(t *testing.T) {
 	server.Router.ServeHTTP(rec, req)
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("POST /api/login status = %d, want %d", rec.Code, http.StatusBadRequest)
+	}
+}
+
+func TestCreateServerRejectsProductionMemoryAgentAttachmentStore(t *testing.T) {
+	t.Setenv("PASSWORD_RESET_URL", "http://localhost:5173/reset")
+	t.Setenv("PASSWORD_RESET_START_URL", "http://localhost:8080/auth/reset/start")
+	t.Setenv("MISTY_ENVIRONMENT", "production")
+	t.Setenv("MISTY_AGENT_DOCUMENTS_ENABLED", "true")
+	t.Setenv("DOCUMENT_STORE", "memory")
+	t.Setenv("DOCUMENT_SIGNING_KEY", strings.Repeat("k", 32))
+	t.Setenv("DOCUMENT_KEY_ID", "test-current")
+	t.Setenv("DOCUMENT_PRIVATE_KEY_B64", testAgentAttachmentPrivateKey(t))
+
+	if _, err := CreateServer(); err == nil || !strings.Contains(err.Error(), "not allowed in production") {
+		t.Fatalf("CreateServer() error = %v, want production memory-store rejection", err)
+	}
+}
+
+func testAgentAttachmentPrivateKey(t *testing.T) string {
+	t.Helper()
+	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pemBytes := pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: mustMarshalPKCS8(t, key)})
+	return base64.StdEncoding.EncodeToString(pemBytes)
+}
+
+func mustMarshalPKCS8(t *testing.T, key *rsa.PrivateKey) []byte {
+	t.Helper()
+	encoded, err := x509.MarshalPKCS8PrivateKey(key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return encoded
+}
+
+func TestCreateServerRejectsMissingAgentAttachmentSigningKey(t *testing.T) {
+	t.Setenv("PASSWORD_RESET_URL", "http://localhost:5173/reset")
+	t.Setenv("PASSWORD_RESET_START_URL", "http://localhost:8080/auth/reset/start")
+	t.Setenv("MISTY_ENVIRONMENT", "production")
+	t.Setenv("MISTY_AGENT_DOCUMENTS_ENABLED", "true")
+	t.Setenv("DOCUMENT_STORE", "r2")
+	t.Setenv("S3_ENDPOINT", "https://account-id.r2.cloudflarestorage.com")
+	t.Setenv("S3_BUCKET", "misty-agent-attachments")
+	t.Setenv("S3_ACCESS_KEY", "test-access")
+	t.Setenv("S3_SECRET_KEY", "test-secret")
+	t.Setenv("S3_PRIVATE", "true")
+	t.Setenv("S3_LIFECYCLE_DAYS", "2")
+	t.Setenv("DOCUMENT_SIGNING_KEY", "")
+
+	if _, err := CreateServer(); err == nil || !strings.Contains(err.Error(), "signing-key") {
+		t.Fatalf("CreateServer() error = %v, want missing signing-key rejection", err)
+	}
+}
+
+func TestCreateServerConfiguresCloudflareR2AgentAttachmentStore(t *testing.T) {
+	t.Setenv("PASSWORD_RESET_URL", "http://localhost:5173/reset")
+	t.Setenv("PASSWORD_RESET_START_URL", "http://localhost:8080/auth/reset/start")
+	t.Setenv("MAILJET_API_KEY", "")
+	t.Setenv("MAILJET_SECRET_KEY", "")
+	t.Setenv("MAILJET_FROM_EMAIL", "")
+	t.Setenv("MISTY_ENVIRONMENT", "production")
+	t.Setenv("MISTY_AGENT_DOCUMENTS_ENABLED", "true")
+	t.Setenv("DOCUMENT_STORE", "r2")
+	t.Setenv("S3_ENDPOINT", "https://account-id.r2.cloudflarestorage.com")
+	t.Setenv("S3_BUCKET", "misty-agent-attachments")
+	t.Setenv("S3_ACCESS_KEY", "test-access")
+	t.Setenv("S3_SECRET_KEY", "test-secret")
+	t.Setenv("S3_PRIVATE", "true")
+	t.Setenv("S3_LIFECYCLE_DAYS", "2")
+	t.Setenv("DOCUMENT_SIGNING_KEY", strings.Repeat("k", 32))
+	t.Setenv("DOCUMENT_KEY_ID", "test-current")
+	t.Setenv("DOCUMENT_PRIVATE_KEY_B64", testAgentAttachmentPrivateKey(t))
+
+	server, err := CreateServer()
+	if err != nil {
+		t.Fatalf("CreateServer() error = %v", err)
+	}
+	if server.AgentAttachmentStore == nil {
+		t.Fatal("CreateServer() did not configure R2 attachment store")
 	}
 }
 

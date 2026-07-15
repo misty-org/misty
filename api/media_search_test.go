@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -27,7 +28,7 @@ func TestMediaSearchHandlersRequireAuthentication(t *testing.T) {
 	}
 }
 func TestMediaIndexValidationEnforcesScopeAndDuration(t *testing.T) {
-	valid := mediaIndexRequest{AssetID: "media_0123456789abcdef0123456789abcdef", Fingerprint: strings.Repeat("a", 64), MediaType: "video", MimeType: "video/mp4", DurationMS: 7_200_000, ChunkIndex: 239, StartMS: 7_170_000, EndMS: 7_200_000}
+	valid := mediaIndexRequest{DeviceID: "device_0123456789abcdef0123456789abcdef", AssetID: "media_0123456789abcdef0123456789abcdef", Fingerprint: strings.Repeat("a", 64), MediaType: "video", MimeType: "video/mp4", DurationMS: 7_200_000, ChunkIndex: 239, StartMS: 7_170_000, EndMS: 7_200_000}
 	if !validMediaIndexRequest(valid) {
 		t.Fatal("valid 120-minute final chunk rejected")
 	}
@@ -41,7 +42,7 @@ func TestMediaIndexValidationEnforcesScopeAndDuration(t *testing.T) {
 
 func TestMediaIndexValidationFoldsTinyFinalTail(t *testing.T) {
 	mime, audio := "audio/mpeg", "YQ=="
-	valid := mediaIndexRequest{AssetID: "media_0123456789abcdef0123456789abcdef", Fingerprint: strings.Repeat("a", 64), MediaType: "video", MimeType: "video/mp4", DurationMS: 120_186, ChunkIndex: 3, StartMS: 90_000, EndMS: 120_186, AudioMimeType: &mime, AudioBase64: &audio}
+	valid := mediaIndexRequest{DeviceID: "device_0123456789abcdef0123456789abcdef", AssetID: "media_0123456789abcdef0123456789abcdef", Fingerprint: strings.Repeat("a", 64), MediaType: "video", MimeType: "video/mp4", DurationMS: 120_186, ChunkIndex: 3, StartMS: 90_000, EndMS: 120_186, AudioMimeType: &mime, AudioBase64: &audio}
 	if !validMediaIndexRequest(valid) {
 		t.Fatal("folded final chunk rejected")
 	}
@@ -97,8 +98,38 @@ func TestMediaPreviewSignatures(t *testing.T) {
 
 func TestMediaSemanticSearchDegradesWithoutAnalyzer(t *testing.T) {
 	service := NewMediaSearchService(&db.Database{}, nil)
-	if _, err := service.cachedEmbedding(context.Background(), "user", "grocery store"); err == nil {
+	if _, err := service.cachedEmbedding(context.Background(), "user", "device_0123456789abcdef0123456789abcdef", "grocery store"); err == nil {
 		t.Fatal("missing analyzer should return a controlled error")
+	}
+}
+
+func TestMediaProviderGuardBoundsPerUserAndGlobalConcurrency(t *testing.T) {
+	service := NewMediaSearchService(&db.Database{}, nil)
+	release, allowed := service.acquireProviderSlot("same-user")
+	if !allowed {
+		t.Fatal("first request should be admitted")
+	}
+	if _, allowed = service.acquireProviderSlot("same-user"); allowed {
+		t.Fatal("a second concurrent request for one user must be rejected")
+	}
+	releases := []func(){release}
+	for index := 1; index < aiGlobalMaxConcurrent; index++ {
+		next, admitted := service.acquireProviderSlot("user-" + strconv.Itoa(index))
+		if !admitted {
+			t.Fatalf("global slot %d was unexpectedly rejected", index)
+		}
+		releases = append(releases, next)
+	}
+	if _, allowed = service.acquireProviderSlot("overflow"); allowed {
+		t.Fatal("global provider concurrency limit was not enforced")
+	}
+	for _, done := range releases {
+		done()
+	}
+	if done, admitted := service.acquireProviderSlot("same-user"); !admitted {
+		t.Fatal("released provider slot was not reusable")
+	} else {
+		done()
 	}
 }
 

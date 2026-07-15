@@ -19,15 +19,34 @@ func (provider namedTestProvider) Next(ModelRequest) (ModelResponse, error) {
 }
 
 type recordingUsageMeter struct {
+	userID   string
+	key      string
 	provider string
 	model    string
 	releases int
 }
 
-func (meter *recordingUsageMeter) Reserve(_ string, _ string, _ string, provider, model string, _, _ int64) (*UsageReservation, error) {
+func (meter *recordingUsageMeter) Reserve(userID string, key string, _ string, provider, model string, _, _ int64) (*UsageReservation, error) {
+	meter.userID = userID
+	meter.key = key
 	meter.provider = provider
 	meter.model = model
 	return &UsageReservation{ID: "reservation", ReservedCredits: 10}, nil
+}
+
+func TestAgentJobSessionBillsRequesterWithJobIdempotency(t *testing.T) {
+	meter := &recordingUsageMeter{}
+	service := NewService(nil, namedTestProvider{provider: "gateway", model: "model", text: "done"}, WithUsageMeter(meter))
+	session := service.CreateSessionForJob("owner-user", "requester-user", "job_123")
+	if err := service.SendMessage(session.ID, "owner-user", AgentMessageRequest{UserMessage: "summarize"}); err != nil {
+		t.Fatal(err)
+	}
+	if meter.userID != "requester-user" {
+		t.Fatalf("job billed %q, want requester", meter.userID)
+	}
+	if meter.key != "agent-job:job_123:1" {
+		t.Fatalf("job billing key = %q", meter.key)
+	}
 }
 
 func (*recordingUsageMeter) Settle(*UsageReservation, string, string, string, string, ModelUsage) (UsageSettlement, error) {

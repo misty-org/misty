@@ -13,6 +13,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/go-chi/chi/v5"
 	serveragent "github.com/kannachi323/misty/server/agent"
 	"github.com/kannachi323/misty/server/db"
 )
@@ -28,17 +29,25 @@ const (
 )
 
 type MediaSearchService struct {
-	database   *db.Database
-	analyzer   *serveragent.SmartLibraryAnalyzer
-	cacheMu    sync.Mutex
-	queryCache map[[32]byte]cachedSemanticQuery
+	database      *db.Database
+	analyzer      *serveragent.SmartLibraryAnalyzer
+	cacheMu       sync.Mutex
+	queryCache    map[[32]byte]cachedSemanticQuery
+	guardMu       sync.Mutex
+	inFlightUsers map[string]struct{}
+	inFlightTotal int
 }
 
 func NewMediaSearchService(database *db.Database, analyzer *serveragent.SmartLibraryAnalyzer) *MediaSearchService {
-	return &MediaSearchService{database: database, analyzer: analyzer, queryCache: map[[32]byte]cachedSemanticQuery{}}
+	return &MediaSearchService{
+		database: database, analyzer: analyzer,
+		queryCache:    map[[32]byte]cachedSemanticQuery{},
+		inFlightUsers: map[string]struct{}{},
+	}
 }
 
 type mediaIndexRequest struct {
+	DeviceID      string  `json:"deviceId"`
 	AssetID       string  `json:"assetId"`
 	Fingerprint   string  `json:"fingerprint"`
 	MediaType     string  `json:"mediaType"`
@@ -102,7 +111,14 @@ func (s *MediaSearchService) IndexChunk() http.HandlerFunc {
 			http.Error(w, "media chunk too large", http.StatusRequestEntityTooLarge)
 			return
 		}
-		asset := db.MediaSearchAsset{AssetID: body.AssetID, Fingerprint: body.Fingerprint, MediaType: body.MediaType, MimeType: body.MimeType, DurationMS: body.DurationMS}
+		releaseProviderSlot, allowed := s.acquireProviderSlot(userID)
+		if !allowed {
+			w.Header().Set("Retry-After", "2")
+			writeJSON(w, http.StatusTooManyRequests, map[string]any{"code": "media_search_busy", "message": "Another media chunk is currently processing. Misty will retry it shortly.", "retry_after_seconds": 2})
+			return
+		}
+		defer releaseProviderSlot()
+		asset := db.MediaSearchAsset{DeviceID: body.DeviceID, AssetID: body.AssetID, Fingerprint: body.Fingerprint, MediaType: body.MediaType, MimeType: body.MimeType, DurationMS: body.DurationMS}
 		claimed, err := s.database.ClaimMediaSearchChunk(userID, asset, body.ChunkIndex, body.StartMS, body.EndMS)
 		if errors.Is(err, db.ErrMediaChunkBusy) {
 			writeJSON(w, 409, map[string]any{"code": "media_chunk_processing", "message": "This media chunk is already processing."})
@@ -121,9 +137,9 @@ func (s *MediaSearchService) IndexChunk() http.HandlerFunc {
 		if license, licenseErr := s.database.GetLicenseByUserID(userID); licenseErr == nil && license != nil {
 			tier = license.Tier
 		}
-		reservation, _, err := s.database.ReserveCredits(userID, tier, db.CreditMeterMediaSearchMinute, "media-search:"+body.AssetID+":"+fmtInt(int64(body.ChunkIndex))+":"+body.Fingerprint+":"+fmtInt(time.Now().UnixNano()), credits, time.Now())
+		reservation, _, err := s.database.ReserveCredits(userID, tier, db.CreditMeterMediaSearchMinute, "media-search:"+body.DeviceID+":"+body.AssetID+":"+fmtInt(int64(body.ChunkIndex))+":"+body.Fingerprint+":"+fmtInt(time.Now().UnixNano()), credits, time.Now())
 		if err != nil {
-			_ = s.database.FailMediaSearchChunk(userID, body.AssetID, body.ChunkIndex, "billing_failed")
+			_ = s.database.FailMediaSearchChunk(userID, body.DeviceID, body.AssetID, body.ChunkIndex, "billing_failed")
 			var insufficient db.InsufficientCreditsError
 			if errors.As(err, &insufficient) {
 				writeJSON(w, 402, map[string]any{"code": "insufficient_credits", "message": "Not enough Mika credits to index this media.", "requiredCredits": float64(insufficient.Required) / float64(db.CreditDenominationScale), "availableCredits": float64(insufficient.Available) / float64(db.CreditDenominationScale)})
@@ -144,7 +160,7 @@ func (s *MediaSearchService) IndexChunk() http.HandlerFunc {
 			transcript, usage, transcribeErr := s.analyzer.TranscribeMedia(r.Context(), audio, valueOr(body.AudioMimeType, "audio/mpeg"), body.EndMS-body.StartMS)
 			addUsage(&totalUsage, usage)
 			if transcribeErr != nil {
-				_ = s.database.FailMediaSearchChunk(userID, body.AssetID, body.ChunkIndex, "transcription_failed")
+				_ = s.database.FailMediaSearchChunk(userID, body.DeviceID, body.AssetID, body.ChunkIndex, "transcription_failed")
 				writeJSON(w, 502, map[string]any{"code": "transcription_failed", "message": "Mika could not transcribe this chunk. No credits were charged."})
 				return
 			}
@@ -158,7 +174,7 @@ func (s *MediaSearchService) IndexChunk() http.HandlerFunc {
 				vectors, usage, embedErr = embedMediaTexts(r.Context(), s.analyzer, texts)
 				addUsage(&totalUsage, usage)
 				if embedErr != nil {
-					_ = s.database.FailMediaSearchChunk(userID, body.AssetID, body.ChunkIndex, "embedding_failed")
+					_ = s.database.FailMediaSearchChunk(userID, body.DeviceID, body.AssetID, body.ChunkIndex, "embedding_failed")
 					writeJSON(w, 502, map[string]any{"code": "embedding_failed", "message": "Mika could not index this transcript. No credits were charged."})
 					return
 				}
@@ -171,7 +187,7 @@ func (s *MediaSearchService) IndexChunk() http.HandlerFunc {
 			analysis, analyzeErr := s.analyzer.Analyze(r.Context(), frames)
 			addUsage(&totalUsage, analysis.Usage)
 			if analyzeErr != nil {
-				_ = s.database.FailMediaSearchChunk(userID, body.AssetID, body.ChunkIndex, "visual_analysis_failed")
+				_ = s.database.FailMediaSearchChunk(userID, body.DeviceID, body.AssetID, body.ChunkIndex, "visual_analysis_failed")
 				writeJSON(w, 502, map[string]any{"code": "visual_analysis_failed", "message": "Mika could not analyze the scenes. No credits were charged."})
 				return
 			}
@@ -196,7 +212,7 @@ func (s *MediaSearchService) IndexChunk() http.HandlerFunc {
 			embeddings, usage, embedErr := embedMediaTexts(r.Context(), s.analyzer, visualTexts)
 			addUsage(&totalUsage, usage)
 			if embedErr != nil {
-				_ = s.database.FailMediaSearchChunk(userID, body.AssetID, body.ChunkIndex, "visual_embedding_failed")
+				_ = s.database.FailMediaSearchChunk(userID, body.DeviceID, body.AssetID, body.ChunkIndex, "visual_embedding_failed")
 				writeJSON(w, 502, map[string]any{"code": "visual_embedding_failed", "message": "Mika could not index the scenes. No credits were charged."})
 				return
 			}
@@ -218,19 +234,40 @@ func (s *MediaSearchService) IndexChunk() http.HandlerFunc {
 				segments = append(segments, db.MediaSearchSegment{AssetID: body.AssetID, Kind: "visual", ChunkIndex: body.ChunkIndex, StartMS: visualStart, EndMS: visualEnd, Content: content, VisualDescription: item.Description, VisibleText: item.VisibleText, Embedding: byID[frame.AssetID], EmbeddingModel: serveragent.SmartLibraryEmbeddingModel, Metadata: map[string]any{"frameTimestampMs": timestamp, "primarySubject": item.PrimarySubject, "tags": item.Tags, "characters": item.Characters, "applications": item.Applications, "objects": item.Objects, "scenes": item.Scenes}})
 			}
 		}
-		if err = s.database.CompleteMediaSearchChunk(userID, body.AssetID, body.ChunkIndex, body.EndMS, segments); err != nil {
-			_ = s.database.FailMediaSearchChunk(userID, body.AssetID, body.ChunkIndex, "persistence_failed")
+		if err = s.database.CompleteMediaSearchChunk(userID, body.DeviceID, body.AssetID, body.ChunkIndex, body.EndMS, segments); err != nil {
+			_ = s.database.FailMediaSearchChunk(userID, body.DeviceID, body.AssetID, body.ChunkIndex, "persistence_failed")
 			http.Error(w, "internal error", 500)
 			return
 		}
-		if _, err = s.database.SettleCreditReservation(reservation.ID, "media-search-settle:"+body.AssetID+":"+fmtInt(int64(body.ChunkIndex))+":"+body.Fingerprint, db.CreditUsage{Provider: "vercel_ai_gateway", Model: "media-search-routing", InputTokens: totalUsage.InputTokens, CachedInputTokens: totalUsage.CachedInputTokens, OutputTokens: totalUsage.OutputTokens, Credits: credits}); err != nil {
-			_ = s.database.FailMediaSearchChunk(userID, body.AssetID, body.ChunkIndex, "billing_settlement_failed")
+		if _, err = s.database.SettleCreditReservation(reservation.ID, "media-search-settle:"+body.DeviceID+":"+body.AssetID+":"+fmtInt(int64(body.ChunkIndex))+":"+body.Fingerprint, db.CreditUsage{Provider: "vercel_ai_gateway", Model: "media-search-routing", InputTokens: totalUsage.InputTokens, CachedInputTokens: totalUsage.CachedInputTokens, OutputTokens: totalUsage.OutputTokens, Credits: credits}); err != nil {
+			_ = s.database.FailMediaSearchChunk(userID, body.DeviceID, body.AssetID, body.ChunkIndex, "billing_settlement_failed")
 			http.Error(w, "internal error", 500)
 			return
 		}
 		release = false
 		writeJSON(w, 200, map[string]any{"status": "indexed", "chunkIndex": body.ChunkIndex, "segmentCount": len(segments), "indexedThroughMs": body.EndMS, "creditsUsed": float64(credits) / float64(db.CreditDenominationScale)})
 	}
+}
+
+// acquireProviderSlot bounds provider fan-out independently of the HTTP rate
+// limiter. A device runs one sequential worker, but this also protects against
+// multiple devices or clients racing under the same account.
+func (s *MediaSearchService) acquireProviderSlot(userID string) (func(), bool) {
+	s.guardMu.Lock()
+	defer s.guardMu.Unlock()
+	if _, busy := s.inFlightUsers[userID]; busy || s.inFlightTotal >= aiGlobalMaxConcurrent {
+		return nil, false
+	}
+	s.inFlightUsers[userID] = struct{}{}
+	s.inFlightTotal++
+	return func() {
+		s.guardMu.Lock()
+		delete(s.inFlightUsers, userID)
+		if s.inFlightTotal > 0 {
+			s.inFlightTotal--
+		}
+		s.guardMu.Unlock()
+	}, true
 }
 
 // embedMediaTexts absorbs one transient embedding failure before failing the
@@ -265,25 +302,26 @@ func (s *MediaSearchService) Search() http.HandlerFunc {
 			return
 		}
 		var body struct {
-			Query string `json:"query"`
-			Limit int    `json:"limit"`
+			DeviceID string `json:"deviceId"`
+			Query    string `json:"query"`
+			Limit    int    `json:"limit"`
 		}
 		if decodeAIJSON(w, r, &body) != nil {
 			return
 		}
 		body.Query = strings.TrimSpace(body.Query)
-		if body.Query == "" || utf8.RuneCountInString(body.Query) > 256 {
+		if !validMediaDeviceID(body.DeviceID) || body.Query == "" || utf8.RuneCountInString(body.Query) > 256 {
 			http.Error(w, "invalid request", 400)
 			return
 		}
 		if body.Limit == 0 {
 			body.Limit = 20
 		}
-		vector, err := s.cachedEmbedding(r.Context(), userID, body.Query)
+		vector, err := s.cachedEmbedding(r.Context(), userID, body.DeviceID, body.Query)
 		if err != nil {
 			vector = nil
 		}
-		hits, err := s.database.SearchMedia(userID, body.Query, vector, body.Limit)
+		hits, err := s.database.SearchMedia(userID, body.DeviceID, body.Query, vector, body.Limit)
 		if err != nil {
 			http.Error(w, "internal error", 500)
 			return
@@ -297,19 +335,89 @@ func (s *MediaSearchService) Status() http.HandlerFunc {
 		if !ok {
 			return
 		}
-		assets, err := s.database.MediaSearchAssets(userID)
+		deviceID := strings.TrimSpace(r.URL.Query().Get("deviceId"))
+		if !validMediaDeviceID(deviceID) {
+			http.Error(w, "invalid request", 400)
+			return
+		}
+		if err := s.database.PruneIncompleteMediaSearchAssets(userID, deviceID); err != nil {
+			http.Error(w, "internal error", 500)
+			return
+		}
+		assets, err := s.database.MediaSearchAssets(userID, deviceID)
 		if err != nil {
 			http.Error(w, "internal error", 500)
 			return
 		}
-		writeJSON(w, 200, map[string]any{"assets": assets, "maxDurationMinutes": 120, "totalDurationLimitMinutes": nil})
+		writeJSON(w, 200, map[string]any{"assets": assets, "maxDurationMinutes": 120, "totalDurationLimitMinutes": nil, "incompleteRetentionDays": 30})
 	}
 }
-func (s *MediaSearchService) cachedEmbedding(ctx context.Context, userID, query string) ([]float64, error) {
+
+func (s *MediaSearchService) DeleteAsset() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userID, ok := s.requireUser(w, r)
+		if !ok {
+			return
+		}
+		deviceID, assetID := strings.TrimSpace(r.URL.Query().Get("deviceId")), chi.URLParam(r, "assetID")
+		if !validMediaDeviceID(deviceID) || !validMediaOpaqueID(assetID) {
+			http.Error(w, "invalid request", 400)
+			return
+		}
+		deleted, err := s.database.DeleteMediaSearchAsset(userID, deviceID, assetID)
+		if err != nil {
+			http.Error(w, "internal error", 500)
+			return
+		}
+		writeJSON(w, 200, map[string]any{"deleted": deleted})
+	}
+}
+
+func (s *MediaSearchService) DeleteDevice() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userID, ok := s.requireUser(w, r)
+		if !ok {
+			return
+		}
+		deviceID := chi.URLParam(r, "deviceID")
+		if !validMediaDeviceID(deviceID) {
+			http.Error(w, "invalid request", 400)
+			return
+		}
+		deleted, err := s.database.DeleteMediaSearchDevice(userID, deviceID)
+		if err != nil {
+			http.Error(w, "internal error", 500)
+			return
+		}
+		writeJSON(w, 200, map[string]any{"deleted": deleted})
+	}
+}
+
+func (s *MediaSearchService) AdoptLegacyDevice() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userID, ok := s.requireUser(w, r)
+		if !ok {
+			return
+		}
+		deviceID := chi.URLParam(r, "deviceID")
+		if !validMediaDeviceID(deviceID) || deviceID == db.LegacyMediaSearchDeviceID {
+			http.Error(w, "invalid request", http.StatusBadRequest)
+			return
+		}
+		ready, adopted, err := s.database.AdoptLegacyMediaSearchDevice(userID, deviceID)
+		if err != nil {
+			http.Error(w, "internal error", http.StatusInternalServerError)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"ready": ready, "adopted": adopted})
+	}
+}
+
+func (s *MediaSearchService) cachedEmbedding(ctx context.Context, userID, deviceID, query string) ([]float64, error) {
 	if s.analyzer == nil || strings.TrimSpace(s.analyzer.APIKey) == "" {
 		return nil, errors.New("media semantic search is unavailable")
 	}
-	key := sha256.Sum256([]byte(userID + "\x00" + strings.ToLower(query)))
+	key := sha256.Sum256([]byte(userID + "\x00" + deviceID + "\x00" + strings.ToLower(query)))
 	s.cacheMu.Lock()
 	cached, found := s.queryCache[key]
 	s.cacheMu.Unlock()
@@ -341,7 +449,7 @@ func (s *MediaSearchService) requireUser(w http.ResponseWriter, r *http.Request)
 	return userID, true
 }
 func validMediaIndexRequest(v mediaIndexRequest) bool {
-	if !validMediaOpaqueID(v.AssetID) || len(v.Fingerprint) != 64 || !isLowerHex(v.Fingerprint) || (v.MediaType != "audio" && v.MediaType != "video") || !strings.HasPrefix(v.MimeType, v.MediaType+"/") || v.DurationMS <= 0 || v.DurationMS > mediaMaxDurationMS || v.ChunkIndex < 0 || v.ChunkIndex >= mediaChunkCount(v.DurationMS) || v.StartMS != int64(v.ChunkIndex)*mediaChunkMS || len(v.Frames) > mediaMaxFrames {
+	if !validMediaDeviceID(v.DeviceID) || !validMediaOpaqueID(v.AssetID) || len(v.Fingerprint) != 64 || !isLowerHex(v.Fingerprint) || (v.MediaType != "audio" && v.MediaType != "video") || !strings.HasPrefix(v.MimeType, v.MediaType+"/") || v.DurationMS <= 0 || v.DurationMS > mediaMaxDurationMS || v.ChunkIndex < 0 || v.ChunkIndex >= mediaChunkCount(v.DurationMS) || v.StartMS != int64(v.ChunkIndex)*mediaChunkMS || len(v.Frames) > mediaMaxFrames {
 		return false
 	}
 	expectedEnd := minInt64(v.DurationMS, v.StartMS+mediaChunkMS)
@@ -361,6 +469,9 @@ func validMediaIndexRequest(v mediaIndexRequest) bool {
 		return false
 	}
 	return true
+}
+func validMediaDeviceID(value string) bool {
+	return len(value) == 39 && strings.HasPrefix(value, "device_") && isLowerHex(value[7:])
 }
 func validMediaOpaqueID(value string) bool {
 	return len(value) == 38 && strings.HasPrefix(value, "media_") && isLowerHex(value[6:])

@@ -3,6 +3,7 @@ package agent
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/google/uuid"
@@ -13,9 +14,20 @@ type modelJSONResponse struct {
 	Text         string             `json:"text"`
 	ToolRequests []ToolRequest      `json:"tool_requests"`
 	FilePlan     *FileOperationPlan `json:"file_plan"`
+	Citations    []AgentCitation    `json:"citations"`
+}
+
+type agentPromptImage struct {
+	Label, DataURL string
 }
 
 func buildAgentPrompt(request ModelRequest) string {
+	prompt, _ := buildAgentPromptWithImages(request)
+	return prompt
+}
+
+func buildAgentPromptWithImages(request ModelRequest) (string, []agentPromptImage) {
+	request, images := sanitizeAgentPromptImages(request)
 	payload := map[string]any{
 		"session_id":    request.SessionID,
 		"mode":          request.Mode,
@@ -26,7 +38,7 @@ func buildAgentPrompt(request ModelRequest) string {
 		"known_paths":   request.KnownPaths,
 		"allowed_ops":   []string{"mkdir", "move", "rename"},
 		"blocked_ops":   []string{"delete", "overwrite", "shell", "outside_root"},
-		"response_rule": "Return one JSON object that matches the required schema. Do not include markdown. When no file plan is ready, return file_plan with empty summary/completion_summary strings and empty operations/warnings arrays.",
+		"response_rule": "Return one JSON object that matches the required schema. Do not include markdown. When no file plan is ready, return file_plan with empty summary/completion_summary strings and empty operations/warnings arrays. Cite document-derived claims using citations and the exact source fields supplied by preview_file.",
 	}
 	encoded, _ := json.MarshalIndent(payload, "", "  ")
 	return fmt.Sprintf(`You are MistyAI, the private assistant inside Misty, a desktop file manager.
@@ -41,7 +53,7 @@ For file organization, prefer a short inspection step first when no tool_results
 For every operation, include all operation fields. Use an empty string for unused path/from/to fields. Use paths exactly as shown by list_directory/search_files tool results, relative to active_root. Keep a file_plan to 30 operations or fewer; if more work remains, add a warning.
 
 Current runtime state:
-%s`, string(encoded))
+%s`, string(encoded)), images
 }
 
 func mistyAgentInstruction() string {
@@ -72,6 +84,7 @@ func parseProviderJSONResponse(raw string) (ModelResponse, error) {
 		Text:         strings.TrimSpace(decoded.Text),
 		ToolRequests: normalizeToolRequests(decoded.ToolRequests),
 		FilePlan:     decoded.FilePlan,
+		Citations:    normalizeAgentCitations(decoded.Citations),
 	}
 	if response.FilePlan != nil {
 		response.FilePlan.Summary = strings.TrimSpace(response.FilePlan.Summary)
@@ -121,9 +134,19 @@ func agentResponseGenAISchema() *genai.Schema {
 				},
 			},
 			"file_plan": filePlanGenAISchema(true),
+			"citations": agentCitationsGenAISchema(),
 		},
-		Required: []string{"text", "tool_requests", "file_plan"},
+		Required: []string{"text", "tool_requests", "file_plan", "citations"},
 	}
+}
+
+func agentCitationsGenAISchema() *genai.Schema {
+	return &genai.Schema{Type: genai.TypeArray, Items: &genai.Schema{Type: genai.TypeObject, Properties: map[string]*genai.Schema{
+		"id": {Type: genai.TypeString}, "scopeId": {Type: genai.TypeString}, "fileName": {Type: genai.TypeString},
+		"relativePath": {Type: genai.TypeString}, "kind": {Type: genai.TypeString, Enum: []string{"pdf_page", "slide", "sheet_range", "section", "image"}},
+		"label": {Type: genai.TypeString}, "page": {Type: genai.TypeInteger}, "slide": {Type: genai.TypeInteger},
+		"sheet": {Type: genai.TypeString}, "range": {Type: genai.TypeString}, "section": {Type: genai.TypeString}, "excerpt": {Type: genai.TypeString},
+	}, Required: []string{"id", "scopeId", "fileName", "relativePath", "kind", "label", "page", "slide", "sheet", "range", "section", "excerpt"}}}
 }
 
 func filePlanGenAISchema(nullable bool) *genai.Schema {
@@ -250,6 +273,12 @@ func agentResponseJSONSchema() map[string]any {
 		},
 		"required": []string{"summary", "completion_summary", "operations", "warnings"},
 	}
+	citationSchema := map[string]any{"type": "object", "additionalProperties": false, "properties": map[string]any{
+		"id": map[string]any{"type": "string"}, "scopeId": map[string]any{"type": "string"}, "fileName": map[string]any{"type": "string"},
+		"relativePath": map[string]any{"type": "string"}, "kind": map[string]any{"type": "string", "enum": []string{"pdf_page", "slide", "sheet_range", "section", "image"}},
+		"label": map[string]any{"type": "string"}, "page": map[string]any{"type": "integer"}, "slide": map[string]any{"type": "integer"},
+		"sheet": map[string]any{"type": "string"}, "range": map[string]any{"type": "string"}, "section": map[string]any{"type": "string"}, "excerpt": map[string]any{"type": "string"},
+	}, "required": []string{"id", "scopeId", "fileName", "relativePath", "kind", "label", "page", "slide", "sheet", "range", "section", "excerpt"}}
 	return map[string]any{
 		"type":                 "object",
 		"additionalProperties": false,
@@ -270,9 +299,144 @@ func agentResponseJSONSchema() map[string]any {
 				},
 			},
 			"file_plan": filePlanSchema,
+			"citations": map[string]any{"type": "array", "items": citationSchema},
 		},
-		"required": []string{"text", "tool_requests", "file_plan"},
+		"required": []string{"text", "tool_requests", "file_plan", "citations"},
 	}
+}
+
+func sanitizeAgentPromptImages(request ModelRequest) (ModelRequest, []agentPromptImage) {
+	request.ToolResults = append([]ToolResult(nil), request.ToolResults...)
+	images := make([]agentPromptImage, 0, 8)
+	for index := range request.ToolResults {
+		if request.ToolResults[index].Name != ToolPreviewFile || len(request.ToolResults[index].Result) == 0 {
+			continue
+		}
+		var value any
+		if json.Unmarshal(request.ToolResults[index].Result, &value) != nil {
+			continue
+		}
+		collectAndStripPromptImages(value, "document", &images)
+		request.ToolResults[index].Result, _ = json.Marshal(value)
+	}
+	return request, images
+}
+
+func collectAndStripPromptImages(value any, context string, images *[]agentPromptImage) {
+	switch typed := value.(type) {
+	case map[string]any:
+		if name, ok := typed["fileName"].(string); ok && strings.TrimSpace(name) != "" {
+			context = name
+		}
+		kind, _ := typed["kind"].(string)
+		locator, _ := typed["locator"].(string)
+		if dataURL, ok := typed["imageDataUrl"].(string); ok && strings.HasPrefix(dataURL, "data:image/") {
+			label := strings.TrimSpace(context + " " + kind + " " + locator)
+			if len(*images) < 8 {
+				*images = append(*images, agentPromptImage{Label: label, DataURL: dataURL})
+			}
+			typed["imageDataUrl"] = "[attached as multimodal image: " + label + "]"
+		}
+		for _, child := range typed {
+			collectAndStripPromptImages(child, context, images)
+		}
+	case []any:
+		for _, child := range typed {
+			collectAndStripPromptImages(child, context, images)
+		}
+	}
+}
+
+func normalizeAgentCitations(values []AgentCitation) []AgentCitation {
+	result := make([]AgentCitation, 0, len(values))
+	for _, citation := range values {
+		citation.ScopeID = strings.TrimSpace(citation.ScopeID)
+		citation.FileName = strings.TrimSpace(citation.FileName)
+		citation.RelativePath = strings.TrimSpace(citation.RelativePath)
+		citation.Label = strings.TrimSpace(citation.Label)
+		if citation.ScopeID == "" || citation.FileName == "" || citation.Label == "" || strings.HasPrefix(citation.RelativePath, "/") || strings.Contains(citation.RelativePath, "..") {
+			continue
+		}
+		if citation.ID == "" {
+			citation.ID = uuid.NewString()
+		}
+		if len(citation.Excerpt) > 500 {
+			citation.Excerpt = citation.Excerpt[:500]
+		}
+		result = append(result, citation)
+		if len(result) == 30 {
+			break
+		}
+	}
+	return result
+}
+
+type agentCitationSource struct {
+	ScopeID      string `json:"scopeId"`
+	FileName     string `json:"fileName"`
+	RelativePath string `json:"relativePath"`
+	Sections     []struct {
+		Kind    string `json:"kind"`
+		Locator string `json:"locator"`
+	} `json:"sections"`
+}
+
+// groundedAgentCitations drops any model citation that is not anchored to a
+// location the device explicitly supplied in a successful preview_file result.
+func groundedAgentCitations(request ModelRequest, citations []AgentCitation) []AgentCitation {
+	sources := make([]agentCitationSource, 0, len(request.ToolResults))
+	for _, result := range request.ToolResults {
+		if result.Name != ToolPreviewFile || !result.OK || len(result.Result) == 0 {
+			continue
+		}
+		var source agentCitationSource
+		if json.Unmarshal(result.Result, &source) == nil && source.ScopeID != "" && source.FileName != "" && len(source.Sections) > 0 {
+			sources = append(sources, source)
+		}
+	}
+	grounded := make([]AgentCitation, 0, len(citations))
+	for _, citation := range citations {
+		for _, source := range sources {
+			if citation.ScopeID == source.ScopeID && citation.FileName == source.FileName && citation.RelativePath == source.RelativePath && citationMatchesSourceLocation(citation, source) {
+				grounded = append(grounded, citation)
+				break
+			}
+		}
+	}
+	return grounded
+}
+
+func citationMatchesSourceLocation(citation AgentCitation, source agentCitationSource) bool {
+	for _, section := range source.Sections {
+		kind := strings.TrimSpace(section.Kind)
+		locator := strings.TrimSpace(section.Locator)
+		switch citation.Kind {
+		case "pdf_page":
+			if kind == "page" && citation.Page > 0 && locator == strconv.Itoa(citation.Page) {
+				return true
+			}
+		case "slide":
+			if kind == "slide" && citation.Slide > 0 && locator == strconv.Itoa(citation.Slide) {
+				return true
+			}
+		case "sheet_range":
+			if kind == "sheet" && locator != "" {
+				sheet, cellRange, hasRange := strings.Cut(locator, "!")
+				if (hasRange && strings.TrimSpace(citation.Sheet) == strings.TrimSpace(sheet) && strings.TrimSpace(citation.Range) == strings.TrimSpace(cellRange)) || strings.Contains(citation.Label, locator) {
+					return true
+				}
+			}
+		case "section":
+			if (kind == "section" || kind == "lines") && locator != "" && (locator == strings.TrimSpace(citation.Section) || strings.Contains(citation.Label, locator)) {
+				return true
+			}
+		case "image":
+			if kind == "image" {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func geminiAgentResponseSchema() map[string]any {

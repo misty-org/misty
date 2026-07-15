@@ -72,6 +72,39 @@ func TestAgentLoopToolResultToFilePlan(t *testing.T) {
 	}
 }
 
+func TestSendMessageRejectsLocalPaths(t *testing.T) {
+	service := NewService(NewSessionStore(0), MockProvider{})
+
+	for _, test := range []struct {
+		name    string
+		request AgentMessageRequest
+	}{
+		{name: "absolute active root", request: AgentMessageRequest{UserMessage: "help", ActiveRoot: "/Users/misty/Documents"}},
+		{name: "windows active root", request: AgentMessageRequest{UserMessage: "help", ActiveRoot: `C:\\Users\\misty\\Documents`}},
+		{name: "traversing selected path", request: AgentMessageRequest{UserMessage: "help", ActiveRoot: "scope_abc", SelectedPaths: []string{"../secret.pdf"}}},
+		{name: "absolute selected path", request: AgentMessageRequest{UserMessage: "help", ActiveRoot: "scope_abc", SelectedPaths: []string{"/tmp/secret.pdf"}}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			session := service.CreateSession("user-1")
+			if err := service.SendMessage(session.ID, "user-1", test.request); err == nil {
+				t.Fatal("SendMessage() error = nil, want path privacy validation error")
+			}
+		})
+	}
+}
+
+func TestSendMessageAcceptsOpaqueScopeAndRelativeSelection(t *testing.T) {
+	service := NewService(NewSessionStore(0), MockProvider{})
+	session := service.CreateSession("user-1")
+	if err := service.SendMessage(session.ID, "user-1", AgentMessageRequest{
+		UserMessage:   "summarize this",
+		ActiveRoot:    "scope_abc123",
+		SelectedPaths: []string{"reports/q2.pdf"},
+	}); err != nil {
+		t.Fatalf("SendMessage() error = %v", err)
+	}
+}
+
 type loopingToolProvider struct{ calls int }
 
 func (provider *loopingToolProvider) Next(ModelRequest) (ModelResponse, error) {

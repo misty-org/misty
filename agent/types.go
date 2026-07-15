@@ -32,9 +32,10 @@ const MaxModelOutputTokens int64 = 2200
 const (
 	MaxUserMessageBytes      = 32 << 10
 	MaxToolResultsPerRequest = 8
-	MaxToolResultBytes       = 512 << 10
-	MaxProviderRequestBytes  = 768 << 10
+	MaxToolResultBytes       = 6 << 20
+	MaxProviderRequestBytes  = 8 << 20
 	MaxProviderCallsPerTurn  = 3
+	MaxDocumentCallsPerTurn  = 26
 )
 
 type AgentMessageRequest struct {
@@ -64,6 +65,7 @@ type AgentEvent struct {
 	CreatedAt        time.Time          `json:"created_at"`
 	CreditsUsed      int64              `json:"credits_used,omitempty"`
 	CreditsRemaining int64              `json:"credits_remaining,omitempty"`
+	Citations        []AgentCitation    `json:"citations,omitempty"`
 }
 
 type ToolRequest struct {
@@ -119,7 +121,24 @@ type ModelResponse struct {
 	Text         string
 	ToolRequests []ToolRequest
 	FilePlan     *FileOperationPlan
+	Citations    []AgentCitation
 	Usage        ModelUsage
+}
+
+type AgentCitation struct {
+	ID           string `json:"id"`
+	ArtifactID   string `json:"artifactId,omitempty"`
+	ScopeID      string `json:"scopeId"`
+	FileName     string `json:"fileName"`
+	RelativePath string `json:"relativePath,omitempty"`
+	Kind         string `json:"kind"`
+	Label        string `json:"label"`
+	Page         int    `json:"page,omitempty"`
+	Slide        int    `json:"slide,omitempty"`
+	Sheet        string `json:"sheet,omitempty"`
+	Range        string `json:"range,omitempty"`
+	Section      string `json:"section,omitempty"`
+	Excerpt      string `json:"excerpt,omitempty"`
 }
 
 type ModelUsage struct {

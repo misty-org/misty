@@ -69,22 +69,27 @@ func (p *OpenAIProvider) NextContext(ctx context.Context, request ModelRequest) 
 	if p.apiKey == "" {
 		return ModelResponse{}, fmt.Errorf("%s API key is required", p.ProviderName())
 	}
+	prompt, promptImages := buildAgentPromptWithImages(request)
+	userContent := []map[string]any{{"type": "input_text", "text": prompt}}
+	for _, image := range promptImages {
+		userContent = append(userContent,
+			map[string]any{"type": "input_text", "text": "OCR/image source: " + image.Label},
+			map[string]any{"type": "input_image", "image_url": image.DataURL},
+		)
+	}
 	body := map[string]any{
 		"model": p.model,
 		"input": []map[string]any{
 			{
 				"role": "system",
-				"content": []map[string]string{{
+				"content": []map[string]any{{
 					"type": "input_text",
 					"text": "Return only JSON that matches the provided schema.",
 				}},
 			},
 			{
-				"role": "user",
-				"content": []map[string]string{{
-					"type": "input_text",
-					"text": buildAgentPrompt(request),
-				}},
+				"role":    "user",
+				"content": userContent,
 			},
 		},
 		"text": map[string]any{

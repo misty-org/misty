@@ -370,6 +370,26 @@ func TestParseFirstProviderJSONResponseExtractsWrappedJSON(t *testing.T) {
 	}
 }
 
+func TestGroundedAgentCitationsRejectInventedFilesAndLocations(t *testing.T) {
+	request := ModelRequest{ToolResults: []ToolResult{{
+		Name: ToolPreviewFile, OK: true,
+		Result: json.RawMessage(`{"scopeId":"scope_12345678","fileName":"report.pdf","relativePath":"reports/report.pdf","sections":[{"kind":"page","locator":"1"},{"kind":"page","locator":"2"}]}`),
+	}, {
+		Name: ToolPreviewFile, OK: true,
+		Result: json.RawMessage(`{"scopeId":"scope_12345678","fileName":"totals.xlsx","relativePath":"reports/totals.xlsx","sections":[{"kind":"sheet","locator":"Summary!A1:D12"}]}`),
+	}}}
+	citations := []AgentCitation{
+		{ID: "ok", ScopeID: "scope_12345678", FileName: "report.pdf", RelativePath: "reports/report.pdf", Kind: "pdf_page", Label: "Page 2", Page: 2},
+		{ID: "sheet", ScopeID: "scope_12345678", FileName: "totals.xlsx", RelativePath: "reports/totals.xlsx", Kind: "sheet_range", Label: "Summary totals", Sheet: "Summary", Range: "A1:D12"},
+		{ID: "wrong-page", ScopeID: "scope_12345678", FileName: "report.pdf", RelativePath: "reports/report.pdf", Kind: "pdf_page", Label: "Page 9", Page: 9},
+		{ID: "wrong-file", ScopeID: "scope_12345678", FileName: "secret.pdf", RelativePath: "secret.pdf", Kind: "pdf_page", Label: "Page 1", Page: 1},
+	}
+	grounded := groundedAgentCitations(request, citations)
+	if len(grounded) != 2 || grounded[0].ID != "ok" || grounded[1].ID != "sheet" {
+		t.Fatalf("grounded citations = %#v", grounded)
+	}
+}
+
 func TestNewProviderFromEnvSelectsGeminiRESTFallback(t *testing.T) {
 	t.Setenv("MISTY_AI_PROVIDER", "gemini_rest")
 	t.Setenv("GEMINI_API_KEY", "key")

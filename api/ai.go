@@ -6,6 +6,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -15,16 +16,24 @@ import (
 	"github.com/kannachi323/misty/server/db"
 )
 
-const maxAIJSONBodyBytes = 2 << 20
+const (
+	maxAIJSONBodyBytes     = 2 << 20
+	maxAIToolJSONBodyBytes = 8 << 20
+)
 
 type AIService struct {
-	database *db.Database
-	runtime  *agent.Service
-	guard    *AIRequestGuard
+	database    *db.Database
+	runtime     *agent.Service
+	guard       *AIRequestGuard
+	attachments *AgentAttachmentsService
 }
 
 func NewAIService(database *db.Database, runtime *agent.Service) *AIService {
 	return &AIService{database: database, runtime: runtime, guard: NewAIRequestGuard()}
+}
+
+func (s *AIService) SetAgentAttachments(attachments *AgentAttachmentsService) {
+	s.attachments = attachments
 }
 
 func (s *AIService) Status() http.HandlerFunc {
@@ -60,7 +69,32 @@ func (s *AIService) CreateSession() http.HandlerFunc {
 			writeAIRateLimit(w, retryAfter)
 			return
 		}
-		session := s.runtime.CreateSession(userID)
+		billingUserID := userID
+		agentJobID := ""
+		if r.ContentLength != 0 {
+			var body struct {
+				AgentJobID string `json:"agent_job_id"`
+			}
+			if err := decodeAIJSON(w, r, &body); err != nil || !jobIDPattern.MatchString(body.AgentJobID) {
+				http.Error(w, "invalid request", http.StatusBadRequest)
+				return
+			}
+			job, err := s.database.AgentJob(userID, body.AgentJobID)
+			if err != nil || job.OwnerUserID != userID {
+				http.Error(w, "job not found", http.StatusNotFound)
+				return
+			}
+			if job.TriggerKind == "manual" {
+				billingUserID = job.RequesterUserID
+			}
+			agentJobID = job.ID
+		}
+		var session *agent.Session
+		if agentJobID != "" {
+			session = s.runtime.CreateSessionForJob(userID, billingUserID, agentJobID)
+		} else {
+			session = s.runtime.CreateSessionWithBilling(userID, billingUserID)
+		}
 		writeJSON(w, http.StatusCreated, map[string]any{
 			"session_id": session.ID,
 		})
@@ -111,6 +145,10 @@ func (s *AIService) SendMessage() http.HandlerFunc {
 			http.Error(w, "invalid request", http.StatusBadRequest)
 			return
 		}
+		if messageRequestsDocumentTool(body) && !agentDocumentsEnabled() {
+			writeJSON(w, http.StatusNotFound, map[string]string{"code": "document_agents_disabled"})
+			return
+		}
 		release, ok := s.acquireProviderCall(w, userID)
 		if !ok {
 			return
@@ -156,9 +194,36 @@ func (s *AIService) SubmitToolResults() http.HandlerFunc {
 		var body struct {
 			Results []agent.ToolResult `json:"results"`
 		}
-		if err := decodeAIJSON(w, r, &body); err != nil {
+		if err := decodeAIJSONWithLimit(w, r, &body, maxAIToolJSONBodyBytes); err != nil {
 			http.Error(w, "invalid request", http.StatusBadRequest)
 			return
+		}
+		if toolResultsContainDocuments(body.Results) && !agentDocumentsEnabled() {
+			writeJSON(w, http.StatusNotFound, map[string]string{"code": "document_agents_disabled"})
+			return
+		}
+		if toolResultsContainDocuments(body.Results) && s.attachments != nil {
+			billingScope, err := s.runtime.SessionBillingScope(sessionID, userID)
+			if err != nil || !strings.HasPrefix(billingScope, "agent-job:") {
+				writeJSON(w, http.StatusBadRequest, map[string]string{"code": "encrypted_attachment_required"})
+				return
+			}
+			jobID := strings.TrimPrefix(billingScope, "agent-job:")
+			job, err := s.database.AgentJob(userID, jobID)
+			if err != nil || job.AgentID == "" {
+				writeJSON(w, http.StatusNotFound, map[string]string{"code": "agent_job_not_found"})
+				return
+			}
+			definition, err := s.database.AgentDefinition(userID, job.AgentID)
+			if err != nil {
+				writeJSON(w, http.StatusNotFound, map[string]string{"code": "agent_not_found"})
+				return
+			}
+			body.Results, err = s.attachments.HydrateDocumentToolResults(r.Context(), userID, jobID, definition.ScopeID, body.Results)
+			if err != nil {
+				writeJSON(w, http.StatusBadRequest, map[string]string{"code": "invalid_encrypted_attachment"})
+				return
+			}
 		}
 		release, ok := s.acquireProviderCall(w, userID)
 		if !ok {
@@ -176,6 +241,28 @@ func (s *AIService) SubmitToolResults() http.HandlerFunc {
 		}
 		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 	}
+}
+
+func agentDocumentsEnabled() bool {
+	return strings.EqualFold(strings.TrimSpace(os.Getenv("MISTY_AGENT_DOCUMENTS_ENABLED")), "true")
+}
+
+func messageRequestsDocumentTool(request agent.AgentMessageRequest) bool {
+	for _, tool := range request.Capabilities.Tools {
+		if tool.Name == agent.ToolPreviewFile {
+			return true
+		}
+	}
+	return false
+}
+
+func toolResultsContainDocuments(results []agent.ToolResult) bool {
+	for _, result := range results {
+		if result.Name == agent.ToolPreviewFile {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *AIService) acquireProviderCall(w http.ResponseWriter, userID string) (func(), bool) {
@@ -230,6 +317,22 @@ func (s *AIService) Cancel() http.HandlerFunc {
 			return
 		}
 		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+	}
+}
+
+func (s *AIService) DeleteConversation() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userID, ok := s.requireUser(w, r)
+		if !ok {
+			return
+		}
+		sessionID := strings.TrimSpace(chi.URLParam(r, "sessionID"))
+		if err := s.database.DeleteAgentConversation(r.Context(), userID, sessionID); err != nil {
+			http.Error(w, "internal error", http.StatusInternalServerError)
+			return
+		}
+		_ = s.runtime.Forget(sessionID, userID)
+		w.WriteHeader(http.StatusNoContent)
 	}
 }
 

@@ -121,6 +121,26 @@ func (s *Service) CreateSession(userID string) *Session {
 	return s.store.Create(userID)
 }
 
+func (s *Service) CreateSessionWithBilling(userID, billingUserID string) *Session {
+	return s.store.CreateWithBilling(userID, billingUserID)
+}
+
+func (s *Service) CreateSessionForJob(userID, billingUserID, jobID string) *Session {
+	return s.store.CreateWithBillingScope(userID, billingUserID, "agent-job:"+jobID)
+}
+
+// SessionBillingScope exposes only the server-owned billing scope associated
+// with a session. API adapters use it to bind short-lived document attachments
+// to the exact durable job that created the conversation.
+func (s *Service) SessionBillingScope(sessionID, userID string) (string, error) {
+	var scope string
+	err := s.store.WithSession(sessionID, userID, func(session *Session) error {
+		scope = session.BillingScope
+		return nil
+	})
+	return scope, err
+}
+
 func (s *Service) SendMessage(sessionID, userID string, request AgentMessageRequest) error {
 	return s.SendMessageWithTier(sessionID, userID, request, MikaLow)
 }
@@ -132,11 +152,20 @@ func (s *Service) SendMessageWithTier(sessionID, userID string, request AgentMes
 func (s *Service) SendMessageWithTierContext(ctx context.Context, sessionID, userID string, request AgentMessageRequest, tier MikaTier) error {
 	request.UserMessage = strings.TrimSpace(request.UserMessage)
 	request.Mode = NormalizeMode(request.Mode)
+	request.ActiveRoot = strings.TrimSpace(request.ActiveRoot)
 	if request.UserMessage == "" {
 		return ErrInvalidRequest("user_message is required")
 	}
 	if len(request.UserMessage) > MaxUserMessageBytes {
 		return ErrInvalidRequest("user_message is too large")
+	}
+	if request.ActiveRoot != "" && !isSafeActiveRoot(request.ActiveRoot) {
+		return ErrInvalidRequest("active_root must be an opaque scope ID or a relative display name")
+	}
+	for _, selected := range request.SelectedPaths {
+		if _, ok := normalizeRelativePath(selected); !ok {
+			return ErrInvalidRequest("selected_paths must contain only safe relative paths")
+		}
 	}
 	return s.store.WithSessionContext(ctx, sessionID, userID, func(ctx context.Context, session *Session) error {
 		if session.Canceled {
@@ -144,7 +173,7 @@ func (s *Service) SendMessageWithTierContext(ctx context.Context, sessionID, use
 		}
 		session.Mode = request.Mode
 		session.MikaTier = NormalizeMikaTier(tier)
-		session.ActiveRoot = strings.TrimSpace(request.ActiveRoot)
+		session.ActiveRoot = request.ActiveRoot
 		session.Capabilities = request.Capabilities
 		session.ProviderCallsThisTurn = 0
 		session.ToolResults = nil
@@ -157,6 +186,15 @@ func (s *Service) SendMessageWithTierContext(ctx context.Context, sessionID, use
 		session.Messages = append(session.Messages, Message{Role: "user", Content: request.UserMessage})
 		return s.advanceLocked(ctx, session)
 	})
+}
+
+func isSafeActiveRoot(value string) bool {
+	trimmed := strings.TrimSpace(value)
+	if strings.HasPrefix(trimmed, "scope_") && !strings.ContainsAny(trimmed, "/\\:") {
+		return true
+	}
+	_, ok := normalizeRelativePath(trimmed)
+	return ok
 }
 
 func (s *Service) SubmitToolResults(sessionID, userID string, results []ToolResult) error {
@@ -185,7 +223,7 @@ func (s *Service) SubmitToolResultsWithTierContext(ctx context.Context, sessionI
 		if session.Canceled {
 			return ErrInvalidRequest("session is canceled")
 		}
-		if session.ProviderCallsThisTurn >= MaxProviderCallsPerTurn {
+		if session.ProviderCallsThisTurn >= providerCallLimit(session) {
 			return ErrInvalidRequest("Mika tool step limit reached; send a new message to continue")
 		}
 		seen := make(map[string]struct{}, len(results))
@@ -203,6 +241,13 @@ func (s *Service) SubmitToolResultsWithTierContext(ctx context.Context, sessionI
 			delete(session.PendingToolRequests, requestID)
 		}
 		session.MikaTier = NormalizeMikaTier(tier)
+		if containsPreviewFileResult(results) {
+			for index := range session.ToolResults {
+				if session.ToolResults[index].Name == ToolPreviewFile {
+					session.ToolResults[index] = sanitizeToolResult(session.ToolResults[index])
+				}
+			}
+		}
 		session.ToolResults = append(session.ToolResults, results...)
 		collectKnownPaths(session, results)
 		return s.advanceLocked(ctx, session)
@@ -217,8 +262,12 @@ func (s *Service) Cancel(sessionID, userID string) error {
 	return s.store.Cancel(sessionID, userID)
 }
 
+func (s *Service) Forget(sessionID, userID string) error {
+	return s.store.Forget(sessionID, userID)
+}
+
 func (s *Service) advanceLocked(ctx context.Context, session *Session) error {
-	if session.ProviderCallsThisTurn >= MaxProviderCallsPerTurn {
+	if session.ProviderCallsThisTurn >= providerCallLimit(session) {
 		return ErrInvalidRequest("Mika tool step limit reached; send a new message to continue")
 	}
 	session.ProviderCallsThisTurn++
@@ -239,10 +288,17 @@ func (s *Service) advanceLocked(ctx context.Context, session *Session) error {
 	selectedProvider := resolveMikaProvider(s.provider, session.MikaTier)
 	provider, model := providerStatus(selectedProvider)
 	idempotencyKey := fmt.Sprintf("%s:%d", session.ID, session.nextSequence+1)
+	if session.BillingScope != "" {
+		idempotencyKey = fmt.Sprintf("%s:%d", session.BillingScope, session.ProviderCallsThisTurn)
+	}
 	var reservation *UsageReservation
 	var err error
 	if s.meter != nil && provider != ProviderMock {
-		reservation, err = s.meter.Reserve(session.UserID, idempotencyKey, "assistant_ai", provider, model, estimateRequestTokens(request), MaxModelOutputTokens)
+		billingUserID := session.BillingUserID
+		if billingUserID == "" {
+			billingUserID = session.UserID
+		}
+		reservation, err = s.meter.Reserve(billingUserID, idempotencyKey, "assistant_ai", provider, model, estimateRequestTokens(request), MaxModelOutputTokens)
 		if err != nil {
 			return err
 		}
@@ -259,6 +315,7 @@ func (s *Service) advanceLocked(ctx context.Context, session *Session) error {
 		session.appendEvent(AgentEvent{Type: EventError, Message: "Mika could not complete this request."})
 		return nil
 	}
+	response.Citations = groundedAgentCitations(request, response.Citations)
 	settlement := UsageSettlement{}
 	if reservation != nil {
 		settlement, err = s.meter.Settle(reservation, idempotencyKey+":settle", "assistant_ai", provider, model, response.Usage)
@@ -269,10 +326,10 @@ func (s *Service) advanceLocked(ctx context.Context, session *Session) error {
 	}
 	if strings.TrimSpace(response.Text) != "" {
 		session.Messages = append(session.Messages, Message{Role: "assistant", Content: response.Text})
-		session.appendEvent(AgentEvent{Type: EventAssistantMessage, Text: response.Text, CreditsUsed: settlement.CreditsUsed, CreditsRemaining: settlement.CreditsRemaining})
+		session.appendEvent(AgentEvent{Type: EventAssistantMessage, Text: response.Text, Citations: response.Citations, CreditsUsed: settlement.CreditsUsed, CreditsRemaining: settlement.CreditsRemaining})
 	}
 	if len(response.ToolRequests) > 0 {
-		if session.ProviderCallsThisTurn >= MaxProviderCallsPerTurn {
+		if session.ProviderCallsThisTurn >= providerCallLimit(session) {
 			clear(session.PendingToolRequests)
 			session.appendEvent(AgentEvent{Type: EventError, Message: "Mika reached the tool step limit. Send a new message to continue."})
 			return nil
@@ -300,6 +357,26 @@ func (s *Service) advanceLocked(ctx context.Context, session *Session) error {
 		session.appendEvent(AgentEvent{Type: EventFilePlan, FilePlan: response.FilePlan})
 	}
 	return nil
+}
+
+func containsPreviewFileResult(results []ToolResult) bool {
+	for _, result := range results {
+		if result.Name == ToolPreviewFile && result.OK {
+			return true
+		}
+	}
+	return false
+}
+
+func providerCallLimit(session *Session) int {
+	if strings.HasPrefix(session.BillingScope, "agent-job:") {
+		for _, tool := range session.Capabilities.Tools {
+			if tool.Name == ToolPreviewFile {
+				return MaxDocumentCallsPerTurn
+			}
+		}
+	}
+	return MaxProviderCallsPerTurn
 }
 
 func estimateRequestTokens(request ModelRequest) int64 {
