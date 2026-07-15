@@ -89,6 +89,10 @@ it("shows green for confirmed healthy sync and live work, with no warning outsid
   expect(
     screen.getByRole("button", { name: "Sync: Up to date" }).getAttribute("data-sync-status"),
   ).toBe("green");
+  expect(
+    screen.getByRole("button", { name: "Sync: Up to date" }).querySelector(".lucide-refresh-cw"),
+  ).toBeTruthy();
+  expect(document.querySelector("[data-sync-issue-badge]")).toBeNull();
   expect(screen.queryByRole("dialog")).toBeNull();
   const pending = session();
   pending.status.pending_changes = 2;
@@ -107,6 +111,8 @@ it("gives local save failures priority and preserves the essential recovery warn
   render(<BrowserSyncBadge accountId="a" onOpenSettings={vi.fn()} />);
   const trigger = screen.getByRole("button", { name: "Sync: Local saving needs attention" });
   expect(trigger.getAttribute("data-sync-status")).toBe("red");
+  expect(trigger.querySelector(".lucide-refresh-cw")).toBeTruthy();
+  expect(trigger.querySelector("[data-sync-issue-badge]")?.textContent).toBe("!");
   fireEvent.click(trigger);
   expect(screen.getByRole("dialog", { name: "Device control center" })).toBeTruthy();
   expect(screen.getByText("Keep Misty open until saved.")).toBeTruthy();

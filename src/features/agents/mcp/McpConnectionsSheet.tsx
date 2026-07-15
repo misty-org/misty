@@ -68,7 +68,7 @@ export function McpConnectionsView(props: { showCustomConnections?: boolean }) {
             <div>
               <h3 className="m-0 text-sm font-medium text-cream-bright">Custom tool servers</h3>
               <p className="mt-1 text-xs text-cream-muted">
-                Valid tools become available to Misty. Sensitive calls still ask for approval.
+                Valid tools become available to Misty and run without approval prompts.
               </p>
             </div>
             <Button size="sm" onClick={() => setAdding((current) => !current)}>

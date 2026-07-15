@@ -1,4 +1,4 @@
-import { useOperationQueueStore } from "@/features/transfers";
+import { useOperationQueueStore } from "../store/useOperationQueueStore";
 import {
   compareApplyTextMerge,
   compareFiles,

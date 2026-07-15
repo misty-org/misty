@@ -89,7 +89,8 @@ pub fn run(workspace: &Workspace, options: Doctor) -> Result<()> {
         record(
             &mut findings,
             "server environment",
-            environment::validate(workspace, environment::Target::Dev),
+            environment::validate(workspace, environment::Target::Dev)
+                .and_then(|_| environment::apply(workspace, environment::Target::Dev)),
             "misty setup server; misty setup cloudflare",
         );
         record(

@@ -287,7 +287,7 @@ export function AgendaTimelineView({
                     {view === "day" ? (
                       <span className="absolute -left-2 top-0 h-px w-2 bg-avatar-red" />
                     ) : null}
-                    <span className="absolute left-0 top-0 size-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-avatar-red ring-2 ring-charcoal-bg" />
+                    <span className="absolute -left-[5px] -top-[5px] size-2.5 rounded-full bg-avatar-red ring-2 ring-charcoal-bg" />
                   </div>
                 ) : null}
               </div>
@@ -295,16 +295,16 @@ export function AgendaTimelineView({
           })}
           {showNow ? (
             <div
-              className="pointer-events-none absolute left-0 z-10 w-[72px] -translate-y-1/2"
+              className="pointer-events-none absolute left-0 z-10 h-6 w-[72px]"
               style={{
-                top: nowTop,
+                top: nowTop - 12,
               }}
               aria-label={`Current time ${currentTimeLabel}`}
               data-agenda-current-time-label
             >
               <span
                 className={cn(
-                  "absolute right-2 top-1/2 -translate-y-1/2 whitespace-nowrap rounded-full",
+                  "absolute inset-y-0 right-2 my-auto h-fit whitespace-nowrap rounded-full",
                   "bg-avatar-red px-2 py-0.5 text-[10px] font-semibold tabular-nums",
                   "text-charcoal-bg shadow-sm",
                 )}

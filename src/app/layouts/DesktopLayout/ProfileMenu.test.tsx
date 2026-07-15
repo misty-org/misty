@@ -48,9 +48,8 @@ describe("ProfileMenu", () => {
   it("lists account actions for a signed-in account", () => {
     renderMenu();
     const menu = screen.getByRole("menu", { name: "Profile" });
-    expect(menu.textContent).toContain("Owner");
     expect(menu.textContent).toContain("owner@example.com");
-    for (const label of [/Account settings/, /Take workspace tour/, /Switch accounts/, /Log out/]) {
+    for (const label of [/Account settings/, /Switch accounts/, /Log out/]) {
       expect(screen.getByRole("menuitem", { name: label })).toBeTruthy();
     }
     expect(menu.textContent).not.toContain("Report a problem");

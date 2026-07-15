@@ -144,7 +144,7 @@ export function GlobalPreviewDialogView(props: {
         ref={previewRef}
         aria-describedby={undefined}
         className={cn(
-          "left-0 top-0 block h-full w-full max-w-none translate-x-0 translate-y-0",
+          "block h-full max-h-none w-full max-w-none",
           "rounded-none bg-charcoal-bg p-0 text-cream shadow-none ring-0",
           "data-[state=closed]:zoom-out-100 data-[state=open]:zoom-in-100",
           "[&>[data-slot=dialog-close]]:hidden",

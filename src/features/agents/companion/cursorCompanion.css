@@ -73,7 +73,8 @@ body,
 .cursor-group[data-phase="processing"] .cursor-spinner {
   opacity: 1;
 }
-.cursor-point-bubble {
+.cursor-point-bubble,
+.cursor-error-bubble {
   opacity: 0;
   transform: translateY(-50%) scale(0.5);
   position: absolute;
@@ -92,8 +93,19 @@ body,
   transition: opacity 0.5s ease-out;
   transform-origin: center;
 }
+.cursor-error-bubble {
+  opacity: 1;
+  transform: none;
+  left: 0;
+}
 @keyframes cursor-spin {
   to {
     transform: translate(-50%, -50%) rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cursor-group {
+    transition: none;
   }
 }

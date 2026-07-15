@@ -1,3 +1,4 @@
+import type { MistyTabGroup } from "./tabGroups";
 import type { DockingLayout } from "@/features/app-shell/dockingLayout";
 import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
@@ -23,8 +24,8 @@ export type WorkspaceSurfaceId =
   | "terminal"
   | "code"
   | "files"
-  | "transfers"
   | "agents"
+  | "scheduled"
   | "official-app"
   | "extension"
   | "marketplace";
@@ -309,7 +310,7 @@ export interface DockWidgetDescriptor<TState = unknown> {
 }
 
 export interface WorkspaceTab {
-  /** A newly split pane can be filled by the next app launch. */
+  /** An unused new tab or split can take the next selected destination. */
   placeholder?: boolean;
   /** Stable identity of this pane’s app group, independent of its label. */
   groupInstanceId?: string;
@@ -354,6 +355,8 @@ export interface WorkspaceLayout {
 
 /** A window tab owns a split tree; each leaf contains one app view. */
 export interface WorkspaceLayoutTab {
+  /** Chrome-style grouping of visible layout tabs, independent of pane identities. */
+  tabGroupId?: string;
   id: string;
   /** Legacy native aliases are resolved after account preferences load. */
   legacyNameKeys?: string[];
@@ -372,6 +375,7 @@ export interface WorkspaceVirtualWindow {
 }
 
 export interface WorkspaceSnapshot {
+  tabGroups?: MistyTabGroup[];
   version: 2 | 3;
   accountId: string;
   deviceId: string;

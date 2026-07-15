@@ -36,74 +36,8 @@ export function transfersSnapshot(filter: TransferFilter = {}): Promise<Transfer
   return invoke("transfers_snapshot", { filter });
 }
 
-export function transfersDeleteSelected(ids: number[]): Promise<void> {
-  return invoke("transfers_delete_selected", { ids });
-}
-
-export function transfersDeleteAll(): Promise<void> {
-  return invoke("transfers_delete_all");
-}
-
 export function operationQueueSnapshot(): Promise<OperationQueueSnapshot> {
   return invoke("operation_queue_snapshot");
-}
-
-export function operationQueueCancel(operationId: number): Promise<OperationQueueSnapshot> {
-  return invoke("operation_queue_cancel", { operationId });
-}
-
-export function operationQueueCancelBatch(batchId: number): Promise<OperationQueueSnapshot> {
-  return invoke("operation_queue_cancel_batch", { batchId });
-}
-
-export function operationQueueRetry(operationId: number): Promise<OperationQueueSnapshot> {
-  return invoke("operation_queue_retry", { operationId });
-}
-
-export function operationQueueRetryTransfer(transferId: number): Promise<OperationQueueSnapshot> {
-  return invoke("operation_queue_retry_transfer", { transferId });
-}
-
-export function operationQueuePause(operationId: number): Promise<OperationQueueSnapshot> {
-  return invoke("operation_queue_pause", { operationId });
-}
-
-export function operationQueueResume(operationId: number): Promise<OperationQueueSnapshot> {
-  return invoke("operation_queue_resume", { operationId });
-}
-
-export function operationQueuePauseBatch(batchId: number): Promise<OperationQueueSnapshot> {
-  return invoke("operation_queue_pause_batch", { batchId });
-}
-
-export function operationQueueResumeBatch(batchId: number): Promise<OperationQueueSnapshot> {
-  return invoke("operation_queue_resume_batch", { batchId });
-}
-
-export function operationQueuePauseAll(): Promise<OperationQueueSnapshot> {
-  return invoke("operation_queue_pause_all");
-}
-
-export function operationQueueResumeAll(): Promise<OperationQueueSnapshot> {
-  return invoke("operation_queue_resume_all");
-}
-
-export function operationQueueSetBandwidthLimit(limit: string): Promise<OperationQueueSnapshot> {
-  return invoke("operation_queue_set_bandwidth_limit", { limit });
-}
-
-export function operationQueueSetTransferProfile(
-  profileId: string,
-  profileName: string,
-  maxConcurrent: number,
-  bandwidthLimit: string,
-): Promise<OperationQueueSnapshot> {
-  return invoke("operation_queue_set_transfer_profile", {
-    profileId,
-    profileName,
-    maxConcurrent,
-    bandwidthLimit,
-  });
 }
 
 export function operationQueueUndo(undoTokenId: number): Promise<OperationQueueSnapshot> {
@@ -195,10 +129,6 @@ export function operationQueueResolveConflict(
   applyToBatch: boolean,
 ): Promise<OperationQueueSnapshot> {
   return invoke("operation_queue_resolve_conflict", { operationId, policy, applyToBatch });
-}
-
-export function operationQueueClearTerminal(): Promise<OperationQueueSnapshot> {
-  return invoke("operation_queue_clear_terminal");
 }
 
 export function fileSyncPairsSnapshot(): Promise<FileSyncPair[]> {

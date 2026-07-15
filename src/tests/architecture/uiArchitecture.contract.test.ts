@@ -19,6 +19,11 @@ const customPropertyDefinitionOwners = new Set([
   // The companion's runtime size feeds four rules in cursorCompanion.css.
   "src/features/agents/companion/CursorCompanionRoot.tsx",
 ]);
+/** The cursor companion rides the pointer and rotates every frame; it is never pixel-aligned. */
+const pointerFollowingFiles = new Set([
+  "src/features/agents/companion/CursorCompanionRoot.tsx",
+  "src/features/agents/companion/cursorCompanion.css",
+]);
 const allowedSourceRoots = new Set([
   "api",
   "app",
@@ -94,6 +99,21 @@ describe("UI architecture contract", () => {
         /["']--[a-z][a-z0-9-]*["']\s*:/.test(text)
       ) {
         failures.push(`${relative}: use Tailwind classes instead of CSS custom properties`);
+      }
+    }
+    expect(failures, failures.join("\n")).toEqual([]);
+  });
+
+  // A -50% translate lands odd-sized surfaces on a half pixel, which blurs their text on 1x
+  // displays. Center with layout instead (inset-0 m-auto, inset-x-0 mx-auto w-fit), which snaps.
+  // Shared UI is included: dialogs are where this showed up first.
+  it("centers surfaces with layout, not half-size translates", () => {
+    const failures: string[] = [];
+    for (const path of walk("src", new Set([...extensions, ".css"]))) {
+      const relative = repositoryPath(path);
+      if (/\.test\.tsx?$/.test(relative) || pointerFollowingFiles.has(relative)) continue;
+      if (/translate-[xy]-1\/2|translate[XY]?\(\s*-?50%/.test(readFileSync(path, "utf8"))) {
+        failures.push(`${relative}: center with inset + auto margins instead of translate 50%`);
       }
     }
     expect(failures, failures.join("\n")).toEqual([]);

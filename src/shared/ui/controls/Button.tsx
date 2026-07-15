@@ -31,7 +31,7 @@ const buttonVariants = cva(
         // Every variant fills on hover and while open/pressed, so interactive
         // controls read the same across the app.
         outline: [
-          "border-charcoal-border bg-charcoal-bg shadow-none",
+          "border-charcoal-border bg-transparent shadow-none",
           "hover:border-charcoal-active hover:bg-charcoal-hover",
           "hover:text-cream-bright aria-expanded:bg-charcoal-hover",
           "aria-expanded:text-cream-bright aria-pressed:bg-charcoal-hover",
@@ -43,19 +43,19 @@ const buttonVariants = cva(
         ],
         // Same wash as the toolbar look, for ghost buttons that keep their own text color.
         ghost: [
-          "hover:bg-cream/[0.045] hover:text-cream",
-          "aria-pressed:bg-cream/[0.06] aria-expanded:bg-cream/[0.06] aria-expanded:text-cream",
-          "data-[state=open]:bg-cream/[0.06] data-[state=open]:text-cream",
+          "hover:bg-control-hover hover:text-cream",
+          "aria-pressed:bg-control-active aria-expanded:bg-control-active aria-expanded:text-cream",
+          "data-[state=open]:bg-control-active data-[state=open]:text-cream",
         ],
         // The browser chrome's look: muted glyph, a soft wash of the text color on hover.
         // Washing with cream keeps it right on light surfaces too.
         toolbar: [
-          "border-0 text-cream-muted hover:bg-cream/[0.045] hover:text-cream",
-          "aria-pressed:bg-cream/[0.06] aria-pressed:text-cream",
-          "aria-expanded:bg-cream/[0.06] aria-expanded:text-cream",
-          "data-[state=open]:bg-cream/[0.06] data-[state=open]:text-cream",
+          "border-0 text-cream-muted hover:bg-control-hover hover:text-cream",
+          "aria-pressed:bg-control-active aria-pressed:text-cream",
+          "aria-expanded:bg-control-active aria-expanded:text-cream",
+          "data-[state=open]:bg-control-active data-[state=open]:text-cream",
           // A menu trigger whose setting is on, e.g. agent access or a narrowed viewport.
-          "data-[active=true]:bg-cream/[0.06] data-[active=true]:text-cream",
+          "data-[active=true]:bg-control-active data-[active=true]:text-cream",
           "focus-visible:border-transparent focus-visible:ring-2 focus-visible:ring-cream/15 disabled:opacity-40",
         ],
         link: "text-cream-bright underline-offset-4 hover:underline",
@@ -68,13 +68,13 @@ const buttonVariants = cva(
         ],
         // Filters, tags, reactions, and presence: outlined until pressed, then filled.
         chip: [
-          "rounded-full border-charcoal-border/70 text-cream-muted hover:bg-cream/[0.045] hover:text-cream",
+          "rounded-full border-charcoal-border/70 text-cream-muted hover:bg-control-hover hover:text-cream",
           "aria-pressed:border-transparent aria-pressed:bg-charcoal-active aria-pressed:text-cream-bright",
-          "data-[state=open]:bg-cream/[0.06] data-[state=open]:text-cream",
+          "data-[state=open]:bg-control-active data-[state=open]:text-cream",
         ],
         "nav-action": [
-          "rounded-md border-0 bg-transparent p-0 text-cream-muted hover:bg-cream/[0.045] hover:text-cream",
-          "aria-pressed:bg-cream/[0.06] aria-expanded:bg-cream/[0.06] data-[state=open]:bg-cream/[0.06]",
+          "rounded-md border-0 bg-transparent p-0 text-cream-muted hover:bg-control-hover hover:text-cream",
+          "aria-pressed:bg-control-active aria-expanded:bg-control-active data-[state=open]:bg-control-active",
           "focus-visible:ring-2 focus-visible:ring-cream/15 disabled:cursor-wait",
         ],
       },

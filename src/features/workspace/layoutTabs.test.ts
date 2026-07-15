@@ -177,7 +177,7 @@ describe("window → tabs → panes", () => {
   });
 });
 
-it("keeps cross-app and route history in its pane with restorable state", () => {
+it("keeps destination histories separate while preserving route state", () => {
   state().newLayoutTab();
   const initial = state().openSurface(createHomeWorkspaceTab("global"));
   const paneId = state().layout.focusedPaneId;
@@ -196,23 +196,35 @@ it("keeps cross-app and route history in its pane with restorable state", () => 
     title: "Discover",
     route: "/discover",
   });
-  expect(state().layout.focusedPaneId).toBe(paneId);
-  expect(allLayoutViews(state().layout).some((view) => view.id === first.id)).toBe(false);
-  expect(state().navigatePane(-1)).toMatchObject({
+  expect(state().layout.focusedPaneId).not.toBe(paneId);
+  expect(allLayoutViews(state().layout).some((view) => view.id === first.id)).toBe(true);
+  expect(state().navigatePane(-1)).toBeNull();
+  state().focusTab(first.id);
+  expect(activeLayoutView(state().layout)).toMatchObject({
     id: first.id,
     route: "/apps/planner?view=agenda",
     state: { viewport: 9 },
   });
   expect(state().navigatePane(-1)).toMatchObject({ id: first.id, route: "/apps/planner" });
-  expect(state().navigatePane(-1)?.id).toBe(initial.id);
-  expect(state().navigatePane(3)?.id).toBe(second.id);
+  expect(state().navigatePane(-1)).toBeNull();
+  expect(allLayoutViews(state().layout).map((view) => view.id)).toEqual(
+    expect.arrayContaining([initial.id, first.id, second.id]),
+  );
 });
 
-it("opens Google in new tabs and splits and navigates inside the selected split", () => {
-  expect(state().newLayoutTab()).toMatchObject({ title: "Google", surfaceId: "browser" });
+it("opens replaceable Home in new tabs and splits and navigates inside the selected split", () => {
+  expect(state().newLayoutTab()).toMatchObject({
+    title: "Home",
+    surfaceId: "home",
+    placeholder: true,
+  });
   const tabId = state().layout.activeLayoutTabId;
   const paneId = state().splitPane(state().layout.focusedPaneId, "right")!;
-  expect(activeLayoutView(state().layout)).toMatchObject({ title: "Google", surfaceId: "browser" });
+  expect(activeLayoutView(state().layout)).toMatchObject({
+    title: "Home",
+    surfaceId: "home",
+    placeholder: true,
+  });
   const view = state().openBrowserTab({ url: "https://example.com", paneId });
   expect(state().layout.activeLayoutTabId).toBe(tabId);
   expect(dockTabs(state().layout.root)).toHaveLength(2);
@@ -236,29 +248,25 @@ it("updates automatic titles live while preserving custom names through history 
   expect(layoutTabLabel(owner(view.id))).toBe("Later content");
 });
 
-it("restores a closed pane's cross-app history and split proportions", () => {
+it("restores a closed pane's own history and split proportions", () => {
   state().newLayoutTab();
   const paneId = state().splitPane(state().layout.focusedPaneId, "right")!;
   const one = state().openSurface({
-    surfaceId: "home",
-    groupKey: "tool:home",
-    title: "Home",
-    route: "/home",
+    surfaceId: "files",
+    groupKey: "tool:files",
+    title: "Files",
+    route: "/files",
     paneId,
   });
-  state().openSurface({
-    surfaceId: "marketplace",
-    groupKey: "tool:marketplace",
-    title: "Discover",
-    route: "/discover",
-  });
+  state().updateTabRoute(one.id, "/files?path=Downloads");
   state().closePane(paneId);
   state().reopenClosedTab();
   expect(state().layout.focusedPaneId).toBe(paneId);
-  expect(state().navigatePane(-1)?.id).toBe(one.id);
+  expect(activeLayoutView(state().layout)?.route).toBe("/files?path=Downloads");
+  expect(state().navigatePane(-1)).toMatchObject({ id: one.id, route: "/files" });
 });
 
-it("blocks replacement, tab closing, and cross-app Back while work is unsaved", () => {
+it("allows destination switching while preserving unsaved work and blocking its closure", () => {
   state().newLayoutTab();
   const first = state().openSurface(createHomeWorkspaceTab("global"));
   const code = state().openSurface({
@@ -276,11 +284,13 @@ it("blocks replacement, tab closing, and cross-app Back while work is unsaved", 
         title: "Discover",
         route: "/discover",
       }).id,
-    ).toBe(code.id);
+    ).not.toBe(code.id);
+    state().focusTab(code.id);
     expect(state().navigatePane(-1)).toBeNull();
     expect(state().closeLayoutTab(state().layout.activeLayoutTabId!)).toBe(false);
   } finally {
     setWorkspaceUnsaved(code.id, false);
   }
-  expect(state().navigatePane(-1)?.id).toBe(first.id);
+  expect(state().navigatePane(-1)).toBeNull();
+  expect(allLayoutViews(state().layout).some((view) => view.id === first.id)).toBe(true);
 });

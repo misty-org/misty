@@ -83,7 +83,7 @@ function getTabIcon(tab: WorkspaceTab | undefined, fallback: LucideIcon): Lucide
 export function TabIcon({
   tab,
   icon: DefaultIcon,
-  size = 14,
+  size = 16,
   isActive = false,
 }: {
   tab?: WorkspaceTab;
@@ -171,7 +171,6 @@ export function TabIcon({
       "agenda",
       "roadmaps",
       "explorer",
-      "transfers",
       "recent",
       "favorites",
       "collections",
@@ -191,10 +190,7 @@ export function TabIcon({
         />
       </span>
     );
-  const ResolvedIcon =
-    appId === "files" && tab?.route.includes("view=transfers")
-      ? workspaceAppIcon("transfers")!
-      : getTabIcon(tab, DefaultIcon);
+  const ResolvedIcon = getTabIcon(tab, DefaultIcon);
   return (
     <ResolvedIcon
       size={size}
@@ -492,7 +488,6 @@ export function workspaceTabAutomaticTitle(
       },
       files: {
         "": "Explorer",
-        transfers: "Transfers",
       },
       inbox: {
         "": "Misty Inbox",

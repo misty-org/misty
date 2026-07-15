@@ -132,3 +132,133 @@ it.each(["left", "right"] as const)(
     expect(tabs[1].getAttribute("aria-selected")).toBe("true");
   },
 );
+
+it.each(["top", "bottom", "left", "right"] as const)(
+  "collapses and reopens a group from the %s strip",
+  (position) => {
+    const store = useWorkspaceStore.getState();
+    const first = store.layout.activeLayoutTabId!;
+    store.newLayoutTab();
+    const second = useWorkspaceStore.getState().layout.activeLayoutTabId!;
+    const id = store.createTabGroup([first, second], "Reading")!;
+    mount(position);
+    expect(screen.getAllByRole("tab")).toHaveLength(2);
+    fireEvent.click(screen.getByRole("button", { name: "Reading, 2 tabs, expanded" }));
+    expect(screen.getAllByRole("tab")).toHaveLength(1);
+    expect(
+      screen
+        .getByRole("button", { name: "Reading, 2 tabs, collapsed" })
+        .getAttribute("aria-expanded"),
+    ).toBe("false");
+    act(() => {
+      useWorkspaceStore.getState().reopenTabGroup(id);
+    });
+    expect(screen.getAllByRole("tab")).toHaveLength(3);
+    expect(screen.queryByRole("button", { name: "Edit group Reading" })).toBeNull();
+    fireEvent.contextMenu(screen.getByRole("button", { name: "Reading, 2 tabs, expanded" }));
+    fireEvent.change(screen.getByLabelText("Group name"), { target: { value: "Research" } });
+    fireEvent.click(screen.getByRole("button", { name: "green" }));
+    fireEvent.click(screen.getByRole("button", { name: "Done" }));
+    expect(useWorkspaceStore.getState().tabGroups.find((g) => g.id === id)).toMatchObject({
+      name: "Research",
+      color: "green",
+    });
+  },
+);
+
+it("moves an expanded group past its own members with the keyboard", () => {
+  const state = useWorkspaceStore.getState();
+  const first = state.layout.activeLayoutTabId!;
+  state.newLayoutTab();
+  const second = useWorkspaceStore.getState().layout.activeLayoutTabId!;
+  state.createTabGroup([first, second], "Reading");
+  state.newLayoutTab();
+  const outside = useWorkspaceStore.getState().layout.activeLayoutTabId!;
+  mount();
+  fireEvent.keyDown(screen.getByRole("button", { name: "Reading, 2 tabs, expanded" }), {
+    key: "ArrowRight",
+    altKey: true,
+    shiftKey: true,
+  });
+  expect(useWorkspaceStore.getState().layout.tabs?.map((tab) => tab.id)).toEqual([
+    outside,
+    first,
+    second,
+  ]);
+});
+
+it.each(["release", "cancel"] as const)("handles a group pointer drag on %s", (finish) => {
+  const state = useWorkspaceStore.getState();
+  const first = state.layout.activeLayoutTabId!;
+  state.newLayoutTab();
+  const second = useWorkspaceStore.getState().layout.activeLayoutTabId!;
+  state.createTabGroup([first, second], "Reading");
+  state.newLayoutTab();
+  const outside = useWorkspaceStore.getState().layout.activeLayoutTabId!;
+  const rects = vi
+    .spyOn(HTMLElement.prototype, "getBoundingClientRect")
+    .mockImplementation(function (this: HTMLElement) {
+      if (this.hasAttribute("data-reorder-list")) return new DOMRect(0, 0, 500, 40);
+      const item = this.closest<HTMLElement>("[data-reorder-item]");
+      if (!item) return new DOMRect(0, 0, 600, 400);
+      return new DOMRect([...item.parentElement!.children].indexOf(item) * 100, 0, 100, 32);
+    });
+  const pointer = (target: EventTarget, type: string, x: number) => {
+    const event = new MouseEvent(type, {
+      bubbles: true,
+      cancelable: true,
+      clientX: x,
+      clientY: 16,
+      button: 0,
+      buttons: type === "pointerup" ? 0 : 1,
+    });
+    Object.defineProperties(event, { pointerId: { value: 1 }, isPrimary: { value: true } });
+    act(() => {
+      target.dispatchEvent(event);
+    });
+  };
+  try {
+    mount();
+    pointer(screen.getByRole("button", { name: "Reading, 2 tabs, expanded" }), "pointerdown", 30);
+    pointer(window, "pointermove", 390);
+    expect(document.querySelector(".pointer-reorder-indicator")).toBeTruthy();
+    expect(useWorkspaceStore.getState().layout.tabs?.map((tab) => tab.id)).toEqual([
+      first,
+      second,
+      outside,
+    ]);
+    if (finish === "cancel") fireEvent.keyDown(window, { key: "Escape" });
+    else pointer(window, "pointerup", 390);
+    expect(useWorkspaceStore.getState().layout.tabs?.map((tab) => tab.id)).toEqual(
+      finish === "cancel" ? [first, second, outside] : [outside, first, second],
+    );
+    expect(document.querySelector(".pointer-reorder-shield")).toBeNull();
+  } finally {
+    rects.mockRestore();
+  }
+});
+
+it("creates groups through a portaled context submenu without a toolbar group button", async () => {
+  mount();
+  expect(screen.queryByRole("button", { name: "Tab groups" })).toBeNull();
+  fireEvent.contextMenu(screen.getByRole("tab"), { clientX: 100, clientY: 20 });
+  const trigger = await screen.findByRole("menuitem", { name: "Add tab to group" });
+  fireEvent.keyDown(trigger, { key: "ArrowRight" });
+  const create = await screen.findByRole("menuitem", { name: "New group" });
+  const submenu = create.closest('[data-slot="context-menu-sub-content"]')!;
+  expect(submenu.closest('[data-slot="context-menu-content"]')).toBeNull();
+  fireEvent.click(create);
+  expect(useWorkspaceStore.getState().tabGroups).toHaveLength(1);
+  expect(await screen.findByLabelText("Group name")).toBeTruthy();
+});
+
+it.each(["ContextMenu", "F10"])("opens group configuration using %s", (key) => {
+  const state = useWorkspaceStore.getState();
+  state.createTabGroup([state.layout.activeLayoutTabId!], "Reading");
+  mount();
+  const label = screen.getByRole("button", { name: "Reading, 1 tab, expanded" });
+  expect(label.textContent).toBe("Reading");
+  fireEvent.keyDown(label, { key, shiftKey: key === "F10" });
+  expect(screen.getByLabelText("Group name")).toBeTruthy();
+  expect(label.getAttribute("aria-expanded")).toBe("true");
+});

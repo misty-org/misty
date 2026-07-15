@@ -20,7 +20,7 @@ export type ActivityTarget =
   | { kind: "space-task"; spaceId: string; taskId: string }
   | {
       kind: "workspace-tool";
-      tool: "files" | "agents" | "marketplace" | "transfers";
+      tool: "files" | "agents" | "marketplace";
     }
   | { kind: "route"; href: string }
   | { kind: "none" };

@@ -11,7 +11,6 @@ import {
   toolbarIconProps,
 } from "@/shared/ui";
 import {
-  ArrowDownUp,
   ChevronRight,
   Clipboard,
   Copy,
@@ -169,18 +168,6 @@ export const ExplorerToolbarView = memo(function ExplorerToolbarView(
             onNavigateSearchResult={props.onNavigateSearchResult}
             onRunCommand={props.onRunCommand}
           />
-          {props.onOpenTransfers && (
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="h-8 shrink-0 gap-1.5 px-2 text-xs text-cream-muted hover:text-cream"
-              onClick={props.onOpenTransfers}
-            >
-              <ArrowDownUp size={16} aria-hidden="true" />
-              Transfers
-            </Button>
-          )}
         </div>
       </div>
 
@@ -235,6 +222,11 @@ export const ExplorerToolbarView = memo(function ExplorerToolbarView(
             <Trash2 {...toolbarIconProps} />
           </IconButton>
         </div>
+        {props.trailingActions ? (
+          <div className="flex shrink-0 items-center justify-end gap-3">
+            {props.trailingActions}
+          </div>
+        ) : null}
       </div>
     </header>
   );

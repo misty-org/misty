@@ -8,7 +8,7 @@ describe("browser workspace deep links", () => {
       expect(workspaceSurfaceFromRoute(route)).toBeNull();
     },
   );
-  it.each(["/home", "/new", "/browser", "/apps/journal", "/discover"])(
+  it.each(["/new", "/browser", "/apps/journal", "/discover"])(
     "opens %s as a global browser tab",
     (route) => {
       expect(workspaceSurfaceFromRoute(route)).toMatchObject({
@@ -62,4 +62,24 @@ it("restores Space tools as split-capable surfaces in the current global workspa
     route: "/spaces/family/planner/tasks/board",
   });
   expect(workspaceSurfaceFromRoute("/spaces")).toMatchObject({ surfaceId: "space" });
+});
+
+it("opens Home as a reusable workspace tab", () => {
+  expect(workspaceSurfaceFromRoute("/home")).toMatchObject({
+    surfaceId: "home",
+    groupKey: "tool:home",
+    title: "Home",
+    route: "/home",
+    instancePolicy: "single",
+  });
+});
+
+it("opens Scheduled directly and preserves legacy task links", () => {
+  for (const route of ["/scheduled?task=weekly", "/agents?view=scheduled&task=weekly"])
+    expect(workspaceSurfaceFromRoute(route)).toMatchObject({
+      surfaceId: "scheduled",
+      groupKey: "tool:scheduled",
+      route: "/scheduled?task=weekly",
+      scopeKey: "global",
+    });
 });

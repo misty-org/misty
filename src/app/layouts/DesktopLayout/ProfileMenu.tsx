@@ -2,7 +2,6 @@ import { SavedAccountSessionUnavailableError, useAuth, useUserStore } from "@/fe
 import { reportSystemError } from "@/features/activity";
 import { routes } from "@/features/app-shell";
 import { useSetupStore } from "@/features/installer";
-import { useTourStore } from "@/features/tour";
 import {
   DropdownMenuContent,
   DropdownMenuLabel,
@@ -12,7 +11,6 @@ import {
 } from "@/shared/ui";
 import {
   Check,
-  Compass,
   ExternalLink,
   LogIn,
   LogOut,
@@ -23,7 +21,7 @@ import {
 import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
-import { emailName, initialsForProfile } from "./helpers";
+import { initialsForProfile } from "./helpers";
 
 function Initials(props: { children: string }) {
   return (
@@ -47,7 +45,6 @@ export function ProfileMenu(props: { onClose: () => void; onOpenAccountSettings:
   const account = user ?? currentUser;
   const accountMe = me.id === account?.id ? me : null;
   const email = accountMe?.email ?? account?.email ?? "";
-  const displayName = accountMe?.name ?? account?.name ?? emailName(email) ?? "Misty";
   const busy = Boolean(switchingAccountId) || transitioning;
 
   const chooseAccount = async (accountId: string) => {
@@ -93,20 +90,8 @@ export function ProfileMenu(props: { onClose: () => void; onOpenAccountSettings:
 
   return (
     <DropdownMenuContent side="right" align="end" sideOffset={10} width="md" aria-label="Profile">
-      <DropdownMenuLabel className="grid grid-cols-[32px_minmax(0,1fr)] items-center gap-2.5 py-1.5">
-        <span className="grid size-8 place-items-center rounded-full bg-charcoal-active text-xs font-bold text-cream">
-          {account ? (
-            initialsForProfile(displayName, email)
-          ) : (
-            <UserCircle size={20} strokeWidth={1.75} />
-          )}
-        </span>
-        <span className="min-w-0">
-          <strong className="block truncate text-xs font-medium text-cream">{displayName}</strong>
-          <small className="block truncate text-[11px] font-normal text-cream-muted">
-            {email || "Not signed in"}
-          </small>
-        </span>
+      <DropdownMenuLabel className="truncate py-1.5 text-xs font-medium text-cream">
+        {email || "Not signed in"}
       </DropdownMenuLabel>
       <DropdownMenuSeparator />
       {!account ? (
@@ -123,11 +108,6 @@ export function ProfileMenu(props: { onClose: () => void; onOpenAccountSettings:
             }
             shortcut={<ExternalLink className="size-3.5" aria-hidden="true" />}
             onSelect={props.onOpenAccountSettings}
-          />
-          <MenuItem
-            icon={<Compass />}
-            label="Take workspace tour"
-            onSelect={() => useTourStore.getState().resetTour(account?.id)}
           />
           <MenuSubmenu
             icon={<Repeat2 />}

@@ -91,7 +91,7 @@ export function TourPopover(props: {
         "misty-popup-surface fixed layer-popover w-[340px] rounded-lg border border-charcoal-border bg-charcoal-card p-5 text-cream",
         "shadow-2xl ring-1 ring-cream/10 transition-all duration-200 ease-out",
       )}
-      style={style ?? { top: "25%", left: "50%", transform: "translateX(-50%)" }}
+      style={style ?? { top: "25%", left: 0, right: 0, marginInline: "auto" }}
       role="dialog"
       aria-label={title}
     >

@@ -9,7 +9,7 @@ import {
 } from "@/shared/ui";
 import type { BrowserMistyPage } from "./browserRuntime";
 
-/** Run-bound agent access and the one-time Misty page read. */
+/** Optional page attachment for the next conversation. */
 export function BrowserAgentAccessMenu(props: {
   overlay: { open: boolean; onOpenChange: (open: boolean) => void };
   agentAccess: boolean;
@@ -21,30 +21,24 @@ export function BrowserAgentAccessMenu(props: {
   return (
     <Popover open={props.overlay.open} onOpenChange={props.overlay.onOpenChange}>
       <PopoverTrigger asChild>
-        <IconButton
-          label={`Agent access: ${props.agentAccess ? "On" : "Off"}`}
-          tooltip={false}
-          data-active={props.agentAccess}
-        >
+        <IconButton label="Page context for Misty" tooltip={false} data-active={props.agentAccess}>
           <MessageCirclePlus {...toolbarIconProps} />
         </IconButton>
       </PopoverTrigger>
       <PopoverContent align="end" sideOffset={8} className="w-72">
-        <p className="m-0 text-sm font-medium">Run-bound Agent access</p>
+        <p className="m-0 text-sm font-medium">Page context</p>
         <p className="mb-3 mt-1 text-xs text-cream-muted">
-          Attach this tab when you ask an Agent to work. Access belongs only to that run and expires
-          automatically.
+          Include this page’s text in your next message to Misty.
         </p>
         <p className="m-0 text-xs text-cream-muted">
           {props.agentAccess
-            ? "This tab is attached to active Agent work."
-            : "No active Agent run is attached to this tab."}
+            ? "Misty is working with this tab."
+            : "Misty can take control of the screen when your task needs it."}
         </p>
         <div className="mt-3 border-t border-charcoal-border pt-3">
-          <p className="m-0 text-xs font-medium">Misty page context</p>
+          <p className="m-0 text-xs font-medium">Attach page text</p>
           <p className="mb-2 mt-1 text-[11px] text-cream-muted">
-            A one-time inspection captures bounded page text. The temporary read grant is revoked
-            immediately after capture.
+            Capture the current text to discuss it in your conversation.
           </p>
           <Button
             variant="outline"
@@ -57,7 +51,7 @@ export function BrowserAgentAccessMenu(props: {
               ? "Reading page…"
               : props.mistyPage
                 ? "Refresh page context"
-                : "Allow one-time page read"}
+                : "Include page in chat"}
           </Button>
           {props.mistyPage ? (
             <p className="mb-0 mt-2 text-[10px] text-cream-muted">

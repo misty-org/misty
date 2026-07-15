@@ -1328,7 +1328,6 @@ mod tests {
         assert_eq!(current_id, previous.id);
     }
 
-    #[test]
     #[cfg(debug_assertions)]
     #[test]
     fn probes_path_presence() {

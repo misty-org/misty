@@ -160,7 +160,6 @@ export function multiPanelWorkspaceNeedsSave(
   return (
     state.tabs !== previous.tabs ||
     state.activeTabId !== previous.activeTabId ||
-    state.closedPanes !== previous.closedPanes ||
     state.nextPaneIndex !== previous.nextPaneIndex ||
     state.nextTabIndex !== previous.nextTabIndex
   );

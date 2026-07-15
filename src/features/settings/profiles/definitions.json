@@ -24,6 +24,19 @@
     "legacyValues": ["browser", "files", "agents"]
   },
   {
+    "id": "app.tabs.startPage",
+    "label": "New tabs and splits",
+    "page": "general",
+    "section": "general",
+    "key": "workspace_default_tab_index",
+    "default": "home",
+    "owner": "profile",
+    "type": "string",
+    "platforms": ["desktop", "web"],
+    "enum": ["home", "browser", "files", "agents"],
+    "legacyValues": ["home", "browser", "files", "agents"]
+  },
+  {
     "id": "app.startup.login",
     "label": "Launch on login",
     "page": "general",
@@ -82,7 +95,7 @@
   },
   {
     "id": "app.appearance.navigator_auto_hide",
-    "label": "Hide sidebar",
+    "label": "Auto-hide navigation",
     "page": "appearance",
     "section": "appearance",
     "key": "navigator_auto_hide",
@@ -510,31 +523,6 @@
     "owner": "device",
     "type": "string",
     "platforms": ["desktop"]
-  },
-  {
-    "id": "files.transfers.behavior",
-    "label": "Default transfer behavior",
-    "page": "transfers",
-    "section": "general",
-    "key": "default_transfer_behavior_index",
-    "default": "ask",
-    "owner": "profile",
-    "type": "string",
-    "platforms": ["desktop", "web"],
-    "enum": ["ask", "default-location"],
-    "legacyValues": ["ask", "default-location"]
-  },
-  {
-    "id": "files.transfers.preset",
-    "label": "Transfer preset",
-    "page": "transfers",
-    "section": "transfer_profiles",
-    "key": "default_profile_id",
-    "default": "balanced",
-    "owner": "device",
-    "type": "string",
-    "platforms": ["desktop"],
-    "enum": ["balanced", "low-bandwidth", "many-small-files", "careful-verify"]
   },
   {
     "id": "agents.model",

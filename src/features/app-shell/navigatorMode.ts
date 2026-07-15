@@ -1,57 +1,23 @@
 import { useEffect, useState } from "react";
 
-/** How wide the navigator draws when it is on screen. */
-export type NavigatorWidth = "full";
-/** Whether the navigator holds its column or slides away until the edge is hovered. */
-export type NavigatorVisibility = "sticky" | "hidden";
-
+/** Navigation is always a thin icon rail, either pinned or revealed at the edge. */
 export interface NavigatorLayout {
-  width: NavigatorWidth;
-  widthPx?: number;
-  visibility: NavigatorVisibility;
+  autoHide: boolean;
 }
 
-export const navigatorLayoutStorageKey = "misty:global-navigator-layout:v3";
-export const navigatorModeStorageKey = "misty:global-navigator-mode:v2";
-export const legacyNavigatorCollapsedStorageKey = "misty:global-navigator-collapsed:v1";
-
-export const navigatorWidths: Record<NavigatorWidth | "hidden", number> = {
-  full: 264,
-  hidden: 0,
-};
-
-export const navigatorMinWidth = 220;
-export const navigatorMaxWidth = 480;
-export function clampNavigatorWidth(width: number): number {
-  return Number.isFinite(width)
-    ? Math.round(Math.min(navigatorMaxWidth, Math.max(navigatorMinWidth, width)))
-    : navigatorWidths.full;
-}
-export function navigatorPixelWidth(layout: NavigatorLayout): number {
-  return clampNavigatorWidth(layout.widthPx ?? navigatorWidths.full);
-}
+export const navigatorLayoutStorageKey = "misty:global-navigator-layout:v6";
+export const navigatorRailWidth = 56;
 
 export function readNavigatorLayout(
   storage: Pick<Storage, "getItem"> = window.localStorage,
 ): NavigatorLayout {
-  const saved = storage.getItem(navigatorLayoutStorageKey);
-  if (saved) {
-    try {
-      const parsed = JSON.parse(saved) as Partial<NavigatorLayout>;
-      return {
-        width: "full",
-        ...(typeof parsed.widthPx === "number"
-          ? { widthPx: clampNavigatorWidth(parsed.widthPx) }
-          : {}),
-        visibility: parsed.visibility === "hidden" ? "hidden" : "sticky",
-      };
-    } catch {
-      // A corrupt entry falls through to the older keys below.
-    }
+  try {
+    const saved = storage.getItem(navigatorLayoutStorageKey);
+    if (saved) return { autoHide: JSON.parse(saved)?.autoHide === true };
+  } catch {
+    // Corrupt or retired width settings return to the visible icon rail.
   }
-  const mode = storage.getItem(navigatorModeStorageKey);
-  if (mode === "hidden") return { width: "full", visibility: "hidden" };
-  return { width: "full", visibility: "sticky" };
+  return { autoHide: false };
 }
 
 export function writeNavigatorLayout(
@@ -62,19 +28,13 @@ export function writeNavigatorLayout(
 }
 
 export const navigatorLayoutChangedEvent = "misty:navigator-layout-changed";
-
 export function publishNavigatorLayout(layout: NavigatorLayout): void {
   writeNavigatorLayout(layout);
-  window.dispatchEvent(
-    new CustomEvent(navigatorLayoutChangedEvent, {
-      detail: layout,
-    }),
-  );
+  window.dispatchEvent(new CustomEvent(navigatorLayoutChangedEvent, { detail: layout }));
 }
 
 export function useNavigatorLayoutValue(): NavigatorLayout {
   const [layout, setLayout] = useState<NavigatorLayout>(() => readNavigatorLayout());
-
   useEffect(() => {
     const sync = () => setLayout(readNavigatorLayout());
     window.addEventListener(navigatorLayoutChangedEvent, sync);
@@ -84,6 +44,5 @@ export function useNavigatorLayoutValue(): NavigatorLayout {
       window.removeEventListener("storage", sync);
     };
   }, []);
-
   return layout;
 }

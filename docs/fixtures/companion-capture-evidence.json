@@ -1,0 +1,110 @@
+[
+  {
+    "state": "failed",
+    "invocation_id": "invocation_025c3431-bca0-442f-a504-70dfc663244e",
+    "captures": [
+      {
+        "id": "b1c220e8-de42-413a-a657-230e2951ddd7",
+        "screen": "screen1",
+        "primary": true,
+        "width": 1280,
+        "height": 720,
+        "mime_type": "image/jpeg",
+        "captured_at": null,
+        "display_id": null,
+        "source": null,
+        "decoded_dimensions": [
+          1280,
+          720
+        ],
+        "decoded_bytes": 141996,
+        "sha256": "d6c4d51529cea3a02a66a302f4d8ca9a1bbe7f98b519b7eb8fa76ebfd9ccc7e4",
+        "hash_matches": true
+      },
+      {
+        "id": "2f3e91fc-1833-41b4-b3b7-5ef96ffbb0c2",
+        "screen": "screen2",
+        "primary": false,
+        "width": 1280,
+        "height": 827,
+        "mime_type": "image/jpeg",
+        "captured_at": null,
+        "display_id": null,
+        "source": null,
+        "decoded_dimensions": [
+          1280,
+          827
+        ],
+        "decoded_bytes": 32905,
+        "sha256": "0dd856f6b9967a2c0adef7b1329ff7430ff31af9ae652b96cc0813c9e405157b",
+        "hash_matches": true
+      }
+    ]
+  },
+  {
+    "state": "completed",
+    "invocation_id": "invocation_8d38e81e-4081-4147-a430-f02263d4c5a4",
+    "captures": [
+      {
+        "id": "fff83c46-0ee3-479b-bf5f-013a1f3d1f65",
+        "screen": "screen1",
+        "primary": true,
+        "width": 1280,
+        "height": 720,
+        "mime_type": "image/jpeg",
+        "captured_at": null,
+        "display_id": null,
+        "source": null,
+        "decoded_dimensions": [
+          1280,
+          720
+        ],
+        "decoded_bytes": 102853,
+        "sha256": "864723d2ba36ebd7f3ae6f503cf29a80338c23206721e82d63d414eb0cf2c3ba",
+        "hash_matches": true
+      },
+      {
+        "id": "37e0a397-d195-4d3e-88c3-948e678c97e4",
+        "screen": "screen2",
+        "primary": false,
+        "width": 1280,
+        "height": 827,
+        "mime_type": "image/jpeg",
+        "captured_at": null,
+        "display_id": null,
+        "source": null,
+        "decoded_dimensions": [
+          1280,
+          827
+        ],
+        "decoded_bytes": 35459,
+        "sha256": "45b5a3e2bc3e5f8f6e75f452ee3c067790d541431036a3439352eba18c80c227",
+        "hash_matches": true
+      }
+    ]
+  },
+  {
+    "state": "completed",
+    "invocation_id": "invocation_cac9008e-2186-4aa6-ba74-81a11e61ac09",
+    "captures": [
+      {
+        "id": "783308fe-92d7-4d9b-9be1-7ef74d9d0005",
+        "screen": "screen1",
+        "primary": true,
+        "width": 1280,
+        "height": 827,
+        "mime_type": "image/jpeg",
+        "captured_at": 1790498775788,
+        "display_id": 1,
+        "source": "desktop-display",
+        "decoded_dimensions": [
+          1280,
+          827
+        ],
+        "decoded_bytes": 176473,
+        "sha256": "9f762ad5e1c6e4fe90b5be0694997d0d8d47bb75975ebba0c0db0054deabda35",
+        "hash_matches": true
+      }
+    ]
+  }
+]

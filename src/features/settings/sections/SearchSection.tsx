@@ -98,6 +98,7 @@ export function SearchSection(props: SettingsContentProps & { page?: "search" | 
               label="Check for changes every"
               description="How often Misty looks for file changes while it is open."
               muted={!automaticFileDiscovery}
+              indent
               last
             >
               <SelectControl

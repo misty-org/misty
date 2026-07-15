@@ -84,23 +84,12 @@ export const navigatorSubsectionIconClass = cn(
 export const navigatorIslandActionClass = [
   "misty-navigator-icon-target grid size-8 shrink-0 place-items-center rounded-lg border-0 bg-transparent p-0",
   "text-cream-muted no-underline outline-none transition-colors",
-  "hover:bg-cream/[0.045] hover:text-cream",
-  "aria-pressed:bg-cream/[0.06] aria-pressed:text-cream data-[state=open]:bg-cream/[0.06]",
+  "hover:bg-control-hover hover:text-cream",
+  "aria-pressed:bg-control-active aria-pressed:text-cream data-[state=open]:bg-control-active",
   navigatorFocusRingClass,
 ].join(" ");
 
 export const navigatorHeaderRowClass = "flex min-w-0 items-center py-0.5";
-
-export const navigatorIslandIdentityLayoutClass =
-  "box-border flex h-[var(--navigation-row-height,32px)] min-w-0 items-center gap-2.5 px-2.5 py-0";
-
-export const navigatorHierarchyTriggerClass = [
-  navigatorIslandIdentityLayoutClass,
-  "misty-navigator-hierarchy-trigger misty-navigator-row-target rounded-lg border-0 bg-transparent",
-  "text-left text-cream no-underline outline-none transition-colors duration-150 motion-reduce:transition-none",
-  "hover:text-cream-bright focus-visible:text-cream-bright active:text-cream-bright data-[state=open]:text-cream-bright",
-  navigatorFocusRingClass,
-].join(" ");
 
 export const navigatorHierarchyActionClass = navigatorIslandActionClass;
 

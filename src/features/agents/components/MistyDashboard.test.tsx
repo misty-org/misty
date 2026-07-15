@@ -5,21 +5,31 @@ const fixture = vi.hoisted(() => ({
   activity: vi.fn(),
   cancelInvocation: vi.fn(async () => {}),
   cancelRun: vi.fn(async () => {}),
-  openMisty: vi.fn(async () => {}),
+  run: vi.fn(),
+  decideApproval: vi.fn(async () => {}),
 }));
 vi.mock("../AgentsRuntime", () => ({
   runtimeAiApi: {
     activity: fixture.activity,
     cancelInvocation: fixture.cancelInvocation,
   },
-  runtimeAgentsApi: { cancelRun: fixture.cancelRun },
+  runtimeAgentsApi: {
+    cancelRun: fixture.cancelRun,
+    run: fixture.run,
+    decideApproval: fixture.decideApproval,
+  },
   useAgentsAuth: () => ({ user: { id: fixture.user } }),
-  openAgentsMisty: fixture.openMisty,
 }));
 import { MistyDashboard } from "./MistyDashboard";
 beforeEach(() => {
   fixture.user = "a";
   vi.clearAllMocks();
+  fixture.run.mockResolvedValue({
+    instruction: "Task instructions",
+    result: {},
+    approvals: [],
+    summary: { run_id: "child" },
+  });
 });
 afterEach(cleanup);
 it("cancels the original invocation or delegated run using their durable IDs", async () => {
@@ -50,11 +60,13 @@ it("cancels the original invocation or delegated run using their durable IDs", a
       },
     ],
   });
-  render(<MistyDashboard onManageConnections={() => {}} />);
+  render(<MistyDashboard />);
   const parent = (await screen.findByText("Parent")).closest("section")!;
+  fireEvent.click(within(parent).getByRole("button"));
   fireEvent.click(within(parent).getByText("Cancel"));
   await waitFor(() => expect(fixture.cancelInvocation).toHaveBeenCalledWith("invocation-a"));
   const child = screen.getByText("Child").closest("section")!;
+  fireEvent.click(within(child).getByRole("button"));
   await waitFor(() =>
     expect((within(child).getByText("Cancel") as HTMLButtonElement).disabled).toBe(false),
   );
@@ -71,9 +83,9 @@ it("discards a previous account's pending activity response", async () => {
         }),
     )
     .mockResolvedValue({ entries: [] });
-  const view = render(<MistyDashboard onManageConnections={() => {}} />);
+  const view = render(<MistyDashboard />);
   fixture.user = "b";
-  view.rerender(<MistyDashboard onManageConnections={() => {}} />);
+  view.rerender(<MistyDashboard />);
   await waitFor(() => expect(fixture.activity).toHaveBeenCalledTimes(2));
   finish({
     entries: [
@@ -89,56 +101,47 @@ it("discards a previous account's pending activity response", async () => {
   await waitFor(() => expect(screen.getByText(/No activity yet/)).toBeTruthy());
   expect(screen.queryByText("Other account secret")).toBeNull();
 });
-it("opens Misty for the personal workspace or a specific conversation", async () => {
+it("opens task details without any conversation navigation", async () => {
   fixture.activity.mockResolvedValue({
     entries: [
       {
         id: "invocation-a",
         kind: "invocation",
-        title: "Agent Task",
+        title: "Organize Downloads",
         state: "completed",
         run_id: "",
         conversation_id: "conversation-123",
         parent_run_id: "",
+        result: "Sorted 12 files.",
         events: [],
         updated_at: new Date().toISOString(),
       },
     ],
   });
-  render(<MistyDashboard onManageConnections={() => {}} />);
-  const openMistyButton = await screen.findByText("Open Misty");
-  fireEvent.click(openMistyButton);
-  await waitFor(() => expect(fixture.openMisty).toHaveBeenCalledWith({ spaceId: "" }));
-
-  const conversationButton = await screen.findByText("Conversation");
-  fireEvent.click(conversationButton);
-  await waitFor(() =>
-    expect(fixture.openMisty).toHaveBeenCalledWith({
-      spaceId: "",
-      conversationId: "conversation-123",
-    }),
-  );
+  render(<MistyDashboard />);
+  fireEvent.click(await screen.findByRole("button", { name: /Organize Downloads/ }));
+  expect(await screen.findByText("Sorted 12 files.")).toBeTruthy();
+  expect(screen.queryByRole("button", { name: /Conversation|Open Misty|Connections/ })).toBeNull();
 });
-it("displays errors if opening Misty fails", async () => {
-  fixture.activity.mockResolvedValue({ entries: [] });
-  fixture.openMisty.mockRejectedValueOnce(
-    new Error("AppRpcError: This App does not have ai.use permission."),
+
+it("shows a recoverable error when activity cannot be loaded", async () => {
+  fixture.activity
+    .mockRejectedValueOnce(new Error("Could not load activity"))
+    .mockResolvedValue({ entries: [] });
+  render(<MistyDashboard />);
+  expect(await screen.findByRole("alert")).toHaveProperty(
+    "textContent",
+    expect.stringContaining("Could not load activity"),
   );
-  render(<MistyDashboard onManageConnections={() => {}} />);
-  const openMistyButton = await screen.findByText("Open Misty");
-  fireEvent.click(openMistyButton);
-  expect(await screen.findByText(/This App does not have ai\.use permission\./)).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+  expect(await screen.findByText("No activity yet.")).toBeTruthy();
 });
 
 it("uses an explicit historical filter only when requested", async () => {
   fixture.activity.mockResolvedValue({ entries: [] });
-  const view = render(
-    <MistyDashboard spaceId="launch" agentId="communications" onManageConnections={() => {}} />,
-  );
+  const view = render(<MistyDashboard spaceId="launch" agentId="communications" />);
   await waitFor(() => expect(fixture.activity).toHaveBeenCalledWith("launch", "communications"));
-  view.rerender(
-    <MistyDashboard spaceId="studio" agentId="communications" onManageConnections={() => {}} />,
-  );
+  view.rerender(<MistyDashboard spaceId="studio" agentId="communications" />);
   await waitFor(() =>
     expect(fixture.activity).toHaveBeenLastCalledWith("studio", "communications"),
   );
@@ -146,7 +149,35 @@ it("uses an explicit historical filter only when requested", async () => {
 
 it("loads personal activity without a Space", async () => {
   fixture.activity.mockResolvedValue({ entries: [] });
-  render(<MistyDashboard onManageConnections={() => {}} />);
+  render(<MistyDashboard />);
   await waitFor(() => expect(fixture.activity).toHaveBeenCalledWith("", undefined));
-  expect(await screen.findByText("No activity yet. Open Misty to start a task.")).toBeTruthy();
+  expect(await screen.findByText("No activity yet.")).toBeTruthy();
+});
+
+it("keeps approvals attached to their task run", async () => {
+  fixture.activity.mockResolvedValue({
+    entries: [
+      {
+        id: "run-entry",
+        run_id: "approval-run",
+        kind: "run",
+        title: "Rename files",
+        state: "awaiting_approval",
+        events: [],
+        updated_at: new Date().toISOString(),
+      },
+    ],
+  });
+  fixture.run.mockResolvedValue({
+    instruction: "Rename screenshots",
+    result: {},
+    approvals: [{ id: "approval-1", state: "pending", summary: "Rename 6 files?" }],
+    summary: { run_id: "approval-run" },
+  });
+  render(<MistyDashboard />);
+  fireEvent.click(await screen.findByRole("button", { name: /Rename files/ }));
+  fireEvent.click(await screen.findByRole("button", { name: "Approve" }));
+  await waitFor(() =>
+    expect(fixture.decideApproval).toHaveBeenCalledWith("approval-run", "approval-1", "approve"),
+  );
 });

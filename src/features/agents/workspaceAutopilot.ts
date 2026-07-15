@@ -6,14 +6,21 @@ import { layoutTabs } from "@/features/workspace/layoutTabs";
 import { dockLeaves } from "@/features/workspace/dockTree";
 import { useUserStore } from "@/features/auth/core";
 import { isApiSessionTransitioning } from "@/api/client/session";
+import { useCompanionState } from "./companion/companionState";
 
-export function workspaceAutopilotContext(accountId: string, _legacySpaceId: string) {
+export function workspaceAutopilotContext(
+  accountId: string,
+  _legacySpaceId: string,
+  desktopControl = false,
+) {
   const spaceId = "";
   const state = useWorkspaceStore.getState();
   if (!accountId || isApiSessionTransitioning() || useUserStore.getState().me?.id !== accountId)
     throw new Error("The account changed. Start a new task in the current workspace.");
   return {
     accountId,
+    desktopControl,
+    askBeforeControl: desktopControl && useCompanionState.getState().presentation.ask === true,
     spaceId,
     spaceName: "", // Retained wire field for historical agent runs.
     activeWindowId: state.activeVirtualWindowId,
@@ -38,10 +45,15 @@ export function workspaceAutopilotContext(accountId: string, _legacySpaceId: str
       })),
   };
 }
-export async function startWorkspaceAutopilot(taskId: string, accountId: string, spaceId: string) {
+export async function startWorkspaceAutopilot(
+  taskId: string,
+  accountId: string,
+  spaceId: string,
+  desktopControl = false,
+) {
   await invoke("agent_workspace_context", {
     taskId,
-    context: workspaceAutopilotContext(accountId, spaceId),
+    context: workspaceAutopilotContext(accountId, spaceId, desktopControl),
     start: true,
   });
 }
@@ -50,6 +62,7 @@ export function watchWorkspaceAutopilot(
   accountId: string,
   spaceId: string,
   stop: (reason?: string) => void,
+  desktopControl = false,
 ) {
   let disposed = false;
   let previous = "";
@@ -58,7 +71,7 @@ export function watchWorkspaceAutopilot(
   const update = () => {
     if (disposed) return;
     try {
-      const context = workspaceAutopilotContext(accountId, spaceId);
+      const context = workspaceAutopilotContext(accountId, spaceId, desktopControl);
       const encoded = JSON.stringify(context);
       if (encoded === previous) return;
       previous = encoded;

@@ -15,7 +15,6 @@ export interface MultiPanelWorkspaceProps {
   renderTabActions?: () => ReactNode;
   registerTabDropTarget?: ChromeTabStripProps["registerTabDropTarget"];
   showTabStrip?: boolean;
-  showDefaultPaneControls?: boolean;
   renderContextHeader?: (tab: MultiPanelTab) => ReactNode;
   renderNavigationAside?: ReactNode;
   navigationAsideWidth?: number;
@@ -29,7 +28,5 @@ export interface MultiPanelWorkspaceProps {
   asideResizing?: boolean;
   canCloseTab?: (tab: MultiPanelTab) => boolean;
   onDidCloseTab?: (tab: MultiPanelTab) => void;
-  canClosePane?: (paneId: string, tab: MultiPanelTab) => boolean;
-  onDidClosePane?: (paneId: string, tab: MultiPanelTab) => void;
   renderPane: (paneId: string, path: string) => ReactNode;
 }

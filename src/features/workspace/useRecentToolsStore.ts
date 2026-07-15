@@ -16,8 +16,8 @@ export type WorkspaceToolId =
   | "browser"
   | "code"
   | "files"
-  | "transfers"
   | "terminal"
+  | "scheduled"
   | "agents"
   | "marketplace"
   | "music"
@@ -45,13 +45,13 @@ export const WORKSPACE_TOOLS_META: Record<WorkspaceToolId, WorkspaceToolMeta> = 
   browser: { id: "browser", label: "Browser", surfaceId: "browser", icon: appIcons.browser },
   code: { id: "code", label: "Code", surfaceId: "code", icon: appIcons.code },
   files: { id: "files", label: "Files", surfaceId: "files", icon: appIcons.files },
-  transfers: {
-    id: "transfers",
-    label: "Transfers",
-    surfaceId: "transfers",
-    icon: appIcons.transfers,
-  },
   terminal: { id: "terminal", label: "Terminal", surfaceId: "terminal", icon: appIcons.terminal },
+  scheduled: {
+    id: "scheduled",
+    label: "Scheduled",
+    surfaceId: "scheduled",
+    icon: appIcons.scheduled,
+  },
   agents: { id: "agents", label: "Agents", surfaceId: "agents", icon: appIcons.agents },
   marketplace: {
     id: "marketplace",

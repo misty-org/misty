@@ -25,7 +25,8 @@ export interface SpaceTaskContext {
   };
   attached_sources: unknown[];
   companion_mode?: "team" | "auto";
-  display_captures?: Array<NonNullable<SpaceTaskContext["capture"]> & { screen: string; primary: boolean }>;
+  companion_explanation?: boolean;
+  display_captures?: Array<NonNullable<SpaceTaskContext["capture"]> & { screen: string; primary: boolean; captured_at?: number; display_id?: number; source?: string }>;
   capture?: {
     id: string;
     name: string;

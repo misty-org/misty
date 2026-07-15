@@ -3,7 +3,6 @@ import { isRememberableAppRoute, useAppRouteMemoryStore, useAppStore } from "@/f
 import { useMediaSearchStore } from "@/features/global-search/indexing";
 import { useSearchIndexStore } from "@/features/global-search/useSearchIndexStore";
 import { selectSearchMaintenancePreferences, useSettingsStore } from "@/features/settings";
-import { useTransfersStore } from "@/features/transfers";
 import { dockLeaves, useWorkspaceStore } from "@/features/workspace";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { useEffect, useMemo, useRef } from "react";
@@ -15,7 +14,6 @@ export function useDesktopBootstrap(params: { getRouteId: (pathname: string) => 
   const navigate = useNavigate();
   const app = useAppStore((state) => state.app);
   const loadApp = useAppStore((state) => state.loadApp);
-  const transferLoad = useTransfersStore((state) => state.load);
   const settings = useSettingsStore((state) => state.settings);
   const settingsLoad = useSettingsStore((state) => state.load);
   const searchMaintenancePreferences = useMemo(
@@ -101,9 +99,8 @@ export function useDesktopBootstrap(params: { getRouteId: (pathname: string) => 
     if (loadedRoutes.current.has(routeId)) return;
     loadedRoutes.current.add(routeId);
     if (!hasTauriInternals()) return;
-    if (routeId === "transfers") void transferLoad("");
     if (routeId === "settings" && !settings) void settingsLoad();
-  }, [routeId, settings, settingsLoad, transferLoad]);
+  }, [routeId, settings, settingsLoad]);
 
   useEffect(() => {
     const route = `${location.pathname}${location.search}`;

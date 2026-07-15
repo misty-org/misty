@@ -1,6 +1,8 @@
 # Files
 
-This directory contains Misty's built-in file browser, previews, file operations, and transfer presentation, including colocated tests. Its component entry and workspace code compile into Misty; they have no separate installation or update lifecycle.
+This directory contains Misty's built-in file browser, previews, file operations, including colocated tests. Its component entry and workspace code compile into Misty; they have no separate installation or update lifecycle.
+
+Each Files tab shows one file pane, with optional navigation and preview sidebars.
 
 Files supports local disks, OS-mounted network shares (such as SMB/NFS), and paired devices reached directly over the LAN. It has no cloud storage provider setup, OAuth flow, cloud API adapter, rclone process, internet relay, or public peer discovery. Pairing and device permissions still apply to LAN access. Retired provider locations are excluded from saved shortcuts and migrated to the local home folder when restored.
 

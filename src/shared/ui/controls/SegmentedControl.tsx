@@ -78,7 +78,7 @@ function SegmentedControl<T extends string>({
           {...option.attributes}
           className={cn(
             "inline-flex min-w-0 items-center justify-center whitespace-nowrap rounded-full font-medium text-cream-muted outline-none transition-colors",
-            "hover:bg-cream/[0.045] hover:text-cream",
+            "hover:bg-control-hover hover:text-cream",
             "data-[state=checked]:bg-charcoal-active data-[state=checked]:text-cream-bright data-[state=checked]:shadow-sm",
             "focus-visible:ring-2 focus-visible:ring-cream/15 disabled:pointer-events-none disabled:opacity-50",
             "[&_svg]:pointer-events-none [&_svg]:shrink-0",

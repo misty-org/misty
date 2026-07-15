@@ -44,7 +44,7 @@ describe("AI response stream recovery", () => {
       );
     const onEvent = vi.fn();
     await readInvocationStream(connect, new AbortController().signal, { onEvent }, 0);
-    expect(connect.mock.calls).toEqual([[""], ["1"]]);
+    expect(connect.mock.calls.map(([id]) => id)).toEqual(["", "1"]);
     expect(onEvent.mock.calls.map(([e]) => e.id)).toEqual(["1", "2"]);
   });
   it("fails explicitly when all streams end before completion", async () => {
@@ -96,5 +96,104 @@ describe("AI response stream recovery", () => {
     await readInvocationStream(connect, new AbortController().signal, { onEvent }, 0);
     expect(connect).toHaveBeenCalledOnce();
     expect(onEvent).toHaveBeenCalledWith(expect.objectContaining({ type: "invocation.completed" }));
+  });
+});
+
+describe("idle transport ownership", () => {
+  it("bounds connection startup and aborts that attempt before reconnecting", async () => {
+    vi.useFakeTimers();
+    try {
+      let firstSignal!: AbortSignal;
+      const connect = vi.fn((_id: string, signal: AbortSignal) => {
+        if (!firstSignal) {
+          firstSignal = signal;
+          return new Promise<Response>(() => {});
+        }
+        expect(firstSignal.aborted).toBe(true);
+        return Promise.resolve(response(event("1", "invocation.completed")));
+      });
+      const pending = readInvocationStream(
+        connect,
+        new AbortController().signal,
+        { onEvent: vi.fn() },
+        0,
+        100,
+      );
+      await vi.advanceTimersByTimeAsync(101);
+      await pending;
+      expect(connect).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+  it("keeps a live approval wait connected while heartbeats continue", async () => {
+    vi.useFakeTimers();
+    try {
+      let source!: ReadableStreamDefaultController<Uint8Array>;
+      const stream = new ReadableStream<Uint8Array>({
+        start(c) {
+          source = c;
+        },
+      });
+      const connect = vi.fn(async () => new Response(stream));
+      const onEvent = vi.fn();
+      const pending = readInvocationStream(
+        connect,
+        new AbortController().signal,
+        { onEvent },
+        0,
+        100,
+      );
+      source.enqueue(new TextEncoder().encode(event("1", "approval.required")));
+      for (let i = 0; i < 10; i++) {
+        await vi.advanceTimersByTimeAsync(90);
+        source.enqueue(new TextEncoder().encode(": heartbeat\n\n"));
+      }
+      source.enqueue(new TextEncoder().encode(event("2", "invocation.completed")));
+      await pending;
+      expect(connect).toHaveBeenCalledOnce();
+      expect(onEvent).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+  it("reconnects a stalled read using the same event cursor", async () => {
+    vi.useFakeTimers();
+    try {
+      const stalled = new ReadableStream<Uint8Array>({
+        start(c) {
+          c.enqueue(new TextEncoder().encode(event("1", "response.delta")));
+        },
+      });
+      const connect = vi
+        .fn()
+        .mockResolvedValueOnce(new Response(stalled))
+        .mockResolvedValueOnce(response(event("2", "invocation.completed")));
+      const onEvent = vi.fn();
+      const pending = readInvocationStream(
+        connect,
+        new AbortController().signal,
+        { onEvent },
+        0,
+        100,
+      );
+      await vi.advanceTimersByTimeAsync(101);
+      await pending;
+      expect(connect.mock.calls.map(([id]) => id)).toEqual(["", "1"]);
+      expect(onEvent).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+  it("cancels a pending read immediately without reconnecting", async () => {
+    const controller = new AbortController();
+    const canceled = vi.fn();
+    const connect = vi.fn(async () => new Response(new ReadableStream({ cancel: canceled })));
+    const pending = readInvocationStream(connect, controller.signal, { onEvent: vi.fn() });
+    await Promise.resolve();
+    controller.abort();
+    await pending;
+    expect(canceled).toHaveBeenCalledOnce();
+    expect(connect).toHaveBeenCalledOnce();
   });
 });

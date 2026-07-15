@@ -1,10 +1,10 @@
 import { useState } from "react";
-import { CircleAlert, SlidersHorizontal } from "lucide-react";
+import { CircleAlert, RefreshCw } from "lucide-react";
 import { isApiSessionTransitioning, readApiSessionGeneration } from "@/api/client/session";
 import { useWorkspaceRecoveryState } from "@/features/workspace/nativeWorkspaceRecovery";
 import { retryWorkspaceRecovery } from "@/features/workspace/useWorkspaceRecoveryRetry";
 import { nativeWorkspaceRecoveryEnabled } from "@/features/workspace/workspaceRecoveryPlatform";
-import { Button, cn, Popover, PopoverContent, PopoverTrigger, Pressable } from "@/shared/ui";
+import { Button, cn, Popover, PopoverContent, PopoverTrigger, IconButton } from "@/shared/ui";
 import { browserSyncRetryEvent, useBrowserSyncStore } from "./store";
 import { DeviceControlContent } from "./DeviceControlContent";
 import { syncBadgeStatus } from "./syncBadgeStatus";
@@ -12,7 +12,7 @@ import { viewingName } from "./treeControl";
 import { useUserStore } from "@/features/auth/core";
 import { RestoreStatusList } from "./restore/RestoreStatusList";
 
-/** Account-wide status stays in the titlebar even when the navigator is hidden. */
+/** Account-wide sync and device controls in the global navigator. */
 export function BrowserSyncBadge({
   accountId,
   onOpenSettings,
@@ -30,7 +30,7 @@ export function BrowserSyncBadge({
     onOpenSettings();
   };
   const status = syncBadgeStatus({ accountId, recovery, ...sync });
-  // Showing another device's workspace: say whose, right in the pill.
+  // Preserve remote-device context in the accessible name and tooltip.
   const viewing =
     sync.session?.account_id === accountId && sync.session
       ? viewingName(sync.session, ownerName)
@@ -50,35 +50,36 @@ export function BrowserSyncBadge({
       setRetrying(false);
     }
   };
-  const Icon = status.tone === "red" ? CircleAlert : SlidersHorizontal;
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Pressable
+        <IconButton
           data-misty-window-drag-block="true"
           data-sync-status={status.tone}
-          aria-label={
-            viewing ? `Viewing ${viewing}. Sync: ${status.title}` : `Sync: ${status.title}`
-          }
-          title={viewing ? `Viewing ${viewing}` : `Sync: ${status.title}`}
+          label={viewing ? `Viewing ${viewing}. Sync: ${status.title}` : `Sync: ${status.title}`}
           className={cn(
-            "flex items-center",
-            "h-6 shrink-0 gap-1.5 rounded-full border px-2 text-xs font-medium",
-            status.tone === "green" &&
-              "border-status-green/25 bg-status-green/15 text-status-green hover:bg-status-green/25 hover:text-status-green aria-expanded:text-status-green",
-            status.tone === "red" &&
-              "border-avatar-red/30 bg-notification-red/20 text-avatar-red hover:bg-notification-red/30 hover:text-avatar-red aria-expanded:text-avatar-red",
-            status.tone === "neutral" &&
-              "border-charcoal-border bg-charcoal-card text-cream-muted hover:text-cream",
+            "misty-navigator-icon-target relative",
+            open && "bg-charcoal-card text-cream-bright",
           )}
         >
-          <Icon aria-hidden="true" className="size-3" />
-          {viewing ? <span className="max-w-40 truncate">Viewing {viewing}</span> : "Sync"}
-        </Pressable>
+          <RefreshCw
+            aria-hidden="true"
+            className={cn("size-4", status.spinning && "animate-spin motion-reduce:animate-none")}
+          />
+          {status.tone === "red" && (
+            <span
+              aria-hidden="true"
+              data-sync-issue-badge="true"
+              className="absolute right-0.5 top-0.5 grid size-3.5 place-items-center rounded-full bg-notification-red text-[9px] font-bold leading-none text-white ring-2 ring-charcoal-workspace"
+            >
+              !
+            </span>
+          )}
+        </IconButton>
       </PopoverTrigger>
       <PopoverContent
         align="start"
-        side="bottom"
+        side="right"
         sideOffset={8}
         collisionPadding={12}
         aria-label="Device control center"

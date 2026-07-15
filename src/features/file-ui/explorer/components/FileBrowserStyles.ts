@@ -48,9 +48,9 @@ export const fileBrowserStyles = {
   tableSortIndicator:
     "inline-flex size-[13px] flex-none items-center justify-center text-cream-muted",
   tableResizeHandle: cn(
-    "absolute right-0 top-0 z-[2] h-full w-[8px] translate-x-1/2",
-    "cursor-col-resize after:absolute after:bottom-[8px] after:left-1/2",
-    "after:top-[8px] after:w-px after:-translate-x-1/2 after:bg-transparent",
+    "absolute -right-1 top-0 z-[2] h-full w-[8px]",
+    "cursor-col-resize after:absolute after:inset-x-0 after:bottom-[8px] after:mx-auto",
+    "after:top-[8px] after:w-px after:bg-transparent",
     "after:content-[''] group-hover/header:after:bg-charcoal-border",
     "max-[720px]:hidden",
   ),

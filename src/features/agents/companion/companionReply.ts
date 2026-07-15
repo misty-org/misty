@@ -19,12 +19,20 @@ export function resolvePoint(
   point: ReturnType<typeof companionReply>["point"],
   captures: DisplayCapture[],
 ) {
-  if (!point) return undefined;
+  if (!point || !Number.isFinite(point.x) || !Number.isFinite(point.y)) return undefined;
   const capture = point.screen
     ? captures.find((c) => c.screen === point.screen)
     : captures.find((c) => c.primary);
   if (!capture || capture.width <= 0 || capture.height <= 0) return undefined;
   const { display } = capture;
+  if (
+    ![capture.width, capture.height, display.x, display.y, display.width, display.height].every(
+      Number.isFinite,
+    ) ||
+    display.width <= 0 ||
+    display.height <= 0
+  )
+    return undefined;
   return {
     x: display.x + (Math.min(capture.width, Math.max(0, point.x)) / capture.width) * display.width,
     y:

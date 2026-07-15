@@ -340,8 +340,8 @@ function applySettingsSideEffects(
   const appearance = document.appearance as Record<string, unknown> | undefined;
   if (applyPortableLayout && typeof appearance?.navigator_auto_hide === "boolean") {
     const layout = readNavigatorLayout();
-    const visibility = appearance.navigator_auto_hide ? "hidden" : "sticky";
-    if (layout.visibility !== visibility) publishNavigatorLayout({ ...layout, visibility });
+    const autoHide = appearance.navigator_auto_hide;
+    if (layout.autoHide !== autoHide) publishNavigatorLayout({ autoHide });
   }
   telemetryPreferencesChanged(
     settingsBoolean(document, "privacy", "anonymous_usage_analytics_enabled", false),

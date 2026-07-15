@@ -52,7 +52,7 @@ function CustomColorSwatch({ value, label, title, onChange }: CustomColorSwatchP
       title={title ?? label}
       className={cn(
         "relative grid size-6 shrink-0 cursor-pointer place-items-center rounded-md text-cream-muted",
-        "transition-colors hover:bg-cream/[0.045] hover:text-cream focus-within:ring-2 focus-within:ring-cream-muted",
+        "transition-colors hover:bg-control-hover hover:text-cream focus-within:ring-2 focus-within:ring-cream-muted",
       )}
     >
       <Palette className="pointer-events-none size-3.5" />

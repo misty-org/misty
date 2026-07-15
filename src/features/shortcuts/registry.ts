@@ -52,8 +52,8 @@ const shellCommands: ShortcutCommandDefinition[] = [
     allowInEditable: true,
     nativeMenu: true,
   }),
-  command("app.toggle_navigator", "Toggle navigator", {
-    description: "Show or hide the global navigator.",
+  command("app.toggle_navigator", "Toggle navigation auto-hide", {
+    description: "Switch between an always-visible icon rail and edge-hover auto-hide.",
     category: "View",
     aliases: ["sidebar", "navigation"],
     mac: "Cmd+Shift+B",
