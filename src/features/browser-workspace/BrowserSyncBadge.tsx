@@ -11,6 +11,7 @@ import { syncBadgeStatus } from "./syncBadgeStatus";
 import { viewingName } from "./treeControl";
 import { useUserStore } from "@/features/auth/core";
 import { RestoreStatusList } from "./restore/RestoreStatusList";
+import { currentDeviceId, websiteDataSummary } from "./websiteData";
 
 /** Account-wide sync and device controls in the global navigator. */
 export function BrowserSyncBadge({
@@ -30,6 +31,16 @@ export function BrowserSyncBadge({
     onOpenSettings();
   };
   const status = syncBadgeStatus({ accountId, recovery, ...sync });
+  // The device this session writes: its own sign-in data is what syncs now.
+  const websiteData =
+    sync.session?.account_id === accountId
+      ? (sync.session.website_data?.find(
+          (device) => device.device_id === currentDeviceId(sync.session!),
+        )?.sites ?? [])
+      : [];
+  const partialData = websiteData.some((site) => site.skipped.length > 0)
+    ? websiteDataSummary(websiteData)
+    : null;
   // Preserve remote-device context in the accessible name and tooltip.
   const viewing =
     sync.session?.account_id === accountId && sync.session
@@ -103,6 +114,17 @@ export function BrowserSyncBadge({
           </div>
           {status.title === "Local saving needs attention" && (
             <p className="mt-1 text-sm text-cream-muted">Keep Misty open until saved.</p>
+          )}
+          {status.tone === "red" && status.title !== "Local saving needs attention" && (
+            <p className="mt-1 text-sm text-cream-muted">{status.detail}</p>
+          )}
+          {partialData && (
+            <p className="mt-1 text-sm text-avatar-yellow">
+              {partialData}.{" "}
+              <Button variant="link" size="sm" onClick={openSyncSettings}>
+                See what’s not synced
+              </Button>
+            </p>
           )}
         </div>
         <div className="mt-3 flex items-center justify-between gap-2">

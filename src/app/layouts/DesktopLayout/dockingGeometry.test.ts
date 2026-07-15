@@ -5,7 +5,7 @@ it("shares the native titlebar with top tabs, including hidden and right navigat
   for (const position of ["left", "right", "bottom"] as const)
     for (const hidden of [false, true]) {
       const geometry = dockingGeometry(position, hidden, true);
-      if (position !== "bottom") expect(geometry.navigation.width).toBe(56);
+      if (position !== "bottom") expect(geometry.navigation.width).toBe(66);
       expect(geometry.content.gridRow).toBe(position === "bottom" ? "1 / 3" : "1 / -1");
       expect(geometry.content.gridColumn).toBe(position === "left" ? 2 : 1);
       expect(geometry.navigation.gridRow).toBe(position === "bottom" ? 3 : 2);

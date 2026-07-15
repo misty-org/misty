@@ -1,9 +1,9 @@
-import { ArrowRightLeft } from "lucide-react";
 import { BlockingScreen, Button, Spinner } from "@/shared/ui";
-import mistyStill from "@/assets/branding/misty-icon.png?inline";
+import misty from "@/shared/assets/misty-cloud-expression-cycle.webp?inline";
+import mistyStill from "@/shared/assets/agents/cloud-sky-poster.webp?inline";
 import { useUserStore } from "@/features/auth/core";
 import type { NativeSyncView, SyncTreeView } from "./native";
-import { seatText, treeRows } from "./treeControl";
+import { treeRows, type TreeRow } from "./treeControl";
 
 /** Shown when another device took this device's seat: take a workspace back. */
 export function DeviceChooseScreen({
@@ -20,61 +20,55 @@ export function DeviceChooseScreen({
   onChoose: (treeId: string) => void;
 }) {
   const ownerName = useUserStore((state) => state.me?.name);
-  const rows = treeRows(session, trees, ownerName).sort(
-    (a, b) => Number(b.local) - Number(a.local),
+  const rows = treeRows(session, trees, ownerName);
+  const local = rows.find((row) => row.local);
+  const others = rows.filter((row) => !row.local);
+  const button = (row: TreeRow, label: string, variant: "primary" | "outline") => (
+    <Button
+      variant={variant}
+      size="lg"
+      className="w-full justify-center"
+      disabled={Boolean(busyTree) || !row.canSwitch}
+      aria-busy={busyTree === row.deviceId}
+      onClick={() => onChoose(row.deviceId)}
+    >
+      {busyTree === row.deviceId ? <Spinner label="Switching…" /> : null}
+      <span className="truncate">{label}</span>
+    </Button>
   );
-  const own = rows.find((row) => row.local);
   return (
     <BlockingScreen
       attributes={{ "data-device-sync-choose": "" }}
       media={
-        <img
-          src={mistyStill}
-          alt=""
-          width={120}
-          height={120}
-          draggable={false}
-          className="mb-5 size-28 select-none object-contain"
-        />
+        <picture className="mb-6">
+          <source media="(prefers-reduced-motion: reduce)" srcSet={mistyStill} />
+          <img
+            src={misty}
+            alt=""
+            width={176}
+            height={176}
+            draggable={false}
+            className="size-44 select-none object-contain"
+          />
+        </picture>
       }
-      title={
-        own?.seat === "other" ? `${own.seatName} is using this workspace` : "Choose a workspace"
+      title="Misty is sleeping here"
+      description={
+        local?.seatName ? `Your workspace is open on ${local.seatName}.` : "Pick where to continue."
       }
-      description="A workspace can be open on one device at a time. Pick one to continue here."
     >
       {trees.displaced_with_edits && (
-        <p className="mt-3 max-w-sm text-sm text-cream-muted">
-          Changes this device hadn’t sent yet are kept on this device.
+        <p className="mt-2 max-w-xs text-sm text-cream-muted">
+          Unsent changes are kept on this device.
         </p>
       )}
-      <ul className="mt-6 w-full max-w-sm space-y-2 text-left">
-        {rows.map((row) => (
-          <li key={row.deviceId}>
-            <Button
-              variant="outline"
-              className="h-auto w-full justify-between gap-3 px-4 py-3 text-left"
-              disabled={Boolean(busyTree) || !row.canSwitch}
-              aria-busy={busyTree === row.deviceId}
-              onClick={() => onChoose(row.deviceId)}
-            >
-              <span className="min-w-0">
-                <span className="block truncate font-medium">
-                  {row.local ? `Take back ${row.name}’s workspace (this device)` : row.name}
-                </span>
-                <span className="block truncate text-xs text-cream-muted">
-                  {[row.os, seatText(row)].filter(Boolean).join(" · ")}
-                </span>
-              </span>
-              {busyTree === row.deviceId ? (
-                <Spinner label="Switching…" className="shrink-0" />
-              ) : (
-                <ArrowRightLeft aria-hidden className="size-4 shrink-0" />
-              )}
-            </Button>
-          </li>
+      <div className="mt-6 w-full max-w-xs space-y-2">
+        {local && button(local, "Continue here", "primary")}
+        {others.map((row) => (
+          <div key={row.deviceId}>{button(row, `Open ${row.name}`, "outline")}</div>
         ))}
-      </ul>
-      <div className="mt-4 min-h-10 max-w-sm text-sm" aria-live="polite">
+      </div>
+      <div className="mt-4 min-h-10 max-w-xs text-sm" aria-live="polite">
         {error && (
           <p role="alert" className="text-red-300">
             {error}

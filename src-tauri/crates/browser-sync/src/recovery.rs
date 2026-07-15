@@ -12,6 +12,7 @@ use zeroize::Zeroizing;
 const MAX_BYTES: usize = 16 << 20;
 const MAX_TOTAL_BYTES: u64 = 128 << 20;
 const MAX_RECORDS: u64 = 128;
+const MAX_ARCHIVES: u64 = 32;
 
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -161,6 +162,16 @@ impl RecoveryStore {
             .optional()?;
         if actual.unwrap_or(0) != expected {
             return Err(Error::Sequence);
+        }
+        if actual.is_none() {
+            // Archives are preserved originals, added on every restore. Only the
+            // newest few matter, so retire the rest instead of letting them fill
+            // the store and block every later save.
+            let keep = MAX_ARCHIVES - u64::from(key.starts_with("archive:"));
+            tx.execute(
+                "DELETE FROM recovery_records WHERE substr(record_key,1,8)='archive:' AND rowid NOT IN (SELECT rowid FROM recovery_records WHERE substr(record_key,1,8)='archive:' ORDER BY rowid DESC LIMIT ?1)",
+                [keep],
+            )?;
         }
         let (count, bytes): (u64, u64) = tx.query_row("SELECT count(*),coalesce(sum(length(envelope)),0) FROM recovery_records WHERE record_key<>?1", [key], |r| Ok((r.get(0)?,r.get(1)?)))?;
         if count >= MAX_RECORDS || bytes + encrypted.len() as u64 > MAX_TOTAL_BYTES {

@@ -59,10 +59,11 @@
   --navigation-primary-icon-size: var(--misty-navigation-icon-size);
 }
 
-/* The global rail uses square 36px tiles around 18px glyphs. */
+/* The global rail uses square 42px tiles around 22px glyphs and 24px avatars. */
 .misty-global-navigator {
-  --misty-navigation-icon-size: 18px;
-  --misty-navigation-tile-size: 36px;
+  --misty-navigation-icon-size: 22px;
+  --misty-navigation-tile-size: 42px;
+  --misty-navigation-identity-size: 24px;
 }
 
 .misty-navigation-icons :is(svg, img:not([data-slot="avatar-image"])) {
@@ -117,8 +118,8 @@
 .misty-navigation-icons
   :is(.misty-space-rail-avatar, [data-navigator-profile-bar])
   :is([data-slot="avatar"], [data-slot="avatar"] img) {
-  width: 28px !important;
-  height: 28px !important;
+  width: var(--misty-navigation-identity-size, 28px) !important;
+  height: var(--misty-navigation-identity-size, 28px) !important;
 }
 
 .misty-space-rail-control {
@@ -127,7 +128,7 @@
   min-width: 32px;
 }
 
-.misty-global-navigator .misty-navigator-icon-target {
+.misty-global-navigator :is(.misty-navigator-icon-target, .misty-space-rail-control) {
   width: var(--misty-navigation-tile-size) !important;
   height: var(--misty-navigation-tile-size) !important;
   min-width: var(--misty-navigation-tile-size);

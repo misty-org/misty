@@ -57,7 +57,7 @@ describe("desktop dock store", () => {
     ]);
   });
 
-  it("closes non-Home last tab in the last virtual window, remembers it, and leaves Choose app open", () => {
+  it("closes the last tab in the last virtual window, remembers it, and leaves no tabs", () => {
     const store = useWorkspaceStore.getState();
     const browser = store.addSurface(browserRequest);
     const initialHome = dockTabs(store.layout.root).find((t) => t.id !== browser.id)!;
@@ -67,9 +67,13 @@ describe("desktop dock store", () => {
     ]);
 
     expect(store.closeTab(browser.id)).toBe(true);
-    const remaining = dockTabs(useWorkspaceStore.getState().layout.root);
-    expect(remaining).toMatchObject([{ surfaceId: "home", title: "New Tab", placeholder: true }]);
+    expect(allLayoutViews(useWorkspaceStore.getState().layout)).toEqual([]);
     expect(useWorkspaceStore.getState().closedTabs[0]?.tab.id).toBe(browser.id);
+    // Opening something again replaces the empty workspace with a single tab.
+    const reopened = useWorkspaceStore.getState().openSurface(browserRequest);
+    expect(allLayoutViews(useWorkspaceStore.getState().layout).map((tab) => tab.id)).toEqual([
+      reopened.id,
+    ]);
   });
 
   it("switches to another panel when closing the last tab of a panel in a multi-panel window", () => {

@@ -40,7 +40,9 @@ fn cookie_target(document: &Document, logical: &str) -> Result<Vec<CredentialRec
     {
         return Err("This workspace has no captured website cookies yet.".into());
     }
-    let cookies: Vec<misty_browser_sync::document::credentials::Cookie> = serde_json::from_value(
+    // Cookies this device cannot store are left for the devices that can:
+    // the restore adapter skips them and reports them back unchanged.
+    serde_json::from_value::<Vec<misty_browser_sync::document::credentials::Cookie>>(
         target
             .iter()
             .find(|record| matches!(record.area, Area::Cookies))
@@ -49,11 +51,6 @@ fn cookie_target(document: &Document, logical: &str) -> Result<Vec<CredentialRec
             .clone(),
     )
     .map_err(|_| "The received cookie data is invalid")?;
-    if cookies.iter().any(|cookie| {
-        cookie.partition_key.is_some() || (cfg!(target_os = "macos") && cookie.same_site.is_none())
-    }) {
-        return Err("The received cookies use attributes this device cannot restore yet.".into());
-    }
     Ok(target)
 }
 
@@ -221,13 +218,6 @@ pub(super) async fn capture_current(
         .map(|v| v.physical_id.clone())
         .unwrap_or_else(super::super::browser_profile::legacy_profile_identity);
     let observer = capture::CaptureView::open(&app, &physical)?;
-    let cookies = super::super::browser_cookie_store::read(&observer.view, &physical)
-        .await
-        .map_err(|_| {
-            "Could not capture this browser's cookie attributes without losing information."
-        })?;
-    let payload =
-        serde_json::to_value(cookies).map_err(|_| "Could not encode the captured cookies")?;
     let journal = active
         .handle
         .browser_import_journal(logical.clone())
@@ -251,17 +241,25 @@ pub(super) async fn capture_current(
         .filter(|url| matches!(url.scheme(), "http" | "https"))
         .map(|url| url.origin().ascii_serialization())
         .collect();
-    let mut observations = super::super::browser_website_storage::capture(
+    let collected = collect::collect(
         app,
+        &observer.view,
         &physical,
         previous,
         Some((observer.view.clone(), origins)),
+        super::super::browser_data_budget::Limit::SingleEvent,
     )
     .await?;
-    observations.push(misty_browser_sync::store::BrowserObservation {
-        area: Area::Cookies,
-        payload: payload.clone(),
-    });
+    active.website_data.insert(
+        active.device_id.clone(),
+        device_data::DeviceWebsiteData::new(
+            &active.device_id,
+            device_data::DeviceDataState::Synced,
+            collected.coverage.report(),
+        ),
+    );
+    active.held = collected.held;
+    let observations = collected.observations;
     if let Some(generation) = binding.active {
         let state = active
             .handle
@@ -286,7 +284,7 @@ pub(super) async fn capture_current(
                     Some(epoch) => payload.published(epoch),
                     None => payload,
                 })
-                    .map_err(|_| "Could not encode the captured cookies")?,
+                .map_err(|_| "Could not encode the captured cookies")?,
             );
             active.handle.enqueue(bytes).await.map_err(issue)?;
         }
@@ -345,6 +343,29 @@ async fn restore(app: tauri::AppHandle, expected: String) -> Result<SyncView, St
 pub(super) enum RestoreMode {
     Background,
     Explicit,
+}
+
+/// Names which restore step failed, in fixed text only.
+#[cfg(any(target_os = "macos", windows))]
+fn restore_issue(action: &str, error: misty_browser_sync::restore::RestoreError) -> String {
+    use misty_browser_sync::restore::{EngineError, RestoreError};
+    let cause = match error {
+        RestoreError::Quarantined => {
+            "an interrupted earlier restore must be recovered first".into()
+        }
+        RestoreError::Engine(EngineError::Unsupported) => {
+            "this browser cannot store some of the received data".into()
+        }
+        RestoreError::Engine(EngineError::Unavailable) => {
+            "the browser's website storage was unavailable".into()
+        }
+        RestoreError::Engine(EngineError::Invalid) => {
+            "the browser did not read back what was written".into()
+        }
+        RestoreError::Engine(EngineError::Timeout) => "the browser took too long to respond".into(),
+        RestoreError::Journal(error) => issue(error).trim_end_matches('.').to_owned(),
+    };
+    format!("{action}: {cause}. Retrying automatically.")
 }
 
 #[cfg(any(target_os = "macos", windows))]
@@ -413,11 +434,13 @@ pub(super) async fn restore_current(
         .filter(|_| binding.staged.is_none() && journal.pending.is_none() && !journal.quarantined)
     {
         let observer = capture::CaptureView::open(app, &generation.physical_id)?;
+        // This live store keeps local data that could not sync.
         let mut backend = super::super::browser_storage_restore::BrowserProfile::for_generation(
             observer.view.clone(),
             logical.clone(),
             generation.physical_id.clone(),
-        );
+        )
+        .with_held(active.held.clone());
         // Retain the existing engine store, including website databases. Close
         // pages before refreshing cookies so capture cannot echo the old tokens.
         super::super::agent_workspace::stop_account_tasks(app)?;
@@ -440,9 +463,9 @@ pub(super) async fn restore_current(
         if mode == RestoreMode::Explicit {
             let _ = app.emit_to("main", "misty:browser-profile-changed", &active.id);
         }
-        return result.map(|_| ()).map_err(|_| {
-            "Could not refresh incoming website sign-ins. Reconnect to retry.".into()
-        });
+        return result
+            .map(|_| ())
+            .map_err(|error| restore_issue("Could not refresh incoming website sign-ins", error));
     }
     // Every retry gets a new isolated store. Late native callbacks from an
     // interrupted earlier attempt can never write into the replacement.
@@ -463,7 +486,7 @@ pub(super) async fn restore_current(
         let staging = capture::CaptureView::open(&app, &physical)?;
         let mut backend = super::super::browser_storage_restore::BrowserProfile::for_generation(staging.view.clone(), logical.clone(), physical.clone());
         misty_browser_sync::restore::restore_staged_profile(&active.handle, &logical, &generation, &mut backend).await
-            .map_err(|_| "Could not restore and verify the received website sign-ins. The previous browser profile has been preserved.")?;
+            .map_err(|error| restore_issue("Could not restore the received website sign-ins; the previous browser profile has been preserved", error))?;
         // Stop actions before closing their browser contexts; preserve the task
         // tombstones so syncing/reopening never grants permission to rerun them.
         super::super::agent_workspace::stop_account_tasks(&app)?;
@@ -483,9 +506,7 @@ pub(super) async fn restore_current(
         // old view handles and reconstructs visible panes from its workspace.
         let _ = app.emit_to("main", "misty:browser-profile-changed", &active.id);
     }
-    active.credential_issue = result.as_ref().err().map(|_| {
-        "Website sign-in restoration needs attention. Previous profiles have been preserved."
-    });
+    active.credential_issue = result.as_ref().err().map(|error| error.clone().into());
     let _ = app.emit_to(
         "main",
         "misty:browser-sync-changed",

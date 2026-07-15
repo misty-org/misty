@@ -145,7 +145,8 @@ impl SyncApi {
         }
         match response.status().as_u16() {
             200 | 201 => {}
-            401 | 403 => return Err(Error::Authentication),
+            401 => return Err(Error::Authentication),
+            403 => return Err(Error::DeviceForbidden),
             409 | 426 => return Err(Error::Recovery),
             _ => return Err(Error::Network),
         }
@@ -578,6 +579,9 @@ mod traffic_tests {
     use super::*;
     #[tokio::test]
     async fn counts_actual_websocket_payloads_and_shares_them_across_reconnect_clients() {
+        // Like the worker tests, install the provider here: it must not depend
+        // on another test having run first.
+        let _ = rustls::crypto::ring::default_provider().install_default();
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let addr = listener.local_addr().unwrap();
         let server = tokio::spawn(async move {
