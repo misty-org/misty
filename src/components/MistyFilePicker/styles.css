@@ -1,0 +1,448 @@
+.misty-picker-layer {
+  position: fixed;
+  inset: 28px 0 0 72px;
+  z-index: 2147483100;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, .62);
+  backdrop-filter: blur(10px);
+}
+
+.misty-picker {
+  display: grid;
+  width: min(920px, calc(100vw - 140px));
+  height: min(680px, calc(100vh - 88px));
+  grid-template-rows: auto auto auto minmax(0, 1fr) auto;
+  overflow: hidden;
+  border: 1px solid var(--misty-border);
+  border-radius: 14px;
+  outline: none;
+  background: var(--misty-app-modal-bg, var(--misty-surface));
+  box-shadow: 0 30px 100px rgba(0, 0, 0, .72);
+  color: var(--misty-text);
+}
+
+.misty-picker-header {
+  display: flex;
+  min-height: 76px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border-bottom: 1px solid var(--misty-border-soft);
+  padding: 0 20px;
+}
+
+.misty-picker-title {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 12px;
+}
+
+.misty-picker-title > span {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  flex: none;
+  place-items: center;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--misty-accent) 14%, transparent);
+  color: var(--misty-accent);
+}
+
+.misty-picker-title h2 {
+  margin: 0;
+  font-size: 17px;
+}
+
+.misty-picker-title p {
+  margin: 4px 0 0;
+  color: var(--misty-text-subtle);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.misty-picker-icon-button,
+.misty-picker-toolbar button,
+.misty-picker-sidebar button,
+.misty-picker-footer button {
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid var(--misty-border-soft);
+  border-radius: 8px;
+  background: var(--misty-neutral-control-bg, var(--misty-surface-2));
+  color: var(--misty-text-muted);
+  font: inherit;
+  cursor: pointer;
+}
+
+.misty-picker button:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--misty-accent) 70%, white);
+  outline-offset: 2px;
+}
+
+.misty-picker-icon-button {
+  width: 38px;
+  height: 38px;
+  flex: none;
+}
+
+.misty-picker-icon-button:hover,
+.misty-picker-toolbar button:hover:not(:disabled),
+.misty-picker-sidebar button:hover {
+  background: var(--misty-neutral-hover-bg, var(--misty-surface-3));
+  color: var(--misty-text);
+}
+
+.misty-picker-toolbar {
+  display: grid;
+  min-height: 54px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  border-bottom: 1px solid var(--misty-border-soft);
+  padding: 0 14px;
+  background: color-mix(in srgb, var(--misty-surface-2) 42%, var(--misty-surface));
+}
+
+.misty-picker-nav-buttons {
+  display: flex;
+  gap: 6px;
+}
+
+.misty-picker-nav-buttons button,
+.misty-picker-hidden-toggle {
+  width: 34px;
+  height: 34px;
+}
+
+.misty-picker-toolbar button:disabled {
+  cursor: default;
+  opacity: .35;
+}
+
+.misty-picker-breadcrumbs {
+  display: flex;
+  min-width: 0;
+  height: 36px;
+  align-items: center;
+  overflow: auto;
+  border: 1px solid var(--misty-border-soft);
+  border-radius: 8px;
+  background: var(--misty-surface);
+  padding: 0 5px;
+  scrollbar-width: none;
+}
+
+.misty-picker-breadcrumbs::-webkit-scrollbar { display: none; }
+
+.misty-picker-breadcrumbs button {
+  display: flex;
+  height: 28px;
+  flex: none;
+  align-items: center;
+  gap: 3px;
+  border: 0;
+  background: transparent;
+  padding: 0 7px;
+  color: var(--misty-text-muted);
+  font-size: 12px;
+}
+
+.misty-picker-breadcrumbs button:hover {
+  background: var(--misty-neutral-hover-bg, var(--misty-surface-2));
+}
+
+.misty-picker-hidden-toggle.is-active { color: var(--misty-accent); }
+.misty-picker-notice-slot { min-height: 0; }
+
+.misty-picker-cloud-notice {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  gap: 10px;
+  border-bottom: 1px solid color-mix(in srgb, #e5b94c 28%, var(--misty-border-soft));
+  padding: 8px 16px;
+  background: color-mix(in srgb, #e5b94c 10%, var(--misty-surface));
+  color: color-mix(in srgb, #ffe7a6 82%, var(--misty-text));
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.misty-picker-cloud-notice svg { flex: none; }
+.misty-picker-cloud-notice strong { color: #ffe7a6; }
+
+.misty-picker-content {
+  display: grid;
+  min-height: 0;
+  grid-template-columns: 210px minmax(0, 1fr);
+}
+
+.misty-picker-sidebar {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  gap: 3px;
+  overflow: auto;
+  border-right: 1px solid var(--misty-border-soft);
+  background: color-mix(in srgb, var(--misty-surface-2) 55%, var(--misty-surface));
+  padding: 12px 9px;
+}
+
+.misty-picker-sidebar-label {
+  padding: 4px 9px 6px;
+  color: var(--misty-text-subtle);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.misty-picker-sidebar-label:not(:first-child) { margin-top: 8px; }
+.misty-picker-sidebar-label.is-device { margin-top: 12px; }
+
+.misty-picker-sidebar button {
+  display: grid;
+  min-height: 40px;
+  grid-template-columns: 20px minmax(0, 1fr) auto;
+  align-items: center;
+  justify-items: start;
+  gap: 8px;
+  border-color: transparent;
+  background: transparent;
+  padding: 0 9px;
+  font-size: 13px;
+  text-align: left;
+}
+
+.misty-picker-sidebar button span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.misty-picker-sidebar button small {
+  max-width: 58px;
+  overflow: hidden;
+  color: var(--misty-text-subtle);
+  font-size: 9px;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.misty-picker-sidebar button.is-active {
+  border-color: var(--misty-border-soft);
+  background: var(--misty-neutral-selected-bg, var(--misty-surface-3));
+  color: var(--misty-text);
+}
+
+.misty-picker-browser {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  background: var(--misty-surface);
+  padding: 10px;
+}
+
+.misty-picker-list {
+  display: grid;
+  align-content: start;
+  gap: 3px;
+}
+
+.misty-picker-list > button {
+  display: grid;
+  min-height: 46px;
+  grid-template-columns: 32px minmax(0, 1fr) 130px;
+  align-items: center;
+  gap: 9px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  padding: 5px 10px;
+  color: var(--misty-text);
+  font: inherit;
+  text-align: left;
+  cursor: default;
+}
+
+.misty-picker-list > button:hover {
+  background: var(--misty-neutral-hover-bg, var(--misty-surface-2));
+}
+
+.misty-picker-list > button.is-selected {
+  border-color: color-mix(in srgb, var(--misty-accent) 48%, var(--misty-border));
+  background: color-mix(in srgb, var(--misty-accent) 10%, var(--misty-surface-2));
+}
+
+.misty-picker-list > button.is-unavailable { opacity: .48; }
+.misty-picker-list > button.is-cloud .misty-picker-entry-kind { color: #e9c86f; }
+
+.misty-picker-entry-icon {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border-radius: 7px;
+  background: var(--misty-surface-2);
+  color: var(--misty-text-subtle);
+}
+
+.misty-picker-entry-icon.is-folder {
+  background: color-mix(in srgb, var(--misty-accent) 12%, transparent);
+  color: var(--misty-accent);
+}
+
+.misty-picker-entry-name {
+  overflow: hidden;
+  font-size: 14px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.misty-picker-entry-kind {
+  overflow: hidden;
+  color: var(--misty-text-subtle);
+  font-size: 11px;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.misty-picker-state {
+  display: grid;
+  height: 100%;
+  place-items: center;
+  align-content: center;
+  gap: 10px;
+  color: var(--misty-text-subtle);
+  text-align: center;
+}
+
+.misty-picker-state strong {
+  color: var(--misty-text-muted);
+  font-size: 14px;
+}
+
+.misty-picker-state span {
+  max-width: 430px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.misty-picker-state.is-error svg,
+.misty-picker-state.is-error strong { color: var(--misty-danger); }
+
+.misty-picker-loading-bar {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: 2px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--misty-accent) 20%, transparent);
+}
+
+.misty-picker-loading-bar::after {
+  position: absolute;
+  width: 34%;
+  height: 100%;
+  animation: misty-picker-loading 1s ease-in-out infinite;
+  background: var(--misty-accent);
+  content: "";
+}
+
+@keyframes misty-picker-loading {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(400%); }
+}
+
+.misty-picker .is-spinning { animation: misty-picker-spin .8s linear infinite; }
+@keyframes misty-picker-spin { to { transform: rotate(360deg); } }
+
+.misty-picker-footer {
+  display: flex;
+  min-height: 72px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  border-top: 1px solid var(--misty-border-soft);
+  padding: 0 18px;
+}
+
+.misty-picker-footer > div:first-child {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+}
+
+.misty-picker-footer > div:first-child span {
+  color: var(--misty-text-subtle);
+  font-size: 10px;
+  text-transform: uppercase;
+}
+
+.misty-picker-footer > div:first-child strong {
+  max-width: 560px;
+  overflow: hidden;
+  color: var(--misty-text-muted);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.misty-picker-footer-actions {
+  display: flex;
+  flex: none;
+  gap: 9px;
+}
+
+.misty-picker-footer button {
+  display: inline-flex;
+  min-height: 40px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 16px;
+  font-size: 13px;
+}
+
+.misty-picker-footer button:disabled {
+  cursor: default;
+  opacity: .45;
+}
+
+.misty-picker-footer .misty-picker-confirm {
+  border-color: color-mix(in srgb, var(--misty-accent) 55%, var(--misty-border));
+  background: var(--misty-accent);
+  color: #fff;
+  font-weight: 650;
+}
+
+.misty-picker-footer .misty-picker-cancel:hover { filter: brightness(1.08); }
+
+@media (prefers-reduced-motion: reduce) {
+  .misty-picker .is-spinning,
+  .misty-picker-loading-bar::after { animation-duration: 2s; }
+}
+
+@media (max-width: 800px) {
+  .misty-picker-layer { inset: 28px 0 0; padding: 12px; }
+  .misty-picker { width: 100%; height: 100%; }
+  .misty-picker-content { grid-template-columns: 150px minmax(0, 1fr); }
+  .misty-picker-list > button { grid-template-columns: 32px minmax(0, 1fr); }
+  .misty-picker-entry-kind { display: none; }
+  .misty-picker-footer > div:first-child { display: none; }
+}
+
+@media (max-width: 560px) {
+  .misty-picker-layer { padding: 0; }
+  .misty-picker { border-radius: 0; }
+  .misty-picker-content { grid-template-columns: 1fr; }
+  .misty-picker-sidebar { max-height: 126px; border-right: 0; border-bottom: 1px solid var(--misty-border-soft); }
+  .misty-picker-toolbar { grid-template-columns: auto minmax(0, 1fr); }
+  .misty-picker-hidden-toggle { display: none !important; }
+}

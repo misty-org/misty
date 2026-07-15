@@ -5,15 +5,12 @@ import { fileURLToPath } from "node:url";
 
 const appDir = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const serviceLibDir = resolve(appDir, "src-tauri/target/misty-service/host");
+const signedMacosRunner = resolve(appDir, "scripts/run-signed-macos-binary.mjs");
 
 const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
 
 const devPort = await findAvailablePort(Number(process.env.MISTY_DESKTOP_DEV_PORT ?? 5173));
 const devUrl = `http://127.0.0.1:${devPort}`;
-const accountApiProxyTarget =
-  process.env.MISTY_DESKTOP_ACCOUNT_API_PROXY?.trim()
-  || process.env.MISTY_ACCOUNT_API_PROXY_TARGET?.trim()
-  || "http://127.0.0.1:8081";
 const tauriDevConfig = JSON.stringify({
   build: {
     devUrl,
@@ -32,9 +29,12 @@ run(
   {
     MISTY_DESKTOP_DEV_PORT: String(devPort),
     MISTY_SERVICE_GO_LIB_DIR: serviceLibDir,
-    MISTY_ACCOUNT_API_PROXY_TARGET: accountApiProxyTarget,
-    VITE_MISTY_SERVER_URL: "/api",
-    VITE_API_BASE: "/api",
+    ...(process.platform === "darwin"
+      ? {
+          CARGO_TARGET_AARCH64_APPLE_DARWIN_RUNNER: `${process.execPath} ${signedMacosRunner}`,
+          CARGO_TARGET_X86_64_APPLE_DARWIN_RUNNER: `${process.execPath} ${signedMacosRunner}`,
+        }
+      : {}),
   },
 );
 

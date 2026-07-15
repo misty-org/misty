@@ -53,6 +53,19 @@
   "bundle": {
     "active": true,
     "targets": ["app", "dmg"],
+    "fileAssociations": [
+      {
+        "ext": ["mf"],
+        "name": "Misty Workflow",
+        "description": "Misty automation and agent workflow",
+        "role": "Editor",
+        "mimeType": "application/vnd.misty.workflow+json",
+        "exportedType": {
+          "identifier": "com.misty.workflow",
+          "conformsTo": ["public.json", "public.data"]
+        }
+      }
+    ],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

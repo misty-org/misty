@@ -1,4 +1,4 @@
-import { mediaSearchResolveAssets, searchQuery, smartLibraryResolveAssets, smartLibrarySnapshot } from "../../../api/misty";
+import { mediaSearchResolveAssets, mediaSearchSnapshot, searchQuery, smartLibraryResolveAssets, smartLibrarySnapshot } from "../../../api/misty";
 import type {
   ExplorerLibrarySnapshot,
   ExplorerLocation,
@@ -15,6 +15,7 @@ import type {
 } from "../../../api/types";
 import { searchSemanticAssets, type SemanticSearchHit } from "../../../stores/smartLibraryServerApi";
 import { searchMedia, type MediaSearchHit } from "../../../stores/mediaSearchServerApi";
+import { ensureMediaSearchDeviceReady } from "../../../stores/mediaSearchMigration";
 import { mergeLibrarySearchResults } from "./librarySearch";
 
 export const semanticQueryMinimumCharacters = 3;
@@ -72,7 +73,7 @@ export async function querySemanticExplorerSearch(
   const request = (async () => {
     const [libraryResponse, mediaResponse] = await Promise.allSettled([
       searchSemanticAssets(trimmed, { limit }),
-      searchMedia(trimmed, Math.min(30, limit)),
+      mediaSearchSnapshot().then(ensureMediaSearchDeviceReady).then((snapshot) => searchMedia(snapshot.deviceId, trimmed, Math.min(30, limit))),
     ]);
     const libraryHits = libraryResponse.status === "fulfilled" ? libraryResponse.value.hits : [];
     const mediaHits = mediaResponse.status === "fulfilled" ? mediaResponse.value.hits : [];

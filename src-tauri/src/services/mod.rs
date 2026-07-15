@@ -1,3 +1,6 @@
+#[cfg(desktop)]
+pub mod agent_device_identity;
+pub mod agents;
 pub mod ai;
 pub mod automations;
 pub mod autostart;
@@ -5,6 +8,7 @@ pub mod claude;
 pub mod commands;
 pub mod devices;
 pub mod directory_size;
+pub mod document_intelligence;
 pub mod environment;
 pub mod explorer;
 pub mod explorer_library;
@@ -35,4 +39,5 @@ pub mod system_dependencies;
 pub mod transfers;
 #[cfg(desktop)]
 pub mod tray;
+pub mod workflow_files;
 pub mod workspaces;

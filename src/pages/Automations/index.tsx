@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   Background,
   BackgroundVariant,
@@ -32,7 +33,9 @@ import {
   Copy,
   CopyPlus,
   FileInput,
+  FileDown,
   FileOutput,
+  FileUp,
   Filter,
   FolderOpen,
   Globe2,
@@ -60,6 +63,8 @@ import {
   automationsRun,
   automationsSaveWorkflow,
   automationsSnapshot,
+  workflowsReadMf,
+  workflowsWriteMf,
 } from "../../api/misty";
 import type {
   AutomationApproval,
@@ -70,7 +75,10 @@ import type {
   AutomationWorkflow,
 } from "../../api/types";
 import { useExplorerStore } from "../../stores/useExplorerStore";
+import { MistyFilePicker } from "../../components/MistyFilePicker/MistyFilePicker";
+import { automationWorkflowToMf, mfToAutomationWorkflow, validateMfWorkflow } from "../../workflows/mf";
 import "./styles.css";
+import { AgentWorkflowEditor } from "./AgentWorkflowEditor";
 
 type NodeDefinition = {
   kind: AutomationNodeKind;
@@ -121,15 +129,18 @@ const nodeDefinitions: NodeDefinition[] = [
   { kind: "move_path", label: "Move", group: "Actions", icon: Move, color: "#b98bd4", config: { source: "{{value}}", destination: "" } },
   { kind: "rename_path", label: "Rename", group: "Actions", icon: FileOutput, color: "#b98bd4", config: { source: "{{value}}", destination: "" } },
   { kind: "notify", label: "Notification", group: "Actions", icon: MessageSquare, color: "#b98bd4", config: { message: "Automation completed" } },
+  { kind: "create_agent", label: "Create draft agent", group: "Actions", icon: Bot, color: "#8f83e8", config: { folderPath: "", name: "", instructions: "", workflowPath: "" } },
 ];
 
 const definitionByKind = new Map(nodeDefinitions.map((item) => [item.kind, item]));
 const nodeTypes = { automation: AutomationCanvasNode };
 
 export default function AutomationsPage() {
+	const [searchParams] = useSearchParams();
+	const agentId = searchParams.get("agentId");
   return (
     <ReactFlowProvider>
-      <AutomationPlayground />
+		{agentId ? <AgentWorkflowEditor agentId={agentId} /> : <AutomationPlayground />}
     </ReactFlowProvider>
   );
 }
@@ -144,6 +155,7 @@ function AutomationPlayground() {
   const [redoStack, setRedoStack] = useState<AutomationWorkflow[]>([]);
   const [nodeClipboard, setNodeClipboard] = useState<AutomationNode | null>(null);
   const [workflowSettingsOpen, setWorkflowSettingsOpen] = useState(false);
+  const [mfPickerOpen, setMfPickerOpen] = useState(false);
   const [inspectorPosition, setInspectorPosition] = useState<InspectorPosition | null>(null);
   const nodeDragStartRef = useRef<AutomationWorkflow | null>(null);
   const nodeInspectorRef = useRef<HTMLElement | null>(null);
@@ -361,7 +373,14 @@ function AutomationPlayground() {
   }, [edges, pushNotification, updateWorkflow, workflow.edges]);
 
   const addNode = useCallback((definition: NodeDefinition, position: { x: number; y: number }) => {
-    const node: AutomationNode = { id: crypto.randomUUID(), kind: definition.kind, label: definition.label, position, config: structuredClone(definition.config) };
+    const node: AutomationNode = {
+      id: crypto.randomUUID(),
+      kind: definition.kind,
+      label: definition.label,
+      position,
+      config: structuredClone(definition.config),
+      policy: definition.kind === "create_agent" ? [{ capability: "create_agent", mode: "approval" }] : [],
+    };
     updateWorkflow((current) => ({ ...current, nodes: [...current.nodes, node] }));
     setSelectedNodeId(node.id);
   }, [updateWorkflow]);
@@ -516,6 +535,41 @@ function AutomationPlayground() {
     } finally { setBusy(false); }
   }, [pushNotification, workflow]);
 
+  const exportMf = useCallback(async () => {
+    setBusy(true);
+    try {
+      const result = await workflowsWriteMf(automationWorkflowToMf(workflow));
+      pushNotification(`Exported ${result.path}`, "success", 5200);
+    } catch (error) {
+      pushNotification(`Could not export .mf: ${errorMessage(error)}`, "error", 5200);
+    } finally {
+      setBusy(false);
+    }
+  }, [pushNotification, workflow]);
+
+  const importMf = useCallback(async (path: string) => {
+    setMfPickerOpen(false);
+    try {
+      const result = await workflowsReadMf(path);
+      const errors = validateMfWorkflow(result.document);
+      const unsupported = result.document.nodes.filter((node) => !definitionByKind.has(node.kind as AutomationNodeKind));
+      if (errors.length || unsupported.length) {
+        const detail = errors[0] ?? `Unsupported automation nodes: ${unsupported.map((node) => node.kind).join(", ")}.`;
+        throw new Error(detail);
+      }
+      if (dirty && !window.confirm("Discard the unsaved changes to this automation?")) return;
+      setWorkflow(mfToAutomationWorkflow(result.document));
+      setSelectedNodeId(undefined);
+      setSelectedEdgeId(undefined);
+      setUndoStack([]);
+      setRedoStack([]);
+      setDirty(true);
+      pushNotification("Imported .mf workflow as a disabled draft", "success", 4200);
+    } catch (error) {
+      pushNotification(`Could not import .mf: ${errorMessage(error)}`, "error", 5200);
+    }
+  }, [dirty, pushNotification]);
+
   const run = useCallback(async () => {
     setBusy(true);
     try {
@@ -635,6 +689,8 @@ function AutomationPlayground() {
           <span className="automation-tool-separator" />
           <EditorToolButton active={disconnectMode} icon={Scissors} label="Disconnect connections" onClick={() => setDisconnectMode((current) => !current)} shortcut="Esc to exit" />
           <EditorToolButton icon={Maximize2} label="Fit workflow to view" onClick={() => void fitView({ padding: 0.18, duration: 180 })} />
+          <EditorToolButton icon={FileUp} label="Import .mf" onClick={() => setMfPickerOpen(true)} />
+          <EditorToolButton disabled={busy} icon={FileDown} label="Export .mf" onClick={() => void exportMf()} />
           <div className="automation-workflow-settings-anchor" ref={workflowSettingsRef}>
             <EditorToolButton active={workflowSettingsOpen} icon={Settings2} label="Workflow settings" onClick={() => setWorkflowSettingsOpen((current) => !current)} />
             {workflowSettingsOpen ? <aside className="automation-workflow-settings-popover" aria-label="Workflow settings">
@@ -730,6 +786,7 @@ function AutomationPlayground() {
           {!selectedRun ? <div className="automation-log-empty">Run the workflow to inspect node outputs and errors.</div> : null}
         </div> : null}
       </section>
+      {mfPickerOpen ? <MistyFilePicker mode="file" title="Import a Misty workflow" allowedExtensions={["mf"]} onCancel={() => setMfPickerOpen(false)} onSelect={(path) => void importMf(path)} /> : null}
     </main>
   );
 }
@@ -862,8 +919,9 @@ function NodeInspector({ node, webhookUrl, onChange, onDelete }: { node: Automat
     {hasConfig(node.kind, "destination") ? <Field label="Destination"><input value={configString(node, "destination")} onChange={(event) => updateConfig("destination", event.target.value)} /></Field> : null}
     {node.kind === "write_text" ? <Field label="Text"><textarea rows={6} value={configString(node, "text")} onChange={(event) => updateConfig("text", event.target.value)} /></Field> : null}
     {node.kind === "notify" ? <Field label="Message"><textarea rows={4} value={configString(node, "message")} onChange={(event) => updateConfig("message", event.target.value)} /></Field> : null}
+    {node.kind === "create_agent" ? <><Field label="Local folder"><input placeholder="/Users/me/Documents" value={configString(node, "folderPath")} onChange={(event) => updateConfig("folderPath", event.target.value)} /></Field><Field label="Agent name"><input value={configString(node, "name")} onChange={(event) => updateConfig("name", event.target.value)} /></Field><Field label="Agent instructions"><textarea rows={6} value={configString(node, "instructions")} onChange={(event) => updateConfig("instructions", event.target.value)} /></Field><Field label="Agent .mf template (optional)"><input placeholder="~/.misty/workflows/agent.mf" value={configString(node, "workflowPath")} onChange={(event) => updateConfig("workflowPath", event.target.value)} /></Field></> : null}
     <p className="automation-inspector-note">Use <code>{"{{input}}"}</code> for the previous node output, or keys such as <code>{"{{text}}"}</code>.</p>
-    {["write_text", "copy_path", "move_path", "rename_path"].includes(node.kind) ? <div className="automation-safety-note">This action always requires approval when a run reaches it.</div> : null}
+    {["write_text", "copy_path", "move_path", "rename_path", "create_agent"].includes(node.kind) ? <div className="automation-safety-note">This action always requires approval when a run reaches it.</div> : null}
   </>;
 }
 
@@ -884,7 +942,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 function createWorkflow(): AutomationWorkflow {
   const id = crypto.randomUUID();
-  return { id, name: "Untitled automation", description: "", enabled: false, nodes: [{ id: crypto.randomUUID(), kind: "manual_trigger", label: "Manual trigger", position: { x: 100, y: 150 }, config: {} }], edges: [], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+  return { format: "misty.workflow", formatVersion: 1, id, revision: 1, profile: "automation", name: "Untitled automation", description: "", enabled: false, nodes: [{ id: crypto.randomUUID(), kind: "manual_trigger", label: "Manual trigger", position: { x: 100, y: 150 }, config: {}, policy: [] }], edges: [], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
 }
 
 function hasConfig(kind: AutomationNodeKind, field: string) { return field in (definitionByKind.get(kind)?.config ?? {}); }

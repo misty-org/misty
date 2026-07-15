@@ -1,5 +1,6 @@
 import { appSnapshot } from "../api/misty";
 import { readAccountAuthToken } from "../pages/Account/shared/authTokenStore";
+import type { AgentCitation } from "../agents/types";
 
 export type AiMode = "ask" | "auto" | "full";
 
@@ -58,6 +59,7 @@ export interface AgentEvent {
   created_at: string;
   credits_used?: number;
   credits_remaining?: number;
+  citations?: AgentCitation[];
 }
 
 export interface AgentEventsResponse {
@@ -78,12 +80,27 @@ export interface AgentStatusResponse {
   error: string | null;
 }
 
+export class ManagedAiRequestError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+    readonly code?: string,
+    readonly retryAfterSeconds?: number,
+  ) {
+    super(message);
+    this.name = "ManagedAiRequestError";
+  }
+}
+
 export async function fetchAgentStatus(): Promise<AgentStatusResponse> {
   return managedAiRequest<AgentStatusResponse>("/ai/status");
 }
 
-export async function createAgentSession(): Promise<CreateSessionResponse> {
-  return managedAiRequest<CreateSessionResponse>("/ai/sessions", { method: "POST" });
+export async function createAgentSession(agentJobId?: string): Promise<CreateSessionResponse> {
+  return managedAiRequest<CreateSessionResponse>("/ai/sessions", {
+    method: "POST",
+    body: agentJobId ? JSON.stringify({ agent_job_id: agentJobId }) : undefined,
+  });
 }
 
 export async function sendAgentMessage(sessionId: string, body: AgentMessageRequest): Promise<void> {
@@ -106,6 +123,10 @@ export async function submitToolResults(sessionId: string, results: ToolResult[]
 
 export async function cancelAgentSession(sessionId: string): Promise<void> {
   await managedAiRequest(`/ai/sessions/${encodeURIComponent(sessionId)}/cancel`, { method: "POST" });
+}
+
+export async function deleteAgentSession(sessionId: string): Promise<void> {
+  await managedAiRequest(`/ai/sessions/${encodeURIComponent(sessionId)}`, { method: "DELETE" });
 }
 
 export async function managedAiRequest<T = unknown>(path: string, init?: RequestInit): Promise<T> {
@@ -131,25 +152,32 @@ export async function managedAiRequest<T = unknown>(path: string, init?: Request
     if (payload) {
       if (payload.code === "credits_exhausted") {
         const reset = payload.reset_at ? new Date(payload.reset_at).toLocaleDateString() : "your next reset";
-        throw new Error(`Misty credits exhausted (${payload.available_credits ?? 0} available). Add credits or wait until ${reset}.`);
+		throw new ManagedAiRequestError(`Misty credits exhausted (${payload.available_credits ?? 0} available). Add credits or wait until ${reset}.`, response.status, payload.code);
       }
       if (payload.code === "insufficient_credits") {
         const required = typeof payload.requiredCredits === "number" ? ` ${payload.requiredCredits} Mika credits are required.` : "";
-        throw new Error(`${payload.message?.trim() || "Not enough Mika credits for this request."}${required}`);
+		throw new ManagedAiRequestError(`${payload.message?.trim() || "Not enough Mika credits for this request."}${required}`, response.status, payload.code);
       }
       if (payload.code === "rate_limited") {
-        throw new Error(`Mika request limit reached. Try again in ${payload.retry_after_seconds ?? 1} seconds. Requests are never retried automatically.`);
+		const retryAfter = payload.retry_after_seconds ?? retryAfterHeader(response);
+		const retryPolicy = path.includes("/media-search/") ? "" : " Requests are never retried automatically.";
+		throw new ManagedAiRequestError(`Mika request limit reached. Try again in ${retryAfter} seconds.${retryPolicy}`, response.status, payload.code, retryAfter);
       }
       if (payload.code === "request_canceled") {
-        throw new Error("Mika request canceled.");
+		throw new ManagedAiRequestError("Mika request canceled.", response.status, payload.code);
       }
-      if (payload.message?.trim()) throw new Error(payload.message.trim());
+		if (payload.message?.trim()) throw new ManagedAiRequestError(payload.message.trim(), response.status, payload.code, payload.retry_after_seconds ?? retryAfterHeader(response));
     }
-    throw new Error(text.trim() || `Mika ${path} failed: ${response.status}`);
+	throw new ManagedAiRequestError(text.trim() || `Mika ${path} failed: ${response.status}`, response.status, undefined, retryAfterHeader(response));
   }
   if (response.status === 204) return undefined as T;
   const contentType = response.headers.get("Content-Type") ?? "";
   return contentType.includes("application/json") ? await response.json() as T : undefined as T;
+}
+
+function retryAfterHeader(response: Response): number | undefined {
+  const seconds = Number(response.headers.get("Retry-After"));
+  return Number.isFinite(seconds) && seconds > 0 ? Math.ceil(seconds) : undefined;
 }
 
 interface ManagedAiErrorPayload {

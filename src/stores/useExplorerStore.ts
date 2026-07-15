@@ -248,6 +248,7 @@ interface ExplorerStore {
   toggleMikaPanel: () => void;
   setMikaPanelOpen: (open: boolean) => void;
   setMikaPanelWidth: (width: number) => void;
+  consumeOperationError: () => string | null;
   pushNotification: (message: string, type?: ExplorerNotificationType, durationMs?: number, showInActivity?: boolean) => number;
   dismissNotification: (id: number) => void;
   markNotificationsRead: () => void;
@@ -1457,6 +1458,11 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
     const width = Math.round(mikaPanelWidth);
     return state.mikaPanelWidth === width ? state : { mikaPanelWidth: width };
   }),
+  consumeOperationError: () => {
+    const message = get().operationError;
+    if (message) set({ operationError: null });
+    return message;
+  },
   pushNotification: (message, type = "info", durationMs = 3000, showInActivity = true) => {
     const trimmed = message.trim();
     if (!trimmed) return 0;

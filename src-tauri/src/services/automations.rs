@@ -18,7 +18,11 @@ use uuid::Uuid;
 
 use crate::{
     error::{ApiError, ApiResult},
-    services::{ai::AiService, environment::AppEnvironmentService},
+    services::{
+        agents::{AgentService, RegisterFolderScopeRequest, SaveAgentDefinitionRequest},
+        ai::AiService,
+        environment::AppEnvironmentService,
+    },
 };
 
 const STORE_VERSION: u32 = 1;
@@ -41,7 +45,21 @@ const SUPPORTED_NODE_KINDS: &[&str] = &[
     "move_path",
     "rename_path",
     "notify",
+    "create_agent",
 ];
+
+fn mf_format() -> String {
+    "misty.workflow".to_owned()
+}
+fn mf_format_version() -> u32 {
+    1
+}
+fn workflow_revision() -> u64 {
+    1
+}
+fn automation_profile() -> String {
+    "automation".to_owned()
+}
 
 #[derive(Clone)]
 pub struct AutomationService {
@@ -57,6 +75,7 @@ struct AutomationServiceInner {
     webhook_url: String,
     server_url: Option<String>,
     managed_ai_auth_token: Mutex<Option<String>>,
+    agents: Option<AgentService>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -70,7 +89,15 @@ struct ManagedAiCompletion {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AutomationWorkflow {
+    #[serde(default = "mf_format")]
+    pub format: String,
+    #[serde(default = "mf_format_version")]
+    pub format_version: u32,
     pub id: String,
+    #[serde(default = "workflow_revision")]
+    pub revision: u64,
+    #[serde(default = "automation_profile")]
+    pub profile: String,
     pub name: String,
     pub description: String,
     pub enabled: bool,
@@ -91,6 +118,14 @@ pub struct AutomationNode {
     pub position: AutomationPosition,
     #[serde(default)]
     pub config: Value,
+    #[serde(default)]
+    pub policy: Vec<AutomationNodePolicy>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AutomationNodePolicy {
+    pub capability: String,
+    pub mode: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -207,7 +242,7 @@ impl Default for RunStore {
 }
 
 impl AutomationService {
-    pub fn new(environment: AppEnvironmentService, ai: AiService) -> Self {
+    pub fn new(environment: AppEnvironmentService, ai: AiService, agents: AgentService) -> Self {
         let root = environment.config_dir().join("automations").join("v1");
         let server_url = environment.snapshot().server_url;
         let port = std::env::var("MISTY_AUTOMATION_WEBHOOK_PORT")
@@ -224,6 +259,7 @@ impl AutomationService {
                 webhook_url: format!("http://127.0.0.1:{port}"),
                 server_url,
                 managed_ai_auth_token: Mutex::new(None),
+                agents: Some(agents),
             }),
         };
         service.start_webhook_server(port);
@@ -346,6 +382,7 @@ impl AutomationService {
             .find(|item| item.id == workflow.id)
         {
             workflow.created_at = existing.created_at.clone();
+            workflow.revision = existing.revision.saturating_add(1);
             // Scheduling state is owned by the backend. An editor may have loaded the
             // workflow before the scheduler claimed its latest interval.
             workflow.last_scheduled_at = existing.last_scheduled_at.clone();
@@ -453,7 +490,7 @@ impl AutomationService {
             ));
         }
         if approved {
-            execute_file_action(&approval.action).await?;
+            self.execute_approval_action(&approval.action).await?;
         }
         let node_id = approval.node_id.clone();
         approval.status = if approved { "approved" } else { "rejected" }.to_owned();
@@ -534,7 +571,7 @@ impl AutomationService {
                     run.node_runs.push(AutomationNodeRun {
                         node_id: node.id.clone(),
                         label: node.label.clone(),
-                        status: if is_write_kind(&node.kind) {
+                        status: if is_approval_kind(&node.kind) {
                             "waiting_approval"
                         } else {
                             "completed"
@@ -613,8 +650,8 @@ impl AutomationService {
             "notify" => Ok(
                 json!({ "message": render_config(&node.config, "message", input), "value": input }),
             ),
-            kind if is_write_kind(kind) => {
-                let action = build_file_action(node, input)?;
+            kind if is_approval_kind(kind) => {
+                let action = build_approval_action(node, input)?;
                 approvals.push(AutomationApproval {
                     id: Uuid::new_v4().to_string(),
                     run_id: run.id.clone(),
@@ -634,6 +671,82 @@ impl AutomationService {
                 node.kind
             ))),
         }
+    }
+
+    async fn execute_approval_action(&self, action: &Value) -> ApiResult<()> {
+        if action.get("kind").and_then(Value::as_str) != Some("create_agent") {
+            return execute_file_action(action).await;
+        }
+        let folder_path = required_action_string(action, "folderPath")?;
+        let name = required_action_string(action, "name")?;
+        let instructions = required_action_string(action, "instructions")?;
+        let agent_id = required_action_string(action, "agentId")?;
+        let agents = self
+            .inner
+            .agents
+            .as_ref()
+            .ok_or_else(|| ApiError::Message("Agent runtime is unavailable.".to_owned()))?;
+        let scope = agents
+            .register_folder_scope(RegisterFolderScopeRequest { path: folder_path })
+            .await?;
+        let device_id = scope
+            .get("deviceId")
+            .and_then(Value::as_str)
+            .unwrap_or("local");
+        let now = Utc::now().to_rfc3339();
+        let workflow_path = action
+            .get("workflowPath")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|value| !value.is_empty());
+        let (workflow, triggers, workflow_id, workflow_revision) = if let Some(path) = workflow_path
+        {
+            let file = crate::services::workflow_files::read_mf(path).await?;
+            let workflow_id = file.document.id.clone();
+            let workflow_revision = file.document.revision;
+            let (workflow, triggers) = agent_workflow_from_mf(file.document)?;
+            (workflow, triggers, Some(workflow_id), workflow_revision)
+        } else {
+            let workflow = action
+                .get("workflow")
+                .cloned()
+                .filter(|value| value.is_object())
+                .unwrap_or_else(default_agent_workflow);
+            (
+                workflow,
+                json!([{ "id": "trigger-manual", "kind": "manual", "enabled": true }]),
+                None,
+                1,
+            )
+        };
+        let definition = json!({
+            "id": agent_id,
+            "ownerAccountId": "local",
+            "deviceId": device_id,
+            "scope": scope,
+            "name": name,
+            "instructions": instructions,
+            "status": "draft",
+            "cloudDocumentConsent": false,
+            "members": [],
+            "triggers": triggers,
+            "trustPolicy": {
+                "automaticActions": ["read", "search", "summarize", "notify_local", "create_file"],
+                "approvalRequiredActions": ["overwrite", "rename", "move", "delete", "change_permissions", "outbound_webhook", "external_message"],
+                "memberWriteAccess": false,
+                "approvalTtlHours": 24
+            },
+            "workflow": workflow,
+            "workflowId": workflow_id,
+            "workflowRevision": workflow_revision,
+            "version": 1,
+            "createdAt": now,
+            "updatedAt": now
+        });
+        agents
+            .save_definition(SaveAgentDefinitionRequest { definition })
+            .await?;
+        Ok(())
     }
 
     async fn managed_ai_complete(&self, prompt: &str) -> ApiResult<ManagedAiCompletion> {
@@ -767,6 +880,12 @@ fn manual_trigger() -> String {
 
 fn validate_workflow(workflow: &AutomationWorkflow) -> AutomationValidation {
     let mut errors = Vec::new();
+    if workflow.format != "misty.workflow" || workflow.format_version != 1 {
+        errors.push("Unsupported Misty workflow format.".to_owned());
+    }
+    if !matches!(workflow.profile.as_str(), "automation" | "universal") {
+        errors.push("Agent-profile .mf files must be opened from an Agent workflow.".to_owned());
+    }
     if workflow.name.trim().is_empty() {
         errors.push("Workflow name is required.".to_owned());
     }
@@ -795,6 +914,15 @@ fn validate_workflow(workflow: &AutomationWorkflow) -> AutomationValidation {
             unsupported.join(", ")
         ));
     }
+    if workflow.nodes.iter().any(|node| {
+        node.kind == "create_agent"
+            && !node
+                .policy
+                .iter()
+                .any(|policy| policy.capability == "create_agent" && policy.mode == "approval")
+    }) {
+        errors.push("Create Agent nodes must explicitly require approval.".to_owned());
+    }
     let ids: HashSet<&str> = workflow.nodes.iter().map(|node| node.id.as_str()).collect();
     if ids.len() != workflow.nodes.len() {
         errors.push("Node IDs must be unique.".to_owned());
@@ -820,10 +948,11 @@ fn validate_workflow(workflow: &AutomationWorkflow) -> AutomationValidation {
         if workflow
             .nodes
             .iter()
-            .any(|node| node.id == edge.source && is_write_kind(&node.kind))
+            .any(|node| node.id == edge.source && is_approval_kind(&node.kind))
         {
             errors.push(
-                "File write, copy, move, and rename nodes must be terminal nodes in V1.".to_owned(),
+                "Approval-gated file and agent creation nodes must be terminal nodes in V1."
+                    .to_owned(),
             );
         }
         if workflow
@@ -1108,7 +1237,11 @@ fn is_write_kind(kind: &str) -> bool {
     )
 }
 
-fn build_file_action(node: &AutomationNode, input: &Value) -> ApiResult<Value> {
+fn is_approval_kind(kind: &str) -> bool {
+    is_write_kind(kind) || kind == "create_agent"
+}
+
+fn build_approval_action(node: &AutomationNode, input: &Value) -> ApiResult<Value> {
     let action = match node.kind.as_str() {
         "write_text" => {
             json!({ "kind": "write_text", "path": render_config(&node.config, "path", input), "text": render_config(&node.config, "text", input) })
@@ -1122,8 +1255,25 @@ fn build_file_action(node: &AutomationNode, input: &Value) -> ApiResult<Value> {
         "rename_path" => {
             json!({ "kind": "rename_path", "source": render_config(&node.config, "source", input), "destination": render_config(&node.config, "destination", input) })
         }
-        _ => return Err(ApiError::Message("Unsupported file action.".to_owned())),
+        "create_agent" => {
+            json!({
+                "kind": "create_agent",
+                "agentId": Uuid::new_v4().to_string(),
+                "folderPath": render_config(&node.config, "folderPath", input),
+                "name": render_config(&node.config, "name", input),
+                "instructions": render_config(&node.config, "instructions", input),
+                "workflowPath": render_config(&node.config, "workflowPath", input),
+                "workflow": node.config.get("workflow").cloned().unwrap_or(Value::Null)
+            })
+        }
+        _ => return Err(ApiError::Message("Unsupported approval action.".to_owned())),
     };
+    if node.kind == "create_agent" {
+        for key in ["agentId", "folderPath", "name", "instructions"] {
+            required_action_string(&action, key)?;
+        }
+        return Ok(action);
+    }
     if action
         .as_object()
         .into_iter()
@@ -1152,8 +1302,144 @@ fn action_summary(action: &Value) -> String {
             action["source"].as_str().unwrap_or(""),
             action["destination"].as_str().unwrap_or("")
         ),
-        _ => "Run file action".to_owned(),
+        "create_agent" => format!(
+            "Create draft agent '{}' for {}",
+            action["name"].as_str().unwrap_or(""),
+            action["folderPath"].as_str().unwrap_or("")
+        ),
+        _ => "Run approval action".to_owned(),
     }
+}
+
+fn required_action_string(action: &Value, key: &str) -> ApiResult<String> {
+    action
+        .get(key)
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_owned)
+        .ok_or_else(|| ApiError::Message(format!("Agent creation requires {key}.")))
+}
+
+fn agent_workflow_from_mf(
+    document: crate::services::workflow_files::MfWorkflowDocument,
+) -> ApiResult<(Value, Value)> {
+    const AGENT_NODE_KINDS: &[&str] = &[
+        "manual_trigger",
+        "schedule_trigger",
+        "file_event",
+        "local_webhook",
+        "document_read",
+        "document_ocr",
+        "folder_query",
+        "mika_task",
+        "artifact_create",
+        "approval",
+        "reply",
+    ];
+    if !matches!(document.profile.as_str(), "agent" | "universal") {
+        return Err(ApiError::Message(
+            "Create Agent requires an agent or universal .mf template.".to_owned(),
+        ));
+    }
+    let unsupported = document
+        .nodes
+        .iter()
+        .filter(|node| !AGENT_NODE_KINDS.contains(&node.kind.as_str()))
+        .map(|node| node.kind.as_str())
+        .collect::<Vec<_>>();
+    if !unsupported.is_empty() {
+        return Err(ApiError::Message(format!(
+            "The Agent .mf template contains unsupported nodes: {}.",
+            unsupported.join(", ")
+        )));
+    }
+    let triggers = document
+        .nodes
+        .iter()
+        .filter_map(|node| {
+            let (kind, schedule) = match node.kind.as_str() {
+                "manual_trigger" => ("manual", None),
+                "schedule_trigger" => (
+                    "schedule",
+                    node.config
+                        .get("schedule")
+                        .and_then(Value::as_str)
+                        .map(str::to_owned),
+                ),
+                "file_event" => (
+                    node.config
+                        .get("event")
+                        .and_then(Value::as_str)
+                        .filter(|value| matches!(*value, "file_created" | "file_changed"))
+                        .unwrap_or("file_created"),
+                    None,
+                ),
+                "local_webhook" => ("local_webhook", None),
+                _ => return None,
+            };
+            Some(json!({
+                "id": format!("trigger-{}", node.id),
+                "kind": kind,
+                "enabled": true,
+                "schedule": schedule
+            }))
+        })
+        .collect::<Vec<_>>();
+    if triggers.is_empty() {
+        return Err(ApiError::Message(
+            "The Agent .mf template needs at least one Agent trigger.".to_owned(),
+        ));
+    }
+    let nodes = document
+        .nodes
+        .into_iter()
+        .map(|node| {
+            let mut config = node.config.as_object().cloned().unwrap_or_default();
+            config.insert(
+                "editorPosition".to_owned(),
+                json!({ "x": node.position.x, "y": node.position.y }),
+            );
+            json!({
+                "id": node.id,
+                "kind": node.kind,
+                "config": config,
+                "policy": node.policy.into_iter().map(|policy| json!({
+                    "action": policy.capability,
+                    "mode": policy.mode
+                })).collect::<Vec<_>>()
+            })
+        })
+        .collect::<Vec<_>>();
+    let edges = document
+        .edges
+        .into_iter()
+        .map(|edge| json!({ "from": edge.source, "to": edge.target }))
+        .collect::<Vec<_>>();
+    Ok((
+        json!({ "version": 1, "revision": document.revision, "nodes": nodes, "edges": edges }),
+        Value::Array(triggers),
+    ))
+}
+
+fn default_agent_workflow() -> Value {
+    json!({
+        "version": 1,
+        "revision": 1,
+        "nodes": [
+            { "id": "manual", "kind": "manual_trigger", "config": {}, "policy": [] },
+            { "id": "query", "kind": "folder_query", "config": { "maxDocuments": 10 }, "policy": [{ "action": "search", "mode": "automatic" }] },
+            { "id": "read", "kind": "document_read", "config": { "ocrFallback": true }, "policy": [{ "action": "read", "mode": "automatic" }] },
+            { "id": "task", "kind": "mika_task", "config": { "serverModelSelection": true }, "policy": [{ "action": "summarize", "mode": "automatic" }] },
+            { "id": "artifact", "kind": "artifact_create", "config": { "collisionPolicy": "create_new" }, "policy": [{ "action": "create_file", "mode": "automatic" }] }
+        ],
+        "edges": [
+            { "from": "manual", "to": "query" },
+            { "from": "query", "to": "read" },
+            { "from": "read", "to": "task" },
+            { "from": "task", "to": "artifact" }
+        ]
+    })
 }
 
 async fn execute_file_action(action: &Value) -> ApiResult<()> {
@@ -1281,6 +1567,7 @@ mod tests {
                 webhook_url: "http://127.0.0.1:0".to_owned(),
                 server_url: None,
                 managed_ai_auth_token: Mutex::new(None),
+                agents: None,
             }),
         }
     }
@@ -1296,9 +1583,14 @@ mod tests {
             label: id.to_owned(),
             position: AutomationPosition { x: 0.0, y: 0.0 },
             config: json!({}),
+            policy: Vec::new(),
         };
         AutomationWorkflow {
+            format: mf_format(),
+            format_version: 1,
             id: "test".to_owned(),
+            revision: 1,
+            profile: automation_profile(),
             name: "Test".to_owned(),
             description: String::new(),
             enabled: false,
@@ -1320,6 +1612,20 @@ mod tests {
         }]);
         assert!(validate_workflow(&value).valid);
         assert_eq!(topological_order(&value).unwrap(), vec!["a", "b"]);
+    }
+
+    #[test]
+    fn migrates_legacy_automation_documents_to_mf_defaults() {
+        let value: AutomationWorkflow = serde_json::from_value(json!({
+            "id": "legacy", "name": "Legacy", "description": "", "enabled": false,
+            "nodes": [{ "id": "manual", "kind": "manual_trigger", "label": "Manual", "position": { "x": 0, "y": 0 }, "config": {} }],
+            "edges": [], "createdAt": "", "updatedAt": ""
+        })).unwrap();
+        assert_eq!(value.format, "misty.workflow");
+        assert_eq!(value.format_version, 1);
+        assert_eq!(value.revision, 1);
+        assert_eq!(value.profile, "automation");
+        assert!(value.nodes[0].policy.is_empty());
     }
 
     #[test]
@@ -1347,9 +1653,14 @@ mod tests {
             label: id.to_owned(),
             position: AutomationPosition { x: 0.0, y: 0.0 },
             config: json!({}),
+            policy: Vec::new(),
         };
         let value = AutomationWorkflow {
+            format: mf_format(),
+            format_version: 1,
             id: "branches".to_owned(),
+            revision: 1,
+            profile: automation_profile(),
             name: "Branches".to_owned(),
             description: String::new(),
             enabled: false,
@@ -1439,6 +1750,7 @@ mod tests {
             label: "Webhook".to_owned(),
             position: AutomationPosition { x: 0.0, y: 0.0 },
             config: json!({}),
+            policy: Vec::new(),
         });
         value.nodes.push(AutomationNode {
             id: "webhook-output".to_owned(),
@@ -1446,6 +1758,7 @@ mod tests {
             label: "Webhook output".to_owned(),
             position: AutomationPosition { x: 0.0, y: 0.0 },
             config: json!({}),
+            policy: Vec::new(),
         });
         value.edges.push(AutomationEdge {
             id: "webhook-edge".to_owned(),
@@ -1719,6 +2032,86 @@ mod tests {
             .contains("status 500: request failed"));
 
         server.abort();
+        fs::remove_dir_all(root).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn create_agent_is_approval_gated_and_creates_a_draft() {
+        let root = test_root("create-agent");
+        let environment = AppEnvironmentService::new_with_data_root(Some(root.clone()));
+        let agents = AgentService::new(environment.clone());
+        let service = AutomationService {
+            inner: Arc::new(AutomationServiceInner {
+                workflows_path: root.join("workflows.json"),
+                runs_path: root.join("runs.json"),
+                write_lock: Mutex::new(()),
+                ai: AiService::new(),
+                http: automation_http_client(),
+                webhook_url: "http://127.0.0.1:0".to_owned(),
+                server_url: None,
+                managed_ai_auth_token: Mutex::new(None),
+                agents: Some(agents.clone()),
+            }),
+        };
+        let folder = root.join("agent-folder");
+        fs::create_dir_all(&folder).await.unwrap();
+        let template: crate::services::workflow_files::MfWorkflowDocument = serde_json::from_value(json!({
+            "format": "misty.workflow", "formatVersion": 1, "id": "agent-template", "revision": 3,
+            "profile": "agent", "name": "Agent template", "description": "",
+            "nodes": [
+                { "id": "manual", "kind": "manual_trigger", "label": "Manual", "position": { "x": 0, "y": 0 }, "config": {}, "policy": [] },
+                { "id": "reply", "kind": "reply", "label": "Reply", "position": { "x": 200, "y": 0 }, "config": {}, "policy": [{ "capability": "notify_local", "mode": "automatic" }] }
+            ],
+            "edges": [{ "id": "edge", "source": "manual", "target": "reply" }], "settings": {},
+            "createdAt": "2026-01-01T00:00:00Z", "updatedAt": "2026-01-01T00:00:00Z"
+        })).unwrap();
+        let template = crate::services::workflow_files::write_mf(&environment, template)
+            .await
+            .unwrap();
+        let mut value = workflow(vec![AutomationEdge {
+            id: "agent-edge".to_owned(),
+            source: "a".to_owned(),
+            target: "b".to_owned(),
+        }]);
+        value.nodes[1].kind = "create_agent".to_owned();
+        value.nodes[1].label = "Create reports agent".to_owned();
+        value.nodes[1].config = json!({
+            "folderPath": folder,
+            "name": "Reports agent",
+            "instructions": "Summarize new reports.",
+            "workflowPath": template.path
+        });
+        value.nodes[1].policy = vec![AutomationNodePolicy {
+            capability: "create_agent".to_owned(),
+            mode: "approval".to_owned(),
+        }];
+        service.save_workflow(value).await.unwrap();
+        let waiting = service
+            .run(AutomationRunRequest {
+                workflow_id: "test".to_owned(),
+                trigger: "manual".to_owned(),
+                input: Value::Null,
+            })
+            .await
+            .unwrap();
+        assert_eq!(waiting.runs[0].status, "waiting_approval");
+        assert!(agents.snapshot().await.unwrap()["definitions"]
+            .as_array()
+            .unwrap()
+            .is_empty());
+
+        service
+            .resolve_approval(&waiting.approvals[0].id, true)
+            .await
+            .unwrap();
+        let snapshot = agents.snapshot().await.unwrap();
+        let definitions = snapshot["definitions"].as_array().unwrap();
+        assert_eq!(definitions.len(), 1);
+        assert_eq!(definitions[0]["name"], "Reports agent");
+        assert_eq!(definitions[0]["status"], "draft");
+        assert_eq!(definitions[0]["workflowId"], "agent-template");
+        assert_eq!(definitions[0]["workflowRevision"], 3);
+        assert_eq!(definitions[0]["workflow"]["nodes"][1]["kind"], "reply");
         fs::remove_dir_all(root).await.unwrap();
     }
 }

@@ -1,5 +1,5 @@
 import { ArrowRight, FileText, Newspaper } from "lucide-react";
-import { FaDiscord, FaGithub, FaXTwitter } from "react-icons/fa6";
+import { FaGithub, FaXTwitter } from "react-icons/fa6";
 import { Link } from "react-router-dom";
 import { openExternalLink } from "../../../shared/openExternalLink";
 
@@ -22,7 +22,6 @@ type HomeFooterProps = {
 };
 
 const socialLinks = [
-  { label: "Discord", href: "https://discord.gg/M3EQuWcFS", icon: FaDiscord },
   { label: "GitHub", href: "https://github.com/misty-org", icon: FaGithub },
   { label: "X", href: "https://x.com/mistysys", icon: FaXTwitter },
 ];

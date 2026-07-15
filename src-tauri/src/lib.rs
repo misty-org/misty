@@ -12,17 +12,17 @@ mod runtime;
 mod services;
 mod telemetry;
 
-#[cfg(target_os = "android")]
 use commands::{
-    android_all_files_access_status, android_grant_local_folder,
-    android_open_all_files_access_settings,
-};
-use commands::{
-    app_environment_snapshot, app_snapshot, archive_create, archive_extract, archive_list,
-    automations_delete_workflow, automations_resolve_approval, automations_run,
-    automations_save_workflow, automations_set_managed_ai_auth, automations_snapshot,
-    automations_validate_workflow, claude_abort, claude_drain_events, claude_send_message,
-    claude_status, clipboard_apply_shared, clipboard_native_file_refs,
+    agents_acknowledge_file_events, agents_cancel_job, agents_claim_jobs, agents_complete_job,
+    agents_create_summary_artifact, agents_delete_definition, agents_execute_approved_action,
+    agents_fail_job, agents_find_scope_document, agents_heartbeat_job, agents_open_citation,
+    agents_prepare_document, agents_prepare_scoped_document, agents_reconcile_scopes,
+    agents_register_folder_scope, agents_resolve_approval, agents_save_definition, agents_snapshot,
+    agents_stage_approved_action, app_environment_snapshot, app_snapshot, archive_create,
+    archive_extract, archive_list, automations_delete_workflow, automations_resolve_approval,
+    automations_run, automations_save_workflow, automations_set_managed_ai_auth,
+    automations_snapshot, automations_validate_workflow, claude_abort, claude_drain_events,
+    claude_send_message, claude_status, clipboard_apply_shared, clipboard_native_file_refs,
     clipboard_publish_image_bytes, clipboard_publish_shared, clipboard_set_local,
     clipboard_shared_image_bytes, clipboard_snapshot, clipboard_write_file_refs,
     compare_apply_text_merge, compare_files, compare_folders, devices_snapshot, duplicates_cancel,
@@ -57,16 +57,24 @@ use commands::{
     settings_apply_launch_on_login, settings_launch_on_login_snapshot,
     settings_open_with_associations, settings_remove_open_with_association, settings_save,
     settings_snapshot, shortcuts_save, shortcuts_snapshot, smart_library_apply_results,
-    smart_library_assets_page, smart_library_delete, smart_library_prepare_previews,
-    smart_library_resolve_assets, smart_library_scan, smart_library_search,
-    smart_library_set_server_folder_id, smart_library_snapshot, storage_snapshot,
-    transfers_delete_all, transfers_delete_selected, transfers_snapshot, workspaces_save,
-    workspaces_snapshot,
+    smart_library_assets_page, smart_library_delete, smart_library_import_files,
+    smart_library_prepare_previews, smart_library_resolve_assets, smart_library_scan,
+    smart_library_search, smart_library_set_server_folder_id, smart_library_snapshot,
+    storage_snapshot, transfers_delete_all, transfers_delete_selected, transfers_snapshot,
+    workflows_read_mf, workflows_write_mf, workspaces_save, workspaces_snapshot,
 };
 #[cfg(desktop)]
 use commands::{
-    media_search_complete, media_search_prepare_chunk, media_search_resolve_assets,
-    media_search_scan_movies, media_search_snapshot,
+    agents_device_identity_load, agents_device_identity_store,
+    media_search_acknowledge_removed_assets, media_search_approve_assets, media_search_complete,
+    media_search_complete_legacy_adoption, media_search_prepare_chunk, media_search_record_chunk,
+    media_search_reset_device_index, media_search_resolve_assets, media_search_scan_movies,
+    media_search_set_asset_state, media_search_snapshot,
+};
+#[cfg(target_os = "android")]
+use commands::{
+    android_all_files_access_status, android_grant_local_folder,
+    android_open_all_files_access_settings,
 };
 use plugins::mac_rounded_corners;
 use runtime::MistyRuntime;
@@ -171,6 +179,29 @@ pub fn run() {
             mika_physics::cancel_mika_momentum,
             app_snapshot,
             app_environment_snapshot,
+            agents_snapshot,
+            agents_register_folder_scope,
+            agents_save_definition,
+            agents_delete_definition,
+            agents_claim_jobs,
+            agents_heartbeat_job,
+            agents_complete_job,
+            agents_fail_job,
+            agents_cancel_job,
+            agents_resolve_approval,
+            agents_open_citation,
+            agents_prepare_document,
+            agents_prepare_scoped_document,
+            agents_find_scope_document,
+            agents_reconcile_scopes,
+            agents_create_summary_artifact,
+            agents_stage_approved_action,
+            agents_execute_approved_action,
+            agents_acknowledge_file_events,
+            #[cfg(desktop)]
+            agents_device_identity_load,
+            #[cfg(desktop)]
+            agents_device_identity_store,
             automations_snapshot,
             automations_set_managed_ai_auth,
             automations_save_workflow,
@@ -178,6 +209,8 @@ pub fn run() {
             automations_validate_workflow,
             automations_run,
             automations_resolve_approval,
+            workflows_write_mf,
+            workflows_read_mf,
             claude_status,
             claude_send_message,
             claude_drain_events,
@@ -251,6 +284,7 @@ pub fn run() {
             explorer_library_set_tags,
             smart_library_snapshot,
             smart_library_scan,
+            smart_library_import_files,
             smart_library_prepare_previews,
             smart_library_apply_results,
             smart_library_set_server_folder_id,
@@ -266,6 +300,18 @@ pub fn run() {
             media_search_prepare_chunk,
             #[cfg(desktop)]
             media_search_complete,
+            #[cfg(desktop)]
+            media_search_approve_assets,
+            #[cfg(desktop)]
+            media_search_acknowledge_removed_assets,
+            #[cfg(desktop)]
+            media_search_record_chunk,
+            #[cfg(desktop)]
+            media_search_set_asset_state,
+            #[cfg(desktop)]
+            media_search_reset_device_index,
+            #[cfg(desktop)]
+            media_search_complete_legacy_adoption,
             #[cfg(desktop)]
             media_search_resolve_assets,
             explorer_queue_create_item,
