@@ -10,7 +10,7 @@ const QUICK_ACCESS_HIDDEN_STORAGE_KEY = "misty.explorer.sidebar.quickAccessHidde
 
 export const sidebarStyles = {
   root:
-    "h-full min-h-0 min-w-0 overflow-x-hidden overflow-y-auto !bg-transparent px-3.5 py-4 [overscroll-behavior:contain] [scrollbar-gutter:stable] [scrollbar-width:thin] max-[980px]:hidden",
+    "misty-transient-scrollbar h-full min-h-0 min-w-0 overflow-x-hidden overflow-y-auto !bg-transparent px-3.5 py-4 [overscroll-behavior:contain] max-[980px]:hidden",
   section: "[&+&]:mt-4",
   sectionTitle: "mb-2.5 flex min-w-0 items-center gap-2",
   sectionToggle:

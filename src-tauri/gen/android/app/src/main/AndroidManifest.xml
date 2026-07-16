@@ -3,8 +3,13 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
 
-    <!-- AndroidTV support -->
-    <uses-feature android:name="android.software.leanback" android:required="false" />
+    <!-- Misty uses its desktop workspace UI and is installable only on tablets. -->
+    <supports-screens
+        android:smallScreens="false"
+        android:normalScreens="false"
+        android:largeScreens="true"
+        android:xlargeScreens="true"
+        android:requiresSmallestWidthDp="600" />
 
     <application
         android:icon="@mipmap/ic_launcher"
@@ -20,8 +25,6 @@
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
-                <!-- AndroidTV support -->
-                <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
             </intent-filter>
             <!-- DEEP LINK PLUGIN. AUTO-GENERATED. DO NOT REMOVE. -->
             <intent-filter >

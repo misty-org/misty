@@ -30,7 +30,6 @@ const rootsToScan = [
   "src-tauri/src",
   "src-tauri/Info.ios.plist",
   "src-tauri/tauri.ios.conf.json",
-  "marketing/app-store-metadata/en-US",
 ];
 
 const ignoredPathParts = new Set([
@@ -72,21 +71,8 @@ const secretPatterns = [
 ];
 
 const forbiddenDistStrings = [
-  "Misty server API",
-  "Server env",
-  "Clear debug events",
-  "misty.clientDebug.events.v1",
   "Action debug",
   "Provider auth debug",
-  "Browse extensions",
-  "Manage extensions",
-  "Search extensions",
-  "Installed extensions",
-  "desktop_notifications_enabled",
-  "Open With...",
-  "Choose Application",
-  "Upload Folder",
-  "Mika AI is coming soon",
   "OPENAI_API_KEY",
   "ANTHROPIC_API_KEY",
 ];
@@ -97,6 +83,37 @@ for (const relativeRoot of rootsToScan) {
 }
 
 const findings = [];
+const legacyPhoneUiPaths = [
+  "src/layouts/MobileLayout.tsx",
+  "src/platform/formFactor.ts",
+  "src/shared/mobileStyles.ts",
+  "src/pages/Account/mobile",
+  "src/pages/Changelog/mobile",
+  "src/pages/Extensions/mobile",
+  "src/pages/Files/mobile",
+  "src/pages/Home/mobile",
+  "src/pages/Providers/mobile",
+  "src/pages/Register/mobile",
+  "src/pages/Settings/mobile",
+  "src/pages/SignIn/mobile",
+  "src/pages/Transfers/mobile",
+];
+for (const relativePath of legacyPhoneUiPaths) {
+  if (existsSync(path.join(root, relativePath))) {
+    const entries = statSync(path.join(root, relativePath)).isDirectory()
+      ? readdirSync(path.join(root, relativePath))
+      : [relativePath];
+    if (entries.length > 0) {
+      findings.push({
+        severity: "high",
+        label: "legacy phone UI is present in the tablet-only app",
+        file: relativePath,
+        line: 1,
+        value: relativePath,
+      });
+    }
+  }
+}
 for (const file of files) {
   const text = readFileSync(file.absolute, "utf8");
   for (const { label, pattern } of secretPatterns) {
@@ -128,11 +145,12 @@ for (const file of files) {
   }
 }
 
-console.log("Misty mobile security audit\n");
-console.log(`Scanned ${files.length} text files across mobile source, iOS native source, metadata, .env.mobile, and dist.`);
+console.log("Misty iPad security audit\n");
+console.log(`Scanned ${files.length} text files across tablet source, native source, .env.mobile, and dist.`);
 console.log("Checks:");
 console.log("- High-confidence secret formats only, to avoid false positives from ordinary variable names.");
-console.log("- Production mobile bundle strings for debug panels, extension UI, and assistant placeholders.");
+console.log("- Production iPad bundle strings for debug panels and embedded provider credentials.");
+console.log("- Tablet-only UI invariant: no legacy phone component tree.");
 
 if (findings.length > 0) {
   console.log("");
@@ -145,7 +163,7 @@ if (findings.length > 0) {
   process.exit(1);
 }
 
-console.log("\nPASS No high-confidence secrets or forbidden production mobile bundle strings found.");
+console.log("\nPASS No high-confidence secrets, forbidden production tablet strings, or legacy phone UI found.");
 
 function collectFiles(absolutePath, relativePath) {
   if (!existsSync(absolutePath)) return;

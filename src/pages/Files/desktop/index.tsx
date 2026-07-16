@@ -45,6 +45,7 @@ import { readText, writeHtml, writeImage, writeText } from "@tauri-apps/plugin-c
 import { useNavigate } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
 import { MultiPanelWorkspace } from "../../../shared/multipanel/MultiPanelWorkspace";
+import { useTransientScrollbars } from "../../../shared/hooks/useTransientScrollbars";
 import { hasTauriInternals } from "../../../shared/tauri";
 import { isAndroidBuild } from "../../../platform/buildTarget";
 import { explorerRootForBuild } from "../../../platform/androidStorage";
@@ -96,6 +97,7 @@ import { ExplorerPaneToolbarActions, ExplorerToolbar } from "../components/Explo
 import type { ExplorerLocationResult } from "../components/ExplorerToolbar";
 import { LibraryWorkspace, libraryWorkspacePath } from "../components/LibraryWorkspace";
 import { FileInspector } from "../components/FileInspector";
+import { ExplorerLoadingShell } from "../components/ExplorerLoadingShell";
 import {
   explorerWorkspaceNeedsSave,
   scheduleExplorerWorkspaceSave,
@@ -184,7 +186,6 @@ const emptyProviderRemotes: ProviderRemote[] = [];
 const emptyPluginCommands: PluginCommandEntry[] = [];
 const emptyPluginPanels: PluginPanelEntry[] = [];
 const emptyMountedDevices: MountedDevice[] = [];
-
 type ResizeTarget = "sidebar" | "preview" | null;
 
 export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
@@ -236,6 +237,7 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
     activeTabPath,
     activeTabPreviewVisible,
     activeTabSidebarVisible,
+    hasExplorerTabs,
     workspacePathSignature,
   } = useMultiPanelStore(useShallow((state) => {
     const activeTab = state.tabs.find((tab) => tab.id === state.activeTabId) ?? state.tabs[0];
@@ -244,12 +246,14 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
       activeTabPath: activeTab?.path ?? "",
       activeTabPreviewVisible: activeTab?.previewVisible ?? true,
       activeTabSidebarVisible: activeTab?.sidebarVisible ?? true,
+      hasExplorerTabs: state.tabs.length > 0,
       workspacePathSignature: state.tabs
         .flatMap((tab) => [tab.path, ...tab.panes.map((pane) => pane.path)])
         .join("\n"),
     };
   }));
   const workspaceRef = useRef<HTMLElement | null>(null);
+  useTransientScrollbars(workspaceRef);
   const mainRef = useRef<HTMLElement | null>(null);
   const resizeFrameRef = useRef<number | null>(null);
   const pendingResizeXRef = useRef(0);
@@ -282,6 +286,7 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
   const homePath = explorerRootForBuild(storageHomePath);
   const mountRoot = resolveMountRoot(storageHomePath, settingsMountPath || app?.environment.mountPath || ".misty/mnt");
   const activePath = useExplorerStore((state) => state.panes[activePaneId]?.listing?.path ?? homePath);
+  const explorerInitialized = useExplorerStore((state) => state.initialized);
   const extensionsEnabled = !isAndroidBuild;
   const activeSelectedPath = useExplorerStore((state) => selectedPathsForPane(state.panes[activePaneId])[0] ?? activePath);
 
@@ -868,6 +873,8 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
     [],
   );
 
+  if (!explorerInitialized || !hasExplorerTabs) return <ExplorerLoadingShell />;
+
   return (
     <section
       ref={workspaceRef}
@@ -908,5 +915,4 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
     </section>
   );
 });
-
 export default ExplorerWorkspace;

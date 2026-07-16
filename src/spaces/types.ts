@@ -179,6 +179,31 @@ export interface SpaceLibraryItem {
   file: LibraryFile;
 }
 
+export interface LibraryAssetStackMember {
+  item_id: string;
+  role: "still" | "motion" | "raw" | "alternate" | "burst_frame";
+  position: number;
+  display_name?: string;
+  original_filename?: string;
+  mime_type?: string;
+}
+
+export interface LibraryAssetStack {
+  id: string;
+  space_id: string;
+  kind: "live_photo" | "raw_pair" | "burst";
+  title: string;
+  cover_item_id: string;
+  motion_item_id?: string;
+  effect: "still" | "loop" | "bounce" | "long_exposure";
+  created_by_user_id: string;
+  lifecycle_state: string;
+  version: number;
+  created_at: string;
+  updated_at: string;
+  members: LibraryAssetStackMember[];
+}
+
 export interface LibraryItemQuery {
   after?: string;
   limit?: number;
@@ -186,8 +211,8 @@ export interface LibraryItemQuery {
   q?: string;
   sort?: "recently-added" | "date-captured" | "name" | "size" | "album-order";
   direction?: "asc" | "desc";
-  media_type?: "image" | "video" | "audio" | "document" | "selfies" | "live-photos" | "portraits" | "panoramas" | "slo-mo" | "cinematic" | "bursts" | "screenshots" | "screen-recordings" | "spatial";
-  utility?: "recently-viewed" | "recently-edited" | "recently-shared" | "recently-saved" | "recovered" | "imports" | "screenshots" | "documents" | "receipts" | "handwriting" | "illustrations" | "qr-codes";
+  media_type?: "image" | "video" | "audio" | "document" | "selfies" | "live-photos" | "portraits" | "panoramas" | "slo-mo" | "cinematic" | "bursts" | "raw" | "screenshots" | "screen-recordings" | "spatial";
+  utility?: "recently-viewed" | "recently-edited" | "recently-shared" | "recently-saved" | "recovered" | "imports" | "featured" | "screenshots" | "documents" | "receipts" | "handwriting" | "illustrations" | "qr-codes";
   visibility?: "visible" | "hidden" | "all";
   album_id?: string;
   favorite?: boolean;
@@ -415,10 +440,37 @@ export interface LibraryEditDefinition {
   contrast: number;
   saturation: number;
   grayscale: number;
+  exposure: number;
+  brilliance: number;
+  highlights: number;
+  shadows: number;
+  black_point: number;
+  vibrance: number;
+  warmth: number;
+  tint: number;
+  sharpness: number;
+  definition: number;
+  noise_reduction: number;
+  vignette: number;
+  straighten: number;
+  markup: LibraryMarkupElement[];
   mute: boolean;
   playback_speed: number;
   crop?: { x: number; y: number; width: number; height: number };
   trim?: { start: number; end: number };
+}
+
+export interface LibraryMarkupElement {
+  kind: "stroke" | "highlight" | "rectangle" | "text" | "cleanup";
+  points?: Array<{ x: number; y: number }>;
+  x?: number;
+  y?: number;
+  width?: number;
+  height?: number;
+  color: string;
+  line_width: number;
+  opacity: number;
+  text?: string;
 }
 
 export interface LibraryEditVersion {

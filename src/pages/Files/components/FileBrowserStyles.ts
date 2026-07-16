@@ -23,7 +23,7 @@ export const fileBrowserStyles = {
   tableResetButton:
     "absolute right-2 top-1.5 z-[4] inline-grid size-7 place-items-center rounded-md border border-transparent bg-[var(--misty-neutral-control-bg,var(--misty-surface-2))] text-[var(--misty-text-muted)] hover:bg-[var(--misty-neutral-hover-bg,var(--misty-surface-hover))] hover:text-[var(--misty-text)] focus-visible:border-[var(--misty-interaction-focus)] max-[720px]:hidden",
   tableScroll:
-    "min-h-0 min-w-0 overflow-auto [contain:layout_paint] [overscroll-behavior:contain] [scrollbar-gutter:stable] max-[720px]:[scrollbar-gutter:auto]",
+    "misty-transient-scrollbar min-h-0 min-w-0 overflow-auto [contain:layout_paint] [overscroll-behavior:contain]",
   table:
     "w-full min-w-[720px] table-fixed border-separate border-spacing-0 max-[720px]:min-w-0 max-[720px]:[&_td:first-child]:w-[64%] max-[720px]:[&_td:nth-child(2)]:w-[36%] max-[720px]:[&_td:nth-child(n+3)]:hidden max-[720px]:[&_th:first-child]:w-[64%] max-[720px]:[&_th:nth-child(2)]:w-[36%] max-[720px]:[&_th:nth-child(n+3)]:hidden",
   tableHeadCell:
@@ -79,7 +79,7 @@ export const fileBrowserStyles = {
   iconText: "text-[var(--misty-text-muted)]",
   iconVideo: "text-[var(--misty-text-muted)]",
   gridScroll:
-    "min-h-0 min-w-0 overflow-auto [contain:layout_paint] [overscroll-behavior:contain] [scrollbar-gutter:stable]",
+    "misty-transient-scrollbar min-h-0 min-w-0 overflow-auto [contain:layout_paint] [overscroll-behavior:contain]",
   gridSizer: "relative min-w-0",
   grid:
     "absolute left-3.5 right-3.5 grid content-start justify-center gap-2 [[data-compact-mode=true]_&]:left-2.5 [[data-compact-mode=true]_&]:right-2.5 [[data-compact-mode=true]_&]:gap-1.5",

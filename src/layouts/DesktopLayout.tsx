@@ -48,7 +48,8 @@ import {
   X,
 } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
-import mistyLogo from "../../assets/logos/misty.png";
+import mistyLogo from "../assets/misty-main-toolbar.png";
+import { preloadDesktopFilesPage } from "../pages/Files";
 import { selectedPathsForPane, useExplorerStore } from "../stores/useExplorerStore";
 import type {
   ExplorerNotification,
@@ -76,11 +77,12 @@ import {
   useAppRouteMemoryStore,
 } from "../stores/useAppRouteMemoryStore";
 import { hasTauriInternals, safeTauriAssetUrl } from "../shared/tauri";
+import { restoreBundledAssetOnError, runtimeAssetSource } from "../shared/assets/runtimeAsset";
 import { useAppStore } from "../stores/useAppStore";
 import { useAppThemeStore } from "../stores/useAppThemeStore";
 import type { AppTab } from "../routing/types";
 import type { TransferRecord, TransferStatus } from "../api/types";
-import { isAndroidBuild } from "../platform/buildTarget";
+import { isAndroidBuild, isNativeMobileBuild } from "../platform/buildTarget";
 import {
   closeCloudFolderBotWindow,
   cloudFolderBotChatVisibilityEvent,
@@ -134,17 +136,17 @@ type WindowRect = {
 
 const desktopFrameClass =
   "relative isolate grid h-full min-h-0 grid-cols-[80px_minmax(0,1fr)] grid-rows-[28px_minmax(0,1fr)] overflow-hidden bg-[var(--misty-app-frame-bg,var(--misty-bg))]";
-const androidDesktopFrameClass =
+const tabletFrameClass =
   "relative isolate grid h-full min-h-0 grid-cols-[80px_minmax(0,1fr)] grid-rows-[minmax(0,1fr)] overflow-hidden bg-[var(--misty-app-frame-bg,var(--misty-bg))] pt-[max(var(--misty-safe-top),28px)] pb-[max(var(--misty-safe-bottom),24px)]";
 
 const desktopNavbarClass =
   "relative z-10 col-start-1 row-start-2 flex min-h-0 flex-col items-center overflow-hidden px-2 py-3";
-const androidDesktopNavbarClass =
+const tabletNavbarClass =
   "relative z-10 col-start-1 row-start-1 flex min-h-0 flex-col items-center overflow-hidden px-2 py-3";
 
 const desktopRouteShellClass =
   "relative z-10 col-start-2 row-start-2 min-h-0 overflow-hidden rounded-tl-xl border-l border-t border-[var(--misty-content-frame-border)] bg-transparent shadow-[0_12px_32px_rgba(0,0,0,0.18)]";
-const androidDesktopRouteShellClass =
+const tabletRouteShellClass =
   "relative z-10 col-start-2 row-start-1 min-h-0 overflow-hidden rounded-tl-xl border-l border-t border-[var(--misty-content-frame-border)] bg-transparent shadow-[0_12px_32px_rgba(0,0,0,0.18)]";
 
 const navbarGroupClass = "flex w-full flex-col items-center gap-3";
@@ -242,7 +244,7 @@ export function DesktopLayout(props: {
   getRouteId: (pathname: string) => AppTab;
   navItems: DesktopNavItem[];
 }) {
-  const usesNativeWindowChrome = !isAndroidBuild;
+  const usesNativeWindowChrome = !isNativeMobileBuild;
   const location = useLocation();
   const navigate = useNavigate();
   const { app, loadApp } = useAppStore(
@@ -287,10 +289,14 @@ export function DesktopLayout(props: {
     ),
   );
   const appWallpaperSrc = useMemo(
-    () => !isAndroidBuild && appearancePreferences.wallpaperPath
+    () => !isNativeMobileBuild && appearancePreferences.wallpaperPath
       ? safeTauriAssetUrl(appearancePreferences.wallpaperPath)
       : "",
     [appearancePreferences.wallpaperPath],
+  );
+  const mistyLogoSource = useMemo(
+    () => runtimeAssetSource(app?.environment.assetsDir, "logos/misty.png", mistyLogo),
+    [app?.environment.assetsDir],
   );
   const appWallpaperIsVideo = useMemo(
     () => isVideoWallpaperPath(appearancePreferences.wallpaperPath),
@@ -443,6 +449,7 @@ export function DesktopLayout(props: {
   useEffect(() => {
     if (appLoadStarted.current) return;
     appLoadStarted.current = true;
+    void preloadDesktopFilesPage()?.catch(() => undefined);
     void loadApp();
     void settingsLoad();
   }, [loadApp, settingsLoad]);
@@ -937,9 +944,9 @@ export function DesktopLayout(props: {
 
   const shouldShowWindowsTitlebarControls =
     usesNativeWindowChrome && (desktopPlatform === "windows" || desktopPlatform === "linux");
-  const frameClass = usesNativeWindowChrome ? desktopFrameClass : androidDesktopFrameClass;
-  const navbarClass = usesNativeWindowChrome ? desktopNavbarClass : androidDesktopNavbarClass;
-  const routeShellClass = usesNativeWindowChrome ? desktopRouteShellClass : androidDesktopRouteShellClass;
+  const frameClass = usesNativeWindowChrome ? desktopFrameClass : tabletFrameClass;
+  const navbarClass = usesNativeWindowChrome ? desktopNavbarClass : tabletNavbarClass;
+  const routeShellClass = usesNativeWindowChrome ? desktopRouteShellClass : tabletRouteShellClass;
 
   return (
     <main
@@ -1025,7 +1032,8 @@ export function DesktopLayout(props: {
         >
           <img
             className="h-[58px] w-[58px] object-contain"
-            src={mistyLogo}
+            src={mistyLogoSource}
+            onError={(event) => restoreBundledAssetOnError(event, mistyLogo)}
             alt="Misty"
           />
         </div>

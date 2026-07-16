@@ -512,7 +512,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.misty.mobile;
 				PRODUCT_NAME = "Misty";
 				SDKROOT = iphoneos;
-				TARGETED_DEVICE_FAMILY = 1;
+				TARGETED_DEVICE_FAMILY = 2;
 				VALID_ARCHS = arm64;
 				DEVELOPMENT_TEAM = "7D6BVN4W87";
 			};
@@ -608,7 +608,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.misty.mobile;
 				PRODUCT_NAME = "Misty";
 				SDKROOT = iphoneos;
-				TARGETED_DEVICE_FAMILY = 1;
+				TARGETED_DEVICE_FAMILY = 2;
 				VALID_ARCHS = arm64;
 				DEVELOPMENT_TEAM = "7D6BVN4W87";
 			};

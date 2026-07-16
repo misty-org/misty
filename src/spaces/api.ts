@@ -22,6 +22,7 @@ import type {
   LibraryRenditionRequest,
   LibraryPinnedCollection,
   LibraryImportHistoryItem,
+  LibraryAssetStack,
   Space,
   SpaceEvent,
   SpaceInboxItem,
@@ -88,6 +89,8 @@ function spaceErrorMessage(code: string | undefined, fallback: string): string {
     space_people_limit_reached: "This Space already has five members or pending invitations.",
     space_node_limit_reached: "This Space has reached its 5,000-item limit.",
     version_conflict: "Someone else changed this item. Reload it before saving again.",
+    library_reauthentication_required: "Unlock this protected Library collection again.",
+    reauthentication_failed: "That password is incorrect.",
     invite_expired: "That invitation has expired.",
     invalid_request: "Misty could not validate that request.",
   };
@@ -123,14 +126,15 @@ export const spacesApi = {
   deleteStudio: (spaceId: string, kind: "agents" | "workflows", id: string) => spaceRequest(`/spaces/${encodeURIComponent(spaceId)}/studio/${kind}/${encodeURIComponent(id)}`, { method: "DELETE" }),
   runStudio: (spaceId: string, kind: "agents" | "workflows", id: string, prompt = "") => spaceRequest<SpaceRun>(`/spaces/${encodeURIComponent(spaceId)}/studio/${kind}/${encodeURIComponent(id)}/runs`, { method: "POST", body: JSON.stringify({ prompt, input: { prompt } }) }),
   realtimeTicket: (after: number) => spaceRequest<{ ticket: string; expires_in: number }>("/realtime/tickets", { method: "POST", body: JSON.stringify({ after }) }),
-  libraryItems: (spaceId: string, query: LibraryItemQuery = {}) => {
+  libraryItems: (spaceId: string, query: LibraryItemQuery = {}, reauthenticationToken = "") => {
     const values = new URLSearchParams();
     for (const [key, value] of Object.entries(query)) {
       if (value !== undefined && value !== "" && value !== false) values.set(key, String(value));
     }
     const suffix = values.size > 0 ? `?${values.toString()}` : "";
-    return spaceRequest<LibraryItemsResult>(`/spaces/${encodeURIComponent(spaceId)}/library${suffix}`);
+    return spaceRequest<LibraryItemsResult>(`/spaces/${encodeURIComponent(spaceId)}/library${suffix}`, { headers: libraryReauthenticationHeaders(reauthenticationToken) });
   },
+  reauthenticateLibrary: (spaceId: string, scope: "hidden" | "recently_deleted" | "bulk_export", password: string) => spaceRequest<{ token: string; scope: string; expires_at: string }>(`/spaces/${encodeURIComponent(spaceId)}/library/reauthenticate`, { method: "POST", body: JSON.stringify({ scope, password }) }),
   libraryFacets: (spaceId: string, query = "") => spaceRequest<LibrarySearchFacets>(`/spaces/${encodeURIComponent(spaceId)}/library/facets${query ? `?q=${encodeURIComponent(query)}` : ""}`),
   semanticLibrarySearch: (spaceId: string, query: string) => spaceRequest<LibraryItemsResult & { semantic: boolean }>(`/spaces/${encodeURIComponent(spaceId)}/library/search/semantic?q=${encodeURIComponent(query)}`),
   libraryDiscovery: (spaceId: string) => spaceRequest<LibraryDiscovery>(`/spaces/${encodeURIComponent(spaceId)}/library/discovery`),
@@ -140,8 +144,9 @@ export const spacesApi = {
   discoveryItems: (spaceId: string, kind: "day" | "month" | "year" | "memory" | "trip" | "duplicate" | "map", groupId: string) => spaceRequest<LibraryItemsResult>(`/spaces/${encodeURIComponent(spaceId)}/library/discovery/${kind}/${encodeURIComponent(groupId)}/items`),
   updateMemoryPreference: (spaceId: string, memory: LibraryDiscovery["memories"][number], patch: { title?: string; cover_item_id?: string; music_item_id?: string; playback_seconds?: number }) => spaceRequest<LibraryDiscovery["memories"][number]>(`/spaces/${encodeURIComponent(spaceId)}/library/discovery/memory/${encodeURIComponent(memory.id)}`, { method: "PATCH", body: JSON.stringify({ version: memory.preference_version ?? 0, title: patch.title ?? memory.title, cover_item_id: patch.cover_item_id ?? memory.cover_item_id ?? "", music_item_id: patch.music_item_id ?? memory.music_item_id ?? "", playback_seconds: patch.playback_seconds ?? memory.playback_seconds ?? 4.5 }) }),
   mergeDuplicates: (spaceId: string, keeper: SpaceLibraryItem, duplicates: SpaceLibraryItem[]) => spaceRequest<SpaceLibraryItem>(`/spaces/${encodeURIComponent(spaceId)}/library/duplicates/merge`, { method: "POST", body: JSON.stringify({ keeper: { id: keeper.id, version: keeper.version }, duplicates: duplicates.map((item) => ({ id: item.id, version: item.version })) }) }),
-  bulkLibraryItems: (spaceId: string, items: SpaceLibraryItem[], action: BulkLibraryItemAction, options: BulkLibraryItemOptions = {}) => spaceRequest<LibraryItemsResult>(`/spaces/${encodeURIComponent(spaceId)}/library/items/bulk`, {
+  bulkLibraryItems: (spaceId: string, items: SpaceLibraryItem[], action: BulkLibraryItemAction, options: BulkLibraryItemOptions = {}, reauthenticationToken = "") => spaceRequest<LibraryItemsResult>(`/spaces/${encodeURIComponent(spaceId)}/library/items/bulk`, {
     method: "POST",
+    headers: libraryReauthenticationHeaders(reauthenticationToken),
     body: JSON.stringify({
       action,
       album_id: options.albumId ?? "",
@@ -151,9 +156,15 @@ export const spacesApi = {
       items: items.map((item) => ({ id: item.id, version: item.version })),
     }),
   }),
+  duplicateLibraryItems: (spaceId: string, itemIds: string[], reauthenticationToken = "") => spaceRequest<LibraryItemsResult>(`/spaces/${encodeURIComponent(spaceId)}/library/items/duplicate`, { method: "POST", headers: libraryReauthenticationHeaders(reauthenticationToken), body: JSON.stringify({ item_ids: itemIds }) }),
   libraryUsage: (spaceId: string) => spaceRequest<SpaceStorageUsage>(`/spaces/${encodeURIComponent(spaceId)}/library/usage`),
-  updateLibraryItem: (spaceId: string, item: SpaceLibraryItem, patch: Partial<Pick<SpaceLibraryItem, "display_name" | "caption" | "tags" | "favorite" | "hidden">>) => spaceRequest<SpaceLibraryItem>(`/spaces/${encodeURIComponent(spaceId)}/library/items/${encodeURIComponent(item.id)}`, {
+  libraryAssetStacks: (spaceId: string) => spaceRequest<{ stacks: LibraryAssetStack[] }>(`/spaces/${encodeURIComponent(spaceId)}/library/asset-stacks`),
+  createLibraryAssetStack: (spaceId: string, input: Pick<LibraryAssetStack, "kind" | "title" | "cover_item_id" | "motion_item_id" | "members">, reauthenticationToken = "") => spaceRequest<LibraryAssetStack>(`/spaces/${encodeURIComponent(spaceId)}/library/asset-stacks`, { method: "POST", headers: libraryReauthenticationHeaders(reauthenticationToken), body: JSON.stringify(input) }),
+  updateLibraryAssetStack: (spaceId: string, stack: LibraryAssetStack, patch: Partial<Pick<LibraryAssetStack, "title" | "cover_item_id" | "effect">>, reauthenticationToken = "") => spaceRequest<LibraryAssetStack>(`/spaces/${encodeURIComponent(spaceId)}/library/asset-stacks/${encodeURIComponent(stack.id)}`, { method: "PATCH", headers: libraryReauthenticationHeaders(reauthenticationToken), body: JSON.stringify({ version: stack.version, title: patch.title ?? stack.title, cover_item_id: patch.cover_item_id ?? stack.cover_item_id, effect: patch.effect ?? stack.effect ?? "still" }) }),
+  deleteLibraryAssetStack: (spaceId: string, stack: LibraryAssetStack, reauthenticationToken = "") => spaceRequest(`/spaces/${encodeURIComponent(spaceId)}/library/asset-stacks/${encodeURIComponent(stack.id)}?version=${stack.version}`, { method: "DELETE", headers: libraryReauthenticationHeaders(reauthenticationToken) }),
+  updateLibraryItem: (spaceId: string, item: SpaceLibraryItem, patch: Partial<Pick<SpaceLibraryItem, "display_name" | "caption" | "tags" | "favorite" | "hidden">>, reauthenticationToken = "") => spaceRequest<SpaceLibraryItem>(`/spaces/${encodeURIComponent(spaceId)}/library/items/${encodeURIComponent(item.id)}`, {
     method: "PATCH",
+    headers: libraryReauthenticationHeaders(reauthenticationToken),
     body: JSON.stringify({
       version: item.version,
       display_name: patch.display_name ?? item.display_name,
@@ -163,22 +174,22 @@ export const spacesApi = {
       hidden: patch.hidden ?? item.hidden,
     }),
   }),
-  trashLibraryItem: (spaceId: string, itemId: string) => spaceRequest<SpaceLibraryItem>(`/spaces/${encodeURIComponent(spaceId)}/library/items/${encodeURIComponent(itemId)}/trash`, { method: "POST" }),
-  restoreLibraryItem: (spaceId: string, itemId: string) => spaceRequest<SpaceLibraryItem>(`/spaces/${encodeURIComponent(spaceId)}/library/items/${encodeURIComponent(itemId)}/restore`, { method: "POST" }),
+  trashLibraryItem: (spaceId: string, itemId: string, reauthenticationToken = "") => spaceRequest<SpaceLibraryItem>(`/spaces/${encodeURIComponent(spaceId)}/library/items/${encodeURIComponent(itemId)}/trash`, { method: "POST", headers: libraryReauthenticationHeaders(reauthenticationToken) }),
+  restoreLibraryItem: (spaceId: string, itemId: string, reauthenticationToken = "") => spaceRequest<SpaceLibraryItem>(`/spaces/${encodeURIComponent(spaceId)}/library/items/${encodeURIComponent(itemId)}/restore`, { method: "POST", headers: libraryReauthenticationHeaders(reauthenticationToken) }),
   uploadLibraryFile: (spaceId: string, file: File, purpose: "library" | "attachment") => uploadLibraryFile(spaceId, file, purpose),
   promoteAttachment: (spaceId: string, attachmentId: string) => spaceRequest<SpaceLibraryItem>(`/spaces/${encodeURIComponent(spaceId)}/attachments/${encodeURIComponent(attachmentId)}/promote`, { method: "POST" }),
-  downloadLibraryItem: (spaceId: string, itemId: string, filename: string) => downloadProtectedFile(`/spaces/${encodeURIComponent(spaceId)}/library/items/${encodeURIComponent(itemId)}/download`, filename),
-  downloadOriginalLibraryItem: (spaceId: string, itemId: string, filename: string) => downloadProtectedFile(`/spaces/${encodeURIComponent(spaceId)}/library/items/${encodeURIComponent(itemId)}/download?version=original`, filename),
-  exportLibraryItems: (spaceId: string, itemIds: string[]) => downloadProtectedFile(`/spaces/${encodeURIComponent(spaceId)}/library/exports/download`, `misty-library-export-${new Date().toISOString().slice(0, 10)}.zip`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ item_ids: itemIds }) }),
-  importLibraryItems: (sourceSpaceId: string, destinationSpaceId: string, itemIds: string[]) => spaceRequest<LibraryItemsResult>(`/spaces/${encodeURIComponent(sourceSpaceId)}/library/imports`, { method: "POST", body: JSON.stringify({ destination_space_id: destinationSpaceId, item_ids: itemIds }) }),
+  downloadLibraryItem: (spaceId: string, itemId: string, filename: string, reauthenticationToken = "") => downloadProtectedFile(`/spaces/${encodeURIComponent(spaceId)}/library/items/${encodeURIComponent(itemId)}/download`, filename, { headers: libraryReauthenticationHeaders(reauthenticationToken) }),
+  downloadOriginalLibraryItem: (spaceId: string, itemId: string, filename: string, reauthenticationToken = "") => downloadProtectedFile(`/spaces/${encodeURIComponent(spaceId)}/library/items/${encodeURIComponent(itemId)}/download?version=original`, filename, { headers: libraryReauthenticationHeaders(reauthenticationToken) }),
+  exportLibraryItems: (spaceId: string, itemIds: string[], reauthenticationToken: string) => downloadProtectedFile(`/spaces/${encodeURIComponent(spaceId)}/library/exports/download`, `misty-library-export-${new Date().toISOString().slice(0, 10)}.zip`, { method: "POST", headers: { "Content-Type": "application/json", ...libraryReauthenticationHeaders(reauthenticationToken) }, body: JSON.stringify({ item_ids: itemIds }) }),
+  importLibraryItems: (sourceSpaceId: string, destinationSpaceId: string, itemIds: string[], reauthenticationToken = "") => spaceRequest<LibraryItemsResult>(`/spaces/${encodeURIComponent(sourceSpaceId)}/library/imports`, { method: "POST", headers: libraryReauthenticationHeaders(reauthenticationToken), body: JSON.stringify({ destination_space_id: destinationSpaceId, item_ids: itemIds }) }),
   sharedReferences: (spaceId: string) => spaceRequest<{ references: LibrarySharedReference[]; outgoing: LibrarySharedReference[] }>(`/spaces/${encodeURIComponent(spaceId)}/library/shared`),
-  shareLibraryItems: (sourceSpaceId: string, destinationSpaceId: string, itemIds: string[]) => spaceRequest<{ references: LibrarySharedReference[] }>(`/spaces/${encodeURIComponent(sourceSpaceId)}/library/shared`, { method: "POST", body: JSON.stringify({ destination_space_id: destinationSpaceId, item_ids: itemIds }) }),
+  shareLibraryItems: (sourceSpaceId: string, destinationSpaceId: string, itemIds: string[], reauthenticationToken = "") => spaceRequest<{ references: LibrarySharedReference[] }>(`/spaces/${encodeURIComponent(sourceSpaceId)}/library/shared`, { method: "POST", headers: libraryReauthenticationHeaders(reauthenticationToken), body: JSON.stringify({ destination_space_id: destinationSpaceId, item_ids: itemIds }) }),
   downloadSharedReference: (spaceId: string, referenceId: string, filename: string) => downloadProtectedFile(`/spaces/${encodeURIComponent(spaceId)}/library/shared/${encodeURIComponent(referenceId)}/download`, filename),
   revokeLibraryGrant: (spaceId: string, grant: LibrarySharedReference) => spaceRequest(`/spaces/${encodeURIComponent(spaceId)}/library/grants/${encodeURIComponent(grant.grant_id)}?version=${grant.version}`, { method: "DELETE" }),
-  libraryContent: (spaceId: string, itemId: string) => fetchProtectedBlob(`/spaces/${encodeURIComponent(spaceId)}/library/items/${encodeURIComponent(itemId)}/download`),
-  libraryOriginalContent: (spaceId: string, itemId: string) => fetchProtectedBlob(`/spaces/${encodeURIComponent(spaceId)}/library/items/${encodeURIComponent(itemId)}/download?version=original`),
-  libraryPreview: (spaceId: string, itemId: string) => fetchProtectedBlob(`/spaces/${encodeURIComponent(spaceId)}/library/items/${encodeURIComponent(itemId)}/preview`),
-  libraryOriginalPreview: (spaceId: string, itemId: string) => fetchProtectedBlob(`/spaces/${encodeURIComponent(spaceId)}/library/items/${encodeURIComponent(itemId)}/preview?version=original`),
+  libraryContent: (spaceId: string, itemId: string, reauthenticationToken = "") => fetchProtectedBlob(`/spaces/${encodeURIComponent(spaceId)}/library/items/${encodeURIComponent(itemId)}/download`, { headers: libraryReauthenticationHeaders(reauthenticationToken) }),
+  libraryOriginalContent: (spaceId: string, itemId: string, reauthenticationToken = "") => fetchProtectedBlob(`/spaces/${encodeURIComponent(spaceId)}/library/items/${encodeURIComponent(itemId)}/download?version=original`, { headers: libraryReauthenticationHeaders(reauthenticationToken) }),
+  libraryPreview: (spaceId: string, itemId: string, reauthenticationToken = "") => fetchProtectedBlob(`/spaces/${encodeURIComponent(spaceId)}/library/items/${encodeURIComponent(itemId)}/preview`, { headers: libraryReauthenticationHeaders(reauthenticationToken) }),
+  libraryOriginalPreview: (spaceId: string, itemId: string, reauthenticationToken = "") => fetchProtectedBlob(`/spaces/${encodeURIComponent(spaceId)}/library/items/${encodeURIComponent(itemId)}/preview?version=original`, { headers: libraryReauthenticationHeaders(reauthenticationToken) }),
   downloadAttachment: (spaceId: string, attachmentId: string, filename: string) => downloadProtectedFile(`/spaces/${encodeURIComponent(spaceId)}/attachments/${encodeURIComponent(attachmentId)}/download`, filename),
   albums: (spaceId: string) => spaceRequest<{ albums: LibraryAlbum[] }>(`/spaces/${encodeURIComponent(spaceId)}/library/albums`),
   albumFolders: (spaceId: string) => spaceRequest<{ folders: LibraryAlbumFolder[] }>(`/spaces/${encodeURIComponent(spaceId)}/library/album-folders`),
@@ -206,11 +217,11 @@ export const spacesApi = {
   addPersonItems: (spaceId: string, personId: string, itemIds: string[]) => spaceRequest<LibraryPerson>(`/spaces/${encodeURIComponent(spaceId)}/library/people/${encodeURIComponent(personId)}/items`, { method: "POST", body: JSON.stringify({ item_ids: itemIds }) }),
   removePersonItems: (spaceId: string, personId: string, itemIds: string[]) => spaceRequest<LibraryPerson>(`/spaces/${encodeURIComponent(spaceId)}/library/people/${encodeURIComponent(personId)}/items`, { method: "DELETE", body: JSON.stringify({ item_ids: itemIds }) }),
   mergePeople: (spaceId: string, source: LibraryPerson, target: LibraryPerson) => spaceRequest<LibraryPerson>(`/spaces/${encodeURIComponent(spaceId)}/library/people/merge`, { method: "POST", body: JSON.stringify({ source_id: source.id, target_id: target.id, source_version: source.version, target_version: target.version }) }),
-  editVersions: (spaceId: string, itemId: string) => spaceRequest<{ versions: LibraryEditVersion[] }>(`/spaces/${encodeURIComponent(spaceId)}/library/items/${encodeURIComponent(itemId)}/versions`),
-  createEditVersion: (spaceId: string, item: SpaceLibraryItem, definition: LibraryEditDefinition) => spaceRequest<LibraryEditResult>(`/spaces/${encodeURIComponent(spaceId)}/library/items/${encodeURIComponent(item.id)}/versions`, { method: "POST", body: JSON.stringify({ item_version: item.version, edit_definition: definition }) }),
-  renderEditVersion: (spaceId: string, itemId: string, editId: string, maximumOutputBytes = 0) => spaceRequest<LibraryRenditionRequest>(`/spaces/${encodeURIComponent(spaceId)}/library/items/${encodeURIComponent(itemId)}/versions/${encodeURIComponent(editId)}/render`, { method: "POST", body: JSON.stringify({ maximum_output_bytes: maximumOutputBytes }) }),
-  selectEditVersion: (spaceId: string, item: SpaceLibraryItem, editId = "") => spaceRequest<LibraryEditResult>(`/spaces/${encodeURIComponent(spaceId)}/library/items/${encodeURIComponent(item.id)}/versions/current`, { method: "PUT", body: JSON.stringify({ item_version: item.version, edit_id: editId }) }),
-  deleteEditVersion: (spaceId: string, itemId: string, editId: string) => spaceRequest(`/spaces/${encodeURIComponent(spaceId)}/library/items/${encodeURIComponent(itemId)}/versions/${encodeURIComponent(editId)}`, { method: "DELETE" }),
+  editVersions: (spaceId: string, itemId: string, reauthenticationToken = "") => spaceRequest<{ versions: LibraryEditVersion[] }>(`/spaces/${encodeURIComponent(spaceId)}/library/items/${encodeURIComponent(itemId)}/versions`, { headers: libraryReauthenticationHeaders(reauthenticationToken) }),
+  createEditVersion: (spaceId: string, item: SpaceLibraryItem, definition: LibraryEditDefinition, reauthenticationToken = "") => spaceRequest<LibraryEditResult>(`/spaces/${encodeURIComponent(spaceId)}/library/items/${encodeURIComponent(item.id)}/versions`, { method: "POST", headers: libraryReauthenticationHeaders(reauthenticationToken), body: JSON.stringify({ item_version: item.version, edit_definition: definition }) }),
+  renderEditVersion: (spaceId: string, itemId: string, editId: string, maximumOutputBytes = 0, reauthenticationToken = "") => spaceRequest<LibraryRenditionRequest>(`/spaces/${encodeURIComponent(spaceId)}/library/items/${encodeURIComponent(itemId)}/versions/${encodeURIComponent(editId)}/render`, { method: "POST", headers: libraryReauthenticationHeaders(reauthenticationToken), body: JSON.stringify({ maximum_output_bytes: maximumOutputBytes }) }),
+  selectEditVersion: (spaceId: string, item: SpaceLibraryItem, editId = "", reauthenticationToken = "") => spaceRequest<LibraryEditResult>(`/spaces/${encodeURIComponent(spaceId)}/library/items/${encodeURIComponent(item.id)}/versions/current`, { method: "PUT", headers: libraryReauthenticationHeaders(reauthenticationToken), body: JSON.stringify({ item_version: item.version, edit_id: editId }) }),
+  deleteEditVersion: (spaceId: string, itemId: string, editId: string, reauthenticationToken = "") => spaceRequest(`/spaces/${encodeURIComponent(spaceId)}/library/items/${encodeURIComponent(itemId)}/versions/${encodeURIComponent(editId)}`, { method: "DELETE", headers: libraryReauthenticationHeaders(reauthenticationToken) }),
   memberPermissions: (spaceId: string, userId: string) => spaceRequest<{ permissions: Record<string, boolean> }>(`/spaces/${encodeURIComponent(spaceId)}/members/${encodeURIComponent(userId)}/permissions`),
   setMemberPermission: (spaceId: string, userId: string, permission: string, effect: "allow" | "deny" | "inherit") => spaceRequest<{ permissions: Record<string, boolean> }>(`/spaces/${encodeURIComponent(spaceId)}/members/${encodeURIComponent(userId)}/permissions`, { method: "PUT", body: JSON.stringify({ permission, effect }) }),
 };
@@ -233,6 +244,10 @@ async function uploadLibraryFile(spaceId: string, file: File, purpose: "library"
     method: "POST",
     headers: { "X-Misty-Library-Upload-Token": initiated.transfer.headers["X-Misty-Library-Upload-Token"] },
   });
+}
+
+function libraryReauthenticationHeaders(token: string): Record<string, string> {
+  return token ? { "X-Misty-Library-Reauthentication": token } : {};
 }
 
 async function downloadProtectedFile(path: string, filename: string, init?: RequestInit): Promise<void> {

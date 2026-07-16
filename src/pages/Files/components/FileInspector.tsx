@@ -115,7 +115,7 @@ const textPreviewExtensions = new Set([
 ]);
 
 const inspectorStyles = {
-  root: "h-full min-w-0 overflow-auto bg-[var(--misty-app-panel-bg,var(--misty-app-page-bg,var(--misty-bg)))] px-3 py-3 text-[var(--misty-text-muted)] [scrollbar-color:#3f3f46_transparent] [scrollbar-width:thin]",
+  root: "misty-transient-scrollbar h-full min-w-0 overflow-auto bg-[var(--misty-app-panel-bg,var(--misty-app-page-bg,var(--misty-bg)))] px-3 py-3 text-[var(--misty-text-muted)]",
   emptyState:
     "grid h-full min-h-0 content-center justify-items-center gap-3 px-6 text-center text-[var(--misty-text-subtle)]",
   emptyStateIcon:
@@ -136,7 +136,7 @@ const inspectorStyles = {
   previewText:
     "m-0 h-full w-full overflow-auto whitespace-pre-wrap break-words p-3 text-left font-mono text-[11px] leading-[1.45] text-[var(--misty-text-muted)]",
   previewStatus: "text-sm font-medium text-[var(--misty-text-subtle)]",
-  folderPreview: "h-full w-full overflow-y-auto overflow-x-hidden p-3 [scrollbar-color:#3f3f46_transparent] [scrollbar-width:thin]",
+  folderPreview: "misty-transient-scrollbar h-full w-full overflow-y-auto overflow-x-hidden p-3",
   folderPreviewList: "grid min-w-0 content-start",
   folderPreviewItem:
     "grid min-h-9 min-w-0 cursor-pointer select-none grid-cols-[28px_minmax(0,1fr)_auto] items-center gap-2 rounded-md border border-transparent bg-transparent px-2 py-1.5 text-left text-[var(--misty-text-muted)] outline-none hover:bg-[var(--misty-row-hover)] focus-visible:border-[var(--misty-interaction-focus)] focus-visible:bg-[var(--misty-row-hover)] focus-visible:shadow-[0_0_0_1px_var(--misty-interaction-focus)]",

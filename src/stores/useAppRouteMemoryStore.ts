@@ -1,6 +1,5 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { isNativeMobileBuild } from "../platform/buildTarget";
 
 interface AppRouteMemoryStore {
   lastAppRoute: string;
@@ -9,9 +8,14 @@ interface AppRouteMemoryStore {
 }
 
 const defaultAppRoute = "/files";
-const desktopRememberableRoutes = isNativeMobileBuild
-  ? []
-  : ["/home", "/spaces/personal", "/studio/agents", "/studio/workflows", "/extensions", "/changelog"];
+const desktopRememberableRoutes = [
+  "/home",
+  "/spaces/personal",
+  "/studio/agents",
+  "/studio/workflows",
+  "/extensions",
+  "/changelog",
+];
 
 export const useAppRouteMemoryStore = create<AppRouteMemoryStore>()(
   persist(

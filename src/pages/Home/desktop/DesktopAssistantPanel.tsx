@@ -3,6 +3,7 @@ import { Bot } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
 import mikaAnimation from "../../../assets/bots/cloud-folder/mika.webp";
 import { openCloudFolderBotWindow } from "../../../bots/cloudFolderBot";
+import { restoreBundledAssetOnError, runtimeAssetSource } from "../../../shared/assets/runtimeAsset";
 import { useAppStore } from "../../../stores/useAppStore";
 import { assistantDailyMessageLimit, useAssistantUsageStore } from "../../../stores/useAssistantUsageStore";
 import { selectAssistantPreferences, useSettingsStore } from "../../../stores/useSettingsStore";
@@ -14,6 +15,7 @@ const headerClass =
 
 export function DesktopAssistantPanel() {
   const assetsDir = useAppStore((state) => state.app?.environment.assetsDir);
+  const mikaAnimationSource = runtimeAssetSource(assetsDir, "animations/mika.webp", mikaAnimation);
   const { enabled, filesAllowed, cleanupAllowed, searchAllowed } = useSettingsStore(
     useShallow((state) => {
       const preferences = selectAssistantPreferences(state.settings?.document);
@@ -63,7 +65,8 @@ export function DesktopAssistantPanel() {
             alt=""
             className="h-[58px] w-[70px] object-contain"
             draggable={false}
-            src={mikaAnimation}
+            src={mikaAnimationSource}
+            onError={(event) => restoreBundledAssetOnError(event, mikaAnimation)}
           />
         </button>
 
