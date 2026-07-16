@@ -55,7 +55,7 @@ const MenuTrigger = React.forwardRef<HTMLButtonElement, MenuTriggerProps>(
             size={size}
             tooltip={tooltip ?? false}
             variant={variant ?? "toolbar"}
-            className={cn(showChevron && "w-auto gap-0.5 px-1", className)}
+            className={cn(showChevron && "w-auto min-w-fit gap-0.5 px-1", className)}
             {...props}
           >
             {icon}

@@ -138,6 +138,9 @@ async fn report(
         Ok(issue) => issue.map(Cow::Borrowed),
         Err(error) => {
             let _ = active.handle.invalidate_browser_readiness().await;
+            if retry.failures < SURFACE_AFTER_FAILURES {
+                return;
+            }
             Some(capture_issue(error))
         }
     };
@@ -150,6 +153,10 @@ async fn report(
         );
     }
 }
+
+/// One failed pass is routine (a page navigating, the engine busy) and the next
+/// retry usually succeeds, so only failures that persist reach the renderer.
+const SURFACE_AFTER_FAILURES: u32 = 3;
 
 // Recovery runs quietly at a bounded rate. It cannot replace open pages.
 #[derive(Default)]
@@ -191,11 +198,34 @@ mod retry_tests {
         retry.finished(false, now);
         assert!(retry.ready(now + std::time::Duration::from_secs(30)));
     }
+
+    #[test]
+    fn cookie_failures_name_the_step_that_failed() {
+        let timeout = capture_issue(format!("{}: Timeout", collect::COOKIES_UNREADABLE));
+        assert!(timeout.contains("timed out"));
+        let profile = capture_issue(format!("{}: Profile", collect::COOKIES_UNREADABLE));
+        assert!(profile.contains("browser profile"));
+        let other = capture_issue(format!("{}: Unavailable", collect::COOKIES_UNREADABLE));
+        assert!(other.starts_with("Website cookies could not be read"));
+    }
 }
 // Only authored diagnostics cross into the renderer: every error on these
 // paths is fixed text or a sanitized `issue()`. Platform errors and website
 // storage/cookie values must never be included in status messages.
 fn capture_issue(error: String) -> Cow<'static, str> {
+    if let Some(kind) = error
+        .strip_prefix(collect::COOKIES_UNREADABLE)
+        .and_then(|rest| rest.strip_prefix(": "))
+    {
+        return Cow::Borrowed(match kind {
+            "Timeout" => "Reading website cookies from this browser profile timed out. Retrying automatically; existing data has been preserved.",
+            "Profile" => "The cookie reader did not open this device's browser profile. Retrying automatically; existing data has been preserved.",
+            "Unsupported" => "This device's web engine cannot read website cookies. Update it to sync website sign-ins; existing data has been preserved.",
+            "TooLarge" => "This browser profile has more cookies than sync can read at once. Existing data has been preserved.",
+            "Invalid" => "The web engine returned cookies sync could not read. Retrying automatically; existing data has been preserved.",
+            _ => "Website cookies could not be read from this browser profile. Retrying automatically; existing data has been preserved.",
+        });
+    }
     Cow::Borrowed(match error.as_str() {
         handoff::RESTORE_DEFERRED => handoff::RESTORE_DEFERRED,
         "Website profile could not be verified" => "Website storage could not verify this browser profile. Retrying automatically.",
@@ -203,7 +233,6 @@ fn capture_issue(error: String) -> Cow<'static, str> {
         "This website's storage could not be transferred" => "A website's storage could not be read. Retrying automatically.",
         "Website storage connection timed out" | "Website storage preparation timed out" => "Website storage preparation timed out. Retrying automatically.",
         "Unsupported website storage" | "Website storage exceeds the sync limit" => "A website's storage is unsupported or exceeds the sync limit. Existing data has been preserved.",
-        collect::COOKIES_UNREADABLE => "Website cookies could not be read from this browser profile. Retrying automatically; existing data has been preserved.",
         // Say what actually failed rather than a generic catch-all.
         _ => return Cow::Owned(error),
     })

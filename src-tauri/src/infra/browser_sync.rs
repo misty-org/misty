@@ -684,6 +684,7 @@ pub async fn browser_sync_setup(
         Some(secret),
         remember,
         true,
+        false,
     )
     .await
 }
@@ -697,11 +698,42 @@ pub async fn browser_sync_connect(
     password: Option<String>,
     sync_secret: Option<String>,
     remember: bool,
+    reenroll: Option<bool>,
 ) -> Result<SyncView, String> {
     let password = password.map(Zeroizing::new);
     let secret = sync_secret.map(Zeroizing::new);
     require_main(&webview)?;
-    open_vault(app, api_base, account_id, password, secret, remember, false).await
+    open_vault(
+        app,
+        api_base,
+        account_id,
+        password,
+        secret,
+        remember,
+        false,
+        reenroll.unwrap_or(false),
+    )
+    .await
+}
+
+/// Keep a rejected device's database beside the new one instead of deleting
+/// it: its outbox is signed by the revoked identity and cannot be replayed, but
+/// it may still hold edits worth recovering by hand.
+fn retire_database(path: &std::path::Path) -> misty_browser_sync::Result<()> {
+    let stamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|elapsed| elapsed.as_millis())
+        .unwrap_or_default();
+    let retired = path.with_file_name(format!("workspace.retired-{stamp}.sqlite"));
+    let storage = || misty_browser_sync::Error::Storage(rusqlite::Error::InvalidPath(path.into()));
+    for suffix in ["", "-wal", "-shm"] {
+        let from = std::path::PathBuf::from(format!("{}{suffix}", path.display()));
+        if from.exists() {
+            let to = format!("{}{suffix}", retired.display());
+            std::fs::rename(&from, to).map_err(|_| storage())?;
+        }
+    }
+    Ok(())
 }
 
 async fn open_vault(
@@ -712,7 +744,14 @@ async fn open_vault(
     secret: Option<Zeroizing<String>>,
     remember: bool,
     create: bool,
+    reenroll: bool,
 ) -> Result<SyncView, String> {
+    // Re-enrolling registers a new device identity, so it must be authorized by
+    // the vault password and sync secret, never by a remembered key alone.
+    let reenroll = reenroll && !create;
+    if reenroll && (password.is_none() || secret.is_none()) {
+        return Err("Enter your sync password and secret to reconnect this device.".into());
+    }
     let _lifecycle = browser_lifecycle().write().await;
     let mut current = session().lock().await;
     let api = account_api(&api_base, &account_id)?;
@@ -732,7 +771,19 @@ async fn open_vault(
     stop(current.take()).await;
     let path = database_path(&app, &api.deployment(), &account_id)?;
     let database_lock = lock_database(&path)?;
-    let cached = Store::read_cached_vault(&path, &api.deployment(), &account_id).map_err(issue)?;
+    let previous = Store::read_cached_vault(&path, &api.deployment(), &account_id);
+    // A re-enrolling device ignores its rejected local identity and joins the
+    // server's current vault as if it were new.
+    let (cached, retired_scope) = if reenroll {
+        let retired = previous.ok().flatten().map(|vault| VaultScope {
+            deployment: api.deployment(),
+            account_id: account_id.clone(),
+            workspace_id: vault.workspace.workspace_id,
+        });
+        (None, retired)
+    } else {
+        (previous.map_err(issue)?, None)
+    };
 
     // Retrying setup after a lost response reopens the persisted root using the
     // same credentials. It must never generate a replacement root or device.
@@ -770,8 +821,8 @@ async fn open_vault(
     {
         return Err("Switch the active browser account before opening a different vault.".into());
     }
-    let existing_identity =
-        Store::belongs_to_account(&path, &scope.deployment, &scope.account_id).map_err(issue)?;
+    let existing_identity = !reenroll
+        && Store::belongs_to_account(&path, &scope.deployment, &scope.account_id).map_err(issue)?;
     if create && existing_identity {
         return Err("The server vault is missing, but local encrypted data still exists. Recovery is required.".into());
     }
@@ -820,6 +871,14 @@ async fn open_vault(
                     .ok_or(misty_browser_sync::Error::Unlock)?,
                 _ => return Err(misty_browser_sync::Error::Invalid),
             };
+            // Only retire the old identity once the password has proven access
+            // to the server's vault; a typo must leave this device untouched.
+            if reenroll {
+                if let Some(retired) = &retired_scope {
+                    secure_store::forget(retired)?;
+                }
+                retire_database(&path)?;
+            }
             (root, vault)
         };
         let (store, device) = if existing_identity {
@@ -1374,6 +1433,28 @@ pub async fn browser_sync_forget_key(
 mod tests {
     use super::*;
     use std::time::Duration;
+
+    #[test]
+    fn retiring_a_rejected_database_keeps_its_files_out_of_account_lookup() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("workspace.sqlite");
+        for suffix in ["", "-wal", "-shm"] {
+            std::fs::write(format!("{}{suffix}", path.display()), suffix).unwrap();
+        }
+        retire_database(&path).unwrap();
+        assert!(!path.exists());
+        let mut retired: Vec<_> = std::fs::read_dir(directory.path())
+            .unwrap()
+            .map(|entry| entry.unwrap().file_name().into_string().unwrap())
+            .collect();
+        retired.sort();
+        assert_eq!(retired.len(), 3);
+        assert!(retired[0].starts_with("workspace.retired-") && retired[0].ends_with(".sqlite"));
+        assert_eq!(retired[1], format!("{}-shm", retired[0]));
+        assert_eq!(retired[2], format!("{}-wal", retired[0]));
+        // A missing database is already retired.
+        retire_database(&path).unwrap();
+    }
 
     #[test]
     fn encrypted_binding_selects_only_activated_native_generations() {

@@ -755,9 +755,9 @@ export async function parkAllBrowserWebviews(): Promise<void> {
   visibleRuntimeIds.clear();
   createdRuntimeIds.forEach((id) => lastBounds.delete(id));
 
-  // Browser workspace cleanup may already have queued an individual hide.
-  // Let that settle, then revive each child underneath the renderer so a
-  // later Browser tab switch has no native hide/show gap.
+  // Let in-flight creation, reconciliation, and individual hides settle
+  // before hiding every native child. Keep the pages loaded, but do not
+  // expose them again until their Browser surface requests reconciliation.
   await Promise.all([...runtimeQueues.values()].map((pending) => pending.catch(() => undefined)));
   if (generation !== browserParkGeneration || desiredVisibleRuntimeIds.size > 0) return;
   await invoke<void>("browser_webviews_park_all").catch(() => undefined);
