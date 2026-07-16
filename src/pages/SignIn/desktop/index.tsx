@@ -31,7 +31,9 @@ export default function SignIn() {
   const location = useLocation();
   const { setUser } = useAuth();
   const saveAuthenticatedUser = useSetupStore((state) => state.saveAuthenticatedUser);
-  const from = (location.state as { from?: string } | null)?.from || "/home";
+  const routeState = location.state as { from?: string; addingAccount?: boolean } | null;
+  const from = routeState?.from || "/home";
+  const addingAccount = Boolean(routeState?.addingAccount);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -60,11 +62,11 @@ export default function SignIn() {
   }
 
   return (
-    <AuthShell title="Welcome back" description="Sign in to your Misty account.">
+    <AuthShell title={addingAccount ? "Add another account" : "Welcome back"} description={addingAccount ? "Your current account will remain signed in on this device." : "Sign in to your Misty account."} onBack={addingAccount ? () => navigate(from, { replace: true }) : undefined}>
       <AuthCard
         footer={
           <div className="text-center text-sm text-text-muted">
-            <NavLink to="/register" className="transition hover:text-text">
+            <NavLink to="/register" state={{ from, addingAccount }} className="transition hover:text-text">
               Don&apos;t have an account? Sign up
             </NavLink>
           </div>

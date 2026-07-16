@@ -24,5 +24,5 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 
-The complete vendored dependency notices remain available in `service/COPYING`
-and the dependency source tree.
+The complete upstream dependency notices remain available in
+`service/rclone/COPYING` after initializing the pinned submodule.

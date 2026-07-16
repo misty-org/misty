@@ -12,6 +12,7 @@ import { selectAssistantPreferences, useSettingsStore } from "./useSettingsStore
 import {
   cancelAgentSession,
   createAgentSession,
+  deleteAgentSession,
   fetchAgentStatus,
   fetchAgentEvents,
   sendAgentMessage,
@@ -23,6 +24,10 @@ import {
   type ToolRequest,
   type ToolResult,
 } from "./aiServerApi";
+import { agentsPrepareDocument, agentsRegisterFolderScope } from "../agents/api";
+import type { AgentCitation } from "../agents/types";
+import { deviceRelativePath, isSafeRelativePath, mikaServerContext } from "../agents/pathPrivacy";
+import { mistyDocumentsEnabled } from "../agents/flags";
 
 export type AiPanelMessage = {
   id: string;
@@ -32,6 +37,7 @@ export type AiPanelMessage = {
   toolRequestId?: string;
   creditsUsed?: number;
   creditsRemaining?: number;
+  citations?: AgentCitation[];
 };
 
 export interface AiStatus {
@@ -94,6 +100,8 @@ let nextPlanId = 1;
 let activeSessionId: string | null = null;
 let lastEventSequence = 0;
 let activeRoot: string | null = null;
+let activeScopeId: string | null = null;
+let activeSelectedPaths: string[] = [];
 let activeRequestScope: AssistantScope | null = null;
 let drainInFlight: Promise<void> | null = null;
 let abortRequested = false;
@@ -104,19 +112,21 @@ const aiToolTimeoutMs = 15000;
 const toolDefinitions = {
   list_directory: { name: "list_directory", risk: "read" },
   search_files: { name: "search_files", risk: "read" },
+  preview_file: { name: "preview_file", risk: "read" },
   validate_file_plan: { name: "validate_file_plan", risk: "read" },
   apply_file_plan: { name: "apply_file_plan", risk: "write" },
 } as const;
 
 function toolManifestForScope(scope: AssistantScope | null): ToolManifest {
+  const previewTools = mistyDocumentsEnabled() ? [toolDefinitions.preview_file] : [];
   if (scope === "files") {
     return { tools: [toolDefinitions.list_directory, toolDefinitions.validate_file_plan, toolDefinitions.apply_file_plan] };
   }
   if (scope === "cleanup") {
-    return { tools: [toolDefinitions.list_directory, toolDefinitions.search_files, toolDefinitions.validate_file_plan] };
+    return { tools: [toolDefinitions.list_directory, toolDefinitions.search_files, ...previewTools, toolDefinitions.validate_file_plan] };
   }
   if (scope === "search") {
-    return { tools: [toolDefinitions.list_directory, toolDefinitions.search_files] };
+    return { tools: [toolDefinitions.list_directory, toolDefinitions.search_files, ...previewTools] };
   }
   return { tools: [] };
 }
@@ -130,10 +140,15 @@ function classifyAssistantRequest(prompt: string): AssistantRequestScope {
   const matches: AssistantScope[] = [];
   if (/\b(clean(?:up)?|tidy|declutter|organize|duplicate|unused|large files?|old files?)\b/.test(normalized)) matches.push("cleanup");
   if (/\b(search|find|locate|look for|where (?:is|are)|collections?|smart folder|query|tagged|tags?)\b/.test(normalized)) matches.push("search");
+  if (/\b(summar(?:y|ize)|compare|analy[sz]e|explain|extract|question|read|review|pdf|document|spreadsheet|presentation|slide|contract|report)\b/.test(normalized)) matches.push("search");
   if (/\b(open|reveal|show in finder|copy|move|rename|create|make (?:a )?(?:file|folder)|transfer|download|upload)\b/.test(normalized)) matches.push("files");
   const distinct = [...new Set(matches)];
   if (distinct.length > 1) return "ambiguous";
   return distinct[0] ?? null;
+}
+
+function isDocumentAssistantRequest(prompt: string): boolean {
+  return /\b(summar(?:y|ize)|compare|analy[sz]e|explain|extract|question|read|review|pdf|document|spreadsheet|presentation|slide|contract|report)\b/i.test(prompt);
 }
 
 function assistantScopeAllowed(
@@ -212,6 +227,10 @@ export const useMikaSessionStore = create<AiSessionStore>((set, get) => ({
       appendBlockedRequest(set, trimmed, "Mika is disabled. Enable Mika in Settings > Assistant to continue.");
       return;
     }
+    if (isDocumentAssistantRequest(trimmed) && !mistyDocumentsEnabled()) {
+      appendBlockedRequest(set, trimmed, "Misty document intelligence is not enabled for this rollout.");
+      return;
+    }
     const requestScope = classifyAssistantRequest(trimmed);
     if (requestScope === "ambiguous") {
       appendBlockedRequest(set, trimmed, "That request crosses more than one permission scope. Please split it into separate Files, Cleanup, or Search steps.");
@@ -222,6 +241,7 @@ export const useMikaSessionStore = create<AiSessionStore>((set, get) => ({
       return;
     }
     activeRoot = cwd || null;
+    activeSelectedPaths = selectedPaths ?? [];
     activeRequestScope = requestScope;
     abortRequested = false;
     set((state) => ({
@@ -231,11 +251,16 @@ export const useMikaSessionStore = create<AiSessionStore>((set, get) => ({
     }));
 
     try {
+      const registeredScope = cwd
+        ? await agentsRegisterFolderScope({ path: cwd }).catch(() => null)
+        : null;
+      activeScopeId = registeredScope?.id ?? null;
+      const serverContext = mikaServerContext(cwd, selectedPaths ?? [], registeredScope?.id ?? null);
       await sendAgentMessageOnce({
         mode: get().mode,
         user_message: scopedAssistantPrompt(prompt, requestScope),
-        active_root: cwd || undefined,
-        selected_paths: selectedPaths,
+        active_root: serverContext.activeRoot,
+        selected_paths: serverContext.selectedPaths,
         capabilities: toolManifestForScope(requestScope),
       });
       ensureAiPolling(set, get);
@@ -338,6 +363,10 @@ export const useMikaSessionStore = create<AiSessionStore>((set, get) => ({
   },
 
   clearConversation: () => {
+    const sessionId = activeSessionId;
+    if (sessionId) void deleteAgentSession(sessionId).catch((error) => {
+      recordAiDebug("warn", "Mika conversation deletion failed.", errorText(error));
+    });
     stopAiPolling();
     activeSessionId = null;
     lastEventSequence = 0;
@@ -345,11 +374,28 @@ export const useMikaSessionStore = create<AiSessionStore>((set, get) => ({
     processedEventSequences.clear();
     processedToolRequestIds.clear();
     activeRequestScope = null;
+    activeRoot = null;
+    activeScopeId = null;
+    activeSelectedPaths = [];
     set({ messages: [], plans: [], toolApprovals: [], error: null, status: serverStatus(false) });
   },
 }));
 
 export const useAiSessionStore = useMikaSessionStore;
+
+export function resetMikaAccountState(): void {
+  stopAiPolling();
+  resetActiveSession();
+  activeRoot = null;
+  useMikaSessionStore.setState({
+    status: serverStatus(false),
+    mode: "auto",
+    messages: [],
+    plans: [],
+    toolApprovals: [],
+    error: null,
+  });
+}
 
 function ensureAiPolling(
   set: (partial: Partial<AiSessionStore> | ((state: AiSessionStore) => Partial<AiSessionStore>)) => void,
@@ -408,7 +454,7 @@ async function drainAiEventsOnce(
   for (const event of nextEvents) {
     lastEventSequence = Math.max(lastEventSequence, event.sequence);
     if (event.type === "assistant_message" && event.text) {
-      nextMessages.push({ id: aiMessageId("assistant"), role: "assistant", text: event.text, creditsUsed: event.credits_used, creditsRemaining: event.credits_remaining });
+      nextMessages.push({ id: aiMessageId("assistant"), role: "assistant", text: event.text, citations: event.citations, creditsUsed: event.credits_used, creditsRemaining: event.credits_remaining });
     } else if (event.type === "error" && event.message) {
       nextMessages.push({ id: aiMessageId("error"), role: "error", text: event.message });
     } else if (event.type === "tool_request") {
@@ -506,6 +552,8 @@ function resetActiveSession(): void {
   processedEventSequences.clear();
   processedToolRequestIds.clear();
   activeRequestScope = null;
+  activeScopeId = null;
+  activeSelectedPaths = [];
 }
 
 function isSessionNotFoundError(error: unknown): boolean {
@@ -526,9 +574,16 @@ async function runToolRequest(request: ToolRequest, scope: AssistantScope | null
     const args = toolArgs(request);
     switch (request.name) {
       case "list_directory": {
-        const listing = await explorerListDirectory({ path: stringArg(args.path) || activeRoot });
+        const requestedPath = stringArg(args.path);
+        const directoryPath = !requestedPath || requestedPath === "." || requestedPath === activeScopeId
+          ? activeRoot
+          : isSafeRelativePath(requestedPath)
+            ? absoluteFromRelative(requestedPath)
+            : null;
+        if (!directoryPath) return toolError(request, "list_directory requires a path relative to the active agent scope.");
+        const listing = await explorerListDirectory({ path: directoryPath });
         return toolOK(request, {
-          path: listing.path,
+          path: activeRoot ? deviceRelativePath(activeRoot, listing.path) ?? "." : ".",
           entries: listing.entries.map((entry) => ({
             name: entry.name,
             path: relativeToRoot(entry.path),
@@ -547,7 +602,47 @@ async function runToolRequest(request: ToolRequest, scope: AssistantScope | null
           scope: "current",
           limit: numberArg(args.limit) ?? 50,
         });
-        return toolOK(request, { results });
+        return toolOK(request, {
+          results: results.flatMap((result) => {
+            const path = activeRoot ? deviceRelativePath(activeRoot, result.entry.path) : null;
+            if (!path) return [];
+            return [{
+              name: result.entry.name,
+              path,
+              kind: result.entry.kind,
+              extension: result.entry.extension,
+              sizeBytes: result.entry.sizeBytes,
+              modifiedMs: result.entry.modifiedMs,
+              score: result.score,
+              match: result.match,
+            }];
+          }),
+        });
+      }
+      case "preview_file": {
+        const requested = stringArg(args.path);
+        if (requested && !isSafeRelativePath(requested)) {
+          return toolError(request, "preview_file requires a path relative to the active agent scope.");
+        }
+        const candidate = requested ? absoluteFromRelative(requested) : activeSelectedPaths[0];
+        if (!candidate) return toolError(request, "Select a document or provide a path to preview_file.");
+        if (activeRoot && !deviceRelativePath(activeRoot, candidate)) {
+          return toolError(request, "The document is outside the active agent scope.");
+        }
+        const document = await agentsPrepareDocument({ path: candidate });
+        const scope = activeRoot ? await agentsRegisterFolderScope({ path: activeRoot }) : null;
+        return toolOK(request, {
+          documentId: document.documentId,
+          fileName: document.displayName,
+          mimeType: document.mimeType,
+          sizeBytes: document.sizeBytes,
+          scopeId: scope?.id ?? "",
+          relativePath: relativeToRoot(candidate),
+          sections: document.sections,
+          truncated: document.truncated,
+          requiresOcr: document.requiresOcr,
+          citationRule: "Cite every factual document claim using the supplied scopeId, relativePath, fileName, section kind, and locator.",
+        });
       }
       case "validate_file_plan": {
         const plan = args.plan as FileOperationPlan | undefined;
@@ -573,12 +668,13 @@ async function runToolRequest(request: ToolRequest, scope: AssistantScope | null
 async function runToolRequestWithTimeout(request: ToolRequest, scope: AssistantScope | null): Promise<ToolResult> {
   let timeoutId: number | null = null;
   try {
+    const timeoutMs = request.name === "preview_file" ? 60_000 : aiToolTimeoutMs;
     return await Promise.race([
       runToolRequest(request, scope),
       new Promise<ToolResult>((resolve) => {
         timeoutId = window.setTimeout(() => {
-          resolve(toolError(request, `${request.name} timed out after ${Math.round(aiToolTimeoutMs / 1000)} seconds.`));
-        }, aiToolTimeoutMs);
+          resolve(toolError(request, `${request.name} timed out after ${Math.round(timeoutMs / 1000)} seconds.`));
+        }, timeoutMs);
       }),
     ]);
   } finally {
@@ -770,11 +866,7 @@ function numberArg(value: unknown): number | null {
 }
 
 function relativeToRoot(path: string): string {
-  const root = activeRoot?.replace(/\/+$/, "");
-  if (!root) return path;
-  if (path === root) return "";
-  if (path.startsWith(`${root}/`)) return path.slice(root.length + 1);
-  return path;
+  return activeRoot ? deviceRelativePath(activeRoot, path) ?? "" : "";
 }
 
 function absoluteFromRelative(path: string): string {

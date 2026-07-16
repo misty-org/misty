@@ -955,7 +955,7 @@ fn cache_verified_license(
 }
 
 fn license_allows_local_use(license: &CurrentLicense) -> bool {
-    matches!(license.tier.as_str(), "basic" | "personal" | "pro")
+    matches!(license.tier.as_str(), "basic" | "personal" | "pro" | "max")
         && matches!(license.status.as_str(), "active" | "trialing")
         && license.allows_use
 }
@@ -1996,6 +1996,25 @@ mod tests {
             .unwrap(),
         )
         .expect("manifest should be written");
+    }
+
+    #[test]
+    fn max_license_allows_local_use() {
+        let license = CurrentLicense {
+            tier: "max".to_string(),
+            status: "active".to_string(),
+            allows_use: true,
+            expires_at: None,
+            trial_started_at: None,
+            license_device: None,
+            verified_at: None,
+            refresh_after: None,
+            verified_until: None,
+            needs_refresh: false,
+            verification_expired: false,
+        };
+
+        assert!(license_allows_local_use(&license));
     }
 
     #[test]

@@ -14,7 +14,6 @@ import {
   ArrowLeftRight,
   Bell,
   Bot,
-  CheckCircle2,
   ChevronDown,
   Cloud,
   Copy,
@@ -29,8 +28,6 @@ import {
   Rows3,
   Search,
   Settings2,
-  ShieldCheck,
-  Sparkles,
   Trash2,
   X,
   type LucideIcon,
@@ -56,8 +53,6 @@ import {
   type CustomFontPreference,
 } from "../../../stores/useSettingsStore";
 import { useSearchStore } from "../../../stores/useSearchStore";
-import { useSmartLibraryStore } from "../../../stores/useSmartLibraryStore";
-import { estimateSmartLibraryTokens } from "../../../contracts/smartLibrary";
 import { formatDate } from "../../Files/utils/fileFormat";
 import { userFacingErrorText } from "../../../shared/format";
 import { hasTauriInternals } from "../../../shared/tauri";
@@ -68,6 +63,22 @@ import {
   transferProfileSettingsPayload,
   type TransferProfileRecord,
 } from "../transferProfiles";
+import {
+  DesktopSettingsRow as SettingsRow,
+  DesktopSettingsSection as SettingsSectionBlock,
+  desktopSettingsContentClass as settingsContentClass,
+  desktopSettingsGridClass as settingsGridClass,
+  desktopSettingsNavItemClass as settingsNavItemClass,
+  desktopSettingsNavItemSelectedClass as settingsNavItemSelectedClass,
+  desktopSettingsOverlayCloseClass as settingsOverlayCloseClass,
+  desktopSettingsOverlayContentClass as settingsOverlayContentClass,
+  desktopSettingsOverlayContentShellClass as settingsOverlayContentShellClass,
+  desktopSettingsOverlayGridClass as settingsOverlayGridClass,
+  desktopSettingsOverlayHeaderClass as settingsOverlayHeaderClass,
+  desktopSettingsOverlayScrollSurfaceClass as settingsOverlayScrollSurfaceClass,
+  desktopSettingsScrollSurfaceClass as settingsScrollSurfaceClass,
+  desktopSettingsSidebarClass as settingsSidebarClass,
+} from "../../../components/settings/DesktopSettingsUI";
 
 type SettingsSection =
   | "general"
@@ -113,40 +124,6 @@ const themeOptions = ["System", "Dark", "Light"];
 const scaleOptions = ["Small", "Default", "Large"];
 const keymapOptions = ["System", "VS Code", "Finder"];
 const conflictOptions = ["Keep Newest", "Ask Me", "Keep Both"];
-
-const settingsGridClass =
-  "grid h-screen min-h-0 min-w-0 grid-cols-[180px_1px_minmax(0,1fr)] overflow-hidden bg-[var(--misty-app-shell-bg,#050607)] text-[#f4f4f5] max-[980px]:grid-cols-[150px_1px_minmax(720px,1fr)] max-[980px]:overflow-x-auto max-[980px]:overflow-y-hidden";
-
-const settingsOverlayGridClass =
-  "grid h-full min-h-0 min-w-0 grid-cols-[214px_1px_minmax(0,1fr)] overflow-hidden bg-[var(--misty-app-shell-bg,#050607)] text-[#f4f4f5] max-[980px]:grid-cols-[180px_1px_minmax(620px,1fr)] max-[980px]:overflow-x-auto max-[980px]:overflow-y-hidden";
-
-const settingsSidebarClass =
-  "flex min-h-0 flex-col gap-[5px] bg-[var(--misty-app-nav-bg,var(--misty-app-shell-bg,#050607))] p-5 max-[980px]:px-2.5 max-[980px]:py-4";
-
-const settingsNavItemClass =
-  "grid h-9 w-full grid-cols-[18px_minmax(0,1fr)] items-center gap-3 rounded-md border border-transparent bg-transparent px-2 py-1.5 text-left text-[15px] text-[#a1a1aa] hover:border-white/10 hover:bg-white/[0.045] hover:text-[#f4f4f5]";
-
-const settingsNavItemSelectedClass =
-  "border-white/15 bg-[#f4f4f5] text-[#07090b] hover:bg-white hover:text-[#07090b]";
-
-const settingsContentClass =
-  "misty-scrollbar min-h-0 min-w-0 overflow-auto bg-[var(--misty-app-shell-bg,#050607)] px-7 py-6";
-
-const settingsOverlayContentShellClass =
-  "grid min-h-0 min-w-0 grid-rows-[72px_minmax(0,1fr)] bg-[var(--misty-app-shell-bg,#050607)]";
-
-const settingsOverlayHeaderClass =
-  "flex min-h-0 items-center justify-between gap-4 border-b border-white/10 px-7";
-
-const settingsOverlayContentClass =
-  "misty-scrollbar min-h-0 min-w-0 overflow-auto bg-[var(--misty-app-shell-bg,#050607)] px-7 py-5";
-
-const settingsScrollSurfaceClass = "w-[min(100%,934px)] min-w-[720px]";
-
-const settingsOverlayScrollSurfaceClass = "w-[min(100%,720px)] min-w-[560px]";
-
-const settingsOverlayCloseClass =
-  "grid size-8 place-items-center rounded-md border border-transparent bg-transparent p-0 text-[#a1a1aa] transition hover:border-white/10 hover:bg-white/[0.045] hover:text-[#f4f4f5]";
 
 const settingsControlButtonClass =
   "inline-flex h-8 w-[220px] items-center justify-center gap-1.5 rounded-md border border-white/10 bg-white/[0.055] text-[15px] font-semibold text-[#f4f4f5] transition hover:border-white/20 hover:bg-white/[0.09] disabled:opacity-55";
@@ -1335,41 +1312,8 @@ function SearchSettings(props: SettingsContentProps) {
         cancelScan: state.cancelScan,
       })),
     );
-  const {
-    loaded: smartLoaded,
-    phase: smartPhase,
-    library,
-    progress,
-    estimate: analysisEstimate,
-    error: smartError,
-    load: loadSmartLibrary,
-    chooseFolder,
-    discoverChanges,
-    trySample,
-    analyzeFolder,
-    removeLibrary,
-  } = useSmartLibraryStore(
-    useShallow((state) => ({
-      loaded: state.loaded,
-      phase: state.phase,
-      library: state.library,
-      progress: state.progress,
-      estimate: state.estimate,
-      error: state.error,
-      load: state.load,
-      chooseFolder: state.chooseFolder,
-      discoverChanges: state.discoverChanges,
-      trySample: state.trySample,
-      analyzeFolder: state.analyzeFolder,
-      removeLibrary: state.removeLibrary,
-    })),
-  );
-  const [analysisConfirmation, setAnalysisConfirmation] = useState<"sample" | "folder" | null>(null);
-  const [confirmRemoveLibrary, setConfirmRemoveLibrary] = useState(false);
-
   useEffect(() => {
     void initialize();
-    void loadSmartLibrary();
     const timer = window.setInterval(
       () => {
         void refreshStatus();
@@ -1377,7 +1321,7 @@ function SearchSettings(props: SettingsContentProps) {
       status?.scanInProgress ? 700 : 5000,
     );
     return () => window.clearInterval(timer);
-  }, [initialize, loadSmartLibrary, refreshStatus, status?.scanInProgress]);
+  }, [initialize, refreshStatus, status?.scanInProgress]);
 
   const scanActive = Boolean(status?.scanInProgress);
   const indexedItems = status?.indexedItemCount ?? 0;
@@ -1393,55 +1337,9 @@ function SearchSettings(props: SettingsContentProps) {
     "automatic_file_discovery_enabled",
     true,
   );
-  const automaticImageDiscovery = booleanSetting(
-    props.document,
-    "search",
-    "automatic_image_discovery_enabled",
-    true,
-  );
-  const preflight = library?.preflight;
-  const eligibleImages = preflight?.pilotCappedImages ?? 0;
-  const analyzedImages = preflight?.alreadyAnalyzedImages ?? 0;
-  const samplePending = Boolean(
-    library
-      && analyzedImages === 0
-      && (progress?.successfulImages ?? 0) === 0
-      && preflight?.sampleAssetIds.length,
-  );
-  const proposedCount = samplePending
-    ? Math.min(preflight?.allowance.sampleImages ?? 25, eligibleImages)
-    : eligibleImages;
-  const tokenEstimate = estimateSmartLibraryTokens(proposedCount);
-  const smartBusy = ["scanning", "uploading", "processing", "reindexing"].includes(smartPhase);
-  const analysisBusy = ["uploading", "processing"].includes(smartPhase);
-  const analyzedProgress = progress
-    ? progress.successfulImages + progress.failedImages
-    : 0;
-  const totalProgress = progress
-    ? Math.max(1, analyzedProgress + progress.queuedImages)
-    : 1;
-
-  const pickSmartFolder = async () => {
-    if (!hasTauriInternals()) return;
-    const selection = await open({
-      title: "Choose one folder for image understanding",
-      multiple: false,
-      directory: true,
-    });
-    const path = Array.isArray(selection) ? selection[0] : selection;
-    if (path) await chooseFolder(path);
-  };
-
-  const approveAnalysis = async () => {
-    const action = analysisConfirmation;
-    setAnalysisConfirmation(null);
-    if (action === "sample") await trySample();
-    if (action === "folder") await analyzeFolder();
-  };
-
   return (
     <>
-      <div className="mb-4 grid grid-cols-2 gap-3">
+      <div className="mb-4 grid gap-3">
         <SearchHealthCard
           icon={<Search size={19} />}
           title="File search"
@@ -1451,40 +1349,18 @@ function SearchSettings(props: SettingsContentProps) {
             : "Misty will discover filenames without using AI"}
           active={scanActive}
         />
-        <SearchHealthCard
-          icon={<Sparkles size={19} />}
-          title="Image understanding"
-          value={!smartLoaded ? "Checking" : library ? `${analyzedImages.toLocaleString()} understood` : "Not set up"}
-          detail={library
-            ? eligibleImages > 0
-              ? `${eligibleImages.toLocaleString()} new or changed files are ready for review`
-              : `Watching ${library.displayName}`
-            : "Choose one folder to add descriptions and tags"}
-          active={smartBusy}
-          attention={eligibleImages > 0}
-        />
       </div>
 
       <SettingsSectionBlock title="Automatic upkeep">
         <SettingsRow
           label="Keep file search ready"
           description="Misty checks for added, renamed, moved, or removed files while the app is open. Existing results stay searchable during updates."
+          last
         >
           <SwitchControl
             checked={automaticFileDiscovery}
             disabled={props.working}
             onChange={(value) => props.onSettingChange("search", "automatic_file_discovery_enabled", value)}
-          />
-        </SettingsRow>
-        <SettingsRow
-          label="Look for new library files"
-          description="Quietly discover new or changed images in your chosen folder. This local check is free and never starts AI analysis."
-          last
-        >
-          <SwitchControl
-            checked={automaticImageDiscovery}
-            disabled={props.working}
-            onChange={(value) => props.onSettingChange("search", "automatic_image_discovery_enabled", value)}
           />
         </SettingsRow>
       </SettingsSectionBlock>
@@ -1547,71 +1423,6 @@ function SearchSettings(props: SettingsContentProps) {
         </div>
       </SettingsSectionBlock>
 
-      <SettingsSectionBlock title="Image understanding">
-        {!smartLoaded ? (
-          <div className="grid min-h-40 place-items-center"><Loader2 className="animate-spin text-[#8f96a1]" size={22} /></div>
-        ) : !library ? (
-          <div className="grid justify-items-center gap-3 px-7 py-9 text-center">
-            <div className="grid size-12 place-items-center rounded-2xl bg-[#7467f0]/15 text-[#a9a0ff]"><Image size={23} /></div>
-            <div><strong className="text-base">Choose one folder to understand</strong><p className="m-0 mt-1 max-w-lg text-sm leading-relaxed text-[#8f8f8f]">Misty first discovers supported files locally. You will see the exact count, token estimate, and price before any thumbnails are analyzed.</p></div>
-            <button className={settingsPrimaryButtonClass} type="button" onClick={() => void pickSmartFolder()}>Choose folder</button>
-            <span className="text-xs text-[#6f7680]">Whole-device image discovery is not enabled in this pilot.</span>
-          </div>
-        ) : (
-          <div className="grid gap-4 px-7 py-5">
-            <div className="flex items-start justify-between gap-5">
-              <div className="flex min-w-0 gap-3">
-                <div className="grid size-10 shrink-0 place-items-center rounded-xl bg-[#7467f0]/15 text-[#aaa2ff]">
-                  {smartBusy ? <Loader2 className="animate-spin" size={18} /> : <FolderOpen size={18} />}
-                </div>
-                <div className="grid min-w-0 gap-1">
-                  <strong className="truncate text-[15px] text-[#f4f4f5]" title={library.rootPath}>{library.displayName}</strong>
-                  <span className="truncate text-sm text-[#8f8f8f]" title={library.rootPath}>{library.rootPath}</span>
-                  <span className="text-xs text-[#737a84]">Last checked {formatDate(library.lastScannedAtMs)}</span>
-                </div>
-              </div>
-              <button className={settingsControlButtonClass} type="button" disabled={smartBusy} onClick={() => void discoverChanges()}>
-                Check for new files
-              </button>
-            </div>
-
-            <div className="grid grid-cols-4 gap-2 border-t border-white/[0.08] pt-4">
-              <SearchStatCard label="Understood" value={analyzedImages.toLocaleString()} compact />
-              <SearchStatCard label="New" value={(preflight?.newImages ?? 0).toLocaleString()} compact />
-              <SearchStatCard label="Changed" value={(preflight?.changedImages ?? 0).toLocaleString()} compact />
-              <SearchStatCard label="Unsupported" value={(preflight?.unsupportedImages ?? 0).toLocaleString()} compact />
-            </div>
-
-            {analysisBusy && progress ? (
-              <div className="grid gap-2 rounded-xl border border-[#776af0]/25 bg-[#776af0]/[0.07] p-4">
-                <div className="flex items-center justify-between text-sm"><strong>Mika is understanding your files</strong><span>{Math.round((analyzedProgress / totalProgress) * 100)}%</span></div>
-                <div className="h-1.5 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full bg-[#8a7cff] transition-[width]" style={{ width: `${(analyzedProgress / totalProgress) * 100}%` }} /></div>
-                <span className="text-xs text-[#9299a5]">{progress.successfulImages.toLocaleString()} complete · {progress.queuedImages.toLocaleString()} remaining · {progress.failedImages.toLocaleString()} failed</span>
-              </div>
-            ) : eligibleImages > 0 ? (
-              <div className="flex items-center justify-between gap-4 rounded-xl border border-[#776af0]/30 bg-[#776af0]/[0.08] p-4">
-                <div><strong className="block text-sm text-[#ddd9ff]">{eligibleImages.toLocaleString()} files are ready</strong><span className="mt-1 block text-xs leading-relaxed text-[#9a94c6]">Review the estimate before Mika creates descriptions, tags, and semantic search data.</span></div>
-                <button className={settingsPrimaryButtonClass} type="button" onClick={() => setAnalysisConfirmation(samplePending ? "sample" : "folder")}>
-                  {samplePending ? "Try sample" : "Review scan"}
-                </button>
-              </div>
-            ) : (
-              <div className="flex items-center gap-3 rounded-xl border border-white/[0.08] bg-white/[0.025] p-4 text-sm text-[#9aa1ab]"><CheckCircle2 className="text-[#78c99a]" size={18} />Everything discovered in this folder is up to date.</div>
-            )}
-
-            {smartError ? <p className="m-0 text-sm text-[#e5a2a2]">{userFacingErrorText(smartError)}</p> : null}
-            <div className="flex items-center justify-between border-t border-white/[0.08] pt-4">
-              <div className="flex items-center gap-2 text-xs text-[#747b85]"><ShieldCheck size={14} />Originals and paths stay on this device. Only approved path-free previews are sent.</div>
-              {confirmRemoveLibrary ? (
-                <div className="flex items-center gap-2"><span className="text-xs text-[#d9a2a2]">Remove this library?</span><button className={settingsControlButtonCompactClass} type="button" onClick={() => setConfirmRemoveLibrary(false)}>Keep</button><button className={settingsControlButtonCompactClass} type="button" onClick={() => { setConfirmRemoveLibrary(false); void removeLibrary(); }}>Remove</button></div>
-              ) : (
-                <button className="text-xs text-[#8e949e] underline-offset-4 hover:text-white hover:underline" type="button" disabled={smartBusy} onClick={() => setConfirmRemoveLibrary(true)}>Remove library</button>
-              )}
-            </div>
-          </div>
-        )}
-      </SettingsSectionBlock>
-
       {status?.scanErrors.length ? (
         <SettingsSectionBlock title="Files Misty could not check">
           <div className={settingsReferenceListClass}>
@@ -1638,19 +1449,6 @@ function SearchSettings(props: SettingsContentProps) {
         </SettingsSectionBlock>
       ) : null}
 
-      {analysisConfirmation ? (
-        <AnalysisConfirmationDialog
-          folderName={library?.displayName ?? "this folder"}
-          count={proposedCount}
-          estimate={tokenEstimate}
-          included={analysisConfirmation === "sample"}
-          priceMinor={analysisEstimate?.priceMinor ?? library?.preflight.estimate.priceMinor ?? null}
-          currency={analysisEstimate?.currency ?? library?.preflight.estimate.currency ?? null}
-          creditUnits={analysisEstimate?.creditUnits ?? proposedCount}
-          onCancel={() => setAnalysisConfirmation(null)}
-          onApprove={() => void approveAnalysis()}
-        />
-      ) : null}
     </>
   );
 }
@@ -1660,32 +1458,6 @@ function SearchHealthCard(props: { icon: ReactNode; title: string; value: string
     <div className="grid min-h-[118px] grid-cols-[40px_minmax(0,1fr)] gap-3 rounded-xl border border-white/10 bg-[var(--misty-app-surface-bg,#090b0d)] p-4">
       <div className={`grid size-10 place-items-center rounded-xl ${props.attention ? "bg-[#776af0]/15 text-[#aaa2ff]" : "bg-white/[0.055] text-[#c5cad2]"}`}>{props.active ? <Loader2 className="animate-spin" size={19} /> : props.icon}</div>
       <div className="grid content-center gap-1"><span className="text-xs text-[#7f8791]">{props.title}</span><strong className="text-lg text-[#f4f4f5]">{props.value}</strong><span className="text-xs leading-relaxed text-[#8f969f]">{props.detail}</span></div>
-    </div>
-  );
-}
-
-function AnalysisConfirmationDialog(props: {
-  folderName: string;
-  count: number;
-  estimate: ReturnType<typeof estimateSmartLibraryTokens>;
-  included: boolean;
-  priceMinor: number | null;
-  currency: string | null;
-  creditUnits: number;
-  onCancel: () => void;
-  onApprove: () => void;
-}) {
-  return (
-    <div className="fixed inset-0 z-[160] grid place-items-center bg-black/70 p-6 backdrop-blur-sm" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) props.onCancel(); }}>
-      <section className="grid w-full max-w-[560px] gap-5 rounded-2xl border border-white/15 bg-[#0c0f13] p-6 shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="analysis-confirmation-title">
-        <div className="flex gap-3"><div className="grid size-11 shrink-0 place-items-center rounded-2xl bg-[#776af0]/15 text-[#aaa2ff]"><Sparkles size={21} /></div><div><h2 className="m-0 text-xl" id="analysis-confirmation-title">Confirm image analysis</h2><p className="m-0 mt-1 text-sm leading-relaxed text-[#9299a4]">Mika will analyze {props.count.toLocaleString()} discovered files from {props.folderName}. Nothing is sent until you confirm.</p></div></div>
-        <div className="grid grid-cols-2 gap-3">
-          <div className="rounded-xl border border-white/10 bg-white/[0.035] p-4"><span className="block text-xs text-[#7f8791]">Estimated AI tokens</span><strong className="mt-1 block text-2xl">≈{compactNumber(props.estimate.estimatedTotalTokens)}</strong><span className="mt-1 block text-xs text-[#777e88]">Likely range {compactNumber(props.estimate.estimatedLowTokens)}–{compactNumber(props.estimate.estimatedHighTokens)}</span></div>
-          <div className="rounded-xl border border-white/10 bg-white/[0.035] p-4"><span className="block text-xs text-[#7f8791]">Estimated charge</span><strong className="mt-1 block text-2xl">{props.included ? "Included" : formatAnalysisPrice(props.priceMinor, props.currency, props.creditUnits)}</strong><span className="mt-1 block text-xs text-[#777e88]">Only successful file analysis is charged</span></div>
-        </div>
-        <div className="grid gap-2 rounded-xl border border-white/[0.08] bg-black/20 p-4 text-xs leading-relaxed text-[#9299a4]"><span><strong className="text-[#d8dbe0]">Estimate includes:</strong> 512 px preview understanding, structured tags and descriptions, and semantic embedding.</span><span>Actual provider token usage can vary with image detail and generated metadata. Misty absorbs provider and schema retries.</span><span>This covers the currently selected folder only; whole-device image scanning is not enabled yet.</span></div>
-        <div className="flex justify-end gap-2"><button className={settingsControlButtonCompactClass} type="button" onClick={props.onCancel}>Cancel</button><button className={settingsPrimaryButtonClass} type="button" disabled={props.count === 0} onClick={props.onApprove}>{props.included ? "Analyze sample" : "Analyze files"}</button></div>
-      </section>
     </div>
   );
 }
@@ -1738,21 +1510,6 @@ function coverageRootLabel(path: string, index: number): string {
 function shortPath(path: string): string {
   const parts = path.split(/[\\/]/).filter(Boolean);
   return parts.length > 3 ? `…/${parts.slice(-3).join("/")}` : path;
-}
-
-function compactNumber(value: number): string {
-  return new Intl.NumberFormat(undefined, {
-    notation: value >= 1_000 ? "compact" : "standard",
-    maximumFractionDigits: 1,
-  }).format(value);
-}
-
-function formatAnalysisPrice(priceMinor: number | null, currency: string | null, creditUnits: number): string {
-  if (priceMinor === null || !currency) return `${creditUnits.toLocaleString()} Mika credits`;
-  return new Intl.NumberFormat(undefined, {
-    style: "currency",
-    currency,
-  }).format(priceMinor / 100);
 }
 
 function NotificationsSettings(props: SettingsContentProps) {
@@ -2266,42 +2023,6 @@ function AdvancedSettings(props: SettingsContentProps) {
         </SettingsRow>
       </SettingsSectionBlock>
     </>
-  );
-}
-
-function SettingsSectionBlock(props: { title: string; children: ReactNode }) {
-  return (
-    <section className="mb-3.5 overflow-hidden rounded-lg border border-white/10 bg-[var(--misty-app-surface-bg,#090b0d)] shadow-[0_1px_0_rgba(255,255,255,0.035)_inset]">
-      <h2 className="border-b border-white/[0.08] bg-[rgba(12,14,16,var(--misty-app-panel-opacity,1))] px-7 py-4 text-[11px] font-[760] leading-none tracking-normal text-[#a1a1aa]">
-        {props.title}
-      </h2>
-      {props.children}
-    </section>
-  );
-}
-
-function SettingsRow(props: {
-  label: string;
-  description: string;
-  children: ReactNode;
-  last?: boolean;
-}) {
-  return (
-    <div
-      className={`grid min-h-[68px] grid-cols-[minmax(0,0.52fr)_minmax(260px,0.48fr)] items-center gap-[18px] border-b border-white/[0.08] bg-[var(--misty-app-surface-bg,#090b0d)] px-7 py-3 ${props.last ? "border-b-0" : ""}`}
-    >
-      <div className="grid min-w-0 gap-1">
-        <strong className="text-[15px] font-[620] leading-[1.1] text-[#f4f4f5]">
-          {props.label}
-        </strong>
-        <span className="text-[14px] leading-[1.25] text-[#8f8f8f]">
-          {props.description}
-        </span>
-      </div>
-      <div className="flex min-w-0 items-center justify-end overflow-hidden">
-        {props.children}
-      </div>
-    </div>
   );
 }
 
