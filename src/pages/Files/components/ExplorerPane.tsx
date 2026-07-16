@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect } from "react";
+import { memo, useCallback, useEffect, useMemo } from "react";
 import type { MouseEvent, ReactNode } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { FileBrowser } from "./FileBrowser";
@@ -12,7 +12,7 @@ const paneStyles = {
   shellInactive:
     "[&_button]:!text-[#5b5b5b] [&_button:hover]:!text-[#666666] [&_footer]:!text-[#555555] [&_img]:opacity-45 [&_span]:!text-[#5b5b5b] [&_svg]:!text-[#5b5b5b] [&_td]:!text-[#5b5b5b] [&_th]:!text-[#606060]",
   path:
-    "grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 overflow-hidden border-b border-transparent bg-transparent py-0 pl-3 pr-3 text-xs text-[var(--misty-text-subtle)] max-[720px]:min-h-8 max-[720px]:pl-2.5 max-[720px]:pr-2.5 max-[720px]:text-[11px] max-[720px]:text-[var(--misty-text-subtle)]",
+    "grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 overflow-hidden bg-transparent py-0 pl-3 pr-3 text-xs text-[var(--misty-text-subtle)] max-[720px]:min-h-8 max-[720px]:pl-2.5 max-[720px]:pr-2.5 max-[720px]:text-[11px] max-[720px]:text-[var(--misty-text-subtle)]",
   pathText:
     "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap",
   pathActions:
@@ -29,15 +29,20 @@ interface ExplorerPaneProps {
 }
 
 export const ExplorerPane = memo(function ExplorerPane(props: ExplorerPaneProps) {
-  const { pane, viewMode, sort, showHidden, inlineEdit } = useExplorerStore(useShallow((state) => ({
+  const { pane, viewMode, sort, showHidden, inlineEdit, clipboard } = useExplorerStore(useShallow((state) => ({
     pane: state.panes[props.paneId],
     viewMode: state.paneViewModes[props.paneId] ?? state.viewMode,
     sort: state.paneSorts[props.paneId] ?? state.sort,
     showHidden: state.paneShowHidden[props.paneId] ?? state.showHidden,
     inlineEdit: inlineEditForPane(state.inlineEdit, props.paneId),
+    clipboard: state.clipboard,
   })));
   const directorySizes = useExplorerStore((state) => state.directorySizes);
   const listing = pane?.listing ?? null;
+  const cutPaths = useMemo(
+    () => new Set(clipboard?.operation === "move" ? clipboard.items.map((item) => item.path) : []),
+    [clipboard],
+  );
 
   useEffect(() => {
     if (pane?.loading) return;
@@ -106,6 +111,7 @@ export const ExplorerPane = memo(function ExplorerPane(props: ExplorerPaneProps)
         commandQuery={pane?.commandQuery ?? ""}
         commandQueryMode={pane?.commandQueryMode ?? "search"}
         directorySizes={directorySizes}
+        cutPaths={cutPaths}
         inlineEdit={inlineEdit}
         onSort={(column) => useExplorerStore.getState().setSort(column, props.paneId)}
         onToggleHidden={() => void useExplorerStore.getState().toggleHidden(props.paneId)}

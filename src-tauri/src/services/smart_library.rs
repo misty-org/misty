@@ -28,6 +28,7 @@ pub const PILOT_SAMPLE_SIZE: usize = 25;
 // server; the local catalog must be able to represent a selected disk.
 pub const PILOT_ASSET_LIMIT: usize = 1_000_000;
 pub const MAX_PREVIEW_BATCH_SIZE: usize = 8;
+pub const MAX_MANUAL_IMPORT_FILES: usize = 500;
 const DEFAULT_PREVIEW_DIMENSION: u32 = 512;
 const MIN_PREVIEW_DIMENSION: u32 = 384;
 
@@ -52,6 +53,19 @@ pub struct SmartLibraryService {
 #[serde(rename_all = "camelCase")]
 pub struct SmartLibraryScanRequest {
     pub root_path: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SmartLibraryImportFilesRequest {
+    pub paths: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SmartLibraryImportResult {
+    pub library: FolderLibraryStatus,
+    pub imported_asset_ids: Vec<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -311,6 +325,11 @@ impl SmartLibraryService {
             ExplorerLocationKind::Local => SmartLibrarySourceKind::Local,
             _ => SmartLibrarySourceKind::Cloud,
         };
+        if source_kind != SmartLibrarySourceKind::Local {
+            return Err(ApiError::Message(
+                "Private Library only accepts files stored on this device.".to_owned(),
+            ));
+        }
 
         let discovered = match source_kind {
             SmartLibrarySourceKind::Local => {
@@ -331,6 +350,30 @@ impl SmartLibraryService {
         let db_path = self.db_path.clone();
         tokio::task::spawn_blocking(move || {
             persist_scan(&db_path, &root_path, source_kind, discovered)
+        })
+        .await
+        .map_err(worker_error)?
+    }
+
+    pub async fn import_files(
+        &self,
+        request: SmartLibraryImportFilesRequest,
+    ) -> ApiResult<SmartLibraryImportResult> {
+        if request.paths.is_empty() {
+            return Err(ApiError::Message(
+                "Choose at least one file to add to Library.".to_owned(),
+            ));
+        }
+        if request.paths.len() > MAX_MANUAL_IMPORT_FILES {
+            return Err(ApiError::Message(format!(
+                "Add at most {MAX_MANUAL_IMPORT_FILES} files at once."
+            )));
+        }
+        let db_path = self.db_path.clone();
+        tokio::task::spawn_blocking(move || {
+            let hints = load_scan_hints(&db_path)?;
+            let discovered = discover_selected_local(&request.paths, &hints)?;
+            persist_imported_files(&db_path, discovered)
         })
         .await
         .map_err(worker_error)?
@@ -621,6 +664,176 @@ fn discover_local(
         });
     }
     Ok(assets)
+}
+
+fn discover_selected_local(
+    paths: &[String],
+    hints: &HashMap<String, ScanHint>,
+) -> ApiResult<Vec<DiscoveredAsset>> {
+    let mut discovered = Vec::new();
+    let mut seen = HashSet::new();
+    for raw_path in paths {
+        let path = PathBuf::from(raw_path.trim());
+        if !seen.insert(path.clone()) {
+            continue;
+        }
+        if path
+            .file_name()
+            .and_then(|value| value.to_str())
+            .is_some_and(|value| value.starts_with('.'))
+        {
+            return Err(ApiError::Message(
+                "Hidden files cannot be added to Library.".to_owned(),
+            ));
+        }
+        let metadata = path.metadata().map_err(io_error)?;
+        if !metadata.is_file() {
+            return Err(ApiError::Message(format!(
+                "{} is not a file.",
+                path.display()
+            )));
+        }
+        let extension = normalize_extension(
+            path.extension()
+                .and_then(|value| value.to_str())
+                .unwrap_or_default(),
+        );
+        let modified_ms = metadata
+            .modified()
+            .ok()
+            .and_then(|value| value.duration_since(UNIX_EPOCH).ok())
+            .map(|value| value.as_millis() as u64)
+            .unwrap_or_default();
+        let mut classification = smart_library_ingestion::classify(&extension, metadata.len());
+        if extension == "ts" && smart_library_ingestion::is_mpeg_transport_stream(&path) {
+            classification.analysis_supported = false;
+            classification.mime_type = "video/mp2t".to_owned();
+            classification.unsupported_reason =
+                Some("Video formats are excluded from semantic indexing".to_owned());
+        }
+        let path_string = path.display().to_string();
+        discovered.push(DiscoveredAsset {
+            path: path_string.clone(),
+            relative_path: path_string.clone(),
+            name: path
+                .file_name()
+                .and_then(|value| value.to_str())
+                .unwrap_or_default()
+                .to_owned(),
+            extension: extension.clone(),
+            mime_type: classification.mime_type,
+            asset_kind: classification.kind,
+            size_bytes: metadata.len(),
+            modified_ms,
+            fingerprint: fingerprint_for_scan(
+                &path,
+                metadata.len(),
+                modified_ms,
+                hints.get(&path_string),
+            )?,
+            preview_supported: classification.analysis_supported,
+            unsupported_reason: classification.unsupported_reason,
+        });
+    }
+    if discovered.is_empty() {
+        return Err(ApiError::Message(
+            "Choose at least one new file to add to Library.".to_owned(),
+        ));
+    }
+    Ok(discovered)
+}
+
+fn persist_imported_files(
+    db_path: &Path,
+    discovered: Vec<DiscoveredAsset>,
+) -> ApiResult<SmartLibraryImportResult> {
+    let mut conn = open_database(db_path)?;
+    let existing_root: Option<(String, String, u64)> = conn
+        .query_row(
+            "SELECT library_id, source_kind, created_at_ms FROM smart_library_root WHERE singleton=1",
+            [],
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+        )
+        .optional()
+        .map_err(sql_error)?;
+    if existing_root
+        .as_ref()
+        .is_some_and(|(_, source, _)| source == "cloud")
+    {
+        return Err(ApiError::Message(
+            "Remove the existing cloud Library before adding local files.".to_owned(),
+        ));
+    }
+    let now = now_ms();
+    let library_id = existing_root
+        .as_ref()
+        .map(|value| value.0.clone())
+        .unwrap_or_else(|| format!("lib_{}", Uuid::new_v4().simple()));
+    let created_at_ms = existing_root.as_ref().map(|value| value.2).unwrap_or(now);
+    let tx = conn.transaction().map_err(sql_error)?;
+    tx.execute(
+        "INSERT INTO smart_library_root (singleton,library_id,root_path,display_name,source_kind,created_at_ms,last_scanned_at_ms)\
+         VALUES(1,?1,'misty://library','Library','local',?2,?3)\
+         ON CONFLICT(singleton) DO UPDATE SET root_path='misty://library',display_name='Library',source_kind='local',last_scanned_at_ms=excluded.last_scanned_at_ms",
+        params![library_id, created_at_ms, now],
+    )
+    .map_err(sql_error)?;
+    tx.execute(
+        "UPDATE smart_library_assets SET relative_path=path WHERE source_kind='local'",
+        [],
+    )
+    .map_err(sql_error)?;
+
+    let mut imported_asset_ids = Vec::with_capacity(discovered.len());
+    for asset in discovered {
+        let existing: Option<(String, String, String)> = tx
+            .query_row(
+                "SELECT asset_id,fingerprint,status FROM smart_library_assets WHERE path=?1",
+                params![asset.path],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            )
+            .optional()
+            .map_err(sql_error)?;
+        let unchanged = existing
+            .as_ref()
+            .is_some_and(|(_, fingerprint, _)| fingerprint == &asset.fingerprint);
+        let asset_id = existing
+            .as_ref()
+            .map(|value| value.0.clone())
+            .unwrap_or_else(|| format!("asset_{}", Uuid::new_v4().simple()));
+        let prior_status = existing
+            .as_ref()
+            .map(|value| SmartLibraryAssetStatus::from_str(&value.2))
+            .unwrap_or(SmartLibraryAssetStatus::Pending);
+        let status = if !asset.preview_supported {
+            SmartLibraryAssetStatus::Unsupported
+        } else if unchanged {
+            prior_status
+        } else if existing.is_some() {
+            SmartLibraryAssetStatus::Changed
+        } else {
+            SmartLibraryAssetStatus::Pending
+        };
+        tx.execute(
+            "INSERT INTO smart_library_assets\
+             (asset_id,path,relative_path,name,mime_type,extension,asset_kind,size_bytes,modified_ms,fingerprint,source_kind,preview_supported,unsupported_reason,status,metadata_json)\
+             VALUES(?1,?2,?2,?3,?4,?5,?6,?7,?8,?9,'local',?10,?11,?12,COALESCE((SELECT metadata_json FROM smart_library_assets WHERE asset_id=?1),'{}'))\
+             ON CONFLICT(asset_id) DO UPDATE SET path=excluded.path,relative_path=excluded.path,name=excluded.name,mime_type=excluded.mime_type,extension=excluded.extension,asset_kind=excluded.asset_kind,size_bytes=excluded.size_bytes,modified_ms=excluded.modified_ms,fingerprint=excluded.fingerprint,source_kind='local',preview_supported=excluded.preview_supported,unsupported_reason=excluded.unsupported_reason,status=excluded.status,indexed_fingerprint=CASE WHEN smart_library_assets.fingerprint=excluded.fingerprint THEN smart_library_assets.indexed_fingerprint ELSE NULL END",
+            params![asset_id, asset.path, asset.name, asset.mime_type, asset.extension,
+                asset.asset_kind.as_str(), asset.size_bytes, asset.modified_ms, asset.fingerprint,
+                asset.preview_supported, asset.unsupported_reason, status.as_str()],
+        )
+        .map_err(sql_error)?;
+        imported_asset_ids.push(asset_id);
+    }
+    tx.commit().map_err(sql_error)?;
+    let library = load_snapshot(db_path)?
+        .active_library
+        .ok_or_else(|| ApiError::Message("Library import did not persist.".to_owned()))?;
+    Ok(SmartLibraryImportResult {
+        library,
+        imported_asset_ids,
+    })
 }
 
 fn persist_scan(
@@ -1603,6 +1816,51 @@ mod tests {
             persist_scan(&db, "/other", SmartLibrarySourceKind::Local, Vec::new()).unwrap_err();
         assert!(error.to_string().contains("Only one Library folder"));
         let _ = fs::remove_file(&db);
+    }
+
+    #[test]
+    fn manual_import_builds_one_local_library_without_removing_existing_files() {
+        let db = temporary_database("manual-import");
+        let first = persist_imported_files(
+            &db,
+            vec![discovered("/photos/one.jpg", "/photos/one.jpg", "first")],
+        )
+        .unwrap();
+        assert_eq!(first.library.display_name, "Library");
+        assert_eq!(first.library.root_path, "misty://library");
+        assert_eq!(first.imported_asset_ids.len(), 1);
+
+        let second = persist_imported_files(
+            &db,
+            vec![discovered(
+                "/documents/two.jpg",
+                "/documents/two.jpg",
+                "second",
+            )],
+        )
+        .unwrap();
+        assert_eq!(second.library.assets.len(), 2);
+        assert!(second
+            .library
+            .assets
+            .iter()
+            .any(|asset| asset.relative_path == "/photos/one.jpg"));
+        assert!(second
+            .library
+            .assets
+            .iter()
+            .any(|asset| asset.relative_path == "/documents/two.jpg"));
+        let _ = fs::remove_file(&db);
+    }
+
+    #[test]
+    fn manual_discovery_rejects_hidden_files() {
+        let path = std::env::temp_dir().join(format!(".misty-hidden-{}", Uuid::new_v4()));
+        fs::write(&path, "secret").unwrap();
+        let error =
+            discover_selected_local(&[path.display().to_string()], &HashMap::new()).unwrap_err();
+        assert!(error.to_string().contains("Hidden files"));
+        let _ = fs::remove_file(path);
     }
 
     #[test]

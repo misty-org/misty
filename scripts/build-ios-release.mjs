@@ -152,21 +152,21 @@ function validateArchive(infoPlist, privacyManifest) {
   assertPlistValue(infoPlist, "MinimumOSVersion", "15.0", [
     "The archive deployment target changed. Confirm iOS support policy before upload.",
   ]);
-  assertPlistValue(infoPlist, "UIDeviceFamily.0", "1", [
-    "Misty mobile is prepared as an iPhone App Store submission.",
-    "Do not upload an archive that declares iPad support unless iPad QA and screenshots are added.",
+  assertPlistValue(infoPlist, "UIDeviceFamily.0", "2", [
+    "Misty is an iPad-only App Store submission.",
+    "Set TARGETED_DEVICE_FAMILY to 2 and rebuild the archive.",
   ]);
   assertPlistMissing(infoPlist, "UIDeviceFamily.1", [
-    "The archive declares iPad support. Remove iPad from TARGETED_DEVICE_FAMILY or add full iPad App Store assets and QA.",
+    "The archive declares more than one device family. Misty supports iPad only.",
   ]);
   assertPlistValue(infoPlist, "UISupportedInterfaceOrientations.0", "UIInterfaceOrientationPortrait", [
-    "Misty iPhone QA and App Store screenshots currently cover portrait flows.",
+    "Misty iPad supports portrait and landscape orientations.",
   ]);
-  assertPlistMissing(infoPlist, "UISupportedInterfaceOrientations.1", [
-    "The archive declares unverified iPhone landscape support. Keep iPhone orientation portrait-only unless landscape QA and screenshots are added.",
+  assertPlistValue(infoPlist, "UISupportedInterfaceOrientations.1", "UIInterfaceOrientationLandscapeLeft", [
+    "Misty iPad supports landscape-left orientation.",
   ]);
-  assertPlistMissing(infoPlist, "UISupportedInterfaceOrientations~ipad", [
-    "The archive is iPhone-only but still declares iPad-specific orientation metadata. Remove it unless iPad support, QA, and screenshots are added.",
+  assertPlistValue(infoPlist, "UISupportedInterfaceOrientations.2", "UIInterfaceOrientationLandscapeRight", [
+    "Misty iPad supports landscape-right orientation.",
   ]);
   assertPlistValue(infoPlist, "CFBundleURLTypes.0.CFBundleURLSchemes.0", "misty", [
     "The archive is missing the misty deep-link URL scheme used for provider auth returns.",
@@ -213,12 +213,6 @@ function validateArchive(infoPlist, privacyManifest) {
       `The privacy manifest is missing collected-data declaration ${dataType}.`,
     ]);
   }
-  assertPngSize(resolve(appBundleDir, "AppIcon60x60@2x.png"), 120, 120, [
-    "The archive is missing the primary iPhone icon output or it has the wrong size.",
-  ]);
-  assertPngOpaque(resolve(appBundleDir, "AppIcon60x60@2x.png"), [
-    "The archive iPhone app icon still has an alpha channel. Run npm run icons:ios:flatten and rebuild.",
-  ]);
   assertPngSize(resolve(appBundleDir, "AppIcon76x76@2x~ipad.png"), 152, 152, [
     "The archive is missing the primary iPad icon output or it has the wrong size.",
   ]);

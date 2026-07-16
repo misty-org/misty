@@ -4,6 +4,7 @@ const mocks = vi.hoisted(() => ({
   searchSemanticAssets: vi.fn(),
   searchMedia: vi.fn(),
   mediaSearchResolveAssets: vi.fn(),
+	mediaSearchSnapshot: vi.fn(),
 }));
 
 vi.mock("../../../stores/smartLibraryServerApi", () => ({
@@ -14,6 +15,7 @@ vi.mock("../../../stores/mediaSearchServerApi", () => ({
 }));
 vi.mock("../../../api/misty", () => ({
   mediaSearchResolveAssets: mocks.mediaSearchResolveAssets,
+	mediaSearchSnapshot: mocks.mediaSearchSnapshot,
   searchQuery: vi.fn(),
   smartLibraryResolveAssets: vi.fn().mockResolvedValue([]),
   smartLibrarySnapshot: vi.fn().mockResolvedValue({ activeLibrary: null }),
@@ -33,6 +35,7 @@ describe("global media search cache resilience", () => {
       mediaType: "video",
       durationMs: 120_000,
     }]);
+	mocks.mediaSearchSnapshot.mockResolvedValue({ deviceId: "device_0123456789abcdef0123456789abcdef" });
   });
 
   it("does not cache a silent fallback when the media branch is temporarily unavailable", async () => {
