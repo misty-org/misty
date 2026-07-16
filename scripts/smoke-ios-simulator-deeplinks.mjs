@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const deviceName = process.env.TAURI_IOS_SIMULATOR_DEVICE ?? "iPhone 17";
+const deviceName = process.env.TAURI_IOS_SIMULATOR_DEVICE ?? "iPad (A16)";
 const bundleId = process.env.TAURI_IOS_BUNDLE_ID ?? "com.misty.mobile";
 const outputDir = path.resolve(root, process.env.MISTY_IOS_DEEPLINK_QA_DIR ?? "build/mobile-ui-qa");
 const settleMs = Number(process.env.MISTY_IOS_DEEPLINK_SETTLE_MS ?? "30000");

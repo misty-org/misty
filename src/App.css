@@ -162,6 +162,41 @@
   background: var(--misty-scrollbar-thumb-hover);
 }
 
+.app-pages-root .misty-transient-scrollbar {
+  --misty-transient-scrollbar-thumb: color-mix(in srgb, var(--misty-text-muted) 42%, transparent);
+  --misty-transient-scrollbar-thumb-hover: color-mix(in srgb, var(--misty-text-muted) 66%, transparent);
+  scrollbar-color: transparent transparent;
+  scrollbar-gutter: auto !important;
+  scrollbar-width: thin;
+}
+
+.app-pages-root .misty-transient-scrollbar::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+.app-pages-root .misty-transient-scrollbar::-webkit-scrollbar-track,
+.app-pages-root .misty-transient-scrollbar::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+.app-pages-root .misty-transient-scrollbar::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 999px;
+}
+
+.app-pages-root .misty-transient-scrollbar-active {
+  scrollbar-color: var(--misty-transient-scrollbar-thumb) transparent;
+}
+
+.app-pages-root .misty-transient-scrollbar-active::-webkit-scrollbar-thumb {
+  background: var(--misty-transient-scrollbar-thumb);
+}
+
+.app-pages-root .misty-transient-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: var(--misty-transient-scrollbar-thumb-hover);
+}
+
 .settings-opacity-range-wrap {
   --settings-range-thumb-size: 22px;
   --settings-range-track-height: 8px;

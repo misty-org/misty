@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState, type Dispatch, type FormEvent, type PointerEvent as ReactPointerEvent, type SetStateAction } from "react";
 import { Navigate, NavLink, Outlet, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   Check,
@@ -48,8 +48,9 @@ import { useShallow } from "zustand/react/shallow";
 import { useAuth } from "../../auth/AuthContext";
 import { useSpacesStore } from "../../stores/useSpacesStore";
 import { useSetupStore } from "../../stores/useSetupStore";
-import { spacesApi } from "../../spaces/api";
-import type { BulkLibraryItemAction, BulkLibraryItemOptions, LibraryAlbum, LibraryAlbumFolder, LibraryDiscovery, LibraryDiscoveryGroup, LibraryEditDefinition, LibraryEditVersion, LibraryGroup, LibraryImportHistoryItem, LibraryIntelligencePolicy, LibraryItemQuery, LibraryMapPoint, LibraryPerson, LibraryPinnedCollection, LibrarySearchFacets, LibrarySharedReference, MessageAttachment, MessageSpan, SpaceLibraryItem, SpaceMember, SpaceMessage, SpaceNode, SpaceStorageUsage, SpaceStudioResource } from "../../spaces/types";
+import { SpaceRequestError, spacesApi } from "../../spaces/api";
+import type { BulkLibraryItemAction, BulkLibraryItemOptions, LibraryAlbum, LibraryAlbumFolder, LibraryAssetStack, LibraryDiscovery, LibraryDiscoveryGroup, LibraryEditDefinition, LibraryEditVersion, LibraryGroup, LibraryImportHistoryItem, LibraryIntelligencePolicy, LibraryItemQuery, LibraryMapPoint, LibraryMarkupElement, LibraryPerson, LibraryPinnedCollection, LibrarySearchFacets, LibrarySharedReference, MessageAttachment, MessageSpan, SpaceLibraryItem, SpaceMember, SpaceMessage, SpaceNode, SpaceStorageUsage, SpaceStudioResource } from "../../spaces/types";
+import { SpaceLibraryEmptyState, SpaceLibraryHeader } from "./components/SpaceLibraryChrome";
 
 const spaceSectionItems = [
   { id: "chat", label: "Chat", icon: MessagesSquare },
@@ -110,17 +111,8 @@ export default function SpacesShell() {
   };
 
   return (
-    <div className="grid h-full min-h-0 grid-cols-[220px_minmax(0,1fr)] bg-[var(--misty-app-page-bg,#07090b)]">
-      <aside className="min-h-0 overflow-auto border-r border-[var(--misty-border-soft)] bg-[var(--misty-surface)] px-3 py-4">
-        <div className="mb-4 flex items-center justify-between px-2">
-          <div>
-            <h1 className="m-0 text-lg font-semibold text-[var(--misty-text)]">Spaces</h1>
-            <p className="m-0 mt-0.5 text-[11px] text-[var(--misty-text-subtle)]">Private until you invite someone</p>
-          </div>
-          <button className={iconButtonClass} type="button" disabled={(limits?.remaining_owned ?? 1) === 0} onClick={() => { clearError(); setCreateOpen(true); }} aria-label="Create Space" title={(limits?.remaining_owned ?? 1) === 0 ? "You already own three Spaces" : "Create Space"}>
-            <Plus size={16} />
-          </button>
-        </div>
+    <div className="grid h-full min-h-0 grid-cols-[232px_minmax(0,1fr)] overflow-hidden bg-[var(--misty-bg)] max-[900px]:grid-cols-[196px_minmax(0,1fr)]">
+      <aside className="min-h-0 overflow-auto border-r border-[var(--misty-border-soft)] bg-[var(--misty-surface)] px-3 py-5">
         {error && !createOpen && !renamingSpaceId ? <button className="mb-3 w-full rounded-xl border border-red-400/20 bg-red-950/20 px-3 py-2 text-left text-[11px] leading-relaxed text-red-200" type="button" onClick={clearError}>{error}</button> : null}
         <nav className="grid gap-1" aria-label="Spaces">
           {spaces.map((space) => (
@@ -133,6 +125,9 @@ export default function SpacesShell() {
             </div>
           ))}
           {loading && spaces.length === 0 ? <p className="px-2 py-3 text-xs text-[var(--misty-text-subtle)]">Loading Spaces…</p> : null}
+          <button className="mt-1 inline-flex min-h-10 w-full items-center gap-2 rounded-xl border border-dashed border-[var(--misty-border-strong)] bg-transparent px-2.5 text-left text-xs font-medium text-[var(--misty-text-muted)] transition-colors hover:border-[var(--misty-accent)] hover:bg-[var(--misty-surface-2)] hover:text-[var(--misty-text)] disabled:cursor-not-allowed disabled:opacity-45" type="button" disabled={(limits?.remaining_owned ?? 1) === 0} onClick={() => { clearError(); setCreateOpen(true); }} title={(limits?.remaining_owned ?? 1) === 0 ? "You already own three Spaces" : "Add workspace"}>
+            <Plus size={15} aria-hidden="true"/><span>Add workspace</span>
+          </button>
         </nav>
         {invitations.length > 0 ? (
           <section className="mt-5 border-t border-[var(--misty-border-soft)] pt-4">
@@ -149,7 +144,7 @@ export default function SpacesShell() {
           </section>
         ) : null}
       </aside>
-      <main className="min-h-0 min-w-0"><Outlet /></main>
+      <main className="min-h-0 min-w-0 bg-[var(--misty-bg)]"><Outlet /></main>
       {createOpen ? (
         <div className="fixed inset-0 z-[2147483000] grid place-items-center bg-black/60 p-6" role="presentation" onMouseDown={(event) => { if (event.currentTarget === event.target && !creating) { clearError(); setCreateOpen(false); } }}>
           <form className="w-full max-w-sm rounded-2xl border border-[var(--misty-border-strong)] bg-[var(--misty-modal-bg,var(--misty-surface))] p-5 shadow-2xl" onSubmit={(event) => void onCreate(event)}>
@@ -200,9 +195,9 @@ export function PersonalSpaceRedirect() {
 function SpaceSectionNavigation({ spaceId, section }: { spaceId: string; section: string }) {
   const navigate = useNavigate();
   return (
-    <nav className="flex shrink-0 rounded-xl bg-[var(--misty-surface-2)] p-1" aria-label="Space sections">
+    <nav className="flex shrink-0 rounded-xl border border-[var(--misty-border-soft)] bg-[var(--misty-surface)] p-1" aria-label="Space sections">
       {spaceSectionItems.map(({ id, label, icon: Icon }) => (
-        <button key={id} className={`grid size-9 place-items-center rounded-lg border-0 ${section === id ? "bg-[var(--misty-surface-3)] text-[var(--misty-text)] shadow-sm" : "bg-transparent text-[var(--misty-text-muted)] hover:text-[var(--misty-text)]"}`} type="button" onClick={() => navigate(`/spaces/${encodeURIComponent(spaceId)}/${id}`)} aria-label={label} title={label} aria-current={section === id ? "page" : undefined}><Icon size={16}/></button>
+        <button key={id} className={`inline-flex min-h-9 items-center gap-2 rounded-lg border-0 px-3 text-xs font-medium transition-colors max-[900px]:px-2.5 ${section === id ? "bg-[var(--misty-surface-3)] text-[var(--misty-text)] shadow-sm" : "bg-transparent text-[var(--misty-text-muted)] hover:bg-[var(--misty-surface-2)] hover:text-[var(--misty-text)]"}`} type="button" onClick={() => navigate(`/spaces/${encodeURIComponent(spaceId)}/${id}`)} aria-label={label} title={label} aria-current={section === id ? "page" : undefined}><Icon size={15}/><span className="max-[900px]:sr-only">{label}</span></button>
       ))}
     </nav>
   );
@@ -420,6 +415,7 @@ function SpaceLibrary({ spaceId, section }: { spaceId: string; section: string }
   const [items, setItems] = useState<SpaceLibraryItem[]>([]);
   const [visibleItems, setVisibleItems] = useState<SpaceLibraryItem[]>([]);
   const [usage, setUsage] = useState<SpaceStorageUsage | null>(null);
+  const [assetStacks, setAssetStacks] = useState<LibraryAssetStack[]>([]);
   const [albums, setAlbums] = useState<LibraryAlbum[]>([]);
   const [albumFolders, setAlbumFolders] = useState<LibraryAlbumFolder[]>([]);
   const [selectedAlbumFolderId, setSelectedAlbumFolderId] = useState("");
@@ -454,6 +450,12 @@ function SpaceLibrary({ spaceId, section }: { spaceId: string; section: string }
   const [selecting, setSelecting] = useState(false);
   const [selectedItemIds, setSelectedItemIds] = useState<string[]>([]);
   const [bulkSaving, setBulkSaving] = useState(false);
+  const [copiedEditDefinition, setCopiedEditDefinition] = useState<LibraryEditDefinition | null>(null);
+  const [sensitiveGrants, setSensitiveGrants] = useState<Partial<Record<"hidden" | "recently_deleted" | "bulk_export", { token: string; expiresAt: string }>>>({});
+  const [unlockScope, setUnlockScope] = useState<"" | "hidden" | "recently_deleted" | "bulk_export">("");
+  const [unlockPassword, setUnlockPassword] = useState("");
+  const [unlockSaving, setUnlockSaving] = useState(false);
+  const [unlockForExport, setUnlockForExport] = useState(false);
   const [metadataDialogAction, setMetadataDialogAction] = useState<"" | "add_tags" | "remove_tags" | "set_date" | "set_location">("");
   const [metadataTags, setMetadataTags] = useState("");
   const [metadataDate, setMetadataDate] = useState("");
@@ -471,7 +473,10 @@ function SpaceLibrary({ spaceId, section }: { spaceId: string; section: string }
   const [personKind, setPersonKind] = useState<"person" | "pet">("person");
   const [personCoverItemId, setPersonCoverItemId] = useState("");
   const [personSaving, setPersonSaving] = useState(false);
-  const selectedItems = useMemo(() => visibleItems.filter((item) => selectedItemIds.includes(item.id)), [selectedItemIds, visibleItems]);
+  const hiddenStackMemberIDs = useMemo(() => new Set(assetStacks.flatMap((stack) => stack.members.filter((member) => member.item_id !== stack.cover_item_id).map((member) => member.item_id))), [assetStacks]);
+  const displayItems = useMemo(() => visibleItems.filter((item) => !hiddenStackMemberIDs.has(item.id)), [hiddenStackMemberIDs, visibleItems]);
+  const stackByItemID = useMemo(() => new Map(assetStacks.flatMap((stack) => stack.members.map((member) => [member.item_id, stack] as const))), [assetStacks]);
+  const selectedItems = useMemo(() => displayItems.filter((item) => selectedItemIds.includes(item.id)), [displayItems, selectedItemIds]);
   const currentAlbum = useMemo(() => collection === "albums" && selectedCollectionId ? albums.find((album) => album.id === selectedCollectionId) ?? null : null, [albums, collection, selectedCollectionId]);
   const currentAlbumFolder = useMemo(() => albumFolders.find((folder) => folder.id === selectedAlbumFolderId) ?? null, [albumFolders, selectedAlbumFolderId]);
   const visibleAlbumFolders = useMemo(() => albumFolders.filter((folder) => (folder.parent_folder_id ?? "") === selectedAlbumFolderId), [albumFolders, selectedAlbumFolderId]);
@@ -482,6 +487,23 @@ function SpaceLibrary({ spaceId, section }: { spaceId: string; section: string }
   const currentDateGroup = useMemo(() => collection === "recent-days" ? discovery.recent_days.find((group) => group.id === selectedCollectionId) ?? null : collection === "months" ? discovery.months.find((group) => group.id === selectedCollectionId) ?? null : collection === "years" ? discovery.years.find((group) => group.id === selectedCollectionId) ?? null : null, [collection, discovery.months, discovery.recent_days, discovery.years, selectedCollectionId]);
   const currentMapPoint = useMemo(() => collection === "map" && selectedCollectionId ? discovery.map_points.find((point) => point.id === selectedCollectionId) ?? null : null, [collection, discovery.map_points, selectedCollectionId]);
   const canReorderAlbum = Boolean(currentAlbum && currentAlbum.sort_mode === "custom" && sort === "album-order" && !searchQuery && !mediaType && currentAlbum.item_count === visibleItems.length);
+  const sensitiveCollectionScope = collection === "hidden" ? "hidden" : collection === "deleted" ? "recently_deleted" : "";
+  const sensitiveCollectionToken = sensitiveCollectionScope ? activeSensitiveGrant(sensitiveGrants[sensitiveCollectionScope]) : "";
+
+  useEffect(() => {
+    setSensitiveGrants({});
+    setUnlockScope("");
+    setUnlockPassword("");
+    setUnlockForExport(false);
+  }, [spaceId]);
+
+  useEffect(() => {
+    const expirations = Object.values(sensitiveGrants).map((grant) => grant?.expiresAt ? Date.parse(grant.expiresAt) : Number.NaN).filter(Number.isFinite);
+    if (expirations.length === 0) return;
+    const delay = Math.max(0, Math.min(...expirations) - Date.now());
+    const timer = window.setTimeout(() => setSensitiveGrants((current) => Object.fromEntries(Object.entries(current).filter(([, grant]) => activeSensitiveGrant(grant) !== "")) as typeof current), delay + 25);
+    return () => window.clearTimeout(timer);
+  }, [sensitiveGrants]);
 
   const libraryQuery = useMemo<LibraryItemQuery>(() => ({
     q: searchQuery,
@@ -513,7 +535,7 @@ function SpaceLibrary({ spaceId, section }: { spaceId: string; section: string }
 
   useEffect(() => {
     let current = true;
-    void Promise.all([spacesApi.libraryUsage(spaceId), spacesApi.albums(spaceId), spacesApi.albumFolders(spaceId).catch(() => ({ folders: [] })), spacesApi.groups(spaceId).catch(() => ({ groups: [] })), spacesApi.peoplePolicy(spaceId).catch(() => null), spacesApi.people(spaceId).catch(() => ({ people: [] })), spacesApi.libraryDiscovery(spaceId).catch(() => ({ recent_days: [], months: [], years: [], memories: [], trips: [], duplicates: [], map_points: [] })), spacesApi.sharedReferences(spaceId).catch(() => ({ references: [], outgoing: [] })), spacesApi.libraryPins(spaceId).catch(() => ({ pins: [] })), spacesApi.libraryImportHistory(spaceId).catch(() => ({ imports: [] }))]).then(([currentUsage, albumResult, folderResult, groupResult, policyResult, peopleResult, discoveryResult, sharedResult, pinResult, importResult]) => {
+    void Promise.all([spacesApi.libraryUsage(spaceId), spacesApi.albums(spaceId), spacesApi.albumFolders(spaceId).catch(() => ({ folders: [] })), spacesApi.groups(spaceId).catch(() => ({ groups: [] })), spacesApi.peoplePolicy(spaceId).catch(() => null), spacesApi.people(spaceId).catch(() => ({ people: [] })), spacesApi.libraryDiscovery(spaceId).catch(() => ({ recent_days: [], months: [], years: [], memories: [], trips: [], duplicates: [], map_points: [] })), spacesApi.sharedReferences(spaceId).catch(() => ({ references: [], outgoing: [] })), spacesApi.libraryPins(spaceId).catch(() => ({ pins: [] })), spacesApi.libraryImportHistory(spaceId).catch(() => ({ imports: [] })), spacesApi.libraryAssetStacks(spaceId).catch(() => ({ stacks: [] }))]).then(([currentUsage, albumResult, folderResult, groupResult, policyResult, peopleResult, discoveryResult, sharedResult, pinResult, importResult, stackResult]) => {
       if (!current) return;
       setUsage(currentUsage);
       setAlbums(albumResult.albums);
@@ -526,12 +548,19 @@ function SpaceLibrary({ spaceId, section }: { spaceId: string; section: string }
       setOutgoingReferences(sharedResult.outgoing);
       setPins(pinResult.pins);
       setImportHistory(importResult.imports);
+      setAssetStacks(stackResult.stacks);
     }).catch((error: unknown) => current && setLocalError(error instanceof Error ? error.message : "Library could not be loaded."));
     return () => { current = false; };
   }, [reloadKey, spaceId]);
 
   useEffect(() => {
     let current = true;
+    if (sensitiveCollectionScope && !sensitiveCollectionToken) {
+      setItems([]);
+      setVisibleItems([]);
+      setLoading(false);
+      return () => { current = false; };
+    }
     if (collection === "collections" || collection === "shared" || collection === "imports" || (collection === "recent-days" || collection === "months" || collection === "years" || collection === "people" || collection === "albums" || collection === "groups" || collection === "duplicate" || collection === "map") && !selectedCollectionId) {
       setItems([]);
       setVisibleItems([]);
@@ -554,7 +583,7 @@ function SpaceLibrary({ spaceId, section }: { spaceId: string; section: string }
       ? spacesApi.groupItems(spaceId, selectedCollectionId)
       : collection === "albums" && selectedCollectionId
         ? spacesApi.albumItems(spaceId, selectedCollectionId)
-        : spacesApi.libraryItems(spaceId, libraryQuery);
+        : spacesApi.libraryItems(spaceId, libraryQuery, sensitiveCollectionToken);
     void request.then((library) => {
       if (!current) return;
       let nextItems = library.items;
@@ -571,9 +600,16 @@ function SpaceLibrary({ spaceId, section }: { spaceId: string; section: string }
       setItems(nextItems);
       setVisibleItems(nextItems);
       setNextAfter(collection === "recent-days" || collection === "months" || collection === "years" || collection === "people" || collection === "groups" || collection === "memory" || collection === "trip" || collection === "map" || collection === "duplicate" || collection === "albums" && selectedCollectionId ? "" : (library as { next_after?: string }).next_after ?? "");
-    }).catch((error: unknown) => current && setLocalError(error instanceof Error ? error.message : "Library could not be loaded.")).finally(() => current && setLoading(false));
+    }).catch((error: unknown) => {
+      if (!current) return;
+      if (error instanceof SpaceRequestError && error.code === "library_reauthentication_required" && sensitiveCollectionScope) {
+        setSensitiveGrants((grants) => ({ ...grants, [sensitiveCollectionScope]: undefined }));
+        return;
+      }
+      setLocalError(error instanceof Error ? error.message : "Library could not be loaded.");
+    }).finally(() => current && setLoading(false));
     return () => { current = false; };
-  }, [collection, libraryQuery, mediaType, peoplePolicy?.semantic_search_enabled, reloadKey, searchQuery, selectedCollectionId, sort, direction, spaceId]);
+  }, [collection, libraryQuery, mediaType, peoplePolicy?.semantic_search_enabled, reloadKey, searchQuery, selectedCollectionId, sensitiveCollectionScope, sensitiveCollectionToken, sort, direction, spaceId]);
 
   useEffect(() => {
     if (collection !== "memory" || !selectedCollectionId) {
@@ -591,7 +627,7 @@ function SpaceLibrary({ spaceId, section }: { spaceId: string; section: string }
   }, [collection, mediaType, searchQuery, selectedCollectionId, sort, direction, spaceId]);
 
   const reload = async () => {
-    const [currentUsage, albumResult, folderResult, groupResult, policyResult, peopleResult, discoveryResult, sharedResult, pinResult, importResult] = await Promise.all([spacesApi.libraryUsage(spaceId), spacesApi.albums(spaceId), spacesApi.albumFolders(spaceId).catch(() => ({ folders: [] })), spacesApi.groups(spaceId).catch(() => ({ groups: [] })), spacesApi.peoplePolicy(spaceId).catch(() => null), spacesApi.people(spaceId).catch(() => ({ people: [] })), spacesApi.libraryDiscovery(spaceId).catch(() => ({ recent_days: [], months: [], years: [], memories: [], trips: [], duplicates: [], map_points: [] })), spacesApi.sharedReferences(spaceId).catch(() => ({ references: [], outgoing: [] })), spacesApi.libraryPins(spaceId).catch(() => ({ pins: [] })), spacesApi.libraryImportHistory(spaceId).catch(() => ({ imports: [] }))]);
+    const [currentUsage, albumResult, folderResult, groupResult, policyResult, peopleResult, discoveryResult, sharedResult, pinResult, importResult, stackResult] = await Promise.all([spacesApi.libraryUsage(spaceId), spacesApi.albums(spaceId), spacesApi.albumFolders(spaceId).catch(() => ({ folders: [] })), spacesApi.groups(spaceId).catch(() => ({ groups: [] })), spacesApi.peoplePolicy(spaceId).catch(() => null), spacesApi.people(spaceId).catch(() => ({ people: [] })), spacesApi.libraryDiscovery(spaceId).catch(() => ({ recent_days: [], months: [], years: [], memories: [], trips: [], duplicates: [], map_points: [] })), spacesApi.sharedReferences(spaceId).catch(() => ({ references: [], outgoing: [] })), spacesApi.libraryPins(spaceId).catch(() => ({ pins: [] })), spacesApi.libraryImportHistory(spaceId).catch(() => ({ imports: [] })), spacesApi.libraryAssetStacks(spaceId).catch(() => ({ stacks: [] }))]);
     setUsage(currentUsage);
     setAlbums(albumResult.albums);
     setAlbumFolders(folderResult.folders);
@@ -603,6 +639,7 @@ function SpaceLibrary({ spaceId, section }: { spaceId: string; section: string }
     setOutgoingReferences(sharedResult.outgoing);
     setPins(pinResult.pins);
     setImportHistory(importResult.imports);
+    setAssetStacks(stackResult.stacks);
     setReloadKey((current) => current + 1);
   };
 
@@ -610,7 +647,7 @@ function SpaceLibrary({ spaceId, section }: { spaceId: string; section: string }
     if (!nextAfter || loadingMore || collection === "groups") return;
     setLoadingMore(true);
     try {
-      const result = await spacesApi.libraryItems(spaceId, { ...libraryQuery, after: nextAfter });
+      const result = await spacesApi.libraryItems(spaceId, { ...libraryQuery, after: nextAfter }, sensitiveCollectionToken);
       setItems((current) => [...current, ...result.items]);
       setVisibleItems((current) => [...current, ...result.items]);
       setNextAfter(result.next_after ?? "");
@@ -626,7 +663,12 @@ function SpaceLibrary({ spaceId, section }: { spaceId: string; section: string }
     setUploading(true);
     setLocalError("");
     try {
-      for (const file of Array.from(files)) await spacesApi.uploadLibraryFile(spaceId, file, "library");
+      const uploaded: SpaceLibraryItem[] = [];
+      for (const file of Array.from(files)) {
+        const result = await spacesApi.uploadLibraryFile(spaceId, file, "library");
+        if (result.item) uploaded.push(result.item);
+      }
+      await Promise.allSettled(detectUploadedAssetStacks(uploaded).map((input) => spacesApi.createLibraryAssetStack(spaceId, input)));
       await reload();
     } catch (error) {
       setLocalError(error instanceof Error ? error.message : "Upload failed.");
@@ -636,9 +678,100 @@ function SpaceLibrary({ spaceId, section }: { spaceId: string; section: string }
     }
   };
 
+  const createSelectedAssetStack = async (kind: LibraryAssetStack["kind"]) => {
+    const input = buildLibraryAssetStack(kind, selectedItems);
+    if (!input) {
+      setLocalError(kind === "live_photo" ? "Select one image and one video to make a Live Photo." : kind === "raw_pair" ? "Select one RAW file and one rendered image to make a RAW pair." : "Select at least two images to make a burst.");
+      return;
+    }
+    setBulkSaving(true);
+    setLocalError("");
+    try {
+      await spacesApi.createLibraryAssetStack(spaceId, input, sensitiveCollectionToken);
+      setSelectedItemIds([]);
+      setSelecting(false);
+      await reload();
+    } catch (error) {
+      setLocalError(error instanceof Error ? error.message : "The selected files could not be grouped.");
+    } finally {
+      setBulkSaving(false);
+    }
+  };
+
+  const duplicateItems = async (itemIDs: string[]) => {
+    if (itemIDs.length === 0 || bulkSaving) return;
+    setBulkSaving(true);
+    setLocalError("");
+    try {
+      await spacesApi.duplicateLibraryItems(spaceId, itemIDs, sensitiveCollectionToken);
+      setSelectedItemIds([]);
+      setSelecting(false);
+      await reload();
+    } catch (error) {
+      setLocalError(error instanceof Error ? error.message : "The selected Library items could not be duplicated.");
+    } finally {
+      setBulkSaving(false);
+    }
+  };
+
+  const pasteEdits = async () => {
+    if (!copiedEditDefinition || selectedItems.length === 0 || bulkSaving) return;
+    const editableItems = selectedItems.filter((item) => /^(image|video)\//.test(libraryItemMIME(item)));
+    if (editableItems.length === 0) {
+      setLocalError("Select images or videos to paste these edits.");
+      return;
+    }
+    setBulkSaving(true);
+    setLocalError("");
+    try {
+      for (const item of editableItems) {
+        const result = await spacesApi.createEditVersion(spaceId, item, copiedEditDefinition, sensitiveCollectionToken);
+        if (result.edit) await spacesApi.renderEditVersion(spaceId, item.id, result.edit.id, 0, sensitiveCollectionToken);
+      }
+      setSelectedItemIds([]);
+      setSelecting(false);
+      await reload();
+    } catch (error) {
+      setLocalError(error instanceof Error ? error.message : "The edits could not be pasted.");
+    } finally {
+      setBulkSaving(false);
+    }
+  };
+
+  const setAssetStackCover = async (stack: LibraryAssetStack, coverItemID: string) => {
+    try {
+      const saved = await spacesApi.updateLibraryAssetStack(spaceId, stack, { cover_item_id: coverItemID }, sensitiveCollectionToken);
+      setAssetStacks((current) => current.map((candidate) => candidate.id === saved.id ? saved : candidate));
+      setSelectedItemId(saved.cover_item_id);
+      await reload();
+    } catch (error) {
+      setLocalError(error instanceof Error ? error.message : "The key photo could not be changed.");
+    }
+  };
+
+  const setAssetStackEffect = async (stack: LibraryAssetStack, effect: LibraryAssetStack["effect"]) => {
+    try {
+      const saved = await spacesApi.updateLibraryAssetStack(spaceId, stack, { effect }, sensitiveCollectionToken);
+      setAssetStacks((current) => current.map((candidate) => candidate.id === saved.id ? saved : candidate));
+    } catch (error) {
+      setLocalError(error instanceof Error ? error.message : "The Live Photo effect could not be changed.");
+    }
+  };
+
+  const ungroupAssetStack = async (stack: LibraryAssetStack) => {
+    if (!window.confirm(`Separate this ${stack.kind === "live_photo" ? "Live Photo" : stack.kind === "raw_pair" ? "RAW pair" : "burst"}?`)) return;
+    try {
+      await spacesApi.deleteLibraryAssetStack(spaceId, stack, sensitiveCollectionToken);
+      setAssetStacks((current) => current.filter((candidate) => candidate.id !== stack.id));
+      await reload();
+    } catch (error) {
+      setLocalError(error instanceof Error ? error.message : "The grouped media could not be separated.");
+    }
+  };
+
   const updateItem = async (item: SpaceLibraryItem, patch: Partial<Pick<SpaceLibraryItem, "display_name" | "caption" | "favorite" | "hidden" | "tags">>) => {
     try {
-      const saved = await spacesApi.updateLibraryItem(spaceId, item, patch);
+      const saved = await spacesApi.updateLibraryItem(spaceId, item, patch, sensitiveCollectionToken);
       const remainsVisible = collection === "hidden" ? saved.hidden : !saved.hidden && (collection !== "favorites" || saved.favorite);
       setItems((current) => remainsVisible ? current.map((candidate) => candidate.id === saved.id ? saved : candidate) : current.filter((candidate) => candidate.id !== saved.id));
       setVisibleItems((current) => remainsVisible ? current.map((candidate) => candidate.id === saved.id ? saved : candidate) : current.filter((candidate) => candidate.id !== saved.id));
@@ -657,7 +790,7 @@ function SpaceLibrary({ spaceId, section }: { spaceId: string; section: string }
   const trashItem = async (item: SpaceLibraryItem) => {
     if (!window.confirm(`Move “${item.display_name}” to Recently Deleted?`)) return false;
     try {
-      await spacesApi.trashLibraryItem(spaceId, item.id);
+      await spacesApi.trashLibraryItem(spaceId, item.id, sensitiveCollectionToken);
       setItems((current) => current.filter((candidate) => candidate.id !== item.id));
       setVisibleItems((current) => current.filter((candidate) => candidate.id !== item.id));
       setSelectedItemId("");
@@ -670,7 +803,7 @@ function SpaceLibrary({ spaceId, section }: { spaceId: string; section: string }
 
   const restoreItem = async (item: SpaceLibraryItem) => {
     try {
-      await spacesApi.restoreLibraryItem(spaceId, item.id);
+      await spacesApi.restoreLibraryItem(spaceId, item.id, sensitiveCollectionToken);
       setItems((current) => current.filter((candidate) => candidate.id !== item.id));
       setVisibleItems((current) => current.filter((candidate) => candidate.id !== item.id));
       setSelectedItemId("");
@@ -694,7 +827,7 @@ function SpaceLibrary({ spaceId, section }: { spaceId: string; section: string }
     setBulkSaving(true);
     setLocalError("");
     try {
-      await spacesApi.bulkLibraryItems(spaceId, selectedItems, action, options);
+      await spacesApi.bulkLibraryItems(spaceId, selectedItems, action, options, sensitiveCollectionToken);
       setSelectedItemIds([]);
       setSelecting(false);
       await reload();
@@ -757,16 +890,53 @@ function SpaceLibrary({ spaceId, section }: { spaceId: string; section: string }
     await applyBulkAction(action);
   };
 
-  const exportSelectedItems = async () => {
+  const performExport = async (reauthenticationToken: string) => {
     if (selectedItems.length === 0 || bulkSaving) return;
     setBulkSaving(true);
     setLocalError("");
     try {
-      await spacesApi.exportLibraryItems(spaceId, selectedItems.map((item) => item.id));
+      await spacesApi.exportLibraryItems(spaceId, selectedItems.map((item) => item.id), reauthenticationToken);
     } catch (error) {
       setLocalError(error instanceof Error ? error.message : "Selected Library items could not be exported.");
     } finally {
       setBulkSaving(false);
+    }
+  };
+
+  const exportSelectedItems = async () => {
+    const token = activeSensitiveGrant(sensitiveGrants.bulk_export);
+    if (token) {
+      await performExport(token);
+      return;
+    }
+    setUnlockPassword("");
+    setUnlockForExport(true);
+    setUnlockScope("bulk_export");
+  };
+
+  const requestSensitiveUnlock = (scope: "hidden" | "recently_deleted") => {
+    setUnlockPassword("");
+    setUnlockForExport(false);
+    setUnlockScope(scope);
+  };
+
+  const submitSensitiveUnlock = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!unlockScope || !unlockPassword || unlockSaving) return;
+    setUnlockSaving(true);
+    setLocalError("");
+    try {
+      const grant = await spacesApi.reauthenticateLibrary(spaceId, unlockScope, unlockPassword);
+      setSensitiveGrants((current) => ({ ...current, [unlockScope]: { token: grant.token, expiresAt: grant.expires_at } }));
+      const exportAfterUnlock = unlockForExport;
+      setUnlockScope("");
+      setUnlockPassword("");
+      setUnlockForExport(false);
+      if (exportAfterUnlock) await performExport(grant.token);
+    } catch (error) {
+      setLocalError(error instanceof Error ? error.message : "This collection could not be unlocked.");
+    } finally {
+      setUnlockSaving(false);
     }
   };
 
@@ -775,7 +945,7 @@ function SpaceLibrary({ spaceId, section }: { spaceId: string; section: string }
     setBulkSaving(true);
     setLocalError("");
     try {
-      await spacesApi.importLibraryItems(spaceId, destinationSpaceId, selectedItems.map((item) => item.id));
+      await spacesApi.importLibraryItems(spaceId, destinationSpaceId, selectedItems.map((item) => item.id), sensitiveCollectionToken);
       setSelectedItemIds([]);
       setSelecting(false);
     } catch (error) {
@@ -790,7 +960,7 @@ function SpaceLibrary({ spaceId, section }: { spaceId: string; section: string }
     setBulkSaving(true);
     setLocalError("");
     try {
-      await spacesApi.shareLibraryItems(spaceId, destinationSpaceId, selectedItems.map((item) => item.id));
+      await spacesApi.shareLibraryItems(spaceId, destinationSpaceId, selectedItems.map((item) => item.id), sensitiveCollectionToken);
       setSelectedItemIds([]);
       setSelecting(false);
     } catch (error) {
@@ -1157,27 +1327,10 @@ function SpaceLibrary({ spaceId, section }: { spaceId: string; section: string }
   };
 
   return (
-    <div className="grid h-full min-h-0 grid-rows-[auto_auto_minmax(0,1fr)]">
-      <div className="flex min-h-14 flex-wrap items-center justify-between gap-3 border-b border-[var(--misty-border-soft)] px-6 py-2">
-        <div className="flex items-center gap-2"><LibraryIcon size={18}/><h3 className="m-0 text-base">Library</h3></div>
-        <div className="flex items-center gap-3">
-          <SpaceSectionNavigation spaceId={spaceId} section={section}/>
-        </div>
-      </div>
-      <nav className="flex items-center gap-1 overflow-x-auto border-b border-[var(--misty-border-soft)] px-6 py-2" aria-label="Library collections">
-        <input ref={inputRef} className="hidden" type="file" multiple onChange={(event) => void uploadFiles(event.target.files)} />
-        <button className={`${primaryButtonClass} mr-2 h-8 min-h-8 shrink-0`} type="button" disabled={uploading || (usage?.remaining_bytes ?? 1) <= 0} onClick={() => inputRef.current?.click()}><Upload size={14}/>{uploading ? "Uploading…" : "Upload"}</button>
-        {([{ id: "recent", label: "Recently Added" }, { id: "months", label: "Months" }, { id: "years", label: "Years" }, { id: "collections", label: "Collections" }] as const).map(({ id, label }) => <button className={`rounded-lg border-0 px-3 py-1.5 text-xs ${collection === id ? "bg-[var(--misty-surface-3)] text-[var(--misty-text)]" : "bg-transparent text-[var(--misty-text-muted)] hover:bg-[var(--misty-surface-2)] hover:text-[var(--misty-text)]"}`} type="button" key={id} onClick={() => selectCollection(id)}>{label}</button>)}
-        <div className="ml-auto flex items-center gap-2 pl-3">
-          <label className="flex h-8 w-44 shrink-0 items-center gap-2 rounded-lg border border-[var(--misty-border-soft)] bg-[var(--misty-surface)] px-2 text-[var(--misty-text-muted)]"><Search size={13}/><input className="min-w-0 flex-1 border-0 bg-transparent text-xs text-[var(--misty-text)] outline-none placeholder:text-[var(--misty-text-subtle)]" value={searchInput} onChange={(event) => setSearchInput(event.target.value)} onFocus={() => setSearchFocused(true)} onBlur={() => window.setTimeout(() => setSearchFocused(false), 120)} placeholder="Search" aria-label="Search Library"/>{searchInput ? <button className="grid size-5 shrink-0 place-items-center border-0 bg-transparent p-0 text-[var(--misty-text-subtle)]" type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => setSearchInput("")} aria-label="Clear Library search"><X size={11}/></button> : null}</label>
-          <select className={libraryControlClass} value={mediaType} onChange={(event) => setMediaType(event.target.value as typeof mediaType)} aria-label="Filter by media type"><option value="">All media</option><option value="image">Images</option><option value="video">Videos</option><option value="audio">Audio</option><option value="document">Documents</option><option value="selfies">Selfies</option><option value="live-photos">Live Photos</option><option value="portraits">Portraits</option><option value="panoramas">Panoramas</option><option value="slo-mo">Slo-mo</option><option value="cinematic">Cinematic</option><option value="bursts">Bursts</option><option value="screenshots">Screenshots</option><option value="screen-recordings">Screen Recordings</option><option value="spatial">Spatial</option></select>
-          <select className={libraryControlClass} value={["favorites", "hidden", "deleted"].includes(collection) ? collection : ""} onChange={(event) => selectCollection((event.target.value || "recent") as "recent" | "favorites" | "hidden" | "deleted")} aria-label="Choose a Library utility"><option value="">More</option><option value="favorites">Favorites</option><option value="hidden">Hidden</option><option value="deleted">Recently Deleted</option></select>
-          <select className={libraryControlClass} value={`${sort}:${direction}`} onChange={(event) => { const [nextSort, nextDirection] = event.target.value.split(":") as [typeof sort, typeof direction]; setSort(nextSort); setDirection(nextDirection); }} aria-label="Sort Library">{currentAlbum ? <option value="album-order:asc">Album order</option> : null}<option value="recently-added:desc">Newest added</option><option value="recently-added:asc">Oldest added</option><option value="date-captured:desc">Newest captured</option><option value="date-captured:asc">Oldest captured</option><option value="name:asc">Name A–Z</option><option value="name:desc">Name Z–A</option><option value="size:desc">Largest</option><option value="size:asc">Smallest</option></select>
-          <div className="flex h-8 shrink-0 items-center rounded-lg border border-[var(--misty-border-soft)] bg-[var(--misty-surface)]"><button className="grid size-7 place-items-center border-0 bg-transparent p-0 text-[var(--misty-text-muted)] disabled:opacity-30" type="button" disabled={gridSize <= 120} onClick={() => setGridSize((current) => Math.max(120, current - 30))} aria-label="Show smaller Library thumbnails"><ZoomOut size={13}/></button><button className="grid size-7 place-items-center border-0 bg-transparent p-0 text-[var(--misty-text-muted)] disabled:opacity-30" type="button" disabled={gridSize >= 300} onClick={() => setGridSize((current) => Math.min(300, current + 30))} aria-label="Show larger Library thumbnails"><ZoomIn size={13}/></button><button className={`h-6 border-0 px-2 text-[10px] ${squareGrid ? "bg-[var(--misty-surface-3)] text-[var(--misty-text)]" : "bg-transparent text-[var(--misty-text-muted)]"}`} type="button" onClick={() => setSquareGrid((current) => !current)} aria-label="Toggle square Library thumbnails">1:1</button></div>
-          <button className={`${secondaryButtonClass} h-8 min-h-8 shrink-0`} type="button" disabled={visibleItems.length === 0} onClick={() => { setSelecting((current) => !current); setSelectedItemIds([]); setSelectedItemId(""); }}>{selecting ? "Cancel" : "Select"}</button>
-        </div>
-      </nav>
-      <div className="min-h-0 overflow-auto p-6">
+    <div className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] bg-[var(--misty-bg)]">
+      <input ref={inputRef} className="hidden" type="file" multiple onChange={(event) => void uploadFiles(event.target.files)} />
+      <SpaceLibraryHeader sectionNavigation={<SpaceSectionNavigation spaceId={spaceId} section={section}/>} collection={collection} onSelectCollection={(nextCollection) => selectCollection(nextCollection)} uploading={uploading} uploadDisabled={uploading || (usage?.remaining_bytes ?? 1) <= 0} onUpload={() => inputRef.current?.click()} searchInput={searchInput} onSearchInput={setSearchInput} onSearchFocus={() => setSearchFocused(true)} onSearchBlur={() => window.setTimeout(() => setSearchFocused(false), 120)} mediaType={mediaType} onMediaType={(value) => setMediaType(value as typeof mediaType)} onSelectUtility={(nextCollection) => selectCollection(nextCollection)} sort={sort} direction={direction} onSort={(nextSort, nextDirection) => { setSort(nextSort); setDirection(nextDirection); }} albumOrderAvailable={Boolean(currentAlbum)} gridSize={gridSize} squareGrid={squareGrid} onSmallerGrid={() => setGridSize((current) => Math.max(120, current - 30))} onLargerGrid={() => setGridSize((current) => Math.min(300, current + 30))} onToggleSquareGrid={() => setSquareGrid((current) => !current)} visibleItemCount={visibleItems.length} selecting={selecting} onToggleSelecting={() => { setSelecting((current) => !current); setSelectedItemIds([]); setSelectedItemId(""); }}/>
+      <div className="min-h-0 overflow-auto bg-[var(--misty-bg)] px-6 pb-6 pt-5">
         {searchFocused && (searchFacets.tags.length > 0 || searchFacets.media_types.length > 0 || searchFacets.years.length > 0 || searchFacets.albums.length > 0 || searchFacets.utilities.length > 0) ? <div className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-[var(--misty-border-soft)] bg-[var(--misty-surface)] p-3" onMouseDown={(event) => event.preventDefault()}>
           {searchFacets.media_types.length > 0 ? <LibraryFacetGroup label="Media" facets={searchFacets.media_types} onSelect={(facet) => appendSearchFacet("type", facet.value)}/> : null}
           {searchFacets.tags.length > 0 ? <LibraryFacetGroup label="Tags" facets={searchFacets.tags} onSelect={(facet) => appendSearchFacet("tag", facet.value)}/> : null}
@@ -1185,16 +1338,19 @@ function SpaceLibrary({ spaceId, section }: { spaceId: string; section: string }
           {searchFacets.years.length > 0 ? <LibraryFacetGroup label="Years" facets={searchFacets.years} onSelect={(facet) => appendSearchFacet("year", facet.value)}/> : null}
           {searchFacets.utilities.length > 0 ? <LibraryFacetGroup label="Utilities" facets={searchFacets.utilities} onSelect={(facet) => selectCollection("utility", facet.value)}/> : null}
         </div> : null}
-        {selecting && visibleItems.length > 0 ? <div className="mb-4 flex min-h-10 flex-wrap items-center gap-2 rounded-xl border border-[var(--misty-border-soft)] bg-[var(--misty-surface)] px-3 py-2">
+        {selecting && displayItems.length > 0 ? <div className="mb-4 flex min-h-10 flex-wrap items-center gap-2 rounded-xl border border-[var(--misty-border-soft)] bg-[var(--misty-surface)] px-3 py-2">
           <span className="mr-1 text-xs font-medium">{selectedItems.length} selected</span>
-          <button className={smallButtonClass} type="button" disabled={bulkSaving} onClick={() => setSelectedItemIds(selectedItems.length === visibleItems.length ? [] : visibleItems.map((item) => item.id))}>{selectedItems.length === visibleItems.length ? "Deselect all" : "Select all"}</button>
+          <button className={smallButtonClass} type="button" disabled={bulkSaving} onClick={() => setSelectedItemIds(selectedItems.length === displayItems.length ? [] : displayItems.map((item) => item.id))}>{selectedItems.length === displayItems.length ? "Deselect all" : "Select all"}</button>
           {collection === "deleted" ? <button className={smallButtonClass} type="button" disabled={bulkSaving || selectedItems.length === 0} onClick={() => void applyBulkAction("restore")}>Restore</button> : <>
             <button className={smallButtonClass} type="button" disabled={bulkSaving || selectedItems.length === 0} onClick={() => void applyBulkAction(collection === "favorites" ? "unfavorite" : "favorite")}><Star size={12}/>{collection === "favorites" ? "Unfavorite" : "Favorite"}</button>
             <button className={smallButtonClass} type="button" disabled={bulkSaving || selectedItems.length === 0} onClick={() => void applyBulkAction(collection === "hidden" ? "unhide" : "hide")}><EyeOff size={12}/>{collection === "hidden" ? "Unhide" : "Hide"}</button>
             {collection === "albums" && selectedCollectionId ? <button className={smallButtonClass} type="button" disabled={bulkSaving || selectedItems.length === 0} onClick={() => void applyBulkAction("remove_from_album", { albumId: selectedCollectionId })}>Remove from album</button> : null}
             {albums.length > 0 ? <select className={libraryControlClass} value="" disabled={bulkSaving || selectedItems.length === 0} onChange={(event) => { if (event.target.value) void applyBulkAction("add_to_album", { albumId: event.target.value }); }} aria-label="Add selected items to album"><option value="">Add to album…</option>{albums.map((album) => <option value={album.id} key={album.id}>{album.name}</option>)}</select> : null}
             <select className={libraryControlClass} value="" disabled={bulkSaving || selectedItems.length === 0} onChange={(event) => { const action = event.target.value; if (action === "add_tags" || action === "remove_tags" || action === "set_date" || action === "set_location") openMetadataDialog(action); else if (action === "clear_date") void clearBulkMetadata("clear_date", "the adjusted date"); else if (action === "clear_location") void clearBulkMetadata("clear_location", "the location"); }} aria-label="Adjust selected item metadata"><option value="">Adjust…</option><option value="add_tags">Add tags</option><option value="remove_tags">Remove tags</option><option value="set_date">Adjust date</option><option value="clear_date">Clear adjusted date</option><option value="set_location">Set location</option><option value="clear_location">Clear location</option></select>
+            {selectedItems.length >= 2 ? <select className={libraryControlClass} value="" disabled={bulkSaving} onChange={(event) => { const kind = event.target.value as LibraryAssetStack["kind"]; if (kind) void createSelectedAssetStack(kind); }} aria-label="Group selected media"><option value="">Group media…</option><option value="live_photo">Live Photo</option><option value="raw_pair">RAW + JPEG</option><option value="burst">Burst</option></select> : null}
             <button className={smallButtonClass} type="button" disabled={bulkSaving || selectedItems.length === 0} onClick={() => void exportSelectedItems()}><Download size={12}/>Export</button>
+            <button className={smallButtonClass} type="button" disabled={bulkSaving || selectedItems.length === 0} onClick={() => void duplicateItems(selectedItems.map((item) => item.id))}><Copy size={12}/>Duplicate</button>
+            {copiedEditDefinition ? <button className={smallButtonClass} type="button" disabled={bulkSaving || selectedItems.length === 0} onClick={() => void pasteEdits()}><SlidersHorizontal size={12}/>Paste edits</button> : null}
             {availableSpaces.some((space) => space.id !== spaceId) ? <select className={libraryControlClass} value="" disabled={bulkSaving || selectedItems.length === 0} onChange={(event) => { if (event.target.value) void copySelectedItems(event.target.value); }} aria-label="Copy selected items to another Space"><option value="">Copy to Space…</option>{availableSpaces.filter((space) => space.id !== spaceId).map((space) => <option value={space.id} key={space.id}>{space.name}</option>)}</select> : null}
             {availableSpaces.some((space) => space.id !== spaceId) ? <select className={libraryControlClass} value="" disabled={bulkSaving || selectedItems.length === 0} onChange={(event) => { if (event.target.value) void shareSelectedItems(event.target.value); }} aria-label="Share selected items with another Space"><option value="">Share to Space…</option>{availableSpaces.filter((space) => space.id !== spaceId).map((space) => <option value={space.id} key={space.id}>{space.name}</option>)}</select> : null}
             {currentPerson ? <button className={smallButtonClass} type="button" disabled={bulkSaving || selectedItems.length === 0} onClick={() => void applyPersonItems(currentPerson.id, true)}>Remove from {currentPerson.kind === "pet" ? "pet" : "person"}</button> : people.length > 0 && selectedItems.length > 0 && selectedItems.every((item) => String(item.file.intrinsic_metadata.server_detected_mime_type ?? "").startsWith("image/")) ? <select className={libraryControlClass} value="" disabled={bulkSaving} onChange={(event) => { if (event.target.value) void applyPersonItems(event.target.value); }} aria-label="Assign selected images to a person or pet"><option value="">Add to People & Pets…</option>{people.filter((person) => person.kind === "person" ? peoplePolicy?.faces_enabled : peoplePolicy?.pets_enabled).map((person) => <option value={person.id} key={person.id}>{person.name || (person.kind === "pet" ? "Unnamed pet" : "Unnamed person")}</option>)}</select> : null}
@@ -1202,12 +1358,13 @@ function SpaceLibrary({ spaceId, section }: { spaceId: string; section: string }
           </>}
         </div> : null}
         {localError ? <button className="mb-4 rounded-xl border border-red-400/20 bg-red-950/20 px-3 py-2 text-left text-xs text-red-200" type="button" onClick={() => setLocalError("")}>{localError}</button> : null}
-        {(collection === "months" || collection === "years" || collection === "recent-days") && !selectedCollectionId ? <div className="mb-5"><div className="grid grid-cols-[repeat(auto-fill,minmax(190px,1fr))] gap-3">{(collection === "months" ? discovery.months : collection === "years" ? discovery.years : discovery.recent_days).map((group) => <LibraryDiscoveryCard key={`${group.kind}:${group.id}`} spaceId={spaceId} group={group} fallbackIcon={collection === "years" ? History : LibraryIcon} onClick={() => selectCollection(collection, group.id)}/>)}</div>{(collection === "months" ? discovery.months : collection === "years" ? discovery.years : discovery.recent_days).length === 0 ? <div className="grid min-h-48 place-items-center text-sm text-[var(--misty-text-subtle)]">Nothing to see here...</div> : null}</div> : null}
+        {(collection === "months" || collection === "years" || collection === "recent-days") && !selectedCollectionId ? <div className="mb-5"><div className="grid grid-cols-[repeat(auto-fill,minmax(190px,1fr))] gap-3">{(collection === "months" ? discovery.months : collection === "years" ? discovery.years : discovery.recent_days).map((group) => <LibraryDiscoveryCard key={`${group.kind}:${group.id}`} spaceId={spaceId} group={group} fallbackIcon={collection === "years" ? History : LibraryIcon} onClick={() => selectCollection(collection, group.id)}/>)}</div>{(collection === "months" ? discovery.months : collection === "years" ? discovery.years : discovery.recent_days).length === 0 ? <SpaceLibraryEmptyState collection={collection} uploading={uploading} uploadDisabled={uploading || (usage?.remaining_bytes ?? 1) <= 0} onUpload={() => inputRef.current?.click()}/> : null}</div> : null}
         {collection === "collections" ? <div className="grid gap-7">
           {pins.length > 0 ? <section><h4 className="mb-3 mt-0 text-sm">Pinned</h4><div className="grid grid-cols-[repeat(auto-fill,minmax(160px,1fr))] gap-3">{pins.map((pin, index) => { const descriptor = pinnedDescriptor(pin); return descriptor ? <LibraryCollectionCard key={pin.id} {...descriptor} pinned onMoveEarlier={index > 0 ? () => void movePin(pin.id, -1) : undefined} onMoveLater={index < pins.length - 1 ? () => void movePin(pin.id, 1) : undefined} onTogglePin={() => void togglePin(pin.target_kind, pin.target_id)}/> : null; })}</div></section> : null}
           <section><h4 className="mb-3 mt-0 text-sm">Collections</h4><div className="grid grid-cols-[repeat(auto-fill,minmax(160px,1fr))] gap-3">
             <LibraryCollectionCard icon={LibraryIcon} label="Recently Added" count={searchFacets.total} pinned={isPinned("system", "recent")} onTogglePin={() => void togglePin("system", "recent")} onClick={() => selectCollection("recent")}/>
             <LibraryCollectionCard icon={Star} label="Favorites" count={searchFacets.favorites} pinned={isPinned("system", "favorites")} onTogglePin={() => void togglePin("system", "favorites")} onClick={() => selectCollection("favorites")}/>
+            {searchFacets.utilities.find((facet) => facet.value === "featured") ? <LibraryCollectionCard icon={Sparkles} label="Featured Photos" count={searchFacets.utilities.find((facet) => facet.value === "featured")?.count ?? 0} pinned={isPinned("system", "featured")} onTogglePin={() => void togglePin("system", "featured")} onClick={() => selectCollection("utility", "featured")}/> : null}
             <LibraryCollectionCard icon={Users} label="People & Pets" count={people.length} disabled={!peoplePolicy} pinned={isPinned("system", "people")} onTogglePin={() => void togglePin("system", "people")} onClick={() => selectCollection("people")}/>
             {discovery.map_points.length > 0 ? <LibraryCollectionCard icon={MapIcon} label="Map" count={discovery.map_points.reduce((total, point) => total + point.item_count, 0)} pinned={isPinned("system", "map")} onTogglePin={() => void togglePin("system", "map")} onClick={() => selectCollection("map")}/> : null}
             {sharedReferences.length + outgoingReferences.length > 0 ? <LibraryCollectionCard icon={MessagesSquare} label="Shared" count={sharedReferences.length + outgoingReferences.length} pinned={isPinned("system", "shared")} onTogglePin={() => void togglePin("system", "shared")} onClick={() => selectCollection("shared")}/> : null}
@@ -1239,19 +1396,20 @@ function SpaceLibrary({ spaceId, section }: { spaceId: string; section: string }
         {currentDateGroup ? <div className="mb-4"><button className="border-0 bg-transparent p-0 text-xs text-[var(--misty-text-muted)]" type="button" onClick={() => selectCollection(collection)}>← {collection === "recent-days" ? "Recent Days" : collection === "months" ? "Months" : "Years"}</button><h4 className="mb-0 mt-2 text-sm">{currentDateGroup.title}</h4><p className="mb-0 mt-1 text-xs text-[var(--misty-text-subtle)]">{currentDateGroup.subtitle}</p></div> : null}
         {currentPerson ? <div className="mb-4 flex items-center justify-between gap-3"><div><button className="border-0 bg-transparent p-0 text-xs text-[var(--misty-text-muted)]" type="button" onClick={() => selectCollection("people")}>← People & Pets</button><h4 className="mb-0 mt-2 text-sm">{currentPerson.name || (currentPerson.kind === "pet" ? "Unnamed pet" : "Unnamed person")}</h4></div><div className="flex flex-wrap gap-2"><select className={libraryControlClass} value="" onChange={(event) => { if (event.target.value) void mergeCurrentPerson(event.target.value); }} aria-label="Merge this identity"><option value="">Merge into…</option>{people.filter((person) => person.id !== currentPerson.id && person.kind === currentPerson.kind).map((person) => <option value={person.id} key={person.id}>{person.name || "Unnamed"}</option>)}</select><button className={smallButtonClass} type="button" onClick={openEditPerson}><Pencil size={12}/>Edit</button><button className={smallButtonClass} type="button" onClick={() => void deleteCurrentPerson()}><Trash2 size={12}/>Remove</button></div></div> : currentAlbum ? <div className="mb-4 flex flex-wrap items-center justify-between gap-3"><div><button className="border-0 bg-transparent p-0 text-xs text-[var(--misty-text-muted)]" type="button" onClick={() => { setSelectedCollectionId(""); setSelectedAlbumFolderId(currentAlbum.folder_id ?? ""); }}>← Albums</button><h4 className="mb-0 mt-2 text-sm">{currentAlbum.name}</h4>{currentAlbum.description ? <p className="mb-0 mt-1 text-xs text-[var(--misty-text-subtle)]">{currentAlbum.description}</p> : null}</div><div className="flex flex-wrap gap-2"><select className={libraryControlClass} value={currentAlbum.folder_id ?? ""} onChange={(event) => void organizeCurrentAlbum({ folder_id: event.target.value })} aria-label="Move album to folder"><option value="">Top level</option>{albumFolders.map((folder) => <option value={folder.id} key={folder.id}>{folder.name}</option>)}</select><select className={libraryControlClass} value={currentAlbum.sort_mode} onChange={(event) => void organizeCurrentAlbum({ sort_mode: event.target.value as LibraryAlbum["sort_mode"] })} aria-label="Sort album"><option value="custom">Custom order</option><option value="oldest">Oldest first</option><option value="newest">Newest first</option></select><button className={smallButtonClass} type="button" onClick={() => void organizeCurrentAlbum({ view_mode: currentAlbum.view_mode === "grid" ? "list" : "grid" })}>{currentAlbum.view_mode === "grid" ? <List size={12}/> : <Grid3X3 size={12}/>} {currentAlbum.view_mode === "grid" ? "List" : "Grid"}</button><button className={smallButtonClass} type="button" onClick={openEditAlbum}><Pencil size={12}/>Edit</button><button className={smallButtonClass} type="button" onClick={() => void deleteCurrentAlbum()}><Trash2 size={12}/>Delete album</button></div></div> : currentMapPoint ? <div className="mb-4"><button className="border-0 bg-transparent p-0 text-xs text-[var(--misty-text-muted)]" type="button" onClick={() => selectCollection("map")}>← Map</button><h4 className="mb-0 mt-2 text-sm">{currentMapPoint.name}</h4><p className="mb-0 mt-1 text-xs text-[var(--misty-text-subtle)]">{currentMapPoint.latitude.toFixed(2)}, {currentMapPoint.longitude.toFixed(2)}</p></div> : currentDiscoveryGroup ? <div className="mb-4 flex items-end justify-between gap-3"><div><button className="border-0 bg-transparent p-0 text-xs text-[var(--misty-text-muted)]" type="button" onClick={() => selectCollection(currentDiscoveryGroup.kind === "duplicate" ? "duplicate" : "collections")}>← {currentDiscoveryGroup.kind === "duplicate" ? "Duplicates" : "Collections"}</button><h4 className="mb-0 mt-2 text-sm">{currentDiscoveryGroup.title}</h4><p className="mb-0 mt-1 text-xs text-[var(--misty-text-subtle)]">{currentDiscoveryGroup.subtitle}</p></div><div className="flex gap-2">{currentDiscoveryGroup.kind === "memory" && visibleItems.length > 0 ? <button className={primaryButtonClass} type="button" onClick={() => setMemoryPlaybackOpen(true)}><Play size={13}/>Play memory</button> : null}{currentDiscoveryGroup.kind === "duplicate" ? <button className={primaryButtonClass} type="button" disabled={bulkSaving || visibleItems.length < 2} onClick={() => void mergeCurrentDuplicates()}>{bulkSaving ? "Merging…" : "Merge"}</button> : null}</div></div> : selectedCollectionId && !currentDateGroup ? <button className="mb-4 border-0 bg-transparent p-0 text-xs text-[var(--misty-text-muted)]" type="button" onClick={() => selectCollection("collections")}>← Collections</button> : null}
         {currentDiscoveryGroup?.kind === "memory" ? <div className="mb-4 flex flex-wrap gap-2"><button className={smallButtonClass} type="button" onClick={() => { const title = window.prompt("Memory title", currentDiscoveryGroup.title)?.trim(); if (title && title !== currentDiscoveryGroup.title) void updateCurrentMemory({ title }); }}><Pencil size={12}/>Rename</button><select className={libraryControlClass} value={currentDiscoveryGroup.cover_item_id ?? ""} onChange={(event) => void updateCurrentMemory({ cover_item_id: event.target.value })} aria-label="Choose memory key photo">{visibleItems.map((candidate) => <option value={candidate.id} key={candidate.id}>{candidate.display_name}</option>)}</select><select className={libraryControlClass} value={currentDiscoveryGroup.music_item_id ?? ""} onChange={(event) => void updateCurrentMemory({ music_item_id: event.target.value })} aria-label="Choose memory music"><option value="">No music</option>{memoryAudioItems.map((candidate) => <option value={candidate.id} key={candidate.id}>{candidate.display_name}</option>)}</select><select className={libraryControlClass} value={currentDiscoveryGroup.playback_seconds ?? 4.5} onChange={(event) => void updateCurrentMemory({ playback_seconds: Number(event.target.value) })} aria-label="Choose memory pace"><option value={2}>Fast</option><option value={4.5}>Medium</option><option value={7}>Slow</option></select></div> : null}
-        {loading ? <div className="grid min-h-64 place-items-center text-sm text-[var(--misty-text-subtle)]">Loading Library…</div> : collection === "collections" || collection === "shared" || collection === "imports" || (collection === "recent-days" || collection === "months" || collection === "years" || collection === "people" || collection === "albums" || collection === "groups" || collection === "duplicate" || collection === "map") && !selectedCollectionId ? null : visibleItems.length === 0 ? (
-          <div className="grid min-h-64 place-items-center text-sm text-[var(--misty-text-subtle)]">Nothing to see here...</div>
+        {loading ? <div className="grid min-h-64 place-items-center text-sm text-[var(--misty-text-subtle)]">Loading Library…</div> : collection === "collections" || collection === "shared" || collection === "imports" || (collection === "recent-days" || collection === "months" || collection === "years" || collection === "people" || collection === "albums" || collection === "groups" || collection === "duplicate" || collection === "map") && !selectedCollectionId ? null : sensitiveCollectionScope && !sensitiveCollectionToken ? <div className="grid min-h-64 place-items-center"><button className={primaryButtonClass} type="button" onClick={() => requestSensitiveUnlock(sensitiveCollectionScope)}>Unlock {collection === "hidden" ? "Hidden" : "Recently Deleted"}</button></div> : displayItems.length === 0 ? (
+          <SpaceLibraryEmptyState collection={collection} searching={Boolean(searchQuery || mediaType)} uploading={uploading} uploadDisabled={uploading || (usage?.remaining_bytes ?? 1) <= 0} onUpload={() => inputRef.current?.click()} onClearSearch={() => { setSearchInput(""); setMediaType(""); }}/>
         ) : (
           <div className="grid gap-3" style={{ gridTemplateColumns: currentAlbum?.view_mode === "list" ? "1fr" : `repeat(auto-fill,minmax(${gridSize}px,1fr))` }}>
-            {visibleItems.map((item, itemIndex) => {
+            {displayItems.map((item, itemIndex) => {
               const dateGroup = libraryDateGroupLabel(item, sort);
-              const previousDateGroup = itemIndex > 0 ? libraryDateGroupLabel(visibleItems[itemIndex - 1], sort) : "";
+              const previousDateGroup = itemIndex > 0 ? libraryDateGroupLabel(displayItems[itemIndex - 1], sort) : "";
+              const assetStack = stackByItemID.get(item.id);
               return <Fragment key={item.id}>
               {dateGroup && dateGroup !== previousDateGroup ? <h4 className="col-span-full mb-0 mt-3 text-xs font-semibold text-[var(--misty-text-muted)] first:mt-0">{dateGroup}</h4> : null}
               <article className={`group min-w-0 rounded-2xl border bg-[var(--misty-surface)] p-3 ${currentAlbum?.view_mode === "list" ? "grid grid-cols-[112px_minmax(0,1fr)] items-center gap-3" : ""} ${selectedItemIds.includes(item.id) ? "border-[var(--misty-primary)]" : "border-[var(--misty-border-soft)]"}`} draggable={canReorderAlbum && !selecting} onDragStart={() => setDraggedAlbumItemId(item.id)} onDragEnd={() => setDraggedAlbumItemId("")} onDragOver={(event) => { if (canReorderAlbum) event.preventDefault(); }} onDrop={(event) => { event.preventDefault(); void reorderAlbumItem(item.id); }}>
-              <button className={`relative grid ${squareGrid ? "aspect-square" : "aspect-[4/3]"} w-full place-items-center overflow-hidden rounded-xl border-0 bg-[var(--misty-surface-2)] text-[var(--misty-text-subtle)]`} type="button" onClick={() => selecting ? toggleSelectedItem(item.id) : setSelectedItemId(item.id)} aria-label={selecting ? `${selectedItemIds.includes(item.id) ? "Deselect" : "Select"} ${item.display_name}` : `Open ${item.display_name}`}><LibraryItemThumbnail spaceId={spaceId} item={item}/>{selecting ? <span className={`absolute right-2 top-2 grid size-5 place-items-center rounded-full border ${selectedItemIds.includes(item.id) ? "border-[var(--misty-primary)] bg-[var(--misty-primary)] text-[var(--misty-primary-contrast)]" : "border-white/60 bg-black/40 text-transparent"}`}><Check size={12}/></span> : null}</button>
+              <button className={`relative grid ${squareGrid ? "aspect-square" : "aspect-[4/3]"} w-full place-items-center overflow-hidden rounded-xl border-0 bg-[var(--misty-surface-2)] text-[var(--misty-text-subtle)]`} type="button" onClick={() => selecting ? toggleSelectedItem(item.id) : setSelectedItemId(item.id)} aria-label={selecting ? `${selectedItemIds.includes(item.id) ? "Deselect" : "Select"} ${item.display_name}` : `Open ${item.display_name}`}><LibraryItemThumbnail spaceId={spaceId} item={item} reauthenticationToken={sensitiveCollectionToken}/>{assetStack ? <span className="absolute bottom-2 left-2 rounded-md bg-black/65 px-1.5 py-1 text-[9px] font-semibold uppercase tracking-wide text-white">{assetStack.kind === "live_photo" ? "Live" : assetStack.kind === "raw_pair" ? "RAW+" : `${assetStack.members.length} burst`}</span> : null}{selecting ? <span className={`absolute right-2 top-2 grid size-5 place-items-center rounded-full border ${selectedItemIds.includes(item.id) ? "border-[var(--misty-primary)] bg-[var(--misty-primary)] text-[var(--misty-primary-contrast)]" : "border-white/60 bg-black/40 text-transparent"}`}><Check size={12}/></span> : null}</button>
               <div className="mt-3 flex min-w-0 items-start gap-2"><div className="min-w-0 flex-1"><p className="m-0 truncate text-xs font-medium" title={item.display_name}>{item.display_name}</p><p className="m-0 mt-1 text-[10px] text-[var(--misty-text-subtle)]">{formatBytes(Number(item.file.intrinsic_metadata.byte_size ?? 0))} · {formatTime(item.added_at)}</p></div>{!selecting ? <button className={`${rowActionClass} !visible`} type="button" onClick={() => void updateItem(item, { favorite: !item.favorite })} title={item.favorite ? "Remove favorite" : "Favorite"}><Star size={14} fill={item.favorite ? "currentColor" : "none"}/></button> : null}</div>
-              {!selecting ? collection === "deleted" ? <div className="mt-2 flex flex-wrap gap-1"><button className={smallButtonClass} type="button" onClick={() => void restoreItem(item)}>Restore</button></div> : <div className="mt-2 flex flex-wrap gap-1"><button className={smallButtonClass} type="button" onClick={() => void spacesApi.downloadLibraryItem(spaceId, item.id, item.display_name)}><Download size={12}/>Download</button><button className={smallButtonClass} type="button" onClick={() => { const name = window.prompt("Rename in this Space", item.display_name)?.trim(); if (name && name !== item.display_name) void updateItem(item, { display_name: name }); }}><Pencil size={12}/>Rename</button><button className={smallButtonClass} type="button" onClick={() => { const tags = window.prompt("Tags, separated by commas", item.tags.join(", ")); if (tags !== null) void updateItem(item, { tags: tags.split(",").map((tag) => tag.trim()).filter(Boolean) }); }}>Tags</button><button className={smallButtonClass} type="button" title="Move to Recently Deleted" onClick={() => void trashItem(item)}><Trash2 size={12}/></button></div> : null}
+              {!selecting ? collection === "deleted" ? <div className="mt-2 flex flex-wrap gap-1"><button className={smallButtonClass} type="button" onClick={() => void restoreItem(item)}>Restore</button></div> : <div className="mt-2 flex flex-wrap gap-1"><button className={smallButtonClass} type="button" onClick={() => void spacesApi.downloadLibraryItem(spaceId, item.id, item.display_name, sensitiveCollectionToken)}><Download size={12}/>Download</button><button className={smallButtonClass} type="button" onClick={() => void duplicateItems([item.id])}><Copy size={12}/>Duplicate</button><button className={smallButtonClass} type="button" onClick={() => { const name = window.prompt("Rename in this Space", item.display_name)?.trim(); if (name && name !== item.display_name) void updateItem(item, { display_name: name }); }}><Pencil size={12}/>Rename</button><button className={smallButtonClass} type="button" onClick={() => { const tags = window.prompt("Tags, separated by commas", item.tags.join(", ")); if (tags !== null) void updateItem(item, { tags: tags.split(",").map((tag) => tag.trim()).filter(Boolean) }); }}>Tags</button><button className={smallButtonClass} type="button" title="Move to Recently Deleted" onClick={() => void trashItem(item)}><Trash2 size={12}/></button></div> : null}
               {!selecting && albums.length > 0 ? <select className="mt-2 w-full rounded-lg border border-[var(--misty-border-soft)] bg-[var(--misty-surface-2)] px-2 py-1 text-[10px] text-[var(--misty-text-muted)]" value="" onChange={(event) => { const albumId = event.target.value; if (albumId) void spacesApi.addAlbumItems(spaceId, albumId, [item.id]).then(() => spacesApi.albums(spaceId)).then((result) => setAlbums(result.albums)); }} aria-label={`Add ${item.display_name} to album`}><option value="">Add to album…</option>{albums.map((album) => <option value={album.id} key={album.id}>{album.name}</option>)}</select> : null}
               </article>
               </Fragment>;
@@ -1260,11 +1418,12 @@ function SpaceLibrary({ spaceId, section }: { spaceId: string; section: string }
           </div>
         )}
       </div>
-      {selectedItemId ? <LibraryItemViewer spaceId={spaceId} item={visibleItems.find((item) => item.id === selectedItemId) ?? items.find((item) => item.id === selectedItemId) ?? null} items={visibleItems} onClose={() => setSelectedItemId("")} onSelect={setSelectedItemId} onUpdate={updateItem} onReplaceItem={replaceItem} onRenditionReady={() => setReloadKey((current) => current + 1)} onTrash={trashItem}/> : null}
+      {selectedItemId ? <LibraryItemViewer spaceId={spaceId} item={displayItems.find((item) => item.id === selectedItemId) ?? items.find((item) => item.id === selectedItemId) ?? null} items={displayItems} allItems={items} assetStack={stackByItemID.get(selectedItemId) ?? null} reauthenticationToken={sensitiveCollectionToken} onCopyEdit={(definition) => setCopiedEditDefinition(structuredClone(definition))} onSetStackCover={setAssetStackCover} onSetStackEffect={setAssetStackEffect} onUngroupStack={ungroupAssetStack} onClose={() => setSelectedItemId("")} onSelect={setSelectedItemId} onUpdate={updateItem} onReplaceItem={replaceItem} onRenditionReady={() => setReloadKey((current) => current + 1)} onTrash={trashItem}/> : null}
       {memoryPlaybackOpen && currentDiscoveryGroup?.kind === "memory" ? <LibraryMemoryPlayback spaceId={spaceId} group={currentDiscoveryGroup} items={visibleItems} onClose={() => setMemoryPlaybackOpen(false)}/> : null}
       {albumDialogMode ? <div className="fixed inset-0 z-[2147483000] grid place-items-center bg-black/60 p-6" role="presentation" onMouseDown={(event) => { if (event.currentTarget === event.target && !albumSaving) setAlbumDialogMode(""); }}><form className="w-full max-w-sm rounded-2xl border border-[var(--misty-border-strong)] bg-[var(--misty-modal-bg,var(--misty-surface))] p-5 shadow-2xl" onSubmit={(event) => void saveAlbum(event)}><div className="flex items-center justify-between gap-4"><h2 className="m-0 text-base font-semibold">{albumDialogMode === "create" ? "New album" : "Edit album"}</h2><button className={iconButtonClass} type="button" disabled={albumSaving} onClick={() => setAlbumDialogMode("")} aria-label="Close album dialog"><X size={15}/></button></div><label className="mt-5 grid gap-2 text-xs font-medium text-[var(--misty-text-muted)]">Name<input className={inputClass} autoFocus maxLength={120} value={albumName} onChange={(event) => setAlbumName(event.target.value)}/></label><label className="mt-4 grid gap-2 text-xs font-medium text-[var(--misty-text-muted)]">Description<textarea className={`${inputClass} min-h-20 resize-y py-2`} maxLength={2000} value={albumDescription} onChange={(event) => setAlbumDescription(event.target.value)}/></label>{albumDialogMode === "edit" && visibleItems.length > 0 ? <label className="mt-4 grid gap-2 text-xs font-medium text-[var(--misty-text-muted)]">Cover<select className={inputClass} value={albumCoverItemId} onChange={(event) => setAlbumCoverItemId(event.target.value)}><option value="">Automatic</option>{visibleItems.map((item) => <option value={item.id} key={item.id}>{item.display_name}</option>)}</select></label> : null}<div className="mt-5 flex justify-end gap-2"><button className={secondaryButtonClass} type="button" disabled={albumSaving} onClick={() => setAlbumDialogMode("")}>Cancel</button><button className={primaryButtonClass} type="submit" disabled={albumSaving || !albumName.trim()}>{albumSaving ? "Saving…" : albumDialogMode === "create" ? "Create" : "Save"}</button></div></form></div> : null}
       {personDialogMode ? <div className="fixed inset-0 z-[2147483000] grid place-items-center bg-black/60 p-6" role="presentation" onMouseDown={(event) => { if (event.currentTarget === event.target && !personSaving) setPersonDialogMode(""); }}><form className="w-full max-w-sm rounded-2xl border border-[var(--misty-border-strong)] bg-[var(--misty-modal-bg,var(--misty-surface))] p-5 shadow-2xl" onSubmit={(event) => void savePerson(event)}><div className="flex items-center justify-between gap-4"><h2 className="m-0 text-base font-semibold">{personDialogMode === "create" ? personKind === "pet" ? "New pet" : "New person" : personKind === "pet" ? "Edit pet" : "Edit person"}</h2><button className={iconButtonClass} type="button" disabled={personSaving} onClick={() => setPersonDialogMode("")} aria-label="Close People & Pets dialog"><X size={15}/></button></div><label className="mt-5 grid gap-2 text-xs font-medium text-[var(--misty-text-muted)]">Name<input className={inputClass} autoFocus maxLength={120} value={personName} onChange={(event) => setPersonName(event.target.value)}/></label>{personDialogMode === "edit" && visibleItems.length > 0 ? <label className="mt-4 grid gap-2 text-xs font-medium text-[var(--misty-text-muted)]">Cover<select className={inputClass} value={personCoverItemId} onChange={(event) => setPersonCoverItemId(event.target.value)}><option value="">Automatic</option>{visibleItems.map((item) => <option value={item.id} key={item.id}>{item.display_name}</option>)}</select></label> : null}<div className="mt-5 flex justify-end gap-2"><button className={secondaryButtonClass} type="button" disabled={personSaving} onClick={() => setPersonDialogMode("")}>Cancel</button><button className={primaryButtonClass} type="submit" disabled={personSaving}>{personSaving ? "Saving…" : personDialogMode === "create" ? "Create" : "Save"}</button></div></form></div> : null}
       {metadataDialogAction ? <div className="fixed inset-0 z-[2147483000] grid place-items-center bg-black/60 p-6" role="presentation" onMouseDown={(event) => { if (event.currentTarget === event.target && !bulkSaving) setMetadataDialogAction(""); }}><form className="w-full max-w-sm rounded-2xl border border-[var(--misty-border-strong)] bg-[var(--misty-modal-bg,var(--misty-surface))] p-5 shadow-2xl" onSubmit={(event) => void saveBulkMetadata(event)}><div className="flex items-center justify-between gap-4"><h2 className="m-0 text-base font-semibold">{metadataDialogAction === "add_tags" ? "Add tags" : metadataDialogAction === "remove_tags" ? "Remove tags" : metadataDialogAction === "set_date" ? "Adjust date" : "Set location"}</h2><button className={iconButtonClass} type="button" disabled={bulkSaving} onClick={() => setMetadataDialogAction("")} aria-label="Close metadata dialog"><X size={15}/></button></div><p className="mb-0 mt-1 text-xs text-[var(--misty-text-subtle)]">{selectedItems.length} selected item{selectedItems.length === 1 ? "" : "s"}</p>{metadataDialogAction === "add_tags" || metadataDialogAction === "remove_tags" ? <label className="mt-5 grid gap-2 text-xs font-medium text-[var(--misty-text-muted)]">Tags<input className={inputClass} autoFocus value={metadataTags} onChange={(event) => setMetadataTags(event.target.value)} placeholder="travel, family"/></label> : metadataDialogAction === "set_date" ? <label className="mt-5 grid gap-2 text-xs font-medium text-[var(--misty-text-muted)]">Date and time<input className={inputClass} autoFocus type="datetime-local" value={metadataDate} onChange={(event) => setMetadataDate(event.target.value)}/></label> : <div className="mt-5 grid gap-4"><label className="grid gap-2 text-xs font-medium text-[var(--misty-text-muted)]">Place name<input className={inputClass} autoFocus value={metadataLocationName} onChange={(event) => setMetadataLocationName(event.target.value)} placeholder="Big Sur"/></label><div className="grid grid-cols-2 gap-3"><label className="grid gap-2 text-xs font-medium text-[var(--misty-text-muted)]">Latitude<input className={inputClass} inputMode="decimal" value={metadataLatitude} onChange={(event) => setMetadataLatitude(event.target.value)} placeholder="36.2704"/></label><label className="grid gap-2 text-xs font-medium text-[var(--misty-text-muted)]">Longitude<input className={inputClass} inputMode="decimal" value={metadataLongitude} onChange={(event) => setMetadataLongitude(event.target.value)} placeholder="-121.8079"/></label></div></div>}<div className="mt-5 flex justify-end gap-2"><button className={secondaryButtonClass} type="button" disabled={bulkSaving} onClick={() => setMetadataDialogAction("")}>Cancel</button><button className={primaryButtonClass} type="submit" disabled={bulkSaving}>{bulkSaving ? "Saving…" : "Apply"}</button></div></form></div> : null}
+      {unlockScope ? <div className="fixed inset-0 z-[2147483200] grid place-items-center bg-black/70 p-6" role="presentation" onMouseDown={(event) => { if (event.currentTarget === event.target && !unlockSaving) setUnlockScope(""); }}><form className="w-full max-w-sm rounded-2xl border border-[var(--misty-border-strong)] bg-[var(--misty-modal-bg,var(--misty-surface))] p-5 shadow-2xl" onSubmit={(event) => void submitSensitiveUnlock(event)}><div className="flex items-center justify-between gap-4"><h2 className="m-0 text-base font-semibold">Unlock {unlockScope === "hidden" ? "Hidden" : unlockScope === "recently_deleted" ? "Recently Deleted" : "Export"}</h2><button className={iconButtonClass} type="button" disabled={unlockSaving} onClick={() => setUnlockScope("")} aria-label="Close unlock dialog"><X size={15}/></button></div><label className="mt-5 grid gap-2 text-xs font-medium text-[var(--misty-text-muted)]">Misty password<input className={inputClass} autoFocus type="password" autoComplete="current-password" value={unlockPassword} onChange={(event) => setUnlockPassword(event.target.value)}/></label>{localError ? <p className="mb-0 mt-3 text-xs text-red-200">{localError}</p> : null}<div className="mt-5 flex justify-end gap-2"><button className={secondaryButtonClass} type="button" disabled={unlockSaving} onClick={() => setUnlockScope("")}>Cancel</button><button className={primaryButtonClass} type="submit" disabled={unlockSaving || !unlockPassword}>{unlockSaving ? "Unlocking…" : "Unlock"}</button></div></form></div> : null}
     </div>
   );
 }
@@ -1361,6 +1520,13 @@ function LibraryItemViewer({
   spaceId,
   item,
   items,
+  allItems,
+  assetStack,
+  reauthenticationToken,
+  onCopyEdit,
+  onSetStackCover,
+  onSetStackEffect,
+  onUngroupStack,
   onClose,
   onSelect,
   onUpdate,
@@ -1371,6 +1537,13 @@ function LibraryItemViewer({
   spaceId: string;
   item: SpaceLibraryItem | null;
   items: SpaceLibraryItem[];
+  allItems: SpaceLibraryItem[];
+  assetStack: LibraryAssetStack | null;
+  reauthenticationToken: string;
+  onCopyEdit: (definition: LibraryEditDefinition) => void;
+  onSetStackCover: (stack: LibraryAssetStack, coverItemID: string) => Promise<void>;
+  onSetStackEffect: (stack: LibraryAssetStack, effect: LibraryAssetStack["effect"]) => Promise<void>;
+  onUngroupStack: (stack: LibraryAssetStack) => Promise<void>;
   onClose: () => void;
   onSelect: (itemId: string) => void;
   onUpdate: (item: SpaceLibraryItem, patch: Partial<Pick<SpaceLibraryItem, "display_name" | "caption" | "favorite" | "hidden" | "tags">>) => Promise<SpaceLibraryItem | null>;
@@ -1379,6 +1552,10 @@ function LibraryItemViewer({
   onTrash: (item: SpaceLibraryItem) => Promise<boolean>;
 }) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const mediaAreaRef = useRef<HTMLDivElement | null>(null);
+  const imageRef = useRef<HTMLImageElement | null>(null);
+  const bounceFrameRef = useRef(0);
+  const drawingMarkupRef = useRef<LibraryMarkupElement | null>(null);
   const [contentUrl, setContentUrl] = useState("");
   const [contentError, setContentError] = useState("");
   const [contentLoading, setContentLoading] = useState(false);
@@ -1392,6 +1569,12 @@ function LibraryItemViewer({
   const [editDraft, setEditDraft] = useState<LibraryEditDefinition>(() => defaultLibraryEdit());
   const [editSaving, setEditSaving] = useState(false);
   const [editError, setEditError] = useState("");
+  const [markupMode, setMarkupMode] = useState(false);
+  const [markupTool, setMarkupTool] = useState<LibraryMarkupElement["kind"]>("stroke");
+  const [markupColor, setMarkupColor] = useState("#ff3b30");
+  const [drawingMarkup, setDrawingMarkup] = useState<LibraryMarkupElement | null>(null);
+  const [markupBounds, setMarkupBounds] = useState({ left: 0, top: 0, width: 0, height: 0 });
+  const [stackMemberID, setStackMemberID] = useState("");
   const index = item ? items.findIndex((candidate) => candidate.id === item.id) : -1;
   const metadata = item?.file.intrinsic_metadata ?? {};
   const mimeType = String(metadata.server_detected_mime_type ?? metadata.client_declared_mime_type ?? "application/octet-stream").split(";")[0].toLowerCase();
@@ -1399,9 +1582,39 @@ function LibraryItemViewer({
   const isVideo = /^video\//.test(mimeType);
   const isAudio = /^audio\//.test(mimeType);
   const activeEdit = editVersions.find((version) => version.is_current) ?? null;
-  const appliedEdit = editing ? editDraft : activeEdit?.edit_definition ?? defaultLibraryEdit();
+  const appliedEdit = editing ? editDraft : normalizeLibraryEdit(activeEdit?.edit_definition);
   const renditionReady = activeEdit?.rendition_state === "ready";
   const mediaStyle = renditionReady && !editing ? undefined : libraryEditStyle(appliedEdit);
+  const stackMediaID = stackMemberID || item?.id || "";
+  const stackMediaItem = allItems.find((candidate) => candidate.id === stackMediaID) ?? (item?.id === stackMediaID ? item : null);
+  const stackMediaMember = assetStack?.members.find((member) => member.item_id === stackMediaID);
+  const stackMediaMetadata = stackMediaItem?.file.intrinsic_metadata ?? {};
+  const stackMediaMIME = String(stackMediaMetadata.server_detected_mime_type ?? stackMediaMetadata.client_declared_mime_type ?? stackMediaMember?.mime_type ?? "application/octet-stream").split(";")[0].toLowerCase();
+  const contentIsImage = stackMediaMIME.startsWith("image/") || !stackMediaMIME.startsWith("video/") && Number(stackMediaMetadata.width ?? 0) > 0 && Number(stackMediaMetadata.height ?? 0) > 0;
+  const contentIsVideo = stackMediaMIME.startsWith("video/");
+  const contentIsAudio = stackMediaMIME.startsWith("audio/");
+
+  useEffect(() => {
+    setStackMemberID("");
+  }, [assetStack?.id, item?.id]);
+
+  useEffect(() => () => window.cancelAnimationFrame(bounceFrameRef.current), []);
+
+  useEffect(() => {
+    if (!markupMode || !mediaAreaRef.current || !imageRef.current) return;
+    const update = () => {
+      const area = mediaAreaRef.current?.getBoundingClientRect();
+      const image = imageRef.current?.getBoundingClientRect();
+      if (!area || !image) return;
+      setMarkupBounds({ left: image.left - area.left, top: image.top - area.top, width: image.width, height: image.height });
+    };
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(mediaAreaRef.current);
+    observer.observe(imageRef.current);
+    window.addEventListener("resize", update);
+    return () => { observer.disconnect(); window.removeEventListener("resize", update); };
+  }, [contentUrl, markupMode]);
 
   useEffect(() => {
     if (!item) return;
@@ -1417,24 +1630,24 @@ function LibraryItemViewer({
       return;
     }
     let current = true;
-    void spacesApi.editVersions(spaceId, item.id).then((result) => {
+    void spacesApi.editVersions(spaceId, item.id, reauthenticationToken).then((result) => {
       if (!current) return;
       setEditVersions(result.versions);
       setEditingAvailable(true);
       const selected = result.versions.find((version) => version.is_current);
-      setEditDraft(selected?.edit_definition ?? defaultLibraryEdit());
+      setEditDraft(normalizeLibraryEdit(selected?.edit_definition));
     }).catch(() => {
       if (!current) return;
       setEditVersions([]);
       setEditingAvailable(false);
     });
     return () => { current = false; };
-  }, [isImage, isVideo, item?.id, item?.version, spaceId]);
+  }, [isImage, isVideo, item?.id, item?.version, reauthenticationToken, spaceId]);
 
   useEffect(() => {
     if (!item || !editVersions.some((version) => version.rendition_state === "queued" || version.rendition_state === "processing")) return;
     let current = true;
-    const refresh = () => void spacesApi.editVersions(spaceId, item.id).then((result) => {
+    const refresh = () => void spacesApi.editVersions(spaceId, item.id, reauthenticationToken).then((result) => {
       if (!current) return;
       const newlyReady = result.versions.some((version) => version.rendition_state === "ready" && editVersions.some((previous) => previous.id === version.id && previous.rendition_state !== "ready"));
       setEditVersions(result.versions);
@@ -1442,10 +1655,10 @@ function LibraryItemViewer({
     }).catch(() => undefined);
     const timer = window.setInterval(refresh, 1500);
     return () => { current = false; window.clearInterval(timer); };
-  }, [editVersions, item?.id, onRenditionReady, spaceId]);
+  }, [editVersions, item?.id, onRenditionReady, reauthenticationToken, spaceId]);
 
   useEffect(() => {
-    if (!item || !isImage && !isVideo && !isAudio) {
+    if (!item || !stackMediaID || !contentIsImage && !contentIsVideo && !contentIsAudio) {
       setContentUrl("");
       setContentError("");
       return;
@@ -1454,9 +1667,13 @@ function LibraryItemViewer({
     let objectUrl = "";
     setContentLoading(true);
     setContentError("");
-    const request = editing
-      ? isImage ? spacesApi.libraryOriginalPreview(spaceId, item.id) : spacesApi.libraryOriginalContent(spaceId, item.id)
-      : isImage ? spacesApi.libraryPreview(spaceId, item.id) : spacesApi.libraryContent(spaceId, item.id);
+    const showingCover = stackMediaID === item.id;
+    const longExposureMotionID = assetStack?.kind === "live_photo" && assetStack.effect === "long_exposure" && showingCover ? assetStack.motion_item_id : "";
+    const request = longExposureMotionID
+      ? spacesApi.libraryContent(spaceId, longExposureMotionID, reauthenticationToken).then(createLongExposureImage)
+      : editing && showingCover
+      ? contentIsImage ? spacesApi.libraryOriginalPreview(spaceId, stackMediaID, reauthenticationToken) : spacesApi.libraryOriginalContent(spaceId, stackMediaID, reauthenticationToken)
+      : contentIsImage ? spacesApi.libraryPreview(spaceId, stackMediaID, reauthenticationToken) : spacesApi.libraryContent(spaceId, stackMediaID, reauthenticationToken);
     void request.then((blob) => {
       if (!current) return;
       objectUrl = URL.createObjectURL(blob);
@@ -1466,7 +1683,7 @@ function LibraryItemViewer({
       current = false;
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
-  }, [activeEdit?.rendition_state, editing, isAudio, isImage, isVideo, item?.id, spaceId]);
+  }, [activeEdit?.rendition_state, assetStack?.effect, assetStack?.kind, assetStack?.motion_item_id, contentIsAudio, contentIsImage, contentIsVideo, editing, item?.id, reauthenticationToken, spaceId, stackMediaID]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -1502,13 +1719,13 @@ function LibraryItemViewer({
     setEditSaving(true);
     setEditError("");
     try {
-      const result = await spacesApi.createEditVersion(spaceId, item, editDraft);
+      const result = await spacesApi.createEditVersion(spaceId, item, editDraft, reauthenticationToken);
       onReplaceItem(result.item);
       if (result.edit) {
         let savedVersion = { ...result.edit, is_current: true };
         setEditVersions((current) => [savedVersion, ...current.map((version) => ({ ...version, is_current: false }))]);
         try {
-          const rendition = await spacesApi.renderEditVersion(spaceId, item.id, result.edit.id);
+          const rendition = await spacesApi.renderEditVersion(spaceId, item.id, result.edit.id, 0, reauthenticationToken);
           savedVersion = { ...savedVersion, rendition_state: rendition.state };
           setEditVersions((current) => current.map((version) => version.id === savedVersion.id ? savedVersion : version));
         } catch (error) {
@@ -1528,7 +1745,7 @@ function LibraryItemViewer({
     setEditSaving(true);
     setEditError("");
     try {
-      const rendition = await spacesApi.renderEditVersion(spaceId, item.id, editID);
+      const rendition = await spacesApi.renderEditVersion(spaceId, item.id, editID, 0, reauthenticationToken);
       setEditVersions((current) => current.map((version) => version.id === editID ? { ...version, rendition_state: rendition.state, rendition_error_code: undefined } : version));
     } catch (error) {
       setEditError(error instanceof Error ? error.message : "The edit rendition could not start.");
@@ -1542,11 +1759,11 @@ function LibraryItemViewer({
     setEditSaving(true);
     setEditError("");
     try {
-      const result = await spacesApi.selectEditVersion(spaceId, item, editID);
+      const result = await spacesApi.selectEditVersion(spaceId, item, editID, reauthenticationToken);
       onReplaceItem(result.item);
       setEditVersions((current) => current.map((version) => ({ ...version, is_current: version.id === editID })));
       const selected = editVersions.find((version) => version.id === editID);
-      setEditDraft(selected?.edit_definition ?? defaultLibraryEdit());
+      setEditDraft(normalizeLibraryEdit(selected?.edit_definition));
       setEditing(false);
     } catch (error) {
       setEditError(error instanceof Error ? error.message : "Version could not be selected.");
@@ -1559,7 +1776,7 @@ function LibraryItemViewer({
     if (editSaving || !window.confirm("Delete this edit version?")) return;
     setEditSaving(true);
     try {
-      await spacesApi.deleteEditVersion(spaceId, item.id, editID);
+      await spacesApi.deleteEditVersion(spaceId, item.id, editID, reauthenticationToken);
       setEditVersions((current) => current.filter((version) => version.id !== editID));
     } catch (error) {
       setEditError(error instanceof Error ? error.message : "Version could not be deleted.");
@@ -1569,7 +1786,7 @@ function LibraryItemViewer({
   };
 
   const beginEditing = () => {
-    setEditDraft(activeEdit?.edit_definition ?? defaultLibraryEdit());
+    setEditDraft(normalizeLibraryEdit(activeEdit?.edit_definition));
     setEditing(true);
     setEditError("");
   };
@@ -1584,28 +1801,100 @@ function LibraryItemViewer({
     if (videoRef.current.currentTime >= trim.end) videoRef.current.pause();
   };
 
+  const handleVideoEnded = () => {
+    const video = videoRef.current;
+    if (!video || assetStack?.kind !== "live_photo" || assetStack.effect !== "bounce") return;
+    const reverse = () => {
+      if (!videoRef.current) return;
+      if (videoRef.current.currentTime <= .04) {
+        videoRef.current.currentTime = 0;
+        void videoRef.current.play();
+        return;
+      }
+      videoRef.current.currentTime = Math.max(0, videoRef.current.currentTime - .04);
+      bounceFrameRef.current = window.requestAnimationFrame(reverse);
+    };
+    reverse();
+  };
+
+  const markupPoint = (event: ReactPointerEvent<SVGSVGElement>) => {
+    const bounds = event.currentTarget.getBoundingClientRect();
+    return { x: Math.max(0, Math.min(1, (event.clientX - bounds.left) / Math.max(1, bounds.width))), y: Math.max(0, Math.min(1, (event.clientY - bounds.top) / Math.max(1, bounds.height))) };
+  };
+
+  const beginMarkup = (event: ReactPointerEvent<SVGSVGElement>) => {
+    if (!editing || !markupMode || editDraft.markup.length >= 16) return;
+    const point = markupPoint(event);
+    if (markupTool === "text") {
+      const text = window.prompt("Markup text")?.replace(/[\\':%\[\];]/g, "").trim().slice(0, 40);
+      if (text) setEditDraft((current) => ({ ...current, markup: [...current.markup, { kind: "text", x: point.x, y: point.y, color: markupColor, line_width: .012, opacity: 1, text }] }));
+      return;
+    }
+    event.currentTarget.setPointerCapture(event.pointerId);
+    const element: LibraryMarkupElement = markupTool === "rectangle" || markupTool === "cleanup"
+      ? { kind: markupTool, points: [point], x: point.x, y: point.y, width: .001, height: .001, color: markupColor, line_width: .008, opacity: 1 }
+      : { kind: markupTool, points: [point, point], color: markupColor, line_width: markupTool === "highlight" ? .025 : .012, opacity: markupTool === "highlight" ? .35 : 1 };
+    drawingMarkupRef.current = element;
+    setDrawingMarkup(element);
+  };
+
+  const continueMarkup = (event: ReactPointerEvent<SVGSVGElement>) => {
+    const current = drawingMarkupRef.current;
+    if (!current) return;
+    const point = markupPoint(event);
+    let next = current;
+    if (current.kind === "rectangle" || current.kind === "cleanup") {
+      const startX = current.points?.[0]?.x ?? current.x ?? point.x;
+      const startY = current.points?.[0]?.y ?? current.y ?? point.y;
+      next = { ...current, x: Math.min(startX, point.x), y: Math.min(startY, point.y), width: Math.abs(point.x - startX), height: Math.abs(point.y - startY) };
+    } else {
+      const points = current.points ?? [];
+      const previous = points[points.length - 1];
+      if (!previous || Math.hypot(point.x - previous.x, point.y - previous.y) >= .006) next = { ...current, points: [...points.slice(0, 63), point] };
+    }
+    drawingMarkupRef.current = next;
+    setDrawingMarkup(next);
+  };
+
+  const finishMarkup = (event: ReactPointerEvent<SVGSVGElement>) => {
+    const element = drawingMarkupRef.current;
+    drawingMarkupRef.current = null;
+    setDrawingMarkup(null);
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+    const rectangular = element?.kind === "rectangle" || element?.kind === "cleanup";
+    if (!element || rectangular && ((element.width ?? 0) < (element.kind === "cleanup" ? .01 : .004) || (element.height ?? 0) < (element.kind === "cleanup" ? .01 : .004)) || !rectangular && (element.points?.length ?? 0) < 2) return;
+    setEditDraft((current) => ({ ...current, markup: current.markup.length < 16 ? [...current.markup, element] : current.markup }));
+  };
+
   return (
     <div className="fixed inset-0 z-[2147483100] grid place-items-center bg-black/80 p-4 backdrop-blur-sm" role="presentation" onMouseDown={(event) => { if (event.currentTarget === event.target) onClose(); }}>
       <section className="grid h-[min(860px,calc(100vh-32px))] w-[min(1320px,calc(100vw-32px))] grid-cols-[minmax(0,1fr)_340px] grid-rows-[56px_minmax(0,1fr)] overflow-hidden rounded-2xl border border-[var(--misty-border-strong)] bg-[var(--misty-app-page-bg,#07090b)] shadow-2xl" role="dialog" aria-modal="true" aria-label={item.display_name}>
         <header className="col-span-2 flex items-center justify-between border-b border-[var(--misty-border-soft)] px-4">
           <div className="min-w-0"><p className="m-0 truncate text-sm font-medium">{item.display_name}</p><p className="m-0 mt-0.5 text-[10px] text-[var(--misty-text-subtle)]">{index + 1} of {items.length}</p></div>
           <div className="flex items-center gap-1">
+            {assetStack && stackMediaID !== assetStack.cover_item_id && stackMediaMember?.role !== "motion" && stackMediaMember?.role !== "raw" ? <button className={smallButtonClass} type="button" onClick={() => void onSetStackCover(assetStack, stackMediaID)}>Make key photo</button> : null}
+            {assetStack ? <button className={smallButtonClass} type="button" onClick={() => void onUngroupStack(assetStack)}>Ungroup</button> : null}
+            {activeEdit ? <button className={smallButtonClass} type="button" onClick={() => onCopyEdit(normalizeLibraryEdit(activeEdit.edit_definition))}><Copy size={12}/>Copy edits</button> : null}
             <button className={iconButtonClass} type="button" onClick={() => void onUpdate(item, { favorite: !item.favorite })} aria-label={item.favorite ? "Remove favorite" : "Favorite"} title={item.favorite ? "Remove favorite" : "Favorite"}><Star size={15} fill={item.favorite ? "currentColor" : "none"}/></button>
             <button className={iconButtonClass} type="button" onClick={() => void onUpdate(item, { hidden: !item.hidden })} aria-label={item.hidden ? "Unhide" : "Hide"} title={item.hidden ? "Unhide" : "Hide"}><EyeOff size={15}/></button>
             {editingAvailable ? <button className={iconButtonClass} type="button" onClick={beginEditing} aria-label="Edit" title="Edit"><SlidersHorizontal size={15}/></button> : null}
-            {activeEdit ? <button className={iconButtonClass} type="button" onClick={() => void spacesApi.downloadOriginalLibraryItem(spaceId, item.id, item.file.original_filename)} aria-label="Download original" title="Download original"><File size={15}/></button> : null}
-            <button className={iconButtonClass} type="button" disabled={Boolean(activeEdit) && !renditionReady} onClick={() => void spacesApi.downloadLibraryItem(spaceId, item.id, item.display_name)} aria-label={activeEdit ? renditionReady ? "Download edited media" : "Edited media is rendering" : "Download"} title={activeEdit ? renditionReady ? "Download edited media" : "Edited media is rendering" : "Download"}><Download size={15}/></button>
+            {activeEdit ? <button className={iconButtonClass} type="button" onClick={() => void spacesApi.downloadOriginalLibraryItem(spaceId, item.id, item.file.original_filename, reauthenticationToken)} aria-label="Download original" title="Download original"><File size={15}/></button> : null}
+            <button className={iconButtonClass} type="button" disabled={Boolean(activeEdit) && !renditionReady} onClick={() => void spacesApi.downloadLibraryItem(spaceId, item.id, item.display_name, reauthenticationToken)} aria-label={activeEdit ? renditionReady ? "Download edited media" : "Edited media is rendering" : "Download"} title={activeEdit ? renditionReady ? "Download edited media" : "Edited media is rendering" : "Download"}><Download size={15}/></button>
             <button className={iconButtonClass} type="button" onClick={() => void onTrash(item)} aria-label="Move to Recently Deleted" title="Move to Recently Deleted"><Trash2 size={15}/></button>
             <button className={iconButtonClass} type="button" onClick={onClose} aria-label="Close"><X size={15}/></button>
           </div>
         </header>
-        <div className="relative grid min-h-0 place-items-center overflow-hidden bg-black/35 p-6">
-          {contentLoading ? <span className="text-xs text-white/50">Loading…</span> : contentError ? <span className="max-w-sm text-center text-xs text-red-200">{contentError}</span> : isImage && contentUrl ? <img className="max-h-full max-w-full object-contain transition-[filter,transform]" style={mediaStyle} src={contentUrl} alt={item.display_name}/> : isVideo && contentUrl ? <video ref={videoRef} className="max-h-full max-w-full transition-[filter,transform]" style={mediaStyle} src={contentUrl} controls autoPlay={false} onLoadedMetadata={handleVideoTime} onTimeUpdate={handleVideoTime}/> : isAudio && contentUrl ? <div className="grid gap-5 text-center"><File className="mx-auto text-white/60" size={64}/><audio src={contentUrl} controls/></div> : <div className="grid gap-3 text-center text-white/50"><File className="mx-auto" size={64}/><span className="text-sm">Preview unavailable</span><button className={secondaryButtonClass} type="button" onClick={() => void spacesApi.downloadLibraryItem(spaceId, item.id, item.display_name)}><Download size={14}/>Download</button></div>}
+        <div ref={mediaAreaRef} className="relative grid min-h-0 place-items-center overflow-hidden bg-black/35 p-6">
+          {contentLoading ? <span className="text-xs text-white/50">Loading…</span> : contentError ? <span className="max-w-sm text-center text-xs text-red-200">{contentError}</span> : contentIsImage && contentUrl ? <img ref={imageRef} className="max-h-full max-w-full object-contain transition-[filter,transform]" style={stackMediaID === item.id ? mediaStyle : undefined} src={contentUrl} alt={stackMediaItem?.display_name ?? stackMediaMember?.display_name ?? item.display_name}/> : contentIsVideo && contentUrl ? <video ref={videoRef} className="max-h-full max-w-full transition-[filter,transform]" style={stackMediaID === item.id ? mediaStyle : undefined} src={contentUrl} controls autoPlay={assetStack?.kind === "live_photo"} loop={assetStack?.kind === "live_photo" && assetStack.effect === "loop"} onEnded={handleVideoEnded} onLoadedMetadata={handleVideoTime} onTimeUpdate={handleVideoTime}/> : contentIsAudio && contentUrl ? <div className="grid gap-5 text-center"><File className="mx-auto text-white/60" size={64}/><audio src={contentUrl} controls/></div> : <div className="grid gap-3 text-center text-white/50"><File className="mx-auto" size={64}/><span className="text-sm">Preview unavailable</span><button className={secondaryButtonClass} type="button" onClick={() => void spacesApi.downloadLibraryItem(spaceId, stackMediaID, stackMediaItem?.display_name ?? stackMediaMember?.display_name ?? item.display_name, reauthenticationToken)}><Download size={14}/>Download</button></div>}
+          {editing && contentIsImage && stackMediaID === item.id && markupBounds.width > 0 ? <LibraryMarkupCanvas elements={drawingMarkup ? [...editDraft.markup, drawingMarkup] : editDraft.markup} interactive={markupMode} bounds={markupBounds} onPointerDown={beginMarkup} onPointerMove={continueMarkup} onPointerUp={finishMarkup}/> : null}
+          {assetStack ? <div className="absolute left-4 top-4 flex items-center gap-1 rounded-xl border border-white/10 bg-black/55 p-1 text-white backdrop-blur-sm">{assetStack.members.map((member, memberIndex) => <button className={`rounded-lg border-0 px-2 py-1 text-[10px] font-medium ${member.item_id === stackMediaID ? "bg-white text-black" : "bg-transparent text-white/75 hover:bg-white/10"}`} type="button" key={member.item_id} onClick={() => setStackMemberID(member.item_id === item.id ? "" : member.item_id)}>{assetStack.kind === "live_photo" ? member.role === "motion" ? <><Play className="mr-1 inline" size={10}/>Motion</> : "Still" : assetStack.kind === "raw_pair" ? member.role === "raw" ? "RAW" : "Rendered" : memberIndex + 1}</button>)}</div> : null}
+          {assetStack?.kind === "live_photo" ? <div className="absolute left-4 top-16 flex items-center gap-1 rounded-xl border border-white/10 bg-black/55 p-1 text-white backdrop-blur-sm">{(["still", "loop", "bounce", "long_exposure"] as const).map((effect) => <button className={`rounded-lg border-0 px-2 py-1 text-[10px] font-medium ${assetStack.effect === effect ? "bg-white text-black" : "bg-transparent text-white/75 hover:bg-white/10"}`} type="button" key={effect} onClick={() => void onSetStackEffect(assetStack, effect)}>{effect === "long_exposure" ? "Long Exposure" : effect[0].toUpperCase() + effect.slice(1)}</button>)}</div> : null}
           <button className="absolute left-4 top-1/2 grid size-10 -translate-y-1/2 place-items-center rounded-full border border-white/10 bg-black/45 text-white disabled:opacity-20" type="button" disabled={index <= 0} onClick={() => index > 0 && onSelect(items[index - 1].id)} aria-label="Previous item"><ChevronLeft size={20}/></button>
           <button className="absolute right-4 top-1/2 grid size-10 -translate-y-1/2 place-items-center rounded-full border border-white/10 bg-black/45 text-white disabled:opacity-20" type="button" disabled={index < 0 || index >= items.length - 1} onClick={() => index >= 0 && index < items.length - 1 && onSelect(items[index + 1].id)} aria-label="Next item"><ChevronRight size={20}/></button>
         </div>
         <aside className="min-h-0 overflow-auto border-l border-[var(--misty-border-soft)] bg-[var(--misty-surface)] p-5">
-          {editing ? <section className="mb-6 border-b border-[var(--misty-border-soft)] pb-5"><div className="flex items-center justify-between"><h3 className="m-0 text-sm">Edit</h3><button className={smallButtonClass} type="button" onClick={() => setEditDraft(defaultLibraryEdit())}>Reset</button></div><div className="mt-4 flex flex-wrap gap-2"><button className={smallButtonClass} type="button" onClick={() => setEditDraft((current) => ({ ...current, rotation: ((current.rotation + 90) % 360) as LibraryEditDefinition["rotation"] }))}><RotateCw size={12}/>Rotate</button><button className={smallButtonClass} type="button" onClick={() => setEditDraft((current) => ({ ...current, flip_horizontal: !current.flip_horizontal }))}>Flip H</button><button className={smallButtonClass} type="button" onClick={() => setEditDraft((current) => ({ ...current, flip_vertical: !current.flip_vertical }))}>Flip V</button><button className={smallButtonClass} type="button" onClick={() => setEditDraft((current) => ({ ...current, auto_enhance: !current.auto_enhance }))}>{editDraft.auto_enhance ? "Auto on" : "Auto"}</button></div><label className="mt-4 grid gap-1.5 text-[10px] font-medium uppercase tracking-wide text-[var(--misty-text-subtle)]">Filter<select className={inputClass} value={editDraft.filter} onChange={(event) => setEditDraft((current) => ({ ...current, filter: event.target.value as LibraryEditDefinition["filter"] }))}><option value="">None</option><option value="vivid">Vivid</option><option value="dramatic">Dramatic</option><option value="warm">Warm</option><option value="cool">Cool</option><option value="mono">Mono</option><option value="noir">Noir</option></select></label><LibraryEditRange label="Brightness" value={editDraft.brightness} min={0} max={2} step={0.05} onChange={(value) => setEditDraft((current) => ({ ...current, brightness: value }))}/><LibraryEditRange label="Contrast" value={editDraft.contrast} min={0} max={2} step={0.05} onChange={(value) => setEditDraft((current) => ({ ...current, contrast: value }))}/><LibraryEditRange label="Saturation" value={editDraft.saturation} min={0} max={2} step={0.05} onChange={(value) => setEditDraft((current) => ({ ...current, saturation: value }))}/><LibraryEditRange label="Grayscale" value={editDraft.grayscale} min={0} max={1} step={0.05} onChange={(value) => setEditDraft((current) => ({ ...current, grayscale: value }))}/>{isImage ? <div className="mt-4"><p className="m-0 text-[10px] font-medium uppercase tracking-wide text-[var(--misty-text-subtle)]">Crop</p><div className="mt-2 flex gap-1"><button className={smallButtonClass} type="button" onClick={() => setEditDraft((current) => ({ ...current, crop: undefined }))}>Original</button><button className={smallButtonClass} type="button" onClick={() => setEditDraft((current) => ({ ...current, crop: { x: 0.125, y: 0, width: 0.75, height: 1 } }))}>Square</button><button className={smallButtonClass} type="button" onClick={() => setEditDraft((current) => ({ ...current, crop: { x: 0, y: 0.125, width: 1, height: 0.75 } }))}>Wide</button></div></div> : null}{isVideo ? <div className="mt-4 grid grid-cols-2 gap-2"><label className="grid gap-1 text-[10px] uppercase text-[var(--misty-text-subtle)]">Trim start<input className={inputClass} type="number" min={0} step={0.1} value={editDraft.trim?.start ?? 0} onChange={(event) => setEditDraft((current) => ({ ...current, trim: { start: Number(event.target.value), end: current.trim?.end ?? Math.max(1, Number(metadata.duration ?? 1)) } }))}/></label><label className="grid gap-1 text-[10px] uppercase text-[var(--misty-text-subtle)]">Trim end<input className={inputClass} type="number" min={0.1} step={0.1} value={editDraft.trim?.end ?? Number(metadata.duration ?? 1)} onChange={(event) => setEditDraft((current) => ({ ...current, trim: { start: current.trim?.start ?? 0, end: Number(event.target.value) } }))}/></label><label className="grid gap-1 text-[10px] uppercase text-[var(--misty-text-subtle)]">Speed<select className={inputClass} value={editDraft.playback_speed} onChange={(event) => setEditDraft((current) => ({ ...current, playback_speed: Number(event.target.value) }))}><option value={0.5}>0.5×</option><option value={1}>1×</option><option value={1.5}>1.5×</option><option value={2}>2×</option></select></label><button className={`${smallButtonClass} self-end`} type="button" onClick={() => setEditDraft((current) => ({ ...current, mute: !current.mute }))}>{editDraft.mute ? "Muted" : "Mute"}</button></div> : null}{editError ? <p className="mb-0 mt-3 text-xs text-red-200">{editError}</p> : null}<div className="mt-4 flex gap-2"><button className={`${secondaryButtonClass} flex-1 justify-center`} type="button" disabled={editSaving} onClick={() => { setEditing(false); setEditDraft(activeEdit?.edit_definition ?? defaultLibraryEdit()); }}>Cancel</button><button className={`${primaryButtonClass} flex-1 justify-center`} type="button" disabled={editSaving} onClick={() => void saveEdit()}>{editSaving ? "Saving…" : "Save edit"}</button></div></section> : null}
+          {editing && isImage ? <div className="mb-4 rounded-xl border border-[var(--misty-border-soft)] p-2"><div className="flex items-center gap-2"><button className={smallButtonClass} type="button" onClick={() => setMarkupMode((current) => !current)}>{markupMode ? "Done Markup" : "Markup & Cleanup"}</button>{markupMode ? <><select className={libraryControlClass} value={markupTool} onChange={(event) => setMarkupTool(event.target.value as LibraryMarkupElement["kind"])} aria-label="Markup tool"><option value="stroke">Pen</option><option value="highlight">Highlighter</option><option value="rectangle">Rectangle</option><option value="text">Text</option><option value="cleanup">Clean Up</option></select><input className="size-8 rounded border-0 bg-transparent p-0" type="color" value={markupColor} onChange={(event) => setMarkupColor(event.target.value)} aria-label="Markup color"/></> : null}</div>{markupMode ? <div className="mt-2 flex gap-2"><button className={smallButtonClass} type="button" disabled={editDraft.markup.length === 0} onClick={() => setEditDraft((current) => ({ ...current, markup: current.markup.slice(0, -1) }))}>Undo</button><button className={smallButtonClass} type="button" disabled={editDraft.markup.length === 0} onClick={() => setEditDraft((current) => ({ ...current, markup: [] }))}>Clear</button><span className="ml-auto self-center text-[10px] text-[var(--misty-text-subtle)]">{editDraft.markup.length}/16</span></div> : null}</div> : null}
+          {editing ? <section className="mb-6 border-b border-[var(--misty-border-soft)] pb-5"><div className="flex items-center justify-between"><h3 className="m-0 text-sm">Edit</h3><button className={smallButtonClass} type="button" onClick={() => setEditDraft(defaultLibraryEdit())}>Reset</button></div><div className="mt-4 flex flex-wrap gap-2"><button className={smallButtonClass} type="button" onClick={() => setEditDraft((current) => ({ ...current, rotation: ((current.rotation + 90) % 360) as LibraryEditDefinition["rotation"] }))}><RotateCw size={12}/>Rotate</button><button className={smallButtonClass} type="button" onClick={() => setEditDraft((current) => ({ ...current, flip_horizontal: !current.flip_horizontal }))}>Flip H</button><button className={smallButtonClass} type="button" onClick={() => setEditDraft((current) => ({ ...current, flip_vertical: !current.flip_vertical }))}>Flip V</button><button className={smallButtonClass} type="button" onClick={() => setEditDraft((current) => ({ ...current, auto_enhance: !current.auto_enhance }))}>{editDraft.auto_enhance ? "Auto on" : "Auto"}</button></div><label className="mt-4 grid gap-1.5 text-[10px] font-medium uppercase tracking-wide text-[var(--misty-text-subtle)]">Filter<select className={inputClass} value={editDraft.filter} onChange={(event) => setEditDraft((current) => ({ ...current, filter: event.target.value as LibraryEditDefinition["filter"] }))}><option value="">None</option><option value="vivid">Vivid</option><option value="dramatic">Dramatic</option><option value="warm">Warm</option><option value="cool">Cool</option><option value="mono">Mono</option><option value="noir">Noir</option></select></label><LibraryEditRange label="Brightness" value={editDraft.brightness} min={0} max={2} step={0.05} onChange={(value) => setEditDraft((current) => ({ ...current, brightness: value }))}/><LibraryEditRange label="Contrast" value={editDraft.contrast} min={0} max={2} step={0.05} onChange={(value) => setEditDraft((current) => ({ ...current, contrast: value }))}/><LibraryEditRange label="Saturation" value={editDraft.saturation} min={0} max={2} step={0.05} onChange={(value) => setEditDraft((current) => ({ ...current, saturation: value }))}/><LibraryEditRange label="Grayscale" value={editDraft.grayscale} min={0} max={1} step={0.05} onChange={(value) => setEditDraft((current) => ({ ...current, grayscale: value }))}/><LibraryAdvancedAdjustments draft={editDraft} onChange={setEditDraft}/>{isImage ? <div className="mt-4"><p className="m-0 text-[10px] font-medium uppercase tracking-wide text-[var(--misty-text-subtle)]">Crop &amp; straighten</p><LibraryEditRange label="Straighten" value={editDraft.straighten} min={-45} max={45} step={0.5} onChange={(value) => setEditDraft((current) => ({ ...current, straighten: value }))}/><div className="mt-2 flex gap-1"><button className={smallButtonClass} type="button" onClick={() => setEditDraft((current) => ({ ...current, crop: undefined }))}>Original</button><button className={smallButtonClass} type="button" onClick={() => setEditDraft((current) => ({ ...current, crop: { x: 0.125, y: 0, width: 0.75, height: 1 } }))}>Square</button><button className={smallButtonClass} type="button" onClick={() => setEditDraft((current) => ({ ...current, crop: { x: 0, y: 0.125, width: 1, height: 0.75 } }))}>Wide</button></div></div> : null}{isVideo ? <div className="mt-4 grid grid-cols-2 gap-2"><label className="grid gap-1 text-[10px] uppercase text-[var(--misty-text-subtle)]">Trim start<input className={inputClass} type="number" min={0} step={0.1} value={editDraft.trim?.start ?? 0} onChange={(event) => setEditDraft((current) => ({ ...current, trim: { start: Number(event.target.value), end: current.trim?.end ?? Math.max(1, Number(metadata.duration ?? 1)) } }))}/></label><label className="grid gap-1 text-[10px] uppercase text-[var(--misty-text-subtle)]">Trim end<input className={inputClass} type="number" min={0.1} step={0.1} value={editDraft.trim?.end ?? Number(metadata.duration ?? 1)} onChange={(event) => setEditDraft((current) => ({ ...current, trim: { start: current.trim?.start ?? 0, end: Number(event.target.value) } }))}/></label><label className="grid gap-1 text-[10px] uppercase text-[var(--misty-text-subtle)]">Speed<select className={inputClass} value={editDraft.playback_speed} onChange={(event) => setEditDraft((current) => ({ ...current, playback_speed: Number(event.target.value) }))}><option value={0.5}>0.5×</option><option value={1}>1×</option><option value={1.5}>1.5×</option><option value={2}>2×</option></select></label><button className={`${smallButtonClass} self-end`} type="button" onClick={() => setEditDraft((current) => ({ ...current, mute: !current.mute }))}>{editDraft.mute ? "Muted" : "Mute"}</button></div> : null}{editError ? <p className="mb-0 mt-3 text-xs text-red-200">{editError}</p> : null}<div className="mt-4 flex gap-2"><button className={`${secondaryButtonClass} flex-1 justify-center`} type="button" disabled={editSaving} onClick={() => { setEditing(false); setEditDraft(normalizeLibraryEdit(activeEdit?.edit_definition)); }}>Cancel</button><button className={`${primaryButtonClass} flex-1 justify-center`} type="button" disabled={editSaving} onClick={() => void saveEdit()}>{editSaving ? "Saving…" : "Save edit"}</button></div></section> : null}
           <form onSubmit={(event) => void saveMetadata(event)}>
             <label className="grid gap-1.5 text-[10px] font-medium uppercase tracking-wide text-[var(--misty-text-subtle)]">Name<input className={inputClass} value={displayName} maxLength={255} onChange={(event) => setDisplayName(event.target.value)}/></label>
             <label className="mt-4 grid gap-1.5 text-[10px] font-medium uppercase tracking-wide text-[var(--misty-text-subtle)]">Caption<textarea className={`${inputClass} min-h-24 resize-y py-2`} value={caption} maxLength={4000} onChange={(event) => setCaption(event.target.value)}/></label>
@@ -1649,8 +1938,57 @@ function LibraryEditRange({ label, value, min, max, step, onChange }: { label: s
   return <label className="mt-4 grid grid-cols-[1fr_auto] items-center gap-x-3 gap-y-1 text-[10px] font-medium uppercase tracking-wide text-[var(--misty-text-subtle)]"><span>{label}</span><span>{value.toFixed(2)}</span><input className="col-span-2 w-full accent-[var(--misty-primary)]" type="range" value={value} min={min} max={max} step={step} onChange={(event) => onChange(Number(event.target.value))}/></label>;
 }
 
+function LibraryAdvancedAdjustments({ draft, onChange }: { draft: LibraryEditDefinition; onChange: Dispatch<SetStateAction<LibraryEditDefinition>> }) {
+  const update = (key: keyof LibraryEditDefinition, value: number) => onChange((current) => ({ ...current, [key]: value }));
+  return <details className="mt-4 rounded-xl border border-[var(--misty-border-soft)] px-3 py-2">
+    <summary className="cursor-pointer text-[10px] font-medium uppercase tracking-wide text-[var(--misty-text-subtle)]">Advanced adjustments</summary>
+    <LibraryEditRange label="Exposure" value={draft.exposure} min={-2} max={2} step={0.05} onChange={(value) => update("exposure", value)}/>
+    <LibraryEditRange label="Brilliance" value={draft.brilliance} min={-1} max={1} step={0.05} onChange={(value) => update("brilliance", value)}/>
+    <LibraryEditRange label="Highlights" value={draft.highlights} min={-1} max={1} step={0.05} onChange={(value) => update("highlights", value)}/>
+    <LibraryEditRange label="Shadows" value={draft.shadows} min={-1} max={1} step={0.05} onChange={(value) => update("shadows", value)}/>
+    <LibraryEditRange label="Black Point" value={draft.black_point} min={-1} max={1} step={0.05} onChange={(value) => update("black_point", value)}/>
+    <LibraryEditRange label="Vibrance" value={draft.vibrance} min={-1} max={1} step={0.05} onChange={(value) => update("vibrance", value)}/>
+    <LibraryEditRange label="Warmth" value={draft.warmth} min={-1} max={1} step={0.05} onChange={(value) => update("warmth", value)}/>
+    <LibraryEditRange label="Tint" value={draft.tint} min={-1} max={1} step={0.05} onChange={(value) => update("tint", value)}/>
+    <LibraryEditRange label="Sharpness" value={draft.sharpness} min={0} max={2} step={0.05} onChange={(value) => update("sharpness", value)}/>
+    <LibraryEditRange label="Definition" value={draft.definition} min={0} max={2} step={0.05} onChange={(value) => update("definition", value)}/>
+    <LibraryEditRange label="Noise Reduction" value={draft.noise_reduction} min={0} max={1} step={0.05} onChange={(value) => update("noise_reduction", value)}/>
+    <LibraryEditRange label="Vignette" value={draft.vignette} min={0} max={1} step={0.05} onChange={(value) => update("vignette", value)}/>
+  </details>;
+}
+
+function LibraryMarkupCanvas({ elements, interactive, bounds, onPointerDown, onPointerMove, onPointerUp }: {
+  elements: LibraryMarkupElement[];
+  interactive: boolean;
+  bounds: { left: number; top: number; width: number; height: number };
+  onPointerDown: (event: ReactPointerEvent<SVGSVGElement>) => void;
+  onPointerMove: (event: ReactPointerEvent<SVGSVGElement>) => void;
+  onPointerUp: (event: ReactPointerEvent<SVGSVGElement>) => void;
+}) {
+  return <svg
+    className="absolute z-10 select-none overflow-visible"
+    style={{ left: bounds.left, top: bounds.top, width: bounds.width, height: bounds.height, pointerEvents: interactive ? "auto" : "none", touchAction: "none", cursor: interactive ? "crosshair" : "default" }}
+    viewBox="0 0 100 100"
+    preserveAspectRatio="none"
+    onPointerDown={onPointerDown}
+    onPointerMove={onPointerMove}
+    onPointerUp={onPointerUp}
+    onPointerCancel={onPointerUp}
+  >
+    {elements.map((element, index) => {
+      if (element.kind === "stroke" || element.kind === "highlight") return <polyline key={index} points={(element.points ?? []).map((point) => `${point.x * 100},${point.y * 100}`).join(" ")} fill="none" stroke={element.color} strokeOpacity={element.opacity} strokeWidth={element.line_width * 100 * (element.kind === "highlight" ? 2.5 : 1)} strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke"/>;
+      if (element.kind === "rectangle" || element.kind === "cleanup") return <rect key={index} x={(element.x ?? 0) * 100} y={(element.y ?? 0) * 100} width={(element.width ?? 0) * 100} height={(element.height ?? 0) * 100} fill={element.kind === "cleanup" ? "rgba(255,255,255,.12)" : "none"} stroke={element.kind === "cleanup" ? "white" : element.color} strokeOpacity={element.opacity} strokeDasharray={element.kind === "cleanup" ? "2 1" : undefined} strokeWidth={element.line_width * 100} vectorEffect="non-scaling-stroke"/>;
+      return <text key={index} x={(element.x ?? 0) * 100} y={(element.y ?? 0) * 100} fill={element.color} fillOpacity={element.opacity} fontSize={Math.max(2.5, element.line_width * 400)}>{element.text}</text>;
+    })}
+  </svg>;
+}
+
 function defaultLibraryEdit(): LibraryEditDefinition {
-  return { rotation: 0, flip_horizontal: false, flip_vertical: false, auto_enhance: false, filter: "", brightness: 1, contrast: 1, saturation: 1, grayscale: 0, mute: false, playback_speed: 1 };
+  return { rotation: 0, flip_horizontal: false, flip_vertical: false, auto_enhance: false, filter: "", brightness: 1, contrast: 1, saturation: 1, grayscale: 0, exposure: 0, brilliance: 0, highlights: 0, shadows: 0, black_point: 0, vibrance: 0, warmth: 0, tint: 0, sharpness: 0, definition: 0, noise_reduction: 0, vignette: 0, straighten: 0, markup: [], mute: false, playback_speed: 1 };
+}
+
+function normalizeLibraryEdit(definition?: Partial<LibraryEditDefinition> | null): LibraryEditDefinition {
+  return { ...defaultLibraryEdit(), ...definition, markup: definition?.markup ?? [] };
 }
 
 function libraryEditStyle(definition: LibraryEditDefinition) {
@@ -1658,10 +1996,61 @@ function libraryEditStyle(definition: LibraryEditDefinition) {
   const preset = definition.filter === "vivid" ? "contrast(1.08) saturate(1.28)" : definition.filter === "dramatic" ? "contrast(1.25) saturate(.82) brightness(.92)" : definition.filter === "warm" ? "sepia(.12) saturate(1.08)" : definition.filter === "cool" ? "hue-rotate(8deg) saturate(1.05)" : definition.filter === "mono" ? "grayscale(1)" : definition.filter === "noir" ? "grayscale(1) contrast(1.35) brightness(.96)" : "";
   const enhance = definition.auto_enhance ? "contrast(1.05) saturate(1.08) brightness(1.02)" : "";
   return {
-    filter: `brightness(${definition.brightness}) contrast(${definition.contrast}) saturate(${definition.saturation}) grayscale(${definition.grayscale}) ${enhance} ${preset}`,
-    transform: `rotate(${definition.rotation}deg) scaleX(${definition.flip_horizontal ? -1 : 1}) scaleY(${definition.flip_vertical ? -1 : 1})`,
+    filter: `brightness(${definition.brightness + definition.exposure * .125 + definition.brilliance * .05 - definition.black_point * .04}) contrast(${definition.contrast * (1 + definition.highlights * .18 - definition.shadows * .08 + definition.black_point * .16)}) saturate(${definition.saturation * (1 + definition.vibrance * .5)}) grayscale(${definition.grayscale}) sepia(${Math.max(0, definition.warmth) * .08}) hue-rotate(${definition.tint * 8 - definition.warmth * 4}deg) blur(${definition.noise_reduction * .35}px) drop-shadow(0 0 ${definition.vignette * 16}px rgba(0,0,0,${definition.vignette * .6})) ${enhance} ${preset}`,
+    transform: `rotate(${definition.rotation + definition.straighten}deg) scaleX(${definition.flip_horizontal ? -1 : 1}) scaleY(${definition.flip_vertical ? -1 : 1})`,
     clipPath: crop ? `inset(${crop.y * 100}% ${(1 - crop.x - crop.width) * 100}% ${(1 - crop.y - crop.height) * 100}% ${crop.x * 100}%)` : undefined,
   };
+}
+
+async function createLongExposureImage(source: Blob): Promise<Blob> {
+  const sourceURL = URL.createObjectURL(source);
+  const video = document.createElement("video");
+  video.muted = true;
+  video.preload = "auto";
+  video.src = sourceURL;
+  try {
+    await waitForMediaEvent(video, "loadeddata");
+    if (!Number.isFinite(video.duration) || video.duration <= 0 || video.videoWidth < 1 || video.videoHeight < 1) throw new Error("Motion media is unavailable.");
+    const scale = Math.min(1, 1600 / Math.max(video.videoWidth, video.videoHeight));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(video.videoWidth * scale));
+    canvas.height = Math.max(1, Math.round(video.videoHeight * scale));
+    const context = canvas.getContext("2d", { willReadFrequently: true });
+    if (!context) throw new Error("Long Exposure rendering is unavailable.");
+    const frameCount = 12;
+    const sums = new Uint32Array(canvas.width * canvas.height * 4);
+    for (let frame = 0; frame < frameCount; frame += 1) {
+      if (frame > 0) {
+        video.currentTime = Math.min(video.duration - .001, video.duration * frame / (frameCount - 1));
+        await waitForMediaEvent(video, "seeked");
+      }
+      context.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
+      for (let index = 0; index < pixels.length; index += 1) sums[index] += pixels[index];
+    }
+    const output = context.createImageData(canvas.width, canvas.height);
+    for (let index = 0; index < output.data.length; index += 1) output.data[index] = Math.round(sums[index] / frameCount);
+    context.putImageData(output, 0, 0);
+    return await new Promise<Blob>((resolve, reject) => canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error("Long Exposure rendering failed.")), "image/jpeg", .92));
+  } finally {
+    video.removeAttribute("src");
+    video.load();
+    URL.revokeObjectURL(sourceURL);
+  }
+}
+
+function waitForMediaEvent(media: HTMLMediaElement, eventName: "loadeddata" | "seeked"): Promise<void> {
+  if (eventName === "loadeddata" && media.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) return Promise.resolve();
+  return new Promise((resolve, reject) => {
+    const done = () => { cleanup(); resolve(); };
+    const failed = () => { cleanup(); reject(new Error("Motion media could not be decoded.")); };
+    const cleanup = () => {
+      media.removeEventListener(eventName, done);
+      media.removeEventListener("error", failed);
+    };
+    media.addEventListener(eventName, done, { once: true });
+    media.addEventListener("error", failed, { once: true });
+  });
 }
 
 function libraryRenditionStatus(version: LibraryEditVersion): string {
@@ -1674,7 +2063,7 @@ function libraryRenditionStatus(version: LibraryEditVersion): string {
   }
 }
 
-function LibraryItemThumbnail({ spaceId, item }: { spaceId: string; item: SpaceLibraryItem }) {
+function LibraryItemThumbnail({ spaceId, item, reauthenticationToken = "" }: { spaceId: string; item: SpaceLibraryItem; reauthenticationToken?: string }) {
   const [url, setUrl] = useState("");
   const mimeType = String(item.file.intrinsic_metadata.server_detected_mime_type ?? "").toLowerCase();
   const visual = mimeType.startsWith("image/") || mimeType.startsWith("video/") || Number(item.file.intrinsic_metadata.width ?? 0) > 0;
@@ -1685,7 +2074,7 @@ function LibraryItemThumbnail({ spaceId, item }: { spaceId: string; item: SpaceL
     }
     let current = true;
     let objectUrl = "";
-    void spacesApi.libraryPreview(spaceId, item.id).then((blob) => {
+    void spacesApi.libraryPreview(spaceId, item.id, reauthenticationToken).then((blob) => {
       if (!current) return;
       objectUrl = URL.createObjectURL(blob);
       setUrl(objectUrl);
@@ -1694,8 +2083,68 @@ function LibraryItemThumbnail({ spaceId, item }: { spaceId: string; item: SpaceL
       current = false;
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
-  }, [item.id, item.version, mimeType, spaceId, visual]);
+  }, [item.id, item.version, mimeType, reauthenticationToken, spaceId, visual]);
   return url ? <img className="size-full object-cover" src={url} alt=""/> : <File size={30}/>;
+}
+
+type LibraryAssetStackInput = Pick<LibraryAssetStack, "kind" | "title" | "cover_item_id" | "motion_item_id" | "members">;
+
+function buildLibraryAssetStack(kind: LibraryAssetStack["kind"], items: SpaceLibraryItem[]): LibraryAssetStackInput | null {
+  if (kind === "live_photo") {
+    if (items.length !== 2) return null;
+    const still = items.find((item) => libraryItemMIME(item).startsWith("image/"));
+    const motion = items.find((item) => libraryItemMIME(item).startsWith("video/"));
+    if (!still || !motion) return null;
+    return { kind, title: "", cover_item_id: still.id, motion_item_id: motion.id, members: [{ item_id: still.id, role: "still", position: 0 }, { item_id: motion.id, role: "motion", position: 1 }] };
+  }
+  if (kind === "raw_pair") {
+    if (items.length !== 2) return null;
+    const raw = items.find((item) => isLibraryRAW(item.file.original_filename));
+    const rendered = items.find((item) => item.id !== raw?.id && libraryItemMIME(item).startsWith("image/"));
+    if (!raw || !rendered) return null;
+    return { kind, title: "", cover_item_id: rendered.id, members: [{ item_id: rendered.id, role: "alternate", position: 0 }, { item_id: raw.id, role: "raw", position: 1 }] };
+  }
+  if (items.length < 2 || items.length > 100 || items.some((item) => !libraryItemMIME(item).startsWith("image/"))) return null;
+  return { kind, title: "", cover_item_id: items[0].id, members: items.map((item, position) => ({ item_id: item.id, role: "burst_frame" as const, position })) };
+}
+
+function detectUploadedAssetStacks(items: SpaceLibraryItem[]): LibraryAssetStackInput[] {
+  const result: LibraryAssetStackInput[] = [];
+  const byStem = new Map<string, SpaceLibraryItem[]>();
+  const bursts = new Map<string, SpaceLibraryItem[]>();
+  for (const item of items) {
+    const filename = item.file.original_filename;
+    const stem = filename.replace(/\.[^.]+$/, "").toLocaleLowerCase();
+    byStem.set(stem, [...(byStem.get(stem) ?? []), item]);
+    const burstMatch = filename.replace(/\.[^.]+$/, "").match(/^(.*?)[_-]burst[_-]?(?:\d+)(?:[_-](?:cover|key))?$/i);
+    if (burstMatch) {
+      const key = burstMatch[1].toLocaleLowerCase();
+      bursts.set(key, [...(bursts.get(key) ?? []), item]);
+    }
+  }
+  for (const grouped of byStem.values()) {
+    const live = buildLibraryAssetStack("live_photo", grouped);
+    if (live) result.push(live);
+    const rawPair = buildLibraryAssetStack("raw_pair", grouped);
+    if (rawPair) result.push(rawPair);
+  }
+  for (const grouped of bursts.values()) {
+    const burst = buildLibraryAssetStack("burst", grouped);
+    if (burst) result.push(burst);
+  }
+  return result;
+}
+
+function libraryItemMIME(item: SpaceLibraryItem): string {
+  return String(item.file.intrinsic_metadata.server_detected_mime_type ?? item.file.intrinsic_metadata.client_declared_mime_type ?? "application/octet-stream").split(";")[0].toLocaleLowerCase();
+}
+
+function activeSensitiveGrant(grant?: { token: string; expiresAt: string }): string {
+  return grant && new Date(grant.expiresAt).getTime() > Date.now() ? grant.token : "";
+}
+
+function isLibraryRAW(filename: string): boolean {
+  return /\.(?:dng|cr2|cr3|nef|nrw|arw|srf|sr2|raf|rw2|orf|pef|x3f)$/i.test(filename);
 }
 
 function AlbumCover({ spaceId, itemId }: { spaceId: string; itemId?: string }) {
@@ -1723,6 +2172,7 @@ function LibraryFacetGroup({ label, facets, onSelect }: { label: string; facets:
 }
 
 function libraryUtilityIcon(value: string): LucideIcon {
+  if (value === "featured") return Sparkles;
   if (value === "recently-edited") return SlidersHorizontal;
   if (value === "recently-shared") return MessagesSquare;
   if (value === "screenshots") return ImageIcon;
@@ -1831,7 +2281,7 @@ function MemberPermissionControls({ spaceId, userId }: { spaceId: string; userId
 }
 
 function spaceLinkClass({ isActive }: { isActive: boolean }) {
-  return `flex min-h-10 items-center gap-2 rounded-xl px-2.5 text-xs no-underline ${isActive ? "bg-[var(--misty-surface-3)] text-[var(--misty-text)]" : "text-[var(--misty-text-muted)] hover:bg-[var(--misty-surface-2)]"}`;
+  return `flex min-h-11 items-center gap-2 rounded-xl border px-2.5 text-xs font-medium no-underline transition-colors ${isActive ? "border-[var(--misty-border-strong)] bg-[var(--misty-surface-3)] text-[var(--misty-text)] shadow-sm" : "border-transparent text-[var(--misty-text-muted)] hover:bg-[var(--misty-surface-2)] hover:text-[var(--misty-text)]"}`;
 }
 
 const iconButtonClass = "grid size-8 place-items-center rounded-xl border border-[var(--misty-border-soft)] bg-[var(--misty-surface-2)] p-0 text-[var(--misty-text)]";

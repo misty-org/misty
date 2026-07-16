@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const deviceName = process.env.TAURI_IOS_SIMULATOR_DEVICE ?? "iPhone 17";
+const deviceName = process.env.TAURI_IOS_SIMULATOR_DEVICE ?? "iPad (A16)";
 const bundleId = process.env.TAURI_IOS_BUNDLE_ID ?? "com.misty.mobile";
 const outputDir = path.resolve(root, process.env.MISTY_IOS_UI_QA_DIR ?? "build/mobile-ui-qa");
 const settleMs = Number(process.env.MISTY_IOS_UI_QA_SETTLE_MS ?? "30000");
@@ -97,6 +97,9 @@ const routes = [
   ["account-signin", "misty://open/account/signin", "Account sign-in", "54-smoke-ui-account-signin.png"],
   ["account-register", "misty://open/account/register", "Account registration", "55-smoke-ui-account-register.png"],
   ["settings", "misty://open/account/settings", "Settings", "56-smoke-ui-settings.png"],
+  ["spaces", "misty://open/spaces/personal", "Spaces", "57-smoke-ui-spaces.png"],
+  ["studio-agents", "misty://open/studio/agents", "Studio Agents", "58-smoke-ui-studio-agents.png"],
+  ["studio-workflows", "misty://open/studio/workflows", "Studio Workflows", "59-smoke-ui-studio-workflows.png"],
 ];
 
 for (const [label, url, expectedSurface, fileName] of routes) {
@@ -130,7 +133,7 @@ const manifest = {
 const manifestPath = path.join(outputDir, "ios-mobile-ui-smoke-manifest.json");
 writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
 
-console.log(`Captured ${captures.length} Misty iOS mobile UI screenshots:`);
+console.log(`Captured ${captures.length} Misty iPad UI screenshots:`);
 for (const capture of captures) {
   console.log(`- ${capture.label}: ${capture.file} (${capture.expectedSurface})`);
 }

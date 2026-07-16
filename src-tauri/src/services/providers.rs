@@ -14,8 +14,6 @@ use crate::services::paths;
 
 use super::storage::{StorageResponse, StorageService};
 
-const RCLONE_OAUTH_CALLBACK_TEMPLATE: &str =
-    include_str!("../../../assets/rclone/oauth-callback.html");
 const PROVIDER_AUTH_CANCEL_RESULT: &str = "cancel";
 
 #[derive(Clone)]
@@ -1297,7 +1295,7 @@ fn provider_config_parameters(
 ) -> ApiResult<BTreeMap<String, String>> {
     let mut parameters = request.parameters.clone();
     if !parameters.contains_key("config_template_file") {
-        if let Some(path) = ensure_rclone_oauth_callback_template()? {
+        if let Some(path) = rclone_oauth_callback_template() {
             parameters.insert(
                 "config_template_file".to_string(),
                 path.display().to_string(),
@@ -1307,27 +1305,15 @@ fn provider_config_parameters(
     Ok(parameters)
 }
 
-fn ensure_rclone_oauth_callback_template() -> ApiResult<Option<PathBuf>> {
+fn rclone_oauth_callback_template() -> Option<PathBuf> {
     let Some(misty_home) = paths::misty_home_dir() else {
-        return Ok(None);
+        return None;
     };
-    let path = misty_home.join("rclone").join("oauth-callback.html");
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent).map_err(|error| {
-            ApiError::Message(format!(
-                "Failed to create authorization callback template directory: {error}"
-            ))
-        })?;
-    }
-    let current = fs::read_to_string(&path).unwrap_or_default();
-    if current != RCLONE_OAUTH_CALLBACK_TEMPLATE {
-        fs::write(&path, RCLONE_OAUTH_CALLBACK_TEMPLATE).map_err(|error| {
-            ApiError::Message(format!(
-                "Failed to write authorization callback template: {error}"
-            ))
-        })?;
-    }
-    Ok(Some(path))
+    let path = misty_home
+        .join("assets")
+        .join("rclone")
+        .join("oauth-callback.html");
+    path.is_file().then_some(path)
 }
 
 fn default_provider_workflows() -> Vec<ProviderWorkflow> {

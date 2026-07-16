@@ -1,27 +1,17 @@
-import { useEffect, useRef, useState } from "react";
-import { Outlet, useNavigate, useOutletContext } from "react-router-dom";
+import { useEffect, useRef } from "react";
+import { Outlet, useNavigate } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
 import { AuthProvider } from "../auth/AuthContext";
 import { RenderErrorBoundary } from "../shared/components/RenderErrorBoundary";
 import { useSetupStore } from "../stores/useSetupStore";
 import { installMistyDeepLinkHandler } from "../routing/deepLinks";
-import {
-  detectAppFormFactor,
-  subscribeAppFormFactor,
-  type AppFormFactor,
-} from "../platform/formFactor";
 import { useAppZoom } from "../shared/hooks/useAppZoom";
 
-type RootLayoutContext = {
-  formFactor: AppFormFactor;
-};
-
 export function RootLayout(props: {
-  isDeepLinkRouteAllowed: (route: string, formFactor: AppFormFactor) => boolean;
+  isDeepLinkRouteAllowed: (route: string) => boolean;
   resolveAuthDeepLinkRoute: (target: "account" | "providers") => string;
 }) {
   const navigate = useNavigate();
-  const [formFactor, setFormFactor] = useState<AppFormFactor>(() => detectAppFormFactor());
   const appZoom = useAppZoom();
   const setupLoadStarted = useRef(false);
   const {
@@ -30,18 +20,14 @@ export function RootLayout(props: {
     loadSystem: state.loadSystem,
   })));
 
-  useEffect(() => subscribeAppFormFactor(setFormFactor), []);
-
   useEffect(
     () =>
       installMistyDeepLinkHandler(
-        formFactor,
         navigate,
         props.isDeepLinkRouteAllowed,
         props.resolveAuthDeepLinkRoute,
       ),
     [
-      formFactor,
       navigate,
       props.isDeepLinkRouteAllowed,
       props.resolveAuthDeepLinkRoute,
@@ -49,9 +35,8 @@ export function RootLayout(props: {
   );
 
   useEffect(() => {
-    const root = document.documentElement;
-    root.dataset.formFactor = formFactor;
-  }, [formFactor]);
+    document.documentElement.dataset.formFactor = "desktop";
+  }, []);
 
   useEffect(() => {
     if (setupLoadStarted.current) return;
@@ -63,16 +48,12 @@ export function RootLayout(props: {
     <>
       <AuthProvider>
         <RenderErrorBoundary>
-          <Outlet context={{ formFactor } satisfies RootLayoutContext} />
+          <Outlet />
         </RenderErrorBoundary>
       </AuthProvider>
       <AppZoomIndicator visible={appZoom.indicatorVisible} percent={appZoom.zoomPercent} />
     </>
   );
-}
-
-export function useRootLayoutContext(): RootLayoutContext {
-  return useOutletContext<RootLayoutContext>();
 }
 
 function AppZoomIndicator(props: { visible: boolean; percent: number }) {

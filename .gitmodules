@@ -1,0 +1,3 @@
+[submodule "service/rclone"]
+	path = service/rclone
+	url = https://github.com/rclone/rclone.git
