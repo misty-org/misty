@@ -168,7 +168,6 @@ export default function AgentsPage() {
           {selected ? (
             <AgentDetail
               agent={selected}
-              localWebhookUrl={snapshot.localWebhookUrl}
               jobs={jobs}
               approvals={approvals}
               artifacts={artifacts}
@@ -210,7 +209,6 @@ export default function AgentsPage() {
 
 function AgentDetail(props: {
   agent: AgentDefinition;
-  localWebhookUrl?: string | null;
   jobs: ReturnType<typeof agentJobsForDefinition>;
   approvals: ReturnType<typeof agentApprovalsForDefinition>;
   artifacts: AgentArtifact[];
@@ -264,7 +262,7 @@ function AgentDetail(props: {
       {props.agent.triggers.filter((trigger) => trigger.enabled && trigger.kind === "local_webhook" && trigger.webhookId).map((trigger) => (
         <section className="agents-instructions-card" key={trigger.id}>
           <span>Local webhook</span>
-          <p><code>{`${props.localWebhookUrl || "http://127.0.0.1:17833"}/agent-hooks/${trigger.webhookId}`}</code></p>
+          <p>This legacy trigger is currently unavailable. You can remove it in the workflow editor.</p>
         </section>
       ))}
 

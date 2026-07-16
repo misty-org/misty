@@ -24,7 +24,7 @@ interface ChromeTabStripProps {
 
 const chromeTabShellClass = [
   "misty-chrome-tabs-shell",
-  "flex h-[46px] min-w-0 overflow-hidden border-b border-transparent",
+  "flex h-[46px] min-w-0 overflow-hidden",
   "!bg-transparent",
   "[&_.chrome-tab_.chrome-tab-background>svg_.chrome-tab-geometry]:!fill-[var(--misty-app-tab-bg,var(--misty-bg-soft))]",
   "[&_.chrome-tab[active]_.chrome-tab-background>svg_.chrome-tab-geometry]:!fill-[var(--misty-app-tab-active-bg,var(--misty-surface-2))]",
@@ -32,8 +32,7 @@ const chromeTabShellClass = [
 
 const chromeTabTrayClass = [
   "misty-chrome-tabs-tray",
-  "flex h-8 flex-none items-center justify-end gap-0.5 rounded-[11px] border border-transparent p-0.5",
-  "!bg-transparent",
+  "flex h-8 flex-none items-center justify-end gap-0.5 rounded-[11px] p-0.5",
 ].join(" ");
 
 export const ChromeTabStrip = memo(function ChromeTabStrip(props: ChromeTabStripProps) {

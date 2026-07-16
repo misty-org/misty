@@ -13,6 +13,7 @@ import type {
   SpaceNode,
   SpaceStudioResource,
   SpaceRun,
+  SpacesSnapshot,
 } from "../spaces/types";
 
 type ActivityTab = "unreads" | "mentions";
@@ -20,6 +21,7 @@ type ActivityTab = "unreads" | "mentions";
 interface SpacesStore {
   spaces: Space[];
   invitations: SpaceInvitation[];
+  limits: SpacesSnapshot["limits"] | null;
   membersBySpace: Record<string, SpaceMember[]>;
   messagesBySpace: Record<string, SpaceMessage[]>;
   nodesBySpace: Record<string, SpaceNode[]>;
@@ -38,13 +40,14 @@ interface SpacesStore {
   loadStudio: (spaceId: string, kind: "agents" | "workflows") => Promise<void>;
   loadInbox: () => Promise<void>;
   createSpace: (name: string) => Promise<Space>;
+  renameSpace: (spaceId: string, name: string) => Promise<Space>;
   invite: (spaceId: string, email: string) => Promise<void>;
   respondInvite: (inviteId: string, accept: boolean) => Promise<void>;
   removeMember: (spaceId: string, userId: string) => Promise<void>;
   leaveSpace: (spaceId: string) => Promise<void>;
   transferOwner: (spaceId: string, userId: string) => Promise<void>;
   deleteSpace: (spaceId: string, confirmation: string) => Promise<void>;
-  sendMessage: (spaceId: string, text: string, fileNodeIds?: string[]) => Promise<void>;
+  sendMessage: (spaceId: string, text: string, fileNodeIds?: string[], attachmentIds?: string[], libraryItemIds?: string[], replyToMessageId?: string) => Promise<void>;
   updateMessage: (spaceId: string, messageId: string, text: string, fileNodeIds?: string[]) => Promise<void>;
   deleteMessage: (spaceId: string, messageId: string) => Promise<void>;
   markRead: (spaceId: string, seq: number) => Promise<void>;
@@ -77,6 +80,7 @@ let realtimeGeneration = 0;
 export const useSpacesStore = create<SpacesStore>((set, get) => ({
   spaces: [],
   invitations: [],
+  limits: null,
   membersBySpace: {},
   messagesBySpace: {},
   nodesBySpace: {},
@@ -92,7 +96,7 @@ export const useSpacesStore = create<SpacesStore>((set, get) => ({
     set({ loading: true, error: null });
     try {
       const snapshot = await spacesApi.snapshot();
-      set({ spaces: snapshot.spaces, invitations: snapshot.invitations, loading: false });
+      set({ spaces: snapshot.spaces, invitations: snapshot.invitations, limits: snapshot.limits, loading: false });
     } catch (error) {
       set({ loading: false, error: errorText(error) });
     }
@@ -156,6 +160,20 @@ export const useSpacesStore = create<SpacesStore>((set, get) => ({
     }
   },
 
+  renameSpace: async (spaceId, name) => {
+    set({ error: null });
+    try {
+      const space = await spacesApi.rename(spaceId, name);
+      set((state) => ({
+        spaces: state.spaces.map((item) => item.id === spaceId ? space : item),
+      }));
+      return space;
+    } catch (error) {
+      set({ error: errorText(error) });
+      throw error;
+    }
+  },
+
   invite: async (spaceId, email) => {
     set({ error: null });
     try {
@@ -198,13 +216,13 @@ export const useSpacesStore = create<SpacesStore>((set, get) => ({
     await get().load();
   },
 
-  sendMessage: async (spaceId, text, fileNodeIds = []) => {
+  sendMessage: async (spaceId, text, fileNodeIds = [], attachmentIds = [], libraryItemIds = [], replyToMessageId = "") => {
     const trimmed = text.trim();
-    if (!trimmed) return;
+    if (!trimmed && attachmentIds.length === 0 && libraryItemIds.length === 0 && fileNodeIds.length === 0) return;
     set({ sending: true, error: null });
     try {
-      const spans = buildMessageSpans(trimmed, get().membersBySpace[spaceId] ?? [], get().agentsBySpace[spaceId] ?? []);
-      const response = await spacesApi.sendMessage(spaceId, spans, fileNodeIds);
+      const spans = trimmed ? buildMessageSpans(trimmed, get().membersBySpace[spaceId] ?? [], get().agentsBySpace[spaceId] ?? []) : [];
+      const response = await spacesApi.sendMessage(spaceId, spans, fileNodeIds, attachmentIds, libraryItemIds, replyToMessageId);
       set((state) => ({
         sending: false,
         messagesBySpace: {
@@ -219,9 +237,15 @@ export const useSpacesStore = create<SpacesStore>((set, get) => ({
   },
 
   updateMessage: async (spaceId, messageId, text, fileNodeIds = []) => {
-    const spans = buildMessageSpans(text.trim(), get().membersBySpace[spaceId] ?? [], get().agentsBySpace[spaceId] ?? []);
-    const saved = await spacesApi.updateMessage(spaceId, messageId, spans, fileNodeIds);
-    set((state) => ({ messagesBySpace: { ...state.messagesBySpace, [spaceId]: mergeMessages(state.messagesBySpace[spaceId] ?? [], [saved]) } }));
+    set({ error: null });
+    try {
+      const spans = buildMessageSpans(text.trim(), get().membersBySpace[spaceId] ?? [], get().agentsBySpace[spaceId] ?? []);
+      const saved = await spacesApi.updateMessage(spaceId, messageId, spans, fileNodeIds);
+      set((state) => ({ messagesBySpace: { ...state.messagesBySpace, [spaceId]: mergeMessages(state.messagesBySpace[spaceId] ?? [], [saved]) } }));
+    } catch (error) {
+      set({ error: errorText(error) });
+      throw error;
+    }
   },
 
   deleteMessage: async (spaceId, messageId) => {
@@ -372,6 +396,7 @@ export function resetSpacesAccountState(): void {
   useSpacesStore.setState({
     spaces: [],
     invitations: [],
+    limits: null,
     membersBySpace: {},
     messagesBySpace: {},
     nodesBySpace: {},

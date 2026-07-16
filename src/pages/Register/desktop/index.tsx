@@ -63,14 +63,13 @@ export default function RegisterPage() {
   }
 
   return (
-    <AuthShell title={addingAccount ? "Create another account" : "Create an account"} description={addingAccount ? "Your current account will remain signed in on this device." : "Sign up to get started."}>
+    <AuthShell title={addingAccount ? "Create another account" : "Create an account"} description={addingAccount ? "Your current account will remain signed in on this device." : "Sign up to get started."} onBack={addingAccount ? () => navigate(from, { replace: true }) : undefined}>
       <AuthCard
         footer={
           <div className="text-center text-sm text-text-muted">
             <NavLink to="/signin" state={{ from, addingAccount }} className="transition hover:text-text">
               Already have an account? Sign in
             </NavLink>
-            {addingAccount ? <button className="ml-4 border-0 bg-transparent p-0 text-text-muted transition hover:text-text" type="button" onClick={() => navigate(from, { replace: true })}>Cancel</button> : null}
           </div>
         }
       >

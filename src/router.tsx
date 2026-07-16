@@ -6,7 +6,7 @@ import {
   RouterProvider,
   useLocation,
 } from "react-router-dom";
-import { ArrowUpDown, Folder, Home, LibraryBig, PlugZap, Puzzle, Settings, UserCircle, Workflow } from "lucide-react";
+import { ArrowUpDown, Boxes, Folder, FolderOpen, Home, PencilSparkles, PlugZap, Puzzle, Settings, UserCircle } from "lucide-react";
 import AccountPage from "./pages/Account";
 import ChangelogPage from "./pages/Changelog";
 import ExtensionsPage from "./pages/Extensions";
@@ -97,9 +97,9 @@ const desktopNavItems = (isPhoneBuild ? [] : [
     active: (pathname: string) =>
       pathname === routes.home || pathname.startsWith(routes.changelog),
   },
-  { id: "files", label: "Files", path: routes.files, icon: Folder },
-  { id: "spaces", label: "Spaces", path: routes.spacePersonal, icon: LibraryBig, active: (pathname: string) => pathname.startsWith(routes.spaces) },
-  { id: "studio", label: "Studio", path: routes.studioAgents, icon: Workflow, active: (pathname: string) => pathname.startsWith(routes.studio) },
+  { id: "files", label: "Files", path: routes.files, icon: FolderOpen },
+  { id: "spaces", label: "Spaces", path: routes.spacePersonal, icon: Boxes, active: (pathname: string) => pathname.startsWith(routes.spaces) },
+  { id: "studio", label: "Studio", path: routes.studioAgents, icon: PencilSparkles, active: (pathname: string) => pathname.startsWith(routes.studio) },
   ...(isAndroidBuild ? [] : [
   {
     id: "extensions",
@@ -238,7 +238,15 @@ export const router = createBrowserRouter([
                   />
                 ),
               },
-              { path: "account", element: <AccountPage /> },
+              {
+                path: "account",
+                element: (
+                  <ResponsiveRoute
+                    desktop={null}
+                    mobile={<AccountPage />}
+                  />
+                ),
+              },
               {
                 path: "account/signin",
                 element: (

@@ -62,14 +62,13 @@ export default function SignIn() {
   }
 
   return (
-    <AuthShell title={addingAccount ? "Add another account" : "Welcome back"} description={addingAccount ? "Your current account will remain signed in on this device." : "Sign in to your Misty account."}>
+    <AuthShell title={addingAccount ? "Add another account" : "Welcome back"} description={addingAccount ? "Your current account will remain signed in on this device." : "Sign in to your Misty account."} onBack={addingAccount ? () => navigate(from, { replace: true }) : undefined}>
       <AuthCard
         footer={
           <div className="text-center text-sm text-text-muted">
             <NavLink to="/register" state={{ from, addingAccount }} className="transition hover:text-text">
               Don&apos;t have an account? Sign up
             </NavLink>
-            {addingAccount ? <button className="ml-4 border-0 bg-transparent p-0 text-text-muted transition hover:text-text" type="button" onClick={() => navigate(from, { replace: true })}>Cancel</button> : null}
           </div>
         }
       >
