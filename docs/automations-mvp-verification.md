@@ -18,7 +18,7 @@ The webhook listener binds only to `127.0.0.1`. Disabled workflows reject schedu
 - `cargo test services::automations --lib`: 13 passed.
 - `cargo test --lib -- --test-threads=1`: 236 passed. Under parallel load, the pre-existing `undo_then_redo_local_move_uses_backend_redo_stack` operation-queue timing test was intermittent; it passed in isolation, in one parallel full run, and in the deterministic serial full run.
 - `git diff --check`: passed.
-- Native debug runtime: Misty launched successfully and `GET http://127.0.0.1:17832/health` returned `Misty automations ready`.
+- Native debug runtime: Misty launched successfully without starting a local webhook listener. Local webhook nodes remain readable for backward compatibility but cannot be newly added.
 - Editor interaction smoke pass at the desktop viewport: click placement, palette drag/drop, node movement, inspector Escape, connect/disconnect, undo/redo, copy/paste/duplicate, workflow settings, fit-to-view, and run-log resizing passed.
 - Service end-to-end tests use isolated temporary stores and files to prove save/reload/manual run, interval claiming, webhook routing, HTTP failure, approval-gated writes, rejection state, and workflow-history deletion.
 - Strict repository-wide Clippy is not currently clean because of 25 existing warnings in unrelated modules; none were reported in the automation service before Clippy stopped the build.

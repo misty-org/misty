@@ -27,11 +27,11 @@ import { agentDefinitionToMf, mfToAgentWorkflow, validateMfWorkflow } from "../.
 type AgentCanvasData = { label: string; kind: AgentWorkflowNodeKind };
 type AgentCanvasNode = Node<AgentCanvasData, "agent-workflow">;
 
-const palette: Array<{ kind: AgentWorkflowNodeKind; label: string; action?: AgentActionKind; mode?: "automatic" | "approval" }> = [
+const palette: Array<{ kind: AgentWorkflowNodeKind; label: string; action?: AgentActionKind; mode?: "automatic" | "approval"; available?: boolean }> = [
   { kind: "manual_trigger", label: "Manual trigger" },
   { kind: "schedule_trigger", label: "Schedule trigger" },
   { kind: "file_event", label: "File event" },
-  { kind: "local_webhook", label: "Local webhook" },
+  { kind: "local_webhook", label: "Local webhook", available: false },
   { kind: "folder_query", label: "Search folder", action: "search", mode: "automatic" },
   { kind: "document_read", label: "Read document", action: "read", mode: "automatic" },
   { kind: "document_ocr", label: "OCR document", action: "read", mode: "automatic" },
@@ -192,7 +192,7 @@ export function AgentWorkflowEditor({ agentId }: { agentId: string }) {
         <div>{message ? <small>{message}</small> : null}<button type="button" onClick={() => setMfPickerOpen(true)}><FileUp size={14} /> Import .mf</button><button type="button" onClick={() => void exportMf()}><FileDown size={14} /> Export .mf</button><button type="button" disabled={!selectedNodeId} onClick={removeSelected}><Trash2 size={14} /> Remove</button><button type="button" disabled={saving} onClick={() => void save()}><Save size={14} /> Save workflow</button></div>
       </header>
       <section className="agent-workflow-body">
-        <aside><strong>Agent nodes</strong>{palette.map((entry) => <button key={entry.kind} type="button" onClick={() => addNode(entry)}><Plus size={13} /> {entry.label}</button>)}</aside>
+        <aside><strong>Agent nodes</strong>{palette.filter((entry) => entry.available !== false).map((entry) => <button key={entry.kind} type="button" onClick={() => addNode(entry)}><Plus size={13} /> {entry.label}</button>)}</aside>
         <div className="agent-workflow-canvas">
           <ReactFlow<AgentCanvasNode, Edge>
             nodes={nodes}

@@ -3,8 +3,8 @@
   min-width: 0;
   height: 46px;
   overflow: hidden;
-  border-bottom: 1px solid var(--misty-border-soft);
-  background: var(--misty-bg-soft);
+  border-bottom: 0;
+  background: transparent;
 }
 
 .misty-chrome-tabs.chrome-tabs {
@@ -59,9 +59,9 @@
   height: 32px;
   margin: 6px 8px 0 4px;
   padding: 2px;
-  border: 1px solid var(--misty-border);
+  border: 0;
   border-radius: 11px;
-  background: var(--misty-surface);
+  background: transparent;
 }
 
 .misty-chrome-tabs-add {
@@ -101,6 +101,11 @@
 
 .misty-chrome-tabs.chrome-tabs.chrome-tabs-dark-theme .chrome-tab[active] .chrome-tab-title {
   color: var(--misty-text);
+}
+
+.misty-chrome-tabs.chrome-tabs .chrome-tab:focus-within .chrome-tab-content {
+  border-radius: 8px;
+  box-shadow: inset 0 0 0 1px var(--misty-interaction-focus);
 }
 
 .misty-chrome-tabs.chrome-tabs .chrome-tab .chrome-tab-content {

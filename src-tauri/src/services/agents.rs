@@ -5,12 +5,6 @@ use std::{
     process::Command,
 };
 
-use axum::{
-    extract::{DefaultBodyLimit, Path as AxumPath, State},
-    http::StatusCode,
-    routing::{get, post},
-    Json, Router,
-};
 use chrono::{Duration, Utc};
 use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
@@ -32,7 +26,6 @@ const LOCAL_STORE_VERSION: i64 = 1;
 #[derive(Clone)]
 pub struct AgentService {
     database_path: PathBuf,
-    webhook_url: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -188,22 +181,15 @@ struct CanonicalApprovedAgentAction<'a> {
 
 impl AgentService {
     pub fn new(environment: AppEnvironmentService) -> Self {
-        let port = std::env::var("MISTY_AGENT_WEBHOOK_PORT")
-            .ok()
-            .and_then(|value| value.parse::<u16>().ok())
-            .unwrap_or(17833);
-        let service = Self {
+        Self {
             database_path: environment.misty_db_path(),
-            webhook_url: format!("http://127.0.0.1:{port}"),
-        };
-        service.start_webhook_server(port);
-        service
+        }
     }
 
     pub async fn snapshot(&self) -> ApiResult<Value> {
         let path = self.database_path.clone();
         let mut snapshot = run_db(path, snapshot_sync).await?;
-        set_value(&mut snapshot, "localWebhookUrl", json!(self.webhook_url));
+        set_value(&mut snapshot, "localWebhookUrl", Value::Null);
         Ok(snapshot)
     }
 
@@ -380,73 +366,6 @@ impl AgentService {
         })
         .await
     }
-
-    fn start_webhook_server(&self, port: u16) {
-        let service = self.clone();
-        tauri::async_runtime::spawn(async move {
-            let app = Router::new()
-                .route("/health", get(|| async { "Misty agents ready" }))
-                .route("/agent-hooks/{webhook_id}", post(run_agent_webhook))
-                .layer(DefaultBodyLimit::max(64 * 1024))
-                .with_state(service);
-            let address = format!("127.0.0.1:{port}");
-            match tokio::net::TcpListener::bind(&address).await {
-                Ok(listener) => {
-                    if let Err(error) = axum::serve(listener, app).await {
-                        eprintln!("Agent webhook server stopped: {error}");
-                    }
-                }
-                Err(error) => eprintln!("Agent webhook server unavailable at {address}: {error}"),
-            }
-        });
-    }
-}
-
-#[derive(Debug, Deserialize)]
-struct AgentWebhookBody {
-    prompt: String,
-}
-
-async fn run_agent_webhook(
-    AxumPath(webhook_id): AxumPath<String>,
-    State(service): State<AgentService>,
-    Json(body): Json<AgentWebhookBody>,
-) -> Result<Json<Value>, (StatusCode, String)> {
-    if webhook_id.len() < 16
-        || webhook_id.len() > 128
-        || !webhook_id
-            .chars()
-            .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
-    {
-        return Err((StatusCode::NOT_FOUND, "Webhook not found.".to_owned()));
-    }
-    let prompt = body.prompt.trim();
-    if prompt.is_empty() || prompt.len() > 4_000 || contains_absolute_local_path(prompt) {
-        return Err((
-            StatusCode::BAD_REQUEST,
-            "A prompt between 1 and 4000 characters is required.".to_owned(),
-        ));
-    }
-    let path = service.database_path.clone();
-    let webhook = webhook_id.clone();
-    let prompt = prompt.to_owned();
-    let event = run_db(path, move |connection| {
-        enqueue_local_webhook_sync(connection, &webhook, &prompt)
-    })
-    .await
-    .map_err(|_| (StatusCode::NOT_FOUND, "Webhook not found.".to_owned()))?;
-    Ok(Json(json!({"accepted":true,"eventId":event["eventId"]})))
-}
-
-fn contains_absolute_local_path(value: &str) -> bool {
-    value.contains("/Users/")
-        || value.contains("/home/")
-        || value.contains("\\Users\\")
-        || value.as_bytes().windows(3).any(|window| {
-            window[0].is_ascii_alphabetic()
-                && window[1] == b':'
-                && matches!(window[2], b'\\' | b'/')
-        })
 }
 
 async fn run_db<T, F>(path: PathBuf, operation: F) -> ApiResult<T>
@@ -473,6 +392,7 @@ where
     .map_err(|error| ApiError::Message(format!("Agent database worker failed: {error}")))?
 }
 
+#[allow(dead_code)]
 fn enqueue_local_webhook_sync(
     connection: &mut Connection,
     webhook_id: &str,

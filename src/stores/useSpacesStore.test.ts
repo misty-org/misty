@@ -1,12 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { buildMessageSpans, resetSpacesAccountState, useSpacesStore } from "./useSpacesStore";
-import type { SpaceMember, SpaceStudioResource } from "../spaces/types";
+import type { Space, SpaceMember, SpaceMessage, SpaceStudioResource } from "../spaces/types";
 
-const apiMocks = vi.hoisted(() => ({ realtimeTicket: vi.fn() }));
+const apiMocks = vi.hoisted(() => ({ realtimeTicket: vi.fn(), rename: vi.fn(), updateMessage: vi.fn() }));
 
 vi.mock("../spaces/api", () => ({
   resolveSpacesApiBase: vi.fn(async () => "http://localhost:8081/api"),
-  spacesApi: { realtimeTicket: apiMocks.realtimeTicket },
+  spacesApi: {
+    realtimeTicket: apiMocks.realtimeTicket,
+    rename: apiMocks.rename,
+    updateMessage: apiMocks.updateMessage,
+  },
 }));
 
 class FakeWebSocket {
@@ -72,6 +76,39 @@ describe("buildMessageSpans", () => {
 
   it("keeps unknown mentions as normal text", () => {
     expect(buildMessageSpans("Hello @Unknown", [member], [agent])).toEqual([{ type: "text", text: "Hello @Unknown" }]);
+  });
+});
+
+describe("Spaces mutations", () => {
+  beforeEach(() => {
+    resetSpacesAccountState();
+    apiMocks.rename.mockReset();
+    apiMocks.updateMessage.mockReset();
+  });
+
+  afterEach(() => resetSpacesAccountState());
+
+  it("replaces the renamed default Space in the snapshot", async () => {
+    const original = spaceFixture({ name: "Default space" });
+    const renamed = { ...original, name: "Home base", updated_at: "2026-07-15T01:00:00Z" };
+    apiMocks.rename.mockResolvedValue(renamed);
+    useSpacesStore.setState({ spaces: [original] });
+
+    await useSpacesStore.getState().renameSpace(original.id, renamed.name);
+
+    expect(apiMocks.rename).toHaveBeenCalledWith(original.id, renamed.name);
+    expect(useSpacesStore.getState().spaces).toEqual([renamed]);
+  });
+
+  it("replaces a message with the edited server response", async () => {
+    const original = messageFixture({ content: [{ type: "text", text: "Before" }] });
+    const edited = { ...original, content: [{ type: "text" as const, text: "After" }], edited_at: "2026-07-15T01:00:00Z" };
+    apiMocks.updateMessage.mockResolvedValue(edited);
+    useSpacesStore.setState({ messagesBySpace: { [original.space_id]: [original] } });
+
+    await useSpacesStore.getState().updateMessage(original.space_id, original.id, "After");
+
+    expect(useSpacesStore.getState().messagesBySpace[original.space_id]).toEqual([edited]);
   });
 });
 
@@ -151,4 +188,35 @@ function deferred<T>() {
   let resolve!: (value: T) => void;
   const promise = new Promise<T>((done) => { resolve = done; });
   return { promise, resolve };
+}
+
+function spaceFixture(patch: Partial<Space> = {}): Space {
+  return {
+    id: "space-default",
+    owner_user_id: "owner",
+    name: "Default space",
+    role: "owner",
+    member_count: 1,
+    pending_count: 0,
+    is_personal: true,
+    is_shared: false,
+    created_at: "2026-07-15T00:00:00Z",
+    updated_at: "2026-07-15T00:00:00Z",
+    ...patch,
+  };
+}
+
+function messageFixture(patch: Partial<SpaceMessage> = {}): SpaceMessage {
+  return {
+    seq: 1,
+    id: "message-1",
+    space_id: "space-default",
+    sender_user_id: "owner",
+    sender_name: "Owner",
+    sender_kind: "person",
+    content: [{ type: "text", text: "Before" }],
+    file_node_ids: [],
+    created_at: "2026-07-15T00:00:00Z",
+    ...patch,
+  };
 }

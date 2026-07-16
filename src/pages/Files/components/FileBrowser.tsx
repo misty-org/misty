@@ -95,6 +95,7 @@ interface FileBrowserProps {
   commandQuery: string;
   commandQueryMode: ExplorerCommandQueryMode;
   directorySizes: Record<string, DirectorySizeRecord>;
+  cutPaths: ReadonlySet<string>;
   inlineEdit: ExplorerInlineEditState | null;
   onSort: (column: ExplorerSortColumn) => void;
   onToggleHidden: () => void;
@@ -301,11 +302,13 @@ function FileTable(props: FileBrowserProps & { listing: DirectoryListing }) {
   const [viewportWidth, setViewportWidth] = useState(0);
   const [columnWidths, setColumnWidths] = useState<FileTableColumnWidths>(loadColumnWidths);
   const [columnOrder] = useState<FileTableColumn[]>(loadColumnOrder);
+  const [resizingColumn, setResizingColumn] = useState<FileTableColumn | null>(null);
   const selectedIds = useMemo(() => new Set(props.selectedIds), [props.selectedIds]);
   const visibleEntryIds = useMemo(() => props.listing.entries.map((entry) => entry.id), [props.listing.entries]);
   const passiveRenameDrafts = useMemo(() => passiveRenameDraftsFor(props.inlineEdit, props.paneId), [props.inlineEdit, props.paneId]);
   const activeInlineEdit = props.inlineEdit?.paneId === props.paneId ? props.inlineEdit : null;
   const [dropTargetId, setDropTargetId] = useState<string | null>(null);
+  const [invalidDropTargetId, setInvalidDropTargetId] = useState<string | null>(null);
   const [draggingEntryIds, setDraggingEntryIds] = useState<Set<string>>(() => new Set());
   const rowHeight = compactModeEnabled ? 36 : TABLE_ROW_HEIGHT;
   const rowCount = props.listing.entries.length;
@@ -398,6 +401,7 @@ function FileTable(props: FileBrowserProps & { listing: DirectoryListing }) {
     const startWidth = columnWidths[column];
     const previousCursor = document.body.style.cursor;
     const previousUserSelect = document.body.style.userSelect;
+    setResizingColumn(column);
     document.body.style.cursor = "col-resize";
     document.body.style.userSelect = "none";
     let pendingWidth = startWidth;
@@ -417,6 +421,7 @@ function FileTable(props: FileBrowserProps & { listing: DirectoryListing }) {
       saveColumnWidths(next);
       document.body.style.cursor = previousCursor;
       document.body.style.userSelect = previousUserSelect;
+      setResizingColumn(null);
       window.removeEventListener("pointermove", onPointerMove);
       window.removeEventListener("pointerup", onPointerUp);
     };
@@ -462,6 +467,7 @@ function FileTable(props: FileBrowserProps & { listing: DirectoryListing }) {
                   label={fileTableColumnLabels[column]}
                   column={column}
                   sort={props.sort}
+                  resizing={resizingColumn === column}
                   onSort={props.onSort}
                   onResizeStart={beginColumnResize}
                 />
@@ -476,7 +482,10 @@ function FileTable(props: FileBrowserProps & { listing: DirectoryListing }) {
         className={fileBrowserStyles.tableScroll}
         onScroll={handleScroll}
         onDragLeave={(event) => {
-          if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDropTargetId(null);
+          if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+            setDropTargetId(null);
+            setInvalidDropTargetId(null);
+          }
         }}
       >
         <table className={fileBrowserStyles.table} style={{ width: renderedTableWidth, minWidth: renderedTableWidth }}>
@@ -503,11 +512,13 @@ function FileTable(props: FileBrowserProps & { listing: DirectoryListing }) {
                 columns={columnOrder}
                 hasFillerColumn={hasFillerColumn}
                 selected={selectedIds.has(entry.id)}
+                cut={props.cutPaths.has(entry.path)}
                 onSelect={handleSelect}
                 onOpen={props.onOpen}
                 onDownload={props.onDownload}
                 onContextMenu={props.onContextMenu}
                 dropTarget={dropTargetId === entry.id}
+                invalidDropTarget={invalidDropTargetId === entry.id}
                 dragging={draggingEntryIds.has(entry.id)}
                 onDragStart={(event) => {
                   const items = dragItemsForEntry(entry, props.listing.entries, selectedIds);
@@ -517,13 +528,20 @@ function FileTable(props: FileBrowserProps & { listing: DirectoryListing }) {
                 onDragEnd={() => {
                   setDraggingEntryIds(new Set());
                   setDropTargetId(null);
+                  setInvalidDropTargetId(null);
                 }}
                 onDragOver={(event) => {
-                  if (!canDropOnEntry(event, entry)) return;
+                  if (!canDropOnEntry(event, entry)) {
+                    setDropTargetId(null);
+                    setInvalidDropTargetId(entry.id);
+                    return;
+                  }
+                  setInvalidDropTargetId(null);
                   setDropTargetId(entry.id);
                 }}
                 onDrop={(event) => {
                   setDropTargetId(null);
+                  setInvalidDropTargetId(null);
                   handleEntryDrop(event, entry, props.onDropItems);
                 }}
                 inlineEdit={activeInlineEdit?.entryId === entry.id ? activeInlineEdit : null}
@@ -546,6 +564,7 @@ const SortableHeader = memo(function SortableHeader(props: {
   label: string;
   column: FileTableColumn;
   sort: ExplorerSortState;
+  resizing: boolean;
   onSort: (column: FileTableColumn) => void;
   onResizeStart: (column: FileTableColumn, event: ReactPointerEvent) => void;
 }) {
@@ -554,7 +573,7 @@ const SortableHeader = memo(function SortableHeader(props: {
   return (
     <th
       aria-sort={active ? (direction === "asc" ? "ascending" : "descending") : "none"}
-      className={fileBrowserStyles.tableHeadCell}
+      className={`${fileBrowserStyles.tableHeadCell} ${props.column === "size" ? fileBrowserStyles.tableNumericHeader : ""}`}
     >
       <button className={`${fileBrowserStyles.tableSort} ${active ? fileBrowserStyles.tableSortActive : ""}`} onClick={() => props.onSort(props.column)}>
         <span className={fileBrowserStyles.tableSortLabel}>{props.label}</span>
@@ -563,7 +582,7 @@ const SortableHeader = memo(function SortableHeader(props: {
         </span>
       </button>
       <span
-        className={fileBrowserStyles.tableResizeHandle}
+        className={`${fileBrowserStyles.tableResizeHandle} ${props.resizing ? fileBrowserStyles.tableResizeHandleActive : ""}`}
         aria-hidden="true"
         onPointerDown={(event) => props.onResizeStart(props.column, event)}
       />
@@ -576,11 +595,13 @@ const FileTableRow = memo(function FileTableRow(props: {
   columns: FileTableColumn[];
   hasFillerColumn: boolean;
   selected: boolean;
+  cut: boolean;
   onSelect: (entryId: string, event: MouseEvent) => void;
   onOpen: FileBrowserProps["onOpen"];
   onDownload: FileBrowserProps["onDownload"];
   onContextMenu: FileBrowserProps["onContextMenu"];
   dropTarget: boolean;
+  invalidDropTarget: boolean;
   dragging: boolean;
   onDragStart: (event: DragEvent<HTMLTableRowElement>) => void;
   onDragEnd: () => void;
@@ -597,11 +618,17 @@ const FileTableRow = memo(function FileTableRow(props: {
 
   return (
     <tr
-      className={`${fileBrowserStyles.tableRow} ${props.selected ? fileBrowserStyles.tableRowSelected : ""} ${props.inlineEdit ? fileBrowserStyles.tableRowInlineEditing : ""} ${entry.isDeleted ? fileBrowserStyles.tableRowDeleted : ""} ${props.dropTarget ? fileBrowserStyles.tableRowDropTarget : ""} ${props.dragging ? fileBrowserStyles.tableRowDragging : ""}`}
+      className={`${fileBrowserStyles.tableRow} ${props.selected ? fileBrowserStyles.tableRowSelected : ""} ${props.inlineEdit ? fileBrowserStyles.tableRowInlineEditing : ""} ${entry.isDeleted ? fileBrowserStyles.tableRowDeleted : ""} ${props.dropTarget ? fileBrowserStyles.tableRowDropTarget : ""} ${props.invalidDropTarget ? fileBrowserStyles.tableRowInvalidDropTarget : ""} ${props.dragging ? fileBrowserStyles.tableRowDragging : ""} ${props.cut ? fileBrowserStyles.tableRowCut : ""}`}
+      aria-disabled={entry.isDeleted || undefined}
+      aria-selected={props.selected}
+      tabIndex={entry.isDeleted ? -1 : 0}
       draggable={!entry.isDeleted}
       onClick={(event) => props.onSelect(entry.id, event)}
       onDoubleClick={() => {
         if (!entry.isDeleted) props.onOpen(entry);
+      }}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" && !entry.isDeleted) props.onOpen(entry);
       }}
       onContextMenu={(event) => props.onContextMenu(event, entry)}
       onDragStart={props.onDragStart}
@@ -660,9 +687,9 @@ function FileTableCell(props: {
         </td>
       );
     case "modified":
-      return <td className={fileBrowserStyles.tableCell}>{formatDate(props.entry.remoteModified ?? props.entry.modifiedMs)}</td>;
+      return <td className={`${fileBrowserStyles.tableCell} ${fileBrowserStyles.tableDateCell}`}>{formatDate(props.entry.remoteModified ?? props.entry.modifiedMs)}</td>;
     case "size":
-      return <td className={fileBrowserStyles.tableCell}>{formatEntrySize(props.entry, props.directorySizes)}</td>;
+      return <td className={`${fileBrowserStyles.tableCell} ${fileBrowserStyles.tableNumericCell}`}>{formatEntrySize(props.entry, props.directorySizes)}</td>;
     case "type":
       if (props.entry.isDeleted) return <td className={fileBrowserStyles.tableCell}>Deleted</td>;
       return (
@@ -708,6 +735,7 @@ function FileGrid(props: FileBrowserProps & { listing: DirectoryListing }) {
   const passiveRenameDrafts = useMemo(() => passiveRenameDraftsFor(props.inlineEdit, props.paneId), [props.inlineEdit, props.paneId]);
   const activeInlineEdit = props.inlineEdit?.paneId === props.paneId ? props.inlineEdit : null;
   const [dropTargetId, setDropTargetId] = useState<string | null>(null);
+  const [invalidDropTargetId, setInvalidDropTargetId] = useState<string | null>(null);
   const [draggingEntryIds, setDraggingEntryIds] = useState<Set<string>>(() => new Set());
   const createOffset = props.inlineEdit?.kind === "create" ? 1 : 0;
   const itemCount = props.listing.entries.length + createOffset;
@@ -813,7 +841,10 @@ function FileGrid(props: FileBrowserProps & { listing: DirectoryListing }) {
       className={fileBrowserStyles.gridScroll}
       onScroll={handleScroll}
       onDragLeave={(event) => {
-        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDropTargetId(null);
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+          setDropTargetId(null);
+          setInvalidDropTargetId(null);
+        }
       }}
     >
       <div className={fileBrowserStyles.gridSizer} style={{ height: totalHeight }}>
@@ -847,6 +878,7 @@ function FileGrid(props: FileBrowserProps & { listing: DirectoryListing }) {
                 entry={item.entry}
                 thumbnailsEnabled={thumbnailPreviewsEnabled}
                 selected={selectedIds.has(item.entry.id)}
+                cut={props.cutPaths.has(item.entry.path)}
                 inlineEdit={activeInlineEdit?.entryId === item.entry.id ? activeInlineEdit : null}
                 passiveRename={passiveRenameDrafts.get(item.entry.id) ?? null}
                 onSelect={handleSelect}
@@ -854,6 +886,7 @@ function FileGrid(props: FileBrowserProps & { listing: DirectoryListing }) {
                 onDownload={props.onDownload}
                 onContextMenu={props.onContextMenu}
                 dropTarget={dropTargetId === item.entry.id}
+                invalidDropTarget={invalidDropTargetId === item.entry.id}
                 dragging={draggingEntryIds.has(item.entry.id)}
                 onDragStart={(event) => {
                   const items = dragItemsForEntry(item.entry, props.listing.entries, selectedIds);
@@ -863,13 +896,20 @@ function FileGrid(props: FileBrowserProps & { listing: DirectoryListing }) {
                 onDragEnd={() => {
                   setDraggingEntryIds(new Set());
                   setDropTargetId(null);
+                  setInvalidDropTargetId(null);
                 }}
                 onDragOver={(event) => {
-                  if (!canDropOnEntry(event, item.entry)) return;
+                  if (!canDropOnEntry(event, item.entry)) {
+                    setDropTargetId(null);
+                    setInvalidDropTargetId(item.entry.id);
+                    return;
+                  }
+                  setInvalidDropTargetId(null);
                   setDropTargetId(item.entry.id);
                 }}
                 onDrop={(event) => {
                   setDropTargetId(null);
+                  setInvalidDropTargetId(null);
                   handleEntryDrop(event, item.entry, props.onDropItems);
                 }}
                 onInlineEditChange={props.onInlineEditChange}
@@ -888,6 +928,7 @@ const FileGridItem = memo(function FileGridItem(props: {
   entry: FileEntry;
   thumbnailsEnabled: boolean;
   selected: boolean;
+  cut: boolean;
   inlineEdit: ExplorerInlineEditState | null;
   passiveRename: PassiveRenameDraft | null;
   onSelect: (entryId: string, event: MouseEvent) => void;
@@ -895,6 +936,7 @@ const FileGridItem = memo(function FileGridItem(props: {
   onDownload: FileBrowserProps["onDownload"];
   onContextMenu: FileBrowserProps["onContextMenu"];
   dropTarget: boolean;
+  invalidDropTarget: boolean;
   dragging: boolean;
   onDragStart: (event: DragEvent<HTMLDivElement>) => void;
   onDragEnd: () => void;
@@ -908,9 +950,11 @@ const FileGridItem = memo(function FileGridItem(props: {
 
   return (
     <div
-      className={`${fileBrowserStyles.gridItem} ${props.selected ? fileBrowserStyles.gridItemSelected : ""} ${entry.isDeleted ? fileBrowserStyles.gridItemDeleted : ""} ${props.dropTarget ? fileBrowserStyles.gridItemDropTarget : ""} ${props.dragging ? fileBrowserStyles.gridItemDragging : ""}`}
+      className={`${fileBrowserStyles.gridItem} ${props.selected ? fileBrowserStyles.gridItemSelected : ""} ${entry.isDeleted ? fileBrowserStyles.gridItemDeleted : ""} ${props.dropTarget ? fileBrowserStyles.gridItemDropTarget : ""} ${props.invalidDropTarget ? fileBrowserStyles.gridItemInvalidDropTarget : ""} ${props.dragging ? fileBrowserStyles.gridItemDragging : ""} ${props.cut ? fileBrowserStyles.gridItemCut : ""}`}
+      aria-disabled={entry.isDeleted || undefined}
+      aria-pressed={props.selected}
       role="button"
-      tabIndex={0}
+      tabIndex={entry.isDeleted ? -1 : 0}
       draggable={!entry.isDeleted}
       onClick={(event) => props.onSelect(entry.id, event)}
       onDoubleClick={() => {

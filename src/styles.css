@@ -12,9 +12,19 @@
   --misty-surface-hover: #171a20;
   --misty-surface-selected: #1d222a;
   --misty-sidebar-selected: #1a2028;
-  --misty-border: #242830;
-  --misty-border-strong: #303640;
-  --misty-border-soft: #1b1f25;
+  --misty-border: #14181d;
+  --misty-border-strong: #1f242d;
+  --misty-border-soft: #0e1014;
+  --misty-content-frame-border: #181a21;
+  --misty-divider-strong: color-mix(in srgb, var(--misty-text) 10.78125%, transparent);
+  --misty-divider-default: color-mix(in srgb, var(--misty-text) 5.390625%, transparent);
+  --misty-divider-subtle: color-mix(in srgb, var(--misty-text) 3.59375%, transparent);
+  --misty-divider-hover: color-mix(in srgb, var(--misty-text) 17.96875%, transparent);
+  --misty-divider-active: var(--misty-accent);
+  --misty-interaction-focus: color-mix(in srgb, var(--misty-accent) 78%, transparent);
+  --misty-row-hover: color-mix(in srgb, var(--misty-text) 7%, transparent);
+  --misty-row-selected: color-mix(in srgb, var(--misty-accent) 18%, transparent);
+  --misty-row-selected-hover: color-mix(in srgb, var(--misty-accent) 24%, transparent);
   --misty-text: #f1f3f4;
   --misty-text-muted: #a7abb3;
   --misty-text-subtle: #747a84;
@@ -94,6 +104,7 @@
   --misty-dropdown-bg: #fffaf2;
   --misty-border: #d8cec0;
   --misty-border-soft: rgba(49, 42, 34, 0.13);
+  --misty-content-frame-border: #b9a997;
   --misty-text: #1b1a18;
   --misty-text-muted: #5f594f;
   --misty-text-subtle: #847a6c;
@@ -122,6 +133,7 @@
   --misty-border: #34383d;
   --misty-border-strong: rgba(238, 242, 246, 0.16);
   --misty-border-soft: rgba(238, 242, 246, 0.09);
+  --misty-content-frame-border: #1d2124;
   --misty-text: #f3f5f7;
   --misty-text-muted: #c7cdd3;
   --misty-text-subtle: #8e98a1;
@@ -161,6 +173,7 @@
   --misty-border: #28484d;
   --misty-border-strong: rgba(211, 255, 247, 0.17);
   --misty-border-soft: rgba(211, 255, 247, 0.1);
+  --misty-content-frame-border: #1a3338;
   --misty-text: #effdfb;
   --misty-text-muted: #c6e4df;
   --misty-text-subtle: #82a6a1;
@@ -200,6 +213,7 @@
   --misty-border: #4a3a30;
   --misty-border-strong: rgba(255, 231, 210, 0.17);
   --misty-border-soft: rgba(255, 231, 210, 0.1);
+  --misty-content-frame-border: #312621;
   --misty-text: #fff4e8;
   --misty-text-muted: #dfcbb9;
   --misty-text-subtle: #a9917d;

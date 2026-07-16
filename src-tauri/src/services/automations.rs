@@ -7,7 +7,7 @@ use std::{
 use axum::{
     extract::{Path as AxumPath, State},
     http::StatusCode,
-    routing::{get, post},
+    routing::get,
     Json, Router,
 };
 use chrono::Utc;
@@ -245,10 +245,6 @@ impl AutomationService {
     pub fn new(environment: AppEnvironmentService, ai: AiService, agents: AgentService) -> Self {
         let root = environment.config_dir().join("automations").join("v1");
         let server_url = environment.snapshot().server_url;
-        let port = std::env::var("MISTY_AUTOMATION_WEBHOOK_PORT")
-            .ok()
-            .and_then(|value| value.parse::<u16>().ok())
-            .unwrap_or(17832);
         let service = Self {
             inner: Arc::new(AutomationServiceInner {
                 workflows_path: root.join("workflows.json"),
@@ -256,13 +252,14 @@ impl AutomationService {
                 write_lock: Mutex::new(()),
                 ai,
                 http: automation_http_client(),
-                webhook_url: format!("http://127.0.0.1:{port}"),
+                // Retain the snapshot field for backward compatibility without
+                // exposing or starting a local HTTP listener.
+                webhook_url: String::new(),
                 server_url,
                 managed_ai_auth_token: Mutex::new(None),
                 agents: Some(agents),
             }),
         };
-        service.start_webhook_server(port);
         service.start_scheduler();
         service
     }
@@ -286,27 +283,6 @@ impl AutomationService {
             runs: runs.runs,
             approvals: runs.approvals,
         })
-    }
-
-    fn start_webhook_server(&self, port: u16) {
-        let service = self.clone();
-        tauri::async_runtime::spawn(async move {
-            let app = Router::new()
-                .route("/health", get(|| async { "Misty automations ready" }))
-                .route("/hooks/{workflow_id}", post(run_webhook))
-                .with_state(service);
-            let address = format!("127.0.0.1:{port}");
-            match tokio::net::TcpListener::bind(&address).await {
-                Ok(listener) => {
-                    if let Err(error) = axum::serve(listener, app).await {
-                        eprintln!("Automation webhook server stopped: {error}");
-                    }
-                }
-                Err(error) => {
-                    eprintln!("Automation webhook server unavailable at {address}: {error}")
-                }
-            }
-        });
     }
 
     fn start_scheduler(&self) {
@@ -844,6 +820,7 @@ impl AutomationService {
     }
 }
 
+#[allow(dead_code)]
 async fn run_webhook(
     AxumPath(workflow_id): AxumPath<String>,
     State(service): State<AutomationService>,

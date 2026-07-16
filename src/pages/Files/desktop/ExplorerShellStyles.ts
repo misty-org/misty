@@ -5,7 +5,7 @@ export const explorerShellStyles = {
   main:
     "col-start-1 col-end-2 row-start-1 min-h-0 min-w-0 overflow-hidden max-[980px]:row-start-1 max-[980px]:min-w-0",
   bottomBar:
-    "grid min-h-[22px] min-w-0 grid-cols-[auto_auto] items-center justify-between gap-2 border-t border-transparent bg-transparent px-2 max-[720px]:hidden",
+    "grid min-h-[26px] min-w-0 grid-cols-[auto_auto] items-center justify-between gap-2 border-t border-[var(--misty-divider-subtle)] bg-transparent px-2 max-[720px]:hidden",
   bottomBarGroup:
     "grid grid-flow-col auto-cols-max items-center gap-1",
   bottomButton:
@@ -16,5 +16,5 @@ export const explorerShellStyles = {
   paneHeaderActions:
     "flex h-full flex-none items-center gap-2.5",
   paneHeaderActionSection:
-    "flex h-7 flex-none items-center gap-px overflow-hidden rounded-lg border border-transparent bg-transparent p-0.5",
+    "flex h-7 flex-none items-center gap-px overflow-hidden rounded-lg bg-transparent p-0.5",
 } as const;

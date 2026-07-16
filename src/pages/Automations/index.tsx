@@ -87,6 +87,7 @@ type NodeDefinition = {
   icon: LucideIcon;
   color: string;
   config: Record<string, unknown>;
+  available?: boolean;
 };
 
 type AutomationNodeData = {
@@ -116,7 +117,7 @@ type CanvasNode = FlowNode<AutomationNodeData, "automation">;
 const nodeDefinitions: NodeDefinition[] = [
   { kind: "manual_trigger", label: "Manual trigger", group: "Triggers", icon: CirclePlay, color: "#45b97c", config: {} },
   { kind: "schedule_trigger", label: "Schedule", group: "Triggers", icon: Clock3, color: "#45b97c", config: {} },
-  { kind: "webhook_trigger", label: "Webhook payload", group: "Triggers", icon: Webhook, color: "#45b97c", config: {} },
+  { kind: "webhook_trigger", label: "Webhook payload", group: "Triggers", icon: Webhook, color: "#45b97c", config: {}, available: false },
   { kind: "select_path", label: "Files / folders", group: "Files", icon: FolderOpen, color: "#4ba3d9", config: { paths: [] } },
   { kind: "list_folder", label: "List folder", group: "Files", icon: ListTree, color: "#4ba3d9", config: { path: "{{value}}" } },
   { kind: "filter", label: "Filter items", group: "Files", icon: Filter, color: "#4ba3d9", config: { contains: "" } },
@@ -146,7 +147,7 @@ export default function AutomationsPage() {
 }
 
 function AutomationPlayground() {
-  const [snapshot, setSnapshot] = useState<AutomationSnapshot>({ version: 1, webhookUrl: "http://127.0.0.1:17832", workflows: [], runs: [], approvals: [] });
+  const [snapshot, setSnapshot] = useState<AutomationSnapshot>({ version: 1, webhookUrl: "", workflows: [], runs: [], approvals: [] });
   const [workflow, setWorkflow] = useState<AutomationWorkflow>(() => createWorkflow());
   const [selectedNodeId, setSelectedNodeId] = useState<string>();
   const [selectedEdgeId, setSelectedEdgeId] = useState<string>();
@@ -716,7 +717,7 @@ function AutomationPlayground() {
         <div className="automation-panel-heading automation-node-heading"><span>Nodes</span></div>
         <div className="automation-node-library">
           {(["Triggers", "Files", "AI", "Integrations", "Actions"] as const).map((group) => (
-            <section key={group}><h3>{group}</h3>{nodeDefinitions.filter((item) => item.group === group).map((definition) => {
+            <section key={group}><h3>{group}</h3>{nodeDefinitions.filter((item) => item.group === group && item.available !== false).map((definition) => {
               const Icon = definition.icon;
               return <button key={definition.kind} onMouseDown={(event) => beginPaletteDrag(event, definition)} type="button"><GripVertical size={13} className="automation-grip" /><span className="automation-library-icon" style={{ color: definition.color }}><Icon size={16} /></span>{definition.label}</button>;
             })}</section>
@@ -750,7 +751,7 @@ function AutomationPlayground() {
             maxHeight: inspectorPosition?.maxHeight ?? 360,
             visibility: inspectorPosition ? "visible" : "hidden",
           }}
-        ><NodeInspector node={selectedNode} webhookUrl={`${snapshot.webhookUrl}/hooks/${workflow.id}`} onChange={(node) => updateWorkflow((current) => ({ ...current, nodes: current.nodes.map((item) => item.id === node.id ? node : item) }))} onDelete={() => {
+        ><NodeInspector node={selectedNode} onChange={(node) => updateWorkflow((current) => ({ ...current, nodes: current.nodes.map((item) => item.id === node.id ? node : item) }))} onDelete={() => {
           updateWorkflow((current) => ({ ...current, nodes: current.nodes.filter((item) => item.id !== selectedNode.id), edges: current.edges.filter((edge) => edge.source !== selectedNode.id && edge.target !== selectedNode.id) }));
           setSelectedNodeId(undefined);
         }} /></aside> : null}
@@ -905,11 +906,11 @@ function WorkflowInspector({ workflow, onChange, onDelete }: { workflow: Automat
   </>;
 }
 
-function NodeInspector({ node, webhookUrl, onChange, onDelete }: { node: AutomationNode; webhookUrl: string; onChange: (value: AutomationNode) => void; onDelete: () => void }) {
+function NodeInspector({ node, onChange, onDelete }: { node: AutomationNode; onChange: (value: AutomationNode) => void; onDelete: () => void }) {
   const updateConfig = (key: string, value: unknown) => onChange({ ...node, config: { ...node.config, [key]: value } });
   return <><div className="automation-inspector-heading"><div><span>Node</span><strong>{node.label}</strong></div><button title="Delete node" onClick={onDelete} type="button"><Trash2 size={16} /></button></div>
     <Field label="Label"><input value={node.label} onChange={(event) => onChange({ ...node, label: event.target.value })} /></Field>
-    {node.kind === "webhook_trigger" ? <Field label="Local webhook URL"><input readOnly value={webhookUrl} /></Field> : null}
+    {node.kind === "webhook_trigger" ? <p className="automation-inspector-note">Local webhook triggers are currently unavailable. This legacy node is preserved so the workflow can still be edited or removed.</p> : null}
     {node.kind === "select_path" ? <Field label="Paths (one per line)"><textarea rows={5} value={stringArray(node.config.paths).join("\n")} onChange={(event) => updateConfig("paths", event.target.value.split("\n").map((item) => item.trim()).filter(Boolean))} /></Field> : null}
     {hasConfig(node.kind, "path") ? <Field label="Path"><input value={configString(node, "path")} onChange={(event) => updateConfig("path", event.target.value)} /></Field> : null}
     {node.kind === "filter" ? <Field label="Contains"><input value={configString(node, "contains")} onChange={(event) => updateConfig("contains", event.target.value)} /></Field> : null}

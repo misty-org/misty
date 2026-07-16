@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 
 const appDir = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const serviceLibDir = resolve(appDir, "src-tauri/target/misty-service/host");
-const signedMacosRunner = resolve(appDir, "scripts/run-signed-macos-binary.mjs");
+const signedMacosRunner = resolve(appDir, "scripts/run-signed-macos-binary.sh");
 
 const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
 
@@ -31,8 +31,8 @@ run(
     MISTY_SERVICE_GO_LIB_DIR: serviceLibDir,
     ...(process.platform === "darwin"
       ? {
-          CARGO_TARGET_AARCH64_APPLE_DARWIN_RUNNER: `${process.execPath} ${signedMacosRunner}`,
-          CARGO_TARGET_X86_64_APPLE_DARWIN_RUNNER: `${process.execPath} ${signedMacosRunner}`,
+          CARGO_TARGET_AARCH64_APPLE_DARWIN_RUNNER: signedMacosRunner,
+          CARGO_TARGET_X86_64_APPLE_DARWIN_RUNNER: signedMacosRunner,
         }
       : {}),
   },

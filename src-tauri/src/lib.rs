@@ -95,7 +95,23 @@ use telemetry::TelemetryReporter;
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     telemetry::initialize();
-    let builder = tauri::Builder::default()
+    let builder = tauri::Builder::default();
+
+    // Register this first so duplicate launches are rejected before any other
+    // plugin or application service can initialize a second Misty runtime.
+    #[cfg(desktop)]
+    let builder = builder.plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+        if let Some(window) = app
+            .get_webview_window("main")
+            .or_else(|| app.webview_windows().into_values().next())
+        {
+            let _ = window.show();
+            let _ = window.unminimize();
+            let _ = window.set_focus();
+        }
+    }));
+
+    let builder = builder
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_document_tree::init())

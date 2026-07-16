@@ -582,12 +582,13 @@ export const ExplorerToolbar = memo(function ExplorerToolbar(props: ExplorerTool
         <button
           ref={commandSearchRef}
           type="button"
-          className={`${toolbarStyles.commandSearch} justify-start`}
+          className={toolbarStyles.searchButton}
+          aria-label="Search files"
+          aria-keyshortcuts="Meta+K Control+K"
+          title="Search files (⌘K)"
           onClick={() => void useSearchStore.getState().openSearch(props.path)}
         >
           <Search size={18} />
-          <span className="min-w-0 flex-1 truncate text-left text-[var(--misty-text-subtle)]">Search, filter, or find all</span>
-          <kbd className="rounded border border-[var(--misty-border)] px-1.5 py-0.5 text-[10px] text-[var(--misty-text-subtle)]">⌘K</kbd>
         </button>
         {commandMode
           ? createPortal(

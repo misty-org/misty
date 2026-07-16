@@ -36,7 +36,7 @@ import {
   Bell,
   Check,
   CheckCheck,
-  ChevronLeft,
+  ChevronRight,
   Folder,
   LogOut,
   Minus,
@@ -60,6 +60,7 @@ import { useSetupStore } from "../stores/useSetupStore";
 import { useUserStore } from "../stores/useUserStore";
 import { useProvidersStore } from "../stores/useProvidersStore";
 import SettingsWorkspace from "../pages/Settings/desktop";
+import AccountWorkspace from "../pages/Account/desktop";
 import {
   selectAppearancePreferences,
   selectCustomFontPreferences,
@@ -132,39 +133,47 @@ type WindowRect = {
 };
 
 const desktopFrameClass =
-  "relative isolate grid h-full min-h-0 grid-cols-[72px_minmax(0,1fr)] grid-rows-[28px_minmax(0,1fr)] overflow-hidden bg-[var(--misty-app-frame-bg,var(--misty-bg))]";
+  "relative isolate grid h-full min-h-0 grid-cols-[80px_minmax(0,1fr)] grid-rows-[28px_minmax(0,1fr)] overflow-hidden bg-[var(--misty-app-frame-bg,var(--misty-bg))]";
 const androidDesktopFrameClass =
-  "relative isolate grid h-full min-h-0 grid-cols-[72px_minmax(0,1fr)] grid-rows-[minmax(0,1fr)] overflow-hidden bg-[var(--misty-app-frame-bg,var(--misty-bg))] pt-[max(var(--misty-safe-top),28px)] pb-[max(var(--misty-safe-bottom),24px)]";
+  "relative isolate grid h-full min-h-0 grid-cols-[80px_minmax(0,1fr)] grid-rows-[minmax(0,1fr)] overflow-hidden bg-[var(--misty-app-frame-bg,var(--misty-bg))] pt-[max(var(--misty-safe-top),28px)] pb-[max(var(--misty-safe-bottom),24px)]";
 
 const desktopNavbarClass =
-  "relative z-10 col-start-1 row-start-2 flex min-h-0 flex-col items-center overflow-hidden border-r border-transparent px-1 pb-2.5 pt-2";
+  "relative z-10 col-start-1 row-start-2 flex min-h-0 flex-col items-center overflow-hidden px-2 py-3";
 const androidDesktopNavbarClass =
-  "relative z-10 col-start-1 row-start-1 flex min-h-0 flex-col items-center overflow-hidden border-r border-transparent px-1 pb-2.5 pt-2";
+  "relative z-10 col-start-1 row-start-1 flex min-h-0 flex-col items-center overflow-hidden px-2 py-3";
 
 const desktopRouteShellClass =
-  "relative z-10 col-start-2 row-start-2 min-h-0 overflow-hidden bg-transparent";
+  "relative z-10 col-start-2 row-start-2 min-h-0 overflow-hidden rounded-tl-xl border-l border-t border-[var(--misty-content-frame-border)] bg-transparent shadow-[0_12px_32px_rgba(0,0,0,0.18)]";
 const androidDesktopRouteShellClass =
-  "relative z-10 col-start-2 row-start-1 min-h-0 overflow-hidden bg-transparent";
+  "relative z-10 col-start-2 row-start-1 min-h-0 overflow-hidden rounded-tl-xl border-l border-t border-[var(--misty-content-frame-border)] bg-transparent shadow-[0_12px_32px_rgba(0,0,0,0.18)]";
 
 const navbarGroupClass = "flex w-full flex-col items-center gap-3";
 
-const navbarBottomClass = `${navbarGroupClass} mt-auto`;
+const navbarBottomClass = "mt-auto flex w-full shrink-0 flex-col items-center gap-4";
 
 const navLinkBaseClass =
-  "grid h-[58px] w-16 place-items-center text-[var(--misty-text-muted)] no-underline";
+  "grid h-[68px] w-16 shrink-0 grid-rows-[48px_18px] place-items-center text-[var(--misty-text-muted)] no-underline";
 
 const navLinkActiveClass = "text-[var(--misty-text)]";
 
 const navIconTileBaseClass =
-  "relative grid h-[52px] w-[52px] place-items-center rounded-[12px] text-[var(--misty-text)] group-hover:bg-[var(--misty-neutral-hover-bg,var(--misty-surface-2))]";
+  "relative grid h-[48px] w-[52px] place-items-center rounded-[12px] text-[var(--misty-text)] group-hover:bg-[var(--misty-neutral-hover-bg,var(--misty-surface-2))]";
 
 const navIconTileActiveClass = "bg-[var(--misty-neutral-selected-bg,var(--misty-surface-3))]";
 
+const navItemLabelBaseClass =
+  "block max-w-[64px] truncate text-center text-[11px] font-semibold leading-[1.25] tracking-[-0.01em] text-[var(--misty-text-subtle)] transition-colors group-hover:text-[var(--misty-text-muted)]";
+
+const navItemLabelActiveClass = "text-[var(--misty-text)]";
+
 const profileDockClass =
-  "relative grid h-[48px] w-[48px] place-items-center rounded-full border border-[var(--misty-border-soft)] bg-[var(--misty-neutral-control-bg,var(--misty-surface-2))] p-0 text-base font-bold text-[var(--misty-text)] transition hover:bg-[var(--misty-neutral-hover-bg,var(--misty-surface-3))]";
+  "relative grid h-[48px] w-[48px] shrink-0 place-items-center rounded-full border border-[var(--misty-border-soft)] bg-[var(--misty-neutral-control-bg,var(--misty-surface-2))] p-0 text-base font-bold text-[var(--misty-text)] transition hover:bg-[var(--misty-neutral-hover-bg,var(--misty-surface-3))]";
 
 const profilePopoverClass =
   "fixed z-[2147482900] grid max-h-[calc(100vh-16px)] w-[286px] overflow-y-auto rounded-xl border border-[var(--misty-border-soft)] bg-[color-mix(in_srgb,var(--misty-surface)_96%,transparent)] p-2 text-[var(--misty-text)] shadow-[0_18px_52px_var(--misty-shadow)]";
+
+const accountChooserPopoverClass =
+  "fixed z-[2147482910] grid max-h-[calc(100vh-16px)] w-[320px] overflow-hidden rounded-xl border border-[var(--misty-border-soft)] bg-[color-mix(in_srgb,var(--misty-surface)_96%,transparent)] p-2 text-[var(--misty-text)] shadow-[0_18px_52px_var(--misty-shadow)]";
 
 const profileMenuItemClass =
   "grid min-h-10 w-full grid-cols-[20px_minmax(0,1fr)_auto] items-center gap-2 rounded-lg border-0 bg-transparent px-2.5 py-2 text-left text-sm text-[var(--misty-text-muted)] hover:bg-[var(--misty-neutral-hover-bg,var(--misty-surface-2))] hover:text-[var(--misty-text)]";
@@ -411,15 +420,24 @@ export function DesktopLayout(props: {
   const [activityOpen, setActivityOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [accountSettingsOpen, setAccountSettingsOpen] = useState(false);
   const [desktopPlatform, setDesktopPlatform] =
     useState<DesktopPlatform>("unknown");
   const navItems = props.navItems;
   const openSettingsOverlay = useCallback(() => {
+    setAccountSettingsOpen(false);
     setSettingsOpen(true);
     void settingsLoad();
   }, [settingsLoad]);
   const closeSettingsOverlay = useCallback(() => {
     setSettingsOpen(false);
+  }, []);
+  const openAccountSettingsOverlay = useCallback(() => {
+    setSettingsOpen(false);
+    setAccountSettingsOpen(true);
+  }, []);
+  const closeAccountSettingsOverlay = useCallback(() => {
+    setAccountSettingsOpen(false);
   }, []);
 
   useEffect(() => {
@@ -594,13 +612,14 @@ export function DesktopLayout(props: {
 
   useEffect(() => {
     const route = `${location.pathname}${location.search}`;
+    if (location.pathname === "/account") return;
     if (isRememberableAppRoute(route)) {
       rememberAppRoute(route);
     }
   }, [location.pathname, location.search, rememberAppRoute]);
 
   useEffect(() => {
-    if (location.pathname.startsWith("/settings")) return;
+    if (location.pathname.startsWith("/settings") || location.pathname === "/account") return;
     lastNonSettingsRouteRef.current = `${location.pathname}${location.search}`;
   }, [location.pathname, location.search]);
 
@@ -612,6 +631,15 @@ export function DesktopLayout(props: {
       { replace: true },
     );
   }, [lastAppRoute, location.pathname, navigate, openSettingsOverlay]);
+
+  useEffect(() => {
+    if (location.pathname !== "/account") return;
+    openAccountSettingsOverlay();
+    navigate(
+      settingsFallbackRoute(lastNonSettingsRouteRef.current, lastAppRoute),
+      { replace: true },
+    );
+  }, [lastAppRoute, location.pathname, navigate, openAccountSettingsOverlay]);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -1049,7 +1077,13 @@ export function DesktopLayout(props: {
         currentPath={location.pathname}
         open={profileOpen}
         onClose={() => setProfileOpen(false)}
+        onOpenAccountSettings={openAccountSettingsOverlay}
         onOpenSettings={openSettingsOverlay}
+      />
+      <AccountSettingsOverlay
+        open={accountSettingsOpen}
+        style={desktopFrameStyle}
+        onClose={closeAccountSettingsOverlay}
       />
       <SettingsOverlay
         open={settingsOpen}
@@ -1341,6 +1375,11 @@ function NavGroup(props: {
                 </span>
               ) : null}
             </span>
+            <span
+              className={`${navItemLabelBaseClass} ${selected ? navItemLabelActiveClass : ""}`}
+            >
+              {item.label}
+            </span>
           </NavLink>
         );
       })}
@@ -1384,6 +1423,11 @@ const ActivityNavButton = memo(
             </span>
           ) : null}
         </span>
+        <span
+          className={`${navItemLabelBaseClass} ${props.open ? navItemLabelActiveClass : ""}`}
+        >
+          Activity
+        </span>
       </button>
     );
   }),
@@ -1404,6 +1448,11 @@ function SettingsNavButton(props: { open: boolean; onClick: () => void }) {
         className={`${navIconTileBaseClass} ${props.open ? navIconTileActiveClass : ""}`}
       >
         <SettingsIcon size={29} strokeWidth={1.85} />
+      </span>
+      <span
+        className={`${navItemLabelBaseClass} ${props.open ? navItemLabelActiveClass : ""}`}
+      >
+        Settings
       </span>
     </button>
   );
@@ -1454,6 +1503,7 @@ function ProfilePopover(props: {
   currentPath: string;
   open: boolean;
   onClose: () => void;
+  onOpenAccountSettings: () => void;
   onOpenSettings: () => void;
 }) {
   const navigate = useNavigate();
@@ -1471,7 +1521,9 @@ function ProfilePopover(props: {
     (state) => state.setActiveSection,
   );
   const menuRef = useRef<HTMLDivElement | null>(null);
+  const accountChooserRef = useRef<HTMLDivElement | null>(null);
   const [menuStyle, setMenuStyle] = useState<CSSProperties>({});
+  const [accountChooserStyle, setAccountChooserStyle] = useState<CSSProperties>({});
   const [accountChooserOpen, setAccountChooserOpen] = useState(false);
   const [switchingAccountId, setSwitchingAccountId] = useState("");
   const [switchError, setSwitchError] = useState("");
@@ -1485,7 +1537,7 @@ function ProfilePopover(props: {
     if (!anchor) return;
     const rect = anchor.getBoundingClientRect();
     const width = 286;
-    const estimatedHeight = accountChooserOpen ? Math.min(420, window.innerHeight - 16) : 236;
+    const estimatedHeight = 236;
     const left = Math.min(
       Math.max(8, rect.right + 10),
       window.innerWidth - width - 8,
@@ -1499,7 +1551,21 @@ function ProfilePopover(props: {
         ? current
         : { left, top, width },
     );
-  }, [accountChooserOpen, props.anchorRef]);
+    const chooserWidth = 320;
+    const chooserHeight = Math.min(420, window.innerHeight - 16);
+    const chooserLeft = left + width + 8;
+    const chooserTop = Math.min(
+      Math.max(8, rect.bottom - chooserHeight),
+      window.innerHeight - chooserHeight - 8,
+    );
+    setAccountChooserStyle((current) => (
+      current.left === chooserLeft
+      && current.top === chooserTop
+      && current.width === chooserWidth
+        ? current
+        : { left: chooserLeft, top: chooserTop, width: chooserWidth }
+    ));
+  }, [props.anchorRef]);
 
   useEffect(() => {
     if (!props.open) return;
@@ -1509,13 +1575,19 @@ function ProfilePopover(props: {
       if (!target) return;
       if (
         props.anchorRef.current?.contains(target) ||
-        menuRef.current?.contains(target)
+        menuRef.current?.contains(target) ||
+        accountChooserRef.current?.contains(target)
       )
         return;
       props.onClose();
     };
     const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") props.onClose();
+      if (event.key !== "Escape") return;
+      if (accountChooserOpen) {
+        setAccountChooserOpen(false);
+        return;
+      }
+      props.onClose();
     };
     window.addEventListener("pointerdown", closeOnPointerDown, true);
     window.addEventListener("keydown", closeOnEscape);
@@ -1525,7 +1597,7 @@ function ProfilePopover(props: {
       window.removeEventListener("keydown", closeOnEscape);
       window.removeEventListener("resize", updatePosition);
     };
-  }, [props.anchorRef, props.onClose, props.open, updatePosition]);
+  }, [accountChooserOpen, props.anchorRef, props.onClose, props.open, updatePosition]);
 
   useEffect(() => {
     if (props.open) return;
@@ -1538,7 +1610,7 @@ function ProfilePopover(props: {
 
   const openAccountSettings = () => {
     props.onClose();
-    navigate("/account", { state: { from: props.currentPath } });
+    props.onOpenAccountSettings();
   };
 
   const switchAccounts = () => {
@@ -1571,18 +1643,79 @@ function ProfilePopover(props: {
   };
 
   return createPortal(
-    <div
-      ref={menuRef}
-      className={profilePopoverClass}
-      style={menuStyle}
-      role="menu"
-      aria-label="Profile"
-    >
+    <>
+      <div
+        ref={menuRef}
+        className={profilePopoverClass}
+        style={menuStyle}
+        role="menu"
+        aria-label="Profile"
+      >
+        <div className="grid grid-cols-[42px_minmax(0,1fr)] items-center gap-3 border-b border-[var(--misty-border-soft)] px-2 pb-3 pt-1">
+          <span className="relative grid h-10 w-10 place-items-center rounded-full bg-[var(--misty-neutral-selected-bg,var(--misty-surface-3))] text-sm font-bold">
+            {account ? initials : <UserCircle size={24} strokeWidth={1.75} />}
+          </span>
+          <span className="min-w-0">
+            <strong className="block truncate text-sm">{displayName}</strong>
+            <small className="block truncate text-xs text-[var(--misty-text-muted)]">
+              {email || "Not signed in"}
+            </small>
+          </span>
+        </div>
+        <div className="grid gap-1 py-2">
+          <span className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-normal text-[var(--misty-text-subtle)]">
+            User/Profile Settings
+          </span>
+          <button className={profileMenuItemClass} type="button" role="menuitem" onClick={openAccountSettings}>
+            <UserCircle size={17} />
+            <span>Account settings</span>
+          </button>
+          <button
+            className={`${profileMenuItemClass} ${accountChooserOpen ? "bg-[var(--misty-neutral-selected-bg,var(--misty-surface-3))] text-[var(--misty-text)]" : ""}`}
+            type="button"
+            role="menuitem"
+            aria-haspopup="menu"
+            aria-expanded={accountChooserOpen}
+            onClick={() => accountChooserOpen ? setAccountChooserOpen(false) : switchAccounts()}
+          >
+            <Repeat2 size={17} />
+            <span>Switch accounts</span>
+            <ChevronRight size={14} className={accountChooserOpen ? "text-[var(--misty-text)]" : "text-[var(--misty-text-subtle)]"} />
+          </button>
+          <button className={profileMenuItemClass} type="button" role="menuitem" onClick={signOut}>
+            <LogOut size={17} />
+            <span>{account ? "Sign out" : "Clear session"}</span>
+          </button>
+          <div className="my-1 h-px bg-[var(--misty-border-soft)]" />
+          <span className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-normal text-[var(--misty-text-subtle)]">
+            Misty App Settings
+          </span>
+          <button
+            className={profileMenuItemClass}
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              setActiveSettingsSection("general");
+              props.onClose();
+              props.onOpenSettings();
+            }}
+          >
+            <SettingsIcon size={17} />
+            <span>Open app settings</span>
+          </button>
+        </div>
+      </div>
       {accountChooserOpen ? (
-        <>
-          <div className="flex items-center gap-2 border-b border-[var(--misty-border-soft)] px-1 pb-2">
-            <button className="grid size-8 place-items-center rounded-lg border-0 bg-transparent text-[var(--misty-text-muted)] hover:bg-[var(--misty-surface-2)] hover:text-[var(--misty-text)]" type="button" aria-label="Back to profile menu" onClick={() => setAccountChooserOpen(false)}><ChevronLeft size={17}/></button>
+        <div
+          ref={accountChooserRef}
+          className={accountChooserPopoverClass}
+          style={accountChooserStyle}
+          role="menu"
+          aria-label="Switch accounts"
+        >
+          <div className="flex items-center justify-between gap-3 border-b border-[var(--misty-border-soft)] px-2 pb-2 pt-1">
             <div><strong className="block text-sm">Switch accounts</strong><small className="text-[11px] text-[var(--misty-text-subtle)]">Your saved Misty sessions</small></div>
+            <button className="grid size-8 place-items-center rounded-lg border-0 bg-transparent text-[var(--misty-text-muted)] hover:bg-[var(--misty-surface-2)] hover:text-[var(--misty-text)]" type="button" aria-label="Close account chooser" onClick={() => setAccountChooserOpen(false)}><X size={16}/></button>
           </div>
           <div className="grid max-h-[268px] gap-1 overflow-auto py-2">
             {accounts.map((saved) => {
@@ -1601,70 +1734,9 @@ function ProfilePopover(props: {
           {switchError ? <p className="m-0 mb-2 rounded-lg border border-red-400/20 bg-red-950/20 px-2.5 py-2 text-[11px] leading-relaxed text-red-200" role="alert">{switchError}</p> : null}
           <button className={profileMenuItemClass} type="button" role="menuitem" disabled={Boolean(switchingAccountId)} onClick={addAccount}><Plus size={17}/><span>Add another account</span></button>
           <p className="m-0 px-2.5 pb-1 pt-2 text-[10px] leading-relaxed text-[var(--misty-text-subtle)]">Accounts remain signed in securely on this device. Only one account is active in the app at a time.</p>
-        </>
-      ) : <>
-      <div className="grid grid-cols-[42px_minmax(0,1fr)] items-center gap-3 border-b border-[var(--misty-border-soft)] px-2 pb-3 pt-1">
-        <span className="relative grid h-10 w-10 place-items-center rounded-full bg-[var(--misty-neutral-selected-bg,var(--misty-surface-3))] text-sm font-bold">
-          {account ? initials : <UserCircle size={24} strokeWidth={1.75} />}
-        </span>
-        <span className="min-w-0">
-          <strong className="block truncate text-sm">{displayName}</strong>
-          <small className="block truncate text-xs text-[var(--misty-text-muted)]">
-            {email || "Not signed in"}
-          </small>
-        </span>
-      </div>
-      <div className="grid gap-1 py-2">
-        <span className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-normal text-[var(--misty-text-subtle)]">
-          User/Profile Settings
-        </span>
-        <button
-          className={profileMenuItemClass}
-          type="button"
-          role="menuitem"
-          onClick={openAccountSettings}
-        >
-          <UserCircle size={17} />
-          <span>Account settings</span>
-        </button>
-        <button
-          className={profileMenuItemClass}
-          type="button"
-          role="menuitem"
-          onClick={switchAccounts}
-        >
-          <Repeat2 size={17} />
-          <span>Switch accounts</span>
-        </button>
-        <button
-          className={profileMenuItemClass}
-          type="button"
-          role="menuitem"
-          onClick={signOut}
-        >
-          <LogOut size={17} />
-          <span>{account ? "Sign out" : "Clear session"}</span>
-        </button>
-        <div className="my-1 h-px bg-[var(--misty-border-soft)]" />
-        <span className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-normal text-[var(--misty-text-subtle)]">
-          Misty App Settings
-        </span>
-        <button
-          className={profileMenuItemClass}
-          type="button"
-          role="menuitem"
-          onClick={() => {
-            setActiveSettingsSection("general");
-            props.onClose();
-            props.onOpenSettings();
-          }}
-        >
-          <SettingsIcon size={17} />
-          <span>Open app settings</span>
-        </button>
-      </div>
-      </>}
-    </div>,
+        </div>
+      ) : null}
+    </>,
     document.body,
   );
 }
@@ -1905,6 +1977,40 @@ function SettingsOverlay(props: { open: boolean; style: CSSProperties; onClose: 
   );
 }
 
+function AccountSettingsOverlay(props: { open: boolean; style: CSSProperties; onClose: () => void }) {
+  useEffect(() => {
+    if (!props.open) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") props.onClose();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [props.onClose, props.open]);
+
+  if (!props.open) return null;
+
+  return createPortal(
+    <div
+      className={`app-pages-root ${settingsOverlayLayerClass}`}
+      style={props.style}
+      role="presentation"
+      onPointerDown={(event) => {
+        if (event.target === event.currentTarget) props.onClose();
+      }}
+    >
+      <div
+        className={settingsOverlayPanelClass}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Account settings"
+      >
+        <AccountWorkspace presentation="overlay" onClose={props.onClose} />
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
 function formatActivityTime(timestampMs: number): string {
   const date = new Date(timestampMs);
   return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
@@ -2024,7 +2130,7 @@ function settingsFallbackRoute(
   const candidates = [previousRoute, rememberedRoute, "/files"];
   return (
     candidates.find((route) => {
-      if (!route || route.startsWith("/settings")) return false;
+      if (!route || route.startsWith("/settings") || route === "/account") return false;
       return isRememberableAppRoute(route);
     }) ?? "/files"
   );

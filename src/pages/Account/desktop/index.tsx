@@ -14,6 +14,30 @@ import {
   type ClientDebugEvent,
 } from "../../../shared/debug/clientDebug";
 import { openExternalLink } from "../../../shared/openExternalLink";
+import {
+  Bug,
+  Lock,
+  Rows3,
+  UserCircle,
+  X,
+  type LucideIcon,
+} from "lucide-react";
+import {
+  DesktopSettingsRow,
+  DesktopSettingsSection,
+  desktopSettingsContentClass,
+  desktopSettingsGridClass,
+  desktopSettingsNavItemClass,
+  desktopSettingsNavItemSelectedClass,
+  desktopSettingsOverlayCloseClass,
+  desktopSettingsOverlayContentClass,
+  desktopSettingsOverlayContentShellClass,
+  desktopSettingsOverlayGridClass,
+  desktopSettingsOverlayHeaderClass,
+  desktopSettingsOverlayScrollSurfaceClass,
+  desktopSettingsScrollSurfaceClass,
+  desktopSettingsSidebarClass,
+} from "../../../components/settings/DesktopSettingsUI";
 
 // ─── display helpers ─────────────────────────────────────────────────────────
 
@@ -44,30 +68,26 @@ function Badge({ label, cls }: { label: string; cls: string }) {
 
 // ─── layout primitives ───────────────────────────────────────────────────────
 
+const accountSettingsCustomRowClass =
+  "border-b border-white/[0.08] bg-[var(--misty-app-surface-bg,#090b0d)] px-7 py-4 last:border-b-0";
+
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <section className="space-y-3">
-      <p className="text-[11px] font-semibold tracking-[0.18em] text-text-muted">{title}</p>
-      <div className="border-y border-border/70 divide-y divide-border/60">{children}</div>
-    </section>
-  );
+  return <DesktopSettingsSection title={title}>{children}</DesktopSettingsSection>;
 }
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="flex flex-col gap-1 py-4 md:flex-row md:items-center md:justify-between md:gap-6">
-      <span className="text-sm text-text-muted">{label}</span>
-      <div className="text-sm text-text md:text-right">{children}</div>
-    </div>
+    <DesktopSettingsRow label={label}>
+      <span className="text-right text-[15px] text-[#f4f4f5]">{children}</span>
+    </DesktopSettingsRow>
   );
 }
 
 function GhostRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex flex-col gap-1 py-4 opacity-40 md:flex-row md:items-center md:justify-between md:gap-6">
-      <span className="text-sm text-text-muted">{label}</span>
-      <span className="text-sm text-text-muted italic md:text-right">{value}</span>
-    </div>
+    <DesktopSettingsRow label={label} muted>
+      <span className="italic text-[#a1a1aa]">{value}</span>
+    </DesktopSettingsRow>
   );
 }
 
@@ -106,18 +126,18 @@ function SaveFeedback({ ok, error }: { ok: boolean; error: string }) {
 
 type Tab = "general" | "account" | "privacy" | "diagnostics";
 
-const TABS: { id: Tab; label: string }[] = [
-  { id: "general", label: "General" },
-  { id: "account", label: "Account" },
-  { id: "privacy", label: "Privacy" },
-  { id: "diagnostics", label: "Diagnostics" },
+const TABS: { id: Tab; label: string; icon: LucideIcon }[] = [
+  { id: "general", label: "General", icon: Rows3 },
+  { id: "account", label: "Account", icon: UserCircle },
+  { id: "privacy", label: "Privacy", icon: Lock },
+  { id: "diagnostics", label: "Diagnostics", icon: Bug },
 ];
 
 // ─── General ─────────────────────────────────────────────────────────────────
 
 function GeneralPanel() {
   return (
-    <div className="flex flex-col gap-6">
+    <div>
       <Section title="Appearance">
         <Row label="Theme">System</Row>
         <Row label="Language">English</Row>
@@ -219,7 +239,7 @@ function AccountPanel({
         : "";
 
   return (
-    <div className="flex flex-col gap-6">
+    <div>
       <Section title="License">
         <Row label="Plan">
           <Badge label={TIER_LABEL[me.tier] ?? me.tier} cls={TIER_COLOR[me.tier] ?? TIER_COLOR.basic} />
@@ -256,7 +276,7 @@ function AccountPanel({
       </Section>
 
       <Section title="Devices">
-        <div className="flex flex-col gap-3 py-4 md:flex-row md:items-start md:justify-between md:gap-6">
+        <div className={`${accountSettingsCustomRowClass} flex flex-col gap-3 md:flex-row md:items-start md:justify-between md:gap-6`}>
           <div className="space-y-1">
             <p className="text-sm text-text">Licensed device</p>
             <p className="text-xs text-text-muted">
@@ -284,7 +304,7 @@ function AccountPanel({
           </div>
         </div>
 
-        <div className="flex flex-col gap-3 py-4 md:flex-row md:items-center md:justify-between md:gap-6">
+        <div className={`${accountSettingsCustomRowClass} flex flex-col gap-3 md:flex-row md:items-center md:justify-between md:gap-6`}>
           <div>
             <p className="text-sm font-medium text-text">{me.license_device || "Primary device"}</p>
             <p className="text-xs text-text-muted mt-0.5">
@@ -295,7 +315,7 @@ function AccountPanel({
         </div>
 
         {me.tier === "max" && (
-          <div className="py-4">
+          <div className={accountSettingsCustomRowClass}>
             <p className="text-xs text-text-muted">
               Additional seats appear here as you activate new devices.
             </p>
@@ -303,7 +323,7 @@ function AccountPanel({
         )}
 
         {me.tier === "basic" && (
-          <div className="flex flex-col gap-3 py-4 md:flex-row md:items-center md:justify-between md:gap-6">
+          <div className={`${accountSettingsCustomRowClass} flex flex-col gap-3 md:flex-row md:items-center md:justify-between md:gap-6`}>
             <p className="text-xs text-text-muted">
               Pro $9.99/month · Max $14.99/month
             </p>
@@ -321,11 +341,11 @@ function AccountPanel({
             <Row label="Monthly allowance">{billingUsage.monthly_remaining.toLocaleString()} of {billingUsage.monthly_allowance.toLocaleString()} remaining</Row>
             <Row label="Purchased">{billingUsage.purchased_remaining.toLocaleString()} credits</Row>
             <Row label="Resets">{new Date(billingUsage.next_reset_at).toLocaleDateString()}</Row>
-            <div className="py-4">
+            <div className={accountSettingsCustomRowClass}>
               <div className="h-1.5 overflow-hidden rounded-full bg-elevated"><div className="h-full bg-blue-400" style={{ width: `${Math.min(100, creditUsedPercent)}%` }} /></div>
               {creditWarning ? <p className="mt-2 text-xs text-amber-400">{creditWarning}</p> : null}
             </div>
-            <div className="flex flex-wrap gap-2 py-4">
+            <div className={`${accountSettingsCustomRowClass} flex flex-wrap gap-2`}>
               <button disabled={billingWorking} onClick={() => void openBillingAction(() => createCreditCheckout("credits_1500"))} className="rounded-lg border border-border px-3 py-2 text-xs text-text disabled:opacity-50">1,500,000 credits · $4.99</button>
               <button disabled={billingWorking} onClick={() => void openBillingAction(() => createCreditCheckout("credits_3500"))} className="rounded-lg border border-border px-3 py-2 text-xs text-text disabled:opacity-50">3,500,000 credits · $9.99</button>
             </div>
@@ -337,12 +357,12 @@ function AccountPanel({
         {me.billing?.kind === "subscription" ? (
           <>
             <Row label="Plan">{TIER_LABEL[me.tier]} · {me.billing.interval === "year" ? "yearly" : "monthly"}</Row>
-            <div className="py-4">
+            <div className={accountSettingsCustomRowClass}>
               <button disabled={billingWorking || !me.billing.customer_portal_available} onClick={() => void openBillingAction(createPortalSession)} className="text-sm text-text-muted hover:text-text disabled:opacity-40">Manage billing →</button>
             </div>
           </>
         ) : (
-          <div className="grid gap-3 py-4">
+          <div className={`${accountSettingsCustomRowClass} grid gap-3`}>
             <p className="m-0 text-sm text-text-muted">Pro includes 2,000 monthly credits. Max includes 6,000.</p>
             <div className="flex flex-wrap gap-2">
               <button disabled={billingWorking} onClick={() => void openBillingAction(() => createCheckout("pro", "month"))} className="rounded-lg bg-white px-3 py-2 text-xs font-semibold text-bg disabled:opacity-50">Pro · $9.99/mo</button>
@@ -352,11 +372,11 @@ function AccountPanel({
             </div>
           </div>
         )}
-        {billingError ? <p className="pb-4 text-xs text-red-400">{billingError}</p> : null}
+        {billingError ? <p className={`${accountSettingsCustomRowClass} text-xs text-red-400`}>{billingError}</p> : null}
       </Section>
 
       <Section title="Info">
-        <div className="flex flex-col gap-4 py-5">
+        <div className={`${accountSettingsCustomRowClass} flex flex-col gap-4 py-5`}>
           <div className="flex items-center gap-4">
             <div className="w-14 h-14 rounded-full border border-border bg-elevated flex items-center justify-center text-lg font-bold text-text shrink-0 select-none">
               {initials}
@@ -409,7 +429,7 @@ function AccountPanel({
       </Section>
 
       <Section title="Security">
-        <div className="flex flex-col gap-3 py-4 md:flex-row md:items-center md:justify-between md:gap-6">
+        <div className={`${accountSettingsCustomRowClass} flex flex-col gap-3 md:flex-row md:items-center md:justify-between md:gap-6`}>
           <div>
             <p className="text-sm text-text">Password</p>
             <p className="text-xs text-text-muted mt-0.5">Reset via email link.</p>
@@ -423,7 +443,7 @@ function AccountPanel({
       </Section>
 
       <Section title="Danger Zone">
-        <div className="flex flex-col gap-3 py-4 md:flex-row md:items-center md:justify-between md:gap-6">
+        <div className={`${accountSettingsCustomRowClass} flex flex-col gap-3 md:flex-row md:items-center md:justify-between md:gap-6`}>
           <div>
             <p className="text-sm text-text">Sign out</p>
             <p className="text-xs text-text-muted mt-0.5">End your session on this device.</p>
@@ -432,7 +452,7 @@ function AccountPanel({
             Sign out
           </button>
         </div>
-        <div className="flex flex-col gap-3 py-4 opacity-40 md:flex-row md:items-center md:justify-between md:gap-6">
+        <div className={`${accountSettingsCustomRowClass} flex flex-col gap-3 opacity-40 md:flex-row md:items-center md:justify-between md:gap-6`}>
           <div>
             <p className="text-sm text-text">Delete account</p>
             <p className="text-xs text-text-muted mt-0.5">Permanently remove your account and all data.</p>
@@ -448,9 +468,9 @@ function AccountPanel({
 
 function PrivacyPanel() {
   return (
-    <div className="flex flex-col gap-6">
+    <div>
       <Section title="Privacy">
-        <div className="py-4 flex flex-col gap-2">
+        <div className={`${accountSettingsCustomRowClass} flex flex-col gap-2`}>
           <p className="text-sm text-text font-medium">Your data stays on your device.</p>
           <p className="text-sm text-text-muted leading-relaxed">
             Misty never transmits your files or cloud credentials to any external server. All provider
@@ -467,7 +487,7 @@ function PrivacyPanel() {
       </Section>
 
       <Section title="Data">
-        <div className="flex flex-col gap-3 py-4 opacity-40 md:flex-row md:items-center md:justify-between md:gap-6">
+        <div className={`${accountSettingsCustomRowClass} flex flex-col gap-3 opacity-40 md:flex-row md:items-center md:justify-between md:gap-6`}>
           <div>
             <p className="text-sm text-text">Export your data</p>
             <p className="text-xs text-text-muted mt-0.5">Download a copy of your account data.</p>
@@ -504,7 +524,7 @@ function DiagnosticsPanel() {
   }, []);
 
   return (
-    <div className="flex flex-col gap-6">
+    <div>
       <Section title="Runtime">
         <Row label="Misty server API">{serverBase || "Not set"}</Row>
         <Row label="Server env">{import.meta.env.VITE_MISTY_SERVER_URL || import.meta.env.VITE_API_BASE || "Not set"}</Row>
@@ -513,7 +533,7 @@ function DiagnosticsPanel() {
 
       <Section title="Client Events">
         {events.length > 0 ? (
-          <div className="divide-y divide-border/60">
+          <div className="divide-y divide-white/[0.08] px-7">
             {events.slice(0, 12).map((event) => (
               <article key={event.id} className="grid gap-1 py-4">
                 <div className="flex min-w-0 items-center justify-between gap-3">
@@ -532,11 +552,11 @@ function DiagnosticsPanel() {
             ))}
           </div>
         ) : (
-          <div className="py-4">
+          <div className={accountSettingsCustomRowClass}>
             <p className="m-0 text-sm text-text-muted">No client events recorded yet.</p>
           </div>
         )}
-        <div className="py-4">
+        <div className={`${accountSettingsCustomRowClass} flex justify-end`}>
           <button
             type="button"
             className="rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text-muted hover:text-text"
@@ -555,7 +575,10 @@ function DiagnosticsPanel() {
 
 // ─── Account shell ───────────────────────────────────────────────────────────
 
-export default function DesktopAccountPage() {
+export default function DesktopAccountPage(props: {
+  presentation?: "page" | "overlay";
+  onClose?: () => void;
+}) {
   const { user, logout, setUser } = useAuth();
   const navigate = useNavigate();
   const currentUser = useSetupStore((state) => state.status?.current_user ?? null);
@@ -576,9 +599,11 @@ export default function DesktopAccountPage() {
     [activeUser, currentLicense],
   );
   const displayMe = me ?? localMe;
+  const overlay = props.presentation === "overlay";
 
   useEffect(() => {
     if (!activeUser) {
+      if (overlay) props.onClose?.();
       navigate("/signin", { replace: true, state: { from: "/account" } });
       return;
     }
@@ -600,79 +625,107 @@ export default function DesktopAccountPage() {
         }
       })
       .finally(() => setLoading(false));
-  }, [activeUser, currentUser, user, navigate, me, setMe, setLoading, setUser]);
+  }, [activeUser, currentUser, user, navigate, me, overlay, props.onClose, setMe, setLoading, setUser]);
 
   if (!activeUser || (loading && !displayMe)) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className={`${overlay ? "h-full" : "min-h-screen"} flex items-center justify-center`}>
         <div className="w-5 h-5 rounded-full border-2 border-border border-t-text-muted animate-spin" />
       </div>
     );
   }
 
-  return (
-    <div className="h-full overflow-auto pt-16">
-      <div className="flex max-w-4xl mx-auto">
-        {/* ── Sidebar — sticky ─────────────────────────────────── */}
-        <aside className="hidden md:flex w-48 shrink-0 flex-col border-r border-border px-3 py-8 gap-1 sticky top-16 self-start h-[calc(100vh-4rem)]">
-          <p className="px-3 mb-4 text-xl font-semibold text-text">Settings</p>
-          {TABS.map(({ id, label }) => (
-            <button
-              key={id}
-              onClick={() => setTab(id)}
-              className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${
-                tab === id
-                  ? "bg-elevated text-text font-medium"
-                  : "text-text-muted hover:text-text hover:bg-elevated/50"
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-        </aside>
+  const activeTab = TABS.find((currentTab) => currentTab.id === tab) ?? TABS[0];
+  const ActiveIcon = activeTab.icon;
+  const activePanel = (
+    <>
+      {tab === "general" && <GeneralPanel />}
 
-        {/* ── Mobile tab bar ──────────────────────────────────── */}
-        <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 border-t border-border bg-bg/90 flex">
-          {TABS.map(({ id, label }) => (
+      {displayMe && tab === "account" && (
+        <AccountPanel
+          me={displayMe}
+          onUpdated={(name) => {
+            patchMe({ name });
+            setUser({ ...activeUser, name });
+          }}
+          onLogout={logout}
+        />
+      )}
+
+      {tab === "privacy" && <PrivacyPanel />}
+
+      {tab === "diagnostics" && <DiagnosticsPanel />}
+    </>
+  );
+
+  return (
+    <section
+      className={overlay ? desktopSettingsOverlayGridClass : desktopSettingsGridClass}
+      aria-label="Account settings"
+    >
+      <aside className={desktopSettingsSidebarClass} aria-label="Account settings sections">
+        <div className="grid gap-[5px]">
+          <span className="px-2 pb-3 pt-2 text-[10px] font-bold uppercase tracking-normal text-[#767676]">
+            {overlay ? "Account settings" : "Misty Account Settings"}
+          </span>
+          {TABS.map(({ id, label, icon: Icon }) => (
             <button
               key={id}
+              type="button"
               onClick={() => setTab(id)}
-              className={`flex-1 py-3 text-xs font-medium transition-colors ${
-                tab === id ? "text-white" : "text-text-muted"
-              }`}
+              className={`${desktopSettingsNavItemClass} ${tab === id ? desktopSettingsNavItemSelectedClass : ""}`}
             >
-              {label}
+              <Icon size={18} strokeWidth={1.8} />
+              <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">
+                {label}
+              </span>
             </button>
           ))}
         </div>
+      </aside>
 
-        {/* ── Content ─────────────────────────────────────────── */}
-        <main className="flex-1 min-w-0">
-          <div className="max-w-xl px-8 py-8 pb-24 md:pb-12">
-            <h1 className="text-xl font-bold text-text tracking-tight mb-6">
-              {TABS.find((currentTab) => currentTab.id === tab)?.label}
-            </h1>
+      <div className="w-px bg-white/10" />
 
-            {tab === "general" && <GeneralPanel />}
-
-            {displayMe && tab === "account" && (
-              <AccountPanel
-                me={displayMe}
-                onUpdated={(name) => {
-                  patchMe({ name });
-                  setUser({ ...activeUser, name });
-                }}
-                onLogout={logout}
+      {overlay ? (
+        <main className={desktopSettingsOverlayContentShellClass}>
+          <header className={desktopSettingsOverlayHeaderClass}>
+            <div className="flex min-w-0 items-center gap-3">
+              <ActiveIcon
+                size={17}
+                strokeWidth={1.8}
+                className="shrink-0 text-[#8d8d8d]"
               />
-            )}
-
-            {tab === "privacy" && <PrivacyPanel />}
-
-            {tab === "diagnostics" && <DiagnosticsPanel />}
+              <h1 className="m-0 min-w-0 truncate text-[15px] font-[740] leading-tight tracking-normal text-[#f4f4f5]">
+                {activeTab.label}
+              </h1>
+            </div>
+            <button
+              type="button"
+              className={desktopSettingsOverlayCloseClass}
+              aria-label="Close account settings"
+              title="Close account settings"
+              onClick={props.onClose}
+            >
+              <X size={17} strokeWidth={1.8} />
+            </button>
+          </header>
+          <div className={desktopSettingsOverlayContentClass}>
+            <div className={desktopSettingsOverlayScrollSurfaceClass}>
+              {activePanel}
+            </div>
           </div>
         </main>
-      </div>
-    </div>
+      ) : (
+        <main className={desktopSettingsContentClass}>
+          <div className={desktopSettingsScrollSurfaceClass}>
+            <h1 className="mb-[18px] mt-1 text-[28px] font-[760] leading-[1.15] tracking-normal text-[#f4f4f5]">
+              {activeTab.label}
+            </h1>
+            {activePanel}
+          </div>
+        </main>
+      )}
+    </section>
   );
 }
 

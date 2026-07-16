@@ -1,4 +1,4 @@
-import { Archive, FileText, Folder, Maximize2, Minus, Music, Plus, RotateCcw, X } from "lucide-react";
+import { Archive, FileSearch, FileText, Folder, Maximize2, Minus, Music, Plus, RotateCcw, X } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { archiveList, explorerGenerateImageThumbnail, explorerListDirectory, explorerPrepareOpenItem, explorerPreviewItem, fileMetadataSnapshot } from "../../../api/misty";
 import type { ArchiveEntry, DirectoryListing, DirectorySizeRecord, FileEntry, FileMetadataSnapshot, PreparedOpenItem } from "../../../api/types";
@@ -116,13 +116,18 @@ const textPreviewExtensions = new Set([
 
 const inspectorStyles = {
   root: "h-full min-w-0 overflow-auto bg-[var(--misty-app-panel-bg,var(--misty-app-page-bg,var(--misty-bg)))] px-3 py-3 text-[var(--misty-text-muted)] [scrollbar-color:#3f3f46_transparent] [scrollbar-width:thin]",
+  emptyState:
+    "grid h-full min-h-0 content-center justify-items-center gap-3 px-6 text-center text-[var(--misty-text-subtle)]",
+  emptyStateIcon:
+    "grid size-12 place-items-center rounded-full bg-[var(--misty-neutral-control-bg,var(--misty-surface-2))] text-[var(--misty-text-muted)]",
+  emptyStateText: "m-0 max-w-52 text-sm leading-relaxed",
   previewCard:
-    "relative isolate grid h-[238px] place-items-center overflow-hidden rounded-[7px] border border-transparent bg-transparent text-[var(--misty-text-subtle)] shadow-[0_14px_34px_rgba(0,0,0,0.2)]",
+    "relative isolate grid h-[238px] place-items-center overflow-hidden rounded-[7px] bg-transparent text-[var(--misty-text-subtle)]",
   previewMedia: "h-full w-full border-0 object-contain",
   audioPreview:
     "grid h-full w-full content-center justify-items-center gap-3 px-4 text-[var(--misty-text-muted)]",
   audioIcon:
-    "grid size-14 place-items-center rounded-full border border-[var(--misty-neutral-border,var(--misty-border-soft))] bg-[var(--misty-neutral-control-bg,var(--misty-surface-2))]",
+    "grid size-14 place-items-center rounded-full border border-[var(--misty-divider-subtle)] bg-[var(--misty-neutral-control-bg,var(--misty-surface-2))]",
   audioControl: "w-full max-w-[260px]",
   previewOpenButton:
     "absolute right-2 top-2 z-[3] grid size-8 place-items-center rounded-[7px] border border-transparent bg-[var(--misty-neutral-control-bg,var(--misty-surface-2))] text-[var(--misty-text-muted)] opacity-0 shadow-[0_10px_24px_rgba(0,0,0,0.25)] transition hover:bg-[var(--misty-neutral-hover-bg,var(--misty-surface-hover))] hover:text-[var(--misty-text)] focus-visible:opacity-100 group-hover:opacity-100",
@@ -134,7 +139,7 @@ const inspectorStyles = {
   folderPreview: "h-full w-full overflow-y-auto overflow-x-hidden p-3 [scrollbar-color:#3f3f46_transparent] [scrollbar-width:thin]",
   folderPreviewList: "grid min-w-0 content-start",
   folderPreviewItem:
-    "grid min-h-9 min-w-0 cursor-pointer select-none grid-cols-[28px_minmax(0,1fr)_auto] items-center gap-2 rounded-md border border-transparent bg-transparent px-2 py-1.5 text-left text-[var(--misty-text-muted)] outline-none hover:border-[var(--misty-neutral-border,var(--misty-border-soft))] hover:bg-[var(--misty-neutral-hover-bg,var(--misty-surface-hover))] focus-visible:border-[var(--misty-border-strong)] focus-visible:bg-[var(--misty-neutral-hover-bg,var(--misty-surface-hover))] focus-visible:shadow-[0_0_0_2px_rgba(241,243,244,0.08)]",
+    "grid min-h-9 min-w-0 cursor-pointer select-none grid-cols-[28px_minmax(0,1fr)_auto] items-center gap-2 rounded-md border border-transparent bg-transparent px-2 py-1.5 text-left text-[var(--misty-text-muted)] outline-none hover:bg-[var(--misty-row-hover)] focus-visible:border-[var(--misty-interaction-focus)] focus-visible:bg-[var(--misty-row-hover)] focus-visible:shadow-[0_0_0_1px_var(--misty-interaction-focus)]",
   folderPreviewThumb:
     "grid size-7 place-items-center overflow-hidden",
   folderPreviewName:
@@ -143,28 +148,28 @@ const inspectorStyles = {
     "pl-2 text-right text-xs font-semibold text-[var(--misty-text-subtle)]",
   archivePreviewSummary:
     "mb-2 flex min-w-0 items-center justify-between gap-2 px-2 text-xs font-semibold uppercase tracking-normal text-[var(--misty-text-subtle)]",
-  detailsCard: "grid",
+  detailsCard: "mt-3 grid border-t border-[var(--misty-divider-subtle)] pt-2",
   detailRow: "grid gap-2 px-5 py-3.5",
   detailLabel: "text-[12px] font-[720] uppercase leading-none tracking-normal text-[var(--misty-text-subtle)]",
   detailValue: "min-w-0 [overflow-wrap:anywhere] text-[17px] font-[650] leading-[1.25] text-[var(--misty-text)]",
-  editorCard: "grid gap-3 border-b border-transparent px-5 py-4",
+  editorCard: "mt-2 grid gap-3 border-t border-[var(--misty-divider-subtle)] px-5 py-4",
   editorLabel: "grid gap-1.5 text-[12px] font-[720] uppercase leading-none tracking-normal text-[var(--misty-text-subtle)]",
-  editorInput: "min-h-9 w-full rounded-[7px] border border-[var(--misty-border)] bg-[var(--misty-neutral-control-bg,var(--misty-surface-2))] px-2.5 py-2 text-sm font-medium normal-case leading-normal text-[var(--misty-text)] outline-none focus:border-[var(--misty-border-strong)] focus:shadow-[0_0_0_2px_rgba(241,243,244,0.08)]",
+  editorInput: "min-h-9 w-full rounded-[7px] border border-[var(--misty-divider-default)] bg-[var(--misty-neutral-control-bg,var(--misty-surface-2))] px-2.5 py-2 text-sm font-medium normal-case leading-normal text-[var(--misty-text)] outline-none focus:border-[var(--misty-interaction-focus)] focus:shadow-[0_0_0_2px_var(--misty-focus-ring)]",
   editorTextarea: "min-h-[74px] resize-y",
   editorActions: "flex justify-end",
-  editorButton: "h-8 rounded-[7px] border border-[var(--misty-border)] bg-[var(--misty-neutral-selected-bg,var(--misty-surface-selected))] px-3 text-sm font-semibold text-[var(--misty-text)] hover:bg-[var(--misty-neutral-strong-bg,var(--misty-surface-3))] hover:border-[var(--misty-border-strong)] disabled:cursor-default disabled:opacity-45",
+  editorButton: "h-8 rounded-[7px] border border-[var(--misty-divider-default)] bg-[var(--misty-neutral-selected-bg,var(--misty-surface-selected))] px-3 text-sm font-semibold text-[var(--misty-text)] hover:border-[var(--misty-divider-strong)] hover:bg-[var(--misty-neutral-strong-bg,var(--misty-surface-3))] focus-visible:border-[var(--misty-interaction-focus)] disabled:cursor-default disabled:opacity-45",
   dots: "inline-flex h-5 items-center gap-1",
   dot: "size-1.5 rounded-full bg-[var(--misty-text-muted)] motion-safe:animate-bounce",
   lightboxBackdrop:
     "fixed inset-0 z-[2147483200] grid place-items-center bg-[rgba(0,0,0,0.64)] p-6 backdrop-blur-[3px]",
   lightbox:
-    "relative grid h-[min(82vh,860px)] w-[min(88vw,1280px)] grid-rows-[auto_minmax(0,1fr)] overflow-hidden rounded-[10px] border border-white/10 bg-[rgba(10,12,15,0.88)] shadow-[0_28px_90px_rgba(0,0,0,0.62)]",
+    "relative grid h-[min(82vh,860px)] w-[min(88vw,1280px)] grid-rows-[auto_minmax(0,1fr)] overflow-hidden rounded-[10px] border border-[var(--misty-divider-default)] bg-[rgba(10,12,15,0.88)] shadow-[0_28px_90px_rgba(0,0,0,0.62)]",
   lightboxHeader:
     "flex min-w-0 items-center justify-between gap-3 px-3 py-2 text-[var(--misty-text)]",
   lightboxTitle: "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-sm font-semibold",
   lightboxControls: "flex shrink-0 items-center gap-1.5",
   lightboxButton:
-    "grid size-8 place-items-center rounded-[7px] border border-white/10 bg-white/5 text-[var(--misty-text-muted)] transition hover:bg-white/12 hover:text-[var(--misty-text)]",
+    "grid size-8 place-items-center rounded-[7px] border border-[var(--misty-divider-subtle)] bg-[var(--misty-neutral-control-bg,var(--misty-surface-2))] text-[var(--misty-text-muted)] transition hover:bg-[var(--misty-neutral-hover-bg,var(--misty-surface-hover))] hover:text-[var(--misty-text)] focus-visible:border-[var(--misty-interaction-focus)]",
   zoomSurface: "relative h-full min-h-0 overflow-hidden bg-black/20",
   zoomImage:
     "absolute left-1/2 top-1/2 max-h-full max-w-full select-none object-contain will-change-transform",
@@ -192,6 +197,21 @@ export function FileInspector(props: FileInspectorProps) {
   }, [displayEntry?.path, props.mistyComments, props.mistyTags]);
   const showPreviewTransition = previewLoading && displayEntry?.kind !== "folder" && !multiple;
   const canOpenPreview = Boolean(preview && (preview.kind === "image" || preview.kind === "video"));
+
+  if (!displayEntry && !multiple) {
+    return (
+      <aside className={inspectorStyles.root}>
+        <div className={inspectorStyles.emptyState}>
+          <span className={inspectorStyles.emptyStateIcon} aria-hidden="true">
+            <FileSearch size={23} />
+          </span>
+          <p className={inspectorStyles.emptyStateText}>
+            Select a file to preview it and view its details.
+          </p>
+        </div>
+      </aside>
+    );
+  }
 
   return (
     <aside className={inspectorStyles.root}>
