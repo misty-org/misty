@@ -105,6 +105,37 @@ func TestCreateServerRejectsProductionMemoryAgentAttachmentStore(t *testing.T) {
 	}
 }
 
+func TestCreateServerRejectsProductionMemoryLibraryStore(t *testing.T) {
+	t.Setenv("PASSWORD_RESET_URL", "http://localhost:5173/reset")
+	t.Setenv("PASSWORD_RESET_START_URL", "http://localhost:8080/auth/reset/start")
+	t.Setenv("MISTY_ENVIRONMENT", "production")
+	t.Setenv("MISTY_LIBRARY_ENABLED", "true")
+	t.Setenv("LIBRARY_STORE", "memory")
+
+	if _, err := CreateServer(); err == nil || !strings.Contains(err.Error(), "not allowed in production") {
+		t.Fatalf("CreateServer() error = %v, want production memory Library rejection", err)
+	}
+}
+
+func TestCreateServerConfiguresIndependentDevelopmentLibrary(t *testing.T) {
+	t.Setenv("PASSWORD_RESET_URL", "http://localhost:5173/reset")
+	t.Setenv("PASSWORD_RESET_START_URL", "http://localhost:8080/auth/reset/start")
+	t.Setenv("MAILJET_API_KEY", "")
+	t.Setenv("MAILJET_SECRET_KEY", "")
+	t.Setenv("MAILJET_FROM_EMAIL", "")
+	t.Setenv("MISTY_LIBRARY_ENABLED", "true")
+	t.Setenv("MISTY_LIBRARY_UPLOADS_ENABLED", "true")
+	t.Setenv("LIBRARY_STORE", "memory")
+
+	server, err := CreateServer()
+	if err != nil {
+		t.Fatalf("CreateServer() error = %v", err)
+	}
+	if server.Library == nil || server.LibraryStore == nil {
+		t.Fatal("CreateServer() did not configure the Space Library")
+	}
+}
+
 func testAgentAttachmentPrivateKey(t *testing.T) string {
 	t.Helper()
 	key, err := rsa.GenerateKey(rand.Reader, 2048)

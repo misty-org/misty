@@ -117,6 +117,8 @@ func writeSpaceError(w http.ResponseWriter, err error) {
 		writeJSON(w, http.StatusForbidden, map[string]string{"code": "forbidden"})
 	case errors.Is(err, db.ErrSpaceLimit):
 		writeJSON(w, http.StatusConflict, map[string]string{"code": "space_limit_reached"})
+	case errors.Is(err, db.ErrSpaceOwnershipLimit):
+		writeJSON(w, http.StatusConflict, map[string]string{"code": "space_ownership_limit_reached"})
 	case errors.Is(err, db.ErrSpacePeopleLimit):
 		writeJSON(w, http.StatusConflict, map[string]string{"code": "space_people_limit_reached"})
 	case errors.Is(err, db.ErrSpaceNodeLimit):
@@ -150,7 +152,21 @@ func (s *SpacesService) Spaces() http.HandlerFunc {
 				writeSpaceError(w, err)
 				return
 			}
-			writeJSON(w, http.StatusOK, map[string]any{"spaces": spaces, "invitations": invites, "limits": map[string]int{"owned": 1, "memberships": db.MaxSpacesPerUser, "people": db.MaxSpacePeople, "nodes": db.MaxSpaceNodes}})
+			owned := 0
+			for _, space := range spaces {
+				if space.OwnerUserID == userID {
+					owned++
+				}
+			}
+			remaining := db.MaxOwnedSpacesPerUser - owned
+			if remaining < 0 {
+				remaining = 0
+			}
+			writeJSON(w, http.StatusOK, map[string]any{"spaces": spaces, "invitations": invites, "limits": map[string]any{
+				"owned": owned, "owned_limit": db.MaxOwnedSpacesPerUser, "remaining_owned": remaining,
+				"memberships": db.MaxSpacesPerUser, "people": db.MaxSpacePeople, "nodes": db.MaxSpaceNodes,
+				"space_storage_bytes": db.MaxSpaceStorageBytes,
+			}})
 		case http.MethodPost:
 			var body struct {
 				Name string `json:"name"`
@@ -339,13 +355,16 @@ func (s *SpacesService) Messages() http.HandlerFunc {
 			return
 		}
 		var body struct {
-			Content     []db.MessageSpan `json:"content"`
-			FileNodeIDs []string         `json:"file_node_ids"`
+			Content          []db.MessageSpan `json:"content"`
+			FileNodeIDs      []string         `json:"file_node_ids"`
+			AttachmentIDs    []string         `json:"attachment_ids"`
+			LibraryItemIDs   []string         `json:"library_item_ids"`
+			ReplyToMessageID string           `json:"reply_to_message_id"`
 		}
 		if decodeJSON(w, r, &body) != nil {
 			return
 		}
-		message, agentIDs, err := s.database.CreateSpaceMessage(r.Context(), userID, spaceID, body.Content, body.FileNodeIDs)
+		message, agentIDs, err := s.database.CreateSpaceMessageWithReferences(r.Context(), userID, spaceID, body.Content, body.FileNodeIDs, body.AttachmentIDs, body.LibraryItemIDs, body.ReplyToMessageID)
 		if err != nil {
 			writeSpaceError(w, err)
 			return

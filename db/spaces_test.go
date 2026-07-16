@@ -23,10 +23,14 @@ func TestPersonalSpaceStartsPrivateAndBecomesSharedOnlyByInvite(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ListSpaces(owner) error = %v", err)
 	}
-	if len(ownerSpaces) != 1 || !ownerSpaces[0].IsPersonal || ownerSpaces[0].IsShared || ownerSpaces[0].MemberCount != 1 {
-		t.Fatalf("initial owner Spaces = %#v, want one private Personal Space", ownerSpaces)
+	if len(ownerSpaces) != 1 || !ownerSpaces[0].IsPersonal || ownerSpaces[0].Name != "Default space" || ownerSpaces[0].IsShared || ownerSpaces[0].MemberCount != 1 {
+		t.Fatalf("initial owner Spaces = %#v, want one private Default space", ownerSpaces)
 	}
 	personal := ownerSpaces[0]
+	renamed, err := database.RenameSpace(ctx, owner.ID, personal.ID, "Home base")
+	if err != nil || renamed.Name != "Home base" || !renamed.IsPersonal {
+		t.Fatalf("RenameSpace(default) = %#v, %v, want renamed personal Space", renamed, err)
+	}
 
 	if _, _, err := database.CreateSpaceMessage(ctx, owner.ID, personal.ID, []MessageSpan{{Type: "text", Text: "Private hello"}}, nil); err != nil {
 		t.Fatalf("CreateSpaceMessage(Personal) error = %v", err)
@@ -39,8 +43,18 @@ func TestPersonalSpaceStartsPrivateAndBecomesSharedOnlyByInvite(t *testing.T) {
 	if additional.IsPersonal || additional.IsShared {
 		t.Fatalf("new Space = %#v, want private non-Personal Space", additional)
 	}
-	if _, err := database.CreateSpace(ctx, owner.ID, "Another"); !errors.Is(err, ErrSpaceLimit) {
-		t.Fatalf("CreateSpace(second additional) error = %v, want ErrSpaceLimit", err)
+	secondAdditional, err := database.CreateSpace(ctx, owner.ID, "Another")
+	if err != nil || secondAdditional.IsPersonal {
+		t.Fatalf("CreateSpace(second additional) = %#v, %v, want success", secondAdditional, err)
+	}
+	if _, err := database.CreateSpace(ctx, owner.ID, "Fourth total"); !errors.Is(err, ErrSpaceOwnershipLimit) {
+		t.Fatalf("CreateSpace(fourth total) error = %v, want ErrSpaceOwnershipLimit", err)
+	}
+	if err := database.DeleteSpace(ctx, owner.ID, secondAdditional.ID, secondAdditional.Name); err != nil {
+		t.Fatalf("DeleteSpace(second additional) error = %v", err)
+	}
+	if _, err := database.CreateSpace(ctx, owner.ID, "Still fourth total"); !errors.Is(err, ErrSpaceOwnershipLimit) {
+		t.Fatalf("CreateSpace while deletion pending error = %v, want ErrSpaceOwnershipLimit", err)
 	}
 
 	memberSpaces, err := database.ListSpaces(ctx, member.ID)
@@ -73,6 +87,13 @@ func TestPersonalSpaceStartsPrivateAndBecomesSharedOnlyByInvite(t *testing.T) {
 	}
 	if message.SenderUserID != owner.ID {
 		t.Fatalf("shared message sender = %q, want %q", message.SenderUserID, owner.ID)
+	}
+	edited, err := database.UpdateSpaceMessage(ctx, owner.ID, personal.ID, message.ID, []MessageSpan{{Type: "text", Text: "Edited hello"}}, nil)
+	if err != nil || edited.EditedAt == nil || len(edited.Content) != 1 || edited.Content[0].Text != "Edited hello" {
+		t.Fatalf("UpdateSpaceMessage(owner) = %#v, %v, want edited message", edited, err)
+	}
+	if _, err := database.UpdateSpaceMessage(ctx, member.ID, personal.ID, message.ID, []MessageSpan{{Type: "text", Text: "Not mine"}}, nil); !errors.Is(err, ErrSpaceForbidden) {
+		t.Fatalf("UpdateSpaceMessage(member) error = %v, want ErrSpaceForbidden", err)
 	}
 	inbox, err := database.SpaceInbox(ctx, member.ID, "unreads", 20)
 	if err != nil {

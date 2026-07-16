@@ -2,6 +2,7 @@ services:
   postgres:
     image: pgvector/pgvector:pg16
     container_name: misty-server-postgres
+    restart: unless-stopped
     environment:
       POSTGRES_USER: ${DB_USER:-misty}
       POSTGRES_PASSWORD: ${DB_PASSWORD:-misty}

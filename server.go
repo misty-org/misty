@@ -28,6 +28,8 @@ type Server struct {
 	AIAgent                   *serveragent.Service
 	AgentAttachmentStore      api.AgentAttachmentStore
 	AgentAttachments          *api.AgentAttachmentsService
+	LibraryStore              api.LibraryObjectStore
+	Library                   *api.SpaceLibraryService
 	Spaces                    *api.SpacesService
 	Realtime                  *api.RealtimeService
 	PasswordResetStartURL     string
@@ -76,6 +78,61 @@ func CreateServer() (*Server, error) {
 			return nil, fmt.Errorf("configure agent attachment envelope keys: %w", err)
 		}
 	}
+	if serverFeatureEnabled("MISTY_LIBRARY_ENABLED") {
+		s.LibraryStore, err = libraryStoreFromEnv()
+		if err != nil {
+			return nil, err
+		}
+		maxFileBytes := int64(250 << 20)
+		if value := strings.TrimSpace(os.Getenv("LIBRARY_MAX_FILE_BYTES")); value != "" {
+			maxFileBytes, err = strconv.ParseInt(value, 10, 64)
+			if err != nil {
+				return nil, fmt.Errorf("LIBRARY_MAX_FILE_BYTES must be an integer: %w", err)
+			}
+		}
+		s.Library, err = api.NewSpaceLibraryService(s.Database, s.LibraryStore, serverFeatureEnabled("MISTY_LIBRARY_UPLOADS_ENABLED"), maxFileBytes)
+		if err != nil {
+			return nil, fmt.Errorf("configure Space Library: %w", err)
+		}
+		s.Library.SetSubsystems(serverFeatureEnabled("MISTY_LIBRARY_ATTACHMENTS_ENABLED"), serverFeatureEnabled("MISTY_LIBRARY_GROUPS_ENABLED"), serverFeatureEnabled("MISTY_LIBRARY_PREVIEWS_ENABLED"), serverFeatureEnabled("MISTY_LIBRARY_PEOPLE_ENABLED"), serverFeatureEnabled("MISTY_LIBRARY_EDITING_ENABLED"), serverFeatureEnabled("MISTY_LIBRARY_LOCATIONS_ENABLED"), serverFeatureEnabled("MISTY_LIBRARY_DUPLICATES_ENABLED"), serverFeatureEnabled("MISTY_LIBRARY_IMPORTS_ENABLED"), serverFeatureEnabled("MISTY_LIBRARY_EXPORTS_ENABLED"))
+		mediaProcessorBin := strings.TrimSpace(os.Getenv("LIBRARY_MEDIA_PROCESSOR_BIN"))
+		if mediaProcessorBin == "" && !strings.EqualFold(strings.TrimSpace(os.Getenv("MISTY_ENVIRONMENT")), "production") {
+			mediaProcessorBin = "ffmpeg"
+		}
+		if mediaProcessorBin != "" {
+			processor, processorErr := api.NewFFmpegLibraryMediaProcessor(mediaProcessorBin)
+			if processorErr != nil {
+				if strings.EqualFold(strings.TrimSpace(os.Getenv("MISTY_ENVIRONMENT")), "production") && (serverFeatureEnabled("MISTY_LIBRARY_EDITING_ENABLED") || serverFeatureEnabled("MISTY_LIBRARY_PREVIEWS_ENABLED")) {
+					return nil, fmt.Errorf("configure Library media processor: %w", processorErr)
+				}
+			} else {
+				s.Library.SetMediaProcessor(processor)
+				if extractor, extractorErr := api.NewFFprobeLibraryMetadataExtractor(mediaProcessorBin); extractorErr == nil {
+					s.Library.SetMetadataExtractor(extractor)
+				} else if strings.EqualFold(strings.TrimSpace(os.Getenv("MISTY_ENVIRONMENT")), "production") {
+					return nil, fmt.Errorf("configure Library metadata extractor: %w", extractorErr)
+				}
+			}
+		} else if strings.EqualFold(strings.TrimSpace(os.Getenv("MISTY_ENVIRONMENT")), "production") && (serverFeatureEnabled("MISTY_LIBRARY_EDITING_ENABLED") || serverFeatureEnabled("MISTY_LIBRARY_PREVIEWS_ENABLED")) {
+			return nil, fmt.Errorf("LIBRARY_MEDIA_PROCESSOR_BIN is required before production Library editing or previews can be enabled")
+		}
+		if endpoint := strings.TrimSpace(os.Getenv("LIBRARY_PEOPLE_PROCESSOR_URL")); endpoint != "" {
+			processor, processorErr := api.NewHTTPLibraryPeopleProcessor(endpoint, os.Getenv("LIBRARY_PEOPLE_PROCESSOR_TOKEN"))
+			if processorErr != nil {
+				return nil, fmt.Errorf("configure Library People processor: %w", processorErr)
+			}
+			s.Library.SetPeopleProcessor(processor)
+		}
+		if address := strings.TrimSpace(os.Getenv("LIBRARY_CLAMAV_ADDRESS")); address != "" {
+			scanner, scannerErr := api.NewClamAVLibraryScanner(address)
+			if scannerErr != nil {
+				return nil, fmt.Errorf("configure Library malware scanner: %w", scannerErr)
+			}
+			s.Library.SetMalwareScanner(scanner)
+		} else if strings.EqualFold(strings.TrimSpace(os.Getenv("MISTY_ENVIRONMENT")), "production") && (serverFeatureEnabled("MISTY_LIBRARY_UPLOADS_ENABLED") || serverFeatureEnabled("MISTY_LIBRARY_ATTACHMENTS_ENABLED")) {
+			return nil, fmt.Errorf("LIBRARY_CLAMAV_ADDRESS is required before production Library uploads can be enabled")
+		}
+	}
 	spaceKey, err := spaceLinkEncryptionKeyFromEnv()
 	if err != nil {
 		return nil, err
@@ -99,7 +156,7 @@ func (s *Server) MountHandlers() error {
 	s.Router.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   allowedCORSOrigins(),
 		AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
-		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-Misty-Platform", "X-Misty-Release-Channel", "X-Misty-Session-Id", "X-Misty-Analytics-Enabled", "X-Misty-Device-Timestamp", "X-Misty-Device-Nonce", "X-Misty-Device-Signature", "X-Misty-Attachment-Upload-Token"},
+		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-Misty-Platform", "X-Misty-Release-Channel", "X-Misty-Session-Id", "X-Misty-Analytics-Enabled", "X-Misty-Device-Timestamp", "X-Misty-Device-Nonce", "X-Misty-Device-Signature", "X-Misty-Attachment-Upload-Token", "X-Misty-Library-Upload-Token"},
 		AllowCredentials: true,
 		MaxAge:           300,
 	}))
@@ -115,11 +172,15 @@ func (s *Server) MountHandlers() error {
 	}
 	aiService := api.NewAIService(s.Database, s.AIAgent)
 	aiService.SetAgentAttachments(s.AgentAttachments)
-	smartLibraryService := api.NewSmartLibraryService(s.Database, &serveragent.SmartLibraryAnalyzer{
+	libraryAnalyzer := &serveragent.SmartLibraryAnalyzer{
 		APIKey:  strings.TrimSpace(os.Getenv("AI_GATEWAY_API_KEY")),
 		BaseURL: strings.TrimSpace(os.Getenv("AI_GATEWAY_BASE_URL")),
-	})
-	mediaSearchService := api.NewMediaSearchService(s.Database, &serveragent.SmartLibraryAnalyzer{APIKey: strings.TrimSpace(os.Getenv("AI_GATEWAY_API_KEY")), BaseURL: strings.TrimSpace(os.Getenv("AI_GATEWAY_BASE_URL"))})
+	}
+	if s.Library != nil {
+		s.Library.SetIntelligence(libraryAnalyzer, serverFeatureEnabled("MISTY_LIBRARY_OCR_ENABLED"), serverFeatureEnabled("MISTY_LIBRARY_AI_ENABLED"))
+	}
+	smartLibraryService := api.NewSmartLibraryService(s.Database, libraryAnalyzer)
+	mediaSearchService := api.NewMediaSearchService(s.Database, libraryAnalyzer)
 	agentsService := api.NewAgentsService(s.Database)
 	registerHandler := api.RegisterWithTelemetry(s.Database, s.Telemetry)
 	loginHandler := api.Login(s.Database)
@@ -157,6 +218,9 @@ func (s *Server) MountHandlers() error {
 	s.mountMediaSearchRoutes("/ai/media-search", mediaSearchService)
 	s.mountAgentsRoutes("", agentsService)
 	s.mountSpacesRoutes("", s.Spaces, s.Realtime)
+	if s.Library != nil {
+		s.mountLibraryRoutes("", s.Library)
+	}
 	if s.AgentAttachments != nil {
 		s.mountAgentAttachmentRoutes("", s.AgentAttachments)
 	}
@@ -186,6 +250,9 @@ func (s *Server) MountHandlers() error {
 	s.mountMediaSearchRoutes("/api/ai/media-search", mediaSearchService)
 	s.mountAgentsRoutes("/api", agentsService)
 	s.mountSpacesRoutes("/api", s.Spaces, s.Realtime)
+	if s.Library != nil {
+		s.mountLibraryRoutes("/api", s.Library)
+	}
 	if s.AgentAttachments != nil {
 		s.mountAgentAttachmentRoutes("/api", s.AgentAttachments)
 	}
@@ -194,6 +261,73 @@ func (s *Server) MountHandlers() error {
 	s.Router.Post("/stripe/webhook", api.StripeWebhookWithService(os.Getenv("STRIPE_WEBHOOK_SECRET"), appbilling.NewStripeService(s.Database, appbilling.WithTelemetry(s.Telemetry))))
 
 	return nil
+}
+
+func (s *Server) mountLibraryRoutes(prefix string, library *api.SpaceLibraryService) {
+	s.Router.MethodFunc(http.MethodGet, prefix+"/spaces/{spaceID}/library", library.Items())
+	s.Router.MethodFunc(http.MethodGet, prefix+"/spaces/{spaceID}/library/facets", library.Facets())
+	s.Router.MethodFunc(http.MethodGet, prefix+"/spaces/{spaceID}/library/search/semantic", library.SemanticSearch())
+	s.Router.MethodFunc(http.MethodGet, prefix+"/spaces/{spaceID}/library/discovery", library.Discovery())
+	s.Router.MethodFunc(http.MethodGet, prefix+"/spaces/{spaceID}/library/discovery/{kind}/{groupID}/items", library.DiscoveryItems())
+	s.Router.MethodFunc(http.MethodPatch, prefix+"/spaces/{spaceID}/library/discovery/memory/{memoryID}", library.MemoryPreference())
+	s.Router.MethodFunc(http.MethodGet, prefix+"/spaces/{spaceID}/library/pins", library.PinnedCollections())
+	s.Router.MethodFunc(http.MethodPut, prefix+"/spaces/{spaceID}/library/pins", library.PinnedCollections())
+	s.Router.MethodFunc(http.MethodPost, prefix+"/spaces/{spaceID}/library/duplicates/merge", library.MergeDuplicates())
+	s.Router.MethodFunc(http.MethodPost, prefix+"/spaces/{spaceID}/library/exports/download", library.ExportItems())
+	s.Router.MethodFunc(http.MethodPost, prefix+"/spaces/{spaceID}/library/imports", library.ImportItems())
+	s.Router.MethodFunc(http.MethodGet, prefix+"/spaces/{spaceID}/library/imports/history", library.ImportHistory())
+	s.Router.MethodFunc(http.MethodGet, prefix+"/spaces/{spaceID}/library/shared", library.SharedReferences())
+	s.Router.MethodFunc(http.MethodPost, prefix+"/spaces/{spaceID}/library/shared", library.SharedReferences())
+	s.Router.MethodFunc(http.MethodGet, prefix+"/spaces/{spaceID}/library/shared/{referenceID}/download", library.SharedReferenceDownload())
+	s.Router.MethodFunc(http.MethodDelete, prefix+"/spaces/{spaceID}/library/grants/{grantID}", library.RevokeGrant())
+	s.Router.MethodFunc(http.MethodGet, prefix+"/spaces/{spaceID}/library/usage", library.Usage())
+	s.Router.MethodFunc(http.MethodPost, prefix+"/spaces/{spaceID}/library/uploads", library.InitiateUpload())
+	s.Router.MethodFunc(http.MethodPut, prefix+"/spaces/{spaceID}/library/uploads/{uploadID}/content", library.UploadContent())
+	s.Router.MethodFunc(http.MethodPost, prefix+"/spaces/{spaceID}/library/uploads/{uploadID}/finalize", library.FinalizeUpload())
+	s.Router.MethodFunc(http.MethodPost, prefix+"/spaces/{spaceID}/library/items/bulk", library.BulkItems())
+	s.Router.MethodFunc(http.MethodGet, prefix+"/spaces/{spaceID}/library/items/{itemID}", library.Item())
+	s.Router.MethodFunc(http.MethodPatch, prefix+"/spaces/{spaceID}/library/items/{itemID}", library.Item())
+	s.Router.MethodFunc(http.MethodGet, prefix+"/spaces/{spaceID}/library/items/{itemID}/download", library.DownloadItem())
+	s.Router.MethodFunc(http.MethodGet, prefix+"/spaces/{spaceID}/library/items/{itemID}/preview", library.PreviewItem())
+	s.Router.MethodFunc(http.MethodPost, prefix+"/spaces/{spaceID}/library/items/{itemID}/trash", library.TrashItem())
+	s.Router.MethodFunc(http.MethodPost, prefix+"/spaces/{spaceID}/library/items/{itemID}/restore", library.RestoreItem())
+	s.Router.MethodFunc(http.MethodGet, prefix+"/spaces/{spaceID}/attachments/{attachmentID}/download", library.DownloadAttachment())
+	s.Router.MethodFunc(http.MethodPost, prefix+"/spaces/{spaceID}/attachments/{attachmentID}/promote", library.PromoteAttachment())
+	s.Router.MethodFunc(http.MethodGet, prefix+"/spaces/{spaceID}/library/albums", library.Albums())
+	s.Router.MethodFunc(http.MethodPost, prefix+"/spaces/{spaceID}/library/albums", library.Albums())
+	s.Router.MethodFunc(http.MethodGet, prefix+"/spaces/{spaceID}/library/albums/{albumID}", library.Album())
+	s.Router.MethodFunc(http.MethodPatch, prefix+"/spaces/{spaceID}/library/albums/{albumID}", library.Album())
+	s.Router.MethodFunc(http.MethodDelete, prefix+"/spaces/{spaceID}/library/albums/{albumID}", library.Album())
+	s.Router.MethodFunc(http.MethodPut, prefix+"/spaces/{spaceID}/library/albums/{albumID}/organization", library.OrganizeAlbum())
+	s.Router.MethodFunc(http.MethodPost, prefix+"/spaces/{spaceID}/library/albums/{albumID}/order", library.ReorderAlbumItems())
+	s.Router.MethodFunc(http.MethodGet, prefix+"/spaces/{spaceID}/library/albums/{albumID}/items", library.AlbumItems())
+	s.Router.MethodFunc(http.MethodPost, prefix+"/spaces/{spaceID}/library/albums/{albumID}/items", library.AlbumItems())
+	s.Router.MethodFunc(http.MethodDelete, prefix+"/spaces/{spaceID}/library/albums/{albumID}/items/{itemID}", library.AlbumItems())
+	s.Router.MethodFunc(http.MethodGet, prefix+"/spaces/{spaceID}/library/album-folders", library.AlbumFolders())
+	s.Router.MethodFunc(http.MethodPost, prefix+"/spaces/{spaceID}/library/album-folders", library.AlbumFolders())
+	s.Router.MethodFunc(http.MethodPatch, prefix+"/spaces/{spaceID}/library/album-folders/{folderID}", library.AlbumFolder())
+	s.Router.MethodFunc(http.MethodDelete, prefix+"/spaces/{spaceID}/library/album-folders/{folderID}", library.AlbumFolder())
+	s.Router.MethodFunc(http.MethodGet, prefix+"/spaces/{spaceID}/library/groups", library.Groups())
+	s.Router.MethodFunc(http.MethodPost, prefix+"/spaces/{spaceID}/library/groups", library.Groups())
+	s.Router.MethodFunc(http.MethodGet, prefix+"/spaces/{spaceID}/library/groups/{groupID}/items", library.GroupItems())
+	s.Router.MethodFunc(http.MethodGet, prefix+"/spaces/{spaceID}/library/people/policy", library.PeoplePolicy())
+	s.Router.MethodFunc(http.MethodPatch, prefix+"/spaces/{spaceID}/library/people/policy", library.PeoplePolicy())
+	s.Router.MethodFunc(http.MethodGet, prefix+"/spaces/{spaceID}/library/people", library.People())
+	s.Router.MethodFunc(http.MethodPost, prefix+"/spaces/{spaceID}/library/people", library.People())
+	s.Router.MethodFunc(http.MethodPost, prefix+"/spaces/{spaceID}/library/people/merge", library.MergePeople())
+	s.Router.MethodFunc(http.MethodGet, prefix+"/spaces/{spaceID}/library/people/{personID}", library.Person())
+	s.Router.MethodFunc(http.MethodPatch, prefix+"/spaces/{spaceID}/library/people/{personID}", library.Person())
+	s.Router.MethodFunc(http.MethodDelete, prefix+"/spaces/{spaceID}/library/people/{personID}", library.Person())
+	s.Router.MethodFunc(http.MethodGet, prefix+"/spaces/{spaceID}/library/people/{personID}/items", library.PersonItems())
+	s.Router.MethodFunc(http.MethodPost, prefix+"/spaces/{spaceID}/library/people/{personID}/items", library.PersonItems())
+	s.Router.MethodFunc(http.MethodDelete, prefix+"/spaces/{spaceID}/library/people/{personID}/items", library.PersonItems())
+	s.Router.MethodFunc(http.MethodGet, prefix+"/spaces/{spaceID}/library/items/{itemID}/versions", library.EditVersions())
+	s.Router.MethodFunc(http.MethodPost, prefix+"/spaces/{spaceID}/library/items/{itemID}/versions", library.EditVersions())
+	s.Router.MethodFunc(http.MethodPut, prefix+"/spaces/{spaceID}/library/items/{itemID}/versions/current", library.SelectEditVersion())
+	s.Router.MethodFunc(http.MethodPost, prefix+"/spaces/{spaceID}/library/items/{itemID}/versions/{editID}/render", library.RenderEditVersion())
+	s.Router.MethodFunc(http.MethodDelete, prefix+"/spaces/{spaceID}/library/items/{itemID}/versions/{editID}", library.DeleteEditVersion())
+	s.Router.MethodFunc(http.MethodGet, prefix+"/spaces/{spaceID}/members/{userID}/permissions", library.MemberPermissions())
+	s.Router.MethodFunc(http.MethodPut, prefix+"/spaces/{spaceID}/members/{userID}/permissions", library.MemberPermissions())
 }
 
 func (s *Server) mountSpacesRoutes(prefix string, spaces *api.SpacesService, realtime *api.RealtimeService) {
@@ -272,6 +406,13 @@ func (s *Server) PurgeExpiredAgentData(ctx context.Context, limit int) (int, err
 		return 0, nil
 	}
 	return s.AgentAttachments.PurgeExpired(ctx, limit)
+}
+
+func (s *Server) CleanupExpiredLibraryData(ctx context.Context, limit int) (int, error) {
+	if s.Library == nil {
+		return 0, nil
+	}
+	return s.Library.CleanupExpired(ctx, limit)
 }
 
 func (s *Server) mountAgentsRoutes(prefix string, service *api.AgentsService) {
@@ -366,6 +507,58 @@ func agentAttachmentStoreFromEnv() (api.AgentAttachmentStore, error) {
 		return nil, fmt.Errorf("DOCUMENT_STORE is required when MISTY_AGENT_DOCUMENTS_ENABLED=true")
 	default:
 		return nil, fmt.Errorf("unsupported DOCUMENT_STORE %q (expected r2, s3, or development-only memory)", storeName)
+	}
+}
+
+func libraryStoreFromEnv() (api.LibraryObjectStore, error) {
+	storeName := strings.ToLower(strings.TrimSpace(os.Getenv("LIBRARY_STORE")))
+	switch storeName {
+	case "local":
+		if strings.EqualFold(strings.TrimSpace(os.Getenv("MISTY_ENVIRONMENT")), "production") {
+			return nil, fmt.Errorf("LIBRARY_STORE=local is not allowed in production")
+		}
+		store, err := api.NewLocalLibraryObjectStore(os.Getenv("LIBRARY_LOCAL_DIR"))
+		if err != nil {
+			return nil, fmt.Errorf("configure local Library store: %w", err)
+		}
+		return store, nil
+	case "memory":
+		if strings.EqualFold(strings.TrimSpace(os.Getenv("MISTY_ENVIRONMENT")), "production") {
+			return nil, fmt.Errorf("LIBRARY_STORE=memory is not allowed in production")
+		}
+		return api.NewMemoryLibraryObjectStore(), nil
+	case "r2", "s3":
+		endpoint := strings.TrimSpace(os.Getenv("LIBRARY_S3_ENDPOINT"))
+		region := strings.TrimSpace(os.Getenv("LIBRARY_S3_REGION"))
+		forcePathStyle := serverFeatureEnabled("LIBRARY_S3_FORCE_PATH_STYLE")
+		if storeName == "r2" {
+			if endpoint == "" {
+				return nil, fmt.Errorf("LIBRARY_S3_ENDPOINT is required for Cloudflare R2")
+			}
+			if region == "" {
+				region = "auto"
+			}
+			forcePathStyle = true
+		}
+		store, err := api.NewS3LibraryObjectStore(api.S3LibraryObjectStoreConfig{
+			Endpoint:           endpoint,
+			Region:             region,
+			Bucket:             os.Getenv("LIBRARY_S3_BUCKET"),
+			AccessKeyID:        os.Getenv("LIBRARY_S3_ACCESS_KEY"),
+			SecretAccessKey:    os.Getenv("LIBRARY_S3_SECRET_KEY"),
+			ForcePathStyle:     forcePathStyle,
+			BucketPrivate:      serverFeatureEnabled("LIBRARY_S3_PRIVATE"),
+			PermanentBucket:    serverFeatureEnabled("LIBRARY_S3_PERMANENT"),
+			AllowInsecureLocal: !strings.EqualFold(strings.TrimSpace(os.Getenv("MISTY_ENVIRONMENT")), "production") && serverFeatureEnabled("LIBRARY_S3_ALLOW_INSECURE_LOCAL"),
+		})
+		if err != nil {
+			return nil, fmt.Errorf("configure %s permanent Library store: %w", storeName, err)
+		}
+		return store, nil
+	case "":
+		return nil, fmt.Errorf("LIBRARY_STORE is required when MISTY_LIBRARY_ENABLED=true")
+	default:
+		return nil, fmt.Errorf("unsupported LIBRARY_STORE %q (expected r2, s3, or development-only local/memory)", storeName)
 	}
 }
 

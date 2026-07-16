@@ -7,6 +7,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/joho/godotenv"
 )
 
@@ -42,6 +43,9 @@ func main() {
 	workerContext, stopWorkers := context.WithCancel(context.Background())
 	defer stopWorkers()
 	go runAgentRetention(workerContext, server)
+	go runLibraryPeopleProcessing(workerContext, server)
+	go runLibraryRenditionProcessing(workerContext, server)
+	go runLibraryIntelligenceProcessing(workerContext, server)
 
 	port := os.Getenv("PORT")
 	if port == "" {
@@ -54,6 +58,63 @@ func main() {
 	}
 }
 
+func runLibraryIntelligenceProcessing(ctx context.Context, server *Server) {
+	if server.Library == nil {
+		return
+	}
+	ticker := time.NewTicker(3 * time.Second)
+	defer ticker.Stop()
+	workerID := "intelligence-worker-" + uuid.NewString()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			if _, err := server.Library.ProcessIntelligenceJobs(ctx, workerID, 2); err != nil {
+				log.Printf("Library intelligence processing failed: %v", err)
+			}
+		}
+	}
+}
+
+func runLibraryRenditionProcessing(ctx context.Context, server *Server) {
+	if server.Library == nil {
+		return
+	}
+	ticker := time.NewTicker(2 * time.Second)
+	defer ticker.Stop()
+	workerID := "rendition-worker-" + uuid.NewString()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			if _, err := server.Library.ProcessRenditionJobs(ctx, workerID, 2); err != nil {
+				log.Printf("Library rendition processing failed: %v", err)
+			}
+		}
+	}
+}
+
+func runLibraryPeopleProcessing(ctx context.Context, server *Server) {
+	if server.Library == nil {
+		return
+	}
+	ticker := time.NewTicker(3 * time.Second)
+	defer ticker.Stop()
+	workerID := "people-worker-" + uuid.NewString()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			if _, err := server.Library.ProcessPeopleJobs(ctx, workerID, 4); err != nil {
+				log.Printf("Library People processing failed: %v", err)
+			}
+		}
+	}
+}
+
 func runAgentRetention(ctx context.Context, server *Server) {
 	ticker := time.NewTicker(time.Minute)
 	defer ticker.Stop()
@@ -63,6 +124,17 @@ func runAgentRetention(ctx context.Context, server *Server) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
+			if _, err := server.CleanupExpiredLibraryData(ctx, 100); err != nil {
+				log.Printf("Library reservation cleanup failed: %v", err)
+			}
+			if server.Library != nil {
+				if _, err := server.Database.ReleaseExpiredLibraryRenditionReservations(ctx, 100); err != nil {
+					log.Printf("Library rendition reservation cleanup failed: %v", err)
+				}
+				if _, err := server.Library.PurgeExpiredRenditions(ctx, 20); err != nil {
+					log.Printf("Library rendition purge failed: %v", err)
+				}
+			}
 			if serverFeatureEnabled("MISTY_FOLDER_AGENTS_ENABLED") {
 				if _, err := server.Database.EnqueueDueAgentSchedules(ctx, time.Now().UTC()); err != nil {
 					log.Printf("Agent schedule enqueue failed: %v", err)
