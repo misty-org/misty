@@ -4,7 +4,7 @@ import { useSpacesStore } from "@/features/spaces";
 import { SystemErrorActivity, reportSystemError } from "@/features/activity";
 import { useAiSurfaceAdapter } from "@/features/ai-surface/AiPaneHost";
 import type { AiSurfaceAdapter } from "@/features/ai-surface/types";
-import { useWorkspaceTabTitle } from "@/features/workspace";
+import { useWorkspaceViewTitle } from "@/features/workspace";
 import { usePinnedIds } from "@/shared/hooks/usePinnedIds";
 import { useSpaceDrawings } from "./hooks/useSpaceDrawings";
 import { useDrawingRoom } from "./hooks/useDrawingRoom";
@@ -16,7 +16,7 @@ import { SpaceDrawingsView, type DrawingsViewRuntime } from "./SpaceDrawingsView
 const Canvas = lazy(() => import("./components/CollaborativeDrawingCanvas"));
 const emptyMembers: never[] = [];
 function Title({ title, tab }: { title: string; tab?: string }) {
-  useWorkspaceTabTitle(tab, title);
+  useWorkspaceViewTitle(tab, title);
   return null;
 }
 function AI({ adapter }: { adapter: AiSurfaceAdapter }) {

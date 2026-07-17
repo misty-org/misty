@@ -1,11 +1,11 @@
 import { useMemo } from "react";
-import { parseBrowserTabState, type WorkspaceTab } from "@/features/workspace";
+import { parseBrowserViewState, type WorkspaceView } from "@/features/workspace";
 import { useBrowserRuntimeStore, type PagePreview } from "@/features/webviews/browserRuntime";
 import { isHomePreviewTab, type ContinueItem } from "./useContinueItems";
 
 /** A cached capture of this website, with content we can render immediately. */
-export function readyHomePreview(tab: WorkspaceTab, preview?: PagePreview): PagePreview | null {
-  if (!isHomePreviewTab(tab) || preview?.url !== parseBrowserTabState(tab.state).url) return null;
+export function readyHomePreview(tab: WorkspaceView, preview?: PagePreview): PagePreview | null {
+  if (!isHomePreviewTab(tab) || preview?.url !== parseBrowserViewState(tab.state).url) return null;
   const document = preview.document;
   const hasDocument =
     !!document?.html.trim() &&

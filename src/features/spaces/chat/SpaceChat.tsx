@@ -11,7 +11,7 @@ import {
   useSocialConnections as useConnectionsStore,
   useSocialSetup as useSetupStore,
   useSocialDraft as useSpaceChatDraft,
-  useSocialTitle as useWorkspaceTabTitle,
+  useSocialTitle as useWorkspaceViewTitle,
 } from "./SocialRuntime";
 import { SpaceSetupCards } from "../components/SpaceSetupCards";
 import { Button, EmptyState, ErrorState, LoadingState } from "@/shared/ui";
@@ -76,7 +76,7 @@ export function SpaceSocial({
     store,
   });
   const access = useSpaceChatPermissions(spaceId, conversationId, scope.activeConversation?.kind);
-  useWorkspaceTabTitle(workspaceTabId, `${spaceName} ${provider === "misty" ? "Chat" : "Social"}`);
+  useWorkspaceViewTitle(workspaceTabId, `${spaceName} ${provider === "misty" ? "Chat" : "Social"}`);
   const {
     accountId: connectionsAccountId,
     connections: accountConnections,

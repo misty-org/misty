@@ -35,12 +35,12 @@ async fn authenticated_requests_refresh_once_retry_and_persist_rotated_cookies()
     let server = tokio::spawn(async move {
         for (expected, status, body) in [
             (
-                "GET /v1/sync/workspace ",
+                "GET /v1/sync/vault ",
                 "401 Unauthorized",
                 r#"{"code":"not_authenticated"}"#,
             ),
             ("POST /v1/auth/refresh ", "204 No Content", ""),
-            ("GET /v1/sync/workspace ", "200 OK", r#"{"workspace":null}"#),
+            ("GET /v1/sync/vault ", "200 OK", r#"{"vault":null}"#),
         ] {
             let (mut stream, _) = listener.accept().await.unwrap();
             let mut request = vec![0; 8192];
@@ -66,7 +66,7 @@ async fn authenticated_requests_refresh_once_retry_and_persist_rotated_cookies()
             called.fetch_add(1, Ordering::SeqCst);
             Ok(())
         });
-    assert!(api.workspace().await.unwrap().is_none());
+    assert!(api.vault().await.unwrap().is_none());
     assert_eq!(persisted.load(Ordering::SeqCst), 1);
     server.await.unwrap();
 }
@@ -127,7 +127,7 @@ async fn denied_device_ticket_reports_access_failure_without_refreshing_sign_in(
     let scope = VaultScope {
         deployment: api.deployment(),
         account_id: "fixture".into(),
-        workspace_id: Uuid::new_v4().to_string(),
+        vault_id: Uuid::new_v4().to_string(),
     };
     let grant = root
         .grant(&scope, &Uuid::new_v4().to_string(), 1, &device)
@@ -174,7 +174,7 @@ async fn pending_connection_does_not_block_local_durability_or_lock() {
     let scope = VaultScope {
         deployment: api.deployment(),
         account_id: "fixture".into(),
-        workspace_id: Uuid::new_v4().to_string(),
+        vault_id: Uuid::new_v4().to_string(),
     };
     let grant = root
         .grant(&scope, &Uuid::new_v4().to_string(), 1, &device)
@@ -227,7 +227,7 @@ async fn offline_edits_are_validated_against_pending_creates_without_advancing_c
     let scope = VaultScope {
         deployment: api.deployment(),
         account_id: "fixture".into(),
-        workspace_id: Uuid::new_v4().to_string(),
+        vault_id: Uuid::new_v4().to_string(),
     };
     let grant = root
         .grant(&scope, &Uuid::new_v4().to_string(), 1, &device)

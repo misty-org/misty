@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, expect, it, vi } from "vitest";
-import type { WorkspaceTab } from "@/features/workspace/core";
+import type { WorkspaceView } from "@/features/workspace/core";
 import { SpaceWorkspaceSurface } from "./SpaceWorkspaceSurface";
 const state = vi.hoisted(() => ({
   user: { id: "one" } as { id: string } | null,
@@ -26,7 +26,7 @@ vi.mock("./components/SpaceWorkspaceRail", () => ({
   SpaceWorkspaceRail: () => <aside aria-label="Space navigation" />,
 }));
 vi.mock("./GlobalCreateSpaceDialog", () => ({ GlobalCreateSpaceDialog: () => null }));
-const tab = { id: "space-tab", route: "/spaces/project/social" } as WorkspaceTab;
+const tab = { id: "space-tab", route: "/spaces/project/social" } as WorkspaceView;
 function mount() {
   return render(
     <MemoryRouter initialEntries={[tab.route]}>

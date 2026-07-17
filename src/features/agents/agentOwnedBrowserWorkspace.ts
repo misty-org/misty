@@ -23,10 +23,10 @@ export async function createAgentOwnedBrowserWorkspace(
   const sourcePane = dockLeaves(workspace.layout.root).find(
     (candidate) => candidate.id === workspace.layout.focusedPaneId,
   );
-  const sourceTabId = sourcePane?.activeTabId;
+  const sourceTabId = sourcePane?.activeViewId;
   const url = browserSearchUrl(query);
-  const tab = workspace.openBrowserTab({ url, sourceTabId: sourceTabId ?? undefined });
-  useWorkspaceStore.getState().updateBrowserTab(tab.id, {
+  const tab = workspace.openBrowserView({ url, sourceViewId: sourceTabId ?? undefined });
+  useWorkspaceStore.getState().updateBrowserView(tab.id, {
     agentOwned: true,
     title: `Misty research · ${query.slice(0, 48)}`,
   });

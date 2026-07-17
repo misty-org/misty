@@ -6,6 +6,6 @@ export function registerProfileWriter(next: typeof writer) {
 export function writeProfilePreference(id: string, value: PreferenceValue): Promise<void> {
   return (
     writer?.(id, value) ??
-    Promise.reject(new Error("Settings profiles are still loading. Try again shortly."))
+    Promise.reject(new Error("Settings are still loading. Try again shortly."))
   );
 }

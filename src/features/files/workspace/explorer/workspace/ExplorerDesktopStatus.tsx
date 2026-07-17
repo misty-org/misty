@@ -99,7 +99,12 @@ function compactNotificationMessage(message: string): string {
 }
 
 const renameStatusStyles = {
-  root: "pointer-events-none absolute inset-x-0 bottom-[34px] z-[28] mx-auto flex min-h-[30px] w-fit max-w-[min(520px,calc(100%_-_96px))] items-center justify-center rounded-lg bg-charcoal-card px-3.5 py-1.5 text-cream shadow-md ring-1 ring-cream/10 animate-in fade-in-0 slide-in-from-bottom-2 duration-160 ease-out",
+  root: cx(
+    "pointer-events-none absolute inset-x-0 bottom-[34px] z-[28] mx-auto flex min-h-[30px] w-fit",
+    "max-w-[min(520px,calc(100%_-_96px))] items-center justify-center rounded-lg bg-charcoal-card px-3.5",
+    "py-1.5 text-cream shadow-md ring-1 ring-cream/10 animate-in fade-in-0 slide-in-from-bottom-2 duration-160",
+    "ease-out",
+  ),
   warning: "text-sage-fg",
   text: "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[13px] font-medium",
 } as const;

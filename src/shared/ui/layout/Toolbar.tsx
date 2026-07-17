@@ -7,6 +7,7 @@ const Toolbar = React.forwardRef<HTMLDivElement, ToolbarProps>(
     <div
       ref={ref}
       role="toolbar"
+      data-window-toolbar={variant !== "floating" && variant !== "bare" ? "true" : undefined}
       aria-label={label}
       className={cn(
         // The browser chrome's geometry: 44px bar, 4px rhythm, 30px icon buttons.

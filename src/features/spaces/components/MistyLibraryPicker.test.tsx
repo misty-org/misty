@@ -2,8 +2,9 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@/api/spaces/api", () => ({
-  spacesApi: {
+vi.mock("@/features/library/library/LibraryRuntime", async () => ({
+  LibraryError: (await import("@/features/activity")).SystemErrorActivity,
+  libraryApi: {
     libraryItems: vi.fn().mockResolvedValue({ items: [] }),
   },
 }));

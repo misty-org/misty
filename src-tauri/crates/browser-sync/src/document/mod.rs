@@ -2,6 +2,7 @@
 //! resume records are read only when the user explicitly chooses Continue here.
 pub mod credentials;
 pub mod entities;
+pub mod renderer;
 
 use std::collections::BTreeMap;
 
@@ -63,19 +64,21 @@ pub struct RejectedCredentials {
 #[serde(deny_unknown_fields)]
 pub struct Resume {
     pub active_window_id: String,
-    pub active_layout_id: String,
+    #[serde(rename = "active_layout_id")]
+    pub active_tab_id: String,
     pub focused_pane_id: String,
-    pub active_tab_by_pane: BTreeMap<String, String>,
+    #[serde(rename = "active_tab_by_pane")]
+    pub active_view_by_pane: BTreeMap<String, String>,
 }
 
 impl Resume {
     fn validate(&self) -> Result<()> {
         if !entities::valid_id(&self.active_window_id)
-            || !entities::valid_id(&self.active_layout_id)
+            || !entities::valid_id(&self.active_tab_id)
             || !entities::valid_id(&self.focused_pane_id)
-            || self.active_tab_by_pane.len() > 4096
+            || self.active_view_by_pane.len() > 4096
             || self
-                .active_tab_by_pane
+                .active_view_by_pane
                 .iter()
                 .any(|(k, v)| !entities::valid_id(k) || !entities::valid_id(v))
         {
@@ -111,10 +114,11 @@ pub struct Document {
     pub resumes: BTreeMap<String, ResumeRecord>,
     #[serde(default)]
     pub active_device: Option<ActiveDevice>,
-    /// Set by the first `TreeMode` event. Workspaces then live in per-device
-    /// trees; this log carries only account-wide credentials, from any device.
+    /// Set by the first `WorkspaceMode` event. Workspaces then live in per-device
+    /// workspaces; this log carries only account-wide credentials, from any device.
     #[serde(default)]
-    pub tree_mode: bool,
+    #[serde(rename = "tree_mode")]
+    pub workspace_mode: bool,
 }
 
 /// This is the renderer boundary. Credential payloads and encryption/signing
@@ -125,8 +129,8 @@ pub struct WorkspaceView {
     pub version: u8,
     pub sequence: u64,
     pub records: Vec<ViewRecord>,
-    pub orphaned_tab_ids: Vec<String>,
-    pub orphaned_website_ids: Vec<String>,
+    pub orphaned_view_ids: Vec<String>,
+    pub orphaned_bookmark_ids: Vec<String>,
     pub resumes: BTreeMap<String, ResumeRecord>,
     pub active_device: Option<ActiveDevice>,
 }
@@ -149,7 +153,7 @@ impl Default for Document {
             rejected_credentials_by_device: BTreeMap::new(),
             resumes: BTreeMap::new(),
             active_device: None,
-            tree_mode: false,
+            workspace_mode: false,
         }
     }
 }
@@ -198,7 +202,8 @@ pub enum Payload {
         version: u8,
         resume: Resume,
     },
-    TreeMode {
+    #[serde(rename = "tree_mode")]
+    WorkspaceMode {
         version: u8,
     },
 }
@@ -268,7 +273,7 @@ impl Payload {
             }
             Self::Credentials { version: 1, batch } => batch.validate(),
             Self::Resume { version: 1, resume } => resume.validate(),
-            Self::TreeMode { version: 1 } => Ok(()),
+            Self::WorkspaceMode { version: 1 } => Ok(()),
             _ => Err(Error::Invalid),
         }
     }
@@ -291,20 +296,20 @@ impl Document {
                 fields: r.values(),
             })
             .collect();
-        let mut orphaned_website_ids = Vec::new();
-        for record in records.iter().filter(|r| r.kind == Kind::Website) {
-            let website: entities::Website =
+        let mut orphaned_bookmark_ids = Vec::new();
+        for record in records.iter().filter(|r| r.kind == Kind::Bookmark) {
+            let bookmark: entities::Bookmark =
                 serde_json::from_value(serde_json::to_value(&record.fields)?)?;
-            if self.live(Kind::Group, &website.group_id).is_none() {
-                orphaned_website_ids.push(record.id.clone());
+            if self.live(Kind::Folder, &bookmark.folder_id).is_none() {
+                orphaned_bookmark_ids.push(record.id.clone());
             }
         }
         Ok(WorkspaceView {
             version: 1,
             sequence: self.sequence,
             records,
-            orphaned_tab_ids: self.orphaned_tabs()?,
-            orphaned_website_ids,
+            orphaned_view_ids: self.orphaned_views()?,
+            orphaned_bookmark_ids,
             resumes: self.resumes.clone(),
             active_device: self.active_device.clone(),
         })
@@ -324,16 +329,16 @@ impl Document {
         }
         payload.validate()?;
         let sequence = context.sequence;
-        // Tree mode is one-way and deterministic: every device reduces the same
+        // Workspace mode is one-way and deterministic: every device reduces the same
         // event. Afterwards only credentials change this document; any device
         // may send them, and base-version checks resolve concurrent batches.
-        if matches!(payload, Payload::TreeMode { .. }) {
-            self.tree_mode = true;
+        if matches!(payload, Payload::WorkspaceMode { .. }) {
+            self.workspace_mode = true;
             self.active_device = None;
             self.sequence = sequence;
             return Ok(());
         }
-        if self.tree_mode && !matches!(payload, Payload::Credentials { .. }) {
+        if self.workspace_mode && !matches!(payload, Payload::Credentials { .. }) {
             self.sequence = sequence;
             return Ok(());
         }
@@ -371,14 +376,14 @@ impl Document {
                 }
                 *payload
             }
-            other if self.active_device.is_none() || self.tree_mode => other,
+            other if self.active_device.is_none() || self.workspace_mode => other,
             _ => {
                 self.sequence = sequence;
                 return Ok(());
             }
         };
         match payload {
-            Payload::ActiveDevice { .. } | Payload::Published { .. } | Payload::TreeMode { .. } => {
+            Payload::ActiveDevice { .. } | Payload::Published { .. } | Payload::WorkspaceMode { .. } => {
                 return Err(Error::Invalid)
             }
             Payload::Workspace { changes, .. } => {
@@ -490,11 +495,11 @@ impl Document {
     }
 
     pub fn can_publish(&self, device_id: &str, payload: &Payload) -> bool {
-        if self.tree_mode {
-            return matches!(payload, Payload::Credentials { .. } | Payload::TreeMode { .. });
+        if self.workspace_mode {
+            return matches!(payload, Payload::Credentials { .. } | Payload::WorkspaceMode { .. });
         }
         match payload {
-            Payload::TreeMode { .. } => true,
+            Payload::WorkspaceMode { .. } => true,
             Payload::ActiveDevice { .. } => true,
             Payload::Published { active_epoch, .. } => {
                 self.is_active(device_id)
@@ -580,21 +585,21 @@ impl Document {
     }
 
     /// Projection must expose these views in deterministic recovery layouts.
-    /// Concurrent tree/container changes never implicitly delete a tab record.
-    pub fn orphaned_tabs(&self) -> Result<Vec<String>> {
+    /// Concurrent workspace/container changes never implicitly delete a tab record.
+    pub fn orphaned_views(&self) -> Result<Vec<String>> {
         let mut orphaned = Vec::new();
         for record in self
             .records
             .values()
-            .filter(|r| r.kind == Kind::Tab && r.deleted_sequence.is_none())
+            .filter(|r| r.kind == Kind::View && r.deleted_sequence.is_none())
         {
-            let tab: entities::Tab =
+            let view: entities::View =
                 serde_json::from_value(serde_json::to_value(record.values())?)?;
-            let valid = if let Some(layout) = self.live(Kind::Layout, &tab.placement.layout_id) {
-                let layout: entities::Layout =
-                    serde_json::from_value(serde_json::to_value(layout.values())?)?;
-                self.live(Kind::Window, &layout.window_id).is_some()
-                    && layout.tree.panes()?.contains(&tab.placement.pane_id)
+            let valid = if let Some(tab) = self.live(Kind::Tab, &view.placement.tab_id) {
+                let tab: entities::Tab =
+                    serde_json::from_value(serde_json::to_value(tab.values())?)?;
+                self.live(Kind::Window, &tab.window_id).is_some()
+                    && tab.tree.panes()?.contains(&view.placement.pane_id)
             } else {
                 false
             };

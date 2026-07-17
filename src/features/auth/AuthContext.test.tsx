@@ -275,7 +275,7 @@ describe("AuthProvider account switching", () => {
     expect(mocks.saveAuthenticatedUser).not.toHaveBeenCalled();
     expect(mocks.userState.me?.id).toBe(mocks.accountA.id);
     expect(auth?.user?.id).toBe(mocks.accountA.id);
-    expect(mocks.setAccountSessionTransitioning.mock.calls.map(([value]) => value)).toEqual([true]);
+    expect(mocks.setAccountSessionTransitioning.mock.calls).toEqual([[true], [false]]);
   });
   it("preserves the original sign-in error when the previous saved session is stale", async () => {
     function Probe() {

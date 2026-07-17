@@ -1,7 +1,7 @@
 import { renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useExplorerStore } from "@/features/files/workspace/explorer";
-import { dockTabs, useMultiPanelStore, useWorkspaceStore } from "@/features/workspace";
+import { dockTreeViews, useMultiPanelStore, useWorkspaceStore } from "@/features/workspace";
 import type { GlobalSearchResult } from "./types";
 import { useGlobalMistyResults } from "./useGlobalMistyResults";
 
@@ -15,15 +15,15 @@ describe("useGlobalMistyResults", () => {
     mockNavigate.mockReset();
     useWorkspaceStore.setState({
       activeScopeKey: "global",
-      virtualWindowsByScope: {},
-      closedVirtualWindowsByScope: {},
-      lastUsedTabByGroup: {},
+      windowsByScope: {},
+      closedWindowsByScope: {},
+      lastUsedViewByGroup: {},
       layout: {
         root: {
           id: "pane-1",
           type: "leaf",
-          activeTabId: "tab-1",
-          tabs: [
+          activeViewId: "tab-1",
+          views: [
             {
               id: "tab-1",
               surfaceId: "files",
@@ -156,8 +156,8 @@ describe("useGlobalMistyResults", () => {
     );
 
     // The files workspace surface should be focused
-    const currentTab = dockTabs(useWorkspaceStore.getState().layout.root).find(
-      (tab) => tab.surfaceId === "official-app" && tab.groupKey === "app:files",
+    const currentTab = dockTreeViews(useWorkspaceStore.getState().layout.root).find(
+      (tab) => tab.surfaceId === "files" && tab.groupKey === "tool:files",
     );
     expect(currentTab).toBeDefined();
   });

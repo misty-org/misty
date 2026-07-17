@@ -1,5 +1,5 @@
 import { useEffect, useRef, type RefObject } from "react";
-import { parseBrowserTabState, type WorkspaceTab } from "./model";
+import { parseBrowserViewState, type WorkspaceView } from "./model";
 import { snapshotPage } from "./pageSnapshot";
 import { pagePreviewGeneration, savePagePreview } from "@/features/webviews/browserRuntime";
 import { invoke } from "@tauri-apps/api/core";
@@ -7,14 +7,14 @@ import { getAppliedAppRenderScale } from "@/shared/hooks/useAppZoom";
 
 /** All host-rendered tools, including misty:// pages, get a real content preview. */
 export function useWorkspacePagePreview(
-  tab: WorkspaceTab | undefined,
+  tab: WorkspaceView | undefined,
   host: RefObject<HTMLElement | null>,
   active: boolean,
 ) {
   const latest = useRef(tab);
   latest.current = tab;
-  const url = tab?.surfaceId === "browser" ? parseBrowserTabState(tab.state).url : tab?.route;
-  const privateTab = tab?.surfaceId === "browser" && parseBrowserTabState(tab.state).private;
+  const url = tab?.surfaceId === "browser" ? parseBrowserViewState(tab.state).url : tab?.route;
+  const privateTab = tab?.surfaceId === "browser" && parseBrowserViewState(tab.state).private;
   const tabId = tab?.id;
   const surfaceId = tab?.surfaceId;
   useEffect(() => {

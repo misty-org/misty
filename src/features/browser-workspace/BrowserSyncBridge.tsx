@@ -21,7 +21,6 @@ import {
   registerRecoveryFlush,
 } from "./recovery";
 import {
-  saveNativeResume,
   editNativeWorkspace,
   readNativeSync,
   watchNativeSync,
@@ -95,7 +94,7 @@ export function BrowserSyncBridge({ accountId }: { accountId: string }) {
           `misty:pre-browser-sync:v1:${base}:${accountId}`,
           true,
         );
-        const journalKey = await recoveryKey("edits", [native.workspace_id, native.device_id]);
+        const journalKey = await recoveryKey("edits", [native.vault_id, native.device_id]);
         await migrateRecoveryRecord(
           recovery.storage,
           journalKey,
@@ -132,7 +131,7 @@ export function BrowserSyncBridge({ accountId }: { accountId: string }) {
           ) {
             const live = workspaceSource.read();
             const changes = workspaceChanges(
-              baseline.virtualWindowsByScope?.global ?? [],
+              baseline.windowsByScope?.global ?? [],
               live.windows,
               native.profile_id,
             );
@@ -140,8 +139,8 @@ export function BrowserSyncBridge({ accountId }: { accountId: string }) {
               [
                 ...changes.changes,
                 ...recordChanges(
-                  [...(baseline.websiteGroups ?? []), ...(baseline.savedWebsites ?? [])],
-                  [...(live.groups ?? []), ...(live.websites ?? [])],
+                  [...(baseline.bookmarkFolders ?? []), ...(baseline.bookmarks ?? [])],
+                  [...(live.folders ?? []), ...(live.bookmarks ?? [])],
                 ),
               ],
               epoch,
@@ -150,9 +149,9 @@ export function BrowserSyncBridge({ accountId }: { accountId: string }) {
               workspaceSource.write({
                 windows: changes.windows,
                 activeWindowId: changes.remapped.get(live.activeWindowId) ?? live.activeWindowId,
-                groups: live.groups ?? [],
-                websites: live.websites ?? [],
-                recoveryTabIds: [],
+                folders: live.folders ?? [],
+                bookmarks: live.bookmarks ?? [],
+                recoveryViewIds: [],
               });
           }
         }
@@ -170,7 +169,6 @@ export function BrowserSyncBridge({ accountId }: { accountId: string }) {
           journal,
           read: readNativeSync,
           publish: editNativeWorkspace,
-          publishResume: saveNativeResume,
           state(session, preserveIssue) {
             if (valid())
               useBrowserSyncStore.setState({ session, ...(preserveIssue ? {} : { issue: null }) });

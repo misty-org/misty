@@ -17,7 +17,7 @@ export function OmniboxRow(props: {
   selected: boolean;
   onChoose: () => void;
   onPoint: () => void;
-  onSwitchTab: (tabId: string) => void;
+  onSwitchView: (tabId: string) => void;
   onRemove?: () => void;
 }) {
   const { match } = props;
@@ -33,7 +33,7 @@ export function OmniboxRow(props: {
       <Icon strokeWidth={1.7} className="opacity-70" />
       <span className="min-w-0 flex-1 truncate font-medium">{match.title}</span>
       <span className="max-w-[48%] truncate text-xs opacity-55">{detail}</span>
-      {match.switchTabId ? (
+      {match.switchViewId ? (
         <Button
           variant="outline"
           size="xs"
@@ -42,7 +42,7 @@ export function OmniboxRow(props: {
           onPointerDown={(event) => event.preventDefault()}
           onClick={(event) => {
             event.stopPropagation();
-            props.onSwitchTab(match.switchTabId!);
+            props.onSwitchView(match.switchViewId!);
           }}
         >
           Switch to tab

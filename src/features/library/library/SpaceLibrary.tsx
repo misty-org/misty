@@ -1,7 +1,7 @@
 import type { AiSurfaceAdapter } from "@/features/ai-surface/AiPaneHost";
 import {
   useLibraryAi as useAiSurfaceAdapter,
-  useLibraryTitle as useWorkspaceTabTitle,
+  useLibraryTitle as useWorkspaceViewTitle,
 } from "./LibraryRuntime";
 import { ComingSoonSurface } from "@/shared/ui";
 import { useEffect, useMemo, useRef } from "react";
@@ -43,7 +43,7 @@ export function SpaceLibrary({
   const itemActions = useSpaceLibraryItemActions(data);
   const collectionActions = useSpaceLibraryCollectionActions(data, itemActions);
   const { canUploadLibrary, setFilePickerOpen } = data;
-  useWorkspaceTabTitle(workspaceTabId, libraryWorkspaceTitle(data));
+  useWorkspaceViewTitle(workspaceTabId, libraryWorkspaceTitle(data));
   const aiAdapter = useMemo<AiSurfaceAdapter>(() => {
     const selectedItems = data.selectedItems ?? [];
     return {

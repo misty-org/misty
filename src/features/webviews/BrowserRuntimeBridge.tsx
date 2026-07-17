@@ -1,7 +1,7 @@
 import { useAiSurfaceStore } from "@/features/ai-surface";
 import { captureAttachmentFromDataUrl } from "@/features/ai-surface/captureAttachment";
 import {
-  browserTabUrl,
+  browserViewUrl,
   recordBrowserVisitTitle,
   useBrowserDownloadsStore,
   useBrowserMediaStore,
@@ -50,7 +50,7 @@ export function browserBlockingOverlayOpen(root: ParentNode = document): boolean
 }
 export function activeBrowserSurfaceExists(root: WorkspaceDockNode): boolean {
   return dockLeaves(root).some((pane) => {
-    const activeTab = pane.tabs.find((tab) => tab.id === pane.activeTabId);
+    const activeTab = pane.views.find((tab) => tab.id === pane.activeViewId);
     return (
       activeTab?.surfaceId === "browser" ||
       (activeTab?.surfaceId === "official-app" &&
@@ -106,7 +106,7 @@ interface BrowserFocusEvent {
 }
 export function focusBrowserRuntimeTab(runtimeId: string): boolean {
   const tabId = browserTabIdForRuntime(runtimeId);
-  if (!tabId || !useWorkspaceStore.getState().focusTab(tabId)) return false;
+  if (!tabId || !useWorkspaceStore.getState().focusView(tabId)) return false;
   window.dispatchEvent(
     new CustomEvent("misty:focus-workspace-tab", {
       detail: {
@@ -268,7 +268,7 @@ export function BrowserRuntimeBridge() {
           useBrowserRuntimeStore.getState().setCompatibilityIssue(tabId, null);
           useBrowserRuntimeStore.getState().setLoading(tabId, true);
         }
-        useWorkspaceStore.getState().updateBrowserTab(tabId, {
+        useWorkspaceStore.getState().updateBrowserView(tabId, {
           url: payload.url,
         });
         if (payload.phase === "finished") {
@@ -298,10 +298,10 @@ export function BrowserRuntimeBridge() {
         if (disposed || !payload.title.trim()) return;
         const tabId = browserTabIdForRuntime(payload.id);
         if (tabId && !browserTabShowsInternalPage(tabId)) {
-          useWorkspaceStore.getState().updateBrowserTab(tabId, {
+          useWorkspaceStore.getState().updateBrowserView(tabId, {
             title: payload.title.trim(),
           });
-          const url = browserTabUrl(tabId);
+          const url = browserViewUrl(tabId);
           if (url) recordBrowserVisitTitle(tabId, url, payload.title.trim());
         }
       }),
@@ -309,7 +309,7 @@ export function BrowserRuntimeBridge() {
         if (disposed || !/^https?:\/\//i.test(payload.url)) return;
         const tabId = browserTabIdForRuntime(payload.id);
         if (tabId && !browserTabShowsInternalPage(tabId)) {
-          useWorkspaceStore.getState().updateBrowserTab(tabId, {
+          useWorkspaceStore.getState().updateBrowserView(tabId, {
             faviconUrl: payload.url,
           });
         }
@@ -342,7 +342,7 @@ export function BrowserRuntimeBridge() {
         const tabId = browserTabIdForRuntime(payload.id);
         if (!tabId) return;
         const pane = dockLeaves(useWorkspaceStore.getState().layout.root).find(
-          (candidate) => candidate.activeTabId === tabId,
+          (candidate) => candidate.activeViewId === tabId,
         );
         if (!pane) return;
         const workspace = document.querySelector<HTMLElement>(
@@ -387,7 +387,7 @@ export function BrowserRuntimeBridge() {
         const tabId = browserTabIdForRuntime(payload.id);
         if (!tabId) return;
         const pane = dockLeaves(useWorkspaceStore.getState().layout.root).find(
-          (candidate) => candidate.activeTabId === tabId,
+          (candidate) => candidate.activeViewId === tabId,
         );
         if (!pane) return;
         const ai = useAiSurfaceStore.getState();
@@ -444,7 +444,7 @@ export function BrowserRuntimeBridge() {
       }),
       listen<string>("misty://open-web-url", ({ payload }) => {
         if (disposed || !/^https?:\/\//i.test(payload)) return;
-        const tab = useWorkspaceStore.getState().openBrowserTab({
+        const tab = useWorkspaceStore.getState().openBrowserView({
           url: payload,
         });
         if (tab) navigate(tab.route);

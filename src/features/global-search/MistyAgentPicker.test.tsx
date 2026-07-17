@@ -1,3 +1,4 @@
+import "../agents/components/agentCloudAvatars.testFixtures";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { AgentProfile } from "@/shared/schemas";

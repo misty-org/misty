@@ -36,7 +36,10 @@ vi.mock("@/features/auth", () => ({
   accountScopeResetEvent: "misty:account-scope-reset",
   useAuth: () => ({ user: { id: "user-1", name: "Matthew Chen", email: "matt@example.com" } }),
 }));
-vi.mock("@/features/activity", () => ({ SystemErrorActivity: () => null }));
+vi.mock("@/features/activity", () => ({
+  reportSystemError: vi.fn(),
+  SystemErrorActivity: () => null,
+}));
 vi.mock("@/features/ai-surface/AiPaneHost", () => ({ useAiSurfaceAdapter: vi.fn() }));
 vi.mock("@/features/journal", () => ({
   JournalAttribution: () => null,
@@ -46,7 +49,7 @@ vi.mock("@/features/spaces", () => ({
   useSpacesStore: (selector: (state: unknown) => unknown) =>
     selector({ membersBySpace: { "space-1": [] } }),
 }));
-vi.mock("@/features/workspace", () => ({ useWorkspaceTabTitle: vi.fn() }));
+vi.mock("@/features/workspace", () => ({ useWorkspaceViewTitle: vi.fn() }));
 vi.mock("./hooks/useSpaceDrawings", () => ({
   useSpaceDrawings: () => ({
     drawings,

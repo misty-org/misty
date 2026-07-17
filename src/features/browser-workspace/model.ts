@@ -1,13 +1,16 @@
 /** Mirrors the native renderer projection. Credentials and vault keys have no
- * renderer-side representation. Native document state remains authoritative. */
-export interface GroupFields {
+ * renderer-side representation. Native document state remains authoritative.
+ * Names follow the sync hierarchy: window → tab → pane → view, plus bookmark
+ * folders and bookmarks. Native storage keeps older names and translates them
+ * at the renderer boundary. */
+export interface FolderFields {
   label: string;
   icon: string;
   order: number;
   hidden: boolean;
 }
-export interface WebsiteFields {
-  group_id: string;
+export interface BookmarkFields {
+  folder_id: string;
   title: string;
   url: string;
   order: number;
@@ -30,32 +33,47 @@ export type SplitTree =
       first: SplitTree;
       second: SplitTree;
     };
-export interface LayoutFields {
+export interface TabFields {
   window_id: string;
   title: string;
   order: number;
   tree: SplitTree;
 }
-export interface TabFields {
+export interface ViewFields {
   surface: "browser" | "files" | "agents" | "space" | "home";
   title: string;
   placement: {
-    layout_id: string;
+    tab_id: string;
     pane_id: string;
     order: number;
   };
   url: string | null;
   profile_id: string | null;
-  website_id: string | null;
+  bookmark_id: string | null;
   tool_route: string | null;
   agent_owned: boolean;
 }
+export interface TabGroupFields {
+  name: string;
+  color: string;
+  order: number;
+  tab_ids: string[];
+}
+export interface SavedTabGroupFields {
+  name: string;
+  color: string;
+  order: number;
+  /** The saved tabs, as JSON text. */
+  tabs: string;
+}
 export interface FieldsByKind {
-  group: GroupFields;
-  website: WebsiteFields;
+  folder: FolderFields;
+  bookmark: BookmarkFields;
   window: WindowFields;
-  layout: LayoutFields;
   tab: TabFields;
+  view: ViewFields;
+  tab_group: TabGroupFields;
+  saved_tab_group: SavedTabGroupFields;
 }
 export type RecordKind = keyof FieldsByKind;
 export type SharedRecord<K extends RecordKind = RecordKind> = {
@@ -67,16 +85,16 @@ export type SharedRecord<K extends RecordKind = RecordKind> = {
 }[K];
 export interface Resume {
   active_window_id: string;
-  active_layout_id: string;
+  active_tab_id: string;
   focused_pane_id: string;
-  active_tab_by_pane: Record<string, string>;
+  active_view_by_pane: Record<string, string>;
 }
-export interface WorkspaceView {
+export interface WorkspaceRecords {
   version: 1;
   sequence: number;
   records: SharedRecord[];
-  orphaned_tab_ids: string[];
-  orphaned_website_ids: string[];
+  orphaned_view_ids: string[];
+  orphaned_bookmark_ids: string[];
   resumes: Record<
     string,
     {
@@ -120,7 +138,10 @@ export type WorkspacePayload = {
  * writes this object; Continue here explicitly selects one when requested. */
 export interface DeviceSelection {
   activeWindowId?: string;
-  activeLayoutByWindow: Record<string, string>;
-  focusedPaneByLayout: Record<string, string>;
-  activeTabByPane: Record<string, string>;
+  activeTabByWindow: Record<string, string>;
+  focusedPaneByTab: Record<string, string>;
+  activeViewByPane: Record<string, string>;
+  /** The window's tab order as last shown, so a selection closed on
+   * another machine moves to its neighbor rather than the first tab. */
+  tabOrderByWindow?: Record<string, string[]>;
 }

@@ -14,115 +14,92 @@ export interface SettingsProfile {
 }
 export interface ProfileMutation {
   id: string;
-  profileId: string;
   set: PreferenceValues;
   unset: string[];
 }
+/** A cache and durable outbox for the single server-owned account settings record. */
 export interface DeviceProfileState {
-  version: 1;
-  selectedProfileId: string | null;
-  profiles: Record<string, SettingsProfile>;
-  localValues: PreferenceValues;
-  overrides: Record<string, PreferenceValues>;
+  version: 2;
+  profile: SettingsProfile | null;
+  seed: PreferenceValues;
   outbox: ProfileMutation[];
-  notice: string | null;
-}
-export interface ResolvedSetting {
-  value: PreferenceValue;
-  source: "default" | "profile" | "device";
 }
 export function initialProfileState(document: Record<string, unknown>): DeviceProfileState {
-  return {
-    version: 1,
-    selectedProfileId: null,
-    profiles: {},
-    localValues: portableValues(document),
-    overrides: {},
-    outbox: [],
-    notice: null,
-  };
+  return { version: 2, profile: null, seed: portableValues(document), outbox: [] };
 }
-export function profileValues(
-  state: DeviceProfileState,
-  profileId = state.selectedProfileId,
-): PreferenceValues {
-  if (!profileId) return state.localValues;
-  const values = { ...state.profiles[profileId]?.values };
-  for (const edit of state.outbox)
-    if (edit.profileId === profileId) {
-      Object.assign(values, edit.set);
-      for (const key of edit.unset) delete values[key];
-    }
-  return values;
+/** Import the old effective preferences once; the server's existing record always wins. */
+export function migrateProfileState(
+  saved: unknown,
+  document: Record<string, unknown>,
+): DeviceProfileState {
+  if (!saved || typeof saved !== "object") return initialProfileState(document);
+  const legacy = saved as {
+    version?: number;
+    selectedProfileId?: string | null;
+    profiles?: Record<string, SettingsProfile>;
+    localValues?: PreferenceValues;
+    overrides?: Record<string, PreferenceValues>;
+    outbox?: (ProfileMutation & { profileId: string })[];
+  };
+  if (legacy.version === 2) return saved as DeviceProfileState;
+  const next = initialProfileState(document);
+  const selected = legacy.selectedProfileId;
+  Object.assign(next.seed, selected ? legacy.profiles?.[selected]?.values : legacy.localValues);
+  for (const edit of legacy.outbox ?? []) {
+    if (edit.profileId !== selected) continue;
+    Object.assign(next.seed, edit.set);
+    for (const key of edit.unset) delete next.seed[key];
+  }
+  if (selected) Object.assign(next.seed, legacy.overrides?.[selected]);
+  next.seed = Object.fromEntries(
+    Object.entries(next.seed).filter(([id, value]) => {
+      const d = definitionById.get(id);
+      return d && validPreference(d, value);
+    }),
+  );
+  return next;
 }
 export function effectiveValues(state: DeviceProfileState): PreferenceValues {
-  return {
-    ...profileValues(state),
-    ...(state.selectedProfileId ? state.overrides[state.selectedProfileId] : {}),
-  };
+  const values = { ...(state.profile?.values ?? state.seed) };
+  for (const edit of state.outbox) {
+    Object.assign(values, edit.set);
+    for (const key of edit.unset) delete values[key];
+  }
+  return values;
 }
-export function resolveSetting(state: DeviceProfileState, id: string): ResolvedSetting {
+export function resolveSetting(state: DeviceProfileState, id: string) {
   const d = definitionById.get(id);
   if (!d) throw new Error("Unknown setting");
-  const overrides = state.selectedProfileId
-    ? state.overrides[state.selectedProfileId]
-    : state.localValues;
-  if (overrides?.[id] !== undefined) return { value: overrides[id], source: "device" };
-  const values = profileValues(state);
+  const values = effectiveValues(state);
   return {
     value: values[id] ?? d.default,
-    source: values[id] === undefined ? "default" : "profile",
+    source: values[id] === undefined ? "default" : "account",
   };
 }
 export function editPreference(
   state: DeviceProfileState,
   id: string,
   value: PreferenceValue | undefined,
-  target: "profile" | "device",
   mutationId: string,
 ): DeviceProfileState {
   const d = definitionById.get(id);
-  if (!d || d.owner !== "profile" || (value !== undefined && !validPreference(d, value)))
-    throw new Error("Invalid portable setting");
-  const next = structuredClone(state);
-  if (!next.selectedProfileId || target === "device") {
-    const values = next.selectedProfileId
-      ? (next.overrides[next.selectedProfileId] ??= {})
-      : next.localValues;
-    if (value === undefined) delete values[id];
-    else values[id] = value;
-  } else {
-    next.outbox.push({
-      id: mutationId,
-      profileId: next.selectedProfileId,
-      set: value === undefined ? {} : { [id]: value },
-      unset: value === undefined ? [id] : [],
-    });
-  }
-  return next;
+  if (!d || (value !== undefined && !validPreference(d, value))) throw new Error("Invalid setting");
+  return {
+    ...state,
+    outbox: [
+      ...state.outbox,
+      {
+        id: mutationId,
+        set: value === undefined ? {} : { [id]: value },
+        unset: value === undefined ? [id] : [],
+      },
+    ],
+  };
 }
-export function reconcileProfiles(
+export function reconcileProfile(
   state: DeviceProfileState,
-  profiles: SettingsProfile[],
+  profile: SettingsProfile,
 ): DeviceProfileState {
-  const next = structuredClone(state);
-  const ids = new Set(profiles.map((p) => p.id));
-  if (next.selectedProfileId && !ids.has(next.selectedProfileId)) {
-    next.localValues = effectiveValues(next);
-    next.selectedProfileId = null;
-    next.notice =
-      "The selected profile was deleted. Your preferences are now local to this device.";
-  }
-  for (const id of Object.keys(next.profiles))
-    if (!ids.has(id)) {
-      // Preserve unsent edits to a deleted inactive profile in a local recovery copy.
-      if (next.outbox.some((m) => m.profileId === id))
-        next.overrides["deleted:" + id] = profileValues(next, id);
-      delete next.profiles[id];
-      next.outbox = next.outbox.filter((m) => m.profileId !== id);
-    }
-  for (const profile of profiles)
-    if (!next.profiles[profile.id] || profile.revision >= next.profiles[profile.id].revision)
-      next.profiles[profile.id] = profile;
-  return next;
+  if (state.profile && state.profile.revision > profile.revision) return state;
+  return { ...state, profile, seed: {} };
 }

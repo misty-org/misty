@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { dockLeaves } from "@/features/workspace/dockTree";
-import { createBrowserTabState, type WorkspaceTab } from "@/features/workspace/model";
+import { createBrowserViewState, type WorkspaceView } from "@/features/workspace/model";
 import { useWorkspaceStore } from "@/features/workspace/useWorkspaceStore";
 import {
   browserRuntimeId,
@@ -15,10 +15,10 @@ import { workspaceSource } from "./source";
 const invoke = vi.hoisted(() => vi.fn());
 vi.mock("@tauri-apps/api/core", () => ({ invoke }));
 
-let tab: WorkspaceTab;
+let tab: WorkspaceView;
 function projection(url = "https://example.test/", title = "Page"): ProjectedWorkspace {
-  const next = { ...tab, title, state: createBrowserTabState(url) };
-  const root = { type: "leaf" as const, id: "pane:a", tabs: [next], activeTabId: tab.id };
+  const next = { ...tab, title, state: createBrowserViewState(url) };
+  const root = { type: "leaf" as const, id: "pane:a", views: [next], activeViewId: tab.id };
   const layout = { id: "layout:a", root, focusedPaneId: root.id };
   return {
     windows: [
@@ -27,13 +27,13 @@ function projection(url = "https://example.test/", title = "Page"): ProjectedWor
         title: "Work",
         createdAt: 0,
         lastFocusedAt: 0,
-        layout: { ...layout, tabs: [layout], activeLayoutTabId: layout.id },
+        layout: { ...layout, tabs: [layout], activeTabId: layout.id },
       },
     ],
     activeWindowId: "window:a",
-    groups: [],
-    websites: [],
-    recoveryTabIds: [],
+    folders: [],
+    bookmarks: [],
+    recoveryViewIds: [],
   };
 }
 const open = () =>
@@ -59,11 +59,11 @@ beforeEach(async () => {
     route: "/browser",
     title: "Page",
     sidebarVisible: false,
-    state: createBrowserTabState("https://example.test/"),
+    state: createBrowserViewState("https://example.test/"),
     createdAt: 0,
     lastFocusedAt: 0,
   };
-  useWorkspaceStore.setState({ virtualWindowsByScope: { global: [] } });
+  useWorkspaceStore.setState({ windowsByScope: { global: [] } });
   workspaceSource.write(projection());
   await settled();
   invoke.mockClear();
@@ -74,26 +74,32 @@ afterEach(async () => {
 });
 
 describe("synced browser navigation", () => {
-  it("loads the remote URL in an existing native page and does not reload it on an echo or title edit", async () => {
+  it("never reloads a page on screen; the remote URL loads once it is hidden, without reloading on an echo", async () => {
     await open();
     invoke.mockClear();
     workspaceSource.write(projection("https://youtube.com/"));
     await settled();
-    expect(dockLeaves(useWorkspaceStore.getState().layout.root)[0].tabs[0].state).toMatchObject({
+    expect(dockLeaves(useWorkspaceStore.getState().layout.root)[0].views[0].state).toMatchObject({
       url: "https://youtube.com/",
     });
-    expect(invoke.mock.calls).toEqual([
+    expect(invoke).not.toHaveBeenCalledWith("browser_webview_navigate", expect.anything());
+    await hideBrowserWebview(tab);
+    await settled();
+    expect(invoke.mock.calls.filter(([command]) => command === "browser_webview_navigate")).toEqual(
       [
-        "browser_webview_navigate",
-        {
-          request: { id: browserRuntimeId(tab), url: "https://youtube.com/" },
-        },
+        [
+          "browser_webview_navigate",
+          {
+            request: { id: browserRuntimeId(tab), url: "https://youtube.com/" },
+          },
+        ],
       ],
-    ]);
+    );
+    invoke.mockClear();
     workspaceSource.write(projection("https://youtube.com/"));
     workspaceSource.write(projection("https://youtube.com/", "YouTube"));
     await settled();
-    expect(invoke).toHaveBeenCalledTimes(1);
+    expect(invoke).not.toHaveBeenCalled();
   });
 
   it("navigates a hidden existing page without revealing or focusing it", async () => {
@@ -126,6 +132,7 @@ describe("synced browser navigation", () => {
     expect(invoke).not.toHaveBeenCalledWith("browser_webview_navigate", expect.anything());
     finish();
     await creating;
+    await hideBrowserWebview(tab);
     await settled();
     expect(invoke).toHaveBeenCalledWith("browser_webview_navigate", {
       request: { id: browserRuntimeId(tab), url: "https://youtube.com/" },
@@ -136,13 +143,14 @@ describe("synced browser navigation", () => {
     await open();
     invoke.mockClear();
     workspaceSource.write(projection("https://youtube.com/"));
-    useWorkspaceStore.getState().updateBrowserTab(tab.id, { url: "https://local.test/" });
+    useWorkspaceStore.getState().updateBrowserView(tab.id, { url: "https://local.test/" });
     await settled();
     expect(invoke).not.toHaveBeenCalled();
   });
 
   it("surfaces a native navigation failure", async () => {
     await open();
+    await hideBrowserWebview(tab);
     invoke.mockRejectedValueOnce(new Error("Navigation failed"));
     workspaceSource.write(projection("https://youtube.com/"));
     await settled();

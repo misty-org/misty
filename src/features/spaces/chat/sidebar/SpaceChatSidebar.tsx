@@ -20,7 +20,8 @@ import {
 } from "../../social/socialRoute";
 import { useSpacesStore } from "../../store/useSpacesStore";
 import { CreateEditConversationDialog } from "./CreateEditConversationDialog";
-import { conversationName, groupConversations, ProviderIcon } from "./conversationGroups";
+import { ProviderIcon } from "./ProviderIcon";
+import { conversationName, groupConversations } from "./conversationGroups";
 import { useSpaceConversations } from "./useSpaceConversations";
 
 /** Every conversation in a Space: channels, direct messages, then connected accounts. */

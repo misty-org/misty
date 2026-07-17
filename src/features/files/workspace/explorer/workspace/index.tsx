@@ -68,7 +68,7 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace(props: Explorer
     const pane = dockLeaves(state.layout.root).find(
       (candidate) => candidate.id === state.layout.focusedPaneId,
     );
-    return pane?.activeTabId === props.workspaceId;
+    return pane?.activeViewId === props.workspaceId;
   });
   const app = useAppStore((state) => state.app);
   const {

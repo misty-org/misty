@@ -10,8 +10,8 @@ import { retainDeviceState } from "@/features/browser-workspace/deviceState";
 const state = () => useWorkspaceStore.getState();
 const tabs = () => layoutTabs(state().layout);
 const add = (title: string) => {
-  const view = state().newLayoutTab();
-  state().renameTab(view.id, title);
+  const view = state().newTab();
+  state().renameView(view.id, title);
   return tabs().find((t) => activeLayoutView(t)?.id === view.id)!.id;
 };
 beforeEach(() => state().reset());
@@ -37,8 +37,8 @@ it("collapses the only group without closing its views and expands a focused mem
   expect(state().tabGroups.find((g) => g.id === group)?.collapsed).toBe(true);
   expect(tabs()).toHaveLength(3);
   expect(allLayoutViews(state().layout).map((v) => v.id)).toEqual(expect.arrayContaining(before));
-  expect(tabs().find((t) => t.id === state().layout.activeLayoutTabId)?.tabGroupId).toBeUndefined();
-  state().focusTab(before[0]);
+  expect(tabs().find((t) => t.id === state().layout.activeTabId)?.tabGroupId).toBeUndefined();
+  state().focusView(before[0]);
   expect(state().tabGroups.find((g) => g.id === group)?.collapsed).toBe(false);
 });
 it("refuses an entire group close when any member has unsaved changes", () => {
@@ -78,8 +78,8 @@ it("saves and restores mixed surfaces and split trees with fresh identities only
 });
 it("never persists private pages or their history in saved groups", () => {
   const publicId = tabs()[0].id;
-  state().openBrowserTab({ url: "https://private.example/", private: true });
-  const privateId = state().layout.activeLayoutTabId!;
+  state().openBrowserView({ url: "https://private.example/", private: true });
+  const privateId = state().layout.activeTabId!;
   const group = state().createTabGroup([publicId, privateId])!;
   state().closeTabGroup(group);
   expect(state().tabGroups[0].savedTabs).toHaveLength(1);
@@ -105,7 +105,7 @@ it("migrates old Groups once without opening or losing saved links, and survives
 });
 it("retains local group membership across a remote page/title update", () => {
   const id = state().createTabGroup([tabs()[0].id])!;
-  const before = state().virtualWindowsByScope.global!;
+  const before = state().windowsByScope.global!;
   const incoming = before.map((w) => ({
     ...w,
     layout: {
@@ -120,25 +120,25 @@ it("moves a group to another window without duplicating live views", () => {
     second = add("Second");
   const group = state().createTabGroup([first, second])!;
   const viewIds = allLayoutViews(state().layout).map((v) => v.id);
-  const oldWindow = state().activeVirtualWindowId;
+  const oldWindow = state().activeWindowId;
   state().moveTabGroupToNewWindow(group);
-  expect(state().activeVirtualWindowId).not.toBe(oldWindow);
+  expect(state().activeWindowId).not.toBe(oldWindow);
   expect(allLayoutViews(state().layout).map((v) => v.id)).toEqual(viewIds);
-  const windows = state().virtualWindowsByScope.global!;
+  const windows = state().windowsByScope.global!;
   expect(
     windows.flatMap((w) => allLayoutViews(w.layout)).filter((v) => viewIds.includes(v.id)),
   ).toHaveLength(2);
-  state().switchVirtualWindow(oldWindow);
+  state().switchWindow(oldWindow);
   state().reopenTabGroup(group);
-  expect(state().activeVirtualWindowId).not.toBe(oldWindow);
-  expect(state().virtualWindowsByScope.global).toHaveLength(2);
+  expect(state().activeWindowId).not.toBe(oldWindow);
+  expect(state().windowsByScope.global).toHaveLength(2);
 });
 it("does not reinterpret new bookmark folders as tab groups on restart", () => {
   const folder = createBookmarkFolder("Bookmarks only");
   saveBookmark({ title: "Example", url: "https://example.com", folderId: folder });
   const migrated = migrateWorkspaceStore(partialWorkspaceStore(state()), 16);
   expect(migrated.tabGroups).toEqual([]);
-  expect(migrated.savedWebsites).toHaveLength(1);
+  expect(migrated.bookmarks).toHaveLength(1);
 });
 
 it("keeps saved groups when recovering alongside a temporary workspace", () => {

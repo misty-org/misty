@@ -86,6 +86,13 @@ fn migrate(connection: &Connection) -> Result<(), String> {
     const MIGRATIONS: &[&str] = &[
         // 1: whether the person typed the address, which the address bar ranks highest.
         "ALTER TABLE visits ADD COLUMN typed INTEGER NOT NULL DEFAULT 0;",
+        // 2: history sync. `origin` is the device that browsed ('' = this one);
+        // `changed` marks a visit not yet in its synced batch; `history_dirty`
+        // holds hours whose batch must be rewritten after a deletion.
+        "ALTER TABLE visits ADD COLUMN origin TEXT NOT NULL DEFAULT '';
+         ALTER TABLE visits ADD COLUMN changed INTEGER NOT NULL DEFAULT 1;
+         CREATE INDEX visits_sync ON visits(profile_id, origin, visited_at);
+         CREATE TABLE history_dirty (origin TEXT NOT NULL, hour INTEGER NOT NULL, PRIMARY KEY (origin, hour));",
     ];
     let version: usize = connection
         .query_row("PRAGMA user_version", [], |row| row.get::<_, i64>(0))

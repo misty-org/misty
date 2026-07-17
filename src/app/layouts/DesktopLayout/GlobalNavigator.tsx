@@ -1,6 +1,6 @@
 import type { DockPosition } from "@/features/app-shell/dockingLayout";
 import { dockLeaves, useWorkspaceStore } from "@/features/workspace";
-import { cn, TooltipSideProvider } from "@/shared/ui";
+import { cn, OverlaySideProvider, inwardSide } from "@/shared/ui";
 import {
   NavigatorHeaderHomeButton,
   NavigatorHeaderAgentsButton,
@@ -16,11 +16,7 @@ import { ActivityMenu } from "./ActivityMenu";
 import { NavigatorServerMenu } from "./NavigatorServerMenu";
 import { useRef } from "react";
 import { NavigatorEdgeMarkers } from "./NavigatorEdgeMarkers";
-import {
-  navigatorTitlebarStripClass,
-  navigatorHeaderRowClass,
-  navigatorHierarchyActionClass,
-} from "./styles";
+import { navigatorHeaderRowClass, navigatorHierarchyActionClass } from "./styles";
 
 export function GlobalNavigator(props: {
   position?: DockPosition;
@@ -32,8 +28,6 @@ export function GlobalNavigator(props: {
   suppressActiveTool?: boolean;
   onSettingsClick: () => void;
   onStartWindowDrag?: (event: React.PointerEvent<HTMLElement>) => void;
-  /** Present on desktop: drags (and double-click zooms) from the top band. */
-  onTitlebarPointerDown?: (event: React.PointerEvent<HTMLElement>) => void;
 }) {
   const navigatorRef = useRef<HTMLElement>(null);
   const pathname = useLocation().pathname;
@@ -41,18 +35,12 @@ export function GlobalNavigator(props: {
   const focusedTab = useWorkspaceStore((state) => {
     const panes = dockLeaves(state.layout.root);
     const pane = panes.find((p) => p.id === state.layout.focusedPaneId) ?? panes[0];
-    return pane?.tabs.find((tab) => tab.id === pane.activeTabId);
+    return pane?.views.find((tab) => tab.id === pane.activeViewId);
   });
   // Standalone pages such as Home and Activity cover the workspace, so no app is current.
   const activeTab = props.suppressActiveTool ? undefined : focusedTab;
   return (
-    <TooltipSideProvider
-      value={
-        ({ left: "right", right: "left", top: "bottom", bottom: "top" } as const)[
-          props.position ?? "left"
-        ]
-      }
-    >
+    <OverlaySideProvider value={inwardSide[props.position ?? "left"]}>
       <nav
         ref={navigatorRef}
         className={cn(
@@ -66,19 +54,6 @@ export function GlobalNavigator(props: {
         data-tour-target="navigation"
         onPointerDown={props.onStartWindowDrag}
       >
-        {props.onTitlebarPointerDown ? (
-          // The rail owns the titlebar band rather than being pushed below it, so
-          // its right border runs the whole window height and the traffic-light
-          // area stays a window-drag surface.
-          <div
-            className={navigatorTitlebarStripClass}
-            onPointerDown={(event) => {
-              event.stopPropagation();
-              props.onTitlebarPointerDown?.(event);
-            }}
-          />
-        ) : null}
-
         <div
           className="shrink-0 px-3 pb-1 pt-0.5"
           data-navigator-header="true"
@@ -96,7 +71,12 @@ export function GlobalNavigator(props: {
         >
           {/* No visible scrollbar: a classic one appearing as the Space stack
               grows would narrow the rail and shift every centered icon. */}
-          <div className="misty-navigator-items grid content-start gap-0.5 overflow-y-auto overflow-x-hidden px-3 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <div
+            className={cn(
+              "misty-navigator-items grid content-start gap-0.5 overflow-y-auto overflow-x-hidden px-3 pb-2",
+              "[scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+            )}
+          >
             <NavigatorHomeLink active={onHome} />
             <NavigatorHeaderHomeButton
               path="/browser"
@@ -127,6 +107,6 @@ export function GlobalNavigator(props: {
         />
       </nav>
       <NavigatorEdgeMarkers navigatorRef={navigatorRef} position={props.position ?? "left"} />
-    </TooltipSideProvider>
+    </OverlaySideProvider>
   );
 }

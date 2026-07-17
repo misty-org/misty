@@ -11,6 +11,42 @@ receipts even after their outbox entries are replayed. Browser credential
 capture/import, cold-start locked-draft recovery, and complete legacy-state migration remain
 incomplete. Do not claim signed-in website session handoff from these tests.
 
+## Naming
+
+Account → vault → workspaces and collections. The **vault** is the account's
+one encrypted sync container (sync password and secret). **Devices** are
+enrolled machines; each device sign-in has one **workspace**: window → tab →
+pane → view, plus that workspace's website sign-ins. A view's **page** is its
+history, page state and session storage, kept in slots on its node.
+**Collections** hold vault-wide records pulled rather than pushed: bookmarks
+(folders and bookmarks), saved tab groups and history.
+
+Wire protocol 3 and the server schema use these names. Names inside encrypted
+or signed bytes keep their original spelling, because they are hashed into
+node IDs or covered by signatures: record kinds (`group`, `website`, `layout`,
+`tab`), record fields, focus records, and labels such as
+`misty.sync.tree-op.v2`. `document::renderer` translates records to current
+names at the renderer boundary. The local store migrates its table names once
+(`PRAGMA user_version` 1); older cached JSON still loads through serde aliases.
+
+## Multi-writer workspaces
+
+Any number of machines may be on (show and edit) one workspace at once.
+Edits apply locally first (`WorkspaceSync::optimistic_view` replays unacknowledged
+edits on the verified copy), queue as batches tagged with the workspace version
+they were made against, and publish as signed CAS ops. The server accepts the
+first op on a version; a loser learns the head it lost to and rebases
+(`model::rebase_batches`). A record another machine deleted after an edit was
+made is never recreated by it, and a move into a parent deleted that way is
+dropped. A structurally rejected op drops only its oldest edit. Focus
+(active tab, pane, window) is local and never synced.
+
+Only website sign-ins keep a single writer: the device's sign-in lease (the
+roster's driver). The device's own machine holds it when online; otherwise a
+machine on the workspace claims it when unheld or held by an offline machine.
+The server discards sign-in slot writes from anyone else; machines without the
+lease load the published sign-ins once when they open the workspace.
+
 Run from the repository root:
 
 ```sh
@@ -33,14 +69,16 @@ encrypted fixture. The identical file is kept by the server under
 independently check native signing bytes and Ed25519 signatures. The fixture
 generator is a development example, not a production enrollment path.
 
-For the per-device tree protocol, build `--example live_tree_fixture` and set
-`MISTY_BROWSER_SYNC_TREE_FIXTURE` to its absolute path when running the server's
-`TestBrowserSyncNativeTreesAgainstGo` (with `MISTY_BROWSER_SYNC_TEST_DSN` as
-below). Two real workers publish, claim, get displaced and take a tree back.
+For the workspace protocol, build `--example live_workspace_fixture` and set
+`MISTY_BROWSER_SYNC_WORKSPACE_FIXTURE` to its absolute path when running the
+server's `TestBrowserSyncNativeWorkspacesAgainstGo` (with
+`MISTY_BROWSER_SYNC_TEST_DSN` as below). Two real workers publish, claim, get
+displaced and take a workspace back. `tests/fixtures/workspace-v3.json` pins
+the signing bytes shared with the server.
 
-The older `live_protocol_fixture` below predates tree mode: it asserts the
-shared-workspace log's exact sequence numbers, which the one-time tree-mode
-event now shifts, so it fails against a tree-protocol client until reworked.
+The older `live_protocol_fixture` below predates workspace mode: it asserts the
+legacy vault log's exact sequence numbers, which the one-time workspace-mode
+event now shifts, so it fails against a workspace-protocol client until reworked.
 
 For the opt-in live native/server test, build `--example live_protocol_fixture`
 and set `MISTY_BROWSER_SYNC_NATIVE_FIXTURE` to its absolute binary path when running

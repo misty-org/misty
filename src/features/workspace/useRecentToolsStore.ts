@@ -3,7 +3,7 @@ import { persist } from "zustand/middleware";
 import { homeApi } from "@/api/home/api";
 import type { LucideIcon } from "lucide-react";
 import { appIcon, appIcons } from "@/shared/ui";
-import type { WorkspaceSurfaceId, WorkspaceTab } from "./model";
+import type { WorkspaceSurfaceId, WorkspaceView } from "./model";
 import { spaceWorkspaceToolFromRoute } from "./routeSurface";
 
 export type WorkspaceToolId =
@@ -75,7 +75,7 @@ export const DEFAULT_RECENT_TOOLS: WorkspaceToolId[] = [
   "files",
 ];
 
-export function toolIdFromTab(tab: Pick<WorkspaceTab, "surfaceId" | "route">): WorkspaceToolId {
+export function toolIdFromView(tab: Pick<WorkspaceView, "surfaceId" | "route">): WorkspaceToolId {
   if (tab.surfaceId === "space") {
     const spaceTool = spaceWorkspaceToolFromRoute(tab.route);
     if (spaceTool === "planner" || spaceTool === "social" || spaceTool === "library") {

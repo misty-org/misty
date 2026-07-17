@@ -93,7 +93,7 @@ impl Fixture {
         let scope = VaultScope {
             deployment: "https://sync.example.test".into(),
             account_id: "owner".into(),
-            workspace_id: id(),
+            vault_id: id(),
         };
         let grant = root.grant(&scope, &id(), 1, &device).unwrap();
         let mut store = Store::initialize(

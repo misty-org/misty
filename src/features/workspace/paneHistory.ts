@@ -1,7 +1,7 @@
-import type { WorkspacePane, WorkspaceTab } from "./model";
+import type { WorkspacePane, WorkspaceView } from "./model";
 
 export function paneHistory(pane: WorkspacePane) {
-  const active = pane.tabs[0];
+  const active = pane.views[0];
   const history = pane.history;
   if (!history?.entries.length) return { entries: active ? [active] : [], index: 0 };
   const index = Math.max(0, Math.min(history.index, history.entries.length - 1));
@@ -12,7 +12,7 @@ export function paneHistory(pane: WorkspacePane) {
 
 export function pushPaneView(
   pane: WorkspacePane,
-  view: WorkspaceTab,
+  view: WorkspaceView,
   replace = false,
 ): WorkspacePane {
   const history = paneHistory(pane);
@@ -22,8 +22,8 @@ export function pushPaneView(
   if (!entries.length) entries.push(view);
   return {
     ...pane,
-    tabs: [view],
-    activeTabId: view.id,
+    views: [view],
+    activeViewId: view.id,
     history: { entries, index: replace ? history.index : entries.length - 1 },
   };
 }
@@ -33,5 +33,5 @@ export function traversePaneHistory(pane: WorkspacePane, delta: number): Workspa
     index = history.index + delta;
   if (index < 0 || index >= history.entries.length) return null;
   const view = history.entries[index];
-  return { ...pane, tabs: [view], activeTabId: view.id, history: { ...history, index } };
+  return { ...pane, views: [view], activeViewId: view.id, history: { ...history, index } };
 }

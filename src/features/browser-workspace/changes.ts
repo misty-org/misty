@@ -1,9 +1,9 @@
 import { dockLeaves } from "@/features/workspace/dockTree";
 import { layoutTabs } from "@/features/workspace/layoutTabs";
 import {
-  parseBrowserTabState,
+  parseBrowserViewState,
   type WorkspaceDockNode,
-  type WorkspaceVirtualWindow,
+  type WorkspaceWindow,
 } from "@/features/workspace/model";
 import type { DeviceSelection, SharedRecord, SplitTree, WorkspaceChange } from "./model";
 
@@ -41,10 +41,7 @@ function tree(node: WorkspaceDockNode): SplitTree {
 
 /** Encode shared fields only. Focus, history, local paths, browser viewport,
  * favicon cache, and physical window geometry are not workspace mutations. */
-export function workspaceRecords(
-  windows: WorkspaceVirtualWindow[],
-  profileId: string,
-): SharedRecord[] {
+export function workspaceRecords(windows: WorkspaceWindow[], profileId: string): SharedRecord[] {
   const records: SharedRecord[] = [];
   const seen = new Set<string>();
   const add = (record: SharedRecord) => {
@@ -54,37 +51,38 @@ export function workspaceRecords(
   };
   windows.forEach((window, order) => {
     add({ kind: "window", id: window.id, fields: { title: window.title, order } });
-    layoutTabs(window.layout).forEach((layout, order) => {
+    layoutTabs(window.layout).forEach((tab, order) => {
       add({
-        kind: "layout",
-        id: layout.id,
-        fields: { window_id: window.id, title: layout.title ?? "", order, tree: tree(layout.root) },
+        kind: "tab",
+        id: tab.id,
+        fields: { window_id: window.id, title: tab.title ?? "", order, tree: tree(tab.root) },
       });
-      for (const pane of dockLeaves(layout.root))
-        pane.tabs.forEach((tab, order) => {
-          if (!["browser", "files", "agents", "space", "home"].includes(tab.surfaceId))
+      for (const pane of dockLeaves(tab.root))
+        // A pane's content in the workspace UI is a synced view.
+        pane.views.forEach((view, order) => {
+          if (!["browser", "files", "agents", "space", "home"].includes(view.surfaceId))
             throw new Error("Retired workspace views must be migrated before enabling sync");
-          const browser = tab.surfaceId === "browser" ? parseBrowserTabState(tab.state) : null;
+          const browser = view.surfaceId === "browser" ? parseBrowserViewState(view.state) : null;
           // Files paths remain device-local until their authorized device/root
           // references are resolved by the Files handoff adapter.
           const toolRoute =
-            tab.surfaceId === "space"
-              ? tab.route
-              : tab.surfaceId === "agents"
-                ? tab.route.replace(/^\/apps\/agents(?=[/?#]|$)/, "/agents")
-                : tab.surfaceId === "home"
+            view.surfaceId === "space"
+              ? view.route
+              : view.surfaceId === "agents"
+                ? view.route.replace(/^\/apps\/agents(?=[/?#]|$)/, "/agents")
+                : view.surfaceId === "home"
                   ? "/home"
                   : "/files";
           add({
-            kind: "tab",
-            id: tab.id,
+            kind: "view",
+            id: view.id,
             fields: {
-              surface: tab.surfaceId as "browser" | "files" | "agents" | "space" | "home",
-              title: tab.title,
-              placement: { layout_id: layout.id, pane_id: pane.id, order },
+              surface: view.surfaceId as "browser" | "files" | "agents" | "space" | "home",
+              title: view.title,
+              placement: { tab_id: tab.id, pane_id: pane.id, order },
               url: browser?.url ?? null,
               profile_id: browser?.profileId ?? (browser ? profileId : null),
-              website_id: browser?.websiteId ?? null,
+              bookmark_id: browser?.bookmarkId ?? null,
               tool_route: browser ? null : toolRoute,
               agent_owned: browser?.agentOwned === true,
             },
@@ -96,22 +94,24 @@ export function workspaceRecords(
 }
 
 export function deviceSelection(
-  windows: WorkspaceVirtualWindow[],
+  windows: WorkspaceWindow[],
   activeWindowId: string,
 ): DeviceSelection {
   const local: DeviceSelection = {
     activeWindowId,
-    activeLayoutByWindow: {},
-    focusedPaneByLayout: {},
-    activeTabByPane: {},
+    activeTabByWindow: {},
+    focusedPaneByTab: {},
+    activeViewByPane: {},
+    tabOrderByWindow: {},
   };
   for (const window of windows) {
-    const layouts = layoutTabs(window.layout);
-    local.activeLayoutByWindow[window.id] = window.layout.activeLayoutTabId ?? layouts[0]?.id;
-    for (const layout of layouts) {
-      local.focusedPaneByLayout[layout.id] = layout.focusedPaneId;
-      for (const pane of dockLeaves(layout.root))
-        if (pane.activeTabId) local.activeTabByPane[pane.id] = pane.activeTabId;
+    const tabs = layoutTabs(window.layout);
+    local.activeTabByWindow[window.id] = window.layout.activeTabId ?? tabs[0]?.id;
+    local.tabOrderByWindow![window.id] = tabs.map((tab) => tab.id);
+    for (const tab of tabs) {
+      local.focusedPaneByTab[tab.id] = tab.focusedPaneId;
+      for (const pane of dockLeaves(tab.root))
+        if (pane.activeViewId) local.activeViewByPane[pane.id] = pane.activeViewId;
     }
   }
   return local;
@@ -120,12 +120,12 @@ export function deviceSelection(
 /** Diff the actual user edit, not the whole current view against server state.
  * This avoids writing back projections, remote edits, or local-only focus. */
 export function workspaceChanges(
-  before: WorkspaceVirtualWindow[],
-  after: WorkspaceVirtualWindow[],
+  before: WorkspaceWindow[],
+  after: WorkspaceWindow[],
   profileId: string,
-  newId: (kind: "window" | "layout") => string = (kind) => `${kind}:${crypto.randomUUID()}`,
+  newId: (kind: "window" | "tab") => string = (kind) => `${kind}:${crypto.randomUUID()}`,
 ): {
-  windows: WorkspaceVirtualWindow[];
+  windows: WorkspaceWindow[];
   changes: WorkspaceChange[];
   remapped: Map<string, string>;
 } {
@@ -134,7 +134,7 @@ export function workspaceChanges(
   const old = new Map(oldRecords.map((record) => [key(record), record]));
   const remapped = new Map<string, string>();
   const containerChanged = (
-    record: SharedRecord<"window"> | SharedRecord<"layout">,
+    record: SharedRecord<"window"> | SharedRecord<"tab">,
     was: SharedRecord | undefined,
   ) => {
     if (!was || !sameValue({ ...was.fields, order: 0 }, { ...record.fields, order: 0 }))
@@ -143,8 +143,8 @@ export function workspaceChanges(
       (peer) =>
         peer.kind === record.kind &&
         peer.id !== record.id &&
-        (record.kind !== "layout" ||
-          (peer as SharedRecord<"layout">).fields.window_id === record.fields.window_id),
+        (record.kind !== "tab" ||
+          (peer as SharedRecord<"tab">).fields.window_id === record.fields.window_id),
     );
     return peers.some((peer) => {
       const previous = old.get(key(peer));
@@ -158,22 +158,22 @@ export function workspaceChanges(
   };
 
   // Recovery containers are projections, not shared entities. Materialize one
-  // only when the user changes its structure, names it, or adds/moves a tab in it.
+  // only when the user changes its structure, names it, or adds/moves a view in it.
   for (const record of nextRecords) {
-    if (record.kind !== "layout" || !recovered(record.id)) continue;
+    if (record.kind !== "tab" || !recovered(record.id)) continue;
     const was = old.get(key(record));
     const changed =
       containerChanged(record, was) ||
       nextRecords.some(
-        (tab) =>
-          tab.kind === "tab" &&
-          tab.fields.placement.layout_id === record.id &&
+        (view) =>
+          view.kind === "view" &&
+          view.fields.placement.tab_id === record.id &&
           !sameValue(
-            (old.get(key(tab)) as SharedRecord<"tab"> | undefined)?.fields.placement,
-            tab.fields.placement,
+            (old.get(key(view)) as SharedRecord<"view"> | undefined)?.fields.placement,
+            view.fields.placement,
           ),
       );
-    if (changed) remapped.set(record.id, newId("layout"));
+    if (changed) remapped.set(record.id, newId("tab"));
   }
   for (const record of nextRecords) {
     if (record.kind !== "window" || !recovered(record.id)) continue;
@@ -181,10 +181,10 @@ export function workspaceChanges(
     if (
       containerChanged(record, was) ||
       nextRecords.some(
-        (layout) =>
-          layout.kind === "layout" &&
-          layout.fields.window_id === record.id &&
-          (!recovered(layout.id) || remapped.has(layout.id)),
+        (tab) =>
+          tab.kind === "tab" &&
+          tab.fields.window_id === record.id &&
+          (!recovered(tab.id) || remapped.has(tab.id)),
       )
     )
       remapped.set(record.id, newId("window"));
@@ -196,16 +196,15 @@ export function workspaceChanges(
         id: mapId(window.id),
         layout: {
           ...window.layout,
-          activeLayoutTabId:
-            window.layout.activeLayoutTabId && mapId(window.layout.activeLayoutTabId),
-          tabs: layoutTabs(window.layout).map((layout) => ({ ...layout, id: mapId(layout.id) })),
+          activeTabId: window.layout.activeTabId && mapId(window.layout.activeTabId),
+          tabs: layoutTabs(window.layout).map((tab) => ({ ...tab, id: mapId(tab.id) })),
         },
       }))
     : after;
   const next = new Map(workspaceRecords(windows, profileId).map((record) => [key(record), record]));
   const changes: WorkspaceChange[] = [];
   for (const [id, record] of next) {
-    if ((record.kind === "layout" || record.kind === "window") && recovered(record.id)) continue;
+    if ((record.kind === "tab" || record.kind === "window") && recovered(record.id)) continue;
     const previous = old.get(id);
     if (!previous) {
       changes.push({ action: "create", ...record } as WorkspaceChange);
@@ -226,7 +225,7 @@ export function workspaceChanges(
       } as WorkspaceChange);
   }
   for (const [id, record] of old) {
-    if ((record.kind === "layout" || record.kind === "window") && recovered(record.id)) continue;
+    if ((record.kind === "tab" || record.kind === "window") && recovered(record.id)) continue;
     if (!next.has(id)) changes.push({ action: "delete", kind: record.kind, id: record.id });
   }
   return { windows, changes, remapped };

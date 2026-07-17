@@ -6,14 +6,14 @@ import {
   normalizeBrowserHomeUrl,
 } from "./browserHome";
 import { blankBrowserUrl } from "./browserUrl";
-import { createBrowserTabState, parseBrowserTabState } from "./model";
+import { createBrowserViewState, parseBrowserViewState } from "./model";
 
 afterEach(() => configureBrowserHomeUrl(""));
 
 describe("browser homepage", () => {
   it("defaults to Google when nothing is configured", () => {
     expect(browserHomeUrl()).toBe(defaultBrowserHomeUrl);
-    expect(createBrowserTabState().url).toBe(defaultBrowserHomeUrl);
+    expect(createBrowserViewState().url).toBe(defaultBrowserHomeUrl);
   });
 
   it("completes a bare host to HTTPS", () => {
@@ -48,11 +48,11 @@ describe("browser homepage", () => {
   it("feeds new tabs once configured", () => {
     configureBrowserHomeUrl("example.com/start");
     expect(browserHomeUrl()).toBe("https://example.com/start");
-    expect(createBrowserTabState().url).toBe("https://example.com/start");
+    expect(createBrowserViewState().url).toBe("https://example.com/start");
   });
 
   it("preserves the agent-owned tab marker", () => {
-    const state = parseBrowserTabState({ ...createBrowserTabState(), agentOwned: true });
+    const state = parseBrowserViewState({ ...createBrowserViewState(), agentOwned: true });
     expect(state.agentOwned).toBe(true);
   });
 });

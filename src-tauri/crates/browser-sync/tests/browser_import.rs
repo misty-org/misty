@@ -38,7 +38,7 @@ impl Fixture {
         let scope = VaultScope {
             deployment: deployment.into(),
             account_id: "import-fixture".into(),
-            workspace_id: id(),
+            vault_id: id(),
         };
         let grant = root.grant(&scope, &id(), 1, &device).unwrap();
         let store = Store::initialize(
