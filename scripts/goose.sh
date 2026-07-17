@@ -16,7 +16,12 @@ DB_PORT="${DB_PORT:-5432}"
 DB_USER="${DB_USER:-misty}"
 DB_PASSWORD="${DB_PASSWORD:-misty}"
 DB_NAME="${DB_NAME:-misty_server}"
-DB_SSLMODE="${DB_SSLMODE:-disable}"
+DB_MIGRATION_USER="${DB_MIGRATION_USER:-$DB_USER}"
+DB_MIGRATION_PASSWORD="${DB_MIGRATION_PASSWORD:-$DB_PASSWORD}"
+case "${DB_HOST}" in
+  localhost|127.0.0.1|::1|postgres|/*) DB_SSLMODE="disable" ;;
+  *) DB_SSLMODE="require" ;;
+esac
 MIGRATIONS_DIR="${MIGRATIONS_DIR:-db/migrations}"
 
 if [[ $# -eq 0 ]]; then
@@ -35,6 +40,6 @@ if ! command -v goose >/dev/null 2>&1; then
   exit 127
 fi
 
-DSN="host=${DB_HOST} port=${DB_PORT} user=${DB_USER} password=${DB_PASSWORD} dbname=${DB_NAME} sslmode=${DB_SSLMODE}"
+DSN="host=${DB_HOST} port=${DB_PORT} user=${DB_MIGRATION_USER} password=${DB_MIGRATION_PASSWORD} dbname=${DB_NAME} sslmode=${DB_SSLMODE}"
 
 exec goose -dir "$MIGRATIONS_DIR" postgres "$DSN" "$@"

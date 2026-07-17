@@ -17,6 +17,9 @@ func TestLibraryCopyOnWriteEditVersionsAndRevert(t *testing.T) {
 	firstDefinition := DefaultLibraryEditDefinition()
 	firstDefinition.Rotation = 90
 	firstDefinition.Contrast = 1.2
+	firstDefinition.Exposure = .5
+	firstDefinition.Straighten = 2.5
+	firstDefinition.Markup = []LibraryMarkupElement{{Kind: "text", X: .1, Y: .1, Color: "#ff3b30", LineWidth: .012, Opacity: 1, Text: "Misty"}}
 	first, err := database.CreateLibraryEditVersion(ctx, owner.ID, spaceID, item.ID, item.Version, firstDefinition)
 	if err != nil || first.Edit == nil || first.Item.CurrentEditVersionID != first.Edit.ID || first.Item.Version != item.Version+1 {
 		t.Fatalf("first edit = %#v, %v", first, err)

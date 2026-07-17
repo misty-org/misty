@@ -133,8 +133,8 @@ func (db *Database) LibraryImportHistory(ctx context.Context, userID, spaceID st
 		rows, err := tx.QueryContext(ctx, `SELECT h.id,CASE WHEN h.destination_space_id=$1 THEN 'incoming' ELSE 'outgoing' END,h.source_space_id,h.destination_space_id,
 			CASE WHEN EXISTS(SELECT 1 FROM space_members member WHERE member.space_id=CASE WHEN h.destination_space_id=$1 THEN h.source_space_id ELSE h.destination_space_id END AND member.user_id=$2)
 				THEN CASE WHEN h.destination_space_id=$1 THEN source_space.name ELSE destination_space.name END ELSE 'Unavailable space' END,
-			CASE WHEN h.destination_space_id=$1 THEN COALESCE(h.destination_item_id,'') ELSE h.source_item_id END,
-			CASE WHEN h.destination_space_id=$1 THEN COALESCE(destination_item.display_name,'Imported item') ELSE COALESCE(source_item.display_name,'Imported item') END,
+			CASE WHEN h.destination_space_id=$1 THEN CASE WHEN destination_item.lifecycle_state='ready' AND destination_item.hidden=FALSE THEN COALESCE(h.destination_item_id,'') ELSE '' END ELSE CASE WHEN source_item.lifecycle_state='ready' AND source_item.hidden=FALSE THEN h.source_item_id ELSE '' END END,
+			CASE WHEN h.destination_space_id=$1 THEN CASE WHEN destination_item.lifecycle_state='ready' AND destination_item.hidden=FALSE THEN COALESCE(destination_item.display_name,'Imported item') ELSE 'Protected item' END ELSE CASE WHEN source_item.lifecycle_state='ready' AND source_item.hidden=FALSE THEN COALESCE(source_item.display_name,'Imported item') ELSE 'Protected item' END END,
 			h.logical_bytes,h.state,h.created_at,h.completed_at
 			FROM space_library_imports h JOIN spaces source_space ON source_space.id=h.source_space_id JOIN spaces destination_space ON destination_space.id=h.destination_space_id
 			LEFT JOIN space_library_items source_item ON source_item.id=h.source_item_id LEFT JOIN space_library_items destination_item ON destination_item.id=h.destination_item_id

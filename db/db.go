@@ -4,7 +4,9 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"net"
 	"os"
+	"strings"
 
 	_ "github.com/lib/pq"
 )
@@ -24,15 +26,23 @@ func (db *Database) GetDSN() string {
 		port = "5432"
 	}
 
-	sslmode := os.Getenv("DB_SSLMODE")
-	if sslmode == "" {
-		sslmode = "require"
-	}
+	sslmode := databaseSSLMode(host)
 
 	return fmt.Sprintf(
 		"host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
 		host, port, user, password, name, sslmode,
 	)
+}
+
+func databaseSSLMode(host string) string {
+	host = strings.TrimSpace(host)
+	if strings.HasPrefix(host, "/") || strings.EqualFold(host, "localhost") || strings.EqualFold(host, "postgres") {
+		return "disable"
+	}
+	if ip := net.ParseIP(strings.Trim(host, "[]")); ip != nil && ip.IsLoopback() {
+		return "disable"
+	}
+	return "require"
 }
 
 func (db *Database) Start() error {

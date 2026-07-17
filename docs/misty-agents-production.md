@@ -25,18 +25,17 @@ Set these server secrets and assertions:
 ```dotenv
 MISTY_ENVIRONMENT=production
 MISTY_AGENT_DOCUMENTS_ENABLED=true
-DOCUMENT_STORE=r2
-S3_ENDPOINT=https://YOUR_ACCOUNT_ID.r2.cloudflarestorage.com
-S3_REGION=auto
-S3_BUCKET=misty-agent-attachments
-S3_ACCESS_KEY=YOUR_BUCKET_SCOPED_ACCESS_KEY
-S3_SECRET_KEY=YOUR_BUCKET_SCOPED_SECRET
-S3_PRIVATE=true
-S3_LIFECYCLE_DAYS=2
+R2_ENDPOINT=https://YOUR_ACCOUNT_ID.r2.cloudflarestorage.com
+R2_BUCKET=misty-server
+R2_ACCESS_KEY=YOUR_BUCKET_SCOPED_ACCESS_KEY
+R2_SECRET_KEY=YOUR_BUCKET_SCOPED_SECRET
 DOCUMENT_SIGNING_KEY=GENERATE_A_RANDOM_SECRET_OF_AT_LEAST_32_BYTES
 DOCUMENT_KEY_ID=2026-07
 DOCUMENT_PRIVATE_KEY_B64=BASE64_PEM
 ```
+
+The bucket must be private. Configure its two-day lifecycle rule with an
+`agents/` prefix filter so permanent `library/` objects are never expired.
 
 Generate the two application secrets outside the repository:
 
@@ -79,6 +78,17 @@ claims and deletes are idempotent.
 
 Apply every database migration before switching on flags. A production smoke
 test should cover:
+
+- Migration `20260824000000_make_agents_space_owned.sql` assigns every legacy
+  device/folder agent to its creator's personal Space, adds the Space foreign
+  key as required, retires per-agent membership rows, and grants the existing
+  `@everyone` roles `studio.view`, `studio.manage`, and `agents.run`. This is the
+  deterministic compatibility fallback for legacy agents with no prior Space
+  owner. Review custom role overrides after deployment if a Space should be
+  view-only or should restrict agent runs.
+- Local-only legacy agent JSON is assigned to the signed-in user's personal
+  Space by the desktop on first load and written back with `spaceId`. Keep the
+  personal Space available during the rolling desktop upgrade.
 
 - Upload a scanned PDF and verify the result contains accurate page citations
   and no local path in any server payload.

@@ -12,6 +12,7 @@ func TestAuthLifecycle(t *testing.T) {
 
 	registerRec := performJSONRequest(t, api.Register(database), http.MethodPost, "/register", map[string]string{
 		"name":     "Ada Lovelace",
+		"username": "ada_lovelace",
 		"email":    "ada@example.com",
 		"password": "correct horse battery staple",
 	})
@@ -23,6 +24,9 @@ func TestAuthLifecycle(t *testing.T) {
 		t.Fatal("register session cookie should be HttpOnly")
 	}
 	registerBody := decodeJSONResponse(t, registerRec)
+	if registerBody["username"] != "ada_lovelace" {
+		t.Fatalf("register username = %#v, want ada_lovelace", registerBody["username"])
+	}
 	registerToken, ok := registerBody["token"].(string)
 	if !ok || registerToken == "" {
 		t.Fatalf("register response missing token: %#v", registerBody)
@@ -31,6 +35,19 @@ func TestAuthLifecycle(t *testing.T) {
 	registerMeRec := performBearerJSONRequest(t, api.GetMe(database), http.MethodGet, "/me", nil, registerToken)
 	if registerMeRec.Code != http.StatusOK {
 		t.Fatalf("register bearer /me status = %d, want %d, body = %q", registerMeRec.Code, http.StatusOK, registerMeRec.Body.String())
+	}
+	registerMeBody := decodeJSONResponse(t, registerMeRec)
+	if registerMeBody["username"] != "ada_lovelace" {
+		t.Fatalf("register /me username = %#v, want ada_lovelace", registerMeBody["username"])
+	}
+	duplicateUsernameRec := performJSONRequest(t, api.Register(database), http.MethodPost, "/register", map[string]string{
+		"name":     "Another Ada",
+		"username": "ADA_LOVELACE",
+		"email":    "another-ada@example.com",
+		"password": "correct horse battery staple",
+	})
+	if duplicateUsernameRec.Code != http.StatusConflict {
+		t.Fatalf("duplicate username status = %d, want %d, body = %q", duplicateUsernameRec.Code, http.StatusConflict, duplicateUsernameRec.Body.String())
 	}
 
 	loginRec := performJSONRequest(t, api.Login(database), http.MethodPost, "/login", map[string]string{
@@ -77,6 +94,9 @@ func TestAuthHandlersErrorPaths(t *testing.T) {
 
 	if rec := performJSONRequest(t, api.Register(database), http.MethodPost, "/register", map[string]string{"email": "   ", "password": "pw"}); rec.Code != http.StatusBadRequest {
 		t.Fatalf("register missing email status = %d, want %d", rec.Code, http.StatusBadRequest)
+	}
+	if rec := performJSONRequest(t, api.Register(database), http.MethodPost, "/register", map[string]string{"username": "has-dash", "email": "valid@example.com", "password": "pw"}); rec.Code != http.StatusBadRequest {
+		t.Fatalf("register invalid username status = %d, want %d", rec.Code, http.StatusBadRequest)
 	}
 
 	if rec := performJSONRequest(t, api.Login(database), http.MethodPost, "/login", map[string]string{"email": "user@example.com"}); rec.Code != http.StatusBadRequest {

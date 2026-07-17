@@ -30,4 +30,17 @@ func TestLibraryPreviewDerivativeAuthorizationAndReuse(t *testing.T) {
 	if err != nil || source.PreviewObjectKey != completed.ObjectKey || source.PreviewBytes != 64_000 || source.PreviewSHA256 != sha {
 		t.Fatalf("reused preview source = %#v, %v", source, err)
 	}
+	repairedKey := "library/preview-object-repaired"
+	selectedKey, err := database.ReplaceMissingLibraryPreviewDeduplicationObject(ctx, owner.ID, spaceID, item.ID, source.SourceIdentity, completed.ObjectKey, repairedKey)
+	if err != nil || selectedKey != repairedKey {
+		t.Fatalf("replace missing preview = %q, %v", selectedKey, err)
+	}
+	source, err = database.LibraryItemPreviewSource(ctx, owner.ID, spaceID, item.ID, false)
+	if err != nil || source.PreviewObjectKey != repairedKey || source.PreviewBytes != 64_000 || source.PreviewSHA256 != sha {
+		t.Fatalf("repaired preview source = %#v, %v", source, err)
+	}
+	selectedKey, err = database.ReplaceMissingLibraryPreviewDeduplicationObject(ctx, owner.ID, spaceID, item.ID, source.SourceIdentity, completed.ObjectKey, "library/concurrent-preview-object")
+	if err != nil || selectedKey != repairedKey {
+		t.Fatalf("concurrent preview repair = %q, %v", selectedKey, err)
+	}
 }

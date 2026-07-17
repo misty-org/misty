@@ -95,7 +95,7 @@ func (db *Database) UpdateLibraryIntelligencePolicy(ctx context.Context, userID,
 			}
 		}
 		if facesEnabled || petsEnabled {
-			rows, err := tx.QueryContext(ctx, `SELECT i.id,s.security_domain_id FROM space_library_items i JOIN library_files f ON f.id=i.file_id JOIN library_blobs b ON b.id=f.blob_id JOIN spaces s ON s.id=i.space_id WHERE i.space_id=$1 AND i.lifecycle_state='ready' AND b.server_detected_mime_type LIKE 'image/%'`, spaceID)
+			rows, err := tx.QueryContext(ctx, `SELECT i.id,s.security_domain_id FROM space_library_items i JOIN library_files f ON f.id=i.file_id JOIN library_blobs b ON b.id=f.blob_id JOIN spaces s ON s.id=i.space_id WHERE i.space_id=$1 AND i.lifecycle_state='ready' AND i.hidden=FALSE AND b.server_detected_mime_type LIKE 'image/%'`, spaceID)
 			if err != nil {
 				return err
 			}
@@ -124,7 +124,7 @@ func (db *Database) UpdateLibraryIntelligencePolicy(ctx context.Context, userID,
 			}
 		}
 		if ocrEnabled || aiEnabled || semanticSearch {
-			rows, err := tx.QueryContext(ctx, `SELECT i.id,s.security_domain_id FROM space_library_items i JOIN spaces s ON s.id=i.space_id WHERE i.space_id=$1 AND i.lifecycle_state='ready'`, spaceID)
+			rows, err := tx.QueryContext(ctx, `SELECT i.id,s.security_domain_id FROM space_library_items i JOIN spaces s ON s.id=i.space_id WHERE i.space_id=$1 AND i.lifecycle_state='ready' AND i.hidden=FALSE`, spaceID)
 			if err != nil {
 				return err
 			}
@@ -241,7 +241,7 @@ func (db *Database) UpdateLibraryPerson(ctx context.Context, userID, spaceID, pe
 		}
 		if coverItemID != "" {
 			var valid bool
-			if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM space_person_observations o JOIN space_people p ON p.id=o.person_id WHERE p.id=$1 AND p.space_id=$2 AND o.space_library_item_id=$3)`, personID, spaceID, coverItemID).Scan(&valid); err != nil || !valid {
+			if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM space_person_observations o JOIN space_people p ON p.id=o.person_id JOIN space_library_items i ON i.id=o.space_library_item_id WHERE p.id=$1 AND p.space_id=$2 AND o.space_library_item_id=$3 AND i.lifecycle_state='ready' AND i.hidden=FALSE)`, personID, spaceID, coverItemID).Scan(&valid); err != nil || !valid {
 				return ErrLibraryInvalid
 			}
 		}
@@ -319,7 +319,7 @@ func (db *Database) LibraryPersonItems(ctx context.Context, userID, spaceID, per
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionLibraryView); err != nil {
 			return err
 		}
-		rows, err := tx.QueryContext(ctx, libraryItemSelect+` JOIN space_person_observations o ON o.space_library_item_id=i.id JOIN space_people p ON p.id=o.person_id WHERE p.id=$1 AND p.space_id=$2 AND p.lifecycle_state='active' AND i.lifecycle_state='ready' GROUP BY i.id,f.id ORDER BY i.added_at DESC LIMIT $3`, personID, spaceID, limit)
+		rows, err := tx.QueryContext(ctx, libraryItemSelect+` JOIN space_person_observations o ON o.space_library_item_id=i.id JOIN space_people p ON p.id=o.person_id WHERE p.id=$1 AND p.space_id=$2 AND p.lifecycle_state='active' AND i.lifecycle_state='ready' AND i.hidden=FALSE GROUP BY i.id,f.id ORDER BY i.added_at DESC LIMIT $3`, personID, spaceID, limit)
 		if err != nil {
 			return err
 		}
@@ -421,7 +421,7 @@ func addLibraryPersonItemsTx(ctx context.Context, tx *sql.Tx, userID, spaceID, p
 		return err
 	}
 	var validCount int
-	if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM space_library_items i JOIN library_files f ON f.id=i.file_id JOIN library_blobs b ON b.id=f.blob_id WHERE i.space_id=$1 AND i.id=ANY($2) AND i.lifecycle_state='ready' AND b.server_detected_mime_type LIKE 'image/%'`, spaceID, pq.Array(itemIDs)).Scan(&validCount); err != nil {
+	if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM space_library_items i JOIN library_files f ON f.id=i.file_id JOIN library_blobs b ON b.id=f.blob_id WHERE i.space_id=$1 AND i.id=ANY($2) AND i.lifecycle_state='ready' AND i.hidden=FALSE AND b.server_detected_mime_type LIKE 'image/%'`, spaceID, pq.Array(itemIDs)).Scan(&validCount); err != nil {
 		return err
 	}
 	if validCount != len(itemIDs) {
@@ -435,7 +435,7 @@ func addLibraryPersonItemsTx(ctx context.Context, tx *sql.Tx, userID, spaceID, p
 	return nil
 }
 
-const libraryPersonSelect = `SELECT p.id,p.space_id,p.kind,p.name,COALESCE(p.cover_item_id,''),(SELECT count(DISTINCT o.space_library_item_id) FROM space_person_observations o JOIN space_library_items i ON i.id=o.space_library_item_id WHERE o.person_id=p.id AND i.lifecycle_state='ready'),p.version,p.created_at,p.updated_at,p.lifecycle_state,COALESCE(p.merged_into_id,'') FROM space_people p`
+const libraryPersonSelect = `SELECT p.id,p.space_id,p.kind,p.name,COALESCE(CASE WHEN EXISTS(SELECT 1 FROM space_library_items cover WHERE cover.id=p.cover_item_id AND cover.lifecycle_state='ready' AND cover.hidden=FALSE) THEN p.cover_item_id END,''),(SELECT count(DISTINCT o.space_library_item_id) FROM space_person_observations o JOIN space_library_items i ON i.id=o.space_library_item_id WHERE o.person_id=p.id AND i.lifecycle_state='ready' AND i.hidden=FALSE),p.version,p.created_at,p.updated_at,p.lifecycle_state,COALESCE(p.merged_into_id,'') FROM space_people p`
 
 func scanLibraryPerson(scanner interface{ Scan(...any) error }, person *LibraryPerson) error {
 	return scanner.Scan(&person.ID, &person.SpaceID, &person.Kind, &person.Name, &person.CoverItemID, &person.ItemCount, &person.Version, &person.CreatedAt, &person.UpdatedAt, &person.Lifecycle, &person.MergedIntoID)

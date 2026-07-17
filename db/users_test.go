@@ -2,6 +2,23 @@ package db
 
 import "testing"
 
+func TestNormalizeUsername(t *testing.T) {
+	for input, want := range map[string]string{
+		"Misty_User":    "misty_user",
+		"  mtccool668 ": "mtccool668",
+	} {
+		got, err := normalizeUsername(input)
+		if err != nil || got != want {
+			t.Fatalf("normalizeUsername(%q) = %q, %v; want %q", input, got, err, want)
+		}
+	}
+	for _, input := range []string{"ab", "has-dash", "has space", "猫猫猫", "this_username_is_more_than_thirty_characters"} {
+		if _, err := normalizeUsername(input); err == nil {
+			t.Fatalf("normalizeUsername(%q) succeeded, want validation error", input)
+		}
+	}
+}
+
 func TestCreateUserNormalizesEmailAndCreatesLicense(t *testing.T) {
 	database := openTestDatabase(t)
 
@@ -11,6 +28,9 @@ func TestCreateUserNormalizesEmailAndCreatesLicense(t *testing.T) {
 	}
 	if user.Email != "ada@example.com" {
 		t.Fatalf("user.Email = %q, want %q", user.Email, "ada@example.com")
+	}
+	if user.Username != "ada" {
+		t.Fatalf("user.Username = %q, want %q", user.Username, "ada")
 	}
 
 	license, err := database.GetLicenseByUserID(user.ID)

@@ -1,6 +1,7 @@
 package api
 
 import (
+	"errors"
 	"net/http"
 	"strings"
 
@@ -18,11 +19,12 @@ func RegisterWithTelemetry(database *db.Database, analytics telemetry.Client) ht
 	return func(w http.ResponseWriter, r *http.Request) {
 		var body struct {
 			Name     string `json:"name"`
+			Username string `json:"username"`
 			Email    string `json:"email"`
 			Password string `json:"password"`
 		}
-		if err := decodeJSON(w, r, &body); err != nil || body.Email == "" || body.Password == "" {
-			http.Error(w, "email and password required", http.StatusBadRequest)
+		if err := decodeJSON(w, r, &body); err != nil || body.Username == "" || body.Email == "" || body.Password == "" {
+			http.Error(w, "username, email, and password required", http.StatusBadRequest)
 			return
 		}
 		body.Email = strings.TrimSpace(body.Email)
@@ -41,8 +43,16 @@ func RegisterWithTelemetry(database *db.Database, analytics telemetry.Client) ht
 			return
 		}
 
-		user, err := database.CreateUser(body.Name, body.Email, body.Password)
+		user, err := database.CreateUserWithUsername(body.Name, body.Username, body.Email, body.Password)
 		if err != nil {
+			if errors.Is(err, db.ErrInvalidUsername) {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
+			if errors.Is(err, db.ErrUsernameTaken) {
+				http.Error(w, err.Error(), http.StatusConflict)
+				return
+			}
 			http.Error(w, "failed to create user", http.StatusInternalServerError)
 			return
 		}
@@ -116,10 +126,11 @@ func writeAuthSession(
 	})
 
 	writeJSON(w, status, map[string]string{
-		"user_id": user.ID,
-		"name":    user.Name,
-		"email":   user.Email,
-		"token":   token,
+		"user_id":  user.ID,
+		"name":     user.Name,
+		"username": user.Username,
+		"email":    user.Email,
+		"token":    token,
 	})
 }
 

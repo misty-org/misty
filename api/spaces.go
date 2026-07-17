@@ -113,8 +113,10 @@ func writeSpaceError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, db.ErrSpaceNotFound), errors.Is(err, db.ErrSpaceInviteNotFound):
 		writeJSON(w, http.StatusNotFound, map[string]string{"code": "not_found"})
-	case errors.Is(err, db.ErrSpaceForbidden):
+	case errors.Is(err, db.ErrSpaceForbidden), errors.Is(err, db.ErrLibraryForbidden):
 		writeJSON(w, http.StatusForbidden, map[string]string{"code": "forbidden"})
+	case errors.Is(err, db.ErrWorkflowIntegrationRequired):
+		writeJSON(w, http.StatusUnprocessableEntity, map[string]string{"code": "integration_required"})
 	case errors.Is(err, db.ErrSpaceLimit):
 		writeJSON(w, http.StatusConflict, map[string]string{"code": "space_limit_reached"})
 	case errors.Is(err, db.ErrSpaceOwnershipLimit):
@@ -127,7 +129,7 @@ func writeSpaceError(w http.ResponseWriter, err error) {
 		writeJSON(w, http.StatusConflict, map[string]string{"code": "version_conflict"})
 	case errors.Is(err, db.ErrSpaceInviteExpired):
 		writeJSON(w, http.StatusGone, map[string]string{"code": "invite_expired"})
-	case errors.Is(err, db.ErrSpaceInvalid):
+	case errors.Is(err, db.ErrSpaceInvalid), errors.Is(err, db.ErrLibraryInvalid):
 		writeJSON(w, http.StatusBadRequest, map[string]string{"code": "invalid_request"})
 	default:
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"code": "internal_error"})
@@ -371,7 +373,7 @@ func (s *SpacesService) Messages() http.HandlerFunc {
 		}
 		agentReplies := make([]*db.SpaceMessage, 0, len(agentIDs))
 		for _, agentID := range uniqueStrings(agentIDs) {
-			reply, runErr := s.runMentionedAgent(r.Context(), userID, spaceID, agentID, body.Content, body.FileNodeIDs)
+			reply, runErr := s.runMentionedAgent(r.Context(), userID, spaceID, agentID, message.ID, body.Content, body.FileNodeIDs)
 			if runErr == nil && reply != nil {
 				agentReplies = append(agentReplies, reply)
 			}
@@ -405,34 +407,43 @@ func renderMessageText(content []db.MessageSpan) string {
 	return strings.TrimSpace(b.String())
 }
 
-func (s *SpacesService) runMentionedAgent(ctx context.Context, billingUserID, spaceID, agentID string, content []db.MessageSpan, fileNodeIDs []string) (*db.SpaceMessage, error) {
-	if s.agent == nil {
-		return nil, errors.New("agent runtime unavailable")
-	}
-	name, instructions, err := s.database.SpaceAgentPrompt(ctx, billingUserID, spaceID, agentID)
-	if err != nil {
-		return nil, err
-	}
+func (s *SpacesService) runMentionedAgent(ctx context.Context, billingUserID, spaceID, agentID, sourceMessageID string, content []db.MessageSpan, fileNodeIDs []string) (*db.SpaceMessage, error) {
 	attachments, err := s.prepareSpaceAgentFiles(ctx, billingUserID, spaceID, fileNodeIDs)
 	if err != nil {
 		return nil, err // File preparation happens before the metered model call.
 	}
+	prompt := renderMessageText(content) + attachments
 	runInput, err := json.Marshal(map[string]any{
 		"content":       content,
 		"file_node_ids": fileNodeIDs,
+		"prompt":        prompt,
 	})
 	if err != nil {
 		return nil, err
 	}
-	run, err := s.database.CreateSpaceRun(ctx, billingUserID, spaceID, "agent", agentID, "mention", runInput)
+	decision, err := s.database.RouteAgentRequest(ctx, billingUserID, renderMessageText(content), spaceID, agentID, "")
 	if err != nil {
 		return nil, err
 	}
-	prompt := fmt.Sprintf("You are %s, a shared Space agent. Follow these instructions:\n%s\n\nRespond to this Space message:\n%s%s", name, instructions, renderMessageText(content), attachments)
-	text, _, err := s.agent.CompleteWithTierContext(ctx, billingUserID, prompt, "automation_ai", serveragent.MikaLow)
+	if decision.NeedsClarification || decision.Selected == nil {
+		return s.database.CreateSpaceAgentMessage(ctx, billingUserID, spaceID, agentID, decision.Question)
+	}
+	run, err := s.database.CreateAgentRun(ctx, db.AgentRunRequest{RequestingMemberID: billingUserID, SpaceID: spaceID, AgentID: agentID, SourceConversationID: sourceMessageID, SourceType: "group_mention", CapabilityID: decision.Selected.CapabilityID, Input: runInput, TriggerKind: "mention"})
 	if err != nil {
-		_, _ = s.database.FinishSpaceRun(ctx, run.ID, "failed", json.RawMessage(`{}`), "execution_failed")
 		return nil, err
+	}
+	if run.State == "awaiting_approval" {
+		return s.database.CreateSpaceAgentMessage(ctx, billingUserID, spaceID, agentID, "I prepared this isolated run, but it needs your approval before I can perform the proposed actions. Open the Agent in Studio to review run "+run.ID+".")
+	}
+	finished, err := s.executeCanonicalAgentRun((&http.Request{}).WithContext(ctx), run, prompt)
+	if err != nil {
+		return nil, err
+	}
+	text := "The isolated device run is queued. Track run " + finished.ID + " in Studio."
+	var output map[string]any
+	_ = json.Unmarshal(finished.Outputs, &output)
+	if value, ok := output["text"].(string); ok && strings.TrimSpace(value) != "" {
+		text = value
 	}
 	runes := []rune(strings.TrimSpace(text))
 	if len(runes) > db.MaxMessageChars {
@@ -440,17 +451,9 @@ func (s *SpacesService) runMentionedAgent(ctx context.Context, billingUserID, sp
 	}
 	reply, err := s.database.CreateSpaceAgentMessage(ctx, billingUserID, spaceID, agentID, string(runes))
 	if err != nil {
-		_, _ = s.database.FinishSpaceRun(ctx, run.ID, "failed", json.RawMessage(`{}`), "reply_failed")
 		return nil, err
 	}
-	result, err := json.Marshal(map[string]string{"message_id": reply.ID})
-	if err != nil {
-		_, _ = s.database.FinishSpaceRun(ctx, run.ID, "failed", json.RawMessage(`{}`), "result_failed")
-		return nil, err
-	}
-	if _, err := s.database.FinishSpaceRun(ctx, run.ID, "completed", result, ""); err != nil {
-		return nil, err
-	}
+	_ = s.database.RecordRunAction(ctx, run.ID, "shared_reply", "Posted Agent reply in shared Space chat", mustAPIRawJSON(map[string]string{"message_id": reply.ID}), false, "completed")
 	return reply, nil
 }
 
@@ -885,9 +888,13 @@ func (s *SpacesService) RunStudioResource(kind string) http.HandlerFunc {
 		if len(input) == 0 {
 			input, _ = json.Marshal(map[string]string{"prompt": strings.TrimSpace(body.Prompt)})
 		}
-		run, err := s.database.CreateSpaceRun(r.Context(), userID, spaceID, kind, resourceID, "manual", input)
+		run, err := s.database.CreateSpaceRun(r.Context(), userID, spaceID, kind, resourceID, "test", input)
 		if err != nil {
 			writeSpaceError(w, err)
+			return
+		}
+		if run.State == "awaiting_approval" {
+			writeJSON(w, http.StatusAccepted, run)
 			return
 		}
 		var result any

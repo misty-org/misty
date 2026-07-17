@@ -10,9 +10,6 @@ import (
 )
 
 func agentAttachmentEnvelopeKeyringFromEnv() (*api.AgentAttachmentEnvelopeKeyring, error) {
-	if strings.EqualFold(strings.TrimSpace(os.Getenv("DOCUMENT_STORE")), "memory") {
-		return api.GenerateDevelopmentAgentAttachmentEnvelopeKeyring()
-	}
 	currentID := strings.TrimSpace(os.Getenv("DOCUMENT_KEY_ID"))
 	currentKey := strings.TrimSpace(os.Getenv("DOCUMENT_PRIVATE_KEY_B64"))
 	if currentID == "" || currentKey == "" {

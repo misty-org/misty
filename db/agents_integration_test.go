@@ -1,6 +1,7 @@
 package db
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -20,9 +21,16 @@ func TestAgentJobLeaseLifecycleAndIdempotency(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	agent, err := database.CreateAgentDefinition(user.ID, AgentDefinition{ID: "agent_11111111-1111-1111-1111-111111111111", DeviceID: device.ID, ScopeID: "scope_abcdefgh", Name: "Reports", Instructions: "Summarize reports", Workflow: json.RawMessage(`{"nodes":[]}`), WorkflowRevision: 1, TrustPolicy: json.RawMessage(`{"memberWriteAccess":false}`)})
+	spaces, err := database.ListSpaces(context.Background(), user.ID)
+	if err != nil || len(spaces) == 0 {
+		t.Fatalf("ListSpaces() = %#v, %v", spaces, err)
+	}
+	agent, err := database.CreateAgentDefinition(user.ID, AgentDefinition{ID: "agent_11111111-1111-1111-1111-111111111111", SpaceID: spaces[0].ID, DeviceID: device.ID, ScopeID: "scope_abcdefgh", Name: "Reports", Instructions: "Summarize reports", Workflow: json.RawMessage(`{"nodes":[]}`), WorkflowRevision: 1, TrustPolicy: json.RawMessage(`{"memberWriteAccess":false}`)})
 	if err != nil {
 		t.Fatal(err)
+	}
+	if agent.SpaceID != spaces[0].ID {
+		t.Fatalf("agent SpaceID = %q, want %q", agent.SpaceID, spaces[0].ID)
 	}
 	agent.Enabled = true
 	staleAgent := *agent
@@ -126,6 +134,72 @@ func TestAgentJobLeaseLifecycleAndIdempotency(t *testing.T) {
 	}
 }
 
+func TestAgentAccessAndActionsInheritSpacePermissions(t *testing.T) {
+	database := openTestDatabase(t)
+	ctx := context.Background()
+	owner, err := database.CreateUser("Space Agent Owner", "space-agent-owner@example.com", "correct horse battery staple")
+	if err != nil {
+		t.Fatal(err)
+	}
+	member, err := database.CreateUser("Space Agent Member", "space-agent-member@example.com", "correct horse battery staple")
+	if err != nil {
+		t.Fatal(err)
+	}
+	spaces, err := database.ListSpaces(ctx, owner.ID)
+	if err != nil || len(spaces) == 0 {
+		t.Fatalf("ListSpaces(owner) = %#v, %v", spaces, err)
+	}
+	space := spaces[0]
+	invite, err := database.InviteToSpace(ctx, owner.ID, space.ID, member.Email)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := database.RespondToSpaceInvite(ctx, member.ID, invite.ID, true); err != nil {
+		t.Fatal(err)
+	}
+	device, err := database.RegisterTrustedDevice(owner.ID, "Space Agent Mac", "CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC", json.RawMessage(`{"documents":true}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	agent, err := database.CreateAgentDefinition(owner.ID, AgentDefinition{
+		ID: "agent_33333333-3333-4333-8333-333333333333", SpaceID: space.ID, DeviceID: device.ID,
+		ScopeID: "scope_space123", Name: "Shared reports", Instructions: "Summarize reports",
+		Workflow: json.RawMessage(`{"nodes":[]}`), WorkflowRevision: 1,
+		TrustPolicy: json.RawMessage(`{"memberWriteAccess":false}`),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	visible, err := database.AgentDefinitions(member.ID)
+	if err != nil || len(visible) != 1 || visible[0].ID != agent.ID || visible[0].SpaceID != space.ID {
+		t.Fatalf("AgentDefinitions(member) = %#v, %v", visible, err)
+	}
+	agent.Name = "Member-managed reports"
+	if _, err := database.UpdateAgentDefinition(member.ID, *agent); err != nil {
+		t.Fatalf("default Space manage permission did not apply: %v", err)
+	}
+	if err := database.SetSpaceMemberPermission(ctx, owner.ID, space.ID, member.ID, PermissionStudioManage, "deny"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := database.UpdateAgentDefinition(member.ID, *agent); !errors.Is(err, ErrLibraryForbidden) {
+		t.Fatalf("UpdateAgentDefinition after studio.manage deny error = %v", err)
+	}
+	if err := database.SetSpaceMemberPermission(ctx, owner.ID, space.ID, member.ID, PermissionAgentsRun, "deny"); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := database.CreateAgentJob(member.ID, agent.ID, "manual", "space-member-run", json.RawMessage(`{}`)); !errors.Is(err, ErrLibraryForbidden) {
+		t.Fatalf("CreateAgentJob after agents.run deny error = %v", err)
+	}
+	if err := database.SetSpaceMemberPermission(ctx, owner.ID, space.ID, member.ID, PermissionStudioView, "deny"); err != nil {
+		t.Fatal(err)
+	}
+	visible, err = database.AgentDefinitions(member.ID)
+	if err != nil || len(visible) != 0 {
+		t.Fatalf("AgentDefinitions after studio.view deny = %#v, %v", visible, err)
+	}
+}
+
 func TestRetryFailedAgentJobRequeuesSameRun(t *testing.T) {
 	database := openTestDatabase(t)
 	user, err := database.CreateUser("Retry Owner", "agent-retry@example.com", "correct horse battery staple")
@@ -136,8 +210,12 @@ func TestRetryFailedAgentJobRequeuesSameRun(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	spaces, err := database.ListSpaces(context.Background(), user.ID)
+	if err != nil || len(spaces) == 0 {
+		t.Fatalf("ListSpaces() = %#v, %v", spaces, err)
+	}
 	agent, err := database.CreateAgentDefinition(user.ID, AgentDefinition{
-		ID: "agent_22222222-2222-4222-8222-222222222222", DeviceID: device.ID,
+		ID: "agent_22222222-2222-4222-8222-222222222222", SpaceID: spaces[0].ID, DeviceID: device.ID,
 		ScopeID: "scope_retry123", Name: "Retry reports", Instructions: "Summarize reports",
 		Workflow: json.RawMessage(`{"nodes":[]}`), WorkflowRevision: 1,
 		TrustPolicy: json.RawMessage(`{"memberWriteAccess":false}`),

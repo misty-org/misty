@@ -3,8 +3,34 @@ package db
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
+	"unicode/utf8"
 )
+
+func TestDefaultPersonalSpaceName(t *testing.T) {
+	tests := []struct {
+		name     string
+		userName string
+		want     string
+	}{
+		{name: "display name", userName: "Owner", want: "Owner's Space"},
+		{name: "surrounding whitespace", userName: "  Misty User  ", want: "Misty User's Space"},
+		{name: "missing display name", userName: "   ", want: "My Space"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if got := defaultPersonalSpaceName(test.userName); got != test.want {
+				t.Fatalf("defaultPersonalSpaceName(%q) = %q, want %q", test.userName, got, test.want)
+			}
+		})
+	}
+
+	longName := strings.Repeat("猫", 100)
+	if got := defaultPersonalSpaceName(longName); utf8.RuneCountInString(got) != 80 || !strings.HasSuffix(got, "'s Space") {
+		t.Fatalf("long default name = %q (%d runes), want an 80-rune name ending in apostrophe-s Space", got, utf8.RuneCountInString(got))
+	}
+}
 
 func TestPersonalSpaceStartsPrivateAndBecomesSharedOnlyByInvite(t *testing.T) {
 	database := openTestDatabase(t)
@@ -23,8 +49,8 @@ func TestPersonalSpaceStartsPrivateAndBecomesSharedOnlyByInvite(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ListSpaces(owner) error = %v", err)
 	}
-	if len(ownerSpaces) != 1 || !ownerSpaces[0].IsPersonal || ownerSpaces[0].Name != "Default space" || ownerSpaces[0].IsShared || ownerSpaces[0].MemberCount != 1 {
-		t.Fatalf("initial owner Spaces = %#v, want one private Default space", ownerSpaces)
+	if len(ownerSpaces) != 1 || !ownerSpaces[0].IsPersonal || ownerSpaces[0].Name != "Owner's Space" || ownerSpaces[0].IsShared || ownerSpaces[0].MemberCount != 1 {
+		t.Fatalf("initial owner Spaces = %#v, want one private owner-named Space", ownerSpaces)
 	}
 	personal := ownerSpaces[0]
 	renamed, err := database.RenameSpace(ctx, owner.ID, personal.ID, "Home base")
@@ -58,8 +84,8 @@ func TestPersonalSpaceStartsPrivateAndBecomesSharedOnlyByInvite(t *testing.T) {
 	}
 
 	memberSpaces, err := database.ListSpaces(ctx, member.ID)
-	if err != nil || len(memberSpaces) != 1 || !memberSpaces[0].IsPersonal {
-		t.Fatalf("ListSpaces(member) = %#v, %v, want default Personal Space", memberSpaces, err)
+	if err != nil || len(memberSpaces) != 1 || !memberSpaces[0].IsPersonal || memberSpaces[0].Name != "Member's Space" {
+		t.Fatalf("ListSpaces(member) = %#v, %v, want member-named personal Space", memberSpaces, err)
 	}
 
 	invite, err := database.InviteToSpace(ctx, owner.ID, personal.ID, member.Email)

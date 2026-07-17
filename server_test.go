@@ -90,30 +90,17 @@ func TestCreateServerAndMountHandlers(t *testing.T) {
 	}
 }
 
-func TestCreateServerRejectsProductionMemoryAgentAttachmentStore(t *testing.T) {
+func TestCreateServerRequiresProductionR2Configuration(t *testing.T) {
 	t.Setenv("PASSWORD_RESET_URL", "http://localhost:5173/reset")
 	t.Setenv("PASSWORD_RESET_START_URL", "http://localhost:8080/auth/reset/start")
 	t.Setenv("MISTY_ENVIRONMENT", "production")
-	t.Setenv("MISTY_AGENT_DOCUMENTS_ENABLED", "true")
-	t.Setenv("DOCUMENT_STORE", "memory")
-	t.Setenv("DOCUMENT_SIGNING_KEY", strings.Repeat("k", 32))
-	t.Setenv("DOCUMENT_KEY_ID", "test-current")
-	t.Setenv("DOCUMENT_PRIVATE_KEY_B64", testAgentAttachmentPrivateKey(t))
+	t.Setenv("R2_ENDPOINT", "")
+	t.Setenv("R2_BUCKET", "")
+	t.Setenv("R2_ACCESS_KEY", "")
+	t.Setenv("R2_SECRET_KEY", "")
 
-	if _, err := CreateServer(); err == nil || !strings.Contains(err.Error(), "not allowed in production") {
-		t.Fatalf("CreateServer() error = %v, want production memory-store rejection", err)
-	}
-}
-
-func TestCreateServerRejectsProductionMemoryLibraryStore(t *testing.T) {
-	t.Setenv("PASSWORD_RESET_URL", "http://localhost:5173/reset")
-	t.Setenv("PASSWORD_RESET_START_URL", "http://localhost:8080/auth/reset/start")
-	t.Setenv("MISTY_ENVIRONMENT", "production")
-	t.Setenv("MISTY_LIBRARY_ENABLED", "true")
-	t.Setenv("LIBRARY_STORE", "memory")
-
-	if _, err := CreateServer(); err == nil || !strings.Contains(err.Error(), "not allowed in production") {
-		t.Fatalf("CreateServer() error = %v, want production memory Library rejection", err)
+	if _, err := CreateServer(); err == nil || !strings.Contains(err.Error(), "R2_ENDPOINT") {
+		t.Fatalf("CreateServer() error = %v, want missing production R2 rejection", err)
 	}
 }
 
@@ -123,9 +110,10 @@ func TestCreateServerConfiguresIndependentDevelopmentLibrary(t *testing.T) {
 	t.Setenv("MAILJET_API_KEY", "")
 	t.Setenv("MAILJET_SECRET_KEY", "")
 	t.Setenv("MAILJET_FROM_EMAIL", "")
-	t.Setenv("MISTY_LIBRARY_ENABLED", "true")
-	t.Setenv("MISTY_LIBRARY_UPLOADS_ENABLED", "true")
-	t.Setenv("LIBRARY_STORE", "memory")
+	t.Setenv("R2_ENDPOINT", "")
+	t.Setenv("R2_BUCKET", "")
+	t.Setenv("R2_ACCESS_KEY", "")
+	t.Setenv("R2_SECRET_KEY", "")
 
 	server, err := CreateServer()
 	if err != nil {
@@ -155,18 +143,20 @@ func mustMarshalPKCS8(t *testing.T, key *rsa.PrivateKey) []byte {
 	return encoded
 }
 
+func configureTestR2(t *testing.T) {
+	t.Helper()
+	t.Setenv("R2_ENDPOINT", "https://account-id.r2.cloudflarestorage.com")
+	t.Setenv("R2_BUCKET", "misty-server")
+	t.Setenv("R2_ACCESS_KEY", "test-access")
+	t.Setenv("R2_SECRET_KEY", "test-secret")
+}
+
 func TestCreateServerRejectsMissingAgentAttachmentSigningKey(t *testing.T) {
 	t.Setenv("PASSWORD_RESET_URL", "http://localhost:5173/reset")
 	t.Setenv("PASSWORD_RESET_START_URL", "http://localhost:8080/auth/reset/start")
 	t.Setenv("MISTY_ENVIRONMENT", "production")
 	t.Setenv("MISTY_AGENT_DOCUMENTS_ENABLED", "true")
-	t.Setenv("DOCUMENT_STORE", "r2")
-	t.Setenv("S3_ENDPOINT", "https://account-id.r2.cloudflarestorage.com")
-	t.Setenv("S3_BUCKET", "misty-agent-attachments")
-	t.Setenv("S3_ACCESS_KEY", "test-access")
-	t.Setenv("S3_SECRET_KEY", "test-secret")
-	t.Setenv("S3_PRIVATE", "true")
-	t.Setenv("S3_LIFECYCLE_DAYS", "2")
+	configureTestR2(t)
 	t.Setenv("DOCUMENT_SIGNING_KEY", "")
 
 	if _, err := CreateServer(); err == nil || !strings.Contains(err.Error(), "signing-key") {
@@ -182,13 +172,7 @@ func TestCreateServerConfiguresCloudflareR2AgentAttachmentStore(t *testing.T) {
 	t.Setenv("MAILJET_FROM_EMAIL", "")
 	t.Setenv("MISTY_ENVIRONMENT", "production")
 	t.Setenv("MISTY_AGENT_DOCUMENTS_ENABLED", "true")
-	t.Setenv("DOCUMENT_STORE", "r2")
-	t.Setenv("S3_ENDPOINT", "https://account-id.r2.cloudflarestorage.com")
-	t.Setenv("S3_BUCKET", "misty-agent-attachments")
-	t.Setenv("S3_ACCESS_KEY", "test-access")
-	t.Setenv("S3_SECRET_KEY", "test-secret")
-	t.Setenv("S3_PRIVATE", "true")
-	t.Setenv("S3_LIFECYCLE_DAYS", "2")
+	configureTestR2(t)
 	t.Setenv("DOCUMENT_SIGNING_KEY", strings.Repeat("k", 32))
 	t.Setenv("DOCUMENT_KEY_ID", "test-current")
 	t.Setenv("DOCUMENT_PRIVATE_KEY_B64", testAgentAttachmentPrivateKey(t))

@@ -9,7 +9,7 @@ not migrated into the new Library.
 - Personal and Space-owned security domains
 - Immutable blobs, canonical files, and Space-scoped Library items
 - One shared decimal 1 GB storage pool per Space with atomic upload reservations
-- Three owned Spaces total, including Default space
+- Three owned Spaces total, including the owner-named personal Space
 - Private permanent R2/S3 storage contract and persistent local development store
 - Quarantine, server-side checksum/type verification, dangerous-format policy,
   EICAR detection, and optional isolated ClamAV streaming scans
@@ -24,33 +24,23 @@ not migrated into the new Library.
 - Authenticated downloads and safe image previews
 - Trash/recovery accounting, shared-pool reservation expiry, audit records, and quota reconciliation
 
-## Rollout controls
+## Capability configuration
 
-`MISTY_LIBRARY_ENABLED` is the core kill switch. Uploads, attachments, Groups,
-previews, imports, OCR, AI, People, locations, editing, duplicates, and exports
-have independent `MISTY_LIBRARY_*_ENABLED` variables. A disabled route must not
-be treated as authorization; every enabled operation still checks permissions.
+The Space Library, uploads, attachments, Groups, locations, duplicates,
+imports, and exports are enabled by default. AI/OCR activates when the AI
+Gateway key is configured. Previews and editing activate when
+`ffmpeg` and `ffprobe` are installed on the server PATH. People processing activates when
+`VISION_PROCESSOR_URL` is configured.
 
-Production uploads require all of the following:
-
-1. `LIBRARY_STORE=r2` or `s3`.
-2. A bucket separate from Agent attachments.
-3. `LIBRARY_S3_PRIVATE=true` after provider public access is disabled.
-4. `LIBRARY_S3_PERMANENT=true` after confirming the short Agent lifecycle rule
-   does not apply.
-5. `LIBRARY_CLAMAV_ADDRESS` pointing at an isolated scanner.
-
-Production editing additionally requires `LIBRARY_MEDIA_PROCESSOR_BIN` to be an
-absolute path to the isolated FFmpeg worker. Development discovers `ffmpeg`
-from `PATH` when available. Every render uses server-generated paths, fixed
-codecs, bounded threads/time/output bytes, and no shell invocation.
-
-The server refuses development memory/local stores in production and refuses
-production uploads without a configured scanner.
+Production uses the shared private R2 configuration (`R2_ENDPOINT`,
+`R2_BUCKET`, `R2_ACCESS_KEY`, and `R2_SECRET_KEY`). Agent attachments use the
+`agents/` prefix and Library objects use `library/`. The provider lifecycle
+rule must delete only `agents/` objects after two days; it must never apply to
+the permanent `library/` prefix.
 
 ## Security-domain mapping
 
-The interim approved mapping is implemented: Default space uses the owner's
+The interim approved mapping is implemented: the personal Space uses the owner's
 personal domain; each non-personal Space receives its own Space-owned domain.
 Cross-domain physical deduplication is prohibited. Future organization domains
 can be added without changing `files` or `space_library_items` ownership.

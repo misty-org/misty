@@ -49,7 +49,7 @@ type LibraryAlbumFolder struct {
 	UpdatedAt       time.Time `json:"updated_at"`
 }
 
-const libraryAlbumSelect = `SELECT a.id,a.space_id,COALESCE(a.folder_id,''),a.name,a.description,COALESCE(a.cover_item_id,''),a.position,a.view_mode,a.sort_mode,a.created_by_user_id,(SELECT count(*) FROM space_album_items ai WHERE ai.album_id=a.id),a.version,a.created_at,a.updated_at FROM space_albums a`
+const libraryAlbumSelect = `SELECT a.id,a.space_id,COALESCE(a.folder_id,''),a.name,a.description,COALESCE(CASE WHEN EXISTS(SELECT 1 FROM space_library_items cover WHERE cover.id=a.cover_item_id AND cover.lifecycle_state='ready' AND cover.hidden=FALSE) THEN a.cover_item_id END,''),a.position,a.view_mode,a.sort_mode,a.created_by_user_id,(SELECT count(*) FROM space_album_items ai JOIN space_library_items i ON i.id=ai.space_library_item_id WHERE ai.album_id=a.id AND i.lifecycle_state='ready' AND i.hidden=FALSE),a.version,a.created_at,a.updated_at FROM space_albums a`
 
 type LibraryGroupRule struct {
 	Field string `json:"field"`
@@ -148,7 +148,7 @@ func (db *Database) UpdateLibraryAlbum(ctx context.Context, userID, spaceID, alb
 		}
 		if coverItemID != "" {
 			var valid bool
-			if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM space_album_items ai JOIN space_albums a ON a.id=ai.album_id WHERE a.id=$1 AND a.space_id=$2 AND ai.space_library_item_id=$3)`, albumID, spaceID, coverItemID).Scan(&valid); err != nil || !valid {
+			if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM space_album_items ai JOIN space_albums a ON a.id=ai.album_id JOIN space_library_items i ON i.id=ai.space_library_item_id WHERE a.id=$1 AND a.space_id=$2 AND ai.space_library_item_id=$3 AND i.lifecycle_state='ready' AND i.hidden=FALSE)`, albumID, spaceID, coverItemID).Scan(&valid); err != nil || !valid {
 				return ErrLibraryInvalid
 			}
 		}
@@ -357,7 +357,7 @@ func (db *Database) ReorderLibraryAlbumItems(ctx context.Context, userID, spaceI
 			return ErrLibraryConflict
 		}
 		for position, itemID := range itemIDs {
-			result, err := tx.ExecContext(ctx, `UPDATE space_album_items SET position=$1 WHERE album_id=$2 AND space_library_item_id=$3`, position, albumID, itemID)
+			result, err := tx.ExecContext(ctx, `UPDATE space_album_items ai SET position=$1 WHERE ai.album_id=$2 AND ai.space_library_item_id=$3 AND EXISTS(SELECT 1 FROM space_library_items i WHERE i.id=ai.space_library_item_id AND i.space_id=$4 AND i.lifecycle_state='ready' AND i.hidden=FALSE)`, position, albumID, itemID, spaceID)
 			if err != nil {
 				return err
 			}
@@ -390,13 +390,13 @@ func (db *Database) AddLibraryAlbumItems(ctx context.Context, userID, spaceID, a
 			return ErrLibraryNotFound
 		}
 		for _, itemID := range itemIDs {
-			result, err := tx.ExecContext(ctx, `INSERT INTO space_album_items(album_id,space_library_item_id,added_by_user_id) SELECT $1,i.id,$3 FROM space_library_items i WHERE i.id=$2 AND i.space_id=$4 AND i.lifecycle_state='ready' ON CONFLICT DO NOTHING`, albumID, itemID, userID, spaceID)
+			result, err := tx.ExecContext(ctx, `INSERT INTO space_album_items(album_id,space_library_item_id,added_by_user_id) SELECT $1,i.id,$3 FROM space_library_items i WHERE i.id=$2 AND i.space_id=$4 AND i.lifecycle_state='ready' AND i.hidden=FALSE ON CONFLICT DO NOTHING`, albumID, itemID, userID, spaceID)
 			if err != nil {
 				return err
 			}
 			if count, _ := result.RowsAffected(); count == 0 {
 				var valid bool
-				if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM space_library_items WHERE id=$1 AND space_id=$2 AND lifecycle_state='ready')`, itemID, spaceID).Scan(&valid); err != nil || !valid {
+				if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM space_library_items WHERE id=$1 AND space_id=$2 AND lifecycle_state='ready' AND hidden=FALSE)`, itemID, spaceID).Scan(&valid); err != nil || !valid {
 					return ErrLibraryInvalid
 				}
 			}
@@ -432,7 +432,7 @@ func (db *Database) LibraryAlbumItems(ctx context.Context, userID, spaceID, albu
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionLibraryView); err != nil {
 			return err
 		}
-		rows, err := tx.QueryContext(ctx, libraryItemSelect+` JOIN space_album_items ai ON ai.space_library_item_id=i.id JOIN space_albums a ON a.id=ai.album_id WHERE a.id=$1 AND a.space_id=$2 AND i.lifecycle_state='ready' ORDER BY CASE a.sort_mode WHEN 'oldest' THEN extract(epoch FROM COALESCE(i.date_override,f.intrinsic_capture_at,f.original_uploaded_at)) WHEN 'newest' THEN -extract(epoch FROM COALESCE(i.date_override,f.intrinsic_capture_at,f.original_uploaded_at)) ELSE ai.position::double precision END,ai.added_at DESC LIMIT $3`, albumID, spaceID, limit)
+		rows, err := tx.QueryContext(ctx, libraryItemSelect+` JOIN space_album_items ai ON ai.space_library_item_id=i.id JOIN space_albums a ON a.id=ai.album_id WHERE a.id=$1 AND a.space_id=$2 AND i.lifecycle_state='ready' AND i.hidden=FALSE ORDER BY CASE a.sort_mode WHEN 'oldest' THEN extract(epoch FROM COALESCE(i.date_override,f.intrinsic_capture_at,f.original_uploaded_at)) WHEN 'newest' THEN -extract(epoch FROM COALESCE(i.date_override,f.intrinsic_capture_at,f.original_uploaded_at)) ELSE ai.position::double precision END,ai.added_at DESC LIMIT $3`, albumID, spaceID, limit)
 		if err != nil {
 			return err
 		}
@@ -518,7 +518,7 @@ func (db *Database) LibraryGroupItems(ctx context.Context, userID, spaceID, grou
 		if json.Unmarshal(raw, &rules) != nil || validateLibraryGroupRules(rules) != nil {
 			return ErrLibraryInvalid
 		}
-		conditions := []string{"i.space_id=$1", "i.lifecycle_state='ready'"}
+		conditions := []string{"i.space_id=$1", "i.lifecycle_state='ready'", "i.hidden=FALSE"}
 		args := []any{spaceID}
 		for _, rule := range rules.All {
 			args = append(args, rule.Value)

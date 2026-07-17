@@ -248,13 +248,13 @@ func (db *Database) UpdateLibraryMemoryPreference(ctx context.Context, userID, s
 		}
 		if coverItemID != "" {
 			var valid bool
-			if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM space_library_items i JOIN library_files f ON f.id=i.file_id WHERE i.id=$1 AND i.space_id=$2 AND i.lifecycle_state='ready' AND COALESCE(i.date_override,f.intrinsic_capture_at,f.original_uploaded_at)>=$3 AND COALESCE(i.date_override,f.intrinsic_capture_at,f.original_uploaded_at)<$4)`, coverItemID, spaceID, start, start.AddDate(0, 1, 0)).Scan(&valid); err != nil || !valid {
+			if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM space_library_items i JOIN library_files f ON f.id=i.file_id WHERE i.id=$1 AND i.space_id=$2 AND i.lifecycle_state='ready' AND i.hidden=FALSE AND COALESCE(i.date_override,f.intrinsic_capture_at,f.original_uploaded_at)>=$3 AND COALESCE(i.date_override,f.intrinsic_capture_at,f.original_uploaded_at)<$4)`, coverItemID, spaceID, start, start.AddDate(0, 1, 0)).Scan(&valid); err != nil || !valid {
 				return ErrLibraryInvalid
 			}
 		}
 		if musicItemID != "" {
 			var valid bool
-			if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM space_library_items i JOIN library_files f ON f.id=i.file_id JOIN library_blobs b ON b.id=f.blob_id WHERE i.id=$1 AND i.space_id=$2 AND i.lifecycle_state='ready' AND b.server_detected_mime_type LIKE 'audio/%')`, musicItemID, spaceID).Scan(&valid); err != nil || !valid {
+			if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM space_library_items i JOIN library_files f ON f.id=i.file_id JOIN library_blobs b ON b.id=f.blob_id WHERE i.id=$1 AND i.space_id=$2 AND i.lifecycle_state='ready' AND i.hidden=FALSE AND b.server_detected_mime_type LIKE 'audio/%')`, musicItemID, spaceID).Scan(&valid); err != nil || !valid {
 				return ErrLibraryInvalid
 			}
 		}

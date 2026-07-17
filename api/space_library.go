@@ -27,8 +27,9 @@ import (
 )
 
 const (
-	libraryUploadTokenHeader = "X-Misty-Library-Upload-Token"
-	libraryUploadLifetime    = 30 * time.Minute
+	libraryUploadTokenHeader      = "X-Misty-Library-Upload-Token"
+	libraryReauthenticationHeader = "X-Misty-Library-Reauthentication"
+	libraryUploadLifetime         = 30 * time.Minute
 )
 
 var librarySHA256Pattern = regexp.MustCompile(`^[0-9a-f]{64}$`)
@@ -105,6 +106,18 @@ func (s *SpaceLibraryService) Items() http.HandlerFunc {
 		spaceID := chi.URLParam(r, "spaceID")
 		if r.Method == http.MethodGet {
 			queryValues := r.URL.Query()
+			sensitiveScope := ""
+			if queryValues.Get("visibility") == "hidden" {
+				sensitiveScope = "hidden"
+			} else if queryValues.Get("collection") == "recently-deleted" {
+				sensitiveScope = "recently_deleted"
+			}
+			if sensitiveScope != "" {
+				if err := s.validateLibraryReauthentication(r, userID, spaceID, sensitiveScope); err != nil {
+					writeLibraryError(w, err)
+					return
+				}
+			}
 			limit, _ := strconv.Atoi(queryValues.Get("limit"))
 			if limit < 1 || limit > 200 {
 				limit = 100
@@ -149,6 +162,43 @@ func (s *SpaceLibraryService) Items() http.HandlerFunc {
 			return
 		}
 		w.WriteHeader(http.StatusMethodNotAllowed)
+	}
+}
+
+func (s *SpaceLibraryService) Reauthenticate() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userID, ok := authenticatedUser(w, r, s.database)
+		if !ok {
+			return
+		}
+		var body struct {
+			Password string `json:"password"`
+			Scope    string `json:"scope"`
+		}
+		if decodeJSON(w, r, &body) != nil {
+			return
+		}
+		valid, err := s.database.VerifyUserPassword(r.Context(), userID, body.Password)
+		if err != nil {
+			writeLibraryError(w, err)
+			return
+		}
+		if !valid {
+			_ = s.database.RecordLibraryReauthenticationDenied(r.Context(), userID, chi.URLParam(r, "spaceID"), body.Scope)
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"code": "reauthentication_failed"})
+			return
+		}
+		token, err := security.GenerateSecureToken()
+		if err != nil {
+			writeLibraryError(w, err)
+			return
+		}
+		expiresAt, err := s.database.CreateLibraryReauthenticationGrant(r.Context(), userID, chi.URLParam(r, "spaceID"), body.Scope, security.HashToken(token), 5*time.Minute)
+		if err != nil {
+			writeLibraryError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"token": token, "scope": body.Scope, "expires_at": expiresAt})
 	}
 }
 
@@ -262,7 +312,18 @@ func (s *SpaceLibraryService) MergeDuplicates() http.HandlerFunc {
 		if decodeJSON(w, r, &body) != nil {
 			return
 		}
-		item, err := s.database.MergeLibraryDuplicates(r.Context(), userID, chi.URLParam(r, "spaceID"), body.Keeper, body.Duplicates)
+		spaceID := chi.URLParam(r, "spaceID")
+		if err := s.validateSensitiveLibraryItem(r, userID, spaceID, body.Keeper.ID); err != nil {
+			writeLibraryError(w, err)
+			return
+		}
+		for _, duplicate := range body.Duplicates {
+			if err := s.validateSensitiveLibraryItem(r, userID, spaceID, duplicate.ID); err != nil {
+				writeLibraryError(w, err)
+				return
+			}
+		}
+		item, err := s.database.MergeLibraryDuplicates(r.Context(), userID, spaceID, body.Keeper, body.Duplicates)
 		if err != nil {
 			writeLibraryError(w, err)
 			return
@@ -287,7 +348,12 @@ func (s *SpaceLibraryService) ExportItems() http.HandlerFunc {
 		if decodeJSON(w, r, &body) != nil {
 			return
 		}
-		items, err := s.database.LibraryTransferItems(r.Context(), userID, chi.URLParam(r, "spaceID"), body.ItemIDs)
+		spaceID := chi.URLParam(r, "spaceID")
+		if err := s.validateLibraryReauthentication(r, userID, spaceID, "bulk_export"); err != nil {
+			writeLibraryError(w, err)
+			return
+		}
+		items, err := s.database.LibraryTransferItems(r.Context(), userID, spaceID, body.ItemIDs)
 		if err != nil {
 			writeLibraryError(w, err)
 			return
@@ -368,6 +434,12 @@ func (s *SpaceLibraryService) ImportItems() http.HandlerFunc {
 			writeLibraryError(w, err)
 			return
 		}
+		for _, itemID := range body.ItemIDs {
+			if err := s.validateSensitiveLibraryItem(r, userID, sourceSpaceID, itemID); err != nil {
+				writeLibraryError(w, err)
+				return
+			}
+		}
 		usage, err := s.database.SpaceStorageUsage(r.Context(), userID, body.DestinationSpaceID)
 		if err != nil {
 			writeLibraryError(w, err)
@@ -383,7 +455,7 @@ func (s *SpaceLibraryService) ImportItems() http.HandlerFunc {
 		}
 		imported := make([]db.SpaceLibraryItem, 0, len(items))
 		for _, item := range items {
-			result, importErr := s.copyLibraryItem(r.Context(), userID, sourceSpaceID, body.DestinationSpaceID, item)
+			result, importErr := s.copyLibraryItem(r.Context(), userID, sourceSpaceID, body.DestinationSpaceID, item, true)
 			if importErr != nil {
 				writeLibraryError(w, importErr)
 				return
@@ -391,6 +463,65 @@ func (s *SpaceLibraryService) ImportItems() http.HandlerFunc {
 			imported = append(imported, *result)
 		}
 		writeJSON(w, http.StatusCreated, map[string]any{"items": imported})
+	}
+}
+
+func (s *SpaceLibraryService) DuplicateItems() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userID, ok := authenticatedUser(w, r, s.database)
+		if !ok {
+			return
+		}
+		var body struct {
+			ItemIDs []string `json:"item_ids"`
+		}
+		if decodeJSON(w, r, &body) != nil {
+			return
+		}
+		if len(body.ItemIDs) < 1 || len(body.ItemIDs) > 50 {
+			writeLibraryError(w, db.ErrLibraryInvalid)
+			return
+		}
+		spaceID := chi.URLParam(r, "spaceID")
+		allowed, err := s.database.HasSpacePermission(r.Context(), userID, spaceID, db.PermissionLibraryEdit)
+		if err != nil || !allowed {
+			writeLibraryError(w, db.ErrLibraryForbidden)
+			return
+		}
+		items, err := s.database.LibraryTransferItems(r.Context(), userID, spaceID, body.ItemIDs)
+		if err != nil {
+			writeLibraryError(w, err)
+			return
+		}
+		for _, itemID := range body.ItemIDs {
+			if err := s.validateSensitiveLibraryItem(r, userID, spaceID, itemID); err != nil {
+				writeLibraryError(w, err)
+				return
+			}
+		}
+		usage, err := s.database.SpaceStorageUsage(r.Context(), userID, spaceID)
+		if err != nil {
+			writeLibraryError(w, err)
+			return
+		}
+		var required int64
+		for _, source := range items {
+			required += source.ByteSize
+		}
+		if required > usage.RemainingBytes {
+			writeLibraryError(w, db.ErrLibraryQuota)
+			return
+		}
+		duplicated := make([]db.SpaceLibraryItem, 0, len(items))
+		for _, source := range items {
+			item, err := s.copyLibraryItem(r.Context(), userID, spaceID, spaceID, source, false)
+			if err != nil {
+				writeLibraryError(w, err)
+				return
+			}
+			duplicated = append(duplicated, *item)
+		}
+		writeJSON(w, http.StatusCreated, map[string]any{"items": duplicated})
 	}
 }
 
@@ -428,6 +559,10 @@ func (s *SpaceLibraryService) SharedReferences() http.HandlerFunc {
 			}
 			items := make([]db.LibrarySharedReference, 0, len(body.ItemIDs))
 			for _, itemID := range body.ItemIDs {
+				if err := s.validateSensitiveLibraryItem(r, userID, spaceID, itemID); err != nil {
+					writeLibraryError(w, err)
+					return
+				}
 				item, err := s.database.CreateLibraryGrant(r.Context(), userID, spaceID, itemID, body.DestinationSpaceID)
 				if err != nil {
 					writeLibraryError(w, err)
@@ -476,7 +611,7 @@ func (s *SpaceLibraryService) RevokeGrant() http.HandlerFunc {
 	}
 }
 
-func (s *SpaceLibraryService) copyLibraryItem(ctx context.Context, userID, sourceSpaceID, destinationSpaceID string, source db.LibraryTransferItem) (*db.SpaceLibraryItem, error) {
+func (s *SpaceLibraryService) copyLibraryItem(ctx context.Context, userID, sourceSpaceID, destinationSpaceID string, source db.LibraryTransferItem, recordImport bool) (*db.SpaceLibraryItem, error) {
 	token, err := security.GenerateSecureToken()
 	if err != nil {
 		return nil, err
@@ -524,7 +659,11 @@ func (s *SpaceLibraryService) copyLibraryItem(ctx context.Context, userID, sourc
 	if completed.Item == nil {
 		return nil, db.ErrLibraryConflict
 	}
-	if _, err := s.database.RecordLibraryImport(ctx, userID, sourceSpaceID, source.ItemID, destinationSpaceID, completed.Item.ID, upload.ID, source.ByteSize); err != nil {
+	if recordImport {
+		if _, err := s.database.RecordLibraryImport(ctx, userID, sourceSpaceID, source.ItemID, destinationSpaceID, completed.Item.ID, upload.ID, source.ByteSize); err != nil {
+			return nil, err
+		}
+	} else if err := s.database.RecordLibraryDuplicate(ctx, userID, destinationSpaceID, source.ItemID, completed.Item.ID, source.ByteSize); err != nil {
 		return nil, err
 	}
 	return completed.Item, nil
@@ -551,6 +690,10 @@ func (s *SpaceLibraryService) Item() http.HandlerFunc {
 			return
 		}
 		spaceID, itemID := chi.URLParam(r, "spaceID"), chi.URLParam(r, "itemID")
+		if err := s.validateSensitiveLibraryItem(r, userID, spaceID, itemID); err != nil {
+			writeLibraryError(w, err)
+			return
+		}
 		switch r.Method {
 		case http.MethodGet:
 			item, err := s.database.LibraryItem(r.Context(), userID, spaceID, itemID)
@@ -604,6 +747,19 @@ func (s *SpaceLibraryService) BulkItems() http.HandlerFunc {
 		if decodeJSON(w, r, &body) != nil {
 			return
 		}
+		spaceID := chi.URLParam(r, "spaceID")
+		for _, item := range body.Items {
+			if err := s.validateSensitiveLibraryItem(r, userID, spaceID, item.ID); err != nil {
+				writeLibraryError(w, err)
+				return
+			}
+		}
+		if body.Action == "restore" {
+			if err := s.validateLibraryReauthentication(r, userID, spaceID, "recently_deleted"); err != nil {
+				writeLibraryError(w, err)
+				return
+			}
+		}
 		operation := db.BulkLibraryItemOperation{Action: body.Action, Items: body.Items, AlbumID: body.AlbumID, Tags: body.Tags, LocationOverride: body.LocationOverride}
 		if body.DateOverride != "" {
 			parsed, err := time.Parse(time.RFC3339, body.DateOverride)
@@ -613,7 +769,7 @@ func (s *SpaceLibraryService) BulkItems() http.HandlerFunc {
 			}
 			operation.DateOverride = &parsed
 		}
-		items, err := s.database.BulkUpdateLibraryItems(r.Context(), userID, chi.URLParam(r, "spaceID"), operation)
+		items, err := s.database.BulkUpdateLibraryItems(r.Context(), userID, spaceID, operation)
 		if err != nil {
 			writeLibraryError(w, err)
 			return
@@ -628,7 +784,12 @@ func (s *SpaceLibraryService) TrashItem() http.HandlerFunc {
 		if !ok {
 			return
 		}
-		item, err := s.database.TrashLibraryItem(r.Context(), userID, chi.URLParam(r, "spaceID"), chi.URLParam(r, "itemID"))
+		spaceID, itemID := chi.URLParam(r, "spaceID"), chi.URLParam(r, "itemID")
+		if err := s.validateSensitiveLibraryItem(r, userID, spaceID, itemID); err != nil {
+			writeLibraryError(w, err)
+			return
+		}
+		item, err := s.database.TrashLibraryItem(r.Context(), userID, spaceID, itemID)
 		if err != nil {
 			writeLibraryError(w, err)
 			return
@@ -643,7 +804,12 @@ func (s *SpaceLibraryService) RestoreItem() http.HandlerFunc {
 		if !ok {
 			return
 		}
-		item, err := s.database.RestoreLibraryItem(r.Context(), userID, chi.URLParam(r, "spaceID"), chi.URLParam(r, "itemID"))
+		spaceID, itemID := chi.URLParam(r, "spaceID"), chi.URLParam(r, "itemID")
+		if err := s.validateLibraryReauthentication(r, userID, spaceID, "recently_deleted"); err != nil {
+			writeLibraryError(w, err)
+			return
+		}
+		item, err := s.database.RestoreLibraryItem(r.Context(), userID, spaceID, itemID)
 		if err != nil {
 			writeLibraryError(w, err)
 			return
@@ -678,6 +844,83 @@ func (s *SpaceLibraryService) Usage() http.HandlerFunc {
 			return
 		}
 		writeJSON(w, http.StatusOK, usage)
+	}
+}
+
+func (s *SpaceLibraryService) AssetStacks() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userID, ok := authenticatedUser(w, r, s.database)
+		if !ok {
+			return
+		}
+		spaceID := chi.URLParam(r, "spaceID")
+		if r.Method == http.MethodGet {
+			stacks, err := s.database.LibraryAssetStacks(r.Context(), userID, spaceID)
+			if err != nil {
+				writeLibraryError(w, err)
+				return
+			}
+			writeJSON(w, http.StatusOK, map[string]any{"stacks": stacks})
+			return
+		}
+		var input db.CreateLibraryAssetStack
+		if decodeJSON(w, r, &input) != nil {
+			return
+		}
+		for _, member := range input.Members {
+			if err := s.validateSensitiveLibraryItem(r, userID, spaceID, member.ItemID); err != nil {
+				writeLibraryError(w, err)
+				return
+			}
+		}
+		stack, err := s.database.CreateLibraryAssetStack(r.Context(), userID, spaceID, input)
+		if err != nil {
+			writeLibraryError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusCreated, stack)
+	}
+}
+
+func (s *SpaceLibraryService) AssetStack() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userID, ok := authenticatedUser(w, r, s.database)
+		if !ok {
+			return
+		}
+		spaceID, stackID := chi.URLParam(r, "spaceID"), chi.URLParam(r, "stackID")
+		if err := s.validateSensitiveLibraryAssetStack(r, userID, spaceID, stackID); err != nil {
+			writeLibraryError(w, err)
+			return
+		}
+		if r.Method == http.MethodPatch {
+			var input struct {
+				Version     int64  `json:"version"`
+				Title       string `json:"title"`
+				CoverItemID string `json:"cover_item_id"`
+				Effect      string `json:"effect"`
+			}
+			if decodeJSON(w, r, &input) != nil {
+				return
+			}
+			stack, err := s.database.UpdateLibraryAssetStack(r.Context(), userID, spaceID, stackID, input.Version, input.Title, input.CoverItemID, input.Effect)
+			if err != nil {
+				writeLibraryError(w, err)
+				return
+			}
+			writeJSON(w, http.StatusOK, stack)
+			return
+		}
+		version, err := strconv.ParseInt(r.URL.Query().Get("version"), 10, 64)
+		if err != nil {
+			writeLibraryError(w, db.ErrLibraryInvalid)
+			return
+		}
+		if err := s.database.DeleteLibraryAssetStack(r.Context(), userID, spaceID, stackID, version); err != nil {
+			writeLibraryError(w, err)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
 	}
 }
 
@@ -720,14 +963,14 @@ func (s *SpaceLibraryService) InitiateUpload() http.HandlerFunc {
 			writeLibraryError(w, err)
 			return
 		}
+		transfer := LibraryObjectUpload{
+			URL: fmt.Sprintf("/spaces/%s/library/uploads/%s/content", upload.SpaceID, upload.ID), Method: http.MethodPut,
+			Headers: map[string]string{libraryUploadTokenHeader: token, "Content-Type": body.MIMEType}, ExpiresAt: expiresAt,
+		}
 		writeJSON(w, http.StatusCreated, map[string]any{
-			"upload": upload,
-			"transfer": map[string]any{
-				"url":        fmt.Sprintf("/spaces/%s/library/uploads/%s/content", upload.SpaceID, upload.ID),
-				"method":     http.MethodPut,
-				"headers":    map[string]string{libraryUploadTokenHeader: token, "Content-Type": body.MIMEType},
-				"expires_at": expiresAt,
-			},
+			"upload":   upload,
+			"transfer": transfer,
+			"finalize": map[string]any{"headers": map[string]string{libraryUploadTokenHeader: token}},
 		})
 	}
 }
@@ -805,80 +1048,47 @@ func (s *SpaceLibraryService) FinalizeUpload() http.HandlerFunc {
 			writeJSON(w, http.StatusOK, result)
 			return
 		}
-		upload, err = s.database.SetLibraryUploadState(r.Context(), userID, spaceID, uploadID, tokenHash, "uploaded_unverified", "quarantined")
-		if err != nil {
-			writeLibraryError(w, err)
+		if upload.State != "uploaded_unverified" {
+			writeLibraryError(w, db.ErrLibraryConflict)
 			return
 		}
-		upload, err = s.database.SetLibraryUploadState(r.Context(), userID, spaceID, uploadID, tokenHash, "quarantined", "scanning")
-		if err != nil {
-			writeLibraryError(w, err)
-			return
-		}
-		reader, metadata, err := s.store.Open(r.Context(), upload.ObjectKey)
-		if err != nil {
-			s.rejectAndDelete(r.Context(), upload, tokenHash, "invalid", "object_missing")
-			writeLibraryError(w, err)
-			return
-		}
-		detected, intrinsic, inspectErr := inspectLibraryContent(reader, metadata.ByteSize, upload.OriginalFilename, upload.ClientDeclaredMIMEType)
-		_ = reader.Close()
-		if inspectErr != nil {
-			state := "rejected"
-			if errors.Is(inspectErr, errLibraryMalware) {
-				state = "infected"
-			}
-			s.rejectAndDelete(r.Context(), upload, tokenHash, state, libraryInspectionCode(inspectErr))
-			writeJSON(w, http.StatusUnprocessableEntity, map[string]string{"code": libraryInspectionCode(inspectErr)})
-			return
-		}
-		if s.malwareScanner != nil {
-			scanReader, _, openErr := s.store.Open(r.Context(), upload.ObjectKey)
-			if openErr != nil {
-				s.rejectAndDelete(r.Context(), upload, tokenHash, "processing_failed", "malware_scan_failed")
-				writeLibraryError(w, openErr)
-				return
-			}
-			scanErr := s.malwareScanner.Scan(r.Context(), scanReader)
-			_ = scanReader.Close()
-			if scanErr != nil {
-				state, code := "processing_failed", "malware_scan_failed"
-				if errors.Is(scanErr, errLibraryMalware) {
-					state, code = "infected", "malware_detected"
-				}
-				s.rejectAndDelete(r.Context(), upload, tokenHash, state, code)
-				writeJSON(w, http.StatusUnprocessableEntity, map[string]string{"code": code})
-				return
-			}
-		}
-		if s.metadataExtractor != nil {
-			if extracted, extractErr := s.metadataExtractor.Extract(r.Context(), s.store, upload.ObjectKey, metadata.ByteSize); extractErr == nil {
-				for key, value := range extracted {
-					intrinsic[key] = value
-				}
-			}
-		}
-		verifiedSHA, _ := intrinsic["sha256"].(string)
-		if metadata.ByteSize != upload.RequestedByteSize || verifiedSHA != upload.ClientSHA256 {
-			s.rejectAndDelete(r.Context(), upload, tokenHash, "invalid", "verification_mismatch")
+
+		// Bytes reach R2 through UploadContent. Finalization verifies that the
+		// server-side write produced the expected immutable object metadata.
+		metadata, headErr := s.store.Head(r.Context(), upload.ObjectKey)
+		if headErr != nil || metadata.ByteSize != upload.RequestedByteSize || metadata.SHA256 != upload.ClientSHA256 {
+			s.rejectAndDelete(r.Context(), upload, tokenHash, "invalid", "object_missing_or_mismatched")
 			writeLibraryError(w, db.ErrLibraryUploadMismatch)
 			return
 		}
-		if _, err = s.database.SetLibraryUploadState(r.Context(), userID, spaceID, uploadID, tokenHash, "scanning", "processing"); err != nil {
-			writeLibraryError(w, err)
+		deduplicationKey, deduplicationErr := s.database.LibraryUploadDeduplicationObjectKey(r.Context(), userID, spaceID, uploadID)
+		if deduplicationErr != nil {
+			writeLibraryError(w, deduplicationErr)
 			return
 		}
-		intrinsicJSON, _ := json.Marshal(intrinsic)
-		result, err := s.database.CompleteLibraryUpload(r.Context(), userID, spaceID, uploadID, tokenHash, metadata.ByteSize, verifiedSHA, detected, intrinsicJSON)
+		if deduplicationKey != "" {
+			if _, existingErr := s.store.Head(r.Context(), deduplicationKey); errors.Is(existingErr, ErrLibraryObjectNotFound) {
+				if repairErr := s.database.ReplaceMissingLibraryUploadDeduplicationObject(r.Context(), userID, spaceID, uploadID, deduplicationKey); repairErr != nil {
+					writeLibraryError(w, repairErr)
+					return
+				}
+			} else if existingErr != nil {
+				writeLibraryError(w, existingErr)
+				return
+			}
+		}
+		intrinsic, _ := json.Marshal(map[string]any{
+			"byte_size":                 metadata.ByteSize,
+			"sha256":                    metadata.SHA256,
+			"client_declared_mime_type": upload.ClientDeclaredMIMEType,
+		})
+		result, err := s.database.CompleteLibraryUpload(r.Context(), userID, spaceID, uploadID, tokenHash, metadata.ByteSize, metadata.SHA256, upload.ClientDeclaredMIMEType, intrinsic)
 		if err != nil {
 			writeLibraryError(w, err)
 			return
 		}
 		if result.DiscardObjectKey != "" {
 			_ = s.store.Delete(r.Context(), result.DiscardObjectKey)
-		}
-		if result.Item != nil && (s.aiEnabled || s.ocrEnabled) {
-			_ = s.database.QueueLibraryIntelligenceForItem(r.Context(), userID, spaceID, result.Item.ID)
 		}
 		writeJSON(w, http.StatusOK, result)
 	}
@@ -890,12 +1100,17 @@ func (s *SpaceLibraryService) DownloadItem() http.HandlerFunc {
 		if !ok {
 			return
 		}
+		spaceID, itemID := chi.URLParam(r, "spaceID"), chi.URLParam(r, "itemID")
+		if err := s.validateSensitiveLibraryItem(r, userID, spaceID, itemID); err != nil {
+			writeLibraryError(w, err)
+			return
+		}
 		var download *db.LibraryDownload
 		var err error
 		if r.URL.Query().Get("version") == "original" {
-			download, err = s.database.LibraryOriginalItemDownload(r.Context(), userID, chi.URLParam(r, "spaceID"), chi.URLParam(r, "itemID"))
+			download, err = s.database.LibraryOriginalItemDownload(r.Context(), userID, spaceID, itemID)
 		} else {
-			download, err = s.database.LibraryItemDownload(r.Context(), userID, chi.URLParam(r, "spaceID"), chi.URLParam(r, "itemID"))
+			download, err = s.database.LibraryItemDownload(r.Context(), userID, spaceID, itemID)
 		}
 		if err != nil {
 			writeLibraryError(w, err)
@@ -916,6 +1131,10 @@ func (s *SpaceLibraryService) PreviewItem() http.HandlerFunc {
 			return
 		}
 		spaceID, itemID := chi.URLParam(r, "spaceID"), chi.URLParam(r, "itemID")
+		if err := s.validateSensitiveLibraryItem(r, userID, spaceID, itemID); err != nil {
+			writeLibraryError(w, err)
+			return
+		}
 		original := r.URL.Query().Get("version") == "original"
 		source, err := s.database.LibraryItemPreviewSource(r.Context(), userID, spaceID, itemID, original)
 		if err != nil {
@@ -962,10 +1181,88 @@ func (s *SpaceLibraryService) PreviewItem() http.HandlerFunc {
 				writeLibraryError(w, completeErr)
 				return
 			}
+			if completed.DiscardObjectKey != "" && completed.ObjectKey != objectKey {
+				if _, existingErr := s.store.Head(r.Context(), completed.ObjectKey); errors.Is(existingErr, ErrLibraryObjectNotFound) {
+					if completed.MIMEType != rendered.MIMEType || completed.ByteSize != rendered.ByteSize || completed.SHA256 != rendered.SHA256 {
+						_ = s.store.Delete(r.Context(), objectKey)
+						writeJSON(w, http.StatusConflict, map[string]string{"code": "library_preview_mismatch"})
+						return
+					}
+					repairedKey, repairErr := s.database.ReplaceMissingLibraryPreviewDeduplicationObject(r.Context(), userID, spaceID, itemID, source.SourceIdentity, completed.ObjectKey, objectKey)
+					if repairErr != nil {
+						_ = s.store.Delete(r.Context(), objectKey)
+						writeLibraryError(w, repairErr)
+						return
+					}
+					completed.ObjectKey = repairedKey
+					if repairedKey == objectKey {
+						completed.DiscardObjectKey = ""
+					}
+				} else if existingErr != nil {
+					_ = s.store.Delete(r.Context(), objectKey)
+					writeLibraryError(w, existingErr)
+					return
+				}
+			}
 			if completed.DiscardObjectKey != "" {
 				_ = s.store.Delete(r.Context(), completed.DiscardObjectKey)
 			}
 			source.PreviewObjectKey, source.PreviewMIME, source.PreviewBytes, source.PreviewSHA256 = completed.ObjectKey, completed.MIMEType, completed.ByteSize, completed.SHA256
+		}
+		if _, headErr := s.store.Head(r.Context(), source.PreviewObjectKey); errors.Is(headErr, ErrLibraryObjectNotFound) {
+			if s.mediaProcessor == nil {
+				writeJSON(w, http.StatusUnsupportedMediaType, map[string]string{"code": "preview_unavailable"})
+				return
+			}
+			sourceReader, sourceMetadata, openSourceErr := s.store.Open(r.Context(), source.ObjectKey)
+			if openSourceErr != nil {
+				writeLibraryError(w, openSourceErr)
+				return
+			}
+			if sourceMetadata.ByteSize != source.ByteSize || sourceMetadata.SHA256 != source.SHA256 {
+				_ = sourceReader.Close()
+				writeJSON(w, http.StatusConflict, map[string]string{"code": "library_object_mismatch"})
+				return
+			}
+			rendered, renderErr := s.mediaProcessor.Preview(r.Context(), sourceReader, source.ByteSize, 2048)
+			_ = sourceReader.Close()
+			if renderErr != nil {
+				writeJSON(w, http.StatusUnsupportedMediaType, map[string]string{"code": "preview_unavailable"})
+				return
+			}
+			defer rendered.Cleanup()
+			if source.PreviewMIME != rendered.MIMEType || source.PreviewBytes != rendered.ByteSize || source.PreviewSHA256 != rendered.SHA256 {
+				writeJSON(w, http.StatusConflict, map[string]string{"code": "library_preview_mismatch"})
+				return
+			}
+			previewReader, openRenderedErr := rendered.Open()
+			if openRenderedErr != nil {
+				writeLibraryError(w, openRenderedErr)
+				return
+			}
+			replacementKey := "library/" + strings.ReplaceAll(uuid.NewString(), "-", "")
+			putErr := s.store.Put(r.Context(), replacementKey, previewReader, LibraryObjectMetadata{ByteSize: rendered.ByteSize, SHA256: rendered.SHA256, MIMEType: rendered.MIMEType})
+			_ = previewReader.Close()
+			if putErr != nil {
+				writeLibraryError(w, putErr)
+				return
+			}
+			repairedKey, repairErr := s.database.ReplaceMissingLibraryPreviewDeduplicationObject(r.Context(), userID, spaceID, itemID, source.SourceIdentity, source.PreviewObjectKey, replacementKey)
+			if repairErr != nil {
+				_ = s.store.Delete(r.Context(), replacementKey)
+				writeLibraryError(w, repairErr)
+				return
+			}
+			if repairedKey != replacementKey {
+				_ = s.store.Delete(r.Context(), replacementKey)
+			}
+			source.PreviewObjectKey = repairedKey
+		} else if headErr != nil {
+			writeLibraryError(w, headErr)
+			return
+		}
+		if writeLibraryPreviewCacheHeaders(w, r, source.PreviewSHA256) {
+			return
 		}
 		reader, metadata, err := s.store.Open(r.Context(), source.PreviewObjectKey)
 		if err != nil {
@@ -980,11 +1277,53 @@ func (s *SpaceLibraryService) PreviewItem() http.HandlerFunc {
 		w.Header().Set("Content-Type", source.PreviewMIME)
 		w.Header().Set("Content-Length", strconv.FormatInt(source.PreviewBytes, 10))
 		w.Header().Set("Content-Disposition", "inline")
-		w.Header().Set("Cache-Control", "private, no-store")
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.WriteHeader(http.StatusOK)
 		_, _ = io.Copy(w, reader)
 	}
+}
+
+func writeLibraryPreviewCacheHeaders(w http.ResponseWriter, r *http.Request, sha string) bool {
+	etag := `"` + sha + `"`
+	w.Header().Set("ETag", etag)
+	w.Header().Add("Vary", "Authorization, X-Misty-Library-Reauthentication")
+	if strings.TrimSpace(r.URL.Query().Get("cache_version")) != "" {
+		w.Header().Set("Cache-Control", "private, max-age=31536000, immutable")
+	} else {
+		w.Header().Set("Cache-Control", "private, no-cache")
+	}
+	for _, candidate := range strings.Split(r.Header.Get("If-None-Match"), ",") {
+		candidate = strings.TrimSpace(candidate)
+		if candidate == "*" || strings.TrimPrefix(candidate, "W/") == etag {
+			w.WriteHeader(http.StatusNotModified)
+			return true
+		}
+	}
+	return false
+}
+
+func (s *SpaceLibraryService) validateLibraryReauthentication(r *http.Request, userID, spaceID, scope string) error {
+	token := strings.TrimSpace(r.Header.Get(libraryReauthenticationHeader))
+	if token == "" {
+		return db.ErrLibraryReauthentication
+	}
+	return s.database.ValidateLibraryReauthenticationGrant(r.Context(), userID, spaceID, scope, security.HashToken(token))
+}
+
+func (s *SpaceLibraryService) validateSensitiveLibraryItem(r *http.Request, userID, spaceID, itemID string) error {
+	scope, err := s.database.SensitiveLibraryItemScope(r.Context(), userID, spaceID, itemID)
+	if err != nil || scope == "" {
+		return err
+	}
+	return s.validateLibraryReauthentication(r, userID, spaceID, scope)
+}
+
+func (s *SpaceLibraryService) validateSensitiveLibraryAssetStack(r *http.Request, userID, spaceID, stackID string) error {
+	scope, err := s.database.SensitiveLibraryAssetStackScope(r.Context(), userID, spaceID, stackID)
+	if err != nil || scope == "" {
+		return err
+	}
+	return s.validateLibraryReauthentication(r, userID, spaceID, scope)
 }
 
 func (s *SpaceLibraryService) DownloadAttachment() http.HandlerFunc {
@@ -1358,6 +1697,10 @@ func (s *SpaceLibraryService) PeoplePolicy() http.HandlerFunc {
 func (s *SpaceLibraryService) People() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if !s.peopleEnabled {
+			if r.Method == http.MethodGet {
+				writeJSON(w, http.StatusOK, map[string]any{"people": []any{}})
+				return
+			}
 			writeJSON(w, http.StatusServiceUnavailable, map[string]string{"code": "library_people_disabled"})
 			return
 		}
@@ -1525,6 +1868,10 @@ func (s *SpaceLibraryService) EditVersions() http.HandlerFunc {
 			return
 		}
 		spaceID, itemID := chi.URLParam(r, "spaceID"), chi.URLParam(r, "itemID")
+		if err := s.validateSensitiveLibraryItem(r, userID, spaceID, itemID); err != nil {
+			writeLibraryError(w, err)
+			return
+		}
 		switch r.Method {
 		case http.MethodGet:
 			versions, err := s.database.LibraryEditVersions(r.Context(), userID, spaceID, itemID)
@@ -1563,6 +1910,11 @@ func (s *SpaceLibraryService) SelectEditVersion() http.HandlerFunc {
 		if !ok {
 			return
 		}
+		spaceID, itemID := chi.URLParam(r, "spaceID"), chi.URLParam(r, "itemID")
+		if err := s.validateSensitiveLibraryItem(r, userID, spaceID, itemID); err != nil {
+			writeLibraryError(w, err)
+			return
+		}
 		var body struct {
 			ItemVersion int64  `json:"item_version"`
 			EditID      string `json:"edit_id"`
@@ -1570,7 +1922,7 @@ func (s *SpaceLibraryService) SelectEditVersion() http.HandlerFunc {
 		if decodeJSON(w, r, &body) != nil {
 			return
 		}
-		result, err := s.database.SelectLibraryEditVersion(r.Context(), userID, chi.URLParam(r, "spaceID"), chi.URLParam(r, "itemID"), body.EditID, body.ItemVersion)
+		result, err := s.database.SelectLibraryEditVersion(r.Context(), userID, spaceID, itemID, body.EditID, body.ItemVersion)
 		if err != nil {
 			writeLibraryError(w, err)
 			return
@@ -1589,7 +1941,12 @@ func (s *SpaceLibraryService) DeleteEditVersion() http.HandlerFunc {
 		if !ok {
 			return
 		}
-		if err := s.database.DeleteLibraryEditVersion(r.Context(), userID, chi.URLParam(r, "spaceID"), chi.URLParam(r, "itemID"), chi.URLParam(r, "editID")); err != nil {
+		spaceID, itemID := chi.URLParam(r, "spaceID"), chi.URLParam(r, "itemID")
+		if err := s.validateSensitiveLibraryItem(r, userID, spaceID, itemID); err != nil {
+			writeLibraryError(w, err)
+			return
+		}
+		if err := s.database.DeleteLibraryEditVersion(r.Context(), userID, spaceID, itemID, chi.URLParam(r, "editID")); err != nil {
 			writeLibraryError(w, err)
 			return
 		}
@@ -1834,6 +2191,8 @@ func writeLibraryError(w http.ResponseWriter, err error) {
 		writeJSON(w, http.StatusNotFound, map[string]string{"code": "not_found"})
 	case errors.Is(err, db.ErrLibraryForbidden):
 		writeJSON(w, http.StatusForbidden, map[string]string{"code": "forbidden"})
+	case errors.Is(err, db.ErrLibraryReauthentication):
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"code": "library_reauthentication_required"})
 	case errors.Is(err, db.ErrLibraryInvalid):
 		writeJSON(w, http.StatusBadRequest, map[string]string{"code": "invalid_request"})
 	case errors.Is(err, db.ErrLibraryQuota):

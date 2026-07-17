@@ -107,10 +107,60 @@ func (db *Database) CompleteLibraryPreview(ctx context.Context, userID, spaceID,
 		} else if existingKey != objectKey {
 			out.ObjectKey, out.DiscardObjectKey = existingKey, objectKey
 		}
-		if _, err := tx.ExecContext(ctx, `INSERT INTO library_derivatives(id,security_domain_id,source_file_id,space_library_item_id,derivative_blob_id,kind,metadata,lifecycle_state) VALUES($1,$2,$3,$4,$5,'image_preview',jsonb_build_object('source_identity',$6),'ready')`, "derivative_"+uuid.NewString(), domainID, fileID, itemID, blobID, sourceIdentity); err != nil {
+		if _, err := tx.ExecContext(ctx, `INSERT INTO library_derivatives(id,security_domain_id,source_file_id,space_library_item_id,derivative_blob_id,kind,metadata,lifecycle_state) VALUES($1,$2,$3,$4,$5,'image_preview',jsonb_build_object('source_identity',$6::text),'ready')`, "derivative_"+uuid.NewString(), domainID, fileID, itemID, blobID, sourceIdentity); err != nil {
 			return err
 		}
 		return insertLibraryAuditTx(ctx, tx, spaceID, domainID, userID, "library.preview.generated", "library_item", itemID, "success", map[string]any{"byte_size": byteSize})
 	})
 	return out, err
+}
+
+// ReplaceMissingLibraryPreviewDeduplicationObject heals a preview blob whose
+// database row is still ready even though its immutable object disappeared.
+// The caller must verify that missingKey is absent and replacementKey contains
+// the freshly rendered preview with the same metadata.
+func (db *Database) ReplaceMissingLibraryPreviewDeduplicationObject(ctx context.Context, userID, spaceID, itemID, sourceIdentity, missingKey, replacementKey string) (string, error) {
+	if itemID == "" || sourceIdentity == "" || missingKey == "" || replacementKey == "" || missingKey == replacementKey {
+		return "", ErrLibraryInvalid
+	}
+	selectedKey := ""
+	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionLibraryView); err != nil {
+			return err
+		}
+		var blobID, domainID, sha, currentKey string
+		var byteSize int64
+		if err := tx.QueryRowContext(ctx, `SELECT pb.id,pb.security_domain_id,pb.sha256,pb.byte_size,pb.r2_object_key
+			FROM library_derivatives d
+			JOIN space_library_items i ON i.id=d.space_library_item_id AND i.space_id=$2 AND i.lifecycle_state='ready'
+			JOIN library_blobs pb ON pb.id=d.derivative_blob_id AND pb.lifecycle_state='ready'
+			WHERE d.space_library_item_id=$1 AND d.kind='image_preview' AND d.lifecycle_state='ready' AND d.metadata->>'source_identity'=$3
+			ORDER BY d.created_at DESC LIMIT 1`, itemID, spaceID, sourceIdentity).
+			Scan(&blobID, &domainID, &sha, &byteSize, &currentKey); err != nil {
+			return err
+		}
+		if _, err := tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock(hashtext($1))`, "library:blob:"+domainID+":"+sha+fmt.Sprint(byteSize)); err != nil {
+			return err
+		}
+		if err := tx.QueryRowContext(ctx, `SELECT r2_object_key FROM library_blobs WHERE id=$1 AND lifecycle_state='ready' FOR UPDATE`, blobID).Scan(&currentKey); err != nil {
+			return err
+		}
+		if currentKey != missingKey {
+			selectedKey = currentKey
+			return nil
+		}
+		result, err := tx.ExecContext(ctx, `UPDATE library_blobs SET r2_object_key=$1,version=version+1,updated_at=NOW() WHERE id=$2 AND r2_object_key=$3`, replacementKey, blobID, missingKey)
+		if err != nil {
+			return err
+		}
+		if count, _ := result.RowsAffected(); count != 1 {
+			return ErrLibraryConflict
+		}
+		selectedKey = replacementKey
+		return nil
+	})
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", ErrLibraryNotFound
+	}
+	return selectedKey, err
 }

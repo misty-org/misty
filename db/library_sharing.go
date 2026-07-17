@@ -33,7 +33,7 @@ func (db *Database) LibraryOutgoingGrants(ctx context.Context, userID, sourceSpa
 		if err := requireSpacePermissionTx(ctx, tx, userID, sourceSpaceID, PermissionLibraryEdit); err != nil {
 			return err
 		}
-		rows, err := tx.QueryContext(ctx, librarySharedReferenceSelect+` WHERE g.source_space_id=$1 AND g.state='active' AND r.lifecycle_state='ready' ORDER BY r.created_at DESC`, sourceSpaceID)
+		rows, err := tx.QueryContext(ctx, librarySharedReferenceSelect+` WHERE g.source_space_id=$1 AND g.state='active' AND r.lifecycle_state='ready' AND i.lifecycle_state='ready' AND i.hidden=FALSE ORDER BY r.created_at DESC`, sourceSpaceID)
 		if err != nil {
 			return err
 		}

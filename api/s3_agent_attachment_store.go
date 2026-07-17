@@ -116,7 +116,7 @@ func validateS3AgentAttachmentStoreConfig(config S3AgentAttachmentStoreConfig) e
 		return errors.New("agent attachment S3 credentials are required")
 	}
 	if !config.BucketPrivate {
-		return errors.New("document bucket must be private; set S3_PRIVATE=true only after public access is disabled")
+		return errors.New("R2 bucket must be private")
 	}
 	if config.LifecycleMaxDays < 1 || config.LifecycleMaxDays > 2 {
 		return errors.New("agent attachment bucket needs a provider lifecycle rule deleting objects after at most 2 days")

@@ -54,6 +54,7 @@ type TrustedDevice struct {
 
 type AgentDefinition struct {
 	ID                   string          `json:"id"`
+	SpaceID              string          `json:"spaceId"`
 	OwnerUserID          string          `json:"ownerUserId"`
 	DeviceID             string          `json:"deviceId"`
 	ScopeID              string          `json:"scopeId"`
@@ -234,6 +235,9 @@ func (db *Database) ConsumeTrustedDeviceNonce(userID, deviceID, nonce string, ex
 }
 
 func (db *Database) CreateAgentDefinition(userID string, a AgentDefinition) (*AgentDefinition, error) {
+	if strings.TrimSpace(a.SpaceID) == "" {
+		return nil, ErrSpaceInvalid
+	}
 	if len(a.Workflow) == 0 {
 		a.Workflow = json.RawMessage(`{}`)
 	}
@@ -245,12 +249,28 @@ func (db *Database) CreateAgentDefinition(userID string, a AgentDefinition) (*Ag
 	}
 	out := &AgentDefinition{}
 	err := db.agentTx(userID, func(tx *sql.Tx) error {
-		return scanAgent(tx.QueryRow(`INSERT INTO agent_definitions(id,owner_user_id,device_id,scope_id,name,instructions,workflow,workflow_revision,trust_policy,cloud_document_consent,enabled)
-			SELECT $1,$2,d.id,$3,$4,$5,$6,$7,$8,$9,FALSE FROM trusted_devices d WHERE d.id=$10 AND d.user_id=$2 AND d.revoked_at IS NULL
+		if err := requireSpacePermissionTx(context.Background(), tx, userID, a.SpaceID, PermissionStudioManage); err != nil {
+			return err
+		}
+		var canonicalExists bool
+		if err := tx.QueryRow(`SELECT EXISTS(SELECT 1 FROM space_agents WHERE id=$1)`, a.ID).Scan(&canonicalExists); err != nil {
+			return err
+		}
+		if !canonicalExists {
+			item := SpaceStudioResource{ID: a.ID, SpaceID: a.SpaceID, CreatorUserID: userID, Kind: "agent", Name: a.Name, Instructions: a.Instructions, Definition: a.Workflow, Icon: "folder-cog", Status: "draft", RuntimeKind: "device"}
+			if err := createDefaultAgentWorkflowTx(context.Background(), tx, userID, &item); err != nil {
+				return err
+			}
+			if _, err := tx.Exec(`INSERT INTO space_agents(id,space_id,creator_user_id,name,description,icon,instructions,enabled,status,runtime_kind,active_workflow_version_id,updated_by_user_id) VALUES($1,$2,$3,$4,'','folder-cog',$5,FALSE,'draft','device',$6,$3)`, a.ID, a.SpaceID, userID, a.Name, a.Instructions, item.ActiveWorkflowVersionID); err != nil {
+				return err
+			}
+		}
+		return scanAgent(tx.QueryRow(`INSERT INTO agent_definitions(id,space_id,space_agent_id,owner_user_id,device_id,scope_id,name,instructions,workflow,workflow_revision,trust_policy,cloud_document_consent,enabled)
+			SELECT $1,$2,$1,$3,d.id,$4,$5,$6,$7,$8,$9,$10,FALSE FROM trusted_devices d WHERE d.id=$11 AND d.user_id=$3 AND d.revoked_at IS NULL
 			ON CONFLICT(id) DO UPDATE SET name=EXCLUDED.name,instructions=EXCLUDED.instructions,workflow=EXCLUDED.workflow,workflow_revision=EXCLUDED.workflow_revision,trust_policy=EXCLUDED.trust_policy,cloud_document_consent=EXCLUDED.cloud_document_consent,version=agent_definitions.version+1,updated_at=NOW()
-			WHERE agent_definitions.owner_user_id=$2 AND agent_definitions.deleted_at IS NULL
-			RETURNING id,owner_user_id,device_id,scope_id,name,instructions,workflow,workflow_revision,trust_policy,cloud_document_consent,enabled,version,created_at,updated_at`,
-			a.ID, userID, a.ScopeID, a.Name, a.Instructions, a.Workflow, a.WorkflowRevision, a.TrustPolicy, a.CloudDocumentConsent, a.DeviceID), out)
+			WHERE agent_definitions.space_id=$2 AND agent_definitions.deleted_at IS NULL
+			RETURNING `+agentDefinitionColumns,
+			a.ID, a.SpaceID, userID, a.ScopeID, a.Name, a.Instructions, a.Workflow, a.WorkflowRevision, a.TrustPolicy, a.CloudDocumentConsent, a.DeviceID), out)
 	})
 	if errors.Is(err, sql.ErrNoRows) {
 		err = ErrDeviceNotFound
@@ -261,7 +281,7 @@ func (db *Database) CreateAgentDefinition(userID string, a AgentDefinition) (*Ag
 func (db *Database) AgentDefinitions(userID string) ([]AgentDefinition, error) {
 	agents := []AgentDefinition{}
 	err := db.agentTx(userID, func(tx *sql.Tx) error {
-		rows, err := tx.Query(`SELECT id,owner_user_id,device_id,scope_id,name,instructions,workflow,workflow_revision,trust_policy,cloud_document_consent,enabled,version,created_at,updated_at FROM agent_definitions WHERE deleted_at IS NULL ORDER BY updated_at DESC`)
+		rows, err := tx.Query(`SELECT ` + agentDefinitionColumns + ` FROM agent_definitions WHERE deleted_at IS NULL ORDER BY updated_at DESC`)
 		if err != nil {
 			return err
 		}
@@ -273,7 +293,29 @@ func (db *Database) AgentDefinitions(userID string) ([]AgentDefinition, error) {
 			}
 			agents = append(agents, a)
 		}
-		return rows.Err()
+		if err := rows.Err(); err != nil {
+			return err
+		}
+		if err := rows.Close(); err != nil {
+			return err
+		}
+		permissionBySpace := map[string]bool{}
+		filtered := agents[:0]
+		for _, agent := range agents {
+			allowed, found := permissionBySpace[agent.SpaceID]
+			if !found {
+				allowed, err = hasSpacePermissionTx(context.Background(), tx, userID, agent.SpaceID, PermissionStudioView)
+				if err != nil {
+					return err
+				}
+				permissionBySpace[agent.SpaceID] = allowed
+			}
+			if allowed {
+				filtered = append(filtered, agent)
+			}
+		}
+		agents = filtered
+		return nil
 	})
 	return agents, err
 }
@@ -281,7 +323,10 @@ func (db *Database) AgentDefinitions(userID string) ([]AgentDefinition, error) {
 func (db *Database) AgentDefinition(userID, agentID string) (*AgentDefinition, error) {
 	a := &AgentDefinition{}
 	err := db.agentTx(userID, func(tx *sql.Tx) error {
-		return scanAgent(tx.QueryRow(`SELECT id,owner_user_id,device_id,scope_id,name,instructions,workflow,workflow_revision,trust_policy,cloud_document_consent,enabled,version,created_at,updated_at FROM agent_definitions WHERE id=$1 AND deleted_at IS NULL`, agentID), a)
+		if err := scanAgent(tx.QueryRow(`SELECT `+agentDefinitionColumns+` FROM agent_definitions WHERE id=$1 AND deleted_at IS NULL`, agentID), a); err != nil {
+			return err
+		}
+		return requireSpacePermissionTx(context.Background(), tx, userID, a.SpaceID, PermissionStudioView)
 	})
 	if errors.Is(err, sql.ErrNoRows) {
 		err = ErrAgentNotFound
@@ -292,12 +337,46 @@ func (db *Database) AgentDefinition(userID, agentID string) (*AgentDefinition, e
 func (db *Database) UpdateAgentDefinition(userID string, a AgentDefinition) (*AgentDefinition, error) {
 	out := &AgentDefinition{}
 	err := db.agentTx(userID, func(tx *sql.Tx) error {
-		err := scanAgent(tx.QueryRow(`UPDATE agent_definitions SET name=$1,instructions=$2,workflow=$3,workflow_revision=$4,trust_policy=$5,cloud_document_consent=$6,enabled=$7,version=version+1,updated_at=NOW() WHERE id=$8 AND owner_user_id=$9 AND version=$10 AND deleted_at IS NULL RETURNING id,owner_user_id,device_id,scope_id,name,instructions,workflow,workflow_revision,trust_policy,cloud_document_consent,enabled,version,created_at,updated_at`, a.Name, a.Instructions, a.Workflow, a.WorkflowRevision, a.TrustPolicy, a.CloudDocumentConsent, a.Enabled, a.ID, userID, a.Version), out)
+		var spaceID, activeVersionID string
+		var existingWorkflowRevision int
+		if err := tx.QueryRow(`SELECT d.space_id,d.workflow_revision,sa.active_workflow_version_id FROM agent_definitions d JOIN space_agents sa ON sa.id=d.space_agent_id WHERE d.id=$1 AND d.deleted_at IS NULL`, a.ID).Scan(&spaceID, &existingWorkflowRevision, &activeVersionID); err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return ErrAgentNotFound
+			}
+			return err
+		}
+		if err := requireSpacePermissionTx(context.Background(), tx, userID, spaceID, PermissionStudioManage); err != nil {
+			return err
+		}
+		if a.WorkflowRevision > existingWorkflowRevision {
+			active, err := loadWorkflowVersionTx(context.Background(), tx, activeVersionID)
+			if err != nil {
+				return err
+			}
+			var packageVersion int64
+			if err := tx.QueryRow(`UPDATE space_workflows SET name=$1,definition=$2,version=version+1,updated_at=NOW() WHERE id=$3 RETURNING version`, a.Name+" Workflow", a.Workflow, active.WorkflowID).Scan(&packageVersion); err != nil {
+				return err
+			}
+			item := SpaceStudioResource{ID: active.WorkflowID, SpaceID: spaceID, Name: a.Name + " Workflow", Definition: a.Workflow, Version: packageVersion, ActiveWorkflow: &WorkflowVersion{Metadata: defaultWorkflowMetadata(a.Name, a.Instructions, "device")}}
+			version, err := snapshotWorkflowTx(context.Background(), tx, userID, &item)
+			if err != nil {
+				return err
+			}
+			activeVersionID = version.ID
+		}
+		err := scanAgent(tx.QueryRow(`UPDATE agent_definitions SET name=$1,instructions=$2,workflow=$3,workflow_revision=$4,trust_policy=$5,cloud_document_consent=$6,enabled=$7,version=version+1,updated_at=NOW() WHERE id=$8 AND space_id=$9 AND version=$10 AND deleted_at IS NULL RETURNING `+agentDefinitionColumns, a.Name, a.Instructions, a.Workflow, a.WorkflowRevision, a.TrustPolicy, a.CloudDocumentConsent, a.Enabled, a.ID, spaceID, a.Version), out)
+		if err == nil {
+			status := "draft"
+			if a.Enabled {
+				status = "available"
+			}
+			_, err = tx.Exec(`UPDATE space_agents SET name=$1,instructions=$2,enabled=$3,status=$4,active_workflow_version_id=$5,updated_by_user_id=$6,version=version+1,updated_at=NOW() WHERE id=$7 AND space_id=$8`, a.Name, a.Instructions, a.Enabled, status, activeVersionID, userID, a.ID, spaceID)
+		}
 		if !errors.Is(err, sql.ErrNoRows) {
 			return err
 		}
 		var exists bool
-		if queryErr := tx.QueryRow(`SELECT EXISTS(SELECT 1 FROM agent_definitions WHERE id=$1 AND owner_user_id=$2 AND deleted_at IS NULL)`, a.ID, userID).Scan(&exists); queryErr != nil {
+		if queryErr := tx.QueryRow(`SELECT EXISTS(SELECT 1 FROM agent_definitions WHERE id=$1 AND space_id=$2 AND deleted_at IS NULL)`, a.ID, spaceID).Scan(&exists); queryErr != nil {
 			return queryErr
 		}
 		if exists {
@@ -310,7 +389,14 @@ func (db *Database) UpdateAgentDefinition(userID string, a AgentDefinition) (*Ag
 
 func (db *Database) DeleteAgentDefinition(userID, agentID string) error {
 	return db.agentTx(userID, func(tx *sql.Tx) error {
-		r, e := tx.Exec(`UPDATE agent_definitions SET deleted_at=NOW(),enabled=FALSE,updated_at=NOW() WHERE id=$1 AND owner_user_id=$2 AND deleted_at IS NULL`, agentID, userID)
+		var spaceID string
+		if err := tx.QueryRow(`SELECT space_id FROM agent_definitions WHERE id=$1 AND deleted_at IS NULL`, agentID).Scan(&spaceID); err != nil {
+			return ErrAgentNotFound
+		}
+		if err := requireSpacePermissionTx(context.Background(), tx, userID, spaceID, PermissionStudioManage); err != nil {
+			return err
+		}
+		r, e := tx.Exec(`UPDATE agent_definitions SET deleted_at=NOW(),enabled=FALSE,updated_at=NOW() WHERE id=$1 AND space_id=$2 AND deleted_at IS NULL`, agentID, spaceID)
 		if e != nil {
 			return e
 		}
@@ -318,41 +404,34 @@ func (db *Database) DeleteAgentDefinition(userID, agentID string) error {
 		if n == 0 {
 			return ErrAgentNotFound
 		}
+		_, _ = tx.Exec(`UPDATE space_agents SET enabled=FALSE,status='disabled',updated_by_user_id=$1,updated_at=NOW() WHERE id=$2 AND space_id=$3`, userID, agentID, spaceID)
 		return nil
 	})
 }
 
 func (db *Database) ReplaceAgentMembers(userID, agentID string, members []string) error {
 	return db.agentTx(userID, func(tx *sql.Tx) error {
-		var owner string
-		if e := tx.QueryRow(`SELECT owner_user_id FROM agent_definitions WHERE id=$1 AND owner_user_id=$2 AND deleted_at IS NULL`, agentID, userID).Scan(&owner); errors.Is(e, sql.ErrNoRows) {
+		var spaceID string
+		if e := tx.QueryRow(`SELECT space_id FROM agent_definitions WHERE id=$1 AND deleted_at IS NULL`, agentID).Scan(&spaceID); errors.Is(e, sql.ErrNoRows) {
 			return ErrAgentNotFound
 		} else if e != nil {
 			return e
 		}
-		if _, e := tx.Exec(`DELETE FROM agent_members WHERE agent_id=$1`, agentID); e != nil {
-			return e
-		}
-		for _, member := range members {
-			if _, e := tx.Exec(`INSERT INTO agent_members(agent_id,owner_user_id,user_id) VALUES($1,$2,$3)`, agentID, userID, member); e != nil {
-				return e
-			}
-		}
-		_, e := tx.Exec(`UPDATE agent_jobs SET state='canceled',canceled_at=NOW(),lease_expires_at=NULL,updated_at=NOW()
-			WHERE agent_id=$1 AND owner_user_id=$2 AND requester_user_id<>$2
-			AND state IN ('queued','leased','running','awaiting_approval')
-			AND NOT EXISTS (SELECT 1 FROM agent_members m WHERE m.agent_id=$1 AND m.user_id=agent_jobs.requester_user_id)`, agentID, userID)
-		if e != nil {
-			return e
-		}
-		return nil
+		return requireSpacePermissionTx(context.Background(), tx, userID, spaceID, PermissionStudioManage)
 	})
 }
 
 func (db *Database) AgentMembers(userID, agentID string) ([]AgentMember, error) {
 	out := []AgentMember{}
 	err := db.agentTx(userID, func(tx *sql.Tx) error {
-		rows, e := tx.Query(`SELECT user_id,role,created_at FROM agent_members WHERE agent_id=$1 ORDER BY created_at`, agentID)
+		var spaceID string
+		if e := tx.QueryRow(`SELECT space_id FROM agent_definitions WHERE id=$1 AND deleted_at IS NULL`, agentID).Scan(&spaceID); e != nil {
+			return ErrAgentNotFound
+		}
+		if err := requireSpacePermissionTx(context.Background(), tx, userID, spaceID, PermissionStudioView); err != nil {
+			return err
+		}
+		rows, e := tx.Query(`SELECT user_id,role,joined_at FROM space_members WHERE space_id=$1 ORDER BY joined_at`, spaceID)
 		if e != nil {
 			return e
 		}
@@ -371,11 +450,14 @@ func (db *Database) AgentMembers(userID, agentID string) ([]AgentMember, error) 
 
 func (db *Database) ReplaceAgentTriggers(userID, agentID string, triggers []AgentTrigger) error {
 	return db.agentTx(userID, func(tx *sql.Tx) error {
-		var owner string
-		if e := tx.QueryRow(`SELECT owner_user_id FROM agent_definitions WHERE id=$1 AND owner_user_id=$2 AND deleted_at IS NULL`, agentID, userID).Scan(&owner); errors.Is(e, sql.ErrNoRows) {
+		var owner, spaceID string
+		if e := tx.QueryRow(`SELECT owner_user_id,space_id FROM agent_definitions WHERE id=$1 AND deleted_at IS NULL`, agentID).Scan(&owner, &spaceID); errors.Is(e, sql.ErrNoRows) {
 			return ErrAgentNotFound
 		} else if e != nil {
 			return e
+		}
+		if err := requireSpacePermissionTx(context.Background(), tx, userID, spaceID, PermissionStudioManage); err != nil {
+			return err
 		}
 		if _, e := tx.Exec(`DELETE FROM agent_triggers WHERE agent_id=$1`, agentID); e != nil {
 			return e
@@ -384,7 +466,7 @@ func (db *Database) ReplaceAgentTriggers(userID, agentID string, triggers []Agen
 			if len(trigger.Config) == 0 {
 				trigger.Config = json.RawMessage(`{}`)
 			}
-			if _, e := tx.Exec(`INSERT INTO agent_triggers(id,agent_id,owner_user_id,kind,config,enabled) VALUES($1,$2,$3,$4,$5,$6)`, `trigger_`+uuid.NewString(), agentID, userID, trigger.Kind, trigger.Config, trigger.Enabled); e != nil {
+			if _, e := tx.Exec(`INSERT INTO agent_triggers(id,agent_id,owner_user_id,kind,config,enabled) VALUES($1,$2,$3,$4,$5,$6)`, `trigger_`+uuid.NewString(), agentID, owner, trigger.Kind, trigger.Config, trigger.Enabled); e != nil {
 				return e
 			}
 		}
@@ -395,6 +477,13 @@ func (db *Database) ReplaceAgentTriggers(userID, agentID string, triggers []Agen
 func (db *Database) AgentTriggers(userID, agentID string) ([]AgentTrigger, error) {
 	out := []AgentTrigger{}
 	err := db.agentTx(userID, func(tx *sql.Tx) error {
+		var spaceID string
+		if e := tx.QueryRow(`SELECT space_id FROM agent_definitions WHERE id=$1 AND deleted_at IS NULL`, agentID).Scan(&spaceID); e != nil {
+			return ErrAgentNotFound
+		}
+		if err := requireSpacePermissionTx(context.Background(), tx, userID, spaceID, PermissionStudioView); err != nil {
+			return err
+		}
 		rows, e := tx.Query(`SELECT id,agent_id,kind,config,enabled,created_at,updated_at FROM agent_triggers WHERE agent_id=$1 ORDER BY created_at`, agentID)
 		if e != nil {
 			return e
@@ -419,6 +508,13 @@ func (db *Database) CreateAgentJob(userID, agentID, triggerKind, idempotencyKey 
 	job := &AgentJob{}
 	created := true
 	err := db.agentTx(userID, func(tx *sql.Tx) error {
+		var spaceID string
+		if err := tx.QueryRow(`SELECT space_id FROM agent_definitions WHERE id=$1 AND deleted_at IS NULL`, agentID).Scan(&spaceID); err != nil {
+			return ErrAgentNotFound
+		}
+		if err := requireSpacePermissionTx(context.Background(), tx, userID, spaceID, PermissionAgentsRun); err != nil {
+			return err
+		}
 		err := scanJob(tx.QueryRow(`INSERT INTO agent_jobs(id,agent_id,owner_user_id,requester_user_id,device_id,trigger_kind,idempotency_key,payload)
 		SELECT $1,a.id,a.owner_user_id,$2,a.device_id,$3,$4,$5 FROM agent_definitions a JOIN trusted_devices d ON d.id=a.device_id WHERE a.id=$6 AND a.deleted_at IS NULL AND a.enabled AND d.revoked_at IS NULL
 		AND (a.owner_user_id=$2 OR $3 = 'manual')
@@ -588,6 +684,9 @@ func (db *Database) leaseJobUpdate(userID, deviceID, jobID, token, set string, a
 	if errors.Is(err, sql.ErrNoRows) {
 		err = ErrInvalidLease
 	}
+	if err == nil {
+		_ = db.syncSpaceRunFromAgentJob(context.Background(), j)
+	}
 	return j, err
 }
 
@@ -612,6 +711,9 @@ func (db *Database) finishAgentJob(userID, deviceID, jobID, token, state string,
 	if errors.Is(err, sql.ErrNoRows) {
 		err = ErrInvalidLease
 	}
+	if err == nil {
+		_ = db.syncSpaceRunFromAgentJob(context.Background(), j)
+	}
 	return j, err
 }
 
@@ -633,6 +735,9 @@ func (db *Database) CancelAgentJob(userID, jobID string) (*AgentJob, error) {
 	})
 	if errors.Is(err, sql.ErrNoRows) {
 		err = ErrAgentJobNotFound
+	}
+	if err == nil {
+		_ = db.syncSpaceRunFromAgentJob(context.Background(), j)
 	}
 	return j, err
 }
@@ -756,8 +861,11 @@ func scanDevice(s scanner, d *TrustedDevice) error {
 	return s.Scan(&d.ID, &d.UserID, &d.Name, &d.PublicKey, &d.KeyAlgorithm, &d.Capabilities, &d.LastSeenAt, &d.RevokedAt, &d.CreatedAt, &d.UpdatedAt)
 }
 func scanAgent(s scanner, a *AgentDefinition) error {
-	return s.Scan(&a.ID, &a.OwnerUserID, &a.DeviceID, &a.ScopeID, &a.Name, &a.Instructions, &a.Workflow, &a.WorkflowRevision, &a.TrustPolicy, &a.CloudDocumentConsent, &a.Enabled, &a.Version, &a.CreatedAt, &a.UpdatedAt)
+	return s.Scan(&a.ID, &a.SpaceID, &a.OwnerUserID, &a.DeviceID, &a.ScopeID, &a.Name, &a.Instructions, &a.Workflow, &a.WorkflowRevision, &a.TrustPolicy, &a.CloudDocumentConsent, &a.Enabled, &a.Version, &a.CreatedAt, &a.UpdatedAt)
 }
+
+const agentDefinitionColumns = `id,space_id,owner_user_id,device_id,scope_id,name,instructions,workflow,workflow_revision,trust_policy,cloud_document_consent,enabled,version,created_at,updated_at`
+
 func scanJob(s scanner, j *AgentJob) error {
 	var result []byte
 	err := s.Scan(&j.ID, &j.AgentID, &j.OwnerUserID, &j.RequesterUserID, &j.DeviceID, &j.TriggerKind, &j.State, &j.IdempotencyKey, &j.Payload, &result, &j.ErrorCode, &j.ErrorMessage, &j.Progress, &j.AttemptCount, &j.LeaseExpiresAt, &j.StartedAt, &j.CompletedAt, &j.CanceledAt, &j.ExpiresAt, &j.CreatedAt, &j.UpdatedAt)

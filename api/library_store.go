@@ -42,13 +42,21 @@ type LibraryObjectMetadata struct {
 	MIMEType string
 }
 
-// LibraryObjectStore is deliberately separate from the short-lived Agent
-// attachment store. Implementations must point at a private, permanent bucket.
+// LibraryObjectStore keeps permanent objects under the library/ prefix. When
+// its bucket is shared with Agent attachments, lifecycle rules must exclude
+// this prefix.
 type LibraryObjectStore interface {
 	Put(context.Context, string, io.Reader, LibraryObjectMetadata) error
 	Head(context.Context, string) (LibraryObjectMetadata, error)
 	Open(context.Context, string) (io.ReadCloser, LibraryObjectMetadata, error)
 	Delete(context.Context, string) error
+}
+
+type LibraryObjectUpload struct {
+	URL       string            `json:"url"`
+	Method    string            `json:"method"`
+	Headers   map[string]string `json:"headers"`
+	ExpiresAt time.Time         `json:"expires_at"`
 }
 
 type memoryLibraryObject struct {
@@ -238,7 +246,7 @@ type S3LibraryObjectStoreConfig struct {
 	SecretAccessKey    string
 	ForcePathStyle     bool
 	BucketPrivate      bool
-	PermanentBucket    bool
+	PermanentObjects   bool
 	AllowInsecureLocal bool
 	HTTPClient         *http.Client
 }
@@ -273,7 +281,8 @@ func NewS3LibraryObjectStore(config S3LibraryObjectStoreConfig) (*S3LibraryObjec
 	if endpoint := strings.TrimSpace(config.Endpoint); endpoint != "" {
 		options.BaseEndpoint = aws.String(strings.TrimRight(endpoint, "/"))
 	}
-	return &S3LibraryObjectStore{bucket: strings.TrimSpace(config.Bucket), client: s3.New(options)}, nil
+	client := s3.New(options)
+	return &S3LibraryObjectStore{bucket: strings.TrimSpace(config.Bucket), client: client}, nil
 }
 
 func validateS3LibraryObjectStoreConfig(config S3LibraryObjectStoreConfig) error {
@@ -289,8 +298,8 @@ func validateS3LibraryObjectStoreConfig(config S3LibraryObjectStoreConfig) error
 	if !config.BucketPrivate {
 		return errors.New("Library bucket must be private")
 	}
-	if !config.PermanentBucket {
-		return errors.New("Library storage must use a permanent bucket without the Agent attachment expiry rule")
+	if !config.PermanentObjects {
+		return errors.New("Library objects must be excluded from the Agent attachment expiry rule")
 	}
 	if endpoint := strings.TrimSpace(config.Endpoint); endpoint != "" {
 		parsed, err := url.Parse(endpoint)

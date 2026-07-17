@@ -144,3 +144,23 @@ func TestAPIRateLimiterSharesBudgetAcrossDynamicAISessionIDs(t *testing.T) {
 		}
 	}
 }
+
+func TestAPIRateLimiterSharesLibraryReauthenticationBudgetAcrossSpaces(t *testing.T) {
+	limiter := NewAPIRateLimiter()
+	limiter.now = func() time.Time { return time.Unix(0, 0) }
+	limiter.routePolicies["POST /spaces/{spaceID}/library/reauthenticate"] = RateLimitPolicy{Limit: 1, Window: time.Minute}
+	handler := limiter.Middleware(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) }))
+	for index, spaceID := range []string{"first", "second"} {
+		request := httptest.NewRequest(http.MethodPost, "/api/spaces/"+spaceID+"/library/reauthenticate", nil)
+		request.RemoteAddr = "203.0.113.10:1234"
+		recorder := httptest.NewRecorder()
+		handler.ServeHTTP(recorder, request)
+		want := http.StatusOK
+		if index == 1 {
+			want = http.StatusTooManyRequests
+		}
+		if recorder.Code != want {
+			t.Fatalf("request %d status=%d, want %d", index, recorder.Code, want)
+		}
+	}
+}

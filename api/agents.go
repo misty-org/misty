@@ -173,6 +173,7 @@ func (s *AgentsService) RevokeDevice() http.HandlerFunc {
 
 type agentDefinitionRequest struct {
 	ID                   string          `json:"id"`
+	SpaceID              string          `json:"spaceId"`
 	DeviceID             string          `json:"deviceId"`
 	ScopeID              string          `json:"scopeId"`
 	Name                 string          `json:"name"`
@@ -189,7 +190,7 @@ func (b agentDefinitionRequest) valid(create bool) bool {
 	if !validText(b.Name, 1, 100) || !validText(b.Instructions, 1, 10000) || !validAgentWorkflow(b.Workflow) || !validAgentTrustPolicy(b.TrustPolicy) || b.WorkflowRevision < 1 {
 		return false
 	}
-	if create && (!deviceIDPattern.MatchString(b.DeviceID) || !scopeIDPattern.MatchString(b.ScopeID) || b.Enabled) {
+	if create && (strings.TrimSpace(b.SpaceID) == "" || len(b.SpaceID) > 160 || !deviceIDPattern.MatchString(b.DeviceID) || !scopeIDPattern.MatchString(b.ScopeID) || b.Enabled) {
 		return false
 	}
 	if create && b.ID != "" && !agentIDPattern.MatchString(b.ID) {
@@ -281,7 +282,7 @@ func (s *AgentsService) CreateAgent() http.HandlerFunc {
 			http.Error(w, "invalid request", 400)
 			return
 		}
-		a, e := s.database.CreateAgentDefinition(userID, db.AgentDefinition{ID: body.ID, DeviceID: body.DeviceID, ScopeID: body.ScopeID, Name: strings.TrimSpace(body.Name), Instructions: strings.TrimSpace(body.Instructions), Workflow: body.Workflow, WorkflowRevision: body.WorkflowRevision, TrustPolicy: body.TrustPolicy, CloudDocumentConsent: body.CloudDocumentConsent})
+		a, e := s.database.CreateAgentDefinition(userID, db.AgentDefinition{ID: body.ID, SpaceID: strings.TrimSpace(body.SpaceID), DeviceID: body.DeviceID, ScopeID: body.ScopeID, Name: strings.TrimSpace(body.Name), Instructions: strings.TrimSpace(body.Instructions), Workflow: body.Workflow, WorkflowRevision: body.WorkflowRevision, TrustPolicy: body.TrustPolicy, CloudDocumentConsent: body.CloudDocumentConsent})
 		writeAgentResult(w, a, e, 201)
 	}
 }
@@ -441,38 +442,16 @@ func (s *AgentsService) Members() http.HandlerFunc {
 			writeJSON(w, 200, map[string]any{"members": m})
 			return
 		}
-		var body struct {
-			UserIDs []string `json:"userIds"`
-			Emails  []string `json:"emails"`
-		}
-		if decodeAIJSON(w, r, &body) != nil || len(body.UserIDs)+len(body.Emails) > 100 || hasInvalidUserIDs(userID, body.UserIDs) {
+		var body struct{}
+		if decodeAIJSON(w, r, &body) != nil {
 			http.Error(w, "invalid request", 400)
 			return
 		}
-		memberIDs := append([]string(nil), body.UserIDs...)
-		for _, email := range dedupe(body.Emails) {
-			if !validMemberEmail(email) {
-				http.Error(w, "invalid request", 400)
-				return
-			}
-			member, _, err := s.database.GetUserByEmail(email)
-			if err != nil {
-				http.Error(w, "internal error", 500)
-				return
-			}
-			if member == nil {
-				writeJSON(w, http.StatusUnprocessableEntity, map[string]string{"code": "misty_account_not_found"})
-				return
-			}
-			if member.ID != userID {
-				memberIDs = append(memberIDs, member.ID)
-			}
-		}
-		if e := s.database.ReplaceAgentMembers(userID, id, dedupe(memberIDs)); e != nil {
+		if e := s.database.ReplaceAgentMembers(userID, id, nil); e != nil {
 			writeAgentError(w, e)
 			return
 		}
-		writeJSON(w, 200, map[string]string{"status": "ok"})
+		writeJSON(w, 200, map[string]string{"status": "inherited_from_space"})
 	}
 }
 
@@ -878,6 +857,10 @@ func writeAgentResult(w http.ResponseWriter, v any, e error, status int) {
 }
 func writeAgentError(w http.ResponseWriter, e error) {
 	switch {
+	case errors.Is(e, db.ErrLibraryForbidden), errors.Is(e, db.ErrSpaceForbidden):
+		http.Error(w, "forbidden", http.StatusForbidden)
+	case errors.Is(e, db.ErrSpaceInvalid), errors.Is(e, db.ErrLibraryInvalid):
+		http.Error(w, "invalid request", http.StatusBadRequest)
 	case errors.Is(e, db.ErrAgentNotFound), errors.Is(e, db.ErrDeviceNotFound), errors.Is(e, db.ErrAgentJobNotFound), errors.Is(e, db.ErrApprovalNotFound):
 		http.Error(w, "not found", 404)
 	case errors.Is(e, db.ErrInvalidLease):

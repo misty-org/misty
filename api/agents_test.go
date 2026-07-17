@@ -87,7 +87,7 @@ func TestApprovalActionIsTypedAndPathSafe(t *testing.T) {
 }
 
 func TestAgentDefinitionRequiresReviewBeforeEnable(t *testing.T) {
-	body := agentDefinitionRequest{DeviceID: "device_12345678-1234-1234-1234-123456789abc", ScopeID: "scope_abcdefgh", Name: "Invoices", Instructions: "Summarize new invoices", Workflow: json.RawMessage(`{"version":1,"revision":1,"nodes":[{"id":"manual","kind":"manual_trigger","config":{},"policy":[]}],"edges":[]}`), WorkflowRevision: 1, TrustPolicy: json.RawMessage(`{"automaticActions":["read"],"approvalRequiredActions":["overwrite","rename","move","delete","change_permissions","outbound_webhook","external_message"],"memberWriteAccess":false,"approvalTtlHours":24}`), Enabled: true}
+	body := agentDefinitionRequest{SpaceID: "space_123", DeviceID: "device_12345678-1234-1234-1234-123456789abc", ScopeID: "scope_abcdefgh", Name: "Invoices", Instructions: "Summarize new invoices", Workflow: json.RawMessage(`{"version":1,"revision":1,"nodes":[{"id":"manual","kind":"manual_trigger","config":{},"policy":[]}],"edges":[]}`), WorkflowRevision: 1, TrustPolicy: json.RawMessage(`{"automaticActions":["read"],"approvalRequiredActions":["overwrite","rename","move","delete","change_permissions","outbound_webhook","external_message"],"memberWriteAccess":false,"approvalTtlHours":24}`), Enabled: true}
 	if body.valid(true) {
 		t.Fatal("new agent was allowed to bypass disabled draft state")
 	}

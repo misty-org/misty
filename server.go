@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"strconv"
+	"os/exec"
 	"strings"
 
 	"github.com/go-chi/chi/v5"
@@ -78,61 +78,38 @@ func CreateServer() (*Server, error) {
 			return nil, fmt.Errorf("configure agent attachment envelope keys: %w", err)
 		}
 	}
-	if serverFeatureEnabled("MISTY_LIBRARY_ENABLED") {
-		s.LibraryStore, err = libraryStoreFromEnv()
-		if err != nil {
-			return nil, err
-		}
-		maxFileBytes := int64(250 << 20)
-		if value := strings.TrimSpace(os.Getenv("LIBRARY_MAX_FILE_BYTES")); value != "" {
-			maxFileBytes, err = strconv.ParseInt(value, 10, 64)
-			if err != nil {
-				return nil, fmt.Errorf("LIBRARY_MAX_FILE_BYTES must be an integer: %w", err)
-			}
-		}
-		s.Library, err = api.NewSpaceLibraryService(s.Database, s.LibraryStore, serverFeatureEnabled("MISTY_LIBRARY_UPLOADS_ENABLED"), maxFileBytes)
-		if err != nil {
-			return nil, fmt.Errorf("configure Space Library: %w", err)
-		}
-		s.Library.SetSubsystems(serverFeatureEnabled("MISTY_LIBRARY_ATTACHMENTS_ENABLED"), serverFeatureEnabled("MISTY_LIBRARY_GROUPS_ENABLED"), serverFeatureEnabled("MISTY_LIBRARY_PREVIEWS_ENABLED"), serverFeatureEnabled("MISTY_LIBRARY_PEOPLE_ENABLED"), serverFeatureEnabled("MISTY_LIBRARY_EDITING_ENABLED"), serverFeatureEnabled("MISTY_LIBRARY_LOCATIONS_ENABLED"), serverFeatureEnabled("MISTY_LIBRARY_DUPLICATES_ENABLED"), serverFeatureEnabled("MISTY_LIBRARY_IMPORTS_ENABLED"), serverFeatureEnabled("MISTY_LIBRARY_EXPORTS_ENABLED"))
-		mediaProcessorBin := strings.TrimSpace(os.Getenv("LIBRARY_MEDIA_PROCESSOR_BIN"))
-		if mediaProcessorBin == "" && !strings.EqualFold(strings.TrimSpace(os.Getenv("MISTY_ENVIRONMENT")), "production") {
-			mediaProcessorBin = "ffmpeg"
-		}
-		if mediaProcessorBin != "" {
-			processor, processorErr := api.NewFFmpegLibraryMediaProcessor(mediaProcessorBin)
-			if processorErr != nil {
-				if strings.EqualFold(strings.TrimSpace(os.Getenv("MISTY_ENVIRONMENT")), "production") && (serverFeatureEnabled("MISTY_LIBRARY_EDITING_ENABLED") || serverFeatureEnabled("MISTY_LIBRARY_PREVIEWS_ENABLED")) {
-					return nil, fmt.Errorf("configure Library media processor: %w", processorErr)
-				}
-			} else {
-				s.Library.SetMediaProcessor(processor)
-				if extractor, extractorErr := api.NewFFprobeLibraryMetadataExtractor(mediaProcessorBin); extractorErr == nil {
-					s.Library.SetMetadataExtractor(extractor)
-				} else if strings.EqualFold(strings.TrimSpace(os.Getenv("MISTY_ENVIRONMENT")), "production") {
-					return nil, fmt.Errorf("configure Library metadata extractor: %w", extractorErr)
-				}
-			}
-		} else if strings.EqualFold(strings.TrimSpace(os.Getenv("MISTY_ENVIRONMENT")), "production") && (serverFeatureEnabled("MISTY_LIBRARY_EDITING_ENABLED") || serverFeatureEnabled("MISTY_LIBRARY_PREVIEWS_ENABLED")) {
-			return nil, fmt.Errorf("LIBRARY_MEDIA_PROCESSOR_BIN is required before production Library editing or previews can be enabled")
-		}
-		if endpoint := strings.TrimSpace(os.Getenv("LIBRARY_PEOPLE_PROCESSOR_URL")); endpoint != "" {
-			processor, processorErr := api.NewHTTPLibraryPeopleProcessor(endpoint, os.Getenv("LIBRARY_PEOPLE_PROCESSOR_TOKEN"))
-			if processorErr != nil {
-				return nil, fmt.Errorf("configure Library People processor: %w", processorErr)
-			}
-			s.Library.SetPeopleProcessor(processor)
-		}
-		if address := strings.TrimSpace(os.Getenv("LIBRARY_CLAMAV_ADDRESS")); address != "" {
-			scanner, scannerErr := api.NewClamAVLibraryScanner(address)
-			if scannerErr != nil {
-				return nil, fmt.Errorf("configure Library malware scanner: %w", scannerErr)
-			}
-			s.Library.SetMalwareScanner(scanner)
-		} else if strings.EqualFold(strings.TrimSpace(os.Getenv("MISTY_ENVIRONMENT")), "production") && (serverFeatureEnabled("MISTY_LIBRARY_UPLOADS_ENABLED") || serverFeatureEnabled("MISTY_LIBRARY_ATTACHMENTS_ENABLED")) {
-			return nil, fmt.Errorf("LIBRARY_CLAMAV_ADDRESS is required before production Library uploads can be enabled")
-		}
+	s.LibraryStore, err = libraryStoreFromEnv()
+	if err != nil {
+		return nil, err
 	}
+	s.Library, err = api.NewSpaceLibraryService(s.Database, s.LibraryStore, true, 250<<20)
+	if err != nil {
+		return nil, fmt.Errorf("configure Space Library: %w", err)
+	}
+	mediaProcessingEnabled := false
+	if mediaProcessorBin, lookupErr := exec.LookPath("ffmpeg"); lookupErr == nil {
+		processor, processorErr := api.NewFFmpegLibraryMediaProcessor(mediaProcessorBin)
+		if processorErr != nil {
+			return nil, fmt.Errorf("configure Library media processor: %w", processorErr)
+		}
+		s.Library.SetMediaProcessor(processor)
+		extractor, extractorErr := api.NewFFprobeLibraryMetadataExtractor(mediaProcessorBin)
+		if extractorErr != nil {
+			return nil, fmt.Errorf("configure Library metadata extractor: %w", extractorErr)
+		}
+		s.Library.SetMetadataExtractor(extractor)
+		mediaProcessingEnabled = true
+	}
+	peopleProcessingEnabled := false
+	if endpoint := strings.TrimSpace(os.Getenv("VISION_PROCESSOR_URL")); endpoint != "" {
+		processor, processorErr := api.NewHTTPLibraryPeopleProcessor(endpoint, os.Getenv("VISION_PROCESSOR_TOKEN"))
+		if processorErr != nil {
+			return nil, fmt.Errorf("configure Library People processor: %w", processorErr)
+		}
+		s.Library.SetPeopleProcessor(processor)
+		peopleProcessingEnabled = true
+	}
+	s.Library.SetSubsystems(true, true, mediaProcessingEnabled, peopleProcessingEnabled, mediaProcessingEnabled, true, true, true, true)
 	spaceKey, err := spaceLinkEncryptionKeyFromEnv()
 	if err != nil {
 		return nil, err
@@ -176,9 +153,8 @@ func (s *Server) MountHandlers() error {
 		APIKey:  strings.TrimSpace(os.Getenv("AI_GATEWAY_API_KEY")),
 		BaseURL: strings.TrimSpace(os.Getenv("AI_GATEWAY_BASE_URL")),
 	}
-	if s.Library != nil {
-		s.Library.SetIntelligence(libraryAnalyzer, serverFeatureEnabled("MISTY_LIBRARY_OCR_ENABLED"), serverFeatureEnabled("MISTY_LIBRARY_AI_ENABLED"))
-	}
+	intelligenceEnabled := libraryAnalyzer.APIKey != ""
+	s.Library.SetIntelligence(libraryAnalyzer, intelligenceEnabled, intelligenceEnabled)
 	smartLibraryService := api.NewSmartLibraryService(s.Database, libraryAnalyzer)
 	mediaSearchService := api.NewMediaSearchService(s.Database, libraryAnalyzer)
 	agentsService := api.NewAgentsService(s.Database)
@@ -281,10 +257,16 @@ func (s *Server) mountLibraryRoutes(prefix string, library *api.SpaceLibraryServ
 	s.Router.MethodFunc(http.MethodGet, prefix+"/spaces/{spaceID}/library/shared/{referenceID}/download", library.SharedReferenceDownload())
 	s.Router.MethodFunc(http.MethodDelete, prefix+"/spaces/{spaceID}/library/grants/{grantID}", library.RevokeGrant())
 	s.Router.MethodFunc(http.MethodGet, prefix+"/spaces/{spaceID}/library/usage", library.Usage())
+	s.Router.MethodFunc(http.MethodPost, prefix+"/spaces/{spaceID}/library/reauthenticate", library.Reauthenticate())
+	s.Router.MethodFunc(http.MethodGet, prefix+"/spaces/{spaceID}/library/asset-stacks", library.AssetStacks())
+	s.Router.MethodFunc(http.MethodPost, prefix+"/spaces/{spaceID}/library/asset-stacks", library.AssetStacks())
+	s.Router.MethodFunc(http.MethodPatch, prefix+"/spaces/{spaceID}/library/asset-stacks/{stackID}", library.AssetStack())
+	s.Router.MethodFunc(http.MethodDelete, prefix+"/spaces/{spaceID}/library/asset-stacks/{stackID}", library.AssetStack())
 	s.Router.MethodFunc(http.MethodPost, prefix+"/spaces/{spaceID}/library/uploads", library.InitiateUpload())
 	s.Router.MethodFunc(http.MethodPut, prefix+"/spaces/{spaceID}/library/uploads/{uploadID}/content", library.UploadContent())
 	s.Router.MethodFunc(http.MethodPost, prefix+"/spaces/{spaceID}/library/uploads/{uploadID}/finalize", library.FinalizeUpload())
 	s.Router.MethodFunc(http.MethodPost, prefix+"/spaces/{spaceID}/library/items/bulk", library.BulkItems())
+	s.Router.MethodFunc(http.MethodPost, prefix+"/spaces/{spaceID}/library/items/duplicate", library.DuplicateItems())
 	s.Router.MethodFunc(http.MethodGet, prefix+"/spaces/{spaceID}/library/items/{itemID}", library.Item())
 	s.Router.MethodFunc(http.MethodPatch, prefix+"/spaces/{spaceID}/library/items/{itemID}", library.Item())
 	s.Router.MethodFunc(http.MethodGet, prefix+"/spaces/{spaceID}/library/items/{itemID}/download", library.DownloadItem())
@@ -361,10 +343,28 @@ func (s *Server) mountSpacesRoutes(prefix string, spaces *api.SpacesService, rea
 	s.Router.MethodFunc(http.MethodPost, prefix+"/spaces/{spaceID}/studio/agents", spaces.StudioResources("agent"))
 	s.Router.Delete(prefix+"/spaces/{spaceID}/studio/agents/{resourceID}", spaces.DeleteStudioResource("agent"))
 	s.Router.Post(prefix+"/spaces/{spaceID}/studio/agents/{resourceID}/runs", spaces.RunStudioResource("agent"))
+	s.Router.MethodFunc(http.MethodGet, prefix+"/spaces/{spaceID}/agents/{agentID}/runs", spaces.DirectAgentRun())
+	s.Router.MethodFunc(http.MethodPost, prefix+"/spaces/{spaceID}/agents/{agentID}/runs", spaces.DirectAgentRun())
+	s.Router.Put(prefix+"/spaces/{spaceID}/studio/agents/{agentID}/workflow", spaces.ReplaceAgentWorkflow())
 	s.Router.MethodFunc(http.MethodGet, prefix+"/spaces/{spaceID}/studio/workflows", spaces.StudioResources("workflow"))
 	s.Router.MethodFunc(http.MethodPost, prefix+"/spaces/{spaceID}/studio/workflows", spaces.StudioResources("workflow"))
 	s.Router.Delete(prefix+"/spaces/{spaceID}/studio/workflows/{resourceID}", spaces.DeleteStudioResource("workflow"))
 	s.Router.Post(prefix+"/spaces/{spaceID}/studio/workflows/{resourceID}/runs", spaces.RunStudioResource("workflow"))
+	s.Router.MethodFunc(http.MethodGet, prefix+"/spaces/{spaceID}/studio/workflows/{workflowID}/versions", spaces.WorkflowVersions())
+	s.Router.MethodFunc(http.MethodPost, prefix+"/spaces/{spaceID}/studio/workflows/{workflowID}/versions", spaces.WorkflowVersions())
+	s.Router.Get(prefix+"/agents/catalog", spaces.AgentCatalog())
+	s.Router.Get(prefix+"/mika/discovery", spaces.AgentCatalog())
+	s.Router.Post(prefix+"/mika/delegations", spaces.MikaDelegation())
+	s.Router.MethodFunc(http.MethodGet, prefix+"/agent-conversations", spaces.PrivateAgentConversations())
+	s.Router.MethodFunc(http.MethodPost, prefix+"/agent-conversations", spaces.PrivateAgentConversations())
+	s.Router.MethodFunc(http.MethodGet, prefix+"/agent-conversations/{conversationID}/events", spaces.PrivateAgentConversationEvents())
+	s.Router.MethodFunc(http.MethodPost, prefix+"/agent-conversations/{conversationID}/events", spaces.PrivateAgentConversationEvents())
+	s.Router.MethodFunc(http.MethodGet, prefix+"/spaces/{spaceID}/integrations", spaces.SpaceIntegrations())
+	s.Router.MethodFunc(http.MethodPut, prefix+"/spaces/{spaceID}/integrations", spaces.SpaceIntegrations())
+	s.Router.Get(prefix+"/runs/{runID}", spaces.RunDetail())
+	s.Router.Post(prefix+"/runs/{runID}/approval", spaces.RunDecision())
+	s.Router.Post(prefix+"/runs/{runID}/cancel", spaces.RunCancel())
+	s.Router.Post(prefix+"/runs/{runID}/retry", spaces.RunRetry())
 	s.Router.Post(prefix+"/realtime/tickets", realtime.Ticket())
 	s.Router.Get(prefix+"/realtime", realtime.Connect())
 }
@@ -461,105 +461,56 @@ func serverFeatureEnabled(name string) bool {
 	return strings.EqualFold(strings.TrimSpace(os.Getenv(name)), "true")
 }
 
-func agentAttachmentStoreFromEnv() (api.AgentAttachmentStore, error) {
-	storeName := strings.ToLower(strings.TrimSpace(os.Getenv("DOCUMENT_STORE")))
-	switch storeName {
-	case "memory":
-		if strings.EqualFold(strings.TrimSpace(os.Getenv("MISTY_ENVIRONMENT")), "production") {
-			return nil, fmt.Errorf("DOCUMENT_STORE=memory is not allowed in production")
-		}
-		return api.NewMemoryAgentAttachmentStore(), nil
-	case "r2", "s3":
-		lifecycleDays, err := strconv.Atoi(strings.TrimSpace(os.Getenv("S3_LIFECYCLE_DAYS")))
-		if err != nil {
-			return nil, fmt.Errorf("S3_LIFECYCLE_DAYS must be an integer between 1 and 2")
-		}
-		endpoint := strings.TrimSpace(os.Getenv("S3_ENDPOINT"))
-		region := strings.TrimSpace(os.Getenv("S3_REGION"))
-		forcePathStyle := serverFeatureEnabled("S3_FORCE_PATH_STYLE")
-		if storeName == "r2" {
-			if endpoint == "" {
-				return nil, fmt.Errorf("S3_ENDPOINT is required for Cloudflare R2")
-			}
-			if region == "" {
-				region = "auto"
-			}
-			// R2 supports path-style S3 requests, which avoid placing a user
-			// supplied bucket name into the endpoint hostname.
-			forcePathStyle = true
-		}
-		store, err := api.NewS3AgentAttachmentStore(api.S3AgentAttachmentStoreConfig{
-			Endpoint:           endpoint,
-			Region:             region,
-			Bucket:             os.Getenv("S3_BUCKET"),
-			AccessKeyID:        os.Getenv("S3_ACCESS_KEY"),
-			SecretAccessKey:    os.Getenv("S3_SECRET_KEY"),
-			ForcePathStyle:     forcePathStyle,
-			BucketPrivate:      serverFeatureEnabled("S3_PRIVATE"),
-			LifecycleMaxDays:   lifecycleDays,
-			AllowInsecureLocal: !strings.EqualFold(strings.TrimSpace(os.Getenv("MISTY_ENVIRONMENT")), "production") && serverFeatureEnabled("S3_ALLOW_INSECURE_LOCAL"),
-		})
-		if err != nil {
-			return nil, fmt.Errorf("configure %s agent attachment store: %w", storeName, err)
-		}
-		return store, nil
-	case "":
-		return nil, fmt.Errorf("DOCUMENT_STORE is required when MISTY_AGENT_DOCUMENTS_ENABLED=true")
-	default:
-		return nil, fmt.Errorf("unsupported DOCUMENT_STORE %q (expected r2, s3, or development-only memory)", storeName)
+type r2Config struct {
+	endpoint, bucket, accessKey, secretKey string
+}
+
+func r2ConfigFromEnv() r2Config {
+	return r2Config{
+		endpoint:  strings.TrimSpace(os.Getenv("R2_ENDPOINT")),
+		bucket:    strings.TrimSpace(os.Getenv("R2_BUCKET")),
+		accessKey: strings.TrimSpace(os.Getenv("R2_ACCESS_KEY")),
+		secretKey: strings.TrimSpace(os.Getenv("R2_SECRET_KEY")),
 	}
 }
 
-func libraryStoreFromEnv() (api.LibraryObjectStore, error) {
-	storeName := strings.ToLower(strings.TrimSpace(os.Getenv("LIBRARY_STORE")))
-	switch storeName {
-	case "local":
-		if strings.EqualFold(strings.TrimSpace(os.Getenv("MISTY_ENVIRONMENT")), "production") {
-			return nil, fmt.Errorf("LIBRARY_STORE=local is not allowed in production")
-		}
-		store, err := api.NewLocalLibraryObjectStore(os.Getenv("LIBRARY_LOCAL_DIR"))
-		if err != nil {
-			return nil, fmt.Errorf("configure local Library store: %w", err)
-		}
-		return store, nil
-	case "memory":
-		if strings.EqualFold(strings.TrimSpace(os.Getenv("MISTY_ENVIRONMENT")), "production") {
-			return nil, fmt.Errorf("LIBRARY_STORE=memory is not allowed in production")
-		}
-		return api.NewMemoryLibraryObjectStore(), nil
-	case "r2", "s3":
-		endpoint := strings.TrimSpace(os.Getenv("LIBRARY_S3_ENDPOINT"))
-		region := strings.TrimSpace(os.Getenv("LIBRARY_S3_REGION"))
-		forcePathStyle := serverFeatureEnabled("LIBRARY_S3_FORCE_PATH_STYLE")
-		if storeName == "r2" {
-			if endpoint == "" {
-				return nil, fmt.Errorf("LIBRARY_S3_ENDPOINT is required for Cloudflare R2")
-			}
-			if region == "" {
-				region = "auto"
-			}
-			forcePathStyle = true
-		}
-		store, err := api.NewS3LibraryObjectStore(api.S3LibraryObjectStoreConfig{
-			Endpoint:           endpoint,
-			Region:             region,
-			Bucket:             os.Getenv("LIBRARY_S3_BUCKET"),
-			AccessKeyID:        os.Getenv("LIBRARY_S3_ACCESS_KEY"),
-			SecretAccessKey:    os.Getenv("LIBRARY_S3_SECRET_KEY"),
-			ForcePathStyle:     forcePathStyle,
-			BucketPrivate:      serverFeatureEnabled("LIBRARY_S3_PRIVATE"),
-			PermanentBucket:    serverFeatureEnabled("LIBRARY_S3_PERMANENT"),
-			AllowInsecureLocal: !strings.EqualFold(strings.TrimSpace(os.Getenv("MISTY_ENVIRONMENT")), "production") && serverFeatureEnabled("LIBRARY_S3_ALLOW_INSECURE_LOCAL"),
-		})
-		if err != nil {
-			return nil, fmt.Errorf("configure %s permanent Library store: %w", storeName, err)
-		}
-		return store, nil
-	case "":
-		return nil, fmt.Errorf("LIBRARY_STORE is required when MISTY_LIBRARY_ENABLED=true")
-	default:
-		return nil, fmt.Errorf("unsupported LIBRARY_STORE %q (expected r2, s3, or development-only local/memory)", storeName)
+func (config r2Config) empty() bool {
+	return config.endpoint == "" && config.bucket == "" && config.accessKey == "" && config.secretKey == ""
+}
+
+func agentAttachmentStoreFromEnv() (api.AgentAttachmentStore, error) {
+	config := r2ConfigFromEnv()
+	if config.endpoint == "" {
+		return nil, fmt.Errorf("R2_ENDPOINT is required for Agent attachments")
 	}
+	store, err := api.NewS3AgentAttachmentStore(api.S3AgentAttachmentStoreConfig{
+		Endpoint: config.endpoint, Region: "auto", Bucket: config.bucket,
+		AccessKeyID: config.accessKey, SecretAccessKey: config.secretKey,
+		ForcePathStyle: true, BucketPrivate: true, LifecycleMaxDays: 2,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("configure R2 agent attachment store: %w", err)
+	}
+	return store, nil
+}
+
+func libraryStoreFromEnv() (api.LibraryObjectStore, error) {
+	config := r2ConfigFromEnv()
+	if config.empty() && !strings.EqualFold(strings.TrimSpace(os.Getenv("MISTY_ENVIRONMENT")), "production") {
+		return api.NewMemoryLibraryObjectStore(), nil
+	}
+	if config.endpoint == "" {
+		return nil, fmt.Errorf("R2_ENDPOINT is required for the Space Library")
+	}
+	store, err := api.NewS3LibraryObjectStore(api.S3LibraryObjectStoreConfig{
+		Endpoint: config.endpoint, Region: "auto", Bucket: config.bucket,
+		AccessKeyID: config.accessKey, SecretAccessKey: config.secretKey,
+		ForcePathStyle: true, BucketPrivate: true, PermanentObjects: true,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("configure R2 Library store: %w", err)
+	}
+	return store, nil
 }
 
 func (s *Server) mountMediaSearchRoutes(prefix string, service *api.MediaSearchService) {

@@ -29,13 +29,18 @@ func (s *SpaceLibraryService) RenderEditVersion() http.HandlerFunc {
 		if !ok {
 			return
 		}
+		spaceID, itemID := chi.URLParam(r, "spaceID"), chi.URLParam(r, "itemID")
+		if err := s.validateSensitiveLibraryItem(r, userID, spaceID, itemID); err != nil {
+			writeLibraryError(w, err)
+			return
+		}
 		var body struct {
 			MaximumOutputBytes int64 `json:"maximum_output_bytes"`
 		}
 		if r.ContentLength > 0 && decodeJSON(w, r, &body) != nil {
 			return
 		}
-		result, err := s.database.QueueLibraryEditRendition(r.Context(), userID, chi.URLParam(r, "spaceID"), chi.URLParam(r, "itemID"), chi.URLParam(r, "editID"), body.MaximumOutputBytes)
+		result, err := s.database.QueueLibraryEditRendition(r.Context(), userID, spaceID, itemID, chi.URLParam(r, "editID"), body.MaximumOutputBytes)
 		if err != nil {
 			writeLibraryError(w, err)
 			return

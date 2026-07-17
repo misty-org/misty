@@ -36,6 +36,24 @@ func TestFFmpegLibraryMediaProcessorRendersBoundedImage(t *testing.T) {
 	definition := db.DefaultLibraryEditDefinition()
 	definition.Rotation = 90
 	definition.Crop = &db.LibraryCrop{X: 0, Y: 0, Width: 0.5, Height: 1}
+	definition.Exposure = .15
+	definition.Brilliance = .1
+	definition.Highlights = -.1
+	definition.Shadows = .1
+	definition.BlackPoint = .1
+	definition.Vibrance = .1
+	definition.Warmth = .1
+	definition.Tint = -.1
+	definition.Sharpness = .1
+	definition.Definition = .1
+	definition.NoiseReduction = .1
+	definition.Vignette = .1
+	definition.Markup = []db.LibraryMarkupElement{
+		{Kind: "stroke", Points: []db.LibraryMarkupPoint{{X: .1, Y: .1}, {X: .2, Y: .2}}, Color: "#ff3b30", LineWidth: .012, Opacity: 1},
+		{Kind: "rectangle", X: .2, Y: .2, Width: .4, Height: .4, Color: "#34c759", LineWidth: .008, Opacity: .8},
+		{Kind: "cleanup", X: .1, Y: .1, Width: .2, Height: .2, Color: "#ffffff", LineWidth: .008, Opacity: 1},
+		{Kind: "text", X: .1, Y: .8, Color: "#ffffff", LineWidth: .012, Opacity: 1, Text: "Misty"},
+	}
 	rendered, err := processor.Render(context.Background(), bytes.NewReader(encoded.Bytes()), "image/png", int64(encoded.Len()), definition, 1_000_000)
 	if err != nil {
 		t.Fatal(err)

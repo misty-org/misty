@@ -13,6 +13,7 @@ func TestPublicAccountResponsesHideLicenseID(t *testing.T) {
 
 	registerRec := performJSONRequest(t, api.Register(database), http.MethodPost, "/register", map[string]string{
 		"name":     "Ada Lovelace",
+		"username": "ada_lovelace",
 		"email":    "ada@example.com",
 		"password": "correct horse battery staple",
 	})
@@ -23,6 +24,9 @@ func TestPublicAccountResponsesHideLicenseID(t *testing.T) {
 	registerBody := decodeJSONResponse(t, registerRec)
 	if _, ok := registerBody["license_id"]; ok {
 		t.Fatalf("register response unexpectedly exposed license_id: %#v", registerBody)
+	}
+	if registerBody["username"] != "ada_lovelace" {
+		t.Fatalf("register username = %#v, want ada_lovelace", registerBody["username"])
 	}
 
 	userID, ok := registerBody["user_id"].(string)
@@ -54,6 +58,9 @@ func TestPublicAccountResponsesHideLicenseID(t *testing.T) {
 	if _, ok := meBody["license_id"]; ok {
 		t.Fatalf("/me response unexpectedly exposed license_id: %#v", meBody)
 	}
+	if meBody["username"] != "ada_lovelace" {
+		t.Fatalf("/me username = %#v, want ada_lovelace", meBody["username"])
+	}
 	if got, ok := meBody["allows_use"].(bool); !ok || !got {
 		t.Fatalf("/me allows_use = %#v, want true", meBody["allows_use"])
 	}
@@ -67,6 +74,7 @@ func TestGetMeExposesBillingKindAndLifetimeFallback(t *testing.T) {
 
 	registerRec := performJSONRequest(t, api.Register(database), http.MethodPost, "/register", map[string]string{
 		"name":     "Upgrade User",
+		"username": "upgrade_user",
 		"email":    "upgrade@example.com",
 		"password": "correct horse battery staple",
 	})
@@ -139,6 +147,7 @@ func TestSettingsEndpointsExposeAndPersistEmailUpdatesPreference(t *testing.T) {
 
 	registerRec := performJSONRequest(t, api.Register(database), http.MethodPost, "/register", map[string]string{
 		"name":     "Settings User",
+		"username": "settings_user",
 		"email":    "settings@example.com",
 		"password": "correct horse battery staple",
 	})

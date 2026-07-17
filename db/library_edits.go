@@ -26,20 +26,52 @@ type LibraryTrim struct {
 	End   float64 `json:"end"`
 }
 
+type LibraryMarkupPoint struct {
+	X float64 `json:"x"`
+	Y float64 `json:"y"`
+}
+
+type LibraryMarkupElement struct {
+	Kind      string               `json:"kind"`
+	Points    []LibraryMarkupPoint `json:"points,omitempty"`
+	X         float64              `json:"x,omitempty"`
+	Y         float64              `json:"y,omitempty"`
+	Width     float64              `json:"width,omitempty"`
+	Height    float64              `json:"height,omitempty"`
+	Color     string               `json:"color"`
+	LineWidth float64              `json:"line_width"`
+	Opacity   float64              `json:"opacity"`
+	Text      string               `json:"text,omitempty"`
+}
+
 type LibraryEditDefinition struct {
-	Rotation       int          `json:"rotation"`
-	FlipHorizontal bool         `json:"flip_horizontal"`
-	FlipVertical   bool         `json:"flip_vertical"`
-	AutoEnhance    bool         `json:"auto_enhance"`
-	Filter         string       `json:"filter"`
-	Brightness     float64      `json:"brightness"`
-	Contrast       float64      `json:"contrast"`
-	Saturation     float64      `json:"saturation"`
-	Grayscale      float64      `json:"grayscale"`
-	Mute           bool         `json:"mute"`
-	PlaybackSpeed  float64      `json:"playback_speed"`
-	Crop           *LibraryCrop `json:"crop,omitempty"`
-	Trim           *LibraryTrim `json:"trim,omitempty"`
+	Rotation       int                    `json:"rotation"`
+	FlipHorizontal bool                   `json:"flip_horizontal"`
+	FlipVertical   bool                   `json:"flip_vertical"`
+	AutoEnhance    bool                   `json:"auto_enhance"`
+	Filter         string                 `json:"filter"`
+	Brightness     float64                `json:"brightness"`
+	Contrast       float64                `json:"contrast"`
+	Saturation     float64                `json:"saturation"`
+	Grayscale      float64                `json:"grayscale"`
+	Exposure       float64                `json:"exposure"`
+	Brilliance     float64                `json:"brilliance"`
+	Highlights     float64                `json:"highlights"`
+	Shadows        float64                `json:"shadows"`
+	BlackPoint     float64                `json:"black_point"`
+	Vibrance       float64                `json:"vibrance"`
+	Warmth         float64                `json:"warmth"`
+	Tint           float64                `json:"tint"`
+	Sharpness      float64                `json:"sharpness"`
+	Definition     float64                `json:"definition"`
+	NoiseReduction float64                `json:"noise_reduction"`
+	Vignette       float64                `json:"vignette"`
+	Straighten     float64                `json:"straighten"`
+	Markup         []LibraryMarkupElement `json:"markup,omitempty"`
+	Mute           bool                   `json:"mute"`
+	PlaybackSpeed  float64                `json:"playback_speed"`
+	Crop           *LibraryCrop           `json:"crop,omitempty"`
+	Trim           *LibraryTrim           `json:"trim,omitempty"`
 }
 
 type LibraryEditVersion struct {
@@ -74,7 +106,12 @@ func (definition LibraryEditDefinition) Validate(mimeType string) error {
 		definition.PlaybackSpeed = 1
 	}
 	validFilter := definition.Filter == "" || definition.Filter == "vivid" || definition.Filter == "dramatic" || definition.Filter == "warm" || definition.Filter == "cool" || definition.Filter == "mono" || definition.Filter == "noir"
-	if !validFilter || definition.Rotation != 0 && definition.Rotation != 90 && definition.Rotation != 180 && definition.Rotation != 270 || !finiteRange(definition.Brightness, 0, 3) || !finiteRange(definition.Contrast, 0, 3) || !finiteRange(definition.Saturation, 0, 3) || !finiteRange(definition.Grayscale, 0, 1) || !finiteRange(definition.PlaybackSpeed, .5, 2) {
+	if !validFilter || definition.Rotation != 0 && definition.Rotation != 90 && definition.Rotation != 180 && definition.Rotation != 270 ||
+		!finiteRange(definition.Brightness, 0, 3) || !finiteRange(definition.Contrast, 0, 3) || !finiteRange(definition.Saturation, 0, 3) || !finiteRange(definition.Grayscale, 0, 1) ||
+		!finiteRange(definition.Exposure, -2, 2) || !finiteRange(definition.Brilliance, -1, 1) || !finiteRange(definition.Highlights, -1, 1) || !finiteRange(definition.Shadows, -1, 1) ||
+		!finiteRange(definition.BlackPoint, -1, 1) || !finiteRange(definition.Vibrance, -1, 1) || !finiteRange(definition.Warmth, -1, 1) || !finiteRange(definition.Tint, -1, 1) ||
+		!finiteRange(definition.Sharpness, 0, 2) || !finiteRange(definition.Definition, 0, 2) || !finiteRange(definition.NoiseReduction, 0, 1) || !finiteRange(definition.Vignette, 0, 1) ||
+		!finiteRange(definition.Straighten, -45, 45) || !finiteRange(definition.PlaybackSpeed, .5, 2) {
 		return ErrLibraryInvalid
 	}
 	if (definition.Mute || definition.PlaybackSpeed != 1) && !strings.HasPrefix(mimeType, "video/") {
@@ -91,7 +128,78 @@ func (definition LibraryEditDefinition) Validate(mimeType string) error {
 			return ErrLibraryInvalid
 		}
 	}
+	if len(definition.Markup) > 16 {
+		return ErrLibraryInvalid
+	}
+	markupCost := 0
+	for _, element := range definition.Markup {
+		if !validLibraryMarkupElement(element) {
+			return ErrLibraryInvalid
+		}
+		if element.Kind == "cleanup" && !strings.HasPrefix(mimeType, "image/") {
+			return ErrLibraryInvalid
+		}
+		if element.Kind == "text" {
+			markupCost += len(element.Text) * 24
+		} else if element.Kind == "rectangle" {
+			markupCost += 4
+		} else {
+			markupCost += len(element.Points)
+		}
+	}
+	if markupCost > 1024 {
+		return ErrLibraryInvalid
+	}
 	return nil
+}
+
+func validLibraryMarkupElement(element LibraryMarkupElement) bool {
+	if !libraryMarkupColor(element.Color) || !finiteRange(element.LineWidth, .001, .1) || !finiteRange(element.Opacity, .05, 1) {
+		return false
+	}
+	switch element.Kind {
+	case "stroke", "highlight":
+		if len(element.Points) < 2 || len(element.Points) > 64 {
+			return false
+		}
+		for _, point := range element.Points {
+			if !finiteRange(point.X, 0, 1) || !finiteRange(point.Y, 0, 1) {
+				return false
+			}
+		}
+		return true
+	case "rectangle", "cleanup":
+		minimum := .001
+		if element.Kind == "cleanup" {
+			minimum = .01
+		}
+		return finiteRange(element.X, 0, 1) && finiteRange(element.Y, 0, 1) && finiteRange(element.Width, minimum, 1) && finiteRange(element.Height, minimum, 1) && element.X+element.Width <= 1.000001 && element.Y+element.Height <= 1.000001
+	case "text":
+		return finiteRange(element.X, 0, 1) && finiteRange(element.Y, 0, 1) && len(element.Text) > 0 && len(element.Text) <= 40 && libraryMarkupText(element.Text)
+	default:
+		return false
+	}
+}
+
+func libraryMarkupColor(value string) bool {
+	if len(value) != 7 || value[0] != '#' {
+		return false
+	}
+	for _, character := range value[1:] {
+		if character < '0' || character > '9' && character < 'A' || character > 'F' && character < 'a' || character > 'f' {
+			return false
+		}
+	}
+	return true
+}
+
+func libraryMarkupText(value string) bool {
+	for _, character := range value {
+		if character < 32 || character > 126 || strings.ContainsRune("'\\:%[];%", character) {
+			return false
+		}
+	}
+	return strings.TrimSpace(value) != ""
 }
 
 func finiteRange(value, minimum, maximum float64) bool {

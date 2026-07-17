@@ -27,6 +27,9 @@ const (
 	PermissionStorageViewMembers = "storage.view_member_usage"
 	PermissionStorageManage      = "storage.manage"
 	PermissionStorageViewOwn     = "storage.view_own_usage"
+	PermissionStudioView         = "studio.view"
+	PermissionStudioManage       = "studio.manage"
+	PermissionAgentsRun          = "agents.run"
 	LibraryRecoveryWindow        = 30 * 24 * time.Hour
 )
 
@@ -34,16 +37,17 @@ var configurableSpacePermissions = []string{
 	PermissionLibraryView, PermissionLibraryUpload, PermissionAttachmentUpload,
 	PermissionLibraryAdd, PermissionLibraryEdit, PermissionLibraryDownload,
 	PermissionLibraryImport, PermissionStorageViewOwn, PermissionStorageViewMembers,
-	PermissionStorageManage,
+	PermissionStorageManage, PermissionStudioView, PermissionStudioManage, PermissionAgentsRun,
 }
 
 var (
-	ErrLibraryNotFound       = errors.New("library resource not found")
-	ErrLibraryForbidden      = errors.New("library permission denied")
-	ErrLibraryInvalid        = errors.New("invalid library request")
-	ErrLibraryQuota          = errors.New("space storage quota exceeded")
-	ErrLibraryConflict       = errors.New("library resource version conflict")
-	ErrLibraryUploadMismatch = errors.New("library upload does not match its reservation")
+	ErrLibraryNotFound         = errors.New("library resource not found")
+	ErrLibraryForbidden        = errors.New("library permission denied")
+	ErrLibraryInvalid          = errors.New("invalid library request")
+	ErrLibraryQuota            = errors.New("space storage quota exceeded")
+	ErrLibraryConflict         = errors.New("library resource version conflict")
+	ErrLibraryReauthentication = errors.New("library reauthentication required")
+	ErrLibraryUploadMismatch   = errors.New("library upload does not match its reservation")
 )
 
 type SpaceStorageUsage struct {
@@ -338,6 +342,72 @@ func (db *Database) LibraryUpload(ctx context.Context, userID, spaceID, uploadID
 	return out, err
 }
 
+// LibraryUploadDeduplicationObjectKey returns the object currently selected as
+// the deduplication target for an upload. The object store must verify this key
+// before finalization reuses it; a ready database row alone does not prove the
+// immutable object still exists in R2.
+func (db *Database) LibraryUploadDeduplicationObjectKey(ctx context.Context, userID, spaceID, uploadID string) (string, error) {
+	var objectKey string
+	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionLibraryUpload); err != nil {
+			return err
+		}
+		err := tx.QueryRowContext(ctx, `SELECT b.r2_object_key
+			FROM space_library_uploads u
+			JOIN library_blobs b ON b.security_domain_id=u.security_domain_id AND b.sha256=u.client_sha256 AND b.byte_size=u.requested_byte_size AND b.lifecycle_state='ready'
+			WHERE u.id=$1 AND u.space_id=$2 AND u.user_id=$3 AND u.state='uploaded_unverified' AND b.r2_object_key<>u.object_key
+			LIMIT 1`, uploadID, spaceID, userID).Scan(&objectKey)
+		if errors.Is(err, sql.ErrNoRows) {
+			objectKey = ""
+			return nil
+		}
+		return err
+	})
+	return objectKey, err
+}
+
+// ReplaceMissingLibraryUploadDeduplicationObject heals a deduplicated blob
+// whose R2 object disappeared. The caller must first verify that missingKey is
+// absent and that the upload's new object exists with the reserved metadata.
+func (db *Database) ReplaceMissingLibraryUploadDeduplicationObject(ctx context.Context, userID, spaceID, uploadID, missingKey string) error {
+	return db.spaceTx(ctx, func(tx *sql.Tx) error {
+		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionLibraryUpload); err != nil {
+			return err
+		}
+		var domainID, sha, uploadKey, state string
+		var byteSize int64
+		if err := tx.QueryRowContext(ctx, `SELECT security_domain_id,client_sha256,requested_byte_size,object_key,state
+			FROM space_library_uploads WHERE id=$1 AND space_id=$2 AND user_id=$3 FOR UPDATE`, uploadID, spaceID, userID).
+			Scan(&domainID, &sha, &byteSize, &uploadKey, &state); err != nil {
+			return err
+		}
+		if state != "uploaded_unverified" || missingKey == "" || uploadKey == missingKey {
+			return ErrLibraryConflict
+		}
+		if _, err := tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock(hashtext($1))`, "library:blob:"+domainID+":"+sha+fmt.Sprint(byteSize)); err != nil {
+			return err
+		}
+		result, err := tx.ExecContext(ctx, `UPDATE library_blobs
+			SET r2_object_key=$1,version=version+1,updated_at=NOW()
+			WHERE security_domain_id=$2 AND sha256=$3 AND byte_size=$4 AND lifecycle_state='ready' AND r2_object_key=$5`,
+			uploadKey, domainID, sha, byteSize, missingKey)
+		if err != nil {
+			return err
+		}
+		if count, _ := result.RowsAffected(); count == 1 {
+			return nil
+		}
+		var currentKey string
+		if err := tx.QueryRowContext(ctx, `SELECT r2_object_key FROM library_blobs WHERE security_domain_id=$1 AND sha256=$2 AND byte_size=$3 AND lifecycle_state='ready' LIMIT 1`, domainID, sha, byteSize).Scan(&currentKey); err != nil {
+			return err
+		}
+		if currentKey == uploadKey {
+			return nil
+		}
+		return ErrLibraryConflict
+	})
+}
+
 func (db *Database) SetLibraryUploadState(ctx context.Context, userID, spaceID, uploadID, tokenHash, from, to string) (*LibraryUpload, error) {
 	out := &LibraryUpload{}
 	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
@@ -379,6 +449,9 @@ func (db *Database) RejectLibraryUpload(ctx context.Context, userID, spaceID, up
 			}
 		}
 		if _, err := tx.ExecContext(ctx, `UPDATE space_library_uploads SET state=$1,error_code=$2,version=version+1,updated_at=NOW() WHERE id=$3`, state, errorCode, upload.ID); err != nil {
+			return err
+		}
+		if _, err := recordSpaceEventTx(ctx, tx, spaceID, userID, "library.upload."+state, upload.ID, map[string]any{"upload_id": upload.ID, "state": state, "error_code": errorCode}); err != nil {
 			return err
 		}
 		return insertLibraryAuditTx(ctx, tx, spaceID, upload.SecurityDomainID, userID, "library.upload."+state, "upload", upload.ID, "failed", map[string]any{"error_code": errorCode, "released_bytes": released})
@@ -596,6 +669,9 @@ func (db *Database) CompleteLibraryUpload(ctx context.Context, userID, spaceID, 
 			return err
 		}
 		upload.VerifiedByteSize, upload.VerifiedSHA256, upload.DetectedMIMEType, upload.State, upload.FileID = &verifiedSize, verifiedSHA, detectedMIME, "ready", file.ID
+		if _, err := recordSpaceEventTx(ctx, tx, spaceID, userID, "library.upload.ready", upload.ID, map[string]any{"upload_id": upload.ID, "state": "ready", "item_id": sourceID, "purpose": upload.Purpose}); err != nil {
+			return err
+		}
 		return insertLibraryAuditTx(ctx, tx, spaceID, upload.SecurityDomainID, userID, "library.upload.ready", sourceKind, sourceID, "success", map[string]any{"logical_bytes": verifiedSize, "deduplicated": result.DiscardObjectKey != ""})
 	})
 	if errors.Is(err, sql.ErrNoRows) {
@@ -705,6 +781,9 @@ func (db *Database) LibraryItems(ctx context.Context, userID, spaceID string, qu
 			return err
 		}
 		conditions := []string{"i.space_id=$1", "i.lifecycle_state=$2"}
+		if state == "ready" {
+			conditions = append(conditions, "NOT EXISTS(SELECT 1 FROM space_library_asset_stack_members stack_member JOIN space_library_asset_stacks asset_stack ON asset_stack.id=stack_member.stack_id WHERE stack_member.space_library_item_id=i.id AND asset_stack.lifecycle_state='ready' AND asset_stack.cover_item_id<>i.id)")
+		}
 		args := []any{spaceID, state}
 		addArgument := func(value any) string {
 			args = append(args, value)
@@ -734,7 +813,7 @@ func (db *Database) LibraryItems(ctx context.Context, userID, spaceID string, qu
 			conditions = append(conditions, "b.server_detected_mime_type LIKE "+addArgument(query.MediaType+"/%"))
 		case "document":
 			conditions = append(conditions, "b.server_detected_mime_type NOT LIKE 'image/%' AND b.server_detected_mime_type NOT LIKE 'video/%' AND b.server_detected_mime_type NOT LIKE 'audio/%'")
-		case "selfies", "live-photos", "portraits", "panoramas", "slo-mo", "cinematic", "bursts", "screenshots", "screen-recordings", "spatial":
+		case "selfies", "live-photos", "portraits", "panoramas", "slo-mo", "cinematic", "bursts", "raw", "screenshots", "screen-recordings", "spatial":
 			conditions = append(conditions, libraryMediaSubtypeCondition(query.MediaType))
 		case "":
 		default:
@@ -763,6 +842,8 @@ func (db *Database) LibraryItems(ctx context.Context, userID, spaceID string, qu
 			sortExpression, subquerySortExpression = "i.updated_at", "cursor_item.updated_at"
 		case "imports":
 			conditions = append(conditions, "EXISTS(SELECT 1 FROM space_library_imports import_record WHERE import_record.destination_space_id=i.space_id AND import_record.destination_item_id=i.id AND import_record.state='ready')")
+		case "featured":
+			conditions = append(conditions, "b.server_detected_mime_type LIKE 'image/%' AND (i.favorite OR EXISTS(SELECT 1 FROM library_derivatives featured_derivative WHERE featured_derivative.space_library_item_id=i.id AND featured_derivative.lifecycle_state='ready' AND featured_derivative.kind='ai_metadata' AND lower(featured_derivative.metadata::text) ~ '(featured|aesthetic|best shot|high quality)'))")
 		case "screenshots":
 			conditions = append(conditions, "(lower(f.original_filename) LIKE '%screenshot%' OR lower(f.intrinsic_metadata::text) LIKE '%screenshot%')")
 		case "documents":
@@ -819,7 +900,7 @@ func libraryMediaSubtypeCondition(kind string) string {
 	case "selfies":
 		return "b.server_detected_mime_type LIKE 'image/%' AND " + metadata + " ~ '(selfie|front.camera)'"
 	case "live-photos":
-		return "b.server_detected_mime_type LIKE 'image/%' AND " + metadata + " ~ '(live.photo|motion.photo)'"
+		return "(EXISTS(SELECT 1 FROM space_library_asset_stacks asset_stack WHERE asset_stack.space_id=i.space_id AND asset_stack.cover_item_id=i.id AND asset_stack.kind='live_photo' AND asset_stack.lifecycle_state='ready') OR b.server_detected_mime_type LIKE 'image/%' AND " + metadata + " ~ '(live.photo|motion.photo)')"
 	case "portraits":
 		return "b.server_detected_mime_type LIKE 'image/%' AND " + metadata + " ~ '(portrait|depth.effect)'"
 	case "panoramas":
@@ -829,7 +910,9 @@ func libraryMediaSubtypeCondition(kind string) string {
 	case "cinematic":
 		return "b.server_detected_mime_type LIKE 'video/%' AND " + metadata + " ~ '(cinematic|depth.video)'"
 	case "bursts":
-		return "b.server_detected_mime_type LIKE 'image/%' AND " + metadata + " ~ '(burst|burst.identifier)'"
+		return "(EXISTS(SELECT 1 FROM space_library_asset_stacks asset_stack WHERE asset_stack.space_id=i.space_id AND asset_stack.cover_item_id=i.id AND asset_stack.kind='burst' AND asset_stack.lifecycle_state='ready') OR b.server_detected_mime_type LIKE 'image/%' AND " + metadata + " ~ '(burst|burst.identifier)')"
+	case "raw":
+		return "(EXISTS(SELECT 1 FROM space_library_asset_stacks asset_stack WHERE asset_stack.space_id=i.space_id AND asset_stack.cover_item_id=i.id AND asset_stack.kind='raw_pair' AND asset_stack.lifecycle_state='ready') OR lower(f.original_filename) ~ '\\.(dng|cr2|cr3|nef|nrw|arw|srf|sr2|raf|rw2|orf|pef|x3f)$')"
 	case "screenshots":
 		return "b.server_detected_mime_type LIKE 'image/%' AND " + metadata + " ~ '(screenshot|screen.shot)'"
 	case "screen-recordings":
