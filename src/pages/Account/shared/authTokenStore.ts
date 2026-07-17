@@ -13,6 +13,7 @@ const legacyUserKey = "misty_user";
 export interface SavedAccountSession {
   id: string;
   name: string;
+  username?: string;
   email: string;
   accountCreatedAt?: string;
   currentPlan?: string;
@@ -279,6 +280,7 @@ function readLegacyAccount(): Omit<SavedAccountSession, "lastUsedAt"> | null {
     return {
       id: value.id,
       name: value.name || value.email,
+      username: value.username,
       email: value.email,
       accountCreatedAt: value.accountCreatedAt,
       currentPlan: value.currentPlan,

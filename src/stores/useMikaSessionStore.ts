@@ -28,6 +28,7 @@ import { agentsPrepareDocument, agentsRegisterFolderScope } from "../agents/api"
 import type { AgentCitation } from "../agents/types";
 import { deviceRelativePath, isSafeRelativePath, mikaServerContext } from "../agents/pathPrivacy";
 import { mistyDocumentsEnabled } from "../agents/flags";
+import { mikaDelegationMessage, publicMikaDisplayName, publicMikaModel, tryMikaSpaceDelegation } from "./mikaDelegation";
 
 export type AiPanelMessage = {
   id: string;
@@ -251,6 +252,16 @@ export const useMikaSessionStore = create<AiSessionStore>((set, get) => ({
     }));
 
     try {
+      const delegation = await tryMikaSpaceDelegation(trimmed);
+      if (delegation && (delegation.run || delegation.routing.options?.length)) {
+        const explanation = mikaDelegationMessage(delegation);
+        set((state) => ({
+          error: null,
+          status: statusWithRunning(state.status, false),
+          messages: [...state.messages, { id: aiMessageId("assistant"), role: "assistant", text: explanation }],
+        }));
+        return;
+      }
       const registeredScope = cwd
         ? await agentsRegisterFolderScope({ path: cwd }).catch(() => null)
         : null;
@@ -821,21 +832,6 @@ function serverStatusFromResponse(response: AgentStatusResponse): AiStatus {
     sessionId: response.session_id ?? activeSessionId,
     error: response.error,
   };
-}
-
-function publicMikaModel(model: string): string {
-  return model === "mika-med" || model === "mika-high" ? model : "mika-low";
-}
-
-function mikaModelDisplayName(model: string): string {
-  if (model === "mika-med") return "Mika Med";
-  if (model === "mika-high") return "Mika High";
-  return "Mika Low";
-}
-
-function publicMikaDisplayName(model: string, modelName?: string): string {
-  const expected = mikaModelDisplayName(model);
-  return modelName === expected ? modelName : expected;
 }
 
 function aiMessageId(prefix: string): string {

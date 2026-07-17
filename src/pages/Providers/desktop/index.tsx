@@ -19,6 +19,7 @@ const useProvidersMultiPanelStore = createMultiPanelStore({ idPrefix: "remotes",
 const PROVIDERS_MULTIPANEL_STORAGE_KEY = "misty.remotes.multipanel.v1";
 const EMPTY_PROVIDER_REMOTES: ProviderRemote[] = [];
 const EMPTY_PROVIDER_WORKFLOWS: ProviderWorkflow[] = [];
+const EMPTY_PROVIDER_WORKSPACE = createProvidersWorkspaceState();
 
 const providersWorkspaceClass =
   "h-full bg-[var(--misty-app-page-bg,var(--misty-bg))]";
@@ -201,7 +202,7 @@ const ProvidersPane = memo(function ProvidersPane(props: { workspaceId: string }
     remoteRevisions: state.remoteRevisions,
     remotes: state.providers?.remotes ?? EMPTY_PROVIDER_REMOTES,
     working: state.working,
-    workspace: state.workspaces[props.workspaceId] ?? createProvidersWorkspaceState(),
+    workspace: state.workspaces[props.workspaceId] ?? EMPTY_PROVIDER_WORKSPACE,
     ensureWorkspace: state.ensureWorkspace,
     load: state.load,
     openAddRemote: state.openAddRemote,

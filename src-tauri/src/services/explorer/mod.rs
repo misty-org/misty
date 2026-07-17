@@ -72,7 +72,6 @@ const IMAGE_THUMBNAIL_PNG_COMPRESSION: CompressionType = CompressionType::Fast;
 const IMAGE_THUMBNAIL_PNG_FILTER: PngFilterType = PngFilterType::Adaptive;
 const REMOTE_INVENTORY_WAIT_ATTEMPTS: usize = 30;
 const REMOTE_INVENTORY_WAIT_INTERVAL: Duration = Duration::from_millis(100);
-const REMOTE_LISTING_CACHE_MAX_AGE: Duration = Duration::from_secs(5 * 60);
 const REMOTE_JOB_STALE_TIMEOUT: Duration = Duration::from_secs(30 * 60);
 const REMOTE_JOB_MAX_WAIT: Duration = Duration::from_secs(24 * 60 * 60);
 

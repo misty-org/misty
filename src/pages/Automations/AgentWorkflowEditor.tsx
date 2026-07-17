@@ -44,19 +44,19 @@ const palette: Array<{ kind: AgentWorkflowNodeKind; label: string; action?: Agen
 const labelByKind = new Map(palette.map((item) => [item.kind, item.label]));
 const nodeTypes = { "agent-workflow": AgentWorkflowCanvasNode };
 
-export function AgentWorkflowEditor({ agentId }: { agentId: string }) {
+export function AgentWorkflowEditor({ agentId, spaceId, personalSpaceId }: { agentId: string; spaceId?: string; personalSpaceId?: string }) {
   const snapshot = useAgentsStore((state) => state.snapshot);
   const loading = useAgentsStore((state) => state.loading);
   const saving = useAgentsStore((state) => state.saving);
   const load = useAgentsStore((state) => state.load);
   const saveDefinition = useAgentsStore((state) => state.saveDefinition);
-  const definition = snapshot.definitions.find((item) => item.id === agentId) ?? null;
+  const definition = snapshot.definitions.find((item) => item.id === agentId && (!spaceId || item.spaceId === spaceId)) ?? null;
   const [draft, setDraft] = useState<AgentDefinition | null>(null);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [mfPickerOpen, setMfPickerOpen] = useState(false);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => { void load(personalSpaceId); }, [load, personalSpaceId]);
   useEffect(() => { if (definition) setDraft(definition); }, [definition?.id, definition?.version]);
 
   const nodes = useMemo<AgentCanvasNode[]>(() => (draft?.workflow.nodes ?? []).map((node, index) => ({
@@ -182,13 +182,13 @@ export function AgentWorkflowEditor({ agentId }: { agentId: string }) {
   };
 
   if (!draft) {
-    return <main className="agent-workflow-editor"><header><Link to="/agents"><ArrowLeft size={15} /> Agents</Link><h1>Agent workflow</h1></header><p>{loading ? "Loading…" : "This agent could not be found."}</p></main>;
+    return <main className="agent-workflow-editor"><header><Link to={spaceId ? `/spaces/${encodeURIComponent(spaceId)}/studio/folder-agents` : "/agents"}><ArrowLeft size={15} /> Folder agents</Link><h1>Agent workflow</h1></header><p>{loading ? "Loading…" : "This agent could not be found in this Space."}</p></main>;
   }
 
   return (
     <main className="agent-workflow-editor">
       <header className="agent-workflow-toolbar">
-        <div><Link to="/agents"><ArrowLeft size={15} /> Agents</Link><span><Bot size={16} /> {draft.name}</span><strong>Workflow revision {draft.workflowRevision}</strong></div>
+        <div><Link to={spaceId ? `/spaces/${encodeURIComponent(spaceId)}/studio/folder-agents` : "/agents"}><ArrowLeft size={15} /> Folder agents</Link><span><Bot size={16} /> {draft.name}</span><strong>Workflow revision {draft.workflowRevision}</strong></div>
         <div>{message ? <small>{message}</small> : null}<button type="button" onClick={() => setMfPickerOpen(true)}><FileUp size={14} /> Import .mf</button><button type="button" onClick={() => void exportMf()}><FileDown size={14} /> Export .mf</button><button type="button" disabled={!selectedNodeId} onClick={removeSelected}><Trash2 size={14} /> Remove</button><button type="button" disabled={saving} onClick={() => void save()}><Save size={14} /> Save workflow</button></div>
       </header>
       <section className="agent-workflow-body">

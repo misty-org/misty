@@ -1,5 +1,6 @@
 import { readAccountAuthToken } from "../pages/Account/shared/authTokenStore";
 import { appSnapshot } from "../api/misty";
+import { safeTauriAssetUrl } from "../shared/tauri";
 import type {
   MessageSpan,
   BulkLibraryItemAction,
@@ -90,6 +91,7 @@ function spaceErrorMessage(code: string | undefined, fallback: string): string {
     space_node_limit_reached: "This Space has reached its 5,000-item limit.",
     version_conflict: "Someone else changed this item. Reload it before saving again.",
     library_reauthentication_required: "Unlock this protected Library collection again.",
+    integration_required: "Connect the workflow’s required provider in this Space before running it.",
     reauthentication_failed: "That password is incorrect.",
     invite_expired: "That invitation has expired.",
     invalid_request: "Misty could not validate that request.",
@@ -176,7 +178,8 @@ export const spacesApi = {
   }),
   trashLibraryItem: (spaceId: string, itemId: string, reauthenticationToken = "") => spaceRequest<SpaceLibraryItem>(`/spaces/${encodeURIComponent(spaceId)}/library/items/${encodeURIComponent(itemId)}/trash`, { method: "POST", headers: libraryReauthenticationHeaders(reauthenticationToken) }),
   restoreLibraryItem: (spaceId: string, itemId: string, reauthenticationToken = "") => spaceRequest<SpaceLibraryItem>(`/spaces/${encodeURIComponent(spaceId)}/library/items/${encodeURIComponent(itemId)}/restore`, { method: "POST", headers: libraryReauthenticationHeaders(reauthenticationToken) }),
-  uploadLibraryFile: (spaceId: string, file: File, purpose: "library" | "attachment") => uploadLibraryFile(spaceId, file, purpose),
+  uploadLibraryFile: (spaceId: string, file: File, purpose: "library" | "attachment", options?: LibraryUploadOptions) => uploadLibraryFile(spaceId, file, purpose, options),
+  uploadLibraryPath: (spaceId: string, path: string, purpose: "library" | "attachment", options?: LibraryUploadOptions) => uploadLibraryPath(spaceId, path, purpose, options),
   promoteAttachment: (spaceId: string, attachmentId: string) => spaceRequest<SpaceLibraryItem>(`/spaces/${encodeURIComponent(spaceId)}/attachments/${encodeURIComponent(attachmentId)}/promote`, { method: "POST" }),
   downloadLibraryItem: (spaceId: string, itemId: string, filename: string, reauthenticationToken = "") => downloadProtectedFile(`/spaces/${encodeURIComponent(spaceId)}/library/items/${encodeURIComponent(itemId)}/download`, filename, { headers: libraryReauthenticationHeaders(reauthenticationToken) }),
   downloadOriginalLibraryItem: (spaceId: string, itemId: string, filename: string, reauthenticationToken = "") => downloadProtectedFile(`/spaces/${encodeURIComponent(spaceId)}/library/items/${encodeURIComponent(itemId)}/download?version=original`, filename, { headers: libraryReauthenticationHeaders(reauthenticationToken) }),
@@ -188,8 +191,8 @@ export const spacesApi = {
   revokeLibraryGrant: (spaceId: string, grant: LibrarySharedReference) => spaceRequest(`/spaces/${encodeURIComponent(spaceId)}/library/grants/${encodeURIComponent(grant.grant_id)}?version=${grant.version}`, { method: "DELETE" }),
   libraryContent: (spaceId: string, itemId: string, reauthenticationToken = "") => fetchProtectedBlob(`/spaces/${encodeURIComponent(spaceId)}/library/items/${encodeURIComponent(itemId)}/download`, { headers: libraryReauthenticationHeaders(reauthenticationToken) }),
   libraryOriginalContent: (spaceId: string, itemId: string, reauthenticationToken = "") => fetchProtectedBlob(`/spaces/${encodeURIComponent(spaceId)}/library/items/${encodeURIComponent(itemId)}/download?version=original`, { headers: libraryReauthenticationHeaders(reauthenticationToken) }),
-  libraryPreview: (spaceId: string, itemId: string, reauthenticationToken = "") => fetchProtectedBlob(`/spaces/${encodeURIComponent(spaceId)}/library/items/${encodeURIComponent(itemId)}/preview`, { headers: libraryReauthenticationHeaders(reauthenticationToken) }),
-  libraryOriginalPreview: (spaceId: string, itemId: string, reauthenticationToken = "") => fetchProtectedBlob(`/spaces/${encodeURIComponent(spaceId)}/library/items/${encodeURIComponent(itemId)}/preview?version=original`, { headers: libraryReauthenticationHeaders(reauthenticationToken) }),
+  libraryPreview: (spaceId: string, itemId: string, reauthenticationToken = "", cacheVersion?: string | number) => fetchProtectedBlob(libraryPreviewPath(spaceId, itemId, false, cacheVersion), { headers: libraryReauthenticationHeaders(reauthenticationToken) }),
+  libraryOriginalPreview: (spaceId: string, itemId: string, reauthenticationToken = "", cacheVersion?: string | number) => fetchProtectedBlob(libraryPreviewPath(spaceId, itemId, true, cacheVersion), { headers: libraryReauthenticationHeaders(reauthenticationToken) }),
   downloadAttachment: (spaceId: string, attachmentId: string, filename: string) => downloadProtectedFile(`/spaces/${encodeURIComponent(spaceId)}/attachments/${encodeURIComponent(attachmentId)}/download`, filename),
   albums: (spaceId: string) => spaceRequest<{ albums: LibraryAlbum[] }>(`/spaces/${encodeURIComponent(spaceId)}/library/albums`),
   albumFolders: (spaceId: string) => spaceRequest<{ folders: LibraryAlbumFolder[] }>(`/spaces/${encodeURIComponent(spaceId)}/library/album-folders`),
@@ -226,28 +229,102 @@ export const spacesApi = {
   setMemberPermission: (spaceId: string, userId: string, permission: string, effect: "allow" | "deny" | "inherit") => spaceRequest<{ permissions: Record<string, boolean> }>(`/spaces/${encodeURIComponent(spaceId)}/members/${encodeURIComponent(userId)}/permissions`, { method: "PUT", body: JSON.stringify({ permission, effect }) }),
 };
 
-async function uploadLibraryFile(spaceId: string, file: File, purpose: "library" | "attachment"): Promise<LibraryUploadResult> {
+export interface LibraryUploadOptions {
+  signal?: AbortSignal;
+  onProgress?: (progress: number) => void;
+  onStage?: (stage: "reading" | "hashing" | "uploading" | "finalizing") => void;
+}
+
+async function uploadLibraryPath(spaceId: string, path: string, purpose: "library" | "attachment", options?: LibraryUploadOptions): Promise<LibraryUploadResult> {
+  options?.onStage?.("reading");
+  const response = await fetch(safeTauriAssetUrl(path));
+  if (!response.ok) throw new Error(`Misty could not read ${fileNameFromPath(path)}.`);
+  const blob = await response.blob();
+  const file = new File([blob], fileNameFromPath(path), {
+    type: blob.type || "application/octet-stream",
+    lastModified: Date.now(),
+  });
+  return uploadLibraryFile(spaceId, file, purpose, options);
+}
+
+export function fileNameFromPath(path: string): string {
+  return path.replace(/[\\/]+$/, "").split(/[\\/]/).pop() || "file";
+}
+
+async function uploadLibraryFile(spaceId: string, file: File, purpose: "library" | "attachment", options?: LibraryUploadOptions): Promise<LibraryUploadResult> {
+  options?.onStage?.("hashing");
   const sha256 = toHex(new Uint8Array(await crypto.subtle.digest("SHA-256", await file.arrayBuffer())));
   const initiated = await spaceRequest<{
     upload: { id: string };
-    transfer: { url: string; headers: Record<string, string> };
+    transfer: { url: string; method?: string; headers: Record<string, string> };
+    finalize?: { headers?: Record<string, string> };
   }>(`/spaces/${encodeURIComponent(spaceId)}/library/uploads`, {
     method: "POST",
     body: JSON.stringify({ filename: file.name, mime_type: file.type || "application/octet-stream", byte_size: file.size, sha256, purpose }),
   });
-  await spaceRequest(initiated.transfer.url, {
-    method: "PUT",
-    headers: initiated.transfer.headers,
-    body: file,
-  });
+  options?.onStage?.("uploading");
+  await transferLibraryObject(initiated.transfer, file, options);
+  options?.onStage?.("finalizing");
+  const finalizeHeaders = initiated.finalize?.headers ?? {
+    "X-Misty-Library-Upload-Token": initiated.transfer.headers["X-Misty-Library-Upload-Token"] ?? initiated.transfer.headers["x-misty-library-upload-token"],
+  };
   return spaceRequest<LibraryUploadResult>(`/spaces/${encodeURIComponent(spaceId)}/library/uploads/${encodeURIComponent(initiated.upload.id)}/finalize`, {
     method: "POST",
-    headers: { "X-Misty-Library-Upload-Token": initiated.transfer.headers["X-Misty-Library-Upload-Token"] },
+    headers: finalizeHeaders,
+  });
+}
+
+async function transferLibraryObject(
+  transfer: { url: string; method?: string; headers: Record<string, string> },
+  file: File,
+  options?: LibraryUploadOptions,
+): Promise<void> {
+  const direct = /^https?:\/\//i.test(transfer.url);
+  const [base, token] = direct ? ["", ""] : await Promise.all([resolveSpacesApiBase(), readAccountAuthToken()]);
+  const url = direct ? transfer.url : `${base}${transfer.url}`;
+  await new Promise<void>((resolve, reject) => {
+    const request = new XMLHttpRequest();
+    const abort = () => request.abort();
+    request.open(transfer.method || "PUT", url, true);
+    request.withCredentials = !direct;
+    for (const [name, value] of Object.entries(transfer.headers ?? {})) {
+      if (!value || /^(host|content-length|connection|origin)$/i.test(name)) continue;
+      request.setRequestHeader(name, value);
+    }
+    if (!direct && token) request.setRequestHeader("Authorization", `Bearer ${token}`);
+    request.upload.onprogress = (event) => {
+      if (event.lengthComputable && event.total > 0) options?.onProgress?.(Math.min(1, event.loaded / event.total));
+    };
+    request.onload = () => {
+      options?.signal?.removeEventListener("abort", abort);
+      if (request.status >= 200 && request.status < 300) {
+        options?.onProgress?.(1);
+        resolve();
+      } else {
+        reject(new SpaceRequestError("The cloud upload failed.", request.status));
+      }
+    };
+    request.onerror = () => {
+      options?.signal?.removeEventListener("abort", abort);
+      reject(new Error("The cloud upload could not be reached. Check the R2 bucket CORS policy."));
+    };
+    request.onabort = () => reject(new DOMException("The upload was canceled.", "AbortError"));
+    if (options?.signal?.aborted) return abort();
+    options?.signal?.addEventListener("abort", abort, { once: true });
+    request.send(file);
   });
 }
 
 function libraryReauthenticationHeaders(token: string): Record<string, string> {
   return token ? { "X-Misty-Library-Reauthentication": token } : {};
+}
+
+function libraryPreviewPath(spaceId: string, itemId: string, original: boolean, cacheVersion?: string | number): string {
+  const query = new URLSearchParams();
+  if (original) query.set("version", "original");
+  if (cacheVersion !== undefined && String(cacheVersion)) query.set("cache_version", String(cacheVersion));
+  const suffix = query.size > 0 ? `?${query.toString()}` : "";
+  return `/spaces/${encodeURIComponent(spaceId)}/library/items/${encodeURIComponent(itemId)}/preview${suffix}`;
 }
 
 async function downloadProtectedFile(path: string, filename: string, init?: RequestInit): Promise<void> {

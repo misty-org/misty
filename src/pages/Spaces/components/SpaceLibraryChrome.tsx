@@ -113,7 +113,7 @@ export function SpaceLibraryHeader(props: SpaceLibraryHeaderProps) {
         </div>
 
         <div className="mt-2.5 flex min-w-0 flex-wrap items-center gap-2.5">
-          <label className="!flex h-9 min-w-[240px] flex-1 items-center gap-2.5 overflow-hidden rounded-xl border border-[var(--misty-border-strong)] bg-[var(--misty-surface-2)] px-3 text-[var(--misty-text-muted)] transition-colors focus-within:border-[var(--misty-accent)] focus-within:ring-2 focus-within:ring-[var(--misty-focus-ring)]">
+          <label className="!flex h-9 min-w-[240px] flex-1 items-center gap-2.5 overflow-hidden rounded-xl border border-[var(--misty-border-strong)] bg-[var(--misty-surface-2)] px-3 text-[var(--misty-text-muted)] transition-colors focus-within:border-white/30 focus-within:ring-2 focus-within:ring-white/15">
             <Search size={15} aria-hidden="true" />
             <input className="!m-0 !h-full !min-h-0 min-w-0 flex-1 !rounded-none !border-0 !bg-transparent !p-0 !shadow-none text-sm leading-none text-[var(--misty-text)] outline-none placeholder:text-[var(--misty-text-subtle)]" value={props.searchInput} onChange={(event) => props.onSearchInput(event.target.value)} onFocus={props.onSearchFocus} onBlur={props.onSearchBlur} placeholder="Search this Space" aria-label="Search Library" />
             {props.searchInput ? <button className="grid size-6 shrink-0 place-items-center rounded-md border-0 bg-transparent p-0 text-[var(--misty-text-subtle)] hover:bg-[var(--misty-surface-3)] hover:text-[var(--misty-text)]" type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => props.onSearchInput("")} aria-label="Clear Library search"><X size={13}/></button> : null}
@@ -211,7 +211,7 @@ function MistyDropdown(props: MistyDropdownProps) {
 
   return (
     <div className={`relative shrink-0 ${props.className}`} ref={rootRef}>
-      <button className={`flex h-9 w-full items-center justify-between gap-2 rounded-xl border bg-[var(--misty-surface-2)] px-3 text-left text-xs text-[var(--misty-text)] outline-none transition-colors hover:bg-[var(--misty-neutral-hover-bg,var(--misty-surface-3))] focus-visible:ring-2 focus-visible:ring-[var(--misty-focus-ring)] ${open ? "border-[var(--misty-accent)]" : "border-[var(--misty-border-strong)]"}`} type="button" ref={triggerRef} aria-label={props.label} aria-haspopup="listbox" aria-expanded={open} aria-controls={open ? listboxId : undefined} onClick={() => setOpen((current) => !current)} onKeyDown={handleTriggerKeyDown}>
+      <button className={`flex h-9 w-full items-center justify-between gap-2 rounded-xl border bg-[var(--misty-surface-2)] px-3 text-left text-xs text-[var(--misty-text)] outline-none transition-colors hover:bg-[var(--misty-neutral-hover-bg,var(--misty-surface-3))] focus-visible:ring-2 focus-visible:ring-white/20 ${open ? "border-white/30" : "border-[var(--misty-border-strong)]"}`} type="button" ref={triggerRef} aria-label={props.label} aria-haspopup="listbox" aria-expanded={open} aria-controls={open ? listboxId : undefined} onClick={() => setOpen((current) => !current)} onKeyDown={handleTriggerKeyDown}>
         <span className="min-w-0 truncate">{selectedOption?.label}</span>
         <ChevronDown className={`shrink-0 text-[var(--misty-text-subtle)] transition-transform ${open ? "rotate-180" : ""}`} size={14} aria-hidden="true"/>
       </button>

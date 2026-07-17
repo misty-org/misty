@@ -262,6 +262,7 @@ export async function saveServerAgentDefinition(definition: AgentDefinition): Pr
   });
   const body = {
     id: definition.id,
+    spaceId: definition.spaceId,
     deviceId: serverDevice.id,
     scopeId: definition.scope.id,
     name: definition.name,
@@ -289,31 +290,19 @@ export async function saveServerAgentDefinition(definition: AgentDefinition): Pr
       body: JSON.stringify(body),
     });
   }
-  const memberUserIds = definition.members
-    .filter((member) => member.role === "member" && member.status === "active" && !member.accountId.startsWith("invite:"))
-    .map((member) => member.accountId);
-  const memberEmails = definition.members
-    .filter((member) => member.role === "member" && Boolean(member.email))
-    .map((member) => member.email as string);
-  await Promise.all([
-    managedAiRequest(`/agents/${encodeURIComponent(saved.id)}/members`, {
-      method: "PUT",
-      body: JSON.stringify({ userIds: memberUserIds, emails: memberEmails }),
+  await managedAiRequest(`/agents/${encodeURIComponent(saved.id)}/triggers`, {
+    method: "PUT",
+    body: JSON.stringify({
+      triggers: definition.triggers.map((trigger) => ({
+        kind: trigger.kind,
+        enabled: trigger.enabled,
+        config: {
+          schedule: trigger.schedule ?? undefined,
+          webhookId: trigger.webhookId ?? undefined,
+        },
+      })),
     }),
-    managedAiRequest(`/agents/${encodeURIComponent(saved.id)}/triggers`, {
-      method: "PUT",
-      body: JSON.stringify({
-        triggers: definition.triggers.map((trigger) => ({
-          kind: trigger.kind,
-          enabled: trigger.enabled,
-          config: {
-            schedule: trigger.schedule ?? undefined,
-            webhookId: trigger.webhookId ?? undefined,
-          },
-        })),
-      }),
-    }),
-  ]);
+  });
   return {
     ...definition,
     ...normalizeServerDefinition(saved, [], definition.triggers.map((trigger) => ({
@@ -357,6 +346,7 @@ export async function retryServerAgentJob(jobId: string): Promise<AgentJob> {
 
 interface ServerAgentDefinition {
   id: string;
+  spaceId: string;
   ownerUserId: string;
   deviceId: string;
   scopeId: string;
@@ -430,6 +420,7 @@ function normalizeServerDefinition(
 ): AgentDefinition {
   return {
     id: definition.id,
+    spaceId: definition.spaceId,
     ownerAccountId: definition.ownerUserId,
     deviceId: definition.deviceId,
     scope: { id: definition.scopeId, deviceId: definition.deviceId, displayName: "Folder", kind: "local_folder", relativePath: null, available: true },

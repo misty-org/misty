@@ -4,7 +4,7 @@ import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import type { CSSProperties, PointerEvent, ReactNode } from "react";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
-import { archiveCreate, archiveExtract, archiveList, fileToolsChecksum, fileToolsCreateSymlink, fileToolsReadSymlink, openTerminalAtPath, providersCreatePublicLink, providersJobStatus, providersVerifyResult, providersVerifyStart } from "../../../api/misty";
+import { archiveCreate, archiveExtract, archiveList, fileToolsChecksum, fileToolsCreateSymlink, fileToolsReadSymlink, openTerminalAtPath, providersJobStatus, providersVerifyResult, providersVerifyStart } from "../../../api/misty";
 import { selectedDeletePathsForPane, selectedPathsForPane, useExplorerStore } from "../../../stores/useExplorerStore";
 import { selectShortcutPreferences, useSettingsStore } from "../../../stores/useSettingsStore";
 import { errorText } from "../../../shared/format";
@@ -13,6 +13,7 @@ import { clearSelectionsAcrossPanes, selectedCountAcrossPanes } from "./Explorer
 import type { CompareDialogSeed } from "./ExplorerCompareDialog";
 import { cx } from "./ExplorerDesktopShared";
 import { useAgentsStore } from "../../../stores/useAgentsStore";
+import { useSpacesStore } from "../../../stores/useSpacesStore";
 import { mistyFolderAgentsEnabled } from "../../../agents/flags";
 
 const explorerCompareWithEvent = "misty:explorer-compare-with";
@@ -155,26 +156,6 @@ function useViewportAnchoredMenu(open: boolean, x: number, y: number) {
   }, [open, updatePosition]);
 
   return { menuRef, style };
-}
-
-async function createExplorerPublicLink(remote: string, remotePath: string): Promise<void> {
-  const explorer = useExplorerStore.getState();
-  try {
-    const result = await providersCreatePublicLink({ remote, path: remotePath });
-    if (!result.supported) {
-      explorer.pushNotification(result.message ?? "Shared links are not supported for this provider.", "info", 4500);
-      return;
-    }
-    const url = result.link?.url;
-    if (!url) {
-      explorer.pushNotification(result.message ?? "No link was returned.", "info", 4500);
-      return;
-    }
-    await writeText(url);
-    explorer.pushNotification("Public link copied.", "success", 3500);
-  } catch (error) {
-    explorer.pushNotification(`Share link failed: ${errorText(error)}`, "error", 4500);
-  }
 }
 
 async function verifyExplorerRemotePath(remote: string, remotePath: string): Promise<void> {
@@ -434,14 +415,6 @@ export const ExplorerContextMenu = memo(function ExplorerContextMenu() {
       onRun: () => run(() => void useExplorerStore.getState().downloadSelected(paneId)),
     },
     {
-      id: "share-link",
-      icon: <Link size={17} />,
-      label: "Share link...",
-      disabled: !targetRemoteName || !targetRemotePath,
-      disabledReason: "Share links are available for provider files and folders.",
-      onRun: () => run(() => targetRemoteName && targetRemotePath && void createExplorerPublicLink(targetRemoteName, targetRemotePath)),
-    },
-    {
       id: "verify",
       icon: <ArrowRightLeft size={17} />,
       label: "Verify against...",
@@ -602,10 +575,17 @@ export const ExplorerContextMenu = memo(function ExplorerContextMenu() {
       label: "Create Mika Agent...",
       disabled: !targetEntry || targetEntry.kind !== "folder" || targetEntry.location.kind !== "local" || targetEntry.isDeleted,
       disabledReason: "Mika agents can be created for local folders.",
-      onRun: () => run(() => {
+      onRun: () => run(async () => {
         if (!targetEntry) return;
-        useAgentsStore.getState().beginFolderDraft(targetEntry.path, fileNameFromPath(targetEntry.path));
-        navigate("/agents");
+        const spacesStore = useSpacesStore.getState();
+        if (spacesStore.spaces.length === 0) await spacesStore.load();
+        const personalSpace = useSpacesStore.getState().spaces.find((space) => space.is_personal);
+        if (!personalSpace) {
+          navigate("/agents");
+          return;
+        }
+        useAgentsStore.getState().beginFolderDraft(targetEntry.path, fileNameFromPath(targetEntry.path), personalSpace.id);
+        navigate(`/spaces/${encodeURIComponent(personalSpace.id)}/studio/folder-agents`);
       }),
     }] : []),
     { id: "delete", icon: <Trash2 size={17} />, label: "Delete", items: deleteItems },

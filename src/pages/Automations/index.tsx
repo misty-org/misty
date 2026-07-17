@@ -136,12 +136,12 @@ const nodeDefinitions: NodeDefinition[] = [
 const definitionByKind = new Map(nodeDefinitions.map((item) => [item.kind, item]));
 const nodeTypes = { automation: AutomationCanvasNode };
 
-export default function AutomationsPage() {
+export default function AutomationsPage({ spaceId, personalSpaceId }: { spaceId?: string; personalSpaceId?: string }) {
 	const [searchParams] = useSearchParams();
 	const agentId = searchParams.get("agentId");
   return (
     <ReactFlowProvider>
-		{agentId ? <AgentWorkflowEditor agentId={agentId} /> : <AutomationPlayground />}
+		{agentId ? <AgentWorkflowEditor agentId={agentId} spaceId={spaceId} personalSpaceId={personalSpaceId} /> : <AutomationPlayground />}
     </ReactFlowProvider>
   );
 }

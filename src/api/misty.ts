@@ -54,7 +54,6 @@ import type {
   PasteTextRequest,
   PrepareDragItemsRequest,
   PreparedDragItemsResult,
-  LinkPathRequest,
   PluginPanelRenderResult,
   PluginCommandRunResult,
   PluginCommandsSnapshot,
@@ -69,8 +68,6 @@ import type {
   ProviderConfigRequest,
   ProviderConfigStep,
   ProvidersSnapshot,
-  PublicLinkActionResult,
-  PublicLinkListResult,
   StorageSnapshot,
   RcloneConfigPaths,
   RemoteEditDraft,
@@ -556,18 +553,6 @@ export function providersJobCancel(jobId: string): Promise<unknown> {
 
 export function providersVerifyResult(jobId: string): Promise<VerifyResult> {
   return invoke("providers_verify_result", { jobId });
-}
-
-export function providersPublicLinks(request: LinkPathRequest): Promise<PublicLinkListResult> {
-  return invoke("providers_public_links", { request });
-}
-
-export function providersCreatePublicLink(request: LinkPathRequest): Promise<PublicLinkActionResult> {
-  return invoke("providers_create_public_link", { request });
-}
-
-export function providersRevokePublicLink(request: LinkPathRequest): Promise<PublicLinkActionResult> {
-  return invoke("providers_revoke_public_link", { request });
 }
 
 export function providersDisconnectRemote(name: string): Promise<ProvidersSnapshot> {

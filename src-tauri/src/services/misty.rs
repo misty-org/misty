@@ -20,9 +20,7 @@ use std::{
 };
 use uuid::Uuid;
 use zip::ZipArchive;
-
 use crate::services::paths;
-
 #[derive(Debug, Serialize)]
 pub struct NativeSystemInfo {
     os: String,
@@ -36,7 +34,6 @@ pub struct NativeSystemInfo {
     current_user: Option<CurrentUser>,
     current_license: Option<CurrentLicense>,
 }
-
 #[derive(Debug, Serialize)]
 pub struct PathProbe {
     path: String,
@@ -44,14 +41,14 @@ pub struct PathProbe {
     is_dir: bool,
     is_file: bool,
 }
-
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct CurrentUser {
     id: String,
     name: String,
+    #[serde(default)]
+    username: String,
     email: String,
 }
-
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct CurrentLicense {
     tier: String,
@@ -864,8 +861,8 @@ fn save_current_user_and_license(
     tx.execute("DELETE FROM users", params![])
         .map_err(|error| format!("Could not clear previous Misty user: {error}"))?;
     tx.execute(
-        "INSERT INTO users (id, name, email) VALUES (?1, ?2, ?3)",
-        params![&user.id, &user.name, &user.email],
+        "INSERT INTO users (id, name, username, email) VALUES (?1, ?2, ?3, ?4)",
+        params![&user.id, &user.name, &user.username, &user.email],
     )
     .map_err(|error| format!("Could not save Misty user: {error}"))?;
 
@@ -1690,6 +1687,7 @@ fn bootstrap_database(conn: &Connection) -> rusqlite::Result<()> {
         CREATE TABLE IF NOT EXISTS users (
             id TEXT PRIMARY KEY,
             name TEXT NOT NULL,
+            username TEXT NOT NULL DEFAULT '',
             email TEXT NOT NULL UNIQUE,
             token_valid_after TEXT
         );
@@ -1753,6 +1751,7 @@ fn bootstrap_database(conn: &Connection) -> rusqlite::Result<()> {
     ensure_column(conn, "license_cache", "verified_at", "TEXT")?;
     ensure_column(conn, "license_cache", "refresh_after", "TEXT")?;
     ensure_column(conn, "license_cache", "verified_until", "TEXT")?;
+    ensure_column(conn, "users", "username", "TEXT NOT NULL DEFAULT ''")?;
     conn.execute_batch(
         r#"
         UPDATE license_cache
@@ -1791,13 +1790,14 @@ fn current_user() -> Result<Option<CurrentUser>, String> {
         .map_err(|error| format!("Could not initialize Misty database: {error}"))?;
 
     conn.query_row(
-        "SELECT id, name, email FROM users ORDER BY rowid ASC LIMIT 1",
+        "SELECT id, name, username, email FROM users ORDER BY rowid ASC LIMIT 1",
         params![],
         |row| {
             Ok(CurrentUser {
                 id: row.get(0)?,
                 name: row.get(1)?,
-                email: row.get(2)?,
+                username: row.get(2)?,
+                email: row.get(3)?,
             })
         },
     )

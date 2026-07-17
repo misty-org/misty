@@ -11,12 +11,14 @@ import { analytics } from "../../../analytics/client";
 export interface AccountAuthUser {
   id: string;
   name: string;
+  username: string;
   email: string;
 }
 
 export interface AccountMeResponse {
   id: string;
   name: string;
+  username: string;
   email: string;
   created_at: string;
 	  tier: "basic" | "pro" | "max";
@@ -51,6 +53,7 @@ interface LoginResponse {
   user_id?: string;
   token?: string;
   name: string;
+  username: string;
   email: string;
 }
 
@@ -202,6 +205,7 @@ export async function accountSignIn(email: string, password: string): Promise<Ac
   const user = {
     id,
     name: data.name,
+    username: data.username,
     email: data.email,
   };
   if (data.token) {
@@ -210,8 +214,8 @@ export async function accountSignIn(email: string, password: string): Promise<Ac
   return user;
 }
 
-export async function accountRegister(name: string, email: string, password: string): Promise<AccountAuthUser> {
-  const data = await postJson<LoginResponse>("/register", { name, email, password });
+export async function accountRegister(name: string, username: string, email: string, password: string): Promise<AccountAuthUser> {
+  const data = await postJson<LoginResponse>("/register", { name, username, email, password });
   const id = data.user_id ?? data.id;
   if (!id) {
     throw new AccountApiError("Registration response did not include a user id.");
@@ -219,6 +223,7 @@ export async function accountRegister(name: string, email: string, password: str
   const user = {
     id,
     name: data.name,
+    username: data.username,
     email: data.email,
   };
   if (data.token) {

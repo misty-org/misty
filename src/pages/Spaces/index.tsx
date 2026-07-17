@@ -36,7 +36,6 @@ import {
   Star,
   Trash2,
   Upload,
-  UserPlus,
   Users,
   Video,
   X,
@@ -46,19 +45,29 @@ import {
 import type { LucideIcon } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
 import { useAuth } from "../../auth/AuthContext";
+import { confirmAction } from "../../shared/confirmAction";
 import { useSpacesStore } from "../../stores/useSpacesStore";
 import { useSetupStore } from "../../stores/useSetupStore";
+import { MistyFilePicker } from "../../components/MistyFilePicker/MistyFilePicker";
 import { SpaceRequestError, spacesApi } from "../../spaces/api";
 import type { BulkLibraryItemAction, BulkLibraryItemOptions, LibraryAlbum, LibraryAlbumFolder, LibraryAssetStack, LibraryDiscovery, LibraryDiscoveryGroup, LibraryEditDefinition, LibraryEditVersion, LibraryGroup, LibraryImportHistoryItem, LibraryIntelligencePolicy, LibraryItemQuery, LibraryMapPoint, LibraryMarkupElement, LibraryPerson, LibraryPinnedCollection, LibrarySearchFacets, LibrarySharedReference, MessageAttachment, MessageSpan, SpaceLibraryItem, SpaceMember, SpaceMessage, SpaceNode, SpaceStorageUsage, SpaceStudioResource } from "../../spaces/types";
+import { MistyLibraryPicker } from "./components/MistyLibraryPicker";
 import { SpaceLibraryEmptyState, SpaceLibraryHeader } from "./components/SpaceLibraryChrome";
-
-const spaceSectionItems = [
-  { id: "chat", label: "Chat", icon: MessagesSquare },
-  { id: "library", label: "Library", icon: LibraryIcon },
-  { id: "members", label: "Members", icon: Users },
-] as const;
+import SpaceStudioPage, { type SpaceStudioKind } from "../Studio";
+import { SpaceMembers } from "./components/SpaceMembers";
+import { SpaceSectionNavigation } from "./components/SpaceSectionNavigation";
+import { compareLibraryItems, formatBytes, formatTime, libraryDateGroupLabel, libraryFacetPrefix } from "./libraryFormat";
 
 type LibraryCollectionKind = "recent" | "months" | "years" | "recent-days" | "utility" | "collections" | "favorites" | "hidden" | "deleted" | "people" | "albums" | "groups" | "memory" | "trip" | "map" | "duplicate" | "shared" | "imports";
+
+type LibraryUploadJob = {
+  id: string;
+  path: string;
+  name: string;
+  stage: "queued" | "reading" | "hashing" | "uploading" | "finalizing" | "ready" | "failed";
+  progress: number;
+  error?: string;
+};
 
 export default function SpacesShell() {
   const navigate = useNavigate();
@@ -125,7 +134,7 @@ export default function SpacesShell() {
             </div>
           ))}
           {loading && spaces.length === 0 ? <p className="px-2 py-3 text-xs text-[var(--misty-text-subtle)]">Loading Spaces…</p> : null}
-          <button className="mt-1 inline-flex min-h-10 w-full items-center gap-2 rounded-xl border border-dashed border-[var(--misty-border-strong)] bg-transparent px-2.5 text-left text-xs font-medium text-[var(--misty-text-muted)] transition-colors hover:border-[var(--misty-accent)] hover:bg-[var(--misty-surface-2)] hover:text-[var(--misty-text)] disabled:cursor-not-allowed disabled:opacity-45" type="button" disabled={(limits?.remaining_owned ?? 1) === 0} onClick={() => { clearError(); setCreateOpen(true); }} title={(limits?.remaining_owned ?? 1) === 0 ? "You already own three Spaces" : "Add workspace"}>
+          <button className="mt-1 inline-flex min-h-10 w-full items-center gap-2 rounded-xl border border-dashed border-[var(--misty-border-strong)] bg-transparent px-2.5 text-left text-xs font-medium text-[var(--misty-text-muted)] transition-colors hover:border-white/30 hover:bg-[var(--misty-surface-2)] hover:text-[var(--misty-text)] disabled:cursor-not-allowed disabled:opacity-45" type="button" disabled={(limits?.remaining_owned ?? 1) === 0} onClick={() => { clearError(); setCreateOpen(true); }} title={(limits?.remaining_owned ?? 1) === 0 ? "You already own three Spaces" : "Add workspace"}>
             <Plus size={15} aria-hidden="true"/><span>Add workspace</span>
           </button>
         </nav>
@@ -149,7 +158,7 @@ export default function SpacesShell() {
         <div className="fixed inset-0 z-[2147483000] grid place-items-center bg-black/60 p-6" role="presentation" onMouseDown={(event) => { if (event.currentTarget === event.target && !creating) { clearError(); setCreateOpen(false); } }}>
           <form className="w-full max-w-sm rounded-2xl border border-[var(--misty-border-strong)] bg-[var(--misty-modal-bg,var(--misty-surface))] p-5 shadow-2xl" onSubmit={(event) => void onCreate(event)}>
             <div className="flex items-start justify-between gap-4">
-              <div><h2 className="m-0 text-base font-semibold">Create a Space</h2><p className="mb-0 mt-1 text-xs leading-relaxed text-[var(--misty-text-subtle)]">It starts private. You can own three Spaces total, including Default space.</p></div>
+              <div><h2 className="m-0 text-base font-semibold">Create a Space</h2><p className="mb-0 mt-1 text-xs leading-relaxed text-[var(--misty-text-subtle)]">It starts private. You can own three Spaces total, including your personal Space.</p></div>
               <button className={iconButtonClass} type="button" disabled={creating} onClick={() => { clearError(); setCreateOpen(false); }} aria-label="Close"><X size={15}/></button>
             </div>
             <label className="mt-5 grid gap-2 text-xs font-medium text-[var(--misty-text-muted)]">Space name<input className={inputClass} autoFocus maxLength={80} placeholder="Design team" value={createName} onChange={(event) => setCreateName(event.target.value)} /></label>
@@ -189,22 +198,11 @@ export function PersonalSpaceRedirect() {
   }, [load, loading, personal]);
 
   if (personal) return <Navigate to={`/spaces/${encodeURIComponent(personal.id)}/library`} replace />;
-  return <div className="grid h-full place-items-center text-sm text-[var(--misty-text-muted)]">Loading Default space…</div>;
-}
-
-function SpaceSectionNavigation({ spaceId, section }: { spaceId: string; section: string }) {
-  const navigate = useNavigate();
-  return (
-    <nav className="flex shrink-0 rounded-xl border border-[var(--misty-border-soft)] bg-[var(--misty-surface)] p-1" aria-label="Space sections">
-      {spaceSectionItems.map(({ id, label, icon: Icon }) => (
-        <button key={id} className={`inline-flex min-h-9 items-center gap-2 rounded-lg border-0 px-3 text-xs font-medium transition-colors max-[900px]:px-2.5 ${section === id ? "bg-[var(--misty-surface-3)] text-[var(--misty-text)] shadow-sm" : "bg-transparent text-[var(--misty-text-muted)] hover:bg-[var(--misty-surface-2)] hover:text-[var(--misty-text)]"}`} type="button" onClick={() => navigate(`/spaces/${encodeURIComponent(spaceId)}/${id}`)} aria-label={label} title={label} aria-current={section === id ? "page" : undefined}><Icon size={15}/><span className="max-[900px]:sr-only">{label}</span></button>
-      ))}
-    </nav>
-  );
+  return <div className="grid h-full place-items-center text-sm text-[var(--misty-text-muted)]">Loading your personal Space…</div>;
 }
 
 export function SpaceDetail() {
-  const { spaceId = "", section = "chat" } = useParams();
+  const { spaceId = "", section = "chat", studioKind = "agents" } = useParams();
   const { user } = useAuth();
   const navigate = useNavigate();
   const { spaces, loading, error, loadSpace, clearError } = useSpacesStore(useShallow((state) => ({
@@ -228,14 +226,18 @@ export function SpaceDetail() {
   return (
     <div className="relative h-full min-h-0">
       {error ? <button className="absolute left-1/2 top-3 z-20 -translate-x-1/2 rounded-lg border border-red-400/30 bg-red-950/80 px-3 py-2 text-xs text-red-100" type="button" onClick={clearError}>{error}</button> : null}
-      {section === "library" || section === "files" ? <SpaceLibrary spaceId={spaceId} section={section} /> : (
+      {section === "library" || section === "files" ? <SpaceLibrary key={`library:${spaceId}`} spaceId={spaceId} section={section} /> : (
         <div className="grid h-full min-h-0 grid-rows-[56px_minmax(0,1fr)]">
           <div className="flex items-center justify-end border-b border-[var(--misty-border-soft)] px-6"><SpaceSectionNavigation spaceId={spaceId} section={section}/></div>
-          <div className="relative min-h-0">{section === "members" ? <SpaceMembers spaceId={spaceId} /> : <SpaceChat spaceId={spaceId} />}</div>
+          <div className="relative min-h-0">{section === "studio" ? <SpaceStudioPage key={`studio:${spaceId}:${studioKind}`} spaceId={spaceId} kind={normalizeStudioKind(studioKind)} /> : section === "members" ? <SpaceMembers key={`members:${spaceId}`} spaceId={spaceId} /> : <SpaceChat key={`chat:${spaceId}`} spaceId={spaceId} />}</div>
         </div>
       )}
     </div>
   );
+}
+
+function normalizeStudioKind(value: string): SpaceStudioKind {
+  return value === "folder-agents" || value === "workflows" ? value : "agents";
 }
 
 function SpaceChat({ spaceId }: { spaceId: string }) {
@@ -244,13 +246,18 @@ function SpaceChat({ spaceId }: { spaceId: string }) {
   const user = authUser ?? setupUser;
   const [searchParams] = useSearchParams();
   const endRef = useRef<HTMLDivElement | null>(null);
-  const attachmentInputRef = useRef<HTMLInputElement | null>(null);
   const [text, setText] = useState("");
   const [selectedFileIds, setSelectedFileIds] = useState<string[]>([]);
   const [selectedLibraryIds, setSelectedLibraryIds] = useState<string[]>([]);
   const [pendingAttachments, setPendingAttachments] = useState<MessageAttachment[]>([]);
   const [libraryItems, setLibraryItems] = useState<SpaceLibraryItem[]>([]);
   const [libraryPickerOpen, setLibraryPickerOpen] = useState(false);
+  const [libraryPickerLoading, setLibraryPickerLoading] = useState(false);
+  const [libraryPickerError, setLibraryPickerError] = useState("");
+  const [libraryPickerQuery, setLibraryPickerQuery] = useState("");
+  const [libraryPickerActiveIndex, setLibraryPickerActiveIndex] = useState(0);
+  const [libraryBrowserOpen, setLibraryBrowserOpen] = useState(false);
+  const [attachmentPickerOpen, setAttachmentPickerOpen] = useState(false);
   const [attachmentUploading, setAttachmentUploading] = useState(false);
   const [replyToMessageId, setReplyToMessageId] = useState("");
   const [editingMessageId, setEditingMessageId] = useState("");
@@ -275,17 +282,33 @@ function SpaceChat({ spaceId }: { spaceId: string }) {
   const agents = agentsBySpace[spaceId] ?? emptyStudioResources;
   const allNodes = nodesBySpace[spaceId] ?? emptyNodes;
   const nodes = useMemo(() => allNodes.filter((node) => node.kind === "link"), [allNodes]);
+  const availableLibraryItems = useMemo(() => {
+    const query = libraryPickerQuery.trim().toLocaleLowerCase();
+    return libraryItems.filter((item) => {
+      if (selectedLibraryIds.includes(item.id)) return false;
+      if (!query || query === "library") return true;
+      return [item.display_name, item.file.original_filename, item.tags.join(" ")].join(" ").toLocaleLowerCase().includes(query);
+    }).slice(0, 24);
+  }, [libraryItems, libraryPickerQuery, selectedLibraryIds]);
 
   useEffect(() => {
     setText("");
     setSelectedFileIds([]);
     setSelectedLibraryIds([]);
     setPendingAttachments([]);
+    setLibraryPickerOpen(false);
+    setLibraryBrowserOpen(false);
+    setAttachmentPickerOpen(false);
     setReplyToMessageId("");
     setEditingMessageId("");
     setEditingText("");
     void loadStudio(spaceId, "agents");
-    void spacesApi.libraryItems(spaceId).then((result) => setLibraryItems(result.items)).catch(() => setLibraryItems([]));
+    setLibraryPickerLoading(true);
+    setLibraryPickerError("");
+    void spacesApi.libraryItems(spaceId).then((result) => setLibraryItems(result.items)).catch((error: unknown) => {
+      setLibraryItems([]);
+      setLibraryPickerError(error instanceof Error ? error.message : "Library items could not be loaded.");
+    }).finally(() => setLibraryPickerLoading(false));
   }, [loadStudio, spaceId, user?.id]);
   useEffect(() => {
     const messageId = searchParams.get("message");
@@ -302,38 +325,71 @@ function SpaceChat({ spaceId }: { spaceId: string }) {
     try {
       await sendMessage(spaceId, value, selectedFileIds, pendingAttachments.map((item) => item.id), selectedLibraryIds, replyToMessageId);
       setText(""); setSelectedFileIds([]); setSelectedLibraryIds([]); setPendingAttachments([]); setReplyToMessageId("");
+      setLibraryPickerOpen(false);
     } catch { /* store renders error */ }
   };
 
-  const uploadAttachments = async (files: FileList | null) => {
-    if (!files?.length || attachmentUploading) return;
+  const uploadAttachments = async (paths: string[]) => {
+    if (paths.length === 0 || attachmentUploading) return;
     const available = Math.max(0, 5 - pendingAttachments.length - selectedLibraryIds.length);
+    if (available === 0) return;
     setAttachmentUploading(true);
     try {
       const uploaded: MessageAttachment[] = [];
-      for (const file of Array.from(files).slice(0, available)) {
-        const result = await spacesApi.uploadLibraryFile(spaceId, file, "attachment");
+      for (const path of paths.slice(0, available)) {
+        const result = await spacesApi.uploadLibraryPath(spaceId, path, "attachment");
         if (result.attachment) uploaded.push(result.attachment);
       }
       setPendingAttachments((current) => [...current, ...uploaded]);
     } finally {
       setAttachmentUploading(false);
-      if (attachmentInputRef.current) attachmentInputRef.current.value = "";
     }
+  };
+
+  const openLibraryPicker = (query = "") => {
+    setLibraryPickerOpen(true);
+    setLibraryPickerQuery(query);
+    setLibraryPickerActiveIndex(0);
+    setLibraryPickerLoading(true);
+    setLibraryPickerError("");
+    void spacesApi.libraryItems(spaceId).then((result) => setLibraryItems(result.items)).catch((error: unknown) => {
+      setLibraryPickerError(error instanceof Error ? error.message : "Library items could not be loaded.");
+    }).finally(() => setLibraryPickerLoading(false));
   };
 
   const onComposerChange = (value: string) => {
     if (/(^|\s)@files\s*$/i.test(value)) {
       setText(value.replace(/(^|\s)@files\s*$/i, "$1"));
-      attachmentInputRef.current?.click();
+      setLibraryPickerOpen(false);
+      if (pendingAttachments.length + selectedLibraryIds.length < 5) setAttachmentPickerOpen(true);
       return;
     }
     if (/(^|\s)@library\s*$/i.test(value)) {
       setText(value.replace(/(^|\s)@library\s*$/i, "$1"));
-      setLibraryPickerOpen(true);
+      setLibraryPickerOpen(false);
+      setLibraryBrowserOpen(true);
       return;
     }
     setText(value);
+    const match = value.match(/(?:^|\s)@([^\s@]*)$/);
+    if (match) {
+      if (!libraryPickerOpen) openLibraryPicker(match[1]);
+      else {
+        setLibraryPickerQuery(match[1]);
+        setLibraryPickerActiveIndex(0);
+      }
+    } else {
+      setLibraryPickerOpen(false);
+      setLibraryPickerQuery("");
+    }
+  };
+
+  const selectLibraryItem = (item: SpaceLibraryItem) => {
+    if (pendingAttachments.length + selectedLibraryIds.length >= 5) return;
+    setSelectedLibraryIds((current) => current.includes(item.id) ? current : [...current, item.id]);
+    setText((current) => current.replace(/(^|\s)@[^\s@]*$/, "$1"));
+    setLibraryPickerOpen(false);
+    setLibraryPickerQuery("");
   };
 
   const beginEditing = (message: SpaceMessage) => {
@@ -377,28 +433,41 @@ function SpaceChat({ spaceId }: { spaceId: string }) {
               {(message.library_item_ids?.length ?? 0) > 0 ? <div className="mt-2 flex flex-wrap gap-1.5">{message.library_item_ids?.map((itemId) => { const item = libraryItems.find((candidate) => candidate.id === itemId); return <button className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--misty-border-soft)] bg-violet-500/10 px-2 py-1 text-[10px] text-violet-200" type="button" key={itemId} disabled={!item} onClick={() => item && void spacesApi.downloadLibraryItem(spaceId, item.id, item.display_name)}><LibraryIcon size={11}/>{item?.display_name ?? "Unavailable Library item"}</button>; })}</div> : null}
               {(message.attachments?.length ?? 0) > 0 ? <div className="mt-2 flex flex-wrap gap-1.5">{message.attachments?.map((attachment) => <span className="inline-flex items-center gap-1 rounded-lg border border-[var(--misty-border-soft)] bg-[var(--misty-surface-2)] p-1 pl-2 text-[10px]" key={attachment.id}><Paperclip size={11}/><button className="border-0 bg-transparent text-sky-200" type="button" onClick={() => void spacesApi.downloadAttachment(spaceId, attachment.id, attachment.display_name)}>{attachment.display_name}</button>{attachment.promoted_item_id ? <span className="px-1 text-[9px] text-emerald-300">In Library</span> : <button className="rounded-md border-0 bg-[var(--misty-surface-3)] px-1.5 py-0.5 text-[9px] text-[var(--misty-text-muted)]" type="button" onClick={() => void spacesApi.promoteAttachment(spaceId, attachment.id).then((item) => { setLibraryItems((current) => [...current.filter((candidate) => candidate.id !== item.id), item]); void loadMessages(spaceId); })}>Add to Library</button>}</span>)}</div> : null}
             </div>
-            <div className="flex gap-1"><button className="invisible grid size-7 place-items-center rounded-lg border-0 bg-transparent text-[var(--misty-text-subtle)] hover:bg-[var(--misty-surface-2)] group-hover:visible focus:visible" type="button" onClick={() => setReplyToMessageId(message.id)} aria-label="Reply" title="Reply"><Reply size={14}/></button>{message.sender_kind === "person" && message.sender_user_id === user?.id ? <button className="invisible grid size-7 place-items-center rounded-lg border-0 bg-transparent text-[var(--misty-text-subtle)] hover:bg-[var(--misty-surface-2)] group-hover:visible focus:visible" type="button" onClick={() => beginEditing(message)} aria-label="Edit message" title="Edit message"><Pencil size={14}/></button> : null}{(message.sender_user_id === user?.id || useSpacesStore.getState().spaces.find((item) => item.id === spaceId)?.role === "owner") ? <button className="invisible grid size-7 place-items-center rounded-lg border-0 bg-transparent text-[var(--misty-text-subtle)] hover:bg-[var(--misty-surface-2)] group-hover:visible focus:visible" type="button" onClick={() => window.confirm("Remove this message?") && void deleteMessage(spaceId, message.id)} aria-label="Remove message" title="Remove message"><Trash2 size={14} /></button> : null}</div>
+            <div className="flex gap-1"><button className="invisible grid size-7 place-items-center rounded-lg border-0 bg-transparent text-[var(--misty-text-subtle)] hover:bg-[var(--misty-surface-2)] group-hover:visible focus:visible" type="button" onClick={() => setReplyToMessageId(message.id)} aria-label="Reply" title="Reply"><Reply size={14}/></button>{message.sender_kind === "person" && message.sender_user_id === user?.id ? <button className="invisible grid size-7 place-items-center rounded-lg border-0 bg-transparent text-[var(--misty-text-subtle)] hover:bg-[var(--misty-surface-2)] group-hover:visible focus:visible" type="button" onClick={() => beginEditing(message)} aria-label="Edit message" title="Edit message"><Pencil size={14}/></button> : null}{(message.sender_user_id === user?.id || useSpacesStore.getState().spaces.find((item) => item.id === spaceId)?.role === "owner") ? <button className="invisible grid size-7 place-items-center rounded-lg border-0 bg-transparent text-[var(--misty-text-subtle)] hover:bg-[var(--misty-surface-2)] group-hover:visible focus:visible" type="button" onClick={() => void confirmAction("Remove this message?").then((confirmed) => { if (confirmed) return deleteMessage(spaceId, message.id); })} aria-label="Remove message" title="Remove message"><Trash2 size={14} /></button> : null}</div>
           </article>
         ))}
         <div ref={endRef} />
       </div>
-      <form className="mx-[clamp(20px,5vw,72px)] mb-5 rounded-2xl border border-[var(--misty-border-strong)] bg-[var(--misty-surface)] p-2" onSubmit={(event) => void submit(event)}>
+      <form className="relative mx-[clamp(20px,5vw,72px)] mb-5 rounded-2xl border border-[var(--misty-border-strong)] bg-[var(--misty-surface)] p-2" onSubmit={(event) => void submit(event)}>
         {replyToMessageId ? <div className="mx-2 mt-1 flex items-center justify-between rounded-lg border-l-2 border-[var(--misty-primary)] bg-[var(--misty-surface-2)] px-3 py-1.5 text-[10px] text-[var(--misty-text-muted)]"><span>Replying to {messages.find((item) => item.id === replyToMessageId)?.sender_name ?? "message"}</span><button className="border-0 bg-transparent text-[var(--misty-text-subtle)]" type="button" onClick={() => setReplyToMessageId("")}><X size={12}/></button></div> : null}
-        <textarea className="min-h-[54px] w-full resize-none border-0 bg-transparent px-3 py-2 text-sm text-[var(--misty-text)] outline-none" maxLength={4000} placeholder="Message this Space — use @files or @library" value={text} onChange={(event) => onComposerChange(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); event.currentTarget.form?.requestSubmit(); } }} />
+        <textarea className="min-h-[54px] w-full resize-none border-0 bg-transparent px-3 py-2 text-sm text-[var(--misty-text)] outline-none" maxLength={4000} placeholder="Message this Space — type @ to add from Library" value={text} onChange={(event) => onComposerChange(event.target.value)} onKeyDown={(event) => {
+          if (libraryPickerOpen && event.key === "ArrowDown") { event.preventDefault(); setLibraryPickerActiveIndex((current) => Math.min(current + 1, Math.max(0, availableLibraryItems.length - 1))); return; }
+          if (libraryPickerOpen && event.key === "ArrowUp") { event.preventDefault(); setLibraryPickerActiveIndex((current) => Math.max(0, current - 1)); return; }
+          if (libraryPickerOpen && event.key === "Escape") { event.preventDefault(); setLibraryPickerOpen(false); return; }
+          if (libraryPickerOpen && event.key === "Enter" && !event.shiftKey) { event.preventDefault(); const selected = availableLibraryItems[libraryPickerActiveIndex]; if (selected) selectLibraryItem(selected); return; }
+          if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); event.currentTarget.form?.requestSubmit(); }
+        }} />
         <div className="flex items-center justify-between gap-3 px-2 pb-1">
           <div className="flex min-w-0 items-center gap-1 overflow-auto">
-            <input ref={attachmentInputRef} className="hidden" type="file" multiple onChange={(event) => void uploadAttachments(event.target.files)}/>
-            <button className="grid size-7 shrink-0 place-items-center rounded-lg border-0 bg-[var(--misty-surface-2)] text-[var(--misty-text-muted)]" type="button" disabled={attachmentUploading || pendingAttachments.length + selectedLibraryIds.length >= 5} onClick={() => attachmentInputRef.current?.click()} title="@files — upload message attachments"><Paperclip size={13}/></button>
-            <div className="relative">
-              <button className="grid size-7 shrink-0 place-items-center rounded-lg border-0 bg-[var(--misty-surface-2)] text-[var(--misty-text-muted)]" type="button" onClick={() => setLibraryPickerOpen((open) => !open)} title="@library — reference this Space's Library"><LibraryIcon size={13}/></button>
-              {libraryPickerOpen ? <div className="absolute bottom-9 left-0 z-30 max-h-56 w-64 overflow-auto rounded-xl border border-[var(--misty-border-strong)] bg-[var(--misty-surface)] p-1 shadow-2xl">{libraryItems.length === 0 ? <p className="m-0 px-3 py-2 text-[10px] text-[var(--misty-text-subtle)]">No Library items available.</p> : libraryItems.filter((item) => !selectedLibraryIds.includes(item.id)).map((item) => <button className="flex w-full items-center gap-2 rounded-lg border-0 bg-transparent px-2 py-2 text-left text-xs text-[var(--misty-text-muted)] hover:bg-[var(--misty-surface-2)]" type="button" key={item.id} onClick={() => { if (pendingAttachments.length + selectedLibraryIds.length < 5) setSelectedLibraryIds((current) => [...current, item.id]); setLibraryPickerOpen(false); }}><File size={13}/><span className="truncate">{item.display_name}</span></button>)}</div> : null}
-            </div>
+            <button className="grid size-7 shrink-0 place-items-center rounded-lg border-0 bg-[var(--misty-surface-2)] text-[var(--misty-text-muted)]" type="button" disabled={attachmentUploading || pendingAttachments.length + selectedLibraryIds.length >= 5} onClick={() => setAttachmentPickerOpen(true)} title="Attach files with Misty's picker"><Paperclip size={13}/></button>
+            <button className="grid size-7 shrink-0 place-items-center rounded-lg border-0 bg-[var(--misty-surface-2)] text-[var(--misty-text-muted)]" type="button" onClick={() => { setLibraryPickerOpen(false); setLibraryBrowserOpen(true); }} title="Browse this Space's Library"><LibraryIcon size={13}/></button>
             {[...members.filter((member) => member.user_id !== user?.id), ...agents].slice(0, 6).map((item) => <button className="whitespace-nowrap rounded-md border-0 bg-[var(--misty-surface-2)] px-2 py-1 text-[10px] text-[var(--misty-text-muted)]" type="button" key={"user_id" in item ? item.user_id : item.id} onClick={() => setText((current) => `${current}${current && !current.endsWith(" ") ? " " : ""}@${item.name} `)}>@{item.name}</button>)}
           </div>
           <button className="grid size-8 shrink-0 place-items-center rounded-xl border-0 bg-[var(--misty-primary)] text-[var(--misty-primary-contrast)] disabled:opacity-50" disabled={sending || (!text.trim() && pendingAttachments.length === 0 && selectedLibraryIds.length === 0)} type="submit"><Send size={15} /></button>
         </div>
+        {libraryPickerOpen ? <div className="absolute bottom-[calc(100%+8px)] left-0 z-30 flex max-h-[min(420px,55vh)] w-full flex-col overflow-hidden rounded-2xl border border-[var(--misty-border-strong)] bg-[var(--misty-surface)] shadow-2xl" role="listbox" aria-label="Add a Library item">
+          <div className="border-b border-[var(--misty-border-soft)] px-4 py-3"><p className="m-0 text-[10px] font-semibold uppercase tracking-wide text-[var(--misty-text-subtle)]">Add from Library</p>{libraryPickerQuery && libraryPickerQuery !== "library" ? <p className="mb-0 mt-1 truncate text-xs text-[var(--misty-text-muted)]">Matching “{libraryPickerQuery}”</p> : null}</div>
+          <div className="overflow-y-auto p-1.5">
+            <button className="mb-1 flex w-full items-center gap-3 rounded-xl border-0 bg-transparent px-3 py-2.5 text-left text-sm text-[var(--misty-text)] hover:bg-[var(--misty-surface-2)]" type="button" onClick={() => { setLibraryPickerOpen(false); setLibraryBrowserOpen(true); }}><span className="grid size-8 shrink-0 place-items-center rounded-lg bg-[var(--misty-surface-2)]"><LibraryIcon size={15}/></span><span><span className="block font-medium">Browse Library</span><span className="mt-0.5 block text-[10px] text-[var(--misty-text-subtle)]">Search, filter, and select multiple items</span></span></button>
+            <button className="mb-1 flex w-full items-center gap-3 rounded-xl border-0 bg-transparent px-3 py-2.5 text-left text-sm text-[var(--misty-text)] hover:bg-[var(--misty-surface-2)] disabled:opacity-40" type="button" disabled={attachmentUploading || pendingAttachments.length + selectedLibraryIds.length >= 5} onClick={() => { setLibraryPickerOpen(false); setAttachmentPickerOpen(true); }}><span className="grid size-8 shrink-0 place-items-center rounded-lg bg-[var(--misty-surface-2)]"><Paperclip size={15}/></span><span><span className="block font-medium">Upload files</span><span className="mt-0.5 block text-[10px] text-[var(--misty-text-subtle)]">Choose with Misty’s file picker</span></span></button>
+            <p className="mb-1 mt-2 px-3 text-[10px] font-semibold uppercase tracking-wide text-[var(--misty-text-subtle)]">Library items</p>
+            {libraryPickerLoading ? <p className="m-0 px-3 py-3 text-xs text-[var(--misty-text-subtle)]">Loading Library…</p> : libraryPickerError ? <div className="px-3 py-3"><p className="m-0 text-xs text-red-200">{libraryPickerError}</p><button className={`${smallButtonClass} mt-2`} type="button" onClick={() => openLibraryPicker(libraryPickerQuery)}>Retry</button></div> : libraryItems.length === 0 ? <p className="m-0 px-3 py-3 text-xs text-[var(--misty-text-subtle)]">No Library items available.</p> : availableLibraryItems.length === 0 ? <p className="m-0 px-3 py-3 text-xs text-[var(--misty-text-subtle)]">No matching Library items.</p> : availableLibraryItems.map((item, itemIndex) => <button className={`flex w-full items-center gap-3 rounded-xl border-0 px-3 py-2.5 text-left text-sm ${itemIndex === libraryPickerActiveIndex ? "bg-[var(--misty-surface-2)] text-[var(--misty-text)]" : "bg-transparent text-[var(--misty-text-muted)] hover:bg-[var(--misty-surface-2)]"}`} type="button" role="option" aria-selected={itemIndex === libraryPickerActiveIndex} key={item.id} onMouseEnter={() => setLibraryPickerActiveIndex(itemIndex)} onClick={() => selectLibraryItem(item)}><span className="grid size-9 shrink-0 place-items-center overflow-hidden rounded-lg bg-[var(--misty-surface-2)]"><LibraryItemThumbnail spaceId={spaceId} item={item}/></span><span className="min-w-0"><span className="block truncate font-medium">{item.display_name}</span><span className="mt-0.5 block truncate text-[10px] text-[var(--misty-text-subtle)]">{item.file.original_filename}</span></span></button>)}
+          </div>
+        </div> : null}
         {pendingAttachments.length > 0 || selectedLibraryIds.length > 0 ? <div className="flex flex-wrap gap-1 px-2 pb-1">{pendingAttachments.map((attachment) => <button className="rounded-md border-0 bg-sky-500/10 px-2 py-1 text-[9px] text-sky-200" type="button" key={attachment.id} onClick={() => setPendingAttachments((current) => current.filter((item) => item.id !== attachment.id))}>{attachment.display_name} ×</button>)}{selectedLibraryIds.map((id) => <button className="rounded-md border-0 bg-violet-500/10 px-2 py-1 text-[9px] text-violet-200" type="button" key={id} onClick={() => setSelectedLibraryIds((current) => current.filter((item) => item !== id))}>@library {libraryItems.find((item) => item.id === id)?.display_name ?? "item"} ×</button>)}</div> : null}
       </form>
+      {libraryBrowserOpen ? <MistyLibraryPicker spaceId={spaceId} selectedIds={selectedLibraryIds} maximumSelected={Math.max(0, 5 - pendingAttachments.length)} onCancel={() => setLibraryBrowserOpen(false)} onChoose={(itemIds) => { setSelectedLibraryIds(itemIds); setLibraryBrowserOpen(false); }}/> : null}
+      {attachmentPickerOpen ? <MistyFilePicker mode="file" multiple title="Attach files to this chat" onCancel={() => setAttachmentPickerOpen(false)} onSelect={(path) => { setAttachmentPickerOpen(false); void uploadAttachments([path]); }} onSelectMany={(paths) => { setAttachmentPickerOpen(false); void uploadAttachments(paths); }}/> : null}
     </div>
   );
 }
@@ -409,7 +478,6 @@ function MessageContent({ span }: { span: MessageSpan }) {
 }
 
 function SpaceLibrary({ spaceId, section }: { spaceId: string; section: string }) {
-  const inputRef = useRef<HTMLInputElement | null>(null);
   const activeSpace = useSpacesStore((state) => state.spaces.find((space) => space.id === spaceId));
   const availableSpaces = useSpacesStore((state) => state.spaces);
   const [items, setItems] = useState<SpaceLibraryItem[]>([]);
@@ -444,7 +512,8 @@ function SpaceLibrary({ spaceId, section }: { spaceId: string; section: string }
   const [nextAfter, setNextAfter] = useState("");
   const [loadingMore, setLoadingMore] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [uploading, setUploading] = useState(false);
+  const [uploadJobs, setUploadJobs] = useState<LibraryUploadJob[]>([]);
+  const [filePickerOpen, setFilePickerOpen] = useState(false);
   const [localError, setLocalError] = useState("");
   const [selectedItemId, setSelectedItemId] = useState("");
   const [selecting, setSelecting] = useState(false);
@@ -590,7 +659,7 @@ function SpaceLibrary({ spaceId, section }: { spaceId: string; section: string }
       if (collection === "recent-days" || collection === "months" || collection === "years" || collection === "people" || collection === "groups" || collection === "memory" || collection === "trip" || collection === "map" || collection === "duplicate" || collection === "albums" && selectedCollectionId) {
         const normalizedSearch = searchQuery.toLocaleLowerCase();
         nextItems = nextItems.filter((item) => {
-          const mime = String(item.file.intrinsic_metadata.server_detected_mime_type ?? "");
+          const mime = libraryItemMIME(item);
           const matchesSearch = !normalizedSearch || [item.display_name, item.caption, item.tags.join(" "), item.file.original_filename].join(" ").toLocaleLowerCase().includes(normalizedSearch);
           const matchesMedia = !mediaType || mediaType === "document" ? !mediaType || !/^(image|video|audio)\//.test(mime) : mime.startsWith(`${mediaType}/`);
           return matchesSearch && matchesMedia;
@@ -658,24 +727,41 @@ function SpaceLibrary({ spaceId, section }: { spaceId: string; section: string }
     }
   };
 
-  const uploadFiles = async (files: FileList | null) => {
-    if (!files?.length || uploading) return;
-    setUploading(true);
+  const uploadFiles = async (paths: string[]) => {
+    if (paths.length === 0) return;
     setLocalError("");
-    try {
-      const uploaded: SpaceLibraryItem[] = [];
-      for (const file of Array.from(files)) {
-        const result = await spacesApi.uploadLibraryFile(spaceId, file, "library");
-        if (result.item) uploaded.push(result.item);
+    const jobs = paths.map((path, index): LibraryUploadJob => ({
+      id: `${Date.now()}-${index}-${Math.random().toString(36).slice(2)}`,
+      path,
+      name: path.replace(/[\\/]+$/, "").split(/[\\/]/).pop() || "file",
+      stage: "queued",
+      progress: 0,
+    }));
+    setUploadJobs(jobs);
+    const uploaded: SpaceLibraryItem[] = [];
+    let cursor = 0;
+    const updateJob = (id: string, patch: Partial<LibraryUploadJob>) => {
+      setUploadJobs((current) => current.map((job) => job.id === id ? { ...job, ...patch } : job));
+    };
+    const worker = async () => {
+      while (cursor < jobs.length) {
+        const job = jobs[cursor++];
+        try {
+          const result = await spacesApi.uploadLibraryPath(spaceId, job.path, "library", {
+            onStage: (stage) => updateJob(job.id, { stage, progress: stage === "finalizing" ? 1 : 0 }),
+            onProgress: (progress) => updateJob(job.id, { progress }),
+          });
+          if (result.item) uploaded.push(result.item);
+          updateJob(job.id, { stage: "ready", progress: 1 });
+        } catch (error) {
+          const message = error instanceof Error ? error.message : "Upload failed.";
+          updateJob(job.id, { stage: "failed", error: message });
+        }
       }
-      await Promise.allSettled(detectUploadedAssetStacks(uploaded).map((input) => spacesApi.createLibraryAssetStack(spaceId, input)));
-      await reload();
-    } catch (error) {
-      setLocalError(error instanceof Error ? error.message : "Upload failed.");
-    } finally {
-      setUploading(false);
-      if (inputRef.current) inputRef.current.value = "";
-    }
+    };
+    await Promise.all(Array.from({ length: Math.min(2, jobs.length) }, () => worker()));
+    await Promise.allSettled(detectUploadedAssetStacks(uploaded).map((input) => spacesApi.createLibraryAssetStack(spaceId, input)));
+    await reload();
   };
 
   const createSelectedAssetStack = async (kind: LibraryAssetStack["kind"]) => {
@@ -759,7 +845,7 @@ function SpaceLibrary({ spaceId, section }: { spaceId: string; section: string }
   };
 
   const ungroupAssetStack = async (stack: LibraryAssetStack) => {
-    if (!window.confirm(`Separate this ${stack.kind === "live_photo" ? "Live Photo" : stack.kind === "raw_pair" ? "RAW pair" : "burst"}?`)) return;
+    if (!await confirmAction(`Separate this ${stack.kind === "live_photo" ? "Live Photo" : stack.kind === "raw_pair" ? "RAW pair" : "burst"}?`)) return;
     try {
       await spacesApi.deleteLibraryAssetStack(spaceId, stack, sensitiveCollectionToken);
       setAssetStacks((current) => current.filter((candidate) => candidate.id !== stack.id));
@@ -788,7 +874,7 @@ function SpaceLibrary({ spaceId, section }: { spaceId: string; section: string }
   };
 
   const trashItem = async (item: SpaceLibraryItem) => {
-    if (!window.confirm(`Move “${item.display_name}” to Recently Deleted?`)) return false;
+    if (!await confirmAction(`Move “${item.display_name}” to Recently Deleted?`)) return false;
     try {
       await spacesApi.trashLibraryItem(spaceId, item.id, sensitiveCollectionToken);
       setItems((current) => current.filter((candidate) => candidate.id !== item.id));
@@ -823,7 +909,7 @@ function SpaceLibrary({ spaceId, section }: { spaceId: string; section: string }
 
   const applyBulkAction = async (action: BulkLibraryItemAction, options: BulkLibraryItemOptions = {}) => {
     if (selectedItems.length === 0 || bulkSaving) return false;
-    if (action === "trash" && !window.confirm(`Move ${selectedItems.length} selected item${selectedItems.length === 1 ? "" : "s"} to Recently Deleted?`)) return false;
+    if (action === "trash" && !await confirmAction(`Move ${selectedItems.length} selected item${selectedItems.length === 1 ? "" : "s"} to Recently Deleted?`)) return false;
     setBulkSaving(true);
     setLocalError("");
     try {
@@ -886,7 +972,7 @@ function SpaceLibrary({ spaceId, section }: { spaceId: string; section: string }
   };
 
   const clearBulkMetadata = async (action: "clear_date" | "clear_location", label: string) => {
-    if (!window.confirm(`Clear ${label} from ${selectedItems.length} selected item${selectedItems.length === 1 ? "" : "s"}?`)) return;
+    if (!await confirmAction(`Clear ${label} from ${selectedItems.length} selected item${selectedItems.length === 1 ? "" : "s"}?`)) return;
     await applyBulkAction(action);
   };
 
@@ -971,7 +1057,7 @@ function SpaceLibrary({ spaceId, section }: { spaceId: string; section: string }
   };
 
   const mergeCurrentDuplicates = async () => {
-    if (collection !== "duplicate" || visibleItems.length < 2 || bulkSaving || !window.confirm(`Merge ${visibleItems.length} matching items? Misty will keep one item, combine metadata and references, and move the redundant copies to Recently Deleted.`)) return;
+    if (collection !== "duplicate" || visibleItems.length < 2 || bulkSaving || !await confirmAction(`Merge ${visibleItems.length} matching items? Misty will keep one item, combine metadata and references, and move the redundant copies to Recently Deleted.`)) return;
     setBulkSaving(true);
     setLocalError("");
     try {
@@ -986,7 +1072,7 @@ function SpaceLibrary({ spaceId, section }: { spaceId: string; section: string }
   };
 
   const revokeSharedReference = async (reference: LibrarySharedReference) => {
-    if (!window.confirm(`Stop sharing “${reference.display_name}” with ${reference.destination_space_name}?`)) return;
+    if (!await confirmAction(`Stop sharing “${reference.display_name}” with ${reference.destination_space_name}?`)) return;
     try {
       await spacesApi.revokeLibraryGrant(spaceId, reference);
       setOutgoingReferences((current) => current.filter((item) => item.grant_id !== reference.grant_id));
@@ -1158,7 +1244,7 @@ function SpaceLibrary({ spaceId, section }: { spaceId: string; section: string }
 
   const deleteAlbumFolder = async () => {
     const folder = albumFolders.find((candidate) => candidate.id === selectedAlbumFolderId);
-    if (!folder || !window.confirm(`Delete “${folder.name}”? Albums will move to the top level.`)) return;
+    if (!folder || !await confirmAction(`Delete “${folder.name}”? Albums will move to the top level.`)) return;
     try {
       await spacesApi.deleteAlbumFolder(spaceId, folder);
       setAlbumFolders((current) => current.filter((candidate) => candidate.id !== folder.id && candidate.parent_folder_id !== folder.id));
@@ -1181,7 +1267,7 @@ function SpaceLibrary({ spaceId, section }: { spaceId: string; section: string }
   };
 
   const deleteCurrentAlbum = async () => {
-    if (!currentAlbum || !window.confirm(`Delete “${currentAlbum.name}”? Its Library items will not be deleted.`)) return;
+    if (!currentAlbum || !await confirmAction(`Delete “${currentAlbum.name}”? Its Library items will not be deleted.`)) return;
     try {
       await spacesApi.deleteAlbum(spaceId, currentAlbum);
       setAlbums((current) => current.filter((album) => album.id !== currentAlbum.id));
@@ -1273,7 +1359,7 @@ function SpaceLibrary({ spaceId, section }: { spaceId: string; section: string }
   };
 
   const deleteCurrentPerson = async () => {
-    if (!currentPerson || !window.confirm(`Remove “${currentPerson.name || (currentPerson.kind === "pet" ? "Unnamed pet" : "Unnamed person")}" from People & Pets? Library items will not be deleted.`)) return;
+    if (!currentPerson || !await confirmAction(`Remove “${currentPerson.name || (currentPerson.kind === "pet" ? "Unnamed pet" : "Unnamed person")}" from People & Pets? Library items will not be deleted.`)) return;
     try {
       await spacesApi.deletePerson(spaceId, currentPerson);
       setPeople((current) => current.filter((person) => person.id !== currentPerson.id));
@@ -1286,7 +1372,7 @@ function SpaceLibrary({ spaceId, section }: { spaceId: string; section: string }
   const mergeCurrentPerson = async (targetID: string) => {
     if (!currentPerson || !targetID) return;
     const target = people.find((person) => person.id === targetID);
-    if (!target || !window.confirm(`Merge “${currentPerson.name || "Unnamed"}” into “${target.name || "Unnamed"}”?`)) return;
+    if (!target || !await confirmAction(`Merge “${currentPerson.name || "Unnamed"}” into “${target.name || "Unnamed"}”?`)) return;
     try {
       const saved = await spacesApi.mergePeople(spaceId, currentPerson, target);
       setPeople((current) => current.filter((person) => person.id !== currentPerson.id).map((person) => person.id === saved.id ? saved : person));
@@ -1326,11 +1412,18 @@ function SpaceLibrary({ spaceId, section }: { spaceId: string; section: string }
     }
   };
 
+  const uploading = uploadJobs.some((job) => !["ready", "failed"].includes(job.stage));
+  const uploadProgress = uploadJobs.length > 0 ? Math.round(uploadJobs.reduce((total, job) => total + (job.stage === "ready" || job.stage === "failed" ? 1 : job.progress), 0) / uploadJobs.length * 100) : 0;
+  const failedUploads = uploadJobs.filter((job) => job.stage === "failed");
+
   return (
     <div className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] bg-[var(--misty-bg)]">
-      <input ref={inputRef} className="hidden" type="file" multiple onChange={(event) => void uploadFiles(event.target.files)} />
-      <SpaceLibraryHeader sectionNavigation={<SpaceSectionNavigation spaceId={spaceId} section={section}/>} collection={collection} onSelectCollection={(nextCollection) => selectCollection(nextCollection)} uploading={uploading} uploadDisabled={uploading || (usage?.remaining_bytes ?? 1) <= 0} onUpload={() => inputRef.current?.click()} searchInput={searchInput} onSearchInput={setSearchInput} onSearchFocus={() => setSearchFocused(true)} onSearchBlur={() => window.setTimeout(() => setSearchFocused(false), 120)} mediaType={mediaType} onMediaType={(value) => setMediaType(value as typeof mediaType)} onSelectUtility={(nextCollection) => selectCollection(nextCollection)} sort={sort} direction={direction} onSort={(nextSort, nextDirection) => { setSort(nextSort); setDirection(nextDirection); }} albumOrderAvailable={Boolean(currentAlbum)} gridSize={gridSize} squareGrid={squareGrid} onSmallerGrid={() => setGridSize((current) => Math.max(120, current - 30))} onLargerGrid={() => setGridSize((current) => Math.min(300, current + 30))} onToggleSquareGrid={() => setSquareGrid((current) => !current)} visibleItemCount={visibleItems.length} selecting={selecting} onToggleSelecting={() => { setSelecting((current) => !current); setSelectedItemIds([]); setSelectedItemId(""); }}/>
+      <SpaceLibraryHeader sectionNavigation={<SpaceSectionNavigation spaceId={spaceId} section={section}/>} collection={collection} onSelectCollection={(nextCollection) => selectCollection(nextCollection)} uploading={uploading} uploadDisabled={uploading || (usage?.remaining_bytes ?? 1) <= 0} onUpload={() => setFilePickerOpen(true)} searchInput={searchInput} onSearchInput={setSearchInput} onSearchFocus={() => setSearchFocused(true)} onSearchBlur={() => window.setTimeout(() => setSearchFocused(false), 120)} mediaType={mediaType} onMediaType={(value) => setMediaType(value as typeof mediaType)} onSelectUtility={(nextCollection) => selectCollection(nextCollection)} sort={sort} direction={direction} onSort={(nextSort, nextDirection) => { setSort(nextSort); setDirection(nextDirection); }} albumOrderAvailable={Boolean(currentAlbum)} gridSize={gridSize} squareGrid={squareGrid} onSmallerGrid={() => setGridSize((current) => Math.max(120, current - 30))} onLargerGrid={() => setGridSize((current) => Math.min(300, current + 30))} onToggleSquareGrid={() => setSquareGrid((current) => !current)} visibleItemCount={visibleItems.length} selecting={selecting} onToggleSelecting={() => { setSelecting((current) => !current); setSelectedItemIds([]); setSelectedItemId(""); }}/>
       <div className="min-h-0 overflow-auto bg-[var(--misty-bg)] px-6 pb-6 pt-5">
+        {uploadJobs.length > 0 ? <div className="mb-4 overflow-hidden rounded-xl border border-[var(--misty-border-soft)] bg-[var(--misty-surface)]">
+          <div className="flex items-center gap-3 px-3 py-2.5"><Upload className="shrink-0 text-[var(--misty-text-muted)]" size={15}/><div className="min-w-0 flex-1"><p className="m-0 truncate text-xs font-medium">{uploading ? `Uploading ${uploadJobs.length} file${uploadJobs.length === 1 ? "" : "s"} in the background` : failedUploads.length > 0 ? `${uploadJobs.length - failedUploads.length} uploaded, ${failedUploads.length} failed` : `${uploadJobs.length} file${uploadJobs.length === 1 ? "" : "s"} uploaded`}</p><p className="m-0 mt-0.5 truncate text-[10px] text-[var(--misty-text-subtle)]">{uploading ? `${uploadProgress}% · You can keep using Misty while this finishes` : failedUploads[0]?.error ?? "Complete"}</p></div>{!uploading ? <button className={iconButtonClass} type="button" onClick={() => setUploadJobs([])} aria-label="Dismiss upload status"><X size={14}/></button> : null}</div>
+          <div className="h-0.5 bg-[var(--misty-surface-3)]"><div className="h-full bg-[var(--misty-primary)] transition-[width]" style={{ width: `${uploadProgress}%` }}/></div>
+        </div> : null}
         {searchFocused && (searchFacets.tags.length > 0 || searchFacets.media_types.length > 0 || searchFacets.years.length > 0 || searchFacets.albums.length > 0 || searchFacets.utilities.length > 0) ? <div className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-[var(--misty-border-soft)] bg-[var(--misty-surface)] p-3" onMouseDown={(event) => event.preventDefault()}>
           {searchFacets.media_types.length > 0 ? <LibraryFacetGroup label="Media" facets={searchFacets.media_types} onSelect={(facet) => appendSearchFacet("type", facet.value)}/> : null}
           {searchFacets.tags.length > 0 ? <LibraryFacetGroup label="Tags" facets={searchFacets.tags} onSelect={(facet) => appendSearchFacet("tag", facet.value)}/> : null}
@@ -1358,7 +1451,7 @@ function SpaceLibrary({ spaceId, section }: { spaceId: string; section: string }
           </>}
         </div> : null}
         {localError ? <button className="mb-4 rounded-xl border border-red-400/20 bg-red-950/20 px-3 py-2 text-left text-xs text-red-200" type="button" onClick={() => setLocalError("")}>{localError}</button> : null}
-        {(collection === "months" || collection === "years" || collection === "recent-days") && !selectedCollectionId ? <div className="mb-5"><div className="grid grid-cols-[repeat(auto-fill,minmax(190px,1fr))] gap-3">{(collection === "months" ? discovery.months : collection === "years" ? discovery.years : discovery.recent_days).map((group) => <LibraryDiscoveryCard key={`${group.kind}:${group.id}`} spaceId={spaceId} group={group} fallbackIcon={collection === "years" ? History : LibraryIcon} onClick={() => selectCollection(collection, group.id)}/>)}</div>{(collection === "months" ? discovery.months : collection === "years" ? discovery.years : discovery.recent_days).length === 0 ? <SpaceLibraryEmptyState collection={collection} uploading={uploading} uploadDisabled={uploading || (usage?.remaining_bytes ?? 1) <= 0} onUpload={() => inputRef.current?.click()}/> : null}</div> : null}
+        {(collection === "months" || collection === "years" || collection === "recent-days") && !selectedCollectionId ? <div className="mb-5"><div className="grid grid-cols-[repeat(auto-fill,minmax(190px,1fr))] gap-3">{(collection === "months" ? discovery.months : collection === "years" ? discovery.years : discovery.recent_days).map((group) => <LibraryDiscoveryCard key={`${group.kind}:${group.id}`} spaceId={spaceId} group={group} fallbackIcon={collection === "years" ? History : LibraryIcon} onClick={() => selectCollection(collection, group.id)}/>)}</div>{(collection === "months" ? discovery.months : collection === "years" ? discovery.years : discovery.recent_days).length === 0 ? <SpaceLibraryEmptyState collection={collection} uploading={uploading} uploadDisabled={uploading || (usage?.remaining_bytes ?? 1) <= 0} onUpload={() => setFilePickerOpen(true)}/> : null}</div> : null}
         {collection === "collections" ? <div className="grid gap-7">
           {pins.length > 0 ? <section><h4 className="mb-3 mt-0 text-sm">Pinned</h4><div className="grid grid-cols-[repeat(auto-fill,minmax(160px,1fr))] gap-3">{pins.map((pin, index) => { const descriptor = pinnedDescriptor(pin); return descriptor ? <LibraryCollectionCard key={pin.id} {...descriptor} pinned onMoveEarlier={index > 0 ? () => void movePin(pin.id, -1) : undefined} onMoveLater={index < pins.length - 1 ? () => void movePin(pin.id, 1) : undefined} onTogglePin={() => void togglePin(pin.target_kind, pin.target_id)}/> : null; })}</div></section> : null}
           <section><h4 className="mb-3 mt-0 text-sm">Collections</h4><div className="grid grid-cols-[repeat(auto-fill,minmax(160px,1fr))] gap-3">
@@ -1397,7 +1490,7 @@ function SpaceLibrary({ spaceId, section }: { spaceId: string; section: string }
         {currentPerson ? <div className="mb-4 flex items-center justify-between gap-3"><div><button className="border-0 bg-transparent p-0 text-xs text-[var(--misty-text-muted)]" type="button" onClick={() => selectCollection("people")}>← People & Pets</button><h4 className="mb-0 mt-2 text-sm">{currentPerson.name || (currentPerson.kind === "pet" ? "Unnamed pet" : "Unnamed person")}</h4></div><div className="flex flex-wrap gap-2"><select className={libraryControlClass} value="" onChange={(event) => { if (event.target.value) void mergeCurrentPerson(event.target.value); }} aria-label="Merge this identity"><option value="">Merge into…</option>{people.filter((person) => person.id !== currentPerson.id && person.kind === currentPerson.kind).map((person) => <option value={person.id} key={person.id}>{person.name || "Unnamed"}</option>)}</select><button className={smallButtonClass} type="button" onClick={openEditPerson}><Pencil size={12}/>Edit</button><button className={smallButtonClass} type="button" onClick={() => void deleteCurrentPerson()}><Trash2 size={12}/>Remove</button></div></div> : currentAlbum ? <div className="mb-4 flex flex-wrap items-center justify-between gap-3"><div><button className="border-0 bg-transparent p-0 text-xs text-[var(--misty-text-muted)]" type="button" onClick={() => { setSelectedCollectionId(""); setSelectedAlbumFolderId(currentAlbum.folder_id ?? ""); }}>← Albums</button><h4 className="mb-0 mt-2 text-sm">{currentAlbum.name}</h4>{currentAlbum.description ? <p className="mb-0 mt-1 text-xs text-[var(--misty-text-subtle)]">{currentAlbum.description}</p> : null}</div><div className="flex flex-wrap gap-2"><select className={libraryControlClass} value={currentAlbum.folder_id ?? ""} onChange={(event) => void organizeCurrentAlbum({ folder_id: event.target.value })} aria-label="Move album to folder"><option value="">Top level</option>{albumFolders.map((folder) => <option value={folder.id} key={folder.id}>{folder.name}</option>)}</select><select className={libraryControlClass} value={currentAlbum.sort_mode} onChange={(event) => void organizeCurrentAlbum({ sort_mode: event.target.value as LibraryAlbum["sort_mode"] })} aria-label="Sort album"><option value="custom">Custom order</option><option value="oldest">Oldest first</option><option value="newest">Newest first</option></select><button className={smallButtonClass} type="button" onClick={() => void organizeCurrentAlbum({ view_mode: currentAlbum.view_mode === "grid" ? "list" : "grid" })}>{currentAlbum.view_mode === "grid" ? <List size={12}/> : <Grid3X3 size={12}/>} {currentAlbum.view_mode === "grid" ? "List" : "Grid"}</button><button className={smallButtonClass} type="button" onClick={openEditAlbum}><Pencil size={12}/>Edit</button><button className={smallButtonClass} type="button" onClick={() => void deleteCurrentAlbum()}><Trash2 size={12}/>Delete album</button></div></div> : currentMapPoint ? <div className="mb-4"><button className="border-0 bg-transparent p-0 text-xs text-[var(--misty-text-muted)]" type="button" onClick={() => selectCollection("map")}>← Map</button><h4 className="mb-0 mt-2 text-sm">{currentMapPoint.name}</h4><p className="mb-0 mt-1 text-xs text-[var(--misty-text-subtle)]">{currentMapPoint.latitude.toFixed(2)}, {currentMapPoint.longitude.toFixed(2)}</p></div> : currentDiscoveryGroup ? <div className="mb-4 flex items-end justify-between gap-3"><div><button className="border-0 bg-transparent p-0 text-xs text-[var(--misty-text-muted)]" type="button" onClick={() => selectCollection(currentDiscoveryGroup.kind === "duplicate" ? "duplicate" : "collections")}>← {currentDiscoveryGroup.kind === "duplicate" ? "Duplicates" : "Collections"}</button><h4 className="mb-0 mt-2 text-sm">{currentDiscoveryGroup.title}</h4><p className="mb-0 mt-1 text-xs text-[var(--misty-text-subtle)]">{currentDiscoveryGroup.subtitle}</p></div><div className="flex gap-2">{currentDiscoveryGroup.kind === "memory" && visibleItems.length > 0 ? <button className={primaryButtonClass} type="button" onClick={() => setMemoryPlaybackOpen(true)}><Play size={13}/>Play memory</button> : null}{currentDiscoveryGroup.kind === "duplicate" ? <button className={primaryButtonClass} type="button" disabled={bulkSaving || visibleItems.length < 2} onClick={() => void mergeCurrentDuplicates()}>{bulkSaving ? "Merging…" : "Merge"}</button> : null}</div></div> : selectedCollectionId && !currentDateGroup ? <button className="mb-4 border-0 bg-transparent p-0 text-xs text-[var(--misty-text-muted)]" type="button" onClick={() => selectCollection("collections")}>← Collections</button> : null}
         {currentDiscoveryGroup?.kind === "memory" ? <div className="mb-4 flex flex-wrap gap-2"><button className={smallButtonClass} type="button" onClick={() => { const title = window.prompt("Memory title", currentDiscoveryGroup.title)?.trim(); if (title && title !== currentDiscoveryGroup.title) void updateCurrentMemory({ title }); }}><Pencil size={12}/>Rename</button><select className={libraryControlClass} value={currentDiscoveryGroup.cover_item_id ?? ""} onChange={(event) => void updateCurrentMemory({ cover_item_id: event.target.value })} aria-label="Choose memory key photo">{visibleItems.map((candidate) => <option value={candidate.id} key={candidate.id}>{candidate.display_name}</option>)}</select><select className={libraryControlClass} value={currentDiscoveryGroup.music_item_id ?? ""} onChange={(event) => void updateCurrentMemory({ music_item_id: event.target.value })} aria-label="Choose memory music"><option value="">No music</option>{memoryAudioItems.map((candidate) => <option value={candidate.id} key={candidate.id}>{candidate.display_name}</option>)}</select><select className={libraryControlClass} value={currentDiscoveryGroup.playback_seconds ?? 4.5} onChange={(event) => void updateCurrentMemory({ playback_seconds: Number(event.target.value) })} aria-label="Choose memory pace"><option value={2}>Fast</option><option value={4.5}>Medium</option><option value={7}>Slow</option></select></div> : null}
         {loading ? <div className="grid min-h-64 place-items-center text-sm text-[var(--misty-text-subtle)]">Loading Library…</div> : collection === "collections" || collection === "shared" || collection === "imports" || (collection === "recent-days" || collection === "months" || collection === "years" || collection === "people" || collection === "albums" || collection === "groups" || collection === "duplicate" || collection === "map") && !selectedCollectionId ? null : sensitiveCollectionScope && !sensitiveCollectionToken ? <div className="grid min-h-64 place-items-center"><button className={primaryButtonClass} type="button" onClick={() => requestSensitiveUnlock(sensitiveCollectionScope)}>Unlock {collection === "hidden" ? "Hidden" : "Recently Deleted"}</button></div> : displayItems.length === 0 ? (
-          <SpaceLibraryEmptyState collection={collection} searching={Boolean(searchQuery || mediaType)} uploading={uploading} uploadDisabled={uploading || (usage?.remaining_bytes ?? 1) <= 0} onUpload={() => inputRef.current?.click()} onClearSearch={() => { setSearchInput(""); setMediaType(""); }}/>
+          <SpaceLibraryEmptyState collection={collection} searching={Boolean(searchQuery || mediaType)} uploading={uploading} uploadDisabled={uploading || (usage?.remaining_bytes ?? 1) <= 0} onUpload={() => setFilePickerOpen(true)} onClearSearch={() => { setSearchInput(""); setMediaType(""); }}/>
         ) : (
           <div className="grid gap-3" style={{ gridTemplateColumns: currentAlbum?.view_mode === "list" ? "1fr" : `repeat(auto-fill,minmax(${gridSize}px,1fr))` }}>
             {displayItems.map((item, itemIndex) => {
@@ -1418,6 +1511,7 @@ function SpaceLibrary({ spaceId, section }: { spaceId: string; section: string }
           </div>
         )}
       </div>
+      {filePickerOpen ? <MistyFilePicker mode="file" multiple title="Add files to this Space" onCancel={() => setFilePickerOpen(false)} onSelect={(path) => { setFilePickerOpen(false); void uploadFiles([path]); }} onSelectMany={(paths) => { setFilePickerOpen(false); void uploadFiles(paths); }}/> : null}
       {selectedItemId ? <LibraryItemViewer spaceId={spaceId} item={displayItems.find((item) => item.id === selectedItemId) ?? items.find((item) => item.id === selectedItemId) ?? null} items={displayItems} allItems={items} assetStack={stackByItemID.get(selectedItemId) ?? null} reauthenticationToken={sensitiveCollectionToken} onCopyEdit={(definition) => setCopiedEditDefinition(structuredClone(definition))} onSetStackCover={setAssetStackCover} onSetStackEffect={setAssetStackEffect} onUngroupStack={ungroupAssetStack} onClose={() => setSelectedItemId("")} onSelect={setSelectedItemId} onUpdate={updateItem} onReplaceItem={replaceItem} onRenditionReady={() => setReloadKey((current) => current + 1)} onTrash={trashItem}/> : null}
       {memoryPlaybackOpen && currentDiscoveryGroup?.kind === "memory" ? <LibraryMemoryPlayback spaceId={spaceId} group={currentDiscoveryGroup} items={visibleItems} onClose={() => setMemoryPlaybackOpen(false)}/> : null}
       {albumDialogMode ? <div className="fixed inset-0 z-[2147483000] grid place-items-center bg-black/60 p-6" role="presentation" onMouseDown={(event) => { if (event.currentTarget === event.target && !albumSaving) setAlbumDialogMode(""); }}><form className="w-full max-w-sm rounded-2xl border border-[var(--misty-border-strong)] bg-[var(--misty-modal-bg,var(--misty-surface))] p-5 shadow-2xl" onSubmit={(event) => void saveAlbum(event)}><div className="flex items-center justify-between gap-4"><h2 className="m-0 text-base font-semibold">{albumDialogMode === "create" ? "New album" : "Edit album"}</h2><button className={iconButtonClass} type="button" disabled={albumSaving} onClick={() => setAlbumDialogMode("")} aria-label="Close album dialog"><X size={15}/></button></div><label className="mt-5 grid gap-2 text-xs font-medium text-[var(--misty-text-muted)]">Name<input className={inputClass} autoFocus maxLength={120} value={albumName} onChange={(event) => setAlbumName(event.target.value)}/></label><label className="mt-4 grid gap-2 text-xs font-medium text-[var(--misty-text-muted)]">Description<textarea className={`${inputClass} min-h-20 resize-y py-2`} maxLength={2000} value={albumDescription} onChange={(event) => setAlbumDescription(event.target.value)}/></label>{albumDialogMode === "edit" && visibleItems.length > 0 ? <label className="mt-4 grid gap-2 text-xs font-medium text-[var(--misty-text-muted)]">Cover<select className={inputClass} value={albumCoverItemId} onChange={(event) => setAlbumCoverItemId(event.target.value)}><option value="">Automatic</option>{visibleItems.map((item) => <option value={item.id} key={item.id}>{item.display_name}</option>)}</select></label> : null}<div className="mt-5 flex justify-end gap-2"><button className={secondaryButtonClass} type="button" disabled={albumSaving} onClick={() => setAlbumDialogMode("")}>Cancel</button><button className={primaryButtonClass} type="submit" disabled={albumSaving || !albumName.trim()}>{albumSaving ? "Saving…" : albumDialogMode === "create" ? "Create" : "Save"}</button></div></form></div> : null}
@@ -1436,7 +1530,7 @@ function LibraryMemoryPlayback({ spaceId, group, items, onClose }: { spaceId: st
   const [musicUrl, setMusicUrl] = useState("");
   const [contentError, setContentError] = useState("");
   const item = items[index] ?? null;
-  const mimeType = String(item?.file.intrinsic_metadata.server_detected_mime_type ?? item?.file.intrinsic_metadata.client_declared_mime_type ?? "").split(";")[0].toLowerCase();
+  const mimeType = item ? libraryItemMIME(item) : "application/octet-stream";
   const isVideo = mimeType.startsWith("video/");
   const isVisualImage = mimeType.startsWith("image/") || !isVideo && Number(item?.file.intrinsic_metadata.width ?? 0) > 0;
 
@@ -1446,7 +1540,7 @@ function LibraryMemoryPlayback({ spaceId, group, items, onClose }: { spaceId: st
     setContentUrl("");
     setContentError("");
     if (!item) return () => { current = false; };
-    const request = isVisualImage ? spacesApi.libraryPreview(spaceId, item.id) : spacesApi.libraryContent(spaceId, item.id);
+    const request = isVisualImage ? spacesApi.libraryPreview(spaceId, item.id, "", item.version).catch(() => spacesApi.libraryContent(spaceId, item.id)) : spacesApi.libraryContent(spaceId, item.id);
     void request.then((blob) => {
       if (!current) return;
       objectUrl = URL.createObjectURL(blob);
@@ -1456,7 +1550,7 @@ function LibraryMemoryPlayback({ spaceId, group, items, onClose }: { spaceId: st
       current = false;
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
-  }, [isVisualImage, item?.id, spaceId]);
+  }, [isVisualImage, item?.id, item?.version, spaceId]);
 
   useEffect(() => {
     let current = true;
@@ -1577,7 +1671,7 @@ function LibraryItemViewer({
   const [stackMemberID, setStackMemberID] = useState("");
   const index = item ? items.findIndex((candidate) => candidate.id === item.id) : -1;
   const metadata = item?.file.intrinsic_metadata ?? {};
-  const mimeType = String(metadata.server_detected_mime_type ?? metadata.client_declared_mime_type ?? "application/octet-stream").split(";")[0].toLowerCase();
+  const mimeType = item ? libraryItemMIME(item) : "application/octet-stream";
   const isImage = mimeType.startsWith("image/") || !mimeType.startsWith("video/") && Number(metadata.width ?? 0) > 0 && Number(metadata.height ?? 0) > 0;
   const isVideo = /^video\//.test(mimeType);
   const isAudio = /^audio\//.test(mimeType);
@@ -1589,7 +1683,7 @@ function LibraryItemViewer({
   const stackMediaItem = allItems.find((candidate) => candidate.id === stackMediaID) ?? (item?.id === stackMediaID ? item : null);
   const stackMediaMember = assetStack?.members.find((member) => member.item_id === stackMediaID);
   const stackMediaMetadata = stackMediaItem?.file.intrinsic_metadata ?? {};
-  const stackMediaMIME = String(stackMediaMetadata.server_detected_mime_type ?? stackMediaMetadata.client_declared_mime_type ?? stackMediaMember?.mime_type ?? "application/octet-stream").split(";")[0].toLowerCase();
+  const stackMediaMIME = stackMediaItem ? libraryItemMIME(stackMediaItem) : String(stackMediaMember?.mime_type ?? "application/octet-stream").split(";")[0].toLowerCase();
   const contentIsImage = stackMediaMIME.startsWith("image/") || !stackMediaMIME.startsWith("video/") && Number(stackMediaMetadata.width ?? 0) > 0 && Number(stackMediaMetadata.height ?? 0) > 0;
   const contentIsVideo = stackMediaMIME.startsWith("video/");
   const contentIsAudio = stackMediaMIME.startsWith("audio/");
@@ -1672,8 +1766,8 @@ function LibraryItemViewer({
     const request = longExposureMotionID
       ? spacesApi.libraryContent(spaceId, longExposureMotionID, reauthenticationToken).then(createLongExposureImage)
       : editing && showingCover
-      ? contentIsImage ? spacesApi.libraryOriginalPreview(spaceId, stackMediaID, reauthenticationToken) : spacesApi.libraryOriginalContent(spaceId, stackMediaID, reauthenticationToken)
-      : contentIsImage ? spacesApi.libraryPreview(spaceId, stackMediaID, reauthenticationToken) : spacesApi.libraryContent(spaceId, stackMediaID, reauthenticationToken);
+		? contentIsImage ? spacesApi.libraryOriginalPreview(spaceId, stackMediaID, reauthenticationToken, stackMediaItem?.version ?? item.version).catch(() => spacesApi.libraryOriginalContent(spaceId, stackMediaID, reauthenticationToken)) : spacesApi.libraryOriginalContent(spaceId, stackMediaID, reauthenticationToken)
+		: contentIsImage ? spacesApi.libraryPreview(spaceId, stackMediaID, reauthenticationToken, stackMediaItem?.version ?? item.version).catch(() => spacesApi.libraryContent(spaceId, stackMediaID, reauthenticationToken)) : spacesApi.libraryContent(spaceId, stackMediaID, reauthenticationToken);
     void request.then((blob) => {
       if (!current) return;
       objectUrl = URL.createObjectURL(blob);
@@ -1683,7 +1777,7 @@ function LibraryItemViewer({
       current = false;
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
-  }, [activeEdit?.rendition_state, assetStack?.effect, assetStack?.kind, assetStack?.motion_item_id, contentIsAudio, contentIsImage, contentIsVideo, editing, item?.id, reauthenticationToken, spaceId, stackMediaID]);
+  }, [activeEdit?.rendition_state, assetStack?.effect, assetStack?.kind, assetStack?.motion_item_id, contentIsAudio, contentIsImage, contentIsVideo, editing, item?.id, item?.version, reauthenticationToken, spaceId, stackMediaID, stackMediaItem?.version]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -1773,7 +1867,7 @@ function LibraryItemViewer({
   };
 
   const deleteEdit = async (editID: string) => {
-    if (editSaving || !window.confirm("Delete this edit version?")) return;
+    if (editSaving || !await confirmAction("Delete this edit version?")) return;
     setEditSaving(true);
     try {
       await spacesApi.deleteEditVersion(spaceId, item.id, editID, reauthenticationToken);
@@ -1868,10 +1962,10 @@ function LibraryItemViewer({
 
   return (
     <div className="fixed inset-0 z-[2147483100] grid place-items-center bg-black/80 p-4 backdrop-blur-sm" role="presentation" onMouseDown={(event) => { if (event.currentTarget === event.target) onClose(); }}>
-      <section className="grid h-[min(860px,calc(100vh-32px))] w-[min(1320px,calc(100vw-32px))] grid-cols-[minmax(0,1fr)_340px] grid-rows-[56px_minmax(0,1fr)] overflow-hidden rounded-2xl border border-[var(--misty-border-strong)] bg-[var(--misty-app-page-bg,#07090b)] shadow-2xl" role="dialog" aria-modal="true" aria-label={item.display_name}>
-        <header className="col-span-2 flex items-center justify-between border-b border-[var(--misty-border-soft)] px-4">
+      <section className="grid h-[min(860px,calc(100dvh-32px))] min-h-0 min-w-0 w-[min(1320px,calc(100vw-32px))] grid-cols-[minmax(0,1fr)_minmax(300px,340px)] grid-rows-[56px_minmax(0,1fr)] overflow-hidden rounded-2xl border border-[var(--misty-border-strong)] bg-[var(--misty-app-page-bg,#07090b)] shadow-2xl" role="dialog" aria-modal="true" aria-label={item.display_name}>
+        <header className="relative z-20 col-span-2 flex min-w-0 items-center justify-between gap-4 border-b border-[var(--misty-border-soft)] bg-[var(--misty-app-page-bg,#07090b)] px-4">
           <div className="min-w-0"><p className="m-0 truncate text-sm font-medium">{item.display_name}</p><p className="m-0 mt-0.5 text-[10px] text-[var(--misty-text-subtle)]">{index + 1} of {items.length}</p></div>
-          <div className="flex items-center gap-1">
+          <div className="flex min-w-0 shrink-0 items-center gap-1 overflow-x-auto py-1">
             {assetStack && stackMediaID !== assetStack.cover_item_id && stackMediaMember?.role !== "motion" && stackMediaMember?.role !== "raw" ? <button className={smallButtonClass} type="button" onClick={() => void onSetStackCover(assetStack, stackMediaID)}>Make key photo</button> : null}
             {assetStack ? <button className={smallButtonClass} type="button" onClick={() => void onUngroupStack(assetStack)}>Ungroup</button> : null}
             {activeEdit ? <button className={smallButtonClass} type="button" onClick={() => onCopyEdit(normalizeLibraryEdit(activeEdit.edit_definition))}><Copy size={12}/>Copy edits</button> : null}
@@ -1884,15 +1978,19 @@ function LibraryItemViewer({
             <button className={iconButtonClass} type="button" onClick={onClose} aria-label="Close"><X size={15}/></button>
           </div>
         </header>
-        <div ref={mediaAreaRef} className="relative grid min-h-0 place-items-center overflow-hidden bg-black/35 p-6">
-          {contentLoading ? <span className="text-xs text-white/50">Loading…</span> : contentError ? <span className="max-w-sm text-center text-xs text-red-200">{contentError}</span> : contentIsImage && contentUrl ? <img ref={imageRef} className="max-h-full max-w-full object-contain transition-[filter,transform]" style={stackMediaID === item.id ? mediaStyle : undefined} src={contentUrl} alt={stackMediaItem?.display_name ?? stackMediaMember?.display_name ?? item.display_name}/> : contentIsVideo && contentUrl ? <video ref={videoRef} className="max-h-full max-w-full transition-[filter,transform]" style={stackMediaID === item.id ? mediaStyle : undefined} src={contentUrl} controls autoPlay={assetStack?.kind === "live_photo"} loop={assetStack?.kind === "live_photo" && assetStack.effect === "loop"} onEnded={handleVideoEnded} onLoadedMetadata={handleVideoTime} onTimeUpdate={handleVideoTime}/> : contentIsAudio && contentUrl ? <div className="grid gap-5 text-center"><File className="mx-auto text-white/60" size={64}/><audio src={contentUrl} controls/></div> : <div className="grid gap-3 text-center text-white/50"><File className="mx-auto" size={64}/><span className="text-sm">Preview unavailable</span><button className={secondaryButtonClass} type="button" onClick={() => void spacesApi.downloadLibraryItem(spaceId, stackMediaID, stackMediaItem?.display_name ?? stackMediaMember?.display_name ?? item.display_name, reauthenticationToken)}><Download size={14}/>Download</button></div>}
+        <div ref={mediaAreaRef} className="relative isolate min-h-0 min-w-0 overflow-hidden bg-black/35">
+          <div className="absolute inset-6 flex min-h-0 min-w-0 items-center justify-center overflow-hidden">
+            {contentLoading ? <span className="text-xs text-white/50">Loading…</span> : contentError ? <span className="max-w-sm text-center text-xs text-red-200">{contentError}</span> : contentIsImage && contentUrl ? <img ref={imageRef} className="block max-h-full max-w-full object-contain transition-[filter,transform]" style={stackMediaID === item.id ? mediaStyle : undefined} src={contentUrl} alt={stackMediaItem?.display_name ?? stackMediaMember?.display_name ?? item.display_name}/> : contentIsVideo && contentUrl ? <video ref={videoRef} className="block max-h-full max-w-full object-contain transition-[filter,transform]" style={stackMediaID === item.id ? mediaStyle : undefined} src={contentUrl} controls autoPlay={assetStack?.kind === "live_photo"} loop={assetStack?.kind === "live_photo" && assetStack.effect === "loop"} onEnded={handleVideoEnded} onLoadedMetadata={handleVideoTime} onTimeUpdate={handleVideoTime}/> : contentIsAudio && contentUrl ? <div className="grid gap-5 text-center"><File className="mx-auto text-white/60" size={64}/><audio src={contentUrl} controls/></div> : <div className="grid gap-3 text-center text-white/50"><File className="mx-auto" size={64}/><span className="text-sm">Preview unavailable</span><button className={secondaryButtonClass} type="button" onClick={() => void spacesApi.downloadLibraryItem(spaceId, stackMediaID, stackMediaItem?.display_name ?? stackMediaMember?.display_name ?? item.display_name, reauthenticationToken)}><Download size={14}/>Download</button></div>}
+          </div>
           {editing && contentIsImage && stackMediaID === item.id && markupBounds.width > 0 ? <LibraryMarkupCanvas elements={drawingMarkup ? [...editDraft.markup, drawingMarkup] : editDraft.markup} interactive={markupMode} bounds={markupBounds} onPointerDown={beginMarkup} onPointerMove={continueMarkup} onPointerUp={finishMarkup}/> : null}
           {assetStack ? <div className="absolute left-4 top-4 flex items-center gap-1 rounded-xl border border-white/10 bg-black/55 p-1 text-white backdrop-blur-sm">{assetStack.members.map((member, memberIndex) => <button className={`rounded-lg border-0 px-2 py-1 text-[10px] font-medium ${member.item_id === stackMediaID ? "bg-white text-black" : "bg-transparent text-white/75 hover:bg-white/10"}`} type="button" key={member.item_id} onClick={() => setStackMemberID(member.item_id === item.id ? "" : member.item_id)}>{assetStack.kind === "live_photo" ? member.role === "motion" ? <><Play className="mr-1 inline" size={10}/>Motion</> : "Still" : assetStack.kind === "raw_pair" ? member.role === "raw" ? "RAW" : "Rendered" : memberIndex + 1}</button>)}</div> : null}
           {assetStack?.kind === "live_photo" ? <div className="absolute left-4 top-16 flex items-center gap-1 rounded-xl border border-white/10 bg-black/55 p-1 text-white backdrop-blur-sm">{(["still", "loop", "bounce", "long_exposure"] as const).map((effect) => <button className={`rounded-lg border-0 px-2 py-1 text-[10px] font-medium ${assetStack.effect === effect ? "bg-white text-black" : "bg-transparent text-white/75 hover:bg-white/10"}`} type="button" key={effect} onClick={() => void onSetStackEffect(assetStack, effect)}>{effect === "long_exposure" ? "Long Exposure" : effect[0].toUpperCase() + effect.slice(1)}</button>)}</div> : null}
-          <button className="absolute left-4 top-1/2 grid size-10 -translate-y-1/2 place-items-center rounded-full border border-white/10 bg-black/45 text-white disabled:opacity-20" type="button" disabled={index <= 0} onClick={() => index > 0 && onSelect(items[index - 1].id)} aria-label="Previous item"><ChevronLeft size={20}/></button>
-          <button className="absolute right-4 top-1/2 grid size-10 -translate-y-1/2 place-items-center rounded-full border border-white/10 bg-black/45 text-white disabled:opacity-20" type="button" disabled={index < 0 || index >= items.length - 1} onClick={() => index >= 0 && index < items.length - 1 && onSelect(items[index + 1].id)} aria-label="Next item"><ChevronRight size={20}/></button>
+          {items.length > 1 ? <>
+            <button className="absolute left-4 top-1/2 z-20 grid size-10 -translate-y-1/2 place-items-center rounded-full border border-white/10 bg-black/45 text-white disabled:opacity-20" type="button" disabled={index <= 0} onClick={() => index > 0 && onSelect(items[index - 1].id)} aria-label="Previous item"><ChevronLeft size={20}/></button>
+            <button className="absolute right-4 top-1/2 z-20 grid size-10 -translate-y-1/2 place-items-center rounded-full border border-white/10 bg-black/45 text-white disabled:opacity-20" type="button" disabled={index < 0 || index >= items.length - 1} onClick={() => index >= 0 && index < items.length - 1 && onSelect(items[index + 1].id)} aria-label="Next item"><ChevronRight size={20}/></button>
+          </> : null}
         </div>
-        <aside className="min-h-0 overflow-auto border-l border-[var(--misty-border-soft)] bg-[var(--misty-surface)] p-5">
+        <aside className="relative z-10 min-h-0 min-w-0 overflow-y-auto border-l border-[var(--misty-border-soft)] bg-[var(--misty-surface)] p-5">
           {editing && isImage ? <div className="mb-4 rounded-xl border border-[var(--misty-border-soft)] p-2"><div className="flex items-center gap-2"><button className={smallButtonClass} type="button" onClick={() => setMarkupMode((current) => !current)}>{markupMode ? "Done Markup" : "Markup & Cleanup"}</button>{markupMode ? <><select className={libraryControlClass} value={markupTool} onChange={(event) => setMarkupTool(event.target.value as LibraryMarkupElement["kind"])} aria-label="Markup tool"><option value="stroke">Pen</option><option value="highlight">Highlighter</option><option value="rectangle">Rectangle</option><option value="text">Text</option><option value="cleanup">Clean Up</option></select><input className="size-8 rounded border-0 bg-transparent p-0" type="color" value={markupColor} onChange={(event) => setMarkupColor(event.target.value)} aria-label="Markup color"/></> : null}</div>{markupMode ? <div className="mt-2 flex gap-2"><button className={smallButtonClass} type="button" disabled={editDraft.markup.length === 0} onClick={() => setEditDraft((current) => ({ ...current, markup: current.markup.slice(0, -1) }))}>Undo</button><button className={smallButtonClass} type="button" disabled={editDraft.markup.length === 0} onClick={() => setEditDraft((current) => ({ ...current, markup: [] }))}>Clear</button><span className="ml-auto self-center text-[10px] text-[var(--misty-text-subtle)]">{editDraft.markup.length}/16</span></div> : null}</div> : null}
           {editing ? <section className="mb-6 border-b border-[var(--misty-border-soft)] pb-5"><div className="flex items-center justify-between"><h3 className="m-0 text-sm">Edit</h3><button className={smallButtonClass} type="button" onClick={() => setEditDraft(defaultLibraryEdit())}>Reset</button></div><div className="mt-4 flex flex-wrap gap-2"><button className={smallButtonClass} type="button" onClick={() => setEditDraft((current) => ({ ...current, rotation: ((current.rotation + 90) % 360) as LibraryEditDefinition["rotation"] }))}><RotateCw size={12}/>Rotate</button><button className={smallButtonClass} type="button" onClick={() => setEditDraft((current) => ({ ...current, flip_horizontal: !current.flip_horizontal }))}>Flip H</button><button className={smallButtonClass} type="button" onClick={() => setEditDraft((current) => ({ ...current, flip_vertical: !current.flip_vertical }))}>Flip V</button><button className={smallButtonClass} type="button" onClick={() => setEditDraft((current) => ({ ...current, auto_enhance: !current.auto_enhance }))}>{editDraft.auto_enhance ? "Auto on" : "Auto"}</button></div><label className="mt-4 grid gap-1.5 text-[10px] font-medium uppercase tracking-wide text-[var(--misty-text-subtle)]">Filter<select className={inputClass} value={editDraft.filter} onChange={(event) => setEditDraft((current) => ({ ...current, filter: event.target.value as LibraryEditDefinition["filter"] }))}><option value="">None</option><option value="vivid">Vivid</option><option value="dramatic">Dramatic</option><option value="warm">Warm</option><option value="cool">Cool</option><option value="mono">Mono</option><option value="noir">Noir</option></select></label><LibraryEditRange label="Brightness" value={editDraft.brightness} min={0} max={2} step={0.05} onChange={(value) => setEditDraft((current) => ({ ...current, brightness: value }))}/><LibraryEditRange label="Contrast" value={editDraft.contrast} min={0} max={2} step={0.05} onChange={(value) => setEditDraft((current) => ({ ...current, contrast: value }))}/><LibraryEditRange label="Saturation" value={editDraft.saturation} min={0} max={2} step={0.05} onChange={(value) => setEditDraft((current) => ({ ...current, saturation: value }))}/><LibraryEditRange label="Grayscale" value={editDraft.grayscale} min={0} max={1} step={0.05} onChange={(value) => setEditDraft((current) => ({ ...current, grayscale: value }))}/><LibraryAdvancedAdjustments draft={editDraft} onChange={setEditDraft}/>{isImage ? <div className="mt-4"><p className="m-0 text-[10px] font-medium uppercase tracking-wide text-[var(--misty-text-subtle)]">Crop &amp; straighten</p><LibraryEditRange label="Straighten" value={editDraft.straighten} min={-45} max={45} step={0.5} onChange={(value) => setEditDraft((current) => ({ ...current, straighten: value }))}/><div className="mt-2 flex gap-1"><button className={smallButtonClass} type="button" onClick={() => setEditDraft((current) => ({ ...current, crop: undefined }))}>Original</button><button className={smallButtonClass} type="button" onClick={() => setEditDraft((current) => ({ ...current, crop: { x: 0.125, y: 0, width: 0.75, height: 1 } }))}>Square</button><button className={smallButtonClass} type="button" onClick={() => setEditDraft((current) => ({ ...current, crop: { x: 0, y: 0.125, width: 1, height: 0.75 } }))}>Wide</button></div></div> : null}{isVideo ? <div className="mt-4 grid grid-cols-2 gap-2"><label className="grid gap-1 text-[10px] uppercase text-[var(--misty-text-subtle)]">Trim start<input className={inputClass} type="number" min={0} step={0.1} value={editDraft.trim?.start ?? 0} onChange={(event) => setEditDraft((current) => ({ ...current, trim: { start: Number(event.target.value), end: current.trim?.end ?? Math.max(1, Number(metadata.duration ?? 1)) } }))}/></label><label className="grid gap-1 text-[10px] uppercase text-[var(--misty-text-subtle)]">Trim end<input className={inputClass} type="number" min={0.1} step={0.1} value={editDraft.trim?.end ?? Number(metadata.duration ?? 1)} onChange={(event) => setEditDraft((current) => ({ ...current, trim: { start: current.trim?.start ?? 0, end: Number(event.target.value) } }))}/></label><label className="grid gap-1 text-[10px] uppercase text-[var(--misty-text-subtle)]">Speed<select className={inputClass} value={editDraft.playback_speed} onChange={(event) => setEditDraft((current) => ({ ...current, playback_speed: Number(event.target.value) }))}><option value={0.5}>0.5×</option><option value={1}>1×</option><option value={1.5}>1.5×</option><option value={2}>2×</option></select></label><button className={`${smallButtonClass} self-end`} type="button" onClick={() => setEditDraft((current) => ({ ...current, mute: !current.mute }))}>{editDraft.mute ? "Muted" : "Mute"}</button></div> : null}{editError ? <p className="mb-0 mt-3 text-xs text-red-200">{editError}</p> : null}<div className="mt-4 flex gap-2"><button className={`${secondaryButtonClass} flex-1 justify-center`} type="button" disabled={editSaving} onClick={() => { setEditing(false); setEditDraft(normalizeLibraryEdit(activeEdit?.edit_definition)); }}>Cancel</button><button className={`${primaryButtonClass} flex-1 justify-center`} type="button" disabled={editSaving} onClick={() => void saveEdit()}>{editSaving ? "Saving…" : "Save edit"}</button></div></section> : null}
           <form onSubmit={(event) => void saveMetadata(event)}>
@@ -2065,7 +2163,7 @@ function libraryRenditionStatus(version: LibraryEditVersion): string {
 
 function LibraryItemThumbnail({ spaceId, item, reauthenticationToken = "" }: { spaceId: string; item: SpaceLibraryItem; reauthenticationToken?: string }) {
   const [url, setUrl] = useState("");
-  const mimeType = String(item.file.intrinsic_metadata.server_detected_mime_type ?? "").toLowerCase();
+  const mimeType = libraryItemMIME(item);
   const visual = mimeType.startsWith("image/") || mimeType.startsWith("video/") || Number(item.file.intrinsic_metadata.width ?? 0) > 0;
   useEffect(() => {
     if (!visual) {
@@ -2074,7 +2172,8 @@ function LibraryItemThumbnail({ spaceId, item, reauthenticationToken = "" }: { s
     }
     let current = true;
     let objectUrl = "";
-    void spacesApi.libraryPreview(spaceId, item.id, reauthenticationToken).then((blob) => {
+    const request = spacesApi.libraryPreview(spaceId, item.id, reauthenticationToken, item.version).catch(() => mimeType.startsWith("image/") ? spacesApi.libraryContent(spaceId, item.id, reauthenticationToken) : Promise.reject(new Error("Preview unavailable")));
+    void request.then((blob) => {
       if (!current) return;
       objectUrl = URL.createObjectURL(blob);
       setUrl(objectUrl);
@@ -2136,7 +2235,13 @@ function detectUploadedAssetStacks(items: SpaceLibraryItem[]): LibraryAssetStack
 }
 
 function libraryItemMIME(item: SpaceLibraryItem): string {
-  return String(item.file.intrinsic_metadata.server_detected_mime_type ?? item.file.intrinsic_metadata.client_declared_mime_type ?? "application/octet-stream").split(";")[0].toLocaleLowerCase();
+  const metadataMIME = String(item.file.intrinsic_metadata.server_detected_mime_type ?? item.file.intrinsic_metadata.client_declared_mime_type ?? "").split(";")[0].toLocaleLowerCase();
+  if (metadataMIME && metadataMIME !== "application/octet-stream") return metadataMIME;
+  const extension = item.file.original_filename.split(".").pop()?.toLocaleLowerCase() ?? "";
+  if (["bmp", "gif", "heic", "heif", "jpeg", "jpg", "png", "tif", "tiff", "webp"].includes(extension)) return `image/${extension === "jpg" ? "jpeg" : extension === "tif" ? "tiff" : extension}`;
+  if (["avi", "m4v", "mkv", "mov", "mp4", "mpeg", "mpg", "webm"].includes(extension)) return `video/${extension === "mov" ? "quicktime" : extension === "m4v" ? "mp4" : extension}`;
+  if (["aac", "aif", "aiff", "flac", "m4a", "mp3", "ogg", "opus", "wav"].includes(extension)) return `audio/${extension === "mp3" ? "mpeg" : extension}`;
+  return "application/octet-stream";
 }
 
 function activeSensitiveGrant(grant?: { token: string; expiresAt: string }): string {
@@ -2213,73 +2318,6 @@ function LibraryDiscoveryCard({ spaceId, group, fallbackIcon: Icon, pinned = fal
   return <article className="group relative overflow-hidden rounded-2xl border border-[var(--misty-border-soft)] bg-[var(--misty-surface)]"><button className="block w-full border-0 bg-transparent p-0 text-left" type="button" onClick={onClick}><span className="relative block"><AlbumCover spaceId={spaceId} itemId={group.cover_item_id}/><span className="absolute left-3 top-3 grid size-8 place-items-center rounded-xl bg-black/55 text-white backdrop-blur"><Icon size={16}/></span></span><span className="block p-3"><span className="block truncate text-xs font-medium">{group.title}</span><span className="mt-1 block truncate text-[10px] text-[var(--misty-text-subtle)]">{group.subtitle}</span></span></button>{onTogglePin ? <button className={`absolute right-3 top-3 grid size-8 place-items-center rounded-xl border-0 backdrop-blur ${pinned ? "bg-white text-black" : "bg-black/55 text-white opacity-0 group-hover:opacity-100 focus:opacity-100"}`} type="button" onClick={onTogglePin} title={pinned ? "Unpin" : "Pin collection"} aria-label={`${pinned ? "Unpin" : "Pin"} ${group.title}`}><Pin size={14} fill={pinned ? "currentColor" : "none"}/></button> : null}</article>;
 }
 
-function SpaceMembers({ spaceId }: { spaceId: string }) {
-  const { user } = useAuth();
-  const [inviteOpen, setInviteOpen] = useState(false);
-  const [inviteEmail, setInviteEmail] = useState("");
-  const [inviting, setInviting] = useState(false);
-  const space = useSpacesStore((state) => state.spaces.find((item) => item.id === spaceId));
-  const { membersBySpace, error, invite, removeMember, leaveSpace, transferOwner, deleteSpace, clearError } = useSpacesStore(useShallow((state) => ({
-    membersBySpace: state.membersBySpace, error: state.error, invite: state.invite, removeMember: state.removeMember, leaveSpace: state.leaveSpace, transferOwner: state.transferOwner, deleteSpace: state.deleteSpace, clearError: state.clearError,
-  })));
-  const members = membersBySpace[spaceId] ?? emptyMembers;
-  const owner = space?.role === "owner";
-  const submitInvite = async (event: FormEvent) => {
-    event.preventDefault();
-    const email = inviteEmail.trim();
-    if (!email || inviting) return;
-    setInviting(true);
-    try {
-      await invite(spaceId, email);
-      setInviteEmail("");
-      setInviteOpen(false);
-    } catch { /* the shared store error is rendered above the section */ }
-    finally { setInviting(false); }
-  };
-  return <div className="h-full min-h-0 overflow-auto px-6 py-5">
-    <div className="mb-5 flex items-center justify-between"><div><h3 className="m-0 text-base">Members</h3><p className="m-0 mt-1 text-xs text-[var(--misty-text-subtle)]">{space?.is_shared ? `Shared with ${members.length} people${space.pending_count ? ` · ${space.pending_count} pending` : ""}` : "Private · invite someone to share this Space"} · 5 people maximum</p></div>{owner && members.length + (space?.pending_count ?? 0) < 5 ? <button className={primaryButtonClass} type="button" onClick={() => { clearError(); setInviteOpen(true); }}><UserPlus size={15}/>Invite</button> : null}</div>
-    <div className="overflow-hidden rounded-2xl border border-[var(--misty-border-soft)] bg-[var(--misty-surface)]">
-      {members.map((member) => <article className="flex min-h-16 items-center gap-3 border-b border-[var(--misty-border-soft)] px-4 last:border-0" key={member.user_id}><span className="grid size-9 place-items-center rounded-full bg-[var(--misty-surface-3)] text-xs font-semibold">{member.name.slice(0,2).toUpperCase()}</span><div className="min-w-0 flex-1"><p className="m-0 truncate text-sm font-medium">{member.name}{member.user_id === user?.id ? " (you)" : ""}</p><p className="m-0 truncate text-[11px] text-[var(--misty-text-subtle)]">{member.email}</p></div><span className="rounded-lg bg-[var(--misty-surface-2)] px-2 py-1 text-[10px] capitalize text-[var(--misty-text-muted)]">{member.role}</span>{owner && member.role !== "owner" ? <><MemberPermissionControls spaceId={spaceId} userId={member.user_id}/><button className={smallButtonClass} type="button" onClick={() => window.confirm(`Make ${member.name} the owner?`) && void transferOwner(spaceId, member.user_id)}>Transfer</button><button className={rowActionClass} type="button" onClick={() => window.confirm(`Remove ${member.name} from this Space?`) && void removeMember(spaceId, member.user_id)}><Trash2 size={14}/></button></> : null}</article>)}
-    </div>
-    {owner && space?.is_personal ? <section className="mt-8 rounded-2xl border border-[var(--misty-border-soft)] bg-[var(--misty-surface)] p-4"><h4 className="m-0 text-sm">Your default Space</h4><p className="mb-0 mt-1 text-xs leading-relaxed text-[var(--misty-text-subtle)]">This Space can be renamed, but cannot be deleted or transferred. It remains private until you invite someone, and you can remove members again at any time.</p></section> : owner ? <section className="mt-8 rounded-2xl border border-red-500/20 bg-red-950/10 p-4"><h4 className="m-0 text-sm text-red-200">Delete Space</h4><p className="mb-3 mt-1 text-xs leading-relaxed text-red-200/60">Removes access immediately and schedules permanent deletion after recovery and storage safety checks. The Space continues using an ownership slot until deletion finishes.</p><button className="rounded-lg border border-red-400/25 bg-red-500/10 px-3 py-2 text-xs text-red-200" type="button" onClick={() => { const confirmation = window.prompt(`Type “${space?.name ?? ""}” to schedule this Space for deletion.`); if (space && confirmation === space.name) void deleteSpace(spaceId, confirmation).then(() => window.location.assign("/spaces/personal")); }}>Delete Space</button></section> : <section className="mt-8 rounded-2xl border border-[var(--misty-border-soft)] bg-[var(--misty-surface)] p-4"><h4 className="m-0 text-sm">Leave Space</h4><p className="mb-3 mt-1 text-xs text-[var(--misty-text-subtle)]">You will immediately lose access to chat and protected Library items.</p><button className={secondaryButtonClass} type="button" onClick={() => window.confirm(`Leave ${space?.name ?? "this Space"}?`) && void leaveSpace(spaceId).then(() => window.location.assign("/spaces/personal"))}>Leave Space</button></section>}
-    {inviteOpen ? (
-      <div className="fixed inset-0 z-[2147483000] grid place-items-center bg-black/60 p-6" role="presentation" onMouseDown={(event) => { if (event.currentTarget === event.target && !inviting) setInviteOpen(false); }}>
-        <form className="w-full max-w-sm rounded-2xl border border-[var(--misty-border-strong)] bg-[var(--misty-modal-bg,var(--misty-surface))] p-5 shadow-2xl" onSubmit={(event) => void submitInvite(event)}>
-          <div className="flex items-start justify-between gap-4">
-            <div><h2 className="m-0 text-base font-semibold">Invite to {space?.name ?? "Space"}</h2><p className="mb-0 mt-1 text-xs leading-relaxed text-[var(--misty-text-subtle)]">Invitations work with an existing Misty account and expire after seven days.</p></div>
-            <button className={iconButtonClass} type="button" disabled={inviting} onClick={() => setInviteOpen(false)} aria-label="Close invite"><X size={15}/></button>
-          </div>
-          <label className="mt-5 grid gap-2 text-xs font-medium text-[var(--misty-text-muted)]">Email address<input className={inputClass} autoFocus type="email" autoComplete="email" placeholder="teammate@example.com" value={inviteEmail} onChange={(event) => setInviteEmail(event.target.value)} /></label>
-          {error ? <p className="mb-0 mt-3 rounded-xl border border-red-400/20 bg-red-950/20 px-3 py-2 text-xs leading-relaxed text-red-200" role="alert">{error}</p> : null}
-          <div className="mt-5 flex justify-end gap-2"><button className={secondaryButtonClass} type="button" disabled={inviting} onClick={() => setInviteOpen(false)}>Cancel</button><button className={primaryButtonClass} type="submit" disabled={inviting || !inviteEmail.trim()}>{inviting ? "Sending…" : "Send invite"}</button></div>
-        </form>
-      </div>
-    ) : null}
-  </div>;
-}
-
-function MemberPermissionControls({ spaceId, userId }: { spaceId: string; userId: string }) {
-  const [permissions, setPermissions] = useState<Record<string, boolean>>({});
-  const [saving, setSaving] = useState(false);
-  useEffect(() => {
-    let current = true;
-    void spacesApi.memberPermissions(spaceId, userId).then((result) => current && setPermissions(result.permissions)).catch(() => undefined);
-    return () => { current = false; };
-  }, [spaceId, userId]);
-  const setContribute = async (allowed: boolean) => {
-    setSaving(true);
-    try {
-      let latest = permissions;
-      for (const permission of ["library.upload", "attachments.upload", "library.add"]) {
-        latest = (await spacesApi.setMemberPermission(spaceId, userId, permission, allowed ? "allow" : "deny")).permissions;
-      }
-      setPermissions(latest);
-    } finally { setSaving(false); }
-  };
-  const contribute = Boolean(permissions["library.upload"] && permissions["attachments.upload"] && permissions["library.add"]);
-  return <div className="flex gap-1"><button className={smallButtonClass} type="button" disabled={saving} onClick={() => void setContribute(!contribute)}>{contribute ? "Can contribute" : "Read only"}</button><button className={smallButtonClass} type="button" disabled={saving} onClick={() => void spacesApi.setMemberPermission(spaceId, userId, "library.edit", permissions["library.edit"] ? "deny" : "allow").then((result) => setPermissions(result.permissions))}>{permissions["library.edit"] ? "Can organize" : "No edits"}</button></div>;
-}
-
 function spaceLinkClass({ isActive }: { isActive: boolean }) {
   return `flex min-h-11 items-center gap-2 rounded-xl border px-2.5 text-xs font-medium no-underline transition-colors ${isActive ? "border-[var(--misty-border-strong)] bg-[var(--misty-surface-3)] text-[var(--misty-text)] shadow-sm" : "border-transparent text-[var(--misty-text-muted)] hover:bg-[var(--misty-surface-2)] hover:text-[var(--misty-text)]"}`;
 }
@@ -2291,45 +2329,6 @@ const primaryButtonClass = "inline-flex min-h-9 items-center gap-2 rounded-xl bo
 const rowActionClass = "invisible grid size-7 place-items-center rounded-lg border-0 bg-transparent text-[var(--misty-text-subtle)] hover:bg-[var(--misty-surface-2)] group-hover:visible";
 const inputClass = "min-h-10 rounded-xl border border-[var(--misty-border-soft)] bg-[var(--misty-surface-2)] px-3 text-sm text-[var(--misty-text)] outline-none focus:border-[var(--misty-primary)]";
 const libraryControlClass = "h-8 shrink-0 rounded-lg border border-[var(--misty-border-soft)] bg-[var(--misty-surface)] px-2 text-xs text-[var(--misty-text-muted)] outline-none";
-
-function compareLibraryItems(left: SpaceLibraryItem, right: SpaceLibraryItem, sort: NonNullable<LibraryItemQuery["sort"]>, direction: NonNullable<LibraryItemQuery["direction"]>) {
-  const multiplier = direction === "asc" ? 1 : -1;
-  let result = 0;
-  if (sort === "name") result = left.display_name.localeCompare(right.display_name);
-  else if (sort === "size") result = Number(left.file.intrinsic_metadata.byte_size ?? 0) - Number(right.file.intrinsic_metadata.byte_size ?? 0);
-  else if (sort === "date-captured") result = new Date(left.date_override ?? String(left.file.intrinsic_metadata.capture_timestamp ?? left.file.original_uploaded_at)).getTime() - new Date(right.date_override ?? String(right.file.intrinsic_metadata.capture_timestamp ?? right.file.original_uploaded_at)).getTime();
-  else result = new Date(left.added_at).getTime() - new Date(right.added_at).getTime();
-  return result === 0 ? left.id.localeCompare(right.id) * multiplier : result * multiplier;
-}
-
-function libraryDateGroupLabel(item: SpaceLibraryItem, sort: NonNullable<LibraryItemQuery["sort"]>) {
-  if (sort === "name" || sort === "size" || sort === "album-order") return "";
-  const value = sort === "date-captured" ? item.date_override ?? String(item.file.intrinsic_metadata.capture_timestamp ?? item.file.original_uploaded_at) : item.added_at;
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "Unknown date";
-  const today = new Date();
-  const day = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
-  const currentDay = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
-  if (day === currentDay) return "Today";
-  if (day === currentDay - 86_400_000) return "Yesterday";
-  return date.toLocaleDateString([], { month: "long", year: "numeric" });
-}
-
-function libraryFacetPrefix(input: string) {
-  const tokens = input.trim().split(/\s+/);
-  const token = tokens[tokens.length - 1] ?? "";
-  const value = token.includes(":") ? token.slice(token.indexOf(":") + 1) : token;
-  return value.replace(/"/g, "").slice(0, 120);
-}
-
-function formatTime(value: string) { return new Date(value).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }); }
-function formatBytes(value: number) {
-  if (!Number.isFinite(value) || value <= 0) return "0 B";
-  if (value >= 1_000_000_000) return `${(value / 1_000_000_000).toFixed(value >= 10_000_000_000 ? 0 : 1)} GB`;
-  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)} MB`;
-  if (value >= 1_000) return `${(value / 1_000).toFixed(1)} KB`;
-  return `${value} B`;
-}
 
 const emptyMessages: SpaceMessage[] = [];
 const emptyMembers: SpaceMember[] = [];

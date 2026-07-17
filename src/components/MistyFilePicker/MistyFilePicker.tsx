@@ -1,74 +1,82 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import type { MouseEvent as ReactMouseEvent } from "react";
 import { createPortal } from "react-dom";
 import {
-  ArrowLeft,
-  ArrowRight,
-  ArrowUp,
-  ChevronRight,
-  Cloud,
   CloudDownload,
-  Eye,
-  EyeOff,
-  File,
-  Folder,
   FolderOpen,
-  HardDrive,
-  Home,
-  LoaderCircle,
-  RefreshCcw,
   X,
 } from "lucide-react";
-import { explorerListDirectory } from "../../api/misty";
-import type { DirectoryListing, FileEntry, ProviderRemote } from "../../api/types";
+import { devicesSnapshot, explorerListDirectory } from "../../api/misty";
+import type { DirectoryListing, FileEntry, MountedDevice, ProviderRemote } from "../../api/types";
+import { FileBrowser } from "../../pages/Files/components/FileBrowser";
+import { ExplorerPickerSidebar } from "../../pages/Files/components/ExplorerPickerSidebar";
+import { ExplorerPickerToolbar } from "../../pages/Files/components/ExplorerPickerToolbar";
 import { errorText } from "../../shared/format";
 import { useMultiPanelStore } from "../../shared/multipanel/useMultiPanelStore";
 import { useAppStore } from "../../stores/useAppStore";
-import { useExplorerStore } from "../../stores/useExplorerStore";
+import { sortListing, useExplorerStore } from "../../stores/useExplorerStore";
+import type { ExplorerSortColumn, ExplorerSortState } from "../../stores/useExplorerStore";
 import { useProvidersStore } from "../../stores/useProvidersStore";
 import {
   selectAdvancedPreferences,
   selectGeneralPreferences,
   useSettingsStore,
 } from "../../stores/useSettingsStore";
-import "./styles.css";
 
 export type MistyFilePickerMode = "file" | "folder";
 
 const emptyProviderRemotes: ProviderRemote[] = [];
+const emptyMountedDevices: MountedDevice[] = [];
+const emptyCutPaths = new Set<string>();
+const pickerControlClass = "inline-grid place-items-center rounded-lg border border-[var(--misty-border-soft)] bg-[var(--misty-neutral-control-bg,var(--misty-surface-2))] text-[var(--misty-text-muted)] transition-colors hover:bg-[var(--misty-neutral-hover-bg,var(--misty-surface-3))] hover:text-[var(--misty-text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30 disabled:cursor-default disabled:opacity-35";
 
 export interface MistyFilePickerProps {
   mode: MistyFilePickerMode;
+  multiple?: boolean;
   title?: string;
   initialPath?: string | null;
   allowedExtensions?: string[];
   onCancel: () => void;
   onSelect: (path: string) => void;
+  onSelectMany?: (paths: string[]) => void;
 }
 
 export function MistyFilePicker({
   mode,
+  multiple = false,
   title,
   initialPath,
   allowedExtensions,
   onCancel,
   onSelect,
+  onSelectMany,
 }: MistyFilePickerProps) {
   const app = useAppStore((state) => state.app);
   const homeDir = app?.environment.homeDir ?? "";
   const activePaneId = useMultiPanelStore((state) => state.activePaneId);
   const explorerPath = useExplorerStore((state) => state.panes[activePaneId]?.listing?.path ?? null);
-  const explorerLocation = useExplorerStore((state) => state.panes[activePaneId]?.listing?.location ?? null);
+  const explorerViewMode = useExplorerStore((state) => state.paneViewModes[activePaneId] ?? state.viewMode);
+  const explorerSort = useExplorerStore((state) => state.paneSorts[activePaneId] ?? state.sort);
+  const directorySizes = useExplorerStore((state) => state.directorySizes);
+  const pinnedPaths = useExplorerStore((state) => state.pinnedPaths);
+  const activeWorkspaceTitle = useExplorerStore((state) => state.activeWorkspaceTitle);
   const remotes = useProvidersStore((state) => state.providers?.remotes ?? emptyProviderRemotes);
+  const providersLoading = useProvidersStore((state) => state.loading);
   const loadProviders = useProvidersStore((state) => state.load);
   const settingsDocument = useSettingsStore((state) => state.settings?.document);
   const [listing, setListing] = useState<DirectoryListing | null>(null);
-  const [selected, setSelected] = useState<FileEntry | null>(null);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [sort, setSort] = useState<ExplorerSortState>(explorerSort);
+  const [devices, setDevices] = useState<MountedDevice[]>(emptyMountedDevices);
+  const [devicesLoading, setDevicesLoading] = useState(false);
   const [history, setHistory] = useState<string[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
   const [showHidden, setShowHidden] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const requestId = useRef(0);
+  const selectionAnchorId = useRef<string | null>(null);
   const dialogRef = useRef<HTMLElement | null>(null);
   const titleId = useId();
   const descriptionId = useId();
@@ -85,6 +93,22 @@ export function MistyFilePicker({
     void loadProviders();
   }, [loadProviders]);
 
+  const refreshDevices = useCallback(async () => {
+    setDevicesLoading(true);
+    try {
+      const snapshot = await devicesSnapshot();
+      setDevices(snapshot.devices);
+    } catch {
+      setDevices(emptyMountedDevices);
+    } finally {
+      setDevicesLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void refreshDevices();
+  }, [refreshDevices]);
+
   const loadPath = useCallback(async (
     path: string,
     historyMode: "push" | "replace" | "none" = "push",
@@ -93,7 +117,8 @@ export function MistyFilePicker({
     const nextRequestId = ++requestId.current;
     setLoading(true);
     setError(null);
-    setSelected(null);
+    setSelectedIds([]);
+    selectionAnchorId.current = null;
     try {
       const next = await explorerListDirectory({ path: path || null, showHidden: hidden });
       if (requestId.current !== nextRequestId) return;
@@ -131,22 +156,6 @@ export function MistyFilePicker({
     };
   }, []);
 
-  const favorites = useMemo(() => {
-    if (!homeDir) return [];
-    return [
-      { label: "Home", path: homeDir, icon: Home },
-      { label: "Desktop", path: joinPath(homeDir, "Desktop"), icon: Folder },
-      { label: "Documents", path: joinPath(homeDir, "Documents"), icon: Folder },
-      { label: "Downloads", path: joinPath(homeDir, "Downloads"), icon: Folder },
-    ];
-  }, [homeDir]);
-
-  const cloudLocations = useMemo(() => remotes.map((remote) => ({
-    label: remote.name,
-    path: joinPath(mountRoot, remote.name),
-    provider: remote.type,
-  })), [mountRoot, remotes]);
-
   const selectableFiles = useMemo(() => {
     if (!allowedExtensions?.length) return null;
     return new Set(allowedExtensions.map((extension) => extension.toLowerCase().replace(/^\./, "")));
@@ -162,6 +171,16 @@ export function MistyFilePicker({
     entry.location.kind === "local" && matchesModeAndExtension(entry)
   );
 
+  const browserListing = useMemo(
+    () => listing ? sortListing(listing, sort, directorySizes) : null,
+    [directorySizes, listing, sort],
+  );
+  const selectedEntries = selectedIds
+    .map((entryId) => listing?.entries.find((entry) => entry.id === entryId))
+    .filter((entry): entry is FileEntry => Boolean(entry));
+  const selected = selectedEntries[selectedEntries.length - 1] ?? null;
+  const selectedPaths = selectedEntries.filter(canSelectEntry).map((entry) => entry.path);
+
   const navigateHistory = (nextIndex: number) => {
     const path = history[nextIndex];
     if (!path) return;
@@ -176,6 +195,11 @@ export function MistyFilePicker({
       if (path && location?.kind === "local") onSelect(path);
       return;
     }
+    if (multiple && selectedPaths.length > 0) {
+      if (onSelectMany) onSelectMany(selectedPaths);
+      else onSelect(selectedPaths[0]);
+      return;
+    }
     if (selected && canSelectEntry(selected)) onSelect(selected.path);
   };
 
@@ -186,24 +210,54 @@ export function MistyFilePicker({
     ? selected?.kind === "folder"
       ? canSelectEntry(selected)
       : Boolean(listing?.path && listing.location.kind === "local")
-    : Boolean(selected && canSelectEntry(selected));
+    : multiple
+      ? selectedPaths.length > 0
+      : Boolean(selected && canSelectEntry(selected));
 
-  const selectEntry = (entry: FileEntry) => {
-    if (entry.location.kind !== "local" || matchesModeAndExtension(entry)) {
-      setSelected(entry);
-      return;
+  const selectBrowserEntry = (entryId: string, event: ReactMouseEvent, visibleEntryIds: string[]) => {
+    const entry = listing?.entries.find((candidate) => candidate.id === entryId);
+    if (!entry) return;
+
+    let nextSelectedIds: string[];
+    if (multiple && mode === "file" && event.shiftKey) {
+      const anchorId = selectionAnchorId.current ?? entryId;
+      const anchorIndex = visibleEntryIds.indexOf(anchorId);
+      const targetIndex = visibleEntryIds.indexOf(entryId);
+      if (anchorIndex >= 0 && targetIndex >= 0) {
+        const start = Math.min(anchorIndex, targetIndex);
+        const end = Math.max(anchorIndex, targetIndex);
+        nextSelectedIds = visibleEntryIds.slice(start, end + 1);
+      } else {
+        nextSelectedIds = [entryId];
+      }
+    } else if (multiple && mode === "file" && (event.metaKey || event.ctrlKey)) {
+      nextSelectedIds = selectedIds.includes(entryId)
+        ? selectedIds.filter((candidate) => candidate !== entryId)
+        : [...selectedIds, entryId];
+    } else {
+      nextSelectedIds = [entryId];
     }
-    setSelected(null);
+
+    setSelectedIds(nextSelectedIds);
+    selectionAnchorId.current = entryId;
   };
 
   const openEntry = (entry: FileEntry) => {
     if (entry.kind === "folder") {
       void loadPath(entry.path);
+    } else if (multiple && mode === "file") {
+      return;
     } else if (canSelectEntry(entry)) {
       onSelect(entry.path);
     } else {
-      selectEntry(entry);
+      setSelectedIds([entry.id]);
     }
+  };
+
+  const updateSort = (column: ExplorerSortColumn) => {
+    setSort((current) => current.column === column
+      ? { column, direction: current.direction === "asc" ? "desc" : "asc" }
+      : { column, direction: "asc" });
   };
 
   const handleDialogKeyDown = (event: React.KeyboardEvent<HTMLElement>) => {
@@ -233,30 +287,10 @@ export function MistyFilePicker({
     }
   };
 
-  const handleEntryKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>, entry: FileEntry) => {
-    const option = event.currentTarget;
-    const options = Array.from(option.parentElement?.querySelectorAll<HTMLButtonElement>('[role="option"]') ?? []);
-    const currentIndex = options.indexOf(option);
-    let nextIndex: number | null = null;
-    if (event.key === "ArrowDown" || event.key === "ArrowRight") nextIndex = Math.min(options.length - 1, currentIndex + 1);
-    if (event.key === "ArrowUp" || event.key === "ArrowLeft") nextIndex = Math.max(0, currentIndex - 1);
-    if (event.key === "Home") nextIndex = 0;
-    if (event.key === "End") nextIndex = options.length - 1;
-    if (nextIndex !== null) {
-      event.preventDefault();
-      options[nextIndex]?.focus();
-      return;
-    }
-    if (event.key === "Enter") {
-      event.preventDefault();
-      openEntry(entry);
-    }
-  };
-
   const picker = (
-    <div className="misty-picker-layer" role="presentation" onKeyDown={handleDialogKeyDown}>
+    <div className="fixed bottom-0 left-[72px] right-0 top-7 z-[2147483100] grid place-items-center bg-black/60 p-6 backdrop-blur-md max-[800px]:left-0 max-[800px]:p-3 max-[560px]:p-0" role="presentation" onKeyDown={handleDialogKeyDown}>
       <section
-        className="misty-picker"
+        className="grid h-[min(680px,calc(100vh-88px))] w-[min(1100px,calc(100vw-140px))] grid-rows-[auto_auto_auto_minmax(0,1fr)_auto] overflow-hidden rounded-2xl border border-[var(--misty-border)] bg-[var(--misty-app-modal-bg,var(--misty-surface))] text-[var(--misty-text)] shadow-2xl outline-none max-[800px]:size-full max-[560px]:rounded-none"
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
@@ -264,153 +298,107 @@ export function MistyFilePicker({
         ref={dialogRef}
         tabIndex={-1}
       >
-        <header className="misty-picker-header">
-          <div className="misty-picker-title">
-            <span><FolderOpen size={20} /></span>
+        <header className="flex min-h-[76px] items-center justify-between gap-4 border-b border-[var(--misty-border-soft)] px-5">
+          <div className="flex min-w-0 items-center gap-3">
+            <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-[var(--misty-surface-2)] text-[var(--misty-text-muted)]"><FolderOpen size={20} /></span>
             <div>
-              <h2 id={titleId}>{title || (mode === "folder" ? "Choose a folder" : "Choose a file")}</h2>
-              <p id={descriptionId}>Browse your current Explorer context and connected locations.</p>
+              <h2 className="m-0 text-[17px] font-semibold" id={titleId}>{title || (mode === "folder" ? "Choose a folder" : "Choose a file")}</h2>
+              <p className="mb-0 mt-1 text-xs leading-relaxed text-[var(--misty-text-subtle)]" id={descriptionId}>{multiple && mode === "file" ? "Select one or more files from Explorer and connected locations." : "Browse your current Explorer context and connected locations."}</p>
             </div>
           </div>
-          <button type="button" className="misty-picker-icon-button" aria-label="Close picker" onClick={onCancel}><X size={18} /></button>
+          <button type="button" className={`${pickerControlClass} size-[38px] shrink-0`} aria-label="Close picker" onClick={onCancel}><X size={18} /></button>
         </header>
 
-        <div className="misty-picker-toolbar">
-          <div className="misty-picker-nav-buttons">
-            <button type="button" aria-label="Back" disabled={historyIndex <= 0} onClick={() => navigateHistory(historyIndex - 1)}><ArrowLeft size={16} /></button>
-            <button type="button" aria-label="Forward" disabled={historyIndex < 0 || historyIndex >= history.length - 1} onClick={() => navigateHistory(historyIndex + 1)}><ArrowRight size={16} /></button>
-            <button type="button" aria-label="Parent folder" disabled={!listing?.parentPath} onClick={() => listing?.parentPath && void loadPath(listing.parentPath)}><ArrowUp size={16} /></button>
-            <button type="button" aria-label="Refresh" onClick={() => listing && void loadPath(listing.path, "none")}><RefreshCcw className={loading ? "is-spinning" : ""} size={15} /></button>
-          </div>
-          <nav className="misty-picker-breadcrumbs" aria-label="Current folder">
-            {pathSegments(listing?.path || initialPath || homeDir).map((segment, index) => (
-              <button type="button" key={`${segment.path}-${index}`} onClick={() => void loadPath(segment.path)}>
-                {index > 0 ? <ChevronRight size={13} /> : null}{segment.label}
-              </button>
-            ))}
-          </nav>
-          <button
-            type="button"
-            className={`misty-picker-hidden-toggle${showHidden ? " is-active" : ""}`}
-            aria-pressed={showHidden}
-            title={showHidden ? "Hide hidden files" : "Show hidden files"}
-            onClick={() => {
-              const next = !showHidden;
-              setShowHidden(next);
-              if (listing) void loadPath(listing.path, "none", next);
-            }}
-          >
-            {showHidden ? <EyeOff size={15} /> : <Eye size={15} />}
-          </button>
+        <div className="border-b border-[var(--misty-divider-subtle)]">
+          <ExplorerPickerToolbar
+            path={listing?.path || initialPath || homeDir}
+            query={searchQuery}
+            canGoBack={historyIndex > 0}
+            canGoForward={historyIndex >= 0 && historyIndex < history.length - 1}
+            canGoParent={Boolean(listing?.parentPath)}
+            onBack={() => navigateHistory(historyIndex - 1)}
+            onForward={() => navigateHistory(historyIndex + 1)}
+            onParent={() => listing?.parentPath && void loadPath(listing.parentPath)}
+            onNavigate={(path) => void loadPath(path)}
+            onRefresh={() => listing && void loadPath(listing.path, "none")}
+            onQueryChange={setSearchQuery}
+          />
         </div>
 
-        <div className="misty-picker-notice-slot">
+        <div className="min-h-0">
           {showCloudNotice ? (
-            <div className="misty-picker-cloud-notice" id={cloudNoticeId} role="status">
-              <CloudDownload size={17} aria-hidden="true" />
-              <span><strong>Download required.</strong> You can browse cloud items here, but you must fully download an item to a local folder before choosing it.</span>
+            <div className="flex min-h-11 items-center gap-2.5 border-b border-amber-200/20 bg-amber-300/5 px-4 py-2 text-xs leading-relaxed text-amber-100/80" id={cloudNoticeId} role="status">
+              <CloudDownload className="shrink-0" size={17} aria-hidden="true" />
+              <span><strong className="text-amber-100">Download required.</strong> You can browse cloud items here, but you must fully download an item to a local folder before choosing it.</span>
             </div>
           ) : null}
         </div>
 
-        <div className="misty-picker-content">
-          <aside className="misty-picker-sidebar" aria-label="Locations">
-            {explorerPath ? (
-              <>
-                <span className="misty-picker-sidebar-label">Explorer</span>
-                <button
-                  type="button"
-                  className={samePath(listing?.path, explorerPath) ? "is-active" : ""}
-                  aria-label={`Current Explorer folder, ${explorerPath}`}
-                  onClick={() => void loadPath(explorerPath)}
-                >
-                  <FolderOpen size={16} /><span>Current Explorer</span>
-                  {explorerLocation?.kind !== "local" ? <small>Cloud</small> : null}
-                </button>
-              </>
-            ) : null}
-            <span className="misty-picker-sidebar-label">Locations</span>
-            {favorites.map((favorite) => {
-              const Icon = favorite.icon;
-              return (
-                <button
-                  type="button"
-                  key={favorite.label}
-                  className={samePath(listing?.path, favorite.path) ? "is-active" : ""}
-                  onClick={() => void loadPath(favorite.path)}
-                >
-                  <Icon size={15} /><span>{favorite.label}</span>
-                </button>
-              );
-            })}
-            <span className="misty-picker-sidebar-label is-device">Device</span>
-            <button type="button" onClick={() => homeDir && void loadPath(homeDir)}><HardDrive size={15} /><span>This Misty</span></button>
-            {cloudLocations.length ? <span className="misty-picker-sidebar-label is-device">Cloud</span> : null}
-            {cloudLocations.map((cloud) => (
-              <button
-                type="button"
-                key={cloud.path}
-                className={samePath(listing?.path, cloud.path) ? "is-active" : ""}
-                aria-label={`${cloud.label}, ${cloud.provider} cloud location`}
-                title={`${cloud.provider} · Browse only; download locally before choosing`}
-                onClick={() => void loadPath(cloud.path)}
-              >
-                <Cloud size={16} /><span>{cloud.label}</span><small>{cloud.provider}</small>
-              </button>
-            ))}
-          </aside>
+        <div className="grid min-h-0 grid-cols-[260px_minmax(0,1fr)] max-[980px]:grid-cols-[minmax(0,1fr)]">
+          <div className="min-h-0 overflow-hidden border-r border-[var(--misty-divider-subtle)] max-[980px]:hidden">
+            <ExplorerPickerSidebar
+              homePath={homeDir}
+              activePath={listing?.path || explorerPath || homeDir}
+              mountRoot={mountRoot}
+              remotes={remotes}
+              remoteLoading={providersLoading}
+              devices={devices}
+              devicesLoading={devicesLoading}
+              pinnedPaths={pinnedPaths}
+              activeWorkspaceTitle={activeWorkspaceTitle}
+              onNavigate={(path) => void loadPath(path)}
+              onRefreshDevices={() => void refreshDevices()}
+            />
+          </div>
 
-          <main className="misty-picker-browser" aria-busy={loading} onMouseDown={(event) => { if (event.target === event.currentTarget) setSelected(null); }}>
-            {error ? (
-              <div className="misty-picker-state is-error" role="alert"><FolderOpen size={28} /><strong>Couldn’t open this folder</strong><span>{error}</span></div>
-            ) : loading && !listing ? (
-              <div className="misty-picker-state" role="status"><LoaderCircle className="is-spinning" size={24} /><span>Opening folder…</span></div>
-            ) : listing?.entries.length ? (
-              <div className="misty-picker-list" role="listbox" aria-label="Folder contents">
-                {listing.entries.map((entry, index) => {
-                  const isFolder = entry.kind === "folder";
-                  const allowed = canSelectEntry(entry);
-                  const cloud = entry.location.kind !== "local";
-                  const isSelected = selected?.path === entry.path;
-                  return (
-                    <button
-                      type="button"
-                      role="option"
-                      aria-selected={isSelected}
-                      aria-disabled={!allowed && !isFolder}
-                      aria-describedby={cloud && showCloudNotice ? cloudNoticeId : undefined}
-                      tabIndex={isSelected || (!selected && index === 0) ? 0 : -1}
-                      key={entry.id}
-                      className={`${isSelected ? "is-selected" : ""}${!cloud && !isFolder && !allowed ? " is-unavailable" : ""}${cloud ? " is-cloud" : ""}`}
-                      onClick={() => selectEntry(entry)}
-                      onDoubleClick={() => openEntry(entry)}
-                      onKeyDown={(event) => handleEntryKeyDown(event, entry)}
-                    >
-                      <span className={`misty-picker-entry-icon is-${entry.kind}`}>{isFolder ? <Folder size={18} /> : <File size={18} />}</span>
-                      <span className="misty-picker-entry-name">{entry.name}</span>
-                      <span className="misty-picker-entry-kind">{cloud ? "Cloud · " : ""}{isFolder ? "Folder" : entry.extension ? entry.extension.toUpperCase() : "File"}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="misty-picker-state"><FolderOpen size={28} /><strong>This folder is empty</strong><span>You can still choose the current folder.</span></div>
-            )}
-            {loading && listing ? <div className="misty-picker-loading-bar" /> : null}
+          <main className="relative grid min-h-0 min-w-0 grid-rows-[minmax(0,1fr)] overflow-hidden bg-[var(--misty-surface)]">
+            <FileBrowser
+              paneId="misty-file-picker"
+              selectionOnly
+              listing={browserListing}
+              selectedIds={selectedIds}
+              loading={loading && !listing}
+              error={error}
+              viewMode={explorerViewMode}
+              sort={sort}
+              showHidden={showHidden}
+              commandQuery={searchQuery}
+              commandQueryMode="filter"
+              directorySizes={directorySizes}
+              cutPaths={emptyCutPaths}
+              inlineEdit={null}
+              onSort={updateSort}
+              onToggleHidden={() => {
+                const next = !showHidden;
+                setShowHidden(next);
+                if (listing) void loadPath(listing.path, "none", next);
+              }}
+              onSelect={selectBrowserEntry}
+              onClearSelection={() => setSelectedIds([])}
+              onOpen={openEntry}
+              onDownload={() => undefined}
+              onContextMenu={(event) => event.preventDefault()}
+              onBackgroundContextMenu={(event) => event.preventDefault()}
+              onDropItems={() => undefined}
+              onInlineEditChange={() => undefined}
+              onInlineEditCommit={() => undefined}
+              onInlineEditCancel={() => undefined}
+            />
+            {loading && listing ? <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-0.5 animate-pulse bg-white/35" /> : null}
           </main>
         </div>
 
-        <footer className="misty-picker-footer">
-          <div>
-            <span>{mode === "folder" ? "Folder" : "File"}</span>
-            <strong title={selected?.path || listing?.path}>
-              {selectionIsCloud ? "Download this item locally before choosing it" : selected?.path || (mode === "folder" ? listing?.path : "Select a file")}
+        <footer className="flex min-h-[72px] items-center justify-between gap-5 border-t border-[var(--misty-border-soft)] px-[18px]">
+          <div className="grid min-w-0 gap-1 max-[800px]:hidden">
+            <span className="text-[10px] uppercase text-[var(--misty-text-subtle)]">{mode === "folder" ? "Folder" : multiple ? "Files" : "File"}</span>
+            <strong className="max-w-[560px] truncate text-xs font-semibold text-[var(--misty-text-muted)]" title={multiple && selectedPaths.length > 0 ? selectedPaths.join("\n") : selected?.path || listing?.path}>
+              {selectionIsCloud ? "Download this item locally before choosing it" : multiple && selectedPaths.length > 0 ? `${selectedPaths.length} file${selectedPaths.length === 1 ? "" : "s"} selected` : selected?.path || (mode === "folder" ? listing?.path : "Select a file")}
             </strong>
           </div>
-          <div className="misty-picker-footer-actions">
-            <button type="button" className="misty-picker-cancel" onClick={onCancel}>Cancel</button>
-            <button type="button" className="misty-picker-confirm" disabled={loading || !canChoose} onClick={choose}>
-              {mode === "folder" ? (selected ? "Choose folder" : "Choose this folder") : "Choose file"}
+          <div className="ml-auto flex shrink-0 gap-2">
+            <button type="button" className="inline-flex min-h-10 items-center justify-center rounded-lg border border-[var(--misty-border-soft)] bg-[var(--misty-neutral-control-bg,var(--misty-surface-2))] px-4 text-[13px] text-[var(--misty-text-muted)] hover:bg-[var(--misty-neutral-hover-bg,var(--misty-surface-3))] hover:text-[var(--misty-text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30" onClick={onCancel}>Cancel</button>
+            <button type="button" className="inline-flex min-h-10 items-center justify-center rounded-lg border border-[var(--misty-border-strong)] bg-[var(--misty-primary)] px-4 text-[13px] font-semibold text-[var(--misty-primary-contrast)] hover:bg-[var(--misty-primary-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30 disabled:cursor-default disabled:opacity-45" disabled={loading || !canChoose} onClick={choose}>
+              {mode === "folder" ? (selected ? "Choose folder" : "Choose this folder") : multiple ? selectedPaths.length > 0 ? `Choose ${selectedPaths.length} file${selectedPaths.length === 1 ? "" : "s"}` : "Choose files" : "Choose file"}
             </button>
           </div>
         </footer>
@@ -437,25 +425,4 @@ function resolvePreferredRoot(configuredPath: string, homePath: string): string 
   if (trimmed.startsWith("~/") || trimmed.startsWith("~\\")) return joinPath(homePath, trimmed.slice(2));
   if (/^(?:\/|[A-Za-z]:[\\/])/.test(trimmed)) return trimmed;
   return joinPath(homePath, trimmed);
-}
-
-function samePath(left?: string | null, right?: string | null): boolean {
-  if (!left || !right) return false;
-  return left.replace(/[\\/]+$/, "").toLowerCase() === right.replace(/[\\/]+$/, "").toLowerCase();
-}
-
-function pathSegments(path: string): Array<{ label: string; path: string }> {
-  if (!path) return [];
-  const separator = path.includes("\\") && !path.includes("/") ? "\\" : "/";
-  const normalized = path.replace(/\\/g, "/");
-  const drive = normalized.match(/^([A-Za-z]:)(?:\/|$)/)?.[1] ?? null;
-  const parts = normalized.replace(/^[A-Za-z]:\/?/, "").split("/").filter(Boolean);
-  const segments: Array<{ label: string; path: string }> = [];
-  let current = drive ? `${drive}${separator}` : separator;
-  segments.push({ label: drive || separator, path: current });
-  for (const part of parts) {
-    current = `${current.replace(/[\\/]+$/, "")}${separator}${part}`;
-    segments.push({ label: part, path: current });
-  }
-  return segments;
 }

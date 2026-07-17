@@ -1,5 +1,7 @@
+import type { WorkflowVersion } from "./agentArchitectureTypes";
+export * from "./agentArchitectureTypes";
+
 export type SpaceRole = "owner" | "member";
-export type StudioScope = { kind: "personal" } | { kind: "space"; spaceId: string };
 
 export interface Space {
   id: string;
@@ -104,29 +106,20 @@ export interface SpaceStudioResource {
   creator_user_id: string;
   kind: "agent" | "workflow";
   name: string;
+  description?: string;
+  icon?: string;
   instructions?: string;
   definition?: Record<string, unknown>;
   enabled: boolean;
+  status?: "available" | "disabled" | string;
+  runtime_kind?: "cloud" | "device" | string;
   version: number;
   schedules_enabled: boolean;
+  stable_identifier?: string;
+  active_workflow_version_id?: string;
+  active_workflow?: WorkflowVersion;
   created_at: string;
   updated_at: string;
-}
-
-export interface SpaceRun {
-  id: string;
-  space_id: string;
-  resource_kind: "agent" | "workflow";
-  resource_id: string;
-  initiated_by_user_id: string;
-  billing_user_id: string;
-  trigger_kind: string;
-  state: "queued" | "running" | "completed" | "failed" | "canceled";
-  input: Record<string, unknown>;
-  result: Record<string, unknown>;
-  error_code?: string;
-  created_at: string;
-  completed_at?: string;
 }
 
 export interface SpacesSnapshot {

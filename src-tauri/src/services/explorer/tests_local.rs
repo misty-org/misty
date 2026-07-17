@@ -140,6 +140,7 @@ fn remote_list_items_are_deduped_by_resolved_path() {
             size: 2048,
             ..remote_list_item_default()
         },
+        remote_list_item_default(),
     ];
 
     let deduped = dedupe_remote_list_items(&parent, items).unwrap();
@@ -147,6 +148,25 @@ fn remote_list_items_are_deduped_by_resolved_path() {
     assert_eq!(deduped.len(), 2);
     assert_eq!(deduped[0].name, "fig2_topo.pdf");
     assert_eq!(deduped[1].name, "Misty_Terms_of_Service.docx");
+}
+
+#[test]
+fn remote_item_paths_prefer_the_fetched_name_over_a_stale_path_field() {
+    let parent = RemoteBrowseTarget {
+        provider_type: "drive".into(),
+        remote_name: "work".into(),
+        remote_path: "/Documents".into(),
+    };
+    let item = RemoteListItem {
+        name: "current-name.pdf".into(),
+        path: "/Documents/old-name.pdf".into(),
+        ..remote_list_item_default()
+    };
+
+    assert_eq!(
+        remote_item_path(&parent, &item).unwrap(),
+        "/Documents/current-name.pdf"
+    );
 }
 
 #[test]

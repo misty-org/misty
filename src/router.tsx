@@ -6,7 +6,7 @@ import {
   RouterProvider,
   useLocation,
 } from "react-router-dom";
-import { Boxes, FolderOpen, Home, PencilSparkles, Puzzle } from "lucide-react";
+import { Boxes, FolderOpen, Home, Puzzle } from "lucide-react";
 import AccountPage from "./pages/Account";
 import ChangelogPage from "./pages/Changelog";
 import ExtensionsPage from "./pages/Extensions";
@@ -20,7 +20,6 @@ import SettingsPage from "./pages/Settings";
 import SignInPage from "./pages/SignIn";
 import TransfersPage from "./pages/Transfers";
 import SpacesShell, { PersonalSpaceRedirect, SpaceDetail } from "./pages/Spaces";
-import StudioPage from "./pages/Studio";
 import type { DesktopNavItem } from "./layouts/DesktopLayout";
 import { RootLayout } from "./layouts/RootLayout";
 import { isAndroidBuild } from "./platform/buildTarget";
@@ -31,6 +30,7 @@ import {
 } from "./stores/useAppRouteMemoryStore";
 import { useSetupStore } from "./stores/useSetupStore";
 import { useSettingsStore } from "./stores/useSettingsStore";
+import { useSpacesStore } from "./stores/useSpacesStore";
 import "./App.css";
 
 const routes = {
@@ -66,7 +66,6 @@ const appPageTitles = new Map<string, string>([
   [routes.home, "Misty - Home"],
   [routes.extensions, "Misty - Extensions"],
   [routes.spaces, "Misty - Spaces"],
-  [routes.studio, "Misty - Studio"],
   [routes.changelog, "Misty - Changelog"],
   [routes.signIn, "Misty - Sign In"],
   [routes.register, "Misty - Register"],
@@ -94,13 +93,6 @@ const desktopNavItems = [
     path: routes.spacePersonal,
     icon: Boxes,
     active: (pathname: string) => pathname.startsWith(routes.spaces),
-  },
-  {
-    id: "studio",
-    label: "Studio",
-    path: routes.studioAgents,
-    icon: PencilSparkles,
-    active: (pathname: string) => pathname.startsWith(routes.studio),
   },
   ...(isAndroidBuild
     ? []
@@ -158,8 +150,8 @@ export const router = createBrowserRouter([
           {
             element: <AppPagesLayout />,
             children: [
-              { path: "agents", element: <Navigate to={routes.studioAgents} replace /> },
-              { path: "automations", element: <Navigate to={routes.studioWorkflows} replace /> },
+              { path: "agents", element: <LegacyStudioRedirect kind="folder-agents" /> },
+              { path: "automations", element: <LegacyStudioRedirect kind="folder-agents" /> },
               {
                 path: "spaces",
                 element: <SpacesShell />,
@@ -167,11 +159,13 @@ export const router = createBrowserRouter([
                   { index: true, element: <Navigate to={routes.spacePersonal} replace /> },
                   { path: "personal", element: <PersonalSpaceRedirect /> },
                   { path: ":spaceId", element: <Navigate to="chat" replace /> },
+                  { path: ":spaceId/:section/:studioKind", element: <SpaceDetail /> },
                   { path: ":spaceId/:section", element: <SpaceDetail /> },
                 ],
               },
-              { path: "studio/agents", element: <StudioPage kind="agents" /> },
-              { path: "studio/workflows", element: <StudioPage kind="workflows" /> },
+              { path: "studio", element: <LegacyStudioRedirect kind="folder-agents" /> },
+              { path: "studio/agents", element: <LegacyStudioRedirect kind="folder-agents" /> },
+              { path: "studio/workflows", element: <LegacyStudioRedirect kind="workflows" /> },
               { path: "home", element: <HomePage /> },
               {
                 path: "extensions",
@@ -266,9 +260,30 @@ function StartupRedirect() {
   return <Navigate to={target} replace />;
 }
 
+function LegacyStudioRedirect({ kind }: { kind: "folder-agents" | "workflows" }) {
+  const location = useLocation();
+  const spaces = useSpacesStore((state) => state.spaces);
+  const loading = useSpacesStore((state) => state.loading);
+  const load = useSpacesStore((state) => state.load);
+
+  useEffect(() => { if (spaces.length === 0 && !loading) void load(); }, [load, loading, spaces.length]);
+  if (spaces.length === 0) return <div className="grid h-full place-items-center text-sm text-[var(--misty-text-muted)]">Loading your Space Studio…</div>;
+
+  const params = new URLSearchParams(location.search);
+  const requestedSpaceId = params.get("spaceId") ?? params.get("space") ?? "";
+  const space = spaces.find((candidate) => candidate.id === requestedSpaceId) ?? spaces.find((candidate) => candidate.is_personal) ?? spaces[0];
+  const oldSpaceScope = params.get("scope") === "space";
+  const targetKind = kind === "folder-agents" && oldSpaceScope ? "agents" : kind;
+  params.delete("scope");
+  params.delete("space");
+  params.delete("spaceId");
+  const query = params.toString();
+  return <Navigate to={`/spaces/${encodeURIComponent(space.id)}/studio/${targetKind}${query ? `?${query}` : ""}`} replace />;
+}
+
 function desktopRouteIdFromPath(pathname: string): AppTab {
   if (pathname.startsWith(routes.spaces) || pathname.startsWith(routes.library)) return "spaces";
-  if (pathname.startsWith(routes.studio) || pathname.startsWith(routes.agents) || pathname.startsWith(routes.automations)) return "studio";
+  if (pathname.startsWith(routes.studio) || pathname.startsWith(routes.agents) || pathname.startsWith(routes.automations)) return "agents";
   if (pathname.startsWith(routes.transfers)) return "transfers";
   if (pathname.startsWith(routes.providers)) return "providers";
   if (pathname.startsWith(routes.account)) return "account";

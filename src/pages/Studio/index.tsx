@@ -1,15 +1,17 @@
-import { useEffect, useMemo, useState } from "react";
-import { Bot, Play, Plus, Save, Trash2, Workflow } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Bot, FolderCog, Play, Plus, Save, Trash2, Workflow } from "lucide-react";
 import { NavLink, useSearchParams } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
 import AgentsPage from "../Agents";
 import AutomationsPage from "../Automations";
 import { useSpacesStore } from "../../stores/useSpacesStore";
 import type { SpaceRun, SpaceStudioResource } from "../../spaces/types";
+import { AgentArchitecturePanel } from "./AgentArchitecturePanel";
 
-export default function StudioPage({ kind }: { kind: "agents" | "workflows" }) {
-  const [searchParams, setSearchParams] = useSearchParams();
-  const selectedSpaceId = searchParams.get("space") ?? "personal";
+export type SpaceStudioKind = "agents" | "folder-agents" | "workflows";
+
+export default function SpaceStudioPage({ spaceId, kind }: { spaceId: string; kind: SpaceStudioKind }) {
+  const [searchParams] = useSearchParams();
   const { spaces, agentsBySpace, workflowsBySpace, load, loadStudio, saveStudio, deleteStudio, runStudio, error } = useSpacesStore(useShallow((state) => ({
     spaces: state.spaces,
     agentsBySpace: state.agentsBySpace,
@@ -21,37 +23,36 @@ export default function StudioPage({ kind }: { kind: "agents" | "workflows" }) {
     runStudio: state.runStudio,
     error: state.error,
   })));
-  const resources = selectedSpaceId === "personal"
-    ? emptyStudioResources
-    : kind === "agents"
-      ? agentsBySpace[selectedSpaceId] ?? emptyStudioResources
-      : workflowsBySpace[selectedSpaceId] ?? emptyStudioResources;
+  const space = spaces.find((candidate) => candidate.id === spaceId);
+  const personalSpaceId = spaces.find((candidate) => candidate.is_personal)?.id ?? spaceId;
+  const resources = kind === "agents"
+    ? agentsBySpace[spaceId] ?? emptyStudioResources
+    : kind === "workflows"
+      ? workflowsBySpace[spaceId] ?? emptyStudioResources
+      : emptyStudioResources;
 
   useEffect(() => { void load(); }, [load]);
-  useEffect(() => { if (selectedSpaceId !== "personal") void loadStudio(selectedSpaceId, kind); }, [kind, loadStudio, selectedSpaceId]);
+  useEffect(() => { if (kind !== "folder-agents") void loadStudio(spaceId, kind); }, [kind, loadStudio, spaceId]);
+  useEffect(() => { if (kind === "agents") void loadStudio(spaceId, "workflows"); }, [kind, loadStudio, spaceId]);
 
   return (
     <div className="grid h-full min-h-0 grid-rows-[58px_minmax(0,1fr)] bg-[var(--misty-app-page-bg,#07090b)]">
-      <header className="flex items-center justify-between gap-4 border-b border-[var(--misty-border-soft)] bg-[var(--misty-surface)] px-5">
+      <header className="flex items-center gap-4 border-b border-[var(--misty-border-soft)] bg-[var(--misty-surface)] px-5">
         <div className="flex items-center gap-4">
-          <h1 className="m-0 text-base font-semibold">Studio</h1>
+          <div><p className="m-0 text-[10px] text-[var(--misty-text-subtle)]">{space?.name ?? "Space"}</p><h1 className="m-0 text-sm font-semibold">Studio</h1></div>
           <nav className="flex rounded-xl bg-[var(--misty-surface-2)] p-1" aria-label="Studio sections">
-            <NavLink className={studioTabClass} to={`/studio/agents${selectedSpaceId === "personal" ? "" : `?space=${encodeURIComponent(selectedSpaceId)}`}`}><Bot size={14}/>Agents</NavLink>
-            <NavLink className={studioTabClass} to={`/studio/workflows${selectedSpaceId === "personal" ? "" : `?space=${encodeURIComponent(selectedSpaceId)}`}`}><Workflow size={14}/>Workflows</NavLink>
+            <NavLink className={studioTabClass} to={`/spaces/${encodeURIComponent(spaceId)}/studio/agents`}><Bot size={14}/>Agents</NavLink>
+            <NavLink className={studioTabClass} to={`/spaces/${encodeURIComponent(spaceId)}/studio/folder-agents`}><FolderCog size={14}/>Folder agents</NavLink>
+            <NavLink className={studioTabClass} to={`/spaces/${encodeURIComponent(spaceId)}/studio/workflows`}><Workflow size={14}/>Workflows</NavLink>
           </nav>
         </div>
-        <label className="flex items-center gap-2 text-[11px] text-[var(--misty-text-subtle)]">
-          Scope
-          <select className="h-8 min-w-36 rounded-lg border border-[var(--misty-border-soft)] bg-[var(--misty-surface-2)] px-2 text-xs text-[var(--misty-text)]" value={selectedSpaceId} onChange={(event) => setSearchParams(event.target.value === "personal" ? {} : { space: event.target.value })}>
-            <option value="personal">Personal</option>
-            {spaces.map((space) => <option value={space.id} key={space.id}>{space.name}</option>)}
-          </select>
-        </label>
       </header>
       <main className="min-h-0">
-        {selectedSpaceId === "personal"
-          ? kind === "agents" ? <AgentsPage /> : <AutomationsPage />
-          : <SharedStudio kind={kind} spaceId={selectedSpaceId} resources={resources} error={error} saveStudio={saveStudio} deleteStudio={deleteStudio} runStudio={runStudio} />}
+        {kind === "folder-agents"
+          ? searchParams.get("agentId")
+            ? <AutomationsPage spaceId={spaceId} personalSpaceId={personalSpaceId} />
+            : <AgentsPage spaceId={spaceId} personalSpaceId={personalSpaceId} spaceName={space?.name ?? "This Space"} initialAgentId={searchParams.get("selectedAgentId") ?? undefined} />
+          : <SharedStudio kind={kind} spaceId={spaceId} resources={resources} workflows={workflowsBySpace[spaceId] ?? emptyStudioResources} initialResourceId={searchParams.get("agentId") ?? undefined} error={error} saveStudio={saveStudio} deleteStudio={deleteStudio} runStudio={runStudio} />}
       </main>
     </div>
   );
@@ -61,21 +62,30 @@ function SharedStudio(props: {
   kind: "agents" | "workflows";
   spaceId: string;
   resources: SpaceStudioResource[];
+  workflows: SpaceStudioResource[];
+  initialResourceId?: string;
   error: string | null;
   saveStudio: ReturnType<typeof useSpacesStore.getState>["saveStudio"];
   deleteStudio: ReturnType<typeof useSpacesStore.getState>["deleteStudio"];
   runStudio: ReturnType<typeof useSpacesStore.getState>["runStudio"];
 }) {
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(props.initialResourceId ?? null);
   const [draft, setDraft] = useState<Partial<SpaceStudioResource> | null>(null);
   const [lastRun, setLastRun] = useState<SpaceRun | null>(null);
   const [running, setRunning] = useState(false);
+  const appliedInitialResourceId = useRef("");
   const selected = props.resources.find((item) => item.id === selectedId) ?? props.resources[0] ?? null;
 
   useEffect(() => {
     if (selected) setDraft(selected);
     else setDraft(null);
   }, [props.spaceId, selected?.id, selected?.version]);
+  useEffect(() => {
+    if (props.initialResourceId && appliedInitialResourceId.current !== props.initialResourceId && props.resources.some((item) => item.id === props.initialResourceId)) {
+      appliedInitialResourceId.current = props.initialResourceId;
+      setSelectedId(props.initialResourceId);
+    }
+  }, [props.initialResourceId, props.resources]);
 
   const title = props.kind === "agents" ? "Space Agents" : "Space Workflows";
   const description = props.kind === "agents"
@@ -85,7 +95,7 @@ function SharedStudio(props: {
 
   const createNew = () => {
     const fresh: Partial<SpaceStudioResource> = props.kind === "agents"
-      ? { kind: "agent", name: "New Agent", instructions: "Help teammates in this Space.", enabled: true, schedules_enabled: false, version: 0 }
+      ? { kind: "agent", name: "New Agent", description: "A capable teammate for this Space.", icon: "bot", instructions: "Help teammates in this Space.", enabled: true, status: "available", runtime_kind: "cloud", schedules_enabled: false, version: 0 }
       : { kind: "workflow", name: "New Workflow", definition: { nodes: [] }, enabled: false, schedules_enabled: false, version: 0 };
     setSelectedId(null); setDraft(fresh);
   };
@@ -118,10 +128,11 @@ function SharedStudio(props: {
           <div><h2 className="m-0 text-lg">{draft.id ? `Edit ${props.kind === "agents" ? "Agent" : "Workflow"}` : `New ${props.kind === "agents" ? "Agent" : "Workflow"}`}</h2><p className="m-0 mt-1 text-xs text-[var(--misty-text-subtle)]">{description}</p></div>
           {props.error ? <p className="m-0 rounded-lg border border-red-400/20 bg-red-950/20 p-3 text-xs text-red-200">{props.error}</p> : null}
           <label className={fieldLabelClass}>Name<input className={inputClass} maxLength={80} value={draft.name ?? ""} onChange={(event) => setDraft({ ...draft, name: event.target.value })}/></label>
-          {props.kind === "agents" ? <label className={fieldLabelClass}>Instructions<textarea className={`${inputClass} min-h-48 resize-y py-3`} value={draft.instructions ?? ""} onChange={(event) => setDraft({ ...draft, instructions: event.target.value })}/></label> : <label className={fieldLabelClass}>Cloud workflow definition<textarea className={`${inputClass} min-h-72 resize-y py-3 font-mono text-[11px]`} value={definitionText} onChange={(event) => { try { setDraft({ ...draft, definition: JSON.parse(event.target.value) as Record<string, unknown> }); } catch { /* retain last valid JSON */ } }}/><span>Local path, read/write file, copy/move/rename, and device-secret nodes are rejected by the server.</span></label>}
+          {props.kind === "agents" ? <><div className="grid grid-cols-[minmax(0,1fr)_140px] gap-3"><label className={fieldLabelClass}>Description<input className={inputClass} maxLength={240} value={draft.description ?? ""} onChange={(event) => setDraft({ ...draft, description: event.target.value })}/></label><label className={fieldLabelClass}>Icon<input className={inputClass} maxLength={40} value={draft.icon ?? "bot"} onChange={(event) => setDraft({ ...draft, icon: event.target.value })}/></label></div><label className={fieldLabelClass}>Instructions<textarea className={`${inputClass} min-h-36 resize-y py-3`} value={draft.instructions ?? ""} onChange={(event) => setDraft({ ...draft, instructions: event.target.value })}/></label></> : <label className={fieldLabelClass}>Portable workflow package definition<textarea className={`${inputClass} min-h-72 resize-y py-3 font-mono text-[11px]`} value={definitionText} onChange={(event) => { try { setDraft({ ...draft, definition: JSON.parse(event.target.value) as Record<string, unknown> }); } catch { /* retain last valid JSON */ } }}/><span>Include a structured metadata object with capabilities, typed inputs/outputs, integrations, permissions, runtime compatibility, and tags. Local-path and device-secret nodes are rejected by the server.</span></label>}
           <div className="flex flex-wrap items-center gap-4"><label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={draft.enabled ?? false} onChange={(event) => setDraft({ ...draft, enabled: event.target.checked })}/>Enabled</label><label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={draft.schedules_enabled ?? false} onChange={(event) => setDraft({ ...draft, schedules_enabled: event.target.checked })}/>Scheduled runs</label><span className="text-[10px] text-[var(--misty-text-subtle)]">Manual runs charge the runner; scheduled runs charge the creator.</span></div>
+          {props.kind === "agents" && draft.id ? <AgentArchitecturePanel agent={draft as SpaceStudioResource} workflows={props.workflows} onAgentUpdated={(agent) => setDraft(agent)}/> : null}
           {lastRun ? <pre className={`m-0 max-h-48 overflow-auto rounded-xl border p-3 text-[11px] ${lastRun.state === "completed" ? "border-emerald-400/20 bg-emerald-950/10 text-emerald-100" : "border-red-400/20 bg-red-950/10 text-red-100"}`}>{JSON.stringify(lastRun.result, null, 2)}</pre> : null}
-          <div className="flex justify-between border-t border-[var(--misty-border-soft)] pt-4">{draft.id ? <button className={dangerButtonClass} type="button" onClick={() => window.confirm(`Delete “${draft.name}”?`) && void props.deleteStudio(props.spaceId, props.kind, draft.id!).then(() => { setSelectedId(null); setDraft(null); })}><Trash2 size={14}/>Delete</button> : <span/>}<div className="flex gap-2">{draft.id && draft.enabled ? <button className={secondaryButtonClass} disabled={running} type="button" onClick={() => void run()}><Play size={14}/>{running ? "Running…" : "Run"}</button> : null}<button className={primaryButtonClass} type="button" onClick={() => void save()}><Save size={14}/>Save</button></div></div>
+          <div className="flex justify-between border-t border-[var(--misty-border-soft)] pt-4">{draft.id ? <button className={dangerButtonClass} type="button" onClick={() => window.confirm(`Delete “${draft.name}”?`) && void props.deleteStudio(props.spaceId, props.kind, draft.id!).then(() => { setSelectedId(null); setDraft(null); })}><Trash2 size={14}/>Delete</button> : <span/>}<div className="flex gap-2">{props.kind === "workflows" && draft.id && draft.enabled ? <button className={secondaryButtonClass} disabled={running} type="button" onClick={() => void run()}><Play size={14}/>{running ? "Running…" : "Run"}</button> : null}<button className={primaryButtonClass} type="button" onClick={() => void save()}><Save size={14}/>Save</button></div></div>
         </div>}
       </section>
     </div>
