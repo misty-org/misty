@@ -117,6 +117,17 @@ body {
   }
 }
 
+@keyframes showcase-card-reveal {
+  from {
+    opacity: 0.28;
+    filter: blur(4px);
+  }
+  to {
+    opacity: 1;
+    filter: blur(0);
+  }
+}
+
 .animate-glow-pulse {
   animation: glow-pulse 3s ease-in-out infinite;
 }

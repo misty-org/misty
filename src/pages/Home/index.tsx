@@ -1,8 +1,8 @@
 import Footer from "../../components/Footer";
 import FeatureDemo from "./FeatureDemo";
 import MainHero from "./MainHero";
-import ServiceProviders from "./FeaturesProviders";
 import ProductScrollShowcase from "./ProductScrollShowcase";
+import FeaturesPreview from "./FeaturesPreview";
 import BlogPreview from "./BlogPreview";
 import Changelog from "./Changelog";
 import EndingOutro from "./EndingOutro";
@@ -19,15 +19,15 @@ export default function Home() {
         </section>
       </div>
 
-      <section>
-        <ServiceProviders/>
-      </section>
-
-      <section>
+      <section className="-mb-[calc(15vh+5rem)]">
         <ProductScrollShowcase/>
       </section>
 
-      <section>
+      <section data-showcase-next>
+        <FeaturesPreview/>
+      </section>
+
+      <section data-blog-preview>
         <BlogPreview/>
       </section>
 

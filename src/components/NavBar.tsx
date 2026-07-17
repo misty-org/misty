@@ -8,10 +8,8 @@ const navItems = [
   { to: "/pricing", label: "Pricing" },
 ];
 
-
 const resourcesLinks = [
   { to: "/features", label: "Features" },
-  { to: "/plugins", label: "Extensions" },
   { to: "/changelog", label: "Changelog" },
   { to: "/blog", label: "Blog" },
   { to: "/roadmap", label: "Roadmap" },
@@ -29,8 +27,13 @@ export default function Navbar() {
 
   const displayName = me?.name ?? user?.name ?? "";
   const initials = displayName
-    ? displayName.split(" ").map((w: string) => w[0]).join("").toUpperCase().slice(0, 2)
-    : user?.email?.[0]?.toUpperCase() ?? "";
+    ? displayName
+        .split(" ")
+        .map((w: string) => w[0])
+        .join("")
+        .toUpperCase()
+        .slice(0, 2)
+    : (user?.email?.[0]?.toUpperCase() ?? "");
 
   useEffect(() => {
     setMenuOpen(false);
@@ -41,7 +44,8 @@ export default function Navbar() {
   useEffect(() => {
     if (!profileOpen) return;
     const handler = (e: MouseEvent) => {
-      if (!profileMenuRef.current?.contains(e.target as Node)) setProfileOpen(false);
+      if (!profileMenuRef.current?.contains(e.target as Node))
+        setProfileOpen(false);
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
@@ -68,7 +72,9 @@ export default function Navbar() {
       >
         <NavLink to="/" className="group flex items-center gap-1">
           <img src="/misty.png" alt="Misty logo" className="w-13 h-13" />
-          <span className="text-lg font-semibold text-text tracking-tight">Misty</span>
+          <span className="text-lg font-semibold text-text tracking-tight">
+            Misty
+          </span>
         </NavLink>
 
         {/* Desktop nav */}
@@ -78,35 +84,56 @@ export default function Navbar() {
               key={to}
               to={to}
               end={to === "/"}
-              className={({ isActive }) => `relative px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
-                isActive ? "text-white" : "text-text hover:text-white"
-              }`}
+              className={({ isActive }) =>
+                `relative px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                  isActive ? "text-white" : "text-text hover:text-white"
+                }`
+              }
             >
               {({ isActive }) => (
                 <>
                   {label}
-                  {isActive && <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-4 h-0.5 bg-primary rounded-full" />}
+                  {isActive && (
+                    <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-4 h-0.5 bg-primary rounded-full" />
+                  )}
                 </>
               )}
             </NavLink>
           ))}
 
           {/* Resources dropdown */}
-          <div className="relative" onMouseEnter={openResources} onMouseLeave={() => setResourcesOpen(false)}>
+          <div
+            className="relative"
+            onMouseEnter={openResources}
+            onMouseLeave={() => setResourcesOpen(false)}
+          >
             <button
               type="button"
               onClick={openResources}
               aria-haspopup="menu"
               aria-expanded={resourcesOpen}
               className={`relative px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 block ${
-                resourcesLinks.some(({ to }) => location.pathname.startsWith(to)) ? "text-white" : "text-text hover:text-white"
+                resourcesLinks.some(({ to }) =>
+                  location.pathname.startsWith(to),
+                )
+                  ? "text-white"
+                  : "text-text hover:text-white"
               }`}
             >
               Resources
-              {resourcesLinks.some(({ to }) => location.pathname.startsWith(to)) && <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-4 h-0.5 bg-primary rounded-full" />}
+              {resourcesLinks.some(({ to }) =>
+                location.pathname.startsWith(to),
+              ) && (
+                <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-4 h-0.5 bg-primary rounded-full" />
+              )}
             </button>
-            <div className={`absolute left-1/2 -translate-x-1/2 top-full pt-1 w-44 transition-all duration-200 ${resourcesOpen ? "opacity-100 visible" : "opacity-0 invisible"}`}>
-              <div className="bg-surface border border-border rounded-xl overflow-hidden shadow-xl shadow-bg/50" role="menu">
+            <div
+              className={`absolute left-1/2 -translate-x-1/2 top-full pt-1 w-44 transition-all duration-200 ${resourcesOpen ? "opacity-100 visible" : "opacity-0 invisible"}`}
+            >
+              <div
+                className="bg-surface border border-border rounded-xl overflow-hidden shadow-xl shadow-bg/50"
+                role="menu"
+              >
                 {resourcesLinks.map(({ to, label }) => (
                   <NavLink
                     key={to}
@@ -135,13 +162,23 @@ export default function Navbar() {
                   <div className="absolute right-0 top-full pt-2">
                     <div className="w-44 glass-card rounded-xl overflow-hidden shadow-xl shadow-bg/50">
                       <div className="px-4 py-3 border-b border-border/50">
-                        <p className="text-sm font-medium text-text truncate">{displayName}</p>
-                        <p className="text-xs text-text-muted truncate">{user.email}</p>
+                        <p className="text-sm font-medium text-text truncate">
+                          {displayName}
+                        </p>
+                        <p className="text-xs text-text-muted truncate">
+                          {user.email}
+                        </p>
                       </div>
-                      <NavLink to="/settings" className="block px-4 py-2.5 text-sm text-text-muted hover:text-text hover:bg-elevated transition-colors">
+                      <NavLink
+                        to="/settings"
+                        className="block px-4 py-2.5 text-sm text-text-muted hover:text-text hover:bg-elevated transition-colors"
+                      >
                         Settings
                       </NavLink>
-                      <button onClick={logout} className="w-full text-left px-4 py-2.5 text-sm text-text-muted hover:text-text hover:bg-elevated transition-colors border-t border-border/30">
+                      <button
+                        onClick={logout}
+                        className="w-full text-left px-4 py-2.5 text-sm text-text-muted hover:text-text hover:bg-elevated transition-colors border-t border-border/30"
+                      >
                         Sign out
                       </button>
                     </div>
@@ -150,7 +187,9 @@ export default function Navbar() {
               </div>
             ) : (
               <button
-                onClick={() => navigate("/signin", { state: { from: location.pathname } })}
+                onClick={() =>
+                  navigate("/signin", { state: { from: location.pathname } })
+                }
                 className="px-4 py-1.5 bg-white hover:bg-zinc-200 text-bg text-sm font-medium rounded-lg transition-colors duration-200"
               >
                 Sign In
@@ -160,44 +199,84 @@ export default function Navbar() {
         </div>
 
         {/* Mobile hamburger */}
-        <button onClick={() => setMenuOpen(!menuOpen)} className="md:hidden relative w-10 h-10 flex items-center justify-center text-text-muted hover:text-text transition-colors">
+        <button
+          onClick={() => setMenuOpen(!menuOpen)}
+          className="md:hidden relative w-10 h-10 flex items-center justify-center text-text-muted hover:text-text transition-colors"
+        >
           <div className="flex flex-col gap-1.5">
-            <span className={`block w-5 h-px bg-current transition-all duration-300 ${menuOpen ? "rotate-45 translate-y-[3.5px]" : ""}`} />
-            <span className={`block w-5 h-px bg-current transition-all duration-300 ${menuOpen ? "-rotate-45 -translate-y-[3.5px]" : ""}`} />
+            <span
+              className={`block w-5 h-px bg-current transition-all duration-300 ${menuOpen ? "rotate-45 translate-y-[3.5px]" : ""}`}
+            />
+            <span
+              className={`block w-5 h-px bg-current transition-all duration-300 ${menuOpen ? "-rotate-45 -translate-y-[3.5px]" : ""}`}
+            />
           </div>
         </button>
       </div>
 
       {/* Mobile menu */}
-      <div className={`md:hidden overflow-hidden transition-all duration-300 ${menuOpen ? "max-h-96 opacity-100" : "max-h-0 opacity-0"}`}>
+      <div
+        className={`md:hidden overflow-hidden transition-all duration-300 ${menuOpen ? "max-h-96 opacity-100" : "max-h-0 opacity-0"}`}
+      >
         <div className="px-6 py-4 border-t border-border/50 glass">
           <div className="flex flex-col gap-1">
             {navItems.map(({ to, label }) => (
-              <NavLink key={to} to={to} end={to === "/"} className={({ isActive }) => `px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                isActive ? "text-primary bg-primary/10" : "text-text-muted hover:text-text hover:bg-elevated"
-              }`}>
+              <NavLink
+                key={to}
+                to={to}
+                end={to === "/"}
+                className={({ isActive }) =>
+                  `px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                    isActive
+                      ? "text-primary bg-primary/10"
+                      : "text-text-muted hover:text-text hover:bg-elevated"
+                  }`
+                }
+              >
                 {label}
               </NavLink>
             ))}
-            <span className="px-4 pt-3 pb-1 text-[11px] font-semibold tracking-[0.18em] text-text-muted">Resources</span>
+            <span className="px-4 pt-3 pb-1 text-[11px] font-semibold tracking-[0.18em] text-text-muted">
+              Resources
+            </span>
             {resourcesLinks.map(({ to, label }) => (
-              <NavLink key={to} to={to} end className="px-4 pl-6 py-2 rounded-lg text-sm font-medium text-text-muted transition-colors hover:text-text hover:bg-elevated">
+              <NavLink
+                key={to}
+                to={to}
+                end
+                className="px-4 pl-6 py-2 rounded-lg text-sm font-medium text-text-muted transition-colors hover:text-text hover:bg-elevated"
+              >
                 {label}
               </NavLink>
             ))}
             {user ? (
               <>
-                <NavLink to="/settings" className={({ isActive }) => `mt-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                  isActive ? "text-primary bg-primary/10" : "text-text-muted hover:text-text hover:bg-elevated"
-                }`}>
+                <NavLink
+                  to="/settings"
+                  className={({ isActive }) =>
+                    `mt-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                      isActive
+                        ? "text-primary bg-primary/10"
+                        : "text-text-muted hover:text-text hover:bg-elevated"
+                    }`
+                  }
+                >
                   Settings
                 </NavLink>
-                <button onClick={logout} className="px-4 py-2.5 text-left text-sm font-medium text-text-muted hover:text-text hover:bg-elevated rounded-lg transition-colors">
+                <button
+                  onClick={logout}
+                  className="px-4 py-2.5 text-left text-sm font-medium text-text-muted hover:text-text hover:bg-elevated rounded-lg transition-colors"
+                >
                   Sign out
                 </button>
               </>
             ) : (
-              <button onClick={() => navigate("/signin")} className="mt-2 px-4 py-2.5 bg-white text-bg text-sm font-medium rounded-lg">Sign In</button>
+              <button
+                onClick={() => navigate("/signin")}
+                className="mt-2 px-4 py-2.5 bg-white text-bg text-sm font-medium rounded-lg"
+              >
+                Sign In
+              </button>
             )}
           </div>
         </div>
