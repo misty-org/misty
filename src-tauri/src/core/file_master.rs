@@ -14,17 +14,17 @@ pub struct RemoteBrowseTarget {
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct RemoteListItem {
-    #[serde(default)]
+    #[serde(default, alias = "Name")]
     pub name: String,
-    #[serde(default)]
+    #[serde(default, alias = "Path")]
     pub path: String,
-    #[serde(default)]
+    #[serde(default, alias = "IsDir")]
     pub is_dir: bool,
-    #[serde(default)]
+    #[serde(default, alias = "Size")]
     pub size: i64,
-    #[serde(default)]
+    #[serde(default, alias = "ModTime")]
     pub mod_time: String,
-    #[serde(default)]
+    #[serde(default, alias = "MimeType")]
     pub mime_type: String,
 }
 
@@ -192,5 +192,25 @@ mod tests {
             target.child_remote_path(&item).unwrap(),
             "/Documents/report.pdf"
         );
+    }
+
+    #[test]
+    fn parses_native_backend_list_item_fields() {
+        let item: RemoteListItem = serde_json::from_value(serde_json::json!({
+            "Name": "Photos",
+            "Path": "Photos",
+            "IsDir": true,
+            "Size": -1,
+            "ModTime": "2026-07-16T10:00:00Z",
+            "MimeType": "inode/directory"
+        }))
+        .expect("native backend list item");
+
+        assert_eq!(item.name, "Photos");
+        assert_eq!(item.path, "Photos");
+        assert!(item.is_dir);
+        assert_eq!(item.size, -1);
+        assert_eq!(item.mod_time, "2026-07-16T10:00:00Z");
+        assert_eq!(item.mime_type, "inode/directory");
     }
 }

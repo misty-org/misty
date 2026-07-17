@@ -35,6 +35,7 @@ export default function RegisterPage() {
   const from = routeState?.from || "/home";
   const addingAccount = Boolean(routeState?.addingAccount);
   const [name, setName] = useState("");
+  const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -43,10 +44,15 @@ export default function RegisterPage() {
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
+    const normalizedUsername = username.trim().toLowerCase();
+    if (!/^[a-z0-9_]{3,30}$/.test(normalizedUsername)) {
+      setError("Username must be 3–30 letters, numbers, or underscores.");
+      return;
+    }
     setLoading(true);
 
     try {
-      const user = await accountRegister(name, email, password);
+      const user = await accountRegister(name, normalizedUsername, email, password);
       const me = await accountFetchMe().catch(() => null);
       await saveAuthenticatedUser(user, licenseFromMe(me));
       setUser({ ...user, accountCreatedAt: me?.created_at, currentPlan: me?.tier });
@@ -83,6 +89,19 @@ export default function RegisterPage() {
             required
             disabled={loading}
             onChange={setName}
+          />
+          <AuthField
+            id="register-username"
+            label="Username"
+            value={username}
+            autoComplete="username"
+            placeholder="misty_user"
+            minLength={3}
+            maxLength={30}
+            pattern="[a-zA-Z0-9_]{3,30}"
+            required
+            disabled={loading}
+            onChange={setUsername}
           />
           <AuthField
             id="register-email"

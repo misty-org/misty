@@ -69,10 +69,10 @@ use crate::services::power_pack::{
     FileToolsSymlinkTargetResult, SavedSearch, SavedSearchesSnapshot,
 };
 use crate::services::providers::{
-    BackendAction, BackendActionResult, BackendRunRequest, ConfigSecurityStatus, LinkPathRequest,
+    BackendAction, BackendActionResult, BackendRunRequest, ConfigSecurityStatus,
     ProviderConfigRequest, ProviderConfigStep, ProviderJobStart, ProviderJobStatus,
-    ProvidersSnapshot, PublicLinkActionResult, PublicLinkListResult, RcloneConfigPaths,
-    RemoteEditDraft, RemoteTestResult, SaveRemoteRequest, VerifyResult, VerifyStartRequest,
+    ProvidersSnapshot, RcloneConfigPaths, RemoteEditDraft, RemoteTestResult, SaveRemoteRequest,
+    VerifyResult, VerifyStartRequest,
 };
 use crate::services::search::{SearchQueryRequest, SearchResult, SearchScanRequest, SearchStatus};
 use crate::services::settings::{OpenWithAssociation, SaveSettingsRequest, SettingsSnapshot};
@@ -1287,30 +1287,6 @@ pub async fn providers_verify_result(
     state: State<'_, MistyRuntime>,
 ) -> ApiResult<VerifyResult> {
     state.providers.verify_result(job_id).await
-}
-
-#[tauri::command]
-pub async fn providers_public_links(
-    request: LinkPathRequest,
-    state: State<'_, MistyRuntime>,
-) -> ApiResult<PublicLinkListResult> {
-    state.providers.public_links(request).await
-}
-
-#[tauri::command]
-pub async fn providers_create_public_link(
-    request: LinkPathRequest,
-    state: State<'_, MistyRuntime>,
-) -> ApiResult<PublicLinkActionResult> {
-    state.providers.create_public_link(request).await
-}
-
-#[tauri::command]
-pub async fn providers_revoke_public_link(
-    request: LinkPathRequest,
-    state: State<'_, MistyRuntime>,
-) -> ApiResult<PublicLinkActionResult> {
-    state.providers.revoke_public_link(request).await
 }
 
 #[tauri::command]

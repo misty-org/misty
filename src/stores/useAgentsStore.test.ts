@@ -86,6 +86,7 @@ function fixtureDefinition(): AgentDefinition {
   const now = "2026-07-14T12:00:00.000Z";
   return {
     id: "agent-1",
+    spaceId: "space-1",
     ownerAccountId: "account-1",
     deviceId: "device-1",
     scope: {

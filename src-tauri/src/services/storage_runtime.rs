@@ -48,6 +48,7 @@ struct StorageJob {
     destination_path: Option<String>,
     provider_type: Option<String>,
     provider_reconnect: bool,
+    pending_option_state: Option<String>,
 }
 
 const MAX_ACTIVE_JOBS: usize = 4;
@@ -250,9 +251,6 @@ impl StorageRuntimeService {
             "remote.file.result.download_path" => {
                 self.download_result(&string_param(&params, "job_id")?)
             }
-            "remote.links.list" => self.public_links(params, "list"),
-            "remote.links.create" => self.public_links(params, "create"),
-            "remote.links.revoke" => self.public_links(params, "revoke"),
             "remote.verify.start" => self.start_verify(params),
             "remote.verify.result" => self.job_result(&string_param(&params, "job_id")?, "verify"),
             "remote.backend.actions" | "remote.backend.run" => {
@@ -409,6 +407,7 @@ impl StorageRuntimeService {
                     destination_path: None,
                     provider_type: Some(provider_type),
                     provider_reconnect: reconnect,
+                    pending_option_state: None,
                 },
             );
         Ok(
@@ -458,12 +457,21 @@ impl StorageRuntimeService {
         }
         let output = status.get("output").cloned().unwrap_or(Value::Null);
         if let Some(option) = output.get("Option").filter(|value| !value.is_null()) {
+            let option_state = output
+                .get("State")
+                .and_then(Value::as_str)
+                .unwrap_or_default();
             let answer = params
                 .get("result")
                 .and_then(Value::as_str)
                 .unwrap_or_default()
                 .trim();
-            if !answer.is_empty() && answer != "pending" && answer != "true" {
+            let answering_pending_option = should_answer_provider_option(
+                session.pending_option_state.as_deref(),
+                option_state,
+                answer,
+            );
+            if answering_pending_option {
                 let provider_type = session
                     .provider_type
                     .as_deref()
@@ -504,10 +512,20 @@ impl StorageRuntimeService {
                     .get_mut(&id)
                 {
                     job.engine_id = engine_id;
+                    job.pending_option_state = None;
                 }
                 return Ok(
                     serde_json::json!({"kind":"browser_auth","state":id,"result":"pending","done":false,"instructions":"Finish the remaining provider configuration.","poll_after_ms":1000}),
                 );
+            }
+            if let Some(job) = self
+                .inner
+                .jobs
+                .lock()
+                .map_err(|_| "Storage jobs are unavailable.".to_owned())?
+                .get_mut(&id)
+            {
+                job.pending_option_state = Some(option_state.to_owned());
             }
             return Ok(
                 serde_json::json!({"kind":"post_auth_config","state":id,"result":output.get("Result").cloned().unwrap_or(Value::Null),"done":false,"option":normalize_provider_option(option),"instructions":"Choose how this account should be configured."}),
@@ -576,6 +594,7 @@ impl StorageRuntimeService {
                     destination_path,
                     provider_type: None,
                     provider_reconnect: false,
+                    pending_option_state: None,
                 },
             );
         Ok(serde_json::json!({"job_id":id}))
@@ -993,41 +1012,20 @@ impl StorageRuntimeService {
         }
         Ok(serde_json::json!({"path":job.destination_path}))
     }
-
-    fn public_links(&self, params: Value, action: &str) -> Result<Value, String> {
-        let remote = params
-            .get("remote")
-            .or_else(|| params.get("name"))
-            .and_then(Value::as_str)
-            .unwrap_or_default();
-        let remote = self.ensure_allowed_remote(remote)?;
-        let path = params
-            .get("path")
-            .and_then(Value::as_str)
-            .unwrap_or_default();
-        let mut opt = serde_json::Map::new();
-        opt.insert("action".to_owned(), Value::String(action.to_owned()));
-        opt.insert("remote".to_owned(), Value::String(clean_path(path)));
-        if let Some(expire) = params.get("expire").and_then(Value::as_str) {
-            opt.insert("expire".to_owned(), Value::String(expire.to_owned()));
-        }
-        if let Some(id) = params
-            .get("link_id")
-            .or_else(|| params.get("id"))
-            .and_then(Value::as_str)
-        {
-            opt.insert("id".to_owned(), Value::String(id.to_owned()));
-        }
-        if let Some(target_id) = params.get("target_id").and_then(Value::as_str) {
-            opt.insert("target_id".to_owned(), Value::String(target_id.to_owned()));
-        }
-        self.call("backend/command", with_no_retry(serde_json::json!({"fs":format!("{remote}:"),"command":"misty-public-links","arg":[path],"opt":opt})))
-    }
 }
 
 fn supported_provider(value: &str) -> bool {
     SUPPORTED_PROVIDERS.contains(&value.trim())
 }
+
+fn should_answer_provider_option(
+    pending_option_state: Option<&str>,
+    option_state: &str,
+    answer: &str,
+) -> bool {
+    pending_option_state == Some(option_state) && !answer.is_empty()
+}
+
 fn string_param(params: &Value, key: &str) -> Result<String, String> {
     params
         .get(key)
@@ -1094,6 +1092,14 @@ fn provider_parameters(provider_type: &str, mut parameters: Value) -> Result<Val
     let object = parameters
         .as_object_mut()
         .ok_or_else(|| "Provider parameters must be an object.".to_owned())?;
+    object
+        .entry("config_is_local".to_owned())
+        .or_insert_with(|| Value::String("true".to_owned()));
+    if provider_type == "drive" {
+        object
+            .entry("config_change_team_drive".to_owned())
+            .or_insert_with(|| Value::String("false".to_owned()));
+    }
     let (id_key, secret_key) = match provider_type {
         "drive" => (
             "MISTY_GOOGLE_DRIVE_CLIENT_ID",
@@ -1124,14 +1130,6 @@ fn provider_parameters(provider_type: &str, mut parameters: Value) -> Result<Val
                 object.insert("client_secret".to_owned(), Value::String(value));
             }
         }
-    }
-    if provider_type == "drive"
-        && object
-            .get("client_id")
-            .and_then(Value::as_str)
-            .is_none_or(|value| value.trim().is_empty())
-    {
-        return Err("Google Drive sign-in is not configured. Set Misty's Google OAuth client or enter a client ID under Advanced.".to_owned());
     }
     Ok(parameters)
 }
@@ -1169,21 +1167,21 @@ fn release_library() {
 
 #[cfg(all(feature = "embedded-storage-go", not(windows)))]
 extern "C" {
-    fn RcloneInitialize();
-    fn RcloneFinalize();
-    fn RcloneRPC(method: *const c_char, input: *const c_char) -> RpcResult;
-    fn RcloneFreeString(value: *mut c_char);
+    fn MistyStorageInitialize();
+    fn MistyStorageFinalize();
+    fn MistyStorageCall(method: *const c_char, input: *const c_char) -> RpcResult;
+    fn MistyStorageFreeString(value: *mut c_char);
 }
 
 #[cfg(all(feature = "embedded-storage-go", not(windows)))]
 fn initialize_library() -> Result<(), String> {
-    unsafe { RcloneInitialize() };
+    unsafe { MistyStorageInitialize() };
     Ok(())
 }
 
 #[cfg(all(feature = "embedded-storage-go", not(windows)))]
 fn finalize_library() {
-    unsafe { RcloneFinalize() };
+    unsafe { MistyStorageFinalize() };
 }
 
 #[cfg(all(feature = "embedded-storage-go", not(windows)))]
@@ -1192,14 +1190,14 @@ fn raw_rpc(method: &str, input: &Value) -> Result<Value, String> {
         CString::new(method).map_err(|_| "Storage method contained a NUL byte.".to_owned())?;
     let input = CString::new(input.to_string())
         .map_err(|_| "Storage input contained a NUL byte.".to_owned())?;
-    let result = unsafe { RcloneRPC(method.as_ptr(), input.as_ptr()) };
+    let result = unsafe { MistyStorageCall(method.as_ptr(), input.as_ptr()) };
     let output = if result.output.is_null() {
         String::new()
     } else {
         let output = unsafe { CStr::from_ptr(result.output) }
             .to_string_lossy()
             .into_owned();
-        unsafe { RcloneFreeString(result.output) };
+        unsafe { MistyStorageFreeString(result.output) };
         output
     };
     if result.status >= 400 {
@@ -1257,14 +1255,16 @@ mod windows_library {
         unsafe {
             Ok(Symbols {
                 initialize: *library
-                    .get(b"RcloneInitialize\0")
+                    .get(b"MistyStorageInitialize\0")
                     .map_err(|e| e.to_string())?,
                 finalize: *library
-                    .get(b"RcloneFinalize\0")
+                    .get(b"MistyStorageFinalize\0")
                     .map_err(|e| e.to_string())?,
-                rpc: *library.get(b"RcloneRPC\0").map_err(|e| e.to_string())?,
+                rpc: *library
+                    .get(b"MistyStorageCall\0")
+                    .map_err(|e| e.to_string())?,
                 free: *library
-                    .get(b"RcloneFreeString\0")
+                    .get(b"MistyStorageFreeString\0")
                     .map_err(|e| e.to_string())?,
                 _library: library,
             })
@@ -1343,50 +1343,4 @@ fn storage_error(method: &str, status: i32, output: &str) -> String {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn formats_structured_errors_without_product_leaking_engine_name() {
-        let error = storage_error("operations/list", 500, r#"{"error":"denied"}"#);
-        assert_eq!(error, "Storage operation failed (500): denied");
-    }
-
-    #[test]
-    fn provider_allowlist_contains_only_core_three() {
-        assert!(supported_provider("drive"));
-        assert!(supported_provider("onedrive"));
-        assert!(supported_provider("dropbox"));
-        assert!(!supported_provider("s3"));
-        assert!(!supported_provider("local"));
-    }
-
-    #[test]
-    fn operation_config_disables_automatic_retries() {
-        let request = with_no_retry(serde_json::json!({"fs":"example:"}));
-        assert_eq!(request["_config"]["retries"], 1);
-        assert_eq!(request["_config"]["lowLevelRetries"], 1);
-        assert_eq!(request["_config"]["retriesSleep"], 0);
-    }
-
-    #[cfg(feature = "embedded-storage-go")]
-    #[test]
-    fn embedded_runtime_starts_and_surfaces_only_curated_workflows() {
-        let root =
-            std::env::temp_dir().join(format!("misty-storage-smoke-{}", uuid::Uuid::new_v4()));
-        let environment = AppEnvironmentService::for_test_home(root.clone());
-        let runtime = StorageRuntimeService::start(&environment);
-        assert!(runtime.snapshot().ready, "{:?}", runtime.snapshot().error);
-        let workflows = runtime.workflows().expect("list curated workflows");
-        let provider_types = workflows
-            .as_array()
-            .expect("workflow array")
-            .iter()
-            .filter_map(|workflow| workflow.get("type").and_then(Value::as_str))
-            .collect::<Vec<_>>();
-        assert_eq!(provider_types.len(), 3);
-        assert!(provider_types.iter().all(|value| supported_provider(value)));
-        drop(runtime);
-        let _ = std::fs::remove_dir_all(root);
-    }
-}
+mod tests;

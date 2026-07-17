@@ -36,6 +36,7 @@ import { compileEntryFilterMatcher, entryMatchesQuery } from "./FileBrowserFilte
 import { FileIcon } from "./FileBrowserIcons";
 import { InlineCreateTableRow, InlineNameEditor, PassiveRenameDraftView } from "./FileBrowserInline";
 import type { PassiveRenameDraft } from "./FileBrowserInline";
+import { FileBrowserSkeleton } from "./FileBrowserSkeleton";
 import { fileBrowserStyles } from "./FileBrowserStyles";
 
 const TABLE_ROW_HEIGHT = 44;
@@ -85,6 +86,7 @@ const maximumColumnWidths: FileTableColumnWidths = {
 
 interface FileBrowserProps {
   paneId: string;
+  selectionOnly?: boolean;
   listing: DirectoryListing | null;
   selectedIds: string[];
   loading: boolean;
@@ -162,9 +164,9 @@ export const FileBrowser = memo(function FileBrowser(props: FileBrowserProps) {
       onClick={(event) => {
         if (event.target === event.currentTarget) props.onClearSelection();
       }}
-      onContextMenu={props.onBackgroundContextMenu}
-      onDragOver={handlePaneDragOver}
-      onDrop={(event) => handlePaneDrop(event, displayListing.path, props.onDropItems)}
+      onContextMenu={props.selectionOnly ? (event) => event.preventDefault() : props.onBackgroundContextMenu}
+      onDragOver={props.selectionOnly ? undefined : handlePaneDragOver}
+      onDrop={props.selectionOnly ? undefined : (event) => handlePaneDrop(event, displayListing.path, props.onDropItems)}
     >
       {props.viewMode === "grid" ? <FileGrid {...props} listing={displayListing} /> : <FileTable {...props} listing={displayListing} />}
       <footer className={fileBrowserStyles.footer}>
@@ -189,39 +191,6 @@ export const FileBrowser = memo(function FileBrowser(props: FileBrowserProps) {
     </section>
   );
 });
-
-function FileBrowserSkeleton(props: { viewMode: ExplorerViewMode }) {
-  const rows = Array.from({ length: 12 }, (_, index) => index);
-  const tiles = Array.from({ length: 20 }, (_, index) => index);
-
-  return (
-    <section className={`${fileBrowserStyles.browser} ${fileBrowserStyles.browserLoading}`} aria-busy="true" aria-label="Loading directory">
-      {props.viewMode === "grid" ? (
-        <div className={fileBrowserStyles.gridSkeleton} aria-hidden="true">
-          {tiles.map((index) => <span className={`${fileBrowserStyles.skeletonCell} ${fileBrowserStyles.gridSkeletonCell}`} key={index} />)}
-        </div>
-      ) : (
-        <div className={fileBrowserStyles.tableSkeleton} aria-hidden="true">
-          <div className={`${fileBrowserStyles.tableSkeletonLine} ${fileBrowserStyles.tableSkeletonHeader}`}>
-            <span className={`${fileBrowserStyles.skeletonCell} ${fileBrowserStyles.tableSkeletonHeaderCell}`} />
-            <span className={`${fileBrowserStyles.skeletonCell} ${fileBrowserStyles.tableSkeletonHeaderCell}`} />
-            <span className={`${fileBrowserStyles.skeletonCell} ${fileBrowserStyles.tableSkeletonHeaderCell}`} />
-            <span className={`${fileBrowserStyles.skeletonCell} ${fileBrowserStyles.tableSkeletonHeaderCell}`} />
-          </div>
-          {rows.map((index) => (
-            <div className={`${fileBrowserStyles.tableSkeletonLine} ${fileBrowserStyles.tableSkeletonRow}`} key={index}>
-              <span className={`${fileBrowserStyles.skeletonCell} ${fileBrowserStyles.tableSkeletonCell}`} />
-              <span className={`${fileBrowserStyles.skeletonCell} ${fileBrowserStyles.tableSkeletonCell}`} />
-              <span className={`${fileBrowserStyles.skeletonCell} ${fileBrowserStyles.tableSkeletonCell}`} />
-              <span className={`${fileBrowserStyles.skeletonCell} ${fileBrowserStyles.tableSkeletonCell}`} />
-            </div>
-          ))}
-        </div>
-      )}
-      <footer className={fileBrowserStyles.footer}>Loading directory...</footer>
-    </section>
-  );
-}
 
 function usePaneSyncStatus(listing: DirectoryListing | null): string {
   const { pairs, loadingPairs, pairsLoaded, loadPairs } = useFileSyncStore(useShallow((state) => ({
@@ -509,6 +478,7 @@ function FileTable(props: FileBrowserProps & { listing: DirectoryListing }) {
               <FileTableRow
                 key={entry.id}
                 entry={entry}
+                selectionOnly={props.selectionOnly === true}
                 columns={columnOrder}
                 hasFillerColumn={hasFillerColumn}
                 selected={selectedIds.has(entry.id)}
@@ -592,6 +562,7 @@ const SortableHeader = memo(function SortableHeader(props: {
 
 const FileTableRow = memo(function FileTableRow(props: {
   entry: FileEntry;
+  selectionOnly: boolean;
   columns: FileTableColumn[];
   hasFillerColumn: boolean;
   selected: boolean;
@@ -622,7 +593,7 @@ const FileTableRow = memo(function FileTableRow(props: {
       aria-disabled={entry.isDeleted || undefined}
       aria-selected={props.selected}
       tabIndex={entry.isDeleted ? -1 : 0}
-      draggable={!entry.isDeleted}
+      draggable={!entry.isDeleted && !props.selectionOnly}
       onClick={(event) => props.onSelect(entry.id, event)}
       onDoubleClick={() => {
         if (!entry.isDeleted) props.onOpen(entry);
@@ -630,17 +601,18 @@ const FileTableRow = memo(function FileTableRow(props: {
       onKeyDown={(event) => {
         if (event.key === "Enter" && !entry.isDeleted) props.onOpen(entry);
       }}
-      onContextMenu={(event) => props.onContextMenu(event, entry)}
-      onDragStart={props.onDragStart}
-      onDragEnd={props.onDragEnd}
-      onDragOver={props.onDragOver}
-      onDrop={props.onDrop}
+      onContextMenu={props.selectionOnly ? (event) => event.preventDefault() : (event) => props.onContextMenu(event, entry)}
+      onDragStart={props.selectionOnly ? undefined : props.onDragStart}
+      onDragEnd={props.selectionOnly ? undefined : props.onDragEnd}
+      onDragOver={props.selectionOnly ? undefined : props.onDragOver}
+      onDrop={props.selectionOnly ? undefined : props.onDrop}
     >
       {props.columns.map((column) => (
         <FileTableCell
           key={column}
           column={column}
           entry={entry}
+          showDownload={!props.selectionOnly}
           inlineEdit={props.inlineEdit}
           passiveRename={props.passiveRename}
           directorySizes={props.directorySizes}
@@ -658,6 +630,7 @@ const FileTableRow = memo(function FileTableRow(props: {
 function FileTableCell(props: {
   column: FileTableColumn;
   entry: FileEntry;
+  showDownload: boolean;
   inlineEdit: ExplorerInlineEditState | null;
   passiveRename: PassiveRenameDraft | null;
   directorySizes: Record<string, DirectorySizeRecord>;
@@ -695,7 +668,7 @@ function FileTableCell(props: {
       return (
         <td className={fileBrowserStyles.tableCell}>
           <span>{props.entry.kind === "folder" ? "Folder" : props.entry.mimeType || props.entry.extension || props.entry.kind}</span>
-          {isDownloadableRemoteFile(props.entry) ? (
+          {props.showDownload && isDownloadableRemoteFile(props.entry) ? (
             <button
               type="button"
               className={`${fileBrowserStyles.downloadButton} ${fileBrowserStyles.rowDownloadButton}`}
@@ -876,6 +849,7 @@ function FileGrid(props: FileBrowserProps & { listing: DirectoryListing }) {
               <FileGridItem
                 key={item.key}
                 entry={item.entry}
+                selectionOnly={props.selectionOnly === true}
                 thumbnailsEnabled={thumbnailPreviewsEnabled}
                 selected={selectedIds.has(item.entry.id)}
                 cut={props.cutPaths.has(item.entry.path)}
@@ -926,6 +900,7 @@ function FileGrid(props: FileBrowserProps & { listing: DirectoryListing }) {
 
 const FileGridItem = memo(function FileGridItem(props: {
   entry: FileEntry;
+  selectionOnly: boolean;
   thumbnailsEnabled: boolean;
   selected: boolean;
   cut: boolean;
@@ -955,7 +930,7 @@ const FileGridItem = memo(function FileGridItem(props: {
       aria-pressed={props.selected}
       role="button"
       tabIndex={entry.isDeleted ? -1 : 0}
-      draggable={!entry.isDeleted}
+      draggable={!entry.isDeleted && !props.selectionOnly}
       onClick={(event) => props.onSelect(entry.id, event)}
       onDoubleClick={() => {
         if (!entry.isDeleted) props.onOpen(entry);
@@ -963,13 +938,13 @@ const FileGridItem = memo(function FileGridItem(props: {
       onKeyDown={(event) => {
         if (event.key === "Enter" && !entry.isDeleted) props.onOpen(entry);
       }}
-      onContextMenu={(event) => props.onContextMenu(event, entry)}
-      onDragStart={props.onDragStart}
-      onDragEnd={props.onDragEnd}
-      onDragOver={props.onDragOver}
-      onDrop={props.onDrop}
+      onContextMenu={props.selectionOnly ? (event) => event.preventDefault() : (event) => props.onContextMenu(event, entry)}
+      onDragStart={props.selectionOnly ? undefined : props.onDragStart}
+      onDragEnd={props.selectionOnly ? undefined : props.onDragEnd}
+      onDragOver={props.selectionOnly ? undefined : props.onDragOver}
+      onDrop={props.selectionOnly ? undefined : props.onDrop}
     >
-      {isDownloadableRemoteFile(entry) ? (
+      {!props.selectionOnly && isDownloadableRemoteFile(entry) ? (
         <button
           type="button"
           className={`${fileBrowserStyles.downloadButton} ${fileBrowserStyles.gridDownloadButton} ${props.selected ? "opacity-100" : ""}`}

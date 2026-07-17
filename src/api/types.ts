@@ -940,42 +940,6 @@ export interface VerifyResult {
   combined: string[];
 }
 
-export interface LinkPathRequest {
-  remote: string;
-  path: string;
-  expire?: string;
-  linkId?: string;
-  targetId?: string;
-}
-
-export interface PublicLinkRecord {
-  id: string;
-  url: string;
-  targetId?: string | null;
-  provider: string;
-  path: string;
-  role?: string | null;
-  scope?: string | null;
-  kind?: string | null;
-  expiresAt?: string | null;
-  createdAt?: string | null;
-  canRevoke: boolean;
-}
-
-export interface PublicLinkListResult {
-  supported: boolean;
-  provider: string;
-  links: PublicLinkRecord[];
-  message?: string | null;
-}
-
-export interface PublicLinkActionResult {
-  supported: boolean;
-  provider: string;
-  link?: PublicLinkRecord | null;
-  message?: string | null;
-}
-
 export type ProviderConfigMode = "add" | "repair";
 
 export interface ProviderConfigRequest {

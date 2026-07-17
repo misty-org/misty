@@ -100,10 +100,18 @@ export function providerOptionsForConnection(
   workflow: ProviderWorkflow | null,
 ): ProviderWorkflowOption[] {
   if (session.step?.option) return [session.step.option];
+  if (isGoogleDriveProviderType(session.providerType)) {
+    return googleDriveSetupOptions();
+  }
   if (shouldUseOneDriveSetupOptions(session)) {
     return visibleOneDriveSetupOptions(session.parameters);
   }
   return workflow?.options ?? [];
+}
+
+export function isGoogleDriveProviderType(value: string): boolean {
+  const normalized = value.toLowerCase().replace(/[^a-z0-9]/g, "");
+  return normalized === "drive" || normalized === "googledrive";
 }
 
 export function isOneDriveProviderType(value: string): boolean {
@@ -113,6 +121,29 @@ export function isOneDriveProviderType(value: string): boolean {
 
 function shouldUseOneDriveSetupOptions(session: ProviderConnectionLike): boolean {
   return isOneDriveProviderType(session.providerType);
+}
+
+function googleDriveSetupOptions(): ProviderWorkflowOption[] {
+  return [
+    {
+      name: "client_id",
+      label: "Client ID",
+      help: "Optional Google OAuth client ID. Leave blank to use the built-in OAuth app.",
+      defaultValue: "",
+      required: false,
+      password: false,
+      choices: [],
+    },
+    {
+      name: "client_secret",
+      label: "Client Secret",
+      help: "Optional Google OAuth client secret. Leave blank to use the built-in OAuth app.",
+      defaultValue: "",
+      required: false,
+      password: true,
+      choices: [],
+    },
+  ];
 }
 
 function visibleOneDriveSetupOptions(parameters: Record<string, string>): ProviderWorkflowOption[] {

@@ -29,6 +29,7 @@ import { analytics } from "../analytics/client";
 export interface AuthUser {
   id: string;
   name: string;
+  username?: string;
   email: string;
   accountCreatedAt?: string;
   currentPlan?: string;
@@ -122,6 +123,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         ...current,
         id: me.id,
         name: me.name,
+        username: me.username,
         email: me.email,
         accountCreatedAt: me.created_at,
         currentPlan: me.tier,
@@ -200,6 +202,7 @@ function authUserFromMe(me: AccountMeResponse, fallback: SavedAccountSession): A
   return {
     id: me.id || fallback.id,
     name: me.name || fallback.name,
+    username: me.username || fallback.username,
     email: me.email || fallback.email,
     accountCreatedAt: me.created_at || fallback.accountCreatedAt,
     currentPlan: me.tier || fallback.currentPlan,

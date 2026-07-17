@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   Bot,
@@ -20,7 +20,6 @@ import {
   RefreshCcw,
   ShieldCheck,
   Trash2,
-  UserRoundPlus,
   X,
 } from "lucide-react";
 import { useAuth } from "../../auth/AuthContext";
@@ -45,7 +44,6 @@ import { AgentSources } from "../../agents/AgentSources";
 import { defaultAgentTrustPolicy } from "../../agents/types";
 import "../../agents/sources.css";
 import "./styles.css";
-
 type WizardState = {
   path: string;
   folderName: string;
@@ -53,18 +51,15 @@ type WizardState = {
   instructions: string;
   triggerKinds: AgentTriggerKind[];
   schedule: string;
-  memberEmails: string;
   cloudDocumentConsent: boolean;
 };
-
 const selectableTriggers: Array<{ kind: AgentTriggerKind; label: string; description: string }> = [
   { kind: "manual", label: "Manual", description: "Run from Misty or a linked integration." },
   { kind: "file_created", label: "New files", description: "Run when a file is added to this folder." },
   { kind: "file_changed", label: "File changes", description: "Run when a file in this folder changes." },
   { kind: "schedule", label: "Schedule", description: "Queue a run on a recurring schedule." },
 ];
-
-export default function AgentsPage() {
+export default function AgentsPage({ spaceId, personalSpaceId, spaceName, initialAgentId }: { spaceId: string; personalSpaceId: string; spaceName: string; initialAgentId?: string }) {
   const { user } = useAuth();
   const snapshot = useAgentsStore((state) => state.snapshot);
   const loading = useAgentsStore((state) => state.loading);
@@ -82,16 +77,24 @@ export default function AgentsPage() {
   const retryJob = useAgentsStore((state) => state.retryJob);
   const [wizardOpen, setWizardOpen] = useState(false);
   const [pageError, setPageError] = useState<string | null>(null);
+  const appliedInitialAgentId = useRef("");
+  useEffect(() => { void load(personalSpaceId); }, [load, personalSpaceId]);
+  useEffect(() => { if (draft?.spaceId === spaceId) setWizardOpen(true); }, [draft, spaceId]);
 
-  useEffect(() => { void load(); }, [load]);
-  useEffect(() => { if (draft) setWizardOpen(true); }, [draft]);
-
-  const selected = snapshot.definitions.find((agent) => agent.id === selectedAgentId) ?? null;
+  const definitions = useMemo(() => snapshot.definitions.filter((agent) => agent.spaceId === spaceId), [snapshot.definitions, spaceId]);
+  useEffect(() => {
+    const initial = initialAgentId && definitions.some((agent) => agent.id === initialAgentId) ? initialAgentId : null;
+    if (initial && appliedInitialAgentId.current !== initial) {
+      appliedInitialAgentId.current = initial;
+      selectAgent(initial);
+    } else if (!selectedAgentId || !definitions.some((agent) => agent.id === selectedAgentId)) selectAgent(definitions[0]?.id ?? null);
+  }, [definitions, initialAgentId, selectAgent, selectedAgentId]);
+  const selected = definitions.find((agent) => agent.id === selectedAgentId) ?? null;
   const jobs = selected ? agentJobsForDefinition(snapshot, selected.id) : [];
   const approvals = selected ? agentApprovalsForDefinition(snapshot, selected.id) : [];
   const artifacts = selected ? snapshot.artifacts.filter((artifact) => artifact.agentId === selected.id) : [];
-  const pendingCount = snapshot.approvals.filter((approval) => approval.status === "pending").length;
-
+  const definitionIds = useMemo(() => new Set(definitions.map((agent) => agent.id)), [definitions]);
+  const pendingCount = snapshot.approvals.filter((approval) => approval.status === "pending" && definitionIds.has(approval.agentId)).length;
   const updateStatus = async (agent: AgentDefinition, status: AgentDefinition["status"]) => {
     setPageError(null);
     try {
@@ -100,18 +103,17 @@ export default function AgentsPage() {
       setPageError(errorText(nextError));
     }
   };
-
   return (
     <main className="agents-page">
       <header className="agents-page-header">
         <div>
-          <span className="agents-eyebrow"><Bot size={14} /> Misty Agents Beta</span>
-          <h1>Agents</h1>
-          <p>Give Mika a folder, a purpose, and safe ways to start working.</p>
+          <span className="agents-eyebrow"><Bot size={14} /> {spaceName} Studio</span>
+          <h1>Folder agents</h1>
+          <p>Give an agent a folder and purpose within this Space.</p>
         </div>
         <div className="agents-header-actions">
           {pendingCount ? <span className="agents-pending-badge">{pendingCount} approval{pendingCount === 1 ? "" : "s"}</span> : null}
-          <button className="agents-icon-button" type="button" title="Refresh agents" onClick={() => void load()} disabled={loading}>
+          <button className="agents-icon-button" type="button" title="Refresh agents" onClick={() => void load(personalSpaceId)} disabled={loading}>
             <RefreshCcw size={16} className={loading ? "is-spinning" : ""} />
           </button>
           <button className="agents-primary-button" type="button" onClick={() => setWizardOpen(true)}>
@@ -127,18 +129,18 @@ export default function AgentsPage() {
         <aside className="agents-list-panel" aria-label="Agents">
           <div className="agents-list-heading">
             <strong>Your agents</strong>
-            <span>{snapshot.definitions.length}</span>
+            <span>{definitions.length}</span>
           </div>
           <div className="agents-list">
-            {loading && snapshot.definitions.length === 0 ? (
+            {loading && definitions.length === 0 ? (
               <div className="agents-empty"><LoaderCircle className="is-spinning" size={18} /> Loading agents…</div>
-            ) : snapshot.definitions.length === 0 ? (
+            ) : definitions.length === 0 ? (
               <div className="agents-empty">
                 <Bot size={28} />
                 <strong>No agents yet</strong>
                 <span>Create one here or right-click a local folder.</span>
               </div>
-            ) : snapshot.definitions.map((agent) => {
+            ) : definitions.map((agent) => {
               const activeRuns = snapshot.jobs.filter((job) => job.agentId === agent.id && isActiveJob(job.status)).length;
               const agentApprovals = snapshot.approvals.filter((approval) => approval.agentId === agent.id && approval.status === "pending").length;
               return (
@@ -168,6 +170,7 @@ export default function AgentsPage() {
           {selected ? (
             <AgentDetail
               agent={selected}
+              spaceId={spaceId}
               jobs={jobs}
               approvals={approvals}
               artifacts={artifacts}
@@ -195,8 +198,9 @@ export default function AgentsPage() {
 
       {wizardOpen ? (
         <AgentWizard
-          draft={draft}
+          draft={draft?.spaceId === spaceId ? draft : null}
           owner={{ id: user?.id ?? "local-owner", name: user?.name ?? "You", email: user?.email ?? "" }}
+          spaceId={spaceId}
           deviceId={snapshot.device?.id ?? "pending-device"}
           saving={saving}
           onClose={() => { useAgentsStore.getState().clearDraft(); setWizardOpen(false); }}
@@ -209,6 +213,7 @@ export default function AgentsPage() {
 
 function AgentDetail(props: {
   agent: AgentDefinition;
+  spaceId: string;
   jobs: ReturnType<typeof agentJobsForDefinition>;
   approvals: ReturnType<typeof agentApprovalsForDefinition>;
   artifacts: AgentArtifact[];
@@ -232,7 +237,7 @@ function AgentDetail(props: {
           <p><FolderOpen size={13} /> {props.agent.scope.displayName} · device-scoped</p>
         </div>
         <div className="agents-detail-actions">
-			<Link className="agents-secondary-button" to={`/automations?agentId=${encodeURIComponent(props.agent.id)}`}>Edit workflow</Link>
+			<Link className="agents-secondary-button" to={`/spaces/${encodeURIComponent(props.spaceId)}/studio/folder-agents?agentId=${encodeURIComponent(props.agent.id)}`}>Edit workflow</Link>
           {props.agent.status === "enabled" ? (
             <button className="agents-secondary-button" type="button" disabled={props.saving} onClick={() => props.onStatusChange("disabled")}><CirclePause size={15} /> Disable</button>
           ) : (
@@ -256,7 +261,7 @@ function AgentDetail(props: {
 
       <div className="agents-summary-grid">
         <section><span><CalendarClock size={14} /> Triggers</span><strong>{props.agent.triggers.filter((trigger) => trigger.enabled).map(triggerLabel).join(", ") || "Manual only"}</strong></section>
-        <section><span><UserRoundPlus size={14} /> Access</span><strong>{props.agent.members.length} member{props.agent.members.length === 1 ? "" : "s"}</strong></section>
+        <section><span><ShieldCheck size={14} /> Access</span><strong>Inherited from Space</strong></section>
         <section><span><ShieldCheck size={14} /> Trust</span><strong>Writes require approval</strong></section>
       </div>
       {props.agent.triggers.filter((trigger) => trigger.enabled && trigger.kind === "local_webhook" && trigger.webhookId).map((trigger) => (
@@ -350,8 +355,9 @@ async function openAgentArtifact(artifact: AgentArtifact): Promise<void> {
 }
 
 function AgentWizard(props: {
-  draft: { localPath: string; displayName: string } | null;
+  draft: { localPath: string; displayName: string; spaceId: string } | null;
   owner: { id: string; name: string; email: string };
+  spaceId: string;
   deviceId: string;
   saving: boolean;
   onClose: () => void;
@@ -366,7 +372,6 @@ function AgentWizard(props: {
     instructions: "",
     triggerKinds: ["manual"],
     schedule: "0 9 * * 1-5",
-    memberEmails: "",
     cloudDocumentConsent: false,
   }));
   const [wizardError, setWizardError] = useState<string | null>(null);
@@ -395,6 +400,7 @@ function AgentWizard(props: {
       const now = new Date().toISOString();
       const definition: AgentDefinition = {
         id: makeId("agent"),
+        spaceId: props.spaceId,
         ownerAccountId: props.owner.id,
         deviceId: scope.deviceId || props.deviceId,
         scope,
@@ -404,7 +410,6 @@ function AgentWizard(props: {
         cloudDocumentConsent: form.cloudDocumentConsent,
         members: [
           { accountId: props.owner.id, displayName: props.owner.name, email: props.owner.email || null, role: "owner", status: "active" },
-          ...parseMemberEmails(form.memberEmails).map((email) => ({ accountId: `invite:${email}`, displayName: email, email, role: "member" as const, status: "invited" as const })),
         ],
         triggers: form.triggerKinds.map((kind) => ({
           id: makeId("trigger"),
@@ -461,9 +466,8 @@ function AgentWizard(props: {
             {form.triggerKinds.includes("schedule") ? <input aria-label="Schedule" value={form.schedule} placeholder="Cron schedule" onChange={(event) => setForm((current) => ({ ...current, schedule: event.target.value }))} /> : null}
           </div>
           <div className="agents-form-row">
-            <label htmlFor="agent-members">Members</label>
-            <textarea className="is-short" id="agent-members" value={form.memberEmails} placeholder="Optional: one Misty account email per line" onChange={(event) => setForm((current) => ({ ...current, memberEmails: event.target.value }))} />
-            <small>Each email must already belong to a Misty account. Members can ask questions and propose actions; only you can configure the agent or approve file changes.</small>
+            <label>Access</label>
+            <small>This agent belongs to the current Space. Its visibility, configuration access, and run permissions are inherited from the Space.</small>
           </div>
           <section className="agents-workflow-preview">
 			<header><div><MessageSquare size={15} /><strong>Workflow draft</strong></div><span>Advanced editor available after save</span><span>Revision 1</span></header>
@@ -532,10 +536,6 @@ function workflowForAgent(triggerKinds: AgentTriggerKind[], schedule: string): A
       { from: "mika-task", to: "artifact-create" },
     ],
   };
-}
-
-function parseMemberEmails(value: string): string[] {
-  return [...new Set(value.split(/[\n,]/).map((email) => email.trim().toLowerCase()).filter((email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)))];
 }
 
 function triggerLabel(trigger: AgentTrigger): string {

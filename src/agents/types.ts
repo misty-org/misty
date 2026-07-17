@@ -95,6 +95,8 @@ export interface AgentWorkflow {
 
 export interface AgentDefinition {
   id: string;
+  /** Owning Space. Legacy local definitions are assigned to the personal Space when loaded. */
+  spaceId: string;
   ownerAccountId: string;
   deviceId: string;
   scope: AgentScope;
@@ -244,6 +246,7 @@ export interface AgentSnapshot {
 export interface AgentDraft {
   localPath: string;
   displayName: string;
+  spaceId: string;
 }
 
 export const defaultAgentTrustPolicy = (): AgentTrustPolicy => ({

@@ -16,6 +16,15 @@ enum PasswordCache {
 
 static RCLONE_CONFIG_PASSWORD_CACHE: Mutex<PasswordCache> = Mutex::new(PasswordCache::Unchecked);
 
+#[cfg(test)]
+pub(crate) fn prime_rclone_config_password_cache_for_test(password: Option<&str>) {
+    if let Ok(mut cache) = RCLONE_CONFIG_PASSWORD_CACHE.lock() {
+        *cache = password
+            .map(|value| PasswordCache::Present(value.to_owned()))
+            .unwrap_or(PasswordCache::Missing);
+    }
+}
+
 pub fn rclone_config_password() -> Option<String> {
     rclone_config_password_result().ok().flatten()
 }

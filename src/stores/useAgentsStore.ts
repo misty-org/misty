@@ -33,8 +33,8 @@ interface AgentsStore {
   syncNotice: string | null;
   draft: AgentDraft | null;
   selectedAgentId: string | null;
-  load: () => Promise<void>;
-  beginFolderDraft: (path: string, displayName: string) => void;
+  load: (personalSpaceId?: string) => Promise<void>;
+  beginFolderDraft: (path: string, displayName: string, spaceId: string) => void;
   clearDraft: () => void;
   selectAgent: (agentId: string | null) => void;
   registerFolderScope: (path: string, displayName: string) => Promise<AgentScope>;
@@ -54,14 +54,17 @@ export const useAgentsStore = create<AgentsStore>((set, get) => ({
   draft: null,
   selectedAgentId: null,
 
-  load: async () => {
+  load: async (personalSpaceId) => {
     if (get().loading) return;
     set({ loading: true, error: null, syncNotice: null });
     const [nativeResult, serverResult] = await Promise.allSettled([
       hasTauriInternals() ? agentsSnapshot() : Promise.reject(new Error("Native agent runtime is unavailable.")),
       fetchServerAgentSnapshot(),
     ]);
-    const nativeSnapshot = nativeResult.status === "fulfilled" ? nativeResult.value : null;
+    const rawNativeSnapshot = nativeResult.status === "fulfilled" ? nativeResult.value : null;
+    const nativeSnapshot = rawNativeSnapshot && personalSpaceId
+      ? assignLegacyDefinitionsToSpace(rawNativeSnapshot, personalSpaceId)
+      : rawNativeSnapshot;
     const serverSnapshot = serverResult.status === "fulfilled" ? serverResult.value : null;
     if (!nativeSnapshot && !serverSnapshot) {
       set({
@@ -83,9 +86,13 @@ export const useAgentsStore = create<AgentsStore>((set, get) => ({
           ? "Showing device data. Cloud sync is temporarily unavailable."
           : "Showing cloud data. This device runtime is unavailable.",
     }));
+    if (rawNativeSnapshot && nativeSnapshot && hasTauriInternals()) {
+      const migrated = nativeSnapshot.definitions.filter((definition, index) => !rawNativeSnapshot.definitions[index]?.spaceId && Boolean(definition.spaceId));
+      if (migrated.length > 0) void Promise.allSettled(migrated.map((definition) => agentsSaveDefinition({ definition })));
+    }
   },
 
-  beginFolderDraft: (path, displayName) => set({ draft: { localPath: path, displayName } }),
+  beginFolderDraft: (path, displayName, spaceId) => set({ draft: { localPath: path, displayName, spaceId } }),
   clearDraft: () => set({ draft: null }),
   selectAgent: (selectedAgentId) => set({ selectedAgentId }),
 
@@ -258,6 +265,16 @@ function mergeAgentSnapshots(local: AgentSnapshot | null, server: AgentSnapshot 
     approvals: mergeById(local.approvals, server.approvals),
     artifacts: mergeById(local.artifacts, server.artifacts),
     loadedAt: new Date().toISOString(),
+  };
+}
+
+function assignLegacyDefinitionsToSpace(snapshot: AgentSnapshot, personalSpaceId: string): AgentSnapshot {
+  return {
+    ...snapshot,
+    definitions: snapshot.definitions.map((definition) => ({
+      ...definition,
+      spaceId: definition.spaceId?.trim() || personalSpaceId,
+    })),
   };
 }
 

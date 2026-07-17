@@ -38,7 +38,6 @@ import {
   desktopSettingsScrollSurfaceClass,
   desktopSettingsSidebarClass,
 } from "../../../components/settings/DesktopSettingsUI";
-
 // ─── display helpers ─────────────────────────────────────────────────────────
 
 const TIER_LABEL: Record<string, string> = {
@@ -736,12 +735,13 @@ function accountDebugBase(base: string | null | undefined) {
 }
 
 function meFromLocalAccount(
-  user: { id: string; name: string; email: string },
+  user: { id: string; name: string; username?: string; email: string },
   license: CurrentLicense | null,
 ): MeResponse {
   return {
     id: user.id,
     name: user.name,
+    username: user.username ?? "",
     email: user.email,
     created_at: new Date().toISOString(),
     tier: license?.tier ?? "basic",

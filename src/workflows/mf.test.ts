@@ -41,7 +41,7 @@ describe(".mf workflow documents", () => {
 
 function agentDefinition(): AgentDefinition {
   return {
-    id: "agent-1", ownerAccountId: "owner", deviceId: "device", scope: { id: "scope", deviceId: "device", displayName: "Reports", kind: "local_folder", relativePath: null, available: true },
+    id: "agent-1", spaceId: "space-1", ownerAccountId: "owner", deviceId: "device", scope: { id: "scope", deviceId: "device", displayName: "Reports", kind: "local_folder", relativePath: null, available: true },
     name: "Reports", instructions: "Summarize reports", status: "draft", cloudDocumentConsent: false, members: [],
     triggers: [{ id: "trigger", kind: "manual", enabled: true }],
     trustPolicy: { automaticActions: ["summarize"], approvalRequiredActions: [], memberWriteAccess: false, approvalTtlHours: 24 },
