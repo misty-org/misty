@@ -11,7 +11,7 @@ export default function Features() {
           Misty features, all in one place.
         </h1>
         <p className="mt-5 max-w-2xl text-pretty text-lg leading-8 text-text-muted">
-          The full set of core workflows behind Misty: search, panels, remotes, transfers, extensions, and AI.
+          Explore the file tools, shared Spaces, and intelligence that turn scattered work into one connected workspace.
         </p>
       </header>
 

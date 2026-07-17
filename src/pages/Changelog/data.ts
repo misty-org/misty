@@ -49,12 +49,6 @@ export const changelog: ChangelogEntry[] = [
         ],
       },
       {
-        heading: "Desktop Extensions",
-        changes: [
-          "Experimental Extensions catalog, installed view, panels, and secure hosted runtime",
-        ],
-      },
-      {
         heading: "Mobile preparation",
         changes: [
           "iPhone and Android Files, Remotes, Transfers, Account, and Settings experiences in release preparation",

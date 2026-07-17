@@ -8,7 +8,7 @@ export const basicFeatures = [
 export const proFeatures = [
   "Remote providers and cross-provider transfers",
   "Synchronization and backup workflows",
-  "Cleanup tools, extensions, and automations",
+  "Cleanup tools and automations",
   "2,000 managed AI credits each month",
   "Prepaid credit packs available",
 ];

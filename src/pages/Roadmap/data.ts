@@ -24,7 +24,6 @@ export const phases: RoadmapPhase[] = [
     items: [
       "Automations workflow editor",
       "Mika, Misty’s experimental AI assistant",
-      "Secure desktop Extensions runtime and catalog",
     ],
   },
   {

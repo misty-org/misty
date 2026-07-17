@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { HiOutlineSparkles, HiOutlinePuzzlePiece } from "react-icons/hi2";
+import { HiOutlineSparkles } from "react-icons/hi2";
 
 const conversations = [
   {
@@ -88,42 +88,6 @@ function ChatCycler() {
 export default function ExpandedFeatures() {
   return (
     <div className="flex flex-col gap-4">
-      <div className="glass-card grid grid-cols-1 overflow-hidden rounded-2xl md:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
-        <div className="border-t border-border/70 bg-[#0f0d0c] p-3 md:border-r md:border-t-0 md:p-4">
-          <div className="overflow-hidden rounded-xl border border-border/70 bg-[#120f0e] shadow-[0_22px_50px_rgba(0,0,0,0.28)]">
-            <img
-              src="/misty-plugins.png"
-              alt="Misty Extensions browser screenshot"
-              className="block h-full w-full object-cover object-top"
-            />
-          </div>
-        </div>
-
-        <div className="p-5 md:p-8">
-          <div className="flex h-full flex-col justify-center rounded-xl bg-surface/20 p-5 text-left md:p-6">
-            <div className="mb-4 flex justify-start">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-border bg-surface">
-                <HiOutlinePuzzlePiece className="h-5 w-5 text-text-muted" />
-              </div>
-            </div>
-            <h2 className="mb-3 text-2xl font-bold tracking-tight text-text md:text-3xl">
-              Experimental Extensions, built in.
-            </h2>
-            <p className="mb-4 max-w-xl text-pretty text-text-muted">
-              Add tools and panels that fit the way you work.
-            </p>
-            <div className="mt-auto flex justify-start">
-              <a
-                href="/plugins"
-                className="text-xs text-text-muted underline underline-offset-4 transition-colors hover:text-white"
-              >
-                Explore Extensions
-              </a>
-            </div>
-          </div>
-        </div>
-      </div>
-
       <div className="glass-card grid grid-cols-1 overflow-hidden rounded-2xl md:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
         <div className="p-5 md:p-8">
           <div className="flex h-full flex-col justify-center rounded-xl bg-surface/20 p-5 text-left md:p-6">
