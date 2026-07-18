@@ -4,11 +4,14 @@ import { pluginById, plugins } from "./plugins/registry";
 import type { MistyPluginContext } from "./plugins/types";
 import {
   configurePluginBridge,
+  applyThemeSnapshot,
+  fallbackTheme,
   isHostedPlugin,
   publishHostNotification,
   readSelectedPathsFromHost,
   runHostCommand,
   subscribeHostContext,
+  standalonePreviewTheme,
 } from "./mistyBridge";
 
 export function App() {
@@ -17,6 +20,7 @@ export function App() {
   const hosted = isHostedPlugin();
   const [selectedPluginId, setSelectedPluginId] = useState(pluginById(initialPluginId).id);
   const [selectedPaths, setSelectedPaths] = useState<string[]>([]);
+  const [theme, setTheme] = useState(hosted ? fallbackTheme : standalonePreviewTheme(params));
   const selectedPlugin = pluginById(selectedPluginId);
   const selectedPanel = selectedPlugin.panels[0];
   const Panel = selectedPanel.component;
@@ -31,8 +35,9 @@ export function App() {
 
   useEffect(() => {
     void refreshSelection();
-    return subscribeHostContext(setSelectedPaths);
-  }, [refreshSelection]);
+    applyThemeSnapshot(theme);
+    return subscribeHostContext((next) => { setSelectedPaths(next.selectedPaths); setTheme(next.theme); applyThemeSnapshot(next.theme); });
+  }, [refreshSelection, theme]);
 
   const context = useMemo<MistyPluginContext>(() => ({
     pluginId: selectedPlugin.id,
@@ -41,7 +46,8 @@ export function App() {
     refreshSelection,
     notify: (level, title, message) => publishHostNotification(selectedPlugin.id, level, title, message),
     runHostCommand,
-  }), [hosted, refreshSelection, selectedPaths, selectedPlugin.id]);
+    theme,
+  }), [hosted, refreshSelection, selectedPaths, selectedPlugin.id, theme]);
 
   const panel = <article className="plugin-panel" aria-label={selectedPanel.title}><Panel context={context} /></article>;
   if (hosted) return <main className="hosted-shell" style={{ "--plugin-accent": selectedPlugin.accent } as React.CSSProperties}>{panel}</main>;

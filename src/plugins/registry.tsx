@@ -1,8 +1,9 @@
-import { Beaker, Download, HardDrive, Palette, Wand2 } from "lucide-react";
-import { PreviewPanelPlugin } from "./previewPanel/PreviewPanelPlugin";
+import { Archive, Download, FolderSearch, Images, Palette, Wand2 } from "lucide-react";
+import { BackupsPlugin } from "./backups/BackupsPlugin";
+import { ImageOptimizerPlugin } from "./imageOptimizer/ImageOptimizerPlugin";
 import { QuickConvertPlugin } from "./quickConvert/QuickConvertPlugin";
 import { ThemesPlugin } from "./themes/ThemesPlugin";
-import { VaultPlugin } from "./vault/VaultPlugin";
+import { StorageReportPlugin } from "./storageReport/StorageReportPlugin";
 import { YtdlpPlugin } from "./ytdlp/YtdlpPlugin";
 import type { PluginDefinition } from "./types";
 
@@ -40,18 +41,34 @@ export const plugins: PluginDefinition[] = [
     ],
   },
   {
-    id: "vault",
-    name: "Vault",
-    description: "Plan and manage restic-powered backup surfaces.",
+    id: "storage_report",
+    name: "Storage Report",
+    description: "Inspect a folder's size, largest files, and file-type distribution.",
+    accent: "#38bdf8",
+    icon: FolderSearch,
+    panels: [{ id: "storage-report.panel", title: "Storage Report", defaultWidth: 680, defaultHeight: 620, component: StorageReportPlugin }],
+  },
+  {
+    id: "image_optimizer",
+    name: "Image Optimizer",
+    description: "Create smaller JPEG, PNG, and WebP copies without changing originals.",
+    accent: "#34d399",
+    icon: Images,
+    panels: [{ id: "image-optimizer.panel", title: "Image Optimizer", defaultWidth: 620, defaultHeight: 600, component: ImageOptimizerPlugin }],
+  },
+  {
+    id: "backups",
+    name: "Backups",
+    description: "Create encrypted Restic snapshots on local volumes or cloud remotes.",
     accent: "#f59e0b",
-    icon: HardDrive,
+    icon: Archive,
     panels: [
       {
-        id: "vault.panel",
-        title: "Vault",
+        id: "backups.panel",
+        title: "Backups",
         defaultWidth: 720,
         defaultHeight: 520,
-        component: VaultPlugin,
+        component: BackupsPlugin,
       },
     ],
   },
@@ -68,22 +85,6 @@ export const plugins: PluginDefinition[] = [
         defaultWidth: 640,
         defaultHeight: 540,
         component: YtdlpPlugin,
-      },
-    ],
-  },
-  {
-    id: "preview-panel",
-    name: "Preview Panel",
-    description: "Sandbox plugin panel compositions with React.",
-    accent: "#a78bfa",
-    icon: Beaker,
-    panels: [
-      {
-        id: "preview-panel.panel",
-        title: "Preview Panel",
-        defaultWidth: 720,
-        defaultHeight: 520,
-        component: PreviewPanelPlugin,
       },
     ],
   },
