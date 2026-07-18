@@ -3,11 +3,16 @@ import type { MistyPluginContext } from "../plugins/types";
 
 export type PluginJob = {
   id: string;
+  pluginId?: string;
   status: "queued" | "running" | "completed" | "failed" | "cancelled";
   progress: number | null;
   message: string;
   outputPaths: string[];
   error?: string;
+  createdAt?: number;
+  updatedAt?: number;
+  completedAt?: number | null;
+  result?: unknown;
 };
 
 type StartResult = { ok?: boolean; jobId?: string; message?: string };
@@ -34,7 +39,19 @@ export function usePluginJob(context: MistyPluginContext) {
     }
   }, [context]);
 
-  useEffect(() => clearTimer, [clearTimer]);
+  useEffect(() => {
+    let cancelled = false;
+    void context.runHostCommand<PluginJob | null>("jobs.latest")
+      .then((latest) => {
+        if (cancelled || !latest?.id) return;
+        setJob(latest);
+        if (latest.status === "queued" || latest.status === "running") void poll(latest.id);
+      });
+    return () => {
+      cancelled = true;
+      clearTimer();
+    };
+  }, [clearTimer, context, poll]);
 
   const start = useCallback(async (command: string, payload: Record<string, unknown>) => {
     clearTimer();

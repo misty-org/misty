@@ -19,6 +19,4 @@ jobs:
       - run: npm run build
       - name: Verify install bundles
         run: |
-          test -f dist/plugins/quick_convert/web/index.html
-          test -f dist/plugins/themes/web/index.html
-          test -f dist/plugins/ytdlp/web/index.html
+          node -e 'for (const {id} of require("./catalog/index.json")) { const fs=require("fs"); if (!fs.existsSync(`dist/plugins/${id}/web/index.html`) || !fs.existsSync(`dist/plugins/${id}/manifest.json`)) throw new Error(`Incomplete bundle: ${id}`) }'

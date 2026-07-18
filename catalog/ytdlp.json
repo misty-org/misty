@@ -1,6 +1,6 @@
 {
   "published": true,
-  "version": "0.2.0",
+  "version": "0.3.0",
   "overview": "yt-dlp brings YouTube downloading into Misty without leaving the app.",
   "status": "available",
   "capabilities": [
@@ -14,7 +14,7 @@
     "Files tabs when launched from Files"
   ],
   "permissions": [
-    "Network access through system yt-dlp",
+    "Network access through the verified bundled yt-dlp",
     "Write access to local download folders",
     "Shell access to invoke yt-dlp and FFmpeg"
   ],
@@ -24,6 +24,7 @@
     "Open it in Misty and paste a YouTube URL."
   ],
   "changelog": [
+    "v0.3.0 - Moved yt-dlp into the self-contained Files extension popup with resumable job status.",
     "v0.2.0 - Added media inspection, playlist safeguards, cancellable download jobs, and output reveal.",
     "v0.1.0 - Added the initial yt-dlp panel."
   ],
@@ -50,15 +51,15 @@
     ],
     "show_in_launcher": true,
     "requires_selected_file": false,
-    "open_mode": "tab"
+    "open_mode": "popup"
   },
   "install": {
     "root": "private",
     "artifacts": [
-      { "platform": "macos-aarch64", "url": "https://github.com/misty-org/misty-extensions/releases/download/v0.2.0/ytdlp.zip" },
-      { "platform": "macos-x86_64", "url": "https://github.com/misty-org/misty-extensions/releases/download/v0.2.0/ytdlp.zip" },
-      { "platform": "windows-x86_64", "url": "https://github.com/misty-org/misty-extensions/releases/download/v0.2.0/ytdlp.zip" },
-      { "platform": "linux-x86_64", "url": "https://github.com/misty-org/misty-extensions/releases/download/v0.2.0/ytdlp.zip" }
+      { "platform": "macos-aarch64", "url": "https://github.com/misty-org/misty-extensions/releases/download/v0.3.0/ytdlp-macos-aarch64.zip" },
+      { "platform": "macos-x86_64", "url": "https://github.com/misty-org/misty-extensions/releases/download/v0.3.0/ytdlp-macos-x86_64.zip" },
+      { "platform": "windows-x86_64", "url": "https://github.com/misty-org/misty-extensions/releases/download/v0.3.0/ytdlp-windows-x86_64.zip" },
+      { "platform": "linux-x86_64", "url": "https://github.com/misty-org/misty-extensions/releases/download/v0.3.0/ytdlp-linux-x86_64.zip" }
     ]
   },
   "logo_path": "https://raw.githubusercontent.com/misty-org/misty-extensions/main/extensions/ytdlp/assets/logo.svg"

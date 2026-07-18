@@ -1,4 +1,7 @@
 [
+  {"id":"storage_report","name":"Storage Report","url":"https://raw.githubusercontent.com/misty-org/misty-extensions/main/catalog/storage_report.json"},
+  {"id":"image_optimizer","name":"Image Optimizer","url":"https://raw.githubusercontent.com/misty-org/misty-extensions/main/catalog/image_optimizer.json"},
+  {"id":"backups","name":"Backups","url":"https://raw.githubusercontent.com/misty-org/misty-extensions/main/catalog/backups.json"},
  {
     "id": "quick_convert",
     "name": "Quick Convert",

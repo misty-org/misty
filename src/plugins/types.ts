@@ -8,6 +8,21 @@ export type MistyPluginContext = {
   refreshSelection: () => Promise<string[]>;
   notify: (level: "info" | "success" | "error", title: string, message: string) => void;
   runHostCommand: <T = unknown>(command: string, payload?: Record<string, unknown>) => Promise<T>;
+  theme: ThemeSnapshot;
+};
+
+export type ThemeMode = "dark" | "light";
+export type SemanticThemeToken =
+  | "background" | "surface" | "surfaceRaised" | "surfaceHover" | "border"
+  | "borderStrong" | "text" | "textMuted" | "textSubtle" | "primary"
+  | "primaryContrast" | "accent" | "focus" | "selection" | "success"
+  | "warning" | "danger" | "info" | "shadow";
+
+export type ThemeSnapshot = {
+  themeId: string;
+  mode: ThemeMode;
+  revision: number;
+  tokens: Record<SemanticThemeToken, string>;
 };
 
 export type PluginPanelProps = {

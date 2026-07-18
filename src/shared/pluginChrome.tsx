@@ -6,10 +6,10 @@ export function Field(props: {
   hint?: string;
 }) {
   return (
-    <label className="grid gap-2 text-sm text-zinc-200">
+    <label className="plugin-field">
       <span className="font-medium">{props.label}</span>
       {props.children}
-      {props.hint ? <span className="text-xs text-zinc-500">{props.hint}</span> : null}
+      {props.hint ? <span className="field-hint">{props.hint}</span> : null}
     </label>
   );
 }

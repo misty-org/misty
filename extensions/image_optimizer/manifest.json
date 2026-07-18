@@ -1,43 +1,11 @@
 {
-  "schema_version": 3,
-  "id": "quick_convert",
-  "name": "Quick Convert",
-  "version": "0.3.0",
-  "description": "Convert selected image, audio, and video files with verified bundled FFmpeg.",
-  "author": "Misty",
-  "enabled": true,
-  "platforms": ["web"],
-  "runtime": {
-    "type": "web",
-    "entry": "web/index.html?plugin=quick_convert"
-  },
-  "launcher": {
-    "views": ["Files"],
-    "show_in_launcher": true,
-    "requires_selected_file": true,
-    "open_mode": "popup"
-  },
-  "plugin": {
-    "runtime": "web",
-    "entry": "web/index.html?plugin=quick_convert"
-  },
+  "schema_version": 3, "id": "image_optimizer", "name": "Image Optimizer", "version": "0.3.0", "description": "Create smaller copies of JPEG, PNG, and WebP images.", "author": "Misty", "enabled": true, "platforms": ["web"],
+  "runtime": { "type": "web", "entry": "web/index.html?plugin=image_optimizer" }, "launcher": { "views": ["Files"], "show_in_launcher": true, "requires_selected_file": true, "open_mode": "popup" }, "plugin": { "runtime": "web", "entry": "web/index.html?plugin=image_optimizer" },
+  "panels": [{ "id": "image-optimizer.panel", "title": "Image Optimizer", "window_type": "panel", "default_width": 620, "default_height": 600, "entry": "web/index.html?plugin=image_optimizer", "launcher": { "views": ["Files"] } }],
   "tools": [
     {"id":"ffmpeg","version":"7.1.1","platform":"macos","architecture":"aarch64","path":"tools/macos-aarch64/ffmpeg"},{"id":"ffprobe","version":"7.1.1","platform":"macos","architecture":"aarch64","path":"tools/macos-aarch64/ffprobe"},
     {"id":"ffmpeg","version":"7.1.1","platform":"macos","architecture":"x86_64","path":"tools/macos-x86_64/ffmpeg"},{"id":"ffprobe","version":"7.1.1","platform":"macos","architecture":"x86_64","path":"tools/macos-x86_64/ffprobe"},
     {"id":"ffmpeg","version":"7.1.1","platform":"linux","architecture":"x86_64","path":"tools/linux-x86_64/ffmpeg"},{"id":"ffprobe","version":"7.1.1","platform":"linux","architecture":"x86_64","path":"tools/linux-x86_64/ffprobe"},
     {"id":"ffmpeg","version":"7.1.1","platform":"windows","architecture":"x86_64","path":"tools/windows-x86_64/ffmpeg.exe"},{"id":"ffprobe","version":"7.1.1","platform":"windows","architecture":"x86_64","path":"tools/windows-x86_64/ffprobe.exe"}
-  ],
-  "panels": [
-    {
-      "id": "quick-convert.panel",
-      "title": "Quick Convert",
-      "window_type": "panel",
-      "default_width": 520,
-      "default_height": 420,
-      "entry": "web/index.html?plugin=quick_convert",
-      "launcher": {
-        "views": ["Files"]
-      }
-    }
   ]
 }

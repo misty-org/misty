@@ -57,17 +57,17 @@ export function YtdlpPlugin({ context }: PluginPanelProps) {
   }
 
   const ready = dependencies?.ytdlp && dependencies.ffmpeg;
-  const status = jobs.job?.error ?? jobs.job?.message ?? (inspectionError || dependencyError || (!dependencies ? "Checking yt-dlp and FFmpeg…" : !ready ? "Install yt-dlp and FFmpeg to enable downloads." : "Paste a supported media URL, then review it before downloading."));
+  const status = jobs.job?.error ?? jobs.job?.message ?? (inspectionError || dependencyError || (!dependencies ? "Verifying bundled yt-dlp and FFmpeg…" : !ready ? "The bundled media tools are missing or failed verification. Reinstall this extension." : "Paste a supported media URL, then review it before downloading."));
   const tone = jobs.job?.status === "completed" ? "success" : jobs.job?.status === "failed" || inspectionError ? "error" : "neutral";
 
   return (
     <div className="panel-stack">
       <div className="panel-title"><h2>yt-dlp</h2><p>Download audio or video through a safe, visible Misty job.</p></div>
       <div className="dependency-row">
-        <span className={`dependency-pill ${dependencies?.ytdlp ? "ready" : ""}`}>{dependencies ? dependencies.ytdlp ? "yt-dlp ready" : "yt-dlp missing" : "Checking yt-dlp…"}</span>
-        <span className={`dependency-pill ${dependencies?.ffmpeg ? "ready" : ""}`}>{dependencies ? dependencies.ffmpeg ? "FFmpeg ready" : "FFmpeg missing" : "Checking FFmpeg…"}</span>
+        <span className={`dependency-pill ${dependencies?.ytdlp ? "ready" : ""}`}>{dependencies ? dependencies.ytdlp ? "yt-dlp verified" : "yt-dlp unavailable" : "Verifying yt-dlp…"}</span>
+        <span className={`dependency-pill ${dependencies?.ffmpeg ? "ready" : ""}`}>{dependencies ? dependencies.ffmpeg ? "FFmpeg verified" : "FFmpeg unavailable" : "Verifying FFmpeg…"}</span>
       </div>
-      <Field label="Video or playlist URL"><div className="input-action"><input className="text-input" value={url} onChange={(event) => { setUrl(event.target.value); setInfo(null); setInspectionError(""); }} placeholder="https://www.youtube.com/watch?v=…" inputMode="url" disabled={jobs.running} /><ActionButton type="button" className="secondary-button" onClick={() => void inspect()} disabled={!ready || !validWebUrl(url) || inspecting || jobs.running}><Search size={16} aria-hidden="true" />{inspecting ? "Reading…" : "Review"}</ActionButton></div></Field>
+      <Field label="Video or playlist URL"><div className="input-action"><input className="text-input" value={url} onChange={(event) => { setUrl(event.target.value); setInfo(null); setInspectionError(""); }} placeholder="https://www.youtube.com/watch?v=…" inputMode="url" aria-label="Video or playlist URL" disabled={jobs.running} /><ActionButton type="button" className="secondary-button" onClick={() => void inspect()} disabled={!ready || !validWebUrl(url) || inspecting || jobs.running}><Search size={16} aria-hidden="true" />{inspecting ? "Reading…" : "Review"}</ActionButton></div></Field>
       {info ? <section className="media-card">{info.thumbnail ? <img src={info.thumbnail} alt="" /> : <div className="media-placeholder"><ExternalLink size={20} /></div>}<div><strong>{info.title}</strong><span>{[info.uploader, info.duration, info.playlistCount ? `${info.playlistCount} items` : ""].filter(Boolean).join(" · ")}</span></div></section> : null}
       <div className="control-grid">
         <Field label="Output"><select className="select-input" value={format} onChange={(event) => setFormat(event.target.value)} disabled={jobs.running}>{outputFormats.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></Field>

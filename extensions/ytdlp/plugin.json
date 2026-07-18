@@ -2,10 +2,10 @@
   "schema_version": 1,
   "id": "ytdlp",
   "name": "yt-dlp",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "author": "Misty",
   "status": "installed",
-  "overview": "yt-dlp brings YouTube downloading into Misty so users can grab videos, playlists, and audio conversions without leaving the app. It relies on the system yt-dlp and FFmpeg tools instead of shipping separate binaries.",
+  "overview": "yt-dlp brings video, playlist, and audio downloads into Misty using pinned, verified yt-dlp, FFmpeg, and FFprobe executables shipped with the extension.",
   "capabilities": [
     "Download single YouTube videos or playlists",
     "Convert downloads into MP3, M4A, MP4, or WEBM",
@@ -17,7 +17,7 @@
     "Files tabs when launched from Files"
   ],
   "permissions": [
-    "Network access through system yt-dlp",
+    "Network access through the verified bundled yt-dlp",
     "Write access to local download folders",
     "Shell access to invoke yt-dlp and FFmpeg"
   ],
@@ -27,6 +27,7 @@
     "Paste a YouTube URL, choose MP3 or MP4, and start the download."
   ],
   "changelog": [
+    "v0.3.0 - Added popup-first launch behavior, bridge readiness, and automatic job recovery.",
     "v0.2.0 - Added dependency checks, URL inspection, playlist safeguards, cancellable download jobs, bounded playlists, safe command arguments, and output reveal.",
     "v0.1.0 - Added the initial yt-dlp panel."
   ],
@@ -50,6 +51,7 @@
     "views": ["all"],
     "show_in_launcher": true,
     "requires_selected_file": false,
-    "open_mode": "tab"
-  }
+    "open_mode": "popup"
+  },
+  "included_tools": [{"name":"yt-dlp","version":"2026.06.09"},{"name":"FFmpeg","version":"7.1.1"},{"name":"FFprobe","version":"7.1.1"}]
 }
