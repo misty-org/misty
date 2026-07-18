@@ -85,7 +85,7 @@ func (db *Database) LibraryAlbums(ctx context.Context, userID, spaceID string) (
 		defer rows.Close()
 		for rows.Next() {
 			var item LibraryAlbum
-			if err := rows.Scan(&item.ID, &item.SpaceID, &item.Name, &item.Description, &item.CoverItemID, &item.CreatedByUserID, &item.ItemCount, &item.Version, &item.CreatedAt, &item.UpdatedAt); err != nil {
+			if err := scanLibraryAlbum(rows, &item); err != nil {
 				return err
 			}
 			items = append(items, item)

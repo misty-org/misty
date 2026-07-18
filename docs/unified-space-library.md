@@ -27,16 +27,15 @@ not migrated into the new Library.
 ## Capability configuration
 
 The Space Library, uploads, attachments, Groups, locations, duplicates,
-imports, and exports are enabled by default. AI/OCR activates when the AI
+imports, and exports are enabled by default. AI metadata activates when the AI
 Gateway key is configured. Previews and editing activate when
 `ffmpeg` and `ffprobe` are installed on the server PATH. People processing activates when
 `VISION_PROCESSOR_URL` is configured.
 
 Production uses the shared private R2 configuration (`R2_ENDPOINT`,
-`R2_BUCKET`, `R2_ACCESS_KEY`, and `R2_SECRET_KEY`). Agent attachments use the
-`agents/` prefix and Library objects use `library/`. The provider lifecycle
-rule must delete only `agents/` objects after two days; it must never apply to
-the permanent `library/` prefix.
+`R2_BUCKET`, `R2_ACCESS_KEY`, and `R2_SECRET_KEY`). Library objects use the
+`library/` prefix. Lifecycle rules must never expire the permanent Library
+prefix.
 
 ## Security-domain mapping
 
@@ -47,7 +46,7 @@ can be added without changing `files` or `space_library_items` ownership.
 
 ## Remaining gated phases
 
-OCR, semantic/visual AI, location Maps, cinematic Memory playback, pinned
+semantic/visual AI, location Maps, cinematic Memory playback, pinned
 collections, stored long-lived exports, and general canonical-file/blob GC
 remain gated. Legal-hold-aware two-phase GC is implemented for edit renditions;
 the same lease protocol still needs to be extended to every other blob-owning

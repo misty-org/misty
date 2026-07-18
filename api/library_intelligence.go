@@ -16,13 +16,12 @@ import (
 )
 
 type libraryIntelligencePayload struct {
-	OCR      bool `json:"ocr"`
 	AI       bool `json:"ai"`
 	Semantic bool `json:"semantic"`
 }
 
 func (s *SpaceLibraryService) ProcessIntelligenceJobs(ctx context.Context, workerID string, limit int) (int, error) {
-	if s.intelligence == nil || !s.aiEnabled && !s.ocrEnabled {
+	if s.intelligence == nil || !s.aiEnabled {
 		return 0, nil
 	}
 	if limit < 1 || limit > 20 {
@@ -59,7 +58,7 @@ var errLibraryUnsupportedIntelligenceMedia = errors.New("unsupported Library int
 
 func (s *SpaceLibraryService) processIntelligenceJob(ctx context.Context, job *db.LibraryIntelligenceJob) error {
 	var payload libraryIntelligencePayload
-	if json.Unmarshal(job.Payload, &payload) != nil || !payload.OCR && !payload.AI && !payload.Semantic {
+	if json.Unmarshal(job.Payload, &payload) != nil || !payload.AI && !payload.Semantic {
 		return db.ErrLibraryForbidden
 	}
 	asset, err := s.libraryIntelligenceAsset(ctx, job)

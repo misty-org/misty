@@ -1,7 +1,6 @@
 package db
 
 import (
-	"encoding/json"
 	"errors"
 	"strings"
 	"testing"
@@ -19,17 +18,5 @@ func TestValidateSpaceMessageLimitsAndMentions(t *testing.T) {
 	}
 	if err := validateMessage([]MessageSpan{{Type: "text", Text: "hello"}}, []string{"1", "2", "3", "4", "5", "6"}); !errors.Is(err, ErrSpaceInvalid) {
 		t.Fatalf("too many attachments error = %v", err)
-	}
-}
-
-func TestValidateCloudWorkflowRejectsDeviceNodes(t *testing.T) {
-	if err := validateCloudWorkflow(json.RawMessage(`{"nodes":[{"type":"http_request"},{"type":"chat_reply"}]}`)); err != nil {
-		t.Fatal(err)
-	}
-	for _, nodeType := range []string{"select_path", "read_file", "read_text", "write_file", "copy_path", "move_path", "rename_path", "local_secret"} {
-		raw := json.RawMessage(`{"nodes":[{"kind":"` + nodeType + `"}]}`)
-		if err := validateCloudWorkflow(raw); !errors.Is(err, ErrSpaceInvalid) {
-			t.Fatalf("node %q error = %v", nodeType, err)
-		}
 	}
 }

@@ -73,7 +73,7 @@ func (p *OpenAIProvider) NextContext(ctx context.Context, request ModelRequest) 
 	userContent := []map[string]any{{"type": "input_text", "text": prompt}}
 	for _, image := range promptImages {
 		userContent = append(userContent,
-			map[string]any{"type": "input_text", "text": "OCR/image source: " + image.Label},
+			map[string]any{"type": "input_text", "text": "Image source: " + image.Label},
 			map[string]any{"type": "input_image", "image_url": image.DataURL},
 		)
 	}

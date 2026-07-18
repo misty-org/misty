@@ -1,11 +1,6 @@
 package main
 
 import (
-	"crypto/rand"
-	"crypto/rsa"
-	"crypto/x509"
-	"encoding/base64"
-	"encoding/pem"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -124,65 +119,18 @@ func TestCreateServerConfiguresIndependentDevelopmentLibrary(t *testing.T) {
 	}
 }
 
-func testAgentAttachmentPrivateKey(t *testing.T) string {
-	t.Helper()
-	key, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		t.Fatal(err)
+func TestDemoLibraryStoreRequiresDedicatedBackingStorage(t *testing.T) {
+	for _, key := range []string{"MISTY_LIBRARY_LOCAL_DIR", "R2_ENDPOINT", "R2_BUCKET", "R2_ACCESS_KEY", "R2_SECRET_KEY"} {
+		t.Setenv(key, "")
 	}
-	pemBytes := pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: mustMarshalPKCS8(t, key)})
-	return base64.StdEncoding.EncodeToString(pemBytes)
-}
-
-func mustMarshalPKCS8(t *testing.T, key *rsa.PrivateKey) []byte {
-	t.Helper()
-	encoded, err := x509.MarshalPKCS8PrivateKey(key)
-	if err != nil {
-		t.Fatal(err)
+	t.Setenv("MISTY_ENVIRONMENT", "development")
+	t.Setenv("MISTY_DEMO_MODE", "local")
+	if _, err := libraryStoreFromEnv(); err == nil || !strings.Contains(err.Error(), "MISTY_LIBRARY_LOCAL_DIR") {
+		t.Fatalf("libraryStoreFromEnv(local demo) error = %v; want persistent local store requirement", err)
 	}
-	return encoded
-}
-
-func configureTestR2(t *testing.T) {
-	t.Helper()
-	t.Setenv("R2_ENDPOINT", "https://account-id.r2.cloudflarestorage.com")
-	t.Setenv("R2_BUCKET", "misty-server")
-	t.Setenv("R2_ACCESS_KEY", "test-access")
-	t.Setenv("R2_SECRET_KEY", "test-secret")
-}
-
-func TestCreateServerRejectsMissingAgentAttachmentSigningKey(t *testing.T) {
-	t.Setenv("PASSWORD_RESET_URL", "http://localhost:5173/reset")
-	t.Setenv("PASSWORD_RESET_START_URL", "http://localhost:8080/auth/reset/start")
-	t.Setenv("MISTY_ENVIRONMENT", "production")
-	t.Setenv("MISTY_AGENT_DOCUMENTS_ENABLED", "true")
-	configureTestR2(t)
-	t.Setenv("DOCUMENT_SIGNING_KEY", "")
-
-	if _, err := CreateServer(); err == nil || !strings.Contains(err.Error(), "signing-key") {
-		t.Fatalf("CreateServer() error = %v, want missing signing-key rejection", err)
-	}
-}
-
-func TestCreateServerConfiguresCloudflareR2AgentAttachmentStore(t *testing.T) {
-	t.Setenv("PASSWORD_RESET_URL", "http://localhost:5173/reset")
-	t.Setenv("PASSWORD_RESET_START_URL", "http://localhost:8080/auth/reset/start")
-	t.Setenv("MAILJET_API_KEY", "")
-	t.Setenv("MAILJET_SECRET_KEY", "")
-	t.Setenv("MAILJET_FROM_EMAIL", "")
-	t.Setenv("MISTY_ENVIRONMENT", "production")
-	t.Setenv("MISTY_AGENT_DOCUMENTS_ENABLED", "true")
-	configureTestR2(t)
-	t.Setenv("DOCUMENT_SIGNING_KEY", strings.Repeat("k", 32))
-	t.Setenv("DOCUMENT_KEY_ID", "test-current")
-	t.Setenv("DOCUMENT_PRIVATE_KEY_B64", testAgentAttachmentPrivateKey(t))
-
-	server, err := CreateServer()
-	if err != nil {
-		t.Fatalf("CreateServer() error = %v", err)
-	}
-	if server.AgentAttachmentStore == nil {
-		t.Fatal("CreateServer() did not configure R2 attachment store")
+	t.Setenv("MISTY_DEMO_MODE", "staging")
+	if _, err := libraryStoreFromEnv(); err == nil || !strings.Contains(err.Error(), "dedicated R2") {
+		t.Fatalf("libraryStoreFromEnv(staging demo) error = %v; want dedicated R2 requirement", err)
 	}
 }
 
@@ -198,7 +146,20 @@ func TestAllowedCORSOriginsRejectsWildcards(t *testing.T) {
 	}
 }
 
-func TestCORSAllowsTauriOrigin(t *testing.T) {
+func TestAllowedCORSOriginAcceptsViteLoopbackPorts(t *testing.T) {
+	for _, origin := range []string{"http://localhost:5174", "http://127.0.0.1:5199", "http://[::1]:5175"} {
+		if !isAllowedCORSOrigin(origin) {
+			t.Fatalf("isAllowedCORSOrigin(%q) = false, want true", origin)
+		}
+	}
+	for _, origin := range []string{"http://127.0.0.1:5200", "https://127.0.0.1:5174", "http://example.com:5174", "http://127.0.0.1:5174?spoofed=true"} {
+		if isAllowedCORSOrigin(origin) {
+			t.Fatalf("isAllowedCORSOrigin(%q) = true, want false", origin)
+		}
+	}
+}
+
+func TestCORSAllowsAppOrigins(t *testing.T) {
 	t.Setenv("PASSWORD_RESET_URL", "http://localhost:5173/reset")
 	t.Setenv("PASSWORD_RESET_START_URL", "http://localhost:8080/auth/reset/start")
 	t.Setenv("MAILJET_API_KEY", "")
@@ -213,20 +174,22 @@ func TestCORSAllowsTauriOrigin(t *testing.T) {
 		t.Fatalf("MountHandlers() error = %v", err)
 	}
 
-	req := httptest.NewRequest(http.MethodOptions, "/api/login", nil)
-	req.Header.Set("Origin", "tauri://localhost")
-	req.Header.Set("Access-Control-Request-Method", "POST")
-	req.Header.Set("Access-Control-Request-Headers", "content-type")
-	rec := httptest.NewRecorder()
-	server.Router.ServeHTTP(rec, req)
+	for _, origin := range []string{"tauri://localhost", "http://127.0.0.1:5174"} {
+		req := httptest.NewRequest(http.MethodOptions, "/api/login", nil)
+		req.Header.Set("Origin", origin)
+		req.Header.Set("Access-Control-Request-Method", "POST")
+		req.Header.Set("Access-Control-Request-Headers", "content-type")
+		rec := httptest.NewRecorder()
+		server.Router.ServeHTTP(rec, req)
 
-	if rec.Code != http.StatusOK {
-		t.Fatalf("OPTIONS /api/login status = %d, want %d", rec.Code, http.StatusOK)
-	}
-	if got := rec.Header().Get("Access-Control-Allow-Origin"); got != "tauri://localhost" {
-		t.Fatalf("Access-Control-Allow-Origin = %q, want tauri://localhost", got)
-	}
-	if got := rec.Header().Get("Access-Control-Allow-Credentials"); got != "true" {
-		t.Fatalf("Access-Control-Allow-Credentials = %q, want true", got)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("OPTIONS /api/login from %s status = %d, want %d", origin, rec.Code, http.StatusOK)
+		}
+		if got := rec.Header().Get("Access-Control-Allow-Origin"); got != origin {
+			t.Fatalf("Access-Control-Allow-Origin = %q, want %s", got, origin)
+		}
+		if got := rec.Header().Get("Access-Control-Allow-Credentials"); got != "true" {
+			t.Fatalf("Access-Control-Allow-Credentials = %q, want true", got)
+		}
 	}
 }

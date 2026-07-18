@@ -43,13 +43,13 @@ func (db *Database) QueueLibraryIntelligenceForItem(ctx context.Context, userID,
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionLibraryView); err != nil {
 			return err
 		}
-		var ocrEnabled, aiEnabled, semanticEnabled bool
-		if err := tx.QueryRowContext(ctx, `SELECT ocr_enabled,ai_enabled,semantic_search_enabled FROM space_library_intelligence_policies WHERE space_id=$1`, spaceID).Scan(&ocrEnabled, &aiEnabled, &semanticEnabled); errors.Is(err, sql.ErrNoRows) {
+		var aiEnabled, semanticEnabled bool
+		if err := tx.QueryRowContext(ctx, `SELECT ai_enabled,semantic_search_enabled FROM space_library_intelligence_policies WHERE space_id=$1`, spaceID).Scan(&aiEnabled, &semanticEnabled); errors.Is(err, sql.ErrNoRows) {
 			return nil
 		} else if err != nil {
 			return err
 		}
-		if !ocrEnabled && !aiEnabled && !semanticEnabled {
+		if !aiEnabled && !semanticEnabled {
 			return nil
 		}
 		var domainID string
@@ -58,7 +58,7 @@ func (db *Database) QueueLibraryIntelligenceForItem(ctx context.Context, userID,
 		} else if err != nil {
 			return err
 		}
-		payload, _ := json.Marshal(map[string]bool{"ocr": ocrEnabled, "ai": aiEnabled, "semantic": semanticEnabled})
+		payload, _ := json.Marshal(map[string]bool{"ai": aiEnabled, "semantic": semanticEnabled})
 		_, err := tx.ExecContext(ctx, `INSERT INTO library_processing_jobs(id,security_domain_id,space_id,job_kind,target_kind,target_id,payload,priority) VALUES($1,$2,$3,'ai','space_library_item',$4,$5,4)
 			ON CONFLICT(job_kind,target_kind,target_id) DO UPDATE SET payload=EXCLUDED.payload,state=CASE WHEN library_processing_jobs.state IN ('leased','running') THEN library_processing_jobs.state ELSE 'queued' END,error_code=NULL,available_at=NOW(),updated_at=NOW()`, "job_"+uuid.NewString(), domainID, spaceID, itemID, payload)
 		return err
@@ -94,8 +94,8 @@ func (db *Database) CompleteLibraryIntelligenceJob(ctx context.Context, job *Lib
 		return ErrLibraryInvalid
 	}
 	return db.spaceTx(ctx, func(tx *sql.Tx) error {
-		var ocrEnabled, aiEnabled, semanticEnabled bool
-		if err := tx.QueryRowContext(ctx, `SELECT ocr_enabled,ai_enabled,semantic_search_enabled FROM space_library_intelligence_policies WHERE space_id=$1`, job.SpaceID).Scan(&ocrEnabled, &aiEnabled, &semanticEnabled); err != nil {
+		var aiEnabled, semanticEnabled bool
+		if err := tx.QueryRowContext(ctx, `SELECT ai_enabled,semantic_search_enabled FROM space_library_intelligence_policies WHERE space_id=$1`, job.SpaceID).Scan(&aiEnabled, &semanticEnabled); err != nil {
 			return err
 		}
 		updated, err := tx.ExecContext(ctx, `UPDATE library_processing_jobs SET state='running',updated_at=NOW() WHERE id=$1 AND state='leased' AND lease_token=$2 AND lease_expires_at>NOW()`, job.ID, job.LeaseToken)
@@ -105,16 +105,11 @@ func (db *Database) CompleteLibraryIntelligenceJob(ctx context.Context, job *Lib
 		if count, _ := updated.RowsAffected(); count == 0 {
 			return ErrLibraryConflict
 		}
-		if !ocrEnabled && !aiEnabled && !semanticEnabled {
+		if !aiEnabled && !semanticEnabled {
 			return ErrLibraryForbidden
 		}
-		if _, err := tx.ExecContext(ctx, `DELETE FROM library_derivatives WHERE space_library_item_id=$1 AND kind IN ('ocr','ai_metadata','embedding','search_document')`, job.ItemID); err != nil {
+		if _, err := tx.ExecContext(ctx, `DELETE FROM library_derivatives WHERE space_library_item_id=$1 AND kind IN ('ai_metadata','embedding','search_document')`, job.ItemID); err != nil {
 			return err
-		}
-		if ocrEnabled {
-			if _, err := tx.ExecContext(ctx, `INSERT INTO library_derivatives(id,security_domain_id,source_file_id,space_library_item_id,kind,metadata,lifecycle_state) VALUES($1,$2,$3,$4,'ocr',$5,'ready')`, "derivative_"+uuid.NewString(), job.SecurityDomainID, job.FileID, job.ItemID, result.Metadata); err != nil {
-				return err
-			}
 		}
 		if aiEnabled {
 			if _, err := tx.ExecContext(ctx, `INSERT INTO library_derivatives(id,security_domain_id,source_file_id,space_library_item_id,kind,metadata,lifecycle_state) VALUES($1,$2,$3,$4,'ai_metadata',$5,'ready')`, "derivative_"+uuid.NewString(), job.SecurityDomainID, job.FileID, job.ItemID, result.Metadata); err != nil {
@@ -137,7 +132,7 @@ func (db *Database) CompleteLibraryIntelligenceJob(ctx context.Context, job *Lib
 		if _, err := tx.ExecContext(ctx, `UPDATE library_processing_jobs SET state='completed',lease_token=NULL,lease_owner=NULL,lease_expires_at=NULL,error_code=NULL,updated_at=NOW() WHERE id=$1`, job.ID); err != nil {
 			return err
 		}
-		return insertLibraryAuditTx(ctx, tx, job.SpaceID, job.SecurityDomainID, "", "library.intelligence.processed", "library_item", job.ItemID, "success", map[string]any{"ocr": ocrEnabled, "ai": aiEnabled, "semantic": semanticEnabled})
+		return insertLibraryAuditTx(ctx, tx, job.SpaceID, job.SecurityDomainID, "", "library.intelligence.processed", "library_item", job.ItemID, "success", map[string]any{"ai": aiEnabled, "semantic": semanticEnabled})
 	})
 }
 

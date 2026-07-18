@@ -1,92 +1,68 @@
-# Mika, Spaces, Agents, and Workflows
+# Unified Agent Workflow Platform
 
-This document defines the canonical execution hierarchy:
+The canonical hierarchy is:
 
 ```text
-Mika
-  discovers authorized capabilities across Spaces
-    Space
-      owns Agents, workflows, integrations, permissions, and shared chat
-        Agent
-          has exactly one active immutable workflow version
-            Workflow package
-              exposes one or more structured capabilities
+Space
+  shared Workflow drafts -> immutable WorkflowVersions
+  shared Agent draft -> immutable AgentVersions -> pinned WorkflowVersions
+  member -> internal AgentInstance -> member-isolated runs, triggers, cursors, grants, connections, memory, approvals, and results
 ```
 
-## Ownership and identity
+Only Agents execute. An Agent can handle ordinary chat with no workflow. A workflow adds automatic triggers and a repeatable, typed execution plan; it is never an execution principal and has no standalone run endpoint.
 
-`space_agents` is the only shared agent catalog. Every Agent has a non-null `space_id`. Device-backed folder Agent definitions remain execution bindings in `agent_definitions`, linked one-to-one through `space_agent_id`; they are not a second ownership system.
+## Definitions, ownership, and access
 
-Agent identity (`name`, `description`, `icon`, `instructions`, availability, runtime) is separate from workflow behavior. Updating identity does not switch behavior. `active_workflow_version_id` is the one active behavior pointer, and it changes only through the explicit workflow-replacement operation.
+Workflow drafts and immutable versions are visible to Space members. Only the Workflow creator may edit or publish. Published definitions use `formatVersion: 2`, typed nodes and ports, a capability envelope, dependency locks, and a checksum. Publication resolves every pinned subflow, rejects missing versions and recursive dependencies, and never mutates a version already used by a run.
 
-Deleting an Agent disables or removes its catalog entry without rewriting historical run snapshots. A workflow version referenced by a run is protected by a restrictive foreign key.
+Only an Agent creator may edit or publish it. An `AgentVersion` freezes its identity, instructions, access policy, and any number of version-pinned workflow attachments. Access defaults to every member of the Space; the creator may select specific members. Sharing an Agent shares only its definition—not a running session or usage state.
 
-## Portable workflows
+`AgentInstance` is internal runtime state belonging to one member. It pins an Agent version and owns that member's connection references, capability grants, workflow enablement, trigger configuration, cursors, memory checkpoints, and derived idle/running state. A newly published Agent version is offered as an update. An instance can update only when it has no queued, running, cooldown, or approval-blocked run. Updating clears capability grants so expanded access is consented again.
 
-`space_workflows` stores package identity and provenance. `space_workflow_versions` stores immutable snapshots. A snapshot includes:
+## Runtime
 
-- stable identifier and semantic version;
-- name, description, author, checksum, and provenance;
-- one or more capabilities;
-- typed capability inputs and outputs;
-- read-only, destructive, and confirmation flags;
-- required Space integrations and permissions;
-- runtime kind and compatibility;
-- searchable tags and portable definition JSON.
+Every run pins its Agent instance, Agent version, optional Workflow version, inputs, attempts, checkpoints, action journal, approvals, and trace data. Terminal states are `completed`, `completed_with_errors`, `failed`, `canceled`, and `rejected`. Nonterminal states are `queued`, `running`, `cooldown`, and `awaiting_approval`.
 
-Destructive capabilities must require confirmation. Unknown permission declarations are rejected. New versions never mutate old versions, and each run pins the exact version ID, identifier, version string, and capability ID used.
+The v2 engine validates the graph and capability envelope before execution, resolves nested typed ports in topological order, validates every node output, and checkpoints every transition. Condition and switch ports skip inactive branches; `For each` executes an inline child graph or pinned subflow with bounded concurrency. Nodes receive three total attempts and a stable idempotency key. A failed attempt enters a persisted one-minute cooldown. Mutations use the action journal and must be idempotent or reconcilable. Resource leases serialize conflicting mutations and preserve the resource fingerprint used for revalidation.
 
-The schema already contains source/fork fields and suggested Agent presets so install and fork behavior can be added without changing execution semantics. A public marketplace, ratings, monetization, and discovery ranking are intentionally deferred.
+Device-only capabilities fail an attempt with `device_unavailable` when no trusted device lease can execute them; they do not wait indefinitely. Cloud providers execute on the server. The effective tool set is the intersection of the Workflow envelope, pinned Agent access, user grants, resource ACLs, and healthy providers.
 
-## Invocation and routing
+Mika and Agent chat use the same discovery catalog and canonical run service. The catalog always advertises ordinary chat, plus capabilities from every attached workflow. Mika's existing tool-call loop remains the tool-call transport; workflow Agent-task nodes use the same managed Mika runtime inside a finite, schema-validated graph step.
 
-All invocation paths create `space_runs` records:
+## Content and built-ins
 
-- direct Agent runs;
-- private Agent conversations;
-- shared Space `@Agent` mentions;
-- Mika delegations;
-- Studio tests and scheduled runs.
+`ContentRef` carries provider-neutral identity, version/fingerprint, MIME type, locator, and permission scope. `ContentPage` returns normalized sections, citations, truncation state, and continuation. Credentials and raw local paths are never embedded in either object. Cloud and leased-device readers support bounded text, JSON, XML, YAML, CSV, PDF embedded text, and native Office text with checksum verification. Images and image-only PDFs fail with `unsupported_content`.
 
-The server discovers only enabled Agents in Spaces where the requester is a member and has `agents.run`. Routing scores structured capability IDs, names, descriptions, and tags. It never routes from display names alone. An explicit Space, Agent, or capability selector narrows that authorized catalog. Ambiguous matches return a clarification question and authorized options.
+The launch registry covers manual/chat, cron, file, Library, Space task, Google Calendar, Slack, Discord, and Notion triggers; changed files, source queries, content/metadata reads and transforms; condition, join, debounce, delay, bounded `For each`, and pinned subflows; Agent tasks; and explicit document, Library, task, notification, approved message, metadata, memory, deletion, and permission actions. Provider callback receivers are private infrastructure and there is no generic inbound endpoint.
 
-Runs record requester, Space, source conversation and source type, Agent, pinned workflow, capability, state, progress, inputs, outputs, artifacts, errors, retries, cancellation, timestamps, action records, and approval records. Device jobs carry the canonical `space_run_id`; job progress and terminal states synchronize back to the Space run.
+Event claims are keyed by user instance, Workflow version, provider, and event ID. This prevents cross-user cursor sharing and makes reordered delivery and concurrent claims safe. Successful items checkpoint independently. Generated artifacts can be excluded through provenance and paths such as `.summaries/**`.
 
-## Privacy and authorization
+Cloud Library artifact writes use the normal immutable object, quota, deduplication, ACL, audit, and provenance path. Space-message replies use normal destination ACLs. Any mutating node without a concrete provider adapter returns `workflow provider missing`; it is never action-journaled as a false success.
 
-Server authorization is required for discovery, invocation, workflow management, integration management, approvals, cancellation, retry, and run detail access. Client filtering is only presentation.
+## Safety and privacy
 
-Private Agent conversations are owner-scoped tables with forced row-level security. Their events and non-shared runs are visible only to the requester. Shared `group_mention` runs are visible to authorized Space members. RLS and repository checks both enforce the boundary.
+Reads within granted scopes run automatically. Scoped writes may be consented when a user enables a workflow. Deletions, permission changes, and high-impact or bulk outbound actions always enter `awaiting_approval`. Approval rechecks the user's membership, resource ACL, provider health, consent, and pinned versions.
 
-Integrations belong to a Space. The database stores only an opaque provider-vault reference; API responses never return that reference. A run is rejected before execution if an active required integration or required permission is unavailable.
-
-Destructive or confirmation-required capabilities enter `awaiting_approval`. The requester sees the proposed action, workflow version, and capability and must approve or reject it. Approval rechecks membership, permissions, integration state, and the pinned workflow before execution.
+Member conversations, runs, steps, workflow settings, event claims, memory, action journals, and leases use requester/instance-scoped access controls. Provider credentials are member connection references and are never inherited from a creator. Proactive results default to the member's Agent Center results; a shared post requires an explicit action and destination permission.
 
 ## HTTP surface
 
-The primary endpoints are:
-
-- `GET /api/agents/catalog` and `GET /api/mika/discovery`
-- `POST /api/mika/delegations`
+- `GET /api/agents/catalog`, `GET /api/mika/discovery`, `POST /api/mika/delegations`
 - `GET|POST /api/spaces/{spaceID}/agents/{agentID}/runs`
-- `PUT /api/spaces/{spaceID}/studio/agents/{agentID}/workflow`
 - `GET|POST /api/spaces/{spaceID}/studio/workflows/{workflowID}/versions`
-- `GET /api/runs/{runID}`
-- `POST /api/runs/{runID}/approval`, `/cancel`, and `/retry`
-- `GET|POST /api/agent-conversations`
-- `GET|POST /api/agent-conversations/{conversationID}/events`
-- `GET|PUT /api/spaces/{spaceID}/integrations`
+- `GET|POST /api/spaces/{spaceID}/studio/agents/{agentID}/versions`
+- `GET|POST /api/spaces/{spaceID}/agents/{agentID}/instance`
+- `PUT /api/agent-instances/{instanceID}/workflows/{workflowVersionID}`
+- `PUT /api/agent-instances/{instanceID}/connections`
+- `GET /api/runs/{runID}` and `POST /api/runs/{runID}/approval|cancel|retry`
+- `GET|POST /api/agent-conversations` and their member-isolated event endpoints
 
-Shared chat continues to use the Space message endpoint. Agent mentions are routed and executed through the same canonical run service.
+There is intentionally no Workflow run endpoint and no Agent workflow-replacement endpoint.
 
-## Migration and rollback
+## Fresh cutover
 
-Migration `20260825000000_version_space_workflows_and_runs.sql`:
+Migration `20260831000000_unified_agent_workflows_v2.sql` preserves valid Space Agents and backfills their first immutable versions. It deletes only known retired device/folder runtime tables and standalone legacy Workflow runs, then installs the v2 definition and member-instance tables. Accounts, Spaces, chats, provider connections, Libraries, ordinary files, Space Agent conversations, and trusted devices are preserved. The migration never recursively deletes Library roots.
 
-1. canonicalizes legacy device Agents without changing their IDs;
-2. creates default portable workflow packages and immutable `1.0.0` versions;
-3. attaches one active version to every Agent;
-4. enriches existing runs and adds approvals, actions, integrations, and private conversations;
-5. replaces membership-wide run RLS with requester-private/shared-mention policies.
+The desktop no longer contains the Rust automation runner, `.mf` import/export contract, or a second TypeScript workflow planner/node model. The remaining device-resource API is a signed lease transport for local scopes; it does not define or traverse a workflow graph.
 
-The migration is reversible. Use a database owner for DDL with `DB_MIGRATION_USER` and `DB_MIGRATION_PASSWORD`; the runtime role remains least-privileged. `scripts/goose.sh down` restores the pre-versioned schema and membership-wide legacy run policy. Back up production data before rollback because version, approval, integration, and private-conversation tables are removed by the down migration.
+The retired runtime-table cleanup is irreversible. Take a database backup before cutover if an environment must retain those obsolete records.

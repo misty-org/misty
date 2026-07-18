@@ -51,13 +51,15 @@ type ToolManifest struct {
 }
 
 type ToolDefinition struct {
-	Name string `json:"name"`
-	Risk string `json:"risk"`
+	Name        string          `json:"name"`
+	Risk        string          `json:"risk"`
+	InputSchema json.RawMessage `json:"input_schema,omitempty"`
 }
 
 type AgentEvent struct {
 	Sequence         int64              `json:"sequence"`
 	Type             string             `json:"type"`
+	RunID            string             `json:"run_id,omitempty"`
 	Text             string             `json:"text,omitempty"`
 	ToolRequests     []ToolRequest      `json:"tool_requests,omitempty"`
 	FilePlan         *FileOperationPlan `json:"file_plan,omitempty"`

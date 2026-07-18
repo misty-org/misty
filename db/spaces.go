@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	workflowv2 "github.com/kannachi323/misty/server/workflow"
 )
 
 const (
@@ -36,17 +37,18 @@ var (
 )
 
 type Space struct {
-	ID               string    `json:"id"`
-	SecurityDomainID string    `json:"security_domain_id"`
-	OwnerUserID      string    `json:"owner_user_id"`
-	Name             string    `json:"name"`
-	Role             string    `json:"role"`
-	MemberCount      int       `json:"member_count"`
-	PendingCount     int       `json:"pending_count"`
-	IsPersonal       bool      `json:"is_personal"`
-	IsShared         bool      `json:"is_shared"`
-	CreatedAt        time.Time `json:"created_at"`
-	UpdatedAt        time.Time `json:"updated_at"`
+	ID               string          `json:"id"`
+	SecurityDomainID string          `json:"security_domain_id"`
+	OwnerUserID      string          `json:"owner_user_id"`
+	Name             string          `json:"name"`
+	Role             string          `json:"role"`
+	MemberCount      int             `json:"member_count"`
+	PendingCount     int             `json:"pending_count"`
+	IsPersonal       bool            `json:"is_personal"`
+	IsShared         bool            `json:"is_shared"`
+	Permissions      map[string]bool `json:"permissions"`
+	CreatedAt        time.Time       `json:"created_at"`
+	UpdatedAt        time.Time       `json:"updated_at"`
 }
 
 type SpaceMember struct {
@@ -83,6 +85,7 @@ type SpaceMessage struct {
 	Seq              int64               `json:"seq"`
 	ID               string              `json:"id"`
 	SpaceID          string              `json:"space_id"`
+	ConversationID   string              `json:"conversation_id,omitempty"`
 	SenderUserID     string              `json:"sender_user_id"`
 	SenderName       string              `json:"sender_name"`
 	SenderKind       string              `json:"sender_kind"`
@@ -154,6 +157,7 @@ type SpaceStudioResource struct {
 	StableIdentifier        string           `json:"stable_identifier,omitempty"`
 	ActiveWorkflowVersionID string           `json:"active_workflow_version_id,omitempty"`
 	ActiveWorkflow          *WorkflowVersion `json:"active_workflow,omitempty"`
+	AccessPolicy            json.RawMessage  `json:"access_policy,omitempty"`
 	CreatedAt               time.Time        `json:"created_at"`
 	UpdatedAt               time.Time        `json:"updated_at"`
 }
@@ -187,6 +191,10 @@ type SpaceRun struct {
 	RetryOfRunID         string          `json:"retry_of_run_id,omitempty"`
 	CanceledAt           *time.Time      `json:"canceled_at,omitempty"`
 	UpdatedAt            time.Time       `json:"updated_at"`
+	AgentInstanceID      string          `json:"agent_instance_id,omitempty"`
+	AgentVersionID       string          `json:"agent_version_id,omitempty"`
+	Attempt              int             `json:"attempt"`
+	NextRetryAt          *time.Time      `json:"next_retry_at,omitempty"`
 }
 
 func (db *Database) spaceTx(ctx context.Context, fn func(*sql.Tx) error) error {
@@ -296,7 +304,7 @@ func (db *Database) CreateSpace(ctx context.Context, userID, name string) (*Spac
 		if _, err := tx.ExecContext(ctx, `INSERT INTO space_members(space_id,user_id,role) VALUES($1,$2,'owner')`, out.ID, userID); err != nil {
 			return err
 		}
-		if _, err := tx.ExecContext(ctx, `INSERT INTO space_roles(id,space_id,name,is_everyone,permissions) VALUES($1,$2,'@everyone',TRUE,'["space.view","messages.read","library.view","library.download","storage.view_own_usage","studio.view","studio.manage","agents.run"]'::jsonb)`, "role_"+uuid.NewString(), out.ID); err != nil {
+		if _, err := tx.ExecContext(ctx, `INSERT INTO space_roles(id,space_id,name,is_everyone,permissions) VALUES($1,$2,'@everyone',TRUE,'["space.view","messages.read","messages.write","library.view","library.download","storage.view_own_usage","studio.view","studio.manage","agents.run","tasks.view","tasks.manage","integrations.manage"]'::jsonb)`, "role_"+uuid.NewString(), out.ID); err != nil {
 			return err
 		}
 		_, err := recordSpaceEventTx(ctx, tx, out.ID, userID, "space.created", out.ID, map[string]any{"name": name})
@@ -343,7 +351,7 @@ func (db *Database) ensurePersonalSpace(ctx context.Context, userID string) erro
 		if _, err := tx.ExecContext(ctx, `INSERT INTO space_members(space_id,user_id,role) VALUES($1,$2,'owner')`, spaceID, userID); err != nil {
 			return err
 		}
-		if _, err := tx.ExecContext(ctx, `INSERT INTO space_roles(id,space_id,name,is_everyone,permissions) VALUES($1,$2,'@everyone',TRUE,'["space.view","messages.read","library.view","library.download","storage.view_own_usage","studio.view","studio.manage","agents.run"]'::jsonb)`, "role_"+uuid.NewString(), spaceID); err != nil {
+		if _, err := tx.ExecContext(ctx, `INSERT INTO space_roles(id,space_id,name,is_everyone,permissions) VALUES($1,$2,'@everyone',TRUE,'["space.view","messages.read","messages.write","library.view","library.download","storage.view_own_usage","studio.view","studio.manage","agents.run","tasks.view","tasks.manage","integrations.manage"]'::jsonb)`, "role_"+uuid.NewString(), spaceID); err != nil {
 			return err
 		}
 		_, err = recordSpaceEventTx(ctx, tx, spaceID, userID, "space.created", spaceID, map[string]any{"name": personalName, "is_personal": true})
@@ -369,15 +377,27 @@ func (db *Database) ListSpaces(ctx context.Context, userID string) ([]Space, err
 		if err != nil {
 			return err
 		}
-		defer rows.Close()
 		for rows.Next() {
 			var space Space
 			if err := rows.Scan(&space.ID, &space.SecurityDomainID, &space.OwnerUserID, &space.Name, &space.Role, &space.MemberCount, &space.PendingCount, &space.IsPersonal, &space.IsShared, &space.CreatedAt, &space.UpdatedAt); err != nil {
+				rows.Close()
 				return err
 			}
 			spaces = append(spaces, space)
 		}
-		return rows.Err()
+		if err := rows.Err(); err != nil {
+			rows.Close()
+			return err
+		}
+		if err := rows.Close(); err != nil {
+			return err
+		}
+		for index := range spaces {
+			if err := populateSpacePermissionsTx(ctx, tx, userID, &spaces[index]); err != nil {
+				return err
+			}
+		}
+		return nil
 	})
 	return spaces, err
 }
@@ -385,7 +405,7 @@ func (db *Database) ListSpaces(ctx context.Context, userID string) ([]Space, err
 func (db *Database) SpaceByID(ctx context.Context, userID, spaceID string) (*Space, error) {
 	out := &Space{}
 	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
-		return tx.QueryRowContext(ctx, `SELECT s.id,s.security_domain_id,s.owner_user_id,s.name,m.role,
+		if err := tx.QueryRowContext(ctx, `SELECT s.id,s.security_domain_id,s.owner_user_id,s.name,m.role,
 			(SELECT count(*) FROM space_members sm WHERE sm.space_id=s.id),
 			(SELECT count(*) FROM space_invitations si WHERE si.space_id=s.id AND si.expires_at>NOW()),
 			s.is_personal,
@@ -393,12 +413,31 @@ func (db *Database) SpaceByID(ctx context.Context, userID, spaceID string) (*Spa
 			 EXISTS(SELECT 1 FROM space_invitations si WHERE si.space_id=s.id AND si.expires_at>NOW())),
 			s.created_at,s.updated_at
 			FROM spaces s JOIN space_members m ON m.space_id=s.id
-			WHERE s.id=$1 AND m.user_id=$2 AND s.lifecycle_state='active'`, spaceID, userID).Scan(&out.ID, &out.SecurityDomainID, &out.OwnerUserID, &out.Name, &out.Role, &out.MemberCount, &out.PendingCount, &out.IsPersonal, &out.IsShared, &out.CreatedAt, &out.UpdatedAt)
+			WHERE s.id=$1 AND m.user_id=$2 AND s.lifecycle_state='active'`, spaceID, userID).Scan(&out.ID, &out.SecurityDomainID, &out.OwnerUserID, &out.Name, &out.Role, &out.MemberCount, &out.PendingCount, &out.IsPersonal, &out.IsShared, &out.CreatedAt, &out.UpdatedAt); err != nil {
+			return err
+		}
+		return populateSpacePermissionsTx(ctx, tx, userID, out)
 	})
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrSpaceNotFound
 	}
+	if err != nil {
+		return nil, err
+	}
 	return out, err
+}
+
+func populateSpacePermissionsTx(ctx context.Context, tx *sql.Tx, userID string, space *Space) error {
+	space.Permissions = make(map[string]bool, len(configurableSpacePermissions))
+	for _, permission := range configurableSpacePermissions {
+		allowed, err := hasSpacePermissionTx(ctx, tx, userID, space.ID, permission)
+		if err != nil {
+			return err
+		}
+		space.Permissions[permission] = allowed
+	}
+	applySpacePermissionDependencies(space.Permissions)
+	return nil
 }
 
 func (db *Database) RenameSpace(ctx context.Context, userID, spaceID, name string) (*Space, error) {
@@ -639,6 +678,9 @@ func (db *Database) RemoveSpaceMember(ctx context.Context, ownerID, spaceID, mem
 		if ownerID == memberID {
 			return ErrSpaceInvalid
 		}
+		if _, err := tx.ExecContext(ctx, `DELETE FROM space_conversation_members cm USING space_conversations c WHERE cm.conversation_id=c.id AND c.space_id=$1 AND cm.user_id=$2`, spaceID, memberID); err != nil {
+			return err
+		}
 		result, err := tx.ExecContext(ctx, `DELETE FROM space_members WHERE space_id=$1 AND user_id=$2 AND role='member'`, spaceID, memberID)
 		if err != nil {
 			return err
@@ -667,6 +709,9 @@ func (db *Database) LeaveSpace(ctx context.Context, userID, spaceID string) erro
 		}
 		if role == "owner" {
 			return ErrSpaceInvalid
+		}
+		if _, err := tx.ExecContext(ctx, `DELETE FROM space_conversation_members cm USING space_conversations c WHERE cm.conversation_id=c.id AND c.space_id=$1 AND cm.user_id=$2`, spaceID, userID); err != nil {
+			return err
 		}
 		if _, err := tx.ExecContext(ctx, `DELETE FROM space_members WHERE space_id=$1 AND user_id=$2`, spaceID, userID); err != nil {
 			return err
@@ -736,6 +781,13 @@ func validateMessage(content []MessageSpan, fileNodeIDs []string) error {
 	return validateMessageWithReferences(content, len(fileNodeIDs))
 }
 
+func requireSpaceMessageWriteTx(ctx context.Context, tx *sql.Tx, userID, spaceID string) error {
+	if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionMessagesRead); err != nil {
+		return err
+	}
+	return requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionMessagesWrite)
+}
+
 func validateMessageWithReferences(content []MessageSpan, referenceCount int) error {
 	if referenceCount > MaxMessageFiles || len(content) == 0 && referenceCount == 0 {
 		return ErrSpaceInvalid
@@ -782,15 +834,33 @@ func (db *Database) CreateSpaceMessage(ctx context.Context, userID, spaceID stri
 }
 
 func (db *Database) CreateSpaceMessageWithReferences(ctx context.Context, userID, spaceID string, content []MessageSpan, fileNodeIDs, attachmentIDs, libraryItemIDs []string, replyToMessageID string) (*SpaceMessage, []string, error) {
+	return db.createSpaceMessageWithReferences(ctx, userID, spaceID, "", content, fileNodeIDs, attachmentIDs, libraryItemIDs, replyToMessageID)
+}
+
+func (db *Database) CreateSpaceConversationMessageWithReferences(ctx context.Context, userID, spaceID, conversationID string, content []MessageSpan, fileNodeIDs, attachmentIDs, libraryItemIDs []string, replyToMessageID string) (*SpaceMessage, []string, error) {
+	return db.createSpaceMessageWithReferences(ctx, userID, spaceID, conversationID, content, fileNodeIDs, attachmentIDs, libraryItemIDs, replyToMessageID)
+}
+
+func (db *Database) createSpaceMessageWithReferences(ctx context.Context, userID, spaceID, conversationID string, content []MessageSpan, fileNodeIDs, attachmentIDs, libraryItemIDs []string, replyToMessageID string) (*SpaceMessage, []string, error) {
 	if err := validateMessageWithReferences(content, len(fileNodeIDs)+len(attachmentIDs)+len(libraryItemIDs)); err != nil {
 		return nil, nil, err
 	}
-	out := &SpaceMessage{ID: "msg_" + uuid.NewString(), SpaceID: spaceID, SenderUserID: userID, SenderKind: "person", Content: content, FileNodeIDs: fileNodeIDs, LibraryItemIDs: uniqueSpaceIDs(libraryItemIDs), Attachments: []MessageAttachment{}, ReplyToMessageID: replyToMessageID}
+	out := &SpaceMessage{ID: "msg_" + uuid.NewString(), SpaceID: spaceID, ConversationID: conversationID, SenderUserID: userID, SenderKind: "person", Content: content, FileNodeIDs: fileNodeIDs, LibraryItemIDs: uniqueSpaceIDs(libraryItemIDs), Attachments: []MessageAttachment{}, ReplyToMessageID: replyToMessageID}
 	attachmentIDs = uniqueSpaceIDs(attachmentIDs)
 	agentMentions := []string{}
 	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
-		if _, err := requireSpaceMemberTx(ctx, tx, spaceID, userID); err != nil {
+		if err := requireSpaceMessageWriteTx(ctx, tx, userID, spaceID); err != nil {
 			return err
+		}
+		if conversationID != "" {
+			if err := requireSpaceConversationMemberTx(ctx, tx, userID, spaceID, conversationID); err != nil {
+				return err
+			}
+		}
+		if len(out.LibraryItemIDs) > 0 {
+			if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionLibraryView); err != nil {
+				return err
+			}
 		}
 		for _, nodeID := range fileNodeIDs {
 			var ok bool
@@ -800,7 +870,7 @@ func (db *Database) CreateSpaceMessageWithReferences(ctx context.Context, userID
 		}
 		if replyToMessageID != "" {
 			var exists bool
-			if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM space_messages WHERE id=$1 AND space_id=$2)`, replyToMessageID, spaceID).Scan(&exists); err != nil || !exists {
+			if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM space_messages WHERE id=$1 AND space_id=$2 AND COALESCE(conversation_id,'')=$3)`, replyToMessageID, spaceID, conversationID).Scan(&exists); err != nil || !exists {
 				return ErrSpaceInvalid
 			}
 		}
@@ -821,7 +891,13 @@ func (db *Database) CreateSpaceMessageWithReferences(ctx context.Context, userID
 		for _, span := range content {
 			if span.UserID != "" {
 				var ok bool
-				if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM space_members WHERE space_id=$1 AND user_id=$2)`, spaceID, span.UserID).Scan(&ok); err != nil || !ok {
+				query := `SELECT EXISTS(SELECT 1 FROM space_members WHERE space_id=$1 AND user_id=$2)`
+				args := []any{spaceID, span.UserID}
+				if conversationID != "" {
+					query = `SELECT EXISTS(SELECT 1 FROM space_conversation_members cm JOIN space_conversations c ON c.id=cm.conversation_id WHERE c.space_id=$1 AND cm.user_id=$2 AND cm.conversation_id=$3)`
+					args = append(args, conversationID)
+				}
+				if err := tx.QueryRowContext(ctx, query, args...).Scan(&ok); err != nil || !ok {
 					return ErrSpaceInvalid
 				}
 				mentionUsers[span.UserID] = true
@@ -835,8 +911,8 @@ func (db *Database) CreateSpaceMessageWithReferences(ctx context.Context, userID
 			}
 		}
 		raw, _ := json.Marshal(content)
-		if err := tx.QueryRowContext(ctx, `INSERT INTO space_messages(id,space_id,sender_user_id,content,file_node_ids,reply_to_message_id)
-			VALUES($1,$2,$3,$4,$5,NULLIF($6,'')) RETURNING seq,created_at`, out.ID, spaceID, userID, raw, pqStringArray(fileNodeIDs), replyToMessageID).Scan(&out.Seq, &out.CreatedAt); err != nil {
+		if err := tx.QueryRowContext(ctx, `INSERT INTO space_messages(id,space_id,conversation_id,sender_user_id,content,file_node_ids,reply_to_message_id)
+			VALUES($1,$2,NULLIF($3,''),$4,$5,$6,NULLIF($7,'')) RETURNING seq,created_at`, out.ID, spaceID, conversationID, userID, raw, pqStringArray(fileNodeIDs), replyToMessageID).Scan(&out.Seq, &out.CreatedAt); err != nil {
 			return err
 		}
 		for _, attachmentID := range attachmentIDs {
@@ -863,8 +939,14 @@ func (db *Database) CreateSpaceMessageWithReferences(ctx context.Context, userID
 		if err != nil {
 			return err
 		}
-		inboxPayload, _ := json.Marshal(map[string]any{"sender_name": out.SenderName, "preview": messagePreview(content)})
-		rows, err := tx.QueryContext(ctx, `SELECT user_id FROM space_members WHERE space_id=$1 AND user_id<>$2`, spaceID, userID)
+		inboxPayload, _ := json.Marshal(map[string]any{"sender_name": out.SenderName, "preview": messagePreview(content), "conversation_id": conversationID})
+		recipientsQuery := `SELECT user_id FROM space_members WHERE space_id=$1 AND user_id<>$2`
+		recipientArgs := []any{spaceID, userID}
+		if conversationID != "" {
+			recipientsQuery = `SELECT cm.user_id FROM space_conversation_members cm JOIN space_conversations c ON c.id=cm.conversation_id WHERE c.space_id=$1 AND cm.user_id<>$2 AND cm.conversation_id=$3`
+			recipientArgs = append(recipientArgs, conversationID)
+		}
+		rows, err := tx.QueryContext(ctx, recipientsQuery, recipientArgs...)
 		if err != nil {
 			return err
 		}
@@ -885,6 +967,13 @@ func (db *Database) CreateSpaceMessageWithReferences(ctx context.Context, userID
 			return err
 		}
 		for _, memberID := range recipientIDs {
+			allowed, err := hasSpacePermissionTx(ctx, tx, memberID, spaceID, PermissionMessagesRead)
+			if err != nil {
+				return err
+			}
+			if !allowed {
+				continue
+			}
 			kind := "unread"
 			if mentionUsers[memberID] {
 				kind = "mention"
@@ -925,7 +1014,7 @@ func scanSpaceMessage(scanner interface{ Scan(...any) error }, out *SpaceMessage
 	var raw []byte
 	var files string
 	var agentID sql.NullString
-	if err := scanner.Scan(&out.Seq, &out.ID, &out.SpaceID, &out.SenderUserID, &out.SenderName, &out.SenderKind, &agentID, &raw, &files, &out.EditedAt, &out.CreatedAt, &out.ReplyToMessageID); err != nil {
+	if err := scanner.Scan(&out.Seq, &out.ID, &out.SpaceID, &out.ConversationID, &out.SenderUserID, &out.SenderName, &out.SenderKind, &agentID, &raw, &files, &out.EditedAt, &out.CreatedAt, &out.ReplyToMessageID); err != nil {
 		return err
 	}
 	out.SenderAgentID = agentID.String
@@ -944,7 +1033,7 @@ func parsePGTextArray(raw string) []string {
 	return strings.Split(strings.TrimSuffix(strings.TrimPrefix(raw, "{"), "}"), ",")
 }
 
-const spaceMessageColumns = `m.seq,m.id,m.space_id,m.sender_user_id,CASE WHEN m.sender_kind='agent' THEN COALESCE(a.name,'Misty Agent') ELSE COALESCE(u.name,'Misty') END,m.sender_kind,m.sender_agent_id,m.content,m.file_node_ids::text,m.edited_at,m.created_at,COALESCE(m.reply_to_message_id,'')`
+const spaceMessageColumns = `m.seq,m.id,m.space_id,COALESCE(m.conversation_id,''),m.sender_user_id,CASE WHEN m.sender_kind='agent' THEN COALESCE(a.name,'Misty Agent') ELSE COALESCE(u.name,'Misty') END,m.sender_kind,m.sender_agent_id,m.content,m.file_node_ids::text,m.edited_at,m.created_at,COALESCE(m.reply_to_message_id,'')`
 
 func (db *Database) SpaceMessages(ctx context.Context, userID, spaceID string, before int64, limit int) ([]SpaceMessage, error) {
 	if limit < 1 || limit > 100 {
@@ -952,12 +1041,12 @@ func (db *Database) SpaceMessages(ctx context.Context, userID, spaceID string, b
 	}
 	items := []SpaceMessage{}
 	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
-		if _, err := requireSpaceMemberTx(ctx, tx, spaceID, userID); err != nil {
+		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionMessagesRead); err != nil {
 			return err
 		}
 		rows, err := tx.QueryContext(ctx, `SELECT `+spaceMessageColumns+` FROM space_messages m
 			LEFT JOIN users u ON u.id=m.sender_user_id LEFT JOIN space_agents a ON a.id=m.sender_agent_id
-			WHERE m.space_id=$1 AND ($2=0 OR m.seq<$2) ORDER BY m.seq DESC LIMIT $3`, spaceID, before, limit)
+			WHERE m.space_id=$1 AND m.conversation_id IS NULL AND ($2=0 OR m.seq<$2) ORDER BY m.seq DESC LIMIT $3`, spaceID, before, limit)
 		if err != nil {
 			return err
 		}
@@ -1020,15 +1109,28 @@ func loadSpaceMessageReferencesTx(ctx context.Context, tx *sql.Tx, message *Spac
 }
 
 func (db *Database) UpdateSpaceMessage(ctx context.Context, userID, spaceID, messageID string, content []MessageSpan, fileNodeIDs []string) (*SpaceMessage, error) {
+	return db.updateSpaceMessage(ctx, userID, spaceID, "", messageID, content, fileNodeIDs)
+}
+
+func (db *Database) UpdateSpaceConversationMessage(ctx context.Context, userID, spaceID, conversationID, messageID string, content []MessageSpan, fileNodeIDs []string) (*SpaceMessage, error) {
+	return db.updateSpaceMessage(ctx, userID, spaceID, conversationID, messageID, content, fileNodeIDs)
+}
+
+func (db *Database) updateSpaceMessage(ctx context.Context, userID, spaceID, conversationID, messageID string, content []MessageSpan, fileNodeIDs []string) (*SpaceMessage, error) {
 	if err := validateMessage(content, fileNodeIDs); err != nil {
 		return nil, err
 	}
 	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
-		if _, err := requireSpaceMemberTx(ctx, tx, spaceID, userID); err != nil {
+		if err := requireSpaceMessageWriteTx(ctx, tx, userID, spaceID); err != nil {
 			return err
 		}
+		if conversationID != "" {
+			if err := requireSpaceConversationMemberTx(ctx, tx, userID, spaceID, conversationID); err != nil {
+				return err
+			}
+		}
 		var sender string
-		if err := tx.QueryRowContext(ctx, `SELECT sender_user_id FROM space_messages WHERE id=$1 AND space_id=$2 FOR UPDATE`, messageID, spaceID).Scan(&sender); errors.Is(err, sql.ErrNoRows) {
+		if err := tx.QueryRowContext(ctx, `SELECT sender_user_id FROM space_messages WHERE id=$1 AND space_id=$2 AND COALESCE(conversation_id,'')=$3 FOR UPDATE`, messageID, spaceID, conversationID).Scan(&sender); errors.Is(err, sql.ErrNoRows) {
 			return ErrSpaceNotFound
 		} else if err != nil {
 			return err
@@ -1045,12 +1147,26 @@ func (db *Database) UpdateSpaceMessage(ctx context.Context, userID, spaceID, mes
 		}
 		for _, span := range content {
 			if span.UserID != "" && span.UserID != sender {
-				if _, err := tx.ExecContext(ctx, `INSERT INTO space_inbox_items(user_id,space_id,kind,message_id,payload) SELECT $1,$2,'mention',$3,'{}'::jsonb WHERE EXISTS(SELECT 1 FROM space_members WHERE space_id=$2 AND user_id=$1)`, span.UserID, spaceID, messageID); err != nil {
+				memberQuery := `SELECT EXISTS(SELECT 1 FROM space_members WHERE space_id=$1 AND user_id=$2)`
+				memberArgs := []any{spaceID, span.UserID}
+				if conversationID != "" {
+					memberQuery = `SELECT EXISTS(SELECT 1 FROM space_conversation_members cm JOIN space_conversations c ON c.id=cm.conversation_id WHERE c.space_id=$1 AND cm.user_id=$2 AND cm.conversation_id=$3)`
+					memberArgs = append(memberArgs, conversationID)
+				}
+				var allowed bool
+				if err := tx.QueryRowContext(ctx, memberQuery, memberArgs...).Scan(&allowed); err != nil {
+					return err
+				}
+				if !allowed {
+					return ErrSpaceInvalid
+				}
+				payload, _ := json.Marshal(map[string]string{"conversation_id": conversationID})
+				if _, err := tx.ExecContext(ctx, `INSERT INTO space_inbox_items(user_id,space_id,kind,message_id,payload) VALUES($1,$2,'mention',$3,$4)`, span.UserID, spaceID, messageID, payload); err != nil {
 					return err
 				}
 			}
 		}
-		_, eventErr := recordSpaceEventTx(ctx, tx, spaceID, userID, "message.updated", messageID, map[string]any{})
+		_, eventErr := recordSpaceEventTx(ctx, tx, spaceID, userID, "message.updated", messageID, map[string]any{"conversation_id": conversationID})
 		return eventErr
 	})
 	if err != nil {
@@ -1058,10 +1174,10 @@ func (db *Database) UpdateSpaceMessage(ctx context.Context, userID, spaceID, mes
 	}
 	out := &SpaceMessage{}
 	err = db.spaceTx(ctx, func(tx *sql.Tx) error {
-		if _, err := requireSpaceMemberTx(ctx, tx, spaceID, userID); err != nil {
+		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionMessagesRead); err != nil {
 			return err
 		}
-		if err := scanSpaceMessage(tx.QueryRowContext(ctx, `SELECT `+spaceMessageColumns+` FROM space_messages m LEFT JOIN users u ON u.id=m.sender_user_id LEFT JOIN space_agents a ON a.id=m.sender_agent_id WHERE m.id=$1 AND m.space_id=$2`, messageID, spaceID), out); err != nil {
+		if err := scanSpaceMessage(tx.QueryRowContext(ctx, `SELECT `+spaceMessageColumns+` FROM space_messages m LEFT JOIN users u ON u.id=m.sender_user_id LEFT JOIN space_agents a ON a.id=m.sender_agent_id WHERE m.id=$1 AND m.space_id=$2 AND COALESCE(m.conversation_id,'')=$3`, messageID, spaceID, conversationID), out); err != nil {
 			return err
 		}
 		return loadSpaceMessageReferencesTx(ctx, tx, out)
@@ -1073,13 +1189,29 @@ func (db *Database) UpdateSpaceMessage(ctx context.Context, userID, spaceID, mes
 }
 
 func (db *Database) DeleteSpaceMessage(ctx context.Context, userID, spaceID, messageID string) error {
+	return db.deleteSpaceMessage(ctx, userID, spaceID, "", messageID)
+}
+
+func (db *Database) DeleteSpaceConversationMessage(ctx context.Context, userID, spaceID, conversationID, messageID string) error {
+	return db.deleteSpaceMessage(ctx, userID, spaceID, conversationID, messageID)
+}
+
+func (db *Database) deleteSpaceMessage(ctx context.Context, userID, spaceID, conversationID, messageID string) error {
 	return db.spaceTx(ctx, func(tx *sql.Tx) error {
+		if err := requireSpaceMessageWriteTx(ctx, tx, userID, spaceID); err != nil {
+			return err
+		}
+		if conversationID != "" {
+			if err := requireSpaceConversationMemberTx(ctx, tx, userID, spaceID, conversationID); err != nil {
+				return err
+			}
+		}
 		role, err := requireSpaceMemberTx(ctx, tx, spaceID, userID)
 		if err != nil {
 			return err
 		}
 		var sender string
-		if err := tx.QueryRowContext(ctx, `SELECT sender_user_id FROM space_messages WHERE id=$1 AND space_id=$2 FOR UPDATE`, messageID, spaceID).Scan(&sender); errors.Is(err, sql.ErrNoRows) {
+		if err := tx.QueryRowContext(ctx, `SELECT sender_user_id FROM space_messages WHERE id=$1 AND space_id=$2 AND COALESCE(conversation_id,'')=$3 FOR UPDATE`, messageID, spaceID, conversationID).Scan(&sender); errors.Is(err, sql.ErrNoRows) {
 			return ErrSpaceNotFound
 		} else if err != nil {
 			return err
@@ -1087,7 +1219,7 @@ func (db *Database) DeleteSpaceMessage(ctx context.Context, userID, spaceID, mes
 		if sender != userID && role != "owner" {
 			return ErrSpaceForbidden
 		}
-		if _, err := recordSpaceEventTx(ctx, tx, spaceID, userID, "message.deleted", messageID, map[string]any{}); err != nil {
+		if _, err := recordSpaceEventTx(ctx, tx, spaceID, userID, "message.deleted", messageID, map[string]any{"conversation_id": conversationID}); err != nil {
 			return err
 		}
 		_, err = tx.ExecContext(ctx, `DELETE FROM space_messages WHERE id=$1`, messageID)
@@ -1096,18 +1228,31 @@ func (db *Database) DeleteSpaceMessage(ctx context.Context, userID, spaceID, mes
 }
 
 func (db *Database) CreateSpaceAgentMessage(ctx context.Context, billingUserID, spaceID, agentID, text string) (*SpaceMessage, error) {
+	return db.createSpaceAgentMessage(ctx, billingUserID, spaceID, "", agentID, text)
+}
+
+func (db *Database) CreateSpaceConversationAgentMessage(ctx context.Context, billingUserID, spaceID, conversationID, agentID, text string) (*SpaceMessage, error) {
+	return db.createSpaceAgentMessage(ctx, billingUserID, spaceID, conversationID, agentID, text)
+}
+
+func (db *Database) createSpaceAgentMessage(ctx context.Context, billingUserID, spaceID, conversationID, agentID, text string) (*SpaceMessage, error) {
 	content := []MessageSpan{{Type: "text", Text: strings.TrimSpace(text)}}
 	if err := validateMessage(content, nil); err != nil {
 		return nil, err
 	}
-	out := &SpaceMessage{ID: "msg_" + uuid.NewString(), SpaceID: spaceID, SenderUserID: billingUserID, SenderKind: "agent", SenderAgentID: agentID, Content: content, FileNodeIDs: []string{}, LibraryItemIDs: []string{}, Attachments: []MessageAttachment{}}
+	out := &SpaceMessage{ID: "msg_" + uuid.NewString(), SpaceID: spaceID, ConversationID: conversationID, SenderUserID: billingUserID, SenderKind: "agent", SenderAgentID: agentID, Content: content, FileNodeIDs: []string{}, LibraryItemIDs: []string{}, Attachments: []MessageAttachment{}}
 	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
-		if _, err := requireSpaceMemberTx(ctx, tx, spaceID, billingUserID); err != nil {
+		if err := requireSpaceMessageWriteTx(ctx, tx, billingUserID, spaceID); err != nil {
 			return err
 		}
+		if conversationID != "" {
+			if err := requireSpaceConversationMemberTx(ctx, tx, billingUserID, spaceID, conversationID); err != nil {
+				return err
+			}
+		}
 		raw, _ := json.Marshal(content)
-		if err := tx.QueryRowContext(ctx, `INSERT INTO space_messages(id,space_id,sender_user_id,sender_kind,sender_agent_id,content)
-			VALUES($1,$2,$3,'agent',$4,$5) RETURNING seq,created_at`, out.ID, spaceID, billingUserID, agentID, raw).Scan(&out.Seq, &out.CreatedAt); err != nil {
+		if err := tx.QueryRowContext(ctx, `INSERT INTO space_messages(id,space_id,conversation_id,sender_user_id,sender_kind,sender_agent_id,content)
+			VALUES($1,$2,NULLIF($3,''),$4,'agent',$5,$6) RETURNING seq,created_at`, out.ID, spaceID, conversationID, billingUserID, agentID, raw).Scan(&out.Seq, &out.CreatedAt); err != nil {
 			return err
 		}
 		if err := tx.QueryRowContext(ctx, `SELECT name FROM space_agents WHERE id=$1 AND space_id=$2`, agentID, spaceID).Scan(&out.SenderName); err != nil {
@@ -1117,16 +1262,40 @@ func (db *Database) CreateSpaceAgentMessage(ctx context.Context, billingUserID, 
 		if err != nil {
 			return err
 		}
-		inboxPayload, _ := json.Marshal(map[string]any{"sender_name": out.SenderName, "preview": messagePreview(content)})
-		rows, err := tx.QueryContext(ctx, `SELECT user_id FROM space_members WHERE space_id=$1`, spaceID)
+		inboxPayload, _ := json.Marshal(map[string]any{"sender_name": out.SenderName, "preview": messagePreview(content), "conversation_id": conversationID})
+		recipientsQuery := `SELECT user_id FROM space_members WHERE space_id=$1`
+		recipientArgs := []any{spaceID}
+		if conversationID != "" {
+			recipientsQuery = `SELECT cm.user_id FROM space_conversation_members cm JOIN space_conversations c ON c.id=cm.conversation_id WHERE c.space_id=$1 AND cm.conversation_id=$2`
+			recipientArgs = append(recipientArgs, conversationID)
+		}
+		rows, err := tx.QueryContext(ctx, recipientsQuery, recipientArgs...)
 		if err != nil {
 			return err
 		}
-		defer rows.Close()
+		recipientIDs := []string{}
 		for rows.Next() {
 			var memberID string
 			if err := rows.Scan(&memberID); err != nil {
+				rows.Close()
 				return err
+			}
+			recipientIDs = append(recipientIDs, memberID)
+		}
+		if err := rows.Err(); err != nil {
+			rows.Close()
+			return err
+		}
+		if err := rows.Close(); err != nil {
+			return err
+		}
+		for _, memberID := range recipientIDs {
+			allowed, err := hasSpacePermissionTx(ctx, tx, memberID, spaceID, PermissionMessagesRead)
+			if err != nil {
+				return err
+			}
+			if !allowed {
+				continue
 			}
 			kind := "unread"
 			if memberID == billingUserID {
@@ -1136,7 +1305,7 @@ func (db *Database) CreateSpaceAgentMessage(ctx context.Context, billingUserID, 
 				return err
 			}
 		}
-		return rows.Err()
+		return nil
 	})
 	return out, err
 }
@@ -1157,7 +1326,7 @@ func (db *Database) UpsertSpaceNode(ctx context.Context, userID string, node Spa
 		node.Metadata = json.RawMessage(`{}`)
 	}
 	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
-		if _, err := requireSpaceMemberTx(ctx, tx, node.SpaceID, userID); err != nil {
+		if err := requireSpaceMessageWriteTx(ctx, tx, userID, node.SpaceID); err != nil {
 			return err
 		}
 		if _, err := tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock(hashtext($1))`, "spaces:nodes:"+node.SpaceID); err != nil {
@@ -1222,7 +1391,7 @@ func nullableBytes(value []byte) any {
 func (db *Database) SpaceNodes(ctx context.Context, userID, spaceID string) ([]SpaceNode, error) {
 	items := []SpaceNode{}
 	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
-		if _, err := requireSpaceMemberTx(ctx, tx, spaceID, userID); err != nil {
+		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionMessagesRead); err != nil {
 			return err
 		}
 		rows, err := tx.QueryContext(ctx, `SELECT id,space_id,COALESCE(parent_id,''),kind,display_name,uploader_user_id,mime_type,size_bytes,stale,metadata,created_at,updated_at
@@ -1246,7 +1415,7 @@ func (db *Database) SpaceNodes(ctx context.Context, userID, spaceID string) ([]S
 func (db *Database) SpaceNodeSecret(ctx context.Context, userID, spaceID, nodeID string) (*SpaceNode, error) {
 	out := &SpaceNode{}
 	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
-		if _, err := requireSpaceMemberTx(ctx, tx, spaceID, userID); err != nil {
+		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionMessagesRead); err != nil {
 			return err
 		}
 		return tx.QueryRowContext(ctx, `SELECT id,space_id,COALESCE(parent_id,''),kind,display_name,uploader_user_id,mime_type,size_bytes,stale,metadata,created_at,updated_at,target_ciphertext,target_nonce,COALESCE(target_key_version,0)
@@ -1255,12 +1424,15 @@ func (db *Database) SpaceNodeSecret(ctx context.Context, userID, spaceID, nodeID
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrSpaceNotFound
 	}
+	if err != nil {
+		return nil, err
+	}
 	return out, err
 }
 
 func (db *Database) DeleteSpaceNode(ctx context.Context, userID, spaceID, nodeID string) error {
 	return db.spaceTx(ctx, func(tx *sql.Tx) error {
-		if _, err := requireSpaceMemberTx(ctx, tx, spaceID, userID); err != nil {
+		if err := requireSpaceMessageWriteTx(ctx, tx, userID, spaceID); err != nil {
 			return err
 		}
 		if _, err := recordSpaceEventTx(ctx, tx, spaceID, userID, "node.removed", nodeID, map[string]any{}); err != nil {
@@ -1279,7 +1451,7 @@ func (db *Database) DeleteSpaceNode(ctx context.Context, userID, spaceID, nodeID
 
 func (db *Database) MarkSpaceNodeStale(ctx context.Context, userID, spaceID, nodeID string) error {
 	return db.spaceTx(ctx, func(tx *sql.Tx) error {
-		if _, err := requireSpaceMemberTx(ctx, tx, spaceID, userID); err != nil {
+		if err := requireSpaceMessageWriteTx(ctx, tx, userID, spaceID); err != nil {
 			return err
 		}
 		if _, err := tx.ExecContext(ctx, `UPDATE space_nodes SET stale=TRUE,updated_at=NOW() WHERE id=$1 AND space_id=$2`, nodeID, spaceID); err != nil {
@@ -1301,7 +1473,14 @@ func (db *Database) SpaceInbox(ctx context.Context, userID, tab string, limit in
 			where = "i.kind IN ('mention','agent','approval','workflow')"
 		}
 		rows, err := tx.QueryContext(ctx, `SELECT i.id,i.space_id,s.name,i.kind,COALESCE(i.message_id,''),i.event_id,i.payload,i.seen_at,i.created_at
-			FROM space_inbox_items i JOIN spaces s ON s.id=i.space_id WHERE i.user_id=$1 AND `+where+` ORDER BY i.id DESC LIMIT $2`, userID, limit)
+			FROM space_inbox_items i JOIN spaces s ON s.id=i.space_id
+			WHERE i.user_id=$1 AND `+where+`
+			AND EXISTS(SELECT 1 FROM space_members current_member WHERE current_member.space_id=i.space_id AND current_member.user_id=$1)
+			AND (i.message_id IS NULL OR s.owner_user_id=$1
+				OR EXISTS(SELECT 1 FROM space_member_permission_overrides mpo WHERE mpo.space_id=i.space_id AND mpo.user_id=$1 AND mpo.permission=$3 AND mpo.effect='allow')
+				OR (NOT EXISTS(SELECT 1 FROM space_member_permission_overrides mpo WHERE mpo.space_id=i.space_id AND mpo.user_id=$1 AND mpo.permission=$3)
+					AND EXISTS(SELECT 1 FROM space_roles role LEFT JOIN space_member_roles mr ON mr.role_id=role.id AND mr.space_id=role.space_id AND mr.user_id=$1 WHERE role.space_id=i.space_id AND (role.is_everyone OR mr.user_id IS NOT NULL) AND role.permissions ? $3)))
+			ORDER BY i.id DESC LIMIT $2`, userID, limit, PermissionMessagesRead)
 		if err != nil {
 			return err
 		}
@@ -1343,7 +1522,7 @@ func (db *Database) ClearSpaceInbox(ctx context.Context, userID, tab string) err
 
 func (db *Database) MarkSpaceRead(ctx context.Context, userID, spaceID string, seq int64) error {
 	return db.spaceTx(ctx, func(tx *sql.Tx) error {
-		if _, err := requireSpaceMemberTx(ctx, tx, spaceID, userID); err != nil {
+		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionMessagesRead); err != nil {
 			return err
 		}
 		if _, err := tx.ExecContext(ctx, `UPDATE space_members SET read_message_seq=GREATEST(read_message_seq,$1) WHERE space_id=$2 AND user_id=$3`, seq, spaceID, userID); err != nil {
@@ -1387,21 +1566,51 @@ func (db *Database) SpaceEventsAfter(ctx context.Context, userID string, after i
 			}
 			resync = oldest.Valid && after < oldest.Int64-1
 		}
-		rows, err := tx.QueryContext(ctx, `SELECT e.id,e.space_id,e.event_type,COALESCE(e.actor_user_id,''),COALESCE(e.entity_id,''),e.payload,e.created_at
-			FROM space_events e JOIN space_members m ON m.space_id=e.space_id
-			WHERE m.user_id=$1 AND e.id>$2 AND e.created_at>NOW()-INTERVAL '7 days' ORDER BY e.id LIMIT $3`, userID, after, limit)
-		if err != nil {
-			return err
-		}
-		defer rows.Close()
-		for rows.Next() {
-			var event SpaceEvent
-			if err := rows.Scan(&event.ID, &event.SpaceID, &event.EventType, &event.ActorUserID, &event.EntityID, &event.Payload, &event.CreatedAt); err != nil {
+		permissionCache := map[string]bool{}
+		cursor := after
+		const batchSize = 500
+		for len(events) < limit {
+			rows, err := tx.QueryContext(ctx, `SELECT e.id,e.space_id,e.event_type,COALESCE(e.actor_user_id,''),COALESCE(e.entity_id,''),e.payload,e.created_at
+				FROM space_events e JOIN space_members m ON m.space_id=e.space_id
+				WHERE m.user_id=$1 AND e.id>$2 AND e.created_at>NOW()-INTERVAL '7 days'
+				ORDER BY e.id LIMIT $3`, userID, cursor, batchSize)
+			if err != nil {
 				return err
 			}
-			events = append(events, event)
+			batch := make([]SpaceEvent, 0, batchSize)
+			for rows.Next() {
+				var event SpaceEvent
+				if err := rows.Scan(&event.ID, &event.SpaceID, &event.EventType, &event.ActorUserID, &event.EntityID, &event.Payload, &event.CreatedAt); err != nil {
+					rows.Close()
+					return err
+				}
+				batch = append(batch, event)
+			}
+			if err := rows.Err(); err != nil {
+				rows.Close()
+				return err
+			}
+			if err := rows.Close(); err != nil {
+				return err
+			}
+			for _, event := range batch {
+				cursor = event.ID
+				visible, err := spaceEventVisibleToUserTx(ctx, tx, userID, event, permissionCache)
+				if err != nil {
+					return err
+				}
+				if visible {
+					events = append(events, event)
+					if len(events) == limit {
+						break
+					}
+				}
+			}
+			if len(batch) < batchSize {
+				break
+			}
 		}
-		return rows.Err()
+		return nil
 	})
 	return events, resync, err
 }
@@ -1409,8 +1618,19 @@ func (db *Database) SpaceEventsAfter(ctx context.Context, userID string, after i
 func (db *Database) EventByIDForUser(ctx context.Context, userID string, eventID int64) (*SpaceEvent, error) {
 	out := &SpaceEvent{}
 	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
-		return tx.QueryRowContext(ctx, `SELECT e.id,e.space_id,e.event_type,COALESCE(e.actor_user_id,''),COALESCE(e.entity_id,''),e.payload,e.created_at
-			FROM space_events e JOIN space_members m ON m.space_id=e.space_id WHERE e.id=$1 AND m.user_id=$2`, eventID, userID).Scan(&out.ID, &out.SpaceID, &out.EventType, &out.ActorUserID, &out.EntityID, &out.Payload, &out.CreatedAt)
+		if err := tx.QueryRowContext(ctx, `SELECT e.id,e.space_id,e.event_type,COALESCE(e.actor_user_id,''),COALESCE(e.entity_id,''),e.payload,e.created_at
+			FROM space_events e JOIN space_members m ON m.space_id=e.space_id
+			WHERE e.id=$1 AND m.user_id=$2`, eventID, userID).Scan(&out.ID, &out.SpaceID, &out.EventType, &out.ActorUserID, &out.EntityID, &out.Payload, &out.CreatedAt); err != nil {
+			return err
+		}
+		visible, err := spaceEventVisibleToUserTx(ctx, tx, userID, *out, map[string]bool{})
+		if err != nil {
+			return err
+		}
+		if !visible {
+			return sql.ErrNoRows
+		}
+		return nil
 	})
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrSpaceNotFound
@@ -1418,12 +1638,80 @@ func (db *Database) EventByIDForUser(ctx context.Context, userID string, eventID
 	return out, err
 }
 
+func spaceEventVisibleToUserTx(ctx context.Context, tx *sql.Tx, userID string, event SpaceEvent, permissionCache map[string]bool) (bool, error) {
+	permission := ""
+	switch {
+	case strings.HasPrefix(event.EventType, "message."):
+		var payload struct {
+			ConversationID string `json:"conversation_id"`
+		}
+		if err := json.Unmarshal(event.Payload, &payload); err != nil {
+			return false, err
+		}
+		if payload.ConversationID != "" {
+			var member bool
+			if err := tx.QueryRowContext(ctx, `SELECT EXISTS(
+				SELECT 1 FROM space_conversation_members cm
+				JOIN space_conversations c ON c.id=cm.conversation_id
+				WHERE cm.conversation_id=$1 AND cm.user_id=$2 AND c.space_id=$3
+			)`, payload.ConversationID, userID, event.SpaceID).Scan(&member); err != nil {
+				return false, err
+			}
+			if !member {
+				return false, nil
+			}
+		}
+		permission = PermissionMessagesRead
+	case strings.HasPrefix(event.EventType, "node."):
+		permission = PermissionMessagesRead
+	case strings.HasPrefix(event.EventType, "library."):
+		permission = PermissionLibraryView
+	case strings.HasPrefix(event.EventType, "agent.run."), strings.HasPrefix(event.EventType, "workflow.run."):
+		run := &SpaceRun{}
+		if err := scanSpaceRun(tx.QueryRowContext(ctx, `SELECT `+spaceRunColumns+` FROM space_runs WHERE id=$1`, event.EntityID), run); errors.Is(err, sql.ErrNoRows) {
+			// Retain requester-only visibility for legacy run events that predate
+			// canonical space_runs rows. Never expose another member's orphaned
+			// event through Studio visibility alone.
+			if event.ActorUserID != userID {
+				return false, nil
+			}
+			permission = PermissionAgentsRun
+		} else if err != nil {
+			return false, err
+		} else {
+			visible, err := sharedSpaceRunVisibleToUserTx(ctx, tx, run, userID)
+			if err != nil || !visible {
+				return false, err
+			}
+			if run.RequestingMemberID == userID {
+				permission = PermissionAgentsRun
+			} else {
+				permission = PermissionStudioView
+			}
+		}
+	case strings.HasPrefix(event.EventType, "agent."), strings.HasPrefix(event.EventType, "workflow."):
+		permission = PermissionStudioView
+	default:
+		return true, nil
+	}
+	key := event.SpaceID + "\x00" + permission
+	if allowed, ok := permissionCache[key]; ok {
+		return allowed, nil
+	}
+	allowed, err := hasSpacePermissionTx(ctx, tx, userID, event.SpaceID, permission)
+	if err != nil {
+		return false, err
+	}
+	permissionCache[key] = allowed
+	return allowed, nil
+}
+
 func (db *Database) CreateResolveTicket(ctx context.Context, userID, spaceID, nodeID, disposition, tokenHash string, expires time.Time) error {
 	if disposition != "open" && disposition != "download" {
 		return ErrSpaceInvalid
 	}
 	return db.spaceTx(ctx, func(tx *sql.Tx) error {
-		if _, err := requireSpaceMemberTx(ctx, tx, spaceID, userID); err != nil {
+		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionMessagesRead); err != nil {
 			return err
 		}
 		var ok bool
@@ -1455,14 +1743,14 @@ func (db *Database) SpaceStudioResources(ctx context.Context, userID, spaceID, k
 			return err
 		}
 		if kind == "agent" {
-			rows, err := tx.QueryContext(ctx, `SELECT id,space_id,creator_user_id,name,description,icon,instructions,enabled,status,runtime_kind,version,schedules_enabled,active_workflow_version_id,created_at,updated_at FROM space_agents WHERE space_id=$1 ORDER BY updated_at DESC`, spaceID)
+			rows, err := tx.QueryContext(ctx, `SELECT id,space_id,creator_user_id,name,description,icon,instructions,enabled,status,runtime_kind,version,schedules_enabled,COALESCE(active_workflow_version_id,''),access_policy,created_at,updated_at FROM space_agents WHERE space_id=$1 ORDER BY updated_at DESC`, spaceID)
 			if err != nil {
 				return err
 			}
 			for rows.Next() {
 				var item SpaceStudioResource
 				item.Kind = "agent"
-				if err := rows.Scan(&item.ID, &item.SpaceID, &item.CreatorUserID, &item.Name, &item.Description, &item.Icon, &item.Instructions, &item.Enabled, &item.Status, &item.RuntimeKind, &item.Version, &item.SchedulesEnabled, &item.ActiveWorkflowVersionID, &item.CreatedAt, &item.UpdatedAt); err != nil {
+				if err := rows.Scan(&item.ID, &item.SpaceID, &item.CreatorUserID, &item.Name, &item.Description, &item.Icon, &item.Instructions, &item.Enabled, &item.Status, &item.RuntimeKind, &item.Version, &item.SchedulesEnabled, &item.ActiveWorkflowVersionID, &item.AccessPolicy, &item.CreatedAt, &item.UpdatedAt); err != nil {
 					rows.Close()
 					return err
 				}
@@ -1476,9 +1764,11 @@ func (db *Database) SpaceStudioResources(ctx context.Context, userID, spaceID, k
 				return err
 			}
 			for index := range items {
-				items[index].ActiveWorkflow, err = loadWorkflowVersionTx(ctx, tx, items[index].ActiveWorkflowVersionID)
-				if err != nil {
-					return err
+				if items[index].ActiveWorkflowVersionID != "" {
+					items[index].ActiveWorkflow, err = loadWorkflowVersionTx(ctx, tx, items[index].ActiveWorkflowVersionID)
+					if err != nil {
+						return err
+					}
 				}
 			}
 			return nil
@@ -1487,11 +1777,53 @@ func (db *Database) SpaceStudioResources(ctx context.Context, userID, spaceID, k
 		if err != nil {
 			return err
 		}
-		defer rows.Close()
 		for rows.Next() {
 			var item SpaceStudioResource
 			item.Kind = "workflow"
 			if err := rows.Scan(&item.ID, &item.SpaceID, &item.CreatorUserID, &item.Name, &item.Description, &item.Definition, &item.Enabled, &item.Version, &item.SchedulesEnabled, &item.StableIdentifier, &item.CreatedAt, &item.UpdatedAt); err != nil {
+				rows.Close()
+				return err
+			}
+			items = append(items, item)
+		}
+		if err := rows.Err(); err != nil {
+			rows.Close()
+			return err
+		}
+		if err := rows.Close(); err != nil {
+			return err
+		}
+		for index := range items {
+			workflow, workflowErr := loadLatestWorkflowVersionTx(ctx, tx, items[index].ID)
+			if workflowErr == nil {
+				items[index].ActiveWorkflow = workflow
+			} else if !errors.Is(workflowErr, sql.ErrNoRows) {
+				return workflowErr
+			}
+		}
+		return nil
+	})
+	return items, err
+}
+
+func (db *Database) SpaceChatAgents(ctx context.Context, userID, spaceID string) ([]SpaceStudioResource, error) {
+	items := []SpaceStudioResource{}
+	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionMessagesRead); err != nil {
+			return err
+		}
+		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionAgentsRun); err != nil {
+			return err
+		}
+		rows, err := tx.QueryContext(ctx, `SELECT id,space_id,creator_user_id,name,description,icon,enabled,status,runtime_kind,version,created_at,updated_at FROM space_agents WHERE space_id=$1 AND enabled AND (creator_user_id=$2 OR access_policy->>'mode'='space' OR access_policy->'allowedUserIds' ? $2) ORDER BY name,id`, spaceID, userID)
+		if err != nil {
+			return err
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var item SpaceStudioResource
+			item.Kind = "agent"
+			if err := rows.Scan(&item.ID, &item.SpaceID, &item.CreatorUserID, &item.Name, &item.Description, &item.Icon, &item.Enabled, &item.Status, &item.RuntimeKind, &item.Version, &item.CreatedAt, &item.UpdatedAt); err != nil {
 				return err
 			}
 			items = append(items, item)
@@ -1519,6 +1851,13 @@ func (db *Database) SaveSpaceStudioResource(ctx context.Context, userID string, 
 			return err
 		}
 		if item.Kind == "agent" {
+			if len(item.AccessPolicy) == 0 {
+				item.AccessPolicy = json.RawMessage(`{"mode":"space","allowedUserIds":[]}`)
+			}
+			var access workflowv2.AgentAccessPolicy
+			if json.Unmarshal(item.AccessPolicy, &access) != nil || !validAgentAccess(access) {
+				return ErrSpaceInvalid
+			}
 			if item.Icon == "" {
 				item.Icon = "bot"
 			}
@@ -1530,12 +1869,16 @@ func (db *Database) SaveSpaceStudioResource(ctx context.Context, userID string, 
 			}
 			if item.Version == 0 {
 				item.CreatorUserID = userID
-				if err := createDefaultAgentWorkflowTx(ctx, tx, userID, &item); err != nil {
-					return err
-				}
-				return tx.QueryRowContext(ctx, `INSERT INTO space_agents(id,space_id,creator_user_id,name,description,icon,instructions,enabled,status,runtime_kind,schedules_enabled,active_workflow_version_id,updated_by_user_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$3) RETURNING version,created_at,updated_at`, item.ID, item.SpaceID, userID, item.Name, item.Description, item.Icon, item.Instructions, item.Enabled, item.Status, item.RuntimeKind, item.SchedulesEnabled, item.ActiveWorkflowVersionID).Scan(&item.Version, &item.CreatedAt, &item.UpdatedAt)
+				return tx.QueryRowContext(ctx, `INSERT INTO space_agents(id,space_id,creator_user_id,name,description,icon,instructions,enabled,status,runtime_kind,schedules_enabled,active_workflow_version_id,access_policy,updated_by_user_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,NULL,$12,$3) RETURNING version,created_at,updated_at`, item.ID, item.SpaceID, userID, item.Name, item.Description, item.Icon, item.Instructions, item.Enabled, item.Status, item.RuntimeKind, item.SchedulesEnabled, item.AccessPolicy).Scan(&item.Version, &item.CreatedAt, &item.UpdatedAt)
 			}
-			result, err := tx.ExecContext(ctx, `UPDATE space_agents SET name=$1,description=$2,icon=$3,instructions=$4,enabled=$5,status=$6,schedules_enabled=$7,updated_by_user_id=$8,version=version+1,updated_at=NOW() WHERE id=$9 AND space_id=$10 AND version=$11`, item.Name, item.Description, item.Icon, item.Instructions, item.Enabled, item.Status, item.SchedulesEnabled, userID, item.ID, item.SpaceID, item.Version)
+			var creatorID string
+			if err := tx.QueryRowContext(ctx, `SELECT creator_user_id FROM space_agents WHERE id=$1 AND space_id=$2`, item.ID, item.SpaceID).Scan(&creatorID); err != nil {
+				return err
+			}
+			if creatorID != userID {
+				return ErrSpaceForbidden
+			}
+			result, err := tx.ExecContext(ctx, `UPDATE space_agents SET name=$1,description=$2,icon=$3,instructions=$4,enabled=$5,status=$6,schedules_enabled=$7,access_policy=$8,updated_by_user_id=$9,version=version+1,updated_at=NOW() WHERE id=$10 AND space_id=$11 AND version=$12`, item.Name, item.Description, item.Icon, item.Instructions, item.Enabled, item.Status, item.SchedulesEnabled, item.AccessPolicy, userID, item.ID, item.SpaceID, item.Version)
 			if err != nil {
 				return err
 			}
@@ -1543,10 +1886,10 @@ func (db *Database) SaveSpaceStudioResource(ctx context.Context, userID string, 
 				return ErrSpaceConflict
 			}
 			item.Version++
-			return tx.QueryRowContext(ctx, `SELECT creator_user_id,runtime_kind,active_workflow_version_id,created_at,updated_at FROM space_agents WHERE id=$1`, item.ID).Scan(&item.CreatorUserID, &item.RuntimeKind, &item.ActiveWorkflowVersionID, &item.CreatedAt, &item.UpdatedAt)
+			return tx.QueryRowContext(ctx, `SELECT creator_user_id,runtime_kind,COALESCE(active_workflow_version_id,''),access_policy,created_at,updated_at FROM space_agents WHERE id=$1`, item.ID).Scan(&item.CreatorUserID, &item.RuntimeKind, &item.ActiveWorkflowVersionID, &item.AccessPolicy, &item.CreatedAt, &item.UpdatedAt)
 		}
-		if err := validateCloudWorkflow(item.Definition); err != nil {
-			return err
+		if validateWorkflowV2Tx(ctx, tx, item.SpaceID, item.Definition) != nil {
+			return ErrSpaceInvalid
 		}
 		if item.Version == 0 {
 			item.CreatorUserID = userID
@@ -1554,8 +1897,14 @@ func (db *Database) SaveSpaceStudioResource(ctx context.Context, userID string, 
 			if err := tx.QueryRowContext(ctx, `INSERT INTO space_workflows(id,space_id,creator_user_id,name,description,definition,enabled,schedules_enabled,stable_identifier,author_name) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,'Misty member') RETURNING version,created_at,updated_at`, item.ID, item.SpaceID, userID, item.Name, item.Description, item.Definition, item.Enabled, item.SchedulesEnabled, item.StableIdentifier).Scan(&item.Version, &item.CreatedAt, &item.UpdatedAt); err != nil {
 				return err
 			}
-			_, err := snapshotWorkflowTx(ctx, tx, userID, &item)
+			return nil
+		}
+		var creatorID string
+		if err := tx.QueryRowContext(ctx, `SELECT creator_user_id FROM space_workflows WHERE id=$1 AND space_id=$2`, item.ID, item.SpaceID).Scan(&creatorID); err != nil {
 			return err
+		}
+		if creatorID != userID {
+			return ErrSpaceForbidden
 		}
 		result, err := tx.ExecContext(ctx, `UPDATE space_workflows SET name=$1,description=$2,definition=$3,enabled=$4,schedules_enabled=$5,version=version+1,updated_at=NOW() WHERE id=$6 AND space_id=$7 AND version=$8`, item.Name, item.Description, item.Definition, item.Enabled, item.SchedulesEnabled, item.ID, item.SpaceID, item.Version)
 		if err != nil {
@@ -1568,8 +1917,7 @@ func (db *Database) SaveSpaceStudioResource(ctx context.Context, userID string, 
 		if err := tx.QueryRowContext(ctx, `SELECT creator_user_id,stable_identifier,created_at,updated_at FROM space_workflows WHERE id=$1`, item.ID).Scan(&item.CreatorUserID, &item.StableIdentifier, &item.CreatedAt, &item.UpdatedAt); err != nil {
 			return err
 		}
-		_, err = snapshotWorkflowTx(ctx, tx, userID, &item)
-		return err
+		return nil
 	})
 	if err != nil {
 		return nil, err
@@ -1584,33 +1932,6 @@ func (db *Database) SaveSpaceStudioResource(ctx context.Context, userID string, 
 	return &item, nil
 }
 
-func validateCloudWorkflow(raw json.RawMessage) error {
-	var definition struct {
-		Nodes []struct {
-			Type string `json:"type"`
-			Kind string `json:"kind"`
-		} `json:"nodes"`
-	}
-	if err := json.Unmarshal(raw, &definition); err != nil {
-		return ErrSpaceInvalid
-	}
-	blocked := map[string]bool{
-		"select_path": true, "list_folder": true, "read_file": true, "read_text": true, "read_metadata": true,
-		"write_file": true, "write_text": true, "copy_file": true, "copy_path": true, "move_file": true,
-		"move_path": true, "rename_file": true, "rename_path": true, "local_secret": true, "create_agent": true,
-	}
-	for _, node := range definition.Nodes {
-		kind := node.Kind
-		if kind == "" {
-			kind = node.Type
-		}
-		if blocked[strings.ToLower(kind)] {
-			return ErrSpaceInvalid
-		}
-	}
-	return nil
-}
-
 func (db *Database) SpaceStudioResourceByID(ctx context.Context, userID, spaceID, kind, id string) (*SpaceStudioResource, error) {
 	out := &SpaceStudioResource{Kind: kind}
 	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
@@ -1618,17 +1939,28 @@ func (db *Database) SpaceStudioResourceByID(ctx context.Context, userID, spaceID
 			return err
 		}
 		if kind == "agent" {
-			if err := tx.QueryRowContext(ctx, `SELECT id,space_id,creator_user_id,name,description,icon,instructions,enabled,status,runtime_kind,version,schedules_enabled,active_workflow_version_id,created_at,updated_at FROM space_agents WHERE id=$1 AND space_id=$2`, id, spaceID).Scan(&out.ID, &out.SpaceID, &out.CreatorUserID, &out.Name, &out.Description, &out.Icon, &out.Instructions, &out.Enabled, &out.Status, &out.RuntimeKind, &out.Version, &out.SchedulesEnabled, &out.ActiveWorkflowVersionID, &out.CreatedAt, &out.UpdatedAt); err != nil {
+			if err := tx.QueryRowContext(ctx, `SELECT id,space_id,creator_user_id,name,description,icon,instructions,enabled,status,runtime_kind,version,schedules_enabled,COALESCE(active_workflow_version_id,''),access_policy,created_at,updated_at FROM space_agents WHERE id=$1 AND space_id=$2`, id, spaceID).Scan(&out.ID, &out.SpaceID, &out.CreatorUserID, &out.Name, &out.Description, &out.Icon, &out.Instructions, &out.Enabled, &out.Status, &out.RuntimeKind, &out.Version, &out.SchedulesEnabled, &out.ActiveWorkflowVersionID, &out.AccessPolicy, &out.CreatedAt, &out.UpdatedAt); err != nil {
 				return err
 			}
-			workflow, err := loadWorkflowVersionTx(ctx, tx, out.ActiveWorkflowVersionID)
-			out.ActiveWorkflow = workflow
-			return err
+			if out.ActiveWorkflowVersionID != "" {
+				workflow, err := loadWorkflowVersionTx(ctx, tx, out.ActiveWorkflowVersionID)
+				out.ActiveWorkflow = workflow
+				return err
+			}
+			return nil
 		}
 		if kind != "workflow" {
 			return ErrSpaceInvalid
 		}
-		return tx.QueryRowContext(ctx, `SELECT id,space_id,creator_user_id,name,description,definition,enabled,version,schedules_enabled,stable_identifier,created_at,updated_at FROM space_workflows WHERE id=$1 AND space_id=$2`, id, spaceID).Scan(&out.ID, &out.SpaceID, &out.CreatorUserID, &out.Name, &out.Description, &out.Definition, &out.Enabled, &out.Version, &out.SchedulesEnabled, &out.StableIdentifier, &out.CreatedAt, &out.UpdatedAt)
+		if err := tx.QueryRowContext(ctx, `SELECT id,space_id,creator_user_id,name,description,definition,enabled,version,schedules_enabled,stable_identifier,created_at,updated_at FROM space_workflows WHERE id=$1 AND space_id=$2`, id, spaceID).Scan(&out.ID, &out.SpaceID, &out.CreatorUserID, &out.Name, &out.Description, &out.Definition, &out.Enabled, &out.Version, &out.SchedulesEnabled, &out.StableIdentifier, &out.CreatedAt, &out.UpdatedAt); err != nil {
+			return err
+		}
+		workflow, err := loadLatestWorkflowVersionTx(ctx, tx, out.ID)
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil
+		}
+		out.ActiveWorkflow = workflow
+		return err
 	})
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrSpaceNotFound
@@ -1636,7 +1968,7 @@ func (db *Database) SpaceStudioResourceByID(ctx context.Context, userID, spaceID
 	return out, err
 }
 
-func (db *Database) CreateSpaceRun(ctx context.Context, userID, spaceID, kind, resourceID, triggerKind string, input json.RawMessage) (*SpaceRun, error) {
+func (db *Database) CreateSpaceRun(ctx context.Context, userID, spaceID, kind, resourceID, triggerKind, capabilityID string, input json.RawMessage) (*SpaceRun, error) {
 	if kind == "agent" {
 		sourceType := "direct"
 		if triggerKind == "mention" {
@@ -1648,60 +1980,15 @@ func (db *Database) CreateSpaceRun(ctx context.Context, userID, spaceID, kind, r
 		if triggerKind == "test" {
 			sourceType = "studio_test"
 		}
-		return db.CreateAgentRun(ctx, AgentRunRequest{RequestingMemberID: userID, SpaceID: spaceID, AgentID: resourceID, SourceType: sourceType, Input: input, TriggerKind: triggerKind})
+		return db.CreateAgentRun(ctx, AgentRunRequest{RequestingMemberID: userID, SpaceID: spaceID, AgentID: resourceID, SourceType: sourceType, CapabilityID: capabilityID, Input: input, TriggerKind: triggerKind})
 	}
-	if len(input) == 0 {
-		input = json.RawMessage(`{}`)
-	}
-	out := &SpaceRun{ID: "run_" + uuid.NewString(), SpaceID: spaceID, ResourceKind: kind, ResourceID: resourceID, InitiatedByUserID: userID, BillingUserID: userID, TriggerKind: triggerKind, State: "running", Input: input, Result: json.RawMessage(`{}`), RequestingMemberID: userID, SourceType: "studio_test", Outputs: json.RawMessage(`{}`), Artifacts: json.RawMessage(`[]`)}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
-		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionAgentsRun); err != nil {
-			return err
-		}
-		if kind != "workflow" {
-			return ErrSpaceInvalid
-		}
-		var creator, versionID string
-		var enabled bool
-		if err := tx.QueryRowContext(ctx, `SELECT w.creator_user_id,w.enabled,v.id FROM space_workflows w JOIN space_workflow_versions v ON v.workflow_id=w.id WHERE w.id=$1 AND w.space_id=$2 ORDER BY v.created_at DESC LIMIT 1`, resourceID, spaceID).Scan(&creator, &enabled, &versionID); errors.Is(err, sql.ErrNoRows) {
-			return ErrSpaceNotFound
-		} else if err != nil {
-			return err
-		}
-		if !enabled {
-			return ErrSpaceInvalid
-		}
-		if triggerKind == "schedule" {
-			out.BillingUserID = creator
-			out.SourceType = "schedule"
-		}
-		workflow, err := loadWorkflowVersionTx(ctx, tx, versionID)
-		if err != nil {
-			return err
-		}
-		capability, err := selectWorkflowCapability(workflow.Metadata, "")
-		if err != nil {
-			return err
-		}
-		if err := authorizeWorkflowRequirementsTx(ctx, tx, userID, spaceID, workflow.Metadata); err != nil {
-			return err
-		}
-		out.WorkflowIdentifier, out.WorkflowVersionID, out.WorkflowVersion, out.CapabilityID = workflow.StableIdentifier, workflow.ID, workflow.Version, capability.ID
-		if capability.Destructive || capability.ConfirmationRequired {
-			out.State = "awaiting_approval"
-		}
-		if err := tx.QueryRowContext(ctx, `INSERT INTO space_runs(id,space_id,resource_kind,resource_id,initiated_by_user_id,billing_user_id,trigger_kind,state,input,requesting_member_id,source_type,workflow_identifier,workflow_version_id,workflow_version,capability_id,outputs,artifacts)
-			VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$5,$10,$11,$12,$13,$14,'{}'::jsonb,'[]'::jsonb) RETURNING created_at,updated_at`, out.ID, spaceID, kind, resourceID, userID, out.BillingUserID, triggerKind, out.State, input, out.SourceType, out.WorkflowIdentifier, out.WorkflowVersionID, out.WorkflowVersion, out.CapabilityID).Scan(&out.CreatedAt, &out.UpdatedAt); err != nil {
-			return err
-		}
-		_, err = recordSpaceEventTx(ctx, tx, spaceID, userID, kind+".run.started", out.ID, out)
-		return err
-	})
-	return out, err
+	// Workflows are immutable plans attached to an Agent. They never execute as
+	// standalone principals, including Studio tests.
+	return nil, ErrSpaceInvalid
 }
 
 func (db *Database) FinishSpaceRun(ctx context.Context, runID, state string, result json.RawMessage, errorCode string) (*SpaceRun, error) {
-	if state != "completed" && state != "failed" && state != "canceled" {
+	if state != "completed" && state != "completed_with_errors" && state != "failed" && state != "canceled" && state != "rejected" {
 		return nil, ErrSpaceInvalid
 	}
 	if len(result) == 0 {
@@ -1710,16 +1997,23 @@ func (db *Database) FinishSpaceRun(ctx context.Context, runID, state string, res
 	out := &SpaceRun{}
 	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
 		progress := 0
-		if state == "completed" {
+		if state == "completed" || state == "completed_with_errors" {
 			progress = 100
 		}
-		if err := scanSpaceRun(tx.QueryRowContext(ctx, `UPDATE space_runs SET state=$1,result=$2,outputs=$2,error_code=NULLIF($3,''),error_message=CASE WHEN $1='failed' THEN COALESCE($2->>'message','Execution failed') ELSE NULL END,progress=$4,completed_at=NOW(),updated_at=NOW()
-			WHERE id=$5 AND state IN ('running','retrying') RETURNING `+spaceRunColumns, state, result, errorCode, progress, runID), out); errors.Is(err, sql.ErrNoRows) {
+		if err := scanSpaceRun(tx.QueryRowContext(ctx, `UPDATE space_runs SET state=$1,result=$2,outputs=$2,error_code=NULLIF($3,''),error_message=CASE WHEN $1='failed' THEN COALESCE(($2::jsonb)->>'message','Execution failed') ELSE NULL END,progress=$4,completed_at=NOW(),updated_at=NOW()
+			WHERE id=$5 AND state IN ('queued','running','cooldown') RETURNING `+spaceRunColumns, state, result, errorCode, progress, runID), out); errors.Is(err, sql.ErrNoRows) {
 			return ErrSpaceNotFound
 		} else if err != nil {
 			return err
 		}
-		_, err := recordSpaceEventTx(ctx, tx, out.SpaceID, out.InitiatedByUserID, out.ResourceKind+".run."+state, out.ID, out)
+		eventID, err := recordSpaceEventTx(ctx, tx, out.SpaceID, out.InitiatedByUserID, out.ResourceKind+".run."+state, out.ID, out)
+		if err != nil {
+			return err
+		}
+		if out.SourceType == "schedule" || out.TriggerKind != "manual" && out.TriggerKind != "mika" && out.TriggerKind != "mention" {
+			payload := mustJSON(map[string]any{"run_id": out.ID, "agent_id": out.AgentID, "state": out.State, "outputs": out.Outputs, "error_code": out.ErrorCode})
+			_, err = tx.ExecContext(ctx, `INSERT INTO space_inbox_items(user_id,space_id,kind,event_id,payload) VALUES($1,$2,'workflow',$3,$4)`, out.RequestingMemberID, out.SpaceID, eventID, payload)
+		}
 		return err
 	})
 	return out, err
@@ -1736,7 +2030,13 @@ func (db *Database) DeleteSpaceStudioResource(ctx context.Context, userID, space
 		} else if kind != "agent" {
 			return ErrSpaceInvalid
 		}
-		result, err := tx.ExecContext(ctx, `DELETE FROM `+table+` WHERE id=$1 AND space_id=$2`, id, spaceID)
+		if _, err := tx.ExecContext(ctx, `UPDATE space_run_approvals SET state='canceled',decided_by_user_id=$1,decided_at=NOW() WHERE state='pending' AND run_id IN (SELECT id FROM space_runs WHERE space_id=$2 AND resource_kind=$3 AND resource_id=$4 AND state IN ('queued','running','awaiting_approval','cooldown'))`, userID, spaceID, kind, id); err != nil {
+			return err
+		}
+		if _, err := tx.ExecContext(ctx, `UPDATE space_runs SET state='canceled',canceled_at=NOW(),completed_at=NOW(),updated_at=NOW() WHERE space_id=$1 AND resource_kind=$2 AND resource_id=$3 AND state IN ('queued','running','awaiting_approval','cooldown')`, spaceID, kind, id); err != nil {
+			return err
+		}
+		result, err := tx.ExecContext(ctx, `DELETE FROM `+table+` WHERE id=$1 AND space_id=$2 AND creator_user_id=$3`, id, spaceID, userID)
 		if err != nil {
 			return err
 		}

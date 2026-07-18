@@ -15,8 +15,8 @@ func TestLibraryIntelligencePolicyProcessingSearchAndCleanup(t *testing.T) {
 	spaceID := spaces[0].ID
 	item := createPeopleTestImage(t, database, owner.ID, spaceID, "bakery-receipt.jpg", "6")
 
-	policy, err := database.UpdateLibraryIntelligencePolicy(ctx, owner.ID, spaceID, 0, false, false, true, true, true)
-	if err != nil || !policy.OCREnabled || !policy.AIEnabled || !policy.SemanticSearch || policy.QueuedAIJobs != 1 {
+	policy, err := database.UpdateLibraryIntelligencePolicy(ctx, owner.ID, spaceID, 0, false, false, true, true)
+	if err != nil || !policy.AIEnabled || !policy.SemanticSearch || policy.QueuedAIJobs != 1 {
 		t.Fatalf("enabled intelligence policy = %#v, %v", policy, err)
 	}
 	job, err := database.ClaimLibraryIntelligenceJob(ctx, "intelligence-test-worker", time.Minute)
@@ -43,8 +43,8 @@ func TestLibraryIntelligencePolicyProcessingSearchAndCleanup(t *testing.T) {
 		t.Fatalf("receipt utility facets = %#v, %v", facets, err)
 	}
 
-	policy, err = database.UpdateLibraryIntelligencePolicy(ctx, owner.ID, spaceID, policy.Version, false, false, false, false, false)
-	if err != nil || policy.OCREnabled || policy.AIEnabled || policy.SemanticSearch || policy.QueuedAIJobs != 0 {
+	policy, err = database.UpdateLibraryIntelligencePolicy(ctx, owner.ID, spaceID, policy.Version, false, false, false, false)
+	if err != nil || policy.AIEnabled || policy.SemanticSearch || policy.QueuedAIJobs != 0 {
 		t.Fatalf("disabled intelligence policy = %#v, %v", policy, err)
 	}
 	lexical, err = database.SearchSpaceLibraryIntelligence(ctx, owner.ID, spaceID, "coffee", nil, 10)

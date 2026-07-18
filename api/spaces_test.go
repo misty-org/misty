@@ -2,9 +2,13 @@ package api
 
 import (
 	"encoding/base64"
+	"errors"
 	"net"
 	"strings"
 	"testing"
+
+	serveragent "github.com/kannachi323/misty/server/agent"
+	"github.com/kannachi323/misty/server/db"
 )
 
 func TestSpaceLinkEncryptionRoundTrip(t *testing.T) {
@@ -64,5 +68,30 @@ func TestSpaceTargetFingerprintDoesNotExposeTarget(t *testing.T) {
 	fingerprint := SpaceTargetFingerprint(target)
 	if len(fingerprint) != 16 || strings.Contains(fingerprint, "secret") {
 		t.Fatalf("unsafe fingerprint %q", fingerprint)
+	}
+}
+
+func TestAgentMentionFailuresAreSafeAndActionable(t *testing.T) {
+	tests := []struct {
+		name string
+		err  error
+		code string
+	}{
+		{name: "credits", err: serveragent.CreditsExhaustedError{Required: 10, Available: 2}, code: "credits_exhausted"},
+		{name: "integration", err: db.ErrWorkflowIntegrationRequired, code: "integration_required"},
+		{name: "permission", err: db.ErrLibraryForbidden, code: "forbidden"},
+		{name: "removed", err: db.ErrAgentNotFound, code: "resource_unavailable"},
+		{name: "internal", err: errors.New("provider secret detail"), code: "run_failed"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			failure := agentMentionFailureFromError("agent_one", test.err)
+			if failure.AgentID != "agent_one" || failure.Code != test.code || failure.Message == "" {
+				t.Fatalf("agentMentionFailureFromError() = %#v", failure)
+			}
+			if strings.Contains(failure.Message, "provider secret detail") {
+				t.Fatalf("failure leaked internal error: %#v", failure)
+			}
+		})
 	}
 }

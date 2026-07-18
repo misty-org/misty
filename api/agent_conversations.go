@@ -9,14 +9,14 @@ import (
 	"github.com/kannachi323/misty/server/db"
 )
 
-func (s *SpacesService) PrivateAgentConversations() http.HandlerFunc {
+func (s *SpacesService) AgentConversations() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		userID, ok := authenticatedUser(w, r, s.database)
 		if !ok {
 			return
 		}
 		if r.Method == http.MethodGet {
-			items, err := s.database.PrivateAgentConversations(r.Context(), userID)
+			items, err := s.database.AgentConversations(r.Context(), userID)
 			if err != nil {
 				writeSpaceError(w, err)
 				return
@@ -32,7 +32,7 @@ func (s *SpacesService) PrivateAgentConversations() http.HandlerFunc {
 		if decodeJSON(w, r, &body) != nil {
 			return
 		}
-		item, err := s.database.CreatePrivateAgentConversation(r.Context(), userID, body.SpaceID, body.AgentID, body.Title)
+		item, err := s.database.CreateAgentConversation(r.Context(), userID, body.SpaceID, body.AgentID, body.Title)
 		if err != nil {
 			writeSpaceError(w, err)
 			return
@@ -41,7 +41,7 @@ func (s *SpacesService) PrivateAgentConversations() http.HandlerFunc {
 	}
 }
 
-func (s *SpacesService) PrivateAgentConversationEvents() http.HandlerFunc {
+func (s *SpacesService) AgentConversationEvents() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		userID, ok := authenticatedUser(w, r, s.database)
 		if !ok {
@@ -49,7 +49,7 @@ func (s *SpacesService) PrivateAgentConversationEvents() http.HandlerFunc {
 		}
 		conversationID := chi.URLParam(r, "conversationID")
 		if r.Method == http.MethodGet {
-			items, err := s.database.PrivateConversationEvents(r.Context(), userID, conversationID)
+			items, err := s.database.AgentConversationEvents(r.Context(), userID, conversationID)
 			if err != nil {
 				writeSpaceError(w, err)
 				return
@@ -57,7 +57,7 @@ func (s *SpacesService) PrivateAgentConversationEvents() http.HandlerFunc {
 			writeJSON(w, http.StatusOK, map[string]any{"events": items})
 			return
 		}
-		conversation, err := s.database.PrivateAgentConversationByID(r.Context(), userID, conversationID)
+		conversation, err := s.database.AgentConversationByID(r.Context(), userID, conversationID)
 		if err != nil {
 			writeSpaceError(w, err)
 			return
@@ -75,7 +75,7 @@ func (s *SpacesService) PrivateAgentConversationEvents() http.HandlerFunc {
 			writeSpaceError(w, db.ErrSpaceInvalid)
 			return
 		}
-		_, err = s.database.AppendPrivateConversationEvent(r.Context(), userID, conversationID, "user_message", mustAPIRawJSON(map[string]string{"text": body.Prompt}))
+		_, err = s.database.AppendAgentConversationEvent(r.Context(), userID, conversationID, "user_message", mustAPIRawJSON(map[string]string{"text": body.Prompt}))
 		if err != nil {
 			writeSpaceError(w, err)
 			return
@@ -86,7 +86,7 @@ func (s *SpacesService) PrivateAgentConversationEvents() http.HandlerFunc {
 			return
 		}
 		if decision.NeedsClarification || decision.Selected == nil {
-			event, _ := s.database.AppendPrivateConversationEvent(r.Context(), userID, conversationID, "agent_message", mustAPIRawJSON(map[string]string{"text": decision.Question}))
+			event, _ := s.database.AppendAgentConversationEvent(r.Context(), userID, conversationID, "agent_message", mustAPIRawJSON(map[string]string{"text": decision.Question}))
 			writeJSON(w, http.StatusOK, map[string]any{"status": "needs_clarification", "routing": decision, "event": event})
 			return
 		}
@@ -98,7 +98,7 @@ func (s *SpacesService) PrivateAgentConversationEvents() http.HandlerFunc {
 			writeSpaceError(w, err)
 			return
 		}
-		_, _ = s.database.AppendPrivateConversationEvent(r.Context(), userID, conversationID, "run", mustAPIRawJSON(map[string]string{"run_id": run.ID}))
+		_, _ = s.database.AppendAgentConversationEvent(r.Context(), userID, conversationID, "run", mustAPIRawJSON(map[string]string{"run_id": run.ID}))
 		if run.State == "awaiting_approval" {
 			writeJSON(w, http.StatusAccepted, map[string]any{"run": run})
 			return
@@ -108,10 +108,8 @@ func (s *SpacesService) PrivateAgentConversationEvents() http.HandlerFunc {
 			writeSpaceError(w, err)
 			return
 		}
-		var output map[string]any
-		_ = json.Unmarshal(finished.Outputs, &output)
-		text, _ := output["text"].(string)
-		event, _ := s.database.AppendPrivateConversationEvent(r.Context(), userID, conversationID, "agent_message", mustAPIRawJSON(map[string]any{"text": text, "run_id": finished.ID}))
+		eventType, text := canonicalRunResponse(finished)
+		event, _ := s.database.AppendAgentConversationEvent(r.Context(), userID, conversationID, eventType, mustAPIRawJSON(map[string]any{"text": text, "run_id": finished.ID}))
 		writeJSON(w, http.StatusOK, map[string]any{"run": finished, "event": event})
 	}
 }

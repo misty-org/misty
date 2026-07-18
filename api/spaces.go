@@ -1,7 +1,6 @@
 package api
 
 import (
-	"bytes"
 	"context"
 	"crypto/aes"
 	"crypto/cipher"
@@ -18,6 +17,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -29,8 +29,10 @@ import (
 type SpacesService struct {
 	database *db.Database
 	agent    *serveragent.Service
+	library  *SpaceLibraryService
 	aead     cipher.AEAD
 	keyVer   int16
+	workers  sync.Once
 }
 
 func NewSpacesService(database *db.Database, agent *serveragent.Service, encryptionKey string) (*SpacesService, error) {
@@ -47,6 +49,13 @@ func NewSpacesService(database *db.Database, agent *serveragent.Service, encrypt
 		return nil, err
 	}
 	return &SpacesService{database: database, agent: agent, aead: aead, keyVer: 1}, nil
+}
+
+// SetLibraryProvider installs the server-side Library provider used by Agent
+// workflow actions. Connections and authorization still come from the run's
+// requesting user; the provider is only the byte/object transport.
+func (s *SpacesService) SetLibraryProvider(library *SpaceLibraryService) {
+	s.library = library
 }
 
 func parseSpaceEncryptionKey(value string) ([]byte, error) {
@@ -372,13 +381,62 @@ func (s *SpacesService) Messages() http.HandlerFunc {
 			return
 		}
 		agentReplies := make([]*db.SpaceMessage, 0, len(agentIDs))
+		agentFailures := make([]agentMentionFailure, 0)
 		for _, agentID := range uniqueStrings(agentIDs) {
-			reply, runErr := s.runMentionedAgent(r.Context(), userID, spaceID, agentID, message.ID, body.Content, body.FileNodeIDs)
-			if runErr == nil && reply != nil {
+			reply, runErr := s.runMentionedAgent(r.Context(), userID, spaceID, "", agentID, message.ID, body.Content, body.FileNodeIDs)
+			if runErr != nil {
+				agentFailures = append(agentFailures, agentMentionFailureFromError(agentID, runErr))
+			} else if reply != nil {
 				agentReplies = append(agentReplies, reply)
 			}
 		}
-		writeJSON(w, http.StatusCreated, map[string]any{"message": message, "agent_replies": agentReplies})
+		writeJSON(w, http.StatusCreated, map[string]any{"message": message, "agent_replies": agentReplies, "agent_failures": agentFailures})
+	}
+}
+
+type agentMentionFailure struct {
+	AgentID string `json:"agent_id"`
+	Code    string `json:"code"`
+	Message string `json:"message"`
+}
+
+func agentMentionFailureFromError(agentID string, err error) agentMentionFailure {
+	code, message := spaceRunFailureFromError(err)
+	return agentMentionFailure{AgentID: agentID, Code: code, Message: message}
+}
+
+func spaceRunFailureFromError(err error) (string, string) {
+	var exhausted serveragent.CreditsExhaustedError
+	switch {
+	case errors.Is(err, context.Canceled):
+		return "request_canceled", "The run was canceled before it could start."
+	case errors.As(err, &exhausted):
+		return "credits_exhausted", "The run could not start because this account does not have enough AI credits."
+	case errors.Is(err, db.ErrWorkflowIntegrationRequired):
+		return "integration_required", "The run needs a required Space integration before it can start."
+	case errors.Is(err, db.ErrLibraryForbidden), errors.Is(err, db.ErrSpaceForbidden):
+		return "forbidden", "You no longer have permission to run this resource."
+	case errors.Is(err, db.ErrAgentNotFound), errors.Is(err, db.ErrLibraryNotFound), errors.Is(err, db.ErrSpaceNotFound):
+		return "resource_unavailable", "This resource is no longer available in the Space."
+	case errors.Is(err, db.ErrSpaceInvalid), errors.Is(err, db.ErrLibraryInvalid):
+		return "invalid_request", "The run input or workflow definition is invalid."
+	default:
+		return "run_failed", "The run could not start. Try again or inspect its details in Studio."
+	}
+}
+
+func (s *SpacesService) ChatAgents() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userID, ok := authenticatedUser(w, r, s.database)
+		if !ok {
+			return
+		}
+		items, err := s.database.SpaceChatAgents(r.Context(), userID, chi.URLParam(r, "spaceID"))
+		if err != nil {
+			writeSpaceError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"agents": items})
 	}
 }
 
@@ -407,7 +465,7 @@ func renderMessageText(content []db.MessageSpan) string {
 	return strings.TrimSpace(b.String())
 }
 
-func (s *SpacesService) runMentionedAgent(ctx context.Context, billingUserID, spaceID, agentID, sourceMessageID string, content []db.MessageSpan, fileNodeIDs []string) (*db.SpaceMessage, error) {
+func (s *SpacesService) runMentionedAgent(ctx context.Context, billingUserID, spaceID, conversationID, agentID, sourceMessageID string, content []db.MessageSpan, fileNodeIDs []string) (*db.SpaceMessage, error) {
 	attachments, err := s.prepareSpaceAgentFiles(ctx, billingUserID, spaceID, fileNodeIDs)
 	if err != nil {
 		return nil, err // File preparation happens before the metered model call.
@@ -426,14 +484,18 @@ func (s *SpacesService) runMentionedAgent(ctx context.Context, billingUserID, sp
 		return nil, err
 	}
 	if decision.NeedsClarification || decision.Selected == nil {
-		return s.database.CreateSpaceAgentMessage(ctx, billingUserID, spaceID, agentID, decision.Question)
+		return s.createConversationAgentMessage(ctx, billingUserID, spaceID, conversationID, agentID, decision.Question)
 	}
-	run, err := s.database.CreateAgentRun(ctx, db.AgentRunRequest{RequestingMemberID: billingUserID, SpaceID: spaceID, AgentID: agentID, SourceConversationID: sourceMessageID, SourceType: "group_mention", CapabilityID: decision.Selected.CapabilityID, Input: runInput, TriggerKind: "mention"})
+	sourceConversationID := sourceMessageID
+	if conversationID != "" {
+		sourceConversationID = conversationID
+	}
+	run, err := s.database.CreateAgentRun(ctx, db.AgentRunRequest{RequestingMemberID: billingUserID, SpaceID: spaceID, AgentID: agentID, SourceConversationID: sourceConversationID, SourceType: "group_mention", CapabilityID: decision.Selected.CapabilityID, Input: runInput, TriggerKind: "mention"})
 	if err != nil {
 		return nil, err
 	}
 	if run.State == "awaiting_approval" {
-		return s.database.CreateSpaceAgentMessage(ctx, billingUserID, spaceID, agentID, "I prepared this isolated run, but it needs your approval before I can perform the proposed actions. Open the Agent in Studio to review run "+run.ID+".")
+		return s.createConversationAgentMessage(ctx, billingUserID, spaceID, conversationID, agentID, "I prepared this isolated run, but it needs your approval before I can perform the proposed actions. Open the Agent in Studio to review run "+run.ID+".")
 	}
 	finished, err := s.executeCanonicalAgentRun((&http.Request{}).WithContext(ctx), run, prompt)
 	if err != nil {
@@ -449,12 +511,19 @@ func (s *SpacesService) runMentionedAgent(ctx context.Context, billingUserID, sp
 	if len(runes) > db.MaxMessageChars {
 		runes = runes[:db.MaxMessageChars]
 	}
-	reply, err := s.database.CreateSpaceAgentMessage(ctx, billingUserID, spaceID, agentID, string(runes))
+	reply, err := s.createConversationAgentMessage(ctx, billingUserID, spaceID, conversationID, agentID, string(runes))
 	if err != nil {
 		return nil, err
 	}
 	_ = s.database.RecordRunAction(ctx, run.ID, "shared_reply", "Posted Agent reply in shared Space chat", mustAPIRawJSON(map[string]string{"message_id": reply.ID}), false, "completed")
 	return reply, nil
+}
+
+func (s *SpacesService) createConversationAgentMessage(ctx context.Context, billingUserID, spaceID, conversationID, agentID, text string) (*db.SpaceMessage, error) {
+	if conversationID == "" {
+		return s.database.CreateSpaceAgentMessage(ctx, billingUserID, spaceID, agentID, text)
+	}
+	return s.database.CreateSpaceConversationAgentMessage(ctx, billingUserID, spaceID, conversationID, agentID, text)
 }
 
 func (s *SpacesService) prepareSpaceAgentFiles(ctx context.Context, userID, spaceID string, nodeIDs []string) (string, error) {
@@ -878,8 +947,9 @@ func (s *SpacesService) RunStudioResource(kind string) http.HandlerFunc {
 		}
 		spaceID, resourceID := chi.URLParam(r, "spaceID"), chi.URLParam(r, "resourceID")
 		var body struct {
-			Prompt string          `json:"prompt"`
-			Input  json.RawMessage `json:"input"`
+			Prompt       string          `json:"prompt"`
+			CapabilityID string          `json:"capability_id"`
+			Input        json.RawMessage `json:"input"`
 		}
 		if r.ContentLength > 0 && decodeJSON(w, r, &body) != nil {
 			return
@@ -888,7 +958,7 @@ func (s *SpacesService) RunStudioResource(kind string) http.HandlerFunc {
 		if len(input) == 0 {
 			input, _ = json.Marshal(map[string]string{"prompt": strings.TrimSpace(body.Prompt)})
 		}
-		run, err := s.database.CreateSpaceRun(r.Context(), userID, spaceID, kind, resourceID, "test", input)
+		run, err := s.database.CreateSpaceRun(r.Context(), userID, spaceID, kind, resourceID, "test", body.CapabilityID, input)
 		if err != nil {
 			writeSpaceError(w, err)
 			return
@@ -897,201 +967,13 @@ func (s *SpacesService) RunStudioResource(kind string) http.HandlerFunc {
 			writeJSON(w, http.StatusAccepted, run)
 			return
 		}
-		var result any
-		if kind == "agent" {
-			result, err = s.executeSpaceAgent(r.Context(), run, body.Prompt)
-		} else {
-			result, err = s.executeSpaceWorkflow(r.Context(), run)
-		}
-		if err != nil {
-			failedResult, _ := json.Marshal(map[string]string{"message": err.Error()})
-			finished, finishErr := s.database.FinishSpaceRun(r.Context(), run.ID, "failed", failedResult, "execution_failed")
-			if finishErr != nil {
-				writeSpaceError(w, finishErr)
-				return
-			}
-			writeJSON(w, http.StatusOK, finished)
-			return
-		}
-		raw, _ := json.Marshal(result)
-		finished, err := s.database.FinishSpaceRun(r.Context(), run.ID, "completed", raw, "")
+		finished, err := s.executeCanonicalAgentRun(r, run, body.Prompt)
 		if err != nil {
 			writeSpaceError(w, err)
 			return
 		}
 		writeJSON(w, http.StatusOK, finished)
 	}
-}
-
-func (s *SpacesService) executeSpaceAgent(ctx context.Context, run *db.SpaceRun, prompt string) (map[string]string, error) {
-	if s.agent == nil {
-		return nil, errors.New("Space Agent runtime is unavailable")
-	}
-	resource, err := s.database.SpaceStudioResourceByID(ctx, run.InitiatedByUserID, run.SpaceID, "agent", run.ResourceID)
-	if err != nil {
-		return nil, err
-	}
-	prompt = strings.TrimSpace(prompt)
-	if prompt == "" {
-		return nil, db.ErrSpaceInvalid
-	}
-	request := fmt.Sprintf("You are %s, a shared Space agent. Follow these instructions:\n%s\n\n%s", resource.Name, resource.Instructions, prompt)
-	text, _, err := s.agent.CompleteWithTierContext(ctx, run.BillingUserID, request, "automation_ai", serveragent.MikaLow)
-	if err != nil {
-		return nil, err
-	}
-	return map[string]string{"text": strings.TrimSpace(text)}, nil
-}
-
-func (s *SpacesService) executeSpaceWorkflow(ctx context.Context, run *db.SpaceRun) (map[string]any, error) {
-	resource, err := s.database.SpaceStudioResourceByID(ctx, run.InitiatedByUserID, run.SpaceID, "workflow", run.ResourceID)
-	if err != nil {
-		return nil, err
-	}
-	var workflow struct {
-		Nodes []struct {
-			Kind   string         `json:"kind"`
-			Type   string         `json:"type"`
-			Config map[string]any `json:"config"`
-		} `json:"nodes"`
-	}
-	if err := json.Unmarshal(resource.Definition, &workflow); err != nil {
-		return nil, db.ErrSpaceInvalid
-	}
-	value := strings.TrimSpace(string(run.Input))
-	steps := make([]map[string]any, 0, len(workflow.Nodes))
-	for _, node := range workflow.Nodes {
-		kind := node.Kind
-		if kind == "" {
-			kind = node.Type
-		}
-		switch kind {
-		case "manual_trigger", "schedule_trigger", "webhook_trigger", "message_trigger", "file_link_trigger":
-			// The trigger has already supplied run.Input.
-		case "text":
-			value = stringConfig(node.Config, "text")
-		case "filter":
-			contains := stringConfig(node.Config, "contains")
-			if contains != "" && !strings.Contains(strings.ToLower(value), strings.ToLower(contains)) {
-				value = ""
-			}
-		case "transform":
-			if prefix := stringConfig(node.Config, "prefix"); prefix != "" {
-				value = prefix + value
-			}
-			if suffix := stringConfig(node.Config, "suffix"); suffix != "" {
-				value += suffix
-			}
-		case "structured_prompt":
-			if s.agent == nil {
-				return nil, errors.New("managed AI is unavailable")
-			}
-			prompt := strings.ReplaceAll(stringConfig(node.Config, "prompt"), "{{input}}", value)
-			text, _, completeErr := s.agent.CompleteWithTierContext(ctx, run.BillingUserID, prompt, "automation_ai", serveragent.MikaLow)
-			if completeErr != nil {
-				return nil, completeErr
-			}
-			value = text
-		case "notify", "chat_reply":
-			message := strings.ReplaceAll(stringConfig(node.Config, "message"), "{{input}}", value)
-			if message == "" {
-				message = value
-			}
-			steps = append(steps, map[string]any{"kind": kind, "message": message})
-		case "http_request":
-			response, requestErr := executeSafeHTTPRequest(ctx, node.Config, value)
-			if requestErr != nil {
-				return nil, requestErr
-			}
-			value = response
-		case "virtual_folder", "virtual_link":
-			steps = append(steps, map[string]any{"kind": kind, "status": "planned"})
-		case "":
-			return nil, db.ErrSpaceInvalid
-		default:
-			return nil, fmt.Errorf("unsupported cloud node %q", kind)
-		}
-		steps = append(steps, map[string]any{"kind": kind, "ok": true})
-	}
-	return map[string]any{"value": value, "steps": steps}, nil
-}
-
-func stringConfig(config map[string]any, key string) string {
-	value, _ := config[key].(string)
-	return value
-}
-
-func executeSafeHTTPRequest(ctx context.Context, config map[string]any, input string) (string, error) {
-	rawURL := strings.ReplaceAll(stringConfig(config, "url"), "{{input}}", url.QueryEscape(input))
-	parsed, err := url.Parse(rawURL)
-	if err != nil || parsed.Scheme != "https" || parsed.Hostname() == "" || parsed.User != nil {
-		return "", errors.New("HTTP workflow nodes require a public HTTPS URL")
-	}
-	method := strings.ToUpper(strings.TrimSpace(stringConfig(config, "method")))
-	if method == "" {
-		method = http.MethodGet
-	}
-	allowedMethods := map[string]bool{http.MethodGet: true, http.MethodPost: true, http.MethodPut: true, http.MethodPatch: true, http.MethodDelete: true}
-	if !allowedMethods[method] {
-		return "", errors.New("HTTP workflow method is not allowed")
-	}
-	body := strings.ReplaceAll(stringConfig(config, "body"), "{{input}}", input)
-	request, err := http.NewRequestWithContext(ctx, method, parsed.String(), bytes.NewBufferString(body))
-	if err != nil {
-		return "", err
-	}
-	request.Header.Set("Accept", "application/json, text/plain;q=0.9")
-	if body != "" {
-		request.Header.Set("Content-Type", "application/json")
-	}
-	transport := &http.Transport{
-		Proxy: nil,
-		DialContext: func(dialCtx context.Context, network, address string) (net.Conn, error) {
-			host, port, splitErr := net.SplitHostPort(address)
-			if splitErr != nil {
-				return nil, splitErr
-			}
-			ips, resolveErr := net.DefaultResolver.LookupIPAddr(dialCtx, host)
-			if resolveErr != nil {
-				return nil, resolveErr
-			}
-			for _, candidate := range ips {
-				if isPublicWorkflowIP(candidate.IP) {
-					return (&net.Dialer{Timeout: 8 * time.Second}).DialContext(dialCtx, network, net.JoinHostPort(candidate.IP.String(), port))
-				}
-			}
-			return nil, errors.New("HTTP workflow target resolves to a private or reserved address")
-		},
-		TLSHandshakeTimeout: 8 * time.Second,
-	}
-	client := &http.Client{
-		Transport: transport,
-		Timeout:   15 * time.Second,
-		CheckRedirect: func(next *http.Request, via []*http.Request) error {
-			if len(via) >= 3 || next.URL.Scheme != "https" || next.URL.User != nil {
-				return errors.New("HTTP workflow redirect was rejected")
-			}
-			next.Header.Del("Authorization")
-			next.Header.Del("Cookie")
-			return nil
-		},
-	}
-	response, err := client.Do(request)
-	if err != nil {
-		return "", err
-	}
-	defer response.Body.Close()
-	limited, err := io.ReadAll(io.LimitReader(response.Body, 1<<20+1))
-	if err != nil {
-		return "", err
-	}
-	if len(limited) > 1<<20 {
-		return "", errors.New("HTTP workflow response exceeded 1 MiB")
-	}
-	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		return "", fmt.Errorf("HTTP workflow returned %s", response.Status)
-	}
-	return string(limited), nil
 }
 
 func isPublicWorkflowIP(ip net.IP) bool {

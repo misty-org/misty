@@ -17,3 +17,25 @@ func TestAgentScheduleDueCoalescesMissedIntervals(t *testing.T) {
 		t.Fatal("invalid cron expression was accepted")
 	}
 }
+
+func TestNextAgentScheduleUsesUserTimezoneAcrossDST(t *testing.T) {
+	location, err := time.LoadLocation("America/Los_Angeles")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// 02:30 does not exist on the spring-forward day; it must not be
+	// fabricated as a UTC/local conversion artifact.
+	baseline := time.Date(2026, 3, 8, 0, 0, 0, 0, location)
+	if _, due := nextAgentSchedule("30 2 * * *", "America/Los_Angeles", baseline, time.Date(2026, 3, 8, 4, 0, 0, 0, location)); due {
+		t.Fatal("nonexistent spring-forward wall time was scheduled")
+	}
+	// The first 01:30 occurrence on fall-back day is a real due occurrence;
+	// event IDs deduplicate any repeated coordinator observation.
+	baseline = time.Date(2026, 11, 1, 0, 0, 0, 0, location)
+	if _, due := nextAgentSchedule("30 1 * * *", "America/Los_Angeles", baseline, time.Date(2026, 11, 1, 1, 45, 0, 0, location)); !due {
+		t.Fatal("fall-back schedule was not due")
+	}
+	if _, due := nextAgentSchedule("0 9 * * *", "local", baseline, time.Now()); due {
+		t.Fatal("ambiguous local timezone was accepted")
+	}
+}

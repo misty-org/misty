@@ -1,104 +1,35 @@
-# Misty Agents production deployment
+# Space Agents production deployment
 
-Misty Agents stores only device-encrypted ciphertext in object storage. Do not
-use a public bucket for agent documents: an R2 public development URL or custom
-domain bypasses Misty's authenticated download path. Either make the existing
-bucket private if nothing else depends on its public URLs, or create a dedicated
-private bucket in the same R2 account.
+Misty exposes one Agent product: creator-authored Space Agents. Each member's conversations, credentials, workflow settings, runs, approvals, memory, cursors, and results remain isolated behind the internal `AgentInstance` record.
 
-## 1. Configure a private Cloudflare R2 bucket
+## Launch integrations
 
-1. Create or choose a **Standard storage** bucket dedicated to agent
-   attachments. Do not use Infrequent Access: its 30-day minimum storage charge
-   is a poor match for Misty's 24-hour retention.
-2. Disable its `r2.dev` public URL and remove any public custom domain.
-3. Create an R2 API token scoped to **Object Read & Write** for that bucket only.
-4. Add a lifecycle rule for prefix `agents/` that deletes objects after at most
-   two days. Misty's worker deletes expired rows and ciphertext after exactly 24
-   hours; the R2 rule is the provider-side backstop.
-5. Do not expose browser upload access. The desktop sends encrypted bytes to
-   `misty-server`, which validates the signed job grant and relays only the
-   ciphertext to R2. The private bucket does not require a CORS policy.
+The visible production catalog is Google Calendar, Slack, Discord, and Notion. Google Calendar and Notion are read/watch only. Slack and Discord use official bot identities, and every outbound reply requires a fresh per-action approval. Provider callbacks are private infrastructure; Misty does not offer a generic inbound endpoint.
 
-Set these server secrets and assertions:
+Configure the complete HTTPS API base (including `/api` or a versioned replacement), desktop OAuth return, encryption key, and provider credentials described in the desktop repository's `docs/UNIFIED_AGENT_PLATFORM_OWNER_INPUTS.md`. Tokens stay in the encrypted server credential vault and must never appear in prompts, workflow definitions, callback URLs, or logs.
 
-```dotenv
-MISTY_ENVIRONMENT=production
-MISTY_AGENT_DOCUMENTS_ENABLED=true
-R2_ENDPOINT=https://YOUR_ACCOUNT_ID.r2.cloudflarestorage.com
-R2_BUCKET=misty-server
-R2_ACCESS_KEY=YOUR_BUCKET_SCOPED_ACCESS_KEY
-R2_SECRET_KEY=YOUR_BUCKET_SCOPED_SECRET
-DOCUMENT_SIGNING_KEY=GENERATE_A_RANDOM_SECRET_OF_AT_LEAST_32_BYTES
-DOCUMENT_KEY_ID=2026-07
-DOCUMENT_PRIVATE_KEY_B64=BASE64_PEM
-```
+Discord requires the official bot token and Message Content Intent for full-message launch behavior. Without that intent, the integration reports `message_content_intent_missing` in Needs attention. It must not silently treat absent content as an empty message.
 
-The bucket must be private. Configure its two-day lifecycle rule with an
-`agents/` prefix filter so permanent `library/` objects are never expired.
+## Cutover
 
-Generate the two application secrets outside the repository:
+1. Back up PostgreSQL.
+2. Apply migrations through `20260902000000_space_tasks_calendar_launch.sql`.
+3. Verify the production callback origin and OAuth redirects.
+4. Start the server worker and confirm Google watch renewal/reconciliation and Discord Gateway health.
+5. Complete the two-user acceptance checklist in the owner-input document.
 
-```sh
-openssl rand -base64 48
-openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:3072 | base64 | tr -d '\n'
-```
+Migration `20260831000000_unified_agent_workflows_v2.sql` preserves valid Space Agents and backfills immutable Agent versions. It drops only the retired device/folder runtime tables and removes standalone legacy Workflow runs. It does not delete Spaces, chats, Libraries, ordinary files, provider connections, trusted devices, or valid Space Agent conversations.
 
-Rotate the RSA wrapping key by changing `DOCUMENT_KEY_ID` and the
-current private key. Keep the preceding key in
-`DOCUMENT_PREVIOUS_KEYS_JSON` for at least 24 hours, then remove it.
-R2 never receives the plaintext AES key; losing all wrapping keys before the
-retention window ends makes in-flight attachments unrecoverable.
+## Release verification
 
-## 2. Enable rollout flags
+- Run `go test . ./agent ./api ./workflow`.
+- Run database integration tests against a disposable migrated PostgreSQL instance.
+- Verify task permissions, optimistic updates, assignment, archival, realtime updates, and Agent/run provenance.
+- Verify Google full and incremental sync, watch renewal, dropped callback repair, cancellation, timezone/DST handling, revocation, and absence of Google writes.
+- Verify Slack signatures, replay rejection, event deduplication, channel-loss handling, approval expiry, posting reconciliation, and uninstall behavior.
+- Verify Discord heartbeat/resume, sequence persistence, reconnects, intent degradation, permission changes, rate limits, approved replies, and bot removal.
+- Verify Notion OAuth, resource selection, recursive pagination, signed change events, reorder tolerance, deletion, revoked access, and citations.
+- Prove two members can use the same Space Agent without sharing conversations, credentials, cursors, memory, approvals, or results.
+- Confirm images and image-only PDF pages return `unsupported_content`; the launch has no optical text extraction path.
 
-Enable each phase independently on the server:
-
-```dotenv
-MISTY_DEVICE_JOBS_ENABLED=true
-MISTY_FOLDER_AGENTS_ENABLED=true
-MISTY_AGENT_DOCUMENTS_ENABLED=true
-```
-
-Build the desktop with the corresponding Vite flags:
-
-```dotenv
-VITE_MISTY_AGENTS_ENABLED=true
-VITE_MISTY_DEVICE_JOBS_ENABLED=true
-VITE_MISTY_FOLDER_AGENTS_ENABLED=true
-VITE_MISTY_DOCUMENTS_ENABLED=true
-```
-
-The server's minute worker enqueues schedules. Every ten minutes it purges
-expired attachment objects/keys and 30-day conversation data. Run at least one
-continuously available server instance; multiple workers are safe because
-claims and deletes are idempotent.
-
-## 3. Deploy and verify
-
-Apply every database migration before switching on flags. A production smoke
-test should cover:
-
-- Migration `20260824000000_make_agents_space_owned.sql` assigns every legacy
-  device/folder agent to its creator's personal Space, adds the Space foreign
-  key as required, retires per-agent membership rows, and grants the existing
-  `@everyone` roles `studio.view`, `studio.manage`, and `agents.run`. This is the
-  deterministic compatibility fallback for legacy agents with no prior Space
-  owner. Review custom role overrides after deployment if a Space should be
-  view-only or should restrict agent runs.
-- Local-only legacy agent JSON is assigned to the signed-in user's personal
-  Space by the desktop on first load and written back with `spaceId`. Keep the
-  personal Space available during the rolling desktop upgrade.
-
-- Upload a scanned PDF and verify the result contains accurate page citations
-  and no local path in any server payload.
-- Trigger a new-file workflow and verify it creates a collision-free summary.
-- Attempt the same agent ID from an unlisted Misty account and verify it is
-  denied without revealing the agent name.
-- Request a mutation, alter its parameters, and verify the approval digest is
-  rejected. Verify an untouched approval expires after 24 hours.
-- Confirm an expired attachment is deleted from R2 and its wrapped key is
-  removed from Postgres. Also verify the R2 lifecycle rule independently.
-
-Do not log or paste R2 secrets, RSA private keys, signed upload URLs, device
-private keys, or attachment envelopes into support tickets.
+Never log or paste OAuth secrets, bot tokens, signing secrets, provider access/refresh tokens, desktop signing keys, or approval payloads into support tickets.

@@ -1,0 +1,131 @@
+package db
+
+import (
+	"context"
+	"database/sql"
+	"encoding/json"
+	"errors"
+	"time"
+
+	"github.com/google/uuid"
+)
+
+type WorkflowDeviceNodeJob struct {
+	ID              string          `json:"id"`
+	RunID           string          `json:"runId"`
+	NodeID          string          `json:"nodeId"`
+	UserID          string          `json:"-"`
+	ScopeID         string          `json:"scopeId"`
+	Operation       string          `json:"operation"`
+	State           string          `json:"state"`
+	Attempt         int             `json:"attempt"`
+	Input           json.RawMessage `json:"input"`
+	Config          json.RawMessage `json:"config"`
+	InputSchema     json.RawMessage `json:"inputSchema"`
+	OutputSchema    json.RawMessage `json:"outputSchema"`
+	Output          json.RawMessage `json:"output,omitempty"`
+	LeasedDeviceID  string          `json:"leasedDeviceId,omitempty"`
+	ErrorCode       string          `json:"errorCode,omitempty"`
+	LeaseExpiresAt  *time.Time      `json:"leaseExpiresAt,omitempty"`
+	LastHeartbeatAt *time.Time      `json:"lastHeartbeatAt,omitempty"`
+	CompletedAt     *time.Time      `json:"completedAt,omitempty"`
+	CreatedAt       time.Time       `json:"createdAt"`
+}
+
+const workflowDeviceJobColumns = `id,run_id,node_id,attempt,user_id,scope_id,operation,input,config,input_schema,output_schema,state,COALESCE(leased_device_id,''),lease_expires_at,last_heartbeat_at,output,COALESCE(error_code,''),created_at,completed_at`
+
+func scanWorkflowDeviceJob(scanner interface{ Scan(...any) error }, item *WorkflowDeviceNodeJob) error {
+	var output []byte
+	if err := scanner.Scan(&item.ID, &item.RunID, &item.NodeID, &item.Attempt, &item.UserID, &item.ScopeID, &item.Operation, &item.Input, &item.Config, &item.InputSchema, &item.OutputSchema, &item.State, &item.LeasedDeviceID, &item.LeaseExpiresAt, &item.LastHeartbeatAt, &output, &item.ErrorCode, &item.CreatedAt, &item.CompletedAt); err != nil {
+		return err
+	}
+	item.Output = output
+	return nil
+}
+
+func (db *Database) QueueWorkflowDeviceNodeJob(ctx context.Context, userID, runID, nodeID string, attempt int, scopeID, operation string, input, config, inputSchema, outputSchema json.RawMessage) (*WorkflowDeviceNodeJob, error) {
+	item := &WorkflowDeviceNodeJob{}
+	err := db.agentTx(userID, func(tx *sql.Tx) error {
+		var healthy bool
+		if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM trusted_devices WHERE user_id=$1 AND revoked_at IS NULL AND last_seen_at>NOW()-INTERVAL '90 seconds' AND COALESCE((capabilities->>'document_intelligence')::boolean,false))`, userID).Scan(&healthy); err != nil {
+			return err
+		}
+		if !healthy {
+			return ErrDeviceNotFound
+		}
+		return scanWorkflowDeviceJob(tx.QueryRowContext(ctx, `INSERT INTO workflow_device_node_jobs(id,run_id,node_id,attempt,user_id,scope_id,operation,input,config,input_schema,output_schema)
+			VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+			ON CONFLICT(run_id,node_id,attempt) DO UPDATE SET run_id=EXCLUDED.run_id
+			RETURNING `+workflowDeviceJobColumns, "devicejob_"+uuid.NewString(), runID, nodeID, attempt, userID, scopeID, operation, input, config, inputSchema, outputSchema), item)
+	})
+	return item, err
+}
+
+func (db *Database) ClaimWorkflowDeviceNodeJob(userID, deviceID string, lease time.Duration) (*WorkflowDeviceNodeJob, string, error) {
+	if lease != time.Minute {
+		lease = time.Minute
+	}
+	token, err := secureToken()
+	if err != nil {
+		return nil, "", err
+	}
+	item := &WorkflowDeviceNodeJob{}
+	err = db.agentTx(userID, func(tx *sql.Tx) error {
+		if _, err := tx.Exec(`UPDATE workflow_device_node_jobs SET state='queued',leased_device_id=NULL,lease_token_hash=NULL,lease_expires_at=NULL,last_heartbeat_at=NULL WHERE user_id=$1 AND state='leased' AND lease_expires_at<=NOW()`, userID); err != nil {
+			return err
+		}
+		return scanWorkflowDeviceJob(tx.QueryRow(`WITH candidate AS (
+			SELECT j.id FROM workflow_device_node_jobs j JOIN trusted_devices d ON d.id=$1 AND d.user_id=$2 AND d.revoked_at IS NULL AND d.last_seen_at>NOW()-INTERVAL '90 seconds'
+			WHERE j.user_id=$2 AND j.state='queued' ORDER BY j.created_at FOR UPDATE OF j SKIP LOCKED LIMIT 1)
+			UPDATE workflow_device_node_jobs j SET state='leased',leased_device_id=$1,lease_token_hash=$3,lease_expires_at=NOW()+INTERVAL '60 seconds',last_heartbeat_at=NOW()
+			FROM candidate c WHERE j.id=c.id RETURNING `+workflowDeviceJobColumns, deviceID, userID, hashToken(token)), item)
+	})
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, "", ErrAgentJobNotFound
+	}
+	return item, token, err
+}
+
+func (db *Database) RenewWorkflowDeviceNodeJob(userID, deviceID, jobID, token string) (*WorkflowDeviceNodeJob, error) {
+	item := &WorkflowDeviceNodeJob{}
+	err := db.agentTx(userID, func(tx *sql.Tx) error {
+		return scanWorkflowDeviceJob(tx.QueryRow(`UPDATE workflow_device_node_jobs SET lease_expires_at=NOW()+INTERVAL '60 seconds',last_heartbeat_at=NOW()
+			WHERE id=$1 AND user_id=$2 AND leased_device_id=$3 AND lease_token_hash=$4 AND state='leased' AND lease_expires_at>NOW() RETURNING `+workflowDeviceJobColumns, jobID, userID, deviceID, hashToken(token)), item)
+	})
+	if errors.Is(err, sql.ErrNoRows) {
+		err = ErrInvalidLease
+	}
+	return item, err
+}
+
+func (db *Database) FinishWorkflowDeviceNodeJob(userID, deviceID, jobID, token, state string, output json.RawMessage, errorCode string) (*WorkflowDeviceNodeJob, error) {
+	if state != "completed" && state != "failed" {
+		return nil, ErrInvalidJobState
+	}
+	item := &WorkflowDeviceNodeJob{}
+	err := db.agentTx(userID, func(tx *sql.Tx) error {
+		return scanWorkflowDeviceJob(tx.QueryRow(`UPDATE workflow_device_node_jobs SET state=$1,output=$2,error_code=NULLIF($3,''),completed_at=NOW(),lease_expires_at=NULL
+			WHERE id=$4 AND user_id=$5 AND leased_device_id=$6 AND lease_token_hash=$7 AND state='leased' AND lease_expires_at>NOW() RETURNING `+workflowDeviceJobColumns, state, output, errorCode, jobID, userID, deviceID, hashToken(token)), item)
+	})
+	if errors.Is(err, sql.ErrNoRows) {
+		// A duplicate completion is idempotent only for the same terminal state.
+		err = db.agentTx(userID, func(tx *sql.Tx) error {
+			return scanWorkflowDeviceJob(tx.QueryRow(`SELECT `+workflowDeviceJobColumns+` FROM workflow_device_node_jobs WHERE id=$1 AND user_id=$2 AND leased_device_id=$3 AND lease_token_hash=$4 AND state=$5`, jobID, userID, deviceID, hashToken(token), state), item)
+		})
+	}
+	if errors.Is(err, sql.ErrNoRows) {
+		err = ErrInvalidLease
+	}
+	return item, err
+}
+
+func (db *Database) WorkflowDeviceNodeJob(ctx context.Context, userID, jobID string) (*WorkflowDeviceNodeJob, error) {
+	item := &WorkflowDeviceNodeJob{}
+	err := db.agentTx(userID, func(tx *sql.Tx) error {
+		return scanWorkflowDeviceJob(tx.QueryRowContext(ctx, `SELECT `+workflowDeviceJobColumns+` FROM workflow_device_node_jobs WHERE id=$1 AND user_id=$2`, jobID, userID), item)
+	})
+	if errors.Is(err, sql.ErrNoRows) {
+		err = ErrAgentJobNotFound
+	}
+	return item, err
+}

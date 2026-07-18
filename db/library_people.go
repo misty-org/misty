@@ -16,7 +16,6 @@ type LibraryIntelligencePolicy struct {
 	SpaceID        string    `json:"space_id"`
 	FacesEnabled   bool      `json:"faces_enabled"`
 	PetsEnabled    bool      `json:"pets_enabled"`
-	OCREnabled     bool      `json:"ocr_enabled"`
 	AIEnabled      bool      `json:"ai_enabled"`
 	SemanticSearch bool      `json:"semantic_search_enabled"`
 	Version        int64     `json:"version"`
@@ -46,7 +45,7 @@ func (db *Database) LibraryPeoplePolicy(ctx context.Context, userID, spaceID str
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionLibraryView); err != nil {
 			return err
 		}
-		err := tx.QueryRowContext(ctx, `SELECT faces_enabled,pets_enabled,ocr_enabled,ai_enabled,semantic_search_enabled,version,created_at,updated_at FROM space_library_intelligence_policies WHERE space_id=$1`, spaceID).Scan(&out.FacesEnabled, &out.PetsEnabled, &out.OCREnabled, &out.AIEnabled, &out.SemanticSearch, &out.Version, &out.CreatedAt, &out.UpdatedAt)
+		err := tx.QueryRowContext(ctx, `SELECT faces_enabled,pets_enabled,ai_enabled,semantic_search_enabled,version,created_at,updated_at FROM space_library_intelligence_policies WHERE space_id=$1`, spaceID).Scan(&out.FacesEnabled, &out.PetsEnabled, &out.AIEnabled, &out.SemanticSearch, &out.Version, &out.CreatedAt, &out.UpdatedAt)
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil
 		}
@@ -63,10 +62,10 @@ func (db *Database) UpdateLibraryPeoplePolicy(ctx context.Context, userID, space
 	if err != nil {
 		return nil, err
 	}
-	return db.UpdateLibraryIntelligencePolicy(ctx, userID, spaceID, version, facesEnabled, petsEnabled, current.OCREnabled, current.AIEnabled, current.SemanticSearch)
+	return db.UpdateLibraryIntelligencePolicy(ctx, userID, spaceID, version, facesEnabled, petsEnabled, current.AIEnabled, current.SemanticSearch)
 }
 
-func (db *Database) UpdateLibraryIntelligencePolicy(ctx context.Context, userID, spaceID string, version int64, facesEnabled, petsEnabled, ocrEnabled, aiEnabled, semanticSearch bool) (*LibraryIntelligencePolicy, error) {
+func (db *Database) UpdateLibraryIntelligencePolicy(ctx context.Context, userID, spaceID string, version int64, facesEnabled, petsEnabled, aiEnabled, semanticSearch bool) (*LibraryIntelligencePolicy, error) {
 	if version < 0 {
 		return nil, ErrLibraryInvalid
 	}
@@ -82,7 +81,7 @@ func (db *Database) UpdateLibraryIntelligencePolicy(ctx context.Context, userID,
 			if version != 0 {
 				return ErrLibraryConflict
 			}
-			if _, err := tx.ExecContext(ctx, `INSERT INTO space_library_intelligence_policies(space_id,faces_enabled,pets_enabled,ocr_enabled,ai_enabled,semantic_search_enabled,enabled_by_user_id) VALUES($1,$2,$3,$4,$5,$6,$7)`, spaceID, facesEnabled, petsEnabled, ocrEnabled, aiEnabled, semanticSearch, userID); err != nil {
+			if _, err := tx.ExecContext(ctx, `INSERT INTO space_library_intelligence_policies(space_id,faces_enabled,pets_enabled,ai_enabled,semantic_search_enabled,enabled_by_user_id) VALUES($1,$2,$3,$4,$5,$6)`, spaceID, facesEnabled, petsEnabled, aiEnabled, semanticSearch, userID); err != nil {
 				return err
 			}
 		case err != nil:
@@ -90,7 +89,7 @@ func (db *Database) UpdateLibraryIntelligencePolicy(ctx context.Context, userID,
 		case currentVersion != version:
 			return ErrLibraryConflict
 		default:
-			if _, err := tx.ExecContext(ctx, `UPDATE space_library_intelligence_policies SET faces_enabled=$1,pets_enabled=$2,ocr_enabled=$3,ai_enabled=$4,semantic_search_enabled=$5,enabled_by_user_id=$6,version=version+1,updated_at=NOW() WHERE space_id=$7`, facesEnabled, petsEnabled, ocrEnabled, aiEnabled, semanticSearch, userID, spaceID); err != nil {
+			if _, err := tx.ExecContext(ctx, `UPDATE space_library_intelligence_policies SET faces_enabled=$1,pets_enabled=$2,ai_enabled=$3,semantic_search_enabled=$4,enabled_by_user_id=$5,version=version+1,updated_at=NOW() WHERE space_id=$6`, facesEnabled, petsEnabled, aiEnabled, semanticSearch, userID, spaceID); err != nil {
 				return err
 			}
 		}
@@ -123,7 +122,7 @@ func (db *Database) UpdateLibraryIntelligencePolicy(ctx context.Context, userID,
 				return err
 			}
 		}
-		if ocrEnabled || aiEnabled || semanticSearch {
+		if aiEnabled || semanticSearch {
 			rows, err := tx.QueryContext(ctx, `SELECT i.id,s.security_domain_id FROM space_library_items i JOIN spaces s ON s.id=i.space_id WHERE i.space_id=$1 AND i.lifecycle_state='ready' AND i.hidden=FALSE`, spaceID)
 			if err != nil {
 				return err
@@ -140,7 +139,7 @@ func (db *Database) UpdateLibraryIntelligencePolicy(ctx context.Context, userID,
 			if err := rows.Close(); err != nil {
 				return err
 			}
-			payload, _ := json.Marshal(map[string]bool{"ocr": ocrEnabled, "ai": aiEnabled, "semantic": semanticSearch})
+			payload, _ := json.Marshal(map[string]bool{"ai": aiEnabled, "semantic": semanticSearch})
 			for _, target := range targets {
 				if _, err := tx.ExecContext(ctx, `INSERT INTO library_processing_jobs(id,security_domain_id,space_id,job_kind,target_kind,target_id,payload,priority) VALUES($1,$2,$3,'ai','space_library_item',$4,$5,4) ON CONFLICT(job_kind,target_kind,target_id) DO UPDATE SET payload=EXCLUDED.payload,state=CASE WHEN library_processing_jobs.state IN ('leased','running') THEN library_processing_jobs.state ELSE 'queued' END,error_code=NULL,available_at=NOW(),updated_at=NOW()`, "job_"+uuid.NewString(), target.domainID, spaceID, target.itemID, payload); err != nil {
 					return err
@@ -153,11 +152,11 @@ func (db *Database) UpdateLibraryIntelligencePolicy(ctx context.Context, userID,
 			if _, err := tx.ExecContext(ctx, `DELETE FROM space_library_search_documents WHERE space_id=$1`, spaceID); err != nil {
 				return err
 			}
-			if _, err := tx.ExecContext(ctx, `DELETE FROM library_derivatives WHERE space_library_item_id IN (SELECT id FROM space_library_items WHERE space_id=$1) AND kind IN ('ocr','ai_metadata','embedding','search_document')`, spaceID); err != nil {
+			if _, err := tx.ExecContext(ctx, `DELETE FROM library_derivatives WHERE space_library_item_id IN (SELECT id FROM space_library_items WHERE space_id=$1) AND kind IN ('ai_metadata','embedding','search_document')`, spaceID); err != nil {
 				return err
 			}
 		}
-		return insertLibraryAuditTx(ctx, tx, spaceID, "", userID, "library.intelligence.policy.updated", "space", spaceID, "success", map[string]any{"faces_enabled": facesEnabled, "pets_enabled": petsEnabled, "ocr_enabled": ocrEnabled, "ai_enabled": aiEnabled, "semantic_search_enabled": semanticSearch})
+		return insertLibraryAuditTx(ctx, tx, spaceID, "", userID, "library.intelligence.policy.updated", "space", spaceID, "success", map[string]any{"faces_enabled": facesEnabled, "pets_enabled": petsEnabled, "ai_enabled": aiEnabled, "semantic_search_enabled": semanticSearch})
 	})
 	if err != nil {
 		return nil, err

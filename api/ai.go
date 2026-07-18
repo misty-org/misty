@@ -22,18 +22,13 @@ const (
 )
 
 type AIService struct {
-	database    *db.Database
-	runtime     *agent.Service
-	guard       *AIRequestGuard
-	attachments *AgentAttachmentsService
+	database *db.Database
+	runtime  *agent.Service
+	guard    *AIRequestGuard
 }
 
 func NewAIService(database *db.Database, runtime *agent.Service) *AIService {
 	return &AIService{database: database, runtime: runtime, guard: NewAIRequestGuard()}
-}
-
-func (s *AIService) SetAgentAttachments(attachments *AgentAttachmentsService) {
-	s.attachments = attachments
 }
 
 func (s *AIService) Status() http.HandlerFunc {
@@ -69,32 +64,11 @@ func (s *AIService) CreateSession() http.HandlerFunc {
 			writeAIRateLimit(w, retryAfter)
 			return
 		}
-		billingUserID := userID
-		agentJobID := ""
-		if r.ContentLength != 0 {
-			var body struct {
-				AgentJobID string `json:"agent_job_id"`
-			}
-			if err := decodeAIJSON(w, r, &body); err != nil || !jobIDPattern.MatchString(body.AgentJobID) {
-				http.Error(w, "invalid request", http.StatusBadRequest)
-				return
-			}
-			job, err := s.database.AgentJob(userID, body.AgentJobID)
-			if err != nil || job.OwnerUserID != userID {
-				http.Error(w, "job not found", http.StatusNotFound)
-				return
-			}
-			if job.TriggerKind == "manual" {
-				billingUserID = job.RequesterUserID
-			}
-			agentJobID = job.ID
+		if r.ContentLength > 0 {
+			http.Error(w, "this session endpoint does not accept a request body", http.StatusBadRequest)
+			return
 		}
-		var session *agent.Session
-		if agentJobID != "" {
-			session = s.runtime.CreateSessionForJob(userID, billingUserID, agentJobID)
-		} else {
-			session = s.runtime.CreateSessionWithBilling(userID, billingUserID)
-		}
+		session := s.runtime.CreateSessionWithBilling(userID, userID)
 		writeJSON(w, http.StatusCreated, map[string]any{
 			"session_id": session.ID,
 		})
@@ -201,29 +175,6 @@ func (s *AIService) SubmitToolResults() http.HandlerFunc {
 		if toolResultsContainDocuments(body.Results) && !agentDocumentsEnabled() {
 			writeJSON(w, http.StatusNotFound, map[string]string{"code": "document_agents_disabled"})
 			return
-		}
-		if toolResultsContainDocuments(body.Results) && s.attachments != nil {
-			billingScope, err := s.runtime.SessionBillingScope(sessionID, userID)
-			if err != nil || !strings.HasPrefix(billingScope, "agent-job:") {
-				writeJSON(w, http.StatusBadRequest, map[string]string{"code": "encrypted_attachment_required"})
-				return
-			}
-			jobID := strings.TrimPrefix(billingScope, "agent-job:")
-			job, err := s.database.AgentJob(userID, jobID)
-			if err != nil || job.AgentID == "" {
-				writeJSON(w, http.StatusNotFound, map[string]string{"code": "agent_job_not_found"})
-				return
-			}
-			definition, err := s.database.AgentDefinition(userID, job.AgentID)
-			if err != nil {
-				writeJSON(w, http.StatusNotFound, map[string]string{"code": "agent_not_found"})
-				return
-			}
-			body.Results, err = s.attachments.HydrateDocumentToolResults(r.Context(), userID, jobID, definition.ScopeID, body.Results)
-			if err != nil {
-				writeJSON(w, http.StatusBadRequest, map[string]string{"code": "invalid_encrypted_attachment"})
-				return
-			}
 		}
 		release, ok := s.acquireProviderCall(w, userID)
 		if !ok {

@@ -13,7 +13,6 @@ func TestAgentRoutesRequireAuthentication(t *testing.T) {
 	t.Setenv("MAILJET_SECRET_KEY", "")
 	t.Setenv("MAILJET_FROM_EMAIL", "")
 	t.Setenv("MISTY_DEVICE_JOBS_ENABLED", "true")
-	t.Setenv("MISTY_FOLDER_AGENTS_ENABLED", "true")
 	server, err := CreateServer()
 	if err != nil {
 		t.Fatal(err)
@@ -21,12 +20,27 @@ func TestAgentRoutesRequireAuthentication(t *testing.T) {
 	if err := server.MountHandlers(); err != nil {
 		t.Fatal(err)
 	}
-	for _, path := range []string{"/api/devices", "/api/agents", "/api/agents/jobs"} {
+	for _, path := range []string{
+		"/api/devices",
+		"/api/agents/catalog",
+		"/api/agent-conversations",
+		"/api/spaces/space-1/tasks",
+		"/api/spaces/space-1/calendar/events",
+		"/api/spaces/space-1/calendar/sources",
+	} {
 		req := httptest.NewRequest(http.MethodGet, path, nil)
 		rec := httptest.NewRecorder()
 		server.Router.ServeHTTP(rec, req)
 		if rec.Code != http.StatusUnauthorized {
 			t.Fatalf("GET %s status = %d, want 401", path, rec.Code)
+		}
+	}
+	for _, path := range []string{"/api/agents", "/api/agents/jobs"} {
+		req := httptest.NewRequest(http.MethodGet, path, nil)
+		rec := httptest.NewRecorder()
+		server.Router.ServeHTTP(rec, req)
+		if rec.Code != http.StatusNotFound {
+			t.Fatalf("legacy GET %s status = %d, want 404", path, rec.Code)
 		}
 	}
 }

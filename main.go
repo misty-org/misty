@@ -135,16 +135,13 @@ func runAgentRetention(ctx context.Context, server *Server) {
 					log.Printf("Library rendition purge failed: %v", err)
 				}
 			}
-			if serverFeatureEnabled("MISTY_FOLDER_AGENTS_ENABLED") {
-				if _, err := server.Database.EnqueueDueAgentSchedules(ctx, time.Now().UTC()); err != nil {
-					log.Printf("Agent schedule enqueue failed: %v", err)
+			if server.Spaces != nil {
+				if _, err := server.Spaces.ProcessDueAgentWorkflows(ctx, time.Now().UTC(), 100); err != nil {
+					log.Printf("Agent workflow schedule processing failed: %v", err)
 				}
 			}
 			retentionCounter++
 			if retentionCounter%10 == 0 {
-				if _, err := server.PurgeExpiredAgentData(ctx, 100); err != nil {
-					log.Printf("Agent attachment purge failed: %v", err)
-				}
 				if _, err := server.Database.PurgeExpiredAgentConversations(ctx); err != nil {
 					log.Printf("Agent conversation purge failed: %v", err)
 				}

@@ -6,19 +6,22 @@ import (
 	"encoding/json"
 	"sort"
 	"strings"
+
+	workflowv2 "github.com/kannachi323/misty/server/workflow"
 )
 
 type AgentCatalogEntry struct {
-	AgentID      string               `json:"agent_id"`
-	AgentName    string               `json:"agent_name"`
-	Description  string               `json:"description"`
-	Icon         string               `json:"icon"`
-	Status       string               `json:"status"`
-	RuntimeKind  string               `json:"runtime_kind"`
-	SpaceID      string               `json:"space_id"`
-	SpaceName    string               `json:"space_name"`
-	Workflow     WorkflowVersion      `json:"workflow"`
-	Capabilities []WorkflowCapability `json:"capabilities"`
+	AgentID        string               `json:"agent_id"`
+	AgentName      string               `json:"agent_name"`
+	Description    string               `json:"description"`
+	Icon           string               `json:"icon"`
+	Status         string               `json:"status"`
+	RuntimeKind    string               `json:"runtime_kind"`
+	SpaceID        string               `json:"space_id"`
+	SpaceName      string               `json:"space_name"`
+	AgentVersionID string               `json:"agent_version_id"`
+	Workflow       WorkflowVersion      `json:"workflow"`
+	Capabilities   []WorkflowCapability `json:"capabilities"`
 }
 
 type RoutingOption struct {
@@ -41,8 +44,8 @@ type RoutingDecision struct {
 func (db *Database) DiscoverAgentCatalog(ctx context.Context, userID string) ([]AgentCatalogEntry, error) {
 	items := []AgentCatalogEntry{}
 	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
-		rows, err := tx.QueryContext(ctx, `SELECT a.id,a.name,a.description,a.icon,a.status,a.runtime_kind,a.space_id,s.name,`+workflowVersionColumns+`
-			FROM space_agents a JOIN spaces s ON s.id=a.space_id JOIN space_workflow_versions v ON v.id=a.active_workflow_version_id
+		rows, err := tx.QueryContext(ctx, `SELECT a.id,v.name,v.description,v.icon,a.status,a.runtime_kind,a.space_id,s.name,v.id,a.creator_user_id,v.access_policy
+			FROM space_agents a JOIN spaces s ON s.id=a.space_id LEFT JOIN space_agent_instances i ON i.agent_id=a.id AND i.user_id=$1 JOIN space_agent_versions v ON v.id=COALESCE(i.agent_version_id,a.published_agent_version_id)
 			JOIN space_members m ON m.space_id=a.space_id AND m.user_id=$1
 			WHERE a.enabled AND a.status='available' AND s.lifecycle_state='active' ORDER BY lower(s.name),lower(a.name)`, userID)
 		if err != nil {
@@ -50,15 +53,16 @@ func (db *Database) DiscoverAgentCatalog(ctx context.Context, userID string) ([]
 		}
 		for rows.Next() {
 			var item AgentCatalogEntry
-			var metadataRaw []byte
-			if err := rows.Scan(&item.AgentID, &item.AgentName, &item.Description, &item.Icon, &item.Status, &item.RuntimeKind, &item.SpaceID, &item.SpaceName,
-				&item.Workflow.ID, &item.Workflow.WorkflowID, &item.Workflow.SpaceID, &item.Workflow.StableIdentifier, &item.Workflow.Version, &item.Workflow.Name, &item.Workflow.Description, &item.Workflow.AuthorName, &metadataRaw, &item.Workflow.Definition, &item.Workflow.ChecksumSHA256, &item.Workflow.CreatedByUserID, &item.Workflow.CreatedAt); err != nil {
+			var creatorID string
+			var accessRaw []byte
+			if err := rows.Scan(&item.AgentID, &item.AgentName, &item.Description, &item.Icon, &item.Status, &item.RuntimeKind, &item.SpaceID, &item.SpaceName, &item.AgentVersionID, &creatorID, &accessRaw); err != nil {
 				return err
 			}
-			if err := json.Unmarshal(metadataRaw, &item.Workflow.Metadata); err != nil {
-				return err
+			var access workflowv2.AgentAccessPolicy
+			if json.Unmarshal(accessRaw, &access) != nil || !agentAccessAllows(access, creatorID, userID) {
+				continue
 			}
-			item.Capabilities = item.Workflow.Metadata.Capabilities
+			item.Capabilities = []WorkflowCapability{{ID: "chat", Name: "Chat", Description: "Handle an ordinary request using the Agent's instructions and the user's granted tools.", Inputs: []WorkflowField{{Name: "prompt", Type: "string", Required: true}}, Outputs: []WorkflowField{{Name: "result", Type: "object"}}, Tags: []string{"chat", "assistant"}}}
 			items = append(items, item)
 		}
 		if err := rows.Err(); err != nil {
@@ -74,9 +78,33 @@ func (db *Database) DiscoverAgentCatalog(ctx context.Context, userID string) ([]
 			if err != nil {
 				return err
 			}
-			if allowed {
-				filtered = append(filtered, item)
+			if !allowed {
+				continue
 			}
+			child, err := tx.QueryContext(ctx, `SELECT `+workflowVersionColumns+` FROM space_agent_version_workflows aw JOIN space_workflow_versions v ON v.id=aw.workflow_version_id WHERE aw.agent_version_id=$1 AND aw.enabled ORDER BY aw.position,aw.alias`, item.AgentVersionID)
+			if err != nil {
+				return err
+			}
+			for child.Next() {
+				var version WorkflowVersion
+				var metadataRaw []byte
+				if err := child.Scan(&version.ID, &version.WorkflowID, &version.SpaceID, &version.StableIdentifier, &version.Version, &version.Name, &version.Description, &version.AuthorName, &metadataRaw, &version.Definition, &version.ChecksumSHA256, &version.CreatedByUserID, &version.CreatedAt); err != nil {
+					child.Close()
+					return err
+				}
+				if err := json.Unmarshal(metadataRaw, &version.Metadata); err != nil {
+					child.Close()
+					return err
+				}
+				if item.Workflow.ID == "" {
+					item.Workflow = version
+				}
+				item.Capabilities = append(item.Capabilities, version.Metadata.Capabilities...)
+			}
+			if err := child.Close(); err != nil {
+				return err
+			}
+			filtered = append(filtered, item)
 		}
 		items = filtered
 		return nil

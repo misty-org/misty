@@ -181,7 +181,7 @@ func sanitizeToolResult(result ToolResult) ToolResult {
 	return result
 }
 
-// Extracted document text and OCR images follow the short-lived file-content
+// Extracted native document text follows the short-lived file-content
 // policy, not the 30-day conversation policy. Persist only citation
 // coordinates and harmless document metadata needed to explain an answer.
 func sanitizePreviewFileResult(raw json.RawMessage) json.RawMessage {
@@ -195,8 +195,7 @@ func sanitizePreviewFileResult(raw json.RawMessage) json.RawMessage {
 			Kind    string `json:"kind"`
 			Locator string `json:"locator"`
 		} `json:"sections"`
-		Truncated   bool `json:"truncated"`
-		RequiresOCR bool `json:"requiresOcr"`
+		Truncated bool `json:"truncated"`
 	}
 	if json.Unmarshal(raw, &document) != nil {
 		return nil

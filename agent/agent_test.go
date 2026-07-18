@@ -105,6 +105,25 @@ func TestSendMessageAcceptsOpaqueScopeAndRelativeSelection(t *testing.T) {
 	}
 }
 
+func TestAppendExternalAssistantMessageReturnsDelegatedRunToMikaSession(t *testing.T) {
+	service := NewService(NewSessionStore(0), MockProvider{})
+	session := service.CreateSession("user-1")
+	event, err := service.AppendExternalAssistantMessage(context.Background(), session.ID, "user-1", "run-1", "Delegated work finished")
+	if err != nil {
+		t.Fatalf("AppendExternalAssistantMessage() error = %v", err)
+	}
+	if event.Type != EventAssistantMessage || event.RunID != "run-1" || event.Text != "Delegated work finished" || event.Sequence != 1 {
+		t.Fatalf("external event = %#v", event)
+	}
+	events, err := service.Events(session.ID, "user-1", 0)
+	if err != nil || len(events) != 1 || events[0].Sequence != event.Sequence || events[0].RunID != event.RunID || events[0].Text != event.Text {
+		t.Fatalf("Events() = %#v, %v", events, err)
+	}
+	if _, err := service.AppendExternalAssistantMessage(context.Background(), session.ID, "other-user", "run-1", "secret"); !errors.Is(err, ErrSessionNotFound) {
+		t.Fatalf("cross-user append error = %v", err)
+	}
+}
+
 type loopingToolProvider struct{ calls int }
 
 func (provider *loopingToolProvider) Next(ModelRequest) (ModelResponse, error) {
@@ -118,7 +137,7 @@ func TestProviderCallsAreCappedPerUserTurn(t *testing.T) {
 	provider := &loopingToolProvider{}
 	service := NewService(NewSessionStore(0), provider)
 	session := service.CreateSession("user")
-	if err := service.SendMessage(session.ID, "user", AgentMessageRequest{Mode: ModeAuto, UserMessage: "loop"}); err != nil {
+	if err := service.SendMessage(session.ID, "user", AgentMessageRequest{Mode: ModeAuto, UserMessage: "loop", Capabilities: ToolManifest{Tools: []ToolDefinition{{Name: ToolListDirectory, Risk: RiskRead}}}}); err != nil {
 		t.Fatal(err)
 	}
 	for expectedCall := 2; expectedCall <= MaxProviderCallsPerTurn; expectedCall++ {
@@ -149,6 +168,33 @@ func TestProviderCallsAreCappedPerUserTurn(t *testing.T) {
 	}
 	if last := events[len(events)-1]; last.Type != EventError || !strings.Contains(last.Message, "tool step limit") {
 		t.Fatalf("last event = %#v", last)
+	}
+}
+
+type serverToolProvider struct{ calls int }
+
+func (provider *serverToolProvider) Next(request ModelRequest) (ModelResponse, error) {
+	provider.calls++
+	if provider.calls == 1 {
+		return ModelResponse{ToolRequests: []ToolRequest{{ID: "read-1", Name: "workflow.read_content", Risk: RiskRead, Arguments: json.RawMessage(`{"resourceId":"doc-1"}`)}}}, nil
+	}
+	if len(request.ToolResults) != 1 || !request.ToolResults[0].OK {
+		return ModelResponse{}, errors.New("missing tool result")
+	}
+	return ModelResponse{Text: "Grounded answer"}, nil
+}
+
+func TestCompleteWithToolsUsesTheValidatedMikaToolLoop(t *testing.T) {
+	provider := &serverToolProvider{}
+	service := NewService(NewSessionStore(0), provider)
+	completion, err := service.CompleteWithToolsContext(context.Background(), "user", "user", "Read the document", MikaLow, ToolManifest{Tools: []ToolDefinition{{Name: "workflow.read_content", Risk: RiskRead}}}, func(_ context.Context, request ToolRequest) (json.RawMessage, error) {
+		if request.Name != "workflow.read_content" {
+			t.Fatalf("tool = %#v", request)
+		}
+		return json.RawMessage(`{"sections":[{"text":"evidence"}]}`), nil
+	})
+	if err != nil || completion.Text != "Grounded answer" || completion.ToolCalls != 1 || provider.calls != 2 {
+		t.Fatalf("completion=%#v calls=%d err=%v", completion, provider.calls, err)
 	}
 }
 

@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 
 	"github.com/go-chi/chi/v5"
@@ -26,10 +27,9 @@ type Server struct {
 	Database                  *db.Database
 	EmailSender               email.Sender
 	AIAgent                   *serveragent.Service
-	AgentAttachmentStore      api.AgentAttachmentStore
-	AgentAttachments          *api.AgentAttachmentsService
 	LibraryStore              api.LibraryObjectStore
 	Library                   *api.SpaceLibraryService
+	Demo                      *api.DemoService
 	Spaces                    *api.SpacesService
 	Realtime                  *api.RealtimeService
 	PasswordResetStartURL     string
@@ -61,23 +61,6 @@ func CreateServer() (*Server, error) {
 		serveragent.NewMikaProviderFromEnv(),
 		serveragent.WithUsageMeter(appbilling.NewCreditMeter(s.Database)),
 	)
-	if serverFeatureEnabled("MISTY_AGENT_DOCUMENTS_ENABLED") {
-		s.AgentAttachmentStore, err = agentAttachmentStoreFromEnv()
-		if err != nil {
-			return nil, err
-		}
-		s.AgentAttachments, err = api.NewAgentAttachmentsService(s.Database, s.AgentAttachmentStore, []byte(os.Getenv("DOCUMENT_SIGNING_KEY")))
-		if err != nil {
-			return nil, fmt.Errorf("configure agent attachment encryption: %w", err)
-		}
-		envelopeKeys, err := agentAttachmentEnvelopeKeyringFromEnv()
-		if err != nil {
-			return nil, fmt.Errorf("configure agent attachment envelope keys: %w", err)
-		}
-		if err := s.AgentAttachments.SetEnvelopeKeyring(envelopeKeys); err != nil {
-			return nil, fmt.Errorf("configure agent attachment envelope keys: %w", err)
-		}
-	}
 	s.LibraryStore, err = libraryStoreFromEnv()
 	if err != nil {
 		return nil, err
@@ -85,6 +68,10 @@ func CreateServer() (*Server, error) {
 	s.Library, err = api.NewSpaceLibraryService(s.Database, s.LibraryStore, true, 250<<20)
 	if err != nil {
 		return nil, fmt.Errorf("configure Space Library: %w", err)
+	}
+	s.Demo, err = api.NewDemoService(s.Database, s.LibraryStore, api.DemoConfigFromEnv())
+	if err != nil {
+		return nil, fmt.Errorf("configure demo management: %w", err)
 	}
 	mediaProcessingEnabled := false
 	if mediaProcessorBin, lookupErr := exec.LookPath("ffmpeg"); lookupErr == nil {
@@ -118,6 +105,7 @@ func CreateServer() (*Server, error) {
 	if err != nil {
 		return nil, fmt.Errorf("configure Space link encryption: %w", err)
 	}
+	s.Spaces.SetLibraryProvider(s.Library)
 	s.Realtime = api.NewRealtimeService(s.Database, s.Database.GetDSN())
 
 	emailSender, err := email.NewSenderFromEnv()
@@ -131,7 +119,7 @@ func CreateServer() (*Server, error) {
 
 func (s *Server) MountHandlers() error {
 	s.Router.Use(cors.Handler(cors.Options{
-		AllowedOrigins:   allowedCORSOrigins(),
+		AllowOriginFunc:  func(_ *http.Request, origin string) bool { return isAllowedCORSOrigin(origin) },
 		AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-Misty-Platform", "X-Misty-Release-Channel", "X-Misty-Session-Id", "X-Misty-Analytics-Enabled", "X-Misty-Device-Timestamp", "X-Misty-Device-Nonce", "X-Misty-Device-Signature", "X-Misty-Attachment-Upload-Token", "X-Misty-Library-Upload-Token"},
 		AllowCredentials: true,
@@ -148,13 +136,12 @@ func (s *Server) MountHandlers() error {
 		return err
 	}
 	aiService := api.NewAIService(s.Database, s.AIAgent)
-	aiService.SetAgentAttachments(s.AgentAttachments)
 	libraryAnalyzer := &serveragent.SmartLibraryAnalyzer{
 		APIKey:  strings.TrimSpace(os.Getenv("AI_GATEWAY_API_KEY")),
 		BaseURL: strings.TrimSpace(os.Getenv("AI_GATEWAY_BASE_URL")),
 	}
 	intelligenceEnabled := libraryAnalyzer.APIKey != ""
-	s.Library.SetIntelligence(libraryAnalyzer, intelligenceEnabled, intelligenceEnabled)
+	s.Library.SetIntelligence(libraryAnalyzer, intelligenceEnabled)
 	smartLibraryService := api.NewSmartLibraryService(s.Database, libraryAnalyzer)
 	mediaSearchService := api.NewMediaSearchService(s.Database, libraryAnalyzer)
 	agentsService := api.NewAgentsService(s.Database)
@@ -197,9 +184,6 @@ func (s *Server) MountHandlers() error {
 	if s.Library != nil {
 		s.mountLibraryRoutes("", s.Library)
 	}
-	if s.AgentAttachments != nil {
-		s.mountAgentAttachmentRoutes("", s.AgentAttachments)
-	}
 
 	// Compatibility routes for clients configured with the /api prefix.
 	s.Router.Post("/api/register", registerHandler)
@@ -229,12 +213,15 @@ func (s *Server) MountHandlers() error {
 	if s.Library != nil {
 		s.mountLibraryRoutes("/api", s.Library)
 	}
-	if s.AgentAttachments != nil {
-		s.mountAgentAttachmentRoutes("/api", s.AgentAttachments)
+	if s.Demo != nil {
+		s.Router.Get("/api/internal/demo/status", s.Demo.Status())
+		s.Router.Post("/api/internal/demo/reset", s.Demo.Reset())
+		s.Router.Post("/api/internal/demo/agent-messages", s.Demo.AgentMessages())
 	}
 
 	// Stripe webhook — called by Stripe on payment events
 	s.Router.Post("/stripe/webhook", api.StripeWebhookWithService(os.Getenv("STRIPE_WEBHOOK_SECRET"), appbilling.NewStripeService(s.Database, appbilling.WithTelemetry(s.Telemetry))))
+	s.Spaces.StartProviderWorkers(context.Background())
 
 	return nil
 }
@@ -327,6 +314,22 @@ func (s *Server) mountSpacesRoutes(prefix string, spaces *api.SpacesService, rea
 	s.Router.Post(prefix+"/spaces/{spaceID}/transfer", spaces.TransferOwner())
 	s.Router.MethodFunc(http.MethodGet, prefix+"/spaces/{spaceID}/messages", spaces.Messages())
 	s.Router.MethodFunc(http.MethodPost, prefix+"/spaces/{spaceID}/messages", spaces.Messages())
+	s.Router.MethodFunc(http.MethodGet, prefix+"/spaces/{spaceID}/conversations", spaces.Conversations())
+	s.Router.MethodFunc(http.MethodPost, prefix+"/spaces/{spaceID}/conversations", spaces.Conversations())
+	s.Router.MethodFunc(http.MethodGet, prefix+"/spaces/{spaceID}/conversations/{conversationID}/messages", spaces.ConversationMessages())
+	s.Router.MethodFunc(http.MethodPost, prefix+"/spaces/{spaceID}/conversations/{conversationID}/messages", spaces.ConversationMessages())
+	s.Router.MethodFunc(http.MethodPut, prefix+"/spaces/{spaceID}/conversations/{conversationID}/messages/{messageID}", spaces.ConversationMessage())
+	s.Router.MethodFunc(http.MethodDelete, prefix+"/spaces/{spaceID}/conversations/{conversationID}/messages/{messageID}", spaces.ConversationMessage())
+	s.Router.MethodFunc(http.MethodGet, prefix+"/spaces/{spaceID}/chat/agents", spaces.ChatAgents())
+	s.Router.MethodFunc(http.MethodGet, prefix+"/spaces/{spaceID}/tasks", spaces.SpaceTasks())
+	s.Router.MethodFunc(http.MethodPost, prefix+"/spaces/{spaceID}/tasks", spaces.SpaceTasks())
+	s.Router.MethodFunc(http.MethodPatch, prefix+"/spaces/{spaceID}/tasks/{taskID}", spaces.SpaceTask())
+	s.Router.MethodFunc(http.MethodDelete, prefix+"/spaces/{spaceID}/tasks/{taskID}", spaces.SpaceTask())
+	s.Router.Get(prefix+"/spaces/{spaceID}/calendar/events", spaces.SpaceCalendar())
+	s.Router.MethodFunc(http.MethodGet, prefix+"/spaces/{spaceID}/calendar/sources", spaces.SpaceCalendarSources())
+	s.Router.MethodFunc(http.MethodPost, prefix+"/spaces/{spaceID}/calendar/sources", spaces.SpaceCalendarSources())
+	s.Router.Delete(prefix+"/spaces/{spaceID}/calendar/sources/{sourceID}", spaces.SpaceCalendarSource())
+	s.Router.Get(prefix+"/spaces/{spaceID}/calendar/google/calendars", spaces.AvailableGoogleCalendars())
 	s.Router.MethodFunc(http.MethodPut, prefix+"/spaces/{spaceID}/messages/{messageID}", spaces.Message())
 	s.Router.MethodFunc(http.MethodDelete, prefix+"/spaces/{spaceID}/messages/{messageID}", spaces.Message())
 	s.Router.Post(prefix+"/spaces/{spaceID}/read", spaces.MarkRead())
@@ -345,22 +348,38 @@ func (s *Server) mountSpacesRoutes(prefix string, spaces *api.SpacesService, rea
 	s.Router.Post(prefix+"/spaces/{spaceID}/studio/agents/{resourceID}/runs", spaces.RunStudioResource("agent"))
 	s.Router.MethodFunc(http.MethodGet, prefix+"/spaces/{spaceID}/agents/{agentID}/runs", spaces.DirectAgentRun())
 	s.Router.MethodFunc(http.MethodPost, prefix+"/spaces/{spaceID}/agents/{agentID}/runs", spaces.DirectAgentRun())
-	s.Router.Put(prefix+"/spaces/{spaceID}/studio/agents/{agentID}/workflow", spaces.ReplaceAgentWorkflow())
+	s.Router.MethodFunc(http.MethodGet, prefix+"/spaces/{spaceID}/studio/agents/{agentID}/versions", spaces.AgentVersions())
+	s.Router.MethodFunc(http.MethodPost, prefix+"/spaces/{spaceID}/studio/agents/{agentID}/versions", spaces.AgentVersions())
+	s.Router.MethodFunc(http.MethodGet, prefix+"/spaces/{spaceID}/agents/{agentID}/instance", spaces.AgentInstance())
+	s.Router.MethodFunc(http.MethodPost, prefix+"/spaces/{spaceID}/agents/{agentID}/instance", spaces.AgentInstance())
+	s.Router.Put(prefix+"/agent-instances/{instanceID}/workflows/{workflowVersionID}", spaces.AgentInstanceWorkflow())
+	s.Router.Put(prefix+"/agent-instances/{instanceID}/connections", spaces.AgentInstanceConnections())
 	s.Router.MethodFunc(http.MethodGet, prefix+"/spaces/{spaceID}/studio/workflows", spaces.StudioResources("workflow"))
 	s.Router.MethodFunc(http.MethodPost, prefix+"/spaces/{spaceID}/studio/workflows", spaces.StudioResources("workflow"))
 	s.Router.Delete(prefix+"/spaces/{spaceID}/studio/workflows/{resourceID}", spaces.DeleteStudioResource("workflow"))
-	s.Router.Post(prefix+"/spaces/{spaceID}/studio/workflows/{resourceID}/runs", spaces.RunStudioResource("workflow"))
 	s.Router.MethodFunc(http.MethodGet, prefix+"/spaces/{spaceID}/studio/workflows/{workflowID}/versions", spaces.WorkflowVersions())
 	s.Router.MethodFunc(http.MethodPost, prefix+"/spaces/{spaceID}/studio/workflows/{workflowID}/versions", spaces.WorkflowVersions())
 	s.Router.Get(prefix+"/agents/catalog", spaces.AgentCatalog())
-	s.Router.Get(prefix+"/mika/discovery", spaces.AgentCatalog())
+	s.Router.Get(prefix+"/mika/discovery", spaces.MikaDiscovery())
 	s.Router.Post(prefix+"/mika/delegations", spaces.MikaDelegation())
-	s.Router.MethodFunc(http.MethodGet, prefix+"/agent-conversations", spaces.PrivateAgentConversations())
-	s.Router.MethodFunc(http.MethodPost, prefix+"/agent-conversations", spaces.PrivateAgentConversations())
-	s.Router.MethodFunc(http.MethodGet, prefix+"/agent-conversations/{conversationID}/events", spaces.PrivateAgentConversationEvents())
-	s.Router.MethodFunc(http.MethodPost, prefix+"/agent-conversations/{conversationID}/events", spaces.PrivateAgentConversationEvents())
+	s.Router.MethodFunc(http.MethodGet, prefix+"/agent-conversations", spaces.AgentConversations())
+	s.Router.MethodFunc(http.MethodPost, prefix+"/agent-conversations", spaces.AgentConversations())
+	s.Router.MethodFunc(http.MethodGet, prefix+"/agent-conversations/{conversationID}/events", spaces.AgentConversationEvents())
+	s.Router.MethodFunc(http.MethodPost, prefix+"/agent-conversations/{conversationID}/events", spaces.AgentConversationEvents())
 	s.Router.MethodFunc(http.MethodGet, prefix+"/spaces/{spaceID}/integrations", spaces.SpaceIntegrations())
-	s.Router.MethodFunc(http.MethodPut, prefix+"/spaces/{spaceID}/integrations", spaces.SpaceIntegrations())
+	s.Router.Get(prefix+"/spaces/{spaceID}/integrations/{integrationID}/resources", spaces.AvailableProviderResources())
+	s.Router.MethodFunc(http.MethodGet, prefix+"/spaces/{spaceID}/provider-resources", spaces.ProviderSharedResources())
+	s.Router.MethodFunc(http.MethodPost, prefix+"/spaces/{spaceID}/provider-resources", spaces.ProviderSharedResources())
+	s.Router.Delete(prefix+"/spaces/{spaceID}/provider-resources/{resourceID}", spaces.ProviderSharedResource())
+	// Connections are created only through branded OAuth/install flows. The
+	// legacy PUT route is intentionally not mounted because callers must never
+	// supply their own credential/vault reference.
+	s.Router.Post(prefix+"/spaces/{spaceID}/integrations/{provider}/authorize", spaces.BeginProviderAuthorization())
+	s.Router.Get(prefix+"/oauth/providers/{provider}/callback", spaces.ProviderAuthorizationCallback())
+	s.Router.Post(prefix+"/provider-callbacks/google/calendar", spaces.GoogleCalendarCallback())
+	s.Router.Post(prefix+"/provider-callbacks/slack-events", spaces.SlackEventsCallback())
+	s.Router.Post(prefix+"/provider-callbacks/notion-events", spaces.NotionEventsCallback())
+	s.Router.Delete(prefix+"/integrations/{integrationID}", spaces.DeleteProviderIntegration())
 	s.Router.Get(prefix+"/runs/{runID}", spaces.RunDetail())
 	s.Router.Post(prefix+"/runs/{runID}/approval", spaces.RunDecision())
 	s.Router.Post(prefix+"/runs/{runID}/cancel", spaces.RunCancel())
@@ -391,23 +410,6 @@ func spaceLinkEncryptionKeyFromEnv() (string, error) {
 	return base64.StdEncoding.EncodeToString(sum[:]), nil
 }
 
-func (s *Server) mountAgentAttachmentRoutes(prefix string, service *api.AgentAttachmentsService) {
-	s.Router.Get(prefix+"/agents/attachments/envelope", service.Envelope())
-	s.Router.Post(prefix+"/agents/jobs/{jobID}/attachments/initiate", service.InitiateUpload())
-	s.Router.Put(prefix+"/agents/jobs/{jobID}/attachments/{attachmentID}/content", service.UploadContent())
-	s.Router.Post(prefix+"/agents/jobs/{jobID}/attachments/{attachmentID}/finalize", service.FinalizeUpload())
-	s.Router.Delete(prefix+"/agents/jobs/{jobID}/attachments/{attachmentID}", service.DeleteAttachment())
-}
-
-// PurgeExpiredAgentData is intended for the deployment scheduler. Objects are
-// deleted before their wrapped keys are erased from the database.
-func (s *Server) PurgeExpiredAgentData(ctx context.Context, limit int) (int, error) {
-	if s.AgentAttachments == nil {
-		return 0, nil
-	}
-	return s.AgentAttachments.PurgeExpired(ctx, limit)
-}
-
 func (s *Server) CleanupExpiredLibraryData(ctx context.Context, limit int) (int, error) {
 	if s.Library == nil {
 		return 0, nil
@@ -416,45 +418,17 @@ func (s *Server) CleanupExpiredLibraryData(ctx context.Context, limit int) (int,
 }
 
 func (s *Server) mountAgentsRoutes(prefix string, service *api.AgentsService) {
-	deviceJobsEnabled := serverFeatureEnabled("MISTY_DEVICE_JOBS_ENABLED")
-	folderAgentsEnabled := serverFeatureEnabled("MISTY_FOLDER_AGENTS_ENABLED")
-	if !deviceJobsEnabled && !folderAgentsEnabled {
+	if !serverFeatureEnabled("MISTY_DEVICE_JOBS_ENABLED") {
 		return
 	}
 	s.Router.Post(prefix+"/devices", service.RegisterDevice())
 	s.Router.Get(prefix+"/devices", service.ListDevices())
 	s.Router.Post(prefix+"/devices/{deviceID}/heartbeat", service.DeviceAuthenticated(service.HeartbeatDevice()))
 	s.Router.Post(prefix+"/devices/{deviceID}/revoke", service.RevokeDevice())
-	if deviceJobsEnabled {
-		s.Router.Post(prefix+"/devices/{deviceID}/jobs/claim", service.DeviceAuthenticated(service.ClaimJob()))
-		s.Router.Post(prefix+"/devices/{deviceID}/jobs/{jobID}/lease", service.DeviceAuthenticated(service.LeaseAction("renew")))
-		s.Router.Post(prefix+"/devices/{deviceID}/jobs/{jobID}/start", service.DeviceAuthenticated(service.LeaseAction("start")))
-		s.Router.Post(prefix+"/devices/{deviceID}/jobs/{jobID}/progress", service.DeviceAuthenticated(service.LeaseAction("progress")))
-		s.Router.Post(prefix+"/devices/{deviceID}/jobs/{jobID}/complete", service.DeviceAuthenticated(service.LeaseAction("complete")))
-		s.Router.Post(prefix+"/devices/{deviceID}/jobs/{jobID}/fail", service.DeviceAuthenticated(service.LeaseAction("fail")))
-	}
-	if !folderAgentsEnabled {
-		return
-	}
-	s.Router.Post(prefix+"/agents", service.CreateAgent())
-	s.Router.Get(prefix+"/agents", service.ListAgents())
-	s.Router.Get(prefix+"/agents/snapshot", service.Snapshot())
-	s.Router.Get(prefix+"/agents/{agentID}", service.GetAgent())
-	s.Router.Put(prefix+"/agents/{agentID}", service.UpdateAgent())
-	s.Router.Delete(prefix+"/agents/{agentID}", service.DeleteAgent())
-	s.Router.Get(prefix+"/agents/{agentID}/members", service.Members())
-	s.Router.Put(prefix+"/agents/{agentID}/members", service.Members())
-	s.Router.Get(prefix+"/agents/{agentID}/triggers", service.Triggers())
-	s.Router.Put(prefix+"/agents/{agentID}/triggers", service.Triggers())
-	s.Router.Post(prefix+"/agents/{agentID}/jobs", service.CreateJob())
-	s.Router.Get(prefix+"/agents/jobs", service.Jobs())
-	s.Router.Get(prefix+"/agents/jobs/{jobID}", service.GetJob())
-	s.Router.Post(prefix+"/agents/jobs/{jobID}/cancel", service.CancelJob())
-	s.Router.Post(prefix+"/agents/jobs/{jobID}/retry", service.RetryJob())
-	s.Router.Post(prefix+"/agents/jobs/{jobID}/approvals", service.CreateApproval())
-	s.Router.Get(prefix+"/agents/approvals", service.Approvals())
-	s.Router.Post(prefix+"/agents/approvals/{approvalID}/decision", service.DecideApproval())
-	s.Router.Post(prefix+"/agents/approvals/{approvalID}/resolve", service.DecideApproval())
+	s.Router.Post(prefix+"/devices/{deviceID}/workflow-node-jobs/claim", service.DeviceAuthenticated(service.ClaimWorkflowNodeJob()))
+	s.Router.Post(prefix+"/devices/{deviceID}/workflow-node-jobs/{jobID}/lease", service.DeviceAuthenticated(service.WorkflowNodeLeaseAction("renew")))
+	s.Router.Post(prefix+"/devices/{deviceID}/workflow-node-jobs/{jobID}/complete", service.DeviceAuthenticated(service.WorkflowNodeLeaseAction("complete")))
+	s.Router.Post(prefix+"/devices/{deviceID}/workflow-node-jobs/{jobID}/fail", service.DeviceAuthenticated(service.WorkflowNodeLeaseAction("fail")))
 }
 
 func serverFeatureEnabled(name string) bool {
@@ -478,25 +452,27 @@ func (config r2Config) empty() bool {
 	return config.endpoint == "" && config.bucket == "" && config.accessKey == "" && config.secretKey == ""
 }
 
-func agentAttachmentStoreFromEnv() (api.AgentAttachmentStore, error) {
-	config := r2ConfigFromEnv()
-	if config.endpoint == "" {
-		return nil, fmt.Errorf("R2_ENDPOINT is required for Agent attachments")
-	}
-	store, err := api.NewS3AgentAttachmentStore(api.S3AgentAttachmentStoreConfig{
-		Endpoint: config.endpoint, Region: "auto", Bucket: config.bucket,
-		AccessKeyID: config.accessKey, SecretAccessKey: config.secretKey,
-		ForcePathStyle: true, BucketPrivate: true, LifecycleMaxDays: 2,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("configure R2 agent attachment store: %w", err)
-	}
-	return store, nil
-}
-
 func libraryStoreFromEnv() (api.LibraryObjectStore, error) {
 	config := r2ConfigFromEnv()
-	if config.empty() && !strings.EqualFold(strings.TrimSpace(os.Getenv("MISTY_ENVIRONMENT")), "production") {
+	environment := strings.TrimSpace(os.Getenv("MISTY_ENVIRONMENT"))
+	demoMode := strings.TrimSpace(os.Getenv("MISTY_DEMO_MODE"))
+	if localRoot := strings.TrimSpace(os.Getenv("MISTY_LIBRARY_LOCAL_DIR")); localRoot != "" {
+		if strings.EqualFold(environment, "production") {
+			return nil, fmt.Errorf("MISTY_LIBRARY_LOCAL_DIR cannot be used in production")
+		}
+		store, err := api.NewLocalLibraryObjectStore(localRoot)
+		if err != nil {
+			return nil, fmt.Errorf("configure local Library store: %w", err)
+		}
+		return store, nil
+	}
+	if demoMode == "local" {
+		return nil, fmt.Errorf("MISTY_LIBRARY_LOCAL_DIR is required for local demo mode")
+	}
+	if demoMode == "staging" && config.empty() {
+		return nil, fmt.Errorf("dedicated R2 storage is required for staging demo mode")
+	}
+	if config.empty() && !strings.EqualFold(environment, "production") {
 		return api.NewMemoryLibraryObjectStore(), nil
 	}
 	if config.endpoint == "" {
@@ -555,6 +531,20 @@ func allowedCORSOrigins() []string {
 		}
 	}
 	return origins
+}
+
+func isAllowedCORSOrigin(origin string) bool {
+	for _, allowed := range allowedCORSOrigins() {
+		if strings.EqualFold(origin, allowed) {
+			return true
+		}
+	}
+	parsed, err := url.Parse(origin)
+	if err != nil || parsed.Scheme != "http" || !isLocalhostHostname(parsed.Hostname()) || parsed.Path != "" || parsed.User != nil || parsed.RawQuery != "" || parsed.Fragment != "" {
+		return false
+	}
+	port, err := strconv.Atoi(parsed.Port())
+	return err == nil && port >= 5173 && port <= 5199
 }
 
 func (s *Server) mountAIRoutes(prefix string, aiService *api.AIService) {

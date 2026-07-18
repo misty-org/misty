@@ -62,6 +62,7 @@ func TestLibraryQuotaUploadDedupAndAttachmentPromotion(t *testing.T) {
 	if err != nil {
 		t.Fatalf("PromoteMessageAttachment() error = %v", err)
 	}
+	assertLibraryRealtimeEvent(t, database, ctx, owner.ID, "library.item.promoted", promoted.ID)
 	usage, _ = database.SpaceStorageUsage(ctx, owner.ID, spaceID)
 	if usage.UsedBytes != 200 {
 		t.Fatalf("promotion double-charged quota: %#v", usage)
@@ -83,6 +84,7 @@ func TestLibraryQuotaUploadDedupAndAttachmentPromotion(t *testing.T) {
 	if err != nil {
 		t.Fatalf("UpdateLibraryItem() error = %v", err)
 	}
+	assertLibraryRealtimeEvent(t, database, ctx, owner.ID, "library.item.updated", updated.ID)
 	searchResults, err := database.LibraryItems(ctx, owner.ID, spaceID, LibraryItemQuery{Search: "sunset", Sort: "name", Direction: "asc"})
 	if err != nil || len(searchResults) != 1 || searchResults[0].ID != updated.ID {
 		t.Fatalf("search results = %#v, %v", searchResults, err)
@@ -315,6 +317,20 @@ func TestLibraryQuotaUploadDedupAndAttachmentPromotion(t *testing.T) {
 	if err := database.DeleteLibraryAlbum(ctx, owner.ID, spaceID, album.ID, album.Version); err != nil {
 		t.Fatalf("DeleteLibraryAlbum() error = %v", err)
 	}
+}
+
+func assertLibraryRealtimeEvent(t *testing.T, database *Database, ctx context.Context, userID, eventType, entityID string) {
+	t.Helper()
+	events, _, err := database.SpaceEventsAfter(ctx, userID, 0, 500)
+	if err != nil {
+		t.Fatalf("SpaceEventsAfter(%s): %v", eventType, err)
+	}
+	for _, event := range events {
+		if event.EventType == eventType && event.EntityID == entityID {
+			return
+		}
+	}
+	t.Fatalf("SpaceEventsAfter() missing %s for %s", eventType, entityID)
 }
 
 func TestMissingDeduplicationObjectCanBeReplacedByNewUpload(t *testing.T) {

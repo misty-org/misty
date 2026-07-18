@@ -119,7 +119,6 @@ func agentResponseGenAISchema() *genai.Schema {
 						},
 						"name": {
 							Type: genai.TypeString,
-							Enum: []string{ToolListDirectory, ToolSearchFiles, ToolPreviewFile, ToolValidateFilePlan, ToolApplyFilePlan},
 						},
 						"risk": {
 							Type: genai.TypeString,
@@ -291,7 +290,7 @@ func agentResponseJSONSchema() map[string]any {
 					"additionalProperties": false,
 					"properties": map[string]any{
 						"id":        map[string]any{"type": "string"},
-						"name":      map[string]any{"type": "string", "enum": []string{ToolListDirectory, ToolSearchFiles, ToolPreviewFile, ToolValidateFilePlan, ToolApplyFilePlan}},
+						"name":      map[string]any{"type": "string"},
 						"risk":      map[string]any{"type": "string", "enum": []string{RiskRead, RiskWrite, RiskDangerous}},
 						"arguments": map[string]any{"type": "object"},
 					},
@@ -461,7 +460,7 @@ func geminiAgentResponseSchema() map[string]any {
 					"type": "OBJECT",
 					"properties": map[string]any{
 						"id":        map[string]any{"type": "STRING"},
-						"name":      map[string]any{"type": "STRING", "enum": []string{ToolListDirectory, ToolSearchFiles, ToolPreviewFile, ToolValidateFilePlan, ToolApplyFilePlan}},
+						"name":      map[string]any{"type": "STRING"},
 						"risk":      map[string]any{"type": "STRING", "enum": []string{RiskRead, RiskWrite, RiskDangerous}},
 						"arguments": map[string]any{"type": "OBJECT"},
 					},

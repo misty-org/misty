@@ -18,6 +18,8 @@ import (
 
 const (
 	PermissionLibraryView        = "library.view"
+	PermissionMessagesRead       = "messages.read"
+	PermissionMessagesWrite      = "messages.write"
 	PermissionLibraryUpload      = "library.upload"
 	PermissionAttachmentUpload   = "attachments.upload"
 	PermissionLibraryAdd         = "library.add"
@@ -30,14 +32,19 @@ const (
 	PermissionStudioView         = "studio.view"
 	PermissionStudioManage       = "studio.manage"
 	PermissionAgentsRun          = "agents.run"
+	PermissionTasksView          = "tasks.view"
+	PermissionTasksManage        = "tasks.manage"
+	PermissionIntegrationsManage = "integrations.manage"
 	LibraryRecoveryWindow        = 30 * 24 * time.Hour
 )
 
 var configurableSpacePermissions = []string{
+	PermissionMessagesRead, PermissionMessagesWrite,
 	PermissionLibraryView, PermissionLibraryUpload, PermissionAttachmentUpload,
 	PermissionLibraryAdd, PermissionLibraryEdit, PermissionLibraryDownload,
 	PermissionLibraryImport, PermissionStorageViewOwn, PermissionStorageViewMembers,
 	PermissionStorageManage, PermissionStudioView, PermissionStudioManage, PermissionAgentsRun,
+	PermissionTasksView, PermissionTasksManage, PermissionIntegrationsManage,
 }
 
 var (
@@ -186,9 +193,22 @@ func (db *Database) SpaceMemberPermissions(ctx context.Context, actorUserID, spa
 			}
 			out[permission] = allowed
 		}
+		applySpacePermissionDependencies(out)
 		return nil
 	})
 	return out, err
+}
+
+func applySpacePermissionDependencies(permissions map[string]bool) {
+	if !permissions[PermissionMessagesRead] {
+		permissions[PermissionMessagesWrite] = false
+	}
+	if !permissions[PermissionMessagesRead] || !permissions[PermissionMessagesWrite] {
+		permissions[PermissionAttachmentUpload] = false
+	}
+	if !permissions[PermissionTasksView] {
+		permissions[PermissionTasksManage] = false
+	}
 }
 
 func (db *Database) SetSpaceMemberPermission(ctx context.Context, ownerUserID, spaceID, memberUserID, permission, effect string) error {
@@ -299,6 +319,11 @@ func (db *Database) CreateLibraryUpload(ctx context.Context, userID, spaceID, pu
 	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, permission); err != nil {
 			return err
+		}
+		if purpose == "attachment" {
+			if err := requireSpaceMessageWriteTx(ctx, tx, userID, spaceID); err != nil {
+				return err
+			}
 		}
 		if err := tx.QueryRowContext(ctx, `SELECT security_domain_id FROM spaces WHERE id=$1`, spaceID).Scan(&out.SecurityDomainID); err != nil {
 			return err
@@ -850,7 +875,7 @@ func (db *Database) LibraryItems(ctx context.Context, userID, spaceID string, qu
 			conditions = append(conditions, "b.server_detected_mime_type NOT LIKE 'image/%' AND b.server_detected_mime_type NOT LIKE 'video/%' AND b.server_detected_mime_type NOT LIKE 'audio/%'")
 		case "receipts", "handwriting", "illustrations", "qr-codes":
 			keyword := map[string]string{"receipts": "receipt", "handwriting": "handwrit", "illustrations": "illustration", "qr-codes": "qr"}[query.Utility]
-			conditions = append(conditions, "EXISTS(SELECT 1 FROM library_derivatives intelligence WHERE intelligence.space_library_item_id=i.id AND intelligence.lifecycle_state='ready' AND intelligence.kind IN ('ocr','ai_metadata') AND lower(intelligence.metadata::text) LIKE "+addArgument("%"+keyword+"%")+")")
+			conditions = append(conditions, "EXISTS(SELECT 1 FROM library_derivatives intelligence WHERE intelligence.space_library_item_id=i.id AND intelligence.lifecycle_state='ready' AND intelligence.kind='ai_metadata' AND lower(intelligence.metadata::text) LIKE "+addArgument("%"+keyword+"%")+")")
 		default:
 			return ErrLibraryInvalid
 		}
@@ -895,7 +920,7 @@ func (db *Database) LibraryItems(ctx context.Context, userID, spaceID string, qu
 }
 
 func libraryMediaSubtypeCondition(kind string) string {
-	metadata := `lower(f.original_filename||' '||f.intrinsic_metadata::text||' '||COALESCE((SELECT string_agg(d.metadata::text,' ') FROM library_derivatives d WHERE d.space_library_item_id=i.id AND d.lifecycle_state='ready' AND d.kind IN ('ocr','ai_metadata')),''))`
+	metadata := `lower(f.original_filename||' '||f.intrinsic_metadata::text||' '||COALESCE((SELECT string_agg(d.metadata::text,' ') FROM library_derivatives d WHERE d.space_library_item_id=i.id AND d.lifecycle_state='ready' AND d.kind='ai_metadata'),''))`
 	switch kind {
 	case "selfies":
 		return "b.server_detected_mime_type LIKE 'image/%' AND " + metadata + " ~ '(selfie|front.camera)'"
@@ -1217,7 +1242,7 @@ func (db *Database) UpdateLibraryItem(ctx context.Context, userID, spaceID, item
 		if n, _ := result.RowsAffected(); n == 0 {
 			return ErrLibraryConflict
 		}
-		return nil
+		return insertLibraryAuditTx(ctx, tx, spaceID, "", userID, "library.item.updated", "library_item", itemID, "success", map[string]any{"version": version + 1})
 	})
 	if err != nil {
 		return nil, err
@@ -1263,7 +1288,10 @@ func (db *Database) PromoteMessageAttachment(ctx context.Context, userID, spaceI
 		if err := insertDefaultAliasTx(ctx, tx, spaceID, "library_item", item.ID, userID); err != nil {
 			return err
 		}
-		return scanLibraryFile(tx.QueryRowContext(ctx, `SELECT id,blob_id,security_domain_id,uploader_user_id,original_filename,intrinsic_metadata,lifecycle_state,original_uploaded_at,version FROM library_files WHERE id=$1`, item.FileID), &item.File)
+		if err := scanLibraryFile(tx.QueryRowContext(ctx, `SELECT id,blob_id,security_domain_id,uploader_user_id,original_filename,intrinsic_metadata,lifecycle_state,original_uploaded_at,version FROM library_files WHERE id=$1`, item.FileID), &item.File); err != nil {
+			return err
+		}
+		return insertLibraryAuditTx(ctx, tx, spaceID, item.File.SecurityDomainID, userID, "library.item.promoted", "library_item", item.ID, "success", map[string]any{"attachment_id": attachment.ID})
 	})
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrLibraryNotFound
@@ -1322,7 +1350,7 @@ func recordLibraryItemViewTx(ctx context.Context, tx *sql.Tx, userID, spaceID, i
 func (db *Database) MessageAttachmentDownload(ctx context.Context, userID, spaceID, attachmentID string) (*LibraryDownload, error) {
 	out := &LibraryDownload{}
 	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
-		if _, err := requireSpaceMemberTx(ctx, tx, spaceID, userID); err != nil {
+		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionMessagesRead); err != nil {
 			return ErrLibraryForbidden
 		}
 		return tx.QueryRowContext(ctx, `SELECT b.r2_object_key,a.display_name,b.server_detected_mime_type,b.byte_size,b.sha256
@@ -1380,8 +1408,42 @@ func insertLibraryAuditTx(ctx context.Context, tx *sql.Tx, spaceID, domainID, us
 	if userID != "" {
 		actorUserID = userID
 	}
-	_, err = tx.ExecContext(ctx, `INSERT INTO space_library_audit_events(request_id,security_domain_id,space_id,actor_user_id,action,target_kind,target_id,outcome,details) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)`, "req_"+hex.EncodeToString(requestHash[:8]), securityDomainID, spaceID, actorUserID, action, targetKind, targetID, outcome, raw)
+	if _, err = tx.ExecContext(ctx, `INSERT INTO space_library_audit_events(request_id,security_domain_id,space_id,actor_user_id,action,target_kind,target_id,outcome,details) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)`, "req_"+hex.EncodeToString(requestHash[:8]), securityDomainID, spaceID, actorUserID, action, targetKind, targetID, outcome, raw); err != nil {
+		return err
+	}
+	if outcome != "success" || !libraryAuditRequiresRealtime(action) {
+		return nil
+	}
+	_, err = recordSpaceEventTx(ctx, tx, spaceID, userID, action, targetID, map[string]any{
+		"action":      action,
+		"target_kind": targetKind,
+		"target_id":   targetID,
+		"outcome":     outcome,
+	})
 	return err
+}
+
+func libraryAuditRequiresRealtime(action string) bool {
+	for _, prefix := range []string{
+		"library.item.",
+		"library.items.",
+		"library.album.",
+		"library.album_folder.",
+		"library.asset_stack.",
+		"library.edit.",
+		"library.people.",
+		"library.intelligence.",
+		"library.memory.",
+		"library.duplicates.",
+		"library.pins.",
+		"library.import.",
+		"library.grant.",
+	} {
+		if strings.HasPrefix(action, prefix) {
+			return true
+		}
+	}
+	return false
 }
 
 func normalizeLibraryTags(tags []string) []string {

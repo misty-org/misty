@@ -1,6 +1,9 @@
 package agent
 
-import "testing"
+import (
+	"encoding/json"
+	"testing"
+)
 
 func TestPermissionPolicyModes(t *testing.T) {
 	policy := PermissionPolicy{}
@@ -23,6 +26,17 @@ func TestPermissionPolicyModes(t *testing.T) {
 	full := policy.Apply(ModeFull, cloneRequests(requests))
 	if full[0].ApprovalRequired || full[1].ApprovalRequired || full[2].ApprovalRequired {
 		t.Fatalf("full mode should not require approvals: %#v", full)
+	}
+}
+
+func TestToolRequestsAreBoundToManifestAndManifestRisk(t *testing.T) {
+	requests, rejected := authorizeToolRequests(ToolManifest{Tools: []ToolDefinition{{Name: "provider.send_message", Risk: RiskDangerous}}}, []ToolRequest{
+		{ID: "allowed", Name: "provider.send_message", Risk: RiskRead, Arguments: json.RawMessage(`{"channel":"C1"}`)},
+		{ID: "unknown", Name: "provider.delete_all", Risk: RiskRead, Arguments: json.RawMessage(`{}`)},
+		{ID: "malformed", Name: "provider.send_message", Risk: RiskRead, Arguments: json.RawMessage(`[]`)},
+	})
+	if rejected != 2 || len(requests) != 1 || requests[0].Risk != RiskDangerous {
+		t.Fatalf("requests=%#v rejected=%d", requests, rejected)
 	}
 }
 

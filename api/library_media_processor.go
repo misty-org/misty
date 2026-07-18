@@ -55,8 +55,9 @@ func (media *RenderedLibraryMedia) Cleanup() {
 // bounded so untrusted filenames and embedded network URLs cannot become
 // command arguments or unbounded work.
 type FFmpegLibraryMediaProcessor struct {
-	Executable string
-	Timeout    time.Duration
+	Executable    string
+	PDFExecutable string
+	Timeout       time.Duration
 }
 
 func NewFFmpegLibraryMediaProcessor(executable string) (*FFmpegLibraryMediaProcessor, error) {
@@ -68,7 +69,11 @@ func NewFFmpegLibraryMediaProcessor(executable string) (*FFmpegLibraryMediaProce
 	if err != nil {
 		return nil, err
 	}
-	return &FFmpegLibraryMediaProcessor{Executable: path, Timeout: 12 * time.Minute}, nil
+	pdfPath := ""
+	if candidate, lookupErr := exec.LookPath("pdftoppm"); lookupErr == nil {
+		pdfPath, _ = filepath.Abs(candidate)
+	}
+	return &FFmpegLibraryMediaProcessor{Executable: path, PDFExecutable: pdfPath, Timeout: 12 * time.Minute}, nil
 }
 
 func (processor *FFmpegLibraryMediaProcessor) Render(ctx context.Context, source io.Reader, mimeType string, sourceBytes int64, definition db.LibraryEditDefinition, maximumBytes int64) (*RenderedLibraryMedia, error) {
@@ -193,14 +198,30 @@ func (processor *FFmpegLibraryMediaProcessor) Preview(ctx context.Context, sourc
 		return cleanup(errors.New("Library preview source size mismatch"))
 	}
 	dimension := strconv.Itoa(maximumDimension)
+	magic := make([]byte, 5)
+	magicFile, magicErr := os.Open(inputPath)
+	if magicErr != nil {
+		return cleanup(magicErr)
+	}
+	_, magicErr = io.ReadFull(magicFile, magic)
+	_ = magicFile.Close()
+	isPDF := magicErr == nil && bytes.Equal(magic, []byte("%PDF-"))
+	executable := processor.Executable
 	args := []string{"-nostdin", "-hide_banner", "-loglevel", "error", "-protocol_whitelist", "file,pipe,crypto,data", "-threads", "2", "-filter_threads", "2", "-i", inputPath, "-map", "0:v:0", "-frames:v", "1", "-vf", "scale='min(" + dimension + ",iw)':'min(" + dimension + ",ih)':force_original_aspect_ratio=decrease", "-an", "-map_metadata", "-1", "-q:v", "3", "-f", "image2", "-y", outputPath}
+	if isPDF {
+		if processor.PDFExecutable == "" {
+			return cleanup(errors.New("PDF preview generation requires pdftoppm"))
+		}
+		executable = processor.PDFExecutable
+		args = []string{"-f", "1", "-l", "1", "-singlefile", "-jpeg", "-scale-to", dimension, inputPath, strings.TrimSuffix(outputPath, filepath.Ext(outputPath))}
+	}
 	timeout := processor.Timeout
 	if timeout <= 0 || timeout > 5*time.Minute {
 		timeout = 2 * time.Minute
 	}
 	commandCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
-	command := exec.CommandContext(commandCtx, processor.Executable, args...)
+	command := exec.CommandContext(commandCtx, executable, args...)
 	command.Dir = tempDir
 	command.Env = []string{"PATH=/usr/bin:/bin", "HOME=" + tempDir, "TMPDIR=" + tempDir, "LC_ALL=C"}
 	var stderr cappedBuffer

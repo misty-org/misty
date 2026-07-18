@@ -32,9 +32,25 @@ import (
 var (
 	ErrLibraryObjectNotFound = errors.New("library object not found")
 	libraryObjectKeyPattern  = regexp.MustCompile(`^library/[a-zA-Z0-9_-]{8,160}$`)
+	sha256Pattern            = regexp.MustCompile(`^[0-9a-f]{64}$`)
 )
 
 const librarySHA256MetadataKey = "misty-library-sha256"
+
+func isLoopbackLibraryHost(host string) bool {
+	return strings.EqualFold(host, "localhost") || net.ParseIP(host) != nil && net.ParseIP(host).IsLoopback()
+}
+
+type cancelOnCloseReadCloser struct {
+	io.ReadCloser
+	cancel context.CancelFunc
+}
+
+func (reader *cancelOnCloseReadCloser) Close() error {
+	err := reader.ReadCloser.Close()
+	reader.cancel()
+	return err
+}
 
 type LibraryObjectMetadata struct {
 	ByteSize int64
@@ -306,7 +322,7 @@ func validateS3LibraryObjectStoreConfig(config S3LibraryObjectStoreConfig) error
 		if err != nil || parsed.Host == "" || parsed.User != nil || parsed.RawQuery != "" || parsed.Fragment != "" || (parsed.Path != "" && parsed.Path != "/") {
 			return errors.New("Library S3 endpoint must be an origin URL without credentials, path, query, or fragment")
 		}
-		if parsed.Scheme != "https" && !(config.AllowInsecureLocal && parsed.Scheme == "http" && isLoopbackAttachmentHost(parsed.Hostname())) {
+		if parsed.Scheme != "https" && !(config.AllowInsecureLocal && parsed.Scheme == "http" && isLoopbackLibraryHost(parsed.Hostname())) {
 			return errors.New("Library S3 endpoint must use HTTPS")
 		}
 	}

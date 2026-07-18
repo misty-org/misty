@@ -452,7 +452,7 @@ func (db *Database) SearchSmartLibrary(userID, folderID, query string, limit int
 }
 
 // SearchSmartLibraryHybrid securely scopes candidates before rank fusion. The
-// lexical branch preserves exact names/OCR/tags, while the ANN branch recovers
+// lexical branch preserves exact names and tags, while the ANN branch recovers
 // concepts that the generated caption omitted.
 func (db *Database) SearchSmartLibraryHybrid(userID, folderID, query string, embedding []float64, limit int) ([]SmartLibrarySearchHit, error) {
 	query = strings.TrimSpace(query)

@@ -2,10 +2,9 @@ package db
 
 import (
 	"testing"
-	"time"
 )
 
-func TestAgentLeaseTokensAreOpaqueAndHashed(t *testing.T) {
+func TestWorkflowNodeLeaseTokensAreOpaqueAndHashed(t *testing.T) {
 	token, err := secureToken()
 	if err != nil {
 		t.Fatalf("secureToken() error = %v", err)
@@ -19,11 +18,5 @@ func TestAgentLeaseTokensAreOpaqueAndHashed(t *testing.T) {
 	}
 	if hash != hashToken(token) {
 		t.Fatal("lease token hashing is not deterministic")
-	}
-}
-
-func TestAgentLeaseIntervalUsesPostgresDuration(t *testing.T) {
-	if got := intervalString(time.Minute); got != "1m0s" {
-		t.Fatalf("intervalString(time.Minute) = %q", got)
 	}
 }
