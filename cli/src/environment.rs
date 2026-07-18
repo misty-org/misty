@@ -234,6 +234,7 @@ const FILES: &[FileSpec] = &[
         names: &[
             "GOOGLE_CLIENT_ID",
             "GOOGLE_CLIENT_SECRET",
+            "GOOGLE_SIGN_IN_REDIRECT_URL",
             "MISTY_GOOGLE_DRIVE_CLIENT_ID",
             "MISTY_GOOGLE_DRIVE_CLIENT_SECRET",
         ],
@@ -434,7 +435,7 @@ pub fn validate(workspace: &Workspace, target: Target) -> Result<()> {
     let deployment = values
         .get("MISTY_DEPLOYMENT_MODE")
         .map(|s| s.trim())
-        .unwrap_or("self_hosted");
+        .unwrap_or("hosted");
     let billing = values
         .get("MISTY_BILLING_ADAPTER")
         .map(|s| s.trim())
@@ -1275,6 +1276,9 @@ mod tests {
             ("MISTY_CLOUDFLARE_WORKER_HOST", "fixture.workers.dev"),
             ("MISTY_DEV_API_ORIGIN", "https://api.example.com"),
             ("MISTY_DEV_API_TUNNEL_HOSTNAME", "api.example.com"),
+            ("MISTY_BILLING_ADAPTER", "http"),
+            ("MISTY_BILLING_URL", "https://billing.example.com/adapter"),
+            ("MISTY_BILLING_SECRET", "fixture-billing-secret-32-bytes-long"),
         ] {
             set(&workspace, Target::Dev, key, val).unwrap();
         }

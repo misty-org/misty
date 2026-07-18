@@ -13,7 +13,6 @@ use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
 #[cfg(not(target_os = "macos"))]
 use tantivy::{
-    collector::TopDocs,
     doc,
     query::{AllQuery, BooleanQuery, FuzzyTermQuery, Occur, Query, TermQuery},
     schema::{
@@ -2514,24 +2513,10 @@ fn delete_doc(writer: &IndexWriter, fields: &SearchIndexFields, path: &str) -> A
     Ok(())
 }
 #[cfg(not(target_os = "macos"))]
-fn query_documents(
-    reader: &IndexReader,
-    fields: SearchIndexFields,
-    text: &str,
-) -> ApiResult<Vec<SearchDoc>> {
-    let searcher = reader.searcher();
-    let hits = searcher
-        .search(&build_query(fields, text), &TopDocs::with_limit(10_000))
-        .map_err(|e| ApiError::Message(e.to_string()))?;
-    hits.into_iter()
-        .filter_map(
-            |(_, address)| match searcher.doc::<TantivyDocument>(address) {
-                Ok(doc) => doc_from_tantivy(fields, &doc).map(Ok),
-                Err(e) => Some(Err(ApiError::Message(e.to_string()))),
-            },
-        )
-        .collect()
-}
+#[path = "search_local_query.rs"]
+mod local_query;
+#[cfg(not(target_os = "macos"))]
+use local_query::query_documents;
 #[cfg(target_os = "macos")]
 #[path = "search_remote_engine.rs"]
 mod remote_engine;

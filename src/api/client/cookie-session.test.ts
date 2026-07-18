@@ -91,6 +91,35 @@ describe("JWT cookie transport", () => {
     expect(native.fetch).not.toHaveBeenCalled();
   });
 
+  it("allows Google begin and completion while signed out without refreshing another session", async () => {
+    native.enabled = true;
+    native.fetch.mockImplementation(async () => new Response(null, { status: 202 }));
+    const { configureApiSession } = await import("./session");
+    configureApiSession({
+      isTransitioning: () => false,
+      readGeneration: () => 0,
+      readToken: async () => null,
+      isSignedOut: () => true,
+    });
+    const { cookieSessionFetch } = await import("./cookie-session");
+    await cookieSessionFetch("https://misty.example/v1/auth/google", { method: "GET" });
+    await cookieSessionFetch("https://misty.example/v1/auth/google", {
+      method: "POST",
+      body: "{}",
+    });
+    await cookieSessionFetch("https://misty.example/v1/auth/google/complete", {
+      method: "POST",
+      body: JSON.stringify({ flow_token: "secret" }),
+    });
+    expect(native.fetch.mock.calls.map(([url]) => url)).toEqual([
+      "https://misty.example/v1/auth/google",
+      "https://misty.example/v1/auth/google",
+      "https://misty.example/v1/auth/google/complete",
+    ]);
+    for (const [, options] of native.fetch.mock.calls)
+      expect(new Headers(options.headers).get("X-Misty-CSRF")).toBe("1");
+  });
+
   it("shares a refresh across simultaneous expired requests without exposing tokens", async () => {
     let finish!: (response: Response) => void;
     let refreshed = false;
