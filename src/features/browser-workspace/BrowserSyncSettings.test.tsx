@@ -148,6 +148,33 @@ it("writes labeled mode changes and waits for server confirmation", async () => 
   act(() => useBrowserSyncStore.setState({ session: view }));
   expect(screen.getByText(/Independent workspace/)).toBeTruthy();
 });
+it("confirms opening another device's tabs without taking its sign-in lease", async () => {
+  const twoWorkspaces = () => {
+    const view = syncSession();
+    view.sync!.workspaces.push({
+      workspace_id: "other",
+      shared: false,
+      driver_device_id: "other",
+      driver_epoch: "o",
+      driver_seen_at: 1,
+      version: 1,
+    });
+    return view;
+  };
+  useBrowserSyncStore.setState({ session: twoWorkspaces() });
+  await mount();
+  await act(async () =>
+    fireEvent.click(screen.getByRole("button", { name: /Open tabs from .* here/ })),
+  );
+  expect(mocks.claim).toHaveBeenCalledWith("s", "other");
+  expect(screen.getByText("Waiting for the device to confirm…")).toBeTruthy();
+  // The online holder keeps the lease; this machine only moves onto its workspace.
+  const opened = twoWorkspaces();
+  opened.sync!.on_workspace = "other";
+  act(() => useBrowserSyncStore.setState({ session: opened }));
+  expect(screen.queryByText("Waiting for the device to confirm…")).toBeNull();
+  expect(screen.getByText("Open here")).toBeTruthy();
+});
 it("absorbs device names into inline rename", async () => {
   await mount();
   fireEvent.click(screen.getByRole("button", { name: "Rename Office" }));
