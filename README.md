@@ -27,9 +27,12 @@ npm run build:desktop
 npm run build:mobile
 npm run build:android
 npm run service:archive
+npm run windows:stage-assets
 ```
 
 The `mobile` build mode is the native iPad packaging target; it uses the same component tree and layout as desktop. Android packages require a 600dp smallest screen width, and the iOS target is restricted to the iPad device family.
+
+For a native Windows NSIS or MSI test build, including the temporary asset-copy workflow, see [docs/windows-build.md](docs/windows-build.md).
 
 Platform release commands, signing preflights, simulator smoke tests, macOS notarization, and Android security checks are listed in `package.json`.
 

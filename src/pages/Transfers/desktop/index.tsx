@@ -149,7 +149,7 @@ const transferStyles = {
   sortMenu:
     "fixed z-[2147483000] grid w-44 gap-1 overflow-y-auto rounded-[10px] border border-[var(--misty-border)] bg-[var(--misty-app-surface-bg,var(--misty-surface))] p-1.5 shadow-[0_16px_38px_rgba(0,0,0,0.38)]",
   sortMenuLabel:
-    "px-2.5 py-1 text-[11px] font-bold uppercase text-[var(--misty-text-subtle)]",
+    "px-2.5 py-1 text-[11px] font-bold capitalize text-[var(--misty-text-subtle)]",
   sortMenuItem:
     "flex h-8 min-w-0 items-center justify-between gap-2 rounded-lg border-0 bg-transparent px-2.5 text-left text-sm text-[var(--misty-text)] hover:bg-[var(--misty-neutral-hover-bg,var(--misty-surface-3))]",
   sortMenuItemActive:
@@ -163,7 +163,7 @@ const transferStyles = {
   actionMenuField:
     "grid min-w-0 gap-1 rounded-lg px-2.5 py-1.5",
   actionMenuFieldLabel:
-    "text-[11px] font-semibold uppercase text-[var(--misty-text-subtle)]",
+    "text-[11px] font-semibold capitalize text-[var(--misty-text-subtle)]",
   actionMenuDanger:
     "text-[var(--misty-danger)]",
   actionMenuSeparator: "my-1 h-px bg-[var(--misty-border-soft)]",
@@ -172,7 +172,7 @@ const transferStyles = {
   summary: "grid grid-cols-2 gap-2",
   summaryCard:
     "grid min-w-0 gap-1 border-b border-[var(--misty-border-soft)] pb-2",
-  summaryLabel: "text-xs font-semibold uppercase text-[var(--misty-text-subtle)]",
+  summaryLabel: "text-xs font-semibold capitalize text-[var(--misty-text-subtle)]",
   summaryValue: "text-2xl leading-none text-[var(--misty-text)]",
   summaryDetail:
     "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-xs not-italic text-[var(--misty-text-muted)]",
@@ -197,7 +197,7 @@ const transferStyles = {
   smallButton:
     "min-h-[30px] rounded-[9px] border border-[var(--misty-border-soft)] bg-[var(--misty-app-surface-soft-bg,var(--misty-surface-2))] px-[9px] py-[5px] text-[var(--misty-text)] disabled:opacity-45",
   filterSection: "grid gap-2.5 border-t border-[var(--misty-border-soft)] py-3 first:border-t-0 first:pt-0",
-  filterSectionTitle: "m-0 text-[11px] font-bold uppercase tracking-[0.06em] text-[var(--misty-text-muted)]",
+  filterSectionTitle: "m-0 text-[11px] font-bold capitalize text-[var(--misty-text-muted)]",
   filterOption:
     "grid min-h-7 min-w-0 cursor-default grid-cols-[18px_minmax(0,1fr)_auto] items-center gap-2 rounded-md px-0.5 text-sm leading-none text-[var(--misty-text)]",
   filterInput:

@@ -3,7 +3,6 @@ import { openExternalLink } from "../shared/openExternalLink";
 import { errorText } from "../shared/format";
 import { resolveSpacesApiBase, spacesApi, type RealtimeEnvelope } from "../spaces/api";
 import type {
-  MessageSpan,
   Space,
   SpaceEvent,
   SpaceInboxItem,
@@ -15,6 +14,8 @@ import type {
   SpaceRun,
   SpacesSnapshot,
 } from "../spaces/types";
+import { buildMessageSpans, mergeSpaceMessages } from "./spaceMessageSpans";
+export { buildMessageSpans } from "./spaceMessageSpans";
 
 type ActivityTab = "unreads" | "mentions";
 
@@ -38,6 +39,7 @@ interface SpacesStore {
   loadNodes: (spaceId: string) => Promise<void>;
   loadMembers: (spaceId: string) => Promise<void>;
   loadStudio: (spaceId: string, kind: "agents" | "workflows") => Promise<void>;
+  loadChatAgents: (spaceId: string) => Promise<void>;
   loadInbox: () => Promise<void>;
   createSpace: (name: string) => Promise<Space>;
   renameSpace: (spaceId: string, name: string) => Promise<Space>;
@@ -58,7 +60,7 @@ interface SpacesStore {
   openNode: (spaceId: string, nodeId: string, disposition?: "open" | "download") => Promise<void>;
   saveStudio: (spaceId: string, kind: "agents" | "workflows", item: Partial<SpaceStudioResource>) => Promise<SpaceStudioResource>;
   deleteStudio: (spaceId: string, kind: "agents" | "workflows", id: string) => Promise<void>;
-  runStudio: (spaceId: string, kind: "agents" | "workflows", id: string, prompt?: string) => Promise<SpaceRun>;
+  runStudio: (spaceId: string, kind: "agents" | "workflows", id: string, prompt?: string, capabilityId?: string) => Promise<SpaceRun>;
   markInboxSeen: () => Promise<void>;
   clearInbox: (tab: ActivityTab) => Promise<void>;
   connectRealtime: (accountId: string) => Promise<void>;
@@ -104,11 +106,21 @@ export const useSpacesStore = create<SpacesStore>((set, get) => ({
 
   loadSpace: async (spaceId) => {
     set({ loading: true, error: null });
-    const results = await Promise.allSettled([
-      get().loadMembers(spaceId),
-      get().loadMessages(spaceId),
-      get().loadNodes(spaceId),
-    ]);
+    if (!get().spaces.some((space) => space.id === spaceId)) await get().load();
+    const space = get().spaces.find((item) => item.id === spaceId);
+    const canReadMessages = space?.permissions?.["messages.read"] !== false;
+    if (!canReadMessages) {
+      set((state) => {
+        const messagesBySpace = { ...state.messagesBySpace };
+        const nodesBySpace = { ...state.nodesBySpace };
+        delete messagesBySpace[spaceId];
+        delete nodesBySpace[spaceId];
+        return { messagesBySpace, nodesBySpace };
+      });
+    }
+    const tasks = [get().loadMembers(spaceId)];
+    if (canReadMessages) tasks.push(get().loadMessages(spaceId), get().loadNodes(spaceId));
+    const results = await Promise.allSettled(tasks);
     const rejected = results.find((result) => result.status === "rejected");
     set({ loading: false, error: rejected?.status === "rejected" ? errorText(rejected.reason) : null });
   },
@@ -134,6 +146,15 @@ export const useSpacesStore = create<SpacesStore>((set, get) => ({
       set((state) => kind === "agents"
         ? { agentsBySpace: { ...state.agentsBySpace, [spaceId]: resources }, error: null }
         : { workflowsBySpace: { ...state.workflowsBySpace, [spaceId]: resources }, error: null });
+    } catch (error) {
+      set({ error: errorText(error) });
+    }
+  },
+
+  loadChatAgents: async (spaceId) => {
+    try {
+      const { agents } = await spacesApi.chatAgents(spaceId);
+      set((state) => ({ agentsBySpace: { ...state.agentsBySpace, [spaceId]: agents }, error: null }));
     } catch (error) {
       set({ error: errorText(error) });
     }
@@ -223,11 +244,16 @@ export const useSpacesStore = create<SpacesStore>((set, get) => ({
     try {
       const spans = trimmed ? buildMessageSpans(trimmed, get().membersBySpace[spaceId] ?? [], get().agentsBySpace[spaceId] ?? []) : [];
       const response = await spacesApi.sendMessage(spaceId, spans, fileNodeIds, attachmentIds, libraryItemIds, replyToMessageId);
+      const agentFailureMessage = response.agent_failures?.map((failure) => {
+        const name = get().agentsBySpace[spaceId]?.find((agent) => agent.id === failure.agent_id)?.name ?? "Agent";
+        return `${name}: ${failure.message}`;
+      }).join("\n") || null;
       set((state) => ({
         sending: false,
+        error: agentFailureMessage,
         messagesBySpace: {
           ...state.messagesBySpace,
-          [spaceId]: mergeMessages(state.messagesBySpace[spaceId] ?? [], [response.message, ...response.agent_replies]),
+          [spaceId]: mergeSpaceMessages(state.messagesBySpace[spaceId] ?? [], [response.message, ...response.agent_replies]),
         },
       }));
     } catch (error) {
@@ -241,7 +267,7 @@ export const useSpacesStore = create<SpacesStore>((set, get) => ({
     try {
       const spans = buildMessageSpans(text.trim(), get().membersBySpace[spaceId] ?? [], get().agentsBySpace[spaceId] ?? []);
       const saved = await spacesApi.updateMessage(spaceId, messageId, spans, fileNodeIds);
-      set((state) => ({ messagesBySpace: { ...state.messagesBySpace, [spaceId]: mergeMessages(state.messagesBySpace[spaceId] ?? [], [saved]) } }));
+      set((state) => ({ messagesBySpace: { ...state.messagesBySpace, [spaceId]: mergeSpaceMessages(state.messagesBySpace[spaceId] ?? [], [saved]) } }));
     } catch (error) {
       set({ error: errorText(error) });
       throw error;
@@ -301,8 +327,8 @@ export const useSpacesStore = create<SpacesStore>((set, get) => ({
     await get().loadStudio(spaceId, kind);
   },
 
-  runStudio: async (spaceId, kind, id, prompt = "") => {
-    return spacesApi.runStudio(spaceId, kind, id, prompt);
+  runStudio: async (spaceId, kind, id, prompt = "", capabilityId = "") => {
+    return spacesApi.runStudio(spaceId, kind, id, prompt, capabilityId);
   },
 
   markInboxSeen: async () => {
@@ -410,39 +436,6 @@ export function resetSpacesAccountState(): void {
   });
 }
 
-function mergeMessages(current: SpaceMessage[], incoming: SpaceMessage[]): SpaceMessage[] {
-  const byId = new Map(current.map((item) => [item.id, item]));
-  for (const item of incoming) byId.set(item.id, item);
-  return [...byId.values()].sort((left, right) => left.seq - right.seq);
-}
-
-export function buildMessageSpans(text: string, members: SpaceMember[], agents: SpaceStudioResource[]): MessageSpan[] {
-  const candidates = [
-    ...members.map((member) => ({ label: member.name, userId: member.user_id, agentId: "" })),
-    ...agents.map((agent) => ({ label: agent.name, userId: "", agentId: agent.id })),
-  ].filter((item) => item.label.trim()).sort((left, right) => right.label.length - left.label.length);
-  if (candidates.length === 0) return [{ type: "text", text }];
-  const pattern = new RegExp(`@(${candidates.map((item) => escapeRegExp(item.label)).join("|")})(?=\\s|$|[.,!?])`, "gi");
-  const spans: MessageSpan[] = [];
-  let offset = 0;
-  for (const match of text.matchAll(pattern)) {
-    const index = match.index ?? 0;
-    if (index > offset) spans.push({ type: "text", text: text.slice(offset, index) });
-    const label = match[1];
-    const candidate = candidates.find((item) => item.label.toLocaleLowerCase() === label.toLocaleLowerCase());
-    if (candidate?.userId) spans.push({ type: "mention", user_id: candidate.userId, label: candidate.label });
-    else if (candidate?.agentId) spans.push({ type: "mention", agent_id: candidate.agentId, label: candidate.label });
-    else spans.push({ type: "text", text: match[0] });
-    offset = index + match[0].length;
-  }
-  if (offset < text.length) spans.push({ type: "text", text: text.slice(offset) });
-  return spans.length ? spans : [{ type: "text", text }];
-}
-
-function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
 async function applyRealtimeEvent(
   event: SpaceEvent,
   accountId: string,
@@ -451,11 +444,18 @@ async function applyRealtimeEvent(
 ) {
   if (accountId !== realtimeAccountId) return;
   writeRealtimeCursor(accountId, event.id);
-  if (event.type.startsWith("message.")) await Promise.all([get().loadMessages(event.space_id), get().loadInbox()]);
-  else if (event.type.startsWith("node.")) await get().loadNodes(event.space_id);
+  const permissions = get().spaces.find((space) => space.id === event.space_id)?.permissions;
+  if (event.type.startsWith("message.") && permissions?.["messages.read"] !== false) {
+    const conversationId = typeof event.payload.conversation_id === "string" ? event.payload.conversation_id : "";
+    window.dispatchEvent(new CustomEvent("misty:space-message-event", { detail: { spaceId: event.space_id, conversationId, event } }));
+    if (conversationId) await get().loadInbox(); else await Promise.all([get().loadMessages(event.space_id), get().loadInbox()]);
+  } else if (event.type.startsWith("conversation.")) window.dispatchEvent(new CustomEvent("misty:space-conversation-event", { detail: event }));
+  else if (event.type.startsWith("node.") && permissions?.["messages.read"] !== false) await get().loadNodes(event.space_id);
   else if (event.type.startsWith("member.") || event.type.startsWith("owner.") || event.type.startsWith("space.")) await Promise.all([get().load(), get().loadMembers(event.space_id)]);
-  else if (event.type.startsWith("agent.")) await get().loadStudio(event.space_id, "agents");
-  else if (event.type.startsWith("workflow.")) await get().loadStudio(event.space_id, "workflows");
+  else if (event.type.startsWith("library.") && permissions?.["library.view"] !== false) window.dispatchEvent(new CustomEvent("misty:space-library-event", { detail: event }));
+  else if ((event.type.startsWith("task.") || event.type.startsWith("calendar.")) && permissions?.["tasks.view"] !== false) window.dispatchEvent(new CustomEvent("misty:space-coordination-event", { detail: event }));
+  else if (event.type.startsWith("agent.") && permissions?.["studio.view"] !== false) await get().loadStudio(event.space_id, "agents");
+  else if (event.type.startsWith("workflow.") && permissions?.["studio.view"] !== false) await get().loadStudio(event.space_id, "workflows");
   set({ realtimeConnected: true });
 }
 

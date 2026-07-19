@@ -5,10 +5,14 @@ import "@sinm/react-chrome-tabs/css/chrome-tabs.css";
 import "@sinm/react-chrome-tabs/css/chrome-tabs-dark-theme.css";
 import "./chromeTabs.css";
 import { memo, useEffect, useMemo, useRef, type ReactNode } from "react";
+import { useExplorerDropRegistry } from "../../pages/Files/drag/ExplorerDragContext";
+import { createExplorerDropTargetSpec } from "../../pages/Files/drag/ExplorerDropTarget";
 
 export interface ChromeTabStripTab {
   id: string;
   title: string;
+  path: string;
+  paneId: string;
 }
 
 interface ChromeTabStripProps {
@@ -37,6 +41,7 @@ const chromeTabTrayClass = [
 
 export const ChromeTabStrip = memo(function ChromeTabStrip(props: ChromeTabStripProps) {
   const shellRef = useRef<HTMLDivElement | null>(null);
+  const registerDropZone = useExplorerDropRegistry();
   const packageTabs = useMemo<TabProperties[]>(
     () => props.tabs.map((tab) => ({
       id: tab.id,
@@ -60,6 +65,33 @@ export const ChromeTabStrip = memo(function ChromeTabStrip(props: ChromeTabStrip
     shell.addEventListener("wheel", preventNativeTabScroll, { capture: true, passive: false });
     return () => shell.removeEventListener("wheel", preventNativeTabScroll, { capture: true });
   }, []);
+
+  useEffect(() => {
+    if (!registerDropZone) return;
+    let disposed = false;
+    let cleanups: Array<() => void> = [];
+    const frame = window.requestAnimationFrame(() => {
+      if (disposed || !shellRef.current) return;
+      cleanups = props.tabs.flatMap((tab) => {
+        const element = Array.from(shellRef.current?.querySelectorAll<HTMLElement>(".chrome-tab[data-tab-id]") ?? [])
+          .find((candidate) => candidate.dataset.tabId === tab.id);
+        if (!element) return [];
+        const spec = createExplorerDropTargetSpec({
+          id: `tab:${tab.id}`,
+          path: tab.path,
+          paneId: tab.paneId,
+          springLoad: tab.id !== props.activeTabId,
+          onSpringLoad: () => props.onSelectTab(tab.id),
+        });
+        return [registerDropZone(element, spec)];
+      });
+    });
+    return () => {
+      disposed = true;
+      window.cancelAnimationFrame(frame);
+      cleanups.forEach((cleanup) => cleanup());
+    };
+  }, [props.activeTabId, props.onSelectTab, props.tabs, registerDropZone]);
 
   return (
     <div ref={shellRef} className={chromeTabShellClass}>

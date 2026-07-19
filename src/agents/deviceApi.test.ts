@@ -12,11 +12,11 @@ describe("device request signing", () => {
   it("uses the server-visible API pathname and exact canonical line order", () => {
     expect(deviceSignaturePayload(
       "post",
-      "/devices/device_123/jobs/claim?ignored=true",
+      "/devices/device_123/workflow-node-jobs/claim?ignored=true",
       "1900000000",
       "bm9uY2U=",
       "E3B0C442",
-    )).toBe("POST\n/api/devices/device_123/jobs/claim\n1900000000\nbm9uY2U=\ne3b0c442");
+    )).toBe("POST\n/api/devices/device_123/workflow-node-jobs/claim\n1900000000\nbm9uY2U=\ne3b0c442");
   });
 
   it("does not reopen a denied device-identity Keychain request during the same session", async () => {

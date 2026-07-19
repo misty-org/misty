@@ -83,7 +83,7 @@ import type {
   WorkspaceDialogState,
   WorkspaceMenuState,
 } from "./ExplorerSidebarSupport";
-
+import { ExplorerDropTarget } from "../drag/ExplorerDropTarget";
 
 interface ExplorerSidebarProps {
   homePath: string;
@@ -447,7 +447,7 @@ export const ExplorerSidebar = memo(function ExplorerSidebar(props: ExplorerSide
   };
 
   return (
-    <aside className={sidebarStyles.root}>
+    <aside className={sidebarStyles.root} data-explorer-scroll-container>
       <section className={sidebarStyles.section}>
         <button
           type="button"
@@ -513,20 +513,22 @@ export const ExplorerSidebar = memo(function ExplorerSidebar(props: ExplorerSide
                     path: item.path,
                   })}
                 >
-                  <button
-                    className={sidebarStyles.pinnedButton}
-                    onClick={() => {
-                      if (item.grantRequest) {
-                        props.onGrantLocalFolder(item.grantRequest);
-                      } else {
-                        props.onNavigate(item.path);
-                      }
-                    }}
-                    title={item.grantRequest && !grantedPath ? `Grant access to ${item.label}` : item.path}
-                  >
-                    <Icon size={20} />
-                    <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{item.label}</span>
-                  </button>
+                  <ExplorerDropTarget id={`sidebar:quick:${item.path}`} path={grantedPath ?? item.path}
+                    springLoad={!item.grantRequest || Boolean(grantedPath)} onSpringLoad={() => props.onNavigate(grantedPath ?? item.path)}>
+                    <button
+                      className={sidebarStyles.pinnedButton}
+                      onClick={() => {
+                        if (item.grantRequest) {
+                          props.onGrantLocalFolder(item.grantRequest);
+                        } else {
+                          props.onNavigate(item.path);
+                        }
+                      }}
+                      title={item.grantRequest && !grantedPath ? `Grant access to ${item.label}` : item.path}
+                    >
+                      <Icon size={20} /><span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{item.label}</span>
+                    </button>
+                  </ExplorerDropTarget>
                   {item.grantRequest && !grantedPath ? (
                     <button
                       type="button"
@@ -565,14 +567,15 @@ export const ExplorerSidebar = memo(function ExplorerSidebar(props: ExplorerSide
                   path,
                 })}
               >
-                <button
-                  className={sidebarStyles.pinnedButton}
-                  onClick={() => props.onNavigate(path)}
-                  title={path}
-                >
-                  <Folder size={20} />
-                  <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{pinnedPathLabel(path)}</span>
-                </button>
+                <ExplorerDropTarget id={`sidebar:pinned:${path}`} path={path} springLoad onSpringLoad={() => props.onNavigate(path)}>
+                  <button
+                    className={sidebarStyles.pinnedButton}
+                    onClick={() => props.onNavigate(path)}
+                    title={path}
+                  >
+                    <Folder size={20} /><span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{pinnedPathLabel(path)}</span>
+                  </button>
+                </ExplorerDropTarget>
                 <button
                   type="button"
                   className={sidebarStyles.pinnedUnpinButton}
@@ -716,17 +719,15 @@ export const ExplorerSidebar = memo(function ExplorerSidebar(props: ExplorerSide
                 const path = joinPath(props.mountRoot, remote.name);
                 const providerIcon = providerIconForType(remote.type);
                 return (
-                  <button
-                    key={`${remote.type}:${remote.name}`}
-                    className={`${sidebarStyles.itemButton} ${props.activePath === path || props.activePath.startsWith(`${path}/`) ? sidebarStyles.itemSelected : ""}`}
-                    onClick={() => props.onNavigate(path)}
-                    title={`${remote.type}: ${remote.name}`}
-                  >
-                    <span className={sidebarStyles.remoteIcon}>
-                      <AssetIcon src={providerIcon.src} color={providerIcon.color} size={24} />
-                    </span>
-                    <span>{remote.name}</span>
-                  </button>
+                  <ExplorerDropTarget key={`${remote.type}:${remote.name}`} id={`sidebar:remote:${remote.name}`} path={path} remoteName={remote.name} springLoad onSpringLoad={() => props.onNavigate(path)}>
+                    <button
+                      className={`${sidebarStyles.itemButton} ${props.activePath === path || props.activePath.startsWith(`${path}/`) ? sidebarStyles.itemSelected : ""}`}
+                      onClick={() => props.onNavigate(path)}
+                      title={`${remote.type}: ${remote.name}`}
+                    >
+                      <span className={sidebarStyles.remoteIcon}><AssetIcon src={providerIcon.src} color={providerIcon.color} size={24} /></span>
+                      <span>{remote.name}</span></button>
+                  </ExplorerDropTarget>
                 );
               })}
             </div>
@@ -777,23 +778,22 @@ export const ExplorerSidebar = memo(function ExplorerSidebar(props: ExplorerSide
                 const usedRatio = device.totalBytes > 0 ? Math.min(100, Math.round((usedBytes / device.totalBytes) * 100)) : 0;
                 return (
                   <div className={sidebarStyles.deviceRow} key={device.id}>
-                    <button
-                      type="button"
-                      className={`${sidebarStyles.deviceButton} ${pathIsInside(props.activePath, device.mountPath) ? sidebarStyles.itemSelected : ""}`}
-                      onClick={() => props.onNavigate(device.mountPath)}
-                      title={`${device.name} · ${device.mountPath}`}
-                    >
-                      <span className={sidebarStyles.deviceIcon} aria-hidden="true">
-                        <HardDrive size={20} />
-                      </span>
-                      <span className={sidebarStyles.deviceCopy}>
-                        <strong className={sidebarStyles.deviceName}>{device.name}</strong>
-                        <small className={sidebarStyles.deviceMeta}>{deviceCapacityLabel(usedBytes, device.totalBytes, device.fsType || device.mountPath)}</small>
-                        {device.totalBytes > 0 ? (
-                          <span className={sidebarStyles.deviceMeter} aria-hidden="true"><i className={sidebarStyles.deviceMeterFill} style={{ width: `${usedRatio}%` }} /></span>
-                        ) : null}
-                      </span>
-                    </button>
+                    <ExplorerDropTarget id={`sidebar:device:${device.id}`} path={device.mountPath} springLoad onSpringLoad={() => props.onNavigate(device.mountPath)}>
+                      <button
+                        type="button"
+                        className={`${sidebarStyles.deviceButton} ${pathIsInside(props.activePath, device.mountPath) ? sidebarStyles.itemSelected : ""}`}
+                        onClick={() => props.onNavigate(device.mountPath)}
+                        title={`${device.name} · ${device.mountPath}`}
+                      >
+                        <span className={sidebarStyles.deviceIcon} aria-hidden="true"><HardDrive size={20} /></span>
+                        <span className={sidebarStyles.deviceCopy}>
+                          <strong className={sidebarStyles.deviceName}>{device.name}</strong>
+                          <small className={sidebarStyles.deviceMeta}>{deviceCapacityLabel(usedBytes, device.totalBytes, device.fsType || device.mountPath)}</small>
+                          {device.totalBytes > 0 ? (
+                            <span className={sidebarStyles.deviceMeter} aria-hidden="true"><i className={sidebarStyles.deviceMeterFill} style={{ width: `${usedRatio}%` }} /></span>
+                          ) : null}
+                        </span>
+                      </button></ExplorerDropTarget>
                   </div>
                 );
               })}

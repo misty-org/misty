@@ -1,8 +1,6 @@
 import {
   AppWindow,
-  ArrowUp,
   ChevronDown,
-  ChevronLeft,
   ChevronRight,
   Clipboard,
   Copy,
@@ -57,6 +55,8 @@ import {
 import { searchResultNavigationTarget } from "../utils/searchNavigation";
 import type { ExplorerSearchNavigationTarget } from "../utils/searchNavigation";
 import { useSearchStore } from "../../../stores/useSearchStore";
+import { ExplorerDropTarget } from "../drag/ExplorerDropTarget";
+import { ExplorerToolbarDragNavigation } from "./ExplorerToolbarDragNavigation";
 
 export interface ExplorerLocationResult {
   id: string;
@@ -184,8 +184,9 @@ interface ExplorerToolbarProps {
   onNavigate: (path: string) => void;
   onNavigateLocation: (path: string) => void;
   onNavigateSearchResult: (target: ExplorerSearchNavigationTarget) => void;
-  canGoBack: boolean;
-  canGoForward: boolean;
+  backPath: string | null;
+  forwardPath: string | null;
+  parentPath: string | null;
   canCreateFile: boolean;
   canCreateFolder: boolean;
   canUndo: boolean;
@@ -523,11 +524,10 @@ export const ExplorerToolbar = memo(function ExplorerToolbar(props: ExplorerTool
     <header className={toolbarStyles.root}>
       <div className={toolbarStyles.navRow}>
         <div className={toolbarStyles.navButtons}>
-          <button className={toolbarStyles.toolbarButton} disabled={!props.canGoBack} onClick={props.onBack}><ChevronLeft size={18} /></button>
-          <button className={toolbarStyles.toolbarButton} disabled={!props.canGoForward} onClick={props.onForward}><ChevronRight size={18} /></button>
-          <button className={toolbarStyles.toolbarButton} onClick={props.onParent}><ArrowUp size={18} /></button>
+          <ExplorerToolbarDragNavigation paneId={props.paneId} backPath={props.backPath} forwardPath={props.forwardPath}
+            parentPath={props.parentPath} onBack={props.onBack} onForward={props.onForward} onParent={props.onParent} />
           <button
-            className={toolbarStyles.toolbarButton}
+            className={toolbarStyles.navigationButton}
             type="button"
             title="Refresh current folder"
             aria-label="Refresh current folder"
@@ -566,15 +566,14 @@ export const ExplorerToolbar = memo(function ExplorerToolbar(props: ExplorerTool
             />
           ) : (
             breadcrumbSegments(props.path).map((segment, index) => (
-              <button
-                key={`${segment.path}-${index}`}
-                className={toolbarStyles.pathButton}
-                onClick={() => props.onNavigate(segment.path)}
-                onDoubleClick={(event) => event.stopPropagation()}
-              >
-                {index > 0 ? <ChevronRight className={toolbarStyles.breadcrumbCaret} size={14} /> : null}
-                {segment.label}
-              </button>
+              <ExplorerDropTarget key={`${segment.path}-${index}`} id={`breadcrumb:${props.paneId}:${segment.path}`}
+                path={segment.path} paneId={props.paneId} springLoad onSpringLoad={() => props.onNavigate(segment.path)}>
+                <button className={toolbarStyles.pathButton} onClick={() => props.onNavigate(segment.path)}
+                  onDoubleClick={(event) => event.stopPropagation()}>
+                  {index > 0 ? <ChevronRight className={toolbarStyles.breadcrumbCaret} size={14} /> : null}
+                  {segment.label}
+                </button>
+              </ExplorerDropTarget>
             ))
           )}
         </div>

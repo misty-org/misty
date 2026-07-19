@@ -43,8 +43,6 @@ export const fileBrowserStyles = {
   tableRow:
     "h-11 cursor-default select-none outline outline-0 outline-offset-[-2px] hover:bg-[var(--misty-row-hover)] focus-visible:relative focus-visible:z-[2] focus-visible:outline-2 focus-visible:outline-[var(--misty-interaction-focus)] [[data-compact-mode=true]_&]:h-9",
   tableRowSelected: "bg-[var(--misty-row-selected)] text-[var(--misty-text)] hover:bg-[var(--misty-row-selected-hover)]",
-  tableRowDropTarget: "bg-[var(--misty-row-selected-hover)] outline outline-2 outline-[var(--misty-divider-active)]",
-  tableRowInvalidDropTarget: "bg-[color-mix(in_srgb,var(--misty-danger)_8%,transparent)] outline outline-1 outline-[color-mix(in_srgb,var(--misty-danger)_72%,transparent)]",
   tableRowDragging: "opacity-50",
   tableRowCut: "opacity-55",
   tableRowDeleted: "text-[var(--misty-text-subtle)] opacity-55",
@@ -86,8 +84,6 @@ export const fileBrowserStyles = {
   gridItem:
     "relative grid min-h-[104px] min-w-0 cursor-default justify-items-center gap-2 rounded-lg border border-transparent bg-transparent px-2 py-3 text-[var(--misty-text-muted)] outline-none hover:bg-[var(--misty-row-hover)] focus-visible:border-[var(--misty-interaction-focus)] focus-visible:shadow-[0_0_0_1px_var(--misty-interaction-focus)] [[data-compact-mode=true]_&]:min-h-[92px] [[data-compact-mode=true]_&]:gap-1.5 [[data-compact-mode=true]_&]:px-[7px] [[data-compact-mode=true]_&]:py-[9px]",
   gridItemSelected: "selected bg-[var(--misty-row-selected)] text-[var(--misty-text)] hover:bg-[var(--misty-row-selected-hover)]",
-  gridItemDropTarget: "bg-[var(--misty-row-selected-hover)] outline outline-2 outline-[var(--misty-divider-active)]",
-  gridItemInvalidDropTarget: "bg-[color-mix(in_srgb,var(--misty-danger)_8%,transparent)] outline outline-1 outline-[color-mix(in_srgb,var(--misty-danger)_72%,transparent)]",
   gridItemDragging: "opacity-50",
   gridItemCut: "opacity-55",
   gridItemDeleted: "deleted text-[var(--misty-text-subtle)] [&>span:not(.inline-name-editor)]:opacity-[0.86]",
@@ -109,10 +105,6 @@ export const fileBrowserStyles = {
   inlineInput:
     "h-7 w-[min(210px,100%)] min-w-16 border-0 bg-transparent px-[7px] text-[var(--misty-text)] outline-0",
   lockedExtension: "flex-none py-0 pl-0 pr-[7px] text-[var(--misty-text-subtle)]",
-  inlineError:
-    "absolute left-0 top-[calc(100%+5px)] z-[8] w-max max-w-[260px] whitespace-normal rounded-[5px] border border-[var(--misty-divider-default)] bg-[var(--misty-glass)] px-[7px] py-[5px] text-[11px] leading-[1.3] text-[var(--misty-text-muted)] shadow-[0_8px_20px_var(--misty-shadow)]",
-  inlineErrorTable:
-    "static min-w-0 flex-auto overflow-hidden text-ellipsis whitespace-nowrap border-0 bg-transparent p-0 text-[var(--misty-text-subtle)] shadow-none",
   passiveDraft:
     "inline-flex min-w-0 max-w-full items-center gap-0 overflow-hidden rounded-[5px] border border-[var(--misty-divider-subtle)] bg-[var(--misty-neutral-control-bg,var(--misty-surface-2))] px-1.5 py-[3px] text-[var(--misty-text)]",
   passiveDraftInvalid: "border-[var(--misty-danger)] text-[var(--misty-text-muted)]",
@@ -136,5 +128,4 @@ export const fileBrowserStyles = {
     "size-1 flex-none rounded-full bg-[var(--misty-divider-default)]",
   empty: "p-6 text-[var(--misty-text-muted)]",
   emptyError: "text-[var(--misty-text-muted)]",
-  dropActive: "outline outline-2 outline-offset-[-2px] outline-[var(--misty-divider-active)]",
 } as const;

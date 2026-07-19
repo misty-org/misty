@@ -1,6 +1,59 @@
 use super::*;
 
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SavePreviewRequest {
+    pub path: String,
+    pub bytes: Vec<u8>,
+    #[serde(default)]
+    pub save_as_copy: bool,
+}
+
 impl ExplorerService {
+    pub async fn save_preview_item(
+        &self,
+        request: SavePreviewRequest,
+    ) -> ApiResult<ExplorerOperationResult> {
+        const MAX_EDIT_BYTES: usize = 100 * 1024 * 1024;
+        if request.bytes.is_empty() {
+            return Err(ApiError::Message("The edited file is empty.".to_string()));
+        }
+        if request.bytes.len() > MAX_EDIT_BYTES {
+            return Err(ApiError::Message(
+                "Edited files are limited to 100 MB.".to_string(),
+            ));
+        }
+        if self.remote_target(&request.path).is_some() {
+            return Err(ApiError::Message(
+                "Save a copy locally before editing a remote file.".to_string(),
+            ));
+        }
+        self.reject_virtual_mount_container(&request.path, "save")?;
+        let source = PathBuf::from(&request.path);
+        let metadata = tokio::fs::metadata(&source).await.map_err(|error| {
+            ApiError::Message(format!("Failed to inspect {}: {error}", source.display()))
+        })?;
+        if !metadata.is_file() {
+            return Err(ApiError::Message("Only files can be saved.".to_string()));
+        }
+        if !request.save_as_copy && metadata.permissions().readonly() {
+            return Err(ApiError::Message(format!(
+                "{} is read-only. Save a copy instead.",
+                source.display()
+            )));
+        }
+        let destination = if request.save_as_copy {
+            available_preview_copy_path(&source).await?
+        } else {
+            source.clone()
+        };
+        write_preview_destination(&destination, &request.bytes, request.save_as_copy).await?;
+        Ok(ExplorerOperationResult {
+            affected_paths: vec![display_path(&destination)],
+            parent_path: destination.parent().map(display_path),
+        })
+    }
+
     pub async fn preview_item(&self, path: &str) -> ApiResult<ExplorerPreviewPayload> {
         if let Some(source) = self.remote_target(path) {
             let parent = RemoteBrowseTarget {
@@ -29,6 +82,7 @@ impl ExplorerService {
                     remote_modified.as_deref(),
                     "Preparing remote file for preview",
                     false,
+                    None,
                 )
                 .await?;
             return self
@@ -93,6 +147,7 @@ impl ExplorerService {
                     remote_modified.as_deref(),
                     "Preparing remote file thumbnail",
                     false,
+                    None,
                 )
                 .await?;
             let identity = ImageThumbnailIdentity {
@@ -190,12 +245,6 @@ impl ExplorerService {
         }
         match format {
             PreviewFormat::Pdf => {
-                if let Some(bytes) = render_pdf_preview_png(path, &metadata).await? {
-                    return Ok(ExplorerPreviewPayload {
-                        mime_type: "image/png".to_string(),
-                        bytes,
-                    });
-                }
                 let bytes = read_preview_file(path).await?;
                 Ok(ExplorerPreviewPayload {
                     mime_type: "application/pdf".to_string(),
@@ -246,4 +295,94 @@ impl ExplorerService {
             }
         }
     }
+}
+
+async fn write_preview_destination(path: &Path, bytes: &[u8], create_new: bool) -> ApiResult<()> {
+    if create_new {
+        return write_preview_file(path, bytes, true).await;
+    }
+    let parent = path
+        .parent()
+        .ok_or_else(|| ApiError::Message("Cannot save a file at a filesystem root.".to_string()))?;
+    let temporary = parent.join(format!(
+        ".{}.misty-edit-{}.tmp",
+        path.file_name().and_then(OsStr::to_str).unwrap_or("file"),
+        uuid::Uuid::new_v4()
+    ));
+    if let Err(error) = write_preview_file(&temporary, bytes, true).await {
+        let _ = tokio::fs::remove_file(&temporary).await;
+        return Err(error);
+    }
+    if let Err(error) = tokio::fs::rename(&temporary, path).await {
+        let _ = tokio::fs::remove_file(&temporary).await;
+        return Err(ApiError::Message(format!(
+            "Failed to replace {} safely: {error}",
+            path.display()
+        )));
+    }
+    Ok(())
+}
+
+async fn write_preview_file(path: &Path, bytes: &[u8], create_new: bool) -> ApiResult<()> {
+    let mut file = tokio::fs::OpenOptions::new()
+        .write(true)
+        .create_new(create_new)
+        .truncate(!create_new)
+        .open(path)
+        .await
+        .map_err(|error| {
+            ApiError::Message(format!("Failed to save {}: {error}", path.display()))
+        })?;
+    if let Err(error) = file.write_all(bytes).await {
+        if create_new {
+            let _ = tokio::fs::remove_file(path).await;
+        }
+        return Err(ApiError::Message(format!(
+            "Failed to save {}: {error}",
+            path.display()
+        )));
+    }
+    file.flush().await.map_err(|error| {
+        ApiError::Message(format!(
+            "Failed to finish saving {}: {error}",
+            path.display()
+        ))
+    })
+}
+
+async fn available_preview_copy_path(source: &Path) -> ApiResult<PathBuf> {
+    let parent = source
+        .parent()
+        .ok_or_else(|| ApiError::Message("Cannot save a copy at a filesystem root.".to_string()))?;
+    let stem = source
+        .file_stem()
+        .and_then(OsStr::to_str)
+        .filter(|value| !value.is_empty())
+        .unwrap_or("Edited file");
+    let extension = source
+        .extension()
+        .and_then(OsStr::to_str)
+        .map(|value| format!(".{value}"))
+        .unwrap_or_default();
+    for index in 1..=10_000_u32 {
+        let suffix = if index == 1 {
+            " copy".to_string()
+        } else {
+            format!(" copy {index}")
+        };
+        let candidate = parent.join(format!("{stem}{suffix}{extension}"));
+        match tokio::fs::metadata(&candidate).await {
+            Ok(_) => continue,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(candidate),
+            Err(error) => {
+                return Err(ApiError::Message(format!(
+                    "Failed to inspect copy destination {}: {error}",
+                    candidate.display()
+                )))
+            }
+        }
+    }
+    Err(ApiError::Message(
+        "Could not find an available name for the copy.".to_string(),
+    ))
 }

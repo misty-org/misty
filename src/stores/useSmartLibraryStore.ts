@@ -4,12 +4,13 @@ import {
   smartLibraryAssetsPage,
   smartLibraryDelete,
   smartLibraryImportFiles,
+  smartLibraryPreflightImport,
   smartLibraryPreparePreviews,
   smartLibraryScan,
   smartLibrarySetServerFolderId,
   smartLibrarySnapshot,
 } from "../api/misty";
-import type { AnalysisEstimate, FolderLibraryStatus, SmartLibraryAsset } from "../api/types";
+import type { AnalysisEstimate, FolderLibraryStatus, SmartLibraryAsset, SmartLibraryImportPreflight } from "../api/types";
 import { errorText } from "../shared/format";
 import { clearSemanticExplorerSearchCache } from "../pages/Files/utils/globalSearch";
 import {
@@ -43,9 +44,13 @@ interface SmartLibraryStore {
   reindexPlan: SemanticReindexPlan | null;
   reindexProcessed: number;
   error: string | null;
+  pendingDrop: SmartLibraryImportPreflight | null;
   load: () => Promise<void>;
   chooseFolder: (rootPath: string) => Promise<void>;
   addFiles: (paths: string[]) => Promise<void>;
+  requestDroppedFiles: (paths: string[]) => Promise<void>;
+  confirmDroppedFiles: () => Promise<void>;
+  cancelDroppedFiles: () => void;
   discoverChanges: () => Promise<void>;
   rescan: () => Promise<void>;
   trySample: () => Promise<void>;
@@ -69,6 +74,7 @@ export const useSmartLibraryStore = create<SmartLibraryStore>((set, get) => ({
   reindexPlan: null,
   reindexProcessed: 0,
   error: null,
+  pendingDrop: null,
 
   load: async () => {
     if (get().loaded) return;
@@ -129,6 +135,29 @@ export const useSmartLibraryStore = create<SmartLibraryStore>((set, get) => ({
     } catch (error) {
       set({ phase: "error", error: errorText(error) });
     }
+  },
+
+  requestDroppedFiles: async (paths) => {
+    const selected = [...new Set(paths.map((path) => path.trim()).filter(Boolean))];
+    if (selected.length === 0) return;
+    set({ phase: "preflight", pendingDrop: null, error: null });
+    try {
+      const pendingDrop = await smartLibraryPreflightImport(selected);
+      set({ pendingDrop, estimate: pendingDrop.estimate, phase: "preflight", error: null });
+    } catch (error) {
+      set({ phase: "error", pendingDrop: null, error: errorText(error) });
+    }
+  },
+
+  confirmDroppedFiles: async () => {
+    const pending = get().pendingDrop;
+    if (!pending) return;
+    set({ pendingDrop: null });
+    await get().addFiles(pending.paths);
+  },
+
+  cancelDroppedFiles: () => {
+    set((state) => ({ pendingDrop: null, phase: state.library ? phaseFromLibrary(state.library) : "idle" }));
   },
 
   discoverChanges: async () => {

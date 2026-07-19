@@ -1,15 +1,11 @@
 use std::{
     fs,
-    io::{Cursor, Read},
+    io::Read,
     path::{Path, PathBuf},
-    process::{Command, Stdio},
 };
 
-use base64::{engine::general_purpose::STANDARD, Engine as _};
 use calamine::{open_workbook_auto, Reader};
-use image::{codecs::jpeg::JpegEncoder, imageops::FilterType, GenericImageView};
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
 use uuid::Uuid;
 use zip::ZipArchive;
 
@@ -18,18 +14,11 @@ use crate::error::{ApiError, ApiResult};
 pub const MAX_AGENT_DOCUMENT_BYTES: u64 = 50 * 1024 * 1024;
 pub const MAX_AGENT_DOCUMENT_PAGES: usize = 200;
 const MAX_AGENT_DOCUMENT_TEXT_BYTES: usize = 384 * 1024;
-const MAX_OCR_PAGE_IMAGES: usize = 8;
-const MAX_OCR_IMAGE_EDGE: u32 = 1_280;
-const OCR_TEXT_THRESHOLD: usize = 24;
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PrepareAgentDocumentRequest {
     pub path: String,
-    #[serde(default)]
-    pub ocr_page_start: Option<usize>,
-    #[serde(default)]
-    pub ocr_page_limit: Option<usize>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -41,7 +30,6 @@ pub struct PreparedAgentDocument {
     pub size_bytes: u64,
     pub sections: Vec<PreparedDocumentSection>,
     pub truncated: bool,
-    pub requires_ocr: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -50,34 +38,17 @@ pub struct PreparedDocumentSection {
     pub kind: String,
     pub locator: String,
     pub text: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub image_data_url: Option<String>,
-    pub requires_ocr: bool,
 }
 
 pub async fn prepare_document(
     request: PrepareAgentDocumentRequest,
 ) -> ApiResult<PreparedAgentDocument> {
-    tokio::task::spawn_blocking(move || {
-        prepare_document_sync_with_ocr_window(
-            &request.path,
-            request.ocr_page_start.unwrap_or(0),
-            request.ocr_page_limit.unwrap_or(MAX_OCR_PAGE_IMAGES),
-        )
-    })
+    tokio::task::spawn_blocking(move || prepare_document_sync(&request.path))
     .await
     .map_err(|error| ApiError::Message(format!("Document preparation worker failed: {error}")))?
 }
 
 fn prepare_document_sync(path_value: &str) -> ApiResult<PreparedAgentDocument> {
-    prepare_document_sync_with_ocr_window(path_value, 0, MAX_OCR_PAGE_IMAGES)
-}
-
-fn prepare_document_sync_with_ocr_window(
-    path_value: &str,
-    ocr_page_start: usize,
-    ocr_page_limit: usize,
-) -> ApiResult<PreparedAgentDocument> {
     let path = PathBuf::from(path_value);
     let metadata = fs::metadata(&path).map_err(|error| {
         ApiError::Message(format!(
@@ -108,22 +79,16 @@ fn prepare_document_sync_with_ocr_window(
         .to_ascii_lowercase();
     let mime_type = document_mime(&extension).to_owned();
     let (mut sections, mut truncated) = match extension.as_str() {
-        "pdf" => prepare_pdf(
-            &path,
-            ocr_page_start.min(MAX_AGENT_DOCUMENT_PAGES),
-            ocr_page_limit.clamp(1, MAX_OCR_PAGE_IMAGES),
-        )?,
+        "pdf" => prepare_pdf(&path)?,
         "docx" => prepare_docx_sections(&path)?,
         "pptx" => prepare_zip_sections(&path, "slide")?,
         "xlsx" | "ods" => prepare_spreadsheet_sections(&path)?,
         "csv" => prepare_csv_sections(&path)?,
-        "png" | "jpg" | "jpeg" | "webp" | "gif" | "bmp" | "tif" | "tiff" => {
-            (vec![prepare_image_section(&path, "image")?], false)
-        }
+        "png" | "jpg" | "jpeg" | "webp" | "gif" | "bmp" | "tif" | "tiff" =>
+            return Err(ApiError::Message("unsupported_content: image files do not contain supported native text".to_owned())),
         _ => prepare_text_sections(&path)?,
     };
     truncated |= cap_document_text(&mut sections);
-    let requires_ocr = sections.iter().any(|section| section.requires_ocr);
     Ok(PreparedAgentDocument {
         document_id: format!("document_{}", Uuid::new_v4().simple()),
         display_name,
@@ -131,44 +96,25 @@ fn prepare_document_sync_with_ocr_window(
         size_bytes: metadata.len(),
         sections,
         truncated,
-        requires_ocr,
     })
 }
 
-fn prepare_pdf(
-    path: &Path,
-    ocr_page_start: usize,
-    ocr_page_limit: usize,
-) -> ApiResult<(Vec<PreparedDocumentSection>, bool)> {
+fn prepare_pdf(path: &Path) -> ApiResult<(Vec<PreparedDocumentSection>, bool)> {
     let pages = std::panic::catch_unwind(|| pdf_extract::extract_text_by_pages(path))
         .map_err(|_| ApiError::Message("PDF page extraction failed safely.".to_owned()))?
         .map_err(|error| ApiError::Message(format!("Could not extract PDF pages: {error}")))?;
     let truncated = pages.len() > MAX_AGENT_DOCUMENT_PAGES;
     let mut sections = Vec::with_capacity(pages.len().min(MAX_AGENT_DOCUMENT_PAGES));
-    let mut rendered = 0;
     for (index, page_text) in pages.into_iter().take(MAX_AGENT_DOCUMENT_PAGES).enumerate() {
         let normalized = normalize_extracted_text(&page_text);
-        let needs_ocr = normalized
-            .chars()
-            .filter(|character| !character.is_whitespace())
-            .count()
-            < OCR_TEXT_THRESHOLD;
-        let image_data_url = if needs_ocr && index >= ocr_page_start && rendered < ocr_page_limit {
-            let image = render_pdf_page(path, index + 1)?;
-            if image.is_some() {
-                rendered += 1;
-            }
-            image
-        } else {
-            None
-        };
         sections.push(PreparedDocumentSection {
             kind: "page".to_owned(),
             locator: (index + 1).to_string(),
             text: normalized,
-            image_data_url,
-            requires_ocr: needs_ocr,
         });
+    }
+    if sections.iter().all(|section| section.text.trim().is_empty()) {
+        return Err(ApiError::Message("unsupported_content: PDF contains no embedded text".to_owned()));
     }
     Ok((sections, truncated))
 }
@@ -207,8 +153,6 @@ fn prepare_spreadsheet_sections(path: &Path) -> ApiResult<(Vec<PreparedDocumentS
             kind: "sheet".to_owned(),
             locator,
             text,
-            image_data_url: None,
-            requires_ocr: false,
         });
     }
     Ok((sections, truncated))
@@ -247,8 +191,6 @@ fn prepare_csv_sections(path: &Path) -> ApiResult<(Vec<PreparedDocumentSection>,
                 .map(|row| row.join("\t"))
                 .collect::<Vec<_>>()
                 .join("\n"),
-            image_data_url: None,
-            requires_ocr: false,
         });
     }
     Ok((sections, truncated))
@@ -314,8 +256,6 @@ fn prepare_docx_sections(path: &Path) -> ApiResult<(Vec<PreparedDocumentSection>
             kind: "section".to_owned(),
             locator: heading,
             text: paragraphs.join("\n"),
-            image_data_url: None,
-            requires_ocr: false,
         })
         .collect();
     Ok((prepared, truncated))
@@ -371,8 +311,6 @@ fn prepare_zip_sections(
             kind: section_kind.to_owned(),
             locator: (ordinal + 1).to_string(),
             text: normalize_extracted_text(&strip_xml(&xml)),
-            image_data_url: None,
-            requires_ocr: false,
         });
     }
     if sections.is_empty() {
@@ -394,8 +332,6 @@ fn prepare_text_sections(path: &Path) -> ApiResult<(Vec<PreparedDocumentSection>
             kind: "lines".to_owned(),
             locator: format!("{start}-{end}"),
             text: chunk.join("\n"),
-            image_data_url: None,
-            requires_ocr: false,
         });
     }
     if sections.is_empty() {
@@ -403,80 +339,9 @@ fn prepare_text_sections(path: &Path) -> ApiResult<(Vec<PreparedDocumentSection>
             kind: "section".to_owned(),
             locator: "1".to_owned(),
             text: String::new(),
-            image_data_url: None,
-            requires_ocr: false,
         });
     }
     Ok((sections, lines.len() > 500 * MAX_AGENT_DOCUMENT_PAGES))
-}
-
-fn prepare_image_section(path: &Path, locator: &str) -> ApiResult<PreparedDocumentSection> {
-    let bytes = fs::read(path)
-        .map_err(|error| ApiError::Message(format!("Could not read image: {error}")))?;
-    let jpeg = bounded_jpeg(&bytes)?;
-    Ok(PreparedDocumentSection {
-        kind: "image".to_owned(),
-        locator: locator.to_owned(),
-        text: String::new(),
-        image_data_url: Some(format!("data:image/jpeg;base64,{}", STANDARD.encode(jpeg))),
-        requires_ocr: true,
-    })
-}
-
-fn render_pdf_page(path: &Path, page: usize) -> ApiResult<Option<String>> {
-    let Some(mutool) = find_mutool() else {
-        return Ok(None);
-    };
-    let mut hasher = Sha256::new();
-    hasher.update(path.to_string_lossy().as_bytes());
-    hasher.update(page.to_le_bytes());
-    let digest = hasher.finalize();
-    let output = std::env::temp_dir().join(format!(
-        "misty-agent-page-{}-{page}.png",
-        hex::encode(&digest[..12])
-    ));
-    let status = Command::new(mutool)
-        .args(["draw", "-F", "png", "-r", "110", "-o"])
-        .arg(&output)
-        .arg(path)
-        .arg(page.to_string())
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .status();
-    if !status.is_ok_and(|status| status.success()) {
-        return Ok(None);
-    }
-    let bytes = match fs::read(&output) {
-        Ok(bytes) if !bytes.is_empty() => bytes,
-        _ => return Ok(None),
-    };
-    let _ = fs::remove_file(output);
-    let jpeg = bounded_jpeg(&bytes)?;
-    Ok(Some(format!(
-        "data:image/jpeg;base64,{}",
-        STANDARD.encode(jpeg)
-    )))
-}
-
-fn bounded_jpeg(bytes: &[u8]) -> ApiResult<Vec<u8>> {
-    let image = image::load_from_memory(bytes)
-        .map_err(|error| ApiError::Message(format!("Could not prepare OCR image: {error}")))?;
-    let (width, height) = image.dimensions();
-    let scale = (MAX_OCR_IMAGE_EDGE as f64 / width.max(height).max(1) as f64).min(1.0);
-    let resized = if scale < 1.0 {
-        image.resize(
-            (width as f64 * scale).round().max(1.0) as u32,
-            (height as f64 * scale).round().max(1.0) as u32,
-            FilterType::Triangle,
-        )
-    } else {
-        image
-    };
-    let mut output = Vec::new();
-    JpegEncoder::new_with_quality(&mut output, 72)
-        .encode_image(&resized)
-        .map_err(|error| ApiError::Message(format!("Could not encode OCR image: {error}")))?;
-    Ok(output)
 }
 
 fn cap_document_text(sections: &mut [PreparedDocumentSection]) -> bool {
@@ -545,28 +410,6 @@ fn natural_entry_number(value: &str) -> u64 {
         .unwrap_or(u64::MAX)
 }
 
-fn find_mutool() -> Option<&'static str> {
-    if Command::new("mutool")
-        .arg("-v")
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .status()
-        .is_ok_and(|status| status.success())
-    {
-        return Some("mutool");
-    }
-    #[cfg(target_os = "macos")]
-    {
-        if Path::new("/opt/homebrew/bin/mutool").is_file() {
-            return Some("/opt/homebrew/bin/mutool");
-        }
-        if Path::new("/usr/local/bin/mutool").is_file() {
-            return Some("/usr/local/bin/mutool");
-        }
-    }
-    None
-}
-
 fn document_mime(extension: &str) -> &'static str {
     match extension {
         "pdf" => "application/pdf",
@@ -604,7 +447,6 @@ mod tests {
         assert_eq!(prepared.sections[0].kind, "lines");
         assert_eq!(prepared.sections[0].locator, "1-500");
         assert_eq!(prepared.sections[1].locator, "501-620");
-        assert!(!prepared.requires_ocr);
         let _ = fs::remove_dir_all(root);
     }
 
@@ -618,6 +460,17 @@ mod tests {
         assert_eq!(prepared.sections[0].kind, "sheet");
         assert_eq!(prepared.sections[0].locator, "Sheet1!A1:B3");
         assert!(prepared.sections[0].text.contains("Alpha\t10"));
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn image_files_fail_as_unsupported_content() {
+        let root = std::env::temp_dir().join(format!("misty-agent-image-{}", Uuid::new_v4()));
+        fs::create_dir_all(&root).unwrap();
+        let path = root.join("scan.png");
+        fs::write(&path, [0x89, b'P', b'N', b'G']).unwrap();
+        let error = prepare_document_sync(path.to_str().unwrap()).unwrap_err().to_string();
+        assert!(error.contains("unsupported_content"));
         let _ = fs::remove_dir_all(root);
     }
 

@@ -2,9 +2,10 @@ import { memo, useCallback, useEffect, useMemo } from "react";
 import type { MouseEvent, ReactNode } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { FileBrowser } from "./FileBrowser";
-import type { FileBrowserDragItem } from "./FileBrowser";
 import { useExplorerStore } from "../../../stores/useExplorerStore";
 import type { FileEntry } from "../../../api/types";
+import { groupItemsByOperation } from "../drag/operations";
+import type { ExplorerDragModifiers, ExplorerDragPayload } from "../drag/types";
 
 const paneStyles = {
   shell:
@@ -85,8 +86,15 @@ export const ExplorerPane = memo(function ExplorerPane(props: ExplorerPaneProps)
     useExplorerStore.getState().openContextMenu(props.paneId, event.clientX, event.clientY, null);
   }, [props.paneId]);
 
-  const handleDropItems = useCallback((items: FileBrowserDragItem[], destination: string) => {
-    void useExplorerStore.getState().dropItems(props.paneId, items, destination, "move");
+  const handleDropItems = useCallback((payload: ExplorerDragPayload, destination: string, destinationStorageId: string, modifiers: ExplorerDragModifiers) => {
+    const store = useExplorerStore.getState();
+    if (payload.origin === "external") {
+      void store.dropExternalPaths(props.paneId, payload.items.map((item) => item.path), destination);
+      return;
+    }
+    const groups = groupItemsByOperation(payload.items, destinationStorageId, modifiers.copyRequested);
+    if (groups.move.length > 0) void store.dropItems(props.paneId, groups.move, destination, "move");
+    if (groups.copy.length > 0) void store.dropItems(props.paneId, groups.copy, destination, "copy");
   }, [props.paneId]);
 
   const handleInlineEditCommit = useCallback(() => {

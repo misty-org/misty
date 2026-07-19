@@ -1,4 +1,5 @@
 import { appSnapshot } from "../api/misty";
+import { normalizeApiBaseUrl, withDefaultApiPath } from "../api/apiBase";
 import { readAccountAuthToken } from "../pages/Account/shared/authTokenStore";
 import type { AgentCitation } from "../agents/types";
 
@@ -52,6 +53,7 @@ export type FileOperation =
 export interface AgentEvent {
   sequence: number;
   type: "assistant_message" | "tool_request" | "file_plan" | "error";
+  run_id?: string;
   text?: string;
   tool_requests?: ToolRequest[];
   file_plan?: FileOperationPlan;
@@ -191,11 +193,12 @@ interface ManagedAiErrorPayload {
 }
 
 async function resolveServerApiBase(): Promise<string> {
-  const explicitServerUrl = normalizeBaseUrl(import.meta.env.VITE_MISTY_SERVER_URL);
-  const envApiBase = normalizeBaseUrl(import.meta.env.VITE_API_BASE);
-  const nativeServerUrl = normalizeBaseUrl((await loadAppSnapshot())?.environment.serverUrl);
-  const localBetaServerUrl = import.meta.env.DEV ? "http://localhost:8080" : null;
-  return withApiPath(explicitServerUrl ?? envApiBase ?? nativeServerUrl ?? localBetaServerUrl);
+  const publicApiBase = normalizeApiBaseUrl(import.meta.env.VITE_MISTY_PUBLIC_API_URL);
+  const explicitServerUrl = normalizeApiBaseUrl(import.meta.env.VITE_MISTY_SERVER_URL);
+  const envApiBase = normalizeApiBaseUrl(import.meta.env.VITE_API_BASE);
+  const nativeServerUrl = normalizeApiBaseUrl((await loadAppSnapshot())?.environment.serverUrl);
+  const localBetaServerUrl = import.meta.env.DEV ? "http://localhost:8080/api" : null;
+  return withDefaultApiPath(publicApiBase ?? explicitServerUrl ?? envApiBase ?? nativeServerUrl ?? localBetaServerUrl);
 }
 
 async function loadAppSnapshot() {
@@ -204,15 +207,4 @@ async function loadAppSnapshot() {
   } catch {
     return null;
   }
-}
-
-function normalizeBaseUrl(value: unknown): string | null {
-  if (typeof value !== "string") return null;
-  const trimmed = value.trim().replace(/\/+$/, "");
-  return trimmed ? trimmed : null;
-}
-
-function withApiPath(base: string | null): string {
-  if (!base) return "";
-  return /\/api$/i.test(base) ? base : `${base}/api`;
 }

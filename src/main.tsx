@@ -23,6 +23,8 @@ const root = ReactDOM.createRoot(
 void bootstrap();
 
 async function bootstrap() {
+  const { bootstrapDemoSession } = await import("./auth/demoSessionBootstrap");
+  await bootstrapDemoSession();
   void analytics.initialize().then(initializeAnalyticsLifecycle);
   const [{ App }] = await Promise.all([
     import("./App"),

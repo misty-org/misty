@@ -1,4 +1,4 @@
-import { RefreshCcw } from "lucide-react";
+import { CheckCircle2, ExternalLink, RefreshCcw } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import type {
   PluginBrowserEntry,
@@ -34,11 +34,11 @@ function pluginStatus(plugin: PluginBrowserEntry) {
 
 function statusPillClass(plugin: PluginBrowserEntry) {
   if (!plugin.installed) {
-    return "border-white/10 bg-white/[0.03] text-zinc-300";
+    return "border-[var(--misty-border)] bg-[var(--misty-surface-2)] text-[var(--misty-text-muted)]";
   }
   return plugin.enabled
-    ? "border-white/12 bg-white/[0.05] text-white"
-    : "border-white/10 bg-white/[0.03] text-zinc-400";
+    ? "border-[var(--misty-border-strong)] bg-[var(--misty-surface-2)] text-[var(--misty-text)]"
+    : "border-[var(--misty-border)] bg-[var(--misty-surface)] text-[var(--misty-text-subtle)]";
 }
 
 function filterPlugins(
@@ -60,6 +60,12 @@ function filterPlugins(
       plugin.overview,
       plugin.id,
       plugin.version,
+      ...plugin.capabilities,
+      ...plugin.permissions,
+      ...plugin.whereItAppears,
+      ...plugin.gettingStarted,
+      ...plugin.changelog,
+      ...plugin.includedTools.map((tool) => `${tool.name} ${tool.version}`),
     ]
       .join("\n")
       .toLowerCase()
@@ -71,7 +77,7 @@ function actionLabel(plugin: PluginBrowserEntry) {
   if (!plugin.installed) {
     return "Install";
   }
-  return plugin.enabled ? "Disable" : "Enable";
+  return plugin.enabled ? "Open" : "Enable";
 }
 
 function PluginLogo({
@@ -105,8 +111,8 @@ function DetailSection({
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-xl border border-white/8 bg-[var(--misty-app-panel-bg,var(--misty-app-page-bg,var(--misty-bg)))] p-4">
-      <p className="text-sm font-medium text-zinc-200">{title}</p>
+    <section className="rounded-xl border border-[var(--misty-border)] bg-[var(--misty-surface)] p-4">
+      <p className="text-sm font-medium text-[var(--misty-text)]">{title}</p>
       <div className="mt-3">{children}</div>
     </section>
   );
@@ -125,8 +131,8 @@ function SidebarPluginCard({
     <button
       className={`w-full rounded-xl border p-3.5 text-left transition ${
         selected
-          ? "border-white/18 bg-white/[0.04]"
-          : "border-white/8 bg-[var(--misty-app-panel-bg,var(--misty-app-page-bg,var(--misty-bg)))] hover:border-white/14 hover:bg-white/[0.02]"
+          ? "border-[var(--misty-border-strong)] bg-[var(--misty-surface-2)]"
+          : "border-[var(--misty-border)] bg-[var(--misty-surface)] hover:border-[var(--misty-border-strong)] hover:bg-[var(--misty-surface-hover)]"
       }`}
       onClick={onClick}
       type="button"
@@ -140,7 +146,7 @@ function SidebarPluginCard({
         />
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-3">
-            <p className="truncate text-[17px] font-medium text-white">
+            <p className="truncate text-[17px] font-medium text-[var(--misty-text)]">
               {plugin.name}
             </p>
             <span
@@ -149,10 +155,10 @@ function SidebarPluginCard({
               {pluginStatus(plugin)}
             </span>
           </div>
-          <p className="mt-2 line-clamp-2 text-sm leading-5 text-zinc-400">
+          <p className="mt-2 line-clamp-2 text-sm leading-5 text-[var(--misty-text-muted)]">
             {plugin.overview}
           </p>
-          <div className="mt-2.5 flex items-center gap-2 text-xs text-zinc-500">
+          <div className="mt-2.5 flex items-center gap-2 text-xs text-[var(--misty-text-subtle)]">
             <span>{plugin.author || "Misty"}</span>
             {plugin.verified ? <span>verified</span> : null}
           </div>
@@ -236,31 +242,26 @@ function PrimaryAction({
   primaryActionLabel?: string;
   onPrimaryAction?: (plugin: PluginBrowserEntry) => void;
 }) {
-  const hasPrimaryAction = Boolean(onPrimaryAction);
-
   return (
     <button
-      className="inline-flex h-10 items-center gap-2 rounded-xl bg-white px-4 text-sm font-medium text-black transition hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-50"
+      className="inline-flex h-10 items-center gap-2 rounded-xl bg-[var(--misty-primary)] px-4 text-sm font-medium text-[var(--misty-primary-contrast)] transition hover:bg-[var(--misty-primary-hover)] disabled:cursor-not-allowed disabled:opacity-50"
       disabled={
         busy ||
-        (!hasPrimaryAction &&
-          ((!plugin.installed && !onInstall) ||
-            (plugin.installed && !onToggle)))
+        ((!plugin.installed && !onInstall) ||
+          (plugin.installed && !plugin.enabled && !onToggle) ||
+          (plugin.installed && plugin.enabled && !onPrimaryAction))
       }
       onClick={() => {
-        if (onPrimaryAction) {
-          onPrimaryAction(plugin);
-          return;
-        }
         if (!plugin.installed) {
           onInstall?.(plugin);
           return;
         }
-        onToggle?.(plugin, !plugin.enabled);
+        if (!plugin.enabled) { onToggle?.(plugin, true); return; }
+        onPrimaryAction?.(plugin);
       }}
       type="button"
     >
-      {hasPrimaryAction ? (primaryActionLabel ?? "Open Misty") : actionLabel(plugin)}
+      {plugin.installed && plugin.enabled && primaryActionLabel ? primaryActionLabel : actionLabel(plugin)}
     </button>
   );
 }
@@ -305,13 +306,13 @@ export function PluginBrowser({
 
   return (
     <div className="mx-auto flex h-full w-full max-w-[1440px] flex-col overflow-x-auto overflow-y-hidden px-4 py-4 sm:px-5 lg:px-6">
-      <div className="flex items-end justify-between gap-4 border-b border-white/[0.07] pb-3">
+      <div className="flex items-end justify-between gap-4 border-b border-[var(--misty-border)] pb-3">
         <div>
-          <h1 className="text-[30px] font-semibold tracking-normal text-white">{title}</h1>
+          <h1 className="text-[30px] font-semibold tracking-normal text-[var(--misty-text)]">{title}</h1>
         </div>
         {onRefresh ? (
           <button
-            className="inline-flex h-10 items-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-4 text-sm font-medium text-white transition hover:bg-white/[0.06] disabled:cursor-progress disabled:opacity-55"
+            className="inline-flex h-10 items-center gap-2 rounded-xl border border-[var(--misty-border)] bg-[var(--misty-surface-2)] px-4 text-sm font-medium text-[var(--misty-text)] transition hover:bg-[var(--misty-surface-hover)] disabled:cursor-progress disabled:opacity-55"
             disabled={loading}
             onClick={onRefresh}
             title="Reload extensions"
@@ -324,12 +325,12 @@ export function PluginBrowser({
       </div>
 
       <div className="grid min-h-0 min-w-[1040px] flex-1 grid-cols-[360px_minmax(0,1fr)] gap-6 pt-6">
-        <aside className="flex min-h-0 flex-col overflow-hidden rounded-[20px] border border-white/8 bg-[var(--misty-app-panel-bg,var(--misty-app-page-bg,var(--misty-bg)))]">
+        <aside className="flex min-h-0 flex-col overflow-hidden rounded-[20px] border border-[var(--misty-border)] bg-[var(--misty-surface)]">
           <div className="shrink-0 border-b border-white/[0.07] bg-[var(--misty-app-panel-bg,var(--misty-app-page-bg,var(--misty-bg)))] p-3">
             <div className="flex h-11 min-w-0 items-center rounded-xl border border-white/10 bg-transparent px-3.5 focus-within:border-white/25">
               <input
                 aria-label="Search extensions"
-                className="w-full bg-transparent text-[15px] text-white outline-none placeholder:text-zinc-500 disabled:cursor-progress"
+                className="w-full bg-transparent text-[15px] text-[var(--misty-text)] outline-none placeholder:text-[var(--misty-text-subtle)] disabled:cursor-progress"
                 disabled={showSkeleton}
                 onChange={(event) => onQueryChange(event.target.value)}
                 placeholder="Search extensions..."
@@ -348,8 +349,8 @@ export function PluginBrowser({
                   key={value}
                     className={`rounded-lg px-3 py-2 text-sm font-medium transition ${
                     browserTab === value
-                      ? "bg-white text-black"
-                      : "text-zinc-400 hover:bg-white/[0.04]"
+                      ? "bg-[var(--misty-primary)] text-[var(--misty-primary-contrast)]"
+                      : "text-[var(--misty-text-muted)] hover:bg-[var(--misty-surface-hover)]"
                   }`}
                   onClick={() => setBrowserTab(value)}
                   type="button"
@@ -361,7 +362,7 @@ export function PluginBrowser({
           </div>
 
           <div className="min-h-0 flex-1 overflow-y-auto p-3">
-            <div className="mb-3 flex items-center justify-between text-xs uppercase tracking-[0.16em] text-zinc-500">
+            <div className="mb-3 flex items-center justify-between text-xs capitalize text-zinc-500">
               <span>{browserTab === "installed" ? "Installed" : "Marketplace"}</span>
               <span>{showSkeleton ? "loading" : visiblePlugins.length}</span>
             </div>
@@ -388,7 +389,7 @@ export function PluginBrowser({
           </div>
         </aside>
 
-        <section className="flex min-h-0 flex-col overflow-hidden rounded-[20px] border border-white/8 bg-[var(--misty-app-panel-bg,var(--misty-app-page-bg,var(--misty-bg)))]">
+        <section className="flex min-h-0 flex-col overflow-hidden rounded-[20px] border border-[var(--misty-border)] bg-[var(--misty-surface)]">
           {showSkeleton ? (
             <PluginDetailSkeleton />
           ) : selectedPlugin ? (
@@ -397,7 +398,7 @@ export function PluginBrowser({
                 <div className="flex flex-wrap items-center justify-between gap-4">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-3">
-                      <h2 className="truncate text-[24px] font-semibold tracking-normal text-white">
+                      <h2 className="truncate text-[24px] font-semibold tracking-normal text-[var(--misty-text)]">
                         {selectedPlugin.name}
                       </h2>
                       <span
@@ -432,6 +433,9 @@ export function PluginBrowser({
                       plugin={selectedPlugin}
                       primaryActionLabel={primaryActionLabel}
                     />
+                    {selectedPlugin.installed && selectedPlugin.enabled && onToggle ? (
+                      <button className="inline-flex h-10 items-center gap-2 rounded-xl border border-[var(--misty-border)] bg-[var(--misty-surface-2)] px-4 text-sm text-[var(--misty-text)] transition hover:bg-[var(--misty-surface-hover)]" onClick={() => onToggle(selectedPlugin, false)} type="button">Disable</button>
+                    ) : null}
                     {selectedPlugin.installed && onUninstall ? (
                       <button
                         className="inline-flex h-10 items-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-4 text-sm text-white transition hover:bg-white/[0.06]"
@@ -454,10 +458,19 @@ export function PluginBrowser({
 
               <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5">
                 <DetailSection title="Overview">
-                  <p className="max-w-4xl text-base leading-8 text-zinc-300">
+                  <p className="max-w-4xl text-sm leading-7 text-[var(--misty-text-muted)]">
                     {selectedPlugin.overview || "No overview yet."}
                   </p>
                 </DetailSection>
+                <div className="mt-3 grid gap-3 lg:grid-cols-2">
+                  <DetailSection title="Capabilities"><ul className="grid gap-2 text-sm text-[var(--misty-text-muted)]">{selectedPlugin.capabilities.map((item) => <li className="flex gap-2" key={item}><CheckCircle2 className="mt-0.5 shrink-0 text-[var(--misty-success)]" size={15}/><span>{item}</span></li>)}</ul></DetailSection>
+                  <DetailSection title="Permissions"><ul className="grid gap-2 text-sm text-[var(--misty-text-muted)]">{selectedPlugin.permissions.map((item) => <li key={item}>{item}</li>)}</ul></DetailSection>
+                  <DetailSection title="Placement"><dl className="grid grid-cols-[110px_1fr] gap-x-3 gap-y-2 text-sm"><dt className="text-[var(--misty-text-subtle)]">Appears in</dt><dd className="text-[var(--misty-text-muted)]">{selectedPlugin.whereItAppears.join(", ") || selectedPlugin.placement.views.join(", ")}</dd><dt className="text-[var(--misty-text-subtle)]">Opens as</dt><dd className="capitalize text-[var(--misty-text-muted)]">{selectedPlugin.placement.openMode}</dd><dt className="text-[var(--misty-text-subtle)]">Selection</dt><dd className="text-[var(--misty-text-muted)]">{selectedPlugin.placement.requiresSelection ? "Required" : "Not required"}</dd></dl></DetailSection>
+                  <DetailSection title="Included tools">{selectedPlugin.includedTools.length ? <ul className="grid gap-2 text-sm text-[var(--misty-text-muted)]">{selectedPlugin.includedTools.map((tool) => <li className="flex justify-between gap-3" key={`${tool.name}-${tool.version}`}><span>{tool.name}</span><code>{tool.version}</code></li>)}</ul> : <p className="text-sm text-[var(--misty-text-subtle)]">No executable tools included.</p>}</DetailSection>
+                  <DetailSection title="Getting started"><ol className="grid list-decimal gap-2 pl-5 text-sm text-[var(--misty-text-muted)]">{selectedPlugin.gettingStarted.map((item) => <li key={item}>{item}</li>)}</ol></DetailSection>
+                  <DetailSection title="Changelog"><ul className="grid gap-2 text-sm text-[var(--misty-text-muted)]">{selectedPlugin.changelog.map((item) => <li key={item}>{item}</li>)}</ul></DetailSection>
+                </div>
+                {selectedPlugin.links.length ? <div className="mt-3 flex flex-wrap gap-2">{selectedPlugin.links.map((link) => <a className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--misty-border)] px-3 py-2 text-sm text-[var(--misty-link)]" href={link.url} key={link.url} rel="noreferrer" target="_blank">{link.label}<ExternalLink size={13}/></a>)}</div> : null}
               </div>
             </div>
           ) : (

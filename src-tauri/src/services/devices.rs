@@ -1,6 +1,7 @@
 use std::collections::HashSet;
 #[cfg(target_os = "macos")]
 use std::ffi::c_void;
+use std::fs;
 use std::path::Path;
 use std::process::Command;
 #[cfg(target_os = "macos")]
@@ -18,10 +19,15 @@ pub const DEVICES_CHANGED_EVENT: &str = "misty://devices-changed";
 #[serde(rename_all = "camelCase")]
 pub struct MountedDeviceSnapshot {
     pub id: String,
+    pub volume_id: String,
     pub name: String,
     pub mount_path: String,
     pub fs_type: String,
     pub is_removable: bool,
+    pub is_system: bool,
+    pub is_external: bool,
+    pub is_network: bool,
+    pub writable: bool,
     pub total_bytes: u64,
     pub free_bytes: u64,
 }
@@ -160,17 +166,95 @@ fn parse_df_kp_output(text: &str) -> Vec<MountedDeviceSnapshot> {
             continue;
         }
         let name = device_name(&row.mount_path, &row.fs_name);
+        let details = device_details(&row);
         devices.push(MountedDeviceSnapshot {
-            id: row.mount_path.clone(),
+            id: details.volume_id.clone(),
+            volume_id: details.volume_id,
             name,
             mount_path: row.mount_path.clone(),
-            fs_type: fs_type_for_row(&row),
+            fs_type: details.fs_type,
             is_removable: is_removable_mount(&row.mount_path),
+            is_system: row.mount_path == "/",
+            is_external: details.is_external,
+            is_network: row.fs_name.starts_with("//") || row.fs_name.contains(":"),
+            writable: details.writable,
             total_bytes: row.total_kb.saturating_mul(1024),
             free_bytes: row.available_kb.saturating_mul(1024),
         });
     }
     devices
+}
+
+struct DeviceDetails {
+    volume_id: String,
+    fs_type: String,
+    is_external: bool,
+    writable: bool,
+}
+
+fn device_details(row: &DfRow) -> DeviceDetails {
+    let fallback = DeviceDetails {
+        volume_id: row.fs_name.clone(),
+        fs_type: fs_type_for_row(row),
+        is_external: row.mount_path != "/",
+        writable: fs::metadata(&row.mount_path)
+            .map(|metadata| !metadata.permissions().readonly())
+            .unwrap_or(false),
+    };
+    #[cfg(target_os = "macos")]
+    {
+        let Ok(output) = Command::new("diskutil")
+            .args(["info", "-plist", &row.mount_path])
+            .output()
+        else {
+            return fallback;
+        };
+        if !output.status.success() {
+            return fallback;
+        }
+        let xml = String::from_utf8_lossy(&output.stdout);
+        let volume_id = plist_string(&xml, "VolumeUUID")
+            .or_else(|| plist_string(&xml, "APFSVolumeUUID"))
+            .unwrap_or_else(|| fallback.volume_id.clone());
+        let fs_type = plist_string(&xml, "FilesystemType")
+            .or_else(|| plist_string(&xml, "Type (Bundle)"))
+            .unwrap_or_else(|| fallback.fs_type.clone());
+        let is_internal = plist_bool(&xml, "Internal").unwrap_or(!fallback.is_external);
+        let writable = plist_bool(&xml, "Writable").unwrap_or(fallback.writable);
+        return DeviceDetails {
+            volume_id,
+            fs_type,
+            is_external: !is_internal,
+            writable,
+        };
+    }
+    #[cfg(not(target_os = "macos"))]
+    fallback
+}
+
+#[cfg(target_os = "macos")]
+fn plist_string(xml: &str, key: &str) -> Option<String> {
+    let marker = format!("<key>{key}</key>");
+    let tail = xml.split_once(&marker)?.1;
+    let value = tail
+        .split_once("<string>")?
+        .1
+        .split_once("</string>")?
+        .0
+        .trim();
+    (!value.is_empty()).then(|| value.to_owned())
+}
+#[cfg(target_os = "macos")]
+fn plist_bool(xml: &str, key: &str) -> Option<bool> {
+    let marker = format!("<key>{key}</key>");
+    let tail = xml.split_once(&marker)?.1.trim_start();
+    if tail.starts_with("<true/>") {
+        Some(true)
+    } else if tail.starts_with("<false/>") {
+        Some(false)
+    } else {
+        None
+    }
 }
 
 #[derive(Debug, PartialEq, Eq)]

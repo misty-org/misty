@@ -1,5 +1,5 @@
 use std::{
-    collections::BTreeSet,
+    collections::{BTreeSet, HashMap},
     ffi::OsStr,
     fs::File,
     io::{BufReader, BufWriter, Cursor},
@@ -96,6 +96,7 @@ pub struct ExplorerService {
     listing_cache: ListingCache,
     remote_file_cache: Arc<Mutex<ClipboardCache>>,
     drag_stage_dir: PathBuf,
+    drag_preparation_cancellations: Arc<Mutex<HashMap<String, Arc<AtomicBool>>>>,
     clipboard_text_cache_dir: PathBuf,
     clipboard_blob_cache_dir: PathBuf,
     trash_dir: PathBuf,
@@ -130,6 +131,7 @@ impl ExplorerService {
             listing_cache: ListingCache::new(cache_dir.join("remotes"), cache_dir.join("listings")),
             remote_file_cache: Arc::new(Mutex::new(remote_file_cache)),
             drag_stage_dir,
+            drag_preparation_cancellations: Arc::new(Mutex::new(HashMap::new())),
             clipboard_text_cache_dir: cache_dir.join("clipboard-paste").join("text"),
             clipboard_blob_cache_dir: cache_dir.join("clipboard-paste").join("blob"),
             trash_dir: cache_dir.join("trash"),
@@ -175,6 +177,7 @@ use cancellation::*;
 use local_mutations::*;
 use misc::*;
 use path_helpers::*;
+pub use preview::SavePreviewRequest;
 use preview_render::*;
 use preview_types::*;
 #[cfg(test)]

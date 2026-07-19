@@ -1,5 +1,6 @@
 import { useEffect, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
 import { PluginBrowser } from "../components/PluginBrowser";
 import type { PluginBrowserEntry } from "../components/types";
@@ -18,10 +19,19 @@ function toBrowserEntry(plugin: PluginEntry): PluginBrowserEntry {
     enabled: plugin.enabled,
     verified: plugin.verified,
     logoSrc: plugin.logo_path,
+    capabilities: plugin.capabilities,
+    whereItAppears: plugin.where_it_appears,
+    permissions: plugin.permissions,
+    gettingStarted: plugin.getting_started,
+    changelog: plugin.changelog,
+    includedTools: plugin.included_tools,
+    links: plugin.links,
+    placement: { views: plugin.launcher.views, openMode: plugin.launcher.open_mode, requiresSelection: plugin.launcher.requires_selected_file },
   };
 }
 
 export default function PluginsPage() {
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const routePluginId = searchParams.get("plugin")?.trim() ?? "";
   const pluginPlatform = useSetupStore((state) =>
@@ -102,6 +112,7 @@ export default function PluginsPage() {
           void installPlugin(match);
         }
       }}
+      onPrimaryAction={(plugin) => navigate(`/files?extension=${encodeURIComponent(plugin.id)}`)}
       onQueryChange={(value) => {
         setQuery(value);
       }}

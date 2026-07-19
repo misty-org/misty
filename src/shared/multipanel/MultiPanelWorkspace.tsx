@@ -241,7 +241,7 @@ export const MultiPanelWorkspace = memo(function MultiPanelWorkspace(props: Mult
   return (
     <section className={`${multiPanelStyles.workspace} ${workspaceRowsClass}${className ? ` ${className}` : ""}`}>
       <ChromeTabStrip
-        tabs={tabs}
+        tabs={tabs.map((tab) => ({ id: tab.id, title: tab.title, path: tab.path, paneId: tab.activePaneId }))}
         activeTabId={activeTabId}
         canCloseTab={() => tabs.length > 1}
         onSelectTab={selectTab}

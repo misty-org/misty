@@ -26,21 +26,26 @@ import { searchResultContext, searchResultSummary } from "./ExplorerToolbarSuppo
 import { searchSemanticAssets } from "../../../stores/smartLibraryServerApi";
 import { formatBytes, formatDate } from "../utils/fileFormat";
 import { aggregateLibraryTags, DEFAULT_ASSET_TAG_LIMIT, DEFAULT_LIBRARY_TAG_LIMIT, tagsWithout, visibleAssetTags, visibleLibraryTags } from "../utils/libraryTags";
+import { GlobalPreviewDialog } from "./GlobalPreview";
+import { LibraryDropReviewDialog } from "./LibraryDropReviewDialog";
 
 export const libraryWorkspacePath = "misty://library";
 
 type LibraryTab = "library" | "collections" | "tags" | "media";
 
 export function LibraryWorkspace(props: { paneId: string; workingDirectory: string; onOpenResult?: (result: SearchResult) => void | Promise<void> }) {
-  const { loaded, phase, library, error, load, addFiles, analyzeFolder, setAssetTags } = useSmartLibraryStore(useShallow((state) => ({
+  const { loaded, phase, library, error, pendingDrop, load, addFiles, analyzeFolder, setAssetTags, confirmDroppedFiles, cancelDroppedFiles } = useSmartLibraryStore(useShallow((state) => ({
     loaded: state.loaded,
     phase: state.phase,
     library: state.library,
     error: state.error,
+    pendingDrop: state.pendingDrop,
     load: state.load,
     addFiles: state.addFiles,
     analyzeFolder: state.analyzeFolder,
     setAssetTags: state.setAssetTags,
+    confirmDroppedFiles: state.confirmDroppedFiles,
+    cancelDroppedFiles: state.cancelDroppedFiles,
   })));
   const [tab, setTab] = useState<LibraryTab>("library");
   const [query, setQuery] = useState("");
@@ -202,6 +207,7 @@ export function LibraryWorkspace(props: { paneId: string; workingDirectory: stri
       </div>
       {folderDialog ? <SmartFolderDialog state={folderDialog} error={folderError} onSave={saveFolder} onDelete={deleteFolder} onCancel={() => setFolderDialog(null)} /> : null}
       {library && selectedAsset ? <LibraryAssetViewer asset={selectedAsset} rootPath={library.rootPath} onClose={() => setSelectedAssetId(null)} onSetTags={(tags) => setAssetTags(selectedAsset.assetId, tags)} /> : null}
+      {pendingDrop ? <LibraryDropReviewDialog preflight={pendingDrop} busy={phase === "uploading" || phase === "processing"} onCancel={cancelDroppedFiles} onConfirm={() => void confirmDroppedFiles()} /> : null}
     </section>
   );
 }
@@ -258,6 +264,27 @@ function LibraryGalleryTile(props: { asset: SmartLibraryAsset; rootPath: string;
 }
 
 function LibraryAssetViewer(props: { asset: SmartLibraryAsset; rootPath: string; onClose: () => void; onSetTags: (tags: string[]) => Promise<void> }) {
+  const path = joinPath(props.rootPath, props.asset.relativePath);
+  return <GlobalPreviewDialog
+    source={{
+      path,
+      name: props.asset.name,
+      extension: props.asset.extension,
+      mimeType: props.asset.mimeType,
+      sizeBytes: props.asset.sizeBytes,
+      modifiedMs: props.asset.modifiedMs,
+      description: props.asset.description,
+      tags: props.asset.tags,
+      originalName: props.asset.name,
+      readonly: props.asset.sourceKind !== "local",
+      remote: props.asset.sourceKind !== "local",
+    }}
+    onClose={props.onClose}
+    onSaveMetadata={(_caption, tags) => props.onSetTags(tags)}
+  />;
+}
+
+function LegacyLibraryAssetViewer(props: { asset: SmartLibraryAsset; rootPath: string; onClose: () => void; onSetTags: (tags: string[]) => Promise<void> }) {
   const [adding, setAdding] = useState(false);
   const [value, setValue] = useState("");
   const [tagsExpanded, setTagsExpanded] = useState(false);
@@ -319,7 +346,7 @@ function LibraryAssetViewer(props: { asset: SmartLibraryAsset; rootPath: string;
   return <div className="fixed inset-0 z-[2147482600] grid place-items-center bg-black/75 p-4 backdrop-blur-sm sm:p-6" role="presentation" onMouseDown={(event) => { if (event.currentTarget === event.target && !tagMutationPending) props.onClose(); }}>
     <section role="dialog" aria-modal="true" aria-labelledby="library-viewer-title" className="grid h-[min(860px,calc(100vh-48px))] w-full max-w-[1280px] min-h-0 grid-rows-[minmax(0,1fr)_minmax(280px,42%)] overflow-hidden rounded-2xl border border-white/15 bg-[var(--misty-surface)] shadow-2xl lg:grid-cols-[minmax(0,1.55fr)_minmax(330px,0.65fr)] lg:grid-rows-1">
       <div className="relative grid min-h-0 place-items-center overflow-hidden bg-[#07090d]">
-        {preview ? <img className="size-full object-contain" src={preview} alt={props.asset.description || props.asset.name} /> : <div className="grid justify-items-center gap-3 text-[var(--misty-text-muted)]"><File size={72} strokeWidth={1.2} /><span>{props.asset.mimeType || "File preview unavailable"}</span></div>}
+        {preview ? <img className="size-full object-contain" src={preview} alt={props.asset.description || props.asset.name} /> : <div className="grid justify-items-center gap-3 text-[var(--misty-text-muted)]"><File size={72} strokeWidth={1.2} /><span>{props.asset.mimeType || "Open with the full reader"}</span></div>}
         <div className="pointer-events-none absolute inset-x-0 top-0 h-20 bg-gradient-to-b from-black/45 to-transparent" />
         <button type="button" disabled={tagMutationPending} aria-label="Close image viewer" className="absolute right-3 top-3 grid size-9 place-items-center rounded-full border border-white/15 bg-black/55 text-white backdrop-blur-md hover:bg-black/75 disabled:cursor-wait disabled:opacity-45" onClick={props.onClose}><X size={18} /></button>
       </div>
@@ -350,8 +377,8 @@ function LibraryAssetViewer(props: { asset: SmartLibraryAsset; rootPath: string;
   </div>;
 }
 
-function DetailLabel(props: { children: React.ReactNode }) { return <strong className="text-xs uppercase tracking-[0.12em] text-[var(--misty-text-subtle)]">{props.children}</strong>; }
-function DetailStat(props: { label: string; value: string }) { return <div className="min-w-0"><span className="block text-[11px] uppercase tracking-wide text-[var(--misty-text-subtle)]">{props.label}</span><strong className="mt-0.5 block truncate font-medium" title={props.value}>{props.value}</strong></div>; }
+function DetailLabel(props: { children: React.ReactNode }) { return <strong className="text-xs capitalize text-[var(--misty-text-subtle)]">{props.children}</strong>; }
+function DetailStat(props: { label: string; value: string }) { return <div className="min-w-0"><span className="block text-[11px] capitalize text-[var(--misty-text-subtle)]">{props.label}</span><strong className="mt-0.5 block truncate font-medium" title={props.value}>{props.value}</strong></div>; }
 function libraryAssetPreview(asset: SmartLibraryAsset, rootPath: string) { return asset.sourceKind === "local" && asset.mimeType.startsWith("image/") ? safeTauriAssetUrl(joinPath(rootPath, asset.relativePath)) : null; }
 
 function LibraryEmpty(props: { title: string; text: string; action?: React.ReactNode }) { return <div className="grid min-h-[420px] place-items-center text-center"><div className="grid max-w-md justify-items-center gap-3"><Images size={34} /><h2 className="m-0 text-xl">{props.title}</h2><p className="m-0 text-sm text-[var(--misty-text-muted)]">{props.text}</p>{props.action}</div></div>; }

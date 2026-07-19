@@ -2,7 +2,7 @@ import type { ExplorerInlineEditState, ExplorerNotification } from "../../../sto
 import { cx } from "./ExplorerDesktopShared";
 
 export function ExplorerRenameStatus(props: { edit: ExplorerInlineEditState | null }) {
-  if (!props.edit) return null;
+  if (!props.edit || props.edit.error || props.edit.batchItems?.some((item) => item.error)) return null;
   const summary = renameStatusSummary(props.edit);
   return (
     <div className={cx(renameStatusStyles.root, summary.tone === "warning" && renameStatusStyles.warning)} role="status" aria-live="polite">
@@ -90,7 +90,7 @@ const renameStatusStyles = {
 
 const notificationStyles = {
   stack:
-    "pointer-events-none absolute left-1/2 top-[58px] z-30 grid w-[min(360px,calc(100%_-_48px))] -translate-x-1/2 justify-items-center gap-2",
+    "pointer-events-none absolute left-1/2 top-3 z-30 grid w-[min(360px,calc(100%_-_48px))] -translate-x-1/2 justify-items-center gap-2",
   item:
     "pointer-events-auto min-h-8 max-w-full overflow-hidden text-ellipsis whitespace-nowrap rounded-[10px] border border-[#525252] bg-[#1e1e1e] px-[13px] py-[7px] text-[#eeeeee] shadow-[0_14px_32px_rgba(0,0,0,0.35)]",
   success: "border-[#787878] bg-[#313131]",

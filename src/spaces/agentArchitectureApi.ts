@@ -1,17 +1,27 @@
 import { spaceRequest } from "./api";
 import type {
   AgentCatalogEntry,
+  AgentInstanceRecord,
+  AgentVersionWorkflow,
+  InstanceWorkflowConfig,
   MikaDelegationResult,
-  PrivateAgentConversation,
-  PrivateConversationEvent,
+  AgentConversation,
+  AgentConversationEvent,
+  PublishedAgentVersion,
   RoutingDecision,
   RunAction,
   RunApproval,
+  WorkflowRunStep,
   SpaceIntegration,
   SpaceRun,
+  Space,
   SpaceStudioResource,
   WorkflowMetadata,
   WorkflowVersion,
+  ProviderAuthorizationStart,
+  ProviderConnectionAvailability,
+  AvailableProviderResource,
+  ProviderSharedResource,
 } from "./types";
 
 export interface AgentInvocationInput {
@@ -30,7 +40,7 @@ const part = encodeURIComponent;
 
 export const agentArchitectureApi = {
   catalog: () => spaceRequest<{ agents: AgentCatalogEntry[] }>("/agents/catalog"),
-  discovery: () => spaceRequest<{ agents: AgentCatalogEntry[] }>("/mika/discovery"),
+  discovery: () => spaceRequest<{ spaces: Space[]; agents: AgentCatalogEntry[] }>("/mika/discovery"),
   delegate: (input: AgentInvocationInput & { space_id?: string; agent_id?: string }) =>
     spaceRequest<MikaDelegationResult>("/mika/delegations", { method: "POST", body: JSON.stringify(input) }),
   runs: (spaceId: string, agentId: string) =>
@@ -38,7 +48,7 @@ export const agentArchitectureApi = {
   run: (spaceId: string, agentId: string, input: AgentInvocationInput) =>
     spaceRequest<AgentInvocationResult>(`/spaces/${part(spaceId)}/agents/${part(agentId)}/runs`, { method: "POST", body: JSON.stringify(input) }),
   runDetail: (runId: string) =>
-    spaceRequest<{ run: SpaceRun; actions: RunAction[]; approvals: RunApproval[] }>(`/runs/${part(runId)}`),
+    spaceRequest<{ run: SpaceRun; actions: RunAction[]; approvals: RunApproval[]; steps: WorkflowRunStep[] }>(`/runs/${part(runId)}`),
   decideRun: (runId: string, approved: boolean) =>
     spaceRequest<SpaceRun>(`/runs/${part(runId)}/approval`, { method: "POST", body: JSON.stringify({ approved }) }),
   cancelRun: (runId: string) => spaceRequest<SpaceRun>(`/runs/${part(runId)}/cancel`, { method: "POST" }),
@@ -47,16 +57,36 @@ export const agentArchitectureApi = {
     spaceRequest<{ versions: WorkflowVersion[] }>(`/spaces/${part(spaceId)}/studio/workflows/${part(workflowId)}/versions`),
   createWorkflowVersion: (spaceId: string, workflowId: string, version: string, metadata: WorkflowMetadata, definition: Record<string, unknown>) =>
     spaceRequest<WorkflowVersion>(`/spaces/${part(spaceId)}/studio/workflows/${part(workflowId)}/versions`, { method: "POST", body: JSON.stringify({ version, metadata, definition }) }),
-  replaceAgentWorkflow: (spaceId: string, agentId: string, workflowVersionId: string) =>
-    spaceRequest<SpaceStudioResource>(`/spaces/${part(spaceId)}/studio/agents/${part(agentId)}/workflow`, { method: "PUT", body: JSON.stringify({ workflow_version_id: workflowVersionId }) }),
-  conversations: () => spaceRequest<{ conversations: PrivateAgentConversation[] }>("/agent-conversations"),
+  agentVersions: (spaceId: string, agentId: string) =>
+    spaceRequest<{ versions: PublishedAgentVersion[] }>(`/spaces/${part(spaceId)}/studio/agents/${part(agentId)}/versions`),
+  publishAgentVersion: (spaceId: string, agentId: string, workflows: AgentVersionWorkflow[]) =>
+    spaceRequest<PublishedAgentVersion>(`/spaces/${part(spaceId)}/studio/agents/${part(agentId)}/versions`, { method: "POST", body: JSON.stringify({ workflows }) }),
+  agentInstance: (spaceId: string, agentId: string) =>
+    spaceRequest<AgentInstanceRecord>(`/spaces/${part(spaceId)}/agents/${part(agentId)}/instance`),
+  updateAgentInstance: (spaceId: string, agentId: string) =>
+    spaceRequest<AgentInstanceRecord>(`/spaces/${part(spaceId)}/agents/${part(agentId)}/instance`, { method: "POST" }),
+  configureInstanceWorkflow: (instanceId: string, workflowVersionId: string, input: { enabled: boolean; trigger_config?: Record<string, unknown>; consent?: Record<string, unknown> }) =>
+    spaceRequest<InstanceWorkflowConfig>(`/agent-instances/${part(instanceId)}/workflows/${part(workflowVersionId)}`, { method: "PUT", body: JSON.stringify(input) }),
+	updateInstanceConnections: (instanceId: string, bindings: Record<string, string>) =>
+		spaceRequest<AgentInstanceRecord>(`/agent-instances/${part(instanceId)}/connections`, { method: "PUT", body: JSON.stringify({ bindings }) }),
+  conversations: () => spaceRequest<{ conversations: AgentConversation[] }>("/agent-conversations"),
   createConversation: (spaceId: string, agentId: string, title = "") =>
-    spaceRequest<PrivateAgentConversation>("/agent-conversations", { method: "POST", body: JSON.stringify({ space_id: spaceId, agent_id: agentId, title }) }),
+    spaceRequest<AgentConversation>("/agent-conversations", { method: "POST", body: JSON.stringify({ space_id: spaceId, agent_id: agentId, title }) }),
   conversationEvents: (conversationId: string) =>
-    spaceRequest<{ events: PrivateConversationEvent[] }>(`/agent-conversations/${part(conversationId)}/events`),
+    spaceRequest<{ events: AgentConversationEvent[] }>(`/agent-conversations/${part(conversationId)}/events`),
   sendConversationMessage: (conversationId: string, input: AgentInvocationInput) =>
-    spaceRequest<{ run?: SpaceRun; event?: PrivateConversationEvent; status?: string; routing?: RoutingDecision }>(`/agent-conversations/${part(conversationId)}/events`, { method: "POST", body: JSON.stringify(input) }),
-  integrations: (spaceId: string) => spaceRequest<{ integrations: SpaceIntegration[] }>(`/spaces/${part(spaceId)}/integrations`),
-  saveIntegration: (spaceId: string, integration: Partial<SpaceIntegration>) =>
-    spaceRequest<SpaceIntegration>(`/spaces/${part(spaceId)}/integrations`, { method: "PUT", body: JSON.stringify(integration) }),
+    spaceRequest<{ run?: SpaceRun; event?: AgentConversationEvent; status?: string; routing?: RoutingDecision }>(`/agent-conversations/${part(conversationId)}/events`, { method: "POST", body: JSON.stringify(input) }),
+  integrations: (spaceId: string) => spaceRequest<{ integrations: SpaceIntegration[]; providers?: ProviderConnectionAvailability[] }>(`/spaces/${part(spaceId)}/integrations`),
+  beginProviderConnection: (spaceId: string, provider: string, returnTo: string) =>
+    spaceRequest<ProviderAuthorizationStart>(`/spaces/${part(spaceId)}/integrations/${part(provider)}/authorize`, { method: "POST", body: JSON.stringify({ return_to: returnTo }) }),
+  deleteIntegration: (integrationId: string) =>
+    spaceRequest<void>(`/integrations/${part(integrationId)}`, { method: "DELETE" }),
+  availableProviderResources: (spaceId: string, integrationId: string) =>
+    spaceRequest<{ resources: AvailableProviderResource[] }>(`/spaces/${part(spaceId)}/integrations/${part(integrationId)}/resources`),
+  sharedProviderResources: (spaceId: string) =>
+    spaceRequest<{ resources: ProviderSharedResource[] }>(`/spaces/${part(spaceId)}/provider-resources`),
+  publishProviderResource: (spaceId: string, integrationId: string, resource: AvailableProviderResource) =>
+    spaceRequest<ProviderSharedResource>(`/spaces/${part(spaceId)}/provider-resources`, { method: "POST", body: JSON.stringify({ integration_id: integrationId, ...resource }) }),
+  disableProviderResource: (spaceId: string, resourceId: string) =>
+    spaceRequest<void>(`/spaces/${part(spaceId)}/provider-resources/${part(resourceId)}`, { method: "DELETE" }),
 };

@@ -301,6 +301,7 @@ export function createMutationsActions(set: ExplorerSet, get: ExplorerGet): Part
     const batchRename = validated.kind === "rename" && validated.batchItems && validated.batchItems.length > 1;
     if (validated.error && !batchRename) {
       set({ inlineEdit: validated });
+      get().pushNotification(validated.error, "error", 4500);
       return;
     }
     const effectiveName = `${validated.value.trim()}${validated.lockedExtension}`;

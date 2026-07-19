@@ -170,6 +170,7 @@ import { CompareDialog } from "./ExplorerCompareDialog";
 import type { CompareDialogSeed } from "./ExplorerCompareDialog";
 import { DuplicateFinderDialog } from "./ExplorerDuplicateFinderDialog";
 import { compareSeedForPane, ExplorerContextMenu, openCompareWith } from "./ExplorerContextMenu";
+import { ExplorerDragProvider } from "../drag/ExplorerDragContext";
 
 const minSidebarWidth = 212;
 const maxSidebarWidth = 380;
@@ -875,7 +876,7 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
   if (!explorerInitialized || !hasExplorerTabs) return <ExplorerLoadingShell />;
 
   return (
-    <section
+    <ExplorerDragProvider><section
       ref={workspaceRef}
       className={cx(
         explorerShellStyles.workspaceBase,
@@ -911,7 +912,7 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
       {compareDialog ? <CompareDialog seed={compareDialog} onClose={() => setCompareDialog(null)} /> : null}
       <ExplorerContextMenu />
       <ExplorerDialog />
-    </section>
+    </section></ExplorerDragProvider>
   );
 });
 export default ExplorerWorkspace;

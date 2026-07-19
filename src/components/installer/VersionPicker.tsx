@@ -163,7 +163,7 @@ export function VersionPicker() {
                       {release.date}
                     </span>
                   </span>
-                  <span className={selected ? "shrink-0 rounded-full bg-black/10 px-2 py-0.5 text-[10px] font-bold tracking-wide text-[#27272a]" : "shrink-0 rounded-full bg-white/[0.04] px-2 py-0.5 text-[10px] text-[#71717a]"}>
+                  <span className={selected ? "shrink-0 rounded-full bg-black/10 px-2 py-0.5 text-[10px] font-bold text-[#27272a]" : "shrink-0 rounded-full bg-white/[0.04] px-2 py-0.5 text-[10px] text-[#71717a]"}>
                     {release.version === latestVersion ? "Latest" : ""}
                   </span>
                 </button>

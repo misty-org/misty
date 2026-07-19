@@ -110,8 +110,8 @@ pub struct PrepareOpenItemRequest {
 #[serde(rename_all = "camelCase")]
 pub struct PrepareDragItemsRequest {
     pub items: Vec<PrepareDragItemRequest>,
+    pub session_id: Option<String>,
 }
-
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PrepareDragItemRequest {

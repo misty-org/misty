@@ -1,4 +1,71 @@
 use super::*;
+
+#[tokio::test]
+async fn preview_editor_saves_image_edits_and_numbered_copies() {
+    let root = unique_test_dir("preview-editor-save");
+    tokio::fs::create_dir_all(&root).await.unwrap();
+    let source = root.join("photo.png");
+    let red = encoded_test_png([255, 0, 0, 255]);
+    let blue = encoded_test_png([0, 80, 255, 255]);
+    let green = encoded_test_png([0, 200, 90, 255]);
+    tokio::fs::write(&source, red).await.unwrap();
+    let service = test_explorer_service();
+
+    let saved = service
+        .save_preview_item(SavePreviewRequest {
+            path: display_path(&source),
+            bytes: blue,
+            save_as_copy: false,
+        })
+        .await
+        .unwrap();
+    assert_eq!(saved.affected_paths, vec![display_path(&source)]);
+    assert_eq!(decoded_test_pixel(&source), [0, 80, 255, 255]);
+
+    let first_copy = service
+        .save_preview_item(SavePreviewRequest {
+            path: display_path(&source),
+            bytes: green.clone(),
+            save_as_copy: true,
+        })
+        .await
+        .unwrap();
+    let second_copy = service
+        .save_preview_item(SavePreviewRequest {
+            path: display_path(&source),
+            bytes: green,
+            save_as_copy: true,
+        })
+        .await
+        .unwrap();
+    assert_eq!(
+        first_copy.affected_paths,
+        vec![display_path(&root.join("photo copy.png"))]
+    );
+    assert_eq!(
+        second_copy.affected_paths,
+        vec![display_path(&root.join("photo copy 2.png"))]
+    );
+    assert_eq!(
+        decoded_test_pixel(&root.join("photo copy.png")),
+        [0, 200, 90, 255]
+    );
+    assert_eq!(decoded_test_pixel(&source), [0, 80, 255, 255]);
+
+    let _ = tokio::fs::remove_dir_all(&root).await;
+}
+
+fn encoded_test_png(pixel: [u8; 4]) -> Vec<u8> {
+    let mut bytes = Cursor::new(Vec::new());
+    image::DynamicImage::ImageRgba8(image::RgbaImage::from_pixel(2, 2, image::Rgba(pixel)))
+        .write_to(&mut bytes, image::ImageFormat::Png)
+        .unwrap();
+    bytes.into_inner()
+}
+
+fn decoded_test_pixel(path: &Path) -> [u8; 4] {
+    image::open(path).unwrap().to_rgba8().get_pixel(0, 0).0
+}
 use crate::services::environment::AppEnvironmentService;
 use std::sync::atomic::AtomicBool;
 
@@ -15,6 +82,12 @@ fn preview_format_matches_imgui_radiance_pic_support() {
     assert!(matches!(
         preview_format(Path::new("thumbnail.psd")),
         Some(PreviewFormat::Psd)
+    ));
+    assert!(matches!(
+        preview_format(Path::new("report.docx")),
+        Some(PreviewFormat::Direct(
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        ))
     ));
 }
 

@@ -13,7 +13,7 @@ const pluginTabMenuStyles = {
   sections: "grid gap-1 py-1",
   section: "grid gap-0.5",
   sectionLabel:
-    "px-2.5 pb-1 pt-1.5 text-[10px] font-bold uppercase tracking-normal text-[#8f8f8f]",
+    "px-2.5 pb-1 pt-1.5 text-[10px] font-bold capitalize text-[#8f8f8f]",
   item:
     "grid min-h-11 w-full grid-cols-[22px_minmax(0,1fr)_auto] items-center gap-2 rounded-lg border border-transparent bg-transparent px-2.5 py-2 text-left text-[#a8a8a8] hover:bg-[var(--misty-neutral-hover-bg,var(--misty-surface-hover))] hover:text-[#f7f7f7]",
   itemUsable:
@@ -31,7 +31,7 @@ const pluginTabMenuStyles = {
   detail:
     "grid min-h-0 gap-3 overflow-auto p-3",
   selection:
-    "grid min-w-0 gap-1 rounded-lg border border-[#303030] bg-[var(--misty-neutral-control-bg,var(--misty-surface-2))] px-3 py-2 [&>span]:text-[10px] [&>span]:font-bold [&>span]:uppercase [&>span]:text-[#858585] [&>strong]:overflow-hidden [&>strong]:text-ellipsis [&>strong]:whitespace-nowrap [&>strong]:font-mono [&>strong]:text-[11px] [&>strong]:font-medium [&>strong]:text-[#cfcfcf]",
+    "grid min-w-0 gap-1 rounded-lg border border-[#303030] bg-[var(--misty-neutral-control-bg,var(--misty-surface-2))] px-3 py-2 [&>span]:text-[10px] [&>span]:font-bold [&>span]:capitalize [&>span]:text-[#858585] [&>strong]:overflow-hidden [&>strong]:text-ellipsis [&>strong]:whitespace-nowrap [&>strong]:font-mono [&>strong]:text-[11px] [&>strong]:font-medium [&>strong]:text-[#cfcfcf]",
   footerItem:
     "mt-1 flex h-9 w-full items-center gap-2 rounded-lg border-0 border-t border-[#292929] bg-transparent px-2.5 text-left text-xs font-semibold text-[#cfcfcf] hover:bg-[var(--misty-neutral-hover-bg,var(--misty-surface-hover))] hover:text-[#f7f7f7]",
 } as const;

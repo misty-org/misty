@@ -56,11 +56,11 @@ export function ExplorerPickerToolbar(props: ExplorerPickerToolbarProps) {
     <header className={toolbarStyles.root}>
       <div className={toolbarStyles.navRow}>
         <div className={toolbarStyles.navButtons}>
-          <button className={toolbarStyles.toolbarButton} type="button" title="Back" aria-label="Back" disabled={!props.canGoBack} onClick={props.onBack}><ChevronLeft size={18} /></button>
-          <button className={toolbarStyles.toolbarButton} type="button" title="Forward" aria-label="Forward" disabled={!props.canGoForward} onClick={props.onForward}><ChevronRight size={18} /></button>
-          <button className={toolbarStyles.toolbarButton} type="button" title="Parent folder" aria-label="Parent folder" disabled={!props.canGoParent} onClick={props.onParent}><ArrowUp size={18} /></button>
+          <button className={toolbarStyles.navigationButton} type="button" title="Back" aria-label="Back" disabled={!props.canGoBack} onClick={props.onBack}><ChevronLeft size={18} /></button>
+          <button className={toolbarStyles.navigationButton} type="button" title="Forward" aria-label="Forward" disabled={!props.canGoForward} onClick={props.onForward}><ChevronRight size={18} /></button>
+          <button className={toolbarStyles.navigationButton} type="button" title="Parent folder" aria-label="Parent folder" disabled={!props.canGoParent} onClick={props.onParent}><ArrowUp size={18} /></button>
           <button
-            className={toolbarStyles.toolbarButton}
+            className={toolbarStyles.navigationButton}
             type="button"
             title="Refresh current folder"
             aria-label="Refresh current folder"

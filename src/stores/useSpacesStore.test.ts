@@ -2,13 +2,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { buildMessageSpans, resetSpacesAccountState, useSpacesStore } from "./useSpacesStore";
 import type { Space, SpaceMember, SpaceMessage, SpaceStudioResource } from "../spaces/types";
 
-const apiMocks = vi.hoisted(() => ({ realtimeTicket: vi.fn(), rename: vi.fn(), updateMessage: vi.fn() }));
+const apiMocks = vi.hoisted(() => ({ realtimeTicket: vi.fn(), rename: vi.fn(), sendMessage: vi.fn(), updateMessage: vi.fn() }));
 
 vi.mock("../spaces/api", () => ({
   resolveSpacesApiBase: vi.fn(async () => "http://localhost:8081/api"),
   spacesApi: {
     realtimeTicket: apiMocks.realtimeTicket,
     rename: apiMocks.rename,
+    sendMessage: apiMocks.sendMessage,
     updateMessage: apiMocks.updateMessage,
   },
 }));
@@ -38,6 +39,10 @@ class FakeWebSocket {
     if (this.readyState === FakeWebSocket.CLOSED) return;
     this.readyState = FakeWebSocket.CLOSED;
     this.onclose?.();
+  }
+
+  message(data: unknown) {
+    this.onmessage?.({ data: JSON.stringify(data) });
   }
 }
 
@@ -83,6 +88,7 @@ describe("Spaces mutations", () => {
   beforeEach(() => {
     resetSpacesAccountState();
     apiMocks.rename.mockReset();
+    apiMocks.sendMessage.mockReset();
     apiMocks.updateMessage.mockReset();
   });
 
@@ -109,6 +115,21 @@ describe("Spaces mutations", () => {
     await useSpacesStore.getState().updateMessage(original.space_id, original.id, "After");
 
     expect(useSpacesStore.getState().messagesBySpace[original.space_id]).toEqual([edited]);
+  });
+
+  it("keeps the sent message and surfaces a safe Agent invocation failure", async () => {
+    const sent = messageFixture({ content: [{ type: "mention", agent_id: agent.id, label: agent.name }] });
+    apiMocks.sendMessage.mockResolvedValue({
+      message: sent,
+      agent_replies: [],
+      agent_failures: [{ agent_id: agent.id, code: "integration_required", message: "The run needs a required Space integration before it can start." }],
+    });
+    useSpacesStore.setState({ agentsBySpace: { [sent.space_id]: [agent] } });
+
+    await useSpacesStore.getState().sendMessage(sent.space_id, `@${agent.name}`);
+
+    expect(useSpacesStore.getState().messagesBySpace[sent.space_id]).toEqual([sent]);
+    expect(useSpacesStore.getState().error).toBe("Helper: The run needs a required Space integration before it can start.");
   });
 });
 
@@ -182,6 +203,53 @@ describe("Spaces realtime account lifecycle", () => {
     expect(FakeWebSocket.instances).toHaveLength(2);
     expect(String(FakeWebSocket.instances[1].url)).toContain("ticket=recovered-ticket");
   });
+
+  it("does not refresh Studio for an own Agent run when Studio visibility is denied", async () => {
+    const loadStudio = vi.fn();
+    apiMocks.realtimeTicket.mockResolvedValue({ ticket: "permission-ticket", expires_in: 60 });
+    useSpacesStore.setState({
+      spaces: [spaceFixture({ id: "space", permissions: { "agents.run": true, "studio.view": false } })],
+      loadStudio,
+    });
+
+    await useSpacesStore.getState().connectRealtime("active-account");
+    FakeWebSocket.instances[0].open();
+    FakeWebSocket.instances[0].message({ type: "event", event: spaceEventFixture({ type: "agent.run.started" }) });
+    await Promise.resolve();
+
+    expect(loadStudio).not.toHaveBeenCalled();
+    expect(useSpacesStore.getState().error).toBeNull();
+  });
+
+  it.each(["library.upload.ready", "library.item.updated"])("announces %s events to the active Library view", async (eventType) => {
+    const listener = vi.fn();
+    apiMocks.realtimeTicket.mockResolvedValue({ ticket: "library-ticket", expires_in: 60 });
+    useSpacesStore.setState({ spaces: [spaceFixture({ id: "space", permissions: { "library.view": true } })] });
+    window.addEventListener("misty:space-library-event", listener);
+
+    await useSpacesStore.getState().connectRealtime("active-account");
+    FakeWebSocket.instances[0].open();
+    FakeWebSocket.instances[0].message({ type: "event", event: spaceEventFixture({ type: eventType }) });
+    await Promise.resolve();
+
+    expect(listener).toHaveBeenCalledOnce();
+    window.removeEventListener("misty:space-library-event", listener);
+  });
+
+  it("does not announce Library events when Library visibility is denied", async () => {
+    const listener = vi.fn();
+    apiMocks.realtimeTicket.mockResolvedValue({ ticket: "library-denied-ticket", expires_in: 60 });
+    useSpacesStore.setState({ spaces: [spaceFixture({ id: "space", permissions: { "library.view": false } })] });
+    window.addEventListener("misty:space-library-event", listener);
+
+    await useSpacesStore.getState().connectRealtime("active-account");
+    FakeWebSocket.instances[0].open();
+    FakeWebSocket.instances[0].message({ type: "event", event: spaceEventFixture({ type: "library.item.updated" }) });
+    await Promise.resolve();
+
+    expect(listener).not.toHaveBeenCalled();
+    window.removeEventListener("misty:space-library-event", listener);
+  });
 });
 
 function deferred<T>() {
@@ -216,6 +284,19 @@ function messageFixture(patch: Partial<SpaceMessage> = {}): SpaceMessage {
     sender_kind: "person",
     content: [{ type: "text", text: "Before" }],
     file_node_ids: [],
+    created_at: "2026-07-15T00:00:00Z",
+    ...patch,
+  };
+}
+
+function spaceEventFixture(patch: Record<string, unknown> = {}) {
+  return {
+    id: 1,
+    space_id: "space",
+    type: "agent.run.started",
+    actor_user_id: "active-account",
+    entity_id: "run-1",
+    payload: {},
     created_at: "2026-07-15T00:00:00Z",
     ...patch,
   };

@@ -1,7 +1,6 @@
-import { AppWindow, Archive, ArrowRightLeft, Bot, ChevronRight, Clipboard, Copy, Download, ExternalLink, Eye, FileArchive, FilePlus, Folder, FolderPlus, Hash, Link, MoreHorizontal, Pencil, Pin, RefreshCcw, Scissors, Terminal, Trash2, X } from "lucide-react";
+import { AppWindow, Archive, ArrowRightLeft, ChevronRight, Clipboard, Copy, Download, ExternalLink, Eye, FileArchive, FilePlus, Folder, FolderPlus, Hash, Link, MoreHorizontal, Pencil, Pin, RefreshCcw, Scissors, Terminal, Trash2, X } from "lucide-react";
 import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { useNavigate } from "react-router-dom";
 import type { CSSProperties, PointerEvent, ReactNode } from "react";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { archiveCreate, archiveExtract, archiveList, fileToolsChecksum, fileToolsCreateSymlink, fileToolsReadSymlink, openTerminalAtPath, providersJobStatus, providersVerifyResult, providersVerifyStart } from "../../../api/misty";
@@ -12,9 +11,6 @@ import { useShallow } from "zustand/react/shallow";
 import { clearSelectionsAcrossPanes, selectedCountAcrossPanes } from "./ExplorerAssistantPanels";
 import type { CompareDialogSeed } from "./ExplorerCompareDialog";
 import { cx } from "./ExplorerDesktopShared";
-import { useAgentsStore } from "../../../stores/useAgentsStore";
-import { useSpacesStore } from "../../../stores/useSpacesStore";
-import { mistyFolderAgentsEnabled } from "../../../agents/flags";
 
 const explorerCompareWithEvent = "misty:explorer-compare-with";
 const emptyPinnedPaths: string[] = [];
@@ -214,14 +210,7 @@ function normalizedPath(path: string): string {
   return path.replace(/\/+$/, "") || "/";
 }
 
-function fileNameFromPath(path: string): string {
-  const normalized = path.replace(/[\\/]+$/, "");
-  const parts = normalized.split(/[\\/]/).filter(Boolean);
-  return parts[parts.length - 1] || "Folder";
-}
-
 export const ExplorerContextMenu = memo(function ExplorerContextMenu() {
-  const navigate = useNavigate();
   const shortcutHintsEnabled = useSettingsStore((state) =>
     selectShortcutPreferences(state.settings?.document).shortcutHintsEnabled,
   );
@@ -569,25 +558,6 @@ export const ExplorerContextMenu = memo(function ExplorerContextMenu() {
       disabledReason: hasRemoteSelection ? "Compare is available for local files and folders." : selectionDisabledReason,
       onRun: () => run(() => openCompareWith(paneId)),
     },
-    ...(mistyFolderAgentsEnabled() ? [{
-      id: "create-mika-agent",
-      icon: <Bot size={17} />,
-      label: "Create Mika Agent...",
-      disabled: !targetEntry || targetEntry.kind !== "folder" || targetEntry.location.kind !== "local" || targetEntry.isDeleted,
-      disabledReason: "Mika agents can be created for local folders.",
-      onRun: () => run(async () => {
-        if (!targetEntry) return;
-        const spacesStore = useSpacesStore.getState();
-        if (spacesStore.spaces.length === 0) await spacesStore.load();
-        const personalSpace = useSpacesStore.getState().spaces.find((space) => space.is_personal);
-        if (!personalSpace) {
-          navigate("/agents");
-          return;
-        }
-        useAgentsStore.getState().beginFolderDraft(targetEntry.path, fileNameFromPath(targetEntry.path), personalSpace.id);
-        navigate(`/spaces/${encodeURIComponent(personalSpace.id)}/studio/folder-agents`);
-      }),
-    }] : []),
     { id: "delete", icon: <Trash2 size={17} />, label: "Delete", items: deleteItems },
     { id: "archive", icon: <Archive size={17} />, label: "Archive", items: archiveItems },
     { id: "file-tools", icon: <Hash size={17} />, label: "File Tools", items: fileToolsItems },
