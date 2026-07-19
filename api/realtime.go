@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"log"
 	"net/http"
 	"strconv"
 	"sync"
@@ -212,6 +213,14 @@ var realtimeUpgrader = websocket.Upgrader{
 
 func (s *RealtimeService) Connect() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		// Check the upgrade before consuming the single-use ticket. A reverse
+		// proxy that drops the Upgrade headers must not invalidate a valid ticket.
+		if !websocket.IsWebSocketUpgrade(r) {
+			log.Printf("Realtime WebSocket upgrade headers missing")
+			w.Header().Set("Upgrade", "websocket")
+			writeJSON(w, http.StatusUpgradeRequired, map[string]string{"code": "websocket_upgrade_required"})
+			return
+		}
 		token := r.URL.Query().Get("ticket")
 		if token == "" {
 			writeJSON(w, http.StatusUnauthorized, map[string]string{"code": "invalid_ticket"})
@@ -219,11 +228,13 @@ func (s *RealtimeService) Connect() http.HandlerFunc {
 		}
 		userID, after, err := s.database.ConsumeRealtimeTicket(r.Context(), security.HashToken(token))
 		if err != nil {
+			log.Printf("Realtime WebSocket ticket rejected: %v", err)
 			writeSpaceError(w, err)
 			return
 		}
 		conn, err := realtimeUpgrader.Upgrade(w, r, nil)
 		if err != nil {
+			log.Printf("Realtime WebSocket upgrade failed: %v", err)
 			return
 		}
 		client := &realtimeClient{userID: userID, conn: conn, send: make(chan []byte, 256), done: make(chan struct{})}
