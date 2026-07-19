@@ -76,3 +76,18 @@ func TestVerifyNotionRequestUsesRawBodyHMAC(t *testing.T) {
 		t.Fatal("Notion signature was accepted without a configured secret")
 	}
 }
+
+func TestNotionVerificationTokenLoggingRequiresExplicitOptIn(t *testing.T) {
+	for _, value := range []string{"", "false", "0", "off"} {
+		t.Setenv("NOTION_WEBHOOK_LOG_VERIFICATION_TOKEN", value)
+		if logNotionVerificationToken() {
+			t.Fatalf("logging enabled for %q", value)
+		}
+	}
+	for _, value := range []string{"true", "TRUE", "1", "yes", "on"} {
+		t.Setenv("NOTION_WEBHOOK_LOG_VERIFICATION_TOKEN", value)
+		if !logNotionVerificationToken() {
+			t.Fatalf("logging disabled for %q", value)
+		}
+	}
+}

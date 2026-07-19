@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
 	"os"
@@ -182,8 +183,12 @@ func (s *SpacesService) NotionEventsCallback() http.HandlerFunc {
 		var probe map[string]any
 		_ = json.Unmarshal(raw, &probe)
 		if verification, _ := probe["verification_token"].(string); verification != "" {
-			// Notion's one-time subscription verification is completed in the
-			// provider console. Never persist the token from an inbound request.
+			// Notion requires the owner to paste this one-time value back into its
+			// provider console. Logging is an explicit bootstrap-only escape hatch;
+			// it is disabled by default and must be removed after setup.
+			if logNotionVerificationToken() {
+				log.Printf("MISTY_NOTION_WEBHOOK_VERIFICATION_TOKEN=%s", verification)
+			}
 			w.WriteHeader(http.StatusOK)
 			return
 		}
@@ -204,6 +209,15 @@ func (s *SpacesService) NotionEventsCallback() http.HandlerFunc {
 			defer cancel()
 			_ = s.processNotionEvent(ctx, event, payload)
 		}()
+	}
+}
+
+func logNotionVerificationToken() bool {
+	switch strings.ToLower(strings.TrimSpace(os.Getenv("NOTION_WEBHOOK_LOG_VERIFICATION_TOKEN"))) {
+	case "1", "true", "yes", "on":
+		return true
+	default:
+		return false
 	}
 }
 
