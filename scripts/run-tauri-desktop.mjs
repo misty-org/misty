@@ -10,7 +10,8 @@ const signedMacosRunner = resolve(appDir, "scripts/run-signed-macos-binary.sh");
 const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
 
 const devPort = await findAvailablePort(Number(process.env.MISTY_DESKTOP_DEV_PORT ?? 5173));
-const devUrl = `http://127.0.0.1:${devPort}`;
+const initialRoute = normalizeInitialRoute(process.env.MISTY_DESKTOP_INITIAL_ROUTE);
+const devUrl = `http://127.0.0.1:${devPort}${initialRoute}`;
 const tauriDevConfig = JSON.stringify({
   build: {
     devUrl,
@@ -37,6 +38,15 @@ run(
       : {}),
   },
 );
+
+function normalizeInitialRoute(value) {
+  if (!value) return "";
+  const route = String(value).trim();
+  if (!route.startsWith("/") || route.startsWith("//") || route.includes("://")) {
+    throw new Error("MISTY_DESKTOP_INITIAL_ROUTE must be an absolute in-app path.");
+  }
+  return route;
+}
 
 async function findAvailablePort(startPort) {
   const basePort = Number.isFinite(startPort) && startPort > 0 ? Math.floor(startPort) : 5173;

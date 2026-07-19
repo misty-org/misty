@@ -3,6 +3,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -17,7 +18,6 @@ import {
 } from "../pages/Account/shared/authTokenStore";
 import { isNativeMobileBuild } from "../platform/buildTarget";
 import type { CurrentLicense } from "../models/setup";
-import { resetAgentsAccountState } from "../stores/useAgentsStore";
 import { resetMikaAccountState } from "../stores/useMikaSessionStore";
 import { resetSpacesAccountState } from "../stores/useSpacesStore";
 import { useSetupStore } from "../stores/useSetupStore";
@@ -57,12 +57,15 @@ const authUserStorageKey = "misty_user";
 export function AuthProvider({ children }: { children: ReactNode }) {
   const signOut = useSetupStore((state) => state.signOut);
   const saveAuthenticatedUser = useSetupStore((state) => state.saveAuthenticatedUser);
+  const nativeUser = useSetupStore((state) => state.status?.current_user ?? null);
   const navigate = useNavigate();
   const [user, setUserState] = useState<AuthUser | null>(() =>
     shouldPersistAuthUser ? readStoredUser() : null,
   );
   const [accounts, setAccounts] = useState<SavedAccountSession[]>(() => listSavedAccountSessions());
   const [telemetryIdentity] = useState(() => new TelemetryIdentityManager(analytics));
+  const startupValidationStarted = useRef(false);
+  const activeUser = user ?? nativeUser;
 
   const setUser = useCallback((nextUser: AuthUser | null) => {
     if (user?.id && nextUser?.id && user.id !== nextUser.id) resetAccountScopedState();
@@ -94,40 +97,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [saveAuthenticatedUser, user?.id]);
 
   useEffect(() => {
-    setAnalyticsAuthenticationState(Boolean(user));
-    telemetryIdentity.sync(user);
-  }, [telemetryIdentity, user]);
+    setAnalyticsAuthenticationState(Boolean(activeUser));
+    telemetryIdentity.sync(activeUser);
+  }, [activeUser, telemetryIdentity]);
 
   useEffect(() => {
     if (shouldPersistAuthUser) {
-      writeStoredUser(user);
+      writeStoredUser(activeUser);
     } else {
       clearStoredUser();
     }
-  }, [user]);
+  }, [activeUser]);
 
   useEffect(() => {
-    if (!user) {
+    if (!activeUser) {
       setAccounts(listSavedAccountSessions());
       return;
     }
-    void updateSavedAccountSession(user).then(() => setAccounts(listSavedAccountSessions()));
-  }, [user]);
+    void updateSavedAccountSession(activeUser).then(() => setAccounts(listSavedAccountSessions()));
+  }, [activeUser]);
 
   useEffect(() => {
-    if (!user) return;
+    if (!activeUser || startupValidationStarted.current) return;
+    startupValidationStarted.current = true;
     let canceled = false;
     void accountFetchMe().then((me) => {
       if (canceled) return;
-      setUserState((current) => current ? {
-        ...current,
+      setUserState((current) => ({
+        ...(current ?? activeUser),
         id: me.id,
         name: me.name,
         username: me.username,
         email: me.email,
         accountCreatedAt: me.created_at,
         currentPlan: me.tier,
-      } : null);
+      }));
     }).catch((error) => {
       if (canceled || !isAccountUnauthorizedError(error)) return;
       void clearAccountAuthToken().then(async (fallback) => {
@@ -154,10 +158,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => {
       canceled = true;
     };
-    // Validate only the persisted startup identity. Sign-in itself already
-    // validates credentials and fetches /me before setting the user.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    // Validate only the first restored identity. Sign-in and account switching
+    // already fetch /me before setting the user.
+  }, [activeUser, saveAuthenticatedUser, signOut]);
 
   const logout = useCallback(() => {
     void (async () => {
@@ -185,7 +188,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [navigate, saveAuthenticatedUser, signOut]);
 
   return (
-    <AuthContext.Provider value={{ user, setUser, accounts, switchAccount, logout }}>
+    <AuthContext.Provider value={{ user: activeUser, setUser, accounts, switchAccount, logout }}>
       {children}
     </AuthContext.Provider>
   );
@@ -194,7 +197,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 function resetAccountScopedState(): void {
   useUserStore.getState().clear();
   resetSpacesAccountState();
-  resetAgentsAccountState();
   resetMikaAccountState();
 }
 

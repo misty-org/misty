@@ -67,7 +67,7 @@ function githubSourceArchiveUrlForCatalog(baseUrl: string): string | null {
   return null;
 }
 
-const REMOVED_PLUGIN_IDS = new Set(["git", "preview-panel", "preview_panel"]);
+const REMOVED_PLUGIN_IDS = new Set(["git", "preview-panel", "preview_panel", "vault"]);
 
 type PluginsStore = {
   loading: boolean;
@@ -106,6 +106,7 @@ type RawPluginCatalogFile = {
   permissions?: string[];
   getting_started?: string[];
   changelog?: string[];
+  included_tools?: Array<string | { name?: string; version?: string }>;
   links?: PluginCatalogEntry["links"];
   actions?: PluginCatalogEntry["actions"];
   verified?: boolean;
@@ -219,6 +220,7 @@ function normalizeCatalogEntry(
     permissions: raw.permissions ?? [],
     getting_started: raw.getting_started ?? [],
     changelog: raw.changelog ?? [],
+    included_tools: (raw.included_tools ?? []).map((tool) => typeof tool === "string" ? { name: tool, version: "" } : { name: tool.name ?? "Tool", version: tool.version ?? "" }),
     links: raw.links ?? [],
     actions: raw.actions ?? [],
     verified: raw.verified ?? false,
@@ -263,6 +265,16 @@ function defaultArtifact(catalog: PluginCatalogEntry, platform: string): PluginA
   return catalog.install.artifacts.find((artifact) => artifact.platform === platform);
 }
 
+async function resolveArtifactChecksum(plugin: PluginEntry): Promise<string | undefined> {
+  if (plugin.artifact?.sha256) return plugin.artifact.sha256;
+  if (!plugin.verified || !plugin.artifact?.url) return undefined;
+  const response = await fetch(`${plugin.artifact.url}.sha256`);
+  if (!response.ok) throw new Error(`The published checksum for ${plugin.name} is unavailable.`);
+  const checksum = (await response.text()).trim().split(/\s+/)[0]?.toLowerCase();
+  if (!/^[a-f0-9]{64}$/.test(checksum)) throw new Error(`The published checksum for ${plugin.name} is invalid.`);
+  return checksum;
+}
+
 function prefer<T>(primary: T | undefined, fallback: T): T {
   if (typeof primary === "string") {
     return (primary.trim().length > 0 ? primary : fallback) as T;
@@ -298,6 +310,7 @@ function toPluginEntry(
     permissions: prefer(local?.permissions, catalog.permissions),
     getting_started: prefer(local?.getting_started, catalog.getting_started),
     changelog: prefer(local?.changelog, catalog.changelog),
+    included_tools: prefer(local?.included_tools, catalog.included_tools),
     links: prefer(local?.links, catalog.links),
     actions: prefer(local?.actions, catalog.actions),
     launcher: {
@@ -331,7 +344,7 @@ function filterCatalogEntries(entries: PluginCatalogEntry[], query: string) {
   }
 
   return entries.filter((plugin) =>
-    [plugin.name, plugin.author, plugin.overview, plugin.id, plugin.version]
+    [plugin.name, plugin.author, plugin.overview, plugin.id, plugin.version, ...plugin.capabilities, ...plugin.permissions, ...plugin.where_it_appears, ...plugin.getting_started, ...plugin.changelog, ...plugin.included_tools.map((tool) => `${tool.name} ${tool.version}`)]
       .join("\n")
       .toLowerCase()
       .includes(normalized),
@@ -541,12 +554,13 @@ export const usePluginsStore = create<PluginsStore>((set, get) => ({
     }
     set({ actionPluginId: plugin.id, error: "", notice: "" });
     try {
+      const sha256 = await resolveArtifactChecksum(plugin);
       const result = await invoke<string>("install_plugin_bundle", {
         pluginId: plugin.id,
         root: plugin.root,
         url: plugin.artifact.url,
         platform: plugin.artifact.platform,
-        sha256: plugin.artifact.sha256,
+        sha256,
       });
       set({ actionPluginId: "", notice: result });
       await rebuildCatalogState(set, get, {

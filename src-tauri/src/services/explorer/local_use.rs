@@ -51,6 +51,7 @@ impl ExplorerService {
             request.remote_modified.as_deref(),
             "Preparing remote file to open",
             false,
+            None,
         )
         .await
     }
@@ -59,16 +60,26 @@ impl ExplorerService {
         &self,
         request: PrepareDragItemsRequest,
     ) -> ApiResult<PreparedDragItemsResult> {
+        let session_id = request.session_id.clone();
+        let cancellation = if let Some(session_id) = &session_id {
+            let mut cancellations = self.drag_preparation_cancellations.lock().await;
+            Some(cancellations.entry(session_id.clone())
+                .or_insert_with(|| Arc::new(AtomicBool::new(false)))
+                .clone())
+        } else { None };
         let mut prepared = Vec::new();
         let mut skipped = Vec::new();
         for item in request.items {
-            match self.prepare_drag_item(item).await {
+            match self.prepare_drag_item(item, cancellation.as_deref()).await {
                 Ok(item) => prepared.push(item),
                 Err(error) => skipped.push(PreparedDragSkippedItem {
                     source_path: error.0,
                     reason: error.1,
                 }),
             }
+        }
+        if let Some(session_id) = session_id {
+            self.drag_preparation_cancellations.lock().await.remove(&session_id);
         }
         Ok(PreparedDragItemsResult {
             items: prepared,
@@ -79,9 +90,10 @@ impl ExplorerService {
     pub(super) async fn prepare_drag_item(
         &self,
         request: PrepareDragItemRequest,
+        cancellation: Option<&AtomicBool>,
     ) -> Result<PreparedDragItem, (String, String)> {
         let source_path = request.path.clone();
-        match self.prepare_drag_item_inner(request).await {
+        match self.prepare_drag_item_inner(request, cancellation).await {
             Ok(item) => Ok(item),
             Err(error) => Err((source_path, error.to_string())),
         }
@@ -90,7 +102,9 @@ impl ExplorerService {
     pub(super) async fn prepare_drag_item_inner(
         &self,
         request: PrepareDragItemRequest,
+        cancellation: Option<&AtomicBool>,
     ) -> ApiResult<PreparedDragItem> {
+        ensure_not_canceled_if(cancellation)?;
         let Some(source) = self.remote_target(&request.path) else {
             self.reject_virtual_mount_container(&request.path, "drag")?;
             let path = Path::new(&request.path);
@@ -124,6 +138,7 @@ impl ExplorerService {
                     request.remote_modified.as_deref(),
                     "Preparing remote file for drag-out",
                     true,
+                    cancellation,
                 )
                 .await?;
             return Ok(PreparedDragItem {
@@ -164,8 +179,11 @@ impl ExplorerService {
         record.detail_message = "Preparing remote folder for drag-out".to_string();
         let transfer_id = self.begin_transfer(record).await;
         let result = self
-            .download_remote_item(&source, true, &stage_path, transfer_id, None)
+            .download_remote_item(&source, true, &stage_path, transfer_id, cancellation)
             .await;
+        if result.is_err() {
+            let _ = tokio::fs::remove_dir_all(stage_path.parent().unwrap_or(&stage_path)).await;
+        }
         self.finish_transfer(transfer_id, result).await?;
 
         Ok(PreparedDragItem {
@@ -183,7 +201,9 @@ impl ExplorerService {
         remote_modified: Option<&str>,
         _detail_message: &str,
         record_transfer: bool,
+        cancellation: Option<&AtomicBool>,
     ) -> ApiResult<PreparedOpenItem> {
+        ensure_not_canceled_if(cancellation)?;
         let file_name = Path::new(&source.remote_path)
             .file_name()
             .and_then(|value| value.to_str())
@@ -246,7 +266,7 @@ impl ExplorerService {
             None
         };
         let result = self
-            .download_remote_item(source, false, &temp_path, transfer_id, None)
+            .download_remote_item(source, false, &temp_path, transfer_id, cancellation)
             .await;
         if let Err(error) = result {
             let _ = tokio::fs::remove_file(&temp_path).await;
@@ -261,7 +281,7 @@ impl ExplorerService {
                 .await
                 .temp_path_for(&ClipboardCache::remote_file_key(&cache_key), &file_name);
             let retry_result = self
-                .download_remote_item(source, false, &retry_temp_path, transfer_id, None)
+                .download_remote_item(source, false, &retry_temp_path, transfer_id, cancellation)
                 .await;
             if let Err(error) = retry_result {
                 let _ = tokio::fs::remove_file(&retry_temp_path).await;
@@ -296,6 +316,15 @@ impl ExplorerService {
                 ApiError::Message(format!("Failed to cache remote file {file_name}: {error}"))
             });
         self.finish_transfer(transfer_id, prepared).await
+    }
+
+    pub async fn cancel_drag_preparation(&self, session_id: &str) {
+        self.drag_preparation_cancellations
+            .lock()
+            .await
+            .entry(session_id.to_owned())
+            .or_insert_with(|| Arc::new(AtomicBool::new(true)))
+            .store(true, Ordering::Relaxed);
     }
 
     pub(super) async fn cached_remote_file_for_paste(

@@ -51,6 +51,5 @@
   "src/pages/Agents/index.tsx": 563,
   "src/agents/api.ts": 527,
   "src-tauri/src/core/file_sync/store.rs": 520,
-  "src/stores/useSettingsStore.ts": 508,
-  "src/stores/useSpacesStore.ts": 501
+  "src/stores/useSettingsStore.ts": 508
 }

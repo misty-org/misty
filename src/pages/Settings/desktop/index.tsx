@@ -222,7 +222,7 @@ export const SettingsWorkspace = memo(function SettingsWorkspace(props: {
       <aside className={settingsSidebarClass} aria-label="Settings sections">
         {navGroups.map((group) => (
           <div className="grid gap-[5px]" key={group.label}>
-            <span className="px-2 pb-3 pt-2 text-[10px] font-bold uppercase tracking-normal text-[#767676]">
+            <span className="px-2 pb-3 pt-2 text-[10px] font-bold capitalize text-[#767676]">
               {overlay ? "Settings" : group.label}
             </span>
             {group.items.map((item) => {

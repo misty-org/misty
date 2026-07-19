@@ -42,6 +42,53 @@ export interface WorkflowVersion {
   created_at: string;
 }
 
+export interface AgentVersionWorkflow {
+  workflow_version_id: string;
+  alias: string;
+  enabled: boolean;
+  position: number;
+}
+
+export interface PublishedAgentVersion {
+  id: string;
+  agent_id: string;
+  space_id: string;
+  creator_user_id: string;
+  version: number;
+  name: string;
+  description: string;
+  icon: string;
+  instructions: string;
+  access: { mode: "space" | "selected"; allowedUserIds?: string[] };
+  workflows: AgentVersionWorkflow[];
+  checksum_sha256: string;
+  published_at: string;
+}
+
+export interface AgentInstanceRecord {
+  id: string;
+  space_id: string;
+  agent_id: string;
+  user_id: string;
+  agent_version_id: string;
+  status: "idle" | "running";
+  update_available: boolean;
+  connection_bindings: Record<string, string>;
+  capability_grants: Array<Record<string, unknown>>;
+	workflows: InstanceWorkflowConfig[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface InstanceWorkflowConfig {
+  workflow_version_id: string;
+  enabled: boolean;
+  trigger_config: Record<string, unknown>;
+  consent: Record<string, unknown>;
+  cursor: Record<string, unknown>;
+  updated_at: string;
+}
+
 export interface SpaceRun {
   id: string;
   space_id: string;
@@ -50,7 +97,11 @@ export interface SpaceRun {
   initiated_by_user_id: string;
   billing_user_id: string;
   trigger_kind: string;
-  state: "queued" | "running" | "awaiting_approval" | "retrying" | "completed" | "failed" | "canceled" | "rejected";
+  state: "queued" | "running" | "cooldown" | "awaiting_approval" | "completed" | "completed_with_errors" | "failed" | "canceled" | "rejected";
+	agent_instance_id?: string;
+	agent_version_id?: string;
+	attempt?: number;
+	next_retry_at?: string;
   input: Record<string, unknown>;
   result: Record<string, unknown>;
   error_code?: string;
@@ -98,6 +149,21 @@ export interface RunApproval {
   expires_at: string;
 }
 
+export interface WorkflowRunStep {
+  ID: string;
+  RunID: string;
+  NodeID: string;
+  State: string;
+  Attempt: number;
+  Input: Record<string, unknown>;
+  Output: Record<string, unknown>;
+  ErrorCode?: string;
+  ErrorMessage?: string;
+  StartedAt?: string;
+  CompletedAt?: string;
+  UpdatedAt: string;
+}
+
 export interface AgentCatalogEntry {
   agent_id: string;
   agent_name: string;
@@ -135,7 +201,7 @@ export interface MikaDelegationResult {
   run?: SpaceRun;
 }
 
-export interface PrivateAgentConversation {
+export interface AgentConversation {
   id: string;
   space_id: string;
   owner_user_id: string;
@@ -146,7 +212,7 @@ export interface PrivateAgentConversation {
   updated_at: string;
 }
 
-export interface PrivateConversationEvent {
+export interface AgentConversationEvent {
   id: number;
   conversation_id: string;
   user_id: string;
@@ -164,6 +230,37 @@ export interface SpaceIntegration {
   granted_permissions: string[];
   status: string;
   connected_by_user_id: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ProviderAuthorizationStart {
+  provider: string;
+  authorization_url: string;
+  state_expires_at: string;
+}
+
+export interface ProviderConnectionAvailability {
+  provider: string;
+  configured: boolean;
+}
+
+export interface AvailableProviderResource {
+  provider: "slack" | "discord" | "notion";
+  resource_type: "channel" | "page" | "database" | "data_source";
+  external_resource_id: string;
+  display_name: string;
+  configuration: Record<string, unknown>;
+}
+
+export interface ProviderSharedResource extends AvailableProviderResource {
+  id: string;
+  space_id: string;
+  integration_id: string;
+  published_by_user_id: string;
+  permission_scope: string;
+  status: "active" | "needs_attention" | "disabled";
+  last_error_code?: string;
   created_at: string;
   updated_at: string;
 }

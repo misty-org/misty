@@ -1,6 +1,7 @@
 import { ArrowLeft, ArrowRightLeft, ExternalLink, Puzzle, RefreshCcw, Sparkles, Terminal, X } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { open } from "@tauri-apps/plugin-dialog";
 import type { CSSProperties } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { extensionCommandRun, openTerminalAtPath, pluginCommandRun, pluginPanelRender } from "../../../api/misty";
@@ -10,10 +11,10 @@ import { publishPluginNotifications } from "../../../plugins/pluginNotifications
 import { useMultiPanelStore } from "../../../shared/multipanel/useMultiPanelStore";
 import { useMinimumSpin } from "../../../shared/hooks/useMinimumSpin";
 import { errorText } from "../../../shared/format";
-import { applyMistyThemeFromExtensionAction, themeBaseMode, useAppThemeStore } from "../../../stores/useAppThemeStore";
-import type { MistyCustomThemeTokens, MistyThemeId } from "../../../stores/useAppThemeStore";
+import { applyMistyThemeFromExtensionAction, useAppThemeStore } from "../../../stores/useAppThemeStore";
+import { advanceThemeRevision, applyThemeTokenPreview, handleSharedExtensionCommand, themeSnapshot } from "../../../plugins/extensionHostBridge";
 import { hasTauriInternals } from "../../../shared/tauri";
-import { useExplorerStore } from "../../../stores/useExplorerStore";
+import { selectedPathsForPane, useExplorerStore } from "../../../stores/useExplorerStore";
 import { useTransfersStore } from "../../../stores/useTransfersStore";
 import { cx } from "./ExplorerDesktopShared";
 import { explorerTrayStyles, extensionsPanelStyles, pluginTabHostStyles, pluginTabMenuStyles } from "./ExplorerDesktopPluginStyles";
@@ -899,42 +900,6 @@ function ExplorerNativePluginPanelHost(props: {
   );
 }
 
-const themeTokenProperties = {
-  background: "--misty-bg", surface: "--misty-surface", foreground: "--misty-text",
-  muted: "--misty-text-muted", accent: "--misty-accent", selection: "--misty-selection",
-  success: "--misty-success", warning: "--misty-warning", danger: "--misty-danger",
-} as const;
-
-function readThemeTokens(): MistyCustomThemeTokens {
-  const styles = getComputedStyle(document.documentElement);
-  return Object.fromEntries(Object.entries(themeTokenProperties).map(([token, property]) => [token, styles.getPropertyValue(property).trim()])) as MistyCustomThemeTokens;
-}
-
-function applyThemeTokenPreview(tokens: MistyCustomThemeTokens | null) {
-  const root = document.documentElement;
-  for (const [token, property] of Object.entries(themeTokenProperties)) {
-    const value = tokens?.[token as keyof MistyCustomThemeTokens];
-    if (value) root.style.setProperty(property, value);
-    else root.style.removeProperty(property);
-  }
-}
-
-function safeThemeTokens(value: unknown): MistyCustomThemeTokens | null {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
-  const result: MistyCustomThemeTokens = {};
-  for (const token of Object.keys(themeTokenProperties) as Array<keyof MistyCustomThemeTokens>) {
-    const color = (value as Record<string, unknown>)[token];
-    if (color === undefined) continue;
-    if (typeof color !== "string" || !/^#[0-9a-f]{6}$/i.test(color)) return null;
-    result[token] = color.toUpperCase();
-  }
-  return Object.keys(result).length ? result : null;
-}
-
-function isMistyThemeId(value: unknown): value is MistyThemeId {
-  return value === "misty-dark" || value === "misty-light" || value === "graphite" || value === "aurora" || value === "copper";
-}
-
 function webPanelUrl(panel: PluginPanelEntry): string {
   const [path, query = ""] = panel.webEntry.split("?", 2);
   const params = new URLSearchParams(query);
@@ -964,6 +929,10 @@ function ExplorerWebPluginPanelHost(props: { panel: PluginPanelEntry; selectedPa
   const [hostState, setHostState] = useState<"loading" | "ready" | "failed">("loading");
   const timeoutRef = useRef<number | null>(null);
   const source = useMemo(() => webPanelUrl(props.panel), [props.panel, reloadKey]);
+  const currentSelection = useCallback(() => {
+    const selections = Object.values(useExplorerStore.getState().panes).map(selectedPathsForPane).find((paths) => paths.includes(props.selectedPath));
+    return selections?.length ? selections : props.selectedPath ? [props.selectedPath] : [];
+  }, [props.selectedPath]);
 
   useEffect(() => () => {
     if (props.panel.pluginId !== "themes") return;
@@ -978,9 +947,10 @@ function ExplorerWebPluginPanelHost(props: { panel: PluginPanelEntry; selectedPa
     if (hostState !== "ready") return;
     iframeRef.current?.contentWindow?.postMessage({
       channel: "misty-host", kind: "context", pluginId: props.panel.pluginId,
-      selectedPaths: props.selectedPath ? [props.selectedPath] : [],
+      selectedPaths: currentSelection(),
+      theme: themeSnapshot(),
     }, "*");
-  }, [hostState, props.panel.pluginId, props.selectedPath]);
+  }, [currentSelection, hostState, props.panel.pluginId]);
 
   const beginHandshake = useCallback(() => {
     setHostState("loading");
@@ -1000,30 +970,33 @@ function ExplorerWebPluginPanelHost(props: { panel: PluginPanelEntry; selectedPa
         return;
       }
       if (request.kind !== "request" || typeof request.requestId !== "string" || typeof request.command !== "string") return;
+      const command = request.command;
       const respond = (ok: boolean, result?: unknown, error?: string) => iframeRef.current?.contentWindow?.postMessage({ channel: "misty-host", kind: "response", requestId: request.requestId, ok, result, error }, "*");
       const payload = request.payload ?? {};
-      if (request.command === "host.selectedPaths") { respond(true, { ok: true, selectedPaths: props.selectedPath ? [props.selectedPath] : [] }); return; }
+      if (request.command === "host.selectedPaths") { respond(true, { ok: true, selectedPaths: currentSelection(), theme: themeSnapshot() }); return; }
+      if (request.command === "host.pickFolders" && props.panel.pluginId === "backups") {
+        void open({ directory: true, multiple: payload.multiple !== false, title: typeof payload.title === "string" ? payload.title : "Choose folders" }).then((value) => respond(true, { ok: true, paths: value == null ? [] : Array.isArray(value) ? value : [value] })).catch((error) => respond(false, undefined, errorText(error)));
+        return;
+      }
       if (request.command === "host.notify") {
         const level = payload.level === "success" || payload.level === "error" ? payload.level : "info";
         const message = typeof payload.message === "string" ? payload.message.slice(0, 500) : "Extension notification";
         useExplorerStore.getState().pushNotification(message, level, 4500); respond(true, { ok: true }); return;
       }
-      if (props.panel.pluginId === "themes") {
-        void handleThemeWebCommand(request.command, payload).then((result) => respond(true, result)).catch((error) => respond(false, undefined, errorText(error)));
-        return;
-      }
-      void extensionCommandRun({ pluginId: props.panel.pluginId, command: request.command, payload })
-        .then((result) => {
-          const started = result as { jobId?: string };
-          if (typeof started.jobId === "string" && started.jobId) {
-            monitorExtensionJob(props.panel.pluginId, props.panel.pluginName, started.jobId);
-          }
+      void handleSharedExtensionCommand(command, payload).then((shared) => {
+        if (shared !== undefined) { respond(true, shared); postContext(); return; }
+        return extensionCommandRun({ pluginId: props.panel.pluginId, command, payload }).then((result) => {
+          const started = result as { jobId?: string }; if (typeof started.jobId === "string" && started.jobId) monitorExtensionJob(props.panel.pluginId, props.panel.pluginName, started.jobId);
           respond(true, result);
-        }).catch((error) => respond(false, undefined, errorText(error)));
+        });
+      }).catch((error) => respond(false, undefined, errorText(error)));
+      return;
     };
     window.addEventListener("message", handleMessage);
     return () => window.removeEventListener("message", handleMessage);
-  }, [props.panel.pluginId, props.selectedPath]);
+  }, [postContext, props.panel.pluginId, props.panel.pluginName, props.selectedPath]);
+
+  useEffect(() => useAppThemeStore.subscribe(() => { advanceThemeRevision(); window.requestAnimationFrame(postContext); }), [postContext]);
 
   useEffect(postContext, [postContext]);
   useEffect(() => {
@@ -1035,17 +1008,17 @@ function ExplorerWebPluginPanelHost(props: { panel: PluginPanelEntry; selectedPa
   return (
     <section className={`${pluginTabHostStyles.panel} relative min-h-[360px] overflow-hidden p-0`}>
       {hostState !== "ready" ? (
-        <div className="absolute inset-0 z-10 grid content-center justify-items-center gap-3 bg-[var(--misty-bg)] p-5 text-center text-sm text-[#adadad]">
+        <div className="absolute inset-0 z-10 grid content-center justify-items-center gap-3 bg-[var(--misty-bg)] p-5 text-center text-sm text-[var(--misty-text-muted)]">
           {hostState === "loading" ? <><RefreshCcw className="animate-spin" size={20} /><span>Loading extension…</span></> : (
             <>
               <Puzzle size={24} />
-              <strong className="text-[#eeeeee]">Extension did not start</strong>
+              <strong className="text-[var(--misty-text)]">Extension did not start</strong>
               <span>The panel bundle may be missing, outdated, or incompatible with this Misty version.</span>
               <div className="flex flex-wrap justify-center gap-2">
                 <button className={pluginTabHostStyles.button} type="button" onClick={() => setReloadKey((value) => value + 1)}><RefreshCcw size={13} />Retry</button>
                 <button className={pluginTabHostStyles.button} type="button" onClick={() => navigate("/extensions")}><ExternalLink size={13} />Manage Extension</button>
               </div>
-              <code className="max-w-full overflow-hidden text-ellipsis text-[10px] text-[#777]">{props.panel.webEntry}</code>
+              <code className="max-w-full overflow-hidden text-ellipsis text-[10px] text-[var(--misty-text-subtle)]">{props.panel.webEntry}</code>
             </>
           )}
         </div>
@@ -1053,47 +1026,6 @@ function ExplorerWebPluginPanelHost(props: { panel: PluginPanelEntry; selectedPa
       <iframe key={reloadKey} ref={iframeRef} className="h-full min-h-[420px] w-full border-0 bg-[var(--misty-bg)]" src={source} title={`${props.panel.title} extension`} sandbox="allow-scripts allow-same-origin" onLoad={beginHandshake} />
     </section>
   );
-}
-
-async function handleThemeWebCommand(command: string, payload: Record<string, unknown>) {
-  const store = useAppThemeStore.getState();
-  if (command === "themes.snapshot") return { ok: true, themeId: store.themeId, tokens: store.customTokens ?? readThemeTokens() };
-  if (command === "themes.applyPreset") {
-    if (!isMistyThemeId(payload.preset)) throw new Error("Unsupported theme preset.");
-    const root = document.documentElement;
-    root.dataset.theme = themeBaseMode(payload.preset);
-    root.dataset.mistyTheme = payload.preset;
-    root.style.colorScheme = themeBaseMode(payload.preset);
-    applyThemeTokenPreview(null);
-    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
-    return { ok: true, tokens: readThemeTokens() };
-  }
-  if (command === "themes.preview") {
-    const tokens = safeThemeTokens(payload.tokens);
-    if (!tokens) throw new Error("Theme tokens are invalid.");
-    applyThemeTokenPreview(tokens);
-    return { ok: true, tokens, message: "Preview updated. Apply to keep these colors." };
-  }
-  if (command === "themes.apply") {
-    if (!isMistyThemeId(payload.preset)) throw new Error("Unsupported theme preset.");
-    const tokens = safeThemeTokens(payload.tokens);
-    if (!tokens) throw new Error("Theme tokens are invalid.");
-    store.setThemeMode(themeBaseMode(payload.preset));
-    store.setThemeId(payload.preset);
-    store.setCustomTokens(tokens);
-    applyThemeTokenPreview(tokens);
-    return { ok: true, tokens, message: "Theme saved and applied across Misty." };
-  }
-  if (command === "themes.revert") {
-    const current = useAppThemeStore.getState();
-    const root = document.documentElement;
-    root.dataset.theme = current.resolvedTheme; root.dataset.mistyTheme = current.themeId;
-    root.style.colorScheme = current.resolvedTheme;
-    applyThemeTokenPreview(current.customTokens);
-    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
-    return { ok: true, tokens: current.customTokens ?? readThemeTokens(), message: "Reverted to the saved theme." };
-  }
-  throw new Error("Theme command is not allowlisted.");
 }
 
 function PluginPanelElementView(props: {

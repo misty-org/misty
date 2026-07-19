@@ -1,16 +1,11 @@
 import { useEffect, useId, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { Check, ChevronDown, Image as ImageIcon, Search, Upload, X, ZoomIn, ZoomOut } from "lucide-react";
+import { Check, ChevronDown, Grid2X2, Image as ImageIcon, List, Search, Upload, X } from "lucide-react";
 import type { LibraryItemQuery } from "../../../spaces/types";
 import { useBoundedFloating } from "../../../shared/hooks/useBoundedFloating";
 
-type PrimaryCollection = "recent" | "months" | "years" | "collections";
-type UtilityCollection = "recent" | "favorites" | "hidden" | "deleted";
-
 interface SpaceLibraryHeaderProps {
-  sectionNavigation: ReactNode;
-  collection: string;
-  onSelectCollection: (collection: PrimaryCollection) => void;
+  uploadAvailable: boolean;
   uploading: boolean;
   uploadDisabled: boolean;
   onUpload: () => void;
@@ -20,27 +15,14 @@ interface SpaceLibraryHeaderProps {
   onSearchBlur: () => void;
   mediaType: string;
   onMediaType: (value: string) => void;
-  onSelectUtility: (collection: UtilityCollection) => void;
   sort: NonNullable<LibraryItemQuery["sort"]>;
   direction: NonNullable<LibraryItemQuery["direction"]>;
   onSort: (sort: NonNullable<LibraryItemQuery["sort"]>, direction: NonNullable<LibraryItemQuery["direction"]>) => void;
   albumOrderAvailable: boolean;
-  gridSize: number;
-  squareGrid: boolean;
-  onSmallerGrid: () => void;
-  onLargerGrid: () => void;
-  onToggleSquareGrid: () => void;
+  viewMode: "grid" | "list";
+  onViewMode: (mode: "grid" | "list") => void;
   visibleItemCount: number;
-  selecting: boolean;
-  onToggleSelecting: () => void;
 }
-
-const primaryCollections: Array<{ id: PrimaryCollection; label: string }> = [
-  { id: "recent", label: "Recently Added" },
-  { id: "months", label: "Months" },
-  { id: "years", label: "Years" },
-  { id: "collections", label: "Collections" },
-];
 
 const mediaTypeOptions = [
   { value: "", label: "All media" },
@@ -61,13 +43,6 @@ const mediaTypeOptions = [
   { value: "spatial", label: "Spatial" },
 ];
 
-const utilityOptions = [
-  { value: "", label: "More" },
-  { value: "favorites", label: "Favorites" },
-  { value: "hidden", label: "Hidden" },
-  { value: "deleted", label: "Recently Deleted" },
-];
-
 const sortOptions = [
   { value: "recently-added:desc", label: "Newest added" },
   { value: "recently-added:asc", label: "Oldest added" },
@@ -80,39 +55,11 @@ const sortOptions = [
 ];
 
 export function SpaceLibraryHeader(props: SpaceLibraryHeaderProps) {
-  const utilityValue = ["favorites", "hidden", "deleted"].includes(props.collection) ? props.collection : "";
   const hasVisibleItems = props.visibleItemCount > 0;
 
   return (
-    <header className="shrink-0 border-b border-[var(--misty-border-soft)] bg-[var(--misty-bg)]">
-      <div className="flex min-h-[52px] items-center justify-end border-b border-[var(--misty-border-soft)] px-6 py-2">
-        {props.sectionNavigation}
-      </div>
-
-      <div className="px-6 py-3">
-        <div className="flex min-w-0 flex-wrap items-center gap-3">
-          <nav className="flex min-w-0 items-center gap-1 overflow-x-auto rounded-xl border border-[var(--misty-border-soft)] bg-[var(--misty-surface)] p-1" aria-label="Library collections">
-            {primaryCollections.map(({ id, label }) => (
-              <button
-                className={`min-h-9 shrink-0 whitespace-nowrap rounded-lg border px-3 text-xs font-medium transition-colors ${props.collection === id ? "border-[var(--misty-border-strong)] bg-[var(--misty-surface-3)] text-[var(--misty-text)] shadow-sm" : "border-transparent bg-transparent text-[var(--misty-text-muted)] hover:bg-[var(--misty-surface-2)] hover:text-[var(--misty-text)]"}`}
-                type="button"
-                key={id}
-                aria-current={props.collection === id ? "page" : undefined}
-                onClick={() => props.onSelectCollection(id)}
-              >
-                {label}
-              </button>
-            ))}
-          </nav>
-          {hasVisibleItems ? (
-            <button className="ml-auto inline-flex min-h-9 shrink-0 items-center gap-2 rounded-xl border-0 bg-[var(--misty-primary)] px-4 text-xs font-semibold text-[var(--misty-primary-contrast)] shadow-sm transition-colors hover:bg-[var(--misty-primary-hover)] disabled:opacity-45" type="button" disabled={props.uploadDisabled} onClick={props.onUpload}>
-              <Upload size={15} aria-hidden="true" />
-              {props.uploading ? "Uploading…" : "Upload files"}
-            </button>
-          ) : null}
-        </div>
-
-        <div className="mt-2.5 flex min-w-0 flex-wrap items-center gap-2.5">
+    <header className="shrink-0 border-b border-[var(--misty-divider-subtle)] bg-[var(--misty-app-page-bg,var(--misty-bg))]/80 backdrop-blur-xl">
+      <div className="flex min-w-0 flex-wrap items-center gap-2.5 px-5 py-3 sm:px-6">
           <label className="!flex h-9 min-w-[240px] flex-1 items-center gap-2.5 overflow-hidden rounded-xl border border-[var(--misty-border-strong)] bg-[var(--misty-surface-2)] px-3 text-[var(--misty-text-muted)] transition-colors focus-within:border-white/30 focus-within:ring-2 focus-within:ring-white/15">
             <Search size={15} aria-hidden="true" />
             <input className="!m-0 !h-full !min-h-0 min-w-0 flex-1 !rounded-none !border-0 !bg-transparent !p-0 !shadow-none text-sm leading-none text-[var(--misty-text)] outline-none placeholder:text-[var(--misty-text-subtle)]" value={props.searchInput} onChange={(event) => props.onSearchInput(event.target.value)} onFocus={props.onSearchFocus} onBlur={props.onSearchBlur} placeholder="Search this Space" aria-label="Search Library" />
@@ -121,23 +68,29 @@ export function SpaceLibraryHeader(props: SpaceLibraryHeaderProps) {
 
           <div className="flex min-w-0 flex-wrap items-center gap-2" aria-label="Library view controls">
             <MistyDropdown className="w-[150px]" label="Filter by media type" value={props.mediaType} options={mediaTypeOptions} onChange={props.onMediaType}/>
-            <MistyDropdown className="w-[140px]" label="Choose a Library utility" value={utilityValue} options={utilityOptions} onChange={(value) => props.onSelectUtility((value || "recent") as UtilityCollection)}/>
             {hasVisibleItems ? (
               <>
                 <MistyDropdown className="w-[160px]" label="Sort Library" value={`${props.sort}:${props.direction}`} options={props.albumOrderAvailable ? [{ value: "album-order:asc", label: "Album order" }, ...sortOptions] : sortOptions} onChange={(value) => { const [sort, direction] = value.split(":") as [NonNullable<LibraryItemQuery["sort"]>, NonNullable<LibraryItemQuery["direction"]>]; props.onSort(sort, direction); }}/>
-                <div className="flex h-9 shrink-0 items-center overflow-hidden rounded-xl border border-[var(--misty-border-strong)] bg-[var(--misty-surface-2)]" aria-label="Thumbnail size controls">
-                  <button className="grid size-9 place-items-center border-0 bg-transparent p-0 text-[var(--misty-text-muted)] hover:bg-[var(--misty-surface-3)] hover:text-[var(--misty-text)] disabled:opacity-30" type="button" disabled={props.gridSize <= 120} onClick={props.onSmallerGrid} aria-label="Show smaller Library thumbnails"><ZoomOut size={14}/></button>
-                  <button className="grid size-9 place-items-center border-0 border-l border-[var(--misty-border-soft)] bg-transparent p-0 text-[var(--misty-text-muted)] hover:bg-[var(--misty-surface-3)] hover:text-[var(--misty-text)] disabled:opacity-30" type="button" disabled={props.gridSize >= 300} onClick={props.onLargerGrid} aria-label="Show larger Library thumbnails"><ZoomIn size={14}/></button>
-                  <button className={`h-full border-0 border-l border-[var(--misty-border-soft)] px-2.5 text-[10px] font-semibold ${props.squareGrid ? "bg-[var(--misty-surface-3)] text-[var(--misty-text)]" : "bg-transparent text-[var(--misty-text-muted)] hover:bg-[var(--misty-surface-3)]"}`} type="button" onClick={props.onToggleSquareGrid} aria-pressed={props.squareGrid} aria-label="Toggle square Library thumbnails">1:1</button>
+                <div className="flex h-9 shrink-0 items-center overflow-hidden rounded-xl border border-[var(--misty-border-strong)] bg-[var(--misty-surface-2)]" aria-label="Library layout">
+                  <LibraryViewButton active={props.viewMode === "grid"} label="Grid view" onClick={() => props.onViewMode("grid")}><Grid2X2 size={14}/></LibraryViewButton>
+                  <LibraryViewButton active={props.viewMode === "list"} label="List view" onClick={() => props.onViewMode("list")} divided><List size={15}/></LibraryViewButton>
                 </div>
-                <button className="inline-flex h-9 shrink-0 items-center rounded-xl border border-[var(--misty-border-strong)] bg-[var(--misty-surface-2)] px-3 text-xs font-medium text-[var(--misty-text)] hover:bg-[var(--misty-surface-3)]" type="button" onClick={props.onToggleSelecting}>{props.selecting ? "Cancel" : "Select"}</button>
               </>
             ) : null}
           </div>
-        </div>
+          {hasVisibleItems && props.uploadAvailable ? (
+            <button className="inline-flex h-9 shrink-0 items-center gap-2 rounded-xl border-0 bg-[var(--misty-primary)] px-3.5 text-xs font-semibold text-[var(--misty-primary-contrast)] shadow-sm transition-colors hover:bg-[var(--misty-primary-hover)] disabled:opacity-45" type="button" disabled={props.uploadDisabled} onClick={props.onUpload}>
+              <Upload size={15} aria-hidden="true" />
+              {props.uploading ? "Uploading…" : "Upload files"}
+            </button>
+          ) : null}
       </div>
     </header>
   );
+}
+
+function LibraryViewButton(props: { active: boolean; divided?: boolean; label: string; onClick: () => void; children: ReactNode }) {
+  return <button className={`grid size-9 place-items-center border-0 ${props.divided ? "border-l border-[var(--misty-border-soft)]" : ""} ${props.active ? "bg-[var(--misty-neutral-selected-bg,var(--misty-surface-3))] text-[var(--misty-text)]" : "bg-transparent text-[var(--misty-text-muted)] hover:bg-[var(--misty-surface-3)] hover:text-[var(--misty-text)]"}`} type="button" onClick={props.onClick} aria-label={props.label} aria-pressed={props.active}>{props.children}</button>;
 }
 
 interface MistyDropdownProps {
@@ -231,6 +184,7 @@ function MistyDropdown(props: MistyDropdownProps) {
 interface SpaceLibraryEmptyStateProps {
   collection: string;
   searching?: boolean;
+  uploadAvailable: boolean;
   uploading: boolean;
   uploadDisabled: boolean;
   onUpload: () => void;
@@ -243,12 +197,14 @@ export function SpaceLibraryEmptyState(props: SpaceLibraryEmptyStateProps) {
   const detail = props.searching
     ? "Try a different search or clear your filters to see everything in this Space."
     : props.collection === "recent"
-      ? "Upload photos, videos, audio, and documents."
+      ? props.uploadAvailable
+        ? "Upload photos, videos, audio, and documents."
+        : "Items shared with this Space will appear here."
       : `Items added to ${label} will appear here.`;
 
   return (
     <div className="grid h-full min-h-[300px] place-items-center px-4 py-8">
-      <section className="grid w-full max-w-sm justify-items-center rounded-2xl border border-[var(--misty-border-soft)] bg-[var(--misty-surface)] px-7 py-7 text-center shadow-[0_12px_36px_rgba(0,0,0,0.12)]" aria-label={title}>
+      <section className="grid w-full max-w-sm justify-items-center rounded-2xl border border-[var(--misty-border-soft)] bg-[var(--misty-app-panel-bg,var(--misty-app-page-bg,var(--misty-bg)))] px-7 py-7 text-center shadow-[0_12px_36px_rgba(0,0,0,0.12)]" aria-label={title}>
         <span className="grid size-11 place-items-center rounded-xl border border-[var(--misty-border-soft)] bg-[var(--misty-surface-2)] text-[var(--misty-text-muted)]">
           {props.searching ? <Search size={19} aria-hidden="true" /> : <ImageIcon size={20} aria-hidden="true" />}
         </span>
@@ -256,7 +212,7 @@ export function SpaceLibraryEmptyState(props: SpaceLibraryEmptyStateProps) {
         <p className="mb-0 mt-1.5 max-w-xs text-sm leading-relaxed text-[var(--misty-text-muted)]">{detail}</p>
         <div className="mt-4.5 flex flex-wrap justify-center gap-2">
           {props.searching && props.onClearSearch ? <button className="inline-flex min-h-10 items-center rounded-xl border border-[var(--misty-border-strong)] bg-[var(--misty-surface-2)] px-4 text-xs font-medium text-[var(--misty-text)] hover:bg-[var(--misty-surface-3)]" type="button" onClick={props.onClearSearch}>Clear search</button> : null}
-          {!props.searching || props.collection === "recent" ? <button className="inline-flex min-h-10 items-center gap-2 rounded-xl border-0 bg-[var(--misty-primary)] px-4 text-xs font-semibold text-[var(--misty-primary-contrast)] hover:bg-[var(--misty-primary-hover)] disabled:opacity-45" type="button" disabled={props.uploadDisabled} onClick={props.onUpload}><Upload size={15}/>{props.uploading ? "Uploading…" : "Upload files"}</button> : null}
+          {props.uploadAvailable && (!props.searching || props.collection === "recent") ? <button className="inline-flex min-h-10 items-center gap-2 rounded-xl border-0 bg-[var(--misty-primary)] px-4 text-xs font-semibold text-[var(--misty-primary-contrast)] hover:bg-[var(--misty-primary-hover)] disabled:opacity-45" type="button" disabled={props.uploadDisabled} onClick={props.onUpload}><Upload size={15}/>{props.uploading ? "Uploading…" : "Upload files"}</button> : null}
         </div>
       </section>
     </div>

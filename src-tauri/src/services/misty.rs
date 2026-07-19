@@ -1,3 +1,4 @@
+use crate::services::paths;
 use aes_gcm::{
     aead::{Aead, KeyInit},
     Aes256Gcm, Nonce,
@@ -20,7 +21,7 @@ use std::{
 };
 use uuid::Uuid;
 use zip::ZipArchive;
-use crate::services::paths;
+
 #[derive(Debug, Serialize)]
 pub struct NativeSystemInfo {
     os: String,
@@ -77,7 +78,6 @@ struct LocalAccessClaims {
     iat: i64,
     exp: i64,
 }
-
 #[derive(Debug, Serialize, Clone)]
 pub struct PluginLink {
     label: String,

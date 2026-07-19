@@ -17,15 +17,15 @@ import { safeTauriAssetUrl } from "../../../shared/tauri";
 import { restoreBundledAssetOnError, runtimeAssetSource } from "../../../shared/assets/runtimeAsset";
 import { cx } from "./ExplorerDesktopShared";
 import { AgentSources } from "../../../agents/AgentSources";
+import { MikaDelegatedRunAction } from "./MikaDelegatedRunAction";
 import "../../../agents/sources.css";
-
 export const assistantPanelStyles = {
   mikaResizer:
     "absolute bottom-[22px] right-[var(--mika-panel-width,380px)] top-[46px] z-[21] w-[5px] cursor-col-resize bg-transparent after:absolute after:bottom-0 after:left-1/2 after:top-0 after:w-px after:-translate-x-1/2 after:bg-transparent after:content-[''] hover:after:bg-[var(--misty-neutral-hover-bg,var(--misty-surface-hover))] max-[720px]:hidden",
   mikaPanel:
     "absolute bottom-[22px] right-0 top-[46px] z-20 grid w-[min(var(--mika-panel-width,380px),calc(100%_-_48px))] min-h-0 min-w-0 grid-rows-[54px_minmax(0,1fr)] overflow-hidden border-l border-t border-[var(--misty-border-soft)] bg-[var(--misty-app-pane-bg,var(--misty-surface))] text-[#e2e2e2] shadow-[-18px_0_38px_rgba(0,0,0,0.42)] max-[720px]:top-[38px]",
   mikaBotPanel:
-    "fixed bottom-5 right-5 top-[48px] z-[2147482500] grid w-[min(440px,calc(100vw_-_112px))] min-h-0 min-w-0 grid-rows-[54px_minmax(0,1fr)] overflow-hidden rounded-2xl border border-[var(--misty-border-soft)] bg-[var(--misty-app-pane-bg,var(--misty-surface))] text-[#e2e2e2] shadow-[0_28px_90px_rgba(0,0,0,0.62)] max-[720px]:bottom-3 max-[720px]:right-3 max-[720px]:top-10 max-[720px]:w-[calc(100vw_-_88px)]",
+    "fixed bottom-5 right-5 top-[calc(var(--misty-window-titlebar-inset)+20px)] z-[2147482500] grid w-[min(440px,calc(100vw_-_112px))] min-h-0 min-w-0 grid-rows-[54px_minmax(0,1fr)] overflow-hidden rounded-2xl border border-[var(--misty-border-soft)] bg-[var(--misty-app-pane-bg,var(--misty-surface))] text-[#e2e2e2] shadow-[0_28px_90px_rgba(0,0,0,0.62)] max-[720px]:bottom-3 max-[720px]:right-3 max-[720px]:top-[calc(var(--misty-window-titlebar-inset)+12px)] max-[720px]:w-[calc(100vw_-_88px)]",
   mikaBotWindowPanel:
     "pointer-events-auto absolute bottom-[142px] left-2 right-2 top-2 z-20 grid min-h-0 min-w-0 grid-rows-[54px_minmax(0,1fr)] overflow-hidden rounded-[22px] border border-white/10 bg-[rgba(7,8,10,0.96)] text-[#e2e2e2] shadow-[0_28px_72px_rgba(0,0,0,0.58)] backdrop-blur-xl",
   mikaChatWindowPanel:
@@ -51,7 +51,7 @@ export const assistantPanelStyles = {
   contextPopover:
     "absolute right-3 top-[62px] z-30 grid w-[min(360px,calc(100vw_-_32px))] gap-3 rounded-xl border border-[#2c3036] bg-[rgba(9,10,12,0.98)] p-3.5 text-[#e2e2e2] shadow-[0_20px_54px_rgba(0,0,0,0.56)]",
   contextSection: "grid gap-1.5 border-b border-[#24262a] pb-3 last:border-b-0 last:pb-0",
-  contextLabel: "text-[11px] font-bold uppercase tracking-normal text-[#8e929a]",
+  contextLabel: "text-[11px] font-bold capitalize text-[#8e929a]",
   contextValueRow: "grid grid-cols-[22px_minmax(0,1fr)_34px] items-center gap-2",
   contextValueText: "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-sm font-semibold text-[#f1f1f1]",
   contextSubText: "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-xs text-[#8f939b]",
@@ -73,7 +73,7 @@ export const assistantPanelStyles = {
     "m-0 grid grid-cols-[24px_minmax(0,1fr)] items-start gap-3 rounded-xl border border-[#6f4f19] bg-[rgba(27,20,8,0.64)] px-4 py-3.5 text-sm font-medium leading-relaxed text-[#e8ded0] shadow-[0_0_28px_rgba(111,79,25,0.08)_inset]",
   betaIcon: "mt-0.5 text-[#efb33d]",
   detailLabel: "text-[#898989]",
-  mikaDetailLabel: "text-xs uppercase",
+  mikaDetailLabel: "text-xs capitalize",
   chatDetailValue:
     "m-0 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap",
   mikaDetailValue: "m-0 min-w-0 break-words",
@@ -105,14 +105,14 @@ export const assistantPanelStyles = {
   planTable:
     "w-full min-w-[760px] border-separate border-spacing-0 text-left text-xs",
   planTableHead:
-    "sticky top-0 z-[1] bg-[#151515] text-[11px] font-bold uppercase text-[#9f9f9f]",
+    "sticky top-0 z-[1] bg-[#151515] text-[11px] font-bold capitalize text-[#9f9f9f]",
   planTableHeaderCell:
     "border-b border-[#2f2f2f] px-3 py-2",
   planTableRow:
     "align-top text-[#d4d4d4] hover:bg-[var(--misty-neutral-hover-bg,var(--misty-surface-hover))]",
   planTableCell:
     "border-b border-[#242424] px-3 py-2.5 last:border-b-[#242424]",
-  planTableOperation: "font-bold uppercase text-[#f0f0f0]",
+  planTableOperation: "font-bold capitalize text-[#f0f0f0]",
   planTablePath: "min-w-0 break-words leading-normal text-[#d2d2d2]",
   planTableReason: "min-w-0 break-words leading-normal text-[#9f9f9f]",
   planWarningText: "m-0 text-xs leading-normal text-[#f0b3b3]",
@@ -129,7 +129,7 @@ export const assistantPanelStyles = {
   reviewSummaryBlock:
     "grid gap-1 rounded-lg border border-[#242529] bg-[#0d0f12] px-3.5 py-3",
   reviewSummaryLabel:
-    "text-[11px] font-bold uppercase text-[#8f8f8f]",
+    "text-[11px] font-bold capitalize text-[#8f8f8f]",
   reviewSummaryText:
     "m-0 min-w-0 break-words text-sm leading-normal text-[#d7d7d7]",
   reviewFooter:
@@ -167,7 +167,6 @@ function assistantStatusText(status: AiStatus | null): string {
 function assistantPlaceholder(configured: boolean, fallback: string): string {
   return configured ? fallback : "Configure Mika backend to continue";
 }
-
 function assistantMessageClass(role: string, density: "chat" | "mika"): string {
   return cx(
     assistantPanelStyles.message,
@@ -177,7 +176,6 @@ function assistantMessageClass(role: string, density: "chat" | "mika"): string {
     role === "error" && assistantPanelStyles.errorMessage,
   );
 }
-
 export const ExplorerChatOverlay = memo(function ExplorerChatOverlay() {
   const activePaneId = useMultiPanelStore((state) => state.activePaneId);
   const panes = useExplorerStore((state) => state.panes);
@@ -268,6 +266,7 @@ export const ExplorerChatOverlay = memo(function ExplorerChatOverlay() {
             <article key={message.id} className={assistantMessageClass(message.role, "chat")}>
               <strong className={assistantPanelStyles.messageTitle}>{message.role === "user" ? "You" : message.role === "tool" ? "Tool" : message.role === "error" ? "Error" : "Mika"}</strong>
               <pre className={assistantPanelStyles.messageText}>{message.text || (message.role === "assistant" && running ? "Thinking..." : "")}</pre>
+              <MikaDelegatedRunAction message={message} />
               {message.citations?.length ? <AgentSources citations={message.citations} compact /> : null}
               {message.creditsUsed !== undefined ? <small className="text-[10px] text-[#858993]">{message.creditsUsed} credits · {message.creditsRemaining?.toLocaleString() ?? 0} remaining</small> : null}
               {message.toolRequestId ? <AssistantToolActions requestId={message.toolRequestId} approvals={toolApprovals} onApprove={approveToolRequest} /> : null}
@@ -497,6 +496,7 @@ export const ExplorerMikaPanel = memo(function ExplorerMikaPanel(props: {
             <article key={message.id} className={assistantMessageClass(message.role, "mika")}>
               <strong className={assistantPanelStyles.messageTitle}>{message.role === "user" ? "You" : message.role === "tool" ? "Tool" : message.role === "error" ? "Error" : "Mika"}</strong>
               <pre className={assistantPanelStyles.messageText}>{message.text || (message.role === "assistant" && running ? "Thinking..." : "")}</pre>
+              <MikaDelegatedRunAction message={message} />
               {message.citations?.length ? <AgentSources citations={message.citations} compact /> : null}
               {message.creditsUsed !== undefined ? <small className="text-[10px] text-[#858993]">{message.creditsUsed} credits · {message.creditsRemaining?.toLocaleString() ?? 0} remaining</small> : null}
               {message.toolRequestId ? <AssistantToolActions requestId={message.toolRequestId} approvals={toolApprovals} onApprove={approveToolRequest} /> : null}
@@ -808,7 +808,7 @@ function SmartLibraryPreflightView(props: { library: ReturnType<typeof useSmartL
     </div>
     {preflight.skippedFullOriginalImages > 0 ? <SmartLibraryError text={`${preflight.skippedFullOriginalImages} cloud files were skipped because their provider would require downloading the full original. This pilot uploads previews or extracted metadata only.`} /> : null}
     <div className="grid gap-4 rounded-2xl border border-[#384a73] bg-[linear-gradient(145deg,rgba(31,45,78,.72),rgba(16,21,33,.72))] p-5 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
-      <div className="grid gap-2"><span className="text-xs font-bold uppercase tracking-[0.12em] text-[#91adff]">25-file trial allowance</span><strong className="text-lg">Try the sample before spending credits</strong><span className="text-sm leading-relaxed text-[#a7afbd]">{preflight.sampleAssetIds.length} files selected across subfolders, formats, and dates. {formatEstimate(props.estimate ?? preflight.estimate)}</span></div>
+      <div className="grid gap-2"><span className="text-xs font-bold capitalize text-[#91adff]">25-File Trial Allowance</span><strong className="text-lg">Try the sample before spending credits</strong><span className="text-sm leading-relaxed text-[#a7afbd]">{preflight.sampleAssetIds.length} files selected across subfolders, formats, and dates. {formatEstimate(props.estimate ?? preflight.estimate)}</span></div>
       <button className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-[#edf1f8] px-5 font-bold text-[#15181d] hover:bg-white disabled:opacity-50" type="button" disabled={preflight.sampleAssetIds.length === 0} onClick={() => void props.onTrySample()}><Sparkles size={18} />Try Sample</button>
     </div>
     <div className="flex items-start gap-3 rounded-xl border border-white/10 bg-white/[0.025] p-4 text-sm leading-relaxed text-[#8f96a1]"><ShieldAlert className="mt-0.5 shrink-0 text-[#a9bfff]" size={18} /><span>Misty sends opaque asset IDs plus EXIF-stripped 384–512px previews for visual files, or bounded extracted text and metadata for other supported files. Paths and originals remain in the device catalog. Analysis and index upgrades always require approval.</span></div>
@@ -838,7 +838,7 @@ function SmartLibraryAssetCard(props: { asset: SmartLibraryAsset; library: NonNu
   const source = visual && props.asset.sourceKind === "local" ? safeTauriAssetUrl(joinDevicePath(props.library.rootPath, props.asset.relativePath)) : null;
   const confidence = props.asset.confidence === null ? null : Math.round(props.asset.confidence * 100);
   return <article className="grid min-w-0 grid-rows-[190px_auto] overflow-hidden rounded-2xl border border-white/10 bg-[#101318] shadow-[0_10px_30px_rgba(0,0,0,.2)]">
-    <div className="relative overflow-hidden bg-[radial-gradient(circle_at_30%_20%,#29334a,#11141a)]">{source ? <img className="size-full object-cover" alt="" src={source} /> : <span className="grid size-full place-items-center gap-2 text-[#71809e]">{visual && props.asset.sourceKind === "cloud" ? <Cloud size={36} /> : <File size={36} />}<small className="font-bold uppercase tracking-[0.08em]">{props.asset.assetKind || props.asset.extension.replace(/^\./, "") || "file"}</small></span>}{confidence !== null ? <span className="absolute right-2 top-2 rounded-full bg-black/70 px-2 py-1 text-[10px] font-bold backdrop-blur">{confidence}% confidence</span> : null}</div>
+    <div className="relative overflow-hidden bg-[radial-gradient(circle_at_30%_20%,#29334a,#11141a)]">{source ? <img className="size-full object-cover" alt="" src={source} /> : <span className="grid size-full place-items-center gap-2 text-[#71809e]">{visual && props.asset.sourceKind === "cloud" ? <Cloud size={36} /> : <File size={36} />}<small className="font-bold capitalize">{props.asset.assetKind || props.asset.extension.replace(/^\./, "") || "file"}</small></span>}{confidence !== null ? <span className="absolute right-2 top-2 rounded-full bg-black/70 px-2 py-1 text-[10px] font-bold backdrop-blur">{confidence}% confidence</span> : null}</div>
     <div className="grid gap-3 p-4"><div className="min-w-0"><strong className="block truncate text-sm" title={props.asset.relativePath}>{props.asset.name}</strong><span className="mt-1 block line-clamp-3 text-xs leading-relaxed text-[#a0a7b2]">{props.asset.description || "No description generated."}</span></div>{props.asset.tags.length > 0 ? <div className="flex flex-wrap gap-1.5">{props.asset.tags.slice(0, 6).map((tag) => <span className="rounded-md bg-white/[0.06] px-2 py-1 text-[10px] font-semibold text-[#b9c0ca]" key={tag}>{tag}</span>)}</div> : null}{props.asset.collections.length > 0 ? <div className="flex items-center gap-2 text-[11px] font-bold text-[#91adff]"><Images size={13} /><span className="truncate">{props.asset.collections.join(" · ")}</span></div> : null}</div>
   </article>;
 }
@@ -993,7 +993,7 @@ function AssistantPlanReviewDialog(props: {
             {groupedOperations.map(([destination, operations]) => (
               <section className="grid gap-3 rounded-xl border border-white/10 bg-white/[0.025] p-4" key={destination}>
                 <header className="flex min-w-0 items-center justify-between gap-3 border-b border-white/10 pb-3">
-                  <div className="flex min-w-0 items-center gap-2.5"><span className="grid size-8 shrink-0 place-items-center rounded-lg bg-[#1c2433] text-[#9eb8f5]"><Folder size={16} /></span><div className="min-w-0"><span className="block text-[10px] font-bold uppercase tracking-[0.1em] text-[#7f8792]">Destination group</span><strong className="block truncate text-sm text-[#edf0f5]" title={destination}>{destination}</strong></div></div>
+                  <div className="flex min-w-0 items-center gap-2.5"><span className="grid size-8 shrink-0 place-items-center rounded-lg bg-[#1c2433] text-[#9eb8f5]"><Folder size={16} /></span><div className="min-w-0"><span className="block text-[10px] font-bold capitalize text-[#7f8792]">Destination Group</span><strong className="block truncate text-sm text-[#edf0f5]" title={destination}>{destination}</strong></div></div>
                   <span className="shrink-0 rounded-full bg-white/[0.06] px-2.5 py-1 text-[11px] font-bold text-[#abb2bd]">{operations.length} item{operations.length === 1 ? "" : "s"}</span>
                 </header>
                 <div className="grid gap-3">
@@ -1003,8 +1003,8 @@ function AssistantPlanReviewDialog(props: {
                     return <article className="grid min-w-0 grid-cols-[64px_minmax(0,1fr)] gap-4 rounded-xl border border-white/[0.07] bg-[#0c0f13] p-3" key={`${operation.type}-${index}-${planOperationDetail(operation)}`}>
                       <div className="grid size-16 place-items-center overflow-hidden rounded-xl bg-[#171b22] text-[#768092]">{preview ? <img alt="" className="size-full object-cover" src={preview} /> : operation.type === "mkdir" ? <Folder size={24} /> : <File size={23} />}</div>
                       <div className="grid min-w-0 gap-2.5">
-                        <div className="flex flex-wrap items-center gap-2"><span className="rounded-md bg-[#232a36] px-2 py-1 text-[10px] font-bold uppercase text-[#bdcae7]">{operation.type}</span>{typeof confidence === "number" ? <span className="text-[11px] font-semibold text-[#8e96a2]">{Math.round(confidence * 100)}% confidence</span> : null}</div>
-                        {operation.type === "mkdir" ? <div><span className="block text-[10px] font-bold uppercase text-[#747c88]">Create folder</span><span className="mt-1 block break-all text-xs leading-relaxed text-[#d6dae1]">{operation.path}</span></div> : <div className="grid gap-2 lg:grid-cols-2"><div className="min-w-0"><span className="block text-[10px] font-bold uppercase text-[#747c88]">From</span><span className="mt-1 block break-all text-xs leading-relaxed text-[#d6dae1]">{planOperationSource(operation)}</span></div><div className="min-w-0"><span className="block text-[10px] font-bold uppercase text-[#747c88]">To</span><span className="mt-1 block break-all text-xs leading-relaxed text-[#d6dae1]">{planOperationDestination(operation)}</span></div></div>}
+                        <div className="flex flex-wrap items-center gap-2"><span className="rounded-md bg-[#232a36] px-2 py-1 text-[10px] font-bold capitalize text-[#bdcae7]">{operation.type}</span>{typeof confidence === "number" ? <span className="text-[11px] font-semibold text-[#8e96a2]">{Math.round(confidence * 100)}% confidence</span> : null}</div>
+                        {operation.type === "mkdir" ? <div><span className="block text-[10px] font-bold capitalize text-[#747c88]">Create Folder</span><span className="mt-1 block break-all text-xs leading-relaxed text-[#d6dae1]">{operation.path}</span></div> : <div className="grid gap-2 lg:grid-cols-2"><div className="min-w-0"><span className="block text-[10px] font-bold capitalize text-[#747c88]">From</span><span className="mt-1 block break-all text-xs leading-relaxed text-[#d6dae1]">{planOperationSource(operation)}</span></div><div className="min-w-0"><span className="block text-[10px] font-bold capitalize text-[#747c88]">To</span><span className="mt-1 block break-all text-xs leading-relaxed text-[#d6dae1]">{planOperationDestination(operation)}</span></div></div>}
                         <p className="m-0 text-xs leading-relaxed text-[#9098a4]"><span className="font-bold text-[#b7bdc7]">Why: </span>{operation.reason || "No reason provided."}</p>
                       </div>
                     </article>;

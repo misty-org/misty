@@ -1,22 +1,22 @@
-import { Fragment, useEffect, useMemo, useRef, useState, type Dispatch, type FormEvent, type PointerEvent as ReactPointerEvent, type SetStateAction } from "react";
-import { Navigate, NavLink, Outlet, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { Fragment, createContext, useContext, useEffect, useMemo, useRef, useState, type Dispatch, type FormEvent, type MouseEvent as ReactMouseEvent, type RefObject, type SetStateAction } from "react";
+import { Navigate, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
+  Bot,
   Check,
+  ClipboardCopy,
   Copy,
   ChevronLeft,
   ChevronRight,
-  Download,
   EyeOff,
+  EllipsisVertical,
   File,
   Folder,
-  Grid3X3,
   History,
   Image as ImageIcon,
   BookOpenText as LibraryIcon,
   Music2,
   Map as MapIcon,
   MapPin,
-  List,
   MessageSquare,
   MessagesSquare,
   Paperclip,
@@ -46,163 +46,37 @@ import type { LucideIcon } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
 import { useAuth } from "../../auth/AuthContext";
 import { confirmAction } from "../../shared/confirmAction";
-import { useSpacesStore } from "../../stores/useSpacesStore";
+import { useDialogFocus } from "../../shared/hooks/useDialogFocus";
+import { buildMessageSpans, useSpacesStore } from "../../stores/useSpacesStore";
+import { mergeSpaceMessages } from "../../stores/spaceMessageSpans";
 import { useSetupStore } from "../../stores/useSetupStore";
 import { MistyFilePicker } from "../../components/MistyFilePicker/MistyFilePicker";
 import { SpaceRequestError, spacesApi } from "../../spaces/api";
-import type { BulkLibraryItemAction, BulkLibraryItemOptions, LibraryAlbum, LibraryAlbumFolder, LibraryAssetStack, LibraryDiscovery, LibraryDiscoveryGroup, LibraryEditDefinition, LibraryEditVersion, LibraryGroup, LibraryImportHistoryItem, LibraryIntelligencePolicy, LibraryItemQuery, LibraryMapPoint, LibraryMarkupElement, LibraryPerson, LibraryPinnedCollection, LibrarySearchFacets, LibrarySharedReference, MessageAttachment, MessageSpan, SpaceLibraryItem, SpaceMember, SpaceMessage, SpaceNode, SpaceStorageUsage, SpaceStudioResource } from "../../spaces/types";
+import type { BulkLibraryItemAction, BulkLibraryItemOptions, LibraryAlbum, LibraryAlbumFolder, LibraryAssetStack, LibraryDiscovery, LibraryDiscoveryGroup, LibraryEditDefinition, LibraryEditVersion, LibraryGroup, LibraryImportHistoryItem, LibraryIntelligencePolicy, LibraryItemQuery, LibraryMapPoint, LibraryPerson, LibraryPinnedCollection, LibrarySearchFacets, LibrarySharedReference, MessageAttachment, MessageSpan, SpaceLibraryItem, SpaceMember, SpaceMessage, SpaceNode, SpaceStorageUsage, SpaceStudioResource } from "../../spaces/types";
 import { MistyLibraryPicker } from "./components/MistyLibraryPicker";
 import { SpaceLibraryEmptyState, SpaceLibraryHeader } from "./components/SpaceLibraryChrome";
-import SpaceStudioPage, { type SpaceStudioKind } from "../Studio";
+import { LibraryItemContextMenu, type LibraryItemMenuState } from "./components/LibraryItemContextMenu";
+import type { SpaceStudioKind } from "../Studio";
+import { AgentConversationPanel } from "../Studio/AgentConversation";
 import { SpaceMembers } from "./components/SpaceMembers";
-import { SpaceSectionNavigation } from "./components/SpaceSectionNavigation";
+import { SpaceSettings } from "./components/SpaceSettings";
 import { compareLibraryItems, formatBytes, formatTime, libraryDateGroupLabel, libraryFacetPrefix } from "./libraryFormat";
-
+import { useSpaceConversationChat } from "./useSpaceConversationChat";
+import { EmbeddedUniversalPreview } from "../Files/components/GlobalPreview";
+import { libraryItemThumbnailEligible } from "./libraryThumbnail";
+import { GlobalImageEditor } from "../../components/GlobalImageEditor";
+import { AgentCenter } from "../Agents/AgentCenter";
+import { SpaceTasksCalendar } from "./SpaceTasksCalendar";
+import { copyBlobFilesToClipboard, copyLibraryItemsToClipboard } from "../../spaces/libraryClipboard";
+export { default, PersonalSpaceRedirect } from "./components/SpacesShell";
 type LibraryCollectionKind = "recent" | "months" | "years" | "recent-days" | "utility" | "collections" | "favorites" | "hidden" | "deleted" | "people" | "albums" | "groups" | "memory" | "trip" | "map" | "duplicate" | "shared" | "imports";
-
-type LibraryUploadJob = {
-  id: string;
-  path: string;
-  name: string;
-  stage: "queued" | "reading" | "hashing" | "uploading" | "finalizing" | "ready" | "failed";
-  progress: number;
-  error?: string;
-};
-
-export default function SpacesShell() {
-  const navigate = useNavigate();
-  const [createOpen, setCreateOpen] = useState(false);
-  const [createName, setCreateName] = useState("");
-  const [creating, setCreating] = useState(false);
-  const [renamingSpaceId, setRenamingSpaceId] = useState("");
-  const [renameName, setRenameName] = useState("");
-  const [renameSaving, setRenameSaving] = useState(false);
-  const { spaces, invitations, limits, loading, error, load, createSpace, renameSpace, respondInvite, clearError } = useSpacesStore(useShallow((state) => ({
-    spaces: state.spaces,
-    invitations: state.invitations,
-    limits: state.limits,
-    loading: state.loading,
-    error: state.error,
-    load: state.load,
-    createSpace: state.createSpace,
-    renameSpace: state.renameSpace,
-    respondInvite: state.respondInvite,
-    clearError: state.clearError,
-  })));
-
-  useEffect(() => { void load(); }, [load]);
-
-  const onCreate = async (event: FormEvent) => {
-    event.preventDefault();
-    const name = createName.trim();
-    if (!name || creating) return;
-    setCreating(true);
-    try {
-      const created = await createSpace(name);
-      setCreateName("");
-      setCreateOpen(false);
-      navigate(`/spaces/${encodeURIComponent(created.id)}/library`);
-    } catch { /* the dialog renders the store error */ }
-    finally { setCreating(false); }
-  };
-
-  const saveSpaceName = async (event: FormEvent) => {
-    event.preventDefault();
-    const name = renameName.trim();
-    const space = spaces.find((item) => item.id === renamingSpaceId);
-    if (!space || !name || name === space.name || renameSaving) return;
-    setRenameSaving(true);
-    try {
-      await renameSpace(space.id, name);
-      setRenamingSpaceId("");
-    } catch { /* the sidebar renders the store error */ }
-    finally { setRenameSaving(false); }
-  };
-
-  return (
-    <div className="grid h-full min-h-0 grid-cols-[232px_minmax(0,1fr)] overflow-hidden bg-[var(--misty-bg)] max-[900px]:grid-cols-[196px_minmax(0,1fr)]">
-      <aside className="min-h-0 overflow-auto border-r border-[var(--misty-border-soft)] bg-[var(--misty-surface)] px-3 py-5">
-        {error && !createOpen && !renamingSpaceId ? <button className="mb-3 w-full rounded-xl border border-red-400/20 bg-red-950/20 px-3 py-2 text-left text-[11px] leading-relaxed text-red-200" type="button" onClick={clearError}>{error}</button> : null}
-        <nav className="grid gap-1" aria-label="Spaces">
-          {spaces.map((space) => (
-            <div className="group relative" key={space.id}>
-              <NavLink className={spaceLinkClass} to={`/spaces/${encodeURIComponent(space.id)}/${space.is_personal ? "library" : "chat"}`}>
-                <span className="grid size-7 place-items-center rounded-lg bg-[var(--misty-surface-3)] text-[11px] font-bold">{space.name.slice(0, 2).toUpperCase()}</span>
-                <span className="min-w-0 flex-1 truncate">{space.name}</span>
-              </NavLink>
-              {space.role === "owner" ? <button className="invisible absolute right-2 top-1/2 grid size-7 -translate-y-1/2 place-items-center rounded-lg border-0 bg-[var(--misty-surface-3)] text-[var(--misty-text-muted)] hover:text-[var(--misty-text)] group-hover:visible focus:visible" type="button" onClick={() => { clearError(); setRenameName(space.name); setRenamingSpaceId(space.id); }} aria-label={`Rename ${space.name}`} title="Rename Space"><Pencil size={13}/></button> : null}
-            </div>
-          ))}
-          {loading && spaces.length === 0 ? <p className="px-2 py-3 text-xs text-[var(--misty-text-subtle)]">Loading Spaces…</p> : null}
-          <button className="mt-1 inline-flex min-h-10 w-full items-center gap-2 rounded-xl border border-dashed border-[var(--misty-border-strong)] bg-transparent px-2.5 text-left text-xs font-medium text-[var(--misty-text-muted)] transition-colors hover:border-white/30 hover:bg-[var(--misty-surface-2)] hover:text-[var(--misty-text)] disabled:cursor-not-allowed disabled:opacity-45" type="button" disabled={(limits?.remaining_owned ?? 1) === 0} onClick={() => { clearError(); setCreateOpen(true); }} title={(limits?.remaining_owned ?? 1) === 0 ? "You already own three Spaces" : "Add workspace"}>
-            <Plus size={15} aria-hidden="true"/><span>Add workspace</span>
-          </button>
-        </nav>
-        {invitations.length > 0 ? (
-          <section className="mt-5 border-t border-[var(--misty-border-soft)] pt-4">
-            <p className="mb-2 px-2 text-[10px] font-semibold uppercase tracking-[0.13em] text-[var(--misty-text-subtle)]">Invitations</p>
-            {invitations.map((invite) => (
-              <article key={invite.id} className="mb-2 rounded-xl bg-[var(--misty-surface-2)] p-2.5 text-xs">
-                <p className="m-0 truncate font-medium">{invite.space_name}</p>
-                <div className="mt-2 flex gap-1.5">
-                  <button className={smallButtonClass} type="button" onClick={() => void respondInvite(invite.id, true)}><Check size={13} />Accept</button>
-                  <button className={smallButtonClass} type="button" onClick={() => void respondInvite(invite.id, false)}>Decline</button>
-                </div>
-              </article>
-            ))}
-          </section>
-        ) : null}
-      </aside>
-      <main className="min-h-0 min-w-0 bg-[var(--misty-bg)]"><Outlet /></main>
-      {createOpen ? (
-        <div className="fixed inset-0 z-[2147483000] grid place-items-center bg-black/60 p-6" role="presentation" onMouseDown={(event) => { if (event.currentTarget === event.target && !creating) { clearError(); setCreateOpen(false); } }}>
-          <form className="w-full max-w-sm rounded-2xl border border-[var(--misty-border-strong)] bg-[var(--misty-modal-bg,var(--misty-surface))] p-5 shadow-2xl" onSubmit={(event) => void onCreate(event)}>
-            <div className="flex items-start justify-between gap-4">
-              <div><h2 className="m-0 text-base font-semibold">Create a Space</h2><p className="mb-0 mt-1 text-xs leading-relaxed text-[var(--misty-text-subtle)]">It starts private. You can own three Spaces total, including your personal Space.</p></div>
-              <button className={iconButtonClass} type="button" disabled={creating} onClick={() => { clearError(); setCreateOpen(false); }} aria-label="Close"><X size={15}/></button>
-            </div>
-            <label className="mt-5 grid gap-2 text-xs font-medium text-[var(--misty-text-muted)]">Space name<input className={inputClass} autoFocus maxLength={80} placeholder="Design team" value={createName} onChange={(event) => setCreateName(event.target.value)} /></label>
-            <p className="mb-0 mt-3 text-[11px] text-[var(--misty-text-subtle)]">{limits ? `${limits.owned} of ${limits.owned_limit} ownership slots used · ${limits.remaining_owned} remaining` : "Checking ownership slots…"}</p>
-            {error ? <p className="mb-0 mt-3 rounded-xl border border-red-400/20 bg-red-950/20 px-3 py-2 text-xs leading-relaxed text-red-200" role="alert">{error}</p> : null}
-            <div className="mt-5 flex justify-end gap-2"><button className={secondaryButtonClass} type="button" disabled={creating} onClick={() => { clearError(); setCreateOpen(false); }}>Cancel</button><button className={primaryButtonClass} type="submit" disabled={creating || !createName.trim()}>{creating ? "Creating…" : "Create Space"}</button></div>
-          </form>
-        </div>
-      ) : null}
-      {renamingSpaceId ? (
-        <div className="fixed inset-0 z-[2147483000] grid place-items-center bg-black/60 p-6" role="presentation" onMouseDown={(event) => { if (event.currentTarget === event.target && !renameSaving) { clearError(); setRenamingSpaceId(""); } }}>
-          <form className="w-full max-w-sm rounded-2xl border border-[var(--misty-border-strong)] bg-[var(--misty-modal-bg,var(--misty-surface))] p-5 shadow-2xl" onSubmit={(event) => void saveSpaceName(event)}>
-            <div className="flex items-start justify-between gap-4">
-              <h2 className="m-0 text-base font-semibold">Rename Space</h2>
-              <button className={iconButtonClass} type="button" disabled={renameSaving} onClick={() => { clearError(); setRenamingSpaceId(""); }} aria-label="Close"><X size={15}/></button>
-            </div>
-            <label className="mt-5 grid gap-2 text-xs font-medium text-[var(--misty-text-muted)]">Space name<input className={inputClass} autoFocus maxLength={80} value={renameName} onChange={(event) => setRenameName(event.target.value)} /></label>
-            {error ? <p className="mb-0 mt-3 rounded-xl border border-red-400/20 bg-red-950/20 px-3 py-2 text-xs leading-relaxed text-red-200" role="alert">{error}</p> : null}
-            <div className="mt-5 flex justify-end gap-2"><button className={secondaryButtonClass} type="button" disabled={renameSaving} onClick={() => { clearError(); setRenamingSpaceId(""); }}>Cancel</button><button className={primaryButtonClass} type="submit" disabled={renameSaving || !renameName.trim() || renameName.trim() === spaces.find((item) => item.id === renamingSpaceId)?.name}>{renameSaving ? "Renaming…" : "Rename"}</button></div>
-          </form>
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
-export function PersonalSpaceRedirect() {
-  const { spaces, loading, load } = useSpacesStore(useShallow((state) => ({ spaces: state.spaces, loading: state.loading, load: state.load })));
-  const personal = spaces.find((space) => space.is_personal);
-  const attemptedLoad = useRef(false);
-
-  useEffect(() => {
-    if (!personal && !loading && !attemptedLoad.current) {
-      attemptedLoad.current = true;
-      void load();
-    }
-  }, [load, loading, personal]);
-
-  if (personal) return <Navigate to={`/spaces/${encodeURIComponent(personal.id)}/library`} replace />;
-  return <div className="grid h-full place-items-center text-sm text-[var(--misty-text-muted)]">Loading your personal Space…</div>;
-}
-
+const libraryCollectionKinds = new Set<LibraryCollectionKind>(["recent", "months", "years", "recent-days", "utility", "collections", "favorites", "hidden", "deleted", "people", "albums", "groups", "memory", "trip", "map", "duplicate", "shared", "imports"]);
+const LibraryCanEditContext = createContext(true);
+type LibraryUploadJob = { id: string; path: string; name: string; stage: "queued" | "reading" | "hashing" | "uploading" | "finalizing" | "ready" | "failed"; progress: number; error?: string };
+type LibraryTextDialogState = { kind: "create-folder" | "rename-folder" | "create-group" | "rename-memory" | "rename-item" | "edit-tags"; title: string; primaryLabel: string; primaryValue: string; secondaryLabel?: string; secondaryValue?: string; itemId?: string };
 export function SpaceDetail() {
   const { spaceId = "", section = "chat", studioKind = "agents" } = useParams();
+  const [routeSearchParams] = useSearchParams();
   const { user } = useAuth();
   const navigate = useNavigate();
   const { spaces, loading, error, loadSpace, clearError } = useSpacesStore(useShallow((state) => ({
@@ -213,38 +87,40 @@ export function SpaceDetail() {
     clearError: state.clearError,
   })));
   const space = spaces.find((item) => item.id === spaceId);
-
   useEffect(() => { if (spaceId) void loadSpace(spaceId); }, [loadSpace, spaceId, user?.id]);
   useEffect(() => {
     if (section === "files") navigate(`/spaces/${encodeURIComponent(spaceId)}/library`, { replace: true });
   }, [navigate, section, spaceId]);
-
   if (!space && !loading) {
     return <div className="grid h-full place-items-center text-sm text-[var(--misty-text-muted)]">This Space is unavailable.</div>;
   }
-
   return (
     <div className="relative h-full min-h-0">
       {error ? <button className="absolute left-1/2 top-3 z-20 -translate-x-1/2 rounded-lg border border-red-400/30 bg-red-950/80 px-3 py-2 text-xs text-red-100" type="button" onClick={clearError}>{error}</button> : null}
-      {section === "library" || section === "files" ? <SpaceLibrary key={`library:${spaceId}`} spaceId={spaceId} section={section} /> : (
-        <div className="grid h-full min-h-0 grid-rows-[56px_minmax(0,1fr)]">
-          <div className="flex items-center justify-end border-b border-[var(--misty-border-soft)] px-6"><SpaceSectionNavigation spaceId={spaceId} section={section}/></div>
-          <div className="relative min-h-0">{section === "studio" ? <SpaceStudioPage key={`studio:${spaceId}:${studioKind}`} spaceId={spaceId} kind={normalizeStudioKind(studioKind)} /> : section === "members" ? <SpaceMembers key={`members:${spaceId}`} spaceId={spaceId} /> : <SpaceChat key={`chat:${spaceId}`} spaceId={spaceId} />}</div>
-        </div>
-      )}
+      {section === "library" || section === "files" ? space?.permissions?.["library.view"] === false ? <SpacePermissionDenied title="Library access required" detail="You do not have permission to view this Space's Library."/> : <SpaceLibrary key={`library:${spaceId}`} spaceId={spaceId} /> : <div className="relative h-full min-h-0">{section === "studio" ? <Navigate to={`/spaces/${encodeURIComponent(spaceId)}/agents/studio/${normalizeStudioKind(studioKind)}${routeSearchParams.size ? `?${routeSearchParams}` : ""}`} replace/> : section === "agents" ? space?.permissions?.["agents.run"] === false && space?.permissions?.["studio.view"] === false ? <SpacePermissionDenied title="Agent access required" detail="Ask a Space owner to grant Agent or Studio access."/> : <AgentCenter key={`agents:${spaceId}:${studioKind}`} spaceId={spaceId} spaceName={space?.name ?? "This Space"} canRun={space?.permissions?.["agents.run"] !== false} canViewStudio={space?.permissions?.["studio.view"] !== false}/> : section === "tasks" ? space?.permissions?.["tasks.view"] === false ? <SpacePermissionDenied title="Task access required" detail="Ask a Space owner to grant task access."/> : <SpaceTasksCalendar key={`tasks:${spaceId}`} spaceId={spaceId} canManage={space?.permissions?.["tasks.manage"] !== false} canManageIntegrations={space?.permissions?.["integrations.manage"] !== false}/> : section === "members" ? <SpaceMembers key={`members:${spaceId}`} spaceId={spaceId} /> : section === "settings" ? <SpaceSettings key={`settings:${spaceId}:${studioKind}`} spaceId={spaceId} section={studioKind}/> : space?.permissions?.["messages.read"] === false ? <div className="grid h-full place-items-center px-6 text-center"><section className="max-w-sm rounded-2xl border border-[var(--misty-border-soft)] bg-[var(--misty-app-panel-bg,var(--misty-app-page-bg,var(--misty-bg)))] p-6"><h2 className="m-0 text-base font-semibold">Chat access required</h2><p className="mb-0 mt-2 text-sm leading-relaxed text-[var(--misty-text-muted)]">You do not have permission to read this Space's messages.</p></section></div> : <SpaceChat key={`chat:${spaceId}`} spaceId={spaceId} />}</div>}
     </div>
   );
 }
-
-function normalizeStudioKind(value: string): SpaceStudioKind {
-  return value === "folder-agents" || value === "workflows" ? value : "agents";
+function SpacePermissionDenied({ title, detail }: { title: string; detail: string }) {
+  return <div className="grid h-full min-h-0 place-items-center px-6 text-center"><section className="max-w-sm rounded-2xl border border-[var(--misty-border-soft)] bg-[var(--misty-app-panel-bg,var(--misty-app-page-bg,var(--misty-bg)))] p-6"><h2 className="m-0 text-base font-semibold">{title}</h2><p className="mb-0 mt-2 text-sm leading-relaxed text-[var(--misty-text-muted)]">{detail}</p></section></div>;
 }
-
+function normalizeStudioKind(value: string): SpaceStudioKind { return value === "workflows" ? "workflows" : "agents"; }
+type ChatComposerSuggestion = { kind: "member"; id: string; label: string; detail: string } | { kind: "agent"; id: string; label: string; detail: string } | { kind: "library"; id: string; label: string; detail: string; item: SpaceLibraryItem };
 function SpaceChat({ spaceId }: { spaceId: string }) {
+  const navigate = useNavigate();
   const { user: authUser } = useAuth();
   const setupUser = useSetupStore((state) => state.status?.current_user ?? null);
   const user = authUser ?? setupUser;
+  const activeSpace = useSpacesStore((state) => state.spaces.find((space) => space.id === spaceId));
+  const permissions = activeSpace?.permissions;
+  const canWriteMessages = permissions?.["messages.write"] !== false;
+  const canUploadAttachments = canWriteMessages && permissions?.["attachments.upload"] !== false;
+  const canBrowseLibrary = canWriteMessages && permissions?.["library.view"] !== false;
+  const canRunAgents = canWriteMessages && permissions?.["agents.run"] !== false;
+  const canCopyLibrary = permissions?.["library.download"] !== false;
+  const canAddToLibrary = permissions?.["library.add"] !== false;
   const [searchParams] = useSearchParams();
+  const conversationId = searchParams.get("conversation") ?? "", agentId = searchParams.get("agentId") ?? "", agentConversationId = searchParams.get("agentConversationId") ?? "";
   const endRef = useRef<HTMLDivElement | null>(null);
   const [text, setText] = useState("");
   const [selectedFileIds, setSelectedFileIds] = useState<string[]>([]);
@@ -263,7 +139,8 @@ function SpaceChat({ spaceId }: { spaceId: string }) {
   const [editingMessageId, setEditingMessageId] = useState("");
   const [editingText, setEditingText] = useState("");
   const [editSaving, setEditSaving] = useState(false);
-  const { messagesBySpace, membersBySpace, agentsBySpace, nodesBySpace, sending, sendMessage, updateMessage, deleteMessage, markRead, loadMessages, loadStudio, openNode } = useSpacesStore(useShallow((state) => ({
+  const { conversations: groupConversations, messages: groupMessages, setMessages: setGroupMessages, loading: groupLoading, error: groupChatError, setError: setGroupChatError } = useSpaceConversationChat(spaceId, conversationId, permissions?.["messages.read"] !== false);
+  const { messagesBySpace, membersBySpace, agentsBySpace, nodesBySpace, sending, sendMessage, updateMessage, deleteMessage, markRead, loadMessages, loadChatAgents, openNode } = useSpacesStore(useShallow((state) => ({
     messagesBySpace: state.messagesBySpace,
     membersBySpace: state.membersBySpace,
     agentsBySpace: state.agentsBySpace,
@@ -274,12 +151,15 @@ function SpaceChat({ spaceId }: { spaceId: string }) {
     deleteMessage: state.deleteMessage,
     markRead: state.markRead,
     loadMessages: state.loadMessages,
-    loadStudio: state.loadStudio,
+    loadChatAgents: state.loadChatAgents,
     openNode: state.openNode,
   })));
-  const messages = messagesBySpace[spaceId] ?? emptyMessages;
-  const members = membersBySpace[spaceId] ?? emptyMembers;
+  const defaultMessages = messagesBySpace[spaceId] ?? emptyMessages;
+  const allMembers = membersBySpace[spaceId] ?? emptyMembers;
   const agents = agentsBySpace[spaceId] ?? emptyStudioResources;
+  const directAgent = agents.find((agent) => agent.id === agentId), activeConversation = groupConversations.find((conversation) => conversation.id === conversationId);
+  const allowedMemberIds = useMemo(() => new Set(activeConversation?.members.map((member) => member.user_id) ?? []), [activeConversation]), members = conversationId ? allMembers.filter((member) => allowedMemberIds.has(member.user_id)) : allMembers;
+  const messages = conversationId ? groupMessages : defaultMessages;
   const allNodes = nodesBySpace[spaceId] ?? emptyNodes;
   const nodes = useMemo(() => allNodes.filter((node) => node.kind === "link"), [allNodes]);
   const availableLibraryItems = useMemo(() => {
@@ -290,7 +170,17 @@ function SpaceChat({ spaceId }: { spaceId: string }) {
       return [item.display_name, item.file.original_filename, item.tags.join(" ")].join(" ").toLocaleLowerCase().includes(query);
     }).slice(0, 24);
   }, [libraryItems, libraryPickerQuery, selectedLibraryIds]);
-
+  const composerSuggestions = useMemo<ChatComposerSuggestion[]>(() => {
+    const query = libraryPickerQuery.trim().toLocaleLowerCase();
+    const mentionSuggestions: ChatComposerSuggestion[] = [
+      ...members.filter((member) => member.user_id !== user?.id).map((member) => ({ kind: "member" as const, id: member.user_id, label: member.name, detail: member.email })),
+      ...(canRunAgents ? agents.filter((agent) => agent.enabled).map((agent) => ({ kind: "agent" as const, id: agent.id, label: agent.name, detail: agent.description || "Shared Agent" })) : []),
+    ].filter((item) => !query || item.label.toLocaleLowerCase().includes(query) || item.detail.toLocaleLowerCase().includes(query));
+    const librarySuggestions: ChatComposerSuggestion[] = canBrowseLibrary && pendingAttachments.length + selectedLibraryIds.length < 5
+      ? availableLibraryItems.map((item) => ({ kind: "library" as const, id: item.id, label: item.display_name, detail: item.file.original_filename, item }))
+      : [];
+    return [...mentionSuggestions, ...librarySuggestions].slice(0, 24);
+  }, [agents, availableLibraryItems, canBrowseLibrary, canRunAgents, libraryPickerQuery, members, pendingAttachments.length, selectedLibraryIds.length, user?.id]);
   useEffect(() => {
     setText("");
     setSelectedFileIds([]);
@@ -302,35 +192,40 @@ function SpaceChat({ spaceId }: { spaceId: string }) {
     setReplyToMessageId("");
     setEditingMessageId("");
     setEditingText("");
-    void loadStudio(spaceId, "agents");
-    setLibraryPickerLoading(true);
-    setLibraryPickerError("");
-    void spacesApi.libraryItems(spaceId).then((result) => setLibraryItems(result.items)).catch((error: unknown) => {
+    if (canRunAgents) void loadChatAgents(spaceId);
+    if (permissions?.["library.view"] === false) {
       setLibraryItems([]);
-      setLibraryPickerError(error instanceof Error ? error.message : "Library items could not be loaded.");
-    }).finally(() => setLibraryPickerLoading(false));
-  }, [loadStudio, spaceId, user?.id]);
+      setLibraryPickerLoading(false);
+      setLibraryPickerError("");
+    } else {
+      setLibraryPickerLoading(true);
+      setLibraryPickerError("");
+      void spacesApi.libraryItems(spaceId).then((result) => setLibraryItems(result.items)).catch((error: unknown) => {
+        setLibraryItems([]);
+        setLibraryPickerError(error instanceof Error ? error.message : "Library items could not be loaded.");
+      }).finally(() => setLibraryPickerLoading(false));
+    }
+  }, [canRunAgents, loadChatAgents, permissions, spaceId, user?.id]);
   useEffect(() => {
     const messageId = searchParams.get("message");
     const target = messageId ? document.getElementById(`message-${messageId}`) : endRef.current;
     target?.scrollIntoView({ block: messageId ? "center" : "end" });
     const last = messages[messages.length - 1];
-    if (last) void markRead(spaceId, last.seq);
-  }, [markRead, messages, searchParams, spaceId]);
-
+    if (last && !conversationId) void markRead(spaceId, last.seq);
+  }, [conversationId, markRead, messages, searchParams, spaceId]);
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     const value = text.trim();
-    if (!value && pendingAttachments.length === 0 && selectedLibraryIds.length === 0) return;
+    if (!canWriteMessages || !value && pendingAttachments.length === 0 && selectedLibraryIds.length === 0) return;
     try {
-      await sendMessage(spaceId, value, selectedFileIds, pendingAttachments.map((item) => item.id), selectedLibraryIds, replyToMessageId);
+      if (conversationId) { const response = await spacesApi.sendConversationMessage(spaceId, conversationId, buildMessageSpans(value, members, agents), selectedFileIds, pendingAttachments.map((item) => item.id), selectedLibraryIds, replyToMessageId); setGroupMessages((current) => mergeSpaceMessages(current, [response.message, ...response.agent_replies])); }
+      else await sendMessage(spaceId, value, selectedFileIds, pendingAttachments.map((item) => item.id), selectedLibraryIds, replyToMessageId);
       setText(""); setSelectedFileIds([]); setSelectedLibraryIds([]); setPendingAttachments([]); setReplyToMessageId("");
       setLibraryPickerOpen(false);
-    } catch { /* store renders error */ }
+    } catch (reason) { if (conversationId) setGroupChatError(reason instanceof Error ? reason.message : "The group message could not be sent."); }
   };
-
   const uploadAttachments = async (paths: string[]) => {
-    if (paths.length === 0 || attachmentUploading) return;
+    if (!canUploadAttachments || paths.length === 0 || attachmentUploading) return;
     const available = Math.max(0, 5 - pendingAttachments.length - selectedLibraryIds.length);
     if (available === 0) return;
     setAttachmentUploading(true);
@@ -345,29 +240,34 @@ function SpaceChat({ spaceId }: { spaceId: string }) {
       setAttachmentUploading(false);
     }
   };
-
   const openLibraryPicker = (query = "") => {
+    if (!canWriteMessages) return;
     setLibraryPickerOpen(true);
     setLibraryPickerQuery(query);
     setLibraryPickerActiveIndex(0);
+    if (!canBrowseLibrary) {
+      setLibraryPickerLoading(false);
+      setLibraryPickerError("");
+      return;
+    }
     setLibraryPickerLoading(true);
     setLibraryPickerError("");
     void spacesApi.libraryItems(spaceId).then((result) => setLibraryItems(result.items)).catch((error: unknown) => {
       setLibraryPickerError(error instanceof Error ? error.message : "Library items could not be loaded.");
     }).finally(() => setLibraryPickerLoading(false));
   };
-
   const onComposerChange = (value: string) => {
+    if (!canWriteMessages) return;
     if (/(^|\s)@files\s*$/i.test(value)) {
       setText(value.replace(/(^|\s)@files\s*$/i, "$1"));
       setLibraryPickerOpen(false);
-      if (pendingAttachments.length + selectedLibraryIds.length < 5) setAttachmentPickerOpen(true);
+      if (canUploadAttachments && pendingAttachments.length + selectedLibraryIds.length < 5) setAttachmentPickerOpen(true);
       return;
     }
     if (/(^|\s)@library\s*$/i.test(value)) {
       setText(value.replace(/(^|\s)@library\s*$/i, "$1"));
       setLibraryPickerOpen(false);
-      setLibraryBrowserOpen(true);
+      if (canBrowseLibrary) setLibraryBrowserOpen(true);
       return;
     }
     setText(value);
@@ -383,37 +283,53 @@ function SpaceChat({ spaceId }: { spaceId: string }) {
       setLibraryPickerQuery("");
     }
   };
-
   const selectLibraryItem = (item: SpaceLibraryItem) => {
-    if (pendingAttachments.length + selectedLibraryIds.length >= 5) return;
+    if (!canBrowseLibrary || pendingAttachments.length + selectedLibraryIds.length >= 5) return;
     setSelectedLibraryIds((current) => current.includes(item.id) ? current : [...current, item.id]);
     setText((current) => current.replace(/(^|\s)@[^\s@]*$/, "$1"));
     setLibraryPickerOpen(false);
     setLibraryPickerQuery("");
   };
-
+  const selectComposerSuggestion = (suggestion: ChatComposerSuggestion) => {
+    if (suggestion.kind === "library") {
+      selectLibraryItem(suggestion.item);
+      return;
+    }
+    setText((current) => current.replace(/(^|\s)@[^\s@]*$/, `$1@${suggestion.label} `));
+    setLibraryPickerOpen(false);
+    setLibraryPickerQuery("");
+  };
   const beginEditing = (message: SpaceMessage) => {
+    if (!canWriteMessages) return;
     setEditingMessageId(message.id);
     setEditingText(message.content.map((span) => span.type === "text" ? span.text : `@${span.label}`).join(""));
   };
-
+  const cancelEditing = (messageId: string) => {
+    setEditingMessageId("");
+    setEditingText("");
+    window.setTimeout(() => {
+      document.querySelector<HTMLButtonElement>(`#message-${CSS.escape(messageId)} button[aria-label="Edit message"]`)?.focus();
+    }, 0);
+  };
   const saveEditedMessage = async (event: FormEvent, message: SpaceMessage) => {
     event.preventDefault();
     const value = editingText.trim();
-    if (!value || editSaving) return;
+    if (!canWriteMessages || !value || editSaving) return;
     setEditSaving(true);
     try {
-      await updateMessage(spaceId, message.id, value, message.file_node_ids);
-      setEditingMessageId("");
-      setEditingText("");
+      if (conversationId) { const saved = await spacesApi.updateConversationMessage(spaceId, conversationId, message.id, buildMessageSpans(value, members, agents), message.file_node_ids); setGroupMessages((current) => mergeSpaceMessages(current, [saved])); }
+      else await updateMessage(spaceId, message.id, value, message.file_node_ids);
+      cancelEditing(message.id);
     } catch { /* the page-level error renders the server response */ }
     finally { setEditSaving(false); }
   };
-
+  if (agentId) return directAgent ? <AgentConversationPanel agent={directAgent} conversationId={agentConversationId || undefined} embedded onClose={() => navigate(`/spaces/${encodeURIComponent(spaceId)}/chat`)}/> : <div className="grid h-full place-items-center px-6 text-center"><div><Bot className="mx-auto text-[var(--misty-text-subtle)]"/><h2 className="mb-1 mt-3 text-base">Agent chat unavailable</h2><p className="m-0 text-xs text-[var(--misty-text-subtle)]">This Space Agent is disabled, missing, or you no longer have permission to run it.</p></div></div>;
   return (
-    <div className="grid h-full min-h-0 grid-rows-[minmax(0,1fr)_auto]">
+    <div className={`grid h-full min-h-0 ${conversationId ? "grid-rows-[auto_minmax(0,1fr)_auto]" : "grid-rows-[minmax(0,1fr)_auto]"}`}>
+      {conversationId ? <header className="flex min-h-12 items-center justify-between border-b border-[var(--misty-divider-subtle)] px-6"><div className="min-w-0"><h2 className="m-0 truncate text-sm font-semibold">{activeConversation?.title ?? "Group chat"}</h2><p className="mb-0 mt-0.5 truncate text-[9px] text-[var(--misty-text-subtle)]">{activeConversation?.members.map((member) => member.user_id === user?.id ? "You" : member.name).join(", ") || "Selected Space members"}</p></div><span className="inline-flex items-center gap-1 rounded-full bg-violet-500/10 px-2 py-1 text-[9px] text-violet-200"><Users size={11}/>Group</span></header> : null}
       <div className="min-h-0 overflow-auto px-[clamp(24px,6vw,88px)] py-6">
-        {messages.length === 0 ? (
+        {groupChatError ? <div className="mb-4 rounded-xl border border-red-400/20 bg-red-950/20 px-3 py-2 text-xs text-red-200" role="alert">{groupChatError}</div> : null}
+        {groupLoading ? <div className="grid h-full place-items-center text-xs text-[var(--misty-text-subtle)]">Loading group chat…</div> : messages.length === 0 ? (
           <div className="grid h-full place-items-center text-center">
             <div><span className="mx-auto grid size-12 place-items-center rounded-2xl bg-[var(--misty-surface-2)]"><MessageSquare size={22} /></span><h3 className="mb-1 mt-3">Start the conversation</h3><p className="m-0 text-sm text-[var(--misty-text-subtle)]">Mention a teammate or shared Agent with @name.</p></div>
           </div>
@@ -421,65 +337,68 @@ function SpaceChat({ spaceId }: { spaceId: string }) {
           <article className="group mb-5 grid grid-cols-[40px_minmax(0,1fr)_auto] gap-3" id={`message-${message.id}`} key={message.id}>
             <span className="grid size-10 place-items-center rounded-full bg-[var(--misty-surface-3)] text-xs font-bold">{message.sender_kind === "agent" ? "AI" : message.sender_name.slice(0, 2).toUpperCase()}</span>
             <div className="min-w-0">
-              <div className="flex items-baseline gap-2"><strong className="text-sm">{message.sender_name}{message.sender_kind === "person" && message.sender_user_id === user?.id ? " (me)" : ""}</strong>{message.sender_kind === "agent" ? <span className="rounded bg-violet-500/15 px-1.5 py-0.5 text-[9px] font-semibold uppercase text-violet-300">Agent</span> : null}<time className="text-[10px] text-[var(--misty-text-subtle)]">{formatTime(message.created_at)}</time>{message.edited_at ? <span className="text-[10px] text-[var(--misty-text-subtle)]">Edited</span> : null}</div>
+              <div className="flex items-baseline gap-2"><strong className="text-sm">{message.sender_name}{message.sender_kind === "person" && message.sender_user_id === user?.id ? " (me)" : ""}</strong>{message.sender_kind === "agent" ? <span className="rounded bg-violet-500/15 px-1.5 py-0.5 text-[9px] font-semibold capitalize text-violet-300">Agent</span> : null}<time className="text-[10px] text-[var(--misty-text-subtle)]">{formatTime(message.created_at)}</time>{message.edited_at ? <span className="text-[10px] text-[var(--misty-text-subtle)]">Edited</span> : null}</div>
               {message.reply_to_message_id ? <button className="mt-1 block max-w-full truncate border-0 border-l-2 border-[var(--misty-primary)] bg-transparent pl-2 text-left text-[10px] text-[var(--misty-text-subtle)]" type="button" onClick={() => document.getElementById(`message-${message.reply_to_message_id}`)?.scrollIntoView({ block: "center" })}>Replying to {messages.find((item) => item.id === message.reply_to_message_id)?.sender_name ?? "a message"}</button> : null}
               {editingMessageId === message.id ? (
-                <form className="mt-2 rounded-xl border border-[var(--misty-border-strong)] bg-[var(--misty-surface)] p-2" onSubmit={(event) => void saveEditedMessage(event, message)}>
-                  <textarea className="min-h-[72px] w-full resize-y border-0 bg-transparent px-2 py-1 text-sm leading-relaxed text-[var(--misty-text)] outline-none" autoFocus maxLength={4000} value={editingText} onChange={(event) => setEditingText(event.target.value)} onKeyDown={(event) => { if (event.key === "Escape" && !editSaving) { setEditingMessageId(""); setEditingText(""); } }} aria-label="Edit message" />
-                  <div className="mt-1 flex justify-end gap-2"><button className={smallButtonClass} type="button" disabled={editSaving} onClick={() => { setEditingMessageId(""); setEditingText(""); }}>Cancel</button><button className={primaryButtonClass} type="submit" disabled={editSaving || !editingText.trim()}>{editSaving ? "Saving…" : "Save"}</button></div>
+                <form className="mt-2 rounded-xl border border-[var(--misty-border-strong)] bg-[var(--misty-app-panel-bg,var(--misty-app-page-bg,var(--misty-bg)))] p-2" onSubmit={(event) => void saveEditedMessage(event, message)}>
+                  <textarea className="min-h-[72px] w-full resize-y border-0 bg-transparent px-2 py-1 text-sm leading-relaxed text-[var(--misty-text)] outline-none" autoFocus maxLength={4000} value={editingText} onChange={(event) => setEditingText(event.target.value)} onKeyDown={(event) => { if (event.key === "Escape" && !editSaving) cancelEditing(message.id); }} aria-label="Edit message" />
+                  <div className="mt-1 flex justify-end gap-2"><button className={smallButtonClass} type="button" disabled={editSaving} onClick={() => cancelEditing(message.id)}>Cancel</button><button className={primaryButtonClass} type="submit" disabled={editSaving || !editingText.trim()}>{editSaving ? "Saving…" : "Save"}</button></div>
                 </form>
               ) : <p className="m-0 mt-1 whitespace-pre-wrap text-sm leading-relaxed text-[var(--misty-text-muted)]">{message.content.map((span, index) => <MessageContent key={index} span={span} />)}</p>}
               {message.file_node_ids.length > 0 ? <div className="mt-2 flex flex-wrap gap-1.5">{message.file_node_ids.map((nodeId) => { const node = nodes.find((item) => item.id === nodeId); return <button className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--misty-border-soft)] bg-[var(--misty-surface-2)] px-2 py-1 text-[10px] text-sky-200" type="button" key={nodeId} onClick={() => void openNode(spaceId, nodeId)}><Paperclip size={11}/>{node?.display_name ?? "Drive file"}</button>; })}</div> : null}
-              {(message.library_item_ids?.length ?? 0) > 0 ? <div className="mt-2 flex flex-wrap gap-1.5">{message.library_item_ids?.map((itemId) => { const item = libraryItems.find((candidate) => candidate.id === itemId); return <button className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--misty-border-soft)] bg-violet-500/10 px-2 py-1 text-[10px] text-violet-200" type="button" key={itemId} disabled={!item} onClick={() => item && void spacesApi.downloadLibraryItem(spaceId, item.id, item.display_name)}><LibraryIcon size={11}/>{item?.display_name ?? "Unavailable Library item"}</button>; })}</div> : null}
-              {(message.attachments?.length ?? 0) > 0 ? <div className="mt-2 flex flex-wrap gap-1.5">{message.attachments?.map((attachment) => <span className="inline-flex items-center gap-1 rounded-lg border border-[var(--misty-border-soft)] bg-[var(--misty-surface-2)] p-1 pl-2 text-[10px]" key={attachment.id}><Paperclip size={11}/><button className="border-0 bg-transparent text-sky-200" type="button" onClick={() => void spacesApi.downloadAttachment(spaceId, attachment.id, attachment.display_name)}>{attachment.display_name}</button>{attachment.promoted_item_id ? <span className="px-1 text-[9px] text-emerald-300">In Library</span> : <button className="rounded-md border-0 bg-[var(--misty-surface-3)] px-1.5 py-0.5 text-[9px] text-[var(--misty-text-muted)]" type="button" onClick={() => void spacesApi.promoteAttachment(spaceId, attachment.id).then((item) => { setLibraryItems((current) => [...current.filter((candidate) => candidate.id !== item.id), item]); void loadMessages(spaceId); })}>Add to Library</button>}</span>)}</div> : null}
+              {(message.library_item_ids?.length ?? 0) > 0 ? <div className="mt-2 flex flex-wrap gap-1.5">{message.library_item_ids?.map((itemId) => { const item = libraryItems.find((candidate) => candidate.id === itemId); return <button className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--misty-border-soft)] bg-violet-500/10 px-2 py-1 text-[10px] text-violet-200 disabled:cursor-not-allowed disabled:opacity-55" type="button" key={itemId} disabled={!item || !canCopyLibrary} title={canCopyLibrary ? "Copy to clipboard" : "Copy permission required"} onClick={() => { if (item && canCopyLibrary) void copyLibraryItemsToClipboard(spaceId, [item]).catch((error) => setGroupChatError(error instanceof Error ? error.message : "The Library item could not be copied.")); }}><LibraryIcon size={11}/>{item?.display_name ?? "Unavailable Library item"}</button>; })}</div> : null}
+              {(message.attachments?.length ?? 0) > 0 ? <div className="mt-2 flex flex-wrap gap-1.5">{message.attachments?.map((attachment) => <span className="inline-flex items-center gap-1 rounded-lg border border-[var(--misty-border-soft)] bg-[var(--misty-surface-2)] p-1 pl-2 text-[10px]" key={attachment.id}><Paperclip size={11}/><button className="border-0 bg-transparent text-sky-200" type="button" onClick={() => void spacesApi.downloadAttachment(spaceId, attachment.id, attachment.display_name)}>{attachment.display_name}</button>{attachment.promoted_item_id ? <span className="px-1 text-[9px] text-emerald-300">In Library</span> : canAddToLibrary ? <button className="rounded-md border-0 bg-[var(--misty-surface-3)] px-1.5 py-0.5 text-[9px] text-[var(--misty-text-muted)]" type="button" onClick={() => void spacesApi.promoteAttachment(spaceId, attachment.id).then((item) => { setLibraryItems((current) => [...current.filter((candidate) => candidate.id !== item.id), item]); void loadMessages(spaceId); })}>Add to Library</button> : null}</span>)}</div> : null}
             </div>
-            <div className="flex gap-1"><button className="invisible grid size-7 place-items-center rounded-lg border-0 bg-transparent text-[var(--misty-text-subtle)] hover:bg-[var(--misty-surface-2)] group-hover:visible focus:visible" type="button" onClick={() => setReplyToMessageId(message.id)} aria-label="Reply" title="Reply"><Reply size={14}/></button>{message.sender_kind === "person" && message.sender_user_id === user?.id ? <button className="invisible grid size-7 place-items-center rounded-lg border-0 bg-transparent text-[var(--misty-text-subtle)] hover:bg-[var(--misty-surface-2)] group-hover:visible focus:visible" type="button" onClick={() => beginEditing(message)} aria-label="Edit message" title="Edit message"><Pencil size={14}/></button> : null}{(message.sender_user_id === user?.id || useSpacesStore.getState().spaces.find((item) => item.id === spaceId)?.role === "owner") ? <button className="invisible grid size-7 place-items-center rounded-lg border-0 bg-transparent text-[var(--misty-text-subtle)] hover:bg-[var(--misty-surface-2)] group-hover:visible focus:visible" type="button" onClick={() => void confirmAction("Remove this message?").then((confirmed) => { if (confirmed) return deleteMessage(spaceId, message.id); })} aria-label="Remove message" title="Remove message"><Trash2 size={14} /></button> : null}</div>
+            {canWriteMessages ? <div className="pointer-events-none flex gap-1 opacity-0 transition-opacity duration-150 group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100"><button className={messageActionButtonClass} type="button" onClick={() => setReplyToMessageId(message.id)} aria-label="Reply" title="Reply"><Reply size={14}/></button>{message.sender_kind === "person" && message.sender_user_id === user?.id ? <button className={messageActionButtonClass} type="button" onClick={() => beginEditing(message)} aria-label="Edit message" title="Edit message"><Pencil size={14}/></button> : null}{(message.sender_user_id === user?.id || activeSpace?.role === "owner") ? <button className={messageActionButtonClass} type="button" onClick={() => void confirmAction("Remove this message?").then(async (confirmed) => { if (!confirmed) return; if (conversationId) { await spacesApi.deleteConversationMessage(spaceId, conversationId, message.id); setGroupMessages((current) => current.filter((item) => item.id !== message.id)); } else await deleteMessage(spaceId, message.id); })} aria-label="Remove message" title="Remove message"><Trash2 size={14} /></button> : null}</div> : null}
           </article>
         ))}
         <div ref={endRef} />
       </div>
-      <form className="relative mx-[clamp(20px,5vw,72px)] mb-5 rounded-2xl border border-[var(--misty-border-strong)] bg-[var(--misty-surface)] p-2" onSubmit={(event) => void submit(event)}>
-        {replyToMessageId ? <div className="mx-2 mt-1 flex items-center justify-between rounded-lg border-l-2 border-[var(--misty-primary)] bg-[var(--misty-surface-2)] px-3 py-1.5 text-[10px] text-[var(--misty-text-muted)]"><span>Replying to {messages.find((item) => item.id === replyToMessageId)?.sender_name ?? "message"}</span><button className="border-0 bg-transparent text-[var(--misty-text-subtle)]" type="button" onClick={() => setReplyToMessageId("")}><X size={12}/></button></div> : null}
-        <textarea className="min-h-[54px] w-full resize-none border-0 bg-transparent px-3 py-2 text-sm text-[var(--misty-text)] outline-none" maxLength={4000} placeholder="Message this Space — type @ to add from Library" value={text} onChange={(event) => onComposerChange(event.target.value)} onKeyDown={(event) => {
-          if (libraryPickerOpen && event.key === "ArrowDown") { event.preventDefault(); setLibraryPickerActiveIndex((current) => Math.min(current + 1, Math.max(0, availableLibraryItems.length - 1))); return; }
+      {canWriteMessages ? <form className="relative mx-[clamp(20px,5vw,72px)] mb-5 rounded-2xl border border-[var(--misty-border-strong)] bg-[var(--misty-app-panel-bg,var(--misty-app-page-bg,var(--misty-bg)))] p-2" onSubmit={(event) => void submit(event)}>
+        {replyToMessageId ? <div className="mx-2 mt-1 flex items-center justify-between rounded-lg border-l-2 border-[var(--misty-primary)] bg-[var(--misty-surface-2)] px-3 py-1.5 text-[10px] text-[var(--misty-text-muted)]"><span>Replying to {messages.find((item) => item.id === replyToMessageId)?.sender_name ?? "message"}</span><button className="border-0 bg-transparent text-[var(--misty-text-subtle)]" type="button" onClick={() => setReplyToMessageId("")} aria-label="Cancel reply" title="Cancel reply"><X size={12}/></button></div> : null}
+        <textarea className="min-h-[54px] w-full resize-none border-0 bg-transparent px-3 py-2 text-sm text-[var(--misty-text)] outline-none" aria-label={conversationId ? "Message this group" : "Message this Space"} maxLength={4000} placeholder={conversationId ? "Message this group — type @ to mention or add" : "Message this Space — type @ to mention or add"} value={text} onChange={(event) => onComposerChange(event.target.value)} onKeyDown={(event) => {
+          if (libraryPickerOpen && event.key === "ArrowDown") { event.preventDefault(); setLibraryPickerActiveIndex((current) => Math.min(current + 1, Math.max(0, composerSuggestions.length - 1))); return; }
           if (libraryPickerOpen && event.key === "ArrowUp") { event.preventDefault(); setLibraryPickerActiveIndex((current) => Math.max(0, current - 1)); return; }
           if (libraryPickerOpen && event.key === "Escape") { event.preventDefault(); setLibraryPickerOpen(false); return; }
-          if (libraryPickerOpen && event.key === "Enter" && !event.shiftKey) { event.preventDefault(); const selected = availableLibraryItems[libraryPickerActiveIndex]; if (selected) selectLibraryItem(selected); return; }
+          if (libraryPickerOpen && event.key === "Enter" && !event.shiftKey) { event.preventDefault(); const selected = composerSuggestions[libraryPickerActiveIndex]; if (selected) selectComposerSuggestion(selected); return; }
           if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); event.currentTarget.form?.requestSubmit(); }
         }} />
         <div className="flex items-center justify-between gap-3 px-2 pb-1">
           <div className="flex min-w-0 items-center gap-1 overflow-auto">
-            <button className="grid size-7 shrink-0 place-items-center rounded-lg border-0 bg-[var(--misty-surface-2)] text-[var(--misty-text-muted)]" type="button" disabled={attachmentUploading || pendingAttachments.length + selectedLibraryIds.length >= 5} onClick={() => setAttachmentPickerOpen(true)} title="Attach files with Misty's picker"><Paperclip size={13}/></button>
-            <button className="grid size-7 shrink-0 place-items-center rounded-lg border-0 bg-[var(--misty-surface-2)] text-[var(--misty-text-muted)]" type="button" onClick={() => { setLibraryPickerOpen(false); setLibraryBrowserOpen(true); }} title="Browse this Space's Library"><LibraryIcon size={13}/></button>
-            {[...members.filter((member) => member.user_id !== user?.id), ...agents].slice(0, 6).map((item) => <button className="whitespace-nowrap rounded-md border-0 bg-[var(--misty-surface-2)] px-2 py-1 text-[10px] text-[var(--misty-text-muted)]" type="button" key={"user_id" in item ? item.user_id : item.id} onClick={() => setText((current) => `${current}${current && !current.endsWith(" ") ? " " : ""}@${item.name} `)}>@{item.name}</button>)}
+            {canUploadAttachments ? <button className="grid size-7 shrink-0 place-items-center rounded-lg border-0 bg-[var(--misty-surface-2)] text-[var(--misty-text-muted)]" type="button" disabled={attachmentUploading || pendingAttachments.length + selectedLibraryIds.length >= 5} onClick={() => setAttachmentPickerOpen(true)} aria-label="Attach files" title="Attach files with Misty's picker"><Paperclip size={13}/></button> : null}
+            {canBrowseLibrary ? <button className="grid size-7 shrink-0 place-items-center rounded-lg border-0 bg-[var(--misty-surface-2)] text-[var(--misty-text-muted)]" type="button" onClick={() => { setLibraryPickerOpen(false); setLibraryBrowserOpen(true); }} aria-label="Browse Space Library" title="Browse this Space's Library"><LibraryIcon size={13}/></button> : null}
+            {[...members.filter((member) => member.user_id !== user?.id), ...(canRunAgents ? agents.filter((agent) => agent.enabled) : [])].slice(0, 6).map((item) => <button className="whitespace-nowrap rounded-md border-0 bg-[var(--misty-surface-2)] px-2 py-1 text-[10px] text-[var(--misty-text-muted)]" type="button" key={"user_id" in item ? item.user_id : item.id} onClick={() => setText((current) => `${current}${current && !current.endsWith(" ") ? " " : ""}@${item.name} `)}>@{item.name}</button>)}
           </div>
-          <button className="grid size-8 shrink-0 place-items-center rounded-xl border-0 bg-[var(--misty-primary)] text-[var(--misty-primary-contrast)] disabled:opacity-50" disabled={sending || (!text.trim() && pendingAttachments.length === 0 && selectedLibraryIds.length === 0)} type="submit"><Send size={15} /></button>
+          <button className="grid size-8 shrink-0 place-items-center rounded-xl border-0 bg-[var(--misty-primary)] text-[var(--misty-primary-contrast)] disabled:opacity-50" disabled={sending || (!text.trim() && pendingAttachments.length === 0 && selectedLibraryIds.length === 0)} type="submit" aria-label="Send message" title="Send message"><Send size={15} /></button>
         </div>
-        {libraryPickerOpen ? <div className="absolute bottom-[calc(100%+8px)] left-0 z-30 flex max-h-[min(420px,55vh)] w-full flex-col overflow-hidden rounded-2xl border border-[var(--misty-border-strong)] bg-[var(--misty-surface)] shadow-2xl" role="listbox" aria-label="Add a Library item">
-          <div className="border-b border-[var(--misty-border-soft)] px-4 py-3"><p className="m-0 text-[10px] font-semibold uppercase tracking-wide text-[var(--misty-text-subtle)]">Add from Library</p>{libraryPickerQuery && libraryPickerQuery !== "library" ? <p className="mb-0 mt-1 truncate text-xs text-[var(--misty-text-muted)]">Matching “{libraryPickerQuery}”</p> : null}</div>
+        {libraryPickerOpen ? <div className="absolute bottom-[calc(100%+8px)] left-0 z-30 flex max-h-[min(420px,55vh)] w-full flex-col overflow-hidden rounded-2xl border border-[var(--misty-border-strong)] bg-[var(--misty-app-panel-bg,var(--misty-app-page-bg,var(--misty-bg)))] shadow-2xl" role="listbox" aria-label="Mention or add to message">
+          <div className="border-b border-[var(--misty-border-soft)] px-4 py-3"><p className="m-0 text-[10px] font-semibold capitalize text-[var(--misty-text-subtle)]">Mention Or Add</p>{libraryPickerQuery ? <p className="mb-0 mt-1 truncate text-xs text-[var(--misty-text-muted)]">Matching “{libraryPickerQuery}”</p> : null}</div>
           <div className="overflow-y-auto p-1.5">
-            <button className="mb-1 flex w-full items-center gap-3 rounded-xl border-0 bg-transparent px-3 py-2.5 text-left text-sm text-[var(--misty-text)] hover:bg-[var(--misty-surface-2)]" type="button" onClick={() => { setLibraryPickerOpen(false); setLibraryBrowserOpen(true); }}><span className="grid size-8 shrink-0 place-items-center rounded-lg bg-[var(--misty-surface-2)]"><LibraryIcon size={15}/></span><span><span className="block font-medium">Browse Library</span><span className="mt-0.5 block text-[10px] text-[var(--misty-text-subtle)]">Search, filter, and select multiple items</span></span></button>
-            <button className="mb-1 flex w-full items-center gap-3 rounded-xl border-0 bg-transparent px-3 py-2.5 text-left text-sm text-[var(--misty-text)] hover:bg-[var(--misty-surface-2)] disabled:opacity-40" type="button" disabled={attachmentUploading || pendingAttachments.length + selectedLibraryIds.length >= 5} onClick={() => { setLibraryPickerOpen(false); setAttachmentPickerOpen(true); }}><span className="grid size-8 shrink-0 place-items-center rounded-lg bg-[var(--misty-surface-2)]"><Paperclip size={15}/></span><span><span className="block font-medium">Upload files</span><span className="mt-0.5 block text-[10px] text-[var(--misty-text-subtle)]">Choose with Misty’s file picker</span></span></button>
-            <p className="mb-1 mt-2 px-3 text-[10px] font-semibold uppercase tracking-wide text-[var(--misty-text-subtle)]">Library items</p>
-            {libraryPickerLoading ? <p className="m-0 px-3 py-3 text-xs text-[var(--misty-text-subtle)]">Loading Library…</p> : libraryPickerError ? <div className="px-3 py-3"><p className="m-0 text-xs text-red-200">{libraryPickerError}</p><button className={`${smallButtonClass} mt-2`} type="button" onClick={() => openLibraryPicker(libraryPickerQuery)}>Retry</button></div> : libraryItems.length === 0 ? <p className="m-0 px-3 py-3 text-xs text-[var(--misty-text-subtle)]">No Library items available.</p> : availableLibraryItems.length === 0 ? <p className="m-0 px-3 py-3 text-xs text-[var(--misty-text-subtle)]">No matching Library items.</p> : availableLibraryItems.map((item, itemIndex) => <button className={`flex w-full items-center gap-3 rounded-xl border-0 px-3 py-2.5 text-left text-sm ${itemIndex === libraryPickerActiveIndex ? "bg-[var(--misty-surface-2)] text-[var(--misty-text)]" : "bg-transparent text-[var(--misty-text-muted)] hover:bg-[var(--misty-surface-2)]"}`} type="button" role="option" aria-selected={itemIndex === libraryPickerActiveIndex} key={item.id} onMouseEnter={() => setLibraryPickerActiveIndex(itemIndex)} onClick={() => selectLibraryItem(item)}><span className="grid size-9 shrink-0 place-items-center overflow-hidden rounded-lg bg-[var(--misty-surface-2)]"><LibraryItemThumbnail spaceId={spaceId} item={item}/></span><span className="min-w-0"><span className="block truncate font-medium">{item.display_name}</span><span className="mt-0.5 block truncate text-[10px] text-[var(--misty-text-subtle)]">{item.file.original_filename}</span></span></button>)}
+            {canBrowseLibrary ? <button className="mb-1 flex w-full items-center gap-3 rounded-xl border-0 bg-transparent px-3 py-2.5 text-left text-sm text-[var(--misty-text)] hover:bg-[var(--misty-surface-2)] disabled:opacity-40" type="button" disabled={pendingAttachments.length + selectedLibraryIds.length >= 5} onClick={() => { setLibraryPickerOpen(false); setLibraryBrowserOpen(true); }}><span className="grid size-8 shrink-0 place-items-center rounded-lg bg-[var(--misty-surface-2)]"><LibraryIcon size={15}/></span><span><span className="block font-medium">Browse Library</span><span className="mt-0.5 block text-[10px] text-[var(--misty-text-subtle)]">Search, filter, and select multiple items</span></span></button> : null}
+            {canUploadAttachments ? <button className="mb-1 flex w-full items-center gap-3 rounded-xl border-0 bg-transparent px-3 py-2.5 text-left text-sm text-[var(--misty-text)] hover:bg-[var(--misty-surface-2)] disabled:opacity-40" type="button" disabled={attachmentUploading || pendingAttachments.length + selectedLibraryIds.length >= 5} onClick={() => { setLibraryPickerOpen(false); setAttachmentPickerOpen(true); }}><span className="grid size-8 shrink-0 place-items-center rounded-lg bg-[var(--misty-surface-2)]"><Paperclip size={15}/></span><span><span className="block font-medium">Upload files</span><span className="mt-0.5 block text-[10px] text-[var(--misty-text-subtle)]">Choose with Misty’s file picker</span></span></button> : null}
+            {composerSuggestions.length > 0 ? <><p className="mb-1 mt-2 px-3 text-[10px] font-semibold capitalize text-[var(--misty-text-subtle)]">Suggestions</p>{composerSuggestions.map((suggestion, suggestionIndex) => <button className={`flex w-full items-center gap-3 rounded-xl border-0 px-3 py-2.5 text-left text-sm ${suggestionIndex === libraryPickerActiveIndex ? "bg-[var(--misty-surface-2)] text-[var(--misty-text)]" : "bg-transparent text-[var(--misty-text-muted)] hover:bg-[var(--misty-surface-2)]"}`} type="button" role="option" aria-selected={suggestionIndex === libraryPickerActiveIndex} key={`${suggestion.kind}:${suggestion.id}`} onMouseEnter={() => setLibraryPickerActiveIndex(suggestionIndex)} onClick={() => selectComposerSuggestion(suggestion)}><span className="grid size-9 shrink-0 place-items-center overflow-hidden rounded-lg bg-[var(--misty-surface-2)]">{suggestion.kind === "member" ? <Users size={15}/> : suggestion.kind === "agent" ? <Sparkles size={15}/> : <LibraryItemThumbnail spaceId={spaceId} item={suggestion.item}/>}</span><span className="min-w-0"><span className="block truncate font-medium">{suggestion.label}</span><span className="mt-0.5 block truncate text-[10px] text-[var(--misty-text-subtle)]">{suggestion.kind === "member" ? `Person · ${suggestion.detail}` : suggestion.kind === "agent" ? `Agent · ${suggestion.detail}` : `Library · ${suggestion.detail}`}</span></span></button>)}</> : !libraryPickerLoading && !libraryPickerError ? <p className="m-0 px-3 py-3 text-xs text-[var(--misty-text-subtle)]">No matching people, Agents, or Library items.</p> : null}
+            {canBrowseLibrary && libraryPickerLoading ? <p className="m-0 px-3 py-3 text-xs text-[var(--misty-text-subtle)]">Loading Library…</p> : canBrowseLibrary && libraryPickerError ? <div className="px-3 py-3"><p className="m-0 text-xs text-red-200">Library: {libraryPickerError}</p><button className={`${smallButtonClass} mt-2`} type="button" onClick={() => openLibraryPicker(libraryPickerQuery)}>Retry</button></div> : null}
           </div>
         </div> : null}
         {pendingAttachments.length > 0 || selectedLibraryIds.length > 0 ? <div className="flex flex-wrap gap-1 px-2 pb-1">{pendingAttachments.map((attachment) => <button className="rounded-md border-0 bg-sky-500/10 px-2 py-1 text-[9px] text-sky-200" type="button" key={attachment.id} onClick={() => setPendingAttachments((current) => current.filter((item) => item.id !== attachment.id))}>{attachment.display_name} ×</button>)}{selectedLibraryIds.map((id) => <button className="rounded-md border-0 bg-violet-500/10 px-2 py-1 text-[9px] text-violet-200" type="button" key={id} onClick={() => setSelectedLibraryIds((current) => current.filter((item) => item !== id))}>@library {libraryItems.find((item) => item.id === id)?.display_name ?? "item"} ×</button>)}</div> : null}
-      </form>
-      {libraryBrowserOpen ? <MistyLibraryPicker spaceId={spaceId} selectedIds={selectedLibraryIds} maximumSelected={Math.max(0, 5 - pendingAttachments.length)} onCancel={() => setLibraryBrowserOpen(false)} onChoose={(itemIds) => { setSelectedLibraryIds(itemIds); setLibraryBrowserOpen(false); }}/> : null}
-      {attachmentPickerOpen ? <MistyFilePicker mode="file" multiple title="Attach files to this chat" onCancel={() => setAttachmentPickerOpen(false)} onSelect={(path) => { setAttachmentPickerOpen(false); void uploadAttachments([path]); }} onSelectMany={(paths) => { setAttachmentPickerOpen(false); void uploadAttachments(paths); }}/> : null}
+      </form> : <div className="mx-[clamp(20px,5vw,72px)] mb-5 rounded-2xl border border-[var(--misty-border-soft)] bg-[var(--misty-app-panel-bg,var(--misty-app-page-bg,var(--misty-bg)))] px-4 py-3 text-center text-xs text-[var(--misty-text-muted)]" role="status">You can read this conversation, but you do not have permission to send messages.</div>}
+      {canBrowseLibrary && libraryBrowserOpen ? <MistyLibraryPicker spaceId={spaceId} selectedIds={selectedLibraryIds} maximumSelected={Math.max(0, 5 - pendingAttachments.length)} onCancel={() => setLibraryBrowserOpen(false)} onChoose={(itemIds) => { setSelectedLibraryIds(itemIds); setLibraryBrowserOpen(false); }}/> : null}
+      {canUploadAttachments && attachmentPickerOpen ? <MistyFilePicker mode="file" multiple title="Attach files to this chat" onCancel={() => setAttachmentPickerOpen(false)} onSelect={(path) => { setAttachmentPickerOpen(false); void uploadAttachments([path]); }} onSelectMany={(paths) => { setAttachmentPickerOpen(false); void uploadAttachments(paths); }}/> : null}
     </div>
   );
 }
 
-function MessageContent({ span }: { span: MessageSpan }) {
-  if (span.type === "text") return <>{span.text}</>;
-  return <span className="rounded bg-violet-500/15 px-1 py-0.5 font-medium text-violet-300">@{span.label}</span>;
-}
+function MessageContent({ span }: { span: MessageSpan }) { return span.type === "text" ? <>{span.text}</> : <span className="rounded bg-violet-500/15 px-1 py-0.5 font-medium text-violet-300">@{span.label}</span>; }
 
-function SpaceLibrary({ spaceId, section }: { spaceId: string; section: string }) {
+function SpaceLibrary({ spaceId }: { spaceId: string }) {
+  const [librarySearchParams, setLibrarySearchParams] = useSearchParams();
+  const requestedCollection = librarySearchParams.get("collection");
+  const requestedCollectionId = librarySearchParams.get("collectionId") ?? "";
   const activeSpace = useSpacesStore((state) => state.spaces.find((space) => space.id === spaceId));
-  const availableSpaces = useSpacesStore((state) => state.spaces);
+  const permissions = activeSpace?.permissions;
+  const canUploadLibrary = permissions?.["library.upload"] !== false;
+  const canEditLibrary = permissions?.["library.edit"] !== false;
+  const canCopyLibrary = permissions?.["library.download"] !== false;
   const [items, setItems] = useState<SpaceLibraryItem[]>([]);
   const [visibleItems, setVisibleItems] = useState<SpaceLibraryItem[]>([]);
   const [usage, setUsage] = useState<SpaceStorageUsage | null>(null);
@@ -504,8 +423,7 @@ function SpaceLibrary({ spaceId, section }: { spaceId: string; section: string }
   const [memoryPlaybackOpen, setMemoryPlaybackOpen] = useState(false);
   const [memoryAudioItems, setMemoryAudioItems] = useState<SpaceLibraryItem[]>([]);
   const [mediaType, setMediaType] = useState<"" | NonNullable<LibraryItemQuery["media_type"]>>("");
-  const [gridSize, setGridSize] = useState(180);
-  const [squareGrid, setSquareGrid] = useState(false);
+  const [libraryViewMode, setLibraryViewMode] = useState<"grid" | "list">("grid");
   const [sort, setSort] = useState<NonNullable<LibraryItemQuery["sort"]>>("recently-added");
   const [direction, setDirection] = useState<NonNullable<LibraryItemQuery["direction"]>>("desc");
   const [reloadKey, setReloadKey] = useState(0);
@@ -516,15 +434,15 @@ function SpaceLibrary({ spaceId, section }: { spaceId: string; section: string }
   const [filePickerOpen, setFilePickerOpen] = useState(false);
   const [localError, setLocalError] = useState("");
   const [selectedItemId, setSelectedItemId] = useState("");
-  const [selecting, setSelecting] = useState(false);
+  const libraryViewerTriggerRef = useRef<HTMLElement | null>(null);
   const [selectedItemIds, setSelectedItemIds] = useState<string[]>([]);
+  const [itemMenu, setItemMenu] = useState<LibraryItemMenuState | null>(null);
   const [bulkSaving, setBulkSaving] = useState(false);
   const [copiedEditDefinition, setCopiedEditDefinition] = useState<LibraryEditDefinition | null>(null);
-  const [sensitiveGrants, setSensitiveGrants] = useState<Partial<Record<"hidden" | "recently_deleted" | "bulk_export", { token: string; expiresAt: string }>>>({});
-  const [unlockScope, setUnlockScope] = useState<"" | "hidden" | "recently_deleted" | "bulk_export">("");
+  const [sensitiveGrants, setSensitiveGrants] = useState<Partial<Record<"hidden" | "recently_deleted", { token: string; expiresAt: string }>>>({});
+  const [unlockScope, setUnlockScope] = useState<"" | "hidden" | "recently_deleted">("");
   const [unlockPassword, setUnlockPassword] = useState("");
   const [unlockSaving, setUnlockSaving] = useState(false);
-  const [unlockForExport, setUnlockForExport] = useState(false);
   const [metadataDialogAction, setMetadataDialogAction] = useState<"" | "add_tags" | "remove_tags" | "set_date" | "set_location">("");
   const [metadataTags, setMetadataTags] = useState("");
   const [metadataDate, setMetadataDate] = useState("");
@@ -542,6 +460,15 @@ function SpaceLibrary({ spaceId, section }: { spaceId: string; section: string }
   const [personKind, setPersonKind] = useState<"person" | "pet">("person");
   const [personCoverItemId, setPersonCoverItemId] = useState("");
   const [personSaving, setPersonSaving] = useState(false);
+  const [textDialog, setTextDialog] = useState<LibraryTextDialogState | null>(null);
+  const [textDialogSaving, setTextDialogSaving] = useState(false);
+  const [textDialogError, setTextDialogError] = useState("");
+  const libraryDialogTriggerRef = useRef<HTMLElement | null>(null);
+  const albumDialogFocus = useDialogFocus<HTMLFormElement>(Boolean(albumDialogMode), libraryDialogTriggerRef);
+  const personDialogFocus = useDialogFocus<HTMLFormElement>(Boolean(personDialogMode), libraryDialogTriggerRef);
+  const metadataDialogFocus = useDialogFocus<HTMLFormElement>(Boolean(metadataDialogAction), libraryDialogTriggerRef);
+  const textDialogFocus = useDialogFocus<HTMLFormElement>(Boolean(textDialog), libraryDialogTriggerRef);
+  const unlockDialogFocus = useDialogFocus<HTMLFormElement>(Boolean(unlockScope), libraryDialogTriggerRef);
   const hiddenStackMemberIDs = useMemo(() => new Set(assetStacks.flatMap((stack) => stack.members.filter((member) => member.item_id !== stack.cover_item_id).map((member) => member.item_id))), [assetStacks]);
   const displayItems = useMemo(() => visibleItems.filter((item) => !hiddenStackMemberIDs.has(item.id)), [hiddenStackMemberIDs, visibleItems]);
   const stackByItemID = useMemo(() => new Map(assetStacks.flatMap((stack) => stack.members.map((member) => [member.item_id, stack] as const))), [assetStacks]);
@@ -555,16 +482,60 @@ function SpaceLibrary({ spaceId, section }: { spaceId: string; section: string }
   const currentDiscoveryGroup = useMemo(() => collection === "memory" ? discovery.memories.find((group) => group.id === selectedCollectionId) ?? null : collection === "trip" ? discovery.trips.find((group) => group.id === selectedCollectionId) ?? null : collection === "duplicate" ? discovery.duplicates.find((group) => group.id === selectedCollectionId) ?? null : null, [collection, discovery, selectedCollectionId]);
   const currentDateGroup = useMemo(() => collection === "recent-days" ? discovery.recent_days.find((group) => group.id === selectedCollectionId) ?? null : collection === "months" ? discovery.months.find((group) => group.id === selectedCollectionId) ?? null : collection === "years" ? discovery.years.find((group) => group.id === selectedCollectionId) ?? null : null, [collection, discovery.months, discovery.recent_days, discovery.years, selectedCollectionId]);
   const currentMapPoint = useMemo(() => collection === "map" && selectedCollectionId ? discovery.map_points.find((point) => point.id === selectedCollectionId) ?? null : null, [collection, discovery.map_points, selectedCollectionId]);
-  const canReorderAlbum = Boolean(currentAlbum && currentAlbum.sort_mode === "custom" && sort === "album-order" && !searchQuery && !mediaType && currentAlbum.item_count === visibleItems.length);
+  const canReorderAlbum = Boolean(canEditLibrary && currentAlbum && currentAlbum.sort_mode === "custom" && sort === "album-order" && !searchQuery && !mediaType && currentAlbum.item_count === visibleItems.length);
   const sensitiveCollectionScope = collection === "hidden" ? "hidden" : collection === "deleted" ? "recently_deleted" : "";
   const sensitiveCollectionToken = sensitiveCollectionScope ? activeSensitiveGrant(sensitiveGrants[sensitiveCollectionScope]) : "";
+  const rememberLibraryDialogTrigger = () => {
+    libraryDialogTriggerRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  };
+  const closeSensitiveUnlock = () => {
+    if (unlockSaving) return;
+    setUnlockScope("");
+    setUnlockPassword("");
+    setLocalError("");
+  };
+  const showTextDialog = (dialog: LibraryTextDialogState) => {
+    rememberLibraryDialogTrigger();
+    setTextDialogError("");
+    setTextDialog(dialog);
+  };
 
   useEffect(() => {
     setSensitiveGrants({});
     setUnlockScope("");
     setUnlockPassword("");
-    setUnlockForExport(false);
   }, [spaceId]);
+
+  useEffect(() => {
+    const handleLibraryEvent = (event: Event) => {
+      const detail = (event as CustomEvent<{ space_id?: string }>).detail;
+      if (detail?.space_id === spaceId) setReloadKey((current) => current + 1);
+    };
+    window.addEventListener("misty:space-library-event", handleLibraryEvent);
+    return () => window.removeEventListener("misty:space-library-event", handleLibraryEvent);
+  }, [spaceId]);
+
+  useEffect(() => {
+    if (!textDialog) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !textDialogSaving) setTextDialog(null);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [textDialog, textDialogSaving]);
+
+  useEffect(() => {
+    if (!albumDialogMode && !personDialogMode && !metadataDialogAction && !unlockScope) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      if (albumDialogMode && !albumSaving) setAlbumDialogMode("");
+      else if (personDialogMode && !personSaving) setPersonDialogMode("");
+      else if (metadataDialogAction && !bulkSaving) setMetadataDialogAction("");
+      else if (unlockScope && !unlockSaving) closeSensitiveUnlock();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [albumDialogMode, albumSaving, bulkSaving, metadataDialogAction, personDialogMode, personSaving, unlockSaving, unlockScope]);
 
   useEffect(() => {
     const expirations = Object.values(sensitiveGrants).map((grant) => grant?.expiresAt ? Date.parse(grant.expiresAt) : Number.NaN).filter(Number.isFinite);
@@ -692,7 +663,6 @@ function SpaceLibrary({ spaceId, section }: { spaceId: string; section: string }
 
   useEffect(() => {
     setSelectedItemIds([]);
-    setSelecting(false);
   }, [collection, mediaType, searchQuery, selectedCollectionId, sort, direction, spaceId]);
 
   const reload = async () => {
@@ -728,7 +698,7 @@ function SpaceLibrary({ spaceId, section }: { spaceId: string; section: string }
   };
 
   const uploadFiles = async (paths: string[]) => {
-    if (paths.length === 0) return;
+    if (!canUploadLibrary || paths.length === 0) return;
     setLocalError("");
     const jobs = paths.map((path, index): LibraryUploadJob => ({
       id: `${Date.now()}-${index}-${Math.random().toString(36).slice(2)}`,
@@ -765,6 +735,7 @@ function SpaceLibrary({ spaceId, section }: { spaceId: string; section: string }
   };
 
   const createSelectedAssetStack = async (kind: LibraryAssetStack["kind"]) => {
+    if (!canEditLibrary) return;
     const input = buildLibraryAssetStack(kind, selectedItems);
     if (!input) {
       setLocalError(kind === "live_photo" ? "Select one image and one video to make a Live Photo." : kind === "raw_pair" ? "Select one RAW file and one rendered image to make a RAW pair." : "Select at least two images to make a burst.");
@@ -775,7 +746,6 @@ function SpaceLibrary({ spaceId, section }: { spaceId: string; section: string }
     try {
       await spacesApi.createLibraryAssetStack(spaceId, input, sensitiveCollectionToken);
       setSelectedItemIds([]);
-      setSelecting(false);
       await reload();
     } catch (error) {
       setLocalError(error instanceof Error ? error.message : "The selected files could not be grouped.");
@@ -785,13 +755,12 @@ function SpaceLibrary({ spaceId, section }: { spaceId: string; section: string }
   };
 
   const duplicateItems = async (itemIDs: string[]) => {
-    if (itemIDs.length === 0 || bulkSaving) return;
+    if (!canEditLibrary || !canCopyLibrary || itemIDs.length === 0 || bulkSaving) return;
     setBulkSaving(true);
     setLocalError("");
     try {
       await spacesApi.duplicateLibraryItems(spaceId, itemIDs, sensitiveCollectionToken);
       setSelectedItemIds([]);
-      setSelecting(false);
       await reload();
     } catch (error) {
       setLocalError(error instanceof Error ? error.message : "The selected Library items could not be duplicated.");
@@ -800,8 +769,49 @@ function SpaceLibrary({ spaceId, section }: { spaceId: string; section: string }
     }
   };
 
+  const copyItemsToClipboard = async (itemsToCopy: SpaceLibraryItem[]) => {
+    if (!canCopyLibrary || itemsToCopy.length === 0 || bulkSaving) return;
+    setBulkSaving(true);
+    setLocalError("");
+    try {
+      await copyLibraryItemsToClipboard(spaceId, itemsToCopy, sensitiveCollectionToken);
+      setSelectedItemIds([]);
+    } catch (error) {
+      setLocalError(error instanceof Error ? error.message : "The selected Library items could not be copied.");
+    } finally {
+      setBulkSaving(false);
+    }
+  };
+
+  const copySharedReferenceToClipboard = async (reference: LibrarySharedReference) => {
+    if (!canCopyLibrary || bulkSaving) return;
+    setBulkSaving(true);
+    setLocalError("");
+    try {
+      const blob = await spacesApi.sharedReferenceContent(spaceId, reference.id);
+      await copyBlobFilesToClipboard([{ name: reference.display_name, blob }]);
+    } catch (error) {
+      setLocalError(error instanceof Error ? error.message : "The shared Library item could not be copied.");
+    } finally {
+      setBulkSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!canCopyLibrary || selectedItems.length === 0 || selectedItemId) return;
+    const copySelection = (event: KeyboardEvent) => {
+      if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== "c") return;
+      const target = event.target as HTMLElement | null;
+      if (target?.matches("input, textarea, select, [contenteditable='true']")) return;
+      event.preventDefault();
+      void copyItemsToClipboard(selectedItems);
+    };
+    window.addEventListener("keydown", copySelection);
+    return () => window.removeEventListener("keydown", copySelection);
+  }, [canCopyLibrary, selectedItemId, selectedItems]);
+
   const pasteEdits = async () => {
-    if (!copiedEditDefinition || selectedItems.length === 0 || bulkSaving) return;
+    if (!canEditLibrary || !copiedEditDefinition || selectedItems.length === 0 || bulkSaving) return;
     const editableItems = selectedItems.filter((item) => /^(image|video)\//.test(libraryItemMIME(item)));
     if (editableItems.length === 0) {
       setLocalError("Select images or videos to paste these edits.");
@@ -815,7 +825,6 @@ function SpaceLibrary({ spaceId, section }: { spaceId: string; section: string }
         if (result.edit) await spacesApi.renderEditVersion(spaceId, item.id, result.edit.id, 0, sensitiveCollectionToken);
       }
       setSelectedItemIds([]);
-      setSelecting(false);
       await reload();
     } catch (error) {
       setLocalError(error instanceof Error ? error.message : "The edits could not be pasted.");
@@ -856,6 +865,7 @@ function SpaceLibrary({ spaceId, section }: { spaceId: string; section: string }
   };
 
   const updateItem = async (item: SpaceLibraryItem, patch: Partial<Pick<SpaceLibraryItem, "display_name" | "caption" | "favorite" | "hidden" | "tags">>) => {
+    if (!canEditLibrary) return null;
     try {
       const saved = await spacesApi.updateLibraryItem(spaceId, item, patch, sensitiveCollectionToken);
       const remainsVisible = collection === "hidden" ? saved.hidden : !saved.hidden && (collection !== "favorites" || saved.favorite);
@@ -874,6 +884,7 @@ function SpaceLibrary({ spaceId, section }: { spaceId: string; section: string }
   };
 
   const trashItem = async (item: SpaceLibraryItem) => {
+    if (!canEditLibrary) return false;
     if (!await confirmAction(`Move “${item.display_name}” to Recently Deleted?`)) return false;
     try {
       await spacesApi.trashLibraryItem(spaceId, item.id, sensitiveCollectionToken);
@@ -888,6 +899,7 @@ function SpaceLibrary({ spaceId, section }: { spaceId: string; section: string }
   };
 
   const restoreItem = async (item: SpaceLibraryItem) => {
+    if (!canEditLibrary) return;
     try {
       await spacesApi.restoreLibraryItem(spaceId, item.id, sensitiveCollectionToken);
       setItems((current) => current.filter((candidate) => candidate.id !== item.id));
@@ -908,14 +920,13 @@ function SpaceLibrary({ spaceId, section }: { spaceId: string; section: string }
   };
 
   const applyBulkAction = async (action: BulkLibraryItemAction, options: BulkLibraryItemOptions = {}) => {
-    if (selectedItems.length === 0 || bulkSaving) return false;
+    if (!canEditLibrary || selectedItems.length === 0 || bulkSaving) return false;
     if (action === "trash" && !await confirmAction(`Move ${selectedItems.length} selected item${selectedItems.length === 1 ? "" : "s"} to Recently Deleted?`)) return false;
     setBulkSaving(true);
     setLocalError("");
     try {
       await spacesApi.bulkLibraryItems(spaceId, selectedItems, action, options, sensitiveCollectionToken);
       setSelectedItemIds([]);
-      setSelecting(false);
       await reload();
       return true;
     } catch (error) {
@@ -927,6 +938,7 @@ function SpaceLibrary({ spaceId, section }: { spaceId: string; section: string }
   };
 
   const openMetadataDialog = (action: "add_tags" | "remove_tags" | "set_date" | "set_location") => {
+    rememberLibraryDialogTrigger();
     setMetadataTags("");
     setMetadataDate("");
     setMetadataLocationName("");
@@ -976,33 +988,9 @@ function SpaceLibrary({ spaceId, section }: { spaceId: string; section: string }
     await applyBulkAction(action);
   };
 
-  const performExport = async (reauthenticationToken: string) => {
-    if (selectedItems.length === 0 || bulkSaving) return;
-    setBulkSaving(true);
-    setLocalError("");
-    try {
-      await spacesApi.exportLibraryItems(spaceId, selectedItems.map((item) => item.id), reauthenticationToken);
-    } catch (error) {
-      setLocalError(error instanceof Error ? error.message : "Selected Library items could not be exported.");
-    } finally {
-      setBulkSaving(false);
-    }
-  };
-
-  const exportSelectedItems = async () => {
-    const token = activeSensitiveGrant(sensitiveGrants.bulk_export);
-    if (token) {
-      await performExport(token);
-      return;
-    }
-    setUnlockPassword("");
-    setUnlockForExport(true);
-    setUnlockScope("bulk_export");
-  };
-
   const requestSensitiveUnlock = (scope: "hidden" | "recently_deleted") => {
+    rememberLibraryDialogTrigger();
     setUnlockPassword("");
-    setUnlockForExport(false);
     setUnlockScope(scope);
   };
 
@@ -1014,11 +1002,8 @@ function SpaceLibrary({ spaceId, section }: { spaceId: string; section: string }
     try {
       const grant = await spacesApi.reauthenticateLibrary(spaceId, unlockScope, unlockPassword);
       setSensitiveGrants((current) => ({ ...current, [unlockScope]: { token: grant.token, expiresAt: grant.expires_at } }));
-      const exportAfterUnlock = unlockForExport;
       setUnlockScope("");
       setUnlockPassword("");
-      setUnlockForExport(false);
-      if (exportAfterUnlock) await performExport(grant.token);
     } catch (error) {
       setLocalError(error instanceof Error ? error.message : "This collection could not be unlocked.");
     } finally {
@@ -1026,38 +1011,8 @@ function SpaceLibrary({ spaceId, section }: { spaceId: string; section: string }
     }
   };
 
-  const copySelectedItems = async (destinationSpaceId: string) => {
-    if (!destinationSpaceId || selectedItems.length === 0 || bulkSaving) return;
-    setBulkSaving(true);
-    setLocalError("");
-    try {
-      await spacesApi.importLibraryItems(spaceId, destinationSpaceId, selectedItems.map((item) => item.id), sensitiveCollectionToken);
-      setSelectedItemIds([]);
-      setSelecting(false);
-    } catch (error) {
-      setLocalError(error instanceof Error ? error.message : "Selected Library items could not be copied.");
-    } finally {
-      setBulkSaving(false);
-    }
-  };
-
-  const shareSelectedItems = async (destinationSpaceId: string) => {
-    if (!destinationSpaceId || selectedItems.length === 0 || bulkSaving) return;
-    setBulkSaving(true);
-    setLocalError("");
-    try {
-      await spacesApi.shareLibraryItems(spaceId, destinationSpaceId, selectedItems.map((item) => item.id), sensitiveCollectionToken);
-      setSelectedItemIds([]);
-      setSelecting(false);
-    } catch (error) {
-      setLocalError(error instanceof Error ? error.message : "Selected Library items could not be shared.");
-    } finally {
-      setBulkSaving(false);
-    }
-  };
-
   const mergeCurrentDuplicates = async () => {
-    if (collection !== "duplicate" || visibleItems.length < 2 || bulkSaving || !await confirmAction(`Merge ${visibleItems.length} matching items? Misty will keep one item, combine metadata and references, and move the redundant copies to Recently Deleted.`)) return;
+    if (!canEditLibrary || collection !== "duplicate" || visibleItems.length < 2 || bulkSaving || !await confirmAction(`Merge ${visibleItems.length} matching items? Misty will keep one item, combine metadata and references, and move the redundant copies to Recently Deleted.`)) return;
     setBulkSaving(true);
     setLocalError("");
     try {
@@ -1072,6 +1027,7 @@ function SpaceLibrary({ spaceId, section }: { spaceId: string; section: string }
   };
 
   const revokeSharedReference = async (reference: LibrarySharedReference) => {
+    if (!canEditLibrary) return;
     if (!await confirmAction(`Stop sharing “${reference.display_name}” with ${reference.destination_space_name}?`)) return;
     try {
       await spacesApi.revokeLibraryGrant(spaceId, reference);
@@ -1084,18 +1040,31 @@ function SpaceLibrary({ spaceId, section }: { spaceId: string; section: string }
   const selectCollection = (next: LibraryCollectionKind, id = "") => {
     setCollection(next);
     setSelectedCollectionId(id);
-    if (next === "albums" && id) {
-      setSort("album-order");
-      setDirection("asc");
-    } else if (sort === "album-order") {
-      setSort("recently-added");
-      setDirection("desc");
-    }
+    const nextSearchParams = new URLSearchParams(librarySearchParams);
+    nextSearchParams.set("collection", next);
+    if (id) nextSearchParams.set("collectionId", id);
+    else nextSearchParams.delete("collectionId");
+    if (nextSearchParams.toString() !== librarySearchParams.toString()) setLibrarySearchParams(nextSearchParams, { replace: true });
+    if (next === "albums" && id) { setSort("album-order"); setDirection("asc"); }
+    else if (sort === "album-order") { setSort("recently-added"); setDirection("desc"); }
   };
 
+  useEffect(() => {
+    if (!requestedCollection || !libraryCollectionKinds.has(requestedCollection as LibraryCollectionKind)) return;
+    const nextCollection = requestedCollection as LibraryCollectionKind;
+    setCollection(nextCollection);
+    setSelectedCollectionId(requestedCollectionId);
+    if (nextCollection === "albums" && requestedCollectionId) {
+      setSort("album-order");
+      setDirection("asc");
+    } else {
+      setSort((current) => current === "album-order" ? "recently-added" : current);
+    }
+  }, [requestedCollection, requestedCollectionId]);
   const isPinned = (kind: LibraryPinnedCollection["target_kind"], id: string) => pins.some((pin) => pin.target_kind === kind && pin.target_id === id);
 
   const togglePin = async (kind: LibraryPinnedCollection["target_kind"], id: string) => {
+    if (!canEditLibrary) return;
     const exists = isPinned(kind, id);
     const targets = exists
       ? pins.filter((pin) => pin.target_kind !== kind || pin.target_id !== id).map((pin) => ({ kind: pin.target_kind, id: pin.target_id }))
@@ -1109,6 +1078,7 @@ function SpaceLibrary({ spaceId, section }: { spaceId: string; section: string }
   };
 
   const movePin = async (pinID: string, delta: -1 | 1) => {
+    if (!canEditLibrary) return;
     const index = pins.findIndex((pin) => pin.id === pinID);
     const destination = index + delta;
     if (index < 0 || destination < 0 || destination >= pins.length) return;
@@ -1125,12 +1095,14 @@ function SpaceLibrary({ spaceId, section }: { spaceId: string; section: string }
   };
 
   const updateCurrentMemory = async (patch: { title?: string; cover_item_id?: string; music_item_id?: string; playback_seconds?: number }) => {
-    if (!currentDiscoveryGroup || currentDiscoveryGroup.kind !== "memory") return;
+    if (!canEditLibrary || !currentDiscoveryGroup || currentDiscoveryGroup.kind !== "memory") return null;
     try {
       const saved = await spacesApi.updateMemoryPreference(spaceId, currentDiscoveryGroup, patch);
       setDiscovery((current) => ({ ...current, memories: current.memories.map((memory) => memory.id === saved.id ? saved : memory) }));
+      return saved;
     } catch (error) {
       setLocalError(error instanceof Error ? error.message : "Memory could not be updated.");
+      return null;
     }
   };
 
@@ -1180,6 +1152,8 @@ function SpaceLibrary({ spaceId, section }: { spaceId: string; section: string }
   };
 
   const openCreateAlbum = () => {
+    if (!canEditLibrary) return;
+    rememberLibraryDialogTrigger();
     setAlbumName("");
     setAlbumDescription("");
     setAlbumCoverItemId("");
@@ -1187,7 +1161,8 @@ function SpaceLibrary({ spaceId, section }: { spaceId: string; section: string }
   };
 
   const openEditAlbum = () => {
-    if (!currentAlbum) return;
+    if (!canEditLibrary || !currentAlbum) return;
+    rememberLibraryDialogTrigger();
     setAlbumName(currentAlbum.name);
     setAlbumDescription(currentAlbum.description);
     setAlbumCoverItemId(currentAlbum.cover_item_id ?? "");
@@ -1197,7 +1172,7 @@ function SpaceLibrary({ spaceId, section }: { spaceId: string; section: string }
   const saveAlbum = async (event: FormEvent) => {
     event.preventDefault();
     const name = albumName.trim();
-    if (!name || albumSaving) return;
+    if (!canEditLibrary || !name || albumSaving) return;
     setAlbumSaving(true);
     try {
       if (albumDialogMode === "edit" && currentAlbum) {
@@ -1217,32 +1192,20 @@ function SpaceLibrary({ spaceId, section }: { spaceId: string; section: string }
     }
   };
 
-  const createAlbumFolder = async () => {
-    const name = window.prompt("Folder name")?.trim();
-    if (!name) return;
-    try {
-      const folder = await spacesApi.createAlbumFolder(spaceId, name, selectedAlbumFolderId);
-      setAlbumFolders((current) => [...current, folder].sort((a, b) => a.position - b.position || a.name.localeCompare(b.name)));
-      setSelectedAlbumFolderId(folder.id);
-    } catch (error) {
-      setLocalError(error instanceof Error ? error.message : "Album folder could not be created.");
-    }
+  const createAlbumFolder = () => {
+    if (!canEditLibrary) return;
+    showTextDialog({ kind: "create-folder", title: "New album folder", primaryLabel: "Folder name", primaryValue: "" });
   };
 
-  const renameAlbumFolder = async () => {
+  const renameAlbumFolder = () => {
+    if (!canEditLibrary) return;
     const folder = albumFolders.find((candidate) => candidate.id === selectedAlbumFolderId);
     if (!folder) return;
-    const name = window.prompt("Folder name", folder.name)?.trim();
-    if (!name || name === folder.name) return;
-    try {
-      const saved = await spacesApi.updateAlbumFolder(spaceId, folder, { name });
-      setAlbumFolders((current) => current.map((candidate) => candidate.id === saved.id ? saved : candidate));
-    } catch (error) {
-      setLocalError(error instanceof Error ? error.message : "Album folder could not be renamed.");
-    }
+    showTextDialog({ kind: "rename-folder", title: "Rename album folder", primaryLabel: "Folder name", primaryValue: folder.name });
   };
 
   const deleteAlbumFolder = async () => {
+    if (!canEditLibrary) return;
     const folder = albumFolders.find((candidate) => candidate.id === selectedAlbumFolderId);
     if (!folder || !await confirmAction(`Delete “${folder.name}”? Albums will move to the top level.`)) return;
     try {
@@ -1255,19 +1218,8 @@ function SpaceLibrary({ spaceId, section }: { spaceId: string; section: string }
     }
   };
 
-  const organizeCurrentAlbum = async (patch: Partial<Pick<LibraryAlbum, "folder_id" | "view_mode" | "sort_mode">>) => {
-    if (!currentAlbum) return;
-    try {
-      const saved = await spacesApi.organizeAlbum(spaceId, currentAlbum, patch);
-      setAlbums((current) => current.map((album) => album.id === saved.id ? saved : album));
-      if (patch.sort_mode) setReloadKey((current) => current + 1);
-    } catch (error) {
-      setLocalError(error instanceof Error ? error.message : "Album organization could not be updated.");
-    }
-  };
-
   const deleteCurrentAlbum = async () => {
-    if (!currentAlbum || !await confirmAction(`Delete “${currentAlbum.name}”? Its Library items will not be deleted.`)) return;
+    if (!canEditLibrary || !currentAlbum || !await confirmAction(`Delete “${currentAlbum.name}”? Its Library items will not be deleted.`)) return;
     try {
       await spacesApi.deleteAlbum(spaceId, currentAlbum);
       setAlbums((current) => current.filter((album) => album.id !== currentAlbum.id));
@@ -1278,7 +1230,7 @@ function SpaceLibrary({ spaceId, section }: { spaceId: string; section: string }
   };
 
   const reorderAlbumItem = async (targetItemId: string) => {
-    if (!currentAlbum || !canReorderAlbum || !draggedAlbumItemId || draggedAlbumItemId === targetItemId) return;
+    if (!canEditLibrary || !currentAlbum || !canReorderAlbum || !draggedAlbumItemId || draggedAlbumItemId === targetItemId) return;
     const nextItems = [...visibleItems];
     const from = nextItems.findIndex((item) => item.id === draggedAlbumItemId);
     const to = nextItems.findIndex((item) => item.id === targetItemId);
@@ -1298,7 +1250,7 @@ function SpaceLibrary({ spaceId, section }: { spaceId: string; section: string }
   };
 
   const togglePeoplePolicy = async (kind: "person" | "pet") => {
-    if (!peoplePolicy) return;
+    if (!canEditLibrary || !peoplePolicy) return;
     try {
       const saved = await spacesApi.updatePeoplePolicy(spaceId, peoplePolicy, kind === "person" ? { faces_enabled: !peoplePolicy.faces_enabled } : { pets_enabled: !peoplePolicy.pets_enabled });
       setPeoplePolicy(saved);
@@ -1307,11 +1259,9 @@ function SpaceLibrary({ spaceId, section }: { spaceId: string; section: string }
     }
   };
 
-  const toggleIntelligencePolicy = async (kind: "ocr" | "ai" | "semantic") => {
-    if (!peoplePolicy) return;
-    const patch = kind === "ocr"
-      ? { ocr_enabled: !peoplePolicy.ocr_enabled }
-      : kind === "ai"
+  const toggleIntelligencePolicy = async (kind: "ai" | "semantic") => {
+    if (!canEditLibrary || !peoplePolicy) return;
+    const patch = kind === "ai"
         ? { ai_enabled: !peoplePolicy.ai_enabled, ...peoplePolicy.ai_enabled ? { semantic_search_enabled: false } : {} }
         : { semantic_search_enabled: !peoplePolicy.semantic_search_enabled, ...peoplePolicy.semantic_search_enabled ? {} : { ai_enabled: true } };
     try {
@@ -1323,6 +1273,8 @@ function SpaceLibrary({ spaceId, section }: { spaceId: string; section: string }
   };
 
   const openCreatePerson = (kind: "person" | "pet") => {
+    if (!canEditLibrary) return;
+    rememberLibraryDialogTrigger();
     setPersonKind(kind);
     setPersonName("");
     setPersonCoverItemId("");
@@ -1330,7 +1282,8 @@ function SpaceLibrary({ spaceId, section }: { spaceId: string; section: string }
   };
 
   const openEditPerson = () => {
-    if (!currentPerson) return;
+    if (!canEditLibrary || !currentPerson) return;
+    rememberLibraryDialogTrigger();
     setPersonKind(currentPerson.kind);
     setPersonName(currentPerson.name);
     setPersonCoverItemId(currentPerson.cover_item_id ?? "");
@@ -1339,7 +1292,7 @@ function SpaceLibrary({ spaceId, section }: { spaceId: string; section: string }
 
   const savePerson = async (event: FormEvent) => {
     event.preventDefault();
-    if (personSaving) return;
+    if (!canEditLibrary || personSaving) return;
     setPersonSaving(true);
     try {
       if (personDialogMode === "edit" && currentPerson) {
@@ -1359,7 +1312,7 @@ function SpaceLibrary({ spaceId, section }: { spaceId: string; section: string }
   };
 
   const deleteCurrentPerson = async () => {
-    if (!currentPerson || !await confirmAction(`Remove “${currentPerson.name || (currentPerson.kind === "pet" ? "Unnamed pet" : "Unnamed person")}" from People & Pets? Library items will not be deleted.`)) return;
+    if (!canEditLibrary || !currentPerson || !await confirmAction(`Remove “${currentPerson.name || (currentPerson.kind === "pet" ? "Unnamed pet" : "Unnamed person")}" from People & Pets? Library items will not be deleted.`)) return;
     try {
       await spacesApi.deletePerson(spaceId, currentPerson);
       setPeople((current) => current.filter((person) => person.id !== currentPerson.id));
@@ -1370,7 +1323,7 @@ function SpaceLibrary({ spaceId, section }: { spaceId: string; section: string }
   };
 
   const mergeCurrentPerson = async (targetID: string) => {
-    if (!currentPerson || !targetID) return;
+    if (!canEditLibrary || !currentPerson || !targetID) return;
     const target = people.find((person) => person.id === targetID);
     if (!target || !await confirmAction(`Merge “${currentPerson.name || "Unnamed"}” into “${target.name || "Unnamed"}”?`)) return;
     try {
@@ -1383,13 +1336,12 @@ function SpaceLibrary({ spaceId, section }: { spaceId: string; section: string }
   };
 
   const applyPersonItems = async (personID: string, remove = false) => {
-    if (selectedItems.length === 0 || bulkSaving) return;
+    if (!canEditLibrary || selectedItems.length === 0 || bulkSaving) return;
     setBulkSaving(true);
     try {
       const saved = remove ? await spacesApi.removePersonItems(spaceId, personID, selectedItems.map((item) => item.id)) : await spacesApi.addPersonItems(spaceId, personID, selectedItems.map((item) => item.id));
       setPeople((current) => current.map((person) => person.id === saved.id ? saved : person));
       setSelectedItemIds([]);
-      setSelecting(false);
       setReloadKey((current) => current + 1);
     } catch (error) {
       setLocalError(error instanceof Error ? error.message : "Selected items could not be assigned.");
@@ -1398,112 +1350,167 @@ function SpaceLibrary({ spaceId, section }: { spaceId: string; section: string }
     }
   };
 
-  const createGroup = async () => {
-    const name = window.prompt("Group name")?.trim();
-    if (!name) return;
-    const tag = window.prompt("Match files with this tag")?.trim();
-    if (!tag) return;
+  const createGroup = () => {
+    if (!canEditLibrary) return;
+    showTextDialog({ kind: "create-group", title: "New smart group", primaryLabel: "Group name", primaryValue: "", secondaryLabel: "Match files with this tag", secondaryValue: "" });
+  };
+
+  const submitTextDialog = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!canEditLibrary || !textDialog || textDialogSaving) return;
+    const primaryValue = textDialog.primaryValue.trim();
+    const secondaryValue = textDialog.secondaryValue?.trim() ?? "";
+    if (textDialog.kind !== "edit-tags" && !primaryValue || textDialog.secondaryLabel && !secondaryValue) return;
+    setTextDialogSaving(true);
+    setTextDialogError("");
     try {
-      const group = await spacesApi.createGroup(spaceId, name, [{ field: "tag", op: "contains", value: tag }]);
-      setGroups((current) => [...current, group].sort((a, b) => a.name.localeCompare(b.name)));
-      selectCollection("groups", group.id);
+      if (textDialog.kind === "create-folder") {
+        const folder = await spacesApi.createAlbumFolder(spaceId, primaryValue, selectedAlbumFolderId);
+        setAlbumFolders((current) => [...current, folder].sort((a, b) => a.position - b.position || a.name.localeCompare(b.name)));
+        setSelectedAlbumFolderId(folder.id);
+      } else if (textDialog.kind === "rename-folder") {
+        const folder = albumFolders.find((candidate) => candidate.id === selectedAlbumFolderId);
+        if (!folder) throw new Error("This album folder is no longer available.");
+        const saved = await spacesApi.updateAlbumFolder(spaceId, folder, { name: primaryValue });
+        setAlbumFolders((current) => current.map((candidate) => candidate.id === saved.id ? saved : candidate));
+      } else if (textDialog.kind === "create-group") {
+        const group = await spacesApi.createGroup(spaceId, primaryValue, [{ field: "tag", op: "contains", value: secondaryValue }]);
+        setGroups((current) => [...current, group].sort((a, b) => a.name.localeCompare(b.name)));
+        selectCollection("groups", group.id);
+      } else if (textDialog.kind === "rename-memory") {
+        if (!await updateCurrentMemory({ title: primaryValue })) throw new Error("The memory could not be renamed.");
+      } else {
+        const item = items.find((candidate) => candidate.id === textDialog.itemId);
+        if (!item) throw new Error("This Library item is no longer available.");
+        const updated = textDialog.kind === "rename-item"
+          ? await updateItem(item, { display_name: primaryValue })
+          : await updateItem(item, { tags: primaryValue.split(",").map((tag) => tag.trim()).filter(Boolean) });
+        if (!updated) throw new Error("The Library item could not be updated.");
+      }
+      setTextDialog(null);
     } catch (error) {
-      setLocalError(error instanceof Error ? error.message : "Group could not be created.");
+      setTextDialogError(error instanceof Error ? error.message : "The change could not be saved.");
+    } finally {
+      setTextDialogSaving(false);
     }
   };
 
   const uploading = uploadJobs.some((job) => !["ready", "failed"].includes(job.stage));
   const uploadProgress = uploadJobs.length > 0 ? Math.round(uploadJobs.reduce((total, job) => total + (job.stage === "ready" || job.stage === "failed" ? 1 : job.progress), 0) / uploadJobs.length * 100) : 0;
   const failedUploads = uploadJobs.filter((job) => job.stage === "failed");
+  const menuItem = itemMenu ? items.find((item) => item.id === itemMenu.itemId) ?? visibleItems.find((item) => item.id === itemMenu.itemId) ?? null : null;
+  const showItemMenu = (itemId: string, left: number, top: number) => {
+    const menuWidth = 224;
+    const menuHeight = 336;
+    setItemMenu({
+      itemId,
+      left: Math.max(8, Math.min(left, window.innerWidth - menuWidth - 8)),
+      top: Math.max(8, Math.min(top, window.innerHeight - menuHeight - 8)),
+    });
+  };
+  const openItemContextMenu = (event: ReactMouseEvent, itemId: string) => {
+    event.preventDefault();
+    event.stopPropagation();
+    showItemMenu(itemId, event.clientX, event.clientY);
+  };
+  const addItemToAlbum = async (itemId: string, albumId: string) => {
+    await spacesApi.addAlbumItems(spaceId, albumId, [itemId]);
+    const result = await spacesApi.albums(spaceId);
+    setAlbums(result.albums);
+  };
 
   return (
-    <div className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] bg-[var(--misty-bg)]">
-      <SpaceLibraryHeader sectionNavigation={<SpaceSectionNavigation spaceId={spaceId} section={section}/>} collection={collection} onSelectCollection={(nextCollection) => selectCollection(nextCollection)} uploading={uploading} uploadDisabled={uploading || (usage?.remaining_bytes ?? 1) <= 0} onUpload={() => setFilePickerOpen(true)} searchInput={searchInput} onSearchInput={setSearchInput} onSearchFocus={() => setSearchFocused(true)} onSearchBlur={() => window.setTimeout(() => setSearchFocused(false), 120)} mediaType={mediaType} onMediaType={(value) => setMediaType(value as typeof mediaType)} onSelectUtility={(nextCollection) => selectCollection(nextCollection)} sort={sort} direction={direction} onSort={(nextSort, nextDirection) => { setSort(nextSort); setDirection(nextDirection); }} albumOrderAvailable={Boolean(currentAlbum)} gridSize={gridSize} squareGrid={squareGrid} onSmallerGrid={() => setGridSize((current) => Math.max(120, current - 30))} onLargerGrid={() => setGridSize((current) => Math.min(300, current + 30))} onToggleSquareGrid={() => setSquareGrid((current) => !current)} visibleItemCount={visibleItems.length} selecting={selecting} onToggleSelecting={() => { setSelecting((current) => !current); setSelectedItemIds([]); setSelectedItemId(""); }}/>
-      <div className="min-h-0 overflow-auto bg-[var(--misty-bg)] px-6 pb-6 pt-5">
-        {uploadJobs.length > 0 ? <div className="mb-4 overflow-hidden rounded-xl border border-[var(--misty-border-soft)] bg-[var(--misty-surface)]">
+    <LibraryCanEditContext.Provider value={canEditLibrary}>
+    <div className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] bg-transparent">
+      <SpaceLibraryHeader uploadAvailable={canUploadLibrary} uploading={uploading} uploadDisabled={uploading || (usage?.remaining_bytes ?? 1) <= 0} onUpload={() => setFilePickerOpen(true)} searchInput={searchInput} onSearchInput={setSearchInput} onSearchFocus={() => setSearchFocused(true)} onSearchBlur={() => window.setTimeout(() => setSearchFocused(false), 120)} mediaType={mediaType} onMediaType={(value) => setMediaType(value as typeof mediaType)} sort={sort} direction={direction} onSort={(nextSort, nextDirection) => { setSort(nextSort); setDirection(nextDirection); }} albumOrderAvailable={Boolean(currentAlbum)} viewMode={libraryViewMode} onViewMode={setLibraryViewMode} visibleItemCount={visibleItems.length}/>
+      <div className="min-h-0 overflow-auto bg-transparent px-6 pb-6 pt-5">
+        {uploadJobs.length > 0 ? <div className="mb-4 overflow-hidden rounded-xl border border-[var(--misty-border-soft)] bg-[var(--misty-app-panel-bg,var(--misty-app-page-bg,var(--misty-bg)))]">
           <div className="flex items-center gap-3 px-3 py-2.5"><Upload className="shrink-0 text-[var(--misty-text-muted)]" size={15}/><div className="min-w-0 flex-1"><p className="m-0 truncate text-xs font-medium">{uploading ? `Uploading ${uploadJobs.length} file${uploadJobs.length === 1 ? "" : "s"} in the background` : failedUploads.length > 0 ? `${uploadJobs.length - failedUploads.length} uploaded, ${failedUploads.length} failed` : `${uploadJobs.length} file${uploadJobs.length === 1 ? "" : "s"} uploaded`}</p><p className="m-0 mt-0.5 truncate text-[10px] text-[var(--misty-text-subtle)]">{uploading ? `${uploadProgress}% · You can keep using Misty while this finishes` : failedUploads[0]?.error ?? "Complete"}</p></div>{!uploading ? <button className={iconButtonClass} type="button" onClick={() => setUploadJobs([])} aria-label="Dismiss upload status"><X size={14}/></button> : null}</div>
           <div className="h-0.5 bg-[var(--misty-surface-3)]"><div className="h-full bg-[var(--misty-primary)] transition-[width]" style={{ width: `${uploadProgress}%` }}/></div>
         </div> : null}
-        {searchFocused && (searchFacets.tags.length > 0 || searchFacets.media_types.length > 0 || searchFacets.years.length > 0 || searchFacets.albums.length > 0 || searchFacets.utilities.length > 0) ? <div className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-[var(--misty-border-soft)] bg-[var(--misty-surface)] p-3" onMouseDown={(event) => event.preventDefault()}>
+        {searchFocused && (searchFacets.tags.length > 0 || searchFacets.media_types.length > 0 || searchFacets.years.length > 0 || searchFacets.albums.length > 0 || searchFacets.utilities.length > 0) ? <div className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-[var(--misty-border-soft)] bg-[var(--misty-app-panel-bg,var(--misty-app-page-bg,var(--misty-bg)))] p-3" onMouseDown={(event) => event.preventDefault()}>
           {searchFacets.media_types.length > 0 ? <LibraryFacetGroup label="Media" facets={searchFacets.media_types} onSelect={(facet) => appendSearchFacet("type", facet.value)}/> : null}
           {searchFacets.tags.length > 0 ? <LibraryFacetGroup label="Tags" facets={searchFacets.tags} onSelect={(facet) => appendSearchFacet("tag", facet.value)}/> : null}
           {searchFacets.albums.length > 0 ? <LibraryFacetGroup label="Albums" facets={searchFacets.albums} onSelect={(facet) => appendSearchFacet("album", facet.label)}/> : null}
           {searchFacets.years.length > 0 ? <LibraryFacetGroup label="Years" facets={searchFacets.years} onSelect={(facet) => appendSearchFacet("year", facet.value)}/> : null}
           {searchFacets.utilities.length > 0 ? <LibraryFacetGroup label="Utilities" facets={searchFacets.utilities} onSelect={(facet) => selectCollection("utility", facet.value)}/> : null}
         </div> : null}
-        {selecting && displayItems.length > 0 ? <div className="mb-4 flex min-h-10 flex-wrap items-center gap-2 rounded-xl border border-[var(--misty-border-soft)] bg-[var(--misty-surface)] px-3 py-2">
+        {selectedItems.length > 0 ? <div className="mb-4 flex min-h-10 flex-wrap items-center gap-2 rounded-xl border border-[var(--misty-border-soft)] bg-[var(--misty-app-panel-bg,var(--misty-app-page-bg,var(--misty-bg)))] px-3 py-2 shadow-sm">
           <span className="mr-1 text-xs font-medium">{selectedItems.length} selected</span>
-          <button className={smallButtonClass} type="button" disabled={bulkSaving} onClick={() => setSelectedItemIds(selectedItems.length === displayItems.length ? [] : displayItems.map((item) => item.id))}>{selectedItems.length === displayItems.length ? "Deselect all" : "Select all"}</button>
-          {collection === "deleted" ? <button className={smallButtonClass} type="button" disabled={bulkSaving || selectedItems.length === 0} onClick={() => void applyBulkAction("restore")}>Restore</button> : <>
-            <button className={smallButtonClass} type="button" disabled={bulkSaving || selectedItems.length === 0} onClick={() => void applyBulkAction(collection === "favorites" ? "unfavorite" : "favorite")}><Star size={12}/>{collection === "favorites" ? "Unfavorite" : "Favorite"}</button>
-            <button className={smallButtonClass} type="button" disabled={bulkSaving || selectedItems.length === 0} onClick={() => void applyBulkAction(collection === "hidden" ? "unhide" : "hide")}><EyeOff size={12}/>{collection === "hidden" ? "Unhide" : "Hide"}</button>
-            {collection === "albums" && selectedCollectionId ? <button className={smallButtonClass} type="button" disabled={bulkSaving || selectedItems.length === 0} onClick={() => void applyBulkAction("remove_from_album", { albumId: selectedCollectionId })}>Remove from album</button> : null}
-            {albums.length > 0 ? <select className={libraryControlClass} value="" disabled={bulkSaving || selectedItems.length === 0} onChange={(event) => { if (event.target.value) void applyBulkAction("add_to_album", { albumId: event.target.value }); }} aria-label="Add selected items to album"><option value="">Add to album…</option>{albums.map((album) => <option value={album.id} key={album.id}>{album.name}</option>)}</select> : null}
-            <select className={libraryControlClass} value="" disabled={bulkSaving || selectedItems.length === 0} onChange={(event) => { const action = event.target.value; if (action === "add_tags" || action === "remove_tags" || action === "set_date" || action === "set_location") openMetadataDialog(action); else if (action === "clear_date") void clearBulkMetadata("clear_date", "the adjusted date"); else if (action === "clear_location") void clearBulkMetadata("clear_location", "the location"); }} aria-label="Adjust selected item metadata"><option value="">Adjust…</option><option value="add_tags">Add tags</option><option value="remove_tags">Remove tags</option><option value="set_date">Adjust date</option><option value="clear_date">Clear adjusted date</option><option value="set_location">Set location</option><option value="clear_location">Clear location</option></select>
-            {selectedItems.length >= 2 ? <select className={libraryControlClass} value="" disabled={bulkSaving} onChange={(event) => { const kind = event.target.value as LibraryAssetStack["kind"]; if (kind) void createSelectedAssetStack(kind); }} aria-label="Group selected media"><option value="">Group media…</option><option value="live_photo">Live Photo</option><option value="raw_pair">RAW + JPEG</option><option value="burst">Burst</option></select> : null}
-            <button className={smallButtonClass} type="button" disabled={bulkSaving || selectedItems.length === 0} onClick={() => void exportSelectedItems()}><Download size={12}/>Export</button>
-            <button className={smallButtonClass} type="button" disabled={bulkSaving || selectedItems.length === 0} onClick={() => void duplicateItems(selectedItems.map((item) => item.id))}><Copy size={12}/>Duplicate</button>
-            {copiedEditDefinition ? <button className={smallButtonClass} type="button" disabled={bulkSaving || selectedItems.length === 0} onClick={() => void pasteEdits()}><SlidersHorizontal size={12}/>Paste edits</button> : null}
-            {availableSpaces.some((space) => space.id !== spaceId) ? <select className={libraryControlClass} value="" disabled={bulkSaving || selectedItems.length === 0} onChange={(event) => { if (event.target.value) void copySelectedItems(event.target.value); }} aria-label="Copy selected items to another Space"><option value="">Copy to Space…</option>{availableSpaces.filter((space) => space.id !== spaceId).map((space) => <option value={space.id} key={space.id}>{space.name}</option>)}</select> : null}
-            {availableSpaces.some((space) => space.id !== spaceId) ? <select className={libraryControlClass} value="" disabled={bulkSaving || selectedItems.length === 0} onChange={(event) => { if (event.target.value) void shareSelectedItems(event.target.value); }} aria-label="Share selected items with another Space"><option value="">Share to Space…</option>{availableSpaces.filter((space) => space.id !== spaceId).map((space) => <option value={space.id} key={space.id}>{space.name}</option>)}</select> : null}
-            {currentPerson ? <button className={smallButtonClass} type="button" disabled={bulkSaving || selectedItems.length === 0} onClick={() => void applyPersonItems(currentPerson.id, true)}>Remove from {currentPerson.kind === "pet" ? "pet" : "person"}</button> : people.length > 0 && selectedItems.length > 0 && selectedItems.every((item) => String(item.file.intrinsic_metadata.server_detected_mime_type ?? "").startsWith("image/")) ? <select className={libraryControlClass} value="" disabled={bulkSaving} onChange={(event) => { if (event.target.value) void applyPersonItems(event.target.value); }} aria-label="Assign selected images to a person or pet"><option value="">Add to People & Pets…</option>{people.filter((person) => person.kind === "person" ? peoplePolicy?.faces_enabled : peoplePolicy?.pets_enabled).map((person) => <option value={person.id} key={person.id}>{person.name || (person.kind === "pet" ? "Unnamed pet" : "Unnamed person")}</option>)}</select> : null}
-            <button className={smallButtonClass} type="button" disabled={bulkSaving || selectedItems.length === 0} onClick={() => void applyBulkAction("trash")}><Trash2 size={12}/>Delete</button>
-          </>}
+          {canCopyLibrary && collection !== "deleted" ? <button className={smallButtonClass} type="button" disabled={bulkSaving} onClick={() => void copyItemsToClipboard(selectedItems)}><ClipboardCopy size={12}/>Copy</button> : null}
+          {canEditLibrary ? collection === "deleted" ? <button className={smallButtonClass} type="button" disabled={bulkSaving} onClick={() => void applyBulkAction("restore")}>Restore</button> : <>
+            <button className={smallButtonClass} type="button" disabled={bulkSaving} onClick={() => void applyBulkAction(collection === "favorites" ? "unfavorite" : "favorite")}><Star size={12}/>{collection === "favorites" ? "Unfavorite" : "Favorite"}</button>
+            {collection === "albums" && selectedCollectionId ? <button className={smallButtonClass} type="button" disabled={bulkSaving} onClick={() => void applyBulkAction("remove_from_album", { albumId: selectedCollectionId })}>Remove from album</button> : null}
+            <button className={smallButtonClass} type="button" disabled={bulkSaving} onClick={() => void applyBulkAction("trash")}><Trash2 size={12}/>Delete</button>
+          </> : null}
+          <button className="ml-auto grid size-7 place-items-center rounded-lg border-0 bg-transparent text-[var(--misty-text-subtle)] hover:bg-[var(--misty-surface-2)] hover:text-[var(--misty-text)]" type="button" disabled={bulkSaving} onClick={() => setSelectedItemIds([])} aria-label="Clear selection"><X size={13}/></button>
         </div> : null}
         {localError ? <button className="mb-4 rounded-xl border border-red-400/20 bg-red-950/20 px-3 py-2 text-left text-xs text-red-200" type="button" onClick={() => setLocalError("")}>{localError}</button> : null}
-        {(collection === "months" || collection === "years" || collection === "recent-days") && !selectedCollectionId ? <div className="mb-5"><div className="grid grid-cols-[repeat(auto-fill,minmax(190px,1fr))] gap-3">{(collection === "months" ? discovery.months : collection === "years" ? discovery.years : discovery.recent_days).map((group) => <LibraryDiscoveryCard key={`${group.kind}:${group.id}`} spaceId={spaceId} group={group} fallbackIcon={collection === "years" ? History : LibraryIcon} onClick={() => selectCollection(collection, group.id)}/>)}</div>{(collection === "months" ? discovery.months : collection === "years" ? discovery.years : discovery.recent_days).length === 0 ? <SpaceLibraryEmptyState collection={collection} uploading={uploading} uploadDisabled={uploading || (usage?.remaining_bytes ?? 1) <= 0} onUpload={() => setFilePickerOpen(true)}/> : null}</div> : null}
-        {collection === "collections" ? <div className="grid gap-7">
-          {pins.length > 0 ? <section><h4 className="mb-3 mt-0 text-sm">Pinned</h4><div className="grid grid-cols-[repeat(auto-fill,minmax(160px,1fr))] gap-3">{pins.map((pin, index) => { const descriptor = pinnedDescriptor(pin); return descriptor ? <LibraryCollectionCard key={pin.id} {...descriptor} pinned onMoveEarlier={index > 0 ? () => void movePin(pin.id, -1) : undefined} onMoveLater={index < pins.length - 1 ? () => void movePin(pin.id, 1) : undefined} onTogglePin={() => void togglePin(pin.target_kind, pin.target_id)}/> : null; })}</div></section> : null}
-          <section><h4 className="mb-3 mt-0 text-sm">Collections</h4><div className="grid grid-cols-[repeat(auto-fill,minmax(160px,1fr))] gap-3">
-            <LibraryCollectionCard icon={LibraryIcon} label="Recently Added" count={searchFacets.total} pinned={isPinned("system", "recent")} onTogglePin={() => void togglePin("system", "recent")} onClick={() => selectCollection("recent")}/>
-            <LibraryCollectionCard icon={Star} label="Favorites" count={searchFacets.favorites} pinned={isPinned("system", "favorites")} onTogglePin={() => void togglePin("system", "favorites")} onClick={() => selectCollection("favorites")}/>
-            {searchFacets.utilities.find((facet) => facet.value === "featured") ? <LibraryCollectionCard icon={Sparkles} label="Featured Photos" count={searchFacets.utilities.find((facet) => facet.value === "featured")?.count ?? 0} pinned={isPinned("system", "featured")} onTogglePin={() => void togglePin("system", "featured")} onClick={() => selectCollection("utility", "featured")}/> : null}
-            <LibraryCollectionCard icon={Users} label="People & Pets" count={people.length} disabled={!peoplePolicy} pinned={isPinned("system", "people")} onTogglePin={() => void togglePin("system", "people")} onClick={() => selectCollection("people")}/>
-            {discovery.map_points.length > 0 ? <LibraryCollectionCard icon={MapIcon} label="Map" count={discovery.map_points.reduce((total, point) => total + point.item_count, 0)} pinned={isPinned("system", "map")} onTogglePin={() => void togglePin("system", "map")} onClick={() => selectCollection("map")}/> : null}
-            {sharedReferences.length + outgoingReferences.length > 0 ? <LibraryCollectionCard icon={MessagesSquare} label="Shared" count={sharedReferences.length + outgoingReferences.length} pinned={isPinned("system", "shared")} onTogglePin={() => void togglePin("system", "shared")} onClick={() => selectCollection("shared")}/> : null}
-            {importHistory.length > 0 ? <LibraryCollectionCard icon={History} label="Imports" count={importHistory.length} pinned={isPinned("system", "imports")} onTogglePin={() => void togglePin("system", "imports")} onClick={() => selectCollection("imports")}/> : null}
-            {discovery.duplicates.length > 0 ? <LibraryCollectionCard icon={Copy} label="Duplicates" count={discovery.duplicates.reduce((total, group) => total + group.item_count, 0)} onClick={() => selectCollection("duplicate")}/> : null}
-            <LibraryCollectionCard icon={EyeOff} label="Hidden" count={searchFacets.hidden} pinned={isPinned("system", "hidden")} onTogglePin={() => void togglePin("system", "hidden")} onClick={() => selectCollection("hidden")}/>
-            <LibraryCollectionCard icon={Trash2} label="Recently Deleted" count={searchFacets.recently_deleted} pinned={isPinned("system", "deleted")} onTogglePin={() => void togglePin("system", "deleted")} onClick={() => selectCollection("deleted")}/>
-          </div></section>
-          {discovery.recent_days.length > 0 ? <section><h4 className="mb-3 mt-0 text-sm">Recent Days</h4><div className="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-3">{discovery.recent_days.slice(0, 12).map((group) => <LibraryDiscoveryCard key={group.id} spaceId={spaceId} group={group} fallbackIcon={LibraryIcon} onClick={() => selectCollection("recent-days", group.id)}/>)}</div></section> : null}
-          {discovery.memories.length > 0 ? <section><h4 className="mb-3 mt-0 text-sm">Memories</h4><div className="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-3">{discovery.memories.map((group) => <LibraryDiscoveryCard key={group.id} spaceId={spaceId} group={group} fallbackIcon={Sparkles} pinned={isPinned("memory", group.id)} onTogglePin={() => void togglePin("memory", group.id)} onClick={() => selectCollection("memory", group.id)}/>)}</div></section> : null}
-          {discovery.trips.length > 0 ? <section><h4 className="mb-3 mt-0 text-sm">Trips</h4><div className="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-3">{discovery.trips.map((group) => <LibraryDiscoveryCard key={group.id} spaceId={spaceId} group={group} fallbackIcon={MapPin} pinned={isPinned("trip", group.id)} onTogglePin={() => void togglePin("trip", group.id)} onClick={() => selectCollection("trip", group.id)}/>)}</div></section> : null}
-          <section><h4 className="mb-3 mt-0 text-sm">Media Types</h4><div className="grid grid-cols-[repeat(auto-fill,minmax(160px,1fr))] gap-3">{searchFacets.media_types.map((facet) => <LibraryCollectionCard icon={facet.value === "image" ? ImageIcon : facet.value === "video" ? Video : facet.value === "audio" ? Music2 : File} label={facet.label} count={facet.count} key={facet.value} pinned={isPinned("system", facet.value)} onTogglePin={() => void togglePin("system", facet.value)} onClick={() => { setMediaType(facet.value as typeof mediaType); selectCollection("recent"); }}/>)}</div></section>
-          {searchFacets.utilities.length > 0 ? <section><h4 className="mb-3 mt-0 text-sm">Utilities</h4><div className="grid grid-cols-[repeat(auto-fill,minmax(160px,1fr))] gap-3">{searchFacets.utilities.map((facet) => <LibraryCollectionCard icon={libraryUtilityIcon(facet.value)} label={facet.label} count={facet.count} key={facet.value} pinned={isPinned("system", facet.value)} onTogglePin={() => void togglePin("system", facet.value)} onClick={() => selectCollection("utility", facet.value)}/>)}</div></section> : null}
-          {activeSpace?.role === "owner" && peoplePolicy ? <section><h4 className="mb-3 mt-0 text-sm">Intelligence</h4><div className="flex flex-wrap gap-2"><button className={smallButtonClass} type="button" onClick={() => void toggleIntelligencePolicy("ocr")}>{peoplePolicy.ocr_enabled ? "OCR on" : "OCR off"}</button><button className={smallButtonClass} type="button" onClick={() => void toggleIntelligencePolicy("ai")}>{peoplePolicy.ai_enabled ? "AI metadata on" : "AI metadata off"}</button><button className={smallButtonClass} type="button" onClick={() => void toggleIntelligencePolicy("semantic")}>{peoplePolicy.semantic_search_enabled ? "Semantic search on" : "Semantic search off"}</button></div></section> : null}
-          <section><div className="mb-3 flex items-center justify-between"><h4 className="m-0 text-sm">Albums</h4><button className={secondaryButtonClass} type="button" onClick={openCreateAlbum}><Plus size={13}/>New album</button></div><div className="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-3">{albums.map((album) => <button className="overflow-hidden rounded-2xl border border-[var(--misty-border-soft)] bg-[var(--misty-surface)] p-0 text-left" type="button" key={album.id} onClick={() => selectCollection("albums", album.id)}><AlbumCover spaceId={spaceId} itemId={album.cover_item_id}/><div className="p-3"><p className="m-0 truncate text-xs font-medium">{album.name}</p><p className="mb-0 mt-1 text-[10px] text-[var(--misty-text-subtle)]">{album.item_count} items</p></div></button>)}</div></section>
-          <section><div className="mb-3 flex items-center justify-between"><h4 className="m-0 text-sm">Groups</h4><button className={secondaryButtonClass} type="button" onClick={() => void createGroup()}><Plus size={13}/>New smart group</button></div><div className="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-3">{groups.map((group) => <button className="rounded-2xl border border-[var(--misty-border-soft)] bg-[var(--misty-surface)] p-4 text-left" type="button" key={group.id} onClick={() => selectCollection("groups", group.id)}><LibraryIcon size={22}/><p className="mb-0 mt-3 truncate text-xs font-medium">{group.name}</p><p className="mb-0 mt-1 truncate text-[10px] text-[var(--misty-text-subtle)]">{group.rules.all.length} rules</p></button>)}</div></section>
+        {(collection === "months" || collection === "years" || collection === "recent-days") && !selectedCollectionId ? <div className="mb-5"><div className="grid grid-cols-[repeat(auto-fill,minmax(190px,1fr))] gap-3">{(collection === "months" ? discovery.months : collection === "years" ? discovery.years : discovery.recent_days).map((group) => <LibraryDiscoveryCard key={`${group.kind}:${group.id}`} spaceId={spaceId} group={group} fallbackIcon={collection === "years" ? History : LibraryIcon} onClick={() => selectCollection(collection, group.id)}/>)}</div>{(collection === "months" ? discovery.months : collection === "years" ? discovery.years : discovery.recent_days).length === 0 ? <SpaceLibraryEmptyState collection={collection} uploadAvailable={canUploadLibrary} uploading={uploading} uploadDisabled={uploading || (usage?.remaining_bytes ?? 1) <= 0} onUpload={() => setFilePickerOpen(true)}/> : null}</div> : null}
+        {collection === "collections" ? <div className="grid gap-8">
+          <section>
+            <h4 className="mb-3 mt-0 text-sm">Recently Added</h4>
+            <div className="flex gap-3 overflow-x-auto pb-2">
+              {displayItems.slice(0, 10).map((item) => <button className="w-[180px] shrink-0 overflow-hidden rounded-2xl border border-[var(--misty-border-soft)] bg-[var(--misty-app-panel-bg,var(--misty-app-page-bg,var(--misty-bg)))] p-0 text-left transition-colors hover:border-[var(--misty-border-strong)]" type="button" key={item.id} onClick={(event) => { libraryViewerTriggerRef.current = event.currentTarget; setSelectedItemId(item.id); }} aria-label={`Open ${item.display_name}`}><span className="grid aspect-[4/3] w-full place-items-center overflow-hidden bg-[var(--misty-surface-2)] text-[var(--misty-text-subtle)]"><LibraryItemThumbnail spaceId={spaceId} item={item} reauthenticationToken={sensitiveCollectionToken}/></span><span className="block p-3"><span className="block truncate text-xs font-medium text-[var(--misty-text)]">{item.display_name}</span><span className="mt-1 block truncate text-[10px] text-[var(--misty-text-subtle)]">{formatBytes(Number(item.file.intrinsic_metadata.byte_size ?? 0))} · {formatTime(item.added_at)}</span></span></button>)}
+              {displayItems.length === 0 ? <p className="m-0 py-4 text-xs text-[var(--misty-text-subtle)]">No recently added items.</p> : null}
+            </div>
+          </section>
+          <section>
+            <div className="mb-3 flex items-center justify-between gap-3"><h4 className="m-0 text-sm">Albums</h4>{canEditLibrary ? <button className={secondaryButtonClass} type="button" onClick={openCreateAlbum}><Plus size={13}/>New album</button> : null}</div>
+            <div className="flex gap-3 overflow-x-auto pb-2">
+              {albums.map((album) => <button className="w-[180px] shrink-0 overflow-hidden rounded-2xl border border-[var(--misty-border-soft)] bg-[var(--misty-app-panel-bg,var(--misty-app-page-bg,var(--misty-bg)))] p-0 text-left transition-colors hover:border-[var(--misty-border-strong)]" type="button" key={album.id} onClick={() => selectCollection("albums", album.id)}><AlbumCover spaceId={spaceId} itemId={album.cover_item_id}/><span className="block p-3"><span className="block truncate text-xs font-medium">{album.name}</span><span className="mt-1 block text-[10px] text-[var(--misty-text-subtle)]">{album.item_count} items</span></span></button>)}
+              {albums.length === 0 ? <p className="m-0 py-4 text-xs text-[var(--misty-text-subtle)]">No albums yet.</p> : null}
+            </div>
+          </section>
+          <section>
+            <div className="mb-3 flex items-center justify-between gap-3"><h4 className="m-0 text-sm">Groups</h4>{canEditLibrary ? <button className={secondaryButtonClass} type="button" onClick={() => void createGroup()}><Plus size={13}/>New smart group</button> : null}</div>
+            <div className="flex gap-3 overflow-x-auto pb-2">
+              {groups.map((group) => <button className="w-[180px] shrink-0 rounded-2xl border border-[var(--misty-border-soft)] bg-[var(--misty-app-panel-bg,var(--misty-app-page-bg,var(--misty-bg)))] p-4 text-left transition-colors hover:border-[var(--misty-border-strong)]" type="button" key={group.id} onClick={() => selectCollection("groups", group.id)}><LibraryIcon size={22}/><span className="mb-0 mt-5 block truncate text-xs font-medium">{group.name}</span><span className="mt-1 block truncate text-[10px] text-[var(--misty-text-subtle)]">{group.rules.all.length} rules</span></button>)}
+              {groups.length === 0 ? <p className="m-0 py-4 text-xs text-[var(--misty-text-subtle)]">No groups yet.</p> : null}
+            </div>
+          </section>
         </div> : null}
         {collection === "albums" && !selectedCollectionId ? <div className="mb-5">
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-3"><div className="flex items-center gap-2">{currentAlbumFolder ? <button className="border-0 bg-transparent p-0 text-xs text-[var(--misty-text-muted)]" type="button" onClick={() => setSelectedAlbumFolderId(currentAlbumFolder.parent_folder_id ?? "")}>←</button> : null}<h4 className="m-0 text-sm">{currentAlbumFolder?.name ?? "Albums"}</h4></div><div className="flex gap-2">{currentAlbumFolder ? <><button className={smallButtonClass} type="button" onClick={() => void renameAlbumFolder()}><Pencil size={12}/>Rename</button><button className={smallButtonClass} type="button" onClick={() => void deleteAlbumFolder()}><Trash2 size={12}/>Delete</button></> : null}<button className={secondaryButtonClass} type="button" onClick={() => void createAlbumFolder()}><Folder size={13}/>New folder</button><button className={secondaryButtonClass} type="button" onClick={openCreateAlbum}><Plus size={13}/>New album</button></div></div>
-          <div className="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-3">{visibleAlbumFolders.map((folder) => <button className="rounded-2xl border border-[var(--misty-border-soft)] bg-[var(--misty-surface)] p-4 text-left" type="button" key={folder.id} onClick={() => setSelectedAlbumFolderId(folder.id)}><Folder size={26}/><p className="mb-0 mt-5 truncate text-xs font-medium">{folder.name}</p><p className="mb-0 mt-1 text-[10px] text-[var(--misty-text-subtle)]">{folder.album_count + folder.folder_count} items</p></button>)}{visibleAlbumsForFolder.map((album) => <button className="overflow-hidden rounded-2xl border border-[var(--misty-border-soft)] bg-[var(--misty-surface)] p-0 text-left" type="button" key={album.id} onClick={() => selectCollection("albums", album.id)}><AlbumCover spaceId={spaceId} itemId={album.cover_item_id}/><div className="p-3"><p className="m-0 truncate text-xs font-medium">{album.name}</p><p className="mb-0 mt-1 text-[10px] text-[var(--misty-text-subtle)]">{album.item_count} items</p></div></button>)}</div>
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-3"><div className="flex items-center gap-2">{currentAlbumFolder ? <button className="border-0 bg-transparent p-0 text-xs text-[var(--misty-text-muted)]" type="button" onClick={() => setSelectedAlbumFolderId(currentAlbumFolder.parent_folder_id ?? "")}>←</button> : null}<h4 className="m-0 text-sm">{currentAlbumFolder?.name ?? "Albums"}</h4></div>{canEditLibrary ? <div className="flex gap-2">{currentAlbumFolder ? <><button className={smallButtonClass} type="button" onClick={() => void renameAlbumFolder()}><Pencil size={12}/>Rename</button><button className={smallButtonClass} type="button" onClick={() => void deleteAlbumFolder()}><Trash2 size={12}/>Delete</button></> : null}<button className={secondaryButtonClass} type="button" onClick={() => void createAlbumFolder()}><Folder size={13}/>New folder</button><button className={secondaryButtonClass} type="button" onClick={openCreateAlbum}><Plus size={13}/>New album</button></div> : null}</div>
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-3">{visibleAlbumFolders.map((folder) => <button className="rounded-2xl border border-[var(--misty-border-soft)] bg-[var(--misty-app-panel-bg,var(--misty-app-page-bg,var(--misty-bg)))] p-4 text-left" type="button" key={folder.id} onClick={() => setSelectedAlbumFolderId(folder.id)}><Folder size={26}/><p className="mb-0 mt-5 truncate text-xs font-medium">{folder.name}</p><p className="mb-0 mt-1 text-[10px] text-[var(--misty-text-subtle)]">{folder.album_count + folder.folder_count} items</p></button>)}{visibleAlbumsForFolder.map((album) => <button className="overflow-hidden rounded-2xl border border-[var(--misty-border-soft)] bg-[var(--misty-app-panel-bg,var(--misty-app-page-bg,var(--misty-bg)))] p-0 text-left" type="button" key={album.id} onClick={() => selectCollection("albums", album.id)}><AlbumCover spaceId={spaceId} itemId={album.cover_item_id}/><div className="p-3"><p className="m-0 truncate text-xs font-medium">{album.name}</p><p className="mb-0 mt-1 text-[10px] text-[var(--misty-text-subtle)]">{album.item_count} items</p></div></button>)}</div>
           {visibleAlbumFolders.length === 0 && visibleAlbumsForFolder.length === 0 ? <div className="grid min-h-48 place-items-center text-sm text-[var(--misty-text-subtle)]">Nothing to see here...</div> : null}
         </div> : null}
-        {collection === "groups" && !selectedCollectionId ? <div className="mb-5"><div className="mb-3 flex items-center justify-between"><h4 className="m-0 text-sm">Groups</h4><button className={secondaryButtonClass} type="button" onClick={() => void createGroup()}><Plus size={13}/>New smart group</button></div><div className="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-3">{groups.map((group) => <button className="rounded-2xl border border-[var(--misty-border-soft)] bg-[var(--misty-surface)] p-4 text-left" type="button" key={group.id} onClick={() => void selectCollection("groups", group.id)}><LibraryIcon size={22}/><p className="mb-0 mt-3 truncate text-xs font-medium">{group.name}</p><p className="mb-0 mt-1 truncate text-[10px] text-[var(--misty-text-subtle)]">{group.rules.all.length} rules</p></button>)}</div></div> : null}
+        {collection === "groups" && !selectedCollectionId ? <div className="mb-5"><div className="mb-3 flex items-center justify-between"><h4 className="m-0 text-sm">Groups</h4>{canEditLibrary ? <button className={secondaryButtonClass} type="button" onClick={() => void createGroup()}><Plus size={13}/>New smart group</button> : null}</div><div className="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-3">{groups.map((group) => <button className="rounded-2xl border border-[var(--misty-border-soft)] bg-[var(--misty-app-panel-bg,var(--misty-app-page-bg,var(--misty-bg)))] p-4 text-left" type="button" key={group.id} onClick={() => void selectCollection("groups", group.id)}><LibraryIcon size={22}/><p className="mb-0 mt-3 truncate text-xs font-medium">{group.name}</p><p className="mb-0 mt-1 truncate text-[10px] text-[var(--misty-text-subtle)]">{group.rules.all.length} rules</p></button>)}</div></div> : null}
         {collection === "map" && !selectedCollectionId ? <LibraryMapView points={discovery.map_points} onBack={() => selectCollection("collections")} onSelect={(point) => selectCollection("map", point.id)}/> : null}
-        {collection === "imports" ? <div className="mb-5"><button className="mb-4 border-0 bg-transparent p-0 text-xs text-[var(--misty-text-muted)]" type="button" onClick={() => selectCollection("collections")}>← Collections</button><div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-3">{importHistory.map((entry) => <article className="rounded-2xl border border-[var(--misty-border-soft)] bg-[var(--misty-surface)] p-4" key={entry.id}><div className="flex items-center justify-between gap-3"><History size={20}/><span className="rounded-lg bg-[var(--misty-surface-2)] px-2 py-1 text-[10px] capitalize text-[var(--misty-text-muted)]">{entry.direction}</span></div><p className="mb-0 mt-3 truncate text-xs font-medium">{entry.display_name}</p><p className="mb-0 mt-1 truncate text-[10px] text-[var(--misty-text-subtle)]">{entry.direction === "incoming" ? "From" : "To"} {entry.counterpart_space_name}</p><p className="mb-0 mt-3 text-[10px] text-[var(--misty-text-subtle)]">{formatBytes(entry.logical_bytes)} · {formatTime(entry.completed_at ?? entry.created_at)} · {entry.state}</p></article>)}</div>{importHistory.length === 0 ? <div className="grid min-h-48 place-items-center text-sm text-[var(--misty-text-subtle)]">Nothing to see here...</div> : null}</div> : null}
-        {collection === "shared" ? <div className="mb-5"><button className="mb-4 border-0 bg-transparent p-0 text-xs text-[var(--misty-text-muted)]" type="button" onClick={() => selectCollection("collections")}>← Collections</button>{sharedReferences.length > 0 ? <section><h4 className="mb-3 mt-0 text-sm">Shared with this Space</h4><div className="grid grid-cols-[repeat(auto-fill,minmax(210px,1fr))] gap-3">{sharedReferences.map((reference) => <article className="rounded-2xl border border-[var(--misty-border-soft)] bg-[var(--misty-surface)] p-4" key={reference.id}><MessagesSquare size={20}/><p className="mb-0 mt-3 truncate text-xs font-medium">{reference.display_name}</p><p className="mb-3 mt-1 truncate text-[10px] text-[var(--misty-text-subtle)]">From {reference.source_space_name} · {formatBytes(reference.byte_size)}</p><button className={smallButtonClass} type="button" onClick={() => void spacesApi.downloadSharedReference(spaceId, reference.id, reference.display_name)}><Download size={12}/>Download</button></article>)}</div></section> : null}{outgoingReferences.length > 0 ? <section className="mt-7"><h4 className="mb-3 mt-0 text-sm">Shared by this Space</h4><div className="grid grid-cols-[repeat(auto-fill,minmax(210px,1fr))] gap-3">{outgoingReferences.map((reference) => <article className="rounded-2xl border border-[var(--misty-border-soft)] bg-[var(--misty-surface)] p-4" key={reference.id}><MessagesSquare size={20}/><p className="mb-0 mt-3 truncate text-xs font-medium">{reference.display_name}</p><p className="mb-3 mt-1 truncate text-[10px] text-[var(--misty-text-subtle)]">To {reference.destination_space_name}</p><button className={smallButtonClass} type="button" onClick={() => void revokeSharedReference(reference)}><X size={12}/>Stop sharing</button></article>)}</div></section> : null}{sharedReferences.length === 0 && outgoingReferences.length === 0 ? <div className="grid min-h-48 place-items-center text-sm text-[var(--misty-text-subtle)]">Nothing to see here...</div> : null}</div> : null}
+        {collection === "imports" ? <div className="mb-5"><button className="mb-4 border-0 bg-transparent p-0 text-xs text-[var(--misty-text-muted)]" type="button" onClick={() => selectCollection("collections")}>← Collections</button><div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-3">{importHistory.map((entry) => <article className="rounded-2xl border border-[var(--misty-border-soft)] bg-[var(--misty-app-panel-bg,var(--misty-app-page-bg,var(--misty-bg)))] p-4" key={entry.id}><div className="flex items-center justify-between gap-3"><History size={20}/><span className="rounded-lg bg-[var(--misty-surface-2)] px-2 py-1 text-[10px] capitalize text-[var(--misty-text-muted)]">{entry.direction}</span></div><p className="mb-0 mt-3 truncate text-xs font-medium">{entry.display_name}</p><p className="mb-0 mt-1 truncate text-[10px] text-[var(--misty-text-subtle)]">{entry.direction === "incoming" ? "From" : "To"} {entry.counterpart_space_name}</p><p className="mb-0 mt-3 text-[10px] text-[var(--misty-text-subtle)]">{formatBytes(entry.logical_bytes)} · {formatTime(entry.completed_at ?? entry.created_at)} · {entry.state}</p></article>)}</div>{importHistory.length === 0 ? <div className="grid min-h-48 place-items-center text-sm text-[var(--misty-text-subtle)]">Nothing to see here...</div> : null}</div> : null}
+        {collection === "shared" ? <div className="mb-5"><button className="mb-4 border-0 bg-transparent p-0 text-xs text-[var(--misty-text-muted)]" type="button" onClick={() => selectCollection("collections")}>← Collections</button>{sharedReferences.length > 0 ? <section><h4 className="mb-3 mt-0 text-sm">Shared with this Space</h4><div className="grid grid-cols-[repeat(auto-fill,minmax(210px,1fr))] gap-3">{sharedReferences.map((reference) => <article className="rounded-2xl border border-[var(--misty-border-soft)] bg-[var(--misty-app-panel-bg,var(--misty-app-page-bg,var(--misty-bg)))] p-4" key={reference.id}><MessagesSquare size={20}/><p className="mb-0 mt-3 truncate text-xs font-medium">{reference.display_name}</p><p className="mb-3 mt-1 truncate text-[10px] text-[var(--misty-text-subtle)]">From {reference.source_space_name} · {formatBytes(reference.byte_size)}</p>{canCopyLibrary ? <button className={smallButtonClass} type="button" disabled={bulkSaving} onClick={() => void copySharedReferenceToClipboard(reference)}><ClipboardCopy size={12}/>Copy</button> : null}</article>)}</div></section> : null}{outgoingReferences.length > 0 ? <section className="mt-7"><h4 className="mb-3 mt-0 text-sm">Shared by this Space</h4><div className="grid grid-cols-[repeat(auto-fill,minmax(210px,1fr))] gap-3">{outgoingReferences.map((reference) => <article className="rounded-2xl border border-[var(--misty-border-soft)] bg-[var(--misty-app-panel-bg,var(--misty-app-page-bg,var(--misty-bg)))] p-4" key={reference.id}><MessagesSquare size={20}/><p className="mb-0 mt-3 truncate text-xs font-medium">{reference.display_name}</p><p className="mb-3 mt-1 truncate text-[10px] text-[var(--misty-text-subtle)]">To {reference.destination_space_name}</p>{canEditLibrary ? <button className={smallButtonClass} type="button" onClick={() => void revokeSharedReference(reference)}><X size={12}/>Stop sharing</button> : null}</article>)}</div></section> : null}{sharedReferences.length === 0 && outgoingReferences.length === 0 ? <div className="grid min-h-48 place-items-center text-sm text-[var(--misty-text-subtle)]">Nothing to see here...</div> : null}</div> : null}
         {collection === "duplicate" && !selectedCollectionId ? <div className="mb-5"><button className="mb-4 border-0 bg-transparent p-0 text-xs text-[var(--misty-text-muted)]" type="button" onClick={() => selectCollection("collections")}>← Collections</button><div className="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-3">{discovery.duplicates.map((group, index) => <LibraryDiscoveryCard key={group.id} spaceId={spaceId} group={{ ...group, title: `Duplicates ${index + 1}` }} fallbackIcon={Copy} onClick={() => selectCollection("duplicate", group.id)}/>)}</div></div> : null}
-        {collection === "people" && !selectedCollectionId && peoplePolicy ? <div className="mb-5"><div className="mb-4 flex flex-wrap items-center justify-between gap-3"><h4 className="m-0 text-sm">People & Pets</h4><div className="flex flex-wrap gap-2">{activeSpace?.role === "owner" ? <><button className={smallButtonClass} type="button" onClick={() => void togglePeoplePolicy("person")}>{peoplePolicy.faces_enabled ? "People on" : "People off"}</button><button className={smallButtonClass} type="button" onClick={() => void togglePeoplePolicy("pet")}>{peoplePolicy.pets_enabled ? "Pets on" : "Pets off"}</button></> : null}{peoplePolicy.faces_enabled ? <button className={secondaryButtonClass} type="button" onClick={() => openCreatePerson("person")}><Plus size={13}/>Person</button> : null}{peoplePolicy.pets_enabled ? <button className={secondaryButtonClass} type="button" onClick={() => openCreatePerson("pet")}><Plus size={13}/>Pet</button> : null}</div></div><div className="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-3">{people.map((person) => <button className="overflow-hidden rounded-2xl border border-[var(--misty-border-soft)] bg-[var(--misty-surface)] p-0 text-left" type="button" key={person.id} onClick={() => selectCollection("people", person.id)}><AlbumCover spaceId={spaceId} itemId={person.cover_item_id}/><div className="p-3"><p className="m-0 truncate text-xs font-medium">{person.name || (person.kind === "pet" ? "Unnamed pet" : "Unnamed person")}</p><p className="mb-0 mt-1 text-[10px] text-[var(--misty-text-subtle)]">{person.item_count} items · {person.kind === "pet" ? "Pet" : "Person"}</p></div></button>)}</div>{people.length === 0 ? <div className="grid min-h-48 place-items-center text-sm text-[var(--misty-text-subtle)]">Nothing to see here...</div> : null}</div> : null}
+        {collection === "people" && !selectedCollectionId && peoplePolicy ? <div className="mb-5"><div className="mb-4 flex flex-wrap items-center justify-between gap-3"><h4 className="m-0 text-sm">People & Pets</h4>{canEditLibrary ? <div className="flex flex-wrap gap-2">{activeSpace?.role === "owner" ? <><button className={smallButtonClass} type="button" onClick={() => void togglePeoplePolicy("person")}>{peoplePolicy.faces_enabled ? "People on" : "People off"}</button><button className={smallButtonClass} type="button" onClick={() => void togglePeoplePolicy("pet")}>{peoplePolicy.pets_enabled ? "Pets on" : "Pets off"}</button></> : null}{peoplePolicy.faces_enabled ? <button className={secondaryButtonClass} type="button" onClick={() => openCreatePerson("person")}><Plus size={13}/>Person</button> : null}{peoplePolicy.pets_enabled ? <button className={secondaryButtonClass} type="button" onClick={() => openCreatePerson("pet")}><Plus size={13}/>Pet</button> : null}</div> : null}</div><div className="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-3">{people.map((person) => <button className="overflow-hidden rounded-2xl border border-[var(--misty-border-soft)] bg-[var(--misty-app-panel-bg,var(--misty-app-page-bg,var(--misty-bg)))] p-0 text-left" type="button" key={person.id} onClick={() => selectCollection("people", person.id)}><AlbumCover spaceId={spaceId} itemId={person.cover_item_id}/><div className="p-3"><p className="m-0 truncate text-xs font-medium">{person.name || (person.kind === "pet" ? "Unnamed pet" : "Unnamed person")}</p><p className="mb-0 mt-1 text-[10px] text-[var(--misty-text-subtle)]">{person.item_count} items · {person.kind === "pet" ? "Pet" : "Person"}</p></div></button>)}</div>{people.length === 0 ? <div className="grid min-h-48 place-items-center text-sm text-[var(--misty-text-subtle)]">Nothing to see here...</div> : null}</div> : null}
         {currentDateGroup ? <div className="mb-4"><button className="border-0 bg-transparent p-0 text-xs text-[var(--misty-text-muted)]" type="button" onClick={() => selectCollection(collection)}>← {collection === "recent-days" ? "Recent Days" : collection === "months" ? "Months" : "Years"}</button><h4 className="mb-0 mt-2 text-sm">{currentDateGroup.title}</h4><p className="mb-0 mt-1 text-xs text-[var(--misty-text-subtle)]">{currentDateGroup.subtitle}</p></div> : null}
-        {currentPerson ? <div className="mb-4 flex items-center justify-between gap-3"><div><button className="border-0 bg-transparent p-0 text-xs text-[var(--misty-text-muted)]" type="button" onClick={() => selectCollection("people")}>← People & Pets</button><h4 className="mb-0 mt-2 text-sm">{currentPerson.name || (currentPerson.kind === "pet" ? "Unnamed pet" : "Unnamed person")}</h4></div><div className="flex flex-wrap gap-2"><select className={libraryControlClass} value="" onChange={(event) => { if (event.target.value) void mergeCurrentPerson(event.target.value); }} aria-label="Merge this identity"><option value="">Merge into…</option>{people.filter((person) => person.id !== currentPerson.id && person.kind === currentPerson.kind).map((person) => <option value={person.id} key={person.id}>{person.name || "Unnamed"}</option>)}</select><button className={smallButtonClass} type="button" onClick={openEditPerson}><Pencil size={12}/>Edit</button><button className={smallButtonClass} type="button" onClick={() => void deleteCurrentPerson()}><Trash2 size={12}/>Remove</button></div></div> : currentAlbum ? <div className="mb-4 flex flex-wrap items-center justify-between gap-3"><div><button className="border-0 bg-transparent p-0 text-xs text-[var(--misty-text-muted)]" type="button" onClick={() => { setSelectedCollectionId(""); setSelectedAlbumFolderId(currentAlbum.folder_id ?? ""); }}>← Albums</button><h4 className="mb-0 mt-2 text-sm">{currentAlbum.name}</h4>{currentAlbum.description ? <p className="mb-0 mt-1 text-xs text-[var(--misty-text-subtle)]">{currentAlbum.description}</p> : null}</div><div className="flex flex-wrap gap-2"><select className={libraryControlClass} value={currentAlbum.folder_id ?? ""} onChange={(event) => void organizeCurrentAlbum({ folder_id: event.target.value })} aria-label="Move album to folder"><option value="">Top level</option>{albumFolders.map((folder) => <option value={folder.id} key={folder.id}>{folder.name}</option>)}</select><select className={libraryControlClass} value={currentAlbum.sort_mode} onChange={(event) => void organizeCurrentAlbum({ sort_mode: event.target.value as LibraryAlbum["sort_mode"] })} aria-label="Sort album"><option value="custom">Custom order</option><option value="oldest">Oldest first</option><option value="newest">Newest first</option></select><button className={smallButtonClass} type="button" onClick={() => void organizeCurrentAlbum({ view_mode: currentAlbum.view_mode === "grid" ? "list" : "grid" })}>{currentAlbum.view_mode === "grid" ? <List size={12}/> : <Grid3X3 size={12}/>} {currentAlbum.view_mode === "grid" ? "List" : "Grid"}</button><button className={smallButtonClass} type="button" onClick={openEditAlbum}><Pencil size={12}/>Edit</button><button className={smallButtonClass} type="button" onClick={() => void deleteCurrentAlbum()}><Trash2 size={12}/>Delete album</button></div></div> : currentMapPoint ? <div className="mb-4"><button className="border-0 bg-transparent p-0 text-xs text-[var(--misty-text-muted)]" type="button" onClick={() => selectCollection("map")}>← Map</button><h4 className="mb-0 mt-2 text-sm">{currentMapPoint.name}</h4><p className="mb-0 mt-1 text-xs text-[var(--misty-text-subtle)]">{currentMapPoint.latitude.toFixed(2)}, {currentMapPoint.longitude.toFixed(2)}</p></div> : currentDiscoveryGroup ? <div className="mb-4 flex items-end justify-between gap-3"><div><button className="border-0 bg-transparent p-0 text-xs text-[var(--misty-text-muted)]" type="button" onClick={() => selectCollection(currentDiscoveryGroup.kind === "duplicate" ? "duplicate" : "collections")}>← {currentDiscoveryGroup.kind === "duplicate" ? "Duplicates" : "Collections"}</button><h4 className="mb-0 mt-2 text-sm">{currentDiscoveryGroup.title}</h4><p className="mb-0 mt-1 text-xs text-[var(--misty-text-subtle)]">{currentDiscoveryGroup.subtitle}</p></div><div className="flex gap-2">{currentDiscoveryGroup.kind === "memory" && visibleItems.length > 0 ? <button className={primaryButtonClass} type="button" onClick={() => setMemoryPlaybackOpen(true)}><Play size={13}/>Play memory</button> : null}{currentDiscoveryGroup.kind === "duplicate" ? <button className={primaryButtonClass} type="button" disabled={bulkSaving || visibleItems.length < 2} onClick={() => void mergeCurrentDuplicates()}>{bulkSaving ? "Merging…" : "Merge"}</button> : null}</div></div> : selectedCollectionId && !currentDateGroup ? <button className="mb-4 border-0 bg-transparent p-0 text-xs text-[var(--misty-text-muted)]" type="button" onClick={() => selectCollection("collections")}>← Collections</button> : null}
-        {currentDiscoveryGroup?.kind === "memory" ? <div className="mb-4 flex flex-wrap gap-2"><button className={smallButtonClass} type="button" onClick={() => { const title = window.prompt("Memory title", currentDiscoveryGroup.title)?.trim(); if (title && title !== currentDiscoveryGroup.title) void updateCurrentMemory({ title }); }}><Pencil size={12}/>Rename</button><select className={libraryControlClass} value={currentDiscoveryGroup.cover_item_id ?? ""} onChange={(event) => void updateCurrentMemory({ cover_item_id: event.target.value })} aria-label="Choose memory key photo">{visibleItems.map((candidate) => <option value={candidate.id} key={candidate.id}>{candidate.display_name}</option>)}</select><select className={libraryControlClass} value={currentDiscoveryGroup.music_item_id ?? ""} onChange={(event) => void updateCurrentMemory({ music_item_id: event.target.value })} aria-label="Choose memory music"><option value="">No music</option>{memoryAudioItems.map((candidate) => <option value={candidate.id} key={candidate.id}>{candidate.display_name}</option>)}</select><select className={libraryControlClass} value={currentDiscoveryGroup.playback_seconds ?? 4.5} onChange={(event) => void updateCurrentMemory({ playback_seconds: Number(event.target.value) })} aria-label="Choose memory pace"><option value={2}>Fast</option><option value={4.5}>Medium</option><option value={7}>Slow</option></select></div> : null}
+        {currentPerson ? <div className="mb-4 flex items-center justify-between gap-3"><div><button className="border-0 bg-transparent p-0 text-xs text-[var(--misty-text-muted)]" type="button" onClick={() => selectCollection("people")}>← People & Pets</button><h4 className="mb-0 mt-2 text-sm">{currentPerson.name || (currentPerson.kind === "pet" ? "Unnamed pet" : "Unnamed person")}</h4></div>{canEditLibrary ? <div className="flex flex-wrap gap-2"><select className={libraryControlClass} value="" onChange={(event) => { if (event.target.value) void mergeCurrentPerson(event.target.value); }} aria-label="Merge this identity"><option value="">Merge into…</option>{people.filter((person) => person.id !== currentPerson.id && person.kind === currentPerson.kind).map((person) => <option value={person.id} key={person.id}>{person.name || "Unnamed"}</option>)}</select><button className={smallButtonClass} type="button" onClick={openEditPerson}><Pencil size={12}/>Edit</button><button className={smallButtonClass} type="button" onClick={() => void deleteCurrentPerson()}><Trash2 size={12}/>Remove</button></div> : null}</div> : currentAlbum ? <div className="mb-4 flex flex-wrap items-center justify-between gap-3"><div><button className="border-0 bg-transparent p-0 text-xs text-[var(--misty-text-muted)]" type="button" onClick={() => { setSelectedAlbumFolderId(currentAlbum.folder_id ?? ""); selectCollection("albums"); }}>← Albums</button><h4 className="mb-0 mt-2 text-sm">{currentAlbum.name}</h4>{currentAlbum.description ? <p className="mb-0 mt-1 text-xs text-[var(--misty-text-subtle)]">{currentAlbum.description}</p> : null}</div>{canEditLibrary ? <details className="relative"><summary className={`${iconButtonClass} cursor-pointer list-none [&::-webkit-details-marker]:hidden`} aria-label="Album actions"><EllipsisVertical size={15}/></summary><div className="absolute right-0 top-[calc(100%+6px)] z-30 grid w-40 gap-1 rounded-xl border border-[var(--misty-border-strong)] bg-[var(--misty-app-panel-bg,var(--misty-app-page-bg,var(--misty-bg)))] p-1.5 shadow-xl"><button className="inline-flex min-h-9 items-center gap-2 rounded-lg border-0 bg-transparent px-2.5 text-left text-xs text-[var(--misty-text)] hover:bg-[var(--misty-surface-2)]" type="button" onClick={openEditAlbum}><Pencil size={13}/>Edit album</button><button className="inline-flex min-h-9 items-center gap-2 rounded-lg border-0 bg-transparent px-2.5 text-left text-xs text-red-200 hover:bg-red-500/10" type="button" onClick={() => void deleteCurrentAlbum()}><Trash2 size={13}/>Delete album</button></div></details> : null}</div> : currentMapPoint ? <div className="mb-4"><button className="border-0 bg-transparent p-0 text-xs text-[var(--misty-text-muted)]" type="button" onClick={() => selectCollection("map")}>← Map</button><h4 className="mb-0 mt-2 text-sm">{currentMapPoint.name}</h4><p className="mb-0 mt-1 text-xs text-[var(--misty-text-subtle)]">{currentMapPoint.latitude.toFixed(2)}, {currentMapPoint.longitude.toFixed(2)}</p></div> : currentDiscoveryGroup ? <div className="mb-4 flex items-end justify-between gap-3"><div><button className="border-0 bg-transparent p-0 text-xs text-[var(--misty-text-muted)]" type="button" onClick={() => selectCollection(currentDiscoveryGroup.kind === "duplicate" ? "duplicate" : "collections")}>← {currentDiscoveryGroup.kind === "duplicate" ? "Duplicates" : "Collections"}</button><h4 className="mb-0 mt-2 text-sm">{currentDiscoveryGroup.title}</h4><p className="mb-0 mt-1 text-xs text-[var(--misty-text-subtle)]">{currentDiscoveryGroup.subtitle}</p></div><div className="flex gap-2">{currentDiscoveryGroup.kind === "memory" && visibleItems.length > 0 ? <button className={primaryButtonClass} type="button" onClick={() => setMemoryPlaybackOpen(true)}><Play size={13}/>Play memory</button> : null}{canEditLibrary && currentDiscoveryGroup.kind === "duplicate" ? <button className={primaryButtonClass} type="button" disabled={bulkSaving || visibleItems.length < 2} onClick={() => void mergeCurrentDuplicates()}>{bulkSaving ? "Merging…" : "Merge"}</button> : null}</div></div> : selectedCollectionId && !currentDateGroup ? <button className="mb-4 border-0 bg-transparent p-0 text-xs text-[var(--misty-text-muted)]" type="button" onClick={() => selectCollection("collections")}>← Collections</button> : null}
+        {canEditLibrary && currentDiscoveryGroup?.kind === "memory" ? <div className="mb-4 flex flex-wrap gap-2"><button className={smallButtonClass} type="button" onClick={() => showTextDialog({ kind: "rename-memory", title: "Rename memory", primaryLabel: "Memory title", primaryValue: currentDiscoveryGroup.title })}><Pencil size={12}/>Rename</button><select className={libraryControlClass} value={currentDiscoveryGroup.cover_item_id ?? ""} onChange={(event) => void updateCurrentMemory({ cover_item_id: event.target.value })} aria-label="Choose memory key photo">{visibleItems.map((candidate) => <option value={candidate.id} key={candidate.id}>{candidate.display_name}</option>)}</select><select className={libraryControlClass} value={currentDiscoveryGroup.music_item_id ?? ""} onChange={(event) => void updateCurrentMemory({ music_item_id: event.target.value })} aria-label="Choose memory music"><option value="">No music</option>{memoryAudioItems.map((candidate) => <option value={candidate.id} key={candidate.id}>{candidate.display_name}</option>)}</select><select className={libraryControlClass} value={currentDiscoveryGroup.playback_seconds ?? 4.5} onChange={(event) => void updateCurrentMemory({ playback_seconds: Number(event.target.value) })} aria-label="Choose memory pace"><option value={2}>Fast</option><option value={4.5}>Medium</option><option value={7}>Slow</option></select></div> : null}
         {loading ? <div className="grid min-h-64 place-items-center text-sm text-[var(--misty-text-subtle)]">Loading Library…</div> : collection === "collections" || collection === "shared" || collection === "imports" || (collection === "recent-days" || collection === "months" || collection === "years" || collection === "people" || collection === "albums" || collection === "groups" || collection === "duplicate" || collection === "map") && !selectedCollectionId ? null : sensitiveCollectionScope && !sensitiveCollectionToken ? <div className="grid min-h-64 place-items-center"><button className={primaryButtonClass} type="button" onClick={() => requestSensitiveUnlock(sensitiveCollectionScope)}>Unlock {collection === "hidden" ? "Hidden" : "Recently Deleted"}</button></div> : displayItems.length === 0 ? (
-          <SpaceLibraryEmptyState collection={collection} searching={Boolean(searchQuery || mediaType)} uploading={uploading} uploadDisabled={uploading || (usage?.remaining_bytes ?? 1) <= 0} onUpload={() => setFilePickerOpen(true)} onClearSearch={() => { setSearchInput(""); setMediaType(""); }}/>
+          <SpaceLibraryEmptyState collection={collection} searching={Boolean(searchQuery || mediaType)} uploadAvailable={canUploadLibrary} uploading={uploading} uploadDisabled={uploading || (usage?.remaining_bytes ?? 1) <= 0} onUpload={() => setFilePickerOpen(true)} onClearSearch={() => { setSearchInput(""); setMediaType(""); }}/>
         ) : (
-          <div className="grid gap-3" style={{ gridTemplateColumns: currentAlbum?.view_mode === "list" ? "1fr" : `repeat(auto-fill,minmax(${gridSize}px,1fr))` }}>
+          <div className="grid gap-3.5" style={{ gridTemplateColumns: libraryViewMode === "list" ? "1fr" : "repeat(auto-fill,minmax(270px,1fr))" }}>
             {displayItems.map((item, itemIndex) => {
               const dateGroup = libraryDateGroupLabel(item, sort);
               const previousDateGroup = itemIndex > 0 ? libraryDateGroupLabel(displayItems[itemIndex - 1], sort) : "";
               const assetStack = stackByItemID.get(item.id);
+              const listLayout = libraryViewMode === "list";
               return <Fragment key={item.id}>
               {dateGroup && dateGroup !== previousDateGroup ? <h4 className="col-span-full mb-0 mt-3 text-xs font-semibold text-[var(--misty-text-muted)] first:mt-0">{dateGroup}</h4> : null}
-              <article className={`group min-w-0 rounded-2xl border bg-[var(--misty-surface)] p-3 ${currentAlbum?.view_mode === "list" ? "grid grid-cols-[112px_minmax(0,1fr)] items-center gap-3" : ""} ${selectedItemIds.includes(item.id) ? "border-[var(--misty-primary)]" : "border-[var(--misty-border-soft)]"}`} draggable={canReorderAlbum && !selecting} onDragStart={() => setDraggedAlbumItemId(item.id)} onDragEnd={() => setDraggedAlbumItemId("")} onDragOver={(event) => { if (canReorderAlbum) event.preventDefault(); }} onDrop={(event) => { event.preventDefault(); void reorderAlbumItem(item.id); }}>
-              <button className={`relative grid ${squareGrid ? "aspect-square" : "aspect-[4/3]"} w-full place-items-center overflow-hidden rounded-xl border-0 bg-[var(--misty-surface-2)] text-[var(--misty-text-subtle)]`} type="button" onClick={() => selecting ? toggleSelectedItem(item.id) : setSelectedItemId(item.id)} aria-label={selecting ? `${selectedItemIds.includes(item.id) ? "Deselect" : "Select"} ${item.display_name}` : `Open ${item.display_name}`}><LibraryItemThumbnail spaceId={spaceId} item={item} reauthenticationToken={sensitiveCollectionToken}/>{assetStack ? <span className="absolute bottom-2 left-2 rounded-md bg-black/65 px-1.5 py-1 text-[9px] font-semibold uppercase tracking-wide text-white">{assetStack.kind === "live_photo" ? "Live" : assetStack.kind === "raw_pair" ? "RAW+" : `${assetStack.members.length} burst`}</span> : null}{selecting ? <span className={`absolute right-2 top-2 grid size-5 place-items-center rounded-full border ${selectedItemIds.includes(item.id) ? "border-[var(--misty-primary)] bg-[var(--misty-primary)] text-[var(--misty-primary-contrast)]" : "border-white/60 bg-black/40 text-transparent"}`}><Check size={12}/></span> : null}</button>
-              <div className="mt-3 flex min-w-0 items-start gap-2"><div className="min-w-0 flex-1"><p className="m-0 truncate text-xs font-medium" title={item.display_name}>{item.display_name}</p><p className="m-0 mt-1 text-[10px] text-[var(--misty-text-subtle)]">{formatBytes(Number(item.file.intrinsic_metadata.byte_size ?? 0))} · {formatTime(item.added_at)}</p></div>{!selecting ? <button className={`${rowActionClass} !visible`} type="button" onClick={() => void updateItem(item, { favorite: !item.favorite })} title={item.favorite ? "Remove favorite" : "Favorite"}><Star size={14} fill={item.favorite ? "currentColor" : "none"}/></button> : null}</div>
-              {!selecting ? collection === "deleted" ? <div className="mt-2 flex flex-wrap gap-1"><button className={smallButtonClass} type="button" onClick={() => void restoreItem(item)}>Restore</button></div> : <div className="mt-2 flex flex-wrap gap-1"><button className={smallButtonClass} type="button" onClick={() => void spacesApi.downloadLibraryItem(spaceId, item.id, item.display_name, sensitiveCollectionToken)}><Download size={12}/>Download</button><button className={smallButtonClass} type="button" onClick={() => void duplicateItems([item.id])}><Copy size={12}/>Duplicate</button><button className={smallButtonClass} type="button" onClick={() => { const name = window.prompt("Rename in this Space", item.display_name)?.trim(); if (name && name !== item.display_name) void updateItem(item, { display_name: name }); }}><Pencil size={12}/>Rename</button><button className={smallButtonClass} type="button" onClick={() => { const tags = window.prompt("Tags, separated by commas", item.tags.join(", ")); if (tags !== null) void updateItem(item, { tags: tags.split(",").map((tag) => tag.trim()).filter(Boolean) }); }}>Tags</button><button className={smallButtonClass} type="button" title="Move to Recently Deleted" onClick={() => void trashItem(item)}><Trash2 size={12}/></button></div> : null}
-              {!selecting && albums.length > 0 ? <select className="mt-2 w-full rounded-lg border border-[var(--misty-border-soft)] bg-[var(--misty-surface-2)] px-2 py-1 text-[10px] text-[var(--misty-text-muted)]" value="" onChange={(event) => { const albumId = event.target.value; if (albumId) void spacesApi.addAlbumItems(spaceId, albumId, [item.id]).then(() => spacesApi.albums(spaceId)).then((result) => setAlbums(result.albums)); }} aria-label={`Add ${item.display_name} to album`}><option value="">Add to album…</option>{albums.map((album) => <option value={album.id} key={album.id}>{album.name}</option>)}</select> : null}
+              <article className={`group relative min-w-0 rounded-2xl border bg-[var(--misty-app-panel-bg,var(--misty-app-page-bg,var(--misty-bg)))] p-2 shadow-sm transition-[border-color,background-color,box-shadow] hover:border-[var(--misty-border-strong)] hover:bg-[var(--misty-app-surface-soft-bg,var(--misty-surface))] ${listLayout ? "grid grid-cols-[132px_minmax(0,1fr)] items-center gap-3" : ""} ${selectedItemIds.includes(item.id) ? "border-[var(--misty-primary)] shadow-[0_0_0_1px_var(--misty-primary)]" : "border-[var(--misty-border-soft)]"}`} draggable={canReorderAlbum && selectedItemIds.length === 0} onContextMenu={(event) => openItemContextMenu(event, item.id)} onDragStart={() => setDraggedAlbumItemId(item.id)} onDragEnd={() => setDraggedAlbumItemId("")} onDragOver={(event) => { if (canReorderAlbum) event.preventDefault(); }} onDrop={(event) => { event.preventDefault(); void reorderAlbumItem(item.id); }}>
+              <div className="relative min-w-0"><button className="relative grid aspect-[4/3] w-full place-items-center overflow-hidden rounded-xl border-0 bg-[var(--misty-surface-2)] text-[var(--misty-text-subtle)]" type="button" onClick={(event) => { libraryViewerTriggerRef.current = event.currentTarget; setSelectedItemId(item.id); }} aria-label={`Open ${item.display_name}`}><LibraryItemThumbnail spaceId={spaceId} item={item} reauthenticationToken={sensitiveCollectionToken}/>{assetStack ? <span className="absolute bottom-2 left-2 rounded-md bg-black/65 px-1.5 py-1 text-[9px] font-semibold capitalize text-white">{assetStack.kind === "live_photo" ? "Live" : assetStack.kind === "raw_pair" ? "RAW+" : `${assetStack.members.length} burst`}</span> : null}</button>{canEditLibrary || canCopyLibrary ? <button className={`absolute right-2 top-2 z-10 grid size-5 place-items-center rounded-md border shadow-sm transition-opacity ${selectedItemIds.includes(item.id) ? "border-[var(--misty-primary)] bg-[var(--misty-primary)] text-[var(--misty-primary-contrast)] opacity-100" : "pointer-events-none border-white/50 bg-black/55 text-transparent opacity-0 group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100"}`} type="button" aria-label={`${selectedItemIds.includes(item.id) ? "Deselect" : "Select"} ${item.display_name}`} aria-pressed={selectedItemIds.includes(item.id)} onClick={(event) => { event.stopPropagation(); toggleSelectedItem(item.id); }}><Check size={12}/></button> : null}</div>
+              <div className={`${listLayout ? "min-w-0 py-1 pr-1" : "px-1 pb-1 pt-2.5"}`}>
+                <div className="flex min-w-0 items-start gap-2">
+                  <div className="min-w-0 flex-1"><p className="m-0 truncate text-xs font-semibold text-[var(--misty-text)]" title={item.display_name}>{item.display_name}</p><p className="m-0 mt-1 truncate text-[10px] text-[var(--misty-text-subtle)]">{formatBytes(Number(item.file.intrinsic_metadata.byte_size ?? 0))} · {formatTime(item.added_at)}</p></div>
+                  {canEditLibrary || canCopyLibrary ? <div className={`flex shrink-0 items-center gap-0.5 transition-opacity ${itemMenu?.itemId === item.id ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0 group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100"}`} aria-label={`Actions for ${item.display_name}`}>
+                    {canEditLibrary ? <button className="grid size-7 shrink-0 place-items-center rounded-lg border-0 bg-transparent text-[var(--misty-text-subtle)] hover:bg-[var(--misty-surface-2)] hover:text-[var(--misty-text)]" type="button" onClick={() => void updateItem(item, { favorite: !item.favorite })} title={item.favorite ? "Remove favorite" : "Favorite"} aria-label={`${item.favorite ? "Remove from favorites" : "Add to favorites"}: ${item.display_name}`}><Star size={14} fill={item.favorite ? "currentColor" : "none"}/></button> : null}
+                    <button className="grid size-7 shrink-0 place-items-center rounded-lg border-0 bg-transparent text-[var(--misty-text-subtle)] hover:bg-[var(--misty-surface-2)] hover:text-[var(--misty-text)]" type="button" onClick={(event) => { const rect = event.currentTarget.getBoundingClientRect(); showItemMenu(item.id, rect.right - 224, rect.bottom + 4); }} aria-label={`More actions for ${item.display_name}`} aria-haspopup="menu"><EllipsisVertical size={15}/></button>
+                  </div> : null}
+                </div>
+                <dl className={`${listLayout ? "mt-3 grid grid-cols-3 gap-x-4" : "mt-3 grid gap-1.5"} text-[10px] leading-4`}>
+                  <div className={listLayout ? "min-w-0" : "flex items-center justify-between gap-3"}><dt className="text-[var(--misty-text-subtle)]">Size</dt><dd className="m-0 truncate text-[var(--misty-text-muted)]">{formatBytes(Number(item.file.intrinsic_metadata.byte_size ?? 0))}</dd></div>
+                  <div className={listLayout ? "min-w-0" : "flex items-center justify-between gap-3"}><dt className="text-[var(--misty-text-subtle)]">Date</dt><dd className="m-0 truncate text-[var(--misty-text-muted)]">{formatTime(item.added_at)}</dd></div>
+                  <div className={listLayout ? "min-w-0" : "flex items-center justify-between gap-3"}><dt className="text-[var(--misty-text-subtle)]">File type</dt><dd className="m-0 truncate text-[var(--misty-text-muted)]">{libraryFileTypeLabel(item)}</dd></div>
+                </dl>
+              </div>
               </article>
               </Fragment>;
             })}
@@ -1511,19 +1518,39 @@ function SpaceLibrary({ spaceId, section }: { spaceId: string; section: string }
           </div>
         )}
       </div>
-      {filePickerOpen ? <MistyFilePicker mode="file" multiple title="Add files to this Space" onCancel={() => setFilePickerOpen(false)} onSelect={(path) => { setFilePickerOpen(false); void uploadFiles([path]); }} onSelectMany={(paths) => { setFilePickerOpen(false); void uploadFiles(paths); }}/> : null}
-      {selectedItemId ? <LibraryItemViewer spaceId={spaceId} item={displayItems.find((item) => item.id === selectedItemId) ?? items.find((item) => item.id === selectedItemId) ?? null} items={displayItems} allItems={items} assetStack={stackByItemID.get(selectedItemId) ?? null} reauthenticationToken={sensitiveCollectionToken} onCopyEdit={(definition) => setCopiedEditDefinition(structuredClone(definition))} onSetStackCover={setAssetStackCover} onSetStackEffect={setAssetStackEffect} onUngroupStack={ungroupAssetStack} onClose={() => setSelectedItemId("")} onSelect={setSelectedItemId} onUpdate={updateItem} onReplaceItem={replaceItem} onRenditionReady={() => setReloadKey((current) => current + 1)} onTrash={trashItem}/> : null}
+      {itemMenu && menuItem ? <LibraryItemContextMenu
+        state={itemMenu}
+        item={menuItem}
+        albums={albums}
+        canCopy={canCopyLibrary}
+        canEdit={canEditLibrary}
+        deleted={collection === "deleted"}
+        onClose={() => setItemMenu(null)}
+        onCopy={() => void copyItemsToClipboard([menuItem])}
+        onDuplicate={() => void duplicateItems([menuItem.id])}
+        onRename={() => showTextDialog({ kind: "rename-item", title: "Rename Library item", primaryLabel: "Name", primaryValue: menuItem.display_name, itemId: menuItem.id })}
+        onEditTags={() => showTextDialog({ kind: "edit-tags", title: "Edit tags", primaryLabel: "Tags, separated by commas", primaryValue: menuItem.tags.join(", "), itemId: menuItem.id })}
+        onAddToAlbum={(albumId) => void addItemToAlbum(menuItem.id, albumId).catch((error) => setLocalError(error instanceof Error ? error.message : "The item could not be added to that album."))}
+        onToggleFavorite={() => void updateItem(menuItem, { favorite: !menuItem.favorite })}
+        onTrash={() => void trashItem(menuItem)}
+        onRestore={() => void restoreItem(menuItem)}
+      /> : null}
+      {filePickerOpen && canUploadLibrary ? <MistyFilePicker mode="file" multiple title="Add files to this Space" onCancel={() => setFilePickerOpen(false)} onSelect={(path) => { setFilePickerOpen(false); void uploadFiles([path]); }} onSelectMany={(paths) => { setFilePickerOpen(false); void uploadFiles(paths); }}/> : null}
+      {selectedItemId ? <LibraryItemViewer spaceId={spaceId} item={displayItems.find((item) => item.id === selectedItemId) ?? items.find((item) => item.id === selectedItemId) ?? null} items={displayItems} allItems={items} assetStack={stackByItemID.get(selectedItemId) ?? null} reauthenticationToken={sensitiveCollectionToken} canEdit={canEditLibrary} canCopy={canCopyLibrary} returnFocusRef={libraryViewerTriggerRef} onCopyEdit={(definition) => setCopiedEditDefinition(structuredClone(definition))} onSetStackCover={setAssetStackCover} onSetStackEffect={setAssetStackEffect} onUngroupStack={ungroupAssetStack} onClose={() => setSelectedItemId("")} onSelect={setSelectedItemId} onUpdate={updateItem} onReplaceItem={replaceItem} onRenditionReady={() => setReloadKey((current) => current + 1)} onTrash={trashItem}/> : null}
       {memoryPlaybackOpen && currentDiscoveryGroup?.kind === "memory" ? <LibraryMemoryPlayback spaceId={spaceId} group={currentDiscoveryGroup} items={visibleItems} onClose={() => setMemoryPlaybackOpen(false)}/> : null}
-      {albumDialogMode ? <div className="fixed inset-0 z-[2147483000] grid place-items-center bg-black/60 p-6" role="presentation" onMouseDown={(event) => { if (event.currentTarget === event.target && !albumSaving) setAlbumDialogMode(""); }}><form className="w-full max-w-sm rounded-2xl border border-[var(--misty-border-strong)] bg-[var(--misty-modal-bg,var(--misty-surface))] p-5 shadow-2xl" onSubmit={(event) => void saveAlbum(event)}><div className="flex items-center justify-between gap-4"><h2 className="m-0 text-base font-semibold">{albumDialogMode === "create" ? "New album" : "Edit album"}</h2><button className={iconButtonClass} type="button" disabled={albumSaving} onClick={() => setAlbumDialogMode("")} aria-label="Close album dialog"><X size={15}/></button></div><label className="mt-5 grid gap-2 text-xs font-medium text-[var(--misty-text-muted)]">Name<input className={inputClass} autoFocus maxLength={120} value={albumName} onChange={(event) => setAlbumName(event.target.value)}/></label><label className="mt-4 grid gap-2 text-xs font-medium text-[var(--misty-text-muted)]">Description<textarea className={`${inputClass} min-h-20 resize-y py-2`} maxLength={2000} value={albumDescription} onChange={(event) => setAlbumDescription(event.target.value)}/></label>{albumDialogMode === "edit" && visibleItems.length > 0 ? <label className="mt-4 grid gap-2 text-xs font-medium text-[var(--misty-text-muted)]">Cover<select className={inputClass} value={albumCoverItemId} onChange={(event) => setAlbumCoverItemId(event.target.value)}><option value="">Automatic</option>{visibleItems.map((item) => <option value={item.id} key={item.id}>{item.display_name}</option>)}</select></label> : null}<div className="mt-5 flex justify-end gap-2"><button className={secondaryButtonClass} type="button" disabled={albumSaving} onClick={() => setAlbumDialogMode("")}>Cancel</button><button className={primaryButtonClass} type="submit" disabled={albumSaving || !albumName.trim()}>{albumSaving ? "Saving…" : albumDialogMode === "create" ? "Create" : "Save"}</button></div></form></div> : null}
-      {personDialogMode ? <div className="fixed inset-0 z-[2147483000] grid place-items-center bg-black/60 p-6" role="presentation" onMouseDown={(event) => { if (event.currentTarget === event.target && !personSaving) setPersonDialogMode(""); }}><form className="w-full max-w-sm rounded-2xl border border-[var(--misty-border-strong)] bg-[var(--misty-modal-bg,var(--misty-surface))] p-5 shadow-2xl" onSubmit={(event) => void savePerson(event)}><div className="flex items-center justify-between gap-4"><h2 className="m-0 text-base font-semibold">{personDialogMode === "create" ? personKind === "pet" ? "New pet" : "New person" : personKind === "pet" ? "Edit pet" : "Edit person"}</h2><button className={iconButtonClass} type="button" disabled={personSaving} onClick={() => setPersonDialogMode("")} aria-label="Close People & Pets dialog"><X size={15}/></button></div><label className="mt-5 grid gap-2 text-xs font-medium text-[var(--misty-text-muted)]">Name<input className={inputClass} autoFocus maxLength={120} value={personName} onChange={(event) => setPersonName(event.target.value)}/></label>{personDialogMode === "edit" && visibleItems.length > 0 ? <label className="mt-4 grid gap-2 text-xs font-medium text-[var(--misty-text-muted)]">Cover<select className={inputClass} value={personCoverItemId} onChange={(event) => setPersonCoverItemId(event.target.value)}><option value="">Automatic</option>{visibleItems.map((item) => <option value={item.id} key={item.id}>{item.display_name}</option>)}</select></label> : null}<div className="mt-5 flex justify-end gap-2"><button className={secondaryButtonClass} type="button" disabled={personSaving} onClick={() => setPersonDialogMode("")}>Cancel</button><button className={primaryButtonClass} type="submit" disabled={personSaving}>{personSaving ? "Saving…" : personDialogMode === "create" ? "Create" : "Save"}</button></div></form></div> : null}
-      {metadataDialogAction ? <div className="fixed inset-0 z-[2147483000] grid place-items-center bg-black/60 p-6" role="presentation" onMouseDown={(event) => { if (event.currentTarget === event.target && !bulkSaving) setMetadataDialogAction(""); }}><form className="w-full max-w-sm rounded-2xl border border-[var(--misty-border-strong)] bg-[var(--misty-modal-bg,var(--misty-surface))] p-5 shadow-2xl" onSubmit={(event) => void saveBulkMetadata(event)}><div className="flex items-center justify-between gap-4"><h2 className="m-0 text-base font-semibold">{metadataDialogAction === "add_tags" ? "Add tags" : metadataDialogAction === "remove_tags" ? "Remove tags" : metadataDialogAction === "set_date" ? "Adjust date" : "Set location"}</h2><button className={iconButtonClass} type="button" disabled={bulkSaving} onClick={() => setMetadataDialogAction("")} aria-label="Close metadata dialog"><X size={15}/></button></div><p className="mb-0 mt-1 text-xs text-[var(--misty-text-subtle)]">{selectedItems.length} selected item{selectedItems.length === 1 ? "" : "s"}</p>{metadataDialogAction === "add_tags" || metadataDialogAction === "remove_tags" ? <label className="mt-5 grid gap-2 text-xs font-medium text-[var(--misty-text-muted)]">Tags<input className={inputClass} autoFocus value={metadataTags} onChange={(event) => setMetadataTags(event.target.value)} placeholder="travel, family"/></label> : metadataDialogAction === "set_date" ? <label className="mt-5 grid gap-2 text-xs font-medium text-[var(--misty-text-muted)]">Date and time<input className={inputClass} autoFocus type="datetime-local" value={metadataDate} onChange={(event) => setMetadataDate(event.target.value)}/></label> : <div className="mt-5 grid gap-4"><label className="grid gap-2 text-xs font-medium text-[var(--misty-text-muted)]">Place name<input className={inputClass} autoFocus value={metadataLocationName} onChange={(event) => setMetadataLocationName(event.target.value)} placeholder="Big Sur"/></label><div className="grid grid-cols-2 gap-3"><label className="grid gap-2 text-xs font-medium text-[var(--misty-text-muted)]">Latitude<input className={inputClass} inputMode="decimal" value={metadataLatitude} onChange={(event) => setMetadataLatitude(event.target.value)} placeholder="36.2704"/></label><label className="grid gap-2 text-xs font-medium text-[var(--misty-text-muted)]">Longitude<input className={inputClass} inputMode="decimal" value={metadataLongitude} onChange={(event) => setMetadataLongitude(event.target.value)} placeholder="-121.8079"/></label></div></div>}<div className="mt-5 flex justify-end gap-2"><button className={secondaryButtonClass} type="button" disabled={bulkSaving} onClick={() => setMetadataDialogAction("")}>Cancel</button><button className={primaryButtonClass} type="submit" disabled={bulkSaving}>{bulkSaving ? "Saving…" : "Apply"}</button></div></form></div> : null}
-      {unlockScope ? <div className="fixed inset-0 z-[2147483200] grid place-items-center bg-black/70 p-6" role="presentation" onMouseDown={(event) => { if (event.currentTarget === event.target && !unlockSaving) setUnlockScope(""); }}><form className="w-full max-w-sm rounded-2xl border border-[var(--misty-border-strong)] bg-[var(--misty-modal-bg,var(--misty-surface))] p-5 shadow-2xl" onSubmit={(event) => void submitSensitiveUnlock(event)}><div className="flex items-center justify-between gap-4"><h2 className="m-0 text-base font-semibold">Unlock {unlockScope === "hidden" ? "Hidden" : unlockScope === "recently_deleted" ? "Recently Deleted" : "Export"}</h2><button className={iconButtonClass} type="button" disabled={unlockSaving} onClick={() => setUnlockScope("")} aria-label="Close unlock dialog"><X size={15}/></button></div><label className="mt-5 grid gap-2 text-xs font-medium text-[var(--misty-text-muted)]">Misty password<input className={inputClass} autoFocus type="password" autoComplete="current-password" value={unlockPassword} onChange={(event) => setUnlockPassword(event.target.value)}/></label>{localError ? <p className="mb-0 mt-3 text-xs text-red-200">{localError}</p> : null}<div className="mt-5 flex justify-end gap-2"><button className={secondaryButtonClass} type="button" disabled={unlockSaving} onClick={() => setUnlockScope("")}>Cancel</button><button className={primaryButtonClass} type="submit" disabled={unlockSaving || !unlockPassword}>{unlockSaving ? "Unlocking…" : "Unlock"}</button></div></form></div> : null}
+{albumDialogMode ? <div className="fixed inset-0 z-[2147483000] grid place-items-center bg-black/60 p-6" role="presentation" onMouseDown={(event) => { if (event.currentTarget === event.target && !albumSaving) setAlbumDialogMode(""); }}><form ref={albumDialogFocus.dialogRef} className="w-full max-w-sm rounded-2xl border border-[var(--misty-border-strong)] bg-[var(--misty-app-modal-bg,var(--misty-surface))] p-5 shadow-2xl" role="dialog" aria-modal="true" aria-label={albumDialogMode === "create" ? "New album" : "Edit album"} onKeyDown={albumDialogFocus.trapFocus} onSubmit={(event) => void saveAlbum(event)}><div className="flex items-center justify-between gap-4"><h2 className="m-0 text-base font-semibold">{albumDialogMode === "create" ? "New album" : "Edit album"}</h2><button className={iconButtonClass} type="button" disabled={albumSaving} onClick={() => setAlbumDialogMode("")} aria-label="Close album dialog"><X size={15}/></button></div><label className="mt-5 grid gap-2 text-xs font-medium text-[var(--misty-text-muted)]">Name<input className={inputClass} data-dialog-autofocus maxLength={120} value={albumName} onChange={(event) => setAlbumName(event.target.value)}/></label><label className="mt-4 grid gap-2 text-xs font-medium text-[var(--misty-text-muted)]">Description<textarea className={`${inputClass} min-h-20 resize-y py-2`} maxLength={2000} value={albumDescription} onChange={(event) => setAlbumDescription(event.target.value)}/></label>{albumDialogMode === "edit" && visibleItems.length > 0 ? <label className="mt-4 grid gap-2 text-xs font-medium text-[var(--misty-text-muted)]">Cover<select className={inputClass} value={albumCoverItemId} onChange={(event) => setAlbumCoverItemId(event.target.value)}><option value="">Automatic</option>{visibleItems.map((item) => <option value={item.id} key={item.id}>{item.display_name}</option>)}</select></label> : null}<div className="mt-5 flex justify-end gap-2"><button className={secondaryButtonClass} type="button" disabled={albumSaving} onClick={() => setAlbumDialogMode("")}>Cancel</button><button className={primaryButtonClass} type="submit" disabled={albumSaving || !albumName.trim()}>{albumSaving ? "Saving…" : albumDialogMode === "create" ? "Create" : "Save"}</button></div></form></div> : null}
+{personDialogMode ? <div className="fixed inset-0 z-[2147483000] grid place-items-center bg-black/60 p-6" role="presentation" onMouseDown={(event) => { if (event.currentTarget === event.target && !personSaving) setPersonDialogMode(""); }}><form ref={personDialogFocus.dialogRef} className="w-full max-w-sm rounded-2xl border border-[var(--misty-border-strong)] bg-[var(--misty-app-modal-bg,var(--misty-surface))] p-5 shadow-2xl" role="dialog" aria-modal="true" aria-label="People and Pets" onKeyDown={personDialogFocus.trapFocus} onSubmit={(event) => void savePerson(event)}><div className="flex items-center justify-between gap-4"><h2 className="m-0 text-base font-semibold">{personDialogMode === "create" ? personKind === "pet" ? "New pet" : "New person" : personKind === "pet" ? "Edit pet" : "Edit person"}</h2><button className={iconButtonClass} type="button" disabled={personSaving} onClick={() => setPersonDialogMode("")} aria-label="Close People & Pets dialog"><X size={15}/></button></div><label className="mt-5 grid gap-2 text-xs font-medium text-[var(--misty-text-muted)]">Name<input className={inputClass} data-dialog-autofocus maxLength={120} value={personName} onChange={(event) => setPersonName(event.target.value)}/></label>{personDialogMode === "edit" && visibleItems.length > 0 ? <label className="mt-4 grid gap-2 text-xs font-medium text-[var(--misty-text-muted)]">Cover<select className={inputClass} value={personCoverItemId} onChange={(event) => setPersonCoverItemId(event.target.value)}><option value="">Automatic</option>{visibleItems.map((item) => <option value={item.id} key={item.id}>{item.display_name}</option>)}</select></label> : null}<div className="mt-5 flex justify-end gap-2"><button className={secondaryButtonClass} type="button" disabled={personSaving} onClick={() => setPersonDialogMode("")}>Cancel</button><button className={primaryButtonClass} type="submit" disabled={personSaving}>{personSaving ? "Saving…" : personDialogMode === "create" ? "Create" : "Save"}</button></div></form></div> : null}
+{metadataDialogAction ? <div className="fixed inset-0 z-[2147483000] grid place-items-center bg-black/60 p-6" role="presentation" onMouseDown={(event) => { if (event.currentTarget === event.target && !bulkSaving) setMetadataDialogAction(""); }}><form ref={metadataDialogFocus.dialogRef} className="w-full max-w-sm rounded-2xl border border-[var(--misty-border-strong)] bg-[var(--misty-app-modal-bg,var(--misty-surface))] p-5 shadow-2xl" role="dialog" aria-modal="true" aria-label="Adjust selected item metadata" onKeyDown={metadataDialogFocus.trapFocus} onSubmit={(event) => void saveBulkMetadata(event)}><div className="flex items-center justify-between gap-4"><h2 className="m-0 text-base font-semibold">{metadataDialogAction === "add_tags" ? "Add tags" : metadataDialogAction === "remove_tags" ? "Remove tags" : metadataDialogAction === "set_date" ? "Adjust date" : "Set location"}</h2><button className={iconButtonClass} type="button" disabled={bulkSaving} onClick={() => setMetadataDialogAction("")} aria-label="Close metadata dialog"><X size={15}/></button></div><p className="mb-0 mt-1 text-xs text-[var(--misty-text-subtle)]">{selectedItems.length} selected item{selectedItems.length === 1 ? "" : "s"}</p>{metadataDialogAction === "add_tags" || metadataDialogAction === "remove_tags" ? <label className="mt-5 grid gap-2 text-xs font-medium text-[var(--misty-text-muted)]">Tags<input className={inputClass} data-dialog-autofocus value={metadataTags} onChange={(event) => setMetadataTags(event.target.value)} placeholder="travel, family"/></label> : metadataDialogAction === "set_date" ? <label className="mt-5 grid gap-2 text-xs font-medium text-[var(--misty-text-muted)]">Date and time<input className={inputClass} data-dialog-autofocus type="datetime-local" value={metadataDate} onChange={(event) => setMetadataDate(event.target.value)}/></label> : <div className="mt-5 grid gap-4"><label className="grid gap-2 text-xs font-medium text-[var(--misty-text-muted)]">Place name<input className={inputClass} data-dialog-autofocus value={metadataLocationName} onChange={(event) => setMetadataLocationName(event.target.value)} placeholder="Big Sur"/></label><div className="grid grid-cols-2 gap-3"><label className="grid gap-2 text-xs font-medium text-[var(--misty-text-muted)]">Latitude<input className={inputClass} inputMode="decimal" value={metadataLatitude} onChange={(event) => setMetadataLatitude(event.target.value)} placeholder="36.2704"/></label><label className="grid gap-2 text-xs font-medium text-[var(--misty-text-muted)]">Longitude<input className={inputClass} inputMode="decimal" value={metadataLongitude} onChange={(event) => setMetadataLongitude(event.target.value)} placeholder="-121.8079"/></label></div></div>}<div className="mt-5 flex justify-end gap-2"><button className={secondaryButtonClass} type="button" disabled={bulkSaving} onClick={() => setMetadataDialogAction("")}>Cancel</button><button className={primaryButtonClass} type="submit" disabled={bulkSaving}>{bulkSaving ? "Saving…" : "Apply"}</button></div></form></div> : null}
+      {textDialog ? <div className="fixed inset-0 z-[2147483100] grid place-items-center bg-black/60 p-6" role="presentation" onMouseDown={(event) => { if (event.currentTarget === event.target && !textDialogSaving) setTextDialog(null); }}><form ref={textDialogFocus.dialogRef} className="w-full max-w-sm rounded-2xl border border-[var(--misty-border-strong)] bg-[var(--misty-app-modal-bg,var(--misty-surface))] p-5 shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="library-text-dialog-title" onKeyDown={textDialogFocus.trapFocus} onSubmit={(event) => void submitTextDialog(event)}><div className="flex items-center justify-between gap-4"><h2 className="m-0 text-base font-semibold" id="library-text-dialog-title">{textDialog.title}</h2><button className={iconButtonClass} type="button" disabled={textDialogSaving} onClick={() => setTextDialog(null)} aria-label="Close dialog"><X size={15}/></button></div><label className="mt-5 grid gap-2 text-xs font-medium text-[var(--misty-text-muted)]">{textDialog.primaryLabel}<input className={inputClass} data-dialog-autofocus maxLength={textDialog.kind === "edit-tags" ? 1000 : 255} value={textDialog.primaryValue} onChange={(event) => setTextDialog((current) => current ? { ...current, primaryValue: event.target.value } : current)}/></label>{textDialog.secondaryLabel ? <label className="mt-4 grid gap-2 text-xs font-medium text-[var(--misty-text-muted)]">{textDialog.secondaryLabel}<input className={inputClass} maxLength={120} value={textDialog.secondaryValue ?? ""} onChange={(event) => setTextDialog((current) => current ? { ...current, secondaryValue: event.target.value } : current)}/></label> : null}{textDialogError ? <p className="mb-0 mt-3 rounded-xl border border-red-400/20 bg-red-950/20 px-3 py-2 text-xs text-red-200" role="alert">{textDialogError}</p> : null}<div className="mt-5 flex justify-end gap-2"><button className={secondaryButtonClass} type="button" disabled={textDialogSaving} onClick={() => setTextDialog(null)}>Cancel</button><button className={primaryButtonClass} type="submit" disabled={textDialogSaving || textDialog.kind !== "edit-tags" && !textDialog.primaryValue.trim() || Boolean(textDialog.secondaryLabel && !textDialog.secondaryValue?.trim())}>{textDialogSaving ? "Saving…" : textDialog.kind === "create-folder" || textDialog.kind === "create-group" ? "Create" : "Save"}</button></div></form></div> : null}
+{unlockScope ? <div className="fixed inset-0 z-[2147483200] grid place-items-center bg-black/70 p-6" role="presentation" onMouseDown={(event) => { if (event.currentTarget === event.target) closeSensitiveUnlock(); }}><form ref={unlockDialogFocus.dialogRef} className="w-full max-w-sm rounded-2xl border border-[var(--misty-border-strong)] bg-[var(--misty-app-modal-bg,var(--misty-surface))] p-5 shadow-2xl" role="dialog" aria-modal="true" aria-label="Unlock protected Library action" onKeyDown={unlockDialogFocus.trapFocus} onSubmit={(event) => void submitSensitiveUnlock(event)}><div className="flex items-center justify-between gap-4"><h2 className="m-0 text-base font-semibold">Unlock {unlockScope === "hidden" ? "Hidden" : "Recently Deleted"}</h2><button className={iconButtonClass} type="button" disabled={unlockSaving} onClick={closeSensitiveUnlock} aria-label="Close unlock dialog"><X size={15}/></button></div><label className="mt-5 grid gap-2 text-xs font-medium text-[var(--misty-text-muted)]">Misty password<input className={inputClass} data-dialog-autofocus type="password" autoComplete="current-password" value={unlockPassword} onChange={(event) => setUnlockPassword(event.target.value)}/></label>{localError ? <p className="mb-0 mt-3 text-xs text-red-200" role="alert">{localError}</p> : null}<div className="mt-5 flex justify-end gap-2"><button className={secondaryButtonClass} type="button" disabled={unlockSaving} onClick={closeSensitiveUnlock}>Cancel</button><button className={primaryButtonClass} type="submit" disabled={unlockSaving || !unlockPassword}>{unlockSaving ? "Unlocking…" : "Unlock"}</button></div></form></div> : null}
     </div>
+    </LibraryCanEditContext.Provider>
   );
 }
 
 function LibraryMemoryPlayback({ spaceId, group, items, onClose }: { spaceId: string; group: LibraryDiscoveryGroup; items: SpaceLibraryItem[]; onClose: () => void }) {
   const musicRef = useRef<HTMLAudioElement | null>(null);
+  const playbackDialog = useDialogFocus<HTMLDivElement>(true);
   const [index, setIndex] = useState(0);
   const [playing, setPlaying] = useState(true);
   const [contentUrl, setContentUrl] = useState("");
@@ -1580,26 +1607,19 @@ function LibraryMemoryPlayback({ spaceId, group, items, onClose }: { spaceId: st
     else musicRef.current.pause();
   }, [musicUrl, playing]);
 
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
-      else if (event.key === "ArrowLeft") setIndex((current) => (current - 1 + items.length) % items.length);
-      else if (event.key === "ArrowRight") setIndex((current) => (current + 1) % items.length);
-      else if (event.key === " ") {
-        event.preventDefault();
-        setPlaying((current) => !current);
-      }
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [items.length, onClose]);
-
   if (!item) return null;
   const previous = () => setIndex((current) => (current - 1 + items.length) % items.length);
   const next = () => setIndex((current) => (current + 1) % items.length);
-  return <div className="fixed inset-0 z-[2147483100] flex flex-col bg-black text-white" role="dialog" aria-modal="true" aria-label={`Playing ${group.title}`}>
+  return <div ref={playbackDialog.dialogRef} className="fixed inset-0 z-[2147483100] flex flex-col bg-black text-white" role="dialog" aria-modal="true" aria-label={`Playing ${group.title}`} onKeyDown={(event) => {
+    if (event.key === "Escape") { event.preventDefault(); onClose(); return; }
+    playbackDialog.trapFocus(event);
+    if ((event.target as HTMLElement).matches("button, input, textarea, select, [contenteditable='true']")) return;
+    if (event.key === "ArrowLeft") previous();
+    else if (event.key === "ArrowRight") next();
+    else if (event.key === " ") { event.preventDefault(); setPlaying((current) => !current); }
+  }}>
     <div className="flex items-center gap-1 px-5 pt-4">{items.map((candidate, candidateIndex) => <button className="h-1 flex-1 overflow-hidden rounded-full border-0 bg-white/20 p-0" type="button" key={candidate.id} onClick={() => setIndex(candidateIndex)} aria-label={`Show item ${candidateIndex + 1}`}><span className={`block h-full bg-white transition-[width] duration-300 ${candidateIndex < index ? "w-full" : candidateIndex === index ? "w-1/2" : "w-0"}`}/></button>)}</div>
-    <header className="flex items-center justify-between gap-4 px-5 py-4"><div className="min-w-0"><h2 className="m-0 truncate text-base font-semibold">{group.title}</h2><p className="mb-0 mt-1 truncate text-xs text-white/55">{group.subtitle}</p></div><button className="grid size-9 shrink-0 place-items-center rounded-full border-0 bg-white/10 text-white hover:bg-white/20" type="button" onClick={onClose} aria-label="Close memory"><X size={18}/></button></header>
+    <header className="flex items-center justify-between gap-4 px-5 py-4"><div className="min-w-0"><h2 className="m-0 truncate text-base font-semibold">{group.title}</h2><p className="mb-0 mt-1 truncate text-xs text-white/55">{group.subtitle}</p></div><button className="grid size-9 shrink-0 place-items-center rounded-full border-0 bg-white/10 text-white hover:bg-white/20" data-dialog-autofocus type="button" onClick={onClose} aria-label="Close memory"><X size={18}/></button></header>
     <main className="relative grid min-h-0 flex-1 place-items-center overflow-hidden bg-[radial-gradient(circle_at_center,#252525,#050505_72%)]">
       {musicUrl ? <audio ref={musicRef} className="hidden" src={musicUrl} autoPlay={playing} loop/> : null}
       {contentUrl ? isVideo ? <video className="max-h-full max-w-full object-contain" key={`${item.id}:${playing}`} src={contentUrl} autoPlay={playing} controls={false} muted={Boolean(musicUrl)} playsInline onEnded={next}/> : isVisualImage ? <img className="max-h-full max-w-full object-contain" src={contentUrl} alt={item.display_name}/> : <div className="grid place-items-center gap-3 text-white/60"><File size={48}/><span className="text-sm">{item.display_name}</span></div> : <div className="text-sm text-white/50">{contentError || "Loading…"}</div>}
@@ -1617,6 +1637,9 @@ function LibraryItemViewer({
   allItems,
   assetStack,
   reauthenticationToken,
+  canEdit,
+  canCopy,
+  returnFocusRef,
   onCopyEdit,
   onSetStackCover,
   onSetStackEffect,
@@ -1634,6 +1657,9 @@ function LibraryItemViewer({
   allItems: SpaceLibraryItem[];
   assetStack: LibraryAssetStack | null;
   reauthenticationToken: string;
+  canEdit: boolean;
+  canCopy: boolean;
+  returnFocusRef: RefObject<HTMLElement | null>;
   onCopyEdit: (definition: LibraryEditDefinition) => void;
   onSetStackCover: (stack: LibraryAssetStack, coverItemID: string) => Promise<void>;
   onSetStackEffect: (stack: LibraryAssetStack, effect: LibraryAssetStack["effect"]) => Promise<void>;
@@ -1645,11 +1671,11 @@ function LibraryItemViewer({
   onRenditionReady: () => void;
   onTrash: (item: SpaceLibraryItem) => Promise<boolean>;
 }) {
-  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const viewerDialog = useDialogFocus<HTMLElement>(true, returnFocusRef);
   const mediaAreaRef = useRef<HTMLDivElement | null>(null);
-  const imageRef = useRef<HTMLImageElement | null>(null);
+  const imageRef = useRef<HTMLImageElement>(null);
   const bounceFrameRef = useRef(0);
-  const drawingMarkupRef = useRef<LibraryMarkupElement | null>(null);
   const [contentUrl, setContentUrl] = useState("");
   const [contentError, setContentError] = useState("");
   const [contentLoading, setContentLoading] = useState(false);
@@ -1658,16 +1684,12 @@ function LibraryItemViewer({
   const [tags, setTags] = useState("");
   const [saving, setSaving] = useState(false);
   const [editVersions, setEditVersions] = useState<LibraryEditVersion[]>([]);
+  const [editVersionsLoading, setEditVersionsLoading] = useState(false);
   const [editingAvailable, setEditingAvailable] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editDraft, setEditDraft] = useState<LibraryEditDefinition>(() => defaultLibraryEdit());
   const [editSaving, setEditSaving] = useState(false);
   const [editError, setEditError] = useState("");
-  const [markupMode, setMarkupMode] = useState(false);
-  const [markupTool, setMarkupTool] = useState<LibraryMarkupElement["kind"]>("stroke");
-  const [markupColor, setMarkupColor] = useState("#ff3b30");
-  const [drawingMarkup, setDrawingMarkup] = useState<LibraryMarkupElement | null>(null);
-  const [markupBounds, setMarkupBounds] = useState({ left: 0, top: 0, width: 0, height: 0 });
   const [stackMemberID, setStackMemberID] = useState("");
   const index = item ? items.findIndex((candidate) => candidate.id === item.id) : -1;
   const metadata = item?.file.intrinsic_metadata ?? {};
@@ -1695,22 +1717,6 @@ function LibraryItemViewer({
   useEffect(() => () => window.cancelAnimationFrame(bounceFrameRef.current), []);
 
   useEffect(() => {
-    if (!markupMode || !mediaAreaRef.current || !imageRef.current) return;
-    const update = () => {
-      const area = mediaAreaRef.current?.getBoundingClientRect();
-      const image = imageRef.current?.getBoundingClientRect();
-      if (!area || !image) return;
-      setMarkupBounds({ left: image.left - area.left, top: image.top - area.top, width: image.width, height: image.height });
-    };
-    update();
-    const observer = new ResizeObserver(update);
-    observer.observe(mediaAreaRef.current);
-    observer.observe(imageRef.current);
-    window.addEventListener("resize", update);
-    return () => { observer.disconnect(); window.removeEventListener("resize", update); };
-  }, [contentUrl, markupMode]);
-
-  useEffect(() => {
     if (!item) return;
     setDisplayName(item.display_name);
     setCaption(item.caption);
@@ -1720,10 +1726,12 @@ function LibraryItemViewer({
   useEffect(() => {
     if (!item || !isImage && !isVideo) {
       setEditVersions([]);
+      setEditVersionsLoading(false);
       setEditingAvailable(false);
       return;
     }
     let current = true;
+    setEditVersionsLoading(true);
     void spacesApi.editVersions(spaceId, item.id, reauthenticationToken).then((result) => {
       if (!current) return;
       setEditVersions(result.versions);
@@ -1734,6 +1742,8 @@ function LibraryItemViewer({
       if (!current) return;
       setEditVersions([]);
       setEditingAvailable(false);
+    }).finally(() => {
+      if (current) setEditVersionsLoading(false);
     });
     return () => { current = false; };
   }, [isImage, isVideo, item?.id, item?.version, reauthenticationToken, spaceId]);
@@ -1752,7 +1762,7 @@ function LibraryItemViewer({
   }, [editVersions, item?.id, onRenditionReady, reauthenticationToken, spaceId]);
 
   useEffect(() => {
-    if (!item || !stackMediaID || !contentIsImage && !contentIsVideo && !contentIsAudio) {
+    if (!item || !stackMediaID) {
       setContentUrl("");
       setContentError("");
       return;
@@ -1765,21 +1775,22 @@ function LibraryItemViewer({
     const longExposureMotionID = assetStack?.kind === "live_photo" && assetStack.effect === "long_exposure" && showingCover ? assetStack.motion_item_id : "";
     const request = longExposureMotionID
       ? spacesApi.libraryContent(spaceId, longExposureMotionID, reauthenticationToken).then(createLongExposureImage)
-      : editing && showingCover
+      : (editing || isImage) && showingCover
 		? contentIsImage ? spacesApi.libraryOriginalPreview(spaceId, stackMediaID, reauthenticationToken, stackMediaItem?.version ?? item.version).catch(() => spacesApi.libraryOriginalContent(spaceId, stackMediaID, reauthenticationToken)) : spacesApi.libraryOriginalContent(spaceId, stackMediaID, reauthenticationToken)
 		: contentIsImage ? spacesApi.libraryPreview(spaceId, stackMediaID, reauthenticationToken, stackMediaItem?.version ?? item.version).catch(() => spacesApi.libraryContent(spaceId, stackMediaID, reauthenticationToken)) : spacesApi.libraryContent(spaceId, stackMediaID, reauthenticationToken);
     void request.then((blob) => {
       if (!current) return;
       objectUrl = URL.createObjectURL(blob);
       setContentUrl(objectUrl);
-    }).catch((error: unknown) => current && setContentError(error instanceof Error ? error.message : "Preview unavailable.")).finally(() => current && setContentLoading(false));
+    }).catch((error: unknown) => current && setContentError(error instanceof Error ? error.message : "The file reader could not load this item.")).finally(() => current && setContentLoading(false));
     return () => {
       current = false;
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
-  }, [activeEdit?.rendition_state, assetStack?.effect, assetStack?.kind, assetStack?.motion_item_id, contentIsAudio, contentIsImage, contentIsVideo, editing, item?.id, item?.version, reauthenticationToken, spaceId, stackMediaID, stackMediaItem?.version]);
+  }, [activeEdit?.rendition_state, assetStack?.effect, assetStack?.kind, assetStack?.motion_item_id, contentIsAudio, contentIsImage, contentIsVideo, editing, isImage, item?.id, item?.version, reauthenticationToken, spaceId, stackMediaID, stackMediaItem?.version]);
 
   useEffect(() => {
+    if (isImage) return;
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         onClose();
@@ -1792,14 +1803,14 @@ function LibraryItemViewer({
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [index, items, onClose, onSelect]);
+  }, [index, isImage, items, onClose, onSelect]);
 
   if (!item) return null;
 
   const saveMetadata = async (event: FormEvent) => {
     event.preventDefault();
     const name = displayName.trim();
-    if (!name || saving) return;
+    if (!canEdit || !name || saving) return;
     setSaving(true);
     try {
       await onUpdate(item, { display_name: name, caption: caption.trim(), tags: tags.split(",").map((tag) => tag.trim()).filter(Boolean) });
@@ -1808,12 +1819,12 @@ function LibraryItemViewer({
     }
   };
 
-  const saveEdit = async () => {
-    if (editSaving) return;
+  const saveEdit = async (definition: LibraryEditDefinition = editDraft) => {
+    if (!canEdit || editSaving) return;
     setEditSaving(true);
     setEditError("");
     try {
-      const result = await spacesApi.createEditVersion(spaceId, item, editDraft, reauthenticationToken);
+      const result = await spacesApi.createEditVersion(spaceId, item, definition, reauthenticationToken);
       onReplaceItem(result.item);
       if (result.edit) {
         let savedVersion = { ...result.edit, is_current: true };
@@ -1834,8 +1845,34 @@ function LibraryItemViewer({
     }
   };
 
+  const saveAsCopy = async (definition: LibraryEditDefinition = editDraft) => {
+    if (!canEdit || editSaving) return;
+    setEditSaving(true); setEditError("");
+    try {
+      const duplicated = await spacesApi.duplicateLibraryItems(spaceId, [item.id], reauthenticationToken);
+      const copy = duplicated.items[0];
+      if ((isImage || editing) && copy) {
+        const edited = await spacesApi.createEditVersion(spaceId, copy, definition, reauthenticationToken);
+        if (edited.edit) await spacesApi.renderEditVersion(spaceId, copy.id, edited.edit.id, 0, reauthenticationToken);
+      }
+      onRenditionReady();
+    }
+    catch (error) { setEditError(error instanceof Error ? error.message : "A copy could not be saved."); }
+    finally { setEditSaving(false); }
+  };
+
+  const copyCurrentItem = async (target: SpaceLibraryItem = item) => {
+    if (!canCopy) return;
+    setEditError("");
+    try {
+      await copyLibraryItemsToClipboard(spaceId, [target], reauthenticationToken);
+    } catch (error) {
+      setEditError(error instanceof Error ? error.message : "The Library item could not be copied.");
+    }
+  };
+
   const renderEdit = async (editID: string) => {
-    if (editSaving) return;
+    if (!canEdit || editSaving) return;
     setEditSaving(true);
     setEditError("");
     try {
@@ -1849,7 +1886,7 @@ function LibraryItemViewer({
   };
 
   const selectEdit = async (editID = "") => {
-    if (editSaving) return;
+    if (!canEdit || editSaving) return;
     setEditSaving(true);
     setEditError("");
     try {
@@ -1867,7 +1904,7 @@ function LibraryItemViewer({
   };
 
   const deleteEdit = async (editID: string) => {
-    if (editSaving || !await confirmAction("Delete this edit version?")) return;
+    if (!canEdit || editSaving || !await confirmAction("Delete this edit version?")) return;
     setEditSaving(true);
     try {
       await spacesApi.deleteEditVersion(spaceId, item.id, editID, reauthenticationToken);
@@ -1880,6 +1917,7 @@ function LibraryItemViewer({
   };
 
   const beginEditing = () => {
+    if (!canEdit) return;
     setEditDraft(normalizeLibraryEdit(activeEdit?.edit_definition));
     setEditing(true);
     setEditError("");
@@ -1911,94 +1949,70 @@ function LibraryItemViewer({
     reverse();
   };
 
-  const markupPoint = (event: ReactPointerEvent<SVGSVGElement>) => {
-    const bounds = event.currentTarget.getBoundingClientRect();
-    return { x: Math.max(0, Math.min(1, (event.clientX - bounds.left) / Math.max(1, bounds.width))), y: Math.max(0, Math.min(1, (event.clientY - bounds.top) / Math.max(1, bounds.height))) };
-  };
-
-  const beginMarkup = (event: ReactPointerEvent<SVGSVGElement>) => {
-    if (!editing || !markupMode || editDraft.markup.length >= 16) return;
-    const point = markupPoint(event);
-    if (markupTool === "text") {
-      const text = window.prompt("Markup text")?.replace(/[\\':%\[\];]/g, "").trim().slice(0, 40);
-      if (text) setEditDraft((current) => ({ ...current, markup: [...current.markup, { kind: "text", x: point.x, y: point.y, color: markupColor, line_width: .012, opacity: 1, text }] }));
-      return;
-    }
-    event.currentTarget.setPointerCapture(event.pointerId);
-    const element: LibraryMarkupElement = markupTool === "rectangle" || markupTool === "cleanup"
-      ? { kind: markupTool, points: [point], x: point.x, y: point.y, width: .001, height: .001, color: markupColor, line_width: .008, opacity: 1 }
-      : { kind: markupTool, points: [point, point], color: markupColor, line_width: markupTool === "highlight" ? .025 : .012, opacity: markupTool === "highlight" ? .35 : 1 };
-    drawingMarkupRef.current = element;
-    setDrawingMarkup(element);
-  };
-
-  const continueMarkup = (event: ReactPointerEvent<SVGSVGElement>) => {
-    const current = drawingMarkupRef.current;
-    if (!current) return;
-    const point = markupPoint(event);
-    let next = current;
-    if (current.kind === "rectangle" || current.kind === "cleanup") {
-      const startX = current.points?.[0]?.x ?? current.x ?? point.x;
-      const startY = current.points?.[0]?.y ?? current.y ?? point.y;
-      next = { ...current, x: Math.min(startX, point.x), y: Math.min(startY, point.y), width: Math.abs(point.x - startX), height: Math.abs(point.y - startY) };
-    } else {
-      const points = current.points ?? [];
-      const previous = points[points.length - 1];
-      if (!previous || Math.hypot(point.x - previous.x, point.y - previous.y) >= .006) next = { ...current, points: [...points.slice(0, 63), point] };
-    }
-    drawingMarkupRef.current = next;
-    setDrawingMarkup(next);
-  };
-
-  const finishMarkup = (event: ReactPointerEvent<SVGSVGElement>) => {
-    const element = drawingMarkupRef.current;
-    drawingMarkupRef.current = null;
-    setDrawingMarkup(null);
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
-    const rectangular = element?.kind === "rectangle" || element?.kind === "cleanup";
-    if (!element || rectangular && ((element.width ?? 0) < (element.kind === "cleanup" ? .01 : .004) || (element.height ?? 0) < (element.kind === "cleanup" ? .01 : .004)) || !rectangular && (element.points?.length ?? 0) < 2) return;
-    setEditDraft((current) => ({ ...current, markup: current.markup.length < 16 ? [...current.markup, element] : current.markup }));
-  };
+  if (isImage) return <GlobalImageEditor
+    sourceKey={`${item.id}:${activeEdit?.id ?? "original"}`}
+    name={item.display_name}
+    url={contentUrl}
+    indexLabel={`${index + 1} of ${items.length}`}
+    tags={item.tags}
+    initialEdit={editDraft}
+    outputMimeType={mimeType === "image/jpeg" ? "image/jpeg" : mimeType === "image/webp" ? "image/webp" : "image/png"}
+    loading={contentLoading || editVersionsLoading}
+    error={contentError || undefined}
+    readonly={!canEdit}
+    onClose={onClose}
+    onCancel={onClose}
+    onSave={async (definition) => { await saveEdit(definition); }}
+    onSaveAsCopy={async (definition) => { await saveAsCopy(definition); }}
+    onSaveTags={async (nextTags) => { await onUpdate(item, { tags: nextTags }); }}
+  />;
 
   return (
     <div className="fixed inset-0 z-[2147483100] grid place-items-center bg-black/80 p-4 backdrop-blur-sm" role="presentation" onMouseDown={(event) => { if (event.currentTarget === event.target) onClose(); }}>
-      <section className="grid h-[min(860px,calc(100dvh-32px))] min-h-0 min-w-0 w-[min(1320px,calc(100vw-32px))] grid-cols-[minmax(0,1fr)_minmax(300px,340px)] grid-rows-[56px_minmax(0,1fr)] overflow-hidden rounded-2xl border border-[var(--misty-border-strong)] bg-[var(--misty-app-page-bg,#07090b)] shadow-2xl" role="dialog" aria-modal="true" aria-label={item.display_name}>
+      <section ref={viewerDialog.dialogRef} className="grid h-[min(860px,calc(100dvh-32px))] min-h-0 min-w-0 w-[min(1320px,calc(100vw-32px))] grid-cols-[minmax(0,1fr)_minmax(300px,340px)] grid-rows-[56px_minmax(0,1fr)] overflow-hidden rounded-2xl border border-[var(--misty-border-strong)] bg-[var(--misty-app-page-bg,#07090b)] shadow-2xl" role="dialog" aria-modal="true" aria-label={item.display_name} onKeyDown={(event) => {
+        const target = event.target as HTMLElement | null;
+        if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "c" && !target?.matches("input, textarea, select, [contenteditable='true']")) {
+          event.preventDefault();
+          void copyCurrentItem();
+          return;
+        }
+        viewerDialog.trapFocus(event);
+      }}>
         <header className="relative z-20 col-span-2 flex min-w-0 items-center justify-between gap-4 border-b border-[var(--misty-border-soft)] bg-[var(--misty-app-page-bg,#07090b)] px-4">
           <div className="min-w-0"><p className="m-0 truncate text-sm font-medium">{item.display_name}</p><p className="m-0 mt-0.5 text-[10px] text-[var(--misty-text-subtle)]">{index + 1} of {items.length}</p></div>
           <div className="flex min-w-0 shrink-0 items-center gap-1 overflow-x-auto py-1">
-            {assetStack && stackMediaID !== assetStack.cover_item_id && stackMediaMember?.role !== "motion" && stackMediaMember?.role !== "raw" ? <button className={smallButtonClass} type="button" onClick={() => void onSetStackCover(assetStack, stackMediaID)}>Make key photo</button> : null}
-            {assetStack ? <button className={smallButtonClass} type="button" onClick={() => void onUngroupStack(assetStack)}>Ungroup</button> : null}
-            {activeEdit ? <button className={smallButtonClass} type="button" onClick={() => onCopyEdit(normalizeLibraryEdit(activeEdit.edit_definition))}><Copy size={12}/>Copy edits</button> : null}
-            <button className={iconButtonClass} type="button" onClick={() => void onUpdate(item, { favorite: !item.favorite })} aria-label={item.favorite ? "Remove favorite" : "Favorite"} title={item.favorite ? "Remove favorite" : "Favorite"}><Star size={15} fill={item.favorite ? "currentColor" : "none"}/></button>
-            <button className={iconButtonClass} type="button" onClick={() => void onUpdate(item, { hidden: !item.hidden })} aria-label={item.hidden ? "Unhide" : "Hide"} title={item.hidden ? "Unhide" : "Hide"}><EyeOff size={15}/></button>
-            {editingAvailable ? <button className={iconButtonClass} type="button" onClick={beginEditing} aria-label="Edit" title="Edit"><SlidersHorizontal size={15}/></button> : null}
-            {activeEdit ? <button className={iconButtonClass} type="button" onClick={() => void spacesApi.downloadOriginalLibraryItem(spaceId, item.id, item.file.original_filename, reauthenticationToken)} aria-label="Download original" title="Download original"><File size={15}/></button> : null}
-            <button className={iconButtonClass} type="button" disabled={Boolean(activeEdit) && !renditionReady} onClick={() => void spacesApi.downloadLibraryItem(spaceId, item.id, item.display_name, reauthenticationToken)} aria-label={activeEdit ? renditionReady ? "Download edited media" : "Edited media is rendering" : "Download"} title={activeEdit ? renditionReady ? "Download edited media" : "Edited media is rendering" : "Download"}><Download size={15}/></button>
-            <button className={iconButtonClass} type="button" onClick={() => void onTrash(item)} aria-label="Move to Recently Deleted" title="Move to Recently Deleted"><Trash2 size={15}/></button>
-            <button className={iconButtonClass} type="button" onClick={onClose} aria-label="Close"><X size={15}/></button>
+            {canEdit && assetStack && stackMediaID !== assetStack.cover_item_id && stackMediaMember?.role !== "motion" && stackMediaMember?.role !== "raw" ? <button className={smallButtonClass} type="button" onClick={() => void onSetStackCover(assetStack, stackMediaID)}>Make key photo</button> : null}
+            {canEdit && assetStack ? <button className={smallButtonClass} type="button" onClick={() => void onUngroupStack(assetStack)}>Ungroup</button> : null}
+            {canEdit && activeEdit ? <button className={smallButtonClass} type="button" onClick={() => onCopyEdit(normalizeLibraryEdit(activeEdit.edit_definition))}><Copy size={12}/>Copy edits</button> : null}
+            {canEdit ? <button className={smallButtonClass} type="button" disabled={editSaving} onClick={() => void saveAsCopy()}><Copy size={12}/>Save as copy</button> : null}
+            {canEdit && editing ? <button className={primaryButtonClass} type="button" disabled={editSaving} onClick={() => void saveEdit()}>{editSaving ? "Saving…" : "Save"}</button> : null}
+            {canEdit ? <button className={iconButtonClass} type="button" onClick={() => void onUpdate(item, { favorite: !item.favorite })} aria-label={item.favorite ? "Remove favorite" : "Favorite"} title={item.favorite ? "Remove favorite" : "Favorite"}><Star size={15} fill={item.favorite ? "currentColor" : "none"}/></button> : null}
+            {canEdit ? <button className={iconButtonClass} type="button" onClick={() => void onUpdate(item, { hidden: !item.hidden })} aria-label={item.hidden ? "Unhide" : "Hide"} title={item.hidden ? "Unhide" : "Hide"}><EyeOff size={15}/></button> : null}
+            {canEdit && editingAvailable ? <button className={iconButtonClass} type="button" onClick={beginEditing} aria-label="Edit" title="Edit"><SlidersHorizontal size={15}/></button> : null}
+            {canCopy ? <button className={iconButtonClass} type="button" disabled={Boolean(activeEdit) && !renditionReady} onClick={() => void copyCurrentItem()} aria-label={activeEdit ? renditionReady ? "Copy edited media" : "Edited media is rendering" : "Copy to clipboard"} title={activeEdit ? renditionReady ? "Copy edited media" : "Edited media is rendering" : "Copy to clipboard"}><ClipboardCopy size={15}/></button> : null}
+            {canEdit ? <button className={iconButtonClass} type="button" onClick={() => void onTrash(item)} aria-label="Move to Recently Deleted" title="Move to Recently Deleted"><Trash2 size={15}/></button> : null}
+            <button className={iconButtonClass} data-dialog-autofocus type="button" onClick={onClose} aria-label="Close"><X size={15}/></button>
           </div>
         </header>
         <div ref={mediaAreaRef} className="relative isolate min-h-0 min-w-0 overflow-hidden bg-black/35">
           <div className="absolute inset-6 flex min-h-0 min-w-0 items-center justify-center overflow-hidden">
-            {contentLoading ? <span className="text-xs text-white/50">Loading…</span> : contentError ? <span className="max-w-sm text-center text-xs text-red-200">{contentError}</span> : contentIsImage && contentUrl ? <img ref={imageRef} className="block max-h-full max-w-full object-contain transition-[filter,transform]" style={stackMediaID === item.id ? mediaStyle : undefined} src={contentUrl} alt={stackMediaItem?.display_name ?? stackMediaMember?.display_name ?? item.display_name}/> : contentIsVideo && contentUrl ? <video ref={videoRef} className="block max-h-full max-w-full object-contain transition-[filter,transform]" style={stackMediaID === item.id ? mediaStyle : undefined} src={contentUrl} controls autoPlay={assetStack?.kind === "live_photo"} loop={assetStack?.kind === "live_photo" && assetStack.effect === "loop"} onEnded={handleVideoEnded} onLoadedMetadata={handleVideoTime} onTimeUpdate={handleVideoTime}/> : contentIsAudio && contentUrl ? <div className="grid gap-5 text-center"><File className="mx-auto text-white/60" size={64}/><audio src={contentUrl} controls/></div> : <div className="grid gap-3 text-center text-white/50"><File className="mx-auto" size={64}/><span className="text-sm">Preview unavailable</span><button className={secondaryButtonClass} type="button" onClick={() => void spacesApi.downloadLibraryItem(spaceId, stackMediaID, stackMediaItem?.display_name ?? stackMediaMember?.display_name ?? item.display_name, reauthenticationToken)}><Download size={14}/>Download</button></div>}
+            <EmbeddedUniversalPreview name={stackMediaItem?.display_name ?? stackMediaMember?.display_name ?? item.display_name} mimeType={stackMediaMIME} url={contentUrl} loading={contentLoading} error={contentError} imageRef={imageRef} videoRef={videoRef} mediaStyle={stackMediaID === item.id ? mediaStyle : undefined} autoPlay={assetStack?.kind === "live_photo"} loop={assetStack?.kind === "live_photo" && assetStack.effect === "loop"} onVideoEnded={handleVideoEnded} onVideoMetadata={handleVideoTime} onVideoTime={handleVideoTime} fallbackAction={canCopy && stackMediaItem ? <button className={secondaryButtonClass} type="button" onClick={() => void copyCurrentItem(stackMediaItem)}><ClipboardCopy size={14}/>Copy</button> : undefined}/>
           </div>
-          {editing && contentIsImage && stackMediaID === item.id && markupBounds.width > 0 ? <LibraryMarkupCanvas elements={drawingMarkup ? [...editDraft.markup, drawingMarkup] : editDraft.markup} interactive={markupMode} bounds={markupBounds} onPointerDown={beginMarkup} onPointerMove={continueMarkup} onPointerUp={finishMarkup}/> : null}
           {assetStack ? <div className="absolute left-4 top-4 flex items-center gap-1 rounded-xl border border-white/10 bg-black/55 p-1 text-white backdrop-blur-sm">{assetStack.members.map((member, memberIndex) => <button className={`rounded-lg border-0 px-2 py-1 text-[10px] font-medium ${member.item_id === stackMediaID ? "bg-white text-black" : "bg-transparent text-white/75 hover:bg-white/10"}`} type="button" key={member.item_id} onClick={() => setStackMemberID(member.item_id === item.id ? "" : member.item_id)}>{assetStack.kind === "live_photo" ? member.role === "motion" ? <><Play className="mr-1 inline" size={10}/>Motion</> : "Still" : assetStack.kind === "raw_pair" ? member.role === "raw" ? "RAW" : "Rendered" : memberIndex + 1}</button>)}</div> : null}
-          {assetStack?.kind === "live_photo" ? <div className="absolute left-4 top-16 flex items-center gap-1 rounded-xl border border-white/10 bg-black/55 p-1 text-white backdrop-blur-sm">{(["still", "loop", "bounce", "long_exposure"] as const).map((effect) => <button className={`rounded-lg border-0 px-2 py-1 text-[10px] font-medium ${assetStack.effect === effect ? "bg-white text-black" : "bg-transparent text-white/75 hover:bg-white/10"}`} type="button" key={effect} onClick={() => void onSetStackEffect(assetStack, effect)}>{effect === "long_exposure" ? "Long Exposure" : effect[0].toUpperCase() + effect.slice(1)}</button>)}</div> : null}
+          {canEdit && assetStack?.kind === "live_photo" ? <div className="absolute left-4 top-16 flex items-center gap-1 rounded-xl border border-white/10 bg-black/55 p-1 text-white backdrop-blur-sm">{(["still", "loop", "bounce", "long_exposure"] as const).map((effect) => <button className={`rounded-lg border-0 px-2 py-1 text-[10px] font-medium ${assetStack.effect === effect ? "bg-white text-black" : "bg-transparent text-white/75 hover:bg-white/10"}`} type="button" key={effect} onClick={() => void onSetStackEffect(assetStack, effect)}>{effect === "long_exposure" ? "Long Exposure" : effect[0].toUpperCase() + effect.slice(1)}</button>)}</div> : null}
           {items.length > 1 ? <>
             <button className="absolute left-4 top-1/2 z-20 grid size-10 -translate-y-1/2 place-items-center rounded-full border border-white/10 bg-black/45 text-white disabled:opacity-20" type="button" disabled={index <= 0} onClick={() => index > 0 && onSelect(items[index - 1].id)} aria-label="Previous item"><ChevronLeft size={20}/></button>
             <button className="absolute right-4 top-1/2 z-20 grid size-10 -translate-y-1/2 place-items-center rounded-full border border-white/10 bg-black/45 text-white disabled:opacity-20" type="button" disabled={index < 0 || index >= items.length - 1} onClick={() => index >= 0 && index < items.length - 1 && onSelect(items[index + 1].id)} aria-label="Next item"><ChevronRight size={20}/></button>
           </> : null}
         </div>
-        <aside className="relative z-10 min-h-0 min-w-0 overflow-y-auto border-l border-[var(--misty-border-soft)] bg-[var(--misty-surface)] p-5">
-          {editing && isImage ? <div className="mb-4 rounded-xl border border-[var(--misty-border-soft)] p-2"><div className="flex items-center gap-2"><button className={smallButtonClass} type="button" onClick={() => setMarkupMode((current) => !current)}>{markupMode ? "Done Markup" : "Markup & Cleanup"}</button>{markupMode ? <><select className={libraryControlClass} value={markupTool} onChange={(event) => setMarkupTool(event.target.value as LibraryMarkupElement["kind"])} aria-label="Markup tool"><option value="stroke">Pen</option><option value="highlight">Highlighter</option><option value="rectangle">Rectangle</option><option value="text">Text</option><option value="cleanup">Clean Up</option></select><input className="size-8 rounded border-0 bg-transparent p-0" type="color" value={markupColor} onChange={(event) => setMarkupColor(event.target.value)} aria-label="Markup color"/></> : null}</div>{markupMode ? <div className="mt-2 flex gap-2"><button className={smallButtonClass} type="button" disabled={editDraft.markup.length === 0} onClick={() => setEditDraft((current) => ({ ...current, markup: current.markup.slice(0, -1) }))}>Undo</button><button className={smallButtonClass} type="button" disabled={editDraft.markup.length === 0} onClick={() => setEditDraft((current) => ({ ...current, markup: [] }))}>Clear</button><span className="ml-auto self-center text-[10px] text-[var(--misty-text-subtle)]">{editDraft.markup.length}/16</span></div> : null}</div> : null}
-          {editing ? <section className="mb-6 border-b border-[var(--misty-border-soft)] pb-5"><div className="flex items-center justify-between"><h3 className="m-0 text-sm">Edit</h3><button className={smallButtonClass} type="button" onClick={() => setEditDraft(defaultLibraryEdit())}>Reset</button></div><div className="mt-4 flex flex-wrap gap-2"><button className={smallButtonClass} type="button" onClick={() => setEditDraft((current) => ({ ...current, rotation: ((current.rotation + 90) % 360) as LibraryEditDefinition["rotation"] }))}><RotateCw size={12}/>Rotate</button><button className={smallButtonClass} type="button" onClick={() => setEditDraft((current) => ({ ...current, flip_horizontal: !current.flip_horizontal }))}>Flip H</button><button className={smallButtonClass} type="button" onClick={() => setEditDraft((current) => ({ ...current, flip_vertical: !current.flip_vertical }))}>Flip V</button><button className={smallButtonClass} type="button" onClick={() => setEditDraft((current) => ({ ...current, auto_enhance: !current.auto_enhance }))}>{editDraft.auto_enhance ? "Auto on" : "Auto"}</button></div><label className="mt-4 grid gap-1.5 text-[10px] font-medium uppercase tracking-wide text-[var(--misty-text-subtle)]">Filter<select className={inputClass} value={editDraft.filter} onChange={(event) => setEditDraft((current) => ({ ...current, filter: event.target.value as LibraryEditDefinition["filter"] }))}><option value="">None</option><option value="vivid">Vivid</option><option value="dramatic">Dramatic</option><option value="warm">Warm</option><option value="cool">Cool</option><option value="mono">Mono</option><option value="noir">Noir</option></select></label><LibraryEditRange label="Brightness" value={editDraft.brightness} min={0} max={2} step={0.05} onChange={(value) => setEditDraft((current) => ({ ...current, brightness: value }))}/><LibraryEditRange label="Contrast" value={editDraft.contrast} min={0} max={2} step={0.05} onChange={(value) => setEditDraft((current) => ({ ...current, contrast: value }))}/><LibraryEditRange label="Saturation" value={editDraft.saturation} min={0} max={2} step={0.05} onChange={(value) => setEditDraft((current) => ({ ...current, saturation: value }))}/><LibraryEditRange label="Grayscale" value={editDraft.grayscale} min={0} max={1} step={0.05} onChange={(value) => setEditDraft((current) => ({ ...current, grayscale: value }))}/><LibraryAdvancedAdjustments draft={editDraft} onChange={setEditDraft}/>{isImage ? <div className="mt-4"><p className="m-0 text-[10px] font-medium uppercase tracking-wide text-[var(--misty-text-subtle)]">Crop &amp; straighten</p><LibraryEditRange label="Straighten" value={editDraft.straighten} min={-45} max={45} step={0.5} onChange={(value) => setEditDraft((current) => ({ ...current, straighten: value }))}/><div className="mt-2 flex gap-1"><button className={smallButtonClass} type="button" onClick={() => setEditDraft((current) => ({ ...current, crop: undefined }))}>Original</button><button className={smallButtonClass} type="button" onClick={() => setEditDraft((current) => ({ ...current, crop: { x: 0.125, y: 0, width: 0.75, height: 1 } }))}>Square</button><button className={smallButtonClass} type="button" onClick={() => setEditDraft((current) => ({ ...current, crop: { x: 0, y: 0.125, width: 1, height: 0.75 } }))}>Wide</button></div></div> : null}{isVideo ? <div className="mt-4 grid grid-cols-2 gap-2"><label className="grid gap-1 text-[10px] uppercase text-[var(--misty-text-subtle)]">Trim start<input className={inputClass} type="number" min={0} step={0.1} value={editDraft.trim?.start ?? 0} onChange={(event) => setEditDraft((current) => ({ ...current, trim: { start: Number(event.target.value), end: current.trim?.end ?? Math.max(1, Number(metadata.duration ?? 1)) } }))}/></label><label className="grid gap-1 text-[10px] uppercase text-[var(--misty-text-subtle)]">Trim end<input className={inputClass} type="number" min={0.1} step={0.1} value={editDraft.trim?.end ?? Number(metadata.duration ?? 1)} onChange={(event) => setEditDraft((current) => ({ ...current, trim: { start: current.trim?.start ?? 0, end: Number(event.target.value) } }))}/></label><label className="grid gap-1 text-[10px] uppercase text-[var(--misty-text-subtle)]">Speed<select className={inputClass} value={editDraft.playback_speed} onChange={(event) => setEditDraft((current) => ({ ...current, playback_speed: Number(event.target.value) }))}><option value={0.5}>0.5×</option><option value={1}>1×</option><option value={1.5}>1.5×</option><option value={2}>2×</option></select></label><button className={`${smallButtonClass} self-end`} type="button" onClick={() => setEditDraft((current) => ({ ...current, mute: !current.mute }))}>{editDraft.mute ? "Muted" : "Mute"}</button></div> : null}{editError ? <p className="mb-0 mt-3 text-xs text-red-200">{editError}</p> : null}<div className="mt-4 flex gap-2"><button className={`${secondaryButtonClass} flex-1 justify-center`} type="button" disabled={editSaving} onClick={() => { setEditing(false); setEditDraft(normalizeLibraryEdit(activeEdit?.edit_definition)); }}>Cancel</button><button className={`${primaryButtonClass} flex-1 justify-center`} type="button" disabled={editSaving} onClick={() => void saveEdit()}>{editSaving ? "Saving…" : "Save edit"}</button></div></section> : null}
-          <form onSubmit={(event) => void saveMetadata(event)}>
-            <label className="grid gap-1.5 text-[10px] font-medium uppercase tracking-wide text-[var(--misty-text-subtle)]">Name<input className={inputClass} value={displayName} maxLength={255} onChange={(event) => setDisplayName(event.target.value)}/></label>
-            <label className="mt-4 grid gap-1.5 text-[10px] font-medium uppercase tracking-wide text-[var(--misty-text-subtle)]">Caption<textarea className={`${inputClass} min-h-24 resize-y py-2`} value={caption} maxLength={4000} onChange={(event) => setCaption(event.target.value)}/></label>
-            <label className="mt-4 grid gap-1.5 text-[10px] font-medium uppercase tracking-wide text-[var(--misty-text-subtle)]">Tags<input className={inputClass} value={tags} placeholder="project, receipt, reference" onChange={(event) => setTags(event.target.value)}/></label>
+        <aside className="relative z-10 min-h-0 min-w-0 overflow-y-auto border-l border-[var(--misty-border-soft)] bg-[var(--misty-app-pane-bg,var(--misty-surface))] p-5">
+          {editing ? <section className="mb-6 border-b border-[var(--misty-border-soft)] pb-5"><div className="flex items-center justify-between"><h3 className="m-0 text-sm">Edit</h3><button className={smallButtonClass} type="button" onClick={() => setEditDraft(defaultLibraryEdit())}>Reset</button></div><div className="mt-4 flex flex-wrap gap-2"><button className={smallButtonClass} type="button" onClick={() => setEditDraft((current) => ({ ...current, rotation: ((current.rotation + 90) % 360) as LibraryEditDefinition["rotation"] }))}><RotateCw size={12}/>Rotate</button><button className={smallButtonClass} type="button" onClick={() => setEditDraft((current) => ({ ...current, flip_horizontal: !current.flip_horizontal }))}>Flip H</button><button className={smallButtonClass} type="button" onClick={() => setEditDraft((current) => ({ ...current, flip_vertical: !current.flip_vertical }))}>Flip V</button><button className={smallButtonClass} type="button" onClick={() => setEditDraft((current) => ({ ...current, auto_enhance: !current.auto_enhance }))}>{editDraft.auto_enhance ? "Auto on" : "Auto"}</button></div><label className="mt-4 grid gap-1.5 text-[10px] font-medium capitalize text-[var(--misty-text-subtle)]">Filter<select className={inputClass} value={editDraft.filter} onChange={(event) => setEditDraft((current) => ({ ...current, filter: event.target.value as LibraryEditDefinition["filter"] }))}><option value="">None</option><option value="vivid">Vivid</option><option value="dramatic">Dramatic</option><option value="warm">Warm</option><option value="cool">Cool</option><option value="mono">Mono</option><option value="noir">Noir</option></select></label><LibraryEditRange label="Brightness" value={editDraft.brightness} min={0} max={2} step={0.05} onChange={(value) => setEditDraft((current) => ({ ...current, brightness: value }))}/><LibraryEditRange label="Contrast" value={editDraft.contrast} min={0} max={2} step={0.05} onChange={(value) => setEditDraft((current) => ({ ...current, contrast: value }))}/><LibraryEditRange label="Saturation" value={editDraft.saturation} min={0} max={2} step={0.05} onChange={(value) => setEditDraft((current) => ({ ...current, saturation: value }))}/><LibraryEditRange label="Grayscale" value={editDraft.grayscale} min={0} max={1} step={0.05} onChange={(value) => setEditDraft((current) => ({ ...current, grayscale: value }))}/><LibraryAdvancedAdjustments draft={editDraft} onChange={setEditDraft}/>{isImage ? <div className="mt-4"><p className="m-0 text-[10px] font-medium capitalize text-[var(--misty-text-subtle)]">Crop &amp; Straighten</p><LibraryEditRange label="Straighten" value={editDraft.straighten} min={-45} max={45} step={0.5} onChange={(value) => setEditDraft((current) => ({ ...current, straighten: value }))}/><div className="mt-2 flex gap-1"><button className={smallButtonClass} type="button" onClick={() => setEditDraft((current) => ({ ...current, crop: undefined }))}>Original</button><button className={smallButtonClass} type="button" onClick={() => setEditDraft((current) => ({ ...current, crop: { x: 0.125, y: 0, width: 0.75, height: 1 } }))}>Square</button><button className={smallButtonClass} type="button" onClick={() => setEditDraft((current) => ({ ...current, crop: { x: 0, y: 0.125, width: 1, height: 0.75 } }))}>Wide</button></div></div> : null}{isVideo ? <div className="mt-4 grid grid-cols-2 gap-2"><label className="grid gap-1 text-[10px] capitalize text-[var(--misty-text-subtle)]">Trim Start<input className={inputClass} type="number" min={0} step={0.1} value={editDraft.trim?.start ?? 0} onChange={(event) => setEditDraft((current) => ({ ...current, trim: { start: Number(event.target.value), end: current.trim?.end ?? Math.max(1, Number(metadata.duration ?? 1)) } }))}/></label><label className="grid gap-1 text-[10px] capitalize text-[var(--misty-text-subtle)]">Trim End<input className={inputClass} type="number" min={0.1} step={0.1} value={editDraft.trim?.end ?? Number(metadata.duration ?? 1)} onChange={(event) => setEditDraft((current) => ({ ...current, trim: { start: current.trim?.start ?? 0, end: Number(event.target.value) } }))}/></label><label className="grid gap-1 text-[10px] capitalize text-[var(--misty-text-subtle)]">Speed<select className={inputClass} value={editDraft.playback_speed} onChange={(event) => setEditDraft((current) => ({ ...current, playback_speed: Number(event.target.value) }))}><option value={0.5}>0.5×</option><option value={1}>1×</option><option value={1.5}>1.5×</option><option value={2}>2×</option></select></label><button className={`${smallButtonClass} self-end`} type="button" onClick={() => setEditDraft((current) => ({ ...current, mute: !current.mute }))}>{editDraft.mute ? "Muted" : "Mute"}</button></div> : null}{editError ? <p className="mb-0 mt-3 text-xs text-red-200">{editError}</p> : null}<div className="mt-4 flex gap-2"><button className={`${secondaryButtonClass} flex-1 justify-center`} type="button" disabled={editSaving} onClick={() => { setEditing(false); setEditDraft(normalizeLibraryEdit(activeEdit?.edit_definition)); }}>Cancel</button><button className={`${primaryButtonClass} flex-1 justify-center`} type="button" disabled={editSaving} onClick={() => void saveEdit()}>{editSaving ? "Saving…" : "Save edit"}</button></div></section> : null}
+          {canEdit ? <form onSubmit={(event) => void saveMetadata(event)}>
+            <label className="grid gap-1.5 text-[10px] font-medium capitalize text-[var(--misty-text-subtle)]">Name<input className={inputClass} value={displayName} maxLength={255} onChange={(event) => setDisplayName(event.target.value)}/></label>
+            <label className="mt-4 grid gap-1.5 text-[10px] font-medium capitalize text-[var(--misty-text-subtle)]">Caption<textarea className={`${inputClass} min-h-24 resize-y py-2`} value={caption} maxLength={4000} onChange={(event) => setCaption(event.target.value)}/></label>
+            <label className="mt-4 grid gap-1.5 text-[10px] font-medium capitalize text-[var(--misty-text-subtle)]">Tags<input className={inputClass} value={tags} placeholder="project, receipt, reference" onChange={(event) => setTags(event.target.value)}/></label>
             <button className={`${primaryButtonClass} mt-4 w-full justify-center`} type="submit" disabled={saving || !displayName.trim()}>{saving ? "Saving…" : "Save metadata"}</button>
-          </form>
+          </form> : <dl className="m-0 grid gap-3 text-xs"><LibraryMetadataRow label="Name" value={item.display_name}/><LibraryMetadataRow label="Caption" value={item.caption}/><LibraryMetadataRow label="Tags" value={item.tags.join(", ")}/></dl>}
           <dl className="mt-6 grid gap-3 border-t border-[var(--misty-border-soft)] pt-5 text-xs">
             <LibraryMetadataRow label="Type" value={mimeType}/>
             <LibraryMetadataRow label="Size" value={formatBytes(Number(metadata.byte_size ?? 0))}/>
@@ -2014,12 +2028,12 @@ function LibraryItemViewer({
             {item.location_override && Object.keys(item.location_override).length > 0 ? <LibraryMetadataRow label="Location" value={JSON.stringify(item.location_override)}/> : null}
           </dl>
           {editingAvailable ? <section className="mt-6 border-t border-[var(--misty-border-soft)] pt-5">
-            <div className="flex items-center justify-between"><h3 className="m-0 text-sm">Versions</h3><button className={`${smallButtonClass} ${!activeEdit ? "text-[var(--misty-text)]" : ""}`} type="button" disabled={editSaving || !activeEdit} onClick={() => void selectEdit()}>Original</button></div>
+            <div className="flex items-center justify-between"><h3 className="m-0 text-sm">Versions</h3>{canEdit ? <button className={`${smallButtonClass} ${!activeEdit ? "text-[var(--misty-text)]" : ""}`} type="button" disabled={editSaving || !activeEdit} onClick={() => void selectEdit()}>Original</button> : !activeEdit ? <span className="text-[10px] text-[var(--misty-text-subtle)]">Original selected</span> : null}</div>
             {editError && !editing ? <p className="mb-0 mt-3 text-xs text-red-200">{editError}</p> : null}
             <div className="mt-3 grid gap-2">{editVersions.map((version) => <div className={`flex items-center gap-2 rounded-lg border px-2 py-2 ${version.is_current ? "border-[var(--misty-primary)]" : "border-[var(--misty-border-soft)]"}`} key={version.id}>
-              <button className="min-w-0 flex-1 border-0 bg-transparent p-0 text-left" type="button" disabled={editSaving || version.is_current} onClick={() => void selectEdit(version.id)}><span className="block text-xs font-medium">Edit {version.version_number}</span><span className="mt-0.5 block text-[10px] text-[var(--misty-text-subtle)]">{libraryRenditionStatus(version)} · {formatTime(version.created_at)}</span></button>
-              {version.rendition_state === "none" || version.rendition_state === "failed" ? <button className={smallButtonClass} type="button" disabled={editSaving} onClick={() => void renderEdit(version.id)}>Render</button> : null}
-              {!version.is_current ? <button className="grid size-6 place-items-center border-0 bg-transparent text-[var(--misty-text-subtle)]" type="button" disabled={editSaving} onClick={() => void deleteEdit(version.id)} aria-label={`Delete edit ${version.version_number}`}><Trash2 size={12}/></button> : null}
+              <button className="min-w-0 flex-1 border-0 bg-transparent p-0 text-left" type="button" disabled={!canEdit || editSaving || version.is_current} onClick={() => void selectEdit(version.id)}><span className="block text-xs font-medium">Edit {version.version_number}{version.is_current ? " · Current" : ""}</span><span className="mt-0.5 block text-[10px] text-[var(--misty-text-subtle)]">{libraryRenditionStatus(version)} · {formatTime(version.created_at)}</span></button>
+              {canEdit && (version.rendition_state === "none" || version.rendition_state === "failed") ? <button className={smallButtonClass} type="button" disabled={editSaving} onClick={() => void renderEdit(version.id)}>Render</button> : null}
+              {canEdit && !version.is_current ? <button className="grid size-6 place-items-center border-0 bg-transparent text-[var(--misty-text-subtle)]" type="button" disabled={editSaving} onClick={() => void deleteEdit(version.id)} aria-label={`Delete edit ${version.version_number}`}><Trash2 size={12}/></button> : null}
             </div>)}</div>
           </section> : null}
         </aside>
@@ -2029,17 +2043,16 @@ function LibraryItemViewer({
 }
 
 function LibraryMetadataRow({ label, value }: { label: string; value: string }) {
-  return <div><dt className="text-[10px] uppercase tracking-wide text-[var(--misty-text-subtle)]">{label}</dt><dd className="m-0 mt-1 break-words text-[var(--misty-text-muted)]">{value || "—"}</dd></div>;
+  return <div><dt className="text-[10px] capitalize text-[var(--misty-text-subtle)]">{label}</dt><dd className="m-0 mt-1 break-words text-[var(--misty-text-muted)]">{value || "—"}</dd></div>;
 }
-
 function LibraryEditRange({ label, value, min, max, step, onChange }: { label: string; value: number; min: number; max: number; step: number; onChange: (value: number) => void }) {
-  return <label className="mt-4 grid grid-cols-[1fr_auto] items-center gap-x-3 gap-y-1 text-[10px] font-medium uppercase tracking-wide text-[var(--misty-text-subtle)]"><span>{label}</span><span>{value.toFixed(2)}</span><input className="col-span-2 w-full accent-[var(--misty-primary)]" type="range" value={value} min={min} max={max} step={step} onChange={(event) => onChange(Number(event.target.value))}/></label>;
+  return <label className="mt-4 grid grid-cols-[1fr_auto] items-center gap-x-3 gap-y-1 text-[10px] font-medium capitalize text-[var(--misty-text-subtle)]"><span>{label}</span><span>{value.toFixed(2)}</span><input className="col-span-2 w-full accent-[var(--misty-primary)]" type="range" value={value} min={min} max={max} step={step} onChange={(event) => onChange(Number(event.target.value))}/></label>;
 }
 
 function LibraryAdvancedAdjustments({ draft, onChange }: { draft: LibraryEditDefinition; onChange: Dispatch<SetStateAction<LibraryEditDefinition>> }) {
   const update = (key: keyof LibraryEditDefinition, value: number) => onChange((current) => ({ ...current, [key]: value }));
   return <details className="mt-4 rounded-xl border border-[var(--misty-border-soft)] px-3 py-2">
-    <summary className="cursor-pointer text-[10px] font-medium uppercase tracking-wide text-[var(--misty-text-subtle)]">Advanced adjustments</summary>
+    <summary className="cursor-pointer text-[10px] font-medium capitalize text-[var(--misty-text-subtle)]">Advanced Adjustments</summary>
     <LibraryEditRange label="Exposure" value={draft.exposure} min={-2} max={2} step={0.05} onChange={(value) => update("exposure", value)}/>
     <LibraryEditRange label="Brilliance" value={draft.brilliance} min={-1} max={1} step={0.05} onChange={(value) => update("brilliance", value)}/>
     <LibraryEditRange label="Highlights" value={draft.highlights} min={-1} max={1} step={0.05} onChange={(value) => update("highlights", value)}/>
@@ -2053,32 +2066,6 @@ function LibraryAdvancedAdjustments({ draft, onChange }: { draft: LibraryEditDef
     <LibraryEditRange label="Noise Reduction" value={draft.noise_reduction} min={0} max={1} step={0.05} onChange={(value) => update("noise_reduction", value)}/>
     <LibraryEditRange label="Vignette" value={draft.vignette} min={0} max={1} step={0.05} onChange={(value) => update("vignette", value)}/>
   </details>;
-}
-
-function LibraryMarkupCanvas({ elements, interactive, bounds, onPointerDown, onPointerMove, onPointerUp }: {
-  elements: LibraryMarkupElement[];
-  interactive: boolean;
-  bounds: { left: number; top: number; width: number; height: number };
-  onPointerDown: (event: ReactPointerEvent<SVGSVGElement>) => void;
-  onPointerMove: (event: ReactPointerEvent<SVGSVGElement>) => void;
-  onPointerUp: (event: ReactPointerEvent<SVGSVGElement>) => void;
-}) {
-  return <svg
-    className="absolute z-10 select-none overflow-visible"
-    style={{ left: bounds.left, top: bounds.top, width: bounds.width, height: bounds.height, pointerEvents: interactive ? "auto" : "none", touchAction: "none", cursor: interactive ? "crosshair" : "default" }}
-    viewBox="0 0 100 100"
-    preserveAspectRatio="none"
-    onPointerDown={onPointerDown}
-    onPointerMove={onPointerMove}
-    onPointerUp={onPointerUp}
-    onPointerCancel={onPointerUp}
-  >
-    {elements.map((element, index) => {
-      if (element.kind === "stroke" || element.kind === "highlight") return <polyline key={index} points={(element.points ?? []).map((point) => `${point.x * 100},${point.y * 100}`).join(" ")} fill="none" stroke={element.color} strokeOpacity={element.opacity} strokeWidth={element.line_width * 100 * (element.kind === "highlight" ? 2.5 : 1)} strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke"/>;
-      if (element.kind === "rectangle" || element.kind === "cleanup") return <rect key={index} x={(element.x ?? 0) * 100} y={(element.y ?? 0) * 100} width={(element.width ?? 0) * 100} height={(element.height ?? 0) * 100} fill={element.kind === "cleanup" ? "rgba(255,255,255,.12)" : "none"} stroke={element.kind === "cleanup" ? "white" : element.color} strokeOpacity={element.opacity} strokeDasharray={element.kind === "cleanup" ? "2 1" : undefined} strokeWidth={element.line_width * 100} vectorEffect="non-scaling-stroke"/>;
-      return <text key={index} x={(element.x ?? 0) * 100} y={(element.y ?? 0) * 100} fill={element.color} fillOpacity={element.opacity} fontSize={Math.max(2.5, element.line_width * 400)}>{element.text}</text>;
-    })}
-  </svg>;
 }
 
 function defaultLibraryEdit(): LibraryEditDefinition {
@@ -2162,28 +2149,28 @@ function libraryRenditionStatus(version: LibraryEditVersion): string {
 }
 
 function LibraryItemThumbnail({ spaceId, item, reauthenticationToken = "" }: { spaceId: string; item: SpaceLibraryItem; reauthenticationToken?: string }) {
-  const [url, setUrl] = useState("");
+  const [preview, setPreview] = useState<{ url: string; kind: "image" | "pdf" } | null>(null);
   const mimeType = libraryItemMIME(item);
-  const visual = mimeType.startsWith("image/") || mimeType.startsWith("video/") || Number(item.file.intrinsic_metadata.width ?? 0) > 0;
+  const visual = libraryItemThumbnailEligible(mimeType, item.file.original_filename) || Number(item.file.intrinsic_metadata.width ?? 0) > 0;
   useEffect(() => {
     if (!visual) {
-      setUrl("");
+      setPreview(null);
       return;
     }
     let current = true;
     let objectUrl = "";
-    const request = spacesApi.libraryPreview(spaceId, item.id, reauthenticationToken, item.version).catch(() => mimeType.startsWith("image/") ? spacesApi.libraryContent(spaceId, item.id, reauthenticationToken) : Promise.reject(new Error("Preview unavailable")));
+    const request = spacesApi.libraryPreview(spaceId, item.id, reauthenticationToken, item.version).catch(() => mimeType.startsWith("image/") || mimeType === "application/pdf" ? spacesApi.libraryContent(spaceId, item.id, reauthenticationToken) : Promise.reject(new Error("The file reader could not load this item")));
     void request.then((blob) => {
       if (!current) return;
       objectUrl = URL.createObjectURL(blob);
-      setUrl(objectUrl);
-    }).catch(() => setUrl(""));
+      setPreview({ url: objectUrl, kind: blob.type === "application/pdf" || mimeType === "application/pdf" && !blob.type.startsWith("image/") ? "pdf" : "image" });
+    }).catch(() => setPreview(null));
     return () => {
       current = false;
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
   }, [item.id, item.version, mimeType, reauthenticationToken, spaceId, visual]);
-  return url ? <img className="size-full object-cover" src={url} alt=""/> : <File size={30}/>;
+  return preview?.kind === "image" ? <img className="size-full object-cover" src={preview.url} alt=""/> : preview?.kind === "pdf" ? <object className="pointer-events-none size-full bg-white" data={preview.url} type="application/pdf" aria-label={`PDF thumbnail for ${item.display_name}`}/> : <File size={30}/>;
 }
 
 type LibraryAssetStackInput = Pick<LibraryAssetStack, "kind" | "title" | "cover_item_id" | "motion_item_id" | "members">;
@@ -2244,6 +2231,16 @@ function libraryItemMIME(item: SpaceLibraryItem): string {
   return "application/octet-stream";
 }
 
+function libraryFileTypeLabel(item: SpaceLibraryItem): string {
+  const mime = libraryItemMIME(item);
+  if (mime === "application/pdf") return "PDF";
+  if (mime.startsWith("image/")) return mime.slice(6).replace("jpeg", "JPEG").replace("png", "PNG").replace("webp", "WebP").toUpperCase();
+  if (mime.startsWith("video/")) return mime.slice(6).replace("quicktime", "MOV").toUpperCase();
+  if (mime.startsWith("audio/")) return mime.slice(6).replace("mpeg", "MP3").toUpperCase();
+  const extension = item.file.original_filename.split(".").pop()?.trim();
+  return extension ? extension.toUpperCase() : "File";
+}
+
 function activeSensitiveGrant(grant?: { token: string; expiresAt: string }): string {
   return grant && new Date(grant.expiresAt).getTime() > Date.now() ? grant.token : "";
 }
@@ -2273,7 +2270,7 @@ function AlbumCover({ spaceId, itemId }: { spaceId: string; itemId?: string }) {
 }
 
 function LibraryFacetGroup({ label, facets, onSelect }: { label: string; facets: LibrarySearchFacets["tags"]; onSelect: (facet: LibrarySearchFacets["tags"][number]) => void }) {
-  return <div className="flex min-w-0 items-center gap-1.5"><span className="mr-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--misty-text-subtle)]">{label}</span>{facets.slice(0, 6).map((facet) => <button className={smallButtonClass} type="button" key={`${facet.value}:${facet.label}`} onClick={() => onSelect(facet)}>{facet.label}<span className="text-[var(--misty-text-subtle)]">{facet.count}</span></button>)}</div>;
+  return <div className="flex min-w-0 items-center gap-1.5"><span className="mr-0.5 text-[10px] font-semibold capitalize text-[var(--misty-text-subtle)]">{label}</span>{facets.slice(0, 6).map((facet) => <button className={smallButtonClass} type="button" key={`${facet.value}:${facet.label}`} onClick={() => onSelect(facet)}>{facet.label}<span className="text-[var(--misty-text-subtle)]">{facet.count}</span></button>)}</div>;
 }
 
 function libraryUtilityIcon(value: string): LucideIcon {
@@ -2288,7 +2285,8 @@ function libraryUtilityIcon(value: string): LucideIcon {
 }
 
 function LibraryCollectionCard({ icon: Icon, label, count, disabled = false, pinned = false, onClick, onTogglePin, onMoveEarlier, onMoveLater }: { icon: LucideIcon; label: string; count: number; disabled?: boolean; pinned?: boolean; onClick?: () => void; onTogglePin?: () => void; onMoveEarlier?: () => void; onMoveLater?: () => void }) {
-  return <article className="group relative overflow-hidden rounded-2xl border border-[var(--misty-border-soft)] bg-[var(--misty-surface)]"><button className="block w-full border-0 bg-transparent p-4 text-left disabled:opacity-40" type="button" disabled={disabled} onClick={onClick}><Icon size={22}/><p className="mb-0 mt-3 truncate text-xs font-medium">{label}</p><p className="mb-0 mt-1 text-[10px] text-[var(--misty-text-subtle)]">{count} items</p></button>{onTogglePin && !disabled ? <button className={`absolute right-2 top-2 grid size-7 place-items-center rounded-lg border-0 ${pinned ? "bg-[var(--misty-surface-3)] text-[var(--misty-text)]" : "bg-transparent text-[var(--misty-text-subtle)] opacity-0 group-hover:opacity-100 focus:opacity-100"}`} type="button" onClick={onTogglePin} title={pinned ? "Unpin" : "Pin collection"} aria-label={`${pinned ? "Unpin" : "Pin"} ${label}`}><Pin size={13} fill={pinned ? "currentColor" : "none"}/></button> : null}{onMoveEarlier || onMoveLater ? <span className="absolute bottom-2 right-2 flex gap-0.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100">{onMoveEarlier ? <button className="grid size-6 place-items-center rounded-md border-0 bg-[var(--misty-surface-2)] text-[var(--misty-text-muted)]" type="button" onClick={onMoveEarlier} title="Move earlier" aria-label={`Move ${label} earlier`}><ChevronLeft size={12}/></button> : null}{onMoveLater ? <button className="grid size-6 place-items-center rounded-md border-0 bg-[var(--misty-surface-2)] text-[var(--misty-text-muted)]" type="button" onClick={onMoveLater} title="Move later" aria-label={`Move ${label} later`}><ChevronRight size={12}/></button> : null}</span> : null}</article>;
+  const canEdit = useContext(LibraryCanEditContext);
+  return <article className="group relative overflow-hidden rounded-2xl border border-[var(--misty-border-soft)] bg-[var(--misty-app-panel-bg,var(--misty-app-page-bg,var(--misty-bg)))]"><button className="block w-full border-0 bg-transparent p-4 text-left disabled:opacity-40" type="button" disabled={disabled} onClick={onClick}><Icon size={22}/><p className="mb-0 mt-3 truncate text-xs font-medium">{label}</p><p className="mb-0 mt-1 text-[10px] text-[var(--misty-text-subtle)]">{count} items</p></button>{canEdit && onTogglePin && !disabled ? <button className={`absolute right-2 top-2 grid size-7 place-items-center rounded-lg border-0 ${pinned ? "bg-[var(--misty-surface-3)] text-[var(--misty-text)]" : "bg-transparent text-[var(--misty-text-subtle)] opacity-0 group-hover:opacity-100 focus:opacity-100"}`} type="button" onClick={onTogglePin} title={pinned ? "Unpin" : "Pin collection"} aria-label={`${pinned ? "Unpin" : "Pin"} ${label}`}><Pin size={13} fill={pinned ? "currentColor" : "none"}/></button> : null}{canEdit && (onMoveEarlier || onMoveLater) ? <span className="absolute bottom-2 right-2 flex gap-0.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100">{onMoveEarlier ? <button className="grid size-6 place-items-center rounded-md border-0 bg-[var(--misty-surface-2)] text-[var(--misty-text-muted)]" type="button" onClick={onMoveEarlier} title="Move earlier" aria-label={`Move ${label} earlier`}><ChevronLeft size={12}/></button> : null}{onMoveLater ? <button className="grid size-6 place-items-center rounded-md border-0 bg-[var(--misty-surface-2)] text-[var(--misty-text-muted)]" type="button" onClick={onMoveLater} title="Move later" aria-label={`Move ${label} later`}><ChevronRight size={12}/></button> : null}</span> : null}</article>;
 }
 
 function LibraryMapView({ points, onBack, onSelect }: { points: LibraryMapPoint[]; onBack: () => void; onSelect: (point: LibraryMapPoint) => void }) {
@@ -2310,27 +2308,22 @@ function LibraryMapView({ points, onBack, onSelect }: { points: LibraryMapPoint[
         })}
       </svg>
     </div>
-    <div className="mt-4 grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-3">{points.slice(0, 12).map((point) => <button className="rounded-xl border border-[var(--misty-border-soft)] bg-[var(--misty-surface)] p-3 text-left" type="button" key={point.id} onClick={() => onSelect(point)}><p className="m-0 truncate text-xs font-medium">{point.name}</p><p className="mb-0 mt-1 text-[10px] text-[var(--misty-text-subtle)]">{point.item_count} items · {point.latitude.toFixed(2)}, {point.longitude.toFixed(2)}</p></button>)}</div>
+    <div className="mt-4 grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-3">{points.slice(0, 12).map((point) => <button className="rounded-xl border border-[var(--misty-border-soft)] bg-[var(--misty-app-panel-bg,var(--misty-app-page-bg,var(--misty-bg)))] p-3 text-left" type="button" key={point.id} onClick={() => onSelect(point)}><p className="m-0 truncate text-xs font-medium">{point.name}</p><p className="mb-0 mt-1 text-[10px] text-[var(--misty-text-subtle)]">{point.item_count} items · {point.latitude.toFixed(2)}, {point.longitude.toFixed(2)}</p></button>)}</div>
   </div>;
 }
 
 function LibraryDiscoveryCard({ spaceId, group, fallbackIcon: Icon, pinned = false, onTogglePin, onClick }: { spaceId: string; group: LibraryDiscoveryGroup; fallbackIcon: LucideIcon; pinned?: boolean; onTogglePin?: () => void; onClick: () => void }) {
-  return <article className="group relative overflow-hidden rounded-2xl border border-[var(--misty-border-soft)] bg-[var(--misty-surface)]"><button className="block w-full border-0 bg-transparent p-0 text-left" type="button" onClick={onClick}><span className="relative block"><AlbumCover spaceId={spaceId} itemId={group.cover_item_id}/><span className="absolute left-3 top-3 grid size-8 place-items-center rounded-xl bg-black/55 text-white backdrop-blur"><Icon size={16}/></span></span><span className="block p-3"><span className="block truncate text-xs font-medium">{group.title}</span><span className="mt-1 block truncate text-[10px] text-[var(--misty-text-subtle)]">{group.subtitle}</span></span></button>{onTogglePin ? <button className={`absolute right-3 top-3 grid size-8 place-items-center rounded-xl border-0 backdrop-blur ${pinned ? "bg-white text-black" : "bg-black/55 text-white opacity-0 group-hover:opacity-100 focus:opacity-100"}`} type="button" onClick={onTogglePin} title={pinned ? "Unpin" : "Pin collection"} aria-label={`${pinned ? "Unpin" : "Pin"} ${group.title}`}><Pin size={14} fill={pinned ? "currentColor" : "none"}/></button> : null}</article>;
-}
-
-function spaceLinkClass({ isActive }: { isActive: boolean }) {
-  return `flex min-h-11 items-center gap-2 rounded-xl border px-2.5 text-xs font-medium no-underline transition-colors ${isActive ? "border-[var(--misty-border-strong)] bg-[var(--misty-surface-3)] text-[var(--misty-text)] shadow-sm" : "border-transparent text-[var(--misty-text-muted)] hover:bg-[var(--misty-surface-2)] hover:text-[var(--misty-text)]"}`;
+  const canEdit = useContext(LibraryCanEditContext);
+  return <article className="group relative overflow-hidden rounded-2xl border border-[var(--misty-border-soft)] bg-[var(--misty-app-panel-bg,var(--misty-app-page-bg,var(--misty-bg)))]"><button className="block w-full border-0 bg-transparent p-0 text-left" type="button" onClick={onClick}><span className="relative block"><AlbumCover spaceId={spaceId} itemId={group.cover_item_id}/><span className="absolute left-3 top-3 grid size-8 place-items-center rounded-xl bg-black/55 text-white backdrop-blur"><Icon size={16}/></span></span><span className="block p-3"><span className="block truncate text-xs font-medium">{group.title}</span><span className="mt-1 block truncate text-[10px] text-[var(--misty-text-subtle)]">{group.subtitle}</span></span></button>{canEdit && onTogglePin ? <button className={`absolute right-3 top-3 grid size-8 place-items-center rounded-xl border-0 backdrop-blur ${pinned ? "bg-white text-black" : "bg-black/55 text-white opacity-0 group-hover:opacity-100 focus:opacity-100"}`} type="button" onClick={onTogglePin} title={pinned ? "Unpin" : "Pin collection"} aria-label={`${pinned ? "Unpin" : "Pin"} ${group.title}`}><Pin size={14} fill={pinned ? "currentColor" : "none"}/></button> : null}</article>;
 }
 
 const iconButtonClass = "grid size-8 place-items-center rounded-xl border border-[var(--misty-border-soft)] bg-[var(--misty-surface-2)] p-0 text-[var(--misty-text)]";
 const smallButtonClass = "inline-flex items-center gap-1 rounded-lg border border-[var(--misty-border-soft)] bg-[var(--misty-surface-2)] px-2 py-1 text-[10px] text-[var(--misty-text-muted)]";
+const messageActionButtonClass = "grid size-7 place-items-center rounded-lg border-0 bg-transparent text-[var(--misty-text-subtle)] opacity-60 transition-opacity hover:bg-[var(--misty-surface-2)] hover:opacity-100 focus:opacity-100";
 const secondaryButtonClass = "inline-flex min-h-9 items-center gap-2 rounded-xl border border-[var(--misty-border-soft)] bg-[var(--misty-surface-2)] px-3 text-xs text-[var(--misty-text)]";
 const primaryButtonClass = "inline-flex min-h-9 items-center gap-2 rounded-xl border-0 bg-[var(--misty-primary)] px-3 text-xs text-[var(--misty-primary-contrast)]";
 const rowActionClass = "invisible grid size-7 place-items-center rounded-lg border-0 bg-transparent text-[var(--misty-text-subtle)] hover:bg-[var(--misty-surface-2)] group-hover:visible";
 const inputClass = "min-h-10 rounded-xl border border-[var(--misty-border-soft)] bg-[var(--misty-surface-2)] px-3 text-sm text-[var(--misty-text)] outline-none focus:border-[var(--misty-primary)]";
-const libraryControlClass = "h-8 shrink-0 rounded-lg border border-[var(--misty-border-soft)] bg-[var(--misty-surface)] px-2 text-xs text-[var(--misty-text-muted)] outline-none";
+const libraryControlClass = "h-8 shrink-0 rounded-lg border border-[var(--misty-border-soft)] bg-[var(--misty-app-surface-bg,var(--misty-surface))] px-2 text-xs text-[var(--misty-text-muted)] outline-none";
 
-const emptyMessages: SpaceMessage[] = [];
-const emptyMembers: SpaceMember[] = [];
-const emptyNodes: SpaceNode[] = [];
-const emptyStudioResources: SpaceStudioResource[] = [];
+const emptyMessages: SpaceMessage[] = [], emptyMembers: SpaceMember[] = [], emptyNodes: SpaceNode[] = [], emptyStudioResources: SpaceStudioResource[] = [];

@@ -106,6 +106,8 @@ import { AgentJobWorker } from "../agents/AgentJobWorker";
 import { SpacesRealtimeBridge } from "../spaces/SpacesRealtimeBridge";
 import { useSpacesStore } from "../stores/useSpacesStore";
 import type { SpaceInboxItem } from "../spaces/types";
+import { AppWallpaperVideo } from "./AppWallpaperVideo";
+import { useDocumentSurfaceVariables } from "./useDocumentSurfaceVariables";
 import {
   advanceTransferCompletionTracker,
   emptyTransferCompletionTracker,
@@ -119,9 +121,7 @@ export type DesktopNavItem = {
   exact?: boolean;
   active?: (pathname: string) => boolean;
 };
-
 const DEFAULT_FONT_STACK = `Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
-
 type WindowBounds = {
   position: PhysicalPosition;
   size: PhysicalSize;
@@ -135,7 +135,7 @@ type WindowRect = {
 };
 
 const desktopFrameClass =
-  "relative isolate grid h-full min-h-0 grid-cols-[80px_minmax(0,1fr)] grid-rows-[28px_minmax(0,1fr)] overflow-hidden bg-[var(--misty-app-frame-bg,var(--misty-bg))]";
+  "relative isolate grid h-full min-h-0 grid-cols-[80px_minmax(0,1fr)] grid-rows-[var(--misty-window-titlebar-inset)_minmax(0,1fr)] overflow-hidden bg-[var(--misty-app-frame-bg,var(--misty-bg))]";
 const tabletFrameClass =
   "relative isolate grid h-full min-h-0 grid-cols-[80px_minmax(0,1fr)] grid-rows-[minmax(0,1fr)] overflow-hidden bg-[var(--misty-app-frame-bg,var(--misty-bg))] pt-[max(var(--misty-safe-top),28px)] pb-[max(var(--misty-safe-bottom),24px)]";
 
@@ -184,10 +184,10 @@ const globalBannerBaseClass =
   "mt-3 max-w-[min(520px,calc(100vw-48px))] rounded-xl border border-[#2f3338] bg-[#07090b] px-3.5 py-2.5 text-sm text-[#f4f4f5] shadow-[0_14px_36px_rgba(0,0,0,0.52)]";
 
 const globalNoticeLayerClass =
-  "pointer-events-none fixed left-1/2 top-14 z-[2147482800] grid -translate-x-1/2 justify-items-center";
+  "pointer-events-none fixed left-1/2 top-[calc(var(--misty-window-titlebar-inset)+28px)] z-[2147482800] grid -translate-x-1/2 justify-items-center";
 
 const workStatusPopupClass =
-  "pointer-events-none fixed left-1/2 top-4 z-[2147482850] grid max-w-[min(360px,calc(100vw-96px))] -translate-x-1/2 grid-cols-[10px_minmax(0,1fr)] items-center gap-3 rounded-lg border border-[#2f3338] bg-[#07090b] px-3.5 py-2.5 text-sm text-[#f4f4f5] shadow-[0_18px_48px_rgba(0,0,0,0.52)]";
+  "pointer-events-none fixed left-1/2 top-[calc(var(--misty-window-titlebar-inset)+16px)] z-[2147482850] grid max-w-[min(360px,calc(100vw-96px))] -translate-x-1/2 grid-cols-[10px_minmax(0,1fr)] items-center gap-3 rounded-lg border border-[#2f3338] bg-[#07090b] px-3.5 py-2.5 text-sm text-[#f4f4f5] shadow-[0_18px_48px_rgba(0,0,0,0.52)]";
 
 const workStatusPulseClass =
   "size-2.5 rounded-full bg-[var(--misty-success)] shadow-[0_0_18px_color-mix(in_srgb,var(--misty-success)_72%,transparent)]";
@@ -202,7 +202,7 @@ const activityButtonClass =
   "grid size-9 place-items-center rounded-lg border border-[#303640] bg-[#191a20] p-0 text-[#f1eee8] transition hover:bg-[#23252d] disabled:opacity-50";
 
 const desktopTitlebarClass =
-  "group/titlebar relative z-10 col-span-full row-start-1 h-7 select-none border-b border-transparent bg-[var(--misty-app-nav-bg,var(--misty-bg))]";
+  "group/titlebar relative z-10 col-span-full row-start-1 h-full select-none border-b border-transparent bg-[var(--misty-app-nav-bg,var(--misty-bg))]";
 
 const desktopTitlebarTitleClass =
   "pointer-events-none absolute inset-x-[112px] top-0 flex h-full min-w-0 items-center justify-center truncate text-[13px] font-semibold leading-none text-[var(--misty-text-muted)]";
@@ -213,7 +213,7 @@ const windowsTitlebarControlsClass =
   "absolute right-0 top-0 z-[3] grid h-full grid-cols-3";
 
 const windowsTitlebarControlButtonClass =
-  "grid h-7 w-[46px] place-items-center border-0 bg-transparent p-0 text-[var(--misty-text-muted)] transition hover:bg-[var(--misty-neutral-hover-bg,var(--misty-surface-2))] hover:text-[var(--misty-text)]";
+  "grid h-full w-[46px] place-items-center border-0 bg-transparent p-0 text-[var(--misty-text-muted)] transition hover:bg-[var(--misty-neutral-hover-bg,var(--misty-surface-2))] hover:text-[var(--misty-text)]";
 
 const windowsTitlebarCloseButtonClass =
   `${windowsTitlebarControlButtonClass} hover:bg-[#c42b1c] hover:text-white`;
@@ -224,7 +224,7 @@ const activityEntryBaseClass =
   "relative grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3 rounded-md px-2.5 py-[9px]";
 
 const frameOverlayBaseClass =
-  "pointer-events-none fixed right-3 top-2.5 z-[90] grid min-w-36 grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-[3px] rounded-[7px] border bg-[color-mix(in_srgb,var(--misty-bg)_88%,transparent)] px-2.5 py-2 text-[11px] leading-[1.2] text-[var(--misty-text)] shadow-[0_12px_34px_var(--misty-shadow)]";
+  "pointer-events-none fixed right-3 top-[calc(var(--misty-window-titlebar-inset)+10px)] z-[90] grid min-w-36 grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-[3px] rounded-[7px] border bg-[color-mix(in_srgb,var(--misty-bg)_88%,transparent)] px-2.5 py-2 text-[11px] leading-[1.2] text-[var(--misty-text)] shadow-[0_12px_34px_var(--misty-shadow)]";
 
 const settingsOverlayLayerClass =
   "fixed inset-0 z-[2147482600] grid place-items-center bg-[rgba(0,0,0,0.36)] p-8 backdrop-blur-[8px]";
@@ -314,14 +314,15 @@ export function DesktopLayout(props: {
     const neutralStrongOpacity = Math.min(0.28, 0.105 + panelOpacity * 0.175);
     const neutralBorderOpacity = Math.min(0.24, 0.08 + panelOpacity * 0.13);
     const appBodyBackground = appWallpaperSrc
-      ? `rgba(5, 6, 7, ${panelOpacity})`
-      : "var(--misty-bg)";
+      ? `rgba(24, 24, 24, ${panelOpacity})`
+      : "var(--misty-page-bg)";
+    const appNavBackground = appWallpaperSrc ? `rgba(16, 16, 16, ${panelOpacity})` : "var(--misty-nav-bg)";
     const appSurfaceBackground = appWallpaperSrc
       ? `rgba(17, 20, 24, ${panelOpacity})`
       : "var(--misty-surface)";
     const wallpaperSurfaceVars = appWallpaperSrc
       ? {
-          "--misty-bg": `rgba(5, 6, 7, ${panelOpacity})`,
+          "--misty-bg": `rgba(24, 24, 24, ${panelOpacity})`,
           "--misty-bg-soft": `rgba(9, 11, 14, ${panelOpacity})`,
           "--misty-surface": `rgba(17, 20, 24, ${panelOpacity})`,
           "--misty-surface-2": `rgba(244, 244, 245, ${neutralControlOpacity})`,
@@ -341,7 +342,7 @@ export function DesktopLayout(props: {
           "--color-border-subtle": "transparent",
           "--misty-skeleton-base": `rgba(244, 244, 245, ${neutralControlOpacity})`,
           "--misty-skeleton-highlight": `rgba(244, 244, 245, ${neutralSelectedOpacity})`,
-          "--color-bg": `rgba(11, 13, 16, ${panelOpacity})`,
+          "--color-bg": `rgba(24, 24, 24, ${panelOpacity})`,
           "--color-surface": `rgba(17, 20, 24, ${panelOpacity})`,
           "--color-elevated": `rgba(244, 244, 245, ${neutralControlOpacity})`,
         }
@@ -357,10 +358,10 @@ export function DesktopLayout(props: {
       "--misty-border-strong": `rgba(244, 244, 245, ${neutralBorderOpacity})`,
       "--color-border": "transparent",
       "--color-border-subtle": "transparent",
-      "--misty-app-frame-bg": appWallpaperSrc ? "transparent" : "var(--misty-bg)",
+      "--misty-app-frame-bg": appWallpaperSrc ? "transparent" : "var(--misty-page-bg)",
       "--misty-app-page-bg": appBodyBackground,
       "--misty-app-shell-bg": appBodyBackground,
-      "--misty-app-nav-bg": appBodyBackground,
+      "--misty-app-nav-bg": appNavBackground,
       "--misty-app-route-bg": appWallpaperSrc ? appBodyBackground : "transparent",
       "--misty-app-panel-bg": "transparent",
       "--misty-app-pane-bg": appSurfaceBackground,
@@ -376,12 +377,10 @@ export function DesktopLayout(props: {
       ...wallpaperSurfaceVars,
     } as unknown as CSSProperties;
   }, [appWallpaperSrc, appearancePreferences.panelOpacity]);
-  const desktopNavbarStyle = useMemo(
-    () => ({
-      backgroundColor: "var(--misty-app-nav-bg,var(--misty-bg))",
-    }) satisfies CSSProperties,
-    [],
-  );
+  useDocumentSurfaceVariables(desktopFrameStyle);
+  const desktopNavbarStyle = useMemo(() => ({
+    backgroundColor: "var(--misty-app-nav-bg,var(--misty-bg))",
+  }) satisfies CSSProperties, []);
   const customFontSignature = useSettingsStore((state) =>
     JSON.stringify(selectCustomFontPreferences(state.settings?.document)),
   );
@@ -411,6 +410,7 @@ export function DesktopLayout(props: {
     (state) => state.rememberAppRoute,
   );
   const lastAppRoute = useAppRouteMemoryStore((state) => state.lastAppRoute);
+  const lastSpacesRoute = useAppRouteMemoryStore((state) => state.lastSpacesRoute);
   const routeId = props.getRouteId(location.pathname);
   const appLoadStarted = useRef(false);
   const searchMaintenanceRunningRef = useRef(false);
@@ -957,15 +957,7 @@ export function DesktopLayout(props: {
       {appWallpaperSrc ? (
         <div aria-hidden="true" className="pointer-events-none fixed inset-0 z-0 overflow-hidden">
           {appWallpaperIsVideo ? (
-            <video
-              className="h-full w-full object-cover"
-              src={appWallpaperSrc}
-              autoPlay
-              loop
-              muted
-              playsInline
-              preload="auto"
-            />
+            <AppWallpaperVideo src={appWallpaperSrc} />
           ) : (
             <img
               alt=""
@@ -1038,7 +1030,7 @@ export function DesktopLayout(props: {
           />
         </div>
         <div className={navbarGroupClass}>
-          <NavGroup currentPath={location.pathname} items={navItems} />
+          <NavGroup currentPath={location.pathname} items={navItems} routeOverrides={{ spaces: lastSpacesRoute }} />
         </div>
         <div className={navbarBottomClass}>
           <ActivityNavButton
@@ -1357,6 +1349,7 @@ function NavGroup(props: {
   items: DesktopNavItem[];
   badges?: Partial<Record<string, number>>;
   currentPath: string;
+  routeOverrides?: Partial<Record<string, string>>;
 }) {
   return (
     <>
@@ -1371,7 +1364,7 @@ function NavGroup(props: {
             end={item.exact}
             key={item.id}
             title={item.label}
-            to={item.path}
+            to={props.routeOverrides?.[item.id] ?? item.path}
           >
             <span
               className={`${navIconTileBaseClass} ${selected ? navIconTileActiveClass : ""}`}
@@ -1671,7 +1664,7 @@ function ProfilePopover(props: {
           </span>
         </div>
         <div className="grid gap-1 py-2">
-          <span className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-normal text-[var(--misty-text-subtle)]">
+          <span className="px-2.5 py-1 text-[10px] font-bold capitalize text-[var(--misty-text-subtle)]">
             User/Profile Settings
           </span>
           <button className={profileMenuItemClass} type="button" role="menuitem" onClick={openAccountSettings}>
@@ -1695,7 +1688,7 @@ function ProfilePopover(props: {
             <span>{account ? "Sign out" : "Clear session"}</span>
           </button>
           <div className="my-1 h-px bg-[var(--misty-border-soft)]" />
-          <span className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-normal text-[var(--misty-text-subtle)]">
+          <span className="px-2.5 py-1 text-[10px] font-bold capitalize text-[var(--misty-text-subtle)]">
             Misty App Settings
           </span>
           <button
@@ -1886,14 +1879,14 @@ function ActivityPopover(props: {
         </div>
         {hasEntries ? (
           <div className="min-h-0 overflow-auto px-4 py-3">
-            {cloudEntries.length > 0 ? <p className="mb-1 mt-0 px-2 text-[9px] font-semibold uppercase tracking-[0.12em] text-[#77736d]">Spaces</p> : null}
+            {cloudEntries.length > 0 ? <p className="mb-1 mt-0 px-2 text-[9px] font-semibold capitalize text-[#77736d]">Spaces</p> : null}
             {cloudEntries.map((entry) => (
               <CloudActivityEntry key={entry.id} entry={entry} onOpen={() => {
                 navigate(`/spaces/${encodeURIComponent(entry.space_id)}/chat${entry.message_id ? `?message=${encodeURIComponent(entry.message_id)}` : ""}`);
                 props.onClose();
               }} />
             ))}
-            {localEntries.length > 0 && cloudEntries.length > 0 ? <p className="mb-1 mt-4 px-2 text-[9px] font-semibold uppercase tracking-[0.12em] text-[#77736d]">This device</p> : null}
+            {localEntries.length > 0 && cloudEntries.length > 0 ? <p className="mb-1 mt-4 px-2 text-[9px] font-semibold capitalize text-[#77736d]">This Device</p> : null}
             {localEntries.map((entry) => (
               <ActivityEntry key={entry.id} entry={entry} />
             ))}

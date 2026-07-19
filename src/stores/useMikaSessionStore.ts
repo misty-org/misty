@@ -28,7 +28,7 @@ import { agentsPrepareDocument, agentsRegisterFolderScope } from "../agents/api"
 import type { AgentCitation } from "../agents/types";
 import { deviceRelativePath, isSafeRelativePath, mikaServerContext } from "../agents/pathPrivacy";
 import { mistyDocumentsEnabled } from "../agents/flags";
-import { mikaDelegationMessage, publicMikaDisplayName, publicMikaModel, tryMikaSpaceDelegation } from "./mikaDelegation";
+import { clearPendingMikaDelegations, hasPendingMikaDelegations, mikaDelegationMessage, publicMikaDisplayName, publicMikaModel, resolvePendingMikaDelegation, trackPendingMikaDelegation, tryMikaSpaceDelegation } from "./mikaDelegation";
 
 export type AiPanelMessage = {
   id: string;
@@ -39,8 +39,8 @@ export type AiPanelMessage = {
   creditsUsed?: number;
   creditsRemaining?: number;
   citations?: AgentCitation[];
+  delegatedRunId?: string;
 };
-
 export interface AiStatus {
   configured: boolean;
   model: string;
@@ -109,7 +109,6 @@ let abortRequested = false;
 const processedEventSequences = new Set<number>();
 const processedToolRequestIds = new Set<string>();
 const aiToolTimeoutMs = 15000;
-
 const toolDefinitions = {
   list_directory: { name: "list_directory", risk: "read" },
   search_files: { name: "search_files", risk: "read" },
@@ -250,16 +249,18 @@ export const useMikaSessionStore = create<AiSessionStore>((set, get) => ({
       error: null,
       status: statusWithRunning(state.status, true),
     }));
-
     try {
-      const delegation = await tryMikaSpaceDelegation(trimmed);
+      const mikaConversationID = await ensureSession();
+      const delegation = await tryMikaSpaceDelegation(trimmed, mikaConversationID);
       if (delegation && (delegation.run || delegation.routing.options?.length)) {
         const explanation = mikaDelegationMessage(delegation);
+        const waitingForDelegatedResult = trackPendingMikaDelegation(delegation);
         set((state) => ({
           error: null,
-          status: statusWithRunning(state.status, false),
-          messages: [...state.messages, { id: aiMessageId("assistant"), role: "assistant", text: explanation }],
+          status: statusWithRunning(state.status, waitingForDelegatedResult),
+          messages: [...state.messages, { id: aiMessageId("assistant"), role: "assistant", text: explanation, delegatedRunId: delegation.run?.id }],
         }));
+        if (waitingForDelegatedResult) ensureAiPolling(set, get);
         return;
       }
       const registeredScope = cwd
@@ -464,8 +465,9 @@ async function drainAiEventsOnce(
   const nextToolApprovals: AiToolApproval[] = [];
   for (const event of nextEvents) {
     lastEventSequence = Math.max(lastEventSequence, event.sequence);
+    resolvePendingMikaDelegation(event.run_id);
     if (event.type === "assistant_message" && event.text) {
-      nextMessages.push({ id: aiMessageId("assistant"), role: "assistant", text: event.text, citations: event.citations, creditsUsed: event.credits_used, creditsRemaining: event.credits_remaining });
+      nextMessages.push({ id: aiMessageId("assistant"), role: "assistant", text: event.text, citations: event.citations, creditsUsed: event.credits_used, creditsRemaining: event.credits_remaining, delegatedRunId: event.run_id });
     } else if (event.type === "error" && event.message) {
       nextMessages.push({ id: aiMessageId("error"), role: "error", text: event.message });
     } else if (event.type === "tool_request") {
@@ -513,6 +515,7 @@ async function drainAiEventsOnce(
 async function settleEmptyEventPoll(
   set: (partial: Partial<AiSessionStore> | ((state: AiSessionStore) => Partial<AiSessionStore>)) => void,
 ): Promise<void> {
+  if (hasPendingMikaDelegations()) { set((state) => ({ status: statusWithRunning(state.status, true) })); ensureAiPolling(set, useMikaSessionStore.getState); return; }
   try {
     const status = await fetchAgentStatus();
     if (status.running) {
@@ -562,6 +565,7 @@ function resetActiveSession(): void {
   drainInFlight = null;
   processedEventSequences.clear();
   processedToolRequestIds.clear();
+  clearPendingMikaDelegations();
   activeRequestScope = null;
   activeScopeId = null;
   activeSelectedPaths = [];
@@ -651,7 +655,6 @@ async function runToolRequest(request: ToolRequest, scope: AssistantScope | null
           relativePath: relativeToRoot(candidate),
           sections: document.sections,
           truncated: document.truncated,
-          requiresOcr: document.requiresOcr,
           citationRule: "Cite every factual document claim using the supplied scopeId, relativePath, fileName, section kind, and locator.",
         });
       }

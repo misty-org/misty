@@ -14,6 +14,7 @@ import {
   type ClientDebugEvent,
 } from "../../../shared/debug/clientDebug";
 import { openExternalLink } from "../../../shared/openExternalLink";
+import { normalizeApiBaseUrl, withDefaultApiPath } from "../../../api/apiBase";
 import {
   Bug,
   Lock,
@@ -504,7 +505,8 @@ function DiagnosticsPanel() {
   const app = useAppStore((state) => state.app);
   const [events, setEvents] = useState<ClientDebugEvent[]>(() => readClientDebugEvents());
   const serverBase = accountDebugBase(
-    import.meta.env.VITE_MISTY_SERVER_URL
+    import.meta.env.VITE_MISTY_PUBLIC_API_URL
+      || import.meta.env.VITE_MISTY_SERVER_URL
       || import.meta.env.VITE_API_BASE
       || app?.environment.serverUrl
       || null,
@@ -526,7 +528,7 @@ function DiagnosticsPanel() {
     <div>
       <Section title="Runtime">
         <Row label="Misty server API">{serverBase || "Not set"}</Row>
-        <Row label="Server env">{import.meta.env.VITE_MISTY_SERVER_URL || import.meta.env.VITE_API_BASE || "Not set"}</Row>
+        <Row label="Server env">{import.meta.env.VITE_MISTY_PUBLIC_API_URL || import.meta.env.VITE_MISTY_SERVER_URL || import.meta.env.VITE_API_BASE || "Not set"}</Row>
         <Row label="Debug logging">{clientDebugPanelEnabled() ? "Enabled" : "Disabled"}</Row>
       </Section>
 
@@ -664,7 +666,7 @@ export default function DesktopAccountPage(props: {
     >
       <aside className={desktopSettingsSidebarClass} aria-label="Account settings sections">
         <div className="grid gap-[5px]">
-          <span className="px-2 pb-3 pt-2 text-[10px] font-bold uppercase tracking-normal text-[#767676]">
+          <span className="px-2 pb-3 pt-2 text-[10px] font-bold capitalize text-[#767676]">
             {overlay ? "Account settings" : "Misty Account Settings"}
           </span>
           {TABS.map(({ id, label, icon: Icon }) => (
@@ -729,9 +731,7 @@ export default function DesktopAccountPage(props: {
 }
 
 function accountDebugBase(base: string | null | undefined) {
-  const trimmed = typeof base === "string" ? base.trim().replace(/\/+$/, "") : "";
-  if (!trimmed) return "";
-  return /\/api$/i.test(trimmed) ? trimmed : `${trimmed}/api`;
+  return withDefaultApiPath(normalizeApiBaseUrl(base));
 }
 
 function meFromLocalAccount(

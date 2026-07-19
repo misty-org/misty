@@ -150,7 +150,7 @@ export const router = createBrowserRouter([
           {
             element: <AppPagesLayout />,
             children: [
-              { path: "agents", element: <LegacyStudioRedirect kind="folder-agents" /> },
+              { path: "agents", element: <LegacyStudioRedirect kind="agents" /> },
               { path: "automations", element: <LegacyStudioRedirect kind="folder-agents" /> },
               {
                 path: "spaces",
@@ -159,12 +159,14 @@ export const router = createBrowserRouter([
                   { index: true, element: <Navigate to={routes.spacePersonal} replace /> },
                   { path: "personal", element: <PersonalSpaceRedirect /> },
                   { path: ":spaceId", element: <Navigate to="chat" replace /> },
+                  { path: ":spaceId/tasks", element: <Navigate to="board" replace /> },
+                  { path: ":spaceId/:section/studio/:studioKind", element: <SpaceDetail /> },
                   { path: ":spaceId/:section/:studioKind", element: <SpaceDetail /> },
                   { path: ":spaceId/:section", element: <SpaceDetail /> },
                 ],
               },
-              { path: "studio", element: <LegacyStudioRedirect kind="folder-agents" /> },
-              { path: "studio/agents", element: <LegacyStudioRedirect kind="folder-agents" /> },
+              { path: "studio", element: <LegacyStudioRedirect kind="agents" /> },
+              { path: "studio/agents", element: <LegacyStudioRedirect kind="agents" /> },
               { path: "studio/workflows", element: <LegacyStudioRedirect kind="workflows" /> },
               { path: "home", element: <HomePage /> },
               {
@@ -241,6 +243,7 @@ function AppPagesLayout() {
 function StartupRedirect() {
   const loaded = useSettingsStore((state) => state.loaded);
   const lastAppRoute = useAppRouteMemoryStore((state) => state.lastAppRoute);
+  const lastSpacesRoute = useAppRouteMemoryStore((state) => state.lastSpacesRoute);
 
   if (!loaded) {
     return (
@@ -253,14 +256,15 @@ function StartupRedirect() {
     );
   }
 
-  const target = isRememberableAppRoute(lastAppRoute)
-    ? lastAppRoute
+  const rememberedRoute = lastAppRoute.startsWith(routes.spaces) ? lastSpacesRoute : lastAppRoute;
+  const target = isRememberableAppRoute(rememberedRoute)
+    ? rememberedRoute
     : routes.home;
 
   return <Navigate to={target} replace />;
 }
 
-function LegacyStudioRedirect({ kind }: { kind: "folder-agents" | "workflows" }) {
+function LegacyStudioRedirect({ kind }: { kind: "agents" | "folder-agents" | "workflows" }) {
   const location = useLocation();
   const spaces = useSpacesStore((state) => state.spaces);
   const loading = useSpacesStore((state) => state.loading);
@@ -272,13 +276,12 @@ function LegacyStudioRedirect({ kind }: { kind: "folder-agents" | "workflows" })
   const params = new URLSearchParams(location.search);
   const requestedSpaceId = params.get("spaceId") ?? params.get("space") ?? "";
   const space = spaces.find((candidate) => candidate.id === requestedSpaceId) ?? spaces.find((candidate) => candidate.is_personal) ?? spaces[0];
-  const oldSpaceScope = params.get("scope") === "space";
-  const targetKind = kind === "folder-agents" && oldSpaceScope ? "agents" : kind;
+  const targetKind = kind === "folder-agents" ? "agents" : kind;
   params.delete("scope");
   params.delete("space");
   params.delete("spaceId");
   const query = params.toString();
-  return <Navigate to={`/spaces/${encodeURIComponent(space.id)}/studio/${targetKind}${query ? `?${query}` : ""}`} replace />;
+  return <Navigate to={`/spaces/${encodeURIComponent(space.id)}/agents/studio/${targetKind}${query ? `?${query}` : ""}`} replace />;
 }
 
 function desktopRouteIdFromPath(pathname: string): AppTab {

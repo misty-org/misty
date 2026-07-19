@@ -49,6 +49,7 @@ import type {
   OperationQueueSnapshot,
   OperationStatus,
   PasteBlobRequest,
+  SavePreviewRequest,
   PasteItem,
   PasteItemsRequest,
   PasteTextRequest,
@@ -98,10 +99,6 @@ import type {
   CompareFoldersResult,
   DuplicateScanRequest,
   DuplicateScanResult,
-  AutomationRunRequest,
-  AutomationSnapshot,
-  AutomationValidation,
-  AutomationWorkflow,
   AnalysisResult,
   FolderLibraryStatus,
   PreparedSmartLibraryPreview,
@@ -109,6 +106,7 @@ import type {
   SmartLibraryAssetsPage,
   SmartLibraryAssetsPageRequest,
   SmartLibraryImportResult,
+  SmartLibraryImportPreflight,
   SmartLibrarySnapshot,
   ResolvedSmartLibraryAsset,
   MediaSearchSnapshot,
@@ -116,7 +114,6 @@ import type {
   ResolvedMediaAsset,
 } from "./types";
 import { hasTauriInternals } from "../shared/tauri";
-import type { MfWorkflowDocument, MfWorkflowFile } from "../workflows/mf";
 
 function invoke<T>(command: string, args?: Record<string, unknown>): Promise<T> {
   if (!hasTauriInternals()) {
@@ -130,38 +127,6 @@ export function appSnapshot(): Promise<AppSnapshot> {
 
 export function appEnvironmentSnapshot(): Promise<AppEnvironmentSnapshot> {
   return invoke("app_environment_snapshot");
-}
-
-export function automationsSnapshot(): Promise<AutomationSnapshot> {
-  return invoke("automations_snapshot");
-}
-
-export function automationsSaveWorkflow(workflow: AutomationWorkflow): Promise<AutomationSnapshot> {
-  return invoke("automations_save_workflow", { workflow });
-}
-
-export function automationsDeleteWorkflow(workflowId: string): Promise<AutomationSnapshot> {
-  return invoke("automations_delete_workflow", { workflowId });
-}
-
-export function automationsValidateWorkflow(workflow: AutomationWorkflow): Promise<AutomationValidation> {
-  return invoke("automations_validate_workflow", { workflow });
-}
-
-export function automationsRun(request: AutomationRunRequest): Promise<AutomationSnapshot> {
-  return invoke("automations_run", { request });
-}
-
-export function automationsResolveApproval(approvalId: string, approved: boolean): Promise<AutomationSnapshot> {
-  return invoke("automations_resolve_approval", { approvalId, approved });
-}
-
-export function workflowsWriteMf(document: MfWorkflowDocument): Promise<MfWorkflowFile> {
-  return invoke("workflows_write_mf", { document });
-}
-
-export function workflowsReadMf(path: string): Promise<MfWorkflowFile> {
-  return invoke("workflows_read_mf", { path });
 }
 
 export function storageSnapshot(): Promise<StorageSnapshot> {
@@ -219,6 +184,10 @@ export function clipboardNativeFileRefs(): Promise<PasteItem[]> {
 
 export function clipboardWriteFileRefs(items: PasteItem[]): Promise<boolean> {
   return invoke("clipboard_write_file_refs", { items });
+}
+
+export function clipboardWriteFileBytes(items: Array<{ name: string; bytes: number[] }>): Promise<boolean> {
+  return invoke("clipboard_write_file_bytes", { items });
 }
 
 export function devicesSnapshot(): Promise<DeviceSnapshot> {
@@ -293,8 +262,16 @@ export function explorerPrepareDragItems(request: PrepareDragItemsRequest): Prom
   return invoke("explorer_prepare_drag_items", { request });
 }
 
+export function explorerCancelDragPreparation(sessionId: string): Promise<void> {
+  return invoke("explorer_cancel_drag_preparation", { sessionId });
+}
+
 export function explorerPreviewItem(path: string): Promise<ExplorerPreviewPayload> {
   return invoke("explorer_preview_item", { path });
+}
+
+export function explorerSavePreviewItem(request: SavePreviewRequest): Promise<ExplorerOperationResult> {
+  return invoke("explorer_save_preview_item", { request });
 }
 
 export function explorerGenerateImageThumbnail(
@@ -357,6 +334,10 @@ export function smartLibraryScan(rootPath: string): Promise<FolderLibraryStatus>
 
 export function smartLibraryImportFiles(paths: string[]): Promise<SmartLibraryImportResult> {
   return invoke("smart_library_import_files", { request: { paths } });
+}
+
+export function smartLibraryPreflightImport(paths: string[]): Promise<SmartLibraryImportPreflight> {
+  return invoke("smart_library_preflight_import", { request: { paths } });
 }
 
 export function smartLibraryPreparePreviews(assetIds: string[], maxDimension = 512): Promise<PreparedSmartLibraryPreview[]> {

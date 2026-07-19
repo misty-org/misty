@@ -36,6 +36,7 @@ export type PluginCatalogEntry = {
   permissions: string[];
   getting_started: string[];
   changelog: string[];
+  included_tools: Array<{ name: string; version: string }>;
   links: PluginLink[];
   actions: PluginAction[];
   verified: boolean;
@@ -71,6 +72,7 @@ export type LocalPluginRecord = {
   permissions: string[];
   getting_started: string[];
   changelog: string[];
+  included_tools?: Array<{ name: string; version: string }>;
   links: PluginLink[];
   actions: PluginAction[];
   launcher: PluginLauncher;
@@ -95,6 +97,7 @@ export type PluginEntry = {
   permissions: string[];
   getting_started: string[];
   changelog: string[];
+  included_tools: Array<{ name: string; version: string }>;
   links: PluginLink[];
   actions: PluginAction[];
   launcher: PluginLauncher;

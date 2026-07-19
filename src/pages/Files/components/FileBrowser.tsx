@@ -7,7 +7,7 @@ import {
   RotateCcw,
 } from "lucide-react";
 import { memo, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
-import type { DragEvent, MouseEvent, PointerEvent as ReactPointerEvent, ReactNode } from "react";
+import type { MouseEvent, PointerEvent as ReactPointerEvent, ReactNode } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { explorerGenerateImageThumbnail } from "../../../api/misty";
 import type { DirectoryListing, DirectorySizeRecord, FileEntry, FileSyncEndpoint, FileSyncPair } from "../../../api/types";
@@ -24,14 +24,13 @@ import type {
 import { useFileSyncStore } from "../../../stores/useFileSyncStore";
 import { formatBytes, formatDate } from "../utils/fileFormat";
 import {
-  beginInternalDrag,
-  canDropOnEntry,
   dragItemsForEntry,
-  handleEntryDrop,
-  handlePaneDragOver,
-  handlePaneDrop,
+  transferDropAcceptance,
 } from "./FileBrowserDrag";
 import type { FileBrowserDragItem } from "./FileBrowserDrag";
+import { storageIdForPath } from "../drag/operations";
+import { useExplorerDragSource, useExplorerDropZone } from "../drag/ExplorerDragContext";
+import type { ExplorerDragModifiers, ExplorerDragPayload } from "../drag/types";
 import { compileEntryFilterMatcher, entryMatchesQuery } from "./FileBrowserFilters";
 import { FileIcon } from "./FileBrowserIcons";
 import { InlineCreateTableRow, InlineNameEditor, PassiveRenameDraftView } from "./FileBrowserInline";
@@ -107,7 +106,7 @@ interface FileBrowserProps {
   onDownload: (entry: FileEntry) => void;
   onContextMenu: (event: MouseEvent, entry: FileEntry) => void;
   onBackgroundContextMenu: (event: MouseEvent) => void;
-  onDropItems: (items: FileBrowserDragItem[], destination: string) => void;
+  onDropItems: (payload: ExplorerDragPayload, destination: string, destinationStorageId: string, modifiers: ExplorerDragModifiers) => void;
   onInlineEditChange: (value: string) => void;
   onInlineEditCommit: () => void;
   onInlineEditCancel: () => void;
@@ -133,6 +132,25 @@ export const FileBrowser = memo(function FileBrowser(props: FileBrowserProps) {
   const thumbnailPreviewsEnabled = useSettingsStore((state) =>
     selectAppearancePreferences(state.settings?.document).thumbnailPreviewsEnabled,
   );
+  const paneDropSpec = useMemo(() => {
+    const destination = props.listing?.path ?? "";
+    return {
+      id: `pane:${props.paneId}`,
+      accepts: (payload: ExplorerDragPayload) => destination
+        ? transferDropAcceptance(payload, destination)
+        : { valid: false, label: "Unavailable" },
+      onDrop: (payload: ExplorerDragPayload, modifiers: ExplorerDragModifiers) => {
+        if (!props.listing) return;
+        props.onDropItems(
+          payload,
+          props.listing.path,
+          storageIdForPath(props.listing.path, props.listing.location.remoteName),
+          modifiers,
+        );
+      },
+    };
+  }, [props.listing, props.onDropItems, props.paneId]);
+  const paneDrop = useExplorerDropZone(paneDropSpec);
 
   useEffect(() => {
     if (!thumbnailPreviewsEnabled || !props.listing) return;
@@ -160,13 +178,12 @@ export const FileBrowser = memo(function FileBrowser(props: FileBrowserProps) {
 
   return (
     <section
+      ref={paneDrop.ref}
       className={fileBrowserStyles.browser}
       onClick={(event) => {
         if (event.target === event.currentTarget) props.onClearSelection();
       }}
       onContextMenu={props.selectionOnly ? (event) => event.preventDefault() : props.onBackgroundContextMenu}
-      onDragOver={props.selectionOnly ? undefined : handlePaneDragOver}
-      onDrop={props.selectionOnly ? undefined : (event) => handlePaneDrop(event, displayListing.path, props.onDropItems)}
     >
       {props.viewMode === "grid" ? <FileGrid {...props} listing={displayListing} /> : <FileTable {...props} listing={displayListing} />}
       <footer className={fileBrowserStyles.footer}>
@@ -276,9 +293,6 @@ function FileTable(props: FileBrowserProps & { listing: DirectoryListing }) {
   const visibleEntryIds = useMemo(() => props.listing.entries.map((entry) => entry.id), [props.listing.entries]);
   const passiveRenameDrafts = useMemo(() => passiveRenameDraftsFor(props.inlineEdit, props.paneId), [props.inlineEdit, props.paneId]);
   const activeInlineEdit = props.inlineEdit?.paneId === props.paneId ? props.inlineEdit : null;
-  const [dropTargetId, setDropTargetId] = useState<string | null>(null);
-  const [invalidDropTargetId, setInvalidDropTargetId] = useState<string | null>(null);
-  const [draggingEntryIds, setDraggingEntryIds] = useState<Set<string>>(() => new Set());
   const rowHeight = compactModeEnabled ? 36 : TABLE_ROW_HEIGHT;
   const rowCount = props.listing.entries.length;
   const tableWidth = columnOrder.reduce((sum, column) => sum + columnWidths[column], 0);
@@ -450,12 +464,7 @@ function FileTable(props: FileBrowserProps & { listing: DirectoryListing }) {
         ref={scrollRef}
         className={fileBrowserStyles.tableScroll}
         onScroll={handleScroll}
-        onDragLeave={(event) => {
-          if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
-            setDropTargetId(null);
-            setInvalidDropTargetId(null);
-          }
-        }}
+        data-explorer-scroll-container
       >
         <table className={fileBrowserStyles.table} style={{ width: renderedTableWidth, minWidth: renderedTableWidth }}>
           <colgroup>
@@ -487,33 +496,8 @@ function FileTable(props: FileBrowserProps & { listing: DirectoryListing }) {
                 onOpen={props.onOpen}
                 onDownload={props.onDownload}
                 onContextMenu={props.onContextMenu}
-                dropTarget={dropTargetId === entry.id}
-                invalidDropTarget={invalidDropTargetId === entry.id}
-                dragging={draggingEntryIds.has(entry.id)}
-                onDragStart={(event) => {
-                  const items = dragItemsForEntry(entry, props.listing.entries, selectedIds);
-                  beginInternalDrag(event, items);
-                  setDraggingEntryIds(new Set(items.map((item) => item.entryId)));
-                }}
-                onDragEnd={() => {
-                  setDraggingEntryIds(new Set());
-                  setDropTargetId(null);
-                  setInvalidDropTargetId(null);
-                }}
-                onDragOver={(event) => {
-                  if (!canDropOnEntry(event, entry)) {
-                    setDropTargetId(null);
-                    setInvalidDropTargetId(entry.id);
-                    return;
-                  }
-                  setInvalidDropTargetId(null);
-                  setDropTargetId(entry.id);
-                }}
-                onDrop={(event) => {
-                  setDropTargetId(null);
-                  setInvalidDropTargetId(null);
-                  handleEntryDrop(event, entry, props.onDropItems);
-                }}
+                dragItems={dragItemsForEntry(entry, props.listing.entries, selectedIds)}
+                onDropItems={props.onDropItems}
                 inlineEdit={activeInlineEdit?.entryId === entry.id ? activeInlineEdit : null}
                 passiveRename={passiveRenameDrafts.get(entry.id) ?? null}
                 directorySizes={props.directorySizes}
@@ -571,13 +555,8 @@ const FileTableRow = memo(function FileTableRow(props: {
   onOpen: FileBrowserProps["onOpen"];
   onDownload: FileBrowserProps["onDownload"];
   onContextMenu: FileBrowserProps["onContextMenu"];
-  dropTarget: boolean;
-  invalidDropTarget: boolean;
-  dragging: boolean;
-  onDragStart: (event: DragEvent<HTMLTableRowElement>) => void;
-  onDragEnd: () => void;
-  onDragOver: (event: DragEvent<HTMLTableRowElement>) => void;
-  onDrop: (event: DragEvent<HTMLTableRowElement>) => void;
+  dragItems: FileBrowserDragItem[];
+  onDropItems: FileBrowserProps["onDropItems"];
   inlineEdit: ExplorerInlineEditState | null;
   passiveRename: PassiveRenameDraft | null;
   directorySizes: Record<string, DirectorySizeRecord>;
@@ -586,14 +565,33 @@ const FileTableRow = memo(function FileTableRow(props: {
   onInlineEditCancel: FileBrowserProps["onInlineEditCancel"];
 }) {
   const { entry } = props;
+  const source = useExplorerDragSource(props.selectionOnly || entry.isDeleted ? [] : props.dragItems);
+  const dropSpec = useMemo(() => ({
+    id: `entry:${entry.id}`,
+    priority: 20,
+    accepts: (payload: ExplorerDragPayload) => transferDropAcceptance(payload, entry.path, {
+      folder: entry.kind === "folder",
+      writable: !entry.readonly && !entry.isDeleted,
+    }),
+    onDrop: (payload: ExplorerDragPayload, modifiers: ExplorerDragModifiers) => props.onDropItems(
+      payload,
+      entry.path,
+      storageIdForPath(entry.path, entry.location.remoteName),
+      modifiers,
+    ),
+    onSpringLoad: entry.kind === "folder" ? () => props.onOpen(entry) : undefined,
+    springLoad: entry.kind === "folder",
+  }), [entry, props.onDropItems, props.onOpen]);
+  const drop = useExplorerDropZone(dropSpec);
 
   return (
     <tr
-      className={`${fileBrowserStyles.tableRow} ${props.selected ? fileBrowserStyles.tableRowSelected : ""} ${props.inlineEdit ? fileBrowserStyles.tableRowInlineEditing : ""} ${entry.isDeleted ? fileBrowserStyles.tableRowDeleted : ""} ${props.dropTarget ? fileBrowserStyles.tableRowDropTarget : ""} ${props.invalidDropTarget ? fileBrowserStyles.tableRowInvalidDropTarget : ""} ${props.dragging ? fileBrowserStyles.tableRowDragging : ""} ${props.cut ? fileBrowserStyles.tableRowCut : ""}`}
+      ref={drop.ref}
+      className={`${fileBrowserStyles.tableRow} ${props.selected ? fileBrowserStyles.tableRowSelected : ""} ${props.inlineEdit ? fileBrowserStyles.tableRowInlineEditing : ""} ${entry.isDeleted ? fileBrowserStyles.tableRowDeleted : ""} ${source.dragging ? fileBrowserStyles.tableRowDragging : ""} ${props.cut ? fileBrowserStyles.tableRowCut : ""}`}
       aria-disabled={entry.isDeleted || undefined}
       aria-selected={props.selected}
       tabIndex={entry.isDeleted ? -1 : 0}
-      draggable={!entry.isDeleted && !props.selectionOnly}
+      onPointerDown={source.onPointerDown}
       onClick={(event) => props.onSelect(entry.id, event)}
       onDoubleClick={() => {
         if (!entry.isDeleted) props.onOpen(entry);
@@ -602,10 +600,6 @@ const FileTableRow = memo(function FileTableRow(props: {
         if (event.key === "Enter" && !entry.isDeleted) props.onOpen(entry);
       }}
       onContextMenu={props.selectionOnly ? (event) => event.preventDefault() : (event) => props.onContextMenu(event, entry)}
-      onDragStart={props.selectionOnly ? undefined : props.onDragStart}
-      onDragEnd={props.selectionOnly ? undefined : props.onDragEnd}
-      onDragOver={props.selectionOnly ? undefined : props.onDragOver}
-      onDrop={props.selectionOnly ? undefined : props.onDrop}
     >
       {props.columns.map((column) => (
         <FileTableCell
@@ -707,9 +701,6 @@ function FileGrid(props: FileBrowserProps & { listing: DirectoryListing }) {
   const visibleEntryIds = useMemo(() => props.listing.entries.map((entry) => entry.id), [props.listing.entries]);
   const passiveRenameDrafts = useMemo(() => passiveRenameDraftsFor(props.inlineEdit, props.paneId), [props.inlineEdit, props.paneId]);
   const activeInlineEdit = props.inlineEdit?.paneId === props.paneId ? props.inlineEdit : null;
-  const [dropTargetId, setDropTargetId] = useState<string | null>(null);
-  const [invalidDropTargetId, setInvalidDropTargetId] = useState<string | null>(null);
-  const [draggingEntryIds, setDraggingEntryIds] = useState<Set<string>>(() => new Set());
   const createOffset = props.inlineEdit?.kind === "create" ? 1 : 0;
   const itemCount = props.listing.entries.length + createOffset;
   const gridPadding = compactModeEnabled ? 10 : GRID_PADDING;
@@ -813,12 +804,7 @@ function FileGrid(props: FileBrowserProps & { listing: DirectoryListing }) {
       ref={scrollRef}
       className={fileBrowserStyles.gridScroll}
       onScroll={handleScroll}
-      onDragLeave={(event) => {
-        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
-          setDropTargetId(null);
-          setInvalidDropTargetId(null);
-        }
-      }}
+      data-explorer-scroll-container
     >
       <div className={fileBrowserStyles.gridSizer} style={{ height: totalHeight }}>
         <div
@@ -859,33 +845,8 @@ function FileGrid(props: FileBrowserProps & { listing: DirectoryListing }) {
                 onOpen={props.onOpen}
                 onDownload={props.onDownload}
                 onContextMenu={props.onContextMenu}
-                dropTarget={dropTargetId === item.entry.id}
-                invalidDropTarget={invalidDropTargetId === item.entry.id}
-                dragging={draggingEntryIds.has(item.entry.id)}
-                onDragStart={(event) => {
-                  const items = dragItemsForEntry(item.entry, props.listing.entries, selectedIds);
-                  beginInternalDrag(event, items);
-                  setDraggingEntryIds(new Set(items.map((dragItem) => dragItem.entryId)));
-                }}
-                onDragEnd={() => {
-                  setDraggingEntryIds(new Set());
-                  setDropTargetId(null);
-                  setInvalidDropTargetId(null);
-                }}
-                onDragOver={(event) => {
-                  if (!canDropOnEntry(event, item.entry)) {
-                    setDropTargetId(null);
-                    setInvalidDropTargetId(item.entry.id);
-                    return;
-                  }
-                  setInvalidDropTargetId(null);
-                  setDropTargetId(item.entry.id);
-                }}
-                onDrop={(event) => {
-                  setDropTargetId(null);
-                  setInvalidDropTargetId(null);
-                  handleEntryDrop(event, item.entry, props.onDropItems);
-                }}
+                dragItems={dragItemsForEntry(item.entry, props.listing.entries, selectedIds)}
+                onDropItems={props.onDropItems}
                 onInlineEditChange={props.onInlineEditChange}
                 onInlineEditCommit={props.onInlineEditCommit}
                 onInlineEditCancel={props.onInlineEditCancel}
@@ -910,27 +871,41 @@ const FileGridItem = memo(function FileGridItem(props: {
   onOpen: FileBrowserProps["onOpen"];
   onDownload: FileBrowserProps["onDownload"];
   onContextMenu: FileBrowserProps["onContextMenu"];
-  dropTarget: boolean;
-  invalidDropTarget: boolean;
-  dragging: boolean;
-  onDragStart: (event: DragEvent<HTMLDivElement>) => void;
-  onDragEnd: () => void;
-  onDragOver: (event: DragEvent<HTMLDivElement>) => void;
-  onDrop: (event: DragEvent<HTMLDivElement>) => void;
+  dragItems: FileBrowserDragItem[];
+  onDropItems: FileBrowserProps["onDropItems"];
   onInlineEditChange: FileBrowserProps["onInlineEditChange"];
   onInlineEditCommit: FileBrowserProps["onInlineEditCommit"];
   onInlineEditCancel: FileBrowserProps["onInlineEditCancel"];
 }) {
   const { entry } = props;
+  const source = useExplorerDragSource(props.selectionOnly || entry.isDeleted ? [] : props.dragItems);
+  const dropSpec = useMemo(() => ({
+    id: `entry:${entry.id}`,
+    priority: 20,
+    accepts: (payload: ExplorerDragPayload) => transferDropAcceptance(payload, entry.path, {
+      folder: entry.kind === "folder",
+      writable: !entry.readonly && !entry.isDeleted,
+    }),
+    onDrop: (payload: ExplorerDragPayload, modifiers: ExplorerDragModifiers) => props.onDropItems(
+      payload,
+      entry.path,
+      storageIdForPath(entry.path, entry.location.remoteName),
+      modifiers,
+    ),
+    onSpringLoad: entry.kind === "folder" ? () => props.onOpen(entry) : undefined,
+    springLoad: entry.kind === "folder",
+  }), [entry, props.onDropItems, props.onOpen]);
+  const drop = useExplorerDropZone(dropSpec);
 
   return (
     <div
-      className={`${fileBrowserStyles.gridItem} ${props.selected ? fileBrowserStyles.gridItemSelected : ""} ${entry.isDeleted ? fileBrowserStyles.gridItemDeleted : ""} ${props.dropTarget ? fileBrowserStyles.gridItemDropTarget : ""} ${props.invalidDropTarget ? fileBrowserStyles.gridItemInvalidDropTarget : ""} ${props.dragging ? fileBrowserStyles.gridItemDragging : ""} ${props.cut ? fileBrowserStyles.gridItemCut : ""}`}
+      ref={drop.ref}
+      className={`${fileBrowserStyles.gridItem} ${props.selected ? fileBrowserStyles.gridItemSelected : ""} ${entry.isDeleted ? fileBrowserStyles.gridItemDeleted : ""} ${source.dragging ? fileBrowserStyles.gridItemDragging : ""} ${props.cut ? fileBrowserStyles.gridItemCut : ""}`}
       aria-disabled={entry.isDeleted || undefined}
       aria-pressed={props.selected}
       role="button"
       tabIndex={entry.isDeleted ? -1 : 0}
-      draggable={!entry.isDeleted && !props.selectionOnly}
+      onPointerDown={source.onPointerDown}
       onClick={(event) => props.onSelect(entry.id, event)}
       onDoubleClick={() => {
         if (!entry.isDeleted) props.onOpen(entry);
@@ -939,10 +914,6 @@ const FileGridItem = memo(function FileGridItem(props: {
         if (event.key === "Enter" && !entry.isDeleted) props.onOpen(entry);
       }}
       onContextMenu={props.selectionOnly ? (event) => event.preventDefault() : (event) => props.onContextMenu(event, entry)}
-      onDragStart={props.selectionOnly ? undefined : props.onDragStart}
-      onDragEnd={props.selectionOnly ? undefined : props.onDragEnd}
-      onDragOver={props.selectionOnly ? undefined : props.onDragOver}
-      onDrop={props.selectionOnly ? undefined : props.onDrop}
     >
       {!props.selectionOnly && isDownloadableRemoteFile(entry) ? (
         <button

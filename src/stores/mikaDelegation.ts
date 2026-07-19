@@ -1,8 +1,10 @@
 import { agentArchitectureApi } from "../spaces/agentArchitectureApi";
 import type { MikaDelegationResult } from "../spaces/types";
 
-export async function tryMikaSpaceDelegation(prompt: string): Promise<MikaDelegationResult | null> {
-  try { return await agentArchitectureApi.delegate({ prompt, input: { prompt } }); }
+const pendingDelegatedRunIDs = new Set<string>();
+
+export async function tryMikaSpaceDelegation(prompt: string, sourceConversationId?: string): Promise<MikaDelegationResult | null> {
+  try { return await agentArchitectureApi.delegate({ prompt, input: { prompt }, source_conversation_id: sourceConversationId }); }
   catch { return null; }
 }
 
@@ -32,3 +34,13 @@ export function mikaDelegationMessage(result: MikaDelegationResult): string {
       : "";
   return [result.trace, output, status].filter(Boolean).join("\n\n");
 }
+
+export function trackPendingMikaDelegation(result: MikaDelegationResult): boolean {
+  const waiting = result.run?.state === "running" || result.run?.state === "queued" || result.run?.state === "cooldown" || result.run?.state === "awaiting_approval";
+  if (waiting && result.run) pendingDelegatedRunIDs.add(result.run.id);
+  return waiting;
+}
+
+export const resolvePendingMikaDelegation = (runID?: string): void => { if (runID) pendingDelegatedRunIDs.delete(runID); };
+export const hasPendingMikaDelegations = (): boolean => pendingDelegatedRunIDs.size > 0;
+export const clearPendingMikaDelegations = (): void => pendingDelegatedRunIDs.clear();

@@ -2,6 +2,7 @@ import { readAccountAuthToken } from "../pages/Account/shared/authTokenStore";
 import { appSnapshot } from "../api/misty";
 import { safeTauriAssetUrl } from "../shared/tauri";
 import type {
+  AgentMentionFailure,
   MessageSpan,
   BulkLibraryItemAction,
   BulkLibraryItemOptions,
@@ -29,13 +30,23 @@ import type {
   SpaceInboxItem,
   SpaceMember,
   SpaceMessage,
+  SpaceConversation,
   SpaceLibraryItem,
   SpaceStorageUsage,
   SpaceNode,
   SpacesSnapshot,
   SpaceStudioResource,
   SpaceRun,
+	SpaceTask,
+	SpaceTaskPage,
+	SpaceTaskPriority,
+	SpaceTaskMoveResult,
+	SpaceTaskStatus,
+	SpaceCalendarEvent,
+	SpaceCalendarSource,
+	GoogleCalendarChoice,
 } from "./types";
+import { normalizeApiBaseUrl, withDefaultApiPath } from "../api/apiBase";
 
 export class SpaceRequestError extends Error {
   constructor(message: string, readonly status: number, readonly code?: string) {
@@ -45,17 +56,15 @@ export class SpaceRequestError extends Error {
 }
 
 export async function resolveSpacesApiBase(): Promise<string> {
-  const explicit = normalizeBase(import.meta.env.VITE_MISTY_SERVER_URL);
-  const envBase = normalizeBase(import.meta.env.VITE_API_BASE);
+  const publicApiBase = normalizeApiBaseUrl(import.meta.env.VITE_MISTY_PUBLIC_API_URL);
+  if (publicApiBase) return withDefaultApiPath(publicApiBase);
+  const explicit = normalizeApiBaseUrl(import.meta.env.VITE_MISTY_SERVER_URL);
+  const envBase = normalizeApiBaseUrl(import.meta.env.VITE_API_BASE);
   let native: string | null = null;
-  try { native = normalizeBase((await appSnapshot()).environment.serverUrl); } catch { /* desktop service may not be ready */ }
-  const base = explicit ?? envBase ?? native ?? (import.meta.env.DEV ? "http://localhost:8080" : null);
+  try { native = normalizeApiBaseUrl((await appSnapshot()).environment.serverUrl); } catch { /* desktop service may not be ready */ }
+  const base = explicit ?? envBase ?? native ?? (import.meta.env.DEV ? "http://localhost:8080/api" : null);
   if (!base) throw new Error("Misty server URL is not configured.");
-  return /\/api$/i.test(base) ? base : `${base}/api`;
-}
-
-function normalizeBase(value: unknown): string | null {
-  return typeof value === "string" && value.trim() ? value.trim().replace(/\/+$/, "") : null;
+  return withDefaultApiPath(base);
 }
 
 export async function spaceRequest<T = void>(path: string, init?: RequestInit): Promise<T> {
@@ -74,7 +83,7 @@ export async function spaceRequest<T = void>(path: string, init?: RequestInit): 
   return await response.json() as T;
 }
 
-function spaceErrorMessage(code: string | undefined, fallback: string): string {
+export function spaceErrorMessage(code: string | undefined, fallback: string): string {
   const messages: Record<string, string> = {
     not_authenticated: "Your Misty session is unavailable. Sign out, then sign in again before creating a Space.",
     forbidden: "You no longer have access to this Space.",
@@ -92,9 +101,13 @@ function spaceErrorMessage(code: string | undefined, fallback: string): string {
     version_conflict: "Someone else changed this item. Reload it before saving again.",
     library_reauthentication_required: "Unlock this protected Library collection again.",
     integration_required: "Connect the workflow’s required provider in this Space before running it.",
+    provider_not_configured: "This provider’s sign-in is not available on the current Misty server.",
+    provider_exchange_failed: "The provider could not complete sign-in. Try connecting again.",
+    provider_token_missing: "The provider completed sign-in without returning an access token. Try connecting again.",
     reauthentication_failed: "That password is incorrect.",
     invite_expired: "That invitation has expired.",
     invalid_request: "Misty could not validate that request.",
+    internal_error: "Misty could not load this Space right now. Try again in a moment.",
   };
   return code && messages[code] ? messages[code] : fallback.trim() || "The Space request failed.";
 }
@@ -111,7 +124,37 @@ export const spacesApi = {
   leave: (spaceId: string) => spaceRequest(`/spaces/${encodeURIComponent(spaceId)}/leave`, { method: "POST" }),
   transfer: (spaceId: string, userId: string) => spaceRequest(`/spaces/${encodeURIComponent(spaceId)}/transfer`, { method: "POST", body: JSON.stringify({ user_id: userId }) }),
   messages: (spaceId: string, before = 0) => spaceRequest<{ messages: SpaceMessage[] }>(`/spaces/${encodeURIComponent(spaceId)}/messages?before=${before}&limit=50`),
-  sendMessage: (spaceId: string, content: MessageSpan[], fileNodeIds: string[] = [], attachmentIds: string[] = [], libraryItemIds: string[] = [], replyToMessageId = "") => spaceRequest<{ message: SpaceMessage; agent_replies: SpaceMessage[] }>(`/spaces/${encodeURIComponent(spaceId)}/messages`, { method: "POST", body: JSON.stringify({ content, file_node_ids: fileNodeIds, attachment_ids: attachmentIds, library_item_ids: libraryItemIds, reply_to_message_id: replyToMessageId }) }),
+  conversations: (spaceId: string) => spaceRequest<{ conversations: SpaceConversation[] }>(`/spaces/${encodeURIComponent(spaceId)}/conversations`),
+  createConversation: (spaceId: string, title: string, memberIds: string[]) => spaceRequest<SpaceConversation>(`/spaces/${encodeURIComponent(spaceId)}/conversations`, { method: "POST", body: JSON.stringify({ title, member_ids: memberIds }) }),
+  conversationMessages: (spaceId: string, conversationId: string, before = 0) => spaceRequest<{ messages: SpaceMessage[] }>(`/spaces/${encodeURIComponent(spaceId)}/conversations/${encodeURIComponent(conversationId)}/messages?before=${before}&limit=50`),
+  sendConversationMessage: (spaceId: string, conversationId: string, content: MessageSpan[], fileNodeIds: string[] = [], attachmentIds: string[] = [], libraryItemIds: string[] = [], replyToMessageId = "") => spaceRequest<{ message: SpaceMessage; agent_replies: SpaceMessage[]; agent_failures?: AgentMentionFailure[] }>(`/spaces/${encodeURIComponent(spaceId)}/conversations/${encodeURIComponent(conversationId)}/messages`, { method: "POST", body: JSON.stringify({ content, file_node_ids: fileNodeIds, attachment_ids: attachmentIds, library_item_ids: libraryItemIds, reply_to_message_id: replyToMessageId }) }),
+  updateConversationMessage: (spaceId: string, conversationId: string, messageId: string, content: MessageSpan[], fileNodeIds: string[] = []) => spaceRequest<SpaceMessage>(`/spaces/${encodeURIComponent(spaceId)}/conversations/${encodeURIComponent(conversationId)}/messages/${encodeURIComponent(messageId)}`, { method: "PUT", body: JSON.stringify({ content, file_node_ids: fileNodeIds }) }),
+  deleteConversationMessage: (spaceId: string, conversationId: string, messageId: string) => spaceRequest(`/spaces/${encodeURIComponent(spaceId)}/conversations/${encodeURIComponent(conversationId)}/messages/${encodeURIComponent(messageId)}`, { method: "DELETE" }),
+  chatAgents: (spaceId: string) => spaceRequest<{ agents: SpaceStudioResource[] }>(`/spaces/${encodeURIComponent(spaceId)}/chat/agents`),
+	tasks: (spaceId: string, filters: { status?: SpaceTaskStatus; assigneeUserId?: string; priority?: SpaceTaskPriority; search?: string; dueFrom?: string; dueTo?: string; sort?: "rank" | "due" | "updated"; cursor?: string; limit?: number; includeArchived?: boolean } = {}) => {
+		const query = new URLSearchParams();
+		if (filters.status) query.set("status", filters.status);
+		if (filters.assigneeUserId) query.set("assignee_user_id", filters.assigneeUserId);
+		if (filters.priority) query.set("priority", filters.priority);
+		if (filters.search) query.set("q", filters.search);
+		if (filters.dueFrom) query.set("due_from", filters.dueFrom);
+		if (filters.dueTo) query.set("due_to", filters.dueTo);
+		if (filters.sort) query.set("sort", filters.sort);
+		if (filters.cursor) query.set("cursor", filters.cursor);
+		if (filters.limit) query.set("limit", String(filters.limit));
+		if (filters.includeArchived) query.set("include_archived", "true");
+		return spaceRequest<SpaceTaskPage>(`/spaces/${encodeURIComponent(spaceId)}/tasks${query.size ? `?${query}` : ""}`);
+	},
+	createTask: (spaceId: string, task: Pick<SpaceTask, "title" | "notes" | "status" | "priority" | "due_timezone"> & Partial<Pick<SpaceTask, "assignee_user_id" | "due_at" | "source_refs">>) => spaceRequest<SpaceTask>(`/spaces/${encodeURIComponent(spaceId)}/tasks`, { method: "POST", body: JSON.stringify(task) }),
+	updateTask: (spaceId: string, task: SpaceTask, patch: Partial<Pick<SpaceTask, "title" | "notes" | "status" | "priority" | "assignee_user_id" | "due_at" | "due_timezone" | "source_refs">>) => spaceRequest<SpaceTask>(`/spaces/${encodeURIComponent(spaceId)}/tasks/${encodeURIComponent(task.id)}`, { method: "PATCH", body: JSON.stringify({ ...task, ...patch }) }),
+	moveTask: (spaceId: string, task: SpaceTask, status: SpaceTaskStatus, beforeTaskId?: string) => spaceRequest<SpaceTaskMoveResult>(`/spaces/${encodeURIComponent(spaceId)}/tasks/${encodeURIComponent(task.id)}/move`, { method: "POST", body: JSON.stringify({ version: task.version, status, before_task_id: beforeTaskId || undefined }) }),
+	archiveTask: (spaceId: string, task: SpaceTask) => spaceRequest<SpaceTask>(`/spaces/${encodeURIComponent(spaceId)}/tasks/${encodeURIComponent(task.id)}?version=${task.version}`, { method: "DELETE" }),
+	calendarEvents: (spaceId: string, from: string, to: string) => spaceRequest<{ events: SpaceCalendarEvent[] }>(`/spaces/${encodeURIComponent(spaceId)}/calendar/events?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`),
+	calendarSources: (spaceId: string) => spaceRequest<{ sources: SpaceCalendarSource[] }>(`/spaces/${encodeURIComponent(spaceId)}/calendar/sources`),
+	googleCalendars: (spaceId: string, integrationId: string) => spaceRequest<{ calendars: GoogleCalendarChoice[] }>(`/spaces/${encodeURIComponent(spaceId)}/calendar/google/calendars?integration_id=${encodeURIComponent(integrationId)}`),
+	publishGoogleCalendar: (spaceId: string, integrationId: string, calendar: GoogleCalendarChoice) => spaceRequest<SpaceCalendarSource>(`/spaces/${encodeURIComponent(spaceId)}/calendar/sources`, { method: "POST", body: JSON.stringify({ integration_id: integrationId, external_calendar_id: calendar.id, display_name: calendar.summary, timezone: calendar.timeZone || "UTC" }) }),
+	disableCalendarSource: (spaceId: string, sourceId: string) => spaceRequest(`/spaces/${encodeURIComponent(spaceId)}/calendar/sources/${encodeURIComponent(sourceId)}`, { method: "DELETE" }),
+  sendMessage: (spaceId: string, content: MessageSpan[], fileNodeIds: string[] = [], attachmentIds: string[] = [], libraryItemIds: string[] = [], replyToMessageId = "") => spaceRequest<{ message: SpaceMessage; agent_replies: SpaceMessage[]; agent_failures?: AgentMentionFailure[] }>(`/spaces/${encodeURIComponent(spaceId)}/messages`, { method: "POST", body: JSON.stringify({ content, file_node_ids: fileNodeIds, attachment_ids: attachmentIds, library_item_ids: libraryItemIds, reply_to_message_id: replyToMessageId }) }),
   updateMessage: (spaceId: string, messageId: string, content: MessageSpan[], fileNodeIds: string[] = []) => spaceRequest<SpaceMessage>(`/spaces/${encodeURIComponent(spaceId)}/messages/${encodeURIComponent(messageId)}`, { method: "PUT", body: JSON.stringify({ content, file_node_ids: fileNodeIds }) }),
   deleteMessage: (spaceId: string, messageId: string) => spaceRequest(`/spaces/${encodeURIComponent(spaceId)}/messages/${encodeURIComponent(messageId)}`, { method: "DELETE" }),
   markRead: (spaceId: string, seq: number) => spaceRequest(`/spaces/${encodeURIComponent(spaceId)}/read`, { method: "POST", body: JSON.stringify({ seq }) }),
@@ -126,7 +169,7 @@ export const spacesApi = {
   studio: (spaceId: string, kind: "agents" | "workflows") => spaceRequest<{ resources: SpaceStudioResource[] }>(`/spaces/${encodeURIComponent(spaceId)}/studio/${kind}`),
   saveStudio: (spaceId: string, kind: "agents" | "workflows", item: Partial<SpaceStudioResource>) => spaceRequest<SpaceStudioResource>(`/spaces/${encodeURIComponent(spaceId)}/studio/${kind}`, { method: "POST", body: JSON.stringify(item) }),
   deleteStudio: (spaceId: string, kind: "agents" | "workflows", id: string) => spaceRequest(`/spaces/${encodeURIComponent(spaceId)}/studio/${kind}/${encodeURIComponent(id)}`, { method: "DELETE" }),
-  runStudio: (spaceId: string, kind: "agents" | "workflows", id: string, prompt = "") => spaceRequest<SpaceRun>(`/spaces/${encodeURIComponent(spaceId)}/studio/${kind}/${encodeURIComponent(id)}/runs`, { method: "POST", body: JSON.stringify({ prompt, input: { prompt } }) }),
+  runStudio: (spaceId: string, kind: "agents" | "workflows", id: string, prompt = "", capabilityId = "") => spaceRequest<SpaceRun>(`/spaces/${encodeURIComponent(spaceId)}/studio/${kind}/${encodeURIComponent(id)}/runs`, { method: "POST", body: JSON.stringify({ prompt, capability_id: capabilityId || undefined, input: { prompt } }) }),
   realtimeTicket: (after: number) => spaceRequest<{ ticket: string; expires_in: number }>("/realtime/tickets", { method: "POST", body: JSON.stringify({ after }) }),
   libraryItems: (spaceId: string, query: LibraryItemQuery = {}, reauthenticationToken = "") => {
     const values = new URLSearchParams();
@@ -136,7 +179,7 @@ export const spacesApi = {
     const suffix = values.size > 0 ? `?${values.toString()}` : "";
     return spaceRequest<LibraryItemsResult>(`/spaces/${encodeURIComponent(spaceId)}/library${suffix}`, { headers: libraryReauthenticationHeaders(reauthenticationToken) });
   },
-  reauthenticateLibrary: (spaceId: string, scope: "hidden" | "recently_deleted" | "bulk_export", password: string) => spaceRequest<{ token: string; scope: string; expires_at: string }>(`/spaces/${encodeURIComponent(spaceId)}/library/reauthenticate`, { method: "POST", body: JSON.stringify({ scope, password }) }),
+  reauthenticateLibrary: (spaceId: string, scope: "hidden" | "recently_deleted", password: string) => spaceRequest<{ token: string; scope: string; expires_at: string }>(`/spaces/${encodeURIComponent(spaceId)}/library/reauthenticate`, { method: "POST", body: JSON.stringify({ scope, password }) }),
   libraryFacets: (spaceId: string, query = "") => spaceRequest<LibrarySearchFacets>(`/spaces/${encodeURIComponent(spaceId)}/library/facets${query ? `?q=${encodeURIComponent(query)}` : ""}`),
   semanticLibrarySearch: (spaceId: string, query: string) => spaceRequest<LibraryItemsResult & { semantic: boolean }>(`/spaces/${encodeURIComponent(spaceId)}/library/search/semantic?q=${encodeURIComponent(query)}`),
   libraryDiscovery: (spaceId: string) => spaceRequest<LibraryDiscovery>(`/spaces/${encodeURIComponent(spaceId)}/library/discovery`),
@@ -181,13 +224,10 @@ export const spacesApi = {
   uploadLibraryFile: (spaceId: string, file: File, purpose: "library" | "attachment", options?: LibraryUploadOptions) => uploadLibraryFile(spaceId, file, purpose, options),
   uploadLibraryPath: (spaceId: string, path: string, purpose: "library" | "attachment", options?: LibraryUploadOptions) => uploadLibraryPath(spaceId, path, purpose, options),
   promoteAttachment: (spaceId: string, attachmentId: string) => spaceRequest<SpaceLibraryItem>(`/spaces/${encodeURIComponent(spaceId)}/attachments/${encodeURIComponent(attachmentId)}/promote`, { method: "POST" }),
-  downloadLibraryItem: (spaceId: string, itemId: string, filename: string, reauthenticationToken = "") => downloadProtectedFile(`/spaces/${encodeURIComponent(spaceId)}/library/items/${encodeURIComponent(itemId)}/download`, filename, { headers: libraryReauthenticationHeaders(reauthenticationToken) }),
-  downloadOriginalLibraryItem: (spaceId: string, itemId: string, filename: string, reauthenticationToken = "") => downloadProtectedFile(`/spaces/${encodeURIComponent(spaceId)}/library/items/${encodeURIComponent(itemId)}/download?version=original`, filename, { headers: libraryReauthenticationHeaders(reauthenticationToken) }),
-  exportLibraryItems: (spaceId: string, itemIds: string[], reauthenticationToken: string) => downloadProtectedFile(`/spaces/${encodeURIComponent(spaceId)}/library/exports/download`, `misty-library-export-${new Date().toISOString().slice(0, 10)}.zip`, { method: "POST", headers: { "Content-Type": "application/json", ...libraryReauthenticationHeaders(reauthenticationToken) }, body: JSON.stringify({ item_ids: itemIds }) }),
   importLibraryItems: (sourceSpaceId: string, destinationSpaceId: string, itemIds: string[], reauthenticationToken = "") => spaceRequest<LibraryItemsResult>(`/spaces/${encodeURIComponent(sourceSpaceId)}/library/imports`, { method: "POST", headers: libraryReauthenticationHeaders(reauthenticationToken), body: JSON.stringify({ destination_space_id: destinationSpaceId, item_ids: itemIds }) }),
   sharedReferences: (spaceId: string) => spaceRequest<{ references: LibrarySharedReference[]; outgoing: LibrarySharedReference[] }>(`/spaces/${encodeURIComponent(spaceId)}/library/shared`),
   shareLibraryItems: (sourceSpaceId: string, destinationSpaceId: string, itemIds: string[], reauthenticationToken = "") => spaceRequest<{ references: LibrarySharedReference[] }>(`/spaces/${encodeURIComponent(sourceSpaceId)}/library/shared`, { method: "POST", headers: libraryReauthenticationHeaders(reauthenticationToken), body: JSON.stringify({ destination_space_id: destinationSpaceId, item_ids: itemIds }) }),
-  downloadSharedReference: (spaceId: string, referenceId: string, filename: string) => downloadProtectedFile(`/spaces/${encodeURIComponent(spaceId)}/library/shared/${encodeURIComponent(referenceId)}/download`, filename),
+  sharedReferenceContent: (spaceId: string, referenceId: string) => fetchProtectedBlob(`/spaces/${encodeURIComponent(spaceId)}/library/shared/${encodeURIComponent(referenceId)}/download`),
   revokeLibraryGrant: (spaceId: string, grant: LibrarySharedReference) => spaceRequest(`/spaces/${encodeURIComponent(spaceId)}/library/grants/${encodeURIComponent(grant.grant_id)}?version=${grant.version}`, { method: "DELETE" }),
   libraryContent: (spaceId: string, itemId: string, reauthenticationToken = "") => fetchProtectedBlob(`/spaces/${encodeURIComponent(spaceId)}/library/items/${encodeURIComponent(itemId)}/download`, { headers: libraryReauthenticationHeaders(reauthenticationToken) }),
   libraryOriginalContent: (spaceId: string, itemId: string, reauthenticationToken = "") => fetchProtectedBlob(`/spaces/${encodeURIComponent(spaceId)}/library/items/${encodeURIComponent(itemId)}/download?version=original`, { headers: libraryReauthenticationHeaders(reauthenticationToken) }),
@@ -211,7 +251,7 @@ export const spacesApi = {
   createGroup: (spaceId: string, name: string, rules: LibraryGroupRule[]) => spaceRequest<LibraryGroup>(`/spaces/${encodeURIComponent(spaceId)}/library/groups`, { method: "POST", body: JSON.stringify({ name, rules: { all: rules } }) }),
   groupItems: (spaceId: string, groupId: string) => spaceRequest<{ items: SpaceLibraryItem[] }>(`/spaces/${encodeURIComponent(spaceId)}/library/groups/${encodeURIComponent(groupId)}/items`),
   peoplePolicy: (spaceId: string) => spaceRequest<LibraryIntelligencePolicy>(`/spaces/${encodeURIComponent(spaceId)}/library/people/policy`),
-  updatePeoplePolicy: (spaceId: string, policy: LibraryIntelligencePolicy, patch: Partial<Pick<LibraryIntelligencePolicy, "faces_enabled" | "pets_enabled" | "ocr_enabled" | "ai_enabled" | "semantic_search_enabled">>) => spaceRequest<LibraryIntelligencePolicy>(`/spaces/${encodeURIComponent(spaceId)}/library/people/policy`, { method: "PATCH", body: JSON.stringify({ version: policy.version, faces_enabled: patch.faces_enabled ?? policy.faces_enabled, pets_enabled: patch.pets_enabled ?? policy.pets_enabled, ocr_enabled: patch.ocr_enabled ?? policy.ocr_enabled, ai_enabled: patch.ai_enabled ?? policy.ai_enabled, semantic_search_enabled: patch.semantic_search_enabled ?? policy.semantic_search_enabled }) }),
+  updatePeoplePolicy: (spaceId: string, policy: LibraryIntelligencePolicy, patch: Partial<Pick<LibraryIntelligencePolicy, "faces_enabled" | "pets_enabled" | "ai_enabled" | "semantic_search_enabled">>) => spaceRequest<LibraryIntelligencePolicy>(`/spaces/${encodeURIComponent(spaceId)}/library/people/policy`, { method: "PATCH", body: JSON.stringify({ version: policy.version, faces_enabled: patch.faces_enabled ?? policy.faces_enabled, pets_enabled: patch.pets_enabled ?? policy.pets_enabled, ai_enabled: patch.ai_enabled ?? policy.ai_enabled, semantic_search_enabled: patch.semantic_search_enabled ?? policy.semantic_search_enabled }) }),
   people: (spaceId: string) => spaceRequest<{ people: LibraryPerson[] }>(`/spaces/${encodeURIComponent(spaceId)}/library/people`),
   createPerson: (spaceId: string, kind: "person" | "pet", name: string, itemIds: string[] = []) => spaceRequest<LibraryPerson>(`/spaces/${encodeURIComponent(spaceId)}/library/people`, { method: "POST", body: JSON.stringify({ kind, name, item_ids: itemIds }) }),
   updatePerson: (spaceId: string, person: LibraryPerson, patch: Partial<Pick<LibraryPerson, "name" | "cover_item_id">>) => spaceRequest<LibraryPerson>(`/spaces/${encodeURIComponent(spaceId)}/library/people/${encodeURIComponent(person.id)}`, { method: "PATCH", body: JSON.stringify({ version: person.version, name: patch.name ?? person.name, cover_item_id: patch.cover_item_id ?? person.cover_item_id ?? "" }) }),

@@ -2,6 +2,7 @@
 !**/.env.example
 **/.venv
 scripts/.signing.env
+.windows-test/
 
 **/.cache/
 **/.DS_Store
@@ -35,6 +36,7 @@ scripts/.signing.env
 **/config/
 **/bin/
 **/sessions
+.demo/
 
 proxy/~/
 proxy/proxy
@@ -114,6 +116,15 @@ proxy/dist/
 *.otf
 *.woff
 *.woff2
+
+# Versioned, copyright-safe Product Research demo fixtures.
+!demo/
+!demo/**/
+!demo/**/*.png
+!demo/**/*.svg
+!demo/**/*.mp4
+!demo/**/*.pdf
+demo/**/research-session-frame.png
 *.xcarchive
 *.app
 *.asar

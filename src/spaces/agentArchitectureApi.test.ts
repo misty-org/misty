@@ -16,6 +16,11 @@ describe("agentArchitectureApi", () => {
     });
   });
 
+  it("discovers authorized Spaces and Agent capabilities together", async () => {
+    await agentArchitectureApi.discovery();
+    expect(request).toHaveBeenCalledWith("/mika/discovery");
+  });
+
   it("creates isolated direct runs with encoded ownership identifiers", async () => {
     await agentArchitectureApi.run("space / one", "agent#one", { prompt: "go", capability_id: "organize", input: { prompt: "go" } });
     expect(request).toHaveBeenCalledWith("/spaces/space%20%2F%20one/agents/agent%23one/runs", {
@@ -24,17 +29,21 @@ describe("agentArchitectureApi", () => {
     });
   });
 
-  it("replaces workflows explicitly and records approval decisions", async () => {
-    await agentArchitectureApi.replaceAgentWorkflow("space", "agent", "version-2");
-    expect(request).toHaveBeenLastCalledWith("/spaces/space/studio/agents/agent/workflow", {
-      method: "PUT",
-      body: JSON.stringify({ workflow_version_id: "version-2" }),
+  it("publishes pinned workflow attachments and records approval decisions", async () => {
+    await agentArchitectureApi.publishAgentVersion("space", "agent", [{ workflow_version_id: "version-2", alias: "primary", enabled: true, position: 0 }]);
+    expect(request).toHaveBeenLastCalledWith("/spaces/space/studio/agents/agent/versions", {
+      method: "POST",
+      body: JSON.stringify({ workflows: [{ workflow_version_id: "version-2", alias: "primary", enabled: true, position: 0 }] }),
     });
     await agentArchitectureApi.decideRun("run/one", false);
     expect(request).toHaveBeenLastCalledWith("/runs/run%2Fone/approval", {
       method: "POST",
       body: JSON.stringify({ approved: false }),
     });
+    await agentArchitectureApi.cancelRun("run/one");
+    expect(request).toHaveBeenLastCalledWith("/runs/run%2Fone/cancel", { method: "POST" });
+    await agentArchitectureApi.retryRun("run/one");
+    expect(request).toHaveBeenLastCalledWith("/runs/run%2Fone/retry", { method: "POST" });
   });
 
   it("keeps private conversation messages on their dedicated endpoint", async () => {
@@ -43,5 +52,10 @@ describe("agentArchitectureApi", () => {
       method: "POST",
       body: JSON.stringify({ prompt: "hello", input: { prompt: "hello" } }),
     });
+  });
+
+  it("loads provider availability with the member's Space connections", async () => {
+    await agentArchitectureApi.integrations("space / one");
+    expect(request).toHaveBeenCalledWith("/spaces/space%20%2F%20one/integrations");
   });
 });

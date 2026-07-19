@@ -1,5 +1,7 @@
 import type { WorkflowVersion } from "./agentArchitectureTypes";
+import type { GlobalImageEditDefinition, GlobalImageMarkupElement } from "../shared/imageEditorTypes";
 export * from "./agentArchitectureTypes";
+export * from "./conversationTypes";
 
 export type SpaceRole = "owner" | "member";
 
@@ -13,6 +15,7 @@ export interface Space {
   pending_count: number;
   is_personal: boolean;
   is_shared: boolean;
+  permissions?: Record<string, boolean>;
   created_at: string;
   updated_at: string;
 }
@@ -39,6 +42,94 @@ export interface SpaceMember {
   read_message_seq: number;
 }
 
+export type SpaceTaskStatus = "todo" | "in_progress" | "done" | "canceled";
+export type SpaceTaskPriority = "high" | "medium" | "low";
+
+export interface SpaceTask {
+  id: string;
+  space_id: string;
+  task_number: number;
+  task_key: string;
+  title: string;
+  notes: string;
+  status: SpaceTaskStatus;
+  priority: SpaceTaskPriority;
+  rank: number;
+  assignee_user_id?: string;
+  due_at?: string;
+  due_timezone: string;
+  source_refs: Array<Record<string, unknown>>;
+  created_by_user_id?: string;
+  created_by_agent_id?: string;
+  source_run_id?: string;
+  version: number;
+  completed_at?: string;
+  archived_at?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SpaceTaskPage {
+  tasks: SpaceTask[];
+  next_cursor?: string;
+  status_totals: Record<SpaceTaskStatus, number>;
+}
+
+export interface SpaceTaskMoveResult {
+  task: SpaceTask;
+  reordered: SpaceTask[];
+}
+
+export interface SpaceCalendarSource {
+  id: string;
+  space_id: string;
+  integration_id: string;
+  connected_by_user_id: string;
+  provider: "google";
+  external_calendar_id: string;
+  display_name: string;
+  timezone: string;
+  watch_expires_at?: string;
+  status: "pending" | "syncing" | "active" | "needs_attention" | "disabled";
+  last_error_code?: string;
+  last_reconciled_at?: string;
+  disabled_at?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SpaceCalendarEvent {
+  id: string;
+  space_id: string;
+  source_id: string;
+  provider: "google";
+  external_event_id: string;
+  fingerprint: string;
+  title: string;
+  description: string;
+  location: string;
+  meeting_url: string;
+  organizer: Record<string, unknown>;
+  starts_at: string;
+  ends_at: string;
+  all_day: boolean;
+  timezone: string;
+  status: "confirmed" | "tentative" | "canceled";
+  provider_created_at?: string;
+  provider_updated_at?: string;
+  removed_at?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface GoogleCalendarChoice {
+  id: string;
+  summary: string;
+  timeZone: string;
+  primary?: boolean;
+  accessRole: string;
+}
+
 export type MessageSpan =
   | { type: "text"; text: string }
   | { type: "mention"; user_id: string; label: string }
@@ -48,6 +139,7 @@ export interface SpaceMessage {
   seq: number;
   id: string;
   space_id: string;
+  conversation_id?: string;
   sender_user_id: string;
   sender_name: string;
   sender_kind: "person" | "agent" | "system";
@@ -60,6 +152,8 @@ export interface SpaceMessage {
   edited_at?: string;
   created_at: string;
 }
+
+export type AgentMentionFailure = { agent_id: string; code: "run_failed" | "request_canceled" | "credits_exhausted" | "integration_required" | "forbidden" | "resource_unavailable" | "invalid_request" | string; message: string };
 
 export interface SpaceNode {
   id: string;
@@ -118,6 +212,7 @@ export interface SpaceStudioResource {
   stable_identifier?: string;
   active_workflow_version_id?: string;
   active_workflow?: WorkflowVersion;
+	access_policy?: { mode: "space" | "selected"; allowedUserIds: string[] };
   created_at: string;
   updated_at: string;
 }
@@ -401,7 +496,6 @@ export interface LibraryIntelligencePolicy {
   space_id: string;
   faces_enabled: boolean;
   pets_enabled: boolean;
-  ocr_enabled: boolean;
   ai_enabled: boolean;
   semantic_search_enabled: boolean;
   version: number;
@@ -423,48 +517,8 @@ export interface LibraryPerson {
   merged_into_id?: string;
 }
 
-export interface LibraryEditDefinition {
-  rotation: 0 | 90 | 180 | 270;
-  flip_horizontal: boolean;
-  flip_vertical: boolean;
-  auto_enhance: boolean;
-  filter: "" | "vivid" | "dramatic" | "warm" | "cool" | "mono" | "noir";
-  brightness: number;
-  contrast: number;
-  saturation: number;
-  grayscale: number;
-  exposure: number;
-  brilliance: number;
-  highlights: number;
-  shadows: number;
-  black_point: number;
-  vibrance: number;
-  warmth: number;
-  tint: number;
-  sharpness: number;
-  definition: number;
-  noise_reduction: number;
-  vignette: number;
-  straighten: number;
-  markup: LibraryMarkupElement[];
-  mute: boolean;
-  playback_speed: number;
-  crop?: { x: number; y: number; width: number; height: number };
-  trim?: { start: number; end: number };
-}
-
-export interface LibraryMarkupElement {
-  kind: "stroke" | "highlight" | "rectangle" | "text" | "cleanup";
-  points?: Array<{ x: number; y: number }>;
-  x?: number;
-  y?: number;
-  width?: number;
-  height?: number;
-  color: string;
-  line_width: number;
-  opacity: number;
-  text?: string;
-}
+export type LibraryEditDefinition = GlobalImageEditDefinition;
+export type LibraryMarkupElement = GlobalImageMarkupElement;
 
 export interface LibraryEditVersion {
   id: string;
@@ -489,7 +543,6 @@ export interface LibraryRenditionRequest {
   state: "queued" | "processing" | "ready";
   reserved_bytes: number;
 }
-
 export interface LibraryEditResult {
   item: SpaceLibraryItem;
   edit?: LibraryEditVersion;

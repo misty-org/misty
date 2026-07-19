@@ -1,4 +1,10 @@
-use std::{env, path::Path, process::Command};
+use std::{
+    collections::HashSet,
+    env,
+    path::Path,
+    process::Command,
+    time::{SystemTime, UNIX_EPOCH},
+};
 
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, State};
@@ -24,15 +30,7 @@ use crate::core::workspace::WorkspaceDocument;
 use crate::error::{ApiError, ApiResult};
 use crate::runtime::MistyRuntime;
 use crate::services::agents::{
-    AcknowledgeAgentFileEventsRequest, AgentJobLeaseRequest, CancelAgentJobRequest,
-    ClaimAgentJobsRequest, CompleteAgentJobRequest, CreateAgentSummaryArtifactRequest,
-    DeleteAgentDefinitionRequest, ExecuteApprovedAgentActionRequest, FailAgentJobRequest,
-    FindScopeDocumentRequest, OpenAgentCitationRequest, PrepareScopedAgentDocumentRequest,
-    ReconcileAgentScopesRequest, RegisterFolderScopeRequest, ResolveAgentApprovalRequest,
-    SaveAgentDefinitionRequest, StageApprovedAgentActionRequest,
-};
-use crate::services::automations::{
-    AutomationRunRequest, AutomationSnapshot, AutomationValidation, AutomationWorkflow,
+    OpenAgentCitationRequest, PrepareScopedAgentDocumentRequest, RegisterFolderScopeRequest,
 };
 use crate::services::autostart::LaunchOnLoginSnapshot;
 use crate::services::claude::{ClaudeSendRequest, ClaudeStatus, ClaudeStreamEvent};
@@ -41,6 +39,7 @@ use crate::services::devices::DeviceSnapshot;
 use crate::services::directory_size::{DirectorySizeRecord, DirectorySizeRequest};
 use crate::services::document_intelligence::{PrepareAgentDocumentRequest, PreparedAgentDocument};
 use crate::services::environment::AppEnvironmentSnapshot;
+use crate::services::explorer::SavePreviewRequest;
 use crate::services::explorer_library::{
     ExplorerLibrarySnapshot, RecordLastOpenedRequest, RecordRecentRequest, SetTagsRequest,
 };
@@ -80,7 +79,7 @@ use crate::services::smart_library::{
     ApplySmartLibraryResultsRequest, FolderLibraryStatus, PrepareSmartLibraryPreviewsRequest,
     PreparedSmartLibraryPreview, ResolveSmartLibraryAssetsRequest, ResolvedSmartLibraryAsset,
     SmartLibraryAssetsPage, SmartLibraryAssetsPageRequest, SmartLibraryImportFilesRequest,
-    SmartLibraryImportResult, SmartLibraryScanRequest, SmartLibrarySearchRequest,
+    SmartLibraryImportPreflight, SmartLibraryImportResult, SmartLibraryScanRequest, SmartLibrarySearchRequest,
     SmartLibrarySnapshot,
 };
 use crate::services::storage::StorageSnapshot;
@@ -103,6 +102,13 @@ pub struct ClipboardSnapshot {
     pub shared: ClipboardPayload,
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ClipboardFileBytes {
+    pub name: String,
+    pub bytes: Vec<u8>,
+}
+
 #[tauri::command]
 pub async fn app_snapshot(state: State<'_, MistyRuntime>) -> ApiResult<AppSnapshot> {
     Ok(AppSnapshot {
@@ -122,8 +128,8 @@ pub async fn app_environment_snapshot(
 }
 
 #[tauri::command]
-pub async fn agents_snapshot(state: State<'_, MistyRuntime>) -> ApiResult<serde_json::Value> {
-    state.agents.snapshot().await
+pub async fn agents_device_snapshot(state: State<'_, MistyRuntime>) -> ApiResult<serde_json::Value> {
+    state.agents.device_snapshot().await
 }
 
 #[tauri::command]
@@ -132,70 +138,6 @@ pub async fn agents_register_folder_scope(
     state: State<'_, MistyRuntime>,
 ) -> ApiResult<serde_json::Value> {
     state.agents.register_folder_scope(request).await
-}
-
-#[tauri::command]
-pub async fn agents_save_definition(
-    request: SaveAgentDefinitionRequest,
-    state: State<'_, MistyRuntime>,
-) -> ApiResult<serde_json::Value> {
-    state.agents.save_definition(request).await
-}
-
-#[tauri::command]
-pub async fn agents_delete_definition(
-    request: DeleteAgentDefinitionRequest,
-    state: State<'_, MistyRuntime>,
-) -> ApiResult<()> {
-    state.agents.delete_definition(request).await
-}
-
-#[tauri::command]
-pub async fn agents_claim_jobs(
-    request: ClaimAgentJobsRequest,
-    state: State<'_, MistyRuntime>,
-) -> ApiResult<Vec<serde_json::Value>> {
-    state.agents.claim_jobs(request).await
-}
-
-#[tauri::command]
-pub async fn agents_heartbeat_job(
-    request: AgentJobLeaseRequest,
-    state: State<'_, MistyRuntime>,
-) -> ApiResult<serde_json::Value> {
-    state.agents.heartbeat_job(request).await
-}
-
-#[tauri::command]
-pub async fn agents_complete_job(
-    request: CompleteAgentJobRequest,
-    state: State<'_, MistyRuntime>,
-) -> ApiResult<serde_json::Value> {
-    state.agents.complete_job(request).await
-}
-
-#[tauri::command]
-pub async fn agents_fail_job(
-    request: FailAgentJobRequest,
-    state: State<'_, MistyRuntime>,
-) -> ApiResult<serde_json::Value> {
-    state.agents.fail_job(request).await
-}
-
-#[tauri::command]
-pub async fn agents_cancel_job(
-    request: CancelAgentJobRequest,
-    state: State<'_, MistyRuntime>,
-) -> ApiResult<serde_json::Value> {
-    state.agents.cancel_job(request).await
-}
-
-#[tauri::command]
-pub async fn agents_resolve_approval(
-    request: ResolveAgentApprovalRequest,
-    state: State<'_, MistyRuntime>,
-) -> ApiResult<serde_json::Value> {
-    state.agents.resolve_approval(request).await
 }
 
 #[tauri::command]
@@ -221,54 +163,6 @@ pub async fn agents_prepare_scoped_document(
     state.agents.prepare_scoped_document(request).await
 }
 
-#[tauri::command]
-pub async fn agents_find_scope_document(
-    request: FindScopeDocumentRequest,
-    state: State<'_, MistyRuntime>,
-) -> ApiResult<Option<String>> {
-    state.agents.find_scope_document(request).await
-}
-
-#[tauri::command]
-pub async fn agents_reconcile_scopes(
-    request: ReconcileAgentScopesRequest,
-    state: State<'_, MistyRuntime>,
-) -> ApiResult<serde_json::Value> {
-    state.agents.reconcile_scopes(request).await
-}
-
-#[tauri::command]
-pub async fn agents_create_summary_artifact(
-    request: CreateAgentSummaryArtifactRequest,
-    state: State<'_, MistyRuntime>,
-) -> ApiResult<serde_json::Value> {
-    state.agents.create_summary_artifact(request).await
-}
-
-#[tauri::command]
-pub async fn agents_stage_approved_action(
-    request: StageApprovedAgentActionRequest,
-    state: State<'_, MistyRuntime>,
-) -> ApiResult<serde_json::Value> {
-    state.agents.stage_approved_action(request).await
-}
-
-#[tauri::command]
-pub async fn agents_execute_approved_action(
-    request: ExecuteApprovedAgentActionRequest,
-    state: State<'_, MistyRuntime>,
-) -> ApiResult<serde_json::Value> {
-    state.agents.execute_approved_action(request).await
-}
-
-#[tauri::command]
-pub async fn agents_acknowledge_file_events(
-    request: AcknowledgeAgentFileEventsRequest,
-    state: State<'_, MistyRuntime>,
-) -> ApiResult<()> {
-    state.agents.acknowledge_file_events(request).await
-}
-
 #[cfg(desktop)]
 #[tauri::command]
 pub async fn agents_device_identity_load(local_device_id: String) -> ApiResult<Option<String>> {
@@ -282,79 +176,6 @@ pub async fn agents_device_identity_store(
     encoded_identity: String,
 ) -> ApiResult<()> {
     crate::services::agent_device_identity::store(&local_device_id, &encoded_identity)
-}
-
-#[tauri::command]
-pub async fn automations_snapshot(state: State<'_, MistyRuntime>) -> ApiResult<AutomationSnapshot> {
-    state.automations.snapshot().await
-}
-
-#[tauri::command]
-pub async fn automations_set_managed_ai_auth(
-    token: String,
-    state: State<'_, MistyRuntime>,
-) -> ApiResult<()> {
-    state.automations.set_managed_ai_auth(token).await;
-    Ok(())
-}
-
-#[tauri::command]
-pub async fn automations_save_workflow(
-    workflow: AutomationWorkflow,
-    state: State<'_, MistyRuntime>,
-) -> ApiResult<AutomationSnapshot> {
-    state.automations.save_workflow(workflow).await
-}
-
-#[tauri::command]
-pub async fn automations_delete_workflow(
-    workflow_id: String,
-    state: State<'_, MistyRuntime>,
-) -> ApiResult<AutomationSnapshot> {
-    state.automations.delete_workflow(&workflow_id).await
-}
-
-#[tauri::command]
-pub fn automations_validate_workflow(
-    workflow: AutomationWorkflow,
-    state: State<'_, MistyRuntime>,
-) -> AutomationValidation {
-    state.automations.validate(&workflow)
-}
-
-#[tauri::command]
-pub async fn automations_run(
-    request: AutomationRunRequest,
-    state: State<'_, MistyRuntime>,
-) -> ApiResult<AutomationSnapshot> {
-    state.automations.run(request).await
-}
-
-#[tauri::command]
-pub async fn workflows_write_mf(
-    document: crate::services::workflow_files::MfWorkflowDocument,
-    state: State<'_, MistyRuntime>,
-) -> ApiResult<crate::services::workflow_files::MfWorkflowFile> {
-    crate::services::workflow_files::write_mf(&state.environment, document).await
-}
-
-#[tauri::command]
-pub async fn workflows_read_mf(
-    path: String,
-) -> ApiResult<crate::services::workflow_files::MfWorkflowFile> {
-    crate::services::workflow_files::read_mf(&path).await
-}
-
-#[tauri::command]
-pub async fn automations_resolve_approval(
-    approval_id: String,
-    approved: bool,
-    state: State<'_, MistyRuntime>,
-) -> ApiResult<AutomationSnapshot> {
-    state
-        .automations
-        .resolve_approval(&approval_id, approved)
-        .await
 }
 
 #[tauri::command]
@@ -494,6 +315,65 @@ pub fn clipboard_native_file_refs() -> ApiResult<Vec<PasteItem>> {
 #[tauri::command]
 pub fn clipboard_write_file_refs(items: Vec<PasteItem>) -> ApiResult<bool> {
     crate::services::native_clipboard::write_native_clipboard_file_refs(&items)
+}
+
+#[tauri::command]
+pub async fn clipboard_write_file_bytes(items: Vec<ClipboardFileBytes>) -> ApiResult<bool> {
+    if items.is_empty() {
+        return Err(ApiError::Message("No Library items were selected to copy.".to_owned()));
+    }
+    let copy_id = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_millis())
+        .unwrap_or_default();
+    let staging = env::temp_dir()
+        .join("misty-library-clipboard")
+        .join(copy_id.to_string());
+    tokio::fs::create_dir_all(&staging).await.map_err(|error| {
+        ApiError::Message(format!("The Library clipboard staging folder could not be created: {error}"))
+    })?;
+
+    let mut references = Vec::with_capacity(items.len());
+    let mut used_names = HashSet::with_capacity(items.len());
+    for (index, item) in items.into_iter().enumerate() {
+        if item.bytes.is_empty() {
+            return Err(ApiError::Message("A selected Library item is empty.".to_owned()));
+        }
+        let original_name = Path::new(item.name.trim())
+            .file_name()
+            .and_then(|name| name.to_str())
+            .filter(|name| !name.is_empty() && *name != "." && *name != "..")
+            .map(str::to_owned)
+            .unwrap_or_else(|| format!("Library item {}", index + 1));
+        let original_path = Path::new(&original_name);
+        let stem = original_path
+            .file_stem()
+            .and_then(|name| name.to_str())
+            .unwrap_or("Library item")
+            .to_owned();
+        let extension = original_path
+            .extension()
+            .and_then(|value| value.to_str())
+            .map(|value| format!(".{value}"))
+            .unwrap_or_default();
+        let mut file_name = original_name;
+        let mut suffix = 2;
+        while !used_names.insert(file_name.clone()) {
+            file_name = format!("{stem} {suffix}{extension}");
+            suffix += 1;
+        }
+        let path = staging.join(file_name);
+        tokio::fs::write(&path, &item.bytes).await.map_err(|error| {
+            ApiError::Message(format!("A Library item could not be prepared for the clipboard: {error}"))
+        })?;
+        references.push(PasteItem {
+            path: path.to_string_lossy().into_owned(),
+            is_directory: false,
+            size_bytes: Some(item.bytes.len() as i64),
+            remote_modified: None,
+        });
+    }
+    crate::services::native_clipboard::write_native_clipboard_file_refs(&references)
 }
 
 #[tauri::command]
@@ -691,11 +571,28 @@ pub async fn explorer_prepare_drag_items(
 }
 
 #[tauri::command]
+pub async fn explorer_cancel_drag_preparation(
+    session_id: String,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<()> {
+    state.explorer.cancel_drag_preparation(&session_id).await;
+    Ok(())
+}
+
+#[tauri::command]
 pub async fn explorer_preview_item(
     path: String,
     state: State<'_, MistyRuntime>,
 ) -> ApiResult<ExplorerPreviewPayload> {
     state.explorer.preview_item(&path).await
+}
+
+#[tauri::command]
+pub async fn explorer_save_preview_item(
+    request: SavePreviewRequest,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<ExplorerOperationResult> {
+    state.explorer.save_preview_item(request).await
 }
 
 #[tauri::command]
@@ -788,6 +685,14 @@ pub async fn smart_library_import_files(
     state: State<'_, MistyRuntime>,
 ) -> ApiResult<SmartLibraryImportResult> {
     state.smart_library.import_files(request).await
+}
+
+#[tauri::command]
+pub async fn smart_library_preflight_import(
+    request: SmartLibraryImportFilesRequest,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<SmartLibraryImportPreflight> {
+    state.smart_library.preflight_import(request).await
 }
 
 #[tauri::command]

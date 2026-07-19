@@ -204,7 +204,7 @@ export function InstallerCard({
                 </p>
               </div>
               <button
-                className="inline-flex shrink-0 items-center gap-2 rounded-md border border-white/10 bg-white/[0.03] px-3 py-1.5 text-[11px] font-semibold tracking-[0.12em] text-[#d4d4d8] uppercase transition hover:border-white/20 hover:bg-white/[0.06] hover:text-white"
+                className="inline-flex shrink-0 items-center gap-2 rounded-md border border-white/10 bg-white/[0.03] px-3 py-1.5 text-[11px] font-semibold capitalize text-[#d4d4d8] transition hover:border-white/20 hover:bg-white/[0.06] hover:text-white"
                 onClick={() => setShowMissingModal(true)}
                 type="button"
               >
@@ -215,11 +215,11 @@ export function InstallerCard({
           ) : (
             <>
               <div className="flex items-center justify-between gap-3 px-4 pb-2">
-                <p className="text-[11px] font-semibold tracking-[0.18em] text-[#8f8f8f] uppercase">
+                <p className="text-[11px] font-semibold capitalize text-[#8f8f8f]">
                   Missing Items
                 </p>
                 <button
-                  className="inline-flex items-center gap-2 rounded-md border border-white/10 bg-white/[0.03] px-3 py-1.5 text-[11px] font-semibold tracking-[0.12em] text-[#d4d4d8] uppercase transition hover:border-white/20 hover:bg-white/[0.06] hover:text-white"
+                  className="inline-flex items-center gap-2 rounded-md border border-white/10 bg-white/[0.03] px-3 py-1.5 text-[11px] font-semibold capitalize text-[#d4d4d8] transition hover:border-white/20 hover:bg-white/[0.06] hover:text-white"
                   onClick={() => setShowMissingModal(true)}
                   type="button"
                 >

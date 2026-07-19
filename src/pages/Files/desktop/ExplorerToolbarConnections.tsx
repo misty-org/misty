@@ -38,8 +38,9 @@ export const ConnectedExplorerToolbar = memo(function ConnectedExplorerToolbar(p
       hasRemoteSelection: selectedEntries.some((entry) => entry.location.kind === "remote"),
       canOpenWithSelected: Boolean(selectedEntry && selectedEntry.kind !== "folder" && selectedEntry.kind !== "symlink"),
       canCalculateDirectorySizes: Boolean(pane?.hasFolderEntries),
-      canGoBack: Boolean(pane?.backHistory.length),
-      canGoForward: Boolean(pane?.forwardHistory.length),
+      backPath: pane?.backHistory[pane.backHistory.length - 1] ?? null,
+      forwardPath: pane?.forwardHistory[pane.forwardHistory.length - 1] ?? null,
+      parentPath: pane?.listing?.parentPath ?? null,
       canCreateFile: explorer.canCreateItem(props.paneId, "file"),
       canCreateFolder: explorer.canCreateItem(props.paneId, "folder"),
     };
@@ -333,6 +334,10 @@ export const ConnectedFileInspector = memo(function ConnectedFileInspector() {
   const onSaveMetadata = useCallback((entry: FileEntry, tags: string[], comments: string) => {
     void useExplorerStore.getState().setLibraryMetadata(entry, tags, comments);
   }, []);
+  const onPreviewSaved = useCallback(() => {
+    if (!activePaneId) return;
+    void useExplorerStore.getState().refreshPane(activePaneId);
+  }, [activePaneId]);
   return (
     <FileInspector
       directorySizes={directorySizes}
@@ -342,6 +347,7 @@ export const ConnectedFileInspector = memo(function ConnectedFileInspector() {
       selectedEntry={selectedEntry}
       selectedCount={selectedCount}
       onOpenEntry={onOpenEntry}
+      onPreviewSaved={onPreviewSaved}
       onSaveMetadata={onSaveMetadata}
     />
   );

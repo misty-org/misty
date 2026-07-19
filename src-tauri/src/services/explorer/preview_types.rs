@@ -38,6 +38,29 @@ pub(super) fn preview_format(path: &Path) -> Option<PreviewFormat> {
         "webp" => Some(PreviewFormat::Image(image::ImageFormat::WebP)),
         "svg" => Some(PreviewFormat::Direct("image/svg+xml")),
         "pdf" => Some(PreviewFormat::Pdf),
+        "docx" => Some(PreviewFormat::Direct(
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        )),
+        "xlsx" => Some(PreviewFormat::Direct(
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )),
+        "pptx" => Some(PreviewFormat::Direct(
+            "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        )),
+        "odt" => Some(PreviewFormat::Direct(
+            "application/vnd.oasis.opendocument.text",
+        )),
+        "ods" => Some(PreviewFormat::Direct(
+            "application/vnd.oasis.opendocument.spreadsheet",
+        )),
+        "odp" => Some(PreviewFormat::Direct(
+            "application/vnd.oasis.opendocument.presentation",
+        )),
+        "epub" => Some(PreviewFormat::Direct("application/epub+zip")),
+        "rtf" => Some(PreviewFormat::Direct("application/rtf")),
+        "doc" => Some(PreviewFormat::Direct("application/msword")),
+        "xls" => Some(PreviewFormat::Direct("application/vnd.ms-excel")),
+        "ppt" => Some(PreviewFormat::Direct("application/vnd.ms-powerpoint")),
         "psd" => Some(PreviewFormat::Psd),
         "txt" | "text" | "log" | "md" | "markdown" | "toml" | "yaml" | "yml" | "ini" | "conf"
         | "cfg" | "csv" | "tsv" | "rs" | "go" | "js" | "jsx" | "ts" | "tsx" | "css" | "html"
