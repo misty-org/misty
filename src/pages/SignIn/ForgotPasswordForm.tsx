@@ -1,3 +1,4 @@
+import { Button } from "@/components/ui/button";
 import AuthField from "../Auth/AuthField";
 import AuthMessage from "../Auth/AuthMessage";
 import AuthSubmitButton from "../Auth/AuthSubmitButton";
@@ -45,9 +46,7 @@ export default function ForgotPasswordForm({
         />
 
         {submitted ? (
-          <p className="text-sm text-text-muted">
-            Check your email for the reset link.
-          </p>
+          <AuthMessage tone="success" message="Check your email for the reset link." />
         ) : null}
         {error ? <AuthMessage tone="error" message={error} /> : null}
 
@@ -59,13 +58,14 @@ export default function ForgotPasswordForm({
         />
       </form>
 
-      <button
+      <Button
         type="button"
+        variant="link"
         onClick={onBack}
-        className="text-sm text-text-muted transition hover:text-text"
+        className="h-auto self-start p-0 text-foreground"
       >
         Back to sign in
-      </button>
+      </Button>
     </>
   );
 }

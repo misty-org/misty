@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { Button } from "@/components/ui/button";
 
 const PUBLIC_ASSET_BASE_URL =
   import.meta.env.VITE_PUBLIC_ASSET_BASE_URL || "https://public.mistysys.com";
@@ -149,11 +150,6 @@ export default function FeatureDemo() {
   const shouldPause = hovering || focused || dragging || reducedMotion || visibleCount < 2;
 
   useEffect(() => {
-    if (visibleCount === 0) return;
-    setActiveIndex((index) => wrapIndex(index, visibleCount));
-  }, [visibleCount]);
-
-  useEffect(() => {
     if (shouldPause) return;
 
     const interval = window.setInterval(() => {
@@ -294,18 +290,25 @@ export default function FeatureDemo() {
       {visibleCount > 1 && (
         <div className="mt-4 flex items-center justify-center gap-2">
           {visibleScreenshots.map((screenshot, index) => (
-            <button
+            <Button
               key={`${screenshot.id}-dot`}
               type="button"
+              variant="ghost"
+              size="icon-xs"
               aria-label={`Show screenshot ${index + 1}`}
               aria-pressed={currentIndex === index}
               onClick={() => setActiveIndex(index)}
-              className={`h-2.5 w-2.5 rounded-full border transition-all duration-300 ${
-                currentIndex === index
-                  ? "border-white bg-white shadow-[0_0_12px_rgba(255,255,255,0.35)]"
-                  : "border-white/45 bg-transparent hover:border-white/80"
-              }`}
-            />
+              className="size-6 rounded-full p-0"
+            >
+              <span
+                aria-hidden="true"
+                className={`size-2.5 rounded-full border transition-all duration-300 ${
+                  currentIndex === index
+                    ? "border-primary bg-primary shadow-sm"
+                    : "border-muted-foreground/60 bg-transparent group-hover/button:border-foreground"
+                }`}
+              />
+            </Button>
           ))}
         </div>
       )}

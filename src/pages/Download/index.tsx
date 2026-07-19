@@ -1,6 +1,15 @@
 import { useState } from "react";
-import { HiOutlineChevronDown } from "react-icons/hi2";
 import { SiAndroid, SiAppstore, SiLinux } from "react-icons/si";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { apiBase } from "../../lib/apiBase";
 import {
   mobileBuilds,
@@ -123,12 +132,42 @@ const mobilePlatformMeta: Record<MobilePlatformName, { icon: React.ReactNode; ar
   },
 };
 
+function BuildCard({
+  icon,
+  platform,
+  tag,
+  arch,
+  children,
+}: {
+  icon: React.ReactNode;
+  platform: string;
+  tag: string;
+  arch: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <Card size="sm" className="gap-0 rounded-xl py-0">
+      <CardContent className="p-4">
+        <div className="mb-3 flex items-start justify-between gap-3">
+          <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+            <span className="text-muted-foreground">{icon}</span>
+            {platform}
+          </div>
+          <Badge variant="outline" className="text-[11px]">
+            {tag}
+          </Badge>
+        </div>
+        <p className="mb-1 text-xs text-muted-foreground">{arch}</p>
+        {children}
+      </CardContent>
+    </Card>
+  );
+}
+
 function ReleaseItem({
   version,
   builds,
   mobileBuilds,
-  open,
-  onToggle,
   isLatest,
   pendingBuildKey,
   onDownload,
@@ -136,91 +175,75 @@ function ReleaseItem({
   version: string;
   builds: ReleaseBuild[];
   mobileBuilds?: MobileBuild[];
-  open: boolean;
-  onToggle: () => void;
   isLatest: boolean;
   pendingBuildKey: string | null;
   onDownload: (build: ReleaseBuild) => void;
 }) {
   return (
-    <div className="border-b border-border last:border-none">
-      <button
-        onClick={onToggle}
-        className="w-full flex items-center justify-between gap-4 py-4 text-left text-sm font-medium text-text hover:text-text transition-colors cursor-pointer"
-      >
+    <AccordionItem value={version}>
+      <AccordionTrigger className="py-4 text-foreground hover:no-underline">
         <span>
           {version}
           {isLatest ? " (latest)" : ""}
         </span>
-        <HiOutlineChevronDown
-          className={`w-4 h-4 shrink-0 text-text-muted transition-transform duration-200 ${open ? "rotate-180" : ""}`}
-        />
-      </button>
-      {open && (
-        <div className="pb-4 space-y-5">
-          <div className="space-y-3">
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {builds.map((build) => (
-                <div key={`${version}-${build.platform}-${build.tag}`} className="rounded-xl border border-border bg-surface/50 p-4">
-                  <div className="flex items-start justify-between gap-3 mb-3">
-                    <div className="flex items-center gap-2 text-sm font-medium text-text">
-                      <span className="text-text-secondary">{platformMeta[build.platform].icon}</span>
-                      {build.platform}
-                    </div>
-                    <span className="rounded-full border border-border px-2 py-0.5 text-[11px] font-medium text-text-muted">
-                      {build.tag}
-                    </span>
-                  </div>
-                  <p className="text-xs text-text-muted mb-1">{platformMeta[build.platform].arch}</p>
-                  <button
-                    type="button"
-                    onClick={() => onDownload(build)}
-                    disabled={pendingBuildKey === `${version}-${build.platformKey}`}
-                    className="inline-flex w-full items-center justify-center rounded-xl bg-white px-4 py-2.5 text-sm font-medium text-black transition-colors duration-300 hover:bg-zinc-200"
-                  >
-                    {pendingBuildKey === `${version}-${build.platformKey}` ? "Preparing..." : "Download"}
-                  </button>
-                </div>
-              ))}
-            </div>
-
-            {mobileBuilds && mobileBuilds.length > 0 ? (
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {mobileBuilds.map((build) => (
-                  <div key={`${version}-${build.platform}-${build.tag}`} className="rounded-xl border border-border bg-surface/50 p-4">
-                    <div className="flex items-start justify-between gap-3 mb-3">
-                      <div className="flex items-center gap-2 text-sm font-medium text-text">
-                        <span className="text-text-secondary">{mobilePlatformMeta[build.platform].icon}</span>
-                        {build.platform}
-                      </div>
-                      <span className="rounded-full border border-border px-2 py-0.5 text-[11px] font-medium text-text-muted">
-                        {build.tag}
-                      </span>
-                    </div>
-                    <p className="text-xs text-text-muted mb-1">{mobilePlatformMeta[build.platform].arch}</p>
-                    {build.href ? (
-                      <a
-                        href={build.href}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex w-full items-center justify-center rounded-xl bg-white px-4 py-2.5 text-sm font-medium text-black transition-colors duration-300 hover:bg-zinc-200"
-                      >
-                        {build.ctaLabel}
-                      </a>
-                    ) : (
-                      <span className="inline-flex w-full items-center justify-center rounded-xl bg-white px-4 py-2.5 text-sm font-medium text-black">
-                        {build.ctaLabel}
-                      </span>
-                    )}
-                  </div>
-                ))}
-              </div>
-            ) : null}
+      </AccordionTrigger>
+      <AccordionContent className="space-y-5 pb-4">
+        <div className="space-y-3">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {builds.map((build) => (
+              <BuildCard
+                key={`${version}-${build.platform}-${build.tag}`}
+                icon={platformMeta[build.platform].icon}
+                platform={build.platform}
+                tag={build.tag}
+                arch={platformMeta[build.platform].arch}
+              >
+                <Button
+                  type="button"
+                  onClick={() => onDownload(build)}
+                  disabled={pendingBuildKey === `${version}-${build.platformKey}`}
+                  className="h-auto w-full rounded-xl px-4 py-2.5"
+                >
+                  {pendingBuildKey === `${version}-${build.platformKey}`
+                    ? "Preparing..."
+                    : "Download"}
+                </Button>
+              </BuildCard>
+            ))}
           </div>
 
+          {mobileBuilds && mobileBuilds.length > 0 ? (
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {mobileBuilds.map((build) => (
+                <BuildCard
+                  key={`${version}-${build.platform}-${build.tag}`}
+                  icon={mobilePlatformMeta[build.platform].icon}
+                  platform={build.platform}
+                  tag={build.tag}
+                  arch={mobilePlatformMeta[build.platform].arch}
+                >
+                  {build.href ? (
+                    <Button asChild className="h-auto w-full rounded-xl px-4 py-2.5">
+                      <a href={build.href} target="_blank" rel="noopener noreferrer">
+                        {build.ctaLabel}
+                      </a>
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="secondary"
+                      disabled
+                      className="h-auto w-full rounded-xl px-4 py-2.5"
+                    >
+                      {build.ctaLabel}
+                    </Button>
+                  )}
+                </BuildCard>
+              ))}
+            </div>
+          ) : null}
         </div>
-      )}
-    </div>
+      </AccordionContent>
+    </AccordionItem>
   );
 }
 
@@ -239,9 +262,10 @@ export default function Download() {
     setDownloadError(null);
 
     try {
-      const response = await fetch(`${apiBase}/download-url?platform=${encodeURIComponent(build.platformKey)}`, {
-        credentials: "include",
-      });
+      const response = await fetch(
+        `${apiBase}/download-url?platform=${encodeURIComponent(build.platformKey)}`,
+        { credentials: "include" },
+      );
 
       const contentType = response.headers.get("Content-Type") ?? "";
       const payload = contentType.includes("application/json")
@@ -285,20 +309,35 @@ export default function Download() {
     <div className="max-w-5xl mx-auto px-3 sm:px-4 pt-32 pb-20">
       {/* Header */}
       <div className="text-center">
-        <h1 className="text-3xl md:text-5xl font-bold text-text mb-5 text-balance">
+        <h1 className="mb-5 text-balance text-3xl font-bold text-foreground md:text-5xl">
           Download
         </h1>
       </div>
 
       {/* Releases */}
       <div className="mb-20">
-        <h2 className="text-lg font-semibold text-text">Releases</h2>
+        <h2 className="text-lg font-semibold text-foreground">Releases</h2>
         {downloadError && (
-          <p className="mt-3 rounded-lg border border-red-400/30 bg-red-500/10 px-3 py-2 text-sm text-red-200">
-            {downloadError}
-          </p>
+          <Alert variant="destructive" className="mt-3">
+            <AlertDescription>{downloadError}</AlertDescription>
+          </Alert>
         )}
-        <div>
+        <Accordion
+          type="multiple"
+          value={releases
+            .filter((release) => openVersions[release.version])
+            .map((release) => release.version)}
+          onValueChange={(versions) => {
+            setOpenVersions(
+              Object.fromEntries(
+                releases.map((release) => [
+                  release.version,
+                  versions.includes(release.version),
+                ]),
+              ),
+            );
+          }}
+        >
           {releases.map((release) => (
             <ReleaseItem
               key={release.version}
@@ -307,17 +346,10 @@ export default function Download() {
               mobileBuilds={release.version === releases[0].version ? mobileBuilds : undefined}
               isLatest={release.version === releases[0].version}
               pendingBuildKey={pendingBuildKey}
-              open={openVersions[release.version] ?? false}
-              onToggle={() =>
-                setOpenVersions((current) => ({
-                  ...current,
-                  [release.version]: !current[release.version],
-                }))
-              }
               onDownload={(build) => requestDownload(build, release.version)}
             />
           ))}
-        </div>
+        </Accordion>
       </div>
     </div>
   );

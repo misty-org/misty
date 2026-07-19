@@ -1,3 +1,6 @@
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+
 interface AuthFieldProps {
   id: string;
   label: string;
@@ -22,9 +25,9 @@ export default function AuthField({
   onChange,
 }: AuthFieldProps) {
   return (
-    <label className="flex flex-col gap-2" htmlFor={id}>
-      <span className="text-sm font-medium text-text-secondary">{label}</span>
-      <input
+    <div className="grid gap-2">
+      <Label htmlFor={id}>{label}</Label>
+      <Input
         id={id}
         type={type}
         value={value}
@@ -33,8 +36,8 @@ export default function AuthField({
         required={required}
         disabled={disabled}
         onChange={(event) => onChange(event.target.value)}
-        className="h-11 rounded-xl border border-border bg-surface px-4 text-sm text-text placeholder:text-text-muted/45 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary disabled:cursor-not-allowed disabled:opacity-65"
+        className="h-11"
       />
-    </label>
+    </div>
   );
 }

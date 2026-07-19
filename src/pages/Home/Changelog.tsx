@@ -1,66 +1,66 @@
-import { useState } from "react";
 import { changelog } from "../Changelog/data";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
+import { Badge } from "@/components/ui/badge";
 
 export default function Changelog() {
-  const [openIndex, setOpenIndex] = useState<number | null>(0);
-
   return (
     <div>
-      <h2 className="text-3xl md:text-4xl font-bold text-text tracking-tight mb-4">
+      <h2 className="mb-4 text-3xl font-bold tracking-tight text-foreground md:text-4xl">
         Changelog
       </h2>
 
-      <div className="space-y-3">
-        {changelog.map((entry, index) => {
-          const isOpen = openIndex === index;
-          return (
-            <div
-              key={entry.version}
-              className="rounded-xl border border-white/10 overflow-hidden"
-            >
-              <button
-                onClick={() => setOpenIndex(isOpen ? null : index)}
-                className="w-full flex items-center justify-between px-6 py-4 text-left hover:bg-white/5 transition-colors"
-              >
-                <div className="flex items-center gap-4">
-                  <span className="text-sm font-mono text-primary bg-primary/10 px-2.5 py-1 rounded">
-                    {entry.version}
-                  </span>
-                  <span className="text-text font-medium">{entry.summary}</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <span className="text-xs text-text-muted">{entry.date}</span>
-                  <svg
-                    className={`w-4 h-4 text-text-muted transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth={2}
-                  >
-                    <path d="M19 9l-7 7-7-7" />
-                  </svg>
-                </div>
-              </button>
+      <Accordion type="single" defaultValue="entry-0" collapsible className="gap-3">
+        {changelog.map((entry, index) => (
+          <AccordionItem
+            key={entry.version}
+            value={`entry-${index}`}
+            className="overflow-hidden rounded-xl border bg-card px-6 shadow-xs"
+          >
+            <AccordionTrigger className="items-center gap-4 hover:no-underline">
+              <span className="flex min-w-0 flex-1 items-center gap-4">
+                <Badge variant="secondary" className="shrink-0 font-mono">
+                  {entry.version}
+                </Badge>
+                <span className="truncate font-medium text-foreground">
+                  {entry.summary}
+                </span>
+              </span>
+              <span className="hidden shrink-0 text-xs font-normal text-muted-foreground sm:inline">
+                {entry.date}
+              </span>
+            </AccordionTrigger>
+            <AccordionContent>
+              <ul className="space-y-2">
+                {entry.groups
+                  .flatMap((group) => group.changes)
+                  .slice(0, 5)
+                  .map((change) => (
+                    <li
+                      key={change}
+                      className="flex items-start gap-3 text-sm text-muted-foreground"
+                    >
+                      <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-primary" />
+                      {change}
+                    </li>
+                  ))}
+              </ul>
+            </AccordionContent>
+          </AccordionItem>
+        ))}
+      </Accordion>
 
-              {isOpen && (
-                <div className="px-6 pb-5 pt-1">
-                  <ul className="space-y-2">
-                    {entry.groups.flatMap((group) => group.changes).slice(0, 5).map((change) => (
-                      <li key={change} className="flex items-start gap-3 text-sm text-text-muted">
-                        <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-primary shrink-0" />
-                        {change}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
-      <p className="text-sm text-text-muted mt-6">
-        
-        <a href="https://forms.gle/your-form-id" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline text-zinc-300">
+      <p className="mt-6 text-sm text-muted-foreground">
+        <a
+          href="https://forms.gle/your-form-id"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="rounded-sm font-medium text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
           See recent updates and changes to Misty &rarr;
         </a>
       </p>

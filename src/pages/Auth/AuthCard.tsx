@@ -1,4 +1,12 @@
 import type { ReactNode } from "react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 
 interface AuthCardProps {
   title?: string;
@@ -9,19 +17,29 @@ interface AuthCardProps {
 
 export default function AuthCard({ title, description, children, footer }: AuthCardProps) {
   return (
-    <section className="glass-card rounded-[2rem] border border-white/8 bg-[#090b0d]/95 p-6 shadow-[0_24px_80px_rgba(0,0,0,0.45)] sm:p-8">
+    <Card className="gap-0 rounded-2xl border-border bg-card p-6 text-card-foreground shadow-lg sm:p-8">
       {title || description ? (
-        <div className="mb-7">
-          {title ? <h2 className="text-2xl font-semibold text-text">{title}</h2> : null}
-          {description ? (
-            <p className="mt-2 text-sm leading-6 text-text-muted">{description}</p>
+        <CardHeader className="p-0">
+          {title ? (
+            <CardTitle role="heading" aria-level={2} className="text-2xl font-semibold">
+              {title}
+            </CardTitle>
           ) : null}
-        </div>
+          {description ? (
+            <CardDescription className="mt-2 leading-6">{description}</CardDescription>
+          ) : null}
+        </CardHeader>
       ) : null}
 
-      {children}
+      <CardContent className={title || description ? "mt-7 p-0" : "p-0"}>
+        {children}
+      </CardContent>
 
-      {footer ? <div className="mt-6 border-t border-white/8 pt-6">{footer}</div> : null}
-    </section>
+      {footer ? (
+        <CardFooter className="mt-6 justify-center border-t border-border p-0 pt-6">
+          {footer}
+        </CardFooter>
+      ) : null}
+    </Card>
   );
 }

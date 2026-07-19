@@ -1,8 +1,16 @@
 import { NavLink } from "react-router";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardFooter,
+  CardHeader,
+} from "@/components/ui/card";
 
 const CheckIcon = ({ muted }: { muted?: boolean }) => (
   <svg
-    className={`w-4 h-4 shrink-0 mt-0.5 ${muted ? "text-text-muted/50" : "text-primary"}`}
+    className={`mt-0.5 h-4 w-4 shrink-0 ${muted ? "text-muted-foreground/50" : "text-primary"}`}
     fill="none"
     viewBox="0 0 24 24"
     stroke="currentColor"
@@ -44,75 +52,89 @@ export default function PricingCard({
   onCtaClick,
 }: PricingCardProps) {
   return (
-    <div className="h-full min-h-92 rounded-2xl border border-border bg-surface/50">
-      <div className="p-6 flex flex-col h-full relative">
-        {(comingSoon || popular) && (
-          <div className="absolute top-3 right-3">
-            <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium border ${
-              popular
-                ? "bg-primary text-bg border-primary"
-                : "bg-primary/10 text-primary border-primary/20"
-            }`}>
-              {popular ? "Recommended" : "Coming Soon"}
-            </span>
-          </div>
-        )}
+    <Card className="relative h-full min-h-92 gap-0 rounded-2xl py-0">
+      {(comingSoon || popular) && (
+        <Badge
+          variant={popular ? "default" : "outline"}
+          className="absolute top-3 right-3"
+        >
+          {popular ? "Recommended" : "Coming Soon"}
+        </Badge>
+      )}
 
+      <CardHeader className="p-6 pb-0">
         <div className="mb-4">
-          <h3 className="text-2xl font-bold text-text mb-0.5">{name}</h3>
+          <h3 className="mb-0.5 text-2xl font-bold text-foreground">{name}</h3>
           <div className="flex items-baseline gap-1.5 mb-1.5">
-            <span className="text-lg font-bold text-text/60">{price ?? "Free"}</span>
-            {period && <span className="text-text-muted text-xs">{period}</span>}
+            <span className="text-lg font-bold text-foreground/60">
+              {price ?? "Free"}
+            </span>
+            {period && <span className="text-xs text-muted-foreground">{period}</span>}
           </div>
-          {description && <p className="text-xs text-text-muted">{description}</p>}
+          {description && (
+            <p className="text-xs text-muted-foreground">{description}</p>
+          )}
         </div>
+      </CardHeader>
 
+      <CardContent className="flex flex-1 flex-col px-6 pb-4">
         {inherits ? (
-          <p className="text-xs text-text-muted mb-2">Everything in {inherits}, plus:</p>
+          <p className="mb-2 text-xs text-muted-foreground">
+            Everything in {inherits}, plus:
+          </p>
         ) : (
-          <p className="text-xs text-text-muted mb-2">Includes</p>
+          <p className="mb-2 text-xs text-muted-foreground">Includes</p>
         )}
 
-        <ul className="flex-1 flex flex-col gap-2 mb-4">
+        <ul className="mb-4 flex flex-1 flex-col gap-2">
           {features.map((feature) => (
-            <li key={feature} className="flex items-start gap-2.5 text-sm text-text-muted">
+            <li
+              key={feature}
+              className="flex items-start gap-2.5 text-sm text-muted-foreground"
+            >
               <CheckIcon />
               {feature}
             </li>
           ))}
         </ul>
+      </CardContent>
 
+      <CardFooter className="px-6 pb-6">
         {onCtaClick ? (
-          <button
+          <Button
             type="button"
             onClick={onCtaClick}
             disabled={ctaBusy}
-            className="w-full text-center px-6 py-2.5 bg-white hover:bg-zinc-200 disabled:cursor-wait disabled:opacity-60 text-black font-medium rounded-xl transition-colors duration-300 shadow-lg cursor-pointer"
+            className="h-auto w-full rounded-xl px-6 py-2.5 shadow-lg disabled:cursor-wait"
           >
             {ctaBusy ? "Opening checkout…" : ctaLabel}
-          </button>
+          </Button>
         ) : ctaHref ? (
-          <a
-            href={ctaHref}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="w-full text-center px-6 py-2.5 bg-white hover:bg-zinc-200 text-black font-medium rounded-xl transition-colors duration-300 shadow-lg"
+          <Button
+            asChild
+            className="h-auto w-full rounded-xl px-6 py-2.5 shadow-lg"
           >
-            {ctaLabel}
-          </a>
+            <a href={ctaHref} target="_blank" rel="noopener noreferrer">
+              {ctaLabel}
+            </a>
+          </Button>
         ) : ctaTo ? (
-          <NavLink
-            to={ctaTo}
-            className="w-full text-center px-6 py-2.5 bg-white hover:bg-zinc-200 text-black font-medium rounded-xl transition-colors duration-300 shadow-lg"
+          <Button
+            asChild
+            className="h-auto w-full rounded-xl px-6 py-2.5 shadow-lg"
           >
-            {ctaLabel}
-          </NavLink>
+            <NavLink to={ctaTo}>{ctaLabel}</NavLink>
+          </Button>
         ) : (
-          <span className="w-full text-center px-6 py-2.5 bg-elevated text-text-muted font-medium rounded-xl border border-border cursor-default">
+          <Button
+            variant="secondary"
+            disabled
+            className="h-auto w-full rounded-xl px-6 py-2.5"
+          >
             Coming soon
-          </span>
+          </Button>
         )}
-      </div>
-    </div>
+      </CardFooter>
+    </Card>
   );
 }
