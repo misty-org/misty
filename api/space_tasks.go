@@ -20,19 +20,27 @@ func (s *SpacesService) SpaceTasks() http.HandlerFunc {
 		spaceID := chi.URLParam(r, "spaceID")
 		switch r.Method {
 		case http.MethodGet:
-			items, err := s.database.SpaceTasks(r.Context(), userID, spaceID, db.SpaceTaskQuery{
-				Status: r.URL.Query().Get("status"), AssigneeUserID: r.URL.Query().Get("assignee_user_id"), IncludeArchived: r.URL.Query().Get("include_archived") == "true",
+			limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+			dueFrom, dueFromErr := optionalRFC3339(r.URL.Query().Get("due_from"))
+			dueTo, dueToErr := optionalRFC3339(r.URL.Query().Get("due_to"))
+			if dueFromErr != nil || dueToErr != nil || dueFrom != nil && dueTo != nil && !dueTo.After(*dueFrom) {
+				writeSpaceError(w, db.ErrSpaceInvalid)
+				return
+			}
+			page, err := s.database.SpaceTaskPage(r.Context(), userID, spaceID, db.SpaceTaskQuery{
+				Status: r.URL.Query().Get("status"), AssigneeUserID: r.URL.Query().Get("assignee_user_id"), Priority: r.URL.Query().Get("priority"), Search: r.URL.Query().Get("q"), DueFrom: dueFrom, DueTo: dueTo, Sort: r.URL.Query().Get("sort"), Cursor: r.URL.Query().Get("cursor"), Limit: limit, IncludeArchived: r.URL.Query().Get("include_archived") == "true",
 			})
 			if err != nil {
 				writeSpaceError(w, err)
 				return
 			}
-			writeJSON(w, http.StatusOK, map[string]any{"tasks": items})
+			writeJSON(w, http.StatusOK, page)
 		case http.MethodPost:
 			var body struct {
 				Title          string          `json:"title"`
 				Notes          string          `json:"notes"`
 				Status         string          `json:"status"`
+				Priority       string          `json:"priority"`
 				AssigneeUserID string          `json:"assignee_user_id"`
 				DueAt          *time.Time      `json:"due_at"`
 				DueTimezone    string          `json:"due_timezone"`
@@ -41,7 +49,7 @@ func (s *SpacesService) SpaceTasks() http.HandlerFunc {
 			if decodeJSON(w, r, &body) != nil {
 				return
 			}
-			item, err := s.database.CreateSpaceTask(r.Context(), userID, db.SpaceTask{SpaceID: spaceID, Title: body.Title, Notes: body.Notes, Status: body.Status, AssigneeUserID: body.AssigneeUserID, DueAt: body.DueAt, DueTimezone: body.DueTimezone, SourceRefs: body.SourceRefs})
+			item, err := s.database.CreateSpaceTask(r.Context(), userID, db.SpaceTask{SpaceID: spaceID, Title: body.Title, Notes: body.Notes, Status: body.Status, Priority: body.Priority, AssigneeUserID: body.AssigneeUserID, DueAt: body.DueAt, DueTimezone: body.DueTimezone, SourceRefs: body.SourceRefs})
 			if err != nil {
 				writeSpaceError(w, err)
 				return
@@ -52,6 +60,38 @@ func (s *SpacesService) SpaceTasks() http.HandlerFunc {
 			w.WriteHeader(http.StatusMethodNotAllowed)
 		}
 	}
+}
+
+func (s *SpacesService) MoveSpaceTask() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userID, ok := authenticatedUser(w, r, s.database)
+		if !ok {
+			return
+		}
+		var body db.SpaceTaskMove
+		if decodeJSON(w, r, &body) != nil {
+			return
+		}
+		result, err := s.database.MoveSpaceTask(r.Context(), userID, chi.URLParam(r, "spaceID"), chi.URLParam(r, "taskID"), body)
+		if err != nil {
+			writeSpaceError(w, err)
+			return
+		}
+		_, _ = s.ProcessSpaceTaskEvent(r.Context(), result.Task, "moved")
+		writeJSON(w, http.StatusOK, result)
+	}
+}
+
+func optionalRFC3339(value string) (*time.Time, error) {
+	if strings.TrimSpace(value) == "" {
+		return nil, nil
+	}
+	parsed, err := time.Parse(time.RFC3339, value)
+	if err != nil {
+		return nil, err
+	}
+	parsed = parsed.UTC()
+	return &parsed, nil
 }
 
 func (s *SpacesService) SpaceTask() http.HandlerFunc {

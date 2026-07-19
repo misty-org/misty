@@ -36,6 +36,7 @@ type Server struct {
 	PasswordResetRedirectURL  string
 	WaitlistNotificationEmail string
 	Telemetry                 telemetry.Client
+	HealthMonitor             *healthMonitor
 }
 
 func CreateServer() (*Server, error) {
@@ -113,6 +114,7 @@ func CreateServer() (*Server, error) {
 		return nil, err
 	}
 	s.EmailSender = emailSender
+	s.HealthMonitor = newHealthMonitor(s)
 
 	return s, nil
 }
@@ -153,6 +155,9 @@ func (s *Server) MountHandlers() error {
 	validateResetTokenHandler := passwordResetService.Validate()
 	resetPasswordHandler := passwordResetService.Reset()
 	waitlistJoinHandler := waitlistService.Join()
+	healthHandler := s.HealthMonitor.Handler()
+	s.Router.Get("/health", healthHandler)
+	s.Router.Get("/api/health", healthHandler)
 
 	// Account management
 	s.Router.Post("/register", registerHandler)
@@ -325,6 +330,7 @@ func (s *Server) mountSpacesRoutes(prefix string, spaces *api.SpacesService, rea
 	s.Router.MethodFunc(http.MethodPost, prefix+"/spaces/{spaceID}/tasks", spaces.SpaceTasks())
 	s.Router.MethodFunc(http.MethodPatch, prefix+"/spaces/{spaceID}/tasks/{taskID}", spaces.SpaceTask())
 	s.Router.MethodFunc(http.MethodDelete, prefix+"/spaces/{spaceID}/tasks/{taskID}", spaces.SpaceTask())
+	s.Router.Post(prefix+"/spaces/{spaceID}/tasks/{taskID}/move", spaces.MoveSpaceTask())
 	s.Router.Get(prefix+"/spaces/{spaceID}/calendar/events", spaces.SpaceCalendar())
 	s.Router.MethodFunc(http.MethodGet, prefix+"/spaces/{spaceID}/calendar/sources", spaces.SpaceCalendarSources())
 	s.Router.MethodFunc(http.MethodPost, prefix+"/spaces/{spaceID}/calendar/sources", spaces.SpaceCalendarSources())

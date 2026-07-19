@@ -11,14 +11,17 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
 	"os"
+	"sort"
 	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/kannachi323/misty/server/db"
+	"github.com/lib/pq"
 )
 
 type providerOAuthDefinition struct {
@@ -37,8 +40,33 @@ var providerOAuthCatalog = map[string]providerOAuthDefinition{
 	"notion":  {ID: "notion", Name: "Notion", AuthorizeURL: "https://api.notion.com/v1/oauth/authorize", TokenURL: "https://api.notion.com/v1/oauth/token", ClientIDEnv: "NOTION_CLIENT_ID", ClientSecretEnv: "NOTION_CLIENT_SECRET"},
 }
 
+type providerOAuthAvailability struct {
+	Provider   string `json:"provider"`
+	Configured bool   `json:"configured"`
+}
+
+func providerOAuthAvailabilityCatalog() []providerOAuthAvailability {
+	providers := make([]providerOAuthAvailability, 0, len(providerOAuthCatalog))
+	for provider, definition := range providerOAuthCatalog {
+		providers = append(providers, providerOAuthAvailability{
+			Provider:   provider,
+			Configured: providerOAuthClientID(definition) != "" && providerOAuthClientSecret(definition) != "",
+		})
+	}
+	sort.Slice(providers, func(i, j int) bool { return providers[i].Provider < providers[j].Provider })
+	return providers
+}
+
+func providerOAuthClientID(definition providerOAuthDefinition) string {
+	return strings.TrimSpace(os.Getenv(definition.ClientIDEnv))
+}
+
+func providerOAuthClientSecret(definition providerOAuthDefinition) string {
+	return strings.TrimSpace(os.Getenv(definition.ClientSecretEnv))
+}
+
 func googleProvider(id, name string, scopes ...string) providerOAuthDefinition {
-	return providerOAuthDefinition{ID: id, Name: name, AuthorizeURL: "https://accounts.google.com/o/oauth2/v2/auth", TokenURL: "https://oauth2.googleapis.com/token", ClientIDEnv: "GOOGLE_OAUTH_CLIENT_ID", ClientSecretEnv: "GOOGLE_OAUTH_CLIENT_SECRET", Scopes: append(scopes, "openid", "email", "profile"), PKCE: true}
+	return providerOAuthDefinition{ID: id, Name: name, AuthorizeURL: "https://accounts.google.com/o/oauth2/v2/auth", TokenURL: "https://oauth2.googleapis.com/token", ClientIDEnv: "GOOGLE_CLIENT_ID", ClientSecretEnv: "GOOGLE_CLIENT_SECRET", Scopes: append(scopes, "openid", "email", "profile"), PKCE: true}
 }
 
 type providerTokenEnvelope struct {
@@ -65,8 +93,8 @@ func (s *SpacesService) BeginProviderAuthorization() http.HandlerFunc {
 			writeSpaceError(w, db.ErrSpaceInvalid)
 			return
 		}
-		clientID := strings.TrimSpace(os.Getenv(definition.ClientIDEnv))
-		if clientID == "" || strings.TrimSpace(os.Getenv(definition.ClientSecretEnv)) == "" {
+		clientID := providerOAuthClientID(definition)
+		if clientID == "" || providerOAuthClientSecret(definition) == "" {
 			writeJSON(w, http.StatusServiceUnavailable, map[string]string{"code": "provider_not_configured", "provider": provider})
 			return
 		}
@@ -176,11 +204,21 @@ func (s *SpacesService) ProviderAuthorizationCallback() http.HandlerFunc {
 		}
 		_, err = s.database.SaveProviderCredential(r.Context(), db.ProviderCredential{SpaceID: stored.SpaceID, UserID: stored.UserID, Provider: provider, Ciphertext: ciphertext, Nonce: nonce, KeyVersion: s.keyVer, AccountID: accountID, AccountDisplay: accountName, ExpiresAt: expiresAt}, accountName, scopes)
 		if err != nil {
+			logProviderCallbackDatabaseFailure(provider, err)
 			writeSpaceError(w, err)
 			return
 		}
 		http.Redirect(w, r, providerCompletionURL(provider, stored.ReturnTo), http.StatusSeeOther)
 	}
+}
+
+func logProviderCallbackDatabaseFailure(provider string, err error) {
+	var databaseError *pq.Error
+	if errors.As(err, &databaseError) {
+		log.Printf("Provider OAuth callback persistence failed: provider=%s sqlstate=%s table=%s constraint=%s", provider, databaseError.Code, databaseError.Table, databaseError.Constraint)
+		return
+	}
+	log.Printf("Provider OAuth callback persistence failed: provider=%s error_type=%T", provider, err)
 }
 
 func (s *SpacesService) DeleteProviderIntegration() http.HandlerFunc {
@@ -263,7 +301,7 @@ func (s *SpacesService) providerAccessToken(ctx context.Context, userID, spaceID
 }
 
 func exchangeProviderCode(ctx context.Context, definition providerOAuthDefinition, code, verifier, redirect string) (providerTokenEnvelope, []byte, error) {
-	values := url.Values{"grant_type": {"authorization_code"}, "code": {code}, "redirect_uri": {redirect}, "client_id": {strings.TrimSpace(os.Getenv(definition.ClientIDEnv))}, "client_secret": {strings.TrimSpace(os.Getenv(definition.ClientSecretEnv))}}
+	values := url.Values{"grant_type": {"authorization_code"}, "code": {code}, "redirect_uri": {redirect}, "client_id": {providerOAuthClientID(definition)}, "client_secret": {providerOAuthClientSecret(definition)}}
 	if definition.PKCE {
 		values.Set("code_verifier", verifier)
 	}
@@ -297,16 +335,26 @@ func exchangeProviderCode(ctx context.Context, definition providerOAuthDefinitio
 func providerCompletionURL(provider, returnTo string) string {
 	base := strings.TrimSpace(os.Getenv("MISTY_DESKTOP_OAUTH_RETURN_URL"))
 	if base == "" {
-		base = configuredPublicAPIBase() + "/oauth/complete"
+		base = "misty://oauth/complete"
 	}
 	parsed, err := url.Parse(base)
 	if err != nil || parsed.Scheme == "" {
 		return "/"
 	}
+	returnPath, returnErr := url.Parse(returnTo)
+	directReturn := parsed.Scheme == "misty" && returnErr == nil && validProviderReturnPath(returnTo) && returnPath.Path != ""
+	if directReturn {
+		// Deep-link directly to the route that launched consent. The desktop and
+		// mobile clients already allow misty://open/<route>; misty://oauth/complete
+		// itself is not an application route.
+		parsed.Host = "open"
+		parsed.Path = returnPath.Path
+		parsed.RawQuery = returnPath.RawQuery
+	}
 	query := parsed.Query()
 	query.Set("provider", provider)
 	query.Set("status", "connected")
-	if strings.HasPrefix(returnTo, "/") {
+	if !directReturn && strings.HasPrefix(returnTo, "/") {
 		query.Set("return_to", returnTo)
 	}
 	parsed.RawQuery = query.Encode()
@@ -314,7 +362,7 @@ func providerCompletionURL(provider, returnTo string) string {
 }
 
 func refreshProviderToken(ctx context.Context, definition providerOAuthDefinition, refreshToken string) (providerTokenEnvelope, []byte, error) {
-	values := url.Values{"grant_type": {"refresh_token"}, "refresh_token": {refreshToken}, "client_id": {strings.TrimSpace(os.Getenv(definition.ClientIDEnv))}, "client_secret": {strings.TrimSpace(os.Getenv(definition.ClientSecretEnv))}}
+	values := url.Values{"grant_type": {"refresh_token"}, "refresh_token": {refreshToken}, "client_id": {providerOAuthClientID(definition)}, "client_secret": {providerOAuthClientSecret(definition)}}
 	var request *http.Request
 	if definition.ID == "notion" {
 		encoded, _ := json.Marshal(map[string]string{"grant_type": "refresh_token", "refresh_token": refreshToken})

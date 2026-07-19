@@ -78,6 +78,13 @@ func (s *RealtimeService) Close() error {
 	return err
 }
 
+func (s *RealtimeService) Health() error {
+	if s == nil || s.listener == nil {
+		return errors.New("realtime listener is not started")
+	}
+	return s.listener.Ping()
+}
+
 func (s *RealtimeService) listen() {
 	for {
 		select {

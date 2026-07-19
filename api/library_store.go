@@ -62,6 +62,7 @@ type LibraryObjectMetadata struct {
 // its bucket is shared with Agent attachments, lifecycle rules must exclude
 // this prefix.
 type LibraryObjectStore interface {
+	Health(context.Context) error
 	Put(context.Context, string, io.Reader, LibraryObjectMetadata) error
 	Head(context.Context, string) (LibraryObjectMetadata, error)
 	Open(context.Context, string) (io.ReadCloser, LibraryObjectMetadata, error)
@@ -85,10 +86,23 @@ type MemoryLibraryObjectStore struct {
 	objects map[string]memoryLibraryObject
 }
 
+func (s *MemoryLibraryObjectStore) Health(_ context.Context) error { return nil }
+
 // LocalLibraryObjectStore is a persistent development backend. Production
 // rejects it so deployed Library data must use the separately configured R2/S3
 // bucket, while desktop development survives server restarts.
 type LocalLibraryObjectStore struct{ root string }
+
+func (s *LocalLibraryObjectStore) Health(_ context.Context) error {
+	info, err := os.Stat(s.root)
+	if err != nil {
+		return err
+	}
+	if !info.IsDir() {
+		return errors.New("local Library store is not a directory")
+	}
+	return nil
+}
 
 func NewLocalLibraryObjectStore(root string) (*LocalLibraryObjectStore, error) {
 	root = strings.TrimSpace(root)
@@ -268,6 +282,7 @@ type S3LibraryObjectStoreConfig struct {
 }
 
 type libraryS3API interface {
+	HeadBucket(context.Context, *s3.HeadBucketInput, ...func(*s3.Options)) (*s3.HeadBucketOutput, error)
 	PutObject(context.Context, *s3.PutObjectInput, ...func(*s3.Options)) (*s3.PutObjectOutput, error)
 	HeadObject(context.Context, *s3.HeadObjectInput, ...func(*s3.Options)) (*s3.HeadObjectOutput, error)
 	GetObject(context.Context, *s3.GetObjectInput, ...func(*s3.Options)) (*s3.GetObjectOutput, error)
@@ -277,6 +292,13 @@ type libraryS3API interface {
 type S3LibraryObjectStore struct {
 	bucket string
 	client libraryS3API
+}
+
+func (s *S3LibraryObjectStore) Health(ctx context.Context) error {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	_, err := s.client.HeadBucket(ctx, &s3.HeadBucketInput{Bucket: aws.String(s.bucket)})
+	return err
 }
 
 func NewS3LibraryObjectStore(config S3LibraryObjectStoreConfig) (*S3LibraryObjectStore, error) {

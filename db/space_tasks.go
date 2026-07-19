@@ -3,8 +3,11 @@ package db
 import (
 	"context"
 	"database/sql"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -14,9 +17,13 @@ import (
 type SpaceTask struct {
 	ID               string          `json:"id"`
 	SpaceID          string          `json:"space_id"`
+	TaskNumber       int64           `json:"task_number"`
+	TaskKey          string          `json:"task_key"`
 	Title            string          `json:"title"`
 	Notes            string          `json:"notes"`
 	Status           string          `json:"status"`
+	Priority         string          `json:"priority"`
+	Rank             int64           `json:"rank"`
 	AssigneeUserID   string          `json:"assignee_user_id,omitempty"`
 	DueAt            *time.Time      `json:"due_at,omitempty"`
 	DueTimezone      string          `json:"due_timezone"`
@@ -34,7 +41,31 @@ type SpaceTask struct {
 type SpaceTaskQuery struct {
 	Status          string
 	AssigneeUserID  string
+	Priority        string
+	Search          string
+	DueFrom         *time.Time
+	DueTo           *time.Time
+	Sort            string
+	Cursor          string
+	Limit           int
 	IncludeArchived bool
+}
+
+type SpaceTaskPage struct {
+	Tasks        []SpaceTask      `json:"tasks"`
+	NextCursor   string           `json:"next_cursor,omitempty"`
+	StatusTotals map[string]int64 `json:"status_totals"`
+}
+
+type SpaceTaskMove struct {
+	Version      int64  `json:"version"`
+	Status       string `json:"status"`
+	BeforeTaskID string `json:"before_task_id,omitempty"`
+}
+
+type SpaceTaskMoveResult struct {
+	Task      SpaceTask   `json:"task"`
+	Reordered []SpaceTask `json:"reordered"`
 }
 
 type SpaceCalendarSource struct {
@@ -83,17 +114,21 @@ type SpaceCalendarEvent struct {
 	UpdatedAt         time.Time       `json:"updated_at"`
 }
 
-const spaceTaskColumns = `id,space_id,title,notes,status,COALESCE(assignee_user_id,''),due_at,due_timezone,source_refs,COALESCE(created_by_user_id,''),COALESCE(created_by_agent_id,''),COALESCE(source_run_id,''),version,completed_at,archived_at,created_at,updated_at`
+const spaceTaskColumns = `id,space_id,task_number,task_key,title,notes,status,priority,rank,COALESCE(assignee_user_id,''),due_at,due_timezone,source_refs,COALESCE(created_by_user_id,''),COALESCE(created_by_agent_id,''),COALESCE(source_run_id,''),version,completed_at,archived_at,created_at,updated_at`
 
 func scanSpaceTask(row interface{ Scan(...any) error }, out *SpaceTask) error {
-	return row.Scan(&out.ID, &out.SpaceID, &out.Title, &out.Notes, &out.Status, &out.AssigneeUserID, &out.DueAt, &out.DueTimezone, &out.SourceRefs, &out.CreatedByUserID, &out.CreatedByAgentID, &out.SourceRunID, &out.Version, &out.CompletedAt, &out.ArchivedAt, &out.CreatedAt, &out.UpdatedAt)
+	return row.Scan(&out.ID, &out.SpaceID, &out.TaskNumber, &out.TaskKey, &out.Title, &out.Notes, &out.Status, &out.Priority, &out.Rank, &out.AssigneeUserID, &out.DueAt, &out.DueTimezone, &out.SourceRefs, &out.CreatedByUserID, &out.CreatedByAgentID, &out.SourceRunID, &out.Version, &out.CompletedAt, &out.ArchivedAt, &out.CreatedAt, &out.UpdatedAt)
 }
 
 func validateSpaceTask(item *SpaceTask) error {
 	item.Title = strings.TrimSpace(item.Title)
 	item.Notes = strings.TrimSpace(item.Notes)
 	item.Status = strings.TrimSpace(item.Status)
+	item.Priority = strings.TrimSpace(item.Priority)
 	item.DueTimezone = strings.TrimSpace(item.DueTimezone)
+	if item.Priority == "" {
+		item.Priority = "medium"
+	}
 	if item.DueTimezone == "" {
 		item.DueTimezone = "UTC"
 	}
@@ -102,6 +137,11 @@ func validateSpaceTask(item *SpaceTask) error {
 	}
 	switch item.Status {
 	case "todo", "in_progress", "done", "canceled":
+	default:
+		return ErrSpaceInvalid
+	}
+	switch item.Priority {
+	case "high", "medium", "low":
 	default:
 		return ErrSpaceInvalid
 	}
@@ -119,14 +159,39 @@ func validateSpaceTask(item *SpaceTask) error {
 }
 
 func (db *Database) SpaceTasks(ctx context.Context, userID, spaceID string, query SpaceTaskQuery) ([]SpaceTask, error) {
-	out := []SpaceTask{}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	page, err := db.SpaceTaskPage(ctx, userID, spaceID, query)
+	return page.Tasks, err
+}
+
+func (db *Database) SpaceTaskPage(ctx context.Context, userID, spaceID string, query SpaceTaskQuery) (SpaceTaskPage, error) {
+	out := SpaceTaskPage{Tasks: []SpaceTask{}, StatusTotals: map[string]int64{"todo": 0, "in_progress": 0, "done": 0, "canceled": 0}}
+	if query.Limit < 1 || query.Limit > 200 {
+		query.Limit = 100
+	}
+	offset, err := decodeTaskCursor(query.Cursor)
+	if err != nil {
+		return out, ErrSpaceInvalid
+	}
+	query.Status, query.AssigneeUserID, query.Priority, query.Search = strings.TrimSpace(query.Status), strings.TrimSpace(query.AssigneeUserID), strings.TrimSpace(query.Priority), strings.TrimSpace(query.Search)
+	if query.Priority != "" && query.Priority != "high" && query.Priority != "medium" && query.Priority != "low" {
+		return out, ErrSpaceInvalid
+	}
+	order := `status,rank,id`
+	switch query.Sort {
+	case "", "rank":
+	case "due":
+		order = `due_at NULLS LAST,updated_at DESC,id`
+	case "updated":
+		order = `updated_at DESC,id`
+	default:
+		return out, ErrSpaceInvalid
+	}
+	err = db.spaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionTasksView); err != nil {
 			return err
 		}
-		rows, err := tx.QueryContext(ctx, `SELECT `+spaceTaskColumns+` FROM space_tasks
-			WHERE space_id=$1 AND ($2='' OR status=$2) AND ($3='' OR assignee_user_id=$3) AND ($4 OR archived_at IS NULL)
-			ORDER BY archived_at NULLS FIRST,due_at NULLS LAST,updated_at DESC,id`, spaceID, query.Status, query.AssigneeUserID, query.IncludeArchived)
+		filters := `space_id=$1 AND ($2='' OR status=$2) AND ($3='' OR assignee_user_id=$3) AND ($4='' OR priority=$4) AND ($5='' OR title ILIKE '%'||$5||'%' OR notes ILIKE '%'||$5||'%' OR task_key ILIKE '%'||$5||'%') AND ($6::timestamptz IS NULL OR due_at >= $6) AND ($7::timestamptz IS NULL OR due_at < $7) AND ($8 OR archived_at IS NULL)`
+		rows, err := tx.QueryContext(ctx, `SELECT `+spaceTaskColumns+` FROM space_tasks WHERE `+filters+` ORDER BY `+order+` LIMIT $9 OFFSET $10`, spaceID, query.Status, query.AssigneeUserID, query.Priority, query.Search, query.DueFrom, query.DueTo, query.IncludeArchived, query.Limit+1, offset)
 		if err != nil {
 			return err
 		}
@@ -136,11 +201,50 @@ func (db *Database) SpaceTasks(ctx context.Context, userID, spaceID string, quer
 			if err := scanSpaceTask(rows, &item); err != nil {
 				return err
 			}
-			out = append(out, item)
+			out.Tasks = append(out.Tasks, item)
 		}
-		return rows.Err()
+		if err := rows.Err(); err != nil {
+			return err
+		}
+		if len(out.Tasks) > query.Limit {
+			out.Tasks = out.Tasks[:query.Limit]
+			out.NextCursor = encodeTaskCursor(offset + query.Limit)
+		}
+		countRows, err := tx.QueryContext(ctx, `SELECT status,COUNT(*) FROM space_tasks WHERE space_id=$1 AND archived_at IS NULL GROUP BY status`, spaceID)
+		if err != nil {
+			return err
+		}
+		defer countRows.Close()
+		for countRows.Next() {
+			var status string
+			var total int64
+			if err := countRows.Scan(&status, &total); err != nil {
+				return err
+			}
+			out.StatusTotals[status] = total
+		}
+		return countRows.Err()
 	})
 	return out, err
+}
+
+func encodeTaskCursor(offset int) string {
+	return base64.RawURLEncoding.EncodeToString([]byte(strconv.Itoa(offset)))
+}
+
+func decodeTaskCursor(cursor string) (int, error) {
+	if cursor == "" {
+		return 0, nil
+	}
+	raw, err := base64.RawURLEncoding.DecodeString(cursor)
+	if err != nil {
+		return 0, err
+	}
+	offset, err := strconv.Atoi(string(raw))
+	if err != nil || offset < 0 || offset > 1_000_000 {
+		return 0, ErrSpaceInvalid
+	}
+	return offset, nil
 }
 
 func (db *Database) CreateSpaceTask(ctx context.Context, actorUserID string, item SpaceTask) (*SpaceTask, error) {
@@ -172,10 +276,21 @@ func (db *Database) CreateSpaceTask(ctx context.Context, actorUserID string, ite
 				return ErrSpaceInvalid
 			}
 		}
+		if _, err := tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock(hashtext($1))`, "space-task-rank:"+item.SpaceID+":"+item.Status); err != nil {
+			return err
+		}
+		if err := tx.QueryRowContext(ctx, `INSERT INTO space_task_counters(space_id,last_number) VALUES($1,1)
+			ON CONFLICT(space_id) DO UPDATE SET last_number=space_task_counters.last_number+1 RETURNING last_number`, item.SpaceID).Scan(&item.TaskNumber); err != nil {
+			return err
+		}
+		item.TaskKey = fmt.Sprintf("MST-%d", item.TaskNumber)
+		if err := tx.QueryRowContext(ctx, `SELECT COALESCE(MAX(rank),0)+1024 FROM space_tasks WHERE space_id=$1 AND status=$2 AND archived_at IS NULL`, item.SpaceID, item.Status).Scan(&item.Rank); err != nil {
+			return err
+		}
 		completed := item.Status == "done"
-		query := `INSERT INTO space_tasks(id,space_id,title,notes,status,assignee_user_id,due_at,due_timezone,source_refs,created_by_user_id,created_by_agent_id,source_run_id,completed_at)
-			VALUES($1,$2,$3,$4,$5,NULLIF($6,''),$7,$8,$9,NULLIF($10,''),NULLIF($11,''),NULLIF($12,''),CASE WHEN $13 THEN NOW() END) RETURNING ` + spaceTaskColumns
-		if err := scanSpaceTask(tx.QueryRowContext(ctx, query, item.ID, item.SpaceID, item.Title, item.Notes, item.Status, item.AssigneeUserID, item.DueAt, item.DueTimezone, item.SourceRefs, item.CreatedByUserID, item.CreatedByAgentID, item.SourceRunID, completed), out); err != nil {
+		query := `INSERT INTO space_tasks(id,space_id,task_number,task_key,title,notes,status,priority,rank,assignee_user_id,due_at,due_timezone,source_refs,created_by_user_id,created_by_agent_id,source_run_id,completed_at)
+			VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,NULLIF($10,''),$11,$12,$13,NULLIF($14,''),NULLIF($15,''),NULLIF($16,''),CASE WHEN $17 THEN NOW() END) RETURNING ` + spaceTaskColumns
+		if err := scanSpaceTask(tx.QueryRowContext(ctx, query, item.ID, item.SpaceID, item.TaskNumber, item.TaskKey, item.Title, item.Notes, item.Status, item.Priority, item.Rank, item.AssigneeUserID, item.DueAt, item.DueTimezone, item.SourceRefs, item.CreatedByUserID, item.CreatedByAgentID, item.SourceRunID, completed), out); err != nil {
 			return err
 		}
 		_, err := recordSpaceEventTx(ctx, tx, item.SpaceID, actorUserID, "task.created", item.ID, map[string]any{"task": out})
@@ -201,10 +316,14 @@ func (db *Database) UpdateSpaceTask(ctx context.Context, actorUserID string, ite
 				return ErrSpaceInvalid
 			}
 		}
-		query := `UPDATE space_tasks SET title=$1,notes=$2,status=$3,assignee_user_id=NULLIF($4,''),due_at=$5,due_timezone=$6,source_refs=$7,
+		if _, err := tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock(hashtext($1))`, "space-task-rank:"+item.SpaceID+":"+item.Status); err != nil {
+			return err
+		}
+		query := `UPDATE space_tasks SET title=$1,notes=$2,status=$3,priority=$4,assignee_user_id=NULLIF($5,''),due_at=$6,due_timezone=$7,source_refs=$8,
+			rank=CASE WHEN status<>$3 THEN (SELECT COALESCE(MAX(other.rank),0)+1024 FROM space_tasks other WHERE other.space_id=$10 AND other.status=$3 AND other.archived_at IS NULL) ELSE rank END,
 			completed_at=CASE WHEN $3='done' THEN COALESCE(completed_at,NOW()) ELSE NULL END,version=version+1,updated_at=NOW()
-			WHERE id=$8 AND space_id=$9 AND version=$10 AND archived_at IS NULL RETURNING ` + spaceTaskColumns
-		err := scanSpaceTask(tx.QueryRowContext(ctx, query, item.Title, item.Notes, item.Status, item.AssigneeUserID, item.DueAt, item.DueTimezone, item.SourceRefs, item.ID, item.SpaceID, item.Version), out)
+			WHERE id=$9 AND space_id=$10 AND version=$11 AND archived_at IS NULL RETURNING ` + spaceTaskColumns
+		err := scanSpaceTask(tx.QueryRowContext(ctx, query, item.Title, item.Notes, item.Status, item.Priority, item.AssigneeUserID, item.DueAt, item.DueTimezone, item.SourceRefs, item.ID, item.SpaceID, item.Version), out)
 		if errors.Is(err, sql.ErrNoRows) {
 			var exists bool
 			if queryErr := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM space_tasks WHERE id=$1 AND space_id=$2)`, item.ID, item.SpaceID).Scan(&exists); queryErr != nil {
@@ -222,6 +341,94 @@ func (db *Database) UpdateSpaceTask(ctx context.Context, actorUserID string, ite
 		return err
 	})
 	return out, err
+}
+
+func (db *Database) MoveSpaceTask(ctx context.Context, actorUserID, spaceID, taskID string, move SpaceTaskMove) (*SpaceTaskMoveResult, error) {
+	if taskID == "" || move.Version < 1 || move.Status != "todo" && move.Status != "in_progress" && move.Status != "done" && move.Status != "canceled" {
+		return nil, ErrSpaceInvalid
+	}
+	result := &SpaceTaskMoveResult{Reordered: []SpaceTask{}}
+	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+		if err := requireSpacePermissionTx(ctx, tx, actorUserID, spaceID, PermissionTasksManage); err != nil {
+			return err
+		}
+		if _, err := tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock(hashtext($1))`, "space-task-rank:"+spaceID+":"+move.Status); err != nil {
+			return err
+		}
+		var currentStatus string
+		if err := tx.QueryRowContext(ctx, `SELECT status FROM space_tasks WHERE id=$1 AND space_id=$2 AND version=$3 AND archived_at IS NULL FOR UPDATE`, taskID, spaceID, move.Version).Scan(&currentStatus); errors.Is(err, sql.ErrNoRows) {
+			return ErrSpaceConflict
+		} else if err != nil {
+			return err
+		}
+		newRank, err := taskRankBefore(ctx, tx, spaceID, taskID, move.Status, move.BeforeTaskID)
+		if err != nil {
+			return err
+		}
+		if newRank == 0 {
+			if err := rebalanceTaskColumn(ctx, tx, spaceID, move.Status, taskID); err != nil {
+				return err
+			}
+			newRank, err = taskRankBefore(ctx, tx, spaceID, taskID, move.Status, move.BeforeTaskID)
+			if err != nil || newRank == 0 {
+				return ErrSpaceConflict
+			}
+		}
+		completed := move.Status == "done"
+		err = scanSpaceTask(tx.QueryRowContext(ctx, `UPDATE space_tasks SET status=$1,rank=$2,completed_at=CASE WHEN $3 THEN COALESCE(completed_at,NOW()) ELSE NULL END,version=version+1,updated_at=NOW() WHERE id=$4 AND space_id=$5 AND version=$6 RETURNING `+spaceTaskColumns, move.Status, newRank, completed, taskID, spaceID, move.Version), &result.Task)
+		if errors.Is(err, sql.ErrNoRows) {
+			return ErrSpaceConflict
+		}
+		if err != nil {
+			return err
+		}
+		rows, err := tx.QueryContext(ctx, `SELECT `+spaceTaskColumns+` FROM space_tasks WHERE space_id=$1 AND status=$2 AND archived_at IS NULL ORDER BY rank,id`, spaceID, move.Status)
+		if err != nil {
+			return err
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var task SpaceTask
+			if err := scanSpaceTask(rows, &task); err != nil {
+				return err
+			}
+			result.Reordered = append(result.Reordered, task)
+		}
+		if err := rows.Err(); err != nil {
+			return err
+		}
+		_, err = recordSpaceEventTx(ctx, tx, spaceID, actorUserID, "task.moved", taskID, map[string]any{"task": result.Task})
+		return err
+	})
+	return result, err
+}
+
+func taskRankBefore(ctx context.Context, tx *sql.Tx, spaceID, taskID, status, beforeTaskID string) (int64, error) {
+	if beforeTaskID == "" {
+		var maxRank int64
+		err := tx.QueryRowContext(ctx, `SELECT COALESCE(MAX(rank),0) FROM space_tasks WHERE space_id=$1 AND status=$2 AND id<>$3 AND archived_at IS NULL`, spaceID, status, taskID).Scan(&maxRank)
+		return maxRank + 1024, err
+	}
+	var beforeRank int64
+	if err := tx.QueryRowContext(ctx, `SELECT rank FROM space_tasks WHERE id=$1 AND space_id=$2 AND status=$3 AND id<>$4 AND archived_at IS NULL`, beforeTaskID, spaceID, status, taskID).Scan(&beforeRank); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return 0, ErrSpaceInvalid
+		}
+		return 0, err
+	}
+	var previousRank int64
+	if err := tx.QueryRowContext(ctx, `SELECT COALESCE(MAX(rank),0) FROM space_tasks WHERE space_id=$1 AND status=$2 AND id<>$3 AND rank<$4 AND archived_at IS NULL`, spaceID, status, taskID, beforeRank).Scan(&previousRank); err != nil {
+		return 0, err
+	}
+	if beforeRank-previousRank <= 1 {
+		return 0, nil
+	}
+	return previousRank + (beforeRank-previousRank)/2, nil
+}
+
+func rebalanceTaskColumn(ctx context.Context, tx *sql.Tx, spaceID, status, movingTaskID string) error {
+	_, err := tx.ExecContext(ctx, `WITH ranked AS (SELECT id,ROW_NUMBER() OVER (ORDER BY rank,id)*1024 AS next_rank FROM space_tasks WHERE space_id=$1 AND status=$2 AND id<>$3 AND archived_at IS NULL) UPDATE space_tasks task SET rank=ranked.next_rank FROM ranked WHERE task.id=ranked.id`, spaceID, status, movingTaskID)
+	return err
 }
 
 func (db *Database) ArchiveSpaceTask(ctx context.Context, actorUserID, spaceID, taskID string, version int64) (*SpaceTask, error) {
@@ -324,14 +531,14 @@ func (db *Database) DisableSpaceCalendarSource(ctx context.Context, userID, spac
 	})
 }
 
-func (db *Database) SpaceCalendarEvents(ctx context.Context, userID, spaceID string, startsBefore, endsAfter time.Time) ([]SpaceCalendarEvent, error) {
+func (db *Database) SpaceCalendarEvents(ctx context.Context, userID, spaceID string, from, to time.Time) ([]SpaceCalendarEvent, error) {
 	out := []SpaceCalendarEvent{}
 	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionTasksView); err != nil {
 			return err
 		}
 		rows, err := tx.QueryContext(ctx, `SELECT id,space_id,source_id,provider,external_event_id,fingerprint,title,description,location,meeting_url,organizer,starts_at,ends_at,all_day,timezone,status,provider_created_at,provider_updated_at,removed_at,created_at,updated_at
-			FROM space_calendar_events WHERE space_id=$1 AND starts_at<$2 AND ends_at>$3 AND removed_at IS NULL ORDER BY starts_at,id`, spaceID, startsBefore, endsAfter)
+			FROM space_calendar_events WHERE space_id=$1 AND starts_at<$2 AND ends_at>$3 AND removed_at IS NULL ORDER BY starts_at,id`, spaceID, to, from)
 		if err != nil {
 			return err
 		}

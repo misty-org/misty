@@ -13,6 +13,7 @@ import (
 func (s *SpacesService) taskQueryNode(ctx context.Context, run *db.SpaceRun, invocation workflowv2.Invocation) (json.RawMessage, error) {
 	var config struct {
 		Status         string `json:"status"`
+		Priority       string `json:"priority"`
 		AssigneeUserID string `json:"assigneeUserId"`
 		AssignedToMe   bool   `json:"assignedToMe"`
 	}
@@ -28,7 +29,10 @@ func (s *SpacesService) taskQueryNode(ctx context.Context, run *db.SpaceRun, inv
 	if config.AssignedToMe {
 		config.AssigneeUserID = run.RequestingMemberID
 	}
-	items, err := s.database.SpaceTasks(ctx, run.RequestingMemberID, run.SpaceID, db.SpaceTaskQuery{Status: config.Status, AssigneeUserID: config.AssigneeUserID})
+	if value, _ := input["priority"].(string); value != "" {
+		config.Priority = value
+	}
+	items, err := s.database.SpaceTasks(ctx, run.RequestingMemberID, run.SpaceID, db.SpaceTaskQuery{Status: config.Status, Priority: config.Priority, AssigneeUserID: config.AssigneeUserID, Limit: 200})
 	if err != nil {
 		return nil, err
 	}
@@ -127,6 +131,7 @@ func decodeWorkflowTask(value map[string]any) (db.SpaceTask, error) {
 		Title          string          `json:"title"`
 		Notes          string          `json:"notes"`
 		Status         string          `json:"status"`
+		Priority       string          `json:"priority"`
 		AssigneeUserID string          `json:"assignee_user_id"`
 		AssigneeCamel  string          `json:"assigneeUserId"`
 		DueAt          string          `json:"due_at"`
@@ -157,5 +162,5 @@ func decodeWorkflowTask(value map[string]any) (db.SpaceTask, error) {
 		value = value.UTC()
 		dueAt = &value
 	}
-	return db.SpaceTask{ID: wire.ID, Title: wire.Title, Notes: wire.Notes, Status: wire.Status, AssigneeUserID: wire.AssigneeUserID, DueAt: dueAt, DueTimezone: wire.DueTimezone, SourceRefs: wire.SourceRefs, Version: wire.Version}, nil
+	return db.SpaceTask{ID: wire.ID, Title: wire.Title, Notes: wire.Notes, Status: wire.Status, Priority: wire.Priority, AssigneeUserID: wire.AssigneeUserID, DueAt: dueAt, DueTimezone: wire.DueTimezone, SourceRefs: wire.SourceRefs, Version: wire.Version}, nil
 }

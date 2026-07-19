@@ -13,7 +13,7 @@ Discord requires the official bot token and Message Content Intent for full-mess
 ## Cutover
 
 1. Back up PostgreSQL.
-2. Apply migrations through `20260902000000_space_tasks_calendar_launch.sql`.
+2. Run `./scripts/goose.sh up` and verify every checked-in migration is applied before restarting the server.
 3. Verify the production callback origin and OAuth redirects.
 4. Start the server worker and confirm Google watch renewal/reconciliation and Discord Gateway health.
 5. Complete the two-user acceptance checklist in the owner-input document.

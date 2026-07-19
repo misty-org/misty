@@ -127,7 +127,10 @@ func (s *SpacesService) SpaceIntegrations() http.HandlerFunc {
 				writeSpaceError(w, err)
 				return
 			}
-			writeJSON(w, http.StatusOK, map[string]any{"integrations": items})
+			writeJSON(w, http.StatusOK, map[string]any{
+				"integrations": items,
+				"providers":    providerOAuthAvailabilityCatalog(),
+			})
 			return
 		}
 		var body struct {
