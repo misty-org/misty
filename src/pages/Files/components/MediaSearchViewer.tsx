@@ -1,14 +1,82 @@
-import { Pause, Play, X } from "lucide-react";
+import { Pause, Play } from "lucide-react";
 import { useEffect, useRef, useState, type SyntheticEvent } from "react";
+import { Button } from "../../../components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "../../../components/ui/dialog";
 import { safeTauriAssetUrl } from "../../../shared/tauri";
 import { useMediaViewerStore } from "../../../stores/useMediaViewerStore";
 
-export function MediaSearchViewer(){
-  const result=useMediaViewerStore((state)=>state.result);const close=useMediaViewerStore((state)=>state.close);const ref=useRef<HTMLVideoElement|HTMLAudioElement|null>(null);const[playing,setPlaying]=useState(false);
-  useEffect(()=>{if(!result)return;const onKey=(event:KeyboardEvent)=>{if(event.key==="Escape")close()};window.addEventListener("keydown",onKey);return()=>window.removeEventListener("keydown",onKey)},[close,result]);
-  useEffect(()=>{setPlaying(false)},[result]);if(!result||!result.match?.mediaSegmentId)return null;
-  const start=(result.match.mediaStartMs??0)/1000;const isVideo=result.match.mediaType==="video";const common={ref:(node:HTMLVideoElement|HTMLAudioElement|null)=>{ref.current=node},src:safeTauriAssetUrl(result.entry.path),controls:true,autoPlay:true,onLoadedMetadata:(event:SyntheticEvent<HTMLMediaElement>)=>{event.currentTarget.currentTime=start;void event.currentTarget.play().catch(()=>undefined)},onPlay:()=>setPlaying(true),onPause:()=>setPlaying(false)};
-  const toggle=()=>{const player=ref.current;if(!player)return;if(player.paused)void player.play();else player.pause()};
-  return <div className="fixed inset-0 z-[2147483000] grid place-items-center bg-black/70 p-5 backdrop-blur-md" role="dialog" aria-modal="true" aria-label={`Media result in ${result.entry.name}`} onMouseDown={(event)=>{if(event.target===event.currentTarget)close()}}><section className="grid max-h-[90vh] w-[min(1050px,94vw)] grid-rows-[minmax(0,1fr)_auto] overflow-hidden rounded-2xl border border-white/15 bg-[#151619] shadow-2xl"><div className="relative grid min-h-[240px] place-items-center overflow-hidden bg-black">{isVideo?<video {...common} className="max-h-[68vh] max-w-full"/>:<audio {...common} className="w-[min(720px,88vw)]"/>}<button type="button" onClick={close} aria-label="Close media viewer" className="absolute right-3 top-3 grid size-9 place-items-center rounded-full bg-black/65 text-white hover:bg-black/85"><X size={18}/></button></div><div className="grid gap-3 p-5"><div className="flex items-start gap-3"><button type="button" onClick={toggle} className="grid size-10 shrink-0 place-items-center rounded-full bg-white text-black">{playing?<Pause size={17}/>:<Play size={17}/>}</button><div className="min-w-0"><h2 className="m-0 truncate text-lg font-bold">{result.entry.name}</h2><p className="m-0 mt-1 text-sm text-white/55">{formatTime(result.match.mediaStartMs??0)} · {result.match.mediaMatchKind==="spoken"?"Spoken audio":"Visual scene"}</p></div></div>{result.match.description?<p className="m-0 text-sm leading-6 text-white/72">{result.match.description}</p>:null}</div></section></div>;
+export function MediaSearchViewer() {
+  const result = useMediaViewerStore((state) => state.result);
+  const close = useMediaViewerStore((state) => state.close);
+  const playerRef = useRef<HTMLVideoElement | HTMLAudioElement | null>(null);
+  const [playing, setPlaying] = useState(false);
+
+  useEffect(() => setPlaying(false), [result]);
+
+  if (!result || !result.match?.mediaSegmentId) return null;
+
+  const startSeconds = (result.match.mediaStartMs ?? 0) / 1000;
+  const isVideo = result.match.mediaType === "video";
+  const common = {
+    ref: (node: HTMLVideoElement | HTMLAudioElement | null) => { playerRef.current = node; },
+    src: safeTauriAssetUrl(result.entry.path),
+    controls: true,
+    autoPlay: true,
+    onLoadedMetadata: (event: SyntheticEvent<HTMLMediaElement>) => {
+      event.currentTarget.currentTime = startSeconds;
+      void event.currentTarget.play().catch(() => undefined);
+    },
+    onPlay: () => setPlaying(true),
+    onPause: () => setPlaying(false),
+  };
+
+  const togglePlayback = () => {
+    const player = playerRef.current;
+    if (!player) return;
+    if (player.paused) void player.play();
+    else player.pause();
+  };
+
+  return (
+    <Dialog open onOpenChange={(open) => { if (!open) close(); }}>
+      <DialogContent className="grid max-h-[90vh] w-[min(1050px,94vw)] max-w-none grid-rows-[minmax(0,1fr)_auto] gap-0 overflow-hidden bg-card p-0 text-card-foreground">
+        <DialogHeader className="sr-only">
+          <DialogTitle>{result.entry.name}</DialogTitle>
+          <DialogDescription>Media search result at {formatTime(result.match.mediaStartMs ?? 0)}.</DialogDescription>
+        </DialogHeader>
+        <div className="grid min-h-[240px] place-items-center overflow-hidden bg-black">
+          {isVideo ? (
+            <video {...common} className="max-h-[68vh] max-w-full" />
+          ) : (
+            <audio {...common} className="w-[min(720px,88vw)]" />
+          )}
+        </div>
+        <div className="grid gap-3 border-t border-border p-5">
+          <div className="flex items-start gap-3">
+            <Button size="icon" type="button" onClick={togglePlayback} aria-label={playing ? "Pause" : "Play"}>
+              {playing ? <Pause size={17} /> : <Play size={17} />}
+            </Button>
+            <div className="min-w-0">
+              <h2 className="m-0 truncate text-lg font-semibold">{result.entry.name}</h2>
+              <p className="m-0 mt-1 text-sm text-muted-foreground">
+                {formatTime(result.match.mediaStartMs ?? 0)} · {result.match.mediaMatchKind === "spoken" ? "Spoken audio" : "Visual scene"}
+              </p>
+            </div>
+          </div>
+          {result.match.description ? <p className="m-0 text-sm leading-6 text-muted-foreground">{result.match.description}</p> : null}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
 }
-function formatTime(ms:number){const seconds=Math.floor(ms/1000);return `${Math.floor(seconds/60)}:${String(seconds%60).padStart(2,"0")}`}
+
+function formatTime(ms: number): string {
+  const seconds = Math.floor(ms / 1000);
+  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
+}

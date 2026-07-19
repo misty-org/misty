@@ -1,77 +1,59 @@
 @import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@import "@fontsource-variable/inter";
+@import "@fontsource-variable/outfit";
 @source "./**/*.{ts,tsx}";
+@import "./base.css";
 
-/* The app wallpaper is decorative. WebKit may briefly expose native media
-   chrome when its autoplay session is rebuilt after a window/app resume. */
-.misty-app-wallpaper-video::-webkit-media-controls {
-  display: none !important;
-  -webkit-appearance: none;
-}
-
-.misty-app-wallpaper-video::-webkit-media-controls-enclosure {
-  display: none !important;
-  -webkit-appearance: none;
-}
-
-.misty-app-wallpaper-video::-webkit-media-controls-panel {
-  display: none !important;
-  -webkit-appearance: none;
-}
-
-.misty-app-wallpaper-video::-webkit-media-controls-play-button {
-  display: none !important;
-  -webkit-appearance: none;
-}
-
-.misty-app-wallpaper-video::-webkit-media-controls-start-playback-button {
-  display: none !important;
-  -webkit-appearance: none;
-}
+@custom-variant dark (&:where(.dark, .dark *, [data-theme="dark"], [data-theme="dark"] *));
 
 :root {
   color-scheme: dark;
-  --misty-page-bg: #181818;
-  --misty-nav-bg: #101010;
-  --misty-bg: #181818;
-  --misty-bg-soft: #090b0e;
-  --misty-surface: #111418;
-  --misty-surface-2: #14171c;
-  --misty-surface-3: #1a1f26;
-  --misty-dropdown-bg: #111418;
-  --misty-surface-hover: #171a20;
-  --misty-surface-selected: #1d222a;
-  --misty-sidebar-selected: #1a2028;
-  --misty-border: #14181d;
-  --misty-border-strong: #1f242d;
-  --misty-border-soft: #0e1014;
-  --misty-content-frame-border: #181a21;
-  --misty-divider-strong: color-mix(in srgb, var(--misty-text) 10.78125%, transparent);
-  --misty-divider-default: color-mix(in srgb, var(--misty-text) 5.390625%, transparent);
-  --misty-divider-subtle: color-mix(in srgb, var(--misty-text) 3.59375%, transparent);
-  --misty-divider-hover: color-mix(in srgb, var(--misty-text) 17.96875%, transparent);
+  /* Misty dark is the same zinc scale used by the website's radix-vega
+     preset. Hierarchy comes from tonal surfaces first and borders second. */
+  --misty-page-bg: oklch(0.141 0.005 285.823);
+  --misty-nav-bg: oklch(0.18 0.006 285.9);
+  --misty-bg: oklch(0.141 0.005 285.823);
+  --misty-bg-soft: oklch(0.165 0.006 285.9);
+  --misty-surface: oklch(0.21 0.006 285.885);
+  --misty-surface-2: oklch(0.274 0.006 286.033);
+  --misty-surface-3: oklch(0.37 0.013 285.805);
+  --misty-dropdown-bg: oklch(0.21 0.006 285.885);
+  --misty-surface-hover: color-mix(in oklch, var(--misty-text) 7%, var(--misty-surface));
+  --misty-surface-selected: color-mix(in oklch, var(--misty-text) 10%, var(--misty-surface));
+  --misty-sidebar-selected: oklch(0.274 0.006 286.033);
+  --misty-border: oklch(1 0 0 / 0.1);
+  --misty-border-strong: oklch(1 0 0 / 0.14);
+  --misty-border-soft: oklch(1 0 0 / 0.06);
+  --misty-content-frame-border: oklch(1 0 0 / 0.07);
+  --misty-divider-strong: oklch(1 0 0 / 0.1);
+  --misty-divider-default: oklch(1 0 0 / 0.065);
+  --misty-divider-subtle: oklch(1 0 0 / 0.04);
+  --misty-divider-hover: oklch(1 0 0 / 0.14);
   --misty-divider-active: var(--misty-accent);
-  --misty-interaction-focus: color-mix(in srgb, var(--misty-accent) 78%, transparent);
-  --misty-row-hover: color-mix(in srgb, var(--misty-text) 7%, transparent);
-  --misty-row-selected: color-mix(in srgb, var(--misty-accent) 18%, transparent);
-  --misty-row-selected-hover: color-mix(in srgb, var(--misty-accent) 24%, transparent);
-  --misty-text: #f1f3f4;
-  --misty-text-muted: #a7abb3;
-  --misty-text-subtle: #747a84;
-  --misty-primary: #dbe2e8;
-  --misty-primary-hover: #f1f3f4;
-  --misty-primary-active: #c6cdd5;
-  --misty-primary-contrast: #0b0d10;
-  --misty-accent: #7dd3fc;
-  --misty-accent-strong: #60a5fa;
-  --misty-accent-soft: rgba(125, 211, 252, 0.14);
-  --misty-success: #22c55e;
-  --misty-warning: #eab308;
-  --misty-danger: #ef4444;
-  --misty-info: #38bdf8;
-  --misty-link: #93c5fd;
-  --misty-selection: rgba(125, 211, 252, 0.24);
-  --misty-code-bg: #0a0d12;
-  --misty-code-border: rgba(255, 255, 255, 0.1);
+  --misty-interaction-focus: oklch(0.552 0.016 285.938);
+  --misty-row-hover: oklch(1 0 0 / 0.055);
+  --misty-row-selected: oklch(1 0 0 / 0.09);
+  --misty-row-selected-hover: oklch(1 0 0 / 0.12);
+  --misty-text: oklch(0.985 0 0);
+  --misty-text-muted: oklch(0.705 0.015 286.067);
+  --misty-text-subtle: oklch(0.552 0.016 285.938);
+  --misty-primary: oklch(0.92 0.004 286.32);
+  --misty-primary-hover: oklch(0.985 0 0);
+  --misty-primary-active: oklch(0.871 0.006 286.286);
+  --misty-primary-contrast: oklch(0.21 0.006 285.885);
+  --misty-accent: oklch(0.705 0.015 286.067);
+  --misty-accent-strong: oklch(0.871 0.006 286.286);
+  --misty-accent-soft: oklch(1 0 0 / 0.08);
+  --misty-success: oklch(0.723 0.219 149.579);
+  --misty-warning: oklch(0.795 0.184 86.047);
+  --misty-danger: oklch(0.704 0.191 22.216);
+  --misty-info: oklch(0.685 0.169 237.323);
+  --misty-link: oklch(0.746 0.16 232.661);
+  --misty-selection: oklch(1 0 0 / 0.14);
+  --misty-code-bg: oklch(0.12 0.005 285.8);
+  --misty-code-border: oklch(1 0 0 / 0.08);
   --misty-syntax-text: #e5e7eb;
   --misty-syntax-comment: #7d8590;
   --misty-syntax-keyword: #f472b6;
@@ -84,10 +66,20 @@
   --misty-diff-added: rgba(34, 197, 94, 0.14);
   --misty-diff-removed: rgba(239, 68, 68, 0.14);
   --misty-diff-changed: rgba(234, 179, 8, 0.14);
-  --misty-shadow: rgba(0, 0, 0, 0.38);
-  --misty-focus-ring: rgba(125, 211, 252, 0.22);
-  --misty-glass: rgba(17, 20, 24, 0.94);
+  --misty-shadow: oklch(0 0 0 / 0.32);
+  --misty-focus-ring: oklch(1 0 0 / 0.16);
+  --misty-glass: oklch(0.21 0.006 285.885 / 0.88);
   --misty-glass-border: var(--misty-border);
+  /* Frame tokens may become translucent over a wallpaper. Component tokens
+     stay opaque and legible regardless of the frame treatment. */
+  --misty-frame-background: var(--misty-page-bg);
+  --misty-frame-navigation: var(--misty-nav-bg);
+  --misty-frame-border: var(--misty-content-frame-border);
+  --misty-component-surface: var(--misty-surface);
+  --misty-component-surface-raised: var(--misty-surface-2);
+  --misty-component-surface-hover: var(--misty-surface-hover);
+  --misty-component-border: var(--misty-divider-default);
+  --misty-component-border-subtle: var(--misty-divider-subtle);
   /* Stable semantic contract consumed by Misty and hosted extensions. */
   --misty-semantic-background: var(--misty-bg);
   --misty-semantic-surface: var(--misty-surface);
@@ -104,12 +96,57 @@
   --misty-semantic-warning: var(--misty-warning);
   --misty-semantic-danger: var(--misty-danger);
   --misty-semantic-info: var(--misty-info);
+  --radius: 0.625rem;
+  --background: var(--misty-semantic-background);
+  --foreground: var(--misty-semantic-text);
+  --card: var(--misty-component-surface);
+  --card-foreground: var(--misty-semantic-text);
+  --popover: var(--misty-component-surface);
+  --popover-foreground: var(--misty-semantic-text);
+  --primary: var(--misty-primary);
+  --primary-foreground: var(--misty-primary-contrast);
+  --secondary: var(--misty-component-surface-raised);
+  --secondary-foreground: var(--misty-semantic-text);
+  --muted: var(--misty-component-surface-raised);
+  --muted-foreground: var(--misty-semantic-text-muted);
+  --accent: var(--misty-component-surface-hover);
+  --accent-foreground: var(--misty-semantic-text);
+  --destructive: var(--misty-semantic-danger);
+  --destructive-foreground: var(--misty-primary-contrast);
+  --success: var(--misty-semantic-success);
+  --success-foreground: var(--misty-primary-contrast);
+  --warning: var(--misty-semantic-warning);
+  --warning-foreground: var(--misty-primary-contrast);
+  --info: var(--misty-semantic-info);
+  --info-foreground: var(--misty-primary-contrast);
+  --border: var(--misty-component-border);
+  --input: var(--misty-divider-strong);
+  --ring: var(--misty-semantic-focus);
+  --sidebar: var(--misty-nav-bg);
+  --sidebar-foreground: var(--misty-semantic-text-muted);
+  --sidebar-primary: var(--misty-primary);
+  --sidebar-primary-foreground: var(--misty-primary-contrast);
+  --sidebar-accent: var(--misty-sidebar-selected);
+  --sidebar-accent-foreground: var(--misty-semantic-text);
+  --sidebar-border: var(--misty-divider-subtle);
+  --sidebar-ring: var(--misty-semantic-focus);
   --misty-skeleton-base: var(--misty-surface-2);
   --misty-skeleton-highlight: var(--misty-surface-3);
-  --misty-radius-xs: 8px;
-  --misty-radius-sm: 10px;
-  --misty-radius-md: 12px;
-  --misty-radius-lg: 16px;
+  --misty-radius-xs: 6px;
+  --misty-radius-sm: 8px;
+  --misty-radius-md: 10px;
+  --misty-radius-lg: 14px;
+  --misty-control-height-compact: 2rem;
+  --misty-control-height-default: 2.25rem;
+  --misty-control-height-touch: 2.5rem;
+  --misty-layer-overlay: 2147483000;
+  --misty-layer-dialog: 2147483100;
+  --misty-layer-alert-overlay: 2147483200;
+  --misty-layer-alert-dialog: 2147483300;
+  --misty-layer-menu: 2147483400;
+  --misty-layer-popover: 2147483420;
+  --misty-layer-tooltip: 2147483500;
+  --misty-layer-toast: 2147483600;
   --misty-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --misty-transition-fast: 160ms var(--misty-ease-out);
   --misty-transition-page: 320ms var(--misty-ease-out);
@@ -130,21 +167,20 @@
   --misty-mobile-tabbar-height: 72px;
   --misty-route-margin: 18px;
   --misty-body-font-size: 15px;
-  --misty-font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  font-family: var(--misty-font-family);
-  width: 100%;
-  height: 100dvh;
-  min-width: 0;
-  min-height: 0;
-  overflow: hidden;
-  background: var(--misty-bg);
-  color: var(--misty-text);
+  --misty-font-family: "Outfit Variable", Outfit, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --misty-heading-font-family: "Inter Variable", Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --chart-1: oklch(0.871 0.006 286.286);
+  --chart-2: oklch(0.552 0.016 285.938);
+  --chart-3: oklch(0.442 0.017 285.786);
+  --chart-4: oklch(0.37 0.013 285.805);
+  --chart-5: oklch(0.274 0.006 286.033);
 }
 
 @theme inline {
   /* Existing utility classes now resolve through the runtime palette. */
-  --color-white: var(--misty-text);
-  --color-black: var(--misty-primary-contrast);
+  --font-sans: var(--misty-font-family);
+  --font-heading: var(--misty-heading-font-family);
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
   --color-zinc-50: var(--misty-text);
   --color-zinc-100: var(--misty-text);
   --color-zinc-200: var(--misty-primary);
@@ -171,6 +207,19 @@
   --color-emerald-400: var(--misty-success);
   --color-amber-300: var(--misty-warning);
   --color-amber-400: var(--misty-warning);
+  /* Legacy utility aliases stay runtime-aware while pages migrate to the
+     shadcn semantic names below. */
+  --color-bg: var(--misty-bg);
+  --color-surface: var(--misty-component-surface);
+  --color-elevated: var(--misty-component-surface-raised);
+  --color-border-subtle: var(--misty-component-border-subtle);
+  --color-text: var(--misty-text);
+  --color-text-muted: var(--misty-text-muted);
+  --color-text-secondary: var(--misty-text-muted);
+  --color-primary-hover: var(--misty-primary-hover);
+  --color-primary-active: var(--misty-primary-active);
+  --color-success-hover: color-mix(in srgb, var(--misty-success) 82%, white);
+  --color-danger-hover: color-mix(in srgb, var(--misty-danger) 82%, white);
   --color-misty-background: var(--misty-semantic-background);
   --color-misty-surface: var(--misty-semantic-surface);
   --color-misty-surface-raised: var(--misty-semantic-surface-raised);
@@ -185,43 +234,98 @@
   --color-misty-warning: var(--misty-semantic-warning);
   --color-misty-danger: var(--misty-semantic-danger);
   --color-misty-info: var(--misty-semantic-info);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 12px);
 }
 
 :root[data-theme="light"] {
   color-scheme: light;
-  --misty-bg: #f5f2ec;
-  --misty-bg-soft: #ede8df;
-  --misty-surface: #fffaf2;
-  --misty-surface-2: #f8f3eb;
-  --misty-surface-3: #ebe4d9;
-  --misty-dropdown-bg: #fffaf2;
-  --misty-surface-hover: #eee7dc;
-  --misty-surface-selected: #e3eaf2;
-  --misty-sidebar-selected: #e7edf4;
-  --misty-border: #d8cec0;
-  --misty-border-strong: #b9a997;
-  --misty-border-soft: rgba(49, 42, 34, 0.13);
-  --misty-content-frame-border: #b9a997;
-  --misty-text: #1b1a18;
-  --misty-text-muted: #5f594f;
-  --misty-text-subtle: #847a6c;
-  --misty-primary: #1f1e1c;
-  --misty-primary-hover: #0f0e0d;
-  --misty-primary-active: #37332e;
-  --misty-primary-contrast: #fffaf2;
-  --misty-accent: #246dc5;
-  --misty-success: #217447;
-  --misty-warning: #9a6a15;
-  --misty-danger: #b4444e;
-  --misty-shadow: rgba(68, 54, 35, 0.16);
-  --misty-focus-ring: rgba(36, 109, 197, 0.22);
-  --misty-glass: rgba(255, 250, 242, 0.9);
-  --misty-skeleton-base: #ece5da;
-  --misty-skeleton-highlight: #f7f1e8;
+  --misty-page-bg: oklch(0.967 0.001 286.375);
+  --misty-nav-bg: oklch(0.985 0 0);
+  --misty-bg: oklch(1 0 0);
+  --misty-bg-soft: oklch(0.985 0 0);
+  --misty-surface: oklch(1 0 0);
+  --misty-surface-2: oklch(0.967 0.001 286.375);
+  --misty-surface-3: oklch(0.92 0.004 286.32);
+  --misty-dropdown-bg: oklch(1 0 0);
+  --misty-surface-hover: oklch(0.967 0.001 286.375);
+  --misty-surface-selected: oklch(0.94 0.003 286.3);
+  --misty-sidebar-selected: oklch(0.967 0.001 286.375);
+  --misty-border: oklch(0.92 0.004 286.32);
+  --misty-border-strong: oklch(0.87 0.006 286.286);
+  --misty-border-soft: oklch(0.92 0.004 286.32 / 0.72);
+  --misty-content-frame-border: oklch(0.92 0.004 286.32);
+  --misty-divider-strong: oklch(0.92 0.004 286.32);
+  --misty-divider-default: oklch(0.92 0.004 286.32 / 0.78);
+  --misty-divider-subtle: oklch(0.92 0.004 286.32 / 0.5);
+  --misty-divider-hover: oklch(0.705 0.015 286.067 / 0.6);
+  --misty-text: oklch(0.141 0.005 285.823);
+  --misty-text-muted: oklch(0.552 0.016 285.938);
+  --misty-text-subtle: oklch(0.61 0.014 285.9);
+  --misty-primary: oklch(0.21 0.006 285.885);
+  --misty-primary-hover: oklch(0.274 0.006 286.033);
+  --misty-primary-active: oklch(0.37 0.013 285.805);
+  --misty-primary-contrast: oklch(0.985 0 0);
+  --misty-accent: oklch(0.552 0.016 285.938);
+  --misty-success: oklch(0.47 0.15 149.214);
+  --misty-warning: oklch(0.554 0.135 66.442);
+  --misty-danger: oklch(0.577 0.245 27.325);
+  --misty-info: oklch(0.546 0.19 248.18);
+  --misty-link: oklch(0.488 0.217 264.376);
+  --misty-selection: oklch(0.141 0.005 285.823 / 0.12);
+  --misty-shadow: oklch(0.141 0.005 285.823 / 0.1);
+  --misty-focus-ring: oklch(0.552 0.016 285.938 / 0.22);
+  --misty-glass: oklch(1 0 0 / 0.9);
+  --misty-skeleton-base: oklch(0.92 0.004 286.32);
+  --misty-skeleton-highlight: oklch(0.985 0 0);
 }
 
 :root[data-misty-theme="graphite"] {
   color-scheme: dark;
+  --misty-page-bg: #08090a;
+  --misty-nav-bg: #0d0f10;
   --misty-bg: #08090a;
   --misty-bg-soft: #0d0f10;
   --misty-surface: #111315;
@@ -262,6 +366,8 @@
 
 :root[data-misty-theme="aurora"] {
   color-scheme: dark;
+  --misty-page-bg: #071011;
+  --misty-nav-bg: #081416;
   --misty-bg: #071011;
   --misty-bg-soft: #0a1718;
   --misty-surface: #0d1b1d;
@@ -302,6 +408,8 @@
 
 :root[data-misty-theme="copper"] {
   color-scheme: dark;
+  --misty-page-bg: #120f0d;
+  --misty-nav-bg: #17110e;
   --misty-bg: #120f0d;
   --misty-bg-soft: #191411;
   --misty-surface: #1d1713;
@@ -360,64 +468,6 @@
   --misty-diff-changed: rgba(154, 106, 21, 0.14);
 }
 
-::selection {
-  background: var(--misty-selection);
-}
-
-.misty-code,
-code,
-pre {
-  background-color: var(--misty-code-bg);
-  border-color: var(--misty-code-border);
-}
-
-.misty-syntax,
-.hljs {
-  color: var(--misty-syntax-text);
-}
-
-.misty-syntax-comment,
-.hljs-comment {
-  color: var(--misty-syntax-comment);
-}
-
-.misty-syntax-keyword,
-.hljs-keyword {
-  color: var(--misty-syntax-keyword);
-}
-
-.misty-syntax-string,
-.hljs-string {
-  color: var(--misty-syntax-string);
-}
-
-.misty-syntax-number,
-.hljs-number {
-  color: var(--misty-syntax-number);
-}
-
-.misty-syntax-function,
-.hljs-title.function_,
-.hljs-function {
-  color: var(--misty-syntax-function);
-}
-
-.misty-syntax-type,
-.hljs-type,
-.hljs-built_in {
-  color: var(--misty-syntax-type);
-}
-
-.misty-syntax-variable,
-.hljs-variable {
-  color: var(--misty-syntax-variable);
-}
-
-.misty-syntax-operator,
-.hljs-operator {
-  color: var(--misty-syntax-operator);
-}
-
 :root[data-ui-scale="small"] {
   --misty-route-margin: 14px;
 }
@@ -434,395 +484,19 @@ pre {
   --misty-body-font-size: 16px;
 }
 
-:root[data-reduced-motion="true"] *,
-:root[data-reduced-motion="true"] *::before,
-:root[data-reduced-motion="true"] *::after {
-  animation-duration: 0.001ms !important;
-  animation-iteration-count: 1 !important;
-  scroll-behavior: auto !important;
-  transition-duration: 0.001ms !important;
-}
-
-* {
-  box-sizing: border-box;
-}
-
-body {
-  margin: 0;
-  width: 100%;
-  min-width: 0;
-  min-height: 0;
-  height: 100dvh;
-  overflow: hidden;
-  background: var(--misty-bg);
-  color: var(--misty-text);
-  font-size: var(--misty-body-font-size);
-}
-
-#root {
-  width: 100%;
-  height: 100%;
-  min-height: 0;
-  overflow: hidden;
-  background: var(--misty-bg);
-}
-
-/* Native desktop chrome does not scale with the webview. The app zoom hook
-   compensates this inset so fullscreen portals always begin below the titlebar. */
-:root[data-form-factor="desktop"] .fixed.inset-0 {
-  top: var(--misty-window-titlebar-inset);
-}
-
-button,
-input {
-  font: inherit;
-}
-
-:where([role="menu"], [role="listbox"]) {
-  background-color: var(--misty-dropdown-bg) !important;
-}
-
-:where(select, option, optgroup) {
-  background-color: var(--misty-dropdown-bg) !important;
-}
-
-button {
-  cursor: pointer;
-}
-
-h1,
-h2,
-p {
-  margin: 0;
-}
-
-h1 {
-  font-size: 32px;
-  line-height: 1.1;
-  font-weight: 650;
-}
-
-h2 {
-  font-size: 18px;
-  line-height: 1.2;
-  font-weight: 620;
-}
-
-p {
-  color: var(--misty-text-muted);
-  margin-top: 6px;
-}
-
-button:disabled,
-input:disabled {
-  cursor: not-allowed;
-  opacity: 0.58;
-}
-
-@keyframes shimmer {
-  to { background-position: -220% 0; }
-}
-
-@keyframes misty-skeleton-sweep {
-  from { transform: translateX(-115%); }
-  to { transform: translateX(115%); }
-}
-
-.misty-skeleton {
-  display: block;
-  position: relative;
-  overflow: hidden;
-  background: var(--misty-skeleton-base);
-}
-
-.misty-skeleton::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  transform: translateX(-115%);
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.11), transparent);
-  animation: misty-skeleton-sweep 1.15s ease-in-out infinite;
-}
-
-:root[data-theme="light"] .misty-skeleton::after {
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.56), transparent);
-}
-
-label {
-  display: grid;
-  gap: 6px;
-  color: var(--misty-text-muted);
-  text-transform: capitalize;
-}
-
-input {
-  width: 100%;
-  min-width: 0;
-  border: 1px solid var(--misty-border);
-  border-radius: 8px;
-  background: var(--misty-surface);
-  color: var(--misty-text);
-  padding: 9px 10px;
-}
-
-.misty-library-picker-search-row {
-  display: flex;
-  min-height: 60px;
-  align-items: center;
-  gap: 12px;
-  border-bottom: 1px solid var(--misty-divider-subtle);
-  padding: 10px 20px;
-}
-
-.misty-library-picker-search {
-  display: flex;
-  min-width: 0;
-  height: 40px;
-  flex: 1 1 auto;
-  align-items: center;
-  gap: 10px;
-  border: 1px solid var(--misty-border-soft);
-  border-radius: 10px;
-  background: var(--misty-surface-2);
-  padding: 0 12px;
-  color: var(--misty-text-subtle);
-  transition: border-color 120ms ease, box-shadow 120ms ease, background-color 120ms ease;
-}
-
-.misty-library-picker-search:focus-within {
-  border-color: var(--misty-border-strong);
-  background: var(--misty-neutral-control-bg, var(--misty-surface-2));
-  box-shadow: 0 0 0 2px var(--misty-focus-ring);
-}
-
-.misty-library-picker-search > svg {
-  flex: 0 0 auto;
-}
-
-.misty-library-picker-search > input {
-  width: 100%;
-  min-width: 0;
-  height: 100%;
-  border: 0;
-  border-radius: 0;
-  outline: 0;
-  background: transparent;
-  padding: 0;
-  color: var(--misty-text);
-  font-size: 14px;
-  line-height: 1;
-  text-transform: none;
-}
-
-.misty-library-picker-search > input::placeholder {
-  color: var(--misty-text-subtle);
-  opacity: 1;
-}
-
-.misty-library-picker-search-count {
-  flex: 0 0 auto;
-  color: var(--misty-text-subtle);
-  font-size: 12px;
-  line-height: 1;
-}
-
-@media (max-width: 560px) {
-  .misty-library-picker-search-row {
-    gap: 8px;
-    padding-inline: 12px;
-  }
-
-  .misty-library-picker-search-count {
-    display: none;
-  }
-}
-
-@media (max-width: 980px) {
-  body {
-    min-width: 0;
-  }
-}
-
 @media (max-width: 720px) {
   :root {
     --misty-route-margin: 0px;
     --misty-body-font-size: 14px;
   }
 
-  :root[data-theme="light"] {
-    color-scheme: dark;
-    --misty-bg: #070707;
-    --misty-bg-soft: #0c0c0c;
-    --misty-surface: #101010;
-    --misty-surface-2: #171717;
-    --misty-surface-3: #222222;
-    --misty-border: #313131;
-    --misty-border-soft: rgba(232, 232, 232, 0.1);
-    --misty-text: #f1f1f1;
-    --misty-text-muted: #b8b8b8;
-    --misty-text-subtle: #8c8c8c;
-    --misty-primary: #f1f1f1;
-    --misty-primary-contrast: #070707;
-    --misty-accent: #b7b7b7;
-    --misty-success: #b8b8b8;
-    --misty-warning: #bfbfbf;
-    --misty-danger: #b0b0b0;
-    --misty-shadow: rgba(0, 0, 0, 0.45);
-    --misty-focus-ring: rgba(183, 183, 183, 0.35);
-    --misty-glass: rgba(12, 12, 12, 0.9);
-  }
-
-  body,
-  #root {
-    height: 100dvh;
-  }
-
-  body {
-    min-height: 0;
-    overflow: hidden;
-    background: #070707;
-  }
-
 }
-
-:root[data-form-factor="mobile"],
-:root[data-form-factor="mobile"] body,
-:root[data-form-factor="mobile"] #root {
-  width: 100%;
-  height: 100dvh;
-  min-width: 0;
-  min-height: 0;
-  overflow: hidden;
-  background: #070707;
-  color: #f1f1f1;
-}
-
 :root[data-form-factor="mobile"] {
   --misty-window-titlebar-inset: 0px;
-  color-scheme: dark;
-  --misty-bg: #070707;
-  --misty-bg-soft: #0c0c0c;
-  --misty-surface: #101010;
-  --misty-surface-2: #171717;
-  --misty-surface-3: #222222;
-  --misty-border: #313131;
-  --misty-border-soft: rgba(232, 232, 232, 0.1);
-  --misty-text: #f1f1f1;
-  --misty-text-muted: #b8b8b8;
-  --misty-text-subtle: #8c8c8c;
-  --misty-accent: #b7b7b7;
-}
-
-/* Misty design-system application layer.
-   Keep new app/mobile surfaces on these tokens unless a feature needs a domain-specific accent. */
-:root[data-form-factor="mobile"],
-:root[data-form-factor="mobile"] body,
-:root[data-form-factor="mobile"] #root {
-  background: var(--misty-page-bg);
-  color: var(--misty-text);
-}
-
-:root[data-form-factor="mobile"] {
-  --misty-bg: #181818;
-  --misty-bg-soft: #090c10;
-  --misty-surface: #0b0d0f;
-  --misty-surface-2: #111317;
-  --misty-surface-3: #18181b;
-  --misty-surface-hover: #202126;
-  --misty-border: #27272a;
-  --misty-border-strong: rgba(255, 255, 255, 0.14);
-  --misty-border-soft: rgba(255, 255, 255, 0.08);
-  --misty-text: #ffffff;
-  --misty-text-muted: #d4d4d8;
-  --misty-text-subtle: #8f8f8f;
-  --misty-primary: #e4e4e7;
-  --misty-primary-hover: #f4f4f5;
-  --misty-primary-active: #d4d4d8;
-  --misty-primary-contrast: #07090b;
-  --misty-accent: #e4e4e7;
-  --misty-focus-ring: rgba(244, 244, 245, 0.18);
-  --misty-glass: rgba(11, 13, 15, 0.88);
 }
 
 /* Compact mobile surface pass: keep the app readable, but remove decorative card stacks. */
 :root[data-form-factor="mobile"] {
   --misty-mobile-page-top: 10px;
   --misty-mobile-page-bottom: 12px;
-}
-
-/* Shared image-editor ranges use an explicit track so WebKit's accent fill never
-   paints beyond the thumb at either endpoint. */
-.global-image-editor-range {
-  --editor-range-progress: 0%;
-  appearance: none;
-  -webkit-appearance: none;
-  height: 20px;
-  cursor: pointer;
-  background: transparent;
-}
-
-.global-image-editor-range::-webkit-slider-runnable-track {
-  height: 4px;
-  border-radius: 999px;
-  background: linear-gradient(
-    to right,
-    rgba(245, 247, 250, 0.96) 0 var(--editor-range-progress),
-    rgba(255, 255, 255, 0.16) var(--editor-range-progress) 100%
-  );
-}
-
-.global-image-editor-range::-webkit-slider-thumb {
-  appearance: none;
-  -webkit-appearance: none;
-  width: 18px;
-  height: 18px;
-  margin-top: -7px;
-  border: 1px solid rgba(0, 0, 0, 0.22);
-  border-radius: 999px;
-  background: #f7f8fa;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
-}
-
-.global-image-editor-range::-moz-range-track {
-  height: 4px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.16);
-}
-
-.global-image-editor-range::-moz-range-progress {
-  height: 4px;
-  border-radius: 999px;
-  background: rgba(245, 247, 250, 0.96);
-}
-
-.global-image-editor-range::-moz-range-thumb {
-  width: 18px;
-  height: 18px;
-  border: 1px solid rgba(0, 0, 0, 0.22);
-  border-radius: 999px;
-  background: #f7f8fa;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
-}
-
-.global-image-editor-range:focus-visible {
-  outline: 2px solid rgba(255, 255, 255, 0.45);
-  outline-offset: 2px;
-  border-radius: 999px;
-}
-
-html[data-explorer-dragging="true"],
-html[data-explorer-dragging="true"] * {
-  -webkit-user-select: none !important;
-  user-select: none !important;
-  -webkit-user-drag: none !important;
-}
-
-[data-explorer-drop-active="true"] {
-  background-image: linear-gradient(120deg, rgba(126, 133, 145, 0.16), rgba(82, 88, 98, 0.08), rgba(126, 133, 145, 0.14)) !important;
-  box-shadow: inset 0 0 0 1px rgba(143, 150, 161, 0.2);
-}
-
-[data-explorer-drop-active="true"] > button {
-  background-image: linear-gradient(120deg, rgba(126, 133, 145, 0.18), rgba(82, 88, 98, 0.1), rgba(126, 133, 145, 0.16)) !important;
-  box-shadow: inset 0 0 0 1px rgba(143, 150, 161, 0.22);
 }

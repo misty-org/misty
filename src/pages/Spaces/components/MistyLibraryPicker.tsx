@@ -1,9 +1,23 @@
-import { useEffect, useId, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
-import { BookOpenText, Check, File, Image, Music2, Search, Video, X } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { BookOpenText, Check, File, Image, Music2, Search, Video } from "lucide-react";
+
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Skeleton } from "@/components/ui/skeleton";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { cn } from "@/lib/utils";
 import { spacesApi } from "../../../spaces/api";
 import type { SpaceLibraryItem } from "../../../spaces/types";
-import { useDialogFocus } from "../../../shared/hooks/useDialogFocus";
 
 type LibraryMediaFilter = "all" | "image" | "video" | "audio" | "document";
 
@@ -15,12 +29,21 @@ interface MistyLibraryPickerProps {
   onChoose: (itemIds: string[]) => void;
 }
 
-const pickerControlClass = "inline-grid place-items-center rounded-lg border border-[var(--misty-border-soft)] bg-[var(--misty-neutral-control-bg,var(--misty-surface-2))] text-[var(--misty-text-muted)] transition-colors hover:bg-[var(--misty-neutral-hover-bg,var(--misty-surface-3))] hover:text-[var(--misty-text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30 disabled:cursor-default disabled:opacity-35";
+const filters: Array<{ value: LibraryMediaFilter; label: string; icon: typeof File }> = [
+  { value: "all", label: "All items", icon: File },
+  { value: "image", label: "Images", icon: Image },
+  { value: "video", label: "Videos", icon: Video },
+  { value: "audio", label: "Audio", icon: Music2 },
+  { value: "document", label: "Documents", icon: File },
+];
 
-export function MistyLibraryPicker({ spaceId, selectedIds, maximumSelected = 5, onCancel, onChoose }: MistyLibraryPickerProps) {
-  const pickerDialog = useDialogFocus<HTMLElement>(true);
-  const titleId = useId();
-  const descriptionId = useId();
+export function MistyLibraryPicker({
+  spaceId,
+  selectedIds,
+  maximumSelected = 5,
+  onCancel,
+  onChoose,
+}: MistyLibraryPickerProps) {
   const [items, setItems] = useState<SpaceLibraryItem[]>([]);
   const [selection, setSelection] = useState<string[]>(selectedIds.slice(0, maximumSelected));
   const [query, setQuery] = useState("");
@@ -32,13 +55,12 @@ export function MistyLibraryPicker({ spaceId, selectedIds, maximumSelected = 5, 
     let current = true;
     setLoading(true);
     setError("");
-    void spacesApi.libraryItems(spaceId, { limit: 200, sort: "recently-added" }).then((result) => {
-      if (current) setItems(result.items);
-    }).catch((nextError: unknown) => {
-      if (current) setError(nextError instanceof Error ? nextError.message : "Library items could not be loaded.");
-    }).finally(() => {
-      if (current) setLoading(false);
-    });
+    void spacesApi.libraryItems(spaceId, { limit: 200, sort: "recently-added" })
+      .then((result) => { if (current) setItems(result.items); })
+      .catch((nextError: unknown) => {
+        if (current) setError(nextError instanceof Error ? nextError.message : "Library items could not be loaded.");
+      })
+      .finally(() => { if (current) setLoading(false); });
     return () => { current = false; };
   }, [spaceId]);
 
@@ -47,10 +69,14 @@ export function MistyLibraryPicker({ spaceId, selectedIds, maximumSelected = 5, 
     return items.filter((item) => {
       const mime = libraryPickerItemMIME(item);
       const matchesMedia = mediaFilter === "all"
-        || mediaFilter === "document" && !/^(image|video|audio)\//.test(mime)
-        || mediaFilter !== "document" && mime.startsWith(`${mediaFilter}/`);
+        || (mediaFilter === "document" && !/^(image|video|audio)\//.test(mime))
+        || (mediaFilter !== "document" && mime.startsWith(`${mediaFilter}/`));
       if (!matchesMedia) return false;
-      return !normalizedQuery || [item.display_name, item.file.original_filename, item.tags.join(" ")].join(" ").toLocaleLowerCase().includes(normalizedQuery);
+      return !normalizedQuery
+        || [item.display_name, item.file.original_filename, item.tags.join(" ")]
+          .join(" ")
+          .toLocaleLowerCase()
+          .includes(normalizedQuery);
     });
   }, [items, mediaFilter, query]);
 
@@ -60,68 +86,130 @@ export function MistyLibraryPicker({ spaceId, selectedIds, maximumSelected = 5, 
       : current.length < maximumSelected ? [...current, itemId] : current);
   };
 
-  const handleDialogKeyDown = (event: React.KeyboardEvent) => {
-    if (event.key === "Escape") {
-      event.preventDefault();
-      onCancel();
-      return;
-    }
-    if (event.key !== "Tab" || !pickerDialog.dialogRef.current) return;
-    const focusable = Array.from(pickerDialog.dialogRef.current.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), [tabindex]:not([tabindex="-1"])'));
-    if (focusable.length === 0) return;
-    const first = focusable[0];
-    const last = focusable[focusable.length - 1];
-    if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
-    else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
-  };
-
-  const picker = (
-    <div className="fixed bottom-0 left-[72px] right-0 top-[var(--misty-window-titlebar-inset)] z-[2147483100] grid place-items-center bg-black/60 p-6 backdrop-blur-md max-[800px]:left-0 max-[800px]:p-3 max-[560px]:p-0" role="presentation" onKeyDown={handleDialogKeyDown}>
-      <section ref={pickerDialog.dialogRef} tabIndex={-1} className="grid h-[min(680px,calc(100vh-88px))] w-[min(1100px,calc(100vw-140px))] grid-rows-[auto_auto_minmax(0,1fr)_auto] overflow-hidden rounded-2xl border border-[var(--misty-border)] bg-[var(--misty-app-modal-bg,var(--misty-surface))] text-[var(--misty-text)] shadow-2xl outline-none max-[800px]:size-full max-[560px]:rounded-none" role="dialog" aria-modal="true" aria-labelledby={titleId} aria-describedby={descriptionId}>
-        <header className="flex min-h-[76px] items-center justify-between gap-4 border-b border-[var(--misty-border-soft)] px-5">
-          <div className="flex min-w-0 items-center gap-3"><span className="grid size-10 shrink-0 place-items-center rounded-xl bg-[var(--misty-surface-2)] text-[var(--misty-text-muted)]"><BookOpenText size={20}/></span><div><h2 className="m-0 text-[17px] font-semibold" id={titleId}>Choose from Library</h2><p className="mb-0 mt-1 text-xs leading-relaxed text-[var(--misty-text-subtle)]" id={descriptionId}>Select Library items to reference in this message.</p></div></div>
-          <button type="button" className={`${pickerControlClass} size-[38px] shrink-0`} aria-label="Close picker" onClick={onCancel}><X size={18}/></button>
-        </header>
-
-        <div className="misty-library-picker-search-row">
-          <div className="misty-library-picker-search" role="search">
-            <Search aria-hidden="true" size={16}/>
-            <input aria-label="Search Library" autoComplete="off" data-dialog-autofocus spellCheck={false} value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search names, filenames, and tags"/>
+  return (
+    <Dialog open onOpenChange={(open) => { if (!open) onCancel(); }}>
+      <DialogContent className="grid h-[min(720px,calc(100vh-48px))] w-[min(1120px,calc(100vw-48px))] max-w-none grid-rows-[auto_auto_minmax(0,1fr)_auto] gap-0 overflow-hidden p-0 max-sm:h-[calc(100vh-var(--misty-window-titlebar-inset))] max-sm:w-screen max-sm:rounded-none">
+        <DialogHeader className="border-b border-border/60 px-6 py-4 pr-14 text-left">
+          <div className="flex items-center gap-3">
+            <span className="grid size-10 shrink-0 place-items-center rounded-lg bg-muted/60 text-muted-foreground">
+              <BookOpenText className="size-5" />
+            </span>
+            <div className="min-w-0">
+              <DialogTitle>Choose from Library</DialogTitle>
+              <DialogDescription className="mt-1">Select Library items to reference in this message.</DialogDescription>
+            </div>
           </div>
-          <span className="misty-library-picker-search-count">{filteredItems.length} item{filteredItems.length === 1 ? "" : "s"}</span>
+        </DialogHeader>
+
+        <div className="flex min-h-14 items-center gap-3 border-b border-border/60 px-5 py-2.5">
+          <div className="flex h-9 min-w-0 flex-1 items-center gap-2 rounded-md border border-border/80 bg-background px-3 text-muted-foreground focus-within:ring-1 focus-within:ring-ring" role="search">
+            <Search aria-hidden="true" className="size-4" />
+            <Input
+              className="h-full border-0 bg-transparent p-0 shadow-none focus-visible:ring-0"
+              aria-label="Search Library"
+              autoComplete="off"
+              autoFocus
+              spellCheck={false}
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Search names, filenames, and tags"
+            />
+          </div>
+          <Badge variant="secondary" className="shrink-0 font-normal max-sm:hidden">
+            {filteredItems.length} item{filteredItems.length === 1 ? "" : "s"}
+          </Badge>
         </div>
 
-        <div className="grid min-h-0 grid-cols-[220px_minmax(0,1fr)] max-[760px]:grid-cols-1">
-          <aside className="min-h-0 overflow-y-auto border-r border-[var(--misty-divider-subtle)] p-3 max-[760px]:hidden">
-            <p className="mb-2 mt-1 px-2 text-[10px] font-semibold capitalize text-[var(--misty-text-subtle)]">Media</p>
-            {(["all", "image", "video", "audio", "document"] as LibraryMediaFilter[]).map((filter) => {
-              const Icon = filter === "image" ? Image : filter === "video" ? Video : filter === "audio" ? Music2 : File;
-              return <button className={`mb-1 flex w-full items-center gap-2.5 rounded-lg border-0 px-2.5 py-2 text-left text-xs ${mediaFilter === filter ? "bg-[var(--misty-surface-2)] text-[var(--misty-text)]" : "bg-transparent text-[var(--misty-text-muted)] hover:bg-[var(--misty-surface-2)]"}`} type="button" key={filter} onClick={() => setMediaFilter(filter)}><Icon size={15}/><span>{filter === "all" ? "All items" : filter[0].toUpperCase() + filter.slice(1)}</span></button>;
-            })}
+        <div className="grid min-h-0 grid-cols-[196px_minmax(0,1fr)] max-md:grid-cols-1">
+          <aside className="min-h-0 border-r border-border/60 bg-muted/20 p-3 max-md:border-b max-md:border-r-0">
+            <p className="mb-2 px-2 text-xs font-medium text-muted-foreground max-md:hidden">Media</p>
+            <ToggleGroup
+              className="grid w-full gap-1 max-md:flex max-md:justify-start max-md:overflow-x-auto"
+              type="single"
+              value={mediaFilter}
+              onValueChange={(value) => { if (value) setMediaFilter(value as LibraryMediaFilter); }}
+              aria-label="Filter Library media"
+            >
+              {filters.map((filter) => {
+                const Icon = filter.icon;
+                return (
+                  <ToggleGroupItem
+                    className="h-9 w-full justify-start gap-2 border-0 px-2.5 text-sm max-md:w-auto max-md:shrink-0"
+                    key={filter.value}
+                    value={filter.value}
+                  >
+                    <Icon className="size-4" />
+                    {filter.label}
+                  </ToggleGroupItem>
+                );
+              })}
+            </ToggleGroup>
           </aside>
 
-          <main className="min-h-0 overflow-y-auto bg-[var(--misty-app-page-bg,var(--misty-bg))] p-4">
-            {loading ? <div className="grid h-full min-h-48 place-items-center text-sm text-[var(--misty-text-subtle)]">Loading Library…</div> : error ? <div className="grid h-full min-h-48 place-items-center px-8 text-center text-sm text-red-200">{error}</div> : filteredItems.length === 0 ? <div className="grid h-full min-h-48 place-items-center text-sm text-[var(--misty-text-subtle)]">No matching Library items.</div> : <div className="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-3">{filteredItems.map((item) => {
-              const selected = selection.includes(item.id);
-              const unavailable = !selected && selection.length >= maximumSelected;
-              return <button className={`group relative overflow-hidden rounded-xl border text-left transition-colors ${selected ? "border-[var(--misty-primary)] bg-[var(--misty-surface-2)]" : "border-[var(--misty-border-soft)] bg-[var(--misty-app-panel-bg,var(--misty-app-page-bg,var(--misty-bg)))] hover:border-[var(--misty-border-strong)]"} disabled:opacity-45`} type="button" key={item.id} disabled={unavailable} aria-pressed={selected} onClick={() => toggleItem(item.id)}>
-                <span className="grid aspect-[4/3] w-full place-items-center overflow-hidden bg-black/20"><MistyLibraryPickerThumbnail spaceId={spaceId} item={item}/></span>
-                <span className="block min-w-0 px-3 py-2.5"><span className="block truncate text-xs font-medium text-[var(--misty-text)]">{item.display_name}</span><span className="mt-1 block truncate text-[10px] text-[var(--misty-text-subtle)]">{item.file.original_filename}</span></span>
-                <span className={`absolute right-2 top-2 grid size-6 place-items-center rounded-full border ${selected ? "border-[var(--misty-primary)] bg-[var(--misty-primary)] text-[var(--misty-primary-contrast)]" : "border-white/25 bg-black/45 text-transparent group-hover:text-white/40"}`}><Check size={13}/></span>
-              </button>;
-            })}</div>}
-          </main>
+          <ScrollArea className="min-h-0 bg-background">
+            <main className="p-4">
+              {loading ? (
+                <div className="grid grid-cols-[repeat(auto-fill,minmax(148px,1fr))] gap-3" aria-label="Loading Library">
+                  {Array.from({ length: 10 }, (_, index) => <Skeleton className="aspect-[4/5] rounded-lg" key={index} />)}
+                </div>
+              ) : error ? (
+                <div className="grid min-h-64 place-items-center px-8 text-center">
+                  <div><p className="text-sm font-medium">Library could not be loaded</p><p className="mt-1 text-sm text-destructive">{error}</p></div>
+                </div>
+              ) : filteredItems.length === 0 ? (
+                <div className="grid min-h-64 place-items-center text-center">
+                  <div><Search className="mx-auto size-8 text-muted-foreground" /><p className="mt-3 text-sm font-medium">No matching Library items</p><p className="mt-1 text-sm text-muted-foreground">Try another search or media type.</p></div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-[repeat(auto-fill,minmax(148px,1fr))] gap-3">
+                  {filteredItems.map((item) => {
+                    const selected = selection.includes(item.id);
+                    const unavailable = !selected && selection.length >= maximumSelected;
+                    return (
+                      <Button
+                        className={cn(
+                          "group relative h-auto flex-col items-stretch justify-start overflow-hidden whitespace-normal rounded-lg p-0 text-left shadow-xs",
+                          selected ? "border-primary bg-primary/5 ring-1 ring-primary" : "border-border/60 bg-card hover:bg-accent/40",
+                        )}
+                        variant="outline"
+                        type="button"
+                        key={item.id}
+                        disabled={unavailable}
+                        aria-pressed={selected}
+                        onClick={() => toggleItem(item.id)}
+                      >
+                        <span className="grid aspect-[4/3] w-full place-items-center overflow-hidden border-b border-border/60 bg-muted">
+                          <MistyLibraryPickerThumbnail spaceId={spaceId} item={item} />
+                        </span>
+                        <span className="block min-w-0 px-3 py-2.5">
+                          <span className="block truncate text-xs font-medium">{item.display_name}</span>
+                          <span className="mt-1 block truncate text-[11px] font-normal text-muted-foreground">{item.file.original_filename}</span>
+                        </span>
+                        <span className={cn(
+                          "absolute right-2 top-2 grid size-6 place-items-center rounded-full border shadow-xs",
+                          selected ? "border-primary bg-primary text-primary-foreground" : "border-white/30 bg-black/50 text-transparent group-hover:text-white/50",
+                        )}>
+                          <Check className="size-3.5" />
+                        </span>
+                      </Button>
+                    );
+                  })}
+                </div>
+              )}
+            </main>
+          </ScrollArea>
         </div>
 
-        <footer className="flex min-h-[72px] items-center justify-between gap-5 border-t border-[var(--misty-border-soft)] px-[18px]">
-          <div className="grid min-w-0 gap-1"><span className="text-[10px] capitalize text-[var(--misty-text-subtle)]">Library Items</span><strong className="truncate text-xs font-semibold text-[var(--misty-text-muted)]">{selection.length} of {maximumSelected} selected</strong></div>
-          <div className="ml-auto flex shrink-0 gap-2"><button type="button" className="inline-flex min-h-10 items-center justify-center rounded-lg border border-[var(--misty-border-soft)] bg-[var(--misty-neutral-control-bg,var(--misty-surface-2))] px-4 text-[13px] text-[var(--misty-text-muted)] hover:bg-[var(--misty-neutral-hover-bg,var(--misty-surface-3))] hover:text-[var(--misty-text)]" onClick={onCancel}>Cancel</button><button type="button" className="inline-flex min-h-10 items-center justify-center rounded-lg border border-[var(--misty-border-strong)] bg-[var(--misty-primary)] px-4 text-[13px] font-semibold text-[var(--misty-primary-contrast)] hover:bg-[var(--misty-primary-hover)] disabled:opacity-45" disabled={loading || selection.length === 0} onClick={() => onChoose(selection)}>Add {selection.length} item{selection.length === 1 ? "" : "s"}</button></div>
-        </footer>
-      </section>
-    </div>
+        <DialogFooter className="flex-row items-center justify-between gap-4 border-t border-border/60 px-5 py-3 sm:justify-between">
+          <p className="text-sm text-muted-foreground"><strong className="font-medium text-foreground">{selection.length}</strong> of {maximumSelected} selected</p>
+          <div className="flex gap-2">
+            <Button type="button" variant="outline" onClick={onCancel}>Cancel</Button>
+            <Button type="button" disabled={loading || selection.length === 0} onClick={() => onChoose(selection)}>Add {selection.length || ""} item{selection.length === 1 ? "" : "s"}</Button>
+          </div>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
-
-  return typeof document === "undefined" ? null : createPortal(picker, document.body);
 }
 
 function MistyLibraryPickerThumbnail({ spaceId, item }: { spaceId: string; item: SpaceLibraryItem }) {
@@ -157,7 +245,7 @@ function MistyLibraryPickerThumbnail({ spaceId, item }: { spaceId: string; item:
   }, [item.id, item.version, previewable, spaceId, visible]);
 
   const Icon = mime.startsWith("image/") ? Image : mime.startsWith("video/") ? Video : mime.startsWith("audio/") ? Music2 : File;
-  return <span ref={rootRef} className="grid size-full place-items-center text-[var(--misty-text-subtle)]">{url ? <img className="size-full object-cover" src={url} alt=""/> : <Icon size={28}/>}</span>;
+  return <span ref={rootRef} className="grid size-full place-items-center text-muted-foreground">{url ? <img className="size-full object-cover" src={url} alt="" /> : <Icon className="size-7" />}</span>;
 }
 
 function libraryPickerItemMIME(item: SpaceLibraryItem): string {

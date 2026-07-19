@@ -1,3 +1,4 @@
+import { Button } from "../../../components/ui/button";
 import { Columns2, PanelTopClose, Rows2 } from "lucide-react";
 import { memo, useCallback, useEffect, useMemo } from "react";
 import { useShallow } from "zustand/react/shallow";
@@ -281,7 +282,7 @@ const ExplorerPaneControls = memo(function ExplorerPaneControls(props: { paneId:
 
   return (
     <>
-      <button
+      <Button
         className={explorerShellStyles.paneActionButton}
         type="button"
         title="Split vertically"
@@ -289,8 +290,8 @@ const ExplorerPaneControls = memo(function ExplorerPaneControls(props: { paneId:
         disabled={!canSplit}
       >
         <Columns2 size={15} />
-      </button>
-      <button
+      </Button>
+      <Button
         className={explorerShellStyles.paneActionButton}
         type="button"
         title="Split horizontally"
@@ -298,8 +299,8 @@ const ExplorerPaneControls = memo(function ExplorerPaneControls(props: { paneId:
         disabled={!canSplit}
       >
         <Rows2 size={15} />
-      </button>
-      <button
+      </Button>
+      <Button
         className={explorerShellStyles.paneActionButton}
         type="button"
         title="Close pane"
@@ -307,7 +308,7 @@ const ExplorerPaneControls = memo(function ExplorerPaneControls(props: { paneId:
         disabled={!canClose}
       >
         <PanelTopClose size={15} />
-      </button>
+      </Button>
     </>
   );
 });

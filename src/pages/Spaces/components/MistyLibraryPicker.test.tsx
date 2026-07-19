@@ -32,7 +32,7 @@ describe("MistyLibraryPicker", () => {
       await Promise.resolve();
     });
 
-    const search = document.body.querySelector('[role="search"].misty-library-picker-search');
+    const search = document.body.querySelector('[role="search"]');
     expect(search?.querySelector("svg")).not.toBeNull();
     expect(search?.querySelector('input[aria-label="Search Library"]')).not.toBeNull();
     expect(search?.closest("label")).toBeNull();

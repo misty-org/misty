@@ -18,22 +18,19 @@ export function resolveRuntimeAssetReference(
 ): string {
   const relativePath = runtimeAssetPath(reference);
   if (relativePath === null) return reference;
-  return runtimeAssetSource(
-    assetsDir,
-    relativePath,
-    "",
-  );
+  return runtimeAssetSource(assetsDir, relativePath);
 }
 
 export function runtimeAssetSource(
   assetsDir: string | null | undefined,
   relativePath: string,
-  fallback: string,
 ): string {
   const base = assetsDir?.trim().replace(/[\\/]+$/, "");
   const relative = relativePath.trim().replace(/^[\\/]+/, "");
-  if (!base || !relative || !isAbsoluteRuntimeAssetsDirectory(base)) return fallback;
-  return safeTauriAssetUrl(`${base}/${relative}`);
+  if (!base || !relative || !isAbsoluteRuntimeAssetsDirectory(base)) return "";
+  const separator = base.includes("\\") ? "\\" : "/";
+  const normalizedRelative = relative.replace(/[\\/]+/g, separator);
+  return safeTauriAssetUrl(`${base}${separator}${normalizedRelative}`);
 }
 
 function isAbsoluteRuntimeAssetsDirectory(path: string): boolean {
@@ -41,12 +38,14 @@ function isAbsoluteRuntimeAssetsDirectory(path: string): boolean {
   return path.startsWith("/") || path.startsWith("\\\\") || /^[a-z]:[\\/]/i.test(path);
 }
 
-export function restoreBundledAssetOnError(
+export function hideRuntimeAssetOnError(
   event: SyntheticEvent<HTMLImageElement>,
-  fallback: string,
 ): void {
-  const image = event.currentTarget;
-  if (image.dataset.bundledFallbackApplied === "true") return;
-  image.dataset.bundledFallbackApplied = "true";
-  image.src = fallback;
+  event.currentTarget.style.visibility = "hidden";
+}
+
+export function revealRuntimeAssetOnLoad(
+  event: SyntheticEvent<HTMLImageElement>,
+): void {
+  event.currentTarget.style.visibility = "";
 }

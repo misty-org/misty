@@ -1,9 +1,35 @@
 import { useCallback, useMemo, useState } from "react";
-import { createPortal } from "react-dom";
+import { Badge } from "@/components/ui/badge";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { validateBatchRenameItems, useExplorerStore } from "../../../stores/useExplorerStore";
 import type { ExplorerBatchRenameItem, ExplorerDialogState } from "../../../stores/useExplorerStore";
-import { cx } from "./ExplorerDesktopShared";
-import { dialogStyles } from "./ExplorerDesktopDialogStyles";
 
 type BatchRenameCaseMode = "none" | "lower" | "upper" | "title";
 interface BatchRenameOptions {
@@ -18,6 +44,15 @@ interface BatchRenameOptions {
   sequencePad: number;
   manualValues: Record<string, string>;
 }
+
+const dialogChromeClass = "flex max-h-[min(760px,calc(100vh-48px))] w-[min(720px,calc(100vw-48px))] max-w-none flex-col overflow-hidden bg-popover p-0 text-popover-foreground";
+const dialogWideClass = "w-[min(940px,calc(100vw-48px))]";
+const fieldClass = "grid gap-1.5 text-xs font-medium text-muted-foreground";
+const controlsClass = "grid grid-cols-4 gap-3 border-b border-border p-4 max-[820px]:grid-cols-2";
+const toggleClass = "flex min-h-9 items-center gap-2 rounded-md bg-muted/50 px-3 text-xs font-medium text-foreground";
+const listClass = "min-h-0 overflow-auto px-4 py-3";
+const rowClass = "grid grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] gap-3 border-b border-border py-2.5 text-xs last:border-0";
+const rowInvalidClass = "rounded-md border border-destructive/25 bg-destructive/10 px-2";
 
 function batchRenameItemKey(item: ExplorerBatchRenameItem): string {
   return `${item.paneId}:${item.entryId}`;
@@ -101,66 +136,64 @@ function BatchRenameDialog(props: {
     void store.confirmDialog();
   }, [dialog.paneId, previewItems]);
 
-  return createPortal(
-    <div className={dialogStyles.backdrop} role="presentation">
+  return (
+    <Dialog open onOpenChange={(open) => { if (!open) useExplorerStore.getState().closeDialog(); }}>
+      <DialogContent className={`${dialogChromeClass} ${dialogWideClass}`}>
       <form
-        className={cx(dialogStyles.dialog, dialogStyles.wide)}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="explorer-dialog-title"
-        onPointerDown={(event) => event.stopPropagation()}
+        className="contents"
         onSubmit={(event) => {
           event.preventDefault();
           applyPreview();
         }}
       >
-        <header className={dialogStyles.batchHeader}>
+        <DialogHeader className="grid grid-cols-[1fr_auto] items-start gap-4 border-b border-border px-5 py-4 text-left">
           <div>
-            <h2 className={dialogStyles.title} id="explorer-dialog-title">Batch Rename</h2>
-            <p className={dialogStyles.text}>{readyCount} ready, {unchangedCount} unchanged, {invalidCount} need fixes.</p>
+            <DialogTitle>Batch Rename</DialogTitle>
+            <DialogDescription>{readyCount} ready, {unchangedCount} unchanged, {invalidCount} need fixes.</DialogDescription>
           </div>
-          <span className={dialogStyles.batchBadge}>{invalidCount > 0 ? `${invalidCount} need fixes` : `${previewItems.length} selected`}</span>
-        </header>
-        <div className={dialogStyles.batchControls}>
-          <label className={dialogStyles.batchField}>
+          <Badge variant={invalidCount > 0 ? "destructive" : "secondary"}>{invalidCount > 0 ? `${invalidCount} need fixes` : `${previewItems.length} selected`}</Badge>
+        </DialogHeader>
+        <div className={controlsClass}>
+          <label className={fieldClass}>
             <span>Find</span>
-            <input className={dialogStyles.input} value={findText} autoComplete="off" onChange={(event) => setFindText(event.target.value)} />
+            <Input value={findText} autoComplete="off" onChange={(event) => setFindText(event.target.value)} />
           </label>
-          <label className={dialogStyles.batchField}>
+          <label className={fieldClass}>
             <span>Replace</span>
-            <input className={dialogStyles.input} value={replaceText} autoComplete="off" onChange={(event) => setReplaceText(event.target.value)} />
+            <Input value={replaceText} autoComplete="off" onChange={(event) => setReplaceText(event.target.value)} />
           </label>
-          <label className={dialogStyles.batchField}>
+          <label className={fieldClass}>
             <span>Prefix</span>
-            <input className={dialogStyles.input} value={prefix} autoComplete="off" onChange={(event) => setPrefix(event.target.value)} />
+            <Input value={prefix} autoComplete="off" onChange={(event) => setPrefix(event.target.value)} />
           </label>
-          <label className={dialogStyles.batchField}>
+          <label className={fieldClass}>
             <span>Suffix</span>
-            <input className={dialogStyles.input} value={suffix} autoComplete="off" onChange={(event) => setSuffix(event.target.value)} />
+            <Input value={suffix} autoComplete="off" onChange={(event) => setSuffix(event.target.value)} />
           </label>
-          <label className={dialogStyles.batchField}>
+          <label className={fieldClass}>
             <span>Case</span>
-            <select className={dialogStyles.batchSelect} value={caseMode} onChange={(event) => setCaseMode(event.target.value as BatchRenameCaseMode)}>
-              <option value="none">Unchanged</option>
-              <option value="lower">lowercase</option>
-              <option value="upper">UPPERCASE</option>
-              <option value="title">Title Case</option>
-            </select>
+            <Select value={caseMode} onValueChange={(value) => setCaseMode(value as BatchRenameCaseMode)}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">Unchanged</SelectItem>
+                <SelectItem value="lower">lowercase</SelectItem>
+                <SelectItem value="upper">UPPERCASE</SelectItem>
+                <SelectItem value="title">Title Case</SelectItem>
+              </SelectContent>
+            </Select>
           </label>
-          <label className={dialogStyles.batchField}>
+          <label className={fieldClass}>
             <span>Start</span>
-            <input
-              className={dialogStyles.input}
+            <Input
               type="number"
               min={0}
               value={sequenceStart}
               onChange={(event) => setSequenceStart(Number.parseInt(event.target.value, 10) || 0)}
             />
           </label>
-          <label className={dialogStyles.batchField}>
+          <label className={fieldClass}>
             <span>Pad</span>
-            <input
-              className={dialogStyles.input}
+            <Input
               type="number"
               min={1}
               max={8}
@@ -168,48 +201,42 @@ function BatchRenameDialog(props: {
               onChange={(event) => setSequencePad(Math.min(8, Math.max(1, Number.parseInt(event.target.value, 10) || 1)))}
             />
           </label>
-          <label className={dialogStyles.batchToggle}>
-            <input className={dialogStyles.batchCheckbox} type="checkbox" checked={sequenceEnabled} onChange={(event) => setSequenceEnabled(event.target.checked)} />
+          <label className={toggleClass}>
+            <Checkbox checked={sequenceEnabled} onCheckedChange={(checked) => setSequenceEnabled(Boolean(checked))} />
             <span>Number suffix</span>
           </label>
-          <label className={dialogStyles.batchToggle}>
-            <input
-              className={dialogStyles.batchCheckbox}
-              type="checkbox"
+          <label className={toggleClass}>
+            <Checkbox
               checked={lockExtensions}
-              onChange={(event) => {
+              onCheckedChange={(checked) => {
                 setManualValues({});
-                setLockExtensions(event.target.checked);
+                setLockExtensions(Boolean(checked));
               }}
             />
             <span>Lock extensions</span>
           </label>
         </div>
-        <div className={dialogStyles.batchHead} aria-hidden="true">
+        <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] gap-3 border-b border-border px-4 py-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground" aria-hidden="true">
           <span>Before</span>
           <span>After</span>
         </div>
-        <div className={dialogStyles.batchList}>
+        <div className={listClass}>
           {previewItems.map((item, index) => (
-            <label className={cx(dialogStyles.batchRow, item.error && dialogStyles.batchRowInvalid)} key={batchRenameItemKey(item)}>
-              <span className={dialogStyles.batchBefore} title={item.originalName}>{item.originalName}</span>
+            <label className={`${rowClass} ${item.error ? rowInvalidClass : ""}`} key={batchRenameItemKey(item)}>
+              <span className="truncate text-muted-foreground" title={item.originalName}>{item.originalName}</span>
               <div>
-                <div className={dialogStyles.batchInputWrap}>
-                  <input
-                    className={cx(dialogStyles.input, dialogStyles.batchInput)}
+                <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
+                  <Input
                     value={item.value}
                     autoComplete="off"
                     aria-invalid={Boolean(item.error)}
                     autoFocus={invalidCount > 0 ? index === firstInvalidIndex : false}
                     onChange={(event) => updateManualValue(item, event.target.value)}
                   />
-                  {item.lockedExtension ? <small className={dialogStyles.batchExtension}>{item.lockedExtension}</small> : null}
+                  {item.lockedExtension ? <Badge variant="secondary" className="font-mono font-normal">{item.lockedExtension}</Badge> : null}
                 </div>
-                {item.error ? <em className={dialogStyles.batchError}>{item.error}</em> : (
-                  <em className={cx(
-                    dialogStyles.batchError,
-                    `${item.value.trim()}${item.lockedExtension}` === item.originalName ? dialogStyles.batchMuted : dialogStyles.batchReady,
-                  )}>
+                {item.error ? <em className="mt-1 block text-[11px] not-italic text-destructive">{item.error}</em> : (
+                  <em className={`${`${item.value.trim()}${item.lockedExtension}` === item.originalName ? "text-muted-foreground" : "text-emerald-500"} mt-1 block text-[11px] not-italic`}>
                     {`${item.value.trim()}${item.lockedExtension}` === item.originalName ? "Unchanged" : "Ready"}
                   </em>
                 )}
@@ -217,13 +244,13 @@ function BatchRenameDialog(props: {
             </label>
           ))}
         </div>
-        <div className={dialogStyles.actions}>
-          <button className={dialogStyles.actionButton} type="button" onClick={() => useExplorerStore.getState().closeDialog()}>Cancel</button>
-          <button className={dialogStyles.actionButton} type="submit" disabled={readyCount === 0 || invalidCount > 0}>Apply</button>
-        </div>
+        <DialogFooter className="mt-0 border-t border-border px-5 py-4">
+          <Button variant="outline" type="button" onClick={() => useExplorerStore.getState().closeDialog()}>Cancel</Button>
+          <Button type="submit" disabled={readyCount === 0 || invalidCount > 0}>Apply</Button>
+        </DialogFooter>
       </form>
-    </div>,
-    document.body,
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -237,27 +264,25 @@ export function ExplorerDialog() {
     ? dialog.paths[0].split("/").filter(Boolean).pop() ?? dialog.paths[0]
     : `${dialog.paths.length} items`;
 
-  return createPortal(
-    <div className={dialogStyles.backdrop} role="presentation">
-      <form
-        className={dialogStyles.dialog}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="explorer-dialog-title"
-        onPointerDown={(event) => event.stopPropagation()}
-        onSubmit={(event) => {
-          event.preventDefault();
-          void useExplorerStore.getState().confirmDialog();
-        }}
-      >
-        <h2 className={dialogStyles.title} id="explorer-dialog-title">Delete Permanently</h2>
-        <p className={dialogStyles.text}>Delete <strong>{deleteLabel}</strong>? This cannot be undone.</p>
-        <div className={dialogStyles.actions}>
-          <button className={dialogStyles.actionButton} type="button" onClick={() => useExplorerStore.getState().closeDialog()}>Cancel</button>
-          <button type="submit" className={cx(dialogStyles.actionButton, dialogStyles.danger)}>Delete</button>
-        </div>
-      </form>
-    </div>,
-    document.body,
+  return (
+    <AlertDialog open onOpenChange={(open) => { if (!open) useExplorerStore.getState().closeDialog(); }}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Delete Permanently</AlertDialogTitle>
+          <AlertDialogDescription>
+            Delete <strong className="font-semibold text-foreground">{deleteLabel}</strong>? This cannot be undone.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            onClick={() => void useExplorerStore.getState().confirmDialog()}
+          >
+            Delete
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 }

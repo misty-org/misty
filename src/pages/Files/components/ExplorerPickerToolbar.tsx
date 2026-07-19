@@ -1,3 +1,6 @@
+import { IconButton, ToolbarGroup } from "../../../components/misty";
+import { Button } from "../../../components/ui/button";
+import { Input } from "../../../components/ui/input";
 import { ArrowUp, ChevronLeft, ChevronRight, RefreshCcw, Search, X } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useMinimumSpin } from "../../../shared/hooks/useMinimumSpin";
@@ -50,28 +53,32 @@ export function ExplorerPickerToolbar(props: ExplorerPickerToolbarProps) {
     setPathEditing(false);
     setPathDraft(props.path);
     if (target) props.onNavigate(target);
-  }, [pathDraft, props]);
+  }, [pathDraft, props.onNavigate, props.path]);
 
   return (
     <header className={toolbarStyles.root}>
       <div className={toolbarStyles.navRow}>
-        <div className={toolbarStyles.navButtons}>
-          <button className={toolbarStyles.navigationButton} type="button" title="Back" aria-label="Back" disabled={!props.canGoBack} onClick={props.onBack}><ChevronLeft size={18} /></button>
-          <button className={toolbarStyles.navigationButton} type="button" title="Forward" aria-label="Forward" disabled={!props.canGoForward} onClick={props.onForward}><ChevronRight size={18} /></button>
-          <button className={toolbarStyles.navigationButton} type="button" title="Parent folder" aria-label="Parent folder" disabled={!props.canGoParent} onClick={props.onParent}><ArrowUp size={18} /></button>
-          <button
+        <ToolbarGroup className={toolbarStyles.navButtons}>
+          <IconButton label="Back" className={toolbarStyles.navigationButton} disabled={!props.canGoBack} onClick={props.onBack}>
+            <ChevronLeft size={18} />
+          </IconButton>
+          <IconButton label="Forward" className={toolbarStyles.navigationButton} disabled={!props.canGoForward} onClick={props.onForward}>
+            <ChevronRight size={18} />
+          </IconButton>
+          <IconButton label="Parent folder" className={toolbarStyles.navigationButton} disabled={!props.canGoParent} onClick={props.onParent}>
+            <ArrowUp size={18} />
+          </IconButton>
+          <IconButton
+            label="Refresh current folder"
             className={toolbarStyles.navigationButton}
-            type="button"
-            title="Refresh current folder"
-            aria-label="Refresh current folder"
             onClick={() => {
               startRefreshSpin();
               props.onRefresh();
             }}
           >
             <RefreshCcw className={refreshSpinning ? "animate-spin" : undefined} size={17} />
-          </button>
-        </div>
+          </IconButton>
+        </ToolbarGroup>
 
         <div
           className={cx(toolbarStyles.pathBar, pathEditing && toolbarStyles.pathBarEditing)}
@@ -79,7 +86,7 @@ export function ExplorerPickerToolbar(props: ExplorerPickerToolbarProps) {
           onDoubleClick={beginPathEdit}
         >
           {pathEditing ? (
-            <input
+            <Input
               ref={pathInputRef}
               className={toolbarStyles.pathInput}
               value={pathDraft}
@@ -99,16 +106,23 @@ export function ExplorerPickerToolbar(props: ExplorerPickerToolbarProps) {
               }}
             />
           ) : breadcrumbSegments(props.path).map((segment, index) => (
-            <button key={`${segment.path}-${index}`} className={toolbarStyles.pathButton} type="button" onClick={() => props.onNavigate(segment.path)}>
+            <Button
+              key={`${segment.path}-${index}`}
+              className={toolbarStyles.pathButton}
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => props.onNavigate(segment.path)}
+            >
               {index > 0 ? <ChevronRight className={toolbarStyles.breadcrumbCaret} size={14} /> : null}
               {segment.label}
-            </button>
+            </Button>
           ))}
         </div>
 
         <label className={`${toolbarStyles.commandSearch} w-[min(260px,28vw)]`}>
           <Search className="shrink-0" size={17} />
-          <input
+          <Input
             ref={searchInputRef}
             className={toolbarStyles.commandInput}
             type="search"
@@ -126,18 +140,17 @@ export function ExplorerPickerToolbar(props: ExplorerPickerToolbarProps) {
             }}
           />
           {props.query ? (
-            <button
+            <IconButton
+              size="sm"
+              label="Clear search"
               className={toolbarStyles.searchButton}
-              type="button"
-              aria-label="Clear search"
-              title="Clear search"
               onClick={() => {
                 props.onQueryChange("");
                 searchInputRef.current?.focus();
               }}
             >
               <X size={14} />
-            </button>
+            </IconButton>
           ) : null}
         </label>
       </div>

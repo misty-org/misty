@@ -1,27 +1,5 @@
-@theme {
-  --color-white: #f1eee8;
-  --color-black: #111317;
-  --color-bg: #0b0d10;
-  --color-surface: #111418;
-  --color-elevated: #14171c;
-  --color-border: #242830;
-  --color-border-subtle: #1b1f25;
-  --color-text: #f1f3f4;
-  --color-text-muted: #a7abb3;
-  --color-text-secondary: #a7abb3;
-  --color-primary: #dbe2e8;
-  --color-primary-hover: #f1f3f4;
-  --color-primary-active: #c6cdd5;
-  --color-success: #22c55e;
-  --color-success-hover: #4ade80;
-  --color-danger: #ef4444;
-  --color-danger-hover: #f87171;
-  --font-family-sans: "Inter", system-ui, -apple-system, sans-serif;
-  --font-family-mono: "Inter", system-ui, -apple-system, sans-serif;
-}
-
 .app-pages-root {
-  font-family: var(--font-family-sans);
+  font-family: var(--misty-font-family);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -54,22 +32,6 @@
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
   border: 0;
-}
-
-.glass {
-  background: var(--misty-glass);
-}
-
-.glass-card {
-  background: var(--misty-surface);
-  border: 1px solid var(--misty-border-soft);
-}
-
-.grid-bg {
-  background-image:
-    linear-gradient(rgba(228, 228, 231, 0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(228, 228, 231, 0.03) 1px, transparent 1px);
-  background-size: 60px 60px;
 }
 
 .scrollbar-hide {
@@ -195,55 +157,6 @@
 
 .app-pages-root .misty-transient-scrollbar::-webkit-scrollbar-thumb:hover {
   background: var(--misty-transient-scrollbar-thumb-hover);
-}
-
-.settings-opacity-range-wrap {
-  --settings-range-thumb-size: 22px;
-  --settings-range-track-height: 8px;
-  position: relative;
-  width: 100%;
-  height: 32px;
-  border: 0;
-  background: transparent;
-  padding: 0;
-  cursor: pointer;
-  touch-action: none;
-}
-
-.settings-opacity-range-track {
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 50%;
-  height: var(--settings-range-track-height);
-  transform: translateY(-50%);
-  border-radius: 999px;
-  background: rgba(244, 244, 245, 0.18);
-}
-
-.settings-opacity-range-thumb {
-  position: absolute;
-  top: 50%;
-  width: var(--settings-range-thumb-size);
-  height: var(--settings-range-thumb-size);
-  transform: translateY(-50%);
-  border-radius: 999px;
-  background: #f4f4f5;
-  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.42);
-}
-
-.settings-opacity-range-wrap:disabled {
-  cursor: not-allowed;
-}
-
-.settings-opacity-range-wrap:focus-visible {
-  outline: 2px solid rgba(244, 244, 245, 0.5);
-  outline-offset: 2px;
-  border-radius: 999px;
-}
-
-.settings-opacity-range-wrap:disabled {
-  opacity: 0.55;
 }
 
 @media (prefers-reduced-motion: reduce) {

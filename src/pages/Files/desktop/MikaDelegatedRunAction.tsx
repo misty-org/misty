@@ -1,3 +1,4 @@
+import { Button } from "../../../components/ui/button";
 import { ExternalLink } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -26,5 +27,5 @@ export function MikaDelegatedRunAction({ message }: { message: AiPanelMessage })
     }
   };
 
-  return <div className="grid justify-items-start gap-1"><button className="inline-flex min-h-7 items-center gap-1.5 rounded-lg border border-[var(--misty-border-soft)] bg-[var(--misty-neutral-control-bg,var(--misty-surface-2))] px-2.5 text-[10px] font-semibold text-[#d4d4d4] hover:bg-[var(--misty-neutral-hover-bg,var(--misty-surface-hover))] disabled:opacity-60" type="button" disabled={busy} onClick={() => void inspect()}><ExternalLink size={12}/>{busy ? "Opening run…" : "Inspect run"}</button>{error ? <small className="text-[10px] text-red-300" role="alert">{error}</small> : null}</div>;
+  return <div className="grid justify-items-start gap-1"><Button className="inline-flex min-h-7 items-center gap-1.5 rounded-lg border border-[var(--misty-border-soft)] bg-[var(--misty-neutral-control-bg,var(--misty-surface-2))] px-2.5 text-[10px] font-semibold text-[#d4d4d4] hover:bg-[var(--misty-neutral-hover-bg,var(--misty-surface-hover))] disabled:opacity-60" type="button" disabled={busy} onClick={() => void inspect()}><ExternalLink size={12}/>{busy ? "Opening run…" : "Inspect run"}</Button>{error ? <small className="text-[10px] text-red-300" role="alert">{error}</small> : null}</div>;
 }

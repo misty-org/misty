@@ -21,7 +21,17 @@ import {
 } from "lucide-react";
 import { Image as TauriImage } from "@tauri-apps/api/image";
 import { writeImage } from "@tauri-apps/plugin-clipboard-manager";
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent, type ReactNode } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Slider } from "@/components/ui/slider";
 import {
   defaultGlobalImageEdit,
   normalizeGlobalImageEdit,
@@ -80,21 +90,6 @@ export function GlobalImageEditor(props: GlobalImageEditorProps) {
   const saveMenuRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    const next = normalizeGlobalImageEdit(props.initialEdit);
-    setHistory([next]);
-    setHistoryIndex(0);
-    setActiveTool("selection");
-    setZoom(100);
-    setTags(props.tags ?? []);
-    setTagDraft("");
-    setEditingTag(null);
-    setSaveMessage("");
-    setSaveError("");
-    setDecodeError("");
-    setSaveMenuOpen(false);
-  }, [props.sourceKey]);
-
-  useEffect(() => {
     if (!saveMenuOpen) return;
     const closeMenu = (event: MouseEvent) => {
       if (!saveMenuRef.current?.contains(event.target as Node)) setSaveMenuOpen(false);
@@ -109,6 +104,21 @@ export function GlobalImageEditor(props: GlobalImageEditorProps) {
       window.removeEventListener("keydown", closeOnEscape);
     };
   }, [saveMenuOpen]);
+
+  useEffect(() => {
+    const next = normalizeGlobalImageEdit(props.initialEdit);
+    setHistory([next]);
+    setHistoryIndex(0);
+    setActiveTool("selection");
+    setZoom(100);
+    setTags(props.tags ?? []);
+    setTagDraft("");
+    setEditingTag(null);
+    setSaveMessage("");
+    setSaveError("");
+    setDecodeError("");
+    setSaveMenuOpen(false);
+  }, [props.sourceKey]);
 
   useEffect(() => {
     let current = true;
@@ -285,25 +295,25 @@ export function GlobalImageEditor(props: GlobalImageEditorProps) {
         <div className="min-w-0"><h1 className="m-0 truncate !text-[13px] !font-medium !leading-5 text-white/90">{props.name}</h1>{props.indexLabel ? <span className="block text-[10px] text-white/40">{props.indexLabel}</span> : null}</div>
         <div className="flex min-w-0 items-center gap-2">
           <div className="flex h-10 items-center overflow-hidden rounded-xl bg-[#f0f1f4] text-[#15171a] shadow-lg" data-editor-history-tray>
-            <button type="button" className="grid size-10 place-items-center border-r border-black/10 hover:bg-white disabled:opacity-30" aria-label="Undo" disabled={historyIndex === 0} onClick={undo}><Undo2 size={17}/></button>
-            <button type="button" className="grid size-10 place-items-center border-r border-black/10 hover:bg-white disabled:opacity-30" aria-label="Redo" disabled={historyIndex >= history.length - 1} onClick={redo}><Redo2 size={17}/></button>
-            <button type="button" className="grid size-10 place-items-center hover:bg-white disabled:opacity-30" aria-label="Zoom out" disabled={zoom <= 25} onClick={() => setZoom((value) => Math.max(25, value - 10))}><Minus size={16}/></button>
+            <Button variant="ghost" size="icon" className="size-10 rounded-none border-r border-black/10 text-[#15171a] hover:bg-white hover:text-[#15171a]" aria-label="Undo" disabled={historyIndex === 0} onClick={undo}><Undo2 size={17}/></Button>
+            <Button variant="ghost" size="icon" className="size-10 rounded-none border-r border-black/10 text-[#15171a] hover:bg-white hover:text-[#15171a]" aria-label="Redo" disabled={historyIndex >= history.length - 1} onClick={redo}><Redo2 size={17}/></Button>
+            <Button variant="ghost" size="icon" className="size-10 rounded-none text-[#15171a] hover:bg-white hover:text-[#15171a]" aria-label="Zoom out" disabled={zoom <= 25} onClick={() => setZoom((value) => Math.max(25, value - 10))}><Minus size={16}/></Button>
             <span className="min-w-12 text-center text-[11px] font-medium tabular-nums" aria-live="polite">{zoom}%</span>
-            <button type="button" className="grid size-10 place-items-center border-r border-black/10 hover:bg-white disabled:opacity-30" aria-label="Zoom in" disabled={zoom >= 300} onClick={() => setZoom((value) => Math.min(300, value + 10))}><Plus size={16}/></button>
-            <button type="button" className="grid size-10 place-items-center border-r border-black/10 hover:bg-white disabled:opacity-30" aria-label="Rotate clockwise" onClick={() => pushEdit((current) => ({ ...current, rotation: nextRotation(current.rotation, 90) }))}><RotateCw size={16}/></button>
-            <button type="button" className="grid size-10 place-items-center hover:bg-white disabled:opacity-30" aria-label="Reset editor" disabled={editIsDefault && zoom === 100} onClick={resetEditor}><RotateCcw size={16}/></button>
+            <Button variant="ghost" size="icon" className="size-10 rounded-none border-r border-black/10 text-[#15171a] hover:bg-white hover:text-[#15171a]" aria-label="Zoom in" disabled={zoom >= 300} onClick={() => setZoom((value) => Math.min(300, value + 10))}><Plus size={16}/></Button>
+            <Button variant="ghost" size="icon" className="size-10 rounded-none border-r border-black/10 text-[#15171a] hover:bg-white hover:text-[#15171a]" aria-label="Rotate clockwise" onClick={() => pushEdit((current) => ({ ...current, rotation: nextRotation(current.rotation, 90) }))}><RotateCw size={16}/></Button>
+            <Button variant="ghost" size="icon" className="size-10 rounded-none text-[#15171a] hover:bg-white hover:text-[#15171a]" aria-label="Reset editor" disabled={editIsDefault && zoom === 100} onClick={resetEditor}><RotateCcw size={16}/></Button>
           </div>
           <div className="relative" ref={saveMenuRef} data-editor-save-menu>
-            <button type="button" className="inline-flex h-10 items-center gap-2 rounded-xl bg-[#e7edf3] px-3 text-xs font-semibold text-[#17191c] shadow-lg hover:bg-white disabled:opacity-40" disabled={Boolean(saving)} aria-haspopup="menu" aria-expanded={saveMenuOpen} onClick={() => setSaveMenuOpen((open) => !open)}><Save size={15}/><span>Save</span><ChevronDown size={14}/></button>
-            {saveMenuOpen ? <div className="absolute right-0 top-[calc(100%+8px)] z-50 min-w-48 overflow-hidden rounded-xl border border-white/10 bg-[#202126] p-1.5 text-white shadow-2xl" role="menu" aria-label="Save options">
-              <button type="button" role="menuitem" disabled={Boolean(saving) || props.readonly} className="flex h-9 w-full items-center gap-2 rounded-lg px-2.5 text-left text-xs text-white/80 hover:bg-white/10 disabled:opacity-35" onClick={() => { setSaveMenuOpen(false); void performSave(true); }}>{saving === "copy" ? <Loader2 className="animate-spin" size={14}/> : <Copy size={14}/>}Save as copy</button>
-              <button type="button" role="menuitem" disabled={!dirty || Boolean(saving) || props.readonly} className="flex h-9 w-full items-center gap-2 rounded-lg px-2.5 text-left text-xs text-white/80 hover:bg-white/10 disabled:opacity-35" onClick={() => { setSaveMenuOpen(false); void performSave(false); }}>{saving === "save" ? <Loader2 className="animate-spin" size={14}/> : <Save size={14}/>}Save</button>
-              <button type="button" role="menuitem" disabled={Boolean(saving) || props.loading || Boolean(props.error)} className="flex h-9 w-full items-center gap-2 rounded-lg px-2.5 text-left text-xs text-white/80 hover:bg-white/10 disabled:opacity-35" onClick={() => { setSaveMenuOpen(false); void copyToClipboard(); }}>{saving === "clipboard" ? <Loader2 className="animate-spin" size={14}/> : <Copy size={14}/>}Copy to clipboard</button>
+            <Button className="h-10 rounded-xl bg-[#e7edf3] text-xs font-semibold text-[#17191c] shadow-lg hover:bg-white hover:text-[#17191c]" disabled={Boolean(saving)} aria-haspopup="menu" aria-expanded={saveMenuOpen} onClick={() => setSaveMenuOpen((open) => !open)}><Save size={15}/><span>Save</span><ChevronDown size={14}/></Button>
+            {saveMenuOpen ? <div className="absolute right-0 top-[calc(100%+8px)] z-50 grid min-w-48 gap-1 overflow-hidden rounded-xl border border-border bg-popover p-1.5 text-popover-foreground shadow-2xl" role="menu" aria-label="Save options">
+              <Button type="button" variant="ghost" role="menuitem" disabled={Boolean(saving) || props.readonly} className="h-9 w-full justify-start text-xs" onClick={() => { setSaveMenuOpen(false); void performSave(true); }}>{saving === "copy" ? <Loader2 className="animate-spin" size={14}/> : <Copy size={14}/>}Save as copy</Button>
+              <Button type="button" variant="ghost" role="menuitem" disabled={!dirty || Boolean(saving) || props.readonly} className="h-9 w-full justify-start text-xs" onClick={() => { setSaveMenuOpen(false); void performSave(false); }}>{saving === "save" ? <Loader2 className="animate-spin" size={14}/> : <Save size={14}/>}Save</Button>
+              <Button type="button" variant="ghost" role="menuitem" disabled={Boolean(saving) || props.loading || Boolean(props.error)} className="h-9 w-full justify-start text-xs" onClick={() => { setSaveMenuOpen(false); void copyToClipboard(); }}>{saving === "clipboard" ? <Loader2 className="animate-spin" size={14}/> : <Copy size={14}/>}Copy to clipboard</Button>
             </div> : null}
           </div>
         </div>
         <div className="flex min-w-0 items-center justify-end">
-          <button type="button" className="grid size-10 shrink-0 place-items-center rounded-xl bg-white/[0.08] text-white/60 hover:bg-white/15 hover:text-white" aria-label="Close editor" onClick={props.onClose}><X size={19}/></button>
+          <Button type="button" variant="ghost" size="icon" className="size-10 shrink-0 rounded-xl bg-white/[0.08] text-white/60 hover:bg-white/15 hover:text-white" aria-label="Close editor" onClick={props.onClose}><X size={19}/></Button>
         </div>
       </header>
 
@@ -318,8 +328,8 @@ export function GlobalImageEditor(props: GlobalImageEditorProps) {
             <ImageToolButton tool="shape" label="Shape" active={activeTool === "shape"} onClick={setActiveTool}><Shapes size={21}/></ImageToolButton>
           </div>
           <div className="mt-3 grid w-full justify-items-center gap-2.5 border-t border-white/[0.06] pt-3">
-            <label className="relative grid cursor-pointer justify-items-center gap-1 text-[9px] text-white/45" title={`Brush color ${brushColor}`}><span className="size-7 rounded-full border-2 border-white/30 shadow" style={{ backgroundColor: brushColor }}/><span className="font-mono text-[8px] uppercase">{brushColor}</span><input aria-label="Brush color" className="absolute inset-0 cursor-pointer opacity-0" type="color" value={brushColor} onChange={(event) => setBrushColor(event.target.value)}/></label>
-            <label className="grid justify-items-center gap-1 text-[9px] text-white/45">Size<input aria-label="Brush size" className="global-image-editor-range w-14" style={{ "--editor-range-progress": `${rangeProgress(brushSize, 2, 18)}%` } as CSSProperties} type="range" min={2} max={18} value={brushSize} onChange={(event) => setBrushSize(Number(event.target.value))}/></label>
+            <label className="relative grid cursor-pointer justify-items-center gap-1 text-[9px] text-white/45" title={`Brush color ${brushColor}`}><span className="size-7 rounded-full border-2 border-white/30 shadow" style={{ backgroundColor: brushColor }}/><span className="font-mono text-[8px] uppercase">{brushColor}</span><Input aria-label="Brush color" className="absolute inset-0 cursor-pointer opacity-0" type="color" value={brushColor} onChange={(event) => setBrushColor(event.target.value)}/></label>
+            <label className="grid w-16 justify-items-center gap-1 text-[9px] text-white/45">Size<Slider aria-label="Brush size" value={[brushSize]} min={2} max={18} onValueChange={([value]) => setBrushSize(value ?? brushSize)}/></label>
           </div>
         </nav>
 
@@ -336,24 +346,24 @@ export function GlobalImageEditor(props: GlobalImageEditorProps) {
 
         <aside className="min-h-0 overflow-y-auto border-l border-white/[0.06] bg-[#141519] p-5 max-[900px]:hidden">
           <section className="border-b border-white/[0.06] pb-5">
-            <div className="flex items-center justify-between"><h2 className="m-0 !text-sm !font-medium">Tags</h2>{props.onSaveTags ? <button type="button" className="rounded-lg px-2 py-1 text-[10px] text-white/60 hover:bg-white/[0.07] disabled:opacity-30" disabled={!tagsDirty || tagsSaving} onClick={() => void saveTags()}>{tagsSaving ? "Saving…" : "Save tags"}</button> : null}</div>
-            <div className="mt-3 flex flex-wrap gap-1.5">{tags.map((tag, index) => editingTag === index ? <input key={`${tag}:${index}`} autoFocus className="h-7 w-24 rounded-full border border-white/20 bg-black/30 px-2.5 text-[10px] outline-none" value={editingTagValue} onChange={(event) => setEditingTagValue(event.target.value)} onBlur={() => { const next = editingTagValue.trim(); if (next) setTags((current) => current.map((value, candidate) => candidate === index ? next : value)); setEditingTag(null); }} onKeyDown={(event) => { if (event.key === "Enter") event.currentTarget.blur(); if (event.key === "Escape") setEditingTag(null); }}/> : <span className="inline-flex h-7 items-center overflow-hidden rounded-full border border-white/10 bg-white/[0.07] text-[10px] text-white/80" key={`${tag}:${index}`}><button type="button" className="h-full px-2.5 hover:bg-white/[0.06]" onClick={() => { setEditingTag(index); setEditingTagValue(tag); }} title={`Edit ${tag}`}>{tag}</button><button type="button" className="grid h-full w-7 place-items-center border-l border-white/10 text-white/45 hover:bg-red-400/15 hover:text-red-200" onClick={() => setTags((current) => current.filter((_, candidate) => candidate !== index))} aria-label={`Delete tag ${tag}`}><X size={11}/></button></span>)}</div>
-            {props.onSaveTags ? <div className="mt-3 flex gap-2"><input className="h-8 min-w-0 flex-1 rounded-lg border border-white/[0.08] bg-white/[0.05] px-2.5 text-xs outline-none focus:border-white/20" value={tagDraft} onChange={(event) => setTagDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === ",") { event.preventDefault(); addTag(); } }} placeholder="Add a tag"/><button type="button" className="size-8 rounded-lg bg-white/[0.08] text-white/70 hover:bg-white/15" onClick={() => addTag()} aria-label="Add tag"><Plus size={14}/></button></div> : null}
+            <div className="flex items-center justify-between"><h2 className="m-0 !text-sm !font-medium">Tags</h2>{props.onSaveTags ? <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-[10px] text-white/60 hover:bg-white/[0.07] hover:text-white" disabled={!tagsDirty || tagsSaving} onClick={() => void saveTags()}>{tagsSaving ? "Saving…" : "Save tags"}</Button> : null}</div>
+            <div className="mt-3 flex flex-wrap gap-1.5">{tags.map((tag, index) => editingTag === index ? <Input key={`${tag}:${index}`} autoFocus className="h-7 w-24 rounded-full border-white/20 bg-black/30 px-2.5 text-[10px] text-white" value={editingTagValue} onChange={(event) => setEditingTagValue(event.target.value)} onBlur={() => { const next = editingTagValue.trim(); if (next) setTags((current) => current.map((value, candidate) => candidate === index ? next : value)); setEditingTag(null); }} onKeyDown={(event) => { if (event.key === "Enter") event.currentTarget.blur(); if (event.key === "Escape") setEditingTag(null); }}/> : <span className="inline-flex h-7 items-center overflow-hidden rounded-full border border-white/10 bg-white/[0.07] text-[10px] text-white/80" key={`${tag}:${index}`}><Button type="button" variant="ghost" className="h-full rounded-none px-2.5 text-[10px] text-white/80 hover:bg-white/[0.06] hover:text-white" onClick={() => { setEditingTag(index); setEditingTagValue(tag); }} title={`Edit ${tag}`}>{tag}</Button><Button type="button" variant="ghost" size="icon" className="h-full w-7 rounded-none border-l border-white/10 text-white/45 hover:bg-red-400/15 hover:text-red-200" onClick={() => setTags((current) => current.filter((_, candidate) => candidate !== index))} aria-label={`Delete tag ${tag}`}><X size={11}/></Button></span>)}</div>
+            {props.onSaveTags ? <div className="mt-3 flex gap-2"><Input className="h-8 min-w-0 flex-1 border-white/[0.08] bg-white/[0.05] text-xs text-white focus-visible:ring-white/20" value={tagDraft} onChange={(event) => setTagDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === ",") { event.preventDefault(); addTag(); } }} placeholder="Add a tag"/><Button type="button" variant="ghost" size="icon" className="size-8 bg-white/[0.08] text-white/70 hover:bg-white/15 hover:text-white" onClick={() => addTag()} aria-label="Add tag"><Plus size={14}/></Button></div> : null}
           </section>
 
           <section className="pt-5">
             <div className="flex items-center justify-between"><h2 className="m-0 !text-sm !font-medium">Edit</h2></div>
-            {(activeTool === "brush" || activeTool === "shape" || activeTool === "text") ? <div className="mt-4 grid gap-2 rounded-xl border border-white/[0.07] bg-white/[0.03] p-3"><div className="flex items-center justify-between text-[10px] text-white/50"><span>{activeTool === "text" ? "Text color" : "Brush color"}</span><span className="flex items-center gap-2 font-mono uppercase text-white/75"><i className="size-4 rounded-full border border-white/20" style={{ backgroundColor: brushColor }}/>{brushColor}</span></div>{activeTool === "text" ? <input className="h-8 rounded-lg bg-black/25 px-2.5 text-xs outline-none" value={annotationText} onChange={(event) => setAnnotationText(event.target.value)} placeholder="Text to place"/> : <EditorRange label="Brush size" value={brushSize} min={2} max={18} step={1} display={String(brushSize)} onChange={setBrushSize}/>}</div> : null}
-            <div className="mt-4 flex flex-wrap gap-2"><button className={adjustButtonClass} type="button" onClick={() => pushEdit((current) => ({ ...current, flip_horizontal: !current.flip_horizontal }))}><FlipHorizontal2 size={13}/>Flip H</button><button className={adjustButtonClass} type="button" onClick={() => pushEdit((current) => ({ ...current, flip_vertical: !current.flip_vertical }))}><FlipVertical2 size={13}/>Flip V</button><button className={adjustButtonClass} type="button" onClick={() => pushEdit((current) => ({ ...current, auto_enhance: !current.auto_enhance }))}>{edit.auto_enhance ? "Auto on" : "Auto"}</button></div>
-            <label className="mt-4 grid gap-1.5 text-[10px] text-white/50">Filter<select className="h-9 rounded-lg border border-white/[0.07] bg-[#15161a] px-2.5 text-xs text-white outline-none" value={edit.filter} onChange={(event) => pushEdit((current) => ({ ...current, filter: event.target.value as GlobalImageEditDefinition["filter"] }))}><option value="">None</option><option value="vivid">Vivid</option><option value="dramatic">Dramatic</option><option value="warm">Warm</option><option value="cool">Cool</option><option value="mono">Mono</option><option value="noir">Noir</option></select></label>
+            {(activeTool === "brush" || activeTool === "shape" || activeTool === "text") ? <div className="mt-4 grid gap-2 rounded-xl border border-white/[0.07] bg-white/[0.03] p-3"><div className="flex items-center justify-between text-[10px] text-white/50"><span>{activeTool === "text" ? "Text color" : "Brush color"}</span><span className="flex items-center gap-2 font-mono uppercase text-white/75"><i className="size-4 rounded-full border border-white/20" style={{ backgroundColor: brushColor }}/>{brushColor}</span></div>{activeTool === "text" ? <Input className="h-8 bg-black/25 text-xs text-white" value={annotationText} onChange={(event) => setAnnotationText(event.target.value)} placeholder="Text to place"/> : <EditorRange label="Brush size" value={brushSize} min={2} max={18} step={1} display={String(brushSize)} onChange={setBrushSize}/>}</div> : null}
+            <div className="mt-4 flex flex-wrap gap-2"><EditorActionButton onClick={() => pushEdit((current) => ({ ...current, flip_horizontal: !current.flip_horizontal }))}><FlipHorizontal2 size={13}/>Flip H</EditorActionButton><EditorActionButton onClick={() => pushEdit((current) => ({ ...current, flip_vertical: !current.flip_vertical }))}><FlipVertical2 size={13}/>Flip V</EditorActionButton><EditorActionButton onClick={() => pushEdit((current) => ({ ...current, auto_enhance: !current.auto_enhance }))}>{edit.auto_enhance ? "Auto on" : "Auto"}</EditorActionButton></div>
+            <label className="mt-4 grid gap-1.5 text-[10px] text-white/50">Filter<Select value={edit.filter || "none"} onValueChange={(value) => pushEdit((current) => ({ ...current, filter: value === "none" ? "" : value as GlobalImageEditDefinition["filter"] }))}><SelectTrigger className="h-9 border-white/[0.07] bg-[#15161a] text-xs text-white"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="none">None</SelectItem><SelectItem value="vivid">Vivid</SelectItem><SelectItem value="dramatic">Dramatic</SelectItem><SelectItem value="warm">Warm</SelectItem><SelectItem value="cool">Cool</SelectItem><SelectItem value="mono">Mono</SelectItem><SelectItem value="noir">Noir</SelectItem></SelectContent></Select></label>
             <EditorRange label="Brightness" value={edit.brightness} min={0} max={2} step={.05} onChange={(value) => pushEdit((current) => ({ ...current, brightness: value }))}/>
             <EditorRange label="Contrast" value={edit.contrast} min={0} max={2} step={.05} onChange={(value) => pushEdit((current) => ({ ...current, contrast: value }))}/>
             <EditorRange label="Saturation" value={edit.saturation} min={0} max={2} step={.05} onChange={(value) => pushEdit((current) => ({ ...current, saturation: value }))}/>
             <EditorRange label="Grayscale" value={edit.grayscale} min={0} max={1} step={.05} onChange={(value) => pushEdit((current) => ({ ...current, grayscale: value }))}/>
             <details className="mt-4 rounded-xl border border-white/[0.06] px-3 py-2"><summary className="cursor-pointer text-[10px] text-white/45">Advanced Adjustments</summary><EditorRange label="Exposure" value={edit.exposure} min={-2} max={2} step={.05} onChange={(value) => pushEdit((current) => ({ ...current, exposure: value }))}/><EditorRange label="Vibrance" value={edit.vibrance} min={-1} max={1} step={.05} onChange={(value) => pushEdit((current) => ({ ...current, vibrance: value }))}/><EditorRange label="Warmth" value={edit.warmth} min={-1} max={1} step={.05} onChange={(value) => pushEdit((current) => ({ ...current, warmth: value }))}/><EditorRange label="Tint" value={edit.tint} min={-1} max={1} step={.05} onChange={(value) => pushEdit((current) => ({ ...current, tint: value }))}/><EditorRange label="Vignette" value={edit.vignette} min={0} max={1} step={.05} onChange={(value) => pushEdit((current) => ({ ...current, vignette: value }))}/></details>
-            <div className="mt-4"><p className="m-0 text-[10px] text-white/45">Crop &amp; Straighten</p><EditorRange label="Straighten" value={edit.straighten} min={-45} max={45} step={.5} onChange={(value) => pushEdit((current) => ({ ...current, straighten: value }))}/><div className="mt-2 flex gap-1"><button className={adjustButtonClass} type="button" onClick={() => pushEdit((current) => ({ ...current, crop: undefined }))}>Original</button><button className={adjustButtonClass} type="button" onClick={() => pushEdit((current) => ({ ...current, crop: { x: .125, y: 0, width: .75, height: 1 }, markup: [] }))}>Square</button><button className={adjustButtonClass} type="button" onClick={() => pushEdit((current) => ({ ...current, crop: { x: 0, y: .125, width: 1, height: .75 }, markup: [] }))}>Wide</button></div></div>
+            <div className="mt-4"><p className="m-0 text-[10px] text-white/45">Crop &amp; Straighten</p><EditorRange label="Straighten" value={edit.straighten} min={-45} max={45} step={.5} onChange={(value) => pushEdit((current) => ({ ...current, straighten: value }))}/><div className="mt-2 flex gap-1"><EditorActionButton onClick={() => pushEdit((current) => ({ ...current, crop: undefined }))}>Original</EditorActionButton><EditorActionButton onClick={() => pushEdit((current) => ({ ...current, crop: { x: .125, y: 0, width: .75, height: 1 }, markup: [] }))}>Square</EditorActionButton><EditorActionButton onClick={() => pushEdit((current) => ({ ...current, crop: { x: 0, y: .125, width: 1, height: .75 }, markup: [] }))}>Wide</EditorActionButton></div></div>
             {(saveMessage || editorError) ? <p className={`mb-0 mt-4 rounded-lg px-3 py-2 text-xs ${editorError ? "bg-red-500/10 text-red-200" : "bg-emerald-500/10 text-emerald-200"}`} role="status">{editorError || saveMessage}</p> : null}
-            <div className="mt-5 grid grid-cols-2 gap-2"><button type="button" className="h-10 rounded-xl bg-white/[0.08] text-sm text-white/80 hover:bg-white/15" onClick={props.onCancel ?? props.onClose}>Cancel</button><button type="button" disabled={!dirty || Boolean(saving) || props.readonly} className="h-10 rounded-xl bg-[#e7edf3] text-sm font-medium text-[#17191c] hover:bg-white disabled:opacity-35" onClick={() => void performSave(false)}>{saving === "save" ? "Saving…" : "Save edit"}</button></div>
+            <div className="mt-5 grid grid-cols-2 gap-2"><Button type="button" variant="outline" className="h-10 border-white/[0.08] bg-white/[0.08] text-white/80 hover:bg-white/15 hover:text-white" onClick={props.onCancel ?? props.onClose}>Cancel</Button><Button type="button" disabled={!dirty || Boolean(saving) || props.readonly} className="h-10 bg-[#e7edf3] text-[#17191c] hover:bg-white hover:text-[#17191c]" onClick={() => void performSave(false)}>{saving === "save" ? "Saving…" : "Save edit"}</Button></div>
           </section>
         </aside>
       </div>
@@ -362,17 +372,19 @@ export function GlobalImageEditor(props: GlobalImageEditorProps) {
 }
 
 function ImageToolButton(props: { tool: ImageTool; label: string; active: boolean; onClick: (tool: ImageTool) => void; children: ReactNode }) {
-  return <button type="button" aria-label={props.label} aria-pressed={props.active} onClick={() => props.onClick(props.tool)} className={`grid size-16 shrink-0 place-items-center content-center gap-1 rounded-xl p-1 text-[9px] transition ${props.active ? "bg-white/[0.11] text-white" : "text-white/65 hover:bg-white/[0.06] hover:text-white"}`}>{props.children}<span className="max-w-full truncate">{props.label}</span></button>;
+  return <Button variant="ghost" type="button" aria-label={props.label} aria-pressed={props.active} onClick={() => props.onClick(props.tool)} className={`grid size-16 shrink-0 place-items-center content-center gap-1 rounded-xl p-1 text-[9px] ${props.active ? "bg-white/[0.11] text-white" : "text-white/65 hover:bg-white/[0.06] hover:text-white"}`}>{props.children}<span className="max-w-full truncate">{props.label}</span></Button>;
 }
 
 function EditorRange(props: { label: string; value: number; min: number; max: number; step: number; display?: string; onChange: (value: number) => void }) {
-  return <label className="mt-4 grid grid-cols-[1fr_auto] gap-x-3 gap-y-1 text-[10px] text-white/45"><span>{props.label}</span><span>{props.display ?? props.value.toFixed(2)}</span><input className="global-image-editor-range col-span-2 w-full" style={{ "--editor-range-progress": `${rangeProgress(props.value, props.min, props.max)}%` } as CSSProperties} type="range" value={props.value} min={props.min} max={props.max} step={props.step} onChange={(event) => props.onChange(Number(event.target.value))}/></label>;
+  return <label className="mt-4 grid grid-cols-[1fr_auto] gap-x-3 gap-y-1 text-[10px] text-white/45"><span>{props.label}</span><span>{props.display ?? props.value.toFixed(2)}</span><Slider className="col-span-2" value={[props.value]} min={props.min} max={props.max} step={props.step} onValueChange={([value]) => props.onChange(value ?? props.value)}/></label>;
 }
 
-const adjustButtonClass = "inline-flex h-9 items-center gap-1.5 rounded-lg bg-white/[0.08] px-2.5 text-xs text-white/65 hover:bg-white/15";
+function EditorActionButton(props: { children: ReactNode; onClick: () => void }) {
+  return <Button type="button" variant="ghost" size="sm" className="h-9 bg-white/[0.08] text-xs text-white/65 hover:bg-white/15 hover:text-white" onClick={props.onClick}>{props.children}</Button>;
+}
+
 function nextRotation(rotation: GlobalImageEditDefinition["rotation"], amount: number): GlobalImageEditDefinition["rotation"] { return ((rotation + amount + 360) % 360) as GlobalImageEditDefinition["rotation"]; }
 function clamp01(value: number) { return Math.max(0, Math.min(1, value)); }
-function rangeProgress(value: number, min: number, max: number) { return max === min ? 0 : Math.max(0, Math.min(100, (value - min) / (max - min) * 100)); }
 function normalizedRect(start: ImagePoint, end: ImagePoint): ImageCrop { return { x: Math.min(start.x, end.x), y: Math.min(start.y, end.y), width: Math.abs(end.x - start.x), height: Math.abs(end.y - start.y) }; }
 function composeCrop(existing: ImageCrop | undefined, selected: ImageCrop): ImageCrop { const base = existing ?? { x: 0, y: 0, width: 1, height: 1 }; return { x: base.x + selected.x * base.width, y: base.y + selected.y * base.height, width: selected.width * base.width, height: selected.height * base.height }; }
 function rgbToHex(red: number, green: number, blue: number) { return `#${[red, green, blue].map((value) => Math.max(0, Math.min(255, value)).toString(16).padStart(2, "0")).join("")}`; }

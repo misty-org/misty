@@ -3,18 +3,28 @@ import {
   useEffect,
   useState,
   type ChangeEvent,
-  type KeyboardEvent,
-  type PointerEvent,
   type ReactNode,
 } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { useShallow } from "zustand/react/shallow";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { Slider } from "@/components/ui/slider";
+import { Spinner } from "@/components/ui/spinner";
 import {
   AppWindow,
   ArrowLeftRight,
   Bell,
   Bot,
-  ChevronDown,
   Cloud,
   Copy,
   Eye,
@@ -22,14 +32,12 @@ import {
   HardDrive,
   Image,
   Keyboard,
-  Loader2,
   Lock,
   RefreshCcw,
   Rows3,
   Search,
   Settings2,
   Trash2,
-  X,
   type LucideIcon,
 } from "lucide-react";
 import { InstallerCard } from "../../../components/installer/InstallerCard";
@@ -64,20 +72,9 @@ import {
   type TransferProfileRecord,
 } from "../transferProfiles";
 import {
+  DesktopSettingsFrame,
   DesktopSettingsRow as SettingsRow,
   DesktopSettingsSection as SettingsSectionBlock,
-  desktopSettingsContentClass as settingsContentClass,
-  desktopSettingsGridClass as settingsGridClass,
-  desktopSettingsNavItemClass as settingsNavItemClass,
-  desktopSettingsNavItemSelectedClass as settingsNavItemSelectedClass,
-  desktopSettingsOverlayCloseClass as settingsOverlayCloseClass,
-  desktopSettingsOverlayContentClass as settingsOverlayContentClass,
-  desktopSettingsOverlayContentShellClass as settingsOverlayContentShellClass,
-  desktopSettingsOverlayGridClass as settingsOverlayGridClass,
-  desktopSettingsOverlayHeaderClass as settingsOverlayHeaderClass,
-  desktopSettingsOverlayScrollSurfaceClass as settingsOverlayScrollSurfaceClass,
-  desktopSettingsScrollSurfaceClass as settingsScrollSurfaceClass,
-  desktopSettingsSidebarClass as settingsSidebarClass,
 } from "../../../components/settings/DesktopSettingsUI";
 
 type SettingsSection =
@@ -114,9 +111,21 @@ const appNavItems: NavItem[] = [
   { id: "advanced", label: "Advanced", icon: Settings2 },
 ];
 
-const navGroups = [{ label: "Misty App Settings", items: appNavItems }];
-
 const navItems = appNavItems;
+
+const sectionDescriptions: Record<SettingsSection, string> = {
+  general: "Startup, default actions, and workspace behavior.",
+  app: "Updates, version details, and local support information.",
+  assistant: "Control Mika and the actions it can perform.",
+  appearance: "Theme, density, wallpaper, typography, and motion.",
+  privacy: "Choose what diagnostic data Misty may share.",
+  sync: "Connection behavior and conflict handling.",
+  transfers: "Defaults for copies, downloads, and destinations.",
+  search: "Keep filenames and connected libraries searchable.",
+  notifications: "Choose which activity should interrupt you.",
+  shortcuts: "Review and customize keyboard commands.",
+  advanced: "Runtime, developer, and recovery preferences.",
+};
 
 const defaultFileActionOptions = ["Open", "Preview", "Show Details"];
 const transferBehaviorOptions = ["Ask Every Time", "Use Default Location"];
@@ -126,37 +135,34 @@ const keymapOptions = ["System", "VS Code", "Finder"];
 const conflictOptions = ["Keep Newest", "Ask Me", "Keep Both"];
 
 const settingsControlButtonClass =
-  "inline-flex h-8 w-[220px] items-center justify-center gap-1.5 rounded-md border border-white/10 bg-white/[0.055] text-[15px] font-semibold text-[#f4f4f5] transition hover:border-white/20 hover:bg-white/[0.09] disabled:opacity-55";
+  "w-[220px] max-w-full gap-1.5";
 
-const settingsControlButtonCompactClass = `${settingsControlButtonClass} w-[100px]`;
+const settingsControlButtonCompactClass = "min-w-24 gap-1.5";
 
 const settingsPrimaryButtonClass =
-  "inline-flex h-[34px] w-[140px] items-center justify-center rounded-md border border-[#f4f4f5] bg-[#f4f4f5] text-[15px] font-bold text-[#07090b] transition hover:bg-white disabled:opacity-55";
+  "min-w-32";
 
 const settingsReferenceListClass = "grid min-w-0";
 
 const settingsReferenceRowClass =
-  "grid min-h-[54px] grid-cols-[minmax(0,0.52fr)_minmax(220px,0.48fr)] items-center gap-[18px] border-b border-white/[0.08] px-7 py-[7px] text-sm text-[#f4f4f5]";
+  "grid min-h-[54px] grid-cols-[minmax(0,0.52fr)_minmax(220px,0.48fr)] items-center gap-[18px] border-b border-border/60 px-5 py-2 text-sm text-foreground";
 
-const settingsReferenceHeaderClass = "min-h-[42px] text-[15px]";
+const settingsReferenceHeaderClass = "min-h-10 bg-muted/40 text-xs font-medium text-muted-foreground";
 
 const settingsReferenceSpanClass = "min-w-0 [overflow-wrap:anywhere]";
 
-const settingsReferenceInputClass =
-  "h-9 w-full rounded-md border border-white/10 bg-[#07090b] px-2.5 text-[#f4f4f5] outline-none focus:border-white/30";
-
 const settingsIconDangerClass =
-  "grid h-[30px] w-[30px] place-items-center rounded-md border border-white/10 bg-white/[0.045] text-[#f4f4f5] transition hover:border-[#fca5a5]/40 hover:text-[#fca5a5] disabled:opacity-55";
+  "size-[30px] border-destructive/25 text-destructive hover:bg-destructive/10 hover:text-destructive";
 
-const settingsInlineActionsClass = "flex items-center gap-3 px-7 py-4";
+const settingsInlineActionsClass = "flex items-center gap-3 px-5 py-4";
 
-const settingsEmptyClass = "px-7 py-4 text-sm text-[#8f8f8f]";
+const settingsEmptyClass = "px-5 py-4 text-sm text-muted-foreground";
 
 const settingsFontRowClass =
-  "grid min-h-[54px] grid-cols-[minmax(110px,0.24fr)_minmax(0,1fr)_32px] items-center gap-[18px] border-b border-white/[0.08] px-7 py-[7px] text-sm text-[#f4f4f5]";
+  "grid min-h-[54px] grid-cols-[minmax(110px,0.24fr)_minmax(0,1fr)_32px] items-center gap-[18px] border-b border-border/60 px-5 py-2 text-sm text-foreground";
 
 const settingsAssociationRowClass =
-  "grid min-h-[54px] grid-cols-[minmax(110px,0.22fr)_minmax(0,1fr)_32px] items-center gap-[18px] border-b border-white/[0.08] px-7 py-[7px] text-sm text-[#f4f4f5]";
+  "grid min-h-[54px] grid-cols-[minmax(110px,0.22fr)_minmax(0,1fr)_32px] items-center gap-[18px] border-b border-border/60 px-5 py-2 text-sm text-foreground";
 
 export const SettingsWorkspace = memo(function SettingsWorkspace(props: {
   presentation?: "page" | "overlay";
@@ -195,11 +201,6 @@ export const SettingsWorkspace = memo(function SettingsWorkspace(props: {
   const document = settings?.document ?? {};
   const title =
     navItems.find((item) => item.id === activeSection)?.label ?? "General";
-  const activeIcon =
-    navItems.find((item) => item.id === activeSection)?.icon ?? Settings2;
-  const ActiveIcon = activeIcon;
-  const overlay = props.presentation === "overlay";
-
   const controlProps = {
     document,
     launchOnLogin,
@@ -215,130 +216,63 @@ export const SettingsWorkspace = memo(function SettingsWorkspace(props: {
   };
 
   return (
-    <section
-      className={overlay ? settingsOverlayGridClass : settingsGridClass}
-      aria-label="Settings"
+    <DesktopSettingsFrame
+      activeId={activeSection}
+      ariaLabel="Settings"
+      description={sectionDescriptions[activeSection]}
+      items={navItems}
+      navigationLabel="Settings sections"
+      navigationTitle="Misty settings"
+      onClose={props.onClose}
+      onSelect={setActiveSection}
+      presentation={props.presentation}
+      title={title}
     >
-      <aside className={settingsSidebarClass} aria-label="Settings sections">
-        {navGroups.map((group) => (
-          <div className="grid gap-[5px]" key={group.label}>
-            <span className="px-2 pb-3 pt-2 text-[10px] font-bold capitalize text-[#767676]">
-              {overlay ? "Settings" : group.label}
-            </span>
-            {group.items.map((item) => {
-              const Icon = item.icon;
-              return (
-                <button
-                  key={item.id}
-                  type="button"
-                  className={`${settingsNavItemClass} ${activeSection === item.id ? settingsNavItemSelectedClass : ""}`}
-                  onClick={() => setActiveSection(item.id)}
-                >
-                  <Icon size={18} strokeWidth={1.8} />
-                  <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">
-                    {item.label}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        ))}
-      </aside>
-      <div className="w-px bg-white/10" />
-      {overlay ? (
-        <main className={settingsOverlayContentShellClass}>
-          <header className={settingsOverlayHeaderClass}>
-            <div className="flex min-w-0 items-center gap-3">
-              <ActiveIcon
-                size={17}
-                strokeWidth={1.8}
-                className="shrink-0 text-[#8d8d8d]"
-              />
-              <h1 className="m-0 min-w-0 truncate text-[15px] font-[740] leading-tight tracking-normal text-[#f4f4f5]">
-                {title}
-              </h1>
-            </div>
-            <button
-              type="button"
-              className={settingsOverlayCloseClass}
-              aria-label="Close settings"
-              title="Close settings"
-              onClick={props.onClose}
-            >
-              <X size={17} strokeWidth={1.8} />
-            </button>
-          </header>
-          <SettingsContent
-            activeSection={activeSection}
-            className={settingsOverlayContentClass}
-            controlProps={controlProps}
-            surfaceClassName={settingsOverlayScrollSurfaceClass}
-            title={null}
-          />
-        </main>
-      ) : (
-        <SettingsContent
-          activeSection={activeSection}
-          className={settingsContentClass}
-          controlProps={controlProps}
-          surfaceClassName={settingsScrollSurfaceClass}
-          title={title}
-        />
-      )}
-    </section>
+      <SettingsContent activeSection={activeSection} controlProps={controlProps} />
+    </DesktopSettingsFrame>
   );
 });
 
 function SettingsContent(props: {
   activeSection: SettingsSection;
-  className: string;
   controlProps: SettingsContentProps;
-  surfaceClassName: string;
-  title: string | null;
 }) {
   return (
-    <main className={props.className}>
-      <div className={props.surfaceClassName}>
-        {props.title ? (
-          <h1 className="mb-[18px] mt-1 text-[28px] font-[760] leading-[1.15] tracking-normal text-[#f4f4f5]">
-            {props.title}
-          </h1>
-        ) : null}
-        {props.activeSection === "general" ? (
-          <GeneralSettings {...props.controlProps} />
-        ) : null}
-        {props.activeSection === "app" ? (
-          <AppSettings {...props.controlProps} />
-        ) : null}
-        {props.activeSection === "assistant" ? (
-          <AssistantSettings {...props.controlProps} />
-        ) : null}
-        {props.activeSection === "appearance" ? (
-          <AppearanceSettings {...props.controlProps} />
-        ) : null}
-        {props.activeSection === "privacy" ? (
-          <PrivacySettings {...props.controlProps} />
-        ) : null}
-        {props.activeSection === "sync" ? (
-          <SyncSettings {...props.controlProps} />
-        ) : null}
-        {props.activeSection === "transfers" ? (
-          <TransfersSettings {...props.controlProps} />
-        ) : null}
-        {props.activeSection === "search" ? (
-          <SearchSettings {...props.controlProps} />
-        ) : null}
-        {props.activeSection === "notifications" ? (
-          <NotificationsSettings {...props.controlProps} />
-        ) : null}
-        {props.activeSection === "shortcuts" ? (
-          <ShortcutsSettings {...props.controlProps} />
-        ) : null}
-        {props.activeSection === "advanced" ? (
-          <AdvancedSettings {...props.controlProps} />
-        ) : null}
-      </div>
-    </main>
+    <>
+      {props.activeSection === "general" ? (
+        <GeneralSettings {...props.controlProps} />
+      ) : null}
+      {props.activeSection === "app" ? (
+        <AppSettings {...props.controlProps} />
+      ) : null}
+      {props.activeSection === "assistant" ? (
+        <AssistantSettings {...props.controlProps} />
+      ) : null}
+      {props.activeSection === "appearance" ? (
+        <AppearanceSettings {...props.controlProps} />
+      ) : null}
+      {props.activeSection === "privacy" ? (
+        <PrivacySettings {...props.controlProps} />
+      ) : null}
+      {props.activeSection === "sync" ? (
+        <SyncSettings {...props.controlProps} />
+      ) : null}
+      {props.activeSection === "transfers" ? (
+        <TransfersSettings {...props.controlProps} />
+      ) : null}
+      {props.activeSection === "search" ? (
+        <SearchSettings {...props.controlProps} />
+      ) : null}
+      {props.activeSection === "notifications" ? (
+        <NotificationsSettings {...props.controlProps} />
+      ) : null}
+      {props.activeSection === "shortcuts" ? (
+        <ShortcutsSettings {...props.controlProps} />
+      ) : null}
+      {props.activeSection === "advanced" ? (
+        <AdvancedSettings {...props.controlProps} />
+      ) : null}
+    </>
   );
 }
 
@@ -480,7 +414,7 @@ function AppSettings(props: SettingsContentProps) {
   return (
     <>
       <SettingsSectionBlock title="Updates">
-        <div className="bg-[#07090b] p-4">
+        <div className="bg-muted/30 p-4">
           <InstallerCard embedded variant="compact" />
         </div>
       </SettingsSectionBlock>
@@ -803,7 +737,9 @@ function AppearanceSettings(props: SettingsContentProps) {
               >
                 {font.path}
               </span>
-              <button
+              <Button
+                variant="outline"
+                size="icon"
                 type="button"
                 className={settingsIconDangerClass}
                 aria-label={`Remove ${font.label || font.path}`}
@@ -811,7 +747,7 @@ function AppearanceSettings(props: SettingsContentProps) {
                 onClick={() => removeCustomFont(index)}
               >
                 <Trash2 size={15} />
-              </button>
+              </Button>
             </div>
           ))}
           {customFonts.length === 0 ? (
@@ -819,14 +755,16 @@ function AppearanceSettings(props: SettingsContentProps) {
           ) : null}
         </div>
         <div className={settingsInlineActionsClass}>
-          <button
+          <Button
+            variant="outline"
+            size="sm"
             type="button"
             className={settingsControlButtonCompactClass}
             disabled={props.working}
             onClick={() => void addCustomFont()}
           >
             Add Font
-          </button>
+          </Button>
         </div>
       </SettingsSectionBlock>
 
@@ -1196,7 +1134,7 @@ function SyncSettings(props: SettingsContentProps) {
                   />
                 )}
               </span>
-              <span className="grid justify-items-end gap-2 text-right text-[#a1a1aa]">
+              <span className="grid justify-items-end gap-2 text-right text-muted-foreground">
                 <span>
                   {profile.transfers} transfers / {profile.checkers} checks
                   {profile.bandwidthLimit ? ` · ${profile.bandwidthLimit}` : ""}
@@ -1228,7 +1166,9 @@ function SyncSettings(props: SettingsContentProps) {
                         updateProfile(profile.id, { bandwidthLimit: value })
                       }
                     />
-                    <button
+                    <Button
+                      variant="outline"
+                      size="sm"
                       className={settingsControlButtonCompactClass}
                       type="button"
                       disabled={props.working}
@@ -1239,8 +1179,10 @@ function SyncSettings(props: SettingsContentProps) {
                       }
                     >
                       {profile.checksum ? "Checksum" : "Fast"}
-                    </button>
-                    <button
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="icon"
                       className={settingsIconDangerClass}
                       type="button"
                       disabled={props.working}
@@ -1248,7 +1190,7 @@ function SyncSettings(props: SettingsContentProps) {
                       onClick={() => removeProfile(profile.id)}
                     >
                       <Trash2 size={15} strokeWidth={1.8} />
-                    </button>
+                    </Button>
                   </span>
                 ) : null}
               </span>
@@ -1256,14 +1198,14 @@ function SyncSettings(props: SettingsContentProps) {
           ))}
         </div>
         <div className={settingsInlineActionsClass}>
-          <button
+          <Button
             className={settingsPrimaryButtonClass}
             type="button"
             disabled={props.working}
             onClick={addProfile}
           >
             Add Profile
-          </button>
+          </Button>
         </div>
       </SettingsSectionBlock>
     </>
@@ -1366,21 +1308,21 @@ function SearchSettings(props: SettingsContentProps) {
       </SettingsSectionBlock>
 
       <SettingsSectionBlock title="Files available to search">
-        <div className="grid gap-4 px-7 py-5">
+        <div className="grid gap-4 px-5 py-5">
           <div className="flex items-start justify-between gap-5">
             <div className="flex min-w-0 gap-3">
-              <div className="grid size-10 shrink-0 place-items-center rounded-xl bg-white/[0.06] text-[#d7dce4]">
-                {scanActive ? <Loader2 className="animate-spin" size={18} /> : <HardDrive size={18} />}
+              <div className="grid size-10 shrink-0 place-items-center rounded-lg bg-muted text-muted-foreground">
+                {scanActive ? <Spinner label="Checking files" size="lg" /> : <HardDrive size={18} />}
               </div>
               <div className="grid min-w-0 gap-1">
-                <strong className="text-[15px] text-[#f4f4f5]">
+                <strong className="text-sm font-medium text-foreground">
                   {scanActive
                     ? "Checking for file changes"
                     : indexedItems
                       ? "Search is kept up to date"
                       : "Ready for the first check"}
                 </strong>
-                <span className="text-sm leading-relaxed text-[#8f8f8f]">
+                <span className="text-sm leading-relaxed text-muted-foreground">
                   {scanActive
                     ? `${scanProgress.toLocaleString()} items checked${status?.currentPath ? ` · ${shortPath(status.currentPath)}` : ""}`
                     : status?.lastScanTimeMs
@@ -1388,36 +1330,36 @@ function SearchSettings(props: SettingsContentProps) {
                       : "Run the first check to make filenames and folders available from Spotlight."}
                 </span>
                 {error || status?.lastScanError ? (
-                  <span className="text-sm text-[#e5a2a2]">{userFacingErrorText(error || status?.lastScanError)}</span>
+                  <span className="text-sm text-destructive">{userFacingErrorText(error || status?.lastScanError)}</span>
                 ) : null}
               </div>
             </div>
             {scanActive ? (
-              <button className={settingsControlButtonCompactClass} type="button" onClick={() => void cancelScan()}>Stop</button>
+              <Button variant="outline" size="sm" className={settingsControlButtonCompactClass} type="button" onClick={() => void cancelScan()}>Stop</Button>
             ) : (
-              <button className={settingsControlButtonClass} type="button" onClick={() => void startScan("")}>
+              <Button variant="outline" className={settingsControlButtonClass} type="button" onClick={() => void startScan("")}>
                 Check now
-              </button>
+              </Button>
             )}
           </div>
-          <div className="grid grid-cols-3 gap-2 border-t border-white/[0.08] pt-4">
+          <div className="grid grid-cols-3 gap-2 border-t border-border/60 pt-4 max-[720px]:grid-cols-1">
             <SearchStatCard label="Searchable" value={indexedItems.toLocaleString()} compact />
             <SearchStatCard label="On this device" value={(status?.indexedLocalItemCount ?? 0).toLocaleString()} compact />
             <SearchStatCard label="Cloud files" value={(status?.indexedRemoteItemCount ?? 0).toLocaleString()} compact />
           </div>
-          <p className="m-0 text-xs leading-relaxed text-[#747b85]">
+          <p className="m-0 text-xs leading-relaxed text-muted-foreground">
             Covered: {friendlyCoverage(indexedLocalRoots, indexedRemoteNames)}. Common build and cache folders are skipped automatically.
           </p>
           <div className="flex flex-wrap gap-2">
             {indexedLocalRoots.map((root, index) => (
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-white/[0.08] bg-white/[0.035] px-2.5 py-1 text-xs text-[#9aa1aa]" key={root} title={root}>
+              <Badge variant="secondary" className="gap-1.5" key={root} title={root}>
                 <FolderOpen size={12} />{coverageRootLabel(root, index)}
-              </span>
+              </Badge>
             ))}
             {indexedRemoteNames.map((name) => (
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-white/[0.08] bg-white/[0.035] px-2.5 py-1 text-xs text-[#9aa1aa]" key={name}>
+              <Badge variant="secondary" className="gap-1.5" key={name}>
                 <Cloud size={12} />{name}
-              </span>
+              </Badge>
             ))}
           </div>
         </div>
@@ -1440,7 +1382,7 @@ function SearchSettings(props: SettingsContentProps) {
                 <span className={settingsReferenceSpanClass}>
                   {scanError.source}
                 </span>
-                <span className="min-w-0 [overflow-wrap:anywhere] text-[#d6a0a0]">
+                <span className="min-w-0 [overflow-wrap:anywhere] text-destructive">
                   {userFacingErrorText(scanError.message)}
                 </span>
               </div>
@@ -1455,9 +1397,9 @@ function SearchSettings(props: SettingsContentProps) {
 
 function SearchHealthCard(props: { icon: ReactNode; title: string; value: string; detail: string; active?: boolean; attention?: boolean }) {
   return (
-    <div className="grid min-h-[118px] grid-cols-[40px_minmax(0,1fr)] gap-3 rounded-xl border border-white/10 bg-[var(--misty-app-surface-bg,#090b0d)] p-4">
-      <div className={`grid size-10 place-items-center rounded-xl ${props.attention ? "bg-[#776af0]/15 text-[#aaa2ff]" : "bg-white/[0.055] text-[#c5cad2]"}`}>{props.active ? <Loader2 className="animate-spin" size={19} /> : props.icon}</div>
-      <div className="grid content-center gap-1"><span className="text-xs text-[#7f8791]">{props.title}</span><strong className="text-lg text-[#f4f4f5]">{props.value}</strong><span className="text-xs leading-relaxed text-[#8f969f]">{props.detail}</span></div>
+    <div className="grid min-h-28 grid-cols-[40px_minmax(0,1fr)] gap-3 rounded-xl bg-card p-4 shadow-xs ring-1 ring-foreground/10">
+      <div className={`grid size-10 place-items-center rounded-lg ${props.attention ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"}`}>{props.active ? <Spinner label="Updating file search" size="lg" /> : props.icon}</div>
+      <div className="grid content-center gap-1"><span className="text-xs text-muted-foreground">{props.title}</span><strong className="text-lg font-semibold text-foreground">{props.value}</strong><span className="text-xs leading-relaxed text-muted-foreground">{props.detail}</span></div>
     </div>
   );
 }
@@ -1469,14 +1411,14 @@ function SearchStatCard(props: {
 }) {
   return (
     <div
-      className={`${props.compact ? "min-h-[54px]" : "min-h-[76px]"} grid content-center gap-1 rounded-md border border-white/10 bg-[#07090b] px-3`}
+      className={`${props.compact ? "min-h-[54px]" : "min-h-[76px]"} grid content-center gap-1 rounded-md bg-muted/45 px-3`}
     >
       <strong
-        className={`min-w-0 overflow-hidden text-ellipsis whitespace-nowrap ${props.compact ? "text-[17px]" : "text-[21px]"} font-[720] text-[#f4f4f5]`}
+        className={`min-w-0 overflow-hidden text-ellipsis whitespace-nowrap ${props.compact ? "text-base" : "text-xl"} font-semibold tabular-nums text-foreground`}
       >
         {props.value}
       </strong>
-      <span className="text-xs text-[#8f8f8f]">{props.label}</span>
+      <span className="text-xs text-muted-foreground">{props.label}</span>
     </div>
   );
 }
@@ -1744,8 +1686,7 @@ function ShortcutsSettings(props: SettingsContentProps) {
               <span className={settingsReferenceSpanClass}>
                 {binding.commandId}
               </span>
-              <input
-                className={settingsReferenceInputClass}
+              <Input
                 value={binding.shortcut}
                 disabled={props.working}
                 onChange={(event) =>
@@ -1756,22 +1697,24 @@ function ShortcutsSettings(props: SettingsContentProps) {
           ))}
         </div>
         <div className={settingsInlineActionsClass}>
-          <button
+          <Button
             type="button"
             className={settingsPrimaryButtonClass}
             disabled={props.working}
             onClick={() => void props.onSaveShortcuts()}
           >
             Save Changes
-          </button>
-          <button
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
             type="button"
             className={settingsControlButtonCompactClass}
             disabled={props.working}
             onClick={() => void props.onLoad()}
           >
             Reset
-          </button>
+          </Button>
         </div>
       </SettingsSectionBlock>
     </>
@@ -1930,7 +1873,9 @@ function AdvancedSettings(props: SettingsContentProps) {
               >
                 {association.applicationPath}
               </span>
-              <button
+              <Button
+                variant="outline"
+                size="icon"
                 type="button"
                 className={settingsIconDangerClass}
                 aria-label={`Remove ${association.key}`}
@@ -1940,7 +1885,7 @@ function AdvancedSettings(props: SettingsContentProps) {
                 }
               >
                 <Trash2 size={15} />
-              </button>
+              </Button>
             </div>
           ))}
           {props.openWithAssociations.length === 0 ? (
@@ -2028,7 +1973,7 @@ function AdvancedSettings(props: SettingsContentProps) {
 
 function SettingsNote(props: { children: ReactNode }) {
   return (
-    <p className="m-0 max-w-[620px] px-7 py-4 text-[14px] leading-[1.35] text-[#8f8f8f]">
+    <p className="m-0 max-w-2xl px-5 py-4 text-sm leading-5 text-muted-foreground">
       {props.children}
     </p>
   );
@@ -2052,15 +1997,17 @@ function WorkspaceRootControl(props: {
   };
 
   return (
-    <div className="grid min-w-0 justify-items-end gap-2">
+    <div className="grid min-w-0 justify-items-end gap-2 max-[760px]:justify-items-start">
       <span
-        className={`max-w-[360px] overflow-hidden text-ellipsis whitespace-nowrap text-right text-[15px] ${props.value ? "text-[#f4f4f5]" : "text-[#8f8f8f]"}`}
+        className={`max-w-[360px] overflow-hidden text-ellipsis whitespace-nowrap text-right text-sm max-[760px]:text-left ${props.value ? "text-foreground" : "text-muted-foreground"}`}
         title={props.value || "Default"}
       >
         {props.value || "Default"}
       </span>
       <div className="flex items-center gap-2">
-        <button
+        <Button
+          variant="outline"
+          size="sm"
           type="button"
           className={settingsControlButtonCompactClass}
           disabled={props.disabled || !pickerAvailable}
@@ -2072,15 +2019,17 @@ function WorkspaceRootControl(props: {
           onClick={() => void chooseFolder()}
         >
           Choose
-        </button>
-        <button
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
           type="button"
           className={settingsControlButtonCompactClass}
           disabled={props.disabled || !props.value}
           onClick={() => props.onChange("")}
         >
           Reset
-        </button>
+        </Button>
       </div>
     </div>
   );
@@ -2125,15 +2074,16 @@ function WallpaperControl(props: {
   };
 
   return (
-    <div className="grid w-full min-w-0 justify-items-end gap-2">
+    <div className="grid w-full min-w-0 justify-items-end gap-2 max-[760px]:justify-items-start">
       <span
-        className={`block w-full min-w-0 max-w-[360px] overflow-hidden text-ellipsis whitespace-nowrap text-right text-[15px] ${props.value ? "text-[#f4f4f5]" : "text-[#8f8f8f]"}`}
+        className={`block w-full min-w-0 max-w-[360px] overflow-hidden text-ellipsis whitespace-nowrap text-right text-sm max-[760px]:text-left ${props.value ? "text-foreground" : "text-muted-foreground"}`}
         title={props.value || "None"}
       >
         {props.value || "None"}
       </span>
       <div className="grid w-full max-w-[360px] grid-cols-2 gap-2">
-        <button
+        <Button
+          variant="outline"
           type="button"
           className={`${settingsControlButtonClass} w-full`}
           disabled={props.disabled || !pickerAvailable}
@@ -2146,15 +2096,16 @@ function WallpaperControl(props: {
         >
           <Image size={15} />
           Choose
-        </button>
-        <button
+        </Button>
+        <Button
+          variant="outline"
           type="button"
           className={`${settingsControlButtonClass} w-full`}
           disabled={props.disabled || !props.value}
           onClick={() => props.onChange("")}
         >
           Reset
-        </button>
+        </Button>
       </div>
     </div>
   );
@@ -2166,88 +2117,39 @@ function OpacityControl(props: {
   onCommit: (value: number) => void;
 }) {
   const normalizedValue = clampOpacity(props.value);
-  const [draft, setDraft] = useState(normalizedValue);
-  const draftPercent = Math.round(draft * 100);
-  const thumbLeft = `calc(${draftPercent}% - ${(draftPercent / 100) * 22}px)`;
+  const [draftPercent, setDraftPercent] = useState(
+    Math.round(normalizedValue * 100),
+  );
 
   useEffect(() => {
-    setDraft(normalizedValue);
+    setDraftPercent(Math.round(normalizedValue * 100));
   }, [normalizedValue]);
 
-  const commitDraft = () => {
-    const nextValue = clampOpacity(draft);
+  const commitDraft = (percent = draftPercent) => {
+    const nextValue = clampOpacity(percent / 100);
     if (nextValue !== normalizedValue) props.onCommit(nextValue);
-  };
-  const setDraftFromPointer = (event: PointerEvent<HTMLButtonElement>) => {
-    if (props.disabled) return;
-    const rect = event.currentTarget.getBoundingClientRect();
-    const next = rect.width > 0 ? (event.clientX - rect.left) / rect.width : 0;
-    setDraft(clampOpacity(next));
-  };
-  const handlePointerDown = (event: PointerEvent<HTMLButtonElement>) => {
-    event.currentTarget.setPointerCapture(event.pointerId);
-    setDraftFromPointer(event);
-  };
-  const handleKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
-    if (props.disabled) return;
-    const step = event.shiftKey ? 0.1 : 0.01;
-    let nextValue: number | null = null;
-    if (event.key === "ArrowLeft" || event.key === "ArrowDown")
-      nextValue = draft - step;
-    if (event.key === "ArrowRight" || event.key === "ArrowUp")
-      nextValue = draft + step;
-    if (event.key === "Home") nextValue = 0;
-    if (event.key === "End") nextValue = 1;
-    if (nextValue === null) return;
-    event.preventDefault();
-    setDraft(clampOpacity(nextValue));
   };
 
   return (
-    <div className="grid w-full min-w-0 max-w-[360px] justify-items-end gap-2">
-      <span className="text-[15px] font-semibold text-[#f4f4f5]">
+    <div className="grid w-full min-w-0 max-w-[360px] justify-items-end gap-2 max-[760px]:justify-items-start">
+      <span className="text-sm font-medium tabular-nums text-foreground">
         {draftPercent}%
       </span>
-      <button
-        type="button"
-        className="settings-opacity-range-wrap"
-        disabled={props.disabled}
-        role="slider"
+      <Slider
         aria-label="Panel opacity"
-        aria-valuemin={0}
-        aria-valuemax={100}
-        aria-valuenow={draftPercent}
-        onBlur={commitDraft}
-        onKeyDown={handleKeyDown}
-        onKeyUp={(event) => {
-          if (
-            event.key.startsWith("Arrow") ||
-            event.key === "Home" ||
-            event.key === "End"
-          ) {
-            commitDraft();
-          }
+        className="h-8 w-[220px] max-w-full"
+        disabled={props.disabled}
+        min={0}
+        max={100}
+        step={1}
+        value={[draftPercent]}
+        onValueChange={(values) => {
+          setDraftPercent(values[0] ?? draftPercent);
         }}
-        onPointerDown={handlePointerDown}
-        onPointerMove={(event) => {
-          if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-            setDraftFromPointer(event);
-          }
+        onValueCommit={(values) => {
+          commitDraft(values[0] ?? draftPercent);
         }}
-        onPointerUp={(event) => {
-          if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-            event.currentTarget.releasePointerCapture(event.pointerId);
-          }
-          commitDraft();
-        }}
-      >
-        <div className="settings-opacity-range-track" aria-hidden="true">
-          <span
-            className="settings-opacity-range-thumb"
-            style={{ left: thumbLeft }}
-          />
-        </div>
-      </button>
+      />
     </div>
   );
 }
@@ -2259,24 +2161,18 @@ function SelectControl(props: {
   onChange: (value: number) => void;
 }) {
   return (
-    <label className="relative block h-9 w-[220px] overflow-hidden rounded-md border border-white/10 bg-[#050607] text-[#f4f4f5] transition focus-within:border-white/30">
-      <select
-        className="h-full w-full appearance-none border-0 bg-transparent py-0 pl-2.5 pr-[38px] text-[15px] font-semibold text-inherit outline-none"
-        value={Math.min(props.value, props.options.length - 1)}
-        disabled={props.disabled}
-        onChange={(event) => props.onChange(Number(event.target.value))}
-      >
+    <Select value={String(Math.min(props.value, props.options.length - 1))} disabled={props.disabled} onValueChange={(value) => props.onChange(Number(value))}>
+      <SelectTrigger className="w-[220px] max-w-full">
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
         {props.options.map((option, index) => (
-          <option key={option} value={index}>
+          <SelectItem key={option} value={String(index)}>
             {option}
-          </option>
+          </SelectItem>
         ))}
-      </select>
-      <ChevronDown
-        className="pointer-events-none absolute right-2.5 top-2 text-[#f4f4f5]"
-        size={18}
-      />
-    </label>
+      </SelectContent>
+    </Select>
   );
 }
 
@@ -2286,26 +2182,7 @@ function SwitchControl(props: {
   onChange: (value: boolean) => void;
 }) {
   return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={props.checked}
-      className={`relative h-[24px] w-[44px] rounded-full border p-0 transition-colors duration-150 disabled:opacity-50 ${
-        props.checked
-          ? "border-[#f4f4f5] bg-[#f4f4f5]"
-          : "border-white/15 bg-white/[0.055]"
-      }`}
-      disabled={props.disabled}
-      onClick={() => props.onChange(!props.checked)}
-    >
-      <span
-        className={`absolute left-[2px] top-1/2 size-[18px] -translate-y-1/2 rounded-full transition-transform duration-150 ${
-          props.checked
-            ? "translate-x-[20px] bg-[#07090b] shadow-[0_1px_4px_rgba(0,0,0,0.42)]"
-            : "translate-x-0 bg-[#d4d4d8] shadow-[0_1px_4px_rgba(0,0,0,0.32)]"
-        }`}
-      />
-    </button>
+    <Switch checked={props.checked} disabled={props.disabled} onCheckedChange={props.onChange} />
   );
 }
 
@@ -2323,9 +2200,9 @@ function TextControl(props: {
   };
 
   return (
-    <input
+    <Input
       key={props.value}
-      className={`h-9 rounded-md border border-white/10 bg-[#050607] px-2.5 text-sm text-[#f4f4f5] outline-none transition focus:border-white/30 disabled:opacity-55 ${props.wide ? "w-[min(520px,52vw)]" : "w-[220px]"}`}
+      className={props.wide ? "w-full max-w-[520px]" : "w-[220px] max-w-full"}
       defaultValue={props.value}
       placeholder={props.placeholder}
       disabled={props.disabled}
@@ -2353,11 +2230,11 @@ function ProfileNumberInput(props: {
     if (next !== props.value) props.onCommit(next);
   };
   return (
-    <label className="grid gap-1 text-left text-[11px] text-[#a1a1aa]">
+    <label className="grid gap-1 text-left text-[11px] text-muted-foreground">
       {props.label}
-      <input
+      <Input
         key={props.value}
-        className="h-8 w-[76px] rounded-md border border-white/10 bg-[#050607] px-2 text-sm text-[#f4f4f5] outline-none transition focus:border-white/30 disabled:opacity-55"
+        className="h-8 w-[76px]"
         defaultValue={props.value}
         disabled={props.disabled}
         inputMode="numeric"
@@ -2383,11 +2260,11 @@ function ProfileTextInput(props: {
       props.onCommit(event.currentTarget.value.trim());
   };
   return (
-    <label className="grid gap-1 text-left text-[11px] text-[#a1a1aa]">
+    <label className="grid gap-1 text-left text-[11px] text-muted-foreground">
       {props.label}
-      <input
+      <Input
         key={props.value}
-        className="h-8 w-[92px] rounded-md border border-white/10 bg-[#050607] px-2 text-sm text-[#f4f4f5] outline-none transition focus:border-white/30 disabled:opacity-55"
+        className="h-8 w-[92px]"
         defaultValue={props.value}
         disabled={props.disabled}
         placeholder="None"
@@ -2403,7 +2280,7 @@ function ProfileTextInput(props: {
 function ValueText(props: { value: string; muted?: boolean }) {
   return (
     <span
-      className={`max-w-[360px] overflow-hidden text-ellipsis whitespace-nowrap text-right text-[15px] ${props.muted ? "text-[#8f8f8f]" : "text-[#f4f4f5]"}`}
+      className={`max-w-[360px] overflow-hidden text-ellipsis whitespace-nowrap text-right text-sm max-[760px]:text-left ${props.muted ? "text-muted-foreground" : "text-foreground"}`}
     >
       {props.value}
     </span>
@@ -2417,23 +2294,24 @@ function CopyableValueText(props: { value: string; disabled?: boolean }) {
   };
 
   return (
-    <span className="flex min-w-0 max-w-[420px] items-center justify-end gap-2">
+    <span className="flex min-w-0 max-w-[420px] items-center justify-end gap-2 max-[760px]:justify-start">
       <span
-        className={`min-w-0 select-text overflow-hidden text-ellipsis whitespace-nowrap text-right text-[15px] ${props.disabled ? "text-[#8f8f8f]" : "text-[#f4f4f5]"}`}
+        className={`min-w-0 select-text overflow-hidden text-ellipsis whitespace-nowrap text-right text-sm max-[760px]:text-left ${props.disabled ? "text-muted-foreground" : "text-foreground"}`}
         title={props.value}
       >
         {props.value}
       </span>
-      <button
+      <Button
+        variant="outline"
+        size="icon"
         type="button"
-        className="grid h-[30px] w-[30px] shrink-0 place-items-center rounded-md border border-white/10 bg-white/[0.045] text-[#f4f4f5] transition hover:border-white/20 hover:bg-white/[0.09] disabled:opacity-55"
         disabled={props.disabled}
         aria-label="Copy value"
         title="Copy"
         onClick={copyValue}
       >
         <Copy size={14} />
-      </button>
+      </Button>
     </span>
   );
 }

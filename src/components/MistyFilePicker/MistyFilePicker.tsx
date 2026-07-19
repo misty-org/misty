@@ -1,18 +1,24 @@
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { MouseEvent as ReactMouseEvent } from "react";
-import { createPortal } from "react-dom";
 import {
   CloudDownload,
   FolderOpen,
-  X,
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { devicesSnapshot, explorerListDirectory } from "../../api/misty";
 import type { DirectoryListing, FileEntry, MountedDevice, ProviderRemote } from "../../api/types";
 import { FileBrowser } from "../../pages/Files/components/FileBrowser";
 import { ExplorerPickerSidebar } from "../../pages/Files/components/ExplorerPickerSidebar";
 import { ExplorerPickerToolbar } from "../../pages/Files/components/ExplorerPickerToolbar";
 import { errorText } from "../../shared/format";
-import { useDialogFocus } from "../../shared/hooks/useDialogFocus";
 import { useMultiPanelStore } from "../../shared/multipanel/useMultiPanelStore";
 import { useAppStore } from "../../stores/useAppStore";
 import { sortListing, useExplorerStore } from "../../stores/useExplorerStore";
@@ -29,7 +35,6 @@ export type MistyFilePickerMode = "file" | "folder";
 const emptyProviderRemotes: ProviderRemote[] = [];
 const emptyMountedDevices: MountedDevice[] = [];
 const emptyCutPaths = new Set<string>();
-const pickerControlClass = "inline-grid place-items-center rounded-lg border border-[var(--misty-border-soft)] bg-[var(--misty-neutral-control-bg,var(--misty-surface-2))] text-[var(--misty-text-muted)] transition-colors hover:bg-[var(--misty-neutral-hover-bg,var(--misty-surface-3))] hover:text-[var(--misty-text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30 disabled:cursor-default disabled:opacity-35";
 
 export interface MistyFilePickerProps {
   mode: MistyFilePickerMode;
@@ -78,10 +83,6 @@ export function MistyFilePicker({
   const [error, setError] = useState<string | null>(null);
   const requestId = useRef(0);
   const selectionAnchorId = useRef<string | null>(null);
-  const pickerDialog = useDialogFocus<HTMLElement>(true);
-  const titleId = useId();
-  const descriptionId = useId();
-  const cloudNoticeId = useId();
 
   const mountRoot = useMemo(() => {
     const general = selectGeneralPreferences(settingsDocument);
@@ -252,56 +253,20 @@ export function MistyFilePicker({
       : { column, direction: "asc" });
   };
 
-  const handleDialogKeyDown = (event: React.KeyboardEvent<HTMLElement>) => {
-    if (event.key === "Escape") {
-      event.preventDefault();
-      event.stopPropagation();
-      onCancel();
-      return;
-    }
-    if (event.key !== "Tab" || !pickerDialog.dialogRef.current) return;
-    const focusable = Array.from(pickerDialog.dialogRef.current.querySelectorAll<HTMLElement>(
-      'button:not(:disabled), [href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])',
-    )).filter((element) => element.getAttribute("aria-hidden") !== "true");
-    if (focusable.length === 0) {
-      event.preventDefault();
-      pickerDialog.dialogRef.current.focus();
-      return;
-    }
-    const first = focusable[0];
-    const last = focusable[focusable.length - 1];
-    if (event.shiftKey && document.activeElement === first) {
-      event.preventDefault();
-      last.focus();
-    } else if (!event.shiftKey && document.activeElement === last) {
-      event.preventDefault();
-      first.focus();
-    }
-  };
-
-  const picker = (
-    <div className="fixed bottom-0 left-[72px] right-0 top-[var(--misty-window-titlebar-inset)] z-[2147483100] grid place-items-center bg-black/60 p-6 backdrop-blur-md max-[800px]:left-0 max-[800px]:p-3 max-[560px]:p-0" role="presentation" onKeyDown={handleDialogKeyDown}>
-      <section
-        className="grid h-[min(680px,calc(100vh-88px))] w-[min(1100px,calc(100vw-140px))] grid-rows-[auto_auto_auto_minmax(0,1fr)_auto] overflow-hidden rounded-2xl border border-[var(--misty-border)] bg-[var(--misty-app-modal-bg,var(--misty-surface))] text-[var(--misty-text)] shadow-2xl outline-none max-[800px]:size-full max-[560px]:rounded-none"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-        aria-describedby={`${descriptionId}${showCloudNotice ? ` ${cloudNoticeId}` : ""}`}
-        ref={pickerDialog.dialogRef}
-        tabIndex={-1}
-      >
-        <header className="flex min-h-[76px] items-center justify-between gap-4 border-b border-[var(--misty-border-soft)] px-5">
+  return <Dialog open onOpenChange={(open) => { if (!open) onCancel(); }}>
+    <DialogContent className="grid h-[min(680px,calc(100vh-88px))] w-[min(1100px,calc(100vw-32px))] max-w-none grid-rows-[auto_auto_auto_minmax(0,1fr)_auto] gap-0 overflow-hidden rounded-2xl bg-[var(--misty-app-modal-bg,var(--popover))] p-0 text-foreground max-[560px]:size-full max-[560px]:rounded-none">
+        <DialogHeader className="flex min-h-[76px] grid-cols-[1fr_auto] items-center justify-between gap-4 border-b border-border px-5 py-0 text-left">
           <div className="flex min-w-0 items-center gap-3">
-            <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-[var(--misty-surface-2)] text-[var(--misty-text-muted)]"><FolderOpen size={20} /></span>
+            <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-muted text-muted-foreground"><FolderOpen size={20} /></span>
             <div>
-              <h2 className="m-0 text-[17px] font-semibold" id={titleId}>{title || (mode === "folder" ? "Choose a folder" : "Choose a file")}</h2>
-              <p className="mb-0 mt-1 text-xs leading-relaxed text-[var(--misty-text-subtle)]" id={descriptionId}>{multiple && mode === "file" ? "Select one or more files from Explorer and connected locations." : "Browse your current Explorer context and connected locations."}</p>
+              <DialogTitle className="text-[17px]">{title || (mode === "folder" ? "Choose a folder" : "Choose a file")}</DialogTitle>
+              <DialogDescription>{multiple && mode === "file" ? "Select one or more files from Explorer and connected locations." : "Browse your current Explorer context and connected locations."}</DialogDescription>
             </div>
           </div>
-          <button type="button" className={`${pickerControlClass} size-[38px] shrink-0`} data-dialog-autofocus aria-label="Close picker" onClick={onCancel}><X size={18} /></button>
-        </header>
+          <Button type="button" variant="ghost" size="icon" data-dialog-autofocus aria-label="Close picker" onClick={onCancel}>×</Button>
+        </DialogHeader>
 
-        <div className="border-b border-[var(--misty-divider-subtle)]">
+        <div className="border-b border-border">
           <ExplorerPickerToolbar
             path={listing?.path || initialPath || homeDir}
             query={searchQuery}
@@ -319,15 +284,15 @@ export function MistyFilePicker({
 
         <div className="min-h-0">
           {showCloudNotice ? (
-            <div className="flex min-h-11 items-center gap-2.5 border-b border-amber-200/20 bg-amber-300/5 px-4 py-2 text-xs leading-relaxed text-amber-100/80" id={cloudNoticeId} role="status">
+            <div className="flex min-h-11 items-center gap-2.5 border-b border-amber-500/20 bg-amber-500/10 px-4 py-2 text-xs leading-relaxed text-amber-500" role="status">
               <CloudDownload className="shrink-0" size={17} aria-hidden="true" />
-              <span><strong className="text-amber-100">Download required.</strong> You can browse cloud items here, but you must fully download an item to a local folder before choosing it.</span>
+              <span><strong>Download required.</strong> You can browse cloud items here, but you must fully download an item to a local folder before choosing it.</span>
             </div>
           ) : null}
         </div>
 
         <div className="grid min-h-0 grid-cols-[260px_minmax(0,1fr)] max-[980px]:grid-cols-[minmax(0,1fr)]">
-          <div className="min-h-0 overflow-hidden border-r border-[var(--misty-divider-subtle)] max-[980px]:hidden">
+          <div className="min-h-0 overflow-hidden border-r border-border max-[980px]:hidden">
             <ExplorerPickerSidebar
               homePath={homeDir}
               activePath={listing?.path || explorerPath || homeDir}
@@ -343,7 +308,7 @@ export function MistyFilePicker({
             />
           </div>
 
-          <main className="relative grid min-h-0 min-w-0 grid-rows-[minmax(0,1fr)] overflow-hidden bg-[var(--misty-surface)]">
+          <main className="relative grid min-h-0 min-w-0 grid-rows-[minmax(0,1fr)] overflow-hidden bg-background">
             <FileBrowser
               paneId="misty-file-picker"
               selectionOnly
@@ -376,29 +341,26 @@ export function MistyFilePicker({
               onInlineEditCommit={() => undefined}
               onInlineEditCancel={() => undefined}
             />
-            {loading && listing ? <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-0.5 animate-pulse bg-white/35" /> : null}
+            {loading && listing ? <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-0.5 animate-pulse bg-primary/60" /> : null}
           </main>
         </div>
 
-        <footer className="flex min-h-[72px] items-center justify-between gap-5 border-t border-[var(--misty-border-soft)] px-[18px]">
+        <DialogFooter className="mt-0 flex min-h-[72px] flex-row items-center justify-between gap-5 border-t border-border px-[18px]">
           <div className="grid min-w-0 gap-1 max-[800px]:hidden">
-            <span className="text-[10px] capitalize text-[var(--misty-text-subtle)]">{mode === "folder" ? "Folder" : multiple ? "Files" : "File"}</span>
-            <strong className="max-w-[560px] truncate text-xs font-semibold text-[var(--misty-text-muted)]" title={multiple && selectedPaths.length > 0 ? selectedPaths.join("\n") : selected?.path || listing?.path}>
+            <span className="text-[10px] capitalize text-muted-foreground">{mode === "folder" ? "Folder" : multiple ? "Files" : "File"}</span>
+            <strong className="max-w-[560px] truncate text-xs font-semibold text-foreground/80" title={multiple && selectedPaths.length > 0 ? selectedPaths.join("\n") : selected?.path || listing?.path}>
               {selectionIsCloud ? "Download this item locally before choosing it" : multiple && selectedPaths.length > 0 ? `${selectedPaths.length} file${selectedPaths.length === 1 ? "" : "s"} selected` : selected?.path || (mode === "folder" ? listing?.path : "Select a file")}
             </strong>
           </div>
           <div className="ml-auto flex shrink-0 gap-2">
-            <button type="button" className="inline-flex min-h-10 items-center justify-center rounded-lg border border-[var(--misty-border-soft)] bg-[var(--misty-neutral-control-bg,var(--misty-surface-2))] px-4 text-[13px] text-[var(--misty-text-muted)] hover:bg-[var(--misty-neutral-hover-bg,var(--misty-surface-3))] hover:text-[var(--misty-text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30" onClick={onCancel}>Cancel</button>
-            <button type="button" className="inline-flex min-h-10 items-center justify-center rounded-lg border border-[var(--misty-border-strong)] bg-[var(--misty-primary)] px-4 text-[13px] font-semibold text-[var(--misty-primary-contrast)] hover:bg-[var(--misty-primary-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30 disabled:cursor-default disabled:opacity-45" disabled={loading || !canChoose} onClick={choose}>
+            <Button type="button" variant="outline" onClick={onCancel}>Cancel</Button>
+            <Button type="button" disabled={loading || !canChoose} onClick={choose}>
               {mode === "folder" ? (selected ? "Choose folder" : "Choose this folder") : multiple ? selectedPaths.length > 0 ? `Choose ${selectedPaths.length} file${selectedPaths.length === 1 ? "" : "s"}` : "Choose files" : "Choose file"}
-            </button>
+            </Button>
           </div>
-        </footer>
-      </section>
-    </div>
-  );
-
-  return typeof document === "undefined" ? null : createPortal(picker, document.body);
+        </DialogFooter>
+    </DialogContent>
+  </Dialog>;
 }
 
 function joinPath(parent: string, child: string): string {

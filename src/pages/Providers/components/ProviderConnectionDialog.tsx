@@ -1,100 +1,85 @@
 import { useEffect, useMemo, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import type { ProviderWorkflow, ProviderWorkflowOption } from "../../../api/types";
 import { iconAssets } from "../../../shared/assets/icons";
 import { AssetIcon } from "../../../shared/components/AssetIcon";
 import { providerOptionsForConnection } from "../providerUtils";
 import type { ProviderConnectionSession } from "../../../stores/useProvidersStore";
 import { ProviderLogo } from "./ProviderLogo";
-
-const modalBackdropClass =
-  "fixed inset-0 z-[100] grid place-items-center bg-[rgba(3,7,10,0.72)] p-6";
+import { EmptyState } from "../../../components/misty";
 
 const providerDialogClass =
-  "flex max-h-[min(760px,calc(100vh-48px))] w-[min(620px,calc(100vw-48px))] flex-col overflow-hidden rounded-[10px] border border-[#35434e] bg-[#0d141a] shadow-[0_28px_90px_rgba(0,0,0,0.58)]";
+  "flex max-h-[min(760px,calc(100vh-48px))] w-[min(620px,calc(100vw-48px))] max-w-none flex-col overflow-hidden bg-popover p-0";
 
 const providerHeaderClass =
-  "flex items-start justify-between gap-5 border-b border-[#25313a] px-5 py-[18px]";
-
-const providerCloseButtonClass =
-  "grid h-[34px] w-[34px] place-items-center rounded-lg border border-[var(--misty-border-soft)] bg-[var(--misty-surface-2)] text-[var(--misty-text)] disabled:opacity-55";
+  "flex grid-cols-[1fr_auto] items-start justify-between gap-5 border-b border-border px-5 py-[18px] text-left";
 
 const providerProgressClass =
-  "grid grid-cols-3 border-b border-[#25313a] bg-[#0a1015] px-5 py-[11px]";
+  "grid grid-cols-3 border-b border-border bg-muted/35 px-5 py-[11px]";
 
 const providerBodyClass =
   "min-h-[280px] overflow-auto p-5";
 
 const providerFooterClass =
-  "flex justify-end gap-[9px] border-t border-[#25313a] px-5 py-3.5";
-
-const providerFooterButtonClass =
-  "inline-flex min-h-9 items-center justify-center gap-[7px] rounded-[7px] border border-[#35414b] bg-[#141c23] px-3.5 py-2 text-[#e8eaed] disabled:opacity-55";
-
-const providerPrimaryButtonClass =
-  `${providerFooterButtonClass} border-[#2879d5] bg-[#176fd1] text-white`;
+  "mt-0 flex-row justify-end gap-[9px] border-t border-border px-5 py-3.5";
 
 const providerWorkflowGridClass =
   "grid grid-cols-2 gap-2.5";
 
 const providerSearchClass =
-  "mb-3 grid gap-2 rounded-lg border border-[#25313a] bg-[#0a1117] p-3";
-
-const providerSearchInputClass =
-  "h-9 rounded-[7px] border border-[#303a44] bg-[#080d11] px-2.5 text-[#f0eee9] outline-none placeholder:text-[#66717d] focus:border-[#4779ae]";
+  "mb-3 grid gap-2 rounded-md bg-muted/35 p-3";
 
 const providerWorkflowButtonClass =
-  "grid min-w-0 grid-cols-[38px_minmax(0,1fr)_18px] items-center gap-[11px] rounded-lg border border-[#2e3943] bg-[#101820] p-3 text-left text-[#eef0f2] hover:border-[#4779ae] hover:bg-[#142536]";
+  "grid h-auto min-w-0 grid-cols-[38px_minmax(0,1fr)_18px] items-center justify-start gap-[11px] rounded-lg p-3 text-left";
 
 const providerWorkflowButtonSelectedClass =
-  "border-[#4779ae] bg-[#142536]";
+  "border-primary bg-primary/10";
 
 const providerWorkflowMarkClass =
-  "grid h-[38px] w-[38px] place-items-center text-[#9dcaff]";
+  "grid h-[38px] w-[38px] place-items-center text-primary";
 
 const providerFormClass =
   "mx-auto grid max-w-[560px] gap-3.5";
 
 const providerFieldClass =
-  "grid gap-2 text-[13px] font-semibold text-[#aab3bd]";
+  "grid gap-2 text-[13px] font-semibold text-muted-foreground";
 
 const providerFormHelpClass =
-  "text-[11px] font-medium normal-case text-[#78838f]";
-
-const providerSelectClass =
-  "min-h-11 w-full rounded-[7px] border border-[#34414d] bg-[#090f14] px-3 text-[#f0eee9] outline-none focus:border-[#5d99d8] focus:shadow-[0_0_0_2px_rgba(78,144,229,0.16)]";
-
-const providerInputWrapClass =
-  "grid min-h-11 grid-cols-[minmax(0,1fr)] items-center overflow-hidden rounded-[7px] border border-[#34414d] bg-[#090f14] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.018)] focus-within:border-[#5d99d8] focus-within:shadow-[0_0_0_2px_rgba(78,144,229,0.16)]";
-
-const providerSecretInputWrapClass =
-  `${providerInputWrapClass} grid-cols-[minmax(0,1fr)_42px]`;
-
-const providerTextInputClass =
-  "h-full min-h-11 w-full border-0 bg-transparent px-3 text-[#f0eee9] outline-none placeholder:text-[#66717d]";
-
-const providerSecretToggleClass =
-  "grid h-11 w-[42px] place-items-center border-0 border-l border-[#27323c] bg-transparent text-[#8f98a4] hover:text-[#e8eaed]";
+  "text-[11px] font-medium normal-case text-muted-foreground";
 
 const providerSummaryClass =
-  "flex items-center justify-between rounded-[7px] border border-[#25313a] bg-[#0a1117] px-3 py-2.5 text-[#8f98a4]";
+  "flex items-center justify-between rounded-md bg-muted/40 px-3 py-2.5 text-muted-foreground";
 
 const providerInstructionsClass =
-  "border-l-2 border-[#4779ae] pl-[11px] text-[13px]";
+  "border-l-2 border-primary pl-[11px] text-[13px] text-foreground";
 
 const providerAuthorizeStateClass =
   "mx-auto my-[30px] grid max-w-[430px] justify-items-center gap-2.5 text-center";
 
 const providerAuthorizeIconClass =
-  "grid h-[58px] w-[58px] place-items-center rounded-full border border-[#335578] bg-[#132538] text-[#91c5ff]";
+  "grid h-[58px] w-[58px] place-items-center rounded-full border border-primary/30 bg-primary/10 text-primary";
 
 const providerAuthorizeCompleteIconClass =
-  "border-[#397c55] bg-[#163424] text-[#91daa3]";
+  "border-[color-mix(in_srgb,var(--misty-success)_30%,transparent)] bg-[color-mix(in_srgb,var(--misty-success)_10%,transparent)] text-[var(--misty-success)]";
 
-const providerAuthLinkClass =
-  "inline-flex items-center gap-[7px] border-0 bg-transparent p-[5px] text-[#87bfff]";
-
-const providerErrorClass =
-  "mt-3.5 rounded-[7px] border border-[#6c363d] bg-[#251217] px-3 py-2.5 text-[13px] text-[#efa1a7]";
+const EMPTY_SELECT_VALUE = "__misty_empty__";
 
 interface ProviderConnectionDialogProps {
   session: ProviderConnectionSession;
@@ -130,17 +115,17 @@ export function ProviderConnectionDialog(props: ProviderConnectionDialogProps) {
   }, [props.onSubmit, session.inFlight, session.stage]);
 
   return (
-    <div className={modalBackdropClass} role="presentation">
-      <section className={providerDialogClass} role="dialog" aria-modal="true" aria-labelledby="provider-connect-title">
-        <header className={providerHeaderClass}>
+    <Dialog open onOpenChange={(open) => { if (!open) props.onClose(); }}>
+      <DialogContent className={`${providerDialogClass} [&>button:last-child]:hidden`}>
+        <DialogHeader className={providerHeaderClass}>
           <div>
-            <h2 className="text-xl" id="provider-connect-title">{title}</h2>
-            <p className="text-[13px]">{dialogSubtitle(session)}</p>
+            <DialogTitle className="text-xl">{title}</DialogTitle>
+            <DialogDescription className="text-[13px]">{dialogSubtitle(session)}</DialogDescription>
           </div>
-          <button className={providerCloseButtonClass} type="button" onClick={props.onClose} aria-label="Close">
+          <Button variant="ghost" size="icon" type="button" onClick={props.onClose} aria-label="Close">
             <AssetIcon src={iconAssets.x24} size={18} />
-          </button>
-        </header>
+          </Button>
+        </DialogHeader>
 
         <div className={providerProgressClass} aria-label="Connection progress">
           <ProgressStep label="Provider" active={session.stage === "provider"} complete={session.stage !== "provider"} />
@@ -173,15 +158,15 @@ export function ProviderConnectionDialog(props: ProviderConnectionDialogProps) {
               </div>
               <h3 className="m-0">Finish signing in with your provider</h3>
               <p className="leading-[1.55]">{session.step?.instructions || "Misty opened the authorization page in your browser and is waiting for it to finish."}</p>
-              <small className="text-[var(--misty-text-subtle)]">
+              <small className="text-muted-foreground">
                 {session.polling
                   ? `Checking authorization${session.authPollAttempts > 0 ? ` (${session.authPollAttempts})` : ""}...`
                   : "Return here after the browser sign-in completes."}
               </small>
               {session.step?.authorizeUrl ? (
-                <button className={providerAuthLinkClass} type="button" onClick={props.onOpenAuthorize}>
+                <Button variant="link" type="button" onClick={props.onOpenAuthorize}>
                   <AssetIcon src={iconAssets.cloud24} size={15} /> {session.openedAuthorizeUrl ? "Reopen authorization page" : "Open authorization page"}
-                </button>
+                </Button>
               ) : null}
             </div>
           ) : null}
@@ -194,33 +179,33 @@ export function ProviderConnectionDialog(props: ProviderConnectionDialogProps) {
             </div>
           ) : null}
 
-          {session.error ? <div className={providerErrorClass} role="alert">{session.error}</div> : null}
+          {session.error ? <Alert variant="destructive" className="mt-3.5"><AlertTitle>Connection error</AlertTitle><AlertDescription>{session.error}</AlertDescription></Alert> : null}
         </div>
 
-        <footer className={providerFooterClass}>
-          <button className={providerFooterButtonClass} type="button" onClick={props.onClose}>
+        <DialogFooter className={providerFooterClass}>
+          <Button variant="ghost" type="button" onClick={props.onClose}>
             {session.stage === "complete" ? "Close" : "Cancel"}
-          </button>
+          </Button>
           {session.stage === "provider" ? (
-            <button className={providerPrimaryButtonClass} type="button" onClick={props.onAdvance} disabled={!session.providerType}>
+            <Button type="button" onClick={props.onAdvance} disabled={!session.providerType}>
               Continue
-            </button>
+            </Button>
           ) : null}
           {session.stage === "configure" ? (
-            <button className={providerPrimaryButtonClass} type="button" onClick={() => props.onSubmit(false)} disabled={session.inFlight}>
+            <Button type="button" onClick={() => props.onSubmit(false)} disabled={session.inFlight}>
               <AssetIcon className={session.inFlight ? "animate-spin" : ""} src={session.inFlight ? iconAssets.sync16 : iconAssets.shieldLock24} size={16} />
               {submitLabel(session)}
-            </button>
+            </Button>
           ) : null}
           {session.stage === "authorize" ? (
-            <button className={providerPrimaryButtonClass} type="button" onClick={() => props.onSubmit(true)} disabled={session.inFlight}>
+            <Button type="button" onClick={() => props.onSubmit(true)} disabled={session.inFlight}>
               <AssetIcon className={session.inFlight ? "animate-spin" : ""} src={session.inFlight ? iconAssets.sync16 : iconAssets.shieldLock24} size={16} />
               {session.inFlight ? "Checking..." : "Check Again"}
-            </button>
+            </Button>
           ) : null}
-        </footer>
-      </section>
-    </div>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -235,17 +220,16 @@ function ProviderPicker(props: {
     [props.workflows, query],
   );
   if (props.workflows.length === 0) {
-    return <div className="m-[18px] text-[var(--misty-text-muted)]">No remote workflows are available. Refresh Remotes and check the remote service connection.</div>;
+    return <EmptyState compact title="No remote workflows available" description="Refresh Remotes and check the remote service connection."/>;
   }
   return (
     <>
       <label className={providerSearchClass}>
-        <span className="flex items-center justify-between gap-3 text-xs text-[#8f98a4]">
-          <strong className="text-[#dce1e6]">Provider backend</strong>
+        <span className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
+          <strong className="text-foreground">Provider backend</strong>
           <span>{filteredWorkflows.length} of {props.workflows.length}</span>
         </span>
-        <input
-          className={providerSearchInputClass}
+        <Input
           value={query}
           placeholder="Search cloud providers..."
           onChange={(event) => setQuery(event.target.value)}
@@ -263,9 +247,7 @@ function ProviderPicker(props: {
           ))}
         </div>
       ) : (
-        <div className="rounded-lg border border-dashed border-[#2e3943] p-5 text-center text-sm text-[#8f98a4]">
-          No rclone backends match this search.
-        </div>
+        <EmptyState compact title="No matching providers" description="Try a different provider name or backend."/>
       )}
     </>
   );
@@ -288,7 +270,8 @@ function ProviderWorkflowButton(props: {
   onSelect: () => void;
 }) {
   return (
-    <button
+    <Button
+      variant="outline"
       type="button"
       className={`${providerWorkflowButtonClass} ${props.selected ? providerWorkflowButtonSelectedClass : ""}`}
       onClick={props.onSelect}
@@ -298,10 +281,10 @@ function ProviderWorkflowButton(props: {
       </span>
       <span>
         <strong className="block overflow-hidden text-ellipsis">{props.workflow.name || props.workflow.type}</strong>
-        <small className="mt-[3px] block overflow-hidden text-ellipsis whitespace-nowrap text-[11px] text-[#8f98a4]">{props.workflow.description || props.workflow.type}</small>
+        <small className="mt-[3px] block overflow-hidden text-ellipsis whitespace-nowrap text-[11px] text-muted-foreground">{props.workflow.description || props.workflow.type}</small>
       </span>
       {props.selected ? <AssetIcon src={iconAssets.verified24} size={17} /> : null}
-    </button>
+    </Button>
   );
 }
 
@@ -317,8 +300,8 @@ function ProviderConfiguration(props: {
     <div className={providerFormClass}>
       <label className={providerFieldClass}>
         Remote name
-        <input
-          className={providerSelectClass}
+        <Input
+          className="h-11"
           value={props.session.remoteName}
           onChange={(event) => props.onName(event.target.value)}
           autoFocus={props.session.mode === "add"}
@@ -327,7 +310,7 @@ function ProviderConfiguration(props: {
       </label>
       <div className={providerSummaryClass}>
         <span>Provider</span>
-        <strong className="text-[#e8eaed]">{props.workflow?.name || props.session.providerType}</strong>
+        <strong className="text-foreground">{props.workflow?.name || props.session.providerType}</strong>
       </div>
       {options.map((option) => (
         <ProviderOptionField
@@ -357,22 +340,29 @@ function ProviderOptionField(props: {
     <label className={providerFieldClass}>
       {option.label || option.name}{option.required ? " *" : ""}
       {option.choices.length > 0 ? (
-        <select className={providerSelectClass} value={props.value} onChange={(event) => props.onChange(event.target.value)}>
+        <Select value={props.value || EMPTY_SELECT_VALUE} onValueChange={(nextValue) => props.onChange(nextValue === EMPTY_SELECT_VALUE ? "" : nextValue)}>
+          <SelectTrigger className="h-11">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
           {option.choices.map((choice) => (
-            <option key={choice.value} value={choice.value}>{choice.help || choice.value}</option>
+            <SelectItem key={choice.value || EMPTY_SELECT_VALUE} value={choice.value || EMPTY_SELECT_VALUE}>{choice.help || choice.value || "None"}</SelectItem>
           ))}
-        </select>
+          </SelectContent>
+        </Select>
       ) : (
-        <span className={secret ? providerSecretInputWrapClass : providerInputWrapClass}>
-          <input
-            className={providerTextInputClass}
+        <span className={secret ? "grid grid-cols-[minmax(0,1fr)_42px] items-center gap-1" : "grid"}>
+          <Input
+            className="h-11"
             value={props.value}
             type={secret && !props.sensitiveVisible ? "password" : "text"}
             onChange={(event) => props.onChange(event.target.value)}
           />
           {secret ? (
-            <button
-              className={providerSecretToggleClass}
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-11"
               type="button"
               title={props.sensitiveVisible ? "Hide sensitive value" : "Show sensitive value"}
               aria-label={props.sensitiveVisible ? "Hide sensitive value" : "Show sensitive value"}
@@ -380,7 +370,7 @@ function ProviderOptionField(props: {
               onClick={() => props.onSensitiveVisible(!props.sensitiveVisible)}
             >
               <AssetIcon src={props.sensitiveVisible ? iconAssets.eyeClosed16 : iconAssets.eye16} size={16} />
-            </button>
+            </Button>
           ) : null}
         </span>
       )}
@@ -391,14 +381,14 @@ function ProviderOptionField(props: {
 
 function ProgressStep(props: { label: string; active: boolean; complete: boolean }) {
   return (
-    <div className={`flex items-center justify-center gap-[7px] text-xs ${props.active || props.complete ? "text-[#dce1e6]" : "text-[#707985]"}`}>
+    <div className={`flex items-center justify-center gap-[7px] text-xs ${props.active || props.complete ? "text-foreground" : "text-muted-foreground"}`}>
       <span
         className={`block h-[12px] w-[12px] shrink-0 rounded-full ${
           props.complete || props.active
             ? props.complete
-              ? "bg-[#5ca875]"
-              : "bg-[#4e90e5]"
-            : "border border-[#4d5964] bg-transparent"
+              ? "bg-[var(--misty-success)]"
+              : "bg-primary"
+            : "border border-border bg-transparent"
         }`}
       />
       {props.label}

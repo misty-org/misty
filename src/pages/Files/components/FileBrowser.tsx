@@ -1,3 +1,4 @@
+import { Button } from "../../../components/ui/button";
 import {
   ChevronDown,
   ChevronUp,
@@ -193,14 +194,14 @@ export const FileBrowser = memo(function FileBrowser(props: FileBrowserProps) {
         <div className={fileBrowserStyles.footerRight}>
           <span className={fileBrowserStyles.footerItem}>{locationLabel}</span>
           <span className={fileBrowserStyles.footerSeparator} aria-hidden="true" />
-          <button
+          <Button
             className={`${fileBrowserStyles.footerButton} ${props.showHidden ? fileBrowserStyles.footerButtonActive : ""}`}
             type="button"
             title={props.showHidden ? "Hide hidden files" : "Show hidden files"}
             onClick={props.onToggleHidden}
           >
             {props.listing.hiddenCount} hidden
-          </button>
+          </Button>
           <span className={fileBrowserStyles.footerSeparator} aria-hidden="true" />
           <span className={fileBrowserStyles.footerItem}>{syncLabel}</span>
         </div>
@@ -426,7 +427,7 @@ function FileTable(props: FileBrowserProps & { listing: DirectoryListing }) {
   return (
     <div className={`${fileBrowserStyles.tableWrap} relative`}>
       {columnsDirty ? (
-        <button
+        <Button
           type="button"
           className={fileBrowserStyles.tableResetButton}
           title="Reset columns"
@@ -434,7 +435,7 @@ function FileTable(props: FileBrowserProps & { listing: DirectoryListing }) {
           onClick={resetColumnWidths}
         >
           <RotateCcw size={14} />
-        </button>
+        </Button>
       ) : null}
       <div ref={headerRef} className={fileBrowserStyles.tableHeaderWrap}>
         <table className={fileBrowserStyles.table} style={{ width: renderedTableWidth, minWidth: renderedTableWidth }}>
@@ -529,12 +530,12 @@ const SortableHeader = memo(function SortableHeader(props: {
       aria-sort={active ? (direction === "asc" ? "ascending" : "descending") : "none"}
       className={`${fileBrowserStyles.tableHeadCell} ${props.column === "size" ? fileBrowserStyles.tableNumericHeader : ""}`}
     >
-      <button className={`${fileBrowserStyles.tableSort} ${active ? fileBrowserStyles.tableSortActive : ""}`} onClick={() => props.onSort(props.column)}>
+      <Button className={`${fileBrowserStyles.tableSort} ${active ? fileBrowserStyles.tableSortActive : ""}`} onClick={() => props.onSort(props.column)}>
         <span className={fileBrowserStyles.tableSortLabel}>{props.label}</span>
         <span className={fileBrowserStyles.tableSortIndicator}>
           {active ? (direction === "asc" ? <ChevronUp size={13} /> : <ChevronDown size={13} />) : null}
         </span>
-      </button>
+      </Button>
       <span
         className={`${fileBrowserStyles.tableResizeHandle} ${props.resizing ? fileBrowserStyles.tableResizeHandleActive : ""}`}
         aria-hidden="true"
@@ -663,7 +664,7 @@ function FileTableCell(props: {
         <td className={fileBrowserStyles.tableCell}>
           <span>{props.entry.kind === "folder" ? "Folder" : props.entry.mimeType || props.entry.extension || props.entry.kind}</span>
           {props.showDownload && isDownloadableRemoteFile(props.entry) ? (
-            <button
+            <Button
               type="button"
               className={`${fileBrowserStyles.downloadButton} ${fileBrowserStyles.rowDownloadButton}`}
               title="Download"
@@ -675,7 +676,7 @@ function FileTableCell(props: {
               onPointerDown={(event) => event.stopPropagation()}
             >
               <Download size={15} />
-            </button>
+            </Button>
           ) : null}
         </td>
       );
@@ -916,7 +917,7 @@ const FileGridItem = memo(function FileGridItem(props: {
       onContextMenu={props.selectionOnly ? (event) => event.preventDefault() : (event) => props.onContextMenu(event, entry)}
     >
       {!props.selectionOnly && isDownloadableRemoteFile(entry) ? (
-        <button
+        <Button
           type="button"
           className={`${fileBrowserStyles.downloadButton} ${fileBrowserStyles.gridDownloadButton} ${props.selected ? "opacity-100" : ""}`}
           title="Download"
@@ -928,7 +929,7 @@ const FileGridItem = memo(function FileGridItem(props: {
           onPointerDown={(event) => event.stopPropagation()}
         >
           <Download size={15} />
-        </button>
+        </Button>
       ) : null}
       <GridThumbnail entry={entry} enabled={props.thumbnailsEnabled} />
       {props.inlineEdit ? (

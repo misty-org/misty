@@ -1,6 +1,23 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Progress } from "@/components/ui/progress";
+import { LoadingState, StatusBadge } from "@/components/misty";
 import { useAuth } from "../../../auth/AuthContext";
 import { createCheckout, createCreditCheckout, createPortalSession, fetchBillingUsage, fetchMe, updateDevice, updateProfile, type BillingUsageResponse, type MeResponse } from "./api";
 import { useUserStore } from "../../../stores/useUserStore";
@@ -20,56 +37,42 @@ import {
   Lock,
   Rows3,
   UserCircle,
-  X,
   type LucideIcon,
 } from "lucide-react";
 import {
+  DesktopSettingsFrame,
   DesktopSettingsRow,
   DesktopSettingsSection,
-  desktopSettingsContentClass,
-  desktopSettingsGridClass,
-  desktopSettingsNavItemClass,
-  desktopSettingsNavItemSelectedClass,
-  desktopSettingsOverlayCloseClass,
-  desktopSettingsOverlayContentClass,
-  desktopSettingsOverlayContentShellClass,
-  desktopSettingsOverlayGridClass,
-  desktopSettingsOverlayHeaderClass,
-  desktopSettingsOverlayScrollSurfaceClass,
-  desktopSettingsScrollSurfaceClass,
-  desktopSettingsSidebarClass,
 } from "../../../components/settings/DesktopSettingsUI";
-// ─── display helpers ─────────────────────────────────────────────────────────
-
 const TIER_LABEL: Record<string, string> = {
   basic: "Basic",
   pro: "Pro",
   max: "Max",
 };
-const TIER_COLOR: Record<string, string> = {
-  basic: "text-zinc-400 bg-zinc-400/10 border-zinc-400/20",
-  pro: "text-blue-400 bg-blue-400/10 border-blue-400/20",
-  max: "text-violet-400 bg-violet-400/10 border-violet-400/20",
+type AccountStatusTone = "neutral" | "info" | "success" | "warning" | "danger";
+
+const TIER_TONE: Record<string, AccountStatusTone> = {
+  basic: "neutral",
+  pro: "info",
+  max: "info",
 };
-const STATUS_COLOR: Record<string, string> = {
-  active: "text-emerald-400 bg-emerald-400/10 border-emerald-400/20",
-  trialing: "text-blue-400 bg-blue-400/10 border-blue-400/20",
-  cancelled: "text-amber-400 bg-amber-400/10 border-amber-400/20",
-  expired: "text-red-400 bg-red-400/10 border-red-400/20",
+const STATUS_TONE: Record<string, AccountStatusTone> = {
+  active: "success",
+  trialing: "info",
+  cancelled: "warning",
+  expired: "danger",
 };
 
-function Badge({ label, cls }: { label: string; cls: string }) {
+function AccountBadge({ label, tone }: { label: string; tone: AccountStatusTone }) {
   return (
-    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${cls}`}>
+    <StatusBadge status={tone} dot>
       {label}
-    </span>
+    </StatusBadge>
   );
 }
 
-// ─── layout primitives ───────────────────────────────────────────────────────
-
 const accountSettingsCustomRowClass =
-  "border-b border-white/[0.08] bg-[var(--misty-app-surface-bg,#090b0d)] px-7 py-4 last:border-b-0";
+  "border-b border-border/60 px-5 py-4 last:border-b-0";
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return <DesktopSettingsSection title={title}>{children}</DesktopSettingsSection>;
@@ -78,7 +81,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <DesktopSettingsRow label={label}>
-      <span className="text-right text-[15px] text-[#f4f4f5]">{children}</span>
+      <span className="text-right text-sm text-foreground max-[760px]:text-left">{children}</span>
     </DesktopSettingsRow>
   );
 }
@@ -86,12 +89,10 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
 function GhostRow({ label, value }: { label: string; value: string }) {
   return (
     <DesktopSettingsRow label={label} muted>
-      <span className="italic text-[#a1a1aa]">{value}</span>
+      <span className="italic text-muted-foreground">{value}</span>
     </DesktopSettingsRow>
   );
 }
-
-// ─── save helper ─────────────────────────────────────────────────────────────
 
 function useSave(fn: () => Promise<void>) {
   const [saving, setSaving] = useState(false);
@@ -117,12 +118,10 @@ function useSave(fn: () => Promise<void>) {
 }
 
 function SaveFeedback({ ok, error }: { ok: boolean; error: string }) {
-  if (ok) return <p className="text-xs text-emerald-400 mt-2">Saved.</p>;
-  if (error) return <p className="text-xs text-red-400 mt-2">{error}</p>;
+  if (ok) return <p className="mt-2 text-xs text-[var(--misty-success)]">Saved.</p>;
+  if (error) return <p className="mt-2 text-xs text-destructive">{error}</p>;
   return null;
 }
-
-// ─── tabs ────────────────────────────────────────────────────────────────────
 
 type Tab = "general" | "account" | "privacy" | "diagnostics";
 
@@ -132,6 +131,13 @@ const TABS: { id: Tab; label: string; icon: LucideIcon }[] = [
   { id: "privacy", label: "Privacy", icon: Lock },
   { id: "diagnostics", label: "Diagnostics", icon: Bug },
 ];
+
+const TAB_DESCRIPTIONS: Record<Tab, string> = {
+  general: "App information and account-level notification defaults.",
+  account: "Manage your profile, license, devices, credits, and billing.",
+  privacy: "Understand how Misty handles your files and account data.",
+  diagnostics: "Inspect runtime configuration and recent client events.",
+};
 
 // ─── General ─────────────────────────────────────────────────────────────────
 
@@ -146,7 +152,7 @@ function GeneralPanel() {
 
       <Section title="App">
         <Row label="Version">
-          <span className="font-mono text-xs text-text-muted">v0.1.0-beta</span>
+          <span className="font-mono text-xs text-muted-foreground">v0.1.0-beta</span>
         </Row>
         <Row label="Release channel">Stable</Row>
         <GhostRow label="Check for updates" value="Coming soon" />
@@ -242,12 +248,15 @@ function AccountPanel({
     <div>
       <Section title="License">
         <Row label="Plan">
-          <Badge label={TIER_LABEL[me.tier] ?? me.tier} cls={TIER_COLOR[me.tier] ?? TIER_COLOR.basic} />
+          <AccountBadge
+            label={TIER_LABEL[me.tier] ?? me.tier}
+            tone={TIER_TONE[me.tier] ?? "neutral"}
+          />
         </Row>
         <Row label="Status">
-          <Badge
+          <AccountBadge
             label={me.status.charAt(0).toUpperCase() + me.status.slice(1)}
-            cls={STATUS_COLOR[me.status] ?? STATUS_COLOR.active}
+            tone={STATUS_TONE[me.status] ?? "neutral"}
           />
         </Row>
         <Row label="Type">
@@ -278,27 +287,30 @@ function AccountPanel({
       <Section title="Devices">
         <div className={`${accountSettingsCustomRowClass} flex flex-col gap-3 md:flex-row md:items-start md:justify-between md:gap-6`}>
           <div className="space-y-1">
-            <p className="text-sm text-text">Licensed device</p>
-            <p className="text-xs text-text-muted">
+            <label htmlFor="account-device-name" className="text-sm font-medium text-foreground">
+              Licensed device
+            </label>
+            <p className="text-xs text-muted-foreground">
               Change the machine name registered to your license.
             </p>
           </div>
           <div className="w-full md:max-w-sm">
             <div className="flex gap-2">
-              <input
+              <Input
+                id="account-device-name"
                 type="text"
                 value={device}
                 onChange={(e) => setDevice(e.target.value)}
                 placeholder="e.g. MacBook Pro"
-                className="flex-1 min-w-0 bg-surface border border-border rounded-lg px-3 py-2 text-sm text-text placeholder:text-text-muted focus:outline-none focus:border-white/30 transition-colors"
+                className="min-w-0 flex-1"
               />
-              <button
+              <Button
                 onClick={saveDevice}
                 disabled={savingDevice}
-                className="px-4 py-2 bg-white hover:bg-zinc-200 disabled:opacity-40 text-bg text-sm font-medium rounded-lg transition-colors shrink-0 cursor-pointer disabled:cursor-not-allowed"
+                className="shrink-0"
               >
                 {savingDevice ? "Saving…" : "Save"}
-              </button>
+              </Button>
             </div>
             <SaveFeedback ok={deviceOk} error={deviceError} />
           </div>
@@ -306,17 +318,17 @@ function AccountPanel({
 
         <div className={`${accountSettingsCustomRowClass} flex flex-col gap-3 md:flex-row md:items-center md:justify-between md:gap-6`}>
           <div>
-            <p className="text-sm font-medium text-text">{me.license_device || "Primary device"}</p>
-            <p className="text-xs text-text-muted mt-0.5">
+            <p className="text-sm font-medium text-foreground">{me.license_device || "Primary device"}</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">
               {TIER_LABEL[me.tier] ?? me.tier} · Activated
             </p>
           </div>
-          <Badge label="Active" cls={STATUS_COLOR.active} />
+          <AccountBadge label="Active" tone="success" />
         </div>
 
         {me.tier === "max" && (
           <div className={accountSettingsCustomRowClass}>
-            <p className="text-xs text-text-muted">
+            <p className="text-xs text-muted-foreground">
               Additional seats appear here as you activate new devices.
             </p>
           </div>
@@ -324,12 +336,12 @@ function AccountPanel({
 
         {me.tier === "basic" && (
           <div className={`${accountSettingsCustomRowClass} flex flex-col gap-3 md:flex-row md:items-center md:justify-between md:gap-6`}>
-            <p className="text-xs text-text-muted">
+            <p className="text-xs text-muted-foreground">
               Pro $9.99/month · Max $14.99/month
             </p>
-            <button disabled={billingWorking} onClick={() => void openBillingAction(() => createCheckout("pro", "month"))} className="shrink-0 text-xs text-text hover:text-white underline underline-offset-2 transition-colors disabled:opacity-50">
+            <Button variant="link" disabled={billingWorking} onClick={() => void openBillingAction(() => createCheckout("pro", "month"))} className="h-auto shrink-0 p-0 text-xs">
               Upgrade to Pro
-            </button>
+            </Button>
           </div>
         )}
       </Section>
@@ -342,12 +354,12 @@ function AccountPanel({
             <Row label="Purchased">{billingUsage.purchased_remaining.toLocaleString()} credits</Row>
             <Row label="Resets">{new Date(billingUsage.next_reset_at).toLocaleDateString()}</Row>
             <div className={accountSettingsCustomRowClass}>
-              <div className="h-1.5 overflow-hidden rounded-full bg-elevated"><div className="h-full bg-blue-400" style={{ width: `${Math.min(100, creditUsedPercent)}%` }} /></div>
-              {creditWarning ? <p className="mt-2 text-xs text-amber-400">{creditWarning}</p> : null}
+              <Progress value={Math.min(100, creditUsedPercent)} />
+              {creditWarning ? <p className="mt-2 text-xs text-[var(--misty-warning)]">{creditWarning}</p> : null}
             </div>
             <div className={`${accountSettingsCustomRowClass} flex flex-wrap gap-2`}>
-              <button disabled={billingWorking} onClick={() => void openBillingAction(() => createCreditCheckout("credits_1500"))} className="rounded-lg border border-border px-3 py-2 text-xs text-text disabled:opacity-50">1,500,000 credits · $4.99</button>
-              <button disabled={billingWorking} onClick={() => void openBillingAction(() => createCreditCheckout("credits_3500"))} className="rounded-lg border border-border px-3 py-2 text-xs text-text disabled:opacity-50">3,500,000 credits · $9.99</button>
+              <Button variant="outline" size="sm" disabled={billingWorking} onClick={() => void openBillingAction(() => createCreditCheckout("credits_1500"))}>1,500,000 credits · $4.99</Button>
+              <Button variant="outline" size="sm" disabled={billingWorking} onClick={() => void openBillingAction(() => createCreditCheckout("credits_3500"))}>3,500,000 credits · $9.99</Button>
             </div>
           </>
         ) : <GhostRow label="Usage" value="Loading credit balance" />}
@@ -358,85 +370,95 @@ function AccountPanel({
           <>
             <Row label="Plan">{TIER_LABEL[me.tier]} · {me.billing.interval === "year" ? "yearly" : "monthly"}</Row>
             <div className={accountSettingsCustomRowClass}>
-              <button disabled={billingWorking || !me.billing.customer_portal_available} onClick={() => void openBillingAction(createPortalSession)} className="text-sm text-text-muted hover:text-text disabled:opacity-40">Manage billing →</button>
+              <Button variant="link" disabled={billingWorking || !me.billing.customer_portal_available} onClick={() => void openBillingAction(createPortalSession)} className="h-auto p-0">Manage billing →</Button>
             </div>
           </>
         ) : (
           <div className={`${accountSettingsCustomRowClass} grid gap-3`}>
-            <p className="m-0 text-sm text-text-muted">Pro includes 2,000 monthly credits. Max includes 6,000.</p>
+            <p className="m-0 text-sm text-muted-foreground">Pro includes 2,000 monthly credits. Max includes 6,000.</p>
             <div className="flex flex-wrap gap-2">
-              <button disabled={billingWorking} onClick={() => void openBillingAction(() => createCheckout("pro", "month"))} className="rounded-lg bg-white px-3 py-2 text-xs font-semibold text-bg disabled:opacity-50">Pro · $9.99/mo</button>
-              <button disabled={billingWorking} onClick={() => void openBillingAction(() => createCheckout("max", "month"))} className="rounded-lg border border-border px-3 py-2 text-xs text-text disabled:opacity-50">Max · $14.99/mo</button>
-              <button disabled={billingWorking} onClick={() => void openBillingAction(() => createCheckout("pro", "year"))} className="rounded-lg border border-border px-3 py-2 text-xs text-text disabled:opacity-50">Pro · $99/yr</button>
-              <button disabled={billingWorking} onClick={() => void openBillingAction(() => createCheckout("max", "year"))} className="rounded-lg border border-border px-3 py-2 text-xs text-text disabled:opacity-50">Max · $149/yr</button>
+              <Button size="sm" disabled={billingWorking} onClick={() => void openBillingAction(() => createCheckout("pro", "month"))}>Pro · $9.99/mo</Button>
+              <Button variant="outline" size="sm" disabled={billingWorking} onClick={() => void openBillingAction(() => createCheckout("max", "month"))}>Max · $14.99/mo</Button>
+              <Button variant="outline" size="sm" disabled={billingWorking} onClick={() => void openBillingAction(() => createCheckout("pro", "year"))}>Pro · $99/yr</Button>
+              <Button variant="outline" size="sm" disabled={billingWorking} onClick={() => void openBillingAction(() => createCheckout("max", "year"))}>Max · $149/yr</Button>
             </div>
           </div>
         )}
-        {billingError ? <p className={`${accountSettingsCustomRowClass} text-xs text-red-400`}>{billingError}</p> : null}
+        {billingError ? (
+          <div className={accountSettingsCustomRowClass}>
+            <Alert variant="destructive">
+              <AlertTitle>Billing is temporarily unavailable</AlertTitle>
+              <AlertDescription>{billingError}</AlertDescription>
+            </Alert>
+          </div>
+        ) : null}
       </Section>
 
       <Section title="Info">
         <div className={`${accountSettingsCustomRowClass} flex flex-col gap-4 py-5`}>
           <div className="flex items-center gap-4">
-            <div className="w-14 h-14 rounded-full border border-border bg-elevated flex items-center justify-center text-lg font-bold text-text shrink-0 select-none">
-              {initials}
-            </div>
+            <Avatar className="size-14">
+              <AvatarFallback className="text-base font-semibold">
+                {initials}
+              </AvatarFallback>
+            </Avatar>
             <div>
-              <p className="text-sm font-medium text-text">{me.name}</p>
-              <p className="text-xs text-text-muted mt-0.5">{me.email}</p>
-              <p className="text-xs text-text-muted/50 mt-1">Photo upload — coming soon</p>
+              <p className="text-sm font-medium text-foreground">{me.name}</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">{me.email}</p>
+              <p className="mt-1 text-xs text-muted-foreground/60">Photo upload — coming soon</p>
             </div>
           </div>
 
           <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
             <div>
-              <label className="block text-xs text-text-muted mb-1.5">Display name</label>
-              <input
+              <label htmlFor="account-display-name" className="mb-1.5 block text-xs font-medium text-foreground">Display name</label>
+              <Input
+                id="account-display-name"
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="w-full bg-surface border border-border rounded-lg px-3 py-2 text-sm text-text placeholder:text-text-muted focus:outline-none focus:border-white/30 transition-colors"
               />
             </div>
             <div className="flex items-center gap-3">
-              <button
+              <Button
                 onClick={saveProfile}
                 disabled={savingProfile || name.trim() === "" || name === me.name}
-                className="px-4 py-2 bg-white hover:bg-zinc-200 disabled:opacity-40 text-bg text-sm font-medium rounded-lg transition-colors cursor-pointer disabled:cursor-not-allowed"
               >
                 {savingProfile ? "Saving…" : "Save changes"}
-              </button>
+              </Button>
               <SaveFeedback ok={profileOk} error={profileError} />
             </div>
           </div>
 
           <div>
-            <label className="block text-xs text-text-muted mb-1.5">Email</label>
-            <input
+            <label htmlFor="account-email" className="mb-1.5 block text-xs font-medium text-foreground">Email</label>
+            <Input
+              id="account-email"
               type="email"
               value={me.email}
               disabled
-              className="w-full bg-surface/50 border border-border rounded-lg px-3 py-2 text-sm text-text-muted cursor-not-allowed"
             />
-            <p className="text-xs text-text-muted/60 mt-1">Email cannot be changed.</p>
+            <p className="mt-1 text-xs text-muted-foreground/60">Email cannot be changed.</p>
           </div>
         </div>
 
         <Row label="Member since">{joined}</Row>
         <Row label="User id">
-          <span className="font-mono text-xs text-text-muted">{me.id}</span>
+          <span className="font-mono text-xs text-muted-foreground">{me.id}</span>
         </Row>
       </Section>
 
       <Section title="Security">
         <div className={`${accountSettingsCustomRowClass} flex flex-col gap-3 md:flex-row md:items-center md:justify-between md:gap-6`}>
           <div>
-            <p className="text-sm text-text">Password</p>
-            <p className="text-xs text-text-muted mt-0.5">Reset via email link.</p>
+            <p className="text-sm text-foreground">Password</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">Reset via email link.</p>
           </div>
-          <a href="/signin" className="text-sm text-text-muted hover:text-text underline underline-offset-2 transition-colors">
+          <Button asChild variant="link" className="h-auto p-0">
+          <a href="/signin">
             Reset
           </a>
+          </Button>
         </div>
         <GhostRow label="Two-factor authentication" value="Coming soon" />
         <GhostRow label="Active sessions" value="Coming soon" />
@@ -445,19 +467,44 @@ function AccountPanel({
       <Section title="Danger Zone">
         <div className={`${accountSettingsCustomRowClass} flex flex-col gap-3 md:flex-row md:items-center md:justify-between md:gap-6`}>
           <div>
-            <p className="text-sm text-text">Sign out</p>
-            <p className="text-xs text-text-muted mt-0.5">End your session on this device.</p>
+            <p className="text-sm text-foreground">Sign out</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">End your session on this device.</p>
           </div>
-          <button onClick={onLogout} className="text-sm text-text-muted hover:text-red-400 transition-colors">
-            Sign out
-          </button>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button
+                variant="outline"
+                className="border-destructive/30 text-destructive hover:bg-destructive/10 hover:text-destructive"
+              >
+                Sign out
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Sign out of Misty?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This ends the account session on this device. Your local files
+                  and preferences will remain in place.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  onClick={onLogout}
+                >
+                  Sign out
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
         <div className={`${accountSettingsCustomRowClass} flex flex-col gap-3 opacity-40 md:flex-row md:items-center md:justify-between md:gap-6`}>
           <div>
-            <p className="text-sm text-text">Delete account</p>
-            <p className="text-xs text-text-muted mt-0.5">Permanently remove your account and all data.</p>
+            <p className="text-sm text-foreground">Delete account</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">Permanently remove your account and all data.</p>
           </div>
-          <button className="text-sm text-text-muted cursor-not-allowed">Delete</button>
+          <Button variant="outline" disabled>Delete</Button>
         </div>
       </Section>
     </div>
@@ -471,8 +518,8 @@ function PrivacyPanel() {
     <div>
       <Section title="Privacy">
         <div className={`${accountSettingsCustomRowClass} flex flex-col gap-2`}>
-          <p className="text-sm text-text font-medium">Your data stays on your device.</p>
-          <p className="text-sm text-text-muted leading-relaxed">
+          <p className="text-sm font-medium text-foreground">Your data stays on your device.</p>
+          <p className="text-sm leading-relaxed text-muted-foreground">
             Misty never transmits your files or cloud credentials to any external server. All provider
             communication runs through Misty's embedded local runtime. We only store your account info
             (name, email, hashed password) and subscription status.
@@ -489,10 +536,10 @@ function PrivacyPanel() {
       <Section title="Data">
         <div className={`${accountSettingsCustomRowClass} flex flex-col gap-3 opacity-40 md:flex-row md:items-center md:justify-between md:gap-6`}>
           <div>
-            <p className="text-sm text-text">Export your data</p>
-            <p className="text-xs text-text-muted mt-0.5">Download a copy of your account data.</p>
+            <p className="text-sm text-foreground">Export your data</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">Download a copy of your account data.</p>
           </div>
-          <button className="text-sm text-text-muted cursor-not-allowed">Export</button>
+          <Button variant="outline" disabled>Export</Button>
         </div>
       </Section>
     </div>
@@ -534,18 +581,18 @@ function DiagnosticsPanel() {
 
       <Section title="Client Events">
         {events.length > 0 ? (
-          <div className="divide-y divide-white/[0.08] px-7">
+          <div className="divide-y divide-border/60 px-7">
             {events.slice(0, 12).map((event) => (
               <article key={event.id} className="grid gap-1 py-4">
                 <div className="flex min-w-0 items-center justify-between gap-3">
-                  <strong className={`text-sm ${event.level === "error" ? "text-red-400" : event.level === "warn" ? "text-amber-400" : "text-text"}`}>
+                  <strong className={`text-sm ${event.level === "error" ? "text-destructive" : event.level === "warn" ? "text-[var(--misty-warning)]" : "text-foreground"}`}>
                     {event.scope}
                   </strong>
-                  <time className="shrink-0 text-xs text-text-muted">{new Date(event.createdAt).toLocaleTimeString()}</time>
+                  <time className="shrink-0 text-xs text-muted-foreground">{new Date(event.createdAt).toLocaleTimeString()}</time>
                 </div>
-                <p className="m-0 text-sm text-text-muted">{event.message}</p>
+                <p className="m-0 text-sm text-muted-foreground">{event.message}</p>
                 {event.detail ? (
-                  <pre className="max-h-40 overflow-auto whitespace-pre-wrap rounded-lg bg-surface px-3 py-2 text-[11px] leading-relaxed text-text-muted [overflow-wrap:anywhere]">
+                  <pre className="max-h-40 overflow-auto whitespace-pre-wrap rounded-lg bg-muted px-3 py-2 text-[11px] leading-relaxed text-muted-foreground [overflow-wrap:anywhere]">
                     {event.detail}
                   </pre>
                 ) : null}
@@ -554,20 +601,20 @@ function DiagnosticsPanel() {
           </div>
         ) : (
           <div className={accountSettingsCustomRowClass}>
-            <p className="m-0 text-sm text-text-muted">No client events recorded yet.</p>
+            <p className="m-0 text-sm text-muted-foreground">No client events recorded yet.</p>
           </div>
         )}
         <div className={`${accountSettingsCustomRowClass} flex justify-end`}>
-          <button
+          <Button
             type="button"
-            className="rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text-muted hover:text-text"
+            variant="outline"
             onClick={() => {
               clearClientDebugEvents();
               setEvents([]);
             }}
           >
             Clear debug events
-          </button>
+          </Button>
         </div>
       </Section>
     </div>
@@ -630,14 +677,17 @@ export default function DesktopAccountPage(props: {
 
   if (!activeUser || (loading && !displayMe)) {
     return (
-      <div className={`${overlay ? "h-full" : "min-h-screen"} flex items-center justify-center`}>
-        <div className="w-5 h-5 rounded-full border-2 border-border border-t-text-muted animate-spin" />
+      <div className={`${overlay ? "h-full" : "min-h-screen"} flex items-center justify-center bg-background`}>
+        <LoadingState
+          compact
+          title="Loading account"
+          description="Checking your Misty profile and license."
+        />
       </div>
     );
   }
 
   const activeTab = TABS.find((currentTab) => currentTab.id === tab) ?? TABS[0];
-  const ActiveIcon = activeTab.icon;
   const activePanel = (
     <>
       {tab === "general" && <GeneralPanel />}
@@ -660,73 +710,20 @@ export default function DesktopAccountPage(props: {
   );
 
   return (
-    <section
-      className={overlay ? desktopSettingsOverlayGridClass : desktopSettingsGridClass}
-      aria-label="Account settings"
+    <DesktopSettingsFrame
+      activeId={tab}
+      ariaLabel="Account settings"
+      description={TAB_DESCRIPTIONS[tab]}
+      items={TABS}
+      navigationLabel="Account settings sections"
+      navigationTitle="Misty account"
+      onClose={props.onClose}
+      onSelect={setTab}
+      presentation={props.presentation}
+      title={activeTab.label}
     >
-      <aside className={desktopSettingsSidebarClass} aria-label="Account settings sections">
-        <div className="grid gap-[5px]">
-          <span className="px-2 pb-3 pt-2 text-[10px] font-bold capitalize text-[#767676]">
-            {overlay ? "Account settings" : "Misty Account Settings"}
-          </span>
-          {TABS.map(({ id, label, icon: Icon }) => (
-            <button
-              key={id}
-              type="button"
-              onClick={() => setTab(id)}
-              className={`${desktopSettingsNavItemClass} ${tab === id ? desktopSettingsNavItemSelectedClass : ""}`}
-            >
-              <Icon size={18} strokeWidth={1.8} />
-              <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">
-                {label}
-              </span>
-            </button>
-          ))}
-        </div>
-      </aside>
-
-      <div className="w-px bg-white/10" />
-
-      {overlay ? (
-        <main className={desktopSettingsOverlayContentShellClass}>
-          <header className={desktopSettingsOverlayHeaderClass}>
-            <div className="flex min-w-0 items-center gap-3">
-              <ActiveIcon
-                size={17}
-                strokeWidth={1.8}
-                className="shrink-0 text-[#8d8d8d]"
-              />
-              <h1 className="m-0 min-w-0 truncate text-[15px] font-[740] leading-tight tracking-normal text-[#f4f4f5]">
-                {activeTab.label}
-              </h1>
-            </div>
-            <button
-              type="button"
-              className={desktopSettingsOverlayCloseClass}
-              aria-label="Close account settings"
-              title="Close account settings"
-              onClick={props.onClose}
-            >
-              <X size={17} strokeWidth={1.8} />
-            </button>
-          </header>
-          <div className={desktopSettingsOverlayContentClass}>
-            <div className={desktopSettingsOverlayScrollSurfaceClass}>
-              {activePanel}
-            </div>
-          </div>
-        </main>
-      ) : (
-        <main className={desktopSettingsContentClass}>
-          <div className={desktopSettingsScrollSurfaceClass}>
-            <h1 className="mb-[18px] mt-1 text-[28px] font-[760] leading-[1.15] tracking-normal text-[#f4f4f5]">
-              {activeTab.label}
-            </h1>
-            {activePanel}
-          </div>
-        </main>
-      )}
-    </section>
+      {activePanel}
+    </DesktopSettingsFrame>
   );
 }
 

@@ -1,3 +1,4 @@
+import { Button } from "../../../components/ui/button";
 import { AppWindow, Archive, ArrowRightLeft, ChevronRight, Clipboard, Copy, Download, ExternalLink, Eye, FileArchive, FilePlus, Folder, FolderPlus, Hash, Link, MoreHorizontal, Pencil, Pin, RefreshCcw, Scissors, Terminal, Trash2, X } from "lucide-react";
 import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -16,16 +17,16 @@ const explorerCompareWithEvent = "misty:explorer-compare-with";
 const emptyPinnedPaths: string[] = [];
 
 const contextMenuStyles = {
-  menu: "fixed z-[1000] w-[250px] overflow-auto rounded-[11px] border border-white/10 bg-[rgba(5,6,7,0.98)] p-1.5 shadow-[0_18px_40px_rgba(0,0,0,0.45)]",
-  submenu: "fixed z-[1001] w-[246px] overflow-auto rounded-[11px] border border-white/10 bg-[rgba(5,6,7,0.98)] p-1.5 shadow-[0_18px_40px_rgba(0,0,0,0.48)]",
+  menu: "fixed z-[var(--misty-layer-menu)] w-[250px] overflow-auto rounded-md bg-popover/95 p-1.5 text-popover-foreground shadow-md ring-1 ring-foreground/10 backdrop-blur-xl",
+  submenu: "fixed z-[var(--misty-layer-popover)] w-[246px] overflow-auto rounded-md bg-popover/95 p-1.5 text-popover-foreground shadow-md ring-1 ring-foreground/10 backdrop-blur-xl",
   item:
-    "grid h-9 w-full grid-cols-[19px_minmax(0,1fr)_auto] items-center gap-2.5 rounded-lg border-0 bg-transparent px-2.5 text-left text-[#e4e4e7] hover:not-disabled:bg-white/[0.06] hover:not-disabled:text-[#f4f4f5] disabled:opacity-45 [&:hover:not(:disabled)_.context-menu-icon]:text-[#d4d4d8] [&:hover:not(:disabled)_.context-menu-shortcut]:text-[#d4d4d8]",
+    "grid h-9 w-full grid-cols-[19px_minmax(0,1fr)_auto] items-center gap-2.5 rounded-sm border-0 bg-transparent px-2.5 text-left text-popover-foreground hover:not-disabled:bg-accent hover:not-disabled:text-accent-foreground disabled:opacity-45 [&:hover:not(:disabled)_.context-menu-icon]:text-foreground [&:hover:not(:disabled)_.context-menu-shortcut]:text-muted-foreground",
   itemActive:
-    "bg-white/[0.08] text-[#f4f4f5] [&_.context-menu-icon]:text-[#d4d4d8] [&_.context-menu-shortcut]:text-[#d4d4d8]",
-  icon: "context-menu-icon inline-flex items-center justify-center text-[#a1a1aa]",
+    "bg-accent text-accent-foreground [&_.context-menu-icon]:text-foreground [&_.context-menu-shortcut]:text-muted-foreground",
+  icon: "context-menu-icon inline-flex items-center justify-center text-muted-foreground",
   label: "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap",
-  shortcut: "context-menu-shortcut text-xs text-[#898989]",
-  separator: "mx-1 my-[5px] h-px bg-white/10",
+  shortcut: "context-menu-shortcut text-xs text-muted-foreground",
+  separator: "mx-1 my-[5px] h-px bg-border/60",
 } as const;
 
 const contextMenuViewportMargin = 8;
@@ -649,7 +650,7 @@ function ContextMenuItem(props: {
   onRun: () => void;
 }) {
   return (
-    <button
+    <Button
       type="button"
       role="menuitem"
       className={cx(contextMenuStyles.item, props.active && contextMenuStyles.itemActive)}
@@ -665,7 +666,7 @@ function ContextMenuItem(props: {
       {props.submenu
         ? <ChevronRight className={contextMenuStyles.shortcut} size={15} aria-hidden="true" />
         : props.shortcut ? <span className={contextMenuStyles.shortcut}>{props.shortcut}</span> : null}
-    </button>
+    </Button>
   );
 }
 

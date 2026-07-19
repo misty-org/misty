@@ -183,10 +183,11 @@ describe("Spaces realtime account lifecycle", () => {
     await useSpacesStore.getState().connectRealtime("active-account");
     FakeWebSocket.instances[0].open();
     FakeWebSocket.instances[0].close();
-    await vi.advanceTimersByTimeAsync(2_000);
+    await vi.advanceTimersByTimeAsync(3_000);
 
     expect(apiMocks.realtimeTicket).toHaveBeenCalledTimes(2);
     expect(FakeWebSocket.instances).toHaveLength(2);
+    expect(typeof FakeWebSocket.instances[1].url).toBe("string");
     expect(String(FakeWebSocket.instances[1].url)).toContain("ticket=retry-ticket");
   });
 
@@ -197,7 +198,7 @@ describe("Spaces realtime account lifecycle", () => {
       .mockResolvedValueOnce({ ticket: "recovered-ticket", expires_in: 60 });
 
     await useSpacesStore.getState().connectRealtime("active-account");
-    await vi.advanceTimersByTimeAsync(14_000);
+    await vi.advanceTimersByTimeAsync(15_000);
 
     expect(apiMocks.realtimeTicket).toHaveBeenCalledTimes(2);
     expect(FakeWebSocket.instances).toHaveLength(2);

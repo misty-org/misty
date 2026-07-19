@@ -1,5 +1,25 @@
 import { useCallback, useMemo, useState } from "react";
-import { createPortal } from "react-dom";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { duplicatesCancel, duplicatesHashRemoteCandidates, duplicatesScan, explorerQueueDeleteItems, explorerQueuePasteItems } from "../../../api/misty";
 import type { DuplicateGroup, DuplicateScanResult, PasteItem } from "../../../api/types";
 import { useOperationQueueStore } from "../../../stores/useOperationQueueStore";
@@ -7,8 +27,11 @@ import { useExplorerStore } from "../../../stores/useExplorerStore";
 import { useTransfersStore } from "../../../stores/useTransfersStore";
 import { errorText } from "../../../shared/format";
 import { formatBytes, formatDate } from "../utils/fileFormat";
-import { cx } from "./ExplorerDesktopShared";
-import { dialogStyles, duplicateFinderStyles } from "./ExplorerDesktopDialogStyles";
+
+const dialogChromeClass = "flex max-h-[min(760px,calc(100vh-48px))] w-[min(940px,calc(100vw-48px))] max-w-none flex-col overflow-hidden bg-popover p-0 text-popover-foreground";
+const bodyClass = "min-h-0 overflow-auto p-4";
+const fieldClass = "grid gap-1.5 text-xs font-medium text-muted-foreground";
+const groupListClass = "mt-4 grid max-h-[360px] gap-3 overflow-auto pr-1";
 
 export function DuplicateFinderDialog(props: {
   paneId: string;
@@ -124,115 +147,113 @@ export function DuplicateFinderDialog(props: {
     }
   }, [cleanupMode, cleanupMoveDestination, props, result?.groups, selectedCleanupPaths.length, selectedSet]);
 
-  return createPortal(
-    <div className={dialogStyles.backdrop} role="presentation">
+  return (
+    <Dialog open onOpenChange={(open) => { if (!open) props.onClose(); }}>
+      <DialogContent className={dialogChromeClass}>
       <form
-        className={cx(dialogStyles.dialog, dialogStyles.wide)}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="duplicate-finder-title"
-        onPointerDown={(event) => event.stopPropagation()}
+        className="contents"
         onSubmit={(event) => {
           event.preventDefault();
           void runScan();
         }}
       >
-        <header className={dialogStyles.batchHeader}>
+        <DialogHeader className="grid grid-cols-[1fr_auto] items-start gap-4 border-b border-border px-5 py-4 text-left">
           <div>
-            <h2 className={dialogStyles.title} id="duplicate-finder-title">Duplicate Finder</h2>
-            <p className={dialogStyles.text}>Scan folders, review duplicate candidates, then queue cleanup.</p>
+            <DialogTitle>Duplicate Finder</DialogTitle>
+            <DialogDescription>Scan folders, review duplicate candidates, then queue cleanup.</DialogDescription>
           </div>
-          <span className={dialogStyles.batchBadge}>{result ? `${result.groups.length} groups` : "Preview first"}</span>
-        </header>
-        <div className={duplicateFinderStyles.body}>
-          <div className={duplicateFinderStyles.controls}>
-            <label className={dialogStyles.batchField}>
+          <Badge variant="secondary">{result ? `${result.groups.length} groups` : "Preview first"}</Badge>
+        </DialogHeader>
+        <div className={bodyClass}>
+          <div className="grid grid-cols-[minmax(0,1fr)_130px] gap-3 max-[720px]:grid-cols-1">
+            <label className={fieldClass}>
               <span>Scan roots</span>
-              <textarea
-                className={duplicateFinderStyles.rootsInput}
+              <Textarea
+                className="min-h-24"
                 value={rootsText}
                 spellCheck={false}
                 onChange={(event) => setRootsText(event.target.value)}
               />
             </label>
             <div className="grid gap-2">
-              <button className={dialogStyles.actionButton} type="submit" disabled={scanning}>
+              <Button type="submit" disabled={scanning}>
                 {scanning ? "Scanning" : "Scan"}
-              </button>
-              <button className={dialogStyles.actionButton} type="button" disabled={!scanning || !result?.scanId} onClick={cancelScan}>Cancel</button>
+              </Button>
+              <Button variant="outline" type="button" disabled={!scanning || !result?.scanId} onClick={cancelScan}>Cancel</Button>
             </div>
           </div>
-          <label className={duplicateFinderStyles.optionRow}>
-            <input className={duplicateFinderStyles.checkbox} type="checkbox" checked={hashAll} onChange={(event) => setHashAll(event.target.checked)} />
+          <label className="mt-3 flex items-center gap-2 rounded-md bg-muted/40 px-3 py-2 text-xs text-foreground">
+            <Checkbox checked={hashAll} onCheckedChange={(checked) => setHashAll(Boolean(checked))} />
             <span>Hash all duplicate-size candidates for exact matches</span>
           </label>
           {remoteApprovalPending ? (
-            <div className={duplicateFinderStyles.warning}>
+            <Card className="mt-3 flex flex-wrap items-center justify-between gap-3 border-0 bg-amber-500/10 p-3 text-sm text-amber-600 shadow-none dark:text-amber-300">
               {result?.remoteCandidateCount ?? 0} remote candidates need explicit download approval before hashing.
-              <button className={dialogStyles.actionButton} type="button" onClick={approveRemoteHash}>Approve Remote Hashing</button>
-            </div>
+              <Button variant="outline" type="button" onClick={approveRemoteHash}>Approve Remote Hashing</Button>
+            </Card>
           ) : null}
-          {error ? <div className={duplicateFinderStyles.error}>{error}</div> : null}
+          {error ? <div className="mt-3 rounded-lg border border-destructive/25 bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</div> : null}
           {result ? (
-            <div className={duplicateFinderStyles.summary}>
+            <Card className="mt-3 grid gap-1 border-0 bg-muted/40 p-3 text-sm text-muted-foreground shadow-none">
               <span>{result.message}</span>
               <span>{result.scannedCount} scanned, {result.hashedCount} hashed, {cleanupCount} selected for cleanup ({formatBytes(cleanupBytes)}).</span>
-            </div>
+            </Card>
           ) : null}
           {result && result.groups.length === 0 ? (
-            <div className={duplicateFinderStyles.empty}>No duplicate candidates found for the current scan.</div>
+            <Card className="mt-3 border-0 bg-muted/30 p-5 text-center text-sm text-muted-foreground shadow-none">No duplicate candidates found for the current scan.</Card>
           ) : null}
           {result && result.groups.length > 0 ? (
-            <div className={duplicateFinderStyles.groupList}>
+            <div className={groupListClass}>
               {result.groups.map((group) => (
-                <section className={duplicateFinderStyles.group} key={group.key}>
-                  <header className={duplicateFinderStyles.groupHeader}>
+                <Card className="overflow-hidden border-0 bg-muted/30 shadow-none" key={group.key}>
+                  <header className="flex items-center justify-between gap-3 border-b border-border/70 px-3 py-2 text-xs">
                     <strong>{group.items.length} copies · {formatBytes(group.sizeBytes)}</strong>
-                    <span className={duplicateFinderStyles.groupMeta}>{group.key}</span>
+                    <span className="truncate text-muted-foreground">{group.key}</span>
                   </header>
                   {group.items.map((item) => {
                     const selected = selectedSet.has(item.path);
                     return (
-                      <label className={duplicateFinderStyles.candidate} key={item.path}>
-                        <input
-                          className={duplicateFinderStyles.checkbox}
-                          type="checkbox"
+                      <label className="grid min-h-12 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 border-b border-border/70 px-3 py-2 text-xs last:border-0" key={item.path}>
+                        <Checkbox
                           checked={selected}
-                          onChange={() => toggleCleanupPath(group, item.path)}
+                          onCheckedChange={() => toggleCleanupPath(group, item.path)}
                         />
                         <span className="grid min-w-0 gap-1">
-                          <span className={duplicateFinderStyles.candidatePath} title={item.path}>{item.path}</span>
-                          <small className={duplicateFinderStyles.candidateMeta}>{formatDate(item.modifiedMs)}{item.sha256 ? ` · ${item.sha256.slice(0, 12)}` : ""}</small>
+                          <span className="truncate text-foreground" title={item.path}>{item.path}</span>
+                          <small className="text-muted-foreground">{formatDate(item.modifiedMs)}{item.sha256 ? ` · ${item.sha256.slice(0, 12)}` : ""}</small>
                         </span>
-                        <span className={duplicateFinderStyles.groupMeta}>{selected ? (cleanupMode === "move" ? "Move" : "Trash") : "Keep"}</span>
+                        <Badge variant={selected ? "secondary" : "outline"}>{selected ? (cleanupMode === "move" ? "Move" : "Trash") : "Keep"}</Badge>
                       </label>
                     );
                   })}
-                </section>
+                </Card>
               ))}
             </div>
           ) : null}
         </div>
-        <div className={dialogStyles.actions}>
-          <select className={dialogStyles.input} value={cleanupMode} onChange={(event) => setCleanupMode(event.target.value === "move" ? "move" : "trash")}>
-            <option value="trash">Trash selected</option>
-            <option value="move">Move selected</option>
-          </select>
+        <DialogFooter className="mt-0 flex-row flex-wrap border-t border-border px-5 py-4">
+          <Select value={cleanupMode} onValueChange={(value) => setCleanupMode(value === "move" ? "move" : "trash")}>
+            <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="trash">Trash selected</SelectItem>
+              <SelectItem value="move">Move selected</SelectItem>
+            </SelectContent>
+          </Select>
           {cleanupMode === "move" ? (
-            <input
-              className={dialogStyles.input}
+            <Input
+              className="w-64"
               value={cleanupMoveDestination}
               placeholder="Destination folder"
               aria-label="Duplicate cleanup destination"
               onChange={(event) => setCleanupMoveDestination(event.target.value)}
             />
           ) : null}
-          <button className={dialogStyles.actionButton} type="button" onClick={props.onClose}>Close</button>
-          <button className={dialogStyles.actionButton} type="button" disabled={cleanupCount === 0} onClick={() => void queueCleanup()}>Queue Cleanup</button>
-        </div>
+          <Button variant="outline" type="button" onClick={props.onClose}>Close</Button>
+          <Button type="button" disabled={cleanupCount === 0} onClick={() => void queueCleanup()}>Queue Cleanup</Button>
+        </DialogFooter>
       </form>
-    </div>,
-    document.body,
+      </DialogContent>
+    </Dialog>
   );
 }
 

@@ -1,5 +1,25 @@
 import { useCallback, useState } from "react";
-import { createPortal } from "react-dom";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { compareApplyTextMerge, compareFiles, compareFolders, explorerPreviewItem, explorerQueueDeleteItems, explorerQueuePasteItems } from "../../../api/misty";
 import type { CompareFilesResult, CompareFolderRow, CompareFoldersResult, PasteItem } from "../../../api/types";
 import { useOperationQueueStore } from "../../../stores/useOperationQueueStore";
@@ -7,7 +27,7 @@ import { useExplorerStore } from "../../../stores/useExplorerStore";
 import { errorText } from "../../../shared/format";
 import { formatBytes } from "../utils/fileFormat";
 import { cx } from "./ExplorerDesktopShared";
-import { compareStyles, dialogStyles } from "./ExplorerDesktopDialogStyles";
+import { compareStyles } from "./ExplorerDesktopDialogStyles";
 
 type CompareMode = "file" | "folder";
 
@@ -55,6 +75,7 @@ export function CompareDialog(props: {
   const [rightPath, setRightPath] = useState("");
   const [running, setRunning] = useState(false);
   const [applyingMerge, setApplyingMerge] = useState<"left" | "right" | null>(null);
+  const [mergeTarget, setMergeTarget] = useState<"left" | "right" | null>(null);
   const [fileResult, setFileResult] = useState<CompareFilesResult | null>(null);
   const [folderResult, setFolderResult] = useState<CompareFoldersResult | null>(null);
   const [textDiff, setTextDiff] = useState<CompareTextDiffState | null>(null);
@@ -94,7 +115,7 @@ export function CompareDialog(props: {
     if (!textDiff) return;
     const targetPath = target === "left" ? leftPath.trim() : rightPath.trim();
     const mergedText = target === "left" ? textDiff.rightText : textDiff.leftText;
-    if (!targetPath || !window.confirm(`Replace ${targetPath} with the ${target === "left" ? "right" : "left"} text?`)) return;
+    if (!targetPath) return;
     setApplyingMerge(target);
     setError(null);
     try {
@@ -136,39 +157,37 @@ export function CompareDialog(props: {
     }
   }, [folderResult]);
 
-  return createPortal(
-    <div className={dialogStyles.backdrop} role="presentation">
+  return (
+    <>
+      <Dialog open onOpenChange={(open) => { if (!open) props.onClose(); }}>
+      <DialogContent className="flex max-h-[min(760px,calc(100vh-48px))] w-[min(940px,calc(100vw-48px))] max-w-none flex-col overflow-hidden bg-popover p-0 text-popover-foreground">
       <form
-        className={cx(dialogStyles.dialog, dialogStyles.wide)}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="compare-dialog-title"
-        onPointerDown={(event) => event.stopPropagation()}
+        className="contents"
         onSubmit={(event) => {
           event.preventDefault();
           void runCompare();
         }}
       >
-        <header className={dialogStyles.batchHeader}>
+        <DialogHeader className="grid grid-cols-[1fr_auto] items-start gap-4 border-b border-border px-5 py-4 text-left">
           <div>
-            <h2 className={dialogStyles.title} id="compare-dialog-title">Compare With</h2>
-            <p className={dialogStyles.text}>Compare files by hash or folders by relative inventory.</p>
+            <DialogTitle>Compare With</DialogTitle>
+            <DialogDescription>Compare files by hash or folders by relative inventory.</DialogDescription>
           </div>
-          <span className={dialogStyles.batchBadge}>{mode === "folder" ? "Folder" : "File"}</span>
-        </header>
-        <div className={compareStyles.body}>
-          <div className={compareStyles.modeRow}>
-            <button className={cx(compareStyles.modeButton, mode === "file" && compareStyles.modeButtonActive)} type="button" onClick={() => setMode("file")}>Files</button>
-            <button className={cx(compareStyles.modeButton, mode === "folder" && compareStyles.modeButtonActive)} type="button" onClick={() => setMode("folder")}>Folders</button>
+          <Badge variant="secondary">{mode === "folder" ? "Folder" : "File"}</Badge>
+        </DialogHeader>
+        <div className={`${compareStyles.body} min-h-0 overflow-auto p-4`}>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button variant={mode === "file" ? "default" : "outline"} size="sm" type="button" onClick={() => setMode("file")}>Files</Button>
+            <Button variant={mode === "folder" ? "default" : "outline"} size="sm" type="button" onClick={() => setMode("folder")}>Folders</Button>
           </div>
           <div className={compareStyles.fields}>
-            <label className={dialogStyles.batchField}>
+            <label className="grid gap-1.5 text-xs font-medium text-muted-foreground">
               <span>Left</span>
-              <input className={dialogStyles.input} value={leftPath} onChange={(event) => setLeftPath(event.target.value)} />
+              <Input value={leftPath} onChange={(event) => setLeftPath(event.target.value)} />
             </label>
-            <label className={dialogStyles.batchField}>
+            <label className="grid gap-1.5 text-xs font-medium text-muted-foreground">
               <span>Right</span>
-              <input className={dialogStyles.input} autoFocus value={rightPath} onChange={(event) => setRightPath(event.target.value)} />
+              <Input autoFocus value={rightPath} onChange={(event) => setRightPath(event.target.value)} />
             </label>
           </div>
           {error ? <div className={compareStyles.error}>{error}</div> : null}
@@ -187,12 +206,12 @@ export function CompareDialog(props: {
               <div className={compareStyles.diffHeader}>
                 <span>{textDiff.rows.filter((row) => row.kind !== "same").length} changed lines{textDiff.truncated ? " shown from the first 800 lines" : ""}</span>
                 <span className={compareStyles.diffActions}>
-                  <button className={compareStyles.miniButton} type="button" disabled={Boolean(applyingMerge)} onClick={() => void applyTextMerge("right")}>
+                  <Button variant="outline" size="sm" type="button" disabled={Boolean(applyingMerge)} onClick={() => setMergeTarget("right")}>
                     {applyingMerge === "right" ? "Applying" : "Apply L to R"}
-                  </button>
-                  <button className={compareStyles.miniButton} type="button" disabled={Boolean(applyingMerge)} onClick={() => void applyTextMerge("left")}>
+                  </Button>
+                  <Button variant="outline" size="sm" type="button" disabled={Boolean(applyingMerge)} onClick={() => setMergeTarget("left")}>
                     {applyingMerge === "left" ? "Applying" : "Apply R to L"}
-                  </button>
+                  </Button>
                 </span>
               </div>
               <div className={compareStyles.diffGrid}>
@@ -241,10 +260,10 @@ export function CompareDialog(props: {
                       <span className={compareStyles.rowMeta}>{row.disposition.replace(/_/g, " ")}</span>
                       <span className={compareStyles.rowMeta}>{formatBytes(row.leftSize ?? null)} / {formatBytes(row.rightSize ?? null)}</span>
                       <span className={compareStyles.rowActions}>
-                        {row.leftSize != null ? <button className={compareStyles.miniButton} type="button" onClick={() => void queueFolderCopy(row, "left_to_right")}>Copy R</button> : null}
-                        {row.rightSize != null ? <button className={compareStyles.miniButton} type="button" onClick={() => void queueFolderCopy(row, "right_to_left")}>Copy L</button> : null}
-                        {row.leftSize != null ? <button className={compareStyles.miniButton} type="button" onClick={() => void queueFolderDelete(row, "left")}>Trash L</button> : null}
-                        {row.rightSize != null ? <button className={compareStyles.miniButton} type="button" onClick={() => void queueFolderDelete(row, "right")}>Trash R</button> : null}
+                        {row.leftSize != null ? <Button variant="outline" size="sm" type="button" onClick={() => void queueFolderCopy(row, "left_to_right")}>Copy R</Button> : null}
+                        {row.rightSize != null ? <Button variant="outline" size="sm" type="button" onClick={() => void queueFolderCopy(row, "right_to_left")}>Copy L</Button> : null}
+                        {row.leftSize != null ? <Button variant="outline" size="sm" type="button" onClick={() => void queueFolderDelete(row, "left")}>Trash L</Button> : null}
+                        {row.rightSize != null ? <Button variant="outline" size="sm" type="button" onClick={() => void queueFolderDelete(row, "right")}>Trash R</Button> : null}
                       </span>
                     </div>
                   ))}
@@ -253,13 +272,35 @@ export function CompareDialog(props: {
             </>
           ) : null}
         </div>
-        <div className={dialogStyles.actions}>
-          <button className={dialogStyles.actionButton} type="button" onClick={props.onClose}>Close</button>
-          <button className={dialogStyles.actionButton} type="submit" disabled={running}>{running ? "Comparing" : "Compare"}</button>
-        </div>
+        <DialogFooter className="mt-0 border-t border-border px-5 py-4">
+          <Button variant="outline" type="button" onClick={props.onClose}>Close</Button>
+          <Button type="submit" disabled={running}>{running ? "Comparing" : "Compare"}</Button>
+        </DialogFooter>
       </form>
-    </div>,
-    document.body,
+      </DialogContent>
+      </Dialog>
+      <AlertDialog open={mergeTarget !== null} onOpenChange={(open) => { if (!open) setMergeTarget(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Replace file text?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Replace <strong className="break-all font-medium text-foreground">{mergeTarget === "left" ? leftPath.trim() : rightPath.trim()}</strong> with the {mergeTarget === "left" ? "right" : "left"} file’s text. This overwrites the current contents.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (mergeTarget) void applyTextMerge(mergeTarget);
+                setMergeTarget(null);
+              }}
+            >
+              Replace text
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }
 

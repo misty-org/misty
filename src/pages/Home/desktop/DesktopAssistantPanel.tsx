@@ -1,21 +1,24 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Bot } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
-import mikaAnimation from "../../../assets/bots/cloud-folder/mika.webp";
 import { openCloudFolderBotWindow } from "../../../bots/cloudFolderBot";
-import { restoreBundledAssetOnError, runtimeAssetSource } from "../../../shared/assets/runtimeAsset";
+import { runtimeAssetSource } from "../../../shared/assets/runtimeAsset";
 import { useAppStore } from "../../../stores/useAppStore";
 import { assistantDailyMessageLimit, useAssistantUsageStore } from "../../../stores/useAssistantUsageStore";
 import { selectAssistantPreferences, useSettingsStore } from "../../../stores/useSettingsStore";
+import { Badge } from "../../../components/ui/badge";
+import { Button } from "../../../components/ui/button";
+import { Progress } from "../../../components/ui/progress";
 
 const panelClass =
-  "flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-2xl border border-white/[0.08] bg-[var(--misty-app-panel-bg,var(--misty-app-page-bg,var(--misty-bg)))] p-3 shadow-xl shadow-black/20";
+  "flex min-h-0 min-w-0 flex-col";
 const headerClass =
-  "mb-2 flex shrink-0 items-center gap-2 border-b border-white/[0.06] pb-2 text-sm font-semibold text-text";
+  "mb-2 flex shrink-0 items-center gap-2 text-sm font-medium text-foreground";
 
 export function DesktopAssistantPanel() {
   const assetsDir = useAppStore((state) => state.app?.environment.assetsDir);
-  const mikaAnimationSource = runtimeAssetSource(assetsDir, "animations/mika.webp", mikaAnimation);
+  const mikaAnimationSource = runtimeAssetSource(assetsDir, "animations/mika.webp");
+  const [mikaImageUnavailable, setMikaImageUnavailable] = useState(false);
   const { enabled, filesAllowed, cleanupAllowed, searchAllowed } = useSettingsStore(
     useShallow((state) => {
       const preferences = selectAssistantPreferences(state.settings?.document);
@@ -45,49 +48,60 @@ export function DesktopAssistantPanel() {
     return () => window.clearInterval(interval);
   }, [syncForToday]);
 
+  useEffect(() => {
+    setMikaImageUnavailable(false);
+  }, [mikaAnimationSource]);
+
   return (
     <section className={panelClass} aria-label="Assistant">
       <div className={headerClass}>
-        <Bot className="h-4 w-4 shrink-0 text-text-muted" />
-        <span className="min-w-0 flex-1 truncate">Assistant</span>
+        <Bot className="h-4 w-4 shrink-0 text-muted-foreground" />
+        <h2 className="min-w-0 flex-1 truncate">Assistant</h2>
       </div>
 
       <div className="grid min-h-0 flex-1 grid-cols-[78px_minmax(0,1fr)] items-center gap-3">
-        <button
+        <Button
           aria-label="Show Mika"
-          className="grid h-[78px] w-[78px] place-items-center rounded-xl border-0 bg-transparent p-0 outline-none transition-opacity hover:opacity-80 focus-visible:ring-2 focus-visible:ring-white/40 disabled:cursor-not-allowed disabled:opacity-45"
+          className="size-[72px] rounded-lg bg-muted/25 p-0 hover:bg-muted/50"
           disabled={!enabled}
           onClick={() => void openCloudFolderBotWindow(assetsDir)}
           title={enabled ? "Show Mika" : "Enable Mika in Settings first"}
           type="button"
+          variant="ghost"
         >
-          <img
-            alt=""
-            className="h-[58px] w-[70px] object-contain"
-            draggable={false}
-            src={mikaAnimationSource}
-            onError={(event) => restoreBundledAssetOnError(event, mikaAnimation)}
-          />
-        </button>
+          {mikaAnimationSource && !mikaImageUnavailable ? (
+            <img
+              alt=""
+              className="h-14 w-16 object-contain"
+              draggable={false}
+              src={mikaAnimationSource}
+              onError={() => setMikaImageUnavailable(true)}
+            />
+          ) : (
+            <Bot aria-hidden="true" className="size-6 text-muted-foreground" />
+          )}
+        </Button>
 
         <div className="grid min-w-0 gap-2">
           <div className="flex min-w-0 items-center justify-between gap-3 text-xs">
-            <span className="truncate font-semibold text-text">Daily usage</span>
-            <span className="shrink-0 tabular-nums text-text-muted">{messagesUsedToday} / {assistantDailyMessageLimit}</span>
+            <span className="truncate font-medium text-foreground">Daily usage</span>
+            <span className="shrink-0 tabular-nums text-muted-foreground">{messagesUsedToday} / {assistantDailyMessageLimit}</span>
           </div>
-          <div className="h-1.5 overflow-hidden rounded-full bg-white/[0.07]" aria-hidden="true">
-            <span
-              className="block h-full rounded-full bg-cyan-300/70 transition-[width] duration-300"
-              style={{ width: `${Math.min(100, (messagesUsedToday / assistantDailyMessageLimit) * 100)}%` }}
-            />
-          </div>
+          <Progress
+            aria-label="Mika daily message usage"
+            aria-valuetext={`${messagesUsedToday} of ${assistantDailyMessageLimit} messages used`}
+            className="h-1.5"
+            value={Math.min(100, (messagesUsedToday / assistantDailyMessageLimit) * 100)}
+          />
           <div className="flex min-h-5 flex-wrap gap-1">
             {enabledScopes.length > 0 ? enabledScopes.map((scope) => (
-              <span className="rounded-md border border-white/[0.08] bg-white/[0.04] px-1.5 py-0.5 text-[10px] font-semibold text-text-muted" key={scope}>
+              <Badge className="text-[10px]" key={scope} variant="secondary">
                 {scope}
-              </span>
+              </Badge>
             )) : (
-              <span className="text-[10px] leading-5 text-text-muted">Allow scopes in Settings</span>
+              <span className="text-[10px] leading-5 text-muted-foreground">
+                {enabled ? "Allow scopes in Settings" : "Enable Mika in Settings"}
+              </span>
             )}
           </div>
         </div>

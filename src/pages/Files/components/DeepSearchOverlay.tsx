@@ -1,3 +1,12 @@
+import { Input } from "../../../components/ui/input";
+import { Button } from "../../../components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "../../../components/ui/dialog";
 import { CornerDownLeft, ListFilter, Loader2, Search } from "lucide-react";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -20,38 +29,37 @@ const scopeOptions: Array<{ value: SearchQueryScope; label: string }> = [
 const emptyPaneEntries: SearchResult["entry"][] = [];
 
 const overlayStyles = {
-  scrim: "fixed inset-0 z-[2147482950] grid place-items-start justify-center bg-black/30 px-4 pt-[clamp(58px,14vh,150px)] backdrop-blur-[5px]",
   panel:
-    "grid w-[min(860px,calc(100vw-28px))] max-h-[min(650px,calc(100vh-86px))] grid-rows-[auto_auto_minmax(0,1fr)_auto] overflow-hidden rounded-[26px] border border-white/[0.16] bg-[rgba(24,25,28,0.94)] shadow-[0_38px_110px_rgba(0,0,0,0.68)] backdrop-blur-[44px]",
+    "left-1/2 top-[clamp(58px,14vh,150px)] grid max-h-[min(650px,calc(100vh-86px))] w-[min(860px,calc(100vw-28px))] max-w-none translate-x-[-50%] translate-y-0 grid-rows-[auto_auto_minmax(0,1fr)_auto] gap-0 overflow-hidden rounded-xl border-border bg-popover p-0 text-popover-foreground shadow-2xl [&>button]:hidden",
   header: "grid min-h-[74px] grid-cols-[minmax(0,1fr)_auto] items-center gap-4 px-5",
   searchBox:
-    "grid h-full min-w-0 grid-cols-[auto_minmax(0,1fr)] items-center gap-4 text-[#a5a8ae]",
+    "grid h-full min-w-0 grid-cols-[auto_minmax(0,1fr)] items-center gap-4 text-muted-foreground",
   input:
-    "h-full min-w-0 border-0 bg-transparent p-0 text-[24px] font-medium tracking-[-0.025em] text-[#f3f4f6] outline-none placeholder:text-[#74777e]",
-  keyHint: "rounded-lg border border-white/[0.1] bg-white/[0.055] px-2 py-1 text-[11px] font-semibold text-[#8f939b]",
+    "h-full min-w-0 border-0 bg-transparent p-0 text-xl font-medium tracking-tight text-foreground shadow-none outline-none placeholder:text-muted-foreground focus-visible:ring-0",
+  keyHint: "rounded-md border border-border bg-muted px-2 py-1 text-[11px] font-medium text-muted-foreground",
   controls:
-    "flex min-w-0 flex-wrap items-center gap-2 border-y border-white/[0.09] px-5 py-3",
+    "flex min-w-0 flex-wrap items-center gap-2 border-y border-border/80 bg-muted/20 px-5 py-2.5",
   scopes: "flex min-w-0 flex-wrap items-center gap-2",
   scope:
-    "h-8 rounded-xl border border-transparent bg-white/[0.055] px-3 text-[13px] font-medium text-[#a5a8ae] hover:bg-white/[0.09] hover:text-[#f4f4f5]",
-  scopeActive: "border-white/[0.1] bg-white/[0.13] text-[#f4f4f5]",
-  status: "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap px-3 py-1.5 text-xs text-[#8f8f8f]",
+    "h-8 rounded-md px-3 text-xs font-medium text-muted-foreground",
+  scopeActive: "bg-accent text-accent-foreground",
+  status: "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap px-3 py-1.5 text-xs text-muted-foreground",
   results: "min-h-[148px] overflow-auto p-2.5",
   result:
-    "grid min-h-[68px] w-full grid-cols-[48px_minmax(0,1fr)_auto] items-center gap-3 rounded-[15px] border-0 bg-transparent px-3 py-2 text-left text-[#e4e4e7]",
-  resultSelected: "bg-white/[0.16] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.04)]",
+    "grid min-h-[64px] w-full grid-cols-[44px_minmax(0,1fr)_auto] items-center gap-3 rounded-lg border-0 bg-transparent px-3 py-2 text-left text-foreground shadow-none",
+  resultSelected: "bg-accent text-accent-foreground",
   resultIcon:
-    "grid size-12 place-items-center overflow-hidden rounded-[11px] border border-white/[0.1] bg-black/20 text-[#d4d4d8]",
+    "grid size-11 place-items-center overflow-hidden rounded-md bg-muted text-muted-foreground",
   resultImage: "size-full object-cover",
   resultText: "grid min-w-0 gap-0.5 leading-tight",
-  resultName: "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[15px] font-semibold text-[#f0f1f3]",
-  resultSummary: "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[13px] text-[#b4b7be]",
-  resultPath: "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[12px] text-[#7e828a]",
-  resultMeta: "hidden text-right text-xs text-[#858992] sm:block",
-  empty: "grid min-h-[148px] place-items-center px-5 py-9 text-center text-sm text-[#8f939a]",
+  resultName: "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-sm font-medium text-foreground",
+  resultSummary: "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-xs text-muted-foreground",
+  resultPath: "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-xs text-muted-foreground/75",
+  resultMeta: "hidden text-right text-xs text-muted-foreground sm:block",
+  empty: "grid min-h-[148px] place-items-center px-5 py-9 text-center text-sm text-muted-foreground",
   footer:
-    "flex min-h-10 items-center justify-between gap-3 border-t border-white/[0.08] px-5 text-[11px] text-[#777b83]",
-  error: "text-[#d6a0a0]",
+    "flex min-h-10 items-center justify-between gap-3 border-t border-border/80 bg-muted/20 px-5 text-[11px] text-muted-foreground",
+  error: "text-destructive",
 } as const;
 
 interface DeepSearchOverlayProps {
@@ -118,10 +126,7 @@ export const DeepSearchOverlay = memo(function DeepSearchOverlay(props: DeepSear
   useEffect(() => {
     if (!open) return;
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        event.preventDefault();
-        useSearchStore.getState().closeSearch();
-      } else if (event.key === "ArrowDown" && displayedResults.length > 0) {
+      if (event.key === "ArrowDown" && displayedResults.length > 0) {
         event.preventDefault();
         setSelectedIndex((index) => (index + 1) % displayedResults.length);
       } else if (event.key === "ArrowUp" && displayedResults.length > 0) {
@@ -141,8 +146,6 @@ export const DeepSearchOverlay = memo(function DeepSearchOverlay(props: DeepSear
     document.querySelector(`[data-spotlight-index="${selectedIndex}"]`)?.scrollIntoView({ block: "nearest" });
   }, [open, selectedIndex]);
 
-  if (!open) return null;
-
   const scanActive = Boolean(status?.scanInProgress);
   const indexedCount = status?.indexedItemCount ?? 0;
   const statusText = scanActive
@@ -152,14 +155,23 @@ export const DeepSearchOverlay = memo(function DeepSearchOverlay(props: DeepSear
       : "Misty is preparing file search · image understanding remains available";
 
   return (
-    <div className={overlayStyles.scrim} role="presentation" onMouseDown={(event) => {
-      if (event.target === event.currentTarget) useSearchStore.getState().closeSearch();
-    }}>
-      <section className={overlayStyles.panel} role="dialog" aria-modal="true" aria-label="Deep search">
+    <Dialog open={open} onOpenChange={(nextOpen) => { if (!nextOpen) useSearchStore.getState().closeSearch(); }}>
+      <DialogContent
+        className={overlayStyles.panel}
+        onOpenAutoFocus={(event) => {
+          event.preventDefault();
+          inputRef.current?.focus();
+          inputRef.current?.select();
+        }}
+      >
+        <DialogHeader className="sr-only">
+          <DialogTitle>Deep search</DialogTitle>
+          <DialogDescription>Search every connected location or filter the current folder.</DialogDescription>
+        </DialogHeader>
         <header className={overlayStyles.header}>
           <label className={overlayStyles.searchBox}>
             <Search size={28} strokeWidth={1.8} />
-            <input
+            <Input
               ref={inputRef}
               className={overlayStyles.input}
               value={mode === "search" ? query : filterQuery}
@@ -171,21 +183,22 @@ export const DeepSearchOverlay = memo(function DeepSearchOverlay(props: DeepSear
         </header>
         <div className={overlayStyles.controls}>
           <div className={overlayStyles.scopes} role="tablist" aria-label="Search mode">
-            <button type="button" className={`${overlayStyles.scope} ${mode === "search" ? overlayStyles.scopeActive : ""}`} onClick={() => setMode("search")}><span className="inline-flex items-center gap-1.5"><Search size={13} />Find all</span></button>
-            <button type="button" className={`${overlayStyles.scope} ${mode === "filter" ? overlayStyles.scopeActive : ""}`} onClick={() => setMode("filter")}><span className="inline-flex items-center gap-1.5"><ListFilter size={13} />Filter folder</span></button>
+            <Button variant="ghost" type="button" className={`${overlayStyles.scope} ${mode === "search" ? overlayStyles.scopeActive : ""}`} onClick={() => setMode("search")}><Search size={13} />Find all</Button>
+            <Button variant="ghost" type="button" className={`${overlayStyles.scope} ${mode === "filter" ? overlayStyles.scopeActive : ""}`} onClick={() => setMode("filter")}><ListFilter size={13} />Filter folder</Button>
           </div>
           {mode === "search" ? <div className={overlayStyles.scopes} role="tablist" aria-label="Search scope">
             {scopeOptions.map((option) => (
-              <button
+              <Button
                 key={option.value}
+                variant="ghost"
                 type="button"
                 className={`${overlayStyles.scope} ${scope === option.value ? overlayStyles.scopeActive : ""}`}
                 onClick={() => useSearchStore.getState().setScope(option.value)}
               >
                 {option.label}
-              </button>
+              </Button>
             ))}
-          </div> : <span className="text-xs text-[#858585]">{filterResults.length} matching items in this folder</span>}
+          </div> : <span className="text-xs text-muted-foreground">{filterResults.length} matching items in this folder</span>}
         </div>
         <div className={overlayStyles.results}>
           {displayedResults.length > 0 ? displayedResults.map((result, index) => (
@@ -211,10 +224,10 @@ export const DeepSearchOverlay = memo(function DeepSearchOverlay(props: DeepSear
         </div>
         <footer className={overlayStyles.footer}>
           <span className={error ? overlayStyles.error : ""}>{error || statusText}</span>
-          <span className="inline-flex items-center gap-2">{mode === "search" && searching ? "Searching..." : `${displayedResults.length} results`}<span className="inline-flex items-center gap-1 text-[#92969e]"><CornerDownLeft size={12} /> open</span></span>
+          <span className="inline-flex items-center gap-2">{mode === "search" && searching ? <><Loader2 className="animate-spin" size={12} />Searching...</> : `${displayedResults.length} results`}<span className="inline-flex items-center gap-1"><CornerDownLeft size={12} /> open</span></span>
         </footer>
-      </section>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 });
 
@@ -226,9 +239,10 @@ function SearchResultRow(props: { result: SearchResult; index: number; selected:
     entry.modifiedMs !== null ? formatDate(entry.modifiedMs) : "",
   ].filter(Boolean).join(" · ");
   return (
-    <button
+    <Button
       data-spotlight-index={props.index}
-      className={`${overlayStyles.result} ${props.selected ? overlayStyles.resultSelected : "hover:bg-white/[0.08]"}`}
+      variant="ghost"
+      className={`${overlayStyles.result} ${props.selected ? overlayStyles.resultSelected : "hover:bg-accent/60"}`}
       type="button"
       aria-selected={props.selected}
       onMouseEnter={props.onHover}
@@ -245,6 +259,6 @@ function SearchResultRow(props: { result: SearchResult; index: number; selected:
         <span className={overlayStyles.resultPath}>{searchResultContext(result)}</span>
       </span>
       <span className={overlayStyles.resultMeta}>{meta}</span>
-    </button>
+    </Button>
   );
 }

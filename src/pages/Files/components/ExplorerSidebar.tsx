@@ -1,3 +1,4 @@
+import { Button } from "../../../components/ui/button";
 import {
   Briefcase,
   Camera,
@@ -44,7 +45,6 @@ import {
   buildLibraryTagViews,
   createSmartFolderDialogState,
   dedupePinnedPathsForQuickAccess,
-  DeviceDialog,
   deviceCapacityLabel,
   joinPath,
   loadDeviceCustomization,
@@ -61,7 +61,6 @@ import {
   saveSidebarCollapsedState,
   sidebarStyles,
   SidebarSectionHeader,
-  SmartFolderDialog,
   smartFolderId,
   smartFolderMatchMode,
   smartFolderQueryFromRules,
@@ -69,8 +68,8 @@ import {
   sortSavedSearches,
   uniqueStrings,
   visibleSmartFolderRules,
-  WorkspaceDialog,
 } from "./ExplorerSidebarSupport";
+import { DeviceDialog, SmartFolderDialog, WorkspaceDialog } from "./ExplorerSidebarDialogs";
 import type {
   DeviceCustomizationState,
   DeviceMenuState,
@@ -449,7 +448,7 @@ export const ExplorerSidebar = memo(function ExplorerSidebar(props: ExplorerSide
   return (
     <aside className={sidebarStyles.root} data-explorer-scroll-container>
       <section className={sidebarStyles.section}>
-        <button
+        <Button
           type="button"
           ref={workspaceButtonRef}
           className={sidebarStyles.workspaceSelect}
@@ -471,7 +470,7 @@ export const ExplorerSidebar = memo(function ExplorerSidebar(props: ExplorerSide
           <Briefcase size={20} />
           <span className={sidebarStyles.workspaceSelectLabel}>{props.activeWorkspaceTitle}</span>
           <ChevronDown size={15} />
-        </button>
+        </Button>
       </section>
 
       <section className={sidebarStyles.section}>
@@ -481,7 +480,7 @@ export const ExplorerSidebar = memo(function ExplorerSidebar(props: ExplorerSide
           onToggle={() => toggleSection("quickAccess")}
           onContextMenu={(event) => openQuickAccessMenu(event, null)}
           actions={props.androidLocal ? (
-            <button
+            <Button
               type="button"
               title="Add local folder"
               aria-label="Add local folder"
@@ -492,7 +491,7 @@ export const ExplorerSidebar = memo(function ExplorerSidebar(props: ExplorerSide
               }}
             >
               <Plus size={15} />
-            </button>
+            </Button>
           ) : undefined}
         />
         {!collapsedSections.quickAccess ? (
@@ -515,7 +514,7 @@ export const ExplorerSidebar = memo(function ExplorerSidebar(props: ExplorerSide
                 >
                   <ExplorerDropTarget id={`sidebar:quick:${item.path}`} path={grantedPath ?? item.path}
                     springLoad={!item.grantRequest || Boolean(grantedPath)} onSpringLoad={() => props.onNavigate(grantedPath ?? item.path)}>
-                    <button
+                    <Button
                       className={sidebarStyles.pinnedButton}
                       onClick={() => {
                         if (item.grantRequest) {
@@ -527,10 +526,10 @@ export const ExplorerSidebar = memo(function ExplorerSidebar(props: ExplorerSide
                       title={item.grantRequest && !grantedPath ? `Grant access to ${item.label}` : item.path}
                     >
                       <Icon size={20} /><span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{item.label}</span>
-                    </button>
+                    </Button>
                   </ExplorerDropTarget>
                   {item.grantRequest && !grantedPath ? (
-                    <button
+                    <Button
                       type="button"
                       className={sidebarStyles.pinnedUnpinButton}
                       title={`Grant access to ${item.label}`}
@@ -538,13 +537,13 @@ export const ExplorerSidebar = memo(function ExplorerSidebar(props: ExplorerSide
                       onClick={() => props.onGrantLocalFolder(item.grantRequest)}
                     >
                       <Plus size={15} />
-                    </button>
+                    </Button>
                   ) : item.grantRequest ? (
                     <span className={sidebarStyles.pinnedUnpinButton} title={`${item.label} access granted`}>
                       <Check size={15} />
                     </span>
                   ) : (
-                    <button
+                    <Button
                       type="button"
                       className={sidebarStyles.pinnedUnpinButton}
                       title={`Unpin ${item.label}`}
@@ -552,7 +551,7 @@ export const ExplorerSidebar = memo(function ExplorerSidebar(props: ExplorerSide
                       onClick={() => setHiddenQuickAccessPaths((paths) => addHiddenQuickAccessPath(paths, item.path))}
                     >
                       <PinOff size={15} />
-                    </button>
+                    </Button>
                   )}
                 </div>
               );
@@ -568,15 +567,15 @@ export const ExplorerSidebar = memo(function ExplorerSidebar(props: ExplorerSide
                 })}
               >
                 <ExplorerDropTarget id={`sidebar:pinned:${path}`} path={path} springLoad onSpringLoad={() => props.onNavigate(path)}>
-                  <button
+                  <Button
                     className={sidebarStyles.pinnedButton}
                     onClick={() => props.onNavigate(path)}
                     title={path}
                   >
                     <Folder size={20} /><span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{pinnedPathLabel(path)}</span>
-                  </button>
+                  </Button>
                 </ExplorerDropTarget>
-                <button
+                <Button
                   type="button"
                   className={sidebarStyles.pinnedUnpinButton}
                   title={`Unpin ${path}`}
@@ -584,7 +583,7 @@ export const ExplorerSidebar = memo(function ExplorerSidebar(props: ExplorerSide
                   onClick={() => props.onUnpinPinnedPath(path)}
                 >
                   <PinOff size={15} />
-                </button>
+                </Button>
               </div>
             ))}
           </div>
@@ -597,7 +596,7 @@ export const ExplorerSidebar = memo(function ExplorerSidebar(props: ExplorerSide
           collapsed={collapsedSections.smartFolders}
           onToggle={() => toggleSection("smartFolders")}
           actions={(
-            <button
+            <Button
               type="button"
               title="New collection"
               aria-label="New collection"
@@ -608,7 +607,7 @@ export const ExplorerSidebar = memo(function ExplorerSidebar(props: ExplorerSide
               }}
             >
               <Plus size={15} />
-            </button>
+            </Button>
           )}
         />
         {!collapsedSections.smartFolders ? (
@@ -620,7 +619,7 @@ export const ExplorerSidebar = memo(function ExplorerSidebar(props: ExplorerSide
               const query = search.query.trim() || smartFolderQueryFromRules(search.rules, smartFolderMatchMode(search.rules));
               return (
                 <div className={`${sidebarStyles.pinnedRow} group/pin`} key={search.id}>
-                  <button
+                  <Button
                     className={sidebarStyles.pinnedButton}
                     onClick={() => void runSmartFolder(search)}
                     title={query || search.name}
@@ -630,8 +629,8 @@ export const ExplorerSidebar = memo(function ExplorerSidebar(props: ExplorerSide
                       <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{search.name}</span>
                       <small className={sidebarStyles.smartMeta}>{query || `${visibleSmartFolderRules(search.rules).length} rules`}</small>
                     </span>
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     type="button"
                     className={sidebarStyles.pinnedUnpinButton}
                     title={`Edit ${search.name}`}
@@ -639,7 +638,7 @@ export const ExplorerSidebar = memo(function ExplorerSidebar(props: ExplorerSide
                     onClick={() => openSmartFolderDialog(search)}
                   >
                     <Pencil size={15} />
-                  </button>
+                  </Button>
                 </div>
               );
             })}
@@ -657,7 +656,7 @@ export const ExplorerSidebar = memo(function ExplorerSidebar(props: ExplorerSide
           <div className={sidebarStyles.list}>
             {visibleTagViews.length === 0 ? <div className={sidebarStyles.muted}>No tags yet</div> : null}
             {visibleTagViews.map((tagView) => (
-              <button
+              <Button
                 key={tagView.key}
                 className={sidebarStyles.itemButton}
                 onClick={() => void openTagView(tagView.name)}
@@ -668,7 +667,7 @@ export const ExplorerSidebar = memo(function ExplorerSidebar(props: ExplorerSide
                   <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{tagView.name}</span>
                   <small className={sidebarStyles.smartMeta}>{tagView.count} {tagView.count === 1 ? "item" : "items"}</small>
                 </span>
-              </button>
+              </Button>
             ))}
           </div>
         ) : null}
@@ -681,7 +680,7 @@ export const ExplorerSidebar = memo(function ExplorerSidebar(props: ExplorerSide
           onToggle={() => toggleSection("remote")}
           actions={(
             <>
-              <button
+              <Button
                 type="button"
                 title="Manage remotes"
                 aria-label="Manage remotes"
@@ -692,8 +691,8 @@ export const ExplorerSidebar = memo(function ExplorerSidebar(props: ExplorerSide
                 }}
               >
                 <SlidersHorizontal size={15} />
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
                 title="Add remote"
                 aria-label="Add remote"
@@ -704,7 +703,7 @@ export const ExplorerSidebar = memo(function ExplorerSidebar(props: ExplorerSide
                 }}
               >
                 <Plus size={15} />
-              </button>
+              </Button>
             </>
           )}
         />
@@ -720,13 +719,13 @@ export const ExplorerSidebar = memo(function ExplorerSidebar(props: ExplorerSide
                 const providerIcon = providerIconForType(remote.type);
                 return (
                   <ExplorerDropTarget key={`${remote.type}:${remote.name}`} id={`sidebar:remote:${remote.name}`} path={path} remoteName={remote.name} springLoad onSpringLoad={() => props.onNavigate(path)}>
-                    <button
+                    <Button
                       className={`${sidebarStyles.itemButton} ${props.activePath === path || props.activePath.startsWith(`${path}/`) ? sidebarStyles.itemSelected : ""}`}
                       onClick={() => props.onNavigate(path)}
                       title={`${remote.type}: ${remote.name}`}
                     >
                       <span className={sidebarStyles.remoteIcon}><AssetIcon src={providerIcon.src} color={providerIcon.color} size={24} /></span>
-                      <span>{remote.name}</span></button>
+                      <span>{remote.name}</span></Button>
                   </ExplorerDropTarget>
                 );
               })}
@@ -742,7 +741,7 @@ export const ExplorerSidebar = memo(function ExplorerSidebar(props: ExplorerSide
           onToggle={() => toggleSection("devices")}
           actions={(
             <>
-              <button
+              <Button
                 type="button"
                 title="Refresh devices"
                 className={`${sidebarStyles.sectionActionButton} ${devicesRefreshSpinning ? sidebarStyles.spinning : ""}`}
@@ -753,8 +752,8 @@ export const ExplorerSidebar = memo(function ExplorerSidebar(props: ExplorerSide
                 }}
               >
                 <RefreshCcw size={14} />
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
                 title="Add mount point"
                 className={sidebarStyles.sectionActionButton}
@@ -764,7 +763,7 @@ export const ExplorerSidebar = memo(function ExplorerSidebar(props: ExplorerSide
                 }}
               >
                 <Plus size={15} />
-              </button>
+              </Button>
             </>
           )}
         />
@@ -779,7 +778,7 @@ export const ExplorerSidebar = memo(function ExplorerSidebar(props: ExplorerSide
                 return (
                   <div className={sidebarStyles.deviceRow} key={device.id}>
                     <ExplorerDropTarget id={`sidebar:device:${device.id}`} path={device.mountPath} springLoad onSpringLoad={() => props.onNavigate(device.mountPath)}>
-                      <button
+                      <Button
                         type="button"
                         className={`${sidebarStyles.deviceButton} ${pathIsInside(props.activePath, device.mountPath) ? sidebarStyles.itemSelected : ""}`}
                         onClick={() => props.onNavigate(device.mountPath)}
@@ -793,7 +792,7 @@ export const ExplorerSidebar = memo(function ExplorerSidebar(props: ExplorerSide
                             <span className={sidebarStyles.deviceMeter} aria-hidden="true"><i className={sidebarStyles.deviceMeterFill} style={{ width: `${usedRatio}%` }} /></span>
                           ) : null}
                         </span>
-                      </button></ExplorerDropTarget>
+                      </Button></ExplorerDropTarget>
                   </div>
                 );
               })}
@@ -814,7 +813,7 @@ export const ExplorerSidebar = memo(function ExplorerSidebar(props: ExplorerSide
                   key={workspace.id}
                   className={`${sidebarStyles.workspaceMenuRow} ${workspace.id === props.activeWorkspaceId ? sidebarStyles.menuButtonSelected : ""}`}
                 >
-                  <button
+                  <Button
                     className={sidebarStyles.workspaceMenuSelect}
                     type="button"
                     role="menuitemradio"
@@ -828,9 +827,9 @@ export const ExplorerSidebar = memo(function ExplorerSidebar(props: ExplorerSide
                       {workspace.id === props.activeWorkspaceId ? <Check size={15} /> : null}
                     </span>
                     <span className={sidebarStyles.menuButtonTruncate}>{workspace.title}</span>
-                  </button>
+                  </Button>
                   <span className={sidebarStyles.workspaceMenuActions}>
-                    <button
+                    <Button
                       className={sidebarStyles.workspaceMenuIconButton}
                       type="button"
                       title={`Rename ${workspace.title}`}
@@ -838,8 +837,8 @@ export const ExplorerSidebar = memo(function ExplorerSidebar(props: ExplorerSide
                       onClick={() => openWorkspaceDialog("rename", workspace)}
                     >
                       <Pencil size={14} />
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       className={sidebarStyles.workspaceMenuIconButton}
                       type="button"
                       title={`Delete ${workspace.title}`}
@@ -848,15 +847,15 @@ export const ExplorerSidebar = memo(function ExplorerSidebar(props: ExplorerSide
                       disabled={props.workspaceEntries.length <= 1}
                     >
                       <Trash2 size={14} />
-                    </button>
+                    </Button>
                   </span>
                 </div>
               ))}
               <div className={sidebarStyles.menuSeparator} />
-              <button className={sidebarStyles.menuButton} type="button" role="menuitem" onClick={() => openWorkspaceDialog("create")}>
+              <Button className={sidebarStyles.menuButton} type="button" role="menuitem" onClick={() => openWorkspaceDialog("create")}>
                 <span className={sidebarStyles.menuButtonIcon}><Plus size={15} /></span>
                 <span>New</span>
-              </button>
+              </Button>
             </div>,
             document.body,
           )
@@ -872,7 +871,7 @@ export const ExplorerSidebar = memo(function ExplorerSidebar(props: ExplorerSide
             >
               {quickAccessMenu.mode === "item" ? (
                 <>
-                  <button
+                  <Button
                     className={sidebarStyles.menuButton}
                     type="button"
                     role="menuitem"
@@ -885,8 +884,8 @@ export const ExplorerSidebar = memo(function ExplorerSidebar(props: ExplorerSide
                   >
                     <ExternalLink size={15} />
                     <span>Open in New Tab</span>
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     className={sidebarStyles.menuButton}
                     type="button"
                     role="menuitem"
@@ -897,7 +896,7 @@ export const ExplorerSidebar = memo(function ExplorerSidebar(props: ExplorerSide
                   >
                     <X size={15} />
                     <span>Remove from Sidebar</span>
-                  </button>
+                  </Button>
                   <div className={sidebarStyles.menuSeparator} />
                 </>
               ) : null}
@@ -906,7 +905,7 @@ export const ExplorerSidebar = memo(function ExplorerSidebar(props: ExplorerSide
                   {quickAccess.map((item) => {
                     const checked = !quickAccessPathHidden(item.path, hiddenQuickAccessPaths);
                     return (
-                      <button
+                      <Button
                         key={`quick-menu:${item.path}`}
                         className={sidebarStyles.menuButton}
                         type="button"
@@ -916,13 +915,13 @@ export const ExplorerSidebar = memo(function ExplorerSidebar(props: ExplorerSide
                       >
                         <span className={sidebarStyles.menuButtonCheck}>{checked ? <Check size={15} /> : null}</span>
                         <span>{item.label}</span>
-                      </button>
+                      </Button>
                     );
                   })}
                   <div className={sidebarStyles.menuSeparator} />
                 </>
               ) : null}
-              <button
+              <Button
                 className={sidebarStyles.menuButton}
                 type="button"
                 role="menuitem"
@@ -930,7 +929,7 @@ export const ExplorerSidebar = memo(function ExplorerSidebar(props: ExplorerSide
               >
                 <RefreshCcw size={15} />
                 <span>Reset Defaults</span>
-              </button>
+              </Button>
             </div>,
             document.body,
           )
@@ -943,15 +942,14 @@ export const ExplorerSidebar = memo(function ExplorerSidebar(props: ExplorerSide
               style={{ left: deviceMenu.left, top: deviceMenu.top }}
               role="menu"
             >
-              <button className={sidebarStyles.menuButton} type="button" role="menuitem" onClick={() => startRename(deviceMenu.device)}>Rename</button>
-              <button className={sidebarStyles.menuButton} type="button" role="menuitem" onClick={() => hideDevice(deviceMenu.device)}>Hide</button>
+              <Button className={sidebarStyles.menuButton} type="button" role="menuitem" onClick={() => startRename(deviceMenu.device)}>Rename</Button>
+              <Button className={sidebarStyles.menuButton} type="button" role="menuitem" onClick={() => hideDevice(deviceMenu.device)}>Hide</Button>
             </div>,
             document.body,
           )
         : null}
       {workspaceDialog
-        ? createPortal(
-            <WorkspaceDialog
+        ? <WorkspaceDialog
               state={workspaceDialog}
               value={workspaceDraft}
               onChange={setWorkspaceDraft}
@@ -960,13 +958,10 @@ export const ExplorerSidebar = memo(function ExplorerSidebar(props: ExplorerSide
                 setWorkspaceDialog(null);
                 setWorkspaceDraft("");
               }}
-            />,
-            document.body,
-          )
+            />
         : null}
       {smartFolderDialog
-        ? createPortal(
-            <SmartFolderDialog
+        ? <SmartFolderDialog
               state={smartFolderDialog}
               error={smartFolderError}
               onSave={saveSmartFolder}
@@ -975,13 +970,10 @@ export const ExplorerSidebar = memo(function ExplorerSidebar(props: ExplorerSide
                 setSmartFolderDialog(null);
                 setSmartFolderError(null);
               }}
-            />,
-            document.body,
-          )
+            />
         : null}
       {addDeviceOpen
-        ? createPortal(
-            <DeviceDialog
+        ? <DeviceDialog
               title="Add Mount Point"
               label="Mount Path"
               placeholder="/Volumes/MyDrive"
@@ -993,13 +985,10 @@ export const ExplorerSidebar = memo(function ExplorerSidebar(props: ExplorerSide
                 setAddDeviceOpen(false);
                 setAddDevicePath("");
               }}
-            />,
-            document.body,
-          )
+            />
         : null}
       {renameDevice
-        ? createPortal(
-            <DeviceDialog
+        ? <DeviceDialog
               title="Rename Drive"
               label="Drive Name"
               value={renameValue}
@@ -1010,9 +999,7 @@ export const ExplorerSidebar = memo(function ExplorerSidebar(props: ExplorerSide
                 setRenameDevice(null);
                 setRenameValue("");
               }}
-            />,
-            document.body,
-          )
+            />
         : null}
     </aside>
   );

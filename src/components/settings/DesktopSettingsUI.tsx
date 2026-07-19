@@ -1,48 +1,127 @@
 import type { ReactNode } from "react";
+import type { LucideIcon } from "lucide-react";
 
-export const desktopSettingsGridClass =
-  "grid h-screen min-h-0 min-w-0 grid-cols-[180px_1px_minmax(0,1fr)] overflow-hidden bg-[var(--misty-app-shell-bg,#050607)] text-[#f4f4f5] max-[980px]:grid-cols-[150px_1px_minmax(720px,1fr)] max-[980px]:overflow-x-auto max-[980px]:overflow-y-hidden";
+import {
+  IconButton,
+  PageBody,
+  PageHeader,
+  PageShell,
+  Section,
+  SidebarNav,
+  SidebarNavItem,
+  SidebarNavSection,
+} from "@/components/misty";
+import { X } from "lucide-react";
+import { cn } from "@/lib/utils";
 
-export const desktopSettingsSidebarClass =
-  "flex min-h-0 flex-col gap-[5px] bg-[var(--misty-app-nav-bg,var(--misty-app-shell-bg,#050607))] p-5 max-[980px]:px-2.5 max-[980px]:py-4";
+export interface DesktopSettingsNavEntry<Id extends string = string> {
+  id: Id;
+  label: string;
+  icon: LucideIcon;
+}
 
-export const desktopSettingsNavItemClass =
-  "grid h-9 w-full grid-cols-[18px_minmax(0,1fr)] items-center gap-3 rounded-md border border-transparent bg-transparent px-2 py-1.5 text-left text-[15px] text-[#a1a1aa] hover:border-white/10 hover:bg-white/[0.045] hover:text-[#f4f4f5]";
+interface DesktopSettingsFrameProps<Id extends string> {
+  activeId: Id;
+  ariaLabel: string;
+  children: ReactNode;
+  description?: ReactNode;
+  items: readonly DesktopSettingsNavEntry<Id>[];
+  navigationLabel: string;
+  navigationTitle: string;
+  onClose?: () => void;
+  onSelect: (id: Id) => void;
+  presentation?: "page" | "overlay";
+  title: ReactNode;
+}
 
-export const desktopSettingsNavItemSelectedClass =
-  "border-white/15 bg-[#f4f4f5] text-[#07090b] hover:bg-white hover:text-[#07090b]";
+export function DesktopSettingsFrame<Id extends string>(
+  props: DesktopSettingsFrameProps<Id>,
+) {
+  const overlay = props.presentation === "overlay";
+  const activeItem =
+    props.items.find((item) => item.id === props.activeId) ?? props.items[0];
+  const ActiveIcon = activeItem?.icon;
 
-export const desktopSettingsContentClass =
-  "misty-scrollbar min-h-0 min-w-0 overflow-auto bg-[var(--misty-app-shell-bg,#050607)] px-7 py-6";
-
-export const desktopSettingsScrollSurfaceClass = "w-[min(100%,934px)] min-w-[720px]";
-
-export const desktopSettingsOverlayGridClass =
-  "grid h-full min-h-0 min-w-0 grid-cols-[214px_1px_minmax(0,1fr)] overflow-hidden bg-[var(--misty-app-shell-bg,#050607)] text-[#f4f4f5] max-[980px]:grid-cols-[180px_1px_minmax(620px,1fr)] max-[980px]:overflow-x-auto max-[980px]:overflow-y-hidden";
-
-export const desktopSettingsOverlayContentShellClass =
-  "grid min-h-0 min-w-0 grid-rows-[72px_minmax(0,1fr)] bg-[var(--misty-app-shell-bg,#050607)]";
-
-export const desktopSettingsOverlayHeaderClass =
-  "flex min-h-0 items-center justify-between gap-4 border-b border-white/10 px-7";
-
-export const desktopSettingsOverlayContentClass =
-  "misty-scrollbar min-h-0 min-w-0 overflow-auto bg-[var(--misty-app-shell-bg,#050607)] px-7 py-5";
-
-export const desktopSettingsOverlayScrollSurfaceClass =
-  "w-[min(100%,720px)] min-w-[560px]";
-
-export const desktopSettingsOverlayCloseClass =
-  "grid size-8 place-items-center rounded-md border border-transparent bg-transparent p-0 text-[#a1a1aa] transition hover:border-white/10 hover:bg-white/[0.045] hover:text-[#f4f4f5]";
-
-export function DesktopSettingsSection(props: { title: string; children: ReactNode }) {
   return (
-    <section className="mb-3.5 overflow-hidden rounded-lg border border-white/10 bg-[var(--misty-app-surface-bg,#090b0d)] shadow-[0_1px_0_rgba(255,255,255,0.035)_inset]">
-      <h2 className="border-b border-white/[0.08] bg-[rgba(12,14,16,var(--misty-app-panel-opacity,1))] px-7 py-4 text-[11px] font-[760] leading-none tracking-normal text-[#a1a1aa]">
-        {props.title}
-      </h2>
-      {props.children}
-    </section>
+    <PageShell
+      aria-label={props.ariaLabel}
+      className={cn(
+        "grid min-h-0 min-w-0 grid-cols-[216px_1px_minmax(0,1fr)] overflow-hidden bg-background",
+        overlay ? "h-full" : "h-screen",
+        "max-[900px]:grid-cols-[184px_1px_minmax(0,1fr)]",
+        "max-[680px]:grid-cols-[156px_1px_minmax(0,1fr)]",
+      )}
+    >
+      <aside className="min-h-0 overflow-y-auto bg-sidebar p-4 text-sidebar-foreground max-[680px]:px-2.5">
+        <SidebarNav label={props.navigationLabel}>
+          <SidebarNavSection
+            label={overlay ? props.navigationLabel : props.navigationTitle}
+          >
+            {props.items.map((item) => {
+              const Icon = item.icon;
+              return (
+                <SidebarNavItem
+                  key={item.id}
+                  active={props.activeId === item.id}
+                  icon={<Icon strokeWidth={1.8} />}
+                  onClick={() => props.onSelect(item.id)}
+                >
+                  {item.label}
+                </SidebarNavItem>
+              );
+            })}
+          </SidebarNavSection>
+        </SidebarNav>
+      </aside>
+
+      <div aria-hidden="true" className="bg-border" />
+
+      <main className="flex min-h-0 min-w-0 flex-col bg-background">
+        <PageHeader
+          title={props.title}
+          description={props.description}
+          leading={ActiveIcon ? <ActiveIcon className="size-4" strokeWidth={1.8} /> : null}
+          actions={
+            overlay ? (
+              <IconButton
+                label={`Close ${props.ariaLabel.toLowerCase()}`}
+                tooltip={false}
+                onClick={props.onClose}
+              >
+                <X className="size-4" strokeWidth={1.8} />
+              </IconButton>
+            ) : null
+          }
+        />
+        <PageBody
+          width="content"
+          className={cn(
+            "misty-scrollbar w-full",
+            overlay ? "max-w-3xl" : "max-w-5xl",
+          )}
+        >
+          {props.children}
+        </PageBody>
+      </main>
+    </PageShell>
+  );
+}
+
+export function DesktopSettingsSection(props: {
+  title: string;
+  description?: string;
+  children: ReactNode;
+}) {
+  return (
+    <Section
+      title={props.title}
+      description={props.description}
+      className="mb-7 last:mb-0"
+    >
+      <div className="overflow-hidden rounded-lg border border-border bg-card">
+        {props.children}
+      </div>
+    </Section>
   );
 }
 
@@ -55,19 +134,24 @@ export function DesktopSettingsRow(props: {
 }) {
   return (
     <div
-      className={`grid min-h-[68px] grid-cols-[minmax(0,0.52fr)_minmax(260px,0.48fr)] items-center gap-[18px] border-b border-white/[0.08] bg-[var(--misty-app-surface-bg,#090b0d)] px-7 py-3 ${props.last ? "border-b-0" : ""} ${props.muted ? "opacity-45" : ""}`}
+      className={cn(
+        "grid min-h-16 grid-cols-[minmax(0,0.52fr)_minmax(240px,0.48fr)] items-center gap-5 border-b border-border px-5 py-3.5 last:border-b-0",
+        "max-[760px]:grid-cols-1 max-[760px]:items-start max-[760px]:gap-3",
+        props.last && "border-b-0",
+        props.muted && "opacity-50",
+      )}
     >
       <div className="grid min-w-0 gap-1">
-        <strong className="text-[15px] font-[620] leading-[1.1] text-[#f4f4f5]">
+        <strong className="text-sm font-medium leading-5 text-foreground">
           {props.label}
         </strong>
         {props.description ? (
-          <span className="text-[14px] leading-[1.25] text-[#8f8f8f]">
+          <span className="text-sm leading-5 text-muted-foreground">
             {props.description}
           </span>
         ) : null}
       </div>
-      <div className="flex min-w-0 items-center justify-end overflow-hidden">
+      <div className="flex min-w-0 items-center justify-end max-[760px]:w-full max-[760px]:justify-start">
         {props.children}
       </div>
     </div>

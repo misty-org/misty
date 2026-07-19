@@ -1,3 +1,5 @@
+import { Input } from "../../../components/ui/input";
+import { Button } from "../../../components/ui/button";
 import { ArrowLeft, ArrowRightLeft, ExternalLink, Puzzle, RefreshCcw, Sparkles, Terminal, X } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -80,7 +82,7 @@ export function ExplorerTray(props: {
   return (
     <>
       <ExplorerTransfersTabButton onClick={props.onOpenTransfers} />
-      <button
+      <Button
         aria-label="Open Mika Assistant"
         className={explorerTrayStyles.trigger}
         disabled={!props.mikaEnabled}
@@ -89,8 +91,8 @@ export function ExplorerTray(props: {
         type="button"
       >
         <Sparkles size={16} />
-      </button>
-      <button
+      </Button>
+      <Button
         className={explorerTrayStyles.trigger}
         type="button"
         title={props.terminalEnabled ? "Open terminal" : "Terminal unavailable for this view"}
@@ -99,7 +101,7 @@ export function ExplorerTray(props: {
         onClick={openTerminal}
       >
         <Terminal size={16} />
-      </button>
+      </Button>
       {props.extensionsEnabled !== false ? (
         <ExplorerPluginTabMenu
           commands={props.commands}
@@ -122,7 +124,7 @@ function ExplorerTransfersTabButton(props: {
   const badgeCount = rows.filter((row) => transferBadgeStatuses.has(row.status)).length;
   return (
     <span className={explorerTrayStyles.triggerWrap}>
-      <button
+      <Button
         className={cx(explorerTrayStyles.trigger, active && explorerTrayStyles.triggerActive)}
         type="button"
         title="Transfers"
@@ -130,7 +132,7 @@ function ExplorerTransfersTabButton(props: {
         onClick={props.onClick}
       >
         <ArrowRightLeft size={16} />
-      </button>
+      </Button>
       {badgeCount > 0 ? (
         <span className={explorerTrayStyles.badge}>{formatTransferBadgeCount(badgeCount)}</span>
       ) : null}
@@ -258,7 +260,7 @@ function ExplorerPluginTabMenu(props: {
 
   return (
     <>
-      <button
+      <Button
         ref={buttonRef}
         className={cx(explorerTrayStyles.trigger, open && explorerTrayStyles.triggerActive)}
         type="button"
@@ -271,7 +273,7 @@ function ExplorerPluginTabMenu(props: {
         }}
       >
         <Puzzle size={16} />
-      </button>
+      </Button>
       {(open || visitedPluginIds.length > 0) ? createPortal((
         <div
           ref={menuRef}
@@ -285,22 +287,22 @@ function ExplorerPluginTabMenu(props: {
           <header className={pluginTabMenuStyles.header}>
             <span className={pluginTabMenuStyles.headerTitle}>
               {selectedPlugin ? (
-                <button data-extension-popup-initial className={pluginTabMenuStyles.iconButton} type="button" title="Back to extensions" onClick={() => setSelectedPluginId(null)}>
+                <Button data-extension-popup-initial className={pluginTabMenuStyles.iconButton} type="button" title="Back to extensions" onClick={() => setSelectedPluginId(null)}>
                   <ArrowLeft size={16} />
-                </button>
+                </Button>
               ) : <Puzzle size={16} />}
               {selectedPlugin ? <PluginIcon pluginId={selectedPlugin.pluginId} pluginName={selectedPlugin.pluginName} fallback={selectedPlugin.kind} size={18} /> : null}
               <strong>{selectedPlugin?.pluginName ?? "Extensions"}</strong>
             </span>
             {selectedPlugin ? (
-              <button className={pluginTabMenuStyles.iconButton} type="button" title="Close extensions" onClick={() => closePopup()}>
+              <Button className={pluginTabMenuStyles.iconButton} type="button" title="Close extensions" onClick={() => closePopup()}>
                 <X size={16} />
-              </button>
+              </Button>
             ) : <span className={pluginTabMenuStyles.headerMeta}>{highlightedCount} usable</span>}
           </header>
           {!selectedPlugin ? <label className={pluginTabMenuStyles.searchLabel}>
             <span className="sr-only">Search extensions</span>
-            <input
+            <Input
               className={pluginTabMenuStyles.searchInput}
               data-extension-popup-initial
               value={query}
@@ -311,7 +313,7 @@ function ExplorerPluginTabMenu(props: {
           {!selectedPlugin && plugins.length > 0 ? (
             <div className={pluginTabMenuStyles.sections}>
               {visiblePlugins.map((plugin) => (
-                <button
+                <Button
                   key={plugin.pluginId}
                   type="button"
                   className={cx(
@@ -329,7 +331,7 @@ function ExplorerPluginTabMenu(props: {
                   <span className={cx(pluginTabMenuStyles.areaPill, plugin.usable && pluginTabMenuStyles.areaPillUsable)}>
                     {plugin.usable ? "Files" : extensionAreaLabel(plugin.primaryArea)}
                   </span>
-                </button>
+                </Button>
               ))}
               {visiblePlugins.length === 0 ? (
                 <div className={pluginTabMenuStyles.empty}>
@@ -368,10 +370,10 @@ function ExplorerPluginTabMenu(props: {
               </div>
             );
           })}
-          <button className={pluginTabMenuStyles.footerItem} type="button" role="menuitem" onClick={browsePlugins}>
+          <Button className={pluginTabMenuStyles.footerItem} type="button" role="menuitem" onClick={browsePlugins}>
             <ExternalLink size={15} />
             <span>{selectedPlugin ? "Manage extension" : "Browse extensions"}</span>
-          </button>
+          </Button>
         </div>
       ), document.body) : null}
     </>
@@ -415,14 +417,14 @@ export function ExplorerExtensionsPanel(props: {
             <span>{openPlugins.length} open</span>
           </div>
         </div>
-        <button className={extensionsPanelStyles.iconButton} type="button" title="Close extensions" onClick={props.onClose}>
+        <Button className={extensionsPanelStyles.iconButton} type="button" title="Close extensions" onClick={props.onClose}>
           <X size={16} />
-        </button>
+        </Button>
       </header>
       <div className={extensionsPanelStyles.body}>
         <nav className={extensionsPanelStyles.list} aria-label="Installed extensions" role="tablist">
           {openPlugins.map((plugin) => (
-            <button
+            <Button
               key={plugin.pluginId}
               type="button"
               role="tab"
@@ -457,7 +459,7 @@ export function ExplorerExtensionsPanel(props: {
               >
                 <X size={13} />
               </span>
-            </button>
+            </Button>
           ))}
         </nav>
         <section className={extensionsPanelStyles.host}>
@@ -495,10 +497,10 @@ export function ExplorerExtensionsPanel(props: {
           )}
         </section>
       </div>
-      <button className={extensionsPanelStyles.footerButton} type="button" onClick={browsePlugins}>
+      <Button className={extensionsPanelStyles.footerButton} type="button" onClick={browsePlugins}>
         Manage extensions
         <ExternalLink size={14} />
-      </button>
+      </Button>
     </aside>
   );
 }
@@ -780,7 +782,7 @@ export function ExplorerPluginTabContent(props: {
               {pluginCommandNeedsSelection(command, props.tab.selectedPath) ? (
                 <em>Select a file first</em>
               ) : null}
-              <button
+              <Button
                 className={pluginTabHostStyles.button}
                 type="button"
                 disabled={runningCommandId === command.id || pluginCommandNeedsSelection(command, props.tab.selectedPath)}
@@ -788,7 +790,7 @@ export function ExplorerPluginTabContent(props: {
               >
                 <Terminal size={13} />
                 {runningCommandId === command.id ? "Running" : "Run"}
-              </button>
+              </Button>
             </div>
           ))}
         </section>
@@ -861,7 +863,7 @@ function ExplorerNativePluginPanelHost(props: {
           <h3>{rendered?.title ?? props.panel.title}</h3>
           <span>{props.panel.pluginName}</span>
         </div>
-        <button
+        <Button
           className={pluginTabHostStyles.button}
           type="button"
           onClick={() => {
@@ -872,7 +874,7 @@ function ExplorerNativePluginPanelHost(props: {
         >
           <RefreshCcw className={refreshSpinning ? "animate-spin" : undefined} size={13} />
           Refresh
-        </button>
+        </Button>
       </header>
       {renderError ? <div className={pluginTabHostStyles.error}>{renderError}</div> : null}
       {rendered && rendered.runtimeStatus !== "native_rendered" ? (
@@ -940,6 +942,7 @@ function ExplorerWebPluginPanelHost(props: { panel: PluginPanelEntry; selectedPa
     const root = document.documentElement;
     root.dataset.theme = current.resolvedTheme; root.dataset.mistyTheme = current.themeId;
     root.style.colorScheme = current.resolvedTheme;
+    root.classList.toggle("dark", current.resolvedTheme === "dark");
     applyThemeTokenPreview(current.customTokens);
   }, [props.panel.pluginId]);
 
@@ -1015,8 +1018,8 @@ function ExplorerWebPluginPanelHost(props: { panel: PluginPanelEntry; selectedPa
               <strong className="text-[var(--misty-text)]">Extension did not start</strong>
               <span>The panel bundle may be missing, outdated, or incompatible with this Misty version.</span>
               <div className="flex flex-wrap justify-center gap-2">
-                <button className={pluginTabHostStyles.button} type="button" onClick={() => setReloadKey((value) => value + 1)}><RefreshCcw size={13} />Retry</button>
-                <button className={pluginTabHostStyles.button} type="button" onClick={() => navigate("/extensions")}><ExternalLink size={13} />Manage Extension</button>
+                <Button className={pluginTabHostStyles.button} type="button" onClick={() => setReloadKey((value) => value + 1)}><RefreshCcw size={13} />Retry</Button>
+                <Button className={pluginTabHostStyles.button} type="button" onClick={() => navigate("/extensions")}><ExternalLink size={13} />Manage Extension</Button>
               </div>
               <code className="max-w-full overflow-hidden text-ellipsis text-[10px] text-[var(--misty-text-subtle)]">{props.panel.webEntry}</code>
             </>
@@ -1037,14 +1040,14 @@ function PluginPanelElementView(props: {
 }) {
   if (props.element.kind === "button") {
     return (
-      <button className={pluginTabHostStyles.button} type="button" disabled={props.disabled} onClick={props.onButton}>
+      <Button className={pluginTabHostStyles.button} type="button" disabled={props.disabled} onClick={props.onButton}>
         {props.element.text || props.element.id}
-      </button>
+      </Button>
     );
   }
   if (props.element.kind === "input" || props.element.kind === "inputText") {
     return (
-      <input
+      <Input
         className={pluginTabHostStyles.input}
         value={props.value}
         disabled={props.disabled}

@@ -1,3 +1,4 @@
+import { Button } from "../components/ui/button";
 import {
   forwardRef,
   memo,
@@ -48,7 +49,6 @@ import {
   X,
 } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
-import mistyLogo from "../assets/misty-main-toolbar.png";
 import { preloadDesktopFilesPage } from "../pages/Files";
 import { selectedPathsForPane, useExplorerStore } from "../stores/useExplorerStore";
 import type {
@@ -77,7 +77,11 @@ import {
   useAppRouteMemoryStore,
 } from "../stores/useAppRouteMemoryStore";
 import { hasTauriInternals, safeTauriAssetUrl } from "../shared/tauri";
-import { restoreBundledAssetOnError, runtimeAssetSource } from "../shared/assets/runtimeAsset";
+import {
+  hideRuntimeAssetOnError,
+  revealRuntimeAssetOnLoad,
+  runtimeAssetSource,
+} from "../shared/assets/runtimeAsset";
 import { useAppStore } from "../stores/useAppStore";
 import { useAppThemeStore } from "../stores/useAppThemeStore";
 import type { AppTab } from "../routing/types";
@@ -121,7 +125,7 @@ export type DesktopNavItem = {
   exact?: boolean;
   active?: (pathname: string) => boolean;
 };
-const DEFAULT_FONT_STACK = `Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
+const DEFAULT_FONT_STACK = `"Outfit Variable", Outfit, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
 type WindowBounds = {
   position: PhysicalPosition;
   size: PhysicalSize;
@@ -295,7 +299,7 @@ export function DesktopLayout(props: {
     [appearancePreferences.wallpaperPath],
   );
   const mistyLogoSource = useMemo(
-    () => runtimeAssetSource(app?.environment.assetsDir, "logos/misty.png", mistyLogo),
+    () => runtimeAssetSource(app?.environment.assetsDir, "logos/misty.png"),
     [app?.environment.assetsDir],
   );
   const appWallpaperIsVideo = useMemo(
@@ -313,38 +317,18 @@ export function DesktopLayout(props: {
     const neutralSelectedOpacity = Math.min(0.22, 0.075 + panelOpacity * 0.145);
     const neutralStrongOpacity = Math.min(0.28, 0.105 + panelOpacity * 0.175);
     const neutralBorderOpacity = Math.min(0.24, 0.08 + panelOpacity * 0.13);
-    const appBodyBackground = appWallpaperSrc
-      ? `rgba(24, 24, 24, ${panelOpacity})`
-      : "var(--misty-page-bg)";
+    const appBodyBackground = "var(--misty-bg)";
     const appNavBackground = appWallpaperSrc ? `rgba(16, 16, 16, ${panelOpacity})` : "var(--misty-nav-bg)";
-    const appSurfaceBackground = appWallpaperSrc
-      ? `rgba(17, 20, 24, ${panelOpacity})`
-      : "var(--misty-surface)";
-    const wallpaperSurfaceVars = appWallpaperSrc
+    const appSurfaceBackground = "var(--misty-surface)";
+    const wallpaperFrameVars = appWallpaperSrc
       ? {
-          "--misty-bg": `rgba(24, 24, 24, ${panelOpacity})`,
-          "--misty-bg-soft": `rgba(9, 11, 14, ${panelOpacity})`,
-          "--misty-surface": `rgba(17, 20, 24, ${panelOpacity})`,
-          "--misty-surface-2": `rgba(244, 244, 245, ${neutralControlOpacity})`,
-          "--misty-surface-3": `rgba(244, 244, 245, ${neutralSelectedOpacity})`,
-          "--misty-surface-hover": `rgba(244, 244, 245, ${neutralHoverOpacity})`,
-          "--misty-surface-selected": `rgba(244, 244, 245, ${neutralSelectedOpacity})`,
-          "--misty-sidebar-selected": `rgba(244, 244, 245, ${neutralSelectedOpacity})`,
-          "--misty-neutral-control-bg": `rgba(244, 244, 245, ${neutralControlOpacity})`,
-          "--misty-neutral-hover-bg": `rgba(244, 244, 245, ${neutralHoverOpacity})`,
-          "--misty-neutral-selected-bg": `rgba(244, 244, 245, ${neutralSelectedOpacity})`,
-          "--misty-neutral-strong-bg": `rgba(244, 244, 245, ${neutralStrongOpacity})`,
-          "--misty-neutral-border": `rgba(244, 244, 245, ${neutralBorderOpacity})`,
-          "--misty-glass": `rgba(17, 20, 24, ${panelOpacity})`,
-          "--misty-border": "transparent",
-          "--misty-border-soft": "transparent",
-          "--color-border": "transparent",
-          "--color-border-subtle": "transparent",
-          "--misty-skeleton-base": `rgba(244, 244, 245, ${neutralControlOpacity})`,
-          "--misty-skeleton-highlight": `rgba(244, 244, 245, ${neutralSelectedOpacity})`,
-          "--color-bg": `rgba(24, 24, 24, ${panelOpacity})`,
-          "--color-surface": `rgba(17, 20, 24, ${panelOpacity})`,
-          "--color-elevated": `rgba(244, 244, 245, ${neutralControlOpacity})`,
+          "--misty-frame-background": "transparent",
+          "--misty-frame-navigation": appNavBackground,
+          "--misty-frame-control-bg": `rgba(244, 244, 245, ${neutralControlOpacity})`,
+          "--misty-frame-control-hover-bg": `rgba(244, 244, 245, ${neutralHoverOpacity})`,
+          "--misty-frame-control-selected-bg": `rgba(244, 244, 245, ${neutralSelectedOpacity})`,
+          "--misty-frame-control-strong-bg": `rgba(244, 244, 245, ${neutralStrongOpacity})`,
+          "--misty-frame-control-border": `rgba(244, 244, 245, ${neutralBorderOpacity})`,
         }
       : {};
     return {
@@ -353,28 +337,19 @@ export function DesktopLayout(props: {
       "--misty-app-chrome-opacity": String(chromePanelOpacity),
       "--misty-app-tab-opacity": String(tabPanelOpacity),
       "--misty-app-tab-active-opacity": String(activeTabPanelOpacity),
-      "--misty-border": "transparent",
-      "--misty-border-soft": "transparent",
-      "--misty-border-strong": `rgba(244, 244, 245, ${neutralBorderOpacity})`,
-      "--color-border": "transparent",
-      "--color-border-subtle": "transparent",
-      "--misty-app-frame-bg": appWallpaperSrc ? "transparent" : "var(--misty-page-bg)",
+      "--misty-app-frame-bg": "var(--misty-frame-background)",
       "--misty-app-page-bg": appBodyBackground,
       "--misty-app-shell-bg": appBodyBackground,
-      "--misty-app-nav-bg": appNavBackground,
-      "--misty-app-route-bg": appWallpaperSrc ? appBodyBackground : "transparent",
-      "--misty-app-panel-bg": "transparent",
+      "--misty-app-nav-bg": "var(--misty-frame-navigation)",
+      "--misty-app-route-bg": appBodyBackground,
+      "--misty-app-panel-bg": "var(--misty-component-surface)",
       "--misty-app-pane-bg": appSurfaceBackground,
       "--misty-app-surface-bg": appSurfaceBackground,
-      "--misty-app-surface-soft-bg": appWallpaperSrc
-        ? `rgba(17, 20, 24, ${panelOpacity})`
-        : "var(--misty-surface-2)",
+      "--misty-app-surface-soft-bg": "var(--misty-component-surface-raised)",
       "--misty-app-tab-bg": appBodyBackground,
       "--misty-app-tab-active-bg": appSurfaceBackground,
-      "--misty-app-modal-bg": appWallpaperSrc
-        ? `rgba(7, 9, 12, ${Math.min(0.78, panelOpacity + 0.08)})`
-        : "var(--misty-surface)",
-      ...wallpaperSurfaceVars,
+      "--misty-app-modal-bg": "var(--misty-component-surface)",
+      ...wallpaperFrameVars,
     } as unknown as CSSProperties;
   }, [appWallpaperSrc, appearancePreferences.panelOpacity]);
   useDocumentSurfaceVariables(desktopFrameStyle);
@@ -653,6 +628,7 @@ export function DesktopLayout(props: {
     root.dataset.theme = resolvedTheme;
     root.dataset.mistyTheme = themeId;
     root.dataset.themeMode = themeMode;
+    root.classList.toggle("dark", resolvedTheme === "dark");
     root.dataset.compactMode = String(appearancePreferences.compactModeEnabled);
     root.dataset.fontSize = appearancePreferences.fontSize;
     root.dataset.reducedMotion = String(
@@ -981,7 +957,7 @@ export function DesktopLayout(props: {
         <span className={desktopTitlebarTitleClass}>Misty</span>
         {shouldShowWindowsTitlebarControls ? (
           <div className={windowsTitlebarControlsClass}>
-            <button
+            <Button
               type="button"
               className={windowsTitlebarControlButtonClass}
               aria-label="Minimize window"
@@ -989,8 +965,8 @@ export function DesktopLayout(props: {
               onClick={minimizeTitlebarWindow}
             >
               <Minus size={15} strokeWidth={1.8} />
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
               className={windowsTitlebarControlButtonClass}
               aria-label="Maximize or restore window"
@@ -998,8 +974,8 @@ export function DesktopLayout(props: {
               onClick={() => void togglePseudoMaximize().catch(() => undefined)}
             >
               <Square size={13} strokeWidth={1.8} />
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
               className={windowsTitlebarCloseButtonClass}
               aria-label="Close window"
@@ -1007,7 +983,7 @@ export function DesktopLayout(props: {
               onClick={closeTitlebarWindow}
             >
               <X size={16} strokeWidth={1.8} />
-            </button>
+            </Button>
           </div>
         ) : null}
       </header> : null}
@@ -1022,12 +998,15 @@ export function DesktopLayout(props: {
           className="mb-3 grid h-[62px] w-[62px] place-items-center"
           title={app?.migrationStage ?? "Misty"}
         >
-          <img
-            className="h-[58px] w-[58px] object-contain"
-            src={mistyLogoSource}
-            onError={(event) => restoreBundledAssetOnError(event, mistyLogo)}
-            alt="Misty"
-          />
+          {mistyLogoSource ? (
+            <img
+              className="h-[58px] w-[58px] object-contain"
+              src={mistyLogoSource}
+              onError={hideRuntimeAssetOnError}
+              onLoad={revealRuntimeAssetOnLoad}
+              alt="Misty"
+            />
+          ) : null}
         </div>
         <div className={navbarGroupClass}>
           <NavGroup currentPath={location.pathname} items={navItems} routeOverrides={{ spaces: lastSpacesRoute }} />
@@ -1404,9 +1383,10 @@ const ActivityNavButton = memo(
     }
   >(function ActivityNavButton(props, ref) {
     return (
-      <button
+      <Button
         ref={ref}
         className={`group ${navLinkBaseClass} ${props.open ? navLinkActiveClass : ""}`}
+        variant="ghost"
         type="button"
         aria-haspopup="dialog"
         aria-expanded={props.open}
@@ -1429,15 +1409,16 @@ const ActivityNavButton = memo(
         >
           Activity
         </span>
-      </button>
+      </Button>
     );
   }),
 );
 
 function SettingsNavButton(props: { open: boolean; onClick: () => void }) {
   return (
-    <button
+    <Button
       className={`group ${navLinkBaseClass} ${props.open ? navLinkActiveClass : ""}`}
+      variant="ghost"
       type="button"
       aria-haspopup="dialog"
       aria-expanded={props.open}
@@ -1455,7 +1436,7 @@ function SettingsNavButton(props: { open: boolean; onClick: () => void }) {
       >
         Settings
       </span>
-    </button>
+    </Button>
   );
 }
 
@@ -1483,7 +1464,7 @@ const ProfileNavButton = memo(
     const initials = initialsForProfile(displayName, email);
 
     return (
-      <button
+      <Button
         ref={ref}
         className={profileDockClass}
         type="button"
@@ -1494,7 +1475,7 @@ const ProfileNavButton = memo(
         onClick={props.onClick}
       >
         {account ? initials : <UserCircle size={24} strokeWidth={1.75} />}
-      </button>
+      </Button>
     );
   }),
 );
@@ -1667,11 +1648,11 @@ function ProfilePopover(props: {
           <span className="px-2.5 py-1 text-[10px] font-bold capitalize text-[var(--misty-text-subtle)]">
             User/Profile Settings
           </span>
-          <button className={profileMenuItemClass} type="button" role="menuitem" onClick={openAccountSettings}>
+          <Button className={profileMenuItemClass} type="button" role="menuitem" onClick={openAccountSettings}>
             <UserCircle size={17} />
             <span>Account settings</span>
-          </button>
-          <button
+          </Button>
+          <Button
             className={`${profileMenuItemClass} ${accountChooserOpen ? "bg-[var(--misty-neutral-selected-bg,var(--misty-surface-3))] text-[var(--misty-text)]" : ""}`}
             type="button"
             role="menuitem"
@@ -1682,16 +1663,16 @@ function ProfilePopover(props: {
             <Repeat2 size={17} />
             <span>Switch accounts</span>
             <ChevronRight size={14} className={accountChooserOpen ? "text-[var(--misty-text)]" : "text-[var(--misty-text-subtle)]"} />
-          </button>
-          <button className={profileMenuItemClass} type="button" role="menuitem" onClick={signOut}>
+          </Button>
+          <Button className={profileMenuItemClass} type="button" role="menuitem" onClick={signOut}>
             <LogOut size={17} />
             <span>{account ? "Sign out" : "Clear session"}</span>
-          </button>
+          </Button>
           <div className="my-1 h-px bg-[var(--misty-border-soft)]" />
           <span className="px-2.5 py-1 text-[10px] font-bold capitalize text-[var(--misty-text-subtle)]">
             Misty App Settings
           </span>
-          <button
+          <Button
             className={profileMenuItemClass}
             type="button"
             role="menuitem"
@@ -1703,7 +1684,7 @@ function ProfilePopover(props: {
           >
             <SettingsIcon size={17} />
             <span>Open app settings</span>
-          </button>
+          </Button>
         </div>
       </div>
       {accountChooserOpen ? (
@@ -1716,24 +1697,24 @@ function ProfilePopover(props: {
         >
           <div className="flex items-center justify-between gap-3 border-b border-[var(--misty-border-soft)] px-2 pb-2 pt-1">
             <div><strong className="block text-sm">Switch accounts</strong><small className="text-[11px] text-[var(--misty-text-subtle)]">Your saved Misty sessions</small></div>
-            <button className="grid size-8 place-items-center rounded-lg border-0 bg-transparent text-[var(--misty-text-muted)] hover:bg-[var(--misty-surface-2)] hover:text-[var(--misty-text)]" type="button" aria-label="Close account chooser" onClick={() => setAccountChooserOpen(false)}><X size={16}/></button>
+            <Button className="grid size-8 place-items-center rounded-lg border-0 bg-transparent text-[var(--misty-text-muted)] hover:bg-[var(--misty-surface-2)] hover:text-[var(--misty-text)]" type="button" aria-label="Close account chooser" onClick={() => setAccountChooserOpen(false)}><X size={16}/></Button>
           </div>
           <div className="grid max-h-[268px] gap-1 overflow-auto py-2">
             {accounts.map((saved) => {
               const active = saved.id === user?.id;
               const savedInitials = initialsForProfile(saved.name, saved.email);
               return (
-                <button className={`${profileMenuItemClass} min-h-[54px] grid-cols-[36px_minmax(0,1fr)_20px]`} type="button" role="menuitem" key={saved.id} disabled={Boolean(switchingAccountId)} onClick={() => void chooseAccount(saved.id)}>
+                <Button className={`${profileMenuItemClass} min-h-[54px] grid-cols-[36px_minmax(0,1fr)_20px]`} type="button" role="menuitem" key={saved.id} disabled={Boolean(switchingAccountId)} onClick={() => void chooseAccount(saved.id)}>
                   <span className="grid size-9 place-items-center rounded-full bg-[var(--misty-neutral-selected-bg,var(--misty-surface-3))] text-xs font-bold text-[var(--misty-text)]">{savedInitials}</span>
                   <span className="min-w-0"><strong className="block truncate text-xs text-[var(--misty-text)]">{saved.name}</strong><small className="block truncate text-[10px] text-[var(--misty-text-subtle)]">{switchingAccountId === saved.id ? "Switching…" : saved.email}</small></span>
                   {active ? <Check size={15} className="text-emerald-300" aria-label="Active account"/> : null}
-                </button>
+                </Button>
               );
             })}
             {accounts.length === 0 ? <p className="m-0 px-2 py-3 text-xs text-[var(--misty-text-subtle)]">No saved accounts are available yet.</p> : null}
           </div>
           {switchError ? <p className="m-0 mb-2 rounded-lg border border-red-400/20 bg-red-950/20 px-2.5 py-2 text-[11px] leading-relaxed text-red-200" role="alert">{switchError}</p> : null}
-          <button className={profileMenuItemClass} type="button" role="menuitem" disabled={Boolean(switchingAccountId)} onClick={addAccount}><Plus size={17}/><span>Add another account</span></button>
+          <Button className={profileMenuItemClass} type="button" role="menuitem" disabled={Boolean(switchingAccountId)} onClick={addAccount}><Plus size={17}/><span>Add another account</span></Button>
           <p className="m-0 px-2.5 pb-1 pt-2 text-[10px] leading-relaxed text-[var(--misty-text-subtle)]">Accounts remain signed in securely on this device. Only one account is active in the app at a time.</p>
         </div>
       ) : null}
@@ -1850,7 +1831,7 @@ function ActivityPopover(props: {
           <h2 className="m-0 text-lg font-semibold leading-tight text-[#f1eee8]">
             Activity
           </h2>
-          <button
+          <Button
             className={activityButtonClass}
             type="button"
             onClick={() => {
@@ -1862,11 +1843,11 @@ function ActivityPopover(props: {
             title="Clear all activity"
           >
             <CheckCheck size={19} strokeWidth={2} />
-          </button>
+          </Button>
         </header>
         <div className="grid grid-cols-2 border-b border-[#333944] px-4">
           {(["unreads", "mentions"] as const).map((item) => (
-            <button
+            <Button
               className={`relative h-10 border-0 bg-transparent text-xs font-semibold capitalize ${tab === item ? "text-[#f1eee8] after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:rounded-full after:bg-violet-400" : "text-[#9e9890]"}`}
               type="button"
               key={item}
@@ -1874,7 +1855,7 @@ function ActivityPopover(props: {
             >
               {item}
               {inbox[item].length > 0 ? <span className="ml-1.5 rounded-full bg-[#252832] px-1.5 py-0.5 text-[9px]">{formatBadgeCount(inbox[item].length)}</span> : null}
-            </button>
+            </Button>
           ))}
         </div>
         {hasEntries ? (
@@ -1919,10 +1900,10 @@ function CloudActivityEntry(props: { entry: SpaceInboxItem; onOpen: () => void }
   const preview = typeof props.entry.payload.preview === "string" ? props.entry.payload.preview : "";
   const label = preview ? `${sender ? `${sender}: ` : ""}${preview}` : fallback;
   return (
-    <button className={`${activityEntryBaseClass} grid w-full border-0 bg-transparent text-left [&+&]:mt-1`} type="button" onClick={props.onOpen}>
+    <Button className={`${activityEntryBaseClass} grid w-full border-0 bg-transparent text-left [&+&]:mt-1`} type="button" onClick={props.onOpen}>
       <span className="m-0 min-w-0 [overflow-wrap:anywhere] leading-[1.35] text-[#f1eee8]"><small className="mb-0.5 block text-[10px] font-semibold text-violet-300">{props.entry.space_name}</small>{label}</span>
       <time className="whitespace-nowrap pt-px text-xs text-[#9e9890]">{formatActivityTime(new Date(props.entry.created_at).getTime())}</time>
-    </button>
+    </Button>
   );
 }
 

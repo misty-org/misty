@@ -36,7 +36,7 @@ All items in this section block live provider acceptance.
 
 - [ ] Stable production HTTPS API base, including its path/version, such as `https://mistysys.com/api`.
 - [ ] Stable public app/web origin.
-- [ ] Desktop OAuth completion behavior: approved deep-link scheme or an HTTPS completion page that safely returns to the app.
+- [ ] Desktop OAuth completion page copy and branding approved.
 - [ ] A continuously running server/worker deployment. Discord Gateway cannot run on a request-only or scale-to-zero service.
 - [ ] Production database migration owner and backup/cutover window.
 - [ ] Production secret manager and the person responsible for adding and rotating secrets.
@@ -70,7 +70,6 @@ Provide:
 ```text
 MISTY_PUBLIC_API_URL=https://mistysys.com/api
 MISTY_APP_URL=https://________________________________
-MISTY_DESKTOP_OAUTH_RETURN_URL=misty://oauth/complete
 ```
 
 `MISTY_PUBLIC_API_URL` is the complete API base—not merely the web origin. The server and frontend build share this exact variable. A future value such as `https://mistysys.com/api/v2` is preserved without appending another `/api` segment. The older frontend-only variables `VITE_MISTY_SERVER_URL` and `VITE_API_BASE` remain compatibility fallbacks and should not be used for new deployments.
@@ -81,7 +80,7 @@ provider tokens. PostgreSQL, Library storage, and realtime are active critical
 checks and return HTTP `503` when unavailable. Optional service/provider gaps
 return HTTP `200` with an overall `degraded` status and per-service details.
 
-If the desktop return uses HTTPS instead, provide that exact URL. The return URL must not carry access tokens or provider secrets.
+Misty shows a browser completion page after OAuth succeeds. The page must not carry access tokens or provider secrets.
 
 Register these OAuth redirects exactly:
 
@@ -125,8 +124,8 @@ temporary logging flag, restart, and delete or expire the sensitive log entry.
 ### Required secrets
 
 ```text
-GOOGLE_OAUTH_CLIENT_ID
-GOOGLE_OAUTH_CLIENT_SECRET
+GOOGLE_CLIENT_ID
+GOOGLE_CLIENT_SECRET
 ```
 
 ### Acceptance result

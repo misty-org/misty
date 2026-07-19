@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 
 interface AuthCardProps {
   title?: string;
@@ -9,19 +10,19 @@ interface AuthCardProps {
 
 export default function AuthCard({ title, description, children, footer }: AuthCardProps) {
   return (
-    <section className="glass-card rounded-[2rem] border border-white/8 bg-[#090b0d]/95 p-6 shadow-[0_24px_80px_rgba(0,0,0,0.45)] sm:p-8">
+    <Card className="bg-card p-0 shadow-xl sm:rounded-xl">
       {title || description ? (
-        <div className="mb-7">
-          {title ? <h2 className="text-2xl font-semibold text-text">{title}</h2> : null}
+        <CardHeader className="p-6 pb-0 sm:p-8 sm:pb-0">
+          {title ? <CardTitle className="text-2xl">{title}</CardTitle> : null}
           {description ? (
-            <p className="mt-2 text-sm leading-6 text-text-muted">{description}</p>
+            <p className="mt-2 text-sm leading-6 text-muted-foreground">{description}</p>
           ) : null}
-        </div>
+        </CardHeader>
       ) : null}
 
-      {children}
+      <CardContent className="p-6 sm:p-8">{children}</CardContent>
 
-      {footer ? <div className="mt-6 border-t border-white/8 pt-6">{footer}</div> : null}
-    </section>
+      {footer ? <CardFooter className="border-t border-border p-6 sm:p-8">{footer}</CardFooter> : null}
+    </Card>
   );
 }
