@@ -6,7 +6,7 @@ Misty exposes one Agent product: creator-authored Space Agents. Each member's co
 
 The visible production catalog is Google Calendar, Slack, Discord, and Notion. Google Calendar and Notion are read/watch only. Slack and Discord use official bot identities, and every outbound reply requires a fresh per-action approval. Provider callbacks are private infrastructure; Misty does not offer a generic inbound endpoint.
 
-Configure the complete HTTPS API base (including `/api` or a versioned replacement), desktop OAuth return, encryption key, and provider credentials described in the desktop repository's `docs/UNIFIED_AGENT_PLATFORM_OWNER_INPUTS.md`. Tokens stay in the encrypted server credential vault and must never appear in prompts, workflow definitions, callback URLs, or logs.
+Configure the complete HTTPS API base (including `/api` or a versioned replacement), encryption key, and provider credentials described in the desktop repository's `docs/UNIFIED_AGENT_PLATFORM_OWNER_INPUTS.md`. Tokens stay in the encrypted server credential vault and must never appear in prompts, workflow definitions, callback URLs, or logs.
 
 Discord requires the official bot token and Message Content Intent for full-message launch behavior. Without that intent, the integration reports `message_content_intent_missing` in Needs attention. It must not silently treat absent content as an empty message.
 

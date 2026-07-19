@@ -1,7 +1,9 @@
 package api
 
 import (
+	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -90,21 +92,23 @@ func TestProviderReturnPathRejectsExternalAndHeaderInjection(t *testing.T) {
 	}
 }
 
-func TestProviderCompletionReturnsToOriginatingDesktopRoute(t *testing.T) {
-	t.Setenv("MISTY_DESKTOP_OAUTH_RETURN_URL", "")
-	got := providerCompletionURL("notion", "/spaces/space-1/agents?tab=settings")
-	want := "misty://open/spaces/space-1/agents?provider=notion&status=connected&tab=settings"
-	if got != want {
-		t.Fatalf("providerCompletionURL() = %q, want %q", got, want)
+func TestProviderCompletionPageTellsUserToReturnToMisty(t *testing.T) {
+	recorder := httptest.NewRecorder()
+	writeProviderCompletionPage(recorder, "Google", "alex@example.com")
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusOK)
 	}
-}
-
-func TestProviderCompletionPreservesConfiguredWebFallback(t *testing.T) {
-	t.Setenv("MISTY_DESKTOP_OAUTH_RETURN_URL", "https://app.mistysys.com/oauth/complete")
-	got := providerCompletionURL("slack", "/spaces/space-1/agents")
-	want := "https://app.mistysys.com/oauth/complete?provider=slack&return_to=%2Fspaces%2Fspace-1%2Fagents&status=connected"
-	if got != want {
-		t.Fatalf("providerCompletionURL() = %q, want %q", got, want)
+	if contentType := recorder.Header().Get("Content-Type"); contentType != "text/html; charset=utf-8" {
+		t.Fatalf("Content-Type = %q, want text/html; charset=utf-8", contentType)
+	}
+	body := recorder.Body.String()
+	for _, want := range []string{"Google is connected", "alex@example.com", "Return to the Misty app", "You can close this browser tab"} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("completion page missing %q in %s", want, body)
+		}
+	}
+	if strings.Contains(body, "misty://") {
+		t.Fatalf("completion page should not emit a custom protocol link: %s", body)
 	}
 }
 
