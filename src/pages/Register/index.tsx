@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { NavLink, useNavigate } from "react-router";
+import { Button } from "@/components/ui/button";
 import AuthCard from "../Auth/AuthCard";
 import AuthField from "../Auth/AuthField";
 import AuthMessage from "../Auth/AuthMessage";
@@ -39,11 +40,13 @@ export default function Register() {
         title=""
         description=""
         footer={
-          <div className="text-center text-sm text-text-muted">
-            <NavLink to="/signin" className="transition hover:text-text">
-              Already have an account? Sign in
-            </NavLink>
-          </div>
+          <Button
+            asChild
+            variant="link"
+            className="h-auto p-0 text-foreground"
+          >
+            <NavLink to="/signin">Already have an account? Sign in</NavLink>
+          </Button>
         }
       >
         <form onSubmit={handleSubmit} className="flex flex-col gap-5">

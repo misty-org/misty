@@ -10,6 +10,9 @@ import {
   type PaidTier,
 } from "./api";
 import { useAuth } from "../../AuthContext";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Card } from "@/components/ui/card";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
 const prices = {
   pro: {
@@ -50,32 +53,36 @@ export default function Pricing() {
       <PricingHeader />
 
       <div className="mb-8 flex justify-center">
-        <div className="inline-flex rounded-xl border border-border bg-surface/70 p-1" aria-label="Billing interval">
+        <ToggleGroup
+          type="single"
+          value={interval}
+          onValueChange={(value) => {
+            if (value) setInterval(value as BillingInterval);
+          }}
+          variant="default"
+          spacing={1}
+          className="rounded-lg bg-muted p-1"
+          aria-label="Billing interval"
+        >
           {(["month", "year"] as const).map((value) => (
-            <button
+            <ToggleGroupItem
               key={value}
-              type="button"
-              aria-pressed={interval === value}
-              onClick={() => setInterval(value)}
-              className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors cursor-pointer ${
-                interval === value
-                  ? "bg-white text-black"
-                  : "text-text-muted hover:text-text"
-              }`}
+              value={value}
+              className="h-9 rounded-md px-4 text-foreground/75 data-[state=on]:bg-background data-[state=on]:text-foreground data-[state=on]:shadow-sm"
             >
               {value === "month" ? "Monthly" : "Yearly · save 17%"}
-            </button>
+            </ToggleGroupItem>
           ))}
-        </div>
+        </ToggleGroup>
       </div>
 
       {checkoutError && (
-        <p role="alert" className="mb-6 text-center text-sm text-red-400">
-          {checkoutError}
-        </p>
+        <Alert variant="destructive" className="mx-auto mb-6 max-w-lg">
+          <AlertDescription className="text-center">{checkoutError}</AlertDescription>
+        </Alert>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-12 items-stretch">
+      <div className="mb-12 grid grid-cols-1 items-stretch gap-4 md:grid-cols-3">
         <PricingCard
           name="Basic"
           price="Free"
@@ -109,23 +116,37 @@ export default function Pricing() {
         />
       </div>
 
-      <section className="mb-20 rounded-2xl border border-border bg-surface/40 px-6 py-7 md:flex md:items-center md:justify-between md:gap-10">
+      <Card
+        role="region"
+        aria-labelledby="credits-heading"
+        className="mb-20 gap-6 rounded-2xl bg-card/70 px-6 py-7 md:flex-row md:items-center md:justify-between md:gap-10"
+      >
         <div className="max-w-2xl">
-          <p className="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-primary">Credits where cost exists</p>
-          <h2 className="mb-2 text-xl font-semibold text-text">Local work stays unlimited</h2>
-          <p className="text-sm leading-6 text-text-muted">
-            Credits are used only by managed AI, including Mika and AI-backed automation nodes. File operations, backups, cleanup scans, sync, scheduled workflows, and non-AI automations do not use credits.
+          <p className="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-primary">
+            Credits where cost exists
+          </p>
+          <h2 id="credits-heading" className="mb-2 text-xl font-semibold text-foreground">
+            Local work stays unlimited
+          </h2>
+          <p className="text-sm leading-6 text-muted-foreground">
+            Credits are used only by managed AI, including Mika and AI-backed automation nodes. File
+            operations, backups, cleanup scans, sync, scheduled workflows, and non-AI automations do
+            not use credits.
           </p>
         </div>
         <div className="mt-6 grid shrink-0 grid-cols-2 gap-3 md:mt-0">
           {creditPacks.map((pack) => (
-            <div key={pack.credits} className="rounded-xl border border-border bg-bg/50 px-4 py-3 text-center">
-              <p className="font-semibold text-text">{pack.credits}</p>
-              <p className="text-xs text-text-muted">credits · {pack.price}</p>
-            </div>
+            <Card
+              key={pack.credits}
+              size="sm"
+              className="gap-0 rounded-xl bg-muted/40 px-4 py-3 text-center"
+            >
+              <p className="font-semibold text-foreground">{pack.credits}</p>
+              <p className="text-xs text-muted-foreground">credits · {pack.price}</p>
+            </Card>
           ))}
         </div>
-      </section>
+      </Card>
 
       <PricingQA />
     </div>

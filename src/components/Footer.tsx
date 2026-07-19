@@ -1,6 +1,7 @@
 import { NavLink } from "react-router";
 import { FaDiscord, FaGithub } from "react-icons/fa";
 import { MdOutlineEmail } from "react-icons/md";
+import { Separator } from "@/components/ui/separator";
 
 const columns = [
   {
@@ -35,36 +36,36 @@ const socials = [
 
 export default function Footer() {
   return (
-    <footer className="border-t border-border/50 py-12">
+    <footer className="border-t border-border py-12">
       <div className="flex flex-col md:flex-row justify-between items-start gap-8">
         {/* Brand */}
         <div className="flex flex-col gap-3">
           <div className="flex items-center gap-1">
-            <img src="/misty_full.png" alt="Misty logo" className="w-12 h-12 opacity-60" />
-            <span className="text-sm font-medium text-text-muted">Misty</span>
+            <img src="/misty_full.png" alt="" className="size-12 opacity-70" />
+            <span className="text-sm font-medium text-foreground">Misty</span>
           </div>
-          <p className="text-sm text-text-muted/60 max-w-xs">
+          <p className="max-w-xs text-sm text-muted-foreground">
             A unified desktop workspace for local files, cloud storage, search, and transfers.
           </p>
           <div className="flex items-center gap-4 mt-2">
             {socials.map(({ href, icon: Icon, label }) => (
-              <a key={label} href={href} target="_blank" rel="noopener noreferrer" className="text-text-muted/40 hover:text-text-muted transition-colors" aria-label={label}>
-                <Icon className="w-4 h-4" />
+              <a key={label} href={href} target="_blank" rel="noopener noreferrer" className="rounded-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label={label}>
+                <Icon className="size-4" />
               </a>
             ))}
           </div>
         </div>
 
         {/* Link Columns */}
-        <div className="flex gap-12 sm:gap-16">
+        <div className="grid w-full grid-cols-2 gap-x-8 gap-y-8 sm:w-auto sm:grid-cols-3 sm:gap-x-16">
           {columns.map((col) => (
-            <div key={col.label} className="flex flex-col gap-3">
-              <span className="text-xs font-medium text-text-muted tracking-[0.14em]">{col.label}</span>
+            <div key={col.label} className="flex flex-col gap-3 last:col-span-2 sm:last:col-span-1">
+              <span className="text-xs font-medium tracking-[0.14em] text-foreground">{col.label}</span>
               {col.links.map((link) =>
                 link.to.startsWith("http") || link.to.startsWith("mailto") ? (
-                  <a key={link.text} href={link.to} target="_blank" rel="noopener noreferrer" className="text-sm text-text-muted/60 hover:text-text transition-colors">{link.text}</a>
+                  <a key={link.text} href={link.to} target="_blank" rel="noopener noreferrer" className="rounded-sm text-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">{link.text}</a>
                 ) : (
-                  <NavLink key={link.text} to={link.to} className="text-sm text-text-muted/60 hover:text-text transition-colors">{link.text}</NavLink>
+                  <NavLink key={link.text} to={link.to} className="rounded-sm text-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">{link.text}</NavLink>
                 )
               )}
             </div>
@@ -73,11 +74,12 @@ export default function Footer() {
       </div>
 
       {/* Bottom */}
-      <div className="mt-12 pt-6 border-t border-border/30 flex flex-col md:flex-row justify-between items-center gap-4">
-        <span className="text-xs text-text-muted/40">&copy; {new Date().getFullYear()} Misty. All rights reserved.</span>
+      <Separator className="mt-12" />
+      <div className="flex flex-col items-center justify-between gap-4 pt-6 md:flex-row">
+        <span className="text-xs text-muted-foreground">&copy; {new Date().getFullYear()} Misty. All rights reserved.</span>
         <div className="flex items-center gap-6">
-          <NavLink to="/privacy" className="text-xs text-text-muted/40 hover:text-text-muted transition-colors">Privacy Policy</NavLink>
-          <NavLink to="/terms" className="text-xs text-text-muted/40 hover:text-text-muted transition-colors">Terms of Service</NavLink>
+          <NavLink to="/privacy" className="rounded-sm text-xs text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Privacy Policy</NavLink>
+          <NavLink to="/terms" className="rounded-sm text-xs text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Terms of Service</NavLink>
         </div>
       </div>
     </footer>

@@ -1,66 +1,108 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router";
-import { useAuth } from "../../AuthContext";
-import { fetchMe, updateDevice, updateProfile, type MeResponse } from "./api";
-import { useUserStore } from "../../store/userStore";
+import { Coins, CreditCard, Lock, UserCircle, type LucideIcon } from "lucide-react";
 
-// ─── display helpers ─────────────────────────────────────────────────────────
+import { useAuth } from "@/AuthContext";
+import {
+  DesktopSettingsFrame,
+  DesktopSettingsRow,
+  DesktopSettingsSection,
+} from "@/components/settings/DesktopSettingsUI";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Progress } from "@/components/ui/progress";
+import { Spinner } from "@/components/ui/spinner";
+import { useUserStore } from "@/store/userStore";
+import {
+  createBillingPortal,
+  createCreditCheckout,
+  createSubscriptionCheckout,
+  fetchBillingUsage,
+  fetchMe,
+  updateProfile,
+  type BillingUsageResponse,
+  type MeResponse,
+} from "./api";
 
 const TIER_LABEL: Record<string, string> = {
   basic: "Basic",
   personal: "Personal",
   pro: "Pro",
-};
-const TIER_COLOR: Record<string, string> = {
-  basic: "text-zinc-400 bg-zinc-400/10 border-zinc-400/20",
-  personal: "text-blue-400 bg-blue-400/10 border-blue-400/20",
-  pro: "text-violet-400 bg-violet-400/10 border-violet-400/20",
-};
-const STATUS_COLOR: Record<string, string> = {
-  active: "text-emerald-400 bg-emerald-400/10 border-emerald-400/20",
-  trialing: "text-blue-400 bg-blue-400/10 border-blue-400/20",
-  cancelled: "text-amber-400 bg-amber-400/10 border-amber-400/20",
-  expired: "text-red-400 bg-red-400/10 border-red-400/20",
+  max: "Max",
 };
 
-function Badge({ label, cls }: { label: string; cls: string }) {
+type AccountStatusTone = "neutral" | "info" | "success" | "warning" | "danger";
+
+const TIER_TONE: Record<string, AccountStatusTone> = {
+  basic: "neutral",
+  personal: "info",
+  pro: "info",
+  max: "info",
+};
+
+const STATUS_TONE: Record<string, AccountStatusTone> = {
+  active: "success",
+  trialing: "info",
+  cancelled: "warning",
+  expired: "danger",
+};
+
+const STATUS_CLASSES: Record<AccountStatusTone, string> = {
+  neutral: "border-border bg-muted text-muted-foreground",
+  info:
+    "border-[color-mix(in_srgb,var(--settings-info)_35%,transparent)] bg-[color-mix(in_srgb,var(--settings-info)_12%,transparent)] text-[var(--settings-info)]",
+  success:
+    "border-[color-mix(in_srgb,var(--settings-success)_35%,transparent)] bg-[color-mix(in_srgb,var(--settings-success)_12%,transparent)] text-[var(--settings-success)]",
+  warning:
+    "border-[color-mix(in_srgb,var(--settings-warning)_35%,transparent)] bg-[color-mix(in_srgb,var(--settings-warning)_12%,transparent)] text-[var(--settings-warning)]",
+  danger:
+    "border-[color-mix(in_srgb,var(--settings-danger)_35%,transparent)] bg-[color-mix(in_srgb,var(--settings-danger)_12%,transparent)] text-[var(--settings-danger)]",
+};
+
+const customRowClass = "border-b border-border/60 px-5 py-4 last:border-b-0";
+
+function AccountBadge({ label, tone }: { label: string; tone: AccountStatusTone }) {
   return (
-    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${cls}`}>
+    <Badge
+      variant="outline"
+      className={`gap-1.5 rounded-md px-2 py-0.5 font-medium shadow-none ${STATUS_CLASSES[tone]}`}
+    >
+      <span aria-hidden="true" className="size-1.5 rounded-full bg-current" />
       {label}
-    </span>
+    </Badge>
   );
 }
 
-// ─── layout primitives ───────────────────────────────────────────────────────
-
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <section className="space-y-3">
-      <p className="text-[11px] font-semibold tracking-[0.18em] text-text-muted">{title}</p>
-      <div className="border-y border-border/70 divide-y divide-border/60">{children}</div>
-    </section>
-  );
+function Section({ title, children }: { title: string; children: ReactNode }) {
+  return <DesktopSettingsSection title={title}>{children}</DesktopSettingsSection>;
 }
 
-function Row({ label, children }: { label: string; children: React.ReactNode }) {
+function Row({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className="flex flex-col gap-1 py-4 md:flex-row md:items-center md:justify-between md:gap-6">
-      <span className="text-sm text-text-muted">{label}</span>
-      <div className="text-sm text-text md:text-right">{children}</div>
-    </div>
+    <DesktopSettingsRow label={label}>
+      <span className="text-right text-sm text-foreground max-[760px]:text-left">
+        {children}
+      </span>
+    </DesktopSettingsRow>
   );
 }
 
 function GhostRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex flex-col gap-1 py-4 opacity-40 md:flex-row md:items-center md:justify-between md:gap-6">
-      <span className="text-sm text-text-muted">{label}</span>
-      <span className="text-sm text-text-muted italic md:text-right">{value}</span>
-    </div>
+    <DesktopSettingsRow label={label}>
+      <span className="text-sm italic text-muted-foreground">{value}</span>
+    </DesktopSettingsRow>
   );
 }
-
-// ─── save helper ─────────────────────────────────────────────────────────────
 
 function useSave(fn: () => Promise<void>) {
   const [saving, setSaving] = useState(false);
@@ -74,9 +116,9 @@ function useSave(fn: () => Promise<void>) {
     try {
       await fn();
       setOk(true);
-      setTimeout(() => setOk(false), 2500);
-    } catch (e: any) {
-      setError(e.message ?? "Something went wrong");
+      window.setTimeout(() => setOk(false), 2500);
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "Something went wrong");
     } finally {
       setSaving(false);
     }
@@ -86,90 +128,67 @@ function useSave(fn: () => Promise<void>) {
 }
 
 function SaveFeedback({ ok, error }: { ok: boolean; error: string }) {
-  if (ok) return <p className="text-xs text-emerald-400 mt-2">Saved.</p>;
-  if (error) return <p className="text-xs text-red-400 mt-2">{error}</p>;
+  if (ok) {
+    return (
+      <p role="status" aria-live="polite" className="mt-2 text-xs text-[var(--settings-success)]">
+        Saved.
+      </p>
+    );
+  }
+
+  if (error) {
+    return (
+      <p role="alert" className="mt-2 text-xs text-destructive">
+        {error}
+      </p>
+    );
+  }
+
   return null;
 }
 
-// ─── tabs ────────────────────────────────────────────────────────────────────
+type Tab = "account" | "credits" | "billing" | "privacy";
 
-type Tab = "general" | "account" | "privacy";
-
-const TABS: { id: Tab; label: string }[] = [
-  { id: "general", label: "General" },
-  { id: "account", label: "Account" },
-  { id: "privacy", label: "Privacy" },
+const TABS: readonly { id: Tab; label: string; icon: LucideIcon }[] = [
+  { id: "account", label: "Account", icon: UserCircle },
+  { id: "credits", label: "Credits", icon: Coins },
+  { id: "billing", label: "Billing", icon: CreditCard },
+  { id: "privacy", label: "Privacy", icon: Lock },
 ];
 
-// ─── General ─────────────────────────────────────────────────────────────────
+const TAB_DESCRIPTIONS: Record<Tab, string> = {
+  account: "Review your Misty account and profile details.",
+  credits: "Check your balance and add credits for managed AI.",
+  billing: "Review your plan and manage subscription billing.",
+  privacy: "Understand how Misty handles your files and account data.",
+};
 
-function GeneralPanel() {
-  return (
-    <div className="flex flex-col gap-6">
-      <Section title="Appearance">
-        <Row label="Theme">System</Row>
-        <Row label="Language">English</Row>
-        <GhostRow label="Density" value="Coming soon" />
-      </Section>
-
-      <Section title="App">
-        <Row label="Version">
-          <span className="font-mono text-xs text-text-muted">v0.1.0-beta</span>
-        </Row>
-        <Row label="Release channel">Stable</Row>
-        <GhostRow label="Check for updates" value="Coming soon" />
-        <GhostRow label="Auto-update" value="Coming soon" />
-      </Section>
-
-      <Section title="Notifications">
-        <GhostRow label="Product updates" value="Coming soon" />
-        <GhostRow label="Release notes emails" value="Coming soon" />
-        <Row label="Security emails">Always on</Row>
-      </Section>
-    </div>
-  );
-}
-
-// ─── Account ─────────────────────────────────────────────────────────────────
+type LoadState = "idle" | "loading" | "ready" | "error";
 
 function AccountPanel({
   me,
   onUpdated,
-  onLogout,
 }: {
   me: MeResponse;
   onUpdated: (name: string) => void;
-  onLogout: () => void;
 }) {
-  const { patchMe } = useUserStore();
   const [name, setName] = useState(me.name);
-  const [device, setDevice] = useState(me.license_device);
   const {
-    saving: savingProfile,
-    error: profileError,
-    ok: profileOk,
-    save: saveProfile,
+    saving,
+    error,
+    ok,
+    save,
   } = useSave(async () => {
-    await updateProfile(name);
-    onUpdated(name);
+    const nextName = name.trim();
+    await updateProfile(nextName);
+    onUpdated(nextName);
   });
-  const {
-    saving: savingDevice,
-    error: deviceError,
-    ok: deviceOk,
-    save: saveDevice,
-  } = useSave(async () => {
-    await updateDevice(device);
-    patchMe({ license_device: device });
-  });
-
   const joined = new Date(me.created_at).toLocaleDateString(undefined, {
     year: "numeric",
     month: "long",
     day: "numeric",
   });
-  const initialsSource = name.trim() || me.name || me.email;
-  const initials = initialsSource
+  const initials = (name.trim() || me.name || me.email)
     .split(" ")
     .map((word) => word[0])
     .join("")
@@ -177,200 +196,352 @@ function AccountPanel({
     .slice(0, 2);
 
   return (
-    <div className="flex flex-col gap-6">
-      <Section title="License">
-        <Row label="Plan">
-          <Badge label={TIER_LABEL[me.tier] ?? me.tier} cls={TIER_COLOR[me.tier] ?? TIER_COLOR.basic} />
-        </Row>
-        <Row label="Status">
-          <Badge
-            label={me.status.charAt(0).toUpperCase() + me.status.slice(1)}
-            cls={STATUS_COLOR[me.status] ?? STATUS_COLOR.active}
-          />
-        </Row>
-        <Row label="Type">{me.tier === "basic" ? "Basic account" : "Perpetual"}</Row>
-        {me.expires_at ? (
-          <Row label="Expires">
-            {new Date(me.expires_at).toLocaleDateString(undefined, {
-              year: "numeric",
-              month: "long",
-              day: "numeric",
-            })}
-          </Row>
-        ) : me.tier !== "basic" ? (
-          <Row label="Expires">Never</Row>
-        ) : null}
-      </Section>
-
-      <Section title="Devices">
-        <div className="flex flex-col gap-3 py-4 md:flex-row md:items-start md:justify-between md:gap-6">
-          <div className="space-y-1">
-            <p className="text-sm text-text">Licensed device</p>
-            <p className="text-xs text-text-muted">
-              Change the machine name registered to your license.
-            </p>
-          </div>
-          <div className="w-full md:max-w-sm">
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={device}
-                onChange={(e) => setDevice(e.target.value)}
-                placeholder="e.g. MacBook Pro"
-                className="flex-1 min-w-0 bg-surface border border-border rounded-lg px-3 py-2 text-sm text-text placeholder:text-text-muted focus:outline-none focus:border-white/30 transition-colors"
-              />
-              <button
-                onClick={saveDevice}
-                disabled={savingDevice}
-                className="px-4 py-2 bg-white hover:bg-zinc-200 disabled:opacity-40 text-bg text-sm font-medium rounded-lg transition-colors shrink-0 cursor-pointer disabled:cursor-not-allowed"
-              >
-                {savingDevice ? "Saving…" : "Save"}
-              </button>
-            </div>
-            <SaveFeedback ok={deviceOk} error={deviceError} />
-          </div>
-        </div>
-
-        <div className="flex flex-col gap-3 py-4 md:flex-row md:items-center md:justify-between md:gap-6">
-          <div>
-            <p className="text-sm font-medium text-text">{me.license_device || "Primary device"}</p>
-            <p className="text-xs text-text-muted mt-0.5">
-              {TIER_LABEL[me.tier] ?? me.tier} · Activated
-            </p>
-          </div>
-          <Badge label="Active" cls={STATUS_COLOR.active} />
-        </div>
-
-        {me.tier === "pro" && (
-          <div className="py-4">
-            <p className="text-xs text-text-muted">
-              Additional seats appear here as you activate new devices.
-            </p>
-          </div>
-        )}
-
-        {me.tier === "basic" && (
-          <div className="flex flex-col gap-3 py-4 md:flex-row md:items-center md:justify-between md:gap-6">
-            <p className="text-xs text-text-muted">
-              Personal - $30 per device · Pro - $89 unlimited devices
-            </p>
-            <a href="/pricing" className="shrink-0 text-xs text-text hover:text-white underline underline-offset-2 transition-colors">
-              Upgrade
-            </a>
-          </div>
-        )}
-      </Section>
-
-      <Section title="Billing">
-        <GhostRow label="Payment method" value="Not connected" />
-        <GhostRow label="Last payment" value="—" />
-        <GhostRow label="Next invoice" value="—" />
-        <div className="py-4 opacity-40">
-          <button className="text-sm text-text-muted cursor-not-allowed">Manage billing →</button>
-        </div>
-      </Section>
-
-      <Section title="Info">
-        <div className="flex flex-col gap-4 py-5">
+    <div>
+      <Section title="Profile">
+        <div className={`${customRowClass} flex flex-col gap-4 py-5`}>
           <div className="flex items-center gap-4">
-            <div className="w-14 h-14 rounded-full border border-border bg-elevated flex items-center justify-center text-lg font-bold text-text shrink-0 select-none">
-              {initials}
-            </div>
-            <div>
-              <p className="text-sm font-medium text-text">{me.name}</p>
-              <p className="text-xs text-text-muted mt-0.5">{me.email}</p>
-              <p className="text-xs text-text-muted/50 mt-1">Photo upload — coming soon</p>
+            <Avatar className="size-14">
+              <AvatarFallback className="text-base font-semibold">{initials}</AvatarFallback>
+            </Avatar>
+            <div className="min-w-0">
+              <p className="truncate text-sm font-medium text-foreground">{me.name}</p>
+              <p className="mt-0.5 truncate text-xs text-muted-foreground">{me.email}</p>
             </div>
           </div>
 
           <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
             <div>
-              <label className="block text-xs text-text-muted mb-1.5">Display name</label>
-              <input
+              <label
+                htmlFor="account-display-name"
+                className="mb-1.5 block text-xs font-medium text-foreground"
+              >
+                Display name
+              </label>
+              <Input
+                id="account-display-name"
                 type="text"
                 value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="w-full bg-surface border border-border rounded-lg px-3 py-2 text-sm text-text placeholder:text-text-muted focus:outline-none focus:border-white/30 transition-colors"
+                onChange={(event) => setName(event.target.value)}
               />
             </div>
-            <div className="flex items-center gap-3">
-              <button
-                onClick={saveProfile}
-                disabled={savingProfile || name.trim() === "" || name === me.name}
-                className="px-4 py-2 bg-white hover:bg-zinc-200 disabled:opacity-40 text-bg text-sm font-medium rounded-lg transition-colors cursor-pointer disabled:cursor-not-allowed"
+            <div className="flex items-center gap-3 max-[520px]:flex-col max-[520px]:items-stretch">
+              <Button
+                type="button"
+                onClick={save}
+                disabled={saving || name.trim() === "" || name.trim() === me.name}
+                aria-busy={saving}
               >
-                {savingProfile ? "Saving…" : "Save changes"}
-              </button>
-              <SaveFeedback ok={profileOk} error={profileError} />
+                {saving ? <Spinner aria-hidden="true" /> : null}
+                {saving ? "Saving…" : "Save changes"}
+              </Button>
+              <SaveFeedback ok={ok} error={error} />
             </div>
           </div>
 
           <div>
-            <label className="block text-xs text-text-muted mb-1.5">Email</label>
-            <input
+            <label
+              htmlFor="account-email"
+              className="mb-1.5 block text-xs font-medium text-foreground"
+            >
+              Email
+            </label>
+            <Input
+              id="account-email"
               type="email"
               value={me.email}
               disabled
-              className="w-full bg-surface/50 border border-border rounded-lg px-3 py-2 text-sm text-text-muted cursor-not-allowed"
+              aria-describedby="account-email-description"
             />
-            <p className="text-xs text-text-muted/60 mt-1">Email cannot be changed.</p>
+            <p id="account-email-description" className="mt-1 text-xs text-muted-foreground">
+              Email cannot be changed.
+            </p>
           </div>
         </div>
 
         <Row label="Member since">{joined}</Row>
         <Row label="User id">
-          <span className="font-mono text-xs text-text-muted">{me.id}</span>
+          <span className="font-mono text-xs text-muted-foreground">{me.id}</span>
         </Row>
       </Section>
 
       <Section title="Security">
-        <div className="flex flex-col gap-3 py-4 md:flex-row md:items-center md:justify-between md:gap-6">
+        <div
+          className={`${customRowClass} flex flex-col gap-3 md:flex-row md:items-center md:justify-between md:gap-6`}
+        >
           <div>
-            <p className="text-sm text-text">Password</p>
-            <p className="text-xs text-text-muted mt-0.5">Reset via email link.</p>
+            <p className="text-sm text-foreground">Password</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">Reset via email link.</p>
           </div>
-          <a href="/signin" className="text-sm text-text-muted hover:text-text underline underline-offset-2 transition-colors">
-            Reset
-          </a>
+          <Button asChild variant="link" className="h-auto p-0">
+            <a href="/signin">Reset</a>
+          </Button>
         </div>
         <GhostRow label="Two-factor authentication" value="Coming soon" />
-        <GhostRow label="Active sessions" value="Coming soon" />
+      </Section>
+    </div>
+  );
+}
+
+function CreditsPanel({
+  usage,
+  state,
+  error,
+  billingWorking,
+  onRetry,
+  onBillingAction,
+}: {
+  usage: BillingUsageResponse | null;
+  state: LoadState;
+  error: string;
+  billingWorking: boolean;
+  onRetry: () => void;
+  onBillingAction: (action: () => Promise<{ url: string }>) => void;
+}) {
+  const creditUsedPercent =
+    usage && usage.monthly_allowance > 0
+      ? Math.round((1 - usage.monthly_remaining / usage.monthly_allowance) * 100)
+      : 0;
+  const creditWarning =
+    creditUsedPercent >= 100
+      ? "Managed AI is paused until you add credits or the allowance resets."
+      : creditUsedPercent >= 90
+        ? "You have used at least 90% of this month’s credits."
+        : creditUsedPercent >= 75
+          ? "You have used at least 75% of this month’s credits."
+          : "";
+
+  return (
+    <div>
+      <Section title="Misty Credits">
+        {state === "loading" || state === "idle" ? (
+          <div className={`${customRowClass} flex min-h-16 items-center gap-2 text-muted-foreground`}>
+            <Spinner aria-hidden="true" className="size-4" />
+            <span className="text-sm">Loading credit balance</span>
+          </div>
+        ) : null}
+
+        {state === "error" ? (
+          <div className={customRowClass}>
+            <Alert variant="destructive">
+              <AlertTitle>Credit balance is unavailable</AlertTitle>
+              <AlertDescription className="flex flex-wrap items-center justify-between gap-3">
+                <span>{error}</span>
+                <Button type="button" variant="outline" size="sm" onClick={onRetry}>
+                  Try again
+                </Button>
+              </AlertDescription>
+            </Alert>
+          </div>
+        ) : null}
+
+        {state === "ready" && usage ? (
+          <>
+            <Row label="Available">{usage.available_credits.toLocaleString()} credits</Row>
+            <Row label="Monthly allowance">
+              {usage.monthly_remaining.toLocaleString()} of{" "}
+              {usage.monthly_allowance.toLocaleString()} remaining
+            </Row>
+            <Row label="Purchased">{usage.purchased_remaining.toLocaleString()} credits</Row>
+            <Row label="Resets">{new Date(usage.next_reset_at).toLocaleDateString()}</Row>
+            <div className={customRowClass}>
+              <Progress
+                value={Math.min(100, creditUsedPercent)}
+                aria-label={`${creditUsedPercent}% of monthly credits used`}
+              />
+              {creditWarning ? (
+                <p className="mt-2 text-xs text-[var(--settings-warning)]">{creditWarning}</p>
+              ) : null}
+            </div>
+          </>
+        ) : null}
       </Section>
 
-      <Section title="Danger Zone">
-        <div className="flex flex-col gap-3 py-4 md:flex-row md:items-center md:justify-between md:gap-6">
-          <div>
-            <p className="text-sm text-text">Sign out</p>
-            <p className="text-xs text-text-muted mt-0.5">End your session on this device.</p>
+      <Section title="Buy credits">
+        <div className={`${customRowClass} grid gap-3`}>
+          <p className="m-0 text-sm text-muted-foreground">
+            Purchased credits do not expire and are used after your monthly allowance.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              disabled={billingWorking}
+              onClick={() => onBillingAction(() => createCreditCheckout("credits_1500"))}
+            >
+              1,500,000 credits · $4.99
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={billingWorking}
+              onClick={() => onBillingAction(() => createCreditCheckout("credits_3500"))}
+            >
+              3,500,000 credits · $9.99
+            </Button>
           </div>
-          <button onClick={onLogout} className="text-sm text-text-muted hover:text-red-400 transition-colors">
-            Sign out
-          </button>
-        </div>
-        <div className="flex flex-col gap-3 py-4 opacity-40 md:flex-row md:items-center md:justify-between md:gap-6">
-          <div>
-            <p className="text-sm text-text">Delete account</p>
-            <p className="text-xs text-text-muted mt-0.5">Permanently remove your account and all data.</p>
-          </div>
-          <button className="text-sm text-text-muted cursor-not-allowed">Delete</button>
         </div>
       </Section>
     </div>
   );
 }
 
-// ─── Privacy ─────────────────────────────────────────────────────────────────
+function BillingPanel({
+  me,
+  loading,
+  loadError,
+  billingWorking,
+  billingError,
+  onBillingAction,
+}: {
+  me: MeResponse | null;
+  loading: boolean;
+  loadError: string;
+  billingWorking: boolean;
+  billingError: string;
+  onBillingAction: (action: () => Promise<{ url: string }>) => void;
+}) {
+  const accountType = me
+    ? me.billing?.kind === "lifetime"
+      ? "Lifetime"
+      : me.billing?.kind === "subscription"
+        ? `${me.billing.interval === "year" ? "Annual" : "Monthly"} subscription`
+        : me.status === "trialing"
+          ? "Pro trial"
+          : me.tier === "basic"
+            ? "Free account"
+            : "Lifetime"
+    : "";
+
+  return (
+    <div>
+      <Section title="Plan">
+        {loading && !me ? (
+          <div className={`${customRowClass} flex min-h-16 items-center gap-2 text-muted-foreground`}>
+            <Spinner aria-hidden="true" className="size-4" />
+            <span className="text-sm">Loading plan details</span>
+          </div>
+        ) : null}
+
+        {loadError && !me ? (
+          <div className={customRowClass}>
+            <Alert variant="destructive">
+              <AlertTitle>Plan details are unavailable</AlertTitle>
+              <AlertDescription>{loadError}</AlertDescription>
+            </Alert>
+          </div>
+        ) : null}
+
+        {me ? (
+          <>
+            <Row label="Plan">
+              <AccountBadge
+                label={TIER_LABEL[me.tier] ?? me.tier}
+                tone={TIER_TONE[me.tier] ?? "neutral"}
+              />
+            </Row>
+            <Row label="Status">
+              <AccountBadge
+                label={me.status.charAt(0).toUpperCase() + me.status.slice(1)}
+                tone={STATUS_TONE[me.status] ?? "neutral"}
+              />
+            </Row>
+            <Row label="Type">{accountType}</Row>
+            {me.billing?.current_period_end ? (
+              <Row label={me.billing.cancel_at_period_end ? "Access until" : "Renews"}>
+                {new Date(me.billing.current_period_end).toLocaleDateString()}
+              </Row>
+            ) : null}
+          </>
+        ) : null}
+      </Section>
+
+      <Section title="Billing">
+        {me?.billing?.kind === "subscription" ? (
+          <>
+            <Row label="Current plan">
+              {TIER_LABEL[me.tier]} · {me.billing.interval === "year" ? "yearly" : "monthly"}
+            </Row>
+            <div className={customRowClass}>
+              <Button
+                type="button"
+                disabled={billingWorking || !me.billing.customer_portal_available}
+                onClick={() => onBillingAction(createBillingPortal)}
+              >
+                Manage billing
+              </Button>
+            </div>
+          </>
+        ) : (
+          <div className={`${customRowClass} grid gap-3`}>
+            <p className="m-0 text-sm text-muted-foreground">
+              Pro includes 2,000 monthly credits. Max includes 6,000.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                disabled={billingWorking}
+                onClick={() =>
+                  onBillingAction(() => createSubscriptionCheckout("pro", "month"))
+                }
+              >
+                Pro · $9.99/mo
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={billingWorking}
+                onClick={() =>
+                  onBillingAction(() => createSubscriptionCheckout("max", "month"))
+                }
+              >
+                Max · $14.99/mo
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={billingWorking}
+                onClick={() =>
+                  onBillingAction(() => createSubscriptionCheckout("pro", "year"))
+                }
+              >
+                Pro · $99/yr
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={billingWorking}
+                onClick={() =>
+                  onBillingAction(() => createSubscriptionCheckout("max", "year"))
+                }
+              >
+                Max · $149/yr
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {billingError ? (
+          <div className={customRowClass}>
+            <Alert variant="destructive">
+              <AlertTitle>Billing is temporarily unavailable</AlertTitle>
+              <AlertDescription>{billingError}</AlertDescription>
+            </Alert>
+          </div>
+        ) : null}
+      </Section>
+    </div>
+  );
+}
 
 function PrivacyPanel() {
   return (
-    <div className="flex flex-col gap-6">
+    <div>
       <Section title="Privacy">
-        <div className="py-4 flex flex-col gap-2">
-          <p className="text-sm text-text font-medium">Your data stays on your device.</p>
-          <p className="text-sm text-text-muted leading-relaxed">
-            Misty never transmits your files or cloud credentials to any external server. All provider
-            communication runs through a local proxy on your machine. We only store your account info
-            (name, email, hashed password) and subscription status.
+        <div className={`${customRowClass} flex flex-col gap-2`}>
+          <p className="text-sm font-medium text-foreground">Your data stays on your device.</p>
+          <p className="text-sm leading-relaxed text-muted-foreground">
+            Misty never transmits your files or cloud credentials to any external server. All
+            provider communication runs through Misty&apos;s embedded local runtime. We only store
+            your account information and subscription status.
           </p>
         </div>
       </Section>
@@ -380,111 +551,189 @@ function PrivacyPanel() {
         <GhostRow label="Terms of Service" value="Coming soon" />
         <GhostRow label="License Agreement" value="Coming soon" />
       </Section>
-
-      <Section title="Data">
-        <div className="flex flex-col gap-3 py-4 opacity-40 md:flex-row md:items-center md:justify-between md:gap-6">
-          <div>
-            <p className="text-sm text-text">Export your data</p>
-            <p className="text-xs text-text-muted mt-0.5">Download a copy of your account data.</p>
-          </div>
-          <button className="text-sm text-text-muted cursor-not-allowed">Export</button>
-        </div>
-      </Section>
     </div>
   );
 }
 
-// ─── Dashboard shell ─────────────────────────────────────────────────────────
-
-export default function Dashboard() {
+export function AccountSettingsDialog({
+  open,
+  onOpenChange,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
   const { user, logout, setUser } = useAuth();
   const navigate = useNavigate();
   const { me, loading, setMe, setLoading, patchMe } = useUserStore();
-  const [tab, setTab] = useState<Tab>("general");
+  const [tab, setTab] = useState<Tab>("account");
+  const [loadError, setLoadError] = useState("");
+  const [usage, setUsage] = useState<BillingUsageResponse | null>(null);
+  const [usageState, setUsageState] = useState<LoadState>("idle");
+  const [usageError, setUsageError] = useState("");
+  const [usageRequest, setUsageRequest] = useState(0);
+  const [billingWorking, setBillingWorking] = useState(false);
+  const [billingError, setBillingError] = useState("");
 
   useEffect(() => {
-    if (!user) {
-      navigate("/signin", { replace: true });
-      return;
-    }
-    if (me) return;
-    setLoading(true);
-    fetchMe()
-      .then(setMe)
-      .catch((err) => {
-        if (err.status === 401) logout();
-      })
-      .finally(() => setLoading(false));
-  }, [user, navigate, logout, me, setMe, setLoading]);
+    if (!open) return;
+    if (user) return;
 
-  if (!user || loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="w-5 h-5 rounded-full border-2 border-border border-t-text-muted animate-spin" />
-      </div>
-    );
+    void Promise.resolve().then(() => {
+      onOpenChange(false);
+      navigate("/signin");
+    });
+  }, [open, user, navigate, onOpenChange]);
+
+  useEffect(() => {
+    if (!open || !user || me) return;
+
+    let active = true;
+    void Promise.resolve().then(async () => {
+      if (!active) return;
+      setLoadError("");
+      setLoading(true);
+      try {
+        const account = await fetchMe();
+        if (active) setMe(account);
+      } catch (error) {
+        if (!active) return;
+        const requestError = error as Error & { status?: number };
+        if (requestError.status === 401) {
+          onOpenChange(false);
+          logout();
+          navigate("/signin", { replace: true });
+          return;
+        }
+        setLoadError(requestError.message || "Could not load your Misty account.");
+      } finally {
+        if (active) setLoading(false);
+      }
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [open, user, me, logout, navigate, onOpenChange, setLoading, setMe]);
+
+  useEffect(() => {
+    if (!open || !user) return;
+
+    let active = true;
+    void Promise.resolve().then(async () => {
+      if (!active) return;
+      setUsageState("loading");
+      setUsageError("");
+      try {
+        const nextUsage = await fetchBillingUsage();
+        if (!active) return;
+        setUsage(nextUsage);
+        setUsageState("ready");
+      } catch (error) {
+        if (!active) return;
+        setUsageError(error instanceof Error ? error.message : "Could not load credit usage.");
+        setUsageState("error");
+      }
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [open, user, usageRequest]);
+
+  function openBillingAction(action: () => Promise<{ url: string }>) {
+    setBillingWorking(true);
+    setBillingError("");
+    void action()
+      .then(({ url }) => {
+        setBillingWorking(false);
+        window.location.assign(url);
+      })
+      .catch((error) => {
+        setBillingError(error instanceof Error ? error.message : "Could not start billing.");
+        setBillingWorking(false);
+      });
   }
 
+  const activeTab = TABS.find((item) => item.id === tab) ?? TABS[0];
+
   return (
-    <div className="pt-16">
-      <div className="flex max-w-4xl mx-auto">
-        {/* ── Sidebar — sticky ─────────────────────────────────── */}
-        <aside className="hidden md:flex w-48 shrink-0 flex-col border-r border-border px-3 py-8 gap-1 sticky top-16 self-start h-[calc(100vh-4rem)]">
-          <p className="px-3 mb-4 text-xl font-semibold text-text">Settings</p>
-          {TABS.map(({ id, label }) => (
-            <button
-              key={id}
-              onClick={() => setTab(id)}
-              className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${
-                tab === id
-                  ? "bg-elevated text-text font-medium"
-                  : "text-text-muted hover:text-text hover:bg-elevated/50"
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-        </aside>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent
+        showCloseButton={false}
+        className="h-[min(760px,calc(100dvh-64px))] w-[min(980px,calc(100vw-64px))] max-w-none gap-0 overflow-hidden rounded-[18px] border border-border bg-card p-0 shadow-[0_28px_90px_rgba(0,0,0,0.62)] ring-0 max-[640px]:h-[calc(100dvh-24px)] max-[640px]:w-[calc(100vw-24px)] sm:max-w-none"
+      >
+        <DialogTitle className="sr-only">Account settings</DialogTitle>
+        <DialogDescription className="sr-only">
+          Manage your Misty account, credits, billing, and privacy settings.
+        </DialogDescription>
 
-        {/* ── Mobile tab bar ──────────────────────────────────── */}
-        <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 border-t border-border bg-bg/90 backdrop-blur flex">
-          {TABS.map(({ id, label }) => (
-            <button
-              key={id}
-              onClick={() => setTab(id)}
-              className={`flex-1 py-3 text-xs font-medium transition-colors ${
-                tab === id ? "text-white" : "text-text-muted"
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-
-        {/* ── Content ─────────────────────────────────────────── */}
-        <main className="flex-1 min-w-0">
-          <div className="max-w-xl px-8 py-8 pb-24 md:pb-12">
-            <h1 className="text-xl font-bold text-text tracking-tight mb-6">
-              {TABS.find((currentTab) => currentTab.id === tab)?.label}
-            </h1>
-
-            {tab === "general" && <GeneralPanel />}
-
-            {me && tab === "account" && (
+        <DesktopSettingsFrame
+          activeId={tab}
+          ariaLabel="Account settings"
+          description={TAB_DESCRIPTIONS[tab]}
+          items={TABS}
+          navigationLabel="Account settings sections"
+          navigationTitle="Misty account"
+          onClose={() => onOpenChange(false)}
+          onSelect={setTab}
+          presentation="overlay"
+          title={activeTab.label}
+        >
+          {tab === "account" ? (
+            me ? (
               <AccountPanel
                 me={me}
                 onUpdated={(name) => {
                   patchMe({ name });
-                  setUser({ ...user, name });
+                  if (user) setUser({ ...user, name });
                 }}
-                onLogout={logout}
               />
-            )}
+            ) : loading ? (
+              <div className="flex min-h-40 items-center justify-center gap-2 text-muted-foreground">
+                <Spinner aria-hidden="true" className="size-4" />
+                <span className="text-sm">Loading account details</span>
+              </div>
+            ) : (
+              <Alert variant="destructive">
+                <AlertTitle>Account details are unavailable</AlertTitle>
+                <AlertDescription>
+                  {loadError || "Close settings and try again in a moment."}
+                </AlertDescription>
+              </Alert>
+            )
+          ) : null}
 
-            {tab === "privacy" && <PrivacyPanel />}
-          </div>
-        </main>
-      </div>
-    </div>
+          {tab === "credits" ? (
+            <CreditsPanel
+              usage={usage}
+              state={usageState}
+              error={usageError}
+              billingWorking={billingWorking}
+              onRetry={() => setUsageRequest((request) => request + 1)}
+              onBillingAction={openBillingAction}
+            />
+          ) : null}
+
+          {tab === "billing" ? (
+            <BillingPanel
+              me={me}
+              loading={loading}
+              loadError={loadError}
+              billingWorking={billingWorking}
+              billingError={billingError}
+              onBillingAction={openBillingAction}
+            />
+          ) : null}
+
+          {tab === "privacy" ? <PrivacyPanel /> : null}
+        </DesktopSettingsFrame>
+      </DialogContent>
+    </Dialog>
   );
+}
+
+// The legacy route is intentionally empty. App converts /settings into the
+// same modal over the home page so old bookmarks still work without a page.
+export default function SettingsRoute() {
+  return null;
 }

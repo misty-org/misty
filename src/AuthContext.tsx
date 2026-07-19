@@ -28,15 +28,23 @@ interface AuthProviderProps {
 
 export function AuthProvider({ children, onLogout }: AuthProviderProps) {
   const [user, setUser] = useState<User | null>(() => {
-    const stored = localStorage.getItem("misty_user");
-    return stored ? JSON.parse(stored) : null;
+    try {
+      const stored = localStorage.getItem("misty_user");
+      return stored ? (JSON.parse(stored) as User) : null;
+    } catch {
+      return null;
+    }
   });
 
   useEffect(() => {
-    if (user) {
-      localStorage.setItem("misty_user", JSON.stringify(user));
-    } else {
-      localStorage.removeItem("misty_user");
+    try {
+      if (user) {
+        localStorage.setItem("misty_user", JSON.stringify(user));
+      } else {
+        localStorage.removeItem("misty_user");
+      }
+    } catch {
+      // Authentication remains usable for the current session without storage.
     }
   }, [user]);
 

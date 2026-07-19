@@ -1,25 +1,32 @@
 import { useState, type FormEvent, type ChangeEvent } from "react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Spinner } from "@/components/ui/spinner";
+import { cn } from "@/lib/utils";
 import { submitWaitlist } from "./api";
 import type { WaitlistFormProps, WaitlistFormState } from "./types";
 
-
 export default function Waitlist() {
-    return (
-        <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center px-4 sm:px-5">
-            <div className="w-full max-w-md">
-                <div className="text-center mb-8">
-                    <h1 className="text-3xl md:text-4xl font-bold text-text mb-2">
-                        Join the Waitlist
-                    </h1>
-                    <p className="text-text-muted">
-                        Be the first to know when we launch.
-                    </p>
-                </div>
-
-                <WaitlistForm />
-            </div>
+  return (
+    <section
+      aria-labelledby="waitlist-title"
+      className="flex min-h-[calc(100vh-4rem)] items-center justify-center bg-background px-4 text-foreground sm:px-5"
+    >
+      <div className="w-full max-w-md">
+        <div className="mb-8 text-center">
+          <h1 id="waitlist-title" className="mb-2 text-3xl font-bold tracking-tight md:text-4xl">
+            Join the Waitlist
+          </h1>
+          <p className="text-muted-foreground">Be the first to know when we launch.</p>
         </div>
-    )
+
+        <WaitlistForm />
+      </div>
+    </section>
+  );
 }
 
 function WaitlistForm({ onSuccess, className }: WaitlistFormProps) {
@@ -51,57 +58,73 @@ function WaitlistForm({ onSuccess, className }: WaitlistFormProps) {
 
   if (success) {
     return (
-      <div className="glass-card rounded-2xl p-6 sm:p-8 text-center">
-        <h3 className="text-xl font-bold text-text mb-2">You're on the list!</h3>
-        <p className="text-text-muted">Check your email for confirmation.</p>
-      </div>
+      <Card className={cn("gap-0 rounded-2xl py-0", className)}>
+        <CardContent
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
+          className="p-6 text-center sm:p-8"
+        >
+          <h3 className="mb-2 text-xl font-bold text-card-foreground">You&apos;re on the list!</h3>
+          <p className="text-muted-foreground">Check your email for confirmation.</p>
+        </CardContent>
+      </Card>
     );
   }
 
   return (
-    <div className={`glass-card rounded-2xl p-6 sm:p-8 ${className ?? ''}`}>
-      <form onSubmit={handleSubmit} className="flex flex-col gap-5">
-        <div className="flex flex-col gap-2">
-          <label htmlFor="email" className="text-sm font-medium text-text-secondary">
-            Email
-          </label>
-          <input
-            id="email"
-            type="email"
-            name="email"
-            value={formData.email}
-            onChange={handleChange}
-            placeholder="you@example.com"
-            required
-            className="w-full px-4 py-2.5 rounded-xl bg-surface border border-border text-base text-text placeholder:text-text-muted/50 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-colors"
-          />
-        </div>
+    <Card className={cn("gap-0 rounded-2xl py-0", className)}>
+      <CardContent className="p-6 sm:p-8">
+        <form onSubmit={handleSubmit} aria-busy={loading} className="flex flex-col gap-5">
+          <div className="grid gap-2">
+            <Label htmlFor="email">Email</Label>
+            <Input
+              id="email"
+              type="email"
+              name="email"
+              value={formData.email}
+              onChange={handleChange}
+              placeholder="you@example.com"
+              autoComplete="email"
+              required
+              className="h-11"
+            />
+          </div>
 
-        <div className="flex flex-col gap-2">
-          <label htmlFor="name" className="text-sm font-medium text-text-secondary">
-            Name <span className="text-text-muted">(optional)</span>
-          </label>
-          <input
-            id="name"
-            type="text"
-            name="name"
-            value={formData.name}
-            onChange={handleChange}
-            placeholder="Your name"
-            className="w-full px-4 py-2.5 rounded-xl bg-surface border border-border text-base text-text placeholder:text-text-muted/50 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-colors"
-          />
-        </div>
+          <div className="grid gap-2">
+            <Label htmlFor="name">
+              Name <span className="font-normal text-muted-foreground">(optional)</span>
+            </Label>
+            <Input
+              id="name"
+              type="text"
+              name="name"
+              value={formData.name}
+              onChange={handleChange}
+              placeholder="Your name"
+              autoComplete="name"
+              className="h-11"
+            />
+          </div>
 
-        {error && <p className="text-sm text-danger">{error}</p>}
+          {error ? (
+            <Alert
+              variant="destructive"
+              role="alert"
+              aria-live="assertive"
+              aria-atomic="true"
+              className="border-destructive/30 bg-destructive/10"
+            >
+              <AlertDescription className="text-destructive">{error}</AlertDescription>
+            </Alert>
+          ) : null}
 
-        <button
-          type="submit"
-          disabled={loading}
-          className="w-full px-4 py-2.5 bg-zinc-100 hover:bg-gray-200 disabled:opacity-50 text-black font-medium rounded-xl transition-all duration-200"
-        >
-          {loading ? "Joining..." : "Join Waitlist"}
-        </button>
-      </form>
-    </div>
+          <Button type="submit" size="lg" disabled={loading} className="h-11 w-full">
+            {loading ? <Spinner aria-hidden="true" /> : null}
+            {loading ? "Joining..." : "Join Waitlist"}
+          </Button>
+        </form>
+      </CardContent>
+    </Card>
   );
 }

@@ -1,286 +1,269 @@
-import { useState, useEffect, useRef } from "react";
-import { NavLink, useNavigate, useLocation } from "react-router";
-import { useAuth } from "../AuthContext";
-import { useUserStore } from "../store/userStore";
+import { useState } from "react";
+import { NavLink, useLocation } from "react-router";
+import { Menu, X } from "lucide-react";
+import { useAuth } from "@/AuthContext";
+import { useUserStore } from "@/store/userStore";
+import { ModeToggle } from "@/components/mode-toggle";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { cn } from "@/lib/utils";
 
 const navItems = [
   { to: "/download", label: "Download" },
   { to: "/pricing", label: "Pricing" },
 ];
 
-const resourcesLinks = [
+const resourceLinks = [
   { to: "/features", label: "Features" },
   { to: "/changelog", label: "Changelog" },
   { to: "/blog", label: "Blog" },
   { to: "/roadmap", label: "Roadmap" },
 ];
 
-export default function Navbar() {
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [resourcesOpen, setResourcesOpen] = useState(false);
-  const [profileOpen, setProfileOpen] = useState(false);
-  const profileMenuRef = useRef<HTMLDivElement | null>(null);
+function DesktopNavLink({ to, label }: { to: string; label: string }) {
+  return (
+    <NavLink
+      to={to}
+      className={({ isActive }) =>
+        cn(
+          "relative rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+          isActive && "text-foreground",
+        )
+      }
+    >
+      {({ isActive }) => (
+        <>
+          {label}
+          {isActive ? (
+            <span className="absolute inset-x-3 -bottom-px h-0.5 rounded-full bg-primary" />
+          ) : null}
+        </>
+      )}
+    </NavLink>
+  );
+}
+
+export default function Navbar({ onOpenSettings }: { onOpenSettings: () => void }) {
+  const [mobileOpen, setMobileOpen] = useState(false);
   const location = useLocation();
-  const navigate = useNavigate();
   const { user, logout } = useAuth();
-  const me = useUserStore((s) => s.me);
+  const me = useUserStore((state) => state.me);
 
   const displayName = me?.name ?? user?.name ?? "";
   const initials = displayName
     ? displayName
         .split(" ")
-        .map((w: string) => w[0])
+        .map((word) => word[0])
         .join("")
         .toUpperCase()
         .slice(0, 2)
-    : (user?.email?.[0]?.toUpperCase() ?? "");
-
-  useEffect(() => {
-    setMenuOpen(false);
-    setResourcesOpen(false);
-    setProfileOpen(false);
-  }, [location]);
-
-  useEffect(() => {
-    if (!profileOpen) return;
-    const handler = (e: MouseEvent) => {
-      if (!profileMenuRef.current?.contains(e.target as Node))
-        setProfileOpen(false);
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [profileOpen]);
-
-  useEffect(() => {
-    const handleScroll = () => {};
-    window.addEventListener("scroll", handleScroll, { passive: true });
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, []);
-
-  function openResources() {
-    setResourcesOpen(true);
-  }
+    : (user?.email?.[0]?.toUpperCase() ?? "?");
+  const resourcesActive = resourceLinks.some(({ to }) =>
+    location.pathname.startsWith(to),
+  );
 
   return (
-    <nav className="fixed top-0 left-0 right-0 z-50 bg-[#0e1114] transition-all duration-300">
-      <div
-        style={{
-          maxWidth: location.pathname === "/" ? "1060px" : "100%",
-          transition: "max-width 0.5s cubic-bezier(0.4, 0, 0.2, 1)",
-        }}
-        className="mx-auto flex h-16 w-full items-center justify-between px-3 sm:px-4"
-      >
-        <NavLink to="/" className="group flex items-center gap-1">
-          <img src="/misty.png" alt="Misty logo" className="w-13 h-13" />
-          <span className="text-lg font-semibold text-text tracking-tight">
-            Misty
-          </span>
-        </NavLink>
-
-        {/* Desktop nav */}
-        <div className="hidden md:flex items-center gap-1">
-          {navItems.map(({ to, label }) => (
-            <NavLink
-              key={to}
-              to={to}
-              end={to === "/"}
-              className={({ isActive }) =>
-                `relative px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
-                  isActive ? "text-white" : "text-text hover:text-white"
-                }`
-              }
-            >
-              {({ isActive }) => (
-                <>
-                  {label}
-                  {isActive && (
-                    <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-4 h-0.5 bg-primary rounded-full" />
-                  )}
-                </>
-              )}
-            </NavLink>
-          ))}
-
-          {/* Resources dropdown */}
-          <div
-            className="relative"
-            onMouseEnter={openResources}
-            onMouseLeave={() => setResourcesOpen(false)}
+    <Collapsible open={mobileOpen} onOpenChange={setMobileOpen} asChild>
+      <nav className="fixed inset-x-0 top-0 z-50 border-b border-border/60 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+        <div
+          style={{
+            maxWidth: location.pathname === "/" ? "1060px" : "100%",
+            transition: "max-width 0.5s cubic-bezier(0.4, 0, 0.2, 1)",
+          }}
+          className="mx-auto flex h-16 w-full items-center justify-between px-3 sm:px-4"
+        >
+          <NavLink
+            to="/"
+            onClick={() => setMobileOpen(false)}
+            aria-label="Misty home"
+            className="flex items-center gap-1 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
-            <button
-              type="button"
-              onClick={openResources}
-              aria-haspopup="menu"
-              aria-expanded={resourcesOpen}
-              className={`relative px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 block ${
-                resourcesLinks.some(({ to }) =>
-                  location.pathname.startsWith(to),
-                )
-                  ? "text-white"
-                  : "text-text hover:text-white"
-              }`}
-            >
-              Resources
-              {resourcesLinks.some(({ to }) =>
-                location.pathname.startsWith(to),
-              ) && (
-                <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-4 h-0.5 bg-primary rounded-full" />
-              )}
-            </button>
-            <div
-              className={`absolute left-1/2 -translate-x-1/2 top-full pt-1 w-44 transition-all duration-200 ${resourcesOpen ? "opacity-100 visible" : "opacity-0 invisible"}`}
-            >
-              <div
-                className="bg-surface border border-border rounded-xl overflow-hidden shadow-xl shadow-bg/50"
-                role="menu"
-              >
-                {resourcesLinks.map(({ to, label }) => (
-                  <NavLink
-                    key={to}
-                    to={to}
-                    end
-                    role="menuitem"
-                    className="block px-4 py-2.5 text-sm text-text transition-colors hover:text-white hover:bg-elevated"
-                  >
-                    {label}
-                  </NavLink>
+            <img src="/misty.png" alt="" className="size-13" />
+            <span className="text-lg font-semibold tracking-tight text-foreground">
+              Misty
+            </span>
+          </NavLink>
+
+          <div className="hidden items-center gap-1 md:flex">
+            {navItems.map((item) => (
+              <DesktopNavLink key={item.to} {...item} />
+            ))}
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  className={cn(
+                    "relative px-3 text-muted-foreground hover:text-foreground",
+                    resourcesActive && "text-foreground",
+                  )}
+                >
+                  Resources
+                  {resourcesActive ? (
+                    <span className="absolute inset-x-3 -bottom-px h-0.5 rounded-full bg-primary" />
+                  ) : null}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="center" className="w-44">
+                {resourceLinks.map(({ to, label }) => (
+                  <DropdownMenuItem key={to} asChild>
+                    <NavLink to={to}>{label}</NavLink>
+                  </DropdownMenuItem>
                 ))}
-              </div>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            <div className="ml-3 flex items-center gap-2 border-l border-border pl-3">
+              <ModeToggle />
+
+              {user ? (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      aria-label="Open account menu"
+                      className="rounded-full"
+                    >
+                      <Avatar className="size-8">
+                        <AvatarFallback className="bg-primary text-xs font-semibold text-primary-foreground">
+                          {initials}
+                        </AvatarFallback>
+                      </Avatar>
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-52">
+                    <DropdownMenuLabel className="font-normal">
+                      <span className="block truncate text-sm font-medium text-foreground">
+                        {displayName}
+                      </span>
+                      <span className="block truncate text-xs text-muted-foreground">
+                        {user.email}
+                      </span>
+                    </DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onSelect={onOpenSettings}>Settings</DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem variant="destructive" onSelect={logout}>
+                      Sign out
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              ) : (
+                <Button asChild size="sm">
+                  <NavLink to="/signin" state={{ from: location.pathname }}>
+                    Sign In
+                  </NavLink>
+                </Button>
+              )}
             </div>
           </div>
 
-          <div className="pl-4 border-l border-border">
-            {user ? (
-              <div ref={profileMenuRef} className="relative">
-                <button
-                  onClick={() => setProfileOpen((o) => !o)}
-                  className="w-8 h-8 rounded-full bg-white hover:bg-zinc-200 flex items-center justify-center text-xs font-semibold text-black transition-colors"
-                >
-                  {initials}
-                </button>
-                {profileOpen && (
-                  <div className="absolute right-0 top-full pt-2">
-                    <div className="w-44 glass-card rounded-xl overflow-hidden shadow-xl shadow-bg/50">
-                      <div className="px-4 py-3 border-b border-border/50">
-                        <p className="text-sm font-medium text-text truncate">
-                          {displayName}
-                        </p>
-                        <p className="text-xs text-text-muted truncate">
-                          {user.email}
-                        </p>
-                      </div>
-                      <NavLink
-                        to="/settings"
-                        className="block px-4 py-2.5 text-sm text-text-muted hover:text-text hover:bg-elevated transition-colors"
-                      >
-                        Settings
-                      </NavLink>
-                      <button
-                        onClick={logout}
-                        className="w-full text-left px-4 py-2.5 text-sm text-text-muted hover:text-text hover:bg-elevated transition-colors border-t border-border/30"
-                      >
-                        Sign out
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <button
-                onClick={() =>
-                  navigate("/signin", { state: { from: location.pathname } })
-                }
-                className="px-4 py-1.5 bg-white hover:bg-zinc-200 text-bg text-sm font-medium rounded-lg transition-colors duration-200"
+          <div className="flex items-center gap-1 md:hidden">
+            <ModeToggle />
+            <CollapsibleTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label={mobileOpen ? "Close navigation menu" : "Open navigation menu"}
+                aria-controls="mobile-navigation"
               >
-                Sign In
-              </button>
-            )}
+                {mobileOpen ? <X aria-hidden="true" /> : <Menu aria-hidden="true" />}
+              </Button>
+            </CollapsibleTrigger>
           </div>
         </div>
 
-        {/* Mobile hamburger */}
-        <button
-          onClick={() => setMenuOpen(!menuOpen)}
-          className="md:hidden relative w-10 h-10 flex items-center justify-center text-text-muted hover:text-text transition-colors"
-        >
-          <div className="flex flex-col gap-1.5">
-            <span
-              className={`block w-5 h-px bg-current transition-all duration-300 ${menuOpen ? "rotate-45 translate-y-[3.5px]" : ""}`}
-            />
-            <span
-              className={`block w-5 h-px bg-current transition-all duration-300 ${menuOpen ? "-rotate-45 -translate-y-[3.5px]" : ""}`}
-            />
-          </div>
-        </button>
-      </div>
-
-      {/* Mobile menu */}
-      <div
-        className={`md:hidden overflow-hidden transition-all duration-300 ${menuOpen ? "max-h-96 opacity-100" : "max-h-0 opacity-0"}`}
-      >
-        <div className="px-6 py-4 border-t border-border/50 glass">
-          <div className="flex flex-col gap-1">
-            {navItems.map(({ to, label }) => (
-              <NavLink
-                key={to}
-                to={to}
-                end={to === "/"}
-                className={({ isActive }) =>
-                  `px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                    isActive
-                      ? "text-primary bg-primary/10"
-                      : "text-text-muted hover:text-text hover:bg-elevated"
-                  }`
-                }
-              >
-                {label}
-              </NavLink>
-            ))}
-            <span className="px-4 pt-3 pb-1 text-[11px] font-semibold tracking-[0.18em] text-text-muted">
-              Resources
-            </span>
-            {resourcesLinks.map(({ to, label }) => (
-              <NavLink
-                key={to}
-                to={to}
-                end
-                className="px-4 pl-6 py-2 rounded-lg text-sm font-medium text-text-muted transition-colors hover:text-text hover:bg-elevated"
-              >
-                {label}
-              </NavLink>
-            ))}
-            {user ? (
-              <>
+        <CollapsibleContent id="mobile-navigation" className="border-t border-border md:hidden">
+          <div className="bg-background px-4 py-4">
+            <div className="flex flex-col gap-1">
+              {navItems.map(({ to, label }) => (
                 <NavLink
-                  to="/settings"
+                  key={to}
+                  to={to}
+                  onClick={() => setMobileOpen(false)}
                   className={({ isActive }) =>
-                    `mt-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                      isActive
-                        ? "text-primary bg-primary/10"
-                        : "text-text-muted hover:text-text hover:bg-elevated"
-                    }`
+                    cn(
+                      "rounded-md px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground",
+                      isActive && "bg-accent text-accent-foreground",
+                    )
                   }
                 >
-                  Settings
+                  {label}
                 </NavLink>
-                <button
-                  onClick={logout}
-                  className="px-4 py-2.5 text-left text-sm font-medium text-text-muted hover:text-text hover:bg-elevated rounded-lg transition-colors"
+              ))}
+
+              <span className="px-3 pb-1 pt-3 text-xs font-medium text-muted-foreground">
+                Resources
+              </span>
+              {resourceLinks.map(({ to, label }) => (
+                <NavLink
+                  key={to}
+                  to={to}
+                  onClick={() => setMobileOpen(false)}
+                  className={({ isActive }) =>
+                    cn(
+                      "rounded-md px-5 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground",
+                      isActive && "bg-accent text-accent-foreground",
+                    )
+                  }
                 >
-                  Sign out
-                </button>
-              </>
-            ) : (
-              <button
-                onClick={() => navigate("/signin")}
-                className="mt-2 px-4 py-2.5 bg-white text-bg text-sm font-medium rounded-lg"
-              >
-                Sign In
-              </button>
-            )}
+                  {label}
+                </NavLink>
+              ))}
+
+              {user ? (
+                <>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => {
+                      setMobileOpen(false);
+                      onOpenSettings();
+                    }}
+                    className="mt-2 justify-start px-3 text-muted-foreground"
+                  >
+                    Settings
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    onClick={() => {
+                      setMobileOpen(false);
+                      logout();
+                    }}
+                    className="justify-start px-3 text-muted-foreground"
+                  >
+                    Sign out
+                  </Button>
+                </>
+              ) : (
+                <Button asChild className="mt-2">
+                  <NavLink
+                    to="/signin"
+                    state={{ from: location.pathname }}
+                    onClick={() => setMobileOpen(false)}
+                  >
+                    Sign In
+                  </NavLink>
+                </Button>
+              )}
+            </div>
           </div>
-        </div>
-      </div>
-    </nav>
+        </CollapsibleContent>
+      </nav>
+    </Collapsible>
   );
 }

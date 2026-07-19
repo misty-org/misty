@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { NavLink } from "react-router";
+import { Button } from "@/components/ui/button";
 import AuthCard from "../Auth/AuthCard";
 import AuthField from "../Auth/AuthField";
 import AuthMessage from "../Auth/AuthMessage";
@@ -19,7 +20,6 @@ export default function ResetPassword() {
 
   useEffect(() => {
     let cancelled = false;
-    setValidationState("checking");
 
     validateResetTokenRequest()
       .then(() => {
@@ -72,7 +72,7 @@ export default function ResetPassword() {
     return (
       <AuthShell title="Reset your password" description="Checking your reset link.">
         <AuthCard>
-          <p className="text-sm text-text-muted">Please wait a moment.</p>
+          <AuthMessage tone="muted" message="Please wait a moment." />
         </AuthCard>
       </AuthShell>
     );
@@ -87,11 +87,13 @@ export default function ResetPassword() {
         title=""
         description=""
         footer={
-          <div className="text-center text-sm text-text-muted">
-            <NavLink to="/signin" className="transition hover:text-text">
-              Back to sign in
-            </NavLink>
-          </div>
+          <Button
+            asChild
+            variant="link"
+            className="h-auto p-0 text-foreground"
+          >
+            <NavLink to="/signin">Back to sign in</NavLink>
+          </Button>
         }
       >
         <form onSubmit={handleSubmit} className="flex flex-col gap-5">

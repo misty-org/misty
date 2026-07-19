@@ -1,6 +1,7 @@
 import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
+import { fileURLToPath, URL } from 'node:url'
 
 function isLocalApiBase(value?: string) {
   const apiBase = value?.trim();
@@ -31,6 +32,9 @@ export default defineConfig(({ command, mode }) => {
       port: 5174,
     },
     resolve: {
+      alias: {
+        "@": fileURLToPath(new URL("./src", import.meta.url)),
+      },
       preserveSymlinks: true,
     },
   };

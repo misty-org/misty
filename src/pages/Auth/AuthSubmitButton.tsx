@@ -1,3 +1,6 @@
+import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
+
 interface AuthSubmitButtonProps {
   idleLabel: string;
   loadingLabel: string;
@@ -12,12 +15,15 @@ export default function AuthSubmitButton({
   disabled,
 }: AuthSubmitButtonProps) {
   return (
-    <button
+    <Button
       type="submit"
       disabled={disabled || loading}
-      className="w-full rounded-xl bg-zinc-100 px-4 py-3 text-sm font-semibold text-black transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
+      size="lg"
+      aria-busy={loading}
+      className="h-11 w-full"
     >
+      {loading ? <Spinner aria-hidden="true" /> : null}
       {loading ? loadingLabel : idleLabel}
-    </button>
+    </Button>
   );
 }

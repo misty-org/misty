@@ -1,4 +1,5 @@
 import { NavLink } from "react-router";
+import { Button } from "@/components/ui/button";
 import AuthField from "../Auth/AuthField";
 import AuthMessage from "../Auth/AuthMessage";
 import AuthSubmitButton from "../Auth/AuthSubmitButton";
@@ -49,13 +50,14 @@ export default function SignInForm({
             required
             onChange={onPasswordChange}
           />
-          <button
+          <Button
             type="button"
+            variant="link"
             onClick={onForgotPasswordClick}
-            className="self-start text-sm text-text-muted transition hover:text-text"
+            className="h-auto self-start p-0 text-foreground"
           >
             Forgot your password?
-          </button>
+          </Button>
         </div>
 
         {error ? <AuthMessage tone="error" message={error} /> : null}
@@ -63,10 +65,16 @@ export default function SignInForm({
         <AuthSubmitButton idleLabel="Sign In" loadingLabel="Signing in..." loading={loading} />
       </form>
 
-      <div className="text-center text-sm text-text-muted">
-        <NavLink to="/register" className="transition hover:text-text">
-          Don&apos;t have an account? Sign up
-        </NavLink>
+      <div className="text-center">
+        <Button
+          asChild
+          variant="link"
+          className="h-auto p-0 text-foreground"
+        >
+          <NavLink to="/register">
+            Don&apos;t have an account? Sign up
+          </NavLink>
+        </Button>
       </div>
     </>
   );
