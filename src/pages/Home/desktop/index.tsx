@@ -40,6 +40,7 @@ import {
   resolvePreferredWorkspaceRoot,
   titleFromPath,
 } from "./recentFileUtils";
+import { PageBody, PageHeader, PageShell } from "../../../components/misty";
 
 const emptyProviderRemotes: ProviderRemote[] = [];
 
@@ -189,8 +190,12 @@ export default function HomePage() {
   };
 
   return (
-    <div className="misty-scrollbar relative box-border h-full min-h-0 min-w-0 overflow-x-hidden overflow-y-auto overscroll-contain p-[clamp(0.5rem,1vw,1.25rem)]">
-      <section className="relative z-10 flex min-h-full w-full min-w-0 flex-col gap-[clamp(0.5rem,0.8vw,1rem)]">
+    <PageShell>
+      <PageHeader
+        title="Home"
+        description="Workspaces, storage, and Mika in one place."
+      />
+      <PageBody className="flex min-h-0 flex-col gap-3 bg-muted/10 p-4" width="full">
         <HomeSidebarPanels
           devices={devices}
           devicesLoading={devicesLoading}
@@ -213,8 +218,8 @@ export default function HomePage() {
           latestChangelog={latestChangelog}
           latestPost={latestPost}
         />
-      </section>
-    </div>
+      </PageBody>
+    </PageShell>
   );
 }
 

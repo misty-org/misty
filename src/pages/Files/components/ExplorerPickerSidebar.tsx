@@ -1,3 +1,4 @@
+import { Button } from "../../../components/ui/button";
 import {
   Briefcase,
   Download,
@@ -93,19 +94,19 @@ export function ExplorerPickerSidebar(props: ExplorerPickerSidebarProps) {
               const Icon = item.icon;
               return (
                 <div className={`${sidebarStyles.pinnedRow} ${props.activePath === item.path ? sidebarStyles.itemSelected : ""}`} key={item.path}>
-                  <button className={sidebarStyles.pinnedButton} type="button" onClick={() => props.onNavigate(item.path)} title={item.path}>
+                  <Button className={sidebarStyles.pinnedButton} type="button" onClick={() => props.onNavigate(item.path)} title={item.path}>
                     <Icon size={20} />
                     <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{item.label}</span>
-                  </button>
+                  </Button>
                 </div>
               );
             })}
             {visiblePinnedPaths.map((path) => (
               <div className={`${sidebarStyles.pinnedRow} ${props.activePath === path ? sidebarStyles.itemSelected : ""}`} key={path}>
-                <button className={sidebarStyles.pinnedButton} type="button" onClick={() => props.onNavigate(path)} title={path}>
+                <Button className={sidebarStyles.pinnedButton} type="button" onClick={() => props.onNavigate(path)} title={path}>
                   <Folder size={20} />
                   <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{pinnedPathLabel(path)}</span>
-                </button>
+                </Button>
               </div>
             ))}
           </div>
@@ -123,7 +124,7 @@ export function ExplorerPickerSidebar(props: ExplorerPickerSidebarProps) {
                     const path = joinPath(props.mountRoot, remote.name);
                     const providerIcon = providerIconForType(remote.type);
                     return (
-                      <button
+                      <Button
                         type="button"
                         key={`${remote.type}:${remote.name}`}
                         className={`${sidebarStyles.itemButton} ${props.activePath === path || props.activePath.startsWith(`${path}/`) ? sidebarStyles.itemSelected : ""}`}
@@ -132,7 +133,7 @@ export function ExplorerPickerSidebar(props: ExplorerPickerSidebarProps) {
                       >
                         <span className={sidebarStyles.remoteIcon}><AssetIcon src={providerIcon.src} color={providerIcon.color} size={24} /></span>
                         <span>{remote.name}</span>
-                      </button>
+                      </Button>
                     );
                   })}
                 </div>
@@ -146,7 +147,7 @@ export function ExplorerPickerSidebar(props: ExplorerPickerSidebarProps) {
           collapsed={collapsedSections.devices}
           onToggle={() => toggleSection("devices")}
           actions={(
-            <button
+            <Button
               type="button"
               title="Refresh devices"
               className={`${sidebarStyles.sectionActionButton} ${devicesRefreshSpinning ? sidebarStyles.spinning : ""}`}
@@ -157,7 +158,7 @@ export function ExplorerPickerSidebar(props: ExplorerPickerSidebarProps) {
               }}
             >
               <RefreshCcw size={14} />
-            </button>
+            </Button>
           )}
         />
         {!collapsedSections.devices ? (
@@ -169,7 +170,7 @@ export function ExplorerPickerSidebar(props: ExplorerPickerSidebarProps) {
                   const usedRatio = device.totalBytes > 0 ? Math.min(100, Math.round((usedBytes / device.totalBytes) * 100)) : 0;
                   return (
                     <div className={sidebarStyles.deviceRow} key={device.id}>
-                      <button
+                      <Button
                         type="button"
                         className={`${sidebarStyles.deviceButton} ${pathIsInside(props.activePath, device.mountPath) ? sidebarStyles.itemSelected : ""}`}
                         onClick={() => props.onNavigate(device.mountPath)}
@@ -181,7 +182,7 @@ export function ExplorerPickerSidebar(props: ExplorerPickerSidebarProps) {
                           <small className={sidebarStyles.deviceMeta}>{deviceCapacityLabel(usedBytes, device.totalBytes, device.fsType || device.mountPath)}</small>
                           {device.totalBytes > 0 ? <span className={sidebarStyles.deviceMeter} aria-hidden="true"><i className={sidebarStyles.deviceMeterFill} style={{ width: `${usedRatio}%` }} /></span> : null}
                         </span>
-                      </button>
+                      </Button>
                     </div>
                   );
                 })}

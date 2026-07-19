@@ -76,7 +76,9 @@ export async function handleSharedExtensionCommand(command: string, payload: Rec
   if (command === "themes.applyPreset") {
     if (!isThemeId(payload.preset)) throw new Error("Unsupported theme preset.");
     const root = document.documentElement;
-    root.dataset.theme = themeBaseMode(payload.preset); root.dataset.mistyTheme = payload.preset; root.style.colorScheme = themeBaseMode(payload.preset);
+    const resolvedTheme = themeBaseMode(payload.preset);
+    root.dataset.theme = resolvedTheme; root.dataset.mistyTheme = payload.preset; root.style.colorScheme = resolvedTheme;
+    root.classList.toggle("dark", resolvedTheme === "dark");
     applyThemeTokenPreview(null);
     await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
     return { ok: true, tokens: readEditableThemeTokens(), theme: themeSnapshot() };
@@ -94,6 +96,7 @@ export async function handleSharedExtensionCommand(command: string, payload: Rec
   if (command === "themes.revert") {
     const current = useAppThemeStore.getState(); const root = document.documentElement;
     root.dataset.theme = current.resolvedTheme; root.dataset.mistyTheme = current.themeId; root.style.colorScheme = current.resolvedTheme;
+    root.classList.toggle("dark", current.resolvedTheme === "dark");
     applyThemeTokenPreview(current.customTokens); await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
     return { ok: true, tokens: current.customTokens ?? readEditableThemeTokens(), theme: themeSnapshot(), message: "Reverted to the saved theme." };
   }

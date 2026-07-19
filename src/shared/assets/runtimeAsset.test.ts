@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { clearMocks, mockConvertFileSrc } from "@tauri-apps/api/mocks";
 import {
   resolveRuntimeAssetReference,
   runtimeAssetReference,
@@ -10,20 +11,35 @@ describe("runtimeAssetSource", () => {
     expect(runtimeAssetSource(
       "/Users/misty/.misty/assets/",
       "/animations/mika.webp",
-      "/bundled/mika.webp",
     )).toBe("/Users/misty/.misty/assets/animations/mika.webp");
   });
 
-  it("uses the bundled asset until the native environment is available", () => {
-    expect(runtimeAssetSource(undefined, "logos/misty.png", "/bundled/misty.png"))
-      .toBe("/bundled/misty.png");
+  it("does not use a bundled fallback before the native environment is available", () => {
+    expect(runtimeAssetSource(undefined, "logos/misty.png")).toBe("");
   });
 
   it("rejects external and relative runtime asset directories", () => {
-    expect(runtimeAssetSource("https://example.invalid/assets", "logos/misty.png", "/bundled/misty.png"))
-      .toBe("/bundled/misty.png");
-    expect(runtimeAssetSource("relative/assets", "logos/misty.png", "/bundled/misty.png"))
-      .toBe("/bundled/misty.png");
+    expect(runtimeAssetSource("https://example.invalid/assets", "logos/misty.png")).toBe("");
+    expect(runtimeAssetSource("relative/assets", "logos/misty.png")).toBe("");
+  });
+
+  it("preserves Windows separators when joining runtime assets", () => {
+    expect(runtimeAssetSource(
+      "C:\\Users\\misty\\.misty\\assets\\",
+      "logos/misty.png",
+    )).toBe("C:\\Users\\misty\\.misty\\assets\\logos\\misty.png");
+  });
+
+  it("converts the native Windows asset path through Tauri", () => {
+    mockConvertFileSrc("windows");
+    try {
+      expect(runtimeAssetSource(
+        "C:\\Users\\misty\\.misty\\assets",
+        "logos/misty.png",
+      )).toBe("http://asset.localhost/C%3A%5CUsers%5Cmisty%5C.misty%5Cassets%5Clogos%5Cmisty.png");
+    } finally {
+      clearMocks();
+    }
   });
 
   it("resolves deferred icon references after the app snapshot loads", () => {

@@ -68,8 +68,8 @@ export async function saveAccountAuthToken(
 }
 
 export async function readAccountAuthToken(): Promise<string | null> {
-  if (cachedToken !== undefined) return cachedToken;
   if (!hasTauriInternals()) return null;
+  if (cachedToken !== undefined) return cachedToken;
 
   try {
     if (isNativeMobileBuild) {

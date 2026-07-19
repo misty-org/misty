@@ -1,4 +1,6 @@
 import type { ReactNode } from "react";
+import { Card, CardHeader } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 
 interface PanelProps {
   as?: "aside" | "section" | "div";
@@ -12,25 +14,30 @@ interface PanelHeaderProps {
   actions?: ReactNode;
 }
 
-const panelBaseClass =
-  "min-w-0 overflow-hidden rounded-xl border border-[var(--misty-border-soft)] bg-[var(--misty-app-pane-bg,var(--misty-surface))] shadow-[0_18px_44px_var(--misty-shadow)]";
-
-const panelHeaderClass =
-  "flex items-center justify-between gap-4 border-b border-[var(--misty-border-soft)] px-[18px] py-4";
-
 export function Panel(props: PanelProps) {
   const Component = props.as ?? "section";
-  return <Component className={`${panelBaseClass}${props.className ? ` ${props.className}` : ""}`}>{props.children}</Component>;
+  return (
+    <Component className="contents">
+      <Card
+        className={cn(
+          "min-w-0 overflow-hidden border-border bg-card text-card-foreground shadow-sm",
+          props.className,
+        )}
+      >
+        {props.children}
+      </Card>
+    </Component>
+  );
 }
 
 export function PanelHeader(props: PanelHeaderProps) {
   return (
-    <div className={panelHeaderClass}>
-      <div>
-        <h2>{props.title}</h2>
-        {props.subtitle ? <p>{props.subtitle}</p> : null}
+    <CardHeader className="flex flex-row items-center justify-between gap-4 border-b border-border px-[18px] py-3.5">
+      <div className="min-w-0">
+        <h2 className="truncate text-sm font-semibold text-foreground">{props.title}</h2>
+        {props.subtitle ? <p className="mt-0.5 truncate text-xs text-muted-foreground">{props.subtitle}</p> : null}
       </div>
       {props.actions}
-    </div>
+    </CardHeader>
   );
 }

@@ -13,11 +13,14 @@ import {
   Tag,
   Trash2,
 } from "lucide-react";
-import type { ReactNode } from "react";
+import { useId, type ReactNode } from "react";
 import type { MountedDevice, ProviderRemote } from "../../../api/types";
 import { providerIconForType } from "../../../shared/assets/icons";
 import { AssetIcon } from "../../../shared/components/AssetIcon";
 import { joinPath, titleFromPath } from "./recentFileUtils";
+import { Button } from "../../../components/ui/button";
+import { Card } from "../../../components/ui/card";
+import { Skeleton } from "../../../components/ui/skeleton";
 
 export type HomeQuickAccessItem = {
   id: string;
@@ -58,26 +61,29 @@ type HomeSidebarPanelsProps = {
 };
 
 const panelClass =
-  "flex min-h-0 min-w-0 flex-col overflow-hidden rounded-2xl border border-white/[0.08] bg-[var(--misty-app-panel-bg,var(--misty-app-page-bg,var(--misty-bg)))] p-3 shadow-xl shadow-black/20";
+  "flex min-h-0 min-w-0 flex-col p-4";
 const headerClass =
-  "mb-2 flex shrink-0 items-center gap-2 border-b border-white/[0.06] pb-2 text-sm font-semibold text-text";
+  "mb-2 flex shrink-0 items-center gap-2 text-sm font-medium text-foreground";
 const rowClass =
-  "grid w-full min-w-0 grid-cols-[26px_minmax(0,1fr)] items-center gap-2 rounded-xl border border-transparent bg-transparent px-2 py-1.5 text-left transition hover:border-white/[0.08] hover:bg-white/[0.045]";
+  "grid w-full min-w-0 grid-cols-[28px_minmax(0,1fr)] items-center gap-2 rounded-md border-0 bg-transparent px-2 py-1.5 text-left transition-colors hover:bg-muted/45";
 const iconCellClass =
-  "grid h-6 w-6 place-items-center rounded-lg bg-white/[0.045] text-text-muted";
+  "grid size-7 place-items-center rounded-md bg-muted/55 text-muted-foreground";
 
 export function HomeSidebarPanels(props: HomeSidebarPanelsProps) {
   return (
-    <div className="flex min-h-0 min-w-0 flex-auto gap-[clamp(0.5rem,0.8vw,1rem)]">
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-[clamp(0.5rem,0.8vw,1rem)]">
-        <div className="min-h-0 flex-[3_1_0]">
+    <Card
+      aria-label="Home overview"
+      className="grid min-h-0 min-w-0 flex-none grid-cols-[repeat(3,minmax(0,1fr))] gap-0 overflow-hidden py-0 max-[900px]:grid-cols-1"
+      role="region"
+    >
+      <div className="min-w-0 divide-y divide-border/50">
+        <div className="p-4">
           {props.workspacePanel}
         </div>
-        <div className="min-h-0 flex-[2_1_0]">
+        <div className="p-4">
           {props.assistantPanel}
         </div>
         <SidebarPanel
-          className="flex-[4_1_0]"
           icon={<HardDrive className="h-4 w-4" />}
           title="Devices"
         >
@@ -87,63 +93,63 @@ export function HomeSidebarPanels(props: HomeSidebarPanelsProps) {
             showEmpty={props.devices.length === 0}
           >
             {props.devices.map((device) => (
-              <button
-                className={rowClass}
+              <Button
+                className={`${rowClass} h-auto justify-start font-normal`}
                 key={device.id}
                 onClick={() => props.onOpenDevice(device)}
                 title={device.mountPath}
                 type="button"
+                variant="ghost"
               >
                 <span className={iconCellClass}>
                   <HardDrive className="h-4 w-4" />
                 </span>
                 <span className="min-w-0">
-                  <span className="block truncate text-sm font-semibold text-text">
+                  <span className="block truncate text-sm font-medium text-foreground">
                     {device.name}
                   </span>
-                  <span className="mt-0.5 block truncate text-[11px] text-text-muted">
+                  <span className="mt-0.5 block truncate text-[11px] text-muted-foreground">
                     {deviceCapacityLabel(device)}
                   </span>
                 </span>
-              </button>
+              </Button>
             ))}
           </PanelRows>
         </SidebarPanel>
       </div>
 
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-[clamp(0.5rem,0.8vw,1rem)]">
+      <div className="min-w-0 divide-y divide-border/50 border-l border-border/50 max-[900px]:border-l-0 max-[900px]:border-t">
         <SidebarPanel
-          className="flex-[4_1_0]"
           icon={<Home className="h-4 w-4" />}
           title="Quick access"
         >
           <PanelRows>
             {props.quickAccessItems.map((item) => (
-              <button
-                className={rowClass}
+              <Button
+                className={`${rowClass} h-auto justify-start font-normal`}
                 key={item.id}
                 onClick={() => props.onOpenQuickAccess(item)}
                 title={item.path}
                 type="button"
+                variant="ghost"
               >
                 <span className={iconCellClass}>
                   <QuickAccessIcon icon={item.icon} />
                 </span>
                 <span className="min-w-0">
-                  <span className="block truncate text-sm font-semibold text-text">
+                  <span className="block truncate text-sm font-medium text-foreground">
                     {item.label}
                   </span>
-                  <span className="mt-0.5 block truncate text-[11px] text-text-muted">
+                  <span className="mt-0.5 block truncate text-[11px] text-muted-foreground">
                     {item.path}
                   </span>
                 </span>
-              </button>
+              </Button>
             ))}
           </PanelRows>
         </SidebarPanel>
 
         <SidebarPanel
-          className="flex-[2_1_0]"
           icon={<Search className="h-4 w-4" />}
           title="Collections"
         >
@@ -153,33 +159,33 @@ export function HomeSidebarPanels(props: HomeSidebarPanelsProps) {
             showEmpty={props.smartFolders.length === 0}
           >
             {props.smartFolders.map((smartFolder) => (
-              <button
-                className={rowClass}
+              <Button
+                className={`${rowClass} h-auto justify-start font-normal`}
                 key={smartFolder.id}
                 onClick={() => props.onOpenSmartFolder(smartFolder)}
                 title={smartFolder.query || smartFolder.name}
                 type="button"
+                variant="ghost"
               >
                 <span className={iconCellClass}>
                   <Search className="h-4 w-4" />
                 </span>
                 <span className="min-w-0">
-                  <span className="block truncate text-sm font-semibold text-text">
+                  <span className="block truncate text-sm font-medium text-foreground">
                     {smartFolder.name}
                   </span>
-                  <span className="mt-0.5 block truncate text-[11px] text-text-muted">
+                  <span className="mt-0.5 block truncate text-[11px] text-muted-foreground">
                     {smartFolder.query || "Search rules"}
                   </span>
                 </span>
-              </button>
+              </Button>
             ))}
           </PanelRows>
         </SidebarPanel>
       </div>
 
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-[clamp(0.5rem,0.8vw,1rem)]">
+      <div className="min-w-0 divide-y divide-border/50 border-l border-border/50 max-[900px]:border-l-0 max-[900px]:border-t">
         <SidebarPanel
-          className="flex-[1_1_0]"
           icon={<Server className="h-4 w-4" />}
           title="Remote"
         >
@@ -191,32 +197,32 @@ export function HomeSidebarPanels(props: HomeSidebarPanelsProps) {
             {props.remotes.map((remote) => {
               const providerIcon = providerIconForType(remote.type);
               return (
-                <button
-                  className={rowClass}
+                <Button
+                  className={`${rowClass} h-auto justify-start font-normal`}
                   key={`${remote.type}:${remote.name}`}
                   onClick={() => props.onOpenRemote(remote)}
                   title={`${remote.type}: ${remote.name}`}
                   type="button"
+                  variant="ghost"
                 >
                   <span className={iconCellClass}>
                     <AssetIcon src={providerIcon.src} color={providerIcon.color} size={20} />
                   </span>
                   <span className="min-w-0">
-                    <span className="block truncate text-sm font-semibold text-text">
+                    <span className="block truncate text-sm font-medium text-foreground">
                       {remote.name}
                     </span>
-                    <span className="mt-0.5 block truncate text-[11px] text-text-muted">
+                    <span className="mt-0.5 block truncate text-[11px] text-muted-foreground">
                       {remote.statusLabel || remote.type}
                     </span>
                   </span>
-                </button>
+                </Button>
               );
             })}
           </PanelRows>
         </SidebarPanel>
 
         <SidebarPanel
-          className="flex-[1_1_0]"
           icon={<Tag className="h-4 w-4" />}
           title="Tags"
         >
@@ -226,29 +232,30 @@ export function HomeSidebarPanels(props: HomeSidebarPanelsProps) {
             showEmpty={props.tags.length === 0}
           >
             {props.tags.map((tag) => (
-              <button
-                className={rowClass}
+              <Button
+                className={`${rowClass} h-auto justify-start font-normal`}
                 key={tag.key}
                 onClick={() => props.onOpenTag(tag)}
                 type="button"
+                variant="ghost"
               >
                 <span className={iconCellClass}>
                   <Tag className="h-4 w-4" />
                 </span>
                 <span className="min-w-0">
-                  <span className="block truncate text-sm font-semibold text-text">
+                  <span className="block truncate text-sm font-medium text-foreground">
                     {tag.name}
                   </span>
-                  <span className="mt-0.5 block truncate text-[11px] text-text-muted">
+                  <span className="mt-0.5 block truncate text-[11px] text-muted-foreground">
                     {tag.count} {tag.count === 1 ? "item" : "items"}
                   </span>
                 </span>
-              </button>
+              </Button>
             ))}
           </PanelRows>
         </SidebarPanel>
       </div>
-    </div>
+    </Card>
   );
 }
 
@@ -298,11 +305,13 @@ function SidebarPanel({
   icon: ReactNode;
   title: string;
 }) {
+  const titleId = useId();
+
   return (
-    <section className={`${panelClass} ${className}`}>
+    <section aria-labelledby={titleId} className={`${panelClass} ${className}`}>
       <div className={headerClass}>
-        <span className="shrink-0 text-text-muted">{icon}</span>
-        <span className="truncate">{title}</span>
+        <span className="shrink-0 text-muted-foreground">{icon}</span>
+        <h2 className="truncate" id={titleId}>{title}</h2>
       </div>
       {children}
     </section>
@@ -322,9 +331,10 @@ function PanelRows({
 }) {
   if (loading) {
     return (
-      <div className="grid shrink-0 gap-1">
+      <div aria-busy="true" className="grid shrink-0 gap-1" role="status">
+        <span className="sr-only">Loading items</span>
         {[0, 1, 2].map((index) => (
-          <div className="misty-skeleton h-11 rounded-lg" key={index} />
+          <Skeleton className="h-11 rounded-md" key={index} />
         ))}
       </div>
     );
@@ -332,13 +342,17 @@ function PanelRows({
 
   if (showEmpty) {
     return (
-      <div className="shrink-0 rounded-xl border border-dashed border-white/[0.08] px-3 py-3 text-center">
-        <p className="truncate text-xs leading-5 text-text-muted">{emptyMessage}</p>
+      <div className="shrink-0 rounded-md bg-muted/30 px-3 py-3 text-center" role="status">
+        <p className="truncate text-xs leading-5 text-muted-foreground">{emptyMessage}</p>
       </div>
     );
   }
 
-  return <div className="grid content-start gap-1 pr-1">{children}</div>;
+  return (
+    <div className="misty-scrollbar grid max-h-80 content-start gap-1 overflow-y-auto pr-1">
+      {children}
+    </div>
+  );
 }
 
 function QuickAccessIcon({ icon }: { icon: HomeQuickAccessItem["icon"] }) {

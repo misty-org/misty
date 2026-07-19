@@ -1,3 +1,4 @@
+import { Button } from "../../../components/ui/button";
 import { PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen } from "lucide-react";
 import type { ExplorerLibrarySnapshot, MountedDevice, PluginCommandEntry, PluginPanelEntry, ProviderRemote } from "../../../api/types";
 import type { MultiPanelTab } from "../../../shared/multipanel/types";
@@ -16,23 +17,23 @@ export function ExplorerBottomBar(props: {
   const PreviewIcon = props.previewVisible ? PanelRightClose : PanelRightOpen;
   return (
     <footer className={explorerShellStyles.bottomBar}>
-      <button
+      <Button
         type="button"
         className={cx(explorerShellStyles.bottomButton, props.sidebarVisible && explorerShellStyles.bottomButtonSelected)}
         title={props.sidebarVisible ? "Hide sidebar" : "Show sidebar"}
         onClick={props.onToggleSidebar}
       >
         <SidebarIcon size={15} />
-      </button>
+      </Button>
       <div className={explorerShellStyles.bottomBarGroup}>
-        <button
+        <Button
           type="button"
           className={cx(explorerShellStyles.bottomButton, props.previewVisible && explorerShellStyles.bottomButtonSelected)}
           title={props.previewVisible ? "Hide preview" : "Show preview"}
           onClick={props.onTogglePreview}
         >
           <PreviewIcon size={15} />
-        </button>
+        </Button>
       </div>
     </footer>
   );

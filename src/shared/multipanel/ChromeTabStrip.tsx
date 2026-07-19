@@ -1,3 +1,4 @@
+import { Button } from "../../components/ui/button";
 import { Tabs } from "@sinm/react-chrome-tabs";
 import type { TabProperties } from "@sinm/react-chrome-tabs/dist/chrome-tabs";
 import { Plus } from "lucide-react";
@@ -102,9 +103,9 @@ export const ChromeTabStrip = memo(function ChromeTabStrip(props: ChromeTabStrip
         draggable
         pinnedRight={(
           <div className="misty-chrome-tabs-toolbar">
-            <button type="button" className="misty-chrome-tabs-add" title="New tab" onClick={props.onAddTab}>
+            <Button type="button" className="misty-chrome-tabs-add" title="New tab" onClick={props.onAddTab}>
               <Plus size={17} strokeWidth={2.4} />
-            </button>
+            </Button>
           </div>
         )}
         onTabActive={props.onSelectTab}

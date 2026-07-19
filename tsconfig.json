@@ -13,6 +13,7 @@
     "moduleResolution": "Node",
     "baseUrl": ".",
     "paths": {
+      "@/*": ["src/*"],
       "@website/*": ["src/pages/Website/*"]
     },
     "resolveJsonModule": true,

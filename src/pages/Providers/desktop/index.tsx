@@ -22,10 +22,10 @@ const EMPTY_PROVIDER_WORKFLOWS: ProviderWorkflow[] = [];
 const EMPTY_PROVIDER_WORKSPACE = createProvidersWorkspaceState();
 
 const providersWorkspaceClass =
-  "h-full bg-[var(--misty-app-page-bg,var(--misty-bg))]";
+  "h-full bg-background";
 
 const providersPaneWorkspaceClass =
-  "grid h-full min-h-0 min-w-0 grid-cols-[minmax(280px,0.42fr)_minmax(420px,0.58fr)] overflow-hidden bg-transparent max-[860px]:grid-cols-[minmax(0,1fr)]";
+  "grid h-full min-h-0 min-w-0 grid-cols-[minmax(280px,0.42fr)_minmax(420px,0.58fr)] overflow-hidden rounded-lg border border-border bg-card max-[860px]:grid-cols-[minmax(0,1fr)]";
 
 interface ProvidersMultiPanelSnapshot {
   tabs: MultiPanelTab[];

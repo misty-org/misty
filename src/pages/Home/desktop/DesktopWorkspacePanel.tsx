@@ -1,30 +1,30 @@
 import { useEffect, useState } from "react";
-import { createPortal } from "react-dom";
 import { Briefcase, Pencil, Plus, Trash2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
 import { useExplorerStore, type ExplorerWorkspaceEntry } from "../../../stores/useExplorerStore";
 import { WorkspaceDialog } from "../../Files/components/ExplorerSidebarSupport";
 import type { WorkspaceDialogState } from "../../Files/components/ExplorerSidebarSupport";
+import { Button } from "../../../components/ui/button";
 
 type DesktopWorkspacePanelProps = {
   homePath: string;
 };
 
 const panelClass =
-  "flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-2xl border border-white/[0.08] bg-[var(--misty-app-panel-bg,var(--misty-app-page-bg,var(--misty-bg)))] p-3 shadow-xl shadow-black/20";
+  "flex max-h-56 min-h-0 min-w-0 flex-col";
 
 const headerClass =
-  "mb-2 flex shrink-0 items-center justify-between gap-2 border-b border-white/[0.06] pb-2 text-sm font-semibold text-text";
+  "mb-2 flex shrink-0 items-center justify-between gap-2 text-sm font-medium text-foreground";
 
 const workspaceRowClass =
-  "group/workspace grid w-full min-w-0 grid-cols-[minmax(0,1fr)_64px] items-stretch gap-1 rounded-xl border border-transparent text-left transition hover:border-white/[0.08] hover:bg-white/[0.045]";
+  "group/workspace grid w-full min-w-0 grid-cols-[minmax(0,1fr)_auto] items-stretch gap-1 rounded-md text-left transition-colors hover:bg-muted/45";
 
 const workspaceOpenButtonClass =
-  "grid min-w-0 grid-cols-[28px_minmax(0,1fr)] items-center gap-2 rounded-xl border-0 bg-transparent px-2.5 py-2 text-left";
+  "grid min-w-0 grid-cols-[28px_minmax(0,1fr)] items-center gap-2 rounded-md border-0 bg-transparent px-2 py-1.5 text-left";
 
 const workspaceActionButtonClass =
-  "grid h-7 w-7 shrink-0 place-items-center rounded-lg border border-transparent bg-transparent p-0 text-text-muted opacity-0 transition hover:bg-white/[0.06] hover:text-text group-hover/workspace:opacity-100 group-focus-within/workspace:opacity-100";
+  "grid size-7 shrink-0 place-items-center rounded-md border-0 bg-transparent p-0 text-muted-foreground opacity-0 transition hover:bg-muted hover:text-foreground group-hover/workspace:opacity-100 group-focus-within/workspace:opacity-100";
 
 export function DesktopWorkspacePanel({ homePath }: DesktopWorkspacePanelProps) {
   const navigate = useNavigate();
@@ -106,24 +106,27 @@ export function DesktopWorkspacePanel({ homePath }: DesktopWorkspacePanelProps) 
   };
 
   return (
-    <div className={panelClass}>
+    <section className={panelClass} aria-label="Workspaces">
       <div className={headerClass}>
         <div className="flex min-w-0 items-center gap-2">
-          <span className="shrink-0 text-text-muted">
+          <span className="shrink-0 text-muted-foreground">
             <Briefcase className="h-4 w-4" />
           </span>
-          <span className="truncate">Workspaces</span>
+          <h2 className="truncate">Workspaces</h2>
         </div>
-        <button
+        <Button
           aria-label="Create workspace"
-          className="grid h-7 w-7 shrink-0 place-items-center rounded-lg border border-white/10 bg-white/[0.03] text-text-muted transition hover:border-white/20 hover:bg-white/[0.06] hover:text-text disabled:opacity-50"
+          aria-busy={creating}
+          className="size-7 shrink-0"
           disabled={creating}
           onClick={() => void addWorkspace()}
           title="Create workspace"
+          size="icon"
           type="button"
+          variant="ghost"
         >
           <Plus className="h-4 w-4" />
-        </button>
+        </Button>
       </div>
 
       <div className="misty-scrollbar min-h-0 flex-1 overflow-y-auto pr-1">
@@ -132,44 +135,49 @@ export function DesktopWorkspacePanel({ homePath }: DesktopWorkspacePanelProps) 
             const active = workspace.id === activeWorkspaceId;
             return (
               <div
-                className={`${workspaceRowClass} ${active ? "border-white/[0.12] bg-white/[0.07]" : ""}`}
+                className={`${workspaceRowClass} ${active ? "bg-muted/70" : ""}`}
                 key={workspace.id}
               >
-                <button
-                  className={workspaceOpenButtonClass}
+                <Button
+                  className={`${workspaceOpenButtonClass} h-auto justify-start font-normal hover:bg-transparent`}
                   onClick={() => void openWorkspace(workspace)}
                   type="button"
+                  variant="ghost"
                 >
-                  <span className="grid h-7 w-7 place-items-center rounded-lg bg-white/[0.045] text-text-muted">
+                  <span className="grid size-7 place-items-center rounded-md bg-muted/60 text-muted-foreground">
                     <Briefcase className="h-4 w-4" />
                   </span>
                   <span className="min-w-0">
-                    <span className="block truncate text-sm font-semibold text-text">{workspace.title}</span>
-                    <span className="mt-0.5 block truncate text-[11px] text-text-muted">
+                    <span className="block truncate text-sm font-medium text-foreground">{workspace.title}</span>
+                    <span className="mt-0.5 block truncate text-[11px] text-muted-foreground">
                       {active ? "Current workspace" : "Open workspace"}
                     </span>
                   </span>
-                </button>
+                </Button>
                 <span className="mr-1 flex items-center justify-end gap-1">
-                  <button
+                  <Button
                     aria-label={`Rename ${workspace.title}`}
                     className={workspaceActionButtonClass}
                     onClick={() => openRenameDialog(workspace)}
                     title={`Rename ${workspace.title}`}
+                    size="icon"
                     type="button"
+                    variant="ghost"
                   >
                     <Pencil className="h-3.5 w-3.5" />
-                  </button>
+                  </Button>
                   {workspaceEntries.length > 1 ? (
-                    <button
+                    <Button
                       aria-label={`Delete ${workspace.title}`}
                       className={workspaceActionButtonClass}
                       onClick={() => openDeleteDialog(workspace)}
                       title={`Delete ${workspace.title}`}
+                      size="icon"
                       type="button"
+                      variant="ghost"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
-                    </button>
+                    </Button>
                   ) : null}
                 </span>
               </div>
@@ -179,18 +187,17 @@ export function DesktopWorkspacePanel({ homePath }: DesktopWorkspacePanelProps) 
       </div>
 
       {operationError ? (
-        <p className="mt-2 line-clamp-2 text-[11px] leading-snug text-[#fca5a5]">{operationError}</p>
+        <p className="mt-2 line-clamp-2 text-xs leading-snug text-destructive" role="alert">{operationError}</p>
       ) : null}
-      {workspaceDialog ? createPortal(
+      {workspaceDialog ? (
         <WorkspaceDialog
           state={workspaceDialog}
           value={workspaceDraft}
           onChange={setWorkspaceDraft}
           onConfirm={confirmWorkspaceDialog}
           onCancel={closeWorkspaceDialog}
-        />,
-        document.body,
+        />
       ) : null}
-    </div>
+    </section>
   );
 }

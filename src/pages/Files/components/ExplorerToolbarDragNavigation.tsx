@@ -1,3 +1,4 @@
+import { IconButton } from "../../../components/misty";
 import { ArrowUp, ChevronLeft, ChevronRight, type LucideIcon } from "lucide-react";
 import { ExplorerDropTarget } from "../drag/ExplorerDropTarget";
 import { toolbarStyles } from "./ExplorerToolbarSupport";
@@ -47,16 +48,14 @@ function NavigationButton(props: {
 }) {
   const Icon = props.icon;
   const button = (
-    <button
-      type="button"
+    <IconButton
+      label={props.label}
       className={toolbarStyles.navigationButton}
       disabled={!props.path}
-      aria-label={props.label}
-      title={props.label}
       onClick={props.onNavigate}
     >
       <Icon size={18} />
-    </button>
+    </IconButton>
   );
   if (!props.path) return button;
   return (

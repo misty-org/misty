@@ -361,7 +361,10 @@ export const useSpacesStore = create<SpacesStore>((set, get) => ({
       url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
       url.pathname = `${url.pathname.replace(/\/$/, "")}/realtime`;
       url.search = new URLSearchParams({ ticket }).toString();
-      const socket = new WebSocket(url);
+      // Older WebKit builds accept URL in the type signature but can reject the
+      // URL object at runtime. Pass the serialized URL to keep desktop WebViews
+      // on the well-supported WebSocket constructor path.
+      const socket = new WebSocket(url.toString());
       realtimeSocket = socket;
       realtimeOpenTimer = window.setTimeout(() => {
         realtimeOpenTimer = null;
@@ -398,7 +401,9 @@ export const useSpacesStore = create<SpacesStore>((set, get) => ({
         set({ realtimeConnected: false });
         scheduleReconnect(get, accountId, generation);
       };
-      socket.onerror = () => socket.close();
+      socket.onerror = () => {
+        try { socket.close(); } catch { /* the close event or timeout will retry */ }
+      };
     } catch (error) {
       if (generation !== realtimeGeneration || realtimeAccountId !== accountId) return;
       set({ realtimeConnected: false, error: errorText(error) });
@@ -461,7 +466,7 @@ async function applyRealtimeEvent(
 
 function scheduleReconnect(get: () => SpacesStore, accountId: string, generation: number) {
   if (!realtimeWanted || realtimeAccountId !== accountId || realtimeGeneration !== generation || reconnectTimer != null) return;
-  const delay = Math.min(30_000, 750 * 2 ** reconnectAttempt) + Math.floor(Math.random() * 500);
+  const delay = Math.min(60_000, 2_000 * 2 ** reconnectAttempt) + Math.floor(Math.random() * 750);
   reconnectAttempt += 1;
   reconnectTimer = window.setTimeout(() => {
     reconnectTimer = null;

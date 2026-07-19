@@ -1,3 +1,5 @@
+import { Textarea } from "../../../components/ui/textarea";
+import { Button } from "../../../components/ui/button";
 import {
   Copy,
   ExternalLink,
@@ -163,18 +165,18 @@ export function GlobalPreviewDialog(props: {
           <span/>
           <div className="flex min-w-0 justify-end gap-2">
             {canEditText ? <>
-              <button type="button" disabled={!dirty || Boolean(saving)} className="inline-flex h-9 items-center gap-2 rounded-lg border border-white/15 px-3 text-xs font-semibold disabled:opacity-35" onClick={() => void save(true)}>{saving === "copy" ? <Loader2 className="animate-spin" size={14} /> : <Copy size={14} />}Save as Copy</button>
-              <button type="button" disabled={!dirty || props.source.readonly || Boolean(saving)} className="inline-flex h-9 items-center gap-2 rounded-lg bg-white px-3 text-xs font-bold text-black disabled:opacity-35" onClick={() => void save(false)}>{saving === "save" ? <Loader2 className="animate-spin" size={14} /> : <Save size={14} />}Save</button>
+              <Button type="button" disabled={!dirty || Boolean(saving)} className="inline-flex h-9 items-center gap-2 rounded-lg border border-white/15 px-3 text-xs font-semibold disabled:opacity-35" onClick={() => void save(true)}>{saving === "copy" ? <Loader2 className="animate-spin" size={14} /> : <Copy size={14} />}Save as Copy</Button>
+              <Button type="button" disabled={!dirty || props.source.readonly || Boolean(saving)} className="inline-flex h-9 items-center gap-2 rounded-lg bg-white px-3 text-xs font-bold text-black disabled:opacity-35" onClick={() => void save(false)}>{saving === "save" ? <Loader2 className="animate-spin" size={14} /> : <Save size={14} />}Save</Button>
             </> : null}
             <ToolbarButton label="Close preview" onClick={props.onClose}><X size={18} /></ToolbarButton>
           </div>
         </header>
         <div className="grid min-h-0 grid-cols-[minmax(0,1fr)_300px] max-[820px]:grid-cols-1">
           <main className="relative grid min-h-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden bg-[#08090b]">
-            {canEditText ? <div className="flex min-h-12 items-center justify-center border-b border-white/10 bg-[#121317] px-3"><button type="button" className="rounded-md border border-white/15 px-3 py-1.5 text-xs font-semibold" onClick={() => setEditingText((value) => !value)}>{editingText ? "Preview" : "Edit text"}</button></div> : <div />}
+            {canEditText ? <div className="flex min-h-12 items-center justify-center border-b border-white/10 bg-[#121317] px-3"><Button type="button" className="rounded-md border border-white/15 px-3 py-1.5 text-xs font-semibold" onClick={() => setEditingText((value) => !value)}>{editingText ? "Preview" : "Edit text"}</Button></div> : <div />}
             <div className="min-h-0 overflow-auto">
               {loading ? <PreviewMessage icon={<Loader2 className="animate-spin" size={28} />} title="Preparing preview" detail="Loading the best available reader…" /> : null}
-              {!loading && loadError ? <PreviewMessage icon={<FileQuestion size={34} />} title="Preview needs attention" detail={loadError} action={<button className="rounded-lg border border-white/15 px-3 py-2 text-xs font-semibold" onClick={() => void explorerOpenPath(props.source.path)}><ExternalLink className="mr-2 inline" size={14} />Open in default app</button>} /> : null}
+              {!loading && loadError ? <PreviewMessage icon={<FileQuestion size={34} />} title="Preview needs attention" detail={loadError} action={<Button className="rounded-lg border border-white/15 px-3 py-2 text-xs font-semibold" onClick={() => void explorerOpenPath(props.source.path)}><ExternalLink className="mr-2 inline" size={14} />Open in default app</Button>} /> : null}
               {!loading && resource ? <PreviewBody resource={resource} source={props.source} extension={extension} textDraft={textDraft} editingText={editingText} onTextChange={(value) => { setTextDraft(value); setSaveStatus(null); }} /> : null}
             </div>
           </main>
@@ -213,11 +215,11 @@ function PreviewBody(props: {
   if (resource.kind === "audio") return <div className="grid h-full min-h-[360px] place-items-center p-5"><div className="grid w-[min(520px,90%)] justify-items-center gap-6 rounded-2xl border border-white/10 bg-white/[0.04] p-10"><span className="grid size-20 place-items-center rounded-full bg-white/10 text-white/70">♫</span><strong className="text-center">{props.source.name}</strong><audio className="w-full" src={resource.url} controls autoPlay preload="metadata" /></div></div>;
   if (resource.kind === "pdf") return <object className="h-full min-h-[620px] w-full bg-white" data={resource.url} type="application/pdf" aria-label={`PDF reader for ${props.source.name}`} />;
   if (resource.kind === "archive") return <ArchiveReader entries={resource.archiveEntries ?? []} format={resource.archiveFormat ?? props.extension} />;
-  if ((resource.kind === "markdown" || resource.kind === "text") && props.editingText) return <textarea autoFocus className="h-full min-h-[620px] w-full resize-none border-0 bg-[#0d0e11] p-6 font-mono text-[13px] leading-6 text-white/80 outline-none" value={props.textDraft} onChange={(event) => props.onTextChange(event.target.value)} />;
+  if ((resource.kind === "markdown" || resource.kind === "text") && props.editingText) return <Textarea autoFocus className="h-full min-h-[620px] w-full resize-none border-0 bg-[#0d0e11] p-6 font-mono text-[13px] leading-6 text-white/80 outline-none" value={props.textDraft} onChange={(event) => props.onTextChange(event.target.value)} />;
   if (resource.kind === "markdown") return <article className="prose prose-invert mx-auto max-w-4xl px-8 py-10 text-white/80"><Suspense fallback={<span>Rendering Markdown…</span>}><ReactMarkdown>{props.textDraft}</ReactMarkdown></Suspense></article>;
   if (resource.kind === "text") return <pre className="m-0 min-h-full whitespace-pre-wrap break-words p-7 font-mono text-[13px] leading-6 text-white/75">{props.textDraft}</pre>;
   if (resource.kind === "document") return <article className="mx-auto max-w-4xl whitespace-pre-wrap px-10 py-12 font-serif text-[16px] leading-8 text-white/80">{resource.text || "This document contains no readable text."}</article>;
-  return <PreviewMessage icon={<FileQuestion size={40} />} title={`${friendlyType(props.extension, props.source.mimeType)} file`} detail="Misty can inspect this file and hand it to its default application." action={<button className="rounded-lg bg-white px-4 py-2 text-xs font-bold text-black" onClick={() => void explorerOpenPath(props.source.path)}><ExternalLink className="mr-2 inline" size={14} />Open file</button>} />;
+  return <PreviewMessage icon={<FileQuestion size={40} />} title={`${friendlyType(props.extension, props.source.mimeType)} file`} detail="Misty can inspect this file and hand it to its default application." action={<Button className="rounded-lg bg-white px-4 py-2 text-xs font-bold text-black" onClick={() => void explorerOpenPath(props.source.path)}><ExternalLink className="mr-2 inline" size={14} />Open file</Button>} />;
 }
 
 export function EmbeddedUniversalPreview(props: {
@@ -288,7 +290,7 @@ function PreviewMessage(props: { icon: React.ReactNode; title: string; detail: s
 }
 
 function ToolbarButton(props: { label: string; disabled?: boolean; onClick: () => void; children: React.ReactNode }) {
-  return <button type="button" aria-label={props.label} title={props.label} disabled={props.disabled} className="grid size-8 place-items-center rounded-md text-white/70 hover:bg-white/10 hover:text-white disabled:opacity-25" onClick={props.onClick}>{props.children}</button>;
+  return <Button type="button" aria-label={props.label} title={props.label} disabled={props.disabled} className="grid size-8 place-items-center rounded-md text-white/70 hover:bg-white/10 hover:text-white disabled:opacity-25" onClick={props.onClick}>{props.children}</Button>;
 }
 
 function InspectorDetail(props: { label: string; value: string; compact?: boolean }) {

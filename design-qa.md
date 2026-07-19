@@ -88,6 +88,55 @@ final result: passed
 
 final result: blocked
 
+---
+
+# Unified Agent Center and native Jira-style Tasks design QA
+
+## Source visual truth
+
+- Jira Board reference: `/Users/mtccool668/misty-org/misty/.codex-qa/jira-tasks-native/jira-reference.webp`
+- Source: `https://wac-cdn.atlassian.com/misc-assets/webp-images/jswf/plan-jumpstart-with-expert-templates.webp`
+- Requested adaptation: use Jira's compact sibling-view toolbar, persistent filters, dense status columns, focused task details, and work-management hierarchy while retaining Misty's visual system and three agreed statuses.
+
+## Native desktop evidence
+
+- Board: `/Users/mtccool668/misty-org/misty/.codex-qa/jira-tasks-native/native-tasks.png`
+- List: `/Users/mtccool668/misty-org/misty/.codex-qa/jira-tasks-native/native-list.png`
+- Calendar: `/Users/mtccool668/misty-org/misty/.codex-qa/jira-tasks-native/native-calendar.png`
+- Task drawer: `/Users/mtccool668/misty-org/misty/.codex-qa/jira-tasks-native/native-task-drawer.png`
+- Narrow Board: `/Users/mtccool668/misty-org/misty/.codex-qa/jira-tasks-native/native-board-1100.png`
+- Agent Center: `/Users/mtccool668/misty-org/misty/.codex-qa/jira-tasks-native/native-current.png`
+- Studio Agents: `/Users/mtccool668/misty-org/misty/.codex-qa/jira-tasks-native/native-studio-agents.png`
+- Studio Workflows: `/Users/mtccool668/misty-org/misty/.codex-qa/jira-tasks-native/native-studio-workflows.png`
+- Reference + native comparison: `/Users/mtccool668/misty-org/misty/.codex-qa/jira-tasks-native/jira-vs-misty-native.png`
+
+All implementation captures came from the running `target/debug/misty-desktop` Tauri application, not a standalone browser preview. The primary capture was 1280 × 820 macOS points (2560 × 1640 Retina pixels); narrow behavior was checked at 1100 × 720 points. The connected production Space had no tasks, so the verified native Board and List show their real empty states rather than seeded browser-only data.
+
+## Visible comparison
+
+- Board, List, and Calendar are sibling views in one compact toolbar alongside search, assignee, filters, calendar-source health, refresh, and Create.
+- The Board follows Jira's dense column structure and inline create affordance, using Misty's dark translucent surfaces, typography, icons, and `To do`, `In progress`, and `Done` status model.
+- At the narrow desktop width the Board preserves its minimum column widths and scrolls horizontally instead of crushing or clipping card content.
+- The month Calendar keeps Google events visually read-only and Misty due tasks editable through separate drawers.
+- Agent authoring is visibly contained inside Agent Center's Studio tab. The Space navigation no longer exposes a separate Studio destination.
+- The Studio Agents empty state was tightened to one short sentence and one action; redundant shared-definition helper copy was removed.
+
+## Interaction and functional checks
+
+- Native navigation exercised Board → List → Calendar and opened/canceled the task-create drawer without writing production data.
+- The task drawer exposes title, notes, status, priority, assignee, and due date in the requested focused two-column structure.
+- Native navigation exercised Agent Center → Studio → Agents/Workflows. The workflow canvas rendered draggable categorized nodes, typed connections, canvas controls, minimap, Save/Publish, and run validation inside Agent Center.
+- Standalone Vite preview QA, its screenshots, its disposable database, and its demo containers were removed or stopped. The Vite development server still used by `tauri dev` is the desktop WebView's required asset server, not a separate product surface.
+
+## Findings
+
+- P0: none.
+- P1: none.
+- P2: none.
+- P3: the Jira reference contains four populated custom columns while the agreed Misty launch model has three statuses and the production test Space was empty; the interaction density and proportions were compared, but card-content fidelity remains covered by component tests rather than this production desktop capture.
+
+final result: passed
+
 # Global image editor design QA
 
 ## Source visual truth

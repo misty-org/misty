@@ -1,3 +1,4 @@
+import { Button } from "../../../components/ui/button";
 import type { ExplorerInlineEditState, ExplorerNotification } from "../../../stores/useExplorerStore";
 import { cx } from "./ExplorerDesktopShared";
 
@@ -57,7 +58,7 @@ export function ExplorerNotifications(props: {
   return (
     <div className={notificationStyles.stack} aria-live="polite" aria-atomic="false">
       {props.notifications.map((notification) => (
-        <button
+        <Button
           key={notification.id}
           type="button"
           className={cx(
@@ -70,7 +71,7 @@ export function ExplorerNotifications(props: {
           onClick={() => props.onDismiss(notification.id)}
         >
           {compactNotificationMessage(notification.message)}
-        </button>
+        </Button>
       ))}
     </div>
   );

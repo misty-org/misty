@@ -1,3 +1,4 @@
+import { Button } from "../../components/ui/button";
 import { Component, type ErrorInfo, type ReactNode } from "react";
 
 interface RenderErrorBoundaryProps {
@@ -28,7 +29,7 @@ export class RenderErrorBoundary extends Component<RenderErrorBoundaryProps, Ren
       <section className="grid h-full min-h-0 min-w-0 content-center justify-items-center gap-3 bg-[#080c10] p-8 text-center text-[#e9e5dc]">
         <h1 className="m-0 text-[22px] font-semibold">Workspace render failed</h1>
         <p className="m-0 max-w-[680px] text-[#aab2bd] [overflow-wrap:anywhere]">{this.state.error.message}</p>
-        <button
+        <Button
           className="rounded-lg border border-[#263342] bg-[#151d27] px-3 py-2 text-[#f2efe8]"
           type="button"
           onClick={() => {
@@ -42,7 +43,7 @@ export class RenderErrorBoundary extends Component<RenderErrorBoundaryProps, Ren
           }}
         >
           Try again
-        </button>
+        </Button>
       </section>
     );
   }

@@ -1,3 +1,4 @@
+import { Input } from "../../../components/ui/input";
 import { useLayoutEffect, useRef } from "react";
 import type { FileEntry } from "../../../api/types";
 import type { ExplorerInlineEditState, ExplorerSortColumn } from "../../../stores/useExplorerStore";
@@ -76,7 +77,7 @@ export function InlineNameEditor(props: {
           props.edit.error && props.variant === "table" ? fileBrowserStyles.inlineFieldsInvalidTable : "",
         ].join(" ")}
       >
-        <input
+        <Input
           className={fileBrowserStyles.inlineInput}
           ref={inputRef}
           aria-label={props.edit.kind === "create" ? "New item name" : "Rename item"}

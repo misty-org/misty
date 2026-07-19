@@ -1,3 +1,4 @@
+import { Button } from "../../components/ui/button";
 import { Columns2, GripVertical, PanelTopClose, Rows2 } from "lucide-react";
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import type { CSSProperties, PointerEvent, ReactNode } from "react";
@@ -224,15 +225,15 @@ export const MultiPanelWorkspace = memo(function MultiPanelWorkspace(props: Mult
       {renderTabActions ? <MultiPanelTabActionsSlot renderTabActions={renderTabActions} /> : null}
       {showDefaultPaneControls ? (
         <>
-          <button className={multiPanelStyles.paneActionButton} type="button" title="Split vertically" onClick={() => splitPane(activePaneId, "vertical")} disabled={!canSplit}>
+          <Button className={multiPanelStyles.paneActionButton} type="button" title="Split vertically" onClick={() => splitPane(activePaneId, "vertical")} disabled={!canSplit}>
             <Columns2 size={16} />
-          </button>
-          <button className={multiPanelStyles.paneActionButton} type="button" title="Split horizontally" onClick={() => splitPane(activePaneId, "horizontal")} disabled={!canSplit}>
+          </Button>
+          <Button className={multiPanelStyles.paneActionButton} type="button" title="Split horizontally" onClick={() => splitPane(activePaneId, "horizontal")} disabled={!canSplit}>
             <Rows2 size={16} />
-          </button>
-          <button className={multiPanelStyles.paneActionButton} type="button" title="Close pane" onClick={() => handleClosePane(activePaneId)} disabled={activeTab.panes.length <= 1}>
+          </Button>
+          <Button className={multiPanelStyles.paneActionButton} type="button" title="Close pane" onClick={() => handleClosePane(activePaneId)} disabled={activeTab.panes.length <= 1}>
             <PanelTopClose size={16} />
-          </button>
+          </Button>
         </>
       ) : null}
     </div>

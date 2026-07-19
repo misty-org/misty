@@ -38,7 +38,12 @@ import {
   createConfiguredWorkflowNode, createWorkflowNode, validateWorkflowV2, workflowNodeRegistry,
   type WorkflowDefinitionV2, type WorkflowNodeDescriptor, type WorkflowNodeKind, type WorkflowNodeV2,
 } from "../../workflows/v2";
-import "./unifiedWorkflowEditor.css";
+import { Button } from "../../components/ui/button";
+import { Checkbox } from "../../components/ui/checkbox";
+import { Input } from "../../components/ui/input";
+import { Textarea } from "../../components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "../../components/ui/popover";
 
 type CanvasData = { workflow: WorkflowNodeV2; descriptor: PaletteDefinition; selected: boolean };
 type CanvasNode = Node<CanvasData, "workflow">;
@@ -64,6 +69,47 @@ const categoryOrder: EditorCategory[] = ["Triggers", "Files", "AI", "Logic", "In
 const categoryColor: Record<EditorCategory, string> = {
   Triggers: "#45b97c", Files: "#4ba3d9", AI: "#d48b45", Logic: "#6f8ed8", Integrations: "#c96f77", Actions: "#b98bd4",
 };
+
+const workflowEditorStyles = {
+  shell: "group/editor grid h-full min-h-0 grid-cols-[236px_minmax(0,1fr)] grid-rows-[54px_minmax(0,1fr)_var(--automation-log-height)] overflow-hidden rounded-lg border border-border bg-background text-foreground max-[1100px]:grid-cols-[210px_minmax(0,1fr)]",
+  toolbar: "relative z-20 col-[1/-1] grid grid-cols-[minmax(180px,1fr)_auto_minmax(220px,1fr)] items-center gap-3 border-b border-border bg-card py-0 pl-4 pr-3 max-[1100px]:grid-cols-[minmax(150px,1fr)_auto_minmax(190px,1fr)] max-[1100px]:gap-2",
+  titleBlock: "flex items-center gap-2",
+  name: "h-auto w-[min(360px,34vw)] border-0 bg-transparent px-0 py-1.5 text-[15px] font-semibold shadow-none focus-visible:ring-0",
+  saveState: "text-[11px] text-muted-foreground",
+  editToolbar: "flex items-center gap-0.5 rounded-md border border-border bg-background p-0.5",
+  toolButton: "grid size-auto h-[26px] w-7 place-items-center rounded p-0 text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-35 max-[1100px]:w-[25px]",
+  toolButtonActive: "bg-destructive/15 text-destructive",
+  toolSeparator: "mx-0.5 h-[17px] w-px bg-border",
+  toolbarActions: "flex items-center justify-self-end gap-2",
+  button: "h-8 gap-2 rounded-md px-3 text-xs",
+  palette: "row-[2/4] min-h-0 overflow-auto border-r border-border bg-card",
+  panelHeading: "sticky top-0 z-[2] flex h-[42px] items-center justify-between bg-card py-0 pl-3.5 pr-3 text-[11px] font-bold uppercase text-muted-foreground [&>button]:size-7 [&>button]:rounded-md [&>button]:p-0",
+  nodeHeading: "top-[42px]",
+  workflowList: "grid gap-0.5 border-b border-border/60 px-2 pb-2.5 [&_button]:grid [&_button]:h-auto [&_button]:grid-cols-[minmax(0,1fr)_auto] [&_button]:rounded-md [&_button]:bg-transparent [&_button]:p-2 [&_button]:text-left [&_button]:text-muted-foreground [&_button.is-active]:bg-accent [&_button.is-active]:text-foreground [&_button:hover]:bg-accent [&_button:hover]:text-foreground [&_span]:truncate [&_span]:text-xs [&_small]:text-[10px] [&_small]:text-muted-foreground",
+  nodeLibrary: "px-2 pb-3.5 [&_section]:mb-3 [&_h3]:mx-1.5 [&_h3]:mb-1 [&_h3]:mt-0 [&_h3]:text-[10px] [&_h3]:font-semibold [&_h3]:text-muted-foreground [&_button]:grid [&_button]:h-[34px] [&_button]:w-full [&_button]:grid-cols-[14px_24px_minmax(0,1fr)] [&_button]:cursor-grab [&_button]:select-none [&_button]:rounded-md [&_button]:bg-transparent [&_button]:px-2 [&_button]:py-0 [&_button]:text-left [&_button]:text-xs [&_button]:text-muted-foreground [&_button:hover]:bg-accent [&_button:hover]:text-foreground [&_button:disabled]:opacity-40",
+  grip: "text-muted-foreground",
+  libraryIcon: "grid place-items-center",
+  canvas: "relative col-start-2 row-start-2 min-h-0 min-w-0 bg-[color-mix(in_srgb,var(--background)_92%,var(--muted))] [&.is-disconnecting_.react-flow__pane]:cursor-crosshair [&_.react-flow__edge.is-disconnectable_path]:cursor-crosshair [&_.react-flow__edge.is-disconnectable:hover_path]:!stroke-destructive [&_.react-flow__edge.is-disconnectable:hover_path]:![stroke-width:2.6] [&_.react-flow__controls]:overflow-hidden [&_.react-flow__controls]:rounded-md [&_.react-flow__controls]:border [&_.react-flow__controls]:border-border [&_.react-flow__controls]:shadow-sm [&_.react-flow__controls-button]:border-border [&_.react-flow__controls-button]:bg-card [&_.react-flow__controls-button]:fill-foreground",
+  minimap: "!rounded-md !border !border-border !bg-card !shadow-sm",
+  emptyCanvas: "pointer-events-none absolute left-1/2 top-1/2 grid -translate-x-1/2 -translate-y-1/2 justify-items-center gap-2 text-center text-muted-foreground [&_strong]:text-[13px] [&_strong]:text-foreground [&_span]:text-[11px]",
+  log: "relative col-start-2 row-start-3 grid h-full min-h-0 grid-rows-[38px_minmax(0,1fr)] border-t border-border bg-card",
+  logResize: "absolute -top-[5px] left-0 z-[4] grid h-[10px] w-full cursor-row-resize place-items-center bg-transparent p-0 [&>span]:h-[3px] [&>span]:w-[38px] [&>span]:rounded-sm [&>span]:bg-border [&>span]:opacity-0 hover:[&>span]:bg-primary hover:[&>span]:opacity-100 group-[.is-resizing-log]/editor:[&>span]:opacity-100",
+  logToggle: "grid h-[38px] w-full grid-cols-[auto_1fr_auto] items-center gap-2.5 bg-transparent px-3 py-0 text-left text-[11px] text-muted-foreground [&_svg]:transition-transform [&_svg.is-open]:rotate-180",
+  logContent: "min-h-0 overflow-auto border-t border-border/60 px-3 py-2",
+  logLine: "flex items-center gap-2 p-1 text-[10px] text-muted-foreground",
+  logDot: "size-1.5 shrink-0 rounded-full bg-current",
+  flowNode: "grid min-h-[58px] w-[184px] grid-cols-[38px_minmax(0,1fr)] items-center rounded-lg border border-border border-l-[3px] border-l-[var(--node-color)] bg-card py-2 pl-2 pr-2.5 shadow-sm max-[1100px]:w-[166px] [&.is-selected]:border-[var(--node-color)] [&.is-selected]:shadow-[0_0_0_2px_color-mix(in_srgb,var(--node-color)_24%,transparent)] [&_strong]:block [&_strong]:truncate [&_strong]:text-xs [&_small]:mt-1 [&_small]:block [&_small]:truncate [&_small]:text-[9px] [&_small]:uppercase [&_small]:text-muted-foreground [&_.react-flow__handle]:size-[9px] [&_.react-flow__handle]:border-2 [&_.react-flow__handle]:border-card [&_.react-flow__handle]:bg-[var(--node-color)]",
+  flowIcon: "grid size-7 place-items-center rounded-md bg-[color-mix(in_srgb,var(--node-color)_15%,var(--muted))] text-[var(--node-color)]",
+  nodePopover: "absolute right-3 top-3 z-[9] max-h-[calc(100%-24px)] w-[min(300px,calc(100%-24px))] overflow-auto rounded-lg border border-border bg-card px-3.5 pb-4 text-card-foreground shadow-sm",
+  settingsPopover: "max-h-[min(520px,calc(100vh-86px))] w-80 overflow-auto p-0",
+  inspectorHeading: "sticky top-0 z-[2] -mx-3.5 mb-3.5 flex min-h-[58px] items-center justify-between border-b border-border bg-card py-0 pl-3.5 pr-3 [&_span]:block [&_span]:text-[9px] [&_span]:uppercase [&_span]:text-muted-foreground [&_strong]:mt-1 [&_strong]:block [&_strong]:text-[13px] [&_strong]:normal-case [&_strong]:text-foreground [&_button]:size-7 [&_button]:rounded-md [&_button]:p-0",
+  inspectorButtons: "!flex",
+  field: "mb-3.5 grid gap-1.5 [&>span]:text-[11px] [&>span]:font-semibold [&>span]:text-muted-foreground",
+  checkbox: "grid-cols-[auto_1fr] items-center",
+  inspectorNote: "text-[10px] leading-6 text-muted-foreground",
+  safetyNote: "rounded-md border border-warning/35 bg-warning/10 p-2.5 text-[11px] leading-relaxed text-muted-foreground",
+  dangerButton: "h-auto justify-start bg-transparent p-0 text-[11px] text-destructive hover:bg-transparent hover:text-destructive",
+} as const;
 
 export function UnifiedWorkflowEditor({ spaceId, canManage }: { spaceId: string; canManage: boolean }) {
   return <ReactFlowProvider><WorkflowEditorBody spaceId={spaceId} canManage={canManage} /></ReactFlowProvider>;
@@ -110,7 +156,7 @@ function WorkflowEditorBody({ spaceId, canManage }: { spaceId: string; canManage
   const edges = useMemo<Edge[]>(() => definition.edges.map((edge) => ({
     id: edge.id, source: edge.source, target: edge.target, sourceHandle: edge.sourcePort, targetHandle: edge.targetPort,
     selected: edge.id === selectedEdgeId, className: disconnectMode ? "is-disconnectable" : "",
-    style: { stroke: edge.id === selectedEdgeId ? "var(--misty-accent)" : "#657080", strokeWidth: edge.id === selectedEdgeId ? 2.4 : 1.7 },
+    style: { stroke: edge.id === selectedEdgeId ? "var(--primary)" : "#657080", strokeWidth: edge.id === selectedEdgeId ? 2.4 : 1.7 },
   })), [definition.edges, disconnectMode, selectedEdgeId]);
 
   useEffect(() => { void loadStudio(spaceId, "workflows"); }, [loadStudio, spaceId]);
@@ -243,69 +289,69 @@ function WorkflowEditorBody({ spaceId, canManage }: { spaceId: string; canManage
   };
 
   const style = { "--automation-log-height": logOpen ? `${logHeight}px` : "38px" } as CSSProperties;
-  return <div className={`automation-shell${resizingLog ? " is-resizing-log" : ""}`} style={style}>
-    <header className="automation-toolbar">
-      <div className="automation-title-block"><input className="automation-name" value={name} onChange={(event) => { setName(event.target.value); setDirty(true); }} disabled={!editable} placeholder="Untitled workflow"/><span className={`automation-save-state${dirty ? " is-dirty" : ""}`}>{dirty ? "Unsaved" : "Saved"}</span></div>
-      <div className="automation-edit-toolbar" aria-label="Edit workflow">
-        <ToolButton label="Undo" disabled={!editable || !undoStack.length} onClick={undo} icon={Undo2}/><ToolButton label="Redo" disabled={!editable || !redoStack.length} onClick={redo} icon={Redo2}/><span className="automation-tool-separator"/>
-        <ToolButton label="Cut" disabled={!editable || !selectedNode} onClick={() => { copySelection(); removeSelection(); }} icon={Scissors}/><ToolButton label="Copy" disabled={!selectedNode} onClick={copySelection} icon={Copy}/><ToolButton label="Paste" disabled={!editable || !clipboard} onClick={paste} icon={Clipboard}/><ToolButton label="Duplicate" disabled={!editable || !selectedNode} onClick={duplicate} icon={CopyPlus}/><span className="automation-tool-separator"/>
+  return <div className={`${workflowEditorStyles.shell}${resizingLog ? " is-resizing-log" : ""}`} style={style}>
+    <header className={workflowEditorStyles.toolbar}>
+      <div className={workflowEditorStyles.titleBlock}><Input className={workflowEditorStyles.name} value={name} onChange={(event) => { setName(event.target.value); setDirty(true); }} disabled={!editable} placeholder="Untitled workflow"/><span className={`${workflowEditorStyles.saveState}${dirty ? " text-warning" : ""}`}>{dirty ? "Unsaved" : "Saved"}</span></div>
+      <div className={workflowEditorStyles.editToolbar} aria-label="Edit workflow">
+        <ToolButton label="Undo" disabled={!editable || !undoStack.length} onClick={undo} icon={Undo2}/><ToolButton label="Redo" disabled={!editable || !redoStack.length} onClick={redo} icon={Redo2}/><span className={workflowEditorStyles.toolSeparator}/>
+        <ToolButton label="Cut" disabled={!editable || !selectedNode} onClick={() => { copySelection(); removeSelection(); }} icon={Scissors}/><ToolButton label="Copy" disabled={!selectedNode} onClick={copySelection} icon={Copy}/><ToolButton label="Paste" disabled={!editable || !clipboard} onClick={paste} icon={Clipboard}/><ToolButton label="Duplicate" disabled={!editable || !selectedNode} onClick={duplicate} icon={CopyPlus}/><span className={workflowEditorStyles.toolSeparator}/>
         <ToolButton label="Delete" disabled={!editable || !selectedNodeId && !selectedEdgeId} onClick={removeSelection} icon={Trash2}/><ToolButton label="Disconnect edges" active={disconnectMode} disabled={!editable} onClick={() => setDisconnectMode((value) => !value)} icon={Unlink}/><ToolButton label="Fit view" onClick={() => void fitView({ padding: .22, duration: 180 })} icon={Move}/>
       </div>
-      <div className="automation-toolbar-actions"><div className="automation-workflow-settings-anchor"><button className="automation-tool-button" title="Workflow settings" onClick={() => setSettingsOpen((value) => !value)}><Settings2 size={15}/></button>{settingsOpen ? <WorkflowSettings description={description} setDescription={(value) => { setDescription(value); setDirty(true); }} template={(id) => { chooseTemplate(id); setSettingsOpen(false); }} remove={selected ? remove : undefined}/> : null}</div><button className="automation-button" disabled={!editable || busy || validationErrors.length > 0 || !name.trim()} onClick={() => void save()}><Save size={13}/>Save</button><button className="automation-button automation-button-primary" disabled={!selected || !editable || busy || validationErrors.length > 0} onClick={() => void publish()}><Send size={13}/>Publish</button></div>
+      <div className={workflowEditorStyles.toolbarActions}><Popover open={settingsOpen} onOpenChange={setSettingsOpen}><PopoverTrigger asChild><Button className={workflowEditorStyles.toolButton} variant="ghost" title="Workflow settings" aria-label="Workflow settings"><Settings2 size={15}/></Button></PopoverTrigger><PopoverContent className={workflowEditorStyles.settingsPopover} align="end" sideOffset={10}><WorkflowSettings description={description} setDescription={(value) => { setDescription(value); setDirty(true); }} template={(id) => { chooseTemplate(id); setSettingsOpen(false); }} remove={selected ? remove : undefined}/></PopoverContent></Popover><Button className={workflowEditorStyles.button} variant="secondary" disabled={!editable || busy || validationErrors.length > 0 || !name.trim()} onClick={() => void save()}><Save size={13}/>Save</Button><Button className={workflowEditorStyles.button} disabled={!selected || !editable || busy || validationErrors.length > 0} onClick={() => void publish()}><Send size={13}/>Publish</Button></div>
     </header>
-    <aside className="automation-palette">
-      <div className="automation-panel-heading"><span>Workflows</span><button onClick={() => chooseTemplate(workflowTemplates[0].id)} title="New workflow" disabled={!canManage}><Plus size={14}/></button></div>
-      <div className="automation-workflow-list">{resources.map((item) => <button key={item.id} className={selected?.id === item.id ? "is-active" : ""} onClick={() => setSelectedId(item.id)}><span>{item.name}</span><small>{item.creator_user_id === user?.id ? "Yours" : "Shared"}</small></button>)}</div>
-      <div className="automation-panel-heading automation-node-heading">Nodes</div>
-      <div className="automation-node-library">{categoryOrder.map((category) => <section key={category}><h3>{category}</h3>{palette.filter((item) => item.category === category).map((item) => <button key={item.id} disabled={!editable} draggable={editable} onDragStart={(event) => { event.dataTransfer.effectAllowed = "copy"; event.dataTransfer.setData("application/x-misty-workflow-node", item.id); }} onDoubleClick={() => addPaletteNode(item, { x: 100 + definition.nodes.length * 24, y: 80 + definition.nodes.length * 20 })} title={item.description}><GripVertical className="automation-grip" size={12}/><span className="automation-library-icon" style={{ color: item.color }}><item.icon size={15}/></span><span>{item.label}</span></button>)}</section>)}</div>
+    <aside className={workflowEditorStyles.palette}>
+      <div className={workflowEditorStyles.panelHeading}><span>Workflows</span><Button onClick={() => chooseTemplate(workflowTemplates[0].id)} title="New workflow" disabled={!canManage}><Plus size={14}/></Button></div>
+      <div className={workflowEditorStyles.workflowList}>{resources.map((item) => <Button key={item.id} className={selected?.id === item.id ? "is-active" : ""} onClick={() => setSelectedId(item.id)}><span>{item.name}</span><small>{item.creator_user_id === user?.id ? "Yours" : "Shared"}</small></Button>)}</div>
+      <div className={`${workflowEditorStyles.panelHeading} ${workflowEditorStyles.nodeHeading}`}>Nodes</div>
+      <div className={workflowEditorStyles.nodeLibrary}>{categoryOrder.map((category) => <section key={category}><h3>{category}</h3>{palette.filter((item) => item.category === category).map((item) => <Button key={item.id} disabled={!editable} draggable={editable} onDragStart={(event) => { event.dataTransfer.effectAllowed = "copy"; event.dataTransfer.setData("application/x-misty-workflow-node", item.id); }} onDoubleClick={() => addPaletteNode(item, { x: 100 + definition.nodes.length * 24, y: 80 + definition.nodes.length * 20 })} title={item.description}><GripVertical className={workflowEditorStyles.grip} size={12}/><span className={workflowEditorStyles.libraryIcon} style={{ color: item.color }}><item.icon size={15}/></span><span>{item.label}</span></Button>)}</section>)}</div>
     </aside>
-    <section ref={canvasRef} className={`automation-canvas${disconnectMode ? " is-disconnecting" : ""}`} onDragOver={(event) => { event.preventDefault(); event.dataTransfer.dropEffect = "copy"; }} onDrop={onDrop}>
+    <section ref={canvasRef} className={`${workflowEditorStyles.canvas}${disconnectMode ? " is-disconnecting" : ""}`} onDragOver={(event) => { event.preventDefault(); event.dataTransfer.dropEffect = "copy"; }} onDrop={onDrop}>
       <ReactFlow<CanvasNode, Edge> nodes={nodes} edges={edges} nodeTypes={nodeTypes} onNodesChange={onNodesChange} onEdgesChange={onEdgesChange} onConnect={onConnect} onNodeClick={(_, node) => { setSelectedNodeId(node.id); setSelectedEdgeId(""); }} onPaneClick={() => { setSelectedNodeId(""); setSelectedEdgeId(""); }} onEdgeClick={(_, edge) => { if (disconnectMode && editable) { commit((current) => ({ ...current, edges: current.edges.filter((item) => item.id !== edge.id) })); return; } setSelectedEdgeId(edge.id); setSelectedNodeId(""); }} onNodeDragStart={() => { dragSnapshot.current = cloneDefinition(definition); }} onNodeDragStop={() => { if (dragSnapshot.current) { setUndoStack((items) => [...items.slice(-99), dragSnapshot.current!]); setRedoStack([]); setDirty(true); dragSnapshot.current = null; } }} nodesConnectable={editable} fitView minZoom={.2} maxZoom={1.8} deleteKeyCode={null}>
-        <Background variant={BackgroundVariant.Dots} gap={18} size={1}/><Controls/><MiniMap className="automation-minimap" pannable zoomable nodeColor={(node) => (node.data as CanvasData).descriptor.color}/>
+        <Background variant={BackgroundVariant.Dots} gap={18} size={1}/><Controls/><MiniMap className={workflowEditorStyles.minimap} pannable zoomable nodeColor={(node) => (node.data as CanvasData).descriptor.color}/>
       </ReactFlow>
-      {!nodes.length ? <div className="automation-empty-canvas"><Workflow size={28}/><strong>Build the execution plan</strong><span>Drag a node here from the categorized library.</span></div> : null}
+      {!nodes.length ? <div className={workflowEditorStyles.emptyCanvas}><Workflow size={28}/><strong>Build the execution plan</strong><span>Drag a node here from the categorized library.</span></div> : null}
       {selectedNode ? <NodeInspector node={selectedNode} descriptor={paletteDescriptorForNode(selectedNode, palette)} editable={editable} onChange={updateSelected} onClose={() => setSelectedNodeId("")} onDelete={removeSelection}/> : null}
     </section>
-    <section className="automation-log">
-      <button className="automation-log-resize" aria-label="Resize run log" onMouseDown={(event) => { resizeStart.current = { y: event.clientY, height: logHeight }; setResizingLog(true); }}><span/></button>
-      <button className="automation-log-toggle" onClick={() => setLogOpen((value) => !value)}><History size={13}/><strong>Run log and validation</strong><ChevronDown size={13} className={logOpen ? "is-open" : ""}/></button>
-      {logOpen ? <div className="automation-log-content">{validationErrors.length ? validationErrors.map((error) => <div className="automation-log-line is-error" key={error}><span className="automation-log-dot"/>{error}</div>) : <div className="automation-log-line is-success"><span className="automation-log-dot"/>Graph, typed ports, retry policy, and capability envelope are valid.</div>}{message ? <div className="automation-log-line"><span className="automation-log-dot"/>{message}</div> : null}<div className="automation-log-line"><span className="automation-log-dot"/>{definition.nodes.length} nodes · {definition.edges.length} edges · {definition.capabilities.length} capabilities</div></div> : null}
+    <section className={workflowEditorStyles.log}>
+      <Button className={workflowEditorStyles.logResize} aria-label="Resize run log" onMouseDown={(event) => { resizeStart.current = { y: event.clientY, height: logHeight }; setResizingLog(true); }}><span/></Button>
+      <Button className={workflowEditorStyles.logToggle} onClick={() => setLogOpen((value) => !value)}><History size={13}/><strong>Run log and validation</strong><ChevronDown size={13} className={logOpen ? "is-open" : ""}/></Button>
+      {logOpen ? <div className={workflowEditorStyles.logContent}>{validationErrors.length ? validationErrors.map((error) => <div className={`${workflowEditorStyles.logLine} text-destructive`} key={error}><span className={workflowEditorStyles.logDot}/>{error}</div>) : <div className={`${workflowEditorStyles.logLine} text-success`}><span className={workflowEditorStyles.logDot}/>Graph, typed ports, retry policy, and capability envelope are valid.</div>}{message ? <div className={workflowEditorStyles.logLine}><span className={workflowEditorStyles.logDot}/>{message}</div> : null}<div className={workflowEditorStyles.logLine}><span className={workflowEditorStyles.logDot}/>{definition.nodes.length} nodes · {definition.edges.length} edges · {definition.capabilities.length} capabilities</div></div> : null}
     </section>
   </div>;
 }
 
 function WorkflowCanvasNode({ data }: NodeProps<CanvasNode>) {
   const Icon = data.descriptor.icon;
-  return <div className={`automation-flow-node${data.selected ? " is-selected" : ""}`} style={{ "--node-color": data.descriptor.color } as CSSProperties}><Handle id="input" type="target" position={Position.Left}/><span className="automation-flow-icon"><Icon size={16}/></span><span><strong>{data.workflow.label}</strong><small>{data.descriptor.category} · {data.descriptor.risk} · {data.descriptor.location}</small></span><Handle id="output" type="source" position={Position.Right}/></div>;
+  return <div className={`${workflowEditorStyles.flowNode}${data.selected ? " is-selected" : ""}`} style={{ "--node-color": data.descriptor.color } as CSSProperties}><Handle id="input" type="target" position={Position.Left}/><span className={workflowEditorStyles.flowIcon}><Icon size={16}/></span><span><strong>{data.workflow.label}</strong><small>{data.descriptor.category} · {data.descriptor.risk} · {data.descriptor.location}</small></span><Handle id="output" type="source" position={Position.Right}/></div>;
 }
 
 function NodeInspector({ node, descriptor, editable, onChange, onClose, onDelete }: { node: WorkflowNodeV2; descriptor: PaletteDefinition; editable: boolean; onChange: (patch: Partial<WorkflowNodeV2>) => void; onClose: () => void; onDelete: () => void }) {
   const provider = providerById(typeof node.config.provider === "string" ? node.config.provider : descriptor.providerId);
   const updateConfig = (key: string, value: unknown) => onChange({ config: { ...node.config, [key]: value } });
-  return <aside className="automation-node-popover">
-    <header className="automation-inspector-heading"><span><span>{descriptor.category}{provider ? ` · ${provider.name}` : ""}</span><strong>{node.label}</strong></span><span className="automation-inspector-buttons"><button onClick={onDelete} disabled={!editable} title="Delete node"><Trash2 size={13}/></button><button onClick={onClose} title="Close inspector"><X size={14}/></button></span></header>
-    <label className="automation-field"><span>Node name</span><input value={node.label} disabled={!editable} onChange={(event) => onChange({ label: event.target.value })}/></label>
+  return <aside className={workflowEditorStyles.nodePopover}>
+    <header className={workflowEditorStyles.inspectorHeading}><span><span>{descriptor.category}{provider ? ` · ${provider.name}` : ""}</span><strong>{node.label}</strong></span><span className={workflowEditorStyles.inspectorButtons}><Button onClick={onDelete} disabled={!editable} title="Delete node"><Trash2 size={13}/></Button><Button onClick={onClose} title="Close inspector"><X size={14}/></Button></span></header>
+    <label className={workflowEditorStyles.field}><span>Node name</span><Input value={node.label} disabled={!editable} onChange={(event) => onChange({ label: event.target.value })}/></label>
     {Object.entries(node.config).map(([key, value]) => <ConfigField key={key} name={key} value={value} disabled={!editable || key === "provider" || key === "operation"} onChange={(next) => updateConfig(key, next)}/>) }
-    <label className="automation-field"><span>Error behavior</span><select value={node.errors.mode} disabled={!editable} onChange={(event) => onChange({ errors: { ...node.errors, mode: event.target.value as "fail" | "continue" | "collect" } })}><option value="fail">Stop workflow</option><option value="continue">Continue</option><option value="collect">Collect item errors</option></select></label>
-    <p className="automation-inspector-note">Typed v2 node <code>{node.kind}@{node.kindVersion}</code>. Three total attempts with a 60-second cooldown.</p>
-    {descriptor.risk !== "read" ? <p className="automation-safety-note">This node mutates an external resource. It requires an idempotency journal and the user’s exact consent or approval.</p> : null}
+    <label className={workflowEditorStyles.field}><span>Error behavior</span><Select value={node.errors.mode} disabled={!editable} onValueChange={(value) => onChange({ errors: { ...node.errors, mode: value as "fail" | "continue" | "collect" } })}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent><SelectItem value="fail">Stop workflow</SelectItem><SelectItem value="continue">Continue</SelectItem><SelectItem value="collect">Collect item errors</SelectItem></SelectContent></Select></label>
+    <p className={workflowEditorStyles.inspectorNote}>Typed v2 node <code>{node.kind}@{node.kindVersion}</code>. Three total attempts with a 60-second cooldown.</p>
+    {descriptor.risk !== "read" ? <p className={workflowEditorStyles.safetyNote}>This node mutates an external resource. It requires an idempotency journal and the user’s exact consent or approval.</p> : null}
   </aside>;
 }
 
 function ConfigField({ name, value, disabled, onChange }: { name: string; value: unknown; disabled: boolean; onChange: (value: unknown) => void }) {
   const label = name.replace(/([A-Z])/g, " $1").replace(/^./, (letter) => letter.toUpperCase());
-  if (typeof value === "boolean") return <label className="automation-field automation-checkbox"><input type="checkbox" checked={value} disabled={disabled} onChange={(event) => onChange(event.target.checked)}/><span>{label}</span></label>;
-  if (typeof value === "number") return <label className="automation-field"><span>{label}</span><input type="number" value={value} disabled={disabled} onChange={(event) => onChange(Number(event.target.value))}/></label>;
-  if (typeof value === "string") return <label className="automation-field"><span>{label}</span>{value.length > 100 || name.toLowerCase().includes("instruction") || name === "body" ? <textarea rows={5} value={value} disabled={disabled} onChange={(event) => onChange(event.target.value)}/> : <input value={value} disabled={disabled} onChange={(event) => onChange(event.target.value)}/>}</label>;
-  return <label className="automation-field"><span>{label}</span><textarea rows={5} value={JSON.stringify(value, null, 2)} disabled={disabled} onChange={(event) => { try { onChange(JSON.parse(event.target.value)); } catch { /* preserve last valid typed value */ } }}/></label>;
+  if (typeof value === "boolean") return <label className={`${workflowEditorStyles.field} ${workflowEditorStyles.checkbox}`}><Checkbox checked={value} disabled={disabled} onCheckedChange={(checked) => onChange(checked === true)}/><span>{label}</span></label>;
+  if (typeof value === "number") return <label className={workflowEditorStyles.field}><span>{label}</span><Input type="number" value={value} disabled={disabled} onChange={(event) => onChange(Number(event.target.value))}/></label>;
+  if (typeof value === "string") return <label className={workflowEditorStyles.field}><span>{label}</span>{value.length > 100 || name.toLowerCase().includes("instruction") || name === "body" ? <Textarea rows={5} value={value} disabled={disabled} onChange={(event) => onChange(event.target.value)}/> : <Input value={value} disabled={disabled} onChange={(event) => onChange(event.target.value)}/>}</label>;
+  return <label className={workflowEditorStyles.field}><span>{label}</span><Textarea rows={5} value={JSON.stringify(value, null, 2)} disabled={disabled} onChange={(event) => { try { onChange(JSON.parse(event.target.value)); } catch { /* preserve last valid typed value */ } }}/></label>;
 }
 
 function WorkflowSettings({ description, setDescription, template, remove }: { description: string; setDescription: (value: string) => void; template: (id: string) => void; remove?: () => void }) {
-  return <section className="automation-workflow-settings-popover"><header className="automation-inspector-heading"><span><span>Workflow</span><strong>Settings</strong></span></header><label className="automation-field"><span>Description</span><textarea rows={4} value={description} onChange={(event) => setDescription(event.target.value)}/></label><label className="automation-field"><span>Load template</span><select defaultValue="" onChange={(event) => event.target.value && template(event.target.value)}><option value="">Choose…</option>{workflowTemplates.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>{remove ? <button className="automation-danger-button" onClick={() => void remove()}><Trash2 size={13}/>Delete workflow</button> : null}</section>;
+  return <section className="px-3.5 pb-4"><header className={workflowEditorStyles.inspectorHeading}><span><span>Workflow</span><strong>Settings</strong></span></header><label className={workflowEditorStyles.field}><span>Description</span><Textarea rows={4} value={description} onChange={(event) => setDescription(event.target.value)}/></label><label className={workflowEditorStyles.field}><span>Load template</span><Select onValueChange={template}><SelectTrigger><SelectValue placeholder="Choose…"/></SelectTrigger><SelectContent>{workflowTemplates.map((item) => <SelectItem key={item.id} value={item.id}>{item.name}</SelectItem>)}</SelectContent></Select></label>{remove ? <Button className={workflowEditorStyles.dangerButton} variant="ghost" onClick={() => void remove()}><Trash2 size={13}/>Delete workflow</Button> : null}</section>;
 }
 
 function ToolButton({ label, icon: Icon, disabled, active, onClick }: { label: string; icon: LucideIcon; disabled?: boolean; active?: boolean; onClick: () => void }) {
-  return <button className={`automation-tool-button${active ? " is-active" : ""}`} type="button" title={label} aria-label={label} aria-pressed={active} disabled={disabled} onClick={onClick}><Icon size={14}/></button>;
+  return <Button className={`${workflowEditorStyles.toolButton}${active ? ` ${workflowEditorStyles.toolButtonActive}` : ""}`} type="button" title={label} aria-label={label} aria-pressed={active} disabled={disabled} onClick={onClick}><Icon size={14}/></Button>;
 }
 
 function buildPalette(): PaletteDefinition[] {

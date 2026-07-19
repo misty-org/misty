@@ -1,0 +1,288 @@
+:root {
+  font-family: var(--misty-font-family);
+  width: 100%;
+  height: 100dvh;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--misty-bg);
+  color: var(--misty-text);
+}
+
+/* The app wallpaper is decorative. WebKit may briefly expose native media
+   chrome when its autoplay session is rebuilt after a window/app resume. */
+.misty-app-wallpaper-video::-webkit-media-controls {
+  display: none !important;
+  -webkit-appearance: none;
+}
+
+.misty-app-wallpaper-video::-webkit-media-controls-enclosure {
+  display: none !important;
+  -webkit-appearance: none;
+}
+
+.misty-app-wallpaper-video::-webkit-media-controls-panel {
+  display: none !important;
+  -webkit-appearance: none;
+}
+
+.misty-app-wallpaper-video::-webkit-media-controls-play-button {
+  display: none !important;
+  -webkit-appearance: none;
+}
+
+.misty-app-wallpaper-video::-webkit-media-controls-start-playback-button {
+  display: none !important;
+  -webkit-appearance: none;
+}
+::selection {
+  background: var(--misty-selection);
+}
+
+.misty-code,
+code,
+pre {
+  background-color: var(--misty-code-bg);
+  border-color: var(--misty-code-border);
+}
+
+.misty-syntax,
+.hljs {
+  color: var(--misty-syntax-text);
+}
+
+.misty-syntax-comment,
+.hljs-comment {
+  color: var(--misty-syntax-comment);
+}
+
+.misty-syntax-keyword,
+.hljs-keyword {
+  color: var(--misty-syntax-keyword);
+}
+
+.misty-syntax-string,
+.hljs-string {
+  color: var(--misty-syntax-string);
+}
+
+.misty-syntax-number,
+.hljs-number {
+  color: var(--misty-syntax-number);
+}
+
+.misty-syntax-function,
+.hljs-title.function_,
+.hljs-function {
+  color: var(--misty-syntax-function);
+}
+
+.misty-syntax-type,
+.hljs-type,
+.hljs-built_in {
+  color: var(--misty-syntax-type);
+}
+
+.misty-syntax-variable,
+.hljs-variable {
+  color: var(--misty-syntax-variable);
+}
+
+.misty-syntax-operator,
+.hljs-operator {
+  color: var(--misty-syntax-operator);
+}
+
+:root[data-reduced-motion="true"] *,
+:root[data-reduced-motion="true"] *::before,
+:root[data-reduced-motion="true"] *::after {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  scroll-behavior: auto !important;
+  transition-duration: 0.001ms !important;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+  height: 100dvh;
+  overflow: hidden;
+  background: var(--misty-bg);
+  color: var(--misty-text);
+  font-size: var(--misty-body-font-size);
+}
+
+#root {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--misty-bg);
+}
+
+/* Native desktop chrome does not scale with the webview. The app zoom hook
+   compensates this inset so fullscreen portals always begin below the titlebar. */
+:root[data-form-factor="desktop"] .fixed.inset-0 {
+  top: var(--misty-window-titlebar-inset);
+}
+
+:root[data-form-factor="desktop"] [data-slot="sheet-content"][data-side="left"],
+:root[data-form-factor="desktop"] [data-slot="sheet-content"][data-side="right"],
+:root[data-form-factor="desktop"] [data-slot="sheet-content"][data-side="top"] {
+  top: var(--misty-window-titlebar-inset);
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+    @apply border-border outline-ring/50;
+  }
+
+  button,
+  input {
+    font: inherit;
+  }
+
+  button {
+    cursor: pointer;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6,
+  [role="heading"],
+  p {
+    margin: 0;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6,
+  [role="heading"] {
+    font-family: var(--misty-heading-font-family);
+  }
+
+  h1 {
+    font-size: 32px;
+    line-height: 1.1;
+    font-weight: 650;
+  }
+
+  h2 {
+    font-size: 18px;
+    line-height: 1.2;
+    font-weight: 620;
+  }
+
+  button:disabled,
+  input:disabled {
+    cursor: not-allowed;
+    opacity: 0.58;
+  }
+}
+
+/* Center modal content inside the usable native-webview region rather than
+   underneath the macOS titlebar inset. The overlay itself is already inset. */
+:root[data-form-factor="desktop"] [data-slot="dialog-content"],
+:root[data-form-factor="desktop"] [data-slot="alert-dialog-content"] {
+  top: calc(50% + var(--misty-window-titlebar-inset) / 2);
+}
+
+:where(select, option, optgroup) {
+  background-color: var(--misty-dropdown-bg) !important;
+}
+
+@keyframes shimmer {
+  to { background-position: -220% 0; }
+}
+
+@keyframes misty-skeleton-sweep {
+  from { transform: translateX(-115%); }
+  to { transform: translateX(115%); }
+}
+
+.misty-skeleton {
+  display: block;
+  position: relative;
+  overflow: hidden;
+  background: var(--misty-skeleton-base);
+}
+
+.misty-skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-115%);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.11), transparent);
+  animation: misty-skeleton-sweep 1.15s ease-in-out infinite;
+}
+
+:root[data-theme="light"] .misty-skeleton::after {
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.56), transparent);
+}
+
+@media (max-width: 980px) {
+  body {
+    min-width: 0;
+  }
+}
+
+@media (max-width: 720px) {
+  body,
+  #root {
+    height: 100dvh;
+  }
+
+  body {
+    min-height: 0;
+    overflow: hidden;
+    background: #070707;
+  }
+}
+:root[data-form-factor="mobile"],
+:root[data-form-factor="mobile"] body,
+:root[data-form-factor="mobile"] #root {
+  width: 100%;
+  height: 100dvh;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  background: #070707;
+  color: #f1f1f1;
+}
+/* Misty design-system application layer.
+   Keep new app/mobile surfaces on these tokens unless a feature needs a domain-specific accent. */
+:root[data-form-factor="mobile"],
+:root[data-form-factor="mobile"] body,
+:root[data-form-factor="mobile"] #root {
+  background: var(--misty-page-bg);
+  color: var(--misty-text);
+}
+html[data-explorer-dragging="true"],
+html[data-explorer-dragging="true"] * {
+  -webkit-user-select: none !important;
+  user-select: none !important;
+  -webkit-user-drag: none !important;
+}
+
+[data-explorer-drop-active="true"] {
+  background-image: linear-gradient(120deg, rgba(126, 133, 145, 0.16), rgba(82, 88, 98, 0.08), rgba(126, 133, 145, 0.14)) !important;
+  box-shadow: inset 0 0 0 1px rgba(143, 150, 161, 0.2);
+}
+
+[data-explorer-drop-active="true"] > button {
+  background-image: linear-gradient(120deg, rgba(126, 133, 145, 0.18), rgba(82, 88, 98, 0.1), rgba(126, 133, 145, 0.16)) !important;
+  box-shadow: inset 0 0 0 1px rgba(143, 150, 161, 0.22);
+}

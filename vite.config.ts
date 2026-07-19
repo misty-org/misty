@@ -57,6 +57,11 @@ export default defineConfig(({ command, mode }) => {
       "import.meta.env.VITE_MISTY_PUBLIC_API_URL": JSON.stringify(publicApiUrl ?? ""),
     },
     clearScreen: false,
+    resolve: {
+      alias: {
+        "@": new URL("./src", import.meta.url).pathname,
+      },
+    },
     build: {
       assetsInlineLimit: 0,
       sourcemap: uploadSourceMaps ? "hidden" : false,

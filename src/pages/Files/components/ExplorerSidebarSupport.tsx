@@ -1,5 +1,5 @@
-import { ChevronDown, ChevronRight, Plus, X } from "lucide-react";
-import { useState } from "react";
+import { Button } from "../../../components/ui/button";
+import { ChevronDown, ChevronRight } from "lucide-react";
 import type { MouseEvent, ReactNode } from "react";
 import type { ExplorerLibrarySnapshot, MountedDevice, SavedSearch, SavedSearchRule } from "../../../api/types";
 import { formatBytes } from "../utils/fileFormat";
@@ -55,13 +55,13 @@ export const sidebarStyles = {
   deviceMenuButton:
     "flex w-7 min-w-7 justify-center rounded-lg border border-transparent bg-transparent p-0 text-[var(--misty-text-muted)] opacity-0 hover:bg-[var(--misty-neutral-hover-bg,var(--misty-surface-hover))] hover:text-[var(--misty-text)] group-hover/device:opacity-100 group-focus-within/device:opacity-100",
   menu:
-    "fixed z-[2147483000] grid w-44 gap-0.5 rounded-[11px] border border-[var(--misty-divider-default)] bg-[var(--misty-glass)] p-1.5 shadow-[0_18px_40px_var(--misty-shadow)]",
-  workspaceMenu: "w-60 !bg-[rgb(7_9_12)]",
+    "fixed z-[var(--misty-layer-menu)] grid w-44 gap-0.5 rounded-md bg-popover/90 p-1 shadow-md ring-1 ring-foreground/10 backdrop-blur-xl",
+  workspaceMenu: "w-60",
   menuButton:
-    "flex h-[34px] items-center gap-2 rounded-lg border-0 bg-transparent px-2.5 text-left text-[var(--misty-text)] hover:bg-[var(--misty-neutral-hover-bg,var(--misty-surface-hover))] hover:text-[var(--misty-primary-hover)] disabled:cursor-default disabled:opacity-40",
+    "flex h-8 items-center gap-2 rounded-sm border-0 bg-transparent px-2 text-left text-foreground hover:bg-foreground/10 hover:text-foreground disabled:cursor-default disabled:opacity-40",
   menuButtonSelected: "bg-[var(--misty-neutral-selected-bg,var(--misty-surface-selected))] text-[var(--misty-text)]",
   workspaceMenuRow:
-    "group/workspace flex h-[34px] min-w-0 items-center gap-1 rounded-lg border-0 bg-transparent text-[var(--misty-text)] hover:bg-[var(--misty-neutral-hover-bg,var(--misty-surface-hover))] hover:text-[var(--misty-primary-hover)]",
+    "group/workspace flex h-8 min-w-0 items-center gap-1 rounded-sm border-0 bg-transparent text-foreground hover:bg-foreground/10 hover:text-foreground",
   workspaceMenuSelect:
     "flex h-full min-w-0 flex-1 items-center gap-2 border-0 bg-transparent px-2.5 text-left text-inherit",
   workspaceMenuActions:
@@ -72,213 +72,12 @@ export const sidebarStyles = {
   menuButtonTruncate: "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap",
   menuButtonCheck: "w-[17px] flex-none text-[var(--misty-text)]",
   menuSeparator: "mx-1 my-[5px] h-px bg-[var(--misty-divider-subtle)]",
-  dialogBackdrop: "fixed inset-0 z-[2147483200] grid place-items-center bg-[rgba(6,6,6,0.58)] p-6 backdrop-blur-[3px]",
-  dialog: "grid w-[min(380px,100%)] gap-4 rounded-[10px] border border-[var(--misty-divider-default)] bg-[var(--misty-surface)] p-[18px] shadow-[0_24px_64px_rgba(0,0,0,0.48)]",
-  dialogHeader: "flex items-center justify-between gap-3",
-  dialogTitle: "m-0 text-[17px] font-semibold",
-  dialogClose:
-    "grid size-[30px] place-items-center rounded-lg border-0 bg-transparent p-0 text-[var(--misty-text-muted)] hover:bg-[var(--misty-surface-hover)] hover:text-[var(--misty-text)]",
-  dialogLabel: "grid gap-2 text-[var(--misty-text-muted)]",
-  dialogText: "m-0 leading-normal text-[var(--misty-text-muted)]",
-  dialogInput: "h-[38px] w-full rounded-[7px] border border-[var(--misty-divider-default)] bg-[var(--misty-surface-2)] px-[11px] text-[var(--misty-text)] outline-none focus:border-[var(--misty-interaction-focus)] focus:shadow-[0_0_0_2px_var(--misty-focus-ring)]",
-  dialogSelect: "h-[38px] w-full rounded-[7px] border border-[var(--misty-divider-default)] bg-[var(--misty-surface-2)] px-[9px] text-[var(--misty-text)] outline-none focus:border-[var(--misty-interaction-focus)]",
-  dialogWide: "w-[min(620px,100%)]",
-  dialogGrid: "grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-3 max-[640px]:grid-cols-1",
-  ruleList: "grid gap-2 rounded-lg border border-[var(--misty-border)] bg-[var(--misty-surface-2)] p-2.5",
-  ruleRow: "grid grid-cols-[minmax(0,1fr)_minmax(0,0.9fr)_minmax(0,1.2fr)_30px] gap-2 max-[640px]:grid-cols-1",
-  iconButton: "grid size-[30px] place-items-center rounded-lg border border-transparent bg-transparent p-0 text-[var(--misty-text-muted)] hover:bg-[var(--misty-surface-hover)] hover:text-[var(--misty-text)]",
-  errorText: "m-0 text-sm text-[#ffb7b7]",
+  errorText: "m-0 text-sm text-destructive",
   smartMeta: "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-xs text-[var(--misty-text-subtle)]",
-  dialogActions: "flex justify-end gap-2",
-  dialogActionButton: "h-[34px] min-w-[82px] rounded-[7px]",
-  dialogDanger: "border-[var(--misty-border)] bg-[var(--misty-surface-selected)] text-[var(--misty-text)]",
 } as const;
 
-export function WorkspaceDialog(props: {
-  state: NonNullable<WorkspaceDialogState>;
-  value: string;
-  onChange: (value: string) => void;
-  onConfirm: () => void;
-  onCancel: () => void;
-}) {
-  const deleting = props.state.kind === "delete";
-  const title = props.state.kind === "create"
-    ? "New Workspace"
-    : props.state.kind === "rename"
-      ? "Rename Workspace"
-      : "Delete Workspace";
-  return (
-    <div className={sidebarStyles.dialogBackdrop} role="presentation" onPointerDown={props.onCancel}>
-      <form
-        className={sidebarStyles.dialog}
-        role="dialog"
-        aria-modal="true"
-        aria-label={title}
-        onPointerDown={(event) => event.stopPropagation()}
-        onSubmit={(event) => {
-          event.preventDefault();
-          props.onConfirm();
-        }}
-      >
-        <header className={sidebarStyles.dialogHeader}>
-          <h2 className={sidebarStyles.dialogTitle}>{title}</h2>
-          <button className={sidebarStyles.dialogClose} type="button" aria-label="Close" onClick={props.onCancel}><X size={16} /></button>
-        </header>
-        {deleting ? (
-          <p className={sidebarStyles.dialogText}>Delete <strong>{props.state.title}</strong>? This removes the saved layout, not any files.</p>
-        ) : (
-          <label className={sidebarStyles.dialogLabel}>
-            <span>Name</span>
-            <input
-              className={sidebarStyles.dialogInput}
-              autoFocus
-              value={props.value}
-              onChange={(event) => props.onChange(event.target.value)}
-            />
-          </label>
-        )}
-        <div className={sidebarStyles.dialogActions}>
-          <button className={sidebarStyles.dialogActionButton} type="button" onClick={props.onCancel}>Cancel</button>
-          <button className={`${sidebarStyles.dialogActionButton} ${deleting ? sidebarStyles.dialogDanger : ""}`} type="submit" disabled={!deleting && !props.value.trim()}>
-            {deleting ? "Delete" : "Save"}
-          </button>
-        </div>
-      </form>
-    </div>
-  );
-}
-
-export function SmartFolderDialog(props: {
-  state: NonNullable<SmartFolderDialogState>;
-  error: string | null;
-  onSave: (draft: SmartFolderDraft) => void | Promise<void>;
-  onDelete: (id: string) => void | Promise<void>;
-  onCancel: () => void;
-}) {
-  const [draft, setDraft] = useState<SmartFolderDraft>(props.state.draft);
-  const editing = Boolean(draft.id);
-  const updateRule = (index: number, patch: Partial<SavedSearchRule>) => {
-    setDraft((current) => ({
-      ...current,
-      rules: current.rules.map((rule, ruleIndex) => ruleIndex === index ? { ...rule, ...patch } : rule),
-    }));
-  };
-  const addRule = () => {
-    setDraft((current) => ({ ...current, rules: [...current.rules, defaultSmartFolderRule()] }));
-  };
-  const removeRule = (index: number) => {
-    setDraft((current) => ({
-      ...current,
-      rules: current.rules.length <= 1 ? [defaultSmartFolderRule()] : current.rules.filter((_rule, ruleIndex) => ruleIndex !== index),
-    }));
-  };
-  return (
-    <div className={sidebarStyles.dialogBackdrop} role="presentation" onPointerDown={props.onCancel}>
-      <form
-        className={`${sidebarStyles.dialog} ${sidebarStyles.dialogWide}`}
-        role="dialog"
-        aria-modal="true"
-        aria-label={editing ? "Edit Collection" : "New Collection"}
-        onPointerDown={(event) => event.stopPropagation()}
-        onSubmit={(event) => {
-          event.preventDefault();
-          void props.onSave(draft);
-        }}
-      >
-        <header className={sidebarStyles.dialogHeader}>
-          <h2 className={sidebarStyles.dialogTitle}>{editing ? "Edit Collection" : "New Collection"}</h2>
-          <button className={sidebarStyles.dialogClose} type="button" aria-label="Close" onClick={props.onCancel}><X size={16} /></button>
-        </header>
-        <div className={sidebarStyles.dialogGrid}>
-          <label className={sidebarStyles.dialogLabel}>
-            <span>Name</span>
-            <input
-              className={sidebarStyles.dialogInput}
-              autoFocus
-              value={draft.name}
-              onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))}
-            />
-          </label>
-          <label className={sidebarStyles.dialogLabel}>
-            <span>Match</span>
-            <select
-              className={sidebarStyles.dialogSelect}
-              value={draft.matchMode}
-              onChange={(event) => setDraft((current) => ({ ...current, matchMode: event.target.value === "any" ? "any" : "all" }))}
-            >
-              <option value="all">All rules</option>
-              <option value="any">Any rule</option>
-            </select>
-          </label>
-        </div>
-        <label className={sidebarStyles.dialogLabel}>
-          <span>Query string</span>
-          <input
-            className={sidebarStyles.dialogInput}
-            value={draft.query}
-            placeholder={smartFolderQueryFromRules(draft.rules, draft.matchMode) || "invoice pdf tag:work"}
-            onChange={(event) => setDraft((current) => ({ ...current, query: event.target.value }))}
-          />
-        </label>
-        <div className={sidebarStyles.ruleList}>
-          {draft.rules.map((rule, index) => (
-            <div className={sidebarStyles.ruleRow} key={`rule:${index}`}>
-              <select
-                className={sidebarStyles.dialogSelect}
-                value={rule.field}
-                onChange={(event) => updateRule(index, { field: event.target.value })}
-                aria-label={`Rule ${index + 1} field`}
-              >
-                {smartFolderFields.map((field) => <option key={field.value} value={field.value}>{field.label}</option>)}
-              </select>
-              <select
-                className={sidebarStyles.dialogSelect}
-                value={rule.operator}
-                onChange={(event) => updateRule(index, { operator: event.target.value })}
-                aria-label={`Rule ${index + 1} operator`}
-              >
-                {smartFolderOperators.map((operator) => <option key={operator.value} value={operator.value}>{operator.label}</option>)}
-              </select>
-              <input
-                className={sidebarStyles.dialogInput}
-                value={rule.value}
-                placeholder={smartFolderValuePlaceholder(rule.field)}
-                onChange={(event) => updateRule(index, { value: event.target.value })}
-                aria-label={`Rule ${index + 1} value`}
-              />
-              <button
-                className={sidebarStyles.iconButton}
-                type="button"
-                aria-label={`Remove rule ${index + 1}`}
-                onClick={() => removeRule(index)}
-              >
-                <X size={15} />
-              </button>
-            </div>
-          ))}
-          <button className={sidebarStyles.menuButton} type="button" onClick={addRule}>
-            <Plus size={15} />
-            <span>Add Rule</span>
-          </button>
-        </div>
-        {props.error ? <p className={sidebarStyles.errorText}>{props.error}</p> : null}
-        <div className={sidebarStyles.dialogActions}>
-          {editing ? (
-            <button
-              className={`${sidebarStyles.dialogActionButton} ${sidebarStyles.dialogDanger}`}
-              type="button"
-              onClick={() => void props.onDelete(draft.id)}
-            >
-              Delete
-            </button>
-          ) : null}
-          <button className={sidebarStyles.dialogActionButton} type="button" onClick={props.onCancel}>Cancel</button>
-          <button className={sidebarStyles.dialogActionButton} type="submit" disabled={!draft.name.trim()}>Save</button>
-        </div>
-      </form>
-    </div>
-  );
-}
+export { DeviceDialog, SmartFolderDialog, WorkspaceDialog } from "./ExplorerSidebarDialogs";
+export { smartFolderQueryFromRules } from "./ExplorerSidebarQuery";
 
 export function SidebarSectionHeader(props: {
   title: string;
@@ -290,57 +89,11 @@ export function SidebarSectionHeader(props: {
   const Chevron = props.collapsed ? ChevronRight : ChevronDown;
   return (
     <div className={sidebarStyles.sectionTitle} onContextMenu={props.onContextMenu}>
-      <button type="button" className={sidebarStyles.sectionToggle} onClick={props.onToggle} aria-expanded={!props.collapsed}>
+      <Button type="button" className={sidebarStyles.sectionToggle} onClick={props.onToggle} aria-expanded={!props.collapsed}>
         <span className={sidebarStyles.sectionToggleLabel}>{props.title}</span>
         <Chevron className={sidebarStyles.sectionChevron} size={14} />
-      </button>
+      </Button>
       {props.actions ? <div className={sidebarStyles.sectionActions}>{props.actions}</div> : null}
-    </div>
-  );
-}
-
-export function DeviceDialog(props: {
-  title: string;
-  label: string;
-  placeholder?: string;
-  value: string;
-  confirmLabel: string;
-  onChange: (value: string) => void;
-  onConfirm: () => void;
-  onCancel: () => void;
-}) {
-  return (
-    <div className={sidebarStyles.dialogBackdrop} role="presentation" onPointerDown={props.onCancel}>
-      <form
-        className={sidebarStyles.dialog}
-        role="dialog"
-        aria-modal="true"
-        aria-label={props.title}
-        onPointerDown={(event) => event.stopPropagation()}
-        onSubmit={(event) => {
-          event.preventDefault();
-          props.onConfirm();
-        }}
-      >
-        <header className={sidebarStyles.dialogHeader}>
-          <h2 className={sidebarStyles.dialogTitle}>{props.title}</h2>
-          <button className={sidebarStyles.dialogClose} type="button" aria-label="Close" onClick={props.onCancel}><X size={16} /></button>
-        </header>
-        <label className={sidebarStyles.dialogLabel}>
-          <span>{props.label}</span>
-          <input
-            className={sidebarStyles.dialogInput}
-            autoFocus
-            value={props.value}
-            placeholder={props.placeholder}
-            onChange={(event) => props.onChange(event.target.value)}
-          />
-        </label>
-        <div className={sidebarStyles.dialogActions}>
-          <button className={sidebarStyles.dialogActionButton} type="button" onClick={props.onCancel}>Cancel</button>
-          <button className={sidebarStyles.dialogActionButton} type="submit" disabled={!props.value.trim()}>{props.confirmLabel}</button>
-        </div>
-      </form>
     </div>
   );
 }
@@ -415,29 +168,6 @@ export interface QuickAccessMenuState {
 
 const smartFolderModeField = "__match";
 
-const smartFolderFields = [
-  { value: "text", label: "Text query" },
-  { value: "path", label: "Path / source" },
-  { value: "kind", label: "File or folder" },
-  { value: "extension", label: "Extension" },
-  { value: "size", label: "Size" },
-  { value: "modified", label: "Modified date" },
-  { value: "hidden", label: "Hidden" },
-  { value: "tag", label: "Misty tag" },
-] as const;
-
-const smartFolderOperators = [
-  { value: "contains", label: "contains" },
-  { value: "is", label: "is" },
-  { value: "is_not", label: "is not" },
-  { value: "starts_with", label: "starts with" },
-  { value: "ends_with", label: "ends with" },
-  { value: "gt", label: "greater than" },
-  { value: "lt", label: "less than" },
-  { value: "after", label: "after" },
-  { value: "before", label: "before" },
-] as const;
-
 function defaultSmartFolderRule(): SavedSearchRule {
   return { field: "text", operator: "contains", value: "" };
 }
@@ -475,71 +205,6 @@ export function smartFolderRulesWithMode(rules: SavedSearchRule[], matchMode: Sm
     { field: smartFolderModeField, operator: "mode", value: matchMode },
     ...cleaned,
   ];
-}
-
-export function smartFolderQueryFromRules(rules: SavedSearchRule[], matchMode: SmartFolderMatchMode): string {
-  const parts = visibleSmartFolderRules(rules)
-    .filter((rule) => rule.value.trim())
-    .map(smartFolderRuleQuery)
-    .filter(Boolean);
-  return matchMode === "any" && parts.length > 1 ? parts.join(" OR ") : parts.join(" ");
-}
-
-function smartFolderRuleQuery(rule: SavedSearchRule): string {
-  const value = quoteSearchToken(rule.value.trim());
-  if (!value) return "";
-  switch (rule.field) {
-    case "path":
-      return `path:${value}`;
-    case "kind":
-      return `kind:${value}`;
-    case "extension":
-      return `ext:${value.replace(/^\./, "")}`;
-    case "size":
-      return `size${operatorSymbol(rule.operator)}${value}`;
-    case "modified":
-      return `modified${operatorSymbol(rule.operator)}${value}`;
-    case "hidden":
-      return `hidden:${value}`;
-    case "tag":
-      return `tag:${value}`;
-    case "text":
-    default:
-      return rule.operator === "is_not" ? `-${value}` : value;
-  }
-}
-
-function operatorSymbol(operator: string): string {
-  if (operator === "gt" || operator === "after") return ":>";
-  if (operator === "lt" || operator === "before") return ":<";
-  if (operator === "is_not") return ":!";
-  return ":";
-}
-
-function quoteSearchToken(value: string): string {
-  if (!value) return "";
-  return /\s/.test(value) ? `"${value.replace(/"/g, "\\\"")}"` : value;
-}
-
-function smartFolderValuePlaceholder(field: string): string {
-  switch (field) {
-    case "path":
-      return "/Users/name/Documents or remote:";
-    case "kind":
-      return "file or folder";
-    case "extension":
-      return "pdf";
-    case "size":
-      return "10MB";
-    case "modified":
-      return "2026-06-01";
-    case "hidden":
-      return "true or false";
-    case "tag":
-      return "work";
-    default:
-      return "invoice";
-  }
 }
 
 export function sortSavedSearches(searches: SavedSearch[]): SavedSearch[] {
