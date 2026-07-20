@@ -129,3 +129,10 @@ Used `rg` and tracked-source inspection for `setInterval`, `setTimeout`, `refetc
 ## Implementation delta (first batch)
 
 The inventory above is the audited baseline. Removed: the 30-second settings refresh and both 250-millisecond device-job completion polls. Settings now use account events/reset/focus/online recovery; completion waiters use committed job-state notifications, reset recovery and actual deadlines. The metrics sampler remains an observability timer, but its per-pass one-second age tickers have been removed. All other inventory entries still require implementation or an explicitly justified exception.
+
+
+## Implementation delta (durable worker queues)
+
+Removed seven more recurring scan timers: billing (10s), social delivery (2s), embeddings (15s), note/drawing controls (3s), Library AI (3s), renditions (2s) and faces (3s). The controls timer formerly serviced three queues; these now have independent deadline planners, including acknowledged drawing purges. Empty queues have no timer. Startup/reconnect and committed PostgreSQL hints initiate reads; real retry/lease/scheduled deadlines arm one-shot timers. Errors and contested ready rows retain capped exponential retries with jitter while pending work exists. Disabled processors remain idle.
+
+Retained connection-health mechanism: one shared worker LISTEN session per API process uses TCP keepalive probes after 30s idle, at 10s intervals with 3 missed probes. This detects silent connection failure so reconnect can rescan durable queues; it sends no SQL state query and is independent of user/device count. Measure its wire cost in the deployment's network path. The Personal Agent 2s dispatcher and 1min maintenance loop still require conversion; neither is claimed fixed by this batch.

@@ -139,3 +139,20 @@ Work remains active on `codex/traffic-control`. This is not completion of all 37
 The API must apply `20271001020000_device_job_state_notifications.sql` before event-based completion waiters serve work. The migration is additive and old polling servers continue to work during a rolling update. The new preferences GET route must be present before new desktop clients depend on it.
 
 Next, finish the presence/driver-fencing design and worker wakeup/deadline inventory before removing safety timers. Keep PostgreSQL as the durable source of truth and use its existing LISTEN/NOTIFY support; this batch adds no Redis, hosted broker or infrastructure provider dependency. Compare/merge overlapping recovery changes from PR #212 when it lands rather than replacing them.
+
+
+## Implementation progress — durable worker queues
+
+T12 and part of T13/T37 now use one shared PostgreSQL listener per API process for nine queues: Library AI, renditions and faces; retrieval embeddings; note controls; drawing controls and purges; social delivery; and billing recovery/delivery. This removes seven recurring scan timers. Disabled processors do not subscribe or claim work.
+
+- Empty queues perform an initial authoritative read and then sleep without a scan timer. Future work uses the earliest eligible database-clock deadline. Committed notifications, restart and listener reconnect cause reconciliation; notifications coalesce in a bounded buffer. Transaction rollback publishes no hint.
+- Bounded batches drain ready work. Database/provider errors and lock contention back off exponentially with jitter, and cancellation stops promptly. Billing reports actual progress so another replica's locks cannot cause a tight retry loop.
+- Library source eligibility is checked before claiming as well as before planning. An unavailable source sleeps until its relevant state changes. Expired face-processing leases are reclaimable with a new fenced lease token. Embeddings are claimed immediately before processing rather than leaving a whole batch waiting under expiring leases.
+- Social scheduling retains authority checks. Sending/unknown outcomes are excluded from automatic replay. Voice recovery preserves unmeasured work for reconciliation instead of automatically charging or releasing it. This work changes scheduling, not authorization or external-effect idempotency.
+- `misty_worker_wakes_total{queue,reason}` records bounded startup, notification, deadline, error and contention causes. Database listener liveness uses TCP keepalives (30s idle, 10s probe interval, 3 probes), not recurring SQL queries. These are connection-health probes, not application-state polling; actual wire overhead still needs measurement.
+
+Validation: race-enabled scheduler tests cover idle silence, bounded draining, notifications during reads, real deadlines, error storms, contention and cancellation. Seven disposable PostgreSQL tests cover commit/rollback, queue isolation, shared-listener reconnect across two API instances, durable deadlines, source eligibility, real Library claims and lease recovery, social/billing safety predicates, idle read count, and migration down/reapply. The full schema migrated successfully in an isolated pgvector/PostgreSQL container; the existing voice-accounting recovery contract and billing tests passed. All internal Go packages compile. These are correctness tests, not a 10,000-user throughput result.
+
+Apply `20271001030000_worker_notifications.sql` before starting event-driven workers. It is additive and compatible with old polling workers during a rolling deployment. PostgreSQL remains the only queue infrastructure; one persistent session per API process must reach PostgreSQL directly or through a session-compatible pooler for LISTEN. Ordinary query-pool settings remain unchanged.
+
+Remaining: the Personal Agent dispatcher, combined retention/scheduled-maintenance loop, abuse propagation, presence/control protocol, other client/native timers, and the wider failure/load matrix remain active work. The baseline inventory above is historical; use the implementation deltas for current status.

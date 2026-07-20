@@ -25,6 +25,7 @@ import (
 type Registry struct {
 	syncTraffic syncTraffic
 	registry    *prometheus.Registry
+	workerWakes *prometheus.CounterVec
 
 	requests      *prometheus.CounterVec
 	duration      *prometheus.HistogramVec
@@ -101,6 +102,7 @@ func New() *Registry {
 		defer m.mu.Unlock()
 		return time.Since(m.lastSample).Seconds()
 	})
+	m.initWorkers()
 	m.initTraffic()
 	m.initSyncTraffic()
 	registry.MustRegister(m.requests, m.duration, m.inFlight, m.sampleAge, m.sampleFail, m.aiInvocations, m.aiDuration, m.aiFirstOutput)
