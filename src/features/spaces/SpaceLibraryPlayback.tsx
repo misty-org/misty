@@ -1,10 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, File, Pause, Play, SkipBack, SkipForward } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
-import { spacesApi } from "@/spaces/api";
-import type { LibraryDiscoveryGroup, SpaceLibraryItem } from "@/spaces/types";
+import { Button } from "@/ui";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/ui";
+import { spacesApi } from "@/stores/spaces/useSpacesBackendStore";
+import type {
+  LibraryDiscoveryGroup,
+  SpaceLibraryItem,
+} from "@/models/interfaces/features/spaces/types";
 
 import { libraryItemMIME } from "./SpaceLibraryPrimitives";
 

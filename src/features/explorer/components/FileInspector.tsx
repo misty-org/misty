@@ -1,8 +1,14 @@
+import type { FileInspectorProps } from "@/models/interfaces/features/explorer/components/FileInspector";
+export type { FileInspectorProps } from "@/models/interfaces/features/explorer/components/FileInspector";
 import { FileSearch, Maximize2 } from "lucide-react";
 import { useState, type ReactNode } from "react";
-import { Button } from "../../../components/ui/button";
-import type { DirectoryListing, DirectorySizeRecord, FileEntry } from "@/services/misty-api/types";
-import { directorySizeRecordForPath } from "../../../stores/useExplorerStore";
+import { Button } from "@/ui";
+import type {
+  DirectoryListing,
+  DirectorySizeRecord,
+  FileEntry,
+} from "@/models/interfaces/services/misty-api";
+import { directorySizeRecordForPath } from "@/stores/explorer";
 import { formatBytes, formatDate } from "../utils/fileFormat";
 import { GlobalPreviewDialog } from "./GlobalPreview";
 import {
@@ -15,15 +21,6 @@ import {
   useFolderPreview,
 } from "./FileInspectorPreview";
 import { inspectorStyles } from "./FileInspectorStyles";
-
-interface FileInspectorProps {
-  listing: DirectoryListing | null;
-  selectedEntry: FileEntry | null;
-  selectedCount: number;
-  directorySizes: Record<string, DirectorySizeRecord>;
-  onOpenEntry: (entry: FileEntry) => void;
-  onPreviewSaved?: () => void | Promise<void>;
-}
 
 export function FileInspector(props: FileInspectorProps) {
   const displayEntry = props.selectedEntry;

@@ -1,3 +1,5 @@
+import type { LibraryItemMenuState } from "@/models/interfaces/features/spaces/components/LibraryItemContextMenu";
+export type { LibraryItemMenuState } from "@/models/interfaces/features/spaces/components/LibraryItemContextMenu";
 import { useEffect, useRef, useState } from "react";
 import {
   ArchiveRestore,
@@ -19,14 +21,8 @@ import {
   ContextMenuSubContent,
   ContextMenuSubTrigger,
   ContextMenuTrigger,
-} from "@/components/ui/context-menu";
-import type { LibraryAlbum, SpaceLibraryItem } from "../../../spaces/types";
-
-export interface LibraryItemMenuState {
-  itemId: string;
-  left: number;
-  top: number;
-}
+} from "@/ui";
+import type { LibraryAlbum, SpaceLibraryItem } from "@/models/interfaces/features/spaces/types";
 
 export function LibraryItemContextMenu(props: {
   state: LibraryItemMenuState;

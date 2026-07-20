@@ -1,5 +1,7 @@
-import type { SearchResult } from "@/services/misty-api/types";
-import { Button } from "../../../components/ui/button";
+import type { ExplorerToolbarSearchProps } from "@/models/interfaces/features/explorer/components/ExplorerToolbarSearch";
+export type { ExplorerToolbarSearchProps } from "@/models/interfaces/features/explorer/components/ExplorerToolbarSearch";
+import type { SearchResult } from "@/models/interfaces/services/misty-api";
+import { Button } from "@/ui";
 import {
   Command,
   CommandEmpty,
@@ -8,18 +10,13 @@ import {
   CommandItem,
   CommandList,
   CommandSeparator,
-} from "../../../components/ui/command";
-import { Popover, PopoverContent, PopoverTrigger } from "../../../components/ui/popover";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "../../../components/ui/tooltip";
+} from "@/ui";
+import { Popover, PopoverContent, PopoverTrigger } from "@/ui";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/ui";
 import { Command as CommandIcon, Folder, Search } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useExplorerStore, type ExplorerCommandQueryMode } from "../../../stores/useExplorerStore";
-import { useSearchStore } from "../../../stores/useSearchStore";
+import { useExplorerStore, type ExplorerCommandQueryMode } from "@/stores/explorer";
+import { useSearchStore } from "@/stores/explorer";
 import {
   mergeHybridSearchResults,
   queryIndexedExplorerSearch,
@@ -28,29 +25,17 @@ import {
   semanticSearchDebounceMs,
 } from "../utils/globalSearch";
 import { searchResultNavigationTarget } from "../utils/searchNavigation";
-import type { ExplorerSearchNavigationTarget } from "../utils/searchNavigation";
+import type { ExplorerSearchNavigationTarget } from "@/models/interfaces/features/explorer/utils/searchNavigation";
 import { SearchResultThumbnail } from "./SearchResultThumbnail";
-import { explorerCommandPaletteEntries, type ExplorerLocationResult } from "./ExplorerToolbarModel";
+import { explorerCommandPaletteEntries } from "./ExplorerToolbarModel";
+import type { ExplorerLocationResult } from "@/models/interfaces/features/explorer/components/ExplorerToolbarModel";
 import {
   fuzzyIncludes,
   searchResultContext,
   searchResultSummary,
   toolbarStyles,
 } from "./ExplorerToolbarSupport";
-import type { PluginCommandEntry } from "@/services/misty-api/types";
-
-interface ExplorerToolbarSearchProps {
-  paneId: string;
-  path: string;
-  commandQuery: string;
-  commandQueryMode: ExplorerCommandQueryMode;
-  locationResults: ExplorerLocationResult[];
-  pluginCommands: PluginCommandEntry[];
-  onCommandQuery: (value: string) => void;
-  onNavigateLocation: (path: string) => void;
-  onNavigateSearchResult: (target: ExplorerSearchNavigationTarget) => void;
-  onRunCommand: (commandId: string) => void;
-}
+import type { PluginCommandEntry } from "@/models/interfaces/services/misty-api";
 
 export function ExplorerToolbarSearch(props: ExplorerToolbarSearchProps) {
   const [searchFocused, setSearchFocused] = useState(false);

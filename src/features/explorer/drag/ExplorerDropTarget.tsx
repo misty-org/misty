@@ -1,18 +1,22 @@
+import type { TargetKind } from "@/models/types/features/explorer/drag/ExplorerDropTarget";
+export type { TargetKind } from "@/models/types/features/explorer/drag/ExplorerDropTarget";
 import { useMemo, type ReactNode } from "react";
 import {
   explorerPathIsDirectory,
   explorerPrepareDragItems,
   explorerQueueDeleteItems,
-} from "@/services/misty-api/misty";
-import { useMultiPanelStore } from "@/shared/multipanel/useMultiPanelStore";
-import { useExplorerStore } from "../../../stores/useExplorerStore";
-import { useSmartLibraryStore } from "../../../stores/useSmartLibraryStore";
+} from "@/stores/backend";
+import { useMultiPanelStore } from "@/features/workspace";
+import { useExplorerStore } from "@/stores/explorer";
+import { useSmartLibraryStore } from "@/stores/media/useSmartLibraryStore";
 import { transferDropAcceptance } from "../components/FileBrowserDrag";
 import { Droppable } from "./ExplorerDragContext";
 import { groupItemsByOperation, storageIdForPath } from "./operations";
-import type { ExplorerDragModifiers, ExplorerDragPayload, ExplorerDropZoneSpec } from "./types";
-
-type TargetKind = "directory" | "trash" | "library" | "invalid";
+import type {
+  ExplorerDragModifiers,
+  ExplorerDragPayload,
+  ExplorerDropZoneSpec,
+} from "@/models/interfaces/features/explorer/drag/types";
 
 export function ExplorerDropTarget(props: {
   id: string;

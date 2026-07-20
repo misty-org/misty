@@ -1,4 +1,4 @@
-import type { ExplorerViewMode } from "../../../stores/useExplorerStore";
+import type { ExplorerViewMode } from "@/stores/explorer";
 import { fileBrowserStyles } from "./FileBrowserStyles";
 
 export function FileBrowserSkeleton(props: { viewMode: ExplorerViewMode }) {

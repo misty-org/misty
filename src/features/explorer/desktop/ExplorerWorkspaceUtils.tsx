@@ -1,4 +1,4 @@
-import { Button } from "../../../components/ui/button";
+import { Button } from "@/ui";
 import { PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen } from "lucide-react";
 import type {
   ExplorerLibrarySnapshot,
@@ -6,9 +6,9 @@ import type {
   PluginCommandEntry,
   PluginPanelEntry,
   ProviderRemote,
-} from "@/services/misty-api/types";
-import type { MultiPanelTab } from "@/shared/multipanel/types";
-import { useMultiPanelStore } from "@/shared/multipanel/useMultiPanelStore";
+} from "@/models/interfaces/services/misty-api";
+import type { MultiPanelTab } from "@/models/interfaces/workspace";
+import { useMultiPanelStore } from "@/features/workspace";
 import type { ExplorerLocationResult } from "../components/ExplorerToolbar";
 import { cx } from "./ExplorerDesktopShared";
 import { explorerShellStyles } from "./ExplorerShellStyles";

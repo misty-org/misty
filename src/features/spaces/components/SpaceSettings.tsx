@@ -20,14 +20,14 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Separator } from "@/components/ui/separator";
-import type { SpaceStudioResource } from "../../../spaces/types";
-import { useSpacesStore } from "../../../stores/useSpacesStore";
+} from "@/ui";
+import { Badge } from "@/ui";
+import { Button } from "@/ui";
+import { Card, CardContent, CardHeader, CardTitle } from "@/ui";
+import { Input } from "@/ui";
+import { Separator } from "@/ui";
+import type { SpaceStudioResource } from "@/models/interfaces/features/spaces/types";
+import { useSpacesStore } from "@/stores/spaces/useSpacesStore";
 
 const validSections = new Set(["general", "chat", "studio", "agents"]);
 const emptyResources: SpaceStudioResource[] = [];

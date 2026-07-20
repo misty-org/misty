@@ -1,9 +1,9 @@
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { Copy, File, Folder, MessageSquare, Sparkles } from "lucide-react";
-import { Button } from "../../../components/ui/button";
-import { errorText } from "@/shared/format";
-import { useExplorerStore } from "../../../stores/useExplorerStore";
-import type { AiStatus } from "../../../stores/useMikaSessionStore";
+import { Button } from "@/ui";
+import { errorText } from "@/lib/format";
+import { useExplorerStore } from "@/stores/explorer";
+import type { AiStatus } from "@/models/interfaces/stores/assistant/useMikaSessionStore";
 import { assistantPanelStyles } from "./ExplorerAssistantStyles";
 import { mikaSelectionSummary } from "./ExplorerAssistantShared";
 

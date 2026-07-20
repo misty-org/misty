@@ -1,14 +1,9 @@
+import type { SpaceLibraryContextValue } from "@/models/interfaces/features/spaces/SpaceLibraryContext";
+export type { SpaceLibraryContextValue } from "@/models/interfaces/features/spaces/SpaceLibraryContext";
 import { createContext, useContext } from "react";
-
-import type { SpaceLibraryCollectionActions } from "./useSpaceLibraryCollectionActions";
-import type { SpaceLibraryData } from "./useSpaceLibraryData";
-import type { SpaceLibraryItemActions } from "./useSpaceLibraryItemActions";
-
-export interface SpaceLibraryContextValue {
-  data: SpaceLibraryData;
-  itemActions: SpaceLibraryItemActions;
-  collectionActions: SpaceLibraryCollectionActions;
-}
+import type { SpaceLibraryCollectionActions } from "@/models/types/features/spaces/useSpaceLibraryCollectionActions";
+import type { SpaceLibraryData } from "@/models/types/features/spaces/useSpaceLibraryData";
+import type { SpaceLibraryItemActions } from "@/models/types/features/spaces/useSpaceLibraryItemActions";
 
 const SpaceLibraryContext = createContext<SpaceLibraryContextValue | null>(null);
 

@@ -1,6 +1,14 @@
-import { Input } from "../../../components/ui/input";
-import { Button } from "../../../components/ui/button";
-import { Popover, PopoverContent, PopoverTrigger } from "../../../components/ui/popover";
+import type {
+  PluginMenuItem,
+  PluginTabState,
+} from "@/models/types/features/explorer/desktop/ExplorerDesktopPlugins";
+export type {
+  PluginMenuItem,
+  PluginTabState,
+} from "@/models/types/features/explorer/desktop/ExplorerDesktopPlugins";
+import { Input } from "@/ui";
+import { Button } from "@/ui";
+import { Popover, PopoverContent, PopoverTrigger } from "@/ui";
 import {
   ArrowLeft,
   ArrowRightLeft,
@@ -19,32 +27,20 @@ import {
   openTerminalAtPath,
   pluginCommandRun,
   pluginPanelRender,
-} from "@/services/misty-api/misty";
+} from "@/stores/backend";
 import type {
   PluginCommandEntry,
   PluginPanelElement,
   PluginPanelEntry,
   PluginPanelRenderResult,
   TransferRecord,
-} from "@/services/misty-api/types";
-import { ExtensionCatalogIcon } from "../../../plugins/ExtensionCatalogIcon";
-import { publishPluginNotifications } from "../../../plugins/pluginNotifications";
-import { useMultiPanelStore } from "@/shared/multipanel/useMultiPanelStore";
-import { useMinimumSpin } from "@/shared/hooks/useMinimumSpin";
-import { errorText } from "@/shared/format";
-import {
-  applyMistyThemeFromExtensionAction,
-  useAppThemeStore,
-} from "../../../stores/useAppThemeStore";
-import {
-  advanceThemeRevision,
-  applyThemeTokenPreview,
-  handleSharedExtensionCommand,
-  themeSnapshot,
-} from "../../../plugins/extensionHostBridge";
-import { hasTauriInternals } from "@/shared/tauri";
-import { selectedPathsForPane, useExplorerStore } from "../../../stores/useExplorerStore";
-import { useTransfersStore } from "../../../stores/useTransfersStore";
+} from "@/models/interfaces/services/misty-api";
+import { useMultiPanelStore } from "@/features/workspace";
+import { useMinimumSpin } from "@/hooks/useMinimumSpin";
+import { errorText } from "@/lib/format";
+import { hasTauriInternals } from "@/platform/tauri";
+import { selectedPathsForPane, useExplorerStore } from "@/stores/explorer";
+import { useTransfersStore } from "@/stores/transfers";
 import { cx } from "./ExplorerDesktopShared";
 import {
   explorerTrayStyles,
@@ -98,10 +94,6 @@ const transferBadgeStatuses = new Set<TransferRecord["status"]>([
 const emptyTransferRows: TransferRecord[] = [];
 
 export function ExplorerTray(props: {
-  commands: PluginCommandEntry[];
-  panels: PluginPanelEntry[];
-  extensionsEnabled?: boolean;
-  selectedPath: string;
   terminalEnabled: boolean;
   terminalPath: string;
   mikaEnabled: boolean;
@@ -140,13 +132,6 @@ export function ExplorerTray(props: {
       >
         <Terminal size={16} />
       </Button>
-      {props.extensionsEnabled !== false ? (
-        <ExplorerPluginTabMenu
-          commands={props.commands}
-          panels={props.panels}
-          selectedPath={props.selectedPath}
-        />
-      ) : null}
     </>
   );
 }
@@ -598,23 +583,6 @@ export function ExplorerExtensionsPanel(props: {
   );
 }
 
-export type PluginMenuItem = {
-  pluginId: string;
-  pluginName: string;
-  panels: PluginPanelEntry[];
-  commands: PluginCommandEntry[];
-  usable: boolean;
-  primaryArea: string;
-  kind: "panel" | "commands";
-};
-
-export type PluginTabState = {
-  kind: "panel" | "commands";
-  pluginId: string;
-  panelId: string;
-  selectedPath: string;
-};
-
 const pluginTabProtocol = "misty-plugin:";
 const currentPluginArea = "files";
 
@@ -871,7 +839,6 @@ export function ExplorerPluginTabContent(props: {
         selectedPaths: props.tab.selectedPath ? [props.tab.selectedPath] : [],
       })
         .then((result) => {
-          publishPluginNotifications(result.notifications, result.message);
           if (result.handled) setMessage(result.message);
           else setError(`${result.label}: ${result.message}`);
         })
@@ -956,10 +923,6 @@ function ExplorerNativePluginPanelHost(props: { panel: PluginPanelEntry; selecte
       })
         .then((result) => {
           setRendered(result);
-          if (props.panel.pluginId === "themes" && clickedButton) {
-            applyMistyThemeFromExtensionAction(clickedButton);
-          }
-          publishPluginNotifications(result.notifications);
         })
         .catch((error) => setRenderError(errorText(error)))
         .finally(() => setRendering(false));
@@ -979,7 +942,6 @@ function ExplorerNativePluginPanelHost(props: { panel: PluginPanelEntry; selecte
     })
       .then((result) => {
         setRendered(result);
-        publishPluginNotifications(result.notifications);
       })
       .catch((error) => setRenderError(errorText(error)))
       .finally(() => setRendering(false));
@@ -1075,20 +1037,6 @@ function ExplorerWebPluginPanelHost(props: { panel: PluginPanelEntry; selectedPa
     return selections?.length ? selections : props.selectedPath ? [props.selectedPath] : [];
   }, [props.selectedPath]);
 
-  useEffect(
-    () => () => {
-      if (props.panel.pluginId !== "themes") return;
-      const current = useAppThemeStore.getState();
-      const root = document.documentElement;
-      root.dataset.theme = current.resolvedTheme;
-      root.dataset.mistyTheme = current.themeId;
-      root.style.colorScheme = current.resolvedTheme;
-      root.classList.toggle("dark", current.resolvedTheme === "dark");
-      applyThemeTokenPreview(current.customTokens);
-    },
-    [props.panel.pluginId],
-  );
-
   const postContext = useCallback(() => {
     if (hostState !== "ready") return;
     iframeRef.current?.contentWindow?.postMessage(
@@ -1097,7 +1045,6 @@ function ExplorerWebPluginPanelHost(props: { panel: PluginPanelEntry; selectedPa
         kind: "context",
         pluginId: props.panel.pluginId,
         selectedPaths: currentSelection(),
-        theme: themeSnapshot(),
       },
       "*",
     );
@@ -1154,7 +1101,7 @@ function ExplorerWebPluginPanelHost(props: { panel: PluginPanelEntry; selectedPa
         );
       const payload = request.payload ?? {};
       if (request.command === "host.selectedPaths") {
-        respond(true, { ok: true, selectedPaths: currentSelection(), theme: themeSnapshot() });
+        respond(true, { ok: true, selectedPaths: currentSelection() });
         return;
       }
       if (request.command === "host.pickFolders" && props.panel.pluginId === "backups") {
@@ -1183,21 +1130,12 @@ function ExplorerWebPluginPanelHost(props: { panel: PluginPanelEntry; selectedPa
         respond(true, { ok: true });
         return;
       }
-      void handleSharedExtensionCommand(command, payload)
-        .then((shared) => {
-          if (shared !== undefined) {
-            respond(true, shared);
-            postContext();
-            return;
-          }
-          return extensionCommandRun({ pluginId: props.panel.pluginId, command, payload }).then(
-            (result) => {
-              const started = result as { jobId?: string };
-              if (typeof started.jobId === "string" && started.jobId)
-                monitorExtensionJob(props.panel.pluginId, props.panel.pluginName, started.jobId);
-              respond(true, result);
-            },
-          );
+      void extensionCommandRun({ pluginId: props.panel.pluginId, command, payload })
+        .then((result) => {
+          const started = result as { jobId?: string };
+          if (typeof started.jobId === "string" && started.jobId)
+            monitorExtensionJob(props.panel.pluginId, props.panel.pluginName, started.jobId);
+          respond(true, result);
         })
         .catch((error) => respond(false, undefined, errorText(error)));
       return;
@@ -1205,15 +1143,6 @@ function ExplorerWebPluginPanelHost(props: { panel: PluginPanelEntry; selectedPa
     window.addEventListener("message", handleMessage);
     return () => window.removeEventListener("message", handleMessage);
   }, [postContext, props.panel.pluginId, props.panel.pluginName, props.selectedPath]);
-
-  useEffect(
-    () =>
-      useAppThemeStore.subscribe(() => {
-        advanceThemeRevision();
-        window.requestAnimationFrame(postContext);
-      }),
-    [postContext],
-  );
 
   useEffect(postContext, [postContext]);
   useEffect(() => {
@@ -1331,12 +1260,12 @@ function PluginIcon(props: {
   size: number;
 }) {
   return (
-    <ExtensionCatalogIcon
-      pluginId={props.pluginId}
-      pluginName={props.pluginName}
-      size={Math.max(props.size + 4, 20)}
-      roundedClassName="rounded-md"
-      textClassName="text-[8px] font-bold text-white"
-    />
+    <span
+      className="grid shrink-0 place-items-center rounded-md bg-[var(--misty-surface-2)] text-[8px] font-bold text-white"
+      style={{ width: Math.max(props.size + 4, 20), height: Math.max(props.size + 4, 20) }}
+      aria-hidden="true"
+    >
+      {(props.pluginName || props.pluginId || props.fallback).slice(0, 2).toUpperCase()}
+    </span>
   );
 }

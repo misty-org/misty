@@ -11,7 +11,7 @@ import {
   ShieldCheck,
   X,
 } from "lucide-react";
-import { agentArchitectureApi } from "../../spaces/agentArchitectureApi";
+import { agentArchitectureApi } from "@/stores/agents/useAgentArchitectureStore";
 import type {
   AgentInstanceRecord,
   PublishedAgentVersion,
@@ -19,16 +19,16 @@ import type {
   RunApproval,
   SpaceIntegration,
   SpaceRun,
-  SpaceStudioResource,
   WorkflowVersion,
-} from "../../spaces/types";
-import { errorText } from "@/shared/format";
-import { openProviderAuthorizationLink } from "@/shared/openExternalLink";
+} from "@/models/interfaces/features/spaces/types";
+import type { SpaceStudioResource } from "@/models/interfaces/features/spaces/types";
+import { errorText } from "@/lib/format";
+import { openProviderAuthorizationLink } from "@/platform/openExternalLink";
 import { AgentConversationPanel } from "./AgentConversation";
-import { useAuth } from "../../auth/AuthContext";
-import { Button } from "../../components/ui/button";
-import { Alert, AlertDescription, AlertTitle } from "../../components/ui/alert";
-import { Badge } from "../../components/ui/badge";
+import { useAuth } from "@/features/auth/AuthContext";
+import { Button } from "@/ui";
+import { Alert, AlertDescription, AlertTitle } from "@/ui";
+import { Badge } from "@/ui";
 import {
   Dialog,
   DialogContent,
@@ -36,18 +36,12 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "../../components/ui/dialog";
-import { Input } from "../../components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "../../components/ui/select";
-import { EmptyState } from "@/components/ui/state-view";
-import { IconButton } from "@/components/ui/icon-button";
-import { StatusBadge } from "@/components/ui/status-badge";
+} from "@/ui";
+import { Input } from "@/ui";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui";
+import { EmptyState } from "@/ui";
+import { PrimitiveIconButton as IconButton } from "@/ui";
+import { StatusBadge } from "@/ui";
 
 export function AgentArchitecturePanel(props: {
   agent: SpaceStudioResource;

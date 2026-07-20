@@ -1,3 +1,5 @@
+import type { AccountStatusTone, Tab } from "@/models/types/pages/Account/desktop/index";
+export type { AccountStatusTone, Tab } from "@/models/types/pages/Account/desktop/index";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
@@ -11,50 +13,51 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Progress } from "@/components/ui/progress";
-import { LoadingState } from "@/components/ui/state-view";
-import { StatusBadge } from "@/components/ui/status-badge";
-import { useAuth } from "../../../auth/AuthContext";
+} from "@/ui";
+import { Alert, AlertDescription, AlertTitle } from "@/ui";
+import { Avatar, AvatarFallback } from "@/ui";
+import { Button } from "@/ui";
+import { Input } from "@/ui";
+import { Progress } from "@/ui";
+import { LoadingState } from "@/ui";
+import { StatusBadge } from "@/ui";
+import { useAuth } from "@/features/auth/AuthContext";
 import {
-  createCheckout,
-  createCreditCheckout,
-  createPortalSession,
-  fetchBillingUsage,
-  fetchMe,
-  updateDevice,
-  updateProfile,
-  type BillingUsageResponse,
-  type MeResponse,
-} from "./api";
-import { useUserStore } from "../../../stores/useUserStore";
-import { useSetupStore } from "../../../stores/useSetupStore";
-import type { CurrentLicense } from "../../../models/setup";
-import { useAppStore } from "../../../stores/useAppStore";
+  accountCreateCheckout as createCheckout,
+  accountCreateCreditCheckout as createCreditCheckout,
+  accountCreatePortalSession as createPortalSession,
+  accountFetchBillingUsage as fetchBillingUsage,
+  accountFetchMe as fetchMe,
+  accountUpdateDevice as updateDevice,
+  accountUpdateProfile as updateProfile,
+} from "@/stores/account/useAccountStore";
+import type {
+  BillingUsageResponse,
+  AccountMeResponse as MeResponse,
+} from "@/models/interfaces/stores/account/useAccountStore";
+import { useUserStore } from "@/stores/account/useUserStore";
+import { useSetupStore } from "@/stores/app";
+import type { CurrentLicense } from "@/models/types/features/installer/types";
+import { useAppStore } from "@/stores/app";
 import {
   clearClientDebugEvents,
   clientDebugPanelEnabled,
   readClientDebugEvents,
-  type ClientDebugEvent,
-} from "@/shared/debug/clientDebug";
-import { openExternalLink } from "@/shared/openExternalLink";
-import { normalizeApiBaseUrl, withDefaultApiPath } from "../../../api/apiBase";
+} from "@/platform/clientDebug";
+import type { ClientDebugEvent } from "@/models/interfaces/platform/clientDebug";
+import { openExternalLink } from "@/platform/openExternalLink";
+import { normalizeApiBaseUrl, withDefaultApiPath } from "@/stores/backend";
 import { Bug, Lock, Rows3, UserCircle, type LucideIcon } from "lucide-react";
 import {
   DesktopSettingsFrame,
   DesktopSettingsRow,
   DesktopSettingsSection,
-} from "../../../components/settings/DesktopSettingsUI";
+} from "../../Settings/DesktopSettingsUI";
 const TIER_LABEL: Record<string, string> = {
   basic: "Basic",
   pro: "Pro",
   max: "Max",
 };
-type AccountStatusTone = "neutral" | "info" | "success" | "warning" | "danger";
 
 const TIER_TONE: Record<string, AccountStatusTone> = {
   basic: "neutral",
@@ -126,8 +129,6 @@ function SaveFeedback({ ok, error }: { ok: boolean; error: string }) {
   if (error) return <p className="mt-2 text-xs text-destructive">{error}</p>;
   return null;
 }
-
-type Tab = "general" | "account" | "privacy" | "diagnostics";
 
 const TABS: { id: Tab; label: string; icon: LucideIcon }[] = [
   { id: "general", label: "General", icon: Rows3 },

@@ -1,3 +1,5 @@
+import type { ResizeTarget } from "@/models/types/features/explorer/desktop/index";
+export type { ResizeTarget } from "@/models/types/features/explorer/desktop/index";
 import {
   Archive,
   AppWindow,
@@ -39,17 +41,14 @@ import {
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { CSSProperties, PointerEvent, ReactNode } from "react";
-import { listen } from "@tauri-apps/api/event";
-import type { UnlistenFn } from "@tauri-apps/api/event";
 import { readText, writeHtml, writeImage, writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { useNavigate } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
-import { MultiPanelWorkspace } from "@/shared/multipanel/MultiPanelWorkspace";
-import { useTransientScrollbars } from "@/shared/hooks/useTransientScrollbars";
-import { hasTauriInternals } from "@/shared/tauri";
+import { MultiPanelWorkspace } from "@/features/workspace";
+import { useTransientScrollbars } from "@/hooks/useTransientScrollbars";
+import { hasTauriInternals } from "@/platform/tauri";
 import { isAndroidBuild } from "@/platform/buildTarget";
-import { explorerRootForBuild } from "@/platform/androidStorage";
-import { useAppStore } from "../../../stores/useAppStore";
+import { useAppStore } from "@/stores/app";
 import {
   clipboardApplyShared,
   clipboardPublishImageBytes,
@@ -60,14 +59,12 @@ import {
   archiveCreate,
   archiveExtract,
   archiveList,
-  devicesSnapshot,
   compareApplyTextMerge,
   compareFiles,
   compareFolders,
   duplicatesCancel,
   duplicatesHashRemoteCandidates,
   duplicatesScan,
-  explorerListDirectory,
   explorerPreviewItem,
   explorerPrepareDragItems,
   explorerQueueDeleteItems,
@@ -87,11 +84,11 @@ import {
   shortcutsSnapshot,
   transfersSnapshot,
   androidGrantLocalFolder,
-  androidAllFilesAccessStatus,
   androidOpenAllFilesAccessSettings,
-} from "@/services/misty-api/misty";
+} from "@/stores/backend";
 import { ExplorerPane } from "../components/ExplorerPane";
-import { ExplorerSidebar, type AndroidLocalGrantRequest } from "../components/ExplorerSidebar";
+import { ExplorerSidebar } from "../components/ExplorerSidebar";
+import type { AndroidLocalGrantRequest } from "@/models/interfaces/features/explorer/components/ExplorerSidebar";
 import { ExplorerPaneToolbarActions, ExplorerToolbar } from "../components/ExplorerToolbar";
 import type { ExplorerLocationResult } from "../components/ExplorerToolbar";
 import { LibraryWorkspace, libraryWorkspacePath } from "../components/LibraryWorkspace";
@@ -102,31 +99,27 @@ import {
   scheduleExplorerWorkspaceSave,
   selectedEntryForPane,
   selectedDeletePathsForPane,
-  selectedPathsForPane,
   useExplorerStore,
   validateBatchRenameItems,
-} from "../../../stores/useExplorerStore";
+} from "@/stores/explorer";
 import type {
   ExplorerBatchRenameItem,
   ExplorerDialogState,
   ExplorerInlineEditState,
   ExplorerNotification,
   ExplorerSortColumn,
-} from "../../../stores/useExplorerStore";
-import { maxMultiPanelPanes, useMultiPanelStore } from "@/shared/multipanel/useMultiPanelStore";
+} from "@/stores/explorer";
+import { maxMultiPanelPanes, useMultiPanelStore } from "@/features/workspace";
 import { ProvidersWorkspacePanel } from "@/pages/Providers/desktop";
-import { useProvidersStore } from "../../../stores/useProvidersStore";
+import { useProvidersStore } from "@/stores/providers";
 import type {
-  AndroidAllFilesAccessStatus,
   ClipboardPayload,
   ExplorerLibrarySnapshot,
   FileEntry,
-  MountedDevice,
   PluginCommandEntry,
   PluginPanelElement,
   PluginPanelEntry,
   PluginPanelRenderResult,
-  ProviderRemote,
   TransferRecord,
   DuplicateGroup,
   DuplicateScanResult,
@@ -134,30 +127,29 @@ import type {
   CompareFolderRow,
   CompareFoldersResult,
   PasteItem,
-} from "@/services/misty-api/types";
-import type { MultiPanelTab } from "@/shared/multipanel/types";
-import { useOperationQueueStore } from "../../../stores/useOperationQueueStore";
-import { useTransfersStore } from "../../../stores/useTransfersStore";
+} from "@/models/interfaces/services/misty-api";
+import type { MultiPanelTab } from "@/models/interfaces/workspace";
+import { useOperationQueueStore } from "@/stores/explorer";
+import { useTransfersStore } from "@/stores/transfers";
 import { TransfersWorkspacePanel } from "@/pages/Transfers/desktop";
-import { shortcutMapFromBindings, shortcutMatchesEvent } from "@/shared/shortcuts";
-import type { ShortcutMap } from "@/shared/shortcuts";
+import { shortcutMapFromBindings, shortcutMatchesEvent } from "@/lib/shortcuts";
+import type { ShortcutMap } from "@/models/types/lib/shortcuts";
 import {
   selectAdvancedPreferences,
   selectAssistantPreferences,
   selectGeneralPreferences,
   selectShortcutPreferences,
   useSettingsStore,
-} from "../../../stores/useSettingsStore";
-import { openCloudFolderBotChatWindow, openCloudFolderBotWindow } from "@/bots/cloudFolderBot";
-import { errorText } from "@/shared/format";
-import { applyMistyThemeFromExtensionAction } from "../../../stores/useAppThemeStore";
-import { ExtensionCatalogIcon } from "../../../plugins/ExtensionCatalogIcon";
-import { pluginCatalogChangedEvent } from "../../../plugins/pluginEvents";
-import { publishPluginNotifications } from "../../../plugins/pluginNotifications";
+} from "@/stores/app";
+import {
+  openCloudFolderBotChatWindow,
+  openCloudFolderBotWindow,
+} from "@/features/bots/cloudFolderBot";
+import { errorText } from "@/lib/format";
 import { clipboardImagePng } from "../utils/clipboardImage";
 import { formatBytes, formatDate } from "../utils/fileFormat";
 import { revealSearchResultInPane } from "../utils/searchNavigation";
-import type { ExplorerSearchNavigationTarget } from "../utils/searchNavigation";
+import type { ExplorerSearchNavigationTarget } from "@/models/interfaces/features/explorer/utils/searchNavigation";
 import { cx } from "./ExplorerDesktopShared";
 import { explorerShellStyles } from "./ExplorerShellStyles";
 import {
@@ -176,7 +168,6 @@ import {
   buildExplorerLocationResults,
   clamp,
   ExplorerBottomBar,
-  mountedDevicesEqual,
   multiPanelWorkspaceNeedsSave,
   pluginCommandsEqual,
   pluginPanelsEqual,
@@ -200,26 +191,23 @@ import {
 } from "./ExplorerDesktopPlugins";
 import { ExplorerDialog } from "./ExplorerBatchRenameDialog";
 import { CompareDialog } from "./ExplorerCompareDialog";
-import type { CompareDialogSeed } from "./ExplorerCompareDialog";
+import type { CompareDialogSeed } from "@/models/interfaces/features/explorer/desktop/ExplorerCompareDialog";
 import { DuplicateFinderDialog } from "./ExplorerDuplicateFinderDialog";
 import { compareSeedForPane, ExplorerContextMenu, openCompareWith } from "./ExplorerContextMenu";
 import { ExplorerDragProvider } from "../drag/ExplorerDragContext";
-
-const minSidebarWidth = 212;
-const maxSidebarWidth = 380;
-const minPreviewWidth = 240;
-const maxPreviewWidth = 420;
-const transferRefreshPollMs = 12000;
-const devicesChangedEvent = "misty://devices-changed";
-const explorerSearchFocusEvent = "misty:explorer-search-focus";
-const explorerDuplicateFinderEvent = "misty:explorer-duplicate-finder";
-const explorerCompareWithEvent = "misty:explorer-compare-with";
-const emptyPinnedPaths: string[] = [];
-const emptyProviderRemotes: ProviderRemote[] = [];
-const emptyPluginCommands: PluginCommandEntry[] = [];
-const emptyPluginPanels: PluginPanelEntry[] = [];
-const emptyMountedDevices: MountedDevice[] = [];
-type ResizeTarget = "sidebar" | "preview" | null;
+import {
+  emptyPluginCommands,
+  emptyPluginPanels,
+  emptyProviderRemotes,
+  explorerCompareWithEvent,
+  explorerDuplicateFinderEvent,
+  maxPreviewWidth,
+  maxSidebarWidth,
+  minPreviewWidth,
+  minSidebarWidth,
+  transferRefreshPollMs,
+} from "./ExplorerWorkspaceConstants";
+import { useExplorerDevices } from "./useExplorerDevices";
 
 export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
   const navigate = useNavigate();
@@ -330,7 +318,7 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
     preferredWorkspaceRoot,
     environmentHomePath,
   );
-  const homePath = explorerRootForBuild(storageHomePath);
+  const homePath = isAndroidBuild ? "misty://local" : storageHomePath;
   const mountRoot = resolveMountRoot(
     storageHomePath,
     settingsMountPath || app?.environment.mountPath || ".misty/mnt",
@@ -340,10 +328,6 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
   );
   const explorerInitialized = useExplorerStore((state) => state.initialized);
   const extensionsEnabled = !isAndroidBuild;
-  const activeSelectedPath = useExplorerStore(
-    (state) => selectedPathsForPane(state.panes[activePaneId])[0] ?? activePath,
-  );
-
   useEffect(() => {
     if (!extensionsEnabled) return;
     const multi = useMultiPanelStore.getState();
@@ -526,11 +510,9 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
     };
     void loadCommandMetadata();
     window.addEventListener("focus", loadCommandMetadata);
-    window.addEventListener(pluginCatalogChangedEvent, loadCommandMetadata);
     return () => {
       disposed = true;
       window.removeEventListener("focus", loadCommandMetadata);
-      window.removeEventListener(pluginCatalogChangedEvent, loadCommandMetadata);
     };
   }, [
     extensionsEnabled,
@@ -986,10 +968,6 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
   const renderTabActions = useCallback(
     () => (
       <ExplorerTray
-        commands={pluginCommands}
-        extensionsEnabled={extensionsEnabled}
-        panels={pluginPanels}
-        selectedPath={activeSelectedPath}
         mikaEnabled={mikaEnabled}
         onOpenMika={() => {
           if (!mikaEnabled) return;
@@ -1008,14 +986,10 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
     ),
     [
       activePath,
-      activeSelectedPath,
       activeTabPath,
       activeTabSupportsSidePanels,
-      extensionsEnabled,
       mikaEnabled,
       app?.environment.assetsDir,
-      pluginCommands,
-      pluginPanels,
     ],
   );
   const renderBottomBar = useCallback((tab: MultiPanelTab) => {

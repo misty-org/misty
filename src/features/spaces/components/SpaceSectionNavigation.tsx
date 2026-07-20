@@ -1,8 +1,8 @@
 import type { ReactNode } from "react";
 import { BookOpenText, Bot, CheckSquare2, MessagesSquare, Settings2, Users } from "lucide-react";
 import { Link } from "react-router-dom";
-import { cn } from "@/lib/utils";
-import { useSpacesStore } from "../../../stores/useSpacesStore";
+import { cn } from "@/ui";
+import { useSpacesStore } from "@/stores/spaces/useSpacesStore";
 
 const sections = [
   { id: "chat", label: "Chat", icon: MessagesSquare },

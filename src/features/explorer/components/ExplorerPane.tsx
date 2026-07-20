@@ -1,11 +1,16 @@
+import type { ExplorerPaneProps } from "@/models/interfaces/features/explorer/components/ExplorerPane";
+export type { ExplorerPaneProps } from "@/models/interfaces/features/explorer/components/ExplorerPane";
 import { memo, useCallback, useEffect, useMemo } from "react";
 import type { MouseEvent, ReactNode } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { FileBrowser } from "./FileBrowser";
-import { useExplorerStore } from "../../../stores/useExplorerStore";
-import type { FileEntry } from "@/services/misty-api/types";
+import { useExplorerStore } from "@/stores/explorer";
+import type { FileEntry } from "@/models/interfaces/services/misty-api";
 import { groupItemsByOperation } from "../drag/operations";
-import type { ExplorerDragModifiers, ExplorerDragPayload } from "../drag/types";
+import type {
+  ExplorerDragModifiers,
+  ExplorerDragPayload,
+} from "@/models/interfaces/features/explorer/drag/types";
 
 const paneStyles = {
   shell:
@@ -17,13 +22,6 @@ const paneStyles = {
 } as const;
 
 const emptySelectedIds: string[] = [];
-
-interface ExplorerPaneProps {
-  paneId: string;
-  path: string;
-  isActive?: boolean;
-  paneActions?: ReactNode;
-}
 
 export const ExplorerPane = memo(function ExplorerPane(props: ExplorerPaneProps) {
   const { pane, viewMode, itemScale, sort, showHidden, inlineEdit, clipboard } = useExplorerStore(

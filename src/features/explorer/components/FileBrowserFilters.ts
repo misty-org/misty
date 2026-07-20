@@ -1,7 +1,6 @@
-import type { FileEntry } from "@/services/misty-api/types";
-
-export type EntryFilterMatcher =
-  { kind: "substring"; query: string } | { kind: "pattern"; expression: RegExp };
+import type { EntryFilterMatcher } from "@/models/types/features/explorer/components/FileBrowserFilters";
+export type { EntryFilterMatcher } from "@/models/types/features/explorer/components/FileBrowserFilters";
+import type { FileEntry } from "@/models/interfaces/services/misty-api";
 
 export function compileEntryFilterMatcher(query: string): EntryFilterMatcher | null {
   if (!query) return null;

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import { spacesApi } from "../../spaces/api";
-import type { SpaceConversation, SpaceMessage } from "../../spaces/types";
+import { spacesApi } from "@/stores/spaces/useSpacesBackendStore";
+import type { SpaceConversation } from "@/models/interfaces/features/spaces/types";
+import type { SpaceMessage } from "@/models/interfaces/features/spaces/types";
 
 export function useSpaceConversationChat(
   spaceId: string,

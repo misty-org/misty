@@ -1,8 +1,5 @@
-export interface PointLike {
-  x: number;
-  y: number;
-}
-
+import type { PointLike } from "@/models/interfaces/features/explorer/drag/geometry";
+export type { PointLike } from "@/models/interfaces/features/explorer/drag/geometry";
 export function physicalToClientPoint(
   point: PointLike,
   scaleFactor: number,

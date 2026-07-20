@@ -1,4 +1,14 @@
-import { Button } from "../../../components/ui/button";
+import type { QuickAccessItem } from "@/models/types/features/explorer/components/ExplorerSidebar";
+export type { QuickAccessItem } from "@/models/types/features/explorer/components/ExplorerSidebar";
+import type {
+  ExplorerSidebarProps,
+  AndroidLocalGrantRequest,
+} from "@/models/interfaces/features/explorer/components/ExplorerSidebar";
+export type {
+  ExplorerSidebarProps,
+  AndroidLocalGrantRequest,
+} from "@/models/interfaces/features/explorer/components/ExplorerSidebar";
+import { Button } from "@/ui";
 import {
   Briefcase,
   Camera,
@@ -29,11 +39,7 @@ import {
   X,
 } from "lucide-react";
 import { memo, useEffect, useMemo, useState } from "react";
-import {
-  savedSearchesDelete,
-  savedSearchesSave,
-  savedSearchesSnapshot,
-} from "@/services/misty-api/misty";
+import { savedSearchesDelete, savedSearchesSave, savedSearchesSnapshot } from "@/stores/backend";
 import type {
   AndroidAllFilesAccessStatus,
   ExplorerLibrarySnapshot,
@@ -41,12 +47,12 @@ import type {
   MountedDevice,
   ProviderRemote,
   SavedSearch,
-} from "@/services/misty-api/types";
-import { providerIconForType } from "@/shared/assets/icons";
-import { AssetIcon } from "@/shared/components/AssetIcon";
-import { errorText } from "@/shared/format";
-import type { ExplorerWorkspaceEntry } from "../../../stores/useExplorerStore";
-import { useSearchStore } from "../../../stores/useSearchStore";
+} from "@/models/interfaces/services/misty-api";
+import { providerIconForType } from "@/assets/icons";
+import { AssetIcon } from "@/ui";
+import { errorText } from "@/lib/format";
+import type { ExplorerWorkspaceEntry } from "@/stores/explorer";
+import { useSearchStore } from "@/stores/explorer";
 import {
   addHiddenQuickAccessPath,
   buildDeviceEntries,
@@ -82,67 +88,26 @@ import {
   ContextMenuItem,
   ContextMenuSeparator,
   ContextMenuTrigger,
-} from "../../../components/ui/context-menu";
+} from "@/ui";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "../../../components/ui/dropdown-menu";
+} from "@/ui";
+import type {
+  QuickAccessMenuItem,
+  SmartFolderDialogState,
+  WorkspaceDialogState,
+} from "@/models/types/features/explorer/components/ExplorerSidebarSupport";
 import type {
   DeviceCustomizationState,
-  QuickAccessMenuItem,
   SidebarCollapsedState,
   SidebarDeviceEntry,
   SmartFolderDraft,
-  SmartFolderDialogState,
-  WorkspaceDialogState,
-} from "./ExplorerSidebarSupport";
+} from "@/models/interfaces/features/explorer/components/ExplorerSidebarSupport";
 import { ExplorerDropTarget } from "../drag/ExplorerDropTarget";
-
-interface ExplorerSidebarProps {
-  homePath: string;
-  activePath: string;
-  mountRoot: string;
-  remotes: ProviderRemote[];
-  remoteLoading: boolean;
-  library: ExplorerLibrarySnapshot | null;
-  devices: MountedDevice[];
-  devicesLoading: boolean;
-  pinnedPaths: string[];
-  workspaceEntries: ExplorerWorkspaceEntry[];
-  activeWorkspaceId: string;
-  activeWorkspaceTitle: string;
-  onNavigate: (path: string) => void;
-  onRefreshDevices: () => void;
-  onSelectWorkspace: (workspaceId: string) => void;
-  onCreateWorkspace: (title: string) => void;
-  onRenameWorkspace: (workspaceId: string, title: string) => void;
-  onDeleteWorkspace: (workspaceId: string) => void;
-  onOpenInNewTab: (path: string, title?: string) => void;
-  onManageRemotes: () => void;
-  onAddRemote: () => void;
-  androidLocal: boolean;
-  androidAllFilesAccess: AndroidAllFilesAccessStatus | null;
-  androidGrantedFolders: FileEntry[];
-  onGrantLocalFolder: (request?: AndroidLocalGrantRequest) => void;
-  onUnpinPinnedPath: (path: string) => void;
-}
-
-export interface AndroidLocalGrantRequest {
-  label: string;
-  targetNames: string[];
-  initialDirectory: string;
-  grantedPath?: string;
-}
-
-type QuickAccessItem = {
-  label: string;
-  icon: typeof Folder;
-  path: string;
-  grantRequest?: AndroidLocalGrantRequest;
-};
 
 const androidSuggestedLocalFolders = [
   { label: "Documents", icon: FileText, initialDirectory: "Documents", targetNames: ["documents"] },

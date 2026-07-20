@@ -1,27 +1,22 @@
-import type { MultiPanelClosedPane, MultiPanelTab } from "@/shared/multipanel/types";
-import type { MultiPanelStore } from "@/shared/multipanel/useMultiPanelStore";
+import type { TransfersMultiPanelSnapshot } from "@/models/interfaces/pages/Transfers/desktop/transferPersistence";
+export type { TransfersMultiPanelSnapshot } from "@/models/interfaces/pages/Transfers/desktop/transferPersistence";
+import type { MultiPanelClosedPane, MultiPanelTab } from "@/models/interfaces/workspace";
+import type { MultiPanelStore } from "@/models/interfaces/workspace";
 import {
   isTransferTableColumn,
   transferDefaultColumnWidths,
   transferMinimumColumnWidths,
   transferTableColumns,
-  type TransferColumnWidths,
-  type TransferTableColumn,
 } from "./transferModel";
+import type {
+  TransferColumnWidths,
+  TransferTableColumn,
+} from "@/models/types/pages/Transfers/desktop/transferModel";
 
 const TRANSFERS_MULTIPANEL_STORAGE_KEY = "misty.transfers.multipanel.v1";
 const TRANSFER_COLUMN_WIDTHS_STORAGE_KEY = "misty.transfers.table.columnWidths";
 const TRANSFER_COLUMN_ORDER_STORAGE_KEY = "misty.transfers.table.columnOrder";
 const TRANSFER_PANEL_VISIBILITY_STORAGE_KEY = "misty.transfers.panelVisibility";
-
-interface TransfersMultiPanelSnapshot {
-  tabs: MultiPanelTab[];
-  activeTabId: string;
-  activePaneId: string;
-  closedPanes: MultiPanelClosedPane[];
-  nextPaneIndex: number;
-  nextTabIndex: number;
-}
 
 export function saveTransfersMultiPanelSnapshot(state: MultiPanelStore): void {
   if (typeof window === "undefined" || state.tabs.length === 0) return;

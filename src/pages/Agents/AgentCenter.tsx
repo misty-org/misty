@@ -1,3 +1,13 @@
+import type {
+  AgentCenterTab,
+  AgentRuntime,
+  RunDetail,
+} from "@/models/types/pages/Agents/AgentCenter";
+export type {
+  AgentCenterTab,
+  AgentRuntime,
+  RunDetail,
+} from "@/models/types/pages/Agents/AgentCenter";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import {
@@ -24,8 +34,8 @@ import {
   Workflow,
   X,
 } from "lucide-react";
-import { agentArchitectureApi } from "../../spaces/agentArchitectureApi";
-import { SpaceRequestError, spacesApi } from "../../spaces/api";
+import { agentArchitectureApi } from "@/stores/agents/useAgentArchitectureStore";
+import { SpaceRequestError, spacesApi } from "@/stores/spaces/useSpacesBackendStore";
 import type {
   AgentCatalogEntry,
   AgentInstanceRecord,
@@ -34,59 +44,29 @@ import type {
   ProviderSharedResource,
   RunAction,
   RunApproval,
-  SpaceCalendarSource,
   SpaceIntegration,
   SpaceRun,
   WorkflowRunStep,
-} from "../../spaces/types";
-import { errorText } from "@/shared/format";
-import { openProviderAuthorizationLink } from "@/shared/openExternalLink";
-import { providerCatalog, providerById } from "../../workflows/providers";
-import SpaceStudioPage, { type SpaceStudioKind } from "@/pages/Studio";
-import { Alert, AlertDescription, AlertTitle } from "../../components/ui/alert";
-import { Badge } from "../../components/ui/badge";
-import { Button } from "../../components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "../../components/ui/card";
-import { Checkbox } from "../../components/ui/checkbox";
-import { Input } from "../../components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "../../components/ui/select";
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from "../../components/ui/sheet";
-import { Tabs, TabsList, TabsTrigger } from "../../components/ui/tabs";
-import { ToggleGroup, ToggleGroupItem } from "../../components/ui/toggle-group";
-import { EmptyState, LoadingState } from "@/components/ui/state-view";
-import { IconButton } from "@/components/ui/icon-button";
-import { StatusBadge } from "@/components/ui/status-badge";
-
-type AgentCenterTab = "attention" | "results" | "activity" | "history" | "settings" | "studio";
-type AgentRuntime = {
-  catalog: AgentCatalogEntry;
-  instance?: AgentInstanceRecord;
-  runs: SpaceRun[];
-};
-type RunDetail = {
-  run: SpaceRun;
-  actions: RunAction[];
-  approvals: RunApproval[];
-  steps: WorkflowRunStep[];
-};
+} from "@/models/interfaces/features/spaces/types";
+import type { SpaceCalendarSource } from "@/models/interfaces/features/spaces/types";
+import { errorText } from "@/lib/format";
+import { openProviderAuthorizationLink } from "@/platform/openExternalLink";
+import { providerCatalog, providerById } from "../../features/workflows/providers";
+import SpaceStudioPage from "@/pages/Studio";
+import type { SpaceStudioKind } from "@/models/types/pages/Studio/index";
+import { Alert, AlertDescription, AlertTitle } from "@/ui";
+import { Badge } from "@/ui";
+import { Button } from "@/ui";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui";
+import { Checkbox } from "@/ui";
+import { Input } from "@/ui";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/ui";
+import { Tabs, TabsList, TabsTrigger } from "@/ui";
+import { ToggleGroup, ToggleGroupItem } from "@/ui";
+import { EmptyState, LoadingState } from "@/ui";
+import { PrimitiveIconButton as IconButton } from "@/ui";
+import { StatusBadge } from "@/ui";
 
 export function AgentCenter({
   spaceId,

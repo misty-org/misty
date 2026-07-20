@@ -86,7 +86,6 @@ const findings = [];
 const legacyPhoneUiPaths = [
   "src/layouts/MobileLayout.tsx",
   "src/platform/formFactor.ts",
-  "src/shared/mobileStyles.ts",
   "src/pages/Account/mobile",
   "src/pages/Changelog/mobile",
   "src/pages/Extensions/mobile",

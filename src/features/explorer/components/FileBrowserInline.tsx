@@ -1,16 +1,12 @@
-import { Input } from "../../../components/ui/input";
-import { TableCell, TableRow } from "../../../components/ui/table";
+import type { PassiveRenameDraft } from "@/models/types/features/explorer/components/FileBrowserInline";
+export type { PassiveRenameDraft } from "@/models/types/features/explorer/components/FileBrowserInline";
+import { Input } from "@/ui";
+import { TableCell, TableRow } from "@/ui";
 import { useLayoutEffect, useRef } from "react";
-import type { FileEntry } from "@/services/misty-api/types";
-import type { ExplorerInlineEditState, ExplorerSortColumn } from "../../../stores/useExplorerStore";
+import type { FileEntry } from "@/models/interfaces/services/misty-api";
+import type { ExplorerInlineEditState, ExplorerSortColumn } from "@/stores/explorer";
 import { FileIcon } from "./FileBrowserIcons";
 import { fileBrowserStyles } from "./FileBrowserStyles";
-
-export type PassiveRenameDraft = {
-  value: string;
-  lockedExtension: string;
-  error: string | null;
-};
 
 export function InlineCreateTableRow(props: {
   edit: ExplorerInlineEditState;

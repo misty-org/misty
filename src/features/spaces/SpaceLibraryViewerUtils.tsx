@@ -1,10 +1,11 @@
 import type { Dispatch, SetStateAction } from "react";
 import { ChevronDown } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Slider } from "@/components/ui/slider";
-import type { LibraryEditDefinition, LibraryEditVersion } from "@/spaces/types";
+import { Button } from "@/ui";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/ui";
+import { Slider } from "@/ui";
+import type { LibraryEditDefinition } from "@/models/types/features/spaces/types";
+import type { LibraryEditVersion } from "@/models/interfaces/features/spaces/types";
 
 import { formatBytes } from "./libraryFormat";
 

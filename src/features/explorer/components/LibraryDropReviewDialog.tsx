@@ -1,4 +1,4 @@
-import { Button } from "../../../components/ui/button";
+import { Button } from "@/ui";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -6,9 +6,9 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "../../../components/ui/alert-dialog";
+} from "@/ui";
 import { AlertTriangle, Files, Sparkles } from "lucide-react";
-import type { SmartLibraryImportPreflight } from "@/services/misty-api/types";
+import type { SmartLibraryImportPreflight } from "@/models/interfaces/services/misty-api";
 
 export function LibraryDropReviewDialog(props: {
   preflight: SmartLibraryImportPreflight;

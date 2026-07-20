@@ -1,5 +1,9 @@
+import type { BatchRenameCaseMode } from "@/models/types/features/explorer/desktop/ExplorerBatchRenameDialog";
+export type { BatchRenameCaseMode } from "@/models/types/features/explorer/desktop/ExplorerBatchRenameDialog";
+import type { BatchRenameOptions } from "@/models/interfaces/features/explorer/desktop/ExplorerBatchRenameDialog";
+export type { BatchRenameOptions } from "@/models/interfaces/features/explorer/desktop/ExplorerBatchRenameDialog";
 import { useCallback, useMemo, useState } from "react";
-import { Badge } from "@/components/ui/badge";
+import { Badge } from "@/ui";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -9,9 +13,9 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
+} from "@/ui";
+import { Button } from "@/ui";
+import { Checkbox } from "@/ui";
 import {
   Dialog,
   DialogContent,
@@ -19,34 +23,11 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { validateBatchRenameItems, useExplorerStore } from "../../../stores/useExplorerStore";
-import type {
-  ExplorerBatchRenameItem,
-  ExplorerDialogState,
-} from "../../../stores/useExplorerStore";
-
-type BatchRenameCaseMode = "none" | "lower" | "upper" | "title";
-interface BatchRenameOptions {
-  findText: string;
-  replaceText: string;
-  prefix: string;
-  suffix: string;
-  caseMode: BatchRenameCaseMode;
-  lockExtensions: boolean;
-  sequenceEnabled: boolean;
-  sequenceStart: number;
-  sequencePad: number;
-  manualValues: Record<string, string>;
-}
+} from "@/ui";
+import { Input } from "@/ui";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui";
+import { validateBatchRenameItems, useExplorerStore } from "@/stores/explorer";
+import type { ExplorerBatchRenameItem, ExplorerDialogState } from "@/stores/explorer";
 
 const dialogChromeClass =
   "flex max-h-[min(760px,calc(100vh-48px))] w-[min(720px,calc(100vw-48px))] max-w-none flex-col overflow-hidden bg-popover p-0 text-popover-foreground";

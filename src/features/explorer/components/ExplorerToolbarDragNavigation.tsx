@@ -1,4 +1,4 @@
-import { Button } from "../../../components/ui/button";
+import { Button } from "@/ui";
 import { ArrowUp, ChevronLeft, ChevronRight, type LucideIcon } from "lucide-react";
 import { ExplorerDropTarget } from "../drag/ExplorerDropTarget";
 import { toolbarStyles } from "./ExplorerToolbarSupport";

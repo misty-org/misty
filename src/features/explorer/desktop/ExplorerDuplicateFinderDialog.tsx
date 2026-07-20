@@ -1,8 +1,8 @@
 import { useCallback, useMemo, useState } from "react";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/ui";
+import { Button } from "@/ui";
+import { Card } from "@/ui";
+import { Checkbox } from "@/ui";
 import {
   Dialog,
   DialogContent,
@@ -10,28 +10,26 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
+} from "@/ui";
+import { Input } from "@/ui";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui";
+import { Textarea } from "@/ui";
 import {
   duplicatesCancel,
   duplicatesHashRemoteCandidates,
   duplicatesScan,
   explorerQueueDeleteItems,
   explorerQueuePasteItems,
-} from "@/services/misty-api/misty";
-import type { DuplicateGroup, DuplicateScanResult, PasteItem } from "@/services/misty-api/types";
-import { useOperationQueueStore } from "../../../stores/useOperationQueueStore";
-import { useExplorerStore } from "../../../stores/useExplorerStore";
-import { useTransfersStore } from "../../../stores/useTransfersStore";
-import { errorText } from "@/shared/format";
+} from "@/stores/backend";
+import type {
+  DuplicateGroup,
+  DuplicateScanResult,
+  PasteItem,
+} from "@/models/interfaces/services/misty-api";
+import { useOperationQueueStore } from "@/stores/explorer";
+import { useExplorerStore } from "@/stores/explorer";
+import { useTransfersStore } from "@/stores/transfers";
+import { errorText } from "@/lib/format";
 import { formatBytes, formatDate } from "../utils/fileFormat";
 
 const dialogChromeClass =

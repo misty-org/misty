@@ -1,8 +1,11 @@
 import { Fragment, type MouseEvent as ReactMouseEvent } from "react";
 import { Check, EllipsisVertical, Star } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
-import type { LibraryAssetStack, SpaceLibraryItem } from "@/spaces/types";
+import { Button } from "@/ui";
+import type {
+  LibraryAssetStack,
+  SpaceLibraryItem,
+} from "@/models/interfaces/features/spaces/types";
 
 import { useSpaceLibraryContext } from "../SpaceLibraryContext";
 import { formatBytes, formatTime, libraryDateGroupLabel } from "../libraryFormat";

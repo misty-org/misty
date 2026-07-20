@@ -1,6 +1,14 @@
+import type {
+  BotContextMenu,
+  MikaNativeVelocity,
+} from "@/models/types/pages/BotOverlay/CloudFolderBotOverlay";
+export type {
+  BotContextMenu,
+  MikaNativeVelocity,
+} from "@/models/types/pages/BotOverlay/CloudFolderBotOverlay";
 import { useEffect, useMemo, useState } from "react";
 import type { MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from "react";
-import { invoke } from "@tauri-apps/api/core";
+import { cancelMikaMomentum, startMikaDrag } from "@/stores/backend";
 import { listen } from "@tauri-apps/api/event";
 import { currentMonitor, getCurrentWindow, primaryMonitor } from "@tauri-apps/api/window";
 import { PhysicalPosition } from "@tauri-apps/api/dpi";
@@ -14,20 +22,19 @@ import {
   openMikaAssistantFromBot,
   positionCloudFolderBotChatWindow,
   returnToMistyAppFromBot,
-  type CloudFolderBotNotification,
-  type CloudFolderBotChatVisibility,
-} from "@/bots/cloudFolderBot";
-import { hasTauriInternals } from "@/shared/tauri";
+} from "@/features/bots/cloudFolderBot";
+import type {
+  CloudFolderBotNotification,
+  CloudFolderBotChatVisibility,
+} from "@/models/interfaces/features/bots/cloudFolderBot";
+import { hasTauriInternals } from "@/platform/tauri";
 import {
   hideRuntimeAssetOnError,
   revealRuntimeAssetOnLoad,
   runtimeAssetSource,
-} from "@/shared/assets/runtimeAsset";
-import { useSettingsStore } from "../../stores/useSettingsStore";
-import { Button } from "../../components/ui/button";
-
-type BotContextMenu = { x: number; y: number };
-type MikaNativeVelocity = { velocityX: number; velocityY: number };
+} from "@/platform/runtimeAsset";
+import { useSettingsStore } from "@/stores/app";
+import { Button } from "@/ui";
 
 const botContextMenuSize = { width: 156, height: 84 };
 const contextMenuClass =
@@ -150,7 +157,7 @@ export default function CloudFolderBotOverlay() {
   useEffect(() => {
     if (!chatMode) return;
     resetSpritePhysics();
-    if (hasTauriInternals()) void invoke("cancel_mika_momentum");
+    if (hasTauriInternals()) void cancelMikaMomentum();
   }, [chatMode]);
 
   useEffect(() => {
@@ -198,7 +205,7 @@ export default function CloudFolderBotOverlay() {
     setContextMenu(null);
     if (!hasTauriInternals()) return;
     resetSpritePhysics();
-    void invoke("start_mika_drag")
+    void startMikaDrag()
       .catch(() => undefined)
       .finally(() => {
         void clampBotWindowToScreen().then(positionCloudFolderBotChatWindow);

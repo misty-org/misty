@@ -1,6 +1,6 @@
 import { ClipboardCopy, Star, Trash2, Upload, X } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
+import { Button } from "@/ui";
 
 import { LibraryFacetGroup } from "../SpaceLibraryPrimitives";
 import { SpaceLibraryEmptyState, SpaceLibraryHeader } from "./SpaceLibraryChrome";

@@ -1,3 +1,5 @@
+import type { LibraryAssetStackInput } from "@/models/types/features/spaces/SpaceLibraryPrimitives";
+export type { LibraryAssetStackInput } from "@/models/types/features/spaces/SpaceLibraryPrimitives";
 import { createContext, useContext, useEffect, useState } from "react";
 import {
   ChevronLeft,
@@ -14,22 +16,16 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { spacesApi } from "@/spaces/api";
+import { Button } from "@/ui";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui";
+import { spacesApi } from "@/stores/spaces/useSpacesBackendStore";
 import type {
   LibraryAssetStack,
   LibraryDiscoveryGroup,
   LibraryMapPoint,
   LibrarySearchFacets,
   SpaceLibraryItem,
-} from "@/spaces/types";
+} from "@/models/interfaces/features/spaces/types";
 
 import { libraryItemThumbnailEligible } from "./libraryThumbnail";
 
@@ -95,11 +91,6 @@ export function LibraryItemThumbnail({
     <File size={30} />
   );
 }
-
-export type LibraryAssetStackInput = Pick<
-  LibraryAssetStack,
-  "kind" | "title" | "cover_item_id" | "motion_item_id" | "members"
->;
 
 export function buildLibraryAssetStack(
   kind: LibraryAssetStack["kind"],

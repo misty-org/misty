@@ -1,38 +1,35 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
-import { devicesSnapshot, savedSearchesSnapshot } from "../../../api/misty";
+import { devicesSnapshot, savedSearchesSnapshot } from "@/stores/backend";
 import type {
   ExplorerLibrarySnapshot,
   MountedDevice,
   ProviderRemote,
   SavedSearch,
   SavedSearchRule,
-} from "../../../api/types";
-import { releases } from "../../../data/releases";
-import { useMultiPanelStore } from "@/shared/multipanel/useMultiPanelStore";
-import { useAppStore } from "../../../stores/useAppStore";
-import { useExplorerStore } from "../../../stores/useExplorerStore";
-import { useProvidersStore } from "../../../stores/useProvidersStore";
-import { useSearchStore } from "../../../stores/useSearchStore";
-import { explorerRootForBuild } from "@/platform/androidStorage";
+} from "@/models/interfaces/services/misty-api";
+import { releases } from "@/features/installer/data/releases";
+import { useMultiPanelStore } from "@/features/workspace";
+import { useAppStore } from "@/stores/app";
+import { useExplorerStore } from "@/stores/explorer";
+import { useProvidersStore } from "@/stores/providers";
+import { useSearchStore } from "@/stores/explorer";
 import { isAndroidBuild } from "@/platform/buildTarget";
 import {
   selectAdvancedPreferences,
   selectGeneralPreferences,
   useSettingsStore,
-} from "../../../stores/useSettingsStore";
-import { changelog } from "../../Changelog/desktop/data";
-import { posts } from "../../../data/blog";
+} from "@/stores/app";
+import { posts } from "@/features/installer/data/blog";
 import { DesktopWorkspacePanel } from "./DesktopWorkspacePanel";
 import { HomeFooter } from "./HomeFooter";
-import {
-  buildHomeQuickAccessItems,
-  HomeSidebarPanels,
-  type HomeQuickAccessItem,
-  type HomeSmartFolderItem,
-  type HomeTagItem,
-} from "./HomeSidebarPanels";
+import { buildHomeQuickAccessItems, HomeSidebarPanels } from "./HomeSidebarPanels";
+import type {
+  HomeQuickAccessItem,
+  HomeSmartFolderItem,
+  HomeTagItem,
+} from "@/models/types/pages/Home/desktop/HomeSidebarPanels";
 import {
   joinPath,
   resolveMountRoot,
@@ -74,7 +71,7 @@ export default function HomePage() {
     preferredWorkspaceRoot,
     app?.environment.homeDir ?? "/",
   );
-  const homePath = explorerRootForBuild(storageHomePath);
+  const homePath = isAndroidBuild ? "misty://local" : storageHomePath;
   const mountRoot = resolveMountRoot(
     storageHomePath,
     settingsMountPath || app?.environment.mountPath || ".misty/mnt",
@@ -138,7 +135,7 @@ export default function HomePage() {
     };
   }, []);
 
-  const latestChangelog = changelog[0] ?? {
+  const latestChangelog = {
     version: releases[0].version,
     date: releases[0].date,
     summary: releases[0].summary,

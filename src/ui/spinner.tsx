@@ -1,0 +1,26 @@
+import type { SpinnerProps } from "@/models/types/ui/spinner";
+export type { SpinnerProps } from "@/models/types/ui/spinner";
+import * as React from "react";
+import { LoaderCircle } from "lucide-react";
+
+import { cn } from "@/ui";
+
+function Spinner({ className, label = "Loading", size = "default", ...props }: SpinnerProps) {
+  return (
+    <span
+      role="status"
+      aria-label={label}
+      className={cn(
+        "inline-flex shrink-0 items-center justify-center text-current",
+        size === "sm" && "size-3.5",
+        size === "default" && "size-4",
+        size === "lg" && "size-5",
+        className,
+      )}
+      {...props}
+    >
+      <LoaderCircle aria-hidden="true" className="size-full animate-spin" />
+    </span>
+  );
+}
+export { Spinner };

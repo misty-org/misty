@@ -1,4 +1,4 @@
-import { Button } from "../../../components/ui/button";
+import { Button } from "@/ui";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -8,13 +8,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuShortcut,
   DropdownMenuTrigger,
-} from "../../../components/ui/dropdown-menu";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "../../../components/ui/tooltip";
+} from "@/ui";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/ui";
 import {
   AppWindow,
   Check,
@@ -30,8 +25,9 @@ import {
   RefreshCcw,
 } from "lucide-react";
 import { memo, useCallback } from "react";
-import { useMinimumSpin } from "@/shared/hooks/useMinimumSpin";
-import { toolbarSortOptions, type ExplorerPaneToolbarActionsProps } from "./ExplorerToolbarModel";
+import { useMinimumSpin } from "@/hooks/useMinimumSpin";
+import { toolbarSortOptions } from "./ExplorerToolbarModel";
+import type { ExplorerPaneToolbarActionsProps } from "@/models/interfaces/features/explorer/components/ExplorerToolbarModel";
 import { cx, paneToolbarActionStyles } from "./ExplorerToolbarSupport";
 
 export const ExplorerPaneToolbarActions = memo(function ExplorerPaneToolbarActions(

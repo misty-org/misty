@@ -1,7 +1,35 @@
-import { Button } from "../../../components/ui/button";
+import type {
+  WorkspaceDialogState,
+  SmartFolderMatchMode,
+  SmartFolderDialogState,
+  QuickAccessMenuItem,
+} from "@/models/types/features/explorer/components/ExplorerSidebarSupport";
+export type {
+  WorkspaceDialogState,
+  SmartFolderMatchMode,
+  SmartFolderDialogState,
+  QuickAccessMenuItem,
+} from "@/models/types/features/explorer/components/ExplorerSidebarSupport";
+import type {
+  DeviceCustomizationState,
+  SidebarCollapsedState,
+  SidebarDeviceEntry,
+  SmartFolderDraft,
+} from "@/models/interfaces/features/explorer/components/ExplorerSidebarSupport";
+export type {
+  DeviceCustomizationState,
+  SidebarCollapsedState,
+  SidebarDeviceEntry,
+  SmartFolderDraft,
+} from "@/models/interfaces/features/explorer/components/ExplorerSidebarSupport";
+import { Button } from "@/ui";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import type { MouseEvent, ReactNode } from "react";
-import type { MountedDevice, SavedSearch, SavedSearchRule } from "@/services/misty-api/types";
+import type {
+  MountedDevice,
+  SavedSearch,
+  SavedSearchRule,
+} from "@/models/interfaces/services/misty-api";
 import { formatBytes } from "../utils/fileFormat";
 
 const DEVICE_CUSTOMIZATION_STORAGE_KEY = "misty.explorer.sidebar.devices";
@@ -87,47 +115,6 @@ export function SidebarSectionHeader(props: {
     </div>
   );
 }
-
-export interface DeviceCustomizationState {
-  nameOverrides: Record<string, string>;
-  hiddenPaths: string[];
-  customMountPaths: string[];
-}
-
-export interface SidebarCollapsedState {
-  quickAccess: boolean;
-  smartFolders: boolean;
-  remote: boolean;
-  devices: boolean;
-}
-
-export interface SidebarDeviceEntry extends MountedDevice {
-  custom: boolean;
-}
-
-export type WorkspaceDialogState =
-  | { kind: "create"; workspaceId: ""; title: string }
-  | { kind: "rename"; workspaceId: string; title: string }
-  | { kind: "delete"; workspaceId: string; title: string }
-  | null;
-
-export type SmartFolderMatchMode = "all" | "any";
-
-export interface SmartFolderDraft {
-  id: string;
-  name: string;
-  query: string;
-  matchMode: SmartFolderMatchMode;
-  rules: SavedSearchRule[];
-}
-
-export type SmartFolderDialogState = { draft: SmartFolderDraft } | null;
-
-export type QuickAccessMenuItem = {
-  kind: "builtIn" | "pinned";
-  label: string;
-  path: string;
-};
 
 const smartFolderModeField = "__match";
 

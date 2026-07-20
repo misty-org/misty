@@ -1,5 +1,5 @@
 {
-  "src/components/GlobalImageEditor.tsx": [
+  "src/features/editor/GlobalImageEditor.tsx": [
     {
       "length": 461,
       "hash": "1dc9b59921a52502"
@@ -17,13 +17,13 @@
       "hash": "2d99f9d2bbeb9e88"
     }
   ],
-  "src/components/MistyFilePicker/MistyFilePicker.tsx": [
+  "src/features/picker/FilePicker.tsx": [
     {
       "length": 307,
       "hash": "0f2f8cea9729653d"
     }
   ],
-  "src/components/ui/alert-dialog.tsx": [
+  "src/ui/alert-dialog.tsx": [
     {
       "length": 423,
       "hash": "a31df42f8a97c2aa"
@@ -33,7 +33,7 @@
       "hash": "fa8359c879e023b1"
     }
   ],
-  "src/components/ui/alert.tsx": [
+  "src/ui/alert.tsx": [
     {
       "length": 318,
       "hash": "99a36f81b1dcd188"
@@ -43,7 +43,7 @@
       "hash": "a664cc2ae011421e"
     }
   ],
-  "src/components/ui/avatar.tsx": [
+  "src/ui/avatar.tsx": [
     {
       "length": 355,
       "hash": "fa30b34687edc47f"
@@ -57,13 +57,13 @@
       "hash": "cf61b2643d240d4c"
     }
   ],
-  "src/components/ui/badge.tsx": [
+  "src/ui/badge.tsx": [
     {
       "length": 322,
       "hash": "25c208a32bccccfc"
     }
   ],
-  "src/components/ui/button.tsx": [
+  "src/ui/button.tsx": [
     {
       "length": 607,
       "hash": "d5cf1800e94bf850"
@@ -89,7 +89,7 @@
       "hash": "47f771c6714fcd43"
     }
   ],
-  "src/components/ui/card.tsx": [
+  "src/ui/card.tsx": [
     {
       "length": 344,
       "hash": "c1674695ad08101a"
@@ -99,13 +99,13 @@
       "hash": "2a97c70f08a14bd4"
     }
   ],
-  "src/components/ui/checkbox.tsx": [
+  "src/ui/checkbox.tsx": [
     {
       "length": 384,
       "hash": "d4709db1c3685b98"
     }
   ],
-  "src/components/ui/command.tsx": [
+  "src/ui/command.tsx": [
     {
       "length": 393,
       "hash": "192909787ceae936"
@@ -123,7 +123,7 @@
       "hash": "86839f7907fdf10c"
     }
   ],
-  "src/components/ui/context-menu.tsx": [
+  "src/ui/context-menu.tsx": [
     {
       "length": 649,
       "hash": "a61f2b3873d975ef"
@@ -149,7 +149,7 @@
       "hash": "eb897849e77fee50"
     }
   ],
-  "src/components/ui/dialog.tsx": [
+  "src/ui/dialog.tsx": [
     {
       "length": 417,
       "hash": "4e15f62f430897ee"
@@ -163,13 +163,13 @@
       "hash": "ab28a86731425b15"
     }
   ],
-  "src/components/ui/drag-layer.tsx": [
+  "src/ui/drag-layer.tsx": [
     {
       "length": 190,
       "hash": "7081d1e9cf5c6694"
     }
   ],
-  "src/components/ui/dropdown-menu.tsx": [
+  "src/ui/dropdown-menu.tsx": [
     {
       "length": 1260,
       "hash": "6311e164246b295e"
@@ -195,31 +195,31 @@
       "hash": "4460484887ad0e44"
     }
   ],
-  "src/components/ui/input.tsx": [
+  "src/ui/input.tsx": [
     {
       "length": 639,
       "hash": "0d1a0fc640539430"
     }
   ],
-  "src/components/ui/popover.tsx": [
+  "src/ui/popover.tsx": [
     {
       "length": 557,
       "hash": "81326dff5aa4bea2"
     }
   ],
-  "src/components/ui/radio-group.tsx": [
+  "src/ui/radio-group.tsx": [
     {
       "length": 241,
       "hash": "d7d1f183821a5848"
     }
   ],
-  "src/components/ui/resizable.tsx": [
+  "src/ui/resizable.tsx": [
     {
       "length": 656,
       "hash": "11c3304a3f118b37"
     }
   ],
-  "src/components/ui/select.tsx": [
+  "src/ui/select.tsx": [
     {
       "length": 643,
       "hash": "361c299a550b7a0f"
@@ -233,7 +233,7 @@
       "hash": "05ab3d09474406e1"
     }
   ],
-  "src/components/ui/sheet.tsx": [
+  "src/ui/sheet.tsx": [
     {
       "length": 257,
       "hash": "352f7b16578d7766"
@@ -247,13 +247,13 @@
       "hash": "ab28a86731425b15"
     }
   ],
-  "src/components/ui/slider.tsx": [
+  "src/ui/slider.tsx": [
     {
       "length": 224,
       "hash": "d288075abc8f0123"
     }
   ],
-  "src/components/ui/switch.tsx": [
+  "src/ui/switch.tsx": [
     {
       "length": 340,
       "hash": "075f8e1c0ecf5043"
@@ -263,7 +263,7 @@
       "hash": "bce13ac375ce3c67"
     }
   ],
-  "src/components/ui/tabs.tsx": [
+  "src/ui/tabs.tsx": [
     {
       "length": 808,
       "hash": "2a36927a59bd4758"
@@ -281,13 +281,13 @@
       "hash": "37ee6dab3893b1bf"
     }
   ],
-  "src/components/ui/textarea.tsx": [
+  "src/ui/textarea.tsx": [
     {
       "length": 522,
       "hash": "a83b9b1f13a0a0cc"
     }
   ],
-  "src/components/ui/toggle-group.tsx": [
+  "src/ui/toggle-group.tsx": [
     {
       "length": 980,
       "hash": "c7037cb5983fee89"
@@ -297,13 +297,13 @@
       "hash": "5a0a74f340ed01bb"
     }
   ],
-  "src/components/ui/toggle.tsx": [
+  "src/ui/toggle.tsx": [
     {
       "length": 458,
       "hash": "37b351ef988dbc53"
     }
   ],
-  "src/components/ui/tooltip.tsx": [
+  "src/ui/tooltip.tsx": [
     {
       "length": 468,
       "hash": "0c2a1656d9cd8b5c"
@@ -1179,7 +1179,7 @@
       "hash": "4bb6b31c0c4f439b"
     }
   ],
-  "src/shared/multipanel/MultiPanelWorkspace.tsx": [
+  "src/workspace/MultiPanelWorkspace.tsx": [
     {
       "length": 398,
       "hash": "9f493e95615d86b8"
@@ -1205,7 +1205,7 @@
       "hash": "373a3a1ba498145b"
     }
   ],
-  "src/stores/useMikaSessionStore.ts": [
+  "src/stores/assistant/useMikaSessionStore.ts": [
     {
       "length": 185,
       "hash": "7f8ead6ee6c72fd3"

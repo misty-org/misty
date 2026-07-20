@@ -1,10 +1,6 @@
+import type { ClipboardPngImage } from "@/models/interfaces/features/explorer/utils/clipboardImage";
+export type { ClipboardPngImage } from "@/models/interfaces/features/explorer/utils/clipboardImage";
 import { readImage } from "@tauri-apps/plugin-clipboard-manager";
-
-export interface ClipboardPngImage {
-  bytes: Uint8Array;
-  width: number;
-  height: number;
-}
 
 export async function clipboardImagePng(): Promise<ClipboardPngImage | null> {
   const image = await readImage().catch(() => null);

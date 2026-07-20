@@ -1,8 +1,10 @@
-import { Input } from "../../../components/ui/input";
-import { Button } from "../../../components/ui/button";
-import { Badge } from "../../../components/ui/badge";
-import { Dialog, DialogContent, DialogTitle } from "../../../components/ui/dialog";
-import { Progress } from "../../../components/ui/progress";
+import type { LibraryTab } from "@/models/types/features/explorer/components/LibraryWorkspace";
+export type { LibraryTab } from "@/models/types/features/explorer/components/LibraryWorkspace";
+import { Input } from "@/ui";
+import { Button } from "@/ui";
+import { Badge } from "@/ui";
+import { Dialog, DialogContent, DialogTitle } from "@/ui";
+import { Progress } from "@/ui";
 import {
   File,
   Film,
@@ -22,20 +24,16 @@ import {
 import { open } from "@tauri-apps/plugin-dialog";
 import { useEffect, useMemo, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
-import {
-  savedSearchesDelete,
-  savedSearchesSave,
-  savedSearchesSnapshot,
-} from "@/services/misty-api/misty";
+import { savedSearchesDelete, savedSearchesSave, savedSearchesSnapshot } from "@/stores/backend";
 import type {
   SavedSearch,
   SavedSearchRule,
   SearchResult,
   SmartLibraryAsset,
-} from "@/services/misty-api/types";
-import { safeTauriAssetUrl } from "@/shared/tauri";
-import { useSmartLibraryStore } from "../../../stores/useSmartLibraryStore";
-import { useMediaSearchStore } from "../../../stores/useMediaSearchStore";
+} from "@/models/interfaces/services/misty-api";
+import { safeTauriAssetUrl } from "@/platform/tauri";
+import { useSmartLibraryStore } from "@/stores/media/useSmartLibraryStore";
+import { useMediaSearchStore } from "@/stores/media/useMediaSearchStore";
 import { revealSearchResultInPane } from "../utils/searchNavigation";
 import {
   mergeHybridSearchResults,
@@ -50,13 +48,13 @@ import {
   smartFolderQueryFromRules,
   smartFolderRulesWithMode,
   sortSavedSearches,
-  type SmartFolderDialogState,
-  type SmartFolderDraft,
 } from "./ExplorerSidebarSupport";
+import type { SmartFolderDialogState } from "@/models/types/features/explorer/components/ExplorerSidebarSupport";
+import type { SmartFolderDraft } from "@/models/interfaces/features/explorer/components/ExplorerSidebarSupport";
 import { SmartFolderDialog } from "./ExplorerSidebarDialogs";
 import { SearchResultThumbnail } from "./SearchResultThumbnail";
 import { searchResultContext, searchResultSummary } from "./ExplorerToolbarSupport";
-import { searchSemanticAssets } from "../../../stores/smartLibraryServerApi";
+import { searchSemanticAssets } from "@/stores/media/useSmartLibraryServerStore";
 import { formatBytes, formatDate } from "../utils/fileFormat";
 import {
   aggregateLibraryTags,
@@ -71,8 +69,6 @@ import { LibraryDropReviewDialog } from "./LibraryDropReviewDialog";
 import { MediaIndexApprovalDialog, MediaIndexRemovalDialog } from "./MediaIndexDialogs";
 
 export const libraryWorkspacePath = "misty://library";
-
-type LibraryTab = "library" | "collections" | "tags" | "media";
 
 export function LibraryWorkspace(props: {
   paneId: string;

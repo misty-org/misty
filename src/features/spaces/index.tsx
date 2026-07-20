@@ -2,13 +2,13 @@ import { useEffect } from "react";
 import { Navigate, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
 
-import { ErrorState, LoadingState, PermissionState } from "@/components/ui/state-view";
-import { Button } from "@/components/ui/button";
-import { useAuth } from "@/auth/AuthContext";
-import { useSpacesStore } from "@/stores/useSpacesStore";
+import { ErrorState, LoadingState, PermissionState } from "@/ui";
+import { Button } from "@/ui";
+import { useAuth } from "@/features/auth/AuthContext";
+import { useSpacesStore } from "@/stores/spaces/useSpacesStore";
 
 import { AgentCenter } from "@/pages/Agents/AgentCenter";
-import type { SpaceStudioKind } from "@/pages/Studio";
+import type { SpaceStudioKind } from "@/models/types/pages/Studio/index";
 import { SpaceChat } from "./SpaceChat";
 import { SpaceLibrary } from "./SpaceLibrary";
 import { SpaceTasksCalendar } from "./SpaceTasksCalendar";

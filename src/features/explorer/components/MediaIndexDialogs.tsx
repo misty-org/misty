@@ -6,8 +6,8 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "../../../components/ui/alert-dialog";
-import { Button } from "../../../components/ui/button";
+} from "@/ui";
+import { Button } from "@/ui";
 
 export function MediaIndexApprovalDialog(props: {
   estimate: {

@@ -18,6 +18,11 @@ const protectedRoots = [
   resolve(sourceRoot, "pages/Transfers"),
 ];
 const sourceExtensions = new Set([".ts", ".tsx"]);
+const uiImplementationRoots = [
+  "src/ui/",
+  "src/models/interfaces/ui/",
+  "src/models/types/ui/",
+];
 const failures = [];
 
 for (const path of walk(sourceRoot)) {
@@ -26,15 +31,15 @@ for (const path of walk(sourceRoot)) {
   const repositoryPath = relative(repositoryRoot, path).split("\\").join("/");
 
   if (
-    !repositoryPath.startsWith("src/components/ui/") &&
+    !uiImplementationRoots.some((root) => repositoryPath.startsWith(root)) &&
     /from\s+["'](?:@radix-ui\/|radix-ui["'])/.test(text)
   ) {
     failures.push(
-      `${repositoryPath}: import Radix only inside src/components/ui; consume the shadcn wrapper elsewhere`,
+      `${repositoryPath}: import Radix only inside src/ui; consume the shadcn wrapper elsewhere`,
     );
   }
 
-  if (repositoryPath.startsWith("src/components/ui/")) {
+  if (repositoryPath.startsWith("src/ui/")) {
     reportMatches(
       repositoryPath,
       text,

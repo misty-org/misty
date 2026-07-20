@@ -1,5 +1,5 @@
-import { DragPreviewCard } from "../../../components/ui/drag-layer";
-import type { ExplorerDragViewState } from "./types";
+import { DragPreviewCard } from "@/ui";
+import type { ExplorerDragViewState } from "@/models/interfaces/features/explorer/drag/types";
 
 export function ExplorerDragPreview({ state }: { state: ExplorerDragViewState }) {
   if (!state.payload || !state.pointer || state.phase === "native-egress") return null;

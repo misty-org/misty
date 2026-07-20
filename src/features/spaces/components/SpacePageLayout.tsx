@@ -1,3 +1,5 @@
+import type { SpacePageSection } from "@/models/types/features/spaces/components/SpacePageLayout";
+export type { SpacePageSection } from "@/models/types/features/spaces/components/SpacePageLayout";
 import type { HTMLAttributes, ReactNode } from "react";
 import {
   BookOpenText,
@@ -9,9 +11,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-import { cn } from "@/lib/utils";
-
-type SpacePageSection = "chat" | "agents" | "tasks" | "library" | "members" | "settings";
+import { cn } from "@/ui";
 
 const pageMetadata: Record<SpacePageSection, { title: string; icon: LucideIcon }> = {
   chat: { title: "Chat", icon: MessagesSquare },

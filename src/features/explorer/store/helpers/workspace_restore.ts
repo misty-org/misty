@@ -1,9 +1,9 @@
 import { create } from "zustand";
 import { readText, writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { open } from "@tauri-apps/plugin-dialog";
-import { hasTauriInternals } from "@/shared/tauri";
+import { hasTauriInternals } from "@/platform/tauri";
 import { isAndroidBuild, isNativeMobileBuild } from "@/platform/buildTarget";
-import { useAppStore } from "@/stores/useAppStore";
+import { useAppStore } from "@/stores/app";
 import {
   clipboardNativeFileRefs,
   explorerCalculateDirectorySizes,
@@ -33,11 +33,10 @@ import {
   transfersSnapshot,
   workspacesSave,
   workspacesSnapshot,
-} from "@/services/misty-api/misty";
+} from "@/stores/backend";
+import type { ClipboardOperation, CreateItemKind } from "@/models/types/services/misty-api";
 import type {
-  ClipboardOperation,
   ClipboardPayload,
-  CreateItemKind,
   DirectorySizeRecord,
   DirectoryListing,
   ExplorerLibraryItem,
@@ -49,36 +48,37 @@ import type {
   PasteItem,
   PreparedOpenItem,
   TransferRecord,
-} from "@/services/misty-api/types";
-import { errorText, userFacingErrorText } from "@/shared/format";
-import { useMultiPanelStore } from "@/shared/multipanel/useMultiPanelStore";
+} from "@/models/interfaces/services/misty-api";
+import { errorText, userFacingErrorText } from "@/lib/format";
+import { useMultiPanelStore } from "@/features/workspace";
 import type {
   MultiPanelClosedPane,
   MultiPanelPane,
   MultiPanelTab,
-} from "@/shared/multipanel/types";
+} from "@/models/interfaces/workspace";
 import {
   selectAdvancedPreferences,
   selectGeneralPreferences,
   selectNotificationPreferences,
   useSettingsStore,
-} from "@/stores/useSettingsStore";
-import { useOperationQueueStore } from "@/stores/useOperationQueueStore";
-import { useTransfersStore } from "@/stores/useTransfersStore";
+} from "@/stores/app";
+import { useOperationQueueStore } from "@/stores/explorer";
+import { useTransfersStore } from "@/stores/transfers";
 import { clipboardImagePng } from "../../utils/clipboardImage";
-import { publishCloudFolderBotNotification } from "@/bots/cloudFolderBot";
+import { publishCloudFolderBotNotification } from "@/features/bots/cloudFolderBot";
 
-import type * as T from "../types";
+import type {
+  ExplorerViewMode,
+  ExplorerDialogState,
+  ExplorerNotificationType,
+} from "@/models/types/features/explorer/store/types";
 import type {
   ExplorerStore,
-  ExplorerViewMode,
   PaneExplorerState,
   ExplorerBatchRenameItem,
-  ExplorerDialogState,
   ExplorerInlineEditState,
-  ExplorerNotificationType,
   ExplorerSortState,
-} from "../types";
+} from "@/models/interfaces/features/explorer/store/types";
 import { explorerRuntime, getExplorerStore } from "../runtime";
 import * as H from "./index";
 

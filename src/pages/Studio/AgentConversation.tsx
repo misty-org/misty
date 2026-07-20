@@ -1,21 +1,21 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
 import { Check, LockKeyhole, Send, X } from "lucide-react";
-import { agentArchitectureApi } from "../../spaces/agentArchitectureApi";
+import { agentArchitectureApi } from "@/stores/agents/useAgentArchitectureStore";
 import type {
   AgentConversation,
   AgentConversationEvent,
   RunAction,
   RunApproval,
   SpaceRun,
-  SpaceStudioResource,
-} from "../../spaces/types";
-import { errorText } from "@/shared/format";
-import { Alert, AlertDescription, AlertTitle } from "../../components/ui/alert";
-import { Badge } from "../../components/ui/badge";
-import { Button } from "../../components/ui/button";
-import { Input } from "../../components/ui/input";
-import { Sheet, SheetContent, SheetDescription, SheetTitle } from "../../components/ui/sheet";
-import { EmptyState, LoadingState } from "@/components/ui/state-view";
+} from "@/models/interfaces/features/spaces/types";
+import type { SpaceStudioResource } from "@/models/interfaces/features/spaces/types";
+import { errorText } from "@/lib/format";
+import { Alert, AlertDescription, AlertTitle } from "@/ui";
+import { Badge } from "@/ui";
+import { Button } from "@/ui";
+import { Input } from "@/ui";
+import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/ui";
+import { EmptyState, LoadingState } from "@/ui";
 
 export function AgentConversationPanel({
   agent,

@@ -1,4 +1,4 @@
-import type { SavedSearchRule } from "@/services/misty-api/types";
+import type { SavedSearchRule } from "@/models/interfaces/services/misty-api";
 
 export function smartFolderQueryFromRules(
   rules: SavedSearchRule[],

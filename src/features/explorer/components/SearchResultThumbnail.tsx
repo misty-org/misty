@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
-import { explorerGenerateImageThumbnail } from "@/services/misty-api/misty";
-import type { SearchResult } from "@/services/misty-api/types";
-import { safeTauriAssetUrl } from "@/shared/tauri";
+import { explorerGenerateImageThumbnail } from "@/stores/backend";
+import type { SearchResult } from "@/models/interfaces/services/misty-api";
+import { safeTauriAssetUrl } from "@/platform/tauri";
 import { FileIcon } from "./FileBrowserIcons";
 
 const thumbnailCache = new Map<string, string>();

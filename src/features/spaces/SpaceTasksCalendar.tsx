@@ -1,3 +1,5 @@
+import type { TaskViewMode, DueFilter } from "@/models/types/features/spaces/SpaceTasksCalendar";
+export type { TaskViewMode, DueFilter } from "@/models/types/features/spaces/SpaceTasksCalendar";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import {
   CalendarDays,
@@ -11,36 +13,29 @@ import {
   X,
 } from "lucide-react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Input } from "@/components/ui/input";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useAuth } from "../../auth/AuthContext";
-import { confirmAction } from "@/shared/confirmAction";
-import { errorText } from "@/shared/format";
-import { agentArchitectureApi } from "../../spaces/agentArchitectureApi";
-import { spacesApi } from "../../spaces/api";
+import { Avatar, AvatarFallback } from "@/ui";
+import { Badge } from "@/ui";
+import { Button } from "@/ui";
+import { Checkbox } from "@/ui";
+import { Input } from "@/ui";
+import { Popover, PopoverContent, PopoverTrigger } from "@/ui";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui";
+import { Tabs, TabsList, TabsTrigger } from "@/ui";
+import { useAuth } from "@/features/auth/AuthContext";
+import { confirmAction } from "@/lib/confirmAction";
+import { errorText } from "@/lib/format";
+import { agentArchitectureApi } from "@/stores/agents/useAgentArchitectureStore";
+import { spacesApi } from "@/stores/spaces/useSpacesBackendStore";
+import type { SpaceIntegration } from "@/models/interfaces/features/spaces/types";
+import type { SpaceTaskPriority, SpaceTaskStatus } from "@/models/types/features/spaces/types";
 import type {
   GoogleCalendarChoice,
   SpaceCalendarEvent,
   SpaceCalendarSource,
-  SpaceIntegration,
   SpaceMember,
   SpaceTask,
-  SpaceTaskPriority,
-  SpaceTaskStatus,
-} from "../../spaces/types";
-import { useSpacesStore } from "../../stores/useSpacesStore";
+} from "@/models/interfaces/features/spaces/types";
+import { useSpacesStore } from "@/stores/spaces/useSpacesStore";
 import { memberInitials, TaskErrorState, toLocalInput } from "./SpaceTaskPrimitives";
 import {
   CalendarSourceDrawer,
@@ -51,9 +46,6 @@ import {
   SpaceTaskList,
   type TaskDraft,
 } from "./SpaceTasksViews";
-
-export type TaskViewMode = "board" | "list" | "calendar";
-export type DueFilter = "all" | "overdue" | "today" | "week" | "no_due";
 
 const emptyMembers: SpaceMember[] = [];
 const emptyDraft = (): TaskDraft => ({

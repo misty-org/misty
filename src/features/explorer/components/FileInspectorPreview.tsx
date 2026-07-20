@@ -1,6 +1,14 @@
+import type {
+  LoadedInspectorPreview,
+  PreparedPreviewPath,
+} from "@/models/interfaces/features/explorer/components/FileInspectorPreview";
+export type {
+  LoadedInspectorPreview,
+  PreparedPreviewPath,
+} from "@/models/interfaces/features/explorer/components/FileInspectorPreview";
 import { Archive, FileText, Folder, Music } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Button } from "../../../components/ui/button";
+import { Button } from "@/ui";
 import {
   archiveList,
   explorerGenerateImageThumbnail,
@@ -8,34 +16,19 @@ import {
   explorerPrepareOpenItem,
   explorerPreviewItem,
   fileMetadataSnapshot,
-} from "@/services/misty-api/misty";
+} from "@/stores/backend";
 import type {
   ArchiveEntry,
   DirectoryListing,
   FileEntry,
   FileMetadataSnapshot,
   PreparedOpenItem,
-} from "@/services/misty-api/types";
-import { errorText } from "@/shared/format";
-import { safeTauriAssetUrl } from "@/shared/tauri";
+} from "@/models/interfaces/services/misty-api";
+import { errorText } from "@/lib/format";
+import { safeTauriAssetUrl } from "@/platform/tauri";
 import { formatBytes } from "../utils/fileFormat";
 import { FileIcon } from "./FileBrowserIcons";
 import { inspectorStyles } from "./FileInspectorStyles";
-
-export interface LoadedInspectorPreview {
-  kind: "image" | "video" | "audio" | "pdf" | "text" | "archive";
-  text: string | null;
-  url: string;
-  mimeType: string;
-  archiveEntries?: ArchiveEntry[];
-  archiveFormat?: string;
-  archiveTotalCount?: number;
-}
-
-interface PreparedPreviewPath {
-  path: string;
-  prepared: PreparedOpenItem | null;
-}
 
 const FOLDER_PREVIEW_LIMIT = 80;
 const FILE_METADATA_LOAD_DELAY_MS = 180;

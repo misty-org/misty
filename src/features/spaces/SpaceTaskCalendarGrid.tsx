@@ -1,8 +1,12 @@
 import { CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import type { SpaceCalendarEvent, SpaceMember, SpaceTask } from "@/spaces/types";
+import { Badge } from "@/ui";
+import { Button } from "@/ui";
+import { Card } from "@/ui";
+import type {
+  SpaceCalendarEvent,
+  SpaceMember,
+  SpaceTask,
+} from "@/models/interfaces/features/spaces/types";
 import { memberName } from "./SpaceTaskPrimitives";
 
 const weekDays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];

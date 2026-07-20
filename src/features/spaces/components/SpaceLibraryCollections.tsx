@@ -1,6 +1,6 @@
 import { BookOpenText as LibraryIcon, Folder, Pencil, Plus, Trash2 } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
+import { Button } from "@/ui";
 
 import { useSpaceLibraryContext } from "../SpaceLibraryContext";
 import { formatBytes, formatTime } from "../libraryFormat";

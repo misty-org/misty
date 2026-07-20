@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Navigate, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { Check, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/ui";
 import {
   Dialog,
   DialogContent,
@@ -10,9 +10,9 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { useSpacesStore } from "../../../stores/useSpacesStore";
+} from "@/ui";
+import { Input } from "@/ui";
+import { useSpacesStore } from "@/stores/spaces/useSpacesStore";
 import { SpacePanelContent } from "./SpacePanelContent";
 import { SpacePageFrame } from "./SpacePageLayout";
 

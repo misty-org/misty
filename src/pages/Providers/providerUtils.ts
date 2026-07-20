@@ -1,22 +1,13 @@
+import type { TokenField } from "@/models/types/pages/Providers/providerUtils";
+export type { TokenField } from "@/models/types/pages/Providers/providerUtils";
+import type { ProviderConnectionLike } from "@/models/interfaces/pages/Providers/providerUtils";
+export type { ProviderConnectionLike } from "@/models/interfaces/pages/Providers/providerUtils";
+import type { ProviderConfigMode } from "@/models/types/services/misty-api";
 import type {
-  ProviderConfigMode,
   ProviderConfigStep,
   ProviderWorkflow,
   ProviderWorkflowOption,
-} from "../../api/types";
-
-export type TokenField = {
-  key: string;
-  value: string;
-  sensitive: boolean;
-};
-
-interface ProviderConnectionLike {
-  mode: ProviderConfigMode;
-  providerType: string;
-  parameters: Record<string, string>;
-  step: ProviderConfigStep | null;
-}
+} from "@/models/interfaces/services/misty-api";
 
 const preferredConfigKeys = [
   "root_folder_id",

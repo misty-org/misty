@@ -1,3 +1,15 @@
+import type {
+  RegisteredZone,
+  ArmedDrag,
+  PreparedEgress,
+  ExplorerDragContextValue,
+} from "@/models/interfaces/features/explorer/drag/ExplorerDragContext";
+export type {
+  RegisteredZone,
+  ArmedDrag,
+  PreparedEgress,
+  ExplorerDragContextValue,
+} from "@/models/interfaces/features/explorer/drag/ExplorerDragContext";
 import {
   createContext,
   useCallback,
@@ -11,20 +23,17 @@ import {
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from "react";
-import {
-  explorerCancelDragPreparation,
-  explorerPrepareDragItems,
-} from "@/services/misty-api/misty";
-import { getAppliedAppZoom } from "@/shared/hooks/useAppZoom";
-import { hasTauriInternals } from "@/shared/tauri";
-import { useExplorerStore } from "../../../stores/useExplorerStore";
+import { explorerCancelDragPreparation, explorerPrepareDragItems } from "@/stores/backend";
+import { getAppliedAppZoom } from "@/hooks/useAppZoom";
+import { hasTauriInternals } from "@/platform/tauri";
+import { useExplorerStore } from "@/stores/explorer";
 import {
   dragDistance,
   edgeScrollDelta,
   physicalToClientPoint,
   selectDropCandidate,
 } from "./geometry";
-import { DragInteractionShield } from "../../../components/ui/drag-layer";
+import { DragInteractionShield } from "@/ui";
 import { dragAnnouncement, ExplorerDragPreview, setWebviewDragActive } from "./ExplorerDragPreview";
 import type {
   ExplorerDragItem,
@@ -32,38 +41,11 @@ import type {
   ExplorerDragPayload,
   ExplorerDragViewState,
   ExplorerDropZoneSpec,
-} from "./types";
+} from "@/models/interfaces/features/explorer/drag/types";
 
 const DRAG_THRESHOLD = 6;
 const SPRING_LOAD_MS = 700;
 const EDGE_SCROLL_SIZE = 32;
-
-interface RegisteredZone {
-  element: HTMLElement;
-  spec: ExplorerDropZoneSpec;
-}
-
-interface ArmedDrag {
-  pointerId: number;
-  source: HTMLElement;
-  start: { x: number; y: number };
-  items: ExplorerDragItem[];
-}
-
-interface PreparedEgress {
-  sessionId: string;
-  promise: Promise<string[]>;
-  settled: boolean;
-  paths: string[] | null;
-  error: string | null;
-}
-
-interface ExplorerDragContextValue {
-  state: ExplorerDragViewState;
-  armSource: (items: ExplorerDragItem[], event: ReactPointerEvent<HTMLElement>) => void;
-  registerZone: (element: HTMLElement, spec: ExplorerDropZoneSpec) => () => void;
-  cancel: (message?: string) => void;
-}
 
 const initialState: ExplorerDragViewState = {
   phase: "idle",

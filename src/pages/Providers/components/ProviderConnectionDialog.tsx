@@ -1,6 +1,8 @@
+import type { ProviderConnectionDialogProps } from "@/models/interfaces/pages/Providers/components/ProviderConnectionDialog";
+export type { ProviderConnectionDialogProps } from "@/models/interfaces/pages/Providers/components/ProviderConnectionDialog";
 import { useEffect, useMemo, useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Button } from "@/ui";
+import { Alert, AlertDescription, AlertTitle } from "@/ui";
 import {
   Dialog,
   DialogContent,
@@ -8,22 +10,19 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import type { ProviderWorkflow, ProviderWorkflowOption } from "../../../api/types";
-import { iconAssets } from "@/shared/assets/icons";
-import { AssetIcon } from "@/shared/components/AssetIcon";
+} from "@/ui";
+import { Input } from "@/ui";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui";
+import type {
+  ProviderWorkflow,
+  ProviderWorkflowOption,
+} from "@/models/interfaces/services/misty-api";
+import { iconAssets } from "@/assets/icons";
+import { AssetIcon } from "@/ui";
 import { providerOptionsForConnection } from "../providerUtils";
-import type { ProviderConnectionSession } from "../../../stores/useProvidersStore";
+import type { ProviderConnectionSession } from "@/models/interfaces/stores/providers/useProvidersStore";
 import { ProviderLogo } from "./ProviderLogo";
-import { EmptyState } from "@/components/ui/state-view";
+import { EmptyState } from "@/ui";
 
 const providerDialogClass =
   "flex max-h-[min(760px,calc(100vh-48px))] w-[min(620px,calc(100vw-48px))] max-w-none flex-col overflow-hidden bg-popover p-0";
@@ -70,18 +69,6 @@ const providerAuthorizeCompleteIconClass =
   "border-[color-mix(in_srgb,var(--misty-success)_30%,transparent)] bg-[color-mix(in_srgb,var(--misty-success)_10%,transparent)] text-[var(--misty-success)]";
 
 const EMPTY_SELECT_VALUE = "__misty_empty__";
-
-interface ProviderConnectionDialogProps {
-  session: ProviderConnectionSession;
-  workflows: ProviderWorkflow[];
-  onClose: () => void;
-  onChooseProvider: (providerType: string) => void;
-  onName: (name: string) => void;
-  onParameter: (key: string, value: string) => void;
-  onAdvance: () => void;
-  onSubmit: (polling?: boolean) => void;
-  onOpenAuthorize: () => void;
-}
 
 export function ProviderConnectionDialog(props: ProviderConnectionDialogProps) {
   const { session } = props;

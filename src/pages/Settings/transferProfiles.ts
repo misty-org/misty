@@ -1,4 +1,6 @@
-import type { TransferProfileOptions } from "../../api/types";
+import type { TransferProfileRecord } from "@/models/interfaces/pages/Settings/transferProfiles";
+export type { TransferProfileRecord } from "@/models/interfaces/pages/Settings/transferProfiles";
+import type { TransferProfileOptions } from "@/models/interfaces/services/misty-api";
 
 export const BUILT_IN_TRANSFER_PROFILE_IDS = new Set([
   "balanced",
@@ -6,18 +8,6 @@ export const BUILT_IN_TRANSFER_PROFILE_IDS = new Set([
   "many-small-files",
   "careful-verify",
 ]);
-
-export interface TransferProfileRecord {
-  id: string;
-  name: string;
-  transfers: number;
-  checkers: number;
-  bandwidthLimit: string;
-  retries: number;
-  lowLevelRetries: number;
-  checksum: boolean;
-  builtIn: boolean;
-}
 
 export function transferProfileRecords(document: Record<string, unknown>): TransferProfileRecord[] {
   const profiles = sectionRecord(document, "transfer_profiles").profiles;

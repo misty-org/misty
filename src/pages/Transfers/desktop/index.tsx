@@ -8,21 +8,21 @@ import {
   Search,
 } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
-import type { TransferRecord } from "../../../api/types";
-import { IconButton } from "@/components/ui/icon-button";
-import { Toolbar, ToolbarGroup } from "@/components/ui/toolbar";
-import { Button } from "../../../components/ui/button";
-import { Input } from "../../../components/ui/input";
-import { prettyLabel } from "@/shared/format";
-import { MultiPanelWorkspace } from "@/shared/multipanel/MultiPanelWorkspace";
-import { createMultiPanelStore } from "@/shared/multipanel/useMultiPanelStore";
-import { useProvidersStore } from "../../../stores/useProvidersStore";
+import type { TransferRecord } from "@/models/interfaces/services/misty-api";
+import { PrimitiveIconButton as IconButton } from "@/ui";
+import { Toolbar, ToolbarGroup } from "@/ui";
+import { Button } from "@/ui";
+import { Input } from "@/ui";
+import { prettyLabel } from "@/lib/format";
+import { MultiPanelWorkspace } from "@/features/workspace";
+import { createMultiPanelStore } from "@/features/workspace";
+import { useProvidersStore } from "@/stores/providers";
 import {
   activeTransferFilterCount,
   createTransferWorkspaceState,
   TRANSFERS_PAGE_SIZE,
   useTransfersStore,
-} from "../../../stores/useTransfersStore";
+} from "@/stores/transfers";
 import { TransferSortMenu, TransferToolbarActions } from "./TransferMenus";
 import { TransferDetail, TransferFilters } from "./TransferPanels";
 import { TransferHistoryTable } from "./TransferTable";
@@ -35,9 +35,11 @@ import {
   TRANSFER_ROW_HEIGHT,
   transferMinimumColumnWidths,
   transferProviderGroups,
-  type TransferColumnWidths,
-  type TransferTableColumn,
 } from "./transferModel";
+import type {
+  TransferColumnWidths,
+  TransferTableColumn,
+} from "@/models/types/pages/Transfers/desktop/transferModel";
 import {
   loadTransferColumnOrder,
   loadTransferColumnWidths,

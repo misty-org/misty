@@ -1,34 +1,18 @@
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import type { RemoteConfigFormProps } from "@/models/interfaces/pages/Providers/components/RemoteConfigForm";
+export type { RemoteConfigFormProps } from "@/models/interfaces/pages/Providers/components/RemoteConfigForm";
+import { Button } from "@/ui";
+import { Input } from "@/ui";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui";
 import type {
   ProviderWorkflow,
   ProviderWorkflowOption,
   RcloneConfigPaths,
   RemoteEditDraft,
-} from "../../../api/types";
-import { iconAssets } from "@/shared/assets/icons";
-import { AssetIcon } from "@/shared/components/AssetIcon";
-import { prettyLabel } from "@/shared/format";
+} from "@/models/interfaces/services/misty-api";
+import { iconAssets } from "@/assets/icons";
+import { AssetIcon } from "@/ui";
+import { prettyLabel } from "@/lib/format";
 import { isSecretKey, parseTokenFields } from "../providerUtils";
-
-interface RemoteConfigFormProps {
-  draft: RemoteEditDraft;
-  configKeys: string[];
-  workflow: ProviderWorkflow | null;
-  configPaths: RcloneConfigPaths | null;
-  tokenVisible: boolean;
-  onDraftName: (name: string) => void;
-  onConfigField: (key: string, value: string) => void;
-  onTokenField: (key: string, value: string) => void;
-  onTokenVisible: (visible: boolean) => void;
-}
 
 const remoteConfigFormClass = "min-h-0";
 

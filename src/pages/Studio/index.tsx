@@ -1,38 +1,32 @@
+import type { SpaceStudioKind } from "@/models/types/pages/Studio/index";
+export type { SpaceStudioKind } from "@/models/types/pages/Studio/index";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Bot, History, Play, Plus, Save, Trash2, Workflow } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
-import { useSpacesStore } from "../../stores/useSpacesStore";
+import { useSpacesStore } from "@/stores/spaces/useSpacesStore";
 import type {
   RunAction,
   RunApproval,
   SpaceRun,
-  SpaceStudioResource,
   WorkflowVersion,
-} from "../../spaces/types";
-import { agentArchitectureApi } from "../../spaces/agentArchitectureApi";
-import { errorText } from "@/shared/format";
-import { confirmAction } from "@/shared/confirmAction";
+} from "@/models/interfaces/features/spaces/types";
+import type { SpaceStudioResource } from "@/models/interfaces/features/spaces/types";
+import { agentArchitectureApi } from "@/stores/agents/useAgentArchitectureStore";
+import { errorText } from "@/lib/format";
+import { confirmAction } from "@/lib/confirmAction";
 import { AgentArchitecturePanel, RunDetailDialog } from "./AgentArchitecturePanel";
 import { UnifiedWorkflowEditor } from "./UnifiedWorkflowEditor";
-import { Badge } from "../../components/ui/badge";
-import { Button } from "../../components/ui/button";
-import { Card } from "../../components/ui/card";
-import { Checkbox } from "../../components/ui/checkbox";
-import { Input } from "../../components/ui/input";
-import { Textarea } from "../../components/ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "../../components/ui/select";
-import { Alert, AlertDescription, AlertTitle } from "../../components/ui/alert";
-import { EmptyState, PermissionState } from "@/components/ui/state-view";
-import { StatusBadge } from "@/components/ui/status-badge";
-
-export type SpaceStudioKind = "agents" | "workflows";
+import { Badge } from "@/ui";
+import { Button } from "@/ui";
+import { Card } from "@/ui";
+import { Checkbox } from "@/ui";
+import { Input } from "@/ui";
+import { Textarea } from "@/ui";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui";
+import { Alert, AlertDescription, AlertTitle } from "@/ui";
+import { EmptyState, PermissionState } from "@/ui";
+import { StatusBadge } from "@/ui";
 
 export default function SpaceStudioPage({
   spaceId,

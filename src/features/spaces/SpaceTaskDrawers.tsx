@@ -11,43 +11,30 @@ import {
   MoreHorizontal,
   UserRound,
 } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Separator } from "@/components/ui/separator";
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetFooter,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
-import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/ui";
+import { Button } from "@/ui";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui";
+import { Input } from "@/ui";
+import { Label } from "@/ui";
+import { Separator } from "@/ui";
+import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from "@/ui";
+import { Textarea } from "@/ui";
+import type { SpaceIntegration } from "@/models/interfaces/features/spaces/types";
+import type { SpaceTaskPriority, SpaceTaskStatus } from "@/models/types/features/spaces/types";
 import type {
   GoogleCalendarChoice,
   SpaceCalendarEvent,
   SpaceCalendarSource,
-  SpaceIntegration,
   SpaceMember,
   SpaceTask,
-  SpaceTaskPriority,
-  SpaceTaskStatus,
-} from "@/spaces/types";
+} from "@/models/interfaces/features/spaces/types";
 import {
-  type TaskDraft,
   TaskEmptyState,
   TaskInlineSelect,
   taskPriorityOptions,
   taskStatusOptions,
 } from "./SpaceTaskPrimitives";
+import type { TaskDraft } from "@/models/types/features/spaces/SpaceTaskPrimitives";
 
 export function SpaceTaskDrawer({
   draft,

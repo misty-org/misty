@@ -1,4 +1,6 @@
-import { Button } from "../../../components/ui/button";
+import type { ExplorerPickerSidebarProps } from "@/models/interfaces/features/explorer/components/ExplorerPickerSidebar";
+export type { ExplorerPickerSidebarProps } from "@/models/interfaces/features/explorer/components/ExplorerPickerSidebar";
+import { Button } from "@/ui";
 import {
   Briefcase,
   Download,
@@ -10,10 +12,10 @@ import {
   RefreshCcw,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import type { MountedDevice, ProviderRemote } from "@/services/misty-api/types";
-import { providerIconForType } from "@/shared/assets/icons";
-import { AssetIcon } from "@/shared/components/AssetIcon";
-import { useMinimumSpin } from "@/shared/hooks/useMinimumSpin";
+import type { MountedDevice, ProviderRemote } from "@/models/interfaces/services/misty-api";
+import { providerIconForType } from "@/assets/icons";
+import { AssetIcon } from "@/ui";
+import { useMinimumSpin } from "@/hooks/useMinimumSpin";
 import {
   buildDeviceEntries,
   dedupePinnedPathsForQuickAccess,
@@ -29,21 +31,7 @@ import {
   sidebarStyles,
   SidebarSectionHeader,
 } from "./ExplorerSidebarSupport";
-import type { SidebarCollapsedState } from "./ExplorerSidebarSupport";
-
-interface ExplorerPickerSidebarProps {
-  homePath: string;
-  activePath: string;
-  mountRoot: string;
-  remotes: ProviderRemote[];
-  remoteLoading: boolean;
-  devices: MountedDevice[];
-  devicesLoading: boolean;
-  pinnedPaths: string[];
-  activeWorkspaceTitle: string;
-  onNavigate: (path: string) => void;
-  onRefreshDevices: () => void;
-}
+import type { SidebarCollapsedState } from "@/models/interfaces/features/explorer/components/ExplorerSidebarSupport";
 
 const quickAccessItems = [
   { label: "Home", icon: Home, suffix: "" },

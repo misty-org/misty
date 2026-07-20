@@ -1,8 +1,5 @@
-import { Button } from "../../../components/ui/button";
-import type {
-  ExplorerInlineEditState,
-  ExplorerNotification,
-} from "../../../stores/useExplorerStore";
+import { Button } from "@/ui";
+import type { ExplorerInlineEditState, ExplorerNotification } from "@/stores/explorer";
 import { cx } from "./ExplorerDesktopShared";
 
 export function ExplorerRenameStatus(props: { edit: ExplorerInlineEditState | null }) {

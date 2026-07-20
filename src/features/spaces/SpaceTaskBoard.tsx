@@ -1,9 +1,10 @@
 import { useState, type DragEvent, type FormEvent } from "react";
 import { GripVertical, LoaderCircle, Plus } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import type { SpaceMember, SpaceTask, SpaceTaskStatus } from "@/spaces/types";
+import { Button } from "@/ui";
+import { Card, CardContent, CardHeader, CardTitle } from "@/ui";
+import { Input } from "@/ui";
+import type { SpaceTaskStatus } from "@/models/types/features/spaces/types";
+import type { SpaceMember, SpaceTask } from "@/models/interfaces/features/spaces/types";
 import {
   dueTone,
   shortDue,

@@ -1,25 +1,23 @@
 import type {
+  LibrarySearchOptions,
+  ParsedLibraryQuery,
+} from "@/models/interfaces/features/explorer/utils/librarySearch";
+export type {
+  LibrarySearchOptions,
+  ParsedLibraryQuery,
+} from "@/models/interfaces/features/explorer/utils/librarySearch";
+import type {
+  FileKind,
+  SearchQueryScope,
+  SearchSourceKind,
+} from "@/models/types/services/misty-api";
+import type {
   ExplorerLibraryItem,
   ExplorerLibrarySnapshot,
   ExplorerLocation,
   FileEntry,
-  FileKind,
-  SearchQueryScope,
   SearchResult,
-  SearchSourceKind,
-} from "@/services/misty-api/types";
-
-interface LibrarySearchOptions {
-  currentPath?: string | null;
-  scope?: SearchQueryScope;
-  limit?: number | null;
-}
-
-interface ParsedLibraryQuery {
-  terms: string[];
-  tags: string[];
-  comments: string[];
-}
+} from "@/models/interfaces/services/misty-api";
 
 export function mergeLibrarySearchResults(
   backendResults: SearchResult[],

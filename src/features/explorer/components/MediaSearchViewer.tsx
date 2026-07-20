@@ -1,15 +1,9 @@
 import { Pause, Play } from "lucide-react";
 import { useEffect, useRef, useState, type SyntheticEvent } from "react";
-import { Button } from "../../../components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "../../../components/ui/dialog";
-import { safeTauriAssetUrl } from "@/shared/tauri";
-import { useMediaViewerStore } from "../../../stores/useMediaViewerStore";
+import { Button } from "@/ui";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/ui";
+import { safeTauriAssetUrl } from "@/platform/tauri";
+import { useMediaViewerStore } from "@/stores/media/useMediaViewerStore";
 
 export function MediaSearchViewer() {
   const result = useMediaViewerStore((state) => state.result);

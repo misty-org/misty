@@ -1,19 +1,23 @@
+import type { SettingsSection, SettingValue } from "@/models/types/pages/Settings/desktop/index";
+export type { SettingsSection, SettingValue } from "@/models/types/pages/Settings/desktop/index";
+import type {
+  NavItem,
+  SettingsContentProps,
+} from "@/models/interfaces/pages/Settings/desktop/index";
+export type {
+  NavItem,
+  SettingsContentProps,
+} from "@/models/interfaces/pages/Settings/desktop/index";
 import { memo, useEffect, useState, type ChangeEvent, type ReactNode } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { useShallow } from "zustand/react/shallow";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
-import { Slider } from "@/components/ui/slider";
-import { Spinner } from "@/components/ui/spinner";
+import { Button } from "@/ui";
+import { Badge } from "@/ui";
+import { Input } from "@/ui";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui";
+import { Switch } from "@/ui";
+import { Slider } from "@/ui";
+import { Spinner } from "@/ui";
 import {
   AppWindow,
   ArrowLeftRight,
@@ -34,57 +38,32 @@ import {
   Trash2,
   type LucideIcon,
 } from "lucide-react";
-import { InstallerCard } from "../../../components/installer/InstallerCard";
-import { useAppStore } from "../../../stores/useAppStore";
-import {
-  settingsIndexToThemeMode,
-  themeModeToSettingsIndex,
-  useAppThemeStore,
-} from "../../../stores/useAppThemeStore";
+import { InstallerCard } from "../../../features/installer/InstallerCard";
+import { useAppStore } from "@/stores/app";
+import { settingsIndexToThemeMode, themeModeToSettingsIndex, useAppThemeStore } from "@/stores/app";
 import type {
   LaunchOnLoginSnapshot,
   OpenWithAssociation,
   SearchStatus,
   ShortcutBinding,
-} from "../../../api/types";
-import { selectAssistantPreferences, useSettingsStore } from "../../../stores/useSettingsStore";
-import { useSearchStore } from "../../../stores/useSearchStore";
+} from "@/models/interfaces/services/misty-api";
+import { selectAssistantPreferences, useSettingsStore } from "@/stores/app";
+import { useSearchStore } from "@/stores/explorer";
 import { formatDate } from "@/features/explorer/utils/fileFormat";
-import { userFacingErrorText } from "@/shared/format";
-import { hasTauriInternals } from "@/shared/tauri";
+import { userFacingErrorText } from "@/lib/format";
+import { hasTauriInternals } from "@/platform/tauri";
 import { isAndroidBuild } from "@/platform/buildTarget";
 import {
   defaultTransferProfileId,
   transferProfileRecords,
   transferProfileSettingsPayload,
-  type TransferProfileRecord,
 } from "../transferProfiles";
+import type { TransferProfileRecord } from "@/models/interfaces/pages/Settings/transferProfiles";
 import {
   DesktopSettingsFrame,
   DesktopSettingsRow as SettingsRow,
   DesktopSettingsSection as SettingsSectionBlock,
-} from "../../../components/settings/DesktopSettingsUI";
-
-type SettingsSection =
-  | "general"
-  | "app"
-  | "assistant"
-  | "appearance"
-  | "privacy"
-  | "sync"
-  | "transfers"
-  | "search"
-  | "notifications"
-  | "shortcuts"
-  | "advanced";
-type SettingValue =
-  string | number | boolean | Record<string, unknown> | Array<Record<string, unknown>>;
-
-interface NavItem {
-  id: SettingsSection;
-  label: string;
-  icon: LucideIcon;
-}
+} from "../DesktopSettingsUI";
 
 const appNavItems: NavItem[] = [
   { id: "general", label: "General", icon: Rows3 },
@@ -238,20 +217,6 @@ function SettingsContent(props: {
       {props.activeSection === "advanced" ? <AdvancedSettings {...props.controlProps} /> : null}
     </>
   );
-}
-
-interface SettingsContentProps {
-  document: Record<string, unknown>;
-  launchOnLogin: LaunchOnLoginSnapshot | null;
-  working: boolean;
-  onSettingChange: (section: string, key: string, value: SettingValue) => void;
-  onLoad: () => Promise<void>;
-  onShortcutChange: (commandId: string, shortcut: string) => void;
-  onSaveShortcuts: () => Promise<void>;
-  onRemoveOpenWithAssociation: (key: string) => Promise<void>;
-  shortcuts: ShortcutBinding[];
-  openWithAssociations: OpenWithAssociation[];
-  app: ReturnType<typeof useAppStore.getState>["app"];
 }
 
 function GeneralSettings(props: SettingsContentProps) {

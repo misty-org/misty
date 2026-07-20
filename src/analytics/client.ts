@@ -1,13 +1,13 @@
 import posthog, { type PostHog } from "posthog-js";
 import { clientMetadata } from "./metadata";
 import { redactRecord, redactedError } from "./redaction";
+import type { AnalyticsEventName } from "@/models/types/analytics/types";
 import type {
-  AnalyticsEventName,
   AnalyticsEventProperties,
   SafeErrorContext,
   SafeUserProperties,
   TelemetryClient,
-} from "./types";
+} from "@/models/interfaces/analytics/types";
 
 export const TELEMETRY_DEFAULTS = Object.freeze({
   analyticsEnabled: false,

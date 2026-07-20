@@ -1,14 +1,11 @@
+import type { TransferActionFeedback } from "@/models/types/pages/Transfers/desktop/useTransferActions";
+export type { TransferActionFeedback } from "@/models/types/pages/Transfers/desktop/useTransferActions";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { TransferRecord } from "../../../api/types";
-import { errorText } from "@/shared/format";
-import { useOperationQueueStore } from "../../../stores/useOperationQueueStore";
-import { useTransfersStore } from "../../../stores/useTransfersStore";
+import type { TransferRecord } from "@/models/interfaces/services/misty-api";
+import { errorText } from "@/lib/format";
+import { useOperationQueueStore } from "@/stores/explorer";
+import { useTransfersStore } from "@/stores/transfers";
 import { isLiveTransfer } from "./transferModel";
-
-export type TransferActionFeedback = {
-  tone: "busy" | "success" | "error";
-  text: string;
-} | null;
 
 export function useTransferActions(options: { workspaceId: string; rows: TransferRecord[] }) {
   const loadTransfers = useTransfersStore((state) => state.load);
