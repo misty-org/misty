@@ -2,18 +2,18 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { ProviderWorkflow, RcloneConfigPaths, RemoteEditDraft } from "../../../api/types";
-import { iconAssets } from "../../../shared/assets/icons";
-import { AssetIcon } from "../../../shared/components/AssetIcon";
-import { Panel, PanelHeader } from "../../../shared/components/Panel";
+import { iconAssets } from "@/shared/assets/icons";
+import { AssetIcon } from "@/shared/components/AssetIcon";
+import { Panel, PanelHeader } from "@/shared/components/Panel";
 import { RemoteConfigForm } from "./RemoteConfigForm";
 import { RemoteEditActions } from "./RemoteEditActions";
-import { EmptyState, ErrorState, StatusBadge } from "../../../components/misty";
+import { EmptyState, ErrorState } from "@/components/ui/state-view";
+import { StatusBadge } from "@/components/ui/status-badge";
 
 const remoteEditPanelClass =
   "grid min-h-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden !rounded-none !border-0 !bg-transparent !shadow-none [border-radius:0]";
 
-const remoteEditBodyClass =
-  "min-h-0 overflow-auto";
+const remoteEditBodyClass = "min-h-0 overflow-auto";
 
 interface RemoteEditPanelProps {
   draft: RemoteEditDraft | null;
@@ -44,11 +44,27 @@ export function RemoteEditPanel(props: RemoteEditPanelProps) {
     <Panel className={remoteEditPanelClass}>
       <PanelHeader
         title="Edit Remote"
-        subtitle={loading ? `Loading ${props.loadingRemoteName}` : draft ? `${draft.providerType} · ${draft.originalName}` : "Select a remote"}
-        actions={<>
-          {!loading && props.stale ? <StatusBadge status="danger" dot>Stale</StatusBadge> : null}
-          {!loading && props.dirty ? <StatusBadge status="warning" dot>Unsaved</StatusBadge> : null}
-        </>}
+        subtitle={
+          loading
+            ? `Loading ${props.loadingRemoteName}`
+            : draft
+              ? `${draft.providerType} · ${draft.originalName}`
+              : "Select a remote"
+        }
+        actions={
+          <>
+            {!loading && props.stale ? (
+              <StatusBadge status="danger" dot>
+                Stale
+              </StatusBadge>
+            ) : null}
+            {!loading && props.dirty ? (
+              <StatusBadge status="warning" dot>
+                Unsaved
+              </StatusBadge>
+            ) : null}
+          </>
+        }
       />
 
       <div className={remoteEditBodyClass}>
@@ -57,9 +73,24 @@ export function RemoteEditPanel(props: RemoteEditPanelProps) {
         ) : draft ? (
           <>
             {props.stale ? (
-              <Alert variant="destructive" className="max-w-[760px] rounded-none border-x-0 border-t-0">
+              <Alert
+                variant="destructive"
+                className="max-w-[760px] rounded-none border-x-0 border-t-0"
+              >
                 <AlertTitle>This remote changed in another pane</AlertTitle>
-                <AlertDescription className="flex items-center justify-between gap-3"><span>Reload before saving.</span><Button className="shrink-0" variant="outline" size="sm" type="button" onClick={props.onReload} disabled={props.working}>Reload</Button></AlertDescription>
+                <AlertDescription className="flex items-center justify-between gap-3">
+                  <span>Reload before saving.</span>
+                  <Button
+                    className="shrink-0"
+                    variant="outline"
+                    size="sm"
+                    type="button"
+                    onClick={props.onReload}
+                    disabled={props.working}
+                  >
+                    Reload
+                  </Button>
+                </AlertDescription>
               </Alert>
             ) : null}
             <RemoteConfigForm
@@ -82,8 +113,18 @@ export function RemoteEditPanel(props: RemoteEditPanelProps) {
               onDelete={() => props.onDelete(draft.originalName)}
             />
           </>
+        ) : props.serviceError ? (
+          <ErrorState
+            compact
+            title="Remote service unavailable"
+            description="Start the Misty remote service, then refresh Remotes."
+          />
         ) : (
-          props.serviceError ? <ErrorState compact title="Remote service unavailable" description="Start the Misty remote service, then refresh Remotes."/> : <EmptyState compact title="Select a remote" description="Choose a remote to view and edit its provider configuration."/>
+          <EmptyState
+            compact
+            title="Select a remote"
+            description="Choose a remote to view and edit its provider configuration."
+          />
         )}
       </div>
     </Panel>
@@ -92,7 +133,11 @@ export function RemoteEditPanel(props: RemoteEditPanelProps) {
 
 function RemoteEditSkeleton() {
   return (
-    <div className="grid max-w-[760px] gap-3.5 p-[18px]" aria-busy="true" aria-label="Loading remote configuration">
+    <div
+      className="grid max-w-[760px] gap-3.5 p-[18px]"
+      aria-busy="true"
+      aria-label="Loading remote configuration"
+    >
       <div className="inline-flex items-center gap-2 text-[13px] text-muted-foreground">
         <AssetIcon className="animate-spin" src={iconAssets.sync16} size={17} />
         <span>Loading remote configuration</span>

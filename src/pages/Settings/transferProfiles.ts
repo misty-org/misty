@@ -23,7 +23,10 @@ export function transferProfileRecords(document: Record<string, unknown>): Trans
   const profiles = sectionRecord(document, "transfer_profiles").profiles;
   if (!Array.isArray(profiles)) return [];
   return profiles
-    .filter((profile): profile is Record<string, unknown> => profile != null && typeof profile === "object" && !Array.isArray(profile))
+    .filter(
+      (profile): profile is Record<string, unknown> =>
+        profile != null && typeof profile === "object" && !Array.isArray(profile),
+    )
     .map((profile) => {
       const id = typeof profile.id === "string" ? profile.id : "";
       return {
@@ -44,7 +47,9 @@ export function transferProfileRecords(document: Record<string, unknown>): Trans
 export function defaultTransferProfile(document: Record<string, unknown>): TransferProfileRecord {
   const profiles = transferProfileRecords(document);
   const defaultId = defaultTransferProfileId(document);
-  return profiles.find((profile) => profile.id === defaultId) ?? profiles[0] ?? fallbackTransferProfile();
+  return (
+    profiles.find((profile) => profile.id === defaultId) ?? profiles[0] ?? fallbackTransferProfile()
+  );
 }
 
 export function defaultTransferProfileId(document: Record<string, unknown>): string {
@@ -63,7 +68,9 @@ export function transferProfileOptions(profile: TransferProfileRecord): Transfer
   };
 }
 
-export function transferProfileSettingsPayload(profile: TransferProfileRecord): Record<string, unknown> {
+export function transferProfileSettingsPayload(
+  profile: TransferProfileRecord,
+): Record<string, unknown> {
   return {
     id: profile.id,
     name: profile.name,
@@ -81,9 +88,14 @@ function numberField(record: Record<string, unknown>, key: string, fallback: num
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
 }
 
-function sectionRecord(document: Record<string, unknown>, section: string): Record<string, unknown> {
+function sectionRecord(
+  document: Record<string, unknown>,
+  section: string,
+): Record<string, unknown> {
   const value = document[section];
-  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
 }
 
 function fallbackTransferProfile(): TransferProfileRecord {

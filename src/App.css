@@ -126,10 +126,18 @@
 
 .app-pages-root .misty-transient-scrollbar {
   --misty-transient-scrollbar-thumb: color-mix(in srgb, var(--misty-text-muted) 42%, transparent);
-  --misty-transient-scrollbar-thumb-hover: color-mix(in srgb, var(--misty-text-muted) 66%, transparent);
+  --misty-transient-scrollbar-thumb-hover: color-mix(
+    in srgb,
+    var(--misty-text-muted) 66%,
+    transparent
+  );
   scrollbar-color: transparent transparent;
   scrollbar-gutter: auto !important;
   scrollbar-width: thin;
+}
+
+.app-pages-root .misty-file-browser-scrollbar {
+  scrollbar-gutter: stable !important;
 }
 
 .app-pages-root .misty-transient-scrollbar::-webkit-scrollbar {

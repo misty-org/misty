@@ -13,7 +13,9 @@ describe("Mika path privacy", () => {
   });
 
   it("handles Windows roots without exposing the drive path", () => {
-    expect(deviceRelativePath("C:\\Users\\Alice\\Docs", "c:\\users\\alice\\docs\\report.pdf")).toBe("report.pdf");
+    expect(deviceRelativePath("C:\\Users\\Alice\\Docs", "c:\\users\\alice\\docs\\report.pdf")).toBe(
+      "report.pdf",
+    );
     expect(deviceRelativePath("C:\\Users\\Alice\\Docs", "D:\\report.pdf")).toBeNull();
   });
 });

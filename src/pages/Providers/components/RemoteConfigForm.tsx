@@ -7,10 +7,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import type { ProviderWorkflow, ProviderWorkflowOption, RcloneConfigPaths, RemoteEditDraft } from "../../../api/types";
-import { iconAssets } from "../../../shared/assets/icons";
-import { AssetIcon } from "../../../shared/components/AssetIcon";
-import { prettyLabel } from "../../../shared/format";
+import type {
+  ProviderWorkflow,
+  ProviderWorkflowOption,
+  RcloneConfigPaths,
+  RemoteEditDraft,
+} from "../../../api/types";
+import { iconAssets } from "@/shared/assets/icons";
+import { AssetIcon } from "@/shared/components/AssetIcon";
+import { prettyLabel } from "@/shared/format";
 import { isSecretKey, parseTokenFields } from "../providerUtils";
 
 interface RemoteConfigFormProps {
@@ -25,20 +30,17 @@ interface RemoteConfigFormProps {
   onTokenVisible: (visible: boolean) => void;
 }
 
-const remoteConfigFormClass =
-  "min-h-0";
+const remoteConfigFormClass = "min-h-0";
 
 const formGridClass =
   "grid max-w-[760px] grid-cols-2 gap-x-4 gap-y-3.5 p-[18px] max-[980px]:grid-cols-1";
 
-const labelClass =
-  "grid gap-1.5 text-xs font-medium text-muted-foreground capitalize";
+const labelClass = "grid gap-1.5 text-xs font-medium text-muted-foreground capitalize";
 
 const tokenFieldsClass =
   "col-span-full m-0 grid grid-cols-2 gap-x-4 gap-y-3.5 p-3.5 max-[980px]:grid-cols-1";
 
-const tokenLegendClass =
-  "flex items-center gap-2.5 px-2 text-foreground";
+const tokenLegendClass = "flex items-center gap-2.5 px-2 text-foreground";
 
 const pathsPanelClass =
   "mx-[18px] mb-3.5 grid max-w-[760px] gap-1.5 rounded-md bg-muted/40 p-3 text-xs text-muted-foreground [overflow-wrap:anywhere]";
@@ -104,7 +106,8 @@ function ConfigField(props: {
   onTokenField: (key: string, value: string) => void;
   onTokenVisible: (visible: boolean) => void;
 }) {
-  const { configKey, option, value, tokenVisible, onConfigField, onTokenField, onTokenVisible } = props;
+  const { configKey, option, value, tokenVisible, onConfigField, onTokenField, onTokenVisible } =
+    props;
 
   if (configKey === "token") {
     const fields = parseTokenFields(value);
@@ -144,17 +147,27 @@ function ConfigField(props: {
     <label className={labelClass}>
       {option?.label || prettyLabel(configKey)}
       {option && option.choices.length > 0 ? (
-        <Select value={value || EMPTY_SELECT_VALUE} onValueChange={(nextValue) => onConfigField(configKey, nextValue === EMPTY_SELECT_VALUE ? "" : nextValue)}>
+        <Select
+          value={value || EMPTY_SELECT_VALUE}
+          onValueChange={(nextValue) =>
+            onConfigField(configKey, nextValue === EMPTY_SELECT_VALUE ? "" : nextValue)
+          }
+        >
           <SelectTrigger>
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-          {value && !option.choices.some((choice) => choice.value === value) ? (
-            <SelectItem value={value}>{value}</SelectItem>
-          ) : null}
-          {option.choices.map((choice) => (
-            <SelectItem key={choice.value || EMPTY_SELECT_VALUE} value={choice.value || EMPTY_SELECT_VALUE}>{choice.help || choice.value || "None"}</SelectItem>
-          ))}
+            {value && !option.choices.some((choice) => choice.value === value) ? (
+              <SelectItem value={value}>{value}</SelectItem>
+            ) : null}
+            {option.choices.map((choice) => (
+              <SelectItem
+                key={choice.value || EMPTY_SELECT_VALUE}
+                value={choice.value || EMPTY_SELECT_VALUE}
+              >
+                {choice.help || choice.value || "None"}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
       ) : (
@@ -166,7 +179,11 @@ function ConfigField(props: {
           onVisible={onTokenVisible}
         />
       )}
-      {option?.help ? <small className="text-xs normal-case leading-[1.35] text-muted-foreground">{option.help}</small> : null}
+      {option?.help ? (
+        <small className="text-xs normal-case leading-[1.35] text-muted-foreground">
+          {option.help}
+        </small>
+      ) : null}
     </label>
   );
 }
@@ -209,6 +226,9 @@ function SecretConfigInput(props: {
   );
 }
 
-function workflowOptionForKey(workflow: ProviderWorkflow | null, key: string): ProviderWorkflowOption | null {
+function workflowOptionForKey(
+  workflow: ProviderWorkflow | null,
+  key: string,
+): ProviderWorkflowOption | null {
   return workflow?.options.find((option) => option.name === key) ?? null;
 }

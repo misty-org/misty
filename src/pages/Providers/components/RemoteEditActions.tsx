@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
-import { iconAssets } from "../../../shared/assets/icons";
-import { AssetIcon } from "../../../shared/components/AssetIcon";
+import { iconAssets } from "@/shared/assets/icons";
+import { AssetIcon } from "@/shared/components/AssetIcon";
 
 interface RemoteEditActionsProps {
   working: boolean;
@@ -17,7 +17,10 @@ const editActionsClass =
 export function RemoteEditActions(props: RemoteEditActionsProps) {
   return (
     <footer className={editActionsClass}>
-      <Button onClick={props.onSave} disabled={props.working || props.stale || !props.dirty || !props.validRemoteName}>
+      <Button
+        onClick={props.onSave}
+        disabled={props.working || props.stale || !props.dirty || !props.validRemoteName}
+      >
         <AssetIcon src={iconAssets.activityCheck} size={16} />
         Save Changes
       </Button>

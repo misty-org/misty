@@ -12,7 +12,9 @@ export function mikaServerContext(
   return {
     activeRoot: opaqueScopeId || undefined,
     selectedPaths: localRoot
-      ? localSelectedPaths.map((path) => deviceRelativePath(localRoot, path)).filter((path): path is string => Boolean(path))
+      ? localSelectedPaths
+          .map((path) => deviceRelativePath(localRoot, path))
+          .filter((path): path is string => Boolean(path))
       : [],
   };
 }
@@ -21,8 +23,12 @@ export function mikaServerContext(
 export function deviceRelativePath(root: string, path: string): string | null {
   const normalizedRoot = normalizeDevicePath(root).replace(/\/+$/, "");
   const normalizedPath = normalizeDevicePath(path);
-  const comparisonRoot = isWindowsPath(normalizedRoot) ? normalizedRoot.toLowerCase() : normalizedRoot;
-  const comparisonPath = isWindowsPath(normalizedRoot) ? normalizedPath.toLowerCase() : normalizedPath;
+  const comparisonRoot = isWindowsPath(normalizedRoot)
+    ? normalizedRoot.toLowerCase()
+    : normalizedRoot;
+  const comparisonPath = isWindowsPath(normalizedRoot)
+    ? normalizedPath.toLowerCase()
+    : normalizedPath;
   if (!normalizedRoot || comparisonPath === comparisonRoot) return null;
   if (!comparisonPath.startsWith(`${comparisonRoot}/`)) return null;
   const relative = normalizedPath.slice(normalizedRoot.length + 1);
@@ -36,7 +42,10 @@ export function isSafeRelativePath(path: string): boolean {
 }
 
 function normalizeDevicePath(path: string): string {
-  return path.trim().replace(/\\/g, "/").replace(/\/{2,}/g, "/");
+  return path
+    .trim()
+    .replace(/\\/g, "/")
+    .replace(/\/{2,}/g, "/");
 }
 
 function isWindowsPath(path: string): boolean {

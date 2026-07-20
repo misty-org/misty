@@ -45,7 +45,8 @@ export function estimateSmartLibraryTokens(assetCount: number): SmartLibraryToke
   const estimatedInputTokens = count * 340 + batchCount * 180;
   const estimatedOutputTokens = count * 220;
   const estimatedEmbeddingTokens = count * 266;
-  const estimatedTotalTokens = estimatedInputTokens + estimatedOutputTokens + estimatedEmbeddingTokens;
+  const estimatedTotalTokens =
+    estimatedInputTokens + estimatedOutputTokens + estimatedEmbeddingTokens;
   return {
     assetCount: count,
     batchCount,
@@ -70,23 +71,60 @@ export const SMART_LIBRARY_ANALYSIS_SCHEMA = {
       items: {
         type: "object",
         additionalProperties: false,
-        required: ["assetId", "assetKind", "mimeType", "description", "tags", "suggestedCollections", "confidence", "metadata"],
+        required: [
+          "assetId",
+          "assetKind",
+          "mimeType",
+          "description",
+          "tags",
+          "suggestedCollections",
+          "confidence",
+          "metadata",
+        ],
         properties: {
           assetId: { type: "string", minLength: 1 },
           assetKind: { type: "string", minLength: 1, maxLength: 32 },
           mimeType: { type: "string", minLength: 1, maxLength: 96 },
           description: { type: "string", minLength: 12, maxLength: 500 },
-          tags: { type: "array", minItems: 3, maxItems: 24, items: { type: "string", minLength: 1, maxLength: 64 } },
-          suggestedCollections: { type: "array", maxItems: 5, items: { type: "string", minLength: 1, maxLength: 64 } },
+          tags: {
+            type: "array",
+            minItems: 3,
+            maxItems: 24,
+            items: { type: "string", minLength: 1, maxLength: 64 },
+          },
+          suggestedCollections: {
+            type: "array",
+            maxItems: 5,
+            items: { type: "string", minLength: 1, maxLength: 64 },
+          },
           confidence: { type: "number", minimum: 0, maximum: 1 },
           metadata: {
             type: "object",
             additionalProperties: false,
-            required: ["contentType", "primarySubject", "searchTerms", "entities", "characters", "brands", "applications", "objects", "scenes", "activities", "colors", "visibleText", "topics"],
+            required: [
+              "contentType",
+              "primarySubject",
+              "searchTerms",
+              "entities",
+              "characters",
+              "brands",
+              "applications",
+              "objects",
+              "scenes",
+              "activities",
+              "colors",
+              "visibleText",
+              "topics",
+            ],
             properties: {
               contentType: { type: "string", minLength: 1, maxLength: 64 },
               primarySubject: { type: "string", minLength: 1, maxLength: 160 },
-              searchTerms: { type: "array", minItems: 3, maxItems: 32, items: { type: "string", minLength: 1, maxLength: 80 } },
+              searchTerms: {
+                type: "array",
+                minItems: 3,
+                maxItems: 32,
+                items: { type: "string", minLength: 1, maxLength: 80 },
+              },
               entities: stringArraySchema(24),
               characters: stringArraySchema(12),
               brands: stringArraySchema(12),

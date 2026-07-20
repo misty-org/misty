@@ -80,11 +80,13 @@ export function clientDebugPanelEnabled(): boolean {
 function isClientDebugEvent(value: unknown): value is ClientDebugEvent {
   if (!value || typeof value !== "object") return false;
   const candidate = value as Record<string, unknown>;
-  return typeof candidate.id === "string"
-    && typeof candidate.createdAt === "string"
-    && typeof candidate.level === "string"
-    && typeof candidate.scope === "string"
-    && typeof candidate.message === "string";
+  return (
+    typeof candidate.id === "string" &&
+    typeof candidate.createdAt === "string" &&
+    typeof candidate.level === "string" &&
+    typeof candidate.scope === "string" &&
+    typeof candidate.message === "string"
+  );
 }
 
 function reasonMessage(reason: unknown): string {

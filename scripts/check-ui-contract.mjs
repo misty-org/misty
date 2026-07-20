@@ -5,9 +5,11 @@ import { fileURLToPath } from "node:url";
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const sourceRoot = resolve(repositoryRoot, "src");
 const protectedRoots = [
-  resolve(sourceRoot, "components/misty"),
+  resolve(sourceRoot, "features/explorer"),
+  resolve(sourceRoot, "features/spaces"),
   resolve(sourceRoot, "pages/Account"),
   resolve(sourceRoot, "pages/Agents"),
+  resolve(sourceRoot, "pages/Files"),
   resolve(sourceRoot, "pages/Home"),
   resolve(sourceRoot, "pages/Providers"),
   resolve(sourceRoot, "pages/Settings"),
@@ -23,19 +25,49 @@ for (const path of walk(sourceRoot)) {
   const text = readFileSync(path, "utf8");
   const repositoryPath = relative(repositoryRoot, path).split("\\").join("/");
 
-  if (!repositoryPath.startsWith("src/components/ui/") && /from\s+["'](?:@radix-ui\/|radix-ui["'])/.test(text)) {
-    failures.push(`${repositoryPath}: import Radix only inside src/components/ui; consume the shadcn wrapper elsewhere`);
+  if (
+    !repositoryPath.startsWith("src/components/ui/") &&
+    /from\s+["'](?:@radix-ui\/|radix-ui["'])/.test(text)
+  ) {
+    failures.push(
+      `${repositoryPath}: import Radix only inside src/components/ui; consume the shadcn wrapper elsewhere`,
+    );
   }
 
   if (repositoryPath.startsWith("src/components/ui/")) {
-    reportMatches(repositoryPath, text, /\[--(?:radix|cmdk|reka)-[^\]]+\]/g, "wrap CSS custom properties in var(...) inside Tailwind arbitrary values");
+    reportMatches(
+      repositoryPath,
+      text,
+      /\[--(?:radix|cmdk|reka)-[^\]]+\]/g,
+      "wrap CSS custom properties in var(...) inside Tailwind arbitrary values",
+    );
   }
 
   if (!protectedRoots.some((root) => path === root || path.startsWith(`${root}/`))) continue;
-  reportMatches(repositoryPath, text, /<(?:button|input|select|textarea)\b/g, "use the shared shadcn control instead of a raw interactive element");
-  reportMatches(repositoryPath, text, /\bfixed\s+inset-0\b/g, "use Dialog, AlertDialog, Sheet, or another shared overlay primitive");
-  reportMatches(repositoryPath, text, /\bcreatePortal\s*\(/g, "let the shared overlay primitive own its portal");
-  reportMatches(repositoryPath, text, /\bz-\[\d{4,}\]/g, "use a named --misty-layer-* token instead of a hard-coded portal layer");
+  reportMatches(
+    repositoryPath,
+    text,
+    /<(?:button|input|select|textarea)\b/g,
+    "use the shared shadcn control instead of a raw interactive element",
+  );
+  reportMatches(
+    repositoryPath,
+    text,
+    /\bfixed\s+inset-0\b/g,
+    "use Dialog, AlertDialog, Sheet, or another shared overlay primitive",
+  );
+  reportMatches(
+    repositoryPath,
+    text,
+    /\bcreatePortal\s*\(/g,
+    "let the shared overlay primitive own its portal",
+  );
+  reportMatches(
+    repositoryPath,
+    text,
+    /\bz-\[\d{4,}\]/g,
+    "use a named --misty-layer-* token instead of a hard-coded portal layer",
+  );
 }
 
 if (failures.length) {
@@ -44,7 +76,7 @@ if (failures.length) {
   process.exit(1);
 }
 
-console.log("UI contract check passed (migrated Misty pages use the shared interaction layer).")
+console.log("UI contract check passed (migrated pages use the shared shadcn/ui layer).");
 
 function reportMatches(path, text, pattern, guidance) {
   for (const match of text.matchAll(pattern)) {

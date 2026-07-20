@@ -25,9 +25,15 @@ export function VersionPicker() {
       >
         <SelectTrigger className="h-10">
           <span className="flex min-w-0 items-center gap-3">
-            <span className="shrink-0 whitespace-nowrap tabular-nums">{release?.version ?? "Loading"}</span>
+            <span className="shrink-0 whitespace-nowrap tabular-nums">
+              {release?.version ?? "Loading"}
+            </span>
             <span className="min-w-0 truncate text-[11px] font-medium text-muted-foreground">
-              {releasesLoading ? "Fetching releases" : release?.version === latestVersion ? "Latest release" : release?.date}
+              {releasesLoading
+                ? "Fetching releases"
+                : release?.version === latestVersion
+                  ? "Latest release"
+                  : release?.date}
             </span>
           </span>
         </SelectTrigger>
@@ -37,9 +43,15 @@ export function VersionPicker() {
               <span className="inline-flex w-full min-w-0 items-center gap-3">
                 <span className="min-w-0">
                   <span className="block text-sm font-semibold">{release.version}</span>
-                  <span className="block truncate text-xs text-muted-foreground">{release.date}</span>
+                  <span className="block truncate text-xs text-muted-foreground">
+                    {release.date}
+                  </span>
                 </span>
-                {release.version === latestVersion ? <Badge className="ml-auto" variant="secondary">Latest</Badge> : null}
+                {release.version === latestVersion ? (
+                  <Badge className="ml-auto" variant="secondary">
+                    Latest
+                  </Badge>
+                ) : null}
               </span>
             </SelectItem>
           ))}

@@ -7,11 +7,7 @@ import AuthShell from "../../../auth/components/AuthShell";
 import AuthSubmitButton from "../../../auth/components/AuthSubmitButton";
 import { useAuth } from "../../../auth/AuthContext";
 import type { CurrentLicense } from "../../../models/setup";
-import {
-  accountFetchMe,
-  accountSignIn,
-  type AccountMeResponse,
-} from "../../Account/shared/api";
+import { accountFetchMe, accountSignIn, type AccountMeResponse } from "../../Account/shared/api";
 import { useSetupStore } from "../../../stores/useSetupStore";
 
 function licenseFromMe(me: AccountMeResponse | null): CurrentLicense | null {
@@ -32,7 +28,7 @@ export default function SignIn() {
   const { setUser } = useAuth();
   const saveAuthenticatedUser = useSetupStore((state) => state.saveAuthenticatedUser);
   const routeState = location.state as { from?: string; addingAccount?: boolean } | null;
-  const from = routeState?.from || "/home";
+  const from = routeState?.from || "/files";
   const addingAccount = Boolean(routeState?.addingAccount);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -51,22 +47,30 @@ export default function SignIn() {
       setUser({ ...user, accountCreatedAt: me?.created_at, currentPlan: me?.tier });
       navigate(from, { replace: true });
     } catch (signInError) {
-      setError(
-        signInError instanceof Error
-          ? signInError.message
-          : "Could not sign in.",
-      );
+      setError(signInError instanceof Error ? signInError.message : "Could not sign in.");
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <AuthShell title={addingAccount ? "Add another account" : "Welcome back"} description={addingAccount ? "Your current account will remain signed in on this device." : "Sign in to your Misty account."} onBack={addingAccount ? () => navigate(from, { replace: true }) : undefined}>
+    <AuthShell
+      title={addingAccount ? "Add another account" : "Welcome back"}
+      description={
+        addingAccount
+          ? "Your current account will remain signed in on this device."
+          : "Sign in to your Misty account."
+      }
+      onBack={addingAccount ? () => navigate(from, { replace: true }) : undefined}
+    >
       <AuthCard
         footer={
           <div className="text-center text-sm text-text-muted">
-            <NavLink to="/register" state={{ from, addingAccount }} className="transition hover:text-text">
+            <NavLink
+              to="/register"
+              state={{ from, addingAccount }}
+              className="transition hover:text-text"
+            >
               Don&apos;t have an account? Sign up
             </NavLink>
           </div>
@@ -96,11 +100,7 @@ export default function SignIn() {
             onChange={setPassword}
           />
           {error ? <AuthMessage tone="error" message={error} /> : null}
-          <AuthSubmitButton
-            idleLabel="Sign In"
-            loadingLabel="Signing in..."
-            loading={loading}
-          />
+          <AuthSubmitButton idleLabel="Sign In" loadingLabel="Signing in..." loading={loading} />
         </form>
       </AuthCard>
     </AuthShell>

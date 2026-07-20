@@ -32,7 +32,9 @@ export default function AuthField({
 }: AuthFieldProps) {
   return (
     <div className="grid gap-2">
-      <Label className="text-sm" htmlFor={id}>{label}</Label>
+      <Label className="text-sm" htmlFor={id}>
+        {label}
+      </Label>
       <Input
         id={id}
         type={type}

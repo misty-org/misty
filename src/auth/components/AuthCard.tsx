@@ -22,7 +22,9 @@ export default function AuthCard({ title, description, children, footer }: AuthC
 
       <CardContent className="p-6 sm:p-8">{children}</CardContent>
 
-      {footer ? <CardFooter className="border-t border-border p-6 sm:p-8">{footer}</CardFooter> : null}
+      {footer ? (
+        <CardFooter className="border-t border-border p-6 sm:p-8">{footer}</CardFooter>
+      ) : null}
     </Card>
   );
 }

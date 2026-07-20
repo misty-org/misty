@@ -15,8 +15,8 @@ import {
 } from "lucide-react";
 import { useId, type ReactNode } from "react";
 import type { MountedDevice, ProviderRemote } from "../../../api/types";
-import { providerIconForType } from "../../../shared/assets/icons";
-import { AssetIcon } from "../../../shared/components/AssetIcon";
+import { providerIconForType } from "@/shared/assets/icons";
+import { AssetIcon } from "@/shared/components/AssetIcon";
 import { joinPath, titleFromPath } from "./recentFileUtils";
 import { Button } from "../../../components/ui/button";
 import { Card } from "../../../components/ui/card";
@@ -26,7 +26,16 @@ export type HomeQuickAccessItem = {
   id: string;
   label: string;
   path: string;
-  icon: "desktop" | "documents" | "downloads" | "folder" | "home" | "pin" | "recent" | "starred" | "trash";
+  icon:
+    | "desktop"
+    | "documents"
+    | "downloads"
+    | "folder"
+    | "home"
+    | "pin"
+    | "recent"
+    | "starred"
+    | "trash";
 };
 
 export type HomeSmartFolderItem = {
@@ -52,7 +61,6 @@ type HomeSidebarPanelsProps = {
   quickAccessItems: HomeQuickAccessItem[];
   remotes: ProviderRemote[];
   remotesLoading: boolean;
-  assistantPanel: ReactNode;
   smartFolders: HomeSmartFolderItem[];
   smartFoldersLoading: boolean;
   tags: HomeTagItem[];
@@ -60,135 +68,78 @@ type HomeSidebarPanelsProps = {
   workspacePanel: ReactNode;
 };
 
-const panelClass =
-  "flex min-h-0 min-w-0 flex-col p-4";
+const panelClass = "flex h-full min-h-0 min-w-0 flex-col p-4";
 const headerClass =
-  "mb-2 flex shrink-0 items-center gap-2 text-sm font-medium text-foreground";
+  "flex shrink-0 items-center gap-2.5 border-b border-border/60 pb-3 text-base font-semibold text-foreground";
 const rowClass =
-  "grid w-full min-w-0 grid-cols-[28px_minmax(0,1fr)] items-center gap-2 rounded-md border-0 bg-transparent px-2 py-1.5 text-left transition-colors hover:bg-muted/45";
-const iconCellClass =
-  "grid size-7 place-items-center rounded-md bg-muted/55 text-muted-foreground";
+  "grid w-full min-w-0 grid-cols-[32px_minmax(0,1fr)] items-center gap-2.5 rounded-md border-0 bg-transparent px-2 py-1 text-left transition-colors hover:bg-muted/45 hover:text-accent-foreground";
+const iconCellClass = "grid size-8 place-items-center rounded-md bg-muted/60 text-muted-foreground";
 
 export function HomeSidebarPanels(props: HomeSidebarPanelsProps) {
   return (
-    <Card
+    <div
       aria-label="Home overview"
-      className="grid min-h-0 min-w-0 flex-none grid-cols-[repeat(3,minmax(0,1fr))] gap-0 overflow-hidden py-0 max-[900px]:grid-cols-1"
+      className="grid min-h-[580px] min-w-0 flex-1 grid-cols-[repeat(3,minmax(0,1fr))] items-stretch gap-4 max-[1180px]:min-h-0 max-[1180px]:grid-cols-2 max-[820px]:grid-cols-1"
       role="region"
     >
-      <div className="min-w-0 divide-y divide-border/50">
-        <div className="p-4">
-          {props.workspacePanel}
-        </div>
-        <div className="p-4">
-          {props.assistantPanel}
-        </div>
-        <SidebarPanel
-          icon={<HardDrive className="h-4 w-4" />}
-          title="Devices"
-        >
+      <div className="grid min-h-0 min-w-0 grid-rows-2 gap-4 max-[1180px]:min-h-[580px] max-[820px]:min-h-[580px]">
+        <Card className="min-h-0 min-w-0 gap-0 py-0" size="sm">
+          <div className="h-full min-h-0 p-4">{props.workspacePanel}</div>
+        </Card>
+        <DashboardCard icon={<HardDrive className="size-4" />} title="Devices">
           <PanelRows
             emptyMessage="No devices connected."
             loading={props.devicesLoading}
             showEmpty={props.devices.length === 0}
           >
             {props.devices.map((device) => (
-              <Button
-                className={`${rowClass} h-auto justify-start font-normal`}
-                key={device.id}
-                onClick={() => props.onOpenDevice(device)}
-                title={device.mountPath}
-                type="button"
-                variant="ghost"
-              >
+              <PanelButton key={device.id} onClick={() => props.onOpenDevice(device)}>
                 <span className={iconCellClass}>
-                  <HardDrive className="h-4 w-4" />
+                  <HardDrive className="size-4" />
                 </span>
-                <span className="min-w-0">
-                  <span className="block truncate text-sm font-medium text-foreground">
-                    {device.name}
-                  </span>
-                  <span className="mt-0.5 block truncate text-[11px] text-muted-foreground">
-                    {deviceCapacityLabel(device)}
-                  </span>
-                </span>
-              </Button>
+                <PanelLabel label={device.name} detail={deviceCapacityLabel(device)} />
+              </PanelButton>
             ))}
           </PanelRows>
-        </SidebarPanel>
+        </DashboardCard>
       </div>
 
-      <div className="min-w-0 divide-y divide-border/50 border-l border-border/50 max-[900px]:border-l-0 max-[900px]:border-t">
-        <SidebarPanel
-          icon={<Home className="h-4 w-4" />}
-          title="Quick access"
-        >
+      <div className="grid min-h-0 min-w-0 grid-rows-[minmax(0,1.65fr)_minmax(0,0.65fr)] gap-4 max-[1180px]:min-h-[580px] max-[820px]:min-h-[580px]">
+        <DashboardCard icon={<Home className="size-4" />} title="Quick access">
           <PanelRows>
             {props.quickAccessItems.map((item) => (
-              <Button
-                className={`${rowClass} h-auto justify-start font-normal`}
-                key={item.id}
-                onClick={() => props.onOpenQuickAccess(item)}
-                title={item.path}
-                type="button"
-                variant="ghost"
-              >
+              <PanelButton key={item.id} onClick={() => props.onOpenQuickAccess(item)}>
                 <span className={iconCellClass}>
                   <QuickAccessIcon icon={item.icon} />
                 </span>
-                <span className="min-w-0">
-                  <span className="block truncate text-sm font-medium text-foreground">
-                    {item.label}
-                  </span>
-                  <span className="mt-0.5 block truncate text-[11px] text-muted-foreground">
-                    {item.path}
-                  </span>
-                </span>
-              </Button>
+                <PanelLabel label={item.label} detail={item.path} />
+              </PanelButton>
             ))}
           </PanelRows>
-        </SidebarPanel>
-
-        <SidebarPanel
-          icon={<Search className="h-4 w-4" />}
-          title="Collections"
-        >
+        </DashboardCard>
+        <DashboardCard icon={<Search className="size-4" />} title="Smart Folders">
           <PanelRows
-            emptyMessage="No collections yet."
+            emptyMessage="No smart folders yet."
             loading={props.smartFoldersLoading}
             showEmpty={props.smartFolders.length === 0}
           >
             {props.smartFolders.map((smartFolder) => (
-              <Button
-                className={`${rowClass} h-auto justify-start font-normal`}
+              <PanelButton
                 key={smartFolder.id}
                 onClick={() => props.onOpenSmartFolder(smartFolder)}
-                title={smartFolder.query || smartFolder.name}
-                type="button"
-                variant="ghost"
               >
                 <span className={iconCellClass}>
-                  <Search className="h-4 w-4" />
+                  <Search className="size-4" />
                 </span>
-                <span className="min-w-0">
-                  <span className="block truncate text-sm font-medium text-foreground">
-                    {smartFolder.name}
-                  </span>
-                  <span className="mt-0.5 block truncate text-[11px] text-muted-foreground">
-                    {smartFolder.query || "Search rules"}
-                  </span>
-                </span>
-              </Button>
+                <PanelLabel label={smartFolder.name} detail={smartFolder.query || "Search rules"} />
+              </PanelButton>
             ))}
           </PanelRows>
-        </SidebarPanel>
+        </DashboardCard>
       </div>
 
-      <div className="min-w-0 divide-y divide-border/50 border-l border-border/50 max-[900px]:border-l-0 max-[900px]:border-t">
-        <SidebarPanel
-          icon={<Server className="h-4 w-4" />}
-          title="Remote"
-        >
+      <div className="grid min-h-0 min-w-0 grid-rows-2 gap-4 max-[1180px]:col-span-2 max-[1180px]:min-h-[580px] max-[1180px]:grid-cols-2 max-[1180px]:grid-rows-1 max-[820px]:col-span-1 max-[820px]:min-h-[580px] max-[820px]:grid-cols-1 max-[820px]:grid-rows-2">
+        <DashboardCard icon={<Server className="size-4" />} title="Remote">
           <PanelRows
             emptyMessage="No remotes connected."
             loading={props.remotesLoading}
@@ -197,65 +148,40 @@ export function HomeSidebarPanels(props: HomeSidebarPanelsProps) {
             {props.remotes.map((remote) => {
               const providerIcon = providerIconForType(remote.type);
               return (
-                <Button
-                  className={`${rowClass} h-auto justify-start font-normal`}
+                <PanelButton
                   key={`${remote.type}:${remote.name}`}
                   onClick={() => props.onOpenRemote(remote)}
-                  title={`${remote.type}: ${remote.name}`}
-                  type="button"
-                  variant="ghost"
                 >
                   <span className={iconCellClass}>
                     <AssetIcon src={providerIcon.src} color={providerIcon.color} size={20} />
                   </span>
-                  <span className="min-w-0">
-                    <span className="block truncate text-sm font-medium text-foreground">
-                      {remote.name}
-                    </span>
-                    <span className="mt-0.5 block truncate text-[11px] text-muted-foreground">
-                      {remote.statusLabel || remote.type}
-                    </span>
-                  </span>
-                </Button>
+                  <PanelLabel label={remote.name} detail={remote.statusLabel || remote.type} />
+                </PanelButton>
               );
             })}
           </PanelRows>
-        </SidebarPanel>
-
-        <SidebarPanel
-          icon={<Tag className="h-4 w-4" />}
-          title="Tags"
-        >
+        </DashboardCard>
+        <DashboardCard icon={<Tag className="size-4" />} title="Tags">
           <PanelRows
             emptyMessage="No tags yet."
             loading={props.tagsLoading}
             showEmpty={props.tags.length === 0}
           >
             {props.tags.map((tag) => (
-              <Button
-                className={`${rowClass} h-auto justify-start font-normal`}
-                key={tag.key}
-                onClick={() => props.onOpenTag(tag)}
-                type="button"
-                variant="ghost"
-              >
+              <PanelButton key={tag.key} onClick={() => props.onOpenTag(tag)}>
                 <span className={iconCellClass}>
-                  <Tag className="h-4 w-4" />
+                  <Tag className="size-4" />
                 </span>
-                <span className="min-w-0">
-                  <span className="block truncate text-sm font-medium text-foreground">
-                    {tag.name}
-                  </span>
-                  <span className="mt-0.5 block truncate text-[11px] text-muted-foreground">
-                    {tag.count} {tag.count === 1 ? "item" : "items"}
-                  </span>
-                </span>
-              </Button>
+                <PanelLabel
+                  label={tag.name}
+                  detail={`${tag.count} ${tag.count === 1 ? "item" : "items"}`}
+                />
+              </PanelButton>
             ))}
           </PanelRows>
-        </SidebarPanel>
+        </DashboardCard>
       </div>
-    </Card>
+    </div>
   );
 }
 
@@ -264,37 +190,56 @@ export function buildHomeQuickAccessItems(
   pinnedPaths: string[],
   androidLocal = false,
 ): HomeQuickAccessItem[] {
-  const quickItems: HomeQuickAccessItem[] = androidLocal ? [
-    { id: "quick:local", icon: "folder", label: "Local", path: homePath },
-    { id: "quick:recent", icon: "recent", label: "Recent", path: "misty://recent" },
-    { id: "quick:starred", icon: "starred", label: "Starred", path: "misty://starred" },
-    { id: "quick:trash", icon: "trash", label: "Trash", path: "misty://trash" },
-  ] : [
-    { id: "quick:home", icon: "home", label: "Home", path: homePath },
-    { id: "quick:desktop", icon: "desktop", label: "Desktop", path: joinPath(homePath, "Desktop") },
-    { id: "quick:documents", icon: "documents", label: "Documents", path: joinPath(homePath, "Documents") },
-    { id: "quick:downloads", icon: "downloads", label: "Downloads", path: joinPath(homePath, "Downloads") },
-    { id: "quick:recent", icon: "recent", label: "Recent", path: "misty://recent" },
-    { id: "quick:starred", icon: "starred", label: "Starred", path: "misty://starred" },
-    { id: "quick:trash", icon: "trash", label: "Trash", path: "misty://trash" },
-  ];
+  const quickItems: HomeQuickAccessItem[] = androidLocal
+    ? [
+        { id: "quick:local", icon: "folder", label: "Local", path: homePath },
+        { id: "quick:recent", icon: "recent", label: "Recent", path: "misty://recent" },
+        { id: "quick:starred", icon: "starred", label: "Starred", path: "misty://starred" },
+        { id: "quick:trash", icon: "trash", label: "Trash", path: "misty://trash" },
+      ]
+    : [
+        { id: "quick:home", icon: "home", label: "Home", path: homePath },
+        {
+          id: "quick:desktop",
+          icon: "desktop",
+          label: "Desktop",
+          path: joinPath(homePath, "Desktop"),
+        },
+        {
+          id: "quick:documents",
+          icon: "documents",
+          label: "Documents",
+          path: joinPath(homePath, "Documents"),
+        },
+        {
+          id: "quick:downloads",
+          icon: "downloads",
+          label: "Downloads",
+          path: joinPath(homePath, "Downloads"),
+        },
+        { id: "quick:recent", icon: "recent", label: "Recent", path: "misty://recent" },
+        { id: "quick:starred", icon: "starred", label: "Starred", path: "misty://starred" },
+        { id: "quick:trash", icon: "trash", label: "Trash", path: "misty://trash" },
+      ];
   const seen = new Set(quickItems.map((item) => normalizePanelPath(item.path)));
   const pinnedItems = pinnedPaths.flatMap((path): HomeQuickAccessItem[] => {
     const normalized = normalizePanelPath(path);
     if (!normalized || seen.has(normalized)) return [];
     seen.add(normalized);
-    return [{
-      id: `pinned:${normalized}`,
-      icon: "pin",
-      label: titleFromPath(normalized),
-      path: normalized,
-    }];
+    return [
+      {
+        id: `pinned:${normalized}`,
+        icon: "pin",
+        label: titleFromPath(normalized),
+        path: normalized,
+      },
+    ];
   });
 
   return [...quickItems, ...pinnedItems];
 }
 
-function SidebarPanel({
+function DashboardCard({
   children,
   className = "",
   icon,
@@ -308,13 +253,39 @@ function SidebarPanel({
   const titleId = useId();
 
   return (
-    <section aria-labelledby={titleId} className={`${panelClass} ${className}`}>
-      <div className={headerClass}>
-        <span className="shrink-0 text-muted-foreground">{icon}</span>
-        <h2 className="truncate" id={titleId}>{title}</h2>
-      </div>
+    <Card aria-labelledby={titleId} className="min-h-0 min-w-0 gap-0 py-0" size="sm">
+      <section className={`${panelClass} ${className}`}>
+        <div className={headerClass}>
+          <span className="shrink-0 text-muted-foreground">{icon}</span>
+          <h2 className="truncate" id={titleId}>
+            {title}
+          </h2>
+        </div>
+        <div className="min-h-0 flex-1 pt-3">{children}</div>
+      </section>
+    </Card>
+  );
+}
+
+function PanelButton({ children, onClick }: { children: ReactNode; onClick: () => void }) {
+  return (
+    <Button
+      className={`${rowClass} h-auto justify-start font-normal`}
+      onClick={onClick}
+      type="button"
+      variant="ghost"
+    >
       {children}
-    </section>
+    </Button>
+  );
+}
+
+function PanelLabel({ detail, label }: { detail: string; label: string }) {
+  return (
+    <span className="min-w-0">
+      <span className="block truncate text-sm font-medium text-foreground">{label}</span>
+      <span className="mt-0.5 block truncate text-xs text-muted-foreground">{detail}</span>
+    </span>
   );
 }
 

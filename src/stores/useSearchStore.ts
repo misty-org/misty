@@ -1,21 +1,16 @@
 import { create } from "zustand";
-import {
-  searchCancelScan,
-  searchGetStatus,
-  searchInit,
-  searchStartScan,
-} from "../api/misty";
+import { searchCancelScan, searchGetStatus, searchInit, searchStartScan } from "../api/misty";
 import type { SearchQueryScope, SearchResult, SearchStatus } from "../api/types";
-import { userFacingErrorText } from "../shared/format";
+import { userFacingErrorText } from "@/shared/format";
 import { useExplorerStore } from "./useExplorerStore";
-import { mergeLibrarySearchResults } from "../pages/Files/utils/librarySearch";
+import { mergeLibrarySearchResults } from "../features/explorer/utils/librarySearch";
 import {
   mergeHybridSearchResults,
   queryIndexedExplorerSearch,
   querySemanticExplorerSearch,
   semanticQueryMinimumCharacters,
   semanticSearchDebounceMs,
-} from "../pages/Files/utils/globalSearch";
+} from "../features/explorer/utils/globalSearch";
 
 const searchDebounceMs = 180;
 const activeStatusPollMs = 500;
@@ -134,7 +129,8 @@ export const useSearchStore = create<SearchStore>((set, get) => ({
     }
     set({ searching: true, error: null });
     await executeIndexedSearch(sequence);
-    if (trimmed.replace(/\s/g, "").length >= semanticQueryMinimumCharacters) await executeSemanticSearch(sequence);
+    if (trimmed.replace(/\s/g, "").length >= semanticQueryMinimumCharacters)
+      await executeSemanticSearch(sequence);
   },
 }));
 
@@ -149,9 +145,12 @@ function scheduleSearch(delay = searchDebounceMs): void {
   }, delay);
   const query = useSearchStore.getState().query.trim();
   if (query.replace(/\s/g, "").length >= semanticQueryMinimumCharacters) {
-    semanticDebounceTimer = window.setTimeout(() => {
-      void executeSemanticSearch(sequence);
-    }, Math.max(delay, semanticSearchDebounceMs));
+    semanticDebounceTimer = window.setTimeout(
+      () => {
+        void executeSemanticSearch(sequence);
+      },
+      Math.max(delay, semanticSearchDebounceMs),
+    );
   }
 }
 
@@ -172,17 +171,34 @@ async function executeIndexedSearch(sequence: number): Promise<void> {
   if (!trimmed || sequence !== querySequence) return;
   useSearchStore.setState({ searching: true, error: null });
   try {
-    indexedResults = !status || status.indexedItemCount === 0
-      ? mergeLibrarySearchResults([], useExplorerStore.getState().library, trimmed, { scope, currentPath, limit: 100 })
-      : await queryIndexedExplorerSearch(trimmed, { scope, currentPath, limit: 100 }, useExplorerStore.getState().library);
+    indexedResults =
+      !status || status.indexedItemCount === 0
+        ? mergeLibrarySearchResults([], useExplorerStore.getState().library, trimmed, {
+            scope,
+            currentPath,
+            limit: 100,
+          })
+        : await queryIndexedExplorerSearch(
+            trimmed,
+            { scope, currentPath, limit: 100 },
+            useExplorerStore.getState().library,
+          );
     indexedError = null;
   } catch (error) {
-    indexedResults = mergeLibrarySearchResults([], useExplorerStore.getState().library, trimmed, { scope, currentPath, limit: 100 });
+    indexedResults = mergeLibrarySearchResults([], useExplorerStore.getState().library, trimmed, {
+      scope,
+      currentPath,
+      limit: 100,
+    });
     indexedError = userFacingErrorText(error);
   }
   if (sequence !== querySequence) return;
   const results = mergeHybridSearchResults(indexedResults, semanticResults, 100);
-  useSearchStore.setState({ results, searching: semanticDebounceTimer !== null, error: results.length > 0 ? null : indexedError });
+  useSearchStore.setState({
+    results,
+    searching: semanticDebounceTimer !== null,
+    error: results.length > 0 ? null : indexedError,
+  });
 }
 
 async function executeSemanticSearch(sequence: number): Promise<void> {
@@ -192,14 +208,22 @@ async function executeSemanticSearch(sequence: number): Promise<void> {
   if (!trimmed || sequence !== querySequence) return;
   useSearchStore.setState({ searching: true });
   try {
-    semanticResults = await querySemanticExplorerSearch(trimmed, { scope, currentPath, limit: 100 });
+    semanticResults = await querySemanticExplorerSearch(trimmed, {
+      scope,
+      currentPath,
+      limit: 100,
+    });
   } catch {
     // Offline/unconfigured semantic search is intentionally a silent local-only fallback.
     semanticResults = [];
   }
   if (sequence !== querySequence) return;
   const results = mergeHybridSearchResults(indexedResults, semanticResults, 100);
-  useSearchStore.setState({ results, searching: false, error: results.length > 0 ? null : indexedError });
+  useSearchStore.setState({
+    results,
+    searching: false,
+    error: results.length > 0 ? null : indexedError,
+  });
 }
 
 function scheduleStatusPolling(): void {

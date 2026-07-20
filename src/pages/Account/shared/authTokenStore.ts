@@ -1,7 +1,7 @@
 import { remove, retrieve, store } from "@impierce/tauri-plugin-keystore";
 import { invoke } from "@tauri-apps/api/core";
-import { isNativeMobileBuild } from "../../../platform/buildTarget";
-import { hasTauriInternals } from "../../../shared/tauri";
+import { isNativeMobileBuild } from "@/platform/buildTarget";
+import { hasTauriInternals } from "@/shared/tauri";
 
 const desktopTokenService = "com.impierce.identity-wallet";
 const desktopTokenUser = "tester";
@@ -101,7 +101,7 @@ export async function readAccountAuthToken(): Promise<string | null> {
 export function listSavedAccountSessions(): SavedAccountSession[] {
   try {
     const raw = localStorage.getItem(accountIndexKey);
-    const parsed = raw ? JSON.parse(raw) as unknown : [];
+    const parsed = raw ? (JSON.parse(raw) as unknown) : [];
     if (!Array.isArray(parsed)) return [];
     const activeId = readActiveAccountId();
     return parsed.filter(isSavedAccountSession).sort((left, right) => {
@@ -160,8 +160,10 @@ export async function clearAccountAuthToken(): Promise<SavedAccountSession | nul
     const vault = await loadSecureVault();
     const activeId = readActiveAccountId() || vault.activeAccountId;
     vault.sessions = vault.sessions.filter((item) => item.account.id !== activeId);
-    const next = [...vault.sessions].sort((left, right) =>
-      right.account.lastUsedAt.localeCompare(left.account.lastUsedAt))[0] ?? null;
+    const next =
+      [...vault.sessions].sort((left, right) =>
+        right.account.lastUsedAt.localeCompare(left.account.lastUsedAt),
+      )[0] ?? null;
     vault.activeAccountId = next?.account.id ?? "";
     cachedToken = next?.token ?? null;
     await persistSecureVault(vault);
@@ -230,7 +232,10 @@ async function persistSecureVault(vault: SecureAccountVault): Promise<void> {
     return;
   }
   await store(JSON.stringify(vault));
-  writeAccountIndex(vault.sessions.map((item) => item.account), vault.activeAccountId);
+  writeAccountIndex(
+    vault.sessions.map((item) => item.account),
+    vault.activeAccountId,
+  );
   writeTokenStoredMarker(true);
 }
 
@@ -251,9 +256,13 @@ async function persistRawToken(token: string): Promise<void> {
 
 function selectActiveSession(vault: SecureAccountVault): SecureAccountSession | null {
   const preferredId = readActiveAccountId() || vault.activeAccountId;
-  return vault.sessions.find((item) => item.account.id === preferredId)
-    ?? [...vault.sessions].sort((left, right) => right.account.lastUsedAt.localeCompare(left.account.lastUsedAt))[0]
-    ?? null;
+  return (
+    vault.sessions.find((item) => item.account.id === preferredId) ??
+    [...vault.sessions].sort((left, right) =>
+      right.account.lastUsedAt.localeCompare(left.account.lastUsedAt),
+    )[0] ??
+    null
+  );
 }
 
 function writeAccountIndex(accounts: SavedAccountSession[], activeAccountId: string): void {
@@ -268,7 +277,11 @@ function writeAccountIndex(accounts: SavedAccountSession[], activeAccountId: str
 }
 
 function readActiveAccountId(): string {
-  try { return localStorage.getItem(activeAccountKey) ?? ""; } catch { return ""; }
+  try {
+    return localStorage.getItem(activeAccountKey) ?? "";
+  } catch {
+    return "";
+  }
 }
 
 function readLegacyAccount(): Omit<SavedAccountSession, "lastUsedAt"> | null {
@@ -299,7 +312,9 @@ function isSavedAccountSession(value: unknown): value is SavedAccountSession {
 function isSecureAccountSession(value: unknown): value is SecureAccountSession {
   if (!value || typeof value !== "object") return false;
   const item = value as Partial<SecureAccountSession>;
-  return typeof item.token === "string" && item.token.length > 0 && isSavedAccountSession(item.account);
+  return (
+    typeof item.token === "string" && item.token.length > 0 && isSavedAccountSession(item.account)
+  );
 }
 
 function emptyVault(): SecureAccountVault {
@@ -336,7 +351,11 @@ function writeTokenStoredMarker(value: boolean): void {
 function errorDetail(error: unknown): string {
   if (error instanceof Error) return error.message;
   if (typeof error === "string") return error;
-  try { return JSON.stringify(error); } catch { return ""; }
+  try {
+    return JSON.stringify(error);
+  } catch {
+    return "";
+  }
 }
 
 function recordTokenDebugEvent(event: {

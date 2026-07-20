@@ -20,9 +20,10 @@ export function advanceTransferCompletionTracker(
   rows: TransferRecord[],
   terminalStatuses: ReadonlySet<TransferStatus>,
 ): TransferCompletionAdvance {
-  const statuses = Object.fromEntries(
-    rows.map((row) => [row.id, row.status]),
-  ) as Record<number, TransferStatus>;
+  const statuses = Object.fromEntries(rows.map((row) => [row.id, row.status])) as Record<
+    number,
+    TransferStatus
+  >;
 
   // The first durable snapshot is hydration, not new work. It must only seed
   // the baseline or every historical completion will be announced on restart.
@@ -35,9 +36,8 @@ export function advanceTransferCompletionTracker(
 
   return {
     tracker: { ready: true, statuses },
-    changed: rows.filter((row) => (
-      terminalStatuses.has(row.status)
-      && current.statuses[row.id] !== row.status
-    )),
+    changed: rows.filter(
+      (row) => terminalStatuses.has(row.status) && current.statuses[row.id] !== row.status,
+    ),
   };
 }

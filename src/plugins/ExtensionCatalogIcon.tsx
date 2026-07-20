@@ -42,9 +42,8 @@ export function ExtensionCatalogIcon({
     setCacheBust(Date.now().toString());
   }, [logoSrc]);
 
-  const src = logoSrc && !imgFailed
-    ? `${logoSrc}${logoSrc.includes("?") ? "&" : "?"}t=${cacheBust}`
-    : "";
+  const src =
+    logoSrc && !imgFailed ? `${logoSrc}${logoSrc.includes("?") ? "&" : "?"}t=${cacheBust}` : "";
   const sizedStyle = size ? { width: size, height: size, ...style } : style;
 
   return (

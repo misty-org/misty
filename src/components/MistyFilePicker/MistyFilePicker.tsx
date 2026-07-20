@@ -1,9 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { MouseEvent as ReactMouseEvent } from "react";
-import {
-  CloudDownload,
-  FolderOpen,
-} from "lucide-react";
+import { CloudDownload, FolderOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -15,11 +12,11 @@ import {
 } from "@/components/ui/dialog";
 import { devicesSnapshot, explorerListDirectory } from "../../api/misty";
 import type { DirectoryListing, FileEntry, MountedDevice, ProviderRemote } from "../../api/types";
-import { FileBrowser } from "../../pages/Files/components/FileBrowser";
-import { ExplorerPickerSidebar } from "../../pages/Files/components/ExplorerPickerSidebar";
-import { ExplorerPickerToolbar } from "../../pages/Files/components/ExplorerPickerToolbar";
-import { errorText } from "../../shared/format";
-import { useMultiPanelStore } from "../../shared/multipanel/useMultiPanelStore";
+import { FileBrowser } from "../../features/explorer/components/FileBrowser";
+import { ExplorerPickerSidebar } from "../../features/explorer/components/ExplorerPickerSidebar";
+import { ExplorerPickerToolbar } from "../../features/explorer/components/ExplorerPickerToolbar";
+import { errorText } from "@/shared/format";
+import { useMultiPanelStore } from "@/shared/multipanel/useMultiPanelStore";
 import { useAppStore } from "../../stores/useAppStore";
 import { sortListing, useExplorerStore } from "../../stores/useExplorerStore";
 import type { ExplorerSortColumn, ExplorerSortState } from "../../stores/useExplorerStore";
@@ -60,8 +57,12 @@ export function MistyFilePicker({
   const app = useAppStore((state) => state.app);
   const homeDir = app?.environment.homeDir ?? "";
   const activePaneId = useMultiPanelStore((state) => state.activePaneId);
-  const explorerPath = useExplorerStore((state) => state.panes[activePaneId]?.listing?.path ?? null);
-  const explorerViewMode = useExplorerStore((state) => state.paneViewModes[activePaneId] ?? state.viewMode);
+  const explorerPath = useExplorerStore(
+    (state) => state.panes[activePaneId]?.listing?.path ?? null,
+  );
+  const explorerViewMode = useExplorerStore(
+    (state) => state.paneViewModes[activePaneId] ?? state.viewMode,
+  );
   const explorerSort = useExplorerStore((state) => state.paneSorts[activePaneId] ?? state.sort);
   const directorySizes = useExplorerStore((state) => state.directorySizes);
   const pinnedPaths = useExplorerStore((state) => state.pinnedPaths);
@@ -88,7 +89,10 @@ export function MistyFilePicker({
     const general = selectGeneralPreferences(settingsDocument);
     const advanced = selectAdvancedPreferences(settingsDocument);
     const storageHome = resolvePreferredRoot(general.preferredWorkspaceRoot, homeDir);
-    return resolveMountRoot(storageHome, advanced.mountPath || app?.environment.mountPath || ".misty/mnt");
+    return resolveMountRoot(
+      storageHome,
+      advanced.mountPath || app?.environment.mountPath || ".misty/mnt",
+    );
   }, [app?.environment.mountPath, homeDir, settingsDocument]);
 
   useEffect(() => {
@@ -111,36 +115,39 @@ export function MistyFilePicker({
     void refreshDevices();
   }, [refreshDevices]);
 
-  const loadPath = useCallback(async (
-    path: string,
-    historyMode: "push" | "replace" | "none" = "push",
-    hidden = showHidden,
-  ) => {
-    const nextRequestId = ++requestId.current;
-    setLoading(true);
-    setError(null);
-    setSelectedIds([]);
-    selectionAnchorId.current = null;
-    try {
-      const next = await explorerListDirectory({ path: path || null, showHidden: hidden });
-      if (requestId.current !== nextRequestId) return;
-      setListing(next);
-      if (historyMode === "push") {
-        setHistory((current) => {
-          const prefix = current.slice(0, historyIndex + 1);
-          return [...prefix, next.path];
-        });
-        setHistoryIndex((current) => current + 1);
-      } else if (historyMode === "replace") {
-        setHistory([next.path]);
-        setHistoryIndex(0);
+  const loadPath = useCallback(
+    async (
+      path: string,
+      historyMode: "push" | "replace" | "none" = "push",
+      hidden = showHidden,
+    ) => {
+      const nextRequestId = ++requestId.current;
+      setLoading(true);
+      setError(null);
+      setSelectedIds([]);
+      selectionAnchorId.current = null;
+      try {
+        const next = await explorerListDirectory({ path: path || null, showHidden: hidden });
+        if (requestId.current !== nextRequestId) return;
+        setListing(next);
+        if (historyMode === "push") {
+          setHistory((current) => {
+            const prefix = current.slice(0, historyIndex + 1);
+            return [...prefix, next.path];
+          });
+          setHistoryIndex((current) => current + 1);
+        } else if (historyMode === "replace") {
+          setHistory([next.path]);
+          setHistoryIndex(0);
+        }
+      } catch (nextError) {
+        if (requestId.current === nextRequestId) setError(errorText(nextError));
+      } finally {
+        if (requestId.current === nextRequestId) setLoading(false);
       }
-    } catch (nextError) {
-      if (requestId.current === nextRequestId) setError(errorText(nextError));
-    } finally {
-      if (requestId.current === nextRequestId) setLoading(false);
-    }
-  }, [historyIndex, showHidden]);
+    },
+    [historyIndex, showHidden],
+  );
 
   useEffect(() => {
     const startPath = initialPath?.trim() || explorerPath || homeDir;
@@ -151,21 +158,24 @@ export function MistyFilePicker({
 
   const selectableFiles = useMemo(() => {
     if (!allowedExtensions?.length) return null;
-    return new Set(allowedExtensions.map((extension) => extension.toLowerCase().replace(/^\./, "")));
+    return new Set(
+      allowedExtensions.map((extension) => extension.toLowerCase().replace(/^\./, "")),
+    );
   }, [allowedExtensions]);
 
   const matchesModeAndExtension = (entry: FileEntry) => {
     if (entry.kind === "folder") return mode === "folder";
     if (mode !== "file" || entry.kind !== "file") return false;
-    return !selectableFiles || selectableFiles.has(entry.extension.toLowerCase().replace(/^\./, ""));
+    return (
+      !selectableFiles || selectableFiles.has(entry.extension.toLowerCase().replace(/^\./, ""))
+    );
   };
 
-  const canSelectEntry = (entry: FileEntry) => (
-    entry.location.kind === "local" && matchesModeAndExtension(entry)
-  );
+  const canSelectEntry = (entry: FileEntry) =>
+    entry.location.kind === "local" && matchesModeAndExtension(entry);
 
   const browserListing = useMemo(
-    () => listing ? sortListing(listing, sort, directorySizes) : null,
+    () => (listing ? sortListing(listing, sort, directorySizes) : null),
     [directorySizes, listing, sort],
   );
   const selectedEntries = selectedIds
@@ -196,18 +206,24 @@ export function MistyFilePicker({
     if (selected && canSelectEntry(selected)) onSelect(selected.path);
   };
 
-  const selectionIsCloud = selected?.location.kind !== undefined && selected.location.kind !== "local";
+  const selectionIsCloud =
+    selected?.location.kind !== undefined && selected.location.kind !== "local";
   const browsingCloud = listing?.location.kind !== undefined && listing.location.kind !== "local";
   const showCloudNotice = selectionIsCloud || browsingCloud;
-  const canChoose = mode === "folder"
-    ? selected?.kind === "folder"
-      ? canSelectEntry(selected)
-      : Boolean(listing?.path && listing.location.kind === "local")
-    : multiple
-      ? selectedPaths.length > 0
-      : Boolean(selected && canSelectEntry(selected));
+  const canChoose =
+    mode === "folder"
+      ? selected?.kind === "folder"
+        ? canSelectEntry(selected)
+        : Boolean(listing?.path && listing.location.kind === "local")
+      : multiple
+        ? selectedPaths.length > 0
+        : Boolean(selected && canSelectEntry(selected));
 
-  const selectBrowserEntry = (entryId: string, event: ReactMouseEvent, visibleEntryIds: string[]) => {
+  const selectBrowserEntry = (
+    entryId: string,
+    event: ReactMouseEvent,
+    visibleEntryIds: string[],
+  ) => {
     const entry = listing?.entries.find((candidate) => candidate.id === entryId);
     if (!entry) return;
 
@@ -248,22 +264,47 @@ export function MistyFilePicker({
   };
 
   const updateSort = (column: ExplorerSortColumn) => {
-    setSort((current) => current.column === column
-      ? { column, direction: current.direction === "asc" ? "desc" : "asc" }
-      : { column, direction: "asc" });
+    setSort((current) =>
+      current.column === column
+        ? { column, direction: current.direction === "asc" ? "desc" : "asc" }
+        : { column, direction: "asc" },
+    );
   };
 
-  return <Dialog open onOpenChange={(open) => { if (!open) onCancel(); }}>
-    <DialogContent className="grid h-[min(680px,calc(100vh-88px))] w-[min(1100px,calc(100vw-32px))] max-w-none grid-rows-[auto_auto_auto_minmax(0,1fr)_auto] gap-0 overflow-hidden rounded-2xl bg-[var(--misty-app-modal-bg,var(--popover))] p-0 text-foreground max-[560px]:size-full max-[560px]:rounded-none">
+  return (
+    <Dialog
+      open
+      onOpenChange={(open) => {
+        if (!open) onCancel();
+      }}
+    >
+      <DialogContent className="grid h-[min(680px,calc(100vh-88px))] w-[min(1100px,calc(100vw-32px))] max-w-none grid-rows-[auto_auto_auto_minmax(0,1fr)_auto] gap-0 overflow-hidden rounded-2xl bg-[var(--misty-app-modal-bg,var(--popover))] p-0 text-foreground max-[560px]:size-full max-[560px]:rounded-none">
         <DialogHeader className="flex min-h-[76px] grid-cols-[1fr_auto] items-center justify-between gap-4 border-b border-border px-5 py-0 text-left">
           <div className="flex min-w-0 items-center gap-3">
-            <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-muted text-muted-foreground"><FolderOpen size={20} /></span>
+            <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-muted text-muted-foreground">
+              <FolderOpen size={20} />
+            </span>
             <div>
-              <DialogTitle className="text-[17px]">{title || (mode === "folder" ? "Choose a folder" : "Choose a file")}</DialogTitle>
-              <DialogDescription>{multiple && mode === "file" ? "Select one or more files from Explorer and connected locations." : "Browse your current Explorer context and connected locations."}</DialogDescription>
+              <DialogTitle className="text-[17px]">
+                {title || (mode === "folder" ? "Choose a folder" : "Choose a file")}
+              </DialogTitle>
+              <DialogDescription>
+                {multiple && mode === "file"
+                  ? "Select one or more files from Explorer and connected locations."
+                  : "Browse your current Explorer context and connected locations."}
+              </DialogDescription>
             </div>
           </div>
-          <Button type="button" variant="ghost" size="icon" data-dialog-autofocus aria-label="Close picker" onClick={onCancel}>×</Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            data-dialog-autofocus
+            aria-label="Close picker"
+            onClick={onCancel}
+          >
+            ×
+          </Button>
         </DialogHeader>
 
         <div className="border-b border-border">
@@ -284,9 +325,15 @@ export function MistyFilePicker({
 
         <div className="min-h-0">
           {showCloudNotice ? (
-            <div className="flex min-h-11 items-center gap-2.5 border-b border-amber-500/20 bg-amber-500/10 px-4 py-2 text-xs leading-relaxed text-amber-500" role="status">
+            <div
+              className="flex min-h-11 items-center gap-2.5 border-b border-amber-500/20 bg-amber-500/10 px-4 py-2 text-xs leading-relaxed text-amber-500"
+              role="status"
+            >
               <CloudDownload className="shrink-0" size={17} aria-hidden="true" />
-              <span><strong>Download required.</strong> You can browse cloud items here, but you must fully download an item to a local folder before choosing it.</span>
+              <span>
+                <strong>Download required.</strong> You can browse cloud items here, but you must
+                fully download an item to a local folder before choosing it.
+              </span>
             </div>
           ) : null}
         </div>
@@ -333,7 +380,6 @@ export function MistyFilePicker({
               onSelect={selectBrowserEntry}
               onClearSelection={() => setSelectedIds([])}
               onOpen={openEntry}
-              onDownload={() => undefined}
               onContextMenu={(event) => event.preventDefault()}
               onBackgroundContextMenu={(event) => event.preventDefault()}
               onDropItems={() => undefined}
@@ -341,26 +387,52 @@ export function MistyFilePicker({
               onInlineEditCommit={() => undefined}
               onInlineEditCancel={() => undefined}
             />
-            {loading && listing ? <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-0.5 animate-pulse bg-primary/60" /> : null}
+            {loading && listing ? (
+              <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-0.5 animate-pulse bg-primary/60" />
+            ) : null}
           </main>
         </div>
 
         <DialogFooter className="mt-0 flex min-h-[72px] flex-row items-center justify-between gap-5 border-t border-border px-[18px]">
           <div className="grid min-w-0 gap-1 max-[800px]:hidden">
-            <span className="text-[10px] capitalize text-muted-foreground">{mode === "folder" ? "Folder" : multiple ? "Files" : "File"}</span>
-            <strong className="max-w-[560px] truncate text-xs font-semibold text-foreground/80" title={multiple && selectedPaths.length > 0 ? selectedPaths.join("\n") : selected?.path || listing?.path}>
-              {selectionIsCloud ? "Download this item locally before choosing it" : multiple && selectedPaths.length > 0 ? `${selectedPaths.length} file${selectedPaths.length === 1 ? "" : "s"} selected` : selected?.path || (mode === "folder" ? listing?.path : "Select a file")}
+            <span className="text-[10px] capitalize text-muted-foreground">
+              {mode === "folder" ? "Folder" : multiple ? "Files" : "File"}
+            </span>
+            <strong
+              className="max-w-[560px] truncate text-xs font-semibold text-foreground/80"
+              title={
+                multiple && selectedPaths.length > 0
+                  ? selectedPaths.join("\n")
+                  : selected?.path || listing?.path
+              }
+            >
+              {selectionIsCloud
+                ? "Download this item locally before choosing it"
+                : multiple && selectedPaths.length > 0
+                  ? `${selectedPaths.length} file${selectedPaths.length === 1 ? "" : "s"} selected`
+                  : selected?.path || (mode === "folder" ? listing?.path : "Select a file")}
             </strong>
           </div>
           <div className="ml-auto flex shrink-0 gap-2">
-            <Button type="button" variant="outline" onClick={onCancel}>Cancel</Button>
+            <Button type="button" variant="outline" onClick={onCancel}>
+              Cancel
+            </Button>
             <Button type="button" disabled={loading || !canChoose} onClick={choose}>
-              {mode === "folder" ? (selected ? "Choose folder" : "Choose this folder") : multiple ? selectedPaths.length > 0 ? `Choose ${selectedPaths.length} file${selectedPaths.length === 1 ? "" : "s"}` : "Choose files" : "Choose file"}
+              {mode === "folder"
+                ? selected
+                  ? "Choose folder"
+                  : "Choose this folder"
+                : multiple
+                  ? selectedPaths.length > 0
+                    ? `Choose ${selectedPaths.length} file${selectedPaths.length === 1 ? "" : "s"}`
+                    : "Choose files"
+                  : "Choose file"}
             </Button>
           </div>
         </DialogFooter>
-    </DialogContent>
-  </Dialog>;
+      </DialogContent>
+    </Dialog>
+  );
 }
 
 function joinPath(parent: string, child: string): string {
@@ -376,7 +448,8 @@ function resolveMountRoot(homePath: string, configuredPath: string): string {
 function resolvePreferredRoot(configuredPath: string, homePath: string): string {
   const trimmed = configuredPath.trim();
   if (!trimmed || trimmed === "~") return homePath;
-  if (trimmed.startsWith("~/") || trimmed.startsWith("~\\")) return joinPath(homePath, trimmed.slice(2));
+  if (trimmed.startsWith("~/") || trimmed.startsWith("~\\"))
+    return joinPath(homePath, trimmed.slice(2));
   if (/^(?:\/|[A-Za-z]:[\\/])/.test(trimmed)) return trimmed;
   return joinPath(homePath, trimmed);
 }

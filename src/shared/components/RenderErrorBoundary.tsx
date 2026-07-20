@@ -9,7 +9,10 @@ interface RenderErrorBoundaryState {
   error: Error | null;
 }
 
-export class RenderErrorBoundary extends Component<RenderErrorBoundaryProps, RenderErrorBoundaryState> {
+export class RenderErrorBoundary extends Component<
+  RenderErrorBoundaryProps,
+  RenderErrorBoundaryState
+> {
   state: RenderErrorBoundaryState = { error: null };
 
   static getDerivedStateFromError(error: Error): RenderErrorBoundaryState {
@@ -28,7 +31,9 @@ export class RenderErrorBoundary extends Component<RenderErrorBoundaryProps, Ren
     return (
       <section className="grid h-full min-h-0 min-w-0 content-center justify-items-center gap-3 bg-[#080c10] p-8 text-center text-[#e9e5dc]">
         <h1 className="m-0 text-[22px] font-semibold">Workspace render failed</h1>
-        <p className="m-0 max-w-[680px] text-[#aab2bd] [overflow-wrap:anywhere]">{this.state.error.message}</p>
+        <p className="m-0 max-w-[680px] text-[#aab2bd] [overflow-wrap:anywhere]">
+          {this.state.error.message}
+        </p>
         <Button
           className="rounded-lg border border-[#263342] bg-[#151d27] px-3 py-2 text-[#f2efe8]"
           type="button"

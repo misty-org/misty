@@ -23,7 +23,9 @@ interface ServerTrustedDevice {
   revokedAt?: string | null;
 }
 
-interface ServerDeviceList { devices: ServerTrustedDevice[]; }
+interface ServerDeviceList {
+  devices: ServerTrustedDevice[];
+}
 
 /**
  * Returns the server-side execution identity for this local Misty device.
@@ -44,7 +46,11 @@ export async function ensureServerAgentDevice(local: AgentDevice): Promise<Serve
       const heartbeat = await heartbeatServerAgentDevice(cachedId, local.id);
       return heartbeat;
     } catch (error) {
-      if (!(error instanceof ManagedAiRequestError) || (error.status !== 401 && error.status !== 404)) throw error;
+      if (
+        !(error instanceof ManagedAiRequestError) ||
+        (error.status !== 401 && error.status !== 404)
+      )
+        throw error;
       if (error.status === 401) {
         // A signed heartbeat can fail after the OS keychain is restored,
         // cleared, or contains a partial legacy identity. Prove account auth is
@@ -60,7 +66,9 @@ export async function ensureServerAgentDevice(local: AgentDevice): Promise<Serve
   }
 
   const list = await managedAiRequest<ServerDeviceList>("/devices").catch(() => ({ devices: [] }));
-  const existing = list.devices.find((device) => device.publicKey === publicKey && !device.revokedAt);
+  const existing = list.devices.find(
+    (device) => device.publicKey === publicKey && !device.revokedAt,
+  );
   if (existing) {
     writeStorage(serverDevicePrefix + local.id, existing.id);
     localDeviceByServerId.set(existing.id, local.id);
@@ -82,17 +90,28 @@ export async function ensureServerAgentDevice(local: AgentDevice): Promise<Serve
   return registered;
 }
 
-export async function heartbeatServerAgentDevice(deviceId: string, localDeviceId = localDeviceByServerId.get(deviceId)): Promise<ServerTrustedDevice> {
+export async function heartbeatServerAgentDevice(
+  deviceId: string,
+  localDeviceId = localDeviceByServerId.get(deviceId),
+): Promise<ServerTrustedDevice> {
   if (!localDeviceId) throw new Error("Local device signing identity is unavailable.");
-  const device = await signedAgentDeviceRequest<ServerTrustedDevice>(localDeviceId, `/devices/${encodeURIComponent(deviceId)}/heartbeat`, {
-    method: "POST",
-    body: JSON.stringify({ capabilities: agentDeviceCapabilities }),
-  });
+  const device = await signedAgentDeviceRequest<ServerTrustedDevice>(
+    localDeviceId,
+    `/devices/${encodeURIComponent(deviceId)}/heartbeat`,
+    {
+      method: "POST",
+      body: JSON.stringify({ capabilities: agentDeviceCapabilities }),
+    },
+  );
   lastHeartbeatByServerId.set(deviceId, Date.now());
   return device;
 }
 
-export async function signedAgentDeviceRequest<T>(localDeviceId: string, path: string, init: RequestInit): Promise<T> {
+export async function signedAgentDeviceRequest<T>(
+  localDeviceId: string,
+  path: string,
+  init: RequestInit,
+): Promise<T> {
   const identity = await loadOrCreateDeviceIdentity(localDeviceId);
   const method = (init.method || "GET").toUpperCase();
   const body = typeof init.body === "string" ? init.body : "";
@@ -100,7 +119,9 @@ export async function signedAgentDeviceRequest<T>(localDeviceId: string, path: s
   const nonceBytes = new Uint8Array(16);
   crypto.getRandomValues(nonceBytes);
   const nonce = toBase64(nonceBytes);
-  const bodyDigest = toHex(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(body))));
+  const bodyDigest = toHex(
+    new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(body))),
+  );
   const canonical = deviceSignaturePayload(method, path, timestamp, nonce, bodyDigest);
   const privateKey = await crypto.subtle.importKey(
     "pkcs8",
@@ -109,7 +130,11 @@ export async function signedAgentDeviceRequest<T>(localDeviceId: string, path: s
     false,
     ["sign"],
   );
-  const signature = await crypto.subtle.sign("Ed25519", privateKey, new TextEncoder().encode(canonical));
+  const signature = await crypto.subtle.sign(
+    "Ed25519",
+    privateKey,
+    new TextEncoder().encode(canonical),
+  );
   const headers = new Headers(init.headers);
   headers.set("X-Misty-Device-Timestamp", timestamp);
   headers.set("X-Misty-Device-Nonce", nonce);
@@ -117,7 +142,10 @@ export async function signedAgentDeviceRequest<T>(localDeviceId: string, path: s
   return managedAiRequest<T>(path, { ...init, headers, body });
 }
 
-interface StoredDeviceIdentity { publicKey: string; privateKey: string; }
+interface StoredDeviceIdentity {
+  publicKey: string;
+  privateKey: string;
+}
 
 async function loadOrCreateDeviceIdentity(localDeviceId: string): Promise<StoredDeviceIdentity> {
   const cached = identityCache.get(localDeviceId);
@@ -148,7 +176,10 @@ async function rotateDeviceIdentity(localDeviceId: string): Promise<StoredDevice
     publicKey: toBase64(new Uint8Array(await crypto.subtle.exportKey("raw", pair.publicKey))),
     privateKey: toBase64(new Uint8Array(await crypto.subtle.exportKey("pkcs8", pair.privateKey))),
   };
-  await invoke("agents_device_identity_store", { localDeviceId, encodedIdentity: JSON.stringify(identity) });
+  await invoke("agents_device_identity_store", {
+    localDeviceId,
+    encodedIdentity: JSON.stringify(identity),
+  });
   identityCache.set(localDeviceId, identity);
   return identity;
 }
@@ -181,13 +212,25 @@ function toHex(bytes: Uint8Array): string {
 }
 
 function readStorage(key: string): string | null {
-  try { return localStorage.getItem(key); } catch { return null; }
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
 }
 
 function writeStorage(key: string, value: string): void {
-  try { localStorage.setItem(key, value); } catch { /* non-secret registration hint */ }
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    /* non-secret registration hint */
+  }
 }
 
 function removeStorage(key: string): void {
-  try { localStorage.removeItem(key); } catch { /* no-op */ }
+  try {
+    localStorage.removeItem(key);
+  } catch {
+    /* no-op */
+  }
 }

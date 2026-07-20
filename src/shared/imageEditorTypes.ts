@@ -71,6 +71,8 @@ export function defaultGlobalImageEdit(): GlobalImageEditDefinition {
   };
 }
 
-export function normalizeGlobalImageEdit(definition?: Partial<GlobalImageEditDefinition> | null): GlobalImageEditDefinition {
+export function normalizeGlobalImageEdit(
+  definition?: Partial<GlobalImageEditDefinition> | null,
+): GlobalImageEditDefinition {
   return { ...defaultGlobalImageEdit(), ...definition, markup: definition?.markup ?? [] };
 }

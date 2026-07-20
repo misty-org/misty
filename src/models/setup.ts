@@ -6,7 +6,7 @@ export type CurrentUser = {
 };
 
 export type CurrentLicense = {
-	  tier: "basic" | "pro" | "max";
+  tier: "basic" | "pro" | "max";
   status: "active" | "trialing" | "cancelled" | "expired";
   allows_use: boolean;
   expires_at: string | null;

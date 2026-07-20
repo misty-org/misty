@@ -105,15 +105,23 @@ export async function createAgentSession(agentJobId?: string): Promise<CreateSes
   });
 }
 
-export async function sendAgentMessage(sessionId: string, body: AgentMessageRequest): Promise<void> {
+export async function sendAgentMessage(
+  sessionId: string,
+  body: AgentMessageRequest,
+): Promise<void> {
   await managedAiRequest(`/ai/sessions/${encodeURIComponent(sessionId)}/messages`, {
     method: "POST",
     body: JSON.stringify(body),
   });
 }
 
-export async function fetchAgentEvents(sessionId: string, after: number): Promise<AgentEventsResponse> {
-  return managedAiRequest<AgentEventsResponse>(`/ai/sessions/${encodeURIComponent(sessionId)}/events?after=${after}`);
+export async function fetchAgentEvents(
+  sessionId: string,
+  after: number,
+): Promise<AgentEventsResponse> {
+  return managedAiRequest<AgentEventsResponse>(
+    `/ai/sessions/${encodeURIComponent(sessionId)}/events?after=${after}`,
+  );
 }
 
 export async function submitToolResults(sessionId: string, results: ToolResult[]): Promise<void> {
@@ -124,7 +132,9 @@ export async function submitToolResults(sessionId: string, results: ToolResult[]
 }
 
 export async function cancelAgentSession(sessionId: string): Promise<void> {
-  await managedAiRequest(`/ai/sessions/${encodeURIComponent(sessionId)}/cancel`, { method: "POST" });
+  await managedAiRequest(`/ai/sessions/${encodeURIComponent(sessionId)}/cancel`, {
+    method: "POST",
+  });
 }
 
 export async function deleteAgentSession(sessionId: string): Promise<void> {
@@ -153,28 +163,61 @@ export async function managedAiRequest<T = unknown>(path: string, init?: Request
     }
     if (payload) {
       if (payload.code === "credits_exhausted") {
-        const reset = payload.reset_at ? new Date(payload.reset_at).toLocaleDateString() : "your next reset";
-		throw new ManagedAiRequestError(`Misty credits exhausted (${payload.available_credits ?? 0} available). Add credits or wait until ${reset}.`, response.status, payload.code);
+        const reset = payload.reset_at
+          ? new Date(payload.reset_at).toLocaleDateString()
+          : "your next reset";
+        throw new ManagedAiRequestError(
+          `Misty credits exhausted (${payload.available_credits ?? 0} available). Add credits or wait until ${reset}.`,
+          response.status,
+          payload.code,
+        );
       }
       if (payload.code === "insufficient_credits") {
-        const required = typeof payload.requiredCredits === "number" ? ` ${payload.requiredCredits} Mika credits are required.` : "";
-		throw new ManagedAiRequestError(`${payload.message?.trim() || "Not enough Mika credits for this request."}${required}`, response.status, payload.code);
+        const required =
+          typeof payload.requiredCredits === "number"
+            ? ` ${payload.requiredCredits} Mika credits are required.`
+            : "";
+        throw new ManagedAiRequestError(
+          `${payload.message?.trim() || "Not enough Mika credits for this request."}${required}`,
+          response.status,
+          payload.code,
+        );
       }
       if (payload.code === "rate_limited") {
-		const retryAfter = payload.retry_after_seconds ?? retryAfterHeader(response);
-		const retryPolicy = path.includes("/media-search/") ? "" : " Requests are never retried automatically.";
-		throw new ManagedAiRequestError(`Mika request limit reached. Try again in ${retryAfter} seconds.${retryPolicy}`, response.status, payload.code, retryAfter);
+        const retryAfter = payload.retry_after_seconds ?? retryAfterHeader(response);
+        const retryPolicy = path.includes("/media-search/")
+          ? ""
+          : " Requests are never retried automatically.";
+        throw new ManagedAiRequestError(
+          `Mika request limit reached. Try again in ${retryAfter} seconds.${retryPolicy}`,
+          response.status,
+          payload.code,
+          retryAfter,
+        );
       }
       if (payload.code === "request_canceled") {
-		throw new ManagedAiRequestError("Mika request canceled.", response.status, payload.code);
+        throw new ManagedAiRequestError("Mika request canceled.", response.status, payload.code);
       }
-		if (payload.message?.trim()) throw new ManagedAiRequestError(payload.message.trim(), response.status, payload.code, payload.retry_after_seconds ?? retryAfterHeader(response));
+      if (payload.message?.trim())
+        throw new ManagedAiRequestError(
+          payload.message.trim(),
+          response.status,
+          payload.code,
+          payload.retry_after_seconds ?? retryAfterHeader(response),
+        );
     }
-	throw new ManagedAiRequestError(text.trim() || `Mika ${path} failed: ${response.status}`, response.status, undefined, retryAfterHeader(response));
+    throw new ManagedAiRequestError(
+      text.trim() || `Mika ${path} failed: ${response.status}`,
+      response.status,
+      undefined,
+      retryAfterHeader(response),
+    );
   }
   if (response.status === 204) return undefined as T;
   const contentType = response.headers.get("Content-Type") ?? "";
-  return contentType.includes("application/json") ? await response.json() as T : undefined as T;
+  return contentType.includes("application/json")
+    ? ((await response.json()) as T)
+    : (undefined as T);
 }
 
 function retryAfterHeader(response: Response): number | undefined {
@@ -198,7 +241,9 @@ async function resolveServerApiBase(): Promise<string> {
   const envApiBase = normalizeApiBaseUrl(import.meta.env.VITE_API_BASE);
   const nativeServerUrl = normalizeApiBaseUrl((await loadAppSnapshot())?.environment.serverUrl);
   const localBetaServerUrl = import.meta.env.DEV ? "http://localhost:8080/api" : null;
-  return withDefaultApiPath(publicApiBase ?? explicitServerUrl ?? envApiBase ?? nativeServerUrl ?? localBetaServerUrl);
+  return withDefaultApiPath(
+    publicApiBase ?? explicitServerUrl ?? envApiBase ?? nativeServerUrl ?? localBetaServerUrl,
+  );
 }
 
 async function loadAppSnapshot() {

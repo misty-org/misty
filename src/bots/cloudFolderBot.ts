@@ -2,7 +2,7 @@ import { emitTo } from "@tauri-apps/api/event";
 import { LogicalSize, PhysicalPosition } from "@tauri-apps/api/dpi";
 import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { currentMonitor, primaryMonitor } from "@tauri-apps/api/window";
-import { hasTauriInternals } from "../shared/tauri";
+import { hasTauriInternals } from "@/shared/tauri";
 
 export const cloudFolderBotLabel = "misty-bot-cloud-folder";
 export const cloudFolderBotChatLabel = "misty-bot-cloud-folder-chat";
@@ -58,10 +58,7 @@ export async function closeCloudFolderBotWindow(): Promise<void> {
     WebviewWindow.getByLabel(cloudFolderBotLabel).catch(() => null),
     WebviewWindow.getByLabel(cloudFolderBotChatLabel).catch(() => null),
   ]);
-  await Promise.all([
-    bot?.close().catch(() => undefined),
-    chat?.close().catch(() => undefined),
-  ]);
+  await Promise.all([bot?.close().catch(() => undefined), chat?.close().catch(() => undefined)]);
 }
 
 export async function setCloudFolderBotWindowVisible(visible: boolean): Promise<void> {
@@ -172,7 +169,9 @@ export async function publishCloudFolderBotContext(context: CloudFolderBotContex
 export async function publishCloudFolderBotChatVisibility(visible: boolean): Promise<void> {
   if (!canUseCloudFolderBotOverlay()) return;
   await Promise.all([
-    emitTo(cloudFolderBotLabel, cloudFolderBotChatVisibilityEvent, { visible }).catch(() => undefined),
+    emitTo(cloudFolderBotLabel, cloudFolderBotChatVisibilityEvent, { visible }).catch(
+      () => undefined,
+    ),
     emitTo("main", cloudFolderBotChatVisibilityEvent, { visible }).catch(() => undefined),
   ]);
 }
@@ -213,7 +212,9 @@ async function openCloudFolderBotWindowInternal(assetsDir?: string): Promise<Web
   });
 
   window.once("tauri://created", () => {
-    void window.setSize(new LogicalSize(cloudFolderBotWindowSize.width, cloudFolderBotWindowSize.height)).catch(() => undefined);
+    void window
+      .setSize(new LogicalSize(cloudFolderBotWindowSize.width, cloudFolderBotWindowSize.height))
+      .catch(() => undefined);
     void window.setResizable(false).catch(() => undefined);
     void window.setMaximizable(false).catch(() => undefined);
     void window.setAlwaysOnTop(true).catch(() => undefined);
@@ -236,7 +237,9 @@ async function defaultBotWindowPosition(): Promise<{ x: number; y: number }> {
 
 async function cloudFolderBotChatPosition(): Promise<{ x: number; y: number }> {
   const physical = await cloudFolderBotChatPositionPhysical();
-  const monitor = await currentMonitor().then((current) => current ?? primaryMonitor()).catch(() => null);
+  const monitor = await currentMonitor()
+    .then((current) => current ?? primaryMonitor())
+    .catch(() => null);
   const scaleFactor = monitor?.scaleFactor ?? 1;
   if (!physical) return { x: 96, y: 96 };
   return { x: physical.x / scaleFactor, y: physical.y / scaleFactor };

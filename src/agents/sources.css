@@ -1,9 +1,60 @@
-.agent-sources { display: grid; gap: 6px; margin-top: 9px; }
-.agent-sources-title { color: var(--misty-text-subtle); font-size: 10px; font-weight: 650; text-transform: capitalize; }
-.agent-sources-list { display: flex; flex-wrap: wrap; gap: 6px; }
-.agent-source { display: grid; max-width: 100%; min-height: 28px; grid-template-columns: 18px 14px minmax(0,auto) auto; align-items: center; gap: 5px; border: 1px solid var(--misty-border-soft); border-radius: 7px; background: var(--misty-neutral-control-bg,var(--misty-surface-2)); padding: 4px 7px 4px 4px; color: var(--misty-text-muted); font: inherit; font-size: 11px; text-align: left; cursor: pointer; }
-.agent-source:hover { border-color: color-mix(in srgb,var(--misty-accent) 45%,var(--misty-border)); color: var(--misty-text); }
-.agent-source-index { display: grid; width: 18px; height: 18px; place-items: center; border-radius: 4px; background: color-mix(in srgb,var(--misty-accent) 14%,transparent); color: var(--misty-accent); font-size: 9px; font-weight: 700; }
-.agent-source-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.agent-source-location { color: var(--misty-text-subtle); white-space: nowrap; }
-.agent-sources.is-compact .agent-sources-title { display: none; }
+.agent-sources {
+  display: grid;
+  gap: 6px;
+  margin-top: 9px;
+}
+.agent-sources-title {
+  color: var(--misty-text-subtle);
+  font-size: 10px;
+  font-weight: 650;
+  text-transform: capitalize;
+}
+.agent-sources-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.agent-source {
+  display: grid;
+  max-width: 100%;
+  min-height: 28px;
+  grid-template-columns: 18px 14px minmax(0, auto) auto;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid var(--misty-border-soft);
+  border-radius: 7px;
+  background: var(--misty-neutral-control-bg, var(--misty-surface-2));
+  padding: 4px 7px 4px 4px;
+  color: var(--misty-text-muted);
+  font: inherit;
+  font-size: 11px;
+  text-align: left;
+  cursor: pointer;
+}
+.agent-source:hover {
+  border-color: color-mix(in srgb, var(--misty-accent) 45%, var(--misty-border));
+  color: var(--misty-text);
+}
+.agent-source-index {
+  display: grid;
+  width: 18px;
+  height: 18px;
+  place-items: center;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--misty-accent) 14%, transparent);
+  color: var(--misty-accent);
+  font-size: 9px;
+  font-weight: 700;
+}
+.agent-source-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.agent-source-location {
+  color: var(--misty-text-subtle);
+  white-space: nowrap;
+}
+.agent-sources.is-compact .agent-sources-title {
+  display: none;
+}

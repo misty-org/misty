@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type RefObject } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type RefObject,
+} from "react";
 
 interface UseBoundedFloatingOptions {
   open: boolean;
@@ -77,7 +85,7 @@ export function useBoundedFloating(options: UseBoundedFloatingOptions): BoundedF
       visibility: "visible",
     };
 
-    setFloatingStyle((current) => (
+    setFloatingStyle((current) =>
       current.left === nextStyle.left &&
       current.top === nextStyle.top &&
       current.width === nextStyle.width &&
@@ -85,10 +93,19 @@ export function useBoundedFloating(options: UseBoundedFloatingOptions): BoundedF
       current.maxHeight === nextStyle.maxHeight &&
       current.visibility === "visible"
         ? current
-        : nextStyle
-    ));
-    setOpensAbove((current) => current === nextOpensAbove ? current : nextOpensAbove);
-  }, [align, gap, matchAnchorWidth, minimumUsefulHeight, options.anchorRef, options.open, preferredMaxHeight, viewportPadding]);
+        : nextStyle,
+    );
+    setOpensAbove((current) => (current === nextOpensAbove ? current : nextOpensAbove));
+  }, [
+    align,
+    gap,
+    matchAnchorWidth,
+    minimumUsefulHeight,
+    options.anchorRef,
+    options.open,
+    preferredMaxHeight,
+    viewportPadding,
+  ]);
 
   useLayoutEffect(() => {
     if (!options.open) {

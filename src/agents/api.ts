@@ -18,7 +18,9 @@ export async function agentsOpenCitation(request: { citation: AgentCitation }): 
   await invoke("agents_open_citation", { request });
 }
 
-export async function agentsPrepareDocument(request: { path: string }): Promise<PreparedAgentDocument> {
+export async function agentsPrepareDocument(request: {
+  path: string;
+}): Promise<PreparedAgentDocument> {
   return invoke<PreparedAgentDocument>("agents_prepare_document", { request });
 }
 

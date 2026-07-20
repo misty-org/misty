@@ -1,5 +1,8 @@
 import type { WorkflowVersion } from "./agentArchitectureTypes";
-import type { GlobalImageEditDefinition, GlobalImageMarkupElement } from "../shared/imageEditorTypes";
+import type {
+  GlobalImageEditDefinition,
+  GlobalImageMarkupElement,
+} from "@/shared/imageEditorTypes";
 export * from "./agentArchitectureTypes";
 export * from "./conversationTypes";
 
@@ -153,7 +156,19 @@ export interface SpaceMessage {
   created_at: string;
 }
 
-export type AgentMentionFailure = { agent_id: string; code: "run_failed" | "request_canceled" | "credits_exhausted" | "integration_required" | "forbidden" | "resource_unavailable" | "invalid_request" | string; message: string };
+export type AgentMentionFailure = {
+  agent_id: string;
+  code:
+    | "run_failed"
+    | "request_canceled"
+    | "credits_exhausted"
+    | "integration_required"
+    | "forbidden"
+    | "resource_unavailable"
+    | "invalid_request"
+    | string;
+  message: string;
+};
 
 export interface SpaceNode {
   id: string;
@@ -212,7 +227,7 @@ export interface SpaceStudioResource {
   stable_identifier?: string;
   active_workflow_version_id?: string;
   active_workflow?: WorkflowVersion;
-	access_policy?: { mode: "space" | "selected"; allowedUserIds: string[] };
+  access_policy?: { mode: "space" | "selected"; allowedUserIds: string[] };
   created_at: string;
   updated_at: string;
 }
@@ -299,8 +314,36 @@ export interface LibraryItemQuery {
   q?: string;
   sort?: "recently-added" | "date-captured" | "name" | "size" | "album-order";
   direction?: "asc" | "desc";
-  media_type?: "image" | "video" | "audio" | "document" | "selfies" | "live-photos" | "portraits" | "panoramas" | "slo-mo" | "cinematic" | "bursts" | "raw" | "screenshots" | "screen-recordings" | "spatial";
-  utility?: "recently-viewed" | "recently-edited" | "recently-shared" | "recently-saved" | "recovered" | "imports" | "featured" | "screenshots" | "documents" | "receipts" | "handwriting" | "illustrations" | "qr-codes";
+  media_type?:
+    | "image"
+    | "video"
+    | "audio"
+    | "document"
+    | "selfies"
+    | "live-photos"
+    | "portraits"
+    | "panoramas"
+    | "slo-mo"
+    | "cinematic"
+    | "bursts"
+    | "raw"
+    | "screenshots"
+    | "screen-recordings"
+    | "spatial";
+  utility?:
+    | "recently-viewed"
+    | "recently-edited"
+    | "recently-shared"
+    | "recently-saved"
+    | "recovered"
+    | "imports"
+    | "featured"
+    | "screenshots"
+    | "documents"
+    | "receipts"
+    | "handwriting"
+    | "illustrations"
+    | "qr-codes";
   visibility?: "visible" | "hidden" | "all";
   album_id?: string;
   favorite?: boolean;
@@ -313,7 +356,21 @@ export interface LibraryItemsResult {
   next_after?: string;
 }
 
-export type BulkLibraryItemAction = "favorite" | "unfavorite" | "hide" | "unhide" | "trash" | "restore" | "add_to_album" | "remove_from_album" | "add_tags" | "remove_tags" | "set_date" | "clear_date" | "set_location" | "clear_location";
+export type BulkLibraryItemAction =
+  | "favorite"
+  | "unfavorite"
+  | "hide"
+  | "unhide"
+  | "trash"
+  | "restore"
+  | "add_to_album"
+  | "remove_from_album"
+  | "add_tags"
+  | "remove_tags"
+  | "set_date"
+  | "clear_date"
+  | "set_location"
+  | "clear_location";
 
 export interface BulkLibraryItemOptions {
   albumId?: string;

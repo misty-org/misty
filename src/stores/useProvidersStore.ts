@@ -21,14 +21,14 @@ import type {
   RemoteEditDraft,
 } from "../api/types";
 import type { CurrentLicense } from "../models/setup";
-import { errorText } from "../shared/format";
-import { isNativeMobileBuild } from "../platform/buildTarget";
-import { hasTauriInternals } from "../shared/tauri";
+import { errorText } from "@/shared/format";
+import { isNativeMobileBuild } from "@/platform/buildTarget";
+import { hasTauriInternals } from "@/shared/tauri";
 import { useSetupStore } from "./useSetupStore";
 import {
   openProviderAuthorizationLink,
   type ProviderAuthorizationOpenResult,
-} from "../shared/openExternalLink";
+} from "@/shared/openExternalLink";
 import {
   configPriority,
   isOneDriveProviderType,
@@ -92,7 +92,12 @@ interface ProvidersStore {
   reloadWorkspaceRemote: (workspaceId: string) => Promise<void>;
   load: (refresh?: boolean) => Promise<void>;
   selectRemote: (name: string, guardDirty?: boolean) => Promise<void>;
-  selectRemoteInWorkspace: (workspaceId: string, name: string, guardDirty?: boolean, forceReload?: boolean) => Promise<void>;
+  selectRemoteInWorkspace: (
+    workspaceId: string,
+    name: string,
+    guardDirty?: boolean,
+    forceReload?: boolean,
+  ) => Promise<void>;
   setDraftName: (name: string) => void;
   setWorkspaceDraftName: (workspaceId: string, name: string) => void;
   setConfigField: (key: string, value: string) => void;
@@ -145,12 +150,16 @@ export const useProvidersStore = create<ProvidersStore>((set, get) => ({
   disconnectTarget: null,
 
   ensureWorkspace: (workspaceId) => {
-    set((state) => state.workspaces[workspaceId] ? state : {
-      workspaces: {
-        ...state.workspaces,
-        [workspaceId]: createProvidersWorkspaceState(),
-      },
-    });
+    set((state) =>
+      state.workspaces[workspaceId]
+        ? state
+        : {
+            workspaces: {
+              ...state.workspaces,
+              [workspaceId]: createProvidersWorkspaceState(),
+            },
+          },
+    );
   },
 
   discardWorkspaces: (workspaceIds) => {
@@ -216,7 +225,11 @@ export const useProvidersStore = create<ProvidersStore>((set, get) => ({
   selectRemoteInWorkspace: async (workspaceId, name, guardDirty = true, forceReload = false) => {
     get().ensureWorkspace(workspaceId);
     const workspace = get().workspaces[workspaceId] ?? createProvidersWorkspaceState();
-    if (guardDirty && isWorkspaceDirty(workspace) && !window.confirm("Discard unsaved remote edits?")) {
+    if (
+      guardDirty &&
+      isWorkspaceDirty(workspace) &&
+      !window.confirm("Discard unsaved remote edits?")
+    ) {
       return;
     }
     const revision = revisionForRemote(get().remoteRevisions, name);
@@ -306,11 +319,16 @@ export const useProvidersStore = create<ProvidersStore>((set, get) => ({
   setWorkspaceTokenField: (workspaceId, key, value) => {
     const workspace = get().workspaces[workspaceId];
     if (!workspace?.draft) return;
-    get().setWorkspaceConfigField(workspaceId, "token", updateTokenField(workspace.draft.config.token ?? "", key, value));
+    get().setWorkspaceConfigField(
+      workspaceId,
+      "token",
+      updateTokenField(workspace.draft.config.token ?? "", key, value),
+    );
   },
 
   setTokenVisible: (tokenVisible) => set({ tokenVisible }),
-  setWorkspaceTokenVisible: (workspaceId, tokenVisible) => setWorkspaceState(set, workspaceId, { tokenVisible }),
+  setWorkspaceTokenVisible: (workspaceId, tokenVisible) =>
+    setWorkspaceState(set, workspaceId, { tokenVisible }),
 
   saveRemote: async () => {
     const { draft, originalDraft } = get();
@@ -349,8 +367,11 @@ export const useProvidersStore = create<ProvidersStore>((set, get) => ({
 
   saveWorkspaceRemote: async (workspaceId) => {
     const workspace = get().workspaces[workspaceId];
-    if (!workspace?.draft || !workspace.originalDraft || !isValidRemoteName(workspace.draft)) return;
-    if (isProviderWorkspaceStale(workspace, get().remoteRevisions, get().providers?.remotes ?? [])) {
+    if (!workspace?.draft || !workspace.originalDraft || !isValidRemoteName(workspace.draft))
+      return;
+    if (
+      isProviderWorkspaceStale(workspace, get().remoteRevisions, get().providers?.remotes ?? [])
+    ) {
       set({ error: "This remote changed in another pane. Reload it before saving." });
       return;
     }
@@ -397,7 +418,9 @@ export const useProvidersStore = create<ProvidersStore>((set, get) => ({
       const result = await providersTestRemote(draft.name);
       set({
         message: result.message,
-        draft: result.aboutJson ? { ...draft, aboutJson: result.aboutJson, lastCheckedUnix: result.checkedUnix } : draft,
+        draft: result.aboutJson
+          ? { ...draft, aboutJson: result.aboutJson, lastCheckedUnix: result.checkedUnix }
+          : draft,
       });
     } catch (error) {
       set({ error: errorText(error) });
@@ -417,7 +440,11 @@ export const useProvidersStore = create<ProvidersStore>((set, get) => ({
         message: result.message,
       });
       if (result.aboutJson) {
-        const nextDraft = { ...draft, aboutJson: result.aboutJson, lastCheckedUnix: result.checkedUnix };
+        const nextDraft = {
+          ...draft,
+          aboutJson: result.aboutJson,
+          lastCheckedUnix: result.checkedUnix,
+        };
         setWorkspaceState(set, workspaceId, {
           draft: nextDraft,
         });
@@ -536,41 +563,53 @@ export const useProvidersStore = create<ProvidersStore>((set, get) => ({
     void cancelProviderAuthorization(session);
   },
 
-  chooseConnectionProvider: (providerType) => set((state) => {
-    if (!state.connection) return state;
-    const workflow = workflowForType(state.providers?.workflows ?? [], providerType);
-    const connection = {
-      ...state.connection,
-      providerType,
-      remoteName: state.connection.remoteName || providerType,
-      parameters: {},
-      error: null,
-    };
-    return {
-      connection: {
-        ...connection,
-        parameters: defaultParametersForSession(connection, workflow),
-      },
-    };
-  }),
+  chooseConnectionProvider: (providerType) =>
+    set((state) => {
+      if (!state.connection) return state;
+      const workflow = workflowForType(state.providers?.workflows ?? [], providerType);
+      const connection = {
+        ...state.connection,
+        providerType,
+        remoteName: state.connection.remoteName || providerType,
+        parameters: {},
+        error: null,
+      };
+      return {
+        connection: {
+          ...connection,
+          parameters: defaultParametersForSession(connection, workflow),
+        },
+      };
+    }),
 
-  setConnectionName: (remoteName) => set((state) => state.connection ? {
-    connection: { ...state.connection, remoteName, error: null },
-  } : state),
+  setConnectionName: (remoteName) =>
+    set((state) =>
+      state.connection
+        ? {
+            connection: { ...state.connection, remoteName, error: null },
+          }
+        : state,
+    ),
 
-  setConnectionParameter: (key, value) => set((state) => state.connection ? {
-    connection: {
-      ...state.connection,
-      parameters: nextConnectionParameters(state.connection, key, value),
-      error: null,
-    },
-  } : state),
+  setConnectionParameter: (key, value) =>
+    set((state) =>
+      state.connection
+        ? {
+            connection: {
+              ...state.connection,
+              parameters: nextConnectionParameters(state.connection, key, value),
+              error: null,
+            },
+          }
+        : state,
+    ),
 
-  advanceConnection: () => set((state) => {
-    const session = state.connection;
-    if (!session || !session.providerType) return state;
-    return { connection: { ...session, stage: "configure", error: null } };
-  }),
+  advanceConnection: () =>
+    set((state) => {
+      const session = state.connection;
+      if (!session || !session.providerType) return state;
+      return { connection: { ...session, stage: "configure", error: null } };
+    }),
 
   submitConnection: async (polling = false) => {
     const session = get().connection;
@@ -580,8 +619,9 @@ export const useProvidersStore = create<ProvidersStore>((set, get) => ({
       return;
     }
     const validationError = validateConnectionSession(session, get().providers?.workflows ?? []);
-    const duplicateName = session.mode === "add"
-      && get().providers?.remotes.some((remote) => remote.name === session.remoteName.trim());
+    const duplicateName =
+      session.mode === "add" &&
+      get().providers?.remotes.some((remote) => remote.name === session.remoteName.trim());
     if ((validationError || duplicateName) && !polling) {
       set({
         connection: {
@@ -621,14 +661,21 @@ export const useProvidersStore = create<ProvidersStore>((set, get) => ({
       const complete = step.done || step.kind === "done";
       const authorize = step.kind === "browser_auth" || Boolean(step.authorizeUrl);
       const configuringProvider = Boolean(step.option?.name);
-      const authDeadlineMs = authorize && !complete && !configuringProvider
-        ? current.authDeadlineMs ?? Date.now() + PROVIDER_AUTH_TIMEOUT_MS
-        : null;
+      const authDeadlineMs =
+        authorize && !complete && !configuringProvider
+          ? (current.authDeadlineMs ?? Date.now() + PROVIDER_AUTH_TIMEOUT_MS)
+          : null;
       const authPollAttempts = authorize && polling ? current.authPollAttempts + 1 : 0;
       const authPollingTimedOut = authDeadlineMs != null && Date.now() >= authDeadlineMs;
       const next: ProviderConnectionSession = {
         ...current,
-        stage: complete ? "complete" : configuringProvider ? "configure" : authorize ? "authorize" : "configure",
+        stage: complete
+          ? "complete"
+          : configuringProvider
+            ? "configure"
+            : authorize
+              ? "authorize"
+              : "configure",
         parameters,
         step,
         inFlight: false,
@@ -638,9 +685,10 @@ export const useProvidersStore = create<ProvidersStore>((set, get) => ({
         error: authPollingTimedOut ? providerAuthorizationTimedOutMessage() : null,
       };
 
-      const shouldOpenAuthorizeUrl = Boolean(step.authorizeUrl)
-        && (!polling || !current.openedAuthorizeUrl)
-        && step.authorizeUrl !== current.openedAuthorizeUrl;
+      const shouldOpenAuthorizeUrl =
+        Boolean(step.authorizeUrl) &&
+        (!polling || !current.openedAuthorizeUrl) &&
+        step.authorizeUrl !== current.openedAuthorizeUrl;
       if (shouldOpenAuthorizeUrl) {
         try {
           const openResult = await openProviderAuthorizationLink(step.authorizeUrl);
@@ -685,9 +733,13 @@ export const useProvidersStore = create<ProvidersStore>((set, get) => ({
       }
     } catch (error) {
       if (generation !== connectionGeneration) return;
-      set((state) => state.connection ? {
-        connection: nextConnectionAfterProviderError(state.connection, error, polling),
-      } : state);
+      set((state) =>
+        state.connection
+          ? {
+              connection: nextConnectionAfterProviderError(state.connection, error, polling),
+            }
+          : state,
+      );
       const current = get().connection;
       if (current?.stage === "authorize" && isProviderAuthorizationExpired(current)) {
         void expireProviderAuthorization(get, set, generation);
@@ -707,12 +759,16 @@ export const useProvidersStore = create<ProvidersStore>((set, get) => ({
     const session = get().connection;
     const authorizeUrl = session?.step?.authorizeUrl;
     if (!session || !authorizeUrl) {
-      set((state) => state.connection ? {
-        connection: {
-          ...state.connection,
-          error: "This provider flow did not return a browser URL to reopen.",
-        },
-      } : state);
+      set((state) =>
+        state.connection
+          ? {
+              connection: {
+                ...state.connection,
+                error: "This provider flow did not return a browser URL to reopen.",
+              },
+            }
+          : state,
+      );
       return;
     }
     try {
@@ -776,7 +832,10 @@ export function selectProviderDerived(state: ProvidersStore) {
     configKeys: state.draft
       ? Object.keys(state.draft.config)
           .filter((key) => key !== "type")
-          .sort((left, right) => configPriority(left) - configPriority(right) || left.localeCompare(right))
+          .sort(
+            (left, right) =>
+              configPriority(left) - configPriority(right) || left.localeCompare(right),
+          )
       : [],
     status: state.providers
       ? state.providers.health.ready
@@ -793,7 +852,10 @@ export function selectProviderWorkspaceDerived(workspace: ProvidersWorkspaceStat
     configKeys: workspace.draft
       ? Object.keys(workspace.draft.config)
           .filter((key) => key !== "type")
-          .sort((left, right) => configPriority(left) - configPriority(right) || left.localeCompare(right))
+          .sort(
+            (left, right) =>
+              configPriority(left) - configPriority(right) || left.localeCompare(right),
+          )
       : [],
   };
 }
@@ -828,7 +890,9 @@ function isDirty(state: Pick<ProvidersStore, "draft" | "originalDraft">): boolea
   );
 }
 
-function isWorkspaceDirty(state: Pick<ProvidersWorkspaceState, "draft" | "originalDraft">): boolean {
+function isWorkspaceDirty(
+  state: Pick<ProvidersWorkspaceState, "draft" | "originalDraft">,
+): boolean {
   if (!state.draft || !state.originalDraft) return false;
   return (
     state.draft.name !== state.originalDraft.name ||
@@ -913,10 +977,18 @@ function bumpRemoteRevisions(
 
 function isValidRemoteName(draft: RemoteEditDraft): boolean {
   const trimmed = draft.name.trim();
-  return trimmed.length > 0 && !trimmed.includes(":") && !trimmed.includes("/") && !trimmed.includes("\\");
+  return (
+    trimmed.length > 0 &&
+    !trimmed.includes(":") &&
+    !trimmed.includes("/") &&
+    !trimmed.includes("\\")
+  );
 }
 
-function createConnectionSession(mode: ProviderConfigMode, remote?: ProviderRemote): ProviderConnectionSession {
+function createConnectionSession(
+  mode: ProviderConfigMode,
+  remote?: ProviderRemote,
+): ProviderConnectionSession {
   return {
     mode,
     stage: mode === "add" ? "provider" : "configure",
@@ -993,9 +1065,8 @@ function nextConnectionAfterProviderError(
 ): ProviderConnectionSession {
   const authPollAttempts = polling ? connection.authPollAttempts + 1 : connection.authPollAttempts;
   const authPollingTimedOut = polling && isProviderAuthorizationExpired(connection);
-  const recoverablePolling = polling
-    && isRecoverableAuthPollingError(error)
-    && !authPollingTimedOut;
+  const recoverablePolling =
+    polling && isRecoverableAuthPollingError(error) && !authPollingTimedOut;
   return {
     ...connection,
     stage: polling && connection.step ? "authorize" : connection.stage,
@@ -1022,7 +1093,8 @@ function providerContinuationResult(session: ProviderConnectionSession): string 
   if (session.step.option) {
     return normalizeProviderParameterValue(
       session.step.option.name,
-      session.parameters[session.step.option.name] ?? defaultProviderOptionValue(session.step.option),
+      session.parameters[session.step.option.name] ??
+        defaultProviderOptionValue(session.step.option),
     );
   }
   if (session.step.kind === "browser_auth" || session.step.authorizeUrl) {
@@ -1037,9 +1109,11 @@ function providerFlowSuccessSuffix(mode: ProviderConfigMode): string {
 }
 
 function isProviderAuthorizationExpired(session: ProviderConnectionSession): boolean {
-  return session.stage === "authorize"
-    && session.authDeadlineMs != null
-    && Date.now() >= session.authDeadlineMs;
+  return (
+    session.stage === "authorize" &&
+    session.authDeadlineMs != null &&
+    Date.now() >= session.authDeadlineMs
+  );
 }
 
 function scheduleProviderAuthorizationTimeout(
@@ -1048,11 +1122,14 @@ function scheduleProviderAuthorizationTimeout(
   generation: number,
   deadlineMs: number,
 ): void {
-  window.setTimeout(() => {
-    if (generation === connectionGeneration) {
-      void expireProviderAuthorization(get, set, generation);
-    }
-  }, Math.max(0, deadlineMs - Date.now()));
+  window.setTimeout(
+    () => {
+      if (generation === connectionGeneration) {
+        void expireProviderAuthorization(get, set, generation);
+      }
+    },
+    Math.max(0, deadlineMs - Date.now()),
+  );
 }
 
 async function expireProviderAuthorization(
@@ -1061,7 +1138,8 @@ async function expireProviderAuthorization(
   generation: number,
 ): Promise<void> {
   const session = get().connection;
-  if (generation !== connectionGeneration || !session || !isProviderAuthorizationExpired(session)) return;
+  if (generation !== connectionGeneration || !session || !isProviderAuthorizationExpired(session))
+    return;
   connectionGeneration += 1;
   set({
     connection: {
@@ -1074,8 +1152,16 @@ async function expireProviderAuthorization(
   await cancelProviderAuthorization(session);
 }
 
-async function cancelProviderAuthorization(session: ProviderConnectionSession | null): Promise<void> {
-  if (!session || session.stage !== "authorize" || !session.providerType || !session.remoteName.trim()) return;
+async function cancelProviderAuthorization(
+  session: ProviderConnectionSession | null,
+): Promise<void> {
+  if (
+    !session ||
+    session.stage !== "authorize" ||
+    !session.providerType ||
+    !session.remoteName.trim()
+  )
+    return;
   if (!session.step?.state) return;
   try {
     await providersConfigureRemote({
@@ -1096,23 +1182,35 @@ async function cancelProviderAuthorization(session: ProviderConnectionSession | 
 
 function isRecoverableAuthPollingError(error: unknown): boolean {
   const message = errorText(error).toLowerCase();
-  return message.includes("authorization")
-    || message.includes("oauth")
-    || message.includes("token")
-    || message.includes("auth header")
-    || message.includes("unauthorized")
-    || message.includes("forbidden");
+  return (
+    message.includes("authorization") ||
+    message.includes("oauth") ||
+    message.includes("token") ||
+    message.includes("auth header") ||
+    message.includes("unauthorized") ||
+    message.includes("forbidden")
+  );
 }
 
-function workflowForType(workflows: ProviderWorkflow[], providerType: string): ProviderWorkflow | null {
+function workflowForType(
+  workflows: ProviderWorkflow[],
+  providerType: string,
+): ProviderWorkflow | null {
   const normalized = providerType.toLowerCase().replace(/[^a-z0-9]/g, "");
-  return workflows.find((workflow) => workflow.type === providerType)
-    ?? workflows.find((workflow) => {
+  return (
+    workflows.find((workflow) => workflow.type === providerType) ??
+    workflows.find((workflow) => {
       const type = workflow.type.toLowerCase().replace(/[^a-z0-9]/g, "");
       const name = workflow.name.toLowerCase().replace(/[^a-z0-9]/g, "");
-      return type === normalized || name === normalized || type.includes(normalized) || normalized.includes(type);
-    })
-    ?? null;
+      return (
+        type === normalized ||
+        name === normalized ||
+        type.includes(normalized) ||
+        normalized.includes(type)
+      );
+    }) ??
+    null
+  );
 }
 
 function defaultParametersForSession(
@@ -1120,14 +1218,20 @@ function defaultParametersForSession(
   workflow: ProviderWorkflow | null,
 ): Record<string, string> {
   const options = providerOptionsForConnection(session, workflow);
-  return Object.fromEntries(options.map((option) => [
-    option.name,
-    defaultProviderOptionValue(option),
-  ]));
+  return Object.fromEntries(
+    options.map((option) => [option.name, defaultProviderOptionValue(option)]),
+  );
 }
 
-function defaultProviderOptionValue(option: { name: string; defaultValue: string; choices: Array<{ value: string }> }): string {
-  return normalizeProviderParameterValue(option.name, option.defaultValue || option.choices[0]?.value || "");
+function defaultProviderOptionValue(option: {
+  name: string;
+  defaultValue: string;
+  choices: Array<{ value: string }>;
+}): string {
+  return normalizeProviderParameterValue(
+    option.name,
+    option.defaultValue || option.choices[0]?.value || "",
+  );
 }
 
 function nextConnectionParameters(
@@ -1139,7 +1243,11 @@ function nextConnectionParameters(
     ...session.parameters,
     [key]: normalizeProviderParameterValue(key, value),
   };
-  if (isOneDriveProviderType(session.providerType) && key === "config_type" && value !== "driveid") {
+  if (
+    isOneDriveProviderType(session.providerType) &&
+    key === "config_type" &&
+    value !== "driveid"
+  ) {
     delete parameters.drive_id;
     delete parameters.drive_type;
     delete parameters.config_driveid;
@@ -1150,11 +1258,16 @@ function nextConnectionParameters(
 
 function normalizeProviderParameters(parameters: Record<string, string>): Record<string, string> {
   return Object.fromEntries(
-    Object.entries(parameters).map(([key, value]) => [key, normalizeProviderParameterValue(key, value)]),
+    Object.entries(parameters).map(([key, value]) => [
+      key,
+      normalizeProviderParameterValue(key, value),
+    ]),
   );
 }
 
-function normalizeProviderParametersForSession(session: ProviderConnectionSession): Record<string, string> {
+function normalizeProviderParametersForSession(
+  session: ProviderConnectionSession,
+): Record<string, string> {
   const parameters = normalizeProviderParameters(session.parameters);
   if (!isOneDriveProviderType(session.providerType)) return parameters;
 
@@ -1167,7 +1280,8 @@ function normalizeProviderParametersForSession(session: ProviderConnectionSessio
     return parameters;
   }
 
-  const driveID = parameters.drive_id || parameters.config_driveid_fixed || parameters.config_driveid || "";
+  const driveID =
+    parameters.drive_id || parameters.config_driveid_fixed || parameters.config_driveid || "";
   if (driveID.trim()) {
     parameters.config_driveid_fixed = driveID.trim();
     parameters.config_driveid = driveID.trim();
@@ -1199,6 +1313,8 @@ function validateConnectionSession(
   }
   const workflow = workflowForType(workflows, session.providerType);
   const options = providerOptionsForConnection(session, workflow);
-  const missing = options.find((option) => option.required && !(session.parameters[option.name] ?? "").trim());
+  const missing = options.find(
+    (option) => option.required && !(session.parameters[option.name] ?? "").trim(),
+  );
   return missing ? `${missing.label || missing.name} is required.` : null;
 }
