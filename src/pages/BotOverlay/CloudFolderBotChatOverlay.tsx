@@ -9,10 +9,10 @@ import {
   requestCloudFolderBotContext,
   setCloudFolderBotWindowVisible,
   type CloudFolderBotContext,
-} from "../../bots/cloudFolderBot";
-import { hasTauriInternals } from "../../shared/tauri";
+} from "@/bots/cloudFolderBot";
+import { hasTauriInternals } from "@/shared/tauri";
 import { useSettingsStore } from "../../stores/useSettingsStore";
-import { ExplorerMikaPanel } from "../Files/desktop/ExplorerAssistantPanels";
+import { ExplorerMikaPanel } from "@/features/explorer/desktop/ExplorerAssistantPanels";
 
 const chatFadeMs = 420;
 
@@ -81,7 +81,10 @@ export default function CloudFolderBotChatOverlay() {
       void (async () => {
         await publishCloudFolderBotChatVisibility(false);
         await setCloudFolderBotWindowVisible(true);
-        if (hasTauriInternals()) await getCurrentWindow().close().catch(() => undefined);
+        if (hasTauriInternals())
+          await getCurrentWindow()
+            .close()
+            .catch(() => undefined);
       })();
     }, chatFadeMs);
   }, []);

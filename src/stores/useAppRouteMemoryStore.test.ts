@@ -7,8 +7,12 @@ beforeAll(async () => {
   vi.stubGlobal("localStorage", {
     clear: () => values.clear(),
     getItem: (key: string) => values.get(key) ?? null,
-    removeItem: (key: string) => { values.delete(key); },
-    setItem: (key: string, value: string) => { values.set(key, value); },
+    removeItem: (key: string) => {
+      values.delete(key);
+    },
+    setItem: (key: string, value: string) => {
+      values.set(key, value);
+    },
   });
   useAppRouteMemoryStore = (await import("./useAppRouteMemoryStore")).useAppRouteMemoryStore;
 });
@@ -29,7 +33,9 @@ describe("app route memory", () => {
   });
 
   it("updates Spaces subsections and discards non-route fragments", () => {
-    useAppRouteMemoryStore.getState().rememberAppRoute("/spaces/space-7/settings/agents#permissions");
+    useAppRouteMemoryStore
+      .getState()
+      .rememberAppRoute("/spaces/space-7/settings/agents#permissions");
 
     expect(useAppRouteMemoryStore.getState()).toMatchObject({
       lastAppRoute: "/spaces/space-7/settings/agents",

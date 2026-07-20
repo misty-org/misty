@@ -1,13 +1,5 @@
 import { Button } from "../components/ui/button";
-import {
-  forwardRef,
-  memo,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { forwardRef, memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type {
   CSSProperties,
   MouseEvent as ReactMouseEvent,
@@ -22,17 +14,8 @@ import type { UnlistenFn } from "@tauri-apps/api/event";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { platform as osPlatform } from "@tauri-apps/plugin-os";
-import {
-  currentMonitor,
-  getCurrentWindow,
-  primaryMonitor,
-} from "@tauri-apps/api/window";
-import {
-  NavLink,
-  Outlet,
-  useLocation,
-  useNavigate,
-} from "react-router-dom";
+import { currentMonitor, getCurrentWindow, primaryMonitor } from "@tauri-apps/api/window";
+import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
   Bell,
   Check,
@@ -49,12 +32,9 @@ import {
   X,
 } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
-import { preloadDesktopFilesPage } from "../pages/Files";
+import { preloadDesktopFilesPage } from "../features/explorer";
 import { selectedPathsForPane, useExplorerStore } from "../stores/useExplorerStore";
-import type {
-  ExplorerNotification,
-  ExplorerNotificationType,
-} from "../stores/useExplorerStore";
+import type { ExplorerNotification, ExplorerNotificationType } from "../stores/useExplorerStore";
 import { useAuth } from "../auth/AuthContext";
 import { usePluginsStore } from "../stores/usePluginsStore";
 import { useSetupStore } from "../stores/useSetupStore";
@@ -64,7 +44,6 @@ import SettingsWorkspace from "../pages/Settings/desktop";
 import AccountWorkspace from "../pages/Account/desktop";
 import {
   selectAppearancePreferences,
-  selectCustomFontPreferences,
   selectNotificationPreferences,
   selectAssistantPreferences,
   selectSearchMaintenancePreferences,
@@ -72,21 +51,18 @@ import {
   useSettingsStore,
 } from "../stores/useSettingsStore";
 import { useTransfersStore } from "../stores/useTransfersStore";
-import {
-  isRememberableAppRoute,
-  useAppRouteMemoryStore,
-} from "../stores/useAppRouteMemoryStore";
-import { hasTauriInternals, safeTauriAssetUrl } from "../shared/tauri";
+import { isRememberableAppRoute, useAppRouteMemoryStore } from "../stores/useAppRouteMemoryStore";
+import { hasTauriInternals, safeTauriAssetUrl } from "@/shared/tauri";
 import {
   hideRuntimeAssetOnError,
   revealRuntimeAssetOnLoad,
   runtimeAssetSource,
-} from "../shared/assets/runtimeAsset";
+} from "@/shared/assets/runtimeAsset";
 import { useAppStore } from "../stores/useAppStore";
 import { useAppThemeStore } from "../stores/useAppThemeStore";
 import type { AppTab } from "../routing/types";
 import type { TransferRecord, TransferStatus } from "../api/types";
-import { isAndroidBuild, isNativeMobileBuild } from "../platform/buildTarget";
+import { isAndroidBuild, isNativeMobileBuild } from "@/platform/buildTarget";
 import {
   closeCloudFolderBotWindow,
   cloudFolderBotChatVisibilityEvent,
@@ -101,9 +77,9 @@ import {
   type CloudFolderBotChatVisibility,
   publishCloudFolderBotContext,
 } from "../bots/cloudFolderBot";
-import { useMultiPanelStore } from "../shared/multipanel/useMultiPanelStore";
-import { DeepSearchOverlay } from "../pages/Files/components/DeepSearchOverlay";
-import { MediaSearchViewer } from "../pages/Files/components/MediaSearchViewer";
+import { useMultiPanelStore } from "@/shared/multipanel/useMultiPanelStore";
+import { DeepSearchOverlay } from "../features/explorer/components/DeepSearchOverlay";
+import { MediaSearchViewer } from "../features/explorer/components/MediaSearchViewer";
 import { useSearchStore } from "../stores/useSearchStore";
 import { useMediaSearchStore } from "../stores/useMediaSearchStore";
 import { AgentJobWorker } from "../agents/AgentJobWorker";
@@ -125,7 +101,6 @@ export type DesktopNavItem = {
   exact?: boolean;
   active?: (pathname: string) => boolean;
 };
-const DEFAULT_FONT_STACK = `"Outfit Variable", Outfit, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
 type WindowBounds = {
   position: PhysicalPosition;
   size: PhysicalSize;
@@ -149,26 +124,27 @@ const tabletNavbarClass =
   "relative z-10 col-start-1 row-start-1 flex min-h-0 flex-col items-center overflow-hidden px-2 py-3";
 
 const desktopRouteShellClass =
-  "relative z-10 col-start-2 row-start-2 min-h-0 overflow-hidden rounded-tl-xl border-l border-t border-[var(--misty-content-frame-border)] bg-transparent shadow-[0_12px_32px_rgba(0,0,0,0.18)]";
+  "relative z-10 col-start-2 row-start-2 min-h-0 overflow-hidden bg-transparent";
 const tabletRouteShellClass =
-  "relative z-10 col-start-2 row-start-1 min-h-0 overflow-hidden rounded-tl-xl border-l border-t border-[var(--misty-content-frame-border)] bg-transparent shadow-[0_12px_32px_rgba(0,0,0,0.18)]";
+  "relative z-10 col-start-2 row-start-1 min-h-0 overflow-hidden bg-transparent";
 
 const navbarGroupClass = "flex w-full flex-col items-center gap-3";
 
 const navbarBottomClass = "mt-auto flex w-full shrink-0 flex-col items-center gap-4";
 
 const navLinkBaseClass =
-  "grid h-[68px] w-16 shrink-0 grid-rows-[48px_18px] place-items-center text-[var(--misty-text-muted)] no-underline";
-
+  "grid h-[70px] w-16 shrink-0 grid-rows-[50px_18px] place-items-center border-0 !bg-transparent p-0 text-[var(--misty-text-muted)] no-underline shadow-none transition-colors hover:!bg-transparent hover:text-[var(--misty-text)] active:translate-y-0 aria-expanded:!bg-transparent";
 const navLinkActiveClass = "text-[var(--misty-text)]";
 
 const navIconTileBaseClass =
-  "relative grid h-[48px] w-[52px] place-items-center rounded-[12px] text-[var(--misty-text)] group-hover:bg-[var(--misty-neutral-hover-bg,var(--misty-surface-2))]";
+  "relative grid h-[50px] w-[54px] place-items-center rounded-[13px] text-[var(--misty-text)] transition-colors group-hover/nav-item:bg-[var(--misty-neutral-hover-bg,var(--misty-surface-2))]";
 
 const navIconTileActiveClass = "bg-[var(--misty-neutral-selected-bg,var(--misty-surface-3))]";
 
+const navIconClass = "size-[27px]";
+
 const navItemLabelBaseClass =
-  "block max-w-[64px] truncate text-center text-[11px] font-semibold leading-[1.25] tracking-[-0.01em] text-[var(--misty-text-subtle)] transition-colors group-hover:text-[var(--misty-text-muted)]";
+  "block max-w-[64px] truncate text-center text-[11px] font-semibold leading-[1.25] text-[var(--misty-text-subtle)] transition-colors group-hover/nav-item:text-[var(--misty-text-muted)]";
 
 const navItemLabelActiveClass = "text-[var(--misty-text)]";
 
@@ -213,14 +189,12 @@ const desktopTitlebarTitleClass =
 
 const desktopTitlebarDoubleClickLayerClass = "absolute inset-0 cursor-default";
 
-const windowsTitlebarControlsClass =
-  "absolute right-0 top-0 z-[3] grid h-full grid-cols-3";
+const windowsTitlebarControlsClass = "absolute right-0 top-0 z-[3] grid h-full grid-cols-3";
 
 const windowsTitlebarControlButtonClass =
   "grid h-full w-[46px] place-items-center border-0 bg-transparent p-0 text-[var(--misty-text-muted)] transition hover:bg-[var(--misty-neutral-hover-bg,var(--misty-surface-2))] hover:text-[var(--misty-text)]";
 
-const windowsTitlebarCloseButtonClass =
-  `${windowsTitlebarControlButtonClass} hover:bg-[#c42b1c] hover:text-white`;
+const windowsTitlebarCloseButtonClass = `${windowsTitlebarControlButtonClass} hover:bg-[#c42b1c] hover:text-white`;
 
 type DesktopPlatform = "macos" | "windows" | "linux" | "browser" | "unknown";
 
@@ -238,10 +212,8 @@ const settingsOverlayPanelClass =
 
 const frameOverlayLevelClass: Record<FramePacingState["level"], string> = {
   idle: "border-[color-mix(in_srgb,var(--misty-success)_45%,var(--misty-border-soft))]",
-  light:
-    "border-[color-mix(in_srgb,var(--misty-warning)_52%,var(--misty-border-soft))]",
-  heavy:
-    "border-[color-mix(in_srgb,var(--misty-danger)_58%,var(--misty-border-soft))]",
+  light: "border-[color-mix(in_srgb,var(--misty-warning)_52%,var(--misty-border-soft))]",
+  heavy: "border-[color-mix(in_srgb,var(--misty-danger)_58%,var(--misty-border-soft))]",
 };
 
 export function DesktopLayout(props: {
@@ -266,12 +238,11 @@ export function DesktopLayout(props: {
     })),
   );
   const localUnreadActivityCount = useExplorerStore(
-    (state) =>
-      state.notificationHistory.filter((notification) => !notification.read)
-        .length,
+    (state) => state.notificationHistory.filter((notification) => !notification.read).length,
   );
-  const cloudUnreadActivityCount = useSpacesStore((state) =>
-    [...state.inbox.unreads, ...state.inbox.mentions].filter((item) => !item.seen_at).length,
+  const cloudUnreadActivityCount = useSpacesStore(
+    (state) =>
+      [...state.inbox.unreads, ...state.inbox.mentions].filter((item) => !item.seen_at).length,
   );
   const unreadActivityCount = localUnreadActivityCount + cloudUnreadActivityCount;
   const activePaneId = useMultiPanelStore((state) => state.activePaneId);
@@ -288,14 +259,13 @@ export function DesktopLayout(props: {
     })),
   );
   const appearancePreferences = useSettingsStore(
-    useShallow((state) =>
-      selectAppearancePreferences(state.settings?.document),
-    ),
+    useShallow((state) => selectAppearancePreferences(state.settings?.document)),
   );
   const appWallpaperSrc = useMemo(
-    () => !isNativeMobileBuild && appearancePreferences.wallpaperPath
-      ? safeTauriAssetUrl(appearancePreferences.wallpaperPath)
-      : "",
+    () =>
+      !isNativeMobileBuild && appearancePreferences.wallpaperPath
+        ? safeTauriAssetUrl(appearancePreferences.wallpaperPath)
+        : "",
     [appearancePreferences.wallpaperPath],
   );
   const mistyLogoSource = useMemo(
@@ -318,7 +288,9 @@ export function DesktopLayout(props: {
     const neutralStrongOpacity = Math.min(0.28, 0.105 + panelOpacity * 0.175);
     const neutralBorderOpacity = Math.min(0.24, 0.08 + panelOpacity * 0.13);
     const appBodyBackground = "var(--misty-bg)";
-    const appNavBackground = appWallpaperSrc ? `rgba(16, 16, 16, ${panelOpacity})` : "var(--misty-nav-bg)";
+    const appNavBackground = appWallpaperSrc
+      ? `rgba(16, 16, 16, ${panelOpacity})`
+      : "var(--misty-nav-bg)";
     const appSurfaceBackground = "var(--misty-surface)";
     const wallpaperFrameVars = appWallpaperSrc
       ? {
@@ -353,21 +325,18 @@ export function DesktopLayout(props: {
     } as unknown as CSSProperties;
   }, [appWallpaperSrc, appearancePreferences.panelOpacity]);
   useDocumentSurfaceVariables(desktopFrameStyle);
-  const desktopNavbarStyle = useMemo(() => ({
-    backgroundColor: "var(--misty-app-nav-bg,var(--misty-bg))",
-  }) satisfies CSSProperties, []);
-  const customFontSignature = useSettingsStore((state) =>
-    JSON.stringify(selectCustomFontPreferences(state.settings?.document)),
+  const desktopNavbarStyle = useMemo(
+    () =>
+      ({
+        backgroundColor: "var(--misty-app-nav-bg,var(--misty-bg))",
+      }) satisfies CSSProperties,
+    [],
   );
   const notificationPreferences = useSettingsStore(
-    useShallow((state) =>
-      selectNotificationPreferences(state.settings?.document),
-    ),
+    useShallow((state) => selectNotificationPreferences(state.settings?.document)),
   );
   const searchMaintenancePreferences = useSettingsStore(
-    useShallow((state) =>
-      selectSearchMaintenancePreferences(state.settings?.document),
-    ),
+    useShallow((state) => selectSearchMaintenancePreferences(state.settings?.document)),
   );
   const cloudFolderBotEnabled = useSettingsStore(
     (state) => selectAssistantPreferences(state.settings?.document).enabled,
@@ -381,9 +350,7 @@ export function DesktopLayout(props: {
       false,
     ),
   );
-  const rememberAppRoute = useAppRouteMemoryStore(
-    (state) => state.rememberAppRoute,
-  );
+  const rememberAppRoute = useAppRouteMemoryStore((state) => state.rememberAppRoute);
   const lastAppRoute = useAppRouteMemoryStore((state) => state.lastAppRoute);
   const lastSpacesRoute = useAppRouteMemoryStore((state) => state.lastSpacesRoute);
   const routeId = props.getRouteId(location.pathname);
@@ -392,9 +359,7 @@ export function DesktopLayout(props: {
   const loadedRoutes = useRef(new Set<AppTab>());
   const activityAnchorRef = useRef<HTMLButtonElement | null>(null);
   const profileAnchorRef = useRef<HTMLButtonElement | null>(null);
-  const lastNonSettingsRouteRef = useRef(
-    settingsFallbackRoute("/files", lastAppRoute),
-  );
+  const lastNonSettingsRouteRef = useRef(settingsFallbackRoute("/files", lastAppRoute));
   const customZoomRestoreBoundsRef = useRef<WindowBounds | null>(null);
   const customZoomedRef = useRef(false);
   const customZoomAnimatingRef = useRef(false);
@@ -402,8 +367,7 @@ export function DesktopLayout(props: {
   const [profileOpen, setProfileOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [accountSettingsOpen, setAccountSettingsOpen] = useState(false);
-  const [desktopPlatform, setDesktopPlatform] =
-    useState<DesktopPlatform>("unknown");
+  const [desktopPlatform, setDesktopPlatform] = useState<DesktopPlatform>("unknown");
   const navItems = props.navItems;
   const openSettingsOverlay = useCallback(() => {
     setAccountSettingsOpen(false);
@@ -454,7 +418,6 @@ export function DesktopLayout(props: {
             await useSearchStore.getState().startScan(app?.environment.homeDir || "");
           }
         }
-
       } finally {
         searchMaintenanceRunningRef.current = false;
       }
@@ -483,7 +446,12 @@ export function DesktopLayout(props: {
 
   useEffect(() => {
     const onGlobalSearchShortcut = (event: KeyboardEvent) => {
-      if (!(event.metaKey || event.ctrlKey) || event.altKey || event.key.toLocaleLowerCase() !== "k") return;
+      if (
+        !(event.metaKey || event.ctrlKey) ||
+        event.altKey ||
+        event.key.toLocaleLowerCase() !== "k"
+      )
+        return;
       event.preventDefault();
       event.stopPropagation();
       void useSearchStore.getState().openSearch(activePanePath || app?.environment.homeDir || "");
@@ -581,11 +549,7 @@ export function DesktopLayout(props: {
   useEffect(() => {
     if (loadedRoutes.current.has(routeId)) return;
     loadedRoutes.current.add(routeId);
-    if (
-      routeId === "files" ||
-      routeId === "providers" ||
-      routeId === "diagnostics"
-    ) {
+    if (routeId === "files" || routeId === "providers" || routeId === "diagnostics") {
       void providerLoad(routeId === "providers");
     }
     if (routeId === "transfers") void transferLoad("");
@@ -608,19 +572,17 @@ export function DesktopLayout(props: {
   useEffect(() => {
     if (!location.pathname.startsWith("/settings")) return;
     openSettingsOverlay();
-    navigate(
-      settingsFallbackRoute(lastNonSettingsRouteRef.current, lastAppRoute),
-      { replace: true },
-    );
+    navigate(settingsFallbackRoute(lastNonSettingsRouteRef.current, lastAppRoute), {
+      replace: true,
+    });
   }, [lastAppRoute, location.pathname, navigate, openSettingsOverlay]);
 
   useEffect(() => {
     if (location.pathname !== "/account") return;
     openAccountSettingsOverlay();
-    navigate(
-      settingsFallbackRoute(lastNonSettingsRouteRef.current, lastAppRoute),
-      { replace: true },
-    );
+    navigate(settingsFallbackRoute(lastNonSettingsRouteRef.current, lastAppRoute), {
+      replace: true,
+    });
   }, [lastAppRoute, location.pathname, navigate, openAccountSettingsOverlay]);
 
   useEffect(() => {
@@ -631,12 +593,8 @@ export function DesktopLayout(props: {
     root.classList.toggle("dark", resolvedTheme === "dark");
     root.dataset.compactMode = String(appearancePreferences.compactModeEnabled);
     root.dataset.fontSize = appearancePreferences.fontSize;
-    root.dataset.reducedMotion = String(
-      appearancePreferences.reducedMotionEnabled,
-    );
-    root.dataset.thumbnailPreviews = String(
-      appearancePreferences.thumbnailPreviewsEnabled,
-    );
+    root.dataset.reducedMotion = String(appearancePreferences.reducedMotionEnabled);
+    root.dataset.thumbnailPreviews = String(appearancePreferences.thumbnailPreviewsEnabled);
     root.dataset.uiScale = appearancePreferences.uiScale;
     root.style.colorScheme = resolvedTheme;
   }, [appearancePreferences, resolvedTheme, themeId, themeMode]);
@@ -660,9 +618,15 @@ export function DesktopLayout(props: {
   useEffect(() => {
     const root = document.documentElement;
     const names: Record<string, string> = {
-      background: "--misty-bg", surface: "--misty-surface", foreground: "--misty-text",
-      muted: "--misty-text-muted", accent: "--misty-accent", selection: "--misty-selection",
-      success: "--misty-success", warning: "--misty-warning", danger: "--misty-danger",
+      background: "--misty-bg",
+      surface: "--misty-surface",
+      foreground: "--misty-text",
+      muted: "--misty-text-muted",
+      accent: "--misty-accent",
+      selection: "--misty-selection",
+      success: "--misty-success",
+      warning: "--misty-warning",
+      danger: "--misty-danger",
     };
     for (const [token, property] of Object.entries(names)) {
       const value = customTokens?.[token as keyof typeof customTokens];
@@ -693,47 +657,8 @@ export function DesktopLayout(props: {
   }, [notificationPreferences.badgeCountEnabled, unreadActivityCount]);
 
   useEffect(() => {
-    const customFonts = parseCustomFontSignature(customFontSignature);
-    const styleId = "misty-custom-fonts";
-    const existing = document.getElementById(styleId);
-    existing?.remove();
-
-    if (customFonts.length === 0) {
-      document.documentElement.style.setProperty(
-        "--misty-font-family",
-        DEFAULT_FONT_STACK,
-      );
-      return;
-    }
-
-    const rules = customFonts
-      .map((font, index) => {
-        const family = customFontFamilyName(index);
-        return `@font-face{font-family:${cssString(family)};src:url(${cssUrl(safeTauriAssetUrl(font.path))});font-display:swap;}`;
-      })
-      .join("\n");
-    const style = document.createElement("style");
-    style.id = styleId;
-    style.textContent = rules;
-    document.head.appendChild(style);
-
-    const customStack = customFonts
-      .map((_, index) => cssString(customFontFamilyName(index)))
-      .join(", ");
-    document.documentElement.style.setProperty(
-      "--misty-font-family",
-      `${customStack}, ${DEFAULT_FONT_STACK}`,
-    );
-
-    return () => {
-      style.remove();
-    };
-  }, [customFontSignature]);
-
-  useEffect(() => {
     const query = window.matchMedia("(prefers-color-scheme: light)");
-    const syncSystemTheme = () =>
-      setSystemTheme(query.matches ? "light" : "dark");
+    const syncSystemTheme = () => setSystemTheme(query.matches ? "light" : "dark");
     syncSystemTheme();
     query.addEventListener("change", syncSystemTheme);
     return () => query.removeEventListener("change", syncSystemTheme);
@@ -768,25 +693,22 @@ export function DesktopLayout(props: {
     }).catch(() => undefined);
   }, []);
 
-  const startTitlebarDrag = useCallback(
-    (event: ReactPointerEvent<HTMLElement>) => {
-      if (event.button !== 0 || event.detail > 1) {
-        return;
-      }
+  const startTitlebarDrag = useCallback((event: ReactPointerEvent<HTMLElement>) => {
+    if (event.button !== 0 || event.detail > 1) {
+      return;
+    }
 
-      const target = event.target as HTMLElement | null;
-      if (target?.closest("button,a,input,textarea,select,[role='button']")) {
-        return;
-      }
+    const target = event.target as HTMLElement | null;
+    if (target?.closest("button,a,input,textarea,select,[role='button']")) {
+      return;
+    }
 
-      event.preventDefault();
-      if (!hasTauriInternals()) return;
-      void getCurrentWindow()
-        .startDragging()
-        .catch(() => undefined);
-    },
-    [],
-  );
+    event.preventDefault();
+    if (!hasTauriInternals()) return;
+    void getCurrentWindow()
+      .startDragging()
+      .catch(() => undefined);
+  }, []);
 
   const animateWindowRect = useCallback(
     async (from: WindowRect, to: WindowRect, durationMs = 500) => {
@@ -819,12 +741,8 @@ export function DesktopLayout(props: {
           const eased = easeOutCubic(progress);
           const x = Math.round(from.x + (to.x - from.x) * eased);
           const y = Math.round(from.y + (to.y - from.y) * eased);
-          const width = Math.round(
-            from.width + (to.width - from.width) * eased,
-          );
-          const height = Math.round(
-            from.height + (to.height - from.height) * eased,
-          );
+          const width = Math.round(from.width + (to.width - from.width) * eased);
+          const height = Math.round(from.height + (to.height - from.height) * eased);
 
           void window.setPosition(new PhysicalPosition(x, y));
           void window.setSize(new PhysicalSize(width, height));
@@ -945,48 +863,50 @@ export function DesktopLayout(props: {
           <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(5,6,7,0.04),rgba(5,6,7,0.16))]" />
         </div>
       ) : null}
-      {usesNativeWindowChrome ? <header
-        className={desktopTitlebarClass}
-        data-tauri-drag-region
-        onPointerDown={startTitlebarDrag}
-      >
-        <div
-          className={desktopTitlebarDoubleClickLayerClass}
-          onDoubleClick={expandTitlebarWindow}
-        />
-        <span className={desktopTitlebarTitleClass}>Misty</span>
-        {shouldShowWindowsTitlebarControls ? (
-          <div className={windowsTitlebarControlsClass}>
-            <Button
-              type="button"
-              className={windowsTitlebarControlButtonClass}
-              aria-label="Minimize window"
-              title="Minimize"
-              onClick={minimizeTitlebarWindow}
-            >
-              <Minus size={15} strokeWidth={1.8} />
-            </Button>
-            <Button
-              type="button"
-              className={windowsTitlebarControlButtonClass}
-              aria-label="Maximize or restore window"
-              title="Maximize"
-              onClick={() => void togglePseudoMaximize().catch(() => undefined)}
-            >
-              <Square size={13} strokeWidth={1.8} />
-            </Button>
-            <Button
-              type="button"
-              className={windowsTitlebarCloseButtonClass}
-              aria-label="Close window"
-              title="Close"
-              onClick={closeTitlebarWindow}
-            >
-              <X size={16} strokeWidth={1.8} />
-            </Button>
-          </div>
-        ) : null}
-      </header> : null}
+      {usesNativeWindowChrome ? (
+        <header
+          className={desktopTitlebarClass}
+          data-tauri-drag-region
+          onPointerDown={startTitlebarDrag}
+        >
+          <div
+            className={desktopTitlebarDoubleClickLayerClass}
+            onDoubleClick={expandTitlebarWindow}
+          />
+          <span className={desktopTitlebarTitleClass}>Misty</span>
+          {shouldShowWindowsTitlebarControls ? (
+            <div className={windowsTitlebarControlsClass}>
+              <Button
+                type="button"
+                className={windowsTitlebarControlButtonClass}
+                aria-label="Minimize window"
+                title="Minimize"
+                onClick={minimizeTitlebarWindow}
+              >
+                <Minus size={15} strokeWidth={1.8} />
+              </Button>
+              <Button
+                type="button"
+                className={windowsTitlebarControlButtonClass}
+                aria-label="Maximize or restore window"
+                title="Maximize"
+                onClick={() => void togglePseudoMaximize().catch(() => undefined)}
+              >
+                <Square size={13} strokeWidth={1.8} />
+              </Button>
+              <Button
+                type="button"
+                className={windowsTitlebarCloseButtonClass}
+                aria-label="Close window"
+                title="Close"
+                onClick={closeTitlebarWindow}
+              >
+                <X size={16} strokeWidth={1.8} />
+              </Button>
+            </div>
+          ) : null}
+        </header>
+      ) : null}
 
       <nav
         className={navbarClass}
@@ -994,10 +914,7 @@ export function DesktopLayout(props: {
         aria-label="Primary"
         onPointerDown={usesNativeWindowChrome ? startTitlebarDrag : undefined}
       >
-        <div
-          className="mb-3 grid h-[62px] w-[62px] place-items-center"
-          title={app?.migrationStage ?? "Misty"}
-        >
+        <div className="mb-3 grid h-[62px] w-[62px] place-items-center">
           {mistyLogoSource ? (
             <img
               className="h-[58px] w-[58px] object-contain"
@@ -1009,17 +926,17 @@ export function DesktopLayout(props: {
           ) : null}
         </div>
         <div className={navbarGroupClass}>
-          <NavGroup currentPath={location.pathname} items={navItems} routeOverrides={{ spaces: lastSpacesRoute }} />
+          <NavGroup
+            currentPath={location.pathname}
+            items={navItems}
+            routeOverrides={{ spaces: lastSpacesRoute }}
+          />
         </div>
         <div className={navbarBottomClass}>
           <ActivityNavButton
             ref={activityAnchorRef}
             open={activityOpen}
-            badge={
-              notificationPreferences.badgeCountEnabled
-                ? unreadActivityCount
-                : 0
-            }
+            badge={notificationPreferences.badgeCountEnabled ? unreadActivityCount : 0}
             onClick={() => {
               setActivityOpen((open) => !open);
             }}
@@ -1080,36 +997,6 @@ export function DesktopLayout(props: {
   );
 }
 
-function parseCustomFontSignature(
-  signature: string,
-): Array<{ label: string; path: string }> {
-  try {
-    const value = JSON.parse(signature) as unknown;
-    if (!Array.isArray(value)) return [];
-    return value.filter(
-      (entry): entry is { label: string; path: string } =>
-        !!entry &&
-        typeof entry === "object" &&
-        typeof (entry as Record<string, unknown>).label === "string" &&
-        typeof (entry as Record<string, unknown>).path === "string",
-    );
-  } catch {
-    return [];
-  }
-}
-
-function customFontFamilyName(index: number): string {
-  return `Misty Custom Font ${index + 1}`;
-}
-
-function cssString(value: string): string {
-  return `"${value.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
-}
-
-function cssUrl(value: string): string {
-  return `"${value.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
-}
-
 const videoWallpaperExtensions = new Set(["m4v", "mov", "mp4", "ogv", "webm"]);
 
 function isVideoWallpaperPath(path: string): boolean {
@@ -1129,9 +1016,7 @@ const RouteNotice = memo(function RouteNotice(props: { routeId: AppTab }) {
   const settingsError = useSettingsStore((state) => state.error);
   const settingsMessage = useSettingsStore((state) => state.message);
   const notificationPreferences = useSettingsStore(
-    useShallow((state) =>
-      selectNotificationPreferences(state.settings?.document),
-    ),
+    useShallow((state) => selectNotificationPreferences(state.settings?.document)),
   );
   const notice = noticeForRoute(props.routeId, {
     app: { error: appError, message: appMessage },
@@ -1140,8 +1025,7 @@ const RouteNotice = memo(function RouteNotice(props: { routeId: AppTab }) {
     settings: { error: settingsError, message: settingsMessage },
   });
   const showMessage =
-    notificationPreferences.inAppNotificationsEnabled &&
-    !notificationPreferences.quietHoursEnabled;
+    notificationPreferences.inAppNotificationsEnabled && !notificationPreferences.quietHoursEnabled;
 
   if (!notice.error && !(showMessage && notice.message)) return null;
 
@@ -1225,25 +1109,19 @@ const AppNoticePublisher = memo(function AppNoticePublisher() {
   return null;
 });
 
-const activeWorkStatuses = new Set<TransferRecord["status"]>([
-  "queued",
-  "pending",
-  "in_progress",
-]);
+const activeWorkStatuses = new Set<TransferRecord["status"]>(["queued", "pending", "in_progress"]);
 const emptyTransferRows: TransferRecord[] = [];
 
 const WorkStatusPopup = memo(function WorkStatusPopup() {
-  const rows = useTransfersStore(
-    (state) => state.transfers?.rows ?? emptyTransferRows,
-  );
+  const rows = useTransfersStore((state) => state.transfers?.rows ?? emptyTransferRows);
   const loadTransfers = useTransfersStore((state) => state.load);
   const setupInstalling = useSetupStore(
     (state) => state.installState === "installing" || state.busy,
   );
-  const pluginInstalling = usePluginsStore((state) =>
-    Boolean(state.actionPluginId),
+  const pluginInstalling = usePluginsStore((state) => Boolean(state.actionPluginId));
+  const [visibleSummary, setVisibleSummary] = useState<{ title: string; detail: string } | null>(
+    null,
   );
-  const [visibleSummary, setVisibleSummary] = useState<{ title: string; detail: string } | null>(null);
 
   useEffect(() => {
     let disposed = false;
@@ -1316,7 +1194,11 @@ const TransferCompletionNotifier = memo(function TransferCompletionNotifier() {
       if (row.status === "completed") {
         pushNotification(`Transfer finished: ${transferNotificationTitle(row)}`, "success", 4200);
       } else {
-        pushNotification(`Transfer needs attention: ${transferNotificationTitle(row)}`, "error", 5600);
+        pushNotification(
+          `Transfer needs attention: ${transferNotificationTitle(row)}`,
+          "error",
+          5600,
+        );
       }
     }
   }, [transferPage]);
@@ -1339,25 +1221,20 @@ function NavGroup(props: {
           <NavLink
             aria-current={selected ? "page" : undefined}
             aria-label={item.label}
-            className={`group ${navLinkBaseClass} ${selected ? navLinkActiveClass : ""}`}
+            className={`group/nav-item ${navLinkBaseClass} ${selected ? navLinkActiveClass : ""}`}
             end={item.exact}
             key={item.id}
-            title={item.label}
             to={props.routeOverrides?.[item.id] ?? item.path}
           >
-            <span
-              className={`${navIconTileBaseClass} ${selected ? navIconTileActiveClass : ""}`}
-            >
-              <Icon size={24} strokeWidth={1.85} />
+            <span className={`${navIconTileBaseClass} ${selected ? navIconTileActiveClass : ""}`}>
+              <Icon className={navIconClass} strokeWidth={1.85} />
               {props.badges?.[item.id] ? (
                 <span className="absolute right-px top-0.5 grid h-[18px] min-w-[18px] place-items-center rounded-full bg-[#d83e3e] px-[5px] text-[10px] font-bold leading-none text-white shadow-[0_0_0_2px_var(--misty-bg)]">
                   {formatBadgeCount(props.badges[item.id] ?? 0)}
                 </span>
               ) : null}
             </span>
-            <span
-              className={`${navItemLabelBaseClass} ${selected ? navItemLabelActiveClass : ""}`}
-            >
+            <span className={`${navItemLabelBaseClass} ${selected ? navItemLabelActiveClass : ""}`}>
               {item.label}
             </span>
           </NavLink>
@@ -1385,28 +1262,23 @@ const ActivityNavButton = memo(
     return (
       <Button
         ref={ref}
-        className={`group ${navLinkBaseClass} ${props.open ? navLinkActiveClass : ""}`}
+        className={`group/nav-item ${navLinkBaseClass} ${props.open ? navLinkActiveClass : ""}`}
         variant="ghost"
         type="button"
         aria-haspopup="dialog"
         aria-expanded={props.open}
         aria-label="Activity"
-        title="Activity"
         onClick={props.onClick}
       >
-        <span
-          className={`${navIconTileBaseClass} ${props.open ? navIconTileActiveClass : ""}`}
-        >
-          <Bell size={29} strokeWidth={1.85} />
+        <span className={`${navIconTileBaseClass} ${props.open ? navIconTileActiveClass : ""}`}>
+          <Bell className={navIconClass} strokeWidth={1.85} />
           {props.badge ? (
             <span className="absolute right-px top-0.5 grid h-[18px] min-w-[18px] place-items-center rounded-full bg-[#d83e3e] px-[5px] text-[10px] font-bold leading-none text-white shadow-[0_0_0_2px_var(--misty-bg)]">
               {formatBadgeCount(props.badge)}
             </span>
           ) : null}
         </span>
-        <span
-          className={`${navItemLabelBaseClass} ${props.open ? navItemLabelActiveClass : ""}`}
-        >
+        <span className={`${navItemLabelBaseClass} ${props.open ? navItemLabelActiveClass : ""}`}>
           Activity
         </span>
       </Button>
@@ -1417,23 +1289,18 @@ const ActivityNavButton = memo(
 function SettingsNavButton(props: { open: boolean; onClick: () => void }) {
   return (
     <Button
-      className={`group ${navLinkBaseClass} ${props.open ? navLinkActiveClass : ""}`}
+      className={`group/nav-item ${navLinkBaseClass} ${props.open ? navLinkActiveClass : ""}`}
       variant="ghost"
       type="button"
       aria-haspopup="dialog"
       aria-expanded={props.open}
       aria-label="Settings"
-      title="Settings"
       onClick={props.onClick}
     >
-      <span
-        className={`${navIconTileBaseClass} ${props.open ? navIconTileActiveClass : ""}`}
-      >
-        <SettingsIcon size={29} strokeWidth={1.85} />
+      <span className={`${navIconTileBaseClass} ${props.open ? navIconTileActiveClass : ""}`}>
+        <SettingsIcon className={navIconClass} strokeWidth={1.85} />
       </span>
-      <span
-        className={`${navItemLabelBaseClass} ${props.open ? navItemLabelActiveClass : ""}`}
-      >
+      <span className={`${navItemLabelBaseClass} ${props.open ? navItemLabelActiveClass : ""}`}>
         Settings
       </span>
     </Button>
@@ -1448,9 +1315,7 @@ const ProfileNavButton = memo(
       onClick: () => void;
     }
   >(function ProfileNavButton(props, ref) {
-    const currentUser = useSetupStore(
-      (state) => state.status?.current_user ?? null,
-    );
+    const currentUser = useSetupStore((state) => state.status?.current_user ?? null);
     const { user } = useAuth();
     const me = useUserStore(
       useShallow((state) => ({
@@ -1471,7 +1336,6 @@ const ProfileNavButton = memo(
         aria-label="Profile"
         aria-haspopup="menu"
         aria-expanded={props.open}
-        title={account ? `${displayName} (${email})` : "Profile"}
         onClick={props.onClick}
       >
         {account ? initials : <UserCircle size={24} strokeWidth={1.75} />}
@@ -1489,9 +1353,7 @@ function ProfilePopover(props: {
   onOpenSettings: () => void;
 }) {
   const navigate = useNavigate();
-  const currentUser = useSetupStore(
-    (state) => state.status?.current_user ?? null,
-  );
+  const currentUser = useSetupStore((state) => state.status?.current_user ?? null);
   const { user, accounts, switchAccount, logout } = useAuth();
   const me = useUserStore(
     useShallow((state) => ({
@@ -1499,9 +1361,7 @@ function ProfilePopover(props: {
       name: state.me?.name,
     })),
   );
-  const setActiveSettingsSection = useSettingsStore(
-    (state) => state.setActiveSection,
-  );
+  const setActiveSettingsSection = useSettingsStore((state) => state.setActiveSection);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const accountChooserRef = useRef<HTMLDivElement | null>(null);
   const [menuStyle, setMenuStyle] = useState<CSSProperties>({});
@@ -1520,10 +1380,7 @@ function ProfilePopover(props: {
     const rect = anchor.getBoundingClientRect();
     const width = 286;
     const estimatedHeight = 236;
-    const left = Math.min(
-      Math.max(8, rect.right + 10),
-      window.innerWidth - width - 8,
-    );
+    const left = Math.min(Math.max(8, rect.right + 10), window.innerWidth - width - 8);
     const top = Math.min(
       Math.max(8, rect.bottom - estimatedHeight),
       window.innerHeight - estimatedHeight - 8,
@@ -1540,13 +1397,11 @@ function ProfilePopover(props: {
       Math.max(8, rect.bottom - chooserHeight),
       window.innerHeight - chooserHeight - 8,
     );
-    setAccountChooserStyle((current) => (
-      current.left === chooserLeft
-      && current.top === chooserTop
-      && current.width === chooserWidth
+    setAccountChooserStyle((current) =>
+      current.left === chooserLeft && current.top === chooserTop && current.width === chooserWidth
         ? current
-        : { left: chooserLeft, top: chooserTop, width: chooserWidth }
-    ));
+        : { left: chooserLeft, top: chooserTop, width: chooserWidth },
+    );
   }, [props.anchorRef]);
 
   useEffect(() => {
@@ -1608,7 +1463,9 @@ function ProfilePopover(props: {
       await switchAccount(accountId);
       props.onClose();
     } catch (error) {
-      setSwitchError(error instanceof Error ? error.message : "That account could not be activated.");
+      setSwitchError(
+        error instanceof Error ? error.message : "That account could not be activated.",
+      );
     } finally {
       setSwitchingAccountId("");
     }
@@ -1648,7 +1505,12 @@ function ProfilePopover(props: {
           <span className="px-2.5 py-1 text-[10px] font-bold capitalize text-[var(--misty-text-subtle)]">
             User/Profile Settings
           </span>
-          <Button className={profileMenuItemClass} type="button" role="menuitem" onClick={openAccountSettings}>
+          <Button
+            className={profileMenuItemClass}
+            type="button"
+            role="menuitem"
+            onClick={openAccountSettings}
+          >
             <UserCircle size={17} />
             <span>Account settings</span>
           </Button>
@@ -1658,11 +1520,16 @@ function ProfilePopover(props: {
             role="menuitem"
             aria-haspopup="menu"
             aria-expanded={accountChooserOpen}
-            onClick={() => accountChooserOpen ? setAccountChooserOpen(false) : switchAccounts()}
+            onClick={() => (accountChooserOpen ? setAccountChooserOpen(false) : switchAccounts())}
           >
             <Repeat2 size={17} />
             <span>Switch accounts</span>
-            <ChevronRight size={14} className={accountChooserOpen ? "text-[var(--misty-text)]" : "text-[var(--misty-text-subtle)]"} />
+            <ChevronRight
+              size={14}
+              className={
+                accountChooserOpen ? "text-[var(--misty-text)]" : "text-[var(--misty-text-subtle)]"
+              }
+            />
           </Button>
           <Button className={profileMenuItemClass} type="button" role="menuitem" onClick={signOut}>
             <LogOut size={17} />
@@ -1696,26 +1563,79 @@ function ProfilePopover(props: {
           aria-label="Switch accounts"
         >
           <div className="flex items-center justify-between gap-3 border-b border-[var(--misty-border-soft)] px-2 pb-2 pt-1">
-            <div><strong className="block text-sm">Switch accounts</strong><small className="text-[11px] text-[var(--misty-text-subtle)]">Your saved Misty sessions</small></div>
-            <Button className="grid size-8 place-items-center rounded-lg border-0 bg-transparent text-[var(--misty-text-muted)] hover:bg-[var(--misty-surface-2)] hover:text-[var(--misty-text)]" type="button" aria-label="Close account chooser" onClick={() => setAccountChooserOpen(false)}><X size={16}/></Button>
+            <div>
+              <strong className="block text-sm">Switch accounts</strong>
+              <small className="text-[11px] text-[var(--misty-text-subtle)]">
+                Your saved Misty sessions
+              </small>
+            </div>
+            <Button
+              className="grid size-8 place-items-center rounded-lg border-0 bg-transparent text-[var(--misty-text-muted)] hover:bg-[var(--misty-surface-2)] hover:text-[var(--misty-text)]"
+              type="button"
+              aria-label="Close account chooser"
+              onClick={() => setAccountChooserOpen(false)}
+            >
+              <X size={16} />
+            </Button>
           </div>
           <div className="grid max-h-[268px] gap-1 overflow-auto py-2">
             {accounts.map((saved) => {
               const active = saved.id === user?.id;
               const savedInitials = initialsForProfile(saved.name, saved.email);
               return (
-                <Button className={`${profileMenuItemClass} min-h-[54px] grid-cols-[36px_minmax(0,1fr)_20px]`} type="button" role="menuitem" key={saved.id} disabled={Boolean(switchingAccountId)} onClick={() => void chooseAccount(saved.id)}>
-                  <span className="grid size-9 place-items-center rounded-full bg-[var(--misty-neutral-selected-bg,var(--misty-surface-3))] text-xs font-bold text-[var(--misty-text)]">{savedInitials}</span>
-                  <span className="min-w-0"><strong className="block truncate text-xs text-[var(--misty-text)]">{saved.name}</strong><small className="block truncate text-[10px] text-[var(--misty-text-subtle)]">{switchingAccountId === saved.id ? "Switching…" : saved.email}</small></span>
-                  {active ? <Check size={15} className="text-emerald-300" aria-label="Active account"/> : null}
+                <Button
+                  className={`${profileMenuItemClass} min-h-[54px] grid-cols-[36px_minmax(0,1fr)_20px]`}
+                  type="button"
+                  role="menuitem"
+                  key={saved.id}
+                  disabled={Boolean(switchingAccountId)}
+                  onClick={() => void chooseAccount(saved.id)}
+                >
+                  <span className="grid size-9 place-items-center rounded-full bg-[var(--misty-neutral-selected-bg,var(--misty-surface-3))] text-xs font-bold text-[var(--misty-text)]">
+                    {savedInitials}
+                  </span>
+                  <span className="min-w-0">
+                    <strong className="block truncate text-xs text-[var(--misty-text)]">
+                      {saved.name}
+                    </strong>
+                    <small className="block truncate text-[10px] text-[var(--misty-text-subtle)]">
+                      {switchingAccountId === saved.id ? "Switching…" : saved.email}
+                    </small>
+                  </span>
+                  {active ? (
+                    <Check size={15} className="text-emerald-300" aria-label="Active account" />
+                  ) : null}
                 </Button>
               );
             })}
-            {accounts.length === 0 ? <p className="m-0 px-2 py-3 text-xs text-[var(--misty-text-subtle)]">No saved accounts are available yet.</p> : null}
+            {accounts.length === 0 ? (
+              <p className="m-0 px-2 py-3 text-xs text-[var(--misty-text-subtle)]">
+                No saved accounts are available yet.
+              </p>
+            ) : null}
           </div>
-          {switchError ? <p className="m-0 mb-2 rounded-lg border border-red-400/20 bg-red-950/20 px-2.5 py-2 text-[11px] leading-relaxed text-red-200" role="alert">{switchError}</p> : null}
-          <Button className={profileMenuItemClass} type="button" role="menuitem" disabled={Boolean(switchingAccountId)} onClick={addAccount}><Plus size={17}/><span>Add another account</span></Button>
-          <p className="m-0 px-2.5 pb-1 pt-2 text-[10px] leading-relaxed text-[var(--misty-text-subtle)]">Accounts remain signed in securely on this device. Only one account is active in the app at a time.</p>
+          {switchError ? (
+            <p
+              className="m-0 mb-2 rounded-lg border border-red-400/20 bg-red-950/20 px-2.5 py-2 text-[11px] leading-relaxed text-red-200"
+              role="alert"
+            >
+              {switchError}
+            </p>
+          ) : null}
+          <Button
+            className={profileMenuItemClass}
+            type="button"
+            role="menuitem"
+            disabled={Boolean(switchingAccountId)}
+            onClick={addAccount}
+          >
+            <Plus size={17} />
+            <span>Add another account</span>
+          </Button>
+          <p className="m-0 px-2.5 pb-1 pt-2 text-[10px] leading-relaxed text-[var(--misty-text-subtle)]">
+            Accounts remain signed in securely on this device. Only one account is active in the app
+            at a time.
+          </p>
         </div>
       ) : null}
     </>,
@@ -1755,12 +1675,14 @@ function ActivityPopover(props: {
       markRead: state.markNotificationsRead,
     })),
   );
-  const { inbox, loadInbox, markInboxSeen, clearInbox } = useSpacesStore(useShallow((state) => ({
-    inbox: state.inbox,
-    loadInbox: state.loadInbox,
-    markInboxSeen: state.markInboxSeen,
-    clearInbox: state.clearInbox,
-  })));
+  const { inbox, loadInbox, markInboxSeen, clearInbox } = useSpacesStore(
+    useShallow((state) => ({
+      inbox: state.inbox,
+      loadInbox: state.loadInbox,
+      markInboxSeen: state.markInboxSeen,
+      clearInbox: state.clearInbox,
+    })),
+  );
   const localEntries = tab === "unreads" ? [...history].reverse() : [];
   const cloudEntries = inbox[tab];
   const hasEntries = localEntries.length + cloudEntries.length > 0;
@@ -1776,10 +1698,7 @@ function ActivityPopover(props: {
       if (!rect) return;
       const panelWidth = 420;
       const panelHeight = Math.min(460, window.innerHeight - 24);
-      const left = Math.min(
-        window.innerWidth - panelWidth - 12,
-        rect.right + 10,
-      );
+      const left = Math.min(window.innerWidth - panelWidth - 12, rect.right + 10);
       const top = Math.min(
         Math.max(12, rect.top + rect.height / 2 - panelHeight / 2),
         window.innerHeight - panelHeight - 12,
@@ -1822,15 +1741,9 @@ function ActivityPopover(props: {
       className={activityPopoverClass}
       style={{ left: position.left, top: position.top }}
     >
-      <section
-        className={activityPanelClass}
-        role="dialog"
-        aria-label="Activity"
-      >
+      <section className={activityPanelClass} role="dialog" aria-label="Activity">
         <header className="flex items-center justify-between gap-3.5 border-b border-[#333944] p-4">
-          <h2 className="m-0 text-lg font-semibold leading-tight text-[#f1eee8]">
-            Activity
-          </h2>
+          <h2 className="m-0 text-lg font-semibold leading-tight text-[#f1eee8]">Activity</h2>
           <Button
             className={activityButtonClass}
             type="button"
@@ -1854,20 +1767,38 @@ function ActivityPopover(props: {
               onClick={() => setTab(item)}
             >
               {item}
-              {inbox[item].length > 0 ? <span className="ml-1.5 rounded-full bg-[#252832] px-1.5 py-0.5 text-[9px]">{formatBadgeCount(inbox[item].length)}</span> : null}
+              {inbox[item].length > 0 ? (
+                <span className="ml-1.5 rounded-full bg-[#252832] px-1.5 py-0.5 text-[9px]">
+                  {formatBadgeCount(inbox[item].length)}
+                </span>
+              ) : null}
             </Button>
           ))}
         </div>
         {hasEntries ? (
           <div className="min-h-0 overflow-auto px-4 py-3">
-            {cloudEntries.length > 0 ? <p className="mb-1 mt-0 px-2 text-[9px] font-semibold capitalize text-[#77736d]">Spaces</p> : null}
+            {cloudEntries.length > 0 ? (
+              <p className="mb-1 mt-0 px-2 text-[9px] font-semibold capitalize text-[#77736d]">
+                Spaces
+              </p>
+            ) : null}
             {cloudEntries.map((entry) => (
-              <CloudActivityEntry key={entry.id} entry={entry} onOpen={() => {
-                navigate(`/spaces/${encodeURIComponent(entry.space_id)}/chat${entry.message_id ? `?message=${encodeURIComponent(entry.message_id)}` : ""}`);
-                props.onClose();
-              }} />
+              <CloudActivityEntry
+                key={entry.id}
+                entry={entry}
+                onOpen={() => {
+                  navigate(
+                    `/spaces/${encodeURIComponent(entry.space_id)}/chat${entry.message_id ? `?message=${encodeURIComponent(entry.message_id)}` : ""}`,
+                  );
+                  props.onClose();
+                }}
+              />
             ))}
-            {localEntries.length > 0 && cloudEntries.length > 0 ? <p className="mb-1 mt-4 px-2 text-[9px] font-semibold capitalize text-[#77736d]">This Device</p> : null}
+            {localEntries.length > 0 && cloudEntries.length > 0 ? (
+              <p className="mb-1 mt-4 px-2 text-[9px] font-semibold capitalize text-[#77736d]">
+                This Device
+              </p>
+            ) : null}
             {localEntries.map((entry) => (
               <ActivityEntry key={entry.id} entry={entry} />
             ))}
@@ -1878,7 +1809,9 @@ function ActivityPopover(props: {
               {tab === "mentions" ? "No mentions" : "You’re all caught up"}
             </h3>
             <p className="mt-1.5 text-[#9e9890]">
-              {tab === "mentions" ? "Direct mentions, Agent replies, and approvals will appear here." : "New Space messages and local file activity will appear here."}
+              {tab === "mentions"
+                ? "Direct mentions, Agent replies, and approvals will appear here."
+                : "New Space messages and local file activity will appear here."}
             </p>
           </div>
         )}
@@ -1889,20 +1822,34 @@ function ActivityPopover(props: {
 }
 
 function CloudActivityEntry(props: { entry: SpaceInboxItem; onOpen: () => void }) {
-  const fallback = props.entry.kind === "mention"
-    ? `You were mentioned in ${props.entry.space_name}`
-    : props.entry.kind === "agent"
-      ? `Agent activity in ${props.entry.space_name}`
-      : props.entry.kind === "workflow"
-        ? `Workflow activity in ${props.entry.space_name}`
-        : `New message in ${props.entry.space_name}`;
-  const sender = typeof props.entry.payload.sender_name === "string" ? props.entry.payload.sender_name : "";
-  const preview = typeof props.entry.payload.preview === "string" ? props.entry.payload.preview : "";
+  const fallback =
+    props.entry.kind === "mention"
+      ? `You were mentioned in ${props.entry.space_name}`
+      : props.entry.kind === "agent"
+        ? `Agent activity in ${props.entry.space_name}`
+        : props.entry.kind === "workflow"
+          ? `Workflow activity in ${props.entry.space_name}`
+          : `New message in ${props.entry.space_name}`;
+  const sender =
+    typeof props.entry.payload.sender_name === "string" ? props.entry.payload.sender_name : "";
+  const preview =
+    typeof props.entry.payload.preview === "string" ? props.entry.payload.preview : "";
   const label = preview ? `${sender ? `${sender}: ` : ""}${preview}` : fallback;
   return (
-    <Button className={`${activityEntryBaseClass} grid w-full border-0 bg-transparent text-left [&+&]:mt-1`} type="button" onClick={props.onOpen}>
-      <span className="m-0 min-w-0 [overflow-wrap:anywhere] leading-[1.35] text-[#f1eee8]"><small className="mb-0.5 block text-[10px] font-semibold text-violet-300">{props.entry.space_name}</small>{label}</span>
-      <time className="whitespace-nowrap pt-px text-xs text-[#9e9890]">{formatActivityTime(new Date(props.entry.created_at).getTime())}</time>
+    <Button
+      className={`${activityEntryBaseClass} grid w-full border-0 bg-transparent text-left [&+&]:mt-1`}
+      type="button"
+      onClick={props.onOpen}
+    >
+      <span className="m-0 min-w-0 [overflow-wrap:anywhere] leading-[1.35] text-[#f1eee8]">
+        <small className="mb-0.5 block text-[10px] font-semibold text-violet-300">
+          {props.entry.space_name}
+        </small>
+        {label}
+      </span>
+      <time className="whitespace-nowrap pt-px text-xs text-[#9e9890]">
+        {formatActivityTime(new Date(props.entry.created_at).getTime())}
+      </time>
     </Button>
   );
 }
@@ -1959,7 +1906,11 @@ function SettingsOverlay(props: { open: boolean; style: CSSProperties; onClose: 
   );
 }
 
-function AccountSettingsOverlay(props: { open: boolean; style: CSSProperties; onClose: () => void }) {
+function AccountSettingsOverlay(props: {
+  open: boolean;
+  style: CSSProperties;
+  onClose: () => void;
+}) {
   useEffect(() => {
     if (!props.open) return;
     const onKeyDown = (event: KeyboardEvent) => {
@@ -2042,9 +1993,7 @@ function FramePacingOverlay(props: { enabled: boolean }) {
         const measuredFrames = Math.max(1, frameCount - 1);
         const fps = Math.round((frameCount * 1000) / elapsedMs);
         const averageFrameMs = totalFrameMs / measuredFrames;
-        const slowFramePercent = Math.round(
-          (slowFrameCount / measuredFrames) * 100,
-        );
+        const slowFramePercent = Math.round((slowFrameCount / measuredFrames) * 100);
         const level =
           fps < 45 || slowFramePercent > 25
             ? "heavy"
@@ -2079,12 +2028,7 @@ function FramePacingOverlay(props: { enabled: boolean }) {
 
   if (!props.enabled) return null;
 
-  const label =
-    state.level === "idle"
-      ? "Idle"
-      : state.level === "light"
-        ? "Light"
-        : "Heavy";
+  const label = state.level === "idle" ? "Idle" : state.level === "light" ? "Light" : "Heavy";
 
   return (
     <aside
@@ -2105,10 +2049,7 @@ function FramePacingOverlay(props: { enabled: boolean }) {
   );
 }
 
-function settingsFallbackRoute(
-  previousRoute: string,
-  rememberedRoute: string,
-): string {
+function settingsFallbackRoute(previousRoute: string, rememberedRoute: string): string {
   const candidates = [previousRoute, rememberedRoute, "/files"];
   return (
     candidates.find((route) => {
@@ -2163,9 +2104,7 @@ function workStatusSummary(
   installing: boolean,
 ): { title: string; detail: string } | null {
   const active = rows.filter((row) => activeWorkStatuses.has(row.status));
-  const downloads = active.filter(
-    (row) => row.transferType === "download",
-  ).length;
+  const downloads = active.filter((row) => row.transferType === "download").length;
   const uploads = active.filter((row) => row.transferType === "upload").length;
 
   if (downloads > 0 && uploads > 0) {

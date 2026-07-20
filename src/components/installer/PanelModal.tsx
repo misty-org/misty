@@ -19,7 +19,12 @@ export function PanelModal({
   children: ReactNode;
 }) {
   return (
-    <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
+    <Dialog
+      open
+      onOpenChange={(open) => {
+        if (!open) onClose();
+      }}
+    >
       <DialogContent className="flex max-h-[min(80vh,720px)] max-w-3xl grid-rows-none flex-col overflow-hidden p-0">
         <DialogHeader className="border-b border-border px-5 py-4">
           <DialogTitle>{title}</DialogTitle>

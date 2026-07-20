@@ -7,11 +7,51 @@ const noisyRcloneDriveWorkflow: ProviderWorkflow = {
   name: "Google Drive",
   description: "Google Drive",
   options: [
-    { name: "client_id", label: "Client ID", help: "", defaultValue: "", required: false, password: false, choices: [] },
-    { name: "client_secret", label: "Client Secret", help: "", defaultValue: "", required: false, password: true, choices: [] },
-    { name: "token", label: "Token", help: "", defaultValue: "", required: false, password: true, choices: [] },
-    { name: "scope", label: "Scope", help: "", defaultValue: "drive", required: false, password: false, choices: [] },
-    { name: "chunk_size", label: "Chunk size", help: "", defaultValue: "8Mi", required: false, password: false, choices: [] },
+    {
+      name: "client_id",
+      label: "Client ID",
+      help: "",
+      defaultValue: "",
+      required: false,
+      password: false,
+      choices: [],
+    },
+    {
+      name: "client_secret",
+      label: "Client Secret",
+      help: "",
+      defaultValue: "",
+      required: false,
+      password: true,
+      choices: [],
+    },
+    {
+      name: "token",
+      label: "Token",
+      help: "",
+      defaultValue: "",
+      required: false,
+      password: true,
+      choices: [],
+    },
+    {
+      name: "scope",
+      label: "Scope",
+      help: "",
+      defaultValue: "drive",
+      required: false,
+      password: false,
+      choices: [],
+    },
+    {
+      name: "chunk_size",
+      label: "Chunk size",
+      help: "",
+      defaultValue: "8Mi",
+      required: false,
+      password: false,
+      choices: [],
+    },
   ],
 };
 
@@ -34,10 +74,29 @@ describe("providerOptionsForConnection", () => {
       defaultValue: "true",
       required: true,
       password: false,
-      choices: [{ value: "true", help: "Yes" }, { value: "false", help: "No" }],
+      choices: [
+        { value: "true", help: "Yes" },
+        { value: "false", help: "No" },
+      ],
     };
     const options = providerOptionsForConnection(
-      { mode: "add", providerType: "drive", parameters: {}, step: { kind: "post_auth_config", name: "", state: "state", result: "", done: false, instructions: "", authorizeUrl: "", option, error: "", pollAfterMs: 0 } },
+      {
+        mode: "add",
+        providerType: "drive",
+        parameters: {},
+        step: {
+          kind: "post_auth_config",
+          name: "",
+          state: "state",
+          result: "",
+          done: false,
+          instructions: "",
+          authorizeUrl: "",
+          option,
+          error: "",
+          pollAfterMs: 0,
+        },
+      },
       noisyRcloneDriveWorkflow,
     );
 

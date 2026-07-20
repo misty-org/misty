@@ -7,7 +7,7 @@ import { Card } from "@/components/ui/card";
 import { PanelModal } from "./PanelModal";
 import { VersionPicker } from "./VersionPicker";
 import { useSetupStore } from "../../stores/useSetupStore";
-import { useMinimumSpin } from "../../shared/hooks/useMinimumSpin";
+import { useMinimumSpin } from "@/shared/hooks/useMinimumSpin";
 import type { InstallCheck } from "../../models/setup";
 
 function countReady(checks: InstallCheck[]) {
@@ -68,7 +68,16 @@ export function InstallerCard({
   variant?: "full" | "compact";
 }) {
   const { user } = useAuth();
-  const { busy, loadReleases, loadSystem, releases, releasesLoading, startInstall, status, systemError } = useSetupStore(
+  const {
+    busy,
+    loadReleases,
+    loadSystem,
+    releases,
+    releasesLoading,
+    startInstall,
+    status,
+    systemError,
+  } = useSetupStore(
     useShallow((state) => ({
       busy: state.busy,
       loadReleases: state.loadReleases,
@@ -86,7 +95,9 @@ export function InstallerCard({
   const selectedVersion = useSetupStore((state) => state.selectedVersion);
   const latestVersion = releases[0]?.version ?? selectedVersion;
   const currentUser = status?.current_user ?? user ?? null;
-  const selectedVersionInstalled = Boolean(status?.ready && sameVersion(status.installed_version, selectedVersion));
+  const selectedVersionInstalled = Boolean(
+    status?.ready && sameVersion(status.installed_version, selectedVersion),
+  );
   const canInstall = !busy && Boolean(currentUser) && !selectedVersionInstalled;
   const osName = status?.os ?? (systemError ? "Unavailable" : "Resolving");
   const binaryType = status?.arch ?? (systemError ? "Unavailable" : "Resolving");
@@ -96,7 +107,9 @@ export function InstallerCard({
   const fileChecks = status?.binaries ?? [];
   const foldersReady = countReady(folderChecks);
   const filesReady = countReady(fileChecks);
-  const missingChecks = [...folderChecks, ...fileChecks].filter((check) => check.required && !check.exists);
+  const missingChecks = [...folderChecks, ...fileChecks].filter(
+    (check) => check.required && !check.exists,
+  );
   const allFound = folderChecks.length > 0 && fileChecks.length > 0 && missingChecks.length === 0;
   const installLabel = selectedVersionInstalled ? "Installed" : "Install";
   const compact = variant === "compact";
@@ -117,7 +130,9 @@ export function InstallerCard({
           : "bg-card/95 shadow-2xl shadow-black/25"
       } ${className}`}
     >
-      <div className={`flex min-w-0 flex-col gap-2 border-b border-border px-4 ${embedded ? "py-3" : "py-4"}`}>
+      <div
+        className={`flex min-w-0 flex-col gap-2 border-b border-border px-4 ${embedded ? "py-3" : "py-4"}`}
+      >
         <VersionPicker />
         <div className="flex min-w-0 flex-wrap items-center gap-2">
           <Button
@@ -143,7 +158,10 @@ export function InstallerCard({
             }}
             type="button"
           >
-            <RefreshCw aria-hidden="true" className={`h-4 w-4 shrink-0 ${updatesSpinning ? "animate-spin" : ""}`} />
+            <RefreshCw
+              aria-hidden="true"
+              className={`h-4 w-4 shrink-0 ${updatesSpinning ? "animate-spin" : ""}`}
+            />
             <span className="whitespace-nowrap">Check for updates</span>
           </Button>
         </div>
@@ -152,19 +170,24 @@ export function InstallerCard({
       <div className={`border-b border-border px-4 ${embedded ? "py-3" : "py-4"}`}>
         <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-4">
           <div className="grid min-w-0 gap-1 text-left">
-            <p className="text-base font-medium text-foreground">{osLabel} · {archLabel}</p>
+            <p className="text-base font-medium text-foreground">
+              {osLabel} · {archLabel}
+            </p>
             {compact ? (
               <>
                 <p className="min-w-0 truncate text-sm text-muted-foreground">
                   Installed {installedVersionLabel} · Latest {latestVersion}
                 </p>
-                <p className={`min-w-0 truncate text-sm ${systemError ? "text-destructive" : "text-muted-foreground"}`}>
+                <p
+                  className={`min-w-0 truncate text-sm ${systemError ? "text-destructive" : "text-muted-foreground"}`}
+                >
                   {readinessLabel}
                 </p>
               </>
             ) : (
               <p className="mt-1 text-sm text-muted-foreground">
-                {foldersReady}/{folderChecks.length || 0} folders · {filesReady}/{fileChecks.length || 0} files
+                {foldersReady}/{folderChecks.length || 0} folders · {filesReady}/
+                {fileChecks.length || 0} files
               </p>
             )}
           </div>
@@ -180,7 +203,10 @@ export function InstallerCard({
             }}
             type="button"
           >
-            <RefreshCw aria-hidden="true" className={`h-4 w-4 ${refreshSpinning ? "animate-spin" : ""}`} />
+            <RefreshCw
+              aria-hidden="true"
+              className={`h-4 w-4 ${refreshSpinning ? "animate-spin" : ""}`}
+            />
           </Button>
         </div>
       </div>
@@ -202,7 +228,8 @@ export function InstallerCard({
             <div className="flex min-w-0 items-center justify-between gap-3 px-4 py-2">
               <div className="min-w-0">
                 <p className="m-0 truncate text-sm font-semibold text-foreground">
-                  {missingChecks.length} required item{missingChecks.length === 1 ? "" : "s"} missing
+                  {missingChecks.length} required item{missingChecks.length === 1 ? "" : "s"}{" "}
+                  missing
                 </p>
                 <p className="m-0 mt-1 truncate text-xs text-muted-foreground">
                   Misty can restore these from the selected release.
@@ -237,7 +264,9 @@ export function InstallerCard({
                 </Button>
               </div>
               <div className="misty-scrollbar min-h-0 flex-1 overflow-x-hidden overflow-y-scroll">
-                {missingChecks.map((check) => <CheckRow check={check} key={check.path} />)}
+                {missingChecks.map((check) => (
+                  <CheckRow check={check} key={check.path} />
+                ))}
               </div>
             </>
           )
@@ -253,7 +282,9 @@ export function InstallerCard({
           title="Missing install files"
         >
           <div className="py-2 text-xs">
-            {missingChecks.map((check) => <CheckRow check={check} key={check.path} />)}
+            {missingChecks.map((check) => (
+              <CheckRow check={check} key={check.path} />
+            ))}
           </div>
         </PanelModal>
       ) : null}

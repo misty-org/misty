@@ -15,7 +15,9 @@ export async function openExternalLink(url: string): Promise<void> {
   const href = url.trim();
   if (!href) return;
 
-  const { openLinksExternally } = selectGeneralPreferences(useSettingsStore.getState().settings?.document);
+  const { openLinksExternally } = selectGeneralPreferences(
+    useSettingsStore.getState().settings?.document,
+  );
   if (openLinksExternally && isExternalUrl(href)) {
     try {
       await openNativeUrl(href);
@@ -42,7 +44,9 @@ export async function openSystemExternalLink(url: string): Promise<void> {
   window.open(href, "_blank", "noopener,noreferrer");
 }
 
-export async function openProviderAuthorizationLink(url: string): Promise<ProviderAuthorizationOpenResult> {
+export async function openProviderAuthorizationLink(
+  url: string,
+): Promise<ProviderAuthorizationOpenResult> {
   const href = url.trim();
   const attemptedAt = Date.now();
   if (!href) {
@@ -96,7 +100,9 @@ export async function openProviderAuthorizationLink(url: string): Promise<Provid
   }
 }
 
-export function handleExternalLinkClick(url: string): (event: MouseEvent<HTMLAnchorElement>) => void {
+export function handleExternalLinkClick(
+  url: string,
+): (event: MouseEvent<HTMLAnchorElement>) => void {
   return (event) => {
     event.preventDefault();
     void openExternalLink(url);

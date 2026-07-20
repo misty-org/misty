@@ -18,12 +18,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import type { ProviderWorkflow, ProviderWorkflowOption } from "../../../api/types";
-import { iconAssets } from "../../../shared/assets/icons";
-import { AssetIcon } from "../../../shared/components/AssetIcon";
+import { iconAssets } from "@/shared/assets/icons";
+import { AssetIcon } from "@/shared/components/AssetIcon";
 import { providerOptionsForConnection } from "../providerUtils";
 import type { ProviderConnectionSession } from "../../../stores/useProvidersStore";
 import { ProviderLogo } from "./ProviderLogo";
-import { EmptyState } from "../../../components/misty";
+import { EmptyState } from "@/components/ui/state-view";
 
 const providerDialogClass =
   "flex max-h-[min(760px,calc(100vh-48px))] w-[min(620px,calc(100vw-48px))] max-w-none flex-col overflow-hidden bg-popover p-0";
@@ -31,44 +31,34 @@ const providerDialogClass =
 const providerHeaderClass =
   "flex grid-cols-[1fr_auto] items-start justify-between gap-5 border-b border-border px-5 py-[18px] text-left";
 
-const providerProgressClass =
-  "grid grid-cols-3 border-b border-border bg-muted/35 px-5 py-[11px]";
+const providerProgressClass = "grid grid-cols-3 border-b border-border bg-muted/35 px-5 py-[11px]";
 
-const providerBodyClass =
-  "min-h-[280px] overflow-auto p-5";
+const providerBodyClass = "min-h-[280px] overflow-auto p-5";
 
 const providerFooterClass =
   "mt-0 flex-row justify-end gap-[9px] border-t border-border px-5 py-3.5";
 
-const providerWorkflowGridClass =
-  "grid grid-cols-2 gap-2.5";
+const providerWorkflowGridClass = "grid grid-cols-2 gap-2.5";
 
-const providerSearchClass =
-  "mb-3 grid gap-2 rounded-md bg-muted/35 p-3";
+const providerSearchClass = "mb-3 grid gap-2 rounded-md bg-muted/35 p-3";
 
 const providerWorkflowButtonClass =
   "grid h-auto min-w-0 grid-cols-[38px_minmax(0,1fr)_18px] items-center justify-start gap-[11px] rounded-lg p-3 text-left";
 
-const providerWorkflowButtonSelectedClass =
-  "border-primary bg-primary/10";
+const providerWorkflowButtonSelectedClass = "border-primary bg-primary/10";
 
-const providerWorkflowMarkClass =
-  "grid h-[38px] w-[38px] place-items-center text-primary";
+const providerWorkflowMarkClass = "grid h-[38px] w-[38px] place-items-center text-primary";
 
-const providerFormClass =
-  "mx-auto grid max-w-[560px] gap-3.5";
+const providerFormClass = "mx-auto grid max-w-[560px] gap-3.5";
 
-const providerFieldClass =
-  "grid gap-2 text-[13px] font-semibold text-muted-foreground";
+const providerFieldClass = "grid gap-2 text-[13px] font-semibold text-muted-foreground";
 
-const providerFormHelpClass =
-  "text-[11px] font-medium normal-case text-muted-foreground";
+const providerFormHelpClass = "text-[11px] font-medium normal-case text-muted-foreground";
 
 const providerSummaryClass =
   "flex items-center justify-between rounded-md bg-muted/40 px-3 py-2.5 text-muted-foreground";
 
-const providerInstructionsClass =
-  "border-l-2 border-primary pl-[11px] text-[13px] text-foreground";
+const providerInstructionsClass = "border-l-2 border-primary pl-[11px] text-[13px] text-foreground";
 
 const providerAuthorizeStateClass =
   "mx-auto my-[30px] grid max-w-[430px] justify-items-center gap-2.5 text-center";
@@ -96,9 +86,7 @@ interface ProviderConnectionDialogProps {
 export function ProviderConnectionDialog(props: ProviderConnectionDialogProps) {
   const { session } = props;
   const workflow = workflowForType(props.workflows, session.providerType);
-  const title = session.mode === "add"
-    ? "Add Remote"
-    : "Configure Remote";
+  const title = session.mode === "add" ? "Add Remote" : "Configure Remote";
 
   useEffect(() => {
     if (session.stage !== "authorize" || session.inFlight) return;
@@ -115,22 +103,45 @@ export function ProviderConnectionDialog(props: ProviderConnectionDialogProps) {
   }, [props.onSubmit, session.inFlight, session.stage]);
 
   return (
-    <Dialog open onOpenChange={(open) => { if (!open) props.onClose(); }}>
+    <Dialog
+      open
+      onOpenChange={(open) => {
+        if (!open) props.onClose();
+      }}
+    >
       <DialogContent className={`${providerDialogClass} [&>button:last-child]:hidden`}>
         <DialogHeader className={providerHeaderClass}>
           <div>
             <DialogTitle className="text-xl">{title}</DialogTitle>
             <DialogDescription className="text-[13px]">{dialogSubtitle(session)}</DialogDescription>
           </div>
-          <Button variant="ghost" size="icon" type="button" onClick={props.onClose} aria-label="Close">
+          <Button
+            variant="ghost"
+            size="icon"
+            type="button"
+            onClick={props.onClose}
+            aria-label="Close"
+          >
             <AssetIcon src={iconAssets.x24} size={18} />
           </Button>
         </DialogHeader>
 
         <div className={providerProgressClass} aria-label="Connection progress">
-          <ProgressStep label="Provider" active={session.stage === "provider"} complete={session.stage !== "provider"} />
-          <ProgressStep label="Configure" active={session.stage === "configure"} complete={session.stage === "authorize" || session.stage === "complete"} />
-          <ProgressStep label="Connect" active={session.stage === "authorize"} complete={session.stage === "complete"} />
+          <ProgressStep
+            label="Provider"
+            active={session.stage === "provider"}
+            complete={session.stage !== "provider"}
+          />
+          <ProgressStep
+            label="Configure"
+            active={session.stage === "configure"}
+            complete={session.stage === "authorize" || session.stage === "complete"}
+          />
+          <ProgressStep
+            label="Connect"
+            active={session.stage === "authorize"}
+            complete={session.stage === "complete"}
+          />
         </div>
 
         <div className={providerBodyClass}>
@@ -154,10 +165,17 @@ export function ProviderConnectionDialog(props: ProviderConnectionDialogProps) {
           {session.stage === "authorize" ? (
             <div className={providerAuthorizeStateClass}>
               <div className={providerAuthorizeIconClass}>
-                <AssetIcon className={session.polling ? "animate-spin" : ""} src={session.polling ? iconAssets.sync24 : iconAssets.cloud24} size={28} />
+                <AssetIcon
+                  className={session.polling ? "animate-spin" : ""}
+                  src={session.polling ? iconAssets.sync24 : iconAssets.cloud24}
+                  size={28}
+                />
               </div>
               <h3 className="m-0">Finish signing in with your provider</h3>
-              <p className="leading-[1.55]">{session.step?.instructions || "Misty opened the authorization page in your browser and is waiting for it to finish."}</p>
+              <p className="leading-[1.55]">
+                {session.step?.instructions ||
+                  "Misty opened the authorization page in your browser and is waiting for it to finish."}
+              </p>
               <small className="text-muted-foreground">
                 {session.polling
                   ? `Checking authorization${session.authPollAttempts > 0 ? ` (${session.authPollAttempts})` : ""}...`
@@ -165,7 +183,10 @@ export function ProviderConnectionDialog(props: ProviderConnectionDialogProps) {
               </small>
               {session.step?.authorizeUrl ? (
                 <Button variant="link" type="button" onClick={props.onOpenAuthorize}>
-                  <AssetIcon src={iconAssets.cloud24} size={15} /> {session.openedAuthorizeUrl ? "Reopen authorization page" : "Open authorization page"}
+                  <AssetIcon src={iconAssets.cloud24} size={15} />{" "}
+                  {session.openedAuthorizeUrl
+                    ? "Reopen authorization page"
+                    : "Open authorization page"}
                 </Button>
               ) : null}
             </div>
@@ -173,13 +194,24 @@ export function ProviderConnectionDialog(props: ProviderConnectionDialogProps) {
 
           {session.stage === "complete" ? (
             <div className={providerAuthorizeStateClass}>
-              <div className={`${providerAuthorizeIconClass} ${providerAuthorizeCompleteIconClass}`}><AssetIcon src={iconAssets.verified24} size={30} /></div>
+              <div
+                className={`${providerAuthorizeIconClass} ${providerAuthorizeCompleteIconClass}`}
+              >
+                <AssetIcon src={iconAssets.verified24} size={30} />
+              </div>
               <h3 className="m-0">Remote connected</h3>
-              <p className="leading-[1.55]"><strong>{session.remoteName}</strong> is ready to use in Explorer.</p>
+              <p className="leading-[1.55]">
+                <strong>{session.remoteName}</strong> is ready to use in Explorer.
+              </p>
             </div>
           ) : null}
 
-          {session.error ? <Alert variant="destructive" className="mt-3.5"><AlertTitle>Connection error</AlertTitle><AlertDescription>{session.error}</AlertDescription></Alert> : null}
+          {session.error ? (
+            <Alert variant="destructive" className="mt-3.5">
+              <AlertTitle>Connection error</AlertTitle>
+              <AlertDescription>{session.error}</AlertDescription>
+            </Alert>
+          ) : null}
         </div>
 
         <DialogFooter className={providerFooterClass}>
@@ -193,13 +225,21 @@ export function ProviderConnectionDialog(props: ProviderConnectionDialogProps) {
           ) : null}
           {session.stage === "configure" ? (
             <Button type="button" onClick={() => props.onSubmit(false)} disabled={session.inFlight}>
-              <AssetIcon className={session.inFlight ? "animate-spin" : ""} src={session.inFlight ? iconAssets.sync16 : iconAssets.shieldLock24} size={16} />
+              <AssetIcon
+                className={session.inFlight ? "animate-spin" : ""}
+                src={session.inFlight ? iconAssets.sync16 : iconAssets.shieldLock24}
+                size={16}
+              />
               {submitLabel(session)}
             </Button>
           ) : null}
           {session.stage === "authorize" ? (
             <Button type="button" onClick={() => props.onSubmit(true)} disabled={session.inFlight}>
-              <AssetIcon className={session.inFlight ? "animate-spin" : ""} src={session.inFlight ? iconAssets.sync16 : iconAssets.shieldLock24} size={16} />
+              <AssetIcon
+                className={session.inFlight ? "animate-spin" : ""}
+                src={session.inFlight ? iconAssets.sync16 : iconAssets.shieldLock24}
+                size={16}
+              />
               {session.inFlight ? "Checking..." : "Check Again"}
             </Button>
           ) : null}
@@ -220,14 +260,22 @@ function ProviderPicker(props: {
     [props.workflows, query],
   );
   if (props.workflows.length === 0) {
-    return <EmptyState compact title="No remote workflows available" description="Refresh Remotes and check the remote service connection."/>;
+    return (
+      <EmptyState
+        compact
+        title="No remote workflows available"
+        description="Refresh Remotes and check the remote service connection."
+      />
+    );
   }
   return (
     <>
       <label className={providerSearchClass}>
         <span className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
           <strong className="text-foreground">Provider backend</strong>
-          <span>{filteredWorkflows.length} of {props.workflows.length}</span>
+          <span>
+            {filteredWorkflows.length} of {props.workflows.length}
+          </span>
         </span>
         <Input
           value={query}
@@ -247,7 +295,11 @@ function ProviderPicker(props: {
           ))}
         </div>
       ) : (
-        <EmptyState compact title="No matching providers" description="Try a different provider name or backend."/>
+        <EmptyState
+          compact
+          title="No matching providers"
+          description="Try a different provider name or backend."
+        />
       )}
     </>
   );
@@ -257,10 +309,7 @@ function filterProviderWorkflows(workflows: ProviderWorkflow[], query: string): 
   const needle = query.trim().toLowerCase();
   if (!needle) return workflows;
   return workflows.filter((workflow) =>
-    [workflow.type, workflow.name, workflow.description]
-      .join("\n")
-      .toLowerCase()
-      .includes(needle)
+    [workflow.type, workflow.name, workflow.description].join("\n").toLowerCase().includes(needle),
   );
 }
 
@@ -280,8 +329,12 @@ function ProviderWorkflowButton(props: {
         <ProviderLogo type={props.workflow.type} size={23} />
       </span>
       <span>
-        <strong className="block overflow-hidden text-ellipsis">{props.workflow.name || props.workflow.type}</strong>
-        <small className="mt-[3px] block overflow-hidden text-ellipsis whitespace-nowrap text-[11px] text-muted-foreground">{props.workflow.description || props.workflow.type}</small>
+        <strong className="block overflow-hidden text-ellipsis">
+          {props.workflow.name || props.workflow.type}
+        </strong>
+        <small className="mt-[3px] block overflow-hidden text-ellipsis whitespace-nowrap text-[11px] text-muted-foreground">
+          {props.workflow.description || props.workflow.type}
+        </small>
       </span>
       {props.selected ? <AssetIcon src={iconAssets.verified24} size={17} /> : null}
     </Button>
@@ -310,7 +363,9 @@ function ProviderConfiguration(props: {
       </label>
       <div className={providerSummaryClass}>
         <span>Provider</span>
-        <strong className="text-foreground">{props.workflow?.name || props.session.providerType}</strong>
+        <strong className="text-foreground">
+          {props.workflow?.name || props.session.providerType}
+        </strong>
       </div>
       {options.map((option) => (
         <ProviderOptionField
@@ -322,7 +377,9 @@ function ProviderConfiguration(props: {
           onSensitiveVisible={setSensitiveVisible}
         />
       ))}
-      {props.session.step?.instructions ? <p className={providerInstructionsClass}>{props.session.step.instructions}</p> : null}
+      {props.session.step?.instructions ? (
+        <p className={providerInstructionsClass}>{props.session.step.instructions}</p>
+      ) : null}
     </div>
   );
 }
@@ -338,20 +395,33 @@ function ProviderOptionField(props: {
   const secret = option.password || isSensitiveOptionName(option.name);
   return (
     <label className={providerFieldClass}>
-      {option.label || option.name}{option.required ? " *" : ""}
+      {option.label || option.name}
+      {option.required ? " *" : ""}
       {option.choices.length > 0 ? (
-        <Select value={props.value || EMPTY_SELECT_VALUE} onValueChange={(nextValue) => props.onChange(nextValue === EMPTY_SELECT_VALUE ? "" : nextValue)}>
+        <Select
+          value={props.value || EMPTY_SELECT_VALUE}
+          onValueChange={(nextValue) =>
+            props.onChange(nextValue === EMPTY_SELECT_VALUE ? "" : nextValue)
+          }
+        >
           <SelectTrigger className="h-11">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-          {option.choices.map((choice) => (
-            <SelectItem key={choice.value || EMPTY_SELECT_VALUE} value={choice.value || EMPTY_SELECT_VALUE}>{choice.help || choice.value || "None"}</SelectItem>
-          ))}
+            {option.choices.map((choice) => (
+              <SelectItem
+                key={choice.value || EMPTY_SELECT_VALUE}
+                value={choice.value || EMPTY_SELECT_VALUE}
+              >
+                {choice.help || choice.value || "None"}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
       ) : (
-        <span className={secret ? "grid grid-cols-[minmax(0,1fr)_42px] items-center gap-1" : "grid"}>
+        <span
+          className={secret ? "grid grid-cols-[minmax(0,1fr)_42px] items-center gap-1" : "grid"}
+        >
           <Input
             className="h-11"
             value={props.value}
@@ -369,7 +439,10 @@ function ProviderOptionField(props: {
               aria-pressed={props.sensitiveVisible}
               onClick={() => props.onSensitiveVisible(!props.sensitiveVisible)}
             >
-              <AssetIcon src={props.sensitiveVisible ? iconAssets.eyeClosed16 : iconAssets.eye16} size={16} />
+              <AssetIcon
+                src={props.sensitiveVisible ? iconAssets.eyeClosed16 : iconAssets.eye16}
+                size={16}
+              />
             </Button>
           ) : null}
         </span>
@@ -381,7 +454,9 @@ function ProviderOptionField(props: {
 
 function ProgressStep(props: { label: string; active: boolean; complete: boolean }) {
   return (
-    <div className={`flex items-center justify-center gap-[7px] text-xs ${props.active || props.complete ? "text-foreground" : "text-muted-foreground"}`}>
+    <div
+      className={`flex items-center justify-center gap-[7px] text-xs ${props.active || props.complete ? "text-foreground" : "text-muted-foreground"}`}
+    >
       <span
         className={`block h-[12px] w-[12px] shrink-0 rounded-full ${
           props.complete || props.active
@@ -398,7 +473,9 @@ function ProgressStep(props: { label: string; active: boolean; complete: boolean
 
 function isSensitiveOptionName(name: string): boolean {
   const normalized = name.toLowerCase();
-  return normalized.includes("secret") || normalized.includes("password") || normalized.includes("token");
+  return (
+    normalized.includes("secret") || normalized.includes("password") || normalized.includes("token")
+  );
 }
 
 function workflowForType(workflows: ProviderWorkflow[], type: string): ProviderWorkflow | null {

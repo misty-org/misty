@@ -3,17 +3,22 @@ import { createJSONStorage, persist } from "zustand/middleware";
 
 export type AppThemeMode = "system" | "dark" | "light";
 export type ResolvedAppTheme = "dark" | "light";
-export type MistyThemeId =
-  | "misty-dark"
-  | "misty-light"
-  | "graphite"
-  | "aurora"
-  | "copper";
+export type MistyThemeId = "misty-dark" | "misty-light" | "graphite" | "aurora" | "copper";
 
-export type MistyCustomThemeTokens = Partial<Record<
-  "background" | "surface" | "foreground" | "muted" | "accent" | "selection" | "success" | "warning" | "danger",
-  string
->>;
+export type MistyCustomThemeTokens = Partial<
+  Record<
+    | "background"
+    | "surface"
+    | "foreground"
+    | "muted"
+    | "accent"
+    | "selection"
+    | "success"
+    | "warning"
+    | "danger",
+    string
+  >
+>;
 
 type AppThemeStore = {
   customTokens: MistyCustomThemeTokens | null;
@@ -50,11 +55,11 @@ function safeThemeMode(value: unknown): AppThemeMode {
 }
 
 function safeThemeId(value: unknown): MistyThemeId {
-  return value === "misty-light"
-    || value === "graphite"
-    || value === "aurora"
-    || value === "copper"
-    || value === "misty-dark"
+  return value === "misty-light" ||
+    value === "graphite" ||
+    value === "aurora" ||
+    value === "copper" ||
+    value === "misty-dark"
     ? value
     : "misty-dark";
 }
@@ -100,9 +105,12 @@ export const useAppThemeStore = create<AppThemeStore>()(
       setSystemTheme: (systemTheme) => {
         const resolvedTheme = resolveTheme(get().themeMode, systemTheme);
         set({
-          themeId: get().themeMode === "system"
-            ? resolvedTheme === "light" ? "misty-light" : "misty-dark"
-            : get().themeId,
+          themeId:
+            get().themeMode === "system"
+              ? resolvedTheme === "light"
+                ? "misty-light"
+                : "misty-dark"
+              : get().themeId,
           systemTheme,
           resolvedTheme,
         });
@@ -124,7 +132,11 @@ export const useAppThemeStore = create<AppThemeStore>()(
     {
       name: THEME_STORAGE_KEY,
       storage: createJSONStorage(() => localStorage),
-      partialize: (state) => ({ customTokens: state.customTokens, themeMode: state.themeMode, themeId: state.themeId }),
+      partialize: (state) => ({
+        customTokens: state.customTokens,
+        themeMode: state.themeMode,
+        themeId: state.themeId,
+      }),
       merge: (persisted, current) => {
         const themeMode =
           persisted && typeof persisted === "object" && "themeMode" in persisted
@@ -134,9 +146,14 @@ export const useAppThemeStore = create<AppThemeStore>()(
           persisted && typeof persisted === "object" && "themeId" in persisted
             ? safeThemeId(persisted.themeId)
             : current.themeId;
-        const customTokens = persisted && typeof persisted === "object" && "customTokens" in persisted && persisted.customTokens && typeof persisted.customTokens === "object"
-          ? persisted.customTokens as MistyCustomThemeTokens
-          : null;
+        const customTokens =
+          persisted &&
+          typeof persisted === "object" &&
+          "customTokens" in persisted &&
+          persisted.customTokens &&
+          typeof persisted.customTokens === "object"
+            ? (persisted.customTokens as MistyCustomThemeTokens)
+            : null;
         return {
           ...current,
           customTokens,

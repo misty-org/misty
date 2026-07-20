@@ -51,7 +51,9 @@ function readStoredUsage(): StoredAssistantUsage {
   const today = localDateKey();
   if (typeof window === "undefined") return { dateKey: today, messagesUsed: 0 };
   try {
-    const parsed = JSON.parse(window.localStorage.getItem(assistantUsageStorageKey) ?? "null") as Partial<StoredAssistantUsage> | null;
+    const parsed = JSON.parse(
+      window.localStorage.getItem(assistantUsageStorageKey) ?? "null",
+    ) as Partial<StoredAssistantUsage> | null;
     if (parsed?.dateKey !== today) return { dateKey: today, messagesUsed: 0 };
     const messagesUsed = Number.isFinite(parsed.messagesUsed)
       ? Math.min(assistantDailyMessageLimit, Math.max(0, Math.floor(parsed.messagesUsed ?? 0)))

@@ -2,7 +2,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 const defaultMinimumSpinMs = 650;
 
-export function useMinimumSpin(active = false, minimumMs = defaultMinimumSpinMs): readonly [boolean, () => void] {
+export function useMinimumSpin(
+  active = false,
+  minimumMs = defaultMinimumSpinMs,
+): readonly [boolean, () => void] {
   const [localSpinning, setLocalSpinning] = useState(false);
   const timeoutRef = useRef<number | null>(null);
 

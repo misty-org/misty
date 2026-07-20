@@ -15,10 +15,13 @@ export function useTransientScrollbars(rootRef: RefObject<HTMLElement>, hideDela
       target.classList.add(activeScrollbarClass);
       const previousTimer = hideTimers.get(target);
       if (previousTimer !== undefined) window.clearTimeout(previousTimer);
-      hideTimers.set(target, window.setTimeout(() => {
-        target.classList.remove(activeScrollbarClass);
-        hideTimers.delete(target);
-      }, hideDelayMs));
+      hideTimers.set(
+        target,
+        window.setTimeout(() => {
+          target.classList.remove(activeScrollbarClass);
+          hideTimers.delete(target);
+        }, hideDelayMs),
+      );
     };
 
     root.addEventListener("scroll", showScrollbar, true);

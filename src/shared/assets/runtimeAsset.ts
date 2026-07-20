@@ -38,14 +38,10 @@ function isAbsoluteRuntimeAssetsDirectory(path: string): boolean {
   return path.startsWith("/") || path.startsWith("\\\\") || /^[a-z]:[\\/]/i.test(path);
 }
 
-export function hideRuntimeAssetOnError(
-  event: SyntheticEvent<HTMLImageElement>,
-): void {
+export function hideRuntimeAssetOnError(event: SyntheticEvent<HTMLImageElement>): void {
   event.currentTarget.style.visibility = "hidden";
 }
 
-export function revealRuntimeAssetOnLoad(
-  event: SyntheticEvent<HTMLImageElement>,
-): void {
+export function revealRuntimeAssetOnLoad(event: SyntheticEvent<HTMLImageElement>): void {
   event.currentTarget.style.visibility = "";
 }

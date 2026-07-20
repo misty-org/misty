@@ -64,7 +64,10 @@ export class DesktopAgentJobWorker {
     }
   }
 
-  private async runWorkflowNodeClaim(claim: ClaimedWorkflowNodeJob, localDeviceId: string): Promise<void> {
+  private async runWorkflowNodeClaim(
+    claim: ClaimedWorkflowNodeJob,
+    localDeviceId: string,
+  ): Promise<void> {
     const deviceId = this.serverDeviceId;
     if (!deviceId) return;
     const base = `/devices/${encodeURIComponent(deviceId)}/workflow-node-jobs/${encodeURIComponent(claim.job.id)}`;
@@ -77,7 +80,10 @@ export class DesktopAgentJobWorker {
         .catch(() => undefined);
     }, leaseHeartbeatMs);
     try {
-      const output = await withTimeout(executeWorkflowNodeOnDevice(claim.job), nodeExecutionTimeoutMs);
+      const output = await withTimeout(
+        executeWorkflowNodeOnDevice(claim.job),
+        nodeExecutionTimeoutMs,
+      );
       await signedAgentDeviceRequest(localDeviceId, `${base}/complete`, {
         method: "POST",
         body: JSON.stringify({ leaseToken: claim.leaseToken, output }),
@@ -154,11 +160,11 @@ export function deviceContentReference(
 ): Record<string, string> {
   const ref = findDeviceContentReference(input);
   if (
-    !ref
-    || ref.scopeId !== expectedScopeId
-    || !ref.relativePath
-    || ref.relativePath.startsWith("/")
-    || ref.relativePath.split(/[\\/]/).includes("..")
+    !ref ||
+    ref.scopeId !== expectedScopeId ||
+    !ref.relativePath ||
+    ref.relativePath.startsWith("/") ||
+    ref.relativePath.split(/[\\/]/).includes("..")
   ) {
     throw new Error("invalid_device_scope");
   }
@@ -175,7 +181,7 @@ function findDeviceContentReference(value: unknown): Record<string, string> | nu
   if (scopeId && relativePath) {
     return {
       ...Object.fromEntries(
-      Object.entries(source).map(([key, entry]) => [key, stringValue(entry)]),
+        Object.entries(source).map(([key, entry]) => [key, stringValue(entry)]),
       ),
       scopeId,
       relativePath,
@@ -217,8 +223,14 @@ function withTimeout<T>(operation: Promise<T>, timeoutMs: number): Promise<T> {
   return new Promise((resolve, reject) => {
     const timeout = window.setTimeout(() => reject(new Error("device_node_timeout")), timeoutMs);
     operation.then(
-      (value) => { window.clearTimeout(timeout); resolve(value); },
-      (error) => { window.clearTimeout(timeout); reject(error); },
+      (value) => {
+        window.clearTimeout(timeout);
+        resolve(value);
+      },
+      (error) => {
+        window.clearTimeout(timeout);
+        reject(error);
+      },
     );
   });
 }

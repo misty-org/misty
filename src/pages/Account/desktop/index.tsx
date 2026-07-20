@@ -17,9 +17,20 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
-import { LoadingState, StatusBadge } from "@/components/misty";
+import { LoadingState } from "@/components/ui/state-view";
+import { StatusBadge } from "@/components/ui/status-badge";
 import { useAuth } from "../../../auth/AuthContext";
-import { createCheckout, createCreditCheckout, createPortalSession, fetchBillingUsage, fetchMe, updateDevice, updateProfile, type BillingUsageResponse, type MeResponse } from "./api";
+import {
+  createCheckout,
+  createCreditCheckout,
+  createPortalSession,
+  fetchBillingUsage,
+  fetchMe,
+  updateDevice,
+  updateProfile,
+  type BillingUsageResponse,
+  type MeResponse,
+} from "./api";
 import { useUserStore } from "../../../stores/useUserStore";
 import { useSetupStore } from "../../../stores/useSetupStore";
 import type { CurrentLicense } from "../../../models/setup";
@@ -29,16 +40,10 @@ import {
   clientDebugPanelEnabled,
   readClientDebugEvents,
   type ClientDebugEvent,
-} from "../../../shared/debug/clientDebug";
-import { openExternalLink } from "../../../shared/openExternalLink";
+} from "@/shared/debug/clientDebug";
+import { openExternalLink } from "@/shared/openExternalLink";
 import { normalizeApiBaseUrl, withDefaultApiPath } from "../../../api/apiBase";
-import {
-  Bug,
-  Lock,
-  Rows3,
-  UserCircle,
-  type LucideIcon,
-} from "lucide-react";
+import { Bug, Lock, Rows3, UserCircle, type LucideIcon } from "lucide-react";
 import {
   DesktopSettingsFrame,
   DesktopSettingsRow,
@@ -71,8 +76,7 @@ function AccountBadge({ label, tone }: { label: string; tone: AccountStatusTone 
   );
 }
 
-const accountSettingsCustomRowClass =
-  "border-b border-border/60 px-5 py-4 last:border-b-0";
+const accountSettingsCustomRowClass = "border-b border-border/60 px-5 py-4 last:border-b-0";
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return <DesktopSettingsSection title={title}>{children}</DesktopSettingsSection>;
@@ -196,7 +200,9 @@ function AccountPanel({
   });
 
   useEffect(() => {
-    void fetchBillingUsage().then(setBillingUsage).catch(() => setBillingUsage(null));
+    void fetchBillingUsage()
+      .then(setBillingUsage)
+      .catch(() => setBillingUsage(null));
   }, [me.tier]);
 
   async function openBillingAction(action: () => Promise<{ url: string }>) {
@@ -233,16 +239,18 @@ function AccountPanel({
     .join("")
     .toUpperCase()
     .slice(0, 2);
-  const creditUsedPercent = billingUsage && billingUsage.monthly_allowance > 0
-    ? Math.round((1 - billingUsage.monthly_remaining / billingUsage.monthly_allowance) * 100)
-    : 0;
-  const creditWarning = creditUsedPercent >= 100
-    ? "Managed AI is paused until you add credits or the allowance resets."
-    : creditUsedPercent >= 90
-      ? "You have used at least 90% of this month’s credits."
-      : creditUsedPercent >= 75
-        ? "You have used at least 75% of this month’s credits."
-        : "";
+  const creditUsedPercent =
+    billingUsage && billingUsage.monthly_allowance > 0
+      ? Math.round((1 - billingUsage.monthly_remaining / billingUsage.monthly_allowance) * 100)
+      : 0;
+  const creditWarning =
+    creditUsedPercent >= 100
+      ? "Managed AI is paused until you add credits or the allowance resets."
+      : creditUsedPercent >= 90
+        ? "You have used at least 90% of this month’s credits."
+        : creditUsedPercent >= 75
+          ? "You have used at least 75% of this month’s credits."
+          : "";
 
   return (
     <div>
@@ -264,7 +272,9 @@ function AccountPanel({
             ? "Lifetime"
             : me.billing?.kind === "subscription"
               ? `${me.billing.interval === "year" ? "Annual" : "Monthly"} subscription`
-              : me.status === "trialing" ? "Pro trial" : "Free account"}
+              : me.status === "trialing"
+                ? "Pro trial"
+                : "Free account"}
         </Row>
         {me.expires_at ? (
           <Row label="Expires">
@@ -285,7 +295,9 @@ function AccountPanel({
       </Section>
 
       <Section title="Devices">
-        <div className={`${accountSettingsCustomRowClass} flex flex-col gap-3 md:flex-row md:items-start md:justify-between md:gap-6`}>
+        <div
+          className={`${accountSettingsCustomRowClass} flex flex-col gap-3 md:flex-row md:items-start md:justify-between md:gap-6`}
+        >
           <div className="space-y-1">
             <label htmlFor="account-device-name" className="text-sm font-medium text-foreground">
               Licensed device
@@ -304,11 +316,7 @@ function AccountPanel({
                 placeholder="e.g. MacBook Pro"
                 className="min-w-0 flex-1"
               />
-              <Button
-                onClick={saveDevice}
-                disabled={savingDevice}
-                className="shrink-0"
-              >
+              <Button onClick={saveDevice} disabled={savingDevice} className="shrink-0">
                 {savingDevice ? "Saving…" : "Save"}
               </Button>
             </div>
@@ -316,9 +324,13 @@ function AccountPanel({
           </div>
         </div>
 
-        <div className={`${accountSettingsCustomRowClass} flex flex-col gap-3 md:flex-row md:items-center md:justify-between md:gap-6`}>
+        <div
+          className={`${accountSettingsCustomRowClass} flex flex-col gap-3 md:flex-row md:items-center md:justify-between md:gap-6`}
+        >
           <div>
-            <p className="text-sm font-medium text-foreground">{me.license_device || "Primary device"}</p>
+            <p className="text-sm font-medium text-foreground">
+              {me.license_device || "Primary device"}
+            </p>
             <p className="mt-0.5 text-xs text-muted-foreground">
               {TIER_LABEL[me.tier] ?? me.tier} · Activated
             </p>
@@ -335,11 +347,16 @@ function AccountPanel({
         )}
 
         {me.tier === "basic" && (
-          <div className={`${accountSettingsCustomRowClass} flex flex-col gap-3 md:flex-row md:items-center md:justify-between md:gap-6`}>
-            <p className="text-xs text-muted-foreground">
-              Pro $9.99/month · Max $14.99/month
-            </p>
-            <Button variant="link" disabled={billingWorking} onClick={() => void openBillingAction(() => createCheckout("pro", "month"))} className="h-auto shrink-0 p-0 text-xs">
+          <div
+            className={`${accountSettingsCustomRowClass} flex flex-col gap-3 md:flex-row md:items-center md:justify-between md:gap-6`}
+          >
+            <p className="text-xs text-muted-foreground">Pro $9.99/month · Max $14.99/month</p>
+            <Button
+              variant="link"
+              disabled={billingWorking}
+              onClick={() => void openBillingAction(() => createCheckout("pro", "month"))}
+              className="h-auto shrink-0 p-0 text-xs"
+            >
               Upgrade to Pro
             </Button>
           </div>
@@ -350,37 +367,96 @@ function AccountPanel({
         {billingUsage ? (
           <>
             <Row label="Available">{billingUsage.available_credits.toLocaleString()} credits</Row>
-            <Row label="Monthly allowance">{billingUsage.monthly_remaining.toLocaleString()} of {billingUsage.monthly_allowance.toLocaleString()} remaining</Row>
+            <Row label="Monthly allowance">
+              {billingUsage.monthly_remaining.toLocaleString()} of{" "}
+              {billingUsage.monthly_allowance.toLocaleString()} remaining
+            </Row>
             <Row label="Purchased">{billingUsage.purchased_remaining.toLocaleString()} credits</Row>
             <Row label="Resets">{new Date(billingUsage.next_reset_at).toLocaleDateString()}</Row>
             <div className={accountSettingsCustomRowClass}>
               <Progress value={Math.min(100, creditUsedPercent)} />
-              {creditWarning ? <p className="mt-2 text-xs text-[var(--misty-warning)]">{creditWarning}</p> : null}
+              {creditWarning ? (
+                <p className="mt-2 text-xs text-[var(--misty-warning)]">{creditWarning}</p>
+              ) : null}
             </div>
             <div className={`${accountSettingsCustomRowClass} flex flex-wrap gap-2`}>
-              <Button variant="outline" size="sm" disabled={billingWorking} onClick={() => void openBillingAction(() => createCreditCheckout("credits_1500"))}>1,500,000 credits · $4.99</Button>
-              <Button variant="outline" size="sm" disabled={billingWorking} onClick={() => void openBillingAction(() => createCreditCheckout("credits_3500"))}>3,500,000 credits · $9.99</Button>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={billingWorking}
+                onClick={() => void openBillingAction(() => createCreditCheckout("credits_1500"))}
+              >
+                1,500,000 credits · $4.99
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={billingWorking}
+                onClick={() => void openBillingAction(() => createCreditCheckout("credits_3500"))}
+              >
+                3,500,000 credits · $9.99
+              </Button>
             </div>
           </>
-        ) : <GhostRow label="Usage" value="Loading credit balance" />}
+        ) : (
+          <GhostRow label="Usage" value="Loading credit balance" />
+        )}
       </Section>
 
       <Section title="Billing">
         {me.billing?.kind === "subscription" ? (
           <>
-            <Row label="Plan">{TIER_LABEL[me.tier]} · {me.billing.interval === "year" ? "yearly" : "monthly"}</Row>
+            <Row label="Plan">
+              {TIER_LABEL[me.tier]} · {me.billing.interval === "year" ? "yearly" : "monthly"}
+            </Row>
             <div className={accountSettingsCustomRowClass}>
-              <Button variant="link" disabled={billingWorking || !me.billing.customer_portal_available} onClick={() => void openBillingAction(createPortalSession)} className="h-auto p-0">Manage billing →</Button>
+              <Button
+                variant="link"
+                disabled={billingWorking || !me.billing.customer_portal_available}
+                onClick={() => void openBillingAction(createPortalSession)}
+                className="h-auto p-0"
+              >
+                Manage billing →
+              </Button>
             </div>
           </>
         ) : (
           <div className={`${accountSettingsCustomRowClass} grid gap-3`}>
-            <p className="m-0 text-sm text-muted-foreground">Pro includes 2,000 monthly credits. Max includes 6,000.</p>
+            <p className="m-0 text-sm text-muted-foreground">
+              Pro includes 2,000 monthly credits. Max includes 6,000.
+            </p>
             <div className="flex flex-wrap gap-2">
-              <Button size="sm" disabled={billingWorking} onClick={() => void openBillingAction(() => createCheckout("pro", "month"))}>Pro · $9.99/mo</Button>
-              <Button variant="outline" size="sm" disabled={billingWorking} onClick={() => void openBillingAction(() => createCheckout("max", "month"))}>Max · $14.99/mo</Button>
-              <Button variant="outline" size="sm" disabled={billingWorking} onClick={() => void openBillingAction(() => createCheckout("pro", "year"))}>Pro · $99/yr</Button>
-              <Button variant="outline" size="sm" disabled={billingWorking} onClick={() => void openBillingAction(() => createCheckout("max", "year"))}>Max · $149/yr</Button>
+              <Button
+                size="sm"
+                disabled={billingWorking}
+                onClick={() => void openBillingAction(() => createCheckout("pro", "month"))}
+              >
+                Pro · $9.99/mo
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={billingWorking}
+                onClick={() => void openBillingAction(() => createCheckout("max", "month"))}
+              >
+                Max · $14.99/mo
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={billingWorking}
+                onClick={() => void openBillingAction(() => createCheckout("pro", "year"))}
+              >
+                Pro · $99/yr
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={billingWorking}
+                onClick={() => void openBillingAction(() => createCheckout("max", "year"))}
+              >
+                Max · $149/yr
+              </Button>
             </div>
           </div>
         )}
@@ -398,9 +474,7 @@ function AccountPanel({
         <div className={`${accountSettingsCustomRowClass} flex flex-col gap-4 py-5`}>
           <div className="flex items-center gap-4">
             <Avatar className="size-14">
-              <AvatarFallback className="text-base font-semibold">
-                {initials}
-              </AvatarFallback>
+              <AvatarFallback className="text-base font-semibold">{initials}</AvatarFallback>
             </Avatar>
             <div>
               <p className="text-sm font-medium text-foreground">{me.name}</p>
@@ -411,7 +485,12 @@ function AccountPanel({
 
           <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
             <div>
-              <label htmlFor="account-display-name" className="mb-1.5 block text-xs font-medium text-foreground">Display name</label>
+              <label
+                htmlFor="account-display-name"
+                className="mb-1.5 block text-xs font-medium text-foreground"
+              >
+                Display name
+              </label>
               <Input
                 id="account-display-name"
                 type="text"
@@ -431,13 +510,13 @@ function AccountPanel({
           </div>
 
           <div>
-            <label htmlFor="account-email" className="mb-1.5 block text-xs font-medium text-foreground">Email</label>
-            <Input
-              id="account-email"
-              type="email"
-              value={me.email}
-              disabled
-            />
+            <label
+              htmlFor="account-email"
+              className="mb-1.5 block text-xs font-medium text-foreground"
+            >
+              Email
+            </label>
+            <Input id="account-email" type="email" value={me.email} disabled />
             <p className="mt-1 text-xs text-muted-foreground/60">Email cannot be changed.</p>
           </div>
         </div>
@@ -449,15 +528,15 @@ function AccountPanel({
       </Section>
 
       <Section title="Security">
-        <div className={`${accountSettingsCustomRowClass} flex flex-col gap-3 md:flex-row md:items-center md:justify-between md:gap-6`}>
+        <div
+          className={`${accountSettingsCustomRowClass} flex flex-col gap-3 md:flex-row md:items-center md:justify-between md:gap-6`}
+        >
           <div>
             <p className="text-sm text-foreground">Password</p>
             <p className="mt-0.5 text-xs text-muted-foreground">Reset via email link.</p>
           </div>
           <Button asChild variant="link" className="h-auto p-0">
-          <a href="/signin">
-            Reset
-          </a>
+            <a href="/signin">Reset</a>
           </Button>
         </div>
         <GhostRow label="Two-factor authentication" value="Coming soon" />
@@ -465,7 +544,9 @@ function AccountPanel({
       </Section>
 
       <Section title="Danger Zone">
-        <div className={`${accountSettingsCustomRowClass} flex flex-col gap-3 md:flex-row md:items-center md:justify-between md:gap-6`}>
+        <div
+          className={`${accountSettingsCustomRowClass} flex flex-col gap-3 md:flex-row md:items-center md:justify-between md:gap-6`}
+        >
           <div>
             <p className="text-sm text-foreground">Sign out</p>
             <p className="mt-0.5 text-xs text-muted-foreground">End your session on this device.</p>
@@ -483,8 +564,8 @@ function AccountPanel({
               <AlertDialogHeader>
                 <AlertDialogTitle>Sign out of Misty?</AlertDialogTitle>
                 <AlertDialogDescription>
-                  This ends the account session on this device. Your local files
-                  and preferences will remain in place.
+                  This ends the account session on this device. Your local files and preferences
+                  will remain in place.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
@@ -499,12 +580,18 @@ function AccountPanel({
             </AlertDialogContent>
           </AlertDialog>
         </div>
-        <div className={`${accountSettingsCustomRowClass} flex flex-col gap-3 opacity-40 md:flex-row md:items-center md:justify-between md:gap-6`}>
+        <div
+          className={`${accountSettingsCustomRowClass} flex flex-col gap-3 opacity-40 md:flex-row md:items-center md:justify-between md:gap-6`}
+        >
           <div>
             <p className="text-sm text-foreground">Delete account</p>
-            <p className="mt-0.5 text-xs text-muted-foreground">Permanently remove your account and all data.</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              Permanently remove your account and all data.
+            </p>
           </div>
-          <Button variant="outline" disabled>Delete</Button>
+          <Button variant="outline" disabled>
+            Delete
+          </Button>
         </div>
       </Section>
     </div>
@@ -520,9 +607,9 @@ function PrivacyPanel() {
         <div className={`${accountSettingsCustomRowClass} flex flex-col gap-2`}>
           <p className="text-sm font-medium text-foreground">Your data stays on your device.</p>
           <p className="text-sm leading-relaxed text-muted-foreground">
-            Misty never transmits your files or cloud credentials to any external server. All provider
-            communication runs through Misty's embedded local runtime. We only store your account info
-            (name, email, hashed password) and subscription status.
+            Misty never transmits your files or cloud credentials to any external server. All
+            provider communication runs through Misty's embedded local runtime. We only store your
+            account info (name, email, hashed password) and subscription status.
           </p>
         </div>
       </Section>
@@ -534,12 +621,18 @@ function PrivacyPanel() {
       </Section>
 
       <Section title="Data">
-        <div className={`${accountSettingsCustomRowClass} flex flex-col gap-3 opacity-40 md:flex-row md:items-center md:justify-between md:gap-6`}>
+        <div
+          className={`${accountSettingsCustomRowClass} flex flex-col gap-3 opacity-40 md:flex-row md:items-center md:justify-between md:gap-6`}
+        >
           <div>
             <p className="text-sm text-foreground">Export your data</p>
-            <p className="mt-0.5 text-xs text-muted-foreground">Download a copy of your account data.</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              Download a copy of your account data.
+            </p>
           </div>
-          <Button variant="outline" disabled>Export</Button>
+          <Button variant="outline" disabled>
+            Export
+          </Button>
         </div>
       </Section>
     </div>
@@ -552,11 +645,11 @@ function DiagnosticsPanel() {
   const app = useAppStore((state) => state.app);
   const [events, setEvents] = useState<ClientDebugEvent[]>(() => readClientDebugEvents());
   const serverBase = accountDebugBase(
-    import.meta.env.VITE_MISTY_PUBLIC_API_URL
-      || import.meta.env.VITE_MISTY_SERVER_URL
-      || import.meta.env.VITE_API_BASE
-      || app?.environment.serverUrl
-      || null,
+    import.meta.env.VITE_MISTY_PUBLIC_API_URL ||
+      import.meta.env.VITE_MISTY_SERVER_URL ||
+      import.meta.env.VITE_API_BASE ||
+      app?.environment.serverUrl ||
+      null,
   );
 
   useEffect(() => {
@@ -575,7 +668,12 @@ function DiagnosticsPanel() {
     <div>
       <Section title="Runtime">
         <Row label="Misty server API">{serverBase || "Not set"}</Row>
-        <Row label="Server env">{import.meta.env.VITE_MISTY_PUBLIC_API_URL || import.meta.env.VITE_MISTY_SERVER_URL || import.meta.env.VITE_API_BASE || "Not set"}</Row>
+        <Row label="Server env">
+          {import.meta.env.VITE_MISTY_PUBLIC_API_URL ||
+            import.meta.env.VITE_MISTY_SERVER_URL ||
+            import.meta.env.VITE_API_BASE ||
+            "Not set"}
+        </Row>
         <Row label="Debug logging">{clientDebugPanelEnabled() ? "Enabled" : "Disabled"}</Row>
       </Section>
 
@@ -585,10 +683,14 @@ function DiagnosticsPanel() {
             {events.slice(0, 12).map((event) => (
               <article key={event.id} className="grid gap-1 py-4">
                 <div className="flex min-w-0 items-center justify-between gap-3">
-                  <strong className={`text-sm ${event.level === "error" ? "text-destructive" : event.level === "warn" ? "text-[var(--misty-warning)]" : "text-foreground"}`}>
+                  <strong
+                    className={`text-sm ${event.level === "error" ? "text-destructive" : event.level === "warn" ? "text-[var(--misty-warning)]" : "text-foreground"}`}
+                  >
                     {event.scope}
                   </strong>
-                  <time className="shrink-0 text-xs text-muted-foreground">{new Date(event.createdAt).toLocaleTimeString()}</time>
+                  <time className="shrink-0 text-xs text-muted-foreground">
+                    {new Date(event.createdAt).toLocaleTimeString()}
+                  </time>
                 </div>
                 <p className="m-0 text-sm text-muted-foreground">{event.message}</p>
                 {event.detail ? (
@@ -643,7 +745,7 @@ export default function DesktopAccountPage(props: {
   const [tab, setTab] = useState<Tab>("general");
   const activeUser = user ?? currentUser;
   const localMe = useMemo(
-    () => activeUser ? meFromLocalAccount(activeUser, currentLicense) : null,
+    () => (activeUser ? meFromLocalAccount(activeUser, currentLicense) : null),
     [activeUser, currentLicense],
   );
   const displayMe = me ?? localMe;
@@ -673,11 +775,24 @@ export default function DesktopAccountPage(props: {
         }
       })
       .finally(() => setLoading(false));
-  }, [activeUser, currentUser, user, navigate, me, overlay, props.onClose, setMe, setLoading, setUser]);
+  }, [
+    activeUser,
+    currentUser,
+    user,
+    navigate,
+    me,
+    overlay,
+    props.onClose,
+    setMe,
+    setLoading,
+    setUser,
+  ]);
 
   if (!activeUser || (loading && !displayMe)) {
     return (
-      <div className={`${overlay ? "h-full" : "min-h-screen"} flex items-center justify-center bg-background`}>
+      <div
+        className={`${overlay ? "h-full" : "min-h-screen"} flex items-center justify-center bg-background`}
+      >
         <LoadingState
           compact
           title="Loading account"

@@ -7,11 +7,17 @@ describe("workflow v2 contract", () => {
     expect(workflowTemplates).toHaveLength(12);
     for (const template of workflowTemplates) {
       expect(validateWorkflowV2(template.definition), template.name).toEqual([]);
-      const nodes = [...template.definition.nodes, ...template.definition.nodes.flatMap((node) => {
-        const child = node.config.childGraph as WorkflowDefinitionV2 | undefined;
-        return child?.nodes ?? [];
-      })];
-      expect(nodes.every((node) => node.id.startsWith(`${template.id}_`)), template.name).toBe(true);
+      const nodes = [
+        ...template.definition.nodes,
+        ...template.definition.nodes.flatMap((node) => {
+          const child = node.config.childGraph as WorkflowDefinitionV2 | undefined;
+          return child?.nodes ?? [];
+        }),
+      ];
+      expect(
+        nodes.every((node) => node.id.startsWith(`${template.id}_`)),
+        template.name,
+      ).toBe(true);
       for (const task of nodes.filter((node) => node.kind === "agent_task")) {
         expect(String(task.config.instructions).length, template.name).toBeGreaterThan(40);
         expect(task.config.requireCitations, template.name).toBe(true);

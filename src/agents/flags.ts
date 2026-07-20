@@ -1,4 +1,6 @@
-function enabled(value: unknown): boolean { return value === "true"; }
+function enabled(value: unknown): boolean {
+  return value === "true";
+}
 
 export function mistyAgentsEnabled(): boolean {
   return enabled(import.meta.env.VITE_MISTY_AGENTS_ENABLED);

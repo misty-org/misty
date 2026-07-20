@@ -1,13 +1,20 @@
 import { useMemo } from "react";
 import { ListFilter, PanelRight } from "lucide-react";
 import type { TransferRecord, TransferType } from "../../../api/types";
-import { EmptyState, StatusBadge } from "../../../components/misty";
+import { EmptyState } from "@/components/ui/state-view";
+import { StatusBadge } from "@/components/ui/status-badge";
 import { Button } from "../../../components/ui/button";
 import { Checkbox } from "../../../components/ui/checkbox";
 import { Progress } from "../../../components/ui/progress";
 import { RadioGroup, RadioGroupItem } from "../../../components/ui/radio-group";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../../components/ui/select";
-import { prettyLabel } from "../../../shared/format";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../../../components/ui/select";
+import { prettyLabel } from "@/shared/format";
 import type { TransferSortDirection, TransferSortKey } from "../../../stores/useTransfersStore";
 import { transferTypes } from "../../../stores/useTransfersStore";
 import { remoteSummary } from "../transferUtils";
@@ -50,15 +57,26 @@ export function TransferFilters(props: {
           <ListFilter aria-hidden="true" className="size-4 text-muted-foreground" />
           <h2 className={transferStyles.filterTitle}>Filters</h2>
         </div>
-        <Button variant="ghost" size="sm" disabled={props.activeFilterCount === 0} onClick={props.onClear}>
+        <Button
+          variant="ghost"
+          size="sm"
+          disabled={props.activeFilterCount === 0}
+          onClick={props.onClear}
+        >
           Clear{props.activeFilterCount > 0 ? ` (${props.activeFilterCount})` : ""}
         </Button>
       </div>
       <FilterSection title="Providers">
-        {props.providerGroups.length === 0 ? <span className={transferStyles.filterEmpty}>No remote providers</span> : null}
+        {props.providerGroups.length === 0 ? (
+          <span className={transferStyles.filterEmpty}>No remote providers</span>
+        ) : null}
         <div className={transferStyles.filterOptions}>
           {props.providerGroups.map((group) => (
-            <label key={group.key} className={transferStyles.filterOption} htmlFor={`transfer-provider-${group.key}`}>
+            <label
+              key={group.key}
+              className={transferStyles.filterOption}
+              htmlFor={`transfer-provider-${group.key}`}
+            >
               <Checkbox
                 id={`transfer-provider-${group.key}`}
                 checked={props.providerFilters.has(group.key)}
@@ -73,7 +91,11 @@ export function TransferFilters(props: {
       <FilterSection title="Transfer type">
         <div className={transferStyles.filterOptions}>
           {transferTypes.map((type) => (
-            <label key={type} className={transferStyles.filterOption} htmlFor={`transfer-type-${type}`}>
+            <label
+              key={type}
+              className={transferStyles.filterOption}
+              htmlFor={`transfer-type-${type}`}
+            >
               <Checkbox
                 id={`transfer-type-${type}`}
                 checked={props.typeFilters.has(type)}
@@ -92,7 +114,11 @@ export function TransferFilters(props: {
           onValueChange={(value) => props.onLocationScope(value as "all" | "local" | "remote")}
         >
           {(["all", "local", "remote"] as const).map((scope) => (
-            <label key={scope} className={transferStyles.filterOption} htmlFor={`transfer-location-${scope}`}>
+            <label
+              key={scope}
+              className={transferStyles.filterOption}
+              htmlFor={`transfer-location-${scope}`}
+            >
               <RadioGroupItem id={`transfer-location-${scope}`} value={scope} />
               <span className={transferStyles.filterOptionLabel}>
                 {scope === "all" ? "All" : scope === "local" ? "Local only" : "Remote involved"}
@@ -106,10 +132,16 @@ export function TransferFilters(props: {
         <RadioGroup
           className={transferStyles.filterOptions}
           value={props.statusFilter}
-          onValueChange={(value) => props.onStatusFilter(value as "all" | "active" | "completed" | "failed")}
+          onValueChange={(value) =>
+            props.onStatusFilter(value as "all" | "active" | "completed" | "failed")
+          }
         >
           {(["all", "active", "completed", "failed"] as const).map((filter) => (
-            <label key={filter} className={transferStyles.filterOption} htmlFor={`transfer-status-${filter}`}>
+            <label
+              key={filter}
+              className={transferStyles.filterOption}
+              htmlFor={`transfer-status-${filter}`}
+            >
               <RadioGroupItem id={`transfer-status-${filter}`} value={filter} />
               <span className={transferStyles.filterOptionLabel}>{prettyLabel(filter)}</span>
               <span aria-hidden="true" />
@@ -125,7 +157,9 @@ export function TransferFilters(props: {
             props.onSort(key, key === "none" ? undefined : props.sortDirection);
           }}
         >
-          <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
+          <SelectTrigger className="h-8">
+            <SelectValue />
+          </SelectTrigger>
           <SelectContent>
             <SelectItem value="none">No sort</SelectItem>
             <SelectItem value="time">Time</SelectItem>
@@ -138,7 +172,11 @@ export function TransferFilters(props: {
           {(["asc", "desc"] as const).map((direction) => (
             <Button
               key={direction}
-              variant={props.sortKey !== "none" && props.sortDirection === direction ? "secondary" : "outline"}
+              variant={
+                props.sortKey !== "none" && props.sortDirection === direction
+                  ? "secondary"
+                  : "outline"
+              }
               size="sm"
               disabled={props.sortKey === "none"}
               onClick={() => props.sortKey !== "none" && props.onSort(props.sortKey, direction)}
@@ -154,16 +192,26 @@ export function TransferFilters(props: {
 
 type DetailHandlers = Pick<
   TransferActionHandlers,
-  "onCancel" | "onRetry" | "onPauseResume" | "onPauseResumeBatch" | "onCancelBatch" | "onResolveConflict"
+  | "onCancel"
+  | "onRetry"
+  | "onPauseResume"
+  | "onPauseResumeBatch"
+  | "onCancelBatch"
+  | "onResolveConflict"
 >;
 
-export function TransferDetail(props: DetailHandlers & {
-  transfer: TransferRecord | null;
-  rows: TransferRecord[];
-  working: boolean;
-}) {
+export function TransferDetail(
+  props: DetailHandlers & {
+    transfer: TransferRecord | null;
+    rows: TransferRecord[];
+    working: boolean;
+  },
+) {
   const row = props.transfer;
-  const progress = useMemo(() => row ? aggregateTransferProgress(row, props.rows) : null, [props.rows, row]);
+  const progress = useMemo(
+    () => (row ? aggregateTransferProgress(row, props.rows) : null),
+    [props.rows, row],
+  );
   if (!row) {
     return (
       <div className={transferStyles.detailEmpty}>
@@ -213,12 +261,19 @@ function DetailRow(props: { label: string; value: string; danger?: boolean }) {
   return (
     <div className={transferStyles.detailRow}>
       <span className={transferStyles.detailLabel}>{props.label}</span>
-      <strong className={props.danger ? transferStyles.detailDangerValue : transferStyles.detailValue}>{props.value}</strong>
+      <strong
+        className={props.danger ? transferStyles.detailDangerValue : transferStyles.detailValue}
+      >
+        {props.value}
+      </strong>
     </div>
   );
 }
 
-function TransferProgressRow(props: { row: TransferRecord; progress: TransferProgressSnapshot | null }) {
+function TransferProgressRow(props: {
+  row: TransferRecord;
+  progress: TransferProgressSnapshot | null;
+}) {
   const { row, progress } = props;
   if (isBinaryProgressTransfer(row)) {
     const complete = row.status === "completed";
@@ -227,18 +282,34 @@ function TransferProgressRow(props: { row: TransferRecord; progress: TransferPro
     return (
       <div className={transferStyles.detailRow}>
         <span className={transferStyles.detailLabel}>Progress</span>
-        <Progress value={percent} aria-label="Operation progress" aria-valuetext={complete ? "Complete" : `${primary}, not complete`} />
-        <ProgressMeta primary={primary} secondary={complete ? "Operation completed" : "Waiting for completion"} />
+        <Progress
+          value={percent}
+          aria-label="Operation progress"
+          aria-valuetext={complete ? "Complete" : `${primary}, not complete`}
+        />
+        <ProgressMeta
+          primary={primary}
+          secondary={complete ? "Operation completed" : "Waiting for completion"}
+        />
       </div>
     );
   }
   const transferred = Math.max(0, progress?.transferredBytes ?? row.transferredBytes);
   const total = Math.max(0, progress?.totalBytes ?? row.totalBytes);
   const hasTotal = total > 0;
-  const percent = hasTotal ? Math.min(100, Math.max(0, Math.round((transferred / total) * 100))) : undefined;
+  const percent = hasTotal
+    ? Math.min(100, Math.max(0, Math.round((transferred / total) * 100)))
+    : undefined;
   const speed = Math.max(0, progress?.bytesPerSecond ?? row.bytesPerSecond ?? 0);
-  const secondary = hasTotal ? `${formatBytes(transferred)} / ${formatBytes(total)}` : `${formatBytes(transferred)} transferred`;
-  const tertiary = [progress?.aggregated ? "tree total" : "", speed > 0 ? `${formatBytes(speed)}/s` : ""].filter(Boolean).join(" · ");
+  const secondary = hasTotal
+    ? `${formatBytes(transferred)} / ${formatBytes(total)}`
+    : `${formatBytes(transferred)} transferred`;
+  const tertiary = [
+    progress?.aggregated ? "tree total" : "",
+    speed > 0 ? `${formatBytes(speed)}/s` : "",
+  ]
+    .filter(Boolean)
+    .join(" · ");
   return (
     <div className={transferStyles.detailRow}>
       <span className={transferStyles.detailLabel}>Progress</span>
@@ -248,7 +319,10 @@ function TransferProgressRow(props: { row: TransferRecord; progress: TransferPro
         aria-valuetext={hasTotal ? `${percent}% complete` : secondary}
         className={hasTotal ? undefined : "[&>div]:!translate-x-[-66%]"}
       />
-      <ProgressMeta primary={hasTotal ? `${percent}%` : "Waiting for total"} secondary={tertiary ? `${secondary} · ${tertiary}` : secondary} />
+      <ProgressMeta
+        primary={hasTotal ? `${percent}%` : "Waiting for total"}
+        secondary={tertiary ? `${secondary} · ${tertiary}` : secondary}
+      />
     </div>
   );
 }
@@ -267,23 +341,87 @@ function DetailActions(props: DetailHandlers & { row: TransferRecord; working: b
   return (
     <div className={transferStyles.detailActions}>
       {row.operationId && canPauseResumeTransfer(row) ? (
-        <Button variant="secondary" size="sm" disabled={props.working} onClick={() => void props.onPauseResume(row)}>
+        <Button
+          variant="secondary"
+          size="sm"
+          disabled={props.working}
+          onClick={() => void props.onPauseResume(row)}
+        >
           {row.paused ? "Resume" : "Pause"}
         </Button>
       ) : null}
       {row.operationId && row.status === "waiting_for_resolution" ? (
         <>
-          {row.supportsReplace ? <Button variant="secondary" size="sm" disabled={props.working} onClick={() => void props.onResolveConflict(row, "replace", false)}>Replace</Button> : null}
-          <Button variant="secondary" size="sm" disabled={props.working} onClick={() => void props.onResolveConflict(row, "skip", false)}>Skip</Button>
-          {row.supportsKeepBoth ? <Button variant="secondary" size="sm" disabled={props.working} onClick={() => void props.onResolveConflict(row, "keep_both", false)}>Keep both</Button> : null}
+          {row.supportsReplace ? (
+            <Button
+              variant="secondary"
+              size="sm"
+              disabled={props.working}
+              onClick={() => void props.onResolveConflict(row, "replace", false)}
+            >
+              Replace
+            </Button>
+          ) : null}
+          <Button
+            variant="secondary"
+            size="sm"
+            disabled={props.working}
+            onClick={() => void props.onResolveConflict(row, "skip", false)}
+          >
+            Skip
+          </Button>
+          {row.supportsKeepBoth ? (
+            <Button
+              variant="secondary"
+              size="sm"
+              disabled={props.working}
+              onClick={() => void props.onResolveConflict(row, "keep_both", false)}
+            >
+              Keep both
+            </Button>
+          ) : null}
         </>
       ) : null}
-      {row.operationId && row.cancelable ? <Button variant="outline" size="sm" className="text-destructive hover:text-destructive" disabled={props.working} onClick={() => void props.onCancel(row)}>Cancel</Button> : null}
-      {row.retryable && row.status === "failed" ? <Button variant="secondary" size="sm" disabled={props.working} onClick={() => void props.onRetry(row)}>Retry</Button> : null}
+      {row.operationId && row.cancelable ? (
+        <Button
+          variant="outline"
+          size="sm"
+          className="text-destructive hover:text-destructive"
+          disabled={props.working}
+          onClick={() => void props.onCancel(row)}
+        >
+          Cancel
+        </Button>
+      ) : null}
+      {row.retryable && row.status === "failed" ? (
+        <Button
+          variant="secondary"
+          size="sm"
+          disabled={props.working}
+          onClick={() => void props.onRetry(row)}
+        >
+          Retry
+        </Button>
+      ) : null}
       {row.batchId ? (
         <>
-          <Button variant="secondary" size="sm" disabled={props.working} onClick={() => void props.onPauseResumeBatch(row)}>Pause/resume batch</Button>
-          <Button variant="outline" size="sm" className="text-destructive hover:text-destructive" disabled={props.working} onClick={() => void props.onCancelBatch(row)}>Cancel batch</Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            disabled={props.working}
+            onClick={() => void props.onPauseResumeBatch(row)}
+          >
+            Pause/resume batch
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="text-destructive hover:text-destructive"
+            disabled={props.working}
+            onClick={() => void props.onCancelBatch(row)}
+          >
+            Cancel batch
+          </Button>
         </>
       ) : null}
     </div>

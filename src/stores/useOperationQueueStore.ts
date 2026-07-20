@@ -18,8 +18,14 @@ import {
   operationQueueSnapshot,
   operationQueueUndo,
 } from "../api/misty";
-import type { OperationBatch, OperationConflictPolicy, OperationDescriptor, OperationEndpoint, OperationQueueSnapshot } from "../api/types";
-import { errorText } from "../shared/format";
+import type {
+  OperationBatch,
+  OperationConflictPolicy,
+  OperationDescriptor,
+  OperationEndpoint,
+  OperationQueueSnapshot,
+} from "../api/types";
+import { errorText } from "@/shared/format";
 
 let silentOperationQueueLoadInFlight = false;
 
@@ -37,12 +43,21 @@ interface OperationQueueStore {
   pauseAll: () => Promise<void>;
   resumeAll: () => Promise<void>;
   setBandwidthLimit: (limit: string) => Promise<void>;
-  setTransferProfile: (profile: { id: string; name: string; transfers: number; bandwidthLimit: string }) => Promise<void>;
+  setTransferProfile: (profile: {
+    id: string;
+    name: string;
+    transfers: number;
+    bandwidthLimit: string;
+  }) => Promise<void>;
   retry: (operationId: number) => Promise<void>;
   retryTransfer: (transferId: number) => Promise<void>;
   undo: (undoTokenId: number) => Promise<void>;
   redo: () => Promise<void>;
-  resolveConflict: (operationId: number, policy: OperationConflictPolicy, applyToBatch: boolean) => Promise<void>;
+  resolveConflict: (
+    operationId: number,
+    policy: OperationConflictPolicy,
+    applyToBatch: boolean,
+  ) => Promise<void>;
   clearTerminal: () => Promise<void>;
 }
 
@@ -57,7 +72,9 @@ export const useOperationQueueStore = create<OperationQueueStore>((set) => ({
     if (!options.silent) set({ working: true, error: null });
     try {
       const next = await operationQueueSnapshot();
-      set((state) => operationQueueSnapshotsEqual(state.snapshot, next) ? state : { snapshot: next });
+      set((state) =>
+        operationQueueSnapshotsEqual(state.snapshot, next) ? state : { snapshot: next },
+      );
     } catch (error) {
       set({ error: errorText(error) });
     } finally {
@@ -255,76 +272,93 @@ export const useOperationQueueStore = create<OperationQueueStore>((set) => ({
   },
 }));
 
-function operationQueueSnapshotsEqual(left: OperationQueueSnapshot | null, right: OperationQueueSnapshot): boolean {
+function operationQueueSnapshotsEqual(
+  left: OperationQueueSnapshot | null,
+  right: OperationQueueSnapshot,
+): boolean {
   if (!left) return false;
-  return left.activeCount === right.activeCount
-    && left.maxConcurrent === right.maxConcurrent
-    && left.redoAvailable === right.redoAvailable
-    && left.paused === right.paused
-    && left.bandwidthLimit === right.bandwidthLimit
-    && left.transferProfileId === right.transferProfileId
-    && left.transferProfileName === right.transferProfileName
-    && operationConflictDialogsEqual(left.conflictDialog, right.conflictDialog)
-    && arraysEqual(left.operations, right.operations, operationsEqual)
-    && arraysEqual(left.batches, right.batches, batchesEqual);
+  return (
+    left.activeCount === right.activeCount &&
+    left.maxConcurrent === right.maxConcurrent &&
+    left.redoAvailable === right.redoAvailable &&
+    left.paused === right.paused &&
+    left.bandwidthLimit === right.bandwidthLimit &&
+    left.transferProfileId === right.transferProfileId &&
+    left.transferProfileName === right.transferProfileName &&
+    operationConflictDialogsEqual(left.conflictDialog, right.conflictDialog) &&
+    arraysEqual(left.operations, right.operations, operationsEqual) &&
+    arraysEqual(left.batches, right.batches, batchesEqual)
+  );
 }
 
 function operationsEqual(left: OperationDescriptor, right: OperationDescriptor): boolean {
-  return left.operationId === right.operationId
-    && left.transferId === right.transferId
-    && left.batchId === right.batchId
-    && left.parentTransferId === right.parentTransferId
-    && left.rootTransferId === right.rootTransferId
-    && left.treeDepth === right.treeDepth
-    && left.kind === right.kind
-    && endpointsEqual(left.source, right.source)
-    && endpointsEqual(left.target, right.target)
-    && left.conflictPolicy === right.conflictPolicy
-    && left.status === right.status
-    && left.preserveOrder === right.preserveOrder
-    && left.retryable === right.retryable
-    && left.cancelable === right.cancelable
-    && left.undoable === right.undoable
-    && left.supportsReplace === right.supportsReplace
-    && left.supportsKeepBoth === right.supportsKeepBoth
-    && left.title === right.title
-    && left.errorMessage === right.errorMessage
-    && left.attempt === right.attempt
-    && left.paused === right.paused;
+  return (
+    left.operationId === right.operationId &&
+    left.transferId === right.transferId &&
+    left.batchId === right.batchId &&
+    left.parentTransferId === right.parentTransferId &&
+    left.rootTransferId === right.rootTransferId &&
+    left.treeDepth === right.treeDepth &&
+    left.kind === right.kind &&
+    endpointsEqual(left.source, right.source) &&
+    endpointsEqual(left.target, right.target) &&
+    left.conflictPolicy === right.conflictPolicy &&
+    left.status === right.status &&
+    left.preserveOrder === right.preserveOrder &&
+    left.retryable === right.retryable &&
+    left.cancelable === right.cancelable &&
+    left.undoable === right.undoable &&
+    left.supportsReplace === right.supportsReplace &&
+    left.supportsKeepBoth === right.supportsKeepBoth &&
+    left.title === right.title &&
+    left.errorMessage === right.errorMessage &&
+    left.attempt === right.attempt &&
+    left.paused === right.paused
+  );
 }
 
 function endpointsEqual(left: OperationEndpoint, right: OperationEndpoint): boolean {
-  return left.localPath === right.localPath
-    && left.remoteName === right.remoteName
-    && left.remotePath === right.remotePath;
+  return (
+    left.localPath === right.localPath &&
+    left.remoteName === right.remoteName &&
+    left.remotePath === right.remotePath
+  );
 }
 
 function batchesEqual(left: OperationBatch, right: OperationBatch): boolean {
-  return left.batchId === right.batchId
-    && left.label === right.label
-    && left.preserveOrder === right.preserveOrder
-    && left.paused === right.paused
-    && left.pausedOperationId === right.pausedOperationId
-    && arraysEqual(left.operationIds, right.operationIds, Object.is);
+  return (
+    left.batchId === right.batchId &&
+    left.label === right.label &&
+    left.preserveOrder === right.preserveOrder &&
+    left.paused === right.paused &&
+    left.pausedOperationId === right.pausedOperationId &&
+    arraysEqual(left.operationIds, right.operationIds, Object.is)
+  );
 }
 
 function operationConflictDialogsEqual(
   left: OperationQueueSnapshot["conflictDialog"],
   right: OperationQueueSnapshot["conflictDialog"],
 ): boolean {
-  return left.open === right.open
-    && left.operationId === right.operationId
-    && left.batchId === right.batchId
-    && left.applyToBatch === right.applyToBatch
-    && left.supportsReplace === right.supportsReplace
-    && left.supportsKeepBoth === right.supportsKeepBoth
-    && left.selectedPolicy === right.selectedPolicy
-    && left.title === right.title
-    && left.sourceLabel === right.sourceLabel
-    && left.targetLabel === right.targetLabel;
+  return (
+    left.open === right.open &&
+    left.operationId === right.operationId &&
+    left.batchId === right.batchId &&
+    left.applyToBatch === right.applyToBatch &&
+    left.supportsReplace === right.supportsReplace &&
+    left.supportsKeepBoth === right.supportsKeepBoth &&
+    left.selectedPolicy === right.selectedPolicy &&
+    left.title === right.title &&
+    left.sourceLabel === right.sourceLabel &&
+    left.targetLabel === right.targetLabel
+  );
 }
 
-function arraysEqual<T>(left: readonly T[], right: readonly T[], equal: (left: T, right: T) => boolean): boolean {
+function arraysEqual<T>(
+  left: readonly T[],
+  right: readonly T[],
+  equal: (left: T, right: T) => boolean,
+): boolean {
   if (left === right) return true;
   if (left.length !== right.length) return false;
   return left.every((value, index) => equal(value, right[index]));

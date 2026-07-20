@@ -75,14 +75,28 @@ describe("transfer model", () => {
 
     const withAncestor = includeTransferAncestors([child], [root, child]);
     expect(withAncestor.map((row) => row.id)).toEqual([1, 2]);
-    expect(buildTransferTreeRows(withAncestor, new Set()).map((entry) => entry.row.id)).toEqual([1]);
-    expect(buildTransferTreeRows(withAncestor, new Set([1])).map((entry) => entry.row.id)).toEqual([1, 2]);
+    expect(buildTransferTreeRows(withAncestor, new Set()).map((entry) => entry.row.id)).toEqual([
+      1,
+    ]);
+    expect(buildTransferTreeRows(withAncestor, new Set([1])).map((entry) => entry.row.id)).toEqual([
+      1, 2,
+    ]);
   });
 
   it("aggregates descendant progress for a completed transfer tree", () => {
     const root = transfer(1, { totalBytes: 0, transferredBytes: 0 });
-    const first = transfer(2, { parentTransferId: 1, totalBytes: 200, transferredBytes: 200, bytesPerSecond: 10 });
-    const second = transfer(3, { parentTransferId: 1, totalBytes: 300, transferredBytes: 150, bytesPerSecond: 20 });
+    const first = transfer(2, {
+      parentTransferId: 1,
+      totalBytes: 200,
+      transferredBytes: 200,
+      bytesPerSecond: 10,
+    });
+    const second = transfer(3, {
+      parentTransferId: 1,
+      totalBytes: 300,
+      transferredBytes: 150,
+      bytesPerSecond: 20,
+    });
 
     expect(aggregateTransferProgress(root, [root, first, second])).toEqual({
       transferredBytes: 350,

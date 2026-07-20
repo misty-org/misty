@@ -35,8 +35,7 @@ interface MaskIconStyle extends CSSProperties {
   mask: string;
 }
 
-const assetIconBaseClass =
-  "inline-block shrink-0 align-[-0.125em]";
+const assetIconBaseClass = "inline-block shrink-0 align-[-0.125em]";
 
 export function AssetIcon(props: AssetIconProps) {
   const size = props.size ?? 16;
@@ -67,7 +66,14 @@ export function AssetIcon(props: AssetIconProps) {
 
   const className = `${assetIconBaseClass}${props.className ? ` ${props.className}` : ""}`;
   if (!available) {
-    return <Fallback className={className} size={size} aria-label={props.title} aria-hidden={props.title ? undefined : true} />;
+    return (
+      <Fallback
+        className={className}
+        size={size}
+        aria-label={props.title}
+        aria-hidden={props.title ? undefined : true}
+      />
+    );
   }
   if (props.color) {
     return (
@@ -88,13 +94,15 @@ export function AssetIcon(props: AssetIconProps) {
       role={props.title ? "img" : undefined}
       aria-label={props.title}
       aria-hidden={props.title ? undefined : true}
-      style={{
-        WebkitMask: `url("${source}") center / contain no-repeat`,
-        background: "currentColor",
-        mask: `url("${source}") center / contain no-repeat`,
-        width: size,
-        height: size,
-      } as MaskIconStyle}
+      style={
+        {
+          WebkitMask: `url("${source}") center / contain no-repeat`,
+          background: "currentColor",
+          mask: `url("${source}") center / contain no-repeat`,
+          width: size,
+          height: size,
+        } as MaskIconStyle
+      }
     />
   );
 }

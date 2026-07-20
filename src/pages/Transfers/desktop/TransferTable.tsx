@@ -1,10 +1,24 @@
 import { memo, useState } from "react";
-import type { MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent, ReactNode } from "react";
-import { ChevronDown, ChevronRight, Pause, Play, RefreshCcw, RotateCcw, XCircle } from "lucide-react";
+import type {
+  MouseEvent as ReactMouseEvent,
+  PointerEvent as ReactPointerEvent,
+  ReactNode,
+} from "react";
+import {
+  ChevronDown,
+  ChevronRight,
+  Pause,
+  Play,
+  RefreshCcw,
+  RotateCcw,
+  XCircle,
+} from "lucide-react";
 import type { TransferRecord } from "../../../api/types";
-import { EmptyState, IconButton, StatusBadge } from "../../../components/misty";
+import { EmptyState } from "@/components/ui/state-view";
+import { IconButton } from "@/components/ui/icon-button";
+import { StatusBadge } from "@/components/ui/status-badge";
 import { Button } from "../../../components/ui/button";
-import { prettyLabel } from "../../../shared/format";
+import { prettyLabel } from "@/shared/format";
 import type { TransferSortDirection, TransferSortKey } from "../../../stores/useTransfersStore";
 import { relativeTime, remoteSummary } from "../transferUtils";
 import {
@@ -38,33 +52,40 @@ type TransferTableActions = TransferActionHandlers & {
   isBatchPaused: (row: TransferRecord) => boolean;
 };
 
-export function TransferHistoryTable(props: TransferTableActions & {
-  rows: TransferTreeRow[];
-  columnOrder: TransferTableColumn[];
-  columnWidths: TransferColumnWidths;
-  tableWidth: number;
-  topSpacerHeight: number;
-  bottomSpacerHeight: number;
-  selectedIds: Set<number>;
-  focusedTransferId: number | null;
-  sortKey: TransferSortKey;
-  sortDirection: TransferSortDirection;
-  draggedColumn: TransferTableColumn | null;
-  onSelect: (row: TransferRecord, event: ReactMouseEvent) => void;
-  onFocus: (row: TransferRecord) => void;
-  onToggleTree: (transferId: number) => void;
-  onSort: (key: TransferSortableKey) => void;
-  onResizeStart: (column: TransferTableColumn, event: ReactPointerEvent) => void;
-  onDragStart: (column: TransferTableColumn) => void;
-  onDragEnd: () => void;
-  onColumnDrop: (source: TransferTableColumn, target: TransferTableColumn) => void;
-}) {
+export function TransferHistoryTable(
+  props: TransferTableActions & {
+    rows: TransferTreeRow[];
+    columnOrder: TransferTableColumn[];
+    columnWidths: TransferColumnWidths;
+    tableWidth: number;
+    topSpacerHeight: number;
+    bottomSpacerHeight: number;
+    selectedIds: Set<number>;
+    focusedTransferId: number | null;
+    sortKey: TransferSortKey;
+    sortDirection: TransferSortDirection;
+    draggedColumn: TransferTableColumn | null;
+    onSelect: (row: TransferRecord, event: ReactMouseEvent) => void;
+    onFocus: (row: TransferRecord) => void;
+    onToggleTree: (transferId: number) => void;
+    onSort: (key: TransferSortableKey) => void;
+    onResizeStart: (column: TransferTableColumn, event: ReactPointerEvent) => void;
+    onDragStart: (column: TransferTableColumn) => void;
+    onDragEnd: () => void;
+    onColumnDrop: (source: TransferTableColumn, target: TransferTableColumn) => void;
+  },
+) {
   return (
     <>
-      <table className={transferStyles.table} style={{ width: props.tableWidth, minWidth: "calc(100% - 12px)" }}>
+      <table
+        className={transferStyles.table}
+        style={{ width: props.tableWidth, minWidth: "calc(100% - 12px)" }}
+      >
         <caption className="sr-only">Transfer history</caption>
         <colgroup>
-          {props.columnOrder.map((column) => <col key={column} style={{ width: props.columnWidths[column] }} />)}
+          {props.columnOrder.map((column) => (
+            <col key={column} style={{ width: props.columnWidths[column] }} />
+          ))}
         </colgroup>
         <thead>
           <tr>
@@ -86,7 +107,9 @@ export function TransferHistoryTable(props: TransferTableActions & {
           </tr>
         </thead>
         <tbody>
-          {props.topSpacerHeight > 0 ? <SpacerRow height={props.topSpacerHeight} colSpan={props.columnOrder.length} /> : null}
+          {props.topSpacerHeight > 0 ? (
+            <SpacerRow height={props.topSpacerHeight} colSpan={props.columnOrder.length} />
+          ) : null}
           {props.rows.map((entry) => (
             <TransferTableRow
               key={entry.row.id}
@@ -99,7 +122,9 @@ export function TransferHistoryTable(props: TransferTableActions & {
               focused={props.focusedTransferId === entry.row.id}
             />
           ))}
-          {props.bottomSpacerHeight > 0 ? <SpacerRow height={props.bottomSpacerHeight} colSpan={props.columnOrder.length} /> : null}
+          {props.bottomSpacerHeight > 0 ? (
+            <SpacerRow height={props.bottomSpacerHeight} colSpan={props.columnOrder.length} />
+          ) : null}
         </tbody>
       </table>
       {props.rows.length === 0 && props.topSpacerHeight === 0 && props.bottomSpacerHeight === 0 ? (
@@ -107,7 +132,11 @@ export function TransferHistoryTable(props: TransferTableActions & {
           compact
           className="min-h-[calc(100%-33px)]"
           title={props.hasTransfers ? "No matching transfers" : "No transfer history"}
-          description={props.hasTransfers ? "Adjust the search or filters to see more history." : "Uploads, downloads, and file operations will appear here."}
+          description={
+            props.hasTransfers
+              ? "Adjust the search or filters to see more history."
+              : "Uploads, downloads, and file operations will appear here."
+          }
         />
       ) : null}
     </>
@@ -131,7 +160,13 @@ const TransferTableHeader = memo(function TransferTableHeader(props: {
     <th
       className={`${transferStyles.tableHeader} ${props.dragging ? transferStyles.tableHeaderDragging : ""}`}
       draggable
-      aria-sort={sort && props.sortKey === sort ? (props.sortDirection === "asc" ? "ascending" : "descending") : "none"}
+      aria-sort={
+        sort && props.sortKey === sort
+          ? props.sortDirection === "asc"
+            ? "ascending"
+            : "descending"
+          : "none"
+      }
       onDragStart={(event) => {
         event.dataTransfer.effectAllowed = "move";
         event.dataTransfer.setData("application/x-misty-transfer-column", props.column);
@@ -154,27 +189,40 @@ const TransferTableHeader = memo(function TransferTableHeader(props: {
       }}
     >
       {sort ? (
-        <Button variant="ghost" size="sm" className={transferStyles.tableHeaderControl} onClick={() => props.onSort(sort)}>
+        <Button
+          variant="ghost"
+          size="sm"
+          className={transferStyles.tableHeaderControl}
+          onClick={() => props.onSort(sort)}
+        >
           {props.label} {sortIndicator(props.sortKey, props.sortDirection, sort)}
         </Button>
-      ) : <span className={transferStyles.tableHeaderControl}>{props.label}</span>}
-      <span className={transferStyles.tableResizeHandle} aria-hidden="true" onPointerDown={(event) => props.onResizeStart(props.column, event)} />
+      ) : (
+        <span className={transferStyles.tableHeaderControl}>{props.label}</span>
+      )}
+      <span
+        className={transferStyles.tableResizeHandle}
+        aria-hidden="true"
+        onPointerDown={(event) => props.onResizeStart(props.column, event)}
+      />
     </th>
   );
 });
 
-const TransferTableRow = memo(function TransferTableRow(props: TransferTableActions & {
-  row: TransferRecord;
-  treeDepth: number;
-  hasChildren: boolean;
-  expanded: boolean;
-  selected: boolean;
-  focused: boolean;
-  columnOrder: TransferTableColumn[];
-  onSelect: (row: TransferRecord, event: ReactMouseEvent) => void;
-  onFocus: (row: TransferRecord) => void;
-  onToggleTree: (transferId: number) => void;
-}) {
+const TransferTableRow = memo(function TransferTableRow(
+  props: TransferTableActions & {
+    row: TransferRecord;
+    treeDepth: number;
+    hasChildren: boolean;
+    expanded: boolean;
+    selected: boolean;
+    focused: boolean;
+    columnOrder: TransferTableColumn[];
+    onSelect: (row: TransferRecord, event: ReactMouseEvent) => void;
+    onFocus: (row: TransferRecord) => void;
+    onToggleTree: (transferId: number) => void;
+  },
+) {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [contextOpen, setContextOpen] = useState(false);
   const menuProps = {
@@ -197,7 +245,13 @@ const TransferTableRow = memo(function TransferTableRow(props: TransferTableActi
   };
   const row = (
     <tr
-      className={[transferStyles.tableRow, props.selected ? transferStyles.tableRowSelected : "", props.focused ? transferStyles.tableRowFocused : ""].filter(Boolean).join(" ")}
+      className={[
+        transferStyles.tableRow,
+        props.selected ? transferStyles.tableRowSelected : "",
+        props.focused ? transferStyles.tableRowFocused : "",
+      ]
+        .filter(Boolean)
+        .join(" ")}
       aria-selected={props.selected}
       onClick={(event) => props.onSelect(props.row, event)}
       onContextMenu={() => props.onFocus(props.row)}
@@ -230,20 +284,25 @@ const TransferTableRow = memo(function TransferTableRow(props: TransferTableActi
   );
 });
 
-const TransferTableCell = memo(function TransferTableCell(props: TransferTableActions & {
-  column: TransferTableColumn;
-  row: TransferRecord;
-  treeDepth: number;
-  hasChildren: boolean;
-  expanded: boolean;
-  actionsVisible: boolean;
-  onToggleTree: (transferId: number) => void;
-  onMenuOpenChange: (open: boolean) => void;
-}) {
+const TransferTableCell = memo(function TransferTableCell(
+  props: TransferTableActions & {
+    column: TransferTableColumn;
+    row: TransferRecord;
+    treeDepth: number;
+    hasChildren: boolean;
+    expanded: boolean;
+    actionsVisible: boolean;
+    onToggleTree: (transferId: number) => void;
+    onMenuOpenChange: (open: boolean) => void;
+  },
+) {
   if (props.column === "transfer") {
     return (
       <td className={transferStyles.tableCell}>
-        <div className={transferStyles.nameCellContent} style={{ paddingLeft: Math.min(props.treeDepth, 6) * 16 }}>
+        <div
+          className={transferStyles.nameCellContent}
+          style={{ paddingLeft: Math.min(props.treeDepth, 6) * 16 }}
+        >
           {props.hasChildren ? (
             <IconButton
               className={transferStyles.treeToggle}
@@ -257,41 +316,84 @@ const TransferTableCell = memo(function TransferTableCell(props: TransferTableAc
             >
               {props.expanded ? <ChevronDown /> : <ChevronRight />}
             </IconButton>
-          ) : <span className={transferStyles.treeSpacer} aria-hidden="true" />}
+          ) : (
+            <span className={transferStyles.treeSpacer} aria-hidden="true" />
+          )}
           <span className={transferStyles.nameText}>
-            <strong className={transferStyles.tablePrimary}>{primaryTransferLabel(props.row)}</strong>
-            <span className={transferStyles.tableSecondary}>J-{props.row.jobId} · {secondaryTransferLabel(props.row)}</span>
+            <strong className={transferStyles.tablePrimary}>
+              {primaryTransferLabel(props.row)}
+            </strong>
+            <span className={transferStyles.tableSecondary}>
+              J-{props.row.jobId} · {secondaryTransferLabel(props.row)}
+            </span>
           </span>
         </div>
       </td>
     );
   }
-  if (props.column === "operation") return <td className={transferStyles.tableCell}>{prettyLabel(props.row.transferType)}</td>;
+  if (props.column === "operation")
+    return <td className={transferStyles.tableCell}>{prettyLabel(props.row.transferType)}</td>;
   if (props.column === "status") {
     return (
       <td className={transferStyles.tableCell}>
-        <StatusBadge status={transferStatusTone(props.row.status)} dot>{transferStatusLabel(props.row.status)}</StatusBadge>
+        <StatusBadge status={transferStatusTone(props.row.status)} dot>
+          {transferStatusLabel(props.row.status)}
+        </StatusBadge>
       </td>
     );
   }
-  if (props.column === "time") return <td className={transferStyles.tableCell}>{relativeTime(transferTime(props.row))}</td>;
-  if (props.column === "remote") return <td className={transferStyles.tableCell}>{remoteSummary(props.row)}</td>;
+  if (props.column === "time")
+    return <td className={transferStyles.tableCell}>{relativeTime(transferTime(props.row))}</td>;
+  if (props.column === "remote")
+    return <td className={transferStyles.tableCell}>{remoteSummary(props.row)}</td>;
   return (
     <td className={transferStyles.tableCell} onClick={(event) => event.stopPropagation()}>
-      <div className={`${transferStyles.rowActions} ${props.actionsVisible ? transferStyles.rowActionsVisible : ""}`}>
+      <div
+        className={`${transferStyles.rowActions} ${props.actionsVisible ? transferStyles.rowActionsVisible : ""}`}
+      >
         <div className={transferStyles.rowActionGroup} role="group" aria-label="Transfer actions">
           {props.row.operationId ? (
             <>
-              <QuickAction label={props.row.paused ? "Resume transfer" : "Pause transfer"} disabled={!canPauseResumeTransfer(props.row) || props.queueWorking} onClick={() => void props.onPauseResume(props.row)}>
+              <QuickAction
+                label={props.row.paused ? "Resume transfer" : "Pause transfer"}
+                disabled={!canPauseResumeTransfer(props.row) || props.queueWorking}
+                onClick={() => void props.onPauseResume(props.row)}
+              >
                 {props.row.paused ? <Play /> : <Pause />}
               </QuickAction>
-              <QuickAction label="Cancel transfer" disabled={!props.row.cancelable || props.queueWorking} onClick={() => void props.onCancel(props.row)}><XCircle /></QuickAction>
-              <QuickAction label="Retry transfer" disabled={!props.row.retryable || props.row.status !== "failed" || props.queueWorking} onClick={() => void props.onRetry(props.row)}><RotateCcw /></QuickAction>
+              <QuickAction
+                label="Cancel transfer"
+                disabled={!props.row.cancelable || props.queueWorking}
+                onClick={() => void props.onCancel(props.row)}
+              >
+                <XCircle />
+              </QuickAction>
+              <QuickAction
+                label="Retry transfer"
+                disabled={
+                  !props.row.retryable || props.row.status !== "failed" || props.queueWorking
+                }
+                onClick={() => void props.onRetry(props.row)}
+              >
+                <RotateCcw />
+              </QuickAction>
             </>
           ) : props.row.retryable && props.row.status === "failed" ? (
-            <QuickAction label="Retry transfer" disabled={props.queueWorking} onClick={() => void props.onRetry(props.row)}><RotateCcw /></QuickAction>
+            <QuickAction
+              label="Retry transfer"
+              disabled={props.queueWorking}
+              onClick={() => void props.onRetry(props.row)}
+            >
+              <RotateCcw />
+            </QuickAction>
           ) : null}
-          <QuickAction label="Undo transfer" disabled={!props.row.undoable || !props.row.undoTokenId || props.queueWorking} onClick={() => props.onUndo(props.row.undoTokenId)}><RefreshCcw /></QuickAction>
+          <QuickAction
+            label="Undo transfer"
+            disabled={!props.row.undoable || !props.row.undoTokenId || props.queueWorking}
+            onClick={() => props.onUndo(props.row.undoTokenId)}
+          >
+            <RefreshCcw />
+          </QuickAction>
           <TransferRowActionsMenu
             {...props}
             row={props.row}
@@ -304,14 +406,30 @@ const TransferTableCell = memo(function TransferTableCell(props: TransferTableAc
   );
 });
 
-function QuickAction(props: { label: string; disabled: boolean; onClick: () => void; children: ReactNode }) {
+function QuickAction(props: {
+  label: string;
+  disabled: boolean;
+  onClick: () => void;
+  children: ReactNode;
+}) {
   return (
-    <IconButton className={transferStyles.rowActionIconButton} label={props.label} size="sm" tooltip={false} disabled={props.disabled} onClick={props.onClick}>
+    <IconButton
+      className={transferStyles.rowActionIconButton}
+      label={props.label}
+      size="sm"
+      tooltip={false}
+      disabled={props.disabled}
+      onClick={props.onClick}
+    >
       {props.children}
     </IconButton>
   );
 }
 
 function SpacerRow(props: { height: number; colSpan: number }) {
-  return <tr aria-hidden="true"><td colSpan={props.colSpan} style={{ height: props.height, padding: 0 }} /></tr>;
+  return (
+    <tr aria-hidden="true">
+      <td colSpan={props.colSpan} style={{ height: props.height, padding: 0 }} />
+    </tr>
+  );
 }

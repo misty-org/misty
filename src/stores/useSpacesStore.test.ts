@@ -2,7 +2,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { buildMessageSpans, resetSpacesAccountState, useSpacesStore } from "./useSpacesStore";
 import type { Space, SpaceMember, SpaceMessage, SpaceStudioResource } from "../spaces/types";
 
-const apiMocks = vi.hoisted(() => ({ realtimeTicket: vi.fn(), rename: vi.fn(), sendMessage: vi.fn(), updateMessage: vi.fn() }));
+const apiMocks = vi.hoisted(() => ({
+  realtimeTicket: vi.fn(),
+  rename: vi.fn(),
+  sendMessage: vi.fn(),
+  updateMessage: vi.fn(),
+}));
 
 vi.mock("../spaces/api", () => ({
   resolveSpacesApiBase: vi.fn(async () => "http://localhost:8081/api"),
@@ -80,7 +85,9 @@ describe("buildMessageSpans", () => {
   });
 
   it("keeps unknown mentions as normal text", () => {
-    expect(buildMessageSpans("Hello @Unknown", [member], [agent])).toEqual([{ type: "text", text: "Hello @Unknown" }]);
+    expect(buildMessageSpans("Hello @Unknown", [member], [agent])).toEqual([
+      { type: "text", text: "Hello @Unknown" },
+    ]);
   });
 });
 
@@ -108,7 +115,11 @@ describe("Spaces mutations", () => {
 
   it("replaces a message with the edited server response", async () => {
     const original = messageFixture({ content: [{ type: "text", text: "Before" }] });
-    const edited = { ...original, content: [{ type: "text" as const, text: "After" }], edited_at: "2026-07-15T01:00:00Z" };
+    const edited = {
+      ...original,
+      content: [{ type: "text" as const, text: "After" }],
+      edited_at: "2026-07-15T01:00:00Z",
+    };
     apiMocks.updateMessage.mockResolvedValue(edited);
     useSpacesStore.setState({ messagesBySpace: { [original.space_id]: [original] } });
 
@@ -118,18 +129,28 @@ describe("Spaces mutations", () => {
   });
 
   it("keeps the sent message and surfaces a safe Agent invocation failure", async () => {
-    const sent = messageFixture({ content: [{ type: "mention", agent_id: agent.id, label: agent.name }] });
+    const sent = messageFixture({
+      content: [{ type: "mention", agent_id: agent.id, label: agent.name }],
+    });
     apiMocks.sendMessage.mockResolvedValue({
       message: sent,
       agent_replies: [],
-      agent_failures: [{ agent_id: agent.id, code: "integration_required", message: "The run needs a required Space integration before it can start." }],
+      agent_failures: [
+        {
+          agent_id: agent.id,
+          code: "integration_required",
+          message: "The run needs a required Space integration before it can start.",
+        },
+      ],
     });
     useSpacesStore.setState({ agentsBySpace: { [sent.space_id]: [agent] } });
 
     await useSpacesStore.getState().sendMessage(sent.space_id, `@${agent.name}`);
 
     expect(useSpacesStore.getState().messagesBySpace[sent.space_id]).toEqual([sent]);
-    expect(useSpacesStore.getState().error).toBe("Helper: The run needs a required Space integration before it can start.");
+    expect(useSpacesStore.getState().error).toBe(
+      "Helper: The run needs a required Space integration before it can start.",
+    );
   });
 });
 
@@ -145,8 +166,12 @@ describe("Spaces realtime account lifecycle", () => {
       value: {
         clear: () => values.clear(),
         getItem: (key: string) => values.get(key) ?? null,
-        removeItem: (key: string) => { values.delete(key); },
-        setItem: (key: string, value: string) => { values.set(key, value); },
+        removeItem: (key: string) => {
+          values.delete(key);
+        },
+        setItem: (key: string, value: string) => {
+          values.set(key, value);
+        },
       },
     });
   });
@@ -160,7 +185,9 @@ describe("Spaces realtime account lifecycle", () => {
   it("discards a stale ticket when the active account changes", async () => {
     const oldTicket = deferred<{ ticket: string; expires_in: number }>();
     const newTicket = deferred<{ ticket: string; expires_in: number }>();
-    apiMocks.realtimeTicket.mockReturnValueOnce(oldTicket.promise).mockReturnValueOnce(newTicket.promise);
+    apiMocks.realtimeTicket
+      .mockReturnValueOnce(oldTicket.promise)
+      .mockReturnValueOnce(newTicket.promise);
 
     const oldConnect = useSpacesStore.getState().connectRealtime("old-account");
     resetSpacesAccountState();
@@ -209,43 +236,61 @@ describe("Spaces realtime account lifecycle", () => {
     const loadStudio = vi.fn();
     apiMocks.realtimeTicket.mockResolvedValue({ ticket: "permission-ticket", expires_in: 60 });
     useSpacesStore.setState({
-      spaces: [spaceFixture({ id: "space", permissions: { "agents.run": true, "studio.view": false } })],
+      spaces: [
+        spaceFixture({ id: "space", permissions: { "agents.run": true, "studio.view": false } }),
+      ],
       loadStudio,
     });
 
     await useSpacesStore.getState().connectRealtime("active-account");
     FakeWebSocket.instances[0].open();
-    FakeWebSocket.instances[0].message({ type: "event", event: spaceEventFixture({ type: "agent.run.started" }) });
+    FakeWebSocket.instances[0].message({
+      type: "event",
+      event: spaceEventFixture({ type: "agent.run.started" }),
+    });
     await Promise.resolve();
 
     expect(loadStudio).not.toHaveBeenCalled();
     expect(useSpacesStore.getState().error).toBeNull();
   });
 
-  it.each(["library.upload.ready", "library.item.updated"])("announces %s events to the active Library view", async (eventType) => {
-    const listener = vi.fn();
-    apiMocks.realtimeTicket.mockResolvedValue({ ticket: "library-ticket", expires_in: 60 });
-    useSpacesStore.setState({ spaces: [spaceFixture({ id: "space", permissions: { "library.view": true } })] });
-    window.addEventListener("misty:space-library-event", listener);
+  it.each(["library.upload.ready", "library.item.updated"])(
+    "announces %s events to the active Library view",
+    async (eventType) => {
+      const listener = vi.fn();
+      apiMocks.realtimeTicket.mockResolvedValue({ ticket: "library-ticket", expires_in: 60 });
+      useSpacesStore.setState({
+        spaces: [spaceFixture({ id: "space", permissions: { "library.view": true } })],
+      });
+      window.addEventListener("misty:space-library-event", listener);
 
-    await useSpacesStore.getState().connectRealtime("active-account");
-    FakeWebSocket.instances[0].open();
-    FakeWebSocket.instances[0].message({ type: "event", event: spaceEventFixture({ type: eventType }) });
-    await Promise.resolve();
+      await useSpacesStore.getState().connectRealtime("active-account");
+      FakeWebSocket.instances[0].open();
+      FakeWebSocket.instances[0].message({
+        type: "event",
+        event: spaceEventFixture({ type: eventType }),
+      });
+      await Promise.resolve();
 
-    expect(listener).toHaveBeenCalledOnce();
-    window.removeEventListener("misty:space-library-event", listener);
-  });
+      expect(listener).toHaveBeenCalledOnce();
+      window.removeEventListener("misty:space-library-event", listener);
+    },
+  );
 
   it("does not announce Library events when Library visibility is denied", async () => {
     const listener = vi.fn();
     apiMocks.realtimeTicket.mockResolvedValue({ ticket: "library-denied-ticket", expires_in: 60 });
-    useSpacesStore.setState({ spaces: [spaceFixture({ id: "space", permissions: { "library.view": false } })] });
+    useSpacesStore.setState({
+      spaces: [spaceFixture({ id: "space", permissions: { "library.view": false } })],
+    });
     window.addEventListener("misty:space-library-event", listener);
 
     await useSpacesStore.getState().connectRealtime("active-account");
     FakeWebSocket.instances[0].open();
-    FakeWebSocket.instances[0].message({ type: "event", event: spaceEventFixture({ type: "library.item.updated" }) });
+    FakeWebSocket.instances[0].message({
+      type: "event",
+      event: spaceEventFixture({ type: "library.item.updated" }),
+    });
     await Promise.resolve();
 
     expect(listener).not.toHaveBeenCalled();
@@ -255,7 +300,9 @@ describe("Spaces realtime account lifecycle", () => {
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
-  const promise = new Promise<T>((done) => { resolve = done; });
+  const promise = new Promise<T>((done) => {
+    resolve = done;
+  });
   return { promise, resolve };
 }
 

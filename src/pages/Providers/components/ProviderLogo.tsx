@@ -54,8 +54,8 @@ import {
   TableProperties,
   Workflow,
 } from "lucide-react";
-import { iconAssets } from "../../../shared/assets/icons";
-import { AssetIcon } from "../../../shared/components/AssetIcon";
+import { iconAssets } from "@/shared/assets/icons";
+import { AssetIcon } from "@/shared/components/AssetIcon";
 
 interface ProviderLogoProps {
   type: string;

@@ -4,7 +4,7 @@
   height: 46px;
   overflow: hidden;
   border-bottom: 0;
-  background: transparent;
+  background: var(--misty-files-panel-bg, transparent);
 }
 
 .misty-chrome-tabs.chrome-tabs {
@@ -14,7 +14,7 @@
   padding: 8px 8px 0;
   border-radius: 0;
   border-bottom: 0;
-  background: transparent;
+  background: var(--misty-files-panel-bg, transparent);
   overscroll-behavior-x: contain;
 }
 
@@ -85,11 +85,19 @@
   display: none;
 }
 
-.misty-chrome-tabs.chrome-tabs.chrome-tabs-dark-theme .chrome-tab .chrome-tab-background > svg .chrome-tab-geometry {
+.misty-chrome-tabs.chrome-tabs.chrome-tabs-dark-theme
+  .chrome-tab
+  .chrome-tab-background
+  > svg
+  .chrome-tab-geometry {
   fill: var(--misty-bg-soft);
 }
 
-.misty-chrome-tabs.chrome-tabs.chrome-tabs-dark-theme .chrome-tab[active] .chrome-tab-background > svg .chrome-tab-geometry {
+.misty-chrome-tabs.chrome-tabs.chrome-tabs-dark-theme
+  .chrome-tab[active]
+  .chrome-tab-background
+  > svg
+  .chrome-tab-geometry {
   fill: var(--misty-surface-2);
 }
 

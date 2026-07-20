@@ -17,8 +17,7 @@ export const useUserStore = create<UserStore>((set) => ({
   loading: false,
   error: false,
   setMe: (me) => set({ me, loading: false, error: false }),
-  patchMe: (patch) =>
-    set((state) => ({ me: state.me ? { ...state.me, ...patch } : state.me })),
+  patchMe: (patch) => set((state) => ({ me: state.me ? { ...state.me, ...patch } : state.me })),
   setLoading: (value) => set({ loading: value }),
   setError: (value) => set({ error: value }),
   clear: () => set({ me: null, loading: false, error: false }),

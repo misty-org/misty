@@ -23,16 +23,20 @@ export function AgentSources({ citations, compact = false, onOpen }: AgentSource
       <strong className="agent-sources-title">Sources</strong>
       <div className="agent-sources-list">
         {citations.map((citation, index) => {
-          const Icon = citation.kind === "slide"
-            ? Presentation
-            : citation.kind === "sheet_range"
-              ? Sheet
-              : citation.kind === "section"
-                ? TextQuote
-                : FileText;
+          const Icon =
+            citation.kind === "slide"
+              ? Presentation
+              : citation.kind === "sheet_range"
+                ? Sheet
+                : citation.kind === "section"
+                  ? TextQuote
+                  : FileText;
           return (
             <Button
-              key={citation.id || `${citation.scopeId}:${citation.relativePath || citation.fileName}:${citation.label}:${index}`}
+              key={
+                citation.id ||
+                `${citation.scopeId}:${citation.relativePath || citation.fileName}:${citation.label}:${index}`
+              }
               className="agent-source"
               type="button"
               title={citation.excerpt ?? `${citation.fileName}, ${citation.label}`}

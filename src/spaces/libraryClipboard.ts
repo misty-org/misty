@@ -16,12 +16,18 @@ export async function copyLibraryItemsToClipboard(
   await copyBlobFilesToClipboard(files);
 }
 
-export async function copyBlobFilesToClipboard(files: Array<{ name: string; blob: Blob }>): Promise<void> {
+export async function copyBlobFilesToClipboard(
+  files: Array<{ name: string; blob: Blob }>,
+): Promise<void> {
   if (files.length === 0) return;
-  const copied = await clipboardWriteFileBytes(await Promise.all(files.map(async ({ name, blob }) => ({
-    name,
-    bytes: Array.from(new Uint8Array(await blob.arrayBuffer())),
-  }))));
+  const copied = await clipboardWriteFileBytes(
+    await Promise.all(
+      files.map(async ({ name, blob }) => ({
+        name,
+        bytes: Array.from(new Uint8Array(await blob.arrayBuffer())),
+      })),
+    ),
+  );
   if (!copied) throw new Error("The selected Library items could not be placed on the clipboard.");
 }
 

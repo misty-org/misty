@@ -24,7 +24,11 @@ export class AnalyticsLifecycleManager {
     private readonly uuid: () => string = () => crypto.randomUUID(),
   ) {
     this.lastActivity = now();
-    try { this.authenticated = Boolean(storage.getItem("misty_user")); } catch { this.authenticated = false; }
+    try {
+      this.authenticated = Boolean(storage.getItem("misty_user"));
+    } catch {
+      this.authenticated = false;
+    }
   }
 
   initialize(): void {
@@ -34,7 +38,9 @@ export class AnalyticsLifecycleManager {
     void this.emitFirstOpenAndSession("process_launch");
   }
 
-  setAuthenticationState(value: boolean): void { this.authenticated = value; }
+  setAuthenticationState(value: boolean): void {
+    this.authenticated = value;
+  }
 
   preferencesChanged(usageAnalytics: boolean, errorReports: boolean): void {
     this.client.setAnalyticsEnabled(usageAnalytics);
@@ -45,7 +51,11 @@ export class AnalyticsLifecycleManager {
   async trackOnboardingCompleted(): Promise<void> {
     if (this.read(onboardingSentKey) === "1") return;
     const metadata = await this.metadata();
-    this.client.track("onboarding_completed", { ...metadata, install_id: this.installId(), onboarding_version: "1" });
+    this.client.track("onboarding_completed", {
+      ...metadata,
+      install_id: this.installId(),
+      onboarding_version: "1",
+    });
     if (this.client.isAnalyticsEnabled()) this.write(onboardingSentKey, "1");
   }
 
@@ -65,7 +75,9 @@ export class AnalyticsLifecycleManager {
     this.write(lastActivityKey, String(now));
   }
 
-  private async emitFirstOpenAndSession(trigger: "process_launch" | "returned_after_inactivity"): Promise<void> {
+  private async emitFirstOpenAndSession(
+    trigger: "process_launch" | "returned_after_inactivity",
+  ): Promise<void> {
     const metadata = await this.metadata();
     const installId = this.installId();
     if (this.read(firstOpenSentKey) !== "1") {
@@ -74,8 +86,11 @@ export class AnalyticsLifecycleManager {
     }
     if (!this.currentSessionSent) {
       this.client.track("app_session_started", {
-        ...metadata, session_id: this.currentSessionId, install_id: installId,
-        authentication_state: this.authenticated ? "authenticated" : "anonymous", session_trigger: trigger,
+        ...metadata,
+        session_id: this.currentSessionId,
+        install_id: installId,
+        authentication_state: this.authenticated ? "authenticated" : "anonymous",
+        session_trigger: trigger,
       });
       if (this.client.isAnalyticsEnabled()) this.currentSessionSent = true;
     }
@@ -88,8 +103,20 @@ export class AnalyticsLifecycleManager {
     this.write(installIdKey, value);
     return value;
   }
-  private read(key: string): string | null { try { return this.storage.getItem(key); } catch { return null; } }
-  private write(key: string, value: string): void { try { this.storage.setItem(key, value); } catch { /* storage can be unavailable */ } }
+  private read(key: string): string | null {
+    try {
+      return this.storage.getItem(key);
+    } catch {
+      return null;
+    }
+  }
+  private write(key: string, value: string): void {
+    try {
+      this.storage.setItem(key, value);
+    } catch {
+      /* storage can be unavailable */
+    }
+  }
 }
 
 export function shouldStartNewSession(lastActivity: number, now: number): boolean {
@@ -103,11 +130,25 @@ export function initializeAnalyticsLifecycle(): void {
   lifecycle.initialize();
   if (listenersInstalled) return;
   listenersInstalled = true;
-  document.addEventListener("visibilitychange", () => lifecycle.handleVisibility(document.visibilityState === "hidden"));
+  document.addEventListener("visibilitychange", () =>
+    lifecycle.handleVisibility(document.visibilityState === "hidden"),
+  );
   window.addEventListener("focus", () => lifecycle.handleVisibility(false));
-  window.addEventListener("beforeunload", () => { void analytics.flush(); });
-  window.addEventListener("error", (event) => analytics.captureException(event.error ?? event.message, { operation: "unknown", runtime_layer: "react" }));
-  window.addEventListener("unhandledrejection", (event) => analytics.captureException(event.reason, { operation: "background_task", runtime_layer: "react" }));
+  window.addEventListener("beforeunload", () => {
+    void analytics.flush();
+  });
+  window.addEventListener("error", (event) =>
+    analytics.captureException(event.error ?? event.message, {
+      operation: "unknown",
+      runtime_layer: "react",
+    }),
+  );
+  window.addEventListener("unhandledrejection", (event) =>
+    analytics.captureException(event.reason, {
+      operation: "background_task",
+      runtime_layer: "react",
+    }),
+  );
 }
 
 export function setAnalyticsAuthenticationState(value: boolean): void {
@@ -116,13 +157,22 @@ export function setAnalyticsAuthenticationState(value: boolean): void {
 }
 export function telemetryPreferencesChanged(usageAnalytics: boolean, errorReports: boolean): void {
   lifecycle.preferencesChanged(usageAnalytics, errorReports);
-  void invoke("telemetry_set_error_reporting_enabled", { enabled: errorReports }).catch(() => undefined);
+  void invoke("telemetry_set_error_reporting_enabled", { enabled: errorReports }).catch(
+    () => undefined,
+  );
   syncTelemetryPreferencesToServer();
 }
-export function trackOnboardingCompleted(): Promise<void> { return lifecycle.trackOnboardingCompleted(); }
+export function trackOnboardingCompleted(): Promise<void> {
+  return lifecycle.trackOnboardingCompleted();
+}
 
 function syncTelemetryPreferencesToServer(): void {
   void import("../pages/Account/shared/api")
-    .then(({ accountUpdateTelemetryPreferences }) => accountUpdateTelemetryPreferences(analytics.isAnalyticsEnabled(), analytics.isErrorReportingEnabled()))
+    .then(({ accountUpdateTelemetryPreferences }) =>
+      accountUpdateTelemetryPreferences(
+        analytics.isAnalyticsEnabled(),
+        analytics.isErrorReportingEnabled(),
+      ),
+    )
     .catch(() => undefined);
 }

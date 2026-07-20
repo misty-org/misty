@@ -205,12 +205,18 @@ body {
 }
 
 @keyframes shimmer {
-  to { background-position: -220% 0; }
+  to {
+    background-position: -220% 0;
+  }
 }
 
 @keyframes misty-skeleton-sweep {
-  from { transform: translateX(-115%); }
-  to { transform: translateX(115%); }
+  from {
+    transform: translateX(-115%);
+  }
+  to {
+    transform: translateX(115%);
+  }
 }
 
 .misty-skeleton {
@@ -278,11 +284,13 @@ html[data-explorer-dragging="true"] * {
 }
 
 [data-explorer-drop-active="true"] {
-  background-image: linear-gradient(120deg, rgba(126, 133, 145, 0.16), rgba(82, 88, 98, 0.08), rgba(126, 133, 145, 0.14)) !important;
+  background-color: color-mix(in srgb, var(--accent) 52%, transparent) !important;
+  background-image: none !important;
   box-shadow: inset 0 0 0 1px rgba(143, 150, 161, 0.2);
 }
 
 [data-explorer-drop-active="true"] > button {
-  background-image: linear-gradient(120deg, rgba(126, 133, 145, 0.18), rgba(82, 88, 98, 0.1), rgba(126, 133, 145, 0.16)) !important;
+  background-color: color-mix(in srgb, var(--accent) 62%, transparent) !important;
+  background-image: none !important;
   box-shadow: inset 0 0 0 1px rgba(143, 150, 161, 0.22);
 }

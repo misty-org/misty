@@ -6,11 +6,7 @@ import AuthMessage from "../../../auth/components/AuthMessage";
 import AuthShell from "../../../auth/components/AuthShell";
 import AuthSubmitButton from "../../../auth/components/AuthSubmitButton";
 import { useAuth } from "../../../auth/AuthContext";
-import {
-  accountFetchMe,
-  accountRegister,
-  type AccountMeResponse,
-} from "../../Account/shared/api";
+import { accountFetchMe, accountRegister, type AccountMeResponse } from "../../Account/shared/api";
 import type { CurrentLicense } from "../../../models/setup";
 import { useSetupStore } from "../../../stores/useSetupStore";
 
@@ -32,7 +28,7 @@ export default function RegisterPage() {
   const { setUser } = useAuth();
   const saveAuthenticatedUser = useSetupStore((state) => state.saveAuthenticatedUser);
   const routeState = location.state as { from?: string; addingAccount?: boolean } | null;
-  const from = routeState?.from || "/home";
+  const from = routeState?.from || "/files";
   const addingAccount = Boolean(routeState?.addingAccount);
   const [name, setName] = useState("");
   const [username, setUsername] = useState("");
@@ -59,9 +55,7 @@ export default function RegisterPage() {
       navigate(from, { replace: true });
     } catch (registerError) {
       setError(
-        registerError instanceof Error
-          ? registerError.message
-          : "Could not create account.",
+        registerError instanceof Error ? registerError.message : "Could not create account.",
       );
     } finally {
       setLoading(false);
@@ -69,11 +63,23 @@ export default function RegisterPage() {
   }
 
   return (
-    <AuthShell title={addingAccount ? "Create another account" : "Create an account"} description={addingAccount ? "Your current account will remain signed in on this device." : "Sign up to get started."} onBack={addingAccount ? () => navigate(from, { replace: true }) : undefined}>
+    <AuthShell
+      title={addingAccount ? "Create another account" : "Create an account"}
+      description={
+        addingAccount
+          ? "Your current account will remain signed in on this device."
+          : "Sign up to get started."
+      }
+      onBack={addingAccount ? () => navigate(from, { replace: true }) : undefined}
+    >
       <AuthCard
         footer={
           <div className="text-center text-sm text-text-muted">
-            <NavLink to="/signin" state={{ from, addingAccount }} className="transition hover:text-text">
+            <NavLink
+              to="/signin"
+              state={{ from, addingAccount }}
+              className="transition hover:text-text"
+            >
               Already have an account? Sign in
             </NavLink>
           </div>

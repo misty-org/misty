@@ -6,8 +6,8 @@ import {
   explorerQueueRenameItem,
   searchQuery,
 } from "../api/misty";
-import { errorText } from "../shared/format";
-import { isNativeMobileBuild } from "../platform/buildTarget";
+import { errorText } from "@/shared/format";
+import { isNativeMobileBuild } from "@/platform/buildTarget";
 import { selectAssistantPreferences, useSettingsStore } from "./useSettingsStore";
 import {
   cancelAgentSession,
@@ -28,7 +28,16 @@ import { agentsPrepareDocument, agentsRegisterFolderScope } from "../agents/api"
 import type { AgentCitation } from "../agents/types";
 import { deviceRelativePath, isSafeRelativePath, mikaServerContext } from "../agents/pathPrivacy";
 import { mistyDocumentsEnabled } from "../agents/flags";
-import { clearPendingMikaDelegations, hasPendingMikaDelegations, mikaDelegationMessage, publicMikaDisplayName, publicMikaModel, resolvePendingMikaDelegation, trackPendingMikaDelegation, tryMikaSpaceDelegation } from "./mikaDelegation";
+import {
+  clearPendingMikaDelegations,
+  hasPendingMikaDelegations,
+  mikaDelegationMessage,
+  publicMikaDisplayName,
+  publicMikaModel,
+  resolvePendingMikaDelegation,
+  trackPendingMikaDelegation,
+  tryMikaSpaceDelegation,
+} from "./mikaDelegation";
 
 export type AiPanelMessage = {
   id: string;
@@ -120,13 +129,28 @@ const toolDefinitions = {
 function toolManifestForScope(scope: AssistantScope | null): ToolManifest {
   const previewTools = mistyDocumentsEnabled() ? [toolDefinitions.preview_file] : [];
   if (scope === "files") {
-    return { tools: [toolDefinitions.list_directory, toolDefinitions.validate_file_plan, toolDefinitions.apply_file_plan] };
+    return {
+      tools: [
+        toolDefinitions.list_directory,
+        toolDefinitions.validate_file_plan,
+        toolDefinitions.apply_file_plan,
+      ],
+    };
   }
   if (scope === "cleanup") {
-    return { tools: [toolDefinitions.list_directory, toolDefinitions.search_files, ...previewTools, toolDefinitions.validate_file_plan] };
+    return {
+      tools: [
+        toolDefinitions.list_directory,
+        toolDefinitions.search_files,
+        ...previewTools,
+        toolDefinitions.validate_file_plan,
+      ],
+    };
   }
   if (scope === "search") {
-    return { tools: [toolDefinitions.list_directory, toolDefinitions.search_files, ...previewTools] };
+    return {
+      tools: [toolDefinitions.list_directory, toolDefinitions.search_files, ...previewTools],
+    };
   }
   return { tools: [] };
 }
@@ -138,17 +162,39 @@ function toolAllowedForScope(toolName: string, scope: AssistantScope): boolean {
 function classifyAssistantRequest(prompt: string): AssistantRequestScope {
   const normalized = prompt.toLowerCase();
   const matches: AssistantScope[] = [];
-  if (/\b(clean(?:up)?|tidy|declutter|organize|duplicate|unused|large files?|old files?)\b/.test(normalized)) matches.push("cleanup");
-  if (/\b(search|find|locate|look for|where (?:is|are)|collections?|smart folder|query|tagged|tags?)\b/.test(normalized)) matches.push("search");
-  if (/\b(summar(?:y|ize)|compare|analy[sz]e|explain|extract|question|read|review|pdf|document|spreadsheet|presentation|slide|contract|report)\b/.test(normalized)) matches.push("search");
-  if (/\b(open|reveal|show in finder|copy|move|rename|create|make (?:a )?(?:file|folder)|transfer|download|upload)\b/.test(normalized)) matches.push("files");
+  if (
+    /\b(clean(?:up)?|tidy|declutter|organize|duplicate|unused|large files?|old files?)\b/.test(
+      normalized,
+    )
+  )
+    matches.push("cleanup");
+  if (
+    /\b(search|find|locate|look for|where (?:is|are)|collections?|smart folder|query|tagged|tags?)\b/.test(
+      normalized,
+    )
+  )
+    matches.push("search");
+  if (
+    /\b(summar(?:y|ize)|compare|analy[sz]e|explain|extract|question|read|review|pdf|document|spreadsheet|presentation|slide|contract|report)\b/.test(
+      normalized,
+    )
+  )
+    matches.push("search");
+  if (
+    /\b(open|reveal|show in finder|copy|move|rename|create|make (?:a )?(?:file|folder)|transfer|download|upload)\b/.test(
+      normalized,
+    )
+  )
+    matches.push("files");
   const distinct = [...new Set(matches)];
   if (distinct.length > 1) return "ambiguous";
   return distinct[0] ?? null;
 }
 
 function isDocumentAssistantRequest(prompt: string): boolean {
-  return /\b(summar(?:y|ize)|compare|analy[sz]e|explain|extract|question|read|review|pdf|document|spreadsheet|presentation|slide|contract|report)\b/i.test(prompt);
+  return /\b(summar(?:y|ize)|compare|analy[sz]e|explain|extract|question|read|review|pdf|document|spreadsheet|presentation|slide|contract|report)\b/i.test(
+    prompt,
+  );
 }
 
 function assistantScopeAllowed(
@@ -179,7 +225,9 @@ function assistantScopeLabel(scope: AssistantScope): string {
 }
 
 function appendBlockedRequest(
-  set: (partial: Partial<AiSessionStore> | ((state: AiSessionStore) => Partial<AiSessionStore>)) => void,
+  set: (
+    partial: Partial<AiSessionStore> | ((state: AiSessionStore) => Partial<AiSessionStore>),
+  ) => void,
   prompt: string,
   response: string,
 ): void {
@@ -224,20 +272,36 @@ export const useMikaSessionStore = create<AiSessionStore>((set, get) => ({
     if (!settingsStore.loaded) await settingsStore.load();
     const preferences = selectAssistantPreferences(useSettingsStore.getState().settings?.document);
     if (!preferences.enabled) {
-      appendBlockedRequest(set, trimmed, "Mika is disabled. Enable Mika in Settings > Assistant to continue.");
+      appendBlockedRequest(
+        set,
+        trimmed,
+        "Mika is disabled. Enable Mika in Settings > Assistant to continue.",
+      );
       return;
     }
     if (isDocumentAssistantRequest(trimmed) && !mistyDocumentsEnabled()) {
-      appendBlockedRequest(set, trimmed, "Misty document intelligence is not enabled for this rollout.");
+      appendBlockedRequest(
+        set,
+        trimmed,
+        "Misty document intelligence is not enabled for this rollout.",
+      );
       return;
     }
     const requestScope = classifyAssistantRequest(trimmed);
     if (requestScope === "ambiguous") {
-      appendBlockedRequest(set, trimmed, "That request crosses more than one permission scope. Please split it into separate Files, Cleanup, or Search steps.");
+      appendBlockedRequest(
+        set,
+        trimmed,
+        "That request crosses more than one permission scope. Please split it into separate Files, Cleanup, or Search steps.",
+      );
       return;
     }
     if (requestScope && !assistantScopeAllowed(preferences, requestScope)) {
-      appendBlockedRequest(set, trimmed, `The ${assistantScopeLabel(requestScope)} scope is disabled. Allow it in Settings > Assistant to continue.`);
+      appendBlockedRequest(
+        set,
+        trimmed,
+        `The ${assistantScopeLabel(requestScope)} scope is disabled. Allow it in Settings > Assistant to continue.`,
+      );
       return;
     }
     activeRoot = cwd || null;
@@ -258,7 +322,15 @@ export const useMikaSessionStore = create<AiSessionStore>((set, get) => ({
         set((state) => ({
           error: null,
           status: statusWithRunning(state.status, waitingForDelegatedResult),
-          messages: [...state.messages, { id: aiMessageId("assistant"), role: "assistant", text: explanation, delegatedRunId: delegation.run?.id }],
+          messages: [
+            ...state.messages,
+            {
+              id: aiMessageId("assistant"),
+              role: "assistant",
+              text: explanation,
+              delegatedRunId: delegation.run?.id,
+            },
+          ],
         }));
         if (waitingForDelegatedResult) ensureAiPolling(set, get);
         return;
@@ -267,7 +339,11 @@ export const useMikaSessionStore = create<AiSessionStore>((set, get) => ({
         ? await agentsRegisterFolderScope({ path: cwd }).catch(() => null)
         : null;
       activeScopeId = registeredScope?.id ?? null;
-      const serverContext = mikaServerContext(cwd, selectedPaths ?? [], registeredScope?.id ?? null);
+      const serverContext = mikaServerContext(
+        cwd,
+        selectedPaths ?? [],
+        registeredScope?.id ?? null,
+      );
       await sendAgentMessageOnce({
         mode: get().mode,
         user_message: scopedAssistantPrompt(prompt, requestScope),
@@ -300,18 +376,24 @@ export const useMikaSessionStore = create<AiSessionStore>((set, get) => ({
     if (!sessionId || !approval || approval.running || approval.completed) return;
     set((state) => ({
       status: statusWithRunning(state.status, true),
-      toolApprovals: state.toolApprovals.map((candidate) => candidate.id === requestId ? { ...candidate, running: true, error: null } : candidate),
+      toolApprovals: state.toolApprovals.map((candidate) =>
+        candidate.id === requestId ? { ...candidate, running: true, error: null } : candidate,
+      ),
     }));
     try {
       const result = await runToolRequest(approval.request, approval.scope);
       await submitToolResults(sessionId, [result]);
       set((state) => ({
-        toolApprovals: state.toolApprovals.map((candidate) => candidate.id === requestId ? {
-          ...candidate,
-          running: false,
-          completed: true,
-          error: result.ok ? null : result.error ?? "Tool failed",
-        } : candidate),
+        toolApprovals: state.toolApprovals.map((candidate) =>
+          candidate.id === requestId
+            ? {
+                ...candidate,
+                running: false,
+                completed: true,
+                error: result.ok ? null : (result.error ?? "Tool failed"),
+              }
+            : candidate,
+        ),
       }));
       ensureAiPolling(set, get);
       await drainAiEvents(set, get);
@@ -321,7 +403,9 @@ export const useMikaSessionStore = create<AiSessionStore>((set, get) => ({
       set((state) => ({
         error: message,
         status: statusWithRunning(state.status, false, message),
-        toolApprovals: state.toolApprovals.map((candidate) => candidate.id === requestId ? { ...candidate, running: false, error: message } : candidate),
+        toolApprovals: state.toolApprovals.map((candidate) =>
+          candidate.id === requestId ? { ...candidate, running: false, error: message } : candidate,
+        ),
         messages: [...state.messages, { id: aiMessageId("error"), role: "error", text: message }],
       }));
     }
@@ -330,31 +414,58 @@ export const useMikaSessionStore = create<AiSessionStore>((set, get) => ({
   approvePlan: async (planId) => {
     const plan = get().plans.find((candidate) => candidate.id === planId);
     if (!plan || plan.applied || plan.applying) return;
-    const blockedReasons = plan.scope !== "files"
-      ? [plan.scope === "cleanup" ? "Cleanup plans are review-only in V1." : "The Files scope is required to apply this plan."]
-      : validateClientPlan(plan.plan);
+    const blockedReasons =
+      plan.scope !== "files"
+        ? [
+            plan.scope === "cleanup"
+              ? "Cleanup plans are review-only in V1."
+              : "The Files scope is required to apply this plan.",
+          ]
+        : validateClientPlan(plan.plan);
     if (blockedReasons.length > 0) {
       set((state) => ({
-        plans: state.plans.map((candidate) => candidate.id === planId ? { ...candidate, blockedReasons } : candidate),
-        messages: [...state.messages, { id: aiMessageId("error"), role: "error", text: `Plan blocked: ${blockedReasons.join("; ")}` }],
+        plans: state.plans.map((candidate) =>
+          candidate.id === planId ? { ...candidate, blockedReasons } : candidate,
+        ),
+        messages: [
+          ...state.messages,
+          {
+            id: aiMessageId("error"),
+            role: "error",
+            text: `Plan blocked: ${blockedReasons.join("; ")}`,
+          },
+        ],
       }));
       return;
     }
     set((state) => ({
-      plans: state.plans.map((candidate) => candidate.id === planId ? { ...candidate, applying: true, blockedReasons: [] } : candidate),
+      plans: state.plans.map((candidate) =>
+        candidate.id === planId ? { ...candidate, applying: true, blockedReasons: [] } : candidate,
+      ),
     }));
     try {
       await applyFilePlan(plan.plan);
       const appliedSummary = queuedSummaryForPlan(plan.plan);
       set((state) => ({
-        plans: state.plans.map((candidate) => candidate.id === planId ? { ...candidate, applied: true, applying: false, appliedSummary } : candidate),
-        messages: [...state.messages, { id: aiMessageId("assistant"), role: "assistant", text: appliedSummary }],
+        plans: state.plans.map((candidate) =>
+          candidate.id === planId
+            ? { ...candidate, applied: true, applying: false, appliedSummary }
+            : candidate,
+        ),
+        messages: [
+          ...state.messages,
+          { id: aiMessageId("assistant"), role: "assistant", text: appliedSummary },
+        ],
       }));
     } catch (error) {
       const message = errorText(error);
       set((state) => ({
         error: message,
-        plans: state.plans.map((candidate) => candidate.id === planId ? { ...candidate, applying: false, blockedReasons: [message] } : candidate),
+        plans: state.plans.map((candidate) =>
+          candidate.id === planId
+            ? { ...candidate, applying: false, blockedReasons: [message] }
+            : candidate,
+        ),
         messages: [...state.messages, { id: aiMessageId("error"), role: "error", text: message }],
       }));
     }
@@ -376,9 +487,10 @@ export const useMikaSessionStore = create<AiSessionStore>((set, get) => ({
 
   clearConversation: () => {
     const sessionId = activeSessionId;
-    if (sessionId) void deleteAgentSession(sessionId).catch((error) => {
-      recordAiDebug("warn", "Mika conversation deletion failed.", errorText(error));
-    });
+    if (sessionId)
+      void deleteAgentSession(sessionId).catch((error) => {
+        recordAiDebug("warn", "Mika conversation deletion failed.", errorText(error));
+      });
     stopAiPolling();
     activeSessionId = null;
     lastEventSequence = 0;
@@ -410,7 +522,9 @@ export function resetMikaAccountState(): void {
 }
 
 function ensureAiPolling(
-  set: (partial: Partial<AiSessionStore> | ((state: AiSessionStore) => Partial<AiSessionStore>)) => void,
+  set: (
+    partial: Partial<AiSessionStore> | ((state: AiSessionStore) => Partial<AiSessionStore>),
+  ) => void,
   get: () => AiSessionStore,
 ): void {
   if (pollTimer !== null || typeof window === "undefined") return;
@@ -429,7 +543,9 @@ function ensureAiPolling(
 }
 
 async function drainAiEvents(
-  set: (partial: Partial<AiSessionStore> | ((state: AiSessionStore) => Partial<AiSessionStore>)) => void,
+  set: (
+    partial: Partial<AiSessionStore> | ((state: AiSessionStore) => Partial<AiSessionStore>),
+  ) => void,
   get: () => AiSessionStore,
 ): Promise<void> {
   if (drainInFlight) return drainInFlight;
@@ -440,7 +556,9 @@ async function drainAiEvents(
 }
 
 async function drainAiEventsOnce(
-  set: (partial: Partial<AiSessionStore> | ((state: AiSessionStore) => Partial<AiSessionStore>)) => void,
+  set: (
+    partial: Partial<AiSessionStore> | ((state: AiSessionStore) => Partial<AiSessionStore>),
+  ) => void,
   get: () => AiSessionStore,
 ): Promise<void> {
   const sessionId = activeSessionId;
@@ -453,7 +571,11 @@ async function drainAiEventsOnce(
     processedEventSequences.add(event.sequence);
     return true;
   });
-  recordAiDebug("info", "Fetched Mika events.", `session=${sessionId} count=${events.length} new=${nextEvents.length} after=${afterSequence}`);
+  recordAiDebug(
+    "info",
+    "Fetched Mika events.",
+    `session=${sessionId} count=${events.length} new=${nextEvents.length} after=${afterSequence}`,
+  );
   if (nextEvents.length === 0) {
     await settleEmptyEventPoll(set);
     return;
@@ -467,7 +589,15 @@ async function drainAiEventsOnce(
     lastEventSequence = Math.max(lastEventSequence, event.sequence);
     resolvePendingMikaDelegation(event.run_id);
     if (event.type === "assistant_message" && event.text) {
-      nextMessages.push({ id: aiMessageId("assistant"), role: "assistant", text: event.text, citations: event.citations, creditsUsed: event.credits_used, creditsRemaining: event.credits_remaining, delegatedRunId: event.run_id });
+      nextMessages.push({
+        id: aiMessageId("assistant"),
+        role: "assistant",
+        text: event.text,
+        citations: event.citations,
+        creditsUsed: event.credits_used,
+        creditsRemaining: event.credits_remaining,
+        delegatedRunId: event.run_id,
+      });
     } else if (event.type === "error" && event.message) {
       nextMessages.push({ id: aiMessageId("error"), role: "error", text: event.message });
     } else if (event.type === "tool_request") {
@@ -477,25 +607,49 @@ async function drainAiEventsOnce(
         nextMessages.push({
           id: aiMessageId("tool"),
           role: "tool",
-          toolRequestId: request.approval_required && get().mode !== "full" ? request.id : undefined,
-          text: request.approval_required ? `Approval required: ${request.name}` : `Running ${request.name}`,
+          toolRequestId:
+            request.approval_required && get().mode !== "full" ? request.id : undefined,
+          text: request.approval_required
+            ? `Approval required: ${request.name}`
+            : `Running ${request.name}`,
         });
         if (!request.approval_required || get().mode === "full") {
           recordAiDebug("info", "Running Mika tool request.", `${request.name} ${request.id}`);
           toolResults.push(await runToolRequestWithTimeout(request, activeRequestScope));
         } else {
-          nextToolApprovals.push({ id: request.id, request, running: false, completed: false, error: null, scope: activeRequestScope });
+          nextToolApprovals.push({
+            id: request.id,
+            request,
+            running: false,
+            completed: false,
+            error: null,
+            scope: activeRequestScope,
+          });
         }
       }
     } else if (event.type === "file_plan" && event.file_plan) {
       const planId = `plan-${Date.now()}-${nextPlanId++}`;
-      const blockedReasons = activeRequestScope === "cleanup"
-        ? ["Cleanup plans are review-only in V1."]
-        : activeRequestScope === "files"
-          ? validateClientPlan(event.file_plan)
-          : ["The Files scope is required to apply this plan."];
-      nextPlans.push({ id: planId, plan: event.file_plan, applied: false, applying: false, appliedSummary: null, blockedReasons, scope: activeRequestScope });
-      nextMessages.push({ id: aiMessageId("plan"), role: "plan", planId, text: planSummary(event.file_plan, blockedReasons) });
+      const blockedReasons =
+        activeRequestScope === "cleanup"
+          ? ["Cleanup plans are review-only in V1."]
+          : activeRequestScope === "files"
+            ? validateClientPlan(event.file_plan)
+            : ["The Files scope is required to apply this plan."];
+      nextPlans.push({
+        id: planId,
+        plan: event.file_plan,
+        applied: false,
+        applying: false,
+        appliedSummary: null,
+        blockedReasons,
+        scope: activeRequestScope,
+      });
+      nextMessages.push({
+        id: aiMessageId("plan"),
+        role: "plan",
+        planId,
+        text: planSummary(event.file_plan, blockedReasons),
+      });
     }
   }
   set((state) => ({
@@ -513,9 +667,15 @@ async function drainAiEventsOnce(
 }
 
 async function settleEmptyEventPoll(
-  set: (partial: Partial<AiSessionStore> | ((state: AiSessionStore) => Partial<AiSessionStore>)) => void,
+  set: (
+    partial: Partial<AiSessionStore> | ((state: AiSessionStore) => Partial<AiSessionStore>),
+  ) => void,
 ): Promise<void> {
-  if (hasPendingMikaDelegations()) { set((state) => ({ status: statusWithRunning(state.status, true) })); ensureAiPolling(set, useMikaSessionStore.getState); return; }
+  if (hasPendingMikaDelegations()) {
+    set((state) => ({ status: statusWithRunning(state.status, true) }));
+    ensureAiPolling(set, useMikaSessionStore.getState);
+    return;
+  }
   try {
     const status = await fetchAgentStatus();
     if (status.running) {
@@ -547,13 +707,19 @@ async function ensureSession(): Promise<string> {
 
 async function sendAgentMessageOnce(body: Parameters<typeof sendAgentMessage>[1]): Promise<void> {
   const sessionId = await ensureSession();
-  recordAiDebug("info", "Sending message to Mika server.", `session=${sessionId} cwd=${activeRoot ?? ""}`);
+  recordAiDebug(
+    "info",
+    "Sending message to Mika server.",
+    `session=${sessionId} cwd=${activeRoot ?? ""}`,
+  );
   try {
     await sendAgentMessage(sessionId, body);
   } catch (error) {
     if (isSessionNotFoundError(error)) {
       resetActiveSession();
-      throw new Error("Mika session expired. Your request was not resent. Send it again to continue.");
+      throw new Error(
+        "Mika session expired. Your request was not resent. Send it again to continue.",
+      );
     }
     throw error;
   }
@@ -575,30 +741,44 @@ function isSessionNotFoundError(error: unknown): boolean {
   return errorText(error).toLowerCase().includes("session not found");
 }
 
-async function runToolRequest(request: ToolRequest, scope: AssistantScope | null): Promise<ToolResult> {
+async function runToolRequest(
+  request: ToolRequest,
+  scope: AssistantScope | null,
+): Promise<ToolResult> {
   try {
     const preferences = selectAssistantPreferences(useSettingsStore.getState().settings?.document);
     if (!scope || !assistantScopeAllowed(preferences, scope)) {
-      return toolError(request, scope
-        ? `The ${assistantScopeLabel(scope)} scope is disabled.`
-        : "This request has no allowed capability scope.");
+      return toolError(
+        request,
+        scope
+          ? `The ${assistantScopeLabel(scope)} scope is disabled.`
+          : "This request has no allowed capability scope.",
+      );
     }
     if (!toolAllowedForScope(request.name, scope)) {
-      return toolError(request, `${request.name} is not allowed by the ${assistantScopeLabel(scope)} scope.`);
+      return toolError(
+        request,
+        `${request.name} is not allowed by the ${assistantScopeLabel(scope)} scope.`,
+      );
     }
     const args = toolArgs(request);
     switch (request.name) {
       case "list_directory": {
         const requestedPath = stringArg(args.path);
-        const directoryPath = !requestedPath || requestedPath === "." || requestedPath === activeScopeId
-          ? activeRoot
-          : isSafeRelativePath(requestedPath)
-            ? absoluteFromRelative(requestedPath)
-            : null;
-        if (!directoryPath) return toolError(request, "list_directory requires a path relative to the active agent scope.");
+        const directoryPath =
+          !requestedPath || requestedPath === "." || requestedPath === activeScopeId
+            ? activeRoot
+            : isSafeRelativePath(requestedPath)
+              ? absoluteFromRelative(requestedPath)
+              : null;
+        if (!directoryPath)
+          return toolError(
+            request,
+            "list_directory requires a path relative to the active agent scope.",
+          );
         const listing = await explorerListDirectory({ path: directoryPath });
         return toolOK(request, {
-          path: activeRoot ? deviceRelativePath(activeRoot, listing.path) ?? "." : ".",
+          path: activeRoot ? (deviceRelativePath(activeRoot, listing.path) ?? ".") : ".",
           entries: listing.entries.map((entry) => ({
             name: entry.name,
             path: relativeToRoot(entry.path),
@@ -621,26 +801,32 @@ async function runToolRequest(request: ToolRequest, scope: AssistantScope | null
           results: results.flatMap((result) => {
             const path = activeRoot ? deviceRelativePath(activeRoot, result.entry.path) : null;
             if (!path) return [];
-            return [{
-              name: result.entry.name,
-              path,
-              kind: result.entry.kind,
-              extension: result.entry.extension,
-              sizeBytes: result.entry.sizeBytes,
-              modifiedMs: result.entry.modifiedMs,
-              score: result.score,
-              match: result.match,
-            }];
+            return [
+              {
+                name: result.entry.name,
+                path,
+                kind: result.entry.kind,
+                extension: result.entry.extension,
+                sizeBytes: result.entry.sizeBytes,
+                modifiedMs: result.entry.modifiedMs,
+                score: result.score,
+                match: result.match,
+              },
+            ];
           }),
         });
       }
       case "preview_file": {
         const requested = stringArg(args.path);
         if (requested && !isSafeRelativePath(requested)) {
-          return toolError(request, "preview_file requires a path relative to the active agent scope.");
+          return toolError(
+            request,
+            "preview_file requires a path relative to the active agent scope.",
+          );
         }
         const candidate = requested ? absoluteFromRelative(requested) : activeSelectedPaths[0];
-        if (!candidate) return toolError(request, "Select a document or provide a path to preview_file.");
+        if (!candidate)
+          return toolError(request, "Select a document or provide a path to preview_file.");
         if (activeRoot && !deviceRelativePath(activeRoot, candidate)) {
           return toolError(request, "The document is outside the active agent scope.");
         }
@@ -655,7 +841,8 @@ async function runToolRequest(request: ToolRequest, scope: AssistantScope | null
           relativePath: relativeToRoot(candidate),
           sections: document.sections,
           truncated: document.truncated,
-          citationRule: "Cite every factual document claim using the supplied scopeId, relativePath, fileName, section kind, and locator.",
+          citationRule:
+            "Cite every factual document claim using the supplied scopeId, relativePath, fileName, section kind, and locator.",
         });
       }
       case "validate_file_plan": {
@@ -679,7 +866,10 @@ async function runToolRequest(request: ToolRequest, scope: AssistantScope | null
   }
 }
 
-async function runToolRequestWithTimeout(request: ToolRequest, scope: AssistantScope | null): Promise<ToolResult> {
+async function runToolRequestWithTimeout(
+  request: ToolRequest,
+  scope: AssistantScope | null,
+): Promise<ToolResult> {
   let timeoutId: number | null = null;
   try {
     const timeoutMs = request.name === "preview_file" ? 60_000 : aiToolTimeoutMs;
@@ -687,7 +877,12 @@ async function runToolRequestWithTimeout(request: ToolRequest, scope: AssistantS
       runToolRequest(request, scope),
       new Promise<ToolResult>((resolve) => {
         timeoutId = window.setTimeout(() => {
-          resolve(toolError(request, `${request.name} timed out after ${Math.round(timeoutMs / 1000)} seconds.`));
+          resolve(
+            toolError(
+              request,
+              `${request.name} timed out after ${Math.round(timeoutMs / 1000)} seconds.`,
+            ),
+          );
         }, timeoutMs);
       }),
     ]);
@@ -736,11 +931,17 @@ async function preparePlanFolders(plan: FileOperationPlan): Promise<void> {
       folderPaths.add(cleanRelativePath(operation.path));
     }
   }
-  const orderedFolders = [...folderPaths].sort((left, right) => left.split("/").length - right.split("/").length);
+  const orderedFolders = [...folderPaths].sort(
+    (left, right) => left.split("/").length - right.split("/").length,
+  );
   for (const relativeFolder of orderedFolders) {
     const target = absoluteFromRelative(relativeFolder);
     try {
-      await explorerCreateItem({ directory: dirname(target), name: basename(target), kind: "folder" });
+      await explorerCreateItem({
+        directory: dirname(target),
+        name: basename(target),
+        kind: "folder",
+      });
     } catch (error) {
       if (!isAlreadyExistsError(error)) throw error;
     }
@@ -755,19 +956,24 @@ function validateClientPlan(plan: FileOperationPlan): string[] {
   const problems: string[] = [];
   const destinations = new Set<string>();
   if (!plan.summary?.trim()) problems.push("summary is required");
-  if (!Array.isArray(plan.operations) || plan.operations.length === 0) problems.push("at least one operation is required");
+  if (!Array.isArray(plan.operations) || plan.operations.length === 0)
+    problems.push("at least one operation is required");
   for (const [index, operation] of plan.operations.entries()) {
     const prefix = `operations[${index}]`;
     if (operation.type === "mkdir") {
-      if (!safeRelativePath(operation.path)) problems.push(`${prefix}: mkdir path must be relative and safe`);
+      if (!safeRelativePath(operation.path))
+        problems.push(`${prefix}: mkdir path must be relative and safe`);
       else destinations.add(cleanRelativePath(operation.path));
     } else if (operation.type === "move" || operation.type === "rename") {
-      if (!safeRelativePath(operation.from)) problems.push(`${prefix}: source must be relative and safe`);
-      if (!safeRelativePath(operation.to)) problems.push(`${prefix}: destination must be relative and safe`);
+      if (!safeRelativePath(operation.from))
+        problems.push(`${prefix}: source must be relative and safe`);
+      if (!safeRelativePath(operation.to))
+        problems.push(`${prefix}: destination must be relative and safe`);
       const to = cleanRelativePath(operation.to);
       if (to && destinations.has(to)) problems.push(`${prefix}: duplicate destination`);
       if (to) destinations.add(to);
-      if (cleanRelativePath(operation.from) === to) problems.push(`${prefix}: source and destination are the same`);
+      if (cleanRelativePath(operation.from) === to)
+        problems.push(`${prefix}: source and destination are the same`);
     } else {
       problems.push(`${prefix}: unsupported operation type`);
     }
@@ -817,7 +1023,11 @@ function serverStatus(running: boolean, error: string | null = null, configured 
   };
 }
 
-function statusWithRunning(status: AiStatus | null, running: boolean, error: string | null = null): AiStatus {
+function statusWithRunning(
+  status: AiStatus | null,
+  running: boolean,
+  error: string | null = null,
+): AiStatus {
   return {
     ...(status ?? serverStatus(running)),
     running,
@@ -865,7 +1075,7 @@ function numberArg(value: unknown): number | null {
 }
 
 function relativeToRoot(path: string): string {
-  return activeRoot ? deviceRelativePath(activeRoot, path) ?? "" : "";
+  return activeRoot ? (deviceRelativePath(activeRoot, path) ?? "") : "";
 }
 
 function absoluteFromRelative(path: string): string {
@@ -910,6 +1120,5 @@ function recordAiDebug(level: "info" | "warn" | "error", message: string, detail
 }
 
 function aiDebugEnabled(): boolean {
-  return !isNativeMobileBuild &&
-    (import.meta.env.DEV || import.meta.env.VITE_MISTY_DEBUG === "1");
+  return !isNativeMobileBuild && (import.meta.env.DEV || import.meta.env.VITE_MISTY_DEBUG === "1");
 }

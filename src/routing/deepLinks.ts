@@ -1,7 +1,7 @@
 import { getCurrent, onOpenUrl } from "@tauri-apps/plugin-deep-link";
 import type { UnlistenFn } from "@tauri-apps/api/event";
-import { isNativeMobileBuild } from "../platform/buildTarget";
-import { hasTauriInternals } from "../shared/tauri";
+import { isNativeMobileBuild } from "@/platform/buildTarget";
+import { hasTauriInternals } from "@/shared/tauri";
 
 const mistyDeepLinkScheme = "misty:";
 const ignoredMistyHosts = new Set(["recent", "starred", "trash"]);
@@ -23,11 +23,7 @@ export function installMistyDeepLinkHandler(
     if (source === "current" && signature === lastCurrentSignature) return;
     lastCurrentSignature = signature;
     for (const url of urls) {
-      const route = routeForMistyDeepLink(
-        url,
-        isRouteAllowed,
-        resolveAuthRoute,
-      );
+      const route = routeForMistyDeepLink(url, isRouteAllowed, resolveAuthRoute);
       if (route) {
         navigate(route);
         return;
@@ -88,9 +84,7 @@ function routeForMistyDeepLink(
   }
   if (first === "auth") {
     return resolveAuthRoute(
-      rest[0] === "providers" || rest[0] === "provider"
-        ? "providers"
-        : "account",
+      rest[0] === "providers" || rest[0] === "provider" ? "providers" : "account",
     );
   }
 
@@ -107,10 +101,7 @@ function parseMistyDeepLink(rawUrl: string): URL | null {
 }
 
 function deepLinkParts(url: URL): string[] {
-  return [
-    url.hostname,
-    ...url.pathname.split("/"),
-  ]
+  return [url.hostname, ...url.pathname.split("/")]
     .map((part) => decodeURIComponent(part).trim().toLowerCase())
     .filter(Boolean);
 }

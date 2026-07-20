@@ -28,7 +28,12 @@ export function publishPluginNotifications(
     .filter((notification) => notification.text.length > 0);
 
   for (const notification of published) {
-    pushNotification(notification.text, notification.type, notification.type === "error" ? 4500 : 3500, true);
+    pushNotification(
+      notification.text,
+      notification.type,
+      notification.type === "error" ? 4500 : 3500,
+      true,
+    );
   }
 
   if (published.length > 0) return true;

@@ -1,19 +1,14 @@
-import * as React from "react"
-import { LoaderCircle } from "lucide-react"
+import * as React from "react";
+import { LoaderCircle } from "lucide-react";
 
-import { cn } from "@/lib/utils"
+import { cn } from "@/lib/utils";
 
 type SpinnerProps = React.HTMLAttributes<HTMLSpanElement> & {
-  label?: string
-  size?: "sm" | "default" | "lg"
-}
+  label?: string;
+  size?: "sm" | "default" | "lg";
+};
 
-function Spinner({
-  className,
-  label = "Loading",
-  size = "default",
-  ...props
-}: SpinnerProps) {
+function Spinner({ className, label = "Loading", size = "default", ...props }: SpinnerProps) {
   return (
     <span
       role="status"
@@ -29,7 +24,7 @@ function Spinner({
     >
       <LoaderCircle aria-hidden="true" className="size-full animate-spin" />
     </span>
-  )
+  );
 }
 
-export { Spinner, type SpinnerProps }
+export { Spinner, type SpinnerProps };

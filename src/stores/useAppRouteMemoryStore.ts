@@ -10,13 +10,7 @@ interface AppRouteMemoryStore {
 
 const defaultAppRoute = "/files";
 const defaultSpacesRoute = "/spaces/personal";
-const desktopRememberableRoutes = [
-  "/home",
-  "/spaces/personal",
-  "/agents",
-  "/extensions",
-  "/changelog",
-];
+const desktopRememberableRoutes = ["/spaces/personal", "/agents", "/extensions", "/changelog"];
 
 export const useAppRouteMemoryStore = create<AppRouteMemoryStore>()(
   persist(
@@ -28,17 +22,25 @@ export const useAppRouteMemoryStore = create<AppRouteMemoryStore>()(
         if (!normalized) return;
         const spacesRoute = normalizeRememberedSpacesRoute(path);
         const current = get();
-        if (current.lastAppRoute === normalized && (!spacesRoute || current.lastSpacesRoute === spacesRoute)) return;
+        if (
+          current.lastAppRoute === normalized &&
+          (!spacesRoute || current.lastSpacesRoute === spacesRoute)
+        )
+          return;
         set({
           lastAppRoute: normalized,
           ...(spacesRoute ? { lastSpacesRoute: spacesRoute } : {}),
         });
       },
-      resetAppRoute: () => set({ lastAppRoute: defaultAppRoute, lastSpacesRoute: defaultSpacesRoute }),
+      resetAppRoute: () =>
+        set({ lastAppRoute: defaultAppRoute, lastSpacesRoute: defaultSpacesRoute }),
     }),
     {
       name: "misty:app-route-memory",
-      partialize: (state) => ({ lastAppRoute: state.lastAppRoute, lastSpacesRoute: state.lastSpacesRoute }),
+      partialize: (state) => ({
+        lastAppRoute: state.lastAppRoute,
+        lastSpacesRoute: state.lastSpacesRoute,
+      }),
     },
   ),
 );
@@ -75,6 +77,7 @@ function normalizeRememberedSpacesRoute(path: string): string | null {
 function pathnameFromRoute(path: string): string {
   const queryIndex = path.indexOf("?");
   const hashIndex = path.indexOf("#");
-  const end = [queryIndex, hashIndex].filter((index) => index >= 0).sort((a, b) => a - b)[0] ?? path.length;
+  const end =
+    [queryIndex, hashIndex].filter((index) => index >= 0).sort((a, b) => a - b)[0] ?? path.length;
   return path.slice(0, end);
 }

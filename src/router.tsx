@@ -1,17 +1,10 @@
 import { lazy, Suspense, useEffect } from "react";
-import {
-  createBrowserRouter,
-  Navigate,
-  Outlet,
-  RouterProvider,
-  useLocation,
-} from "react-router-dom";
-import { Boxes, FolderOpen, Home, Puzzle } from "lucide-react";
+import { createBrowserRouter, Navigate, Outlet, RouterProvider, useLocation } from "react-router";
+import { FolderOpen, PanelsTopLeft, Puzzle } from "lucide-react";
 import AccountPage from "./pages/Account";
 import ChangelogPage from "./pages/Changelog";
 import ExtensionsPage from "./pages/Extensions";
 import FilesPage from "./pages/Files";
-import HomePage from "./pages/Home";
 import CloudFolderBotOverlay from "./pages/BotOverlay/CloudFolderBotOverlay";
 import CloudFolderBotChatOverlay from "./pages/BotOverlay/CloudFolderBotChatOverlay";
 import ProvidersPage from "./pages/Providers";
@@ -24,10 +17,7 @@ import type { DesktopNavItem } from "./layouts/DesktopLayout";
 import { RootLayout } from "./layouts/RootLayout";
 import { isAndroidBuild } from "./platform/buildTarget";
 import type { AppTab } from "./routing/types";
-import {
-  isRememberableAppRoute,
-  useAppRouteMemoryStore,
-} from "./stores/useAppRouteMemoryStore";
+import { isRememberableAppRoute, useAppRouteMemoryStore } from "./stores/useAppRouteMemoryStore";
 import { useSetupStore } from "./stores/useSetupStore";
 import { useSettingsStore } from "./stores/useSettingsStore";
 import { useSpacesStore } from "./stores/useSpacesStore";
@@ -63,7 +53,6 @@ const routes = {
 } as const;
 
 const appPageTitles = new Map<string, string>([
-  [routes.home, "Misty - Home"],
   [routes.extensions, "Misty - Extensions"],
   [routes.spaces, "Misty - Spaces"],
   [routes.changelog, "Misty - Changelog"],
@@ -78,20 +67,12 @@ const DesktopLayoutComponent = lazy(() =>
 );
 
 const desktopNavItems = [
-  {
-    id: "home",
-    label: "Home",
-    path: routes.home,
-    icon: Home,
-    active: (pathname: string) =>
-      pathname === routes.home || pathname.startsWith(routes.changelog),
-  },
   { id: "files", label: "Files", path: routes.files, icon: FolderOpen },
   {
     id: "spaces",
     label: "Spaces",
     path: routes.spacePersonal,
-    icon: Boxes,
+    icon: PanelsTopLeft,
     active: (pathname: string) => pathname.startsWith(routes.spaces),
   },
   ...(isAndroidBuild
@@ -117,7 +98,6 @@ const deepLinkPrefixes = [
   routes.studio,
   routes.account,
   routes.settings,
-  routes.home,
   routes.library,
   routes.extensions,
   routes.changelog,
@@ -146,7 +126,6 @@ export const router = createBrowserRouter([
           { path: "library", element: <Navigate to={routes.spacePersonal} replace /> },
           { path: "providers", element: <ProvidersPage /> },
           { path: "transfers", element: <TransfersPage /> },
-          { path: "dock", element: <Navigate to={routes.files} replace /> },
           {
             element: <AppPagesLayout />,
             children: [
@@ -168,14 +147,22 @@ export const router = createBrowserRouter([
               { path: "studio", element: <LegacyStudioRedirect kind="agents" /> },
               { path: "studio/agents", element: <LegacyStudioRedirect kind="agents" /> },
               { path: "studio/workflows", element: <LegacyStudioRedirect kind="workflows" /> },
-              { path: "home", element: <HomePage /> },
+              { path: "home", element: <Navigate to={routes.files} replace /> },
               {
                 path: "extensions",
-                element: isAndroidBuild ? <Navigate to={routes.files} replace /> : <ExtensionsPage />,
+                element: isAndroidBuild ? (
+                  <Navigate to={routes.files} replace />
+                ) : (
+                  <ExtensionsPage />
+                ),
               },
               {
                 path: "changelog",
-                element: isAndroidBuild ? <Navigate to={routes.files} replace /> : <ChangelogPage />,
+                element: isAndroidBuild ? (
+                  <Navigate to={routes.files} replace />
+                ) : (
+                  <ChangelogPage />
+                ),
               },
               { path: "signin", element: <SignInPage /> },
               { path: "register", element: <RegisterPage /> },
@@ -209,25 +196,23 @@ function AppFrameLayout() {
 
 function AppPagesLayout() {
   const location = useLocation();
-  const refreshLocalAccessToken = useSetupStore(
-    (state) => state.refreshLocalAccessToken,
-  );
+  const refreshLocalAccessToken = useSetupStore((state) => state.refreshLocalAccessToken);
 
   useEffect(() => {
     const match = [...appPageTitles.keys()]
       .sort((left, right) => right.length - left.length)
-      .find(
-        (path) =>
-          location.pathname === path || location.pathname.startsWith(`${path}/`),
-      );
-    document.title = match ? appPageTitles.get(match) ?? "Misty" : "Misty";
+      .find((path) => location.pathname === path || location.pathname.startsWith(`${path}/`));
+    document.title = match ? (appPageTitles.get(match) ?? "Misty") : "Misty";
     window.getSelection()?.removeAllRanges();
   }, [location.pathname]);
 
   useEffect(() => {
-    const interval = window.setInterval(() => {
-      void refreshLocalAccessToken();
-    }, 10 * 60 * 1000);
+    const interval = window.setInterval(
+      () => {
+        void refreshLocalAccessToken();
+      },
+      10 * 60 * 1000,
+    );
     return () => window.clearInterval(interval);
   }, [refreshLocalAccessToken]);
 
@@ -257,9 +242,7 @@ function StartupRedirect() {
   }
 
   const rememberedRoute = lastAppRoute.startsWith(routes.spaces) ? lastSpacesRoute : lastAppRoute;
-  const target = isRememberableAppRoute(rememberedRoute)
-    ? rememberedRoute
-    : routes.home;
+  const target = isRememberableAppRoute(rememberedRoute) ? rememberedRoute : routes.files;
 
   return <Navigate to={target} replace />;
 }
@@ -270,42 +253,60 @@ function LegacyStudioRedirect({ kind }: { kind: "agents" | "folder-agents" | "wo
   const loading = useSpacesStore((state) => state.loading);
   const load = useSpacesStore((state) => state.load);
 
-  useEffect(() => { if (spaces.length === 0 && !loading) void load(); }, [load, loading, spaces.length]);
-  if (spaces.length === 0) return <div className="grid h-full place-items-center text-sm text-[var(--misty-text-muted)]">Loading your Space Studio…</div>;
+  useEffect(() => {
+    if (spaces.length === 0 && !loading) void load();
+  }, [load, loading, spaces.length]);
+  if (spaces.length === 0)
+    return (
+      <div className="grid h-full place-items-center text-sm text-[var(--misty-text-muted)]">
+        Loading your Space Studio…
+      </div>
+    );
 
   const params = new URLSearchParams(location.search);
   const requestedSpaceId = params.get("spaceId") ?? params.get("space") ?? "";
-  const space = spaces.find((candidate) => candidate.id === requestedSpaceId) ?? spaces.find((candidate) => candidate.is_personal) ?? spaces[0];
+  const space =
+    spaces.find((candidate) => candidate.id === requestedSpaceId) ??
+    spaces.find((candidate) => candidate.is_personal) ??
+    spaces[0];
   const targetKind = kind === "folder-agents" ? "agents" : kind;
   params.delete("scope");
   params.delete("space");
   params.delete("spaceId");
   const query = params.toString();
-  return <Navigate to={`/spaces/${encodeURIComponent(space.id)}/agents/studio/${targetKind}${query ? `?${query}` : ""}`} replace />;
+  return (
+    <Navigate
+      to={`/spaces/${encodeURIComponent(space.id)}/agents/studio/${targetKind}${query ? `?${query}` : ""}`}
+      replace
+    />
+  );
 }
 
 function desktopRouteIdFromPath(pathname: string): AppTab {
   if (pathname.startsWith(routes.spaces) || pathname.startsWith(routes.library)) return "spaces";
-  if (pathname.startsWith(routes.studio) || pathname.startsWith(routes.agents) || pathname.startsWith(routes.automations)) return "agents";
+  if (
+    pathname.startsWith(routes.studio) ||
+    pathname.startsWith(routes.agents) ||
+    pathname.startsWith(routes.automations)
+  )
+    return "agents";
   if (pathname.startsWith(routes.transfers)) return "transfers";
   if (pathname.startsWith(routes.providers)) return "providers";
   if (pathname.startsWith(routes.account)) return "account";
   if (
-    pathname.startsWith(routes.home) ||
     pathname.startsWith(routes.extensions) ||
     pathname.startsWith(routes.changelog) ||
     pathname.startsWith(routes.signIn) ||
     pathname.startsWith(routes.register)
-  ) return "home";
+  )
+    return "home";
   if (pathname.startsWith(routes.settings)) return "settings";
   if (pathname.startsWith(routes.diagnostics)) return "diagnostics";
   return "files";
 }
 
 function isDeepLinkRouteAllowed(route: string): boolean {
-  return deepLinkPrefixes.some(
-    (prefix) => route === prefix || route.startsWith(`${prefix}/`),
-  );
+  return deepLinkPrefixes.some((prefix) => route === prefix || route.startsWith(`${prefix}/`));
 }
 
 function resolveAuthDeepLinkRoute(target: "account" | "providers"): string {

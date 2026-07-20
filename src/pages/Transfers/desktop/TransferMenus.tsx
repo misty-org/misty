@@ -12,7 +12,7 @@ import {
   XCircle,
 } from "lucide-react";
 import type { TransferRecord } from "../../../api/types";
-import { IconButton } from "../../../components/misty";
+import { IconButton } from "@/components/ui/icon-button";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -30,14 +30,22 @@ import {
   DropdownMenuTrigger,
 } from "../../../components/ui/dropdown-menu";
 import type { TransferSortDirection, TransferSortKey } from "../../../stores/useTransfersStore";
-import { canPauseResumeTransfer, transferSortOptions, type TransferSortableKey } from "./transferModel";
+import {
+  canPauseResumeTransfer,
+  transferSortOptions,
+  type TransferSortableKey,
+} from "./transferModel";
 import { transferStyles } from "./transferStyles";
 
 export type TransferActionHandlers = {
   onPauseResume: (transfer: TransferRecord) => Promise<void>;
   onPauseResumeBatch: (transfer: TransferRecord) => Promise<void>;
   onCancelBatch: (transfer: TransferRecord) => Promise<void>;
-  onResolveConflict: (transfer: TransferRecord, policy: "replace" | "skip" | "keep_both", applyToBatch: boolean) => Promise<void>;
+  onResolveConflict: (
+    transfer: TransferRecord,
+    policy: "replace" | "skip" | "keep_both",
+    applyToBatch: boolean,
+  ) => Promise<void>;
   onCancel: (transfer: TransferRecord) => Promise<void>;
   onRetry: (transfer: TransferRecord) => Promise<void>;
   onUndo: (undoTokenId: number) => void;
@@ -79,7 +87,9 @@ export function TransferSortMenu(props: {
         </IconButton>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-48 border-border/70 shadow-md">
-        <DropdownMenuLabel className="text-xs text-muted-foreground">Sort transfers</DropdownMenuLabel>
+        <DropdownMenuLabel className="text-xs text-muted-foreground">
+          Sort transfers
+        </DropdownMenuLabel>
         <DropdownMenuSeparator />
         {transferSortOptions.map((option) => {
           const active = props.sortKey === option.key;
@@ -113,7 +123,9 @@ export function TransferToolbarActions(props: TransferActionMenuProps) {
         </IconButton>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56 border-border/70 shadow-md">
-        <DropdownMenuLabel className="text-xs text-muted-foreground">History actions</DropdownMenuLabel>
+        <DropdownMenuLabel className="text-xs text-muted-foreground">
+          History actions
+        </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownActionEntries entries={entries} />
       </DropdownMenuContent>
@@ -121,9 +133,11 @@ export function TransferToolbarActions(props: TransferActionMenuProps) {
   );
 }
 
-export function TransferRowActionsMenu(props: TransferActionMenuProps & {
-  onOpenChange?: (open: boolean) => void;
-}) {
+export function TransferRowActionsMenu(
+  props: TransferActionMenuProps & {
+    onOpenChange?: (open: boolean) => void;
+  },
+) {
   const entries = buildTransferMenuEntries(props);
   return (
     <DropdownMenu onOpenChange={props.onOpenChange}>
@@ -144,10 +158,12 @@ export function TransferRowActionsMenu(props: TransferActionMenuProps & {
   );
 }
 
-export function TransferRowContextMenu(props: TransferActionMenuProps & {
-  children: ReactElement;
-  onOpenChange?: (open: boolean) => void;
-}) {
+export function TransferRowContextMenu(
+  props: TransferActionMenuProps & {
+    children: ReactElement;
+    onOpenChange?: (open: boolean) => void;
+  },
+) {
   const entries = buildTransferMenuEntries(props);
   return (
     <ContextMenu onOpenChange={props.onOpenChange}>
@@ -160,35 +176,39 @@ export function TransferRowContextMenu(props: TransferActionMenuProps & {
 }
 
 function DropdownActionEntries({ entries }: { entries: TransferMenuEntry[] }) {
-  return entries.map((entry, index) => entry.kind === "separator" ? (
-    <DropdownMenuSeparator key={`separator-${index}`} />
-  ) : (
-    <DropdownMenuItem
-      key={`${entry.label}-${index}`}
-      disabled={entry.disabled}
-      className={entry.danger ? "text-destructive focus:text-destructive" : undefined}
-      onSelect={entry.run}
-    >
-      {entry.icon}
-      {entry.label}
-    </DropdownMenuItem>
-  ));
+  return entries.map((entry, index) =>
+    entry.kind === "separator" ? (
+      <DropdownMenuSeparator key={`separator-${index}`} />
+    ) : (
+      <DropdownMenuItem
+        key={`${entry.label}-${index}`}
+        disabled={entry.disabled}
+        className={entry.danger ? "text-destructive focus:text-destructive" : undefined}
+        onSelect={entry.run}
+      >
+        {entry.icon}
+        {entry.label}
+      </DropdownMenuItem>
+    ),
+  );
 }
 
 function ContextActionEntries({ entries }: { entries: TransferMenuEntry[] }) {
-  return entries.map((entry, index) => entry.kind === "separator" ? (
-    <ContextMenuSeparator key={`separator-${index}`} />
-  ) : (
-    <ContextMenuItem
-      key={`${entry.label}-${index}`}
-      disabled={entry.disabled}
-      className={entry.danger ? "gap-2 text-destructive focus:text-destructive" : "gap-2"}
-      onSelect={entry.run}
-    >
-      {entry.icon}
-      {entry.label}
-    </ContextMenuItem>
-  ));
+  return entries.map((entry, index) =>
+    entry.kind === "separator" ? (
+      <ContextMenuSeparator key={`separator-${index}`} />
+    ) : (
+      <ContextMenuItem
+        key={`${entry.label}-${index}`}
+        disabled={entry.disabled}
+        className={entry.danger ? "gap-2 text-destructive focus:text-destructive" : "gap-2"}
+        onSelect={entry.run}
+      >
+        {entry.icon}
+        {entry.label}
+      </ContextMenuItem>
+    ),
+  );
 }
 
 function buildTransferMenuEntries(props: TransferActionMenuProps): TransferMenuEntry[] {
@@ -197,7 +217,8 @@ function buildTransferMenuEntries(props: TransferActionMenuProps): TransferMenuE
     entries.push({ kind: "item", ...entry });
   };
   const pushSeparator = () => {
-    if (entries.length > 0 && entries[entries.length - 1]?.kind !== "separator") entries.push({ kind: "separator" });
+    if (entries.length > 0 && entries[entries.length - 1]?.kind !== "separator")
+      entries.push({ kind: "separator" });
   };
   const row = props.row;
   if (row?.operationId) {
@@ -210,14 +231,33 @@ function buildTransferMenuEntries(props: TransferActionMenuProps): TransferMenuE
     });
     if (row.status === "waiting_for_resolution" && !props.queueWorking) {
       pushSeparator();
-      if (row.supportsReplace) pushItem({ label: "Replace", run: () => void props.onResolveConflict(row, "replace", false) });
+      if (row.supportsReplace)
+        pushItem({
+          label: "Replace",
+          run: () => void props.onResolveConflict(row, "replace", false),
+        });
       pushItem({ label: "Skip", run: () => void props.onResolveConflict(row, "skip", false) });
-      if (row.supportsKeepBoth) pushItem({ label: "Keep both", run: () => void props.onResolveConflict(row, "keep_both", false) });
+      if (row.supportsKeepBoth)
+        pushItem({
+          label: "Keep both",
+          run: () => void props.onResolveConflict(row, "keep_both", false),
+        });
       if (row.batchId) {
         pushSeparator();
-        if (row.supportsReplace) pushItem({ label: "Replace batch", run: () => void props.onResolveConflict(row, "replace", true) });
-        pushItem({ label: "Skip batch", run: () => void props.onResolveConflict(row, "skip", true) });
-        if (row.supportsKeepBoth) pushItem({ label: "Keep both in batch", run: () => void props.onResolveConflict(row, "keep_both", true) });
+        if (row.supportsReplace)
+          pushItem({
+            label: "Replace batch",
+            run: () => void props.onResolveConflict(row, "replace", true),
+          });
+        pushItem({
+          label: "Skip batch",
+          run: () => void props.onResolveConflict(row, "skip", true),
+        });
+        if (row.supportsKeepBoth)
+          pushItem({
+            label: "Keep both in batch",
+            run: () => void props.onResolveConflict(row, "keep_both", true),
+          });
       }
     }
     pushSeparator();
@@ -241,18 +281,39 @@ function buildTransferMenuEntries(props: TransferActionMenuProps): TransferMenuE
         disabled: props.queueWorking,
         run: () => void props.onPauseResumeBatch(row),
       });
-      pushItem({ label: "Cancel batch", icon: <XCircle />, disabled: props.queueWorking, run: () => void props.onCancelBatch(row) });
+      pushItem({
+        label: "Cancel batch",
+        icon: <XCircle />,
+        disabled: props.queueWorking,
+        run: () => void props.onCancelBatch(row),
+      });
     }
   } else if (row?.retryable && row.status === "failed") {
-    pushItem({ label: "Retry", icon: <RotateCcw />, disabled: props.queueWorking, run: () => void props.onRetry(row) });
+    pushItem({
+      label: "Retry",
+      icon: <RotateCcw />,
+      disabled: props.queueWorking,
+      run: () => void props.onRetry(row),
+    });
   }
   if (row && !row.operationId && row.undoable && row.undoTokenId) {
     pushSeparator();
-    pushItem({ label: "Undo", icon: <RefreshCcw />, disabled: props.queueWorking, run: () => props.onUndo(row.undoTokenId) });
+    pushItem({
+      label: "Undo",
+      icon: <RefreshCcw />,
+      disabled: props.queueWorking,
+      run: () => props.onUndo(row.undoTokenId),
+    });
   }
   if (row) {
     pushSeparator();
-    pushItem({ label: "Delete row", icon: <Trash2 />, danger: true, disabled: props.historyWorking, run: () => props.onDeleteRow(row.id) });
+    pushItem({
+      label: "Delete row",
+      icon: <Trash2 />,
+      danger: true,
+      disabled: props.historyWorking,
+      run: () => props.onDeleteRow(row.id),
+    });
   }
   pushSeparator();
   pushItem({
@@ -262,6 +323,12 @@ function buildTransferMenuEntries(props: TransferActionMenuProps): TransferMenuE
     disabled: props.selectedCount === 0 || props.historyWorking,
     run: props.onDeleteSelected,
   });
-  pushItem({ label: "Clear all rows", icon: <Trash2 />, danger: true, disabled: !props.hasTransfers || props.historyWorking, run: props.onDeleteAll });
+  pushItem({
+    label: "Clear all rows",
+    icon: <Trash2 />,
+    danger: true,
+    disabled: !props.hasTransfers || props.historyWorking,
+    run: props.onDeleteAll,
+  });
   return entries;
 }

@@ -1,5 +1,5 @@
-import type { MultiPanelClosedPane, MultiPanelTab } from "../../../shared/multipanel/types";
-import type { MultiPanelStore } from "../../../shared/multipanel/useMultiPanelStore";
+import type { MultiPanelClosedPane, MultiPanelTab } from "@/shared/multipanel/types";
+import type { MultiPanelStore } from "@/shared/multipanel/useMultiPanelStore";
 import {
   isTransferTableColumn,
   transferDefaultColumnWidths,
@@ -47,7 +47,8 @@ export function loadTransfersMultiPanelSnapshot(): TransfersMultiPanelSnapshot |
     if (!raw) return null;
     const parsed = JSON.parse(raw) as Partial<TransfersMultiPanelSnapshot>;
     if (!Array.isArray(parsed.tabs) || parsed.tabs.length === 0) return null;
-    if (typeof parsed.activeTabId !== "string" || typeof parsed.activePaneId !== "string") return null;
+    if (typeof parsed.activeTabId !== "string" || typeof parsed.activePaneId !== "string")
+      return null;
     return {
       tabs: parsed.tabs,
       activeTabId: parsed.activeTabId,
@@ -63,12 +64,15 @@ export function loadTransfersMultiPanelSnapshot(): TransfersMultiPanelSnapshot |
 
 export function loadTransferColumnWidths(): TransferColumnWidths {
   try {
-    const parsed = JSON.parse(window.localStorage.getItem(TRANSFER_COLUMN_WIDTHS_STORAGE_KEY) ?? "{}");
+    const parsed = JSON.parse(
+      window.localStorage.getItem(TRANSFER_COLUMN_WIDTHS_STORAGE_KEY) ?? "{}",
+    );
     if (!parsed || typeof parsed !== "object") return { ...transferDefaultColumnWidths };
     const widths = { ...transferDefaultColumnWidths };
     for (const column of transferTableColumns) {
       const value = Number((parsed as Partial<Record<TransferTableColumn, unknown>>)[column]);
-      if (Number.isFinite(value)) widths[column] = Math.max(transferMinimumColumnWidths[column], Math.min(640, value));
+      if (Number.isFinite(value))
+        widths[column] = Math.max(transferMinimumColumnWidths[column], Math.min(640, value));
     }
     return widths;
   } catch {
@@ -86,10 +90,16 @@ export function saveTransferColumnWidths(widths: TransferColumnWidths): void {
 
 export function loadTransferColumnOrder(): TransferTableColumn[] {
   try {
-    const parsed = JSON.parse(window.localStorage.getItem(TRANSFER_COLUMN_ORDER_STORAGE_KEY) ?? "[]");
+    const parsed = JSON.parse(
+      window.localStorage.getItem(TRANSFER_COLUMN_ORDER_STORAGE_KEY) ?? "[]",
+    );
     const unique = Array.isArray(parsed)
-      ? parsed.filter((value, index): value is TransferTableColumn =>
-          typeof value === "string" && isTransferTableColumn(value) && parsed.indexOf(value) === index)
+      ? parsed.filter(
+          (value, index): value is TransferTableColumn =>
+            typeof value === "string" &&
+            isTransferTableColumn(value) &&
+            parsed.indexOf(value) === index,
+        )
       : [];
     const missing = transferTableColumns.filter((column) => !unique.includes(column));
     return unique.length > 0 ? [...unique, ...missing] : [...transferTableColumns];
@@ -108,7 +118,9 @@ export function saveTransferColumnOrder(order: TransferTableColumn[]): void {
 
 export function loadTransferPanelVisibility(): { filters: boolean; detail: boolean } {
   try {
-    const parsed = JSON.parse(window.localStorage.getItem(TRANSFER_PANEL_VISIBILITY_STORAGE_KEY) ?? "{}") as Partial<{ filters: boolean; detail: boolean }>;
+    const parsed = JSON.parse(
+      window.localStorage.getItem(TRANSFER_PANEL_VISIBILITY_STORAGE_KEY) ?? "{}",
+    ) as Partial<{ filters: boolean; detail: boolean }>;
     return {
       filters: typeof parsed.filters === "boolean" ? parsed.filters : true,
       detail: typeof parsed.detail === "boolean" ? parsed.detail : true,
@@ -118,7 +130,10 @@ export function loadTransferPanelVisibility(): { filters: boolean; detail: boole
   }
 }
 
-export function saveTransferPanelVisibility(visibility: { filters: boolean; detail: boolean }): void {
+export function saveTransferPanelVisibility(visibility: {
+  filters: boolean;
+  detail: boolean;
+}): void {
   try {
     window.localStorage.setItem(TRANSFER_PANEL_VISIBILITY_STORAGE_KEY, JSON.stringify(visibility));
   } catch {

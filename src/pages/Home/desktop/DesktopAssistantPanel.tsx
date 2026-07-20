@@ -1,19 +1,20 @@
 import { useEffect, useState } from "react";
 import { Bot } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
-import { openCloudFolderBotWindow } from "../../../bots/cloudFolderBot";
-import { runtimeAssetSource } from "../../../shared/assets/runtimeAsset";
+import { openCloudFolderBotWindow } from "@/bots/cloudFolderBot";
+import { runtimeAssetSource } from "@/shared/assets/runtimeAsset";
 import { useAppStore } from "../../../stores/useAppStore";
-import { assistantDailyMessageLimit, useAssistantUsageStore } from "../../../stores/useAssistantUsageStore";
+import {
+  assistantDailyMessageLimit,
+  useAssistantUsageStore,
+} from "../../../stores/useAssistantUsageStore";
 import { selectAssistantPreferences, useSettingsStore } from "../../../stores/useSettingsStore";
 import { Badge } from "../../../components/ui/badge";
 import { Button } from "../../../components/ui/button";
 import { Progress } from "../../../components/ui/progress";
 
-const panelClass =
-  "flex min-h-0 min-w-0 flex-col";
-const headerClass =
-  "mb-2 flex shrink-0 items-center gap-2 text-sm font-medium text-foreground";
+const panelClass = "flex min-h-0 min-w-0 flex-col";
+const headerClass = "mb-2 flex shrink-0 items-center gap-2 text-sm font-medium text-foreground";
 
 export function DesktopAssistantPanel() {
   const assetsDir = useAppStore((state) => state.app?.environment.assetsDir);
@@ -85,7 +86,9 @@ export function DesktopAssistantPanel() {
         <div className="grid min-w-0 gap-2">
           <div className="flex min-w-0 items-center justify-between gap-3 text-xs">
             <span className="truncate font-medium text-foreground">Daily usage</span>
-            <span className="shrink-0 tabular-nums text-muted-foreground">{messagesUsedToday} / {assistantDailyMessageLimit}</span>
+            <span className="shrink-0 tabular-nums text-muted-foreground">
+              {messagesUsedToday} / {assistantDailyMessageLimit}
+            </span>
           </div>
           <Progress
             aria-label="Mika daily message usage"
@@ -94,11 +97,13 @@ export function DesktopAssistantPanel() {
             value={Math.min(100, (messagesUsedToday / assistantDailyMessageLimit) * 100)}
           />
           <div className="flex min-h-5 flex-wrap gap-1">
-            {enabledScopes.length > 0 ? enabledScopes.map((scope) => (
-              <Badge className="text-[10px]" key={scope} variant="secondary">
-                {scope}
-              </Badge>
-            )) : (
+            {enabledScopes.length > 0 ? (
+              enabledScopes.map((scope) => (
+                <Badge className="text-[10px]" key={scope} variant="secondary">
+                  {scope}
+                </Badge>
+              ))
+            ) : (
               <span className="text-[10px] leading-5 text-muted-foreground">
                 {enabled ? "Allow scopes in Settings" : "Enable Mika in Settings"}
               </span>

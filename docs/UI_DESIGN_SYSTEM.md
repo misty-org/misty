@@ -1,6 +1,6 @@
 # Misty UI design system
 
-Misty uses a layered component system so product pages share the same visual language without giving up feature-specific behavior.
+Misty uses `src/components/ui` as the reusable component system so product pages share the same primitive behavior and can inherit user theming cleanly.
 
 ## Preset identity
 
@@ -8,23 +8,21 @@ Misty's canonical component preset is the same one used by `misty-website` and t
 
 - shadcn style: `radix-vega`
 - base and chart palette: Zinc
-- body typeface: Outfit Variable
-- heading typeface: Inter Variable
+- body and heading typeface: Inter Variable
 - icons: Lucide (brand marks may use their official icon)
 - radius: medium (`--radius: 0.625rem`)
 - menu treatment: default translucent with subtle accents
 
-`components.json` records this identity. `src/styles.css` owns the runtime token mapping for Misty's dark, light, and optional custom themes; page code must not recreate the preset locally.
+`components.json` records this identity. `src/styles.css` owns the runtime token mapping for Misty's dark, light, and optional custom themes; page code must not recreate the preset locally. Font-family overrides are intentionally unsupported so every native surface remains visually consistent.
 
 ## Component ownership
 
-1. `src/components/ui` contains low-level shadcn components. These files wrap Radix behavior and expose Tailwind-based variants. Product pages should not restyle their internal structure.
-2. `src/components/misty` contains stable Misty patterns such as page anatomy, navigation, toolbars, states, sections, status treatments, and icon buttons.
-3. `src/pages/*/components` contains feature-specific composition and behavior. A feature component may combine Misty and shadcn components, but it should not introduce another general-purpose button, dialog, menu, or form system.
+1. `src/components/ui` contains the shadcn/Radix primitives and small generic compositions such as icon buttons, state views, status badges, and toolbars. This is the styling authority.
+2. `src/pages/*/components` contains feature-specific composition and behavior. A feature component may combine shadcn/ui components, but it should not introduce another general-purpose button, dialog, menu, toolbar, status, or form system.
 
 Use a shadcn component before importing Radix directly. Import Radix directly only when implementing a new low-level primitive that does not exist in `src/components/ui`.
 
-`npm run check:ui` enforces this boundary for the shared Misty layer and the migrated Account, Agents, Home, Providers, Settings, Spaces, Studio, and Transfers pages. It also rejects raw form controls and hand-built fullscreen overlays in those protected areas; the command runs as part of `npm run check`.
+`npm run check:ui` enforces this boundary for the shared ui layer and the migrated Account, Agents, Home, Providers, Settings, Spaces, Studio, and Transfers pages. It also rejects raw form controls and hand-built fullscreen overlays in those protected areas; the command runs as part of `npm run check`.
 
 ## Styling contract
 
@@ -44,22 +42,21 @@ Use a shadcn component before importing Radix directly. Import Radix directly on
 Use this structure for standard product pages:
 
 ```tsx
-<PageShell>
-  <PageHeader
-    title="Page title"
-    description="Short context"
-    actions={<Button>Primary action</Button>}
-  />
-  <PageBody>
-    <Section title="Section title">...</Section>
-  </PageBody>
-</PageShell>
+<div className="flex h-full min-h-0 flex-col bg-background text-foreground">
+  <header className="border-b border-border/60 bg-background">
+    <div className="flex min-h-14 items-center gap-3 px-6">
+      <h1 className="text-base font-semibold">Page title</h1>
+      <Button>Primary action</Button>
+    </div>
+  </header>
+  <main className="min-h-0 flex-1 overflow-auto p-6">...</main>
+</div>
 ```
 
-- `PageHeader` is the stable page landmark and action area.
-- `Toolbar` contains search, filters, sorting, and view controls. It does not replace the page header.
-- `Section` groups related content; cards are used only when the content is truly a discrete object or needs its own boundary. Nested sections should normally be borderless.
-- Use `EmptyState`, `LoadingState`, `ErrorState`, and `PermissionState` instead of inventing page-local status panels.
+- The header is the stable page landmark and action area.
+- `Toolbar` from `src/components/ui/toolbar` contains search, filters, sorting, and view controls. It does not replace the page header.
+- Use `Card` only when the content is truly a discrete object or needs its own boundary.
+- Use `EmptyState`, `LoadingState`, `ErrorState`, and `PermissionState` from `src/components/ui/state-view` instead of inventing page-local status panels.
 
 ## Interaction patterns
 
@@ -78,7 +75,7 @@ All overlays must support keyboard traversal, Escape dismissal when safe, visibl
 ## Layout rules
 
 - Preserve established workspace layouts when they carry product behavior. File Explorer keeps its nested split panes, virtualized browser, inspector, drag and drop, and tab persistence.
-- Spaces keeps its contextual two-column shell. Its primary destinations are labeled; a page may add at most one contextual inner rail.
+- Spaces keeps its contextual two-column shell. Primary destinations use the compact horizontal icon rail with accessible labels and tooltips; a page may add at most one contextual inner rail.
 - Avoid nested navigation rails that repeat the same destinations.
 - At narrow widths, reduce secondary metadata and move non-primary actions into menus before collapsing core content.
 
@@ -87,9 +84,8 @@ All overlays must support keyboard traversal, Escape dismissal when safe, visibl
 Before adding a new component:
 
 1. Check `src/components/ui` for the low-level behavior.
-2. Check `src/components/misty` for an existing product pattern.
-3. Decide whether the component is reusable across features or belongs beside one page.
-4. Use semantic tokens and an existing size/radius contract.
-5. Add keyboard and state coverage for interactive behavior.
+2. Decide whether the component is a generic ui primitive/composition or belongs beside one page.
+3. Use semantic tokens and an existing size/radius contract.
+4. Add keyboard and state coverage for interactive behavior.
 
 Use the shadcn CLI with `--dry-run` or `--diff` first. Never blanket-overwrite `src/components/ui`, because these components are application-owned source.

@@ -35,7 +35,9 @@ export function PanelHeader(props: PanelHeaderProps) {
     <CardHeader className="flex flex-row items-center justify-between gap-4 border-b border-border px-[18px] py-3.5">
       <div className="min-w-0">
         <h2 className="truncate text-sm font-semibold text-foreground">{props.title}</h2>
-        {props.subtitle ? <p className="mt-0.5 truncate text-xs text-muted-foreground">{props.subtitle}</p> : null}
+        {props.subtitle ? (
+          <p className="mt-0.5 truncate text-xs text-muted-foreground">{props.subtitle}</p>
+        ) : null}
       </div>
       {props.actions}
     </CardHeader>

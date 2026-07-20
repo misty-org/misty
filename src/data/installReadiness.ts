@@ -1,4 +1,11 @@
-import type { InstallCheck, InstallerStatus, MistyTemplateEntry, MistyTemplateStatus, NativeSystemInfo, PathProbe } from "../models/setup";
+import type {
+  InstallCheck,
+  InstallerStatus,
+  MistyTemplateEntry,
+  MistyTemplateStatus,
+  NativeSystemInfo,
+  PathProbe,
+} from "../models/setup";
 
 export const browserTemplateEntries: MistyTemplateEntry[] = [
   templateEntry("dir", ".local"),
@@ -78,7 +85,9 @@ function templateCheck(entry: MistyTemplateEntry): InstallCheck {
     required: entry.required,
     exists: entry.exists,
     status: entry.exists ? "ready" : "missing",
-    message: entry.exists ? `${label} is ready.` : `${label} will be restored from the Misty template.`,
+    message: entry.exists
+      ? `${label} is ready.`
+      : `${label} will be restored from the Misty template.`,
   };
 }
 

@@ -9,7 +9,9 @@ describe("AppWallpaperVideo", () => {
   let root: Root;
 
   beforeEach(() => {
-    (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    (
+      globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
+    ).IS_REACT_ACT_ENVIRONMENT = true;
     vi.useFakeTimers();
     vi.spyOn(HTMLMediaElement.prototype, "paused", "get").mockReturnValue(true);
     container = document.createElement("div");
@@ -43,7 +45,8 @@ describe("AppWallpaperVideo", () => {
   });
 
   it("retries a rejected autoplay attempt and resumes after an unexpected pause", async () => {
-    const play = vi.spyOn(HTMLMediaElement.prototype, "play")
+    const play = vi
+      .spyOn(HTMLMediaElement.prototype, "play")
       .mockRejectedValueOnce(new DOMException("Not ready", "NotAllowedError"))
       .mockResolvedValue(undefined);
 
@@ -63,7 +66,8 @@ describe("AppWallpaperVideo", () => {
   });
 
   it("keeps retrying while WebKit restores playback after a reload", async () => {
-    const play = vi.spyOn(HTMLMediaElement.prototype, "play")
+    const play = vi
+      .spyOn(HTMLMediaElement.prototype, "play")
       .mockRejectedValue(new DOMException("Media session suspended", "NotAllowedError"));
 
     await act(async () => {

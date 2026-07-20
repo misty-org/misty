@@ -1,4 +1,7 @@
-import { saveAccountAuthToken, type SavedAccountSession } from "../pages/Account/shared/authTokenStore";
+import {
+  saveAccountAuthToken,
+  type SavedAccountSession,
+} from "../pages/Account/shared/authTokenStore";
 
 const demoEmailSuffix = "@demo.misty.local";
 
@@ -14,7 +17,9 @@ export async function bootstrapDemoSession(): Promise<void> {
   if (!token && !rawAccount) return;
 
   if (!import.meta.env.DEV || import.meta.env.VITE_MISTY_DEMO_MODE !== "1") {
-    throw new Error("Demo session bootstrap is only available in an explicit development demo launch.");
+    throw new Error(
+      "Demo session bootstrap is only available in an explicit development demo launch.",
+    );
   }
   if (!token || token.length < 32 || !rawAccount) {
     throw new Error("Demo session bootstrap requires a session token and account identity.");
@@ -39,7 +44,9 @@ export function parseDemoAccount(rawAccount: string): DemoAccount {
     id: String(candidate.id ?? "").trim(),
     name: String(candidate.name ?? "").trim(),
     username: String(candidate.username ?? "").trim() || undefined,
-    email: String(candidate.email ?? "").trim().toLowerCase(),
+    email: String(candidate.email ?? "")
+      .trim()
+      .toLowerCase(),
   };
   if (!account.id || !account.name || !account.email.endsWith(demoEmailSuffix)) {
     throw new Error("Demo account identity must contain an id, name, and reserved demo email.");

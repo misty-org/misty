@@ -9,16 +9,12 @@ if (
   !isNativeMobileBuild &&
   (import.meta.env.DEV || import.meta.env.VITE_MISTY_DEBUG === "1")
 ) {
-  void import("./shared/debug/clientDebug").then(
-    ({ installClientDebugging }) => {
-      installClientDebugging();
-    },
-  );
+  void import("./shared/debug/clientDebug").then(({ installClientDebugging }) => {
+    installClientDebugging();
+  });
 }
 
-const root = ReactDOM.createRoot(
-  document.getElementById("root") as HTMLElement,
-);
+const root = ReactDOM.createRoot(document.getElementById("root") as HTMLElement);
 
 void bootstrap();
 
@@ -26,10 +22,7 @@ async function bootstrap() {
   const { bootstrapDemoSession } = await import("./auth/demoSessionBootstrap");
   await bootstrapDemoSession();
   void analytics.initialize().then(initializeAnalyticsLifecycle);
-  const [{ App }] = await Promise.all([
-    import("./App"),
-    import("./styles.css"),
-  ]);
+  const [{ App }] = await Promise.all([import("./App"), import("./styles.css")]);
   root.render(
     <TelemetryErrorBoundary>
       <App />

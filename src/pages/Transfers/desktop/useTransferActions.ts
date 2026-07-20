@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { TransferRecord } from "../../../api/types";
-import { errorText } from "../../../shared/format";
+import { errorText } from "@/shared/format";
 import { useOperationQueueStore } from "../../../stores/useOperationQueueStore";
 import { useTransfersStore } from "../../../stores/useTransfersStore";
 import { isLiveTransfer } from "./transferModel";
@@ -31,12 +31,15 @@ export function useTransferActions(options: { workspaceId: string; rows: Transfe
   const feedbackTimerRef = useRef<number | null>(null);
   const [actionFeedback, setActionFeedback] = useState<TransferActionFeedback>(null);
 
-  const refreshTransferViews = useCallback(async (options: { force?: boolean } = {}) => {
-    await Promise.all([
-      loadTransfers(undefined, { silent: true, force: options.force }),
-      useOperationQueueStore.getState().load({ silent: true, force: options.force }),
-    ]);
-  }, [loadTransfers]);
+  const refreshTransferViews = useCallback(
+    async (options: { force?: boolean } = {}) => {
+      await Promise.all([
+        loadTransfers(undefined, { silent: true, force: options.force }),
+        useOperationQueueStore.getState().load({ silent: true, force: options.force }),
+      ]);
+    },
+    [loadTransfers],
+  );
 
   const hasLiveTransferWork = useMemo(
     () => options.rows.some(isLiveTransfer) || (queueSnapshot?.activeCount ?? 0) > 0,
@@ -50,9 +53,12 @@ export function useTransferActions(options: { workspaceId: string; rows: Transfe
     return () => window.clearInterval(interval);
   }, [hasLiveTransferWork, refreshTransferViews]);
 
-  useEffect(() => () => {
-    if (feedbackTimerRef.current !== null) window.clearTimeout(feedbackTimerRef.current);
-  }, []);
+  useEffect(
+    () => () => {
+      if (feedbackTimerRef.current !== null) window.clearTimeout(feedbackTimerRef.current);
+    },
+    [],
+  );
 
   const showActionFeedback = useCallback((feedback: TransferActionFeedback, autoClearMs = 2800) => {
     if (feedbackTimerRef.current !== null) window.clearTimeout(feedbackTimerRef.current);
@@ -66,82 +72,138 @@ export function useTransferActions(options: { workspaceId: string; rows: Transfe
     }
   }, []);
 
-  const refreshAfterQueueMutation = useCallback(async (
-    action: Promise<void>,
-    labels: { busy: string; success: string },
-  ) => {
-    showActionFeedback({ tone: "busy", text: labels.busy }, 0);
-    try {
-      await action;
-      const queueError = useOperationQueueStore.getState().error;
-      await refreshTransferViews({ force: true });
-      if (queueError) showActionFeedback({ tone: "error", text: queueError }, 6500);
-      else showActionFeedback({ tone: "success", text: labels.success });
-    } catch (error) {
-      await refreshTransferViews({ force: true });
-      showActionFeedback({ tone: "error", text: errorText(error) }, 6500);
-    }
-  }, [refreshTransferViews, showActionFeedback]);
+  const refreshAfterQueueMutation = useCallback(
+    async (action: Promise<void>, labels: { busy: string; success: string }) => {
+      showActionFeedback({ tone: "busy", text: labels.busy }, 0);
+      try {
+        await action;
+        const queueError = useOperationQueueStore.getState().error;
+        await refreshTransferViews({ force: true });
+        if (queueError) showActionFeedback({ tone: "error", text: queueError }, 6500);
+        else showActionFeedback({ tone: "success", text: labels.success });
+      } catch (error) {
+        await refreshTransferViews({ force: true });
+        showActionFeedback({ tone: "error", text: errorText(error) }, 6500);
+      }
+    },
+    [refreshTransferViews, showActionFeedback],
+  );
 
-  const handleUndo = useCallback((undoTokenId: number) => {
-    void refreshAfterQueueMutation(undoOperation(undoTokenId), { busy: "Undoing transfer…", success: "Undo queued." });
-  }, [refreshAfterQueueMutation, undoOperation]);
-  const handleCancelOperation = useCallback((operationId: number) => refreshAfterQueueMutation(cancelOperation(operationId), {
-    busy: "Canceling transfer…",
-    success: "Cancel requested.",
-  }), [cancelOperation, refreshAfterQueueMutation]);
-  const handleRetryOperation = useCallback((operationId: number) => refreshAfterQueueMutation(retryOperation(operationId), {
-    busy: "Retrying transfer…",
-    success: "Retry queued.",
-  }), [refreshAfterQueueMutation, retryOperation]);
-  const handlePauseResumeTransfer = useCallback((transfer: TransferRecord) => {
-    if (!transfer.operationId) return Promise.resolve();
-    const resuming = transfer.paused;
-    return refreshAfterQueueMutation(resuming ? resumeOperation(transfer.operationId) : pauseOperation(transfer.operationId), {
-      busy: resuming ? "Resuming transfer…" : "Pausing transfer…",
-      success: resuming ? "Transfer resumed." : "Pause requested.",
-    });
-  }, [pauseOperation, refreshAfterQueueMutation, resumeOperation]);
-  const handlePauseResumeBatchTransfer = useCallback((transfer: TransferRecord) => {
-    if (!transfer.batchId) return Promise.resolve();
-    const batch = queueSnapshot?.batches.find((candidate) => candidate.batchId === transfer.batchId);
-    const resuming = Boolean(batch?.paused);
-    return refreshAfterQueueMutation(resuming ? resumeBatch(transfer.batchId) : pauseBatch(transfer.batchId), {
-      busy: resuming ? "Resuming batch…" : "Pausing batch…",
-      success: resuming ? "Batch resumed." : "Batch paused.",
-    });
-  }, [pauseBatch, queueSnapshot?.batches, refreshAfterQueueMutation, resumeBatch]);
-  const handleCancelBatchTransfer = useCallback((transfer: TransferRecord) => {
-    if (!transfer.batchId) return Promise.resolve();
-    return refreshAfterQueueMutation(cancelBatch(transfer.batchId), { busy: "Canceling batch…", success: "Batch cancellation requested." });
-  }, [cancelBatch, refreshAfterQueueMutation]);
-  const handleResolveConflictTransfer = useCallback((
-    transfer: TransferRecord,
-    policy: "replace" | "skip" | "keep_both",
-    applyToBatch: boolean,
-  ) => {
-    if (!transfer.operationId) return Promise.resolve();
-    return refreshAfterQueueMutation(resolveConflict(transfer.operationId, policy, applyToBatch), {
-      busy: "Resolving conflict…",
-      success: "Conflict resolved.",
-    });
-  }, [refreshAfterQueueMutation, resolveConflict]);
-  const handleCancelTransfer = useCallback((transfer: TransferRecord) => {
-    if (!transfer.operationId) return Promise.resolve();
-    return handleCancelOperation(transfer.operationId);
-  }, [handleCancelOperation]);
-  const handleRetryTransfer = useCallback((transfer: TransferRecord) => {
-    if (transfer.operationId) return handleRetryOperation(transfer.operationId);
-    return refreshAfterQueueMutation(retryTransfer(transfer.id), { busy: "Retrying transfer…", success: "Retry queued." });
-  }, [handleRetryOperation, refreshAfterQueueMutation, retryTransfer]);
-  const handleDeleteTransfer = useCallback((transferId: number) => {
-    void deleteIds(options.workspaceId, [transferId]);
-  }, [deleteIds, options.workspaceId]);
-  const handleDeleteSelected = useCallback(() => void deleteSelected(options.workspaceId), [deleteSelected, options.workspaceId]);
+  const handleUndo = useCallback(
+    (undoTokenId: number) => {
+      void refreshAfterQueueMutation(undoOperation(undoTokenId), {
+        busy: "Undoing transfer…",
+        success: "Undo queued.",
+      });
+    },
+    [refreshAfterQueueMutation, undoOperation],
+  );
+  const handleCancelOperation = useCallback(
+    (operationId: number) =>
+      refreshAfterQueueMutation(cancelOperation(operationId), {
+        busy: "Canceling transfer…",
+        success: "Cancel requested.",
+      }),
+    [cancelOperation, refreshAfterQueueMutation],
+  );
+  const handleRetryOperation = useCallback(
+    (operationId: number) =>
+      refreshAfterQueueMutation(retryOperation(operationId), {
+        busy: "Retrying transfer…",
+        success: "Retry queued.",
+      }),
+    [refreshAfterQueueMutation, retryOperation],
+  );
+  const handlePauseResumeTransfer = useCallback(
+    (transfer: TransferRecord) => {
+      if (!transfer.operationId) return Promise.resolve();
+      const resuming = transfer.paused;
+      return refreshAfterQueueMutation(
+        resuming ? resumeOperation(transfer.operationId) : pauseOperation(transfer.operationId),
+        {
+          busy: resuming ? "Resuming transfer…" : "Pausing transfer…",
+          success: resuming ? "Transfer resumed." : "Pause requested.",
+        },
+      );
+    },
+    [pauseOperation, refreshAfterQueueMutation, resumeOperation],
+  );
+  const handlePauseResumeBatchTransfer = useCallback(
+    (transfer: TransferRecord) => {
+      if (!transfer.batchId) return Promise.resolve();
+      const batch = queueSnapshot?.batches.find(
+        (candidate) => candidate.batchId === transfer.batchId,
+      );
+      const resuming = Boolean(batch?.paused);
+      return refreshAfterQueueMutation(
+        resuming ? resumeBatch(transfer.batchId) : pauseBatch(transfer.batchId),
+        {
+          busy: resuming ? "Resuming batch…" : "Pausing batch…",
+          success: resuming ? "Batch resumed." : "Batch paused.",
+        },
+      );
+    },
+    [pauseBatch, queueSnapshot?.batches, refreshAfterQueueMutation, resumeBatch],
+  );
+  const handleCancelBatchTransfer = useCallback(
+    (transfer: TransferRecord) => {
+      if (!transfer.batchId) return Promise.resolve();
+      return refreshAfterQueueMutation(cancelBatch(transfer.batchId), {
+        busy: "Canceling batch…",
+        success: "Batch cancellation requested.",
+      });
+    },
+    [cancelBatch, refreshAfterQueueMutation],
+  );
+  const handleResolveConflictTransfer = useCallback(
+    (transfer: TransferRecord, policy: "replace" | "skip" | "keep_both", applyToBatch: boolean) => {
+      if (!transfer.operationId) return Promise.resolve();
+      return refreshAfterQueueMutation(
+        resolveConflict(transfer.operationId, policy, applyToBatch),
+        {
+          busy: "Resolving conflict…",
+          success: "Conflict resolved.",
+        },
+      );
+    },
+    [refreshAfterQueueMutation, resolveConflict],
+  );
+  const handleCancelTransfer = useCallback(
+    (transfer: TransferRecord) => {
+      if (!transfer.operationId) return Promise.resolve();
+      return handleCancelOperation(transfer.operationId);
+    },
+    [handleCancelOperation],
+  );
+  const handleRetryTransfer = useCallback(
+    (transfer: TransferRecord) => {
+      if (transfer.operationId) return handleRetryOperation(transfer.operationId);
+      return refreshAfterQueueMutation(retryTransfer(transfer.id), {
+        busy: "Retrying transfer…",
+        success: "Retry queued.",
+      });
+    },
+    [handleRetryOperation, refreshAfterQueueMutation, retryTransfer],
+  );
+  const handleDeleteTransfer = useCallback(
+    (transferId: number) => {
+      void deleteIds(options.workspaceId, [transferId]);
+    },
+    [deleteIds, options.workspaceId],
+  );
+  const handleDeleteSelected = useCallback(
+    () => void deleteSelected(options.workspaceId),
+    [deleteSelected, options.workspaceId],
+  );
   const handleDeleteAll = useCallback(() => void deleteAll(), [deleteAll]);
-  const isBatchPaused = useCallback((row: TransferRecord) => Boolean(
-    row.batchId && queueSnapshot?.batches.find((batch) => batch.batchId === row.batchId)?.paused,
-  ), [queueSnapshot?.batches]);
+  const isBatchPaused = useCallback(
+    (row: TransferRecord) =>
+      Boolean(
+        row.batchId &&
+        queueSnapshot?.batches.find((batch) => batch.batchId === row.batchId)?.paused,
+      ),
+    [queueSnapshot?.batches],
+  );
 
   return {
     actionFeedback,

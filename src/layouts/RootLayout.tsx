@@ -2,11 +2,11 @@ import { useEffect, useRef } from "react";
 import { Outlet, useNavigate } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
 import { AuthProvider } from "../auth/AuthContext";
-import { RenderErrorBoundary } from "../shared/components/RenderErrorBoundary";
+import { RenderErrorBoundary } from "@/shared/components/RenderErrorBoundary";
 import { useSetupStore } from "../stores/useSetupStore";
 import { installMistyDeepLinkHandler } from "../routing/deepLinks";
-import { useAppZoom } from "../shared/hooks/useAppZoom";
-import { isNativeMobileBuild } from "../platform/buildTarget";
+import { useAppZoom } from "@/shared/hooks/useAppZoom";
+import { isNativeMobileBuild } from "@/platform/buildTarget";
 
 export function RootLayout(props: {
   isDeepLinkRouteAllowed: (route: string) => boolean;
@@ -15,11 +15,11 @@ export function RootLayout(props: {
   const navigate = useNavigate();
   const appZoom = useAppZoom();
   const setupLoadStarted = useRef(false);
-  const {
-    loadSystem,
-  } = useSetupStore(useShallow((state) => ({
-    loadSystem: state.loadSystem,
-  })));
+  const { loadSystem } = useSetupStore(
+    useShallow((state) => ({
+      loadSystem: state.loadSystem,
+    })),
+  );
 
   useEffect(
     () =>
@@ -28,11 +28,7 @@ export function RootLayout(props: {
         props.isDeepLinkRouteAllowed,
         props.resolveAuthDeepLinkRoute,
       ),
-    [
-      navigate,
-      props.isDeepLinkRouteAllowed,
-      props.resolveAuthDeepLinkRoute,
-    ],
+    [navigate, props.isDeepLinkRouteAllowed, props.resolveAuthDeepLinkRoute],
   );
 
   useEffect(() => {
@@ -69,4 +65,3 @@ function AppZoomIndicator(props: { visible: boolean; percent: number }) {
     </div>
   );
 }
-  

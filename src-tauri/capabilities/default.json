@@ -2,7 +2,7 @@
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
   "description": "Misty desktop window permissions",
-  "windows": ["main"],
+  "windows": ["main", "playground"],
   "permissions": [
     "core:default",
     "core:window:allow-close",
