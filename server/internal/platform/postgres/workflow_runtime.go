@@ -281,23 +281,6 @@ func (db *Database) JournalWorkflowAction(ctx context.Context, runID, nodeID, id
 	return result, executeErr
 }
 
-func (db *Database) AcquireWorkflowResourceLease(ctx context.Context, runID, nodeID, resourceKey, fingerprint string, duration time.Duration) (bool, error) {
-	if duration < time.Second || duration > 10*time.Minute {
-		return false, ErrSpaceInvalid
-	}
-	acquired := false
-	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
-		result, err := tx.ExecContext(ctx, `INSERT INTO space_workflow_resource_leases(resource_key,run_id,node_id,fingerprint,expires_at) VALUES($1,$2,$3,$4,NOW()+$5::interval) ON CONFLICT(resource_key) DO UPDATE SET run_id=EXCLUDED.run_id,node_id=EXCLUDED.node_id,fingerprint=EXCLUDED.fingerprint,expires_at=EXCLUDED.expires_at,created_at=NOW() WHERE space_workflow_resource_leases.expires_at<=NOW() OR space_workflow_resource_leases.run_id=EXCLUDED.run_id`, resourceKey, runID, nodeID, fingerprint, duration.String())
-		if err != nil {
-			return err
-		}
-		count, _ := result.RowsAffected()
-		acquired = count == 1
-		return nil
-	})
-	return acquired, err
-}
-
 func (db *Database) ReleaseWorkflowResourceLease(ctx context.Context, runID, nodeID, resourceKey string) error {
 	return db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		_, err := tx.ExecContext(ctx, `DELETE FROM space_workflow_resource_leases WHERE resource_key=$1 AND run_id=$2 AND node_id=$3`, resourceKey, runID, nodeID)

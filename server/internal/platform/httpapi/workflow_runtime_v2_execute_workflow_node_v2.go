@@ -212,24 +212,13 @@ func (s *SpacesService) executeWorkflowNodeV2(ctx context.Context, run *db.Space
 	}
 	resourceKey, fingerprint := TestingWorkflowResourceIdentity(invocation.Config, invocation.Input)
 	if resourceKey != "" {
-		for {
-			acquired, err := s.database.AcquireWorkflowResourceLease(ctx, run.ID, invocation.NodeID, resourceKey, fingerprint, 2*time.Minute)
-			if err != nil {
-				return nil, err
-			}
-			if acquired {
-				break
-			}
-			timer := time.NewTimer(500 * time.Millisecond)
-			select {
-			case <-ctx.Done():
-				timer.Stop()
-				return nil, ctx.Err()
-			case <-timer.C:
-			}
+		if err := waitForWorkflowResource(ctx, s.database, run.ID, invocation.NodeID, resourceKey, fingerprint, 2*time.Minute); err != nil {
+			return nil, err
 		}
 		defer func() {
-			_ = s.database.ReleaseWorkflowResourceLease(context.Background(), run.ID, invocation.NodeID, resourceKey)
+			release, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+			defer cancel()
+			_ = s.database.ReleaseWorkflowResourceLease(release, run.ID, invocation.NodeID, resourceKey)
 		}()
 	}
 	return s.database.JournalWorkflowAction(ctx, run.ID, invocation.NodeID, invocation.IdempotencyKey, descriptor.Kind, descriptor.Risk, invocation.Input, readResult)
