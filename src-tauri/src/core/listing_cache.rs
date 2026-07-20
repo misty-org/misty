@@ -1,7 +1,4 @@
-use std::{
-    path::{Path, PathBuf},
-    time::SystemTime,
-};
+use std::path::{Path, PathBuf};
 
 use crate::error::{ApiError, ApiResult};
 
@@ -75,19 +72,6 @@ impl ListingCache {
                 .map_err(|error| io_error("replace listing cache", &path, error))?;
         }
         Ok(())
-    }
-
-    pub async fn last_write_time(
-        &self,
-        remote: &str,
-        remote_path: &str,
-    ) -> ApiResult<Option<SystemTime>> {
-        let primary = self.file_for(remote, remote_path);
-        match tokio::fs::metadata(&primary).await {
-            Ok(metadata) => Ok(metadata.modified().ok()),
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
-            Err(error) => Err(io_error("inspect listing cache", &primary, error)),
-        }
     }
 
     pub async fn clear(&self, remote: &str, remote_path: &str) -> ApiResult<()> {

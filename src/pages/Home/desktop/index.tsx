@@ -1,39 +1,35 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
-import { devicesSnapshot, savedSearchesSnapshot } from "../../../api/misty";
+import { devicesSnapshot, savedSearchesSnapshot } from "@/stores/backend";
 import type {
   ExplorerLibrarySnapshot,
   MountedDevice,
   ProviderRemote,
   SavedSearch,
   SavedSearchRule,
-} from "../../../api/types";
-import { releases } from "../../../data/releases";
-import { useMultiPanelStore } from "../../../shared/multipanel/useMultiPanelStore";
-import { useAppStore } from "../../../stores/useAppStore";
-import { useExplorerStore } from "../../../stores/useExplorerStore";
-import { useProvidersStore } from "../../../stores/useProvidersStore";
-import { useSearchStore } from "../../../stores/useSearchStore";
-import { explorerRootForBuild } from "../../../platform/androidStorage";
-import { isAndroidBuild } from "../../../platform/buildTarget";
+} from "@/models/interfaces/services/misty-api";
+import { releases } from "@/features/installer/data/releases";
+import { useMultiPanelStore } from "@/features/workspace";
+import { useAppStore } from "@/stores/app";
+import { useExplorerStore } from "@/stores/explorer";
+import { useProvidersStore } from "@/stores/providers";
+import { useSearchStore } from "@/stores/explorer";
+import { isAndroidBuild } from "@/platform/buildTarget";
 import {
   selectAdvancedPreferences,
   selectGeneralPreferences,
   useSettingsStore,
-} from "../../../stores/useSettingsStore";
-import { changelog } from "../../Changelog/desktop/data";
-import { posts } from "../../../data/blog";
+} from "@/stores/app";
+import { posts } from "@/features/installer/data/blog";
 import { DesktopWorkspacePanel } from "./DesktopWorkspacePanel";
-import { DesktopAssistantPanel } from "./DesktopAssistantPanel";
 import { HomeFooter } from "./HomeFooter";
-import {
-  buildHomeQuickAccessItems,
-  HomeSidebarPanels,
-  type HomeQuickAccessItem,
-  type HomeSmartFolderItem,
-  type HomeTagItem,
-} from "./HomeSidebarPanels";
+import { buildHomeQuickAccessItems, HomeSidebarPanels } from "./HomeSidebarPanels";
+import type {
+  HomeQuickAccessItem,
+  HomeSmartFolderItem,
+  HomeTagItem,
+} from "@/models/types/pages/Home/desktop/HomeSidebarPanels";
 import {
   joinPath,
   resolveMountRoot,
@@ -48,15 +44,12 @@ export default function HomePage() {
   const app = useAppStore((state) => state.app);
   const { preferredWorkspaceRoot, settingsMountPath } = useSettingsStore(
     useShallow((state) => ({
-      preferredWorkspaceRoot: selectGeneralPreferences(state.settings?.document).preferredWorkspaceRoot,
+      preferredWorkspaceRoot: selectGeneralPreferences(state.settings?.document)
+        .preferredWorkspaceRoot,
       settingsMountPath: selectAdvancedPreferences(state.settings?.document).mountPath,
     })),
   );
-  const {
-    library,
-    loadLibrary,
-    pinnedPaths,
-  } = useExplorerStore(
+  const { library, loadLibrary, pinnedPaths } = useExplorerStore(
     useShallow((state) => ({
       library: state.library,
       loadLibrary: state.loadLibrary,
@@ -78,7 +71,7 @@ export default function HomePage() {
     preferredWorkspaceRoot,
     app?.environment.homeDir ?? "/",
   );
-  const homePath = explorerRootForBuild(storageHomePath);
+  const homePath = isAndroidBuild ? "misty://local" : storageHomePath;
   const mountRoot = resolveMountRoot(
     storageHomePath,
     settingsMountPath || app?.environment.mountPath || ".misty/mnt",
@@ -142,7 +135,7 @@ export default function HomePage() {
     };
   }, []);
 
-  const latestChangelog = changelog[0] ?? {
+  const latestChangelog = {
     version: releases[0].version,
     date: releases[0].date,
     summary: releases[0].summary,
@@ -189,8 +182,8 @@ export default function HomePage() {
   };
 
   return (
-    <div className="misty-scrollbar relative box-border h-full min-h-0 min-w-0 overflow-x-hidden overflow-y-auto overscroll-contain p-[clamp(0.5rem,1vw,1.25rem)]">
-      <section className="relative z-10 flex min-h-full w-full min-w-0 flex-col gap-[clamp(0.5rem,0.8vw,1rem)]">
+    <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden bg-background text-foreground">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain bg-background p-5 max-[720px]:p-4">
         <HomeSidebarPanels
           devices={devices}
           devicesLoading={devicesLoading}
@@ -202,18 +195,14 @@ export default function HomePage() {
           quickAccessItems={quickAccessItems}
           remotes={remotes}
           remotesLoading={remotesLoading}
-          assistantPanel={<DesktopAssistantPanel />}
           smartFolders={smartFolders}
           smartFoldersLoading={smartFoldersLoading}
           tags={tags}
           tagsLoading={!library}
           workspacePanel={<DesktopWorkspacePanel homePath={homePath} />}
         />
-        <HomeFooter
-          latestChangelog={latestChangelog}
-          latestPost={latestPost}
-        />
-      </section>
+        <HomeFooter latestChangelog={latestChangelog} latestPost={latestPost} />
+      </div>
     </div>
   );
 }
@@ -242,18 +231,21 @@ function buildHomeTagItems(library: ExplorerLibrarySnapshot | null): HomeTagItem
     seenByPath.set(pathKey, pathTags);
   }
 
-  return [...tags.values()].sort((left, right) =>
-    right.count - left.count || left.name.localeCompare(right.name),
+  return [...tags.values()].sort(
+    (left, right) => right.count - left.count || left.name.localeCompare(right.name),
   );
 }
 
 function smartFolderQuery(search: SavedSearch): string {
-  return search.query.trim() || smartFolderQueryFromRules(search.rules, smartFolderMatchMode(search.rules));
+  return (
+    search.query.trim() ||
+    smartFolderQueryFromRules(search.rules, smartFolderMatchMode(search.rules))
+  );
 }
 
 function sortSavedSearches(searches: SavedSearch[]): SavedSearch[] {
-  return [...searches].sort((left, right) =>
-    right.updatedAtMs - left.updatedAtMs || left.name.localeCompare(right.name),
+  return [...searches].sort(
+    (left, right) => right.updatedAtMs - left.updatedAtMs || left.name.localeCompare(right.name),
   );
 }
 
@@ -307,7 +299,7 @@ function operatorSymbol(operator: string): string {
 
 function quoteSearchToken(value: string): string {
   if (!value) return "";
-  return /\s/.test(value) ? `"${value.replace(/"/g, "\\\"")}"` : value;
+  return /\s/.test(value) ? `"${value.replace(/"/g, '\\"')}"` : value;
 }
 
 function quoteTagQueryValue(value: string): string {

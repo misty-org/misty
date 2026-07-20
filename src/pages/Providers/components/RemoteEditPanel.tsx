@@ -1,48 +1,25 @@
-import type { ProviderWorkflow, RcloneConfigPaths, RemoteEditDraft } from "../../../api/types";
-import { iconAssets } from "../../../shared/assets/icons";
-import { AssetIcon } from "../../../shared/components/AssetIcon";
-import { Panel, PanelHeader } from "../../../shared/components/Panel";
+import type { RemoteEditPanelProps } from "@/models/interfaces/pages/Providers/components/RemoteEditPanel";
+export type { RemoteEditPanelProps } from "@/models/interfaces/pages/Providers/components/RemoteEditPanel";
+import { Alert, AlertDescription, AlertTitle } from "@/ui";
+import { Button } from "@/ui";
+import { Skeleton } from "@/ui";
+import type {
+  ProviderWorkflow,
+  RcloneConfigPaths,
+  RemoteEditDraft,
+} from "@/models/interfaces/services/misty-api";
+import { iconAssets } from "@/assets/icons";
+import { AssetIcon } from "@/ui";
+import { Panel, PanelHeader } from "@/pages/Providers/components/ProviderPanel";
 import { RemoteConfigForm } from "./RemoteConfigForm";
 import { RemoteEditActions } from "./RemoteEditActions";
-
-const dirtyPillClass =
-  "rounded-full border border-[color-mix(in_srgb,var(--misty-warning)_48%,var(--misty-border))] bg-[color-mix(in_srgb,var(--misty-warning)_12%,var(--misty-surface))] px-[9px] py-[5px] text-xs text-[var(--misty-warning)]";
-
-const stalePillClass =
-  "rounded-full border border-[color-mix(in_srgb,var(--misty-danger)_44%,var(--misty-border))] bg-[color-mix(in_srgb,var(--misty-danger)_12%,var(--misty-surface))] px-[9px] py-[5px] text-xs text-[var(--misty-danger)]";
-
-const staleWarningClass =
-  "flex max-w-[760px] items-center justify-between gap-3 border-b border-[color-mix(in_srgb,var(--misty-danger)_32%,var(--misty-border))] bg-[color-mix(in_srgb,var(--misty-danger)_8%,var(--misty-surface))] px-[18px] py-2.5 text-[var(--misty-danger)]";
-
-const staleWarningButtonClass =
-  "shrink-0 rounded-[7px] border border-[color-mix(in_srgb,var(--misty-danger)_44%,var(--misty-border))] bg-[color-mix(in_srgb,var(--misty-danger)_10%,var(--misty-surface))] px-2.5 py-1.5 text-[var(--misty-danger)] disabled:opacity-55";
+import { EmptyState, ErrorState } from "@/ui";
+import { StatusBadge } from "@/ui";
 
 const remoteEditPanelClass =
   "grid min-h-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden !rounded-none !border-0 !bg-transparent !shadow-none [border-radius:0]";
 
-const remoteEditBodyClass =
-  "min-h-0 overflow-auto";
-
-interface RemoteEditPanelProps {
-  draft: RemoteEditDraft | null;
-  configPaths: RcloneConfigPaths | null;
-  configKeys: string[];
-  workflow: ProviderWorkflow | null;
-  dirty: boolean;
-  loadingRemoteName: string | null;
-  working: boolean;
-  tokenVisible: boolean;
-  validRemoteName: boolean;
-  stale: boolean;
-  serviceError: string | null;
-  onDraftName: (name: string) => void;
-  onConfigField: (key: string, value: string) => void;
-  onTokenField: (key: string, value: string) => void;
-  onTokenVisible: (visible: boolean) => void;
-  onSave: () => void;
-  onDelete: (name: string) => void;
-  onReload: () => void;
-}
+const remoteEditBodyClass = "min-h-0 overflow-auto";
 
 export function RemoteEditPanel(props: RemoteEditPanelProps) {
   const { draft } = props;
@@ -52,11 +29,27 @@ export function RemoteEditPanel(props: RemoteEditPanelProps) {
     <Panel className={remoteEditPanelClass}>
       <PanelHeader
         title="Edit Remote"
-        subtitle={loading ? `Loading ${props.loadingRemoteName}` : draft ? `${draft.providerType} · ${draft.originalName}` : "Select a remote"}
-        actions={<>
-          {!loading && props.stale ? <span className={stalePillClass}>Stale</span> : null}
-          {!loading && props.dirty ? <span className={dirtyPillClass}>Unsaved</span> : null}
-        </>}
+        subtitle={
+          loading
+            ? `Loading ${props.loadingRemoteName}`
+            : draft
+              ? `${draft.providerType} · ${draft.originalName}`
+              : "Select a remote"
+        }
+        actions={
+          <>
+            {!loading && props.stale ? (
+              <StatusBadge status="danger" dot>
+                Stale
+              </StatusBadge>
+            ) : null}
+            {!loading && props.dirty ? (
+              <StatusBadge status="warning" dot>
+                Unsaved
+              </StatusBadge>
+            ) : null}
+          </>
+        }
       />
 
       <div className={remoteEditBodyClass}>
@@ -65,10 +58,25 @@ export function RemoteEditPanel(props: RemoteEditPanelProps) {
         ) : draft ? (
           <>
             {props.stale ? (
-              <div className={staleWarningClass}>
-                <span className="min-w-0 [overflow-wrap:anywhere]">This remote changed in another pane. Reload before saving.</span>
-                <button className={staleWarningButtonClass} type="button" onClick={props.onReload} disabled={props.working}>Reload</button>
-              </div>
+              <Alert
+                variant="destructive"
+                className="max-w-[760px] rounded-none border-x-0 border-t-0"
+              >
+                <AlertTitle>This remote changed in another pane</AlertTitle>
+                <AlertDescription className="flex items-center justify-between gap-3">
+                  <span>Reload before saving.</span>
+                  <Button
+                    className="shrink-0"
+                    variant="outline"
+                    size="sm"
+                    type="button"
+                    onClick={props.onReload}
+                    disabled={props.working}
+                  >
+                    Reload
+                  </Button>
+                </AlertDescription>
+              </Alert>
             ) : null}
             <RemoteConfigForm
               draft={draft}
@@ -90,15 +98,18 @@ export function RemoteEditPanel(props: RemoteEditPanelProps) {
               onDelete={() => props.onDelete(draft.originalName)}
             />
           </>
+        ) : props.serviceError ? (
+          <ErrorState
+            compact
+            title="Remote service unavailable"
+            description="Start the Misty remote service, then refresh Remotes."
+          />
         ) : (
-          <div className="empty m-[18px] inline-flex max-w-[560px] items-center gap-[9px]">
-            <AssetIcon className="shrink-0 text-[var(--misty-accent)]" src={iconAssets.cloud24} size={22} />
-            <span>
-              {props.serviceError
-                ? "Start the Misty remote service, then refresh Remotes."
-                : "Select a remote to view and edit its provider configuration."}
-            </span>
-          </div>
+          <EmptyState
+            compact
+            title="Select a remote"
+            description="Choose a remote to view and edit its provider configuration."
+          />
         )}
       </div>
     </Panel>
@@ -106,29 +117,32 @@ export function RemoteEditPanel(props: RemoteEditPanelProps) {
 }
 
 function RemoteEditSkeleton() {
-  const skeletonBlockClass = "misty-skeleton rounded-[7px]";
   return (
-    <div className="grid max-w-[760px] gap-3.5 p-[18px]" aria-busy="true" aria-label="Loading remote configuration">
-      <div className="inline-flex items-center gap-2 text-[13px] text-[var(--misty-text-muted)]">
+    <div
+      className="grid max-w-[760px] gap-3.5 p-[18px]"
+      aria-busy="true"
+      aria-label="Loading remote configuration"
+    >
+      <div className="inline-flex items-center gap-2 text-[13px] text-muted-foreground">
         <AssetIcon className="animate-spin" src={iconAssets.sync16} size={17} />
         <span>Loading remote configuration</span>
       </div>
       <div className="grid grid-cols-2 gap-4">
-        <span className={`${skeletonBlockClass} h-[68px]`} />
-        <span className={`${skeletonBlockClass} h-[68px]`} />
+        <Skeleton className="h-[68px]" />
+        <Skeleton className="h-[68px]" />
       </div>
       <div className="grid grid-cols-2 gap-4">
-        <span className={`${skeletonBlockClass} h-[68px]`} />
-        <span className={`${skeletonBlockClass} h-[68px]`} />
+        <Skeleton className="h-[68px]" />
+        <Skeleton className="h-[68px]" />
       </div>
-      <div className={`${skeletonBlockClass} h-24`} />
+      <Skeleton className="h-24" />
       <div className="grid grid-cols-2 gap-4">
-        <span className={`${skeletonBlockClass} h-[68px]`} />
-        <span className={`${skeletonBlockClass} h-[68px]`} />
+        <Skeleton className="h-[68px]" />
+        <Skeleton className="h-[68px]" />
       </div>
       <div className="mt-1 grid grid-cols-2 gap-2.5">
-        <span className={`${skeletonBlockClass} h-10`} />
-        <span className={`${skeletonBlockClass} h-10`} />
+        <Skeleton className="h-10" />
+        <Skeleton className="h-10" />
       </div>
     </div>
   );

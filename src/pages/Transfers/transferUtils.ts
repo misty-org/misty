@@ -1,11 +1,11 @@
-import type { TransferRecord } from "../../api/types";
+import type { TransferRecord } from "@/models/interfaces/services/misty-api";
 
 export function transferProgress(row: TransferRecord): string {
   if (
-    row.transferType === "archive"
-    || row.transferType === "create"
-    || row.transferType === "rename"
-    || row.transferType === "delete"
+    row.transferType === "archive" ||
+    row.transferType === "create" ||
+    row.transferType === "rename" ||
+    row.transferType === "delete"
   ) {
     return row.status === "completed" ? "100%" : "0%";
   }

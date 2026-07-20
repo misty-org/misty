@@ -1,18 +1,15 @@
 import { FormEvent, useState } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
-import AuthCard from "../../../auth/components/AuthCard";
-import AuthField from "../../../auth/components/AuthField";
-import AuthMessage from "../../../auth/components/AuthMessage";
-import AuthShell from "../../../auth/components/AuthShell";
-import AuthSubmitButton from "../../../auth/components/AuthSubmitButton";
-import { useAuth } from "../../../auth/AuthContext";
-import {
-  accountFetchMe,
-  accountRegister,
-  type AccountMeResponse,
-} from "../../Account/shared/api";
-import type { CurrentLicense } from "../../../models/setup";
-import { useSetupStore } from "../../../stores/useSetupStore";
+import AuthCard from "@/features/auth/components/AuthCard";
+import AuthField from "@/features/auth/components/AuthField";
+import AuthMessage from "@/features/auth/components/AuthMessage";
+import AuthShell from "@/features/auth/components/AuthShell";
+import AuthSubmitButton from "@/features/auth/components/AuthSubmitButton";
+import { useAuth } from "@/features/auth/AuthContext";
+import { accountFetchMe, accountRegister } from "@/stores/account/useAccountStore";
+import type { AccountMeResponse } from "@/models/interfaces/stores/account/useAccountStore";
+import type { CurrentLicense } from "@/models/types/features/installer/types";
+import { useSetupStore } from "@/stores/app";
 
 function licenseFromMe(me: AccountMeResponse | null): CurrentLicense | null {
   if (!me) return null;
@@ -32,9 +29,10 @@ export default function RegisterPage() {
   const { setUser } = useAuth();
   const saveAuthenticatedUser = useSetupStore((state) => state.saveAuthenticatedUser);
   const routeState = location.state as { from?: string; addingAccount?: boolean } | null;
-  const from = routeState?.from || "/home";
+  const from = routeState?.from || "/files";
   const addingAccount = Boolean(routeState?.addingAccount);
   const [name, setName] = useState("");
+  const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -43,19 +41,22 @@ export default function RegisterPage() {
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
+    const normalizedUsername = username.trim().toLowerCase();
+    if (!/^[a-z0-9_]{3,30}$/.test(normalizedUsername)) {
+      setError("Username must be 3–30 letters, numbers, or underscores.");
+      return;
+    }
     setLoading(true);
 
     try {
-      const user = await accountRegister(name, email, password);
+      const user = await accountRegister(name, normalizedUsername, email, password);
       const me = await accountFetchMe().catch(() => null);
       await saveAuthenticatedUser(user, licenseFromMe(me));
       setUser({ ...user, accountCreatedAt: me?.created_at, currentPlan: me?.tier });
       navigate(from, { replace: true });
     } catch (registerError) {
       setError(
-        registerError instanceof Error
-          ? registerError.message
-          : "Could not create account.",
+        registerError instanceof Error ? registerError.message : "Could not create account.",
       );
     } finally {
       setLoading(false);
@@ -63,11 +64,23 @@ export default function RegisterPage() {
   }
 
   return (
-    <AuthShell title={addingAccount ? "Create another account" : "Create an account"} description={addingAccount ? "Your current account will remain signed in on this device." : "Sign up to get started."} onBack={addingAccount ? () => navigate(from, { replace: true }) : undefined}>
+    <AuthShell
+      title={addingAccount ? "Create another account" : "Create an account"}
+      description={
+        addingAccount
+          ? "Your current account will remain signed in on this device."
+          : "Sign up to get started."
+      }
+      onBack={addingAccount ? () => navigate(from, { replace: true }) : undefined}
+    >
       <AuthCard
         footer={
           <div className="text-center text-sm text-text-muted">
-            <NavLink to="/signin" state={{ from, addingAccount }} className="transition hover:text-text">
+            <NavLink
+              to="/signin"
+              state={{ from, addingAccount }}
+              className="transition hover:text-text"
+            >
               Already have an account? Sign in
             </NavLink>
           </div>
@@ -83,6 +96,19 @@ export default function RegisterPage() {
             required
             disabled={loading}
             onChange={setName}
+          />
+          <AuthField
+            id="register-username"
+            label="Username"
+            value={username}
+            autoComplete="username"
+            placeholder="misty_user"
+            minLength={3}
+            maxLength={30}
+            pattern="[a-zA-Z0-9_]{3,30}"
+            required
+            disabled={loading}
+            onChange={setUsername}
           />
           <AuthField
             id="register-email"

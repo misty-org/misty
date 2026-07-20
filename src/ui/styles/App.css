@@ -1,0 +1,178 @@
+.app-pages-root {
+  font-family: var(--misty-font-family);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.app-pages-root button {
+  cursor: pointer;
+}
+
+.app-pages-root button:disabled {
+  cursor: not-allowed;
+}
+
+.app-pages-root input,
+.app-pages-root textarea {
+  font-variant-ligatures: no-contextual;
+}
+
+.app-pages-root ::selection {
+  background-color: var(--misty-selection);
+  color: var(--misty-text);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+@keyframes misty-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(0.94);
+    opacity: 0.78;
+  }
+}
+
+@keyframes progress {
+  0% {
+    width: 18%;
+    transform: translateX(-30%);
+  }
+  50% {
+    width: 58%;
+    transform: translateX(80%);
+  }
+  100% {
+    width: 18%;
+    transform: translateX(560%);
+  }
+}
+
+.animate-misty-pulse {
+  animation: misty-pulse 1.4s ease-in-out infinite;
+}
+
+.animate-progress {
+  animation: progress 1.25s ease-in-out infinite;
+}
+
+.app-pages-root ::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.app-pages-root ::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.app-pages-root ::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 3px;
+}
+
+.app-pages-root ::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-muted);
+}
+
+.app-pages-root .misty-scrollbar {
+  --misty-scrollbar-thumb: color-mix(in srgb, var(--misty-text-muted) 36%, transparent);
+  --misty-scrollbar-thumb-hover: color-mix(in srgb, var(--misty-text-muted) 58%, transparent);
+  --misty-scrollbar-track: color-mix(in srgb, var(--misty-text-muted) 7%, transparent);
+  scrollbar-color: var(--misty-scrollbar-thumb) var(--misty-scrollbar-track);
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+}
+
+.app-pages-root .misty-scrollbar::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.app-pages-root .misty-scrollbar::-webkit-scrollbar-thumb {
+  background: var(--misty-scrollbar-thumb);
+  border-radius: 999px;
+}
+
+.app-pages-root .misty-scrollbar::-webkit-scrollbar-track {
+  background: var(--misty-scrollbar-track);
+  border-radius: 999px;
+}
+
+.app-pages-root .misty-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: var(--misty-scrollbar-thumb-hover);
+}
+
+.app-pages-root .misty-transient-scrollbar {
+  --misty-transient-scrollbar-thumb: color-mix(in srgb, var(--misty-text-muted) 42%, transparent);
+  --misty-transient-scrollbar-thumb-hover: color-mix(
+    in srgb,
+    var(--misty-text-muted) 66%,
+    transparent
+  );
+  scrollbar-color: transparent transparent;
+  scrollbar-gutter: auto !important;
+  scrollbar-width: thin;
+}
+
+.app-pages-root .misty-file-browser-scrollbar {
+  scrollbar-gutter: stable !important;
+}
+
+.app-pages-root .misty-transient-scrollbar::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+.app-pages-root .misty-transient-scrollbar::-webkit-scrollbar-track,
+.app-pages-root .misty-transient-scrollbar::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+.app-pages-root .misty-transient-scrollbar::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 999px;
+}
+
+.app-pages-root .misty-transient-scrollbar-active {
+  scrollbar-color: var(--misty-transient-scrollbar-thumb) transparent;
+}
+
+.app-pages-root .misty-transient-scrollbar-active::-webkit-scrollbar-thumb {
+  background: var(--misty-transient-scrollbar-thumb);
+}
+
+.app-pages-root .misty-transient-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: var(--misty-transient-scrollbar-thumb-hover);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

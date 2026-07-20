@@ -132,6 +132,15 @@ async fn cancellation_cleanup_removes_partial_destination() {
 }
 
 #[tokio::test]
+async fn drag_preparation_session_can_be_canceled() {
+    let service = test_explorer_service();
+    service.cancel_drag_preparation("session").await;
+    let cancellation = service.drag_preparation_cancellations.lock().await
+        .get("session").cloned().expect("cancel flag should survive an early cancel request");
+    assert!(cancellation.load(Ordering::Relaxed));
+}
+
+#[tokio::test]
 async fn prepared_remote_file_reuses_mounted_file_as_cache() {
     let home = unique_test_dir("remote-files-cache-home");
     let service = test_explorer_service_for_home(home.clone());
@@ -155,6 +164,7 @@ async fn prepared_remote_file_reuses_mounted_file_as_cache() {
             Some("2026-06-26T21:58:36Z"),
             "Preparing remote file to open",
             false,
+            None,
         )
         .await
         .unwrap();
