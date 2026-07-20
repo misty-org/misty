@@ -1,22 +1,13 @@
+import type { TokenField } from "@/models/types/pages/Providers/providerUtils";
+export type { TokenField } from "@/models/types/pages/Providers/providerUtils";
+import type { ProviderConnectionLike } from "@/models/interfaces/pages/Providers/providerUtils";
+export type { ProviderConnectionLike } from "@/models/interfaces/pages/Providers/providerUtils";
+import type { ProviderConfigMode } from "@/models/types/services/misty-api";
 import type {
-  ProviderConfigMode,
   ProviderConfigStep,
   ProviderWorkflow,
   ProviderWorkflowOption,
-} from "../../api/types";
-
-export type TokenField = {
-  key: string;
-  value: string;
-  sensitive: boolean;
-};
-
-interface ProviderConnectionLike {
-  mode: ProviderConfigMode;
-  providerType: string;
-  parameters: Record<string, string>;
-  step: ProviderConfigStep | null;
-}
+} from "@/models/interfaces/services/misty-api";
 
 const preferredConfigKeys = [
   "root_folder_id",
@@ -62,7 +53,10 @@ export function parseTokenFields(tokenJson: string): TokenField[] {
         value: typeof value === "string" ? value : JSON.stringify(value),
         sensitive: key !== "token_type" && (key.includes("token") || key.includes("secret")),
       }))
-      .sort((left, right) => tokenPriority(left.key) - tokenPriority(right.key) || left.key.localeCompare(right.key));
+      .sort(
+        (left, right) =>
+          tokenPriority(left.key) - tokenPriority(right.key) || left.key.localeCompare(right.key),
+      );
   } catch {
     return [];
   }
@@ -100,10 +94,18 @@ export function providerOptionsForConnection(
   workflow: ProviderWorkflow | null,
 ): ProviderWorkflowOption[] {
   if (session.step?.option) return [session.step.option];
+  if (isGoogleDriveProviderType(session.providerType)) {
+    return googleDriveSetupOptions();
+  }
   if (shouldUseOneDriveSetupOptions(session)) {
     return visibleOneDriveSetupOptions(session.parameters);
   }
   return workflow?.options ?? [];
+}
+
+export function isGoogleDriveProviderType(value: string): boolean {
+  const normalized = value.toLowerCase().replace(/[^a-z0-9]/g, "");
+  return normalized === "drive" || normalized === "googledrive";
 }
 
 export function isOneDriveProviderType(value: string): boolean {
@@ -113,6 +115,29 @@ export function isOneDriveProviderType(value: string): boolean {
 
 function shouldUseOneDriveSetupOptions(session: ProviderConnectionLike): boolean {
   return isOneDriveProviderType(session.providerType);
+}
+
+function googleDriveSetupOptions(): ProviderWorkflowOption[] {
+  return [
+    {
+      name: "client_id",
+      label: "Client ID",
+      help: "Optional Google OAuth client ID. Leave blank to use the built-in OAuth app.",
+      defaultValue: "",
+      required: false,
+      password: false,
+      choices: [],
+    },
+    {
+      name: "client_secret",
+      label: "Client Secret",
+      help: "Optional Google OAuth client secret. Leave blank to use the built-in OAuth app.",
+      defaultValue: "",
+      required: false,
+      password: true,
+      choices: [],
+    },
+  ];
 }
 
 function visibleOneDriveSetupOptions(parameters: Record<string, string>): ProviderWorkflowOption[] {

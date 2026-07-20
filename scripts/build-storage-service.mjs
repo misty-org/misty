@@ -1,24 +1,17 @@
 import { spawnSync } from "node:child_process";
-import { createHash } from "node:crypto";
 import {
   copyFileSync,
-  cpSync,
   existsSync,
   mkdirSync,
-  readFileSync,
   readdirSync,
-  rmSync,
-  writeFileSync,
 } from "node:fs";
-import { basename, dirname, join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const appDir = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const serviceDir = resolve(appDir, "service");
 const submoduleDir = resolve(serviceDir, "rclone");
-const patchesDir = resolve(serviceDir, "patches");
-const stagedSourceDir = resolve(appDir, "src-tauri/target/misty-service/source");
-const sourceStampPath = join(stagedSourceDir, ".misty-source-version");
+const adapterDir = resolve(serviceDir, "adapter");
 const expectedRcloneCommit = "5bc93a2a7ab0ebd0a11352bc4968eabeffb18027";
 const target = process.env.MISTY_SERVICE_GO_TARGET ?? "host";
 const outDir = process.env.MISTY_SERVICE_GO_OUT_DIR ?? resolve(appDir, "src-tauri/target/misty-service", target);
@@ -28,7 +21,7 @@ const isAndroid = target.startsWith("android-");
 const isWindowsHost = target === "host" && process.platform === "win32";
 const outputName = isAndroid ? `lib${libName}.so` : isWindowsHost ? `${libName}.dll` : `lib${libName}.a`;
 
-preparePatchedSource();
+verifyStorageSource();
 mkdirSync(outDir, { recursive: true });
 const result = spawnSync("go", [
   "build",
@@ -37,14 +30,14 @@ const result = spawnSync("go", [
   "-ldflags=-s -w",
   "-o",
   join(outDir, outputName),
-  "./librclone",
-], { cwd: stagedSourceDir, stdio: "inherit", shell: false, env });
+  ".",
+], { cwd: adapterDir, stdio: "inherit", shell: false, env });
 
 if (result.error) throw result.error;
 if (result.status !== 0) process.exit(result.status ?? 1);
 if (isAndroid) copyAndroidSharedLibrary(target, join(outDir, outputName));
 
-function preparePatchedSource() {
+function verifyStorageSource() {
   if (!existsSync(join(submoduleDir, "go.mod"))) {
     throw new Error(
       "The rclone submodule is not initialized. Run: git submodule update --init --recursive",
@@ -54,46 +47,6 @@ function preparePatchedSource() {
   if (commit !== expectedRcloneCommit) {
     throw new Error(`Expected rclone ${expectedRcloneCommit}, found ${commit}. Run git submodule update --init --recursive.`);
   }
-  const patchFiles = readdirSync(patchesDir)
-    .filter((name) => name.endsWith(".patch"))
-    .sort()
-    .map((name) => resolve(patchesDir, name));
-  const sourceVersion = createHash("sha256")
-    .update(commit)
-    .update(patchFiles.map((file) => readFileSync(file)).join(""))
-    .digest("hex");
-  if (
-    existsSync(join(stagedSourceDir, "go.mod")) &&
-    readText(sourceStampPath) === sourceVersion
-  ) {
-    return;
-  }
-
-  rmSync(stagedSourceDir, { recursive: true, force: true });
-  mkdirSync(dirname(stagedSourceDir), { recursive: true });
-  cpSync(submoduleDir, stagedSourceDir, {
-    recursive: true,
-    filter: (source) => basename(source) !== ".git",
-  });
-  for (const patchFile of patchFiles) {
-    runChecked("git", ["apply", "--check", patchFile], stagedSourceDir);
-    runChecked("git", ["apply", patchFile], stagedSourceDir);
-  }
-  writeFileSync(sourceStampPath, `${sourceVersion}\n`);
-}
-
-function readText(path) {
-  try {
-    return readFileSync(path, "utf8").trim();
-  } catch {
-    return "";
-  }
-}
-
-function runChecked(command, args, cwd) {
-  const result = spawnSync(command, args, { cwd, stdio: "inherit", shell: false });
-  if (result.error) throw result.error;
-  if (result.status !== 0) process.exit(result.status ?? 1);
 }
 
 function targetEnvironment(target) {

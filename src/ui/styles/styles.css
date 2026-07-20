@@ -1,0 +1,503 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@import "@fontsource-variable/inter";
+@source "./**/*.{ts,tsx}";
+@import "./base.css";
+
+@custom-variant dark (&:where(.dark, .dark *, [data-theme="dark"], [data-theme="dark"] *));
+
+:root {
+  color-scheme: dark;
+  /* Misty dark is the same zinc scale used by the website's radix-vega
+     preset. Hierarchy comes from tonal surfaces first and borders second. */
+  --misty-page-bg: oklch(0.141 0.005 285.823);
+  --misty-nav-bg: oklch(0.18 0.006 285.9);
+  --misty-bg: oklch(0.141 0.005 285.823);
+  --misty-bg-soft: oklch(0.165 0.006 285.9);
+  --misty-surface: oklch(0.21 0.006 285.885);
+  --misty-surface-2: oklch(0.274 0.006 286.033);
+  --misty-surface-3: oklch(0.37 0.013 285.805);
+  --misty-dropdown-bg: oklch(0.21 0.006 285.885);
+  --misty-surface-hover: color-mix(in oklch, var(--misty-text) 7%, var(--misty-surface));
+  --misty-surface-selected: color-mix(in oklch, var(--misty-text) 10%, var(--misty-surface));
+  --misty-sidebar-selected: oklch(0.274 0.006 286.033);
+  --misty-border: oklch(1 0 0 / 0.1);
+  --misty-border-strong: oklch(1 0 0 / 0.14);
+  --misty-border-soft: oklch(1 0 0 / 0.06);
+  --misty-content-frame-border: oklch(1 0 0 / 0.07);
+  --misty-divider-strong: oklch(1 0 0 / 0.1);
+  --misty-divider-default: oklch(1 0 0 / 0.065);
+  --misty-divider-subtle: oklch(1 0 0 / 0.04);
+  --misty-divider-hover: oklch(1 0 0 / 0.14);
+  --misty-divider-active: var(--misty-accent);
+  --misty-interaction-focus: oklch(0.552 0.016 285.938);
+  --misty-row-hover: oklch(1 0 0 / 0.055);
+  --misty-row-selected: oklch(1 0 0 / 0.09);
+  --misty-row-selected-hover: oklch(1 0 0 / 0.12);
+  --misty-text: oklch(0.985 0 0);
+  --misty-text-muted: oklch(0.705 0.015 286.067);
+  --misty-text-subtle: oklch(0.552 0.016 285.938);
+  --misty-primary: oklch(0.92 0.004 286.32);
+  --misty-primary-hover: oklch(0.985 0 0);
+  --misty-primary-active: oklch(0.871 0.006 286.286);
+  --misty-primary-contrast: oklch(0.21 0.006 285.885);
+  --misty-accent: oklch(0.705 0.015 286.067);
+  --misty-accent-strong: oklch(0.871 0.006 286.286);
+  --misty-accent-soft: oklch(1 0 0 / 0.08);
+  --misty-success: oklch(0.723 0.219 149.579);
+  --misty-warning: oklch(0.795 0.184 86.047);
+  --misty-danger: oklch(0.704 0.191 22.216);
+  --misty-info: oklch(0.685 0.169 237.323);
+  --misty-link: oklch(0.746 0.16 232.661);
+  --misty-selection: oklch(1 0 0 / 0.14);
+  --misty-code-bg: oklch(0.12 0.005 285.8);
+  --misty-code-border: oklch(1 0 0 / 0.08);
+  --misty-syntax-text: #e5e7eb;
+  --misty-syntax-comment: #7d8590;
+  --misty-syntax-keyword: #f472b6;
+  --misty-syntax-string: #86efac;
+  --misty-syntax-number: #fbbf24;
+  --misty-syntax-function: #93c5fd;
+  --misty-syntax-type: #67e8f9;
+  --misty-syntax-variable: #e5e7eb;
+  --misty-syntax-operator: #c4b5fd;
+  --misty-diff-added: rgba(34, 197, 94, 0.14);
+  --misty-diff-removed: rgba(239, 68, 68, 0.14);
+  --misty-diff-changed: rgba(234, 179, 8, 0.14);
+  --misty-shadow: oklch(0 0 0 / 0.32);
+  --misty-focus-ring: oklch(1 0 0 / 0.16);
+  --misty-glass: oklch(0.21 0.006 285.885 / 0.88);
+  --misty-glass-border: var(--misty-border);
+  /* Frame tokens may become translucent over a wallpaper. Component tokens
+     stay opaque and legible regardless of the frame treatment. */
+  --misty-frame-background: var(--misty-page-bg);
+  --misty-frame-navigation: var(--misty-nav-bg);
+  --misty-frame-border: var(--misty-content-frame-border);
+  --misty-component-surface: var(--misty-surface);
+  --misty-component-surface-raised: var(--misty-surface-2);
+  --misty-component-surface-hover: var(--misty-surface-hover);
+  --misty-component-border: var(--misty-divider-default);
+  --misty-component-border-subtle: var(--misty-divider-subtle);
+  /* Stable semantic contract consumed by Misty and hosted extensions. */
+  --misty-semantic-background: var(--misty-bg);
+  --misty-semantic-surface: var(--misty-surface);
+  --misty-semantic-surface-raised: var(--misty-surface-2);
+  --misty-semantic-surface-hover: var(--misty-surface-hover);
+  --misty-semantic-border: var(--misty-border);
+  --misty-semantic-border-strong: var(--misty-border-strong);
+  --misty-semantic-text: var(--misty-text);
+  --misty-semantic-text-muted: var(--misty-text-muted);
+  --misty-semantic-text-subtle: var(--misty-text-subtle);
+  --misty-semantic-accent: var(--misty-accent);
+  --misty-semantic-focus: var(--misty-interaction-focus);
+  --misty-semantic-success: var(--misty-success);
+  --misty-semantic-warning: var(--misty-warning);
+  --misty-semantic-danger: var(--misty-danger);
+  --misty-semantic-info: var(--misty-info);
+  --radius: 0.625rem;
+  --background: var(--misty-semantic-background);
+  --foreground: var(--misty-semantic-text);
+  --card: var(--misty-component-surface);
+  --card-foreground: var(--misty-semantic-text);
+  --popover: var(--misty-component-surface);
+  --popover-foreground: var(--misty-semantic-text);
+  --primary: var(--misty-primary);
+  --primary-foreground: var(--misty-primary-contrast);
+  --secondary: var(--misty-component-surface-raised);
+  --secondary-foreground: var(--misty-semantic-text);
+  --muted: var(--misty-component-surface-raised);
+  --muted-foreground: var(--misty-semantic-text-muted);
+  --accent: var(--misty-component-surface-hover);
+  --accent-foreground: var(--misty-semantic-text);
+  --destructive: var(--misty-semantic-danger);
+  --destructive-foreground: var(--misty-primary-contrast);
+  --success: var(--misty-semantic-success);
+  --success-foreground: var(--misty-primary-contrast);
+  --warning: var(--misty-semantic-warning);
+  --warning-foreground: var(--misty-primary-contrast);
+  --info: var(--misty-semantic-info);
+  --info-foreground: var(--misty-primary-contrast);
+  --border: var(--misty-component-border);
+  --input: var(--misty-divider-strong);
+  --ring: var(--misty-semantic-focus);
+  --sidebar: var(--misty-nav-bg);
+  --sidebar-foreground: var(--misty-semantic-text-muted);
+  --sidebar-primary: var(--misty-primary);
+  --sidebar-primary-foreground: var(--misty-primary-contrast);
+  --sidebar-accent: var(--misty-sidebar-selected);
+  --sidebar-accent-foreground: var(--misty-semantic-text);
+  --sidebar-border: var(--misty-divider-subtle);
+  --sidebar-ring: var(--misty-semantic-focus);
+  --misty-skeleton-base: var(--misty-surface-2);
+  --misty-skeleton-highlight: var(--misty-surface-3);
+  --misty-radius-xs: 6px;
+  --misty-radius-sm: 8px;
+  --misty-radius-md: 10px;
+  --misty-radius-lg: 14px;
+  --misty-control-height-compact: 2rem;
+  --misty-control-height-default: 2.25rem;
+  --misty-control-height-touch: 2.5rem;
+  --misty-layer-panel: 2147482500;
+  --misty-layer-overlay: 2147483000;
+  --misty-layer-dialog: 2147483100;
+  --misty-layer-alert-overlay: 2147483200;
+  --misty-layer-alert-dialog: 2147483300;
+  --misty-layer-menu: 2147483400;
+  --misty-layer-popover: 2147483420;
+  --misty-layer-tooltip: 2147483500;
+  --misty-layer-toast: 2147483600;
+  --misty-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --misty-transition-fast: 160ms var(--misty-ease-out);
+  --misty-transition-page: 320ms var(--misty-ease-out);
+  --misty-grid-bg:
+    linear-gradient(rgba(228, 228, 231, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(228, 228, 231, 0.03) 1px, transparent 1px);
+  --misty-grid-size: 60px 60px;
+  --misty-safe-top: env(safe-area-inset-top, 0px);
+  --misty-safe-right: env(safe-area-inset-right, 0px);
+  --misty-safe-bottom: env(safe-area-inset-bottom, 0px);
+  --misty-safe-left: env(safe-area-inset-left, 0px);
+  --misty-app-zoom: 1;
+  --misty-window-titlebar-inset: 28px;
+  --misty-page-x: clamp(16px, 2vw, 20px);
+  --misty-mobile-edge: 16px;
+  --misty-mobile-page-top: 14px;
+  --misty-mobile-page-bottom: 18px;
+  --misty-mobile-tabbar-height: 72px;
+  --misty-route-margin: 18px;
+  --misty-body-font-size: 15px;
+  --misty-font-family:
+    "Inter Variable", Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+    "Segoe UI", sans-serif;
+  --misty-heading-font-family: var(--misty-font-family);
+  --chart-1: oklch(0.871 0.006 286.286);
+  --chart-2: oklch(0.552 0.016 285.938);
+  --chart-3: oklch(0.442 0.017 285.786);
+  --chart-4: oklch(0.37 0.013 285.805);
+  --chart-5: oklch(0.274 0.006 286.033);
+}
+
+@theme inline {
+  /* Existing utility classes now resolve through the runtime palette. */
+  --font-sans: var(--misty-font-family);
+  --font-heading: var(--misty-heading-font-family);
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  --color-zinc-50: var(--misty-text);
+  --color-zinc-100: var(--misty-text);
+  --color-zinc-200: var(--misty-primary);
+  --color-zinc-300: var(--misty-text-muted);
+  --color-zinc-400: var(--misty-text-muted);
+  --color-zinc-500: var(--misty-text-subtle);
+  --color-zinc-600: var(--misty-text-subtle);
+  --color-zinc-700: var(--misty-border-strong);
+  --color-zinc-800: var(--misty-surface-3);
+  --color-zinc-900: var(--misty-surface-2);
+  --color-zinc-950: var(--misty-bg-soft);
+  --color-neutral-50: var(--misty-text);
+  --color-neutral-100: var(--misty-primary);
+  --color-neutral-300: var(--misty-text-muted);
+  --color-neutral-400: var(--misty-text-muted);
+  --color-neutral-500: var(--misty-text-subtle);
+  --color-neutral-700: var(--misty-border-strong);
+  --color-neutral-800: var(--misty-surface-3);
+  --color-neutral-900: var(--misty-surface-2);
+  --color-neutral-950: var(--misty-bg-soft);
+  --color-red-300: var(--misty-danger);
+  --color-red-400: var(--misty-danger);
+  --color-emerald-300: var(--misty-success);
+  --color-emerald-400: var(--misty-success);
+  --color-amber-300: var(--misty-warning);
+  --color-amber-400: var(--misty-warning);
+  /* Legacy utility aliases stay runtime-aware while pages migrate to the
+     shadcn semantic names below. */
+  --color-bg: var(--misty-bg);
+  --color-surface: var(--misty-component-surface);
+  --color-elevated: var(--misty-component-surface-raised);
+  --color-border-subtle: var(--misty-component-border-subtle);
+  --color-text: var(--misty-text);
+  --color-text-muted: var(--misty-text-muted);
+  --color-text-secondary: var(--misty-text-muted);
+  --color-primary-hover: var(--misty-primary-hover);
+  --color-primary-active: var(--misty-primary-active);
+  --color-success-hover: color-mix(in srgb, var(--misty-success) 82%, white);
+  --color-danger-hover: color-mix(in srgb, var(--misty-danger) 82%, white);
+  --color-misty-background: var(--misty-semantic-background);
+  --color-misty-surface: var(--misty-semantic-surface);
+  --color-misty-surface-raised: var(--misty-semantic-surface-raised);
+  --color-misty-surface-hover: var(--misty-semantic-surface-hover);
+  --color-misty-border: var(--misty-semantic-border);
+  --color-misty-border-strong: var(--misty-semantic-border-strong);
+  --color-misty-text: var(--misty-semantic-text);
+  --color-misty-text-muted: var(--misty-semantic-text-muted);
+  --color-misty-text-subtle: var(--misty-semantic-text-subtle);
+  --color-misty-accent: var(--misty-semantic-accent);
+  --color-misty-success: var(--misty-semantic-success);
+  --color-misty-warning: var(--misty-semantic-warning);
+  --color-misty-danger: var(--misty-semantic-danger);
+  --color-misty-info: var(--misty-semantic-info);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 12px);
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+  --misty-page-bg: oklch(0.967 0.001 286.375);
+  --misty-nav-bg: oklch(0.985 0 0);
+  --misty-bg: oklch(1 0 0);
+  --misty-bg-soft: oklch(0.985 0 0);
+  --misty-surface: oklch(1 0 0);
+  --misty-surface-2: oklch(0.967 0.001 286.375);
+  --misty-surface-3: oklch(0.92 0.004 286.32);
+  --misty-dropdown-bg: oklch(1 0 0);
+  --misty-surface-hover: oklch(0.967 0.001 286.375);
+  --misty-surface-selected: oklch(0.94 0.003 286.3);
+  --misty-sidebar-selected: oklch(0.967 0.001 286.375);
+  --misty-border: oklch(0.92 0.004 286.32);
+  --misty-border-strong: oklch(0.87 0.006 286.286);
+  --misty-border-soft: oklch(0.92 0.004 286.32 / 0.72);
+  --misty-content-frame-border: oklch(0.92 0.004 286.32);
+  --misty-divider-strong: oklch(0.92 0.004 286.32);
+  --misty-divider-default: oklch(0.92 0.004 286.32 / 0.78);
+  --misty-divider-subtle: oklch(0.92 0.004 286.32 / 0.5);
+  --misty-divider-hover: oklch(0.705 0.015 286.067 / 0.6);
+  --misty-text: oklch(0.141 0.005 285.823);
+  --misty-text-muted: oklch(0.552 0.016 285.938);
+  --misty-text-subtle: oklch(0.61 0.014 285.9);
+  --misty-primary: oklch(0.21 0.006 285.885);
+  --misty-primary-hover: oklch(0.274 0.006 286.033);
+  --misty-primary-active: oklch(0.37 0.013 285.805);
+  --misty-primary-contrast: oklch(0.985 0 0);
+  --misty-accent: oklch(0.552 0.016 285.938);
+  --misty-success: oklch(0.47 0.15 149.214);
+  --misty-warning: oklch(0.554 0.135 66.442);
+  --misty-danger: oklch(0.577 0.245 27.325);
+  --misty-info: oklch(0.546 0.19 248.18);
+  --misty-link: oklch(0.488 0.217 264.376);
+  --misty-selection: oklch(0.141 0.005 285.823 / 0.12);
+  --misty-shadow: oklch(0.141 0.005 285.823 / 0.1);
+  --misty-focus-ring: oklch(0.552 0.016 285.938 / 0.22);
+  --misty-glass: oklch(1 0 0 / 0.9);
+  --misty-skeleton-base: oklch(0.92 0.004 286.32);
+  --misty-skeleton-highlight: oklch(0.985 0 0);
+}
+
+:root[data-misty-theme="graphite"] {
+  color-scheme: dark;
+  --misty-page-bg: #08090a;
+  --misty-nav-bg: #0d0f10;
+  --misty-bg: #08090a;
+  --misty-bg-soft: #0d0f10;
+  --misty-surface: #111315;
+  --misty-surface-2: #181b1d;
+  --misty-surface-3: #222629;
+  --misty-dropdown-bg: #111315;
+  --misty-surface-hover: #2b3034;
+  --misty-border: #34383d;
+  --misty-border-strong: rgba(238, 242, 246, 0.16);
+  --misty-border-soft: rgba(238, 242, 246, 0.09);
+  --misty-content-frame-border: #1d2124;
+  --misty-text: #f3f5f7;
+  --misty-text-muted: #c7cdd3;
+  --misty-text-subtle: #8e98a1;
+  --misty-primary: #dbe3ea;
+  --misty-primary-hover: #f0f4f8;
+  --misty-primary-active: #bcc8d1;
+  --misty-primary-contrast: #08090a;
+  --misty-accent: #8bd3dd;
+  --misty-success: #52d273;
+  --misty-warning: #e2b84b;
+  --misty-danger: #f06f6f;
+  --misty-info: #79bfff;
+  --misty-link: #9bd1ff;
+  --misty-selection: rgba(139, 211, 221, 0.22);
+  --misty-code-bg: #090b0c;
+  --misty-code-border: rgba(219, 227, 234, 0.1);
+  --misty-syntax-comment: #7d8992;
+  --misty-syntax-keyword: #ff9ab5;
+  --misty-syntax-string: #9fe6b8;
+  --misty-syntax-number: #f4c56f;
+  --misty-syntax-function: #9bd1ff;
+  --misty-syntax-type: #8bd3dd;
+  --misty-syntax-operator: #d2c7ff;
+  --misty-shadow: rgba(0, 0, 0, 0.5);
+  --misty-focus-ring: rgba(139, 211, 221, 0.2);
+}
+
+:root[data-misty-theme="aurora"] {
+  color-scheme: dark;
+  --misty-page-bg: #071011;
+  --misty-nav-bg: #081416;
+  --misty-bg: #071011;
+  --misty-bg-soft: #0a1718;
+  --misty-surface: #0d1b1d;
+  --misty-surface-2: #122426;
+  --misty-surface-3: #193033;
+  --misty-dropdown-bg: #0d1b1d;
+  --misty-surface-hover: #213d41;
+  --misty-border: #28484d;
+  --misty-border-strong: rgba(211, 255, 247, 0.17);
+  --misty-border-soft: rgba(211, 255, 247, 0.1);
+  --misty-content-frame-border: #1a3338;
+  --misty-text: #effdfb;
+  --misty-text-muted: #c6e4df;
+  --misty-text-subtle: #82a6a1;
+  --misty-primary: #c9f4ef;
+  --misty-primary-hover: #e5fffb;
+  --misty-primary-active: #9edbd3;
+  --misty-primary-contrast: #071011;
+  --misty-accent: #69d2c8;
+  --misty-success: #7ddf86;
+  --misty-warning: #e6c45f;
+  --misty-danger: #ff7a82;
+  --misty-info: #7cc7ff;
+  --misty-link: #8fd7ff;
+  --misty-selection: rgba(105, 210, 200, 0.24);
+  --misty-code-bg: #071112;
+  --misty-code-border: rgba(201, 244, 239, 0.12);
+  --misty-syntax-comment: #73918e;
+  --misty-syntax-keyword: #ff91c0;
+  --misty-syntax-string: #a6e98f;
+  --misty-syntax-number: #f3ca6f;
+  --misty-syntax-function: #8fd7ff;
+  --misty-syntax-type: #69d2c8;
+  --misty-syntax-operator: #d7b8ff;
+  --misty-shadow: rgba(0, 0, 0, 0.54);
+  --misty-focus-ring: rgba(105, 210, 200, 0.22);
+}
+
+:root[data-misty-theme="copper"] {
+  color-scheme: dark;
+  --misty-page-bg: #120f0d;
+  --misty-nav-bg: #17110e;
+  --misty-bg: #120f0d;
+  --misty-bg-soft: #191411;
+  --misty-surface: #1d1713;
+  --misty-surface-2: #261e19;
+  --misty-surface-3: #332820;
+  --misty-dropdown-bg: #1d1713;
+  --misty-surface-hover: #403229;
+  --misty-border: #4a3a30;
+  --misty-border-strong: rgba(255, 231, 210, 0.17);
+  --misty-border-soft: rgba(255, 231, 210, 0.1);
+  --misty-content-frame-border: #312621;
+  --misty-text: #fff4e8;
+  --misty-text-muted: #dfcbb9;
+  --misty-text-subtle: #a9917d;
+  --misty-primary: #f4dcc8;
+  --misty-primary-hover: #fff0df;
+  --misty-primary-active: #d6bba5;
+  --misty-primary-contrast: #120f0d;
+  --misty-accent: #e49f6a;
+  --misty-success: #8dd47e;
+  --misty-warning: #f0c45d;
+  --misty-danger: #ff7f72;
+  --misty-info: #8fc7ff;
+  --misty-link: #a9d4ff;
+  --misty-selection: rgba(228, 159, 106, 0.24);
+  --misty-code-bg: #110d0b;
+  --misty-code-border: rgba(244, 220, 200, 0.11);
+  --misty-syntax-comment: #a38d7a;
+  --misty-syntax-keyword: #ff9fb4;
+  --misty-syntax-string: #a6df90;
+  --misty-syntax-number: #f5c76c;
+  --misty-syntax-function: #a9d4ff;
+  --misty-syntax-type: #e8ad7f;
+  --misty-syntax-operator: #d8c0ff;
+  --misty-shadow: rgba(0, 0, 0, 0.55);
+  --misty-focus-ring: rgba(228, 159, 106, 0.22);
+}
+
+:root[data-misty-theme="misty-light"] {
+  --misty-code-bg: #f4efe6;
+  --misty-code-border: rgba(49, 42, 34, 0.13);
+  --misty-info: #2563eb;
+  --misty-link: #1d5fb8;
+  --misty-selection: rgba(36, 109, 197, 0.2);
+  --misty-syntax-text: #1b1a18;
+  --misty-syntax-comment: #81766a;
+  --misty-syntax-keyword: #9d3c72;
+  --misty-syntax-string: #257247;
+  --misty-syntax-number: #9a6513;
+  --misty-syntax-function: #1d5fb8;
+  --misty-syntax-type: #047481;
+  --misty-syntax-variable: #1b1a18;
+  --misty-syntax-operator: #6d5fb5;
+  --misty-diff-added: rgba(33, 116, 71, 0.13);
+  --misty-diff-removed: rgba(180, 68, 78, 0.13);
+  --misty-diff-changed: rgba(154, 106, 21, 0.14);
+}
+
+:root[data-ui-scale="small"] {
+  --misty-route-margin: 14px;
+}
+
+:root[data-ui-scale="large"] {
+  --misty-route-margin: 22px;
+}
+
+:root[data-font-size="small"] {
+  --misty-body-font-size: 14px;
+}
+
+:root[data-font-size="large"] {
+  --misty-body-font-size: 16px;
+}
+
+@media (max-width: 720px) {
+  :root {
+    --misty-route-margin: 0px;
+    --misty-body-font-size: 14px;
+  }
+}
+:root[data-form-factor="mobile"] {
+  --misty-window-titlebar-inset: 0px;
+}
+
+/* Compact mobile surface pass: keep the app readable, but remove decorative card stacks. */
+:root[data-form-factor="mobile"] {
+  --misty-mobile-page-top: 10px;
+  --misty-mobile-page-bottom: 12px;
+}

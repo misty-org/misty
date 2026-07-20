@@ -9,7 +9,7 @@ use crate::services::media_search::MediaSearchService;
 #[cfg(desktop)]
 use crate::services::plugin_commands::PluginCommandService;
 use crate::services::{
-    agents::AgentService, ai::AiService, automations::AutomationService, claude::ClaudeService,
+    agents::AgentService, claude::ClaudeService,
     commands::CommandService, devices::DeviceService, directory_size::DirectorySizeService,
     environment::AppEnvironmentService, explorer::ExplorerService,
     explorer_library::ExplorerLibraryService, file_sync::FileSyncService,
@@ -47,7 +47,6 @@ pub struct MistyRuntime {
     pub media_search: MediaSearchService,
     pub workspaces: WorkspaceService,
     pub operation_queue: OperationQueueService,
-    pub automations: AutomationService,
     pub agents: AgentService,
     pub claude: ClaudeService,
 }
@@ -97,9 +96,7 @@ impl MistyRuntime {
             explorer.clone(),
             operation_queue.clone(),
         );
-        let ai = AiService::new();
         let agents = AgentService::new(environment.clone());
-        let automations = AutomationService::new(environment.clone(), ai.clone(), agents.clone());
         let claude = ClaudeService::new();
         let file_sync = FileSyncService::new(
             environment.clone(),
@@ -136,7 +133,6 @@ impl MistyRuntime {
             media_search,
             workspaces,
             operation_queue,
-            automations,
             agents,
             claude,
         }

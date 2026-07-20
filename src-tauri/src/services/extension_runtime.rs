@@ -18,7 +18,16 @@ use uuid::Uuid;
 
 use crate::{
     error::{ApiError, ApiResult},
-    services::{environment::AppEnvironmentService, system_dependencies::resolve_executable},
+    services::{
+        devices::DeviceService,
+        environment::AppEnvironmentService,
+        extension_reporting::scan_storage,
+        extension_tools::ExtensionToolResolver,
+        keychain::{
+            backup_repository_password, generate_backup_repository_password,
+            rclone_config_password, store_backup_repository_password,
+        },
+    },
 };
 
 #[derive(Debug, Clone, Deserialize)]
@@ -43,6 +52,7 @@ pub struct ExtensionJobSnapshot {
     pub created_at: u64,
     pub updated_at: u64,
     pub completed_at: Option<u64>,
+    pub result: Option<Value>,
 }
 
 struct ExtensionJob {
@@ -55,33 +65,54 @@ pub struct ExtensionRuntimeService {
     jobs: Arc<Mutex<HashMap<String, ExtensionJob>>>,
     home_dir: PathBuf,
     cache_dir: PathBuf,
-    settings_path: PathBuf,
+    tools: ExtensionToolResolver,
+    backup_state_path: PathBuf,
 }
 
 impl ExtensionRuntimeService {
     pub fn new(environment: AppEnvironmentService) -> Self {
+        let tools = ExtensionToolResolver::new(&environment);
+        let backup_state_path = environment
+            .settings_path()
+            .parent()
+            .unwrap_or(Path::new("."))
+            .join("backups.json");
         Self {
             jobs: Arc::new(Mutex::new(HashMap::new())),
             home_dir: environment.home_dir(),
             cache_dir: environment.cache_dir().join("extension-jobs"),
-            settings_path: environment.settings_path(),
+            tools,
+            backup_state_path,
         }
     }
 
     pub async fn execute(&self, request: ExtensionCommandRequest) -> ApiResult<Value> {
         validate_command_scope(&request.plugin_id, &request.command)?;
         match request.command.as_str() {
-            "dependencies.check" => dependency_check(&request.payload, &self.settings_path),
+            "dependencies.check" => {
+                dependency_check(&request.plugin_id, &request.payload, &self.tools)
+            }
             "quick_convert.start" => self.start_quick_convert(&request.plugin_id, &request.payload),
+            "storage_report.start" => {
+                self.start_storage_report(&request.plugin_id, &request.payload)
+            }
+            "image_optimizer.start" => {
+                self.start_image_optimizer(&request.plugin_id, &request.payload)
+            }
+            "backups.repositories" => self.backup_repositories(),
+            "backups.repository.init" => self.initialize_backup_repository(&request.payload),
+            "backups.snapshots" => self.backup_snapshots(&request.payload),
+            "backups.start" => {
+                self.start_backup_job(&request.plugin_id, &request.payload, "backup")
+            }
+            "backups.check" => self.start_backup_job(&request.plugin_id, &request.payload, "check"),
+            "backups.restore" => {
+                self.start_backup_job(&request.plugin_id, &request.payload, "restore")
+            }
             "ytdlp.start" => self.start_ytdlp(&request.plugin_id, &request.payload),
             "ytdlp.inspect" => {
                 let payload = request.payload;
-                let executable = resolve_executable("yt-dlp", Some(&self.settings_path))
-                    .ok_or_else(|| {
-                        ApiError::Message(
-                            "yt-dlp is not installed or could not be found.".to_owned(),
-                        )
-                    })?;
+                let executable = self.tools.resolve(&request.plugin_id, "yt-dlp")?;
                 tokio::task::spawn_blocking(move || inspect_ytdlp(&payload, &executable))
                     .await
                     .map_err(|error| {
@@ -163,10 +194,7 @@ impl ExtensionRuntimeService {
     }
 
     fn start_quick_convert(&self, plugin_id: &str, payload: &Value) -> ApiResult<Value> {
-        let executable =
-            resolve_executable("ffmpeg", Some(&self.settings_path)).ok_or_else(|| {
-                ApiError::Message("FFmpeg is not installed or could not be found.".to_owned())
-            })?;
+        let executable = self.tools.resolve(plugin_id, "ffmpeg")?;
         let paths = safe_input_paths(payload)?;
         let format = allowed_string(payload, "format", QUICK_FORMATS)?;
         let quality = allowed_string(payload, "quality", &["small", "balanced", "high"])?;
@@ -199,10 +227,7 @@ impl ExtensionRuntimeService {
     }
 
     fn start_ytdlp(&self, plugin_id: &str, payload: &Value) -> ApiResult<Value> {
-        let executable =
-            resolve_executable("yt-dlp", Some(&self.settings_path)).ok_or_else(|| {
-                ApiError::Message("yt-dlp is not installed or could not be found.".to_owned())
-            })?;
+        let executable = self.tools.resolve(plugin_id, "yt-dlp")?;
         let url = required_string(payload, "url", 4096)?;
         validate_http_url(&url)?;
         let format = allowed_string(payload, "format", &["mp3", "m4a", "mp4", "webm"])?;
@@ -257,6 +282,262 @@ impl ExtensionRuntimeService {
         Ok(json!({ "ok": true, "jobId": id, "message": "Download queued." }))
     }
 
+    fn start_storage_report(&self, plugin_id: &str, payload: &Value) -> ApiResult<Value> {
+        let raw = required_string(payload, "root", 16_384)?;
+        let root = fs::canonicalize(&raw)
+            .map_err(|_| ApiError::Message("Selected folder does not exist.".to_owned()))?;
+        if !root.is_dir() {
+            return Err(ApiError::Message(
+                "Storage Report requires one local folder.".to_owned(),
+            ));
+        }
+        let id = Uuid::new_v4().to_string();
+        let cancel = Arc::new(AtomicBool::new(false));
+        self.insert_job(
+            &id,
+            plugin_id,
+            cancel.clone(),
+            "Scanning folder…".to_owned(),
+        )?;
+        let jobs = self.jobs.clone();
+        let job_id = id.clone();
+        thread::spawn(move || {
+            update_job(&jobs, &job_id, |job| {
+                job.status = "running".to_owned();
+                job.progress = None;
+            });
+            match scan_storage(&root, &cancel) {
+                Ok(result) => update_job(&jobs, &job_id, |job| {
+                    job.status = "completed".to_owned();
+                    job.progress = Some(100.0);
+                    job.message = "Storage report ready.".to_owned();
+                    job.result = Some(result);
+                }),
+                Err(error) if cancel.load(Ordering::Relaxed) => {
+                    finish_cancelled(&jobs, &job_id, Vec::new())
+                }
+                Err(error) => finish_failed(&jobs, &job_id, error.to_string(), Vec::new()),
+            }
+        });
+        Ok(json!({"ok":true,"jobId":id,"message":"Folder scan started."}))
+    }
+
+    fn start_image_optimizer(&self, plugin_id: &str, payload: &Value) -> ApiResult<Value> {
+        let executable = self.tools.resolve(plugin_id, "ffmpeg")?;
+        let paths = safe_input_paths(payload)?;
+        if paths.iter().any(|path| {
+            !matches!(
+                path.extension()
+                    .and_then(|value| value.to_str())
+                    .map(str::to_ascii_lowercase)
+                    .as_deref(),
+                Some("jpg" | "jpeg" | "png" | "webp")
+            )
+        }) {
+            return Err(ApiError::Message(
+                "Only JPEG, PNG, and WebP images are supported.".to_owned(),
+            ));
+        }
+        let quality = allowed_string(payload, "quality", &["small", "balanced", "high"])?;
+        let destination = allowed_string(payload, "destination", &["beside", "downloads"])?;
+        let max_dimension = allowed_string(
+            payload,
+            "maxDimension",
+            &["original", "3840", "2560", "1920", "1280"],
+        )?;
+        let id = Uuid::new_v4().to_string();
+        let cancel = Arc::new(AtomicBool::new(false));
+        self.insert_job(
+            &id,
+            plugin_id,
+            cancel.clone(),
+            format!("Queued {} image(s)…", paths.len()),
+        )?;
+        let jobs = self.jobs.clone();
+        let home = self.home_dir.clone();
+        let job_id = id.clone();
+        thread::spawn(move || {
+            run_image_optimizer_job(
+                jobs,
+                job_id,
+                cancel,
+                paths,
+                quality,
+                max_dimension,
+                destination,
+                home,
+                executable,
+            )
+        });
+        Ok(json!({"ok":true,"jobId":id,"message":"Image optimization queued."}))
+    }
+
+    fn backup_repositories(&self) -> ApiResult<Value> {
+        let repositories = read_backup_repositories(&self.backup_state_path)?;
+        let devices = DeviceService::new().snapshot().devices;
+        let cloud_remotes = connected_rclone_remotes(&self.tools);
+        let rows=repositories.into_iter().map(|repo| { let available=if repo.kind=="cloud" { repo.location.strip_prefix("rclone:").and_then(|value|value.split_once(':')).map(|(remote,_)|cloud_remotes.iter().any(|item|item==remote)).unwrap_or(false) } else { resolved_repository_location(&repo).is_ok() }; json!({"id":repo.id,"name":repo.name,"kind":repo.kind,"location":repo.display_location,"available":available,"initialized":true,"lastBackup":repo.last_backup}) }).collect::<Vec<_>>();
+        Ok(
+            json!({"ok":true,"repositories":rows,"devices":devices,"cloudRemotes":cloud_remotes,"message":if rows.is_empty(){"Set up a repository to create your first backup."}else{"Backup repositories are ready."}}),
+        )
+    }
+
+    fn initialize_backup_repository(&self, payload: &Value) -> ApiResult<Value> {
+        let kind = allowed_string(payload, "kind", &["local", "cloud"])?;
+        let name = required_string(payload, "name", 64)?;
+        let location = required_string(payload, "location", 16_384)?;
+        let normalized = if kind == "local" {
+            validate_local_repository_location(&location)?
+        } else {
+            let normalized = validate_cloud_repository_location(&location)?;
+            let identity = location
+                .split_once(':')
+                .map(|(remote, _)| remote)
+                .unwrap_or_default();
+            if !connected_rclone_remotes(&self.tools)
+                .iter()
+                .any(|remote| remote == identity)
+            {
+                return Err(ApiError::Message(
+                    "Choose a cloud remote already connected through Misty.".to_owned(),
+                ));
+            }
+            normalized
+        };
+        let id = Uuid::new_v4().to_string();
+        let password = generate_backup_repository_password();
+        let restic = self.tools.resolve("backups", "restic")?;
+        let rclone = if kind == "cloud" {
+            Some(self.tools.resolve("backups", "rclone")?)
+        } else {
+            None
+        };
+        let (volume_id, relative_path) = if kind == "local" {
+            local_repository_identity(Path::new(&normalized))?
+        } else {
+            (String::new(), String::new())
+        };
+        let repository = StoredBackupRepository {
+            id: id.clone(),
+            name,
+            kind: kind.clone(),
+            location: normalized.clone(),
+            display_location: redact_repository_location(&normalized),
+            last_backup: None,
+            volume_id,
+            relative_path,
+        };
+        let mut command = restic_command(&restic, &repository, &password, rclone.as_deref());
+        command.arg("init");
+        run_checked_command(&mut command, "initialize the backup repository")?;
+        store_backup_repository_password(&id, &password)?;
+        let mut repositories = read_backup_repositories(&self.backup_state_path)?;
+        repositories.push(repository);
+        write_backup_repositories(&self.backup_state_path, &repositories)?;
+        Ok(
+            json!({"ok":true,"repositoryId":id,"message":"Encrypted backup repository initialized."}),
+        )
+    }
+
+    fn backup_snapshots(&self, payload: &Value) -> ApiResult<Value> {
+        let repository = required_backup_repository(&self.backup_state_path, payload)?;
+        let password = backup_repository_password(&repository.id)?.ok_or_else(|| {
+            ApiError::Message("Backup credential is missing from the OS vault.".to_owned())
+        })?;
+        let restic = self.tools.resolve("backups", "restic")?;
+        let rclone = if repository.kind == "cloud" {
+            Some(self.tools.resolve("backups", "rclone")?)
+        } else {
+            None
+        };
+        let mut command = restic_command(&restic, &repository, &password, rclone.as_deref());
+        command.args(["snapshots", "--json"]);
+        let output = command
+            .output()
+            .map_err(|error| ApiError::Message(format!("Could not list snapshots: {error}")))?;
+        if !output.status.success() {
+            return Err(redacted_command_error(
+                "Could not list snapshots",
+                &output.stderr,
+            ));
+        }
+        let snapshots: Value = serde_json::from_slice(&output.stdout)
+            .map_err(|_| ApiError::Message("Restic returned invalid snapshot data.".to_owned()))?;
+        Ok(json!({"ok":true,"snapshots":snapshots}))
+    }
+
+    fn start_backup_job(
+        &self,
+        plugin_id: &str,
+        payload: &Value,
+        operation: &str,
+    ) -> ApiResult<Value> {
+        let repository = required_backup_repository(&self.backup_state_path, payload)?;
+        let password = backup_repository_password(&repository.id)?.ok_or_else(|| {
+            ApiError::Message("Backup credential is missing from the OS vault.".to_owned())
+        })?;
+        let restic = self.tools.resolve("backups", "restic")?;
+        let rclone = if repository.kind == "cloud" {
+            Some(self.tools.resolve("backups", "rclone")?)
+        } else {
+            None
+        };
+        let sources = if operation == "backup" {
+            safe_source_folders(payload)?
+        } else {
+            Vec::new()
+        };
+        let snapshot_id = if operation == "restore" {
+            Some(required_string(payload, "snapshotId", 128)?)
+        } else {
+            None
+        };
+        let restore_parent = payload
+            .get("destination")
+            .and_then(Value::as_str)
+            .map(PathBuf::from)
+            .or_else(dirs::download_dir)
+            .unwrap_or_else(|| self.home_dir.join("Downloads"));
+        let id = Uuid::new_v4().to_string();
+        let cancel = Arc::new(AtomicBool::new(false));
+        self.insert_job(
+            &id,
+            plugin_id,
+            cancel.clone(),
+            format!(
+                "{} queued…",
+                if operation == "check" {
+                    "Verification"
+                } else if operation == "restore" {
+                    "Restore"
+                } else {
+                    "Backup"
+                }
+            ),
+        )?;
+        let jobs = self.jobs.clone();
+        let job_id = id.clone();
+        let operation = operation.to_owned();
+        let state_path = self.backup_state_path.clone();
+        thread::spawn(move || {
+            run_restic_job(
+                jobs,
+                job_id,
+                cancel,
+                operation,
+                repository,
+                password,
+                restic,
+                rclone,
+                sources,
+                snapshot_id,
+                restore_parent,
+                state_path,
+            )
+        });
+        Ok(json!({"ok":true,"jobId":id,"message":"Backup operation queued."}))
+    }
+
     fn insert_job(
         &self,
         id: &str,
@@ -296,6 +577,7 @@ impl ExtensionRuntimeService {
                     created_at: now,
                     updated_at: now,
                     completed_at: None,
+                    result: None,
                 },
                 cancel,
             },
@@ -329,6 +611,31 @@ fn validate_command_scope(plugin_id: &str, command: &str) -> ApiResult<()> {
                 | "jobs.cancel"
                 | "host.revealOutput"
         ),
+        "storage_report" => matches!(
+            command,
+            "storage_report.start" | "jobs.status" | "jobs.latest" | "jobs.cancel"
+        ),
+        "image_optimizer" => matches!(
+            command,
+            "image_optimizer.start"
+                | "jobs.status"
+                | "jobs.latest"
+                | "jobs.cancel"
+                | "host.revealOutput"
+        ),
+        "backups" => matches!(
+            command,
+            "backups.repositories"
+                | "backups.repository.init"
+                | "backups.start"
+                | "backups.snapshots"
+                | "backups.check"
+                | "backups.restore"
+                | "jobs.status"
+                | "jobs.latest"
+                | "jobs.cancel"
+                | "host.revealOutput"
+        ),
         _ => false,
     };
     if allowed {
@@ -340,10 +647,19 @@ fn validate_command_scope(plugin_id: &str, command: &str) -> ApiResult<()> {
     }
 }
 
-fn dependency_check(payload: &Value, settings_path: &Path) -> ApiResult<Value> {
-    let requested = allowed_string(payload, "name", &["ffmpeg", "yt-dlp"])?;
-    let Some(executable) = resolve_executable(&requested, Some(settings_path)) else {
-        return Ok(json!({ "ok": true, "available": false, "version": "" }));
+fn dependency_check(
+    plugin_id: &str,
+    payload: &Value,
+    tools: &ExtensionToolResolver,
+) -> ApiResult<Value> {
+    let requested = allowed_string(
+        payload,
+        "name",
+        &["ffmpeg", "ffprobe", "yt-dlp", "restic", "rclone"],
+    )?;
+    let executable = match tools.resolve(plugin_id, &requested) {
+        Ok(value) => value,
+        Err(_) => return Ok(json!({ "ok": true, "available": false, "version": "" })),
     };
     let output = Command::new(&executable)
         .arg("--version")
@@ -537,6 +853,165 @@ fn run_quick_convert_job(
         job.message = format!("Converted {} file(s).", outputs.len());
         job.output_paths = outputs;
     });
+}
+
+fn run_image_optimizer_job(
+    jobs: Arc<Mutex<HashMap<String, ExtensionJob>>>,
+    id: String,
+    cancel: Arc<AtomicBool>,
+    paths: Vec<PathBuf>,
+    quality: String,
+    max_dimension: String,
+    destination: String,
+    home_dir: PathBuf,
+    executable: PathBuf,
+) {
+    update_job(&jobs, &id, |job| {
+        job.status = "running".to_owned();
+        job.message = "Preparing images…".to_owned();
+    });
+    let mut outputs = Vec::new();
+    let mut outcomes = Vec::new();
+    let mut original_total = 0_u64;
+    let mut output_total = 0_u64;
+    for (index, source) in paths.iter().enumerate() {
+        if cancel.load(Ordering::Relaxed) {
+            for output in &outputs {
+                let _ = fs::remove_file(output);
+            }
+            finish_cancelled(&jobs, &id, Vec::new());
+            return;
+        }
+        let directory = if destination == "downloads" {
+            dirs::download_dir().unwrap_or_else(|| home_dir.join("Downloads"))
+        } else {
+            source.parent().unwrap_or(Path::new(".")).to_path_buf()
+        };
+        if let Err(error) = fs::create_dir_all(&directory) {
+            finish_failed(
+                &jobs,
+                &id,
+                format!("Could not create {}: {error}", directory.display()),
+                outputs,
+            );
+            return;
+        }
+        let extension = source
+            .extension()
+            .and_then(|value| value.to_str())
+            .unwrap_or("jpg");
+        let output = collision_safe_optimized_output(source, &directory, extension);
+        let original = fs::metadata(source).map(|value| value.len()).unwrap_or(0);
+        original_total = original_total.saturating_add(original);
+        update_job(&jobs, &id, |job| {
+            job.progress = Some(index as f64 / paths.len() as f64 * 100.0);
+            job.message = format!("Optimizing {} of {}…", index + 1, paths.len());
+        });
+        let mut command = Command::new(&executable);
+        command
+            .args(["-nostdin", "-hide_banner", "-loglevel", "error", "-n", "-i"])
+            .arg(source);
+        if max_dimension != "original" {
+            command.args(["-vf",&format!("scale='min({max_dimension},iw)':'min({max_dimension},ih)':force_original_aspect_ratio=decrease")]);
+        }
+        match extension.to_ascii_lowercase().as_str() {
+            "jpg" | "jpeg" => {
+                command.args([
+                    "-q:v",
+                    if quality == "high" {
+                        "2"
+                    } else if quality == "small" {
+                        "7"
+                    } else {
+                        "4"
+                    },
+                ]);
+            }
+            "png" => {
+                command.args([
+                    "-compression_level",
+                    if quality == "small" { "9" } else { "7" },
+                ]);
+            }
+            "webp" => {
+                command.args([
+                    "-quality",
+                    if quality == "high" {
+                        "88"
+                    } else if quality == "small" {
+                        "68"
+                    } else {
+                        "78"
+                    },
+                ]);
+            }
+            _ => {}
+        }
+        command
+            .arg(&output)
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null());
+        match command
+            .spawn()
+            .and_then(|mut child| wait_for_child(&mut child, &cancel))
+        {
+            Ok(Some(status)) if status.success() => {
+                let optimized = fs::metadata(&output).map(|value| value.len()).unwrap_or(0);
+                output_total = output_total.saturating_add(optimized);
+                outputs.push(output.display().to_string());
+                outcomes.push(json!({"source":source.display().to_string(),"output":output.display().to_string(),"originalBytes":original,"outputBytes":optimized,"status":"completed"}));
+            }
+            Ok(None) => {
+                let _ = fs::remove_file(&output);
+                for path in &outputs {
+                    let _ = fs::remove_file(path);
+                }
+                finish_cancelled(&jobs, &id, Vec::new());
+                return;
+            }
+            Ok(Some(status)) => {
+                let _ = fs::remove_file(&output);
+                outcomes.push(json!({"source":source.display().to_string(),"originalBytes":original,"status":"failed","message":format!("FFmpeg exited with {status}.")}));
+            }
+            Err(error) => {
+                let _ = fs::remove_file(&output);
+                outcomes.push(json!({"source":source.display().to_string(),"originalBytes":original,"status":"failed","message":format!("Could not run FFmpeg: {error}")}));
+            }
+        }
+    }
+    let completed = outputs.len();
+    update_job(&jobs, &id, |job| {
+        job.status = if completed > 0 { "completed" } else { "failed" }.to_owned();
+        job.progress = Some(100.0);
+        job.message = format!("Optimized {completed} of {} image(s).", paths.len());
+        job.output_paths = outputs;
+        job.result = Some(
+            json!({"originalBytes":original_total,"outputBytes":output_total,"files":outcomes}),
+        );
+        if completed == 0 {
+            job.error = Some("No images could be optimized.".to_owned());
+        }
+    });
+}
+
+fn collision_safe_optimized_output(source: &Path, directory: &Path, extension: &str) -> PathBuf {
+    let stem = source
+        .file_stem()
+        .and_then(|value| value.to_str())
+        .unwrap_or("image");
+    for suffix in 1..10_000 {
+        let name = if suffix == 1 {
+            format!("{stem}_optimized.{extension}")
+        } else {
+            format!("{stem}_optimized ({suffix}).{extension}")
+        };
+        let candidate = directory.join(name);
+        if !candidate.exists() {
+            return candidate;
+        }
+    }
+    directory.join(format!("{stem}_optimized-{}.{}", Uuid::new_v4(), extension))
 }
 
 fn apply_ffmpeg_options(command: &mut Command, format: &str, quality: &str) {
@@ -1020,9 +1495,444 @@ fn inspect_ytdlp(payload: &Value, executable: &Path) -> ApiResult<Value> {
     }}))
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct StoredBackupRepository {
+    id: String,
+    name: String,
+    kind: String,
+    location: String,
+    display_location: String,
+    last_backup: Option<String>,
+    #[serde(default)]
+    volume_id: String,
+    #[serde(default)]
+    relative_path: String,
+}
+
+fn read_backup_repositories(path: &Path) -> ApiResult<Vec<StoredBackupRepository>> {
+    if !path.is_file() {
+        return Ok(Vec::new());
+    }
+    serde_json::from_slice(
+        &fs::read(path).map_err(|error| {
+            ApiError::Message(format!("Could not read backup settings: {error}"))
+        })?,
+    )
+    .map_err(|_| ApiError::Message("Backup settings are invalid.".to_owned()))
+}
+fn write_backup_repositories(
+    path: &Path,
+    repositories: &[StoredBackupRepository],
+) -> ApiResult<()> {
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).map_err(|error| {
+            ApiError::Message(format!("Could not prepare backup settings: {error}"))
+        })?;
+    }
+    let temporary = path.with_extension("json.tmp");
+    fs::write(
+        &temporary,
+        serde_json::to_vec_pretty(repositories)
+            .map_err(|error| ApiError::Message(error.to_string()))?,
+    )
+    .map_err(|error| ApiError::Message(format!("Could not save backup settings: {error}")))?;
+    fs::rename(temporary, path)
+        .map_err(|error| ApiError::Message(format!("Could not commit backup settings: {error}")))
+}
+fn required_backup_repository(path: &Path, payload: &Value) -> ApiResult<StoredBackupRepository> {
+    let id = required_string(payload, "repositoryId", 128)?;
+    let mut repository = read_backup_repositories(path)?
+        .into_iter()
+        .find(|repo| repo.id == id)
+        .ok_or_else(|| ApiError::Message("Backup repository was not found.".to_owned()))?;
+    repository.location = resolved_repository_location(&repository)?
+        .display()
+        .to_string();
+    Ok(repository)
+}
+
+fn local_repository_identity(path: &Path) -> ApiResult<(String, String)> {
+    let canonical = fs::canonicalize(path)
+        .map_err(|_| ApiError::Message("Could not identify the repository volume.".to_owned()))?;
+    let device = DeviceService::new()
+        .snapshot()
+        .devices
+        .into_iter()
+        .filter(|device| canonical.starts_with(&device.mount_path))
+        .max_by_key(|device| device.mount_path.len())
+        .ok_or_else(|| ApiError::Message("Repository volume is unavailable.".to_owned()))?;
+    let relative = canonical
+        .strip_prefix(&device.mount_path)
+        .map_err(|_| ApiError::Message("Repository path is outside its volume.".to_owned()))?
+        .display()
+        .to_string();
+    Ok((device.volume_id, relative))
+}
+
+fn resolved_repository_location(repository: &StoredBackupRepository) -> ApiResult<PathBuf> {
+    if repository.kind != "local" {
+        return Ok(PathBuf::from(&repository.location));
+    }
+    if repository.volume_id.is_empty() {
+        return fs::canonicalize(&repository.location)
+            .map_err(|_| ApiError::Message("Repository volume is disconnected.".to_owned()));
+    }
+    let device = DeviceService::new()
+        .snapshot()
+        .devices
+        .into_iter()
+        .find(|device| {
+            device.volume_id == repository.volume_id
+                && device.writable
+                && !device.is_system
+                && !device.is_network
+        })
+        .ok_or_else(|| {
+            ApiError::Message("Repository volume is disconnected or no longer writable.".to_owned())
+        })?;
+    let candidate = PathBuf::from(&device.mount_path).join(&repository.relative_path);
+    let canonical = fs::canonicalize(candidate)
+        .map_err(|_| ApiError::Message("Repository folder is unavailable.".to_owned()))?;
+    if !canonical.starts_with(&device.mount_path) {
+        return Err(ApiError::Message(
+            "Repository path escaped its volume.".to_owned(),
+        ));
+    }
+    Ok(canonical)
+}
+
+fn validate_local_repository_location(raw: &str) -> ApiResult<String> {
+    let path = fs::canonicalize(raw).map_err(|_| {
+        ApiError::Message("Choose an existing folder on a writable non-system volume.".to_owned())
+    })?;
+    if !path.is_dir() {
+        return Err(ApiError::Message(
+            "Backup destination must be a folder.".to_owned(),
+        ));
+    }
+    let device = DeviceService::new()
+        .snapshot()
+        .devices
+        .into_iter()
+        .filter(|device| path.starts_with(&device.mount_path))
+        .max_by_key(|device| device.mount_path.len())
+        .ok_or_else(|| {
+            ApiError::Message("Backup destination is not on a recognized volume.".to_owned())
+        })?;
+    if device.is_system || device.is_network || !device.writable {
+        return Err(ApiError::Message("Choose a writable local non-system volume. OS, network, and read-only volumes are not allowed.".to_owned()));
+    }
+    let target = path.join("Misty Backups");
+    fs::create_dir_all(&target).map_err(|error| {
+        ApiError::Message(format!("Could not create the repository folder: {error}"))
+    })?;
+    let canonical = fs::canonicalize(&target)
+        .map_err(|_| ApiError::Message("Could not verify the repository folder.".to_owned()))?;
+    if !canonical.starts_with(&path) {
+        return Err(ApiError::Message(
+            "Repository path escaped the selected volume.".to_owned(),
+        ));
+    }
+    Ok(canonical.display().to_string())
+}
+fn validate_cloud_repository_location(raw: &str) -> ApiResult<String> {
+    let value = raw.trim();
+    let (remote, path) = value
+        .split_once(':')
+        .ok_or_else(|| ApiError::Message("Choose a configured Misty cloud remote.".to_owned()))?;
+    if remote.is_empty()
+        || path.is_empty()
+        || !remote
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'-'))
+        || path.split('/').any(|part| part == ".." || part == ".")
+    {
+        return Err(ApiError::Message(
+            "Cloud repository identity or subpath is invalid.".to_owned(),
+        ));
+    }
+    Ok(format!("rclone:{remote}:{path}"))
+}
+fn redact_repository_location(location: &str) -> String {
+    if let Some(rest) = location.strip_prefix("rclone:") {
+        let remote = rest.split(':').next().unwrap_or("cloud");
+        format!("{remote}:Misty Backups")
+    } else {
+        location.to_owned()
+    }
+}
+
+fn connected_rclone_remotes(tools: &ExtensionToolResolver) -> Vec<String> {
+    let Ok(rclone) = tools.resolve("backups", "rclone") else {
+        return Vec::new();
+    };
+    let mut command = Command::new(rclone);
+    command.arg("listremotes").stdin(Stdio::null());
+    if let Some(password) = rclone_config_password() {
+        command.env("RCLONE_CONFIG_PASS", password);
+    }
+    let Ok(output) = command.output() else {
+        return Vec::new();
+    };
+    if !output.status.success() {
+        return Vec::new();
+    }
+    String::from_utf8_lossy(&output.stdout)
+        .lines()
+        .map(|line| line.trim().trim_end_matches(':'))
+        .filter(|value| {
+            !value.is_empty()
+                && value
+                    .bytes()
+                    .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'-'))
+        })
+        .take(32)
+        .map(ToOwned::to_owned)
+        .collect()
+}
+fn safe_source_folders(payload: &Value) -> ApiResult<Vec<PathBuf>> {
+    let values = payload
+        .get("sources")
+        .and_then(Value::as_array)
+        .ok_or_else(|| ApiError::Message("Choose at least one local source folder.".to_owned()))?;
+    if values.is_empty() || values.len() > 32 {
+        return Err(ApiError::Message(
+            "Choose between 1 and 32 source folders.".to_owned(),
+        ));
+    }
+    values
+        .iter()
+        .map(|value| {
+            let raw = value
+                .as_str()
+                .ok_or_else(|| ApiError::Message("Source paths must be strings.".to_owned()))?;
+            let path = fs::canonicalize(raw)
+                .map_err(|_| ApiError::Message(format!("Source folder does not exist: {raw}")))?;
+            if !path.is_dir() {
+                return Err(ApiError::Message(format!(
+                    "Backup source is not a folder: {raw}"
+                )));
+            }
+            Ok(path)
+        })
+        .collect()
+}
+
+fn restic_command(
+    executable: &Path,
+    repository: &StoredBackupRepository,
+    password: &str,
+    rclone: Option<&Path>,
+) -> Command {
+    let mut command = Command::new(executable);
+    command
+        .env("RESTIC_PASSWORD", password)
+        .arg("-r")
+        .arg(&repository.location);
+    if let Some(rclone) = rclone {
+        command.args(["-o", &format!("rclone.program={}", rclone.display())]);
+        if let Some(config_password) = rclone_config_password() {
+            command.env("RCLONE_CONFIG_PASS", config_password);
+        }
+    }
+    command.stdin(Stdio::null());
+    command
+}
+fn run_checked_command(command: &mut Command, operation: &str) -> ApiResult<()> {
+    let output = command
+        .output()
+        .map_err(|error| ApiError::Message(format!("Could not {operation}: {error}")))?;
+    if output.status.success() {
+        Ok(())
+    } else {
+        Err(redacted_command_error(
+            &format!("Could not {operation}"),
+            &output.stderr,
+        ))
+    }
+}
+fn redacted_command_error(prefix: &str, stderr: &[u8]) -> ApiError {
+    let detail = String::from_utf8_lossy(stderr)
+        .lines()
+        .next()
+        .unwrap_or("Restic failed.")
+        .chars()
+        .filter(|character| !character.is_control())
+        .take(240)
+        .collect::<String>();
+    ApiError::Message(format!("{prefix}: {detail}"))
+}
+fn collision_safe_restore_folder(parent: &Path) -> ApiResult<PathBuf> {
+    fs::create_dir_all(parent).map_err(|error| {
+        ApiError::Message(format!("Could not prepare restore destination: {error}"))
+    })?;
+    for suffix in 1..10_000 {
+        let name = if suffix == 1 {
+            "Misty Restore".to_owned()
+        } else {
+            format!("Misty Restore {suffix}")
+        };
+        let path = parent.join(name);
+        match fs::create_dir(&path) {
+            Ok(()) => return Ok(path),
+            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
+            Err(error) => {
+                return Err(ApiError::Message(format!(
+                    "Could not create restore destination: {error}"
+                )))
+            }
+        }
+    }
+    Err(ApiError::Message(
+        "Could not create a unique restore folder.".to_owned(),
+    ))
+}
+
+#[allow(clippy::too_many_arguments)]
+fn run_restic_job(
+    jobs: Arc<Mutex<HashMap<String, ExtensionJob>>>,
+    id: String,
+    cancel: Arc<AtomicBool>,
+    operation: String,
+    repository: StoredBackupRepository,
+    password: String,
+    restic: PathBuf,
+    rclone: Option<PathBuf>,
+    sources: Vec<PathBuf>,
+    snapshot_id: Option<String>,
+    restore_parent: PathBuf,
+    state_path: PathBuf,
+) {
+    update_job(&jobs, &id, |job| {
+        job.status = "running".to_owned();
+        job.progress = None;
+        job.message = match operation.as_str() {
+            "check" => "Verifying repository…",
+            "restore" => "Restoring snapshot…",
+            _ => "Creating encrypted snapshot…",
+        }
+        .to_owned();
+    });
+    let mut command = restic_command(&restic, &repository, &password, rclone.as_deref());
+    let mut restore_output = None;
+    match operation.as_str() {
+        "check" => {
+            command.arg("check");
+        }
+        "restore" => {
+            let destination = match collision_safe_restore_folder(&restore_parent) {
+                Ok(value) => value,
+                Err(error) => {
+                    finish_failed(&jobs, &id, error.to_string(), Vec::new());
+                    return;
+                }
+            };
+            command
+                .arg("restore")
+                .arg(snapshot_id.unwrap_or_else(|| "latest".to_owned()))
+                .arg("--target")
+                .arg(&destination);
+            restore_output = Some(destination);
+        }
+        _ => {
+            command.arg("backup").args(["--json"]);
+            for source in &sources {
+                command.arg(source);
+            }
+        }
+    }
+    command.stdout(Stdio::piped()).stderr(Stdio::null());
+    let result = match command.spawn() {
+        Ok(mut child) => {
+            let reader = child.stdout.take().map(|stdout| {
+                let progress_jobs = jobs.clone();
+                let progress_id = id.clone();
+                thread::spawn(move || {
+                    for line in BufReader::new(stdout).lines().map_while(Result::ok) {
+                        if let Some(progress) = restic_progress(&line) {
+                            update_job(&progress_jobs, &progress_id, |job| {
+                                job.progress = Some(progress);
+                                job.message = format!("Backup in progress… {}%", progress.round());
+                            });
+                        }
+                    }
+                })
+            });
+            let status = wait_for_child(&mut child, &cancel);
+            if let Some(reader) = reader {
+                let _ = reader.join();
+            }
+            status
+        }
+        Err(error) => Err(error),
+    };
+    match result {
+        Ok(Some(status)) if status.success() => {
+            let outputs = restore_output
+                .iter()
+                .map(|path| path.display().to_string())
+                .collect::<Vec<_>>();
+            update_job(&jobs, &id, |job| {
+                job.status = "completed".to_owned();
+                job.progress = Some(100.0);
+                job.message = match operation.as_str() {
+                    "check" => "Repository verification completed.",
+                    "restore" => "Snapshot restored into a new folder.",
+                    _ => "Backup snapshot created.",
+                }
+                .to_owned();
+                job.output_paths = outputs;
+            });
+            if operation == "backup" {
+                if let Ok(mut repositories) = read_backup_repositories(&state_path) {
+                    if let Some(item) = repositories
+                        .iter_mut()
+                        .find(|item| item.id == repository.id)
+                    {
+                        item.last_backup = Some(format!("{}", unix_timestamp_ms()));
+                        let _ = write_backup_repositories(&state_path, &repositories);
+                    }
+                }
+            }
+        }
+        Ok(None) => {
+            if let Some(path) = restore_output {
+                let _ = fs::remove_dir_all(path);
+            }
+            finish_cancelled(&jobs, &id, Vec::new());
+        }
+        Ok(Some(status)) => {
+            if let Some(path) = restore_output {
+                let _ = fs::remove_dir_all(path);
+            }
+            finish_failed(&jobs,&id,format!("Restic exited with {status}. Credentials and repository access were not exposed."),Vec::new());
+        }
+        Err(error) => {
+            if let Some(path) = restore_output {
+                let _ = fs::remove_dir_all(path);
+            }
+            finish_failed(
+                &jobs,
+                &id,
+                format!("Could not run Restic: {error}"),
+                Vec::new(),
+            );
+        }
+    }
+}
+fn restic_progress(line: &str) -> Option<f64> {
+    let value: Value = serde_json::from_str(line).ok()?;
+    value
+        .get("percent_done")
+        .and_then(Value::as_f64)
+        .map(|progress| (progress * 100.0).clamp(0.0, 100.0))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::services::system_dependencies::resolve_executable;
     #[test]
     fn rejects_non_public_urls() {
         assert!(validate_http_url("file:///etc/passwd").is_err());
@@ -1041,6 +1951,8 @@ mod tests {
     fn scopes_commands_by_plugin() {
         assert!(validate_command_scope("ytdlp", "quick_convert.start").is_err());
         assert!(validate_command_scope("quick_convert", "quick_convert.start").is_ok());
+        assert!(validate_command_scope("backups", "backups.restore").is_ok());
+        assert!(validate_command_scope("vault", "backups.start").is_err());
     }
     #[test]
     fn creates_collision_safe_names() {
@@ -1087,6 +1999,7 @@ mod tests {
                     created_at: 1,
                     updated_at: 1,
                     completed_at: None,
+                    result: None,
                 },
                 cancel: Arc::new(AtomicBool::new(false)),
             },
@@ -1131,6 +2044,84 @@ mod tests {
             .is_err());
         let latest = service.latest_job("quick_convert").unwrap();
         assert_eq!(latest.get("id").and_then(Value::as_str), Some("quick"));
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn validates_cloud_repository_identity_and_progress() {
+        assert!(validate_local_repository_location("/").is_err());
+        assert_eq!(
+            validate_cloud_repository_location("drive:Misty Backups/laptop").unwrap(),
+            "rclone:drive:Misty Backups/laptop"
+        );
+        assert!(validate_cloud_repository_location("drive:../escape").is_err());
+        assert!(validate_cloud_repository_location("bad remote:path").is_err());
+        assert_eq!(
+            restic_progress(r#"{"message_type":"status","percent_done":0.425}"#),
+            Some(42.5)
+        );
+    }
+
+    #[test]
+    fn restore_folder_is_collision_safe() {
+        let root = std::env::temp_dir().join(format!("misty-restore-{}", Uuid::new_v4()));
+        fs::create_dir_all(root.join("Misty Restore")).unwrap();
+        let created = collision_safe_restore_folder(&root).unwrap();
+        assert!(created.ends_with("Misty Restore 2"));
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn optimizer_preserves_source_and_records_output() {
+        use std::os::unix::fs::PermissionsExt;
+        let root = std::env::temp_dir().join(format!("misty-optimize-{}", Uuid::new_v4()));
+        fs::create_dir_all(&root).unwrap();
+        let source = root.join("photo.jpg");
+        fs::write(&source, b"original").unwrap();
+        let executable = root.join("fake-ffmpeg");
+        fs::write(
+            &executable,
+            b"#!/bin/sh\nfor last; do :; done\nprintf optimized > \"$last\"\n",
+        )
+        .unwrap();
+        fs::set_permissions(&executable, fs::Permissions::from_mode(0o755)).unwrap();
+        let jobs = Arc::new(Mutex::new(HashMap::new()));
+        let id = "optimizer".to_owned();
+        jobs.lock().unwrap().insert(
+            id.clone(),
+            ExtensionJob {
+                snapshot: ExtensionJobSnapshot {
+                    id: id.clone(),
+                    plugin_id: "image_optimizer".to_owned(),
+                    status: "queued".to_owned(),
+                    progress: Some(0.0),
+                    message: String::new(),
+                    output_paths: Vec::new(),
+                    error: None,
+                    created_at: 1,
+                    updated_at: 1,
+                    completed_at: None,
+                    result: None,
+                },
+                cancel: Arc::new(AtomicBool::new(false)),
+            },
+        );
+        run_image_optimizer_job(
+            jobs.clone(),
+            id.clone(),
+            Arc::new(AtomicBool::new(false)),
+            vec![source.clone()],
+            "balanced".to_owned(),
+            "original".to_owned(),
+            "beside".to_owned(),
+            root.clone(),
+            executable,
+        );
+        let snapshot = jobs.lock().unwrap().get(&id).unwrap().snapshot.clone();
+        assert_eq!(fs::read(&source).unwrap(), b"original");
+        assert_eq!(snapshot.status, "completed");
+        assert_eq!(snapshot.output_paths.len(), 1);
         let _ = fs::remove_dir_all(root);
     }
 }

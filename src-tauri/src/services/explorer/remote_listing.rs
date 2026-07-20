@@ -103,14 +103,11 @@ impl ExplorerService {
         &self,
         target: RemoteBrowseTarget,
         show_hidden: bool,
-        force_remote_refresh: bool,
+        _force_remote_refresh: bool,
     ) -> ApiResult<DirectoryListing> {
-        if !force_remote_refresh {
-            if let Some(items) = self.load_fresh_cached_remote_items(&target).await? {
-                return self.remote_listing_from_items(target, show_hidden, items);
-            }
-        }
-
+        // The backend is the source of truth. Files already materialized below the
+        // virtual mount are reusable by their fetched name, while the serialized
+        // listing is only an offline/error fallback.
         let items = match self.fetch_remote_items(&target).await {
             Ok(items) => items,
             Err(remote_error) if is_remote_directory_not_found_error(&remote_error) => {
@@ -126,27 +123,6 @@ impl ExplorerService {
             },
         };
         self.remote_listing_from_items(target, show_hidden, items)
-    }
-
-    pub(super) async fn load_fresh_cached_remote_items(
-        &self,
-        target: &RemoteBrowseTarget,
-    ) -> ApiResult<Option<Vec<RemoteListItem>>> {
-        let Some(last_write_time) = self
-            .listing_cache
-            .last_write_time(&target.remote_name, &target.remote_path)
-            .await?
-        else {
-            return Ok(None);
-        };
-        if last_write_time
-            .elapsed()
-            .map(|age| age > REMOTE_LISTING_CACHE_MAX_AGE)
-            .unwrap_or(true)
-        {
-            return Ok(None);
-        }
-        self.load_cached_remote_items(target).await
     }
 
     pub(super) async fn load_cached_remote_items(
@@ -189,7 +165,7 @@ impl ExplorerService {
             if !show_hidden && item.name.starts_with('.') {
                 continue;
             }
-            let remote_path = target.child_remote_path(&item)?;
+            let remote_path = remote_item_path(&target, &item)?;
             let item_target = RemoteBrowseTarget {
                 provider_type: target.provider_type.clone(),
                 remote_name: target.remote_name.clone(),
