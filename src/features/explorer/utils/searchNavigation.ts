@@ -1,12 +1,8 @@
-import type { SearchResult } from "@/services/misty-api/types";
-import { useExplorerStore } from "../../../stores/useExplorerStore";
-import { useMediaViewerStore } from "../../../stores/useMediaViewerStore";
-
-export interface ExplorerSearchNavigationTarget {
-  result: SearchResult;
-  path: string;
-  selectEntryId: string | null;
-}
+import type { ExplorerSearchNavigationTarget } from "@/models/interfaces/features/explorer/utils/searchNavigation";
+export type { ExplorerSearchNavigationTarget } from "@/models/interfaces/features/explorer/utils/searchNavigation";
+import type { SearchResult } from "@/models/interfaces/services/misty-api";
+import { useExplorerStore } from "@/stores/explorer";
+import { useMediaViewerStore } from "@/stores/media/useMediaViewerStore";
 
 export function searchResultNavigationTarget(result: SearchResult): ExplorerSearchNavigationTarget {
   const entry = result.entry;

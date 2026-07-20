@@ -1,33 +1,29 @@
+import type { ExplorerMikaPanelProps } from "@/models/interfaces/features/explorer/desktop/ExplorerMikaPanel";
+export type { ExplorerMikaPanelProps } from "@/models/interfaces/features/explorer/desktop/ExplorerMikaPanel";
 import { ArrowUp, ChevronDown, Info, Mic, Plus, ShieldAlert, Sparkles, X } from "lucide-react";
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
-import { Button } from "../../../components/ui/button";
+import { Button } from "@/ui";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
-} from "../../../components/ui/dropdown-menu";
-import { Popover, PopoverContent, PopoverTrigger } from "../../../components/ui/popover";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "../../../components/ui/select";
-import { Textarea } from "../../../components/ui/textarea";
+} from "@/ui";
+import { Popover, PopoverContent, PopoverTrigger } from "@/ui";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui";
+import { Textarea } from "@/ui";
 import {
   hideRuntimeAssetOnError,
   revealRuntimeAssetOnLoad,
   runtimeAssetSource,
-} from "@/shared/assets/runtimeAsset";
-import { useMultiPanelStore } from "@/shared/multipanel/useMultiPanelStore";
-import { useAppStore } from "../../../stores/useAppStore";
-import { useExplorerStore } from "../../../stores/useExplorerStore";
-import { useMikaSessionStore } from "../../../stores/useMikaSessionStore";
-import type { AiMode } from "../../../stores/aiServerApi";
+} from "@/platform/runtimeAsset";
+import { useMultiPanelStore } from "@/features/workspace";
+import { useAppStore } from "@/stores/app";
+import { useExplorerStore } from "@/stores/explorer";
+import { useMikaSessionStore } from "@/stores/assistant/useMikaSessionStore";
+import type { AiMode } from "@/models/types/stores/assistant/useAiServerStore";
 import { AssistantMessage } from "./ExplorerAssistantMessage";
 import { MikaContextContent, MikaEmptyState } from "./ExplorerAssistantContext";
 import {
@@ -39,14 +35,6 @@ import {
 } from "./ExplorerAssistantShared";
 import { assistantPanelStyles } from "./ExplorerAssistantStyles";
 import { cx } from "./ExplorerDesktopShared";
-
-export interface ExplorerMikaPanelProps {
-  surface?: "explorer" | "bot" | "bot-window" | "bot-chat-window";
-  onHeaderDragStart?: () => void;
-  onClose?: () => void;
-  workingDirectory?: string;
-  selectedPaths?: string[];
-}
 
 export const ExplorerMikaPanel = memo(function ExplorerMikaPanel(props: ExplorerMikaPanelProps) {
   const assetsDir = useAppStore((state) => state.app?.environment.assetsDir);

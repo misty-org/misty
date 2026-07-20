@@ -1,24 +1,24 @@
+import type { DetailHandlers } from "@/models/types/pages/Transfers/desktop/TransferPanels";
+export type { DetailHandlers } from "@/models/types/pages/Transfers/desktop/TransferPanels";
 import { useMemo } from "react";
 import { ListFilter, PanelRight } from "lucide-react";
-import type { TransferRecord, TransferType } from "../../../api/types";
-import { EmptyState } from "@/components/ui/state-view";
-import { StatusBadge } from "@/components/ui/status-badge";
-import { Button } from "../../../components/ui/button";
-import { Checkbox } from "../../../components/ui/checkbox";
-import { Progress } from "../../../components/ui/progress";
-import { RadioGroup, RadioGroupItem } from "../../../components/ui/radio-group";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "../../../components/ui/select";
-import { prettyLabel } from "@/shared/format";
-import type { TransferSortDirection, TransferSortKey } from "../../../stores/useTransfersStore";
-import { transferTypes } from "../../../stores/useTransfersStore";
+import type { TransferType } from "@/models/types/services/misty-api";
+import type { TransferRecord } from "@/models/interfaces/services/misty-api";
+import { EmptyState } from "@/ui";
+import { StatusBadge } from "@/ui";
+import { Button } from "@/ui";
+import { Checkbox } from "@/ui";
+import { Progress } from "@/ui";
+import { RadioGroup, RadioGroupItem } from "@/ui";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui";
+import { prettyLabel } from "@/lib/format";
+import type {
+  TransferSortDirection,
+  TransferSortKey,
+} from "@/models/types/stores/transfers/useTransfersStore";
+import { transferTypes } from "@/stores/transfers";
 import { remoteSummary } from "../transferUtils";
-import type { TransferActionHandlers } from "./TransferMenus";
+import type { TransferActionHandlers } from "@/models/types/pages/Transfers/desktop/TransferMenus";
 import {
   aggregateTransferProgress,
   binaryProgressStatus,
@@ -30,8 +30,8 @@ import {
   targetEndpoint,
   timestampLabel,
   transferStatusTone,
-  type TransferProgressSnapshot,
 } from "./transferModel";
+import type { TransferProgressSnapshot } from "@/models/types/pages/Transfers/desktop/transferModel";
 import { transferStyles } from "./transferStyles";
 
 export function TransferFilters(props: {
@@ -189,16 +189,6 @@ export function TransferFilters(props: {
     </div>
   );
 }
-
-type DetailHandlers = Pick<
-  TransferActionHandlers,
-  | "onCancel"
-  | "onRetry"
-  | "onPauseResume"
-  | "onPauseResumeBatch"
-  | "onCancelBatch"
-  | "onResolveConflict"
->;
 
 export function TransferDetail(
   props: DetailHandlers & {

@@ -1,40 +1,25 @@
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
-import type { ProviderWorkflow, RcloneConfigPaths, RemoteEditDraft } from "../../../api/types";
-import { iconAssets } from "@/shared/assets/icons";
-import { AssetIcon } from "@/shared/components/AssetIcon";
-import { Panel, PanelHeader } from "@/shared/components/Panel";
+import type { RemoteEditPanelProps } from "@/models/interfaces/pages/Providers/components/RemoteEditPanel";
+export type { RemoteEditPanelProps } from "@/models/interfaces/pages/Providers/components/RemoteEditPanel";
+import { Alert, AlertDescription, AlertTitle } from "@/ui";
+import { Button } from "@/ui";
+import { Skeleton } from "@/ui";
+import type {
+  ProviderWorkflow,
+  RcloneConfigPaths,
+  RemoteEditDraft,
+} from "@/models/interfaces/services/misty-api";
+import { iconAssets } from "@/assets/icons";
+import { AssetIcon } from "@/ui";
+import { Panel, PanelHeader } from "@/pages/Providers/components/ProviderPanel";
 import { RemoteConfigForm } from "./RemoteConfigForm";
 import { RemoteEditActions } from "./RemoteEditActions";
-import { EmptyState, ErrorState } from "@/components/ui/state-view";
-import { StatusBadge } from "@/components/ui/status-badge";
+import { EmptyState, ErrorState } from "@/ui";
+import { StatusBadge } from "@/ui";
 
 const remoteEditPanelClass =
   "grid min-h-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden !rounded-none !border-0 !bg-transparent !shadow-none [border-radius:0]";
 
 const remoteEditBodyClass = "min-h-0 overflow-auto";
-
-interface RemoteEditPanelProps {
-  draft: RemoteEditDraft | null;
-  configPaths: RcloneConfigPaths | null;
-  configKeys: string[];
-  workflow: ProviderWorkflow | null;
-  dirty: boolean;
-  loadingRemoteName: string | null;
-  working: boolean;
-  tokenVisible: boolean;
-  validRemoteName: boolean;
-  stale: boolean;
-  serviceError: string | null;
-  onDraftName: (name: string) => void;
-  onConfigField: (key: string, value: string) => void;
-  onTokenField: (key: string, value: string) => void;
-  onTokenVisible: (visible: boolean) => void;
-  onSave: () => void;
-  onDelete: (name: string) => void;
-  onReload: () => void;
-}
 
 export function RemoteEditPanel(props: RemoteEditPanelProps) {
   const { draft } = props;

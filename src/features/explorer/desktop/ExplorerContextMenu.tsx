@@ -1,3 +1,13 @@
+import type {
+  ContextMenuLeafItem,
+  ContextMenuBranchItem,
+  ContextMenuEntry,
+} from "@/models/types/features/explorer/desktop/ExplorerContextMenu";
+export type {
+  ContextMenuLeafItem,
+  ContextMenuBranchItem,
+  ContextMenuEntry,
+} from "@/models/types/features/explorer/desktop/ExplorerContextMenu";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -7,7 +17,7 @@ import {
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
-} from "../../../components/ui/dropdown-menu";
+} from "@/ui";
 import {
   AppWindow,
   Archive,
@@ -46,41 +56,20 @@ import {
   providersJobStatus,
   providersVerifyResult,
   providersVerifyStart,
-} from "@/services/misty-api/misty";
+} from "@/stores/backend";
 import {
   selectedDeletePathsForPane,
   selectedPathsForPane,
   useExplorerStore,
-} from "../../../stores/useExplorerStore";
-import { selectShortcutPreferences, useSettingsStore } from "../../../stores/useSettingsStore";
-import { errorText } from "@/shared/format";
+} from "@/stores/explorer";
+import { selectShortcutPreferences, useSettingsStore } from "@/stores/app";
+import { errorText } from "@/lib/format";
 import { useShallow } from "zustand/react/shallow";
 import { clearSelectionsAcrossPanes, selectedCountAcrossPanes } from "./ExplorerAssistantPanels";
-import type { CompareDialogSeed } from "./ExplorerCompareDialog";
+import type { CompareDialogSeed } from "@/models/interfaces/features/explorer/desktop/ExplorerCompareDialog";
 
 const explorerCompareWithEvent = "misty:explorer-compare-with";
 const emptyPinnedPaths: string[] = [];
-
-type ContextMenuLeafItem = {
-  id: string;
-  icon: ReactNode;
-  label: string;
-  shortcut?: string;
-  disabled?: boolean;
-  disabledReason?: string;
-  onRun: () => void;
-};
-
-type ContextMenuBranchItem = {
-  id: string;
-  icon: ReactNode;
-  label: string;
-  disabled?: boolean;
-  disabledReason?: string;
-  items: ContextMenuLeafItem[];
-};
-
-type ContextMenuEntry = ContextMenuLeafItem | ContextMenuBranchItem;
 
 function isContextMenuBranch(item: ContextMenuEntry): item is ContextMenuBranchItem {
   return "items" in item;

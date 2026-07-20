@@ -1,13 +1,23 @@
+import type {
+  LibraryCollectionKind,
+  LibraryUploadJob,
+  SpaceLibraryData,
+} from "@/models/types/features/spaces/useSpaceLibraryData";
+export type {
+  LibraryCollectionKind,
+  LibraryUploadJob,
+  SpaceLibraryData,
+} from "@/models/types/features/spaces/useSpaceLibraryData";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
-import { SpaceRequestError, spacesApi } from "@/spaces/api";
+import { SpaceRequestError, spacesApi } from "@/stores/spaces/useSpacesBackendStore";
+import type { LibraryEditDefinition } from "@/models/types/features/spaces/types";
 import type {
   LibraryAlbum,
   LibraryAlbumFolder,
   LibraryAssetStack,
   LibraryDiscovery,
-  LibraryEditDefinition,
   LibraryGroup,
   LibraryImportHistoryItem,
   LibraryIntelligencePolicy,
@@ -18,39 +28,18 @@ import type {
   LibrarySharedReference,
   SpaceLibraryItem,
   SpaceStorageUsage,
-} from "@/spaces/types";
-import { useSpacesStore } from "@/stores/useSpacesStore";
-
-import type { LibraryItemMenuState } from "./components/LibraryItemContextMenu";
+} from "@/models/interfaces/features/spaces/types";
+import { useSpacesStore } from "@/stores/spaces/useSpacesStore";
+import type { LibraryItemMenuState } from "@/models/interfaces/features/spaces/components/LibraryItemContextMenu";
 import { compareLibraryItems, libraryFacetPrefix } from "./libraryFormat";
-import {
-  type LibraryAlbumDialogMode,
-  type LibraryMetadataDialogAction,
-  type LibraryPersonDialogMode,
-  type LibraryTextDialogState,
-  type LibraryUnlockScope,
-} from "./SpaceLibraryDialogs";
+import type {
+  LibraryAlbumDialogMode,
+  LibraryMetadataDialogAction,
+  LibraryPersonDialogMode,
+  LibraryTextDialogState,
+  LibraryUnlockScope,
+} from "@/models/types/features/spaces/SpaceLibraryDialogs";
 import { activeSensitiveGrant, libraryItemMIME } from "./SpaceLibraryPrimitives";
-
-export type LibraryCollectionKind =
-  | "recent"
-  | "months"
-  | "years"
-  | "recent-days"
-  | "utility"
-  | "collections"
-  | "favorites"
-  | "hidden"
-  | "deleted"
-  | "people"
-  | "albums"
-  | "groups"
-  | "memory"
-  | "trip"
-  | "map"
-  | "duplicate"
-  | "shared"
-  | "imports";
 
 export const libraryCollectionKinds = new Set<LibraryCollectionKind>([
   "recent",
@@ -72,15 +61,6 @@ export const libraryCollectionKinds = new Set<LibraryCollectionKind>([
   "shared",
   "imports",
 ]);
-
-export type LibraryUploadJob = {
-  id: string;
-  path: string;
-  name: string;
-  stage: "queued" | "reading" | "hashing" | "uploading" | "finalizing" | "ready" | "failed";
-  progress: number;
-  error?: string;
-};
 
 export function useSpaceLibraryData(spaceId: string) {
   const [librarySearchParams, setLibrarySearchParams] = useSearchParams();
@@ -760,5 +740,3 @@ export function useSpaceLibraryData(spaceId: string) {
     showTextDialog,
   };
 }
-
-export type SpaceLibraryData = ReturnType<typeof useSpaceLibraryData>;

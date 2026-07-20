@@ -1,7 +1,7 @@
-import { invoke } from "@tauri-apps/api/core";
+import { telemetrySetErrorReportingEnabled } from "@/stores/backend";
 import { analytics } from "./client";
 import { clientMetadata } from "./metadata";
-import type { CommonClientProperties, TelemetryClient } from "./types";
+import type { CommonClientProperties, TelemetryClient } from "@/models/interfaces/analytics/types";
 
 export const ANALYTICS_SESSION_TIMEOUT_MS = 30 * 60 * 1000;
 const installIdKey = "misty.analytics.install_id";
@@ -157,9 +157,7 @@ export function setAnalyticsAuthenticationState(value: boolean): void {
 }
 export function telemetryPreferencesChanged(usageAnalytics: boolean, errorReports: boolean): void {
   lifecycle.preferencesChanged(usageAnalytics, errorReports);
-  void invoke("telemetry_set_error_reporting_enabled", { enabled: errorReports }).catch(
-    () => undefined,
-  );
+  void telemetrySetErrorReportingEnabled(errorReports).catch(() => undefined);
   syncTelemetryPreferencesToServer();
 }
 export function trackOnboardingCompleted(): Promise<void> {
@@ -167,7 +165,7 @@ export function trackOnboardingCompleted(): Promise<void> {
 }
 
 function syncTelemetryPreferencesToServer(): void {
-  void import("../pages/Account/shared/api")
+  void import("@/stores/account/useAccountStore")
     .then(({ accountUpdateTelemetryPreferences }) =>
       accountUpdateTelemetryPreferences(
         analytics.isAnalyticsEnabled(),

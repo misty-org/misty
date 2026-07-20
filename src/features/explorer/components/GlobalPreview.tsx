@@ -1,6 +1,16 @@
-import { Textarea } from "../../../components/ui/textarea";
-import { Button } from "../../../components/ui/button";
-import { Dialog, DialogContent, DialogTitle } from "../../../components/ui/dialog";
+import type { GlobalPreviewKind } from "@/models/types/features/explorer/components/GlobalPreview";
+export type { GlobalPreviewKind } from "@/models/types/features/explorer/components/GlobalPreview";
+import type {
+  GlobalPreviewSource,
+  PreviewResource,
+} from "@/models/interfaces/features/explorer/components/GlobalPreview";
+export type {
+  GlobalPreviewSource,
+  PreviewResource,
+} from "@/models/interfaces/features/explorer/components/GlobalPreview";
+import { Textarea } from "@/ui";
+import { Button } from "@/ui";
+import { Dialog, DialogContent, DialogTitle } from "@/ui";
 import { Copy, ExternalLink, FileArchive, FileQuestion, Loader2, Save, X } from "lucide-react";
 import { lazy, Suspense, useCallback, useEffect, useState } from "react";
 import {
@@ -9,40 +19,13 @@ import {
   explorerPrepareOpenItem,
   explorerPreviewItem,
   explorerSavePreviewItem,
-} from "@/services/misty-api/misty";
-import type { ArchiveEntry } from "@/services/misty-api/types";
-import { errorText } from "@/shared/format";
-import { safeTauriAssetUrl } from "@/shared/tauri";
+  fetchPreviewBytes,
+} from "@/stores/backend";
+import type { ArchiveEntry } from "@/models/interfaces/services/misty-api";
+import { errorText } from "@/lib/format";
+import { safeTauriAssetUrl } from "@/platform/tauri";
 import { formatBytes, formatDate } from "../utils/fileFormat";
-import { GlobalImageEditor } from "../../../components/GlobalImageEditor";
-
-export interface GlobalPreviewSource {
-  path: string;
-  name: string;
-  extension?: string;
-  mimeType?: string | null;
-  sizeBytes?: number | null;
-  modifiedMs?: number | null;
-  createdMs?: number | null;
-  description?: string | null;
-  tags?: string[];
-  originalName?: string | null;
-  uploadedMs?: number | null;
-  readonly?: boolean;
-  remote?: boolean;
-}
-
-interface PreviewResource {
-  kind:
-    "image" | "video" | "audio" | "pdf" | "markdown" | "text" | "document" | "archive" | "generic";
-  url?: string;
-  text?: string;
-  mimeType: string;
-  archiveEntries?: ArchiveEntry[];
-  archiveFormat?: string;
-}
-
-export type GlobalPreviewKind = PreviewResource["kind"];
+import { GlobalImageEditor } from "../../editor/GlobalImageEditor";
 
 const ReactMarkdown = lazy(() => import("react-markdown"));
 const textExtensions = new Set([
@@ -672,11 +655,7 @@ function useEmbeddedDocument(url: string, extension: string, mimeType: string, e
       return () => undefined;
     }
     setLoading(true);
-    void fetch(url)
-      .then((response) => {
-        if (!response.ok) throw new Error(`The file reader returned ${response.status}.`);
-        return response.arrayBuffer();
-      })
+    void fetchPreviewBytes(url)
       .then(async (buffer) => {
         const bytes = new Uint8Array(buffer);
         if (officeExtensions.has(extension))

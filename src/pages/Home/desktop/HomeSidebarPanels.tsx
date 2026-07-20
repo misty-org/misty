@@ -1,3 +1,15 @@
+import type {
+  HomeQuickAccessItem,
+  HomeSmartFolderItem,
+  HomeTagItem,
+  HomeSidebarPanelsProps,
+} from "@/models/types/pages/Home/desktop/HomeSidebarPanels";
+export type {
+  HomeQuickAccessItem,
+  HomeSmartFolderItem,
+  HomeTagItem,
+  HomeSidebarPanelsProps,
+} from "@/models/types/pages/Home/desktop/HomeSidebarPanels";
 import {
   Clock3,
   Download,
@@ -14,59 +26,13 @@ import {
   Trash2,
 } from "lucide-react";
 import { useId, type ReactNode } from "react";
-import type { MountedDevice, ProviderRemote } from "../../../api/types";
-import { providerIconForType } from "@/shared/assets/icons";
-import { AssetIcon } from "@/shared/components/AssetIcon";
+import type { MountedDevice, ProviderRemote } from "@/models/interfaces/services/misty-api";
+import { providerIconForType } from "@/assets/icons";
+import { AssetIcon } from "@/ui";
 import { joinPath, titleFromPath } from "./recentFileUtils";
-import { Button } from "../../../components/ui/button";
-import { Card } from "../../../components/ui/card";
-import { Skeleton } from "../../../components/ui/skeleton";
-
-export type HomeQuickAccessItem = {
-  id: string;
-  label: string;
-  path: string;
-  icon:
-    | "desktop"
-    | "documents"
-    | "downloads"
-    | "folder"
-    | "home"
-    | "pin"
-    | "recent"
-    | "starred"
-    | "trash";
-};
-
-export type HomeSmartFolderItem = {
-  id: string;
-  name: string;
-  query: string;
-};
-
-export type HomeTagItem = {
-  key: string;
-  name: string;
-  count: number;
-};
-
-type HomeSidebarPanelsProps = {
-  devices: MountedDevice[];
-  devicesLoading: boolean;
-  onOpenDevice: (device: MountedDevice) => void;
-  onOpenQuickAccess: (item: HomeQuickAccessItem) => void;
-  onOpenRemote: (remote: ProviderRemote) => void;
-  onOpenSmartFolder: (smartFolder: HomeSmartFolderItem) => void;
-  onOpenTag: (tag: HomeTagItem) => void;
-  quickAccessItems: HomeQuickAccessItem[];
-  remotes: ProviderRemote[];
-  remotesLoading: boolean;
-  smartFolders: HomeSmartFolderItem[];
-  smartFoldersLoading: boolean;
-  tags: HomeTagItem[];
-  tagsLoading: boolean;
-  workspacePanel: ReactNode;
-};
+import { Button } from "@/ui";
+import { Card } from "@/ui";
+import { Skeleton } from "@/ui";
 
 const panelClass = "flex h-full min-h-0 min-w-0 flex-col p-4";
 const headerClass =

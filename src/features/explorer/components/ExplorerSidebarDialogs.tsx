@@ -9,8 +9,8 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "../../../components/ui/alert-dialog";
-import { Button } from "../../../components/ui/button";
+} from "@/ui";
+import { Button } from "@/ui";
 import {
   Dialog,
   DialogContent,
@@ -18,22 +18,16 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "../../../components/ui/dialog";
-import { Input } from "../../../components/ui/input";
-import { Label } from "../../../components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "../../../components/ui/select";
-import type { SavedSearchRule } from "@/services/misty-api/types";
+} from "@/ui";
+import { Input } from "@/ui";
+import { Label } from "@/ui";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui";
+import type { SavedSearchRule } from "@/models/interfaces/services/misty-api";
 import type {
   SmartFolderDialogState,
-  SmartFolderDraft,
   WorkspaceDialogState,
-} from "./ExplorerSidebarSupport";
+} from "@/models/types/features/explorer/components/ExplorerSidebarSupport";
+import type { SmartFolderDraft } from "@/models/interfaces/features/explorer/components/ExplorerSidebarSupport";
 import { smartFolderQueryFromRules } from "./ExplorerSidebarQuery";
 
 const smartFolderFields = [

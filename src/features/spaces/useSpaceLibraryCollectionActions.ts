@@ -1,3 +1,5 @@
+import type { SpaceLibraryCollectionActions } from "@/models/types/features/spaces/useSpaceLibraryCollectionActions";
+export type { SpaceLibraryCollectionActions } from "@/models/types/features/spaces/useSpaceLibraryCollectionActions";
 import { useEffect, type FormEvent } from "react";
 import {
   EyeOff,
@@ -18,17 +20,20 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
-import { confirmAction } from "@/shared/confirmAction";
-import { spacesApi } from "@/spaces/api";
-import type { LibraryPinnedCollection, LibrarySharedReference } from "@/spaces/types";
+import { confirmAction } from "@/lib/confirmAction";
+import { spacesApi } from "@/stores/spaces/useSpacesBackendStore";
+import type {
+  LibraryPinnedCollection,
+  LibrarySharedReference,
+} from "@/models/interfaces/features/spaces/types";
 
 import { libraryUtilityIcon } from "./SpaceLibraryPrimitives";
-import {
-  libraryCollectionKinds,
-  type LibraryCollectionKind,
-  type SpaceLibraryData,
-} from "./useSpaceLibraryData";
-import type { SpaceLibraryItemActions } from "./useSpaceLibraryItemActions";
+import { libraryCollectionKinds } from "./useSpaceLibraryData";
+import type {
+  LibraryCollectionKind,
+  SpaceLibraryData,
+} from "@/models/types/features/spaces/useSpaceLibraryData";
+import type { SpaceLibraryItemActions } from "@/models/types/features/spaces/useSpaceLibraryItemActions";
 
 export function useSpaceLibraryCollectionActions(
   data: SpaceLibraryData,
@@ -821,5 +826,3 @@ export function useSpaceLibraryCollectionActions(
     submitTextDialog,
   };
 }
-
-export type SpaceLibraryCollectionActions = ReturnType<typeof useSpaceLibraryCollectionActions>;

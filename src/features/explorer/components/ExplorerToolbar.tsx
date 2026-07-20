@@ -1,12 +1,12 @@
-import { Button } from "../../../components/ui/button";
+import { Button } from "@/ui";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuTrigger,
-} from "../../../components/ui/dropdown-menu";
-import { Input } from "../../../components/ui/input";
+} from "@/ui";
+import { Input } from "@/ui";
 import {
   ChevronDown,
   ChevronRight,
@@ -31,11 +31,11 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { useMinimumSpin } from "@/shared/hooks/useMinimumSpin";
+import { useMinimumSpin } from "@/hooks/useMinimumSpin";
 import { ExplorerDropTarget } from "../drag/ExplorerDropTarget";
 import { breadcrumbSegments } from "../utils/fileFormat";
 import { ExplorerToolbarDragNavigation } from "./ExplorerToolbarDragNavigation";
-import type { ExplorerToolbarProps } from "./ExplorerToolbarModel";
+import type { ExplorerToolbarProps } from "@/models/interfaces/features/explorer/components/ExplorerToolbarModel";
 import { ExplorerToolbarSearch } from "./ExplorerToolbarSearch";
 import { cx, toolbarStyles } from "./ExplorerToolbarSupport";
 

@@ -1,8 +1,12 @@
+import type { LibraryMediaFilter } from "@/models/types/features/spaces/components/MistyLibraryPicker";
+export type { LibraryMediaFilter } from "@/models/types/features/spaces/components/MistyLibraryPicker";
+import type { MistyLibraryPickerProps } from "@/models/interfaces/features/spaces/components/MistyLibraryPicker";
+export type { MistyLibraryPickerProps } from "@/models/interfaces/features/spaces/components/MistyLibraryPicker";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { BookOpenText, Check, File, Image, Music2, Search, Video } from "lucide-react";
 
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Badge } from "@/ui";
+import { Button } from "@/ui";
 import {
   Dialog,
   DialogContent,
@@ -10,24 +14,14 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Skeleton } from "@/components/ui/skeleton";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { cn } from "@/lib/utils";
-import { spacesApi } from "../../../spaces/api";
-import type { SpaceLibraryItem } from "../../../spaces/types";
-
-type LibraryMediaFilter = "all" | "image" | "video" | "audio" | "document";
-
-interface MistyLibraryPickerProps {
-  spaceId: string;
-  selectedIds: string[];
-  maximumSelected?: number;
-  onCancel: () => void;
-  onChoose: (itemIds: string[]) => void;
-}
+} from "@/ui";
+import { Input } from "@/ui";
+import { ScrollArea } from "@/ui";
+import { Skeleton } from "@/ui";
+import { ToggleGroup, ToggleGroupItem } from "@/ui";
+import { cn } from "@/ui";
+import { spacesApi } from "@/stores/spaces/useSpacesBackendStore";
+import type { SpaceLibraryItem } from "@/models/interfaces/features/spaces/types";
 
 const filters: Array<{ value: LibraryMediaFilter; label: string; icon: typeof File }> = [
   { value: "all", label: "All items", icon: File },

@@ -1,22 +1,18 @@
-import { Button } from "../../../components/ui/button";
+import { Button } from "@/ui";
 import { Columns2, PanelTopClose, Rows2 } from "lucide-react";
 import { memo, useCallback, useEffect, useMemo } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { ExplorerPaneToolbarActions, ExplorerToolbar } from "../components/ExplorerToolbar";
 import type { ExplorerLocationResult } from "../components/ExplorerToolbar";
 import { FileInspector } from "../components/FileInspector";
-import type { FileEntry, PluginCommandEntry } from "@/services/misty-api/types";
-import { maxMultiPanelPanes, useMultiPanelStore } from "@/shared/multipanel/useMultiPanelStore";
-import {
-  selectedEntriesForPane,
-  selectedEntryForPane,
-  useExplorerStore,
-} from "../../../stores/useExplorerStore";
-import type { ExplorerSortColumn } from "../../../stores/useExplorerStore";
-import { useOperationQueueStore } from "../../../stores/useOperationQueueStore";
-import { useTransfersStore } from "../../../stores/useTransfersStore";
+import type { FileEntry, PluginCommandEntry } from "@/models/interfaces/services/misty-api";
+import { maxMultiPanelPanes, useMultiPanelStore } from "@/features/workspace";
+import { selectedEntriesForPane, selectedEntryForPane, useExplorerStore } from "@/stores/explorer";
+import type { ExplorerSortColumn } from "@/stores/explorer";
+import { useOperationQueueStore } from "@/stores/explorer";
+import { useTransfersStore } from "@/stores/transfers";
 import { revealSearchResultInPane } from "../utils/searchNavigation";
-import type { ExplorerSearchNavigationTarget } from "../utils/searchNavigation";
+import type { ExplorerSearchNavigationTarget } from "@/models/interfaces/features/explorer/utils/searchNavigation";
 import { explorerShellStyles } from "./ExplorerShellStyles";
 import {
   newestUndoableTransfer,

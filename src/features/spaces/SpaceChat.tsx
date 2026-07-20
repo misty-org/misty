@@ -1,11 +1,13 @@
+import type { ChatComposerSuggestion } from "@/models/types/features/spaces/SpaceChat";
+export type { ChatComposerSuggestion } from "@/models/types/features/spaces/SpaceChat";
 import { useEffect, useId, useMemo, useRef, useState, type FormEvent } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Bot, LibraryBig, Paperclip, Send, Sparkles, Users, X } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
 
-import { useAuth } from "../../auth/AuthContext";
-import { MistyFilePicker } from "../../components/MistyFilePicker/MistyFilePicker";
-import { spacesApi } from "../../spaces/api";
+import { useAuth } from "@/features/auth/AuthContext";
+import { MistyFilePicker } from "../picker/FilePicker";
+import { spacesApi } from "@/stores/spaces/useSpacesBackendStore";
 import type {
   MessageAttachment,
   SpaceLibraryItem,
@@ -13,11 +15,11 @@ import type {
   SpaceMessage,
   SpaceNode,
   SpaceStudioResource,
-} from "../../spaces/types";
-import { mergeSpaceMessages } from "../../stores/spaceMessageSpans";
-import { buildMessageSpans, useSpacesStore } from "../../stores/useSpacesStore";
-import { useSetupStore } from "../../stores/useSetupStore";
-import { Button } from "../../components/ui/button";
+} from "@/models/interfaces/features/spaces/types";
+import { mergeSpaceMessages } from "@/stores/spaces/useSpaceMessageSpansStore";
+import { buildMessageSpans, useSpacesStore } from "@/stores/spaces/useSpacesStore";
+import { useSetupStore } from "@/stores/app";
+import { Button } from "@/ui";
 import {
   Command,
   CommandEmpty,
@@ -25,18 +27,13 @@ import {
   CommandItem,
   CommandList,
   CommandSeparator,
-} from "../../components/ui/command";
-import { Popover, PopoverAnchor, PopoverContent } from "../../components/ui/popover";
-import { Textarea } from "../../components/ui/textarea";
+} from "@/ui";
+import { Popover, PopoverAnchor, PopoverContent } from "@/ui";
+import { Textarea } from "@/ui";
 import { MistyLibraryPicker } from "./components/MistyLibraryPicker";
 import { AgentConversationPanel } from "@/pages/Studio/AgentConversation";
 import { useSpaceConversationChat } from "./useSpaceConversationChat";
 import { DeleteMessageDialog, SpaceChatMessages } from "./components/SpaceChatMessages";
-
-type ChatComposerSuggestion =
-  | { kind: "member"; id: string; label: string; detail: string }
-  | { kind: "agent"; id: string; label: string; detail: string }
-  | { kind: "library"; id: string; label: string; detail: string; item: SpaceLibraryItem };
 
 const emptyMessages: SpaceMessage[] = [];
 const emptyMembers: SpaceMember[] = [];

@@ -1,3 +1,5 @@
+import type { SpaceChatMessagesProps } from "@/models/interfaces/features/spaces/components/SpaceChatMessages";
+export type { SpaceChatMessagesProps } from "@/models/interfaces/features/spaces/components/SpaceChatMessages";
 import type { FormEvent, RefObject } from "react";
 import {
   Ellipsis,
@@ -10,7 +12,7 @@ import {
   Trash2,
 } from "lucide-react";
 
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/ui";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -20,49 +22,26 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+} from "@/ui";
+import { Badge } from "@/ui";
+import { Button } from "@/ui";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Textarea } from "@/components/ui/textarea";
-import { copyLibraryItemsToClipboard } from "../../../spaces/libraryClipboard";
-import { spacesApi } from "../../../spaces/api";
-import type { MessageSpan, SpaceLibraryItem, SpaceMessage, SpaceNode } from "../../../spaces/types";
+} from "@/ui";
+import { Textarea } from "@/ui";
+import { copyLibraryItemsToClipboard } from "@/features/spaces/libraryClipboard";
+import { spacesApi } from "@/stores/spaces/useSpacesBackendStore";
+import type { MessageSpan } from "@/models/types/features/spaces/types";
+import type {
+  SpaceLibraryItem,
+  SpaceMessage,
+  SpaceNode,
+} from "@/models/interfaces/features/spaces/types";
 import { formatTime } from "../libraryFormat";
-
-interface SpaceChatMessagesProps {
-  error: string;
-  loading: boolean;
-  messages: SpaceMessage[];
-  currentUserId?: string;
-  isOwner: boolean;
-  canWrite: boolean;
-  editingMessageId: string;
-  editingText: string;
-  editSaving: boolean;
-  nodes: SpaceNode[];
-  libraryItems: SpaceLibraryItem[];
-  canCopyLibrary: boolean;
-  canAddToLibrary: boolean;
-  spaceId: string;
-  endRef: RefObject<HTMLDivElement>;
-  onEditingText: (value: string) => void;
-  onCancelEditing: (messageId: string) => void;
-  onSaveEdited: (event: FormEvent, message: SpaceMessage) => void;
-  onReply: (messageId: string) => void;
-  onBeginEditing: (message: SpaceMessage) => void;
-  onDelete: (message: SpaceMessage) => void;
-  onOpenNode: (nodeId: string) => void;
-  onError: (message: string) => void;
-  onLibraryItem: (item: SpaceLibraryItem) => void;
-  onReload: () => void;
-}
 
 export function SpaceChatMessages(props: SpaceChatMessagesProps) {
   return (

@@ -1,11 +1,11 @@
 import { useEffect, useRef } from "react";
 import { Outlet, useNavigate } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
-import { AuthProvider } from "../auth/AuthContext";
-import { RenderErrorBoundary } from "@/shared/components/RenderErrorBoundary";
-import { useSetupStore } from "../stores/useSetupStore";
+import { AuthProvider } from "@/features/auth/AuthContext";
+import { RenderErrorBoundary } from "@/layouts/RenderErrorBoundary";
+import { useSetupStore } from "@/stores/app";
 import { installMistyDeepLinkHandler } from "../routing/deepLinks";
-import { useAppZoom } from "@/shared/hooks/useAppZoom";
+import { useAppZoom } from "@/hooks/useAppZoom";
 import { isNativeMobileBuild } from "@/platform/buildTarget";
 
 export function RootLayout(props: {

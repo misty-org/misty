@@ -1,3 +1,15 @@
+import type {
+  CanvasData,
+  CanvasNode,
+  PaletteDefinition,
+  EditorCategory,
+} from "@/models/types/pages/Studio/UnifiedWorkflowEditor";
+export type {
+  CanvasData,
+  CanvasNode,
+  PaletteDefinition,
+  EditorCategory,
+} from "@/models/types/pages/Studio/UnifiedWorkflowEditor";
 import {
   useCallback,
   useEffect,
@@ -61,58 +73,34 @@ import {
   X,
   type LucideIcon,
 } from "lucide-react";
-import { useAuth } from "../../auth/AuthContext";
-import { errorText } from "@/shared/format";
-import { confirmAction } from "@/shared/confirmAction";
-import { agentArchitectureApi } from "../../spaces/agentArchitectureApi";
-import type { SpaceStudioResource, WorkflowMetadata } from "../../spaces/types";
-import { useSpacesStore } from "../../stores/useSpacesStore";
-import { workflowTemplates } from "../../workflows/templates";
-import {
-  providerById,
-  providerNodeTemplates,
-  type ProviderNodeTemplate,
-} from "../../workflows/providers";
+import { useAuth } from "@/features/auth/AuthContext";
+import { errorText } from "@/lib/format";
+import { confirmAction } from "@/lib/confirmAction";
+import { agentArchitectureApi } from "@/stores/agents/useAgentArchitectureStore";
+import type { WorkflowMetadata } from "@/models/interfaces/features/spaces/types";
+import type { SpaceStudioResource } from "@/models/interfaces/features/spaces/types";
+import { useSpacesStore } from "@/stores/spaces/useSpacesStore";
+import { workflowTemplates } from "../../features/workflows/templates";
+import { providerById, providerNodeTemplates } from "../../features/workflows/providers";
+import type { ProviderNodeTemplate } from "@/models/interfaces/features/workflows/providers";
 import {
   createConfiguredWorkflowNode,
   createWorkflowNode,
   validateWorkflowV2,
   workflowNodeRegistry,
-  type WorkflowDefinitionV2,
-  type WorkflowNodeDescriptor,
-  type WorkflowNodeKind,
-  type WorkflowNodeV2,
-} from "../../workflows/v2";
-import { Button } from "../../components/ui/button";
-import { Checkbox } from "../../components/ui/checkbox";
-import { Input } from "../../components/ui/input";
-import { Textarea } from "../../components/ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "../../components/ui/select";
-import { Popover, PopoverContent, PopoverTrigger } from "../../components/ui/popover";
-
-type CanvasData = { workflow: WorkflowNodeV2; descriptor: PaletteDefinition; selected: boolean };
-type CanvasNode = Node<CanvasData, "workflow">;
-type PaletteDefinition = {
-  id: string;
-  kind: WorkflowNodeKind;
-  label: string;
-  category: EditorCategory;
-  color: string;
-  icon: LucideIcon;
-  capability: string;
-  risk: "read" | "write" | "destructive";
-  location: "cloud" | "device" | "either";
-  config: Record<string, unknown>;
-  providerId?: string;
-  description: string;
-};
-type EditorCategory = "Triggers" | "Files" | "AI" | "Logic" | "Integrations" | "Actions";
+} from "../../features/workflows/v2";
+import type { WorkflowNodeKind } from "@/models/types/features/workflows/v2";
+import type {
+  WorkflowDefinitionV2,
+  WorkflowNodeDescriptor,
+  WorkflowNodeV2,
+} from "@/models/interfaces/features/workflows/v2";
+import { Button } from "@/ui";
+import { Checkbox } from "@/ui";
+import { Input } from "@/ui";
+import { Textarea } from "@/ui";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui";
+import { Popover, PopoverContent, PopoverTrigger } from "@/ui";
 
 const emptyWorkflowResources: SpaceStudioResource[] = [];
 const nodeTypes = { workflow: WorkflowCanvasNode };

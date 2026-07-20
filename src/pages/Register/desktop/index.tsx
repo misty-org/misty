@@ -1,14 +1,15 @@
 import { FormEvent, useState } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
-import AuthCard from "../../../auth/components/AuthCard";
-import AuthField from "../../../auth/components/AuthField";
-import AuthMessage from "../../../auth/components/AuthMessage";
-import AuthShell from "../../../auth/components/AuthShell";
-import AuthSubmitButton from "../../../auth/components/AuthSubmitButton";
-import { useAuth } from "../../../auth/AuthContext";
-import { accountFetchMe, accountRegister, type AccountMeResponse } from "../../Account/shared/api";
-import type { CurrentLicense } from "../../../models/setup";
-import { useSetupStore } from "../../../stores/useSetupStore";
+import AuthCard from "@/features/auth/components/AuthCard";
+import AuthField from "@/features/auth/components/AuthField";
+import AuthMessage from "@/features/auth/components/AuthMessage";
+import AuthShell from "@/features/auth/components/AuthShell";
+import AuthSubmitButton from "@/features/auth/components/AuthSubmitButton";
+import { useAuth } from "@/features/auth/AuthContext";
+import { accountFetchMe, accountRegister } from "@/stores/account/useAccountStore";
+import type { AccountMeResponse } from "@/models/interfaces/stores/account/useAccountStore";
+import type { CurrentLicense } from "@/models/types/features/installer/types";
+import { useSetupStore } from "@/stores/app";
 
 function licenseFromMe(me: AccountMeResponse | null): CurrentLicense | null {
   if (!me) return null;

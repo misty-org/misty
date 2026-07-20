@@ -1,27 +1,19 @@
+import type {
+  LatestPost,
+  LatestChangelog,
+  HomeFooterProps,
+} from "@/models/types/pages/Home/desktop/HomeFooter";
+export type {
+  LatestPost,
+  LatestChangelog,
+  HomeFooterProps,
+} from "@/models/types/pages/Home/desktop/HomeFooter";
 import { ArrowRight, FileText, Newspaper } from "lucide-react";
 import { FaGithub, FaXTwitter } from "react-icons/fa6";
 import { Link } from "react-router-dom";
-import { openExternalLink } from "@/shared/openExternalLink";
-import { Button } from "../../../components/ui/button";
-import { Card } from "../../../components/ui/card";
-
-type LatestPost = {
-  date: string;
-  tag: string;
-  title: string;
-};
-
-type LatestChangelog = {
-  changes: string[];
-  date: string;
-  summary: string;
-  version: string;
-};
-
-type HomeFooterProps = {
-  latestChangelog: LatestChangelog;
-  latestPost: LatestPost | null;
-};
+import { openExternalLink } from "@/platform/openExternalLink";
+import { Button } from "@/ui";
+import { Card } from "@/ui";
 
 const socialLinks = [
   { label: "GitHub", href: "https://github.com/misty-org", icon: FaGithub },

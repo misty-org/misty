@@ -1,5 +1,5 @@
-import type { SearchResult } from "@/services/misty-api/types";
-import { cn } from "../../../lib/utils";
+import type { SearchResult } from "@/models/interfaces/services/misty-api";
+import { cn } from "@/ui";
 
 export const toolbarStyles = {
   root: "min-w-0 overflow-visible bg-[var(--misty-files-panel-bg,var(--background))] text-foreground max-[720px]:overflow-x-auto max-[720px]:overflow-y-hidden max-[720px]:[scrollbar-width:none] [&::-webkit-scrollbar]:hidden",

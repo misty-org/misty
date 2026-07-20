@@ -1,20 +1,17 @@
-import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { remoteDisplayName } from "../../../api/misty";
-import type { ProviderRemote } from "../../../api/types";
-import { iconAssets } from "@/shared/assets/icons";
-import { AssetIcon } from "@/shared/components/AssetIcon";
-import { IconButton } from "@/shared/components/IconButton";
-import { Panel, PanelHeader } from "@/shared/components/Panel";
-import { useMinimumSpin } from "@/shared/hooks/useMinimumSpin";
+import type { RemoteListPanelProps } from "@/models/interfaces/pages/Providers/components/RemoteListPanel";
+export type { RemoteListPanelProps } from "@/models/interfaces/pages/Providers/components/RemoteListPanel";
+import { Button } from "@/ui";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui";
+import { remoteDisplayName } from "@/stores/backend";
+import type { ProviderRemote } from "@/models/interfaces/services/misty-api";
+import { iconAssets } from "@/assets/icons";
+import { AssetIcon } from "@/ui";
+import { IconButton } from "@/ui";
+import { Panel, PanelHeader } from "@/pages/Providers/components/ProviderPanel";
+import { useMinimumSpin } from "@/hooks/useMinimumSpin";
 import { ProviderLogo } from "./ProviderLogo";
-import { EmptyState, ErrorState } from "@/components/ui/state-view";
-import { StatusBadge } from "@/components/ui/status-badge";
+import { EmptyState, ErrorState } from "@/ui";
+import { StatusBadge } from "@/ui";
 
 const remotePanelClass =
   "grid min-h-0 grid-rows-[auto_minmax(0,1fr)] !rounded-none !border-0 !bg-transparent !shadow-none [border-radius:0]";
@@ -34,19 +31,6 @@ const remoteRowSelectClass =
 const remoteProviderIconClass = "grid h-[26px] w-[26px] place-items-center text-primary";
 
 const remoteProviderIconWarningClass = "text-amber-500";
-
-interface RemoteListPanelProps {
-  remotes: ProviderRemote[];
-  selectedRemoteName: string | null;
-  loading: boolean;
-  serviceError: string | null;
-  working: boolean;
-  onRefresh: () => void;
-  onAdd: () => void;
-  onSelectRemote: (name: string) => void;
-  onRepair: (remote: ProviderRemote) => void;
-  onDisconnect: (name: string) => void;
-}
 
 export function RemoteListPanel(props: RemoteListPanelProps) {
   const [refreshSpinning, startRefreshSpin] = useMinimumSpin(props.loading);

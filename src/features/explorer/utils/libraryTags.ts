@@ -1,12 +1,9 @@
-import type { SmartLibraryAsset } from "@/services/misty-api/types";
+import type { LibraryTagCount } from "@/models/interfaces/features/explorer/utils/libraryTags";
+export type { LibraryTagCount } from "@/models/interfaces/features/explorer/utils/libraryTags";
+import type { SmartLibraryAsset } from "@/models/interfaces/services/misty-api";
 
 export const DEFAULT_LIBRARY_TAG_LIMIT = 12;
 export const DEFAULT_ASSET_TAG_LIMIT = 5;
-
-export interface LibraryTagCount {
-  name: string;
-  count: number;
-}
 
 export function aggregateLibraryTags(assets: SmartLibraryAsset[]): LibraryTagCount[] {
   const counts = new Map<string, LibraryTagCount>();
