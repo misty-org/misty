@@ -34,7 +34,6 @@ export interface BillingUsageResponse {
 
 export type PaidTier = "pro" | "max";
 export type BillingInterval = "month" | "year";
-export type CreditPackId = "credits_1500" | "credits_3500";
 
 async function apiFetch(path: string, init?: RequestInit) {
   const res = await fetch(`${apiBase}${path}`, {
@@ -66,15 +65,6 @@ export async function createSubscriptionCheckout(
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ tier, interval }),
-  });
-  return res.json();
-}
-
-export async function createCreditCheckout(packId: CreditPackId): Promise<{ url: string }> {
-  const res = await apiFetch("/billing/credit-checkout-session", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ pack_id: packId }),
   });
   return res.json();
 }

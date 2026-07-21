@@ -26,6 +26,19 @@ const baseMe: MeResponse = {
   },
 };
 
+const freeMe: MeResponse = {
+  ...baseMe,
+  tier: "basic",
+  billing: {
+    kind: "free",
+    interval: null,
+    subscription_status: null,
+    current_period_end: null,
+    cancel_at_period_end: false,
+    customer_portal_available: false,
+  },
+};
+
 const billingUsage = {
   plan: "pro",
   monthly_allowance: 2_000,
@@ -134,7 +147,9 @@ for (const theme of ["light", "dark"] as const) {
     await expect(dialog.getByRole("heading", { level: 1, name: "Credits" })).toBeVisible();
     await expect(dialog.getByText("845 credits")).toBeVisible();
     await expect(dialog.getByText("720 of 2,000 remaining")).toBeVisible();
-    await expect(dialog.getByRole("button", { name: "1,500,000 credits · $4.99" })).toBeVisible();
+    await expect(
+      dialog.getByText("Credit checkout is not open during the invite-only beta."),
+    ).toBeVisible();
 
     await expect(dialog.getByRole("button", { name: "General" })).toHaveCount(0);
     await expect(dialog.getByRole("button", { name: "Diagnostics" })).toHaveCount(0);
@@ -146,7 +161,9 @@ for (const theme of ["light", "dark"] as const) {
 
     await dialog.getByRole("button", { name: "Privacy", exact: true }).click();
     await expect(dialog.getByRole("heading", { level: 1, name: "Privacy" })).toBeVisible();
-    await expect(dialog.getByText("Your data stays on your device.")).toBeVisible();
+    await expect(
+      dialog.getByText("Private Files and shared Space content are handled differently."),
+    ).toBeVisible();
 
     const geometry = await dialog.evaluate((element) => {
       const rect = element.getBoundingClientRect();
@@ -179,7 +196,7 @@ for (const theme of ["light", "dark"] as const) {
   });
 }
 
-test("account updates and credit purchases use the expected APIs", async ({ page }) => {
+test("account updates work while planned credit checkout remains closed", async ({ page }) => {
   const requests: Array<{ path: string; method: string; body: string | null }> = [];
   await prepareAccount(page, "dark", baseMe, (route) => {
     const request = route.request();
@@ -202,13 +219,30 @@ test("account updates and credit purchases use the expected APIs", async ({ page
   });
 
   await page.getByRole("dialog").getByRole("button", { name: "Credits", exact: true }).click();
-  await page.getByRole("dialog").getByRole("button", { name: "1,500,000 credits · $4.99" }).click();
-  await expect(page).toHaveURL(/\/pricing#credit-checkout$/);
-  expect(requests).toContainEqual({
-    path: "/api/billing/credit-checkout-session",
-    method: "POST",
-    body: JSON.stringify({ pack_id: "credits_1500" }),
+  await expect(
+    page.getByRole("dialog").getByText("Credit checkout is not open during the invite-only beta."),
+  ).toBeVisible();
+  expect(requests.some(({ path }) => path === "/api/billing/credit-checkout-session")).toBe(false);
+});
+
+test("free accounts see beta pricing without a subscription checkout action", async ({ page }) => {
+  const requests: string[] = [];
+  await prepareAccount(page, "dark", freeMe, (route) => {
+    requests.push(new URL(route.request().url()).pathname);
   });
+  await page.goto("/pricing");
+  await openAccountSettings(page);
+
+  const dialog = page.getByRole("dialog", { name: "Account settings" });
+  await dialog.getByRole("button", { name: "Billing", exact: true }).click();
+  await expect(dialog.getByText("Paid checkout is not open during the invite-only beta.")).toBeVisible();
+  await expect(dialog.getByText(/Pro at \$8\.99 monthly or \$89 yearly/)).toBeVisible();
+  await expect(dialog.getByText(/Max at \$19\.99 monthly or \$199 yearly/)).toBeVisible();
+  await expect(dialog.getByRole("link", { name: "Join the beta" })).toHaveAttribute(
+    "href",
+    "/waitlist",
+  );
+  expect(requests.some((path) => path.endsWith("/billing/checkout-session"))).toBe(false);
 });
 
 test("an authenticated legacy settings URL opens the dialog over home", async ({ page }) => {

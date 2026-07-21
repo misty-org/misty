@@ -1,356 +1,141 @@
-import { useState } from "react";
-import { SiAndroid, SiAppstore, SiLinux } from "react-icons/si";
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { ArrowRight, Download as DownloadIcon, ExternalLink, ShieldCheck, Tablet } from "lucide-react";
+import { FaApple, FaWindows } from "react-icons/fa";
+import { Link } from "react-router";
+
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { apiBase } from "../../lib/apiBase";
-import {
-  mobileBuilds,
-  releases,
-  type MobileBuild,
-  type MobilePlatformName,
-  type PlatformName,
-  type ReleaseBuild,
-} from "./data";
+import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
+import { currentRelease, type PlatformName, type ReleaseBuild } from "./data";
 
-type PlatformIconProps = {
-  size?: number | string;
-  color?: string;
-  background?: string;
-  opacity?: number;
-  rotation?: number;
-  shadow?: number;
-  flipHorizontal?: boolean;
-  flipVertical?: boolean;
-};
-
-function iconStyle({
-  background,
-  opacity,
-  rotation,
-  shadow,
-  flipHorizontal,
-  flipVertical,
-}: Omit<PlatformIconProps, "size" | "color">) {
-  const transforms = [];
-  if (rotation) transforms.push(`rotate(${rotation}deg)`);
-  if (flipHorizontal) transforms.push("scaleX(-1)");
-  if (flipVertical) transforms.push("scaleY(-1)");
-
-  return {
-    opacity,
-    transform: transforms.join(" ") || undefined,
-    filter: shadow ? `drop-shadow(0 ${shadow}px ${shadow * 2}px rgba(0,0,0,0.3))` : undefined,
-    backgroundColor: background && background !== "transparent" ? background : undefined,
-  };
-}
-
-function Windows11Icon({
-  size = 32,
-  color = "currentColor",
-  background = "transparent",
-  opacity = 1,
-  rotation = 0,
-  shadow = 0,
-  flipHorizontal = false,
-  flipVertical = false,
-}: PlatformIconProps) {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 128 128"
-      width={size}
-      height={size}
-      fill="none"
-      aria-hidden="true"
-      style={iconStyle({ background, opacity, rotation, shadow, flipHorizontal, flipVertical })}
-    >
-      <path fill={color} d="M67.328 67.331h60.669V128H67.328zm-67.325 0h60.669V128H.003zM67.328 0h60.669v60.669H67.328zM.003 0h60.669v60.669H.003z" />
-    </svg>
-  );
-}
-
-function AppleIcon({
-  size = 32,
-  color = "currentColor",
-  background = "transparent",
-  opacity = 1,
-  rotation = 0,
-  shadow = 0,
-  flipHorizontal = false,
-  flipVertical = false,
-}: PlatformIconProps) {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="-12 -8 280 321"
-      width={size}
-      height={size}
-      fill={color}
-      aria-hidden="true"
-      style={{
-        ...iconStyle({ background, opacity, rotation, shadow, flipHorizontal, flipVertical }),
-        display: "block",
-        overflow: "visible",
-      }}
-    >
-      <path d="M213.803 167.03c.442 47.58 41.74 63.413 42.197 63.615c-.35 1.116-6.599 22.563-21.757 44.716c-13.104 19.153-26.705 38.235-48.13 38.63c-21.05.388-27.82-12.483-51.888-12.483c-24.061 0-31.582 12.088-51.51 12.871c-20.68.783-36.428-20.71-49.64-39.793c-27-39.033-47.633-110.3-19.928-158.406c13.763-23.89 38.36-39.017 65.056-39.405c20.307-.387 39.475 13.662 51.889 13.662c12.406 0 35.699-16.895 60.186-14.414c10.25.427 39.026 4.14 57.503 31.186c-1.49.923-34.335 20.044-33.978 59.822M174.24 50.199c10.98-13.29 18.369-31.79 16.353-50.199c-15.826.636-34.962 10.546-46.314 23.828c-10.173 11.763-19.082 30.589-16.678 48.633c17.64 1.365 35.66-8.964 46.64-22.262" />
-    </svg>
-  );
-}
-
-const platformMeta: Record<PlatformName, { icon: React.ReactNode; arch: string }> = {
-  Windows: {
-    icon: <Windows11Icon size={16} />,
-    arch: "x86_64",
-  },
+const platformMeta: Record<
+  PlatformName,
+  { icon: React.ReactNode; requirements: string }
+> = {
   macOS: {
-    icon: <AppleIcon size={16} color="currentColor" />,
-    arch: "Apple Silicon / Intel",
+    icon: <FaApple className="size-5" aria-hidden="true" />,
+    requirements: "Apple Silicon only",
   },
-  Linux: {
-    icon: <SiLinux className="h-4 w-4" aria-hidden="true" />,
-    arch: "x86_64 / ARM64",
-  },
-};
-
-const mobilePlatformMeta: Record<MobilePlatformName, { icon: React.ReactNode; arch: string }> = {
-  iOS: {
-    icon: <SiAppstore className="h-4 w-4" aria-hidden="true" />,
-    arch: "iPhone / iPad",
-  },
-  Android: {
-    icon: <SiAndroid className="h-4 w-4" aria-hidden="true" />,
-    arch: "Android phones",
+  Windows: {
+    icon: <FaWindows className="size-5" aria-hidden="true" />,
+    requirements: "64-bit Windows",
   },
 };
 
-function BuildCard({
-  icon,
-  platform,
-  tag,
-  arch,
-  children,
-}: {
-  icon: React.ReactNode;
-  platform: string;
-  tag: string;
-  arch: string;
-  children: React.ReactNode;
-}) {
+function BuildCard({ build }: { build: ReleaseBuild }) {
+  const meta = platformMeta[build.platform];
+
   return (
-    <Card size="sm" className="gap-0 rounded-xl py-0">
-      <CardContent className="p-4">
-        <div className="mb-3 flex items-start justify-between gap-3">
-          <div className="flex items-center gap-2 text-sm font-medium text-foreground">
-            <span className="text-muted-foreground">{icon}</span>
-            {platform}
+    <Card className="gap-0 py-0 shadow-sm">
+      <CardHeader className="border-b border-border px-6 py-5">
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <span className="flex size-10 items-center justify-center rounded-lg border border-border bg-muted/50 text-foreground">
+              {meta.icon}
+            </span>
+            <div>
+              <h3 className="text-lg font-semibold text-foreground">{build.platform}</h3>
+              <p className="mt-0.5 text-xs text-muted-foreground">{build.architecture}</p>
+            </div>
           </div>
-          <Badge variant="outline" className="text-[11px]">
-            {tag}
-          </Badge>
+          <Badge variant="outline">{build.packageType}</Badge>
         </div>
-        <p className="mb-1 text-xs text-muted-foreground">{arch}</p>
-        {children}
+      </CardHeader>
+
+      <CardContent className="px-6 py-5">
+        <dl className="grid gap-3 text-sm">
+          <div className="flex items-center justify-between gap-4">
+            <dt className="text-muted-foreground">Build</dt>
+            <dd className="font-medium text-foreground">{currentRelease.version}</dd>
+          </div>
+          <div className="flex items-center justify-between gap-4">
+            <dt className="text-muted-foreground">Compatibility</dt>
+            <dd className="text-right font-medium text-foreground">{meta.requirements}</dd>
+          </div>
+        </dl>
+        <p className="mt-5 border-t border-border pt-4 text-sm leading-6 text-muted-foreground">
+          ZIP archive · beta software.
+        </p>
       </CardContent>
+
+      <CardFooter className="border-t border-border px-6 py-5">
+        <Button asChild size="lg" className="h-11 w-full">
+          <a href={build.href} aria-label={`Download Misty ${currentRelease.version} for ${build.platform}`}>
+            <DownloadIcon aria-hidden="true" />
+            Download for {build.platform}
+          </a>
+        </Button>
+      </CardFooter>
     </Card>
   );
 }
 
-function ReleaseItem({
-  version,
-  builds,
-  mobileBuilds,
-  isLatest,
-  pendingBuildKey,
-  onDownload,
-}: {
-  version: string;
-  builds: ReleaseBuild[];
-  mobileBuilds?: MobileBuild[];
-  isLatest: boolean;
-  pendingBuildKey: string | null;
-  onDownload: (build: ReleaseBuild) => void;
-}) {
-  return (
-    <AccordionItem value={version}>
-      <AccordionTrigger className="py-4 text-foreground hover:no-underline">
-        <span>
-          {version}
-          {isLatest ? " (latest)" : ""}
-        </span>
-      </AccordionTrigger>
-      <AccordionContent className="space-y-5 pb-4">
-        <div className="space-y-3">
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {builds.map((build) => (
-              <BuildCard
-                key={`${version}-${build.platform}-${build.tag}`}
-                icon={platformMeta[build.platform].icon}
-                platform={build.platform}
-                tag={build.tag}
-                arch={platformMeta[build.platform].arch}
-              >
-                <Button
-                  type="button"
-                  onClick={() => onDownload(build)}
-                  disabled={pendingBuildKey === `${version}-${build.platformKey}`}
-                  className="h-auto w-full rounded-xl px-4 py-2.5"
-                >
-                  {pendingBuildKey === `${version}-${build.platformKey}`
-                    ? "Preparing..."
-                    : "Download"}
-                </Button>
-              </BuildCard>
-            ))}
-          </div>
-
-          {mobileBuilds && mobileBuilds.length > 0 ? (
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {mobileBuilds.map((build) => (
-                <BuildCard
-                  key={`${version}-${build.platform}-${build.tag}`}
-                  icon={mobilePlatformMeta[build.platform].icon}
-                  platform={build.platform}
-                  tag={build.tag}
-                  arch={mobilePlatformMeta[build.platform].arch}
-                >
-                  {build.href ? (
-                    <Button asChild className="h-auto w-full rounded-xl px-4 py-2.5">
-                      <a href={build.href} target="_blank" rel="noopener noreferrer">
-                        {build.ctaLabel}
-                      </a>
-                    </Button>
-                  ) : (
-                    <Button
-                      variant="secondary"
-                      disabled
-                      className="h-auto w-full rounded-xl px-4 py-2.5"
-                    >
-                      {build.ctaLabel}
-                    </Button>
-                  )}
-                </BuildCard>
-              ))}
-            </div>
-          ) : null}
-        </div>
-      </AccordionContent>
-    </AccordionItem>
-  );
-}
-
 export default function Download() {
-  const [openVersions, setOpenVersions] = useState<Record<string, boolean>>(
-    Object.fromEntries(
-      releases.map((release, index) => [release.version, index === 0]),
-    ),
-  );
-  const [pendingBuildKey, setPendingBuildKey] = useState<string | null>(null);
-  const [downloadError, setDownloadError] = useState<string | null>(null);
-
-  async function requestDownload(build: ReleaseBuild, version: string) {
-    const buildKey = `${version}-${build.platformKey}`;
-    setPendingBuildKey(buildKey);
-    setDownloadError(null);
-
-    try {
-      const response = await fetch(
-        `${apiBase}/download-url?platform=${encodeURIComponent(build.platformKey)}`,
-        { credentials: "include" },
-      );
-
-      const contentType = response.headers.get("Content-Type") ?? "";
-      const payload = contentType.includes("application/json")
-        ? await response.json()
-        : await response.text();
-
-      if (!response.ok) {
-        const message =
-          typeof payload === "string"
-            ? payload.trim()
-            : typeof payload?.message === "string"
-              ? payload.message
-              : "Unable to prepare this download.";
-        throw Object.assign(new Error(message || "Unable to prepare this download."), {
-          status: response.status,
-        });
-      }
-
-      if (typeof payload?.url !== "string") {
-        throw new Error("The download server returned an invalid URL.");
-      }
-
-      window.location.assign(payload.url);
-    } catch (error) {
-      const status = typeof error === "object" && error !== null && "status" in error
-        ? Number(error.status)
-        : 0;
-
-      if (status === 401) {
-        window.location.assign("/signin");
-        return;
-      }
-
-      setDownloadError(error instanceof Error ? error.message : "Unable to prepare this download.");
-    } finally {
-      setPendingBuildKey(null);
-    }
-  }
-
   return (
-    <div className="max-w-5xl mx-auto px-3 sm:px-4 pt-32 pb-20">
-      {/* Header */}
-      <div className="text-center">
-        <h1 className="mb-5 text-balance text-3xl font-bold text-foreground md:text-5xl">
-          Download
+    <div className="mx-auto max-w-6xl px-5 pb-24 pt-32 sm:px-8 lg:px-12">
+      <header className="mx-auto max-w-3xl text-center">
+        <Badge variant="outline" className="mb-5 text-muted-foreground">
+          {currentRelease.label} · {currentRelease.version}
+        </Badge>
+        <h1 className="text-balance text-4xl font-semibold tracking-[-0.035em] text-foreground sm:text-5xl md:text-6xl">
+          Download Misty for desktop.
         </h1>
-      </div>
+        <p className="mx-auto mt-5 max-w-2xl text-pretty text-lg leading-8 text-muted-foreground">
+          Public builds are available for Apple Silicon macOS and 64-bit Windows. Shared Space
+          services require approved beta access.
+        </p>
+        <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
+          <Button asChild variant="outline">
+            <a href={currentRelease.releasePage} target="_blank" rel="noopener noreferrer">
+              Release notes
+              <ExternalLink aria-hidden="true" />
+            </a>
+          </Button>
+          <Button asChild variant="ghost">
+            <Link to="/waitlist">
+              Request beta access
+              <ArrowRight aria-hidden="true" />
+            </Link>
+          </Button>
+        </div>
+      </header>
 
-      {/* Releases */}
-      <div className="mb-20">
-        <h2 className="text-lg font-semibold text-foreground">Releases</h2>
-        {downloadError && (
-          <Alert variant="destructive" className="mt-3">
-            <AlertDescription>{downloadError}</AlertDescription>
-          </Alert>
-        )}
-        <Accordion
-          type="multiple"
-          value={releases
-            .filter((release) => openVersions[release.version])
-            .map((release) => release.version)}
-          onValueChange={(versions) => {
-            setOpenVersions(
-              Object.fromEntries(
-                releases.map((release) => [
-                  release.version,
-                  versions.includes(release.version),
-                ]),
-              ),
-            );
-          }}
-        >
-          {releases.map((release) => (
-            <ReleaseItem
-              key={release.version}
-              version={release.version}
-              builds={release.builds}
-              mobileBuilds={release.version === releases[0].version ? mobileBuilds : undefined}
-              isLatest={release.version === releases[0].version}
-              pendingBuildKey={pendingBuildKey}
-              onDownload={(build) => requestDownload(build, release.version)}
-            />
+      <section aria-labelledby="desktop-builds-title" className="mt-14 md:mt-16">
+        <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h2 id="desktop-builds-title" className="mt-2 text-2xl font-semibold tracking-tight text-foreground">
+              Available builds
+            </h2>
+          </div>
+        </div>
+
+        <div className="grid gap-5 md:grid-cols-2">
+          {currentRelease.builds.map((build) => (
+            <BuildCard key={build.platform} build={build} />
           ))}
-        </Accordion>
-      </div>
+        </div>
+      </section>
+
+      <Separator className="my-12" />
+
+      <section className="grid gap-5 lg:grid-cols-[1fr_1fr]" aria-label="Beta download notes">
+        <Alert role="note" className="items-start rounded-xl bg-muted/25 px-5 py-4">
+          <ShieldCheck className="mt-0.5 size-4" aria-hidden="true" />
+          <AlertTitle>Approved access</AlertTitle>
+          <AlertDescription className="leading-6">
+            Downloads are public. Shared services require an approved account.
+          </AlertDescription>
+        </Alert>
+
+        <Alert role="note" className="items-start rounded-xl bg-muted/25 px-5 py-4">
+          <Tablet className="mt-0.5 size-4" aria-hidden="true" />
+          <AlertTitle>Tablet</AlertTitle>
+          <AlertDescription className="leading-6">
+            No public tablet build is available yet.
+          </AlertDescription>
+        </Alert>
+      </section>
     </div>
   );
 }

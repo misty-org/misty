@@ -12,14 +12,20 @@ export default function Changelog() {
   const [openVersion, setOpenVersion] = useState(changelog[0]?.version ?? "");
 
   return (
-    <div className="mx-auto flex h-[calc(100vh-4rem)] w-full max-w-[1440px] flex-col overflow-hidden px-5 py-4 sm:px-6 lg:h-screen lg:px-8 xl:px-10">
-      <div className="border-b border-border pb-4">
-        <h1 className="text-[34px] font-semibold tracking-[-0.03em] text-foreground">
+    <div className="mx-auto w-full max-w-5xl px-4 pb-20 pt-28 sm:px-6 sm:pt-32">
+      <header className="border-b border-border pb-8">
+        <p className="mb-3 text-xs font-semibold uppercase tracking-[0.16em] text-primary">
+          Product updates
+        </p>
+        <h1 className="text-3xl font-semibold tracking-[-0.03em] text-foreground md:text-5xl">
           Changelog
         </h1>
-      </div>
+        <p className="mt-4 max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base">
+          Current beta changes and availability.
+        </p>
+      </header>
 
-      <div className="min-h-0 flex-1 overflow-y-auto pt-6">
+      <div className="pt-8">
         <Accordion
           type="single"
           collapsible
@@ -39,13 +45,21 @@ export default function Changelog() {
                     <Badge variant="secondary" className="rounded font-mono">
                       {entry.version}
                     </Badge>
-                    <span className="text-sm font-medium text-foreground">
-                      {entry.summary}
-                    </span>
+                    <div className="min-w-0 text-left">
+                      <span className="block text-sm font-medium text-foreground">
+                        {entry.summary}
+                      </span>
+                      <span className="mt-1 block text-xs capitalize text-muted-foreground sm:hidden">
+                        {entry.status}
+                      </span>
+                    </div>
                   </div>
-                  <span className="hidden shrink-0 text-xs text-muted-foreground sm:inline">
-                    {entry.date}
-                  </span>
+                  <div className="hidden shrink-0 items-center gap-3 sm:flex">
+                    <Badge variant="outline" className="capitalize">
+                      {entry.status}
+                    </Badge>
+                    <span className="text-xs text-muted-foreground">{entry.date}</span>
+                  </div>
                 </div>
               </AccordionTrigger>
 

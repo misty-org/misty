@@ -21,11 +21,10 @@ import {
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { Spinner } from "@/components/ui/spinner";
+import { BETA_ACCESS_EXTERNAL, BETA_ACCESS_HREF } from "@/lib/site";
 import { useUserStore } from "@/store/userStore";
 import {
   createBillingPortal,
-  createCreditCheckout,
-  createSubscriptionCheckout,
   fetchBillingUsage,
   fetchMe,
   updateProfile,
@@ -34,7 +33,7 @@ import {
 } from "./api";
 
 const TIER_LABEL: Record<string, string> = {
-  basic: "Basic",
+  basic: "Free",
   personal: "Personal",
   pro: "Pro",
   max: "Max",
@@ -286,16 +285,12 @@ function CreditsPanel({
   usage,
   state,
   error,
-  billingWorking,
   onRetry,
-  onBillingAction,
 }: {
   usage: BillingUsageResponse | null;
   state: LoadState;
   error: string;
-  billingWorking: boolean;
   onRetry: () => void;
-  onBillingAction: (action: () => Promise<{ url: string }>) => void;
 }) {
   const creditUsedPercent =
     usage && usage.monthly_allowance > 0
@@ -356,28 +351,15 @@ function CreditsPanel({
         ) : null}
       </Section>
 
-      <Section title="Buy credits">
+      <Section title="Credit packs">
         <div className={`${customRowClass} grid gap-3`}>
-          <p className="m-0 text-sm text-muted-foreground">
-            Purchased credits do not expire and are used after your monthly allowance.
+          <p className="m-0 text-sm font-medium text-foreground">
+            Credit checkout is not open during the invite-only beta.
           </p>
-          <div className="flex flex-wrap gap-2">
-            <Button
-              type="button"
-              disabled={billingWorking}
-              onClick={() => onBillingAction(() => createCreditCheckout("credits_1500"))}
-            >
-              1,500,000 credits · $4.99
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              disabled={billingWorking}
-              onClick={() => onBillingAction(() => createCreditCheckout("credits_3500"))}
-            >
-              3,500,000 credits · $9.99
-            </Button>
-          </div>
+          <p className="m-0 text-sm leading-6 text-muted-foreground">
+            Permanent top-up packs are planned at 1,500 credits for $4.99 and 3,500 credits for
+            $9.99. Purchased credits will be used after the monthly allowance and will not expire.
+          </p>
         </div>
       </Section>
     </div>
@@ -472,50 +454,23 @@ function BillingPanel({
           </>
         ) : (
           <div className={`${customRowClass} grid gap-3`}>
-            <p className="m-0 text-sm text-muted-foreground">
-              Pro includes 2,000 monthly credits. Max includes 6,000.
+            <p className="m-0 text-sm font-medium text-foreground">
+              Paid checkout is not open during the invite-only beta.
             </p>
-            <div className="flex flex-wrap gap-2">
-              <Button
-                type="button"
-                disabled={billingWorking}
-                onClick={() =>
-                  onBillingAction(() => createSubscriptionCheckout("pro", "month"))
-                }
+            <p className="m-0 text-sm leading-6 text-muted-foreground">
+              Future pricing is Pro at $8.99 monthly or $89 yearly and Max at $19.99 monthly or
+              $199 yearly. The planned beta invitation flow includes a code-gated 30-day Pro
+              trial with 2,000 Mika credits.
+            </p>
+            <Button asChild className="w-fit">
+              <a
+                href={BETA_ACCESS_HREF}
+                target={BETA_ACCESS_EXTERNAL ? "_blank" : undefined}
+                rel={BETA_ACCESS_EXTERNAL ? "noopener noreferrer" : undefined}
               >
-                Pro · $9.99/mo
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                disabled={billingWorking}
-                onClick={() =>
-                  onBillingAction(() => createSubscriptionCheckout("max", "month"))
-                }
-              >
-                Max · $14.99/mo
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                disabled={billingWorking}
-                onClick={() =>
-                  onBillingAction(() => createSubscriptionCheckout("pro", "year"))
-                }
-              >
-                Pro · $99/yr
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                disabled={billingWorking}
-                onClick={() =>
-                  onBillingAction(() => createSubscriptionCheckout("max", "year"))
-                }
-              >
-                Max · $149/yr
-              </Button>
-            </div>
+                Join the beta
+              </a>
+            </Button>
           </div>
         )}
 
@@ -537,11 +492,14 @@ function PrivacyPanel() {
     <div>
       <Section title="Privacy">
         <div className={`${customRowClass} flex flex-col gap-2`}>
-          <p className="text-sm font-medium text-foreground">Your data stays on your device.</p>
+          <p className="text-sm font-medium text-foreground">
+            Private Files and shared Space content are handled differently.
+          </p>
           <p className="text-sm leading-relaxed text-muted-foreground">
-            Misty never transmits your files or cloud credentials to any external server. All
-            provider communication runs through Misty&apos;s embedded local runtime. We only store
-            your account information and subscription status.
+            Private Files operations stay local unless you connect a provider or explicitly add
+            content to a Space. Shared Library content is stored for that Space, and Mika may use
+            context you are permitted to access. Billing records do not contain prompts or file
+            contents.
           </p>
         </div>
       </Section>
@@ -708,9 +666,7 @@ export function AccountSettingsDialog({
               usage={usage}
               state={usageState}
               error={usageError}
-              billingWorking={billingWorking}
               onRetry={() => setUsageRequest((request) => request + 1)}
-              onBillingAction={openBillingAction}
             />
           ) : null}
 

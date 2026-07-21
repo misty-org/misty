@@ -1,85 +1,96 @@
+import { ArrowUpRight } from "lucide-react";
 import { NavLink } from "react-router";
-import { FaDiscord, FaGithub } from "react-icons/fa";
-import { MdOutlineEmail } from "react-icons/md";
+
 import { Separator } from "@/components/ui/separator";
+import {
+  BETA_ACCESS_EXTERNAL,
+  BETA_ACCESS_HREF,
+  PUBLIC_RELEASES_URL,
+} from "@/lib/site";
 
 const columns = [
   {
     label: "Product",
     links: [
-      { to: "/download", text: "Download" },
-      { to: "/changelog", text: "Changelog" },
-    ],
-  },
-  {
-    label: "Resources",
-    links: [
       { to: "/features", text: "Features" },
-      { to: "/roadmap", text: "Roadmap" },
+      { to: "/pricing", text: "Pricing" },
+      { to: "/download", text: "Download" },
     ],
   },
   {
-    label: "Support",
+    label: "Updates",
     links: [
-      { to: "https://forms.gle/your-form-id", text: "Submit a Ticket", external: true },
-      { to: "https://discord.gg/M3EQuWcFS", text: "Discord Community", external: true },
-      { to: "mailto:hello@misty.app", text: "Contact", external: true },
+      { to: "/roadmap", text: "Roadmap" },
+      { to: "/changelog", text: "Changelog" },
+      { to: "/blog", text: "Blog" },
+    ],
+  },
+  {
+    label: "Access",
+    links: [
+      { to: BETA_ACCESS_HREF, text: "Request beta access", external: BETA_ACCESS_EXTERNAL },
+      { to: "/signin", text: "Sign in" },
+      { to: PUBLIC_RELEASES_URL, text: "Public releases", external: true },
     ],
   },
 ];
 
-const socials = [
-  { href: "https://discord.gg/M3EQuWcFS", icon: FaDiscord, label: "Discord" },
-  { href: "https://github.com/misty-org/misty-public", icon: FaGithub, label: "GitHub" },
-  { href: "mailto:hello@misty.app", icon: MdOutlineEmail, label: "Email" },
-];
+const linkClass =
+  "w-fit rounded-sm text-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
 export default function Footer() {
   return (
-    <footer className="border-t border-border py-12">
-      <div className="flex flex-col md:flex-row justify-between items-start gap-8">
-        {/* Brand */}
-        <div className="flex flex-col gap-3">
-          <div className="flex items-center gap-1">
-            <img src="/misty_full.png" alt="" className="size-12 opacity-70" />
-            <span className="text-sm font-medium text-foreground">Misty</span>
+    <footer className="relative z-10 border-t border-border bg-background px-5 py-12 sm:px-8 lg:px-12">
+      <div className="mx-auto max-w-7xl">
+        <div className="flex flex-col justify-between gap-10 md:flex-row md:items-start">
+          <div className="max-w-sm">
+            <NavLink
+              to="/"
+              aria-label="Misty footer"
+              className="flex w-fit items-center gap-1 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <img src="/misty_full.png" alt="" className="size-12" />
+              <span className="text-base font-semibold tracking-tight text-foreground">Misty</span>
+            </NavLink>
+            <p className="mt-4 text-sm leading-6 text-muted-foreground">
+              Spaces for members, chat, tasks, and shared files.
+            </p>
+            <p className="mt-3 text-xs text-muted-foreground">Invite-only beta.</p>
           </div>
-          <p className="max-w-xs text-sm text-muted-foreground">
-            A unified desktop workspace for local files, cloud storage, search, and transfers.
-          </p>
-          <div className="flex items-center gap-4 mt-2">
-            {socials.map(({ href, icon: Icon, label }) => (
-              <a key={label} href={href} target="_blank" rel="noopener noreferrer" className="rounded-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label={label}>
-                <Icon className="size-4" />
-              </a>
+
+          <div className="grid grid-cols-2 gap-x-10 gap-y-8 sm:grid-cols-3 sm:gap-x-16">
+            {columns.map((column) => (
+              <div key={column.label} className="flex flex-col gap-3">
+                <span className="text-xs font-semibold uppercase tracking-[0.14em] text-foreground">
+                  {column.label}
+                </span>
+                {column.links.map((link) =>
+                  link.external ? (
+                    <a
+                      key={link.text}
+                      href={link.to}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={`${linkClass} inline-flex items-center gap-1`}
+                    >
+                      {link.text}
+                      <ArrowUpRight className="size-3" aria-hidden="true" />
+                    </a>
+                  ) : (
+                    <NavLink key={link.text} to={link.to} className={linkClass}>
+                      {link.text}
+                    </NavLink>
+                  ),
+                )}
+              </div>
             ))}
           </div>
         </div>
 
-        {/* Link Columns */}
-        <div className="grid w-full grid-cols-2 gap-x-8 gap-y-8 sm:w-auto sm:grid-cols-3 sm:gap-x-16">
-          {columns.map((col) => (
-            <div key={col.label} className="flex flex-col gap-3 last:col-span-2 sm:last:col-span-1">
-              <span className="text-xs font-medium tracking-[0.14em] text-foreground">{col.label}</span>
-              {col.links.map((link) =>
-                link.to.startsWith("http") || link.to.startsWith("mailto") ? (
-                  <a key={link.text} href={link.to} target="_blank" rel="noopener noreferrer" className="rounded-sm text-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">{link.text}</a>
-                ) : (
-                  <NavLink key={link.text} to={link.to} className="rounded-sm text-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">{link.text}</NavLink>
-                )
-              )}
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Bottom */}
-      <Separator className="mt-12" />
-      <div className="flex flex-col items-center justify-between gap-4 pt-6 md:flex-row">
-        <span className="text-xs text-muted-foreground">&copy; {new Date().getFullYear()} Misty. All rights reserved.</span>
-        <div className="flex items-center gap-6">
-          <NavLink to="/privacy" className="rounded-sm text-xs text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Privacy Policy</NavLink>
-          <NavLink to="/terms" className="rounded-sm text-xs text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Terms of Service</NavLink>
+        <Separator className="mt-12" />
+        <div className="flex flex-col gap-2 pt-6 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+          <span>&copy; {new Date().getFullYear()} Misty. All rights reserved.</span>
+          <span>Invite-only beta.</span>
         </div>
       </div>
     </footer>

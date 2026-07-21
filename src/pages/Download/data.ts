@@ -1,46 +1,38 @@
-export type PlatformName = "Windows" | "macOS" | "Linux";
-export type MobilePlatformName = "iOS" | "Android";
+export type PlatformName = "macOS" | "Windows";
 
 export type ReleaseBuild = {
   platform: PlatformName;
-  tag: string;
-  platformKey: "windows" | "macos" | "linux";
-};
-
-export type MobileBuild = {
-  platform: MobilePlatformName;
-  tag: string;
-  ctaLabel: string;
-  href?: string;
+  architecture: string;
+  packageType: "ZIP";
+  href: string;
+  note: string;
 };
 
 export interface Release {
   version: string;
-  date: string;
+  label: string;
+  releasePage: string;
   builds: ReleaseBuild[];
 }
 
-export const releases: Release[] = [
-  {
-    version: "v0.1.0",
-    date: "Current",
-    builds: [
-      { platform: "Windows", tag: "Installer", platformKey: "windows" },
-      { platform: "macOS", tag: "DMG", platformKey: "macos" },
-      { platform: "Linux", tag: "AppImage", platformKey: "linux" },
-    ],
-  },
-];
-
-export const mobileBuilds: MobileBuild[] = [
-  {
-    platform: "iOS",
-    tag: "iOS",
-    ctaLabel: "Coming soon",
-  },
-  {
-    platform: "Android",
-    tag: "Android",
-    ctaLabel: "Coming soon",
-  },
-];
+export const currentRelease: Release = {
+  version: "v0.1.0",
+  label: "Public beta build",
+  releasePage: "https://github.com/misty-org/misty-public/releases/tag/v0.1.0",
+  builds: [
+    {
+      platform: "macOS",
+      architecture: "Apple Silicon",
+      packageType: "ZIP",
+      href: "https://pub-6656b731eca949d8bf695989e0c862b8.r2.dev/misty-0.1.0-arm64.zip",
+      note: "For Macs with Apple silicon.",
+    },
+    {
+      platform: "Windows",
+      architecture: "64-bit (x86_64)",
+      packageType: "ZIP",
+      href: "https://pub-6656b731eca949d8bf695989e0c862b8.r2.dev/misty-v0.1.0-windows-x86_64.zip",
+      note: "For 64-bit Windows PCs.",
+    },
+  ],
+};

@@ -1,63 +1,35 @@
 import { useState } from "react";
-import { useNavigate } from "react-router";
 import PricingHeader from "./PricingHeader";
 import PricingCard from "./PricingCard";
 import PricingQA from "./PricingFooter";
-import { basicFeatures, creditPacks, maxFeatures, proFeatures } from "./data";
 import {
-  createSubscriptionCheckout,
-  type BillingInterval,
-  type PaidTier,
-} from "./api";
-import { useAuth } from "../../AuthContext";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Card } from "@/components/ui/card";
+  ownerRules,
+  permanentCreditPacks,
+  planLimitRows,
+  plans,
+  subscriberRefills,
+  type PricingInterval,
+} from "./data";
+import { BETA_ACCESS_HREF } from "@/lib/site";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
-const prices = {
-  pro: {
-    month: { price: "$9.99", period: "per month" },
-    year: { price: "$99", period: "per year · save $20.88" },
-  },
-  max: {
-    month: { price: "$14.99", period: "per month" },
-    year: { price: "$149", period: "per year · save $30.88" },
-  },
-} as const;
-
 export default function Pricing() {
-  const { user } = useAuth();
-  const navigate = useNavigate();
-  const [interval, setInterval] = useState<BillingInterval>("month");
-  const [checkoutTier, setCheckoutTier] = useState<PaidTier | null>(null);
-  const [checkoutError, setCheckoutError] = useState("");
-
-  async function startCheckout(tier: PaidTier) {
-    if (!user) {
-      navigate("/signin");
-      return;
-    }
-
-    setCheckoutTier(tier);
-    setCheckoutError("");
-    try {
-      window.location.assign(await createSubscriptionCheckout(tier, interval));
-    } catch (error) {
-      setCheckoutError(error instanceof Error ? error.message : "Unable to start checkout");
-      setCheckoutTier(null);
-    }
-  }
+  const [interval, setInterval] = useState<PricingInterval>("month");
 
   return (
-    <div className="max-w-6xl mx-auto px-4 pt-32 pb-20">
+    <div className="mx-auto max-w-6xl px-4 pb-20 pt-28 sm:px-6 md:pt-32">
       <PricingHeader />
 
-      <div className="mb-8 flex justify-center">
+      <section aria-labelledby="plans-heading">
+        <h2 id="plans-heading" className="sr-only">Plans</h2>
+        <div className="mb-8 flex flex-col items-center gap-3">
         <ToggleGroup
           type="single"
           value={interval}
           onValueChange={(value) => {
-            if (value) setInterval(value as BillingInterval);
+            if (value) setInterval(value as PricingInterval);
           }}
           variant="default"
           spacing={1}
@@ -70,83 +42,149 @@ export default function Pricing() {
               value={value}
               className="h-9 rounded-md px-4 text-foreground/75 data-[state=on]:bg-background data-[state=on]:text-foreground data-[state=on]:shadow-sm"
             >
-              {value === "month" ? "Monthly" : "Yearly · save 17%"}
+              {value === "month" ? "Monthly" : "Yearly · save up to 18%"}
             </ToggleGroupItem>
           ))}
         </ToggleGroup>
-      </div>
+        <p className="text-center text-xs text-muted-foreground">
+          Pricing is planned. Checkout is closed.
+        </p>
+        </div>
 
-      {checkoutError && (
-        <Alert variant="destructive" className="mx-auto mb-6 max-w-lg">
-          <AlertDescription className="text-center">{checkoutError}</AlertDescription>
-        </Alert>
-      )}
+        <div className="mb-20 grid grid-cols-1 items-stretch gap-4 md:grid-cols-3">
+          {plans.map((plan) => (
+            <PricingCard
+              key={plan.id}
+              name={plan.name}
+              price={plan.prices[interval].price}
+              period={plan.prices[interval].period}
+              description={plan.description}
+              features={plan.features}
+              ctaHref={BETA_ACCESS_HREF}
+              ctaLabel="Join the beta"
+              popular={plan.id === "pro"}
+            />
+          ))}
+        </div>
+      </section>
 
-      <div className="mb-12 grid grid-cols-1 items-stretch gap-4 md:grid-cols-3">
-        <PricingCard
-          name="Basic"
-          price="Free"
-          description="A capable local data workspace with AI credits to explore Mika."
-          features={basicFeatures}
-          ctaTo="/download"
-          ctaLabel="Download Misty"
-        />
-        <PricingCard
-          name="Pro"
-          price={prices.pro[interval].price}
-          period={prices.pro[interval].period}
-          description="The complete data-management suite for everyday work."
-          features={proFeatures}
-          ctaLabel={user ? "Choose Pro" : "Sign in to choose Pro"}
-          ctaBusy={checkoutTier === "pro"}
-          onCtaClick={() => void startCheckout("pro")}
-          inherits="Basic"
-          popular
-        />
-        <PricingCard
-          name="Max"
-          price={prices.max[interval].price}
-          period={prices.max[interval].period}
-          description="More capacity and deeper AI for individual power users."
-          features={maxFeatures}
-          ctaLabel={user ? "Choose Max" : "Sign in to choose Max"}
-          ctaBusy={checkoutTier === "max"}
-          onCtaClick={() => void startCheckout("max")}
-          inherits="Pro"
-        />
-      </div>
-
-      <Card
-        role="region"
-        aria-labelledby="credits-heading"
-        className="mb-20 gap-6 rounded-2xl bg-card/70 px-6 py-7 md:flex-row md:items-center md:justify-between md:gap-10"
-      >
-        <div className="max-w-2xl">
-          <p className="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-primary">
-            Credits where cost exists
-          </p>
-          <h2 id="credits-heading" className="mb-2 text-xl font-semibold text-foreground">
-            Local work stays unlimited
+      <section aria-labelledby="limits-heading" className="mb-20 scroll-mt-24">
+        <div className="mb-6 max-w-2xl">
+          <h2 id="limits-heading" className="mb-2 text-2xl font-semibold tracking-tight text-foreground md:text-3xl">
+            Plan limits
           </h2>
           <p className="text-sm leading-6 text-muted-foreground">
-            Credits are used only by managed AI, including Mika and AI-backed automation nodes. File
-            operations, backups, cleanup scans, sync, scheduled workflows, and non-AI automations do
-            not use credits.
+            Space limits come from the owner. Mika credits belong to each member.
           </p>
         </div>
-        <div className="mt-6 grid shrink-0 grid-cols-2 gap-3 md:mt-0">
-          {creditPacks.map((pack) => (
-            <Card
-              key={pack.credits}
-              size="sm"
-              className="gap-0 rounded-xl bg-muted/40 px-4 py-3 text-center"
+
+        <Card className="rounded-2xl py-0">
+          <CardContent className="p-0">
+            <div
+              className="overflow-x-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              role="region"
+              aria-label="Plan limits comparison"
+              tabIndex={0}
             >
-              <p className="font-semibold text-foreground">{pack.credits}</p>
-              <p className="text-xs text-muted-foreground">credits · {pack.price}</p>
+              <table className="w-full min-w-[760px] border-collapse text-left text-sm">
+                <caption className="sr-only">Free, Pro, and Max plan limits</caption>
+                <thead>
+                  <tr className="border-b border-border bg-muted/40">
+                    <th scope="col" className="px-5 py-4 font-medium text-muted-foreground">Limit</th>
+                    <th scope="col" className="px-5 py-4 font-semibold text-foreground">Free</th>
+                    <th scope="col" className="px-5 py-4 font-semibold text-foreground">Pro</th>
+                    <th scope="col" className="px-5 py-4 font-semibold text-foreground">Max</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {planLimitRows.map((row) => (
+                    <tr key={row.label} className="border-b border-border/70 last:border-b-0">
+                      <th scope="row" className="px-5 py-4 font-medium text-foreground">{row.label}</th>
+                      <td className="px-5 py-4 text-muted-foreground">{row.free}</td>
+                      <td className="px-5 py-4 text-muted-foreground">{row.pro}</td>
+                      <td className="px-5 py-4 text-muted-foreground">{row.max}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      </section>
+
+      <section aria-labelledby="rules-heading" className="mb-20">
+        <div className="mb-6 max-w-2xl">
+          <h2 id="rules-heading" className="mb-2 text-2xl font-semibold tracking-tight text-foreground md:text-3xl">
+            Owner and member rules
+          </h2>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2">
+          {ownerRules.map((rule) => (
+            <Card key={rule.title} size="sm" className="rounded-2xl bg-card/70">
+              <CardContent>
+                <h3 className="mb-2 font-semibold text-foreground">{rule.title}</h3>
+                <p className="text-sm leading-6 text-muted-foreground">{rule.description}</p>
+              </CardContent>
             </Card>
           ))}
         </div>
-      </Card>
+      </section>
+
+      <section aria-labelledby="credits-heading" className="mb-20">
+        <div className="mb-7 max-w-2xl">
+          <h2 id="credits-heading" className="mb-2 text-2xl font-semibold tracking-tight text-foreground md:text-3xl">
+            Credit packs
+          </h2>
+          <p className="text-sm leading-6 text-muted-foreground">
+            Mika pauses at zero. There are no automatic overages.
+          </p>
+        </div>
+
+        <div className="grid gap-4 lg:grid-cols-2">
+          <Card className="rounded-2xl">
+            <CardContent>
+              <div className="mb-5 flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <h3 className="font-semibold text-foreground">Planned one-time top-ups</h3>
+                  <p className="mt-1 text-xs text-muted-foreground">Keep them on your account</p>
+                </div>
+                <Badge variant="outline">Do not expire</Badge>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {permanentCreditPacks.map((pack) => (
+                  <div key={pack.name} className="rounded-xl border border-border bg-muted/30 p-4">
+                    <p className="font-semibold text-foreground">{pack.name}</p>
+                    <p className="mt-1 text-sm text-muted-foreground">{pack.price}</p>
+                    <p className="mt-3 text-xs text-muted-foreground">{pack.detail}</p>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="rounded-2xl">
+            <CardContent>
+              <div className="mb-5 flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <h3 className="font-semibold text-foreground">Planned subscriber refills</h3>
+                  <p className="mt-1 text-xs text-muted-foreground">For active Pro and Max subscribers</p>
+                </div>
+                <Badge variant="outline">Expires at reset</Badge>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {subscriberRefills.map((refill) => (
+                  <div key={refill.name} className="rounded-xl border border-border bg-muted/30 p-4">
+                    <p className="text-xs font-medium text-muted-foreground">{refill.name}</p>
+                    <p className="mt-1 font-semibold text-foreground">{refill.credits}</p>
+                    <p className="mt-1 text-sm text-muted-foreground">{refill.price}</p>
+                    <p className="mt-3 text-xs text-muted-foreground">{refill.detail}</p>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </section>
 
       <PricingQA />
     </div>

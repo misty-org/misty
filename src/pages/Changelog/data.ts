@@ -7,52 +7,45 @@ export interface ChangelogEntry {
   version: string;
   date: string;
   summary: string;
-  status: "in-development" | "released";
+  status: "beta" | "released";
   groups: ChangelogGroup[];
 }
 
 export const changelog: ChangelogEntry[] = [
   {
     version: "v0.1.0",
-    date: "In development",
-    summary: "First public release",
-    status: "in-development",
+    date: "Private beta · July 2026",
+    summary: "Spaces for shared project work",
+    status: "beta",
     groups: [
       {
-        heading: "Desktop foundation",
+        heading: "Space collaboration",
         changes: [
-          "React and Tauri desktop application for macOS and Windows",
-          "Local-first services that keep file operations on your device",
-          "Tabs, workspaces, pinned locations, and multi-panel file browsing",
+          "Create a Space to keep a project's people, conversations, tasks, and shared resources together",
+          "Durable Space Chat with shared conversations and Library references",
+          "Invite existing Misty accounts, manage membership, and transfer Space ownership",
         ],
       },
       {
-        heading: "Files and Search",
+        heading: "Tasks",
         changes: [
-          "Create, rename, copy, move, upload, download, and delete workflows",
-          "File previews, metadata inspection, tags, sorting, and view controls",
-          "Deep Search across indexed local and connected locations",
+          "Create, assign, prioritize, and schedule work with shared task details",
+          "Switch between focused list and board views as the project changes",
         ],
       },
       {
-        heading: "Remotes and Transfers",
+        heading: "Library",
         changes: [
-          "Google Drive, OneDrive, and Dropbox Remote connections",
-          "Persistent transfer history with progress, filters, retry, pause, resume, and cancel controls where supported",
+          "Collect the useful files and references a Space needs in one curated Library",
+          "Upload, preview, find, download, and organize shared resources without turning the Library into another raw file browser",
         ],
       },
       {
-        heading: "Experimental Automations and Mika",
+        heading: "Beta availability",
         changes: [
-          "Desktop workflow editor with manual, interval, and local webhook triggers",
-          "Experimental Mika assistant for contextual file discovery and reviewed actions",
-        ],
-      },
-      {
-        heading: "Mobile preparation",
-        changes: [
-          "iPhone and Android Files, Remotes, Transfers, Account, and Settings experiences in release preparation",
-          "Public mobile store downloads are coming soon",
+          "Access is opening in approved, invite-only cohorts while the Space beta is tested",
+          "Mika's permission-scoped Space experience is being tested during the beta",
+          "Google Calendar, Slack, and Notion connections are in pilot work; Discord support is coming after configuration and reliability testing",
         ],
       },
     ],

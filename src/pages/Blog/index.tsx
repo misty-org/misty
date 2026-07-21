@@ -4,22 +4,25 @@ import { posts, tagColors } from "./data";
 
 export default function Blog() {
   return (
-    <div className="max-w-5xl mx-auto px-3 sm:px-4 pt-32 pb-20">
-      <div className="mb-12">
-        <h1 className="mb-4 text-3xl font-bold text-foreground md:text-5xl">
+    <div className="mx-auto max-w-5xl px-4 pb-20 pt-28 sm:px-6 sm:pt-32">
+      <header className="mb-10 border-b border-border pb-8">
+        <p className="mb-3 text-xs font-semibold uppercase tracking-[0.16em] text-primary">
+          Notes from Misty
+        </p>
+        <h1 className="text-3xl font-semibold tracking-[-0.03em] text-foreground md:text-5xl">
           Blog
         </h1>
-        <p className="leading-relaxed text-muted-foreground">
-          Updates, deep dives, and behind-the-scenes from the Misty team.
+        <p className="mt-4 max-w-2xl leading-relaxed text-muted-foreground">
+          Product notes and archived announcements.
         </p>
-      </div>
+      </header>
 
       <div className="flex flex-col gap-6">
         {posts.map((post) => (
           <Card
             key={post.title}
             role="article"
-            className="group gap-0 rounded-xl py-0 transition-colors hover:bg-muted/30"
+            className="gap-0 rounded-xl py-0"
           >
             <CardHeader className="p-6">
               <div className="mb-3 flex items-center gap-3">
@@ -31,9 +34,14 @@ export default function Blog() {
                 </Badge>
                 <span className="text-xs text-muted-foreground">{post.date}</span>
               </div>
-              <h2 className="mb-2 text-lg font-semibold text-foreground transition-colors group-hover:text-primary">
+              <h2 className="mb-2 text-lg font-semibold text-foreground">
                 {post.title}
               </h2>
+              {post.historicalContext ? (
+                <p className="mb-4 border-l-2 border-primary/50 pl-4 text-sm leading-relaxed text-foreground/80">
+                  {post.historicalContext}
+                </p>
+              ) : null}
               <p className="text-sm leading-relaxed text-muted-foreground">
                 {post.summary}
               </p>
