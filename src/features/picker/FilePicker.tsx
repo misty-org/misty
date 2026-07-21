@@ -4,7 +4,7 @@ import type { MistyFilePickerProps } from "@/models/interfaces/features/picker/F
 export type { MistyFilePickerProps } from "@/models/interfaces/features/picker/FilePicker";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { MouseEvent as ReactMouseEvent } from "react";
-import { CloudDownload, FolderOpen } from "lucide-react";
+import { CloudDownload } from "lucide-react";
 import { Button } from "@/ui";
 import {
   Dialog,
@@ -21,8 +21,9 @@ import type {
   MountedDevice,
   ProviderRemote,
 } from "@/models/interfaces/services/misty-api";
+import { Alert, AlertDescription } from "@/ui";
 import { FileBrowser } from "../explorer/components/FileBrowser";
-import { ExplorerPickerSidebar } from "../explorer/components/ExplorerPickerSidebar";
+import { PickerPlaces } from "./PickerPlaces";
 import { ExplorerPickerToolbar } from "../explorer/components/ExplorerPickerToolbar";
 import { errorText } from "@/lib/format";
 import { useMultiPanelStore } from "@/features/workspace";
@@ -39,6 +40,11 @@ import {
 const emptyProviderRemotes: ProviderRemote[] = [];
 const emptyMountedDevices: MountedDevice[] = [];
 const emptyCutPaths = new Set<string>();
+const pickerDialogClassName = [
+  "grid h-[min(640px,calc(100vh-64px))] w-[min(960px,calc(100vw-32px))] max-w-none",
+  "grid-rows-[auto_auto_minmax(0,1fr)_auto] gap-0 overflow-hidden p-0",
+  "max-[560px]:size-full max-[560px]:rounded-none",
+].join(" ");
 
 export function MistyFilePicker({
   mode,
@@ -46,6 +52,7 @@ export function MistyFilePicker({
   title,
   initialPath,
   allowedExtensions,
+  sourceToggle,
   onCancel,
   onSelect,
   onSelectMany,
@@ -62,7 +69,6 @@ export function MistyFilePicker({
   const explorerSort = useExplorerStore((state) => state.paneSorts[activePaneId] ?? state.sort);
   const directorySizes = useExplorerStore((state) => state.directorySizes);
   const pinnedPaths = useExplorerStore((state) => state.pinnedPaths);
-  const activeWorkspaceTitle = useExplorerStore((state) => state.activeWorkspaceTitle);
   const remotes = useProvidersStore((state) => state.providers?.remotes ?? emptyProviderRemotes);
   const providersLoading = useProvidersStore((state) => state.loading);
   const loadProviders = useProvidersStore((state) => state.load);
@@ -274,33 +280,21 @@ export function MistyFilePicker({
         if (!open) onCancel();
       }}
     >
-      <DialogContent className="grid h-[min(680px,calc(100vh-88px))] w-[min(1100px,calc(100vw-32px))] max-w-none grid-rows-[auto_auto_auto_minmax(0,1fr)_auto] gap-0 overflow-hidden rounded-2xl bg-[var(--misty-app-modal-bg,var(--popover))] p-0 text-foreground max-[560px]:size-full max-[560px]:rounded-none">
-        <DialogHeader className="flex min-h-[76px] grid-cols-[1fr_auto] items-center justify-between gap-4 border-b border-border px-5 py-0 text-left">
-          <div className="flex min-w-0 items-center gap-3">
-            <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-muted text-muted-foreground">
-              <FolderOpen size={20} />
-            </span>
-            <div>
-              <DialogTitle className="text-[17px]">
-                {title || (mode === "folder" ? "Choose a folder" : "Choose a file")}
-              </DialogTitle>
-              <DialogDescription>
-                {multiple && mode === "file"
-                  ? "Select one or more files from Explorer and connected locations."
-                  : "Browse your current Explorer context and connected locations."}
-              </DialogDescription>
-            </div>
+      <DialogContent className={pickerDialogClassName}>
+        <DialogHeader className="flex-row items-center justify-between gap-4 border-b border-border px-5 py-3 pr-14 text-left">
+          <div className="min-w-0">
+            <DialogTitle className="text-base">
+              {title || (mode === "folder" ? "Choose a folder" : "Choose a file")}
+            </DialogTitle>
+            <DialogDescription>
+              {mode === "folder"
+                ? "Pick a destination folder."
+                : multiple
+                  ? "Pick one or more files."
+                  : "Pick a file."}
+            </DialogDescription>
           </div>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            data-dialog-autofocus
-            aria-label="Close picker"
-            onClick={onCancel}
-          >
-            ×
-          </Button>
+          {sourceToggle}
         </DialogHeader>
 
         <div className="border-b border-border">
@@ -319,24 +313,9 @@ export function MistyFilePicker({
           />
         </div>
 
-        <div className="min-h-0">
-          {showCloudNotice ? (
-            <div
-              className="flex min-h-11 items-center gap-2.5 border-b border-amber-500/20 bg-amber-500/10 px-4 py-2 text-xs leading-relaxed text-amber-500"
-              role="status"
-            >
-              <CloudDownload className="shrink-0" size={17} aria-hidden="true" />
-              <span>
-                <strong>Download required.</strong> You can browse cloud items here, but you must
-                fully download an item to a local folder before choosing it.
-              </span>
-            </div>
-          ) : null}
-        </div>
-
-        <div className="grid min-h-0 grid-cols-[260px_minmax(0,1fr)] max-[980px]:grid-cols-[minmax(0,1fr)]">
-          <div className="min-h-0 overflow-hidden border-r border-border max-[980px]:hidden">
-            <ExplorerPickerSidebar
+        <div className="grid min-h-0 grid-cols-[220px_minmax(0,1fr)] max-[860px]:grid-cols-[minmax(0,1fr)]">
+          <div className="min-h-0 overflow-hidden border-r border-border max-[860px]:hidden">
+            <PickerPlaces
               homePath={homeDir}
               activePath={listing?.path || explorerPath || homeDir}
               mountRoot={mountRoot}
@@ -345,13 +324,19 @@ export function MistyFilePicker({
               devices={devices}
               devicesLoading={devicesLoading}
               pinnedPaths={pinnedPaths}
-              activeWorkspaceTitle={activeWorkspaceTitle}
               onNavigate={(path) => void loadPath(path)}
-              onRefreshDevices={() => void refreshDevices()}
             />
           </div>
 
-          <main className="relative grid min-h-0 min-w-0 grid-rows-[minmax(0,1fr)] overflow-hidden bg-background">
+          <main className="relative grid min-h-0 min-w-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden bg-background">
+            {showCloudNotice ? (
+              <Alert className="rounded-none border-x-0 border-t-0 border-b-border bg-muted/40 px-4 py-2.5">
+                <CloudDownload className="text-muted-foreground" />
+                <AlertDescription className="text-xs">
+                  Cloud items must be downloaded to a local folder before you can choose them.
+                </AlertDescription>
+              </Alert>
+            ) : null}
             <FileBrowser
               paneId="misty-file-picker"
               selectionOnly
@@ -389,26 +374,21 @@ export function MistyFilePicker({
           </main>
         </div>
 
-        <DialogFooter className="mt-0 flex min-h-[72px] flex-row items-center justify-between gap-5 border-t border-border px-[18px]">
-          <div className="grid min-w-0 gap-1 max-[800px]:hidden">
-            <span className="text-[10px] capitalize text-muted-foreground">
-              {mode === "folder" ? "Folder" : multiple ? "Files" : "File"}
-            </span>
-            <strong
-              className="max-w-[560px] truncate text-xs font-semibold text-foreground/80"
-              title={
-                multiple && selectedPaths.length > 0
-                  ? selectedPaths.join("\n")
-                  : selected?.path || listing?.path
-              }
-            >
-              {selectionIsCloud
-                ? "Download this item locally before choosing it"
-                : multiple && selectedPaths.length > 0
-                  ? `${selectedPaths.length} file${selectedPaths.length === 1 ? "" : "s"} selected`
-                  : selected?.path || (mode === "folder" ? listing?.path : "Select a file")}
-            </strong>
-          </div>
+        <DialogFooter className="mt-0 flex flex-row items-center justify-between gap-4 border-t border-border px-5 py-3 sm:justify-between">
+          <p
+            className="m-0 min-w-0 truncate text-xs text-muted-foreground max-[800px]:hidden"
+            title={
+              multiple && selectedPaths.length > 0
+                ? selectedPaths.join("\n")
+                : selected?.path || listing?.path
+            }
+          >
+            {selectionIsCloud
+              ? "Download this item locally before choosing it"
+              : multiple && selectedPaths.length > 0
+                ? `${selectedPaths.length} file${selectedPaths.length === 1 ? "" : "s"} selected`
+                : selected?.path || (mode === "folder" ? listing?.path : "Select a file")}
+          </p>
           <div className="ml-auto flex shrink-0 gap-2">
             <Button type="button" variant="outline" onClick={onCancel}>
               Cancel

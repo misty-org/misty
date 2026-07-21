@@ -225,9 +225,13 @@ export function LibraryWorkspace(props: {
     }
   };
   const deleteFolder = async (id: string) => {
-    const snapshot = await savedSearchesDelete(id);
-    setSavedSearches(sortSavedSearches(snapshot.searches));
-    setFolderDialog(null);
+    try {
+      const snapshot = await savedSearchesDelete(id);
+      setSavedSearches(sortSavedSearches(snapshot.searches));
+      setFolderDialog(null);
+    } catch (reason) {
+      setFolderError(reason instanceof Error ? reason.message : String(reason));
+    }
   };
   const runFolder = async (search: SavedSearch) => {
     setFolderSearching(true);

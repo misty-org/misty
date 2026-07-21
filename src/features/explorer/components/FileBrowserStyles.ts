@@ -1,6 +1,8 @@
 export const fileBrowserStyles = {
-  browser:
-    "grid min-h-0 min-w-0 grid-rows-[minmax(0,1fr)_36px] overflow-hidden bg-[var(--misty-files-content-bg,var(--card))] outline outline-0 outline-offset-[-2px]",
+  browser: [
+    "grid min-h-0 min-w-0 grid-rows-[minmax(0,1fr)_36px] overflow-hidden",
+    "bg-[var(--misty-files-content-bg,var(--background))] outline outline-0 outline-offset-[-2px]",
+  ].join(" "),
   browserLoading: "bg-[var(--misty-files-content-bg,var(--background))]",
   tableSkeleton: "min-h-0 min-w-[720px] overflow-hidden",
   tableSkeletonLine:
@@ -14,7 +16,7 @@ export const fileBrowserStyles = {
     "grid min-h-0 min-w-0 content-start gap-[18px] overflow-hidden p-1 [grid-template-columns:repeat(auto-fill,minmax(144px,1fr))] [[data-compact-mode=true]_&]:gap-2.5 [[data-compact-mode=true]_&]:p-0.5 [[data-compact-mode=true]_&]:[grid-template-columns:repeat(auto-fill,minmax(124px,1fr))]",
   gridSkeletonCell: "h-[156px] [[data-compact-mode=true]_&]:h-[132px]",
   tableWrap:
-    "grid min-h-0 min-w-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden bg-[var(--misty-files-content-bg,var(--card))]",
+    "grid min-h-0 min-w-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden bg-[var(--misty-files-content-bg,var(--background))]",
   tableHeaderWrap: "min-w-0 overflow-hidden",
   tableResetButton:
     "absolute right-2 top-1.5 z-[4] inline-grid size-7 place-items-center rounded-md border border-transparent text-muted-foreground hover:bg-accent hover:text-accent-foreground focus-visible:border-ring max-[720px]:hidden",

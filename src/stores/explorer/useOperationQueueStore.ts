@@ -46,7 +46,10 @@ export const useOperationQueueStore = create<OperationQueueStore>((set) => ({
         operationQueueSnapshotsEqual(state.snapshot, next) ? state : { snapshot: next },
       );
     } catch (error) {
-      set({ error: errorText(error) });
+      // A silent background poll must not publish its failure: the transfers view
+      // reads `error` right after awaiting a user action, so a poll that fails in
+      // that window would be reported as the failure of whatever was just clicked.
+      if (!options.silent) set({ error: errorText(error) });
     } finally {
       if (options.silent) silentOperationQueueLoadInFlight = false;
       if (!options.silent) set({ working: false });

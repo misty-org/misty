@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { Navigate, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { Navigate, useLocation, useNavigate, useParams } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
 
 import { ErrorState, LoadingState, PermissionState } from "@/ui";
@@ -7,9 +7,9 @@ import { Button } from "@/ui";
 import { useAuth } from "@/features/auth/AuthContext";
 import { useSpacesStore } from "@/stores/spaces/useSpacesStore";
 
-import { AgentCenter } from "@/pages/Agents/AgentCenter";
-import type { SpaceStudioKind } from "@/models/types/pages/Studio/index";
+import { SpaceNotes } from "@/features/notes/SpaceNotes";
 import { SpaceChat } from "./SpaceChat";
+import { SpaceAssistant } from "./SpaceAssistant";
 import { SpaceLibrary } from "./SpaceLibrary";
 import { SpaceTasksCalendar } from "./SpaceTasksCalendar";
 import { SpaceMembers } from "./components/SpaceMembers";
@@ -17,14 +17,26 @@ import { SpaceSettings } from "./components/SpaceSettings";
 
 export { default, PersonalSpaceRedirect } from "./components/SpacesShell";
 
+const validSpaceSections = new Set([
+  "chat",
+  "tasks",
+  "notes",
+  "library",
+  "assistant",
+  "members",
+  "settings",
+]);
+const validSettingsSections = new Set(["general", "chat", "integrations"]);
+
 export function SpaceDetail() {
-  const { spaceId = "", section = "chat", studioKind = "agents" } = useParams();
-  const [routeSearchParams] = useSearchParams();
+  const { spaceId = "", section = "chat", studioKind = "" } = useParams();
   const { user } = useAuth();
+  const location = useLocation();
   const navigate = useNavigate();
-  const { spaces, loading, error, loadSpace, clearError } = useSpacesStore(
+  const { spaces, snapshotReady, loading, error, loadSpace, clearError } = useSpacesStore(
     useShallow((state) => ({
       spaces: state.spaces,
+      snapshotReady: state.snapshotReady,
       loading: state.loading,
       error: state.error,
       loadSpace: state.loadSpace,
@@ -34,16 +46,57 @@ export function SpaceDetail() {
   const space = spaces.find((item) => item.id === spaceId);
 
   useEffect(() => {
-    if (spaceId) void loadSpace(spaceId);
+    if (spaceId && user) void loadSpace(spaceId);
   }, [loadSpace, spaceId, user?.id]);
 
-  useEffect(() => {
-    if (section === "files") {
-      navigate(`/spaces/${encodeURIComponent(spaceId)}/library`, { replace: true });
-    }
-  }, [navigate, section, spaceId]);
+  if (section === "files") {
+    return <Navigate to={`/spaces/${encodeURIComponent(spaceId)}/library`} replace />;
+  }
+  if (!validSpaceSections.has(section)) {
+    return <Navigate to={`/spaces/${encodeURIComponent(spaceId)}/chat`} replace />;
+  }
+  if (section === "settings" && studioKind && !validSettingsSections.has(studioKind)) {
+    return <Navigate to={`/spaces/${encodeURIComponent(spaceId)}/settings/general`} replace />;
+  }
 
-  if (!space && loading) {
+  if (!user) {
+    return (
+      <PermissionState
+        className="h-full"
+        title="Log in to view this Space"
+        description="Sign in to your Misty account to open Spaces and see their content."
+        action={
+          <Button
+            type="button"
+            onClick={() =>
+              navigate("/signin", {
+                state: { from: `${location.pathname}${location.search}${location.hash}` },
+              })
+            }
+          >
+            Log in
+          </Button>
+        }
+      />
+    );
+  }
+
+  if (!snapshotReady && error) {
+    return (
+      <ErrorState
+        className="h-full"
+        title="Spaces unavailable"
+        description="Misty could not confirm your Space access. Try again when the service is available."
+        action={
+          <Button type="button" variant="outline" onClick={() => void loadSpace(spaceId)}>
+            Try again
+          </Button>
+        }
+      />
+    );
+  }
+
+  if (!snapshotReady || (!space && loading)) {
     return (
       <LoadingState
         className="h-full"
@@ -63,8 +116,6 @@ export function SpaceDetail() {
     );
   }
 
-  const query = routeSearchParams.size ? `?${routeSearchParams}` : "";
-
   return (
     <div className="relative h-full min-h-0 overflow-hidden">
       {error ? (
@@ -77,7 +128,7 @@ export function SpaceDetail() {
           <span className="truncate">{error}</span>
         </Button>
       ) : null}
-      {section === "library" || section === "files" ? (
+      {section === "library" ? (
         space.permissions?.["library.view"] === false ? (
           <SpacePermissionDenied
             title="Library access required"
@@ -85,27 +136,6 @@ export function SpaceDetail() {
           />
         ) : (
           <SpaceLibrary key={`library:${spaceId}`} spaceId={spaceId} />
-        )
-      ) : section === "studio" ? (
-        <Navigate
-          to={`/spaces/${encodeURIComponent(spaceId)}/agents/studio/${normalizeStudioKind(studioKind)}${query}`}
-          replace
-        />
-      ) : section === "agents" ? (
-        space.permissions?.["agents.run"] === false &&
-        space.permissions?.["studio.view"] === false ? (
-          <SpacePermissionDenied
-            title="Agent access required"
-            detail="Ask a Space owner to grant Agent or Studio access."
-          />
-        ) : (
-          <AgentCenter
-            key={`agents:${spaceId}:${studioKind}`}
-            spaceId={spaceId}
-            spaceName={space.name ?? "This Space"}
-            canRun={space.permissions?.["agents.run"] !== false}
-            canViewStudio={space.permissions?.["studio.view"] !== false}
-          />
         )
       ) : section === "tasks" ? (
         space.permissions?.["tasks.view"] === false ? (
@@ -121,6 +151,23 @@ export function SpaceDetail() {
             canManageIntegrations={space.permissions?.["integrations.manage"] !== false}
           />
         )
+      ) : section === "notes" ? (
+        space.permissions?.["library.view"] === false ? (
+          <SpacePermissionDenied
+            title="Notes access required"
+            detail="You do not have permission to view this Space's Notes."
+          />
+        ) : (
+          <SpaceNotes key={`notes:${spaceId}`} spaceId={spaceId} spaceName={space.name} />
+        )
+      ) : section === "assistant" ? (
+        <SpaceAssistant
+          key={`assistant:${user.id}:${spaceId}`}
+          accountId={user.id}
+          spaceId={spaceId}
+          spaceName={space.name}
+          permissions={space.permissions}
+        />
       ) : section === "members" ? (
         <SpaceMembers key={`members:${spaceId}`} spaceId={spaceId} />
       ) : section === "settings" ? (
@@ -143,8 +190,4 @@ export function SpaceDetail() {
 
 function SpacePermissionDenied({ title, detail }: { title: string; detail: string }) {
   return <PermissionState className="h-full" title={title} description={detail} />;
-}
-
-function normalizeStudioKind(value: string): SpaceStudioKind {
-  return value === "workflows" ? "workflows" : "agents";
 }

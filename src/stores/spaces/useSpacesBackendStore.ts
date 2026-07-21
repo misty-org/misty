@@ -1,8 +1,13 @@
 import type { RealtimeEnvelope } from "@/models/types/stores/spaces/useSpacesBackendStore";
 export type { RealtimeEnvelope } from "@/models/types/stores/spaces/useSpacesBackendStore";
+export type { SpacePresenceViewer } from "@/models/types/stores/spaces/useSpacesBackendStore";
 import type { LibraryUploadOptions } from "@/models/interfaces/stores/spaces/useSpacesBackendStore";
 export type { LibraryUploadOptions } from "@/models/interfaces/stores/spaces/useSpacesBackendStore";
-import { readAccountAuthToken } from "@/stores/account/useAuthTokenStore";
+import {
+  isAccountSessionTransitioning,
+  readAccountSessionGeneration,
+  readAccountAuthToken,
+} from "@/stores/account/useAuthTokenStore";
 import { appSnapshot } from "@/stores/backend";
 import { safeTauriAssetUrl } from "@/platform/tauri";
 import type { SpaceConversation, SpaceRun } from "@/models/interfaces/features/spaces/types";
@@ -49,8 +54,14 @@ import type {
   SpaceTaskMoveResult,
   SpaceCalendarEvent,
   SpaceCalendarSource,
+  SpaceIntegration,
+  ProviderAuthorizationStart,
+  ProviderConnectionAvailability,
+  AvailableProviderResource,
   GoogleCalendarChoice,
 } from "@/models/interfaces/features/spaces/types";
+import type { TaskSchedule } from "@/models/interfaces/features/spaces/integrations/calendarTasks";
+import type { ConflictResolution } from "@/models/types/features/spaces/integrations/calendarTasks";
 import { normalizeApiBaseUrl, withDefaultApiPath } from "@/stores/backend";
 
 export class SpaceRequestError extends Error {
@@ -82,13 +93,24 @@ export async function resolveSpacesApiBase(): Promise<string> {
 }
 
 export async function spaceRequest<T = void>(path: string, init?: RequestInit): Promise<T> {
+  const accountGeneration = readAccountSessionGeneration();
+  assertStableSpaceAccount(accountGeneration);
   const [base, token] = await Promise.all([resolveSpacesApiBase(), readAccountAuthToken()]);
+  assertStableSpaceAccount(accountGeneration);
   const headers = new Headers(init?.headers);
   if (init?.body && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");
   if (token) headers.set("Authorization", `Bearer ${token}`);
-  const response = await fetch(`${base}${path}`, { credentials: "include", ...init, headers });
+  let response: Response;
+  try {
+    response = await fetch(`${base}${path}`, { credentials: "include", ...init, headers });
+  } catch (error) {
+    assertStableSpaceAccount(accountGeneration);
+    throw error;
+  }
+  assertStableSpaceAccount(accountGeneration);
   if (!response.ok) {
     const text = await response.text();
+    assertStableSpaceAccount(accountGeneration);
     let code: string | undefined;
     try {
       code = (JSON.parse(text) as { code?: string }).code;
@@ -98,7 +120,15 @@ export async function spaceRequest<T = void>(path: string, init?: RequestInit): 
     throw new SpaceRequestError(spaceErrorMessage(code, text), response.status, code);
   }
   if (response.status === 204) return undefined as T;
-  return (await response.json()) as T;
+  const result = (await response.json()) as T;
+  assertStableSpaceAccount(accountGeneration);
+  return result;
+}
+
+function assertStableSpaceAccount(generation: number): void {
+  if (isAccountSessionTransitioning() || generation !== readAccountSessionGeneration()) {
+    throw new SpaceRequestError("Wait for the account switch to finish.", 409, "account_changed");
+  }
 }
 
 export function spaceErrorMessage(code: string | undefined, fallback: string): string {
@@ -107,6 +137,7 @@ export function spaceErrorMessage(code: string | undefined, fallback: string): s
       "Your Misty session is unavailable. Sign out, then sign in again before creating a Space.",
     forbidden: "You no longer have access to this Space.",
     not_found: "That Space item no longer exists.",
+    invitee_not_found: "No Misty account was found for that email address.",
     space_limit_reached: "This account has reached its Space limit.",
     space_ownership_limit_reached:
       "You already own three Spaces. Delete one permanently before creating another.",
@@ -181,11 +212,35 @@ export const spacesApi = {
     spaceRequest<{ conversations: SpaceConversation[] }>(
       `/spaces/${encodeURIComponent(spaceId)}/conversations`,
     ),
+  integrations: (spaceId: string) =>
+    spaceRequest<{
+      integrations: SpaceIntegration[];
+      providers?: ProviderConnectionAvailability[];
+    }>(`/spaces/${encodeURIComponent(spaceId)}/integrations`),
+  beginProviderConnection: (spaceId: string, provider: string, returnTo: string) =>
+    spaceRequest<ProviderAuthorizationStart>(
+      `/spaces/${encodeURIComponent(spaceId)}/integrations/${encodeURIComponent(provider)}/authorize`,
+      { method: "POST", body: JSON.stringify({ return_to: returnTo }) },
+    ),
+  availableProviderResources: (spaceId: string, integrationId: string) =>
+    spaceRequest<{ resources: AvailableProviderResource[] }>(
+      `/spaces/${encodeURIComponent(spaceId)}/integrations/${encodeURIComponent(integrationId)}/resources`,
+    ),
   createConversation: (spaceId: string, title: string, memberIds: string[]) =>
     spaceRequest<SpaceConversation>(`/spaces/${encodeURIComponent(spaceId)}/conversations`, {
       method: "POST",
       body: JSON.stringify({ title, member_ids: memberIds }),
     }),
+  updateConversation: (
+    spaceId: string,
+    conversationId: string,
+    title: string,
+    memberIds: string[],
+  ) =>
+    spaceRequest<SpaceConversation>(
+      `/spaces/${encodeURIComponent(spaceId)}/conversations/${encodeURIComponent(conversationId)}`,
+      { method: "PATCH", body: JSON.stringify({ title, member_ids: memberIds }) },
+    ),
   conversationMessages: (spaceId: string, conversationId: string, before = 0) =>
     spaceRequest<{ messages: SpaceMessage[] }>(
       `/spaces/${encodeURIComponent(spaceId)}/conversations/${encodeURIComponent(conversationId)}/messages?before=${before}&limit=50`,
@@ -313,6 +368,56 @@ export const spacesApi = {
       `/spaces/${encodeURIComponent(spaceId)}/tasks/${encodeURIComponent(task.id)}?version=${task.version}`,
       { method: "DELETE" },
     ),
+  /**
+   * Creates a task bound to a Google calendar. `publish: false` keeps it a local
+   * draft; `true` creates the Google event immediately. Either way the write is
+   * something the user asked for, never an implicit consequence of typing.
+   */
+  createCalendarTask: (
+    spaceId: string,
+    input: {
+      title: string;
+      notes: string;
+      status: SpaceTaskStatus;
+      priority: SpaceTaskPriority;
+      calendar_source_id: string;
+      schedule: TaskSchedule;
+      publish: boolean;
+      assignee_user_id?: string;
+    },
+  ) =>
+    spaceRequest<SpaceTask>(`/spaces/${encodeURIComponent(spaceId)}/tasks/calendar`, {
+      method: "POST",
+      body: JSON.stringify(input),
+    }),
+
+  /** Pushes a task's local schedule edits to Google. */
+  publishTaskToCalendar: (spaceId: string, task: SpaceTask) =>
+    spaceRequest<SpaceTask>(
+      `/spaces/${encodeURIComponent(spaceId)}/tasks/${encodeURIComponent(task.id)}/calendar/publish`,
+      { method: "POST", body: JSON.stringify({ version: task.version }) },
+    ),
+
+  /**
+   * Resolves a conflict explicitly. Misty holds both versions until the user
+   * chooses, so neither side is lost to a background sync.
+   */
+  resolveTaskCalendarConflict: (spaceId: string, task: SpaceTask, resolution: ConflictResolution) =>
+    spaceRequest<SpaceTask>(
+      `/spaces/${encodeURIComponent(spaceId)}/tasks/${encodeURIComponent(task.id)}/calendar/resolve`,
+      { method: "POST", body: JSON.stringify({ version: task.version, resolution }) },
+    ),
+
+  /**
+   * Pulls Google changes into Misty's tasks. The server uses Calendar's sync
+   * token when it has one and falls back to a time-window poll when it does not.
+   */
+  syncCalendarTasks: (spaceId: string, sourceId?: string) =>
+    spaceRequest<{ tasks: SpaceTask[]; synced_at: string; sources: SpaceCalendarSource[] }>(
+      `/spaces/${encodeURIComponent(spaceId)}/calendar/sync`,
+      { method: "POST", body: JSON.stringify({ source_id: sourceId }) },
+    ),
+
   calendarEvents: (spaceId: string, from: string, to: string) =>
     spaceRequest<{ events: SpaceCalendarEvent[] }>(
       `/spaces/${encodeURIComponent(spaceId)}/calendar/events?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`,
@@ -384,20 +489,6 @@ export const spacesApi = {
     }),
   nodes: (spaceId: string) =>
     spaceRequest<{ nodes: SpaceNode[] }>(`/spaces/${encodeURIComponent(spaceId)}/nodes`),
-  createNode: (spaceId: string, body: Record<string, unknown>) =>
-    spaceRequest<SpaceNode>(`/spaces/${encodeURIComponent(spaceId)}/nodes`, {
-      method: "POST",
-      body: JSON.stringify(body),
-    }),
-  updateNode: (spaceId: string, nodeId: string, body: Record<string, unknown>) =>
-    spaceRequest<SpaceNode>(
-      `/spaces/${encodeURIComponent(spaceId)}/nodes/${encodeURIComponent(nodeId)}`,
-      { method: "PUT", body: JSON.stringify(body) },
-    ),
-  deleteNode: (spaceId: string, nodeId: string) =>
-    spaceRequest(`/spaces/${encodeURIComponent(spaceId)}/nodes/${encodeURIComponent(nodeId)}`, {
-      method: "DELETE",
-    }),
   resolve: (spaceId: string, nodeId: string, disposition: "open" | "download") =>
     spaceRequest<{ ticket: string; url: string; expires_in: number }>(
       `/spaces/${encodeURIComponent(spaceId)}/nodes/${encodeURIComponent(nodeId)}/resolve`,
@@ -641,12 +732,6 @@ export const spacesApi = {
       `/spaces/${encodeURIComponent(spaceId)}/library/items/${encodeURIComponent(itemId)}/restore`,
       { method: "POST", headers: libraryReauthenticationHeaders(reauthenticationToken) },
     ),
-  uploadLibraryFile: (
-    spaceId: string,
-    file: File,
-    purpose: "library" | "attachment",
-    options?: LibraryUploadOptions,
-  ) => uploadLibraryFile(spaceId, file, purpose, options),
   uploadLibraryPath: (
     spaceId: string,
     path: string,
@@ -658,37 +743,9 @@ export const spacesApi = {
       `/spaces/${encodeURIComponent(spaceId)}/attachments/${encodeURIComponent(attachmentId)}/promote`,
       { method: "POST" },
     ),
-  importLibraryItems: (
-    sourceSpaceId: string,
-    destinationSpaceId: string,
-    itemIds: string[],
-    reauthenticationToken = "",
-  ) =>
-    spaceRequest<LibraryItemsResult>(
-      `/spaces/${encodeURIComponent(sourceSpaceId)}/library/imports`,
-      {
-        method: "POST",
-        headers: libraryReauthenticationHeaders(reauthenticationToken),
-        body: JSON.stringify({ destination_space_id: destinationSpaceId, item_ids: itemIds }),
-      },
-    ),
   sharedReferences: (spaceId: string) =>
     spaceRequest<{ references: LibrarySharedReference[]; outgoing: LibrarySharedReference[] }>(
       `/spaces/${encodeURIComponent(spaceId)}/library/shared`,
-    ),
-  shareLibraryItems: (
-    sourceSpaceId: string,
-    destinationSpaceId: string,
-    itemIds: string[],
-    reauthenticationToken = "",
-  ) =>
-    spaceRequest<{ references: LibrarySharedReference[] }>(
-      `/spaces/${encodeURIComponent(sourceSpaceId)}/library/shared`,
-      {
-        method: "POST",
-        headers: libraryReauthenticationHeaders(reauthenticationToken),
-        body: JSON.stringify({ destination_space_id: destinationSpaceId, item_ids: itemIds }),
-      },
     ),
   sharedReferenceContent: (spaceId: string, referenceId: string) =>
     fetchProtectedBlob(
@@ -820,11 +877,6 @@ export const spacesApi = {
     spaceRequest(
       `/spaces/${encodeURIComponent(spaceId)}/library/albums/${encodeURIComponent(albumId)}/items`,
       { method: "POST", body: JSON.stringify({ item_ids: itemIds }) },
-    ),
-  removeAlbumItem: (spaceId: string, albumId: string, itemId: string) =>
-    spaceRequest(
-      `/spaces/${encodeURIComponent(spaceId)}/library/albums/${encodeURIComponent(albumId)}/items/${encodeURIComponent(itemId)}`,
-      { method: "DELETE" },
     ),
   reorderAlbumItems: (spaceId: string, album: LibraryAlbum, itemIds: string[]) =>
     spaceRequest<LibraryAlbum>(
@@ -1005,15 +1057,22 @@ async function uploadLibraryPath(
   purpose: "library" | "attachment",
   options?: LibraryUploadOptions,
 ): Promise<LibraryUploadResult> {
+  const accountGeneration = readAccountSessionGeneration();
+  assertStableSpaceAccount(accountGeneration);
   options?.onStage?.("reading");
-  const response = await fetch(safeTauriAssetUrl(path));
+  const response = await fetch(safeTauriAssetUrl(path), { signal: options?.signal });
+  assertStableSpaceAccount(accountGeneration);
   if (!response.ok) throw new Error(`Misty could not read ${fileNameFromPath(path)}.`);
+  const declaredSize = Number(response.headers.get("content-length") ?? 0);
+  if (declaredSize > maxWebviewUploadBytes) throw webviewUploadSizeError();
   const blob = await response.blob();
+  assertStableSpaceAccount(accountGeneration);
+  if (blob.size > maxWebviewUploadBytes) throw webviewUploadSizeError();
   const file = new File([blob], fileNameFromPath(path), {
     type: blob.type || "application/octet-stream",
     lastModified: Date.now(),
   });
-  return uploadLibraryFile(spaceId, file, purpose, options);
+  return uploadLibraryFile(spaceId, file, purpose, accountGeneration, options);
 }
 
 export function fileNameFromPath(path: string): string {
@@ -1029,12 +1088,15 @@ async function uploadLibraryFile(
   spaceId: string,
   file: File,
   purpose: "library" | "attachment",
+  accountGeneration: number,
   options?: LibraryUploadOptions,
 ): Promise<LibraryUploadResult> {
+  assertStableSpaceAccount(accountGeneration);
   options?.onStage?.("hashing");
-  const sha256 = toHex(
-    new Uint8Array(await crypto.subtle.digest("SHA-256", await file.arrayBuffer())),
-  );
+  const bytes = await file.arrayBuffer();
+  assertStableSpaceAccount(accountGeneration);
+  const sha256 = toHex(new Uint8Array(await crypto.subtle.digest("SHA-256", bytes)));
+  assertStableSpaceAccount(accountGeneration);
   const initiated = await spaceRequest<{
     upload: { id: string };
     transfer: { url: string; method?: string; headers: Record<string, string> };
@@ -1050,7 +1112,7 @@ async function uploadLibraryFile(
     }),
   });
   options?.onStage?.("uploading");
-  await transferLibraryObject(initiated.transfer, file, options);
+  await transferLibraryObject(initiated.transfer, file, accountGeneration, options);
   options?.onStage?.("finalizing");
   const finalizeHeaders = initiated.finalize?.headers ?? {
     "X-Misty-Library-Upload-Token":
@@ -1069,12 +1131,15 @@ async function uploadLibraryFile(
 async function transferLibraryObject(
   transfer: { url: string; method?: string; headers: Record<string, string> },
   file: File,
+  accountGeneration: number,
   options?: LibraryUploadOptions,
 ): Promise<void> {
+  assertStableSpaceAccount(accountGeneration);
   const direct = /^https?:\/\//i.test(transfer.url);
   const [base, token] = direct
     ? ["", ""]
     : await Promise.all([resolveSpacesApiBase(), readAccountAuthToken()]);
+  assertStableSpaceAccount(accountGeneration);
   const url = direct ? transfer.url : `${base}${transfer.url}`;
   await new Promise<void>((resolve, reject) => {
     const request = new XMLHttpRequest();
@@ -1087,6 +1152,10 @@ async function transferLibraryObject(
     }
     if (!direct && token) request.setRequestHeader("Authorization", `Bearer ${token}`);
     request.upload.onprogress = (event) => {
+      if (isAccountSessionTransitioning() || accountGeneration !== readAccountSessionGeneration()) {
+        request.abort();
+        return;
+      }
       if (event.lengthComputable && event.total > 0)
         options?.onProgress?.(Math.min(1, event.loaded / event.total));
     };
@@ -1108,6 +1177,7 @@ async function transferLibraryObject(
     options?.signal?.addEventListener("abort", abort, { once: true });
     request.send(file);
   });
+  assertStableSpaceAccount(accountGeneration);
 }
 
 function libraryReauthenticationHeaders(token: string): Record<string, string> {
@@ -1144,12 +1214,23 @@ async function downloadProtectedFile(
 }
 
 async function fetchProtectedBlob(path: string, init?: RequestInit): Promise<Blob> {
+  const accountGeneration = readAccountSessionGeneration();
+  assertStableSpaceAccount(accountGeneration);
   const [base, token] = await Promise.all([resolveSpacesApiBase(), readAccountAuthToken()]);
+  assertStableSpaceAccount(accountGeneration);
   const headers = new Headers(init?.headers);
   if (token) headers.set("Authorization", `Bearer ${token}`);
-  const response = await fetch(`${base}${path}`, { credentials: "include", ...init, headers });
+  let response: Response;
+  try {
+    response = await fetch(`${base}${path}`, { credentials: "include", ...init, headers });
+  } catch (error) {
+    assertStableSpaceAccount(accountGeneration);
+    throw error;
+  }
+  assertStableSpaceAccount(accountGeneration);
   if (!response.ok) {
     const text = await response.text();
+    assertStableSpaceAccount(accountGeneration);
     let code: string | undefined;
     try {
       code = (JSON.parse(text) as { code?: string }).code;
@@ -1158,7 +1239,17 @@ async function fetchProtectedBlob(path: string, init?: RequestInit): Promise<Blo
     }
     throw new SpaceRequestError(spaceErrorMessage(code, text), response.status, code);
   }
-  return response.blob();
+  const blob = await response.blob();
+  assertStableSpaceAccount(accountGeneration);
+  return blob;
+}
+
+export const maxWebviewUploadBytes = 128 * 1024 * 1024;
+
+function webviewUploadSizeError(): Error {
+  return new Error(
+    "This beta can safely copy files up to 128 MB. Larger files need Misty’s streaming uploader.",
+  );
 }
 
 function toHex(bytes: Uint8Array): string {

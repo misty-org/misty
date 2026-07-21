@@ -2,7 +2,10 @@ import { create } from "zustand";
 import { openExternalLink } from "@/platform/openExternalLink";
 import { errorText } from "@/lib/format";
 import { resolveSpacesApiBase, spacesApi } from "@/stores/spaces/useSpacesBackendStore";
-import type { RealtimeEnvelope } from "@/models/types/stores/spaces/useSpacesBackendStore";
+import type {
+  RealtimeEnvelope,
+  SpacePresenceViewer,
+} from "@/models/types/stores/spaces/useSpacesBackendStore";
 import type { SpaceRun } from "@/models/interfaces/features/spaces/types";
 import type {
   Space,
@@ -29,6 +32,8 @@ export interface SpacesStore {
   agentsBySpace: Record<string, SpaceStudioResource[]>;
   workflowsBySpace: Record<string, SpaceStudioResource[]>;
   inbox: Record<ActivityTab, SpaceInboxItem[]>;
+  presenceBySpace: Record<string, SpacePresenceViewer[]>;
+  snapshotReady: boolean;
   loading: boolean;
   sending: boolean;
   realtimeConnected: boolean;
@@ -65,13 +70,6 @@ export interface SpacesStore {
   ) => Promise<void>;
   deleteMessage: (spaceId: string, messageId: string) => Promise<void>;
   markRead: (spaceId: string, seq: number) => Promise<void>;
-  createFolder: (spaceId: string, displayName: string, parentId?: string) => Promise<void>;
-  addDriveLink: (
-    spaceId: string,
-    input: { displayName: string; driveUrl: string; parentId?: string },
-  ) => Promise<void>;
-  updateNode: (spaceId: string, node: SpaceNode, patch: Partial<SpaceNode>) => Promise<void>;
-  removeNode: (spaceId: string, nodeId: string) => Promise<void>;
   openNode: (spaceId: string, nodeId: string, disposition?: "open" | "download") => Promise<void>;
   saveStudio: (
     spaceId: string,
@@ -90,5 +88,6 @@ export interface SpacesStore {
   clearInbox: (tab: ActivityTab) => Promise<void>;
   connectRealtime: (accountId: string) => Promise<void>;
   disconnectRealtime: () => void;
+  setViewingSpace: (spaceId: string) => void;
   clearError: () => void;
 }

@@ -33,7 +33,8 @@ export function settingsFallbackRoute(previousRoute: string, rememberedRoute: st
   const candidates = [previousRoute, rememberedRoute, "/files"];
   return (
     candidates.find((route) => {
-      if (!route || route.startsWith("/settings") || route === "/account") return false;
+      if (!route || route.startsWith("/settings")) return false;
+      if (route === "/account" || route.startsWith("/providers")) return false;
       return isRememberableAppRoute(route);
     }) ?? "/files"
   );

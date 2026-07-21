@@ -22,7 +22,7 @@ async function bootstrap() {
   const { bootstrapDemoSession } = await import("@/features/auth/demoSessionBootstrap");
   await bootstrapDemoSession();
   void analytics.initialize().then(initializeAnalyticsLifecycle);
-  const [{ App }] = await Promise.all([import("./App"), import("@/ui/styles.css")]);
+  const [{ App }] = await Promise.all([import("./App"), import("@/ui/styles/styles.css")]);
   root.render(
     <TelemetryErrorBoundary>
       <App />

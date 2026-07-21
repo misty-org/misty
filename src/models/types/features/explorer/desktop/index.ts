@@ -200,7 +200,6 @@ import {
   isChromeTabPath,
   isRemotesTabPath,
   isTransfersTabPath,
-  openRemotesTab,
   openTransfersTab,
   parsePluginTabPath,
   toggleActiveTabPanelVisibility,

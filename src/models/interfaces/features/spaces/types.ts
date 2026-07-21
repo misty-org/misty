@@ -3,6 +3,12 @@ import type {
   GlobalImageEditDefinition,
   GlobalImageMarkupElement,
 } from "@/models/interfaces/features/editor/imageEditor";
+import type { MessageOrigin } from "@/models/interfaces/features/spaces/integrations/discord";
+import type {
+  TaskCalendarLink,
+  TaskSchedule,
+} from "@/models/interfaces/features/spaces/integrations/calendarTasks";
+import type { ScheduleField } from "@/models/types/features/spaces/integrations/calendarTasks";
 
 import type {
   SpaceRole,
@@ -73,6 +79,15 @@ export interface SpaceTask {
   version: number;
   completed_at?: string;
   archived_at?: string;
+  /**
+   * Schedule fields Google Calendar owns, present on calendar-backed tasks and
+   * local drafts. Misty-only tasks leave this unset.
+   */
+  schedule?: TaskSchedule;
+  /** Binding to a Google calendar. Absent on Misty-only tasks. */
+  calendar?: TaskCalendarLink;
+  /** Set by a sync pass when local edits collide with a Google update. */
+  conflicted_fields?: ScheduleField[];
   created_at: string;
   updated_at: string;
 }
@@ -153,6 +168,11 @@ export interface SpaceMessage {
   attachments?: MessageAttachment[];
   reply_to_message_id?: string;
   edited_at?: string;
+  /**
+   * Set only on mirrored messages. Absent means Misty-native chat, so every
+   * existing caller stays valid and the UI can treat "no origin" as "ours".
+   */
+  origin?: MessageOrigin;
   created_at: string;
 }
 

@@ -11,8 +11,12 @@ import { activeMultiPanelTab, maxMultiPanelPanes, useMultiPanelStore } from "./u
 import type { MultiPanelStoreHook } from "@/models/types/workspace/useMultiPanelStore";
 
 // Shared pane edges are owned here so adjacent panels never draw duplicate borders.
-const paneResizeDividerClass =
-  "group/resize relative z-[5] min-h-0 min-w-0 cursor-col-resize bg-transparent before:absolute before:inset-y-0 before:left-1/2 before:w-[9px] before:-translate-x-1/2 before:content-[''] after:pointer-events-none after:absolute after:inset-y-0 after:left-1/2 after:w-px after:-translate-x-1/2 after:bg-[var(--misty-divider-default)] after:content-[''] hover:after:bg-[var(--misty-divider-hover)]";
+const paneResizeDividerClass = [
+  "group/resize relative z-[5] min-h-0 min-w-0 cursor-col-resize bg-transparent before:absolute before:inset-y-0",
+  "before:left-1/2 before:w-[9px] before:-translate-x-1/2 before:content-[''] after:pointer-events-none after:absolute",
+  "after:inset-y-0 after:left-1/2 after:w-px after:-translate-x-1/2 after:bg-[var(--misty-divider-default)]",
+  "after:content-[''] hover:after:bg-[var(--misty-divider-hover)]",
+].join(" ");
 const paneResizeDividerActiveClass = "after:!bg-[var(--misty-divider-active)] [&>div]:!opacity-100";
 
 const multiPanelStyles = {
@@ -34,8 +38,10 @@ const multiPanelStyles = {
     "grid-cols-[minmax(0,1fr)_1px_var(--preview-width,280px)] max-[980px]:grid-cols-[minmax(0,1fr)]",
   bodyWithNavigationAndAside:
     "grid-cols-[var(--explorer-sidebar-width,260px)_1px_minmax(0,1fr)_1px_var(--preview-width,280px)] max-[980px]:grid-cols-[minmax(0,1fr)]",
-  panel:
-    "relative grid min-h-0 min-w-0 grid-cols-[minmax(0,1fr)] grid-rows-[minmax(0,1fr)] overflow-hidden bg-[var(--misty-files-content-bg,var(--background))] [contain:layout_paint]",
+  panel: [
+    "relative grid min-h-0 min-w-0 grid-cols-[minmax(0,1fr)] grid-rows-[minmax(0,1fr)] overflow-hidden",
+    "bg-[var(--misty-files-content-bg,var(--background))] [contain:layout_paint]",
+  ].join(" "),
   lane: "relative grid min-h-0 min-w-0 grid-rows-[minmax(0,1fr)] overflow-hidden",
   splitter:
     "absolute z-[6] bg-transparent after:absolute after:bg-[var(--misty-divider-subtle)] after:content-[''] hover:after:bg-[var(--misty-divider-hover)]",
@@ -51,16 +57,22 @@ const multiPanelStyles = {
   navigationAside:
     "min-h-0 min-w-0 overflow-hidden bg-[var(--misty-files-panel-bg,var(--sidebar))] max-[980px]:hidden",
   navigationAsideResizer: `${paneResizeDividerClass} max-[980px]:hidden`,
-  asideResizerGrip:
-    "pointer-events-none absolute left-1/2 top-1/2 z-[1] grid size-5 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-md bg-[var(--misty-app-page-bg,var(--misty-bg))] text-[var(--misty-text-muted)] opacity-0 transition-opacity group-hover/resize:opacity-60",
+  asideResizerGrip: [
+    "pointer-events-none absolute left-1/2 top-1/2 z-[1] grid size-5 -translate-x-1/2 -translate-y-1/2",
+    "place-items-center rounded-md bg-[var(--misty-app-page-bg,var(--misty-bg))] text-[var(--misty-text-muted)]",
+    "opacity-0 transition-opacity group-hover/resize:opacity-60",
+  ].join(" "),
   asideResizerGripIcon: "pointer-events-none",
   pane: "grid min-h-0 min-w-0 grid-rows-[minmax(0,1fr)] overflow-hidden bg-transparent [container-type:inline-size]",
   paneActive: "",
   paneContent: "min-h-0 min-w-0 overflow-hidden",
   paneActions:
     "flex flex-none items-center gap-1 overflow-hidden px-2 py-1 max-[720px]:gap-0.5 max-[720px]:px-1.5",
-  paneActionButton:
-    "grid h-[26px] w-7 place-items-center rounded-md border-0 bg-transparent text-[var(--misty-text-muted)] hover:bg-[var(--misty-neutral-hover-bg,var(--misty-surface-hover))] hover:text-[var(--misty-text)] max-[720px]:h-7 max-[720px]:w-[30px]",
+  paneActionButton: [
+    "grid h-[26px] w-7 place-items-center rounded-md border-0 bg-transparent text-[var(--misty-text-muted)]",
+    "hover:bg-[var(--misty-neutral-hover-bg,var(--misty-surface-hover))] hover:text-[var(--misty-text)]",
+    "max-[720px]:h-7 max-[720px]:w-[30px]",
+  ].join(" "),
 } as const;
 
 export const MultiPanelWorkspace = memo(function MultiPanelWorkspace(
@@ -332,7 +344,11 @@ export const MultiPanelWorkspace = memo(function MultiPanelWorkspace(
                 })}
                 {lane.length > 1 ? (
                   <div
-                    className={`${multiPanelStyles.splitter} ${multiPanelStyles.splitterHorizontal} ${draggingSplitter === `lane${laneIndex}` ? multiPanelStyles.splitterActive : ""}`}
+                    className={cx(
+                      multiPanelStyles.splitter,
+                      multiPanelStyles.splitterHorizontal,
+                      draggingSplitter === `lane${laneIndex}` && multiPanelStyles.splitterActive,
+                    )}
                     style={{ top: `${laneRatio * 100}%` }}
                     onPointerDown={(event) =>
                       beginSplitterDrag(laneIndex === 0 ? "lane0" : "lane1", event)
@@ -346,7 +362,11 @@ export const MultiPanelWorkspace = memo(function MultiPanelWorkspace(
           })}
           {lanes.length > 1 ? (
             <div
-              className={`${multiPanelStyles.splitter} ${multiPanelStyles.splitterVertical} ${draggingSplitter === "grid" ? multiPanelStyles.splitterActive : ""}`}
+              className={cx(
+                multiPanelStyles.splitter,
+                multiPanelStyles.splitterVertical,
+                draggingSplitter === "grid" && multiPanelStyles.splitterActive,
+              )}
               style={{ left: `${gridSplitRatio * 100}%` }}
               onPointerDown={(event) => beginSplitterDrag("grid", event)}
               role="separator"

@@ -3,7 +3,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { createTask } = vi.hoisted(() => ({
+const { createTask, loadTasks, loadCalendarSources, loadIntegrations } = vi.hoisted(() => ({
   createTask: vi.fn().mockResolvedValue({
     id: "task-1",
     task_key: "MST-1",
@@ -16,19 +16,20 @@ const { createTask } = vi.hoisted(() => ({
     due_timezone: "UTC",
     version: 1,
   }),
+  loadTasks: vi.fn().mockResolvedValue({ tasks: [] }),
+  loadCalendarSources: vi.fn().mockResolvedValue({ sources: [] }),
+  loadIntegrations: vi.fn().mockResolvedValue({ integrations: [] }),
 }));
 
 vi.mock("@/features/auth/AuthContext", () => ({ useAuth: () => ({ user: { id: "user-1" } }) }));
 vi.mock("@/stores/spaces/useSpacesBackendStore", () => ({
   spacesApi: {
-    tasks: vi.fn().mockResolvedValue({ tasks: [] }),
+    tasks: loadTasks,
     calendarEvents: vi.fn().mockResolvedValue({ events: [] }),
-    calendarSources: vi.fn().mockResolvedValue({ sources: [] }),
+    calendarSources: loadCalendarSources,
+    integrations: loadIntegrations,
     createTask,
   },
-}));
-vi.mock("@/stores/agents/useAgentArchitectureStore", () => ({
-  agentArchitectureApi: { integrations: vi.fn().mockResolvedValue({ integrations: [] }) },
 }));
 
 import { useSpacesStore } from "@/stores/spaces/useSpacesStore";
@@ -44,6 +45,9 @@ describe("SpaceTasksCalendar", () => {
     ).IS_REACT_ACT_ENVIRONMENT = true;
     useSpacesStore.setState({ membersBySpace: {} });
     createTask.mockClear();
+    loadTasks.mockReset().mockResolvedValue({ tasks: [] });
+    loadCalendarSources.mockReset().mockResolvedValue({ sources: [] });
+    loadIntegrations.mockReset().mockResolvedValue({ integrations: [] });
     container = document.createElement("div");
     document.body.append(container);
     root = createRoot(container);
@@ -67,9 +71,85 @@ describe("SpaceTasksCalendar", () => {
     expect(container.textContent).toContain("Board");
     expect(container.textContent).toContain("List");
     expect(container.textContent).toContain("Calendar");
+    expect(container.textContent).toContain("Tasks");
+    expect(container.textContent).toContain("Sync");
     expect(container.textContent).toContain("To do");
     expect(container.textContent).toContain("In progress");
     expect(container.textContent).toContain("Done");
+  });
+
+  it("keeps core tasks available when optional calendar endpoints fail", async () => {
+    loadTasks.mockResolvedValue({
+      tasks: [
+        {
+          id: "task-existing",
+          task_key: "MST-2",
+          title: "Ship beta",
+          notes: "",
+          status: "todo",
+          priority: "medium",
+          rank: 1024,
+          source_refs: [],
+          due_timezone: "UTC",
+          version: 1,
+        },
+      ],
+    });
+    loadCalendarSources.mockRejectedValue(new Error("Calendar endpoint unavailable"));
+    loadIntegrations.mockRejectedValue(new Error("Provider endpoint unavailable"));
+
+    await act(async () => {
+      root.render(
+        <MemoryRouter initialEntries={["/spaces/space-new/tasks/list"]}>
+          <SpaceTasksCalendar spaceId="space-new" canManage canManageIntegrations />
+        </MemoryRouter>,
+      );
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(container.textContent).toContain("Ship beta");
+    expect(container.textContent).toContain("Tasks are available");
+  });
+
+  it("shows core tasks without waiting for slow optional provider discovery", async () => {
+    let releaseIntegrations!: (value: { integrations: never[] }) => void;
+    loadTasks.mockResolvedValue({
+      tasks: [
+        {
+          id: "task-fast",
+          task_key: "MST-3",
+          title: "Available immediately",
+          notes: "",
+          status: "todo",
+          priority: "medium",
+          rank: 1024,
+          source_refs: [],
+          due_timezone: "UTC",
+          version: 1,
+        },
+      ],
+    });
+    loadIntegrations.mockImplementation(
+      () => new Promise((resolve) => (releaseIntegrations = resolve)),
+    );
+
+    await act(async () => {
+      root.render(
+        <MemoryRouter initialEntries={["/spaces/space-new/tasks/list"]}>
+          <SpaceTasksCalendar spaceId="space-new" canManage canManageIntegrations />
+        </MemoryRouter>,
+      );
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(container.textContent).toContain("Available immediately");
+
+    await act(async () => {
+      releaseIntegrations({ integrations: [] });
+      await Promise.resolve();
+    });
   });
 
   it("does not send blank optional date and assignee fields when quick-adding a task", async () => {
@@ -124,7 +204,7 @@ describe("SpaceTasksCalendar", () => {
     });
 
     const createButton = [...container.querySelectorAll("button")].find(
-      (button) => button.textContent === "Create",
+      (button) => button.textContent === "New",
     );
     await act(async () => createButton?.click());
     // The shadcn Sheet renders into a portal attached to the document body.

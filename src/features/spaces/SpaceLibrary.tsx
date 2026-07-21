@@ -15,6 +15,8 @@ import {
 
 import { Button } from "@/ui";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui";
+import { Skeleton } from "@/ui";
+import { useMinimumSpin } from "@/hooks/useMinimumSpin";
 
 import { SpaceLibraryCollectionOverview } from "./components/SpaceLibraryCollections";
 import { SpaceLibraryOverlays } from "./components/SpaceLibraryOverlays";
@@ -34,6 +36,8 @@ import { SpaceLibraryProvider } from "./SpaceLibraryContext";
 import { useSpaceLibraryCollectionActions } from "./useSpaceLibraryCollectionActions";
 import { useSpaceLibraryData } from "./useSpaceLibraryData";
 import { useSpaceLibraryItemActions } from "./useSpaceLibraryItemActions";
+
+const libraryItemSkeletonCount = Array.from({ length: 10 }, (_, index) => index);
 
 export function SpaceLibrary({ spaceId }: { spaceId: string }) {
   const data = useSpaceLibraryData(spaceId);
@@ -101,6 +105,7 @@ export function SpaceLibrary({ spaceId }: { spaceId: string }) {
   } = collectionActions;
 
   const uploading = uploadJobs.some((job) => !["ready", "failed"].includes(job.stage));
+  const [librarySkeletonVisible] = useMinimumSpin(loading);
   return (
     <SpaceLibraryProvider value={{ data, itemActions, collectionActions }}>
       <LibraryCanEditContext.Provider value={canEditLibrary}>
@@ -735,9 +740,20 @@ export function SpaceLibrary({ spaceId }: { spaceId: string }) {
                 />
               </div>
             ) : null}
-            {loading ? (
-              <div className="grid min-h-64 place-items-center text-sm text-muted-foreground">
-                Loading Library…
+            {librarySkeletonVisible ? (
+              <div
+                className="grid gap-3.5"
+                style={{ gridTemplateColumns: "repeat(auto-fill,minmax(270px,1fr))" }}
+                aria-busy="true"
+                role="status"
+              >
+                <span className="sr-only">Loading Library</span>
+                {libraryItemSkeletonCount.map((index) => (
+                  <div className="grid gap-2" key={index}>
+                    <Skeleton className="aspect-square w-full rounded-lg" />
+                    <Skeleton className="h-3.5 w-3/4 rounded" />
+                  </div>
+                ))}
               </div>
             ) : collection === "collections" ||
               collection === "shared" ||

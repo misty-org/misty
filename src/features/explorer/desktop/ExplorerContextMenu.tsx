@@ -35,6 +35,7 @@ import {
   Link,
   MoreHorizontal,
   Pencil,
+  PanelsTopLeft,
   Pin,
   RefreshCcw,
   Scissors,
@@ -42,7 +43,7 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { memo } from "react";
+import { memo, useState } from "react";
 import type { ReactNode } from "react";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import {
@@ -67,9 +68,12 @@ import { errorText } from "@/lib/format";
 import { useShallow } from "zustand/react/shallow";
 import { clearSelectionsAcrossPanes, selectedCountAcrossPanes } from "./ExplorerAssistantPanels";
 import type { CompareDialogSeed } from "@/models/interfaces/features/explorer/desktop/ExplorerCompareDialog";
+import type { FileEntry } from "@/models/interfaces/services/misty-api";
+import { AddFilesToSpaceDialog } from "@/features/spaces/components/AddFilesToSpaceDialog";
 
 const explorerCompareWithEvent = "misty:explorer-compare-with";
 const emptyPinnedPaths: string[] = [];
+const emptyStringArray: string[] = [];
 
 function isContextMenuBranch(item: ContextMenuEntry): item is ContextMenuBranchItem {
   return "items" in item;
@@ -144,6 +148,7 @@ function normalizedPath(path: string): string {
 }
 
 export const ExplorerContextMenu = memo(function ExplorerContextMenu() {
+  const [addToSpacePaths, setAddToSpacePaths] = useState<string[]>([]);
   const shortcutHintsEnabled = useSettingsStore(
     (state) => selectShortcutPreferences(state.settings?.document).shortcutHintsEnabled,
   );
@@ -169,6 +174,7 @@ export const ExplorerContextMenu = memo(function ExplorerContextMenu() {
     hasPermanentDeleteSelection,
     canCreateFile,
     canCreateFolder,
+    selectedCount,
   } = useExplorerStore(
     useShallow((state) => {
       const { open, x, y, paneId, entryId } = state.contextMenu;
@@ -216,13 +222,26 @@ export const ExplorerContextMenu = memo(function ExplorerContextMenu() {
         hasPermanentDeleteSelection: permanentDeleteCount > 0,
         canCreateFile: state.canCreateItem(paneId, "file"),
         canCreateFolder: state.canCreateItem(paneId, "folder"),
+        selectedCount,
       };
     }),
   );
-  if (!open) return null;
+  // Kept as its own useShallow selector so the array is compared element-wise;
+  // returning it inside the object above breaks shallow equality (a fresh array
+  // ref every render) and drives an infinite useSyncExternalStore render loop.
+  const selectedLocalFilePaths = useExplorerStore(
+    useShallow((state) => {
+      const { open, paneId } = state.contextMenu;
+      const targetPane = open ? state.panes[paneId] : undefined;
+      return open ? localFilePathsForPane(targetPane) : emptyStringArray;
+    }),
+  );
+  if (!open && addToSpacePaths.length === 0) return null;
 
   const primaryShortcut = shortcutHintsEnabled ? primaryShortcutLabel() : "";
   const selectionDisabledReason = hasSelection ? undefined : "Select a file or folder first.";
+  const canAddCopiesToSpace =
+    selectedLocalFilePaths.length > 0 && selectedLocalFilePaths.length === selectedCount;
   const createDisabledReason = "New items are only available in writable folders.";
   const shortcut = (value: string) => (shortcutHintsEnabled ? value : undefined);
 
@@ -346,8 +365,10 @@ export const ExplorerContextMenu = memo(function ExplorerContextMenu() {
       id: "archive-preview",
       icon: <Eye size={17} />,
       label: "Preview Archive",
-      disabled: !targetEntry || targetEntry.kind !== "file" || !isArchivePath(targetEntry.path),
-      disabledReason: "Choose an archive file.",
+      disabled: !canActOnLocalArchiveFile(targetEntry, hasRemoteSelection),
+      disabledReason: hasRemoteSelection
+        ? "Archive preview is available for local files."
+        : "Choose an archive file.",
       onRun: () => run(() => targetEntry && void previewArchive(targetEntry.path)),
     },
     {
@@ -364,17 +385,21 @@ export const ExplorerContextMenu = memo(function ExplorerContextMenu() {
       id: "extract-here",
       icon: <Archive size={17} />,
       label: "Extract Here",
-      disabled: !targetEntry || targetEntry.kind !== "file" || !isArchivePath(targetEntry.path),
-      disabledReason: "Choose an archive file.",
-      onRun: () => run(() => targetEntry && void extractArchiveHere(targetEntry.path)),
+      disabled: !canActOnLocalArchiveFile(targetEntry, hasRemoteSelection),
+      disabledReason: hasRemoteSelection
+        ? "Extract is available for local files."
+        : "Choose an archive file.",
+      onRun: () => run(() => targetEntry && void extractArchiveHere(targetEntry.path, paneId)),
     },
     {
       id: "extract-to",
       icon: <FolderPlus size={17} />,
       label: "Extract To...",
-      disabled: !targetEntry || targetEntry.kind !== "file" || !isArchivePath(targetEntry.path),
-      disabledReason: "Choose an archive file.",
-      onRun: () => run(() => targetEntry && void extractArchiveTo(targetEntry.path)),
+      disabled: !canActOnLocalArchiveFile(targetEntry, hasRemoteSelection),
+      disabledReason: hasRemoteSelection
+        ? "Extract is available for local files."
+        : "Choose an archive file.",
+      onRun: () => run(() => targetEntry && void extractArchiveTo(targetEntry.path, paneId)),
     },
   ];
 
@@ -484,6 +509,20 @@ export const ExplorerContextMenu = memo(function ExplorerContextMenu() {
     { id: "new", icon: <FolderPlus size={17} />, label: "New", items: newItems },
     { id: "clipboard", icon: <Clipboard size={17} />, label: "Clipboard", items: clipboardItems },
     {
+      id: "add-to-space",
+      icon: <PanelsTopLeft size={17} />,
+      label: "Add copy to Space...",
+      disabled: !canAddCopiesToSpace,
+      disabledReason: hasSelection
+        ? "Choose local files only. Folders and cloud items cannot be uploaded directly."
+        : "Select one or more local files first.",
+      onRun: () => {
+        const paths = [...selectedLocalFilePaths];
+        useExplorerStore.getState().closeContextMenu();
+        setAddToSpacePaths(paths);
+      },
+    },
+    {
       id: "rename",
       icon: <Pencil size={17} />,
       label: "Rename",
@@ -545,52 +584,77 @@ export const ExplorerContextMenu = memo(function ExplorerContextMenu() {
   );
 
   return (
-    <DropdownMenu
-      open
-      onOpenChange={(next) => {
-        if (!next) useExplorerStore.getState().closeContextMenu();
-      }}
-    >
-      <DropdownMenuTrigger asChild>
-        <span aria-hidden="true" className="fixed size-0" style={{ left: x, top: y }} />
-      </DropdownMenuTrigger>
-      <DropdownMenuContent
-        align="start"
-        side="bottom"
-        sideOffset={0}
-        collisionPadding={8}
-        className="max-h-[min(560px,var(--radix-dropdown-menu-content-available-height))] w-[250px] overflow-y-auto"
-        onPointerDown={(event) => event.stopPropagation()}
-      >
-        {menuEntries.map((item) =>
-          isContextMenuBranch(item) ? (
-            <DropdownMenuSub key={item.id}>
-              <DropdownMenuSubTrigger
-                disabled={item.disabled}
-                title={item.disabled ? item.disabledReason : undefined}
-              >
-                <span className="inline-flex w-[19px] items-center justify-center text-muted-foreground">
-                  {item.icon}
-                </span>
-                <span className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap">
-                  {item.label}
-                </span>
-              </DropdownMenuSubTrigger>
-              <DropdownMenuSubContent className="max-h-[min(560px,var(--radix-dropdown-menu-content-available-height))] w-[246px] overflow-y-auto">
-                {item.items.map(renderLeaf)}
-              </DropdownMenuSubContent>
-            </DropdownMenuSub>
-          ) : (
-            renderLeaf(item)
-          ),
-        )}
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <>
+      {open ? (
+        <DropdownMenu
+          open
+          onOpenChange={(next) => {
+            if (!next) useExplorerStore.getState().closeContextMenu();
+          }}
+        >
+          <DropdownMenuTrigger asChild>
+            <span aria-hidden="true" className="fixed size-0" style={{ left: x, top: y }} />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent
+            align="start"
+            side="bottom"
+            sideOffset={0}
+            collisionPadding={8}
+            className="max-h-[min(560px,var(--radix-dropdown-menu-content-available-height))] w-[250px] overflow-y-auto"
+            onPointerDown={(event) => event.stopPropagation()}
+          >
+            {menuEntries.map((item) =>
+              isContextMenuBranch(item) ? (
+                <DropdownMenuSub key={item.id}>
+                  <DropdownMenuSubTrigger
+                    disabled={item.disabled}
+                    title={item.disabled ? item.disabledReason : undefined}
+                  >
+                    <span className="inline-flex w-[19px] items-center justify-center text-muted-foreground">
+                      {item.icon}
+                    </span>
+                    <span className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap">
+                      {item.label}
+                    </span>
+                  </DropdownMenuSubTrigger>
+                  <DropdownMenuSubContent className="max-h-[min(560px,var(--radix-dropdown-menu-content-available-height))] w-[246px] overflow-y-auto">
+                    {item.items.map(renderLeaf)}
+                  </DropdownMenuSubContent>
+                </DropdownMenuSub>
+              ) : (
+                renderLeaf(item)
+              ),
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      ) : null}
+      <AddFilesToSpaceDialog
+        open={addToSpacePaths.length > 0}
+        paths={addToSpacePaths}
+        onOpenChange={(next) => {
+          if (!next) setAddToSpacePaths([]);
+        }}
+      />
+    </>
   );
 });
 
 function isArchivePath(path: string) {
   return /\.(zip|tar|tgz|tar\.gz|tar\.bz2|7z|rar)$/i.test(path);
+}
+
+// power_pack.rs's archive tools never reject a misty:// path, so a remote file
+// must be gated here or it hits a raw filesystem error instead of a clear message.
+export function canActOnLocalArchiveFile(
+  targetEntry: FileEntry | null,
+  hasRemoteSelection: boolean,
+): boolean {
+  return Boolean(
+    targetEntry &&
+    targetEntry.kind === "file" &&
+    isArchivePath(targetEntry.path) &&
+    !hasRemoteSelection,
+  );
 }
 
 async function previewArchive(path: string) {
@@ -627,20 +691,19 @@ async function compressSelectedItems(paneId: string) {
   }
 }
 
-async function extractArchiveHere(path: string) {
+export async function extractArchiveHere(path: string, paneId: string) {
   const explorer = useExplorerStore.getState();
   const destinationDir = `${parentPath(path)}/${fileStem(path)}`;
   try {
     const result = await archiveExtract({ archivePath: path, destinationDir });
     explorer.pushNotification(result.message, "success", 4500);
-    const paneId = explorer.contextMenu.paneId;
-    if (paneId) void explorer.refreshPane(paneId);
+    void explorer.refreshPane(paneId);
   } catch (error) {
     explorer.pushNotification(`Extract failed: ${errorText(error)}`, "error", 5500);
   }
 }
 
-async function extractArchiveTo(path: string) {
+export async function extractArchiveTo(path: string, paneId: string) {
   const explorer = useExplorerStore.getState();
   const defaultDestination = `${parentPath(path)}/${fileStem(path)}`;
   const destinationDir = window.prompt("Extract archive to folder:", defaultDestination);
@@ -651,8 +714,7 @@ async function extractArchiveTo(path: string) {
       destinationDir: destinationDir.trim(),
     });
     explorer.pushNotification(result.message, "success", 4500);
-    const paneId = explorer.contextMenu.paneId;
-    if (paneId) void explorer.refreshPane(paneId);
+    void explorer.refreshPane(paneId);
   } catch (error) {
     explorer.pushNotification(`Extract failed: ${errorText(error)}`, "error", 5500);
   }
@@ -726,14 +788,6 @@ function parentPath(path: string) {
   return index > 0 ? normalized.slice(0, index) : "/";
 }
 
-function joinLocalPath(root: string, relativePath: string) {
-  const normalizedRoot = root.replace(/\/+$/, "");
-  const normalizedRelative = relativePath.replace(/^\/+/, "");
-  return normalizedRoot === "/"
-    ? `/${normalizedRelative}`
-    : `${normalizedRoot}/${normalizedRelative}`;
-}
-
 function fileStem(path: string) {
   const parts = path.split("/").filter(Boolean);
   const name = parts[parts.length - 1] ?? "Archive";
@@ -775,6 +829,22 @@ function selectedRemoteEntryCount(
   return pane.listing.entries.filter(
     (entry) => selected.has(entry.id) && !entry.isDeleted && entry.location.kind === "remote",
   ).length;
+}
+
+function localFilePathsForPane(
+  pane: ReturnType<typeof useExplorerStore.getState>["panes"][string] | undefined,
+): string[] {
+  if (!pane?.listing) return [];
+  const selected = new Set(pane.selectedIds);
+  return pane.listing.entries
+    .filter(
+      (entry) =>
+        selected.has(entry.id) &&
+        !entry.isDeleted &&
+        entry.kind === "file" &&
+        entry.location.kind === "local",
+    )
+    .map((entry) => entry.path);
 }
 
 function calculateSelectedFolderSizes(paneId: string): void {

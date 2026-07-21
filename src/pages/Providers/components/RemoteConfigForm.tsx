@@ -6,8 +6,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import type {
   ProviderWorkflow,
   ProviderWorkflowOption,
-  RcloneConfigPaths,
-  RemoteEditDraft,
 } from "@/models/interfaces/services/misty-api";
 import { iconAssets } from "@/assets/icons";
 import { AssetIcon } from "@/ui";

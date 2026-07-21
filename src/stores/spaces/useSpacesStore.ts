@@ -32,6 +32,21 @@ let reconnectAttempt = 0;
 let realtimeWanted = false;
 let realtimeAccountId = "";
 let realtimeGeneration = 0;
+// The space we last told the server we're "viewing", for the active-users
+// presence capsule. Re-sent on every reconnect since the server only knows
+// about it for the lifetime of a single WebSocket connection.
+let currentViewingSpaceId = "";
+// Whether the viewed space's chat is currently in focus (vs. still connected
+// but tabbed/alt-tabbed away — "idle"). Tracked globally rather than per
+// mount so it stays correct across reconnects and re-renders.
+let currentViewingActive = computeViewingActivity();
+
+// Bumped whenever the authenticated account context changes (see
+// resetSpacesAccountState). Async loaders capture this value before making a
+// request and discard their result if it no longer matches by the time the
+// response lands, so a slow request from a previous account can never
+// overwrite state or surface an error for the account that's active now.
+let spacesAccountGeneration = 0;
 
 export const useSpacesStore = create<SpacesStore>((set, get) => ({
   spaces: [],
@@ -43,31 +58,51 @@ export const useSpacesStore = create<SpacesStore>((set, get) => ({
   agentsBySpace: {},
   workflowsBySpace: {},
   inbox: { unreads: [], mentions: [] },
+  presenceBySpace: {},
+  snapshotReady: false,
   loading: false,
   sending: false,
   realtimeConnected: false,
   error: null,
 
   load: async () => {
-    set({ loading: true, error: null });
+    const generation = spacesAccountGeneration;
+    set({ snapshotReady: false, loading: true, error: null });
     try {
       const snapshot = await spacesApi.snapshot();
+      if (generation !== spacesAccountGeneration) return;
       set({
         spaces: snapshot.spaces,
         invitations: snapshot.invitations,
         limits: snapshot.limits,
+        snapshotReady: true,
         loading: false,
       });
     } catch (error) {
-      set({ loading: false, error: errorText(error) });
+      if (generation !== spacesAccountGeneration) return;
+      set({ snapshotReady: false, loading: false, error: errorText(error) });
     }
   },
 
   loadSpace: async (spaceId) => {
+    const generation = spacesAccountGeneration;
     set({ loading: true, error: null });
-    if (!get().spaces.some((space) => space.id === spaceId)) await get().load();
+    await get().load();
+    if (generation !== spacesAccountGeneration || !get().snapshotReady) return;
     const space = get().spaces.find((item) => item.id === spaceId);
-    const canReadMessages = space?.permissions?.["messages.read"] !== false;
+    if (!space) {
+      set((state) => {
+        const membersBySpace = { ...state.membersBySpace };
+        const messagesBySpace = { ...state.messagesBySpace };
+        const nodesBySpace = { ...state.nodesBySpace };
+        delete membersBySpace[spaceId];
+        delete messagesBySpace[spaceId];
+        delete nodesBySpace[spaceId];
+        return { membersBySpace, messagesBySpace, nodesBySpace, loading: false };
+      });
+      return;
+    }
+    const canReadMessages = space.permissions?.["messages.read"] !== false;
     if (!canReadMessages) {
       set((state) => {
         const messagesBySpace = { ...state.messagesBySpace };
@@ -80,6 +115,7 @@ export const useSpacesStore = create<SpacesStore>((set, get) => ({
     const tasks = [get().loadMembers(spaceId)];
     if (canReadMessages) tasks.push(get().loadMessages(spaceId), get().loadNodes(spaceId));
     const results = await Promise.allSettled(tasks);
+    if (generation !== spacesAccountGeneration) return;
     const rejected = results.find((result) => result.status === "rejected");
     set({
       loading: false,
@@ -88,55 +124,70 @@ export const useSpacesStore = create<SpacesStore>((set, get) => ({
   },
 
   loadMessages: async (spaceId) => {
+    const generation = spacesAccountGeneration;
     const { messages } = await spacesApi.messages(spaceId);
+    if (generation !== spacesAccountGeneration) return;
     set((state) => ({
       messagesBySpace: { ...state.messagesBySpace, [spaceId]: [...messages].reverse() },
     }));
   },
 
   loadNodes: async (spaceId) => {
+    const generation = spacesAccountGeneration;
     const { nodes } = await spacesApi.nodes(spaceId);
+    if (generation !== spacesAccountGeneration) return;
     set((state) => ({ nodesBySpace: { ...state.nodesBySpace, [spaceId]: nodes } }));
   },
 
   loadMembers: async (spaceId) => {
+    const generation = spacesAccountGeneration;
     const { members } = await spacesApi.members(spaceId);
+    if (generation !== spacesAccountGeneration) return;
     set((state) => ({ membersBySpace: { ...state.membersBySpace, [spaceId]: members } }));
   },
 
   loadStudio: async (spaceId, kind) => {
+    const generation = spacesAccountGeneration;
     try {
       const { resources } = await spacesApi.studio(spaceId, kind);
+      if (generation !== spacesAccountGeneration) return;
       set((state) =>
         kind === "agents"
           ? { agentsBySpace: { ...state.agentsBySpace, [spaceId]: resources }, error: null }
           : { workflowsBySpace: { ...state.workflowsBySpace, [spaceId]: resources }, error: null },
       );
     } catch (error) {
+      if (generation !== spacesAccountGeneration) return;
       set({ error: errorText(error) });
     }
   },
 
   loadChatAgents: async (spaceId) => {
+    const generation = spacesAccountGeneration;
     try {
       const { agents } = await spacesApi.chatAgents(spaceId);
+      if (generation !== spacesAccountGeneration) return;
       set((state) => ({
         agentsBySpace: { ...state.agentsBySpace, [spaceId]: agents },
         error: null,
       }));
     } catch (error) {
+      if (generation !== spacesAccountGeneration) return;
       set({ error: errorText(error) });
     }
   },
 
   loadInbox: async () => {
+    const generation = spacesAccountGeneration;
     try {
       const [unreads, mentions] = await Promise.all([
         spacesApi.inbox("unreads"),
         spacesApi.inbox("mentions"),
       ]);
+      if (generation !== spacesAccountGeneration) return;
       set({ inbox: { unreads: unreads.items, mentions: mentions.items } });
     } catch (error) {
+      if (generation !== spacesAccountGeneration) return;
       set({ error: errorText(error) });
     }
   },
@@ -179,37 +230,67 @@ export const useSpacesStore = create<SpacesStore>((set, get) => ({
   },
 
   respondInvite: async (inviteId, accept) => {
-    await spacesApi.respondInvite(inviteId, accept);
-    await get().load();
+    set({ error: null });
+    try {
+      await spacesApi.respondInvite(inviteId, accept);
+      await get().load();
+    } catch (error) {
+      set({ error: errorText(error) });
+      throw error;
+    }
   },
 
   removeMember: async (spaceId, userId) => {
-    await spacesApi.removeMember(spaceId, userId);
-    await Promise.all([get().loadMembers(spaceId), get().load()]);
+    set({ error: null });
+    try {
+      await spacesApi.removeMember(spaceId, userId);
+      await Promise.all([get().loadMembers(spaceId), get().load()]);
+    } catch (error) {
+      set({ error: errorText(error) });
+      throw error;
+    }
   },
 
   leaveSpace: async (spaceId) => {
-    await spacesApi.leave(spaceId);
-    await get().load();
+    set({ error: null });
+    try {
+      await spacesApi.leave(spaceId);
+      await get().load();
+    } catch (error) {
+      set({ error: errorText(error) });
+      throw error;
+    }
   },
 
   transferOwner: async (spaceId, userId) => {
-    await spacesApi.transfer(spaceId, userId);
-    await Promise.all([get().loadMembers(spaceId), get().load()]);
+    set({ error: null });
+    try {
+      await spacesApi.transfer(spaceId, userId);
+      await Promise.all([get().loadMembers(spaceId), get().load()]);
+    } catch (error) {
+      set({ error: errorText(error) });
+      throw error;
+    }
   },
 
   deleteSpace: async (spaceId, confirmation) => {
-    await spacesApi.delete(spaceId, confirmation);
-    set((state) => {
-      const messagesBySpace = { ...state.messagesBySpace };
-      delete messagesBySpace[spaceId];
-      const nodesBySpace = { ...state.nodesBySpace };
-      delete nodesBySpace[spaceId];
-      const membersBySpace = { ...state.membersBySpace };
-      delete membersBySpace[spaceId];
-      return { messagesBySpace, nodesBySpace, membersBySpace };
-    });
-    await get().load();
+    set({ error: null });
+    try {
+      await spacesApi.delete(spaceId, confirmation);
+      set((state) => {
+        const messagesBySpace = { ...state.messagesBySpace };
+        delete messagesBySpace[spaceId];
+        const nodesBySpace = { ...state.nodesBySpace };
+        delete nodesBySpace[spaceId];
+        const membersBySpace = { ...state.membersBySpace };
+        delete membersBySpace[spaceId];
+        return { messagesBySpace, nodesBySpace, membersBySpace };
+      });
+      await get().load();
+    } catch (error) {
+      set({ error: errorText(error) });
+      throw error;
+    }
   },
 
   sendMessage: async (
@@ -231,11 +312,7 @@ export const useSpacesStore = create<SpacesStore>((set, get) => ({
     set({ sending: true, error: null });
     try {
       const spans = trimmed
-        ? buildMessageSpans(
-            trimmed,
-            get().membersBySpace[spaceId] ?? [],
-            get().agentsBySpace[spaceId] ?? [],
-          )
+        ? buildMessageSpans(trimmed, get().membersBySpace[spaceId] ?? [], [])
         : [];
       const response = await spacesApi.sendMessage(
         spaceId,
@@ -245,24 +322,12 @@ export const useSpacesStore = create<SpacesStore>((set, get) => ({
         libraryItemIds,
         replyToMessageId,
       );
-      const agentFailureMessage =
-        response.agent_failures
-          ?.map((failure) => {
-            const name =
-              get().agentsBySpace[spaceId]?.find((agent) => agent.id === failure.agent_id)?.name ??
-              "Agent";
-            return `${name}: ${failure.message}`;
-          })
-          .join("\n") || null;
       set((state) => ({
         sending: false,
-        error: agentFailureMessage,
+        error: null,
         messagesBySpace: {
           ...state.messagesBySpace,
-          [spaceId]: mergeSpaceMessages(state.messagesBySpace[spaceId] ?? [], [
-            response.message,
-            ...response.agent_replies,
-          ]),
+          [spaceId]: mergeSpaceMessages(state.messagesBySpace[spaceId] ?? [], [response.message]),
         },
       }));
     } catch (error) {
@@ -274,11 +339,7 @@ export const useSpacesStore = create<SpacesStore>((set, get) => ({
   updateMessage: async (spaceId, messageId, text, fileNodeIds = []) => {
     set({ error: null });
     try {
-      const spans = buildMessageSpans(
-        text.trim(),
-        get().membersBySpace[spaceId] ?? [],
-        get().agentsBySpace[spaceId] ?? [],
-      );
+      const spans = buildMessageSpans(text.trim(), get().membersBySpace[spaceId] ?? [], []);
       const saved = await spacesApi.updateMessage(spaceId, messageId, spans, fileNodeIds);
       set((state) => ({
         messagesBySpace: {
@@ -293,54 +354,24 @@ export const useSpacesStore = create<SpacesStore>((set, get) => ({
   },
 
   deleteMessage: async (spaceId, messageId) => {
-    await spacesApi.deleteMessage(spaceId, messageId);
-    set((state) => ({
-      messagesBySpace: {
-        ...state.messagesBySpace,
-        [spaceId]: (state.messagesBySpace[spaceId] ?? []).filter((item) => item.id !== messageId),
-      },
-    }));
+    set({ error: null });
+    try {
+      await spacesApi.deleteMessage(spaceId, messageId);
+      set((state) => ({
+        messagesBySpace: {
+          ...state.messagesBySpace,
+          [spaceId]: (state.messagesBySpace[spaceId] ?? []).filter((item) => item.id !== messageId),
+        },
+      }));
+    } catch (error) {
+      set({ error: errorText(error) });
+      throw error;
+    }
   },
 
   markRead: async (spaceId, seq) => {
     await spacesApi.markRead(spaceId, seq);
     await get().loadInbox();
-  },
-
-  createFolder: async (spaceId, displayName, parentId = "") => {
-    await spacesApi.createNode(spaceId, {
-      kind: "folder",
-      display_name: displayName,
-      parent_id: parentId,
-    });
-    await get().loadNodes(spaceId);
-  },
-
-  addDriveLink: async (spaceId, input) => {
-    await spacesApi.createNode(spaceId, {
-      kind: "link",
-      display_name: input.displayName,
-      drive_url: input.driveUrl,
-      parent_id: input.parentId ?? "",
-    });
-    await get().loadNodes(spaceId);
-  },
-
-  updateNode: async (spaceId, node, patch) => {
-    await spacesApi.updateNode(spaceId, node.id, {
-      parent_id: patch.parent_id ?? node.parent_id ?? "",
-      display_name: patch.display_name ?? node.display_name,
-      stale: patch.stale ?? node.stale,
-      mime_type: patch.mime_type ?? node.mime_type,
-      size_bytes: patch.size_bytes ?? node.size_bytes,
-      metadata: patch.metadata ?? node.metadata,
-    });
-    await get().loadNodes(spaceId);
-  },
-
-  removeNode: async (spaceId, nodeId) => {
-    await spacesApi.deleteNode(spaceId, nodeId);
-    await get().loadNodes(spaceId);
   },
 
   openNode: async (spaceId, nodeId, disposition = "open") => {
@@ -352,18 +383,35 @@ export const useSpacesStore = create<SpacesStore>((set, get) => ({
   },
 
   saveStudio: async (spaceId, kind, item) => {
-    const saved = await spacesApi.saveStudio(spaceId, kind, item);
-    await get().loadStudio(spaceId, kind);
-    return saved;
+    set({ error: null });
+    try {
+      const saved = await spacesApi.saveStudio(spaceId, kind, item);
+      await get().loadStudio(spaceId, kind);
+      return saved;
+    } catch (error) {
+      set({ error: errorText(error) });
+      throw error;
+    }
   },
 
   deleteStudio: async (spaceId, kind, id) => {
-    await spacesApi.deleteStudio(spaceId, kind, id);
-    await get().loadStudio(spaceId, kind);
+    set({ error: null });
+    try {
+      await spacesApi.deleteStudio(spaceId, kind, id);
+      await get().loadStudio(spaceId, kind);
+    } catch (error) {
+      set({ error: errorText(error) });
+      throw error;
+    }
   },
 
   runStudio: async (spaceId, kind, id, prompt = "", capabilityId = "") => {
-    return spacesApi.runStudio(spaceId, kind, id, prompt, capabilityId);
+    try {
+      return await spacesApi.runStudio(spaceId, kind, id, prompt, capabilityId);
+    } catch (error) {
+      set({ error: errorText(error) });
+      throw error;
+    }
   },
 
   markInboxSeen: async () => {
@@ -434,6 +482,7 @@ export const useSpacesStore = create<SpacesStore>((set, get) => ({
         clearRealtimeOpenTimer();
         reconnectAttempt = 0;
         set({ realtimeConnected: true });
+        if (currentViewingSpaceId) sendViewingMessage(currentViewingSpaceId, currentViewingActive);
       };
       socket.onmessage = (message) => {
         if (
@@ -450,6 +499,13 @@ export const useSpacesStore = create<SpacesStore>((set, get) => ({
             if (envelope.resync_required) void Promise.all([get().load(), get().loadInbox()]);
           } else if (envelope.type === "event") {
             void applyRealtimeEvent(envelope.event, accountId, get, set);
+          } else if (envelope.type === "presence") {
+            set((state) => ({
+              presenceBySpace: {
+                ...state.presenceBySpace,
+                [envelope.space_id]: envelope.viewers,
+              },
+            }));
           } else {
             void Promise.all([get().load(), get().loadInbox()]);
             if (window.location.pathname.startsWith(`/spaces/${envelope.space_id}/`))
@@ -493,12 +549,22 @@ export const useSpacesStore = create<SpacesStore>((set, get) => ({
     set({ realtimeConnected: false });
   },
 
+  setViewingSpace: (spaceId) => {
+    if (currentViewingSpaceId === spaceId) return;
+    currentViewingSpaceId = spaceId;
+    sendViewingMessage(spaceId, currentViewingActive);
+  },
+
   clearError: () => set({ error: null }),
 }));
 
 export function resetSpacesAccountState(): void {
   stopRealtimeConnection();
   reconnectAttempt = 0;
+  // Bump the generation first so any request already in flight for the
+  // account we're leaving can no longer write into the state we're about to
+  // clear for the new one, no matter when it resolves.
+  spacesAccountGeneration += 1;
   useSpacesStore.setState({
     spaces: [],
     invitations: [],
@@ -509,7 +575,12 @@ export function resetSpacesAccountState(): void {
     agentsBySpace: {},
     workflowsBySpace: {},
     inbox: { unreads: [], mentions: [] },
-    loading: false,
+    presenceBySpace: {},
+    snapshotReady: false,
+    // Stay in a loading state rather than flashing an empty "no Spaces yet"
+    // view — the caller is expected to re-trigger a load for the new
+    // account, and until that resolves there's nothing confirmed to show.
+    loading: true,
     sending: false,
     realtimeConnected: false,
     error: null,
@@ -523,6 +594,7 @@ async function applyRealtimeEvent(
   set: (partial: Partial<SpacesStore> | ((state: SpacesStore) => Partial<SpacesStore>)) => void,
 ) {
   if (accountId !== realtimeAccountId) return;
+  const generation = spacesAccountGeneration;
   writeRealtimeCursor(accountId, event.id);
   const permissions = get().spaces.find((space) => space.id === event.space_id)?.permissions;
   if (event.type.startsWith("message.") && permissions?.["messages.read"] !== false) {
@@ -552,10 +624,7 @@ async function applyRealtimeEvent(
     permissions?.["tasks.view"] !== false
   )
     window.dispatchEvent(new CustomEvent("misty:space-coordination-event", { detail: event }));
-  else if (event.type.startsWith("agent.") && permissions?.["studio.view"] !== false)
-    await get().loadStudio(event.space_id, "agents");
-  else if (event.type.startsWith("workflow.") && permissions?.["studio.view"] !== false)
-    await get().loadStudio(event.space_id, "workflows");
+  if (accountId !== realtimeAccountId || generation !== spacesAccountGeneration) return;
   set({ realtimeConnected: true });
 }
 
@@ -582,12 +651,44 @@ function stopRealtimeConnection() {
   realtimeConnecting = false;
   realtimeAccountId = "";
   realtimeGeneration += 1;
+  currentViewingSpaceId = "";
   if (reconnectTimer != null) window.clearTimeout(reconnectTimer);
   reconnectTimer = null;
   clearRealtimeOpenTimer();
   const socket = realtimeSocket;
   realtimeSocket = null;
   socket?.close();
+}
+
+function sendViewingMessage(spaceId: string, active: boolean): void {
+  if (realtimeSocket?.readyState !== WebSocket.OPEN) return;
+  try {
+    realtimeSocket.send(JSON.stringify({ type: "viewing", space_id: spaceId, active }));
+  } catch {
+    /* the connection will retry and re-send on the next open */
+  }
+}
+
+// "Active" means the space's chat is actually in view — the window has focus
+// and the tab/webview isn't hidden. Anything else (alt-tabbed away, another
+// app in front, minimized) counts as idle even though the WebSocket is still
+// connected.
+function computeViewingActivity(): boolean {
+  if (typeof document === "undefined") return true;
+  return document.visibilityState === "visible" && document.hasFocus();
+}
+
+function handleViewingActivityChange(): void {
+  const active = computeViewingActivity();
+  if (active === currentViewingActive) return;
+  currentViewingActive = active;
+  if (currentViewingSpaceId) sendViewingMessage(currentViewingSpaceId, currentViewingActive);
+}
+
+if (typeof document !== "undefined") {
+  document.addEventListener("visibilitychange", handleViewingActivityChange);
+  window.addEventListener("focus", handleViewingActivityChange);
+  window.addEventListener("blur", handleViewingActivityChange);
 }
 
 function clearRealtimeOpenTimer() {

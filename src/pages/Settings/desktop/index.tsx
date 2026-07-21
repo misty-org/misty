@@ -31,7 +31,6 @@ import {
   Image,
   Keyboard,
   Lock,
-  RefreshCcw,
   Rows3,
   Search,
   Settings2,
@@ -71,7 +70,6 @@ const appNavItems: NavItem[] = [
   { id: "assistant", label: "Assistant", icon: Bot },
   { id: "appearance", label: "Appearance", icon: Eye },
   { id: "privacy", label: "Privacy", icon: Lock },
-  { id: "sync", label: "Sync", icon: RefreshCcw },
   { id: "transfers", label: "Transfers", icon: ArrowLeftRight },
   { id: "search", label: "Search & Library", icon: Search },
   { id: "notifications", label: "Notifications", icon: Bell },
@@ -82,12 +80,11 @@ const appNavItems: NavItem[] = [
 const navItems = appNavItems;
 
 const sectionDescriptions: Record<SettingsSection, string> = {
-  general: "Startup, default actions, and workspace behavior.",
+  general: "Files startup, default actions, and browsing behavior.",
   app: "Updates, version details, and local support information.",
   assistant: "Control Mika and the actions it can perform.",
   appearance: "Theme, density, wallpaper, text size, and motion.",
   privacy: "Choose what diagnostic data Misty may share.",
-  sync: "Connection behavior and conflict handling.",
   transfers: "Defaults for copies, downloads, and destinations.",
   search: "Keep filenames and connected libraries searchable.",
   notifications: "Choose which activity should interrupt you.",
@@ -100,7 +97,6 @@ const transferBehaviorOptions = ["Ask Every Time", "Use Default Location"];
 const themeOptions = ["System", "Dark", "Light"];
 const scaleOptions = ["Small", "Default", "Large"];
 const keymapOptions = ["System", "VS Code", "Finder"];
-const conflictOptions = ["Keep Newest", "Ask Me", "Keep Both"];
 
 const settingsControlButtonClass = "w-[220px] max-w-full gap-1.5";
 
@@ -207,7 +203,6 @@ function SettingsContent(props: {
       {props.activeSection === "assistant" ? <AssistantSettings {...props.controlProps} /> : null}
       {props.activeSection === "appearance" ? <AppearanceSettings {...props.controlProps} /> : null}
       {props.activeSection === "privacy" ? <PrivacySettings {...props.controlProps} /> : null}
-      {props.activeSection === "sync" ? <SyncSettings {...props.controlProps} /> : null}
       {props.activeSection === "transfers" ? <TransfersSettings {...props.controlProps} /> : null}
       {props.activeSection === "search" ? <SearchSettings {...props.controlProps} /> : null}
       {props.activeSection === "notifications" ? (
@@ -286,7 +281,7 @@ function GeneralSettings(props: SettingsContentProps) {
 
       <SettingsSectionBlock title="Defaults">
         <SettingsRow
-          label="Preferred workspace root"
+          label="Files starting folder"
           description="Choose the default starting location for file browsing."
           last
         >
@@ -387,7 +382,7 @@ function AssistantSettings(props: SettingsContentProps) {
       <SettingsSectionBlock title="Permissions">
         <SettingsRow
           label="Files"
-          description="Allow Mika to inspect and organize files in the active workspace."
+          description="Allow Mika to inspect and organize files in the active Files folder."
         >
           <SwitchControl
             checked={assistant.scopes.filesAllowed}
@@ -593,6 +588,7 @@ function PrivacySettings(props: SettingsContentProps) {
         <SettingsRow
           label="Send anonymous crash reports"
           description="Share sanitized unexpected React and Rust errors without file or account data."
+          last
         >
           <SwitchControl
             checked={booleanSetting(
@@ -605,48 +601,6 @@ function PrivacySettings(props: SettingsContentProps) {
             onChange={(value) =>
               props.onSettingChange("privacy", "anonymous_error_reporting_enabled", value)
             }
-          />
-        </SettingsRow>
-        <SettingsRow
-          label="Process data locally"
-          description="Keep file handling and provider orchestration local whenever possible."
-        >
-          <SwitchControl
-            checked={booleanSetting(props.document, "privacy", "local_processing_only", true)}
-            disabled={props.working}
-            onChange={(value) => props.onSettingChange("privacy", "local_processing_only", value)}
-          />
-        </SettingsRow>
-        <SettingsRow
-          label="Share diagnostics"
-          description="Allow Misty to include low-level runtime details when exporting diagnostics."
-          last
-        >
-          <SwitchControl
-            checked={booleanSetting(
-              props.document,
-              "privacy",
-              "diagnostics_sharing_enabled",
-              false,
-            )}
-            disabled={props.working}
-            onChange={(value) =>
-              props.onSettingChange("privacy", "diagnostics_sharing_enabled", value)
-            }
-          />
-        </SettingsRow>
-      </SettingsSectionBlock>
-
-      <SettingsSectionBlock title="Exports & deletion">
-        <SettingsRow
-          label="Allow data export"
-          description="Keep account export actions available in privacy and support workflows."
-          last
-        >
-          <SwitchControl
-            checked={booleanSetting(props.document, "privacy", "export_data_enabled", true)}
-            disabled={props.working}
-            onChange={(value) => props.onSettingChange("privacy", "export_data_enabled", value)}
           />
         </SettingsRow>
       </SettingsSectionBlock>
@@ -670,7 +624,7 @@ function PrivacySettings(props: SettingsContentProps) {
   );
 }
 
-function SyncSettings(props: SettingsContentProps) {
+function TransferProfilesSettings(props: SettingsContentProps) {
   const transferProfiles = transferProfileRecords(props.document);
   const defaultProfileId = defaultTransferProfileId(props.document);
   const defaultProfileIndex = Math.max(
@@ -717,210 +671,139 @@ function SyncSettings(props: SettingsContentProps) {
     }
   };
   return (
-    <>
-      <SettingsSectionBlock title="Status">
-        <SettingsRow
-          label="Auto-sync"
-          description="Keep Misty in sync without requiring manual refreshes."
-        >
-          <SwitchControl
-            checked={booleanSetting(props.document, "sync", "auto_sync_enabled", true)}
-            disabled={props.working}
-            onChange={(value) => props.onSettingChange("sync", "auto_sync_enabled", value)}
-          />
-        </SettingsRow>
-        <SettingsRow
-          label="Version history"
-          description="Keep enough state around to recover from accidental overwrites."
-          last
-        >
-          <SwitchControl
-            checked={booleanSetting(props.document, "sync", "version_history_enabled", true)}
-            disabled={props.working}
-            onChange={(value) => props.onSettingChange("sync", "version_history_enabled", value)}
-          />
-        </SettingsRow>
-      </SettingsSectionBlock>
-
-      <SettingsSectionBlock title="Rules">
-        <SettingsRow
-          label="Sync on launch"
-          description="Check for sync activity automatically when Misty starts."
-        >
-          <SwitchControl
-            checked={booleanSetting(props.document, "sync", "sync_on_launch_enabled", true)}
-            disabled={props.working}
-            onChange={(value) => props.onSettingChange("sync", "sync_on_launch_enabled", value)}
-          />
-        </SettingsRow>
-        <SettingsRow
-          label="Sync on quit"
-          description="Attempt a final sync pass before Misty closes."
-        >
-          <SwitchControl
-            checked={booleanSetting(props.document, "sync", "sync_on_quit_enabled", false)}
-            disabled={props.working}
-            onChange={(value) => props.onSettingChange("sync", "sync_on_quit_enabled", value)}
-          />
-        </SettingsRow>
-        <SettingsRow
-          label="Allow metered sync"
-          description="Continue syncing when the network may have bandwidth limits."
-          last
-        >
-          <SwitchControl
-            checked={booleanSetting(props.document, "sync", "allow_metered_sync", false)}
-            disabled={props.working}
-            onChange={(value) => props.onSettingChange("sync", "allow_metered_sync", value)}
-          />
-        </SettingsRow>
-      </SettingsSectionBlock>
-
-      <SettingsSectionBlock title="Conflict resolution">
-        <SettingsRow
-          label="Default strategy"
-          description="Choose how Misty should behave when the same file changes in two places."
-          last
-        >
-          <SelectControl
-            value={numberSetting(props.document, "sync", "conflict_resolution_index", 0)}
-            options={conflictOptions}
-            disabled={props.working}
-            onChange={(value) => props.onSettingChange("sync", "conflict_resolution_index", value)}
-          />
-        </SettingsRow>
-      </SettingsSectionBlock>
-
-      <SettingsSectionBlock title="Transfer profiles">
-        <SettingsRow
-          label="Default profile"
-          description="Choose the saved transfer behavior Misty should preselect."
-        >
-          <SelectControl
-            value={defaultProfileIndex}
-            options={transferProfiles.map((profile) => profile.name)}
-            disabled={props.working}
-            onChange={(value) =>
-              props.onSettingChange(
-                "transfer_profiles",
-                "default_profile_id",
-                transferProfiles[value]?.id ?? "balanced",
-              )
-            }
-          />
-        </SettingsRow>
-        <div className={settingsReferenceListClass}>
-          <div className={`${settingsReferenceRowClass} ${settingsReferenceHeaderClass}`}>
-            <span>Name</span>
-            <span>Behavior</span>
-          </div>
-          {transferProfiles.map((profile) => (
-            <div className={settingsReferenceRowClass} key={profile.id}>
-              <span className={settingsReferenceSpanClass}>
-                {profile.builtIn ? (
-                  profile.name
-                ) : (
-                  <TextControl
-                    value={profile.name}
+    <SettingsSectionBlock title="Transfer profiles">
+      <SettingsRow
+        label="Default profile"
+        description="Choose the saved transfer behavior Misty should preselect."
+      >
+        <SelectControl
+          value={defaultProfileIndex}
+          options={transferProfiles.map((profile) => profile.name)}
+          disabled={props.working}
+          onChange={(value) =>
+            props.onSettingChange(
+              "transfer_profiles",
+              "default_profile_id",
+              transferProfiles[value]?.id ?? "balanced",
+            )
+          }
+        />
+      </SettingsRow>
+      <div className={settingsReferenceListClass}>
+        <div className={`${settingsReferenceRowClass} ${settingsReferenceHeaderClass}`}>
+          <span>Name</span>
+          <span>Behavior</span>
+        </div>
+        {transferProfiles.map((profile) => (
+          <div className={settingsReferenceRowClass} key={profile.id}>
+            <span className={settingsReferenceSpanClass}>
+              {profile.builtIn ? (
+                profile.name
+              ) : (
+                <TextControl
+                  value={profile.name}
+                  disabled={props.working}
+                  onCommit={(value) =>
+                    updateProfile(profile.id, {
+                      name: value.trim() || "Custom Profile",
+                    })
+                  }
+                />
+              )}
+            </span>
+            <span className="grid justify-items-end gap-2 text-right text-muted-foreground">
+              <span>
+                {profile.transfers} transfers / {profile.checkers} checks
+                {profile.bandwidthLimit ? ` · ${profile.bandwidthLimit}` : ""}
+                {profile.checksum ? " · checksum" : ""}
+              </span>
+              {!profile.builtIn ? (
+                <span className="flex flex-wrap justify-end gap-2">
+                  <ProfileNumberInput
+                    label="Transfers"
+                    value={profile.transfers}
                     disabled={props.working}
-                    onCommit={(value) =>
+                    onCommit={(value) => updateProfile(profile.id, { transfers: value })}
+                  />
+                  <ProfileNumberInput
+                    label="Checkers"
+                    value={profile.checkers}
+                    disabled={props.working}
+                    onCommit={(value) => updateProfile(profile.id, { checkers: value })}
+                  />
+                  <ProfileTextInput
+                    label="Limit"
+                    value={profile.bandwidthLimit}
+                    disabled={props.working}
+                    onCommit={(value) => updateProfile(profile.id, { bandwidthLimit: value })}
+                  />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className={settingsControlButtonCompactClass}
+                    type="button"
+                    disabled={props.working}
+                    onClick={() =>
                       updateProfile(profile.id, {
-                        name: value.trim() || "Custom Profile",
+                        checksum: !profile.checksum,
                       })
                     }
-                  />
-                )}
-              </span>
-              <span className="grid justify-items-end gap-2 text-right text-muted-foreground">
-                <span>
-                  {profile.transfers} transfers / {profile.checkers} checks
-                  {profile.bandwidthLimit ? ` · ${profile.bandwidthLimit}` : ""}
-                  {profile.checksum ? " · checksum" : ""}
+                  >
+                    {profile.checksum ? "Checksum" : "Fast"}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className={settingsIconDangerClass}
+                    type="button"
+                    disabled={props.working}
+                    aria-label={`Remove ${profile.name}`}
+                    onClick={() => removeProfile(profile.id)}
+                  >
+                    <Trash2 size={15} strokeWidth={1.8} />
+                  </Button>
                 </span>
-                {!profile.builtIn ? (
-                  <span className="flex flex-wrap justify-end gap-2">
-                    <ProfileNumberInput
-                      label="Transfers"
-                      value={profile.transfers}
-                      disabled={props.working}
-                      onCommit={(value) => updateProfile(profile.id, { transfers: value })}
-                    />
-                    <ProfileNumberInput
-                      label="Checkers"
-                      value={profile.checkers}
-                      disabled={props.working}
-                      onCommit={(value) => updateProfile(profile.id, { checkers: value })}
-                    />
-                    <ProfileTextInput
-                      label="Limit"
-                      value={profile.bandwidthLimit}
-                      disabled={props.working}
-                      onCommit={(value) => updateProfile(profile.id, { bandwidthLimit: value })}
-                    />
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className={settingsControlButtonCompactClass}
-                      type="button"
-                      disabled={props.working}
-                      onClick={() =>
-                        updateProfile(profile.id, {
-                          checksum: !profile.checksum,
-                        })
-                      }
-                    >
-                      {profile.checksum ? "Checksum" : "Fast"}
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      className={settingsIconDangerClass}
-                      type="button"
-                      disabled={props.working}
-                      aria-label={`Remove ${profile.name}`}
-                      onClick={() => removeProfile(profile.id)}
-                    >
-                      <Trash2 size={15} strokeWidth={1.8} />
-                    </Button>
-                  </span>
-                ) : null}
-              </span>
-            </div>
-          ))}
-        </div>
-        <div className={settingsInlineActionsClass}>
-          <Button
-            className={settingsPrimaryButtonClass}
-            type="button"
-            disabled={props.working}
-            onClick={addProfile}
-          >
-            Add Profile
-          </Button>
-        </div>
-      </SettingsSectionBlock>
-    </>
+              ) : null}
+            </span>
+          </div>
+        ))}
+      </div>
+      <div className={settingsInlineActionsClass}>
+        <Button
+          className={settingsPrimaryButtonClass}
+          type="button"
+          disabled={props.working}
+          onClick={addProfile}
+        >
+          Add Profile
+        </Button>
+      </div>
+    </SettingsSectionBlock>
   );
 }
 
 function TransfersSettings(props: SettingsContentProps) {
   return (
-    <SettingsSectionBlock title="Defaults">
-      <SettingsRow
-        label="Default transfer behavior"
-        description="Choose how copy and download flows should behave by default."
-        last
-      >
-        <SelectControl
-          value={numberSetting(props.document, "general", "default_transfer_behavior_index", 0)}
-          options={transferBehaviorOptions}
-          disabled={props.working}
-          onChange={(value) =>
-            props.onSettingChange("general", "default_transfer_behavior_index", value)
-          }
-        />
-      </SettingsRow>
-    </SettingsSectionBlock>
+    <>
+      <SettingsSectionBlock title="Defaults">
+        <SettingsRow
+          label="Default transfer behavior"
+          description="Choose how copy and download flows should behave by default."
+          last
+        >
+          <SelectControl
+            value={numberSetting(props.document, "general", "default_transfer_behavior_index", 0)}
+            options={transferBehaviorOptions}
+            disabled={props.working}
+            onChange={(value) =>
+              props.onSettingChange("general", "default_transfer_behavior_index", value)
+            }
+          />
+        </SettingsRow>
+      </SettingsSectionBlock>
+
+      <TransferProfilesSettings {...props} />
+    </>
   );
 }
 
@@ -1382,33 +1265,6 @@ function AdvancedSettings(props: SettingsContentProps) {
           <ValueText value="Tauri route shell" muted />
         </SettingsRow>
         <SettingsRow
-          label="Debug logging"
-          description="Keep more verbose runtime details available while polishing the release."
-        >
-          <SwitchControl
-            checked={booleanSetting(props.document, "advanced", "debug_logging_enabled", false)}
-            disabled={props.working}
-            onChange={(value) => props.onSettingChange("advanced", "debug_logging_enabled", value)}
-          />
-        </SettingsRow>
-        <SettingsRow
-          label="Experimental features"
-          description="Allow in-progress features to surface before they are fully settled."
-        >
-          <SwitchControl
-            checked={booleanSetting(
-              props.document,
-              "advanced",
-              "experimental_features_enabled",
-              false,
-            )}
-            disabled={props.working}
-            onChange={(value) =>
-              props.onSettingChange("advanced", "experimental_features_enabled", value)
-            }
-          />
-        </SettingsRow>
-        <SettingsRow
           label="Frame pacing overlay"
           description="Show the live idle, light, and heavy pacing state in the top-right corner."
           last
@@ -1498,50 +1354,6 @@ function AdvancedSettings(props: SettingsContentProps) {
             <p className={settingsEmptyClass}>No Open With associations saved.</p>
           ) : null}
         </div>
-      </SettingsSectionBlock>
-
-      <SettingsSectionBlock title="Safeguards">
-        <SettingsRow
-          label="Confirm clear recent"
-          description="Ask before clearing the recent-items list."
-        >
-          <SwitchControl
-            checked={booleanSetting(props.document, "advanced", "confirm_clear_recent", false)}
-            disabled={props.working}
-            onChange={(value) => props.onSettingChange("advanced", "confirm_clear_recent", value)}
-          />
-        </SettingsRow>
-        <SettingsRow
-          label="Confirm clear starred"
-          description="Ask before clearing starred items in bulk."
-        >
-          <SwitchControl
-            checked={booleanSetting(props.document, "advanced", "confirm_clear_starred", false)}
-            disabled={props.working}
-            onChange={(value) => props.onSettingChange("advanced", "confirm_clear_starred", value)}
-          />
-        </SettingsRow>
-        <SettingsRow
-          label="Confirm empty trash"
-          description="Require confirmation before emptying trash."
-        >
-          <SwitchControl
-            checked={booleanSetting(props.document, "advanced", "confirm_empty_trash", false)}
-            disabled={props.working}
-            onChange={(value) => props.onSettingChange("advanced", "confirm_empty_trash", value)}
-          />
-        </SettingsRow>
-        <SettingsRow
-          label="Confirm clear cache"
-          description="Ask before clearing runtime caches and temporary data."
-          last
-        >
-          <SwitchControl
-            checked={booleanSetting(props.document, "advanced", "confirm_clear_cache", false)}
-            disabled={props.working}
-            onChange={(value) => props.onSettingChange("advanced", "confirm_clear_cache", value)}
-          />
-        </SettingsRow>
       </SettingsSectionBlock>
     </>
   );

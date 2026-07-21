@@ -20,6 +20,7 @@ import type {
   TransferSortDirection,
   TransferSortKey,
 } from "@/models/types/stores/transfers/useTransfersStore";
+import type { OperationQueueSnapshot } from "@/models/interfaces/services/misty-api";
 
 export const transferTableColumns: TransferTableColumn[] = [
   "transfer",
@@ -321,6 +322,29 @@ export function transferStatusTone(
   if (status === "waiting_for_resolution") return "warning";
   if (status === "queued" || status === "pending" || status === "in_progress") return "info";
   return "neutral";
+}
+
+/**
+ * Resolves whether a transfer is paused.
+ *
+ * `TransferRecord.paused` and the operation queue snapshot are refreshed by two
+ * independent loads, and queue mutations update the snapshot immediately while
+ * the record only catches up on the next transfers poll. The snapshot is
+ * therefore the authoritative source whenever it knows about the operation —
+ * without this, the pause/resume toggle can read a stale record and send the
+ * opposite command.
+ */
+export function transferPaused(
+  transfer: TransferRecord,
+  snapshot: OperationQueueSnapshot | null | undefined,
+): boolean {
+  if (transfer.operationId && snapshot) {
+    const operation = snapshot.operations.find(
+      (candidate) => candidate.operationId === transfer.operationId,
+    );
+    if (operation) return operation.paused;
+  }
+  return transfer.paused;
 }
 
 export function canPauseResumeTransfer(transfer: TransferRecord): boolean {

@@ -1,4 +1,4 @@
-import { useState, type DragEvent, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent, type PointerEvent } from "react";
 import { GripVertical, LoaderCircle, Plus } from "lucide-react";
 import { Button } from "@/ui";
 import { Card, CardContent, CardHeader, CardTitle } from "@/ui";
@@ -14,12 +14,25 @@ import {
   TaskPriorityBadge,
   taskStatusOptions,
 } from "./SpaceTaskPrimitives";
+import { TaskSyncBadge } from "@/features/spaces/components/TaskSyncBadge";
+import {
+  useDropZone,
+  usePointerDrag,
+  type PointerDragPayload,
+} from "@/features/dnd/PointerDragContext";
 
 const boardStatuses: Array<{ id: SpaceTaskStatus; label: string }> = [
   { id: "todo", label: "To do" },
   { id: "in_progress", label: "In progress" },
   { id: "done", label: "Done" },
 ];
+
+const TASK_DRAG_KIND = "space-task";
+
+/** Interactive controls inside a card own their own gestures and must not start a drag. */
+const NON_DRAGGABLE_SELECTOR = "button, input, select, textarea, [role='combobox']";
+
+const acceptsTask = (payload: PointerDragPayload) => payload.kind === TASK_DRAG_KIND;
 
 export function SpaceTaskBoard({
   tasks,
@@ -42,133 +55,176 @@ export function SpaceTaskBoard({
 }) {
   const [creating, setCreating] = useState<SpaceTaskStatus>();
   const [title, setTitle] = useState("");
-  const [dragging, setDragging] = useState("");
 
-  const submit = (event: FormEvent, status: SpaceTaskStatus) => {
-    event.preventDefault();
-    if (!title.trim()) return;
-    onCreate(title.trim(), status);
-    setTitle("");
-    setCreating(undefined);
-  };
-
-  const moveFromEvent = (event: DragEvent, status: SpaceTaskStatus, beforeTaskId?: string) => {
-    event.preventDefault();
-    const taskId = event.dataTransfer.getData("text/misty-task");
+  const moveById = (taskId: string, status: SpaceTaskStatus, beforeTaskId?: string) => {
     const task = tasks.find((item) => item.id === taskId);
     if (task) onMove(task, status, beforeTaskId);
-    setDragging("");
   };
 
   return (
-    <div className="flex min-h-full gap-3 overflow-x-auto pb-3" aria-label="Task board">
-      {boardStatuses.map((column) => {
-        const columnTasks = tasks
-          .filter((task) => task.status === column.id)
-          .sort((left, right) => left.rank - right.rank);
-
-        return (
-          <section
-            className="flex min-h-[520px] w-[min(340px,86vw)] min-w-[290px] flex-col rounded-xl bg-muted/35 p-2"
-            key={column.id}
-            onDragOver={(event) => event.preventDefault()}
-            onDrop={(event) => moveFromEvent(event, column.id)}
-          >
-            <header className="flex min-h-10 items-center gap-2 px-2">
-              <span className={`size-2 rounded-full ${statusDot(column.id)}`} />
-              <h2 className="m-0 text-xs font-semibold text-foreground">{column.label}</h2>
-              <span className="text-[11px] tabular-nums text-muted-foreground">
-                {totals[column.id] ?? columnTasks.length}
-              </span>
-              {canManage ? (
-                <Button
-                  className="ml-auto size-7"
-                  size="icon"
-                  variant="ghost"
-                  type="button"
-                  onClick={() => {
-                    setCreating(column.id);
-                    setTitle("");
-                  }}
-                  aria-label={`Create in ${column.label}`}
-                >
-                  <Plus className="size-3.5" />
-                </Button>
-              ) : null}
-            </header>
-
-            <div className="grid content-start gap-2">
-              {columnTasks.map((task) => (
-                <TaskCard
-                  task={task}
-                  members={members}
-                  busy={busy === task.id}
-                  canManage={canManage}
-                  dragging={dragging === task.id}
-                  onOpen={onOpen}
-                  onMove={onMove}
-                  onDragStart={(event) => {
-                    event.dataTransfer.effectAllowed = "move";
-                    event.dataTransfer.setData("text/misty-task", task.id);
-                    setDragging(task.id);
-                  }}
-                  onDrop={(event) => moveFromEvent(event, column.id, task.id)}
-                  key={task.id}
-                />
-              ))}
-
-              {creating === column.id ? (
-                <Card className="gap-0 py-0 shadow-none ring-foreground/8">
-                  <form onSubmit={(event) => submit(event, column.id)}>
-                    <CardContent className="p-3">
-                      <Input
-                        autoFocus
-                        maxLength={240}
-                        placeholder="Task title"
-                        value={title}
-                        onChange={(event) => setTitle(event.target.value)}
-                      />
-                      <div className="mt-2 flex justify-end gap-2">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          type="button"
-                          onClick={() => setCreating(undefined)}
-                        >
-                          Cancel
-                        </Button>
-                        <Button
-                          size="sm"
-                          disabled={!title.trim() || busy === `create:${column.id}`}
-                          type="submit"
-                        >
-                          {busy === `create:${column.id}` ? (
-                            <LoaderCircle className="size-3.5 animate-spin" />
-                          ) : null}
-                          Add
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </form>
-                </Card>
-              ) : null}
-
-              {!columnTasks.length && creating !== column.id ? (
-                <Button
-                  className="min-h-28 bg-muted/45 text-xs text-muted-foreground shadow-none hover:bg-muted/65"
-                  variant="ghost"
-                  type="button"
-                  disabled={!canManage}
-                  onClick={() => setCreating(column.id)}
-                >
-                  Drop or create
-                </Button>
-              ) : null}
-            </div>
-          </section>
-        );
-      })}
+    <div
+      className="flex h-full min-h-0 gap-3 overflow-x-auto overflow-y-hidden"
+      aria-label="Task board"
+    >
+      {boardStatuses.map((column) => (
+        <BoardColumn
+          key={column.id}
+          column={column}
+          tasks={tasks
+            .filter((task) => task.status === column.id)
+            .sort((left, right) => left.rank - right.rank)}
+          members={members}
+          total={totals[column.id]}
+          busy={busy}
+          canManage={canManage}
+          creating={creating === column.id}
+          title={title}
+          onTitle={setTitle}
+          onStartCreate={() => {
+            setCreating(column.id);
+            setTitle("");
+          }}
+          onCancelCreate={() => setCreating(undefined)}
+          onSubmitCreate={(event: FormEvent) => {
+            event.preventDefault();
+            if (!title.trim()) return;
+            onCreate(title.trim(), column.id);
+            setTitle("");
+            setCreating(undefined);
+          }}
+          onOpen={onOpen}
+          onMove={onMove}
+          onMoveById={moveById}
+        />
+      ))}
     </div>
+  );
+}
+
+function BoardColumn({
+  column,
+  tasks,
+  members,
+  total,
+  busy,
+  canManage,
+  creating,
+  title,
+  onTitle,
+  onStartCreate,
+  onCancelCreate,
+  onSubmitCreate,
+  onOpen,
+  onMove,
+  onMoveById,
+}: {
+  column: { id: SpaceTaskStatus; label: string };
+  tasks: SpaceTask[];
+  members: SpaceMember[];
+  total?: number;
+  busy: string;
+  canManage: boolean;
+  creating: boolean;
+  title: string;
+  onTitle: (value: string) => void;
+  onStartCreate: () => void;
+  onCancelCreate: () => void;
+  onSubmitCreate: (event: FormEvent) => void;
+  onOpen: (task: SpaceTask) => void;
+  onMove: (task: SpaceTask, status: SpaceTaskStatus) => void;
+  onMoveById: (taskId: string, status: SpaceTaskStatus, beforeTaskId?: string) => void;
+}) {
+  const dropZone = useDropZone({
+    id: `task-column:${column.id}`,
+    accepts: acceptsTask,
+    onDrop: (payload) => onMoveById(payload.id, column.id),
+  });
+
+  return (
+    <section
+      ref={dropZone.ref}
+      className={`flex h-full min-h-0 w-[min(340px,86vw)] min-w-[290px] shrink-0 flex-col rounded-xl p-2 transition-colors ${
+        dropZone.active ? "bg-accent/60 ring-1 ring-primary/40" : "bg-muted/35"
+      }`}
+    >
+      <header className="flex min-h-10 items-center gap-2 px-2">
+        <span className={`size-2 rounded-full ${statusDot(column.id)}`} />
+        <h2 className="m-0 text-xs font-semibold text-foreground">{column.label}</h2>
+        <span className="text-[11px] tabular-nums text-muted-foreground">
+          {total ?? tasks.length}
+        </span>
+        {canManage ? (
+          <Button
+            className="ml-auto size-7"
+            size="icon"
+            variant="ghost"
+            type="button"
+            onClick={onStartCreate}
+            aria-label={`Create in ${column.label}`}
+          >
+            <Plus className="size-3.5" />
+          </Button>
+        ) : null}
+      </header>
+
+      <div className="grid min-h-0 flex-1 content-start gap-2 overflow-y-auto overscroll-contain pr-0.5">
+        {tasks.map((task) => (
+          <TaskCard
+            task={task}
+            members={members}
+            busy={busy === task.id}
+            canManage={canManage}
+            onOpen={onOpen}
+            onMove={onMove}
+            onDropBefore={(payload) => onMoveById(payload.id, column.id, task.id)}
+            key={task.id}
+          />
+        ))}
+
+        {creating ? (
+          <Card className="gap-0 py-0 shadow-none ring-foreground/8">
+            <form onSubmit={onSubmitCreate}>
+              <CardContent className="p-3">
+                <Input
+                  autoFocus
+                  maxLength={240}
+                  placeholder="Task title"
+                  value={title}
+                  onChange={(event) => onTitle(event.target.value)}
+                />
+                <div className="mt-2 flex justify-end gap-2">
+                  <Button size="sm" variant="ghost" type="button" onClick={onCancelCreate}>
+                    Cancel
+                  </Button>
+                  <Button
+                    size="sm"
+                    disabled={!title.trim() || busy === `create:${column.id}`}
+                    type="submit"
+                  >
+                    {busy === `create:${column.id}` ? (
+                      <LoaderCircle className="size-3.5 animate-spin" />
+                    ) : null}
+                    Add
+                  </Button>
+                </div>
+              </CardContent>
+            </form>
+          </Card>
+        ) : null}
+
+        {!tasks.length && !creating ? (
+          <Button
+            className="min-h-28 bg-muted/45 text-xs text-muted-foreground shadow-none hover:bg-muted/65"
+            variant="ghost"
+            type="button"
+            disabled={!canManage}
+            onClick={onStartCreate}
+          >
+            Drop or create
+          </Button>
+        ) : null}
+      </div>
+    </section>
   );
 }
 
@@ -177,50 +233,78 @@ function TaskCard({
   members,
   busy,
   canManage,
-  dragging,
   onOpen,
   onMove,
-  onDragStart,
-  onDrop,
+  onDropBefore,
 }: {
   task: SpaceTask;
   members: SpaceMember[];
   busy: boolean;
   canManage: boolean;
-  dragging: boolean;
   onOpen: (task: SpaceTask) => void;
   onMove: (task: SpaceTask, status: SpaceTaskStatus) => void;
-  onDragStart: (event: DragEvent<HTMLElement>) => void;
-  onDrop: (event: DragEvent<HTMLElement>) => void;
+  onDropBefore: (payload: PointerDragPayload) => void;
 }) {
   const assignee = members.find((member) => member.user_id === task.assignee_user_id);
+  const { startDrag, state } = usePointerDrag();
+  const dragging = state.payload?.kind === TASK_DRAG_KIND && state.payload.id === task.id;
+  const draggedRef = useRef(false);
+  const dropZone = useDropZone({
+    id: `task-card:${task.id}`,
+    accepts: (payload) => acceptsTask(payload) && payload.id !== task.id,
+    onDrop: onDropBefore,
+  });
+
+  useEffect(() => {
+    if (dragging) draggedRef.current = true;
+  }, [dragging]);
+
+  const beginDrag = (event: PointerEvent<HTMLElement>) => {
+    if (!canManage) return;
+    if ((event.target as HTMLElement).closest(NON_DRAGGABLE_SELECTOR)) return;
+    draggedRef.current = false;
+    startDrag(event, { kind: TASK_DRAG_KIND, id: task.id }, <TaskDragPreview task={task} />);
+  };
+
+  // A drag ends with a click on the source; opening the task then would be wrong.
+  const openTask = () => {
+    if (draggedRef.current) {
+      draggedRef.current = false;
+      return;
+    }
+    onOpen(task);
+  };
 
   return (
     <Card
-      className={`group cursor-default gap-0 py-0 shadow-none ring-foreground/8 transition-opacity ${dragging ? "opacity-40" : ""}`}
-      draggable={canManage}
-      onDragStart={onDragStart}
-      onDragOver={(event) => event.preventDefault()}
-      onDrop={(event) => {
-        event.stopPropagation();
-        onDrop(event);
-      }}
+      ref={dropZone.ref}
+      className={`group gap-0 py-0 shadow-none ring-foreground/8 transition-opacity ${
+        canManage ? "cursor-grab" : "cursor-default"
+      } ${dragging ? "opacity-40" : ""} ${dropZone.active ? "ring-2 ring-primary" : ""}`}
+      onPointerDown={beginDrag}
     >
       <CardHeader className="p-3 pb-2">
-        <Button
-          className="h-auto w-full items-start justify-start whitespace-normal p-0 text-left hover:bg-transparent"
-          variant="ghost"
-          onClick={() => onOpen(task)}
+        <div
+          className="flex w-full items-start gap-1.5 rounded-md text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+          role="button"
+          tabIndex={0}
+          onClick={openTask}
+          onKeyDown={(event) => {
+            if (event.key !== "Enter" && event.key !== " ") return;
+            event.preventDefault();
+            onOpen(task);
+          }}
         >
           <GripVertical className="mt-0.5 size-3.5 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
           <CardTitle className="line-clamp-3 flex-1 text-sm leading-5">{task.title}</CardTitle>
           {busy ? <LoaderCircle className="size-3.5 animate-spin text-muted-foreground" /> : null}
-        </Button>
+        </div>
       </CardHeader>
       <CardContent className="p-3 pt-0">
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-[10px] font-medium text-muted-foreground">{task.task_key}</span>
           <TaskPriorityBadge priority={task.priority} />
+          <TaskSyncBadge task={task} />
           {task.due_at ? (
             <span className={`text-[10px] font-medium ${dueTone(task)}`}>
               {shortDue(task.due_at)}
@@ -242,5 +326,14 @@ function TaskCard({
         ) : null}
       </CardContent>
     </Card>
+  );
+}
+
+function TaskDragPreview({ task }: { task: SpaceTask }) {
+  return (
+    <div className="rounded-xl border border-border bg-card px-3 py-2 shadow-lg">
+      <p className="m-0 line-clamp-2 text-sm font-medium text-foreground">{task.title}</p>
+      <span className="text-[10px] font-medium text-muted-foreground">{task.task_key}</span>
+    </div>
   );
 }

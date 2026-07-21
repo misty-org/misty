@@ -1,7 +1,8 @@
 import type { Dispatch, FormEvent, SetStateAction } from "react";
+
+import { TaskCalendarNotice } from "@/features/spaces/components/TaskCalendarNotice";
 import {
   Archive,
-  Bot,
   CalendarDays,
   Check,
   CircleAlert,
@@ -46,6 +47,8 @@ export function SpaceTaskDrawer({
   onClose,
   onSave,
   onArchive,
+  onPublishCalendar,
+  onDiscardCalendar,
 }: {
   draft: TaskDraft;
   setDraft: Dispatch<SetStateAction<TaskDraft>> | ((draft: TaskDraft) => void);
@@ -56,6 +59,10 @@ export function SpaceTaskDrawer({
   onClose: () => void;
   onSave: (event: FormEvent) => void;
   onArchive?: () => void;
+  /** Sends this task's schedule edits to Google. Omitted for Misty-only tasks. */
+  onPublishCalendar?: () => void;
+  /** Drops local schedule edits in favour of what Google holds. */
+  onDiscardCalendar?: () => void;
 }) {
   return (
     <Sheet open onOpenChange={(open) => !open && !busy && onClose()}>
@@ -94,6 +101,15 @@ export function SpaceTaskDrawer({
 
           <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_240px] overflow-auto max-sm:grid-cols-1">
             <div className="grid content-start gap-5 p-5 sm:p-6">
+              {editing && onPublishCalendar && onDiscardCalendar ? (
+                <TaskCalendarNotice
+                  task={editing}
+                  busy={busy}
+                  canManage={canManage}
+                  onPublish={onPublishCalendar}
+                  onDiscard={onDiscardCalendar}
+                />
+              ) : null}
               <div className="grid gap-2">
                 <Label htmlFor="space-task-title">Title</Label>
                 <Input
@@ -128,12 +144,7 @@ export function SpaceTaskDrawer({
                       Provenance
                     </summary>
                     <div className="mt-2 grid gap-1">
-                      {editing.created_by_agent_id ? (
-                        <span className="flex items-center gap-1.5">
-                          <Bot className="size-3.5" /> Agent {editing.created_by_agent_id}
-                        </span>
-                      ) : null}
-                      {editing.source_run_id ? <span>Run {editing.source_run_id}</span> : null}
+                      {editing.created_by_agent_id ? <span>Generated task</span> : null}
                       <span>
                         {editing.source_refs.length} source
                         {editing.source_refs.length === 1 ? "" : "s"}
@@ -261,6 +272,7 @@ export function CalendarSourceDrawer({
   selectedIntegration,
   choices,
   sources,
+  connectionsUnavailable,
   busy,
   onSelect,
   onPublish,
@@ -271,6 +283,7 @@ export function CalendarSourceDrawer({
   selectedIntegration: string;
   choices: GoogleCalendarChoice[];
   sources: SpaceCalendarSource[];
+  connectionsUnavailable: boolean;
   busy: string;
   onSelect: (id: string) => void;
   onPublish: (choice: GoogleCalendarChoice) => void;
@@ -305,10 +318,15 @@ export function CalendarSourceDrawer({
             ]}
           />
 
-          {!activeIntegrations.length ? (
+          {connectionsUnavailable ? (
+            <TaskEmptyState
+              title="Calendar connections unavailable"
+              description="Misty could not check Google Calendar connections on this server. Your Space tasks are still available."
+            />
+          ) : !activeIntegrations.length ? (
             <TaskEmptyState
               title="No Google account connected"
-              description="Connect Google Calendar from Agent settings before publishing a calendar."
+              description="This Space does not currently have a working Google Calendar connection."
             />
           ) : busy === "calendars" ? (
             <div className="grid min-h-40 place-items-center text-muted-foreground">

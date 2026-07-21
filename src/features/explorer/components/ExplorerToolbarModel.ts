@@ -28,7 +28,6 @@ const explorerCommands: ExplorerCommandPaletteEntry[] = [
     hint: "Show transfer history and active work",
   },
   { id: "app.open_settings", label: "Open Settings", hint: "Switch to application settings" },
-  { id: "app.toggle_plugin_launcher", label: "Open Extensions", hint: "Open Extensions" },
   {
     id: "clipboard.publish_shared",
     label: "Publish Shared Clipboard",
@@ -79,7 +78,6 @@ const explorerCommands: ExplorerCommandPaletteEntry[] = [
     label: "Compare With",
     hint: "Compare the selected file or folder against another path",
   },
-  { id: "explorer.automation_rules", label: "Automation Rules", hint: "coming soon..." },
   { id: "explorer.delete", label: "Delete", hint: "Delete the selected items" },
   {
     id: "explorer.download",
@@ -110,7 +108,7 @@ const explorerCommands: ExplorerCommandPaletteEntry[] = [
   { id: "explorer.toggle_mika", label: "Toggle Mika", hint: "Open or close Mika Assistant" },
   {
     id: "explorer.next_workspace",
-    label: "Next Workspace",
+    label: "Next File Layout",
     hint: "Cycle to the next explorer tab",
   },
   ...Array.from({ length: 9 }, (_, index): ExplorerCommandPaletteEntry => ({

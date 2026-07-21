@@ -5,7 +5,18 @@ import { persist } from "zustand/middleware";
 
 const defaultAppRoute = "/files";
 const defaultSpacesRoute = "/spaces/personal";
-const desktopRememberableRoutes = ["/spaces/personal", "/agents", "/extensions", "/changelog"];
+const desktopRememberableRoutes = ["/spaces/personal"];
+const validSpaceSections = new Set([
+  "chat",
+  "tasks",
+  "notes",
+  "library",
+  "assistant",
+  "members",
+  "settings",
+]);
+const validSettingsSections = new Set(["general", "chat", "integrations"]);
+const validTaskViews = new Set(["board", "list", "calendar"]);
 
 export const useAppRouteMemoryStore = create<AppRouteMemoryStore>()(
   persist(
@@ -36,6 +47,18 @@ export const useAppRouteMemoryStore = create<AppRouteMemoryStore>()(
         lastAppRoute: state.lastAppRoute,
         lastSpacesRoute: state.lastSpacesRoute,
       }),
+      merge: (persistedState, currentState) => {
+        const persisted = persistedState as Partial<AppRouteMemoryStore> | undefined;
+        const lastSpacesRoute = normalizeRememberedSpacesRoute(
+          persisted?.lastSpacesRoute ?? defaultSpacesRoute,
+        );
+        return {
+          ...currentState,
+          lastAppRoute:
+            normalizeRememberedRoute(persisted?.lastAppRoute ?? defaultAppRoute) ?? defaultAppRoute,
+          lastSpacesRoute: lastSpacesRoute ?? defaultSpacesRoute,
+        };
+      },
     },
   ),
 );
@@ -44,12 +67,10 @@ export function isRememberableAppRoute(path: string): boolean {
   const pathname = pathnameFromRoute(path);
   return (
     pathname === "/files" ||
-    pathname === "/providers" ||
     pathname === "/transfers" ||
     pathname === "/account" ||
     desktopRememberableRoutes.includes(pathname) ||
-    pathname.startsWith("/spaces/") ||
-    pathname.startsWith("/studio/")
+    pathname.startsWith("/spaces/")
   );
 }
 
@@ -57,16 +78,56 @@ function normalizeRememberedRoute(path: string): string | null {
   const pathname = pathnameFromRoute(path);
   if (!isRememberableAppRoute(pathname)) return null;
   if (pathname === "/library") return "/spaces/personal";
-  if (pathname === "/agents") return "/agents";
-  if (pathname === "/automations") return "/studio/workflows";
+  if (pathname.startsWith("/spaces/")) {
+    const spacesRoute = normalizeRememberedSpacesRoute(path);
+    return spacesRoute ? pathnameFromRoute(spacesRoute) : null;
+  }
   return pathname;
 }
 
-function normalizeRememberedSpacesRoute(path: string): string | null {
+export function normalizeRememberedSpacesRoute(path: string): string | null {
   const pathname = pathnameFromRoute(path);
-  if (pathname !== defaultSpacesRoute && !pathname.startsWith("/spaces/")) return null;
-  const hashIndex = path.indexOf("#");
-  return hashIndex >= 0 ? path.slice(0, hashIndex) : path;
+  if (pathname === defaultSpacesRoute) return defaultSpacesRoute;
+  const parts = pathname.split("/").filter(Boolean);
+  if (parts[0] !== "spaces" || !parts[1]) return null;
+
+  const base = `/spaces/${parts[1]}`;
+  const requestedSection = parts[2] === "files" ? "library" : parts[2];
+  if (!requestedSection || !validSpaceSections.has(requestedSection)) return base;
+
+  let normalizedPath = `${base}/${requestedSection}`;
+  if (requestedSection === "tasks" && validTaskViews.has(parts[3] ?? "")) {
+    normalizedPath += `/${parts[3]}`;
+  }
+  if (requestedSection === "settings") {
+    normalizedPath += `/${validSettingsSections.has(parts[3] ?? "") ? parts[3] : "general"}`;
+  }
+
+  const query = safeSpaceQuery(path, requestedSection);
+  return `${normalizedPath}${query}`;
+}
+
+function safeSpaceQuery(path: string, section: string): string {
+  const queryIndex = path.indexOf("?");
+  if (queryIndex < 0) return "";
+  const hashIndex = path.indexOf("#", queryIndex);
+  const params = new URLSearchParams(
+    path.slice(queryIndex + 1, hashIndex >= 0 ? hashIndex : path.length),
+  );
+  const allowed =
+    section === "chat"
+      ? new Set(["conversation", "message", "mika"])
+      : section === "tasks"
+        ? new Set(["q", "status", "assignee", "priority", "due", "mine", "sort", "mika"])
+        : section === "library"
+          ? new Set(["collection", "mika"])
+          : section === "notes"
+            ? new Set(["group"])
+            : new Set(["mika"]);
+  for (const key of [...params.keys()]) {
+    if (!allowed.has(key)) params.delete(key);
+  }
+  return params.size ? `?${params.toString()}` : "";
 }
 
 function pathnameFromRoute(path: string): string {

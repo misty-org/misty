@@ -22,7 +22,7 @@ import {
   XCircle,
 } from "lucide-react";
 import type { TransferRecord } from "@/models/interfaces/services/misty-api";
-import { PrimitiveIconButton as IconButton } from "@/ui";
+import { IconButton } from "@/ui/icon-button";
 import {
   ContextMenu,
   ContextMenuContent,

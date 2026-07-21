@@ -68,7 +68,7 @@ export function installMistyDeepLinkHandler(
   };
 }
 
-function routeForMistyDeepLink(
+export function routeForMistyDeepLink(
   rawUrl: string,
   isRouteAllowed: (route: string) => boolean,
   resolveAuthRoute: (target: AuthDeepLinkTarget) => string,
@@ -81,7 +81,7 @@ function routeForMistyDeepLink(
   if (!first || ignoredMistyHosts.has(first)) return null;
 
   if (first === "open") {
-    return normalizeDeepLinkRoute(rest, isRouteAllowed);
+    return normalizeDeepLinkRoute(rest, url.search, isRouteAllowed);
   }
   if (first === "auth") {
     return resolveAuthRoute(
@@ -89,7 +89,7 @@ function routeForMistyDeepLink(
     );
   }
 
-  return normalizeDeepLinkRoute(parts, isRouteAllowed);
+  return normalizeDeepLinkRoute(parts, url.search, isRouteAllowed);
 }
 
 function parseMistyDeepLink(rawUrl: string): URL | null {
@@ -109,11 +109,12 @@ function deepLinkParts(url: URL): string[] {
 
 function normalizeDeepLinkRoute(
   parts: string[],
+  search: string,
   isRouteAllowed: (route: string) => boolean,
 ): string | null {
   const route = `/${parts.join("/")}`;
   if (!isRouteAllowed(route)) {
     return null;
   }
-  return route;
+  return `${route}${search}`;
 }

@@ -1,17 +1,29 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+const accountSession = vi.hoisted(() => ({ transitioning: false, generation: 0 }));
+
 vi.mock("@/stores/account/useAuthTokenStore", () => ({
+  isAccountSessionTransitioning: () => accountSession.transitioning,
+  readAccountSessionGeneration: () => accountSession.generation,
   readAccountAuthToken: vi.fn().mockResolvedValue("signed-in-token"),
 }));
 
-vi.mock("@/stores/backend", () => ({
+vi.mock("@/stores/backend", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/stores/backend")>()),
   appSnapshot: vi.fn().mockRejectedValue(new Error("not running in Tauri")),
 }));
 
-import { createAgentSession, fetchAgentStatus } from "@/stores/assistant/useAiServerStore";
+import {
+  createAgentSession,
+  fetchAgentStatus,
+  listAgentSessions,
+  renameAgentSession,
+} from "@/stores/assistant/useAiServerStore";
 
 describe("Mika server API", () => {
   beforeEach(() => {
+    accountSession.transitioning = false;
+    accountSession.generation = 0;
     vi.stubEnv("VITE_MISTY_SERVER_URL", "https://misty.example");
   });
 
@@ -61,6 +73,72 @@ describe("Mika server API", () => {
     await expect(createAgentSession()).rejects.toThrow("Misty credits exhausted (0 available)");
   });
 
+  it("binds a new Mika session to the requested Space", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ session_id: "space-session" }), {
+        status: 201,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+
+    await createAgentSession(undefined, "space-a");
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://misty.example/api/ai/sessions",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ space_id: "space-a" }),
+      }),
+    );
+  });
+
+  it("blocks managed Mika requests while an account switch is in progress", async () => {
+    accountSession.transitioning = true;
+    const fetchMock = vi.spyOn(globalThis, "fetch");
+
+    await expect(fetchAgentStatus()).rejects.toMatchObject({
+      message: "Wait for the account switch to finish.",
+      status: 409,
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects a Mika response that arrives after the account generation changes", async () => {
+    let releaseResponse!: (response: Response) => void;
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockImplementation(() => new Promise<Response>((resolve) => (releaseResponse = resolve)));
+    const request = fetchAgentStatus();
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledOnce());
+
+    accountSession.generation += 1;
+    releaseResponse(
+      new Response(JSON.stringify({ configured: true }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+
+    await expect(request).rejects.toMatchObject({ code: "account_changed", status: 409 });
+  });
+
+  it("rejects a Mika body that finishes decoding after the account generation changes", async () => {
+    let releaseBody!: (value: unknown) => void;
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: new Headers({ "Content-Type": "application/json" }),
+      json: () => new Promise((resolve) => (releaseBody = resolve)),
+    } as Response);
+    const request = fetchAgentStatus();
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledOnce());
+
+    accountSession.generation += 1;
+    releaseBody({ configured: true });
+
+    await expect(request).rejects.toMatchObject({ code: "account_changed", status: 409 });
+  });
+
   it("does not misclassify a gateway 429 as exhausted credits", async () => {
     const fetchMock = vi
       .spyOn(globalThis, "fetch")
@@ -85,5 +163,47 @@ describe("Mika server API", () => {
       "Try again in 30 seconds. Requests are never retried automatically.",
     );
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("lists the account's sessions so another device can rebuild them", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          sessions: [
+            {
+              id: "conversation_1",
+              title: "Rename batch",
+              active: false,
+              created_at: "2026-07-20T10:00:00Z",
+              updated_at: "2026-07-20T11:00:00Z",
+            },
+          ],
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+
+    await expect(listAgentSessions()).resolves.toMatchObject({
+      sessions: [{ id: "conversation_1", title: "Rename batch", active: false }],
+    });
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://misty.example/api/ai/sessions",
+      expect.objectContaining({ credentials: "include" }),
+    );
+  });
+
+  it("patches a session title so the label follows the account", async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(new Response(null, { status: 204 }));
+
+    await renameAgentSession("conversation_1", "Find duplicates");
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://misty.example/api/ai/sessions/conversation_1",
+      expect.objectContaining({
+        method: "PATCH",
+        body: JSON.stringify({ title: "Find duplicates" }),
+      }),
+    );
   });
 });

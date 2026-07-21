@@ -188,7 +188,7 @@ export function ProviderConnectionDialog(props: ProviderConnectionDialogProps) {
               </div>
               <h3 className="m-0">Remote connected</h3>
               <p className="leading-[1.55]">
-                <strong>{session.remoteName}</strong> is ready to use in Explorer.
+                <strong>{session.remoteName}</strong> is ready to use in Files.
               </p>
             </div>
           ) : null}
@@ -250,7 +250,7 @@ function ProviderPicker(props: {
     return (
       <EmptyState
         compact
-        title="No remote workflows available"
+        title="No cloud providers available"
         description="Refresh Remotes and check the remote service connection."
       />
     );

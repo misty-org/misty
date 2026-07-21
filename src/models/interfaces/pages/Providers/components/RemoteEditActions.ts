@@ -9,4 +9,5 @@ export interface RemoteEditActionsProps {
   stale: boolean;
   onSave: () => void;
   onDelete: () => void;
+  onTest: () => void;
 }

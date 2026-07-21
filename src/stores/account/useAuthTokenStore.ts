@@ -22,11 +22,27 @@ const legacyUserKey = "misty_user";
 
 let cachedToken: string | null | undefined;
 let cachedVault: SecureAccountVault | undefined;
+let accountSessionTransitioning = false;
+let accountSessionGeneration = 0;
+
+export function setAccountSessionTransitioning(transitioning: boolean): void {
+  if (transitioning && !accountSessionTransitioning) accountSessionGeneration += 1;
+  accountSessionTransitioning = transitioning;
+}
+
+export function isAccountSessionTransitioning(): boolean {
+  return accountSessionTransitioning;
+}
+
+export function readAccountSessionGeneration(): number {
+  return accountSessionGeneration;
+}
 
 export async function saveAccountAuthToken(
   token: string,
   account?: Omit<SavedAccountSession, "lastUsedAt">,
 ): Promise<void> {
+  if (cachedToken !== undefined && cachedToken !== (token || null)) accountSessionGeneration += 1;
   cachedToken = token || null;
   if (!token || !hasTauriInternals()) return;
 
@@ -124,6 +140,7 @@ export async function activateAccountSession(accountId: string): Promise<SavedAc
 
   session.account = { ...session.account, lastUsedAt: new Date().toISOString() };
   vault.activeAccountId = accountId;
+  if (cachedToken !== session.token) accountSessionGeneration += 1;
   cachedToken = session.token;
   await persistSecureVault(vault);
   await syncManagedAiToken(session.token);
@@ -131,6 +148,7 @@ export async function activateAccountSession(accountId: string): Promise<SavedAc
 }
 
 export async function clearAccountAuthToken(): Promise<SavedAccountSession | null> {
+  accountSessionGeneration += 1;
   cachedToken = null;
   if (!hasTauriInternals()) return null;
   await syncManagedAiToken("");
@@ -161,6 +179,29 @@ export async function clearAccountAuthToken(): Promise<SavedAccountSession | nul
   } catch (error) {
     recordRemoveError(error);
     return null;
+  }
+}
+
+/**
+ * Removes a non-active saved session without changing the token currently used
+ * by requests. A failed secure-store write leaves the session indexed and is
+ * reported through diagnostics; the active identity remains unchanged.
+ */
+export async function removeSavedAccountSession(accountId: string): Promise<boolean> {
+  if (!accountId || !hasTauriInternals() || isNativeMobileBuild) return false;
+  try {
+    const vault = await loadSecureVault();
+    if (vault.activeAccountId === accountId || readActiveAccountId() === accountId) {
+      throw new Error("The active Misty session cannot be removed as a background account.");
+    }
+    const sessions = vault.sessions.filter((item) => item.account.id !== accountId);
+    if (sessions.length === vault.sessions.length) return true;
+    vault.sessions = sessions;
+    await persistSecureVault(vault);
+    return true;
+  } catch (error) {
+    recordRemoveError(error);
+    return false;
   }
 }
 

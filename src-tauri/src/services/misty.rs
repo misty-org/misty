@@ -379,12 +379,17 @@ fn extract_port_from_addr(addr: &str) -> Option<u16> {
 #[tauri::command]
 pub fn check_system() -> Result<NativeSystemInfo, String> {
     ensure_database()?;
+    build_system_info(current_user()?, current_license()?)
+}
+
+fn build_system_info(
+    current_user: Option<CurrentUser>,
+    current_license: Option<CurrentLicense>,
+) -> Result<NativeSystemInfo, String> {
     let home = misty_home_dir()?;
     let install_dir = misty_bin_dir()?;
     let legacy_install_dir = legacy_misty_bin_dir()?;
     let db_path = misty_db_path()?;
-    let current_user = current_user()?;
-    let current_license = current_license()?;
     let setup_path = std::env::current_exe()
         .unwrap_or_else(|_| PathBuf::from("Misty"))
         .display()
@@ -765,7 +770,11 @@ pub fn sign_out_misty() -> Result<NativeSystemInfo, String> {
         .map_err(|error| format!("Could not open Misty database: {error}"))?;
     bootstrap_database(&conn)
         .map_err(|error| format!("Could not initialize Misty database: {error}"))?;
-    conn.execute_batch(
+    let system_info = build_system_info(None, None)?;
+    let tx = conn
+        .unchecked_transaction()
+        .map_err(|error| format!("Could not start Misty sign-out: {error}"))?;
+    tx.execute_batch(
         r#"
         UPDATE access_tokens SET revoked = 1;
         DELETE FROM refresh_tokens;
@@ -776,8 +785,10 @@ pub fn sign_out_misty() -> Result<NativeSystemInfo, String> {
         "#,
     )
     .map_err(|error| format!("Could not sign out of Misty: {error}"))?;
+    tx.commit()
+        .map_err(|error| format!("Could not finish Misty sign-out: {error}"))?;
 
-    check_system()
+    Ok(system_info)
 }
 
 #[tauri::command]
@@ -795,11 +806,20 @@ pub fn save_authenticated_user(
         .map_err(|error| format!("Could not open Misty database: {error}"))?;
     bootstrap_database(&conn)
         .map_err(|error| format!("Could not initialize Misty database: {error}"))?;
-    save_current_user_and_license(&conn, &user, &license)?;
-    issue_local_refresh_token(&conn, &user)?;
-    issue_local_access_token(&conn, &user)?;
+    // Build the response before mutating authentication state so a filesystem
+    // status error cannot turn a successful identity commit into an ambiguous
+    // command failure for the frontend.
+    let system_info = build_system_info(Some(user.clone()), Some(license.clone()))?;
+    let tx = conn
+        .unchecked_transaction()
+        .map_err(|error| format!("Could not start Misty auth update: {error}"))?;
+    save_current_user_and_license(&tx, &user, &license)?;
+    issue_local_refresh_token(&tx, &user)?;
+    issue_local_access_token(&tx, &user)?;
+    tx.commit()
+        .map_err(|error| format!("Could not finish Misty auth update: {error}"))?;
 
-    check_system()
+    Ok(system_info)
 }
 
 #[tauri::command]
@@ -847,20 +867,17 @@ fn save_current_user_and_license(
     user: &CurrentUser,
     license: &CurrentLicense,
 ) -> Result<(), String> {
-    let tx = conn
-        .unchecked_transaction()
-        .map_err(|error| format!("Could not start Misty auth update: {error}"))?;
-    tx.execute("DELETE FROM refresh_tokens", params![])
+    conn.execute("DELETE FROM refresh_tokens", params![])
         .map_err(|error| format!("Could not clear previous refresh tokens: {error}"))?;
-    tx.execute("DELETE FROM access_tokens", params![])
+    conn.execute("DELETE FROM access_tokens", params![])
         .map_err(|error| format!("Could not clear previous access tokens: {error}"))?;
-    tx.execute("DELETE FROM revoked_access_tokens", params![])
+    conn.execute("DELETE FROM revoked_access_tokens", params![])
         .map_err(|error| format!("Could not clear previous revoked tokens: {error}"))?;
-    tx.execute("DELETE FROM license_cache", params![])
+    conn.execute("DELETE FROM license_cache", params![])
         .map_err(|error| format!("Could not clear previous license cache: {error}"))?;
-    tx.execute("DELETE FROM users", params![])
+    conn.execute("DELETE FROM users", params![])
         .map_err(|error| format!("Could not clear previous Misty user: {error}"))?;
-    tx.execute(
+    conn.execute(
         "INSERT INTO users (id, name, username, email) VALUES (?1, ?2, ?3, ?4)",
         params![&user.id, &user.name, &user.username, &user.email],
     )
@@ -869,7 +886,7 @@ fn save_current_user_and_license(
     let verified_at = Utc::now();
     let refresh_after = verified_at + chrono::Duration::days(LICENSE_REFRESH_AFTER_DAYS);
     let verified_until = verified_at + chrono::Duration::days(LICENSE_VERIFIED_DAYS);
-    tx.execute(
+    conn.execute(
         r#"
         INSERT INTO license_cache (
             user_id, tier, status, allows_use, expires_at, trial_started_at, license_device,
@@ -893,8 +910,7 @@ fn save_current_user_and_license(
     )
     .map_err(|error| format!("Could not save Misty license cache: {error}"))?;
 
-    tx.commit()
-        .map_err(|error| format!("Could not finish Misty auth update: {error}"))
+    Ok(())
 }
 
 fn license_cache_window() -> (String, String, String) {
@@ -2015,6 +2031,54 @@ mod tests {
         };
 
         assert!(license_allows_local_use(&license));
+    }
+
+    #[test]
+    fn authenticated_identity_write_rolls_back_with_its_outer_transaction() {
+        let conn = Connection::open_in_memory().expect("database should open");
+        bootstrap_database(&conn).expect("database should bootstrap");
+        let license = CurrentLicense {
+            tier: "personal".to_string(),
+            status: "active".to_string(),
+            allows_use: true,
+            expires_at: None,
+            trial_started_at: None,
+            license_device: None,
+            verified_at: None,
+            refresh_after: None,
+            verified_until: None,
+            needs_refresh: false,
+            verification_expired: false,
+        };
+        let previous = CurrentUser {
+            id: "account-a".to_string(),
+            name: "Account A".to_string(),
+            username: "account-a".to_string(),
+            email: "a@example.test".to_string(),
+        };
+        let target = CurrentUser {
+            id: "account-b".to_string(),
+            name: "Account B".to_string(),
+            username: "account-b".to_string(),
+            email: "b@example.test".to_string(),
+        };
+        save_current_user_and_license(&conn, &previous, &license)
+            .expect("previous identity should save");
+
+        {
+            let tx = conn
+                .unchecked_transaction()
+                .expect("transaction should start");
+            save_current_user_and_license(&tx, &target, &license)
+                .expect("target identity should stage");
+            // Simulate a later token-issuance failure by dropping without a
+            // commit. The original identity must remain intact.
+        }
+
+        let current_id: String = conn
+            .query_row("SELECT id FROM users LIMIT 1", params![], |row| row.get(0))
+            .expect("previous identity should remain");
+        assert_eq!(current_id, previous.id);
     }
 
     #[test]

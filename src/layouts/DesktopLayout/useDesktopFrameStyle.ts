@@ -4,7 +4,12 @@ import { useShallow } from "zustand/react/shallow";
 import { safeTauriAssetUrl } from "@/platform/tauri";
 import { runtimeAssetSource } from "@/platform/runtimeAsset";
 import { isNativeMobileBuild } from "@/platform/buildTarget";
-import { selectAppearancePreferences, useAppStore, useAppThemeStore, useSettingsStore } from "@/stores/app";
+import {
+  selectAppearancePreferences,
+  useAppStore,
+  useAppThemeStore,
+  useSettingsStore,
+} from "@/stores/app";
 import { useDocumentSurfaceVariables } from "../useDocumentSurfaceVariables";
 import { isVideoWallpaperPath } from "./helpers";
 

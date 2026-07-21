@@ -1,4 +1,4 @@
-import { Fragment, type MouseEvent as ReactMouseEvent } from "react";
+import { Fragment, type CSSProperties, type MouseEvent as ReactMouseEvent } from "react";
 import { Check, EllipsisVertical, Star } from "lucide-react";
 
 import { Button } from "@/ui";
@@ -7,12 +7,22 @@ import type {
   SpaceLibraryItem,
 } from "@/models/interfaces/features/spaces/types";
 
+import { useDropZone, usePointerDrag } from "@/features/dnd/PointerDragContext";
 import { useSpaceLibraryContext } from "../SpaceLibraryContext";
-import { formatBytes, formatTime, libraryDateGroupLabel } from "../libraryFormat";
+import {
+  formatBytes,
+  formatTime,
+  libraryDateGroupLabel,
+  normalizeLibraryItemScale,
+} from "../libraryFormat";
 import { LibraryItemThumbnail, libraryFileTypeLabel } from "../SpaceLibraryPrimitives";
 
 const ITEM_ACTION_MENU_WIDTH = 224;
 const ITEM_ACTION_MENU_HEIGHT = 336;
+
+const GRID_COLUMN_WIDTHS = [172, 224, 300] as const;
+const LIST_THUMBNAIL_WIDTHS = [96, 132, 176] as const;
+const LIBRARY_ITEM_DRAG_KIND = "library-item";
 
 function clampMenuPosition(left: number, top: number) {
   return {
@@ -35,6 +45,7 @@ export function SpaceLibraryItems() {
       sort,
       stackByItemID,
       libraryViewMode,
+      libraryItemScale,
       selectedItemIds,
       canEditLibrary,
       canCopyLibrary,
@@ -65,12 +76,16 @@ export function SpaceLibraryItems() {
     showItemMenu(itemId, event.clientX, event.clientY);
   };
 
+  const itemScale = normalizeLibraryItemScale(libraryItemScale);
+  const listLayout = libraryViewMode === "list";
+
   return (
     <div
-      className="grid gap-3.5"
+      className={listLayout ? "grid gap-2" : "grid gap-3.5"}
       style={{
-        gridTemplateColumns:
-          libraryViewMode === "list" ? "1fr" : "repeat(auto-fill,minmax(270px,1fr))",
+        gridTemplateColumns: listLayout
+          ? "1fr"
+          : `repeat(auto-fill,minmax(${GRID_COLUMN_WIDTHS[itemScale]}px,1fr))`,
       }}
     >
       {displayItems.map((item, itemIndex) => {
@@ -78,7 +93,6 @@ export function SpaceLibraryItems() {
         const previousDateGroup =
           itemIndex > 0 ? libraryDateGroupLabel(displayItems[itemIndex - 1], sort) : "";
         const assetStack = stackByItemID.get(item.id);
-        const listLayout = libraryViewMode === "list";
 
         return (
           <Fragment key={item.id}>
@@ -90,6 +104,7 @@ export function SpaceLibraryItems() {
             <LibraryItemCard
               assetStack={assetStack}
               item={item}
+              itemScale={itemScale}
               listLayout={listLayout}
               onContextMenu={openItemContextMenu}
               onShowMenu={showItemMenu}
@@ -118,6 +133,7 @@ export function SpaceLibraryItems() {
 function LibraryItemCard({
   assetStack,
   item,
+  itemScale,
   listLayout,
   onContextMenu,
   onShowMenu,
@@ -125,6 +141,7 @@ function LibraryItemCard({
 }: {
   assetStack?: LibraryAssetStack;
   item: SpaceLibraryItem;
+  itemScale: number;
   listLayout: boolean;
   onContextMenu: (event: ReactMouseEvent, itemId: string) => void;
   onShowMenu: (itemId: string, left: number, top: number) => void;
@@ -146,29 +163,47 @@ function LibraryItemCard({
     itemActions: { toggleSelectedItem, updateItem },
     collectionActions: { reorderAlbumItem },
   } = useSpaceLibraryContext();
-  const itemCardLayout = listLayout
-    ? "grid grid-cols-[132px_minmax(0,1fr)] items-center gap-3"
-    : "";
+  const { startDrag, state } = usePointerDrag();
+  const reorderable = canReorderAlbum && selectedItemIds.length === 0;
+  const dragging = state.payload?.kind === LIBRARY_ITEM_DRAG_KIND && state.payload.id === item.id;
+  const dropZone = useDropZone({
+    id: `library-item:${item.id}`,
+    accepts: (payload) =>
+      reorderable && payload.kind === LIBRARY_ITEM_DRAG_KIND && payload.id !== item.id,
+    onDrop: (payload) => {
+      setDraggedAlbumItemId("");
+      void reorderAlbumItem(item.id, payload.id);
+    },
+  });
   const itemSelectionStyle = selected ? "ring-2 ring-primary" : "ring-1 ring-foreground/10";
 
   return (
     <article
       className={[
         "group relative min-w-0 rounded-xl bg-card p-2 shadow-xs",
-        "transition-[background-color,box-shadow] hover:bg-accent",
-        itemCardLayout,
-        itemSelectionStyle,
+        "transition-[background-color,box-shadow,opacity] hover:bg-accent",
+        listLayout ? "flex items-center gap-3" : "flex flex-col",
+        reorderable ? "cursor-grab" : "",
+        dragging ? "opacity-40" : "",
+        dropZone.active ? "ring-2 ring-primary" : itemSelectionStyle,
       ].join(" ")}
-      draggable={canReorderAlbum && selectedItemIds.length === 0}
+      style={
+        listLayout
+          ? ({
+              "--library-thumb-width": `${LIST_THUMBNAIL_WIDTHS[itemScale]}px`,
+            } as CSSProperties)
+          : undefined
+      }
+      ref={dropZone.ref}
       onContextMenu={(event) => onContextMenu(event, item.id)}
-      onDragStart={() => setDraggedAlbumItemId(item.id)}
-      onDragEnd={() => setDraggedAlbumItemId("")}
-      onDragOver={(event) => {
-        if (canReorderAlbum) event.preventDefault();
-      }}
-      onDrop={(event) => {
-        event.preventDefault();
-        void reorderAlbumItem(item.id);
+      onPointerDown={(event) => {
+        if (!reorderable) return;
+        if ((event.target as HTMLElement).closest("button, input, [role='combobox']")) return;
+        startDrag(
+          event,
+          { kind: LIBRARY_ITEM_DRAG_KIND, id: item.id },
+          <LibraryItemDragPreview name={item.display_name} />,
+        );
       }}
     >
       <LibraryItemPreview
@@ -177,7 +212,7 @@ function LibraryItemCard({
         selected={selected}
         selectionAvailable={canEditLibrary || canCopyLibrary}
       />
-      <div className={listLayout ? "min-w-0 py-1 pr-1" : "px-1 pb-1 pt-2.5"}>
+      <div className={listLayout ? "min-w-0 flex-1 py-1 pr-1" : "min-w-0 px-1 pb-1 pt-2.5"}>
         <div className="flex min-w-0 items-start gap-2">
           <div className="min-w-0 flex-1">
             <p
@@ -186,9 +221,12 @@ function LibraryItemCard({
             >
               {item.display_name}
             </p>
-            <p className="m-0 mt-1 truncate text-[10px] text-muted-foreground">
-              {formatBytes(Number(item.file.intrinsic_metadata.byte_size ?? 0))} ·{" "}
-              {formatTime(item.added_at)}
+            <p className="m-0 mt-1 truncate text-[11px] leading-4 text-muted-foreground">
+              {[
+                formatBytes(Number(item.file.intrinsic_metadata.byte_size ?? 0)),
+                libraryFileTypeLabel(item),
+                formatTime(item.added_at),
+              ].join(" · ")}
             </p>
           </div>
           {canEditLibrary || canCopyLibrary ? (
@@ -200,7 +238,6 @@ function LibraryItemCard({
             />
           ) : null}
         </div>
-        <LibraryItemMetadata item={item} listLayout={listLayout} />
       </div>
     </article>
   );
@@ -217,9 +254,19 @@ function LibraryItemCard({
     selectionAvailable: boolean;
   }) {
     return (
-      <div className="relative min-w-0">
+      <div
+        className={
+          listLayout
+            ? "relative w-[var(--library-thumb-width)] shrink-0"
+            : "relative w-full min-w-0"
+        }
+      >
         <Button
-          className="relative grid aspect-[4/3] w-full place-items-center overflow-hidden rounded-lg border-0 bg-muted text-muted-foreground"
+          className={[
+            "relative grid aspect-[4/3] h-auto w-full place-items-center overflow-hidden",
+            "rounded-lg border-0 bg-muted p-0 text-muted-foreground hover:bg-muted",
+          ].join(" ")}
+          variant="ghost"
           type="button"
           onClick={(event) => {
             libraryViewerTriggerRef.current = event.currentTarget;
@@ -309,46 +356,10 @@ function LibraryItemActions({
   );
 }
 
-function LibraryItemMetadata({
-  item,
-  listLayout,
-}: {
-  item: SpaceLibraryItem;
-  listLayout: boolean;
-}) {
-  const rowClassName = listLayout ? "min-w-0" : "flex items-center justify-between gap-3";
-
+function LibraryItemDragPreview({ name }: { name: string }) {
   return (
-    <dl
-      className={`${listLayout ? "mt-3 grid grid-cols-3 gap-x-4" : "mt-3 grid gap-1.5"} text-[10px] leading-4`}
-    >
-      <LibraryItemMetadataRow label="Size" listLayout={listLayout}>
-        {formatBytes(Number(item.file.intrinsic_metadata.byte_size ?? 0))}
-      </LibraryItemMetadataRow>
-      <LibraryItemMetadataRow label="Date" listLayout={listLayout}>
-        {formatTime(item.added_at)}
-      </LibraryItemMetadataRow>
-      <div className={rowClassName}>
-        <dt className="text-muted-foreground">File type</dt>
-        <dd className="m-0 truncate text-muted-foreground">{libraryFileTypeLabel(item)}</dd>
-      </div>
-    </dl>
-  );
-}
-
-function LibraryItemMetadataRow({
-  children,
-  label,
-  listLayout,
-}: {
-  children: string;
-  label: string;
-  listLayout: boolean;
-}) {
-  return (
-    <div className={listLayout ? "min-w-0" : "flex items-center justify-between gap-3"}>
-      <dt className="text-muted-foreground">{label}</dt>
-      <dd className="m-0 truncate text-muted-foreground">{children}</dd>
+    <div className="max-w-[240px] truncate rounded-lg border border-border bg-card px-3 py-2 text-xs font-medium text-foreground shadow-lg">
+      {name}
     </div>
   );
 }

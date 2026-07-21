@@ -90,7 +90,7 @@ export function RemoteListPanel(props: RemoteListPanelProps) {
             <EmptyState
               compact
               title="No remotes found"
-              description="Add a provider remote to make cloud storage available in Explorer."
+              description="Add a provider remote to make cloud storage available in Files."
             />
           )
         ) : null}

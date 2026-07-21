@@ -1,6 +1,5 @@
-import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
-  Bot,
   Briefcase,
   Check,
   ChevronDown,
@@ -10,60 +9,61 @@ import {
   Images,
   Map as MapIcon,
   MessageSquare,
-  MessagesSquare,
+  Plug,
   Plus,
   Settings2,
-  Sparkles,
   Trash2,
   Users,
 } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
 import { Button } from "@/ui";
-import { Checkbox } from "@/ui";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
 } from "@/ui";
-import { Input } from "@/ui";
-import { Popover, PopoverContent, PopoverTrigger } from "@/ui";
 import { Progress } from "@/ui";
+import { Skeleton } from "@/ui";
 import { Separator } from "@/ui";
 import { cn } from "@/ui";
 import { useAuth } from "@/features/auth/AuthContext";
-import { agentArchitectureApi } from "@/stores/agents/useAgentArchitectureStore";
+import { useMinimumSpin } from "@/hooks/useMinimumSpin";
 import { spacesApi } from "@/stores/spaces/useSpacesBackendStore";
-import type {
-  AgentConversation,
-  SpaceConversation,
-} from "@/models/interfaces/features/spaces/types";
+import type { SpaceConversation } from "@/models/interfaces/features/spaces/types";
 import type {
   Space,
   SpaceMember,
   SpaceStorageUsage,
-  SpaceStudioResource,
   SpacesSnapshot,
 } from "@/models/interfaces/features/spaces/types";
 import { useSpacesStore } from "@/stores/spaces/useSpacesStore";
 import { SpaceSectionNavigation } from "./SpaceSectionNavigation";
 import { SpaceSidebarSection } from "./SpaceSidebarSection";
+import { SpaceChatConversationList } from "./SpaceChatConversationList";
+import { NotesPanelSidebar } from "@/features/notes/components/NotesPanelSidebar";
+import { defaultNoteGroup } from "@/features/notes/noteFilters";
+import { spaceNotesEnabled } from "@/features/notes/availability";
+import {
+  CreateEditConversationDialog,
+  type ConversationDialogKind,
+} from "./CreateEditConversationDialog";
+import { SpaceAssistantSessionSidebar } from "../mika/SpaceAssistantSessionSidebar";
 
 const emptyMembers: SpaceMember[] = [];
-const emptyAgents: SpaceStudioResource[] = [];
 const validSections = new Set([
   "chat",
-  "agents",
   "tasks",
+  "notes",
   "library",
-  "studio",
+  "assistant",
   "members",
   "settings",
 ]);
-const validSettingsSections = new Set(["general", "chat", "studio", "agents"]);
+const validSettingsSections = new Set(["general", "chat", "integrations"]);
 
 export function SpacePanelContent(props: {
   spaces: Space[];
@@ -75,36 +75,29 @@ export function SpacePanelContent(props: {
   const location = useLocation();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const [spacesListSkeletonVisible] = useMinimumSpin(props.loading && props.spaces.length === 0);
   const routeParts = location.pathname.split("/").filter(Boolean);
-  const activeSpaceId = routeParts[0] === "spaces" ? (routeParts[1] ?? "") : "";
+  const activeSpaceId = routeParts[0] === "spaces" ? decodeRouteSegment(routeParts[1] ?? "") : "";
   const activeSpace = props.spaces.find((space) => space.id === activeSpaceId);
   const routeSection = routeParts[2] === "files" ? "library" : (routeParts[2] ?? "chat");
   const section = validSections.has(routeSection) ? routeSection : "chat";
-  const agentStudioActive =
-    section === "studio" || (section === "agents" && routeParts[3] === "studio");
-  const studioKindSegment =
-    agentStudioActive && section === "agents" ? routeParts[4] : routeParts[3];
-  const studioKind = studioKindSegment === "workflows" ? "workflows" : "agents";
   const settingsSection = validSettingsSections.has(routeParts[3] ?? "")
     ? routeParts[3]
     : "general";
   const search = useMemo(() => new URLSearchParams(location.search), [location.search]);
   const libraryCollection = search.get("collection") ?? "recent";
-  const [agentConversations, setAgentConversations] = useState<AgentConversation[]>([]);
   const [groupConversations, setGroupConversations] = useState<SpaceConversation[]>([]);
-  const [groupDialogOpen, setGroupDialogOpen] = useState(false);
-  const [groupTitle, setGroupTitle] = useState("");
-  const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>([]);
-  const [groupSaving, setGroupSaving] = useState(false);
-  const [groupError, setGroupError] = useState("");
+  const [conversationDialogOpen, setConversationDialogOpen] = useState(false);
+  const [conversationDialogKind, setConversationDialogKind] =
+    useState<ConversationDialogKind>("group");
+  const [editingConversation, setEditingConversation] = useState<SpaceConversation | null>(null);
   const [spacePickerOpen, setSpacePickerOpen] = useState(false);
   const [libraryUsage, setLibraryUsage] = useState<SpaceStorageUsage | null>(null);
-  const { members, agents, loadMembers, loadChatAgents } = useSpacesStore(
+  const { members, snapshotReady, loadMembers } = useSpacesStore(
     useShallow((state) => ({
       members: state.membersBySpace[activeSpaceId] ?? emptyMembers,
-      agents: state.agentsBySpace[activeSpaceId] ?? emptyAgents,
+      snapshotReady: state.snapshotReady,
       loadMembers: state.loadMembers,
-      loadChatAgents: state.loadChatAgents,
     })),
   );
 
@@ -112,52 +105,20 @@ export function SpacePanelContent(props: {
     if (props.loading || activeSpace || props.spaces.length === 0) return;
     const fallback = props.spaces.find((space) => space.is_personal) ?? props.spaces[0];
     const fallbackSection = fallback.is_personal && section === "chat" ? "library" : section;
-    navigate(
-      spaceSectionPath(
-        fallback.id,
-        fallbackSection,
-        studioKind,
-        settingsSection,
-        agentStudioActive,
-      ),
-      { replace: true },
-    );
-  }, [
-    activeSpace,
-    agentStudioActive,
-    navigate,
-    props.loading,
-    props.spaces,
-    section,
-    settingsSection,
-    studioKind,
-  ]);
+    navigate(spaceSectionPath(fallback.id, fallbackSection, settingsSection), { replace: true });
+  }, [activeSpace, navigate, props.loading, props.spaces, section, settingsSection]);
 
   useEffect(() => {
-    if (!activeSpaceId) return;
+    if (!user || !snapshotReady || !activeSpaceId || !activeSpace) {
+      setGroupConversations([]);
+      return;
+    }
     void loadMembers(activeSpaceId);
-    if (
-      activeSpace?.permissions?.["studio.view"] !== false ||
-      activeSpace?.permissions?.["agents.run"] !== false
-    )
-      void loadChatAgents(activeSpaceId);
     if (activeSpace?.permissions?.["messages.read"] === false) {
-      setAgentConversations([]);
       setGroupConversations([]);
       return;
     }
     let active = true;
-    void agentArchitectureApi
-      .conversations()
-      .then((result) => {
-        if (active)
-          setAgentConversations(
-            result.conversations.filter((conversation) => conversation.space_id === activeSpaceId),
-          );
-      })
-      .catch(() => {
-        if (active) setAgentConversations([]);
-      });
     void spacesApi
       .conversations(activeSpaceId)
       .then((result) => {
@@ -169,10 +130,10 @@ export function SpacePanelContent(props: {
     return () => {
       active = false;
     };
-  }, [activeSpace?.permissions, activeSpaceId, loadChatAgents, loadMembers]);
+  }, [activeSpace, activeSpaceId, loadMembers, snapshotReady, user]);
 
   useEffect(() => {
-    if (!activeSpaceId) return;
+    if (!snapshotReady || !activeSpaceId || !activeSpace) return;
     const reload = (event: Event) => {
       const detail = (event as CustomEvent<{ space_id?: string }>).detail;
       if (detail?.space_id !== activeSpaceId) return;
@@ -183,10 +144,10 @@ export function SpacePanelContent(props: {
     };
     window.addEventListener("misty:space-conversation-event", reload);
     return () => window.removeEventListener("misty:space-conversation-event", reload);
-  }, [activeSpaceId]);
+  }, [activeSpace, activeSpaceId, snapshotReady]);
 
   useEffect(() => {
-    if (section !== "library" || !activeSpaceId) {
+    if (section !== "library" || !snapshotReady || !activeSpaceId || !activeSpace) {
       setLibraryUsage(null);
       return;
     }
@@ -211,129 +172,54 @@ export function SpacePanelContent(props: {
       active = false;
       window.removeEventListener("misty:space-library-event", reloadOnLibraryEvent);
     };
-  }, [activeSpaceId, section]);
+  }, [activeSpace, activeSpaceId, section, snapshotReady]);
 
   const switchSpace = (spaceId: string) => {
     if (!spaceId || spaceId === activeSpaceId) return;
     const nextSpace = props.spaces.find((space) => space.id === spaceId);
     const nextSection = nextSpace?.is_personal && section === "chat" ? "library" : section;
+    navigate(spaceSectionPath(spaceId, nextSection, settingsSection));
+  };
+  const handleConversationSaved = (saved: SpaceConversation) => {
+    setGroupConversations((current) => {
+      const exists = current.some((conversation) => conversation.id === saved.id);
+      return exists
+        ? current.map((conversation) => (conversation.id === saved.id ? saved : conversation))
+        : [saved, ...current];
+    });
     navigate(
-      spaceSectionPath(spaceId, nextSection, studioKind, settingsSection, agentStudioActive),
+      `/spaces/${encodeURIComponent(activeSpaceId)}/chat?conversation=${encodeURIComponent(saved.id)}`,
     );
   };
-  const closeGroupDialog = () => {
-    if (groupSaving) return;
-    setGroupDialogOpen(false);
-    setGroupTitle("");
-    setSelectedMemberIds([]);
-    setGroupError("");
-  };
-  const createGroup = async (event: FormEvent) => {
-    event.preventDefault();
-    if (!activeSpaceId || !groupTitle.trim() || selectedMemberIds.length === 0 || groupSaving)
-      return;
-    setGroupSaving(true);
-    setGroupError("");
-    try {
-      const created = await spacesApi.createConversation(
-        activeSpaceId,
-        groupTitle.trim(),
-        selectedMemberIds,
-      );
-      setGroupConversations((current) => [created, ...current]);
-      setGroupDialogOpen(false);
-      setGroupTitle("");
-      setSelectedMemberIds([]);
-      navigate(
-        `/spaces/${encodeURIComponent(activeSpaceId)}/chat?conversation=${encodeURIComponent(created.id)}`,
-      );
-    } catch (reason) {
-      setGroupError(
-        reason instanceof Error ? reason.message : "The group chat could not be created.",
-      );
-    } finally {
-      setGroupSaving(false);
-    }
-  };
 
-  const conversationByAgent = new Map(
-    agentConversations.map((conversation) => [conversation.agent_id, conversation]),
-  );
-  const enabledAgents = agents.filter((agent) => agent.enabled);
   const canAddSpace = (props.limits?.remaining_owned ?? 1) > 0;
+  // The active Space is the menu title, so it is not repeated in the list below.
+  const otherSpaces = props.spaces.filter((space) => space.id !== activeSpaceId);
   const sidebarContext =
     section === "chat" ? (
       <div className="grid gap-3">
-        {enabledAgents.length ? (
-          <SpaceSidebarSection title="Agents">
-            <nav className="grid gap-1" aria-label="Agent conversations">
-              {enabledAgents.map((agent) => {
-                const conversation = conversationByAgent.get(agent.id);
-                const params = new URLSearchParams({ agentId: agent.id });
-                if (conversation) params.set("agentConversationId", conversation.id);
-                return (
-                  <Link
-                    className={conversationLinkClass(search.get("agentId") === agent.id)}
-                    key={agent.id}
-                    to={`/spaces/${encodeURIComponent(activeSpaceId)}/chat?${params.toString()}`}
-                  >
-                    <span className="grid size-7 place-items-center rounded-md bg-sidebar-accent text-muted-foreground">
-                      <Bot size={14} />
-                    </span>
-                    <span className="min-w-0 truncate font-medium">{agent.name}</span>
-                  </Link>
-                );
-              })}
-            </nav>
-          </SpaceSidebarSection>
-        ) : null}
-
-        <SpaceSidebarSection title="Conversations">
-          <nav className="grid gap-1" aria-label="Space conversations">
-            <Link
-              className={conversationLinkClass(
-                !search.has("conversation") && !search.has("agentId"),
-              )}
-              to={`/spaces/${encodeURIComponent(activeSpaceId)}/chat`}
-            >
-              <span className="grid size-7 place-items-center rounded-md bg-sidebar-accent text-muted-foreground">
-                <Users size={14} />
-              </span>
-              <span className="min-w-0 truncate font-medium">Everyone</span>
-            </Link>
-            {groupConversations.map((conversation) => (
-              <Link
-                className={conversationLinkClass(search.get("conversation") === conversation.id)}
-                key={conversation.id}
-                to={`/spaces/${encodeURIComponent(activeSpaceId)}/chat?conversation=${encodeURIComponent(conversation.id)}`}
-              >
-                <span className="grid size-7 place-items-center rounded-md bg-sidebar-accent text-muted-foreground">
-                  <MessagesSquare size={14} />
-                </span>
-                <span className="min-w-0">
-                  <span className="block truncate font-medium">{conversation.title}</span>
-                  <span className="block truncate text-[11px] text-muted-foreground">
-                    {conversation.members
-                      .map((member) => (member.user_id === user?.id ? "You" : member.name))
-                      .join(", ")}
-                  </span>
-                </span>
-              </Link>
-            ))}
-            {members.some((member) => member.user_id !== user?.id) ? (
-              <Button
-                className="mt-1 h-10 w-full justify-start border-sidebar-border/60 bg-transparent px-2.5 text-sm text-sidebar-foreground shadow-none"
-                variant="outline"
-                type="button"
-                onClick={() => setGroupDialogOpen(true)}
-              >
-                <Plus size={14} />
-                <span>Add group chat</span>
-              </Button>
-            ) : null}
-          </nav>
-        </SpaceSidebarSection>
+        <SpaceChatConversationList
+          activeSpaceId={activeSpaceId}
+          conversations={groupConversations}
+          activeConversationId={search.get("conversation")}
+          currentUserId={user?.id}
+          onCreateConversation={(kind) => {
+            setEditingConversation(null);
+            setConversationDialogKind(kind);
+            setConversationDialogOpen(true);
+          }}
+          onEditConversation={(conversation) => {
+            setEditingConversation(conversation);
+            setConversationDialogKind(conversation.members.length > 2 ? "group" : "direct");
+            setConversationDialogOpen(true);
+          }}
+        />
       </div>
+    ) : section === "notes" && spaceNotesEnabled ? (
+      <NotesPanelSidebar
+        spaceId={activeSpaceId}
+        activeGroup={search.get("group") ?? defaultNoteGroup}
+      />
     ) : section === "library" ? (
       <div className="grid gap-3">
         <SpaceSidebarSection title="Browse">
@@ -388,6 +274,12 @@ export function SpacePanelContent(props: {
           ) : null}
         </section>
       </div>
+    ) : section === "assistant" && user ? (
+      <SpaceAssistantSessionSidebar
+        accountId={user.id}
+        spaceId={activeSpaceId}
+        accessReady={snapshotReady && Boolean(activeSpace)}
+      />
     ) : section === "settings" ? (
       <SpaceSidebarSection title="Preferences">
         <nav className="grid gap-1" aria-label="Space settings sections">
@@ -404,16 +296,10 @@ export function SpacePanelContent(props: {
             to={`/spaces/${encodeURIComponent(activeSpaceId)}/settings/chat`}
           />
           <SettingsPanelLink
-            active={settingsSection === "studio"}
-            icon={Sparkles}
-            label="Studio"
-            to={`/spaces/${encodeURIComponent(activeSpaceId)}/settings/studio`}
-          />
-          <SettingsPanelLink
-            active={settingsSection === "agents"}
-            icon={Bot}
-            label="Agents"
-            to={`/spaces/${encodeURIComponent(activeSpaceId)}/settings/agents`}
+            active={settingsSection === "integrations"}
+            icon={Plug}
+            label="Integrations"
+            to={`/spaces/${encodeURIComponent(activeSpaceId)}/settings/integrations`}
           />
         </nav>
       </SpaceSidebarSection>
@@ -421,13 +307,13 @@ export function SpacePanelContent(props: {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <Popover open={spacePickerOpen} onOpenChange={setSpacePickerOpen}>
-        <PopoverTrigger asChild>
+      <DropdownMenu open={spacePickerOpen} onOpenChange={setSpacePickerOpen}>
+        <DropdownMenuTrigger asChild>
           <Button
             className="mb-4 h-11 w-full min-w-0 justify-start gap-2.5 border-sidebar-border/60 bg-sidebar-accent/35 px-3 text-left text-sidebar-accent-foreground shadow-none hover:bg-sidebar-accent"
             variant="outline"
             type="button"
-            aria-label={`Switch Space${activeSpace?.name ? `, current Space: ${activeSpace.name}` : ""}`}
+            aria-label={activeSpace?.name ? `Space menu: ${activeSpace.name}` : "Space menu"}
             title={activeSpace?.name ?? "Spaces"}
             disabled={props.loading || props.spaces.length === 0}
           >
@@ -439,83 +325,80 @@ export function SpacePanelContent(props: {
             </span>
             <ChevronDown className="shrink-0 text-muted-foreground" size={15} />
           </Button>
-        </PopoverTrigger>
-        <PopoverContent
-          className="w-[var(--radix-popover-trigger-width)] min-w-[220px] p-1.5"
+        </DropdownMenuTrigger>
+        <DropdownMenuContent
+          className="w-[var(--radix-dropdown-menu-trigger-width)] min-w-[240px]"
           align="start"
           sideOffset={6}
         >
-          <p className="mb-1 px-2 py-1 text-xs font-semibold text-muted-foreground">Switch Space</p>
-          <div className="misty-transient-scrollbar max-h-60 overflow-y-auto">
-            {props.spaces.map((space) => (
-              <div
-                className={cn(
-                  "group flex min-w-0 items-center rounded-md",
-                  space.id === activeSpaceId && "bg-accent",
-                )}
-                key={space.id}
-              >
-                <Button
-                  className="h-auto min-h-10 min-w-0 flex-1 justify-start gap-2 bg-transparent px-2 py-1.5 text-left text-sm shadow-none hover:bg-accent"
-                  variant="ghost"
-                  type="button"
-                  aria-current={space.id === activeSpaceId ? "true" : undefined}
-                  onClick={() => {
-                    setSpacePickerOpen(false);
-                    switchSpace(space.id);
-                  }}
-                >
-                  <span className="grid size-4 shrink-0 place-items-center text-primary">
-                    {space.id === activeSpaceId ? <Check size={13} /> : null}
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate font-medium text-foreground">{space.name}</span>
-                    <span className="block truncate text-[11px] font-normal text-muted-foreground">
-                      {space.is_personal
-                        ? "Personal Space"
-                        : space.is_shared
-                          ? "Shared Space"
-                          : "Private Space"}
-                    </span>
-                  </span>
-                </Button>
-                <Button
-                  className="mr-1 size-7 shrink-0 opacity-60 shadow-none group-hover:opacity-100 group-focus-within:opacity-100"
-                  size="icon"
-                  variant="ghost"
-                  type="button"
-                  title={`${space.name} settings`}
-                  aria-label={`Open settings for ${space.name}`}
-                  onClick={() => {
-                    setSpacePickerOpen(false);
-                    navigate(`/spaces/${encodeURIComponent(space.id)}/settings/general`);
-                  }}
-                >
-                  <Settings2 size={13} />
-                </Button>
-              </div>
-            ))}
-          </div>
-          <Separator className="my-1" />
-          <Button
-            className="h-10 w-full justify-start px-2 text-sm shadow-none"
-            variant="ghost"
-            type="button"
+          <DropdownMenuLabel className="truncate">
+            {activeSpace?.name ?? "Spaces"}
+          </DropdownMenuLabel>
+          <DropdownMenuSeparator />
+
+          <DropdownMenuItem
+            disabled={!activeSpaceId}
+            onSelect={() => navigate(`/spaces/${encodeURIComponent(activeSpaceId)}/members`)}
+          >
+            <Users size={14} />
+            Members
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            disabled={!activeSpaceId}
+            onSelect={() =>
+              navigate(`/spaces/${encodeURIComponent(activeSpaceId)}/settings/general`)
+            }
+          >
+            <Settings2 size={14} />
+            Settings
+          </DropdownMenuItem>
+
+          <DropdownMenuSeparator />
+          <DropdownMenuLabel className="truncate">New</DropdownMenuLabel>
+          <DropdownMenuItem
             disabled={!canAddSpace}
-            title={canAddSpace ? "New Space" : "You already own three Spaces"}
-            onClick={() => {
-              setSpacePickerOpen(false);
-              props.onAddSpace();
-            }}
+            title={canAddSpace ? undefined : "You already own three Spaces"}
+            onSelect={() => props.onAddSpace()}
           >
             <Plus size={14} />
-            <span>New Space</span>
-          </Button>
-        </PopoverContent>
-      </Popover>
+            Add Space
+          </DropdownMenuItem>
 
-      {props.loading && props.spaces.length === 0 ? (
-        <p className="mb-3 px-2 text-xs text-muted-foreground">Loading Spaces...</p>
+          {otherSpaces.length > 0 ? (
+            <>
+              <DropdownMenuSeparator />
+              <div className="misty-transient-scrollbar max-h-60 overflow-y-auto">
+                {otherSpaces.map((space) => (
+                  <DropdownMenuItem
+                    key={space.id}
+                    className="gap-2"
+                    onSelect={() => switchSpace(space.id)}
+                  >
+                    <span className="grid size-4 shrink-0 place-items-center text-muted-foreground">
+                      <Briefcase size={13} />
+                    </span>
+                    <span className="min-w-0 flex-1 truncate">{space.name}</span>
+                  </DropdownMenuItem>
+                ))}
+              </div>
+            </>
+          ) : null}
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      {spacesListSkeletonVisible ? (
+        <div className="grid gap-2" aria-busy="true" role="status">
+          <span className="sr-only">Loading Spaces</span>
+          <Skeleton className="h-11 rounded-md" />
+          <div className="grid grid-cols-5 gap-1.5">
+            {[0, 1, 2, 3, 4].map((index) => (
+              <Skeleton key={index} className="h-10 rounded-lg" />
+            ))}
+          </div>
+          <Skeleton className="mt-2 h-9 rounded-md" />
+          <Skeleton className="h-9 w-4/5 rounded-md" />
+          <Skeleton className="h-9 w-3/5 rounded-md" />
+        </div>
       ) : null}
       {props.notices ? (
         <div className="misty-transient-scrollbar mb-3 max-h-40 shrink-0 overflow-y-auto">
@@ -530,86 +413,16 @@ export function SpacePanelContent(props: {
         />
       ) : null}
 
-      <Dialog
-        open={groupDialogOpen}
-        onOpenChange={(open) => {
-          if (open) setGroupDialogOpen(true);
-          else closeGroupDialog();
-        }}
-      >
-        <DialogContent className="max-w-sm">
-          <form onSubmit={(event) => void createGroup(event)}>
-            <DialogHeader>
-              <DialogTitle>Create a group chat</DialogTitle>
-              <DialogDescription>
-                Only selected members can see this conversation.
-              </DialogDescription>
-            </DialogHeader>
-            <label className="mt-5 grid gap-2 text-xs font-medium text-muted-foreground">
-              Group name
-              <Input
-                autoFocus
-                maxLength={80}
-                placeholder="Launch crew"
-                value={groupTitle}
-                onChange={(event) => setGroupTitle(event.target.value)}
-              />
-            </label>
-            <fieldset className="misty-transient-scrollbar mt-4 grid max-h-56 gap-1 overflow-y-auto border-0 p-0">
-              <legend className="mb-2 text-xs font-medium text-muted-foreground">Members</legend>
-              {members
-                .filter((member) => member.user_id !== user?.id)
-                .map((member) => (
-                  <label
-                    className="flex min-h-10 items-center gap-3 rounded-md px-3 text-xs hover:bg-accent"
-                    key={member.user_id}
-                  >
-                    <Checkbox
-                      checked={selectedMemberIds.includes(member.user_id)}
-                      onCheckedChange={(checked) =>
-                        setSelectedMemberIds((current) =>
-                          checked
-                            ? [...current, member.user_id]
-                            : current.filter((id) => id !== member.user_id),
-                        )
-                      }
-                    />
-                    <span className="min-w-0">
-                      <span className="block truncate text-foreground">{member.name}</span>
-                      <span className="block truncate text-[9px] text-muted-foreground">
-                        {member.email}
-                      </span>
-                    </span>
-                  </label>
-                ))}
-            </fieldset>
-            {groupError ? (
-              <p
-                className="mb-0 mt-3 rounded-lg border border-destructive/25 bg-destructive/10 px-3 py-2 text-xs text-destructive"
-                role="alert"
-              >
-                {groupError}
-              </p>
-            ) : null}
-            <DialogFooter className="mt-5">
-              <Button
-                variant="outline"
-                type="button"
-                disabled={groupSaving}
-                onClick={closeGroupDialog}
-              >
-                Cancel
-              </Button>
-              <Button
-                type="submit"
-                disabled={groupSaving || !groupTitle.trim() || selectedMemberIds.length === 0}
-              >
-                {groupSaving ? "Creating..." : "Create group"}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+      <CreateEditConversationDialog
+        spaceId={activeSpaceId}
+        open={conversationDialogOpen}
+        onOpenChange={setConversationDialogOpen}
+        members={members}
+        currentUserId={user?.id}
+        conversation={editingConversation}
+        kindHint={conversationDialogKind}
+        onSaved={handleConversationSaved}
+      />
     </div>
   );
 }
@@ -649,30 +462,19 @@ function SpaceSidebarLink({
   );
 }
 
-export function spaceSectionPath(
-  spaceId: string,
-  section: string,
-  studioKind: string,
-  settingsSection: string,
-  agentStudioActive = false,
-) {
-  const destination =
-    section === "studio" || agentStudioActive
-      ? `agents/studio/${studioKind}`
-      : section === "settings"
-        ? `settings/${settingsSection}`
-        : section;
+export function spaceSectionPath(spaceId: string, section: string, settingsSection: string) {
+  const destination = section === "settings" ? `settings/${settingsSection}` : section;
   return `/spaces/${encodeURIComponent(spaceId)}/${destination}`;
 }
 
-function conversationLinkClass(isActive: boolean) {
-  return cn(
-    "grid min-h-11 grid-cols-[32px_minmax(0,1fr)] items-center gap-2.5 rounded-md px-2.5 text-sm no-underline outline-none transition-colors focus-visible:ring-1 focus-visible:ring-sidebar-ring",
-    isActive
-      ? "bg-sidebar-accent text-sidebar-accent-foreground"
-      : "text-sidebar-foreground hover:bg-sidebar-accent/65 hover:text-sidebar-accent-foreground",
-  );
+function decodeRouteSegment(value: string): string {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return "";
+  }
 }
+
 function sidebarLinkClass(isActive: boolean) {
   return cn(
     "flex h-10 min-w-0 items-center gap-2.5 rounded-md px-2.5 text-sm no-underline outline-none transition-colors focus-visible:ring-1 focus-visible:ring-sidebar-ring",

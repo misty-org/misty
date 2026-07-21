@@ -541,17 +541,17 @@ export function useSpaceLibraryCollectionActions(
     }
   };
 
-  const reorderAlbumItem = async (targetItemId: string) => {
+  const reorderAlbumItem = async (targetItemId: string, movingItemId = draggedAlbumItemId) => {
     if (
       !canEditLibrary ||
       !currentAlbum ||
       !canReorderAlbum ||
-      !draggedAlbumItemId ||
-      draggedAlbumItemId === targetItemId
+      !movingItemId ||
+      movingItemId === targetItemId
     )
       return;
     const nextItems = [...visibleItems];
-    const from = nextItems.findIndex((item) => item.id === draggedAlbumItemId);
+    const from = nextItems.findIndex((item) => item.id === movingItemId);
     const to = nextItems.findIndex((item) => item.id === targetItemId);
     if (from < 0 || to < 0) return;
     const [moved] = nextItems.splice(from, 1);

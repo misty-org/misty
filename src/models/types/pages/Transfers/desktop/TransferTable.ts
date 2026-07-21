@@ -55,4 +55,5 @@ export type TransferTableActions = TransferActionHandlers & {
   historyWorking: boolean;
   queueWorking: boolean;
   isBatchPaused: (row: TransferRecord) => boolean;
+  isTransferPaused: (row: TransferRecord) => boolean;
 };
