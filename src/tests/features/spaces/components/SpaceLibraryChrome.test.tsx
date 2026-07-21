@@ -42,6 +42,8 @@ describe("SpaceLibraryHeader", () => {
           albumOrderAvailable={false}
           viewMode="grid"
           onViewMode={vi.fn()}
+          itemScale={1}
+          onItemScale={vi.fn()}
           visibleItemCount={6}
         />,
       );
@@ -51,6 +53,9 @@ describe("SpaceLibraryHeader", () => {
     expect(layout?.querySelectorAll("button")).toHaveLength(2);
     expect(layout?.querySelector('button[aria-label="Grid view"]')).not.toBeNull();
     expect(layout?.querySelector('button[aria-label="List view"]')).not.toBeNull();
+    const scale = container.querySelector('[aria-label="Item scale"]');
+    expect(scale?.querySelector('button[aria-label="Zoom out"]')).not.toBeNull();
+    expect(scale?.querySelector('button[aria-label="Zoom in"]')).not.toBeNull();
     expect(container.querySelector('[aria-label="Thumbnail density"]')).toBeNull();
     expect(container.querySelector('[aria-label="Library collections"]')).toBeNull();
     expect(container.querySelector('input[aria-label="Search Library"]')).not.toBeNull();

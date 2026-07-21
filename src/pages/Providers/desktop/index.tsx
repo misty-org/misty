@@ -1,11 +1,7 @@
-import type { ProvidersMultiPanelSnapshot } from "@/models/interfaces/pages/Providers/desktop/index";
-export type { ProvidersMultiPanelSnapshot } from "@/models/interfaces/pages/Providers/desktop/index";
-import { memo, useCallback, useEffect, useMemo } from "react";
+import { memo, useEffect, useMemo, useRef } from "react";
 import { useShallow } from "zustand/react/shallow";
-import type { MultiPanelClosedPane, MultiPanelTab } from "@/models/interfaces/workspace";
-import { MultiPanelWorkspace } from "@/features/workspace";
-import { createMultiPanelStore } from "@/features/workspace";
-import type { MultiPanelStore } from "@/models/interfaces/workspace";
+import { X } from "lucide-react";
+import { Button } from "@/ui";
 import { RemoteEditPanel } from "../components/RemoteEditPanel";
 import { RemoteListPanel } from "../components/RemoteListPanel";
 import { ProviderConnectionDialog } from "../components/ProviderConnectionDialog";
@@ -18,97 +14,54 @@ import {
   useProvidersStore,
 } from "@/stores/providers";
 
-const useProvidersMultiPanelStore = createMultiPanelStore({
-  idPrefix: "remotes",
-  defaultTitle: "Remotes",
-});
-const PROVIDERS_MULTIPANEL_STORAGE_KEY = "misty.remotes.multipanel.v1";
+// Remotes is a single-pane surface. The previous multi-tab workspace was
+// removed — there is one remotes pane, so it renders directly with a stable id.
+const REMOTES_WORKSPACE_ID = "remotes://root";
 const EMPTY_PROVIDER_REMOTES: ProviderRemote[] = [];
 const EMPTY_PROVIDER_WORKFLOWS: ProviderWorkflow[] = [];
 const EMPTY_PROVIDER_WORKSPACE = createProvidersWorkspaceState();
 
-const providersWorkspaceClass = "h-full bg-background";
+const providersShellClass = "grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] bg-background";
+
+const providersPageShellClass = "grid h-full min-h-0 grid-rows-[minmax(0,1fr)] bg-background";
+
+const providersOverlayHeaderClass =
+  "flex items-center justify-between gap-3 border-b border-border px-4 py-2.5";
+
+const providersPaneContainerClass = "min-h-0 min-w-0 overflow-hidden p-3";
 
 const providersPaneWorkspaceClass =
   "grid h-full min-h-0 min-w-0 grid-cols-[minmax(280px,0.42fr)_minmax(420px,0.58fr)] overflow-hidden rounded-lg border border-border bg-card max-[860px]:grid-cols-[minmax(0,1fr)]";
 
-export const ProvidersWorkspace = memo(function ProvidersWorkspace() {
-  const discardWorkspaces = useProvidersStore((state) => state.discardWorkspaces);
+export const ProvidersWorkspace = memo(function ProvidersWorkspace(props: {
+  presentation?: "page" | "overlay";
+  onClose?: () => void;
+}) {
   const loadProviders = useProvidersStore((state) => state.load);
-
-  useEffect(() => {
-    const multi = useProvidersMultiPanelStore.getState();
-    if (multi.tabs.length === 0) {
-      const snapshot = loadProvidersMultiPanelSnapshot();
-      if (!snapshot || !multi.hydrate(snapshot)) {
-        multi.initialize("remotes://root", "Remotes");
-      }
-    }
-    saveProvidersMultiPanelSnapshot(useProvidersMultiPanelStore.getState());
-    return useProvidersMultiPanelStore.subscribe(saveProvidersMultiPanelSnapshot);
-  }, []);
 
   useEffect(() => {
     void loadProviders();
   }, [loadProviders]);
 
-  const dirtyPaneIdsForTab = useCallback((tab: MultiPanelTab) => {
-    const { workspaces } = useProvidersStore.getState();
-    return tab.panes
-      .filter(
-        (pane) =>
-          selectProviderWorkspaceDerived(workspaces[pane.id] ?? createProvidersWorkspaceState())
-            .dirty,
-      )
-      .map((pane) => pane.id);
-  }, []);
-
-  const canCloseTab = useCallback(
-    (tab: MultiPanelTab) => {
-      const dirtyPaneIds = dirtyPaneIdsForTab(tab);
-      if (dirtyPaneIds.length === 0) return true;
-      const suffix =
-        dirtyPaneIds.length === 1 ? "this remote pane" : `${dirtyPaneIds.length} remote panes`;
-      return window.confirm(`Discard unsaved remote edits in ${suffix} before closing this tab?`);
-    },
-    [dirtyPaneIdsForTab],
-  );
-
-  const canClosePane = useCallback((paneId: string) => {
-    const workspace =
-      useProvidersStore.getState().workspaces[paneId] ?? createProvidersWorkspaceState();
-    if (!selectProviderWorkspaceDerived(workspace).dirty) return true;
-    return window.confirm("Discard unsaved remote edits before closing this remote pane?");
-  }, []);
-
-  const discardTabWorkspaces = useCallback(
-    (tab: MultiPanelTab) => {
-      discardWorkspaces(tab.panes.map((pane) => pane.id));
-    },
-    [discardWorkspaces],
-  );
-
-  const discardPaneWorkspace = useCallback(
-    (paneId: string) => {
-      discardWorkspaces([paneId]);
-    },
-    [discardWorkspaces],
-  );
+  const overlay = props.presentation === "overlay";
 
   return (
-    <>
-      <MultiPanelWorkspace
-        className={providersWorkspaceClass}
-        store={useProvidersMultiPanelStore}
-        canCloseTab={canCloseTab}
-        onDidCloseTab={discardTabWorkspaces}
-        canClosePane={canClosePane}
-        onDidClosePane={discardPaneWorkspace}
-        renderPane={(paneId) => <ProvidersPane workspaceId={paneId} />}
-      />
+    <div className={overlay ? providersShellClass : providersPageShellClass}>
+      {overlay ? (
+        <header className={providersOverlayHeaderClass}>
+          <h2 className="text-sm font-medium text-foreground">Remotes</h2>
+          <Button variant="ghost" size="icon" aria-label="Close remotes" onClick={props.onClose}>
+            <X size={16} />
+          </Button>
+        </header>
+      ) : null}
+
+      <div className={providersPaneContainerClass}>
+        <ProvidersPane workspaceId={REMOTES_WORKSPACE_ID} />
+      </div>
 
       <ProvidersDialogs />
-    </>
+    </div>
   );
 });
 
@@ -201,6 +154,7 @@ const ProvidersPane = memo(function ProvidersPane(props: { workspaceId: string }
     workspace,
     ensureWorkspace,
     load,
+    loadWorkspaceConfigPaths,
     openAddRemote,
     openRepairRemote,
     reloadWorkspaceRemote,
@@ -211,6 +165,7 @@ const ProvidersPane = memo(function ProvidersPane(props: { workspaceId: string }
     setWorkspaceDraftName,
     setWorkspaceTokenField,
     setWorkspaceTokenVisible,
+    testWorkspaceConnection,
   } = useProvidersStore(
     useShallow((state) => ({
       loading: state.loading,
@@ -221,6 +176,7 @@ const ProvidersPane = memo(function ProvidersPane(props: { workspaceId: string }
       workspace: state.workspaces[props.workspaceId] ?? EMPTY_PROVIDER_WORKSPACE,
       ensureWorkspace: state.ensureWorkspace,
       load: state.load,
+      loadWorkspaceConfigPaths: state.loadWorkspaceConfigPaths,
       openAddRemote: state.openAddRemote,
       openRepairRemote: state.openRepairRemote,
       reloadWorkspaceRemote: state.reloadWorkspaceRemote,
@@ -231,6 +187,7 @@ const ProvidersPane = memo(function ProvidersPane(props: { workspaceId: string }
       setWorkspaceDraftName: state.setWorkspaceDraftName,
       setWorkspaceTokenField: state.setWorkspaceTokenField,
       setWorkspaceTokenVisible: state.setWorkspaceTokenVisible,
+      testWorkspaceConnection: state.testWorkspaceConnection,
     })),
   );
   const { dirty, validRemoteName, configKeys } = useMemo(
@@ -249,12 +206,21 @@ const ProvidersPane = memo(function ProvidersPane(props: { workspaceId: string }
 
   useEffect(() => {
     ensureWorkspace(props.workspaceId);
-  }, [ensureWorkspace, props.workspaceId]);
+    void loadWorkspaceConfigPaths(props.workspaceId);
+  }, [ensureWorkspace, loadWorkspaceConfigPaths, props.workspaceId]);
 
+  // Auto-select the first remote once per pane. Re-running whenever `draft` goes
+  // null would fight the dirty guard: discarding or deleting a draft would
+  // immediately pull the pane back into the first remote.
+  const autoSelectedRef = useRef(false);
   useEffect(() => {
-    if (!loading && !workspace.draft && !workspace.loadingRemoteName && remotes.length > 0) {
-      void selectRemoteInWorkspace(props.workspaceId, remotes[0].name, false);
-    }
+    autoSelectedRef.current = false;
+  }, [props.workspaceId]);
+  useEffect(() => {
+    if (autoSelectedRef.current) return;
+    if (loading || workspace.draft || workspace.loadingRemoteName || remotes.length === 0) return;
+    autoSelectedRef.current = true;
+    void selectRemoteInWorkspace(props.workspaceId, remotes[0].name, false);
   }, [
     loading,
     props.workspaceId,
@@ -291,12 +257,15 @@ const ProvidersPane = memo(function ProvidersPane(props: { workspaceId: string }
         validRemoteName={validRemoteName}
         stale={stale}
         serviceError={serviceError}
+        feedbackError={workspace.error}
+        feedbackMessage={workspace.message}
         onDraftName={(name) => setWorkspaceDraftName(props.workspaceId, name)}
         onConfigField={(key, value) => setWorkspaceConfigField(props.workspaceId, key, value)}
         onTokenField={(key, value) => setWorkspaceTokenField(props.workspaceId, key, value)}
         onTokenVisible={(visible) => setWorkspaceTokenVisible(props.workspaceId, visible)}
         onSave={() => void saveWorkspaceRemote(props.workspaceId)}
         onDelete={requestDisconnect}
+        onTest={() => void testWorkspaceConnection(props.workspaceId)}
         onReload={() => {
           if (
             dirty &&
@@ -309,50 +278,5 @@ const ProvidersPane = memo(function ProvidersPane(props: { workspaceId: string }
     </section>
   );
 });
-
-function snapshotProvidersMultiPanel(state: MultiPanelStore): ProvidersMultiPanelSnapshot {
-  return {
-    tabs: state.tabs,
-    activeTabId: state.activeTabId,
-    activePaneId: state.activePaneId,
-    closedPanes: state.closedPanes,
-    nextPaneIndex: state.nextPaneIndex,
-    nextTabIndex: state.nextTabIndex,
-  };
-}
-
-function saveProvidersMultiPanelSnapshot(state: MultiPanelStore): void {
-  if (typeof window === "undefined" || state.tabs.length === 0) return;
-  try {
-    window.localStorage.setItem(
-      PROVIDERS_MULTIPANEL_STORAGE_KEY,
-      JSON.stringify(snapshotProvidersMultiPanel(state)),
-    );
-  } catch {
-    // Remotes remains fully usable if localStorage is unavailable.
-  }
-}
-
-function loadProvidersMultiPanelSnapshot(): ProvidersMultiPanelSnapshot | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = window.localStorage.getItem(PROVIDERS_MULTIPANEL_STORAGE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as Partial<ProvidersMultiPanelSnapshot>;
-    if (!Array.isArray(parsed.tabs) || parsed.tabs.length === 0) return null;
-    if (typeof parsed.activeTabId !== "string" || typeof parsed.activePaneId !== "string")
-      return null;
-    return {
-      tabs: parsed.tabs,
-      activeTabId: parsed.activeTabId,
-      activePaneId: parsed.activePaneId,
-      closedPanes: Array.isArray(parsed.closedPanes) ? parsed.closedPanes : [],
-      nextPaneIndex: typeof parsed.nextPaneIndex === "number" ? parsed.nextPaneIndex : 1,
-      nextTabIndex: typeof parsed.nextTabIndex === "number" ? parsed.nextTabIndex : 1,
-    };
-  } catch {
-    return null;
-  }
-}
 
 export default ProvidersWorkspace;

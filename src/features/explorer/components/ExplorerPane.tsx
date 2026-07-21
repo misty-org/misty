@@ -16,7 +16,12 @@ const paneStyles = {
   shell:
     "grid h-full min-h-0 w-full min-w-0 grid-rows-[38px_minmax(0,1fr)] overflow-hidden max-[720px]:grid-rows-[36px_minmax(0,1fr)]",
   shellInactive: "opacity-65 transition-opacity hover:opacity-85",
-  path: "grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 overflow-hidden border-b border-border/40 bg-[var(--misty-files-content-bg,var(--card))] py-0 pl-3 pr-3 text-xs text-muted-foreground max-[720px]:min-h-8 max-[720px]:pl-2.5 max-[720px]:pr-2.5 max-[720px]:text-[11px]",
+  path: [
+    "grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 overflow-hidden",
+    "border-b border-border/60 bg-[var(--misty-files-content-bg,var(--background))]",
+    "py-0 pl-3 pr-3 text-xs text-muted-foreground",
+    "max-[720px]:min-h-8 max-[720px]:pl-2.5 max-[720px]:pr-2.5 max-[720px]:text-[11px]",
+  ].join(" "),
   pathText: "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap",
   pathActions: "flex h-full flex-none items-center overflow-hidden",
 } as const;

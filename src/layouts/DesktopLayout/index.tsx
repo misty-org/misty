@@ -21,11 +21,9 @@ export type {
 import { Button } from "@/ui";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Outlet } from "react-router-dom";
+import { useShallow } from "zustand/react/shallow";
 import { Minus, Square, X } from "lucide-react";
-import {
-  hideRuntimeAssetOnError,
-  revealRuntimeAssetOnLoad,
-} from "@/platform/runtimeAsset";
+import { hideRuntimeAssetOnError, revealRuntimeAssetOnLoad } from "@/platform/runtimeAsset";
 import type { AppTab } from "@/models/types/routing/types";
 import {
   selectAssistantPreferences,
@@ -39,7 +37,6 @@ import { useSpacesStore } from "@/stores/spaces/useSpacesStore";
 import { AppWallpaperVideo } from "../AppWallpaperVideo";
 import { DeepSearchOverlay } from "@/features/explorer/components/DeepSearchOverlay";
 import { MediaSearchViewer } from "@/features/explorer/components/MediaSearchViewer";
-import { AgentJobWorker } from "@/features/agents/AgentJobWorker";
 import { SpacesRealtimeBridge } from "@/features/spaces/SpacesRealtimeBridge";
 import {
   desktopNavbarClass,
@@ -65,10 +62,14 @@ import { useCloudFolderBotBridge } from "./useCloudFolderBotBridge";
 import { useUnreadBadgeSync } from "./useUnreadBadgeSync";
 import { ActivityNavButton, NavGroup, ProfileNavButton, SettingsNavButton } from "./NavRail";
 import { ProfilePopover } from "./ProfilePopover";
-import { ActivityPopover } from "./ActivityPopover";
 import { AppNoticePublisher, RouteNotice } from "./RouteNotices";
 import { TransferCompletionNotifier, WorkStatusPopup } from "./TransferStatus";
-import { AccountSettingsOverlay, SettingsOverlay } from "./SettingsOverlays";
+import {
+  AccountSettingsOverlay,
+  ActivityOverlay,
+  RemotesOverlay,
+  SettingsOverlay,
+} from "./SettingsOverlays";
 import { FramePacingOverlay } from "./FramePacingOverlay";
 
 export function DesktopLayout(props: {
@@ -96,8 +97,13 @@ export function DesktopLayout(props: {
     minimizeTitlebarWindow,
     closeTitlebarWindow,
   } = useDesktopWindowChrome();
-  const { appWallpaperSrc, appWallpaperIsVideo, mistyLogoSource, desktopFrameStyle, desktopNavbarStyle } =
-    useDesktopFrameStyle();
+  const {
+    appWallpaperSrc,
+    appWallpaperIsVideo,
+    mistyLogoSource,
+    desktopFrameStyle,
+    desktopNavbarStyle,
+  } = useDesktopFrameStyle();
 
   const localUnreadActivityCount = useExplorerStore(
     (state) => state.notificationHistory.filter((notification) => !notification.read).length,
@@ -107,8 +113,8 @@ export function DesktopLayout(props: {
       [...state.inbox.unreads, ...state.inbox.mentions].filter((item) => !item.seen_at).length,
   );
   const unreadActivityCount = localUnreadActivityCount + cloudUnreadActivityCount;
-  const notificationPreferences = useSettingsStore((state) =>
-    selectNotificationPreferences(state.settings?.document),
+  const notificationPreferences = useSettingsStore(
+    useShallow((state) => selectNotificationPreferences(state.settings?.document)),
   );
   const cloudFolderBotEnabled = useSettingsStore(
     (state) => selectAssistantPreferences(state.settings?.document).enabled,
@@ -138,6 +144,7 @@ export function DesktopLayout(props: {
   const [profileOpen, setProfileOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [accountSettingsOpen, setAccountSettingsOpen] = useState(false);
+  const [remotesOpen, setRemotesOpen] = useState(false);
   const navItems = props.navItems;
   const openSettingsOverlay = useCallback(() => {
     setAccountSettingsOpen(false);
@@ -154,6 +161,14 @@ export function DesktopLayout(props: {
   const closeAccountSettingsOverlay = useCallback(() => {
     setAccountSettingsOpen(false);
   }, []);
+  const openRemotesOverlay = useCallback(() => {
+    setSettingsOpen(false);
+    setAccountSettingsOpen(false);
+    setRemotesOpen(true);
+  }, []);
+  const closeRemotesOverlay = useCallback(() => {
+    setRemotesOpen(false);
+  }, []);
 
   useEffect(() => {
     if (!location.pathname.startsWith("/settings")) return;
@@ -164,12 +179,26 @@ export function DesktopLayout(props: {
   }, [lastAppRoute, lastNonSettingsRouteRef, location.pathname, navigate, openSettingsOverlay]);
 
   useEffect(() => {
+    if (!location.pathname.startsWith("/providers")) return;
+    openRemotesOverlay();
+    navigate(settingsFallbackRoute(lastNonSettingsRouteRef.current, lastAppRoute), {
+      replace: true,
+    });
+  }, [lastAppRoute, lastNonSettingsRouteRef, location.pathname, navigate, openRemotesOverlay]);
+
+  useEffect(() => {
     if (location.pathname !== "/account") return;
     openAccountSettingsOverlay();
     navigate(settingsFallbackRoute(lastNonSettingsRouteRef.current, lastAppRoute), {
       replace: true,
     });
-  }, [lastAppRoute, lastNonSettingsRouteRef, location.pathname, navigate, openAccountSettingsOverlay]);
+  }, [
+    lastAppRoute,
+    lastNonSettingsRouteRef,
+    location.pathname,
+    navigate,
+    openAccountSettingsOverlay,
+  ]);
 
   const shouldShowWindowsControls = shouldShowWindowsTitlebarControls;
   const frameClass = usesNativeWindowChrome ? desktopFrameClass : tabletFrameClass;
@@ -297,9 +326,9 @@ export function DesktopLayout(props: {
       <WorkStatusPopup />
       <TransferCompletionNotifier />
       <FramePacingOverlay enabled={framePacingOverlayEnabled} />
-      <ActivityPopover
-        anchorRef={activityAnchorRef}
+      <ActivityOverlay
         open={activityOpen}
+        style={desktopFrameStyle}
         onClose={() => setActivityOpen(false)}
       />
       <ProfilePopover
@@ -315,6 +344,7 @@ export function DesktopLayout(props: {
         style={desktopFrameStyle}
         onClose={closeAccountSettingsOverlay}
       />
+      <RemotesOverlay open={remotesOpen} style={desktopFrameStyle} onClose={closeRemotesOverlay} />
       <SettingsOverlay
         open={settingsOpen}
         style={desktopFrameStyle}
@@ -325,7 +355,6 @@ export function DesktopLayout(props: {
         currentPath={activePanePath || app?.environment.homeDir || ""}
       />
       <MediaSearchViewer />
-      <AgentJobWorker />
       <SpacesRealtimeBridge />
     </main>
   );

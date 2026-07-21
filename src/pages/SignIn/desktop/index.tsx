@@ -6,28 +6,12 @@ import AuthMessage from "@/features/auth/components/AuthMessage";
 import AuthShell from "@/features/auth/components/AuthShell";
 import AuthSubmitButton from "@/features/auth/components/AuthSubmitButton";
 import { useAuth } from "@/features/auth/AuthContext";
-import type { CurrentLicense } from "@/models/types/features/installer/types";
-import { accountFetchMe, accountSignIn } from "@/stores/account/useAccountStore";
-import type { AccountMeResponse } from "@/models/interfaces/stores/account/useAccountStore";
-import { useSetupStore } from "@/stores/app";
-
-function licenseFromMe(me: AccountMeResponse | null): CurrentLicense | null {
-  if (!me) return null;
-  return {
-    tier: me.tier,
-    status: me.status,
-    allows_use: me.allows_use,
-    expires_at: me.expires_at,
-    trial_started_at: me.trial_started_at,
-    license_device: me.license_device || null,
-  };
-}
+import { accountSignIn } from "@/stores/account/useAccountStore";
 
 export default function SignIn() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { setUser } = useAuth();
-  const saveAuthenticatedUser = useSetupStore((state) => state.saveAuthenticatedUser);
+  const { authenticateAccount } = useAuth();
   const routeState = location.state as { from?: string; addingAccount?: boolean } | null;
   const from = routeState?.from || "/files";
   const addingAccount = Boolean(routeState?.addingAccount);
@@ -42,10 +26,7 @@ export default function SignIn() {
     setLoading(true);
 
     try {
-      const user = await accountSignIn(email, password);
-      const me = await accountFetchMe().catch(() => null);
-      await saveAuthenticatedUser(user, licenseFromMe(me));
-      setUser({ ...user, accountCreatedAt: me?.created_at, currentPlan: me?.tier });
+      await authenticateAccount(() => accountSignIn(email, password));
       navigate(from, { replace: true });
     } catch (signInError) {
       setError(signInError instanceof Error ? signInError.message : "Could not sign in.");

@@ -5,7 +5,7 @@ import { iconAssets } from "@/assets/icons";
 import { AssetIcon } from "@/ui";
 
 const editActionsClass =
-  "grid max-w-[760px] grid-cols-2 gap-2.5 px-[18px] pb-[18px] max-[980px]:grid-cols-1";
+  "grid max-w-[760px] grid-cols-3 gap-2.5 px-[18px] pb-[18px] max-[980px]:grid-cols-1";
 
 export function RemoteEditActions(props: RemoteEditActionsProps) {
   return (
@@ -16,6 +16,19 @@ export function RemoteEditActions(props: RemoteEditActionsProps) {
       >
         <AssetIcon src={iconAssets.activityCheck} size={16} />
         Save Changes
+      </Button>
+      <Button
+        variant="outline"
+        onClick={props.onTest}
+        disabled={props.working || props.dirty || !props.validRemoteName}
+        title={
+          props.dirty
+            ? "Save your changes before testing this remote."
+            : "Check that this remote responds."
+        }
+      >
+        <AssetIcon src={iconAssets.sync16} size={16} />
+        Test Connection
       </Button>
       <Button variant="destructive" onClick={props.onDelete} disabled={props.working}>
         <AssetIcon src={iconAssets.trash24} size={16} />

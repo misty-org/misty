@@ -20,6 +20,7 @@ export interface AgentMessageRequest {
   active_root?: string;
   selected_paths?: string[];
   capabilities: ToolManifest;
+  space_id?: string;
 }
 
 export interface ToolRequest {
@@ -67,6 +68,24 @@ export interface CreateSessionResponse {
   session_id: string;
 }
 
+/** One retained Mika session as the server sees it, for rebuilding the session list. */
+export interface AgentSessionSummary {
+  id: string;
+  title: string;
+  /** False once the runtime cache TTL lapses; the session is still resumable. */
+  active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AgentSessionsResponse {
+  sessions: AgentSessionSummary[];
+}
+
+export interface AgentTranscriptResponse {
+  messages: Array<{ role: string; content: string }>;
+}
+
 export interface AgentStatusResponse {
   configured: boolean;
   provider: string;
@@ -75,6 +94,8 @@ export interface AgentStatusResponse {
   running: boolean;
   session_id: string | null;
   error: string | null;
+  space_scoped_sessions?: boolean;
+  capabilities?: { space_scoped_sessions?: boolean };
 }
 
 export interface ManagedAiErrorPayload {

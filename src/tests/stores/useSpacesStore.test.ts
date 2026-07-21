@@ -16,6 +16,19 @@ const apiMocks = vi.hoisted(() => ({
   rename: vi.fn(),
   sendMessage: vi.fn(),
   updateMessage: vi.fn(),
+  deleteMessage: vi.fn(),
+  removeMember: vi.fn(),
+  respondInvite: vi.fn(),
+  leave: vi.fn(),
+  transfer: vi.fn(),
+  delete: vi.fn(),
+  saveStudio: vi.fn(),
+  deleteStudio: vi.fn(),
+  runStudio: vi.fn(),
+  snapshot: vi.fn(),
+  members: vi.fn(),
+  messages: vi.fn(),
+  nodes: vi.fn(),
 }));
 
 vi.mock("@/stores/spaces/useSpacesBackendStore", () => ({
@@ -25,6 +38,19 @@ vi.mock("@/stores/spaces/useSpacesBackendStore", () => ({
     rename: apiMocks.rename,
     sendMessage: apiMocks.sendMessage,
     updateMessage: apiMocks.updateMessage,
+    deleteMessage: apiMocks.deleteMessage,
+    removeMember: apiMocks.removeMember,
+    respondInvite: apiMocks.respondInvite,
+    leave: apiMocks.leave,
+    transfer: apiMocks.transfer,
+    delete: apiMocks.delete,
+    saveStudio: apiMocks.saveStudio,
+    deleteStudio: apiMocks.deleteStudio,
+    runStudio: apiMocks.runStudio,
+    snapshot: apiMocks.snapshot,
+    members: apiMocks.members,
+    messages: apiMocks.messages,
+    nodes: apiMocks.nodes,
   },
 }));
 
@@ -98,6 +124,60 @@ describe("buildMessageSpans", () => {
       { type: "text", text: "Hello @Unknown" },
     ]);
   });
+
+  it("keeps unsupported shared @Mika text literal instead of sending an invalid Agent span", () => {
+    expect(buildMessageSpans("@Mika summarize these files", [member], [agent])).toEqual([
+      { type: "text", text: "@Mika summarize these files" },
+    ]);
+  });
+});
+
+describe("Space loading access boundary", () => {
+  beforeEach(() => {
+    resetSpacesAccountState();
+    apiMocks.snapshot.mockReset();
+    apiMocks.members.mockReset();
+    apiMocks.messages.mockReset();
+    apiMocks.nodes.mockReset();
+  });
+
+  afterEach(() => resetSpacesAccountState());
+
+  it("does not fan out protected requests when a fresh snapshot omits the Space", async () => {
+    apiMocks.snapshot.mockResolvedValue({ spaces: [], invitations: [], limits: null });
+    useSpacesStore.setState({
+      membersBySpace: { revoked: [member] },
+      messagesBySpace: { revoked: [messageFixture({ space_id: "revoked" })] },
+      nodesBySpace: { revoked: [] },
+    });
+
+    await useSpacesStore.getState().loadSpace("revoked");
+
+    expect(apiMocks.members).not.toHaveBeenCalled();
+    expect(apiMocks.messages).not.toHaveBeenCalled();
+    expect(apiMocks.nodes).not.toHaveBeenCalled();
+    expect(useSpacesStore.getState()).toMatchObject({
+      snapshotReady: true,
+      membersBySpace: {},
+      messagesBySpace: {},
+      nodesBySpace: {},
+    });
+  });
+
+  it("fails closed when refreshing a stale Space snapshot fails", async () => {
+    apiMocks.snapshot.mockRejectedValue(new Error("offline"));
+    useSpacesStore.setState({ spaces: [spaceFixture({ id: "stale" })] });
+
+    await useSpacesStore.getState().loadSpace("stale");
+
+    expect(apiMocks.members).not.toHaveBeenCalled();
+    expect(apiMocks.messages).not.toHaveBeenCalled();
+    expect(apiMocks.nodes).not.toHaveBeenCalled();
+    expect(useSpacesStore.getState()).toMatchObject({
+      snapshotReady: false,
+      error: "offline",
+    });
+  });
 });
 
 describe("Spaces mutations", () => {
@@ -106,6 +186,15 @@ describe("Spaces mutations", () => {
     apiMocks.rename.mockReset();
     apiMocks.sendMessage.mockReset();
     apiMocks.updateMessage.mockReset();
+    apiMocks.deleteMessage.mockReset();
+    apiMocks.removeMember.mockReset();
+    apiMocks.respondInvite.mockReset();
+    apiMocks.leave.mockReset();
+    apiMocks.transfer.mockReset();
+    apiMocks.delete.mockReset();
+    apiMocks.saveStudio.mockReset();
+    apiMocks.deleteStudio.mockReset();
+    apiMocks.runStudio.mockReset();
   });
 
   afterEach(() => resetSpacesAccountState());
@@ -137,7 +226,7 @@ describe("Spaces mutations", () => {
     expect(useSpacesStore.getState().messagesBySpace[original.space_id]).toEqual([edited]);
   });
 
-  it("keeps the sent message and surfaces a safe Agent invocation failure", async () => {
+  it("keeps the sent message without reactivating beta-hidden Agent failures", async () => {
     const sent = messageFixture({
       content: [{ type: "mention", agent_id: agent.id, label: agent.name }],
     });
@@ -156,10 +245,68 @@ describe("Spaces mutations", () => {
 
     await useSpacesStore.getState().sendMessage(sent.space_id, `@${agent.name}`);
 
+    expect(apiMocks.sendMessage.mock.calls[0]?.[1]).toEqual([
+      { type: "text", text: `@${agent.name}` },
+    ]);
     expect(useSpacesStore.getState().messagesBySpace[sent.space_id]).toEqual([sent]);
-    expect(useSpacesStore.getState().error).toBe(
-      "Helper: The run needs a required Space integration before it can start.",
-    );
+    expect(useSpacesStore.getState().error).toBeNull();
+  });
+
+  // Regression coverage: these actions previously had no error handling at all,
+  // so a failed request left `error` untouched and the UI's error banner (which
+  // every caller's own comments assumed would show something) stayed empty.
+  it.each([
+    ["deleteMessage", () => useSpacesStore.getState().deleteMessage("space-default", "message-1")],
+    ["removeMember", () => useSpacesStore.getState().removeMember("space-default", "user-sam")],
+    ["respondInvite", () => useSpacesStore.getState().respondInvite("invite-1", true)],
+    ["leaveSpace", () => useSpacesStore.getState().leaveSpace("space-default")],
+    ["transferOwner", () => useSpacesStore.getState().transferOwner("space-default", "user-sam")],
+    ["deleteSpace", () => useSpacesStore.getState().deleteSpace("space-default", "Default space")],
+    [
+      "saveStudio",
+      () =>
+        useSpacesStore
+          .getState()
+          .saveStudio("space-default", "agents", { name: "Helper" } as never),
+    ],
+    [
+      "deleteStudio",
+      () => useSpacesStore.getState().deleteStudio("space-default", "agents", "agent-helper"),
+    ],
+    [
+      "runStudio",
+      () => useSpacesStore.getState().runStudio("space-default", "agents", "agent-helper"),
+    ],
+  ] as const)(
+    "%s records the failure on the shared store error and rethrows",
+    async (name, run) => {
+      const failure = new Error(`${name} failed`);
+      apiMocks.deleteMessage.mockRejectedValue(failure);
+      apiMocks.removeMember.mockRejectedValue(failure);
+      apiMocks.respondInvite.mockRejectedValue(failure);
+      apiMocks.leave.mockRejectedValue(failure);
+      apiMocks.transfer.mockRejectedValue(failure);
+      apiMocks.delete.mockRejectedValue(failure);
+      apiMocks.saveStudio.mockRejectedValue(failure);
+      apiMocks.deleteStudio.mockRejectedValue(failure);
+      apiMocks.runStudio.mockRejectedValue(failure);
+
+      await expect(run()).rejects.toThrow(`${name} failed`);
+
+      expect(useSpacesStore.getState().error).toBe(`${name} failed`);
+    },
+  );
+
+  it("does not leave a stale error from a previous failure once a call succeeds", async () => {
+    apiMocks.leave.mockRejectedValueOnce(new Error("network blip"));
+    await expect(useSpacesStore.getState().leaveSpace("space-default")).rejects.toThrow();
+    expect(useSpacesStore.getState().error).toBe("network blip");
+
+    apiMocks.leave.mockResolvedValueOnce(undefined);
+    apiMocks.snapshot.mockResolvedValue({ spaces: [], invitations: [], limits: null });
+    await useSpacesStore.getState().leaveSpace("space-default");
+
+    expect(useSpacesStore.getState().error).toBeNull();
   });
 });
 

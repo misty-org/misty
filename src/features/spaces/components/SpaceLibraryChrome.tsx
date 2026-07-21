@@ -6,14 +6,26 @@ export type {
   SpaceLibraryHeaderProps,
   SpaceLibraryEmptyStateProps,
 } from "@/models/interfaces/features/spaces/components/SpaceLibraryChrome";
-import { Grid2X2, Image as ImageIcon, List, Search, Upload, X } from "lucide-react";
+import { Grid2X2, Image as ImageIcon, List, Minus, Plus, Search, Upload, X } from "lucide-react";
 import { EmptyState } from "@/ui";
 import { Toolbar, ToolbarGroup } from "@/ui";
 import { Button } from "@/ui";
 import { Input } from "@/ui";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui";
-import { ToggleGroup, ToggleGroupItem } from "@/ui";
+import { cn } from "@/ui";
 import type { LibraryItemQuery } from "@/models/interfaces/features/spaces/types";
+import {
+  LIBRARY_ITEM_SCALE_MAX,
+  LIBRARY_ITEM_SCALE_MIN,
+  normalizeLibraryItemScale,
+} from "../libraryFormat";
+
+const toolbarControlStyles = {
+  group:
+    "flex h-9 shrink-0 items-center gap-0.5 rounded-md border border-border/80 bg-background px-1 shadow-xs",
+  button: "size-7 rounded-sm text-muted-foreground shadow-none",
+  buttonActive: "bg-accent text-accent-foreground",
+} as const;
 
 const mediaTypeOptions = [
   { value: "", label: "All media" },
@@ -119,26 +131,42 @@ export function SpaceLibraryHeader(props: SpaceLibraryHeaderProps) {
                   ))}
                 </SelectContent>
               </Select>
-              <ToggleGroup
-                className="h-9 shrink-0 overflow-hidden rounded-md border border-border/80 bg-background shadow-xs"
-                type="single"
-                value={props.viewMode}
-                onValueChange={(value) => {
-                  if (value === "grid" || value === "list") props.onViewMode(value);
-                }}
-                aria-label="Library layout"
-              >
-                <ToggleGroupItem className="size-9 border-0" value="grid" aria-label="Grid view">
-                  <Grid2X2 size={14} />
-                </ToggleGroupItem>
-                <ToggleGroupItem
-                  className="size-9 border-0 border-l border-border/60"
-                  value="list"
+              <div role="group" aria-label="Library layout" className={toolbarControlStyles.group}>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  className={cn(
+                    toolbarControlStyles.button,
+                    props.viewMode === "grid" && toolbarControlStyles.buttonActive,
+                  )}
+                  aria-label="Grid view"
+                  title="Grid view"
+                  aria-pressed={props.viewMode === "grid"}
+                  onClick={() => props.onViewMode("grid")}
+                >
+                  <Grid2X2 size={15} />
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  className={cn(
+                    toolbarControlStyles.button,
+                    props.viewMode === "list" && toolbarControlStyles.buttonActive,
+                  )}
                   aria-label="List view"
+                  title="List view"
+                  aria-pressed={props.viewMode === "list"}
+                  onClick={() => props.onViewMode("list")}
                 >
                   <List size={15} />
-                </ToggleGroupItem>
-              </ToggleGroup>
+                </Button>
+              </div>
+              <SpaceLibraryScaleControls
+                itemScale={props.itemScale}
+                onItemScale={props.onItemScale}
+              />
             </>
           ) : null}
           {props.uploadAvailable ? (
@@ -155,6 +183,45 @@ export function SpaceLibraryHeader(props: SpaceLibraryHeaderProps) {
           ) : null}
         </ToolbarGroup>
       </Toolbar>
+    </div>
+  );
+}
+
+function SpaceLibraryScaleControls({
+  itemScale,
+  onItemScale,
+}: {
+  itemScale: number;
+  onItemScale: (scale: number) => void;
+}) {
+  const scale = normalizeLibraryItemScale(itemScale);
+
+  return (
+    <div role="group" aria-label="Item scale" className={toolbarControlStyles.group}>
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon-sm"
+        className={toolbarControlStyles.button}
+        aria-label="Zoom out"
+        title="Zoom out"
+        disabled={scale <= LIBRARY_ITEM_SCALE_MIN}
+        onClick={() => onItemScale(scale - 1)}
+      >
+        <Minus size={15} />
+      </Button>
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon-sm"
+        className={toolbarControlStyles.button}
+        aria-label="Zoom in"
+        title="Zoom in"
+        disabled={scale >= LIBRARY_ITEM_SCALE_MAX}
+        onClick={() => onItemScale(scale + 1)}
+      >
+        <Plus size={15} />
+      </Button>
     </div>
   );
 }

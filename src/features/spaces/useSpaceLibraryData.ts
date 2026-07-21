@@ -114,6 +114,7 @@ export function useSpaceLibraryData(spaceId: string) {
   const [memoryAudioItems, setMemoryAudioItems] = useState<SpaceLibraryItem[]>([]);
   const [mediaType, setMediaType] = useState<"" | NonNullable<LibraryItemQuery["media_type"]>>("");
   const [libraryViewMode, setLibraryViewMode] = useState<"grid" | "list">("grid");
+  const [libraryItemScale, setLibraryItemScale] = useState(1);
   const [sort, setSort] = useState<NonNullable<LibraryItemQuery["sort"]>>("recently-added");
   const [direction, setDirection] = useState<NonNullable<LibraryItemQuery["direction"]>>("desc");
   const [reloadKey, setReloadKey] = useState(0);
@@ -644,6 +645,8 @@ export function useSpaceLibraryData(spaceId: string) {
     setMediaType,
     libraryViewMode,
     setLibraryViewMode,
+    libraryItemScale,
+    setLibraryItemScale,
     sort,
     setSort,
     direction,

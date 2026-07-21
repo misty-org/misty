@@ -66,4 +66,18 @@ export interface SpaceChatMessagesProps {
   onError: (message: string) => void;
   onLibraryItem: (item: SpaceLibraryItem) => void;
   onReload: () => void;
+  /**
+   * Publishes one message to the linked Discord channel. Omitted when the Space
+   * has no outbound link, which is how the action stays hidden rather than
+   * appearing and failing.
+   */
+  onPublishToDiscord?: (message: SpaceMessage) => void;
+  /** Message id currently being published, so the row can show progress. */
+  publishingMessageId?: string;
+  /** Names the empty conversation, e.g. "What should we work on in Design?". */
+  spaceName?: string;
+  /** Runs an opening move from the empty state. Omitted when the viewer cannot write. */
+  onStarter?: (starter: SpaceChatStarter) => void;
 }
+
+export type SpaceChatStarter = "mention" | "files" | "library";

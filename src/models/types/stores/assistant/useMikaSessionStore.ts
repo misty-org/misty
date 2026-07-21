@@ -62,7 +62,15 @@ export type AiPanelMessage = {
   creditsUsed?: number;
   creditsRemaining?: number;
   citations?: AgentCitation[];
+  contextSources?: MikaContextSource[];
   delegatedRunId?: string;
+};
+
+export type MikaContextSource = {
+  id: string;
+  kind: "library" | "note" | "task" | "chat" | "member";
+  label: string;
+  href: string;
 };
 
 export type AssistantScope = "files" | "cleanup" | "search";

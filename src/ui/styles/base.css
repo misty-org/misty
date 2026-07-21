@@ -276,6 +276,21 @@ body {
   background: var(--misty-page-bg);
   color: var(--misty-text);
 }
+/* A pointer drag is in flight: the closed-hand cursor must win over whatever the
+   pointer happens to be travelling across. */
+html[data-pointer-dragging="true"],
+html[data-pointer-dragging="true"] * {
+  cursor: grabbing !important;
+  -webkit-user-select: none !important;
+  user-select: none !important;
+}
+
+/* WKWebView (Tauri) needs an explicit opt-in before it will start an HTML5 drag
+   on a non-natively-draggable element such as a div. */
+[draggable="true"] {
+  -webkit-user-drag: element;
+}
+
 html[data-explorer-dragging="true"],
 html[data-explorer-dragging="true"] * {
   -webkit-user-select: none !important;

@@ -1,81 +1,40 @@
-import { useEffect, useRef } from "react";
 import type { CSSProperties } from "react";
-import { createPortal } from "react-dom";
 import SettingsWorkspace from "@/pages/Settings/desktop";
 import AccountWorkspace from "@/pages/Account/desktop";
-import { settingsOverlayLayerClass, settingsOverlayPanelClass } from "./styles";
+import { ProvidersWorkspace } from "@/pages/Providers/desktop";
+import { ActivityFeed } from "./ActivityFeed";
+import { WorkspaceOverlay } from "./WorkspaceOverlay";
 
-export function SettingsOverlay(props: { open: boolean; style: CSSProperties; onClose: () => void }) {
-  const panelRef = useRef<HTMLDivElement | null>(null);
+type OverlayProps = { open: boolean; style: CSSProperties; onClose: () => void };
 
-  useEffect(() => {
-    if (!props.open) return;
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") props.onClose();
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [props.onClose, props.open]);
-
-  if (!props.open) return null;
-
-  return createPortal(
-    <div
-      className={`app-pages-root ${settingsOverlayLayerClass}`}
-      style={props.style}
-      role="presentation"
-      onPointerDown={(event) => {
-        if (event.target === event.currentTarget) props.onClose();
-      }}
-    >
-      <div
-        ref={panelRef}
-        className={settingsOverlayPanelClass}
-        role="dialog"
-        aria-modal="true"
-        aria-label="Settings"
-      >
-        <SettingsWorkspace presentation="overlay" onClose={props.onClose} />
-      </div>
-    </div>,
-    document.body,
+export function ActivityOverlay(props: OverlayProps) {
+  return (
+    <WorkspaceOverlay {...props} ariaLabel="Activity">
+      <ActivityFeed onClose={props.onClose} />
+    </WorkspaceOverlay>
   );
 }
 
-export function AccountSettingsOverlay(props: {
-  open: boolean;
-  style: CSSProperties;
-  onClose: () => void;
-}) {
-  useEffect(() => {
-    if (!props.open) return;
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") props.onClose();
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [props.onClose, props.open]);
+export function SettingsOverlay(props: OverlayProps) {
+  return (
+    <WorkspaceOverlay {...props} ariaLabel="Settings">
+      <SettingsWorkspace presentation="overlay" onClose={props.onClose} />
+    </WorkspaceOverlay>
+  );
+}
 
-  if (!props.open) return null;
+export function AccountSettingsOverlay(props: OverlayProps) {
+  return (
+    <WorkspaceOverlay {...props} ariaLabel="Account settings">
+      <AccountWorkspace presentation="overlay" onClose={props.onClose} />
+    </WorkspaceOverlay>
+  );
+}
 
-  return createPortal(
-    <div
-      className={`app-pages-root ${settingsOverlayLayerClass}`}
-      style={props.style}
-      role="presentation"
-      onPointerDown={(event) => {
-        if (event.target === event.currentTarget) props.onClose();
-      }}
-    >
-      <div
-        className={settingsOverlayPanelClass}
-        role="dialog"
-        aria-modal="true"
-        aria-label="Account settings"
-      >
-        <AccountWorkspace presentation="overlay" onClose={props.onClose} />
-      </div>
-    </div>,
-    document.body,
+export function RemotesOverlay(props: OverlayProps) {
+  return (
+    <WorkspaceOverlay {...props} ariaLabel="Remotes">
+      <ProvidersWorkspace presentation="overlay" onClose={props.onClose} />
+    </WorkspaceOverlay>
   );
 }

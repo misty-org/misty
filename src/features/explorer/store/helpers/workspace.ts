@@ -128,7 +128,7 @@ export async function persistExplorerWorkspace(): Promise<void> {
   const activeTab = multi.tabs.find((tab) => tab.id === multi.activeTabId) ?? multi.tabs[0];
   const workspace: NativeWorkspace = {
     id: workspaceId,
-    title: existing?.title || "Workspace 1",
+    title: existing?.title || "File layout 1",
     sidebar_width: explorer.sidebarWidth,
     sidebar_visible: activeTab?.sidebarVisible ?? explorer.sidebarVisible,
     inspector_width: explorer.previewWidth,
@@ -267,7 +267,7 @@ export function workspaceMetadata(
 ): Pick<ExplorerStore, "workspaceEntries" | "activeWorkspaceId" | "activeWorkspaceTitle"> {
   const workspaceEntries = document.workspaces.map((workspace, index) => ({
     id: workspace.id || `workspace_${index}`,
-    title: workspace.title || `Workspace ${index + 1}`,
+    title: workspace.title || `File layout ${index + 1}`,
   }));
   const activeWorkspace =
     workspaceEntries.find((workspace) => workspace.id === document.active_workspace_id) ??
@@ -275,7 +275,7 @@ export function workspaceMetadata(
   return {
     workspaceEntries,
     activeWorkspaceId: activeWorkspace?.id ?? document.active_workspace_id,
-    activeWorkspaceTitle: activeWorkspace?.title ?? "Workspace 1",
+    activeWorkspaceTitle: activeWorkspace?.title ?? "File layout 1",
   };
 }
 
@@ -290,7 +290,7 @@ export function nextWorkspaceIndex(document: NativeWorkspaceDocument): number {
 }
 
 export function uniqueWorkspaceTitle(title: string, workspaces: Array<{ title: string }>): string {
-  const base = title.trim() || "Workspace";
+  const base = title.trim() || "File layout";
   const names = new Set(workspaces.map((workspace) => workspace.title.trim()).filter(Boolean));
   if (!names.has(base)) return base;
   for (let index = 2; index < 1000; index += 1) {

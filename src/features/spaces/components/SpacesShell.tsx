@@ -12,6 +12,9 @@ import {
   DialogTitle,
 } from "@/ui";
 import { Input } from "@/ui";
+import { Skeleton } from "@/ui";
+import { useAuth } from "@/features/auth/AuthContext";
+import { useMinimumSpin } from "@/hooks/useMinimumSpin";
 import { useSpacesStore } from "@/stores/spaces/useSpacesStore";
 import { SpacePanelContent } from "./SpacePanelContent";
 import { SpacePageFrame } from "./SpacePageLayout";
@@ -19,6 +22,7 @@ import { SpacePageFrame } from "./SpacePageLayout";
 export default function SpacesShell() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { user } = useAuth();
   const [createOpen, setCreateOpen] = useState(false);
   const [createName, setCreateName] = useState("");
   const [creating, setCreating] = useState(false);
@@ -54,12 +58,14 @@ export default function SpacesShell() {
   );
   const routeParts = location.pathname.split("/").filter(Boolean);
   const detailRouteActive = routeParts[0] === "spaces" && routeParts.length >= 3;
-  const activeSpace = spaces.find((space) => space.id === routeParts[1]);
-  const pageSection = routeParts[2] === "files" ? "library" : (routeParts[2] ?? "chat");
+  const activeSpaceId = detailRouteActive ? (routeParts[1] ?? "") : "";
 
   useEffect(() => {
     void load();
-  }, [load]);
+    // Re-fires on account switch so Spaces reloads for the new account
+    // instead of leaving whatever was last fetched (or was in flight) for
+    // the previous one sitting in the shared store.
+  }, [load, user?.id]);
   useEffect(() => {
     try {
       window.localStorage.setItem("misty:spaces-panel-visible", String(panelVisible));
@@ -161,10 +167,10 @@ export default function SpacesShell() {
         </aside>
       ) : null}
       <main
-        className={`${panelVisible ? "col-start-2" : "col-start-1"} row-start-1 min-h-0 min-w-0 bg-background`}
+        className={`${panelVisible ? "col-start-2" : "col-start-1"} relative row-start-1 min-h-0 min-w-0 overflow-hidden bg-background`}
       >
         {detailRouteActive ? (
-          <SpacePageFrame section={pageSection} spaceName={activeSpace?.name}>
+          <SpacePageFrame>
             <Outlet />
           </SpacePageFrame>
         ) : (
@@ -244,6 +250,7 @@ export default function SpacesShell() {
 }
 
 export function PersonalSpaceRedirect() {
+  const { user } = useAuth();
   const { spaces, loading, error, load, clearError } = useSpacesStore(
     useShallow((state) => ({
       spaces: state.spaces,
@@ -254,16 +261,22 @@ export function PersonalSpaceRedirect() {
     })),
   );
   const personal = spaces.find((space) => space.is_personal);
+  const [skeletonVisible] = useMinimumSpin(!personal);
   const attemptedLoad = useRef(false);
+  const attemptedLoadForUserId = useRef(user?.id);
+  if (attemptedLoadForUserId.current !== user?.id) {
+    attemptedLoadForUserId.current = user?.id;
+    attemptedLoad.current = false;
+  }
   useEffect(() => {
     if (!personal && !loading && !attemptedLoad.current) {
       attemptedLoad.current = true;
       void load();
     }
   }, [load, loading, personal]);
-  if (personal)
+  if (personal && !skeletonVisible)
     return <Navigate to={`/spaces/${encodeURIComponent(personal.id)}/library`} replace />;
-  if (error && !loading)
+  if (error && !loading && !skeletonVisible)
     return (
       <div className="grid h-full place-items-center px-6 text-center">
         <div>
@@ -284,8 +297,19 @@ export function PersonalSpaceRedirect() {
       </div>
     );
   return (
-    <div className="grid h-full place-items-center text-sm text-muted-foreground">
-      Loading your personal Space...
+    <div className="h-full min-h-0 overflow-hidden p-6" aria-busy="true" role="status">
+      <span className="sr-only">Loading your personal Space</span>
+      <div
+        className="grid gap-3.5"
+        style={{ gridTemplateColumns: "repeat(auto-fill,minmax(270px,1fr))" }}
+      >
+        {[0, 1, 2, 3, 4, 5].map((index) => (
+          <div className="grid gap-2" key={index}>
+            <Skeleton className="aspect-square w-full rounded-lg" />
+            <Skeleton className="h-3.5 w-3/4 rounded" />
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

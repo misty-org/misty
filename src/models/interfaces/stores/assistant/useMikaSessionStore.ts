@@ -49,10 +49,12 @@ import type {
   AiPanelMessage,
   AssistantScope,
   AssistantRequestScope,
+  MikaContextSource,
 } from "@/models/types/stores/assistant/useMikaSessionStore";
 
 export interface AiStatus {
   configured: boolean;
+  spaceScopedSessions: boolean;
   model: string;
   modelName: string;
   running: boolean;
@@ -84,6 +86,13 @@ export interface SendAiPromptRequest {
   prompt: string;
   cwd: string | null;
   selectedPaths?: string[];
+  contextSources?: MikaContextSource[];
+}
+
+export interface AiConversationSummary {
+  id: string;
+  title: string;
+  updatedAt: number;
 }
 
 export interface AiSessionStore {
@@ -93,6 +102,9 @@ export interface AiSessionStore {
   plans: AiPlanReview[];
   toolApprovals: AiToolApproval[];
   error: string | null;
+  conversations: AiConversationSummary[];
+  activeConversationId: string;
+  conversationScopeKey: string;
   refreshStatus: () => Promise<void>;
   setMode: (mode: AiMode) => void;
   sendPrompt: (request: SendAiPromptRequest) => Promise<void>;
@@ -100,4 +112,10 @@ export interface AiSessionStore {
   approvePlan: (planId: string) => Promise<void>;
   abortPrompt: () => Promise<void>;
   clearConversation: () => void;
+  activateConversationScope: (scopeKey: string) => Promise<void>;
+  startNewConversation: () => Promise<void>;
+  /** Merges the account's server-side sessions into the local list. Safe to call repeatedly. */
+  hydrateConversations: () => Promise<void>;
+  switchConversation: (id: string) => Promise<void>;
+  deleteConversationSession: (id: string) => Promise<void>;
 }

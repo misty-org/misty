@@ -19,6 +19,11 @@ import {
 } from "./styles";
 import { emailName, formatBadgeCount, initialsForProfile } from "./helpers";
 
+const notificationBadgeClass = [
+  "absolute right-px top-0.5 grid h-[18px] min-w-[18px] place-items-center rounded-full bg-[#d83e3e]",
+  "px-[5px] text-[10px] font-bold leading-none text-white shadow-[0_0_0_2px_var(--misty-bg)]",
+].join(" ");
+
 export function NavGroup(props: {
   items: DesktopNavItem[];
   badges?: Partial<Record<string, number>>;
@@ -42,7 +47,7 @@ export function NavGroup(props: {
             <span className={`${navIconTileBaseClass} ${selected ? navIconTileActiveClass : ""}`}>
               <Icon className={navIconClass} strokeWidth={1.85} />
               {props.badges?.[item.id] ? (
-                <span className="absolute right-px top-0.5 grid h-[18px] min-w-[18px] place-items-center rounded-full bg-[#d83e3e] px-[5px] text-[10px] font-bold leading-none text-white shadow-[0_0_0_2px_var(--misty-bg)]">
+                <span className={notificationBadgeClass}>
                   {formatBadgeCount(props.badges[item.id] ?? 0)}
                 </span>
               ) : null}
@@ -86,9 +91,7 @@ export const ActivityNavButton = memo(
         <span className={`${navIconTileBaseClass} ${props.open ? navIconTileActiveClass : ""}`}>
           <Bell className={navIconClass} strokeWidth={1.85} />
           {props.badge ? (
-            <span className="absolute right-px top-0.5 grid h-[18px] min-w-[18px] place-items-center rounded-full bg-[#d83e3e] px-[5px] text-[10px] font-bold leading-none text-white shadow-[0_0_0_2px_var(--misty-bg)]">
-              {formatBadgeCount(props.badge)}
-            </span>
+            <span className={notificationBadgeClass}>{formatBadgeCount(props.badge)}</span>
           ) : null}
         </span>
         <span className={`${navItemLabelBaseClass} ${props.open ? navItemLabelActiveClass : ""}`}>
@@ -132,13 +135,15 @@ export const ProfileNavButton = memo(
     const { user } = useAuth();
     const me = useUserStore(
       useShallow((state) => ({
+        id: state.me?.id,
         email: state.me?.email,
         name: state.me?.name,
       })),
     );
-    const account = currentUser ?? user;
-    const email = me.email ?? account?.email ?? "";
-    const displayName = me.name ?? account?.name ?? emailName(email) ?? "Misty";
+    const account = user ?? currentUser;
+    const accountMe = me.id === account?.id ? me : null;
+    const email = accountMe?.email ?? account?.email ?? "";
+    const displayName = accountMe?.name ?? account?.name ?? emailName(email) ?? "Misty";
     const initials = initialsForProfile(displayName, email);
 
     return (

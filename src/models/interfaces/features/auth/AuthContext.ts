@@ -44,6 +44,8 @@ export interface AuthContextValue {
   user: AuthUser | null;
   setUser: (user: AuthUser | null) => void;
   accounts: SavedAccountSession[];
+  transitioning: boolean;
+  authenticateAccount: (request: () => Promise<AuthUser>) => Promise<AuthUser>;
   switchAccount: (accountId: string) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
 }

@@ -15,6 +15,7 @@ import { normalizeApiBaseUrl, withDefaultApiPath } from "@/stores/backend";
 import { isAndroidBuild, isNativeMobileBuild } from "@/platform/buildTarget";
 import {
   clearAccountAuthToken,
+  readAccountSessionGeneration,
   readAccountAuthToken,
   saveAccountAuthToken,
 } from "./useAuthTokenStore";
@@ -34,10 +35,13 @@ async function requestJson<T>(
   path: string,
   body?: unknown,
 ): Promise<T> {
+  const accountGeneration = readAccountSessionGeneration();
   const apiBase = await resolveAccountApiBase();
+  assertAccountGeneration(accountGeneration);
   const url = `${apiBase}${path}`;
   try {
     const token = shouldAttachAuthToken(path) ? await readAccountAuthToken() : null;
+    assertAccountGeneration(accountGeneration);
     const headers = requestHeaders(body, token);
     const response = await fetch(url, {
       method,
@@ -45,9 +49,13 @@ async function requestJson<T>(
       body: body === undefined ? undefined : JSON.stringify(body),
       credentials: "include",
     });
-    return await parseResponse<T>(response, method, path, url);
+    assertAccountGeneration(accountGeneration);
+    const result = await parseResponse<T>(response, method, path, url);
+    assertAccountGeneration(accountGeneration);
+    return result;
   } catch (error) {
-    if (error instanceof AccountApiError) throw error;
+    if (error instanceof AccountApiError || error instanceof AccountSessionChangedError)
+      throw error;
     const message = apiBase
       ? `Could not reach Misty server at ${apiBase}. ${errorMessage(error)}`
       : `Missing Misty API base URL for ${method} ${path}.`;
@@ -58,6 +66,12 @@ async function requestJson<T>(
       detail: `${method} ${url}`,
     });
     throw new Error(message);
+  }
+}
+
+function assertAccountGeneration(expected: number): void {
+  if (readAccountSessionGeneration() !== expected) {
+    throw new AccountSessionChangedError();
   }
 }
 
@@ -256,12 +270,16 @@ export async function accountUpdateTelemetryPreferences(
 }
 
 export async function accountLogout(): Promise<SavedAccountSession | null> {
+  await accountRevokeCurrentSession();
+  return await clearAccountAuthToken();
+}
+
+export async function accountRevokeCurrentSession(): Promise<void> {
   try {
     await postJson("/logout");
   } catch {
     // Local sign-out and account switching must still work while offline.
   }
-  return await clearAccountAuthToken();
 }
 
 class AccountApiError extends Error {
@@ -272,6 +290,14 @@ class AccountApiError extends Error {
     readonly status?: number,
   ) {
     super(message);
+  }
+}
+
+class AccountSessionChangedError extends Error {
+  name = "AccountSessionChangedError";
+
+  constructor() {
+    super("The active Misty account changed before this request finished. Please try again.");
   }
 }
 

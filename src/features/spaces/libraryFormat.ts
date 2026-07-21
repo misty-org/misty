@@ -1,5 +1,13 @@
 import type { LibraryItemQuery, SpaceLibraryItem } from "@/models/interfaces/features/spaces/types";
 
+export const LIBRARY_ITEM_SCALE_MIN = 0;
+export const LIBRARY_ITEM_SCALE_MAX = 2;
+
+export function normalizeLibraryItemScale(scale: number | undefined) {
+  if (!Number.isFinite(scale)) return 1;
+  return Math.min(LIBRARY_ITEM_SCALE_MAX, Math.max(LIBRARY_ITEM_SCALE_MIN, Math.round(scale ?? 1)));
+}
+
 export function compareLibraryItems(
   left: SpaceLibraryItem,
   right: SpaceLibraryItem,

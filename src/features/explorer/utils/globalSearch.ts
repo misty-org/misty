@@ -33,6 +33,7 @@ const semanticCacheTtlMs = 2 * 60 * 1000;
 const semanticCacheMaxEntries = 50;
 const semanticCache = new Map<string, { expiresAt: number; results: SearchResult[] }>();
 const semanticInFlight = new Map<string, Promise<SearchResult[]>>();
+let semanticCacheGeneration = 0;
 
 export async function queryIndexedExplorerSearch(
   query: string,
@@ -66,11 +67,15 @@ export async function querySemanticExplorerSearch(
     return [];
   const limit = clampLimit(options.limit ?? 100);
   const cacheKey = semanticCacheKey(trimmed, options, limit);
+  const cacheGeneration = semanticCacheGeneration;
   const cached = semanticCache.get(cacheKey);
   if (cached && cached.expiresAt > Date.now()) return cached.results;
   if (cached) semanticCache.delete(cacheKey);
   const inFlight = semanticInFlight.get(cacheKey);
-  if (inFlight) return inFlight;
+  if (inFlight) {
+    const results = await inFlight;
+    return cacheGeneration === semanticCacheGeneration ? results : [];
+  }
   let cacheable = false;
   const request = (async () => {
     const [libraryResponse, mediaResponse] = await Promise.allSettled([
@@ -100,6 +105,7 @@ export async function querySemanticExplorerSearch(
   semanticInFlight.set(cacheKey, request);
   try {
     const results = await request;
+    if (cacheGeneration !== semanticCacheGeneration) return [];
     if (cacheable) {
       semanticCache.set(cacheKey, { expiresAt: Date.now() + semanticCacheTtlMs, results });
       while (semanticCache.size > semanticCacheMaxEntries)
@@ -107,12 +113,14 @@ export async function querySemanticExplorerSearch(
     }
     return results;
   } finally {
-    semanticInFlight.delete(cacheKey);
+    if (semanticInFlight.get(cacheKey) === request) semanticInFlight.delete(cacheKey);
   }
 }
 
 export function clearSemanticExplorerSearchCache(): void {
+  semanticCacheGeneration += 1;
   semanticCache.clear();
+  semanticInFlight.clear();
 }
 
 /**

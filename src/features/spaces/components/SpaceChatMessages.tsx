@@ -1,7 +1,14 @@
-import type { SpaceChatMessagesProps } from "@/models/interfaces/features/spaces/components/SpaceChatMessages";
-export type { SpaceChatMessagesProps } from "@/models/interfaces/features/spaces/components/SpaceChatMessages";
+import type {
+  SpaceChatMessagesProps,
+  SpaceChatStarter,
+} from "@/models/interfaces/features/spaces/components/SpaceChatMessages";
+export type {
+  SpaceChatMessagesProps,
+  SpaceChatStarter,
+} from "@/models/interfaces/features/spaces/components/SpaceChatMessages";
 import type { FormEvent, RefObject } from "react";
 import {
+  AtSign,
   Ellipsis,
   LibraryBig,
   MessageSquare,
@@ -13,6 +20,7 @@ import {
 } from "lucide-react";
 
 import { Avatar, AvatarFallback } from "@/ui";
+import { Skeleton } from "@/ui";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -33,6 +41,10 @@ import {
   DropdownMenuTrigger,
 } from "@/ui";
 import { Textarea } from "@/ui";
+import { SiDiscord } from "react-icons/si";
+
+import { MessageOriginBadge } from "@/features/spaces/components/MessageOriginBadge";
+import { SpaceChatStarters } from "./SpaceChatStarters";
 import { copyLibraryItemsToClipboard } from "@/features/spaces/libraryClipboard";
 import { spacesApi } from "@/stores/spaces/useSpacesBackendStore";
 import type { MessageSpan } from "@/models/types/features/spaces/types";
@@ -55,21 +67,27 @@ export function SpaceChatMessages(props: SpaceChatMessagesProps) {
         </div>
       ) : null}
       {props.loading ? (
-        <div className="grid h-full place-items-center text-sm text-muted-foreground">
-          Loading conversation…
+        <div aria-busy="true" role="status">
+          <span className="sr-only">Loading conversation</span>
+          {messageSkeletonWidths.map((widths, index) => (
+            <div className="mb-6 grid grid-cols-[36px_minmax(0,1fr)_32px] gap-3" key={index}>
+              <Skeleton className="size-9 rounded-full" />
+              <div className="grid min-w-0 gap-2">
+                <Skeleton className="h-3.5 rounded" style={{ width: widths.name }} />
+                <Skeleton className="h-4 rounded" style={{ width: widths.line1 }} />
+                {widths.line2 ? (
+                  <Skeleton className="h-4 rounded" style={{ width: widths.line2 }} />
+                ) : null}
+              </div>
+              <div />
+            </div>
+          ))}
         </div>
       ) : props.messages.length === 0 ? (
-        <div className="grid h-full place-items-center text-center">
-          <div className="max-w-sm">
-            <span className="mx-auto grid size-12 place-items-center rounded-xl bg-muted/60">
-              <MessageSquare />
-            </span>
-            <h2 className="mt-4 text-base font-semibold">Start the conversation</h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Mention a teammate or shared Agent with @name.
-            </p>
-          </div>
-        </div>
+        <SpaceChatStarters
+          spaceName={props.spaceName}
+          onStarter={props.canWrite ? props.onStarter : undefined}
+        />
       ) : (
         props.messages.map((message) => (
           <article
@@ -91,9 +109,10 @@ export function SpaceChatMessages(props: SpaceChatMessagesProps) {
                 {message.sender_kind === "agent" ? (
                   <Badge variant="secondary" className="h-5 gap-1 px-1.5 text-[10px]">
                     <Sparkles />
-                    Agent
+                    {message.sender_name.toLocaleLowerCase() === "mika" ? "Mika" : "Assistant"}
                   </Badge>
                 ) : null}
+                <MessageOriginBadge origin={message.origin} />
                 <time className="text-xs text-muted-foreground">
                   {formatTime(message.created_at)}
                 </time>
@@ -190,6 +209,17 @@ export function SpaceChatMessages(props: SpaceChatMessagesProps) {
                     <Reply />
                     Reply
                   </DropdownMenuItem>
+                  {props.onPublishToDiscord && canPublish(message, props.currentUserId) ? (
+                    <DropdownMenuItem
+                      disabled={props.publishingMessageId === message.id}
+                      onSelect={() => props.onPublishToDiscord?.(message)}
+                    >
+                      <SiDiscord />
+                      {message.origin?.publish_state === "published"
+                        ? "Send to Discord again"
+                        : "Send to Discord"}
+                    </DropdownMenuItem>
+                  ) : null}
                   {message.sender_kind === "person" &&
                   message.sender_user_id === props.currentUserId ? (
                     <DropdownMenuItem onSelect={() => props.onBeginEditing(message)}>
@@ -217,6 +247,19 @@ export function SpaceChatMessages(props: SpaceChatMessagesProps) {
       )}
       <div ref={props.endRef} />
     </div>
+  );
+}
+
+/**
+ * Only a person's own Misty message may be mirrored outward. Agent output,
+ * system notices, and messages that arrived *from* Discord are never republished
+ * — that is what keeps the mirror from looping.
+ */
+function canPublish(message: SpaceMessage, currentUserId?: string) {
+  return (
+    message.sender_kind === "person" &&
+    message.sender_user_id === currentUserId &&
+    (message.origin?.system ?? "misty") === "misty"
   );
 }
 
@@ -384,6 +427,13 @@ function MessageAttachments({
     </>
   );
 }
+
+const messageSkeletonWidths: { name: string; line1: string; line2?: string }[] = [
+  { name: "30%", line1: "70%", line2: "45%" },
+  { name: "22%", line1: "50%" },
+  { name: "26%", line1: "85%", line2: "60%" },
+  { name: "20%", line1: "35%" },
+];
 
 function initials(name: string): string {
   return (

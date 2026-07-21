@@ -1,7 +1,5 @@
 import { CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
-import { Badge } from "@/ui";
-import { Button } from "@/ui";
-import { Card } from "@/ui";
+import { Badge, Button, Card } from "@/ui";
 import type {
   SpaceCalendarEvent,
   SpaceMember,

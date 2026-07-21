@@ -1,16 +1,9 @@
 import type { ExplorerMikaPanelProps } from "@/models/interfaces/features/explorer/desktop/ExplorerMikaPanel";
 export type { ExplorerMikaPanelProps } from "@/models/interfaces/features/explorer/desktop/ExplorerMikaPanel";
-import { ArrowUp, ChevronDown, Info, Mic, Plus, ShieldAlert, Sparkles, X } from "lucide-react";
+import { ArrowUp, Info, Sparkles, X } from "lucide-react";
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { Button } from "@/ui";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
-  DropdownMenuTrigger,
-} from "@/ui";
 import { Popover, PopoverContent, PopoverTrigger } from "@/ui";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui";
 import { Textarea } from "@/ui";
@@ -22,16 +15,16 @@ import {
 import { useMultiPanelStore } from "@/features/workspace";
 import { useAppStore } from "@/stores/app";
 import { useExplorerStore } from "@/stores/explorer";
-import { useMikaSessionStore } from "@/stores/assistant/useMikaSessionStore";
-import type { AiMode } from "@/models/types/stores/assistant/useAiServerStore";
+import { filesMikaScopeKey, useMikaSessionStore } from "@/stores/assistant/useMikaSessionStore";
+import { MistyPicker } from "@/features/picker/MistyPicker";
 import { AssistantMessage } from "./ExplorerAssistantMessage";
 import { MikaContextContent, MikaEmptyState } from "./ExplorerAssistantContext";
+import { AssistantComposerActions } from "./ExplorerAssistantComposer";
 import {
   assistantPlaceholder,
   buildMikaPrompt,
-  randomInteger,
-  randomMikaPeek,
   selectedPathsAcrossPanes,
+  useMikaPeekAnimation,
 } from "./ExplorerAssistantShared";
 import { assistantPanelStyles } from "./ExplorerAssistantStyles";
 import { cx } from "./ExplorerDesktopShared";
@@ -43,7 +36,12 @@ export const ExplorerMikaPanel = memo(function ExplorerMikaPanel(props: Explorer
   const panes = useExplorerStore((state) => state.panes);
   const listing = useExplorerStore((state) => state.panes[activePaneId]?.listing ?? null);
   const explorerSelectedPaths = useMemo(() => selectedPathsAcrossPanes(panes), [panes]);
-  const selectedPaths = props.selectedPaths ?? explorerSelectedPaths;
+  const [contextPickerOpen, setContextPickerOpen] = useState(false);
+  const [manualContextPaths, setManualContextPaths] = useState<string[]>([]);
+  const selectedPaths = useMemo(
+    () => [...new Set([...(props.selectedPaths ?? explorerSelectedPaths), ...manualContextPaths])],
+    [props.selectedPaths, explorerSelectedPaths, manualContextPaths],
+  );
   const {
     status,
     mode,
@@ -52,6 +50,7 @@ export const ExplorerMikaPanel = memo(function ExplorerMikaPanel(props: Explorer
     toolApprovals,
     error,
     refreshStatus,
+    activateConversationScope,
     setMode,
     sendPrompt,
     abortPrompt,
@@ -66,6 +65,7 @@ export const ExplorerMikaPanel = memo(function ExplorerMikaPanel(props: Explorer
       toolApprovals: state.toolApprovals,
       error: state.error,
       refreshStatus: state.refreshStatus,
+      activateConversationScope: state.activateConversationScope,
       setMode: state.setMode,
       sendPrompt: state.sendPrompt,
       abortPrompt: state.abortPrompt,
@@ -74,47 +74,27 @@ export const ExplorerMikaPanel = memo(function ExplorerMikaPanel(props: Explorer
     })),
   );
   const [prompt, setPrompt] = useState("");
-  const [mikaPeek, setMikaPeek] = useState(() => randomMikaPeek());
   const logRef = useRef<HTMLDivElement | null>(null);
   const promptRef = useRef<HTMLTextAreaElement | null>(null);
   const workingDirectory = props.workingDirectory ?? listing?.path ?? "";
   const running = status?.running ?? false;
   const configured = status?.configured ?? false;
   const chatWindow = props.surface === "bot-chat-window";
+  const mikaPeek = useMikaPeekAnimation(chatWindow);
 
   useEffect(() => {
-    void refreshStatus();
-  }, [refreshStatus]);
+    let active = true;
+    void activateConversationScope(filesMikaScopeKey).then(() => {
+      if (active && useMikaSessionStore.getState().conversationScopeKey === filesMikaScopeKey)
+        void refreshStatus();
+    });
+    return () => {
+      active = false;
+    };
+  }, [activateConversationScope, refreshStatus]);
   useEffect(() => {
     logRef.current?.scrollTo({ top: logRef.current.scrollHeight });
   }, [messages]);
-
-  useEffect(() => {
-    if (!chatWindow) return;
-    let timer = 0;
-    let disposed = false;
-    const scheduleRetreat = () => {
-      timer = window.setTimeout(
-        () => {
-          setMikaPeek((peek) => ({ ...peek, popped: false }));
-          timer = window.setTimeout(
-            () => {
-              if (disposed) return;
-              setMikaPeek(randomMikaPeek());
-              scheduleRetreat();
-            },
-            randomInteger(700, 1_500),
-          );
-        },
-        randomInteger(3_500, 7_500),
-      );
-    };
-    scheduleRetreat();
-    return () => {
-      disposed = true;
-      window.clearTimeout(timer);
-    };
-  }, [chatWindow]);
 
   useLayoutEffect(() => {
     const textarea = promptRef.current;
@@ -273,7 +253,7 @@ export const ExplorerMikaPanel = memo(function ExplorerMikaPanel(props: Explorer
               }}
             />
             {chatWindow ? (
-              <ChatWindowComposerActions
+              <AssistantComposerActions
                 mode={mode}
                 modelName={status?.modelName ?? "Mika"}
                 configured={configured}
@@ -281,6 +261,7 @@ export const ExplorerMikaPanel = memo(function ExplorerMikaPanel(props: Explorer
                 prompt={prompt}
                 setMode={setMode}
                 abortPrompt={abortPrompt}
+                onAddContext={() => setContextPickerOpen(true)}
               />
             ) : (
               <div
@@ -322,110 +303,20 @@ export const ExplorerMikaPanel = memo(function ExplorerMikaPanel(props: Explorer
           </footer>
         )}
       </div>
+      {contextPickerOpen ? (
+        <MistyPicker
+          multiple
+          title="Add files as context for Mika"
+          onCancel={() => setContextPickerOpen(false)}
+          onChooseFiles={(paths) => {
+            setManualContextPaths((current) => [...new Set([...current, ...paths])]);
+            setContextPickerOpen(false);
+          }}
+        />
+      ) : null}
     </aside>
   );
 });
-
-function ChatWindowComposerActions(props: {
-  mode: AiMode;
-  modelName: string;
-  configured: boolean;
-  running: boolean;
-  prompt: string;
-  setMode: (mode: AiMode) => void;
-  abortPrompt: () => Promise<void>;
-}) {
-  return (
-    <div className="relative z-10 flex h-[50px] min-w-0 items-center justify-between gap-3 px-3 pb-2">
-      <div className="flex min-w-0 items-center gap-1">
-        <Button
-          variant="ghost"
-          size="icon"
-          className="size-9 rounded-full"
-          disabled
-          title="Attachments coming soon"
-          type="button"
-          aria-label="Add context"
-        >
-          <Plus size={19} />
-        </Button>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              className={cx(
-                "h-9 min-w-[124px] justify-start gap-2 px-2.5",
-                props.mode !== "ask" && "text-destructive",
-              )}
-              type="button"
-            >
-              <ShieldAlert size={17} />
-              <span className="min-w-0 flex-1 truncate text-left">
-                {props.mode === "ask" ? "Ask first" : "Full access"}
-              </span>
-              <ChevronDown size={15} />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" side="top" className="w-40">
-            <DropdownMenuRadioGroup
-              value={props.mode === "ask" ? "ask" : "auto"}
-              onValueChange={(value) => props.setMode(value === "auto" ? "auto" : "ask")}
-            >
-              <DropdownMenuRadioItem value="ask">Ask first</DropdownMenuRadioItem>
-              <DropdownMenuRadioItem
-                value="auto"
-                className="text-destructive focus:text-destructive"
-              >
-                Full access
-              </DropdownMenuRadioItem>
-            </DropdownMenuRadioGroup>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
-      <div className="flex shrink-0 items-center gap-1">
-        <span
-          className="max-w-28 truncate px-1 text-sm text-muted-foreground"
-          title={props.modelName}
-        >
-          {props.modelName}
-        </span>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="size-9 rounded-full"
-          disabled
-          title="Voice input coming soon"
-          type="button"
-          aria-label="Voice input"
-        >
-          <Mic size={17} />
-        </Button>
-        {props.running ? (
-          <Button
-            size="icon"
-            className="size-9 rounded-full"
-            type="button"
-            aria-label="Stop Mika"
-            title="Cancel the active Mika request"
-            onClick={props.abortPrompt}
-          >
-            <X size={17} />
-          </Button>
-        ) : (
-          <Button
-            size="icon"
-            className="size-9 rounded-full"
-            type="submit"
-            aria-label="Send to Mika"
-            disabled={!props.configured || !props.prompt.trim()}
-          >
-            <ArrowUp size={19} />
-          </Button>
-        )}
-      </div>
-    </div>
-  );
-}
 
 function mikaPanelClass(surface: ExplorerMikaPanelProps["surface"]): string {
   if (surface === "bot-chat-window") return assistantPanelStyles.mikaChatWindowPanel;

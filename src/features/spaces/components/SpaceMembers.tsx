@@ -34,7 +34,9 @@ import {
   DropdownMenuTrigger,
 } from "@/ui";
 import { Input } from "@/ui";
+import { Skeleton } from "@/ui";
 import { useAuth } from "@/features/auth/AuthContext";
+import { useMinimumSpin } from "@/hooks/useMinimumSpin";
 import { spacesApi } from "@/stores/spaces/useSpacesBackendStore";
 import type { SpaceMember } from "@/models/interfaces/features/spaces/types";
 import { useSpacesStore } from "@/stores/spaces/useSpacesStore";
@@ -47,17 +49,20 @@ export function SpaceMembers({ spaceId }: { spaceId: string }) {
   const [memberAction, setMemberAction] = useState<MemberAction>();
   const [actionBusy, setActionBusy] = useState(false);
   const space = useSpacesStore((state) => state.spaces.find((item) => item.id === spaceId));
-  const { membersBySpace, error, invite, removeMember, transferOwner, clearError } = useSpacesStore(
-    useShallow((state) => ({
-      membersBySpace: state.membersBySpace,
-      error: state.error,
-      invite: state.invite,
-      removeMember: state.removeMember,
-      transferOwner: state.transferOwner,
-      clearError: state.clearError,
-    })),
-  );
+  const { membersBySpace, loading, error, invite, removeMember, transferOwner, clearError } =
+    useSpacesStore(
+      useShallow((state) => ({
+        membersBySpace: state.membersBySpace,
+        loading: state.loading,
+        error: state.error,
+        invite: state.invite,
+        removeMember: state.removeMember,
+        transferOwner: state.transferOwner,
+        clearError: state.clearError,
+      })),
+    );
   const members = membersBySpace[spaceId] ?? [];
+  const [membersLoading] = useMinimumSpin(loading && members.length === 0);
   const owner = space?.role === "owner";
   const canInvite = owner && members.length + (space?.pending_count ?? 0) < 5;
 
@@ -134,66 +139,90 @@ export function SpaceMembers({ spaceId }: { spaceId: string }) {
         ) : null}
 
         <Card className="overflow-hidden" aria-label="Space members">
-          {members.map((member, index) => (
-            <div
-              className={`group flex min-h-[72px] min-w-0 items-center gap-3 px-4 py-3 transition-colors hover:bg-muted/50 ${index ? "border-t border-border/60" : ""}`}
-              key={member.user_id}
-            >
-              <Avatar className="size-10 shrink-0">
-                <AvatarFallback className="text-xs font-semibold">
-                  {memberInitials(member.name)}
-                </AvatarFallback>
-              </Avatar>
-              <div className="min-w-0 flex-1">
-                <div className="flex min-w-0 items-center gap-2">
-                  <p className="m-0 truncate text-sm font-medium text-foreground">{member.name}</p>
-                  {member.user_id === user?.id ? <Badge variant="secondary">You</Badge> : null}
+          {membersLoading ? (
+            <div aria-busy="true" role="status">
+              <span className="sr-only">Loading members</span>
+              {[0, 1, 2, 3].map((index) => (
+                <div
+                  className={`flex min-h-[72px] min-w-0 items-center gap-3 px-4 py-3 ${index ? "border-t border-border/60" : ""}`}
+                  key={index}
+                >
+                  <Skeleton className="size-10 shrink-0 rounded-full" />
+                  <div className="min-w-0 flex-1 grid gap-2">
+                    <Skeleton className="h-3.5 w-32 rounded" />
+                    <Skeleton className="h-3 w-44 rounded" />
+                  </div>
                 </div>
-                <p className="mb-0 mt-0.5 flex items-center gap-1.5 truncate text-xs text-muted-foreground">
-                  <Mail className="size-3 shrink-0" /> {member.email}
-                </p>
-              </div>
-              <Badge className="hidden capitalize sm:inline-flex" variant="outline">
-                {member.role}
-              </Badge>
-              {owner && member.role !== "owner" ? (
-                <div className="flex shrink-0 items-center gap-1">
-                  <MemberPermissionControls
-                    spaceId={spaceId}
-                    userId={member.user_id}
-                    memberName={member.name}
-                  />
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        type="button"
-                        aria-label={`Actions for ${member.name}`}
-                      >
-                        <Ellipsis className="size-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem
-                        onSelect={() => setMemberAction({ kind: "transfer", member })}
-                      >
-                        <ShieldCheck className="mr-2 size-4" /> Transfer ownership
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem
-                        className="text-destructive focus:text-destructive"
-                        onSelect={() => setMemberAction({ kind: "remove", member })}
-                      >
-                        <Trash2 className="mr-2 size-4" /> Remove member
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-              ) : null}
+              ))}
             </div>
-          ))}
-          {!members.length ? (
+          ) : (
+            members.map((member, index) => (
+              <div
+                className={[
+                  "group flex min-h-[72px] min-w-0 items-center gap-3 px-4 py-3",
+                  "transition-colors hover:bg-muted/50",
+                  index ? "border-t border-border/60" : "",
+                ].join(" ")}
+                key={member.user_id}
+              >
+                <Avatar className="size-10 shrink-0">
+                  <AvatarFallback className="text-xs font-semibold">
+                    {memberInitials(member.name)}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="min-w-0 flex-1">
+                  <div className="flex min-w-0 items-center gap-2">
+                    <p className="m-0 truncate text-sm font-medium text-foreground">
+                      {member.name}
+                    </p>
+                    {member.user_id === user?.id ? <Badge variant="secondary">You</Badge> : null}
+                  </div>
+                  <p className="mb-0 mt-0.5 flex items-center gap-1.5 truncate text-xs text-muted-foreground">
+                    <Mail className="size-3 shrink-0" /> {member.email}
+                  </p>
+                </div>
+                <Badge className="hidden capitalize sm:inline-flex" variant="outline">
+                  {member.role}
+                </Badge>
+                {owner && member.role !== "owner" ? (
+                  <div className="flex shrink-0 items-center gap-1">
+                    <MemberPermissionControls
+                      spaceId={spaceId}
+                      userId={member.user_id}
+                      memberName={member.name}
+                    />
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          type="button"
+                          aria-label={`Actions for ${member.name}`}
+                        >
+                          <Ellipsis className="size-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem
+                          onSelect={() => setMemberAction({ kind: "transfer", member })}
+                        >
+                          <ShieldCheck className="mr-2 size-4" /> Transfer ownership
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          className="text-destructive focus:text-destructive"
+                          onSelect={() => setMemberAction({ kind: "remove", member })}
+                        >
+                          <Trash2 className="mr-2 size-4" /> Remove member
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                ) : null}
+              </div>
+            ))
+          )}
+          {!membersLoading && !members.length ? (
             <div className="grid min-h-56 place-items-center p-6 text-center">
               <div>
                 <Users className="mx-auto size-6 text-muted-foreground" />
@@ -585,26 +614,6 @@ const permissionGroups = [
         id: "library.import",
         label: "Import items",
         description: "Copy shared items into this Space.",
-      },
-    ],
-  },
-  {
-    title: "Studio and Agents",
-    items: [
-      {
-        id: "studio.view",
-        label: "View Studio",
-        description: "See shared Agents, workflows, and run history.",
-      },
-      {
-        id: "studio.manage",
-        label: "Manage Studio",
-        description: "Create, edit, replace, and delete resources.",
-      },
-      {
-        id: "agents.run",
-        label: "Run Agents",
-        description: "Start manual, chat, and automated runs.",
       },
     ],
   },

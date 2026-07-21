@@ -43,10 +43,10 @@ import { createPortal } from "react-dom";
 import type { CSSProperties, PointerEvent, ReactNode } from "react";
 import { readText, writeHtml, writeImage, writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { useNavigate } from "react-router-dom";
+import { routes } from "@/routing/paths";
 import { useShallow } from "zustand/react/shallow";
 import { MultiPanelWorkspace } from "@/features/workspace";
 import { useTransientScrollbars } from "@/hooks/useTransientScrollbars";
-import { hasTauriInternals } from "@/platform/tauri";
 import { isAndroidBuild } from "@/platform/buildTarget";
 import { useAppStore } from "@/stores/app";
 import {
@@ -115,7 +115,6 @@ import { useProvidersStore } from "@/stores/providers";
 import type {
   ClipboardPayload,
   ExplorerLibrarySnapshot,
-  FileEntry,
   PluginCommandEntry,
   PluginPanelElement,
   PluginPanelEntry,
@@ -184,7 +183,6 @@ import {
   isChromeTabPath,
   isRemotesTabPath,
   isTransfersTabPath,
-  openRemotesTab,
   openTransfersTab,
   parsePluginTabPath,
   toggleActiveTabPanelVisibility,
@@ -287,17 +285,10 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
   const resizeTargetRef = useRef<ResizeTarget>(null);
   const pendingResizeSaveRef = useRef(false);
   const transferRefreshInFlightRef = useRef(false);
-  const deviceRefreshInFlightRef = useRef(false);
-  const deviceRefreshMountedRef = useRef(true);
   const [resizeTarget, setResizeTarget] = useState<ResizeTarget>(null);
   const [pluginCommands, setPluginCommands] = useState<PluginCommandEntry[]>(emptyPluginCommands);
   const [pluginPanels, setPluginPanels] = useState<PluginPanelEntry[]>(emptyPluginPanels);
   const pluginCommandsRef = useRef<PluginCommandEntry[]>(emptyPluginCommands);
-  const [mountedDevices, setMountedDevices] = useState<MountedDevice[]>(emptyMountedDevices);
-  const [devicesLoading, setDevicesLoading] = useState(false);
-  const [androidAllFilesAccess, setAndroidAllFilesAccess] =
-    useState<AndroidAllFilesAccessStatus | null>(null);
-  const [androidGrantedFolders, setAndroidGrantedFolders] = useState<FileEntry[]>([]);
   const [duplicateFinderPaneId, setDuplicateFinderPaneId] = useState<string | null>(null);
   const [compareDialog, setCompareDialog] = useState<CompareDialogSeed | null>(null);
   const { mikaEnabled, preferredWorkspaceRoot, settingsLoaded, settingsMountPath } =
@@ -319,6 +310,15 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
     environmentHomePath,
   );
   const homePath = isAndroidBuild ? "misty://local" : storageHomePath;
+  const {
+    androidAllFilesAccess,
+    androidGrantedFolders,
+    devicesLoading,
+    mountedDevices,
+    refreshAndroidAllFilesAccess,
+    refreshAndroidGrantedFolders,
+    refreshDevices,
+  } = useExplorerDevices(homePath);
   const mountRoot = resolveMountRoot(
     storageHomePath,
     settingsMountPath || app?.environment.mountPath || ".misty/mnt",
@@ -380,11 +380,6 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
       ({
         "--explorer-sidebar-width": `${sidebarWidth}px`,
         "--preview-width": `${previewWidth}px`,
-        "--misty-files-panel-bg": "#141519",
-        "--misty-files-content-bg": "var(--misty-files-panel-bg)",
-        "--misty-files-tab-bg": "#191a1f",
-        "--misty-app-tab-bg": "var(--misty-files-tab-bg)",
-        "--misty-app-tab-active-bg": "var(--misty-files-tab-bg)",
       }) as CSSProperties,
     [previewWidth, sidebarWidth],
   );
@@ -519,109 +514,6 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
     shortcutPreferences.customShortcutsEnabled,
     shortcutPreferences.keymapIndex,
   ]);
-
-  const refreshDevices = useCallback(async (options?: { showLoading?: boolean }) => {
-    if (deviceRefreshInFlightRef.current) return;
-    const showLoading = options?.showLoading ?? true;
-    deviceRefreshInFlightRef.current = true;
-    if (showLoading && deviceRefreshMountedRef.current) setDevicesLoading(true);
-    try {
-      const snapshot = await devicesSnapshot();
-      if (deviceRefreshMountedRef.current) {
-        setMountedDevices((current) =>
-          mountedDevicesEqual(current, snapshot.devices) ? current : snapshot.devices,
-        );
-      }
-    } catch {
-      if (deviceRefreshMountedRef.current) {
-        setMountedDevices((current) => (current.length === 0 ? current : emptyMountedDevices));
-      }
-    } finally {
-      deviceRefreshInFlightRef.current = false;
-      if (showLoading && deviceRefreshMountedRef.current) setDevicesLoading(false);
-    }
-  }, []);
-
-  const refreshAndroidGrantedFolders = useCallback(async (): Promise<FileEntry[]> => {
-    if (!isAndroidBuild) return [];
-    try {
-      const listing = await explorerListDirectory({ path: homePath, showHidden: false });
-      const folders = listing.entries.filter((entry) => entry.kind === "folder");
-      setAndroidGrantedFolders(folders);
-      return folders;
-    } catch {
-      setAndroidGrantedFolders([]);
-      return [];
-    }
-  }, [homePath]);
-
-  const refreshAndroidAllFilesAccess =
-    useCallback(async (): Promise<AndroidAllFilesAccessStatus | null> => {
-      if (!isAndroidBuild) return null;
-      try {
-        const status = await androidAllFilesAccessStatus();
-        setAndroidAllFilesAccess(status);
-        return status;
-      } catch {
-        setAndroidAllFilesAccess(null);
-        return null;
-      }
-    }, []);
-
-  useEffect(() => {
-    if (!isAndroidBuild) return;
-    void refreshAndroidAllFilesAccess();
-    void refreshAndroidGrantedFolders();
-    const refreshOnFocus = () => {
-      void refreshAndroidAllFilesAccess();
-      void refreshAndroidGrantedFolders();
-    };
-    const refreshOnVisibility = () => {
-      if (document.visibilityState === "visible") refreshOnFocus();
-    };
-    window.addEventListener("focus", refreshOnFocus);
-    document.addEventListener("visibilitychange", refreshOnVisibility);
-    return () => {
-      window.removeEventListener("focus", refreshOnFocus);
-      document.removeEventListener("visibilitychange", refreshOnVisibility);
-    };
-  }, [refreshAndroidAllFilesAccess, refreshAndroidGrantedFolders]);
-
-  useEffect(() => {
-    deviceRefreshMountedRef.current = true;
-    void refreshDevices();
-    const refreshOnFocus = () => void refreshDevices();
-    window.addEventListener("focus", refreshOnFocus);
-    let active = true;
-    let unlisten: UnlistenFn | null = null;
-    const eventRefreshTimers = new Set<number>();
-    const refreshFromDeviceEvent = () => {
-      void refreshDevices({ showLoading: false });
-      const timer = window.setTimeout(() => {
-        eventRefreshTimers.delete(timer);
-        void refreshDevices({ showLoading: false });
-      }, 1200);
-      eventRefreshTimers.add(timer);
-    };
-    void (async () => {
-      try {
-        if (!hasTauriInternals()) return;
-        const stopListening = await listen(devicesChangedEvent, refreshFromDeviceEvent);
-        if (active) {
-          unlisten = stopListening;
-        } else {
-          void stopListening();
-        }
-      } catch {}
-    })();
-    return () => {
-      active = false;
-      deviceRefreshMountedRef.current = false;
-      window.removeEventListener("focus", refreshOnFocus);
-      eventRefreshTimers.forEach((timer) => window.clearTimeout(timer));
-      if (unlisten) void unlisten();
-    };
-  }, [refreshDevices]);
 
   useEffect(() => {
     const poll = async () => {
@@ -838,13 +730,16 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
   const openSidebarPathInNewTab = useCallback((path: string, title?: string) => {
     useMultiPanelStore.getState().addTab(path, title);
   }, []);
+  // Remotes is presented as an overlay. Navigating to /providers is the shared
+  // entry point: DesktopLayout turns it into "open the overlay and restore the
+  // previous route", the same way /settings and /account behave.
   const handleManageRemotes = useCallback(() => {
-    openRemotesTab();
-  }, []);
+    navigate(routes.providers);
+  }, [navigate]);
   const handleAddRemote = useCallback(() => {
-    openRemotesTab();
+    navigate(routes.providers);
     void useProvidersStore.getState().openAddRemote();
-  }, []);
+  }, [navigate]);
   const handleGrantLocalFolder = useCallback(
     (request?: AndroidLocalGrantRequest) => {
       void (async () => {

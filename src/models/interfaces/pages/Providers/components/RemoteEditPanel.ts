@@ -26,6 +26,8 @@ export interface RemoteEditPanelProps {
   validRemoteName: boolean;
   stale: boolean;
   serviceError: string | null;
+  feedbackError: string | null;
+  feedbackMessage: string | null;
   onDraftName: (name: string) => void;
   onConfigField: (key: string, value: string) => void;
   onTokenField: (key: string, value: string) => void;
@@ -33,4 +35,5 @@ export interface RemoteEditPanelProps {
   onSave: () => void;
   onDelete: (name: string) => void;
   onReload: () => void;
+  onTest: () => void;
 }

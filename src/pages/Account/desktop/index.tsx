@@ -36,6 +36,7 @@ import type {
   AccountMeResponse as MeResponse,
 } from "@/models/interfaces/stores/account/useAccountStore";
 import { useUserStore } from "@/stores/account/useUserStore";
+import { readAccountSessionGeneration } from "@/stores/account/useAuthTokenStore";
 import { useSetupStore } from "@/stores/app";
 import type { CurrentLicense } from "@/models/types/features/installer/types";
 import { useAppStore } from "@/stores/app";
@@ -179,10 +180,12 @@ function AccountPanel({
   me,
   onUpdated,
   onLogout,
+  transitioning,
 }: {
   me: MeResponse;
   onUpdated: (name: string) => void;
-  onLogout: () => void;
+  onLogout: () => Promise<void>;
+  transitioning: boolean;
 }) {
   const patchMe = useUserStore((state) => state.patchMe);
   const [name, setName] = useState(me.name);
@@ -196,26 +199,41 @@ function AccountPanel({
     ok: profileOk,
     save: saveProfile,
   } = useSave(async () => {
+    const generation = readAccountSessionGeneration();
     await updateProfile(name);
+    if (readAccountSessionGeneration() !== generation) return;
     onUpdated(name);
   });
 
   useEffect(() => {
+    const generation = readAccountSessionGeneration();
+    let canceled = false;
+    setBillingUsage(null);
     void fetchBillingUsage()
-      .then(setBillingUsage)
-      .catch(() => setBillingUsage(null));
-  }, [me.tier]);
+      .then((usage) => {
+        if (!canceled && readAccountSessionGeneration() === generation) setBillingUsage(usage);
+      })
+      .catch(() => {
+        if (!canceled && readAccountSessionGeneration() === generation) setBillingUsage(null);
+      });
+    return () => {
+      canceled = true;
+    };
+  }, [me.id, me.tier]);
 
   async function openBillingAction(action: () => Promise<{ url: string }>) {
+    const generation = readAccountSessionGeneration();
     setBillingWorking(true);
     setBillingError("");
     try {
       const { url } = await action();
+      if (readAccountSessionGeneration() !== generation) return;
       await openExternalLink(url);
     } catch (error) {
+      if (readAccountSessionGeneration() !== generation) return;
       setBillingError(error instanceof Error ? error.message : "Could not start billing.");
     } finally {
-      setBillingWorking(false);
+      if (readAccountSessionGeneration() === generation) setBillingWorking(false);
     }
   }
   const {
@@ -224,7 +242,9 @@ function AccountPanel({
     ok: deviceOk,
     save: saveDevice,
   } = useSave(async () => {
+    const generation = readAccountSessionGeneration();
     await updateDevice(device);
+    if (readAccountSessionGeneration() !== generation) return;
     patchMe({ license_device: device });
   });
 
@@ -315,9 +335,14 @@ function AccountPanel({
                 value={device}
                 onChange={(e) => setDevice(e.target.value)}
                 placeholder="e.g. MacBook Pro"
+                disabled={transitioning}
                 className="min-w-0 flex-1"
               />
-              <Button onClick={saveDevice} disabled={savingDevice} className="shrink-0">
+              <Button
+                onClick={saveDevice}
+                disabled={transitioning || savingDevice}
+                className="shrink-0"
+              >
                 {savingDevice ? "Saving…" : "Save"}
               </Button>
             </div>
@@ -354,7 +379,7 @@ function AccountPanel({
             <p className="text-xs text-muted-foreground">Pro $9.99/month · Max $14.99/month</p>
             <Button
               variant="link"
-              disabled={billingWorking}
+              disabled={transitioning || billingWorking}
               onClick={() => void openBillingAction(() => createCheckout("pro", "month"))}
               className="h-auto shrink-0 p-0 text-xs"
             >
@@ -384,7 +409,7 @@ function AccountPanel({
               <Button
                 variant="outline"
                 size="sm"
-                disabled={billingWorking}
+                disabled={transitioning || billingWorking}
                 onClick={() => void openBillingAction(() => createCreditCheckout("credits_1500"))}
               >
                 1,500,000 credits · $4.99
@@ -392,7 +417,7 @@ function AccountPanel({
               <Button
                 variant="outline"
                 size="sm"
-                disabled={billingWorking}
+                disabled={transitioning || billingWorking}
                 onClick={() => void openBillingAction(() => createCreditCheckout("credits_3500"))}
               >
                 3,500,000 credits · $9.99
@@ -413,7 +438,7 @@ function AccountPanel({
             <div className={accountSettingsCustomRowClass}>
               <Button
                 variant="link"
-                disabled={billingWorking || !me.billing.customer_portal_available}
+                disabled={transitioning || billingWorking || !me.billing.customer_portal_available}
                 onClick={() => void openBillingAction(createPortalSession)}
                 className="h-auto p-0"
               >
@@ -429,7 +454,7 @@ function AccountPanel({
             <div className="flex flex-wrap gap-2">
               <Button
                 size="sm"
-                disabled={billingWorking}
+                disabled={transitioning || billingWorking}
                 onClick={() => void openBillingAction(() => createCheckout("pro", "month"))}
               >
                 Pro · $9.99/mo
@@ -437,7 +462,7 @@ function AccountPanel({
               <Button
                 variant="outline"
                 size="sm"
-                disabled={billingWorking}
+                disabled={transitioning || billingWorking}
                 onClick={() => void openBillingAction(() => createCheckout("max", "month"))}
               >
                 Max · $14.99/mo
@@ -445,7 +470,7 @@ function AccountPanel({
               <Button
                 variant="outline"
                 size="sm"
-                disabled={billingWorking}
+                disabled={transitioning || billingWorking}
                 onClick={() => void openBillingAction(() => createCheckout("pro", "year"))}
               >
                 Pro · $99/yr
@@ -453,7 +478,7 @@ function AccountPanel({
               <Button
                 variant="outline"
                 size="sm"
-                disabled={billingWorking}
+                disabled={transitioning || billingWorking}
                 onClick={() => void openBillingAction(() => createCheckout("max", "year"))}
               >
                 Max · $149/yr
@@ -497,12 +522,13 @@ function AccountPanel({
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
+                disabled={transitioning}
               />
             </div>
             <div className="flex items-center gap-3">
               <Button
                 onClick={saveProfile}
-                disabled={savingProfile || name.trim() === "" || name === me.name}
+                disabled={transitioning || savingProfile || name.trim() === "" || name === me.name}
               >
                 {savingProfile ? "Saving…" : "Save changes"}
               </Button>
@@ -556,6 +582,7 @@ function AccountPanel({
             <AlertDialogTrigger asChild>
               <Button
                 variant="outline"
+                disabled={transitioning}
                 className="border-destructive/30 text-destructive hover:bg-destructive/10 hover:text-destructive"
               >
                 Sign out
@@ -573,7 +600,8 @@ function AccountPanel({
                 <AlertDialogCancel>Cancel</AlertDialogCancel>
                 <AlertDialogAction
                   className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                  onClick={onLogout}
+                  disabled={transitioning}
+                  onClick={() => void onLogout()}
                 >
                   Sign out
                 </AlertDialogAction>
@@ -606,11 +634,15 @@ function PrivacyPanel() {
     <div>
       <Section title="Privacy">
         <div className={`${accountSettingsCustomRowClass} flex flex-col gap-2`}>
-          <p className="text-sm font-medium text-foreground">Your data stays on your device.</p>
+          <p className="text-sm font-medium text-foreground">
+            Private by default, explicit when shared.
+          </p>
           <p className="text-sm leading-relaxed text-muted-foreground">
-            Misty never transmits your files or cloud credentials to any external server. All
-            provider communication runs through Misty's embedded local runtime. We only store your
-            account info (name, email, hashed password) and subscription status.
+            Files and local provider access stay private until you choose an action that uploads or
+            shares content. Space Library copies, Chat attachments, account data, Mika prompts and
+            selected context, and supported integration credentials may be sent to the configured
+            Misty service or provider to perform that action. Misty shows the destination before a
+            private file becomes shared Space content.
           </p>
         </div>
       </Section>
@@ -730,7 +762,7 @@ export default function DesktopAccountPage(props: {
   presentation?: "page" | "overlay";
   onClose?: () => void;
 }) {
-  const { user, logout, setUser } = useAuth();
+  const { user, logout, setUser, transitioning } = useAuth();
   const navigate = useNavigate();
   const currentUser = useSetupStore((state) => state.status?.current_user ?? null);
   const currentLicense = useSetupStore((state) => state.status?.current_license ?? null);
@@ -749,47 +781,69 @@ export default function DesktopAccountPage(props: {
     () => (activeUser ? meFromLocalAccount(activeUser, currentLicense) : null),
     [activeUser, currentLicense],
   );
-  const displayMe = me ?? localMe;
+  const accountMe = me?.id === activeUser?.id ? me : null;
+  const displayMe = accountMe ?? localMe;
   const overlay = props.presentation === "overlay";
 
   useEffect(() => {
+    let canceled = false;
     if (!activeUser) {
       if (overlay) props.onClose?.();
       navigate("/signin", { replace: true, state: { from: "/account" } });
       return;
     }
+    if (transitioning) {
+      setLoading(true);
+      return;
+    }
     if (!user && currentUser) {
       setUser(currentUser);
     }
-    if (me) return;
+    if (accountMe) {
+      setLoading(false);
+      return;
+    }
+    const expectedAccountId = activeUser.id;
+    const generation = readAccountSessionGeneration();
     setLoading(true);
-    fetchMe()
-      .then(setMe)
+    void fetchMe()
+      .then((profile) => {
+        if (
+          canceled ||
+          readAccountSessionGeneration() !== generation ||
+          profile.id !== expectedAccountId
+        )
+          return;
+        setMe(profile);
+      })
       .catch((err) => {
-        if (err.status === 401) {
-          if (currentUser) {
-            setUser(currentUser);
-            return;
-          }
-          setUser(null);
-          navigate("/signin", { replace: true, state: { from: "/account" } });
+        if (canceled || readAccountSessionGeneration() !== generation) return;
+        if (err?.status === 401) {
+          void logout();
         }
       })
-      .finally(() => setLoading(false));
+      .finally(() => {
+        if (!canceled && readAccountSessionGeneration() === generation) setLoading(false);
+      });
+    return () => {
+      canceled = true;
+    };
   }, [
+    accountMe,
     activeUser,
     currentUser,
     user,
     navigate,
-    me,
+    logout,
     overlay,
     props.onClose,
     setMe,
     setLoading,
     setUser,
+    transitioning,
   ]);
 
-  if (!activeUser || (loading && !displayMe)) {
+  if (!activeUser || transitioning || (loading && !displayMe)) {
     return (
       <div
         className={`${overlay ? "h-full" : "min-h-screen"} flex items-center justify-center bg-background`}
@@ -810,12 +864,14 @@ export default function DesktopAccountPage(props: {
 
       {displayMe && tab === "account" && (
         <AccountPanel
+          key={displayMe.id}
           me={displayMe}
           onUpdated={(name) => {
             patchMe({ name });
             setUser({ ...activeUser, name });
           }}
           onLogout={logout}
+          transitioning={transitioning}
         />
       )}
 

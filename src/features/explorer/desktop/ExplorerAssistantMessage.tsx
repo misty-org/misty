@@ -2,6 +2,7 @@ import type { AssistantPlanOperation } from "@/models/types/features/explorer/de
 export type { AssistantPlanOperation } from "@/models/types/features/explorer/desktop/ExplorerAssistantMessage";
 import { File, Folder } from "lucide-react";
 import { useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { AgentSources } from "@/features/agents/AgentSources";
 import "@/features/agents/sources.css";
 import { Badge } from "@/ui";
@@ -20,7 +21,6 @@ import type {
   AiPlanReview,
   AiToolApproval,
 } from "@/models/interfaces/stores/assistant/useMikaSessionStore";
-import { MikaDelegatedRunAction } from "./MikaDelegatedRunAction";
 import { cx } from "./ExplorerDesktopShared";
 import { assistantPanelStyles } from "./ExplorerAssistantStyles";
 
@@ -33,6 +33,12 @@ export function AssistantMessage(props: {
   onApproveTool: (requestId: string) => Promise<void>;
 }) {
   const { message } = props;
+  const citedContextSources = useMemo(() => {
+    const citedIds = new Set(
+      [...message.text.matchAll(/\[(S\d+)\]/gi)].map((match) => match[1].toUpperCase()),
+    );
+    return (message.contextSources ?? []).filter((source) => citedIds.has(source.id.toUpperCase()));
+  }, [message.contextSources, message.text]);
   return (
     <article className={assistantMessageClass(message.role)}>
       <strong className={assistantPanelStyles.messageTitle}>
@@ -41,8 +47,28 @@ export function AssistantMessage(props: {
       <pre className={assistantPanelStyles.messageText}>
         {message.text || (message.role === "assistant" && props.running ? "Thinking..." : "")}
       </pre>
-      <MikaDelegatedRunAction message={message} />
       {message.citations?.length ? <AgentSources citations={message.citations} compact /> : null}
+      {citedContextSources.length ? (
+        <div
+          className="flex min-w-0 flex-wrap items-center gap-1.5 pt-0.5"
+          aria-label="Space sources"
+        >
+          {citedContextSources.map((source) => (
+            <Button
+              key={`${message.id}:${source.id}`}
+              asChild
+              className="h-7 max-w-full gap-1 px-2 text-[11px] shadow-none"
+              size="sm"
+              variant="outline"
+            >
+              <Link to={source.href} title={source.label}>
+                <span className="shrink-0 text-muted-foreground">[{source.id}]</span>
+                <span className="truncate">{source.label}</span>
+              </Link>
+            </Button>
+          ))}
+        </div>
+      ) : null}
       {message.creditsUsed !== undefined ? (
         <small className="text-[10px] text-muted-foreground">
           {message.creditsUsed} credits · {message.creditsRemaining?.toLocaleString() ?? 0}{" "}

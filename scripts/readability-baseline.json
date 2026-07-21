@@ -17,12 +17,6 @@
       "hash": "2d99f9d2bbeb9e88"
     }
   ],
-  "src/features/picker/FilePicker.tsx": [
-    {
-      "length": 307,
-      "hash": "0f2f8cea9729653d"
-    }
-  ],
   "src/ui/alert-dialog.tsx": [
     {
       "length": 423,
@@ -333,12 +327,6 @@
     {
       "length": 289,
       "hash": "532cd64796d48e5f"
-    }
-  ],
-  "src/features/explorer/components/ExplorerPickerSidebar.tsx": [
-    {
-      "length": 167,
-      "hash": "ce56304291bdc574"
     }
   ],
   "src/features/explorer/components/ExplorerSidebar.tsx": [
@@ -695,16 +683,6 @@
     {
       "length": 206,
       "hash": "927a2c3f702b9865"
-    }
-  ],
-  "src/features/spaces/components/MistyLibraryPicker.tsx": [
-    {
-      "length": 275,
-      "hash": "f59a9df9973a5570"
-    },
-    {
-      "length": 185,
-      "hash": "ba95cd8acfd7c6e1"
     }
   ],
   "src/features/spaces/components/SpaceLibraryChrome.tsx": [

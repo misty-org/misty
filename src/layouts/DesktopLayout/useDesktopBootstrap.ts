@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { useShallow } from "zustand/react/shallow";
 import { useExplorerStore, useSearchStore } from "@/stores/explorer";
 import { useMultiPanelStore } from "@/features/workspace";
 import { preloadDesktopFilesPage } from "@/features/explorer";
@@ -26,11 +27,13 @@ export function useDesktopBootstrap(params: { getRouteId: (pathname: string) => 
   const transferLoad = useTransfersStore((state) => state.load);
   const settings = useSettingsStore((state) => state.settings);
   const settingsLoad = useSettingsStore((state) => state.load);
-  const searchMaintenancePreferences = useSettingsStore((state) =>
-    selectSearchMaintenancePreferences(state.settings?.document),
+  const searchMaintenancePreferences = useSettingsStore(
+    useShallow((state) => selectSearchMaintenancePreferences(state.settings?.document)),
   );
   const activePaneId = useMultiPanelStore((state) => state.activePaneId);
-  const activePanePath = useExplorerStore((state) => state.panes[activePaneId]?.listing?.path ?? "");
+  const activePanePath = useExplorerStore(
+    (state) => state.panes[activePaneId]?.listing?.path ?? "",
+  );
   const rememberAppRoute = useAppRouteMemoryStore((state) => state.rememberAppRoute);
   const lastAppRoute = useAppRouteMemoryStore((state) => state.lastAppRoute);
 
@@ -116,6 +119,25 @@ export function useDesktopBootstrap(params: { getRouteId: (pathname: string) => 
   }, [activePanePath, app?.environment.homeDir]);
 
   useEffect(() => {
+    const onGlobalRefreshShortcut = (event: KeyboardEvent) => {
+      if (!(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey) return;
+      if (event.key.toLocaleLowerCase() !== "r") return;
+      // Cmd+R is bound to "explorer.refresh", but that binding is only
+      // intercepted while the Files page is mounted. Everywhere else (Spaces,
+      // Settings, Assistant, ...) nothing prevents the default, so the
+      // webview does a real full-page reload: every bit of in-memory state is
+      // lost and the whole bootstrap sequence in main.tsx reruns from
+      // scratch, which is what causes the black-screen flash on refresh.
+      // This only calls preventDefault(), not stopPropagation(), so
+      // Explorer's own bubble-phase listener still runs its refresh command
+      // normally when it's mounted.
+      event.preventDefault();
+    };
+    window.addEventListener("keydown", onGlobalRefreshShortcut, true);
+    return () => window.removeEventListener("keydown", onGlobalRefreshShortcut, true);
+  }, []);
+
+  useEffect(() => {
     if (loadedRoutes.current.has(routeId)) return;
     loadedRoutes.current.add(routeId);
     if (routeId === "files" || routeId === "providers" || routeId === "diagnostics") {
@@ -127,14 +149,19 @@ export function useDesktopBootstrap(params: { getRouteId: (pathname: string) => 
 
   useEffect(() => {
     const route = `${location.pathname}${location.search}`;
-    if (location.pathname === "/account") return;
+    if (location.pathname === "/account" || location.pathname.startsWith("/providers")) return;
     if (isRememberableAppRoute(route)) {
       rememberAppRoute(route);
     }
   }, [location.pathname, location.search, rememberAppRoute]);
 
   useEffect(() => {
-    if (location.pathname.startsWith("/settings") || location.pathname === "/account") return;
+    if (
+      location.pathname.startsWith("/settings") ||
+      location.pathname === "/account" ||
+      location.pathname.startsWith("/providers")
+    )
+      return;
     lastNonSettingsRouteRef.current = `${location.pathname}${location.search}`;
   }, [location.pathname, location.search]);
 

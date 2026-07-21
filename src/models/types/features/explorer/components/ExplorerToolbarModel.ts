@@ -17,7 +17,6 @@ import type {
 export type ExplorerCommandId =
   | "app.toggle_transfers"
   | "app.open_settings"
-  | "app.toggle_plugin_launcher"
   | "clipboard.publish_shared"
   | "clipboard.apply_shared"
   | "search.toggle"
@@ -32,7 +31,6 @@ export type ExplorerCommandId =
   | "explorer.batch_rename"
   | "explorer.duplicate_finder"
   | "explorer.compare_with"
-  | "explorer.automation_rules"
   | "explorer.delete"
   | "explorer.download"
   | "explorer.open_with"

@@ -42,9 +42,7 @@ import {
 import {
   CalendarSourceDrawer,
   SpaceTaskBoard,
-  SpaceTaskCalendar,
   SpaceTaskDrawer,
-  SpaceTaskEventDrawer,
   SpaceTaskList,
   type TaskDraft,
 } from "@/features/spaces/SpaceTasksViews";

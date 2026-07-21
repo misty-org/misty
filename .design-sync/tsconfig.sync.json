@@ -1,0 +1,12 @@
+{
+  "comment": "Used only by design-sync's esbuild path resolver. Explicit index-file targets for the two @/ aliases that point at directory barrels (esbuild's paths plugin would otherwise resolve them to the bare directory). All other @/* aliases fall through to the wildcard.",
+  "compilerOptions": {
+    "baseUrl": "..",
+    "paths": {
+      "@/ui": ["src/ui/index.ts"],
+      "@/stores/app": [".design-sync/stubs/stores-app.ts"],
+      "@/platform/runtimeAsset": [".design-sync/stubs/runtime-asset.ts"],
+      "@/*": ["src/*"]
+    }
+  }
+}

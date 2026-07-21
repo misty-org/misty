@@ -63,6 +63,8 @@ export interface ProvidersWorkspaceState {
   tokenVisible: boolean;
   loadingRemoteName: string | null;
   loadedRemoteRevision: number;
+  error: string | null;
+  message: string | null;
 }
 
 export interface CachedRemoteDraft {
@@ -72,10 +74,6 @@ export interface CachedRemoteDraft {
 
 export interface ProvidersStore {
   providers: ProvidersSnapshot | null;
-  draft: RemoteEditDraft | null;
-  originalDraft: RemoteEditDraft | null;
-  configPaths: RcloneConfigPaths | null;
-  tokenVisible: boolean;
   workspaces: Record<string, ProvidersWorkspaceState>;
   remoteDraftCache: Record<string, CachedRemoteDraft>;
   remoteRevisions: Record<string, number>;
@@ -89,27 +87,19 @@ export interface ProvidersStore {
   discardWorkspaces: (workspaceIds: string[]) => void;
   reloadWorkspaceRemote: (workspaceId: string) => Promise<void>;
   load: (refresh?: boolean) => Promise<void>;
-  selectRemote: (name: string, guardDirty?: boolean) => Promise<void>;
   selectRemoteInWorkspace: (
     workspaceId: string,
     name: string,
     guardDirty?: boolean,
     forceReload?: boolean,
   ) => Promise<void>;
-  setDraftName: (name: string) => void;
   setWorkspaceDraftName: (workspaceId: string, name: string) => void;
-  setConfigField: (key: string, value: string) => void;
   setWorkspaceConfigField: (workspaceId: string, key: string, value: string) => void;
-  setTokenField: (key: string, value: string) => void;
   setWorkspaceTokenField: (workspaceId: string, key: string, value: string) => void;
-  setTokenVisible: (visible: boolean) => void;
   setWorkspaceTokenVisible: (workspaceId: string, visible: boolean) => void;
-  saveRemote: () => Promise<void>;
   saveWorkspaceRemote: (workspaceId: string) => Promise<void>;
-  testConnection: () => Promise<void>;
   testWorkspaceConnection: (workspaceId: string) => Promise<void>;
-  revealConfig: () => Promise<void>;
-  revealWorkspaceConfig: (workspaceId: string) => Promise<void>;
+  loadWorkspaceConfigPaths: (workspaceId: string) => Promise<void>;
   openAddRemote: () => Promise<void>;
   openRepairRemote: (remote: ProviderRemote) => Promise<void>;
   closeConnection: () => void;

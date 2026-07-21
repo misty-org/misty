@@ -1,10 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/stores/account/useAuthTokenStore", () => ({
+  isAccountSessionTransitioning: vi.fn(() => false),
+  readAccountSessionGeneration: vi.fn(() => 0),
   readAccountAuthToken: vi.fn().mockResolvedValue("smart-library-token"),
 }));
 
-vi.mock("@/stores/backend", () => ({
+vi.mock("@/stores/backend", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/stores/backend")>()),
   appSnapshot: vi.fn().mockRejectedValue(new Error("not running in Tauri")),
 }));
 

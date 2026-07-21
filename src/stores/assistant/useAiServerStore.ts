@@ -9,6 +9,8 @@ import type {
   FileOperationPlan,
   AgentEvent,
   AgentEventsResponse,
+  AgentSessionsResponse,
+  AgentTranscriptResponse,
   CreateSessionResponse,
   AgentStatusResponse,
   ManagedAiErrorPayload,
@@ -28,7 +30,11 @@ export type {
 } from "@/models/interfaces/stores/assistant/useAiServerStore";
 import { appSnapshot } from "@/stores/backend";
 import { normalizeApiBaseUrl, withDefaultApiPath } from "@/stores/backend";
-import { readAccountAuthToken } from "@/stores/account/useAuthTokenStore";
+import {
+  isAccountSessionTransitioning,
+  readAccountSessionGeneration,
+  readAccountAuthToken,
+} from "@/stores/account/useAuthTokenStore";
 import type { AgentCitation } from "@/models/interfaces/features/agents/types";
 
 export class ManagedAiRequestError extends Error {
@@ -47,10 +53,19 @@ export async function fetchAgentStatus(): Promise<AgentStatusResponse> {
   return managedAiRequest<AgentStatusResponse>("/ai/status");
 }
 
-export async function createAgentSession(agentJobId?: string): Promise<CreateSessionResponse> {
+export async function createAgentSession(
+  agentJobId?: string,
+  spaceId?: string,
+): Promise<CreateSessionResponse> {
   return managedAiRequest<CreateSessionResponse>("/ai/sessions", {
     method: "POST",
-    body: agentJobId ? JSON.stringify({ agent_job_id: agentJobId }) : undefined,
+    body:
+      agentJobId || spaceId
+        ? JSON.stringify({
+            agent_job_id: agentJobId || undefined,
+            space_id: spaceId || undefined,
+          })
+        : undefined,
   });
 }
 
@@ -86,24 +101,53 @@ export async function cancelAgentSession(sessionId: string): Promise<void> {
   });
 }
 
+export async function listAgentSessions(): Promise<AgentSessionsResponse> {
+  return managedAiRequest<AgentSessionsResponse>("/ai/sessions");
+}
+
+export async function fetchAgentTranscript(sessionId: string): Promise<AgentTranscriptResponse> {
+  return managedAiRequest<AgentTranscriptResponse>(
+    `/ai/sessions/${encodeURIComponent(sessionId)}/transcript`,
+  );
+}
+
+export async function renameAgentSession(sessionId: string, title: string): Promise<void> {
+  await managedAiRequest(`/ai/sessions/${encodeURIComponent(sessionId)}`, {
+    method: "PATCH",
+    body: JSON.stringify({ title }),
+  });
+}
+
 export async function deleteAgentSession(sessionId: string): Promise<void> {
   await managedAiRequest(`/ai/sessions/${encodeURIComponent(sessionId)}`, { method: "DELETE" });
 }
 
 export async function managedAiRequest<T = unknown>(path: string, init?: RequestInit): Promise<T> {
+  const accountGeneration = readAccountSessionGeneration();
+  assertStableManagedAiAccount(accountGeneration);
   const base = await resolveServerApiBase();
+  assertStableManagedAiAccount(accountGeneration);
   if (!base) throw new Error("Misty server URL is not configured.");
   const token = await readAccountAuthToken();
+  assertStableManagedAiAccount(accountGeneration);
   const headers = new Headers(init?.headers);
   if (init?.body && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");
   if (token && !headers.has("Authorization")) headers.set("Authorization", `Bearer ${token}`);
-  const response = await fetch(`${base}${path}`, {
-    credentials: "include",
-    ...init,
-    headers,
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${base}${path}`, {
+      credentials: "include",
+      ...init,
+      headers,
+    });
+  } catch (error) {
+    assertStableManagedAiAccount(accountGeneration);
+    throw error;
+  }
+  assertStableManagedAiAccount(accountGeneration);
   if (!response.ok) {
     const text = await response.text();
+    assertStableManagedAiAccount(accountGeneration);
     let payload: ManagedAiErrorPayload | null = null;
     try {
       payload = JSON.parse(text) as ManagedAiErrorPayload;
@@ -164,9 +208,20 @@ export async function managedAiRequest<T = unknown>(path: string, init?: Request
   }
   if (response.status === 204) return undefined as T;
   const contentType = response.headers.get("Content-Type") ?? "";
-  return contentType.includes("application/json")
-    ? ((await response.json()) as T)
-    : (undefined as T);
+  if (!contentType.includes("application/json")) return undefined as T;
+  const result = (await response.json()) as T;
+  assertStableManagedAiAccount(accountGeneration);
+  return result;
+}
+
+function assertStableManagedAiAccount(generation: number): void {
+  if (isAccountSessionTransitioning() || generation !== readAccountSessionGeneration()) {
+    throw new ManagedAiRequestError(
+      "Wait for the account switch to finish.",
+      409,
+      "account_changed",
+    );
+  }
 }
 
 function retryAfterHeader(response: Response): number | undefined {
