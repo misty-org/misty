@@ -146,3 +146,8 @@ Removed the 30-second abuse-block refresh ticker. Committed changes and LISTEN r
 ## Implementation delta (resource leases)
 
 Removed the workflow resource lease's 500ms contention poll. Each waiter now subscribes to a resource-specific committed hint before claiming and arms only the current lease holder's actual database-clock deadline. Unrelated resource transitions cause no reads. LISTEN reconnect triggers reconciliation; cancellation or a closed subscription stops the waiter. A five-second one-shot deadline bounds post-action release. These use the existing shared listener, not a PostgreSQL session per resource/waiter.
+
+
+## Implementation delta (AI invocation streams)
+
+Removed the AI invocation SSE loop's per-viewer database refresh on every event and every 15-second keepalive. Viewers share one per-invocation stream fed by committed PostgreSQL hints and incremental, bounded page reads. Keepalive comments are transport-only. Expiry uses the invocation's own deadline, not a timer poll.
