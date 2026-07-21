@@ -1,94 +1,38 @@
-import { useState } from "react";
-import { NavLink, useNavigate } from "react-router";
+import { ArrowRight, LockKeyhole } from "lucide-react";
+import { NavLink } from "react-router";
+
 import { Button } from "@/components/ui/button";
 import AuthCard from "../Auth/AuthCard";
-import AuthField from "../Auth/AuthField";
-import AuthMessage from "../Auth/AuthMessage";
 import AuthShell from "../Auth/AuthShell";
-import AuthSubmitButton from "../Auth/AuthSubmitButton";
-import { registerRequest } from "../Auth/api";
 
 export default function Register() {
-  const navigate = useNavigate();
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setError("");
-    setLoading(true);
-
-    try {
-      await registerRequest(name, email, password);
-      navigate("/signin");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not connect to server");
-    } finally {
-      setLoading(false);
-    }
-  }
-
   return (
     <AuthShell
-      title="Create an account"
-      description="Sign up to get started."
+      title="Misty is invite-only"
+      description="New accounts are currently opened only for approved beta participants."
     >
-      <AuthCard
-        title=""
-        description=""
-        footer={
-          <Button
-            asChild
-            variant="link"
-            className="h-auto p-0 text-foreground"
-          >
-            <NavLink to="/signin">Already have an account? Sign in</NavLink>
+      <AuthCard title="" description="">
+        <div className="flex flex-col gap-5 text-center">
+          <div className="mx-auto flex size-11 items-center justify-center rounded-lg border border-border bg-muted/50">
+            <LockKeyhole className="size-5 text-foreground" aria-hidden="true" />
+          </div>
+          <div>
+            <h2 className="text-lg font-semibold text-foreground">Request access for your group</h2>
+            <p className="mt-2 text-sm leading-6 text-muted-foreground">
+              We are admitting beta groups in small waves while the invite-code flow is finalized.
+              Request access and we will contact you when a place is ready.
+            </p>
+          </div>
+          <Button asChild>
+            <NavLink to="/waitlist">
+              Request beta access
+              <ArrowRight aria-hidden="true" />
+            </NavLink>
           </Button>
-        }
-      >
-        <form onSubmit={handleSubmit} className="flex flex-col gap-5">
-          <AuthField
-            id="register-name"
-            label="Name"
-            value={name}
-            placeholder="Your name"
-            required
-            onChange={setName}
-          />
-
-          <AuthField
-            id="register-email"
-            type="email"
-            label="Email"
-            value={email}
-            autoComplete="email"
-            placeholder="you@example.com"
-            required
-            onChange={setEmail}
-          />
-
-          <AuthField
-            id="register-password"
-            type="password"
-            label="Password"
-            value={password}
-            autoComplete="new-password"
-            placeholder="••••••••"
-            required
-            onChange={setPassword}
-          />
-
-          {error ? <AuthMessage tone="error" message={error} /> : null}
-
-          <AuthSubmitButton
-            idleLabel="Create account"
-            loadingLabel="Creating account..."
-            loading={loading}
-          />
-        </form>
+          <Button asChild variant="ghost">
+            <NavLink to="/signin">Already invited? Sign in</NavLink>
+          </Button>
+        </div>
       </AuthCard>
     </AuthShell>
   );

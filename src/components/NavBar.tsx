@@ -48,7 +48,10 @@ function DesktopNavLink({ to, label }: { to: string; label: string }) {
         <>
           {label}
           {isActive ? (
-            <span className="absolute inset-x-3 -bottom-px h-0.5 rounded-full bg-primary" />
+            <span
+              aria-hidden="true"
+              className="absolute inset-x-3 -bottom-px h-0.5 rounded-full bg-primary"
+            />
           ) : null}
         </>
       )}
@@ -77,7 +80,10 @@ export default function Navbar({ onOpenSettings }: { onOpenSettings: () => void 
 
   return (
     <Collapsible open={mobileOpen} onOpenChange={setMobileOpen} asChild>
-      <nav className="fixed inset-x-0 top-0 z-50 border-b border-border/60 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+      <nav
+        aria-label="Primary navigation"
+        className="fixed inset-x-0 top-0 z-50 border-b border-border/60 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80"
+      >
         <div
           style={{
             maxWidth: location.pathname === "/" ? "1060px" : "100%",
@@ -197,7 +203,7 @@ export default function Navbar({ onOpenSettings }: { onOpenSettings: () => void 
                   onClick={() => setMobileOpen(false)}
                   className={({ isActive }) =>
                     cn(
-                      "rounded-md px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground",
+                      "rounded-md px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                       isActive && "bg-accent text-accent-foreground",
                     )
                   }
@@ -216,7 +222,7 @@ export default function Navbar({ onOpenSettings }: { onOpenSettings: () => void 
                   onClick={() => setMobileOpen(false)}
                   className={({ isActive }) =>
                     cn(
-                      "rounded-md px-5 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground",
+                      "rounded-md px-5 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                       isActive && "bg-accent text-accent-foreground",
                     )
                   }

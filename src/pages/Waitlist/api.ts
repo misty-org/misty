@@ -9,7 +9,10 @@ export async function submitWaitlist(formData: WaitlistFormState) {
   });
 
   if (!response.ok) {
-    const text = await response.text();
-    throw new Error(text || "Submission failed");
+    if (response.status === 429) {
+      throw new Error("Too many requests. Please wait a moment and try again.");
+    }
+
+    throw new Error("We couldn't submit your request. Please try again.");
   }
 }

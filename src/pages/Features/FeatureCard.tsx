@@ -1,56 +1,95 @@
-import { useState } from "react";
+import {
+  ChatPreview,
+  ConnectionsPreview,
+  FilesPreview,
+  MikaPreview,
+  ProductScreenshot,
+} from "@/components/ProductPreview";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 import type { MainFeature } from "./featureData";
 
-export default function FeatureCard({ feature }: { feature: MainFeature }) {
-  const [failed, setFailed] = useState(false);
-  const Icon = feature.Icon;
-  const showImage = feature.imageSrc && !failed;
+function FeaturePreview({ feature }: { feature: MainFeature }) {
+  switch (feature.id) {
+    case "work-together":
+      return <ChatPreview />;
+    case "shared-library":
+      return (
+        <ProductScreenshot
+          src="/space-library-crop.webp"
+          alt="Misty Space Library showing shared project research and files"
+          label="Space Library · Beta"
+        />
+      );
+    case "integrations":
+      return <ConnectionsPreview />;
+    case "mika":
+      return <MikaPreview />;
+    case "private-files":
+      return <FilesPreview />;
+  }
+}
+
+export default function FeatureCard({
+  feature,
+  index,
+}: {
+  feature: MainFeature;
+  index: number;
+}) {
+  const visualFirst = index % 2 === 1;
 
   return (
     <Card
+      id={feature.id}
       role="article"
-      className="group min-h-[560px] gap-0 rounded-xl bg-card py-0 shadow-lg transition-colors hover:bg-accent/20"
+      aria-labelledby={`${feature.id}-title`}
+      className="scroll-mt-28 gap-0 overflow-hidden py-0 shadow-sm"
     >
-      <div className="relative aspect-video overflow-hidden border-b border-border bg-muted/40">
-        {showImage ? (
-          <img
-            src={feature.imageSrc}
-            alt={feature.imageAlt}
-            className="block h-full w-full object-cover object-top"
-            loading="lazy"
-            decoding="async"
-            onError={() => setFailed(true)}
-          />
-        ) : (
-          <div className="flex h-full w-full items-center justify-center bg-[radial-gradient(circle_at_center,var(--muted),transparent_68%)]">
-            <Icon className="h-14 w-14 text-muted-foreground/60" />
+      <div className="grid lg:grid-cols-[0.65fr_1.35fr]">
+        <CardContent className="flex flex-col justify-center px-6 py-8 sm:px-8 sm:py-10 lg:min-h-[30rem] lg:px-10">
+          <div className="mb-5 flex flex-wrap items-center gap-2">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+              {feature.eyebrow}
+            </p>
+            {feature.availability ? (
+              <Badge variant="outline" className="text-[10px] text-foreground/75">
+                {feature.availability}
+              </Badge>
+            ) : null}
           </div>
-        )}
-      </div>
 
-      <CardContent className="flex flex-1 flex-col p-6">
-        <div className="mb-5 flex items-center justify-between gap-4">
-          <div className="flex h-11 w-11 items-center justify-center rounded-lg border border-border bg-muted">
-            <Icon className="h-5 w-5 text-muted-foreground" />
-          </div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-            {feature.eyebrow}
+          <h2
+            id={`${feature.id}-title`}
+            className="max-w-lg text-balance text-3xl font-semibold tracking-tight text-foreground md:text-4xl"
+          >
+            {feature.title}
+          </h2>
+          <p className="mt-4 max-w-lg text-base leading-7 text-muted-foreground">
+            {feature.description}
           </p>
-        </div>
 
-        <h3 className="text-3xl font-bold tracking-tight text-foreground">{feature.title}</h3>
-        <p className="mt-4 text-base leading-7 text-muted-foreground">{feature.description}</p>
+          <ul className="mt-7 divide-y divide-border border-y border-border">
+            {feature.details.map((detail) => (
+              <li key={detail} className="py-3 text-sm text-foreground/75">
+                {detail}
+              </li>
+            ))}
+          </ul>
+        </CardContent>
 
-        <div className="mt-auto grid gap-3 pt-8">
-          {feature.details.map((detail) => (
-            <div key={detail} className="flex items-center gap-3 text-sm text-muted-foreground">
-              <span className="h-px w-5 bg-border" />
-              <span>{detail}</span>
-            </div>
-          ))}
+        <div
+          className={cn(
+            "flex items-center border-t border-border bg-muted/20 p-4 sm:p-6 lg:min-h-[30rem] lg:border-t-0 lg:p-8",
+            visualFirst ? "lg:order-first lg:border-r" : "lg:border-l",
+          )}
+        >
+          <div className="w-full">
+            <FeaturePreview feature={feature} />
+          </div>
         </div>
-      </CardContent>
+      </div>
     </Card>
   );
 }

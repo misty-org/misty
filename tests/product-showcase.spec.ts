@@ -5,104 +5,62 @@ test.beforeEach(async ({ page }) => {
   await page.goto("/");
 });
 
-test("the product showcase uses accessible user-controlled tabs", async ({ page }) => {
-  const showcase = page.locator("[data-showcase-root]");
-  await showcase.scrollIntoViewIfNeeded();
-
-  const filesTab = showcase.getByRole("tab", { name: "Files" });
-  const spaceTab = showcase.getByRole("tab", { name: "Space" });
-  const intelligenceTab = showcase.getByRole("tab", { name: "Intelligence" });
-
-  await expect(filesTab).toHaveAttribute("aria-selected", "true");
-  await expect(showcase.locator('[data-showcase-panel="files"]')).toBeVisible();
-  await expect(showcase.getByRole("img", { name: "Files demo placeholder" })).toBeVisible();
-
-  await spaceTab.click();
-  await expect(spaceTab).toHaveAttribute("aria-selected", "true");
-  await expect(showcase.locator('[data-showcase-panel="space"]')).toBeVisible();
-  await expect(showcase.getByRole("img", { name: "Space demo placeholder" })).toBeVisible();
-
-  await intelligenceTab.click();
-  await expect(intelligenceTab).toHaveAttribute("aria-selected", "true");
-  await expect(showcase.locator('[data-showcase-panel="intelligence"]')).toBeVisible();
+test("the homepage tells the complete collaboration story", async ({ page }) => {
   await expect(
-    showcase.getByRole("img", { name: "Intelligence demo placeholder" }),
+    page.getByRole("heading", {
+      level: 1,
+      name: "Keep the whole project in one Space.",
+    }),
   ).toBeVisible();
+  await expect(page.getByText("Invite-only beta").first()).toBeVisible();
+  await expect(
+    page.getByRole("img", {
+      name: "Misty Space Library with shared project research and files",
+    }),
+  ).toBeVisible();
+
+  for (const heading of [
+    "Members, Chat, Tasks, and Library.",
+    "Connectors are in pilot.",
+    "Ask about the active Space.",
+    "Browse first. Share deliberately.",
+    "Request beta access.",
+  ]) {
+    await expect(page.getByRole("heading", { name: heading })).toBeAttached();
+  }
+
+  await expect(page.getByText("Message this Space")).toBeVisible();
+  await expect(page.getByText("Search connections")).toBeVisible();
+  await expect(page.getByText("Search Files")).toBeAttached();
 });
 
-test("the product showcase supports keyboard navigation", async ({ page }) => {
-  const showcase = page.locator("[data-showcase-root]");
-  await showcase.scrollIntoViewIfNeeded();
-
-  const filesTab = showcase.getByRole("tab", { name: "Files" });
-  const spaceTab = showcase.getByRole("tab", { name: "Space" });
-  const intelligenceTab = showcase.getByRole("tab", { name: "Intelligence" });
-
-  await filesTab.focus();
-  await page.keyboard.press("ArrowRight");
-  await expect(spaceTab).toBeFocused();
-  await expect(spaceTab).toHaveAttribute("aria-selected", "true");
-
-  await page.keyboard.press("End");
-  await expect(intelligenceTab).toBeFocused();
-  await expect(intelligenceTab).toHaveAttribute("aria-selected", "true");
+test("the product templates are available without motion-dependent UI", async ({ page }) => {
+  await expect(page.getByText("Launch plan").first()).toBeVisible();
+  await expect(page.locator("video[autoplay]")).toHaveCount(0);
+  await expect(page.locator("[data-scroll-stack-anchor], [data-scroll-stack-panel]")).toHaveCount(0);
+  await expect(page.locator(".page-transition")).toHaveCount(0);
 });
 
-test("the simplified showcase is responsive and honors reduced motion", async ({ page }) => {
-  const showcase = page.locator("[data-showcase-root]");
-  await showcase.scrollIntoViewIfNeeded();
+test("the homepage is complete, responsive, and free of horizontal overflow", async ({ page }) => {
+  await page.getByRole("heading", { name: "Request beta access." }).scrollIntoViewIfNeeded();
+  await expect(page.getByRole("contentinfo")).toBeVisible();
 
-  await expect(showcase).toHaveAttribute("data-motion", "reduced");
-
-  const viewport = page.viewportSize();
-  const showcaseBox = await showcase.boundingBox();
-  expect(viewport).not.toBeNull();
-  expect(showcaseBox).not.toBeNull();
-  expect(showcaseBox!.height).toBeLessThan(viewport!.height * 2);
-
-  const layout = await page.evaluate(() => {
-    const root = document.querySelector<HTMLElement>("[data-showcase-root]");
-    return {
-      hasHorizontalOverflow: document.documentElement.scrollWidth > window.innerWidth,
-      opacity: root ? getComputedStyle(root).opacity : "",
-      transform: root ? getComputedStyle(root).transform : "",
-    };
-  });
+  const layout = await page.evaluate(() => ({
+    hasHorizontalOverflow: document.documentElement.scrollWidth > window.innerWidth,
+    documentHeight: document.documentElement.scrollHeight,
+    visibleText: document.body.innerText.length,
+  }));
 
   expect(layout.hasHorizontalOverflow).toBe(false);
-  expect(layout.opacity).toBe("1");
-  expect(layout.transform).toBe("none");
+  expect(layout.documentHeight).toBeGreaterThan(page.viewportSize()!.height * 3);
+  expect(layout.visibleText).toBeGreaterThan(600);
 });
 
-test("the homepage uses a sticky push-up stack after the hero carousel", async ({ page }, testInfo) => {
-  const anchor = page.locator("[data-scroll-stack-anchor]");
-  const spacer = page.locator("[data-scroll-stack-spacer]");
-  const stage = page.locator("[data-scroll-stage]");
-  const panels = page.locator("[data-scroll-stack-panel]");
-
-  await expect(anchor).toHaveCSS("position", "sticky");
-  const navigationBox = await page.locator("nav.fixed").boundingBox();
-  const anchorTop = await anchor.evaluate((element) => parseFloat(getComputedStyle(element).top));
-  expect(navigationBox).not.toBeNull();
-  expect(Math.abs(anchorTop - navigationBox!.height)).toBeLessThanOrEqual(1.1);
-  const spacerBox = await spacer.boundingBox();
-  expect(spacerBox).not.toBeNull();
-  expect(spacerBox!.height).toBeCloseTo(page.viewportSize()!.height * 0.3, 0);
-  const stageRadius = await stage.evaluate((element) =>
-    parseFloat(getComputedStyle(element).borderTopLeftRadius),
-  );
-  expect(stageRadius).toBeGreaterThanOrEqual(32);
-  await expect(panels).toHaveCount(4);
-
-  if (testInfo.project.name === "desktop-chromium") {
-    for (const panel of await panels.all()) {
-      await expect(panel).toHaveCSS("position", "sticky");
-      const panelTop = await panel.evaluate((element) => parseFloat(getComputedStyle(element).top));
-      expect(Math.abs(panelTop - navigationBox!.height)).toBeLessThanOrEqual(1.1);
-    }
-  } else {
-    for (const panel of await panels.all()) {
-      await expect(panel).toHaveCSS("position", "relative");
-    }
-  }
+test("beta calls to action use the working request-access fallback", async ({ page }) => {
+  const hero = page.locator("section").first();
+  const betaLink = hero.getByRole("link", { name: "Join the beta" });
+  await expect(betaLink).toHaveAttribute("href", "/waitlist");
+  await betaLink.click();
+  await expect(page).toHaveURL(/\/waitlist$/);
+  await expect(page.getByRole("heading", { level: 1, name: /request beta access/i })).toBeVisible();
 });

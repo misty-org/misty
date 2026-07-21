@@ -7,32 +7,24 @@ import {
 
 const faqs = [
   {
-    q: "What uses Misty credits?",
-    a: "Only managed services with a real provider cost use credits: Mika requests, AI-backed automation nodes, and future hosted services that are clearly labeled before launch. Ordinary file operations and non-AI automations remain unmetered.",
+    q: "Who supplies a Space’s capacity?",
+    a: "The owner supplies the member limit and Library storage. Each member uses their own Mika credits.",
   },
   {
-    q: "Do unused monthly credits roll over?",
-    a: "No. Plan credits reset each month, including for annual subscribers. Misty uses monthly credits before purchased credits so your top-ups are preserved.",
+    q: "Can a Free member join a paid owner’s Space?",
+    a: "Yes. Joining a paid owner’s Space does not require an upgrade.",
   },
   {
     q: "What happens when I run out of credits?",
-    a: "Managed AI pauses without creating an overage bill. You can wait for your reset or add a prepaid pack: 1,500 credits for $4.99 or 3,500 for $9.99. Purchased credits do not expire while your account remains open.",
+    a: "Mika pauses. Wait for the monthly reset or add credits. There are no automatic overages.",
   },
   {
-    q: "What's the difference between Pro and Max?",
-    a: "Pro includes the complete data-management suite and 2,000 monthly credits. Max includes everything in Pro, triples the allowance to 6,000 credits, and unlocks deeper AI modes with larger context and output limits.",
-  },
-  {
-    q: "Can I try Pro first?",
-    a: "Yes. New eligible Basic accounts can start a 14-day Pro trial before subscribing.",
-  },
-  {
-    q: "How does annual billing work?",
-    a: "Pro is $99 per year and Max is $149 per year. Your included credits still reset monthly on your subscription anniversary rather than being granted all at once.",
+    q: "How does beta access work?",
+    a: "Access opens in cohorts. Single-use codes and a 30-day Pro trial are planned.",
   },
   {
     q: "How does Misty handle my data?",
-    a: "Misty keeps file operations local and stores only usage metadata for billing. Billing records do not contain prompts, file paths, file contents, or model responses.",
+    a: "Private Files stay local or in the connected provider until added to a Space. Library items are stored for the Space. Mika uses permitted context.",
   },
 ];
 

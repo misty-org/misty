@@ -22,18 +22,13 @@ const CheckIcon = ({ muted }: { muted?: boolean }) => (
 
 interface PricingCardProps {
   name: string;
-  price: string | null;
+  price: string;
   period?: string;
-  description?: string;
-  features: string[];
-  inherits?: string;
-  comingSoon?: boolean;
+  description: string;
+  features: readonly string[];
   popular?: boolean;
-  ctaTo?: string;
-  ctaHref?: string;
-  ctaLabel?: string;
-  ctaBusy?: boolean;
-  onCtaClick?: () => void;
+  ctaHref: string;
+  ctaLabel: string;
 }
 
 export default function PricingCard({
@@ -42,49 +37,31 @@ export default function PricingCard({
   period,
   description,
   features,
-  inherits,
-  comingSoon = false,
   popular = false,
-  ctaTo,
   ctaHref,
   ctaLabel,
-  ctaBusy = false,
-  onCtaClick,
 }: PricingCardProps) {
-  return (
-    <Card className="relative h-full min-h-92 gap-0 rounded-2xl py-0">
-      {(comingSoon || popular) && (
-        <Badge
-          variant={popular ? "default" : "outline"}
-          className="absolute top-3 right-3"
-        >
-          {popular ? "Recommended" : "Coming Soon"}
-        </Badge>
-      )}
+  const externalCta = /^https:\/\//i.test(ctaHref);
 
-      <CardHeader className="p-6 pb-0">
+  return (
+    <Card className="relative h-full min-h-[28rem] gap-0 rounded-2xl py-0">
+      {popular ? <Badge className="absolute right-4 top-4">Recommended</Badge> : null}
+
+      <CardHeader className={`p-6 pb-0 ${popular ? "pr-32" : ""}`}>
         <div className="mb-4">
           <h3 className="mb-0.5 text-2xl font-bold text-foreground">{name}</h3>
-          <div className="flex items-baseline gap-1.5 mb-1.5">
-            <span className="text-lg font-bold text-foreground/60">
-              {price ?? "Free"}
-            </span>
+          <div className="mb-2 flex flex-wrap items-baseline gap-1.5">
+            <span className="text-3xl font-bold tracking-tight text-foreground">{price}</span>
             {period && <span className="text-xs text-muted-foreground">{period}</span>}
           </div>
-          {description && (
-            <p className="text-xs text-muted-foreground">{description}</p>
-          )}
+          <p className="text-sm leading-6 text-muted-foreground">{description}</p>
         </div>
       </CardHeader>
 
       <CardContent className="flex flex-1 flex-col px-6 pb-4">
-        {inherits ? (
-          <p className="mb-2 text-xs text-muted-foreground">
-            Everything in {inherits}, plus:
-          </p>
-        ) : (
-          <p className="mb-2 text-xs text-muted-foreground">Includes</p>
-        )}
+        <p className="mb-3 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+          Plan limits
+        </p>
 
         <ul className="mb-4 flex flex-1 flex-col gap-2">
           {features.map((feature) => (
@@ -93,47 +70,22 @@ export default function PricingCard({
               className="flex items-start gap-2.5 text-sm text-muted-foreground"
             >
               <CheckIcon />
-              {feature}
+              <span>{feature}</span>
             </li>
           ))}
         </ul>
       </CardContent>
 
       <CardFooter className="px-6 pb-6">
-        {onCtaClick ? (
-          <Button
-            type="button"
-            onClick={onCtaClick}
-            disabled={ctaBusy}
-            className="h-auto w-full rounded-xl px-6 py-2.5 shadow-lg disabled:cursor-wait"
-          >
-            {ctaBusy ? "Opening checkout…" : ctaLabel}
-          </Button>
-        ) : ctaHref ? (
-          <Button
-            asChild
-            className="h-auto w-full rounded-xl px-6 py-2.5 shadow-lg"
-          >
+        <Button asChild className="h-auto w-full rounded-xl px-6 py-2.5 shadow-sm">
+          {externalCta ? (
             <a href={ctaHref} target="_blank" rel="noopener noreferrer">
               {ctaLabel}
             </a>
-          </Button>
-        ) : ctaTo ? (
-          <Button
-            asChild
-            className="h-auto w-full rounded-xl px-6 py-2.5 shadow-lg"
-          >
-            <NavLink to={ctaTo}>{ctaLabel}</NavLink>
-          </Button>
-        ) : (
-          <Button
-            variant="secondary"
-            disabled
-            className="h-auto w-full rounded-xl px-6 py-2.5"
-          >
-            Coming soon
-          </Button>
-        )}
+          ) : (
+            <NavLink to={ctaHref}>{ctaLabel}</NavLink>
+          )}
+        </Button>
       </CardFooter>
     </Card>
   );

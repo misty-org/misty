@@ -1,49 +1,85 @@
-export type PhaseStatus = "done" | "active" | "planned";
+export type PhaseStatus = "available" | "pilot" | "development";
+
+export interface RoadmapItem {
+  title: string;
+  description: string;
+}
 
 export interface RoadmapPhase {
   label: string;
   status: PhaseStatus;
-  items: string[];
+  items: RoadmapItem[];
 }
 
 export const phases: RoadmapPhase[] = [
   {
-    label: "Available",
-    status: "done",
+    label: "Available in beta",
+    status: "available",
     items: [
-      "Misty desktop for macOS and Windows",
-      "Local file browsing, tabs, workspaces, and common file operations",
-      "File previews, metadata inspection, and Deep Search",
-      "Transfer queue, progress, controls, and history",
-      "Google Drive, OneDrive, and Dropbox Remotes",
+      {
+        title: "Shared Spaces",
+        description: "Create a Space and manage members.",
+      },
+      {
+        title: "Space Chat",
+        description: "Shared, group, and direct messages.",
+      },
+      {
+        title: "Tasks",
+        description: "List and board views with assignees and priorities.",
+      },
+      {
+        title: "Library",
+        description: "Shared project files and references.",
+      },
+      {
+        title: "Private Files",
+        description: "Local and connected files stay private until shared.",
+      },
+      {
+        title: "Public desktop builds",
+        description: "Apple Silicon macOS and Windows x64.",
+      },
     ],
   },
   {
-    label: "Preview",
-    status: "active",
+    label: "Limited pilot",
+    status: "pilot",
     items: [
-      "Automations workflow editor",
-      "Mika, Misty’s experimental AI assistant",
+      {
+        title: "Space-scoped Mika",
+        description: "Limited beta; availability varies.",
+      },
+      {
+        title: "Google Calendar",
+        description: "Limited task-publishing pilot.",
+      },
+      {
+        title: "Slack and Notion connections",
+        description: "Not generally available.",
+      },
+      {
+        title: "Discord connection",
+        description: "Not available yet.",
+      },
     ],
   },
   {
-    label: "Coming next",
-    status: "active",
+    label: "In development",
+    status: "development",
     items: [
-      "iPhone and Android distribution",
-      "Production account and provider authorization hardening",
-      "Desktop and mobile release packaging",
-    ],
-  },
-  {
-    label: "Planned",
-    status: "planned",
-    items: [
-      "S3-compatible storage and SFTP Remotes",
-      "Backups, snapshots, and restore workflows",
-      "Verified Linux distribution",
-      "Shared workspaces and team accounts",
-      "Broader offline and sync workflows",
+      {
+        title: "Tablet builds",
+        description: "No public build yet.",
+      },
+      {
+        title: "Broader integration access",
+        description: "Self-service setup and hardening.",
+      },
+      {
+        title: "Beta reliability",
+        description: "Accounts, providers, and packaging.",
+      },
     ],
   },
 ];

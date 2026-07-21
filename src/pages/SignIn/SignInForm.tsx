@@ -71,8 +71,8 @@ export default function SignInForm({
           variant="link"
           className="h-auto p-0 text-foreground"
         >
-          <NavLink to="/register">
-            Don&apos;t have an account? Sign up
+          <NavLink to="/waitlist">
+            Need access? Request a beta invite
           </NavLink>
         </Button>
       </div>
