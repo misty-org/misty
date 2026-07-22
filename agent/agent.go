@@ -27,6 +27,13 @@ type ToolCompletion struct {
 	ToolCalls int
 }
 
+// MaxToolRounds bounds how many tool round trips one automated run may make.
+// Generous for real work, finite so a runaway loop cannot bill forever.
+const MaxToolRounds = 12
+
+// ErrToolRoundLimit is returned when a run exceeds MaxToolRounds.
+var ErrToolRoundLimit = errors.New("agent run exceeded its tool round limit")
+
 // CompleteWithToolsContext runs the same Mika session/tool protocol used by
 // interactive chat, but dispatches each manifest-authorized request through a
 // server-owned executor. This is the bridge used by automated Agent tasks;
@@ -43,7 +50,13 @@ func (s *Service) CompleteWithToolsContext(ctx context.Context, userID, billingU
 	}
 	after := int64(0)
 	completion := ToolCompletion{}
-	for {
+	// Each round trip is another paid model call. Without a cap, a model that
+	// keeps asking for tools loops until the caller disconnects, so one request
+	// can bill indefinitely.
+	for round := 0; ; round++ {
+		if round >= MaxToolRounds {
+			return ToolCompletion{}, ErrToolRoundLimit
+		}
 		if ctx.Err() != nil {
 			return ToolCompletion{}, ctx.Err()
 		}
@@ -327,6 +340,19 @@ func (s *Service) SubmitToolResultsWithTierContext(ctx context.Context, sessionI
 
 func (s *Service) Events(sessionID, userID string, after int64) ([]AgentEvent, error) {
 	return s.store.Events(sessionID, userID, after)
+}
+
+// Transcript returns the conversation as plain messages, for a client rebuilding
+// a session it does not hold locally. Replaying the event stream would be wrong
+// for that: events carry tool requests, and a client that replayed them would
+// run the tools a second time.
+func (s *Service) Transcript(ctx context.Context, sessionID, userID string) ([]Message, error) {
+	var messages []Message
+	err := s.store.WithSessionContext(ctx, sessionID, userID, func(_ context.Context, session *Session) error {
+		messages = append(messages, session.Messages...)
+		return nil
+	})
+	return messages, err
 }
 
 // AppendExternalAssistantMessage delivers the terminal result of delegated

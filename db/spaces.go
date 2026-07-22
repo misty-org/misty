@@ -24,16 +24,17 @@ const (
 )
 
 var (
-	ErrSpaceNotFound       = errors.New("space not found")
-	ErrSpaceForbidden      = errors.New("space permission denied")
-	ErrSpaceLimit          = errors.New("space limit reached")
-	ErrSpaceOwnershipLimit = errors.New("space ownership limit reached")
-	ErrSpacePeopleLimit    = errors.New("space member limit reached")
-	ErrSpaceNodeLimit      = errors.New("space node limit reached")
-	ErrSpaceConflict       = errors.New("space resource version conflict")
-	ErrSpaceInviteNotFound = errors.New("space invitation not found")
-	ErrSpaceInviteExpired  = errors.New("space invitation expired")
-	ErrSpaceInvalid        = errors.New("invalid space data")
+	ErrSpaceNotFound        = errors.New("space not found")
+	ErrSpaceForbidden       = errors.New("space permission denied")
+	ErrSpaceLimit           = errors.New("space limit reached")
+	ErrSpaceOwnershipLimit  = errors.New("space ownership limit reached")
+	ErrSpacePeopleLimit     = errors.New("space member limit reached")
+	ErrSpaceNodeLimit       = errors.New("space node limit reached")
+	ErrSpaceConflict        = errors.New("space resource version conflict")
+	ErrSpaceInviteNotFound  = errors.New("space invitation not found")
+	ErrSpaceInviteeNotFound = errors.New("no misty account found for invitee email")
+	ErrSpaceInviteExpired   = errors.New("space invitation expired")
+	ErrSpaceInvalid         = errors.New("invalid space data")
 )
 
 type Space struct {
@@ -96,7 +97,10 @@ type SpaceMessage struct {
 	Attachments      []MessageAttachment `json:"attachments"`
 	ReplyToMessageID string              `json:"reply_to_message_id,omitempty"`
 	EditedAt         *time.Time          `json:"edited_at,omitempty"`
-	CreatedAt        time.Time           `json:"created_at"`
+	// Provenance for a mirrored message. Absent means Misty-native chat, so
+	// every existing client stays valid and "no origin" reads as "ours".
+	Origin    json.RawMessage `json:"origin,omitempty"`
+	CreatedAt time.Time       `json:"created_at"`
 }
 
 type SpaceNode struct {
@@ -230,6 +234,27 @@ func requireSpaceMemberTx(ctx context.Context, tx *sql.Tx, spaceID, userID strin
 		return "", ErrSpaceForbidden
 	}
 	return role, err
+}
+
+// IsSpaceMember reports whether userID is an active member of spaceID. It
+// exists for callers outside the normal request/response flow (the realtime
+// WebSocket handler, checking a client-claimed "viewing" space) that need a
+// lightweight membership check without an otherwise-unused mutation.
+func (db *Database) IsSpaceMember(ctx context.Context, userID, spaceID string) (bool, error) {
+	var isMember bool
+	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+		_, memberErr := requireSpaceMemberTx(ctx, tx, spaceID, userID)
+		if errors.Is(memberErr, ErrSpaceForbidden) {
+			isMember = false
+			return nil
+		}
+		if memberErr != nil {
+			return memberErr
+		}
+		isMember = true
+		return nil
+	})
+	return isMember, err
 }
 
 func requireSpaceOwnerTx(ctx context.Context, tx *sql.Tx, spaceID, userID string) error {
@@ -560,7 +585,7 @@ func (db *Database) InviteToSpace(ctx context.Context, ownerID, spaceID, email s
 			return ErrSpaceLimit
 		}
 		if err := tx.QueryRowContext(ctx, `SELECT id,name,email FROM users WHERE lower(email)=$1`, email).Scan(&out.InvitedUserID, &out.InvitedUserName, &out.InvitedEmail); errors.Is(err, sql.ErrNoRows) {
-			return ErrSpaceInviteNotFound
+			return ErrSpaceInviteeNotFound
 		} else if err != nil {
 			return err
 		}
@@ -1014,10 +1039,14 @@ func scanSpaceMessage(scanner interface{ Scan(...any) error }, out *SpaceMessage
 	var raw []byte
 	var files string
 	var agentID sql.NullString
-	if err := scanner.Scan(&out.Seq, &out.ID, &out.SpaceID, &out.ConversationID, &out.SenderUserID, &out.SenderName, &out.SenderKind, &agentID, &raw, &files, &out.EditedAt, &out.CreatedAt, &out.ReplyToMessageID); err != nil {
+	var origin []byte
+	if err := scanner.Scan(&out.Seq, &out.ID, &out.SpaceID, &out.ConversationID, &out.SenderUserID, &out.SenderName, &out.SenderKind, &agentID, &raw, &files, &out.EditedAt, &out.CreatedAt, &out.ReplyToMessageID, &origin); err != nil {
 		return err
 	}
 	out.SenderAgentID = agentID.String
+	if len(origin) > 0 {
+		out.Origin = append(json.RawMessage(nil), origin...)
+	}
 	if err := json.Unmarshal(raw, &out.Content); err != nil {
 		return err
 	}
@@ -1033,7 +1062,7 @@ func parsePGTextArray(raw string) []string {
 	return strings.Split(strings.TrimSuffix(strings.TrimPrefix(raw, "{"), "}"), ",")
 }
 
-const spaceMessageColumns = `m.seq,m.id,m.space_id,COALESCE(m.conversation_id,''),m.sender_user_id,CASE WHEN m.sender_kind='agent' THEN COALESCE(a.name,'Misty Agent') ELSE COALESCE(u.name,'Misty') END,m.sender_kind,m.sender_agent_id,m.content,m.file_node_ids::text,m.edited_at,m.created_at,COALESCE(m.reply_to_message_id,'')`
+const spaceMessageColumns = `m.seq,m.id,m.space_id,COALESCE(m.conversation_id,''),m.sender_user_id,CASE WHEN m.origin->>'author_name' IS NOT NULL AND m.origin->>'author_name'<>'' THEN m.origin->>'author_name' WHEN m.sender_kind='agent' THEN COALESCE(a.name,'Misty Agent') ELSE COALESCE(u.name,'Misty') END,m.sender_kind,m.sender_agent_id,m.content,m.file_node_ids::text,m.edited_at,m.created_at,COALESCE(m.reply_to_message_id,''),m.origin`
 
 func (db *Database) SpaceMessages(ctx context.Context, userID, spaceID string, before int64, limit int) ([]SpaceMessage, error) {
 	if limit < 1 || limit > 100 {

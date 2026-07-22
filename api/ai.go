@@ -19,6 +19,7 @@ import (
 const (
 	maxAIJSONBodyBytes     = 2 << 20
 	maxAIToolJSONBodyBytes = 8 << 20
+	maxAISessionTitleRunes = 120
 )
 
 type AIService struct {
@@ -72,6 +73,74 @@ func (s *AIService) CreateSession() http.HandlerFunc {
 		writeJSON(w, http.StatusCreated, map[string]any{
 			"session_id": session.ID,
 		})
+	}
+}
+
+// Sessions lists the account's retained Mika sessions so a client can rebuild
+// its session list on a new device, or after losing local state.
+func (s *AIService) Sessions() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userID, ok := s.requireUser(w, r)
+		if !ok {
+			return
+		}
+		sessions, err := s.database.ListAgentSessions(r.Context(), userID)
+		if err != nil {
+			http.Error(w, "internal error", http.StatusInternalServerError)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"sessions": sessions})
+	}
+}
+
+// Transcript returns a session's messages so a device that has never seen the
+// session can render it. Read-only: it neither resumes generation nor replays
+// tool requests.
+func (s *AIService) Transcript() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userID, ok := s.requireUser(w, r)
+		if !ok {
+			return
+		}
+		sessionID := strings.TrimSpace(chi.URLParam(r, "sessionID"))
+		messages, err := s.runtime.Transcript(r.Context(), sessionID, userID)
+		if err != nil {
+			writeAIError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"messages": messages})
+	}
+}
+
+// RenameSession labels a session. Titles are display-only, so an over-long or
+// blank title is normalised rather than rejected.
+func (s *AIService) RenameSession() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userID, ok := s.requireUser(w, r)
+		if !ok {
+			return
+		}
+		sessionID := strings.TrimSpace(chi.URLParam(r, "sessionID"))
+		var body struct {
+			Title string `json:"title"`
+		}
+		if err := json.NewDecoder(io.LimitReader(r.Body, maxAIJSONBodyBytes)).Decode(&body); err != nil {
+			http.Error(w, "invalid request body", http.StatusBadRequest)
+			return
+		}
+		title := strings.TrimSpace(body.Title)
+		if len([]rune(title)) > maxAISessionTitleRunes {
+			title = string([]rune(title)[:maxAISessionTitleRunes])
+		}
+		if err := s.database.RenameAgentSession(r.Context(), userID, sessionID, title); err != nil {
+			if errors.Is(err, agent.ErrPersistedSessionNotFound) {
+				http.Error(w, "session not found", http.StatusNotFound)
+				return
+			}
+			http.Error(w, "internal error", http.StatusInternalServerError)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]string{"id": sessionID, "title": title})
 	}
 }
 

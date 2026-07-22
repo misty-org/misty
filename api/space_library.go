@@ -37,8 +37,10 @@ const (
 var librarySHA256Pattern = regexp.MustCompile(`^[0-9a-f]{64}$`)
 
 type SpaceLibraryService struct {
-	database           *db.Database
-	store              LibraryObjectStore
+	database *db.Database
+	store    LibraryObjectStore
+	// egress bounds bytes served per account and across the deployment.
+	egress             *EgressGuard
 	uploadsEnabled     bool
 	attachmentsEnabled bool
 	groupsEnabled      bool
@@ -94,7 +96,10 @@ func NewSpaceLibraryService(database *db.Database, store LibraryObjectStore, upl
 	if maxFileBytes < 1 || maxFileBytes > db.MaxSpaceStorageBytes {
 		return nil, errors.New("Library max file bytes must be between 1 and 1,000,000,000")
 	}
-	return &SpaceLibraryService{database: database, store: store, uploadsEnabled: uploadsEnabled, maxFileBytes: maxFileBytes}, nil
+	return &SpaceLibraryService{
+		database: database, store: store, uploadsEnabled: uploadsEnabled, maxFileBytes: maxFileBytes,
+		egress: NewEgressGuard(EgressBudgetFromEnv()),
+	}, nil
 }
 
 // WriteGeneratedTextArtifact creates a normal, ACL-protected Library item
@@ -2076,6 +2081,12 @@ func (s *SpaceLibraryService) MemberPermissions() http.HandlerFunc {
 }
 
 func (s *SpaceLibraryService) writeDownload(w http.ResponseWriter, r *http.Request, download *db.LibraryDownload) {
+	// Bandwidth is billed per byte by object storage and by the host, so the
+	// ceiling is checked before anything is streamed.
+	if s.egress != nil && !s.egress.Allow(rateLimitIdentity(r), download.ByteSize) {
+		WriteQuotaExceeded(w)
+		return
+	}
 	reader, metadata, err := s.store.Open(r.Context(), download.ObjectKey)
 	if err != nil {
 		writeLibraryError(w, err)

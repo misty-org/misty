@@ -6,6 +6,7 @@ import (
 	"errors"
 	"log"
 	"net/http"
+	"sort"
 	"strconv"
 	"sync"
 	"time"
@@ -28,20 +29,38 @@ type realtimeClient struct {
 	send   chan []byte
 	done   chan struct{}
 	once   sync.Once
+	// viewingSpaceID is the space this client last told us it's actively
+	// viewing (empty when not viewing any space's chat). Mutated only while
+	// holding RealtimeService.mu.
+	viewingSpaceID string
+	// active is whether the client reported having this space's chat in
+	// focus (vs. connected but idle — e.g. tabbed away). Only meaningful
+	// while viewingSpaceID is non-empty. Mutated only while holding
+	// RealtimeService.mu.
+	active bool
 }
 
 type RealtimeService struct {
-	database  *db.Database
-	dsn       string
-	listener  *pq.Listener
-	mu        sync.RWMutex
-	clients   map[*realtimeClient]struct{}
+	database *db.Database
+	dsn      string
+	listener *pq.Listener
+	mu       sync.RWMutex
+	clients  map[*realtimeClient]struct{}
+	// viewers maps a space ID to the set of clients currently viewing that
+	// space's chat, for the "active users" presence capsule. Guarded by mu.
+	viewers   map[string]map[*realtimeClient]struct{}
 	closed    chan struct{}
 	closeOnce sync.Once
 }
 
 func NewRealtimeService(database *db.Database, dsn string) *RealtimeService {
-	return &RealtimeService{database: database, dsn: dsn, clients: map[*realtimeClient]struct{}{}, closed: make(chan struct{})}
+	return &RealtimeService{
+		database: database,
+		dsn:      dsn,
+		clients:  map[*realtimeClient]struct{}{},
+		viewers:  map[string]map[*realtimeClient]struct{}{},
+		closed:   make(chan struct{}),
+	}
 }
 
 func (s *RealtimeService) Start() error {
@@ -74,6 +93,7 @@ func (s *RealtimeService) Close() error {
 			_ = client.conn.Close()
 		}
 		s.clients = map[*realtimeClient]struct{}{}
+		s.viewers = map[string]map[*realtimeClient]struct{}{}
 		s.mu.Unlock()
 	})
 	return err
@@ -266,7 +286,138 @@ func (s *RealtimeService) unregister(client *realtimeClient) {
 		delete(s.clients, client)
 		client.once.Do(func() { close(client.done) })
 	}
+	previousSpaceID := client.viewingSpaceID
+	if previousSpaceID != "" {
+		s.removeViewerLocked(previousSpaceID, client)
+		client.viewingSpaceID = ""
+	}
 	s.mu.Unlock()
+	if previousSpaceID != "" {
+		s.broadcastPresence(previousSpaceID)
+	}
+}
+
+// removeViewerLocked removes client from spaceID's viewer set. Callers must
+// hold s.mu.
+func (s *RealtimeService) removeViewerLocked(spaceID string, client *realtimeClient) {
+	viewers := s.viewers[spaceID]
+	if viewers == nil {
+		return
+	}
+	delete(viewers, client)
+	if len(viewers) == 0 {
+		delete(s.viewers, spaceID)
+	}
+}
+
+// handleClientMessage processes a message sent by a connected client. The
+// only message clients currently send is a "viewing" declaration, used to
+// drive the per-Space "active users" presence capsule. It carries an
+// "active" flag distinguishing a client that has the space's chat in focus
+// from one that's merely still connected while viewing something else
+// (idle).
+func (s *RealtimeService) handleClientMessage(client *realtimeClient, payload []byte) {
+	var msg struct {
+		Type    string `json:"type"`
+		SpaceID string `json:"space_id"`
+		Active  bool   `json:"active"`
+	}
+	if json.Unmarshal(payload, &msg) != nil {
+		return
+	}
+	if msg.Type == "viewing" {
+		s.setViewing(client, msg.SpaceID, msg.Active)
+	}
+}
+
+// setViewing updates which space (if any) a client is actively viewing, and
+// whether it currently has that space's chat in focus, then broadcasts the
+// resulting presence change. A non-empty spaceID is verified against real
+// space membership before being accepted — otherwise a client could claim to
+// be viewing a space it has no access to and leak its presence to that
+// space's real members.
+func (s *RealtimeService) setViewing(client *realtimeClient, spaceID string, active bool) {
+	if spaceID != "" {
+		isMember, err := s.database.IsSpaceMember(context.Background(), client.userID, spaceID)
+		if err != nil || !isMember {
+			spaceID = ""
+		}
+	}
+
+	s.mu.Lock()
+	previous := client.viewingSpaceID
+	if previous == spaceID && client.active == active {
+		s.mu.Unlock()
+		return
+	}
+	spaceChanged := previous != spaceID
+	if spaceChanged && previous != "" {
+		s.removeViewerLocked(previous, client)
+	}
+	if spaceID != "" {
+		if s.viewers[spaceID] == nil {
+			s.viewers[spaceID] = map[*realtimeClient]struct{}{}
+		}
+		s.viewers[spaceID][client] = struct{}{}
+	}
+	client.viewingSpaceID = spaceID
+	client.active = active
+	s.mu.Unlock()
+
+	if spaceChanged && previous != "" {
+		s.broadcastPresence(previous)
+	}
+	if spaceID != "" {
+		s.broadcastPresence(spaceID)
+	}
+}
+
+// presenceViewer describes one distinct user viewing a space, and whether
+// any of their connections currently has that space's chat in focus.
+type presenceViewer struct {
+	UserID string `json:"user_id"`
+	Active bool   `json:"active"`
+}
+
+// broadcastPresence sends the current list of distinct users viewing spaceID
+// (and their active/idle status) to every client currently viewing it. A
+// user with multiple connections (e.g. two tabs) counts as active if any one
+// of them has the space in focus.
+func (s *RealtimeService) broadcastPresence(spaceID string) {
+	s.mu.RLock()
+	viewers := s.viewers[spaceID]
+	targets := make([]*realtimeClient, 0, len(viewers))
+	activeByUser := map[string]bool{}
+	for client := range viewers {
+		targets = append(targets, client)
+		activeByUser[client.userID] = activeByUser[client.userID] || client.active
+	}
+	s.mu.RUnlock()
+
+	userIDs := make([]string, 0, len(activeByUser))
+	for userID := range activeByUser {
+		userIDs = append(userIDs, userID)
+	}
+	sort.Strings(userIDs)
+	presenceViewers := make([]presenceViewer, 0, len(userIDs))
+	for _, userID := range userIDs {
+		presenceViewers = append(presenceViewers, presenceViewer{UserID: userID, Active: activeByUser[userID]})
+	}
+
+	payload, err := json.Marshal(map[string]any{
+		"type":     "presence",
+		"space_id": spaceID,
+		"viewers":  presenceViewers,
+	})
+	if err != nil {
+		return
+	}
+	for _, client := range targets {
+		select {
+		case client.send <- payload:
+		default:
+		}
+	}
 }
 
 func (s *RealtimeService) readLoop(client *realtimeClient) {
@@ -275,9 +426,11 @@ func (s *RealtimeService) readLoop(client *realtimeClient) {
 	_ = client.conn.SetReadDeadline(time.Now().Add(realtimePongWait))
 	client.conn.SetPongHandler(func(string) error { return client.conn.SetReadDeadline(time.Now().Add(realtimePongWait)) })
 	for {
-		if _, _, err := client.conn.ReadMessage(); err != nil {
+		_, payload, err := client.conn.ReadMessage()
+		if err != nil {
 			return
 		}
+		s.handleClientMessage(client, payload)
 	}
 }
 

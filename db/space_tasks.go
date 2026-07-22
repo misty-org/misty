@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/lib/pq"
 )
 
 type SpaceTask struct {
@@ -34,6 +35,10 @@ type SpaceTask struct {
 	Version          int64           `json:"version"`
 	CompletedAt      *time.Time      `json:"completed_at,omitempty"`
 	ArchivedAt       *time.Time      `json:"archived_at,omitempty"`
+	// Google Calendar state. All three stay empty for Misty-only tasks.
+	Schedule         json.RawMessage `json:"schedule,omitempty"`
+	Calendar         json.RawMessage `json:"calendar,omitempty"`
+	ConflictedFields []string        `json:"conflicted_fields,omitempty"`
 	CreatedAt        time.Time       `json:"created_at"`
 	UpdatedAt        time.Time       `json:"updated_at"`
 }
@@ -114,10 +119,22 @@ type SpaceCalendarEvent struct {
 	UpdatedAt         time.Time       `json:"updated_at"`
 }
 
-const spaceTaskColumns = `id,space_id,task_number,task_key,title,notes,status,priority,rank,COALESCE(assignee_user_id,''),due_at,due_timezone,source_refs,COALESCE(created_by_user_id,''),COALESCE(created_by_agent_id,''),COALESCE(source_run_id,''),version,completed_at,archived_at,created_at,updated_at`
+const spaceTaskColumns = `id,space_id,task_number,task_key,title,notes,status,priority,rank,COALESCE(assignee_user_id,''),due_at,due_timezone,source_refs,COALESCE(created_by_user_id,''),COALESCE(created_by_agent_id,''),COALESCE(source_run_id,''),version,completed_at,archived_at,created_at,updated_at,schedule,calendar,conflicted_fields`
 
 func scanSpaceTask(row interface{ Scan(...any) error }, out *SpaceTask) error {
-	return row.Scan(&out.ID, &out.SpaceID, &out.TaskNumber, &out.TaskKey, &out.Title, &out.Notes, &out.Status, &out.Priority, &out.Rank, &out.AssigneeUserID, &out.DueAt, &out.DueTimezone, &out.SourceRefs, &out.CreatedByUserID, &out.CreatedByAgentID, &out.SourceRunID, &out.Version, &out.CompletedAt, &out.ArchivedAt, &out.CreatedAt, &out.UpdatedAt)
+	var schedule, calendar []byte
+	var conflicts pq.StringArray
+	if err := row.Scan(&out.ID, &out.SpaceID, &out.TaskNumber, &out.TaskKey, &out.Title, &out.Notes, &out.Status, &out.Priority, &out.Rank, &out.AssigneeUserID, &out.DueAt, &out.DueTimezone, &out.SourceRefs, &out.CreatedByUserID, &out.CreatedByAgentID, &out.SourceRunID, &out.Version, &out.CompletedAt, &out.ArchivedAt, &out.CreatedAt, &out.UpdatedAt, &schedule, &calendar, &conflicts); err != nil {
+		return err
+	}
+	if len(schedule) > 0 {
+		out.Schedule = append(json.RawMessage(nil), schedule...)
+	}
+	if len(calendar) > 0 {
+		out.Calendar = append(json.RawMessage(nil), calendar...)
+	}
+	out.ConflictedFields = conflicts
+	return nil
 }
 
 func validateSpaceTask(item *SpaceTask) error {

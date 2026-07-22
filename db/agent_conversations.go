@@ -25,15 +25,21 @@ func (db *Database) CreateAgentSession(ctx context.Context, conversationID, user
 	})
 }
 
-// LoadAgentSession returns only active, owned sessions. RLS and the explicit
-// user predicate ensure callers cannot probe another account's conversation.
+// LoadAgentSession returns owned sessions that are still retained. RLS and the
+// explicit user predicate ensure callers cannot probe another account's
+// conversation.
+//
+// This gates on retention rather than active_until: active_until is the
+// in-memory cache TTL, and gating resumption on it meant a session opened on one
+// device could not be continued from another two hours later, which defeats the
+// point of persisting it for thirty days.
 func (db *Database) LoadAgentSession(ctx context.Context, conversationID, userID string) (json.RawMessage, error) {
 	var state json.RawMessage
 	err := db.withRLSContext(ctx, userRLSSettings(userID), func(tx *sql.Tx) error {
 		return tx.QueryRowContext(ctx, `
 			SELECT state
 			FROM agent_conversations
-			WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL AND active_until > NOW()
+			WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL AND retention_expires_at > NOW()
 		`, conversationID, userID).Scan(&state)
 	})
 	if errors.Is(err, sql.ErrNoRows) {
@@ -68,6 +74,69 @@ func (db *Database) SaveAgentSession(ctx context.Context, conversationID, userID
 			`, conversationID, userID, event.Type, event.Data); err != nil {
 				return err
 			}
+		}
+		return nil
+	})
+}
+
+// AgentSessionSummary is the listing shape: enough to render a session rail
+// without loading conversation state or events.
+type AgentSessionSummary struct {
+	ID        string    `json:"id"`
+	Title     string    `json:"title"`
+	Active    bool      `json:"active"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+// ListAgentSessions returns the account's retained sessions, newest first.
+// Sessions past active_until are still listed — they are resumable history, and
+// only retention_expires_at removes them — with Active reporting which ones the
+// runtime can still continue.
+func (db *Database) ListAgentSessions(ctx context.Context, userID string) ([]AgentSessionSummary, error) {
+	items := []AgentSessionSummary{}
+	err := db.withRLSContext(ctx, userRLSSettings(userID), func(tx *sql.Tx) error {
+		rows, err := tx.QueryContext(ctx, `
+			SELECT id, title, active_until > NOW(), created_at, updated_at
+			FROM agent_conversations
+			WHERE user_id = $1 AND deleted_at IS NULL
+			ORDER BY updated_at DESC
+		`, userID)
+		if err != nil {
+			return err
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var item AgentSessionSummary
+			if err := rows.Scan(&item.ID, &item.Title, &item.Active, &item.CreatedAt, &item.UpdatedAt); err != nil {
+				return err
+			}
+			items = append(items, item)
+		}
+		return rows.Err()
+	})
+	return items, err
+}
+
+// RenameAgentSession sets the human-facing label. Clients derive a first title
+// from the opening message, so this runs on the first exchange and again on any
+// explicit rename.
+func (db *Database) RenameAgentSession(ctx context.Context, userID, conversationID, title string) error {
+	return db.withRLSContext(ctx, userRLSSettings(userID), func(tx *sql.Tx) error {
+		result, err := tx.ExecContext(ctx, `
+			UPDATE agent_conversations
+			SET title = $1
+			WHERE id = $2 AND user_id = $3 AND deleted_at IS NULL
+		`, title, conversationID, userID)
+		if err != nil {
+			return err
+		}
+		rows, err := result.RowsAffected()
+		if err != nil {
+			return err
+		}
+		if rows == 0 {
+			return serveragent.ErrPersistedSessionNotFound
 		}
 		return nil
 	})

@@ -5,12 +5,14 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"fmt"
+	"log"
 	"net/http"
 	"net/url"
 	"os"
 	"os/exec"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/cors"
@@ -40,6 +42,7 @@ type Server struct {
 }
 
 func CreateServer() (*Server, error) {
+	warnOnInsecureBillingConfiguration()
 	passwordResetRedirectURL, err := passwordResetRedirectURLFromEnv()
 	if err != nil {
 		return nil, err
@@ -59,7 +62,12 @@ func CreateServer() (*Server, error) {
 	}
 	s.AIAgent = serveragent.NewService(
 		serveragent.NewSessionStoreWithPersistence(0, s.Database),
-		serveragent.NewMikaProviderFromEnv(),
+		// Every paid model call in the process passes through this ceiling, so
+		// no path can run up an unbounded provider bill.
+		serveragent.NewBudgetedProvider(
+			serveragent.NewMikaProviderFromEnv(),
+			serveragent.ProviderBudgetFromEnv(),
+		),
 		serveragent.WithUsageMeter(appbilling.NewCreditMeter(s.Database)),
 	)
 	s.LibraryStore, err = libraryStoreFromEnv()
@@ -127,7 +135,16 @@ func (s *Server) MountHandlers() error {
 		AllowCredentials: true,
 		MaxAge:           300,
 	}))
-	s.Router.Use(api.NewAPIRateLimiter().Middleware)
+	// The abuse guard runs first: a blocked caller is rejected before any
+	// routing or handler work, and repeated per-route rejections escalate
+	// into a block through the shared guard.
+	// Blocks are persisted so a restart or a second instance still honours
+	// them; the per-request counters stay in memory for speed.
+	abuseGuard := api.NewAbuseGuard(api.DefaultAbusePolicy()).
+		WithStore(context.Background(), s.Database)
+	abuseGuard.StartRefreshLoop(context.Background(), 30*time.Second)
+	s.Router.Use(abuseGuard.Middleware)
+	s.Router.Use(api.NewAPIRateLimiter().WithAbuseGuard(abuseGuard).Middleware)
 
 	passwordResetService, err := api.NewPasswordResetService(s.Database, s.EmailSender, s.PasswordResetStartURL, s.PasswordResetRedirectURL)
 	if err != nil {
@@ -321,6 +338,7 @@ func (s *Server) mountSpacesRoutes(prefix string, spaces *api.SpacesService, rea
 	s.Router.MethodFunc(http.MethodPost, prefix+"/spaces/{spaceID}/messages", spaces.Messages())
 	s.Router.MethodFunc(http.MethodGet, prefix+"/spaces/{spaceID}/conversations", spaces.Conversations())
 	s.Router.MethodFunc(http.MethodPost, prefix+"/spaces/{spaceID}/conversations", spaces.Conversations())
+	s.Router.MethodFunc(http.MethodPatch, prefix+"/spaces/{spaceID}/conversations/{conversationID}", spaces.Conversation())
 	s.Router.MethodFunc(http.MethodGet, prefix+"/spaces/{spaceID}/conversations/{conversationID}/messages", spaces.ConversationMessages())
 	s.Router.MethodFunc(http.MethodPost, prefix+"/spaces/{spaceID}/conversations/{conversationID}/messages", spaces.ConversationMessages())
 	s.Router.MethodFunc(http.MethodPut, prefix+"/spaces/{spaceID}/conversations/{conversationID}/messages/{messageID}", spaces.ConversationMessage())
@@ -336,6 +354,10 @@ func (s *Server) mountSpacesRoutes(prefix string, spaces *api.SpacesService, rea
 	s.Router.MethodFunc(http.MethodPost, prefix+"/spaces/{spaceID}/calendar/sources", spaces.SpaceCalendarSources())
 	s.Router.Delete(prefix+"/spaces/{spaceID}/calendar/sources/{sourceID}", spaces.SpaceCalendarSource())
 	s.Router.Get(prefix+"/spaces/{spaceID}/calendar/google/calendars", spaces.AvailableGoogleCalendars())
+	s.Router.Post(prefix+"/spaces/{spaceID}/calendar/sync", spaces.SyncCalendarTasks())
+	s.Router.Post(prefix+"/spaces/{spaceID}/tasks/calendar", spaces.CreateCalendarTask())
+	s.Router.Post(prefix+"/spaces/{spaceID}/tasks/{taskID}/calendar/publish", spaces.PublishTaskToCalendar())
+	s.Router.Post(prefix+"/spaces/{spaceID}/tasks/{taskID}/calendar/resolve", spaces.ResolveTaskCalendarConflict())
 	s.Router.MethodFunc(http.MethodPut, prefix+"/spaces/{spaceID}/messages/{messageID}", spaces.Message())
 	s.Router.MethodFunc(http.MethodDelete, prefix+"/spaces/{spaceID}/messages/{messageID}", spaces.Message())
 	s.Router.Post(prefix+"/spaces/{spaceID}/read", spaces.MarkRead())
@@ -386,6 +408,27 @@ func (s *Server) mountSpacesRoutes(prefix string, spaces *api.SpacesService, rea
 	s.Router.Post(prefix+"/provider-callbacks/slack-events", spaces.SlackEventsCallback())
 	s.Router.Post(prefix+"/provider-callbacks/notion-events", spaces.NotionEventsCallback())
 	s.Router.Delete(prefix+"/integrations/{integrationID}", spaces.DeleteProviderIntegration())
+
+	// Space ↔ Discord conversation mirroring.
+	s.Router.MethodFunc(http.MethodGet, prefix+"/spaces/{spaceID}/integrations/discord/link", spaces.SpaceDiscordLink())
+	s.Router.MethodFunc(http.MethodPost, prefix+"/spaces/{spaceID}/integrations/discord/link", spaces.SpaceDiscordLink())
+	s.Router.MethodFunc(http.MethodPatch, prefix+"/spaces/{spaceID}/integrations/discord/link/{linkID}", spaces.SpaceDiscordLinkItem())
+	s.Router.MethodFunc(http.MethodDelete, prefix+"/spaces/{spaceID}/integrations/discord/link/{linkID}", spaces.SpaceDiscordLinkItem())
+	s.Router.Post(prefix+"/spaces/{spaceID}/integrations/discord/link/{linkID}/sync", spaces.SyncSpaceDiscordLink())
+	s.Router.Post(prefix+"/spaces/{spaceID}/integrations/discord/link/{linkID}/publish", spaces.PublishSpaceDiscordMessage())
+
+	// Notion read/write proxy. The Notion token stays server-side.
+	s.Router.Get(prefix+"/spaces/{spaceID}/integrations/notion/status", spaces.NotionStatus())
+	s.Router.Delete(prefix+"/spaces/{spaceID}/integrations/notion/connection", spaces.NotionConnection())
+	s.Router.Get(prefix+"/spaces/{spaceID}/integrations/notion/sources", spaces.NotionSources())
+	s.Router.Get(prefix+"/spaces/{spaceID}/integrations/notion/search", spaces.NotionSearch())
+	s.Router.Post(prefix+"/spaces/{spaceID}/integrations/notion/pages", spaces.NotionPages())
+	s.Router.MethodFunc(http.MethodGet, prefix+"/spaces/{spaceID}/integrations/notion/pages/{pageID}", spaces.NotionPage())
+	s.Router.MethodFunc(http.MethodPatch, prefix+"/spaces/{spaceID}/integrations/notion/pages/{pageID}", spaces.NotionPage())
+	s.Router.Get(prefix+"/spaces/{spaceID}/integrations/notion/pages/{pageID}/blocks", spaces.NotionPageBlocks())
+	s.Router.Patch(prefix+"/spaces/{spaceID}/integrations/notion/blocks/{blockID}/children", spaces.NotionBlockChildren())
+	s.Router.Get(prefix+"/spaces/{spaceID}/integrations/notion/databases/{databaseID}", spaces.NotionDatabase())
+	s.Router.Post(prefix+"/spaces/{spaceID}/integrations/notion/databases/{databaseID}/query", spaces.NotionDatabaseQuery())
 	s.Router.Get(prefix+"/runs/{runID}", spaces.RunDetail())
 	s.Router.Post(prefix+"/runs/{runID}/approval", spaces.RunDecision())
 	s.Router.Post(prefix+"/runs/{runID}/cancel", spaces.RunCancel())
@@ -556,9 +599,12 @@ func isAllowedCORSOrigin(origin string) bool {
 func (s *Server) mountAIRoutes(prefix string, aiService *api.AIService) {
 	s.Router.Get(prefix+"/status", aiService.Status())
 	s.Router.Post(prefix+"/complete", aiService.Complete())
+	s.Router.Get(prefix+"/sessions", aiService.Sessions())
 	s.Router.Post(prefix+"/sessions", aiService.CreateSession())
+	s.Router.Patch(prefix+"/sessions/{sessionID}", aiService.RenameSession())
 	s.Router.Post(prefix+"/sessions/{sessionID}/messages", aiService.SendMessage())
 	s.Router.Get(prefix+"/sessions/{sessionID}/events", aiService.Events())
+	s.Router.Get(prefix+"/sessions/{sessionID}/transcript", aiService.Transcript())
 	s.Router.Post(prefix+"/sessions/{sessionID}/tool-results", aiService.SubmitToolResults())
 	s.Router.Post(prefix+"/sessions/{sessionID}/cancel", aiService.Cancel())
 	s.Router.Delete(prefix+"/sessions/{sessionID}", aiService.DeleteConversation())
@@ -613,6 +659,29 @@ func passwordResetStartURLFromEnv() (string, error) {
 func isLocalhostHostname(host string) bool {
 	switch strings.ToLower(strings.TrimSpace(host)) {
 	case "localhost", "127.0.0.1", "::1":
+		return true
+	default:
+		return false
+	}
+}
+
+// warnOnInsecureBillingConfiguration surfaces a missing webhook secret at boot
+// rather than on the first forged event. The handler refuses those requests
+// regardless; this exists so the operator learns before real Stripe events are
+// silently rejected too.
+func warnOnInsecureBillingConfiguration() {
+	if len(strings.TrimSpace(os.Getenv("STRIPE_WEBHOOK_SECRET"))) < 16 {
+		log.Println("SECURITY: STRIPE_WEBHOOK_SECRET is unset or too short; Stripe webhooks will be refused")
+	}
+	if trustProxyHeadersEnabled() && strings.TrimSpace(os.Getenv("TRUSTED_PROXY_CIDRS")) == "" {
+		log.Println("NOTICE: TRUST_PROXY_HEADERS is on and TRUSTED_PROXY_CIDRS is unset; " +
+			"forwarded headers are honoured only from loopback and private ranges")
+	}
+}
+
+func trustProxyHeadersEnabled() bool {
+	switch strings.ToLower(strings.TrimSpace(os.Getenv("TRUST_PROXY_HEADERS"))) {
+	case "1", "true", "yes":
 		return true
 	default:
 		return false

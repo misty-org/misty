@@ -248,6 +248,11 @@ func (s *SpacesService) processDiscordDispatch(ctx context.Context, envelope dis
 	if json.Unmarshal(envelope.Data, &event) != nil || event.GuildID == "" || event.ChannelID == "" {
 		return errors.New("discord dispatch identity is missing")
 	}
+	// Mirror into any Space conversation linked to this channel. This is
+	// independent of the shared-resource pipeline below: a Space can mirror a
+	// channel without publishing it as a workflow resource, and vice versa.
+	s.mirrorDiscordDispatch(ctx, envelope, event.GuildID, event.ChannelID)
+
 	resources, err := s.database.MatchingProviderResources(ctx, "discord", event.GuildID, event.ChannelID)
 	if err != nil {
 		return err
@@ -299,4 +304,36 @@ func (e discordGatewayEnvelope) SequenceOrZero() int64 {
 		return 0
 	}
 	return *e.Sequence
+}
+
+// mirrorDiscordDispatch fans a live Discord message out to every Space that
+// mirrors the channel. Failures are deliberately swallowed: a Space whose
+// conversation was deleted must not stall the Gateway for everyone else, and
+// the next manual sync will reconcile from the stored cursor regardless.
+func (s *SpacesService) mirrorDiscordDispatch(ctx context.Context, envelope discordGatewayEnvelope, guildID, channelID string) {
+	if envelope.Type != "MESSAGE_CREATE" {
+		return
+	}
+	links, err := s.database.SpaceDiscordLinksForChannel(ctx, guildID, channelID)
+	if err != nil || len(links) == 0 {
+		return
+	}
+	var message discordMessage
+	if json.Unmarshal(envelope.Data, &message) != nil || message.ID == "" {
+		return
+	}
+	for _, link := range links {
+		if !shouldMirrorDiscordMessage(message, &link) {
+			continue
+		}
+		if _, mirrorErr := s.mirrorDiscordMessage(ctx, link, message); mirrorErr != nil {
+			continue
+		}
+		now := time.Now().UTC()
+		cursor := ""
+		if snowflakeAfter(message.ID, link.LastMessageID) {
+			cursor = message.ID
+		}
+		_ = s.database.SetSpaceDiscordLinkSync(ctx, link.ID, cursor, "active", "", &now)
+	}
 }

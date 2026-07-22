@@ -12,6 +12,8 @@ if [[ -f .env ]]; then
 fi
 
 EXPLICIT_TEST_DB_HOST="${TEST_DB_HOST:-}"
+EXPLICIT_TEST_DB_USER="${TEST_DB_USER:-}"
+EXPLICIT_TEST_DB_SSLMODE="${TEST_DB_SSLMODE:-}"
 
 export TEST_DB_HOST="${TEST_DB_HOST:-${DB_HOST:-}}"
 export TEST_DB_PORT="${TEST_DB_PORT:-${DB_PORT:-5432}}"
@@ -53,6 +55,21 @@ if [[ "$SHOULD_BOOTSTRAP_TEST_DB" == "true" ]]; then
   export TEST_DB_PORT="${TEST_DB_PORT:-5432}"
   export TEST_DB_USER="${TEST_DB_USER:-misty}"
   export TEST_DB_PASSWORD="${TEST_DB_PASSWORD:-misty}"
+
+  # DB_USER is the application role and is deliberately unprivileged, so it can
+  # neither recreate the test database nor TRUNCATE between tests. Bootstrap and
+  # run as the migration role when one is configured.
+  if [[ -z "$EXPLICIT_TEST_DB_USER" && -n "${DB_MIGRATION_USER:-}" ]]; then
+    export TEST_DB_USER="$DB_MIGRATION_USER"
+    export TEST_DB_PASSWORD="${DB_MIGRATION_PASSWORD:-$TEST_DB_PASSWORD}"
+  fi
+  ADMIN_DB_USER="$TEST_DB_USER"
+
+  # The bootstrapped container has no TLS, so a production DB_SSLMODE inherited
+  # from .env would fail every connection.
+  if [[ -z "$EXPLICIT_TEST_DB_SSLMODE" ]]; then
+    export TEST_DB_SSLMODE="disable"
+  fi
   export TEST_DB_NAME="${TEST_DB_NAME:-misty_server_test}"
   export TEST_DB_SSLMODE="${TEST_DB_SSLMODE:-disable}"
 
@@ -63,7 +80,7 @@ if [[ "$SHOULD_BOOTSTRAP_TEST_DB" == "true" ]]; then
 
   docker compose up -d postgres
 
-  until docker compose exec -T postgres pg_isready -U "$DB_USER" -d "$DB_NAME" >/dev/null 2>&1; do
+  until docker compose exec -T postgres pg_isready -U "$ADMIN_DB_USER" -d "$DB_NAME" >/dev/null 2>&1; do
     sleep 1
   done
 
@@ -79,7 +96,7 @@ if [[ "$SHOULD_BOOTSTRAP_TEST_DB" == "true" ]]; then
       ;;
   esac
 
-  docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d postgres <<SQL
+  docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$ADMIN_DB_USER" -d postgres <<SQL
 SELECT pg_terminate_backend(pid)
 FROM pg_stat_activity
 WHERE datname = '${TEST_DB_NAME}' AND pid <> pg_backend_pid();
@@ -93,8 +110,21 @@ SQL
       /^-- \+goose Down$/ { in_up = 0 }
       in_up && /^-- \+goose/ { next }
       in_up { print }
-    ' "$migration" | docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$TEST_DB_NAME"
+    ' "$migration" | docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$ADMIN_DB_USER" -d "$TEST_DB_NAME"
   done
+
+  # Migrations are applied with psql rather than goose, so record them in the
+  # version table goose would have written. checkSchemaVersion reads it, and
+  # without this a bootstrapped database looks unmigrated.
+  {
+    echo "CREATE TABLE IF NOT EXISTS goose_db_version (id SERIAL PRIMARY KEY, version_id BIGINT NOT NULL, is_applied BOOLEAN NOT NULL, tstamp TIMESTAMP NULL DEFAULT now());"
+    echo "TRUNCATE goose_db_version RESTART IDENTITY;"
+    echo "INSERT INTO goose_db_version (version_id, is_applied) VALUES (0, true);"
+    for migration in db/migrations/*.sql; do
+      version="$(basename "$migration" | cut -d_ -f1)"
+      echo "INSERT INTO goose_db_version (version_id, is_applied) VALUES (${version}, true);"
+    done
+  } | docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$ADMIN_DB_USER" -d "$TEST_DB_NAME" >/dev/null
 fi
 
 go test ./... -count=1 "$@"

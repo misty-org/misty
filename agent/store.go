@@ -228,8 +228,12 @@ func (s *SessionStore) acquireEntry(ctx context.Context, id, userID string) *ses
 		}
 		return nil
 	}
+	// Staleness here is measured against retention, not the in-memory ttl: ttl
+	// only decides how long a session stays cached in this process, while a
+	// persisted session stays resumable — including from another device — for as
+	// long as it is retained.
 	session, err := unmarshalPersistentSession(raw, id, userID)
-	if err != nil || session.UpdatedAt.Before(s.now().Add(-s.ttl)) {
+	if err != nil || session.UpdatedAt.Before(s.now().Add(-conversationRetention)) {
 		if err != nil && !errors.Is(err, ErrPersistedSessionNotFound) {
 			log.Printf("decode persisted Mika session %q: %v", id, err)
 		}

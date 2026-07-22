@@ -109,6 +109,11 @@ func TestCreateServerConfiguresIndependentDevelopmentLibrary(t *testing.T) {
 	t.Setenv("R2_BUCKET", "")
 	t.Setenv("R2_ACCESS_KEY", "")
 	t.Setenv("R2_SECRET_KEY", "")
+	// The memory-backed Library fallback this test exercises is gated on a
+	// non-production environment; without this the test's outcome silently
+	// depends on whatever MISTY_ENVIRONMENT happens to be set to in the
+	// process running the suite (e.g. a local .env that mimics production).
+	t.Setenv("MISTY_ENVIRONMENT", "")
 
 	server, err := CreateServer()
 	if err != nil {

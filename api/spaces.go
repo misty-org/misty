@@ -122,6 +122,8 @@ func writeSpaceError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, db.ErrSpaceNotFound), errors.Is(err, db.ErrSpaceInviteNotFound):
 		writeJSON(w, http.StatusNotFound, map[string]string{"code": "not_found"})
+	case errors.Is(err, db.ErrSpaceInviteeNotFound):
+		writeJSON(w, http.StatusNotFound, map[string]string{"code": "invitee_not_found"})
 	case errors.Is(err, db.ErrSpaceForbidden), errors.Is(err, db.ErrLibraryForbidden):
 		writeJSON(w, http.StatusForbidden, map[string]string{"code": "forbidden"})
 	case errors.Is(err, db.ErrWorkflowIntegrationRequired):

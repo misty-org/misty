@@ -2,14 +2,19 @@ package db
 
 import (
 	"database/sql"
+	"embed"
 	"fmt"
 	"log"
 	"net"
 	"os"
+	"strconv"
 	"strings"
 
 	_ "github.com/lib/pq"
 )
+
+//go:embed migrations/*.sql
+var migrationFiles embed.FS
 
 type Database struct {
 	Conn *sql.DB
@@ -59,7 +64,65 @@ func (db *Database) Start() error {
 	warnIfRoleBypassesRLS(conn)
 
 	db.Conn = conn
+	if err := db.checkSchemaVersion(); err != nil {
+		return err
+	}
 	return nil
+}
+
+// checkSchemaVersion fails fast with a clear error when the database hasn't
+// had every migration applied, instead of letting the server start against a
+// stale schema — which manifests later as scattered, hard-to-diagnose
+// failures (400s on requests that touch changed tables, dropped WebSocket
+// connections, etc.) rather than one obvious error at boot.
+func (db *Database) checkSchemaVersion() error {
+	expected, err := latestMigrationVersion()
+	if err != nil {
+		return fmt.Errorf("determine expected schema version: %w", err)
+	}
+	var applied int64
+	if err := db.Conn.QueryRow(
+		`SELECT COALESCE(MAX(version_id), 0) FROM goose_db_version WHERE is_applied = true`,
+	).Scan(&applied); err != nil {
+		return fmt.Errorf(
+			"read applied schema version (run ./scripts/goose.sh up if migrations have never been applied): %w", err,
+		)
+	}
+	if applied < expected {
+		return fmt.Errorf(
+			"database schema is out of date: applied migration %d, latest migration is %d — run ./scripts/goose.sh up",
+			applied, expected,
+		)
+	}
+	return nil
+}
+
+func latestMigrationVersion() (int64, error) {
+	entries, err := migrationFiles.ReadDir("migrations")
+	if err != nil {
+		return 0, err
+	}
+	var latest int64
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".sql") {
+			continue
+		}
+		underscoreIndex := strings.Index(entry.Name(), "_")
+		if underscoreIndex <= 0 {
+			continue
+		}
+		version, err := strconv.ParseInt(entry.Name()[:underscoreIndex], 10, 64)
+		if err != nil {
+			continue
+		}
+		if version > latest {
+			latest = version
+		}
+	}
+	if latest == 0 {
+		return 0, fmt.Errorf("no migration files found")
+	}
+	return latest, nil
 }
 
 func (db *Database) Stop() {

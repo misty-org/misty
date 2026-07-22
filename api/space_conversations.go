@@ -40,6 +40,30 @@ func (s *SpacesService) Conversations() http.HandlerFunc {
 	}
 }
 
+func (s *SpacesService) Conversation() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userID, ok := authenticatedUser(w, r, s.database)
+		if !ok {
+			return
+		}
+		spaceID := chi.URLParam(r, "spaceID")
+		conversationID := chi.URLParam(r, "conversationID")
+		var body struct {
+			Title     string   `json:"title"`
+			MemberIDs []string `json:"member_ids"`
+		}
+		if decodeJSON(w, r, &body) != nil {
+			return
+		}
+		item, err := s.database.UpdateSpaceConversation(r.Context(), userID, spaceID, conversationID, body.Title, body.MemberIDs)
+		if err != nil {
+			writeSpaceError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, item)
+	}
+}
+
 func (s *SpacesService) ConversationMessages() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		userID, ok := authenticatedUser(w, r, s.database)

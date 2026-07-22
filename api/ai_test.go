@@ -28,6 +28,9 @@ func TestAIHandlersRequireAuthentication(t *testing.T) {
 		{name: "events", handler: service.Events(), method: http.MethodGet, path: "/ai/sessions/s/events"},
 		{name: "tool-results", handler: service.SubmitToolResults(), method: http.MethodPost, path: "/ai/sessions/s/tool-results"},
 		{name: "cancel", handler: service.Cancel(), method: http.MethodPost, path: "/ai/sessions/s/cancel"},
+		{name: "list", handler: service.Sessions(), method: http.MethodGet, path: "/ai/sessions"},
+		{name: "rename", handler: service.RenameSession(), method: http.MethodPatch, path: "/ai/sessions/s"},
+		{name: "transcript", handler: service.Transcript(), method: http.MethodGet, path: "/ai/sessions/s/transcript"},
 	}
 
 	for _, tt := range tests {
