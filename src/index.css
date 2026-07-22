@@ -36,6 +36,8 @@
   --radius: 0.625rem;
   --showcase-surface: oklch(0.141 0.005 285.823);
   --showcase-foreground: oklch(0.985 0 0);
+  --misty-cloud-accent: oklch(0.74 0.13 236);
+  --misty-folder-accent: oklch(0.82 0.14 84);
   --sidebar: oklch(0.985 0 0);
   --sidebar-foreground: oklch(0.141 0.005 285.823);
   --sidebar-primary: oklch(0.21 0.006 285.885);
@@ -241,6 +243,72 @@ body {
   .radial-glow {
     background: radial-gradient(ellipse 600px 400px at 50% 0%, color-mix(in oklch, var(--foreground) 8%, transparent), transparent);
   }
+}
+
+/* Static atmospheric fields for product-led marketing surfaces.
+   Monochrome (white glows on the dark surface) to match Misty's
+   black / gray / white theme. */
+.misty-hero-field {
+  background:
+    radial-gradient(
+      ellipse 55% 48% at 15% 0%,
+      color-mix(in oklch, var(--showcase-foreground) 14%, transparent),
+      transparent 70%
+    ),
+    radial-gradient(
+      ellipse 48% 40% at 88% 6%,
+      color-mix(in oklch, var(--showcase-foreground) 9%, transparent),
+      transparent 72%
+    ),
+    radial-gradient(
+      ellipse 64% 50% at 50% 30%,
+      color-mix(in oklch, var(--showcase-foreground) 8%, transparent),
+      transparent 76%
+    );
+}
+
+.misty-cta-field {
+  background:
+    radial-gradient(
+      ellipse 46% 82% at 15% 100%,
+      color-mix(in oklch, var(--showcase-foreground) 12%, transparent),
+      transparent 72%
+    ),
+    radial-gradient(
+      ellipse 40% 72% at 88% 100%,
+      color-mix(in oklch, var(--showcase-foreground) 8%, transparent),
+      transparent 74%
+    );
+}
+
+/* Repeating page-wide atmospheric gradient. Tiles vertically down the whole
+   page so every section shares the same misty backdrop. Monochrome, so it
+   reads as soft light rather than color. */
+.misty-page-field {
+  background-color: var(--background);
+  background-image:
+    radial-gradient(
+      ellipse 42% 26% at 12% 8%,
+      color-mix(in oklch, var(--foreground) 7%, transparent),
+      transparent 68%
+    ),
+    radial-gradient(
+      ellipse 36% 24% at 88% 34%,
+      color-mix(in oklch, var(--foreground) 5%, transparent),
+      transparent 70%
+    ),
+    radial-gradient(
+      ellipse 48% 30% at 46% 72%,
+      color-mix(in oklch, var(--foreground) 6%, transparent),
+      transparent 72%
+    ),
+    radial-gradient(
+      ellipse 30% 22% at 72% 94%,
+      color-mix(in oklch, var(--foreground) 4%, transparent),
+      transparent 70%
+    );
+  background-size: 100% 1500px;
+  background-repeat: repeat;
 }
 
 /* Disable Inter contextual alternates in inputs (fixes @ jiggle) */

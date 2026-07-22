@@ -1,17 +1,21 @@
-import { ArrowRight } from "lucide-react";
+import type { ReactNode } from "react";
 import { NavLink } from "react-router";
 
-import {
-  ChatPreview,
-  ConnectionsPreview,
-  FilesPreview,
-  MikaPreview,
-  ProductScreenshot,
-  TasksPreview,
-} from "@/components/ProductPreview";
-import { Badge } from "@/components/ui/badge";
+import { ChatPreview, ProductScreenshot, TasksPreview } from "@/components/ProductPreview";
 import { Button } from "@/components/ui/button";
 import { BETA_ACCESS_EXTERNAL, BETA_ACCESS_HREF } from "@/lib/site";
+
+const workflowSteps = [
+  ["Create a Space", "Invite the people working on the project."],
+  ["Bring in the work", "Add the conversations, tasks, and files that matter."],
+  ["Stay in context", "Pick up where the group left off."],
+];
+
+const principles = [
+  ["Private by default", "Files stay private until you share them."],
+  ["One shared context", "Chat, tasks, and Library stay together."],
+  ["Mika, in context", "Ask across content you can already access."],
+];
 
 function BetaAccessButton({ className }: { className?: string }) {
   return (
@@ -19,43 +23,60 @@ function BetaAccessButton({ className }: { className?: string }) {
       {BETA_ACCESS_EXTERNAL ? (
         <a href={BETA_ACCESS_HREF} target="_blank" rel="noopener noreferrer">
           Join the beta
-          <ArrowRight aria-hidden="true" />
         </a>
       ) : (
-        <NavLink to={BETA_ACCESS_HREF}>
-          Join the beta
-          <ArrowRight aria-hidden="true" />
-        </NavLink>
+        <NavLink to={BETA_ACCESS_HREF}>Join the beta</NavLink>
       )}
     </Button>
   );
 }
 
+function SectionLabel({ children, inverted = false }: { children: ReactNode; inverted?: boolean }) {
+  return (
+    <p
+      className={
+        inverted
+          ? "font-mono text-[11px] font-medium uppercase tracking-[0.16em] text-showcase-foreground/55"
+          : "font-mono text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground"
+      }
+    >
+      {children}
+    </p>
+  );
+}
+
 export default function Home() {
   return (
-    <div className="overflow-hidden">
-      <section className="border-b border-border px-5 pb-20 pt-32 sm:px-8 sm:pb-24 sm:pt-36">
-        <div className="mx-auto max-w-[1060px]">
-          <div className="mx-auto max-w-3xl text-center">
-            <Badge variant="outline" className="mb-5 rounded-full px-3 py-1 text-xs">
+    <div className="relative overflow-hidden">
+      <div className="misty-page-field pointer-events-none absolute inset-0 -z-10" aria-hidden="true" />
+
+      <section className="relative isolate mt-16 overflow-hidden border-b border-border bg-showcase px-6 pb-14 pt-16 text-showcase-foreground sm:px-10 sm:pb-20 sm:pt-20 lg:px-16">
+        <div className="misty-hero-field absolute inset-0 -z-10" aria-hidden="true" />
+        <div className="mx-auto max-w-6xl">
+          <div className="max-w-3xl">
+            <p className="mb-5 font-mono text-[11px] font-medium uppercase tracking-[0.16em] text-showcase-foreground/55">
               Invite-only beta
-            </Badge>
-            <h1 className="text-balance text-4xl font-semibold tracking-[-0.05em] text-foreground sm:text-6xl lg:text-7xl lg:leading-[1.02]">
-              Keep the whole project in one Space.
-            </h1>
-            <p className="mx-auto mt-6 max-w-2xl text-pretty text-base leading-7 text-muted-foreground sm:text-lg sm:leading-8">
-              Misty keeps members, chat, tasks, and shared files together. Private Files stay
-              private until you add them.
             </p>
-            <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
-              <BetaAccessButton className="w-full rounded-full px-6 sm:w-auto" />
-              <Button asChild size="lg" variant="outline" className="w-full rounded-full px-6 sm:w-auto">
-                <NavLink to="/download">Download beta</NavLink>
+            <h1 className="text-balance text-5xl font-medium leading-[0.98] tracking-[-0.055em] text-showcase-foreground sm:text-7xl">
+              One Space for the whole project.
+            </h1>
+            <p className="mt-6 max-w-lg text-pretty text-base leading-7 text-showcase-foreground/65 sm:text-lg">
+              Chat, tasks, and files—together.
+            </p>
+            <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+              <BetaAccessButton className="w-full rounded-full bg-showcase-foreground px-6 text-showcase hover:bg-showcase-foreground/90 sm:w-auto" />
+              <Button
+                asChild
+                size="lg"
+                variant="outline"
+                className="w-full rounded-full border-showcase-foreground/25 bg-transparent px-6 text-showcase-foreground shadow-none hover:bg-showcase-foreground/10 hover:text-showcase-foreground dark:bg-transparent sm:w-auto"
+              >
+                <a href="#how-misty-works">How it works</a>
               </Button>
             </div>
           </div>
 
-          <div className="mt-14 sm:mt-16">
+          <div className="mt-12 sm:mt-16">
             <ProductScreenshot
               src="/space-library-crop.webp"
               alt="Misty Space Library with shared project research and files"
@@ -66,100 +87,98 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="border-b border-border px-5 py-20 sm:px-8 sm:py-24">
-        <div className="mx-auto max-w-7xl">
-          <div className="max-w-3xl">
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-              Spaces
-            </p>
-            <h2 className="mt-3 text-balance text-3xl font-semibold tracking-[-0.035em] text-foreground sm:text-5xl">
-              Members, Chat, Tasks, and Library.
+      <section className="border-b border-border px-6 py-14 sm:px-10 sm:py-20 lg:px-16">
+        <div className="mx-auto max-w-5xl">
+          <div className="max-w-2xl">
+            <SectionLabel>Inside a Space</SectionLabel>
+            <h2 className="mt-3 text-balance text-3xl font-medium tracking-[-0.04em] text-foreground sm:text-5xl">
+              Work without the tool shuffle.
             </h2>
           </div>
 
-          <div className="mt-10 grid gap-6 lg:grid-cols-2">
-            <ChatPreview />
-            <TasksPreview />
+          <div className="mt-9 grid gap-6 lg:grid-cols-2">
+            <figure>
+              <ChatPreview />
+              <figcaption className="mt-4 text-base font-medium text-foreground">
+                Conversations stay with the project.
+              </figcaption>
+            </figure>
+            <figure>
+              <TasksPreview />
+              <figcaption className="mt-4 text-base font-medium text-foreground">
+                Everyone sees what moves next.
+              </figcaption>
+            </figure>
           </div>
+        </div>
+      </section>
 
-          <div className="mt-8 grid grid-cols-2 border-y border-border text-sm sm:grid-cols-4">
-            {["Members", "Chat", "Tasks", "Library"].map((item) => (
+      <section className="border-b border-border px-6 py-14 sm:px-10 sm:py-20 lg:px-16">
+        <div className="mx-auto grid max-w-5xl gap-9 lg:grid-cols-[0.7fr_1.3fr] lg:items-center lg:gap-14">
+          <div>
+            <SectionLabel>Your files</SectionLabel>
+            <h2 className="mt-3 text-balance text-3xl font-medium tracking-[-0.04em] text-foreground sm:text-5xl">
+              Private until you share.
+            </h2>
+            <p className="mt-4 max-w-sm text-base leading-7 text-muted-foreground">
+              Browse across storage, then add only what belongs in the Space.
+            </p>
+          </div>
+          <ProductScreenshot
+            src="/misty-browse.png"
+            alt="Browsing local and connected files in Misty"
+            label="Private Files · Beta"
+          />
+        </div>
+      </section>
+
+      <section
+        id="how-misty-works"
+        className="scroll-mt-24 border-b border-border px-6 py-14 sm:px-10 sm:py-20 lg:px-16"
+      >
+        <div className="mx-auto max-w-5xl">
+          <SectionLabel>How it works</SectionLabel>
+          <h2 className="mt-3 text-balance text-3xl font-medium tracking-[-0.04em] text-foreground sm:text-5xl">
+            Start with a Space.
+          </h2>
+
+          <ol className="mt-10 grid gap-8 sm:grid-cols-3">
+            {workflowSteps.map(([title, description], index) => (
+              <li key={title} className="border-t border-border pt-4">
+                <span className="font-mono text-xs text-muted-foreground" aria-hidden="true">
+                  0{index + 1}
+                </span>
+                <h3 className="mt-6 text-lg font-medium tracking-[-0.02em] text-foreground">{title}</h3>
+                <p className="mt-2 max-w-xs text-sm leading-6 text-muted-foreground">{description}</p>
+              </li>
+            ))}
+          </ol>
+
+          <dl className="mt-12 grid border-y border-border sm:grid-cols-3">
+            {principles.map(([title, description], index) => (
               <div
-                key={item}
-                className="border-border px-4 py-4 text-center font-medium text-foreground even:border-l sm:border-l sm:first:border-l-0"
+                key={title}
+                className={`py-5 sm:px-6 ${index === 0 ? "sm:pl-0" : "border-t border-border sm:border-l sm:border-t-0"}`}
               >
-                {item}
+                <dt className="text-sm font-medium text-foreground">{title}</dt>
+                <dd className="mt-1 text-sm leading-6 text-muted-foreground">{description}</dd>
               </div>
             ))}
-          </div>
+          </dl>
         </div>
       </section>
 
-      <section className="border-b border-border px-5 py-20 sm:px-8 sm:py-24">
-        <div className="mx-auto max-w-7xl">
-          <div className="grid gap-10 lg:grid-cols-2 lg:gap-16">
-            <div>
-              <div className="mb-6">
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                  Integrations
-                </p>
-                <h2 className="mt-3 text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
-                  Connectors are in pilot.
-                </h2>
-                <p className="mt-3 max-w-xl text-sm leading-6 text-muted-foreground">
-                  Google Calendar is in pilot. Slack, Notion, and Discord are not generally
-                  available.
-                </p>
-              </div>
-              <ConnectionsPreview />
-            </div>
-
-            <div>
-              <div className="mb-6">
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                  Mika
-                </p>
-                <h2 className="mt-3 text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
-                  Ask about the active Space.
-                </h2>
-                <p className="mt-3 max-w-xl text-sm leading-6 text-muted-foreground">
-                  Where enabled, Mika uses permitted Space context. The conversation stays private
-                  to your account.
-                </p>
-              </div>
-              <MikaPreview />
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="border-b border-border px-5 py-20 sm:px-8 sm:py-24">
-        <div className="mx-auto grid max-w-7xl gap-10 lg:grid-cols-[0.58fr_1.42fr] lg:items-center lg:gap-16">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-              Private Files
-            </p>
-            <h2 className="mt-3 text-balance text-3xl font-semibold tracking-[-0.035em] text-foreground sm:text-4xl">
-              Browse first. Share deliberately.
+      <section className="px-6 py-14 sm:px-10 sm:py-20 lg:px-16">
+        <div className="relative isolate mx-auto max-w-5xl overflow-hidden rounded-3xl bg-showcase px-6 py-12 text-showcase-foreground sm:px-10 sm:py-16">
+          <div className="misty-cta-field absolute inset-0 -z-10" aria-hidden="true" />
+          <div className="max-w-xl">
+            <SectionLabel inverted>Invite-only beta</SectionLabel>
+            <h2 className="mt-3 text-balance text-3xl font-medium tracking-[-0.04em] text-showcase-foreground sm:text-5xl">
+              Bring your next project.
             </h2>
-            <p className="mt-4 max-w-lg text-sm leading-6 text-muted-foreground">
-              Browse local and connected storage, then choose what to add to a Space.
-            </p>
-            <Button asChild variant="outline" className="mt-6">
-              <NavLink to="/features#private-files">View Files</NavLink>
-            </Button>
-          </div>
-          <FilesPreview />
-        </div>
-      </section>
-
-      <section className="px-5 py-20 sm:px-8 sm:py-24">
-        <div className="mx-auto max-w-3xl text-center">
-          <h2 className="text-balance text-3xl font-semibold tracking-[-0.04em] text-foreground sm:text-5xl">
-            Request beta access.
-          </h2>
-          <div className="mt-7">
-            <BetaAccessButton className="rounded-full px-6" />
+            <div className="mt-7">
+              <BetaAccessButton className="rounded-full bg-showcase-foreground px-6 text-showcase hover:bg-showcase-foreground/90" />
+            </div>
           </div>
         </div>
       </section>

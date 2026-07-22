@@ -8,18 +8,6 @@ import {
   CardHeader,
 } from "@/components/ui/card";
 
-const CheckIcon = ({ muted }: { muted?: boolean }) => (
-  <svg
-    className={`mt-0.5 h-4 w-4 shrink-0 ${muted ? "text-muted-foreground/50" : "text-primary"}`}
-    fill="none"
-    viewBox="0 0 24 24"
-    stroke="currentColor"
-    strokeWidth={2}
-  >
-    <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-  </svg>
-);
-
 interface PricingCardProps {
   name: string;
   price: string;
@@ -63,14 +51,13 @@ export default function PricingCard({
           Plan limits
         </p>
 
-        <ul className="mb-4 flex flex-1 flex-col gap-2">
+        <ul className="mb-4 flex flex-1 flex-col divide-y divide-border border-y border-border">
           {features.map((feature) => (
             <li
               key={feature}
-              className="flex items-start gap-2.5 text-sm text-muted-foreground"
+              className="py-2.5 text-sm text-muted-foreground"
             >
-              <CheckIcon />
-              <span>{feature}</span>
+              {feature}
             </li>
           ))}
         </ul>

@@ -1,4 +1,3 @@
-import { ArrowUpRight } from "lucide-react";
 import { NavLink } from "react-router";
 
 import { Separator } from "@/components/ui/separator";
@@ -49,13 +48,9 @@ export default function Footer() {
               aria-label="Misty footer"
               className="flex w-fit items-center gap-1 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
-              <img src="/misty_full.png" alt="" className="size-12" />
               <span className="text-base font-semibold tracking-tight text-foreground">Misty</span>
             </NavLink>
-            <p className="mt-4 text-sm leading-6 text-muted-foreground">
-              Spaces for members, chat, tasks, and shared files.
-            </p>
-            <p className="mt-3 text-xs text-muted-foreground">Invite-only beta.</p>
+            <p className="mt-3 text-sm text-muted-foreground">One Space for the whole project.</p>
           </div>
 
           <div className="grid grid-cols-2 gap-x-10 gap-y-8 sm:grid-cols-3 sm:gap-x-16">
@@ -71,10 +66,9 @@ export default function Footer() {
                       href={link.to}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className={`${linkClass} inline-flex items-center gap-1`}
+                      className={linkClass}
                     >
                       {link.text}
-                      <ArrowUpRight className="size-3" aria-hidden="true" />
                     </a>
                   ) : (
                     <NavLink key={link.text} to={link.to} className={linkClass}>
@@ -88,9 +82,8 @@ export default function Footer() {
         </div>
 
         <Separator className="mt-12" />
-        <div className="flex flex-col gap-2 pt-6 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+        <div className="pt-6 text-xs text-muted-foreground">
           <span>&copy; {new Date().getFullYear()} Misty. All rights reserved.</span>
-          <span>Invite-only beta.</span>
         </div>
       </div>
     </footer>

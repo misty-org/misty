@@ -1,52 +1,39 @@
 import { Badge } from "@/components/ui/badge";
-import { Card, CardHeader } from "@/components/ui/card";
 import { posts, tagColors } from "./data";
 
 export default function Blog() {
   return (
     <div className="mx-auto max-w-5xl px-4 pb-20 pt-28 sm:px-6 sm:pt-32">
-      <header className="mb-10 border-b border-border pb-8">
-        <p className="mb-3 text-xs font-semibold uppercase tracking-[0.16em] text-primary">
-          Notes from Misty
+      <header className="border-b border-border pb-8">
+        <p className="mb-3 font-mono text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+          Blog
         </p>
         <h1 className="text-3xl font-semibold tracking-[-0.03em] text-foreground md:text-5xl">
-          Blog
+          Notes from Misty
         </h1>
-        <p className="mt-4 max-w-2xl leading-relaxed text-muted-foreground">
-          Product notes and archived announcements.
-        </p>
       </header>
 
-      <div className="flex flex-col gap-6">
+      <div>
         {posts.map((post) => (
-          <Card
-            key={post.title}
-            role="article"
-            className="gap-0 rounded-xl py-0"
-          >
-            <CardHeader className="p-6">
-              <div className="mb-3 flex items-center gap-3">
-                <Badge
-                  variant="outline"
-                  className={tagColors[post.tag] ?? "bg-muted text-muted-foreground"}
-                >
-                  {post.tag}
-                </Badge>
-                <span className="text-xs text-muted-foreground">{post.date}</span>
-              </div>
-              <h2 className="mb-2 text-lg font-semibold text-foreground">
+          <article key={post.title} className="grid gap-5 border-b border-border py-8 sm:grid-cols-[9rem_1fr] sm:gap-10">
+            <div>
+              <Badge variant="outline" className={tagColors[post.tag] ?? "bg-muted text-muted-foreground"}>
+                {post.tag}
+              </Badge>
+              <p className="mt-2 text-xs text-muted-foreground">{post.date}</p>
+            </div>
+            <div className="max-w-2xl">
+              <h2 className="text-xl font-semibold tracking-[-0.02em] text-foreground">
                 {post.title}
               </h2>
+              <p className="mt-3 text-sm leading-6 text-muted-foreground">{post.summary}</p>
               {post.historicalContext ? (
-                <p className="mb-4 border-l-2 border-primary/50 pl-4 text-sm leading-relaxed text-foreground/80">
-                  {post.historicalContext}
+                <p className="mt-3 text-xs leading-5 text-muted-foreground/80">
+                  Archived: {post.historicalContext}
                 </p>
               ) : null}
-              <p className="text-sm leading-relaxed text-muted-foreground">
-                {post.summary}
-              </p>
-            </CardHeader>
-          </Card>
+            </div>
+          </article>
         ))}
       </div>
     </div>

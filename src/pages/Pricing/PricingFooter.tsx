@@ -11,16 +11,8 @@ const faqs = [
     a: "The owner supplies the member limit and Library storage. Each member uses their own Mika credits.",
   },
   {
-    q: "Can a Free member join a paid owner’s Space?",
-    a: "Yes. Joining a paid owner’s Space does not require an upgrade.",
-  },
-  {
     q: "What happens when I run out of credits?",
     a: "Mika pauses. Wait for the monthly reset or add credits. There are no automatic overages.",
-  },
-  {
-    q: "How does beta access work?",
-    a: "Access opens in cohorts. Single-use codes and a 30-day Pro trial are planned.",
   },
   {
     q: "How does Misty handle my data?",
