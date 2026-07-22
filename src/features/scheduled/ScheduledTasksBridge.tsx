@@ -1,13 +1,14 @@
+import { observeAccountChanges } from "@/api/accountEvents";
 import { useActivityStore } from "@/features/activity/useActivityStore";
 import { useAuth } from "@/features/auth";
 import { useEffect, useRef } from "react";
 import { useScheduledTasksStore } from "./useScheduledTasksStore";
 
-const refreshMs = 60_000;
-
 /**
  * Keeps scheduled tasks current while the app is open and posts each finished run to
  * Activity. Runs that finished before this session started are history, not news.
+ * The server publishes a "scheduled-tasks" account event whenever a task changes,
+ * so the list reloads on change (and on stream reset) rather than on a timer.
  */
 export function ScheduledTasksBridge() {
   const { user } = useAuth();
@@ -19,14 +20,9 @@ export function ScheduledTasksBridge() {
     store.setAccount(accountId);
     seenRuns.current = null;
     if (!accountId) return;
-    const refresh = () => void useScheduledTasksStore.getState().load();
-    refresh();
-    const interval = window.setInterval(refresh, refreshMs);
-    window.addEventListener("focus", refresh);
-    return () => {
-      window.clearInterval(interval);
-      window.removeEventListener("focus", refresh);
-    };
+    return observeAccountChanges(accountId, ["scheduled-tasks"], () =>
+      useScheduledTasksStore.getState().load(),
+    );
   }, [accountId]);
 
   useEffect(

@@ -8,7 +8,9 @@ import {
   Input,
   Spinner,
 } from "@/shared/ui";
+import { subscribeAccountEvents } from "@/api/accountEvents";
 import { reportSystemError } from "@/features/activity";
+import { useAuth } from "@/features/auth";
 import { ManagedAiRequestError } from "@/features/agents";
 import { QRCodeSVG } from "qrcode.react";
 import { RefreshCcw, Wifi } from "lucide-react";
@@ -35,13 +37,27 @@ export function ConnectedDevicePairingDialog({
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [failureMessage, setFailureMessage] = useState("");
+  const accountId = useAuth().user?.id ?? "";
 
+  // The server publishes each pairing state change ("device-pairing"); expiry is
+  // the one transition time alone causes, so it gets a single timer.
+  const pairingState = controller.pairing?.session.state;
+  const pairingExpiresAt = controller.pairing?.session.expiresAt;
   useEffect(() => {
-    const state = controller.pairing?.session.state;
-    if (!open || (state !== "pending" && state !== "redeemed")) return;
-    const timer = window.setInterval(() => void controller.refreshPairing().catch(() => {}), 1500);
-    return () => window.clearInterval(timer);
-  }, [controller, open]);
+    if (!open || (pairingState !== "pending" && pairingState !== "redeemed")) return;
+    const refresh = () => void controller.refreshPairing().catch(() => {});
+    const stop = subscribeAccountEvents(accountId, (event) => {
+      if (event.topic === "device-pairing" || event.topic === "reset") refresh();
+    });
+    const untilExpiry = pairingExpiresAt ? Date.parse(pairingExpiresAt) - Date.now() : NaN;
+    const expiry = Number.isFinite(untilExpiry)
+      ? window.setTimeout(refresh, Math.max(0, untilExpiry) + 500)
+      : undefined;
+    return () => {
+      stop();
+      window.clearTimeout(expiry);
+    };
+  }, [accountId, controller, open, pairingExpiresAt, pairingState]);
 
   const run = async (action: () => Promise<unknown>) => {
     setFailureMessage("");
