@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 
+import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
 export function ProductFrame({
@@ -14,9 +15,9 @@ export function ProductFrame({
   className?: string;
 }) {
   return (
-    <div
+    <Card
       className={cn(
-        "overflow-hidden rounded-2xl border border-border bg-card shadow-sm",
+        "gap-0 overflow-hidden rounded-2xl py-0 shadow-sm",
         className,
       )}
     >
@@ -28,7 +29,7 @@ export function ProductFrame({
         {meta ? <span className="text-xs text-muted-foreground">{meta}</span> : null}
       </div>
       {children}
-    </div>
+    </Card>
   );
 }
 
@@ -47,8 +48,8 @@ export function ProductScreenshot({
 }) {
   return (
     <figure className={className}>
-      <div className="overflow-hidden rounded-2xl border border-border bg-zinc-950 p-1.5 shadow-xl shadow-foreground/10 sm:p-2">
-        <div className="aspect-[16/10] overflow-hidden rounded-xl bg-zinc-950">
+      <div className="overflow-hidden rounded-2xl border border-border bg-showcase p-1.5 shadow-xl shadow-foreground/10 sm:p-2">
+        <div className="aspect-[16/10] overflow-hidden rounded-xl bg-showcase">
           <img
             src={src}
             alt={alt}

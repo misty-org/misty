@@ -1,4 +1,3 @@
-import { ArrowRight } from "lucide-react";
 import { NavLink } from "react-router";
 
 import { Badge } from "@/components/ui/badge";
@@ -13,13 +12,9 @@ function BetaAccessButton() {
       {BETA_ACCESS_EXTERNAL ? (
         <a href={BETA_ACCESS_HREF} target="_blank" rel="noopener noreferrer">
           Request beta access
-          <ArrowRight aria-hidden="true" />
         </a>
       ) : (
-        <NavLink to={BETA_ACCESS_HREF}>
-          Request beta access
-          <ArrowRight aria-hidden="true" />
-        </NavLink>
+        <NavLink to={BETA_ACCESS_HREF}>Request beta access</NavLink>
       )}
     </Button>
   );
@@ -36,17 +31,13 @@ export default function Features() {
           <h1 className="text-balance text-4xl font-semibold tracking-[-0.035em] text-foreground sm:text-5xl md:text-6xl">
             Features
           </h1>
-          <p className="mt-5 max-w-3xl text-pretty text-base leading-7 text-muted-foreground sm:text-lg sm:leading-8">
-            Each Space includes Members, Chat, Tasks, and a shared Library. Files stay private
-            until you add them.
+          <p className="mt-5 max-w-2xl text-pretty text-base leading-7 text-muted-foreground sm:text-lg">
+            Chat, tasks, Library, and private files—without losing context.
           </p>
         </div>
 
-        <div className="flex flex-col gap-3">
+        <div>
           <BetaAccessButton />
-          <Button asChild size="lg" variant="outline" className="h-11 px-5">
-            <NavLink to="/download">Download beta</NavLink>
-          </Button>
         </div>
       </header>
 
@@ -56,12 +47,6 @@ export default function Features() {
         ))}
       </section>
 
-      <section className="flex flex-col gap-5 border-t border-border py-12 sm:flex-row sm:items-center sm:justify-between">
-        <h2 className="text-2xl font-semibold tracking-tight text-foreground md:text-3xl">
-          Request beta access.
-        </h2>
-        <BetaAccessButton />
-      </section>
     </div>
   );
 }

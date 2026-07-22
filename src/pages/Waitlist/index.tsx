@@ -1,5 +1,4 @@
 import { useState, type FormEvent, type ChangeEvent } from "react";
-import { Check } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -28,13 +27,8 @@ export default function Waitlist() {
           >
             Request beta access
           </h1>
-          <p className="mt-5 max-w-xl text-base leading-7 text-muted-foreground sm:text-lg">
-            Misty opens beta access in small cohorts. Approved requests receive setup and download
-            instructions by email.
-          </p>
-
-          <p className="mt-10 border-t border-border pt-8 text-sm leading-6 text-muted-foreground">
-            Single-use invitation codes and a 30-day Pro trial are planned.
+          <p className="mt-5 max-w-lg text-base leading-7 text-muted-foreground sm:text-lg">
+            Access opens in small cohorts. We&rsquo;ll send setup details if you&rsquo;re invited.
           </p>
         </section>
 
@@ -80,9 +74,6 @@ function WaitlistForm({ onSuccess, className }: WaitlistFormProps) {
           aria-atomic="true"
           className="p-6 text-center sm:p-8"
         >
-          <span className="mx-auto mb-5 flex size-10 items-center justify-center rounded-full bg-primary/10 text-primary">
-            <Check className="size-5" aria-hidden="true" />
-          </span>
           <h2 className="mb-2 text-xl font-semibold text-card-foreground">Request received</h2>
           <p className="leading-6 text-muted-foreground">
             Check your inbox for confirmation. We&apos;ll follow up by email if your request is
@@ -103,9 +94,6 @@ function WaitlistForm({ onSuccess, className }: WaitlistFormProps) {
           <h2 className="mt-2 text-xl font-semibold text-card-foreground">
             Your details
           </h2>
-          <p className="mt-2 text-sm leading-6 text-muted-foreground">
-            We&apos;ll only use these details to contact you about beta access.
-          </p>
         </div>
 
         <form onSubmit={handleSubmit} aria-busy={loading} className="flex flex-col gap-5">
@@ -156,10 +144,6 @@ function WaitlistForm({ onSuccess, className }: WaitlistFormProps) {
             {loading ? <Spinner aria-hidden="true" /> : null}
             {loading ? "Sending request..." : "Request access"}
           </Button>
-
-          <p className="text-center text-xs leading-5 text-muted-foreground">
-            No payment information is required.
-          </p>
         </form>
       </CardContent>
     </Card>

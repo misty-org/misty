@@ -1,8 +1,6 @@
-import { ArrowRight, Download as DownloadIcon, ExternalLink, ShieldCheck, Tablet } from "lucide-react";
 import { FaApple, FaWindows } from "react-icons/fa";
 import { Link } from "react-router";
 
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
@@ -62,7 +60,6 @@ function BuildCard({ build }: { build: ReleaseBuild }) {
       <CardFooter className="border-t border-border px-6 py-5">
         <Button asChild size="lg" className="h-11 w-full">
           <a href={build.href} aria-label={`Download Misty ${currentRelease.version} for ${build.platform}`}>
-            <DownloadIcon aria-hidden="true" />
             Download for {build.platform}
           </a>
         </Button>
@@ -81,21 +78,18 @@ export default function Download() {
         <h1 className="text-balance text-4xl font-semibold tracking-[-0.035em] text-foreground sm:text-5xl md:text-6xl">
           Download Misty for desktop.
         </h1>
-        <p className="mx-auto mt-5 max-w-2xl text-pretty text-lg leading-8 text-muted-foreground">
-          Public builds are available for Apple Silicon macOS and 64-bit Windows. Shared Space
-          services require approved beta access.
+        <p className="mx-auto mt-5 max-w-xl text-pretty text-base leading-7 text-muted-foreground sm:text-lg">
+          Public builds for Apple Silicon macOS and 64-bit Windows.
         </p>
         <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
           <Button asChild variant="outline">
             <a href={currentRelease.releasePage} target="_blank" rel="noopener noreferrer">
               Release notes
-              <ExternalLink aria-hidden="true" />
             </a>
           </Button>
           <Button asChild variant="ghost">
             <Link to="/waitlist">
               Request beta access
-              <ArrowRight aria-hidden="true" />
             </Link>
           </Button>
         </div>
@@ -119,22 +113,9 @@ export default function Download() {
 
       <Separator className="my-12" />
 
-      <section className="grid gap-5 lg:grid-cols-[1fr_1fr]" aria-label="Beta download notes">
-        <Alert role="note" className="items-start rounded-xl bg-muted/25 px-5 py-4">
-          <ShieldCheck className="mt-0.5 size-4" aria-hidden="true" />
-          <AlertTitle>Approved access</AlertTitle>
-          <AlertDescription className="leading-6">
-            Downloads are public. Shared services require an approved account.
-          </AlertDescription>
-        </Alert>
-
-        <Alert role="note" className="items-start rounded-xl bg-muted/25 px-5 py-4">
-          <Tablet className="mt-0.5 size-4" aria-hidden="true" />
-          <AlertTitle>Tablet</AlertTitle>
-          <AlertDescription className="leading-6">
-            No public tablet build is available yet.
-          </AlertDescription>
-        </Alert>
+      <section className="grid gap-3 text-sm text-muted-foreground sm:grid-cols-2" aria-label="Beta download notes">
+        <p>Shared services require an approved account.</p>
+        <p className="sm:text-right">Tablet builds are not available yet.</p>
       </section>
     </div>
   );

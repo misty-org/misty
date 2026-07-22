@@ -9,7 +9,7 @@ test("the homepage tells the complete collaboration story", async ({ page }) => 
   await expect(
     page.getByRole("heading", {
       level: 1,
-      name: "Keep the whole project in one Space.",
+      name: "One Space for the whole project.",
     }),
   ).toBeVisible();
   await expect(page.getByText("Invite-only beta").first()).toBeVisible();
@@ -20,18 +20,15 @@ test("the homepage tells the complete collaboration story", async ({ page }) => 
   ).toBeVisible();
 
   for (const heading of [
-    "Members, Chat, Tasks, and Library.",
-    "Connectors are in pilot.",
-    "Ask about the active Space.",
-    "Browse first. Share deliberately.",
-    "Request beta access.",
+    "Work without the tool shuffle.",
+    "Private until you share.",
+    "Start with a Space.",
+    "Bring your next project.",
   ]) {
     await expect(page.getByRole("heading", { name: heading })).toBeAttached();
   }
 
   await expect(page.getByText("Message this Space")).toBeVisible();
-  await expect(page.getByText("Search connections")).toBeVisible();
-  await expect(page.getByText("Search Files")).toBeAttached();
 });
 
 test("the product templates are available without motion-dependent UI", async ({ page }) => {
@@ -42,7 +39,9 @@ test("the product templates are available without motion-dependent UI", async ({
 });
 
 test("the homepage is complete, responsive, and free of horizontal overflow", async ({ page }) => {
-  await page.getByRole("heading", { name: "Request beta access." }).scrollIntoViewIfNeeded();
+  await page
+    .getByRole("heading", { name: "Bring your next project." })
+    .scrollIntoViewIfNeeded();
   await expect(page.getByRole("contentinfo")).toBeVisible();
 
   const layout = await page.evaluate(() => ({
