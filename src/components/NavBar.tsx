@@ -22,14 +22,14 @@ import {
 import { cn } from "@/lib/utils";
 
 const navItems = [
-  { to: "/download", label: "Download" },
+  { to: "/features", label: "Features" },
   { to: "/pricing", label: "Pricing" },
+  { to: "/download", label: "Download" },
 ];
 
 const resourceLinks = [
-  { to: "/features", label: "Features" },
-  { to: "/changelog", label: "Changelog" },
   { to: "/blog", label: "Blog" },
+  { to: "/changelog", label: "Changelog" },
   { to: "/roadmap", label: "Roadmap" },
 ];
 
@@ -39,7 +39,7 @@ function DesktopNavLink({ to, label }: { to: string; label: string }) {
       to={to}
       className={({ isActive }) =>
         cn(
-          "relative rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+          "relative border-b border-transparent px-2 py-5 text-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
           isActive && "text-foreground",
         )
       }
@@ -50,7 +50,7 @@ function DesktopNavLink({ to, label }: { to: string; label: string }) {
           {isActive ? (
             <span
               aria-hidden="true"
-              className="absolute inset-x-3 -bottom-px h-0.5 rounded-full bg-primary"
+              className="absolute inset-x-2 -bottom-px h-px bg-foreground"
             />
           ) : null}
         </>
@@ -82,25 +82,16 @@ export default function Navbar({ onOpenSettings }: { onOpenSettings: () => void 
     <Collapsible open={mobileOpen} onOpenChange={setMobileOpen} asChild>
       <nav
         aria-label="Primary navigation"
-        className="fixed inset-x-0 top-0 z-50 border-b border-border/60 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80"
+        className="fixed inset-x-0 top-0 z-50 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/85"
       >
-        <div
-          style={{
-            maxWidth: location.pathname === "/" ? "1060px" : "100%",
-            transition: "max-width 0.5s cubic-bezier(0.4, 0, 0.2, 1)",
-          }}
-          className="mx-auto flex h-16 w-full items-center justify-between px-3 sm:px-4"
-        >
+        <div className="mx-auto flex h-16 w-full max-w-[1280px] items-center justify-between px-6 sm:px-10 lg:px-16">
           <NavLink
             to="/"
             onClick={() => setMobileOpen(false)}
             aria-label="Misty home"
-            className="flex items-center gap-1 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="rounded-md text-lg font-semibold tracking-[-0.025em] text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
-            <img src="/misty.png" alt="" className="size-13" />
-            <span className="text-lg font-semibold tracking-tight text-foreground">
-              Misty
-            </span>
+            Misty
           </NavLink>
 
           <div className="hidden items-center gap-1 md:flex">
@@ -113,13 +104,13 @@ export default function Navbar({ onOpenSettings }: { onOpenSettings: () => void 
                 <Button
                   variant="ghost"
                   className={cn(
-                    "relative px-3 text-muted-foreground hover:text-foreground",
+                    "relative h-16 rounded-none border-b border-transparent px-2 text-sm font-normal text-muted-foreground hover:bg-transparent hover:text-foreground",
                     resourcesActive && "text-foreground",
                   )}
                 >
                   Resources
                   {resourcesActive ? (
-                    <span className="absolute inset-x-3 -bottom-px h-0.5 rounded-full bg-primary" />
+                    <span className="absolute inset-x-2 -bottom-px h-px bg-foreground" />
                   ) : null}
                 </Button>
               </DropdownMenuTrigger>
@@ -132,7 +123,7 @@ export default function Navbar({ onOpenSettings }: { onOpenSettings: () => void 
               </DropdownMenuContent>
             </DropdownMenu>
 
-            <div className="ml-3 flex items-center gap-2 border-l border-border pl-3">
+            <div className="ml-3 flex items-center gap-2 border-l border-border pl-4">
               <ModeToggle />
 
               {user ? (
@@ -169,11 +160,18 @@ export default function Navbar({ onOpenSettings }: { onOpenSettings: () => void 
                   </DropdownMenuContent>
                 </DropdownMenu>
               ) : (
-                <Button asChild size="sm">
-                  <NavLink to="/signin" state={{ from: location.pathname }}>
-                    Sign In
+                <>
+                  <NavLink
+                    to="/signin"
+                    state={{ from: location.pathname }}
+                    className="px-2 py-2 text-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    Sign in
                   </NavLink>
-                </Button>
+                  <Button asChild size="sm" className="px-4">
+                    <NavLink to="/waitlist">Request access</NavLink>
+                  </Button>
+                </>
               )}
             </div>
           </div>
@@ -194,7 +192,7 @@ export default function Navbar({ onOpenSettings }: { onOpenSettings: () => void 
         </div>
 
         <CollapsibleContent id="mobile-navigation" className="border-t border-border md:hidden">
-          <div className="bg-background px-4 py-4">
+          <div className="bg-background px-6 py-5 sm:px-10">
             <div className="flex flex-col gap-1">
               {navItems.map(({ to, label }) => (
                 <NavLink
@@ -203,8 +201,8 @@ export default function Navbar({ onOpenSettings }: { onOpenSettings: () => void 
                   onClick={() => setMobileOpen(false)}
                   className={({ isActive }) =>
                     cn(
-                      "rounded-md px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                      isActive && "bg-accent text-accent-foreground",
+                      "border-b border-border px-0 py-3 text-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                      isActive && "text-foreground",
                     )
                   }
                 >
@@ -212,7 +210,7 @@ export default function Navbar({ onOpenSettings }: { onOpenSettings: () => void 
                 </NavLink>
               ))}
 
-              <span className="px-3 pb-1 pt-3 text-xs font-medium text-muted-foreground">
+              <span className="pt-5 text-sm text-foreground">
                 Resources
               </span>
               {resourceLinks.map(({ to, label }) => (
@@ -222,8 +220,8 @@ export default function Navbar({ onOpenSettings }: { onOpenSettings: () => void 
                   onClick={() => setMobileOpen(false)}
                   className={({ isActive }) =>
                     cn(
-                      "rounded-md px-5 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                      isActive && "bg-accent text-accent-foreground",
+                      "border-b border-border px-0 py-3 text-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                      isActive && "text-foreground",
                     )
                   }
                 >
@@ -240,7 +238,7 @@ export default function Navbar({ onOpenSettings }: { onOpenSettings: () => void 
                       setMobileOpen(false);
                       onOpenSettings();
                     }}
-                    className="mt-2 justify-start px-3 text-muted-foreground"
+                    className="mt-4 justify-start px-0 text-muted-foreground"
                   >
                     Settings
                   </Button>
@@ -250,21 +248,28 @@ export default function Navbar({ onOpenSettings }: { onOpenSettings: () => void 
                       setMobileOpen(false);
                       logout();
                     }}
-                    className="justify-start px-3 text-muted-foreground"
+                    className="justify-start px-0 text-muted-foreground"
                   >
                     Sign out
                   </Button>
                 </>
               ) : (
-                <Button asChild className="mt-2">
-                  <NavLink
-                    to="/signin"
-                    state={{ from: location.pathname }}
-                    onClick={() => setMobileOpen(false)}
-                  >
-                    Sign In
-                  </NavLink>
-                </Button>
+                <div className="mt-5 grid grid-cols-2 gap-3">
+                  <Button asChild variant="outline">
+                    <NavLink
+                      to="/signin"
+                      state={{ from: location.pathname }}
+                      onClick={() => setMobileOpen(false)}
+                    >
+                      Sign in
+                    </NavLink>
+                  </Button>
+                  <Button asChild>
+                    <NavLink to="/waitlist" onClick={() => setMobileOpen(false)}>
+                      Request access
+                    </NavLink>
+                  </Button>
+                </div>
               )}
             </div>
           </div>

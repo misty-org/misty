@@ -1,6 +1,12 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router";
-import { Coins, CreditCard, Lock, UserCircle, type LucideIcon } from "lucide-react";
+import {
+  Sparkles,
+  CreditCard,
+  Lock,
+  UserCircle,
+  type LucideIcon,
+} from "lucide-react";
 
 import { useAuth } from "@/AuthContext";
 import {
@@ -21,10 +27,11 @@ import {
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { Spinner } from "@/components/ui/spinner";
-import { BETA_ACCESS_EXTERNAL, BETA_ACCESS_HREF } from "@/lib/site";
+import { PRICING_MODEL } from "@/lib/pricing";
 import { useUserStore } from "@/store/userStore";
 import {
   createBillingPortal,
+  createSubscriptionCheckout,
   fetchBillingUsage,
   fetchMe,
   updateProfile,
@@ -34,18 +41,25 @@ import {
 
 const TIER_LABEL: Record<string, string> = {
   basic: "Free",
-  personal: "Personal",
   pro: "Pro",
-  max: "Max",
 };
+
+function storageQuotaNotice(storage: BillingUsageResponse["storage"]): string {
+  const noticeDate = storage.cleanup_notice_until
+    ? new Date(storage.cleanup_notice_until)
+    : null;
+  const followUp =
+    noticeDate && Number.isFinite(noticeDate.getTime())
+      ? ` We’ll keep this notice visible through ${noticeDate.toLocaleDateString()}.`
+      : "";
+  return `New hosted uploads are paused because the pooled owner storage is over quota. Existing data remains intact, and nothing is automatically deleted.${followUp}`;
+}
 
 type AccountStatusTone = "neutral" | "info" | "success" | "warning" | "danger";
 
 const TIER_TONE: Record<string, AccountStatusTone> = {
   basic: "neutral",
-  personal: "info",
   pro: "info",
-  max: "info",
 };
 
 const STATUS_TONE: Record<string, AccountStatusTone> = {
@@ -57,8 +71,7 @@ const STATUS_TONE: Record<string, AccountStatusTone> = {
 
 const STATUS_CLASSES: Record<AccountStatusTone, string> = {
   neutral: "border-border bg-muted text-muted-foreground",
-  info:
-    "border-[color-mix(in_srgb,var(--settings-info)_35%,transparent)] bg-[color-mix(in_srgb,var(--settings-info)_12%,transparent)] text-[var(--settings-info)]",
+  info: "border-[color-mix(in_srgb,var(--settings-info)_35%,transparent)] bg-[color-mix(in_srgb,var(--settings-info)_12%,transparent)] text-[var(--settings-info)]",
   success:
     "border-[color-mix(in_srgb,var(--settings-success)_35%,transparent)] bg-[color-mix(in_srgb,var(--settings-success)_12%,transparent)] text-[var(--settings-success)]",
   warning:
@@ -69,7 +82,13 @@ const STATUS_CLASSES: Record<AccountStatusTone, string> = {
 
 const customRowClass = "border-b border-border/60 px-5 py-4 last:border-b-0";
 
-function AccountBadge({ label, tone }: { label: string; tone: AccountStatusTone }) {
+function AccountBadge({
+  label,
+  tone,
+}: {
+  label: string;
+  tone: AccountStatusTone;
+}) {
   return (
     <Badge
       variant="outline"
@@ -82,7 +101,9 @@ function AccountBadge({ label, tone }: { label: string; tone: AccountStatusTone 
 }
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
-  return <DesktopSettingsSection title={title}>{children}</DesktopSettingsSection>;
+  return (
+    <DesktopSettingsSection title={title}>{children}</DesktopSettingsSection>
+  );
 }
 
 function Row({ label, children }: { label: string; children: ReactNode }) {
@@ -101,6 +122,24 @@ function GhostRow({ label, value }: { label: string; value: string }) {
       <span className="text-sm italic text-muted-foreground">{value}</span>
     </DesktopSettingsRow>
   );
+}
+
+function formatBytes(bytes: number): string {
+  const safeBytes = Math.max(0, bytes);
+  if (safeBytes < 1_000) return `${safeBytes} B`;
+  const units = ["KB", "MB", "GB", "TB"];
+  const unitIndex = Math.min(
+    units.length - 1,
+    Math.floor(Math.log(safeBytes) / Math.log(1_000)) - 1,
+  );
+  const value = safeBytes / 1_000 ** (unitIndex + 1);
+  return `${value >= 10 ? value.toFixed(0) : value.toFixed(1)} ${units[unitIndex]}`;
+}
+
+function formatStatus(status: string): string {
+  return status
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (character: string) => character.toUpperCase());
 }
 
 function useSave(fn: () => Promise<void>) {
@@ -129,7 +168,11 @@ function useSave(fn: () => Promise<void>) {
 function SaveFeedback({ ok, error }: { ok: boolean; error: string }) {
   if (ok) {
     return (
-      <p role="status" aria-live="polite" className="mt-2 text-xs text-[var(--settings-success)]">
+      <p
+        role="status"
+        aria-live="polite"
+        className="mt-2 text-xs text-[var(--settings-success)]"
+      >
         Saved.
       </p>
     );
@@ -146,18 +189,18 @@ function SaveFeedback({ ok, error }: { ok: boolean; error: string }) {
   return null;
 }
 
-type Tab = "account" | "credits" | "billing" | "privacy";
+type Tab = "account" | "usage" | "billing" | "privacy";
 
 const TABS: readonly { id: Tab; label: string; icon: LucideIcon }[] = [
   { id: "account", label: "Account", icon: UserCircle },
-  { id: "credits", label: "Credits", icon: Coins },
+  { id: "usage", label: "Usage", icon: Sparkles },
   { id: "billing", label: "Billing", icon: CreditCard },
   { id: "privacy", label: "Privacy", icon: Lock },
 ];
 
 const TAB_DESCRIPTIONS: Record<Tab, string> = {
   account: "Review your Misty account and profile details.",
-  credits: "Check your balance and add credits for managed AI.",
+  usage: "Review pooled storage and weekly hosted AI usage.",
   billing: "Review your plan and manage subscription billing.",
   privacy: "Understand how Misty handles your files and account data.",
 };
@@ -172,12 +215,7 @@ function AccountPanel({
   onUpdated: (name: string) => void;
 }) {
   const [name, setName] = useState(me.name);
-  const {
-    saving,
-    error,
-    ok,
-    save,
-  } = useSave(async () => {
+  const { saving, error, ok, save } = useSave(async () => {
     const nextName = name.trim();
     await updateProfile(nextName);
     onUpdated(nextName);
@@ -200,11 +238,17 @@ function AccountPanel({
         <div className={`${customRowClass} flex flex-col gap-4 py-5`}>
           <div className="flex items-center gap-4">
             <Avatar className="size-14">
-              <AvatarFallback className="text-base font-semibold">{initials}</AvatarFallback>
+              <AvatarFallback className="text-base font-semibold">
+                {initials}
+              </AvatarFallback>
             </Avatar>
             <div className="min-w-0">
-              <p className="truncate text-sm font-medium text-foreground">{me.name}</p>
-              <p className="mt-0.5 truncate text-xs text-muted-foreground">{me.email}</p>
+              <p className="truncate text-sm font-medium text-foreground">
+                {me.name}
+              </p>
+              <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                {me.email}
+              </p>
             </div>
           </div>
 
@@ -227,7 +271,9 @@ function AccountPanel({
               <Button
                 type="button"
                 onClick={save}
-                disabled={saving || name.trim() === "" || name.trim() === me.name}
+                disabled={
+                  saving || name.trim() === "" || name.trim() === me.name
+                }
                 aria-busy={saving}
               >
                 {saving ? <Spinner aria-hidden="true" /> : null}
@@ -251,7 +297,10 @@ function AccountPanel({
               disabled
               aria-describedby="account-email-description"
             />
-            <p id="account-email-description" className="mt-1 text-xs text-muted-foreground">
+            <p
+              id="account-email-description"
+              className="mt-1 text-xs text-muted-foreground"
+            >
               Email cannot be changed.
             </p>
           </div>
@@ -259,7 +308,9 @@ function AccountPanel({
 
         <Row label="Member since">{joined}</Row>
         <Row label="User id">
-          <span className="font-mono text-xs text-muted-foreground">{me.id}</span>
+          <span className="font-mono text-xs text-muted-foreground">
+            {me.id}
+          </span>
         </Row>
       </Section>
 
@@ -269,7 +320,9 @@ function AccountPanel({
         >
           <div>
             <p className="text-sm text-foreground">Password</p>
-            <p className="mt-0.5 text-xs text-muted-foreground">Reset via email link.</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              Reset via email link.
+            </p>
           </div>
           <Button asChild variant="link" className="h-auto p-0">
             <a href="/signin">Reset</a>
@@ -281,7 +334,7 @@ function AccountPanel({
   );
 }
 
-function CreditsPanel({
+function UsagePanel({
   usage,
   state,
   error,
@@ -292,36 +345,52 @@ function CreditsPanel({
   error: string;
   onRetry: () => void;
 }) {
-  const creditUsedPercent =
-    usage && usage.monthly_allowance > 0
-      ? Math.round((1 - usage.monthly_remaining / usage.monthly_allowance) * 100)
-      : 0;
-  const creditWarning =
-    creditUsedPercent >= 100
-      ? "Managed AI is paused until you add credits or the allowance resets."
-      : creditUsedPercent >= 90
-        ? "You have used at least 90% of this month’s credits."
-        : creditUsedPercent >= 75
-          ? "You have used at least 75% of this month’s credits."
+  const hostedAIUsedPercent = usage
+    ? Math.round(Math.min(1, Math.max(0, usage.hosted_ai.used_ratio)) * 100)
+    : 0;
+  const storageUsedPercent = usage
+    ? usage.storage.limit_bytes > 0
+      ? Math.min(
+          100,
+          Math.round(
+            (usage.storage.used_bytes / usage.storage.limit_bytes) * 100,
+          ),
+        )
+      : 0
+    : 0;
+  const hostedAIWarning =
+    hostedAIUsedPercent >= 100
+      ? "Hosted AI is paused until the weekly reset or a Pro upgrade. Files and collaboration still work, with no automatic overage."
+      : hostedAIUsedPercent >= 90
+        ? "You have used at least 90% of this week’s Hosted AI usage."
+        : hostedAIUsedPercent >= 75
+          ? "You have used at least 75% of this week’s Hosted AI usage."
           : "";
 
   return (
     <div>
-      <Section title="Misty Credits">
+      <Section title="Storage">
         {state === "loading" || state === "idle" ? (
-          <div className={`${customRowClass} flex min-h-16 items-center gap-2 text-muted-foreground`}>
+          <div
+            className={`${customRowClass} flex min-h-16 items-center gap-2 text-muted-foreground`}
+          >
             <Spinner aria-hidden="true" className="size-4" />
-            <span className="text-sm">Loading credit balance</span>
+            <span className="text-sm">Loading usage</span>
           </div>
         ) : null}
 
         {state === "error" ? (
           <div className={customRowClass}>
             <Alert variant="destructive">
-              <AlertTitle>Credit balance is unavailable</AlertTitle>
+              <AlertTitle>Usage is unavailable</AlertTitle>
               <AlertDescription className="flex flex-wrap items-center justify-between gap-3">
                 <span>{error}</span>
-                <Button type="button" variant="outline" size="sm" onClick={onRetry}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={onRetry}
+                >
                   Try again
                 </Button>
               </AlertDescription>
@@ -331,36 +400,48 @@ function CreditsPanel({
 
         {state === "ready" && usage ? (
           <>
-            <Row label="Available">{usage.available_credits.toLocaleString()} credits</Row>
-            <Row label="Monthly allowance">
-              {usage.monthly_remaining.toLocaleString()} of{" "}
-              {usage.monthly_allowance.toLocaleString()} remaining
+            <Row label="Owner pool">
+              {formatBytes(usage.storage.used_bytes)} of{" "}
+              {formatBytes(usage.storage.limit_bytes)} used
             </Row>
-            <Row label="Purchased">{usage.purchased_remaining.toLocaleString()} credits</Row>
-            <Row label="Resets">{new Date(usage.next_reset_at).toLocaleDateString()}</Row>
+            <Row label="Available">
+              {formatBytes(usage.storage.remaining_bytes)}
+            </Row>
             <div className={customRowClass}>
               <Progress
-                value={Math.min(100, creditUsedPercent)}
-                aria-label={`${creditUsedPercent}% of monthly credits used`}
+                value={storageUsedPercent}
+                aria-label={`${storageUsedPercent}% of owner storage used`}
               />
-              {creditWarning ? (
-                <p className="mt-2 text-xs text-[var(--settings-warning)]">{creditWarning}</p>
+              {usage.storage.over_quota ? (
+                <p className="mt-2 text-xs text-[var(--settings-warning)]">
+                  {storageQuotaNotice(usage.storage)}
+                </p>
               ) : null}
             </div>
           </>
         ) : null}
       </Section>
 
-      <Section title="Credit packs">
-        <div className={`${customRowClass} grid gap-3`}>
-          <p className="m-0 text-sm font-medium text-foreground">
-            Credit checkout is not open during the invite-only beta.
-          </p>
-          <p className="m-0 text-sm leading-6 text-muted-foreground">
-            Permanent top-up packs are planned at 1,500 credits for $4.99 and 3,500 credits for
-            $9.99. Purchased credits will be used after the monthly allowance and will not expire.
-          </p>
-        </div>
+      <Section title="Hosted AI usage">
+        {state === "ready" && usage ? (
+          <>
+            <Row label="This week">{hostedAIUsedPercent}% used</Row>
+            <Row label="Weekly reset">
+              {new Date(usage.hosted_ai.reset_at).toLocaleDateString()}
+            </Row>
+            <div className={customRowClass}>
+              <Progress
+                value={hostedAIUsedPercent}
+                aria-label={`${hostedAIUsedPercent}% of weekly hosted AI used`}
+              />
+              {hostedAIWarning ? (
+                <p className="mt-2 text-xs text-[var(--settings-warning)]">
+                  {hostedAIWarning}
+                </p>
+              ) : null}
+            </div>
+          </>
+        ) : null}
       </Section>
     </div>
   );
@@ -368,6 +449,7 @@ function CreditsPanel({
 
 function BillingPanel({
   me,
+  usage,
   loading,
   loadError,
   billingWorking,
@@ -375,29 +457,27 @@ function BillingPanel({
   onBillingAction,
 }: {
   me: MeResponse | null;
+  usage: BillingUsageResponse | null;
   loading: boolean;
   loadError: string;
   billingWorking: boolean;
   billingError: string;
   onBillingAction: (action: () => Promise<{ url: string }>) => void;
 }) {
-  const accountType = me
-    ? me.billing?.kind === "lifetime"
-      ? "Lifetime"
-      : me.billing?.kind === "subscription"
-        ? `${me.billing.interval === "year" ? "Annual" : "Monthly"} subscription`
-        : me.status === "trialing"
-          ? "Pro trial"
-          : me.tier === "basic"
-            ? "Free account"
-            : "Lifetime"
-    : "";
+  const plan = usage?.plan ?? me?.tier;
+  const trial = usage?.trial;
+  const subscription = usage?.subscription;
+  const canManageBilling =
+    Boolean(me?.billing?.customer_portal_available) &&
+    (me?.billing?.kind === "subscription" || me?.billing?.kind === "trial");
 
   return (
     <div>
       <Section title="Plan">
         {loading && !me ? (
-          <div className={`${customRowClass} flex min-h-16 items-center gap-2 text-muted-foreground`}>
+          <div
+            className={`${customRowClass} flex min-h-16 items-center gap-2 text-muted-foreground`}
+          >
             <Spinner aria-hidden="true" className="size-4" />
             <span className="text-sm">Loading plan details</span>
           </div>
@@ -416,36 +496,65 @@ function BillingPanel({
           <>
             <Row label="Plan">
               <AccountBadge
-                label={TIER_LABEL[me.tier] ?? me.tier}
-                tone={TIER_TONE[me.tier] ?? "neutral"}
+                label={TIER_LABEL[plan ?? me.tier] ?? plan ?? me.tier}
+                tone={TIER_TONE[plan ?? me.tier] ?? "neutral"}
               />
             </Row>
-            <Row label="Status">
-              <AccountBadge
-                label={me.status.charAt(0).toUpperCase() + me.status.slice(1)}
-                tone={STATUS_TONE[me.status] ?? "neutral"}
-              />
-            </Row>
-            <Row label="Type">{accountType}</Row>
-            {me.billing?.current_period_end ? (
-              <Row label={me.billing.cancel_at_period_end ? "Access until" : "Renews"}>
-                {new Date(me.billing.current_period_end).toLocaleDateString()}
+            {trial ? (
+              <>
+                <Row label="Trial status">{formatStatus(trial.status)}</Row>
+                <Row label="Trial ends">
+                  {new Date(trial.ends_at).toLocaleDateString()}
+                </Row>
+              </>
+            ) : subscription ? (
+              <>
+                <Row label="Subscription status">
+                  {subscription.cancel_at_period_end
+                    ? "Cancellation scheduled"
+                    : formatStatus(subscription.status)}
+                </Row>
+                <Row label="Billing interval">
+                  {subscription.billing_interval === "year"
+                    ? "Yearly"
+                    : "Monthly"}
+                </Row>
+                <Row
+                  label={
+                    subscription.cancel_at_period_end
+                      ? "Access until"
+                      : "Renews"
+                  }
+                >
+                  {new Date(
+                    subscription.current_period_end,
+                  ).toLocaleDateString()}
+                </Row>
+              </>
+            ) : (
+              <Row label="Status">
+                <AccountBadge
+                  label={formatStatus(me.status)}
+                  tone={STATUS_TONE[me.status] ?? "neutral"}
+                />
               </Row>
-            ) : null}
+            )}
           </>
         ) : null}
       </Section>
 
       <Section title="Billing">
-        {me?.billing?.kind === "subscription" ? (
+        {canManageBilling ? (
           <>
             <Row label="Current plan">
-              {TIER_LABEL[me.tier]} · {me.billing.interval === "year" ? "yearly" : "monthly"}
+              {trial
+                ? "Pro trial"
+                : `${TIER_LABEL[plan ?? "pro"]} · ${subscription?.billing_interval === "year" || me?.billing?.interval === "year" ? "yearly" : "monthly"}`}
             </Row>
             <div className={customRowClass}>
               <Button
                 type="button"
-                disabled={billingWorking || !me.billing.customer_portal_available}
+                disabled={billingWorking}
                 onClick={() => onBillingAction(createBillingPortal)}
               >
                 Manage billing
@@ -455,22 +564,39 @@ function BillingPanel({
         ) : (
           <div className={`${customRowClass} grid gap-3`}>
             <p className="m-0 text-sm font-medium text-foreground">
-              Paid checkout is not open during the invite-only beta.
+              Upgrade to Pro for {PRICING_MODEL.pro.storage} of pooled owner
+              storage and {PRICING_MODEL.pro.hostedAI}.
             </p>
             <p className="m-0 text-sm leading-6 text-muted-foreground">
-              Future pricing is Pro at $8.99 monthly or $89 yearly and Max at $19.99 monthly or
-              $199 yearly. The planned beta invitation flow includes a code-gated 30-day Pro
-              trial with 2,000 Mika credits.
+              Start with a one-time {PRICING_MODEL.pro.trialDays}-day trial. A
+              card is required, and your plan automatically renews unless
+              canceled. There are no automatic overages or surprise charges.
             </p>
-            <Button asChild className="w-fit">
-              <a
-                href={BETA_ACCESS_HREF}
-                target={BETA_ACCESS_EXTERNAL ? "_blank" : undefined}
-                rel={BETA_ACCESS_EXTERNAL ? "noopener noreferrer" : undefined}
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                disabled={billingWorking}
+                onClick={() =>
+                  onBillingAction(() =>
+                    createSubscriptionCheckout("pro", "month"),
+                  )
+                }
               >
-                Join the beta
-              </a>
-            </Button>
+                Start Pro trial · {PRICING_MODEL.pro.monthlyPrice}/mo
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={billingWorking}
+                onClick={() =>
+                  onBillingAction(() =>
+                    createSubscriptionCheckout("pro", "year"),
+                  )
+                }
+              >
+                Start annual trial · {PRICING_MODEL.pro.yearlyPrice}/yr
+              </Button>
+            </div>
           </div>
         )}
 
@@ -496,10 +622,10 @@ function PrivacyPanel() {
             Private Files and shared Space content are handled differently.
           </p>
           <p className="text-sm leading-relaxed text-muted-foreground">
-            Private Files operations stay local unless you connect a provider or explicitly add
-            content to a Space. Shared Library content is stored for that Space, and Mika may use
-            context you are permitted to access. Billing records do not contain prompts or file
-            contents.
+            Private Files operations stay local unless you connect a provider or
+            explicitly add content to a Space. Shared Library content is stored
+            for that Space, and agents may use context you are permitted to
+            access. Billing records do not contain prompts or file contents.
           </p>
         </div>
       </Section>
@@ -562,7 +688,9 @@ export function AccountSettingsDialog({
           navigate("/signin", { replace: true });
           return;
         }
-        setLoadError(requestError.message || "Could not load your Misty account.");
+        setLoadError(
+          requestError.message || "Could not load your Misty account.",
+        );
       } finally {
         if (active) setLoading(false);
       }
@@ -588,7 +716,9 @@ export function AccountSettingsDialog({
         setUsageState("ready");
       } catch (error) {
         if (!active) return;
-        setUsageError(error instanceof Error ? error.message : "Could not load credit usage.");
+        setUsageError(
+          error instanceof Error ? error.message : "Could not load usage.",
+        );
         setUsageState("error");
       }
     });
@@ -607,7 +737,9 @@ export function AccountSettingsDialog({
         window.location.assign(url);
       })
       .catch((error) => {
-        setBillingError(error instanceof Error ? error.message : "Could not start billing.");
+        setBillingError(
+          error instanceof Error ? error.message : "Could not start billing.",
+        );
         setBillingWorking(false);
       });
   }
@@ -622,7 +754,7 @@ export function AccountSettingsDialog({
       >
         <DialogTitle className="sr-only">Account settings</DialogTitle>
         <DialogDescription className="sr-only">
-          Manage your Misty account, credits, billing, and privacy settings.
+          Manage your Misty account, usage, billing, and privacy settings.
         </DialogDescription>
 
         <DesktopSettingsFrame
@@ -661,8 +793,8 @@ export function AccountSettingsDialog({
             )
           ) : null}
 
-          {tab === "credits" ? (
-            <CreditsPanel
+          {tab === "usage" ? (
+            <UsagePanel
               usage={usage}
               state={usageState}
               error={usageError}
@@ -673,6 +805,7 @@ export function AccountSettingsDialog({
           {tab === "billing" ? (
             <BillingPanel
               me={me}
+              usage={usage}
               loading={loading}
               loadError={loadError}
               billingWorking={billingWorking}

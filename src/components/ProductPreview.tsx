@@ -17,16 +17,17 @@ export function ProductFrame({
   return (
     <Card
       className={cn(
-        "gap-0 overflow-hidden rounded-2xl py-0 shadow-sm",
+        "gap-0 overflow-hidden rounded-xl py-0 shadow-sm",
         className,
       )}
     >
       <div className="flex h-12 items-center justify-between border-b border-border px-4 sm:px-5">
         <div className="flex items-center gap-2.5">
-          <span className="size-2 rounded-full bg-foreground/25" aria-hidden="true" />
           <span className="text-sm font-medium text-foreground">{title}</span>
         </div>
-        {meta ? <span className="text-xs text-muted-foreground">{meta}</span> : null}
+        {meta ? (
+          <span className="text-xs text-muted-foreground">{meta}</span>
+        ) : null}
       </div>
       {children}
     </Card>
@@ -48,8 +49,8 @@ export function ProductScreenshot({
 }) {
   return (
     <figure className={className}>
-      <div className="overflow-hidden rounded-2xl border border-border bg-showcase p-1.5 shadow-xl shadow-foreground/10 sm:p-2">
-        <div className="aspect-[16/10] overflow-hidden rounded-xl bg-showcase">
+      <div className="overflow-hidden rounded-xl border border-border bg-showcase p-1.5 shadow-lg shadow-foreground/10 sm:p-2">
+        <div className="aspect-[16/10] overflow-hidden rounded-lg bg-showcase">
           <img
             src={src}
             alt={alt}
@@ -62,7 +63,9 @@ export function ProductScreenshot({
           />
         </div>
       </div>
-      <figcaption className="mt-3 text-xs text-muted-foreground">{label}</figcaption>
+      <figcaption className="mt-3 text-xs text-muted-foreground">
+        {label}
+      </figcaption>
     </figure>
   );
 }
@@ -85,15 +88,17 @@ export function ChatPreview() {
     <ProductFrame title="Launch plan" meta="4 members">
       <div className="grid min-h-[22rem] sm:grid-cols-[10rem_1fr]">
         <div className="hidden border-r border-border bg-muted/25 p-3 sm:block">
-          <p className="px-2 py-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+          <p className="px-2 py-2 text-[11px] font-medium text-muted-foreground">
             Conversations
           </p>
           {["Everyone", "Design", "Release"].map((channel, index) => (
             <div
               key={channel}
               className={cn(
-                "mt-1 rounded-lg px-3 py-2 text-xs",
-                index === 0 ? "bg-background font-medium text-foreground shadow-xs" : "text-muted-foreground",
+                "mt-1 rounded-md px-3 py-2 text-xs",
+                index === 0
+                  ? "bg-background font-medium text-foreground shadow-xs"
+                  : "text-muted-foreground",
               )}
             >
               {channel}
@@ -108,13 +113,17 @@ export function ChatPreview() {
                   {message.initials}
                 </span>
                 <div className="min-w-0">
-                  <p className="text-xs font-medium text-foreground">{message.name}</p>
-                  <p className="mt-1 text-sm leading-6 text-muted-foreground">{message.text}</p>
+                  <p className="text-xs font-medium text-foreground">
+                    {message.name}
+                  </p>
+                  <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                    {message.text}
+                  </p>
                 </div>
               </div>
             ))}
           </div>
-          <div className="mt-6 rounded-xl border border-border bg-muted/20 px-4 py-3 text-sm text-muted-foreground">
+          <div className="mt-6 rounded-lg border border-border bg-muted/20 px-4 py-3 text-sm text-muted-foreground">
             Message this Space
           </div>
         </div>
@@ -152,17 +161,27 @@ export function TasksPreview() {
       >
         <div className="grid min-h-[20rem] min-w-[32rem] grid-cols-3 gap-3">
           {columns.map((column, columnIndex) => (
-            <div key={column.title} className="rounded-xl border border-border bg-muted/25 p-3">
+            <div
+              key={column.title}
+              className="rounded-lg border border-border bg-muted/25 p-3"
+            >
               <div className="mb-4 flex items-center justify-between">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-foreground">
+                <p className="text-[11px] font-medium text-foreground">
                   {column.title}
                 </p>
-                <span className="text-xs text-muted-foreground">{column.tasks.length}</span>
+                <span className="text-xs text-muted-foreground">
+                  {column.tasks.length}
+                </span>
               </div>
               <div className="space-y-2">
                 {column.tasks.map(([task, priority]) => (
-                  <div key={task} className="rounded-lg border border-border bg-background p-3 shadow-xs">
-                    <p className="text-xs font-medium text-foreground">{task}</p>
+                  <div
+                    key={task}
+                    className="rounded-md border border-border bg-background p-3 shadow-xs"
+                  >
+                    <p className="text-xs font-medium text-foreground">
+                      {task}
+                    </p>
                     <div className="mt-5 flex items-center justify-between text-[10px] text-muted-foreground">
                       <span>{priority}</span>
                       <span>{columnIndex === 2 ? "Completed" : "Jul 24"}</span>
@@ -189,13 +208,18 @@ export function ConnectionsPreview() {
   return (
     <ProductFrame title="Connections" meta="Beta preview">
       <div className="min-h-80 p-4 sm:p-6">
-        <div className="mb-5 rounded-lg border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+        <div className="mb-5 rounded-md border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
           Search connections
         </div>
-        <div className="divide-y divide-border rounded-xl border border-border">
+        <div className="divide-y divide-border overflow-hidden rounded-lg border border-border">
           {connections.map(([name, status]) => (
-            <div key={name} className="flex items-center justify-between gap-4 px-4 py-4">
-              <span className="text-sm font-medium text-foreground">{name}</span>
+            <div
+              key={name}
+              className="flex items-center justify-between gap-4 px-4 py-4"
+            >
+              <span className="text-sm font-medium text-foreground">
+                {name}
+              </span>
               <span className="rounded-full border border-border px-2.5 py-1 text-xs text-muted-foreground">
                 {status}
               </span>
@@ -207,19 +231,24 @@ export function ConnectionsPreview() {
   );
 }
 
-export function MikaPreview() {
+export function AgentsPreview() {
   return (
-    <ProductFrame title="Mika" meta="Conditional beta">
+    <ProductFrame title="Agents" meta="Collaborative AI">
       <div className="flex min-h-80 flex-col justify-end gap-4 p-4 sm:p-6">
-        <div className="ml-auto max-w-[82%] rounded-2xl rounded-br-md bg-foreground px-4 py-3 text-sm leading-6 text-background">
+        <div className="ml-auto max-w-[82%] rounded-xl rounded-br-md bg-foreground px-4 py-3 text-sm leading-6 text-background">
           What still needs a decision before launch?
         </div>
-        <div className="max-w-[90%] rounded-2xl rounded-bl-md border border-border bg-muted/35 px-4 py-3 text-sm leading-6 text-foreground/80">
-          The release date and onboarding owner are still open in the launch brief.
+        <div className="max-w-[90%] rounded-xl rounded-bl-md border border-border bg-muted/35 px-4 py-3 text-sm leading-6 text-foreground/80">
+          The release date and onboarding owner are still open in the launch
+          brief.
         </div>
         <div className="flex flex-wrap gap-2 border-t border-border pt-4 text-xs text-muted-foreground">
-          <span className="rounded-full border border-border px-2.5 py-1">Private conversation</span>
-          <span className="rounded-full border border-border px-2.5 py-1">Permitted context</span>
+          <span className="rounded-full border border-border px-2.5 py-1">
+            Private conversation
+          </span>
+          <span className="rounded-full border border-border px-2.5 py-1">
+            Permitted context
+          </span>
         </div>
       </div>
     </ProductFrame>
@@ -238,15 +267,17 @@ export function FilesPreview() {
     <ProductFrame title="Files" meta="Private to you">
       <div className="grid min-h-[22rem] sm:grid-cols-[10rem_1fr]">
         <div className="hidden border-r border-border bg-muted/25 p-3 sm:block">
-          <p className="px-2 py-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+          <p className="px-2 py-2 text-[11px] font-medium text-muted-foreground">
             Locations
           </p>
           {["Local", "Connected", "Recent"].map((location, index) => (
             <div
               key={location}
               className={cn(
-                "mt-1 rounded-lg px-3 py-2 text-xs",
-                index === 0 ? "bg-background font-medium text-foreground shadow-xs" : "text-muted-foreground",
+                "mt-1 rounded-md px-3 py-2 text-xs",
+                index === 0
+                  ? "bg-background font-medium text-foreground shadow-xs"
+                  : "text-muted-foreground",
               )}
             >
               {location}
@@ -254,15 +285,24 @@ export function FilesPreview() {
           ))}
         </div>
         <div className="min-w-0 p-4 sm:p-5">
-          <div className="mb-4 rounded-lg border border-border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+          <div className="mb-4 rounded-md border border-border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
             Search Files
           </div>
-          <div className="divide-y divide-border rounded-xl border border-border">
+          <div className="divide-y divide-border overflow-hidden rounded-lg border border-border">
             {files.map(([name, size, source]) => (
-              <div key={name} className="grid grid-cols-[1fr_auto] gap-4 px-4 py-3 sm:grid-cols-[1fr_5rem_5rem]">
-                <span className="truncate text-xs font-medium text-foreground">{name}</span>
-                <span className="hidden text-xs text-muted-foreground sm:block">{size}</span>
-                <span className="text-right text-xs text-muted-foreground">{source}</span>
+              <div
+                key={name}
+                className="grid grid-cols-[1fr_auto] gap-4 px-4 py-3 sm:grid-cols-[1fr_5rem_5rem]"
+              >
+                <span className="truncate text-xs font-medium text-foreground">
+                  {name}
+                </span>
+                <span className="hidden text-xs text-muted-foreground sm:block">
+                  {size}
+                </span>
+                <span className="text-right text-xs text-muted-foreground">
+                  {source}
+                </span>
               </div>
             ))}
           </div>

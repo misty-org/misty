@@ -1,12 +1,5 @@
 import { NavLink } from "react-router";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardFooter,
-  CardHeader,
-} from "@/components/ui/card";
 
 interface PricingCardProps {
   name: string;
@@ -15,8 +8,10 @@ interface PricingCardProps {
   description: string;
   features: readonly string[];
   popular?: boolean;
-  ctaHref: string;
+  ctaHref?: string;
   ctaLabel: string;
+  ctaBusy?: boolean;
+  onCtaClick?: () => void;
 }
 
 export default function PricingCard({
@@ -28,52 +23,72 @@ export default function PricingCard({
   popular = false,
   ctaHref,
   ctaLabel,
+  ctaBusy = false,
+  onCtaClick,
 }: PricingCardProps) {
-  const externalCta = /^https:\/\//i.test(ctaHref);
+  const externalCta = ctaHref ? /^https:\/\//i.test(ctaHref) : false;
 
   return (
-    <Card className="relative h-full min-h-[28rem] gap-0 rounded-2xl py-0">
-      {popular ? <Badge className="absolute right-4 top-4">Recommended</Badge> : null}
-
-      <CardHeader className={`p-6 pb-0 ${popular ? "pr-32" : ""}`}>
-        <div className="mb-4">
-          <h3 className="mb-0.5 text-2xl font-bold text-foreground">{name}</h3>
-          <div className="mb-2 flex flex-wrap items-baseline gap-1.5">
-            <span className="text-3xl font-bold tracking-tight text-foreground">{price}</span>
-            {period && <span className="text-xs text-muted-foreground">{period}</span>}
-          </div>
-          <p className="text-sm leading-6 text-muted-foreground">{description}</p>
+    <article className="flex min-h-[30rem] flex-col rounded-xl bg-card p-6 shadow-xs ring-1 ring-foreground/10 md:p-8">
+      <div className="min-h-48 border-b border-border pb-7">
+        <div className="flex items-start justify-between gap-4">
+          <h3 className="text-2xl font-medium tracking-[-0.03em] text-foreground">
+            {name}
+          </h3>
+          {popular ? (
+            <span className="pt-1 text-xs text-muted-foreground">
+              Recommended
+            </span>
+          ) : null}
         </div>
-      </CardHeader>
-
-      <CardContent className="flex flex-1 flex-col px-6 pb-4">
-        <p className="mb-3 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-          Plan limits
+        <div className="mt-8 flex flex-wrap items-baseline gap-2">
+          <span className="text-4xl font-medium tracking-[-0.045em] text-foreground">
+            {price}
+          </span>
+          {period && (
+            <span className="text-xs text-muted-foreground">{period}</span>
+          )}
+        </div>
+        <p className="mt-3 text-sm leading-6 text-muted-foreground">
+          {description}
         </p>
+      </div>
+
+      <div className="flex flex-1 flex-col pt-7">
+        <p className="mb-3 text-sm text-foreground">Included</p>
 
         <ul className="mb-4 flex flex-1 flex-col divide-y divide-border border-y border-border">
           {features.map((feature) => (
-            <li
-              key={feature}
-              className="py-2.5 text-sm text-muted-foreground"
-            >
+            <li key={feature} className="py-2.5 text-sm text-muted-foreground">
               {feature}
             </li>
           ))}
         </ul>
-      </CardContent>
+      </div>
 
-      <CardFooter className="px-6 pb-6">
-        <Button asChild className="h-auto w-full rounded-xl px-6 py-2.5 shadow-sm">
-          {externalCta ? (
-            <a href={ctaHref} target="_blank" rel="noopener noreferrer">
-              {ctaLabel}
-            </a>
-          ) : (
-            <NavLink to={ctaHref}>{ctaLabel}</NavLink>
-          )}
-        </Button>
-      </CardFooter>
-    </Card>
+      <div className="pt-5">
+        {onCtaClick ? (
+          <Button
+            type="button"
+            className="h-11 w-full px-6"
+            disabled={ctaBusy}
+            aria-busy={ctaBusy}
+            onClick={onCtaClick}
+          >
+            {ctaBusy ? "Opening checkout…" : ctaLabel}
+          </Button>
+        ) : ctaHref ? (
+          <Button asChild className="h-11 w-full px-6">
+            {externalCta ? (
+              <a href={ctaHref} target="_blank" rel="noopener noreferrer">
+                {ctaLabel}
+              </a>
+            ) : (
+              <NavLink to={ctaHref}>{ctaLabel}</NavLink>
+            )}
+          </Button>
+        ) : null}
+      </div>
+    </article>
   );
 }

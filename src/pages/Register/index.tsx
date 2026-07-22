@@ -1,14 +1,15 @@
 import { NavLink } from "react-router";
 
 import { Button } from "@/components/ui/button";
+import { marketingCopy } from "@/content/marketingCopy";
 import AuthCard from "../Auth/AuthCard";
 import AuthShell from "../Auth/AuthShell";
 
 export default function Register() {
   return (
     <AuthShell
-      title="Misty is invite-only"
-      description="New accounts are currently opened only for approved beta participants."
+      title={marketingCopy.auth.registerTitle}
+      description={marketingCopy.auth.registerDescription}
     >
       <AuthCard title="" description="">
         <div className="flex flex-col gap-5 text-center">

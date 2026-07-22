@@ -1,18 +1,19 @@
 import { apiBase } from "../../lib/apiBase";
+import type { BillingInterval, PaidTier } from "@/lib/pricing";
 
 export interface MeResponse {
   id: string;
   name: string;
   email: string;
   created_at: string;
-  tier: "basic" | "personal" | "pro" | "max";
+  tier: "basic" | "pro";
   status: "active" | "trialing" | "cancelled" | "expired";
   allows_use: boolean;
   expires_at: string | null;
   trial_started_at: string | null;
   license_device: string;
   billing?: {
-    kind: "free" | "trial" | "lifetime" | "subscription";
+    kind: "free" | "trial" | "subscription";
     interval: "month" | "year" | null;
     subscription_status: string | null;
     current_period_end: string | null;
@@ -22,18 +23,28 @@ export interface MeResponse {
 }
 
 export interface BillingUsageResponse {
-  plan: "basic" | "pro" | "max";
-  monthly_allowance: number;
-  monthly_remaining: number;
-  purchased_remaining: number;
-  available_credits: number;
-  reserved_credits: number;
-  next_reset_at: string;
-  usage_by_meter: Array<{ meter: string; credits: number }> | null;
+  plan: "basic" | "pro";
+  storage: {
+    used_bytes: number;
+    reserved_bytes: number;
+    limit_bytes: number;
+    remaining_bytes: number;
+    over_quota: boolean;
+    over_quota_since?: string;
+    cleanup_notice_until?: string;
+  };
+  hosted_ai: {
+    used_ratio: number;
+    reset_at: string;
+  };
+  trial?: { status: string; ends_at: string };
+  subscription?: {
+    status: string;
+    current_period_end: string;
+    cancel_at_period_end: boolean;
+    billing_interval: BillingInterval;
+  };
 }
-
-export type PaidTier = "pro" | "max";
-export type BillingInterval = "month" | "year";
 
 async function apiFetch(path: string, init?: RequestInit) {
   const res = await fetch(`${apiBase}${path}`, {
@@ -42,7 +53,9 @@ async function apiFetch(path: string, init?: RequestInit) {
   });
   if (!res.ok) {
     const text = await res.text();
-    throw Object.assign(new Error(text.trim() || "Request failed"), { status: res.status });
+    throw Object.assign(new Error(text.trim() || "Request failed"), {
+      status: res.status,
+    });
   }
   return res;
 }

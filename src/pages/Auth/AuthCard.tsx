@@ -17,7 +17,7 @@ interface AuthCardProps {
 
 export default function AuthCard({ title, description, children, footer }: AuthCardProps) {
   return (
-    <Card className="gap-0 rounded-2xl border-border bg-card p-6 text-card-foreground shadow-lg sm:p-8">
+    <Card className="gap-0 rounded-xl bg-card p-6 text-card-foreground shadow-xl ring-1 ring-foreground/10 sm:p-8">
       {title || description ? (
         <CardHeader className="p-0">
           {title ? (

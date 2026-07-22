@@ -10,23 +10,18 @@ export default function AuthShell({ title, description, children }: AuthShellPro
   return (
     <section
       aria-labelledby="auth-page-title"
-      className="relative min-h-[calc(100vh-4rem)] overflow-hidden bg-background px-4 py-10 text-foreground sm:px-5 sm:py-14"
+      className="min-h-[calc(100vh-4rem)] bg-background px-6 pb-24 pt-28 text-foreground sm:px-10 sm:pt-32 lg:px-16"
     >
-      <div className="pointer-events-none absolute inset-0">
-        <div className="absolute left-1/2 top-16 h-56 w-56 -translate-x-1/2 rounded-full bg-foreground/[0.04] blur-3xl" />
-        <div className="radial-glow absolute inset-0" />
-      </div>
-
-      <div className="relative mx-auto flex max-w-md flex-col items-center pt-6 sm:pt-10">
-        <div className="mb-8 text-center">
+      <div className="mx-auto grid w-full max-w-[1280px] gap-10 lg:grid-cols-[minmax(0,1fr)_28rem] lg:items-start lg:gap-20">
+        <div className="max-w-2xl border-t border-border pt-8">
           <h1
             id="auth-page-title"
-            className="text-3xl font-semibold tracking-tight text-foreground sm:text-4xl"
+            className="text-balance text-4xl font-medium leading-[1.04] tracking-[-0.045em] text-foreground sm:text-5xl"
           >
             {title}
           </h1>
           {description ? (
-            <p className="mt-3 text-sm leading-6 text-muted-foreground sm:text-base">
+            <p className="mt-5 max-w-lg text-base leading-7 text-muted-foreground">
               {description}
             </p>
           ) : null}

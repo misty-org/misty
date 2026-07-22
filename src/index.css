@@ -190,7 +190,15 @@
 html {
   font-size: 17px;
   scroll-behavior: auto;
-  scrollbar-gutter: stable;
+  scrollbar-gutter: auto;
+}
+
+button,
+a,
+input,
+textarea,
+select {
+  text-transform: none;
 }
 
 @media (max-width: 639px) {

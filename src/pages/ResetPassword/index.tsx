@@ -8,6 +8,7 @@ import AuthShell from "../Auth/AuthShell";
 import AuthSubmitButton from "../Auth/AuthSubmitButton";
 import { resetPasswordRequest, validateResetTokenRequest } from "../Auth/api";
 import NotFound from "../NotFound";
+import { marketingCopy } from "@/content/marketingCopy";
 
 export default function ResetPassword() {
   const [validationState, setValidationState] = useState<"checking" | "ready" | "invalid">("checking");
@@ -81,7 +82,7 @@ export default function ResetPassword() {
   return (
     <AuthShell
       title="Reset your password"
-      description="Choose a new password."
+      description={marketingCopy.auth.resetDescription}
     >
       <AuthCard
         title=""

@@ -13,8 +13,7 @@ import Changelog from "./pages/Changelog";
 import Blog from "./pages/Blog";
 import Roadmap from "./pages/Roadmap";
 import Features from "./pages/Features";
-
-
+import { marketingCopy } from "./content/marketingCopy";
 
 export const router = createBrowserRouter([
   {
@@ -26,8 +25,7 @@ export const router = createBrowserRouter([
         element: <Home />,
         handle: {
           title: "Misty — One Space for the whole project",
-          description:
-            "Misty combines members, chat, tasks, and a shared Library in one project Space. Private Files stay private until shared.",
+          description: marketingCopy.metadata.home,
         },
       },
       {
@@ -35,7 +33,7 @@ export const router = createBrowserRouter([
         element: <Settings />,
         handle: {
           title: "Account settings — Misty",
-          description: "Manage your Misty account, credits, and billing.",
+          description: "Manage your Misty account, usage, and billing.",
         },
       },
       {
@@ -43,15 +41,15 @@ export const router = createBrowserRouter([
         element: <Download />,
         handle: {
           title: "Download Misty — macOS and Windows beta",
-          description: "Download the Misty beta for Apple Silicon Macs or 64-bit Windows PCs.",
+          description: marketingCopy.metadata.download,
         },
       },
       {
         path: "pricing",
         element: <Pricing />,
         handle: {
-          title: "Pricing — Plans for every project group | Misty",
-          description: "Compare Misty Free, Pro, and Max limits for Spaces, members, Library storage, and Mika.",
+          title: "Pricing — Free and Pro plans | Misty",
+          description: marketingCopy.metadata.pricing,
         },
       },
       {
@@ -59,7 +57,7 @@ export const router = createBrowserRouter([
         element: <Changelog />,
         handle: {
           title: "Changelog — Misty beta updates",
-          description: "See what changed across Misty Spaces, Files, and the beta experience.",
+          description: marketingCopy.metadata.changelog,
         },
       },
       {
@@ -67,7 +65,7 @@ export const router = createBrowserRouter([
         element: <Blog />,
         handle: {
           title: "Blog — Notes from Misty",
-          description: "Historical announcements and product notes from the Misty team.",
+          description: marketingCopy.metadata.blog,
         },
       },
       {
@@ -75,7 +73,7 @@ export const router = createBrowserRouter([
         element: <Roadmap />,
         handle: {
           title: "Roadmap — What Misty is building",
-          description: "Follow the current beta, connector pilots, and next steps for Misty.",
+          description: marketingCopy.metadata.roadmap,
         },
       },
       {
@@ -83,7 +81,7 @@ export const router = createBrowserRouter([
         element: <Features />,
         handle: {
           title: "Features — Work together in one Space | Misty",
-          description: "Explore Misty Chat, Library, Tasks, Members, private Files, connector pilots, and Space-aware Mika.",
+          description: marketingCopy.metadata.features,
         },
       },
       {
@@ -91,13 +89,16 @@ export const router = createBrowserRouter([
         element: <Waitlist />,
         handle: {
           title: "Request beta access — Misty",
-          description: "Request invite-only access to the Misty beta for your project group.",
+          description: marketingCopy.metadata.waitlist,
         },
       },
       {
         path: "signin",
         element: <SignIn />,
-        handle: { title: "Sign in — Misty", description: "Sign in to your Misty account." },
+        handle: {
+          title: "Sign in — Misty",
+          description: "Sign in to your Misty account.",
+        },
       },
       {
         path: "register",
@@ -110,12 +111,18 @@ export const router = createBrowserRouter([
       {
         path: "reset",
         element: <ResetPassword />,
-        handle: { title: "Reset your password — Misty", description: "Reset your Misty account password." },
+        handle: {
+          title: "Reset your password — Misty",
+          description: "Reset your Misty account password.",
+        },
       },
       {
         path: "*",
         element: <NotFound />,
-        handle: { title: "Page not found — Misty", description: "The requested Misty page could not be found." },
+        handle: {
+          title: "Page not found — Misty",
+          description: "The requested Misty page could not be found.",
+        },
       },
     ],
   },

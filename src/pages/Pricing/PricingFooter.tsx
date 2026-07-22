@@ -4,28 +4,16 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-
-const faqs = [
-  {
-    q: "Who supplies a Space’s capacity?",
-    a: "The owner supplies the member limit and Library storage. Each member uses their own Mika credits.",
-  },
-  {
-    q: "What happens when I run out of credits?",
-    a: "Mika pauses. Wait for the monthly reset or add credits. There are no automatic overages.",
-  },
-  {
-    q: "How does Misty handle my data?",
-    a: "Private Files stay local or in the connected provider until added to a Space. Library items are stored for the Space. Mika uses permitted context.",
-  },
-];
+import { pricingFaqs } from "./data";
 
 export default function PricingQA() {
   return (
     <div>
-      <h2 className="mb-6 text-lg font-semibold text-foreground">Questions & Answers</h2>
+      <h2 className="mb-6 text-2xl font-medium tracking-[-0.03em] text-foreground">
+        Questions and answers
+      </h2>
       <Accordion type="multiple">
-        {faqs.map((faq) => (
+        {pricingFaqs.map((faq) => (
           <AccordionItem key={faq.q} value={faq.q}>
             <AccordionTrigger className="py-4 text-foreground hover:no-underline">
               {faq.q}

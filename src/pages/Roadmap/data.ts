@@ -47,7 +47,7 @@ export const phases: RoadmapPhase[] = [
     status: "pilot",
     items: [
       {
-        title: "Space-scoped Mika",
+        title: "Space-scoped agents",
         description: "Limited beta; availability varies.",
       },
       {

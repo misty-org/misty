@@ -1,104 +1,119 @@
-export type PricingInterval = "month" | "year";
+import {
+  PRICING_MODEL,
+  SHARED_PLAN_FEATURES,
+  type BillingInterval,
+} from "@/lib/pricing";
+
+export type PricingInterval = BillingInterval;
 
 export const plans = [
   {
     id: "free",
-    name: "Free",
-    description: "For small projects.",
+    name: PRICING_MODEL.free.name,
+    description:
+      "For getting work out of group chats and into one shared place.",
     prices: {
-      month: { price: "$0", period: "forever" },
-      year: { price: "$0", period: "forever" },
+      month: { price: PRICING_MODEL.free.monthlyPrice, period: "forever" },
+      year: { price: PRICING_MODEL.free.yearlyPrice, period: "forever" },
     },
     features: [
-      "Own up to 3 Spaces",
-      "Join up to 5 Spaces",
-      "5 people per owned Space",
-      "2 GB shared owner Library pool",
-      "100 monthly Mika credits · Mika Low",
+      ...SHARED_PLAN_FEATURES,
+      `${PRICING_MODEL.free.storage} total storage across Spaces you own`,
+      PRICING_MODEL.free.hostedAI,
+      PRICING_MODEL.free.modelRouting,
     ],
   },
   {
     id: "pro",
-    name: "Pro",
-    description: "For active teams.",
+    name: PRICING_MODEL.pro.name,
+    description:
+      "For groups that need more room and more Hosted AI every week.",
     prices: {
-      month: { price: "$8.99", period: "per month" },
-      year: { price: "$89", period: "per year · save $18.88" },
+      month: { price: PRICING_MODEL.pro.monthlyPrice, period: "per month" },
+      year: {
+        price: PRICING_MODEL.pro.yearlyPrice,
+        period: "per year · save $19",
+      },
     },
     features: [
-      "Own up to 10 Spaces",
-      "Join up to 25 Spaces",
-      "15 people per owned Space",
-      "50 GB shared owner Library pool",
-      "2,000 monthly Mika credits · Mika Med",
-    ],
-  },
-  {
-    id: "max",
-    name: "Max",
-    description: "For larger groups.",
-    prices: {
-      month: { price: "$19.99", period: "per month" },
-      year: { price: "$199", period: "per year · save $40.88" },
-    },
-    features: [
-      "Own up to 25 Spaces",
-      "Join up to 100 Spaces",
-      "50 people per owned Space",
-      "250 GB shared owner Library pool",
-      "6,000 monthly Mika credits · Mika High",
+      ...SHARED_PLAN_FEATURES,
+      `${PRICING_MODEL.pro.storage} total storage across Spaces you own`,
+      PRICING_MODEL.pro.hostedAI,
+      PRICING_MODEL.pro.modelRouting,
+      `One-time ${PRICING_MODEL.pro.trialDays}-day trial`,
+      "Card required · automatically renews",
     ],
   },
 ] as const;
 
 export const planLimitRows = [
-  { label: "Price", free: "$0", pro: "$8.99 monthly / $89 yearly", max: "$19.99 monthly / $199 yearly" },
-  { label: "Owned Spaces", free: "3", pro: "10", max: "25" },
-  { label: "Joined Spaces", free: "5", pro: "25", max: "100" },
-  { label: "People per owned Space", free: "5", pro: "15", max: "50" },
-  { label: "Owner Library pool", free: "2 GB", pro: "50 GB", max: "250 GB" },
-  { label: "Monthly Mika", free: "100 credits · Mika Low", pro: "2,000 credits · Mika Med", max: "6,000 credits · Mika High" },
+  {
+    label: "Price",
+    free: PRICING_MODEL.free.monthlyPrice,
+    pro: `${PRICING_MODEL.pro.monthlyPrice} monthly / ${PRICING_MODEL.pro.yearlyPrice} yearly`,
+  },
+  { label: "Owned and joined Spaces", free: "Unlimited", pro: "Unlimited" },
+  { label: "Collaborators", free: "Unlimited", pro: "Unlimited" },
+  { label: "Custom agents", free: "Unlimited", pro: "Unlimited" },
+  {
+    label: "Storage pooled across owned Spaces",
+    free: PRICING_MODEL.free.storage,
+    pro: PRICING_MODEL.pro.storage,
+  },
+  {
+    label: "Hosted AI usage",
+    free: "Weekly usage",
+    pro: PRICING_MODEL.pro.hostedAI,
+  },
+  { label: "Automatic model routing", free: "Included", pro: "Included" },
 ] as const;
 
 export const ownerRules = [
   {
-    title: "The owner sets Space capacity",
+    title: "Storage follows the owner",
     description:
-      "A Space uses its owner’s people limit and shared Library pool, even when other members upload files.",
+      "Hosted files count toward the Space owner’s pooled storage, including files uploaded by collaborators.",
   },
   {
-    title: "Membership stays flexible",
+    title: "Collaboration stays unlimited",
     description:
-      "Free members can join Spaces owned by Pro or Max members. Nobody has to upgrade just to participate.",
+      "Joining Spaces and collaborating do not use your storage. Only hosted files in Spaces you own count toward your pool.",
   },
   {
-    title: "Your plan travels with you",
+    title: "Hosted AI usage stays personal",
     description:
-      "Your subscription controls how many Spaces you can own or join and which Mika tier you can use.",
+      "Hosted AI usage resets weekly. Misty shows the percentage used and reset date, never a dollar or usage-unit balance.",
   },
   {
-    title: "Mika credits stay personal",
+    title: "No surprise charges",
     description:
-      "The member making a Mika request uses their own credits. Space owners never pay another member’s Mika usage.",
+      "There are no automatic overages or surprise charges. Usage pauses at the limit instead of creating a bill.",
   },
 ] as const;
 
-export const permanentCreditPacks = [
-  { name: "1,500 credits", price: "$4.99 once", detail: "Non-expiring top-up" },
-  { name: "3,500 credits", price: "$9.99 once", detail: "Non-expiring top-up" },
-] as const;
-
-export const subscriberRefills = [
+export const pricingFaqs = [
   {
-    name: "Pro refill",
-    credits: "2,000 credits",
-    price: "$4.99",
-    detail: "Added for the current billing period",
+    q: "How does storage work across Spaces?",
+    a: "Your storage is pooled across every Space you own. Hosted files are charged to the Space owner, including files uploaded by collaborators. Joining someone else’s Space and collaborating there do not use your storage.",
   },
   {
-    name: "Max refill",
-    credits: "6,000 credits",
-    price: "$14.99",
-    detail: "Added for the current billing period",
+    q: "What happens when I reach my Hosted AI limit?",
+    a: "New Hosted AI work pauses until your weekly reset or until you upgrade. Files, Spaces, conversations, and collaboration keep working, and there are no automatic overages.",
+  },
+  {
+    q: "Does Pro start with a trial?",
+    a: "Yes. Monthly and yearly Pro subscriptions begin with a one-time 14-day trial. A card is required, and the plan automatically renews unless you cancel.",
+  },
+  {
+    q: "Do Free and Pro use different AI models?",
+    a: "No. Both plans use the same automatic model routing. Pro simply gives you over 6× more Hosted AI capacity.",
+  },
+  {
+    q: "How does Misty handle my data?",
+    a: "Private files stay local or with the connected provider until copied into a Space. Agents only use context you are permitted to access. If you exceed storage, existing data remains intact and nothing is automatically deleted.",
+  },
+  {
+    q: "Can usage create an extra bill?",
+    a: "No. Misty never charges beyond your plan automatically. Hosted AI usage and new hosted uploads pause at their limits, so there are no automatic overages or surprise charges.",
   },
 ] as const;
