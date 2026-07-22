@@ -7,6 +7,7 @@ import { forgotPasswordRequest, signInRequest, type AuthUser } from "../Auth/api
 import { fetchMe, type MeResponse } from "../Dashboard/api";
 import ForgotPasswordForm from "./ForgotPasswordForm";
 import SignInForm from "./SignInForm";
+import { marketingCopy } from "@/content/marketingCopy";
 
 type SignInMode = "signin" | "forgot";
 
@@ -105,8 +106,8 @@ export default function SignIn({ onSignedIn }: SignInProps = {}) {
   const cardTitle = mode === "signin" ? "Welcome back" : "Forgot your password?";
   const shellDescription =
     mode === "signin"
-      ? "Sign in to your Misty account."
-      : "Enter your email and we’ll send a reset link.";
+      ? marketingCopy.auth.signInDescription
+      : marketingCopy.auth.forgotDescription;
 
   return (
     <AuthShell title={cardTitle} description={shellDescription}>

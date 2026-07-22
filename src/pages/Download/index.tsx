@@ -1,122 +1,108 @@
+import { useState } from "react";
+import { ChevronUp } from "lucide-react";
 import { FaApple, FaWindows } from "react-icons/fa";
 import { Link } from "react-router";
 
+import { PublicPage } from "@/components/marketing/PublicPage";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
+import { Card } from "@/components/ui/card";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { currentRelease, type PlatformName, type ReleaseBuild } from "./data";
 
-const platformMeta: Record<
-  PlatformName,
-  { icon: React.ReactNode; requirements: string }
-> = {
-  macOS: {
-    icon: <FaApple className="size-5" aria-hidden="true" />,
-    requirements: "Apple Silicon only",
-  },
-  Windows: {
-    icon: <FaWindows className="size-5" aria-hidden="true" />,
-    requirements: "64-bit Windows",
-  },
+const platformMeta: Record<PlatformName, { icon: React.ReactNode }> = {
+  macOS: { icon: <FaApple className="size-4" aria-hidden="true" /> },
+  Windows: { icon: <FaWindows className="size-4" aria-hidden="true" /> },
 };
 
 function BuildCard({ build }: { build: ReleaseBuild }) {
-  const meta = platformMeta[build.platform];
-
   return (
-    <Card className="gap-0 py-0 shadow-sm">
-      <CardHeader className="border-b border-border px-6 py-5">
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <span className="flex size-10 items-center justify-center rounded-lg border border-border bg-muted/50 text-foreground">
-              {meta.icon}
-            </span>
-            <div>
-              <h3 className="text-lg font-semibold text-foreground">{build.platform}</h3>
-              <p className="mt-0.5 text-xs text-muted-foreground">{build.architecture}</p>
-            </div>
-          </div>
-          <Badge variant="outline">{build.packageType}</Badge>
+    <Card role="article" className="gap-0 rounded-xl p-4 shadow-xs ring-1 ring-foreground/10">
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex min-w-0 items-center gap-2.5">
+          <span className="text-muted-foreground">{platformMeta[build.platform].icon}</span>
+          <h3 className="truncate text-base font-medium text-foreground">{build.platform}</h3>
         </div>
-      </CardHeader>
+        <Badge variant="outline" className="font-normal text-muted-foreground">
+          {build.packageType}
+        </Badge>
+      </div>
 
-      <CardContent className="px-6 py-5">
-        <dl className="grid gap-3 text-sm">
-          <div className="flex items-center justify-between gap-4">
-            <dt className="text-muted-foreground">Build</dt>
-            <dd className="font-medium text-foreground">{currentRelease.version}</dd>
-          </div>
-          <div className="flex items-center justify-between gap-4">
-            <dt className="text-muted-foreground">Compatibility</dt>
-            <dd className="text-right font-medium text-foreground">{meta.requirements}</dd>
-          </div>
-        </dl>
-        <p className="mt-5 border-t border-border pt-4 text-sm leading-6 text-muted-foreground">
-          ZIP archive · beta software.
-        </p>
-      </CardContent>
+      <div className="pt-3">
+        <p className="text-sm text-muted-foreground">{build.architecture}</p>
+      </div>
 
-      <CardFooter className="border-t border-border px-6 py-5">
-        <Button asChild size="lg" className="h-11 w-full">
-          <a href={build.href} aria-label={`Download Misty ${currentRelease.version} for ${build.platform}`}>
-            Download for {build.platform}
+      <div className="pt-3">
+        <Button asChild size="lg" className="h-11 w-full text-sm">
+          <a
+            href={build.href}
+            aria-label={`Download Misty ${currentRelease.version} for ${build.platform}`}
+          >
+            Download
           </a>
         </Button>
-      </CardFooter>
+      </div>
     </Card>
   );
 }
 
 export default function Download() {
+  const [releaseOpen, setReleaseOpen] = useState(true);
+
   return (
-    <div className="mx-auto max-w-6xl px-5 pb-24 pt-32 sm:px-8 lg:px-12">
-      <header className="mx-auto max-w-3xl text-center">
-        <Badge variant="outline" className="mb-5 text-muted-foreground">
-          {currentRelease.label} · {currentRelease.version}
-        </Badge>
-        <h1 className="text-balance text-4xl font-semibold tracking-[-0.035em] text-foreground sm:text-5xl md:text-6xl">
-          Download Misty for desktop.
+    <PublicPage className="max-w-[1280px]">
+      <header className="pb-8 text-center sm:pb-10">
+        <h1 className="text-5xl font-semibold tracking-[-0.04em] text-foreground">
+          Download
         </h1>
-        <p className="mx-auto mt-5 max-w-xl text-pretty text-base leading-7 text-muted-foreground sm:text-lg">
-          Public builds for Apple Silicon macOS and 64-bit Windows.
-        </p>
-        <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
-          <Button asChild variant="outline">
-            <a href={currentRelease.releasePage} target="_blank" rel="noopener noreferrer">
-              Release notes
-            </a>
-          </Button>
-          <Button asChild variant="ghost">
-            <Link to="/waitlist">
-              Request beta access
-            </Link>
-          </Button>
-        </div>
       </header>
 
-      <section aria-labelledby="desktop-builds-title" className="mt-14 md:mt-16">
-        <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <h2 id="desktop-builds-title" className="mt-2 text-2xl font-semibold tracking-tight text-foreground">
-              Available builds
-            </h2>
-          </div>
+      <section aria-labelledby="releases-title">
+        <div className="flex items-center justify-between gap-5">
+          <h2 id="releases-title" className="text-xl font-semibold text-foreground">
+            Releases
+          </h2>
         </div>
 
-        <div className="grid gap-5 md:grid-cols-2">
-          {currentRelease.builds.map((build) => (
-            <BuildCard key={build.platform} build={build} />
-          ))}
-        </div>
-      </section>
+        <Collapsible open={releaseOpen} onOpenChange={setReleaseOpen} className="mt-6">
+          <CollapsibleTrigger asChild>
+            <button
+              type="button"
+              className="flex w-full items-center justify-between rounded-md py-2 text-left text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <span>{currentRelease.version} (latest)</span>
+              <ChevronUp
+                aria-hidden="true"
+                className={`size-4 text-muted-foreground transition-transform ${releaseOpen ? "rotate-0" : "rotate-180"}`}
+              />
+            </button>
+          </CollapsibleTrigger>
 
-      <Separator className="my-12" />
-
-      <section className="grid gap-3 text-sm text-muted-foreground sm:grid-cols-2" aria-label="Beta download notes">
-        <p>Shared services require an approved account.</p>
-        <p className="sm:text-right">Tablet builds are not available yet.</p>
+          <CollapsibleContent>
+            <div className="mt-4 grid gap-4 md:grid-cols-2">
+              {[...currentRelease.builds].sort((a, b) => b.platform.localeCompare(a.platform)).map((build) => (
+                <BuildCard key={build.platform} build={build} />
+              ))}
+            </div>
+            <div className="mt-6 flex flex-col gap-4 border-t border-border pt-5 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex flex-col gap-1">
+                <p>Shared services require an approved account.</p>
+                <p>Tablet builds are not available yet.</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button asChild variant="ghost" size="sm">
+                  <a href={currentRelease.releasePage} target="_blank" rel="noopener noreferrer">
+                    Release notes
+                  </a>
+                </Button>
+                <Button asChild variant="ghost" size="sm">
+                  <Link to="/waitlist">Request beta access</Link>
+                </Button>
+              </div>
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
       </section>
-    </div>
+    </PublicPage>
   );
 }

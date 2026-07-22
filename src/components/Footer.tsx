@@ -1,6 +1,6 @@
 import { NavLink } from "react-router";
 
-import { Separator } from "@/components/ui/separator";
+import { marketingCopy } from "@/content/marketingCopy";
 import {
   BETA_ACCESS_EXTERNAL,
   BETA_ACCESS_HREF,
@@ -34,29 +34,28 @@ const columns = [
   },
 ];
 
-const linkClass =
-  "w-fit rounded-sm text-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
+const linkClass = "w-fit text-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
 export default function Footer() {
   return (
-    <footer className="relative z-10 border-t border-border bg-background px-5 py-12 sm:px-8 lg:px-12">
-      <div className="mx-auto max-w-7xl">
-        <div className="flex flex-col justify-between gap-10 md:flex-row md:items-start">
-          <div className="max-w-sm">
+    <footer className="relative z-10 border-t border-border bg-background">
+      <div className="mx-auto max-w-[1280px] px-6 py-14 sm:px-10 lg:px-16">
+        <div className="grid gap-12 border-b border-border pb-14 md:grid-cols-[1fr_auto] md:gap-20">
+          <div className="max-w-xs">
             <NavLink
               to="/"
               aria-label="Misty footer"
-              className="flex w-fit items-center gap-1 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="w-fit text-lg font-semibold tracking-[-0.025em] text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
-              <span className="text-base font-semibold tracking-tight text-foreground">Misty</span>
+              Misty
             </NavLink>
-            <p className="mt-3 text-sm text-muted-foreground">One Space for the whole project.</p>
+            <p className="mt-4 text-sm leading-6 text-muted-foreground">{marketingCopy.home.proof}</p>
           </div>
 
-          <div className="grid grid-cols-2 gap-x-10 gap-y-8 sm:grid-cols-3 sm:gap-x-16">
+          <div className="grid grid-cols-2 gap-x-12 gap-y-10 sm:grid-cols-3 sm:gap-x-20">
             {columns.map((column) => (
               <div key={column.label} className="flex flex-col gap-3">
-                <span className="text-xs font-semibold uppercase tracking-[0.14em] text-foreground">
+                <span className="text-sm font-medium text-foreground">
                   {column.label}
                 </span>
                 {column.links.map((link) =>
@@ -81,7 +80,6 @@ export default function Footer() {
           </div>
         </div>
 
-        <Separator className="mt-12" />
         <div className="pt-6 text-xs text-muted-foreground">
           <span>&copy; {new Date().getFullYear()} Misty. All rights reserved.</span>
         </div>

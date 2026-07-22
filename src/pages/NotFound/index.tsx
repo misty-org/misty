@@ -2,12 +2,13 @@ import { NavLink } from "react-router";
 import { Button } from "@/components/ui/button";
 import AuthCard from "../Auth/AuthCard";
 import AuthShell from "../Auth/AuthShell";
+import { marketingCopy } from "@/content/marketingCopy";
 
 export default function NotFound() {
   return (
     <AuthShell
       title="Page not found"
-      description="The page you requested does not exist or is no longer available."
+      description={marketingCopy.auth.notFoundDescription}
     >
       <AuthCard>
         <div className="text-center">

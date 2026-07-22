@@ -1,7 +1,5 @@
 import { apiBase } from "../../lib/apiBase";
-
-export type PaidTier = "pro" | "max";
-export type BillingInterval = "month" | "year";
+import type { BillingInterval, PaidTier } from "@/lib/pricing";
 
 export async function createSubscriptionCheckout(
   tier: PaidTier,

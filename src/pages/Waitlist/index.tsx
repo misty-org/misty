@@ -1,12 +1,12 @@
 import { useState, type FormEvent, type ChangeEvent } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/utils";
+import { marketingCopy } from "@/content/marketingCopy";
 import { submitWaitlist } from "./api";
 import type { WaitlistFormProps, WaitlistFormState } from "./types";
 
@@ -16,19 +16,17 @@ export default function Waitlist() {
       aria-labelledby="waitlist-title"
       className="bg-background px-4 pb-20 pt-28 text-foreground sm:px-6 sm:pt-32"
     >
-      <div className="mx-auto grid w-full max-w-5xl gap-10 lg:grid-cols-[minmax(0,1fr)_26rem] lg:items-start lg:gap-16">
+      <div className="mx-auto grid w-full max-w-[1280px] gap-10 lg:grid-cols-[minmax(0,1fr)_28rem] lg:items-start lg:gap-20">
         <section className="pt-1" aria-label="Beta access details">
-          <Badge variant="secondary" className="mb-5">
-            Private beta
-          </Badge>
+          <p className="mb-5 text-sm text-muted-foreground">Private beta</p>
           <h1
             id="waitlist-title"
             className="max-w-2xl text-4xl font-semibold tracking-[-0.04em] text-foreground sm:text-5xl"
           >
-            Request beta access
+            {marketingCopy.waitlist.title}
           </h1>
           <p className="mt-5 max-w-lg text-base leading-7 text-muted-foreground sm:text-lg">
-            Access opens in small cohorts. We&rsquo;ll send setup details if you&rsquo;re invited.
+            {marketingCopy.waitlist.description}
           </p>
         </section>
 
@@ -67,7 +65,7 @@ function WaitlistForm({ onSuccess, className }: WaitlistFormProps) {
 
   if (success) {
     return (
-      <Card className={cn("gap-0 rounded-2xl py-0", className)}>
+      <Card className={cn("gap-0 rounded-xl py-0 shadow-xl ring-1 ring-foreground/10", className)}>
         <CardContent
           role="status"
           aria-live="polite"
@@ -85,10 +83,10 @@ function WaitlistForm({ onSuccess, className }: WaitlistFormProps) {
   }
 
   return (
-    <Card className={cn("gap-0 rounded-2xl py-0", className)}>
+    <Card className={cn("gap-0 rounded-xl py-0 shadow-xl ring-1 ring-foreground/10", className)}>
       <CardContent className="p-6 sm:p-8">
         <div className="mb-6">
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+          <p className="text-sm text-muted-foreground">
             Access request
           </p>
           <h2 className="mt-2 text-xl font-semibold text-card-foreground">

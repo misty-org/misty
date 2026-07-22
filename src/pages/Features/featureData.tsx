@@ -2,7 +2,7 @@ export type FeatureId =
   | "work-together"
   | "shared-library"
   | "integrations"
-  | "mika"
+  | "agents"
   | "private-files";
 
 export type MainFeature = {
@@ -52,11 +52,12 @@ const integrations: MainFeature = {
   availability: "Pilot and coming",
 };
 
-const mika: MainFeature = {
-  id: "mika",
-  title: "Mika",
+const agents: MainFeature = {
+  id: "agents",
+  title: "Agents",
   eyebrow: "Conditional beta",
-  description: "Where enabled, Mika answers from permitted Space context.",
+  description:
+    "Talk with agents that work from the Space context you can access.",
   details: [
     "Uses only content you can access.",
     "Your conversation stays private.",
@@ -69,7 +70,8 @@ const privateFiles: MainFeature = {
   id: "private-files",
   title: "Private Files",
   eyebrow: "Your file environment",
-  description: "Browse local and connected storage, then choose what to add to a Space.",
+  description:
+    "Browse local and connected storage, then choose what to add to a Space.",
   details: [
     "Local and connected storage.",
     "Search and inspect files.",
@@ -81,6 +83,6 @@ export const mainFeatures = [
   workTogether,
   sharedLibrary,
   integrations,
-  mika,
+  agents,
   privateFiles,
 ];

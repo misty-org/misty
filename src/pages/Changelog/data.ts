@@ -44,7 +44,7 @@ export const changelog: ChangelogEntry[] = [
         heading: "Beta availability",
         changes: [
           "Access is opening in approved, invite-only cohorts while the Space beta is tested",
-          "Mika's permission-scoped Space experience is being tested during the beta",
+          "Permission-scoped agents in Spaces are being tested during the beta",
           "Google Calendar, Slack, and Notion connections are in pilot work; Discord support is coming after configuration and reliability testing",
         ],
       },

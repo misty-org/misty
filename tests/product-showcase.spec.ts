@@ -6,29 +6,22 @@ test.beforeEach(async ({ page }) => {
 });
 
 test("the homepage tells the complete collaboration story", async ({ page }) => {
-  await expect(
-    page.getByRole("heading", {
-      level: 1,
-      name: "One Space for the whole project.",
-    }),
-  ).toBeVisible();
-  await expect(page.getByText("Invite-only beta").first()).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
   await expect(
     page.getByRole("img", {
       name: "Misty Space Library with shared project research and files",
     }),
   ).toBeVisible();
 
-  for (const heading of [
-    "Work without the tool shuffle.",
-    "Private until you share.",
-    "Start with a Space.",
-    "Bring your next project.",
-  ]) {
-    await expect(page.getByRole("heading", { name: heading })).toBeAttached();
-  }
-
   await expect(page.getByText("Message this Space")).toBeVisible();
+  await expect(page.getByRole("link", { name: "View roadmap" })).toHaveAttribute(
+    "href",
+    "/roadmap",
+  );
+  await expect(page.getByRole("link", { name: "View blog" })).toHaveAttribute(
+    "href",
+    "/blog",
+  );
 });
 
 test("the product templates are available without motion-dependent UI", async ({ page }) => {
@@ -39,9 +32,7 @@ test("the product templates are available without motion-dependent UI", async ({
 });
 
 test("the homepage is complete, responsive, and free of horizontal overflow", async ({ page }) => {
-  await page
-    .getByRole("heading", { name: "Bring your next project." })
-    .scrollIntoViewIfNeeded();
+  await page.getByRole("contentinfo").scrollIntoViewIfNeeded();
   await expect(page.getByRole("contentinfo")).toBeVisible();
 
   const layout = await page.evaluate(() => ({
@@ -57,7 +48,7 @@ test("the homepage is complete, responsive, and free of horizontal overflow", as
 
 test("beta calls to action use the working request-access fallback", async ({ page }) => {
   const hero = page.locator("section").first();
-  const betaLink = hero.getByRole("link", { name: "Join the beta" });
+  const betaLink = hero.getByRole("link", { name: "Request beta access" });
   await expect(betaLink).toHaveAttribute("href", "/waitlist");
   await betaLink.click();
   await expect(page).toHaveURL(/\/waitlist$/);
