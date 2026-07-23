@@ -102,12 +102,6 @@ const explorerCommands: ExplorerCommandPaletteEntry[] = [
     hint: "Show or hide the navigation sidebar",
   },
   {
-    id: "explorer.toggle_chat",
-    label: "Toggle Chat",
-    hint: "Open or close the explorer chat overlay",
-  },
-  { id: "explorer.toggle_mika", label: "Toggle Agents", hint: "Open or close Agents" },
-  {
     id: "explorer.next_workspace",
     label: "Next File Layout",
     hint: "Cycle to the next explorer tab",

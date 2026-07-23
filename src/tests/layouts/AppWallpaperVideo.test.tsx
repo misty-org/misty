@@ -6,6 +6,7 @@ import { AppWallpaperVideo } from "@/layouts/AppWallpaperVideo";
 
 describe("AppWallpaperVideo", () => {
   let container: HTMLDivElement;
+  let paused: boolean;
   let root: Root;
 
   beforeEach(() => {
@@ -13,7 +14,14 @@ describe("AppWallpaperVideo", () => {
       globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
     ).IS_REACT_ACT_ENVIRONMENT = true;
     vi.useFakeTimers();
-    vi.spyOn(HTMLMediaElement.prototype, "paused", "get").mockReturnValue(true);
+    paused = true;
+    vi.spyOn(HTMLMediaElement.prototype, "paused", "get").mockImplementation(() => paused);
+    vi.spyOn(HTMLMediaElement.prototype, "currentTime", "get").mockImplementation(() =>
+      paused ? 0 : Date.now() / 1_000,
+    );
+    vi.spyOn(HTMLMediaElement.prototype, "pause").mockImplementation(() => {
+      paused = true;
+    });
     container = document.createElement("div");
     document.body.append(container);
     root = createRoot(container);
@@ -25,14 +33,20 @@ describe("AppWallpaperVideo", () => {
     vi.useRealTimers();
   });
 
+  function startPlaying(this: HTMLMediaElement): Promise<void> {
+    paused = false;
+    this.dispatchEvent(new Event("playing"));
+    return Promise.resolve();
+  }
+
   it("keeps decorative native controls disabled", async () => {
-    vi.spyOn(HTMLMediaElement.prototype, "play").mockResolvedValue(undefined);
+    vi.spyOn(HTMLMediaElement.prototype, "play").mockImplementation(startPlaying);
 
     await act(async () => {
       root.render(<AppWallpaperVideo src="asset://wallpaper.mp4" />);
     });
     await act(async () => {
-      await vi.runAllTimersAsync();
+      await vi.advanceTimersByTimeAsync(0);
     });
 
     const video = container.querySelector("video");
@@ -48,21 +62,57 @@ describe("AppWallpaperVideo", () => {
     const play = vi
       .spyOn(HTMLMediaElement.prototype, "play")
       .mockRejectedValueOnce(new DOMException("Not ready", "NotAllowedError"))
-      .mockResolvedValue(undefined);
+      .mockImplementation(startPlaying);
 
     await act(async () => {
       root.render(<AppWallpaperVideo src="asset://wallpaper.mp4" />);
     });
     await act(async () => {
-      await vi.runAllTimersAsync();
+      await vi.advanceTimersByTimeAsync(100);
     });
     expect(play).toHaveBeenCalledTimes(2);
 
     await act(async () => {
+      paused = true;
       container.querySelector("video")?.dispatchEvent(new Event("pause"));
-      await vi.runAllTimersAsync();
+      await vi.advanceTimersByTimeAsync(0);
     });
     expect(play).toHaveBeenCalledTimes(3);
+  });
+
+  it("keeps retrying when WebKit resolves play while the video is still paused", async () => {
+    const play = vi
+      .spyOn(HTMLMediaElement.prototype, "play")
+      .mockResolvedValueOnce(undefined)
+      .mockImplementation(startPlaying);
+
+    await act(async () => {
+      root.render(<AppWallpaperVideo src="asset://wallpaper.mp4" />);
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(100);
+    });
+
+    expect(play).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not trust a non-paused state until playback is observable", async () => {
+    const play = vi
+      .spyOn(HTMLMediaElement.prototype, "play")
+      .mockImplementationOnce(() => {
+        paused = false;
+        return Promise.resolve();
+      })
+      .mockImplementation(startPlaying);
+
+    await act(async () => {
+      root.render(<AppWallpaperVideo src="asset://wallpaper.mp4" />);
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(100);
+    });
+
+    expect(play).toHaveBeenCalledTimes(2);
   });
 
   it("keeps retrying while WebKit restores playback after a reload", async () => {
@@ -79,7 +129,7 @@ describe("AppWallpaperVideo", () => {
 
     expect(play).toHaveBeenCalledTimes(6);
 
-    play.mockResolvedValue(undefined);
+    play.mockImplementation(startPlaying);
     await act(async () => {
       await vi.advanceTimersByTimeAsync(2_000);
     });
@@ -92,7 +142,7 @@ describe("AppWallpaperVideo", () => {
   });
 
   it("keeps the wallpaper visible and resumes after a pause", async () => {
-    const play = vi.spyOn(HTMLMediaElement.prototype, "play").mockResolvedValue(undefined);
+    const play = vi.spyOn(HTMLMediaElement.prototype, "play").mockImplementation(startPlaying);
 
     await act(async () => {
       root.render(<AppWallpaperVideo src="asset://wallpaper-with-audio.mp4" />);
@@ -101,22 +151,25 @@ describe("AppWallpaperVideo", () => {
     expect(video?.className).not.toContain("opacity-0");
 
     await act(async () => {
-      await vi.runAllTimersAsync();
+      await vi.advanceTimersByTimeAsync(0);
     });
     expect(play).toHaveBeenCalledTimes(1);
-    await act(async () => video?.dispatchEvent(new Event("pause")));
+    await act(async () => {
+      paused = true;
+      video?.dispatchEvent(new Event("pause"));
+    });
     expect(video?.className).not.toContain("opacity-0");
   });
 
   it("starts playback even when the app launches inactive", async () => {
     vi.spyOn(document, "visibilityState", "get").mockReturnValue("hidden");
-    const play = vi.spyOn(HTMLMediaElement.prototype, "play").mockResolvedValue(undefined);
+    const play = vi.spyOn(HTMLMediaElement.prototype, "play").mockImplementation(startPlaying);
 
     await act(async () => {
       root.render(<AppWallpaperVideo src="asset://wallpaper.mp4" />);
     });
     await act(async () => {
-      await vi.runAllTimersAsync();
+      await vi.advanceTimersByTimeAsync(0);
     });
 
     expect(play).toHaveBeenCalledTimes(1);

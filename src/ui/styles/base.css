@@ -193,15 +193,17 @@ body {
   }
 }
 
-/* Center modal content inside the usable native-webview region rather than
-   underneath the macOS titlebar inset. The overlay itself is already inset. */
+/* Center modal content inside the usable desktop workspace beside the nav and
+   below the native titlebar. The overlay itself is already vertically inset. */
 :root[data-form-factor="desktop"] [data-slot="dialog-content"],
 :root[data-form-factor="desktop"] [data-slot="alert-dialog-content"] {
+  left: calc(50% + var(--misty-desktop-nav-width) / 2);
   top: calc(50% + var(--misty-window-titlebar-inset) / 2);
+  max-width: calc(100dvw - var(--misty-desktop-nav-width) - 2rem);
 }
 
 :where(select, option, optgroup) {
-  background-color: var(--misty-dropdown-bg) !important;
+  background-color: var(--misty-runtime-popover, var(--misty-dropdown-bg)) !important;
 }
 
 @keyframes shimmer {
@@ -254,7 +256,7 @@ body {
   body {
     min-height: 0;
     overflow: hidden;
-    background: #070707;
+    background: var(--misty-page-bg);
   }
 }
 :root[data-form-factor="mobile"],
@@ -265,8 +267,8 @@ body {
   min-width: 0;
   min-height: 0;
   overflow: hidden;
-  background: #070707;
-  color: #f1f1f1;
+  background: var(--misty-page-bg);
+  color: var(--misty-text);
 }
 /* Misty design-system application layer.
    Keep new app/mobile surfaces on these tokens unless a feature needs a domain-specific accent. */

@@ -49,5 +49,7 @@ export interface AuthContextValue {
   refreshUser: () => Promise<AuthUser | null>;
   authenticateAccount: (request: () => Promise<AuthUser>) => Promise<AuthUser>;
   switchAccount: (accountId: string) => Promise<void>;
+  resumeAccount: (accountId: string) => Promise<void>;
+  removeAccount: (accountId: string) => Promise<void>;
   logout: () => Promise<void>;
 }

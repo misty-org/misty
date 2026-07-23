@@ -65,7 +65,6 @@ import {
 import { useOperationQueueStore } from "@/stores/explorer";
 import { useTransfersStore } from "@/stores/transfers";
 import { clipboardImagePng } from "../../utils/clipboardImage";
-import { publishCloudFolderBotNotification } from "@/features/bots/cloudFolderBot";
 import type { ExplorerGet, ExplorerSet } from "@/models/types/features/explorer/store/types";
 import type { ExplorerStore } from "@/models/interfaces/features/explorer/store/types";
 import { explorerRuntime, getExplorerStore } from "../runtime";
@@ -136,15 +135,6 @@ export function createShellActions(set: ExplorerSet, get: ExplorerGet): Partial<
         const width = Math.round(previewWidth);
         return state.previewWidth === width ? state : { previewWidth: width };
       }),
-    toggleChatOverlay: () => set((state) => ({ chatOverlayOpen: !state.chatOverlayOpen })),
-    toggleMikaPanel: () => set((state) => ({ mikaPanelOpen: !state.mikaPanelOpen })),
-    setMikaPanelOpen: (mikaPanelOpen) =>
-      set((state) => (state.mikaPanelOpen === mikaPanelOpen ? state : { mikaPanelOpen })),
-    setMikaPanelWidth: (mikaPanelWidth) =>
-      set((state) => {
-        const width = Math.round(mikaPanelWidth);
-        return state.mikaPanelWidth === width ? state : { mikaPanelWidth: width };
-      }),
     consumeOperationError: () => {
       const message = get().operationError;
       if (message) set({ operationError: null });
@@ -182,7 +172,6 @@ export function createShellActions(set: ExplorerSet, get: ExplorerGet): Partial<
           : state.notificationHistory,
       }));
       void H.publishDesktopNotification(notification, showDesktop);
-      void publishCloudFolderBotNotification(notification);
       if (playSound) {
         H.playNotificationSound(type);
       }

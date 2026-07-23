@@ -30,6 +30,7 @@ export function WorkspaceOverlay(props: {
 
   return createPortal(
     <div
+      data-slot="workspace-overlay"
       className={`app-pages-root ${settingsOverlayLayerClass}`}
       style={props.style}
       role="presentation"
@@ -38,6 +39,7 @@ export function WorkspaceOverlay(props: {
       }}
     >
       <div
+        data-slot="workspace-overlay-panel"
         className={settingsOverlayPanelClass}
         role="dialog"
         aria-modal="true"

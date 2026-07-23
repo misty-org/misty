@@ -1,25 +1,22 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { CSSProperties, RefObject } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
-import {
-  Check,
-  ChevronRight,
-  LogOut,
-  Plus,
-  Repeat2,
-  Settings as SettingsIcon,
-  UserCircle,
-  X,
-} from "lucide-react";
+import { Check, ChevronRight, LogOut, Plus, Repeat2, UserCircle, X } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
 import { Button } from "@/ui";
 import { useAuth } from "@/features/auth/AuthContext";
 import { useSetupStore } from "@/stores/app";
 import { useUserStore } from "@/stores/account/useUserStore";
-import { useSettingsStore } from "@/stores/app";
 import { accountChooserPopoverClass, profileMenuItemClass, profilePopoverClass } from "./styles";
 import { emailName, initialsForProfile } from "./helpers";
+import { adjacentPanelLeft, fitFloatingPanel } from "./popupGeometry";
+
+const profilePopoverWidth = 286;
+const profilePopoverFallbackHeight = 332;
+const accountChooserWidth = 320;
+const accountChooserFallbackHeight = 392;
+const viewportGutter = 8;
 
 export function ProfilePopover(props: {
   anchorRef: RefObject<HTMLButtonElement | null>;
@@ -27,7 +24,6 @@ export function ProfilePopover(props: {
   open: boolean;
   onClose: () => void;
   onOpenAccountSettings: () => void;
-  onOpenSettings: () => void;
 }) {
   const navigate = useNavigate();
   const currentUser = useSetupStore((state) => state.status?.current_user ?? null);
@@ -39,7 +35,6 @@ export function ProfilePopover(props: {
       name: state.me?.name,
     })),
   );
-  const setActiveSettingsSection = useSettingsStore((state) => state.setActiveSection);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const accountChooserRef = useRef<HTMLDivElement | null>(null);
   const switchAccountsRef = useRef<HTMLButtonElement | null>(null);
@@ -57,37 +52,78 @@ export function ProfilePopover(props: {
   const updatePosition = useCallback(() => {
     const anchor = props.anchorRef.current;
     if (!anchor) return;
-    const rect = anchor.getBoundingClientRect();
-    const width = 286;
-    const estimatedHeight = 236;
-    const left = Math.min(Math.max(8, rect.right + 10), window.innerWidth - width - 8);
-    const top = Math.min(
-      Math.max(8, rect.bottom - estimatedHeight),
-      window.innerHeight - estimatedHeight - 8,
+    const anchorRect = anchor.getBoundingClientRect();
+    const titlebarInset =
+      Number.parseFloat(
+        window
+          .getComputedStyle(document.documentElement)
+          .getPropertyValue("--misty-window-titlebar-inset"),
+      ) || 0;
+    const viewport = {
+      width: window.innerWidth,
+      height: window.innerHeight,
+      topInset: titlebarInset,
+      gutter: viewportGutter,
+    };
+    const measuredMenu = menuRef.current?.getBoundingClientRect();
+    const menuHeight = measuredMenu?.height || profilePopoverFallbackHeight;
+    const menu = fitFloatingPanel(
+      anchorRect.right + 10,
+      anchorRect.bottom - menuHeight,
+      profilePopoverWidth,
+      menuHeight,
+      viewport,
     );
     setMenuStyle((current) =>
-      current.left === left && current.top === top && current.width === width
+      current.left === menu.left &&
+      current.top === menu.top &&
+      current.width === menu.width &&
+      current.maxHeight === menu.maxHeight
         ? current
-        : { left, top, width },
+        : { left: menu.left, top: menu.top, width: menu.width, maxHeight: menu.maxHeight },
     );
-    const chooserWidth = 320;
-    const chooserLeft = left + width + 8;
+
+    const measuredChooser = accountChooserRef.current?.getBoundingClientRect();
+    const chooserHeight = measuredChooser?.height || accountChooserFallbackHeight;
+    const fittedChooser = fitFloatingPanel(0, 0, accountChooserWidth, chooserHeight, viewport);
+    const chooserLeft = adjacentPanelLeft({
+      anchorLeft: menu.left,
+      anchorWidth: menu.width,
+      panelWidth: fittedChooser.width,
+      viewportWidth: viewport.width,
+      gutter: viewportGutter,
+    });
     // Sit the chooser beside the Switch accounts row rather than anchoring it
     // to the profile button, so it opens right next to what was clicked.
     const rowRect = switchAccountsRef.current?.getBoundingClientRect();
-    const itemsHeight = accounts.length > 0 ? Math.min(accounts.length, 5) * 54 : 40;
-    const estimatedChooserHeight = Math.min(176 + itemsHeight, window.innerHeight - 16);
-    const desiredTop = rowRect ? rowRect.top - 8 : rect.bottom - estimatedChooserHeight;
-    const chooserTop = Math.min(
-      Math.max(8, desiredTop),
-      window.innerHeight - estimatedChooserHeight - 8,
+    const rowOffset =
+      rowRect && measuredMenu ? rowRect.top - measuredMenu.top : menu.height - chooserHeight;
+    const chooser = fitFloatingPanel(
+      chooserLeft,
+      menu.top + rowOffset - 8,
+      accountChooserWidth,
+      chooserHeight,
+      viewport,
     );
     setAccountChooserStyle((current) =>
-      current.left === chooserLeft && current.top === chooserTop && current.width === chooserWidth
+      current.left === chooser.left &&
+      current.top === chooser.top &&
+      current.width === chooser.width &&
+      current.maxHeight === chooser.maxHeight
         ? current
-        : { left: chooserLeft, top: chooserTop, width: chooserWidth },
+        : {
+            left: chooser.left,
+            top: chooser.top,
+            width: chooser.width,
+            maxHeight: chooser.maxHeight,
+          },
     );
-  }, [props.anchorRef, accounts.length]);
+  }, [props.anchorRef]);
+
+  useLayoutEffect(() => {
+    if (!props.open) return;
+    updatePosition();
+  }, [accountChooserOpen, accounts.length, props.open, switchError, updatePosition]);
 
   useEffect(() => {
     if (!props.open) return;
@@ -120,6 +156,14 @@ export function ProfilePopover(props: {
       window.removeEventListener("resize", updatePosition);
     };
   }, [accountChooserOpen, props.anchorRef, props.onClose, props.open, updatePosition]);
+
+  useEffect(() => {
+    if (!props.open || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(updatePosition);
+    if (menuRef.current) observer.observe(menuRef.current);
+    if (accountChooserRef.current) observer.observe(accountChooserRef.current);
+    return () => observer.disconnect();
+  }, [accountChooserOpen, props.open, updatePosition]);
 
   useEffect(() => {
     if (props.open) return;
@@ -244,23 +288,6 @@ export function ProfilePopover(props: {
           >
             <LogOut size={17} />
             <span>Log out</span>
-          </Button>
-          <div className="my-1 h-px bg-[var(--misty-border-soft)]" />
-          <span className="px-2.5 py-1 text-[10px] font-bold capitalize text-[var(--misty-text-subtle)]">
-            Misty App Settings
-          </span>
-          <Button
-            className={profileMenuItemClass}
-            type="button"
-            role="menuitem"
-            onClick={() => {
-              setActiveSettingsSection("general");
-              props.onClose();
-              props.onOpenSettings();
-            }}
-          >
-            <SettingsIcon size={17} />
-            <span>Open app settings</span>
           </Button>
         </div>
       </div>

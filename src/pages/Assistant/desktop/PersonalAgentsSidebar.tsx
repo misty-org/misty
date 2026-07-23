@@ -26,11 +26,11 @@ import {
   Textarea,
   cn,
 } from "@/ui";
-import type { PersonalAgent } from "@/models/interfaces/features/agents/personal";
+import type { PersonalAgent, ReasoningEffort } from "@/models/interfaces/features/agents/personal";
 import { personalAgentsApi, usePersonalAgentsStore } from "@/stores/agents/usePersonalAgentsStore";
 import { useSpacesStore } from "@/stores/spaces/useSpacesStore";
 import { AgentModelPicker } from "@/features/agents/components/AgentModelPicker";
-import { initialAgentModelId } from "@/features/agents/modelSelection";
+import { initialAgentModelId, modelSupportsReasoning } from "@/features/agents/modelSelection";
 import { useMikaSessionStore } from "@/stores/assistant/useMikaSessionStore";
 import { AgentChatList } from "./AgentChatList";
 
@@ -74,6 +74,7 @@ export function PersonalAgentsSidebar({
   const [description, setDescription] = useState("");
   const [instructions, setInstructions] = useState("");
   const [modelId, setModelId] = useState(initialAgentModelId);
+  const [reasoningEffort, setReasoningEffort] = useState<ReasoningEffort>("");
   const [contextPermissions, setContextPermissions] = useState(defaultContext);
   const [writeAllowed, setWriteAllowed] = useState(false);
   const [grants, setGrants] = useState<GrantDraft>({});
@@ -85,6 +86,9 @@ export function PersonalAgentsSidebar({
     void load();
   }, [load]);
 
+  const selectedModel = models.find((model) => model.id === modelId);
+  const selectedSupportsReasoning = modelSupportsReasoning(selectedModel?.capabilities);
+
   const openEditor = (agent: PersonalAgent | "new") => {
     setEditing(agent);
     setName(agent === "new" ? "" : agent.name);
@@ -95,6 +99,7 @@ export function PersonalAgentsSidebar({
         ? initialAgentModelId
         : agent.model_id,
     );
+    setReasoningEffort(agent === "new" ? "" : (agent.reasoning_effort ?? ""));
     setContextPermissions(
       agent === "new" ? defaultContext : { ...defaultContext, ...agent.context_permissions },
     );
@@ -137,6 +142,7 @@ export function PersonalAgentsSidebar({
         instructions: instructions.trim(),
         model_mode: "pinned",
         model_id: modelId,
+        reasoning_effort: selectedSupportsReasoning ? reasoningEffort || "medium" : "",
         context_permissions: contextPermissions,
         tool_permissions: { read: true, write: writeAllowed, integrations: [] },
         enabled: current?.enabled ?? true,
@@ -295,6 +301,27 @@ export function PersonalAgentsSidebar({
                 onValueChange={setModelId}
                 className="w-full border border-input bg-background"
               />
+            </Field>
+            <Field label="Reasoning effort">
+              <Select
+                value={reasoningEffort || "medium"}
+                onValueChange={(value) => setReasoningEffort(value as ReasoningEffort)}
+                disabled={!selectedSupportsReasoning}
+              >
+                <SelectTrigger className="w-full border border-input bg-background">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="low">Low</SelectItem>
+                  <SelectItem value="medium">Medium</SelectItem>
+                  <SelectItem value="high">High</SelectItem>
+                </SelectContent>
+              </Select>
+              <span className="text-xs text-muted-foreground">
+                {selectedSupportsReasoning
+                  ? "Higher effort means deeper reasoning and slower, costlier replies."
+                  : "This model doesn't support adjustable reasoning. Pick a reasoning model to enable it."}
+              </span>
             </Field>
             <fieldset className="grid gap-2 rounded-lg border border-border p-3">
               <legend className="px-1 text-sm font-medium">Readable Space context</legend>

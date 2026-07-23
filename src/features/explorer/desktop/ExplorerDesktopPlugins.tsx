@@ -9,7 +9,7 @@ export type {
 import { Input } from "@/ui";
 import { Button } from "@/ui";
 import { Popover, PopoverContent, PopoverTrigger } from "@/ui";
-import { ArrowLeft, ArrowRightLeft, Puzzle, RefreshCcw, Sparkles, Terminal, X } from "lucide-react";
+import { ArrowLeft, ArrowRightLeft, Puzzle, RefreshCcw, Terminal, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -87,8 +87,6 @@ const emptyTransferRows: TransferRecord[] = [];
 export function ExplorerTray(props: {
   terminalEnabled: boolean;
   terminalPath: string;
-  mikaEnabled: boolean;
-  onOpenMika: () => void;
   onOpenTransfers: () => void;
 }) {
   const openTerminal = useCallback(() => {
@@ -103,16 +101,6 @@ export function ExplorerTray(props: {
   return (
     <>
       <ExplorerTransfersTabButton onClick={props.onOpenTransfers} />
-      <Button
-        aria-label="Open Agents"
-        className={explorerTrayStyles.trigger}
-        disabled={!props.mikaEnabled}
-        onClick={props.onOpenMika}
-        title={props.mikaEnabled ? "Open Agents" : "Enable Agents in Settings"}
-        type="button"
-      >
-        <Sparkles size={16} />
-      </Button>
       <Button
         className={explorerTrayStyles.trigger}
         type="button"

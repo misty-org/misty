@@ -65,7 +65,6 @@ import {
 import { useOperationQueueStore } from "@/stores/explorer";
 import { useTransfersStore } from "@/stores/transfers";
 import { clipboardImagePng } from "@/features/explorer/utils/clipboardImage";
-import { publishCloudFolderBotNotification } from "@/features/bots/cloudFolderBot";
 import type { StateCreator } from "zustand";
 
 import type {
@@ -173,9 +172,6 @@ export interface ExplorerStore {
   operationError: string | null;
   notifications: ExplorerNotification[];
   notificationHistory: ExplorerNotification[];
-  chatOverlayOpen: boolean;
-  mikaPanelOpen: boolean;
-  mikaPanelWidth: number;
   clipboard: ExplorerClipboardState | null;
   pinnedPaths: string[];
   contextMenu: ExplorerContextMenuState;
@@ -269,10 +265,6 @@ export interface ExplorerStore {
   setPreviewVisible: (visible: boolean) => void;
   setSidebarWidth: (width: number) => void;
   setPreviewWidth: (width: number) => void;
-  toggleChatOverlay: () => void;
-  toggleMikaPanel: () => void;
-  setMikaPanelOpen: (open: boolean) => void;
-  setMikaPanelWidth: (width: number) => void;
   consumeOperationError: () => string | null;
   pushNotification: (
     message: string,

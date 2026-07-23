@@ -7,6 +7,7 @@ import { RenderErrorBoundary } from "@/layouts/RenderErrorBoundary";
 import { useSetupStore } from "@/stores/app";
 import { installMistyDeepLinkHandler } from "../routing/deepLinks";
 import { useAppZoom } from "@/hooks/useAppZoom";
+import { useDocumentAppAppearance } from "@/hooks/useDocumentAppAppearance";
 import { isNativeMobileBuild } from "@/platform/buildTarget";
 
 export function RootLayout(props: {
@@ -15,6 +16,7 @@ export function RootLayout(props: {
 }) {
   const navigate = useNavigate();
   const appZoom = useAppZoom();
+  useDocumentAppAppearance();
   const setupLoadStarted = useRef(false);
   const { loadSystem } = useSetupStore(
     useShallow((state) => ({

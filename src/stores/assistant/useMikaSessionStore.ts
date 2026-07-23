@@ -85,6 +85,7 @@ let activeContextSources: MikaContextSource[] = [];
 // The active chat's per-chat model, overriding the agent's configured model.
 // Null means the chat follows the agent's model (or the base default).
 let activeAgentModelOverride: string | null = null;
+let activeAgentReasoningOverride: string | null = null;
 // Chats whose model was just switched while keeping their history. The next send
 // replays the prior transcript to the new model so it continues the same thread.
 const pendingReseedConversationIds = new Set<string>();
@@ -138,6 +139,8 @@ interface StoredConversation {
   transcriptLoaded: boolean;
   /** Model this chat is pinned to, overriding the agent/base default when set. */
   modelId?: string;
+  /** Reasoning effort for this chat, overriding the agent default when set. */
+  reasoningEffort?: string;
   runtime: ConversationRuntimeSnapshot;
 }
 
@@ -309,6 +312,7 @@ function snapshotActiveConversation(
     error: state.error,
     transcriptLoaded: existing?.transcriptLoaded ?? true,
     modelId: activeAgentModelOverride ?? existing?.modelId,
+    reasoningEffort: activeAgentReasoningOverride ?? existing?.reasoningEffort,
     runtime: {
       sessionId: activeSessionId,
       lastEventSequence,
@@ -350,6 +354,7 @@ function mikaSyncDeps(scopeKey = activeConversationScopeKey) {
 function applyConversationRuntime(snapshot: StoredConversation): void {
   mikaRuntimeGeneration += 1;
   activeAgentModelOverride = snapshot.modelId ?? null;
+  activeAgentReasoningOverride = snapshot.reasoningEffort ?? null;
   activeSessionId = snapshot.runtime.sessionId;
   lastEventSequence = snapshot.runtime.lastEventSequence;
   activeRoot = snapshot.runtime.activeRoot;
@@ -525,6 +530,7 @@ export const useMikaSessionStore = create<AiSessionStore>((set, get) => ({
   activeConversationId: initialConversationId,
   conversationScopeKey: filesMikaScopeKey,
   activeModelId: "",
+  activeReasoningEffort: "",
 
   refreshStatus: async () => {
     const generation = mikaRuntimeGeneration;
@@ -597,6 +603,38 @@ export const useMikaSessionStore = create<AiSessionStore>((set, get) => ({
         status: serverStatus(false),
       });
     }
+  },
+
+  setConversationReasoning: async (effort) => {
+    const nextEffort = effort.trim();
+    if (get().status?.running) return;
+    const conversationId = get().activeConversationId;
+    if (nextEffort === (get().activeReasoningEffort || "")) return;
+    // Repin this chat's effort only; the agent's saved default is never written here.
+    activeAgentReasoningOverride = nextEffort || null;
+    const existing = conversationSnapshots.get(conversationId);
+    const priorSessionId = activeSessionId;
+    if (priorSessionId) {
+      // A server session is created with a fixed effort, so switching means opening a
+      // fresh session on the next send. History is kept and replayed for continuity.
+      resetActiveSession();
+      stopAiPolling();
+      void deleteAgentSession(priorSessionId).catch(() => undefined);
+      const clearedRuntime = existing
+        ? { ...existing.runtime, sessionId: null, lastEventSequence: 0 }
+        : undefined;
+      if (get().messages.length > 0) pendingReseedConversationIds.add(conversationId);
+      if (existing && clearedRuntime) {
+        conversationSnapshots.set(conversationId, {
+          ...existing,
+          reasoningEffort: nextEffort,
+          runtime: clearedRuntime,
+        });
+      }
+    } else if (existing) {
+      conversationSnapshots.set(conversationId, { ...existing, reasoningEffort: nextEffort });
+    }
+    set({ activeReasoningEffort: nextEffort, error: null });
   },
 
   sendPrompt: async ({ displayPrompt, prompt, cwd, selectedPaths, contextSources }) => {
@@ -907,6 +945,7 @@ export const useMikaSessionStore = create<AiSessionStore>((set, get) => ({
       activeConversationId: target.id,
       conversationScopeKey: nextScopeKey,
       activeModelId: target.modelId ?? "",
+      activeReasoningEffort: target.reasoningEffort ?? "",
       status: target.status,
       mode: target.mode,
       messages: target.messages,
@@ -941,6 +980,7 @@ export const useMikaSessionStore = create<AiSessionStore>((set, get) => ({
     set((state) => ({
       activeConversationId: id,
       activeModelId: fresh.modelId ?? "",
+      activeReasoningEffort: fresh.reasoningEffort ?? "",
       status: fresh.status,
       mode: fresh.mode,
       messages: fresh.messages,
@@ -963,6 +1003,7 @@ export const useMikaSessionStore = create<AiSessionStore>((set, get) => ({
     set({
       activeConversationId: id,
       activeModelId: target.modelId ?? "",
+      activeReasoningEffort: target.reasoningEffort ?? "",
       status: target.status,
       mode: target.mode,
       messages: target.messages,
@@ -1044,6 +1085,7 @@ export const useMikaSessionStore = create<AiSessionStore>((set, get) => ({
       set({
         activeConversationId: next.id,
         activeModelId: target.modelId ?? "",
+      activeReasoningEffort: target.reasoningEffort ?? "",
         status: target.status,
         mode: target.mode,
         messages: target.messages,
@@ -1070,6 +1112,7 @@ export function resetMikaAccountState(): void {
   activeConversationScopeKey = filesMikaScopeKey;
   activeContextSources = [];
   activeAgentModelOverride = null;
+  activeAgentReasoningOverride = null;
   pendingReseedConversationIds.clear();
   const freshId = newConversationId();
   useMikaSessionStore.setState({
@@ -1085,6 +1128,7 @@ export function resetMikaAccountState(): void {
     activeConversationId: freshId,
     conversationScopeKey: filesMikaScopeKey,
     activeModelId: "",
+    activeReasoningEffort: "",
   });
 }
 
@@ -1287,6 +1331,8 @@ async function ensureSession(generation = mikaRuntimeGeneration): Promise<string
   // treats a supplied model_id as this session's model without touching the agent.
   if (activeAgentModelOverride) sessionInput.modelId = activeAgentModelOverride;
   if (!sessionInput.agentId && !sessionInput.modelId) sessionInput.modelId = initialAgentModelId;
+  // A per-chat effort override wins over the agent's configured effort for this session.
+  if (activeAgentReasoningOverride) sessionInput.reasoningEffort = activeAgentReasoningOverride;
   const session = await createAgentSession(sessionInput);
   assertMikaRuntime(generation);
   if (scopeKey !== activeConversationScopeKey) throw new MikaRuntimeChangedError();
@@ -1298,7 +1344,7 @@ async function ensureSession(generation = mikaRuntimeGeneration): Promise<string
 
 function parseAgentScopeKey(
   scopeKey: string,
-): { agentId?: string; spaceId?: string; modelId?: string } | null {
+): { agentId?: string; spaceId?: string; modelId?: string; reasoningEffort?: string } | null {
   const marker = ":agents?";
   const offset = scopeKey.indexOf(marker);
   if (offset < 0) return null;

@@ -100,7 +100,3 @@ export interface SettingsStore {
   setShortcut: (commandId: string, shortcut: string) => void;
   saveShortcuts: () => Promise<void>;
 }
-
-export interface BotPreferences {
-  cloudFolderEnabled: boolean;
-}

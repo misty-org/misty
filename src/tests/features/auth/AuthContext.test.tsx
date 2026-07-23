@@ -63,6 +63,7 @@ const mocks = vi.hoisted(() => {
     spacesLoad,
     mikaRefresh,
     activeAccountId: accountA.id,
+    readActiveSavedAccountSession: vi.fn(),
     activateAccountSession: vi.fn(),
     accountFetchMe: vi.fn(),
     clearAccountAuthToken: vi.fn().mockResolvedValue(null),
@@ -90,6 +91,7 @@ vi.mock("@/stores/account/useAuthTokenStore", () => ({
   activateAccountSession: mocks.activateAccountSession,
   clearAccountAuthToken: mocks.clearAccountAuthToken,
   listSavedAccountSessions: () => [mocks.accountA, mocks.accountB],
+  readActiveSavedAccountSession: mocks.readActiveSavedAccountSession,
   readAccountSessionGeneration: () => 0,
   removeSavedAccountSession: mocks.removeSavedAccountSession,
   setAccountSessionTransitioning: mocks.setAccountSessionTransitioning,
@@ -162,6 +164,7 @@ describe("AuthProvider account switching", () => {
     localStorage.clear();
     localStorage.setItem("misty_user", JSON.stringify(mocks.accountA));
     mocks.activeAccountId = mocks.accountA.id;
+    mocks.readActiveSavedAccountSession.mockReset().mockReturnValue(mocks.accountA);
     mocks.userState.me = mocks.meA;
     mocks.activateAccountSession.mockReset().mockImplementation(async (accountId: string) => {
       mocks.activeAccountId = accountId;
@@ -301,5 +304,28 @@ describe("AuthProvider account switching", () => {
       avatarVersion: 3,
       currentPlan: "pro",
     });
+  });
+
+  it("restores the active saved account before protected pages render", async () => {
+    localStorage.removeItem("misty_user");
+
+    function Probe() {
+      auth = useAuth();
+      return null;
+    }
+
+    await act(async () => {
+      root!.render(
+        <MemoryRouter>
+          <AuthProvider>
+            <Probe />
+          </AuthProvider>
+        </MemoryRouter>,
+      );
+      await Promise.resolve();
+    });
+
+    expect(auth?.user?.id).toBe(mocks.accountA.id);
+    expect(mocks.accountFetchMe).toHaveBeenCalled();
   });
 });

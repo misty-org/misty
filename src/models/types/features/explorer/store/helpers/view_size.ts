@@ -65,7 +65,6 @@ import {
 import { useOperationQueueStore } from "@/stores/explorer";
 import { useTransfersStore } from "@/stores/transfers";
 import { clipboardImagePng } from "@/features/explorer/utils/clipboardImage";
-import { publishCloudFolderBotNotification } from "@/features/bots/cloudFolderBot";
 import type {
   ExplorerSortColumn,
   ExplorerSortDirection,

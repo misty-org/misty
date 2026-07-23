@@ -1,4 +1,4 @@
-import { ArrowUp, ChevronDown, Plus, ShieldAlert, X } from "lucide-react";
+import { ArrowUp, ChevronDown, Gauge, Plus, ShieldAlert, X } from "lucide-react";
 import { Button } from "@/ui";
 import {
   DropdownMenu,
@@ -11,9 +11,7 @@ import type { AiMode } from "@/models/types/stores/assistant/useAiServerStore";
 import type { GatewayModel } from "@/models/interfaces/features/agents/personal";
 import { AgentModelPicker } from "@/features/agents/components/AgentModelPicker";
 
-// The composer bar shared by every "chat window" style Mika surface: the
-// floating Explorer chat window and the full-page Assistant view. Keeping
-// this in one place means both stay visually identical instead of drifting.
+// Shared composer actions for full-page Agent and Space conversations.
 export function AssistantComposerActions(props: {
   mode: AiMode;
   modelName: string;
@@ -28,6 +26,9 @@ export function AssistantComposerActions(props: {
   modelOptions?: GatewayModel[];
   selectedModelId?: string;
   onSelectModel?: (modelId: string) => void;
+  reasoningEffort?: string;
+  reasoningSupported?: boolean;
+  onSelectReasoning?: (effort: string) => void;
 }) {
   const showAccessControls = props.showAccessControls !== false;
   return (
@@ -76,6 +77,33 @@ export function AssistantComposerActions(props: {
         )}
       </div>
       <div className="flex shrink-0 items-center gap-1">
+        {props.onSelectReasoning && props.reasoningSupported ? (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                className="h-9 gap-1.5 px-2.5 text-sm text-muted-foreground"
+                type="button"
+                disabled={props.running}
+                title="Reasoning effort"
+              >
+                <Gauge size={16} className="shrink-0" />
+                <span className="capitalize">{props.reasoningEffort || "medium"}</span>
+                <ChevronDown size={15} />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" side="top" className="w-36">
+              <DropdownMenuRadioGroup
+                value={props.reasoningEffort || "medium"}
+                onValueChange={props.onSelectReasoning}
+              >
+                <DropdownMenuRadioItem value="low">Low</DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="medium">Medium</DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="high">High</DropdownMenuRadioItem>
+              </DropdownMenuRadioGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        ) : null}
         {props.modelOptions && props.onSelectModel ? (
           <AgentModelPicker
             models={props.modelOptions}

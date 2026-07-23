@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AgentModelPicker } from "@/features/agents/components/AgentModelPicker";
 import { initialAgentModelId, initialAgentModelName } from "@/features/agents/modelSelection";
 import type { GatewayModel } from "@/models/interfaces/features/agents/personal";
+import { Dialog, DialogContent, DialogTitle } from "@/ui";
 
 describe("AgentModelPicker", () => {
   let container: HTMLDivElement;
@@ -83,5 +84,49 @@ describe("AgentModelPicker", () => {
     expect(container.textContent).toContain("Choose a model");
     expect(container.textContent).not.toContain("Default");
     expect(container.textContent).not.toContain("Automatic");
+  });
+
+  it("allows its portaled model list to scroll from inside a modal dialog", async () => {
+    const models: GatewayModel[] = Array.from({ length: 72 }, (_, index) => ({
+      id: `provider/model-${index}`,
+      name: `Model ${index}`,
+      capabilities: ["language"],
+    }));
+
+    await act(async () => {
+      root.render(
+        <Dialog defaultOpen>
+          <DialogContent>
+            <DialogTitle>Configure Agent</DialogTitle>
+            <AgentModelPicker models={models} value={models[0].id} onValueChange={vi.fn()} />
+          </DialogContent>
+        </Dialog>,
+      );
+    });
+
+    const trigger = document.querySelector<HTMLButtonElement>('[aria-label="Model: Model 0"]');
+    await act(async () => {
+      trigger?.click();
+      await Promise.resolve();
+    });
+
+    const list = document.querySelector<HTMLElement>("[cmdk-list]");
+    expect(list).not.toBeNull();
+    if (!list) return;
+
+    list.style.overflowY = "auto";
+    Object.defineProperties(list, {
+      clientHeight: { configurable: true, value: 300 },
+      scrollHeight: { configurable: true, value: 1_000 },
+      scrollTop: { configurable: true, value: 0, writable: true },
+    });
+    const wheel = new WheelEvent("wheel", {
+      bubbles: true,
+      cancelable: true,
+      deltaY: 100,
+    });
+    list.dispatchEvent(wheel);
+
+    expect(wheel.defaultPrevented).toBe(false);
   });
 });

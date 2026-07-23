@@ -45,9 +45,6 @@ export const useExplorerStore = create<ExplorerStore>(
       previewWidth: 300,
       sort: { column: "name", direction: "asc" },
       paneSorts: {},
-      chatOverlayOpen: false,
-      mikaPanelOpen: false,
-      mikaPanelWidth: 380,
 
       ...createWorkspaceActions(set, get),
       ...createNavigationActions(set, get),

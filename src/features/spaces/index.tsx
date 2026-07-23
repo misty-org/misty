@@ -29,7 +29,7 @@ const validSettingsSections = new Set(["general", "chat", "integrations"]);
 
 export function SpaceDetail() {
   const { spaceId = "", section = "chat", studioKind = "" } = useParams();
-  const { user } = useAuth();
+  const { user, accounts, transitioning } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const { spaces, snapshotReady, loading, error, loadSpace, clearError } = useSpacesStore(
@@ -58,6 +58,21 @@ export function SpaceDetail() {
     return <Navigate to={`/spaces/${encodeURIComponent(spaceId)}/settings/general`} replace />;
   }
 
+  const returnPath = `${location.pathname}${location.search}${location.hash}`;
+  if (!user && transitioning) {
+    return (
+      <LoadingState
+        className="h-full"
+        title="Switching accounts"
+        description="Restoring your Misty session…"
+      />
+    );
+  }
+
+  if (!user && accounts.length > 0) {
+    return <Navigate to="/signin" state={{ from: returnPath }} replace />;
+  }
+
   if (!user) {
     return (
       <PermissionState
@@ -69,7 +84,7 @@ export function SpaceDetail() {
             type="button"
             onClick={() =>
               navigate("/signin", {
-                state: { from: `${location.pathname}${location.search}${location.hash}` },
+                state: { from: returnPath },
               })
             }
           >

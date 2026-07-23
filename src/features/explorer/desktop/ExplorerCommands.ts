@@ -60,8 +60,6 @@ export const executableShortcutCommands = [
   "explorer.restore_pane",
   "explorer.split_vertical",
   "explorer.split_horizontal",
-  "explorer.toggle_chat",
-  "explorer.toggle_mika",
   "explorer.next_workspace",
   "explorer.tab_1",
   "explorer.tab_2",
@@ -89,8 +87,6 @@ const defaultMacExplorerShortcuts: ShortcutMap = {
   "explorer.delete": "Delete",
   "explorer.rename": "F2",
   "explorer.refresh": "Cmd+R",
-  "explorer.toggle_chat": "Cmd+J",
-  "explorer.toggle_mika": "Cmd+Shift+A",
   "explorer.next_workspace": "Cmd+Shift+Grave",
   "explorer.new_tab": "Cmd+T",
   "explorer.restore_tab": "Cmd+Shift+T",
@@ -124,8 +120,6 @@ const defaultNonMacExplorerShortcuts: ShortcutMap = {
   "explorer.delete": "Delete",
   "explorer.rename": "F2",
   "explorer.refresh": "Ctrl+R",
-  "explorer.toggle_chat": "Ctrl+J",
-  "explorer.toggle_mika": "Ctrl+Shift+A",
   "explorer.next_workspace": "Ctrl+Shift+Grave",
   "explorer.new_tab": "Ctrl+T",
   "explorer.restore_tab": "Ctrl+Shift+T",
@@ -280,10 +274,6 @@ export function runExplorerCommand(
       break;
     case "explorer.sidebar.toggle":
       toggleActiveTabPanelVisibility("sidebar");
-      break;
-    case "explorer.toggle_chat":
-    case "explorer.toggle_mika":
-      explorer.toggleMikaPanel();
       break;
     case "explorer.next_workspace": {
       if (multi.tabs.length <= 1) break;

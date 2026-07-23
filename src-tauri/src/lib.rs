@@ -5,8 +5,6 @@ mod core;
 mod error;
 #[cfg(desktop)]
 mod extension_protocol;
-#[cfg(desktop)]
-mod mika_physics;
 mod plugins;
 mod runtime;
 mod services;
@@ -136,8 +134,6 @@ pub fn run() {
             let runtime = MistyRuntime::new();
             app.manage(runtime);
             #[cfg(desktop)]
-            app.manage(mika_physics::MikaPhysicsState::default());
-            #[cfg(desktop)]
             if let Err(error) = tray::setup(app) {
                 let error = std::io::Error::other(error);
                 telemetry::PostHogTelemetryReporter
@@ -189,10 +185,6 @@ pub fn run() {
             mac_rounded_corners::enable_modern_window_style,
             mac_rounded_corners::enable_custom_titlebar_window_style,
             mac_rounded_corners::reposition_traffic_lights,
-            #[cfg(desktop)]
-            mika_physics::start_mika_drag,
-            #[cfg(desktop)]
-            mika_physics::cancel_mika_momentum,
             app_snapshot,
             app_environment_snapshot,
             agents_device_snapshot,

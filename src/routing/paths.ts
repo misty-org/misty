@@ -25,5 +25,4 @@ export const routes = {
   settings: "/settings",
   signIn: "/signin",
   transfers: "/transfers",
-  cloudFolderBot: "/bot/cloud-folder",
 } as const;

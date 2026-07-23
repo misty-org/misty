@@ -63,20 +63,6 @@ import type { AppTab } from "@/models/types/routing/types";
 import type { TransferStatus } from "@/models/types/services/misty-api";
 import type { TransferRecord } from "@/models/interfaces/services/misty-api";
 import { isAndroidBuild, isNativeMobileBuild } from "@/platform/buildTarget";
-import {
-  closeCloudFolderBotWindow,
-  cloudFolderBotChatVisibilityEvent,
-  cloudFolderBotContextRequestEvent,
-  cloudFolderBotDismissEvent,
-  cloudFolderBotOpenAssistantEvent,
-  cloudFolderBotReturnToAppEvent,
-  openCloudFolderBotChatWindow,
-  openCloudFolderBotWindow,
-  publishCloudFolderBotChatVisibility,
-  setCloudFolderBotWindowVisible,
-  publishCloudFolderBotContext,
-} from "@/features/bots/cloudFolderBot";
-import type { CloudFolderBotChatVisibility } from "@/models/interfaces/features/bots/cloudFolderBot";
 import { useMultiPanelStore } from "@/features/workspace";
 import { DeepSearchOverlay } from "@/features/explorer/components/DeepSearchOverlay";
 import { MediaSearchViewer } from "@/features/explorer/components/MediaSearchViewer";
