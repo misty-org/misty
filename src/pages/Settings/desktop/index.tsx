@@ -67,7 +67,7 @@ import {
 const appNavItems: NavItem[] = [
   { id: "general", label: "General", icon: Rows3 },
   { id: "app", label: "App", icon: AppWindow },
-  { id: "assistant", label: "Assistant", icon: Bot },
+  { id: "assistant", label: "Agents", icon: Bot },
   { id: "appearance", label: "Appearance", icon: Eye },
   { id: "privacy", label: "Privacy", icon: Lock },
   { id: "transfers", label: "Transfers", icon: ArrowLeftRight },
@@ -82,7 +82,7 @@ const navItems = appNavItems;
 const sectionDescriptions: Record<SettingsSection, string> = {
   general: "Files startup, default actions, and browsing behavior.",
   app: "Updates, version details, and local support information.",
-  assistant: "Control Mika and the actions it can perform.",
+  assistant: "Control Agents and the actions they can perform.",
   appearance: "Theme, density, wallpaper, text size, and motion.",
   privacy: "Choose what diagnostic data Misty may share.",
   transfers: "Defaults for copies, downloads, and destinations.",
@@ -365,10 +365,10 @@ function AssistantSettings(props: SettingsContentProps) {
 
   return (
     <>
-      <SettingsSectionBlock title="Mika">
+      <SettingsSectionBlock title="Agents">
         <SettingsRow
-          label="Enable Mika"
-          description="Show Mika and allow the assistant to help with files and folders."
+          label="Enable Agents"
+          description="Show Agents and let them help with files and folders."
           last
         >
           <SwitchControl
@@ -382,7 +382,7 @@ function AssistantSettings(props: SettingsContentProps) {
       <SettingsSectionBlock title="Permissions">
         <SettingsRow
           label="Files"
-          description="Allow Mika to inspect and organize files in the active Files folder."
+          description="Allow Agents to inspect and organize files in the active Files folder."
         >
           <SwitchControl
             checked={assistant.scopes.filesAllowed}
@@ -392,7 +392,7 @@ function AssistantSettings(props: SettingsContentProps) {
         </SettingsRow>
         <SettingsRow
           label="Cleanup"
-          description="Allow Mika to identify clutter and propose cleanup actions."
+          description="Allow Agents to identify clutter and propose cleanup actions."
         >
           <SwitchControl
             checked={assistant.scopes.cleanupAllowed}
@@ -402,7 +402,7 @@ function AssistantSettings(props: SettingsContentProps) {
         </SettingsRow>
         <SettingsRow
           label="Search"
-          description="Allow Mika to search indexed files and folders."
+          description="Allow Agents to search indexed files and folders."
           last
         >
           <SwitchControl

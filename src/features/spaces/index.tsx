@@ -9,7 +9,6 @@ import { useSpacesStore } from "@/stores/spaces/useSpacesStore";
 
 import { SpaceNotes } from "@/features/notes/SpaceNotes";
 import { SpaceChat } from "./SpaceChat";
-import { SpaceAssistant } from "./SpaceAssistant";
 import { SpaceLibrary } from "./SpaceLibrary";
 import { SpaceTasksCalendar } from "./SpaceTasksCalendar";
 import { SpaceMembers } from "./components/SpaceMembers";
@@ -161,13 +160,7 @@ export function SpaceDetail() {
           <SpaceNotes key={`notes:${spaceId}`} spaceId={spaceId} spaceName={space.name} />
         )
       ) : section === "assistant" ? (
-        <SpaceAssistant
-          key={`assistant:${user.id}:${spaceId}`}
-          accountId={user.id}
-          spaceId={spaceId}
-          spaceName={space.name}
-          permissions={space.permissions}
-        />
+        <Navigate to={`/agents?spaceId=${encodeURIComponent(spaceId)}`} replace />
       ) : section === "members" ? (
         <SpaceMembers key={`members:${spaceId}`} spaceId={spaceId} />
       ) : section === "settings" ? (

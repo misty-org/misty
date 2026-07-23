@@ -130,6 +130,21 @@ describe("buildMessageSpans", () => {
       { type: "text", text: "@Mika summarize these files" },
     ]);
   });
+
+  it("requires a picker selection when Agent names are ambiguous", () => {
+    const duplicate = { ...agent, id: "agent-helper-two" };
+    expect(buildMessageSpans("@Helper help", [], [agent, duplicate])).toEqual([
+      { type: "text", text: "@Helper help" },
+    ]);
+    expect(
+      buildMessageSpans("@Helper help", [], [agent, duplicate], {
+        helper: "agent-helper-two",
+      }),
+    ).toEqual([
+      { type: "mention", agent_id: "agent-helper-two", label: "Helper" },
+      { type: "text", text: " help" },
+    ]);
+  });
 });
 
 describe("Space loading access boundary", () => {
@@ -226,7 +241,7 @@ describe("Spaces mutations", () => {
     expect(useSpacesStore.getState().messagesBySpace[original.space_id]).toEqual([edited]);
   });
 
-  it("keeps the sent message without reactivating beta-hidden Agent failures", async () => {
+  it("sends accessible Agent mentions as structured spans", async () => {
     const sent = messageFixture({
       content: [{ type: "mention", agent_id: agent.id, label: agent.name }],
     });
@@ -246,7 +261,7 @@ describe("Spaces mutations", () => {
     await useSpacesStore.getState().sendMessage(sent.space_id, `@${agent.name}`);
 
     expect(apiMocks.sendMessage.mock.calls[0]?.[1]).toEqual([
-      { type: "text", text: `@${agent.name}` },
+      { type: "mention", agent_id: agent.id, label: agent.name },
     ]);
     expect(useSpacesStore.getState().messagesBySpace[sent.space_id]).toEqual([sent]);
     expect(useSpacesStore.getState().error).toBeNull();

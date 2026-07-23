@@ -1,5 +1,10 @@
 import { agentArchitectureApi } from "@/stores/agents/useAgentArchitectureStore";
 import type { MikaDelegationResult } from "@/models/interfaces/features/spaces/types";
+import {
+  initialAgentModelId,
+  initialAgentModelName,
+  selectedAgentModelName,
+} from "@/features/agents/modelSelection";
 
 const pendingDelegatedRunIDs = new Set<string>();
 
@@ -19,13 +24,20 @@ export async function tryMikaSpaceDelegation(
 }
 
 export function publicMikaModel(model: string): string {
-  return model === "mika-med" || model === "mika-high" ? model : "mika-low";
+  const normalized = model.trim();
+  return isInternalModelLabel(normalized) ? initialAgentModelId : normalized || initialAgentModelId;
 }
 
 export function publicMikaDisplayName(model: string, modelName?: string): string {
-  const expected =
-    model === "mika-med" ? "Mika Med" : model === "mika-high" ? "Mika High" : "Mika Low";
-  return modelName === expected ? modelName : expected;
+  const normalizedName = modelName?.trim() ?? "";
+  if (isInternalModelLabel(model) || isInternalModelLabel(normalizedName)) {
+    return initialAgentModelName;
+  }
+  return normalizedName || selectedAgentModelName(model);
+}
+
+function isInternalModelLabel(value: string): boolean {
+  return /^(automatic(?: routing)?|mika[ -]?(?:low|med|medium|high))$/i.test(value.trim());
 }
 
 export function mikaDelegationMessage(result: MikaDelegationResult): string {

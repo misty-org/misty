@@ -203,7 +203,7 @@ export default function SpacesShell() {
             <DialogHeader>
               <DialogTitle>Create a Space</DialogTitle>
               <DialogDescription>
-                It starts private. You can own three Spaces total, including your personal Space.
+                It starts private. Create as many Spaces as your work needs.
               </DialogDescription>
             </DialogHeader>
             <label className="mt-5 grid gap-2 text-xs font-medium text-muted-foreground">
@@ -217,9 +217,7 @@ export default function SpacesShell() {
               />
             </label>
             <p className="mb-0 mt-3 text-[11px] text-muted-foreground">
-              {limits
-                ? `${limits.owned} of ${limits.owned_limit} ownership slots used · ${limits.remaining_owned} remaining`
-                : "Checking ownership slots..."}
+              Spaces and collaborators are unlimited. Hosted files share your account storage pool.
             </p>
             {error ? (
               <p

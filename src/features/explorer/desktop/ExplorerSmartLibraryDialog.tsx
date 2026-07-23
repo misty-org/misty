@@ -88,7 +88,7 @@ export function SmartLibraryDialog(props: { workingDirectory: string; onClose: (
     const selected = await open({
       directory: true,
       multiple: false,
-      title: "Choose one Mika Library folder",
+      title: "Choose one Smart Library folder",
     });
     if (typeof selected === "string") await chooseFolder(selected);
   };
@@ -116,7 +116,7 @@ export function SmartLibraryDialog(props: { workingDirectory: string; onClose: (
                 <Images size={20} />
               </span>
               <div className="min-w-0">
-                <DialogTitle>Mika Library</DialogTitle>
+                <DialogTitle>Smart Library</DialogTitle>
                 <DialogDescription className="mt-1 truncate">
                   Scan, review, and manage semantic metadata for Explorer search.
                 </DialogDescription>
@@ -152,7 +152,7 @@ export function SmartLibraryDialog(props: { workingDirectory: string; onClose: (
                 title={loaded ? "Scanning this folder" : "Loading your Library"}
                 text={
                   loaded
-                    ? "Reading filenames, formats, dates, and fingerprints locally. This does not use AI credits."
+                    ? "Reading filenames, formats, dates, and fingerprints locally. This does not use hosted AI."
                     : "Opening the private device catalog…"
                 }
               />
@@ -271,7 +271,7 @@ export function SmartLibraryDialog(props: { workingDirectory: string; onClose: (
                       {failedAssets.length > 0 ? (
                         <p className="m-0 text-sm text-destructive">
                           {failedAssets.length} file{failedAssets.length === 1 ? "" : "s"} failed.
-                          Mika does not charge for failed analysis or infrastructure retries.
+                          Failed analysis and infrastructure retries do not use hosted AI.
                         </p>
                       ) : null}
                     </div>
@@ -291,7 +291,7 @@ export function SmartLibraryDialog(props: { workingDirectory: string; onClose: (
 
       <ConfirmationDialog
         open={confirmDelete}
-        title="Remove Mika Library?"
+        title="Remove Smart Library?"
         description="Remove this device catalog and its generated semantic metadata. Original files stay in place."
         confirmLabel="Remove Library"
         destructive
@@ -309,7 +309,7 @@ export function SmartLibraryDialog(props: { workingDirectory: string; onClose: (
       <ConfirmationDialog
         open={confirmIndexUpgrade}
         title="Improve metadata and search?"
-        description={`${indexStatus?.outdatedAssets ?? reindexPlan?.assets.length ?? 0} assets need index v${reindexPlan?.targetVersion ?? "latest"}. Misty may resend private path-free previews and use a small amount of Mika processing. It never runs automatically.`}
+        description={`${indexStatus?.outdatedAssets ?? reindexPlan?.assets.length ?? 0} assets need index v${reindexPlan?.targetVersion ?? "latest"}. This batch uses about ${Math.ceil((reindexPlan?.hostedAIWeeklyRatio ?? 0) * 100)}% of your weekly hosted AI usage. Misty may resend private path-free previews, and it never runs automatically.`}
         confirmLabel="Approve Improvements"
         confirmDisabled={!reindexPlan}
         onOpenChange={setConfirmIndexUpgrade}
@@ -336,8 +336,8 @@ function LibraryOnboarding(props: {
             Understand your files, not just their folders.
           </h3>
           <p className="m-0 mx-auto max-w-2xl text-sm leading-relaxed text-muted-foreground">
-            Mika first scans one folder for free, then analyzes a representative 25-file sample.
-            Originals stay where they are; organization is virtual and reversible.
+            Smart Library first scans one folder locally, then analyzes a representative 25-file
+            sample. Originals stay where they are; organization is virtual and reversible.
           </p>
         </div>
         <div className="grid w-full grid-cols-1 gap-3 text-left sm:grid-cols-3">

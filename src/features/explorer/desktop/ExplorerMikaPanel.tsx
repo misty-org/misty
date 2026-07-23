@@ -28,6 +28,7 @@ import {
 } from "./ExplorerAssistantShared";
 import { assistantPanelStyles } from "./ExplorerAssistantStyles";
 import { cx } from "./ExplorerDesktopShared";
+import { initialAgentModelName } from "@/features/agents/modelSelection";
 
 export const ExplorerMikaPanel = memo(function ExplorerMikaPanel(props: ExplorerMikaPanelProps) {
   const assetsDir = useAppStore((state) => state.app?.environment.assetsDir);
@@ -120,7 +121,7 @@ export const ExplorerMikaPanel = memo(function ExplorerMikaPanel(props: Explorer
   }, [prompt, running, selectedPaths, sendPrompt, workingDirectory]);
 
   return (
-    <aside className={mikaPanelClass(props.surface)} aria-label="Mika Assistant">
+    <aside className={mikaPanelClass(props.surface)} aria-label="Agents">
       <header
         className={cx(
           assistantPanelStyles.header,
@@ -137,7 +138,7 @@ export const ExplorerMikaPanel = memo(function ExplorerMikaPanel(props: Explorer
         <span
           className={cx(assistantPanelStyles.headerTitle, assistantPanelStyles.mikaHeaderTitle)}
         >
-          Mika{" "}
+          Agents{" "}
           {running ? <small className={assistantPanelStyles.runningBadge}>Running</small> : null}
         </span>
         <div className={assistantPanelStyles.headerActions}>
@@ -148,7 +149,7 @@ export const ExplorerMikaPanel = memo(function ExplorerMikaPanel(props: Explorer
                 size="icon"
                 className={assistantPanelStyles.headerButton}
                 type="button"
-                aria-label="Mika context"
+                aria-label="Agent context"
               >
                 <Info size={17} />
               </Button>
@@ -166,7 +167,7 @@ export const ExplorerMikaPanel = memo(function ExplorerMikaPanel(props: Explorer
             size="icon"
             className={assistantPanelStyles.headerButton}
             type="button"
-            aria-label="Close Mika"
+            aria-label="Close Agents"
             onClick={props.onClose ?? (() => useExplorerStore.getState().setMikaPanelOpen(false))}
           >
             <X size={18} />
@@ -242,7 +243,10 @@ export const ExplorerMikaPanel = memo(function ExplorerMikaPanel(props: Explorer
               ref={promptRef}
               value={prompt}
               rows={chatWindow ? 1 : 3}
-              placeholder={assistantPlaceholder(configured, "Ask Mika to organize this folder...")}
+              placeholder={assistantPlaceholder(
+                configured,
+                "Ask an agent to organize this folder...",
+              )}
               disabled={!configured || running}
               onChange={(event) => setPrompt(event.target.value)}
               onKeyDown={(event) => {
@@ -255,7 +259,7 @@ export const ExplorerMikaPanel = memo(function ExplorerMikaPanel(props: Explorer
             {chatWindow ? (
               <AssistantComposerActions
                 mode={mode}
-                modelName={status?.modelName ?? "Mika"}
+                modelName={status?.modelName ?? initialAgentModelName}
                 configured={configured}
                 running={running}
                 prompt={prompt}
@@ -271,7 +275,7 @@ export const ExplorerMikaPanel = memo(function ExplorerMikaPanel(props: Explorer
                   value={mode === "full" ? "auto" : mode}
                   onValueChange={(value) => setMode(value as Parameters<typeof setMode>[0])}
                 >
-                  <SelectTrigger className="h-9 w-32" aria-label="Mika mode">
+                  <SelectTrigger className="h-9 w-32" aria-label="Agent mode">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -282,7 +286,7 @@ export const ExplorerMikaPanel = memo(function ExplorerMikaPanel(props: Explorer
                 {running ? (
                   <Button
                     type="button"
-                    title="Cancel the active Mika gateway request."
+                    title="Cancel the active agent request."
                     onClick={abortPrompt}
                   >
                     Stop
@@ -299,14 +303,14 @@ export const ExplorerMikaPanel = memo(function ExplorerMikaPanel(props: Explorer
         {chatWindow ? null : (
           <footer className={assistantPanelStyles.mikaFooter}>
             <Sparkles size={15} />
-            Mika can make mistakes. Review file plans before applying them.
+            Agents can make mistakes. Review file plans before applying them.
           </footer>
         )}
       </div>
       {contextPickerOpen ? (
         <MistyPicker
           multiple
-          title="Add files as context for Mika"
+          title="Add files as agent context"
           onCancel={() => setContextPickerOpen(false)}
           onChooseFiles={(paths) => {
             setManualContextPaths((current) => [...new Set([...current, ...paths])]);

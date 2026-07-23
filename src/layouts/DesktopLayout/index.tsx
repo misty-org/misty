@@ -71,11 +71,13 @@ import {
   SettingsOverlay,
 } from "./SettingsOverlays";
 import { FramePacingOverlay } from "./FramePacingOverlay";
+import { useAuth } from "@/features/auth/AuthContext";
 
 export function DesktopLayout(props: {
   getRouteId: (pathname: string) => AppTab;
   navItems: DesktopNavItem[];
 }) {
+  const { refreshUser } = useAuth();
   const {
     location,
     navigate,
@@ -146,6 +148,9 @@ export function DesktopLayout(props: {
   const [accountSettingsOpen, setAccountSettingsOpen] = useState(false);
   const [remotesOpen, setRemotesOpen] = useState(false);
   const navItems = props.navItems;
+  const refreshUserAfterSettings = useCallback(() => {
+    void refreshUser().catch(() => undefined);
+  }, [refreshUser]);
   const openSettingsOverlay = useCallback(() => {
     setAccountSettingsOpen(false);
     setSettingsOpen(true);
@@ -153,14 +158,16 @@ export function DesktopLayout(props: {
   }, [settingsLoad]);
   const closeSettingsOverlay = useCallback(() => {
     setSettingsOpen(false);
-  }, []);
+    refreshUserAfterSettings();
+  }, [refreshUserAfterSettings]);
   const openAccountSettingsOverlay = useCallback(() => {
     setSettingsOpen(false);
     setAccountSettingsOpen(true);
   }, []);
   const closeAccountSettingsOverlay = useCallback(() => {
     setAccountSettingsOpen(false);
-  }, []);
+    refreshUserAfterSettings();
+  }, [refreshUserAfterSettings]);
   const openRemotesOverlay = useCallback(() => {
     setSettingsOpen(false);
     setAccountSettingsOpen(false);

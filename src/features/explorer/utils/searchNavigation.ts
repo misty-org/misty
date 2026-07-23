@@ -17,6 +17,14 @@ export async function revealSearchResultInPane(
   paneId: string,
   target: ExplorerSearchNavigationTarget,
 ): Promise<void> {
+  if (
+    target.result.entry.location.providerType === "misty-space" &&
+    target.result.entry.location.remotePath
+  ) {
+    window.history.pushState({}, "", target.result.entry.location.remotePath);
+    window.dispatchEvent(new PopStateEvent("popstate"));
+    return;
+  }
   await useExplorerStore.getState().navigatePane(paneId, target.path);
   if (target.result.match?.mediaSegmentId) useMediaViewerStore.getState().open(target.result);
   const pane = useExplorerStore.getState().panes[paneId];

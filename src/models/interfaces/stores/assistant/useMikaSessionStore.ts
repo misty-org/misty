@@ -93,6 +93,8 @@ export interface AiConversationSummary {
   id: string;
   title: string;
   updatedAt: number;
+  /** Fixed at creation; drives a stable list order so rows never reshuffle. */
+  createdAt: number;
 }
 
 export interface AiSessionStore {
@@ -105,8 +107,19 @@ export interface AiSessionStore {
   conversations: AiConversationSummary[];
   activeConversationId: string;
   conversationScopeKey: string;
+  /**
+   * The model this chat is pinned to, overriding the agent's configured model.
+   * Empty means the chat follows the agent's own model (or the base default).
+   */
+  activeModelId: string;
   refreshStatus: () => Promise<void>;
   setMode: (mode: AiMode) => void;
+  /**
+   * Repins the active chat to a different model without touching the agent's
+   * saved model. `resend` replays the existing transcript to the new model on
+   * the next send (costly); otherwise the chat is reset to an empty history.
+   */
+  setConversationModel: (modelId: string, options: { resend: boolean }) => Promise<void>;
   sendPrompt: (request: SendAiPromptRequest) => Promise<void>;
   approveToolRequest: (requestId: string) => Promise<void>;
   approvePlan: (planId: string) => Promise<void>;
@@ -117,5 +130,6 @@ export interface AiSessionStore {
   /** Merges the account's server-side sessions into the local list. Safe to call repeatedly. */
   hydrateConversations: () => Promise<void>;
   switchConversation: (id: string) => Promise<void>;
+  renameConversation: (id: string, title: string) => Promise<void>;
   deleteConversationSession: (id: string) => Promise<void>;
 }

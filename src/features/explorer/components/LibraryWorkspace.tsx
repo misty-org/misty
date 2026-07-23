@@ -389,7 +389,7 @@ export function LibraryWorkspace(props: {
               <div>
                 <h2 className="m-0 text-xl font-bold">Tags</h2>
                 <p className="m-0 mt-1 text-sm text-muted-foreground">
-                  Mika adds tags during analysis. Open a file to review, remove, or add one.
+                  Agents add tags during analysis. Open a file to review, remove, or add one.
                 </p>
               </div>
               <div className="flex h-9 w-full min-w-0 items-center gap-2 rounded-md border border-input bg-transparent px-3 sm:w-[260px]">
@@ -693,7 +693,7 @@ function MediaLibraryPanel() {
         <p className="m-0 mt-1 text-muted-foreground">
           Misty strips paths and metadata, sends 30-second compressed audio with up to four
           shot-aware 512px frames, and remembers progress across restarts. Each file is limited to
-          120 minutes; total minutes are unlimited and always confirmed with a credit estimate.
+          120 minutes; total minutes are unlimited and always confirmed with a weekly hosted AI estimate.
           Failed or abandoned incomplete indexes are removed from the server after 30 days.
         </p>
       </div>

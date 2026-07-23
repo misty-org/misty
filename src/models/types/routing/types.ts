@@ -3,6 +3,7 @@ export type AppTab =
   | "spaces"
   | "assistant"
   | "agents"
+  | "extensions"
   | "transfers"
   | "providers"
   | "home"

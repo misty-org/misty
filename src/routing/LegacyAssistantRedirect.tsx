@@ -7,24 +7,12 @@ import { routes } from "./paths";
 
 export function legacyAssistantDestination(
   search: string,
-  accessibleSpaceIds?: ReadonlySet<string>,
+  _accessibleSpaceIds?: ReadonlySet<string>,
 ): string {
   const params = new URLSearchParams(search);
-  const spaceId = params.get("spaceId")?.trim() ?? "";
-  params.delete("spaceId");
-
-  if (spaceId && accessibleSpaceIds?.has(spaceId)) {
-    // File-system paths belong to the private Files assistant and must not be
-    // carried into a collaborative Space URL.
-    params.delete("path");
-    params.delete("paths");
-    params.delete("mika");
-    const suffix = params.size > 0 ? `?${params.toString()}` : "";
-    return `${routes.spaces}/${encodeURIComponent(spaceId)}/assistant${suffix}`;
-  }
-
-  params.set("mika", "open");
-  return `${routes.files}?${params.toString()}`;
+  params.delete("mika");
+  const suffix = params.size > 0 ? `?${params.toString()}` : "";
+  return `${routes.agents}${suffix}`;
 }
 
 export function LegacyAssistantRedirect() {
@@ -58,7 +46,7 @@ export function LegacyAssistantRedirect() {
     return (
       <LoadingState
         className="h-full"
-        title="Opening Mika"
+        title="Opening Agents"
         description="Checking your Space access…"
       />
     );

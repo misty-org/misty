@@ -21,8 +21,9 @@ export interface AccountMeResponse {
   name: string;
   username: string;
   email: string;
+  avatar_version?: number;
   created_at: string;
-  tier: "basic" | "pro" | "max";
+  tier: "basic" | "pro";
   status: "active" | "trialing" | "cancelled" | "expired";
   allows_use: boolean;
   expires_at: string | null;
@@ -39,14 +40,27 @@ export interface AccountMeResponse {
 }
 
 export interface BillingUsageResponse {
-  plan: "basic" | "pro" | "max";
-  monthly_allowance: number;
-  monthly_remaining: number;
-  purchased_remaining: number;
-  available_credits: number;
-  reserved_credits: number;
-  next_reset_at: string;
-  usage_by_meter: Array<{ meter: string; credits: number }> | null;
+  plan: "basic" | "pro";
+  storage: {
+    used_bytes: number;
+    reserved_bytes: number;
+    limit_bytes: number;
+    remaining_bytes: number;
+    over_quota: boolean;
+    over_quota_since?: string;
+    cleanup_notice_until?: string;
+  };
+  hosted_ai: {
+    used_ratio: number;
+    reset_at: string;
+  };
+  trial?: { status: string; ends_at: string | null };
+  subscription?: {
+    status: string;
+    current_period_end: string | null;
+    cancel_at_period_end: boolean;
+    billing_interval: "month" | "year";
+  };
 }
 
 export interface LoginResponse {

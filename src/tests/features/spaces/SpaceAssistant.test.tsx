@@ -34,8 +34,8 @@ describe("SpaceAssistant", () => {
       status: {
         configured: true,
         spaceScopedSessions: true,
-        model: "mika-low",
-        modelName: "Mika Low",
+        model: "automatic",
+        modelName: "Automatic",
         running: false,
         sessionId: null,
         error: null,
@@ -63,17 +63,17 @@ describe("SpaceAssistant", () => {
   it("renders the original full-page Assistant layout inside a Space", async () => {
     await renderAssistant(root);
 
-    expect(container.querySelector('[aria-label="Mika sessions"]')).toBeNull();
-    expect(container.querySelector("h1")?.textContent).toBe("Assistant");
+    expect(container.querySelector('[aria-label="Agent sessions"]')).toBeNull();
+    expect(container.querySelector("h1")?.textContent).toBe("Agent chat");
     expect(container.textContent).toContain("Private · Design team");
-    expect(container.textContent).toContain("Ask Mika about Design team");
+    expect(container.textContent).toContain("Ask an agent about Design team");
     expect(container.textContent).toContain("Space context only");
 
     const composer = container.querySelector<HTMLTextAreaElement>(
-      'textarea[aria-label="Ask Mika about Design team"]',
+      'textarea[aria-label="Ask an agent about Design team"]',
     );
     expect(composer?.disabled).toBe(false);
-    expect(composer?.placeholder).toBe("Ask Mika about Design team…");
+    expect(composer?.placeholder).toBe("Ask an agent about Design team…");
     expect(container.querySelector('button[aria-label="Add context"]')).toBeNull();
   });
 
@@ -84,10 +84,10 @@ describe("SpaceAssistant", () => {
 
     await renderAssistant(root);
 
-    expect(container.textContent).toContain("Private Space Assistant is unavailable");
+    expect(container.textContent).toContain("Private Space agent chat is unavailable");
     expect(container.textContent).toContain("permission-checked Space sessions");
     const composer = container.querySelector<HTMLTextAreaElement>(
-      'textarea[aria-label="Ask Mika about Design team"]',
+      'textarea[aria-label="Ask an agent about Design team"]',
     );
     expect(composer?.disabled).toBe(true);
     expect(composer?.placeholder).toBe("Private Space sessions are unavailable");
@@ -96,13 +96,20 @@ describe("SpaceAssistant", () => {
   it("does not paint the prior Space while a new scope is still activating", async () => {
     useMikaSessionStore.setState({
       conversationScopeKey: spaceMikaScopeKey("account-1", "space-old"),
-      conversations: [{ id: "old-session", title: "Old Space strategy", updatedAt: Date.now() }],
+      conversations: [
+        {
+          id: "old-session",
+          title: "Old Space strategy",
+          updatedAt: Date.now(),
+          createdAt: Date.now(),
+        },
+      ],
       activeConversationId: "old-session",
       messages: [{ id: "old-message", role: "assistant", text: "Old Space secret" }],
       status: {
         configured: true,
         spaceScopedSessions: true,
-        model: "mika-low",
+        model: "automatic",
         modelName: "Old Space model",
         running: true,
         sessionId: "old-session",

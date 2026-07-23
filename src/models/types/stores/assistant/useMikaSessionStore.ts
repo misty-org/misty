@@ -59,8 +59,8 @@ export type AiPanelMessage = {
   text: string;
   planId?: string;
   toolRequestId?: string;
-  creditsUsed?: number;
-  creditsRemaining?: number;
+  hostedAiUsedRatio?: number;
+  hostedAiResetAt?: string;
   citations?: AgentCitation[];
   contextSources?: MikaContextSource[];
   delegatedRunId?: string;

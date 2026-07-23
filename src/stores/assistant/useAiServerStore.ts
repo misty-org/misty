@@ -54,16 +54,32 @@ export async function fetchAgentStatus(): Promise<AgentStatusResponse> {
 }
 
 export async function createAgentSession(
-  agentJobId?: string,
-  spaceId?: string,
+  optionsOrJob: { agentId?: string; spaceId?: string; modelId?: string } | string | undefined = {},
+  legacySpaceId?: string,
 ): Promise<CreateSessionResponse> {
+  const options: {
+    agentId?: string;
+    agentJobId?: string;
+    spaceId?: string;
+    modelId?: string;
+  } =
+    legacySpaceId !== undefined
+      ? {
+          agentJobId: typeof optionsOrJob === "string" ? optionsOrJob : undefined,
+          spaceId: legacySpaceId,
+        }
+      : typeof optionsOrJob === "object"
+      ? optionsOrJob
+      : { agentJobId: optionsOrJob, spaceId: legacySpaceId };
   return managedAiRequest<CreateSessionResponse>("/ai/sessions", {
     method: "POST",
     body:
-      agentJobId || spaceId
+      options.agentId || options.spaceId || options.modelId
         ? JSON.stringify({
-            agent_job_id: agentJobId || undefined,
-            space_id: spaceId || undefined,
+            agent_id: options.agentId || undefined,
+            agent_job_id: options.agentJobId || undefined,
+            space_id: options.spaceId || undefined,
+            model_id: options.modelId || undefined,
           })
         : undefined,
   });
@@ -155,23 +171,12 @@ export async function managedAiRequest<T = unknown>(path: string, init?: Request
       // Plain-text errors are handled below.
     }
     if (payload) {
-      if (payload.code === "credits_exhausted") {
+      if (payload.code === "hosted_ai_limit_reached") {
         const reset = payload.reset_at
           ? new Date(payload.reset_at).toLocaleDateString()
-          : "your next reset";
+          : "Monday";
         throw new ManagedAiRequestError(
-          `Misty credits exhausted (${payload.available_credits ?? 0} available). Add credits or wait until ${reset}.`,
-          response.status,
-          payload.code,
-        );
-      }
-      if (payload.code === "insufficient_credits") {
-        const required =
-          typeof payload.requiredCredits === "number"
-            ? ` ${payload.requiredCredits} Mika credits are required.`
-            : "";
-        throw new ManagedAiRequestError(
-          `${payload.message?.trim() || "Not enough Mika credits for this request."}${required}`,
+          `Weekly hosted AI usage is fully used. Try again after the reset on ${reset} or upgrade to Pro.`,
           response.status,
           payload.code,
         );
@@ -182,14 +187,14 @@ export async function managedAiRequest<T = unknown>(path: string, init?: Request
           ? ""
           : " Requests are never retried automatically.";
         throw new ManagedAiRequestError(
-          `Mika request limit reached. Try again in ${retryAfter} seconds.${retryPolicy}`,
+          `Agent request limit reached. Try again in ${retryAfter} seconds.${retryPolicy}`,
           response.status,
           payload.code,
           retryAfter,
         );
       }
       if (payload.code === "request_canceled") {
-        throw new ManagedAiRequestError("Mika request canceled.", response.status, payload.code);
+        throw new ManagedAiRequestError("Agent request canceled.", response.status, payload.code);
       }
       if (payload.message?.trim())
         throw new ManagedAiRequestError(
@@ -200,7 +205,7 @@ export async function managedAiRequest<T = unknown>(path: string, init?: Request
         );
     }
     throw new ManagedAiRequestError(
-      text.trim() || `Mika ${path} failed: ${response.status}`,
+      text.trim() || `Agent ${path} failed: ${response.status}`,
       response.status,
       undefined,
       retryAfterHeader(response),

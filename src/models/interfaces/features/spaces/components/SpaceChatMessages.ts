@@ -76,6 +76,12 @@ export interface SpaceChatMessagesProps {
   publishingMessageId?: string;
   /** Names the empty conversation, e.g. "What should we work on in Design?". */
   spaceName?: string;
+  /**
+   * The other person in a one-on-one conversation. When set, the empty state
+   * shows the direct-message intro (avatar + "beginning of your history")
+   * instead of the generic Space starters.
+   */
+  directRecipient?: { userId: string; name: string };
   /** Runs an opening move from the empty state. Omitted when the viewer cannot write. */
   onStarter?: (starter: SpaceChatStarter) => void;
 }

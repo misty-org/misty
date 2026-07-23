@@ -47,6 +47,7 @@ export function useDesktopBootstrap(params: { getRouteId: (pathname: string) => 
     if (appLoadStarted.current) return;
     appLoadStarted.current = true;
     void preloadDesktopFilesPage()?.catch(() => undefined);
+    if (!hasTauriInternals()) return;
     void loadApp();
     void settingsLoad();
   }, [loadApp, settingsLoad]);

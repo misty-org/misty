@@ -62,7 +62,7 @@ export function MikaEmptyState() {
           <MessageSquare size={34} strokeWidth={1.5} />
           <Sparkles className={assistantPanelStyles.mikaEmptySpark} size={17} />
         </span>
-        <h3 className={assistantPanelStyles.mikaEmptyTitle}>Ask Mika</h3>
+        <h3 className={assistantPanelStyles.mikaEmptyTitle}>Ask an agent</h3>
         <p className={assistantPanelStyles.mikaEmptyText}>
           Start with the current folder or selected files.
         </p>

@@ -9,6 +9,7 @@ import {
   Pencil,
   Play,
   Plus,
+  Sparkles,
   Trash2,
   X,
 } from "lucide-react";
@@ -49,8 +50,6 @@ export function SpaceLibrary({ spaceId }: { spaceId: string }) {
     visibleItems,
     usage,
     setSelectedAlbumFolderId,
-    groups,
-    people,
     peoplePolicy,
     collection,
     selectedCollectionId,
@@ -73,7 +72,6 @@ export function SpaceLibrary({ spaceId }: { spaceId: string }) {
     currentAlbumFolder,
     visibleAlbumFolders,
     visibleAlbumsForFolder,
-    currentPerson,
     currentDiscoveryGroup,
     currentDateGroup,
     currentMapPoint,
@@ -96,12 +94,7 @@ export function SpaceLibrary({ spaceId }: { spaceId: string }) {
     renameAlbumFolder,
     deleteAlbumFolder,
     deleteCurrentAlbum,
-    togglePeoplePolicy,
-    openCreatePerson,
-    openEditPerson,
-    deleteCurrentPerson,
-    mergeCurrentPerson,
-    createGroup,
+    toggleIntelligencePolicy,
   } = collectionActions;
 
   const uploading = uploadJobs.some((job) => !["ready", "failed"].includes(job.stage));
@@ -112,6 +105,51 @@ export function SpaceLibrary({ spaceId }: { spaceId: string }) {
         <div className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] bg-transparent">
           <SpaceLibraryTopChrome />
           <div className="min-h-0 overflow-auto bg-transparent px-6 pb-6 pt-5">
+            {collection === "smart" && peoplePolicy ? (
+              <section className="mb-5 flex flex-wrap items-center justify-between gap-4 rounded-xl border border-border bg-card/70 p-4">
+                <div className="flex min-w-0 items-start gap-3">
+                  <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary">
+                    <Sparkles size={18} />
+                  </span>
+                  <div>
+                    <h2 className="m-0 text-sm font-semibold">Smart Library</h2>
+                    <p className="mb-0 mt-1 max-w-xl text-xs text-muted-foreground">
+                      Search this Space by meaning and use generated captions and tags. Analysis
+                      pauses at the weekly Hosted AI limit without blocking uploads.
+                    </p>
+                    <p className="mb-0 mt-2 text-[11px] text-muted-foreground">
+                      {peoplePolicy.ai_enabled
+                        ? peoplePolicy.queued_ai_jobs > 0
+                          ? `${peoplePolicy.queued_ai_jobs} item${peoplePolicy.queued_ai_jobs === 1 ? "" : "s"} queued for analysis`
+                          : "Analysis is on and up to date"
+                        : "Analysis is off"}
+                    </p>
+                  </div>
+                </div>
+                {activeSpace?.role === "owner" ? (
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      variant={peoplePolicy.ai_enabled ? "secondary" : "default"}
+                      onClick={() => void toggleIntelligencePolicy("ai")}
+                    >
+                      {peoplePolicy.ai_enabled ? "Turn off" : "Enable Smart Library"}
+                    </Button>
+                    {peoplePolicy.ai_enabled ? (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => void toggleIntelligencePolicy("semantic")}
+                      >
+                        {peoplePolicy.semantic_search_enabled
+                          ? "Semantic search on"
+                          : "Enable semantic search"}
+                      </Button>
+                    ) : null}
+                  </div>
+                ) : null}
+              </section>
+            ) : null}
             {(collection === "months" || collection === "years" || collection === "recent-days") &&
             !selectedCollectionId ? (
               <div className="mb-5">
@@ -242,40 +280,6 @@ export function SpaceLibrary({ spaceId }: { spaceId: string }) {
                     Nothing to see here...
                   </div>
                 ) : null}
-              </div>
-            ) : null}
-            {collection === "groups" && !selectedCollectionId ? (
-              <div className="mb-5">
-                <div className="mb-3 flex items-center justify-between">
-                  <h4 className="m-0 text-sm">Groups</h4>
-                  {canEditLibrary ? (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      type="button"
-                      onClick={() => void createGroup()}
-                    >
-                      <Plus size={13} />
-                      New smart group
-                    </Button>
-                  ) : null}
-                </div>
-                <div className="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-3">
-                  {groups.map((group) => (
-                    <Button
-                      className="rounded-xl border-0 bg-card p-4 text-left shadow-xs ring-1 ring-foreground/10 hover:bg-accent"
-                      type="button"
-                      key={group.id}
-                      onClick={() => void selectCollection("groups", group.id)}
-                    >
-                      <LibraryIcon size={22} />
-                      <p className="mb-0 mt-3 truncate text-xs font-medium">{group.name}</p>
-                      <p className="mb-0 mt-1 truncate text-[10px] text-muted-foreground">
-                        {group.rules.all.length} rules
-                      </p>
-                    </Button>
-                  ))}
-                </div>
               </div>
             ) : null}
             {collection === "map" && !selectedCollectionId ? (
@@ -428,85 +432,6 @@ export function SpaceLibrary({ spaceId }: { spaceId: string }) {
                 </div>
               </div>
             ) : null}
-            {collection === "people" && !selectedCollectionId && peoplePolicy ? (
-              <div className="mb-5">
-                <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-                  <h4 className="m-0 text-sm">People & Pets</h4>
-                  {canEditLibrary ? (
-                    <div className="flex flex-wrap gap-2">
-                      {activeSpace?.role === "owner" ? (
-                        <>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            type="button"
-                            onClick={() => void togglePeoplePolicy("person")}
-                          >
-                            {peoplePolicy.faces_enabled ? "People on" : "People off"}
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            type="button"
-                            onClick={() => void togglePeoplePolicy("pet")}
-                          >
-                            {peoplePolicy.pets_enabled ? "Pets on" : "Pets off"}
-                          </Button>
-                        </>
-                      ) : null}
-                      {peoplePolicy.faces_enabled ? (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          type="button"
-                          onClick={() => openCreatePerson("person")}
-                        >
-                          <Plus size={13} />
-                          Person
-                        </Button>
-                      ) : null}
-                      {peoplePolicy.pets_enabled ? (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          type="button"
-                          onClick={() => openCreatePerson("pet")}
-                        >
-                          <Plus size={13} />
-                          Pet
-                        </Button>
-                      ) : null}
-                    </div>
-                  ) : null}
-                </div>
-                <div className="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-3">
-                  {people.map((person) => (
-                    <Button
-                      className="overflow-hidden rounded-xl border-0 bg-card p-0 text-left shadow-xs ring-1 ring-foreground/10 hover:bg-accent"
-                      type="button"
-                      key={person.id}
-                      onClick={() => selectCollection("people", person.id)}
-                    >
-                      <AlbumCover spaceId={spaceId} itemId={person.cover_item_id} />
-                      <div className="p-3">
-                        <p className="m-0 truncate text-xs font-medium">
-                          {person.name ||
-                            (person.kind === "pet" ? "Unnamed pet" : "Unnamed person")}
-                        </p>
-                        <p className="mb-0 mt-1 text-[10px] text-muted-foreground">
-                          {person.item_count} items · {person.kind === "pet" ? "Pet" : "Person"}
-                        </p>
-                      </div>
-                    </Button>
-                  ))}
-                </div>
-                {people.length === 0 ? (
-                  <div className="grid min-h-48 place-items-center text-sm text-muted-foreground">
-                    Nothing to see here...
-                  </div>
-                ) : null}
-              </div>
-            ) : null}
             {currentDateGroup ? (
               <div className="mb-4">
                 <Button
@@ -527,59 +452,7 @@ export function SpaceLibrary({ spaceId }: { spaceId: string }) {
                 </p>
               </div>
             ) : null}
-            {currentPerson ? (
-              <div className="mb-4 flex items-center justify-between gap-3">
-                <div>
-                  <Button
-                    className="border-0 bg-transparent p-0 text-xs text-muted-foreground"
-                    type="button"
-                    onClick={() => selectCollection("people")}
-                  >
-                    ← People & Pets
-                  </Button>
-                  <h4 className="mb-0 mt-2 text-sm">
-                    {currentPerson.name ||
-                      (currentPerson.kind === "pet" ? "Unnamed pet" : "Unnamed person")}
-                  </h4>
-                </div>
-                {canEditLibrary ? (
-                  <div className="flex flex-wrap gap-2">
-                    <LibrarySelect
-                      className="h-8 w-40"
-                      value=""
-                      onChange={(value) => {
-                        if (value) void mergeCurrentPerson(value);
-                      }}
-                      label="Merge this identity"
-                      options={[
-                        ["", "Merge into…"],
-                        ...people
-                          .filter(
-                            (person) =>
-                              person.id !== currentPerson.id && person.kind === currentPerson.kind,
-                          )
-                          .map(
-                            (person) => [person.id, person.name || "Unnamed"] as [string, string],
-                          ),
-                      ]}
-                    />
-                    <Button size="sm" variant="outline" type="button" onClick={openEditPerson}>
-                      <Pencil size={12} />
-                      Edit
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      type="button"
-                      onClick={() => void deleteCurrentPerson()}
-                    >
-                      <Trash2 size={12} />
-                      Remove
-                    </Button>
-                  </div>
-                ) : null}
-              </div>
-            ) : currentAlbum ? (
+            {currentAlbum ? (
               <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <Button
@@ -761,9 +634,7 @@ export function SpaceLibrary({ spaceId }: { spaceId: string }) {
               ((collection === "recent-days" ||
                 collection === "months" ||
                 collection === "years" ||
-                collection === "people" ||
                 collection === "albums" ||
-                collection === "groups" ||
                 collection === "duplicate" ||
                 collection === "map") &&
                 !selectedCollectionId) ? null : sensitiveCollectionScope &&

@@ -18,6 +18,7 @@ export function buildMessageSpans(
   text: string,
   members: SpaceMember[],
   agents: SpaceStudioResource[],
+  selectedAgentIdsByLabel: Record<string, string> = {},
 ): MessageSpan[] {
   const candidates = [
     ...members.map((member) => ({ label: member.name, userId: member.user_id, agentId: "" })),
@@ -36,9 +37,15 @@ export function buildMessageSpans(
     const index = match.index ?? 0;
     if (index > offset) spans.push({ type: "text", text: text.slice(offset, index) });
     const label = match[1];
-    const candidate = candidates.find(
+    const matching = candidates.filter(
       (item) => item.label.toLocaleLowerCase() === label.toLocaleLowerCase(),
     );
+    const selectedAgentId = selectedAgentIdsByLabel[label.toLocaleLowerCase()];
+    const candidate = selectedAgentId
+      ? matching.find((item) => item.agentId === selectedAgentId)
+      : matching.length === 1
+        ? matching[0]
+        : undefined;
     if (candidate?.userId)
       spans.push({ type: "mention", user_id: candidate.userId, label: candidate.label });
     else if (candidate?.agentId)
@@ -47,7 +54,16 @@ export function buildMessageSpans(
     offset = index + match[0].length;
   }
   if (offset < text.length) spans.push({ type: "text", text: text.slice(offset) });
-  return spans.length ? spans : [{ type: "text", text }];
+  if (!spans.length) return [{ type: "text", text }];
+  return spans.reduce<MessageSpan[]>((merged, span) => {
+    const previous = merged[merged.length - 1];
+    if (previous?.type === "text" && span.type === "text") {
+      previous.text += span.text;
+    } else {
+      merged.push(span);
+    }
+    return merged;
+  }, []);
 }
 
 function escapeRegExp(value: string): string {

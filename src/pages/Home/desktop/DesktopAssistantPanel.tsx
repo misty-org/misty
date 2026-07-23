@@ -4,14 +4,9 @@ import { useShallow } from "zustand/react/shallow";
 import { openCloudFolderBotWindow } from "@/features/bots/cloudFolderBot";
 import { runtimeAssetSource } from "@/platform/runtimeAsset";
 import { useAppStore } from "@/stores/app";
-import {
-  assistantDailyMessageLimit,
-  useAssistantUsageStore,
-} from "@/stores/assistant/useAssistantUsageStore";
 import { selectAssistantPreferences, useSettingsStore } from "@/stores/app";
 import { Badge } from "@/ui";
 import { Button } from "@/ui";
-import { Progress } from "@/ui";
 
 const panelClass = "flex min-h-0 min-w-0 flex-col";
 const headerClass = "mb-2 flex shrink-0 items-center gap-2 text-sm font-medium text-foreground";
@@ -31,12 +26,6 @@ export function DesktopAssistantPanel() {
       };
     }),
   );
-  const { messagesUsedToday, syncForToday } = useAssistantUsageStore(
-    useShallow((state) => ({
-      messagesUsedToday: state.messagesUsedToday,
-      syncForToday: state.syncForToday,
-    })),
-  );
   const enabledScopes = [
     filesAllowed ? "Files" : null,
     cleanupAllowed ? "Cleanup" : null,
@@ -44,29 +33,23 @@ export function DesktopAssistantPanel() {
   ].filter((scope): scope is string => scope !== null);
 
   useEffect(() => {
-    syncForToday();
-    const interval = window.setInterval(syncForToday, 60_000);
-    return () => window.clearInterval(interval);
-  }, [syncForToday]);
-
-  useEffect(() => {
     setMikaImageUnavailable(false);
   }, [mikaAnimationSource]);
 
   return (
-    <section className={panelClass} aria-label="Assistant">
+    <section className={panelClass} aria-label="Agents">
       <div className={headerClass}>
         <Bot className="h-4 w-4 shrink-0 text-muted-foreground" />
-        <h2 className="min-w-0 flex-1 truncate">Assistant</h2>
+        <h2 className="min-w-0 flex-1 truncate">Agents</h2>
       </div>
 
       <div className="grid min-h-0 flex-1 grid-cols-[78px_minmax(0,1fr)] items-center gap-3">
         <Button
-          aria-label="Show Mika"
+          aria-label="Show Agents"
           className="size-[72px] rounded-lg bg-muted/25 p-0 hover:bg-muted/50"
           disabled={!enabled}
           onClick={() => void openCloudFolderBotWindow(assetsDir)}
-          title={enabled ? "Show Mika" : "Enable Mika in Settings first"}
+          title={enabled ? "Show Agents" : "Enable Agents in Settings first"}
           type="button"
           variant="ghost"
         >
@@ -84,18 +67,6 @@ export function DesktopAssistantPanel() {
         </Button>
 
         <div className="grid min-w-0 gap-2">
-          <div className="flex min-w-0 items-center justify-between gap-3 text-xs">
-            <span className="truncate font-medium text-foreground">Daily usage</span>
-            <span className="shrink-0 tabular-nums text-muted-foreground">
-              {messagesUsedToday} / {assistantDailyMessageLimit}
-            </span>
-          </div>
-          <Progress
-            aria-label="Mika daily message usage"
-            aria-valuetext={`${messagesUsedToday} of ${assistantDailyMessageLimit} messages used`}
-            className="h-1.5"
-            value={Math.min(100, (messagesUsedToday / assistantDailyMessageLimit) * 100)}
-          />
           <div className="flex min-h-5 flex-wrap gap-1">
             {enabledScopes.length > 0 ? (
               enabledScopes.map((scope) => (
@@ -105,7 +76,7 @@ export function DesktopAssistantPanel() {
               ))
             ) : (
               <span className="text-[10px] leading-5 text-muted-foreground">
-                {enabled ? "Allow scopes in Settings" : "Enable Mika in Settings"}
+                {enabled ? "Allow scopes in Settings" : "Enable Agents in Settings"}
               </span>
             )}
           </div>

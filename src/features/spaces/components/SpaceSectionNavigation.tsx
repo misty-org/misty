@@ -1,7 +1,6 @@
 import type { ReactNode } from "react";
 import {
   BookOpenText,
-  Bot,
   CheckSquare2,
   MessagesSquare,
   NotebookPen,
@@ -19,7 +18,6 @@ const sections = [
   { id: "tasks", label: "Tasks", icon: CheckSquare2 },
   { id: "notes", label: "Notes", icon: NotebookPen },
   { id: "library", label: "Library", icon: BookOpenText },
-  { id: "assistant", label: "Assistant", icon: Bot },
 ] as const;
 
 export function SpaceSectionNavigation({
@@ -64,7 +62,7 @@ export function SpaceSectionNavigation({
       <div
         className={cn(
           "misty-transient-scrollbar min-h-0 flex-1 overflow-x-hidden pt-4 [overscroll-behavior:contain]",
-          section === "assistant" ? "overflow-y-hidden" : "overflow-y-auto",
+          "overflow-y-auto",
         )}
       >
         {context}

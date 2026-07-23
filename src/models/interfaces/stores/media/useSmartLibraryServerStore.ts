@@ -137,6 +137,7 @@ export interface SemanticReindexPlan {
   status: string;
   targetVersion: number;
   embeddingModel: string;
+  hostedAIWeeklyRatio: number;
   nextCursor?: string | null;
   assets: SemanticReindexAsset[];
 }

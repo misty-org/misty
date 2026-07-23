@@ -64,8 +64,8 @@ export function SmartLibraryPreflightView(props: {
       <div>
         <h3 className="m-0 text-xl font-semibold tracking-tight">Ready to try a sample</h3>
         <p className="m-0 mt-2 text-sm text-muted-foreground">
-          The scan was local and free. Mika will analyze a representative sample before asking to
-          continue.
+          The scan was local and free. Smart Library will analyze a representative sample before
+          asking to continue.
         </p>
       </div>
       <div className="grid grid-cols-2 divide-x divide-border overflow-hidden rounded-lg bg-muted/35 lg:grid-cols-5 lg:divide-y-0">
@@ -96,7 +96,7 @@ export function SmartLibraryPreflightView(props: {
           <span className="text-xs font-medium uppercase tracking-wide text-primary">
             25-file trial allowance
           </span>
-          <strong className="text-lg font-semibold">Try the sample before spending credits</strong>
+          <strong className="text-lg font-semibold">Try the sample before using hosted AI</strong>
           <span className="text-sm leading-relaxed text-muted-foreground">
             {preflight.sampleAssetIds.length} files selected across subfolders, formats, and dates.{" "}
             {formatEstimate(props.estimate ?? preflight.estimate)}
@@ -137,9 +137,9 @@ export function SmartLibraryProgressView(props: {
       <div className="grid w-full max-w-2xl gap-5 rounded-lg bg-muted/30 p-6">
         <div className="flex items-center justify-between gap-4">
           <div>
-            <h3 className="m-0 text-xl font-semibold">Mika is understanding your files</h3>
+            <h3 className="m-0 text-xl font-semibold">Smart Library is understanding your files</h3>
             <p className="m-0 mt-1 text-sm text-muted-foreground">
-              Keep Misty open while the existing Mika server processes each bounded batch.
+              Keep Misty open while hosted AI processes each bounded batch.
             </p>
           </div>
           <span className="text-2xl font-semibold">{percent}%</span>
@@ -267,14 +267,8 @@ function SmartLibraryAssetCard(props: { asset: SmartLibraryAsset; library: Smart
 }
 
 export function formatEstimate(estimate: SmartLibraryEstimate): string {
-  if (!estimate) return "Final credits and price will be confirmed before upload.";
-  const price =
-    estimate.priceMinor !== null && estimate.currency
-      ? new Intl.NumberFormat(undefined, { style: "currency", currency: estimate.currency }).format(
-          estimate.priceMinor / 100,
-        )
-      : "price confirmed by your plan";
-  return `${estimate.includedImages} included · ${estimate.billableImages} billable Mika credits · ${price}.`;
+  if (!estimate) return "Your estimated weekly hosted AI impact will be confirmed first.";
+  return `${estimate.eligibleImages} files · about ${Math.ceil(estimate.hostedAIWeeklyRatio * 100)}% of weekly hosted AI usage.`;
 }
 
 function joinDevicePath(root: string, relative: string): string {

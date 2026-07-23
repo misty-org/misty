@@ -90,7 +90,7 @@ async function openCloudFolderBotChatWindowInternal(): Promise<WebviewWindow | n
   const url = new URL("/bot/cloud-folder-chat", globalThis.window.location.href);
   const window = new WebviewWindow(cloudFolderBotChatLabel, {
     url: url.toString(),
-    title: "Mika Chat",
+    title: "Agent Chat",
     width: cloudFolderBotChatWindowSize.width,
     height: cloudFolderBotChatWindowSize.height,
     x: position.x,
@@ -188,7 +188,7 @@ async function openCloudFolderBotWindowInternal(assetsDir?: string): Promise<Web
   if (assetsDir) url.searchParams.set("assetsDir", assetsDir);
   const window = new WebviewWindow(cloudFolderBotLabel, {
     url: url.toString(),
-    title: "Mika Assistant",
+    title: "Agents",
     width: cloudFolderBotWindowSize.width,
     height: cloudFolderBotWindowSize.height,
     x: position.x,

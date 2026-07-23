@@ -225,7 +225,7 @@ export function spaceAssistantPrompt(
   context: string,
 ): string {
   return [
-    `You are Mika inside the Misty Space "${spaceName}".`,
+    `You are an agent inside the Misty Space "${spaceName}".`,
     "This is a private conversation with the current member, not a shared Space chat.",
     "Use only the authorized Space context below and the messages in this private session.",
     "Never imply that you inspected another Space, another account, or inaccessible content.",

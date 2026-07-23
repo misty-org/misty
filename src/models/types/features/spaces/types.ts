@@ -65,7 +65,7 @@ export type AgentMentionFailure = {
   code:
     | "run_failed"
     | "request_canceled"
-    | "credits_exhausted"
+    | "hosted_ai_limit_reached"
     | "integration_required"
     | "forbidden"
     | "resource_unavailable"

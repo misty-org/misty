@@ -44,6 +44,15 @@ describe("spaceErrorMessage", () => {
       ),
     ).toBe("This provider’s sign-in is not available on the current Misty server.");
   });
+
+  it("describes storage quota errors as an owner-pooled limit", () => {
+    const expected =
+      "This upload would exceed the Space owner’s shared storage pool. Existing files remain available.";
+
+    expect(spaceErrorMessage("owner_storage_quota_exceeded", "fallback")).toBe(expected);
+    expect(spaceErrorMessage("space_storage_quota_exceeded", "fallback")).toBe(expected);
+    expect(expected).not.toContain("1 GB");
+  });
 });
 
 describe("spaceRequest account isolation", () => {

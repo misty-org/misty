@@ -73,7 +73,11 @@ export async function saveAccountAuthToken(
 }
 
 export async function readAccountAuthToken(): Promise<string | null> {
-  if (!hasTauriInternals()) return null;
+  if (!hasTauriInternals()) {
+    return import.meta.env.DEV && import.meta.env.VITE_MISTY_DEMO_MODE === "1"
+      ? (cachedToken ?? null)
+      : null;
+  }
   if (cachedToken !== undefined) return cachedToken;
 
   try {

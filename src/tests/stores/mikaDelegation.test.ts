@@ -4,9 +4,12 @@ import {
   clearPendingMikaDelegations,
   hasPendingMikaDelegations,
   mikaDelegationMessage,
+  publicMikaDisplayName,
+  publicMikaModel,
   resolvePendingMikaDelegation,
   trackPendingMikaDelegation,
 } from "@/stores/assistant/useMikaDelegationStore";
+import { initialAgentModelId, initialAgentModelName } from "@/features/agents/modelSelection";
 
 const run = (state: SpaceRun["state"]): SpaceRun => ({
   id: "run_one",
@@ -39,6 +42,20 @@ const result = (state: SpaceRun["state"]): MikaDelegationResult => ({
 afterEach(clearPendingMikaDelegations);
 
 describe("Mika Space delegation", () => {
+  it("never exposes internal automatic-routing or Mika tier labels", () => {
+    expect(publicMikaDisplayName("automatic", "Automatic routing")).toBe(initialAgentModelName);
+    expect(publicMikaDisplayName("mika-low", "Mika Low")).toBe(initialAgentModelName);
+    expect(publicMikaDisplayName("mika-med", "Mika Med")).toBe(initialAgentModelName);
+    expect(publicMikaDisplayName("mika-high", "Mika High")).toBe(initialAgentModelName);
+    expect(publicMikaModel("mika-high")).toBe(initialAgentModelId);
+  });
+
+  it("preserves the selected gateway model name", () => {
+    expect(publicMikaModel("xai/grok-4")).toBe("xai/grok-4");
+    expect(publicMikaDisplayName("xai/grok-4", "Grok 4")).toBe("Grok 4");
+    expect(publicMikaDisplayName("anthropic/claude-sonnet-4", "")).toBe("claude-sonnet-4");
+  });
+
   it("tracks only nonterminal delegated runs until their correlated event arrives", () => {
     expect(trackPendingMikaDelegation(result("awaiting_approval"))).toBe(true);
     expect(hasPendingMikaDelegations()).toBe(true);

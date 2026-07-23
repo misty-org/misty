@@ -20,21 +20,21 @@ import {
   renameAgentSession,
 } from "@/stores/assistant/useAiServerStore";
 
-describe("Mika server API", () => {
+describe("Agent server API", () => {
   beforeEach(() => {
     accountSession.transitioning = false;
     accountSession.generation = 0;
     vi.stubEnv("VITE_MISTY_SERVER_URL", "https://misty.example");
   });
 
-  it("propagates the bearer token and accepts the public Mika status contract", async () => {
+  it("propagates the bearer token and accepts an explicit model status contract", async () => {
     const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
       new Response(
         JSON.stringify({
           configured: true,
           provider: "misty",
-          model: "mika-high",
-          model_name: "Mika High",
+          model: "google/gemini-2.5-flash-lite",
+          model_name: "Gemini 2.5 Flash-Lite",
           running: false,
           session_id: null,
           error: null,
@@ -44,8 +44,8 @@ describe("Mika server API", () => {
     );
 
     await expect(fetchAgentStatus()).resolves.toMatchObject({
-      model: "mika-high",
-      model_name: "Mika High",
+      model: "google/gemini-2.5-flash-lite",
+      model_name: "Gemini 2.5 Flash-Lite",
     });
     expect(fetchMock).toHaveBeenCalledWith(
       "https://misty.example/api/ai/status",
@@ -58,22 +58,21 @@ describe("Mika server API", () => {
     expect(headers.get("Authorization")).toBe("Bearer signed-in-token");
   });
 
-  it("preserves structured credits-exhausted handling", async () => {
+  it("preserves structured hosted-AI-limit handling", async () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue(
       new Response(
         JSON.stringify({
-          code: "credits_exhausted",
-          available_credits: 0,
+          code: "hosted_ai_limit_reached",
           reset_at: "2026-08-01T00:00:00Z",
         }),
         { status: 402, headers: { "Content-Type": "application/json" } },
       ),
     );
 
-    await expect(createAgentSession()).rejects.toThrow("Misty credits exhausted (0 available)");
+    await expect(createAgentSession()).rejects.toThrow("Weekly hosted AI usage is fully used");
   });
 
-  it("binds a new Mika session to the requested Space", async () => {
+  it("binds a new agent session to the requested Space", async () => {
     const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
       new Response(JSON.stringify({ session_id: "space-session" }), {
         status: 201,
@@ -92,7 +91,7 @@ describe("Mika server API", () => {
     );
   });
 
-  it("blocks managed Mika requests while an account switch is in progress", async () => {
+  it("blocks managed agent requests while an account switch is in progress", async () => {
     accountSession.transitioning = true;
     const fetchMock = vi.spyOn(globalThis, "fetch");
 
@@ -103,7 +102,7 @@ describe("Mika server API", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("rejects a Mika response that arrives after the account generation changes", async () => {
+  it("rejects an agent response that arrives after the account generation changes", async () => {
     let releaseResponse!: (response: Response) => void;
     const fetchMock = vi
       .spyOn(globalThis, "fetch")
@@ -122,7 +121,7 @@ describe("Mika server API", () => {
     await expect(request).rejects.toMatchObject({ code: "account_changed", status: 409 });
   });
 
-  it("rejects a Mika body that finishes decoding after the account generation changes", async () => {
+  it("rejects an agent body that finishes decoding after the account generation changes", async () => {
     let releaseBody!: (value: unknown) => void;
     const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue({
       ok: true,
@@ -139,12 +138,14 @@ describe("Mika server API", () => {
     await expect(request).rejects.toMatchObject({ code: "account_changed", status: 409 });
   });
 
-  it("does not misclassify a gateway 429 as exhausted credits", async () => {
+  it("does not misclassify a gateway 429 as exhausted hosted AI", async () => {
     const fetchMock = vi
       .spyOn(globalThis, "fetch")
-      .mockResolvedValue(new Response("Mika could not complete this request.", { status: 429 }));
+      .mockResolvedValue(
+        new Response("The agent could not complete this request.", { status: 429 }),
+      );
 
-    await expect(createAgentSession()).rejects.not.toThrow("credits exhausted");
+    await expect(createAgentSession()).rejects.not.toThrow("hosted AI usage is fully used");
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 

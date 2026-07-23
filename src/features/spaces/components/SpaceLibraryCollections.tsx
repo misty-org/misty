@@ -1,4 +1,4 @@
-import { BookOpenText as LibraryIcon, Folder, Pencil, Plus, Trash2 } from "lucide-react";
+import { Folder, Pencil, Plus, Trash2 } from "lucide-react";
 
 import { Button } from "@/ui";
 
@@ -11,17 +11,11 @@ const collectionRailCardClassName = [
   "ring-1 ring-foreground/10 transition-colors hover:bg-accent",
 ].join(" ");
 
-const collectionRailGroupCardClassName = [
-  "w-[180px] shrink-0 rounded-xl border-0 bg-card p-4 text-left shadow-xs",
-  "ring-1 ring-foreground/10 transition-colors hover:bg-accent",
-].join(" ");
-
 export function SpaceLibraryCollectionOverview() {
   return (
     <div className="grid gap-8">
       <RecentlyAddedRail />
       <AlbumsRail />
-      <GroupsRail />
     </div>
   );
 }
@@ -141,43 +135,6 @@ export function SpaceLibraryAlbumsOverview() {
   );
 }
 
-export function SpaceLibraryGroupsOverview() {
-  const {
-    data: { groups, canEditLibrary },
-    collectionActions: { createGroup, selectCollection },
-  } = useSpaceLibraryContext();
-
-  return (
-    <div className="mb-5">
-      <div className="mb-3 flex items-center justify-between">
-        <h4 className="m-0 text-sm">Groups</h4>
-        {canEditLibrary ? (
-          <Button size="sm" variant="outline" type="button" onClick={() => void createGroup()}>
-            <Plus size={13} />
-            New smart group
-          </Button>
-        ) : null}
-      </div>
-      <div className="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-3">
-        {groups.map((group) => (
-          <Button
-            className="rounded-xl border-0 bg-card p-4 text-left shadow-xs ring-1 ring-foreground/10 hover:bg-accent"
-            type="button"
-            key={group.id}
-            onClick={() => void selectCollection("groups", group.id)}
-          >
-            <LibraryIcon size={22} />
-            <p className="mb-0 mt-3 truncate text-xs font-medium">{group.name}</p>
-            <p className="mb-0 mt-1 truncate text-[10px] text-muted-foreground">
-              {group.rules.all.length} rules
-            </p>
-          </Button>
-        ))}
-      </div>
-    </div>
-  );
-}
-
 function RecentlyAddedRail() {
   const {
     data: {
@@ -266,46 +223,6 @@ function AlbumsRail() {
         ))}
         {albums.length === 0 ? (
           <p className="m-0 py-4 text-xs text-muted-foreground">No albums yet.</p>
-        ) : null}
-      </div>
-    </section>
-  );
-}
-
-function GroupsRail() {
-  const {
-    data: { groups, canEditLibrary },
-    collectionActions: { createGroup, selectCollection },
-  } = useSpaceLibraryContext();
-
-  return (
-    <section>
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <h4 className="m-0 text-sm">Groups</h4>
-        {canEditLibrary ? (
-          <Button size="sm" variant="outline" type="button" onClick={() => void createGroup()}>
-            <Plus size={13} />
-            New smart group
-          </Button>
-        ) : null}
-      </div>
-      <div className="flex gap-3 overflow-x-auto pb-2">
-        {groups.map((group) => (
-          <Button
-            className={collectionRailGroupCardClassName}
-            type="button"
-            key={group.id}
-            onClick={() => selectCollection("groups", group.id)}
-          >
-            <LibraryIcon size={22} />
-            <span className="mb-0 mt-5 block truncate text-xs font-medium">{group.name}</span>
-            <span className="mt-1 block truncate text-[10px] text-muted-foreground">
-              {group.rules.all.length} rules
-            </span>
-          </Button>
-        ))}
-        {groups.length === 0 ? (
-          <p className="m-0 py-4 text-xs text-muted-foreground">No groups yet.</p>
         ) : null}
       </div>
     </section>
