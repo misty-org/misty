@@ -54,7 +54,10 @@ export async function fetchAgentStatus(): Promise<AgentStatusResponse> {
 }
 
 export async function createAgentSession(
-  optionsOrJob: { agentId?: string; spaceId?: string; modelId?: string } | string | undefined = {},
+  optionsOrJob:
+    | { agentId?: string; spaceId?: string; modelId?: string; reasoningEffort?: string }
+    | string
+    | undefined = {},
   legacySpaceId?: string,
 ): Promise<CreateSessionResponse> {
   const options: {
@@ -62,6 +65,7 @@ export async function createAgentSession(
     agentJobId?: string;
     spaceId?: string;
     modelId?: string;
+    reasoningEffort?: string;
   } =
     legacySpaceId !== undefined
       ? {
@@ -74,12 +78,13 @@ export async function createAgentSession(
   return managedAiRequest<CreateSessionResponse>("/ai/sessions", {
     method: "POST",
     body:
-      options.agentId || options.spaceId || options.modelId
+      options.agentId || options.spaceId || options.modelId || options.reasoningEffort
         ? JSON.stringify({
             agent_id: options.agentId || undefined,
             agent_job_id: options.agentJobId || undefined,
             space_id: options.spaceId || undefined,
             model_id: options.modelId || undefined,
+            reasoning_effort: options.reasoningEffort || undefined,
           })
         : undefined,
   });

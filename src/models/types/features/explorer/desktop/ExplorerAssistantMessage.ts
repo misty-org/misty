@@ -17,7 +17,6 @@ import type {
   AiPlanReview,
   AiToolApproval,
 } from "@/models/interfaces/stores/assistant/useMikaSessionStore";
-import { MikaDelegatedRunAction } from "@/features/explorer/desktop/MikaDelegatedRunAction";
 import { cx } from "@/features/explorer/desktop/ExplorerDesktopShared";
 import { assistantPanelStyles } from "@/features/explorer/desktop/ExplorerAssistantStyles";
 

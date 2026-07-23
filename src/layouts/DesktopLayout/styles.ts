@@ -1,12 +1,12 @@
 import type { FramePacingState } from "@/models/types/layouts";
 
 export const desktopFrameClass = [
-  "relative isolate grid h-full min-h-0 grid-cols-[80px_minmax(0,1fr)]",
+  "relative isolate grid h-full min-h-0 grid-cols-[var(--misty-desktop-nav-width)_minmax(0,1fr)]",
   "grid-rows-[var(--misty-window-titlebar-inset)_minmax(0,1fr)] overflow-hidden",
   "bg-[var(--misty-app-frame-bg,var(--misty-bg))]",
 ].join(" ");
 export const tabletFrameClass = [
-  "relative isolate grid h-full min-h-0 grid-cols-[80px_minmax(0,1fr)] grid-rows-[minmax(0,1fr)] overflow-hidden",
+  "relative isolate grid h-full min-h-0 grid-cols-[var(--misty-desktop-nav-width)_minmax(0,1fr)] grid-rows-[minmax(0,1fr)] overflow-hidden",
   "bg-[var(--misty-app-frame-bg,var(--misty-bg))] pt-[max(var(--misty-safe-top),28px)]",
   "pb-[max(var(--misty-safe-bottom),24px)]",
 ].join(" ");
@@ -17,9 +17,9 @@ export const tabletNavbarClass =
   "relative z-10 col-start-1 row-start-1 flex min-h-0 flex-col items-center overflow-hidden px-2 py-3";
 
 export const desktopRouteShellClass =
-  "relative z-10 col-start-2 row-start-2 min-h-0 overflow-hidden bg-transparent";
+  "relative z-10 col-start-2 row-start-2 min-h-0 overflow-hidden bg-[var(--misty-app-route-bg,var(--misty-bg))]";
 export const tabletRouteShellClass =
-  "relative z-10 col-start-2 row-start-1 min-h-0 overflow-hidden bg-transparent";
+  "relative z-10 col-start-2 row-start-1 min-h-0 overflow-hidden bg-[var(--misty-app-route-bg,var(--misty-bg))]";
 
 export const navbarGroupClass = "flex w-full flex-col items-center gap-3";
 
@@ -56,14 +56,14 @@ export const profileDockClass = [
 ].join(" ");
 
 export const profilePopoverClass = [
-  "fixed z-[2147482900] grid max-h-[calc(100vh-16px)] w-[286px] overflow-y-auto rounded-xl",
-  "border border-[var(--misty-border-soft)] bg-[color-mix(in_srgb,var(--misty-surface)_96%,transparent)]",
+  "fixed z-[2147482900] grid max-h-[calc(100dvh-var(--misty-window-titlebar-inset)-16px)] w-[286px] overflow-y-auto rounded-xl",
+  "border border-[var(--misty-border-soft)] bg-popover",
   "p-2 text-[var(--misty-text)] shadow-[0_18px_52px_var(--misty-shadow)]",
 ].join(" ");
 
 export const accountChooserPopoverClass = [
-  "fixed z-[2147482910] grid max-h-[calc(100vh-16px)] w-[320px] overflow-hidden rounded-xl",
-  "border border-[var(--misty-border-soft)] bg-[color-mix(in_srgb,var(--misty-surface)_96%,transparent)]",
+  "fixed z-[2147482910] grid max-h-[calc(100dvh-var(--misty-window-titlebar-inset)-16px)] w-[320px] overflow-y-auto rounded-xl",
+  "border border-[var(--misty-border-soft)] bg-popover",
   "p-2 text-[var(--misty-text)] shadow-[0_18px_52px_var(--misty-shadow)]",
 ].join(" ");
 
@@ -113,12 +113,16 @@ export const frameOverlayBaseClass = [
   "text-[var(--misty-text)] shadow-[0_12px_34px_var(--misty-shadow)]",
 ].join(" ");
 
-export const settingsOverlayLayerClass =
-  "fixed inset-0 z-[2147482600] grid place-items-center bg-[rgba(0,0,0,0.36)] p-8 backdrop-blur-[8px]";
+export const settingsOverlayLayerClass = [
+  "fixed inset-0 z-[2147482600] grid place-items-center bg-[rgba(0,0,0,0.36)] py-8 pr-8",
+  "pl-[calc(var(--misty-desktop-nav-width)+2rem)] backdrop-blur-[8px]",
+].join(" ");
 
 export const settingsOverlayPanelClass = [
-  "h-[min(760px,calc(100vh-64px))] w-[min(980px,calc(100vw-64px))] min-w-0 overflow-hidden rounded-2xl",
-  "border border-[#242529] bg-[var(--misty-app-modal-bg,var(--misty-app-surface-bg,#07090b))]",
+  "h-[min(760px,calc(100dvh-var(--misty-window-titlebar-inset)-64px))]",
+  "w-[min(980px,calc(100dvw-var(--misty-desktop-nav-width)-64px))]",
+  "min-w-0 overflow-hidden rounded-2xl",
+  "border border-border bg-[var(--misty-app-modal-bg,var(--popover))]",
   "shadow-[0_28px_90px_rgba(0,0,0,0.62)] backdrop-blur-xl",
 ].join(" ");
 

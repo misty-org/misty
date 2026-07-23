@@ -131,14 +131,6 @@ export function enableModernWindowStyle(window: unknown): Promise<void> {
   return invoke("enable_modern_window_style", { window, offsetX: -6, offsetY: -12 });
 }
 
-export function cancelMikaMomentum(): Promise<void> {
-  return invoke("cancel_mika_momentum");
-}
-
-export function startMikaDrag(): Promise<void> {
-  return invoke("start_mika_drag");
-}
-
 export async function fetchPreviewBytes(url: string): Promise<ArrayBuffer> {
   const response = await fetch(url);
   if (!response.ok) throw new Error(`The file reader returned ${response.status}.`);

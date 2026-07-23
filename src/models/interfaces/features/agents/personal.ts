@@ -1,3 +1,5 @@
+export type ReasoningEffort = "" | "low" | "medium" | "high";
+
 export interface PersonalAgent {
   id: string;
   owner_user_id: string;
@@ -7,6 +9,8 @@ export interface PersonalAgent {
   instructions: string;
   model_mode: "automatic" | "pinned";
   model_id?: string;
+  /** Reasoning effort for reasoning-capable models: "", "low", "medium", or "high". */
+  reasoning_effort?: ReasoningEffort;
   context_permissions: Record<string, boolean>;
   tool_permissions: { read: boolean; write: boolean; integrations: string[] };
   enabled: boolean;

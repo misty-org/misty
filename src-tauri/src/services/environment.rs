@@ -157,7 +157,6 @@ impl AppEnvironment {
         let workspaces_path = config_dir.join("workspaces.json");
         let commands_path = config_dir.join("commands.msy");
         ensure_mobile_user_dirs(&home_dir);
-        seed_builtin_animation_assets(&assets_dir);
         let grpc_address = settings_advanced_string(&settings_path, "server_address")
             .unwrap_or_else(|| "localhost:50051".to_owned());
         let mount_path = settings_advanced_string(&settings_path, "mount_path")
@@ -207,7 +206,6 @@ impl AppEnvironment {
         let workspaces_path = config_dir.join("workspaces.json");
         let commands_path = config_dir.join("commands.msy");
         ensure_mobile_user_dirs(&home_dir);
-        seed_builtin_animation_assets(&assets_dir);
         let grpc_address = settings_advanced_string(&settings_path, "server_address")
             .unwrap_or_else(|| "localhost:50051".to_owned());
         let mount_path = settings_advanced_string(&settings_path, "mount_path")
@@ -293,20 +291,6 @@ fn resolve_home_dir() -> Option<PathBuf> {
 
 fn display_path(path: &Path) -> String {
     path.display().to_string()
-}
-
-fn seed_builtin_animation_assets(assets_dir: &Path) {
-    let animations_dir = assets_dir.join("animations");
-    if fs::create_dir_all(&animations_dir).is_err() {
-        return;
-    }
-
-    for (file_name, bytes) in [(
-        "mika.webp",
-        include_bytes!("../../../src/assets/bots/cloud-folder/mika.webp").as_slice(),
-    )] {
-        let _ = fs::write(animations_dir.join(file_name), bytes);
-    }
 }
 
 #[cfg(target_os = "ios")]

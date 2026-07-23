@@ -16,6 +16,7 @@ type AgentInput = Pick<
   | "instructions"
   | "model_mode"
   | "model_id"
+  | "reasoning_effort"
   | "context_permissions"
   | "tool_permissions"
   | "enabled"
@@ -46,6 +47,14 @@ export const personalAgentsApi = {
   models: () => spaceRequest<{ catalog_version: string; models: GatewayModel[] }>("/ai/models"),
 };
 
+// The gateway exposes dozens of providers; surface only the ones people recognize.
+const allowedModelProviders = new Set(["openai", "anthropic", "google"]);
+
+function isMajorProviderModel(model: GatewayModel): boolean {
+  const provider = model.id.split("/")[0]?.toLowerCase() ?? "";
+  return allowedModelProviders.has(provider);
+}
+
 interface PersonalAgentsStore {
   agents: PersonalAgent[];
   models: GatewayModel[];
@@ -70,7 +79,7 @@ export const usePersonalAgentsStore = create<PersonalAgentsStore>((set, get) => 
     set({
       agents:
         agents.status === "fulfilled" ? agents.value.agents.map(withConcreteModelSelection) : [],
-      models: models.status === "fulfilled" ? models.value.models : [],
+      models: models.status === "fulfilled" ? models.value.models.filter(isMajorProviderModel) : [],
       loading: false,
       error: agents.status === "rejected" ? errorText(agents.reason) : null,
     });

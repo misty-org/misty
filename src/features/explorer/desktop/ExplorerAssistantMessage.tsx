@@ -1,10 +1,11 @@
 import type { AssistantPlanOperation } from "@/models/types/features/explorer/desktop/ExplorerAssistantMessage";
 export type { AssistantPlanOperation } from "@/models/types/features/explorer/desktop/ExplorerAssistantMessage";
-import { File, Folder } from "lucide-react";
+import { File, Folder, Sparkles, User } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { AgentSources } from "@/features/agents/AgentSources";
 import "@/features/agents/sources.css";
+import { Avatar, AvatarFallback } from "@/ui";
 import { Badge } from "@/ui";
 import { Button } from "@/ui";
 import {
@@ -31,6 +32,8 @@ export function AssistantMessage(props: {
   toolApprovals: AiToolApproval[];
   onApplyPlan: (planId: string) => Promise<void>;
   onApproveTool: (requestId: string) => Promise<void>;
+  /** Full-width conversation styling (avatar + name rows) to match Space chat. */
+  spacious?: boolean;
 }) {
   const { message } = props;
   const citedContextSources = useMemo(() => {
@@ -39,14 +42,9 @@ export function AssistantMessage(props: {
     );
     return (message.contextSources ?? []).filter((source) => citedIds.has(source.id.toUpperCase()));
   }, [message.contextSources, message.text]);
-  return (
-    <article className={assistantMessageClass(message.role)}>
-      <strong className={assistantPanelStyles.messageTitle}>
-        {assistantMessageTitle(message.role)}
-      </strong>
-      <pre className={assistantPanelStyles.messageText}>
-        {message.text || (message.role === "assistant" && props.running ? "Thinking..." : "")}
-      </pre>
+  const text = message.text || (message.role === "assistant" && props.running ? "Thinking..." : "");
+  const extras = (
+    <>
       {message.citations?.length ? <AgentSources citations={message.citations} compact /> : null}
       {citedContextSources.length ? (
         <div
@@ -91,6 +89,55 @@ export function AssistantMessage(props: {
           onApply={props.onApplyPlan}
         />
       ) : null}
+    </>
+  );
+
+  if (props.spacious) {
+    return (
+      <article className="group grid grid-cols-[40px_minmax(0,1fr)] gap-x-4 rounded-md py-1 [&:not(:first-child)]:mt-5">
+        <div className="col-start-1 flex justify-end">
+          <Avatar className="mt-0.5 size-10">
+            <AvatarFallback className="text-xs font-semibold">
+              {message.role === "user" ? <User className="size-5" /> : "AI"}
+            </AvatarFallback>
+          </Avatar>
+        </div>
+        <div className="col-start-2 grid min-w-0 gap-1.5">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 leading-5">
+            <strong className="text-[15px] font-semibold text-foreground">
+              {assistantMessageTitle(message.role)}
+            </strong>
+            {message.role === "assistant" ? (
+              <Badge
+                variant="secondary"
+                className="h-4 gap-1 rounded px-1 text-[9px] uppercase"
+              >
+                <Sparkles />
+                Agent
+              </Badge>
+            ) : null}
+          </div>
+          <p
+            className={cx(
+              "m-0 whitespace-pre-wrap break-words text-[15px] leading-6",
+              message.role === "error" ? "text-destructive" : "text-foreground/90",
+            )}
+          >
+            {text}
+          </p>
+          {extras}
+        </div>
+      </article>
+    );
+  }
+
+  return (
+    <article className={assistantMessageClass(message.role)}>
+      <strong className={assistantPanelStyles.messageTitle}>
+        {assistantMessageTitle(message.role)}
+      </strong>
+      <pre className={assistantPanelStyles.messageText}>{text}</pre>
+      {extras}
     </article>
   );
 }

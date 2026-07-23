@@ -10,18 +10,14 @@ import {
   useAppThemeStore,
   useSettingsStore,
 } from "@/stores/app";
-import { useDocumentSurfaceVariables } from "../useDocumentSurfaceVariables";
 import { isVideoWallpaperPath } from "./helpers";
 
 export function useDesktopFrameStyle() {
   const app = useAppStore((state) => state.app);
-  const { customTokens, resolvedTheme, setSystemTheme, themeId, themeMode } = useAppThemeStore(
+  const { customTokens, resolvedTheme } = useAppThemeStore(
     useShallow((state) => ({
       customTokens: state.customTokens,
       resolvedTheme: state.resolvedTheme,
-      setSystemTheme: state.setSystemTheme,
-      themeId: state.themeId,
-      themeMode: state.themeMode,
     })),
   );
   const appearancePreferences = useSettingsStore(
@@ -35,8 +31,12 @@ export function useDesktopFrameStyle() {
     [appearancePreferences.wallpaperPath],
   );
   const mistyLogoSource = useMemo(
-    () => runtimeAssetSource(app?.environment.assetsDir, "logos/misty.png"),
-    [app?.environment.assetsDir],
+    () =>
+      runtimeAssetSource(
+        app?.environment.assetsDir,
+        resolvedTheme === "dark" ? "logos/misty-white.png" : "logos/misty-black.png",
+      ),
+    [app?.environment.assetsDir, resolvedTheme],
   );
   const appWallpaperIsVideo = useMemo(
     () => isVideoWallpaperPath(appearancePreferences.wallpaperPath),
@@ -53,20 +53,28 @@ export function useDesktopFrameStyle() {
     const neutralSelectedOpacity = Math.min(0.22, 0.075 + panelOpacity * 0.145);
     const neutralStrongOpacity = Math.min(0.28, 0.105 + panelOpacity * 0.175);
     const neutralBorderOpacity = Math.min(0.24, 0.08 + panelOpacity * 0.13);
-    const appBodyBackground = "var(--misty-bg)";
-    const appNavBackground = appWallpaperSrc
-      ? `rgba(16, 16, 16, ${panelOpacity})`
-      : "var(--misty-nav-bg)";
-    const appSurfaceBackground = "var(--misty-surface)";
+    const appBackground = opacityAwareColor(
+      "var(--misty-bg)",
+      panelOpacity,
+      Boolean(appWallpaperSrc),
+    );
+    const appSurfaceBackground = "transparent";
+    const appRaisedSurfaceBackground = "transparent";
+    const appHoverSurfaceBackground = translucentTextColor(neutralHoverOpacity);
+    const appSelectedSurfaceBackground = translucentTextColor(neutralSelectedOpacity);
     const wallpaperFrameVars = appWallpaperSrc
       ? {
           "--misty-frame-background": "transparent",
-          "--misty-frame-navigation": appNavBackground,
-          "--misty-frame-control-bg": `rgba(244, 244, 245, ${neutralControlOpacity})`,
-          "--misty-frame-control-hover-bg": `rgba(244, 244, 245, ${neutralHoverOpacity})`,
-          "--misty-frame-control-selected-bg": `rgba(244, 244, 245, ${neutralSelectedOpacity})`,
-          "--misty-frame-control-strong-bg": `rgba(244, 244, 245, ${neutralStrongOpacity})`,
-          "--misty-frame-control-border": `rgba(244, 244, 245, ${neutralBorderOpacity})`,
+          "--misty-frame-navigation": appBackground,
+          "--misty-frame-control-bg": translucentTextColor(neutralControlOpacity),
+          "--misty-frame-control-hover-bg": translucentTextColor(neutralHoverOpacity),
+          "--misty-frame-control-selected-bg": translucentTextColor(neutralSelectedOpacity),
+          "--misty-frame-control-strong-bg": translucentTextColor(neutralStrongOpacity),
+          "--misty-frame-control-border": translucentTextColor(neutralBorderOpacity),
+          "--misty-neutral-control-bg": translucentTextColor(neutralControlOpacity),
+          "--misty-neutral-hover-bg": translucentTextColor(neutralHoverOpacity),
+          "--misty-neutral-selected-bg": translucentTextColor(neutralSelectedOpacity),
+          "--misty-neutral-strong-bg": translucentTextColor(neutralStrongOpacity),
         }
       : {};
     return {
@@ -75,22 +83,28 @@ export function useDesktopFrameStyle() {
       "--misty-app-chrome-opacity": String(chromePanelOpacity),
       "--misty-app-tab-opacity": String(tabPanelOpacity),
       "--misty-app-tab-active-opacity": String(activeTabPanelOpacity),
+      "--misty-runtime-background": appSurfaceBackground,
+      "--misty-runtime-navigation": appBackground,
+      "--misty-runtime-surface": appSurfaceBackground,
+      "--misty-runtime-surface-raised": appRaisedSurfaceBackground,
+      "--misty-runtime-surface-hover": appHoverSurfaceBackground,
+      "--misty-runtime-sidebar-selected": appSelectedSurfaceBackground,
+      "--misty-runtime-popover": appBackground,
       "--misty-app-frame-bg": "var(--misty-frame-background)",
-      "--misty-app-page-bg": appBodyBackground,
-      "--misty-app-shell-bg": appBodyBackground,
+      "--misty-app-page-bg": appSurfaceBackground,
+      "--misty-app-shell-bg": appSurfaceBackground,
       "--misty-app-nav-bg": "var(--misty-frame-navigation)",
-      "--misty-app-route-bg": appBodyBackground,
+      "--misty-app-route-bg": appBackground,
       "--misty-app-panel-bg": "var(--misty-component-surface)",
       "--misty-app-pane-bg": appSurfaceBackground,
       "--misty-app-surface-bg": appSurfaceBackground,
-      "--misty-app-surface-soft-bg": "var(--misty-component-surface-raised)",
-      "--misty-app-tab-bg": appBodyBackground,
+      "--misty-app-surface-soft-bg": appRaisedSurfaceBackground,
+      "--misty-app-tab-bg": appSurfaceBackground,
       "--misty-app-tab-active-bg": appSurfaceBackground,
-      "--misty-app-modal-bg": "var(--misty-component-surface)",
+      "--misty-app-modal-bg": appBackground,
       ...wallpaperFrameVars,
     } as unknown as CSSProperties;
   }, [appWallpaperSrc, appearancePreferences.panelOpacity]);
-  useDocumentSurfaceVariables(desktopFrameStyle);
   const desktopNavbarStyle = useMemo(
     () =>
       ({
@@ -99,10 +113,8 @@ export function useDesktopFrameStyle() {
     [],
   );
 
-  useDocumentThemeSync({ appearancePreferences, resolvedTheme, themeId, themeMode });
   useDocumentFrameCssVars(appWallpaperSrc, desktopFrameStyle);
   useDocumentCustomTokens(customTokens, desktopFrameStyle);
-  useSystemThemeListener(setSystemTheme);
 
   return {
     app,
@@ -114,26 +126,14 @@ export function useDesktopFrameStyle() {
   };
 }
 
-function useDocumentThemeSync(params: {
-  appearancePreferences: ReturnType<typeof selectAppearancePreferences>;
-  resolvedTheme: string;
-  themeId: string;
-  themeMode: string;
-}) {
-  const { appearancePreferences, resolvedTheme, themeId, themeMode } = params;
-  useEffect(() => {
-    const root = document.documentElement;
-    root.dataset.theme = resolvedTheme;
-    root.dataset.mistyTheme = themeId;
-    root.dataset.themeMode = themeMode;
-    root.classList.toggle("dark", resolvedTheme === "dark");
-    root.dataset.compactMode = String(appearancePreferences.compactModeEnabled);
-    root.dataset.fontSize = appearancePreferences.fontSize;
-    root.dataset.reducedMotion = String(appearancePreferences.reducedMotionEnabled);
-    root.dataset.thumbnailPreviews = String(appearancePreferences.thumbnailPreviewsEnabled);
-    root.dataset.uiScale = appearancePreferences.uiScale;
-    root.style.colorScheme = resolvedTheme;
-  }, [appearancePreferences, resolvedTheme, themeId, themeMode]);
+export function opacityAwareColor(token: string, opacity: number, enabled: boolean): string {
+  if (!enabled) return token;
+  const percentage = Math.round(Math.min(1, Math.max(0, opacity)) * 10_000) / 100;
+  return `color-mix(in srgb, ${token} ${percentage}%, transparent)`;
+}
+
+function translucentTextColor(opacity: number): string {
+  return opacityAwareColor("var(--misty-text)", opacity, true);
 }
 
 function useDocumentFrameCssVars(appWallpaperSrc: string, desktopFrameStyle: CSSProperties) {
@@ -181,14 +181,4 @@ function useDocumentCustomTokens(
       }
     }
   }, [customTokens, desktopFrameStyle]);
-}
-
-function useSystemThemeListener(setSystemTheme: (mode: "light" | "dark") => void) {
-  useEffect(() => {
-    const query = window.matchMedia("(prefers-color-scheme: light)");
-    const syncSystemTheme = () => setSystemTheme(query.matches ? "light" : "dark");
-    syncSystemTheme();
-    query.addEventListener("change", syncSystemTheme);
-    return () => query.removeEventListener("change", syncSystemTheme);
-  }, [setSystemTheme]);
 }

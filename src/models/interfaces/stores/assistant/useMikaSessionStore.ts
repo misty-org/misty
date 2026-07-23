@@ -112,6 +112,7 @@ export interface AiSessionStore {
    * Empty means the chat follows the agent's own model (or the base default).
    */
   activeModelId: string;
+  activeReasoningEffort: string;
   refreshStatus: () => Promise<void>;
   setMode: (mode: AiMode) => void;
   /**
@@ -120,6 +121,7 @@ export interface AiSessionStore {
    * the next send (costly); otherwise the chat is reset to an empty history.
    */
   setConversationModel: (modelId: string, options: { resend: boolean }) => Promise<void>;
+  setConversationReasoning: (effort: string) => Promise<void>;
   sendPrompt: (request: SendAiPromptRequest) => Promise<void>;
   approveToolRequest: (requestId: string) => Promise<void>;
   approvePlan: (planId: string) => Promise<void>;

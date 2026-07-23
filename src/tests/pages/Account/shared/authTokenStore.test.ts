@@ -62,13 +62,26 @@ describe("multi-account auth token storage", () => {
       grace.id,
       ada.id,
     ]);
+    expect(store.readActiveSavedAccountSession()).toEqual(expect.objectContaining(grace));
     await expect(store.readAccountAuthToken()).resolves.toBe("grace-token");
 
     await store.activateAccountSession(ada.id);
+    expect(store.readActiveSavedAccountSession()).toEqual(expect.objectContaining(ada));
     await expect(store.readAccountAuthToken()).resolves.toBe("ada-token");
 
     await expect(store.clearAccountAuthToken()).resolves.toEqual(expect.objectContaining(grace));
     expect(store.listSavedAccountSessions().map((account) => account.id)).toEqual([grace.id]);
     await expect(store.readAccountAuthToken()).resolves.toBe("grace-token");
+  });
+
+  it("keeps saved accounts available without presenting one as active after deactivation", async () => {
+    const store = await import("@/stores/account/useAuthTokenStore");
+    await store.saveAccountAuthToken("ada-token", ada);
+    await store.saveAccountAuthToken("grace-token", grace);
+
+    await store.deactivateActiveAccount();
+
+    expect(store.listSavedAccountSessions()).toHaveLength(2);
+    expect(store.readActiveSavedAccountSession()).toBeNull();
   });
 });

@@ -135,15 +135,10 @@ import { shortcutMapFromBindings, shortcutMatchesEvent } from "@/lib/shortcuts";
 import type { ShortcutMap } from "@/models/types/lib/shortcuts";
 import {
   selectAdvancedPreferences,
-  selectAssistantPreferences,
   selectGeneralPreferences,
   selectShortcutPreferences,
   useSettingsStore,
 } from "@/stores/app";
-import {
-  openCloudFolderBotChatWindow,
-  openCloudFolderBotWindow,
-} from "@/features/bots/cloudFolderBot";
 import { errorText } from "@/lib/format";
 import { clipboardImagePng } from "../utils/clipboardImage";
 import { formatBytes, formatDate } from "../utils/fileFormat";
@@ -291,16 +286,14 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
   const pluginCommandsRef = useRef<PluginCommandEntry[]>(emptyPluginCommands);
   const [duplicateFinderPaneId, setDuplicateFinderPaneId] = useState<string | null>(null);
   const [compareDialog, setCompareDialog] = useState<CompareDialogSeed | null>(null);
-  const { mikaEnabled, preferredWorkspaceRoot, settingsLoaded, settingsMountPath } =
-    useSettingsStore(
-      useShallow((state) => ({
-        mikaEnabled: selectAssistantPreferences(state.settings?.document).enabled,
-        preferredWorkspaceRoot: selectGeneralPreferences(state.settings?.document)
-          .preferredWorkspaceRoot,
-        settingsMountPath: selectAdvancedPreferences(state.settings?.document).mountPath,
-        settingsLoaded: state.loaded,
-      })),
-    );
+  const { preferredWorkspaceRoot, settingsLoaded, settingsMountPath } = useSettingsStore(
+    useShallow((state) => ({
+      preferredWorkspaceRoot: selectGeneralPreferences(state.settings?.document)
+        .preferredWorkspaceRoot,
+      settingsMountPath: selectAdvancedPreferences(state.settings?.document).mountPath,
+      settingsLoaded: state.loaded,
+    })),
+  );
   const shortcutPreferences = useSettingsStore(
     useShallow((state) => selectShortcutPreferences(state.settings?.document)),
   );
@@ -863,13 +856,6 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
   const renderTabActions = useCallback(
     () => (
       <ExplorerTray
-        mikaEnabled={mikaEnabled}
-        onOpenMika={() => {
-          if (!mikaEnabled) return;
-          void openCloudFolderBotWindow(app?.environment.assetsDir).then(() =>
-            openCloudFolderBotChatWindow(),
-          );
-        }}
         terminalEnabled={
           activeTabSupportsSidePanels &&
           canOpenTerminalPath(activeTabPath) &&
@@ -879,13 +865,7 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
         onOpenTransfers={openTransfersTab}
       />
     ),
-    [
-      activePath,
-      activeTabPath,
-      activeTabSupportsSidePanels,
-      mikaEnabled,
-      app?.environment.assetsDir,
-    ],
+    [activePath, activeTabPath, activeTabSupportsSidePanels],
   );
   const renderBottomBar = useCallback((tab: MultiPanelTab) => {
     if (isChromeTabPath(tab.path)) return null;
