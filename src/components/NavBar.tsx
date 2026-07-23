@@ -77,6 +77,7 @@ export default function Navbar({ onOpenSettings }: { onOpenSettings: () => void 
   const resourcesActive = resourceLinks.some(({ to }) =>
     location.pathname.startsWith(to),
   );
+  const isHome = location.pathname === "/";
 
   return (
     <Collapsible open={mobileOpen} onOpenChange={setMobileOpen} asChild>
@@ -84,7 +85,18 @@ export default function Navbar({ onOpenSettings }: { onOpenSettings: () => void 
         aria-label="Primary navigation"
         className="fixed inset-x-0 top-0 z-50 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/85"
       >
-        <div className="mx-auto flex h-16 w-full max-w-[1280px] items-center justify-between px-6 sm:px-10 lg:px-16">
+        {/*
+         * The bar narrows to a centered column on home and expands to full
+         * width on every other route. The reduced-motion rule in index.css
+         * overrides this transition-duration, so the change is instant there.
+         */}
+        <div
+          style={{
+            maxWidth: isHome ? "1060px" : "100%",
+            transition: "max-width 0.5s cubic-bezier(0.4, 0, 0.2, 1)",
+          }}
+          className="mx-auto flex h-16 w-full items-center justify-between px-6 sm:px-10 lg:px-16"
+        >
           <NavLink
             to="/"
             onClick={() => setMobileOpen(false)}

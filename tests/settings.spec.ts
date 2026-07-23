@@ -247,9 +247,13 @@ for (const theme of ["light", "dark"] as const) {
       return {
         width: rect.width,
         height: rect.height,
-        overflow:
+        // Clamped: `scrollbar-gutter: stable` reserves a gutter, so the
+        // difference rests negative. Only a positive value is real overflow.
+        overflow: Math.max(
+          0,
           document.documentElement.scrollWidth -
-          document.documentElement.clientWidth,
+            document.documentElement.clientWidth,
+        ),
       };
     });
     if ((page.viewportSize()?.width ?? 1440) < 768) {

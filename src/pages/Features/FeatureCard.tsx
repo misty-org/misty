@@ -4,6 +4,7 @@ import {
   ConnectionsPreview,
   FilesPreview,
   ProductScreenshot,
+  TasksPreview,
 } from "@/components/ProductPreview";
 import { marketingCopy } from "@/content/marketingCopy";
 import { cn } from "@/lib/utils";
@@ -11,13 +12,15 @@ import type { MainFeature } from "./featureData";
 
 function FeaturePreview({ feature }: { feature: MainFeature }) {
   switch (feature.id) {
-    case "work-together":
+    case "spaces":
       return <ChatPreview />;
+    case "work-together":
+      return <TasksPreview />;
     case "shared-library":
       return (
         <ProductScreenshot
           src="/space-library-crop.webp"
-          alt="Misty Space Library showing shared project research and files"
+          alt="Misty Space Library showing shared research and files"
           label="Space Library · Beta"
         />
       );

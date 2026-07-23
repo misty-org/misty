@@ -1,26 +1,43 @@
+import { useEffect, useState } from "react";
+import {
+  SiDiscord,
+  SiGooglecalendar,
+  SiNotion,
+  SiSlack,
+} from "react-icons/si";
 import { NavLink } from "react-router";
 
 import {
+  AgentBuilderPreview,
   AgentsPreview,
   ChatPreview,
   FilesPreview,
   ProductScreenshot,
+  SharedLibraryPreview,
   TasksPreview,
 } from "@/components/ProductPreview";
 import { publicPageContainer } from "@/components/marketing/PublicPage";
 import { Button } from "@/components/ui/button";
-import { marketingCopy } from "@/content/marketingCopy";
+import { marketingCopy, type MarketingCopy } from "@/content/marketingCopy";
 import { BETA_ACCESS_EXTERNAL, BETA_ACCESS_HREF } from "@/lib/site";
+import { cn } from "@/lib/utils";
 import { posts } from "@/pages/Blog/data";
 import { phases, type PhaseStatus } from "@/pages/Roadmap/data";
 
 const capabilities = [
-  "Spaces",
-  "Chat",
-  "Tasks",
-  "Library",
-  "Private files",
-  "Agents",
+  { name: "Agents", description: "Custom AI on Space context." },
+  { name: "Spaces", description: "One shared home for the group." },
+  { name: "Chat", description: "Conversation beside the work." },
+  { name: "Tasks", description: "Boards, owners, and priorities." },
+  { name: "Library", description: "Shared files and references." },
+  { name: "Private files", description: "Local and connected, still yours." },
+];
+
+const connections = [
+  { name: "Google Calendar", Mark: SiGooglecalendar, status: "In pilot" },
+  { name: "Slack", Mark: SiSlack, status: "Coming" },
+  { name: "Notion", Mark: SiNotion, status: "Coming" },
+  { name: "Discord", Mark: SiDiscord, status: "Coming" },
 ];
 
 const roadmapPreview: { status: PhaseStatus; label: string }[] = [
@@ -51,6 +68,131 @@ function BetaAccessButton({ inverted = false }: { inverted?: boolean }) {
   );
 }
 
+const TYPE_MS = 125;
+const DELETE_MS = 55;
+const HOLD_MS = 3000;
+
+function usePrefersReducedMotion() {
+  const query = "(prefers-reduced-motion: reduce)";
+  const [reduced, setReduced] = useState(
+    () => typeof window !== "undefined" && window.matchMedia(query).matches,
+  );
+
+  useEffect(() => {
+    const media = window.matchMedia(query);
+    const onChange = () => setReduced(media.matches);
+    media.addEventListener("change", onChange);
+    return () => media.removeEventListener("change", onChange);
+  }, []);
+
+  return reduced;
+}
+
+/**
+ * Types each phrase in, holds, deletes, and moves to the next. When disabled it
+ * rests on the first phrase, fully typed — the CSS reduced-motion rule in
+ * index.css cannot stop a JS timer, so that case is handled here instead.
+ */
+function useTypedPhrase(phrases: readonly string[], enabled: boolean) {
+  const [index, setIndex] = useState(0);
+  const [length, setLength] = useState(phrases[0].length);
+  const [deleting, setDeleting] = useState(false);
+
+  useEffect(() => {
+    if (!enabled) return;
+
+    const phrase = phrases[index];
+    const settled = !deleting && length === phrase.length;
+    const timer = window.setTimeout(
+      () => {
+        if (deleting) {
+          if (length === 0) {
+            setDeleting(false);
+            setIndex((current) => (current + 1) % phrases.length);
+          } else {
+            setLength(length - 1);
+          }
+        } else if (settled) {
+          setDeleting(true);
+        } else {
+          setLength(length + 1);
+        }
+      },
+      settled ? HOLD_MS : deleting ? DELETE_MS : TYPE_MS,
+    );
+
+    return () => window.clearTimeout(timer);
+  }, [enabled, phrases, index, length, deleting]);
+
+  return phrases[index].slice(0, length);
+}
+
+/**
+ * "Space" in the hero, rendered as a link to the Spaces explainer.
+ * The resting underline is a static bar so the affordance survives the global
+ * `animation: none` under prefers-reduced-motion (see src/index.css).
+ */
+function SpacesLink({ children }: { children: string }) {
+  return (
+    <NavLink
+      to="/features#spaces"
+      className="relative inline-block rounded-sm transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-4 focus-visible:ring-offset-background"
+    >
+      {children}
+      <span
+        aria-hidden="true"
+        className="absolute inset-x-0 bottom-[0.06em] h-[0.055em] overflow-hidden rounded-full"
+      >
+        <span className="absolute inset-0 bg-foreground/45" />
+        <span className="absolute inset-0 animate-[underline-sweep_3.2s_ease-in-out_infinite] bg-foreground" />
+      </span>
+    </NavLink>
+  );
+}
+
+const headlineType =
+  "text-5xl font-medium leading-[0.98] tracking-[-0.055em] text-foreground sm:text-6xl lg:text-7xl";
+
+function HeroHeadline({
+  heroTitle,
+}: {
+  heroTitle: MarketingCopy["home"]["heroTitle"];
+}) {
+  const { before, link, after, phrases } = heroTitle;
+  const reducedMotion = usePrefersReducedMotion();
+  const typed = useTypedPhrase(phrases, !reducedMotion);
+
+  // The tallest phrase reserves the row so the hero never reflows mid-cycle.
+  const longest = phrases.reduce((a, b) => (b.length > a.length ? b : a));
+
+  return (
+    <div className="grid">
+      <span
+        aria-hidden="true"
+        className={`invisible col-start-1 row-start-1 ${headlineType}`}
+      >
+        {before}
+        {link}
+        {after}
+        {longest}
+      </span>
+      <h1 className={`col-start-1 row-start-1 ${headlineType}`}>
+        {before}
+        <SpacesLink>{link}</SpacesLink>
+        {after}
+        {/* Stable accessible name; the animated copy below is decorative. */}
+        <span className="sr-only">{phrases[0]}</span>
+        <span aria-hidden="true">
+          {typed}
+          {reducedMotion ? null : (
+            <span className="ml-[0.06em] inline-block h-[0.78em] w-[0.055em] translate-y-[0.06em] animate-[caret-blink_1.1s_steps(1)_infinite] bg-foreground align-baseline" />
+          )}
+        </span>
+      </h1>
+    </div>
+  );
+}
+
 function EditorialLink({ to, children }: { to: string; children: string }) {
   return (
     <NavLink
@@ -70,9 +212,7 @@ export default function Home() {
       <section className="border-b border-border py-16 sm:py-20 lg:py-24">
         <div className={publicPageContainer}>
           <div className="max-w-5xl">
-            <h1 className="text-balance text-5xl font-medium leading-[0.98] tracking-[-0.055em] text-foreground sm:text-6xl lg:text-7xl">
-              {copy.heroTitle}
-            </h1>
+            <HeroHeadline heroTitle={copy.heroTitle} />
             <p className="mt-7 max-w-xl text-base leading-7 text-muted-foreground sm:text-lg">
               {copy.heroDescription}
             </p>
@@ -87,7 +227,7 @@ export default function Home() {
           <div className="mt-14 sm:mt-16">
             <ProductScreenshot
               src="/space-library-crop.webp"
-              alt="Misty Space Library with shared project research and files"
+              alt="Misty Space Library with shared research and files"
               label="Space Library · Beta"
               eager
             />
@@ -103,12 +243,23 @@ export default function Home() {
             {copy.proof}
           </p>
           <ul className="grid grid-cols-2 md:grid-cols-3">
-            {capabilities.map((capability) => (
+            {capabilities.map((capability, index) => (
               <li
-                key={capability}
-                className="border-b border-border px-5 py-6 text-sm text-foreground last:border-b-0 md:border-b-0 md:border-l first:md:border-l-0"
+                key={capability.name}
+                className={cn(
+                  "border-border px-5 py-6",
+                  index % 2 === 1 && "border-l",
+                  index < 4 && "border-b",
+                  index % 3 === 0 ? "md:border-l-0" : "md:border-l",
+                  index >= 3 && "md:border-b-0",
+                )}
               >
-                {capability}
+                <p className="text-sm font-medium text-foreground">
+                  {capability.name}
+                </p>
+                <p className="mt-2 text-xs leading-5 text-muted-foreground">
+                  {capability.description}
+                </p>
               </li>
             ))}
           </ul>
@@ -132,18 +283,17 @@ export default function Home() {
               </p>
             </div>
             <div className="grid gap-5">
-              <ChatPreview />
-              <TasksPreview />
+              <AgentsPreview />
+              <AgentBuilderPreview />
             </div>
           </div>
         </article>
 
         <article className="border-b border-border py-16 sm:py-24">
           <div
-            className={`${publicPageContainer} grid gap-12 lg:grid-cols-[1.25fr_0.75fr] lg:items-center lg:gap-16`}
+            className={`${publicPageContainer} grid gap-12 lg:grid-cols-[1.28fr_0.72fr] lg:items-start lg:gap-16`}
           >
-            <FilesPreview />
-            <div className="max-w-md lg:order-last">
+            <div className="max-w-md lg:sticky lg:top-28 lg:order-last">
               <p className="text-sm text-muted-foreground">
                 {copy.features[1].label}
               </p>
@@ -154,14 +304,18 @@ export default function Home() {
                 {copy.features[1].description}
               </p>
             </div>
+            <div className="grid gap-5 lg:order-first">
+              <ChatPreview />
+              <TasksPreview />
+            </div>
           </div>
         </article>
 
         <article className="border-b border-border py-16 sm:py-24">
           <div
-            className={`${publicPageContainer} grid gap-12 lg:grid-cols-[0.75fr_1.25fr] lg:items-center lg:gap-16`}
+            className={`${publicPageContainer} grid gap-12 lg:grid-cols-[0.72fr_1.28fr] lg:items-start lg:gap-16`}
           >
-            <div className="max-w-md">
+            <div className="max-w-md lg:sticky lg:top-28">
               <p className="text-sm text-muted-foreground">
                 {copy.features[2].label}
               </p>
@@ -172,9 +326,45 @@ export default function Home() {
                 {copy.features[2].description}
               </p>
             </div>
-            <AgentsPreview />
+            <div className="grid gap-5">
+              <FilesPreview />
+              <SharedLibraryPreview />
+            </div>
           </div>
         </article>
+      </section>
+
+      <section
+        aria-label="Connections"
+        className="border-b border-border py-14 sm:py-16"
+      >
+        <div
+          className={`${publicPageContainer} grid gap-10 lg:grid-cols-[0.9fr_2.1fr] lg:items-center lg:gap-16`}
+        >
+          <div className="max-w-sm">
+            <h2 className="text-balance text-xl font-medium tracking-[-0.02em] text-foreground">
+              Works with the tools your group already uses.
+            </h2>
+            <p className="mt-3 text-sm leading-6 text-muted-foreground">
+              Connections are rolling out through the beta. Current status is
+              listed for each.
+            </p>
+          </div>
+          <ul className="grid grid-cols-2 gap-x-6 gap-y-8 sm:grid-cols-4">
+            {connections.map(({ name, Mark, status }) => (
+              <li key={name} className="flex flex-col gap-3">
+                <Mark
+                  className="size-7 text-foreground/75"
+                  aria-hidden="true"
+                />
+                <div>
+                  <p className="text-sm font-medium text-foreground">{name}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">{status}</p>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
       </section>
 
       <section

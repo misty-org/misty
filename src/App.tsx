@@ -32,10 +32,10 @@ export default function App() {
       .reverse()
       .find((routeMatch) => Boolean(routeMatch.handle as Handle | undefined));
     const handle = match?.handle as Handle | undefined;
-    const title = handle?.title ?? "Misty — One Space for the whole project";
+    const title = handle?.title ?? "Misty — One shared Space for everyone";
     const description =
       handle?.description ??
-      "Misty combines members, chat, tasks, and a shared Library in one project Space. Private Files stay private until shared.";
+      "Misty combines members, chat, tasks, a shared Library, and AI Agents in one shared Space. Private Files stay private until shared.";
     const canonicalUrl = new URL(location.pathname, SITE_URL).toString();
 
     document.title = title;
@@ -54,6 +54,20 @@ export default function App() {
     }
     canonical.href = canonicalUrl;
   }, [location.pathname, matches]);
+
+  // Cross-page anchors (e.g. "/features#spaces" from the home hero). Router
+  // navigation does not scroll to the hash on its own, so do it once the target
+  // route has rendered.
+  useEffect(() => {
+    if (!location.hash || location.hash.startsWith("#/")) return;
+
+    const frame = window.requestAnimationFrame(() => {
+      const target = document.querySelector(location.hash);
+      target?.scrollIntoView({ block: "start" });
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [location.pathname, location.hash]);
 
   useEffect(() => {
     const previousPath = previousPathRef.current;

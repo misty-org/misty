@@ -190,7 +190,12 @@
 html {
   font-size: 17px;
   scroll-behavior: auto;
-  scrollbar-gutter: auto;
+  /*
+   * Always reserve the scrollbar gutter. Without this, navigating between a
+   * page tall enough to scroll and one that isn't adds/removes the scrollbar
+   * and shifts every centered container sideways.
+   */
+  scrollbar-gutter: stable;
 }
 
 button,
@@ -355,6 +360,35 @@ button:disabled {
 }
 ::-webkit-scrollbar-thumb:hover {
   background: var(--muted-foreground);
+}
+
+/*
+ * Hero "Space" link. The sweep sits on top of a static underline, so when the
+ * reduced-motion rule below kills the animation the bar simply rests at
+ * translateX(0) — a solid underline rather than a missing one.
+ */
+@keyframes underline-sweep {
+  0% {
+    transform: translateX(-100%);
+  }
+  55% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+/* Typing caret in the hero headline. Not rendered at all under reduced motion. */
+@keyframes caret-blink {
+  0%,
+  49% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
