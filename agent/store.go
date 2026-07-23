@@ -36,6 +36,7 @@ type Session struct {
 	BillingUserID         string
 	BillingScope          string
 	ModelID               string
+	ReasoningEffort       string
 	SystemPrompt          string
 	AllowTools            bool
 	AllowWriteTools       bool

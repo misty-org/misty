@@ -31,7 +31,7 @@ import (
 
 var (
 	ErrLibraryObjectNotFound = errors.New("library object not found")
-	libraryObjectKeyPattern  = regexp.MustCompile(`^library/[a-zA-Z0-9_-]{8,160}$`)
+	libraryObjectKeyPattern  = regexp.MustCompile(`^(?:library|avatars)/[a-zA-Z0-9_-]{8,160}$`)
 	sha256Pattern            = regexp.MustCompile(`^[0-9a-f]{64}$`)
 )
 
@@ -58,9 +58,9 @@ type LibraryObjectMetadata struct {
 	MIMEType string
 }
 
-// LibraryObjectStore keeps permanent objects under the library/ prefix. When
-// its bucket is shared with Agent attachments, lifecycle rules must exclude
-// this prefix.
+// LibraryObjectStore keeps permanent objects under the library/ and avatars/
+// prefixes. The bucket is shared (Library items, Agent attachments, user
+// avatars), so lifecycle rules must exclude these permanent prefixes.
 type LibraryObjectStore interface {
 	Health(context.Context) error
 	Put(context.Context, string, io.Reader, LibraryObjectMetadata) error

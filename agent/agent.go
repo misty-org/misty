@@ -235,6 +235,15 @@ func (s *Service) ConfigureSession(sessionID, userID, systemPrompt string, allow
 	})
 }
 
+// SetSessionReasoningEffort pins the reasoning effort ("low"/"medium"/"high") for
+// a session. It is only forwarded to the gateway for reasoning-capable models.
+func (s *Service) SetSessionReasoningEffort(sessionID, userID, effort string) error {
+	return s.store.WithSession(sessionID, userID, func(session *Session) error {
+		session.ReasoningEffort = strings.TrimSpace(effort)
+		return nil
+	})
+}
+
 func (s *Service) CreateSessionForJob(userID, billingUserID, jobID string) *Session {
 	return s.store.CreateWithBillingScope(userID, billingUserID, "agent-job:"+jobID)
 }
@@ -433,7 +442,11 @@ func (s *Service) advanceLocked(ctx context.Context, session *Session) error {
 			return ErrModelUnavailable
 		}
 		var providerErr error
-		selectedProvider, providerErr = NewGatewayProviderForModel(session.ModelID)
+		effort := ""
+		if GatewayModelSupportsReasoning(ctx, session.ModelID) {
+			effort = session.ReasoningEffort
+		}
+		selectedProvider, providerErr = NewGatewayProviderForModelWithReasoning(session.ModelID, effort)
 		if providerErr != nil {
 			return providerErr
 		}

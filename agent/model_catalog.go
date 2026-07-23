@@ -96,6 +96,29 @@ func GatewayModelSupportsTools(ctx context.Context, modelID string) bool {
 	return false
 }
 
+// GatewayModelSupportsReasoning reports whether a model exposes adjustable
+// reasoning effort, based on the capabilities the gateway advertises. Keep the
+// capability strings in sync with modelSupportsReasoning on the client.
+func GatewayModelSupportsReasoning(ctx context.Context, modelID string) bool {
+	models, err := GatewayModels(ctx)
+	if err != nil {
+		return false
+	}
+	for _, model := range models {
+		if model.ID != strings.TrimSpace(modelID) {
+			continue
+		}
+		for _, capability := range model.Capabilities {
+			switch strings.ToLower(strings.TrimSpace(capability)) {
+			case "reasoning", "thinking", "reasoning-effort":
+				return true
+			}
+		}
+		return false
+	}
+	return false
+}
+
 // CachedGatewayModelRates exposes server-only gateway pricing to the usage
 // meter without sending prices to clients. Values are thousandths of a dollar
 // per million tokens, matching the versioned Hosted AI rate-card units.
@@ -115,6 +138,10 @@ func CachedGatewayModelRates(modelID string) (input, cachedInput, output int64, 
 }
 
 func NewGatewayProviderForModel(modelID string) (ModelProvider, error) {
+	return NewGatewayProviderForModelWithReasoning(modelID, "")
+}
+
+func NewGatewayProviderForModelWithReasoning(modelID, reasoningEffort string) (ModelProvider, error) {
 	modelID = strings.TrimSpace(modelID)
 	if modelID == "" || strings.ContainsAny(modelID, "\r\n\t ") || len(modelID) > 200 {
 		return nil, errors.New("invalid gateway model")
@@ -123,7 +150,7 @@ func NewGatewayProviderForModel(modelID string) (ModelProvider, error) {
 	if apiKey == "" {
 		return nil, errors.New("AI gateway is not configured")
 	}
-	return NewOpenAIProvider(OpenAIProviderConfig{APIKey: apiKey, BaseURL: envOrDefault("AI_GATEWAY_BASE_URL", defaultVercelAIBaseURL), Model: modelID, ProviderName: ProviderVercelAI}), nil
+	return NewOpenAIProvider(OpenAIProviderConfig{APIKey: apiKey, BaseURL: envOrDefault("AI_GATEWAY_BASE_URL", defaultVercelAIBaseURL), Model: modelID, ProviderName: ProviderVercelAI, ReasoningEffort: strings.TrimSpace(reasoningEffort)}), nil
 }
 
 func configuredGatewayModels() []GatewayModel {

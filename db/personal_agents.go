@@ -27,6 +27,7 @@ type PersonalAgent struct {
 	Instructions       string          `json:"instructions,omitempty"`
 	ModelMode          string          `json:"model_mode"`
 	ModelID            string          `json:"model_id,omitempty"`
+	ReasoningEffort    string          `json:"reasoning_effort,omitempty"`
 	ContextPermissions json.RawMessage `json:"context_permissions"`
 	ToolPermissions    json.RawMessage `json:"tool_permissions"`
 	Enabled            bool            `json:"enabled"`
@@ -52,11 +53,11 @@ type PersonalAgentGrantInput struct {
 	MemberUserIDs []string `json:"member_user_ids"`
 }
 
-const personalAgentColumns = `id,owner_user_id,name,description,icon,instructions,model_mode,model_id,context_permissions,tool_permissions,enabled,version,created_at,updated_at`
+const personalAgentColumns = `id,owner_user_id,name,description,icon,instructions,model_mode,model_id,reasoning_effort,context_permissions,tool_permissions,enabled,version,created_at,updated_at`
 
 func scanPersonalAgent(row scanner, out *PersonalAgent) error {
 	return row.Scan(&out.ID, &out.OwnerUserID, &out.Name, &out.Description, &out.Icon, &out.Instructions,
-		&out.ModelMode, &out.ModelID, &out.ContextPermissions, &out.ToolPermissions, &out.Enabled,
+		&out.ModelMode, &out.ModelID, &out.ReasoningEffort, &out.ContextPermissions, &out.ToolPermissions, &out.Enabled,
 		&out.Version, &out.CreatedAt, &out.UpdatedAt)
 }
 
@@ -67,6 +68,12 @@ func normalizePersonalAgent(agent *PersonalAgent) error {
 	agent.Instructions = strings.TrimSpace(agent.Instructions)
 	agent.ModelMode = strings.ToLower(strings.TrimSpace(agent.ModelMode))
 	agent.ModelID = strings.TrimSpace(agent.ModelID)
+	agent.ReasoningEffort = strings.ToLower(strings.TrimSpace(agent.ReasoningEffort))
+	switch agent.ReasoningEffort {
+	case "", "low", "medium", "high":
+	default:
+		agent.ReasoningEffort = ""
+	}
 	if agent.ModelMode == "" {
 		agent.ModelMode = "pinned"
 	}
@@ -132,9 +139,9 @@ func (db *Database) CreatePersonalAgent(ctx context.Context, userID string, item
 		item.Enabled = true
 	}
 	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
-		return scanPersonalAgent(tx.QueryRowContext(ctx, `INSERT INTO personal_agents(id,owner_user_id,name,description,icon,instructions,model_mode,model_id,context_permissions,tool_permissions,enabled)
-			VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING `+personalAgentColumns,
-			item.ID, userID, item.Name, item.Description, item.Icon, item.Instructions, item.ModelMode, item.ModelID, item.ContextPermissions, item.ToolPermissions, item.Enabled), &item)
+		return scanPersonalAgent(tx.QueryRowContext(ctx, `INSERT INTO personal_agents(id,owner_user_id,name,description,icon,instructions,model_mode,model_id,reasoning_effort,context_permissions,tool_permissions,enabled)
+			VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING `+personalAgentColumns,
+			item.ID, userID, item.Name, item.Description, item.Icon, item.Instructions, item.ModelMode, item.ModelID, item.ReasoningEffort, item.ContextPermissions, item.ToolPermissions, item.Enabled), &item)
 	})
 	return &item, err
 }
@@ -147,9 +154,9 @@ func (db *Database) UpdatePersonalAgent(ctx context.Context, userID string, item
 		return nil, err
 	}
 	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
-		err := scanPersonalAgent(tx.QueryRowContext(ctx, `UPDATE personal_agents SET name=$1,description=$2,icon=$3,instructions=$4,model_mode=$5,model_id=$6,context_permissions=$7,tool_permissions=$8,enabled=$9,version=version+1,updated_at=NOW()
-			WHERE id=$10 AND owner_user_id=$11 AND version=$12 AND deleted_at IS NULL RETURNING `+personalAgentColumns,
-			item.Name, item.Description, item.Icon, item.Instructions, item.ModelMode, item.ModelID, item.ContextPermissions, item.ToolPermissions, item.Enabled, item.ID, userID, item.Version), &item)
+		err := scanPersonalAgent(tx.QueryRowContext(ctx, `UPDATE personal_agents SET name=$1,description=$2,icon=$3,instructions=$4,model_mode=$5,model_id=$6,reasoning_effort=$7,context_permissions=$8,tool_permissions=$9,enabled=$10,version=version+1,updated_at=NOW()
+			WHERE id=$11 AND owner_user_id=$12 AND version=$13 AND deleted_at IS NULL RETURNING `+personalAgentColumns,
+			item.Name, item.Description, item.Icon, item.Instructions, item.ModelMode, item.ModelID, item.ReasoningEffort, item.ContextPermissions, item.ToolPermissions, item.Enabled, item.ID, userID, item.Version), &item)
 		if !errors.Is(err, sql.ErrNoRows) {
 			return err
 		}

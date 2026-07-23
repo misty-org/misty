@@ -1,7 +1,6 @@
 package db
 
 import (
-	"bytes"
 	"testing"
 )
 
@@ -84,25 +83,25 @@ func TestUserSettingsDefaultAndUpdate(t *testing.T) {
 	}
 }
 
-func TestUserAvatarRoundTrip(t *testing.T) {
+func TestUserAvatarVersionBumps(t *testing.T) {
 	database := openTestDatabase(t)
 	user, err := database.CreateUser("Avatar User", "avatar@example.com", "password123")
 	if err != nil {
 		t.Fatalf("CreateUser() error = %v", err)
 	}
 
-	data, version, err := database.GetUserAvatar(user.ID)
-	if err != nil || data != nil || version != 0 {
-		t.Fatalf("GetUserAvatar() before upload = %v, %d, %v; want nil, 0, nil", data, version, err)
+	// Avatar bytes live in object storage (R2); Postgres tracks only the version.
+	version, err := database.GetUserAvatarVersion(user.ID)
+	if err != nil || version != 0 {
+		t.Fatalf("GetUserAvatarVersion() before upload = %d, %v; want 0, nil", version, err)
 	}
 
-	want := []byte("validity is checked by the HTTP boundary")
-	version, err = database.UpdateUserAvatar(user.ID, want)
+	version, err = database.BumpUserAvatarVersion(user.ID)
 	if err != nil || version != 1 {
-		t.Fatalf("UpdateUserAvatar() = %d, %v; want 1, nil", version, err)
+		t.Fatalf("BumpUserAvatarVersion() = %d, %v; want 1, nil", version, err)
 	}
-	data, version, err = database.GetUserAvatar(user.ID)
-	if err != nil || version != 1 || !bytes.Equal(data, want) {
-		t.Fatalf("GetUserAvatar() = %q, %d, %v; want stored bytes, 1, nil", data, version, err)
+	version, err = database.GetUserAvatarVersion(user.ID)
+	if err != nil || version != 1 {
+		t.Fatalf("GetUserAvatarVersion() = %d, %v; want 1, nil", version, err)
 	}
 }

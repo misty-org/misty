@@ -118,40 +118,43 @@ func (db *Database) UpdateUserName(id, name string) error {
 	return err
 }
 
-func (db *Database) UpdateUserAvatar(id string, png []byte) (int64, error) {
+// BumpUserAvatarVersion advances the avatar version without storing bytes in
+// Postgres; the PNG itself lives in the object store (R2). Used after a
+// successful avatar upload so clients cache-bust the new image.
+func (db *Database) BumpUserAvatarVersion(id string) (int64, error) {
 	var version int64
 	err := db.withRLSContext(context.Background(), userRLSSettings(id), func(tx *sql.Tx) error {
 		return tx.QueryRowContext(
 			context.Background(),
-			`UPDATE users SET avatar_png = $1, avatar_version = avatar_version + 1, avatar_updated_at = NOW() WHERE id = $2 RETURNING avatar_version`,
-			png,
+			`UPDATE users SET avatar_version = avatar_version + 1, avatar_updated_at = NOW() WHERE id = $1 RETURNING avatar_version`,
 			id,
 		).Scan(&version)
 	})
 	if err != nil {
-		log.Println("Failed to update user avatar:", err)
+		log.Println("Failed to bump user avatar version:", err)
 	}
 	return version, err
 }
 
-func (db *Database) GetUserAvatar(id string) ([]byte, int64, error) {
-	var png []byte
+// GetUserAvatarVersion returns the current avatar version (0 when the user has
+// never set an avatar), used to build the ETag and decide whether to serve.
+func (db *Database) GetUserAvatarVersion(id string) (int64, error) {
 	var version int64
 	err := db.withRLSContext(context.Background(), userRLSSettings(id), func(tx *sql.Tx) error {
 		return tx.QueryRowContext(
 			context.Background(),
-			`SELECT avatar_png, avatar_version FROM users WHERE id = $1 AND avatar_png IS NOT NULL`,
+			`SELECT avatar_version FROM users WHERE id = $1`,
 			id,
-		).Scan(&png, &version)
+		).Scan(&version)
 	})
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, 0, nil
+		return 0, nil
 	}
 	if err != nil {
-		log.Println("Failed to get user avatar:", err)
-		return nil, 0, err
+		log.Println("Failed to get user avatar version:", err)
+		return 0, err
 	}
-	return png, version, nil
+	return version, nil
 }
 
 func (db *Database) GetUserByID(id string) (*User, error) {

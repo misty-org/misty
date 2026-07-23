@@ -37,6 +37,7 @@ type persistedSessionState struct {
 	BillingUserID         string            `json:"billingUserId"`
 	BillingScope          string            `json:"billingScope"`
 	ModelID               string            `json:"modelId,omitempty"`
+	ReasoningEffort       string            `json:"reasoningEffort,omitempty"`
 	SystemPrompt          string            `json:"systemPrompt,omitempty"`
 	AllowTools            *bool             `json:"allowTools,omitempty"`
 	AllowWriteTools       *bool             `json:"allowWriteTools,omitempty"`
@@ -68,6 +69,7 @@ func marshalPersistentSession(session *Session) (json.RawMessage, error) {
 		BillingUserID:         session.BillingUserID,
 		BillingScope:          session.BillingScope,
 		ModelID:               session.ModelID,
+		ReasoningEffort:       session.ReasoningEffort,
 		SystemPrompt:          session.SystemPrompt,
 		AllowTools:            &allowTools,
 		AllowWriteTools:       &allowWrite,
@@ -118,6 +120,7 @@ func unmarshalPersistentSession(raw json.RawMessage, expectedID, expectedUserID 
 		BillingUserID:         state.BillingUserID,
 		BillingScope:          state.BillingScope,
 		ModelID:               state.ModelID,
+		ReasoningEffort:       state.ReasoningEffort,
 		SystemPrompt:          state.SystemPrompt,
 		AllowTools:            allowTools,
 		AllowWriteTools:       allowWrite,

@@ -11,19 +11,21 @@ import (
 )
 
 type OpenAIProviderConfig struct {
-	APIKey       string
-	BaseURL      string
-	Model        string
-	ProviderName string
-	Client       *http.Client
+	APIKey          string
+	BaseURL         string
+	Model           string
+	ProviderName    string
+	ReasoningEffort string
+	Client          *http.Client
 }
 
 type OpenAIProvider struct {
-	apiKey       string
-	baseURL      string
-	model        string
-	providerName string
-	client       *http.Client
+	apiKey          string
+	baseURL         string
+	model           string
+	providerName    string
+	reasoningEffort string
+	client          *http.Client
 }
 
 func NewOpenAIProvider(config OpenAIProviderConfig) *OpenAIProvider {
@@ -42,11 +44,23 @@ func NewOpenAIProvider(config OpenAIProviderConfig) *OpenAIProvider {
 		client = noRedirectHTTPClient(client)
 	}
 	return &OpenAIProvider{
-		apiKey:       strings.TrimSpace(config.APIKey),
-		baseURL:      baseURL,
-		model:        model,
-		providerName: strings.TrimSpace(config.ProviderName),
-		client:       client,
+		apiKey:          strings.TrimSpace(config.APIKey),
+		baseURL:         baseURL,
+		model:           model,
+		providerName:    strings.TrimSpace(config.ProviderName),
+		reasoningEffort: normalizeReasoningEffort(config.ReasoningEffort),
+		client:          client,
+	}
+}
+
+// normalizeReasoningEffort keeps only the effort levels the Responses API accepts;
+// anything else (including empty) yields "" so no reasoning field is sent.
+func normalizeReasoningEffort(effort string) string {
+	switch strings.ToLower(strings.TrimSpace(effort)) {
+	case "low", "medium", "high":
+		return strings.ToLower(strings.TrimSpace(effort))
+	default:
+		return ""
 	}
 }
 
@@ -101,6 +115,9 @@ func (p *OpenAIProvider) NextContext(ctx context.Context, request ModelRequest) 
 			},
 		},
 		"max_output_tokens": MaxModelOutputTokens,
+	}
+	if p.reasoningEffort != "" {
+		body["reasoning"] = map[string]any{"effort": p.reasoningEffort}
 	}
 	payload, err := json.Marshal(body)
 	if err != nil {

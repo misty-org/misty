@@ -115,6 +115,7 @@ func CreateServer() (*Server, error) {
 		return nil, fmt.Errorf("configure Space link encryption: %w", err)
 	}
 	s.Spaces.SetLibraryProvider(s.Library)
+	s.Spaces.SetAvatarStore(s.LibraryStore)
 	s.Realtime = api.NewRealtimeService(s.Database, s.Database.GetDSN())
 
 	emailSender, err := email.NewSenderFromEnv()
@@ -189,8 +190,8 @@ func (s *Server) MountHandlers() error {
 	// Dashboard — authenticated endpoints
 	s.Router.Get("/me", api.GetMe(s.Database))
 	s.Router.Put("/me/profile", api.UpdateProfile(s.Database))
-	s.Router.MethodFunc(http.MethodGet, "/me/avatar", api.UserAvatar(s.Database))
-	s.Router.MethodFunc(http.MethodPut, "/me/avatar", api.UserAvatar(s.Database))
+	s.Router.MethodFunc(http.MethodGet, "/me/avatar", api.UserAvatar(s.Database, s.LibraryStore))
+	s.Router.MethodFunc(http.MethodPut, "/me/avatar", api.UserAvatar(s.Database, s.LibraryStore))
 	s.Router.Put("/me/device", api.UpdateDevice(s.Database))
 	s.Router.Get("/me/settings", api.GetSettings(s.Database))
 	s.Router.Put("/me/settings", api.UpdateSettings(s.Database))
@@ -220,8 +221,8 @@ func (s *Server) MountHandlers() error {
 	s.Router.Post("/api/waitlist", waitlistJoinHandler)
 	s.Router.Get("/api/me", api.GetMe(s.Database))
 	s.Router.Put("/api/me/profile", api.UpdateProfile(s.Database))
-	s.Router.MethodFunc(http.MethodGet, "/api/me/avatar", api.UserAvatar(s.Database))
-	s.Router.MethodFunc(http.MethodPut, "/api/me/avatar", api.UserAvatar(s.Database))
+	s.Router.MethodFunc(http.MethodGet, "/api/me/avatar", api.UserAvatar(s.Database, s.LibraryStore))
+	s.Router.MethodFunc(http.MethodPut, "/api/me/avatar", api.UserAvatar(s.Database, s.LibraryStore))
 	s.Router.Put("/api/me/device", api.UpdateDevice(s.Database))
 	s.Router.Get("/api/me/settings", api.GetSettings(s.Database))
 	s.Router.Put("/api/me/settings", api.UpdateSettings(s.Database))

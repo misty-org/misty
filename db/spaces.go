@@ -542,8 +542,10 @@ func (db *Database) SpaceMembers(ctx context.Context, userID, spaceID string) ([
 	return members, err
 }
 
-func (db *Database) SpaceMemberAvatar(ctx context.Context, requestingUserID, spaceID, memberID string) ([]byte, int64, error) {
-	var data []byte
+// SpaceMemberAvatarMeta permission-checks the requester and target within a Space
+// and returns the member's avatar version (0 when unset). The bytes themselves are
+// streamed from the object store (R2).
+func (db *Database) SpaceMemberAvatarMeta(ctx context.Context, requestingUserID, spaceID, memberID string) (int64, error) {
 	var version int64
 	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
 		if _, err := requireSpaceMemberTx(ctx, tx, spaceID, requestingUserID); err != nil {
@@ -552,13 +554,13 @@ func (db *Database) SpaceMemberAvatar(ctx context.Context, requestingUserID, spa
 		if _, err := requireSpaceMemberTx(ctx, tx, spaceID, memberID); err != nil {
 			return err
 		}
-		err := tx.QueryRowContext(ctx, `SELECT avatar_png,avatar_version FROM users WHERE id=$1 AND avatar_png IS NOT NULL`, memberID).Scan(&data, &version)
+		err := tx.QueryRowContext(ctx, `SELECT avatar_version FROM users WHERE id=$1`, memberID).Scan(&version)
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil
 		}
 		return err
 	})
-	return data, version, err
+	return version, err
 }
 
 func (db *Database) InviteToSpace(ctx context.Context, ownerID, spaceID, email string) (*SpaceInvitation, error) {
