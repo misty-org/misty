@@ -90,16 +90,16 @@ function ConversationGroup({
           onClick={() => setExpanded((current) => !current)}
           aria-expanded={expanded}
         >
-          <ChevronRight
-            size={13}
-            className={cn("shrink-0 transition-transform", expanded && "rotate-90")}
-          />
           <span className="min-w-0 flex-1 truncate">
             {title}
             {conversations.length > 0 ? (
               <span className="text-muted-foreground/80"> - {conversations.length}</span>
             ) : null}
           </span>
+          <ChevronRight
+            size={13}
+            className={cn("ml-auto shrink-0 transition-transform", expanded && "rotate-90")}
+          />
         </button>
         <Button
           variant="ghost"
@@ -163,7 +163,7 @@ function conversationLinkClass(isActive: boolean) {
   return cn(
     [
       "grid min-h-11 grid-cols-[32px_minmax(0,1fr)] items-center gap-2.5 rounded-md",
-      "px-2.5 text-sm no-underline outline-none transition-colors",
+      "bg-none px-2.5 text-sm no-underline outline-none transition-colors hover:bg-none",
       "focus-visible:ring-1 focus-visible:ring-sidebar-ring",
     ].join(" "),
     isActive

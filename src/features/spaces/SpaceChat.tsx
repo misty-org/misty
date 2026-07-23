@@ -2,7 +2,7 @@ import type { ChatComposerSuggestion } from "@/models/types/features/spaces/Spac
 export type { ChatComposerSuggestion } from "@/models/types/features/spaces/SpaceChat";
 import { useEffect, useId, useMemo, useRef, useState, type FormEvent } from "react";
 import { useSearchParams } from "react-router-dom";
-import { LibraryBig, Paperclip, Plus, Send, Users, X } from "lucide-react";
+import { Bot, LibraryBig, Paperclip, Plus, Send, Users, X } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
 
 import { useAuth } from "@/features/auth/AuthContext";
@@ -16,6 +16,7 @@ import type {
   SpaceMember,
   SpaceMessage,
   SpaceNode,
+  SpaceStudioResource,
 } from "@/models/interfaces/features/spaces/types";
 import { mergeSpaceMessages } from "@/stores/spaces/useSpaceMessageSpansStore";
 import type { SpacePresenceViewer } from "@/models/types/stores/spaces/useSpacesBackendStore";
@@ -41,6 +42,7 @@ const emptyMessages: SpaceMessage[] = [];
 const emptyMembers: SpaceMember[] = [];
 const emptyNodes: SpaceNode[] = [];
 const emptyPresence: SpacePresenceViewer[] = [];
+const emptyAgents: SpaceStudioResource[] = [];
 
 export function SpaceChat({ spaceId }: { spaceId: string }) {
   const [searchParams] = useSearchParams();
@@ -66,6 +68,7 @@ export function SpaceChat({ spaceId }: { spaceId: string }) {
   const [suggestionsLoading, setSuggestionsLoading] = useState(false);
   const [suggestionsError, setSuggestionsError] = useState("");
   const [suggestionQuery, setSuggestionQuery] = useState("");
+  const [selectedAgentIdsByLabel, setSelectedAgentIdsByLabel] = useState<Record<string, string>>({});
   const [activeSuggestionIndex, setActiveSuggestionIndex] = useState(0);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickerSource, setPickerSource] = useState<MistyPickerSource>("files");
@@ -88,6 +91,7 @@ export function SpaceChat({ spaceId }: { spaceId: string }) {
     membersBySpace,
     nodesBySpace,
     presenceBySpace,
+    agentsBySpace,
     loading: spacesLoading,
     sending,
     spacesError,
@@ -96,6 +100,7 @@ export function SpaceChat({ spaceId }: { spaceId: string }) {
     deleteMessage,
     markRead,
     loadMessages,
+    loadChatAgents,
     openNode,
     setViewingSpace,
     clearSpacesError,
@@ -105,6 +110,7 @@ export function SpaceChat({ spaceId }: { spaceId: string }) {
       membersBySpace: state.membersBySpace,
       nodesBySpace: state.nodesBySpace,
       presenceBySpace: state.presenceBySpace,
+      agentsBySpace: state.agentsBySpace,
       loading: state.loading,
       sending: state.sending,
       spacesError: state.error,
@@ -113,6 +119,7 @@ export function SpaceChat({ spaceId }: { spaceId: string }) {
       deleteMessage: state.deleteMessage,
       markRead: state.markRead,
       loadMessages: state.loadMessages,
+      loadChatAgents: state.loadChatAgents,
       openNode: state.openNode,
       setViewingSpace: state.setViewingSpace,
       clearSpacesError: state.clearError,
@@ -121,6 +128,7 @@ export function SpaceChat({ spaceId }: { spaceId: string }) {
   const defaultMessages = messagesBySpace[spaceId] ?? emptyMessages;
   const allMembers = membersBySpace[spaceId] ?? emptyMembers;
   const activeUserIds = presenceBySpace[spaceId] ?? emptyPresence;
+  const agents = agentsBySpace[spaceId] ?? emptyAgents;
   const activeConversation = groupConversations.find(
     (conversation) => conversation.id === conversationId,
   );
@@ -128,6 +136,13 @@ export function SpaceChat({ spaceId }: { spaceId: string }) {
     () => new Set(activeConversation?.members.map((member) => member.user_id) ?? []),
     [activeConversation],
   );
+  const directRecipient = useMemo(() => {
+    if (!activeConversation || activeConversation.members.length > 2) return undefined;
+    const other =
+      activeConversation.members.find((member) => member.user_id !== user?.id) ??
+      activeConversation.members[0];
+    return other ? { userId: other.user_id, name: other.name } : undefined;
+  }, [activeConversation, user?.id]);
   const members = conversationId
     ? allMembers.filter((member) => allowedMemberIds.has(member.user_id))
     : allMembers;
@@ -152,6 +167,12 @@ export function SpaceChat({ spaceId }: { spaceId: string }) {
         label: member.name,
         detail: member.email,
       }));
+    const agentSuggestions: ChatComposerSuggestion[] = agents.map((agent) => ({
+      kind: "agent" as const,
+      id: agent.id,
+      label: agent.name,
+      detail: agent.creator_user_id === user?.id ? "Your Agent" : "Shared Agent",
+    }));
     const library =
       canBrowseLibrary && pendingAttachments.length + selectedLibraryIds.length < 5
         ? libraryItems
@@ -164,13 +185,14 @@ export function SpaceChat({ spaceId }: { spaceId: string }) {
               item,
             }))
         : [];
-    return [...people, ...library]
+    return [...agentSuggestions, ...people, ...library]
       .filter(
         (item) => !query || `${item.label} ${item.detail}`.toLocaleLowerCase().includes(query),
       )
       .slice(0, 24);
   }, [
     canBrowseLibrary,
+    agents,
     libraryItems,
     members,
     pendingAttachments.length,
@@ -189,7 +211,9 @@ export function SpaceChat({ spaceId }: { spaceId: string }) {
     setReplyToMessageId("");
     setEditingMessageId("");
     setEditingText("");
+    setSelectedAgentIdsByLabel({});
     clearSpacesError();
+    void loadChatAgents(spaceId);
     if (permissions?.["library.view"] === false) {
       setLibraryItems([]);
       return;
@@ -206,7 +230,7 @@ export function SpaceChat({ spaceId }: { spaceId: string }) {
         );
       })
       .finally(() => setSuggestionsLoading(false));
-  }, [clearSpacesError, permissions, spaceId, user?.id]);
+  }, [clearSpacesError, loadChatAgents, permissions, spaceId, user?.id]);
 
   useEffect(() => {
     setViewingSpace(spaceId);
@@ -234,7 +258,7 @@ export function SpaceChat({ spaceId }: { spaceId: string }) {
         const response = await spacesApi.sendConversationMessage(
           spaceId,
           conversationId,
-          buildMessageSpans(value, members, []),
+          buildMessageSpans(value, members, agents, selectedAgentIdsByLabel),
           selectedFileIds,
           pendingAttachments.map((item) => item.id),
           selectedLibraryIds,
@@ -251,6 +275,7 @@ export function SpaceChat({ spaceId }: { spaceId: string }) {
           pendingAttachments.map((item) => item.id),
           selectedLibraryIds,
           replyToMessageId,
+          selectedAgentIdsByLabel,
         );
       }
       setText("");
@@ -259,6 +284,7 @@ export function SpaceChat({ spaceId }: { spaceId: string }) {
       setPendingAttachments([]);
       setReplyToMessageId("");
       setSuggestionsOpen(false);
+      setSelectedAgentIdsByLabel({});
     } catch (reason) {
       if (conversationId)
         setGroupChatError(
@@ -329,6 +355,12 @@ export function SpaceChat({ spaceId }: { spaceId: string }) {
       setText((current) => current.replace(/(^|\s)@[^\s@]*$/, "$1"));
     } else {
       setText((current) => current.replace(/(^|\s)@[^\s@]*$/, `$1@${suggestion.label} `));
+      if (suggestion.kind === "agent") {
+        setSelectedAgentIdsByLabel((current) => ({
+          ...current,
+          [suggestion.label.toLocaleLowerCase()]: suggestion.id,
+        }));
+      }
     }
     setSuggestionsOpen(false);
     setSuggestionQuery("");
@@ -357,7 +389,7 @@ export function SpaceChat({ spaceId }: { spaceId: string }) {
           spaceId,
           conversationId,
           message.id,
-          buildMessageSpans(value, members, []),
+          buildMessageSpans(value, members, agents),
           message.file_node_ids,
         );
         setGroupMessages((current) => mergeSpaceMessages(current, [saved]));
@@ -422,6 +454,7 @@ export function SpaceChat({ spaceId }: { spaceId: string }) {
         canAddToLibrary={canAddToLibrary}
         spaceId={spaceId}
         spaceName={activeConversation?.title || activeSpace?.name}
+        directRecipient={directRecipient}
         onStarter={(starter) => {
           if (starter === "files" || starter === "library") return openPicker(starter);
           setText((current) => `${current}${current && !current.endsWith(" ") ? " " : ""}@`);
@@ -588,7 +621,13 @@ export function SpaceChat({ spaceId }: { spaceId: string }) {
                         onMouseEnter={() => setActiveSuggestionIndex(index)}
                         onSelect={() => selectSuggestion(suggestion)}
                       >
-                        {suggestion.kind === "member" ? <Users /> : <LibraryBig />}
+                        {suggestion.kind === "member" ? (
+                          <Users />
+                        ) : suggestion.kind === "agent" ? (
+                          <Bot />
+                        ) : (
+                          <LibraryBig />
+                        )}
                         <span className="min-w-0">
                           <span className="block truncate">{suggestion.label}</span>
                           <span className="block truncate text-xs text-muted-foreground">
@@ -599,7 +638,7 @@ export function SpaceChat({ spaceId }: { spaceId: string }) {
                     ))}
                   </CommandGroup>
                   {!suggestionsLoading && !suggestionsError && suggestions.length === 0 ? (
-                    <CommandEmpty>No matching people or Library items.</CommandEmpty>
+                    <CommandEmpty>No matching Agents, people, or Library items.</CommandEmpty>
                   ) : null}
                   {suggestionsLoading ? (
                     <p className="p-3 text-sm text-muted-foreground">Loading Library…</p>

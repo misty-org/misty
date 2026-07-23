@@ -47,7 +47,6 @@ describe("SpaceSectionNavigation", () => {
       "Tasks",
       "Notes",
       "Library",
-      "Assistant",
     ]);
     expect(container.textContent).toContain("Library context");
     expect(container.querySelector('a[aria-current="page"]')?.textContent).toContain("Library");
@@ -75,7 +74,7 @@ describe("SpaceSectionNavigation", () => {
     });
 
     const labels = [...container.querySelectorAll("a")].map((link) => link.textContent?.trim());
-    expect(labels).toEqual(["Notes", "Library", "Assistant"]);
+    expect(labels).toEqual(["Notes", "Library"]);
   });
 
   it("keeps Space management out of the primary strip", async () => {
@@ -92,22 +91,6 @@ describe("SpaceSectionNavigation", () => {
     const labels = [...container.querySelectorAll("a")].map((link) => link.textContent?.trim());
     expect(labels).not.toContain("Members");
     expect(labels).not.toContain("Settings");
-  });
-
-  it("opens Assistant as a full Space destination", async () => {
-    useSpacesStore.setState({ spaces: [spaceFixture()] });
-
-    await act(async () => {
-      root.render(
-        <MemoryRouter initialEntries={["/spaces/space-1/assistant"]}>
-          <SpaceSectionNavigation spaceId="space-1" section="assistant" />
-        </MemoryRouter>,
-      );
-    });
-
-    const assistant = container.querySelector('a[aria-label="Assistant"]');
-    expect(assistant?.getAttribute("href")).toBe("/spaces/space-1/assistant");
-    expect(assistant?.getAttribute("aria-current")).toBe("page");
   });
 
   it("hides Library when access is denied", async () => {

@@ -2,27 +2,27 @@ import { describe, expect, it } from "vitest";
 import { legacyAssistantDestination } from "@/routing/LegacyAssistantRedirect";
 
 describe("legacyAssistantDestination", () => {
-  it("opens Mika in Files and preserves private file context", () => {
+  it("redirects legacy links to Agents and preserves context", () => {
     expect(legacyAssistantDestination("?path=%2Ftmp%2Fwork&paths=a%2Cb")).toBe(
-      "/files?path=%2Ftmp%2Fwork&paths=a%2Cb&mika=open",
+      "/agents?path=%2Ftmp%2Fwork&paths=a%2Cb",
     );
   });
 
-  it("opens Mika in the requested Space without carrying local paths", () => {
+  it("preserves a requested Space context", () => {
     expect(
       legacyAssistantDestination(
         "?spaceId=space%2Fone&path=%2Fprivate&paths=secret",
         new Set(["space/one"]),
       ),
-    ).toBe("/spaces/space%2Fone/assistant");
+    ).toBe("/agents?spaceId=space%2Fone&path=%2Fprivate&paths=secret");
   });
 
-  it("falls back to Files when the current account cannot access the requested Space", () => {
+  it("lets the Agents page perform current-account access checks", () => {
     expect(
       legacyAssistantDestination(
         "?spaceId=another-space&path=%2Fprivate%2Fproject",
         new Set(["my-space"]),
       ),
-    ).toBe("/files?path=%2Fprivate%2Fproject&mika=open");
+    ).toBe("/agents?spaceId=another-space&path=%2Fprivate%2Fproject");
   });
 });

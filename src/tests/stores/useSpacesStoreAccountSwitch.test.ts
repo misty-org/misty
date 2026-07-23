@@ -54,14 +54,16 @@ function snapshotWith(spaces: Space[]): SpacesSnapshot {
   return {
     spaces,
     invitations: [],
-    limits: {
-      owned: 0,
-      owned_limit: 3,
-      remaining_owned: 3,
-      memberships: 0,
-      people: 0,
-      nodes: 0,
-      space_storage_bytes: 0,
+    entitlements: {
+      unlimited_spaces: true,
+      unlimited_collaborators: true,
+    },
+    owner_storage: {
+      used_bytes: 0,
+      reserved_bytes: 0,
+      limit_bytes: 2_000_000_000,
+      remaining_bytes: 2_000_000_000,
+      spaces: [],
     },
   };
 }

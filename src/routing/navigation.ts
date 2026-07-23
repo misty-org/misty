@@ -1,4 +1,4 @@
-import { FolderOpen, PanelsTopLeft } from "lucide-react";
+import { Blocks, Bot, FolderOpen, PanelsTopLeft } from "lucide-react";
 import type { DesktopNavItem } from "@/models/types/layouts";
 import type { AppTab } from "@/models/types/routing/types";
 import { routes } from "./paths";
@@ -11,6 +11,20 @@ export const desktopNavItems = [
     path: routes.spacePersonal,
     icon: PanelsTopLeft,
     active: (pathname: string) => pathname.startsWith(routes.spaces),
+  },
+  {
+    id: "agents",
+    label: "Agents",
+    path: routes.agents,
+    icon: Bot,
+    active: (pathname: string) => pathname.startsWith(routes.agents),
+  },
+  {
+    id: "extensions",
+    label: "Extensions",
+    path: routes.extensions,
+    icon: Blocks,
+    active: (pathname: string) => pathname.startsWith(routes.extensions),
   },
 ] satisfies DesktopNavItem[];
 
@@ -33,20 +47,18 @@ const deepLinkPrefixes = [
 ];
 
 export function desktopRouteIdFromPath(pathname: string): AppTab {
-  // Assistant and Extensions remain accepted as legacy deep links, but both
-  // redirect into a real Files or Space surface instead of owning a nav slot.
-  if (pathname.startsWith(routes.assistant)) return "files";
+  // Assistant remains an accepted legacy deep link that redirects into Agents.
+  if (pathname.startsWith(routes.extensions)) return "extensions";
+  if (pathname.startsWith(routes.assistant) || pathname.startsWith(routes.agents)) return "agents";
   if (pathname.startsWith(routes.spaces) || pathname.startsWith(routes.library)) return "spaces";
   if (
     pathname.startsWith(routes.studio) ||
-    pathname.startsWith(routes.agents) ||
     pathname.startsWith(routes.automations)
   )
     return "spaces";
   if (pathname.startsWith(routes.transfers)) return "transfers";
   if (pathname.startsWith(routes.providers)) return "providers";
   if (pathname.startsWith(routes.account)) return "account";
-  if (pathname.startsWith(routes.extensions)) return "spaces";
   if (
     pathname.startsWith(routes.changelog) ||
     pathname.startsWith(routes.signIn) ||

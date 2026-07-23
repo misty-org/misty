@@ -104,11 +104,11 @@ export function ExplorerTray(props: {
     <>
       <ExplorerTransfersTabButton onClick={props.onOpenTransfers} />
       <Button
-        aria-label="Open Mika Assistant"
+        aria-label="Open Agents"
         className={explorerTrayStyles.trigger}
         disabled={!props.mikaEnabled}
         onClick={props.onOpenMika}
-        title={props.mikaEnabled ? "Open Mika Assistant" : "Enable Mika in Settings"}
+        title={props.mikaEnabled ? "Open Agents" : "Enable Agents in Settings"}
         type="button"
       >
         <Sparkles size={16} />

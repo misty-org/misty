@@ -25,7 +25,7 @@ import type { ActivityTab } from "@/models/types/stores/spaces/useSpacesStore";
 export interface SpacesStore {
   spaces: Space[];
   invitations: SpaceInvitation[];
-  limits: SpacesSnapshot["limits"] | null;
+  limits: SpacesSnapshot["entitlements"] | null;
   membersBySpace: Record<string, SpaceMember[]>;
   messagesBySpace: Record<string, SpaceMessage[]>;
   nodesBySpace: Record<string, SpaceNode[]>;
@@ -61,6 +61,7 @@ export interface SpacesStore {
     attachmentIds?: string[],
     libraryItemIds?: string[],
     replyToMessageId?: string,
+    selectedAgentIdsByLabel?: Record<string, string>,
   ) => Promise<void>;
   updateMessage: (
     spaceId: string,

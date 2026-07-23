@@ -21,7 +21,7 @@ function SpaceAssistantSessionLoading() {
   return (
     <section
       className="flex h-full min-h-0 flex-col gap-3"
-      aria-label="Mika sessions"
+      aria-label="Agent sessions"
       aria-busy="true"
     >
       <span className="h-9 w-full animate-pulse rounded-md bg-muted" />

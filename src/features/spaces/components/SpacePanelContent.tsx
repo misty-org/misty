@@ -12,6 +12,7 @@ import {
   Plug,
   Plus,
   Settings2,
+  Sparkles,
   Trash2,
   Users,
 } from "lucide-react";
@@ -51,23 +52,14 @@ import {
   CreateEditConversationDialog,
   type ConversationDialogKind,
 } from "./CreateEditConversationDialog";
-import { SpaceAssistantSessionSidebar } from "../mika/SpaceAssistantSessionSidebar";
 
 const emptyMembers: SpaceMember[] = [];
-const validSections = new Set([
-  "chat",
-  "tasks",
-  "notes",
-  "library",
-  "assistant",
-  "members",
-  "settings",
-]);
+const validSections = new Set(["chat", "tasks", "notes", "library", "members", "settings"]);
 const validSettingsSections = new Set(["general", "chat", "integrations"]);
 
 export function SpacePanelContent(props: {
   spaces: Space[];
-  limits: SpacesSnapshot["limits"] | null;
+  limits: SpacesSnapshot["entitlements"] | null;
   loading: boolean;
   onAddSpace: () => void;
   notices?: ReactNode;
@@ -192,7 +184,8 @@ export function SpacePanelContent(props: {
     );
   };
 
-  const canAddSpace = (props.limits?.remaining_owned ?? 1) > 0;
+  const canAddSpace = props.limits?.unlimited_spaces !== false;
+  const showsOwnerStorage = activeSpace?.owner_user_id === user?.id;
   // The active Space is the menu title, so it is not repeated in the list below.
   const otherSpaces = props.spaces.filter((space) => space.id !== activeSpaceId);
   const sidebarContext =
@@ -247,26 +240,29 @@ export function SpacePanelContent(props: {
               </strong>
               <span className="block text-xs text-muted-foreground">
                 {libraryUsage
-                  ? `${formatStorageBytes(libraryUsage.remaining_bytes, libraryUsage.limit_bytes)} left`
+                  ? showsOwnerStorage && libraryUsage.remaining_bytes !== undefined
+                    ? `${formatStorageBytes(libraryUsage.remaining_bytes, libraryUsage.limit_bytes)} left across your Spaces`
+                    : libraryUsage.storage_available
+                      ? "Uploads available"
+                      : "New uploads paused"
                   : "Checking..."}
               </span>
             </span>
           </div>
-          <Progress
-            className="mt-3 h-1.5"
-            value={
-              libraryUsage
-                ? Math.max(
-                    0,
-                    Math.min(
-                      100,
-                      (libraryUsage.used_bytes / Math.max(1, libraryUsage.limit_bytes)) * 100,
-                    ),
-                  )
-                : 0
-            }
-          />
-          {libraryUsage ? (
+          {showsOwnerStorage &&
+          libraryUsage?.used_bytes !== undefined &&
+          libraryUsage.limit_bytes ? (
+            <Progress
+              className="mt-3 h-1.5"
+              value={Math.max(
+                0,
+                Math.min(100, (libraryUsage.used_bytes / libraryUsage.limit_bytes) * 100),
+              )}
+            />
+          ) : null}
+          {showsOwnerStorage &&
+          libraryUsage?.used_bytes !== undefined &&
+          libraryUsage.limit_bytes ? (
             <p className="mb-0 mt-2 text-[11px] text-muted-foreground">
               {formatStorageBytes(libraryUsage.used_bytes)} of{" "}
               {formatStorageBytes(libraryUsage.limit_bytes)} used
@@ -274,12 +270,6 @@ export function SpacePanelContent(props: {
           ) : null}
         </section>
       </div>
-    ) : section === "assistant" && user ? (
-      <SpaceAssistantSessionSidebar
-        accountId={user.id}
-        spaceId={activeSpaceId}
-        accessReady={snapshotReady && Boolean(activeSpace)}
-      />
     ) : section === "settings" ? (
       <SpaceSidebarSection title="Preferences">
         <nav className="grid gap-1" aria-label="Space settings sections">
@@ -484,12 +474,12 @@ function sidebarLinkClass(isActive: boolean) {
   );
 }
 
-const librarySidebarItems = [
+export const librarySidebarItems = [
   { collection: "recent", label: "All items", icon: Images },
+  { collection: "smart", label: "Smart Library", icon: Sparkles },
   { collection: "favorites", label: "Favorites", icon: Heart },
   { collection: "collections", label: "Collections", icon: Folder },
   { collection: "albums", label: "Albums", icon: Images },
-  { collection: "people", label: "People", icon: Users },
   { collection: "map", label: "Places", icon: MapIcon },
   { collection: "deleted", label: "Recently deleted", icon: Trash2 },
 ] as const;

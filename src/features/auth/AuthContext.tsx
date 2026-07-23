@@ -44,6 +44,7 @@ const AuthContext = createContext<AuthContextValue>({
   setUser: () => {},
   accounts: [],
   transitioning: false,
+  refreshUser: async () => null,
   authenticateAccount: async (request) => request(),
   switchAccount: async () => {},
   logout: async () => {},
@@ -216,6 +217,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [activeUser, beginAccountOperation, finishAccountOperation, saveAuthenticatedUser],
   );
 
+  const refreshUser = useCallback(async (): Promise<AuthUser | null> => {
+    if (!activeUser || accountOperationActive.current) return activeUser ?? null;
+
+    const expectedAccountId = activeUser.id;
+    const generation = readAccountSessionGeneration();
+    const me = await accountFetchMe();
+    if (readAccountSessionGeneration() !== generation) return null;
+    assertAccountIdentity(me, expectedAccountId);
+
+    const fallback = listSavedAccountSessions().find(
+      (account) => account.id === expectedAccountId,
+    ) ?? {
+      ...activeUser,
+      lastUsedAt: new Date().toISOString(),
+    };
+    const nextUser = authUserFromMe(me, fallback);
+    useUserStore.getState().setMe(me);
+    setUserState(nextUser);
+    return nextUser;
+  }, [activeUser]);
+
   useEffect(() => {
     setAnalyticsAuthenticationState(Boolean(activeUser));
     telemetryIdentity.sync(activeUser);
@@ -368,6 +390,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser,
         accounts,
         transitioning,
+        refreshUser,
         authenticateAccount,
         switchAccount,
         logout,
@@ -398,6 +421,7 @@ function authUserFromMe(me: AccountMeResponse, fallback: SavedAccountSession): A
     name: me.name || fallback.name,
     username: me.username || fallback.username,
     email: me.email || fallback.email,
+    avatarVersion: me.avatar_version,
     accountCreatedAt: me.created_at || fallback.accountCreatedAt,
     currentPlan: me.tier || fallback.currentPlan,
   };

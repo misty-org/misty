@@ -55,8 +55,8 @@ export interface AgentEvent {
   file_plan?: FileOperationPlan;
   message?: string;
   created_at: string;
-  credits_used?: number;
-  credits_remaining?: number;
+  hosted_ai_used_ratio?: number;
+  hosted_ai_reset_at?: string;
   citations?: AgentCitation[];
 }
 
@@ -66,6 +66,10 @@ export interface AgentEventsResponse {
 
 export interface CreateSessionResponse {
   session_id: string;
+  agent_id?: string;
+  space_id?: string;
+  model_id?: string;
+  model_catalog_version?: string;
 }
 
 /** One retained Mika session as the server sees it, for rebuilding the session list. */
@@ -74,6 +78,9 @@ export interface AgentSessionSummary {
   title: string;
   /** False once the runtime cache TTL lapses; the session is still resumable. */
   active: boolean;
+  agent_id?: string;
+  space_id?: string;
+  model_id?: string;
   created_at: string;
   updated_at: string;
 }
@@ -101,9 +108,6 @@ export interface AgentStatusResponse {
 export interface ManagedAiErrorPayload {
   code?: string;
   message?: string;
-  available_credits?: number;
-  availableCredits?: number;
-  requiredCredits?: number;
   reset_at?: string;
   retry_after_seconds?: number;
 }

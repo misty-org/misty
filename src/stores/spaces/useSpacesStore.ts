@@ -74,7 +74,7 @@ export const useSpacesStore = create<SpacesStore>((set, get) => ({
       set({
         spaces: snapshot.spaces,
         invitations: snapshot.invitations,
-        limits: snapshot.limits,
+        limits: snapshot.entitlements,
         snapshotReady: true,
         loading: false,
       });
@@ -300,6 +300,7 @@ export const useSpacesStore = create<SpacesStore>((set, get) => ({
     attachmentIds = [],
     libraryItemIds = [],
     replyToMessageId = "",
+    selectedAgentIdsByLabel = {},
   ) => {
     const trimmed = text.trim();
     if (
@@ -312,7 +313,12 @@ export const useSpacesStore = create<SpacesStore>((set, get) => ({
     set({ sending: true, error: null });
     try {
       const spans = trimmed
-        ? buildMessageSpans(trimmed, get().membersBySpace[spaceId] ?? [], [])
+        ? buildMessageSpans(
+            trimmed,
+            get().membersBySpace[spaceId] ?? [],
+            get().agentsBySpace[spaceId] ?? [],
+            selectedAgentIdsByLabel,
+          )
         : [];
       const response = await spacesApi.sendMessage(
         spaceId,
@@ -327,7 +333,10 @@ export const useSpacesStore = create<SpacesStore>((set, get) => ({
         error: null,
         messagesBySpace: {
           ...state.messagesBySpace,
-          [spaceId]: mergeSpaceMessages(state.messagesBySpace[spaceId] ?? [], [response.message]),
+          [spaceId]: mergeSpaceMessages(state.messagesBySpace[spaceId] ?? [], [
+            response.message,
+            ...response.agent_replies,
+          ]),
         },
       }));
     } catch (error) {
@@ -339,7 +348,11 @@ export const useSpacesStore = create<SpacesStore>((set, get) => ({
   updateMessage: async (spaceId, messageId, text, fileNodeIds = []) => {
     set({ error: null });
     try {
-      const spans = buildMessageSpans(text.trim(), get().membersBySpace[spaceId] ?? [], []);
+      const spans = buildMessageSpans(
+        text.trim(),
+        get().membersBySpace[spaceId] ?? [],
+        get().agentsBySpace[spaceId] ?? [],
+      );
       const saved = await spacesApi.updateMessage(spaceId, messageId, spans, fileNodeIds);
       set((state) => ({
         messagesBySpace: {

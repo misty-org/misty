@@ -28,6 +28,7 @@ const explorerCommands: ExplorerCommandPaletteEntry[] = [
     hint: "Show transfer history and active work",
   },
   { id: "app.open_settings", label: "Open Settings", hint: "Switch to application settings" },
+  { id: "app.toggle_plugin_launcher", label: "Open Extensions", hint: "Open Extensions" },
   {
     id: "clipboard.publish_shared",
     label: "Publish Shared Clipboard",
@@ -105,7 +106,7 @@ const explorerCommands: ExplorerCommandPaletteEntry[] = [
     label: "Toggle Chat",
     hint: "Open or close the explorer chat overlay",
   },
-  { id: "explorer.toggle_mika", label: "Toggle Mika", hint: "Open or close Mika Assistant" },
+  { id: "explorer.toggle_mika", label: "Toggle Agents", hint: "Open or close Agents" },
   {
     id: "explorer.next_workspace",
     label: "Next File Layout",

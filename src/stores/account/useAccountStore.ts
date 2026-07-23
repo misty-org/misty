@@ -235,16 +235,10 @@ export function accountFetchBillingUsage(): Promise<BillingUsageResponse> {
 }
 
 export function accountCreateCheckout(
-  tier: "pro" | "max",
+  tier: "pro",
   interval: "month" | "year",
 ): Promise<{ url: string }> {
   return postJson("/billing/checkout-session", { tier, interval });
-}
-
-export function accountCreateCreditCheckout(
-  packId: "credits_1500" | "credits_3500",
-): Promise<{ url: string }> {
-  return postJson("/billing/credit-checkout-session", { pack_id: packId });
 }
 
 export function accountCreatePortalSession(): Promise<{ url: string }> {
@@ -253,6 +247,43 @@ export function accountCreatePortalSession(): Promise<{ url: string }> {
 
 export async function accountUpdateProfile(name: string): Promise<void> {
   await requestJson("PUT", "/me/profile", { name });
+}
+
+export async function accountUpdateAvatar(file: Blob): Promise<number> {
+  const response = await accountAvatarRequest("PUT", file);
+  const payload = (await response.json()) as { avatar_version?: number };
+  if (!payload.avatar_version) throw new Error("Misty did not confirm the profile image update.");
+  return payload.avatar_version;
+}
+
+export async function accountFetchAvatar(): Promise<Blob> {
+  const response = await accountAvatarRequest("GET");
+  return response.blob();
+}
+
+async function accountAvatarRequest(method: "GET" | "PUT", body?: Blob): Promise<Response> {
+  const accountGeneration = readAccountSessionGeneration();
+  const apiBase = await resolveAccountApiBase();
+  assertAccountGeneration(accountGeneration);
+  const token = await readAccountAuthToken();
+  assertAccountGeneration(accountGeneration);
+  const headers = requestHeaders(undefined, token) ?? new Headers();
+  if (body) headers.set("Content-Type", "image/png");
+  const response = await fetch(`${apiBase}/me/avatar`, {
+    method,
+    headers,
+    body,
+    credentials: "include",
+  });
+  assertAccountGeneration(accountGeneration);
+  if (!response.ok) {
+    const message = (await response.text()).trim();
+    throw new AccountApiError(
+      message || `Profile image request failed (${response.status}).`,
+      response.status,
+    );
+  }
+  return response;
 }
 
 export async function accountUpdateDevice(device: string): Promise<void> {

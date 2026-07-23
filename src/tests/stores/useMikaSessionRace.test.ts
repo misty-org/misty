@@ -45,8 +45,8 @@ vi.mock("@/stores/assistant/useAiServerStore", () => ({
 }));
 
 vi.mock("@/stores/assistant/useMikaDelegationStore", () => ({
-  publicMikaDisplayName: (_model: string, name?: string) => name ?? "Mika Low",
-  publicMikaModel: (model: string) => model,
+  publicMikaDisplayName: () => "Gemini 2.5 Flash-Lite",
+  publicMikaModel: () => "google/gemini-2.5-flash-lite",
   tryMikaSpaceDelegation: api.delegate,
 }));
 

@@ -160,6 +160,7 @@ export interface SpaceMessage {
   conversation_id?: string;
   sender_user_id: string;
   sender_name: string;
+  sender_avatar_version?: number;
   sender_kind: "person" | "agent" | "system";
   sender_agent_id?: string;
   content: MessageSpan[];
@@ -221,6 +222,8 @@ export interface SpaceStudioResource {
   name: string;
   description?: string;
   icon?: string;
+  model_mode?: "automatic" | "pinned";
+  model_id?: string;
   instructions?: string;
   definition?: Record<string, unknown>;
   enabled: boolean;
@@ -239,14 +242,23 @@ export interface SpaceStudioResource {
 export interface SpacesSnapshot {
   spaces: Space[];
   invitations: SpaceInvitation[];
-  limits: {
-    owned: number;
-    owned_limit: number;
-    remaining_owned: number;
-    memberships: number;
-    people: number;
-    nodes: number;
-    space_storage_bytes: number;
+  entitlements: {
+    unlimited_spaces: boolean;
+    unlimited_collaborators: boolean;
+  };
+  owner_storage: {
+    used_bytes: number;
+    reserved_bytes: number;
+    limit_bytes: number;
+    remaining_bytes: number;
+    over_quota_since?: string;
+    cleanup_notice_until?: string;
+    spaces: Array<{
+      space_id: string;
+      name: string;
+      used_bytes: number;
+      reserved_bytes: number;
+    }>;
   };
 }
 
@@ -464,11 +476,12 @@ export interface LibrarySharedReference {
 
 export interface SpaceStorageUsage {
   space_id: string;
-  used_bytes: number;
-  reserved_bytes: number;
-  limit_bytes: number;
-  remaining_bytes: number;
-  version: number;
+  storage_available?: boolean;
+  used_bytes?: number;
+  reserved_bytes?: number;
+  limit_bytes?: number;
+  remaining_bytes?: number;
+  version?: number;
 }
 
 export interface MessageAttachment {

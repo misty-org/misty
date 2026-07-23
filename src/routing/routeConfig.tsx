@@ -14,6 +14,8 @@ import { AppPagesLayout } from "../layouts/AppPagesLayout";
 import { isDeepLinkRouteAllowed, resolveAuthDeepLinkRoute } from "./navigation";
 import { routes } from "./paths";
 import { LegacyAssistantRedirect } from "./LegacyAssistantRedirect";
+import AgentsPage from "../pages/Assistant";
+import ExtensionsPage from "../pages/Extensions";
 
 export const router = createBrowserRouter([
   {
@@ -39,7 +41,7 @@ export const router = createBrowserRouter([
           {
             element: <AppPagesLayout />,
             children: [
-              { path: "agents", element: <Navigate to={routes.spacePersonal} replace /> },
+              { path: "agents", element: <AgentsPage /> },
               { path: "automations", element: <Navigate to={routes.spacePersonal} replace /> },
               { path: "assistant", element: <LegacyAssistantRedirect /> },
               {
@@ -55,10 +57,10 @@ export const router = createBrowserRouter([
                 ],
               },
               { path: "studio", element: <Navigate to={routes.spacePersonal} replace /> },
-              { path: "studio/agents", element: <Navigate to={routes.spacePersonal} replace /> },
+              { path: "studio/agents", element: <Navigate to={routes.agents} replace /> },
               { path: "studio/workflows", element: <Navigate to={routes.spacePersonal} replace /> },
               { path: "home", element: <Navigate to={routes.files} replace /> },
-              { path: "extensions", element: <Navigate to={routes.spacePersonal} replace /> },
+              { path: "extensions", element: <ExtensionsPage /> },
               { path: "changelog", element: <Navigate to={routes.files} replace /> },
               { path: "signin", element: <SignInPage /> },
               { path: "register", element: <RegisterPage /> },

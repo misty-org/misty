@@ -247,10 +247,10 @@ export default function CloudFolderBotOverlay() {
       {!chatMode ? (
         <div className="pointer-events-auto absolute right-0 top-2 z-40 flex w-6 flex-col items-center gap-1">
           <Button
-            aria-label="Open Mika chat"
+            aria-label="Open agent chat"
             className="grid size-5 place-items-center border-0 bg-transparent p-0 text-[#f1f3f5] transition hover:scale-110 hover:text-white"
             onClick={openAssistant}
-            title="Open Mika chat"
+            title="Open agent chat"
             type="button"
           >
             <MessageSquare aria-hidden="true" size={15} strokeWidth={2.2} />
@@ -300,7 +300,7 @@ export default function CloudFolderBotOverlay() {
       </aside>
 
       <motion.button
-        aria-label="Drag Mika to move"
+        aria-label="Drag agent to move"
         aria-hidden={chatMode}
         disabled={chatMode}
         className={`absolute bottom-0 left-0 z-30 grid h-[101px] w-[124px] touch-none place-items-center border-0 bg-transparent p-0 [backface-visibility:hidden] [contain:layout_paint] transition-[opacity,transform] duration-[420ms] ease-[cubic-bezier(0.22,1,0.36,1)] will-change-[opacity,transform] motion-reduce:transition-none ${chatMode ? "pointer-events-none translate-y-2 scale-[0.96] cursor-default opacity-0 !transition-none" : "pointer-events-auto translate-y-0 scale-100 cursor-grab opacity-100 active:cursor-grabbing"}`}
@@ -351,7 +351,7 @@ export default function CloudFolderBotOverlay() {
             type="button"
           >
             <X className="text-current" aria-hidden="true" size={16} />
-            <span className="truncate">Close Mika</span>
+            <span className="truncate">Close agent</span>
           </Button>
         </div>
       ) : null}

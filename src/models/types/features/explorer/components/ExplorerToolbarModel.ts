@@ -17,6 +17,7 @@ import type {
 export type ExplorerCommandId =
   | "app.toggle_transfers"
   | "app.open_settings"
+  | "app.toggle_plugin_launcher"
   | "clipboard.publish_shared"
   | "clipboard.apply_shared"
   | "search.toggle"

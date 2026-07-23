@@ -69,10 +69,12 @@ export function AssistantMessage(props: {
           ))}
         </div>
       ) : null}
-      {message.creditsUsed !== undefined ? (
+      {message.hostedAiUsedRatio !== undefined ? (
         <small className="text-[10px] text-muted-foreground">
-          {message.creditsUsed} credits · {message.creditsRemaining?.toLocaleString() ?? 0}{" "}
-          remaining
+          {Math.round(message.hostedAiUsedRatio * 100)}% of weekly hosted AI used
+          {message.hostedAiResetAt
+            ? ` · resets ${new Date(message.hostedAiResetAt).toLocaleDateString()}`
+            : ""}
         </small>
       ) : null}
       {message.toolRequestId ? (
@@ -107,7 +109,7 @@ function assistantMessageTitle(role: AiPanelMessage["role"]): string {
   if (role === "tool") return "Tool";
   if (role === "error") return "Error";
   if (role === "plan") return "Plan";
-  return "Mika";
+  return "Agent";
 }
 
 function AssistantPlanActions(props: {
@@ -201,7 +203,7 @@ function AssistantPlanReviewDialog(props: {
         </DialogHeader>
         <div className="grid min-h-0 gap-4 overflow-auto p-5">
           <div className="grid gap-3 md:grid-cols-2">
-            <PlanSummary label="What Mika will do" text={props.plan.plan.summary} />
+            <PlanSummary label="What the agent will do" text={props.plan.plan.summary} />
             {props.plan.appliedSummary ? (
               <PlanSummary label="What Misty queued" text={props.plan.appliedSummary} />
             ) : null}

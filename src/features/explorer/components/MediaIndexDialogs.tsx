@@ -14,7 +14,7 @@ export function MediaIndexApprovalDialog(props: {
     fileNames: string[];
     fileCount: number;
     remainingDurationMs: number;
-    estimatedCredits: number;
+    estimatedWeeklyPercent: number;
   };
   pending: boolean;
   onCancel: () => void;
@@ -43,11 +43,11 @@ export function MediaIndexApprovalDialog(props: {
                 {props.estimate.fileCount === 1 ? "file" : "files"}?
               </AlertDialogTitle>
               <AlertDialogDescription className="leading-6">
-                About {minutes.toFixed(minutes < 10 ? 1 : 0)} minutes remain and will use up to{" "}
+                About {minutes.toFixed(minutes < 10 ? 1 : 0)} minutes remain and may use up to{" "}
                 <strong className="font-medium text-foreground">
-                  {props.estimate.estimatedCredits.toFixed(3)} Mika credits
+                  {props.estimate.estimatedWeeklyPercent}% of your weekly hosted AI usage
                 </strong>
-                . Infrastructure retries are not charged.
+                . Failed analysis and infrastructure retries do not count.
               </AlertDialogDescription>
             </div>
           </div>

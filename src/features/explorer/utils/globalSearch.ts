@@ -26,6 +26,8 @@ import { searchMedia } from "@/stores/media/useMediaSearchServerStore";
 import type { MediaSearchHit } from "@/models/interfaces/stores/media/useMediaSearchServerStore";
 import { ensureMediaSearchDeviceReady } from "@/stores/media/useMediaSearchMigrationStore";
 import { mergeLibrarySearchResults } from "./librarySearch";
+import { spacesApi } from "@/stores/spaces/useSpacesBackendStore";
+import type { GlobalSpaceLibraryHit } from "@/models/interfaces/features/agents/personal";
 
 export const semanticQueryMinimumCharacters = 3;
 export const semanticSearchDebounceMs = 650;
@@ -78,14 +80,16 @@ export async function querySemanticExplorerSearch(
   }
   let cacheable = false;
   const request = (async () => {
-    const [libraryResponse, mediaResponse] = await Promise.allSettled([
+    const [libraryResponse, mediaResponse, spacesResponse] = await Promise.allSettled([
       searchSemanticAssets(trimmed, { limit }),
       mediaSearchSnapshot()
         .then(ensureMediaSearchDeviceReady)
         .then((snapshot) => searchMedia(snapshot.deviceId, trimmed, Math.min(30, limit))),
+      spacesApi.globalSpaceLibrarySearch(trimmed, Math.min(50, limit)),
     ]);
     const libraryHits = libraryResponse.status === "fulfilled" ? libraryResponse.value.hits : [];
     const mediaHits = mediaResponse.status === "fulfilled" ? mediaResponse.value.hits : [];
+    const spaceHits = spacesResponse.status === "fulfilled" ? spacesResponse.value.hits : [];
     const [locations, mediaLocations] = await Promise.all([
       libraryHits.length ? resolveSemanticLocations(libraryHits) : Promise.resolve([]),
       mediaHits.length ? resolveMediaLocations(mediaHits) : Promise.resolve([]),
@@ -93,11 +97,13 @@ export async function querySemanticExplorerSearch(
     cacheable =
       libraryResponse.status === "fulfilled" &&
       mediaResponse.status === "fulfilled" &&
+      spacesResponse.status === "fulfilled" &&
       (libraryHits.length === 0 || locations.length > 0) &&
       (mediaHits.length === 0 || mediaLocations.length > 0);
     return [
       ...semanticHitsToSearchResults(libraryHits, locations, options),
       ...mediaHitsToSearchResults(mediaHits, mediaLocations, options),
+      ...spaceLibraryHitsToSearchResults(spaceHits),
     ]
       .sort((a, b) => b.score - a.score)
       .slice(0, limit);
@@ -115,6 +121,47 @@ export async function querySemanticExplorerSearch(
   } finally {
     if (semanticInFlight.get(cacheKey) === request) semanticInFlight.delete(cacheKey);
   }
+}
+
+function spaceLibraryHitsToSearchResults(hits: GlobalSpaceLibraryHit[]): SearchResult[] {
+  const now = Date.now();
+  return hits.map((hit, index) => {
+    const filename = hit.item.file.original_filename || hit.item.display_name;
+    const extension = extensionOf(filename);
+    return {
+      entry: {
+        id: hit.item.id,
+        name: hit.item.display_name,
+        path: `/spaces/${hit.space_id}/library/${hit.item.id}`,
+        extension,
+        mimeType: null,
+        remoteModified: hit.item.updated_at,
+        kind: "file",
+        sizeBytes: null,
+        modifiedMs: Date.parse(hit.item.updated_at) || null,
+        createdMs: Date.parse(hit.item.added_at) || null,
+        readonly: true,
+        hidden: false,
+        isDeleted: false,
+        location: {
+          kind: "remote",
+          providerType: "misty-space",
+          remoteName: hit.space_name,
+          remotePath: hit.deep_link,
+        },
+      },
+      score: Math.max(0.1, 1 - index / Math.max(1, hits.length)),
+      sourceKind: "remote",
+      indexedAtMs: now,
+      match: {
+        kind: "semantic",
+        reasons: [hit.space_name, ...(hit.item.tags ?? []).slice(0, 2)],
+        description: hit.item.caption || null,
+        tags: hit.item.tags,
+        assetKind: "Space Library",
+      },
+    } satisfies SearchResult;
+  });
 }
 
 export function clearSemanticExplorerSearchCache(): void {

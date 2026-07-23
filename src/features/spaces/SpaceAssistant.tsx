@@ -12,13 +12,10 @@ import {
   runtimeAssetSource,
 } from "@/platform/runtimeAsset";
 import { selectAssistantPreferences, useAppStore, useSettingsStore } from "@/stores/app";
-import {
-  assistantDailyMessageLimit,
-  useAssistantUsageStore,
-} from "@/stores/assistant/useAssistantUsageStore";
 import { spaceMikaScopeKey, useMikaSessionStore } from "@/stores/assistant/useMikaSessionStore";
-import { Badge, Progress, Textarea } from "@/ui";
+import { Badge, Textarea } from "@/ui";
 import { buildSpaceMikaContext, spaceAssistantPrompt } from "./mika/spaceMikaContext";
+import { initialAgentModelName } from "@/features/agents/modelSelection";
 
 export function SpaceAssistant({
   accountId,
@@ -65,12 +62,6 @@ export function SpaceAssistant({
       approveToolRequest: state.approveToolRequest,
     })),
   );
-  const { messagesUsedToday, syncForToday } = useAssistantUsageStore(
-    useShallow((state) => ({
-      messagesUsedToday: state.messagesUsedToday,
-      syncForToday: state.syncForToday,
-    })),
-  );
   const mikaEnabled = useSettingsStore(
     (state) => selectAssistantPreferences(state.settings?.document).enabled,
   );
@@ -104,12 +95,6 @@ export function SpaceAssistant({
       requestGeneration.current += 1;
     };
   }, [activateConversationScope, refreshStatus, scopeKey]);
-
-  useEffect(() => {
-    syncForToday();
-    const interval = window.setInterval(syncForToday, 60_000);
-    return () => window.clearInterval(interval);
-  }, [syncForToday]);
 
   useEffect(() => {
     logRef.current?.scrollTo({ top: logRef.current.scrollHeight });
@@ -154,7 +139,7 @@ export function SpaceAssistant({
     } catch (reason) {
       if (generation === requestGeneration.current) {
         setContextNotice(
-          reason instanceof Error ? reason.message : "Mika could not prepare Space context.",
+          reason instanceof Error ? reason.message : "The agent could not prepare Space context.",
         );
       }
     } finally {
@@ -186,7 +171,7 @@ export function SpaceAssistant({
       <header className="flex min-w-0 flex-wrap items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-2.5">
           <Bot className="size-5 shrink-0 text-muted-foreground" aria-hidden="true" />
-          <h1 className="min-w-0 truncate text-lg font-semibold text-foreground">Assistant</h1>
+          <h1 className="min-w-0 truncate text-lg font-semibold text-foreground">Agent chat</h1>
           {running ? (
             <Badge variant="secondary" className="shrink-0">
               Running
@@ -198,16 +183,6 @@ export function SpaceAssistant({
           <Badge variant="outline" className="max-w-64 truncate">
             Private · {spaceName}
           </Badge>
-          <div className="grid min-w-[140px] gap-1">
-            <span className="text-right text-[11px] tabular-nums text-muted-foreground">
-              {messagesUsedToday} / {assistantDailyMessageLimit} today
-            </span>
-            <Progress
-              aria-label="Mika daily message usage"
-              className="h-1.5 w-[140px]"
-              value={Math.min(100, (messagesUsedToday / assistantDailyMessageLimit) * 100)}
-            />
-          </div>
         </div>
       </header>
 
@@ -272,7 +247,7 @@ export function SpaceAssistant({
         <div className="relative z-10 min-w-0 rounded-xl bg-muted/60">
           <Textarea
             ref={promptRef}
-            aria-label={`Ask Mika about ${spaceName}`}
+            aria-label={`Ask an agent about ${spaceName}`}
             className={[
               "max-h-[260px] min-h-[72px] w-full resize-none rounded-none border-0",
               "bg-transparent px-4 pb-2 pt-3.5 text-sm shadow-none focus-visible:ring-0",
@@ -297,7 +272,9 @@ export function SpaceAssistant({
           />
           <AssistantComposerActions
             mode={mode}
-            modelName={scopeReady ? (status?.modelName ?? "Mika") : "Mika"}
+            modelName={
+              scopeReady ? (status?.modelName ?? initialAgentModelName) : initialAgentModelName
+            }
             configured={available && scopeReady && !preparing}
             running={running}
             prompt={prompt}
@@ -336,32 +313,32 @@ function spaceAssistantEmptyState(input: {
   if (!input.scopeReady) {
     return {
       title: "Switching Space context…",
-      detail: "Preparing a private Assistant session for this Space.",
+      detail: "Preparing a private agent session for this Space.",
     };
   }
   if (input.available) {
     return {
-      title: `Ask Mika about ${input.spaceName}`,
+      title: `Ask an agent about ${input.spaceName}`,
       detail:
-        "Mika can use the Space content you are allowed to access. This conversation is visible only to you.",
+        "Agents can use the Space content you are allowed to access. This conversation is visible only to you.",
     };
   }
   if (!input.mikaEnabled) {
     return {
-      title: "Mika is disabled",
-      detail: "Enable Mika in Settings to use private Space conversations.",
+      title: "Agents are disabled",
+      detail: "Enable Agents in Settings to use private Space conversations.",
     };
   }
   if (!input.configured) {
     return {
-      title: "Mika is unavailable",
-      detail: "Mika is temporarily unavailable. Try again after the service reconnects.",
+      title: "Agents are unavailable",
+      detail: "Agents are temporarily unavailable. Try again after the service reconnects.",
     };
   }
   return {
-    title: "Private Space Assistant is unavailable",
+    title: "Private Space agent chat is unavailable",
     detail:
-      "This Misty server does not yet support permission-checked Space sessions. Files Mika remains available.",
+      "This Misty server does not yet support permission-checked Space sessions. File agents remain available.",
   };
 }
 
@@ -373,8 +350,8 @@ function spaceAssistantPlaceholder(input: {
   spaceName: string;
 }): string {
   if (!input.scopeReady) return "Switching Space context…";
-  if (input.available) return `Ask Mika about ${input.spaceName}…`;
-  if (!input.mikaEnabled) return "Mika is disabled";
-  if (!input.configured) return "Mika is unavailable";
+  if (input.available) return `Ask an agent about ${input.spaceName}…`;
+  if (!input.mikaEnabled) return "Agents are disabled";
+  if (!input.configured) return "Agents are unavailable";
   return "Private Space sessions are unavailable";
 }

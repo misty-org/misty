@@ -262,4 +262,44 @@ describe("AuthProvider account switching", () => {
     expect(mocks.resetMikaAccountState).toHaveBeenCalled();
     expect(mocks.resetNotesAccountState).toHaveBeenCalled();
   });
+
+  it("rehydrates the active user and profile from the server", async () => {
+    function Probe() {
+      auth = useAuth();
+      return null;
+    }
+
+    await act(async () => {
+      root!.render(
+        <MemoryRouter>
+          <AuthProvider>
+            <Probe />
+          </AuthProvider>
+        </MemoryRouter>,
+      );
+      await Promise.resolve();
+    });
+
+    const refreshedMe = {
+      ...mocks.meA,
+      name: "Updated Account",
+      username: "updated-account",
+      avatar_version: 3,
+      tier: "pro",
+    };
+    mocks.accountFetchMe.mockResolvedValueOnce(refreshedMe);
+
+    await act(async () => {
+      await auth!.refreshUser();
+    });
+
+    expect(mocks.userStore.setMe).toHaveBeenLastCalledWith(refreshedMe);
+    expect(auth?.user).toMatchObject({
+      id: mocks.accountA.id,
+      name: "Updated Account",
+      username: "updated-account",
+      avatarVersion: 3,
+      currentPlan: "pro",
+    });
+  });
 });

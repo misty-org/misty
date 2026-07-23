@@ -43,6 +43,7 @@ import { activeSensitiveGrant, libraryItemMIME } from "./SpaceLibraryPrimitives"
 
 export const libraryCollectionKinds = new Set<LibraryCollectionKind>([
   "recent",
+  "smart",
   "months",
   "years",
   "recent-days",
@@ -51,9 +52,7 @@ export const libraryCollectionKinds = new Set<LibraryCollectionKind>([
   "favorites",
   "hidden",
   "deleted",
-  "people",
   "albums",
-  "groups",
   "memory",
   "trip",
   "map",
@@ -463,7 +462,7 @@ export function useSpaceLibraryData(spaceId: string) {
             ? "year"
             : null;
     const semanticSearch =
-      collection === "recent" &&
+      (collection === "recent" || collection === "smart") &&
       Boolean(searchQuery) &&
       !searchQuery.includes(":") &&
       !mediaType &&

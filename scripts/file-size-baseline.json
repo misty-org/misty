@@ -1,4 +1,5 @@
 {
+  "src/pages/Assistant/desktop/PersonalAgentsSidebar.tsx": 540,
   "src-tauri/src/services/plugin_commands.rs": 3779,
   "src-tauri/src/services/operation_queue.rs": 3502,
   "src-tauri/src/services/misty.rs": 2172,

@@ -60,6 +60,7 @@ import type {
   AvailableProviderResource,
   GoogleCalendarChoice,
 } from "@/models/interfaces/features/spaces/types";
+import type { GlobalSpaceLibraryHit } from "@/models/interfaces/features/agents/personal";
 import type { TaskSchedule } from "@/models/interfaces/features/spaces/integrations/calendarTasks";
 import type { ConflictResolution } from "@/models/types/features/spaces/integrations/calendarTasks";
 import { normalizeApiBaseUrl, withDefaultApiPath } from "@/stores/backend";
@@ -141,8 +142,10 @@ export function spaceErrorMessage(code: string | undefined, fallback: string): s
     space_limit_reached: "This account has reached its Space limit.",
     space_ownership_limit_reached:
       "You already own three Spaces. Delete one permanently before creating another.",
+    owner_storage_quota_exceeded:
+      "This upload would exceed the Space owner’s shared storage pool. Existing files remain available.",
     space_storage_quota_exceeded:
-      "This upload would exceed this Space’s shared 1 GB storage limit.",
+      "This upload would exceed the Space owner’s shared storage pool. Existing files remain available.",
     library_uploads_disabled: "Library uploads are temporarily unavailable.",
     library_media_processor_unavailable: "Edited media rendering is temporarily unavailable.",
     upload_verification_failed: "Misty could not verify the uploaded file.",
@@ -154,6 +157,7 @@ export function spaceErrorMessage(code: string | undefined, fallback: string): s
     library_reauthentication_required: "Unlock this protected Library collection again.",
     integration_required:
       "Connect the workflow’s required provider in this Space before running it.",
+    agent_model_unavailable: "This Agent’s selected model is unavailable. Choose another model.",
     provider_not_configured:
       "This provider’s sign-in is not available on the current Misty server.",
     provider_exchange_failed: "The provider could not complete sign-in. Try connecting again.",
@@ -168,6 +172,10 @@ export function spaceErrorMessage(code: string | undefined, fallback: string): s
 }
 
 export const spacesApi = {
+  globalSpaceLibrarySearch: (query: string, limit = 50) =>
+    spaceRequest<{ hits: GlobalSpaceLibraryHit[]; semantic: boolean; request_id: string }>(
+      `/search/spaces?q=${encodeURIComponent(query)}&limit=${limit}`,
+    ),
   snapshot: () => spaceRequest<SpacesSnapshot>("/spaces"),
   create: (name: string) =>
     spaceRequest<Space>("/spaces", { method: "POST", body: JSON.stringify({ name }) }),
@@ -183,6 +191,10 @@ export const spacesApi = {
     }),
   members: (spaceId: string) =>
     spaceRequest<{ members: SpaceMember[] }>(`/spaces/${encodeURIComponent(spaceId)}/members`),
+  memberAvatar: (spaceId: string, userId: string) =>
+    fetchProtectedBlob(
+      `/spaces/${encodeURIComponent(spaceId)}/members/${encodeURIComponent(userId)}/avatar`,
+    ),
   invite: (spaceId: string, email: string) =>
     spaceRequest(`/spaces/${encodeURIComponent(spaceId)}/invitations`, {
       method: "POST",

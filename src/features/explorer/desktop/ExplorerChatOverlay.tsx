@@ -130,7 +130,7 @@ export const ExplorerChatOverlay = memo(function ExplorerChatOverlay() {
         >
           {messages.length === 0 ? (
             <p className={assistantPanelStyles.emptyLog}>
-              Ask Mika about the current folder or selection.
+              Ask an agent about the current folder or selection.
             </p>
           ) : (
             messages.map((message) => (
@@ -157,7 +157,7 @@ export const ExplorerChatOverlay = memo(function ExplorerChatOverlay() {
             className={assistantPanelStyles.textarea}
             value={prompt}
             rows={3}
-            placeholder={assistantPlaceholder(configured, "Ask Mika to organize files...")}
+            placeholder={assistantPlaceholder(configured, "Ask an agent to organize files...")}
             disabled={!configured || running}
             onChange={(event) => setPrompt(event.target.value)}
             onKeyDown={(event) => {
@@ -172,7 +172,7 @@ export const ExplorerChatOverlay = memo(function ExplorerChatOverlay() {
               value={mode === "full" ? "auto" : mode}
               onValueChange={(value) => setMode(value as Parameters<typeof setMode>[0])}
             >
-              <SelectTrigger className="h-8 w-28" aria-label="Mika mode">
+              <SelectTrigger className="h-8 w-28" aria-label="Agent mode">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -187,7 +187,7 @@ export const ExplorerChatOverlay = memo(function ExplorerChatOverlay() {
               <Button
                 size="sm"
                 type="button"
-                title="Cancel the active Mika gateway request."
+                title="Cancel the active agent request."
                 onClick={abortPrompt}
               >
                 Stop

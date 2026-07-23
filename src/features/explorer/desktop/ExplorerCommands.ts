@@ -37,6 +37,7 @@ const explorerDuplicateFinderEvent = "misty:explorer-duplicate-finder";
 export const executableShortcutCommands = [
   "app.open_settings",
   "app.toggle_transfers",
+  "app.toggle_plugin_launcher",
   "clipboard.publish_shared",
   "clipboard.apply_shared",
   "search.toggle",
@@ -75,6 +76,7 @@ export const executableShortcutCommands = [
 const defaultMacExplorerShortcuts: ShortcutMap = {
   "app.open_settings": "Cmd+Comma",
   "app.toggle_transfers": "Cmd+Shift+Y",
+  "app.toggle_plugin_launcher": "Cmd+Shift+P",
   "clipboard.publish_shared": "Cmd+Alt+C",
   "clipboard.apply_shared": "Cmd+Alt+V",
   "search.toggle": "Cmd+K",
@@ -109,6 +111,7 @@ const defaultMacExplorerShortcuts: ShortcutMap = {
 const defaultNonMacExplorerShortcuts: ShortcutMap = {
   "app.open_settings": "Ctrl+Comma",
   "app.toggle_transfers": "Ctrl+Shift+Y",
+  "app.toggle_plugin_launcher": "Ctrl+Shift+P",
   "clipboard.publish_shared": "Ctrl+Alt+C",
   "clipboard.apply_shared": "Ctrl+Alt+V",
   "search.toggle": "Ctrl+K",
@@ -201,6 +204,9 @@ export function runExplorerCommand(
       break;
     case "app.open_settings":
       navigateRoute("/settings");
+      break;
+    case "app.toggle_plugin_launcher":
+      navigateRoute("/extensions");
       break;
     case "clipboard.publish_shared":
       void publishSharedClipboard();

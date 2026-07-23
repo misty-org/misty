@@ -1,5 +1,6 @@
 import type { AiConversationSummary } from "@/models/interfaces/stores/assistant/useMikaSessionStore";
 import type { AiPanelMessage } from "@/models/types/stores/assistant/useMikaSessionStore";
+import type { AgentSessionSummary } from "@/models/interfaces/stores/assistant/useAiServerStore";
 import { errorText } from "@/lib/format";
 import { fetchAgentTranscript, listAgentSessions } from "@/stores/assistant/useAiServerStore";
 
@@ -15,8 +16,11 @@ export interface SyncableConversation {
   id: string;
   title: string;
   updatedAt: number;
+  createdAt: number;
   messages: AiPanelMessage[];
   transcriptLoaded: boolean;
+  /** Model this chat is pinned to, if it overrides the agent/base default. */
+  modelId?: string;
   runtime: { sessionId: string | null };
 }
 
@@ -35,6 +39,7 @@ export interface MikaSyncDeps<T extends SyncableConversation> {
  */
 export async function hydrateServerSessions<T extends SyncableConversation>(
   deps: MikaSyncDeps<T>,
+  belongsToScope?: (session: AgentSessionSummary) => boolean,
 ): Promise<AiConversationSummary[]> {
   let sessions;
   try {
@@ -51,15 +56,19 @@ export async function hydrateServerSessions<T extends SyncableConversation>(
   const added: AiConversationSummary[] = [];
   for (const session of sessions) {
     if (knownSessionIds.has(session.id)) continue;
+    if (belongsToScope && !belongsToScope(session)) continue;
     const updatedAt = Date.parse(session.updated_at) || Date.now();
+    const createdAt = Date.parse(session.created_at) || updatedAt;
     // The server id doubles as the local conversation id for hydrated sessions,
     // which keeps rename and delete addressing the same row.
     const stored = deps.createSnapshot(session.id, updatedAt);
     stored.title = session.title || "New chat";
+    stored.createdAt = createdAt;
     stored.transcriptLoaded = false;
+    stored.modelId = session.model_id || undefined;
     stored.runtime.sessionId = session.id;
     deps.snapshots.set(session.id, stored);
-    added.push({ id: session.id, title: stored.title, updatedAt });
+    added.push({ id: session.id, title: stored.title, updatedAt, createdAt });
   }
   return added;
 }

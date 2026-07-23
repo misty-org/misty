@@ -11,11 +11,9 @@ import {
   MapPin,
   MessagesSquare,
   Music2,
-  SlidersHorizontal,
   Sparkles,
   Star,
   Trash2,
-  Users,
   Video,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -62,8 +60,6 @@ export function useSpaceLibraryCollectionActions(
     setAlbumFolders,
     selectedAlbumFolderId,
     setSelectedAlbumFolderId,
-    groups,
-    setGroups,
     people,
     setPeople,
     peoplePolicy,
@@ -165,6 +161,10 @@ export function useSpaceLibraryCollectionActions(
   };
 
   const selectCollection = (next: LibraryCollectionKind, id = "") => {
+    if (next === "people" || next === "groups") {
+      next = "recent";
+      id = "";
+    }
     setCollection(next);
     setSelectedCollectionId(id);
     const nextSearchParams = new URLSearchParams(librarySearchParams);
@@ -183,6 +183,10 @@ export function useSpaceLibraryCollectionActions(
   };
 
   useEffect(() => {
+    if (requestedCollection === "people" || requestedCollection === "groups") {
+      selectCollection("recent");
+      return;
+    }
     if (
       !requestedCollection ||
       !libraryCollectionKinds.has(requestedCollection as LibraryCollectionKind)
@@ -276,28 +280,7 @@ export function useSpaceLibraryCollectionActions(
           }
         : null;
     }
-    if (pin.target_kind === "group") {
-      const group = groups.find((candidate) => candidate.id === pin.target_id);
-      return group
-        ? {
-            label: group.name,
-            count: group.rules.all.length,
-            icon: SlidersHorizontal,
-            onClick: () => selectCollection("groups", group.id),
-          }
-        : null;
-    }
-    if (pin.target_kind === "person") {
-      const person = people.find((candidate) => candidate.id === pin.target_id);
-      return person
-        ? {
-            label: person.name || (person.kind === "pet" ? "Unnamed pet" : "Unnamed person"),
-            count: person.item_count,
-            icon: Users,
-            onClick: () => selectCollection("people", person.id),
-          }
-        : null;
-    }
+    if (pin.target_kind === "group" || pin.target_kind === "person") return null;
     if (pin.target_kind === "memory" || pin.target_kind === "trip") {
       const kind = pin.target_kind;
       const group = (kind === "memory" ? discovery.memories : discovery.trips).find(
@@ -354,14 +337,7 @@ export function useSpaceLibraryCollectionActions(
         icon: Star,
         collection: "favorites",
       },
-      people: { label: "People & Pets", count: people.length, icon: Users, collection: "people" },
       albums: { label: "Albums", count: albums.length, icon: LibraryIcon, collection: "albums" },
-      groups: {
-        label: "Groups",
-        count: groups.length,
-        icon: SlidersHorizontal,
-        collection: "groups",
-      },
       map: {
         label: "Map",
         count: discovery.map_points.reduce((total, point) => total + point.item_count, 0),
@@ -722,18 +698,6 @@ export function useSpaceLibraryCollectionActions(
     }
   };
 
-  const createGroup = () => {
-    if (!canEditLibrary) return;
-    showTextDialog({
-      kind: "create-group",
-      title: "New smart group",
-      primaryLabel: "Group name",
-      primaryValue: "",
-      secondaryLabel: "Match files with this tag",
-      secondaryValue: "",
-    });
-  };
-
   const submitTextDialog = async (event: FormEvent) => {
     event.preventDefault();
     if (!canEditLibrary || !textDialog || textDialogSaving) return;
@@ -766,12 +730,6 @@ export function useSpaceLibraryCollectionActions(
         setAlbumFolders((current) =>
           current.map((candidate) => (candidate.id === saved.id ? saved : candidate)),
         );
-      } else if (textDialog.kind === "create-group") {
-        const group = await spacesApi.createGroup(spaceId, primaryValue, [
-          { field: "tag", op: "contains", value: secondaryValue },
-        ]);
-        setGroups((current) => [...current, group].sort((a, b) => a.name.localeCompare(b.name)));
-        selectCollection("groups", group.id);
       } else if (textDialog.kind === "rename-memory") {
         if (!(await updateCurrentMemory({ title: primaryValue })))
           throw new Error("The memory could not be renamed.");
@@ -822,7 +780,6 @@ export function useSpaceLibraryCollectionActions(
     deleteCurrentPerson,
     mergeCurrentPerson,
     applyPersonItems,
-    createGroup,
     submitTextDialog,
   };
 }

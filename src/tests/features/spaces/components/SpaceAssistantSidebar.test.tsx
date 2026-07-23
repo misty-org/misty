@@ -24,7 +24,14 @@ describe("Space Assistant sessions in the Space sidebar", () => {
     resetMikaAccountState();
     useMikaSessionStore.setState({
       conversationScopeKey: spaceMikaScopeKey("account-1", "space-1"),
-      conversations: [{ id: "session-1", title: "Launch plan", updatedAt: Date.now() }],
+      conversations: [
+        {
+          id: "session-1",
+          title: "Launch plan",
+          updatedAt: Date.now(),
+          createdAt: Date.now(),
+        },
+      ],
       activeConversationId: "session-1",
     });
     useSpacesStore.setState({
@@ -47,7 +54,7 @@ describe("Space Assistant sessions in the Space sidebar", () => {
     await renderPanel(root);
 
     const sectionStrip = container.querySelector('nav[aria-label="Space sections"]');
-    const sessions = container.querySelector<HTMLElement>('[aria-label="Mika sessions"]');
+    const sessions = container.querySelector<HTMLElement>('[aria-label="Agent sessions"]');
 
     expect(sectionStrip).not.toBeNull();
     expect(sessions?.tagName).toBe("SECTION");
@@ -63,13 +70,20 @@ describe("Space Assistant sessions in the Space sidebar", () => {
   it("withholds the prior Space's sessions while the requested scope activates", async () => {
     useMikaSessionStore.setState({
       conversationScopeKey: spaceMikaScopeKey("account-1", "space-old"),
-      conversations: [{ id: "old-session", title: "Old Space secret", updatedAt: Date.now() }],
+      conversations: [
+        {
+          id: "old-session",
+          title: "Old Space secret",
+          updatedAt: Date.now(),
+          createdAt: Date.now(),
+        },
+      ],
       activeConversationId: "old-session",
     });
 
     await renderPanel(root);
 
-    const sessions = container.querySelector<HTMLElement>('[aria-label="Mika sessions"]');
+    const sessions = container.querySelector<HTMLElement>('[aria-label="Agent sessions"]');
     expect(sessions?.getAttribute("aria-busy")).toBe("true");
     expect(sessions?.textContent).not.toContain("Old Space secret");
   });
@@ -77,14 +91,19 @@ describe("Space Assistant sessions in the Space sidebar", () => {
   it("withholds matching cached sessions until Space access is freshly confirmed", async () => {
     useMikaSessionStore.setState({
       conversations: [
-        { id: "cached-session", title: "Cached Space secret", updatedAt: Date.now() },
+        {
+          id: "cached-session",
+          title: "Cached Space secret",
+          updatedAt: Date.now(),
+          createdAt: Date.now(),
+        },
       ],
       activeConversationId: "cached-session",
     });
 
     await renderPanel(root, false);
 
-    const sessions = container.querySelector<HTMLElement>('[aria-label="Mika sessions"]');
+    const sessions = container.querySelector<HTMLElement>('[aria-label="Agent sessions"]');
     expect(sessions?.getAttribute("aria-busy")).toBe("true");
     expect(sessions?.textContent).not.toContain("Cached Space secret");
   });

@@ -70,6 +70,7 @@ import {
 } from "@/features/agents/pathPrivacy";
 import { mistyDocumentsEnabled } from "@/features/agents/flags";
 import { publicMikaDisplayName, publicMikaModel } from "./useMikaDelegationStore";
+import { initialAgentModelId, initialAgentModelName } from "@/features/agents/modelSelection";
 
 let pollTimer: number | null = null;
 let nextMessageId = 1;
@@ -81,6 +82,12 @@ let activeScopeId: string | null = null;
 let activeSelectedPaths: string[] = [];
 let activeRequestScope: AssistantScope | null = null;
 let activeContextSources: MikaContextSource[] = [];
+// The active chat's per-chat model, overriding the agent's configured model.
+// Null means the chat follows the agent's model (or the base default).
+let activeAgentModelOverride: string | null = null;
+// Chats whose model was just switched while keeping their history. The next send
+// replays the prior transcript to the new model so it continues the same thread.
+const pendingReseedConversationIds = new Set<string>();
 let drainInFlight: Promise<void> | null = null;
 let abortRequested = false;
 let mikaRuntimeGeneration = 0;
@@ -90,7 +97,7 @@ const aiToolTimeoutMs = 15000;
 
 class MikaRuntimeChangedError extends Error {
   constructor() {
-    super("Mika conversation changed while the request was running.");
+    super("Agent conversation changed while the request was running.");
     this.name = "MikaRuntimeChangedError";
   }
 }
@@ -120,6 +127,7 @@ interface StoredConversation {
   scopeKey: string;
   title: string;
   updatedAt: number;
+  createdAt: number;
   status: AiStatus | null;
   mode: AiMode;
   messages: AiPanelMessage[];
@@ -128,6 +136,8 @@ interface StoredConversation {
   error: string | null;
   /** False for a session hydrated from the server whose messages are not loaded yet. */
   transcriptLoaded: boolean;
+  /** Model this chat is pinned to, overriding the agent/base default when set. */
+  modelId?: string;
   runtime: ConversationRuntimeSnapshot;
 }
 
@@ -140,6 +150,19 @@ const initialConversationId = newConversationId();
 
 export function spaceMikaScopeKey(accountId: string, spaceId: string): string {
   return `account:${encodeURIComponent(accountId)}:space:${encodeURIComponent(spaceId)}`;
+}
+
+export function agentMikaScopeKey(
+  accountId: string,
+  agentId = "",
+  spaceId = "",
+  modelId = "",
+): string {
+  const params = new URLSearchParams();
+  if (agentId) params.set("agent", agentId);
+  if (spaceId) params.set("space", spaceId);
+  if (modelId) params.set("model", modelId);
+  return `account:${encodeURIComponent(accountId)}:agents?${params.toString()}`;
 }
 
 function newConversationId(): string {
@@ -156,6 +179,7 @@ function emptyStoredConversation(
     scopeKey,
     title: "New chat",
     updatedAt: now,
+    createdAt: now,
     status: serverStatus(false),
     mode: "auto",
     messages: [],
@@ -181,6 +205,76 @@ function conversationTitleFromText(text: string): string {
   return normalized.length > 48 ? `${normalized.slice(0, 48)}…` : normalized;
 }
 
+// Renders the visible transcript as a plain preamble so a freshly created
+// session on a newly chosen model can pick up where the prior model left off.
+// Only user and assistant turns are replayed; errors and tool chatter are skipped.
+function serializeTranscriptForReseed(messages: AiPanelMessage[]): string {
+  const turns = messages
+    .filter((message) => message.role === "user" || message.role === "assistant")
+    .map((message) => `${message.role === "user" ? "User" : "Assistant"}: ${message.text}`)
+    .filter((line) => line.trim().length > 0);
+  if (turns.length === 0) return "";
+  return [
+    "The conversation so far (continue it seamlessly; do not greet again or repeat this back):",
+    turns.join("\n\n"),
+  ].join("\n\n");
+}
+
+const chatTitleInstruction = [
+  "You are naming a chat thread. Read the user's opening message and reply with a short,",
+  "specific title of 2 to 5 words that captures what the chat is about.",
+  "Reply with ONLY the title: plain text, no surrounding quotes, no trailing punctuation.",
+  "",
+  "Opening message:",
+].join("\n");
+
+function sanitizeChatTitle(raw: string): string {
+  const firstLine = raw.trim().split(/\r?\n/)[0] ?? "";
+  const cleaned = firstLine
+    .replace(/^["'`\s]+|["'`\s]+$/g, "")
+    .replace(/[.!?,;:]+$/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!cleaned) return "";
+  return cleaned.length > 48 ? `${cleaned.slice(0, 48)}…` : cleaned;
+}
+
+/**
+ * Asks the model for a short title in a throwaway session that has no tools, so it
+ * can only reply with text. Best-effort: any failure returns null and the caller
+ * keeps whatever title it already had. The scratch session is always cleaned up.
+ */
+async function requestGeneratedChatTitle(userMessage: string): Promise<string | null> {
+  const message = userMessage.trim();
+  if (!message) return null;
+  let sessionId: string | null = null;
+  try {
+    const session = await createAgentSession({});
+    sessionId = session.session_id;
+    await sendAgentMessage(sessionId, {
+      mode: "auto",
+      user_message: `${chatTitleInstruction}\n${message}`,
+      capabilities: { tools: [] },
+    });
+    const deadline = Date.now() + 20000;
+    let after = 0;
+    while (Date.now() < deadline) {
+      const { events } = await fetchAgentEvents(sessionId, after);
+      for (const event of events) {
+        after = Math.max(after, event.sequence);
+        if (event.type === "assistant_message" && event.text) return sanitizeChatTitle(event.text);
+        if (event.type === "error") return null;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 600));
+    }
+    return null;
+  } catch {
+    return null;
+  } finally {
+    if (sessionId) void deleteAgentSession(sessionId).catch(() => undefined);
+  }
+}
+
 function snapshotActiveConversation(
   set: (
     partial: Partial<AiSessionStore> | ((state: AiSessionStore) => Partial<AiSessionStore>),
@@ -191,15 +285,22 @@ function snapshotActiveConversation(
   const id = state.activeConversationId;
   const existing = conversationSnapshots.get(id);
   const firstUserMessage = state.messages.find((message) => message.role === "user")?.text ?? "";
-  const title = firstUserMessage
-    ? conversationTitleFromText(firstUserMessage)
-    : (existing?.title ?? "New chat");
+  // Once a conversation has a real title — auto-derived from its first message or
+  // set by the person via rename — keep it, so a manual rename is never clobbered.
+  const existingTitle = existing?.title ?? "";
+  const hasRealTitle = existingTitle !== "" && existingTitle !== "New chat";
+  const title = hasRealTitle
+    ? existingTitle
+    : firstUserMessage
+      ? conversationTitleFromText(firstUserMessage)
+      : existingTitle || "New chat";
   const updatedAt = Date.now();
   conversationSnapshots.set(id, {
     id,
     scopeKey: activeConversationScopeKey,
     title,
     updatedAt,
+    createdAt: existing?.createdAt ?? updatedAt,
     status: state.status,
     mode: state.mode,
     messages: state.messages,
@@ -207,6 +308,7 @@ function snapshotActiveConversation(
     toolApprovals: state.toolApprovals,
     error: state.error,
     transcriptLoaded: existing?.transcriptLoaded ?? true,
+    modelId: activeAgentModelOverride ?? existing?.modelId,
     runtime: {
       sessionId: activeSessionId,
       lastEventSequence,
@@ -217,20 +319,29 @@ function snapshotActiveConversation(
       contextSources: activeContextSources,
     },
   });
-  if (activeSessionId && title !== existing?.title && title !== "New chat") {
+  // Sync the title to the account when it changed, or when this snapshot is the first
+  // to carry a server session id (e.g. a background rename set the title locally before
+  // the session existed) so that title still reaches the server.
+  const sessionJustAssigned = activeSessionId !== null && !existing?.runtime.sessionId;
+  if (
+    activeSessionId &&
+    title !== "New chat" &&
+    (title !== existing?.title || sessionJustAssigned)
+  ) {
     void renameAgentSession(activeSessionId, title).catch(() => undefined);
   }
   set({
     conversations: state.conversations.map((conversation) =>
-      conversation.id === id ? { id, title, updatedAt } : conversation,
+      conversation.id === id ? { ...conversation, id, title, updatedAt } : conversation,
     ),
   });
 }
 
-function mikaSyncDeps() {
+function mikaSyncDeps(scopeKey = activeConversationScopeKey) {
   return {
     snapshots: conversationSnapshots,
-    createSnapshot: emptyStoredConversation,
+    createSnapshot: (id: string, updatedAt: number) =>
+      emptyStoredConversation(id, updatedAt, scopeKey),
     messageId: aiMessageId,
     debug: recordAiDebug,
   };
@@ -238,6 +349,7 @@ function mikaSyncDeps() {
 
 function applyConversationRuntime(snapshot: StoredConversation): void {
   mikaRuntimeGeneration += 1;
+  activeAgentModelOverride = snapshot.modelId ?? null;
   activeSessionId = snapshot.runtime.sessionId;
   lastEventSequence = snapshot.runtime.lastEventSequence;
   activeRoot = snapshot.runtime.activeRoot;
@@ -407,9 +519,12 @@ export const useMikaSessionStore = create<AiSessionStore>((set, get) => ({
   plans: [],
   toolApprovals: [],
   error: null,
-  conversations: [{ id: initialConversationId, title: "New chat", updatedAt: Date.now() }],
+  conversations: [
+    { id: initialConversationId, title: "New chat", updatedAt: Date.now(), createdAt: Date.now() },
+  ],
   activeConversationId: initialConversationId,
   conversationScopeKey: filesMikaScopeKey,
+  activeModelId: "",
 
   refreshStatus: async () => {
     const generation = mikaRuntimeGeneration;
@@ -429,11 +544,71 @@ export const useMikaSessionStore = create<AiSessionStore>((set, get) => ({
     set({ mode: mode === "full" ? "auto" : mode });
   },
 
+  setConversationModel: async (modelId, { resend }) => {
+    const nextModelId = modelId.trim();
+    if (!nextModelId || get().status?.running) return;
+    const conversationId = get().activeConversationId;
+    if (nextModelId === (get().activeModelId || "")) return;
+    // Repin this chat only. The agent's saved model is never written here.
+    activeAgentModelOverride = nextModelId;
+    // A server session is locked to the model it was created with, so switching
+    // means abandoning the old one and opening a fresh session on the new model at
+    // the next send. The old session is deleted so it can't resurface on hydrate.
+    const priorSessionId = activeSessionId;
+    resetActiveSession();
+    stopAiPolling();
+    if (priorSessionId) void deleteAgentSession(priorSessionId).catch(() => undefined);
+    const existing = conversationSnapshots.get(conversationId);
+    const clearedRuntime = existing
+      ? { ...existing.runtime, sessionId: null, lastEventSequence: 0 }
+      : undefined;
+    if (resend) {
+      // Keep the visible history; the next send replays it to the new model. This
+      // is the costly path, which the UI warns about before choosing it.
+      pendingReseedConversationIds.add(conversationId);
+      if (existing && clearedRuntime) {
+        conversationSnapshots.set(conversationId, {
+          ...existing,
+          modelId: nextModelId,
+          runtime: clearedRuntime,
+        });
+      }
+      set({ activeModelId: nextModelId, error: null });
+    } else {
+      // Reset: start this chat fresh on the new model with no history to resend.
+      pendingReseedConversationIds.delete(conversationId);
+      if (existing && clearedRuntime) {
+        conversationSnapshots.set(conversationId, {
+          ...existing,
+          modelId: nextModelId,
+          messages: [],
+          plans: [],
+          toolApprovals: [],
+          transcriptLoaded: true,
+          runtime: clearedRuntime,
+        });
+      }
+      set({
+        activeModelId: nextModelId,
+        messages: [],
+        plans: [],
+        toolApprovals: [],
+        error: null,
+        status: serverStatus(false),
+      });
+    }
+  },
+
   sendPrompt: async ({ displayPrompt, prompt, cwd, selectedPaths, contextSources }) => {
     const trimmed = displayPrompt.trim();
     if (!trimmed || get().status?.running) return;
     const generation = mikaRuntimeGeneration;
     const conversationId = get().activeConversationId;
+    // When this chat's model was just switched with history kept, replay the
+    // prior transcript to the new model on this first turn so it has full context.
+    const reseedTranscript = pendingReseedConversationIds.has(conversationId)
+      ? serializeTranscriptForReseed(get().messages)
+      : "";
     const settingsStore = useSettingsStore.getState();
     if (!settingsStore.loaded) await settingsStore.load();
     if (!mikaRuntimeIsCurrent(generation) || conversationId !== get().activeConversationId) return;
@@ -442,7 +617,7 @@ export const useMikaSessionStore = create<AiSessionStore>((set, get) => ({
       appendBlockedRequest(
         set,
         trimmed,
-        "Mika is disabled. Enable Mika in Settings > Assistant to continue.",
+        "Agents are disabled. Enable Agents in Settings to continue.",
       );
       return;
     }
@@ -451,7 +626,7 @@ export const useMikaSessionStore = create<AiSessionStore>((set, get) => ({
       appendBlockedRequest(
         set,
         trimmed,
-        "Private Space Mika is unavailable because this Misty server does not support permission-checked Space sessions yet.",
+        "Private Space Agents are unavailable because this Misty server does not support permission-checked Space sessions yet.",
       );
       return;
     }
@@ -490,6 +665,20 @@ export const useMikaSessionStore = create<AiSessionStore>((set, get) => ({
     activeRequestScope = requestScope;
     activeContextSources = contextSources ?? [];
     abortRequested = false;
+    // The opening message of an untitled agent chat is a good moment to let the model
+    // name the thread. Runs in the background so it never delays the reply, and only
+    // for agent chats that still carry the default title.
+    const isFirstUserMessage = !get().messages.some((message) => message.role === "user");
+    const currentTitle = get().conversations.find((c) => c.id === conversationId)?.title;
+    if (
+      isFirstUserMessage &&
+      (currentTitle === undefined || currentTitle === "New chat") &&
+      parseAgentScopeKey(activeConversationScopeKey) !== null
+    ) {
+      void requestGeneratedChatTitle(trimmed).then((title) => {
+        if (title) void get().renameConversation(conversationId, title);
+      });
+    }
     set((state) => ({
       messages: [...state.messages, { id: aiMessageId("user"), role: "user", text: trimmed }],
       error: null,
@@ -508,10 +697,11 @@ export const useMikaSessionStore = create<AiSessionStore>((set, get) => ({
         selectedPaths ?? [],
         registeredScope?.id ?? null,
       );
+      const outboundPrompt = reseedTranscript ? `${reseedTranscript}\n\n${prompt}` : prompt;
       await sendAgentMessageOnce(
         {
           mode: get().mode,
-          user_message: scopedAssistantPrompt(prompt, requestScope),
+          user_message: scopedAssistantPrompt(outboundPrompt, requestScope),
           active_root: serverContext.activeRoot,
           selected_paths: serverContext.selectedPaths,
           capabilities: toolManifestForScope(requestScope),
@@ -519,6 +709,7 @@ export const useMikaSessionStore = create<AiSessionStore>((set, get) => ({
         },
         generation,
       );
+      if (reseedTranscript) pendingReseedConversationIds.delete(conversationId);
       assertMikaRuntime(generation);
       ensureAiPolling(set, get);
       await drainAiEvents(set, get);
@@ -693,6 +884,19 @@ export const useMikaSessionStore = create<AiSessionStore>((set, get) => ({
     await suspendActiveConversation(set, get);
     if (generation !== scopeActivationGeneration) return;
     activeConversationScopeKey = nextScopeKey;
+    // Agent chats live on the account (tagged with the session's agent/space).
+    // Pull any that this device hasn't seen so restored chats are chosen over a
+    // throwaway empty conversation. Failures leave the in-memory list authoritative.
+    const agentScope = parseAgentScopeKey(nextScopeKey);
+    if (agentScope?.agentId) {
+      await hydrateServerSessions(
+        mikaSyncDeps(nextScopeKey),
+        (session) =>
+          session.agent_id === agentScope.agentId &&
+          (session.space_id ?? "") === (agentScope.spaceId ?? ""),
+      );
+      if (generation !== scopeActivationGeneration) return;
+    }
     const candidates = [...conversationSnapshots.values()]
       .filter((conversation) => conversation.scopeKey === nextScopeKey)
       .sort((left, right) => right.updatedAt - left.updatedAt);
@@ -702,6 +906,7 @@ export const useMikaSessionStore = create<AiSessionStore>((set, get) => ({
     set({
       activeConversationId: target.id,
       conversationScopeKey: nextScopeKey,
+      activeModelId: target.modelId ?? "",
       status: target.status,
       mode: target.mode,
       messages: target.messages,
@@ -709,8 +914,20 @@ export const useMikaSessionStore = create<AiSessionStore>((set, get) => ({
       toolApprovals: target.toolApprovals,
       error: target.error,
       conversations: candidates.length
-        ? candidates.map(({ id, title, updatedAt }) => ({ id, title, updatedAt }))
-        : [{ id: target.id, title: target.title, updatedAt: target.updatedAt }],
+        ? candidates.map(({ id, title, updatedAt, createdAt }) => ({
+            id,
+            title,
+            updatedAt,
+            createdAt,
+          }))
+        : [
+            {
+              id: target.id,
+              title: target.title,
+              updatedAt: target.updatedAt,
+              createdAt: target.createdAt,
+            },
+          ],
     });
   },
 
@@ -723,13 +940,17 @@ export const useMikaSessionStore = create<AiSessionStore>((set, get) => ({
     applyConversationRuntime(fresh);
     set((state) => ({
       activeConversationId: id,
+      activeModelId: fresh.modelId ?? "",
       status: fresh.status,
       mode: fresh.mode,
       messages: fresh.messages,
       plans: fresh.plans,
       toolApprovals: fresh.toolApprovals,
       error: fresh.error,
-      conversations: [{ id, title: fresh.title, updatedAt: now }, ...state.conversations],
+      conversations: [
+        ...state.conversations,
+        { id, title: fresh.title, updatedAt: now, createdAt: fresh.createdAt },
+      ],
     }));
   },
 
@@ -741,6 +962,7 @@ export const useMikaSessionStore = create<AiSessionStore>((set, get) => ({
     applyConversationRuntime(target);
     set({
       activeConversationId: id,
+      activeModelId: target.modelId ?? "",
       status: target.status,
       mode: target.mode,
       messages: target.messages,
@@ -759,13 +981,40 @@ export const useMikaSessionStore = create<AiSessionStore>((set, get) => ({
     }
   },
 
+  renameConversation: async (id, title) => {
+    const next = title.trim();
+    const snapshot = conversationSnapshots.get(id);
+    if (!next || !snapshot || next === snapshot.title) return;
+    const updatedAt = Date.now();
+    conversationSnapshots.set(id, { ...snapshot, title: next, updatedAt });
+    set((state) => ({
+      conversations: state.conversations.map((conversation) =>
+        conversation.id === id ? { ...conversation, title: next, updatedAt } : conversation,
+      ),
+    }));
+    // Persist to the account so the rename survives reloads and reaches other devices.
+    // For the active chat the live session id may not be written into the snapshot yet
+    // (that happens on suspend), so fall back to the running session.
+    const sessionId =
+      snapshot.runtime.sessionId ??
+      (id === get().activeConversationId ? activeSessionId : null);
+    if (sessionId) {
+      await renameAgentSession(sessionId, next).catch((error: unknown) =>
+        recordAiDebug("warn", "Mika chat rename could not be saved.", errorText(error)),
+      );
+    }
+  },
+
   hydrateConversations: async () => {
     // The current server session schema has no Space scope metadata. Hydrating
     // an unlabelled server session into a Space could expose another Space's
     // private conversation, so only the Files scope may import legacy rows.
     if (activeConversationScopeKey !== filesMikaScopeKey) return;
     const generation = mikaRuntimeGeneration;
-    const added = await hydrateServerSessions(mikaSyncDeps());
+    const added = await hydrateServerSessions(
+      mikaSyncDeps(),
+      (session) => !session.agent_id && !session.space_id,
+    );
     if (!mikaRuntimeIsCurrent(generation) || activeConversationScopeKey !== filesMikaScopeKey)
       return;
     if (added.length === 0) return;
@@ -794,6 +1043,7 @@ export const useMikaSessionStore = create<AiSessionStore>((set, get) => ({
       applyConversationRuntime(target);
       set({
         activeConversationId: next.id,
+        activeModelId: target.modelId ?? "",
         status: target.status,
         mode: target.mode,
         messages: target.messages,
@@ -819,6 +1069,8 @@ export function resetMikaAccountState(): void {
   scopeActivationGeneration += 1;
   activeConversationScopeKey = filesMikaScopeKey;
   activeContextSources = [];
+  activeAgentModelOverride = null;
+  pendingReseedConversationIds.clear();
   const freshId = newConversationId();
   useMikaSessionStore.setState({
     status: serverStatus(false),
@@ -827,9 +1079,12 @@ export function resetMikaAccountState(): void {
     plans: [],
     toolApprovals: [],
     error: null,
-    conversations: [{ id: freshId, title: "New chat", updatedAt: Date.now() }],
+    conversations: [
+      { id: freshId, title: "New chat", updatedAt: Date.now(), createdAt: Date.now() },
+    ],
     activeConversationId: freshId,
     conversationScopeKey: filesMikaScopeKey,
+    activeModelId: "",
   });
 }
 
@@ -916,8 +1171,8 @@ async function drainAiEventsOnce(
         text: event.text,
         citations: event.citations,
         contextSources: activeContextSources,
-        creditsUsed: event.credits_used,
-        creditsRemaining: event.credits_remaining,
+        hostedAiUsedRatio: event.hosted_ai_used_ratio,
+        hostedAiResetAt: event.hosted_ai_reset_at,
       });
     } else if (event.type === "error" && event.message) {
       nextMessages.push({ id: aiMessageId("error"), role: "error", text: event.message });
@@ -1024,16 +1279,35 @@ async function ensureSession(generation = mikaRuntimeGeneration): Promise<string
   assertMikaRuntime(generation);
   if (activeSessionId) return activeSessionId;
   const scopeKey = activeConversationScopeKey;
-  const session = await createAgentSession(
-    undefined,
-    scopeKey === filesMikaScopeKey ? undefined : activeSpaceIdFromScopeKey(scopeKey),
-  );
+  const agentScope = parseAgentScopeKey(scopeKey);
+  const sessionInput = agentScope ?? {
+    spaceId: scopeKey === filesMikaScopeKey ? undefined : activeSpaceIdFromScopeKey(scopeKey),
+  };
+  // A per-chat model override wins over the agent's configured model. The server
+  // treats a supplied model_id as this session's model without touching the agent.
+  if (activeAgentModelOverride) sessionInput.modelId = activeAgentModelOverride;
+  if (!sessionInput.agentId && !sessionInput.modelId) sessionInput.modelId = initialAgentModelId;
+  const session = await createAgentSession(sessionInput);
   assertMikaRuntime(generation);
   if (scopeKey !== activeConversationScopeKey) throw new MikaRuntimeChangedError();
   activeSessionId = session.session_id;
   lastEventSequence = 0;
   recordAiDebug("info", "Created Mika session.", activeSessionId);
   return activeSessionId;
+}
+
+function parseAgentScopeKey(
+  scopeKey: string,
+): { agentId?: string; spaceId?: string; modelId?: string } | null {
+  const marker = ":agents?";
+  const offset = scopeKey.indexOf(marker);
+  if (offset < 0) return null;
+  const params = new URLSearchParams(scopeKey.slice(offset + marker.length));
+  return {
+    agentId: params.get("agent") || undefined,
+    spaceId: params.get("space") || undefined,
+    modelId: params.get("model") || undefined,
+  };
 }
 
 async function sendAgentMessageOnce(
@@ -1055,7 +1329,7 @@ async function sendAgentMessageOnce(
     if (isSessionNotFoundError(error)) {
       resetActiveSession(false);
       throw new Error(
-        "Mika session expired. Your request was not resent. Send it again to continue.",
+        "Agent session expired. Your request was not resent. Send it again to continue.",
       );
     }
     throw error;
@@ -1353,8 +1627,8 @@ function serverStatus(running: boolean, error: string | null = null, configured 
   return {
     configured,
     spaceScopedSessions: false,
-    model: "mika-low",
-    modelName: "Mika Low",
+    model: initialAgentModelId,
+    modelName: initialAgentModelName,
     running,
     sessionId: activeSessionId,
     error,

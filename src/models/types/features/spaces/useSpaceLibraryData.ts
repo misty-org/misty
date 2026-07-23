@@ -32,6 +32,7 @@ import { activeSensitiveGrant, libraryItemMIME } from "@/features/spaces/SpaceLi
 
 export type LibraryCollectionKind =
   | "recent"
+  | "smart"
   | "months"
   | "years"
   | "recent-days"
