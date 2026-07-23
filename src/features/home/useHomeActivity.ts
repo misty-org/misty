@@ -6,8 +6,8 @@ import { cacheHomeActivity, dateKey, type HomeActivity } from "./homeActivity";
 type ActivityResult = { scope: string; activity: HomeActivity; state: "ready" | "error" };
 
 /**
- * Records today's Home visit once per session and loads the visit history behind the
- * streak and heatmap. `spaceId` scopes it to one Space; leave it out for the global Home.
+ * Records today's Home visit once per day across this app's windows (shared local
+ * storage) and loads the visit history behind the streak and heatmap. `spaceId` scopes it to one Space; leave it out for the global Home.
  */
 export function useHomeActivity(
   userId: string | undefined,
@@ -25,7 +25,7 @@ export function useHomeActivity(
     const sessionKey = `misty:home-activity-session:${userId ?? "guest"}:${spaceId ?? "global"}:${todayKey}`;
     let recordedThisSession = false;
     try {
-      recordedThisSession = !!window.sessionStorage.getItem(sessionKey);
+      recordedThisSession = !!window.localStorage.getItem(sessionKey);
     } catch {
       // The server remains authoritative when session storage is unavailable.
     }
@@ -40,7 +40,7 @@ export function useHomeActivity(
         setResult({ scope, activity: snapshot.activity, state: "ready" });
         cacheHomeActivity(userId ?? "", spaceId ?? "global", snapshot.activity);
         try {
-          window.sessionStorage.setItem(sessionKey, "1");
+          window.localStorage.setItem(sessionKey, "1");
         } catch {
           // A successful database response does not depend on local storage.
         }

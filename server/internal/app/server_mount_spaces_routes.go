@@ -60,6 +60,7 @@ func (s *Server) mountSpacesRoutes(prefix string, spaces *api.SpacesService, rea
 	s.Router.Get(prefix+"/spaces/{spaceID}/home", api.HomeDashboard(s.Database))
 	s.Router.Post(prefix+"/spaces/{spaceID}/home/visits", api.RecordHomeVisit(s.Database))
 	s.Router.Get(prefix+"/spaces/{spaceID}/agenda", spaces.SpaceAgenda())
+	s.Router.Get(prefix+"/me/home/agenda", spaces.HomeAgenda())
 	s.Router.MethodFunc(http.MethodGet, prefix+"/spaces/{spaceID}/roadmap-node-definitions", spaces.SpaceRoadmapNodeDefinitions())
 	s.Router.MethodFunc(http.MethodPost, prefix+"/spaces/{spaceID}/roadmap-node-definitions", spaces.SpaceRoadmapNodeDefinitions())
 	s.Router.MethodFunc(http.MethodPatch, prefix+"/spaces/{spaceID}/roadmap-node-definitions/{definitionID}", spaces.SpaceRoadmapNodeDefinition())
