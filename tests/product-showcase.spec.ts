@@ -9,7 +9,7 @@ test("the homepage tells the complete collaboration story", async ({ page }) => 
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
   await expect(
     page.getByRole("img", {
-      name: "Misty Space Library with shared project research and files",
+      name: "Misty Space Library with shared research and files",
     }),
   ).toBeVisible();
 

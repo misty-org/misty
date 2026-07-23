@@ -4,7 +4,7 @@ import { expect, test, type Page } from "@playwright/test";
 type Theme = "light" | "dark";
 
 const publicRoutes = [
-  { name: "home", path: "/", title: "Misty — One Space for the whole project" },
+  { name: "home", path: "/", title: "Misty — One shared Space for everyone" },
   {
     name: "download",
     path: "/download",

@@ -231,6 +231,52 @@ export function ConnectionsPreview() {
   );
 }
 
+export function AgentBuilderPreview() {
+  const sources = [
+    ["Launch plan conversations", "Permitted"],
+    ["Space Library", "Permitted"],
+    ["Your private files", "Excluded"],
+  ];
+
+  return (
+    <ProductFrame title="New Agent" meta="Model routing · Automatic">
+      <div className="min-h-80 p-4 sm:p-6">
+        <div className="rounded-lg border border-border bg-muted/20 px-4 py-3">
+          <p className="text-[11px] text-muted-foreground">Name</p>
+          <p className="mt-1 text-sm font-medium text-foreground">
+            Launch assistant
+          </p>
+        </div>
+        <p className="mt-6 text-[11px] font-medium text-muted-foreground">
+          Context this Agent can use
+        </p>
+        <div className="mt-3 divide-y divide-border overflow-hidden rounded-lg border border-border">
+          {sources.map(([source, access]) => (
+            <div
+              key={source}
+              className="flex items-center justify-between gap-4 px-4 py-3"
+            >
+              <span className="truncate text-xs font-medium text-foreground">
+                {source}
+              </span>
+              <span
+                className={cn(
+                  "shrink-0 rounded-full border px-2.5 py-1 text-[10px]",
+                  access === "Permitted"
+                    ? "border-foreground text-foreground"
+                    : "border-border text-muted-foreground",
+                )}
+              >
+                {access}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </ProductFrame>
+  );
+}
+
 export function AgentsPreview() {
   return (
     <ProductFrame title="Agents" meta="Collaborative AI">
@@ -250,6 +296,57 @@ export function AgentsPreview() {
             Permitted context
           </span>
         </div>
+      </div>
+    </ProductFrame>
+  );
+}
+
+export function SharedLibraryPreview() {
+  const items = [
+    ["Launch brief.pdf", "Alex", "Everyone"],
+    ["Research notes.md", "Jordan", "Everyone"],
+    ["Brand assets", "Alex", "Design"],
+  ];
+
+  return (
+    <ProductFrame title="Library" meta="Shared with the Space">
+      <div className="min-h-80 p-4 sm:p-5">
+        <div className="mb-4 flex flex-wrap gap-2">
+          {["All", "Files", "Links", "Notes"].map((filter, index) => (
+            <span
+              key={filter}
+              className={cn(
+                "rounded-full border px-2.5 py-1 text-xs",
+                index === 0
+                  ? "border-foreground bg-foreground font-medium text-background"
+                  : "border-border text-muted-foreground",
+              )}
+            >
+              {filter}
+            </span>
+          ))}
+        </div>
+        <div className="divide-y divide-border overflow-hidden rounded-lg border border-border">
+          {items.map(([name, addedBy, audience]) => (
+            <div
+              key={name}
+              className="grid grid-cols-[1fr_auto] gap-4 px-4 py-3 sm:grid-cols-[1fr_7rem_5rem]"
+            >
+              <span className="truncate text-xs font-medium text-foreground">
+                {name}
+              </span>
+              <span className="hidden truncate text-xs text-muted-foreground sm:block">
+                Added by {addedBy}
+              </span>
+              <span className="text-right text-xs text-muted-foreground">
+                {audience}
+              </span>
+            </div>
+          ))}
+        </div>
+        <p className="mt-4 text-xs text-muted-foreground">
+          Everything else on your device stays private.
+        </p>
       </div>
     </ProductFrame>
   );

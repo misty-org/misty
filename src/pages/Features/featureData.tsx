@@ -1,4 +1,5 @@
 export type FeatureId =
+  | "spaces"
   | "work-together"
   | "shared-library"
   | "integrations"
@@ -12,6 +13,19 @@ export type MainFeature = {
   description: string;
   details: string[];
   availability?: string;
+};
+
+const spaces: MainFeature = {
+  id: "spaces",
+  title: "Spaces",
+  eyebrow: "What a Space is",
+  description:
+    "A Space is one shared workspace for a group — people, chat, tasks, a Library, and Agents in the same place.",
+  details: [
+    "Everything the group shares lives in the Space.",
+    "Members see the same conversations, tasks, and files.",
+    "Your private files stay private until you add them.",
+  ],
 };
 
 const workTogether: MainFeature = {
@@ -29,7 +43,7 @@ const workTogether: MainFeature = {
 const sharedLibrary: MainFeature = {
   id: "shared-library",
   title: "Library",
-  eyebrow: "Shared project material",
+  eyebrow: "Shared material",
   description: "Add files and references for everyone in the Space.",
   details: [
     "Upload and download Space files.",
@@ -80,6 +94,7 @@ const privateFiles: MainFeature = {
 };
 
 export const mainFeatures = [
+  spaces,
   workTogether,
   sharedLibrary,
   integrations,

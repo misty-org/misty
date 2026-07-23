@@ -1,6 +1,17 @@
 export interface MarketingCopy {
   home: {
-    heroTitle: string;
+    /**
+     * Split so "Space" renders as a link to the Spaces explainer and the
+     * trailing phrase can type in and out. `phrases[0]` is the resting
+     * headline — it is what screen readers and reduced-motion visitors get,
+     * so it must read as a complete sentence with the stem.
+     */
+    heroTitle: {
+      before: string;
+      link: string;
+      after: string;
+      phrases: readonly string[];
+    };
     heroDescription: string;
     proof: string;
     features: readonly { label: string; title: string; description: string }[];
@@ -36,15 +47,31 @@ export interface MarketingCopy {
 
 export const marketingCopy: MarketingCopy = {
   home: {
-    heroTitle: "One shared Space for everything your group is building.",
+    heroTitle: {
+      before: "One shared ",
+      link: "Space",
+      after: " for ",
+      phrases: [
+        "everyone.",
+        "chat, tasks, and files.",
+        "custom AI Agents.",
+        "everything the group shares.",
+      ],
+    },
     heroDescription:
-      "Keep files, conversations, tasks, tools, and Agents together without forcing a small team into an enterprise stack.",
+      "Keep files, conversations, tasks, tools, and Agents together without forcing a small group into an enterprise stack.",
     proof:
-      "Built for small dev teams, student projects, and collaborative groups.",
+      "Built for any group that works together — teams, classes, clubs, and collaborators.",
     features: [
       {
+        label: "Agents",
+        title: "Build Agents around shared context.",
+        description:
+          "Create custom Agents that work from the files and conversations each member is allowed to access.",
+      },
+      {
         label: "Spaces",
-        title: "Keep the whole project in one place.",
+        title: "Keep everything in one place.",
         description:
           "Bring collaborators, conversations, tasks, and shared resources into a Space everyone can follow.",
       },
@@ -54,12 +81,6 @@ export const marketingCopy: MarketingCopy = {
         description:
           "Browse local and connected files privately, then add the useful material to the shared Space.",
       },
-      {
-        label: "Agents",
-        title: "Build Agents around shared context.",
-        description:
-          "Create custom Agents that work from the files and conversations each member is allowed to access.",
-      },
     ],
     workflowTitle: "Start working together in minutes.",
     workflowDescription:
@@ -68,7 +89,7 @@ export const marketingCopy: MarketingCopy = {
       {
         title: "Create a Space",
         description:
-          "Give the project one home for people, files, conversations, and tools.",
+          "Give the work one home for people, files, conversations, and tools.",
       },
       {
         title: "Invite the group",
@@ -84,16 +105,19 @@ export const marketingCopy: MarketingCopy = {
     updatesTitle: "Follow what Misty ships next.",
     updatesDescription:
       "Read product notes and see the public roadmap without digging through release threads.",
-    ctaTitle: "Move the project out of scattered tabs.",
+    ctaTitle: "Move the work out of scattered tabs.",
     ctaDescription:
       "Give your group one Space for the files, conversations, tools, and Agents that move the work forward.",
   },
   features: {
-    title: "Everything the project needs, inside one Space.",
+    title: "Everything your group needs, inside one Space.",
     description:
       "Misty keeps collaborative work close together while your private files remain under your control.",
+    // Positional: index-matched against `mainFeatures` in src/pages/Features/featureData.tsx.
+    // Adding or reordering a feature there requires the same change here.
     itemDescriptions: [
-      "Bring members, conversations, and tasks together so everyone can see the same project state.",
+      "One shared Space holds the people, conversations, tasks, Library, and Agents that belong together.",
+      "Bring members, conversations, and tasks together so everyone sees the same state of the work.",
       "Collect the files and references your group needs without exposing everything on your device.",
       "Connect the tools your group already uses and keep the useful context close to the work.",
       "Create custom Agents that work from permitted Space context with automatic model routing.",
@@ -144,7 +168,7 @@ export const marketingCopy: MarketingCopy = {
       "Lorem ipsum dolor sit amet, consectetur adipiscing elit sed do eiusmod.",
   },
   metadata: {
-    home: "Misty gives small dev teams, students, and collaborative groups one shared Space for files, conversations, tools, tasks, and Agents.",
+    home: "Misty gives any group that works together one shared Space for files, conversations, tools, tasks, and AI Agents.",
     features:
       "Keep files, conversations, tasks, tools, and custom Agents together in one shared Misty Space.",
     pricing:
