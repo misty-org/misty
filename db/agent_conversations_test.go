@@ -102,3 +102,73 @@ func TestMikaSessionsAreListableRenamableAndResumableAcrossDevices(t *testing.T)
 		t.Fatalf("RenameAgentSession(unknown) error = %v, want ErrPersistedSessionNotFound", err)
 	}
 }
+
+func TestAgentSpaceSessionAccessIsRevalidated(t *testing.T) {
+	database := openTestDatabase(t)
+	ctx := context.Background()
+	owner, err := database.CreateUser("Session Access Owner", "session-access-owner@example.com", "password123")
+	if err != nil {
+		t.Fatal(err)
+	}
+	member, err := database.CreateUser("Session Access Member", "session-access-member@example.com", "password123")
+	if err != nil {
+		t.Fatal(err)
+	}
+	space, err := database.CreateSpace(ctx, owner.ID, "Session Access Space")
+	if err != nil {
+		t.Fatal(err)
+	}
+	invite, err := database.InviteToSpace(ctx, owner.ID, space.ID, member.Email)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := database.RespondToSpaceInvite(ctx, member.ID, invite.ID, true); err != nil {
+		t.Fatal(err)
+	}
+	personal, err := database.CreatePersonalAgent(ctx, owner.ID, PersonalAgent{
+		Name: "Shared Agent", Instructions: "Help with the Space.", ModelMode: "pinned", ModelID: "google/gemini-2.5-flash-lite",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := database.ReplacePersonalAgentGrants(ctx, owner.ID, personal.ID, []PersonalAgentGrantInput{{
+		SpaceID: space.ID, MemberUserIDs: []string{member.ID},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+
+	now := time.Now().UTC()
+	agentSessionID := "conversation_" + uuid.NewString()
+	if err := database.CreateAgentSession(ctx, agentSessionID, member.ID, json.RawMessage(`{}`), now.Add(time.Hour), now.Add(24*time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	if err := database.BindAgentSessionContext(ctx, member.ID, agentSessionID, personal.ID, space.ID, "", "test"); err != nil {
+		t.Fatal(err)
+	}
+	if err := database.ValidateAgentSessionAccess(ctx, member.ID, agentSessionID); err != nil {
+		t.Fatalf("ValidateAgentSessionAccess() before revocation = %v", err)
+	}
+	if _, err := database.ReplacePersonalAgentGrants(ctx, owner.ID, personal.ID, nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := database.ValidateAgentSessionAccess(ctx, member.ID, agentSessionID); !errors.Is(err, ErrPersonalAgentNotFound) {
+		t.Fatalf("ValidateAgentSessionAccess() after grant revocation = %v, want ErrPersonalAgentNotFound", err)
+	}
+
+	directSessionID := "conversation_" + uuid.NewString()
+	if err := database.CreateAgentSession(ctx, directSessionID, member.ID, json.RawMessage(`{}`), now.Add(time.Hour), now.Add(24*time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	if err := database.BindAgentSessionContext(ctx, member.ID, directSessionID, "", space.ID, "", "test"); err != nil {
+		t.Fatal(err)
+	}
+	if err := database.ValidateAgentSessionAccess(ctx, member.ID, directSessionID); err != nil {
+		t.Fatalf("ValidateAgentSessionAccess() before member removal = %v", err)
+	}
+	if err := database.RemoveSpaceMember(ctx, owner.ID, space.ID, member.ID); err != nil {
+		t.Fatal(err)
+	}
+	if err := database.ValidateAgentSessionAccess(ctx, member.ID, directSessionID); !errors.Is(err, ErrLibraryForbidden) {
+		t.Fatalf("ValidateAgentSessionAccess() after member removal = %v, want ErrLibraryForbidden", err)
+	}
+}

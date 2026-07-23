@@ -57,17 +57,19 @@ type ToolDefinition struct {
 }
 
 type AgentEvent struct {
-	Sequence         int64              `json:"sequence"`
-	Type             string             `json:"type"`
-	RunID            string             `json:"run_id,omitempty"`
-	Text             string             `json:"text,omitempty"`
-	ToolRequests     []ToolRequest      `json:"tool_requests,omitempty"`
-	FilePlan         *FileOperationPlan `json:"file_plan,omitempty"`
-	Message          string             `json:"message,omitempty"`
-	CreatedAt        time.Time          `json:"created_at"`
-	CreditsUsed      int64              `json:"credits_used,omitempty"`
-	CreditsRemaining int64              `json:"credits_remaining,omitempty"`
-	Citations        []AgentCitation    `json:"citations,omitempty"`
+	Sequence          int64              `json:"sequence"`
+	Type              string             `json:"type"`
+	RunID             string             `json:"run_id,omitempty"`
+	Text              string             `json:"text,omitempty"`
+	ToolRequests      []ToolRequest      `json:"tool_requests,omitempty"`
+	FilePlan          *FileOperationPlan `json:"file_plan,omitempty"`
+	Message           string             `json:"message,omitempty"`
+	CreatedAt         time.Time          `json:"created_at"`
+	HostedAIUsedRatio float64            `json:"hosted_ai_used_ratio,omitempty"`
+	HostedAIResetAt   *time.Time         `json:"hosted_ai_reset_at,omitempty"`
+	CreditsUsed       int64              `json:"-"`
+	CreditsRemaining  int64              `json:"-"`
+	Citations         []AgentCitation    `json:"citations,omitempty"`
 }
 
 type ToolRequest struct {
@@ -110,6 +112,7 @@ type Message struct {
 type ModelRequest struct {
 	SessionID    string
 	UserID       string
+	SystemPrompt string
 	MikaTier     MikaTier
 	Mode         string
 	ActiveRoot   string
@@ -152,11 +155,15 @@ type ModelUsage struct {
 }
 
 type UsageReservation struct {
-	ID              string
-	ReservedCredits int64
+	ID               string
+	ReservedMicrousd int64
+	ReservedCredits  int64
 }
 
 type UsageSettlement struct {
+	ChargedMicrousd  int64
+	UsedRatio        float64
+	ResetAt          time.Time
 	CreditsUsed      int64
 	CreditsRemaining int64
 }
@@ -167,13 +174,15 @@ type UsageMeter interface {
 	Release(reservation *UsageReservation) error
 }
 
-type CreditsExhaustedError struct {
+type HostedAILimitReachedError struct {
 	Required  int64
 	Available int64
 	ResetAt   time.Time
 }
 
-func (e CreditsExhaustedError) Error() string { return "managed AI credits exhausted" }
+func (e HostedAILimitReachedError) Error() string { return "weekly hosted AI limit reached" }
+
+type CreditsExhaustedError = HostedAILimitReachedError
 
 type ModelProvider interface {
 	Next(request ModelRequest) (ModelResponse, error)

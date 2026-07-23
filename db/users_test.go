@@ -1,6 +1,9 @@
 package db
 
-import "testing"
+import (
+	"bytes"
+	"testing"
+)
 
 func TestNormalizeUsername(t *testing.T) {
 	for input, want := range map[string]string{
@@ -78,5 +81,28 @@ func TestUserSettingsDefaultAndUpdate(t *testing.T) {
 	}
 	if settings == nil || !settings.EmailUpdatesEnabled || !settings.AnalyticsEnabled || !settings.ErrorReportingEnabled {
 		t.Fatalf("settings after update = %#v, want all preferences enabled", settings)
+	}
+}
+
+func TestUserAvatarRoundTrip(t *testing.T) {
+	database := openTestDatabase(t)
+	user, err := database.CreateUser("Avatar User", "avatar@example.com", "password123")
+	if err != nil {
+		t.Fatalf("CreateUser() error = %v", err)
+	}
+
+	data, version, err := database.GetUserAvatar(user.ID)
+	if err != nil || data != nil || version != 0 {
+		t.Fatalf("GetUserAvatar() before upload = %v, %d, %v; want nil, 0, nil", data, version, err)
+	}
+
+	want := []byte("validity is checked by the HTTP boundary")
+	version, err = database.UpdateUserAvatar(user.ID, want)
+	if err != nil || version != 1 {
+		t.Fatalf("UpdateUserAvatar() = %d, %v; want 1, nil", version, err)
+	}
+	data, version, err = database.GetUserAvatar(user.ID)
+	if err != nil || version != 1 || !bytes.Equal(data, want) {
+		t.Fatalf("GetUserAvatar() = %q, %d, %v; want stored bytes, 1, nil", data, version, err)
 	}
 }

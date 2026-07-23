@@ -8,7 +8,8 @@ not migrated into the new Library.
 
 - Personal and Space-owned security domains
 - Immutable blobs, canonical files, and Space-scoped Library items
-- One shared decimal 1 GB storage pool per Space with atomic upload reservations
+- One owner-pooled storage allowance across all owned Spaces (2 GB Free or 50 GB Pro), with atomic upload reservations
+- A separate 1 GB per-file technical safeguard that is not a pricing entitlement
 - Three owned Spaces total, including the owner-named personal Space
 - Private permanent R2/S3 storage contract and persistent local development store
 - Quarantine, server-side checksum/type verification, dangerous-format policy,

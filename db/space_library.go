@@ -58,12 +58,15 @@ var (
 )
 
 type SpaceStorageUsage struct {
-	SpaceID        string `json:"space_id"`
-	UsedBytes      int64  `json:"used_bytes"`
-	ReservedBytes  int64  `json:"reserved_bytes"`
-	LimitBytes     int64  `json:"limit_bytes"`
-	RemainingBytes int64  `json:"remaining_bytes"`
-	Version        int64  `json:"version"`
+	SpaceID            string `json:"space_id"`
+	OwnerUserID        string `json:"owner_user_id,omitempty"`
+	SpaceUsedBytes     int64  `json:"space_used_bytes"`
+	SpaceReservedBytes int64  `json:"space_reserved_bytes"`
+	UsedBytes          int64  `json:"used_bytes"`
+	ReservedBytes      int64  `json:"reserved_bytes"`
+	LimitBytes         int64  `json:"limit_bytes"`
+	RemainingBytes     int64  `json:"remaining_bytes"`
+	Version            int64  `json:"version"`
 }
 
 type LibraryUpload struct {
@@ -287,22 +290,29 @@ func requireSpacePermissionTx(ctx context.Context, tx *sql.Tx, userID, spaceID, 
 }
 
 func (db *Database) SpaceStorageUsage(ctx context.Context, userID, spaceID string) (*SpaceStorageUsage, error) {
-	out := &SpaceStorageUsage{SpaceID: spaceID, LimitBytes: MaxSpaceStorageBytes}
+	out := &SpaceStorageUsage{SpaceID: spaceID}
 	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionStorageViewOwn); err != nil {
+			return err
+		}
+		if err := tx.QueryRowContext(ctx, `SELECT owner_user_id FROM spaces WHERE id=$1`, spaceID).Scan(&out.OwnerUserID); err != nil {
 			return err
 		}
 		if _, err := tx.ExecContext(ctx, `INSERT INTO space_storage_usage(space_id) VALUES($1) ON CONFLICT DO NOTHING`, spaceID); err != nil {
 			return err
 		}
-		return tx.QueryRowContext(ctx, `SELECT used_bytes,reserved_bytes,version FROM space_storage_usage WHERE space_id=$1`, spaceID).Scan(&out.UsedBytes, &out.ReservedBytes, &out.Version)
+		if err := tx.QueryRowContext(ctx, `SELECT used_bytes,reserved_bytes,version FROM space_storage_usage WHERE space_id=$1`, spaceID).Scan(&out.SpaceUsedBytes, &out.SpaceReservedBytes, &out.Version); err != nil {
+			return err
+		}
+		owner, err := ownerStorageUsageTx(ctx, tx, out.OwnerUserID, false)
+		if err != nil {
+			return err
+		}
+		out.UsedBytes, out.ReservedBytes, out.LimitBytes, out.RemainingBytes = owner.UsedBytes, owner.ReservedBytes, owner.LimitBytes, owner.RemainingBytes
+		return nil
 	})
 	if err != nil {
 		return nil, err
-	}
-	out.RemainingBytes = MaxSpaceStorageBytes - out.UsedBytes - out.ReservedBytes
-	if out.RemainingBytes < 0 {
-		out.RemainingBytes = 0
 	}
 	return out, nil
 }
@@ -325,8 +335,19 @@ func (db *Database) CreateLibraryUpload(ctx context.Context, userID, spaceID, pu
 				return err
 			}
 		}
-		if err := tx.QueryRowContext(ctx, `SELECT security_domain_id FROM spaces WHERE id=$1`, spaceID).Scan(&out.SecurityDomainID); err != nil {
+		var ownerID string
+		if err := tx.QueryRowContext(ctx, `SELECT security_domain_id,owner_user_id FROM spaces WHERE id=$1 FOR SHARE`, spaceID).Scan(&out.SecurityDomainID, &ownerID); err != nil {
 			return err
+		}
+		if _, err := tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock(hashtext($1))`, "owner-storage:"+ownerID); err != nil {
+			return err
+		}
+		ownerUsage, err := ownerStorageUsageTx(ctx, tx, ownerID, true)
+		if err != nil {
+			return err
+		}
+		if ownerUsage.UsedBytes+ownerUsage.ReservedBytes+byteSize > ownerUsage.LimitBytes {
+			return ErrLibraryQuota
 		}
 		if _, err := tx.ExecContext(ctx, `INSERT INTO space_storage_usage(space_id) VALUES($1) ON CONFLICT DO NOTHING`, spaceID); err != nil {
 			return err
@@ -335,9 +356,8 @@ func (db *Database) CreateLibraryUpload(ctx context.Context, userID, spaceID, pu
 		if err := tx.QueryRowContext(ctx, `SELECT used_bytes,reserved_bytes FROM space_storage_usage WHERE space_id=$1 FOR UPDATE`, spaceID).Scan(&used, &reserved); err != nil {
 			return err
 		}
-		if used+reserved+byteSize > MaxSpaceStorageBytes {
-			return ErrLibraryQuota
-		}
+		_ = used
+		_ = reserved
 		if err := tx.QueryRowContext(ctx, `INSERT INTO space_library_uploads(id,space_id,security_domain_id,user_id,object_key,original_filename,purpose,client_declared_mime_type,requested_byte_size,client_sha256,state,upload_token_hash,expires_at)
 			VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'initiated',$11,$12) RETURNING created_at,updated_at`, out.ID, spaceID, out.SecurityDomainID, userID, objectKey, filename, purpose, declaredMIME, byteSize, clientSHA, tokenHash, expiresAt).Scan(&out.CreatedAt, &out.UpdatedAt); err != nil {
 			return err

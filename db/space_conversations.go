@@ -141,7 +141,7 @@ func (db *Database) CreateSpaceConversation(ctx context.Context, userID, spaceID
 		return nil, err
 	}
 	members := uniqueSpaceIDs(append(memberIDs, userID))
-	if len(members) < 2 || len(members) > MaxSpacePeople {
+	if len(members) < 2 {
 		return nil, ErrSpaceInvalid
 	}
 	out := &SpaceConversation{ID: "space_conversation_" + uuid.NewString(), SpaceID: spaceID, Title: title, CreatedByUserID: userID}
@@ -187,7 +187,7 @@ func (db *Database) UpdateSpaceConversation(ctx context.Context, userID, spaceID
 		return nil, err
 	}
 	members := uniqueSpaceIDs(append(memberIDs, userID))
-	if len(members) < 2 || len(members) > MaxSpacePeople {
+	if len(members) < 2 {
 		return nil, ErrSpaceInvalid
 	}
 	out := &SpaceConversation{ID: conversationID, SpaceID: spaceID, Title: title}

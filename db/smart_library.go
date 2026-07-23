@@ -156,11 +156,7 @@ func (db *Database) SetSmartLibraryEstimate(userID, folderID string, eligible in
 	if eligible < 0 {
 		eligible = 0
 	}
-	included := eligible
-	if included > 25 {
-		included = 25
-	}
-	_, err := db.smartLibraryExec(`UPDATE smart_library_folders SET eligible_images=$1,included_images=$2,billable_images=$3,updated_at=NOW() WHERE id=$4 AND user_id=$5 AND deleted_at IS NULL`, eligible, included, eligible-included, folderID, userID)
+	_, err := db.smartLibraryExec(`UPDATE smart_library_folders SET eligible_images=$1,included_images=0,billable_images=$1,updated_at=NOW() WHERE id=$2 AND user_id=$3 AND deleted_at IS NULL`, eligible, folderID, userID)
 	if err != nil {
 		return nil, err
 	}

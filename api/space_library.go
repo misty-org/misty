@@ -931,6 +931,12 @@ func (s *SpaceLibraryService) Usage() http.HandlerFunc {
 			writeLibraryError(w, err)
 			return
 		}
+		if usage.OwnerUserID != userID {
+			writeJSON(w, http.StatusOK, map[string]any{
+				"space_id": usage.SpaceID, "storage_available": usage.RemainingBytes > 0,
+			})
+			return
+		}
 		writeJSON(w, http.StatusOK, usage)
 	}
 }
@@ -1228,6 +1234,10 @@ func (s *SpaceLibraryService) PreviewItem() http.HandlerFunc {
 		if err != nil {
 			writeLibraryError(w, err)
 			return
+		}
+		if source.PreviewObjectKey == "" {
+			// Completion consumes the reservation. Every earlier exit releases it.
+			defer func() { _ = s.database.ReleaseLibraryPreviewReservation(context.Background(), userID, spaceID, itemID) }()
 		}
 		if source.PreviewObjectKey == "" && s.mediaProcessor == nil {
 			writeJSON(w, http.StatusUnsupportedMediaType, map[string]string{"code": "preview_unavailable"})
@@ -2289,7 +2299,7 @@ func writeLibraryError(w http.ResponseWriter, err error) {
 	case errors.Is(err, db.ErrLibraryInvalid):
 		writeJSON(w, http.StatusBadRequest, map[string]string{"code": "invalid_request"})
 	case errors.Is(err, db.ErrLibraryQuota):
-		writeJSON(w, http.StatusConflict, map[string]any{"code": "space_storage_quota_exceeded", "limit_bytes": db.MaxSpaceStorageBytes})
+		writeJSON(w, http.StatusConflict, map[string]any{"code": "owner_storage_quota_exceeded", "owner_can_upgrade": true})
 	case errors.Is(err, db.ErrLibraryConflict):
 		writeJSON(w, http.StatusConflict, map[string]string{"code": "version_conflict"})
 	case errors.Is(err, db.ErrLibraryUploadMismatch):

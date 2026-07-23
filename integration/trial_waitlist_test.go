@@ -10,7 +10,7 @@ import (
 	"github.com/kannachi323/misty/server/security"
 )
 
-func TestPersonalTrialLifecycle(t *testing.T) {
+func TestDirectTrialEndpointIsRetired(t *testing.T) {
 	database := openIntegrationDatabase(t)
 
 	user, err := database.CreateUser("Trial User", "trial@example.com", "password123")
@@ -24,41 +24,17 @@ func TestPersonalTrialLifecycle(t *testing.T) {
 
 	cookie := &http.Cookie{Name: sessionCookieName, Value: sessionToken}
 
-	firstRec := performJSONRequest(t, api.StartPersonalTrial(database), http.MethodPost, "/billing/trial/start", nil, cookie)
-	if firstRec.Code != http.StatusOK {
-		t.Fatalf("first trial start status = %d, want %d, body = %q", firstRec.Code, http.StatusOK, firstRec.Body.String())
+	recorder := performJSONRequest(t, api.StartPersonalTrial(database), http.MethodPost, "/billing/trial/start", nil, cookie)
+	if recorder.Code != http.StatusGone {
+		t.Fatalf("direct trial status = %d, want %d, body = %q", recorder.Code, http.StatusGone, recorder.Body.String())
 	}
 
 	license, err := database.GetLicenseByUserID(user.ID)
 	if err != nil || license == nil {
 		t.Fatalf("GetLicenseByUserID() error = %v, license = %#v", err, license)
 	}
-	if license.Tier != db.TierPro || license.Status != db.LicenseStatusTrialing || license.ExpiresAt == nil {
-		t.Fatalf("trial license = %#v, want pro trialing with expiry", license)
-	}
-
-	secondRec := performJSONRequest(t, api.StartPersonalTrial(database), http.MethodPost, "/billing/trial/start", nil, cookie)
-	if secondRec.Code != http.StatusConflict {
-		t.Fatalf("second trial start status = %d, want %d", secondRec.Code, http.StatusConflict)
-	}
-
-	if err := database.UpsertStripePurchase(&db.StripePurchase{
-		UserID:                  user.ID,
-		LicenseID:               user.LicenseID,
-		TierPurchased:           db.TierPersonal,
-		StripeCheckoutSessionID: "cs_completed",
-		Status:                  "completed",
-		EventSource:             "test",
-	}); err != nil {
-		t.Fatalf("UpsertStripePurchase() error = %v", err)
-	}
-	if err := database.SetLicenseStateByID(user.LicenseID, db.TierBasic, db.LicenseStatusActive, nil); err != nil {
-		t.Fatalf("SetLicenseStateByID() error = %v", err)
-	}
-
-	blockedRec := performJSONRequest(t, api.StartPersonalTrial(database), http.MethodPost, "/billing/trial/start", nil, cookie)
-	if blockedRec.Code != http.StatusConflict {
-		t.Fatalf("purchase-blocked trial status = %d, want %d", blockedRec.Code, http.StatusConflict)
+	if license.Tier != db.TierBasic || license.Status != db.LicenseStatusActive || license.ExpiresAt != nil {
+		t.Fatalf("direct trial changed license = %#v", license)
 	}
 }
 

@@ -25,14 +25,7 @@ func NormalizeMikaTier(value MikaTier) MikaTier {
 }
 
 func (tier MikaTier) DisplayName() string {
-	switch NormalizeMikaTier(tier) {
-	case MikaMed:
-		return "Mika Med"
-	case MikaHigh:
-		return "Mika High"
-	default:
-		return "Mika Low"
-	}
+	return InitialSelectedModelName
 }
 
 type MikaProviderRouter struct {
@@ -76,7 +69,7 @@ func (router *MikaProviderRouter) NextContext(ctx context.Context, request Model
 // ProviderInfo on the router is deliberately provider-neutral. Internal callers
 // that need billing metadata resolve the concrete provider with ProviderForTier.
 func (*MikaProviderRouter) ProviderName() string { return "misty" }
-func (*MikaProviderRouter) ModelName() string    { return string(MikaLow) }
+func (*MikaProviderRouter) ModelName() string    { return InitialSelectedModelID }
 
 type mikaProviderResolver interface {
 	ProviderForTier(MikaTier) ModelProvider

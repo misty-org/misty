@@ -98,7 +98,7 @@ func TestMediaPreviewSignatures(t *testing.T) {
 
 func TestMediaSemanticSearchDegradesWithoutAnalyzer(t *testing.T) {
 	service := NewMediaSearchService(&db.Database{}, nil)
-	if _, err := service.cachedEmbedding(context.Background(), "user", "device_0123456789abcdef0123456789abcdef", "grocery store"); err == nil {
+	if _, _, err := service.cachedEmbedding(context.Background(), "user", "device_0123456789abcdef0123456789abcdef", "grocery store"); err == nil {
 		t.Fatal("missing analyzer should return a controlled error")
 	}
 }

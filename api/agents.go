@@ -17,6 +17,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/go-chi/chi/v5"
+	serveragent "github.com/kannachi323/misty/server/agent"
 	"github.com/kannachi323/misty/server/db"
 	workflowv2 "github.com/kannachi323/misty/server/workflow"
 )
@@ -40,6 +41,143 @@ type AgentsService struct {
 
 func NewAgentsService(database *db.Database) *AgentsService {
 	return &AgentsService{database: database}
+}
+
+func (s *AgentsService) PersonalAgents() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userID, ok := s.requireUser(w, r)
+		if !ok {
+			return
+		}
+		switch r.Method {
+		case http.MethodGet:
+			items, err := s.database.ListPersonalAgents(r.Context(), userID)
+			if err != nil {
+				writeAgentError(w, err)
+				return
+			}
+			writeJSON(w, http.StatusOK, map[string]any{"agents": items})
+		case http.MethodPost:
+			var body db.PersonalAgent
+			if decodeAIJSON(w, r, &body) != nil {
+				return
+			}
+			if strings.TrimSpace(body.ModelID) == "" {
+				writeJSON(w, http.StatusUnprocessableEntity, map[string]string{"code": "agent_model_required"})
+				return
+			}
+			body.ModelMode = "pinned"
+			if !serveragent.GatewayModelAvailable(r.Context(), body.ModelID) {
+				writeJSON(w, http.StatusUnprocessableEntity, map[string]string{"code": "agent_model_unavailable"})
+				return
+			}
+			item, err := s.database.CreatePersonalAgent(r.Context(), userID, body)
+			if err != nil {
+				writeAgentError(w, err)
+				return
+			}
+			writeJSON(w, http.StatusCreated, item)
+		default:
+			w.WriteHeader(http.StatusMethodNotAllowed)
+		}
+	}
+}
+
+func (s *AgentsService) PersonalAgent() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userID, ok := s.requireUser(w, r)
+		if !ok {
+			return
+		}
+		agentID := strings.TrimSpace(chi.URLParam(r, "agentID"))
+		switch r.Method {
+		case http.MethodGet:
+			item, err := s.database.PersonalAgentByID(r.Context(), userID, agentID)
+			if err != nil {
+				writeAgentError(w, err)
+				return
+			}
+			writeJSON(w, http.StatusOK, item)
+		case http.MethodPatch, http.MethodPut:
+			var body db.PersonalAgent
+			if decodeAIJSON(w, r, &body) != nil {
+				return
+			}
+			body.ID = agentID
+			if strings.TrimSpace(body.ModelID) == "" {
+				writeJSON(w, http.StatusUnprocessableEntity, map[string]string{"code": "agent_model_required"})
+				return
+			}
+			body.ModelMode = "pinned"
+			if !serveragent.GatewayModelAvailable(r.Context(), body.ModelID) {
+				writeJSON(w, http.StatusUnprocessableEntity, map[string]string{"code": "agent_model_unavailable"})
+				return
+			}
+			item, err := s.database.UpdatePersonalAgent(r.Context(), userID, body)
+			if err != nil {
+				writeAgentError(w, err)
+				return
+			}
+			writeJSON(w, http.StatusOK, item)
+		case http.MethodDelete:
+			if err := s.database.DeletePersonalAgent(r.Context(), userID, agentID); err != nil {
+				writeAgentError(w, err)
+				return
+			}
+			w.WriteHeader(http.StatusNoContent)
+		default:
+			w.WriteHeader(http.StatusMethodNotAllowed)
+		}
+	}
+}
+
+func (s *AgentsService) PersonalAgentGrants() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userID, ok := s.requireUser(w, r)
+		if !ok {
+			return
+		}
+		agentID := strings.TrimSpace(chi.URLParam(r, "agentID"))
+		if r.Method == http.MethodGet {
+			items, err := s.database.PersonalAgentGrants(r.Context(), userID, agentID)
+			if err != nil {
+				writeAgentError(w, err)
+				return
+			}
+			writeJSON(w, http.StatusOK, map[string]any{"grants": items})
+			return
+		}
+		if r.Method != http.MethodPut {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+		var body struct {
+			Spaces []db.PersonalAgentGrantInput `json:"spaces"`
+		}
+		if decodeAIJSON(w, r, &body) != nil {
+			return
+		}
+		items, err := s.database.ReplacePersonalAgentGrants(r.Context(), userID, agentID, body.Spaces)
+		if err != nil {
+			writeAgentError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"grants": items})
+	}
+}
+
+func (s *AgentsService) Models() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if _, ok := s.requireUser(w, r); !ok {
+			return
+		}
+		models, err := serveragent.GatewayModels(r.Context())
+		if err != nil {
+			writeJSON(w, http.StatusServiceUnavailable, map[string]string{"code": "model_catalog_unavailable"})
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"catalog_version": serveragent.GatewayModelCatalogVersion, "models": models})
+	}
 }
 
 func (s *AgentsService) ClaimWorkflowNodeJob() http.HandlerFunc {
@@ -254,8 +392,14 @@ func writeAgentError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, db.ErrLibraryForbidden), errors.Is(err, db.ErrSpaceForbidden):
 		http.Error(w, "forbidden", http.StatusForbidden)
-	case errors.Is(err, db.ErrDeviceNotFound), errors.Is(err, db.ErrAgentJobNotFound), errors.Is(err, db.ErrAgentNotFound):
-		http.Error(w, "not found", http.StatusNotFound)
+	case errors.Is(err, db.ErrDeviceNotFound), errors.Is(err, db.ErrAgentJobNotFound), errors.Is(err, db.ErrAgentNotFound), errors.Is(err, db.ErrPersonalAgentNotFound):
+		writeJSON(w, http.StatusNotFound, map[string]string{"code": "not_found"})
+	case errors.Is(err, db.ErrPersonalAgentConflict):
+		writeJSON(w, http.StatusConflict, map[string]string{"code": "version_conflict"})
+	case errors.Is(err, db.ErrSpaceInvalid):
+		writeJSON(w, http.StatusBadRequest, map[string]string{"code": "invalid_request"})
+	case errors.Is(err, db.ErrPersonalAgentModel):
+		writeJSON(w, http.StatusUnprocessableEntity, map[string]string{"code": "agent_model_unavailable"})
 	case errors.Is(err, db.ErrInvalidLease), errors.Is(err, db.ErrInvalidJobState):
 		writeJSON(w, http.StatusConflict, map[string]string{"code": "invalid_or_expired_lease"})
 	default:

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log"
+	"strings"
 	"sync"
 	"time"
 
@@ -34,6 +35,10 @@ type Session struct {
 	UserID                string
 	BillingUserID         string
 	BillingScope          string
+	ModelID               string
+	SystemPrompt          string
+	AllowTools            bool
+	AllowWriteTools       bool
 	MikaTier              MikaTier
 	Mode                  string
 	ActiveRoot            string
@@ -74,6 +79,16 @@ func (s *SessionStore) CreateWithBilling(userID, billingUserID string) *Session 
 	return s.CreateWithBillingScope(userID, billingUserID, "")
 }
 
+func (s *SessionStore) CreateWithModel(userID, billingUserID, modelID string) *Session {
+	session := s.CreateWithBillingScope(userID, billingUserID, "")
+	_ = s.WithSession(session.ID, userID, func(current *Session) error {
+		current.ModelID = strings.TrimSpace(modelID)
+		return nil
+	})
+	session.ModelID = strings.TrimSpace(modelID)
+	return session
+}
+
 func (s *SessionStore) CreateWithBillingScope(userID, billingUserID, billingScope string) *Session {
 	s.mu.Lock()
 	s.cleanupLocked()
@@ -85,6 +100,8 @@ func (s *SessionStore) CreateWithBillingScope(userID, billingUserID, billingScop
 		BillingScope:        billingScope,
 		MikaTier:            MikaLow,
 		Mode:                ModeAsk,
+		AllowTools:          true,
+		AllowWriteTools:     true,
 		KnownPaths:          make(map[string]struct{}),
 		PendingToolRequests: make(map[string]string),
 		CreatedAt:           now,

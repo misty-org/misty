@@ -77,12 +77,12 @@ func TestMikaRouterUsesTierWithoutChangingBillingIdentity(t *testing.T) {
 	if meter.provider != "high-provider" || meter.model != "high-model" {
 		t.Fatalf("billing identity = %s/%s", meter.provider, meter.model)
 	}
-	if provider, model := router.ProviderName(), router.ModelName(); provider != "misty" || model != string(MikaLow) {
+	if provider, model := router.ProviderName(), router.ModelName(); provider != "misty" || model != InitialSelectedModelID {
 		t.Fatalf("public router identity = %s/%s", provider, model)
 	}
 }
 
-func TestProviderErrorsUseMikaBrandingInSessionEvents(t *testing.T) {
+func TestProviderErrorsUseAgentBrandingInSessionEvents(t *testing.T) {
 	meter := &recordingUsageMeter{}
 	service := NewService(nil, NewMikaProviderRouter(
 		namedTestProvider{err: errors.New("openai secret provider failure")}, nil, nil,
@@ -95,7 +95,7 @@ func TestProviderErrorsUseMikaBrandingInSessionEvents(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(events) != 1 || events[0].Message != "Mika could not complete this request." {
+	if len(events) != 1 || events[0].Message != "The agent could not complete this request." {
 		t.Fatalf("events = %#v", events)
 	}
 	if meter.releases != 1 {

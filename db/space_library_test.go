@@ -492,15 +492,26 @@ func TestLibraryQuotaReservationRejectsOversubscriptionAndReleasesFailure(t *tes
 	if err != nil {
 		t.Fatalf("exact quota reservation error = %v", err)
 	}
+	secondUpload, err := database.CreateLibraryUpload(ctx, member.ID, spaceID, "library", "second-large.bin", "application/octet-stream", MaxSpaceStorageBytes, digest, "library/second-quotaobject", "second-quota-token", time.Now().Add(time.Hour))
+	if err != nil {
+		t.Fatalf("member upload should share owner pool: %v", err)
+	}
 	if _, err := database.CreateLibraryUpload(ctx, member.ID, spaceID, "library", "extra.bin", "application/octet-stream", 1, digest, "library/extraobject", "extra-token", time.Now().Add(time.Hour)); !errors.Is(err, ErrLibraryQuota) {
 		t.Fatalf("cross-member oversubscription error = %v, want ErrLibraryQuota", err)
 	}
 	if err := database.RejectLibraryUpload(ctx, owner.ID, spaceID, upload.ID, "quota-token", "invalid", "test_failure"); err != nil {
 		t.Fatal(err)
 	}
+	if err := database.RejectLibraryUpload(ctx, member.ID, spaceID, secondUpload.ID, "second-quota-token", "invalid", "test_failure"); err != nil {
+		t.Fatal(err)
+	}
 	usage, _ := database.SpaceStorageUsage(ctx, member.ID, spaceID)
-	if usage.ReservedBytes != 0 || usage.RemainingBytes != MaxSpaceStorageBytes {
+	if usage.ReservedBytes != 0 || usage.RemainingBytes != FreeStorageBytes {
 		t.Fatalf("rejected reservation usage = %#v", usage)
+	}
+	baseUpload, err := database.CreateLibraryUpload(ctx, owner.ID, spaceID, "library", "base.bin", "application/octet-stream", MaxSpaceStorageBytes, digest, "library/base-quotaobject", "base-quota-token", time.Now().Add(time.Hour))
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	type reservationResult struct {
@@ -536,5 +547,47 @@ func TestLibraryQuotaReservationRejectsOversubscriptionAndReleasesFailure(t *tes
 	}
 	if succeeded != 1 || denied != 1 {
 		t.Fatalf("concurrent shared quota results: succeeded=%d denied=%d", succeeded, denied)
+	}
+	if err := database.RejectLibraryUpload(ctx, owner.ID, spaceID, baseUpload.ID, "base-quota-token", "invalid", "test_cleanup"); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestOwnedSpacesShareOneStoragePool(t *testing.T) {
+	database := openTestDatabase(t)
+	ctx := context.Background()
+	owner, err := database.CreateUser("Pooled Owner", "pooled-owner@example.com", "password123")
+	if err != nil {
+		t.Fatal(err)
+	}
+	spaces, err := database.ListSpaces(ctx, owner.ID)
+	if err != nil || len(spaces) == 0 {
+		t.Fatalf("personal Space = %#v, %v", spaces, err)
+	}
+	project, err := database.CreateSpace(ctx, owner.ID, "Second pool consumer")
+	if err != nil {
+		t.Fatal(err)
+	}
+	digest := strings.Repeat("c", 64)
+	first, err := database.CreateLibraryUpload(ctx, owner.ID, spaces[0].ID, "library", "first.bin", "application/octet-stream", MaxSpaceStorageBytes, digest, "library/pool-first", "pool-first-token", time.Now().Add(time.Hour))
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := database.CreateLibraryUpload(ctx, owner.ID, project.ID, "library", "second.bin", "application/octet-stream", MaxSpaceStorageBytes, digest, "library/pool-second", "pool-second-token", time.Now().Add(time.Hour))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := database.CreateLibraryUpload(ctx, owner.ID, project.ID, "library", "overflow.bin", "application/octet-stream", 1, digest, "library/pool-overflow", "pool-overflow-token", time.Now().Add(time.Hour)); !errors.Is(err, ErrLibraryQuota) {
+		t.Fatalf("cross-Space overflow = %v, want ErrLibraryQuota", err)
+	}
+	ownerUsage, err := database.OwnerStorageUsage(ctx, owner.ID)
+	if err != nil || ownerUsage.ReservedBytes != FreeStorageBytes || len(ownerUsage.Spaces) != 2 {
+		t.Fatalf("owner pool = %#v, %v", ownerUsage, err)
+	}
+	if err := database.RejectLibraryUpload(ctx, owner.ID, spaces[0].ID, first.ID, "pool-first-token", "invalid", "test_cleanup"); err != nil {
+		t.Fatal(err)
+	}
+	if err := database.RejectLibraryUpload(ctx, owner.ID, project.ID, second.ID, "pool-second-token", "invalid", "test_cleanup"); err != nil {
+		t.Fatal(err)
 	}
 }

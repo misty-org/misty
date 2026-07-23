@@ -93,6 +93,17 @@ func (db *Database) QueueLibraryEditRendition(ctx context.Context, userID, space
 		if !errors.Is(err, sql.ErrNoRows) {
 			return err
 		}
+		var ownerID string
+		if err := tx.QueryRowContext(ctx, `SELECT owner_user_id FROM spaces WHERE id=$1 FOR SHARE`, spaceID).Scan(&ownerID); err != nil {
+			return err
+		}
+		if _, err := tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock(hashtext($1))`, "owner-storage:"+ownerID); err != nil {
+			return err
+		}
+		ownerUsage, err := ownerStorageUsageTx(ctx, tx, ownerID, true)
+		if err != nil {
+			return err
+		}
 		if _, err := tx.ExecContext(ctx, `INSERT INTO space_storage_usage(space_id) VALUES($1) ON CONFLICT DO NOTHING`, spaceID); err != nil {
 			return err
 		}
@@ -100,7 +111,9 @@ func (db *Database) QueueLibraryEditRendition(ctx context.Context, userID, space
 		if err := tx.QueryRowContext(ctx, `SELECT used_bytes,reserved_bytes FROM space_storage_usage WHERE space_id=$1 FOR UPDATE`, spaceID).Scan(&used, &reserved); err != nil {
 			return err
 		}
-		remaining := MaxSpaceStorageBytes - used - reserved
+		_ = used
+		_ = reserved
+		remaining := ownerUsage.RemainingBytes
 		if remaining < minimumLibraryRenditionReserve {
 			return ErrLibraryQuota
 		}

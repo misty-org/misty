@@ -75,14 +75,14 @@ func TestPersonalSpaceStartsPrivateAndBecomesSharedOnlyByInvite(t *testing.T) {
 	if err != nil || secondAdditional.IsPersonal {
 		t.Fatalf("CreateSpace(second additional) = %#v, %v, want success", secondAdditional, err)
 	}
-	if _, err := database.CreateSpace(ctx, owner.ID, "Fourth total"); !errors.Is(err, ErrSpaceOwnershipLimit) {
-		t.Fatalf("CreateSpace(fourth total) error = %v, want ErrSpaceOwnershipLimit", err)
+	if _, err := database.CreateSpace(ctx, owner.ID, "Fourth total"); err != nil {
+		t.Fatalf("CreateSpace(fourth total) error = %v, want unlimited owned Spaces", err)
 	}
 	if err := database.DeleteSpace(ctx, owner.ID, secondAdditional.ID, secondAdditional.Name); err != nil {
 		t.Fatalf("DeleteSpace(second additional) error = %v", err)
 	}
-	if _, err := database.CreateSpace(ctx, owner.ID, "Still fourth total"); !errors.Is(err, ErrSpaceOwnershipLimit) {
-		t.Fatalf("CreateSpace while deletion pending error = %v, want ErrSpaceOwnershipLimit", err)
+	if _, err := database.CreateSpace(ctx, owner.ID, "Still another Space"); err != nil {
+		t.Fatalf("CreateSpace while deletion pending error = %v, want unlimited owned Spaces", err)
 	}
 
 	memberSpaces, err := database.ListSpaces(ctx, member.ID)
@@ -98,8 +98,12 @@ func TestPersonalSpaceStartsPrivateAndBecomesSharedOnlyByInvite(t *testing.T) {
 	if err != nil || !personalAfterInvite.IsShared || personalAfterInvite.PendingCount != 1 {
 		t.Fatalf("Personal after invite = %#v, %v, want shared with one pending", personalAfterInvite, err)
 	}
-	if _, err := database.InviteToSpace(ctx, owner.ID, additional.ID, member.Email); !errors.Is(err, ErrSpaceLimit) {
-		t.Fatalf("InviteToSpace(second owned Space) error = %v, want ErrSpaceLimit", err)
+	secondInvite, err := database.InviteToSpace(ctx, owner.ID, additional.ID, member.Email)
+	if err != nil {
+		t.Fatalf("InviteToSpace(second owned Space) error = %v, want unlimited joined Spaces", err)
+	}
+	if _, err := database.RespondToSpaceInvite(ctx, member.ID, secondInvite.ID, true); err != nil {
+		t.Fatalf("RespondToSpaceInvite(second Space) error = %v", err)
 	}
 
 	if _, err := database.RespondToSpaceInvite(ctx, member.ID, invite.ID, true); err != nil {
@@ -140,6 +144,65 @@ func TestPersonalSpaceStartsPrivateAndBecomesSharedOnlyByInvite(t *testing.T) {
 	}
 	if err := database.DeleteSpace(ctx, owner.ID, personal.ID, personal.Name); !errors.Is(err, ErrSpaceForbidden) {
 		t.Fatalf("DeleteSpace(Personal) error = %v, want ErrSpaceForbidden", err)
+	}
+}
+
+func TestOwnershipTransferRequiresRecipientStorageCapacity(t *testing.T) {
+	database := openTestDatabase(t)
+	ctx := context.Background()
+	owner, err := database.CreateUser("Transfer Owner", "transfer-owner@example.com", "password123")
+	if err != nil {
+		t.Fatal(err)
+	}
+	recipient, err := database.CreateUser("Transfer Recipient", "transfer-recipient@example.com", "password123")
+	if err != nil {
+		t.Fatal(err)
+	}
+	project, err := database.CreateSpace(ctx, owner.ID, "Transfer project")
+	if err != nil {
+		t.Fatal(err)
+	}
+	invite, err := database.InviteToSpace(ctx, owner.ID, project.ID, recipient.Email)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := database.RespondToSpaceInvite(ctx, recipient.ID, invite.ID, true); err != nil {
+		t.Fatal(err)
+	}
+	recipientSpaces, err := database.ListSpaces(ctx, recipient.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var recipientPersonal string
+	for _, space := range recipientSpaces {
+		if space.IsPersonal {
+			recipientPersonal = space.ID
+		}
+	}
+	if recipientPersonal == "" {
+		t.Fatal("recipient personal Space missing")
+	}
+	setUsage := func(spaceID string, used int64) {
+		t.Helper()
+		if err := database.spaceTx(ctx, func(tx *sql.Tx) error {
+			_, err := tx.ExecContext(ctx, `UPDATE space_storage_usage SET used_bytes=$2,version=version+1,updated_at=NOW() WHERE space_id=$1`, spaceID, used)
+			return err
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	setUsage(project.ID, 200_000_000)
+	setUsage(recipientPersonal, 1_900_000_000)
+	if err := database.TransferSpaceOwnership(ctx, owner.ID, project.ID, recipient.ID); !errors.Is(err, ErrLibraryQuota) {
+		t.Fatalf("over-capacity transfer = %v, want ErrLibraryQuota", err)
+	}
+	setUsage(recipientPersonal, 1_700_000_000)
+	if err := database.TransferSpaceOwnership(ctx, owner.ID, project.ID, recipient.ID); err != nil {
+		t.Fatalf("transfer with capacity = %v", err)
+	}
+	transferred, err := database.SpaceByID(ctx, recipient.ID, project.ID)
+	if err != nil || transferred.OwnerUserID != recipient.ID {
+		t.Fatalf("transferred Space = %#v, %v", transferred, err)
 	}
 }
 

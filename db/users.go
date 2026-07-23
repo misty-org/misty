@@ -24,6 +24,7 @@ type User struct {
 	Name                string
 	Username            string
 	Email               string
+	AvatarVersion       int64
 	EmailUpdatesEnabled bool
 	CreatedAt           time.Time
 }
@@ -117,14 +118,50 @@ func (db *Database) UpdateUserName(id, name string) error {
 	return err
 }
 
+func (db *Database) UpdateUserAvatar(id string, png []byte) (int64, error) {
+	var version int64
+	err := db.withRLSContext(context.Background(), userRLSSettings(id), func(tx *sql.Tx) error {
+		return tx.QueryRowContext(
+			context.Background(),
+			`UPDATE users SET avatar_png = $1, avatar_version = avatar_version + 1, avatar_updated_at = NOW() WHERE id = $2 RETURNING avatar_version`,
+			png,
+			id,
+		).Scan(&version)
+	})
+	if err != nil {
+		log.Println("Failed to update user avatar:", err)
+	}
+	return version, err
+}
+
+func (db *Database) GetUserAvatar(id string) ([]byte, int64, error) {
+	var png []byte
+	var version int64
+	err := db.withRLSContext(context.Background(), userRLSSettings(id), func(tx *sql.Tx) error {
+		return tx.QueryRowContext(
+			context.Background(),
+			`SELECT avatar_png, avatar_version FROM users WHERE id = $1 AND avatar_png IS NOT NULL`,
+			id,
+		).Scan(&png, &version)
+	})
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, 0, nil
+	}
+	if err != nil {
+		log.Println("Failed to get user avatar:", err)
+		return nil, 0, err
+	}
+	return png, version, nil
+}
+
 func (db *Database) GetUserByID(id string) (*User, error) {
 	var u User
 	err := db.withRLSContext(context.Background(), userRLSSettings(id), func(tx *sql.Tx) error {
 		return tx.QueryRowContext(
 			context.Background(),
-			`SELECT id, license_id, name, username, email, email_updates_enabled, created_at FROM users WHERE id = $1`,
+			`SELECT id, license_id, name, username, email, avatar_version, email_updates_enabled, created_at FROM users WHERE id = $1`,
 			id,
-		).Scan(&u.ID, &u.LicenseID, &u.Name, &u.Username, &u.Email, &u.EmailUpdatesEnabled, &u.CreatedAt)
+		).Scan(&u.ID, &u.LicenseID, &u.Name, &u.Username, &u.Email, &u.AvatarVersion, &u.EmailUpdatesEnabled, &u.CreatedAt)
 	})
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {

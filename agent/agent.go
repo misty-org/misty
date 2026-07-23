@@ -83,7 +83,7 @@ func (s *Service) CompleteWithToolsContext(ctx context.Context, userID, billingU
 		}
 		if len(requests) == 0 {
 			if completion.Text == "" {
-				return ToolCompletion{}, errors.New("Mika returned neither a result nor a tool request")
+				return ToolCompletion{}, errors.New("the agent returned neither a result nor a tool request")
 			}
 			return completion, nil
 		}
@@ -112,6 +112,21 @@ func (s *Service) CompleteWithTier(userID, prompt, meterName string, tier MikaTi
 }
 
 func (s *Service) CompleteWithTierContext(ctx context.Context, userID, prompt, meterName string, tier MikaTier) (string, UsageSettlement, error) {
+	return s.completeWithProviderContext(ctx, userID, prompt, meterName, resolveMikaProvider(s.provider, NormalizeMikaTier(tier)), NormalizeMikaTier(tier))
+}
+
+func (s *Service) CompleteWithModelContext(ctx context.Context, userID, prompt, meterName, modelID string) (string, UsageSettlement, error) {
+	if !GatewayModelAvailable(ctx, modelID) {
+		return "", UsageSettlement{}, ErrModelUnavailable
+	}
+	provider, err := NewGatewayProviderForModel(modelID)
+	if err != nil {
+		return "", UsageSettlement{}, err
+	}
+	return s.completeWithProviderContext(ctx, userID, prompt, meterName, provider, MikaLow)
+}
+
+func (s *Service) completeWithProviderContext(ctx context.Context, userID, prompt, meterName string, selectedProvider ModelProvider, tier MikaTier) (string, UsageSettlement, error) {
 	prompt = strings.TrimSpace(prompt)
 	if prompt == "" {
 		return "", UsageSettlement{}, ErrInvalidRequest("prompt is required")
@@ -119,9 +134,7 @@ func (s *Service) CompleteWithTierContext(ctx context.Context, userID, prompt, m
 	if len(prompt) > MaxUserMessageBytes {
 		return "", UsageSettlement{}, ErrInvalidRequest("prompt is too large")
 	}
-	tier = NormalizeMikaTier(tier)
 	request := ModelRequest{SessionID: uuid.NewString(), UserID: userID, MikaTier: tier, Mode: ModeAsk, Messages: []Message{{Role: "user", Content: prompt}}}
-	selectedProvider := resolveMikaProvider(s.provider, tier)
 	provider, model := providerStatus(selectedProvider)
 	idempotencyKey := "completion:" + request.SessionID
 	var reservation *UsageReservation
@@ -207,6 +220,19 @@ func (s *Service) CreateSession(userID string) *Session {
 
 func (s *Service) CreateSessionWithBilling(userID, billingUserID string) *Session {
 	return s.store.CreateWithBilling(userID, billingUserID)
+}
+
+func (s *Service) CreateSessionWithModel(userID, billingUserID, modelID string) *Session {
+	return s.store.CreateWithModel(userID, billingUserID, modelID)
+}
+
+func (s *Service) ConfigureSession(sessionID, userID, systemPrompt string, allowTools, allowWriteTools bool) error {
+	return s.store.WithSession(sessionID, userID, func(session *Session) error {
+		session.SystemPrompt = strings.TrimSpace(systemPrompt)
+		session.AllowTools = allowTools
+		session.AllowWriteTools = allowWriteTools
+		return nil
+	})
 }
 
 func (s *Service) CreateSessionForJob(userID, billingUserID, jobID string) *Session {
@@ -308,7 +334,7 @@ func (s *Service) SubmitToolResultsWithTierContext(ctx context.Context, sessionI
 			return ErrInvalidRequest("session is canceled")
 		}
 		if session.ProviderCallsThisTurn >= providerCallLimit(session) {
-			return ErrInvalidRequest("Mika tool step limit reached; send a new message to continue")
+			return ErrInvalidRequest("Agent tool step limit reached; send a new message to continue")
 		}
 		seen := make(map[string]struct{}, len(results))
 		for _, result := range results {
@@ -383,12 +409,13 @@ func (s *Service) Forget(sessionID, userID string) error {
 
 func (s *Service) advanceLocked(ctx context.Context, session *Session) error {
 	if session.ProviderCallsThisTurn >= providerCallLimit(session) {
-		return ErrInvalidRequest("Mika tool step limit reached; send a new message to continue")
+		return ErrInvalidRequest("Agent tool step limit reached; send a new message to continue")
 	}
 	session.ProviderCallsThisTurn++
 	request := ModelRequest{
 		SessionID:    session.ID,
 		UserID:       session.UserID,
+		SystemPrompt: session.SystemPrompt,
 		MikaTier:     session.MikaTier,
 		Mode:         session.Mode,
 		ActiveRoot:   session.ActiveRoot,
@@ -398,9 +425,19 @@ func (s *Service) advanceLocked(ctx context.Context, session *Session) error {
 		KnownPaths:   knownPaths(session),
 	}
 	if requestSizeBytes(request) > MaxProviderRequestBytes {
-		return ErrInvalidRequest("Mika request context is too large; start a new conversation")
+		return ErrInvalidRequest("Agent request context is too large; start a new conversation")
 	}
 	selectedProvider := resolveMikaProvider(s.provider, session.MikaTier)
+	if session.ModelID != "" {
+		if !GatewayModelAvailable(ctx, session.ModelID) {
+			return ErrModelUnavailable
+		}
+		var providerErr error
+		selectedProvider, providerErr = NewGatewayProviderForModel(session.ModelID)
+		if providerErr != nil {
+			return providerErr
+		}
+	}
 	provider, model := providerStatus(selectedProvider)
 	idempotencyKey := fmt.Sprintf("%s:%d", session.ID, session.nextSequence+1)
 	if session.BillingScope != "" {
@@ -427,7 +464,7 @@ func (s *Service) advanceLocked(ctx context.Context, session *Session) error {
 			return err
 		}
 		log.Printf("Mika provider request failed for tier %s: %v", session.MikaTier, err)
-		session.appendEvent(AgentEvent{Type: EventError, Message: "Mika could not complete this request."})
+		session.appendEvent(AgentEvent{Type: EventError, Message: "The agent could not complete this request."})
 		return nil
 	}
 	response.Citations = groundedAgentCitations(request, response.Citations)
@@ -441,17 +478,33 @@ func (s *Service) advanceLocked(ctx context.Context, session *Session) error {
 	}
 	if strings.TrimSpace(response.Text) != "" {
 		session.Messages = append(session.Messages, Message{Role: "assistant", Content: response.Text})
-		session.appendEvent(AgentEvent{Type: EventAssistantMessage, Text: response.Text, Citations: response.Citations, CreditsUsed: settlement.CreditsUsed, CreditsRemaining: settlement.CreditsRemaining})
+		resetAt := settlement.ResetAt
+		session.appendEvent(AgentEvent{Type: EventAssistantMessage, Text: response.Text, Citations: response.Citations, HostedAIUsedRatio: settlement.UsedRatio, HostedAIResetAt: &resetAt})
 	}
 	if len(response.ToolRequests) > 0 {
 		if session.ProviderCallsThisTurn >= providerCallLimit(session) {
 			clear(session.PendingToolRequests)
-			session.appendEvent(AgentEvent{Type: EventError, Message: "Mika reached the tool step limit. Send a new message to continue."})
+			session.appendEvent(AgentEvent{Type: EventError, Message: "The agent reached the tool step limit. Send a new message to continue."})
 			return nil
 		}
 		requests, rejected := authorizeToolRequests(session.Capabilities, response.ToolRequests)
+		if !session.AllowTools {
+			rejected += len(requests)
+			requests = nil
+		}
+		if !session.AllowWriteTools {
+			filtered := requests[:0]
+			for _, request := range requests {
+				if request.Risk == RiskRead {
+					filtered = append(filtered, request)
+				} else {
+					rejected++
+				}
+			}
+			requests = filtered
+		}
 		if rejected > 0 {
-			session.appendEvent(AgentEvent{Type: EventError, Message: "Mika requested a tool outside the allowed capability envelope."})
+			session.appendEvent(AgentEvent{Type: EventError, Message: "The agent requested a tool outside the allowed capability envelope."})
 		}
 		requests = s.policy.Apply(session.Mode, requests)
 		if len(requests) > MaxToolResultsPerRequest {

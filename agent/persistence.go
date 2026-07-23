@@ -36,6 +36,10 @@ type persistedSessionState struct {
 	UserID                string            `json:"userId"`
 	BillingUserID         string            `json:"billingUserId"`
 	BillingScope          string            `json:"billingScope"`
+	ModelID               string            `json:"modelId,omitempty"`
+	SystemPrompt          string            `json:"systemPrompt,omitempty"`
+	AllowTools            *bool             `json:"allowTools,omitempty"`
+	AllowWriteTools       *bool             `json:"allowWriteTools,omitempty"`
 	MikaTier              MikaTier          `json:"mikaTier"`
 	Mode                  string            `json:"mode"`
 	Capabilities          ToolManifest      `json:"capabilities"`
@@ -56,11 +60,17 @@ var (
 )
 
 func marshalPersistentSession(session *Session) (json.RawMessage, error) {
+	allowWrite := session.AllowWriteTools
+	allowTools := session.AllowTools
 	state := persistedSessionState{
 		ID:                    session.ID,
 		UserID:                session.UserID,
 		BillingUserID:         session.BillingUserID,
 		BillingScope:          session.BillingScope,
+		ModelID:               session.ModelID,
+		SystemPrompt:          session.SystemPrompt,
+		AllowTools:            &allowTools,
+		AllowWriteTools:       &allowWrite,
 		MikaTier:              session.MikaTier,
 		Mode:                  session.Mode,
 		Capabilities:          session.Capabilities,
@@ -94,11 +104,23 @@ func unmarshalPersistentSession(raw json.RawMessage, expectedID, expectedUserID 
 	if state.BillingUserID == "" {
 		state.BillingUserID = state.UserID
 	}
+	allowWrite := true
+	allowTools := true
+	if state.AllowTools != nil {
+		allowTools = *state.AllowTools
+	}
+	if state.AllowWriteTools != nil {
+		allowWrite = *state.AllowWriteTools
+	}
 	return &Session{
 		ID:                    state.ID,
 		UserID:                state.UserID,
 		BillingUserID:         state.BillingUserID,
 		BillingScope:          state.BillingScope,
+		ModelID:               state.ModelID,
+		SystemPrompt:          state.SystemPrompt,
+		AllowTools:            allowTools,
+		AllowWriteTools:       allowWrite,
 		MikaTier:              state.MikaTier,
 		Mode:                  state.Mode,
 		Capabilities:          state.Capabilities,

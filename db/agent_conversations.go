@@ -82,11 +82,14 @@ func (db *Database) SaveAgentSession(ctx context.Context, conversationID, userID
 // AgentSessionSummary is the listing shape: enough to render a session rail
 // without loading conversation state or events.
 type AgentSessionSummary struct {
-	ID        string    `json:"id"`
-	Title     string    `json:"title"`
-	Active    bool      `json:"active"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	ID              string    `json:"id"`
+	Title           string    `json:"title"`
+	Active          bool      `json:"active"`
+	PersonalAgentID string    `json:"agent_id,omitempty"`
+	SpaceID         string    `json:"space_id,omitempty"`
+	ModelID         string    `json:"model_id,omitempty"`
+	CreatedAt       time.Time `json:"created_at"`
+	UpdatedAt       time.Time `json:"updated_at"`
 }
 
 // ListAgentSessions returns the account's retained sessions, newest first.
@@ -97,7 +100,7 @@ func (db *Database) ListAgentSessions(ctx context.Context, userID string) ([]Age
 	items := []AgentSessionSummary{}
 	err := db.withRLSContext(ctx, userRLSSettings(userID), func(tx *sql.Tx) error {
 		rows, err := tx.QueryContext(ctx, `
-			SELECT id, title, active_until > NOW(), created_at, updated_at
+			SELECT id, title, active_until > NOW(), COALESCE(personal_agent_id,''), COALESCE(space_id,''), model_id, created_at, updated_at
 			FROM agent_conversations
 			WHERE user_id = $1 AND deleted_at IS NULL
 			ORDER BY updated_at DESC
@@ -108,7 +111,7 @@ func (db *Database) ListAgentSessions(ctx context.Context, userID string) ([]Age
 		defer rows.Close()
 		for rows.Next() {
 			var item AgentSessionSummary
-			if err := rows.Scan(&item.ID, &item.Title, &item.Active, &item.CreatedAt, &item.UpdatedAt); err != nil {
+			if err := rows.Scan(&item.ID, &item.Title, &item.Active, &item.PersonalAgentID, &item.SpaceID, &item.ModelID, &item.CreatedAt, &item.UpdatedAt); err != nil {
 				return err
 			}
 			items = append(items, item)
@@ -116,6 +119,65 @@ func (db *Database) ListAgentSessions(ctx context.Context, userID string) ([]Age
 		return rows.Err()
 	})
 	return items, err
+}
+
+func (db *Database) BindAgentSessionContext(ctx context.Context, userID, conversationID, agentID, spaceID, modelID, catalogVersion string) error {
+	return db.withRLSContext(ctx, userRLSSettings(userID), func(tx *sql.Tx) error {
+		result, err := tx.ExecContext(ctx, `UPDATE agent_conversations SET personal_agent_id=NULLIF($1,''),space_id=NULLIF($2,''),model_id=$3,model_catalog_version=$4,updated_at=NOW() WHERE id=$5 AND user_id=$6 AND deleted_at IS NULL`, agentID, spaceID, modelID, catalogVersion, conversationID, userID)
+		if err != nil {
+			return err
+		}
+		rows, err := result.RowsAffected()
+		if err != nil {
+			return err
+		}
+		if rows == 0 {
+			return serveragent.ErrPersistedSessionNotFound
+		}
+		return nil
+	})
+}
+
+// ValidateAgentSpaceAccess checks the permissions required to create a Space-
+// scoped Agent session. Personal Agent sessions additionally require a current
+// owner or sharing grant for the Agent in that Space.
+func (db *Database) ValidateAgentSpaceAccess(ctx context.Context, userID, spaceID, agentID string) error {
+	return db.spaceTx(ctx, func(tx *sql.Tx) error {
+		return validateAgentSpaceAccessTx(ctx, tx, userID, spaceID, agentID)
+	})
+}
+
+// ValidateAgentSessionAccess revalidates a persisted session's Space access.
+// This must run before every operation that can read context or continue a run,
+// because Space membership, permissions, and Agent grants can change after the
+// session was created.
+func (db *Database) ValidateAgentSessionAccess(ctx context.Context, userID, conversationID string) error {
+	return db.spaceTx(ctx, func(tx *sql.Tx) error {
+		var agentID, spaceID string
+		err := tx.QueryRowContext(ctx, `
+			SELECT COALESCE(personal_agent_id, ''), COALESCE(space_id, '')
+			FROM agent_conversations
+			WHERE id=$1 AND user_id=$2 AND deleted_at IS NULL
+		`, conversationID, userID).Scan(&agentID, &spaceID)
+		if errors.Is(err, sql.ErrNoRows) {
+			return serveragent.ErrPersistedSessionNotFound
+		}
+		if err != nil || spaceID == "" {
+			return err
+		}
+		return validateAgentSpaceAccessTx(ctx, tx, userID, spaceID, agentID)
+	})
+}
+
+func validateAgentSpaceAccessTx(ctx context.Context, tx *sql.Tx, userID, spaceID, agentID string) error {
+	if agentID != "" {
+		_, err := personalAgentAllowedTx(ctx, tx, userID, spaceID, agentID)
+		return err
+	}
+	if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionMessagesRead); err != nil {
+		return err
+	}
+	return requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionAgentsRun)
 }
 
 // RenameAgentSession sets the human-facing label. Clients derive a first title

@@ -29,16 +29,17 @@ func buildAgentPrompt(request ModelRequest) string {
 func buildAgentPromptWithImages(request ModelRequest) (string, []agentPromptImage) {
 	request, images := sanitizeAgentPromptImages(request)
 	payload := map[string]any{
-		"session_id":    request.SessionID,
-		"mode":          request.Mode,
-		"active_root":   request.ActiveRoot,
-		"messages":      request.Messages,
-		"tool_results":  request.ToolResults,
-		"capabilities":  request.Capabilities,
-		"known_paths":   request.KnownPaths,
-		"allowed_ops":   []string{"mkdir", "move", "rename"},
-		"blocked_ops":   []string{"delete", "overwrite", "shell", "outside_root"},
-		"response_rule": "Return one JSON object that matches the required schema. Do not include markdown. When no file plan is ready, return file_plan with empty summary/completion_summary strings and empty operations/warnings arrays. Cite document-derived claims using citations and the exact source fields supplied by preview_file.",
+		"session_id":                     request.SessionID,
+		"agent_instructions_and_context": request.SystemPrompt,
+		"mode":                           request.Mode,
+		"active_root":                    request.ActiveRoot,
+		"messages":                       request.Messages,
+		"tool_results":                   request.ToolResults,
+		"capabilities":                   request.Capabilities,
+		"known_paths":                    request.KnownPaths,
+		"allowed_ops":                    []string{"mkdir", "move", "rename"},
+		"blocked_ops":                    []string{"delete", "overwrite", "shell", "outside_root"},
+		"response_rule":                  "Return one JSON object that matches the required schema. Do not include markdown. When no file plan is ready, return file_plan with empty summary/completion_summary strings and empty operations/warnings arrays. Cite document-derived claims using citations and the exact source fields supplied by preview_file.",
 	}
 	encoded, _ := json.MarshalIndent(payload, "", "  ")
 	return fmt.Sprintf(`You are MistyAI, the private assistant inside Misty, a desktop file manager.

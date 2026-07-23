@@ -92,7 +92,7 @@ func (s *SpacesService) MikaDelegation() http.HandlerFunc {
 			writeSpaceError(w, err)
 			return
 		}
-		trace := fmt.Sprintf("Mika assigned this task to %s in %s.", decision.Selected.AgentName, decision.Selected.SpaceName)
+		trace := fmt.Sprintf("The agent system assigned this task to %s in %s.", decision.Selected.AgentName, decision.Selected.SpaceName)
 		if run.State == "awaiting_approval" {
 			writeJSON(w, http.StatusAccepted, map[string]any{"status": "awaiting_approval", "trace": trace, "routing": decision, "run": run})
 			return
@@ -703,7 +703,7 @@ func publishCanonicalRunResponse(ctx context.Context, database *db.Database, run
 		}
 	case "mika":
 		if runtime == nil {
-			err = errors.New("Mika runtime is unavailable")
+			err = errors.New("Agent runtime is unavailable")
 		} else {
 			_, err = runtime.AppendExternalAssistantMessage(ctx, run.SourceConversationID, userID, run.ID, text)
 		}

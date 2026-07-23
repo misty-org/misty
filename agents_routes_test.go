@@ -22,7 +22,10 @@ func TestAgentRoutesRequireAuthentication(t *testing.T) {
 	}
 	for _, path := range []string{
 		"/api/devices",
+		"/api/agents",
+		"/api/agents/jobs",
 		"/api/agents/catalog",
+		"/api/ai/models",
 		"/api/agent-conversations",
 		"/api/spaces/space-1/tasks",
 		"/api/spaces/space-1/calendar/events",
@@ -33,14 +36,6 @@ func TestAgentRoutesRequireAuthentication(t *testing.T) {
 		server.Router.ServeHTTP(rec, req)
 		if rec.Code != http.StatusUnauthorized {
 			t.Fatalf("GET %s status = %d, want 401", path, rec.Code)
-		}
-	}
-	for _, path := range []string{"/api/agents", "/api/agents/jobs"} {
-		req := httptest.NewRequest(http.MethodGet, path, nil)
-		rec := httptest.NewRecorder()
-		server.Router.ServeHTTP(rec, req)
-		if rec.Code != http.StatusNotFound {
-			t.Fatalf("legacy GET %s status = %d, want 404", path, rec.Code)
 		}
 	}
 }

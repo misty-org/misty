@@ -192,7 +192,7 @@ func (s *SpacesService) executeWorkflowNodeV2(ctx context.Context, run *db.Space
 			return normalizeContentPage(run, prepared)
 		case "agent_task":
 			if s.agent == nil {
-				return nil, errors.New("Mika runtime is unavailable")
+				return nil, errors.New("Agent runtime is unavailable")
 			}
 			var config struct {
 				Instructions string `json:"instructions"`

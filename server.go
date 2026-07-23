@@ -189,6 +189,8 @@ func (s *Server) MountHandlers() error {
 	// Dashboard — authenticated endpoints
 	s.Router.Get("/me", api.GetMe(s.Database))
 	s.Router.Put("/me/profile", api.UpdateProfile(s.Database))
+	s.Router.MethodFunc(http.MethodGet, "/me/avatar", api.UserAvatar(s.Database))
+	s.Router.MethodFunc(http.MethodPut, "/me/avatar", api.UserAvatar(s.Database))
 	s.Router.Put("/me/device", api.UpdateDevice(s.Database))
 	s.Router.Get("/me/settings", api.GetSettings(s.Database))
 	s.Router.Put("/me/settings", api.UpdateSettings(s.Database))
@@ -218,6 +220,8 @@ func (s *Server) MountHandlers() error {
 	s.Router.Post("/api/waitlist", waitlistJoinHandler)
 	s.Router.Get("/api/me", api.GetMe(s.Database))
 	s.Router.Put("/api/me/profile", api.UpdateProfile(s.Database))
+	s.Router.MethodFunc(http.MethodGet, "/api/me/avatar", api.UserAvatar(s.Database))
+	s.Router.MethodFunc(http.MethodPut, "/api/me/avatar", api.UserAvatar(s.Database))
 	s.Router.Put("/api/me/device", api.UpdateDevice(s.Database))
 	s.Router.Get("/api/me/settings", api.GetSettings(s.Database))
 	s.Router.Put("/api/me/settings", api.UpdateSettings(s.Database))
@@ -249,6 +253,7 @@ func (s *Server) MountHandlers() error {
 }
 
 func (s *Server) mountLibraryRoutes(prefix string, library *api.SpaceLibraryService) {
+	s.Router.MethodFunc(http.MethodGet, prefix+"/search/spaces", library.GlobalSemanticSearch())
 	s.Router.MethodFunc(http.MethodGet, prefix+"/spaces/{spaceID}/library", library.Items())
 	s.Router.MethodFunc(http.MethodGet, prefix+"/spaces/{spaceID}/library/facets", library.Facets())
 	s.Router.MethodFunc(http.MethodGet, prefix+"/spaces/{spaceID}/library/search/semantic", library.SemanticSearch())
@@ -328,6 +333,7 @@ func (s *Server) mountSpacesRoutes(prefix string, spaces *api.SpacesService, rea
 	s.Router.MethodFunc(http.MethodPatch, prefix+"/spaces/{spaceID}", spaces.Space())
 	s.Router.MethodFunc(http.MethodDelete, prefix+"/spaces/{spaceID}", spaces.Space())
 	s.Router.Get(prefix+"/spaces/{spaceID}/members", spaces.Members())
+	s.Router.Get(prefix+"/spaces/{spaceID}/members/{userID}/avatar", spaces.MemberAvatar())
 	s.Router.Post(prefix+"/spaces/{spaceID}/invitations", spaces.Invite())
 	s.Router.Post(prefix+"/spaces/invitations/{inviteID}/accept", spaces.RespondInvite(true))
 	s.Router.Post(prefix+"/spaces/invitations/{inviteID}/decline", spaces.RespondInvite(false))
@@ -467,6 +473,14 @@ func (s *Server) CleanupExpiredLibraryData(ctx context.Context, limit int) (int,
 }
 
 func (s *Server) mountAgentsRoutes(prefix string, service *api.AgentsService) {
+	s.Router.MethodFunc(http.MethodGet, prefix+"/agents", service.PersonalAgents())
+	s.Router.MethodFunc(http.MethodPost, prefix+"/agents", service.PersonalAgents())
+	s.Router.MethodFunc(http.MethodGet, prefix+"/agents/{agentID}", service.PersonalAgent())
+	s.Router.MethodFunc(http.MethodPatch, prefix+"/agents/{agentID}", service.PersonalAgent())
+	s.Router.MethodFunc(http.MethodDelete, prefix+"/agents/{agentID}", service.PersonalAgent())
+	s.Router.MethodFunc(http.MethodGet, prefix+"/agents/{agentID}/space-grants", service.PersonalAgentGrants())
+	s.Router.MethodFunc(http.MethodPut, prefix+"/agents/{agentID}/space-grants", service.PersonalAgentGrants())
+	s.Router.MethodFunc(http.MethodGet, prefix+"/ai/models", service.Models())
 	if !serverFeatureEnabled("MISTY_DEVICE_JOBS_ENABLED") {
 		return
 	}

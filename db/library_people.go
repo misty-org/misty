@@ -141,7 +141,7 @@ func (db *Database) UpdateLibraryIntelligencePolicy(ctx context.Context, userID,
 			}
 			payload, _ := json.Marshal(map[string]bool{"ai": aiEnabled, "semantic": semanticSearch})
 			for _, target := range targets {
-				if _, err := tx.ExecContext(ctx, `INSERT INTO library_processing_jobs(id,security_domain_id,space_id,job_kind,target_kind,target_id,payload,priority) VALUES($1,$2,$3,'ai','space_library_item',$4,$5,4) ON CONFLICT(job_kind,target_kind,target_id) DO UPDATE SET payload=EXCLUDED.payload,state=CASE WHEN library_processing_jobs.state IN ('leased','running') THEN library_processing_jobs.state ELSE 'queued' END,error_code=NULL,available_at=NOW(),updated_at=NOW()`, "job_"+uuid.NewString(), target.domainID, spaceID, target.itemID, payload); err != nil {
+				if _, err := tx.ExecContext(ctx, `INSERT INTO library_processing_jobs(id,security_domain_id,space_id,job_kind,target_kind,target_id,payload,priority,billing_user_id) VALUES($1,$2,$3,'ai','space_library_item',$4,$5,4,$6) ON CONFLICT(job_kind,target_kind,target_id) DO UPDATE SET payload=EXCLUDED.payload,billing_user_id=EXCLUDED.billing_user_id,state=CASE WHEN library_processing_jobs.state IN ('leased','running') THEN library_processing_jobs.state ELSE 'queued' END,error_code=NULL,available_at=NOW(),updated_at=NOW()`, "job_"+uuid.NewString(), target.domainID, spaceID, target.itemID, payload, userID); err != nil {
 					return err
 				}
 			}
