@@ -89,11 +89,15 @@ export function useDesktopFrameStyle() {
       "--misty-runtime-surface-raised": appRaisedSurfaceBackground,
       "--misty-runtime-surface-hover": appHoverSurfaceBackground,
       "--misty-runtime-sidebar-selected": appSelectedSurfaceBackground,
-      "--misty-runtime-popover": appBackground,
+      // Popovers, dropdowns, selects, context menus and dialogs stack above
+      // everything, so they must stay fully opaque regardless of the panel
+      // opacity / wallpaper — otherwise the background bleeds through them.
+      "--misty-runtime-popover": "var(--misty-bg)",
       "--misty-app-frame-bg": "var(--misty-frame-background)",
       "--misty-app-page-bg": appSurfaceBackground,
       "--misty-app-shell-bg": appSurfaceBackground,
       "--misty-app-nav-bg": "var(--misty-frame-navigation)",
+      "--misty-app-titlebar-bg": appBackground,
       "--misty-app-route-bg": appBackground,
       "--misty-app-panel-bg": "var(--misty-component-surface)",
       "--misty-app-pane-bg": appSurfaceBackground,
@@ -101,7 +105,7 @@ export function useDesktopFrameStyle() {
       "--misty-app-surface-soft-bg": appRaisedSurfaceBackground,
       "--misty-app-tab-bg": appSurfaceBackground,
       "--misty-app-tab-active-bg": appSurfaceBackground,
-      "--misty-app-modal-bg": appBackground,
+      "--misty-app-modal-bg": "var(--misty-bg)",
       ...wallpaperFrameVars,
     } as unknown as CSSProperties;
   }, [appWallpaperSrc, appearancePreferences.panelOpacity]);

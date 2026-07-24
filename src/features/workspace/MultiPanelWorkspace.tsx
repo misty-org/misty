@@ -273,7 +273,12 @@ export const MultiPanelWorkspace = memo(function MultiPanelWorkspace(
           paneId: tab.activePaneId,
         }))}
         activeTabId={activeTabId}
-        canCloseTab={() => tabs.length > 1}
+        canCloseTab={(tab) => {
+          const matchingTab = tabs.find((candidate) => candidate.id === tab.id);
+          return Boolean(
+            tabs.length > 1 && matchingTab && (!canCloseTab || canCloseTab(matchingTab)),
+          );
+        }}
         onSelectTab={selectTab}
         onCloseTab={(tab) => {
           const matchingTab = tabs.find((candidate) => candidate.id === tab.id);

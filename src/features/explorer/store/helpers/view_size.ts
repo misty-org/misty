@@ -146,7 +146,7 @@ export function titleFromPath(path: string): string {
   if (path === "misty://starred") return "Starred";
   if (path === "misty://trash") return "Trash";
   if (path === "misty://local") return "Local";
-  const clean = path.replace(/\/+$/, "");
+  const clean = H.normalizedPath(path);
   return clean.split("/").filter(Boolean).pop() || clean || "Home";
 }
 

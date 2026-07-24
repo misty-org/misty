@@ -1,10 +1,4 @@
-import { Button } from "@/ui";
-import { Tabs } from "@sinm/react-chrome-tabs";
-import type { TabProperties } from "@sinm/react-chrome-tabs/dist/chrome-tabs";
-import { Plus } from "lucide-react";
-import { memo, useEffect, useMemo, useRef, type ReactNode } from "react";
-import { useExplorerDropRegistry } from "@/features/explorer/drag/ExplorerDragContext";
-import { createExplorerDropTargetSpec } from "@/features/explorer/drag/ExplorerDropTarget";
+import type { ReactNode } from "react";
 
 export interface ChromeTabStripTab {
   id: string;

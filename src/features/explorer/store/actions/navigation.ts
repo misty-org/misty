@@ -80,6 +80,7 @@ export function createNavigationActions(
 ): Partial<ExplorerStore> {
   return {
     loadPane: (paneId, path, mode = "push", options) => {
+      path = H.normalizedPath(path);
       if (H.isExplorerInternalTabPath(path)) {
         set((state) => ({
           panes: {
@@ -176,11 +177,13 @@ export function createNavigationActions(
         });
         try {
           const listing = H.sortListing(
-            await explorerListDirectory({
-              path,
-              showHidden: H.showHiddenForPane(get(), paneId),
-              forceRemoteRefresh: options?.forceRemoteRefresh,
-            }),
+            H.normalizeDirectoryListingPaths(
+              await explorerListDirectory({
+                path,
+                showHidden: H.showHiddenForPane(get(), paneId),
+                forceRemoteRefresh: options?.forceRemoteRefresh,
+              }),
+            ),
             H.sortForPane(get(), paneId),
             get().directorySizes,
           );

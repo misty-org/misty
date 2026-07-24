@@ -44,6 +44,7 @@ import {
   desktopTitlebarClass,
   desktopTitlebarDoubleClickLayerClass,
   desktopTitlebarTitleClass,
+  desktopWallpaperLayerClass,
   navbarBottomClass,
   navbarGroupClass,
   tabletFrameClass,
@@ -210,7 +211,7 @@ export function DesktopLayout(props: {
       style={desktopFrameStyle}
     >
       {appWallpaperSrc ? (
-        <div aria-hidden="true" className="pointer-events-none fixed inset-0 z-0 overflow-hidden">
+        <div aria-hidden="true" className={desktopWallpaperLayerClass}>
           {appWallpaperIsVideo ? (
             <AppWallpaperVideo src={appWallpaperSrc} />
           ) : (

@@ -10,6 +10,10 @@ import type {
   MultiPanelPane,
   MultiPanelTab,
 } from "@/models/interfaces/workspace";
+import {
+  explorerPathName,
+  normalizeExplorerPath,
+} from "@/features/explorer/utils/pathNormalization";
 
 const maxPanesPerTab = 4;
 
@@ -130,16 +134,17 @@ export function createMultiPanelStore(options: MultiPanelStoreOptions = {}) {
     },
 
     updateActiveTabPath: (paneId, path, title) => {
+      const normalizedPath = normalizeExplorerPath(path);
       set((state) => {
         let changed = false;
         const tabs = state.tabs.map((tab) => {
           const pane = tab.panes.find((candidate) => candidate.id === paneId);
           if (!pane) return tab;
-          const nextTitle = title ?? titleFromPath(path);
+          const nextTitle = title ?? titleFromPath(normalizedPath);
           const nextTabTitle = tab.activePaneId === paneId ? nextTitle : tab.title;
-          const nextTabPath = tab.activePaneId === paneId ? path : tab.path;
+          const nextTabPath = tab.activePaneId === paneId ? normalizedPath : tab.path;
           if (
-            pane.path === path &&
+            pane.path === normalizedPath &&
             pane.title === nextTitle &&
             tab.title === nextTabTitle &&
             tab.path === nextTabPath
@@ -152,7 +157,9 @@ export function createMultiPanelStore(options: MultiPanelStoreOptions = {}) {
             title: nextTabTitle,
             path: nextTabPath,
             panes: tab.panes.map((candidate) =>
-              candidate.id === paneId ? { ...candidate, path, title: nextTitle } : candidate,
+              candidate.id === paneId
+                ? { ...candidate, path: normalizedPath, title: nextTitle }
+                : candidate,
             ),
           };
         });
@@ -404,11 +411,12 @@ function normalizedIdPrefix(value: string): string {
 }
 
 function createTab(id: string, paneId: string, path: string, title: string): MultiPanelTab {
+  const normalizedPath = normalizeExplorerPath(path);
   return {
     id,
     title,
-    path,
-    panes: [createPane(paneId, path, title)],
+    path: normalizedPath,
+    panes: [createPane(paneId, normalizedPath, title)],
     activePaneId: paneId,
     layout: defaultLayout("vertical", [paneId]),
     mode: "browse",
@@ -418,7 +426,7 @@ function createTab(id: string, paneId: string, path: string, title: string): Mul
 }
 
 function createPane(id: string, path: string, title: string): MultiPanelPane {
-  return { id, path, title };
+  return { id, path: normalizeExplorerPath(path), title };
 }
 
 function normalizeSnapshot(snapshot: {
@@ -460,7 +468,10 @@ function normalizeSnapshot(snapshot: {
 }
 
 function normalizeTab(tab: MultiPanelTab): MultiPanelTab | null {
-  let panes = tab.panes.filter(validPane).slice(0, maxPanesPerTab);
+  let panes = tab.panes
+    .filter(validPane)
+    .slice(0, maxPanesPerTab)
+    .map((pane) => ({ ...pane, path: normalizeExplorerPath(pane.path) }));
   if (panes.length === 0) return null;
   if (panes.length > 1) {
     const preferredPane = panes.find((pane) => pane.id === tab.activePaneId) ?? panes[0];
@@ -477,7 +488,7 @@ function normalizeTab(tab: MultiPanelTab): MultiPanelTab | null {
     ...tab,
     mode: "browse",
     title: tab.title || activePane.title,
-    path: tab.path || activePane.path,
+    path: normalizeExplorerPath(tab.path || activePane.path),
     panes,
     activePaneId,
     sidebarVisible: tab.sidebarVisible ?? true,
@@ -612,7 +623,7 @@ function normalizeClosedPanes(
     if (isClosedPane(value)) {
       if (!validPane(value.pane)) continue;
       normalized.push({
-        pane: value.pane,
+        pane: { ...value.pane, path: normalizeExplorerPath(value.pane.path) },
         tabId: value.tabId || fallbackTabId,
         restoreMode: value.restoreMode === "new_lane" ? "new_lane" : "same_lane",
         laneIndex: validIndex(value.laneIndex),
@@ -620,7 +631,7 @@ function normalizeClosedPanes(
       });
     } else if (validPane(value)) {
       normalized.push({
-        pane: value,
+        pane: { ...value, path: normalizeExplorerPath(value.path) },
         tabId: fallbackTabId,
         restoreMode: "same_lane",
         laneIndex: -1,
@@ -723,6 +734,5 @@ function titleFromPath(path: string): string {
   if (path === "misty://recent") return "Recent";
   if (path === "misty://starred") return "Starred";
   if (path === "misty://trash") return "Trash";
-  const clean = path.replace(/\/+$/, "");
-  return clean.split("/").filter(Boolean).pop() || clean || "Home";
+  return explorerPathName(path) || "Home";
 }

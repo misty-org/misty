@@ -88,7 +88,10 @@ export const workStatusPulseClass =
 export const workStatusToastDurationMs = 3500;
 
 export const desktopTitlebarClass =
-  "group/titlebar relative z-10 col-span-full row-start-1 h-full select-none border-b border-transparent bg-[var(--misty-app-nav-bg,var(--misty-bg))]";
+  "group/titlebar relative z-10 col-span-full row-start-1 h-full select-none border-b border-transparent bg-[var(--misty-app-titlebar-bg,var(--misty-bg))]";
+
+export const desktopWallpaperLayerClass =
+  "pointer-events-none absolute inset-0 z-0 col-span-full row-span-full overflow-hidden";
 
 export const desktopTitlebarTitleClass = [
   "pointer-events-none absolute inset-x-[112px] top-0 flex h-full min-w-0 items-center justify-center truncate",
