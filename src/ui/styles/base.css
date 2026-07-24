@@ -11,6 +11,11 @@
 
 /* The app wallpaper is decorative. WebKit may briefly expose native media
    chrome when its autoplay session is rebuilt after a window/app resume. */
+.misty-app-wallpaper-video {
+  pointer-events: none;
+  -webkit-appearance: none;
+}
+
 .misty-app-wallpaper-video::-webkit-media-controls {
   display: none !important;
   -webkit-appearance: none;
@@ -32,6 +37,11 @@
 }
 
 .misty-app-wallpaper-video::-webkit-media-controls-start-playback-button {
+  display: none !important;
+  -webkit-appearance: none;
+}
+
+.misty-app-wallpaper-video::-webkit-media-controls-overlay-play-button {
   display: none !important;
   -webkit-appearance: none;
 }

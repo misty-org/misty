@@ -65,6 +65,7 @@ import {
 import { useOperationQueueStore } from "@/stores/explorer";
 import { useTransfersStore } from "@/stores/transfers";
 import { clipboardImagePng } from "../../utils/clipboardImage";
+import { explorerPathKey, normalizeExplorerPath } from "../../utils/pathNormalization";
 
 import type {
   NavigationMode,
@@ -251,13 +252,23 @@ export function fileEntriesEqual(left: FileEntry, right: FileEntry): boolean {
 }
 
 export function samePath(left: string, right: string): boolean {
-  return H.normalizedPath(left) === H.normalizedPath(right);
+  return explorerPathKey(left) === explorerPathKey(right);
 }
 
 export function normalizedPath(path: string): string {
-  if (path.startsWith("misty://")) return path.replace(/\/+$/, "");
-  const normalized = path.replace(/\/+$/, "");
-  return normalized || "/";
+  return normalizeExplorerPath(path) || "/";
+}
+
+export function normalizeDirectoryListingPaths(listing: DirectoryListing): DirectoryListing {
+  return {
+    ...listing,
+    path: normalizeExplorerPath(listing.path),
+    parentPath: listing.parentPath ? normalizeExplorerPath(listing.parentPath) : null,
+    entries: listing.entries.map((entry) => ({
+      ...entry,
+      path: normalizeExplorerPath(entry.path),
+    })),
+  };
 }
 
 export function libraryItemFromEntry(entry: FileEntry): ExplorerLibraryItem {

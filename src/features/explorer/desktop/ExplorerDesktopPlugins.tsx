@@ -26,6 +26,8 @@ import type {
   PluginPanelRenderResult,
   TransferRecord,
 } from "@/models/interfaces/services/misty-api";
+import type { MultiPanelTab } from "@/models/interfaces/workspace";
+import type { MultiPanelStoreHook } from "@/models/types/workspace/useMultiPanelStore";
 import { useMultiPanelStore } from "@/features/workspace";
 import { useMinimumSpin } from "@/hooks/useMinimumSpin";
 import { errorText } from "@/lib/format";
@@ -661,6 +663,27 @@ export function isRemotesTabPath(path: string): boolean {
 
 export function isChromeTabPath(path: string): boolean {
   return isTransfersTabPath(path) || isRemotesTabPath(path);
+}
+
+export function canCloseExplorerTab(tab: MultiPanelTab, tabs: MultiPanelTab[]): boolean {
+  if (isChromeTabPath(tab.path)) return true;
+  return tabs.some((candidate) => candidate.id !== tab.id && !isChromeTabPath(candidate.path));
+}
+
+export function ensureFilesBrowseTab(
+  fallbackPath: string,
+  store: MultiPanelStoreHook = useMultiPanelStore,
+): boolean {
+  const path = fallbackPath.trim();
+  if (!path || isChromeTabPath(path)) return false;
+
+  const workspace = store.getState();
+  if (workspace.tabs.length === 0 || workspace.tabs.some((tab) => !isChromeTabPath(tab.path))) {
+    return false;
+  }
+
+  workspace.addTab(path, "Home");
+  return true;
 }
 
 export function canOpenTerminalPath(path: string): boolean {
