@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { Outlet, useNavigate } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
+import { platform as osPlatform } from "@tauri-apps/plugin-os";
 import { AuthProvider } from "@/features/auth/AuthContext";
 import { PointerDragProvider } from "@/features/dnd/PointerDragContext";
 import { RenderErrorBoundary } from "@/layouts/RenderErrorBoundary";
@@ -9,6 +10,7 @@ import { installMistyDeepLinkHandler } from "../routing/deepLinks";
 import { useAppZoom } from "@/hooks/useAppZoom";
 import { useDocumentAppAppearance } from "@/hooks/useDocumentAppAppearance";
 import { isNativeMobileBuild } from "@/platform/buildTarget";
+import { hasTauriInternals } from "@/platform/tauri";
 
 export function RootLayout(props: {
   isDeepLinkRouteAllowed: (route: string) => boolean;
@@ -36,6 +38,15 @@ export function RootLayout(props: {
 
   useEffect(() => {
     document.documentElement.dataset.formFactor = isNativeMobileBuild ? "mobile" : "desktop";
+  }, []);
+
+  useEffect(() => {
+    if (!hasTauriInternals()) return;
+    try {
+      document.documentElement.dataset.osPlatform = osPlatform();
+    } catch {
+      // Platform detection is best-effort; leave the attribute unset.
+    }
   }, []);
 
   useEffect(() => {
