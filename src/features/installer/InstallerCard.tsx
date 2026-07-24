@@ -94,7 +94,7 @@ export function InstallerCard({
   const [updatesSpinning, startUpdatesSpin] = useMinimumSpin(releasesLoading);
   const selectedVersion = useSetupStore((state) => state.selectedVersion);
   const latestVersion = releases[0]?.version ?? selectedVersion;
-  const currentUser = status?.current_user ?? user ?? null;
+  const currentUser = user ?? status?.current_user ?? null;
   const selectedVersionInstalled = Boolean(
     status?.ready && sameVersion(status.installed_version, selectedVersion),
   );

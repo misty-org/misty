@@ -29,7 +29,6 @@ import type {
   AdvancedPreferences,
   SearchMaintenancePreferences,
   SettingsStore,
-  BotPreferences,
 } from "@/models/interfaces/stores/app/useSettingsStore";
 
 export type SettingsSection =
@@ -38,7 +37,6 @@ export type SettingsSection =
   | "assistant"
   | "appearance"
   | "privacy"
-  | "sync"
   | "transfers"
   | "search"
   | "notifications"

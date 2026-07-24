@@ -28,6 +28,8 @@ export function SpaceLibraryTopChrome() {
     currentAlbum,
     libraryViewMode,
     setLibraryViewMode,
+    libraryItemScale,
+    setLibraryItemScale,
     visibleItems,
     selectedItems,
     selectedItemIds,
@@ -64,6 +66,8 @@ export function SpaceLibraryTopChrome() {
         albumOrderAvailable={Boolean(currentAlbum)}
         viewMode={libraryViewMode}
         onViewMode={setLibraryViewMode}
+        itemScale={libraryItemScale}
+        onItemScale={setLibraryItemScale}
         visibleItemCount={visibleItems.length}
       />
       <SpaceLibraryInlineStatus />

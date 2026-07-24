@@ -73,7 +73,7 @@ export function WorkspaceDialog(props: {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Workspace</AlertDialogTitle>
+            <AlertDialogTitle>Delete file layout</AlertDialogTitle>
             <AlertDialogDescription>
               Delete <strong className="font-medium text-foreground">{props.state.title}</strong>?
               This removes the saved layout, not any files.
@@ -93,7 +93,7 @@ export function WorkspaceDialog(props: {
     );
   }
 
-  const title = props.state.kind === "create" ? "New Workspace" : "Rename Workspace";
+  const title = props.state.kind === "create" ? "New file layout" : "Rename file layout";
   return (
     <Dialog
       open
@@ -111,7 +111,7 @@ export function WorkspaceDialog(props: {
         >
           <DialogHeader>
             <DialogTitle>{title}</DialogTitle>
-            <DialogDescription>Give this Explorer pane arrangement a clear name.</DialogDescription>
+            <DialogDescription>Give this Files pane arrangement a clear name.</DialogDescription>
           </DialogHeader>
           <div className={fieldClass}>
             <Label className={fieldLabelClass} htmlFor="workspace-name">
@@ -176,7 +176,7 @@ export function SmartFolderDialog(props: {
         if (!open) props.onCancel();
       }}
     >
-      <DialogContent className="max-h-[min(720px,calc(100vh-48px))] overflow-y-auto sm:max-w-2xl">
+      <DialogContent className="max-h-[min(720px,calc(100vh-48px))] overflow-y-auto sm:max-w-xl">
         <form
           className="contents"
           onSubmit={(event) => {

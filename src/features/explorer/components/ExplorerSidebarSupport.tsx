@@ -31,6 +31,11 @@ import type {
   SavedSearchRule,
 } from "@/models/interfaces/services/misty-api";
 import { formatBytes } from "../utils/fileFormat";
+import {
+  explorerPathName,
+  joinExplorerPath,
+  normalizeExplorerPath,
+} from "../utils/pathNormalization";
 
 const DEVICE_CUSTOMIZATION_STORAGE_KEY = "misty.explorer.sidebar.devices";
 const SIDEBAR_COLLAPSE_STORAGE_KEY = "misty.explorer.sidebar.collapsed";
@@ -233,16 +238,14 @@ export function dedupePinnedPathsForQuickAccess(paths: string[], builtInPaths: s
 }
 
 export function normalizeSidebarPath(path: string): string {
-  const trimmed = path.trim();
-  const normalized = trimmed.replace(/\/+$/, "");
-  return normalized || (trimmed === "/" ? "/" : "");
+  return normalizeExplorerPath(path);
 }
 
 export function pinnedPathLabel(path: string): string {
   if (path === "misty://recent") return "Recent";
   if (path === "misty://starred") return "Starred";
   if (path === "misty://trash") return "Trash";
-  return path.split("/").filter(Boolean).pop() || path;
+  return explorerPathName(path) || path;
 }
 
 export function quickAccessPathHidden(path: string, hiddenPaths: string[]): boolean {
@@ -337,9 +340,7 @@ export function saveSidebarCollapsedState(state: SidebarCollapsedState): void {
 }
 
 export function normalizeDevicePath(path: string): string {
-  const trimmed = path.trim();
-  if (trimmed.length <= 1) return trimmed;
-  return trimmed.replace(/\/+$/, "");
+  return normalizeExplorerPath(path);
 }
 
 export function uniqueStrings(values: string[]): string[] {
@@ -348,7 +349,5 @@ export function uniqueStrings(values: string[]): string[] {
 
 export function joinPath(...parts: string[]): string {
   const [first, ...rest] = parts;
-  return [first.replace(/\/+$/, ""), ...rest.map((part) => part.replace(/^\/+|\/+$/g, ""))].join(
-    "/",
-  );
+  return joinExplorerPath(first, ...rest);
 }

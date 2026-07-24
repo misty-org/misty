@@ -5,8 +5,6 @@ mod core;
 mod error;
 #[cfg(desktop)]
 mod extension_protocol;
-#[cfg(desktop)]
-mod mika_physics;
 mod plugins;
 mod runtime;
 mod services;
@@ -136,10 +134,6 @@ pub fn run() {
             let runtime = MistyRuntime::new();
             app.manage(runtime);
             #[cfg(desktop)]
-            app.manage(mika_physics::MikaPhysicsState::default());
-            #[cfg(all(desktop, debug_assertions))]
-            setup_ui_playground(app)?;
-            #[cfg(desktop)]
             if let Err(error) = tray::setup(app) {
                 let error = std::io::Error::other(error);
                 telemetry::PostHogTelemetryReporter
@@ -191,10 +185,6 @@ pub fn run() {
             mac_rounded_corners::enable_modern_window_style,
             mac_rounded_corners::enable_custom_titlebar_window_style,
             mac_rounded_corners::reposition_traffic_lights,
-            #[cfg(desktop)]
-            mika_physics::start_mika_drag,
-            #[cfg(desktop)]
-            mika_physics::cancel_mika_momentum,
             app_snapshot,
             app_environment_snapshot,
             agents_device_snapshot,
@@ -408,24 +398,4 @@ pub fn run() {
                 telemetry::shutdown();
             }
         });
-}
-
-#[cfg(all(desktop, debug_assertions))]
-fn setup_ui_playground(app: &mut tauri::App) -> tauri::Result<()> {
-    tauri::WebviewWindowBuilder::new(
-        app,
-        "playground",
-        tauri::WebviewUrl::App("playground".into()),
-    )
-    .title("Misty UI Playground")
-    .inner_size(1180.0, 780.0)
-    .min_inner_size(900.0, 600.0)
-    .minimizable(true)
-    .maximizable(true)
-    .resizable(true)
-    .decorations(true)
-    .shadow(true)
-    .build()?;
-
-    Ok(())
 }

@@ -1,9 +1,11 @@
 import type { AssistantPlanOperation } from "@/models/types/features/explorer/desktop/ExplorerAssistantMessage";
 export type { AssistantPlanOperation } from "@/models/types/features/explorer/desktop/ExplorerAssistantMessage";
-import { File, Folder } from "lucide-react";
+import { File, Folder, Sparkles, User } from "lucide-react";
 import { useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { AgentSources } from "@/features/agents/AgentSources";
 import "@/features/agents/sources.css";
+import { Avatar, AvatarFallback } from "@/ui";
 import { Badge } from "@/ui";
 import { Button } from "@/ui";
 import {
@@ -20,7 +22,6 @@ import type {
   AiPlanReview,
   AiToolApproval,
 } from "@/models/interfaces/stores/assistant/useMikaSessionStore";
-import { MikaDelegatedRunAction } from "./MikaDelegatedRunAction";
 import { cx } from "./ExplorerDesktopShared";
 import { assistantPanelStyles } from "./ExplorerAssistantStyles";
 
@@ -31,22 +32,47 @@ export function AssistantMessage(props: {
   toolApprovals: AiToolApproval[];
   onApplyPlan: (planId: string) => Promise<void>;
   onApproveTool: (requestId: string) => Promise<void>;
+  /** Full-width conversation styling (avatar + name rows) to match Space chat. */
+  spacious?: boolean;
 }) {
   const { message } = props;
-  return (
-    <article className={assistantMessageClass(message.role)}>
-      <strong className={assistantPanelStyles.messageTitle}>
-        {assistantMessageTitle(message.role)}
-      </strong>
-      <pre className={assistantPanelStyles.messageText}>
-        {message.text || (message.role === "assistant" && props.running ? "Thinking..." : "")}
-      </pre>
-      <MikaDelegatedRunAction message={message} />
+  const citedContextSources = useMemo(() => {
+    const citedIds = new Set(
+      [...message.text.matchAll(/\[(S\d+)\]/gi)].map((match) => match[1].toUpperCase()),
+    );
+    return (message.contextSources ?? []).filter((source) => citedIds.has(source.id.toUpperCase()));
+  }, [message.contextSources, message.text]);
+  const text = message.text || (message.role === "assistant" && props.running ? "Thinking..." : "");
+  const extras = (
+    <>
       {message.citations?.length ? <AgentSources citations={message.citations} compact /> : null}
-      {message.creditsUsed !== undefined ? (
+      {citedContextSources.length ? (
+        <div
+          className="flex min-w-0 flex-wrap items-center gap-1.5 pt-0.5"
+          aria-label="Space sources"
+        >
+          {citedContextSources.map((source) => (
+            <Button
+              key={`${message.id}:${source.id}`}
+              asChild
+              className="h-7 max-w-full gap-1 px-2 text-[11px] shadow-none"
+              size="sm"
+              variant="outline"
+            >
+              <Link to={source.href} title={source.label}>
+                <span className="shrink-0 text-muted-foreground">[{source.id}]</span>
+                <span className="truncate">{source.label}</span>
+              </Link>
+            </Button>
+          ))}
+        </div>
+      ) : null}
+      {message.hostedAiUsedRatio !== undefined ? (
         <small className="text-[10px] text-muted-foreground">
-          {message.creditsUsed} credits · {message.creditsRemaining?.toLocaleString() ?? 0}{" "}
-          remaining
+          {Math.round(message.hostedAiUsedRatio * 100)}% of weekly hosted AI used
+          {message.hostedAiResetAt
+            ? ` · resets ${new Date(message.hostedAiResetAt).toLocaleDateString()}`
+            : ""}
         </small>
       ) : null}
       {message.toolRequestId ? (
@@ -63,6 +89,55 @@ export function AssistantMessage(props: {
           onApply={props.onApplyPlan}
         />
       ) : null}
+    </>
+  );
+
+  if (props.spacious) {
+    return (
+      <article className="group grid grid-cols-[40px_minmax(0,1fr)] gap-x-4 rounded-md py-1 [&:not(:first-child)]:mt-5">
+        <div className="col-start-1 flex justify-end">
+          <Avatar className="mt-0.5 size-10">
+            <AvatarFallback className="text-xs font-semibold">
+              {message.role === "user" ? <User className="size-5" /> : "AI"}
+            </AvatarFallback>
+          </Avatar>
+        </div>
+        <div className="col-start-2 grid min-w-0 gap-1.5">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 leading-5">
+            <strong className="text-[15px] font-semibold text-foreground">
+              {assistantMessageTitle(message.role)}
+            </strong>
+            {message.role === "assistant" ? (
+              <Badge
+                variant="secondary"
+                className="h-4 gap-1 rounded px-1 text-[9px] uppercase"
+              >
+                <Sparkles />
+                Agent
+              </Badge>
+            ) : null}
+          </div>
+          <p
+            className={cx(
+              "m-0 whitespace-pre-wrap break-words text-[15px] leading-6",
+              message.role === "error" ? "text-destructive" : "text-foreground/90",
+            )}
+          >
+            {text}
+          </p>
+          {extras}
+        </div>
+      </article>
+    );
+  }
+
+  return (
+    <article className={assistantMessageClass(message.role)}>
+      <strong className={assistantPanelStyles.messageTitle}>
+        {assistantMessageTitle(message.role)}
+      </strong>
+      <pre className={assistantPanelStyles.messageText}>{text}</pre>
+      {extras}
     </article>
   );
 }
@@ -81,7 +156,7 @@ function assistantMessageTitle(role: AiPanelMessage["role"]): string {
   if (role === "tool") return "Tool";
   if (role === "error") return "Error";
   if (role === "plan") return "Plan";
-  return "Mika";
+  return "Agent";
 }
 
 function AssistantPlanActions(props: {
@@ -166,7 +241,7 @@ function AssistantPlanReviewDialog(props: {
 
   return (
     <Dialog open={props.open} onOpenChange={props.onOpenChange}>
-      <DialogContent className="flex max-h-[min(820px,calc(100vh-64px))] w-[min(1040px,calc(100vw-64px))] max-w-none flex-col gap-0 overflow-hidden bg-popover p-0 text-popover-foreground">
+      <DialogContent className="flex max-h-[min(820px,calc(100vh-64px))] w-[min(780px,calc(100vw-64px))] max-w-none flex-col gap-0 overflow-hidden bg-popover p-0 text-popover-foreground">
         <DialogHeader className="border-b border-border px-5 py-4 pr-12">
           <DialogTitle>Review File Operations</DialogTitle>
           <DialogDescription>
@@ -175,7 +250,7 @@ function AssistantPlanReviewDialog(props: {
         </DialogHeader>
         <div className="grid min-h-0 gap-4 overflow-auto p-5">
           <div className="grid gap-3 md:grid-cols-2">
-            <PlanSummary label="What Mika will do" text={props.plan.plan.summary} />
+            <PlanSummary label="What the agent will do" text={props.plan.plan.summary} />
             {props.plan.appliedSummary ? (
               <PlanSummary label="What Misty queued" text={props.plan.appliedSummary} />
             ) : null}

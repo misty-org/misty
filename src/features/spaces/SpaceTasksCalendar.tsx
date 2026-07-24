@@ -1,30 +1,14 @@
 import type { TaskViewMode, DueFilter } from "@/models/types/features/spaces/SpaceTasksCalendar";
 export type { TaskViewMode, DueFilter } from "@/models/types/features/spaces/SpaceTasksCalendar";
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
-import {
-  CalendarDays,
-  Filter,
-  KanbanSquare,
-  List,
-  LoaderCircle,
-  Plus,
-  RefreshCcw,
-  Search,
-  X,
-} from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { LoaderCircle } from "lucide-react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
-import { Avatar, AvatarFallback } from "@/ui";
-import { Badge } from "@/ui";
 import { Button } from "@/ui";
 import { Checkbox } from "@/ui";
-import { Input } from "@/ui";
-import { Popover, PopoverContent, PopoverTrigger } from "@/ui";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui";
-import { Tabs, TabsList, TabsTrigger } from "@/ui";
 import { useAuth } from "@/features/auth/AuthContext";
 import { confirmAction } from "@/lib/confirmAction";
 import { errorText } from "@/lib/format";
-import { agentArchitectureApi } from "@/stores/agents/useAgentArchitectureStore";
 import { spacesApi } from "@/stores/spaces/useSpacesBackendStore";
 import type { SpaceIntegration } from "@/models/interfaces/features/spaces/types";
 import type { SpaceTaskPriority, SpaceTaskStatus } from "@/models/types/features/spaces/types";
@@ -36,7 +20,8 @@ import type {
   SpaceTask,
 } from "@/models/interfaces/features/spaces/types";
 import { useSpacesStore } from "@/stores/spaces/useSpacesStore";
-import { memberInitials, TaskErrorState, toLocalInput } from "./SpaceTaskPrimitives";
+import { TaskErrorState, toLocalInput } from "./SpaceTaskPrimitives";
+import { SpaceTasksHeader } from "./components/SpaceTasksHeader";
 import {
   CalendarSourceDrawer,
   SpaceTaskBoard,
@@ -88,9 +73,11 @@ export function SpaceTasksCalendar({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [sourceOpen, setSourceOpen] = useState(false);
-  const [filtersOpen, setFiltersOpen] = useState(false);
   const [selectedIntegration, setSelectedIntegration] = useState("");
   const [calendarChoices, setCalendarChoices] = useState<GoogleCalendarChoice[]>([]);
+  const [calendarNotice, setCalendarNotice] = useState("");
+  const [calendarConnectionsUnavailable, setCalendarConnectionsUnavailable] = useState(false);
+  const loadGenerationRef = useRef(0);
 
   const query = searchParams.get("q") ?? "";
   const status = (searchParams.get("status") as SpaceTaskStatus | "all") || "all";
@@ -121,6 +108,7 @@ export function SpaceTasksCalendar({
 
   const load = useCallback(
     async (append = false) => {
+      const loadGeneration = ++loadGenerationRef.current;
       setLoading(true);
       try {
         const taskRequest = spacesApi.tasks(spaceId, {
@@ -134,27 +122,45 @@ export function SpaceTasksCalendar({
           cursor: append ? nextCursor : undefined,
           limit: 200,
         });
-        const [taskResult, sourceResult, integrationResult, eventResult] = await Promise.all([
-          taskRequest,
+        const optionalRequest = Promise.allSettled([
           spacesApi.calendarSources(spaceId),
-          agentArchitectureApi.integrations(spaceId),
+          spacesApi.integrations(spaceId),
           view === "calendar"
             ? spacesApi.calendarEvents(spaceId, range.from.toISOString(), range.to.toISOString())
             : Promise.resolve({ events: [] as SpaceCalendarEvent[] }),
         ]);
+        const taskResult = await taskRequest;
+        if (loadGeneration !== loadGenerationRef.current) return;
         setTasks((current) => (append ? mergeTasks(current, taskResult.tasks) : taskResult.tasks));
         setNextCursor(taskResult.next_cursor ?? "");
         setStatusTotals(taskResult.status_totals ?? {});
-        setSources(sourceResult.sources);
-        setIntegrations(
-          integrationResult.integrations.filter((item) => item.provider === "google"),
-        );
-        setEvents(eventResult.events);
         setError("");
-      } catch (reason) {
-        setError(errorText(reason));
-      } finally {
         setLoading(false);
+
+        const [sourceResult, integrationResult, eventResult] = await optionalRequest;
+        if (loadGeneration !== loadGenerationRef.current) return;
+        setSources(sourceResult.status === "fulfilled" ? sourceResult.value.sources : []);
+        setIntegrations(
+          integrationResult.status === "fulfilled"
+            ? integrationResult.value.integrations.filter((item) => item.provider === "google")
+            : [],
+        );
+        setEvents(eventResult.status === "fulfilled" ? eventResult.value.events : []);
+        setCalendarConnectionsUnavailable(integrationResult.status === "rejected");
+        const unavailable = [
+          sourceResult.status === "rejected" ? "calendar sync status" : "",
+          integrationResult.status === "rejected" ? "Google Calendar connections" : "",
+          eventResult.status === "rejected" ? "published calendar events" : "",
+        ].filter(Boolean);
+        setCalendarNotice(
+          unavailable.length
+            ? `Tasks are available, but ${unavailable.join(" and ")} could not be checked.`
+            : "",
+        );
+      } catch (reason) {
+        if (loadGeneration === loadGenerationRef.current) setError(errorText(reason));
+      } finally {
+        if (loadGeneration === loadGenerationRef.current) setLoading(false);
       }
     },
     [
@@ -342,146 +348,88 @@ export function SpaceTasksCalendar({
       setBusy("");
     }
   };
+  /**
+   * Sends a task's schedule to Google. Explicit by design — editing a task in
+   * Misty never writes to someone's calendar on its own.
+   */
+  const publishCalendarTask = async (task: SpaceTask) => {
+    setBusy(task.id);
+    try {
+      const saved = await spacesApi.publishTaskToCalendar(spaceId, task);
+      setTasks((current) => mergeTasks(current, [saved]));
+      setEditing(saved);
+      setError("");
+    } catch (reason) {
+      setError(errorText(reason));
+    } finally {
+      setBusy("");
+    }
+  };
+  const discardCalendarChanges = async (task: SpaceTask) => {
+    if (!(await confirmAction("Discard your changes and use Google Calendar's version?"))) return;
+    setBusy(task.id);
+    try {
+      const saved = await spacesApi.resolveTaskCalendarConflict(spaceId, task, "discard_local");
+      setTasks((current) => mergeTasks(current, [saved]));
+      setEditing(saved);
+      setDraft(taskDraft(saved));
+      setError("");
+    } catch (reason) {
+      setError(errorText(reason));
+    } finally {
+      setBusy("");
+    }
+  };
+
   const clearFilters = () => {
     const next = new URLSearchParams(searchParams);
     ["status", "assignee", "priority", "due", "mine", "sort"].forEach((key) => next.delete(key));
     setSearchParams(next, { replace: true });
-    setFiltersOpen(false);
   };
 
   return (
     <div className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] bg-background">
-      <header className="flex min-h-13 flex-wrap items-center gap-2 border-b border-border/60 bg-card px-4 py-2">
-        <Tabs value={view} onValueChange={(next) => changeView(next as TaskViewMode)}>
-          <TabsList className="h-9" aria-label="Task views">
-            <TabsTrigger className="gap-1.5 px-2.5 text-xs" value="board">
-              <KanbanSquare className="size-3.5" />
-              Board
-            </TabsTrigger>
-            <TabsTrigger className="gap-1.5 px-2.5 text-xs" value="list">
-              <List className="size-3.5" />
-              List
-            </TabsTrigger>
-            <TabsTrigger className="gap-1.5 px-2.5 text-xs" value="calendar">
-              <CalendarDays className="size-3.5" />
-              Calendar
-            </TabsTrigger>
-          </TabsList>
-        </Tabs>
-        <div className="relative min-w-44 flex-1">
-          <Search className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            className="h-9 pl-8 pr-8 text-xs"
-            aria-label="Search tasks"
-            placeholder="Search tasks"
-            value={query}
-            onChange={(event) => updateParam("q", event.target.value)}
+      <SpaceTasksHeader
+        view={view}
+        query={query}
+        activeFilterCount={activeFilterCount(searchParams)}
+        sources={sources}
+        loading={loading}
+        canManage={canManage}
+        canManageIntegrations={canManageIntegrations}
+        calendarImportAvailable={
+          sources.length > 0 || integrations.some((integration) => integration.status === "active")
+        }
+        onView={changeView}
+        onQuery={(value: string) => updateParam("q", value)}
+        onSync={() => void load(false)}
+        onImport={() => setSourceOpen(true)}
+        onCreate={() => openCreate()}
+        filters={
+          <TaskFilters
+            members={members}
+            status={status}
+            assignee={assignee}
+            priority={priority}
+            due={due}
+            mine={mine}
+            sort={sort}
+            onChange={updateParam}
+            onClear={clearFilters}
           />
-          {query ? (
-            <Button
-              className="absolute right-1 top-1/2 size-7 -translate-y-1/2"
-              size="icon"
-              variant="ghost"
-              type="button"
-              onClick={() => updateParam("q")}
-              aria-label="Clear search"
-            >
-              <X className="size-3.5" />
-            </Button>
-          ) : null}
-        </div>
-        {members.length ? (
-          <div className="flex -space-x-1.5" aria-label="Filter by assignee">
-            {members.slice(0, 5).map((member) => {
-              const selected = assignee === member.user_id || (mine && member.user_id === user?.id);
-              return (
-                <Button
-                  className={`size-8 rounded-full p-0 ring-offset-background ${selected ? "z-10 ring-2 ring-primary ring-offset-1" : ""}`}
-                  variant="ghost"
-                  type="button"
-                  title={member.name}
-                  aria-label={`Filter by ${member.name}`}
-                  aria-pressed={selected}
-                  key={member.user_id}
-                  onClick={() => {
-                    const next = new URLSearchParams(searchParams);
-                    next.delete("mine");
-                    if (selected) next.delete("assignee");
-                    else next.set("assignee", member.user_id);
-                    setSearchParams(next, { replace: true });
-                  }}
-                >
-                  <Avatar className="size-7">
-                    <AvatarFallback className="text-[9px]">
-                      {memberInitials(member.name)}
-                    </AvatarFallback>
-                  </Avatar>
-                </Button>
-              );
-            })}
-          </div>
-        ) : null}
-        <Popover open={filtersOpen} onOpenChange={setFiltersOpen}>
-          <PopoverTrigger asChild>
-            <Button variant="outline" type="button">
-              <Filter className="size-3.5" />
-              Filter
-              {activeFilterCount(searchParams) ? (
-                <Badge className="ml-0.5 h-5 min-w-5 justify-center px-1.5" variant="secondary">
-                  {activeFilterCount(searchParams)}
-                </Badge>
-              ) : null}
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-[min(420px,calc(100vw-24px))]" align="end">
-            <TaskFilters
-              members={members}
-              status={status}
-              assignee={assignee}
-              priority={priority}
-              due={due}
-              mine={mine}
-              sort={sort}
-              onChange={updateParam}
-              onClear={clearFilters}
-            />
-          </PopoverContent>
-        </Popover>
-        {canManageIntegrations ? (
-          <Button
-            className="relative"
-            size="icon"
-            variant="outline"
-            type="button"
-            onClick={() => setSourceOpen(true)}
-            aria-label="Calendars"
-            title="Calendars"
-          >
-            <CalendarDays className="size-4" />
-            {sources.some((source) => source.status !== "active") ? (
-              <span className="absolute right-1 top-1 size-1.5 rounded-full bg-amber-500" />
-            ) : null}
-          </Button>
-        ) : null}
-        <Button
-          size="icon"
-          variant="outline"
-          type="button"
-          onClick={() => void load(false)}
-          aria-label="Refresh tasks"
-          title="Refresh"
-        >
-          <RefreshCcw className={`size-4 ${loading ? "animate-spin" : ""}`} />
-        </Button>
-        {canManage ? (
-          <Button type="button" onClick={() => openCreate()}>
-            <Plus className="size-4" />
-            Create
-          </Button>
-        ) : null}
-      </header>
-      <section className="min-h-0 overflow-auto p-4">
+        }
+      />
+      {/* The board owns its own scrolling (horizontal columns, vertical cards); the list does not. */}
+      <section className={`min-h-0 p-4 ${view === "board" ? "overflow-hidden" : "overflow-auto"}`}>
         {error ? <TaskErrorState message={error} onDismiss={() => setError("")} /> : null}
+        {calendarNotice ? (
+          <p
+            className="mx-0 mb-3 mt-0 rounded-md bg-muted/55 px-3 py-2 text-xs text-muted-foreground"
+            role="status"
+          >
+            {calendarNotice}
+          </p>
+        ) : null}
         {loading && !tasks.length && !events.length ? (
           <div className="grid h-full min-h-56 place-items-center text-muted-foreground">
             <LoaderCircle className="size-5 animate-spin" aria-label="Loading tasks" />
@@ -540,6 +488,12 @@ export function SpaceTasksCalendar({
           onClose={() => setEditing(undefined)}
           onSave={save}
           onArchive={editing ? () => void archive(editing) : undefined}
+          onPublishCalendar={
+            editing?.calendar ? () => void publishCalendarTask(editing) : undefined
+          }
+          onDiscardCalendar={
+            editing?.calendar ? () => void discardCalendarChanges(editing) : undefined
+          }
         />
       ) : null}
       {eventOpen ? (
@@ -555,6 +509,7 @@ export function SpaceTasksCalendar({
           selectedIntegration={selectedIntegration}
           choices={calendarChoices}
           sources={sources}
+          connectionsUnavailable={calendarConnectionsUnavailable}
           busy={busy}
           onSelect={(id) => void loadCalendars(id)}
           onPublish={(choice) => void publishCalendar(choice)}

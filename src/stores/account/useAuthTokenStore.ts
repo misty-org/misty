@@ -22,11 +22,32 @@ const legacyUserKey = "misty_user";
 
 let cachedToken: string | null | undefined;
 let cachedVault: SecureAccountVault | undefined;
+// The most recent payload written to the OS keystore. Writing to the keychain
+// can prompt the user on macOS, and the app persists the vault on nearly every
+// auth state change (login, /me refresh, effect re-runs), so we skip redundant
+// writes whose serialized content is identical to what is already stored.
+let lastPersistedPayload: string | undefined;
+let accountSessionTransitioning = false;
+let accountSessionGeneration = 0;
+
+export function setAccountSessionTransitioning(transitioning: boolean): void {
+  if (transitioning && !accountSessionTransitioning) accountSessionGeneration += 1;
+  accountSessionTransitioning = transitioning;
+}
+
+export function isAccountSessionTransitioning(): boolean {
+  return accountSessionTransitioning;
+}
+
+export function readAccountSessionGeneration(): number {
+  return accountSessionGeneration;
+}
 
 export async function saveAccountAuthToken(
   token: string,
   account?: Omit<SavedAccountSession, "lastUsedAt">,
 ): Promise<void> {
+  if (cachedToken !== undefined && cachedToken !== (token || null)) accountSessionGeneration += 1;
   cachedToken = token || null;
   if (!token || !hasTauriInternals()) return;
 
@@ -57,7 +78,11 @@ export async function saveAccountAuthToken(
 }
 
 export async function readAccountAuthToken(): Promise<string | null> {
-  if (!hasTauriInternals()) return null;
+  if (!hasTauriInternals()) {
+    return import.meta.env.DEV && import.meta.env.VITE_MISTY_DEMO_MODE === "1"
+      ? (cachedToken ?? null)
+      : null;
+  }
   if (cachedToken !== undefined) return cachedToken;
 
   try {
@@ -103,6 +128,12 @@ export function listSavedAccountSessions(): SavedAccountSession[] {
   }
 }
 
+export function readActiveSavedAccountSession(): SavedAccountSession | null {
+  const activeAccountId = readActiveAccountId();
+  if (!activeAccountId) return null;
+  return listSavedAccountSessions().find((account) => account.id === activeAccountId) ?? null;
+}
+
 export async function updateSavedAccountSession(
   account: Omit<SavedAccountSession, "lastUsedAt">,
 ): Promise<void> {
@@ -124,6 +155,7 @@ export async function activateAccountSession(accountId: string): Promise<SavedAc
 
   session.account = { ...session.account, lastUsedAt: new Date().toISOString() };
   vault.activeAccountId = accountId;
+  if (cachedToken !== session.token) accountSessionGeneration += 1;
   cachedToken = session.token;
   await persistSecureVault(vault);
   await syncManagedAiToken(session.token);
@@ -131,6 +163,7 @@ export async function activateAccountSession(accountId: string): Promise<SavedAc
 }
 
 export async function clearAccountAuthToken(): Promise<SavedAccountSession | null> {
+  accountSessionGeneration += 1;
   cachedToken = null;
   if (!hasTauriInternals()) return null;
   await syncManagedAiToken("");
@@ -164,6 +197,63 @@ export async function clearAccountAuthToken(): Promise<SavedAccountSession | nul
   }
 }
 
+/**
+ * Signs out the active account without forgetting any saved session. The active
+ * pointer and in-memory token are cleared so the app is logged out, but every
+ * account stays listed so the sign-in chooser can offer them again (each is
+ * re-validated, and re-login is required, only when it is next selected).
+ */
+export async function deactivateActiveAccount(): Promise<void> {
+  accountSessionGeneration += 1;
+  cachedToken = null;
+  if (!hasTauriInternals()) return;
+  await syncManagedAiToken("");
+
+  if (isNativeMobileBuild) {
+    // Mobile keeps a single raw token and no multi-account chooser, so signing
+    // out clears it outright.
+    writeTokenStoredMarker(false);
+    try {
+      await remove(desktopTokenService, desktopTokenUser);
+    } catch (error) {
+      recordRemoveError(error);
+    }
+    return;
+  }
+
+  try {
+    const vault = await loadSecureVault();
+    if (vault.sessions.length === 0) return;
+    vault.activeAccountId = "";
+    await persistSecureVault(vault);
+  } catch (error) {
+    recordRemoveError(error);
+  }
+}
+
+/**
+ * Removes a non-active saved session without changing the token currently used
+ * by requests. A failed secure-store write leaves the session indexed and is
+ * reported through diagnostics; the active identity remains unchanged.
+ */
+export async function removeSavedAccountSession(accountId: string): Promise<boolean> {
+  if (!accountId || !hasTauriInternals() || isNativeMobileBuild) return false;
+  try {
+    const vault = await loadSecureVault();
+    if (vault.activeAccountId === accountId || readActiveAccountId() === accountId) {
+      throw new Error("The active Misty session cannot be removed as a background account.");
+    }
+    const sessions = vault.sessions.filter((item) => item.account.id !== accountId);
+    if (sessions.length === vault.sessions.length) return true;
+    vault.sessions = sessions;
+    await persistSecureVault(vault);
+    return true;
+  } catch (error) {
+    recordRemoveError(error);
+    return false;
+  }
+}
+
 async function loadSecureVault(): Promise<SecureAccountVault> {
   if (cachedVault) return cachedVault;
   let raw: string | null = null;
@@ -177,6 +267,10 @@ async function loadSecureVault(): Promise<SecureAccountVault> {
   cachedVault = parsed.vault;
   if (parsed.migrated && parsed.vault.sessions.length > 0) {
     await persistSecureVault(parsed.vault);
+  } else if (parsed.vault.sessions.length > 0) {
+    // Record what the keystore already holds so an unchanged re-persist on the
+    // common cold-start path is skipped (avoids a needless macOS prompt).
+    lastPersistedPayload = JSON.stringify(parsed.vault);
   }
   return parsed.vault;
 }
@@ -216,11 +310,19 @@ async function persistSecureVault(vault: SecureAccountVault): Promise<void> {
     } catch {
       // Removing a missing item is equivalent to the desired state.
     }
+    lastPersistedPayload = undefined;
     writeAccountIndex([], "");
     writeTokenStoredMarker(false);
     return;
   }
-  await store(JSON.stringify(vault));
+  const payload = JSON.stringify(vault);
+  // Skip the keystore write when nothing changed. Each write can trigger a
+  // macOS Keychain prompt, and callers persist the vault far more often than
+  // its contents actually change.
+  if (payload !== lastPersistedPayload) {
+    await store(payload);
+    lastPersistedPayload = payload;
+  }
   writeAccountIndex(
     vault.sessions.map((item) => item.account),
     vault.activeAccountId,

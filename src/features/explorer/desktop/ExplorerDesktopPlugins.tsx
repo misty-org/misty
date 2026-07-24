@@ -9,16 +9,7 @@ export type {
 import { Input } from "@/ui";
 import { Button } from "@/ui";
 import { Popover, PopoverContent, PopoverTrigger } from "@/ui";
-import {
-  ArrowLeft,
-  ArrowRightLeft,
-  ExternalLink,
-  Puzzle,
-  RefreshCcw,
-  Sparkles,
-  Terminal,
-  X,
-} from "lucide-react";
+import { ArrowLeft, ArrowRightLeft, Puzzle, RefreshCcw, Terminal, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -35,6 +26,8 @@ import type {
   PluginPanelRenderResult,
   TransferRecord,
 } from "@/models/interfaces/services/misty-api";
+import type { MultiPanelTab } from "@/models/interfaces/workspace";
+import type { MultiPanelStoreHook } from "@/models/types/workspace/useMultiPanelStore";
 import { useMultiPanelStore } from "@/features/workspace";
 import { useMinimumSpin } from "@/hooks/useMinimumSpin";
 import { errorText } from "@/lib/format";
@@ -96,8 +89,6 @@ const emptyTransferRows: TransferRecord[] = [];
 export function ExplorerTray(props: {
   terminalEnabled: boolean;
   terminalPath: string;
-  mikaEnabled: boolean;
-  onOpenMika: () => void;
   onOpenTransfers: () => void;
 }) {
   const openTerminal = useCallback(() => {
@@ -112,16 +103,6 @@ export function ExplorerTray(props: {
   return (
     <>
       <ExplorerTransfersTabButton onClick={props.onOpenTransfers} />
-      <Button
-        aria-label="Open Mika Assistant"
-        className={explorerTrayStyles.trigger}
-        disabled={!props.mikaEnabled}
-        onClick={props.onOpenMika}
-        title={props.mikaEnabled ? "Open Mika Assistant" : "Enable Mika in Settings"}
-        type="button"
-      >
-        <Sparkles size={16} />
-      </Button>
       <Button
         className={explorerTrayStyles.trigger}
         type="button"
@@ -236,11 +217,6 @@ function ExplorerPluginTabMenu(props: {
             : (current + 1) % items.length;
     items[next]?.focus();
   }, []);
-
-  const browsePlugins = useCallback(() => {
-    closePopup();
-    navigate("/extensions");
-  }, [closePopup, navigate]);
 
   return (
     <Popover
@@ -421,15 +397,6 @@ function ExplorerPluginTabMenu(props: {
               </div>
             );
           })}
-          <Button
-            className={pluginTabMenuStyles.footerItem}
-            type="button"
-            role="menuitem"
-            onClick={browsePlugins}
-          >
-            <ExternalLink size={15} />
-            <span>{selectedPlugin ? "Manage extension" : "Browse extensions"}</span>
-          </Button>
         </PopoverContent>
       ) : null}
     </Popover>
@@ -445,7 +412,6 @@ export function ExplorerExtensionsPanel(props: {
   onClosePlugin: (pluginId: string) => void;
   onClose: () => void;
 }) {
-  const navigate = useNavigate();
   const openPlugins = useMemo(
     () =>
       props.openPluginIds
@@ -462,10 +428,6 @@ export function ExplorerExtensionsPanel(props: {
       selectedPlugin.panels[0] ??
       null)
     : null;
-
-  const browsePlugins = useCallback(() => {
-    navigate("/extensions");
-  }, [navigate]);
 
   return (
     <aside className={extensionsPanelStyles.root} aria-label="Extensions">
@@ -575,10 +537,6 @@ export function ExplorerExtensionsPanel(props: {
           )}
         </section>
       </div>
-      <Button className={extensionsPanelStyles.footerButton} type="button" onClick={browsePlugins}>
-        Manage extensions
-        <ExternalLink size={14} />
-      </Button>
     </aside>
   );
 }
@@ -707,6 +665,27 @@ export function isChromeTabPath(path: string): boolean {
   return isTransfersTabPath(path) || isRemotesTabPath(path);
 }
 
+export function canCloseExplorerTab(tab: MultiPanelTab, tabs: MultiPanelTab[]): boolean {
+  if (isChromeTabPath(tab.path)) return true;
+  return tabs.some((candidate) => candidate.id !== tab.id && !isChromeTabPath(candidate.path));
+}
+
+export function ensureFilesBrowseTab(
+  fallbackPath: string,
+  store: MultiPanelStoreHook = useMultiPanelStore,
+): boolean {
+  const path = fallbackPath.trim();
+  if (!path || isChromeTabPath(path)) return false;
+
+  const workspace = store.getState();
+  if (workspace.tabs.length === 0 || workspace.tabs.some((tab) => !isChromeTabPath(tab.path))) {
+    return false;
+  }
+
+  workspace.addTab(path, "Home");
+  return true;
+}
+
 export function canOpenTerminalPath(path: string): boolean {
   const trimmed = path.trim();
   return Boolean(trimmed) && !trimmed.includes("://");
@@ -720,19 +699,6 @@ export function openTransfersTab(): void {
     return;
   }
   const tabId = multi.addTab(transfersTabPath, "Transfers");
-  useMultiPanelStore
-    .getState()
-    .setTabPanelVisibility(tabId, { sidebarVisible: false, previewVisible: false });
-}
-
-export function openRemotesTab(): void {
-  const multi = useMultiPanelStore.getState();
-  const existing = multi.tabs.find((tab) => isRemotesTabPath(tab.path));
-  if (existing) {
-    multi.selectTab(existing.id);
-    return;
-  }
-  const tabId = multi.addTab(remotesTabPath, "Remotes");
   useMultiPanelStore
     .getState()
     .setTabPanelVisibility(tabId, { sidebarVisible: false, previewVisible: false });
@@ -1024,7 +990,6 @@ function webPanelUrl(panel: PluginPanelEntry): string {
 }
 
 function ExplorerWebPluginPanelHost(props: { panel: PluginPanelEntry; selectedPath: string }) {
-  const navigate = useNavigate();
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
   const [hostState, setHostState] = useState<"loading" | "ready" | "failed">("loading");
@@ -1175,14 +1140,6 @@ function ExplorerWebPluginPanelHost(props: { panel: PluginPanelEntry; selectedPa
                 >
                   <RefreshCcw size={13} />
                   Retry
-                </Button>
-                <Button
-                  className={pluginTabHostStyles.button}
-                  type="button"
-                  onClick={() => navigate("/extensions")}
-                >
-                  <ExternalLink size={13} />
-                  Manage Extension
                 </Button>
               </div>
               <code className="max-w-full overflow-hidden text-ellipsis text-[10px] text-[var(--misty-text-subtle)]">

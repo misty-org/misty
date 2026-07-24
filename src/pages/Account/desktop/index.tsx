@@ -15,7 +15,6 @@ import {
   AlertDialogTrigger,
 } from "@/ui";
 import { Alert, AlertDescription, AlertTitle } from "@/ui";
-import { Avatar, AvatarFallback } from "@/ui";
 import { Button } from "@/ui";
 import { Input } from "@/ui";
 import { Progress } from "@/ui";
@@ -24,7 +23,6 @@ import { StatusBadge } from "@/ui";
 import { useAuth } from "@/features/auth/AuthContext";
 import {
   accountCreateCheckout as createCheckout,
-  accountCreateCreditCheckout as createCreditCheckout,
   accountCreatePortalSession as createPortalSession,
   accountFetchBillingUsage as fetchBillingUsage,
   accountFetchMe as fetchMe,
@@ -36,6 +34,7 @@ import type {
   AccountMeResponse as MeResponse,
 } from "@/models/interfaces/stores/account/useAccountStore";
 import { useUserStore } from "@/stores/account/useUserStore";
+import { readAccountSessionGeneration } from "@/stores/account/useAuthTokenStore";
 import { useSetupStore } from "@/stores/app";
 import type { CurrentLicense } from "@/models/types/features/installer/types";
 import { useAppStore } from "@/stores/app";
@@ -48,21 +47,21 @@ import type { ClientDebugEvent } from "@/models/interfaces/platform/clientDebug"
 import { openExternalLink } from "@/platform/openExternalLink";
 import { normalizeApiBaseUrl, withDefaultApiPath } from "@/stores/backend";
 import { Bug, Lock, Rows3, UserCircle, type LucideIcon } from "lucide-react";
+import { formatBytes } from "@/features/spaces/libraryFormat";
 import {
   DesktopSettingsFrame,
   DesktopSettingsRow,
   DesktopSettingsSection,
 } from "../../Settings/DesktopSettingsUI";
+import { ProfileAvatarEditor } from "./ProfileAvatarEditor";
 const TIER_LABEL: Record<string, string> = {
-  basic: "Basic",
+  basic: "Free",
   pro: "Pro",
-  max: "Max",
 };
 
 const TIER_TONE: Record<string, AccountStatusTone> = {
   basic: "neutral",
   pro: "info",
-  max: "info",
 };
 const STATUS_TONE: Record<string, AccountStatusTone> = {
   active: "success",
@@ -130,6 +129,15 @@ function SaveFeedback({ ok, error }: { ok: boolean; error: string }) {
   return null;
 }
 
+function storageCleanupNotice(storage: BillingUsageResponse["storage"]): string {
+  const deadline = storage.cleanup_notice_until ? new Date(storage.cleanup_notice_until) : null;
+  if (deadline && deadline.getTime() <= Date.now()) {
+    return "The 30-day cleanup period has ended. Your storage remains intact, and new hosted files stay paused until usage falls below the limit or Pro resumes.";
+  }
+  const due = deadline ? ` by ${deadline.toLocaleDateString()}` : "";
+  return `New hosted files are paused while this account is over its storage limit. Clean up or resume Pro${due}. Existing files remain available and are never deleted automatically.`;
+}
+
 const TABS: { id: Tab; label: string; icon: LucideIcon }[] = [
   { id: "general", label: "General", icon: Rows3 },
   { id: "account", label: "Account", icon: UserCircle },
@@ -139,7 +147,7 @@ const TABS: { id: Tab; label: string; icon: LucideIcon }[] = [
 
 const TAB_DESCRIPTIONS: Record<Tab, string> = {
   general: "App information and account-level notification defaults.",
-  account: "Manage your profile, license, devices, credits, and billing.",
+  account: "Manage your profile, storage, hosted AI usage, and billing.",
   privacy: "Understand how Misty handles your files and account data.",
   diagnostics: "Inspect runtime configuration and recent client events.",
 };
@@ -178,11 +186,15 @@ function GeneralPanel() {
 function AccountPanel({
   me,
   onUpdated,
+  onAvatarUpdated,
   onLogout,
+  transitioning,
 }: {
   me: MeResponse;
   onUpdated: (name: string) => void;
-  onLogout: () => void;
+  onAvatarUpdated: (avatarVersion: number) => void;
+  onLogout: () => Promise<void>;
+  transitioning: boolean;
 }) {
   const patchMe = useUserStore((state) => state.patchMe);
   const [name, setName] = useState(me.name);
@@ -196,26 +208,41 @@ function AccountPanel({
     ok: profileOk,
     save: saveProfile,
   } = useSave(async () => {
+    const generation = readAccountSessionGeneration();
     await updateProfile(name);
+    if (readAccountSessionGeneration() !== generation) return;
     onUpdated(name);
   });
 
   useEffect(() => {
+    const generation = readAccountSessionGeneration();
+    let canceled = false;
+    setBillingUsage(null);
     void fetchBillingUsage()
-      .then(setBillingUsage)
-      .catch(() => setBillingUsage(null));
-  }, [me.tier]);
+      .then((usage) => {
+        if (!canceled && readAccountSessionGeneration() === generation) setBillingUsage(usage);
+      })
+      .catch(() => {
+        if (!canceled && readAccountSessionGeneration() === generation) setBillingUsage(null);
+      });
+    return () => {
+      canceled = true;
+    };
+  }, [me.id, me.tier]);
 
   async function openBillingAction(action: () => Promise<{ url: string }>) {
+    const generation = readAccountSessionGeneration();
     setBillingWorking(true);
     setBillingError("");
     try {
       const { url } = await action();
+      if (readAccountSessionGeneration() !== generation) return;
       await openExternalLink(url);
     } catch (error) {
+      if (readAccountSessionGeneration() !== generation) return;
       setBillingError(error instanceof Error ? error.message : "Could not start billing.");
     } finally {
-      setBillingWorking(false);
+      if (readAccountSessionGeneration() === generation) setBillingWorking(false);
     }
   }
   const {
@@ -224,7 +251,9 @@ function AccountPanel({
     ok: deviceOk,
     save: saveDevice,
   } = useSave(async () => {
+    const generation = readAccountSessionGeneration();
     await updateDevice(device);
+    if (readAccountSessionGeneration() !== generation) return;
     patchMe({ license_device: device });
   });
 
@@ -233,24 +262,16 @@ function AccountPanel({
     month: "long",
     day: "numeric",
   });
-  const initialsSource = name.trim() || me.name || me.email;
-  const initials = initialsSource
-    .split(" ")
-    .map((word) => word[0])
-    .join("")
-    .toUpperCase()
-    .slice(0, 2);
-  const creditUsedPercent =
-    billingUsage && billingUsage.monthly_allowance > 0
-      ? Math.round((1 - billingUsage.monthly_remaining / billingUsage.monthly_allowance) * 100)
-      : 0;
-  const creditWarning =
-    creditUsedPercent >= 100
-      ? "Managed AI is paused until you add credits or the allowance resets."
-      : creditUsedPercent >= 90
-        ? "You have used at least 90% of this month’s credits."
-        : creditUsedPercent >= 75
-          ? "You have used at least 75% of this month’s credits."
+  const hostedAIUsedPercent = billingUsage
+    ? Math.round(Math.min(1, Math.max(0, billingUsage.hosted_ai.used_ratio)) * 100)
+    : 0;
+  const hostedAIWarning =
+    hostedAIUsedPercent >= 100
+      ? "Hosted AI is paused until the weekly reset or a Pro upgrade."
+      : hostedAIUsedPercent >= 90
+        ? "You have used at least 90% of this week’s hosted AI usage."
+        : hostedAIUsedPercent >= 75
+          ? "You have used at least 75% of this week’s hosted AI usage."
           : "";
 
   return (
@@ -315,9 +336,14 @@ function AccountPanel({
                 value={device}
                 onChange={(e) => setDevice(e.target.value)}
                 placeholder="e.g. MacBook Pro"
+                disabled={transitioning}
                 className="min-w-0 flex-1"
               />
-              <Button onClick={saveDevice} disabled={savingDevice} className="shrink-0">
+              <Button
+                onClick={saveDevice}
+                disabled={transitioning || savingDevice}
+                className="shrink-0"
+              >
                 {savingDevice ? "Saving…" : "Save"}
               </Button>
             </div>
@@ -339,22 +365,16 @@ function AccountPanel({
           <AccountBadge label="Active" tone="success" />
         </div>
 
-        {me.tier === "max" && (
-          <div className={accountSettingsCustomRowClass}>
-            <p className="text-xs text-muted-foreground">
-              Additional seats appear here as you activate new devices.
-            </p>
-          </div>
-        )}
-
         {me.tier === "basic" && (
           <div
             className={`${accountSettingsCustomRowClass} flex flex-col gap-3 md:flex-row md:items-center md:justify-between md:gap-6`}
           >
-            <p className="text-xs text-muted-foreground">Pro $9.99/month · Max $14.99/month</p>
+            <p className="text-xs text-muted-foreground">
+              Pro is $9/month or $89/year, with a 14-day trial.
+            </p>
             <Button
               variant="link"
-              disabled={billingWorking}
+              disabled={transitioning || billingWorking}
               onClick={() => void openBillingAction(() => createCheckout("pro", "month"))}
               className="h-auto shrink-0 p-0 text-xs"
             >
@@ -364,43 +384,49 @@ function AccountPanel({
         )}
       </Section>
 
-      <Section title="Misty Credits">
+      <Section title="Storage">
         {billingUsage ? (
           <>
-            <Row label="Available">{billingUsage.available_credits.toLocaleString()} credits</Row>
-            <Row label="Monthly allowance">
-              {billingUsage.monthly_remaining.toLocaleString()} of{" "}
-              {billingUsage.monthly_allowance.toLocaleString()} remaining
+            <Row label="Owner pool">
+              {formatBytes(billingUsage.storage.used_bytes)} of{" "}
+              {formatBytes(billingUsage.storage.limit_bytes)} used
             </Row>
-            <Row label="Purchased">{billingUsage.purchased_remaining.toLocaleString()} credits</Row>
-            <Row label="Resets">{new Date(billingUsage.next_reset_at).toLocaleDateString()}</Row>
+            <Row label="Available">{formatBytes(billingUsage.storage.remaining_bytes)}</Row>
             <div className={accountSettingsCustomRowClass}>
-              <Progress value={Math.min(100, creditUsedPercent)} />
-              {creditWarning ? (
-                <p className="mt-2 text-xs text-[var(--misty-warning)]">{creditWarning}</p>
+              <Progress
+                value={Math.min(
+                  100,
+                  Math.round(
+                    (billingUsage.storage.used_bytes / billingUsage.storage.limit_bytes) * 100,
+                  ),
+                )}
+              />
+              {billingUsage.storage.over_quota_since ? (
+                <p className="mt-2 text-xs text-[var(--misty-warning)]">
+                  {storageCleanupNotice(billingUsage.storage)}
+                </p>
               ) : null}
-            </div>
-            <div className={`${accountSettingsCustomRowClass} flex flex-wrap gap-2`}>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={billingWorking}
-                onClick={() => void openBillingAction(() => createCreditCheckout("credits_1500"))}
-              >
-                1,500,000 credits · $4.99
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={billingWorking}
-                onClick={() => void openBillingAction(() => createCreditCheckout("credits_3500"))}
-              >
-                3,500,000 credits · $9.99
-              </Button>
             </div>
           </>
         ) : (
-          <GhostRow label="Usage" value="Loading credit balance" />
+          <GhostRow label="Usage" value="Loading storage usage" />
+        )}
+      </Section>
+
+      <Section title="Hosted AI usage">
+        {billingUsage ? (
+          <>
+            <Row label="This week">{hostedAIUsedPercent}% used</Row>
+            <Row label="Resets">{new Date(billingUsage.hosted_ai.reset_at).toLocaleString()}</Row>
+            <div className={accountSettingsCustomRowClass}>
+              <Progress value={hostedAIUsedPercent} />
+              {hostedAIWarning ? (
+                <p className="mt-2 text-xs text-[var(--misty-warning)]">{hostedAIWarning}</p>
+              ) : null}
+            </div>
+          </>
+        ) : (
+          <GhostRow label="Usage" value="Loading hosted AI usage" />
         )}
       </Section>
 
@@ -413,7 +439,7 @@ function AccountPanel({
             <div className={accountSettingsCustomRowClass}>
               <Button
                 variant="link"
-                disabled={billingWorking || !me.billing.customer_portal_available}
+                disabled={transitioning || billingWorking || !me.billing.customer_portal_available}
                 onClick={() => void openBillingAction(createPortalSession)}
                 className="h-auto p-0"
               >
@@ -424,39 +450,23 @@ function AccountPanel({
         ) : (
           <div className={`${accountSettingsCustomRowClass} grid gap-3`}>
             <p className="m-0 text-sm text-muted-foreground">
-              Pro includes 2,000 monthly credits. Max includes 6,000.
+              Pro includes 50 GB of owner storage and over 6× the weekly hosted AI capacity.
             </p>
             <div className="flex flex-wrap gap-2">
               <Button
                 size="sm"
-                disabled={billingWorking}
+                disabled={transitioning || billingWorking}
                 onClick={() => void openBillingAction(() => createCheckout("pro", "month"))}
               >
-                Pro · $9.99/mo
+                Start Pro trial · $9/mo
               </Button>
               <Button
                 variant="outline"
                 size="sm"
-                disabled={billingWorking}
-                onClick={() => void openBillingAction(() => createCheckout("max", "month"))}
-              >
-                Max · $14.99/mo
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={billingWorking}
+                disabled={transitioning || billingWorking}
                 onClick={() => void openBillingAction(() => createCheckout("pro", "year"))}
               >
-                Pro · $99/yr
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={billingWorking}
-                onClick={() => void openBillingAction(() => createCheckout("max", "year"))}
-              >
-                Max · $149/yr
+                Start annual trial · $89/yr
               </Button>
             </div>
           </div>
@@ -473,16 +483,13 @@ function AccountPanel({
 
       <Section title="Info">
         <div className={`${accountSettingsCustomRowClass} flex flex-col gap-4 py-5`}>
-          <div className="flex items-center gap-4">
-            <Avatar className="size-14">
-              <AvatarFallback className="text-base font-semibold">{initials}</AvatarFallback>
-            </Avatar>
-            <div>
-              <p className="text-sm font-medium text-foreground">{me.name}</p>
-              <p className="mt-0.5 text-xs text-muted-foreground">{me.email}</p>
-              <p className="mt-1 text-xs text-muted-foreground/60">Photo upload — coming soon</p>
-            </div>
-          </div>
+          <ProfileAvatarEditor
+            name={me.name}
+            email={me.email}
+            initialVersion={me.avatar_version ?? 0}
+            disabled={transitioning}
+            onUpdated={onAvatarUpdated}
+          />
 
           <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
             <div>
@@ -497,12 +504,13 @@ function AccountPanel({
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
+                disabled={transitioning}
               />
             </div>
             <div className="flex items-center gap-3">
               <Button
                 onClick={saveProfile}
-                disabled={savingProfile || name.trim() === "" || name === me.name}
+                disabled={transitioning || savingProfile || name.trim() === "" || name === me.name}
               >
                 {savingProfile ? "Saving…" : "Save changes"}
               </Button>
@@ -556,6 +564,7 @@ function AccountPanel({
             <AlertDialogTrigger asChild>
               <Button
                 variant="outline"
+                disabled={transitioning}
                 className="border-destructive/30 text-destructive hover:bg-destructive/10 hover:text-destructive"
               >
                 Sign out
@@ -573,7 +582,8 @@ function AccountPanel({
                 <AlertDialogCancel>Cancel</AlertDialogCancel>
                 <AlertDialogAction
                   className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                  onClick={onLogout}
+                  disabled={transitioning}
+                  onClick={() => void onLogout()}
                 >
                   Sign out
                 </AlertDialogAction>
@@ -606,11 +616,15 @@ function PrivacyPanel() {
     <div>
       <Section title="Privacy">
         <div className={`${accountSettingsCustomRowClass} flex flex-col gap-2`}>
-          <p className="text-sm font-medium text-foreground">Your data stays on your device.</p>
+          <p className="text-sm font-medium text-foreground">
+            Private by default, explicit when shared.
+          </p>
           <p className="text-sm leading-relaxed text-muted-foreground">
-            Misty never transmits your files or cloud credentials to any external server. All
-            provider communication runs through Misty's embedded local runtime. We only store your
-            account info (name, email, hashed password) and subscription status.
+            Files and local provider access stay private until you choose an action that uploads or
+            shares content. Space Library copies, Chat attachments, account data, agent prompts and
+            selected context, and supported integration credentials may be sent to the configured
+            Misty service or provider to perform that action. Misty shows the destination before a
+            private file becomes shared Space content.
           </p>
         </div>
       </Section>
@@ -730,7 +744,7 @@ export default function DesktopAccountPage(props: {
   presentation?: "page" | "overlay";
   onClose?: () => void;
 }) {
-  const { user, logout, setUser } = useAuth();
+  const { user, logout, setUser, transitioning } = useAuth();
   const navigate = useNavigate();
   const currentUser = useSetupStore((state) => state.status?.current_user ?? null);
   const currentLicense = useSetupStore((state) => state.status?.current_license ?? null);
@@ -749,47 +763,69 @@ export default function DesktopAccountPage(props: {
     () => (activeUser ? meFromLocalAccount(activeUser, currentLicense) : null),
     [activeUser, currentLicense],
   );
-  const displayMe = me ?? localMe;
+  const accountMe = me?.id === activeUser?.id ? me : null;
+  const displayMe = accountMe ?? localMe;
   const overlay = props.presentation === "overlay";
 
   useEffect(() => {
+    let canceled = false;
     if (!activeUser) {
       if (overlay) props.onClose?.();
       navigate("/signin", { replace: true, state: { from: "/account" } });
       return;
     }
+    if (transitioning) {
+      setLoading(true);
+      return;
+    }
     if (!user && currentUser) {
       setUser(currentUser);
     }
-    if (me) return;
+    if (accountMe) {
+      setLoading(false);
+      return;
+    }
+    const expectedAccountId = activeUser.id;
+    const generation = readAccountSessionGeneration();
     setLoading(true);
-    fetchMe()
-      .then(setMe)
+    void fetchMe()
+      .then((profile) => {
+        if (
+          canceled ||
+          readAccountSessionGeneration() !== generation ||
+          profile.id !== expectedAccountId
+        )
+          return;
+        setMe(profile);
+      })
       .catch((err) => {
-        if (err.status === 401) {
-          if (currentUser) {
-            setUser(currentUser);
-            return;
-          }
-          setUser(null);
-          navigate("/signin", { replace: true, state: { from: "/account" } });
+        if (canceled || readAccountSessionGeneration() !== generation) return;
+        if (err?.status === 401) {
+          void logout();
         }
       })
-      .finally(() => setLoading(false));
+      .finally(() => {
+        if (!canceled && readAccountSessionGeneration() === generation) setLoading(false);
+      });
+    return () => {
+      canceled = true;
+    };
   }, [
+    accountMe,
     activeUser,
     currentUser,
     user,
     navigate,
-    me,
+    logout,
     overlay,
     props.onClose,
     setMe,
     setLoading,
     setUser,
+    transitioning,
   ]);
 
-  if (!activeUser || (loading && !displayMe)) {
+  if (!activeUser || transitioning || (loading && !displayMe)) {
     return (
       <div
         className={`${overlay ? "h-full" : "min-h-screen"} flex items-center justify-center bg-background`}
@@ -810,12 +846,18 @@ export default function DesktopAccountPage(props: {
 
       {displayMe && tab === "account" && (
         <AccountPanel
+          key={displayMe.id}
           me={displayMe}
           onUpdated={(name) => {
             patchMe({ name });
             setUser({ ...activeUser, name });
           }}
+          onAvatarUpdated={(avatarVersion) => {
+            patchMe({ avatar_version: avatarVersion });
+            setUser({ ...activeUser, avatarVersion });
+          }}
           onLogout={logout}
+          transitioning={transitioning}
         />
       )}
 
@@ -848,7 +890,7 @@ function accountDebugBase(base: string | null | undefined) {
 }
 
 function meFromLocalAccount(
-  user: { id: string; name: string; username?: string; email: string },
+  user: { id: string; name: string; username?: string; email: string; avatarVersion?: number },
   license: CurrentLicense | null,
 ): MeResponse {
   return {
@@ -856,8 +898,9 @@ function meFromLocalAccount(
     name: user.name,
     username: user.username ?? "",
     email: user.email,
+    avatar_version: user.avatarVersion ?? 0,
     created_at: new Date().toISOString(),
-    tier: license?.tier ?? "basic",
+    tier: license?.tier === "pro" || license?.tier === "max" ? "pro" : "basic",
     status: license?.status ?? "active",
     allows_use: license?.allows_use ?? true,
     expires_at: license?.expires_at ?? null,

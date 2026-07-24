@@ -1,14 +1,5 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
-import {
-  ArrowRight,
-  Bot,
-  Check,
-  MessageSquare,
-  Sparkles,
-  Trash2,
-  Users,
-  Workflow,
-} from "lucide-react";
+import { ArrowRight, MessageSquare, Trash2 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
 import {
@@ -26,33 +17,19 @@ import { Button } from "@/ui";
 import { Card, CardContent, CardHeader, CardTitle } from "@/ui";
 import { Input } from "@/ui";
 import { Separator } from "@/ui";
-import type { SpaceStudioResource } from "@/models/interfaces/features/spaces/types";
+import { DiscordLinkPanel } from "@/features/spaces/integrations/DiscordLinkPanel";
 import { useSpacesStore } from "@/stores/spaces/useSpacesStore";
 
-const validSections = new Set(["general", "chat", "studio", "agents"]);
-const emptyResources: SpaceStudioResource[] = [];
+const validSections = new Set(["general", "chat", "integrations"]);
 
 export function SpaceSettings({ spaceId, section }: { spaceId: string; section: string }) {
   const navigate = useNavigate();
   const activeSection = validSections.has(section) ? section : "general";
-  const {
-    space,
-    agents,
-    workflows,
-    error,
-    renameSpace,
-    loadStudio,
-    leaveSpace,
-    deleteSpace,
-    clearError,
-  } = useSpacesStore(
+  const { space, error, renameSpace, leaveSpace, deleteSpace, clearError } = useSpacesStore(
     useShallow((state) => ({
       space: state.spaces.find((item) => item.id === spaceId),
-      agents: state.agentsBySpace[spaceId] ?? emptyResources,
-      workflows: state.workflowsBySpace[spaceId] ?? emptyResources,
       error: state.error,
       renameSpace: state.renameSpace,
-      loadStudio: state.loadStudio,
       leaveSpace: state.leaveSpace,
       deleteSpace: state.deleteSpace,
       clearError: state.clearError,
@@ -65,15 +42,10 @@ export function SpaceSettings({ spaceId, section }: { spaceId: string; section: 
   const [deleteConfirmation, setDeleteConfirmation] = useState("");
   const [dangerBusy, setDangerBusy] = useState(false);
   const isOwner = space?.role === "owner";
-  const canViewStudio = space?.permissions?.["studio.view"] !== false;
 
   useEffect(() => {
     setName(space?.name ?? "");
   }, [space?.name]);
-  useEffect(() => {
-    if (spaceId && canViewStudio)
-      void Promise.all([loadStudio(spaceId, "agents"), loadStudio(spaceId, "workflows")]);
-  }, [canViewStudio, loadStudio, spaceId]);
 
   const saveName = async (event: FormEvent) => {
     event.preventDefault();
@@ -225,8 +197,8 @@ export function SpaceSettings({ spaceId, section }: { spaceId: string; section: 
                     <div className="min-w-0 flex-1">
                       <p className="m-0 text-sm font-medium">Leave this Space</p>
                       <p className="mb-0 mt-1 text-xs leading-relaxed text-muted-foreground">
-                        You will immediately lose access to chat, tasks, Agents, and protected
-                        Library items.
+                        You will immediately lose access to chat, tasks, and protected Library
+                        items.
                       </p>
                     </div>
                     <Button
@@ -248,67 +220,23 @@ export function SpaceSettings({ spaceId, section }: { spaceId: string; section: 
 
         {activeSection === "chat" ? (
           <SettingsCard icon={<MessageSquare className="size-5" />} title="Space chat">
-            <div className="mt-5 grid gap-2 sm:grid-cols-2">
+            <div className="mt-5 grid gap-2">
               <Fact
                 label="People"
                 value={`${space.member_count} member${space.member_count === 1 ? "" : "s"}`}
-              />
-              <Fact
-                label="Available Agents"
-                value={String(agents.filter((agent) => agent.enabled).length)}
               />
             </div>
             <ActionLink to={`/spaces/${encodeURIComponent(spaceId)}/chat`} label="Open Chat" />
           </SettingsCard>
         ) : null}
-        {activeSection === "studio" ? (
-          <div className="grid gap-3 sm:grid-cols-2">
-            <ManagementCard
-              icon={<Bot className="size-5" />}
-              title="Agents"
-              count={agents.length}
-              to={`/spaces/${encodeURIComponent(spaceId)}/agents/studio/agents`}
-            />
-            <ManagementCard
-              icon={<Workflow className="size-5" />}
-              title="Workflows"
-              count={workflows.length}
-              to={`/spaces/${encodeURIComponent(spaceId)}/agents/studio/workflows`}
+
+        {activeSection === "integrations" ? (
+          <div className="grid gap-5">
+            <DiscordLinkPanel
+              spaceId={spaceId}
+              canManage={space.permissions?.["integrations.manage"] !== false}
             />
           </div>
-        ) : null}
-        {activeSection === "agents" ? (
-          <SettingsCard icon={<Sparkles className="size-5" />} title="Agents">
-            <div className="mt-5 grid gap-1.5">
-              {agents.slice(0, 6).map((agent) => (
-                <div
-                  className="flex min-h-12 items-center gap-3 rounded-lg bg-muted/40 px-3"
-                  key={agent.id}
-                >
-                  <span className="grid size-8 place-items-center rounded-md bg-muted text-muted-foreground">
-                    <Bot className="size-4" />
-                  </span>
-                  <span className="min-w-0 flex-1 truncate text-xs font-medium">{agent.name}</span>
-                  <Badge variant={agent.enabled ? "secondary" : "outline"}>
-                    {agent.enabled ? <Check className="mr-1 size-3" /> : null}
-                    {agent.enabled ? "Available" : "Off"}
-                  </Badge>
-                </div>
-              ))}
-              {agents.length === 0 ? (
-                <div className="rounded-lg bg-muted/30 px-4 py-7 text-center">
-                  <Users className="mx-auto size-5 text-muted-foreground" />
-                  <p className="mb-0 mt-2 text-xs text-muted-foreground">
-                    No Agents have been added yet.
-                  </p>
-                </div>
-              ) : null}
-            </div>
-            <ActionLink
-              to={`/spaces/${encodeURIComponent(spaceId)}/agents/studio/agents`}
-              label={agents.length === 0 ? "Add an Agent" : "Manage Agents"}
-            />
-          </SettingsCard>
         ) : null}
       </div>
 
@@ -409,33 +337,6 @@ function SettingsCard({
     </Card>
   );
 }
-function ManagementCard({
-  icon,
-  title,
-  count,
-  to,
-}: {
-  icon: ReactNode;
-  title: string;
-  count: number;
-  to: string;
-}) {
-  return (
-    <Link className="group block no-underline" to={to}>
-      <Card className="transition-colors hover:bg-muted/50">
-        <CardContent className="flex items-center gap-3 p-5">
-          <span className="grid size-9 place-items-center rounded-md bg-muted/60 text-muted-foreground">
-            {icon}
-          </span>
-          <CardTitle>{title}</CardTitle>
-          <Badge className="ml-auto" variant="outline">
-            {count}
-          </Badge>
-        </CardContent>
-      </Card>
-    </Link>
-  );
-}
 function ActionLink({ to, label }: { to: string; label: string }) {
   return (
     <Button asChild className="mt-5" variant="outline">
@@ -465,11 +366,7 @@ function DangerError({ message }: { message: string }) {
   );
 }
 function sectionTitle(section: string) {
-  return section === "chat"
-    ? "Chat settings"
-    : section === "studio"
-      ? "Studio settings"
-      : section === "agents"
-        ? "Agent settings"
-        : "Space settings";
+  if (section === "chat") return "Chat settings";
+  if (section === "integrations") return "Integrations";
+  return "Space settings";
 }

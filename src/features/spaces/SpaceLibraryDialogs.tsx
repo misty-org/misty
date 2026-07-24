@@ -323,7 +323,7 @@ function TextDialog({ model }: { model: TextDialogModel }) {
               >
                 {model.saving
                   ? "Saving…"
-                  : state.kind === "create-folder" || state.kind === "create-group"
+                  : state.kind === "create-folder"
                     ? "Create"
                     : "Save changes"}
               </Button>

@@ -31,7 +31,7 @@ import type { ExplorerBatchRenameItem, ExplorerDialogState } from "@/stores/expl
 
 const dialogChromeClass =
   "flex max-h-[min(760px,calc(100vh-48px))] w-[min(720px,calc(100vw-48px))] max-w-none flex-col overflow-hidden bg-popover p-0 text-popover-foreground";
-const dialogWideClass = "w-[min(940px,calc(100vw-48px))]";
+const dialogWideClass = "w-[min(760px,calc(100vw-48px))]";
 const fieldClass = "grid gap-1.5 text-xs font-medium text-muted-foreground";
 const controlsClass = "grid grid-cols-4 gap-3 border-b border-border p-4 max-[820px]:grid-cols-2";
 const toggleClass =

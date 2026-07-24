@@ -6,6 +6,7 @@ export const routes = {
   accountSignIn: "/account/signin",
   activity: "/activity",
   agents: "/agents",
+  assistant: "/assistant",
   automations: "/automations",
   changelog: "/changelog",
   diagnostics: "/diagnostics",
@@ -24,5 +25,4 @@ export const routes = {
   settings: "/settings",
   signIn: "/signin",
   transfers: "/transfers",
-  cloudFolderBot: "/bot/cloud-folder",
 } as const;

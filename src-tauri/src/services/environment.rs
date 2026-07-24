@@ -157,7 +157,6 @@ impl AppEnvironment {
         let workspaces_path = config_dir.join("workspaces.json");
         let commands_path = config_dir.join("commands.msy");
         ensure_mobile_user_dirs(&home_dir);
-        seed_builtin_animation_assets(&assets_dir);
         let grpc_address = settings_advanced_string(&settings_path, "server_address")
             .unwrap_or_else(|| "localhost:50051".to_owned());
         let mount_path = settings_advanced_string(&settings_path, "mount_path")
@@ -207,7 +206,6 @@ impl AppEnvironment {
         let workspaces_path = config_dir.join("workspaces.json");
         let commands_path = config_dir.join("commands.msy");
         ensure_mobile_user_dirs(&home_dir);
-        seed_builtin_animation_assets(&assets_dir);
         let grpc_address = settings_advanced_string(&settings_path, "server_address")
             .unwrap_or_else(|| "localhost:50051".to_owned());
         let mount_path = settings_advanced_string(&settings_path, "mount_path")
@@ -292,21 +290,23 @@ fn resolve_home_dir() -> Option<PathBuf> {
 }
 
 fn display_path(path: &Path) -> String {
-    path.display().to_string()
+    clean_display_path(path.display().to_string().as_str())
 }
 
-fn seed_builtin_animation_assets(assets_dir: &Path) {
-    let animations_dir = assets_dir.join("animations");
-    if fs::create_dir_all(&animations_dir).is_err() {
-        return;
+#[cfg(windows)]
+fn clean_display_path(path: &str) -> String {
+    if let Some(rest) = path.strip_prefix(r"\\?\UNC\") {
+        format!(r"\\{rest}")
+    } else if let Some(rest) = path.strip_prefix(r"\\?\") {
+        rest.to_string()
+    } else {
+        path.to_string()
     }
+}
 
-    for (file_name, bytes) in [(
-        "mika.webp",
-        include_bytes!("../../../src/assets/bots/cloud-folder/mika.webp").as_slice(),
-    )] {
-        let _ = fs::write(animations_dir.join(file_name), bytes);
-    }
+#[cfg(not(windows))]
+fn clean_display_path(path: &str) -> String {
+    path.to_string()
 }
 
 #[cfg(target_os = "ios")]

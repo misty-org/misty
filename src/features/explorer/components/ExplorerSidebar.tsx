@@ -323,9 +323,9 @@ export const ExplorerSidebar = memo(function ExplorerSidebar(props: ExplorerSide
         ? { kind, workspaceId: active.id, title: active.title }
         : kind === "delete" && active
           ? { kind, workspaceId: active.id, title: active.title }
-          : { kind: "create", workspaceId: "", title: "Workspace" },
+          : { kind: "create", workspaceId: "", title: "File layout" },
     );
-    setWorkspaceDraft(kind === "rename" && active ? active.title : "Workspace");
+    setWorkspaceDraft(kind === "rename" && active ? active.title : "File layout");
   };
   const confirmWorkspaceDialog = () => {
     if (!workspaceDialog) return;

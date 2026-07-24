@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { ReactNode } from "react";
 import type { MouseEvent as ReactMouseEvent } from "react";
 import { CloudDownload, FolderOpen } from "lucide-react";
 import { Button } from "@/ui";
@@ -18,7 +18,6 @@ import type {
   ProviderRemote,
 } from "@/models/interfaces/services/misty-api";
 import { FileBrowser } from "@/features/explorer/components/FileBrowser";
-import { ExplorerPickerSidebar } from "@/features/explorer/components/ExplorerPickerSidebar";
 import { ExplorerPickerToolbar } from "@/features/explorer/components/ExplorerPickerToolbar";
 import { errorText } from "@/lib/format";
 import { useMultiPanelStore } from "@/features/workspace";
@@ -40,6 +39,8 @@ export interface MistyFilePickerProps {
   title?: string;
   initialPath?: string | null;
   allowedExtensions?: string[];
+  /** Source switcher rendered in the header when this picker is hosted by MistyPicker. */
+  sourceToggle?: ReactNode;
   onCancel: () => void;
   onSelect: (path: string) => void;
   onSelectMany?: (paths: string[]) => void;

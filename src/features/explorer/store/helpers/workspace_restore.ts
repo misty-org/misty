@@ -65,7 +65,6 @@ import {
 import { useOperationQueueStore } from "@/stores/explorer";
 import { useTransfersStore } from "@/stores/transfers";
 import { clipboardImagePng } from "../../utils/clipboardImage";
-import { publishCloudFolderBotNotification } from "@/features/bots/cloudFolderBot";
 
 import type {
   ExplorerViewMode,
@@ -389,23 +388,27 @@ export function parsePaneRestoreState(
   backHistory: string[];
   forwardHistory: string[];
 } {
+  const normalizedFallbackPath = H.normalizedPath(fallbackPath);
   try {
     const parsed = JSON.parse(value || "{}") as Record<string, unknown>;
     const restoredPath =
       typeof parsed.current_path === "string" && parsed.current_path
-        ? parsed.current_path
-        : fallbackPath;
+        ? H.normalizedPath(parsed.current_path)
+        : normalizedFallbackPath;
     return {
-      path: isAndroidBuild && !restoredPath.startsWith("misty://") ? fallbackPath : restoredPath,
+      path:
+        isAndroidBuild && !restoredPath.startsWith("misty://")
+          ? normalizedFallbackPath
+          : restoredPath,
       showHidden: parsed.show_hidden === true,
       gridView: parsed.grid_view === true,
       sort: H.parseSortState(parsed.sort_column, parsed.sort_direction),
-      backHistory: H.stringArray(parsed.back_history),
-      forwardHistory: H.stringArray(parsed.forward_history),
+      backHistory: H.stringArray(parsed.back_history).map(H.normalizedPath),
+      forwardHistory: H.stringArray(parsed.forward_history).map(H.normalizedPath),
     };
   } catch {
     return {
-      path: fallbackPath,
+      path: normalizedFallbackPath,
       showHidden: false,
       gridView: false,
       sort: { column: "name", direction: "asc" },
@@ -417,7 +420,7 @@ export function parsePaneRestoreState(
 
 export function placeholderListing(path: string): DirectoryListing {
   return {
-    path,
+    path: H.normalizedPath(path),
     parentPath: null,
     location: { kind: "local", providerType: null, remoteName: null, remotePath: null },
     entries: [],

@@ -154,3 +154,9 @@ service/lib/encoder/encoder_cases_test.go
 service/cmd/bisync/testdata/bisync_vscode_debuggers_launch.json
 service/cmd/lsf/testfiles/file[23]
 service/cmd/lsf/testfiles/subdir/file[23]
+.ds-sync/
+ds-bundle/
+.design-sync/.cache/
+.design-sync/learnings/
+.design-sync/node_modules
+node_modules/@misty/desktop

@@ -26,6 +26,7 @@ export interface MediaChunkIndexResponse {
   chunkIndex: number;
   segmentCount?: number;
   indexedThroughMs?: number;
-  creditsUsed?: number;
+  hostedAIUsedRatio?: number;
+  hostedAIResetAt?: string;
   alreadyIndexed?: boolean;
 }

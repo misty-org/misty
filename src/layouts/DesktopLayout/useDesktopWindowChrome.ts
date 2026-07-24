@@ -10,12 +10,33 @@ import { hasTauriInternals } from "@/platform/tauri";
 import { isNativeMobileBuild } from "@/platform/buildTarget";
 import type { DesktopPlatform, WindowBounds, WindowRect } from "@/models/types/layouts";
 
+export const WINDOW_DRAG_SUPPRESS_SELECTOR = [
+  "button",
+  "a",
+  "input",
+  "textarea",
+  "select",
+  "[role='button']",
+  "[draggable='true']",
+  "[data-misty-window-drag-block='true']",
+  "[data-pointer-drag-source='true']",
+  "[data-explorer-drag-source='true']",
+  "[data-reorder-drag-source='true']",
+].join(",");
+
+export function shouldSuppressWindowDrag(target: EventTarget | null) {
+  const element = typeof Element === "undefined" || !(target instanceof Element) ? null : target;
+  return Boolean(element?.closest(WINDOW_DRAG_SUPPRESS_SELECTOR));
+}
+
 export function useDesktopWindowChrome() {
   const usesNativeWindowChrome = !isNativeMobileBuild;
   const [desktopPlatform, setDesktopPlatform] = useState<DesktopPlatform>("unknown");
   const customZoomRestoreBoundsRef = useRef<WindowBounds | null>(null);
   const customZoomedRef = useRef(false);
   const customZoomAnimatingRef = useRef(false);
+  const lastTitlebarPressRef = useRef(0);
+  const [isWindowMaximized, setIsWindowMaximized] = useState(false);
 
   useEffect(() => {
     if (!hasTauriInternals()) {
@@ -47,8 +68,7 @@ export function useDesktopWindowChrome() {
       return;
     }
 
-    const target = event.target as HTMLElement | null;
-    if (target?.closest("button,a,input,textarea,select,[role='button']")) {
+    if (shouldSuppressWindowDrag(event.target)) {
       return;
     }
 
@@ -144,12 +164,14 @@ export function useDesktopWindowChrome() {
         height: monitor.workArea.size.height,
       });
       customZoomedRef.current = true;
+      setIsWindowMaximized(true);
       return;
     }
 
     const restoreBounds = customZoomRestoreBoundsRef.current;
     if (!restoreBounds) {
       customZoomedRef.current = false;
+      setIsWindowMaximized(false);
       return;
     }
 
@@ -160,7 +182,33 @@ export function useDesktopWindowChrome() {
       height: restoreBounds.size.height,
     });
     customZoomedRef.current = false;
+    setIsWindowMaximized(false);
   }, [animateWindowRect]);
+
+  // Windows/Linux titlebar: drag on press, toggle maximize on a double-press.
+  // We detect the double-press by timing rather than the DOM `dblclick`, which
+  // the native drag loop (started on the first press) swallows. Uses the
+  // pseudo-maximize because native toggleMaximize() is unreliable on this
+  // borderless, transparent window.
+  const handleWindowsTitlebarPointerDown = useCallback(
+    (event: ReactPointerEvent<HTMLElement>) => {
+      if (event.button !== 0) return;
+      if (shouldSuppressWindowDrag(event.target)) return;
+      event.preventDefault();
+      if (!hasTauriInternals()) return;
+      const now = Date.now();
+      const isDoublePress = now - lastTitlebarPressRef.current <= 500;
+      lastTitlebarPressRef.current = isDoublePress ? 0 : now;
+      if (isDoublePress) {
+        void togglePseudoMaximize().catch(() => undefined);
+        return;
+      }
+      void getCurrentWindow()
+        .startDragging()
+        .catch(() => undefined);
+    },
+    [togglePseudoMaximize],
+  );
 
   const expandTitlebarWindow = useCallback(
     (event: ReactMouseEvent<HTMLElement>) => {
@@ -192,7 +240,9 @@ export function useDesktopWindowChrome() {
     usesNativeWindowChrome,
     desktopPlatform,
     shouldShowWindowsTitlebarControls,
+    isWindowMaximized,
     startTitlebarDrag,
+    handleWindowsTitlebarPointerDown,
     expandTitlebarWindow,
     togglePseudoMaximize,
     minimizeTitlebarWindow,

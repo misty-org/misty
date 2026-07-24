@@ -2,8 +2,9 @@ import { forwardRef, memo } from "react";
 import { NavLink } from "react-router-dom";
 import { Bell, Settings as SettingsIcon, UserCircle } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
-import { Button } from "@/ui";
+import { Avatar, AvatarFallback, AvatarImage, Button } from "@/ui";
 import { useAuth } from "@/features/auth/AuthContext";
+import { useAccountAvatarUrl } from "@/hooks/useAccountAvatarUrl";
 import { useSetupStore } from "@/stores/app";
 import { useUserStore } from "@/stores/account/useUserStore";
 import type { DesktopNavItem } from "@/models/types/layouts";
@@ -18,6 +19,11 @@ import {
   profileDockClass,
 } from "./styles";
 import { emailName, formatBadgeCount, initialsForProfile } from "./helpers";
+
+const notificationBadgeClass = [
+  "absolute right-px top-0.5 grid h-[18px] min-w-[18px] place-items-center rounded-full bg-[#d83e3e]",
+  "px-[5px] text-[10px] font-bold leading-none text-white shadow-[0_0_0_2px_var(--misty-bg)]",
+].join(" ");
 
 export function NavGroup(props: {
   items: DesktopNavItem[];
@@ -42,7 +48,7 @@ export function NavGroup(props: {
             <span className={`${navIconTileBaseClass} ${selected ? navIconTileActiveClass : ""}`}>
               <Icon className={navIconClass} strokeWidth={1.85} />
               {props.badges?.[item.id] ? (
-                <span className="absolute right-px top-0.5 grid h-[18px] min-w-[18px] place-items-center rounded-full bg-[#d83e3e] px-[5px] text-[10px] font-bold leading-none text-white shadow-[0_0_0_2px_var(--misty-bg)]">
+                <span className={notificationBadgeClass}>
                   {formatBadgeCount(props.badges[item.id] ?? 0)}
                 </span>
               ) : null}
@@ -86,9 +92,7 @@ export const ActivityNavButton = memo(
         <span className={`${navIconTileBaseClass} ${props.open ? navIconTileActiveClass : ""}`}>
           <Bell className={navIconClass} strokeWidth={1.85} />
           {props.badge ? (
-            <span className="absolute right-px top-0.5 grid h-[18px] min-w-[18px] place-items-center rounded-full bg-[#d83e3e] px-[5px] text-[10px] font-bold leading-none text-white shadow-[0_0_0_2px_var(--misty-bg)]">
-              {formatBadgeCount(props.badge)}
-            </span>
+            <span className={notificationBadgeClass}>{formatBadgeCount(props.badge)}</span>
           ) : null}
         </span>
         <span className={`${navItemLabelBaseClass} ${props.open ? navItemLabelActiveClass : ""}`}>
@@ -132,14 +136,19 @@ export const ProfileNavButton = memo(
     const { user } = useAuth();
     const me = useUserStore(
       useShallow((state) => ({
+        id: state.me?.id,
         email: state.me?.email,
         name: state.me?.name,
+        avatarVersion: state.me?.avatar_version ?? 0,
       })),
     );
-    const account = currentUser ?? user;
-    const email = me.email ?? account?.email ?? "";
-    const displayName = me.name ?? account?.name ?? emailName(email) ?? "Misty";
+    const account = user ?? currentUser;
+    const accountMe = me.id === account?.id ? me : null;
+    const email = accountMe?.email ?? account?.email ?? "";
+    const displayName = accountMe?.name ?? account?.name ?? emailName(email) ?? "Misty";
     const initials = initialsForProfile(displayName, email);
+    const avatarVersion = accountMe?.avatarVersion ?? user?.avatarVersion ?? 0;
+    const avatarUrl = useAccountAvatarUrl(account?.id, avatarVersion);
 
     return (
       <Button
@@ -151,7 +160,18 @@ export const ProfileNavButton = memo(
         aria-expanded={props.open}
         onClick={props.onClick}
       >
-        {account ? initials : <UserCircle size={24} strokeWidth={1.75} />}
+        {account ? (
+          <Avatar className="size-full">
+            {avatarUrl ? (
+              <AvatarImage src={avatarUrl} alt={`${displayName} profile picture`} />
+            ) : null}
+            <AvatarFallback className="font-bold text-[var(--misty-text)]">
+              {initials}
+            </AvatarFallback>
+          </Avatar>
+        ) : (
+          <UserCircle size={24} strokeWidth={1.75} />
+        )}
       </Button>
     );
   }),
