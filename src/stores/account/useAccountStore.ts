@@ -15,6 +15,7 @@ import { normalizeApiBaseUrl, withDefaultApiPath } from "@/stores/backend";
 import { isAndroidBuild, isNativeMobileBuild } from "@/platform/buildTarget";
 import {
   clearAccountAuthToken,
+  readAccountSessionGeneration,
   readAccountAuthToken,
   saveAccountAuthToken,
 } from "./useAuthTokenStore";
@@ -34,10 +35,13 @@ async function requestJson<T>(
   path: string,
   body?: unknown,
 ): Promise<T> {
+  const accountGeneration = readAccountSessionGeneration();
   const apiBase = await resolveAccountApiBase();
+  assertAccountGeneration(accountGeneration);
   const url = `${apiBase}${path}`;
   try {
     const token = shouldAttachAuthToken(path) ? await readAccountAuthToken() : null;
+    assertAccountGeneration(accountGeneration);
     const headers = requestHeaders(body, token);
     const response = await fetch(url, {
       method,
@@ -45,9 +49,13 @@ async function requestJson<T>(
       body: body === undefined ? undefined : JSON.stringify(body),
       credentials: "include",
     });
-    return await parseResponse<T>(response, method, path, url);
+    assertAccountGeneration(accountGeneration);
+    const result = await parseResponse<T>(response, method, path, url);
+    assertAccountGeneration(accountGeneration);
+    return result;
   } catch (error) {
-    if (error instanceof AccountApiError) throw error;
+    if (error instanceof AccountApiError || error instanceof AccountSessionChangedError)
+      throw error;
     const message = apiBase
       ? `Could not reach Misty server at ${apiBase}. ${errorMessage(error)}`
       : `Missing Misty API base URL for ${method} ${path}.`;
@@ -58,6 +66,12 @@ async function requestJson<T>(
       detail: `${method} ${url}`,
     });
     throw new Error(message);
+  }
+}
+
+function assertAccountGeneration(expected: number): void {
+  if (readAccountSessionGeneration() !== expected) {
+    throw new AccountSessionChangedError();
   }
 }
 
@@ -221,16 +235,10 @@ export function accountFetchBillingUsage(): Promise<BillingUsageResponse> {
 }
 
 export function accountCreateCheckout(
-  tier: "pro" | "max",
+  tier: "pro",
   interval: "month" | "year",
 ): Promise<{ url: string }> {
   return postJson("/billing/checkout-session", { tier, interval });
-}
-
-export function accountCreateCreditCheckout(
-  packId: "credits_1500" | "credits_3500",
-): Promise<{ url: string }> {
-  return postJson("/billing/credit-checkout-session", { pack_id: packId });
 }
 
 export function accountCreatePortalSession(): Promise<{ url: string }> {
@@ -239,6 +247,43 @@ export function accountCreatePortalSession(): Promise<{ url: string }> {
 
 export async function accountUpdateProfile(name: string): Promise<void> {
   await requestJson("PUT", "/me/profile", { name });
+}
+
+export async function accountUpdateAvatar(file: Blob): Promise<number> {
+  const response = await accountAvatarRequest("PUT", file);
+  const payload = (await response.json()) as { avatar_version?: number };
+  if (!payload.avatar_version) throw new Error("Misty did not confirm the profile image update.");
+  return payload.avatar_version;
+}
+
+export async function accountFetchAvatar(): Promise<Blob> {
+  const response = await accountAvatarRequest("GET");
+  return response.blob();
+}
+
+async function accountAvatarRequest(method: "GET" | "PUT", body?: Blob): Promise<Response> {
+  const accountGeneration = readAccountSessionGeneration();
+  const apiBase = await resolveAccountApiBase();
+  assertAccountGeneration(accountGeneration);
+  const token = await readAccountAuthToken();
+  assertAccountGeneration(accountGeneration);
+  const headers = requestHeaders(undefined, token) ?? new Headers();
+  if (body) headers.set("Content-Type", "image/png");
+  const response = await fetch(`${apiBase}/me/avatar`, {
+    method,
+    headers,
+    body,
+    credentials: "include",
+  });
+  assertAccountGeneration(accountGeneration);
+  if (!response.ok) {
+    const message = (await response.text()).trim();
+    throw new AccountApiError(
+      message || `Profile image request failed (${response.status}).`,
+      response.status,
+    );
+  }
+  return response;
 }
 
 export async function accountUpdateDevice(device: string): Promise<void> {
@@ -256,12 +301,16 @@ export async function accountUpdateTelemetryPreferences(
 }
 
 export async function accountLogout(): Promise<SavedAccountSession | null> {
+  await accountRevokeCurrentSession();
+  return await clearAccountAuthToken();
+}
+
+export async function accountRevokeCurrentSession(): Promise<void> {
   try {
     await postJson("/logout");
   } catch {
     // Local sign-out and account switching must still work while offline.
   }
-  return await clearAccountAuthToken();
 }
 
 class AccountApiError extends Error {
@@ -272,6 +321,14 @@ class AccountApiError extends Error {
     readonly status?: number,
   ) {
     super(message);
+  }
+}
+
+class AccountSessionChangedError extends Error {
+  name = "AccountSessionChangedError";
+
+  constructor() {
+    super("The active Misty account changed before this request finished. Please try again.");
   }
 }
 

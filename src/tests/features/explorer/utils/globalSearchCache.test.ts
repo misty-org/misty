@@ -72,4 +72,27 @@ describe("global media search cache resilience", () => {
     expect(mocks.searchMedia).toHaveBeenCalledTimes(2);
     expect(retried[0]?.match?.mediaStartMs).toBe(40_000);
   });
+
+  it("does not return or cache an in-flight result after the cache is cleared", async () => {
+    let resolveSearch: ((value: { hits: never[] }) => void) | undefined;
+    mocks.searchMedia
+      .mockImplementationOnce(
+        () =>
+          new Promise<{ hits: never[] }>((resolve) => {
+            resolveSearch = resolve;
+          }),
+      )
+      .mockResolvedValue({ hits: [] });
+
+    const staleRequest = querySemanticExplorerSearch("account private query", {});
+    const sharedStaleRequest = querySemanticExplorerSearch("account private query", {});
+    await vi.waitFor(() => expect(resolveSearch).toBeTypeOf("function"));
+    clearSemanticExplorerSearchCache();
+    resolveSearch?.({ hits: [] });
+
+    await expect(staleRequest).resolves.toEqual([]);
+    await expect(sharedStaleRequest).resolves.toEqual([]);
+    await querySemanticExplorerSearch("account private query", {});
+    expect(mocks.searchMedia).toHaveBeenCalledTimes(2);
+  });
 });

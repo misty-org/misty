@@ -27,6 +27,8 @@ export interface SpaceLibraryHeaderProps {
   albumOrderAvailable: boolean;
   viewMode: "grid" | "list";
   onViewMode: (mode: "grid" | "list") => void;
+  itemScale: number;
+  onItemScale: (scale: number) => void;
   visibleItemCount: number;
 }
 

@@ -3,6 +3,12 @@ import type {
   GlobalImageEditDefinition,
   GlobalImageMarkupElement,
 } from "@/models/interfaces/features/editor/imageEditor";
+import type { MessageOrigin } from "@/models/interfaces/features/spaces/integrations/discord";
+import type {
+  TaskCalendarLink,
+  TaskSchedule,
+} from "@/models/interfaces/features/spaces/integrations/calendarTasks";
+import type { ScheduleField } from "@/models/types/features/spaces/integrations/calendarTasks";
 
 import type {
   SpaceRole,
@@ -73,6 +79,15 @@ export interface SpaceTask {
   version: number;
   completed_at?: string;
   archived_at?: string;
+  /**
+   * Schedule fields Google Calendar owns, present on calendar-backed tasks and
+   * local drafts. Misty-only tasks leave this unset.
+   */
+  schedule?: TaskSchedule;
+  /** Binding to a Google calendar. Absent on Misty-only tasks. */
+  calendar?: TaskCalendarLink;
+  /** Set by a sync pass when local edits collide with a Google update. */
+  conflicted_fields?: ScheduleField[];
   created_at: string;
   updated_at: string;
 }
@@ -145,6 +160,7 @@ export interface SpaceMessage {
   conversation_id?: string;
   sender_user_id: string;
   sender_name: string;
+  sender_avatar_version?: number;
   sender_kind: "person" | "agent" | "system";
   sender_agent_id?: string;
   content: MessageSpan[];
@@ -153,6 +169,11 @@ export interface SpaceMessage {
   attachments?: MessageAttachment[];
   reply_to_message_id?: string;
   edited_at?: string;
+  /**
+   * Set only on mirrored messages. Absent means Misty-native chat, so every
+   * existing caller stays valid and the UI can treat "no origin" as "ours".
+   */
+  origin?: MessageOrigin;
   created_at: string;
 }
 
@@ -201,6 +222,8 @@ export interface SpaceStudioResource {
   name: string;
   description?: string;
   icon?: string;
+  model_mode?: "automatic" | "pinned";
+  model_id?: string;
   instructions?: string;
   definition?: Record<string, unknown>;
   enabled: boolean;
@@ -219,14 +242,23 @@ export interface SpaceStudioResource {
 export interface SpacesSnapshot {
   spaces: Space[];
   invitations: SpaceInvitation[];
-  limits: {
-    owned: number;
-    owned_limit: number;
-    remaining_owned: number;
-    memberships: number;
-    people: number;
-    nodes: number;
-    space_storage_bytes: number;
+  entitlements: {
+    unlimited_spaces: boolean;
+    unlimited_collaborators: boolean;
+  };
+  owner_storage: {
+    used_bytes: number;
+    reserved_bytes: number;
+    limit_bytes: number;
+    remaining_bytes: number;
+    over_quota_since?: string;
+    cleanup_notice_until?: string;
+    spaces: Array<{
+      space_id: string;
+      name: string;
+      used_bytes: number;
+      reserved_bytes: number;
+    }>;
   };
 }
 
@@ -444,11 +476,12 @@ export interface LibrarySharedReference {
 
 export interface SpaceStorageUsage {
   space_id: string;
-  used_bytes: number;
-  reserved_bytes: number;
-  limit_bytes: number;
-  remaining_bytes: number;
-  version: number;
+  storage_available?: boolean;
+  used_bytes?: number;
+  reserved_bytes?: number;
+  limit_bytes?: number;
+  remaining_bytes?: number;
+  version?: number;
 }
 
 export interface MessageAttachment {

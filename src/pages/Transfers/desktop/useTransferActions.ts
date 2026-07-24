@@ -5,7 +5,7 @@ import type { TransferRecord } from "@/models/interfaces/services/misty-api";
 import { errorText } from "@/lib/format";
 import { useOperationQueueStore } from "@/stores/explorer";
 import { useTransfersStore } from "@/stores/transfers";
-import { isLiveTransfer } from "./transferModel";
+import { isLiveTransfer, transferPaused } from "./transferModel";
 
 export function useTransferActions(options: { workspaceId: string; rows: TransferRecord[] }) {
   const loadTransfers = useTransfersStore((state) => state.load);
@@ -114,7 +114,7 @@ export function useTransferActions(options: { workspaceId: string; rows: Transfe
   const handlePauseResumeTransfer = useCallback(
     (transfer: TransferRecord) => {
       if (!transfer.operationId) return Promise.resolve();
-      const resuming = transfer.paused;
+      const resuming = transferPaused(transfer, queueSnapshot);
       return refreshAfterQueueMutation(
         resuming ? resumeOperation(transfer.operationId) : pauseOperation(transfer.operationId),
         {
@@ -123,7 +123,7 @@ export function useTransferActions(options: { workspaceId: string; rows: Transfe
         },
       );
     },
-    [pauseOperation, refreshAfterQueueMutation, resumeOperation],
+    [pauseOperation, queueSnapshot, refreshAfterQueueMutation, resumeOperation],
   );
   const handlePauseResumeBatchTransfer = useCallback(
     (transfer: TransferRecord) => {
@@ -182,6 +182,9 @@ export function useTransferActions(options: { workspaceId: string; rows: Transfe
     },
     [handleRetryOperation, refreshAfterQueueMutation, retryTransfer],
   );
+  // Delete outcomes are reported by the transfers store's own `error`/`message`,
+  // which surface through AppNoticePublisher/RouteNotice. Do not mirror them into
+  // the action feedback banner or every delete notifies twice.
   const handleDeleteTransfer = useCallback(
     (transferId: number) => {
       void deleteIds(options.workspaceId, [transferId]);
@@ -193,6 +196,10 @@ export function useTransferActions(options: { workspaceId: string; rows: Transfe
     [deleteSelected, options.workspaceId],
   );
   const handleDeleteAll = useCallback(() => void deleteAll(), [deleteAll]);
+  const isTransferPaused = useCallback(
+    (row: TransferRecord) => transferPaused(row, queueSnapshot),
+    [queueSnapshot],
+  );
   const isBatchPaused = useCallback(
     (row: TransferRecord) =>
       Boolean(
@@ -215,6 +222,7 @@ export function useTransferActions(options: { workspaceId: string; rows: Transfe
     handleRetryTransfer,
     handleUndo,
     isBatchPaused,
+    isTransferPaused,
     loadQueue,
     loadTransfers,
     queueWorking,

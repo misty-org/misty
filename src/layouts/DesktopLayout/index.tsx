@@ -18,17 +18,13 @@ export type {
   AppNoticeEntry,
   FramePacingState,
 } from "@/models/types/layouts";
-import { Button } from "@/ui";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Outlet } from "react-router-dom";
+import { useShallow } from "zustand/react/shallow";
 import { Minus, Square, X } from "lucide-react";
-import {
-  hideRuntimeAssetOnError,
-  revealRuntimeAssetOnLoad,
-} from "@/platform/runtimeAsset";
+import { hideRuntimeAssetOnError, revealRuntimeAssetOnLoad } from "@/platform/runtimeAsset";
 import type { AppTab } from "@/models/types/routing/types";
 import {
-  selectAssistantPreferences,
   selectNotificationPreferences,
   settingsBoolean,
   useAppRouteMemoryStore,
@@ -39,7 +35,6 @@ import { useSpacesStore } from "@/stores/spaces/useSpacesStore";
 import { AppWallpaperVideo } from "../AppWallpaperVideo";
 import { DeepSearchOverlay } from "@/features/explorer/components/DeepSearchOverlay";
 import { MediaSearchViewer } from "@/features/explorer/components/MediaSearchViewer";
-import { AgentJobWorker } from "@/features/agents/AgentJobWorker";
 import { SpacesRealtimeBridge } from "@/features/spaces/SpacesRealtimeBridge";
 import {
   desktopNavbarClass,
@@ -48,6 +43,7 @@ import {
   desktopTitlebarClass,
   desktopTitlebarDoubleClickLayerClass,
   desktopTitlebarTitleClass,
+  desktopWallpaperLayerClass,
   navbarBottomClass,
   navbarGroupClass,
   tabletFrameClass,
@@ -56,25 +52,42 @@ import {
   windowsTitlebarCloseButtonClass,
   windowsTitlebarControlButtonClass,
   windowsTitlebarControlsClass,
+  windowsTitlebarTitleClass,
 } from "./styles";
 import { settingsFallbackRoute } from "./helpers";
 import { useDesktopWindowChrome } from "./useDesktopWindowChrome";
 import { useDesktopFrameStyle } from "./useDesktopFrameStyle";
 import { useDesktopBootstrap } from "./useDesktopBootstrap";
-import { useCloudFolderBotBridge } from "./useCloudFolderBotBridge";
 import { useUnreadBadgeSync } from "./useUnreadBadgeSync";
 import { ActivityNavButton, NavGroup, ProfileNavButton, SettingsNavButton } from "./NavRail";
 import { ProfilePopover } from "./ProfilePopover";
-import { ActivityPopover } from "./ActivityPopover";
 import { AppNoticePublisher, RouteNotice } from "./RouteNotices";
 import { TransferCompletionNotifier, WorkStatusPopup } from "./TransferStatus";
-import { AccountSettingsOverlay, SettingsOverlay } from "./SettingsOverlays";
+import {
+  AccountSettingsOverlay,
+  ActivityOverlay,
+  RemotesOverlay,
+  SettingsOverlay,
+} from "./SettingsOverlays";
 import { FramePacingOverlay } from "./FramePacingOverlay";
+import { useAuth } from "@/features/auth/AuthContext";
+
+// Windows "restore" caption glyph: two offset squares, the front one masked with
+// the titlebar background so the overlap reads cleanly.
+function RestoreGlyph() {
+  return (
+    <span className="relative block size-3" aria-hidden="true">
+      <span className="absolute right-0 top-0 size-2 rounded-[1px] border border-current" />
+      <span className="absolute bottom-0 left-0 size-2 rounded-[1px] border border-current bg-[var(--misty-app-titlebar-bg,var(--misty-bg))]" />
+    </span>
+  );
+}
 
 export function DesktopLayout(props: {
   getRouteId: (pathname: string) => AppTab;
   navItems: DesktopNavItem[];
 }) {
+  const { refreshUser } = useAuth();
   const {
     location,
     navigate,
@@ -90,14 +103,21 @@ export function DesktopLayout(props: {
     usesNativeWindowChrome,
     desktopPlatform,
     shouldShowWindowsTitlebarControls,
+    isWindowMaximized,
     startTitlebarDrag,
+    handleWindowsTitlebarPointerDown,
     expandTitlebarWindow,
     togglePseudoMaximize,
     minimizeTitlebarWindow,
     closeTitlebarWindow,
   } = useDesktopWindowChrome();
-  const { appWallpaperSrc, appWallpaperIsVideo, mistyLogoSource, desktopFrameStyle, desktopNavbarStyle } =
-    useDesktopFrameStyle();
+  const {
+    appWallpaperSrc,
+    appWallpaperIsVideo,
+    mistyLogoSource,
+    desktopFrameStyle,
+    desktopNavbarStyle,
+  } = useDesktopFrameStyle();
 
   const localUnreadActivityCount = useExplorerStore(
     (state) => state.notificationHistory.filter((notification) => !notification.read).length,
@@ -107,11 +127,8 @@ export function DesktopLayout(props: {
       [...state.inbox.unreads, ...state.inbox.mentions].filter((item) => !item.seen_at).length,
   );
   const unreadActivityCount = localUnreadActivityCount + cloudUnreadActivityCount;
-  const notificationPreferences = useSettingsStore((state) =>
-    selectNotificationPreferences(state.settings?.document),
-  );
-  const cloudFolderBotEnabled = useSettingsStore(
-    (state) => selectAssistantPreferences(state.settings?.document).enabled,
+  const notificationPreferences = useSettingsStore(
+    useShallow((state) => selectNotificationPreferences(state.settings?.document)),
   );
   const framePacingOverlayEnabled = useSettingsStore((state) =>
     settingsBoolean(
@@ -123,10 +140,6 @@ export function DesktopLayout(props: {
   );
   const lastSpacesRoute = useAppRouteMemoryStore((state) => state.lastSpacesRoute);
 
-  useCloudFolderBotBridge({
-    cloudFolderBotEnabled,
-    assetsDir: app?.environment.assetsDir,
-  });
   useUnreadBadgeSync({
     badgeCountEnabled: notificationPreferences.badgeCountEnabled,
     unreadActivityCount,
@@ -138,7 +151,11 @@ export function DesktopLayout(props: {
   const [profileOpen, setProfileOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [accountSettingsOpen, setAccountSettingsOpen] = useState(false);
+  const [remotesOpen, setRemotesOpen] = useState(false);
   const navItems = props.navItems;
+  const refreshUserAfterSettings = useCallback(() => {
+    void refreshUser().catch(() => undefined);
+  }, [refreshUser]);
   const openSettingsOverlay = useCallback(() => {
     setAccountSettingsOpen(false);
     setSettingsOpen(true);
@@ -146,13 +163,23 @@ export function DesktopLayout(props: {
   }, [settingsLoad]);
   const closeSettingsOverlay = useCallback(() => {
     setSettingsOpen(false);
-  }, []);
+    refreshUserAfterSettings();
+  }, [refreshUserAfterSettings]);
   const openAccountSettingsOverlay = useCallback(() => {
     setSettingsOpen(false);
     setAccountSettingsOpen(true);
   }, []);
   const closeAccountSettingsOverlay = useCallback(() => {
     setAccountSettingsOpen(false);
+    refreshUserAfterSettings();
+  }, [refreshUserAfterSettings]);
+  const openRemotesOverlay = useCallback(() => {
+    setSettingsOpen(false);
+    setAccountSettingsOpen(false);
+    setRemotesOpen(true);
+  }, []);
+  const closeRemotesOverlay = useCallback(() => {
+    setRemotesOpen(false);
   }, []);
 
   useEffect(() => {
@@ -164,12 +191,26 @@ export function DesktopLayout(props: {
   }, [lastAppRoute, lastNonSettingsRouteRef, location.pathname, navigate, openSettingsOverlay]);
 
   useEffect(() => {
+    if (!location.pathname.startsWith("/providers")) return;
+    openRemotesOverlay();
+    navigate(settingsFallbackRoute(lastNonSettingsRouteRef.current, lastAppRoute), {
+      replace: true,
+    });
+  }, [lastAppRoute, lastNonSettingsRouteRef, location.pathname, navigate, openRemotesOverlay]);
+
+  useEffect(() => {
     if (location.pathname !== "/account") return;
     openAccountSettingsOverlay();
     navigate(settingsFallbackRoute(lastNonSettingsRouteRef.current, lastAppRoute), {
       replace: true,
     });
-  }, [lastAppRoute, lastNonSettingsRouteRef, location.pathname, navigate, openAccountSettingsOverlay]);
+  }, [
+    lastAppRoute,
+    lastNonSettingsRouteRef,
+    location.pathname,
+    navigate,
+    openAccountSettingsOverlay,
+  ]);
 
   const shouldShowWindowsControls = shouldShowWindowsTitlebarControls;
   const frameClass = usesNativeWindowChrome ? desktopFrameClass : tabletFrameClass;
@@ -183,7 +224,7 @@ export function DesktopLayout(props: {
       style={desktopFrameStyle}
     >
       {appWallpaperSrc ? (
-        <div aria-hidden="true" className="pointer-events-none fixed inset-0 z-0 overflow-hidden">
+        <div aria-hidden="true" className={desktopWallpaperLayerClass}>
           {appWallpaperIsVideo ? (
             <AppWallpaperVideo src={appWallpaperSrc} />
           ) : (
@@ -200,43 +241,53 @@ export function DesktopLayout(props: {
       {usesNativeWindowChrome ? (
         <header
           className={desktopTitlebarClass}
-          data-tauri-drag-region
-          onPointerDown={startTitlebarDrag}
+          data-tauri-drag-region={shouldShowWindowsControls ? undefined : ""}
+          onPointerDown={
+            shouldShowWindowsControls ? handleWindowsTitlebarPointerDown : startTitlebarDrag
+          }
         >
+          {/* Windows/Linux handle drag + double-press-to-maximize via the pointer
+              handler above; macOS keeps the native drag region + pseudo-maximize. */}
           <div
             className={desktopTitlebarDoubleClickLayerClass}
-            onDoubleClick={expandTitlebarWindow}
+            onDoubleClick={shouldShowWindowsControls ? undefined : expandTitlebarWindow}
           />
-          <span className={desktopTitlebarTitleClass}>Misty</span>
+          <span
+            className={
+              shouldShowWindowsControls ? windowsTitlebarTitleClass : desktopTitlebarTitleClass
+            }
+          >
+            Misty
+          </span>
           {shouldShowWindowsControls ? (
             <div className={windowsTitlebarControlsClass}>
-              <Button
+              <button
                 type="button"
                 className={windowsTitlebarControlButtonClass}
                 aria-label="Minimize window"
                 title="Minimize"
                 onClick={minimizeTitlebarWindow}
               >
-                <Minus size={15} strokeWidth={1.8} />
-              </Button>
-              <Button
+                <Minus size={16} strokeWidth={1.6} />
+              </button>
+              <button
                 type="button"
                 className={windowsTitlebarControlButtonClass}
-                aria-label="Maximize or restore window"
-                title="Maximize"
+                aria-label={isWindowMaximized ? "Restore window" : "Maximize window"}
+                title={isWindowMaximized ? "Restore" : "Maximize"}
                 onClick={() => void togglePseudoMaximize().catch(() => undefined)}
               >
-                <Square size={13} strokeWidth={1.8} />
-              </Button>
-              <Button
+                {isWindowMaximized ? <RestoreGlyph /> : <Square size={12} strokeWidth={1.6} />}
+              </button>
+              <button
                 type="button"
                 className={windowsTitlebarCloseButtonClass}
                 aria-label="Close window"
                 title="Close"
                 onClick={closeTitlebarWindow}
               >
-                <X size={16} strokeWidth={1.8} />
-              </Button>
+                <X size={17} strokeWidth={1.6} />
+              </button>
             </div>
           ) : null}
         </header>
@@ -248,10 +299,10 @@ export function DesktopLayout(props: {
         aria-label="Primary"
         onPointerDown={usesNativeWindowChrome ? startTitlebarDrag : undefined}
       >
-        <div className="mb-3 grid h-[62px] w-[62px] place-items-center">
+        <div className="mb-3 grid h-[50px] w-[54px] place-items-center">
           {mistyLogoSource ? (
             <img
-              className="h-[58px] w-[58px] object-contain"
+              className="h-[34px] w-[34px] object-contain"
               src={mistyLogoSource}
               onError={hideRuntimeAssetOnError}
               onLoad={revealRuntimeAssetOnLoad}
@@ -297,9 +348,9 @@ export function DesktopLayout(props: {
       <WorkStatusPopup />
       <TransferCompletionNotifier />
       <FramePacingOverlay enabled={framePacingOverlayEnabled} />
-      <ActivityPopover
-        anchorRef={activityAnchorRef}
+      <ActivityOverlay
         open={activityOpen}
+        style={desktopFrameStyle}
         onClose={() => setActivityOpen(false)}
       />
       <ProfilePopover
@@ -308,13 +359,13 @@ export function DesktopLayout(props: {
         open={profileOpen}
         onClose={() => setProfileOpen(false)}
         onOpenAccountSettings={openAccountSettingsOverlay}
-        onOpenSettings={openSettingsOverlay}
       />
       <AccountSettingsOverlay
         open={accountSettingsOpen}
         style={desktopFrameStyle}
         onClose={closeAccountSettingsOverlay}
       />
+      <RemotesOverlay open={remotesOpen} style={desktopFrameStyle} onClose={closeRemotesOverlay} />
       <SettingsOverlay
         open={settingsOpen}
         style={desktopFrameStyle}
@@ -325,7 +376,6 @@ export function DesktopLayout(props: {
         currentPath={activePanePath || app?.environment.homeDir || ""}
       />
       <MediaSearchViewer />
-      <AgentJobWorker />
       <SpacesRealtimeBridge />
     </main>
   );

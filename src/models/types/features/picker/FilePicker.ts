@@ -18,7 +18,6 @@ import type {
   ProviderRemote,
 } from "@/models/interfaces/services/misty-api";
 import { FileBrowser } from "@/features/explorer/components/FileBrowser";
-import { ExplorerPickerSidebar } from "@/features/explorer/components/ExplorerPickerSidebar";
 import { ExplorerPickerToolbar } from "@/features/explorer/components/ExplorerPickerToolbar";
 import { errorText } from "@/lib/format";
 import { useMultiPanelStore } from "@/features/workspace";

@@ -501,9 +501,7 @@ export interface AnalysisEstimate {
   eligibleImages: number;
   includedImages: number;
   billableImages: number;
-  creditUnits: number;
-  priceMinor: number | null;
-  currency: string | null;
+  hostedAIWeeklyRatio: number;
 }
 
 export interface FolderPreflight {

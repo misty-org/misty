@@ -1,20 +1,22 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { CSSProperties, RefObject } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
-import { Check, ChevronRight, LogOut, Plus, Repeat2, Settings as SettingsIcon, UserCircle, X } from "lucide-react";
+import { Check, ChevronRight, LogOut, Plus, Repeat2, UserCircle, X } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
 import { Button } from "@/ui";
 import { useAuth } from "@/features/auth/AuthContext";
 import { useSetupStore } from "@/stores/app";
 import { useUserStore } from "@/stores/account/useUserStore";
-import { useSettingsStore } from "@/stores/app";
-import {
-  accountChooserPopoverClass,
-  profileMenuItemClass,
-  profilePopoverClass,
-} from "./styles";
+import { accountChooserPopoverClass, profileMenuItemClass, profilePopoverClass } from "./styles";
 import { emailName, initialsForProfile } from "./helpers";
+import { adjacentPanelLeft, fitFloatingPanel } from "./popupGeometry";
+
+const profilePopoverWidth = 286;
+const profilePopoverFallbackHeight = 332;
+const accountChooserWidth = 320;
+const accountChooserFallbackHeight = 392;
+const viewportGutter = 8;
 
 export function ProfilePopover(props: {
   anchorRef: RefObject<HTMLButtonElement | null>;
@@ -22,59 +24,106 @@ export function ProfilePopover(props: {
   open: boolean;
   onClose: () => void;
   onOpenAccountSettings: () => void;
-  onOpenSettings: () => void;
 }) {
   const navigate = useNavigate();
   const currentUser = useSetupStore((state) => state.status?.current_user ?? null);
-  const { user, accounts, switchAccount, logout } = useAuth();
+  const { user, accounts, transitioning, switchAccount, logout } = useAuth();
   const me = useUserStore(
     useShallow((state) => ({
+      id: state.me?.id,
       email: state.me?.email,
       name: state.me?.name,
     })),
   );
-  const setActiveSettingsSection = useSettingsStore((state) => state.setActiveSection);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const accountChooserRef = useRef<HTMLDivElement | null>(null);
+  const switchAccountsRef = useRef<HTMLButtonElement | null>(null);
   const [menuStyle, setMenuStyle] = useState<CSSProperties>({});
   const [accountChooserStyle, setAccountChooserStyle] = useState<CSSProperties>({});
   const [accountChooserOpen, setAccountChooserOpen] = useState(false);
   const [switchingAccountId, setSwitchingAccountId] = useState("");
   const [switchError, setSwitchError] = useState("");
-  const account = currentUser ?? user;
-  const email = me.email ?? account?.email ?? "";
-  const displayName = me.name ?? account?.name ?? emailName(email) ?? "Misty";
+  const account = user ?? currentUser;
+  const accountMe = me.id === account?.id ? me : null;
+  const email = accountMe?.email ?? account?.email ?? "";
+  const displayName = accountMe?.name ?? account?.name ?? emailName(email) ?? "Misty";
   const initials = initialsForProfile(displayName, email);
 
   const updatePosition = useCallback(() => {
     const anchor = props.anchorRef.current;
     if (!anchor) return;
-    const rect = anchor.getBoundingClientRect();
-    const width = 286;
-    const estimatedHeight = 236;
-    const left = Math.min(Math.max(8, rect.right + 10), window.innerWidth - width - 8);
-    const top = Math.min(
-      Math.max(8, rect.bottom - estimatedHeight),
-      window.innerHeight - estimatedHeight - 8,
+    const anchorRect = anchor.getBoundingClientRect();
+    const titlebarInset =
+      Number.parseFloat(
+        window
+          .getComputedStyle(document.documentElement)
+          .getPropertyValue("--misty-window-titlebar-inset"),
+      ) || 0;
+    const viewport = {
+      width: window.innerWidth,
+      height: window.innerHeight,
+      topInset: titlebarInset,
+      gutter: viewportGutter,
+    };
+    const measuredMenu = menuRef.current?.getBoundingClientRect();
+    const menuHeight = measuredMenu?.height || profilePopoverFallbackHeight;
+    const menu = fitFloatingPanel(
+      anchorRect.right + 10,
+      anchorRect.bottom - menuHeight,
+      profilePopoverWidth,
+      menuHeight,
+      viewport,
     );
     setMenuStyle((current) =>
-      current.left === left && current.top === top && current.width === width
+      current.left === menu.left &&
+      current.top === menu.top &&
+      current.width === menu.width &&
+      current.maxHeight === menu.maxHeight
         ? current
-        : { left, top, width },
+        : { left: menu.left, top: menu.top, width: menu.width, maxHeight: menu.maxHeight },
     );
-    const chooserWidth = 320;
-    const chooserHeight = Math.min(420, window.innerHeight - 16);
-    const chooserLeft = left + width + 8;
-    const chooserTop = Math.min(
-      Math.max(8, rect.bottom - chooserHeight),
-      window.innerHeight - chooserHeight - 8,
+
+    const measuredChooser = accountChooserRef.current?.getBoundingClientRect();
+    const chooserHeight = measuredChooser?.height || accountChooserFallbackHeight;
+    const fittedChooser = fitFloatingPanel(0, 0, accountChooserWidth, chooserHeight, viewport);
+    const chooserLeft = adjacentPanelLeft({
+      anchorLeft: menu.left,
+      anchorWidth: menu.width,
+      panelWidth: fittedChooser.width,
+      viewportWidth: viewport.width,
+      gutter: viewportGutter,
+    });
+    // Sit the chooser beside the Switch accounts row rather than anchoring it
+    // to the profile button, so it opens right next to what was clicked.
+    const rowRect = switchAccountsRef.current?.getBoundingClientRect();
+    const rowOffset =
+      rowRect && measuredMenu ? rowRect.top - measuredMenu.top : menu.height - chooserHeight;
+    const chooser = fitFloatingPanel(
+      chooserLeft,
+      menu.top + rowOffset - 8,
+      accountChooserWidth,
+      chooserHeight,
+      viewport,
     );
     setAccountChooserStyle((current) =>
-      current.left === chooserLeft && current.top === chooserTop && current.width === chooserWidth
+      current.left === chooser.left &&
+      current.top === chooser.top &&
+      current.width === chooser.width &&
+      current.maxHeight === chooser.maxHeight
         ? current
-        : { left: chooserLeft, top: chooserTop, width: chooserWidth },
+        : {
+            left: chooser.left,
+            top: chooser.top,
+            width: chooser.width,
+            maxHeight: chooser.maxHeight,
+          },
     );
   }, [props.anchorRef]);
+
+  useLayoutEffect(() => {
+    if (!props.open) return;
+    updatePosition();
+  }, [accountChooserOpen, accounts.length, props.open, switchError, updatePosition]);
 
   useEffect(() => {
     if (!props.open) return;
@@ -109,6 +158,14 @@ export function ProfilePopover(props: {
   }, [accountChooserOpen, props.anchorRef, props.onClose, props.open, updatePosition]);
 
   useEffect(() => {
+    if (!props.open || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(updatePosition);
+    if (menuRef.current) observer.observe(menuRef.current);
+    if (accountChooserRef.current) observer.observe(accountChooserRef.current);
+    return () => observer.disconnect();
+  }, [accountChooserOpen, props.open, updatePosition]);
+
+  useEffect(() => {
     if (props.open) return;
     setAccountChooserOpen(false);
     setSwitchingAccountId("");
@@ -123,12 +180,13 @@ export function ProfilePopover(props: {
   };
 
   const switchAccounts = () => {
+    if (transitioning) return;
     setSwitchError("");
     setAccountChooserOpen(true);
   };
 
   const chooseAccount = async (accountId: string) => {
-    if (accountId === user?.id || switchingAccountId) return;
+    if (accountId === account?.id || switchingAccountId || transitioning) return;
     setSwitchError("");
     setSwitchingAccountId(accountId);
     try {
@@ -144,13 +202,15 @@ export function ProfilePopover(props: {
   };
 
   const addAccount = () => {
+    if (transitioning) return;
     props.onClose();
     navigate("/signin", { state: { from: props.currentPath, addingAccount: true } });
   };
 
   const signOut = () => {
+    if (transitioning) return;
     props.onClose();
-    logout();
+    void logout();
   };
 
   return createPortal(
@@ -163,7 +223,12 @@ export function ProfilePopover(props: {
         aria-label="Profile"
       >
         <div className="grid grid-cols-[42px_minmax(0,1fr)] items-center gap-3 border-b border-[var(--misty-border-soft)] px-2 pb-3 pt-1">
-          <span className="relative grid h-10 w-10 place-items-center rounded-full bg-[var(--misty-neutral-selected-bg,var(--misty-surface-3))] text-sm font-bold">
+          <span
+            className={[
+              "relative grid h-10 w-10 place-items-center rounded-full",
+              "bg-[var(--misty-neutral-selected-bg,var(--misty-surface-3))] text-sm font-bold",
+            ].join(" ")}
+          >
             {account ? initials : <UserCircle size={24} strokeWidth={1.75} />}
           </span>
           <span className="min-w-0">
@@ -187,11 +252,18 @@ export function ProfilePopover(props: {
             <span>Account settings</span>
           </Button>
           <Button
-            className={`${profileMenuItemClass} ${accountChooserOpen ? "bg-[var(--misty-neutral-selected-bg,var(--misty-surface-3))] text-[var(--misty-text)]" : ""}`}
+            ref={switchAccountsRef}
+            className={[
+              profileMenuItemClass,
+              accountChooserOpen
+                ? "bg-[var(--misty-neutral-selected-bg,var(--misty-surface-3))] text-[var(--misty-text)]"
+                : "",
+            ].join(" ")}
             type="button"
             role="menuitem"
             aria-haspopup="menu"
             aria-expanded={accountChooserOpen}
+            disabled={transitioning}
             onClick={() => (accountChooserOpen ? setAccountChooserOpen(false) : switchAccounts())}
           >
             <Repeat2 size={17} />
@@ -203,26 +275,19 @@ export function ProfilePopover(props: {
               }
             />
           </Button>
-          <Button className={profileMenuItemClass} type="button" role="menuitem" onClick={signOut}>
-            <LogOut size={17} />
-            <span>{account ? "Sign out" : "Clear session"}</span>
-          </Button>
-          <div className="my-1 h-px bg-[var(--misty-border-soft)]" />
-          <span className="px-2.5 py-1 text-[10px] font-bold capitalize text-[var(--misty-text-subtle)]">
-            Misty App Settings
-          </span>
           <Button
-            className={profileMenuItemClass}
+            className={[
+              profileMenuItemClass,
+              "text-[var(--misty-danger)] hover:bg-[color-mix(in_srgb,var(--misty-danger)_12%,transparent)]",
+              "hover:text-[var(--misty-danger)]",
+            ].join(" ")}
             type="button"
             role="menuitem"
-            onClick={() => {
-              setActiveSettingsSection("general");
-              props.onClose();
-              props.onOpenSettings();
-            }}
+            disabled={transitioning}
+            onClick={signOut}
           >
-            <SettingsIcon size={17} />
-            <span>Open app settings</span>
+            <LogOut size={17} />
+            <span>Log out</span>
           </Button>
         </div>
       </div>
@@ -242,7 +307,10 @@ export function ProfilePopover(props: {
               </small>
             </div>
             <Button
-              className="grid size-8 place-items-center rounded-lg border-0 bg-transparent text-[var(--misty-text-muted)] hover:bg-[var(--misty-surface-2)] hover:text-[var(--misty-text)]"
+              className={[
+                "grid size-8 place-items-center rounded-lg border-0 bg-transparent",
+                "text-[var(--misty-text-muted)] hover:bg-[var(--misty-surface-2)] hover:text-[var(--misty-text)]",
+              ].join(" ")}
               type="button"
               aria-label="Close account chooser"
               onClick={() => setAccountChooserOpen(false)}
@@ -252,7 +320,7 @@ export function ProfilePopover(props: {
           </div>
           <div className="grid max-h-[268px] gap-1 overflow-auto py-2">
             {accounts.map((saved) => {
-              const active = saved.id === user?.id;
+              const active = saved.id === account?.id;
               const savedInitials = initialsForProfile(saved.name, saved.email);
               return (
                 <Button
@@ -260,10 +328,16 @@ export function ProfilePopover(props: {
                   type="button"
                   role="menuitem"
                   key={saved.id}
-                  disabled={Boolean(switchingAccountId)}
+                  disabled={Boolean(switchingAccountId) || transitioning}
                   onClick={() => void chooseAccount(saved.id)}
                 >
-                  <span className="grid size-9 place-items-center rounded-full bg-[var(--misty-neutral-selected-bg,var(--misty-surface-3))] text-xs font-bold text-[var(--misty-text)]">
+                  <span
+                    className={[
+                      "grid size-9 place-items-center rounded-full",
+                      "bg-[var(--misty-neutral-selected-bg,var(--misty-surface-3))]",
+                      "text-xs font-bold text-[var(--misty-text)]",
+                    ].join(" ")}
+                  >
                     {savedInitials}
                   </span>
                   <span className="min-w-0">
@@ -298,7 +372,7 @@ export function ProfilePopover(props: {
             className={profileMenuItemClass}
             type="button"
             role="menuitem"
-            disabled={Boolean(switchingAccountId)}
+            disabled={Boolean(switchingAccountId) || transitioning}
             onClick={addAccount}
           >
             <Plus size={17} />

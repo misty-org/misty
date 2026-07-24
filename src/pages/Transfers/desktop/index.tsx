@@ -1,15 +1,8 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from "react";
-import {
-  PanelLeftClose,
-  PanelLeftOpen,
-  PanelRightClose,
-  PanelRightOpen,
-  Search,
-} from "lucide-react";
+import { Search } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
 import type { TransferRecord } from "@/models/interfaces/services/misty-api";
-import { PrimitiveIconButton as IconButton } from "@/ui";
 import { Toolbar, ToolbarGroup } from "@/ui";
 import { Button } from "@/ui";
 import { Input } from "@/ui";
@@ -26,6 +19,7 @@ import {
 import { TransferSortMenu, TransferToolbarActions } from "./TransferMenus";
 import { TransferDetail, TransferFilters } from "./TransferPanels";
 import { TransferHistoryTable } from "./TransferTable";
+import { TransfersBottomBar } from "./TransfersBottomBar";
 import {
   buildTransferTreeRows,
   filterAndSortTransfers,
@@ -148,6 +142,7 @@ const TransferWorkspacePane = memo(function TransferWorkspacePane(props: { works
     handleRetryTransfer,
     handleUndo,
     isBatchPaused,
+    isTransferPaused,
     loadQueue,
     loadTransfers,
     queueWorking,
@@ -487,6 +482,7 @@ const TransferWorkspacePane = memo(function TransferWorkspacePane(props: { works
                 sortDirection={sortDirection}
                 draggedColumn={draggedColumn}
                 isBatchPaused={isBatchPaused}
+                isTransferPaused={isTransferPaused}
                 onSelect={handleSelectTransfer}
                 onFocus={handleFocusTransfer}
                 onToggleTree={toggleTransferTree}
@@ -550,41 +546,5 @@ const TransferWorkspacePane = memo(function TransferWorkspacePane(props: { works
     </div>
   );
 });
-
-function TransfersBottomBar(props: {
-  filtersVisible: boolean;
-  detailVisible: boolean;
-  onToggleFilters: () => void;
-  onToggleDetail: () => void;
-}) {
-  const LeftIcon = props.filtersVisible ? PanelLeftClose : PanelLeftOpen;
-  const RightIcon = props.detailVisible ? PanelRightClose : PanelRightOpen;
-  return (
-    <footer className={transferStyles.bottomBar}>
-      <div className={transferStyles.bottomBarSide}>
-        <IconButton
-          label={props.filtersVisible ? "Hide filters" : "Show filters"}
-          size="sm"
-          tooltip={false}
-          variant={props.filtersVisible ? "secondary" : "ghost"}
-          onClick={props.onToggleFilters}
-        >
-          <LeftIcon />
-        </IconButton>
-      </div>
-      <div className={transferStyles.bottomBarSide}>
-        <IconButton
-          label={props.detailVisible ? "Hide details" : "Show details"}
-          size="sm"
-          tooltip={false}
-          variant={props.detailVisible ? "secondary" : "ghost"}
-          onClick={props.onToggleDetail}
-        >
-          <RightIcon />
-        </IconButton>
-      </div>
-    </footer>
-  );
-}
 
 export default TransfersWorkspace;

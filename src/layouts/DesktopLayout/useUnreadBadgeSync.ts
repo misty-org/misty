@@ -2,11 +2,15 @@ import { useEffect } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { hasTauriInternals } from "@/platform/tauri";
 
-export function useUnreadBadgeSync(params: { badgeCountEnabled: boolean; unreadActivityCount: number }) {
+export function useUnreadBadgeSync(params: {
+  badgeCountEnabled: boolean;
+  unreadActivityCount: number;
+}) {
   const { badgeCountEnabled, unreadActivityCount } = params;
 
   useEffect(() => {
-    const badgeCount = badgeCountEnabled && unreadActivityCount > 0 ? unreadActivityCount : undefined;
+    const badgeCount =
+      badgeCountEnabled && unreadActivityCount > 0 ? unreadActivityCount : undefined;
     try {
       if (!hasTauriInternals()) return;
       void getCurrentWindow()

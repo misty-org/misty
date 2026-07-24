@@ -11,9 +11,9 @@
   color-scheme: dark;
   /* Misty dark is the same zinc scale used by the website's radix-vega
      preset. Hierarchy comes from tonal surfaces first and borders second. */
-  --misty-page-bg: oklch(0.141 0.005 285.823);
-  --misty-nav-bg: oklch(0.18 0.006 285.9);
-  --misty-bg: oklch(0.141 0.005 285.823);
+  --misty-bg: oklch(0.18 0.006 285.9);
+  --misty-page-bg: var(--misty-bg);
+  --misty-nav-bg: var(--misty-bg);
   --misty-bg-soft: oklch(0.165 0.006 285.9);
   --misty-surface: oklch(0.21 0.006 285.885);
   --misty-surface-2: oklch(0.274 0.006 286.033);
@@ -69,21 +69,28 @@
   --misty-focus-ring: oklch(1 0 0 / 0.16);
   --misty-glass: oklch(0.21 0.006 285.885 / 0.88);
   --misty-glass-border: var(--misty-border);
-  /* Frame tokens may become translucent over a wallpaper. Component tokens
-     stay opaque and legible regardless of the frame treatment. */
-  --misty-frame-background: var(--misty-page-bg);
-  --misty-frame-navigation: var(--misty-nav-bg);
+  /* Runtime tokens become translucent when a wallpaper is active. They feed
+     the same semantic contract used by Misty and shadcn components. */
+  --misty-runtime-background: transparent;
+  --misty-runtime-navigation: var(--misty-bg);
+  --misty-runtime-surface: transparent;
+  --misty-runtime-surface-raised: transparent;
+  --misty-runtime-surface-hover: color-mix(in srgb, var(--misty-text) 7%, transparent);
+  --misty-runtime-sidebar-selected: color-mix(in srgb, var(--misty-text) 10%, transparent);
+  --misty-runtime-popover: var(--misty-bg);
+  --misty-frame-background: var(--misty-bg);
+  --misty-frame-navigation: var(--misty-runtime-navigation);
   --misty-frame-border: var(--misty-content-frame-border);
-  --misty-component-surface: var(--misty-surface);
-  --misty-component-surface-raised: var(--misty-surface-2);
-  --misty-component-surface-hover: var(--misty-surface-hover);
+  --misty-component-surface: var(--misty-runtime-surface);
+  --misty-component-surface-raised: var(--misty-runtime-surface-raised);
+  --misty-component-surface-hover: var(--misty-runtime-surface-hover);
   --misty-component-border: var(--misty-divider-default);
   --misty-component-border-subtle: var(--misty-divider-subtle);
   /* Stable semantic contract consumed by Misty and hosted extensions. */
-  --misty-semantic-background: var(--misty-bg);
-  --misty-semantic-surface: var(--misty-surface);
-  --misty-semantic-surface-raised: var(--misty-surface-2);
-  --misty-semantic-surface-hover: var(--misty-surface-hover);
+  --misty-semantic-background: var(--misty-runtime-background);
+  --misty-semantic-surface: var(--misty-runtime-surface);
+  --misty-semantic-surface-raised: var(--misty-runtime-surface-raised);
+  --misty-semantic-surface-hover: var(--misty-runtime-surface-hover);
   --misty-semantic-border: var(--misty-border);
   --misty-semantic-border-strong: var(--misty-border-strong);
   --misty-semantic-text: var(--misty-text);
@@ -100,7 +107,7 @@
   --foreground: var(--misty-semantic-text);
   --card: var(--misty-component-surface);
   --card-foreground: var(--misty-semantic-text);
-  --popover: var(--misty-component-surface);
+  --popover: var(--misty-runtime-popover);
   --popover-foreground: var(--misty-semantic-text);
   --primary: var(--misty-primary);
   --primary-foreground: var(--misty-primary-contrast);
@@ -121,11 +128,11 @@
   --border: var(--misty-component-border);
   --input: var(--misty-divider-strong);
   --ring: var(--misty-semantic-focus);
-  --sidebar: var(--misty-nav-bg);
+  --sidebar: var(--misty-runtime-navigation);
   --sidebar-foreground: var(--misty-semantic-text-muted);
   --sidebar-primary: var(--misty-primary);
   --sidebar-primary-foreground: var(--misty-primary-contrast);
-  --sidebar-accent: var(--misty-sidebar-selected);
+  --sidebar-accent: var(--misty-runtime-sidebar-selected);
   --sidebar-accent-foreground: var(--misty-semantic-text);
   --sidebar-border: var(--misty-divider-subtle);
   --sidebar-ring: var(--misty-semantic-focus);
@@ -159,6 +166,7 @@
   --misty-safe-bottom: env(safe-area-inset-bottom, 0px);
   --misty-safe-left: env(safe-area-inset-left, 0px);
   --misty-app-zoom: 1;
+  --misty-desktop-nav-width: 80px;
   --misty-window-titlebar-inset: 28px;
   --misty-page-x: clamp(16px, 2vw, 20px);
   --misty-mobile-edge: 16px;
@@ -284,9 +292,9 @@
 
 :root[data-theme="light"] {
   color-scheme: light;
-  --misty-page-bg: oklch(0.967 0.001 286.375);
-  --misty-nav-bg: oklch(0.985 0 0);
-  --misty-bg: oklch(1 0 0);
+  --misty-bg: oklch(0.985 0 0);
+  --misty-page-bg: var(--misty-bg);
+  --misty-nav-bg: var(--misty-bg);
   --misty-bg-soft: oklch(0.985 0 0);
   --misty-surface: oklch(1 0 0);
   --misty-surface-2: oklch(0.967 0.001 286.375);
@@ -326,9 +334,9 @@
 
 :root[data-misty-theme="graphite"] {
   color-scheme: dark;
-  --misty-page-bg: #08090a;
-  --misty-nav-bg: #0d0f10;
-  --misty-bg: #08090a;
+  --misty-bg: #0d0f10;
+  --misty-page-bg: var(--misty-bg);
+  --misty-nav-bg: var(--misty-bg);
   --misty-bg-soft: #0d0f10;
   --misty-surface: #111315;
   --misty-surface-2: #181b1d;
@@ -368,9 +376,9 @@
 
 :root[data-misty-theme="aurora"] {
   color-scheme: dark;
-  --misty-page-bg: #071011;
-  --misty-nav-bg: #081416;
-  --misty-bg: #071011;
+  --misty-bg: #081416;
+  --misty-page-bg: var(--misty-bg);
+  --misty-nav-bg: var(--misty-bg);
   --misty-bg-soft: #0a1718;
   --misty-surface: #0d1b1d;
   --misty-surface-2: #122426;
@@ -410,9 +418,9 @@
 
 :root[data-misty-theme="copper"] {
   color-scheme: dark;
-  --misty-page-bg: #120f0d;
-  --misty-nav-bg: #17110e;
-  --misty-bg: #120f0d;
+  --misty-bg: #17110e;
+  --misty-page-bg: var(--misty-bg);
+  --misty-nav-bg: var(--misty-bg);
   --misty-bg-soft: #191411;
   --misty-surface: #1d1713;
   --misty-surface-2: #261e19;

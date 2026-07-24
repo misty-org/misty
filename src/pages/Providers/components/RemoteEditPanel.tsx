@@ -3,11 +3,6 @@ export type { RemoteEditPanelProps } from "@/models/interfaces/pages/Providers/c
 import { Alert, AlertDescription, AlertTitle } from "@/ui";
 import { Button } from "@/ui";
 import { Skeleton } from "@/ui";
-import type {
-  ProviderWorkflow,
-  RcloneConfigPaths,
-  RemoteEditDraft,
-} from "@/models/interfaces/services/misty-api";
 import { iconAssets } from "@/assets/icons";
 import { AssetIcon } from "@/ui";
 import { Panel, PanelHeader } from "@/pages/Providers/components/ProviderPanel";
@@ -96,7 +91,16 @@ export function RemoteEditPanel(props: RemoteEditPanelProps) {
               stale={props.stale}
               onSave={props.onSave}
               onDelete={() => props.onDelete(draft.originalName)}
+              onTest={props.onTest}
             />
+            {props.feedbackError || props.feedbackMessage ? (
+              <Alert
+                className="mx-[18px] mb-[18px] max-w-[760px]"
+                variant={props.feedbackError ? "destructive" : "default"}
+              >
+                <AlertDescription>{props.feedbackError ?? props.feedbackMessage}</AlertDescription>
+              </Alert>
+            ) : null}
           </>
         ) : props.serviceError ? (
           <ErrorState

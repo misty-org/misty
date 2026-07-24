@@ -3,7 +3,10 @@ import { useEffect, type RefObject } from "react";
 const activeScrollbarClass = "misty-transient-scrollbar-active";
 const transientScrollbarSelector = ".misty-transient-scrollbar";
 
-export function useTransientScrollbars(rootRef: RefObject<HTMLElement>, hideDelayMs = 650): void {
+export function useTransientScrollbars(
+  rootRef: RefObject<HTMLElement | null>,
+  hideDelayMs = 650,
+): void {
   useEffect(() => {
     const root = rootRef.current;
     if (!root) return;

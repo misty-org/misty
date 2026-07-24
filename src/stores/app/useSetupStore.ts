@@ -5,6 +5,10 @@ import { create } from "zustand";
 import { hasTauriInternals } from "@/platform/tauri";
 import { accountFetchMe } from "@/stores/account/useAccountStore";
 import type { AccountMeResponse } from "@/models/interfaces/stores/account/useAccountStore";
+import {
+  isAccountSessionTransitioning,
+  readAccountSessionGeneration,
+} from "@/stores/account/useAuthTokenStore";
 import { buildInstallerStatusFromTemplate } from "@/features/installer/data/installReadiness";
 import { releases } from "@/features/installer/data/releases";
 import type {
@@ -27,6 +31,55 @@ async function loadInstallerStatus(nativeOverride?: NativeSystemInfo) {
   });
 
   return buildInstallerStatusFromTemplate(native, template, setupProbe);
+}
+
+let setupStatusRequestSequence = 0;
+
+function beginSetupStatusRequest() {
+  return {
+    sequence: ++setupStatusRequestSequence,
+    accountGeneration: readAccountSessionGeneration(),
+  };
+}
+
+function isCurrentSetupStatusRequest(request: {
+  sequence: number;
+  accountGeneration: number;
+}): boolean {
+  return (
+    request.sequence === setupStatusRequestSequence &&
+    request.accountGeneration === readAccountSessionGeneration()
+  );
+}
+
+function installerStatusWithNativeIdentity(
+  native: NativeSystemInfo,
+  previous: InstallerStatus | null,
+): InstallerStatus {
+  return {
+    os: native.os,
+    arch: native.arch,
+    misty_home: native.misty_home,
+    install_dir: native.install_dir,
+    legacy_install_dir: native.legacy_install_dir,
+    db_path: native.db_path,
+    installed_version: native.installed_version,
+    current_user: native.current_user,
+    current_license: native.current_license,
+    ready: previous?.ready ?? false,
+    folders: previous?.folders ?? [],
+    binaries: previous?.binaries ?? [],
+    setup_update:
+      previous?.setup_update ??
+      ({
+        name: "Misty installer",
+        path: native.setup_path,
+        required: false,
+        exists: false,
+        status: "pending",
+        message: "Installer checks could not be refreshed.",
+      } satisfies InstallerStatus["setup_update"]),
+  };
 }
 
 async function refreshLocalAccessToken() {
@@ -71,6 +124,7 @@ async function refreshVerifiedLicenseIfDue(native: NativeSystemInfo) {
   }
   try {
     const me = await accountFetchMe();
+    if (me.id !== native.current_user.id) return native;
     return invoke<NativeSystemInfo>("save_verified_license", {
       license: licenseFromMe(me),
     });
@@ -123,8 +177,11 @@ export const useSetupStore = create<SetupStore>((set, get) => ({
     }
   },
   loadSystem: async () => {
+    if (isAccountSessionTransitioning()) return;
+    const request = beginSetupStatusRequest();
     try {
       if (!hasTauriInternals()) {
+        if (!isCurrentSetupStatusRequest(request)) return;
         set({
           status: null,
           systemError: "Misty requires the native app runtime.",
@@ -137,27 +194,33 @@ export const useSetupStore = create<SetupStore>((set, get) => ({
         native = await refreshVerifiedLicenseIfDue(native);
       }
       const status = await loadInstallerStatus(native);
+      if (!isCurrentSetupStatusRequest(request)) return;
       set({ status, systemError: "" });
     } catch (error) {
+      if (!isCurrentSetupStatusRequest(request)) return;
       set({ systemError: String(error) });
     }
   },
   refreshLocalAccessToken: async () => {
+    if (isAccountSessionTransitioning()) return;
+    const request = beginSetupStatusRequest();
     try {
       if (!hasTauriInternals()) return;
       const native = await refreshLocalAccessToken();
-      if (!native.current_user) {
-        return;
-      }
-      const refreshedNative = await refreshVerifiedLicenseIfDue(native);
+      const refreshedNative = native.current_user
+        ? await refreshVerifiedLicenseIfDue(native)
+        : native;
       const status = await loadInstallerStatus(refreshedNative);
+      if (!isCurrentSetupStatusRequest(request)) return;
       set({ status, systemError: "" });
     } catch (error) {
       void error;
     }
   },
   saveAuthenticatedUser: async (user, license) => {
+    let request = beginSetupStatusRequest();
     if (!hasTauriInternals()) {
+      if (!isCurrentSetupStatusRequest(request)) return;
       set((state) => ({
         systemError: "Saving account state is only available in the Misty app.",
         events: [
@@ -175,15 +238,33 @@ export const useSetupStore = create<SetupStore>((set, get) => ({
       user,
       license: license ?? null,
     });
-    const status = await loadInstallerStatus(native);
-    set((state) => ({
-      status,
-      systemError: "",
-      events: [
-        ...state.events,
-        { level: "info", source: "installer", message: `Signed in as ${user.email}.` },
-      ],
-    }));
+    // Supersede any installer refresh that started while the native identity
+    // transaction was committing.
+    request = beginSetupStatusRequest();
+    try {
+      const status = await loadInstallerStatus(native);
+      if (!isCurrentSetupStatusRequest(request)) return;
+      set((state) => ({
+        status,
+        systemError: "",
+        events: [
+          ...state.events,
+          { level: "info", source: "installer", message: `Signed in as ${user.email}.` },
+        ],
+      }));
+    } catch (error) {
+      // The native identity has already been committed. A secondary installer
+      // status refresh must not make callers roll back to a different token.
+      if (!isCurrentSetupStatusRequest(request)) return;
+      set((state) => ({
+        status: installerStatusWithNativeIdentity(native, state.status),
+        systemError: String(error),
+        events: [
+          ...state.events,
+          { level: "info", source: "installer", message: `Signed in as ${user.email}.` },
+        ],
+      }));
+    }
   },
   setSelectedVersion: (selectedVersion) => set({ selectedVersion }),
   launchMisty: async () => {
@@ -217,33 +298,59 @@ export const useSetupStore = create<SetupStore>((set, get) => ({
     }
   },
   signOut: async () => {
+    let request = beginSetupStatusRequest();
+    if (!hasTauriInternals()) {
+      if (!isCurrentSetupStatusRequest(request)) return;
+      const error = new Error("Signing out is only available in the Misty app.");
+      set((state) => ({
+        systemError: error.message,
+        events: [
+          ...state.events,
+          {
+            level: "error",
+            source: "installer",
+            message: "Could not sign out outside the Misty app.",
+          },
+        ],
+      }));
+      throw error;
+    }
+    let native: NativeSystemInfo;
     try {
-      if (!hasTauriInternals()) {
+      native = await invoke<NativeSystemInfo>("sign_out_misty");
+    } catch (error) {
+      if (isCurrentSetupStatusRequest(request)) {
         set((state) => ({
-          systemError: "Signing out is only available in the Misty app.",
+          systemError: String(error),
           events: [
             ...state.events,
-            {
-              level: "error",
-              source: "installer",
-              message: "Could not sign out outside the Misty app.",
-            },
+            { level: "error", source: "installer", message: String(error) },
           ],
         }));
-        return;
       }
-      const native = await invoke<NativeSystemInfo>("sign_out_misty");
+      throw error;
+    }
+    request = beginSetupStatusRequest();
+    try {
       const status = await loadInstallerStatus(native);
+      if (!isCurrentSetupStatusRequest(request)) return;
       set((state) => ({
         status,
+        systemError: "",
         events: [
           ...state.events,
           { level: "info", source: "installer", message: "Signed out of Misty." },
         ],
       }));
     } catch (error) {
+      if (!isCurrentSetupStatusRequest(request)) return;
       set((state) => ({
-        events: [...state.events, { level: "error", source: "installer", message: String(error) }],
+        status: installerStatusWithNativeIdentity(native, state.status),
+        systemError: String(error),
+        events: [
+          ...state.events,
+          { level: "info", source: "installer", message: "Signed out of Misty." },
+        ],
       }));
     }
   },

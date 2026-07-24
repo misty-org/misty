@@ -26,6 +26,7 @@ import {
   indexMediaChunk,
 } from "@/stores/media/useMediaSearchServerStore";
 import { ManagedAiRequestError } from "@/stores/assistant/useAiServerStore";
+import { useUserStore } from "@/stores/account/useUserStore";
 import { ensureMediaSearchDeviceReady } from "./useMediaSearchMigrationStore";
 
 export const useMediaSearchStore = create<MediaSearchState>((set, get) => {
@@ -210,7 +211,7 @@ function isRunnableAsset(asset: MediaAsset): boolean {
 
 export function estimateAssets(assets: MediaAsset[]): MediaIndexEstimate {
   let remainingDurationMs = 0;
-  let estimatedCredits = 0;
+  let estimatedMicrousd = 0;
   for (const asset of assets) {
     const startChunk = asset.approvedFingerprint === asset.fingerprint ? asset.nextChunkIndex : 0;
     for (let index = startChunk; index < mediaChunkCount(asset.durationMs); index += 1) {
@@ -219,7 +220,7 @@ export function estimateAssets(assets: MediaAsset[]): MediaIndexEstimate {
         index + 1 === mediaChunkCount(asset.durationMs) ? asset.durationMs : start + 30_000;
       const duration = Math.max(0, end - start);
       remainingDurationMs += duration;
-      estimatedCredits += Math.max(1, Math.ceil((duration * 1000) / 60_000)) / 1000;
+      estimatedMicrousd += Math.ceil((duration / 60_000) * 15_000);
     }
   }
   return {
@@ -227,7 +228,14 @@ export function estimateAssets(assets: MediaAsset[]): MediaIndexEstimate {
     fileNames: assets.map((asset) => asset.name),
     fileCount: assets.length,
     remainingDurationMs,
-    estimatedCredits: Math.round(estimatedCredits * 1000) / 1000,
+    estimatedWeeklyPercent: Math.min(
+      100,
+      Math.ceil(
+        (estimatedMicrousd /
+          (useUserStore.getState().me?.tier === "pro" ? 1_000_000 : 150_000)) *
+          100,
+      ),
+    ),
   };
 }
 
@@ -259,7 +267,7 @@ async function indexChunkWithRetry(chunk: Parameters<typeof indexMediaChunk>[0])
 
 function isRetryableChunkError(reason: unknown): boolean {
   if (reason instanceof ManagedAiRequestError) {
-    if (reason.code === "media_search_disabled" || reason.code === "insufficient_credits")
+    if (reason.code === "media_search_disabled" || reason.code === "hosted_ai_limit_reached")
       return false;
     return (
       reason.status === 409 ||

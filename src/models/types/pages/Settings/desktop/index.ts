@@ -21,7 +21,6 @@ import {
   Image,
   Keyboard,
   Lock,
-  RefreshCcw,
   Rows3,
   Search,
   Settings2,
@@ -66,7 +65,6 @@ export type SettingsSection =
   | "assistant"
   | "appearance"
   | "privacy"
-  | "sync"
   | "transfers"
   | "search"
   | "notifications"

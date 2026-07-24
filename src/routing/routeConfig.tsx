@@ -1,11 +1,8 @@
 import { createBrowserRouter, Navigate } from "react-router";
 import { RootLayout } from "../layouts/RootLayout";
 import AccountPage from "../pages/Account";
-import CloudFolderBotChatOverlay from "../pages/BotOverlay/CloudFolderBotChatOverlay";
-import CloudFolderBotOverlay from "../pages/BotOverlay/CloudFolderBotOverlay";
-import ExtensionsPage from "../pages/Extensions";
 import FilesPage from "../pages/Files";
-import ProvidersPage from "../pages/Providers";
+import HomePage from "../pages/Home";
 import RegisterPage from "../pages/Register";
 import SettingsPage from "../pages/Settings";
 import SignInPage from "../pages/SignIn";
@@ -15,6 +12,9 @@ import { AppFrameLayout } from "../layouts/AppFrameLayout";
 import { AppPagesLayout } from "../layouts/AppPagesLayout";
 import { isDeepLinkRouteAllowed, resolveAuthDeepLinkRoute } from "./navigation";
 import { routes } from "./paths";
+import { LegacyAssistantRedirect } from "./LegacyAssistantRedirect";
+import AgentsPage from "../pages/Assistant";
+import ExtensionsPage from "../pages/Extensions";
 
 export const router = createBrowserRouter([
   {
@@ -26,22 +26,20 @@ export const router = createBrowserRouter([
       />
     ),
     children: [
-      { path: "bot/cloud-folder", element: <CloudFolderBotOverlay /> },
-      { path: "bot/cloud-folder-chat", element: <CloudFolderBotChatOverlay /> },
-      { path: "pet/cloud-folder", element: <Navigate to={routes.cloudFolderBot} replace /> },
       {
         element: <AppFrameLayout />,
         children: [
-          { index: true, element: <Navigate to={routes.files} replace /> },
+          { index: true, element: <Navigate to={routes.home} replace /> },
           { path: "files", element: <FilesPage /> },
           { path: "library", element: <Navigate to={routes.spacePersonal} replace /> },
-          { path: "providers", element: <ProvidersPage /> },
+          { path: "providers", element: null },
           { path: "transfers", element: <TransfersPage /> },
           {
             element: <AppPagesLayout />,
             children: [
-              { path: "agents", element: <Navigate to={routes.spacePersonal} replace /> },
+              { path: "agents", element: <AgentsPage /> },
               { path: "automations", element: <Navigate to={routes.spacePersonal} replace /> },
+              { path: "assistant", element: <LegacyAssistantRedirect /> },
               {
                 path: "spaces",
                 element: <SpacesShell />,
@@ -49,16 +47,15 @@ export const router = createBrowserRouter([
                   { index: true, element: <Navigate to={routes.spacePersonal} replace /> },
                   { path: "personal", element: <PersonalSpaceRedirect /> },
                   { path: ":spaceId", element: <Navigate to="chat" replace /> },
-                  { path: ":spaceId/tasks", element: <Navigate to="board" replace /> },
                   { path: ":spaceId/:section/studio/:studioKind", element: <SpaceDetail /> },
                   { path: ":spaceId/:section/:studioKind", element: <SpaceDetail /> },
                   { path: ":spaceId/:section", element: <SpaceDetail /> },
                 ],
               },
               { path: "studio", element: <Navigate to={routes.spacePersonal} replace /> },
-              { path: "studio/agents", element: <Navigate to={routes.spacePersonal} replace /> },
+              { path: "studio/agents", element: <Navigate to={routes.agents} replace /> },
               { path: "studio/workflows", element: <Navigate to={routes.spacePersonal} replace /> },
-              { path: "home", element: <Navigate to={routes.files} replace /> },
+              { path: "home", element: <HomePage /> },
               { path: "extensions", element: <ExtensionsPage /> },
               { path: "changelog", element: <Navigate to={routes.files} replace /> },
               { path: "signin", element: <SignInPage /> },

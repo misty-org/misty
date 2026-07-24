@@ -1,3 +1,5 @@
+import { isWindowsExplorerPath, normalizeExplorerPath } from "./pathNormalization";
+
 export function formatBytes(bytes: number | null): string {
   if (bytes == null) return "-";
   if (bytes < 1024) return `${bytes} B`;
@@ -27,7 +29,18 @@ export function breadcrumbSegments(path: string): Array<{ label: string; path: s
   if (path === "misty://recent") return [{ label: "Recent", path }];
   if (path === "misty://starred") return [{ label: "Starred", path }];
   if (path === "misty://trash") return [{ label: "Trash", path }];
-  const parts = path.split("/").filter(Boolean);
+  const normalized = normalizeExplorerPath(path);
+  const parts = normalized.split("/").filter(Boolean);
+  if (isWindowsExplorerPath(normalized) && /^[A-Za-z]:$/.test(parts[0] ?? "")) {
+    const [drive, ...children] = parts;
+    const segments = [{ label: drive, path: `${drive}/` }];
+    let current = `${drive}/`;
+    for (const part of children) {
+      current = `${current.replace(/\/+$/, "")}/${part}`;
+      segments.push({ label: part, path: current });
+    }
+    return segments;
+  }
   const segments = [{ label: "/", path: "/" }];
   let current = "";
   for (const part of parts) {

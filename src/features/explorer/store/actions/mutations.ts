@@ -65,7 +65,6 @@ import {
 import { useOperationQueueStore } from "@/stores/explorer";
 import { useTransfersStore } from "@/stores/transfers";
 import { clipboardImagePng } from "../../utils/clipboardImage";
-import { publishCloudFolderBotNotification } from "@/features/bots/cloudFolderBot";
 import type { ExplorerGet, ExplorerSet } from "@/models/types/features/explorer/store/types";
 import type {
   ExplorerInlineEditState,

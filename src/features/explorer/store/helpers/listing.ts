@@ -65,7 +65,7 @@ import {
 import { useOperationQueueStore } from "@/stores/explorer";
 import { useTransfersStore } from "@/stores/transfers";
 import { clipboardImagePng } from "../../utils/clipboardImage";
-import { publishCloudFolderBotNotification } from "@/features/bots/cloudFolderBot";
+import { explorerPathKey, normalizeExplorerPath } from "../../utils/pathNormalization";
 
 import type {
   NavigationMode,
@@ -252,13 +252,23 @@ export function fileEntriesEqual(left: FileEntry, right: FileEntry): boolean {
 }
 
 export function samePath(left: string, right: string): boolean {
-  return H.normalizedPath(left) === H.normalizedPath(right);
+  return explorerPathKey(left) === explorerPathKey(right);
 }
 
 export function normalizedPath(path: string): string {
-  if (path.startsWith("misty://")) return path.replace(/\/+$/, "");
-  const normalized = path.replace(/\/+$/, "");
-  return normalized || "/";
+  return normalizeExplorerPath(path) || "/";
+}
+
+export function normalizeDirectoryListingPaths(listing: DirectoryListing): DirectoryListing {
+  return {
+    ...listing,
+    path: normalizeExplorerPath(listing.path),
+    parentPath: listing.parentPath ? normalizeExplorerPath(listing.parentPath) : null,
+    entries: listing.entries.map((entry) => ({
+      ...entry,
+      path: normalizeExplorerPath(entry.path),
+    })),
+  };
 }
 
 export function libraryItemFromEntry(entry: FileEntry): ExplorerLibraryItem {
@@ -410,7 +420,10 @@ export function remoteBrowseTargetForPath(
 
 export function parentDirectory(path: string): string {
   const normalized = H.normalizedPath(path);
+  if (/^[A-Za-z]:\/?$/.test(normalized))
+    return normalized.endsWith("/") ? normalized : `${normalized}/`;
   const slash = normalized.lastIndexOf("/");
+  if (slash === 2 && /^[A-Za-z]:\//.test(normalized)) return normalized.slice(0, 3);
   if (slash <= 0) return "/";
   return normalized.slice(0, slash);
 }

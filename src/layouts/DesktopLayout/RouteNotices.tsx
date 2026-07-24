@@ -7,7 +7,11 @@ import { useTransfersStore } from "@/stores/transfers";
 import { selectNotificationPreferences, useAppStore, useSettingsStore } from "@/stores/app";
 import type { AppTab } from "@/models/types/routing/types";
 import type { AppNoticeEntry, AppNoticeKind, AppNoticeSource } from "@/models/types/layouts";
-import { globalBannerBaseClass, globalNoticeLayerClass } from "./styles";
+import { Banner } from "@/ui";
+import { globalNoticeLayerClass } from "./styles";
+
+const globalBannerClass =
+  "pointer-events-auto mt-3 max-w-[min(520px,calc(100vw-48px))] rounded-xl shadow-[0_14px_36px_var(--misty-shadow)]";
 
 export const RouteNotice = memo(function RouteNotice(props: { routeId: AppTab }) {
   const appError = useAppStore((state) => state.error);
@@ -35,18 +39,14 @@ export const RouteNotice = memo(function RouteNotice(props: { routeId: AppTab })
   return (
     <div className={globalNoticeLayerClass}>
       {notice.error ? (
-        <div
-          className={`${globalBannerBaseClass} border-[color-mix(in_srgb,var(--misty-danger)_42%,#2f3338)] text-[var(--misty-danger)]`}
-        >
+        <Banner variant="danger" className={globalBannerClass}>
           {notice.error}
-        </div>
+        </Banner>
       ) : null}
       {showMessage && notice.message ? (
-        <div
-          className={`${globalBannerBaseClass} border-[color-mix(in_srgb,var(--misty-success)_38%,#2f3338)] text-[var(--misty-success)]`}
-        >
+        <Banner variant="success" className={globalBannerClass}>
           {notice.message}
-        </div>
+        </Banner>
       ) : null}
     </div>
   );

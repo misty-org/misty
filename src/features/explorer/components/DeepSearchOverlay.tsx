@@ -27,7 +27,7 @@ const emptyPaneEntries: SearchResult["entry"][] = [];
 
 const overlayStyles = {
   panel:
-    "left-1/2 top-[clamp(58px,14vh,150px)] grid max-h-[min(650px,calc(100vh-86px))] w-[min(860px,calc(100vw-28px))] max-w-none translate-x-[-50%] translate-y-0 grid-rows-[auto_auto_minmax(0,1fr)_auto] gap-0 overflow-hidden rounded-xl border-border bg-popover p-0 text-popover-foreground shadow-2xl [&>button]:hidden",
+    "left-1/2 top-[clamp(58px,14vh,150px)] grid max-h-[min(650px,calc(100vh-86px))] w-[min(680px,calc(100vw-28px))] max-w-none translate-x-[-50%] translate-y-0 grid-rows-[auto_auto_minmax(0,1fr)_auto] gap-0 overflow-hidden rounded-xl border-border bg-popover p-0 text-popover-foreground shadow-2xl [&>button]:hidden",
   header: "grid min-h-[74px] grid-cols-[minmax(0,1fr)_auto] items-center gap-4 px-5",
   searchBox:
     "grid h-full min-w-0 grid-cols-[auto_minmax(0,1fr)] items-center gap-4 text-muted-foreground",

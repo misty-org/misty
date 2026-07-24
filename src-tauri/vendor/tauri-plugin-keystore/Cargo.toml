@@ -13,7 +13,13 @@ name = "tauri_plugin_keystore"
 path = "src/lib.rs"
 
 [dependencies]
-keyring = { version = "3", features = ["apple-native"] }
+# Each target OS needs its native credential store enabled explicitly. Without
+# the matching feature keyring 3.x silently falls back to an in-memory "mock"
+# store on that platform, so tokens never persist across restarts (root cause of
+# the Windows "log in every launch" bug). apple-native -> macOS/iOS Keychain,
+# windows-native -> Windows Credential Manager. For Linux, add a secret-service
+# feature plus a crypto provider, e.g. "sync-secret-service" + "crypto-rust".
+keyring = { version = "3", features = ["apple-native", "windows-native"] }
 serde = { version = "1", features = ["derive"] }
 tauri = "2.2.4"
 thiserror = "2"

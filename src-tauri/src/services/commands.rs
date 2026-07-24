@@ -404,14 +404,6 @@ fn default_command_entries() -> &'static [DefaultCommandEntry] {
                 shortcut: "Cmd+R",
             },
             DefaultCommandEntry {
-                id: "explorer.toggle_chat",
-                shortcut: "Cmd+J",
-            },
-            DefaultCommandEntry {
-                id: "explorer.toggle_mika",
-                shortcut: "Cmd+Shift+A",
-            },
-            DefaultCommandEntry {
                 id: "explorer.next_workspace",
                 shortcut: "Cmd+Shift+Grave",
             },
@@ -565,14 +557,6 @@ fn default_command_entries() -> &'static [DefaultCommandEntry] {
             DefaultCommandEntry {
                 id: "explorer.refresh",
                 shortcut: "Ctrl+R",
-            },
-            DefaultCommandEntry {
-                id: "explorer.toggle_chat",
-                shortcut: "Ctrl+J",
-            },
-            DefaultCommandEntry {
-                id: "explorer.toggle_mika",
-                shortcut: "Ctrl+Shift+A",
             },
             DefaultCommandEntry {
                 id: "explorer.next_workspace",

@@ -38,7 +38,6 @@ export interface AppearancePreferences {
 
 export interface NotificationPreferences {
   badgeCountEnabled: boolean;
-  deviceNotificationsEnabled: boolean;
   desktopNotificationsEnabled: boolean;
   digestNotificationsEnabled: boolean;
   inAppNotificationsEnabled: boolean;
@@ -52,8 +51,6 @@ export interface GeneralPreferences {
   defaultTransferBehaviorIndex: number;
   openLinksExternally: boolean;
   preferredWorkspaceRoot: string;
-  reopenLastSession: boolean;
-  startupViewIndex: number;
 }
 
 export interface AssistantPreferences {
@@ -102,8 +99,4 @@ export interface SettingsStore {
   removeOpenWithAssociation: (key: string) => Promise<void>;
   setShortcut: (commandId: string, shortcut: string) => void;
   saveShortcuts: () => Promise<void>;
-}
-
-export interface BotPreferences {
-  cloudFolderEnabled: boolean;
 }

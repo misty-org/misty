@@ -4,8 +4,10 @@ import { useSetupStore } from "@/stores/app";
 import { routes } from "../routing/paths";
 
 const appPageTitles = new Map<string, string>([
+  [routes.home, "Misty - Home"],
   [routes.extensions, "Misty - Extensions"],
   [routes.spaces, "Misty - Spaces"],
+  [routes.agents, "Misty - Agents"],
   [routes.changelog, "Misty - Changelog"],
   [routes.signIn, "Misty - Sign In"],
   [routes.register, "Misty - Register"],
@@ -36,7 +38,7 @@ export function AppPagesLayout() {
   }, [refreshLocalAccessToken]);
 
   return (
-    <div className="app-pages-root h-full min-h-0 bg-[var(--misty-app-page-bg,#07090b)] text-text">
+    <div className="app-pages-root h-full min-h-0 bg-[var(--misty-app-page-bg,var(--background))] text-text">
       <main className="h-full min-h-0">
         <Outlet />
       </main>
