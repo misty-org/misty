@@ -1,6 +1,8 @@
 import { spawnSync } from "node:child_process";
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import net from "node:net";
-import { dirname, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const appDir = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -12,12 +14,22 @@ const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
 const devPort = await findAvailablePort(Number(process.env.MISTY_DESKTOP_DEV_PORT ?? 5173));
 const initialRoute = normalizeInitialRoute(process.env.MISTY_DESKTOP_INITIAL_ROUTE);
 const devUrl = `http://127.0.0.1:${devPort}${initialRoute}`;
-const tauriDevConfig = JSON.stringify({
-  build: {
-    devUrl,
-    beforeDevCommand: "npm run dev:desktop",
-  },
-});
+
+// Written to a file rather than passed inline: on Windows, spawnSync requires
+// shell:true to run npm.cmd, and cmd.exe mangles quotes in inline JSON args.
+const tauriDevConfigPath = join(
+  mkdtempSync(join(tmpdir(), "misty-tauri-dev-")),
+  "tauri.dev.conf.json",
+);
+writeFileSync(
+  tauriDevConfigPath,
+  JSON.stringify({
+    build: {
+      devUrl,
+      beforeDevCommand: "npm run dev:desktop",
+    },
+  }),
+);
 
 if (devPort !== 5173) {
   console.warn(`Desktop dev port 5173 is busy; using ${devPort} for this Tauri session.`);
@@ -26,7 +38,7 @@ if (devPort !== 5173) {
 run(npmCommand, ["run", "service:archive"]);
 run(
   npmCommand,
-  ["run", "tauri", "--", "dev", "--features=embedded-storage-go", "--config", tauriDevConfig],
+  ["run", "tauri", "--", "dev", "--features=embedded-storage-go", "--config", tauriDevConfigPath],
   {
     MISTY_DESKTOP_DEV_PORT: String(devPort),
     MISTY_SERVICE_GO_LIB_DIR: serviceLibDir,

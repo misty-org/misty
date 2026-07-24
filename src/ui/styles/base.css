@@ -321,3 +321,47 @@ html[data-explorer-dragging="true"] * {
   background-image: none !important;
   box-shadow: inset 0 0 0 1px rgba(143, 150, 161, 0.22);
 }
+
+/* Windows' default WebView2 scrollbar is a thick, square-edged native control.
+   Extend the thin scrollbar styling .app-pages-root already uses (App.css)
+   app-wide, so surfaces outside it (dialogs, portals, etc.) match instead of
+   falling back to the native control. Sizing/colors mirror that rule exactly
+   so there's no visible seam between the two. */
+:root[data-os-platform="windows"] {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border) transparent;
+}
+
+:root[data-os-platform="windows"] ::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+:root[data-os-platform="windows"] ::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+:root[data-os-platform="windows"] ::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 3px;
+}
+
+:root[data-os-platform="windows"] ::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-muted);
+}
+
+:root[data-os-platform="windows"] ::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+:root[data-os-platform="windows"] ::-webkit-scrollbar-button,
+:root[data-os-platform="windows"] ::-webkit-scrollbar-button:single-button,
+:root[data-os-platform="windows"] ::-webkit-scrollbar-button:vertical:start,
+:root[data-os-platform="windows"] ::-webkit-scrollbar-button:vertical:end,
+:root[data-os-platform="windows"] ::-webkit-scrollbar-button:horizontal:start,
+:root[data-os-platform="windows"] ::-webkit-scrollbar-button:horizontal:end {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  -webkit-appearance: none !important;
+}
