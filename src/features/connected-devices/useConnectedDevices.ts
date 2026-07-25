@@ -65,6 +65,9 @@ export function useConnectedDevices() {
     if (!packaged || !accountId) return;
     const controller = new AbortController();
     let retry: ReturnType<typeof setTimeout> | undefined;
+    // Restarts back off exponentially (30s to 5 minutes, jittered) and reset
+    // once the service is up, so a broken service is not retried every 30s.
+    let failures = 0;
     setDeviceInstance("");
     const start = async () => {
       let detach = () => {};
@@ -79,6 +82,7 @@ export function useConnectedDevices() {
                 resolve();
                 return;
               }
+              failures = 0;
               setDeviceInstance(instance);
               const stop = () => resolve();
               controller.signal.addEventListener("abort", stop, { once: true });
@@ -99,7 +103,10 @@ export function useConnectedDevices() {
         }
       } finally {
         detach();
-        if (!controller.signal.aborted) retry = setTimeout(() => void start(), refreshIntervalMs);
+        if (!controller.signal.aborted) {
+          const backoff = Math.min(5 * 60_000, refreshIntervalMs * 2 ** failures++);
+          retry = setTimeout(() => void start(), backoff * (0.75 + Math.random() * 0.5));
+        }
       }
     };
     void start();

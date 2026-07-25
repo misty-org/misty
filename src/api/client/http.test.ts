@@ -1,8 +1,40 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { httpRequest } from "./http";
+import { httpRequest, resetHttpOutageForTests } from "./http";
 
 describe("httpRequest", () => {
-  beforeEach(() => vi.restoreAllMocks());
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    resetHttpOutageForTests();
+  });
+
+  it("makes one attempt per request after retries are exhausted, until one succeeds", async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(new Response("down", { status: 503 }));
+
+    expect((await httpRequest("https://misty.example/api/apps")).status).toBe(503);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    fetchMock.mockClear();
+    expect((await httpRequest("https://misty.example/api/spaces")).status).toBe(503);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    fetchMock.mockClear();
+    fetchMock.mockResolvedValueOnce(new Response("ok", { status: 200 }));
+    resetHttpOutageForTests();
+    expect((await httpRequest("https://misty.example/api/apps")).status).toBe(200);
+    fetchMock.mockResolvedValue(new Response("down", { status: 503 }));
+    await httpRequest("https://misty.example/api/apps");
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+  });
+
+  it("does not retry a 503 that asks for a longer pause", async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(new Response("busy", { status: 503, headers: { "Retry-After": "30" } }));
+
+    expect((await httpRequest("https://misty.example/api/apps")).status).toBe(503);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
 
   it("keeps public cross-origin downloads free of preflight-only headers", async () => {
     const fetchMock = vi
