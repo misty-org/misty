@@ -278,6 +278,8 @@ function TaskCard({
   return (
     <Card
       ref={dropZone.ref}
+      data-misty-window-drag-block={canManage ? "true" : undefined}
+      data-pointer-drag-source={canManage ? "true" : undefined}
       className={`group gap-0 py-0 shadow-none ring-foreground/8 transition-opacity ${
         canManage ? "cursor-grab" : "cursor-default"
       } ${dragging ? "opacity-40" : ""} ${dropZone.active ? "ring-2 ring-primary" : ""}`}

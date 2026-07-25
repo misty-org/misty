@@ -1,7 +1,23 @@
 use super::*;
 
 pub(super) fn display_path(path: &Path) -> String {
-    path.to_string_lossy().to_string()
+    clean_display_path(path.to_string_lossy().as_ref())
+}
+
+#[cfg(windows)]
+fn clean_display_path(path: &str) -> String {
+    if let Some(rest) = path.strip_prefix(r"\\?\UNC\") {
+        format!(r"\\{rest}")
+    } else if let Some(rest) = path.strip_prefix(r"\\?\") {
+        rest.to_string()
+    } else {
+        path.to_string()
+    }
+}
+
+#[cfg(not(windows))]
+fn clean_display_path(path: &str) -> String {
+    path.to_string()
 }
 
 pub(super) fn sanitize_drag_file_name(name: &str) -> String {

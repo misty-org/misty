@@ -265,7 +265,7 @@ export function PersonalAgentsSidebar({
       </nav>
 
       <Dialog open={editing !== null} onOpenChange={(open) => !open && setEditing(null)}>
-        <DialogContent className="max-h-[88vh] max-w-2xl overflow-y-auto">
+        <DialogContent className="max-h-[88vh] max-w-xl overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editing === "new" ? "Create Agent" : "Edit Agent"}</DialogTitle>
             <DialogDescription>

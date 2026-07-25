@@ -98,6 +98,8 @@ export const ChromeTabStrip = memo(function ChromeTabStrip(props: ChromeTabStrip
               className="chrome-tab"
               data-tab-id={tab.id}
               data-active={active ? "true" : "false"}
+              data-misty-window-drag-block={props.onReorderTab ? "true" : undefined}
+              data-reorder-drag-source={props.onReorderTab ? "true" : undefined}
               draggable={Boolean(props.onReorderTab)}
               onDragEnd={() => {
                 draggedTabIdRef.current = null;

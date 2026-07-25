@@ -183,7 +183,7 @@ export function CompareDialog(props: { seed: CompareDialogSeed; onClose: () => v
           if (!open) props.onClose();
         }}
       >
-        <DialogContent className="flex max-h-[min(760px,calc(100vh-48px))] w-[min(940px,calc(100vw-48px))] max-w-none flex-col overflow-hidden bg-popover p-0 text-popover-foreground">
+        <DialogContent className="flex max-h-[min(760px,calc(100vh-48px))] w-[min(780px,calc(100vw-48px))] max-w-none flex-col overflow-hidden bg-popover p-0 text-popover-foreground">
           <form
             className="contents"
             onSubmit={(event) => {

@@ -176,7 +176,7 @@ export function SmartFolderDialog(props: {
         if (!open) props.onCancel();
       }}
     >
-      <DialogContent className="max-h-[min(720px,calc(100vh-48px))] overflow-y-auto sm:max-w-2xl">
+      <DialogContent className="max-h-[min(720px,calc(100vh-48px))] overflow-y-auto sm:max-w-xl">
         <form
           className="contents"
           onSubmit={(event) => {

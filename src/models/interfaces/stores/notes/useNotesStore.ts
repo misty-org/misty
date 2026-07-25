@@ -9,6 +9,7 @@ export interface NotesStoreState {
   /** Keyed by connector id; a present entry renders a calm inline notice. */
   connectorErrors: Record<string, string>;
   selectedNoteId?: string;
+  editingNoteId?: string;
   /** Account owning the device-local note partition. */
   accountId?: string;
   /** The Space whose Notes section is mounted; new notes default into it. */
@@ -35,10 +36,11 @@ export interface NotesStoreActions {
   syncAll: () => Promise<void>;
   setQuery: (query: string) => void;
   selectNote: (noteId: string | undefined) => void;
+  setEditingNoteId: (noteId: string | undefined) => void;
   toggleContextPanel: () => void;
   setIntegrationsOpen: (open: boolean) => void;
   toggleFavorite: (noteId: string) => Promise<void>;
-  createNote: (input: CreateNoteInput) => Promise<void>;
+  createNote: (input: CreateNoteInput) => Promise<UnifiedNote | undefined>;
   updateNoteBody: (noteId: string, body: string) => Promise<void>;
   assignSpace: (noteId: string, spaceId?: string, spaceName?: string) => Promise<void>;
   openInSource: (noteId: string) => Promise<void>;

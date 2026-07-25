@@ -4,7 +4,7 @@ const windowsUncPathPattern = /^(?:\\\\|\/\/)[^\\/]+[\\/][^\\/]+/;
 const urlLikePathPattern = /^[A-Za-z][A-Za-z\d+.-]*:\/\//;
 
 export function normalizeExplorerPath(path: string): string {
-  const trimmed = path.trim();
+  const trimmed = stripWindowsVerbatimPrefix(path.trim());
   if (!trimmed) return "";
 
   const windowsPath =
@@ -27,6 +27,18 @@ export function normalizeExplorerPath(path: string): string {
 
   normalized = normalized.replace(/\/+$/, "");
   return normalized || "/";
+}
+
+function stripWindowsVerbatimPrefix(path: string): string {
+  const uncMatch = path.match(/^(?:\\\\|\/\/)\?[/\\]UNC[/\\](.+)$/i);
+  if (uncMatch?.[1]) return `//${uncMatch[1]}`;
+
+  const driveMatch = path.match(/^(?:\\\\|\/\/)\?[/\\]([A-Za-z]:)(?:[/\\](.*))?$/);
+  if (!driveMatch?.[1]) return path;
+
+  const drive = driveMatch[1];
+  const rest = driveMatch[2] ?? "";
+  return rest ? `${drive}/${rest}` : `${drive}/`;
 }
 
 export function explorerPathKey(path: string): string {

@@ -8,32 +8,27 @@ export type {
 } from "@/models/interfaces/features/notes/components/NoteListPanel";
 import { FileText, Plus, SearchX, Star } from "lucide-react";
 import { Button, EmptyState, ScrollArea, Skeleton, cn } from "@/ui";
-import { noteGroupById, relativeTime } from "@/features/notes/noteFilters";
-import { NoteSourceBadge, NoteSyncIndicator } from "./NoteSourceBadge";
-import { NotionConnectCard, SyncErrorNotice } from "./NotesConnectionCards";
+import { relativeTime } from "@/features/notes/noteFilters";
+import { SyncErrorNotice } from "./NotesConnectionCards";
 
 const listPanelClass =
-  "grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] border-r border-border bg-background";
+  "grid h-full min-h-[280px] grid-rows-[auto_minmax(0,1fr)] overflow-hidden rounded-lg border border-sidebar-border/60 bg-sidebar-accent/15";
 
 const listHeaderClass =
-  "flex h-9 shrink-0 items-center justify-between gap-2 border-b border-border px-3";
+  "flex h-9 shrink-0 items-center justify-between gap-2 border-b border-sidebar-border/60 px-3";
 
 const rowClass =
-  "block w-full cursor-pointer border-b border-border/60 px-3 py-2.5 text-left transition-colors hover:bg-muted/50";
+  "block w-full cursor-pointer border-b border-sidebar-border/60 px-3 py-2.5 text-left transition-colors hover:bg-sidebar-accent/45";
 
-const rowSelectedClass = "bg-muted/80 shadow-[inset_2px_0_0_var(--primary)] hover:bg-muted/80";
+const rowSelectedClass =
+  "bg-sidebar-accent/70 shadow-[inset_2px_0_0_var(--primary)] hover:bg-sidebar-accent/70";
 
 export function NoteListPanel(props: NoteListPanelProps) {
-  const group = noteGroupById(props.activeGroup);
-  const notionStatus = props.notionConnector?.status();
-  const showNotionCard =
-    props.activeGroup === "notion" && notionStatus !== undefined && notionStatus !== "connected";
-
   return (
     <section className={listPanelClass} aria-label="Note list">
       <div className={listHeaderClass}>
         <h2 className="truncate text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-          {group.label}
+          {props.spaceName}
         </h2>
         <span className="text-[11px] tabular-nums text-muted-foreground/70">
           {props.notes.length}
@@ -47,23 +42,13 @@ export function NoteListPanel(props: NoteListPanelProps) {
 
         {props.loading ? <NoteListSkeleton /> : null}
 
-        {!props.loading && showNotionCard ? (
-          <div className="p-3">
-            <NotionConnectCard
-              status={notionStatus}
-              busy={false}
-              onConnect={props.onConnectNotion}
-            />
-          </div>
-        ) : null}
-
-        {!props.loading && !showNotionCard && props.notes.length === 0 ? (
+        {!props.loading && props.notes.length === 0 ? (
           props.query ? (
             <EmptyState
               compact
               icon={<SearchX />}
               title="No matching notes"
-              description={`Nothing matches “${props.query}” in ${group.label}.`}
+              description={`Nothing matches “${props.query}” in ${props.spaceName}.`}
               action={
                 <Button type="button" variant="secondary" size="sm" onClick={props.onClearQuery}>
                   Clear search
@@ -74,16 +59,8 @@ export function NoteListPanel(props: NoteListPanelProps) {
             <EmptyState
               compact
               icon={<FileText />}
-              title={
-                props.activeGroup === "space"
-                  ? `No notes in ${props.spaceName} yet`
-                  : "No notes here yet"
-              }
-              description={
-                props.activeGroup === "space"
-                  ? "Write a note in this Space, or file an existing one from Unlinked."
-                  : "Write a native Misty note, or connect a source to bring existing pages in."
-              }
+              title={`No notes in ${props.spaceName} yet`}
+              description="Write a note in this Space to keep the thread of work close by."
               action={
                 <Button type="button" size="sm" className="gap-1.5" onClick={props.onNewNote}>
                   <Plus size={14} strokeWidth={2.2} />
@@ -132,23 +109,14 @@ function NoteListItem(props: NoteListItemProps) {
           {note.favorite ? (
             <Star size={12} className="shrink-0 fill-amber-500 text-amber-500" />
           ) : null}
-          <NoteSyncIndicator compact status={note.syncStatus} />
         </span>
 
         <span className="line-clamp-2 text-[12px] leading-[1.45] text-muted-foreground">
           {note.preview}
         </span>
 
-        <span className="flex min-w-0 items-center gap-1.5 pt-0.5">
-          <NoteSourceBadge source={note.source} />
-          {note.spaceName ? (
-            <span className="truncate text-[11px] text-muted-foreground/80">{note.spaceName}</span>
-          ) : (
-            <span className="text-[11px] italic text-muted-foreground/50">Unlinked</span>
-          )}
-          <span className="ml-auto shrink-0 text-[11px] tabular-nums text-muted-foreground/60">
-            {relativeTime(note.updatedAt)}
-          </span>
+        <span className="text-[11px] tabular-nums text-muted-foreground/60">
+          {relativeTime(note.updatedAt)}
         </span>
       </span>
     </Button>

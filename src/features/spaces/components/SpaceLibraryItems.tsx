@@ -179,6 +179,8 @@ function LibraryItemCard({
 
   return (
     <article
+      data-misty-window-drag-block={reorderable ? "true" : undefined}
+      data-pointer-drag-source={reorderable ? "true" : undefined}
       className={[
         "group relative min-w-0 rounded-xl bg-card p-2 shadow-xs",
         "transition-[background-color,box-shadow,opacity] hover:bg-accent",

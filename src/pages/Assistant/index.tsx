@@ -1,6 +1,11 @@
-import { Bot } from "lucide-react";
-import { BetaFeatureNotice } from "@/features/beta/BetaFeatureNotice";
+import { lazy, Suspense } from "react";
+
+const DesktopAssistantPage = lazy(() => import("./desktop"));
 
 export default function AssistantPage() {
-  return <BetaFeatureNotice featureName="Agents" icon={Bot} />;
+  return (
+    <Suspense fallback={null}>
+      <DesktopAssistantPage />
+    </Suspense>
+  );
 }

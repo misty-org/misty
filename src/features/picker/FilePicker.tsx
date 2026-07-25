@@ -41,7 +41,7 @@ const emptyProviderRemotes: ProviderRemote[] = [];
 const emptyMountedDevices: MountedDevice[] = [];
 const emptyCutPaths = new Set<string>();
 const pickerDialogClassName = [
-  "grid h-[min(640px,calc(100vh-64px))] w-[min(960px,calc(100vw-32px))] max-w-none",
+  "grid h-[min(640px,calc(100vh-64px))] w-[min(760px,calc(100vw-32px))] max-w-none",
   "grid-rows-[auto_auto_minmax(0,1fr)_auto] gap-0 overflow-hidden p-0",
   "max-[560px]:size-full max-[560px]:rounded-none",
 ].join(" ");

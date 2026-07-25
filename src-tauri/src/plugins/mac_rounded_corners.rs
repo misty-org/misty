@@ -135,7 +135,34 @@ pub fn enable_modern_window_style<R: Runtime>(
 
     #[cfg(not(target_os = "macos"))]
     {
+        let _ = (offset_x, offset_y);
+        // Windows 11 rounds custom (decorationless) windows only when asked to.
+        #[cfg(windows)]
+        apply_windows_rounded_corners(&window);
         Ok(())
+    }
+}
+
+/// Opts a Windows 11 window into the system's rounded-corner treatment. No-op on
+/// Windows 10 (the DWM attribute is simply ignored there).
+#[cfg(windows)]
+fn apply_windows_rounded_corners<R: Runtime>(window: &WebviewWindow<R>) {
+    use windows_sys::Win32::Foundation::HWND;
+    use windows_sys::Win32::Graphics::Dwm::{
+        DwmSetWindowAttribute, DWMWA_WINDOW_CORNER_PREFERENCE, DWMWCP_ROUND,
+        DWM_WINDOW_CORNER_PREFERENCE,
+    };
+
+    if let Ok(hwnd) = window.hwnd() {
+        let preference: DWM_WINDOW_CORNER_PREFERENCE = DWMWCP_ROUND;
+        unsafe {
+            let _ = DwmSetWindowAttribute(
+                hwnd.0 as HWND,
+                DWMWA_WINDOW_CORNER_PREFERENCE as u32,
+                &preference as *const DWM_WINDOW_CORNER_PREFERENCE as *const core::ffi::c_void,
+                core::mem::size_of::<DWM_WINDOW_CORNER_PREFERENCE>() as u32,
+            );
+        }
     }
 }
 

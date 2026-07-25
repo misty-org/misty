@@ -31,7 +31,7 @@ export function NotesIntegrationsDialog(props: NotesIntegrationsDialogProps) {
 
   return (
     <Dialog open={props.open} onOpenChange={props.onOpenChange}>
-      <DialogContent className="max-w-[620px] gap-0 p-0">
+      <DialogContent className="max-w-[560px] gap-0 p-0">
         <DialogHeader className="border-b border-border px-5 py-4">
           <DialogTitle className="text-[14px]">Note sources</DialogTitle>
           <DialogDescription className="text-[12px]">

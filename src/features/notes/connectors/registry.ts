@@ -5,7 +5,6 @@ import type {
 } from "@/models/interfaces/features/notes/connectors";
 import type { UnifiedNote } from "@/models/types/features/notes/types";
 import { createMistyNativeNotesConnector } from "./mistyNativeNotes";
-import { createNotionConnector } from "./notion";
 
 /**
  * Fan-out layer over the registered connectors. The UI asks the registry for
@@ -59,10 +58,7 @@ export class NotesConnectorRegistry {
 }
 
 export function createDefaultNotesRegistry(accountId = ""): NotesConnectorRegistry {
-  return new NotesConnectorRegistry([
-    createMistyNativeNotesConnector(accountId),
-    createNotionConnector(),
-  ]);
+  return new NotesConnectorRegistry([createMistyNativeNotesConnector(accountId)]);
 }
 
 /**

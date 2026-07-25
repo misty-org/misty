@@ -29,68 +29,47 @@ function note(overrides: Partial<UnifiedNote> & { id: string }): UnifiedNote {
 }
 
 const notes: UnifiedNote[] = [
-  note({ id: "a", title: "Roadmap", spaceId: "s1", spaceName: "Product", tags: ["planning"] }),
-  note({ id: "b", source: "notion", title: "Interviews", preview: "eleven calls", favorite: true }),
+  note({
+    id: "a",
+    title: "Roadmap",
+    spaceId: "s1",
+    spaceName: "Product",
+    tags: ["planning"],
+  }),
+  note({
+    id: "b",
+    title: "Interview notes",
+    preview: "eleven calls",
+    spaceId: "s1",
+    spaceName: "Product",
+    updatedAt: new Date(now - 30_000).toISOString(),
+  }),
   note({
     id: "c",
-    title: "Old note",
+    title: "Platform note",
     spaceId: "s2",
     spaceName: "Platform",
     updatedAt: new Date(now - 10 * 24 * 60 * 60 * 1000).toISOString(),
   }),
+  note({ id: "d", title: "Old unlinked local note" }),
 ];
 
 describe("notesInGroup", () => {
-  it("scopes the Space lens to the active Space", () => {
-    expect(notesInGroup(notes, "space", now, "s1").map((entry) => entry.id)).toEqual(["a"]);
+  it("only returns notes attached to the active Space", () => {
+    expect(notesInGroup(notes, "space", now, "s1").map((entry) => entry.id)).toEqual(["a", "b"]);
     expect(notesInGroup(notes, "space", now, "s2").map((entry) => entry.id)).toEqual(["c"]);
   });
 
-  it("returns nothing for the Space lens when no Space is active", () => {
+  it("returns nothing when no Space is active", () => {
     expect(notesInGroup(notes, "space", now, undefined)).toEqual([]);
-  });
-
-  it("keeps the other groups cross-Space so loose notes stay findable", () => {
-    expect(notesInGroup(notes, "all", now, "s1")).toHaveLength(3);
-    expect(notesInGroup(notes, "unlinked", now, "s1").map((entry) => entry.id)).toEqual(["b"]);
-  });
-
-  it("splits by connector source", () => {
-    expect(notesInGroup(notes, "misty", now).map((entry) => entry.id)).toEqual(["a", "c"]);
-    expect(notesInGroup(notes, "notion", now).map((entry) => entry.id)).toEqual(["b"]);
-  });
-
-  it("treats notes without a Space as unlinked", () => {
-    expect(notesInGroup(notes, "unlinked", now).map((entry) => entry.id)).toEqual(["b"]);
-  });
-
-  it("limits recently updated to the last 48 hours", () => {
-    expect(notesInGroup(notes, "recent", now).map((entry) => entry.id)).toEqual(["a", "b"]);
-  });
-
-  it("filters favorites", () => {
-    expect(notesInGroup(notes, "favorites", now).map((entry) => entry.id)).toEqual(["b"]);
   });
 });
 
 describe("searchNotes", () => {
-  it("matches on title", () => {
+  it("matches on title, Space name, tags, and preview", () => {
     expect(searchNotes(notes, "roadmap").map((entry) => entry.id)).toEqual(["a"]);
-  });
-
-  it("matches on Space name", () => {
     expect(searchNotes(notes, "platform").map((entry) => entry.id)).toEqual(["c"]);
-  });
-
-  it("matches on tags", () => {
     expect(searchNotes(notes, "planning").map((entry) => entry.id)).toEqual(["a"]);
-  });
-
-  it("matches on source name", () => {
-    expect(searchNotes(notes, "notion").map((entry) => entry.id)).toEqual(["b"]);
-  });
-
-  it("matches on preview text", () => {
     expect(searchNotes(notes, "eleven").map((entry) => entry.id)).toEqual(["b"]);
   });
 
@@ -98,41 +77,26 @@ describe("searchNotes", () => {
     expect(searchNotes(notes, "roadmap product").map((entry) => entry.id)).toEqual(["a"]);
     expect(searchNotes(notes, "roadmap platform")).toEqual([]);
   });
-
-  it("returns everything for an empty query", () => {
-    expect(searchNotes(notes, "   ")).toHaveLength(3);
-  });
 });
 
 describe("selectVisibleNotes", () => {
-  it("intersects the Space lens with the query", () => {
-    expect(selectVisibleNotes(notes, "space", "roadmap", now, "s1").map((n) => n.id)).toEqual([
-      "a",
-    ]);
-    expect(selectVisibleNotes(notes, "space", "roadmap", now, "s2")).toEqual([]);
+  it("intersects active Space notes with the query", () => {
+    expect(selectVisibleNotes(notes, "roadmap", now, "s1").map((entry) => entry.id)).toEqual(["a"]);
+    expect(selectVisibleNotes(notes, "roadmap", now, "s2")).toEqual([]);
   });
 
-  it("applies the group filter before the query and sorts newest first", () => {
-    const visible = selectVisibleNotes(notes, "misty", "", now);
-    expect(visible.map((entry) => entry.id)).toEqual(["a", "c"]);
+  it("sorts current-Space notes newest first", () => {
+    expect(selectVisibleNotes(notes, "", now, "s1").map((entry) => entry.id)).toEqual(["b", "a"]);
   });
 
-  it("intersects group and query", () => {
-    expect(selectVisibleNotes(notes, "notion", "roadmap", now)).toEqual([]);
+  it("does not surface unlinked notes in the beta view", () => {
+    expect(selectVisibleNotes(notes, "old", now, "s1")).toEqual([]);
   });
 });
 
 describe("groupCounts", () => {
-  it("counts every sidebar group", () => {
-    expect(groupCounts(notes, now, "s1")).toEqual({
-      space: 1,
-      all: 3,
-      misty: 2,
-      notion: 1,
-      unlinked: 1,
-      recent: 2,
-      favorites: 1,
-    });
+  it("counts only the active Space", () => {
+    expect(groupCounts(notes, now, "s1")).toEqual({ space: 2 });
   });
 });
 

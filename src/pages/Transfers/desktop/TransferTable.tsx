@@ -155,6 +155,8 @@ const TransferTableHeader = memo(function TransferTableHeader(props: {
   return (
     <th
       className={`${transferStyles.tableHeader} ${props.dragging ? transferStyles.tableHeaderDragging : ""}`}
+      data-misty-window-drag-block="true"
+      data-reorder-drag-source="true"
       draggable
       aria-sort={
         sort && props.sortKey === sort

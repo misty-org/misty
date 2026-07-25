@@ -33,7 +33,7 @@ import { errorText } from "@/lib/format";
 import { formatBytes, formatDate } from "../utils/fileFormat";
 
 const dialogChromeClass =
-  "flex max-h-[min(760px,calc(100vh-48px))] w-[min(940px,calc(100vw-48px))] max-w-none flex-col overflow-hidden bg-popover p-0 text-popover-foreground";
+  "flex max-h-[min(760px,calc(100vh-48px))] w-[min(760px,calc(100vw-48px))] max-w-none flex-col overflow-hidden bg-popover p-0 text-popover-foreground";
 const bodyClass = "min-h-0 overflow-auto p-4";
 const fieldClass = "grid gap-1.5 text-xs font-medium text-muted-foreground";
 const groupListClass = "mt-4 grid max-h-[360px] gap-3 overflow-auto pr-1";

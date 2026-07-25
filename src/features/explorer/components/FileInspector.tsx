@@ -1,7 +1,7 @@
 import type { FileInspectorProps } from "@/models/interfaces/features/explorer/components/FileInspector";
 export type { FileInspectorProps } from "@/models/interfaces/features/explorer/components/FileInspector";
 import { FileSearch, Maximize2 } from "lucide-react";
-import { useState, type ReactNode } from "react";
+import { lazy, Suspense, useState, type ReactNode } from "react";
 import { Button } from "@/ui";
 import type {
   DirectoryListing,
@@ -21,6 +21,8 @@ import {
   useFolderPreview,
 } from "./FileInspectorPreview";
 import { inspectorStyles } from "./FileInspectorStyles";
+
+const PdfViewer = lazy(() => import("./PdfViewer"));
 
 export function FileInspector(props: FileInspectorProps) {
   const displayEntry = props.selectedEntry;
@@ -72,12 +74,9 @@ export function FileInspector(props: FileInspectorProps) {
         {preview?.kind === "archive" ? (
           <ArchiveContentsPreview preview={preview} />
         ) : preview?.kind === "pdf" ? (
-          <object
-            className={inspectorStyles.previewMedia}
-            data={preview.url}
-            type={preview.mimeType}
-            aria-label={`Preview of ${title}`}
-          />
+          <Suspense fallback={<div className={inspectorStyles.previewMedia} />}>
+            <PdfViewer url={preview.url} name={title} compact />
+          </Suspense>
         ) : preview?.text != null ? (
           <pre className={inspectorStyles.previewText}>{preview.text}</pre>
         ) : preview?.kind === "video" ? (

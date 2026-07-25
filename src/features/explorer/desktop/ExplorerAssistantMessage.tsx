@@ -241,7 +241,7 @@ function AssistantPlanReviewDialog(props: {
 
   return (
     <Dialog open={props.open} onOpenChange={props.onOpenChange}>
-      <DialogContent className="flex max-h-[min(820px,calc(100vh-64px))] w-[min(1040px,calc(100vw-64px))] max-w-none flex-col gap-0 overflow-hidden bg-popover p-0 text-popover-foreground">
+      <DialogContent className="flex max-h-[min(820px,calc(100vh-64px))] w-[min(780px,calc(100vw-64px))] max-w-none flex-col gap-0 overflow-hidden bg-popover p-0 text-popover-foreground">
         <DialogHeader className="border-b border-border px-5 py-4 pr-12">
           <DialogTitle>Review File Operations</DialogTitle>
           <DialogDescription>

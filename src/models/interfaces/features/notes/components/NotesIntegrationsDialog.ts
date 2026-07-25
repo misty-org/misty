@@ -26,7 +26,6 @@ export interface ConnectorCardProps {
 
 export interface NewNoteDialogProps {
   open: boolean;
-  spaces: { id: string; name: string }[];
   onOpenChange: (open: boolean) => void;
-  onCreate: (input: { title: string; body: string; spaceId?: string; spaceName?: string }) => void;
+  onCreate: (input: { title: string; body: string }) => void | Promise<void>;
 }

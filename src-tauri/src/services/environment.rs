@@ -290,7 +290,23 @@ fn resolve_home_dir() -> Option<PathBuf> {
 }
 
 fn display_path(path: &Path) -> String {
-    path.display().to_string()
+    clean_display_path(path.display().to_string().as_str())
+}
+
+#[cfg(windows)]
+fn clean_display_path(path: &str) -> String {
+    if let Some(rest) = path.strip_prefix(r"\\?\UNC\") {
+        format!(r"\\{rest}")
+    } else if let Some(rest) = path.strip_prefix(r"\\?\") {
+        rest.to_string()
+    } else {
+        path.to_string()
+    }
+}
+
+#[cfg(not(windows))]
+fn clean_display_path(path: &str) -> String {
+    path.to_string()
 }
 
 #[cfg(target_os = "ios")]

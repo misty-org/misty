@@ -109,7 +109,7 @@ export function SmartLibraryDialog(props: { workingDirectory: string; onClose: (
           if (!open && !busy) props.onClose();
         }}
       >
-        <DialogContent className="flex h-[min(860px,calc(100vh-48px))] w-[min(1180px,calc(100vw-48px))] max-w-none flex-col gap-0 overflow-hidden bg-popover p-0 text-popover-foreground [&>button]:hidden">
+        <DialogContent className="flex h-[min(860px,calc(100vh-48px))] w-[min(860px,calc(100vw-48px))] max-w-none flex-col gap-0 overflow-hidden bg-popover p-0 text-popover-foreground [&>button]:hidden">
           <DialogHeader className="flex-row items-center justify-between gap-5 border-b border-border px-6 py-4 text-left">
             <div className="flex min-w-0 items-center gap-3">
               <span className="grid size-10 shrink-0 place-items-center rounded-lg bg-primary text-primary-foreground">

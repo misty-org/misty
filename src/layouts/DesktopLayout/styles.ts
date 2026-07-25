@@ -98,6 +98,14 @@ export const desktopTitlebarTitleClass = [
   "text-[13px] font-semibold leading-none text-[var(--misty-text-muted)]",
 ].join(" ");
 
+// Windows/Linux have no left-side traffic lights, so the centered inset leaves a
+// dead gap in the top-left. Left-align the title there instead (native Windows
+// style), leaving room on the right for the caption buttons.
+export const windowsTitlebarTitleClass = [
+  "pointer-events-none absolute inset-y-0 left-3.5 right-[152px] flex min-w-0 items-center justify-start truncate",
+  "text-[13px] font-semibold leading-none text-[var(--misty-text-muted)]",
+].join(" ");
+
 export const desktopTitlebarDoubleClickLayerClass = "absolute inset-0 cursor-default";
 
 export const windowsTitlebarControlsClass = "absolute right-0 top-0 z-[3] grid h-full grid-cols-3";
