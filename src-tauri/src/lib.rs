@@ -18,7 +18,7 @@ use commands::{
     claude_send_message, claude_status, clipboard_apply_shared, clipboard_native_file_refs,
     clipboard_publish_image_bytes, clipboard_publish_shared, clipboard_set_local,
     clipboard_shared_image_bytes, clipboard_snapshot, clipboard_write_file_bytes,
-    clipboard_write_file_refs,
+    clipboard_write_file_refs, notes_store_asset,
     compare_apply_text_merge, compare_files, compare_folders, devices_snapshot, duplicates_cancel,
     duplicates_hash_remote_candidates, duplicates_scan, explorer_calculate_directory_sizes,
     explorer_create_item, explorer_delete_items, explorer_directory_size_snapshot,
@@ -234,6 +234,7 @@ pub fn run() {
             clipboard_native_file_refs,
             clipboard_write_file_bytes,
             clipboard_write_file_refs,
+            notes_store_asset,
             devices_snapshot,
             explorer_list_directory,
             #[cfg(target_os = "android")]

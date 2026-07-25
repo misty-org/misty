@@ -129,6 +129,10 @@ impl AppEnvironmentService {
         self.inner.cache_dir.clone()
     }
 
+    pub fn assets_dir(&self) -> PathBuf {
+        self.inner.assets_dir.clone()
+    }
+
     pub fn workspaces_path(&self) -> PathBuf {
         self.inner.workspaces_path.clone()
     }

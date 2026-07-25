@@ -58,6 +58,79 @@ describe("MistyNativeNotesConnector", () => {
     expect(updated.preview).toBe("second body");
     expect(Date.parse(updated.updatedAt)).toBeGreaterThanOrEqual(Date.parse(created.updatedAt));
   });
+
+  it("stores BlockNote JSON while keeping markdown available for previews", async () => {
+    const connector = createMistyNativeNotesConnector();
+    const body = JSON.stringify([
+      {
+        id: "block-1",
+        type: "paragraph",
+        props: {},
+        content: "hello **blocks**",
+        children: [],
+      },
+    ]);
+
+    const created = await connector.createNote!({
+      title: "Draft",
+      body,
+      bodyFormat: "blocknote-json",
+      bodyMarkdown: "hello **blocks**",
+      ...spaceInput,
+    });
+
+    expect(created.body).toBe(body);
+    expect(created.bodyFormat).toBe("blocknote-json");
+    expect(created.bodyMarkdown).toBe("hello **blocks**");
+    expect(created.preview).toBe("hello blocks");
+  });
+
+  it("drops unlinked notes from account storage during native beta load", async () => {
+    const storageKey = "misty.notes.native.v1.account-with-loose-notes";
+    window.localStorage.setItem(
+      storageKey,
+      JSON.stringify([
+        {
+          id: "misty:loose",
+          source: "misty",
+          sourceId: "loose",
+          title: "Loose",
+          body: "hidden",
+          bodyFormat: "markdown",
+          preview: "hidden",
+          tags: [],
+          backlinks: [],
+          updatedAt: "2026-07-20T12:00:00.000Z",
+          createdAt: "2026-07-20T12:00:00.000Z",
+          favorite: false,
+          syncStatus: "local-only",
+        },
+        {
+          id: "misty:space",
+          source: "misty",
+          sourceId: "space",
+          title: "Space",
+          body: "visible",
+          bodyFormat: "markdown",
+          preview: "visible",
+          spaceId: spaceInput.spaceId,
+          spaceName: spaceInput.spaceName,
+          tags: [],
+          backlinks: [],
+          updatedAt: "2026-07-20T12:00:00.000Z",
+          createdAt: "2026-07-20T12:00:00.000Z",
+          favorite: false,
+          syncStatus: "local-only",
+        },
+      ]),
+    );
+
+    const connector = createMistyNativeNotesConnector("account-with-loose-notes");
+    const notes = await connector.listNotes();
+
+    expect(notes.map((note) => note.title)).toEqual(["Space"]);
+    expect(window.localStorage.getItem(storageKey)).not.toContain("Loose");
+  });
 });
 
 describe("NotionConnector", () => {
