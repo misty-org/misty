@@ -1,4 +1,4 @@
-import { PageHeader, PublicPage, ResourceNav } from "@/components/marketing/PublicPage";
+import { PageHeader, PublicPage, ResourceNav } from "@/components/marketing";
 import { Badge } from "@/components/ui/badge";
 import { marketingCopy } from "@/content/marketingCopy";
 import { posts, tagColors } from "./data";

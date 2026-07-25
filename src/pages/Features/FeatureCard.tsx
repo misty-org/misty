@@ -5,7 +5,7 @@ import {
   FilesPreview,
   ProductScreenshot,
   TasksPreview,
-} from "@/components/ProductPreview";
+} from "@/components/marketing/previews";
 import { marketingCopy } from "@/content/marketingCopy";
 import { cn } from "@/lib/utils";
 import type { MainFeature } from "./featureData";

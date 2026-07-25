@@ -31,9 +31,9 @@ const publicRoutes = [
     path: "/roadmap",
     title: "Roadmap — What Misty is building",
   },
-  { name: "waitlist", path: "/waitlist", title: "Request beta access — Misty" },
+  { name: "legacy join", path: "/waitlist", title: "Join Misty — Misty" },
   { name: "sign in", path: "/signin", title: "Sign in — Misty" },
-  { name: "register", path: "/register", title: "Beta invitations — Misty" },
+  { name: "register", path: "/register", title: "Join Misty — Misty" },
   {
     name: "tokenless reset",
     path: "/reset",

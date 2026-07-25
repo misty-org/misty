@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/png" href="/misty.png" />
+    <link rel="icon" type="image/png" href="/misty-white.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Misty — One shared Space for everyone</title>
     <meta
@@ -37,6 +37,8 @@
           const theme = storedTheme === "light" ? "light" : "dark";
           document.documentElement.classList.add(theme);
           document.documentElement.style.colorScheme = theme;
+          document.querySelector('link[rel="icon"]').href =
+            theme === "light" ? "/misty-black.png" : "/misty-white.png";
         } catch {
           document.documentElement.classList.add("dark");
         }

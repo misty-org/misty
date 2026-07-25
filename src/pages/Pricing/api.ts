@@ -1,5 +1,5 @@
 import { apiBase } from "../../lib/apiBase";
-import type { BillingInterval, PaidTier } from "@/lib/pricing";
+import type { BillingInterval, PaidTier } from "./data";
 
 export async function createSubscriptionCheckout(
   tier: PaidTier,

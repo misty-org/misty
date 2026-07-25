@@ -49,7 +49,7 @@ export const marketingCopy: MarketingCopy = {
   home: {
     heroTitle: {
       before: "One shared ",
-      link: "Space",
+      link: "space",
       after: " for ",
       phrases: [
         "everyone.",
@@ -65,7 +65,7 @@ export const marketingCopy: MarketingCopy = {
     features: [
       {
         label: "Agents",
-        title: "Build Agents around shared context.",
+        title: "Build agents around shared context.",
         description:
           "Create custom Agents that work from the files and conversations each member is allowed to access.",
       },
@@ -73,7 +73,7 @@ export const marketingCopy: MarketingCopy = {
         label: "Spaces",
         title: "Keep everything in one place.",
         description:
-          "Bring collaborators, conversations, tasks, and shared resources into a Space everyone can follow.",
+          "conversations, tasks, and shared resources into a Space everyone can follow.",
       },
       {
         label: "Private files",
@@ -127,7 +127,7 @@ export const marketingCopy: MarketingCopy = {
   pricing: {
     title: "Simple pricing for shared work.",
     description:
-      "Free and Pro both include unlimited Spaces, collaborators, custom Agents, and the same automatic model routing. Pro adds more pooled owner storage and over 6× more Hosted AI capacity.",
+      "Free covers a small group with 3 Spaces, 5 collaborators per Space, and 1 custom agent. Pro removes those limits and adds more pooled owner storage with over 10× more weekly agent usage.",
   },
   download: {
     title: "Lorem ipsum dolor sit amet.",
@@ -150,9 +150,9 @@ export const marketingCopy: MarketingCopy = {
       "Praesent commodo cursus magna, vel scelerisque nisl consectetur et.",
   },
   waitlist: {
-    title: "Request beta access",
+    title: "Join Misty",
     description:
-      "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Integer vitae justo sed nisl consequat posuere.",
+      "Sign in to join your group and start working together in one shared Space.",
   },
   auth: {
     signInDescription:
@@ -172,7 +172,7 @@ export const marketingCopy: MarketingCopy = {
     features:
       "Keep files, conversations, tasks, tools, and custom Agents together in one shared Misty Space.",
     pricing:
-      "Compare Misty Free and Pro: unlimited Spaces, collaborators, and custom Agents with pooled owner storage and weekly Hosted AI usage.",
+      "Compare Misty Free and Pro: Spaces, collaborators, custom agents, pooled owner storage, and weekly agent usage.",
     download:
       "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Integer posuere erat a ante venenatis.",
     blog: "Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur.",
@@ -181,6 +181,6 @@ export const marketingCopy: MarketingCopy = {
     roadmap:
       "Praesent commodo cursus magna, vel scelerisque nisl consectetur et. Cras mattis consectetur purus.",
     waitlist:
-      "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Integer vitae justo sed nisl consequat posuere.",
+      "Sign in to Misty and join your group in one shared Space for files, conversations, tools, tasks, and Agents.",
   },
 };

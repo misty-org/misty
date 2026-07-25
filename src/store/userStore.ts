@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { MeResponse } from "../pages/Dashboard/api";
+import type { MeResponse } from "../pages/AccountSettings/api";
 
 interface UserStore {
   me: MeResponse | null;

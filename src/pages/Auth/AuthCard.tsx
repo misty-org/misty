@@ -15,18 +15,29 @@ interface AuthCardProps {
   footer?: ReactNode;
 }
 
-export default function AuthCard({ title, description, children, footer }: AuthCardProps) {
+export default function AuthCard({
+  title,
+  description,
+  children,
+  footer,
+}: AuthCardProps) {
   return (
     <Card className="gap-0 rounded-xl bg-card p-6 text-card-foreground shadow-xl ring-1 ring-foreground/10 sm:p-8">
       {title || description ? (
         <CardHeader className="p-0">
           {title ? (
-            <CardTitle role="heading" aria-level={2} className="text-2xl font-semibold">
+            <CardTitle
+              role="heading"
+              aria-level={2}
+              className="text-2xl font-semibold"
+            >
               {title}
             </CardTitle>
           ) : null}
           {description ? (
-            <CardDescription className="mt-2 leading-6">{description}</CardDescription>
+            <CardDescription className="mt-2 leading-6">
+              {description}
+            </CardDescription>
           ) : null}
         </CardHeader>
       ) : null}

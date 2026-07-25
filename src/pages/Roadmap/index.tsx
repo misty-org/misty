@@ -1,6 +1,10 @@
 import { Link } from "react-router";
 
-import { PageHeader, PublicPage, ResourceNav } from "@/components/marketing/PublicPage";
+import {
+  PageHeader,
+  PublicPage,
+  ResourceNav,
+} from "@/components/marketing";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -31,17 +35,28 @@ export default function Roadmap() {
           const items = phase?.items ?? [];
 
           return (
-            <Card key={status} className="gap-0 rounded-xl py-0 shadow-xs ring-1 ring-foreground/10">
+            <Card
+              key={status}
+              className="gap-0 rounded-xl py-0 shadow-xs ring-1 ring-foreground/10"
+            >
               <CardHeader className="flex-row items-center justify-between border-b border-border px-5 py-4">
-                <CardTitle className="text-sm font-medium">{columnMeta[status]}</CardTitle>
-                <Badge variant="secondary" className="tabular-nums">{items.length}</Badge>
+                <CardTitle className="text-sm font-medium">
+                  {columnMeta[status]}
+                </CardTitle>
+                <Badge variant="secondary" className="tabular-nums">
+                  {items.length}
+                </Badge>
               </CardHeader>
               <CardContent className="px-5 py-1">
                 <ul className="divide-y divide-border">
                   {items.map((item) => (
                     <li key={item.title} className="py-5">
-                      <h3 className="text-sm font-medium text-foreground">{item.title}</h3>
-                      <p className="mt-2 text-sm leading-6 text-muted-foreground">{item.description}</p>
+                      <h3 className="text-sm font-medium text-foreground">
+                        {item.title}
+                      </h3>
+                      <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                        {item.description}
+                      </p>
                     </li>
                   ))}
                 </ul>
@@ -53,11 +68,15 @@ export default function Roadmap() {
 
       <section className="flex flex-col gap-6 rounded-xl bg-card p-6 shadow-xs ring-1 ring-foreground/10 sm:flex-row sm:items-center sm:justify-between sm:p-8">
         <div>
-          <h2 className="text-xl font-medium tracking-[-0.02em] text-foreground">Shape what comes next.</h2>
-          <p className="mt-2 text-sm text-muted-foreground">Request access to the current Misty beta.</p>
+          <h2 className="text-xl font-medium tracking-[-0.02em] text-foreground">
+            Shape what comes next.
+          </h2>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Sign in and bring your group into Misty.
+          </p>
         </div>
         <Button asChild size="lg" className="px-5">
-          <Link to="/waitlist">Request beta access</Link>
+          <Link to="/signin">Join now</Link>
         </Button>
       </section>
     </PublicPage>

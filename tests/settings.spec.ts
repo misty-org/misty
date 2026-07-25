@@ -4,7 +4,7 @@ import { expect, test, type Page, type Route } from "@playwright/test";
 import type {
   BillingUsageResponse,
   MeResponse,
-} from "../src/pages/Dashboard/api";
+} from "../src/pages/AccountSettings/api";
 
 type Theme = "light" | "dark";
 
@@ -205,7 +205,7 @@ for (const theme of ["light", "dark"] as const) {
     await expect(dialog.getByText("38 GB")).toBeVisible();
     await expect(dialog.getByText("64% used")).toBeVisible();
     await expect(
-      dialog.getByRole("heading", { name: "Hosted AI usage" }),
+      dialog.getByRole("heading", { name: "Agent usage" }),
     ).toBeVisible();
     await expect(
       dialog.getByText(
@@ -335,7 +335,7 @@ test("free accounts can select the monthly Pro trial", async ({ page }) => {
   await dialog.getByRole("button", { name: "Billing", exact: true }).click();
   await expect(dialog.getByText(/50 GB of pooled owner storage/)).toBeVisible();
   await expect(
-    dialog.getByText(/over 6× more Hosted AI capacity/),
+    dialog.getByText(/over 10× more weekly agent usage/),
   ).toBeVisible();
   await dialog.getByRole("button", { name: "Start Pro trial · $9/mo" }).click();
   await expect
