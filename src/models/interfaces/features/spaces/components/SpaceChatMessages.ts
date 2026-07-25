@@ -55,7 +55,7 @@ export interface SpaceChatMessagesProps {
   canCopyLibrary: boolean;
   canAddToLibrary: boolean;
   spaceId: string;
-  endRef: RefObject<HTMLDivElement>;
+  endRef: RefObject<HTMLDivElement | null>;
   onEditingText: (value: string) => void;
   onCancelEditing: (messageId: string) => void;
   onSaveEdited: (event: FormEvent, message: SpaceMessage) => void;

@@ -420,7 +420,10 @@ export function remoteBrowseTargetForPath(
 
 export function parentDirectory(path: string): string {
   const normalized = H.normalizedPath(path);
+  if (/^[A-Za-z]:\/?$/.test(normalized))
+    return normalized.endsWith("/") ? normalized : `${normalized}/`;
   const slash = normalized.lastIndexOf("/");
+  if (slash === 2 && /^[A-Za-z]:\//.test(normalized)) return normalized.slice(0, 3);
   if (slash <= 0) return "/";
   return normalized.slice(0, slash);
 }

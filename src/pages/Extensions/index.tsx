@@ -1,6 +1,11 @@
-import { Blocks } from "lucide-react";
-import { BetaFeatureNotice } from "@/features/beta/BetaFeatureNotice";
+import { lazy, Suspense } from "react";
+
+const DesktopExtensionsPage = lazy(() => import("./desktop"));
 
 export default function ExtensionsPage() {
-  return <BetaFeatureNotice featureName="Extensions" icon={Blocks} />;
+  return (
+    <Suspense fallback={null}>
+      <DesktopExtensionsPage />
+    </Suspense>
+  );
 }

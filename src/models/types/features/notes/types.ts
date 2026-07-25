@@ -37,8 +37,7 @@ export type UnifiedNote = {
  * "space" is the default lens inside a Space; the rest stay cross-Space so loose
  * notes can be found and filed without leaving the section.
  */
-export type NoteGroupId =
-  "space" | "all" | "misty" | "notion" | "unlinked" | "recent" | "favorites";
+export type NoteGroupId = "space";
 
 export type NoteGroup = {
   id: NoteGroupId;

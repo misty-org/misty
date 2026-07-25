@@ -5,5 +5,5 @@ export interface SpaceNotesProps {
 
 export interface NotesPanelSidebarProps {
   spaceId: string;
-  activeGroup: string;
+  spaceName: string;
 }

@@ -5,6 +5,8 @@ import {
   joinExplorerPath,
   normalizeExplorerPath,
 } from "@/features/explorer/utils/pathNormalization";
+import { breadcrumbSegments } from "@/features/explorer/utils/fileFormat";
+import { parentDirectory } from "@/features/explorer/store/helpers/listing";
 import { createMultiPanelStore } from "@/features/workspace";
 
 describe("explorer path normalization", () => {
@@ -14,11 +16,35 @@ describe("explorer path normalization", () => {
     expect(explorerPathName("C:\\Users\\Misty\\Documents")).toBe("Documents");
   });
 
+  it("strips Windows verbatim path prefixes before storing paths", () => {
+    expect(normalizeExplorerPath("\\\\?\\C:\\Users\\Misty\\Desktop\\")).toBe(
+      "C:/Users/Misty/Desktop",
+    );
+    expect(normalizeExplorerPath("//?/C:/Users/Misty/Desktop")).toBe("C:/Users/Misty/Desktop");
+    expect(normalizeExplorerPath("\\\\?\\UNC\\server\\share\\folder")).toBe(
+      "//server/share/folder",
+    );
+  });
+
   it("preserves UNC roots while normalizing their separators", () => {
     expect(normalizeExplorerPath("\\\\server\\share\\folder\\")).toBe("//server/share/folder");
     expect(joinExplorerPath("\\\\server\\share", "folder", "report.pdf")).toBe(
       "//server/share/folder/report.pdf",
     );
+  });
+
+  it("builds Windows drive breadcrumbs from the drive root", () => {
+    expect(breadcrumbSegments("//?/C:/Users/Misty")).toEqual([
+      { label: "C:", path: "C:/" },
+      { label: "Users", path: "C:/Users" },
+      { label: "Misty", path: "C:/Users/Misty" },
+    ]);
+  });
+
+  it("keeps Windows drive roots intact when resolving parents", () => {
+    expect(parentDirectory("C:/")).toBe("C:/");
+    expect(parentDirectory("C:/Users")).toBe("C:/");
+    expect(parentDirectory("C:/Users/Misty")).toBe("C:/Users");
   });
 
   it("compares Windows paths case-insensitively", () => {

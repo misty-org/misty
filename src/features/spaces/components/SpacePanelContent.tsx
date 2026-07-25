@@ -46,7 +46,6 @@ import { SpaceSectionNavigation } from "./SpaceSectionNavigation";
 import { SpaceSidebarSection } from "./SpaceSidebarSection";
 import { SpaceChatConversationList } from "./SpaceChatConversationList";
 import { NotesPanelSidebar } from "@/features/notes/components/NotesPanelSidebar";
-import { defaultNoteGroup } from "@/features/notes/noteFilters";
 import { spaceNotesEnabled } from "@/features/notes/availability";
 import {
   CreateEditConversationDialog,
@@ -209,10 +208,7 @@ export function SpacePanelContent(props: {
         />
       </div>
     ) : section === "notes" && spaceNotesEnabled ? (
-      <NotesPanelSidebar
-        spaceId={activeSpaceId}
-        activeGroup={search.get("group") ?? defaultNoteGroup}
-      />
+      <NotesPanelSidebar spaceId={activeSpaceId} spaceName={activeSpace?.name ?? "Notes"} />
     ) : section === "library" ? (
       <div className="grid gap-3">
         <SpaceSidebarSection title="Browse">

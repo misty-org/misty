@@ -6,8 +6,13 @@ vi.mock("@/platform/openExternalLink", () => ({
 
 import { createMistyNativeNotesConnector } from "@/features/notes/connectors/mistyNativeNotes";
 import { createNotionConnector } from "@/features/notes/connectors/notion";
-import { NotesConnectorRegistry } from "@/features/notes/connectors/registry";
+import {
+  createDefaultNotesRegistry,
+  NotesConnectorRegistry,
+} from "@/features/notes/connectors/registry";
 import { createFakeNotionClient, notionPage } from "./fakeNotionClient";
+
+const spaceInput = { spaceId: "space-product", spaceName: "Product" };
 
 describe("MistyNativeNotesConnector", () => {
   it("is always connected and accepts writes", async () => {
@@ -19,23 +24,35 @@ describe("MistyNativeNotesConnector", () => {
 
   it("creates notes as local-only until synced", async () => {
     const connector = createMistyNativeNotesConnector();
-    const created = await connector.createNote!({ title: "Draft", body: "hello world" });
+    const created = await connector.createNote!({
+      title: "Draft",
+      body: "hello world",
+      ...spaceInput,
+    });
 
     expect(created.source).toBe("misty");
     expect(created.syncStatus).toBe("local-only");
     expect(created.preview).toBe("hello world");
+    expect(created.spaceId).toBe(spaceInput.spaceId);
     expect(await connector.getNote(created.sourceId)).toMatchObject({ title: "Draft" });
   });
 
   it("falls back to a placeholder title", async () => {
     const connector = createMistyNativeNotesConnector();
-    const created = await connector.createNote!({ title: "   ", body: "" });
+    const created = await connector.createNote!({ title: "   ", body: "", ...spaceInput });
     expect(created.title).toBe("Untitled note");
+  });
+
+  it("requires every new note to belong to a Space", async () => {
+    const connector = createMistyNativeNotesConnector();
+    await expect(connector.createNote!({ title: "Loose", body: "" })).rejects.toThrow(
+      /belong to a Space/,
+    );
   });
 
   it("regenerates the preview when the body changes", async () => {
     const connector = createMistyNativeNotesConnector();
-    const created = await connector.createNote!({ title: "Draft", body: "first" });
+    const created = await connector.createNote!({ title: "Draft", body: "first", ...spaceInput });
     const updated = await connector.updateNote!(created.sourceId, { body: "## second body" });
 
     expect(updated.preview).toBe("second body");
@@ -70,6 +87,13 @@ describe("NotionConnector", () => {
 });
 
 describe("NotesConnectorRegistry", () => {
+  it("registers only native Misty notes in the beta default registry", () => {
+    const registry = createDefaultNotesRegistry("account-1");
+    expect(registry.forSource("misty")?.providerId).toBe("misty");
+    expect(registry.forSource("notion")).toBeUndefined();
+    expect(registry.list().map((connector) => connector.providerId)).toEqual(["misty"]);
+  });
+
   it("merges notes from every connector", async () => {
     const notion = createNotionConnector(
       createFakeNotionClient({ pages: { "page-1": notionPage("page-1", "Roadmap") } }).client,

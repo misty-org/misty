@@ -15,7 +15,6 @@ import type { ArchiveEntry } from "@/models/interfaces/services/misty-api";
 import { errorText } from "@/lib/format";
 import { safeTauriAssetUrl } from "@/platform/tauri";
 import { formatBytes, formatDate } from "@/features/explorer/utils/fileFormat";
-import { GlobalImageEditor } from "@/features/editor/GlobalImageEditor";
 
 import type {
   GlobalPreviewSource,

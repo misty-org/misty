@@ -25,7 +25,7 @@ import { ProviderLogo } from "./ProviderLogo";
 import { EmptyState } from "@/ui";
 
 const providerDialogClass =
-  "flex max-h-[min(760px,calc(100vh-48px))] w-[min(620px,calc(100vw-48px))] max-w-none flex-col overflow-hidden bg-popover p-0";
+  "flex max-h-[min(760px,calc(100vh-48px))] w-[min(560px,calc(100vw-48px))] max-w-none flex-col overflow-hidden bg-popover p-0";
 
 const providerHeaderClass =
   "flex grid-cols-[1fr_auto] items-start justify-between gap-5 border-b border-border px-5 py-[18px] text-left";
@@ -48,7 +48,7 @@ const providerWorkflowButtonSelectedClass = "border-primary bg-primary/10";
 
 const providerWorkflowMarkClass = "grid h-[38px] w-[38px] place-items-center text-primary";
 
-const providerFormClass = "mx-auto grid max-w-[560px] gap-3.5";
+const providerFormClass = "mx-auto grid max-w-[520px] gap-3.5";
 
 const providerFieldClass = "grid gap-2 text-[13px] font-semibold text-muted-foreground";
 
