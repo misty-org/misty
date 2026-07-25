@@ -109,6 +109,28 @@ pub struct ClipboardFileBytes {
     pub bytes: Vec<u8>,
 }
 
+const NOTE_ASSET_MAX_BYTES: usize = 15 * 1024 * 1024;
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NoteAssetStoreRequest {
+    pub account_id: String,
+    pub space_id: String,
+    pub note_id: String,
+    pub file_name: String,
+    pub mime_type: Option<String>,
+    pub bytes: Vec<u8>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NoteAssetStoreResult {
+    pub path: String,
+    pub name: String,
+    pub mime_type: Option<String>,
+    pub byte_size: u64,
+}
+
 #[tauri::command]
 pub async fn app_snapshot(state: State<'_, MistyRuntime>) -> ApiResult<AppSnapshot> {
     Ok(AppSnapshot {
@@ -374,6 +396,94 @@ pub async fn clipboard_write_file_bytes(items: Vec<ClipboardFileBytes>) -> ApiRe
         });
     }
     crate::services::native_clipboard::write_native_clipboard_file_refs(&references)
+}
+
+#[tauri::command]
+pub async fn notes_store_asset(
+    request: NoteAssetStoreRequest,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<NoteAssetStoreResult> {
+    if request.bytes.is_empty() {
+        return Err(ApiError::Message("The selected note file is empty.".to_owned()));
+    }
+    if request.bytes.len() > NOTE_ASSET_MAX_BYTES {
+        return Err(ApiError::Message(
+            "Note files must be 15 MB or smaller for this beta.".to_owned(),
+        ));
+    }
+
+    let timestamp = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_millis())
+        .unwrap_or_default();
+    let original_name = safe_file_name(&request.file_name, "note-asset");
+    let original_path = Path::new(&original_name);
+    let stem = original_path
+        .file_stem()
+        .and_then(|name| name.to_str())
+        .filter(|name| !name.is_empty())
+        .unwrap_or("note-asset");
+    let extension = original_path
+        .extension()
+        .and_then(|value| value.to_str())
+        .map(|value| format!(".{}", safe_path_segment(value, "file")))
+        .unwrap_or_default();
+    let file_name = format!("{stem}-{timestamp}{extension}");
+    let directory = state
+        .environment
+        .assets_dir()
+        .join("notes")
+        .join(safe_path_segment(&request.account_id, "account"))
+        .join(safe_path_segment(&request.space_id, "space"))
+        .join(safe_path_segment(&request.note_id, "note"));
+
+    tokio::fs::create_dir_all(&directory).await.map_err(|error| {
+        ApiError::Message(format!("Misty could not prepare note asset storage: {error}"))
+    })?;
+    let path = directory.join(&file_name);
+    tokio::fs::write(&path, &request.bytes).await.map_err(|error| {
+        ApiError::Message(format!("Misty could not save this note file: {error}"))
+    })?;
+
+    Ok(NoteAssetStoreResult {
+        path: path.to_string_lossy().into_owned(),
+        name: original_name,
+        mime_type: request
+            .mime_type
+            .map(|value| value.trim().to_owned())
+            .filter(|value| !value.is_empty()),
+        byte_size: request.bytes.len() as u64,
+    })
+}
+
+fn safe_file_name(value: &str, fallback: &str) -> String {
+    let name = Path::new(value.trim())
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or(fallback);
+    safe_path_segment(name, fallback)
+}
+
+fn safe_path_segment(value: &str, fallback: &str) -> String {
+    let sanitized: String = value
+        .chars()
+        .map(|character| {
+            if character.is_ascii_alphanumeric()
+                || matches!(character, '.' | '-' | '_' | ' ')
+            {
+                character
+            } else {
+                '-'
+            }
+        })
+        .collect::<String>()
+        .trim_matches([' ', '.', '-'])
+        .to_owned();
+    if sanitized.is_empty() {
+        fallback.to_owned()
+    } else {
+        sanitized
+    }
 }
 
 #[tauri::command]

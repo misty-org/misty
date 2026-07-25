@@ -1,12 +1,20 @@
-import type { UnifiedNote } from "@/models/types/features/notes/types";
+import type { NoteBodyFormat, UnifiedNote } from "@/models/types/features/notes/types";
+
+export interface NoteContentDraft {
+  body: string;
+  bodyFormat: NoteBodyFormat;
+  bodyMarkdown?: string;
+}
 
 export interface NoteReadingPaneProps {
   note?: UnifiedNote;
+  accountId?: string;
   loading: boolean;
   editingNoteId?: string;
   onEditingNoteChange?: (noteId: string | undefined) => void;
   /** Undefined for read-only sources; presence enables the Edit affordance. */
   onSaveBody?: (noteId: string, body: string) => void;
+  onSaveContent?: (noteId: string, content: NoteContentDraft) => void;
   onToggleFavorite?: (noteId: string) => void;
   onNewNote: () => void;
 }

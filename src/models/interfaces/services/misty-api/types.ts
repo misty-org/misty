@@ -137,6 +137,22 @@ export interface ClipboardSnapshot {
   shared: ClipboardPayload;
 }
 
+export interface NoteAssetStoreRequest {
+  accountId: string;
+  spaceId: string;
+  noteId: string;
+  fileName: string;
+  mimeType?: string | null;
+  bytes: number[];
+}
+
+export interface NoteAssetStoreResult {
+  path: string;
+  name: string;
+  mimeType: string | null;
+  byteSize: number;
+}
+
 export interface MountedDevice {
   id: string;
   volumeId: string;

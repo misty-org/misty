@@ -71,6 +71,7 @@
     "check:readability": "node scripts/check-readability.mjs"
   },
   "dependencies": {
+    "@blocknote/code-block": "^0.52.1",
     "@blocknote/core": "^0.52.1",
     "@blocknote/mantine": "^0.52.1",
     "@blocknote/react": "^0.52.1",

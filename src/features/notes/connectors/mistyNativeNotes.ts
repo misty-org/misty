@@ -81,8 +81,9 @@ export function createMistyNativeNotesConnector(accountId = ""): NotesConnector 
         sourceId,
         title: input.title.trim() || "Untitled note",
         body: input.body,
-        bodyFormat: "markdown",
-        preview: previewFrom(input.body),
+        bodyFormat: input.bodyFormat ?? "markdown",
+        bodyMarkdown: input.bodyMarkdown,
+        preview: previewFrom(input.bodyMarkdown ?? input.body),
         spaceId: input.spaceId,
         spaceName: input.spaceName,
         tags: input.tags ?? [],
@@ -104,7 +105,10 @@ export function createMistyNativeNotesConnector(accountId = ""): NotesConnector 
       const updated: UnifiedNote = {
         ...existing,
         ...patch,
-        preview: patch.body === undefined ? existing.preview : previewFrom(patch.body),
+        preview:
+          patch.body === undefined && patch.bodyMarkdown === undefined
+            ? existing.preview
+            : previewFrom(patch.bodyMarkdown ?? patch.body ?? existing.bodyMarkdown ?? existing.body),
         updatedAt: nowIso(),
       };
       commit(notes.map((note) => (note.sourceId === sourceId ? updated : note)));
@@ -127,7 +131,9 @@ function readNativeNotes(storageKey: string): UnifiedNote[] {
   try {
     const raw = window.localStorage.getItem(storageKey);
     const parsed: unknown = raw ? JSON.parse(raw) : [];
-    return Array.isArray(parsed) ? parsed.filter(isStoredNativeNote) : [];
+    return Array.isArray(parsed)
+      ? parsed.filter(isStoredNativeNote).map(normalizeStoredNativeNote)
+      : [];
   } catch {
     return [];
   }
@@ -150,12 +156,20 @@ function isStoredNativeNote(value: unknown): value is UnifiedNote {
     typeof note.sourceId === "string" &&
     typeof note.title === "string" &&
     typeof note.body === "string" &&
+    (note.bodyMarkdown === undefined || typeof note.bodyMarkdown === "string") &&
     typeof note.preview === "string" &&
     typeof note.updatedAt === "string" &&
     typeof note.createdAt === "string" &&
     Array.isArray(note.tags) &&
     Array.isArray(note.backlinks)
   );
+}
+
+function normalizeStoredNativeNote(note: UnifiedNote): UnifiedNote {
+  return {
+    ...note,
+    bodyFormat: note.bodyFormat ?? "markdown",
+  };
 }
 
 function isSpaceAttachedNote(note: UnifiedNote): boolean {
