@@ -4,7 +4,7 @@ import { useAuth } from "../../AuthContext";
 import AuthCard from "../Auth/AuthCard";
 import AuthShell from "../Auth/AuthShell";
 import { forgotPasswordRequest, signInRequest, type AuthUser } from "../Auth/api";
-import { fetchMe, type MeResponse } from "../Dashboard/api";
+import { fetchMe, type MeResponse } from "../AccountSettings/api";
 import ForgotPasswordForm from "./ForgotPasswordForm";
 import SignInForm from "./SignInForm";
 import { marketingCopy } from "@/content/marketingCopy";

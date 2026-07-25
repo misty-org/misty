@@ -12,7 +12,7 @@ test("pricing publishes only Free and Pro without retired terminology", async ({
   ).toEqual(["Free", "Pro"]);
   await expect(planSection.getByText("$9", { exact: true })).toBeVisible();
   await expect(
-    planSection.getByText("over 6× more Hosted AI capacity", { exact: true }),
+    planSection.getByText("over 10× more weekly agent usage", { exact: true }),
   ).toBeVisible();
 
   const customerText = await page.locator("main").innerText();

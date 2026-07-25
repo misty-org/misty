@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { Outlet, useLocation, useMatches, ScrollRestoration, useNavigate } from "react-router";
 import { AuthProvider } from "./AuthContext";
-import Navbar from "./components/NavBar";
-import Footer from "./components/Footer";
-import { AccountSettingsDialog } from "./pages/Dashboard";
+import Navbar from "./components/layout/NavBar";
+import Footer from "./components/layout/Footer";
+import { AccountSettingsDialog } from "./pages/AccountSettings";
 import { SITE_URL } from "./lib/site";
 
 type Handle = { title?: string; description?: string };

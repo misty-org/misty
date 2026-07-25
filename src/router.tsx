@@ -8,11 +8,14 @@ import Register from "./pages/Register";
 import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
 import Waitlist from "./pages/Waitlist";
-import Settings from "./pages/Dashboard";
+import Settings from "./pages/AccountSettings";
 import Changelog from "./pages/Changelog";
 import Blog from "./pages/Blog";
 import Roadmap from "./pages/Roadmap";
 import Features from "./pages/Features";
+import Privacy from "./pages/Legal/Privacy";
+import Terms from "./pages/Legal/Terms";
+import License from "./pages/Legal/License";
 import { marketingCopy } from "./content/marketingCopy";
 
 export const router = createBrowserRouter([
@@ -85,10 +88,36 @@ export const router = createBrowserRouter([
         },
       },
       {
+        path: "privacy",
+        element: <Privacy />,
+        handle: {
+          title: "Privacy Policy — Misty",
+          description:
+            "How Misty handles your account details, files, and Space content.",
+        },
+      },
+      {
+        path: "terms",
+        element: <Terms />,
+        handle: {
+          title: "Terms of Service — Misty",
+          description:
+            "The agreement covering your use of Misty and its hosted services.",
+        },
+      },
+      {
+        path: "license",
+        element: <License />,
+        handle: {
+          title: "License Agreement — Misty",
+          description: "The license covering the Misty desktop application.",
+        },
+      },
+      {
         path: "waitlist",
         element: <Waitlist />,
         handle: {
-          title: "Request beta access — Misty",
+          title: "Join Misty — Misty",
           description: marketingCopy.metadata.waitlist,
         },
       },
@@ -104,8 +133,9 @@ export const router = createBrowserRouter([
         path: "register",
         element: <Register />,
         handle: {
-          title: "Beta invitations — Misty",
-          description: "Request invite-only access to create a Misty account.",
+          title: "Join Misty — Misty",
+          description:
+            "Sign in to join your group and start working together in Misty.",
         },
       },
       {

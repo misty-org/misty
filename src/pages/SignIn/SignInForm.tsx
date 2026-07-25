@@ -1,4 +1,3 @@
-import { NavLink } from "react-router";
 import { Button } from "@/components/ui/button";
 import AuthField from "../Auth/AuthField";
 import AuthMessage from "../Auth/AuthMessage";
@@ -62,20 +61,12 @@ export default function SignInForm({
 
         {error ? <AuthMessage tone="error" message={error} /> : null}
 
-        <AuthSubmitButton idleLabel="Sign In" loadingLabel="Signing in..." loading={loading} />
+        <AuthSubmitButton
+          idleLabel="Sign In"
+          loadingLabel="Signing in..."
+          loading={loading}
+        />
       </form>
-
-      <div className="text-center">
-        <Button
-          asChild
-          variant="link"
-          className="h-auto p-0 text-foreground"
-        >
-          <NavLink to="/waitlist">
-            Need access? Request a beta invite
-          </NavLink>
-        </Button>
-      </div>
     </>
   );
 }

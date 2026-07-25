@@ -1,8 +1,8 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ModeToggle } from "@/components/mode-toggle";
-import { ThemeProvider, useTheme } from "@/components/theme-provider";
+import { ModeToggle } from "@/components/theme/mode-toggle";
+import { ThemeProvider, useTheme } from "@/components/theme/theme-provider";
 
 const storageKey = "misty-theme-test";
 

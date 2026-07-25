@@ -1,13 +1,16 @@
 import { useState } from "react";
 import { ChevronUp } from "lucide-react";
 import { FaApple, FaWindows } from "react-icons/fa";
-import { Link } from "react-router";
 
-import { PublicPage } from "@/components/marketing/PublicPage";
+import { PublicPage } from "@/components/marketing";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { currentRelease, type PlatformName, type ReleaseBuild } from "./data";
 
 const platformMeta: Record<PlatformName, { icon: React.ReactNode }> = {
@@ -17,11 +20,18 @@ const platformMeta: Record<PlatformName, { icon: React.ReactNode }> = {
 
 function BuildCard({ build }: { build: ReleaseBuild }) {
   return (
-    <Card role="article" className="gap-0 rounded-xl p-4 shadow-xs ring-1 ring-foreground/10">
+    <Card
+      role="article"
+      className="gap-0 rounded-xl p-4 shadow-xs ring-1 ring-foreground/10"
+    >
       <div className="flex items-center justify-between gap-4">
         <div className="flex min-w-0 items-center gap-2.5">
-          <span className="text-muted-foreground">{platformMeta[build.platform].icon}</span>
-          <h3 className="truncate text-base font-medium text-foreground">{build.platform}</h3>
+          <span className="text-muted-foreground">
+            {platformMeta[build.platform].icon}
+          </span>
+          <h3 className="truncate text-base font-medium text-foreground">
+            {build.platform}
+          </h3>
         </div>
         <Badge variant="outline" className="font-normal text-muted-foreground">
           {build.packageType}
@@ -50,21 +60,31 @@ export default function Download() {
   const [releaseOpen, setReleaseOpen] = useState(true);
 
   return (
-    <PublicPage className="max-w-[1280px]">
+    <PublicPage>
       <header className="pb-8 text-center sm:pb-10">
         <h1 className="text-5xl font-semibold tracking-[-0.04em] text-foreground">
           Download
         </h1>
       </header>
 
-      <section aria-labelledby="releases-title">
+      <section
+        aria-labelledby="releases-title"
+        className="mx-auto max-w-3xl"
+      >
         <div className="flex items-center justify-between gap-5">
-          <h2 id="releases-title" className="text-xl font-semibold text-foreground">
+          <h2
+            id="releases-title"
+            className="text-xl font-semibold text-foreground"
+          >
             Releases
           </h2>
         </div>
 
-        <Collapsible open={releaseOpen} onOpenChange={setReleaseOpen} className="mt-6">
+        <Collapsible
+          open={releaseOpen}
+          onOpenChange={setReleaseOpen}
+          className="mt-6"
+        >
           <CollapsibleTrigger asChild>
             <button
               type="button"
@@ -80,25 +100,11 @@ export default function Download() {
 
           <CollapsibleContent>
             <div className="mt-4 grid gap-4 md:grid-cols-2">
-              {[...currentRelease.builds].sort((a, b) => b.platform.localeCompare(a.platform)).map((build) => (
-                <BuildCard key={build.platform} build={build} />
-              ))}
-            </div>
-            <div className="mt-6 flex flex-col gap-4 border-t border-border pt-5 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex flex-col gap-1">
-                <p>Shared services require an approved account.</p>
-                <p>Tablet builds are not available yet.</p>
-              </div>
-              <div className="flex items-center gap-2">
-                <Button asChild variant="ghost" size="sm">
-                  <a href={currentRelease.releasePage} target="_blank" rel="noopener noreferrer">
-                    Release notes
-                  </a>
-                </Button>
-                <Button asChild variant="ghost" size="sm">
-                  <Link to="/waitlist">Request beta access</Link>
-                </Button>
-              </div>
+              {[...currentRelease.builds]
+                .sort((a, b) => b.platform.localeCompare(a.platform))
+                .map((build) => (
+                  <BuildCard key={build.platform} build={build} />
+                ))}
             </div>
           </CollapsibleContent>
         </Collapsible>

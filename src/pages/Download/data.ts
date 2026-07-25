@@ -11,14 +11,12 @@ export type ReleaseBuild = {
 export interface Release {
   version: string;
   label: string;
-  releasePage: string;
   builds: ReleaseBuild[];
 }
 
 export const currentRelease: Release = {
   version: "v0.1.0",
   label: "Public beta build",
-  releasePage: "https://github.com/misty-org/misty-public/releases/tag/v0.1.0",
   builds: [
     {
       platform: "macOS",

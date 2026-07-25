@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router";
-import { logoutRequest } from "./pages/Dashboard/api";
+import { logoutRequest } from "./pages/AccountSettings/api";
 import { useUserStore } from "./store/userStore";
 
 interface User {
