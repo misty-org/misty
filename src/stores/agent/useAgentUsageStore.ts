@@ -1,19 +1,22 @@
 import type {
-  StoredAssistantUsage,
-  AssistantUsageStore,
-} from "@/models/interfaces/stores/assistant/useAssistantUsageStore";
+  StoredAgentUsage,
+  AgentUsageStore,
+} from "@/models/interfaces/stores/agent/useAgentUsageStore";
 export type {
-  StoredAssistantUsage,
-  AssistantUsageStore,
-} from "@/models/interfaces/stores/assistant/useAssistantUsageStore";
+  StoredAgentUsage,
+  AgentUsageStore,
+} from "@/models/interfaces/stores/agent/useAgentUsageStore";
 import { create } from "zustand";
 
-export const assistantDailyMessageLimit = 50;
-const assistantUsageStorageKey = "misty.assistant.daily-usage.v1";
+export const agentDailyMessageLimit = 50;
+// The key value is deliberately unchanged by the agent rename: it addresses
+// existing localStorage entries, and renaming it would reset every user's daily
+// usage counter to zero on upgrade. Only the identifier was renamed.
+const agentUsageStorageKey = "misty.assistant.daily-usage.v1";
 
 const initialUsage = readStoredUsage();
 
-export const useAssistantUsageStore = create<AssistantUsageStore>((set, get) => ({
+export const useAgentUsageStore = create<AgentUsageStore>((set, get) => ({
   dateKey: initialUsage.dateKey,
   messagesUsedToday: initialUsage.messagesUsed,
 
@@ -27,7 +30,7 @@ export const useAssistantUsageStore = create<AssistantUsageStore>((set, get) => 
   consumeMessage: () => {
     get().syncForToday();
     const current = get().messagesUsedToday;
-    if (current >= assistantDailyMessageLimit) return false;
+    if (current >= agentDailyMessageLimit) return false;
     const next = current + 1;
     const dateKey = get().dateKey;
     writeStoredUsage({ dateKey, messagesUsed: next });
@@ -43,16 +46,16 @@ export function localDateKey(date = new Date()): string {
   return `${year}-${month}-${day}`;
 }
 
-function readStoredUsage(): StoredAssistantUsage {
+function readStoredUsage(): StoredAgentUsage {
   const today = localDateKey();
   if (typeof window === "undefined") return { dateKey: today, messagesUsed: 0 };
   try {
     const parsed = JSON.parse(
-      window.localStorage.getItem(assistantUsageStorageKey) ?? "null",
-    ) as Partial<StoredAssistantUsage> | null;
+      window.localStorage.getItem(agentUsageStorageKey) ?? "null",
+    ) as Partial<StoredAgentUsage> | null;
     if (parsed?.dateKey !== today) return { dateKey: today, messagesUsed: 0 };
     const messagesUsed = Number.isFinite(parsed.messagesUsed)
-      ? Math.min(assistantDailyMessageLimit, Math.max(0, Math.floor(parsed.messagesUsed ?? 0)))
+      ? Math.min(agentDailyMessageLimit, Math.max(0, Math.floor(parsed.messagesUsed ?? 0)))
       : 0;
     return { dateKey: today, messagesUsed };
   } catch {
@@ -60,10 +63,10 @@ function readStoredUsage(): StoredAssistantUsage {
   }
 }
 
-function writeStoredUsage(usage: StoredAssistantUsage): void {
+function writeStoredUsage(usage: StoredAgentUsage): void {
   if (typeof window === "undefined") return;
   try {
-    window.localStorage.setItem(assistantUsageStorageKey, JSON.stringify(usage));
+    window.localStorage.setItem(agentUsageStorageKey, JSON.stringify(usage));
   } catch {
     // Usage limits still work for this session when storage is unavailable.
   }

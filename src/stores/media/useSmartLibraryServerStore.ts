@@ -40,7 +40,7 @@ import type {
   FolderPreflight,
   SmartLibraryAsset,
 } from "@/models/interfaces/services/misty-api";
-import { managedAiRequest } from "@/stores/assistant/useAiServerStore";
+import { managedAiRequest } from "@/stores/agent/useAiServerStore";
 import { SMART_LIBRARY_PILOT } from "@/features/spaces/smartLibrary";
 
 const basePath = "/ai/smart-library";

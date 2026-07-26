@@ -51,14 +51,17 @@ export function HomeDashboard({
   const spaceManagement = buildSpaceManagement(contentSpace);
 
   return (
-    <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden bg-background text-foreground">
-      <div className="misty-scrollbar flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain p-5 max-[720px]:p-4">
+    <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden bg-transparent text-foreground">
+      <div
+        className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden p-5 max-[720px]:p-4"
+        data-slot="home-dashboard-viewport"
+      >
         <div
           aria-label="Home dashboard"
-          className="grid min-h-[580px] min-w-0 flex-1 grid-cols-[repeat(3,minmax(0,1fr))] items-stretch gap-4 max-[1180px]:min-h-0 max-[1180px]:grid-cols-2 max-[820px]:grid-cols-1"
+          className="grid h-full min-h-0 min-w-0 flex-1 grid-cols-[repeat(3,minmax(0,1fr))] grid-rows-[minmax(0,1fr)] items-stretch gap-4 max-[1180px]:grid-cols-2 max-[1180px]:grid-rows-[minmax(0,2fr)_minmax(0,1fr)] max-[820px]:grid-cols-1 max-[820px]:grid-rows-[repeat(3,minmax(0,1fr))]"
           role="region"
         >
-          <div className="grid min-h-0 min-w-0 grid-rows-2 gap-4 max-[1180px]:min-h-[580px] max-[820px]:min-h-[580px]">
+          <div className="grid min-h-0 min-w-0 grid-rows-2 gap-4">
             <DashboardCard
               icon={BriefcaseBusiness}
               title="Your Spaces"
@@ -91,7 +94,7 @@ export function HomeDashboard({
             </DashboardCard>
           </div>
 
-          <div className="grid min-h-0 min-w-0 grid-rows-[minmax(0,1.65fr)_minmax(0,0.65fr)] gap-4 max-[1180px]:min-h-[580px] max-[820px]:min-h-[580px]">
+          <div className="grid min-h-0 min-w-0 grid-rows-[minmax(0,1.65fr)_minmax(0,0.65fr)] gap-4">
             <DashboardCard
               icon={BookOpenText}
               title={contentSpace ? `Inside ${contentSpace.name}` : "Inside Spaces"}
@@ -129,13 +132,13 @@ export function HomeDashboard({
             </DashboardCard>
           </div>
 
-          <div className="grid min-h-0 min-w-0 grid-rows-2 gap-4 max-[1180px]:col-span-2 max-[1180px]:min-h-[580px] max-[1180px]:grid-cols-2 max-[1180px]:grid-rows-1 max-[820px]:col-span-1 max-[820px]:min-h-[580px] max-[820px]:grid-cols-1 max-[820px]:grid-rows-2">
+          <div className="grid min-h-0 min-w-0 grid-rows-2 gap-4 max-[1180px]:col-span-2 max-[1180px]:grid-cols-2 max-[1180px]:grid-rows-1 max-[820px]:col-span-1 max-[820px]:grid-cols-1 max-[820px]:grid-rows-2">
             <DashboardCard icon={Bot} title="Coming in v0.2.0" detail="Estimated August 9, 2026.">
               <DestinationRows
                 destinations={[
                   {
                     badge: "Coming soon",
-                    detail: "Custom assistants for repeat work",
+                    detail: "Custom agents for repeat work",
                     icon: Bot,
                     label: "Agents",
                     to: routes.agents,
@@ -321,7 +324,7 @@ function DashboardCard({
   title: string;
 }) {
   return (
-    <Card className={cn("min-h-0 min-w-0 gap-0 px-4 py-4", className)} size="sm">
+    <Card className={cn("min-h-0 min-w-0 gap-0 !bg-transparent px-4 py-4", className)} size="sm">
       <section className="flex h-full min-h-0 min-w-0 flex-col">
         <header className="flex shrink-0 items-start gap-3 border-b border-border/60 pb-3">
           <span className="mt-0.5 grid size-8 shrink-0 place-items-center rounded-md bg-muted text-muted-foreground">

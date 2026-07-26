@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { MessageSquare, Pencil, Trash2 } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
 import { Button, Input, cn } from "@/ui";
-import { useAgentSessionStore } from "@/stores/assistant/useAgentSessionStore";
+import { useAgentSessionStore } from "@/stores/agent/useAgentSessionStore";
 
 /**
  * The saved chats for the currently active agent, shown inline beneath its row.

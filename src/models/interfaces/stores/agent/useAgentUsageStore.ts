@@ -1,11 +1,11 @@
 import { create } from "zustand";
 
-export interface StoredAssistantUsage {
+export interface StoredAgentUsage {
   dateKey: string;
   messagesUsed: number;
 }
 
-export interface AssistantUsageStore {
+export interface AgentUsageStore {
   dateKey: string;
   messagesUsedToday: number;
   syncForToday: () => void;

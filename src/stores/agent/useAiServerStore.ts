@@ -1,5 +1,5 @@
-import type { AiMode, FileOperation } from "@/models/types/stores/assistant/useAiServerStore";
-export type { AiMode, FileOperation } from "@/models/types/stores/assistant/useAiServerStore";
+import type { AiMode, FileOperation } from "@/models/types/stores/agent/useAiServerStore";
+export type { AiMode, FileOperation } from "@/models/types/stores/agent/useAiServerStore";
 import type {
   ToolDefinition,
   ToolManifest,
@@ -14,7 +14,7 @@ import type {
   CreateSessionResponse,
   AgentStatusResponse,
   ManagedAiErrorPayload,
-} from "@/models/interfaces/stores/assistant/useAiServerStore";
+} from "@/models/interfaces/stores/agent/useAiServerStore";
 export type {
   ToolDefinition,
   ToolManifest,
@@ -27,7 +27,7 @@ export type {
   CreateSessionResponse,
   AgentStatusResponse,
   ManagedAiErrorPayload,
-} from "@/models/interfaces/stores/assistant/useAiServerStore";
+} from "@/models/interfaces/stores/agent/useAiServerStore";
 import { appSnapshot } from "@/stores/backend";
 import { normalizeApiBaseUrl, withDefaultApiPath } from "@/stores/backend";
 import {

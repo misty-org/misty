@@ -44,7 +44,7 @@ vi.mock("@/stores/app", () => ({
   useSettingsStore: vi.fn(),
 }));
 
-vi.mock("./ExplorerAssistantPanels", () => ({
+vi.mock("./ExplorerAgentPanels", () => ({
   clearSelectionsAcrossPanes: vi.fn(),
   selectedCountAcrossPanes: vi.fn(() => 0),
 }));

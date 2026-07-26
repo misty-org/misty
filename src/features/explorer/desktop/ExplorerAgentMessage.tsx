@@ -1,5 +1,5 @@
-import type { AssistantPlanOperation } from "@/models/types/features/explorer/desktop/ExplorerAssistantMessage";
-export type { AssistantPlanOperation } from "@/models/types/features/explorer/desktop/ExplorerAssistantMessage";
+import type { AgentPlanOperation } from "@/models/types/features/explorer/desktop/ExplorerAgentMessage";
+export type { AgentPlanOperation } from "@/models/types/features/explorer/desktop/ExplorerAgentMessage";
 import { File, Folder, Sparkles, User } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
@@ -17,15 +17,15 @@ import {
   DialogTitle,
 } from "@/ui";
 import { safeTauriAssetUrl } from "@/platform/tauri";
-import type { AiPanelMessage } from "@/models/types/stores/assistant/useAgentSessionStore";
+import type { AiPanelMessage } from "@/models/types/stores/agent/useAgentSessionStore";
 import type {
   AiPlanReview,
   AiToolApproval,
-} from "@/models/interfaces/stores/assistant/useAgentSessionStore";
+} from "@/models/interfaces/stores/agent/useAgentSessionStore";
 import { cx } from "./ExplorerDesktopShared";
-import { assistantPanelStyles } from "./ExplorerAssistantStyles";
+import { agentPanelStyles } from "./ExplorerAgentStyles";
 
-export function AssistantMessage(props: {
+export function AgentMessage(props: {
   message: AiPanelMessage;
   running: boolean;
   plans: AiPlanReview[];
@@ -42,7 +42,7 @@ export function AssistantMessage(props: {
     );
     return (message.contextSources ?? []).filter((source) => citedIds.has(source.id.toUpperCase()));
   }, [message.contextSources, message.text]);
-  const text = message.text || (message.role === "assistant" && props.running ? "Thinking..." : "");
+  const text = message.text || (message.role === "agent" && props.running ? "Thinking..." : "");
   const extras = (
     <>
       {message.citations?.length ? <AgentSources citations={message.citations} compact /> : null}
@@ -76,14 +76,14 @@ export function AssistantMessage(props: {
         </small>
       ) : null}
       {message.toolRequestId ? (
-        <AssistantToolActions
+        <AgentToolActions
           requestId={message.toolRequestId}
           approvals={props.toolApprovals}
           onApprove={props.onApproveTool}
         />
       ) : null}
       {message.planId ? (
-        <AssistantPlanActions
+        <AgentPlanActions
           planId={message.planId}
           plans={props.plans}
           onApply={props.onApplyPlan}
@@ -105,9 +105,9 @@ export function AssistantMessage(props: {
         <div className="col-start-2 grid min-w-0 gap-1.5">
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1 leading-5">
             <strong className="text-[15px] font-semibold text-foreground">
-              {assistantMessageTitle(message.role)}
+              {agentMessageTitle(message.role)}
             </strong>
-            {message.role === "assistant" ? (
+            {message.role === "agent" ? (
               <Badge
                 variant="secondary"
                 className="h-4 gap-1 rounded px-1 text-[9px] uppercase"
@@ -132,26 +132,26 @@ export function AssistantMessage(props: {
   }
 
   return (
-    <article className={assistantMessageClass(message.role)}>
-      <strong className={assistantPanelStyles.messageTitle}>
-        {assistantMessageTitle(message.role)}
+    <article className={agentMessageClass(message.role)}>
+      <strong className={agentPanelStyles.messageTitle}>
+        {agentMessageTitle(message.role)}
       </strong>
-      <pre className={assistantPanelStyles.messageText}>{text}</pre>
+      <pre className={agentPanelStyles.messageText}>{text}</pre>
       {extras}
     </article>
   );
 }
 
-function assistantMessageClass(role: string): string {
+function agentMessageClass(role: string): string {
   return cx(
-    assistantPanelStyles.message,
-    role === "user" && assistantPanelStyles.userMessage,
-    role === "tool" && assistantPanelStyles.toolMessage,
-    role === "error" && assistantPanelStyles.errorMessage,
+    agentPanelStyles.message,
+    role === "user" && agentPanelStyles.userMessage,
+    role === "tool" && agentPanelStyles.toolMessage,
+    role === "error" && agentPanelStyles.errorMessage,
   );
 }
 
-function assistantMessageTitle(role: AiPanelMessage["role"]): string {
+function agentMessageTitle(role: AiPanelMessage["role"]): string {
   if (role === "user") return "You";
   if (role === "tool") return "Tool";
   if (role === "error") return "Error";
@@ -159,7 +159,7 @@ function assistantMessageTitle(role: AiPanelMessage["role"]): string {
   return "Agent";
 }
 
-function AssistantPlanActions(props: {
+function AgentPlanActions(props: {
   planId: string;
   plans: AiPlanReview[];
   onApply: (planId: string) => Promise<void>;
@@ -169,9 +169,9 @@ function AssistantPlanActions(props: {
   if (!plan) return null;
   const blocked = plan.blockedReasons.length > 0;
   return (
-    <div className={assistantPanelStyles.planDetails}>
-      <div className={assistantPanelStyles.planActions}>
-        <span className={assistantPanelStyles.runningBadge}>
+    <div className={agentPanelStyles.planDetails}>
+      <div className={agentPanelStyles.planActions}>
+        <span className={agentPanelStyles.runningBadge}>
           {plan.plan.operations.length} operations
           {blocked ? " blocked" : plan.applied ? " queued" : ""}
         </span>
@@ -179,7 +179,7 @@ function AssistantPlanActions(props: {
           {plan.applied ? "View" : "Review & Apply"}
         </Button>
       </div>
-      <AssistantPlanReviewDialog
+      <AgentPlanReviewDialog
         open={reviewOpen}
         plan={plan}
         onApply={props.onApply}
@@ -189,7 +189,7 @@ function AssistantPlanActions(props: {
   );
 }
 
-function AssistantToolActions(props: {
+function AgentToolActions(props: {
   requestId: string;
   approvals: AiToolApproval[];
   onApprove: (requestId: string) => Promise<void>;
@@ -197,8 +197,8 @@ function AssistantToolActions(props: {
   const approval = props.approvals.find((candidate) => candidate.id === props.requestId);
   if (!approval) return null;
   return (
-    <div className={assistantPanelStyles.planActions}>
-      <span className={assistantPanelStyles.runningBadge}>
+    <div className={agentPanelStyles.planActions}>
+      <span className={agentPanelStyles.runningBadge}>
         {approval.completed ? "Completed" : approval.error ? "Blocked" : "Needs approval"}
       </span>
       <Button
@@ -214,7 +214,7 @@ function AssistantToolActions(props: {
   );
 }
 
-function AssistantPlanReviewDialog(props: {
+function AgentPlanReviewDialog(props: {
   open: boolean;
   plan: AiPlanReview;
   onApply: (planId: string) => Promise<void>;
@@ -226,7 +226,7 @@ function AssistantPlanReviewDialog(props: {
     ...props.plan.blockedReasons.map((reason) => `Blocked: ${reason}`),
   ];
   const groupedOperations = useMemo(() => {
-    const groups = new Map<string, AssistantPlanOperation[]>();
+    const groups = new Map<string, AgentPlanOperation[]>();
     for (const operation of props.plan.plan.operations) {
       const group = planOperationGroup(operation);
       groups.set(group, [...(groups.get(group) ?? []), operation]);
@@ -294,7 +294,7 @@ function AssistantPlanReviewDialog(props: {
           </div>
         </div>
         <DialogFooter className="mt-0 flex-row flex-wrap items-center justify-between border-t border-border px-5 py-4 sm:justify-between">
-          <span className={assistantPanelStyles.runningBadge}>
+          <span className={agentPanelStyles.runningBadge}>
             {props.plan.plan.operations.length} operations
             {blocked ? " blocked" : props.plan.applied ? " queued" : ""}
           </span>
@@ -327,7 +327,7 @@ function PlanSummary(props: { label: string; text: string }) {
   );
 }
 
-function PlanOperationRow(props: { operation: AssistantPlanOperation }) {
+function PlanOperationRow(props: { operation: AgentPlanOperation }) {
   const { operation } = props;
   const preview = planOperationPreview(operation);
   const confidence = operation.type === "mkdir" ? null : operation.confidence;
@@ -381,26 +381,26 @@ function PathDetail(props: { label: string; path: string }) {
   );
 }
 
-function planOperationDetail(operation: AssistantPlanOperation): string {
+function planOperationDetail(operation: AgentPlanOperation): string {
   return operation.type === "mkdir" ? operation.path : `${operation.from} -> ${operation.to}`;
 }
 
-function planOperationSource(operation: AssistantPlanOperation): string {
+function planOperationSource(operation: AgentPlanOperation): string {
   return operation.type === "mkdir" ? "-" : operation.from;
 }
 
-function planOperationDestination(operation: AssistantPlanOperation): string {
+function planOperationDestination(operation: AgentPlanOperation): string {
   return operation.type === "mkdir" ? operation.path : operation.to;
 }
 
-function planOperationGroup(operation: AssistantPlanOperation): string {
+function planOperationGroup(operation: AgentPlanOperation): string {
   const destination = planOperationDestination(operation).replace(/[\\/]+$/, "");
   const separator = Math.max(destination.lastIndexOf("/"), destination.lastIndexOf("\\"));
   if (operation.type === "mkdir") return destination;
   return separator > 0 ? destination.slice(0, separator) : "Destination";
 }
 
-function planOperationPreview(operation: AssistantPlanOperation): string | null {
+function planOperationPreview(operation: AgentPlanOperation): string | null {
   if (operation.type === "mkdir") return null;
   const extension = operation.from.split(".").pop()?.toLowerCase() ?? "";
   return [

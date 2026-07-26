@@ -1,8 +1,8 @@
-import type { AiConversationSummary } from "@/models/interfaces/stores/assistant/useAgentSessionStore";
-import type { AiPanelMessage } from "@/models/types/stores/assistant/useAgentSessionStore";
-import type { AgentSessionSummary } from "@/models/interfaces/stores/assistant/useAiServerStore";
+import type { AiConversationSummary } from "@/models/interfaces/stores/agent/useAgentSessionStore";
+import type { AiPanelMessage } from "@/models/types/stores/agent/useAgentSessionStore";
+import type { AgentSessionSummary } from "@/models/interfaces/stores/agent/useAiServerStore";
 import { errorText } from "@/lib/format";
-import { fetchAgentTranscript, listAgentSessions } from "@/stores/assistant/useAiServerStore";
+import { fetchAgentTranscript, listAgentSessions } from "@/stores/agent/useAiServerStore";
 
 /**
  * Cross-device session sync for agents. Sessions live on the account, so a device
@@ -85,12 +85,22 @@ export async function fetchConversationTranscript<T extends SyncableConversation
   try {
     const transcript = await fetchAgentTranscript(sessionId);
     return transcript.messages
-      .filter((message) => message.role === "user" || message.role === "assistant")
-      .map((message) => ({
-        id: deps.messageId(message.role),
-        role: message.role as AiPanelMessage["role"],
-        text: message.content,
-      }));
+      .filter(
+        (message) =>
+          message.role === "user" ||
+          message.role === "agent" ||
+          // Pre-rename transcripts, and a server that has not been redeployed
+          // yet, still label model turns "assistant".
+          message.role === "assistant",
+      )
+      .map((message) => {
+        const role: AiPanelMessage["role"] = message.role === "user" ? "user" : "agent";
+        return {
+          id: deps.messageId(role),
+          role,
+          text: message.content,
+        };
+      });
   } catch (error) {
     deps.debug("warn", "Agent transcript could not be loaded.", errorText(error));
     return null;

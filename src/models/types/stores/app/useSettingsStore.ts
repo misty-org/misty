@@ -24,7 +24,7 @@ import type {
   AppearancePreferences,
   NotificationPreferences,
   GeneralPreferences,
-  AssistantPreferences,
+  AgentPreferences,
   ShortcutPreferences,
   AdvancedPreferences,
   SearchMaintenancePreferences,
@@ -34,7 +34,7 @@ import type {
 export type SettingsSection =
   | "general"
   | "app"
-  | "assistant"
+  | "agent"
   | "appearance"
   | "privacy"
   | "transfers"

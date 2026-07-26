@@ -3,13 +3,13 @@ import { useShallow } from "zustand/react/shallow";
 
 import { Button } from "@/ui";
 import { cn } from "@/ui";
-import { useAgentSessionStore } from "@/stores/assistant/useAgentSessionStore";
+import { useAgentSessionStore } from "@/stores/agent/useAgentSessionStore";
 
 /**
- * Session rail for the Assistant. Sessions are the Assistant's organising unit the way
+ * Session rail for Agents. Sessions are the agent's organising unit the way
  * channels are the Space chat's, so they get a persistent list rather than a dropdown.
  */
-export function AssistantSessionSidebar({
+export function AgentSessionSidebar({
   embedded = false,
   title = "Sessions",
 }: {

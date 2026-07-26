@@ -15,7 +15,7 @@ import type {
   CreateSessionResponse,
   AgentStatusResponse,
   ManagedAiErrorPayload,
-} from "@/models/interfaces/stores/assistant/useAiServerStore";
+} from "@/models/interfaces/stores/agent/useAiServerStore";
 
 export type AiMode = "ask" | "auto" | "full";
 

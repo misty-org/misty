@@ -31,7 +31,7 @@ import { personalAgentsApi, usePersonalAgentsStore } from "@/stores/agents/usePe
 import { useSpacesStore } from "@/stores/spaces/useSpacesStore";
 import { AgentModelPicker } from "@/features/agents/components/AgentModelPicker";
 import { initialAgentModelId, modelSupportsReasoning } from "@/features/agents/modelSelection";
-import { useAgentSessionStore } from "@/stores/assistant/useAgentSessionStore";
+import { useAgentSessionStore } from "@/stores/agent/useAgentSessionStore";
 import { AgentChatList } from "./AgentChatList";
 
 const defaultContext = {

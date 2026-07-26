@@ -8,7 +8,7 @@ export type {
   ServerDeviceList,
   StoredDeviceIdentity,
 } from "@/models/interfaces/stores/agents/useAgentDeviceStore";
-import { managedAiRequest, ManagedAiRequestError } from "@/stores/assistant/useAiServerStore";
+import { managedAiRequest, ManagedAiRequestError } from "@/stores/agent/useAiServerStore";
 import type { AgentDevice } from "@/models/interfaces/features/agents/types";
 import { invoke } from "@tauri-apps/api/core";
 

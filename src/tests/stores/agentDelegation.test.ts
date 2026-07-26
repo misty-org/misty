@@ -8,7 +8,7 @@ import {
   publicAgentModel,
   resolvePendingAgentDelegation,
   trackPendingAgentDelegation,
-} from "@/stores/assistant/useAgentDelegationStore";
+} from "@/stores/agent/useAgentDelegationStore";
 import { initialAgentModelId, initialAgentModelName } from "@/features/agents/modelSelection";
 
 const run = (state: SpaceRun["state"]): SpaceRun => ({

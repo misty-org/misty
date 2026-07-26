@@ -17,7 +17,7 @@ import {
   deleteMediaSearchDevice,
   indexMediaChunk,
 } from "@/stores/media/useMediaSearchServerStore";
-import { ManagedAiRequestError } from "@/stores/assistant/useAiServerStore";
+import { ManagedAiRequestError } from "@/stores/agent/useAiServerStore";
 import { ensureMediaSearchDeviceReady } from "@/stores/media/useMediaSearchMigrationStore";
 
 export interface MediaIndexEstimate {

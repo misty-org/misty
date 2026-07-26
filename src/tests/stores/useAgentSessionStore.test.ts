@@ -4,7 +4,7 @@ import {
   resetAgentAccountState,
   spaceAgentScopeKey,
   useAgentSessionStore,
-} from "@/stores/assistant/useAgentSessionStore";
+} from "@/stores/agent/useAgentSessionStore";
 
 describe("useAgentSessionStore conversations", () => {
   beforeEach(() => {

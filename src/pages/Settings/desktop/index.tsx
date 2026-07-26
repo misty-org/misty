@@ -46,7 +46,7 @@ import type {
   SearchStatus,
   ShortcutBinding,
 } from "@/models/interfaces/services/misty-api";
-import { selectAssistantPreferences, useSettingsStore } from "@/stores/app";
+import { selectAgentPreferences, useSettingsStore } from "@/stores/app";
 import { useSearchStore } from "@/stores/explorer";
 import { formatDate } from "@/features/explorer/utils/fileFormat";
 import { userFacingErrorText } from "@/lib/format";
@@ -67,7 +67,7 @@ import {
 const appNavItems: NavItem[] = [
   { id: "general", label: "General", icon: Rows3 },
   { id: "app", label: "App", icon: AppWindow },
-  { id: "assistant", label: "Agents", icon: Bot },
+  { id: "agent", label: "Agents", icon: Bot },
   { id: "appearance", label: "Appearance", icon: Eye },
   { id: "privacy", label: "Privacy", icon: Lock },
   { id: "transfers", label: "Transfers", icon: ArrowLeftRight },
@@ -82,7 +82,7 @@ const navItems = appNavItems;
 const sectionDescriptions: Record<SettingsSection, string> = {
   general: "Files startup, default actions, and browsing behavior.",
   app: "Updates, version details, and local support information.",
-  assistant: "Control Agents and the actions they can perform.",
+  agent: "Control Agents and the actions they can perform.",
   appearance: "Theme, density, wallpaper, text size, and motion.",
   privacy: "Choose what diagnostic data Misty may share.",
   transfers: "Defaults for copies, downloads, and destinations.",
@@ -200,7 +200,7 @@ function SettingsContent(props: {
     <>
       {props.activeSection === "general" ? <GeneralSettings {...props.controlProps} /> : null}
       {props.activeSection === "app" ? <AppSettings {...props.controlProps} /> : null}
-      {props.activeSection === "assistant" ? <AssistantSettings {...props.controlProps} /> : null}
+      {props.activeSection === "agent" ? <AgentSettings {...props.controlProps} /> : null}
       {props.activeSection === "appearance" ? <AppearanceSettings {...props.controlProps} /> : null}
       {props.activeSection === "privacy" ? <PrivacySettings {...props.controlProps} /> : null}
       {props.activeSection === "transfers" ? <TransfersSettings {...props.controlProps} /> : null}
@@ -354,13 +354,13 @@ function AppSettings(props: SettingsContentProps) {
   );
 }
 
-function AssistantSettings(props: SettingsContentProps) {
-  const assistant = selectAssistantPreferences(props.document);
+function AgentSettings(props: SettingsContentProps) {
+  const agent = selectAgentPreferences(props.document);
   const updateScope = (
     key: "files_allowed" | "cleanup_allowed" | "search_allowed",
     value: boolean,
   ) => {
-    props.onSettingChange("assistant", "scopes", assistantScopesPayload(assistant, key, value));
+    props.onSettingChange("agent", "scopes", agentScopesPayload(agent, key, value));
   };
 
   return (
@@ -372,9 +372,9 @@ function AssistantSettings(props: SettingsContentProps) {
           last
         >
           <SwitchControl
-            checked={assistant.enabled}
+            checked={agent.enabled}
             disabled={props.working}
-            onChange={(value) => props.onSettingChange("assistant", "enabled", value)}
+            onChange={(value) => props.onSettingChange("agent", "enabled", value)}
           />
         </SettingsRow>
       </SettingsSectionBlock>
@@ -385,8 +385,8 @@ function AssistantSettings(props: SettingsContentProps) {
           description="Allow Agents to inspect and organize files in the active Files folder."
         >
           <SwitchControl
-            checked={assistant.scopes.filesAllowed}
-            disabled={props.working || !assistant.enabled}
+            checked={agent.scopes.filesAllowed}
+            disabled={props.working || !agent.enabled}
             onChange={(value) => updateScope("files_allowed", value)}
           />
         </SettingsRow>
@@ -395,8 +395,8 @@ function AssistantSettings(props: SettingsContentProps) {
           description="Allow Agents to identify clutter and propose cleanup actions."
         >
           <SwitchControl
-            checked={assistant.scopes.cleanupAllowed}
-            disabled={props.working || !assistant.enabled}
+            checked={agent.scopes.cleanupAllowed}
+            disabled={props.working || !agent.enabled}
             onChange={(value) => updateScope("cleanup_allowed", value)}
           />
         </SettingsRow>
@@ -406,8 +406,8 @@ function AssistantSettings(props: SettingsContentProps) {
           last
         >
           <SwitchControl
-            checked={assistant.scopes.searchAllowed}
-            disabled={props.working || !assistant.enabled}
+            checked={agent.scopes.searchAllowed}
+            disabled={props.working || !agent.enabled}
             onChange={(value) => updateScope("search_allowed", value)}
           />
         </SettingsRow>
@@ -416,15 +416,15 @@ function AssistantSettings(props: SettingsContentProps) {
   );
 }
 
-function assistantScopesPayload(
-  assistant: ReturnType<typeof selectAssistantPreferences>,
+function agentScopesPayload(
+  agent: ReturnType<typeof selectAgentPreferences>,
   key: "files_allowed" | "cleanup_allowed" | "search_allowed",
   value: boolean,
 ): Record<string, unknown> {
   return {
-    files_allowed: assistant.scopes.filesAllowed,
-    cleanup_allowed: assistant.scopes.cleanupAllowed,
-    search_allowed: assistant.scopes.searchAllowed,
+    files_allowed: agent.scopes.filesAllowed,
+    cleanup_allowed: agent.scopes.cleanupAllowed,
+    search_allowed: agent.scopes.searchAllowed,
     [key]: value,
   };
 }
@@ -995,7 +995,7 @@ function SearchHealthCard(props: {
   attention?: boolean;
 }) {
   return (
-    <div className="grid min-h-28 grid-cols-[40px_minmax(0,1fr)] gap-3 rounded-xl bg-card p-4 shadow-xs ring-1 ring-foreground/10">
+    <div className="grid min-h-28 grid-cols-[40px_minmax(0,1fr)] gap-3 rounded-xl bg-card p-4 shadow-xs inset-ring-1 inset-ring-foreground/10">
       <div
         className={`grid size-10 place-items-center rounded-lg ${props.attention ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"}`}
       >

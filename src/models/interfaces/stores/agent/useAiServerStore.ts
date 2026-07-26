@@ -3,7 +3,7 @@ import { normalizeApiBaseUrl, withDefaultApiPath } from "@/stores/backend";
 import { readAccountAuthToken } from "@/stores/account/useAuthTokenStore";
 import type { AgentCitation } from "@/models/interfaces/features/agents/types";
 
-import type { AiMode, FileOperation } from "@/models/types/stores/assistant/useAiServerStore";
+import type { AiMode, FileOperation } from "@/models/types/stores/agent/useAiServerStore";
 
 export interface ToolDefinition {
   name: string;
@@ -48,7 +48,10 @@ export interface FileOperationPlan {
 
 export interface AgentEvent {
   sequence: number;
-  type: "assistant_message" | "tool_request" | "file_plan" | "error";
+  // "assistant_message" is the pre-rename value. A server that has not been
+  // redeployed yet, and any transcript persisted before the rename, still send
+  // it, so both are accepted until that compatibility window closes.
+  type: "agent_message" | "assistant_message" | "tool_request" | "file_plan" | "error";
   run_id?: string;
   text?: string;
   tool_requests?: ToolRequest[];

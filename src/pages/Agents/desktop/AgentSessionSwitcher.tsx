@@ -5,9 +5,9 @@ import { Button } from "@/ui";
 import { Popover, PopoverContent, PopoverTrigger } from "@/ui";
 import { Separator } from "@/ui";
 import { cn } from "@/ui";
-import { useAgentSessionStore } from "@/stores/assistant/useAgentSessionStore";
+import { useAgentSessionStore } from "@/stores/agent/useAgentSessionStore";
 
-export function AssistantSessionSwitcher() {
+export function AgentSessionSwitcher() {
   const [open, setOpen] = useState(false);
   const {
     conversations,

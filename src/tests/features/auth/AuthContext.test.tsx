@@ -119,7 +119,7 @@ vi.mock("@/stores/spaces/useSpacesStore", () => ({
   resetSpacesAccountState: mocks.resetSpacesAccountState,
   useSpacesStore: mocks.useSpacesStore,
 }));
-vi.mock("@/stores/assistant/useAgentSessionStore", () => ({
+vi.mock("@/stores/agent/useAgentSessionStore", () => ({
   resetAgentAccountState: mocks.resetAgentAccountState,
   useAgentSessionStore: mocks.useAgentSessionStore,
 }));

@@ -125,7 +125,7 @@ export function useDesktopBootstrap(params: { getRouteId: (pathname: string) => 
       if (event.key.toLocaleLowerCase() !== "r") return;
       // Cmd+R is bound to "explorer.refresh", but that binding is only
       // intercepted while the Files page is mounted. Everywhere else (Spaces,
-      // Settings, Assistant, ...) nothing prevents the default, so the
+      // Settings, Agents, ...) nothing prevents the default, so the
       // webview does a real full-page reload: every bit of in-memory state is
       // lost and the whole bootstrap sequence in main.tsx reruns from
       // scratch, which is what causes the black-screen flash on refresh.
