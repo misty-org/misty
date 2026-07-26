@@ -6,6 +6,8 @@ export const routes = {
   accountSignIn: "/account/signin",
   activity: "/activity",
   agents: "/agents",
+  // Legacy path, kept so saved bookmarks and misty:// deep links still resolve.
+  // LegacyAgentRedirect forwards it to `agents`.
   assistant: "/assistant",
   automations: "/automations",
   changelog: "/changelog",

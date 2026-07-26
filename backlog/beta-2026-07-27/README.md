@@ -16,12 +16,22 @@
 ## Why it's here
 
 Cut from beta scope on 2026-07-27 to ship a focused product loop: a Space
-(Library, Chat, Members) plus a global Assistant (Mika) surface, with
-`@Mika` as the lightweight in-chat AI bridge. Agents, Workflows, Studio,
-Automations, and Tasks-as-a-tab were pruned from the beta UI to keep the
-initial release simple. **Not abandoned** — the direction is Mika-first for
-now, with Agents/Workflows potentially returning after user validation of
-the simpler product.
+(Library, Chat, Members) plus a single global agent surface, with `@agent`
+as the lightweight in-chat AI bridge. Custom per-Space Agents, Workflows,
+Studio, Automations, and Tasks-as-a-tab were pruned from the beta UI to keep
+the initial release simple.
+
+**Update 2026-07-25.** The direction changed: agents are now a first-class
+beta feature. They stay on the global `/agents` destination rather than
+returning as a per-Space panel, but they became Space-aware — server-side
+per-turn Space context, a capability card describing what a Space and its
+surfaces are, permission-checked read tools, and confirmed writes. "Mika" and
+"assistant" were removed as concepts in favour of "agent" throughout both
+repos; if you restore anything from this directory, expect its identifiers to
+predate that rename.
+
+What remains genuinely out of beta is the rest of this directory: the Studio
+editors, the workflow data model, and per-Space custom Agent management.
 
 ## Constraint: this code does not build
 
