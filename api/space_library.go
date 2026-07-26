@@ -241,6 +241,20 @@ func (s *SpaceLibraryService) SetNoteAssetsEnabled(enabled bool) {
 	s.noteAssetsEnabled = enabled
 }
 
+// transferPurposeEnabled gates the routes that move or finalize bytes for an
+// upload that already exists.
+//
+// Unlike initiation, these cannot be used to obtain access: the upload row was
+// created by an authorized route, carries its own note binding, and is proven
+// by the upload token. So note_attachment is allowed here even though the
+// generic initiation endpoint rejects it.
+func (s *SpaceLibraryService) transferPurposeEnabled(purpose UploadPurpose) bool {
+	if purpose == UploadPurposeNoteAttachment {
+		return s.noteAssetsEnabled
+	}
+	return s.uploadPurposeEnabled(purpose)
+}
+
 func NewSpaceLibraryService(database *db.Database, store LibraryObjectStore, uploadsEnabled bool, limits UploadLimits) (*SpaceLibraryService, error) {
 	if database == nil || store == nil {
 		return nil, errors.New("Library database and permanent object store are required")
@@ -1264,7 +1278,7 @@ func (s *SpaceLibraryService) UploadContent() http.HandlerFunc {
 			writeLibraryError(w, err)
 			return
 		}
-		if !s.uploadPurposeEnabled(pending.Purpose) {
+		if !s.transferPurposeEnabled(pending.Purpose) {
 			writeJSON(w, http.StatusServiceUnavailable, map[string]string{"code": "library_uploads_disabled"})
 			return
 		}
@@ -1313,7 +1327,7 @@ func (s *SpaceLibraryService) FinalizeUpload() http.HandlerFunc {
 			writeLibraryError(w, err)
 			return
 		}
-		if !s.uploadPurposeEnabled(upload.Purpose) {
+		if !s.transferPurposeEnabled(upload.Purpose) {
 			writeJSON(w, http.StatusServiceUnavailable, map[string]string{"code": "library_uploads_disabled"})
 			return
 		}
