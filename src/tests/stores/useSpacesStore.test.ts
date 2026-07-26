@@ -125,9 +125,11 @@ describe("buildMessageSpans", () => {
     ]);
   });
 
-  it("keeps unsupported shared @Mika text literal instead of sending an invalid Agent span", () => {
-    expect(buildMessageSpans("@Mika summarize these files", [member], [agent])).toEqual([
-      { type: "text", text: "@Mika summarize these files" },
+  // Spans are only ever synthesized from a real member or agent record, never
+  // from raw text that merely looks like a mention.
+  it("keeps an unmatched agent-style mention literal instead of sending an invalid Agent span", () => {
+    expect(buildMessageSpans("@Nonexistent summarize these files", [member], [agent])).toEqual([
+      { type: "text", text: "@Nonexistent summarize these files" },
     ]);
   });
 

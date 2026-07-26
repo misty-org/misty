@@ -26,7 +26,10 @@ import {
 import type { SavedAccountSession } from "@/models/interfaces/stores/account/useAuthTokenStore";
 import { isNativeMobileBuild } from "@/platform/buildTarget";
 import type { CurrentLicense } from "@/models/types/features/installer/types";
-import { resetMikaAccountState, useMikaSessionStore } from "@/stores/assistant/useMikaSessionStore";
+import {
+  resetAgentAccountState,
+  useAgentSessionStore,
+} from "@/stores/assistant/useAgentSessionStore";
 import { resetSpacesAccountState, useSpacesStore } from "@/stores/spaces/useSpacesStore";
 import { resetNotesAccountState } from "@/stores/notes/useNotesStore";
 import { useSetupStore } from "@/stores/app";
@@ -390,13 +393,13 @@ function resetAccountScopedState(): void {
   useExplorerStore.setState({ notifications: [], notificationHistory: [] });
   resetSearchAccountState();
   resetSpacesAccountState();
-  resetMikaAccountState();
+  resetAgentAccountState();
   resetNotesAccountState();
 }
 
 function refreshAuthenticatedAccountState(): void {
   void useSpacesStore.getState().load();
-  void useMikaSessionStore.getState().refreshStatus();
+  void useAgentSessionStore.getState().refreshStatus();
 }
 
 function authUserFromMe(me: AccountMeResponse, fallback: SavedAccountSession): AuthUser {

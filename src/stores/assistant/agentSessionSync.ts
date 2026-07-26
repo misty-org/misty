@@ -1,11 +1,11 @@
-import type { AiConversationSummary } from "@/models/interfaces/stores/assistant/useMikaSessionStore";
-import type { AiPanelMessage } from "@/models/types/stores/assistant/useMikaSessionStore";
+import type { AiConversationSummary } from "@/models/interfaces/stores/assistant/useAgentSessionStore";
+import type { AiPanelMessage } from "@/models/types/stores/assistant/useAgentSessionStore";
 import type { AgentSessionSummary } from "@/models/interfaces/stores/assistant/useAiServerStore";
 import { errorText } from "@/lib/format";
 import { fetchAgentTranscript, listAgentSessions } from "@/stores/assistant/useAiServerStore";
 
 /**
- * Cross-device session sync for Mika. Sessions live on the account, so a device
+ * Cross-device session sync for agents. Sessions live on the account, so a device
  * that has never seen one still lists it and can open its transcript. The store
  * owns conversation state; this module only talks to the server and hands back
  * plain data.
@@ -24,7 +24,7 @@ export interface SyncableConversation {
   runtime: { sessionId: string | null };
 }
 
-export interface MikaSyncDeps<T extends SyncableConversation> {
+export interface AgentSyncDeps<T extends SyncableConversation> {
   snapshots: Map<string, T>;
   /** Builds an empty conversation record in the store's own shape. */
   createSnapshot: (id: string, updatedAt: number) => T;
@@ -38,7 +38,7 @@ export interface MikaSyncDeps<T extends SyncableConversation> {
  * left alone, so in-flight local state is never clobbered.
  */
 export async function hydrateServerSessions<T extends SyncableConversation>(
-  deps: MikaSyncDeps<T>,
+  deps: AgentSyncDeps<T>,
   belongsToScope?: (session: AgentSessionSummary) => boolean,
 ): Promise<AiConversationSummary[]> {
   let sessions;
@@ -46,7 +46,7 @@ export async function hydrateServerSessions<T extends SyncableConversation>(
     ({ sessions } = await listAgentSessions());
   } catch (error) {
     // Offline or signed out: the local list stays authoritative.
-    deps.debug("warn", "Mika sessions could not be listed.", errorText(error));
+    deps.debug("warn", "Agent sessions could not be listed.", errorText(error));
     return [];
   }
   const knownSessionIds = new Set<string>();
@@ -80,7 +80,7 @@ export async function hydrateServerSessions<T extends SyncableConversation>(
  */
 export async function fetchConversationTranscript<T extends SyncableConversation>(
   sessionId: string,
-  deps: MikaSyncDeps<T>,
+  deps: AgentSyncDeps<T>,
 ): Promise<AiPanelMessage[] | null> {
   try {
     const transcript = await fetchAgentTranscript(sessionId);
@@ -92,7 +92,7 @@ export async function fetchConversationTranscript<T extends SyncableConversation
         text: message.content,
       }));
   } catch (error) {
-    deps.debug("warn", "Mika transcript could not be loaded.", errorText(error));
+    deps.debug("warn", "Agent transcript could not be loaded.", errorText(error));
     return null;
   }
 }
@@ -104,7 +104,7 @@ export async function fetchConversationTranscript<T extends SyncableConversation
 export async function loadConversationTranscript<T extends SyncableConversation>(
   conversationId: string,
   sessionId: string,
-  deps: MikaSyncDeps<T>,
+  deps: AgentSyncDeps<T>,
   setMessages: (messages: AiPanelMessage[]) => void,
   activeConversationId: () => string,
 ): Promise<void> {

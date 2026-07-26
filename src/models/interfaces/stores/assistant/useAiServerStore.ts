@@ -72,7 +72,7 @@ export interface CreateSessionResponse {
   model_catalog_version?: string;
 }
 
-/** One retained Mika session as the server sees it, for rebuilding the session list. */
+/** One retained agent session as the server sees it, for rebuilding the session list. */
 export interface AgentSessionSummary {
   id: string;
   title: string;

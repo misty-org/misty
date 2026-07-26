@@ -31,19 +31,19 @@ import type { AgentCitation } from "@/models/interfaces/features/agents/types";
 import {
   deviceRelativePath,
   isSafeRelativePath,
-  mikaServerContext,
+  agentServerContext,
 } from "@/features/agents/pathPrivacy";
 import { mistyDocumentsEnabled } from "@/features/agents/flags";
 import {
-  clearPendingMikaDelegations,
-  hasPendingMikaDelegations,
-  mikaDelegationMessage,
-  publicMikaDisplayName,
-  publicMikaModel,
-  resolvePendingMikaDelegation,
-  trackPendingMikaDelegation,
-  tryMikaSpaceDelegation,
-} from "@/stores/assistant/useMikaDelegationStore";
+  clearPendingAgentDelegations,
+  hasPendingAgentDelegations,
+  agentDelegationMessage,
+  publicAgentDisplayName,
+  publicAgentModel,
+  resolvePendingAgentDelegation,
+  trackPendingAgentDelegation,
+  tryAgentSpaceDelegation,
+} from "@/stores/assistant/useAgentDelegationStore";
 
 import type {
   AiStatus,
@@ -51,7 +51,7 @@ import type {
   AiToolApproval,
   SendAiPromptRequest,
   AiSessionStore,
-} from "@/models/interfaces/stores/assistant/useMikaSessionStore";
+} from "@/models/interfaces/stores/assistant/useAgentSessionStore";
 
 export type AiPanelMessage = {
   id: string;
@@ -62,11 +62,11 @@ export type AiPanelMessage = {
   hostedAiUsedRatio?: number;
   hostedAiResetAt?: string;
   citations?: AgentCitation[];
-  contextSources?: MikaContextSource[];
+  contextSources?: AgentContextSource[];
   delegatedRunId?: string;
 };
 
-export type MikaContextSource = {
+export type AgentContextSource = {
   id: string;
   kind: "library" | "note" | "task" | "chat" | "member";
   label: string;

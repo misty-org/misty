@@ -31,26 +31,26 @@ import type { AgentCitation } from "@/models/interfaces/features/agents/types";
 import {
   deviceRelativePath,
   isSafeRelativePath,
-  mikaServerContext,
+  agentServerContext,
 } from "@/features/agents/pathPrivacy";
 import { mistyDocumentsEnabled } from "@/features/agents/flags";
 import {
-  clearPendingMikaDelegations,
-  hasPendingMikaDelegations,
-  mikaDelegationMessage,
-  publicMikaDisplayName,
-  publicMikaModel,
-  resolvePendingMikaDelegation,
-  trackPendingMikaDelegation,
-  tryMikaSpaceDelegation,
-} from "@/stores/assistant/useMikaDelegationStore";
+  clearPendingAgentDelegations,
+  hasPendingAgentDelegations,
+  agentDelegationMessage,
+  publicAgentDisplayName,
+  publicAgentModel,
+  resolvePendingAgentDelegation,
+  trackPendingAgentDelegation,
+  tryAgentSpaceDelegation,
+} from "@/stores/assistant/useAgentDelegationStore";
 
 import type {
   AiPanelMessage,
   AssistantScope,
   AssistantRequestScope,
-  MikaContextSource,
-} from "@/models/types/stores/assistant/useMikaSessionStore";
+  AgentContextSource,
+} from "@/models/types/stores/assistant/useAgentSessionStore";
 
 export interface AiStatus {
   configured: boolean;
@@ -86,7 +86,7 @@ export interface SendAiPromptRequest {
   prompt: string;
   cwd: string | null;
   selectedPaths?: string[];
-  contextSources?: MikaContextSource[];
+  contextSources?: AgentContextSource[];
 }
 
 export interface AiConversationSummary {

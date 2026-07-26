@@ -3,7 +3,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { AgentChatList } from "@/pages/Assistant/desktop/AgentChatList";
-import { useMikaSessionStore } from "@/stores/assistant/useMikaSessionStore";
+import { useAgentSessionStore } from "@/stores/assistant/useAgentSessionStore";
 
 describe("AgentChatList", () => {
   let container: HTMLDivElement;
@@ -16,7 +16,7 @@ describe("AgentChatList", () => {
     container = document.createElement("div");
     document.body.append(container);
     root = createRoot(container);
-    useMikaSessionStore.setState({
+    useAgentSessionStore.setState({
       conversations: [
         { id: "chat-1", title: "New chat", updatedAt: 2, createdAt: 2 },
         { id: "chat-2", title: "Research notes", updatedAt: 1, createdAt: 1 },

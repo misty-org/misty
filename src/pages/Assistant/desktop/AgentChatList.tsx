@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { MessageSquare, Pencil, Trash2 } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
 import { Button, Input, cn } from "@/ui";
-import { useMikaSessionStore } from "@/stores/assistant/useMikaSessionStore";
+import { useAgentSessionStore } from "@/stores/assistant/useAgentSessionStore";
 
 /**
  * The saved chats for the currently active agent, shown inline beneath its row.
@@ -17,7 +17,7 @@ export function AgentChatList() {
     switchConversation,
     renameConversation,
     deleteConversationSession,
-  } = useMikaSessionStore(
+  } = useAgentSessionStore(
     useShallow((state) => ({
       conversations: state.conversations,
       activeConversationId: state.activeConversationId,

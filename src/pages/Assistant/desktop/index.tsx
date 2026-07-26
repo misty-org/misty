@@ -19,7 +19,7 @@ import { useMultiPanelStore } from "@/features/workspace";
 import { useExplorerStore } from "@/stores/explorer";
 import { MistyPicker } from "@/features/picker/MistyPicker";
 import { useSpacesStore } from "@/stores/spaces/useSpacesStore";
-import { agentMikaScopeKey, useMikaSessionStore } from "@/stores/assistant/useMikaSessionStore";
+import { agentScopeKey, useAgentSessionStore } from "@/stores/assistant/useAgentSessionStore";
 import { usePersonalAgentsStore } from "@/stores/agents/usePersonalAgentsStore";
 import { useAuth } from "@/features/auth/AuthContext";
 import { AssistantMessage } from "@/features/explorer/desktop/ExplorerAssistantMessage";
@@ -88,7 +88,7 @@ export default function DesktopAgentsPage() {
     approveToolRequest,
     activateConversationScope,
     startNewConversation,
-  } = useMikaSessionStore(
+  } = useAgentSessionStore(
     useShallow((state) => ({
       status: state.status,
       mode: state.mode,
@@ -165,7 +165,7 @@ export default function DesktopAgentsPage() {
   }, [hydrateConversations]);
   useEffect(() => {
     if (!user?.id || !selectedAgentId) return;
-    void activateConversationScope(agentMikaScopeKey(user.id, selectedAgentId, spaceId, ""));
+    void activateConversationScope(agentScopeKey(user.id, selectedAgentId, spaceId, ""));
   }, [activateConversationScope, selectedAgentId, spaceId, user?.id]);
   useEffect(() => {
     logRef.current?.scrollTo({ top: logRef.current.scrollHeight });
@@ -200,7 +200,7 @@ export default function DesktopAgentsPage() {
       if (!user?.id) return;
       // Ensure the agent's scope is live before creating the chat there. Both
       // calls are idempotent, so this is safe even when the agent is already open.
-      await activateConversationScope(agentMikaScopeKey(user.id, agentId, spaceId, ""));
+      await activateConversationScope(agentScopeKey(user.id, agentId, spaceId, ""));
       await startNewConversation();
     },
     [activateConversationScope, selectAgent, spaceId, startNewConversation, user?.id],
@@ -208,7 +208,7 @@ export default function DesktopAgentsPage() {
 
   return (
     <div className="grid h-full min-h-0 grid-cols-[280px_minmax(0,1fr)] overflow-hidden max-[900px]:grid-cols-[minmax(0,1fr)]">
-      <aside className="flex h-full min-h-0 flex-col border-r border-border bg-sidebar/40 p-4 max-[900px]:hidden">
+      <aside className="flex h-full min-h-0 flex-col border-r border-border bg-[var(--misty-app-panel-bg,transparent)] p-4 max-[900px]:hidden">
         <div className="misty-transient-scrollbar flex min-h-0 flex-1 flex-col overflow-hidden [overscroll-behavior:contain]">
           <PersonalAgentsSidebar
             selectedAgentId={selectedAgentId}

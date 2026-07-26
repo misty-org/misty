@@ -8,7 +8,7 @@ import type {
   AgentInstanceRecord,
   AgentVersionWorkflow,
   InstanceWorkflowConfig,
-  MikaDelegationResult,
+  AgentDelegationResult,
   AgentConversation,
   AgentConversationEvent,
   PublishedAgentVersion,
@@ -34,7 +34,7 @@ export const agentArchitectureApi = {
   discovery: () =>
     spaceRequest<{ spaces: Space[]; agents: AgentCatalogEntry[] }>("/mika/discovery"),
   delegate: (input: AgentInvocationInput & { space_id?: string; agent_id?: string }) =>
-    spaceRequest<MikaDelegationResult>("/mika/delegations", {
+    spaceRequest<AgentDelegationResult>("/mika/delegations", {
       method: "POST",
       body: JSON.stringify(input),
     }),

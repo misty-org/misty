@@ -8,8 +8,8 @@ const api = vi.hoisted(() => ({
   fetchAgentEvents: vi.fn().mockResolvedValue({ events: [] }),
   fetchAgentStatus: vi.fn().mockResolvedValue({
     configured: true,
-    model: "mika-low",
-    model_name: "Mika Low",
+    model: "tier-low",
+    model_name: "Tier Low",
     running: false,
     session_id: null,
     error: null,
@@ -44,29 +44,29 @@ vi.mock("@/stores/assistant/useAiServerStore", () => ({
   submitToolResults: api.submitToolResults,
 }));
 
-vi.mock("@/stores/assistant/useMikaDelegationStore", () => ({
-  publicMikaDisplayName: () => "Gemini 2.5 Flash-Lite",
-  publicMikaModel: () => "google/gemini-2.5-flash-lite",
-  tryMikaSpaceDelegation: api.delegate,
+vi.mock("@/stores/assistant/useAgentDelegationStore", () => ({
+  publicAgentDisplayName: () => "Gemini 2.5 Flash-Lite",
+  publicAgentModel: () => "google/gemini-2.5-flash-lite",
+  tryAgentSpaceDelegation: api.delegate,
 }));
 
 import {
-  resetMikaAccountState,
-  spaceMikaScopeKey,
-  useMikaSessionStore,
-} from "@/stores/assistant/useMikaSessionStore";
+  resetAgentAccountState,
+  spaceAgentScopeKey,
+  useAgentSessionStore,
+} from "@/stores/assistant/useAgentSessionStore";
 
-describe("useMikaSessionStore runtime isolation", () => {
+describe("useAgentSessionStore runtime isolation", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    resetMikaAccountState();
+    resetAgentAccountState();
   });
 
   it("does not route a private Files prompt through Space-agent delegation", async () => {
     api.sendAgentMessage.mockResolvedValue(undefined);
-    const send = useMikaSessionStore.getState().sendPrompt({
-      displayPrompt: "Hello Mika",
-      prompt: "Hello Mika",
+    const send = useAgentSessionStore.getState().sendPrompt({
+      displayPrompt: "Hello agent",
+      prompt: "Hello agent",
       cwd: null,
       selectedPaths: [],
     });
@@ -82,7 +82,7 @@ describe("useMikaSessionStore runtime isolation", () => {
     api.sendAgentMessage.mockImplementation(
       () => new Promise<void>((resolve) => (releaseSend = resolve)),
     );
-    const send = useMikaSessionStore.getState().sendPrompt({
+    const send = useAgentSessionStore.getState().sendPrompt({
       displayPrompt: "Hello from Files",
       prompt: "Hello from Files",
       cwd: null,
@@ -90,9 +90,9 @@ describe("useMikaSessionStore runtime isolation", () => {
     });
     await vi.waitFor(() => expect(api.sendAgentMessage).toHaveBeenCalledOnce());
 
-    const spaceScope = spaceMikaScopeKey("account-a", "space-a");
-    await useMikaSessionStore.getState().activateConversationScope(spaceScope);
-    expect(useMikaSessionStore.getState()).toMatchObject({
+    const spaceScope = spaceAgentScopeKey("account-a", "space-a");
+    await useAgentSessionStore.getState().activateConversationScope(spaceScope);
+    expect(useAgentSessionStore.getState()).toMatchObject({
       conversationScopeKey: spaceScope,
       messages: [],
     });
@@ -100,7 +100,7 @@ describe("useMikaSessionStore runtime isolation", () => {
     releaseSend();
     await send;
 
-    expect(useMikaSessionStore.getState()).toMatchObject({
+    expect(useAgentSessionStore.getState()).toMatchObject({
       conversationScopeKey: spaceScope,
       messages: [],
     });

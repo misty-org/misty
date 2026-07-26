@@ -1,5 +1,5 @@
 import { agentArchitectureApi } from "@/stores/agents/useAgentArchitectureStore";
-import type { MikaDelegationResult } from "@/models/interfaces/features/spaces/types";
+import type { AgentDelegationResult } from "@/models/interfaces/features/spaces/types";
 import {
   initialAgentModelId,
   initialAgentModelName,
@@ -8,10 +8,10 @@ import {
 
 const pendingDelegatedRunIDs = new Set<string>();
 
-export async function tryMikaSpaceDelegation(
+export async function tryAgentSpaceDelegation(
   prompt: string,
   sourceConversationId?: string,
-): Promise<MikaDelegationResult | null> {
+): Promise<AgentDelegationResult | null> {
   try {
     return await agentArchitectureApi.delegate({
       prompt,
@@ -23,12 +23,12 @@ export async function tryMikaSpaceDelegation(
   }
 }
 
-export function publicMikaModel(model: string): string {
+export function publicAgentModel(model: string): string {
   const normalized = model.trim();
   return isInternalModelLabel(normalized) ? initialAgentModelId : normalized || initialAgentModelId;
 }
 
-export function publicMikaDisplayName(model: string, modelName?: string): string {
+export function publicAgentDisplayName(model: string, modelName?: string): string {
   const normalizedName = modelName?.trim() ?? "";
   if (isInternalModelLabel(model) || isInternalModelLabel(normalizedName)) {
     return initialAgentModelName;
@@ -36,11 +36,15 @@ export function publicMikaDisplayName(model: string, modelName?: string): string
   return normalizedName || selectedAgentModelName(model);
 }
 
+// Internal routing labels must never reach the user. Both the current "tier-*"
+// values and the legacy "mika-*" ones are matched: the gateway still returns the
+// legacy labels for sessions persisted before the agent rename, so narrowing this
+// pattern to the new values would leak "Mika Low" into the model picker.
 function isInternalModelLabel(value: string): boolean {
-  return /^(automatic(?: routing)?|mika[ -]?(?:low|med|medium|high))$/i.test(value.trim());
+  return /^(automatic(?: routing)?|(?:tier|mika)[ -]?(?:low|med|medium|high))$/i.test(value.trim());
 }
 
-export function mikaDelegationMessage(result: MikaDelegationResult): string {
+export function agentDelegationMessage(result: AgentDelegationResult): string {
   if (!result.run) {
     const choices =
       result.routing.options?.map(
@@ -66,7 +70,7 @@ export function mikaDelegationMessage(result: MikaDelegationResult): string {
   return [result.trace, output, status].filter(Boolean).join("\n\n");
 }
 
-export function trackPendingMikaDelegation(result: MikaDelegationResult): boolean {
+export function trackPendingAgentDelegation(result: AgentDelegationResult): boolean {
   const waiting =
     result.run?.state === "running" ||
     result.run?.state === "queued" ||
@@ -76,8 +80,8 @@ export function trackPendingMikaDelegation(result: MikaDelegationResult): boolea
   return waiting;
 }
 
-export const resolvePendingMikaDelegation = (runID?: string): void => {
+export const resolvePendingAgentDelegation = (runID?: string): void => {
   if (runID) pendingDelegatedRunIDs.delete(runID);
 };
-export const hasPendingMikaDelegations = (): boolean => pendingDelegatedRunIDs.size > 0;
-export const clearPendingMikaDelegations = (): void => pendingDelegatedRunIDs.clear();
+export const hasPendingAgentDelegations = (): boolean => pendingDelegatedRunIDs.size > 0;
+export const clearPendingAgentDelegations = (): void => pendingDelegatedRunIDs.clear();

@@ -4,7 +4,7 @@ import type {
   AgentInstanceRecord,
   AgentVersionWorkflow,
   InstanceWorkflowConfig,
-  MikaDelegationResult,
+  AgentDelegationResult,
   AgentConversation,
   AgentConversationEvent,
   PublishedAgentVersion,

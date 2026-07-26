@@ -3,7 +3,7 @@ import { useShallow } from "zustand/react/shallow";
 
 import { Button } from "@/ui";
 import { cn } from "@/ui";
-import { useMikaSessionStore } from "@/stores/assistant/useMikaSessionStore";
+import { useAgentSessionStore } from "@/stores/assistant/useAgentSessionStore";
 
 /**
  * Session rail for the Assistant. Sessions are the Assistant's organising unit the way
@@ -22,7 +22,7 @@ export function AssistantSessionSidebar({
     startNewConversation,
     switchConversation,
     deleteConversationSession,
-  } = useMikaSessionStore(
+  } = useAgentSessionStore(
     useShallow((state) => ({
       conversations: state.conversations,
       activeConversationId: state.activeConversationId,
@@ -39,7 +39,9 @@ export function AssistantSessionSidebar({
     <Sidebar
       className={cn(
         "flex min-h-0 flex-col",
-        embedded ? "h-full" : "border-r border-border bg-sidebar/40 p-2",
+        embedded
+          ? "h-full"
+          : "border-r border-border bg-[var(--misty-app-panel-bg,transparent)] p-2",
       )}
       aria-label="Agent sessions"
     >
