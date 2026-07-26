@@ -24,6 +24,15 @@ const audience = "misty-journal-collab";
 const publicKey = loadPublicKey(process.env.JOURNAL_COLLAB_TICKET_PUBLIC_KEY || "");
 const maxDocumentBytes = 8 * 1024 * 1024;
 const maxMessageBytes = 512 * 1024;
+// A socket this far behind is dropped; its client reconnects and resyncs.
+const maxBufferedBytes = 4 * 1024 * 1024;
+// Saves follow a 2s quiet period, but never trail the first unsaved change by
+// more than this, and failures back off instead of retrying every 2s.
+const persistQuietMs = 2_000;
+const persistMaxLatencyMs = 10_000;
+const persistMaxBackoffMs = 60_000;
+// A room with no clients is flushed and released after this grace period.
+const idleRoomMs = 60_000;
 const messageSync = 0;
 const messageAwareness = 1;
 const rooms = new Map();
@@ -43,6 +52,7 @@ const server = createServer((request, response) => {
 const sockets = new WebSocketServer({ noServer: true, maxPayload: maxMessageBytes });
 
 server.on("upgrade", async (request, socket, head) => {
+  let held = null;
   try {
     const url = new URL(request.url || "/", "http://collab.internal");
     const match = url.pathname.match(/^\/parties\/(note-room|drawing-room)\/([A-Za-z0-9_-]{1,128})$/);
@@ -52,12 +62,24 @@ server.on("upgrade", async (request, socket, head) => {
     const claims = verifyTicket(url.searchParams.get("ticket") || "", roomName, resourceType);
     burnTicket(claims.jti, claims.exp);
     const room = await getRoom(roomName, resourceType, claims.resource_id);
+    held = room;
     if (claims.acl_version < room.aclVersion) throw new Error("ticket_acl_stale");
     room.aclVersion = Math.max(room.aclVersion, claims.acl_version);
+    // The room stays held until the client is attached or the handshake ends.
+    let released = false;
+    const release = () => {
+      if (!released) {
+        released = true;
+        releaseRoom(room);
+      }
+    };
+    socket.once("close", release);
     sockets.handleUpgrade(request, socket, head, (websocket) => {
       attach(room, websocket, claims);
+      release();
     });
   } catch {
+    if (held) releaseRoom(held);
     socket.write("HTTP/1.1 401 Unauthorized\r\nConnection: close\r\n\r\n");
     socket.destroy();
   }
@@ -65,28 +87,80 @@ server.on("upgrade", async (request, socket, head) => {
 
 server.listen(port, "0.0.0.0");
 
+// Returns a held room: callers release it once attached or finished, so idle
+// eviction never races a connection or control request.
 async function getRoom(name, resourceType, resourceID) {
   const existing = rooms.get(name);
   if (existing) {
     const room = await existing;
-    if (room.resourceType !== resourceType || room.resourceID !== resourceID) throw new Error("room_mismatch");
-    return room;
+    if (!room.evicted) {
+      if (room.resourceType !== resourceType || room.resourceID !== resourceID) throw new Error("room_mismatch");
+      holdRoom(room);
+      return room;
+    }
+    if (rooms.get(name) === existing) rooms.delete(name);
+    return getRoom(name, resourceType, resourceID);
   }
   const pending = createRoom(name, resourceType, resourceID);
   rooms.set(name, pending);
   try {
-    return await pending;
+    const room = await pending;
+    room.entry = pending;
+    holdRoom(room);
+    return room;
   } catch (error) {
-    rooms.delete(name);
+    if (rooms.get(name) === pending) rooms.delete(name);
     throw error;
   }
+}
+
+function holdRoom(room) {
+  room.holds += 1;
+  if (room.evictTimer) clearTimeout(room.evictTimer);
+  room.evictTimer = null;
+}
+
+function releaseRoom(room) {
+  room.holds = Math.max(0, room.holds - 1);
+  scheduleEviction(room);
+}
+
+function scheduleEviction(room) {
+  if (room.evicted || room.clients.size || room.holds) return;
+  if (room.evictTimer) clearTimeout(room.evictTimer);
+  room.evictTimer = setTimeout(() => void evictRoom(room), idleRoomMs);
+}
+
+// Flush, then release the document and awareness of a room nobody uses. A room
+// whose latest state is not saved stays resident and retries.
+async function evictRoom(room) {
+  room.evictTimer = null;
+  if (room.evicted || room.clients.size || room.holds) return;
+  const saved = await persist(room);
+  if (room.evicted || room.clients.size || room.holds) return;
+  if (!saved || room.generation !== room.savedGeneration || room.projectionPending) {
+    scheduleEviction(room);
+    return;
+  }
+  room.evicted = true;
+  if (room.persistTimer) clearTimeout(room.persistTimer);
+  room.persistTimer = null;
+  if (rooms.get(room.name) === room.entry) rooms.delete(room.name);
+  room.awareness.destroy();
+  room.doc.destroy();
 }
 
 async function createRoom(name, resourceType, resourceID) {
   const doc = new Y.Doc();
   const awareness = new awarenessProtocol.Awareness(doc);
   awareness.setLocalState(null);
-  const room = { name, resourceType, resourceID, doc, awareness, clients: new Set(), aclVersion: 0, persistTimer: null, drawingRevision: 0, drawingRequests: new Map() };
+  const room = {
+    name, resourceType, resourceID, doc, awareness, clients: new Set(), aclVersion: 0, persistTimer: null, drawingRevision: 0, drawingRequests: new Map(),
+    // Persistence state: a save is needed while generation > savedGeneration.
+    generation: 0, savedGeneration: 0, savedChecksum: "", savedAclVersion: 0, dirtySince: 0, failures: 0,
+    saving: null, saveAgain: null, projectionPending: false,
+    holds: 0, evictTimer: null, evicted: false, entry: null,
+  };
   const response = await fetch(`${apiBase}/internal/self-host/collaboration/${resourceType}/${encodeURIComponent(resourceID)}`, {
     headers: { "X-Misty-Internal-Secret": internalSecret },
   });
@@ -96,13 +170,17 @@ async function createRoom(name, resourceType, resourceID) {
     if (checksum !== response.headers.get("X-Content-SHA256")) throw new Error("snapshot_checksum_mismatch");
     Y.applyUpdate(doc, update, "persistence");
     room.aclVersion = readNonNegativeInteger(response.headers.get("X-Misty-ACL-Version"), 0);
+    room.savedChecksum = checksum;
+    room.savedAclVersion = room.aclVersion;
   } else if (response.status !== 404) {
     throw new Error("snapshot_unavailable");
   }
   if (resourceType === "drawing") room.drawingRevision = readNonNegativeInteger(doc.getMap("drawing:scene").get("mistyRevision"), 0);
   doc.on("update", (update, origin) => {
-    if (origin !== "persistence") broadcastUpdate(room, update, origin);
-    schedulePersistence(room);
+    // The loaded snapshot is already durable; only later changes need saving.
+    if (origin === "persistence") return;
+    broadcastUpdate(room, update, origin);
+    markDirty(room);
   });
   awareness.on("update", ({ added, updated, removed }, origin) => {
     const changed = added.concat(updated, removed);
@@ -135,8 +213,11 @@ function attach(room, socket, claims) {
   });
   socket.on("close", () => {
     room.clients.delete(socket);
+    if (room.evicted) return;
     awarenessProtocol.removeAwarenessStates(room.awareness, [...socket.controlledAwarenessIDs], socket);
+    // A departing editor's changes are flushed now; an unchanged room saves nothing.
     schedulePersistence(room, true);
+    scheduleEviction(room);
   });
   const syncEncoder = encoding.createEncoder();
   encoding.writeVarUint(syncEncoder, messageSync);
@@ -190,40 +271,109 @@ function broadcast(room, message) {
 }
 
 function send(socket, message) {
-  if (socket.readyState === 1) socket.send(message, { binary: true });
+  if (socket.readyState !== 1) return;
+  // A reader that cannot keep up is disconnected rather than buffered without
+  // bound; its client reconnects and resyncs from the document state.
+  if (socket.bufferedAmount > maxBufferedBytes) {
+    socket.terminate();
+    return;
+  }
+  socket.send(message, { binary: true });
+}
+
+function markDirty(room) {
+  room.generation += 1;
+  if (!room.dirtySince) room.dirtySince = Date.now();
+  schedulePersistence(room);
+}
+
+function persistenceNeeded(room) {
+  return room.generation !== room.savedGeneration || room.aclVersion !== room.savedAclVersion || room.projectionPending;
 }
 
 function schedulePersistence(room, immediate = false) {
+  if (room.evicted || !persistenceNeeded(room)) return;
   if (room.persistTimer) clearTimeout(room.persistTimer);
-  room.persistTimer = setTimeout(() => void persist(room), immediate ? 0 : 2000);
+  let delay = immediate ? 0 : persistQuietMs;
+  if (room.dirtySince) delay = Math.min(delay, Math.max(0, room.dirtySince + persistMaxLatencyMs - Date.now()));
+  if (room.failures) {
+    const backoff = Math.min(persistMaxBackoffMs, persistQuietMs * 2 ** (room.failures - 1));
+    delay = Math.max(delay, backoff / 2 + Math.random() * (backoff / 2));
+  }
+  room.persistTimer = setTimeout(() => void persist(room), delay);
 }
 
-async function persist(room) {
+// Saves are single-flight: callers during a save share one trailing save,
+// which covers every change made before it starts. Resolves true once the
+// state at the time of the call is durable.
+function persist(room) {
+  if (room.saving) {
+    room.saveAgain ??= room.saving.then(() => {
+      room.saveAgain = null;
+      return persist(room);
+    });
+    return room.saveAgain;
+  }
+  room.saving = saveOnce(room).finally(() => {
+    room.saving = null;
+  });
+  return room.saving;
+}
+
+async function saveOnce(room) {
   if (room.persistTimer) clearTimeout(room.persistTimer);
   room.persistTimer = null;
-  const update = Y.encodeStateAsUpdate(room.doc);
-  if (update.byteLength > maxDocumentBytes) return;
-  const checksum = createHash("sha256").update(update).digest("hex");
-  const response = await fetch(`${apiBase}/internal/self-host/collaboration/${room.resourceType}/${encodeURIComponent(room.resourceID)}`, {
-    method: "PUT",
-    headers: {
-      "Content-Type": "application/vnd.yjs.update",
-      "X-Content-SHA256": checksum,
-      "X-Misty-ACL-Version": String(room.aclVersion),
-      "X-Misty-Internal-Secret": internalSecret,
-    },
-    body: update,
-  }).catch(() => null);
-  if (!response?.ok) {
-    schedulePersistence(room);
-  } else if (room.resourceType === "note") {
-    await publishNoteProjection(room).catch(() => schedulePersistence(room));
+  if (room.evicted) return true;
+  const generation = room.generation;
+  const aclVersion = room.aclVersion;
+  if (generation !== room.savedGeneration || aclVersion !== room.savedAclVersion) {
+    const update = Y.encodeStateAsUpdate(room.doc);
+    if (update.byteLength > maxDocumentBytes) return false;
+    const checksum = createHash("sha256").update(update).digest("hex");
+    // Edits that net out to the saved state, such as undo, upload nothing.
+    if (checksum !== room.savedChecksum || aclVersion !== room.savedAclVersion) {
+      const response = await fetch(`${apiBase}/internal/self-host/collaboration/${room.resourceType}/${encodeURIComponent(room.resourceID)}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/vnd.yjs.update",
+          "X-Content-SHA256": checksum,
+          "X-Misty-ACL-Version": String(aclVersion),
+          "X-Misty-Internal-Secret": internalSecret,
+        },
+        body: update,
+      }).catch(() => null);
+      if (!response?.ok) {
+        room.failures += 1;
+        schedulePersistence(room);
+        return false;
+      }
+      room.savedChecksum = checksum;
+      room.projectionPending = room.resourceType === "note";
+    }
+    room.savedGeneration = generation;
+    room.savedAclVersion = aclVersion;
+    if (room.generation === generation) room.dirtySince = 0;
   }
+  if (room.projectionPending) {
+    try {
+      await publishNoteProjection(room);
+      room.projectionPending = false;
+    } catch {
+      // Only the projection is retried; the saved document is not re-uploaded.
+      room.failures += 1;
+      schedulePersistence(room);
+      return false;
+    }
+  }
+  room.failures = 0;
+  if (persistenceNeeded(room)) schedulePersistence(room);
+  return true;
 }
 
 async function handleHTTPRequest(request, response) {
   if (request.method === "GET" && request.url === "/health") {
-    return writeJSON(response, 200, { status: "ok" });
+    // Residency counters let operators see rooms and sockets held in memory.
+    return writeJSON(response, 200, { status: "ok", rooms: rooms.size, sockets: sockets.clients.size });
   }
   const url = new URL(request.url || "/", "http://collab.internal");
   const match = url.pathname.match(/^\/parties\/(note-room|drawing-room)\/([A-Za-z0-9_-]{1,128})$/);
@@ -244,7 +394,11 @@ async function handleHTTPRequest(request, response) {
     .slice(0, 32);
   if (expectedRoom !== match[2]) throw new Error("room_mismatch");
   const room = await getRoom(match[2], resourceType, resourceID);
-  return handleControl(response, room, envelope.command, envelope.payload || {});
+  try {
+    return await handleControl(response, room, envelope.command, envelope.payload || {});
+  } finally {
+    releaseRoom(room);
+  }
 }
 
 async function handleControl(response, room, command, payload) {
@@ -367,7 +521,10 @@ async function handleControl(response, room, command, payload) {
       headers: { "X-Misty-Internal-Secret": internalSecret },
     });
     if (!deleted.ok) throw new Error("purge_failed");
-    rooms.delete(room.name);
+    room.evicted = true;
+    if (room.evictTimer) clearTimeout(room.evictTimer);
+    if (rooms.get(room.name) === room.entry) rooms.delete(room.name);
+    room.awareness.destroy();
     room.doc.destroy();
     return writeJSON(response, 200, { ok: true, purged: true });
   }

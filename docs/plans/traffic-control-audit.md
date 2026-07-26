@@ -276,3 +276,15 @@ T19, client part:
 - Connected Devices service restarts back off from 30 seconds to 5 minutes, jittered, and reset when the service starts.
 
 Remaining: native control-advertisement retries (Rust, native batch) and an account-wide cooldown shared by all client transports.
+
+
+## Implementation progress — self-host collaboration
+
+T26 and T27 in `server/apps/self-host-collab`:
+
+- Saves track a dirty generation and the last saved checksum. Loading a snapshot no longer schedules a save of the same document. An unchanged disconnect saves nothing, and edits that net out to the saved state (such as undo) upload nothing.
+- Saves are single-flight with one trailing save. They follow a 2-second quiet period but never trail the first unsaved change by more than 10 seconds. Failures back off from 2 seconds to 1 minute with jitter instead of retrying every 2 seconds. A failed note projection is retried alone, without re-uploading the document. ACL changes still save with the new fencing version.
+- A socket more than 4 MiB behind is terminated; its client reconnects and resyncs.
+- A room with no clients and no in-flight connection or control request is flushed and evicted after 60 seconds, and its document and awareness are destroyed. A room whose latest state is not saved stays resident and retries. `/health` reports resident rooms and sockets.
+
+Validation: syntax-checked with `node --check`. The package's `node --test` suite needs `npm ci`, which was not run under the agreed scope.
