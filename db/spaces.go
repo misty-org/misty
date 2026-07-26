@@ -659,6 +659,11 @@ func (db *Database) RespondToSpaceInvite(ctx context.Context, userID, inviteID s
 		if _, err := tx.ExecContext(ctx, `DELETE FROM space_invitations WHERE id=$1`, inviteID); err != nil {
 			return err
 		}
+		// Rejoining the same Space inside the retention window restores the
+		// notes archived when this user left.
+		if err := handleNoteMembershipRestoreTx(ctx, tx, spaceID, userID); err != nil {
+			return err
+		}
 		_, err := recordSpaceEventTx(ctx, tx, spaceID, userID, "member.joined", userID, map[string]any{})
 		return err
 	})
@@ -692,6 +697,11 @@ func (db *Database) RemoveSpaceMember(ctx context.Context, ownerID, spaceID, mem
 		if _, err := tx.ExecContext(ctx, `UPDATE space_workflows SET schedules_enabled=FALSE WHERE space_id=$1 AND creator_user_id=$2`, spaceID, memberID); err != nil {
 			return err
 		}
+		// Same transaction as the membership delete: a note must never remain
+		// reachable by someone who is no longer a member, not even briefly.
+		if err := handleNoteMembershipLossTx(ctx, tx, spaceID, memberID); err != nil {
+			return err
+		}
 		if _, err = recordSpaceEventTx(ctx, tx, spaceID, ownerID, "member.removed", memberID, map[string]any{}); err != nil {
 			return err
 		}
@@ -718,6 +728,9 @@ func (db *Database) LeaveSpace(ctx context.Context, userID, spaceID string) erro
 			return err
 		}
 		if _, err := tx.ExecContext(ctx, `UPDATE space_workflows SET schedules_enabled=FALSE WHERE space_id=$1 AND creator_user_id=$2`, spaceID, userID); err != nil {
+			return err
+		}
+		if err := handleNoteMembershipLossTx(ctx, tx, spaceID, userID); err != nil {
 			return err
 		}
 		if _, err := recordSpaceEventTx(ctx, tx, spaceID, userID, "member.left", userID, map[string]any{}); err != nil {

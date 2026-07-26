@@ -140,6 +140,9 @@ func runAgentRetention(ctx context.Context, server *Server) {
 					log.Printf("Agent workflow schedule processing failed: %v", err)
 				}
 			}
+			if _, err := server.Database.PurgeExpiredNotes(ctx, 100); err != nil {
+				log.Printf("Note retention purge failed: %v", err)
+			}
 			retentionCounter++
 			if retentionCounter%10 == 0 {
 				if _, err := server.Database.PurgeExpiredAgentConversations(ctx); err != nil {
