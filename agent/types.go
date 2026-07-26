@@ -11,10 +11,25 @@ const (
 	ModeAuto = "auto"
 	ModeFull = "full"
 
-	EventAssistantMessage = "assistant_message"
-	EventToolRequest      = "tool_request"
-	EventFilePlan         = "file_plan"
-	EventError            = "error"
+	EventAgentMessage = "agent_message"
+	EventToolRequest  = "tool_request"
+	EventFilePlan     = "file_plan"
+	EventError        = "error"
+
+	// Pre-rename values. Sessions persisted before the agent rename replay their
+	// events and messages with these, so readers accept both until
+	// 20260917000000_rename_agent_message_event_type.sql has run everywhere and
+	// every retained session has aged out. Only the current values are written.
+	EventAgentMessageLegacy = "assistant_message"
+	RoleAgentLegacy         = "assistant"
+
+	RoleUser  = "user"
+	RoleAgent = "agent"
+
+	// Mirrors db.HostedAIMeterAgent, which the agent package cannot import. The
+	// "assistant_ai" value is intentionally unchanged by the agent rename because
+	// it is persisted in hosted-AI usage and credit ledger rows.
+	hostedAIMeterAgent = "assistant_ai"
 
 	ToolListDirectory    = "list_directory"
 	ToolSearchFiles      = "search_files"
@@ -113,7 +128,7 @@ type ModelRequest struct {
 	SessionID    string
 	UserID       string
 	SystemPrompt string
-	AgentTier     AgentTier
+	AgentTier    AgentTier
 	Mode         string
 	ActiveRoot   string
 	Messages     []Message

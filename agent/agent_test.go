@@ -105,21 +105,21 @@ func TestSendMessageAcceptsOpaqueScopeAndRelativeSelection(t *testing.T) {
 	}
 }
 
-func TestAppendExternalAssistantMessageReturnsDelegatedRunToAgentSession(t *testing.T) {
+func TestAppendExternalAgentMessageReturnsDelegatedRunToAgentSession(t *testing.T) {
 	service := NewService(NewSessionStore(0), MockProvider{})
 	session := service.CreateSession("user-1")
-	event, err := service.AppendExternalAssistantMessage(context.Background(), session.ID, "user-1", "run-1", "Delegated work finished")
+	event, err := service.AppendExternalAgentMessage(context.Background(), session.ID, "user-1", "run-1", "Delegated work finished")
 	if err != nil {
-		t.Fatalf("AppendExternalAssistantMessage() error = %v", err)
+		t.Fatalf("AppendExternalAgentMessage() error = %v", err)
 	}
-	if event.Type != EventAssistantMessage || event.RunID != "run-1" || event.Text != "Delegated work finished" || event.Sequence != 1 {
+	if event.Type != EventAgentMessage || event.RunID != "run-1" || event.Text != "Delegated work finished" || event.Sequence != 1 {
 		t.Fatalf("external event = %#v", event)
 	}
 	events, err := service.Events(session.ID, "user-1", 0)
 	if err != nil || len(events) != 1 || events[0].Sequence != event.Sequence || events[0].RunID != event.RunID || events[0].Text != event.Text {
 		t.Fatalf("Events() = %#v, %v", events, err)
 	}
-	if _, err := service.AppendExternalAssistantMessage(context.Background(), session.ID, "other-user", "run-1", "secret"); !errors.Is(err, ErrSessionNotFound) {
+	if _, err := service.AppendExternalAgentMessage(context.Background(), session.ID, "other-user", "run-1", "secret"); !errors.Is(err, ErrSessionNotFound) {
 		t.Fatalf("cross-user append error = %v", err)
 	}
 }

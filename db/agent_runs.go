@@ -316,9 +316,29 @@ func selectWorkflowCapability(metadata WorkflowMetadata, requested string) (*Wor
 	return nil, ErrSpaceInvalid
 }
 
+const (
+	// RunSourceAgentConsole replaces the pre-rename "mika" value. The legacy
+	// value stays accepted, and permitted by the space_runs CHECK, until
+	// 20260916000000_rename_agent_run_source_type.sql has run everywhere and no
+	// old binary is still writing it. Only the current value is written.
+	RunSourceAgentConsole       = "agent_console"
+	RunSourceAgentConsoleLegacy = "mika"
+)
+
+// Every value here must also appear in the space_runs source_type CHECK, or the
+// run passes validation and then fails at insert time. "connector" and "task"
+// were accepted here long before the constraint listed them, which is why
+// 20260916000000_rename_agent_run_source_type.sql adds them.
 func validRunSource(value string) bool {
 	switch value {
-	case "direct", "group_mention", "mika", "studio_test", "schedule", "connector", "task":
+	case "direct",
+		"group_mention",
+		RunSourceAgentConsole,
+		RunSourceAgentConsoleLegacy,
+		"studio_test",
+		"schedule",
+		"connector",
+		"task":
 		return true
 	default:
 		return false

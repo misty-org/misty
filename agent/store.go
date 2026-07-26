@@ -40,7 +40,7 @@ type Session struct {
 	SystemPrompt          string
 	AllowTools            bool
 	AllowWriteTools       bool
-	AgentTier              AgentTier
+	AgentTier             AgentTier
 	Mode                  string
 	ActiveRoot            string
 	Capabilities          ToolManifest
@@ -99,7 +99,7 @@ func (s *SessionStore) CreateWithBillingScope(userID, billingUserID, billingScop
 		UserID:              userID,
 		BillingUserID:       billingUserID,
 		BillingScope:        billingScope,
-		AgentTier:            TierLow,
+		AgentTier:           TierLow,
 		Mode:                ModeAsk,
 		AllowTools:          true,
 		AllowWriteTools:     true,

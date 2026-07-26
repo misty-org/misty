@@ -85,8 +85,8 @@ func (s *SpacesService) AgentDelegation() http.HandlerFunc {
 		}
 		run, err := s.database.CreateAgentRun(r.Context(), db.AgentRunRequest{
 			RequestingMemberID: userID, SpaceID: decision.Selected.SpaceID, AgentID: decision.Selected.AgentID,
-			SourceConversationID: body.SourceConversationID, SourceType: "mika", CapabilityID: decision.Selected.CapabilityID,
-			Input: body.Input, TriggerKind: "mika",
+			SourceConversationID: body.SourceConversationID, SourceType: db.RunSourceAgentConsole, CapabilityID: decision.Selected.CapabilityID,
+			Input: body.Input, TriggerKind: db.RunSourceAgentConsole,
 		})
 		if err != nil {
 			writeSpaceError(w, err)
@@ -701,11 +701,11 @@ func publishCanonicalRunResponse(ctx context.Context, database *db.Database, run
 		if err == nil {
 			details["message_id"] = reply.ID
 		}
-	case "mika":
+	case db.RunSourceAgentConsole, db.RunSourceAgentConsoleLegacy:
 		if runtime == nil {
 			err = errors.New("Agent runtime is unavailable")
 		} else {
-			_, err = runtime.AppendExternalAssistantMessage(ctx, run.SourceConversationID, userID, run.ID, text)
+			_, err = runtime.AppendExternalAgentMessage(ctx, run.SourceConversationID, userID, run.ID, text)
 		}
 	default:
 		details["status"] = "no_conversation_delivery_required"

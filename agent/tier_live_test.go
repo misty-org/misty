@@ -22,7 +22,7 @@ func TestAgentGatewayLiveCapabilities(t *testing.T) {
 	request := ModelRequest{
 		SessionID:  "agent-live-smoke",
 		UserID:     "agent-live-smoke",
-		AgentTier:   TierLow,
+		AgentTier:  TierLow,
 		Mode:       ModeAuto,
 		ActiveRoot: "Documents",
 		Messages: []Message{{
@@ -84,7 +84,7 @@ func TestAgentGatewayLiveCapabilities(t *testing.T) {
 			response, err := tierProvider.Next(ModelRequest{
 				SessionID: "agent-live-" + string(tier),
 				UserID:    "agent-live-smoke",
-				AgentTier:  tier,
+				AgentTier: tier,
 				Mode:      ModeAsk,
 				Messages: []Message{{
 					Role:    "user",

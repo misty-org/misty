@@ -2070,7 +2070,7 @@ func (db *Database) FinishSpaceRun(ctx context.Context, runID, state string, res
 		if err != nil {
 			return err
 		}
-		if out.SourceType == "schedule" || out.TriggerKind != "manual" && out.TriggerKind != "mika" && out.TriggerKind != "mention" {
+		if out.SourceType == "schedule" || out.TriggerKind != "manual" && out.TriggerKind != RunSourceAgentConsole && out.TriggerKind != RunSourceAgentConsoleLegacy && out.TriggerKind != "mention" {
 			payload := mustJSON(map[string]any{"run_id": out.ID, "agent_id": out.AgentID, "state": out.State, "outputs": out.Outputs, "error_code": out.ErrorCode})
 			_, err = tx.ExecContext(ctx, `INSERT INTO space_inbox_items(user_id,space_id,kind,event_id,payload) VALUES($1,$2,'workflow',$3,$4)`, out.RequestingMemberID, out.SpaceID, eventID, payload)
 		}
