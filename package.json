@@ -20,6 +20,7 @@
     "smoke:ios:simulator:fresh-install": "node scripts/smoke-ios-simulator-fresh-install.mjs",
     "smoke:ios:simulator:deeplinks": "node scripts/smoke-ios-simulator-deeplinks.mjs",
     "smoke:ios:simulator:ui": "node scripts/smoke-ios-simulator-ui.mjs",
+    "icons:sync": "node scripts/sync-app-icons.mjs",
     "icons:ios:flatten": "swift scripts/flatten-ios-app-icons.swift",
     "security:mobile:audit": "node scripts/audit-mobile-security.mjs",
     "security:android:audit": "node scripts/audit-android-release.mjs",

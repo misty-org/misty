@@ -136,6 +136,14 @@ body {
   background: var(--misty-bg);
 }
 
+/* On macOS, video wallpapers are rendered by AVFoundation below WKWebView so
+   Low Power Mode cannot impose WebKit's user-gesture autoplay restriction. */
+:root[data-misty-native-wallpaper-video="true"],
+:root[data-misty-native-wallpaper-video="true"] body,
+:root[data-misty-native-wallpaper-video="true"] #root {
+  background: transparent;
+}
+
 /* Native desktop chrome does not scale with the webview. The app zoom hook
    compensates this inset so fullscreen portals always begin below the titlebar. */
 :root[data-form-factor="desktop"] .fixed.inset-0 {

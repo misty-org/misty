@@ -185,6 +185,7 @@ pub fn run() {
             mac_rounded_corners::enable_modern_window_style,
             mac_rounded_corners::enable_custom_titlebar_window_style,
             mac_rounded_corners::reposition_traffic_lights,
+            mac_rounded_corners::set_native_wallpaper_video,
             app_snapshot,
             app_environment_snapshot,
             agents_device_snapshot,
