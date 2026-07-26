@@ -97,7 +97,11 @@ func (monitor *healthMonitor) evaluate(ctx context.Context) (healthSnapshot, int
 	})
 
 	checks["public_api"] = publicAPIConfigurationCheck()
-	checks["mika"] = environmentConfigurationCheck("AI_GATEWAY_API_KEY|VERCEL_OIDC_TOKEN")
+	agentGatewayCheck := environmentConfigurationCheck("AI_GATEWAY_API_KEY|VERCEL_OIDC_TOKEN")
+	checks["agent_gateway"] = agentGatewayCheck
+	// Pre-rename key, still emitted so any external dashboard or alert watching
+	// it keeps reporting while it is repointed at agent_gateway.
+	checks["mika"] = agentGatewayCheck
 	checks["email"] = environmentConfigurationCheck("MAILJET_API_KEY", "MAILJET_SECRET_KEY", "MAILJET_FROM_EMAIL")
 	checks["billing"] = environmentConfigurationCheck("STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET")
 	checks["google"] = environmentConfigurationCheck("GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET")

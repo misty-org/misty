@@ -114,7 +114,7 @@ func TestPersistentSessionRestoresAfterRuntimeRestart(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Events after restart: %v", err)
 	}
-	if len(events) != 1 || events[0].Type != EventAssistantMessage {
+	if len(events) != 1 || events[0].Type != EventAgentMessage {
 		t.Fatalf("restored events = %#v", events)
 	}
 	if err := second.SendMessage(session.ID, "user-1", AgentMessageRequest{UserMessage: "again"}); err != nil {
@@ -136,7 +136,7 @@ func TestPersistentSessionStripsImagesAndLocalPaths(t *testing.T) {
 	err := store.WithSession(session.ID, "user-1", func(current *Session) error {
 		current.ActiveRoot = "/Users/misty/Documents/private"
 		current.KnownPaths["/Users/misty/Documents/private/report.pdf"] = struct{}{}
-		current.Messages = append(current.Messages, Message{Role: "user", Content: "read /Users/misty/Documents/private/report.pdf"})
+		current.Messages = append(current.Messages, Message{Role: RoleUser, Content: "read /Users/misty/Documents/private/report.pdf"})
 		current.ToolResults = append(current.ToolResults, ToolResult{
 			RequestID: "request-1",
 			Name:      ToolPreviewFile,

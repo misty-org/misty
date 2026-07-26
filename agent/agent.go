@@ -72,7 +72,7 @@ func (s *Service) CompleteWithToolsContext(ctx context.Context, userID, billingU
 			switch event.Type {
 			case EventError:
 				return ToolCompletion{}, errors.New(event.Message)
-			case EventAssistantMessage:
+			case EventAgentMessage:
 				if strings.TrimSpace(event.Text) != "" {
 					completion.Text = strings.TrimSpace(event.Text)
 					completion.Citations = append([]AgentCitation(nil), event.Citations...)
@@ -134,7 +134,7 @@ func (s *Service) completeWithProviderContext(ctx context.Context, userID, promp
 	if len(prompt) > MaxUserMessageBytes {
 		return "", UsageSettlement{}, ErrInvalidRequest("prompt is too large")
 	}
-	request := ModelRequest{SessionID: uuid.NewString(), UserID: userID, AgentTier: tier, Mode: ModeAsk, Messages: []Message{{Role: "user", Content: prompt}}}
+	request := ModelRequest{SessionID: uuid.NewString(), UserID: userID, AgentTier: tier, Mode: ModeAsk, Messages: []Message{{Role: RoleUser, Content: prompt}}}
 	provider, model := providerStatus(selectedProvider)
 	idempotencyKey := "completion:" + request.SessionID
 	var reservation *UsageReservation
@@ -302,7 +302,7 @@ func (s *Service) SendMessageWithTierContext(ctx context.Context, sessionID, use
 				session.KnownPaths[normalized] = struct{}{}
 			}
 		}
-		session.Messages = append(session.Messages, Message{Role: "user", Content: request.UserMessage})
+		session.Messages = append(session.Messages, Message{Role: RoleUser, Content: request.UserMessage})
 		return s.advanceLocked(ctx, session)
 	})
 }
@@ -390,18 +390,18 @@ func (s *Service) Transcript(ctx context.Context, sessionID, userID string) ([]M
 	return messages, err
 }
 
-// AppendExternalAssistantMessage delivers the terminal result of delegated
+// AppendExternalAgentMessage delivers the terminal result of delegated
 // work back into the originating agent session without invoking the model.
 // WithSessionContext persists both the message and its sequenced event.
-func (s *Service) AppendExternalAssistantMessage(ctx context.Context, sessionID, userID, runID, text string) (*AgentEvent, error) {
+func (s *Service) AppendExternalAgentMessage(ctx context.Context, sessionID, userID, runID, text string) (*AgentEvent, error) {
 	var appended AgentEvent
 	err := s.store.WithSessionContext(ctx, sessionID, userID, func(_ context.Context, session *Session) error {
 		message := strings.TrimSpace(text)
 		if message == "" {
-			return ErrInvalidRequest("assistant message is required")
+			return ErrInvalidRequest("agent message is required")
 		}
-		session.Messages = append(session.Messages, Message{Role: "assistant", Content: message})
-		session.appendEvent(AgentEvent{Type: EventAssistantMessage, RunID: runID, Text: message})
+		session.Messages = append(session.Messages, Message{Role: RoleAgent, Content: message})
+		session.appendEvent(AgentEvent{Type: EventAgentMessage, RunID: runID, Text: message})
 		appended = session.Events[len(session.Events)-1]
 		return nil
 	})
@@ -425,7 +425,7 @@ func (s *Service) advanceLocked(ctx context.Context, session *Session) error {
 		SessionID:    session.ID,
 		UserID:       session.UserID,
 		SystemPrompt: session.SystemPrompt,
-		AgentTier:     session.AgentTier,
+		AgentTier:    session.AgentTier,
 		Mode:         session.Mode,
 		ActiveRoot:   session.ActiveRoot,
 		Messages:     append([]Message(nil), session.Messages...),
@@ -463,7 +463,7 @@ func (s *Service) advanceLocked(ctx context.Context, session *Session) error {
 		if billingUserID == "" {
 			billingUserID = session.UserID
 		}
-		reservation, err = s.meter.Reserve(billingUserID, idempotencyKey, "assistant_ai", provider, model, estimateRequestTokens(request), MaxModelOutputTokens)
+		reservation, err = s.meter.Reserve(billingUserID, idempotencyKey, hostedAIMeterAgent, provider, model, estimateRequestTokens(request), MaxModelOutputTokens)
 		if err != nil {
 			return err
 		}
@@ -483,16 +483,16 @@ func (s *Service) advanceLocked(ctx context.Context, session *Session) error {
 	response.Citations = groundedAgentCitations(request, response.Citations)
 	settlement := UsageSettlement{}
 	if reservation != nil {
-		settlement, err = s.meter.Settle(reservation, idempotencyKey+":settle", "assistant_ai", provider, model, response.Usage)
+		settlement, err = s.meter.Settle(reservation, idempotencyKey+":settle", hostedAIMeterAgent, provider, model, response.Usage)
 		if err != nil {
 			_ = s.meter.Release(reservation)
 			return err
 		}
 	}
 	if strings.TrimSpace(response.Text) != "" {
-		session.Messages = append(session.Messages, Message{Role: "assistant", Content: response.Text})
+		session.Messages = append(session.Messages, Message{Role: RoleAgent, Content: response.Text})
 		resetAt := settlement.ResetAt
-		session.appendEvent(AgentEvent{Type: EventAssistantMessage, Text: response.Text, Citations: response.Citations, HostedAIUsedRatio: settlement.UsedRatio, HostedAIResetAt: &resetAt})
+		session.appendEvent(AgentEvent{Type: EventAgentMessage, Text: response.Text, Citations: response.Citations, HostedAIUsedRatio: settlement.UsedRatio, HostedAIResetAt: &resetAt})
 	}
 	if len(response.ToolRequests) > 0 {
 		if session.ProviderCallsThisTurn >= providerCallLimit(session) {

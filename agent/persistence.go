@@ -152,8 +152,8 @@ func persistentEvents(beforeMessages, beforeResults, beforeEvents int, session *
 	events := make([]PersistedConversationEvent, 0)
 	for _, message := range session.Messages[boundedIndex(beforeMessages, len(session.Messages)):] {
 		eventType := "user_message"
-		if message.Role == "assistant" {
-			eventType = "assistant_message"
+		if message.Role == RoleAgent || message.Role == RoleAgentLegacy {
+			eventType = EventAgentMessage
 		}
 		data, _ := json.Marshal(map[string]any{"message": sanitizeMessage(message)})
 		events = append(events, PersistedConversationEvent{Type: eventType, Data: data})
@@ -163,8 +163,8 @@ func persistentEvents(beforeMessages, beforeResults, beforeEvents int, session *
 		events = append(events, PersistedConversationEvent{Type: "tool_result", Data: data})
 	}
 	for _, event := range session.Events[boundedIndex(beforeEvents, len(session.Events)):] {
-		if event.Type == EventAssistantMessage {
-			continue // already represented by the assistant message above
+		if event.Type == EventAgentMessage || event.Type == EventAgentMessageLegacy {
+			continue // already represented by the agent message above
 		}
 		eventType := "tool_call"
 		if event.Type == EventError {

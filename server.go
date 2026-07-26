@@ -395,6 +395,11 @@ func (s *Server) mountSpacesRoutes(prefix string, spaces *api.SpacesService, rea
 	s.Router.MethodFunc(http.MethodGet, prefix+"/spaces/{spaceID}/studio/workflows/{workflowID}/versions", spaces.WorkflowVersions())
 	s.Router.MethodFunc(http.MethodPost, prefix+"/spaces/{spaceID}/studio/workflows/{workflowID}/versions", spaces.WorkflowVersions())
 	s.Router.Get(prefix+"/agents/catalog", spaces.AgentCatalog())
+	s.Router.Get(prefix+"/agents/discovery", spaces.AgentDiscovery())
+	s.Router.Post(prefix+"/agents/delegations", spaces.AgentDelegation())
+	// Pre-rename aliases. Unlike an internal identifier, a route is a contract
+	// with desktop binaries that are already shipped, so both paths serve the
+	// same handlers until those clients have updated.
 	s.Router.Get(prefix+"/mika/discovery", spaces.AgentDiscovery())
 	s.Router.Post(prefix+"/mika/delegations", spaces.AgentDelegation())
 	s.Router.MethodFunc(http.MethodGet, prefix+"/agent-conversations", spaces.AgentConversations())
