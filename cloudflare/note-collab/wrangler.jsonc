@@ -24,7 +24,7 @@
   "vars": {
     // Non-secret configuration. Every secret is set with `wrangler secret put`
     // and never appears in this file.
-    "MISTY_INTERNAL_API_BASE": "http://localhost:8080",
+    "MISTY_INTERNAL_API_BASE": "https://mistysys.com/api",
     "NOTE_COLLAB_ISSUER": "misty-api",
     "NOTE_COLLAB_AUDIENCE": "misty-note-collab"
   }

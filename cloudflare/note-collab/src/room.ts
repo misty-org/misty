@@ -1,4 +1,5 @@
 import { YServer } from "y-partyserver";
+import * as Y from "yjs";
 import type { Connection, ConnectionContext } from "partyserver";
 
 import { TicketError, verifyTicket, type NoteRole } from "./ticket";
@@ -36,6 +37,10 @@ const MAX_CONNECTIONS_PER_ROOM = 40;
 const MAX_MESSAGE_BYTES = 512 * 1024;
 /** Used ticket ids are kept a little past ticket expiry, then swept. */
 const JTI_RETENTION_MS = 5 * 60 * 1000;
+/** Durable Object storage caps a single value at 128 KiB; stay well under. */
+const DOCUMENT_CHUNK_BYTES = 96 * 1024;
+/** Beta ceiling for one note's document. */
+const MAX_DOCUMENT_BYTES = 8 * 1024 * 1024;
 
 export class NoteRoom extends YServer<Env> {
   /**
@@ -240,6 +245,78 @@ export class NoteRoom extends YServer<Env> {
   override async onStart(): Promise<void> {
     this.aclVersion = (await this.ctx.storage.get<number>("aclVersion")) ?? 0;
     await super.onStart?.();
+  }
+
+  /**
+   * Restores the document from Durable Object storage.
+   *
+   * y-partyserver's base implementations of onLoad/onSave are no-ops, so
+   * without these the document would live only in memory and be lost the
+   * moment the object is evicted.
+   */
+  override async onLoad(): Promise<void> {
+    const update = await this.readDocumentUpdate();
+    if (update) {
+      Y.applyUpdate(this.document, update);
+    }
+  }
+
+  /**
+   * Persists the whole document as a single Yjs update.
+   *
+   * A full state snapshot rather than an incremental log: it keeps loading to
+   * one read, and Yjs updates are already compact. Storage values are capped,
+   * so the snapshot is chunked.
+   */
+  override async onSave(): Promise<void> {
+    const update = Y.encodeStateAsUpdate(this.document);
+    if (update.byteLength > MAX_DOCUMENT_BYTES) {
+      // Refusing to save a document this large would silently lose edits, so
+      // it is logged loudly instead. The note id is deliberately omitted.
+      console.error(`note document exceeds ${MAX_DOCUMENT_BYTES} bytes; not persisted`);
+      return;
+    }
+    const chunks: Record<string, ArrayBuffer> = {};
+    let chunkCount = 0;
+    for (let offset = 0; offset < update.byteLength; offset += DOCUMENT_CHUNK_BYTES) {
+      const slice = update.slice(offset, offset + DOCUMENT_CHUNK_BYTES);
+      // A copy, because slice() on a subarray-backed view can retain the whole
+      // buffer and blow past the per-value storage limit.
+      chunks[`doc:${chunkCount}`] = new Uint8Array(slice).buffer;
+      chunkCount += 1;
+    }
+    const previousCount = (await this.ctx.storage.get<number>("doc:chunks")) ?? 0;
+    await this.ctx.storage.put(chunks);
+    await this.ctx.storage.put("doc:chunks", chunkCount);
+    // Drop chunks left over from a larger previous revision.
+    if (previousCount > chunkCount) {
+      const stale: string[] = [];
+      for (let index = chunkCount; index < previousCount; index += 1) stale.push(`doc:${index}`);
+      await this.ctx.storage.delete(stale);
+    }
+  }
+
+  private async readDocumentUpdate(): Promise<Uint8Array | null> {
+    const chunkCount = (await this.ctx.storage.get<number>("doc:chunks")) ?? 0;
+    if (chunkCount < 1) return null;
+    const parts: Uint8Array[] = [];
+    let total = 0;
+    for (let index = 0; index < chunkCount; index += 1) {
+      const chunk = await this.ctx.storage.get<ArrayBuffer>(`doc:${index}`);
+      // A missing chunk means a partially written snapshot; applying the rest
+      // would corrupt the document, so nothing is restored.
+      if (!chunk) return null;
+      const part = new Uint8Array(chunk);
+      parts.push(part);
+      total += part.byteLength;
+    }
+    const update = new Uint8Array(total);
+    let offset = 0;
+    for (const part of parts) {
+      update.set(part, offset);
+      offset += part.byteLength;
+    }
+    return update;
   }
 }
 
