@@ -316,6 +316,30 @@ func (db *Database) CreateSpaceTask(ctx context.Context, actorUserID string, ite
 	return out, err
 }
 
+// lockActiveSpaceTaskTx takes the row lock that establishes server-receipt
+// order for concurrent writes to one task. Lock acquisition order is the
+// authoritative ordering: whichever transaction acquires the lock last writes
+// last and wins.
+//
+// An archived task is a tombstone. It reports not-found so a stale in-flight
+// write cannot resurrect it.
+func lockActiveSpaceTaskTx(ctx context.Context, tx *sql.Tx, spaceID, taskID string) error {
+	var archivedAt sql.NullTime
+	err := tx.QueryRowContext(ctx,
+		`SELECT archived_at FROM space_tasks WHERE id=$1 AND space_id=$2 FOR UPDATE`,
+		taskID, spaceID).Scan(&archivedAt)
+	if errors.Is(err, sql.ErrNoRows) {
+		return ErrSpaceNotFound
+	}
+	if err != nil {
+		return err
+	}
+	if archivedAt.Valid {
+		return ErrSpaceNotFound
+	}
+	return nil
+}
+
 func (db *Database) UpdateSpaceTask(ctx context.Context, actorUserID string, item SpaceTask) (*SpaceTask, error) {
 	if item.ID == "" || item.SpaceID == "" || item.Version < 1 {
 		return nil, ErrSpaceInvalid
@@ -336,19 +360,20 @@ func (db *Database) UpdateSpaceTask(ctx context.Context, actorUserID string, ite
 		if _, err := tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock(hashtext($1))`, "space-task-rank:"+item.SpaceID+":"+item.Status); err != nil {
 			return err
 		}
+		// Active tasks are last-write-wins: the row lock below, not the client's
+		// submitted version, decides the order of concurrent writes. The
+		// submitted version is still accepted for wire compatibility.
+		if err := lockActiveSpaceTaskTx(ctx, tx, item.SpaceID, item.ID); err != nil {
+			return err
+		}
 		query := `UPDATE space_tasks SET title=$1,notes=$2,status=$3,priority=$4,assignee_user_id=NULLIF($5,''),due_at=$6,due_timezone=$7,source_refs=$8,
 			rank=CASE WHEN status<>$3 THEN (SELECT COALESCE(MAX(other.rank),0)+1024 FROM space_tasks other WHERE other.space_id=$10 AND other.status=$3 AND other.archived_at IS NULL) ELSE rank END,
 			completed_at=CASE WHEN $3='done' THEN COALESCE(completed_at,NOW()) ELSE NULL END,version=version+1,updated_at=NOW()
-			WHERE id=$9 AND space_id=$10 AND version=$11 AND archived_at IS NULL RETURNING ` + spaceTaskColumns
-		err := scanSpaceTask(tx.QueryRowContext(ctx, query, item.Title, item.Notes, item.Status, item.Priority, item.AssigneeUserID, item.DueAt, item.DueTimezone, item.SourceRefs, item.ID, item.SpaceID, item.Version), out)
+			WHERE id=$9 AND space_id=$10 AND archived_at IS NULL RETURNING ` + spaceTaskColumns
+		err := scanSpaceTask(tx.QueryRowContext(ctx, query, item.Title, item.Notes, item.Status, item.Priority, item.AssigneeUserID, item.DueAt, item.DueTimezone, item.SourceRefs, item.ID, item.SpaceID), out)
 		if errors.Is(err, sql.ErrNoRows) {
-			var exists bool
-			if queryErr := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM space_tasks WHERE id=$1 AND space_id=$2)`, item.ID, item.SpaceID).Scan(&exists); queryErr != nil {
-				return queryErr
-			}
-			if exists {
-				return ErrSpaceConflict
-			}
+			// The archived_at guard above means the row was archived between the
+			// lock and the write. A tombstone must never be resurrected.
 			return ErrSpaceNotFound
 		}
 		if err != nil {
@@ -372,10 +397,9 @@ func (db *Database) MoveSpaceTask(ctx context.Context, actorUserID, spaceID, tas
 		if _, err := tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock(hashtext($1))`, "space-task-rank:"+spaceID+":"+move.Status); err != nil {
 			return err
 		}
-		var currentStatus string
-		if err := tx.QueryRowContext(ctx, `SELECT status FROM space_tasks WHERE id=$1 AND space_id=$2 AND version=$3 AND archived_at IS NULL FOR UPDATE`, taskID, spaceID, move.Version).Scan(&currentStatus); errors.Is(err, sql.ErrNoRows) {
-			return ErrSpaceConflict
-		} else if err != nil {
+		// The row lock decides which of two concurrent moves is last, so the
+		// client's submitted version is not part of the predicate.
+		if err := lockActiveSpaceTaskTx(ctx, tx, spaceID, taskID); err != nil {
 			return err
 		}
 		newRank, err := taskRankBefore(ctx, tx, spaceID, taskID, move.Status, move.BeforeTaskID)
@@ -392,9 +416,9 @@ func (db *Database) MoveSpaceTask(ctx context.Context, actorUserID, spaceID, tas
 			}
 		}
 		completed := move.Status == "done"
-		err = scanSpaceTask(tx.QueryRowContext(ctx, `UPDATE space_tasks SET status=$1,rank=$2,completed_at=CASE WHEN $3 THEN COALESCE(completed_at,NOW()) ELSE NULL END,version=version+1,updated_at=NOW() WHERE id=$4 AND space_id=$5 AND version=$6 RETURNING `+spaceTaskColumns, move.Status, newRank, completed, taskID, spaceID, move.Version), &result.Task)
+		err = scanSpaceTask(tx.QueryRowContext(ctx, `UPDATE space_tasks SET status=$1,rank=$2,completed_at=CASE WHEN $3 THEN COALESCE(completed_at,NOW()) ELSE NULL END,version=version+1,updated_at=NOW() WHERE id=$4 AND space_id=$5 AND archived_at IS NULL RETURNING `+spaceTaskColumns, move.Status, newRank, completed, taskID, spaceID), &result.Task)
 		if errors.Is(err, sql.ErrNoRows) {
-			return ErrSpaceConflict
+			return ErrSpaceNotFound
 		}
 		if err != nil {
 			return err
@@ -448,15 +472,25 @@ func rebalanceTaskColumn(ctx context.Context, tx *sql.Tx, spaceID, status, movin
 	return err
 }
 
-func (db *Database) ArchiveSpaceTask(ctx context.Context, actorUserID, spaceID, taskID string, version int64) (*SpaceTask, error) {
+// ArchiveSpaceTask writes a tombstone. version is accepted for wire
+// compatibility with existing clients but is deliberately not part of the
+// predicate: archiving is last-write-wins and idempotent.
+func (db *Database) ArchiveSpaceTask(ctx context.Context, actorUserID, spaceID, taskID string, _ int64) (*SpaceTask, error) {
 	out := &SpaceTask{}
 	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, actorUserID, spaceID, PermissionTasksManage); err != nil {
 			return err
 		}
-		err := scanSpaceTask(tx.QueryRowContext(ctx, `UPDATE space_tasks SET archived_at=NOW(),version=version+1,updated_at=NOW() WHERE id=$1 AND space_id=$2 AND version=$3 AND archived_at IS NULL RETURNING `+spaceTaskColumns, taskID, spaceID, version), out)
+		// Archiving is idempotent and does not depend on the client's version:
+		// re-archiving an already-archived task returns the existing tombstone
+		// rather than conflicting.
+		err := scanSpaceTask(tx.QueryRowContext(ctx, `UPDATE space_tasks SET archived_at=NOW(),version=version+1,updated_at=NOW() WHERE id=$1 AND space_id=$2 AND archived_at IS NULL RETURNING `+spaceTaskColumns, taskID, spaceID), out)
 		if errors.Is(err, sql.ErrNoRows) {
-			return ErrSpaceConflict
+			existing := scanSpaceTask(tx.QueryRowContext(ctx, `SELECT `+spaceTaskColumns+` FROM space_tasks WHERE id=$1 AND space_id=$2`, taskID, spaceID), out)
+			if errors.Is(existing, sql.ErrNoRows) {
+				return ErrSpaceNotFound
+			}
+			return existing
 		}
 		if err != nil {
 			return err
