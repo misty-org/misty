@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"log"
-	"net/http"
 	"os"
 	"time"
 
@@ -53,9 +52,10 @@ func main() {
 	}
 
 	log.Printf("Misty server running on :%s", port)
-	if err := http.ListenAndServe(":"+port, server.Router); err != nil {
+	if err := runHTTPServer(newHTTPServer(":"+port, server.Router), stopWorkers); err != nil {
 		panic(err)
 	}
+	log.Println("Misty server stopped")
 }
 
 func runLibraryIntelligenceProcessing(ctx context.Context, server *Server) {
