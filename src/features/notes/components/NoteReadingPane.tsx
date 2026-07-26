@@ -5,7 +5,7 @@ import type {
 export type { NoteReadingPaneProps } from "@/models/interfaces/features/notes/components/NoteReadingPane";
 import { Suspense, lazy, useEffect, useState } from "react";
 import { Check, FileText, PenLine, Plus, Star, X } from "lucide-react";
-import { Button, EmptyState, ScrollArea, Skeleton, cn } from "@/ui";
+import { Button, EmptyState, Skeleton, cn } from "@/ui";
 import { relativeTime } from "@/features/notes/noteFilters";
 import { NoteSyncIndicator } from "./NoteSourceBadge";
 
@@ -16,6 +16,8 @@ const paneClass = "grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] bg-backgro
 const headerClass = "shrink-0 border-b border-border px-5 py-3.5";
 
 const noteBodyClass = "mx-auto w-full max-w-[760px] px-5 py-6";
+
+const editableNoteBodyClass = "mx-auto w-full min-w-[520px] max-w-[760px] py-6 pl-16 pr-5";
 
 export function NoteReadingPane(props: NoteReadingPaneProps) {
   const { note } = props;
@@ -136,9 +138,9 @@ export function NoteReadingPane(props: NoteReadingPaneProps) {
         </div>
       </header>
 
-      <ScrollArea className="min-h-0">
+      <div className="misty-scrollbar min-h-0 overflow-auto overscroll-contain">
         {editing ? (
-          <div className={noteBodyClass}>
+          <div className={editableNoteBodyClass}>
             <Suspense fallback={<Skeleton className="h-[420px] w-full" />}>
               <NoteBlockEditor
                 key={note.id}
@@ -170,7 +172,7 @@ export function NoteReadingPane(props: NoteReadingPaneProps) {
             </Suspense>
           </div>
         )}
-      </ScrollArea>
+      </div>
     </article>
   );
 }

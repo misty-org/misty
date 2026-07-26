@@ -101,7 +101,7 @@ export default function SpacesShell() {
       className={`grid h-full min-h-0 grid-rows-[minmax(0,1fr)_32px] overflow-hidden bg-background ${panelVisible ? "grid-cols-[280px_minmax(0,1fr)] max-[900px]:grid-cols-[252px_minmax(0,1fr)]" : "grid-cols-[minmax(0,1fr)]"}`}
     >
       {panelVisible ? (
-        <aside className="col-start-1 row-start-1 flex min-h-0 flex-col overflow-hidden border-r border-sidebar-border/60 bg-sidebar p-4 text-sm text-sidebar-foreground">
+        <aside className="col-start-1 row-start-1 flex min-h-0 flex-col overflow-hidden border-r border-sidebar-border/60 bg-[var(--misty-app-panel-bg,transparent)] p-4 text-sm text-sidebar-foreground">
           {error && !detailRouteActive && !createOpen ? (
             <Button
               className="mb-3 h-auto w-full justify-start whitespace-normal border border-destructive/25 bg-destructive/10 px-3 py-2 text-left text-xs leading-relaxed text-destructive shadow-none hover:bg-destructive/15 hover:text-destructive"

@@ -45,11 +45,11 @@ export function HomeSidebarPanels(props: HomeSidebarPanelsProps) {
   return (
     <div
       aria-label="Home overview"
-      className="grid min-h-[580px] min-w-0 flex-1 grid-cols-[repeat(3,minmax(0,1fr))] items-stretch gap-4 max-[1180px]:min-h-0 max-[1180px]:grid-cols-2 max-[820px]:grid-cols-1"
+      className="grid h-full min-h-0 min-w-0 flex-1 grid-cols-[repeat(3,minmax(0,1fr))] grid-rows-[minmax(0,1fr)] items-stretch gap-4 max-[1180px]:grid-cols-2 max-[1180px]:grid-rows-[minmax(0,2fr)_minmax(0,1fr)] max-[820px]:grid-cols-1 max-[820px]:grid-rows-[repeat(3,minmax(0,1fr))]"
       role="region"
     >
-      <div className="grid min-h-0 min-w-0 grid-rows-2 gap-4 max-[1180px]:min-h-[580px] max-[820px]:min-h-[580px]">
-        <Card className="min-h-0 min-w-0 gap-0 py-0" size="sm">
+      <div className="grid min-h-0 min-w-0 grid-rows-2 gap-4">
+        <Card className="min-h-0 min-w-0 gap-0 !bg-transparent py-0" size="sm">
           <div className="h-full min-h-0 p-4">{props.workspacePanel}</div>
         </Card>
         <DashboardCard icon={<HardDrive className="size-4" />} title="Devices">
@@ -70,7 +70,7 @@ export function HomeSidebarPanels(props: HomeSidebarPanelsProps) {
         </DashboardCard>
       </div>
 
-      <div className="grid min-h-0 min-w-0 grid-rows-[minmax(0,1.65fr)_minmax(0,0.65fr)] gap-4 max-[1180px]:min-h-[580px] max-[820px]:min-h-[580px]">
+      <div className="grid min-h-0 min-w-0 grid-rows-[minmax(0,1.65fr)_minmax(0,0.65fr)] gap-4">
         <DashboardCard icon={<Home className="size-4" />} title="Quick access">
           <PanelRows>
             {props.quickAccessItems.map((item) => (
@@ -104,7 +104,7 @@ export function HomeSidebarPanels(props: HomeSidebarPanelsProps) {
         </DashboardCard>
       </div>
 
-      <div className="grid min-h-0 min-w-0 grid-rows-2 gap-4 max-[1180px]:col-span-2 max-[1180px]:min-h-[580px] max-[1180px]:grid-cols-2 max-[1180px]:grid-rows-1 max-[820px]:col-span-1 max-[820px]:min-h-[580px] max-[820px]:grid-cols-1 max-[820px]:grid-rows-2">
+      <div className="grid min-h-0 min-w-0 grid-rows-2 gap-4 max-[1180px]:col-span-2 max-[1180px]:grid-cols-2 max-[1180px]:grid-rows-1 max-[820px]:col-span-1 max-[820px]:grid-cols-1 max-[820px]:grid-rows-2">
         <DashboardCard icon={<Server className="size-4" />} title="Remote">
           <PanelRows
             emptyMessage="No remotes connected."
@@ -219,7 +219,11 @@ function DashboardCard({
   const titleId = useId();
 
   return (
-    <Card aria-labelledby={titleId} className="min-h-0 min-w-0 gap-0 py-0" size="sm">
+    <Card
+      aria-labelledby={titleId}
+      className="min-h-0 min-w-0 gap-0 !bg-transparent py-0"
+      size="sm"
+    >
       <section className={`${panelClass} ${className}`}>
         <div className={headerClass}>
           <span className="shrink-0 text-muted-foreground">{icon}</span>

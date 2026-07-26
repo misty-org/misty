@@ -8,7 +8,7 @@ import { AlbumCover, LibraryItemThumbnail } from "../SpaceLibraryPrimitives";
 
 const collectionRailCardClassName = [
   "w-[180px] shrink-0 overflow-hidden rounded-xl border-0 bg-card p-0 text-left shadow-xs",
-  "ring-1 ring-foreground/10 transition-colors hover:bg-accent",
+  "inset-ring-1 inset-ring-foreground/10 transition-colors hover:bg-accent",
 ].join(" ");
 
 export function SpaceLibraryCollectionOverview() {
@@ -97,7 +97,7 @@ export function SpaceLibraryAlbumsOverview() {
       <div className="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-3">
         {visibleAlbumFolders.map((folder) => (
           <Button
-            className="rounded-xl border-0 bg-card p-4 text-left shadow-xs ring-1 ring-foreground/10 hover:bg-accent"
+            className="rounded-xl border-0 bg-card p-4 text-left shadow-xs inset-ring-1 inset-ring-foreground/10 hover:bg-accent"
             type="button"
             key={folder.id}
             onClick={() => setSelectedAlbumFolderId(folder.id)}
@@ -111,7 +111,7 @@ export function SpaceLibraryAlbumsOverview() {
         ))}
         {visibleAlbumsForFolder.map((album) => (
           <Button
-            className="overflow-hidden rounded-xl border-0 bg-card p-0 text-left shadow-xs ring-1 ring-foreground/10 hover:bg-accent"
+            className="overflow-hidden rounded-xl border-0 bg-card p-0 text-left shadow-xs inset-ring-1 inset-ring-foreground/10 hover:bg-accent"
             type="button"
             key={album.id}
             onClick={() => selectCollection("albums", album.id)}

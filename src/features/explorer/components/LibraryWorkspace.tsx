@@ -484,7 +484,7 @@ export function LibraryWorkspace(props: {
               {savedSearches.map((search) => (
                 <div
                   key={search.id}
-                  className="flex items-center gap-3 rounded-lg bg-card p-3 shadow-xs ring-1 ring-foreground/10"
+                  className="flex items-center gap-3 rounded-lg bg-card p-3 shadow-xs inset-ring-1 inset-ring-foreground/10"
                 >
                   <Button
                     variant="ghost"
@@ -867,7 +867,7 @@ function LibraryGalleryTile(props: {
     <Button
       type="button"
       variant="ghost"
-      className="group block h-auto min-w-0 overflow-hidden rounded-lg bg-card p-0 text-left shadow-xs ring-1 ring-foreground/10 transition hover:-translate-y-0.5 hover:shadow-md"
+      className="group block h-auto min-w-0 overflow-hidden rounded-lg bg-card p-0 text-left shadow-xs inset-ring-1 inset-ring-foreground/10 transition hover:-translate-y-0.5 hover:shadow-md"
       aria-label={`View ${props.asset.name}`}
       title={props.asset.name}
       onClick={props.onOpen}

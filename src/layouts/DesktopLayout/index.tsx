@@ -112,6 +112,7 @@ export function DesktopLayout(props: {
     closeTitlebarWindow,
   } = useDesktopWindowChrome();
   const {
+    appWallpaperPath,
     appWallpaperSrc,
     appWallpaperIsVideo,
     mistyLogoSource,
@@ -226,7 +227,7 @@ export function DesktopLayout(props: {
       {appWallpaperSrc ? (
         <div aria-hidden="true" className={desktopWallpaperLayerClass}>
           {appWallpaperIsVideo ? (
-            <AppWallpaperVideo src={appWallpaperSrc} />
+            <AppWallpaperVideo path={appWallpaperPath} src={appWallpaperSrc} />
           ) : (
             <img
               alt=""

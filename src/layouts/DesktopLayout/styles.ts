@@ -12,16 +12,17 @@ export const tabletFrameClass = [
 ].join(" ");
 
 export const desktopNavbarClass =
-  "relative z-10 col-start-1 row-start-2 flex min-h-0 flex-col items-center overflow-hidden px-2 py-3";
+  "relative z-10 col-start-1 row-start-2 flex min-h-0 flex-col items-center overflow-hidden px-2 py-2";
 export const tabletNavbarClass =
-  "relative z-10 col-start-1 row-start-1 flex min-h-0 flex-col items-center overflow-hidden px-2 py-3";
+  "relative z-10 col-start-1 row-start-1 flex min-h-0 flex-col items-center overflow-hidden px-2 py-2";
 
 export const desktopRouteShellClass =
   "relative z-10 col-start-2 row-start-2 min-h-0 overflow-hidden bg-[var(--misty-app-route-bg,var(--misty-bg))]";
 export const tabletRouteShellClass =
   "relative z-10 col-start-2 row-start-1 min-h-0 overflow-hidden bg-[var(--misty-app-route-bg,var(--misty-bg))]";
 
-export const navbarGroupClass = "flex w-full flex-col items-center gap-3";
+export const navbarGroupClass =
+  "flex min-h-0 w-full flex-1 flex-col items-center gap-3 overflow-x-hidden overflow-y-auto overscroll-contain py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden";
 
 export const navbarBottomClass = "mt-auto flex w-full shrink-0 flex-col items-center gap-4";
 
@@ -125,7 +126,7 @@ export const frameOverlayBaseClass = [
 ].join(" ");
 
 export const settingsOverlayLayerClass = [
-  "fixed inset-0 z-[2147482600] grid place-items-center bg-[rgba(0,0,0,0.36)] py-8 pr-8",
+  "fixed inset-0 z-[2147482600] grid place-items-center bg-transparent py-8 pr-8",
   "pl-[calc(var(--misty-desktop-nav-width)+2rem)] backdrop-blur-[8px]",
 ].join(" ");
 

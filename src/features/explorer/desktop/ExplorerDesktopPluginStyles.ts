@@ -77,7 +77,7 @@ const pluginTabHostStyles = {
     "shrink-0 rounded-full border border-border px-2.5 py-1.5 text-xs font-semibold text-muted-foreground",
   statusPillUsable: "border-border bg-secondary text-foreground",
   body: "grid min-h-full content-start gap-3 overflow-auto bg-background p-4 text-foreground",
-  panel: "grid gap-3 rounded-lg bg-card p-3.5 shadow-xs ring-1 ring-foreground/10",
+  panel: "grid gap-3 rounded-lg bg-card p-3.5 shadow-xs inset-ring-1 inset-ring-foreground/10",
   panelHeader:
     "flex items-center justify-between gap-3 [&_h3]:m-0 [&_h3]:text-[15px] [&_span]:mt-1 [&_span]:block [&_span]:text-xs [&_span]:text-muted-foreground",
   button:
@@ -96,7 +96,7 @@ const pluginTabHostStyles = {
   error: "rounded-lg bg-destructive/10 px-3 py-2.5 text-sm text-destructive",
   message: "rounded-lg bg-success/10 px-3 py-2.5 text-sm text-success",
   commands:
-    "grid gap-2 rounded-lg bg-card p-3.5 shadow-xs ring-1 ring-foreground/10 [&_h3]:m-0 [&_h3]:text-[15px]",
+    "grid gap-2 rounded-lg bg-card p-3.5 shadow-xs inset-ring-1 inset-ring-foreground/10 [&_h3]:m-0 [&_h3]:text-[15px]",
   commandRow:
     "grid grid-cols-[minmax(0,1fr)_auto_auto_auto] items-center gap-3 border-t border-border/60 pt-2 first:border-t-0 first:pt-0 [&_em]:whitespace-nowrap [&_em]:text-xs [&_em]:not-italic [&_em]:text-foreground/80 [&_small]:text-muted-foreground",
   commandLabel: "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-sm",

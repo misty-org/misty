@@ -55,7 +55,7 @@ const multiPanelStyles = {
   asideResizer: `${paneResizeDividerClass} max-[980px]:hidden`,
   asideResizerActive: paneResizeDividerActiveClass,
   navigationAside:
-    "min-h-0 min-w-0 overflow-hidden bg-[var(--misty-files-panel-bg,var(--sidebar))] max-[980px]:hidden",
+    "min-h-0 min-w-0 overflow-hidden bg-[var(--misty-files-panel-bg,transparent)] max-[980px]:hidden",
   navigationAsideResizer: `${paneResizeDividerClass} max-[980px]:hidden`,
   asideResizerGrip: [
     "pointer-events-none absolute left-1/2 top-1/2 z-[1] grid size-5 -translate-x-1/2 -translate-y-1/2",

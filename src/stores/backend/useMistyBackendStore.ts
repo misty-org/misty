@@ -133,6 +133,10 @@ export function enableModernWindowStyle(window: unknown): Promise<void> {
   return invoke("enable_modern_window_style", { window, offsetX: -6, offsetY: -12 });
 }
 
+export function setNativeWallpaperVideo(window: unknown, path: string | null): Promise<boolean> {
+  return invoke("set_native_wallpaper_video", { window, path });
+}
+
 export async function fetchPreviewBytes(url: string): Promise<ArrayBuffer> {
   const response = await fetch(url);
   if (!response.ok) throw new Error(`The file reader returned ${response.status}.`);
@@ -209,9 +213,7 @@ export function clipboardWriteFileBytes(
   return invoke("clipboard_write_file_bytes", { items });
 }
 
-export function notesStoreAsset(
-  request: NoteAssetStoreRequest,
-): Promise<NoteAssetStoreResult> {
+export function notesStoreAsset(request: NoteAssetStoreRequest): Promise<NoteAssetStoreResult> {
   return invoke("notes_store_asset", { request });
 }
 

@@ -41,7 +41,7 @@ describe("AppWallpaperVideo", () => {
     expect(video?.getAttribute("aria-hidden")).toBe("true");
     expect(video?.getAttribute("controlsList")).toContain("noremoteplayback");
 
-    expect(play).not.toHaveBeenCalled();
+    expect(play).toHaveBeenCalled();
     expect(pause).not.toHaveBeenCalled();
     expect(load).not.toHaveBeenCalled();
   });

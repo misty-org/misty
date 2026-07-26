@@ -450,7 +450,7 @@ function PreviewBody(props: {
   if (resource.kind === "audio")
     return (
       <div className="grid h-full min-h-[360px] place-items-center p-5">
-        <div className="grid w-[min(520px,90%)] justify-items-center gap-6 rounded-xl bg-card p-10 shadow-xs ring-1 ring-foreground/10">
+        <div className="grid w-[min(520px,90%)] justify-items-center gap-6 rounded-xl bg-card p-10 shadow-xs inset-ring-1 inset-ring-foreground/10">
           <span className="grid size-20 place-items-center rounded-full bg-muted text-muted-foreground">
             ♫
           </span>
@@ -587,7 +587,7 @@ export function EmbeddedUniversalPreview(props: {
     );
   if (isAudio && props.url)
     return (
-      <div className="grid w-[min(520px,90%)] justify-items-center gap-5 rounded-xl bg-card p-8 text-center shadow-xs ring-1 ring-foreground/10">
+      <div className="grid w-[min(520px,90%)] justify-items-center gap-5 rounded-xl bg-card p-8 text-center shadow-xs inset-ring-1 inset-ring-foreground/10">
         <span className="text-5xl text-muted-foreground">♫</span>
         <strong>{props.name}</strong>
         <audio className="w-full" src={props.url} controls />

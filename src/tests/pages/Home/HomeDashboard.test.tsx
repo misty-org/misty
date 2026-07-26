@@ -73,5 +73,20 @@ describe("HomeDashboard", () => {
       expect(region.className).toContain("overflow-y-auto");
       expect(region.className).toContain("overscroll-contain");
     });
+
+    const dashboardCards = container.querySelectorAll('[data-slot="card"]');
+    expect(dashboardCards.length).toBeGreaterThan(0);
+    dashboardCards.forEach((card) => {
+      expect(card.className).toContain("!bg-transparent");
+    });
+
+    const viewport = container.querySelector('[data-slot="home-dashboard-viewport"]');
+    expect(viewport).not.toBeNull();
+    expect(viewport?.className).toContain("overflow-hidden");
+    expect(viewport?.className).not.toContain("overflow-y-auto");
+
+    const dashboard = container.querySelector('[aria-label="Home dashboard"]');
+    expect(dashboard?.className).toContain("h-full");
+    expect(dashboard?.className).toContain("max-[1180px]:grid-rows-[minmax(0,2fr)_minmax(0,1fr)]");
   });
 });

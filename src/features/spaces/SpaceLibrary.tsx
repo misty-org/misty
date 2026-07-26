@@ -246,7 +246,7 @@ export function SpaceLibrary({ spaceId }: { spaceId: string }) {
                 <div className="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-3">
                   {visibleAlbumFolders.map((folder) => (
                     <Button
-                      className="rounded-xl border-0 bg-card p-4 text-left shadow-xs ring-1 ring-foreground/10 hover:bg-accent"
+                      className="rounded-xl border-0 bg-card p-4 text-left shadow-xs inset-ring-1 inset-ring-foreground/10 hover:bg-accent"
                       type="button"
                       key={folder.id}
                       onClick={() => setSelectedAlbumFolderId(folder.id)}
@@ -260,7 +260,7 @@ export function SpaceLibrary({ spaceId }: { spaceId: string }) {
                   ))}
                   {visibleAlbumsForFolder.map((album) => (
                     <Button
-                      className="overflow-hidden rounded-xl border-0 bg-card p-0 text-left shadow-xs ring-1 ring-foreground/10 hover:bg-accent"
+                      className="overflow-hidden rounded-xl border-0 bg-card p-0 text-left shadow-xs inset-ring-1 inset-ring-foreground/10 hover:bg-accent"
                       type="button"
                       key={album.id}
                       onClick={() => selectCollection("albums", album.id)}
@@ -301,7 +301,7 @@ export function SpaceLibrary({ spaceId }: { spaceId: string }) {
                 <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-3">
                   {importHistory.map((entry) => (
                     <article
-                      className="rounded-xl bg-card p-4 shadow-xs ring-1 ring-foreground/10"
+                      className="rounded-xl bg-card p-4 shadow-xs inset-ring-1 inset-ring-foreground/10"
                       key={entry.id}
                     >
                       <div className="flex items-center justify-between gap-3">
@@ -344,7 +344,7 @@ export function SpaceLibrary({ spaceId }: { spaceId: string }) {
                     <div className="grid grid-cols-[repeat(auto-fill,minmax(210px,1fr))] gap-3">
                       {sharedReferences.map((reference) => (
                         <article
-                          className="rounded-xl bg-card p-4 shadow-xs ring-1 ring-foreground/10"
+                          className="rounded-xl bg-card p-4 shadow-xs inset-ring-1 inset-ring-foreground/10"
                           key={reference.id}
                         >
                           <MessagesSquare size={20} />
@@ -377,7 +377,7 @@ export function SpaceLibrary({ spaceId }: { spaceId: string }) {
                     <div className="grid grid-cols-[repeat(auto-fill,minmax(210px,1fr))] gap-3">
                       {outgoingReferences.map((reference) => (
                         <article
-                          className="rounded-xl bg-card p-4 shadow-xs ring-1 ring-foreground/10"
+                          className="rounded-xl bg-card p-4 shadow-xs inset-ring-1 inset-ring-foreground/10"
                           key={reference.id}
                         >
                           <MessagesSquare size={20} />
