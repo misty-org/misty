@@ -105,7 +105,7 @@ func TestSendMessageAcceptsOpaqueScopeAndRelativeSelection(t *testing.T) {
 	}
 }
 
-func TestAppendExternalAssistantMessageReturnsDelegatedRunToMikaSession(t *testing.T) {
+func TestAppendExternalAssistantMessageReturnsDelegatedRunToAgentSession(t *testing.T) {
 	service := NewService(NewSessionStore(0), MockProvider{})
 	session := service.CreateSession("user-1")
 	event, err := service.AppendExternalAssistantMessage(context.Background(), session.ID, "user-1", "run-1", "Delegated work finished")
@@ -184,10 +184,10 @@ func (provider *serverToolProvider) Next(request ModelRequest) (ModelResponse, e
 	return ModelResponse{Text: "Grounded answer"}, nil
 }
 
-func TestCompleteWithToolsUsesTheValidatedMikaToolLoop(t *testing.T) {
+func TestCompleteWithToolsUsesTheValidatedAgentToolLoop(t *testing.T) {
 	provider := &serverToolProvider{}
 	service := NewService(NewSessionStore(0), provider)
-	completion, err := service.CompleteWithToolsContext(context.Background(), "user", "user", "Read the document", MikaLow, ToolManifest{Tools: []ToolDefinition{{Name: "workflow.read_content", Risk: RiskRead}}}, func(_ context.Context, request ToolRequest) (json.RawMessage, error) {
+	completion, err := service.CompleteWithToolsContext(context.Background(), "user", "user", "Read the document", TierLow, ToolManifest{Tools: []ToolDefinition{{Name: "workflow.read_content", Risk: RiskRead}}}, func(_ context.Context, request ToolRequest) (json.RawMessage, error) {
 		if request.Name != "workflow.read_content" {
 			t.Fatalf("tool = %#v", request)
 		}

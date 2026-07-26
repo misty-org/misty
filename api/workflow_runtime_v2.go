@@ -209,7 +209,7 @@ func (s *SpacesService) executeWorkflowNodeV2(ctx context.Context, run *db.Space
 				provider := toolProviders[name]
 				manifest.Tools = append(manifest.Tools, serveragent.ToolDefinition{Name: name, Risk: agentToolRisk(provider.Risk), InputSchema: mustAPIRawJSON(provider.ToolSchema)})
 			}
-			completion, err := s.agent.CompleteWithToolsContext(ctx, run.RequestingMemberID, run.BillingUserID, request, serveragent.MikaLow, manifest, func(toolCtx context.Context, tool serveragent.ToolRequest) (json.RawMessage, error) {
+			completion, err := s.agent.CompleteWithToolsContext(ctx, run.RequestingMemberID, run.BillingUserID, request, serveragent.TierLow, manifest, func(toolCtx context.Context, tool serveragent.ToolRequest) (json.RawMessage, error) {
 				provider, ok := toolProviders[tool.Name]
 				if !ok {
 					return nil, workflowv2.ErrCapabilityDenied

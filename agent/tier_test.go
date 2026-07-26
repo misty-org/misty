@@ -58,8 +58,8 @@ func (meter *recordingUsageMeter) Release(*UsageReservation) error {
 	return nil
 }
 
-func TestMikaRouterUsesTierWithoutChangingBillingIdentity(t *testing.T) {
-	router := NewMikaProviderRouter(
+func TestAgentRouterUsesTierWithoutChangingBillingIdentity(t *testing.T) {
+	router := NewAgentProviderRouter(
 		namedTestProvider{provider: "low-provider", model: "low-model", text: "low"},
 		namedTestProvider{provider: "med-provider", model: "med-model", text: "med"},
 		namedTestProvider{provider: "high-provider", model: "high-model", text: "high"},
@@ -67,7 +67,7 @@ func TestMikaRouterUsesTierWithoutChangingBillingIdentity(t *testing.T) {
 	meter := &recordingUsageMeter{}
 	service := NewService(nil, router, WithUsageMeter(meter))
 
-	text, usage, err := service.CompleteWithTier("user", "hello", "automation_ai", MikaHigh)
+	text, usage, err := service.CompleteWithTier("user", "hello", "automation_ai", TierHigh)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -84,11 +84,11 @@ func TestMikaRouterUsesTierWithoutChangingBillingIdentity(t *testing.T) {
 
 func TestProviderErrorsUseAgentBrandingInSessionEvents(t *testing.T) {
 	meter := &recordingUsageMeter{}
-	service := NewService(nil, NewMikaProviderRouter(
+	service := NewService(nil, NewAgentProviderRouter(
 		namedTestProvider{err: errors.New("openai secret provider failure")}, nil, nil,
 	), WithUsageMeter(meter))
 	session := service.CreateSession("user")
-	if err := service.SendMessageWithTier(session.ID, "user", AgentMessageRequest{UserMessage: "hello"}, MikaLow); err != nil {
+	if err := service.SendMessageWithTier(session.ID, "user", AgentMessageRequest{UserMessage: "hello"}, TierLow); err != nil {
 		t.Fatal(err)
 	}
 	events, err := service.Events(session.ID, "user", 0)
@@ -105,11 +105,11 @@ func TestProviderErrorsUseAgentBrandingInSessionEvents(t *testing.T) {
 
 func TestCompletionProviderErrorReleasesReservation(t *testing.T) {
 	meter := &recordingUsageMeter{}
-	service := NewService(nil, NewMikaProviderRouter(
+	service := NewService(nil, NewAgentProviderRouter(
 		namedTestProvider{provider: ProviderVercelAI, model: "private-model", err: errors.New("status 429")}, nil, nil,
 	), WithUsageMeter(meter))
 
-	_, _, err := service.CompleteWithTier("user", "hello", "automation_ai", MikaLow)
+	_, _, err := service.CompleteWithTier("user", "hello", "automation_ai", TierLow)
 	if err == nil || err.Error() != "status 429" {
 		t.Fatalf("error = %v, want gateway 429", err)
 	}
@@ -122,8 +122,8 @@ func TestCompletionProviderErrorReleasesReservation(t *testing.T) {
 	}
 }
 
-func TestNormalizeMikaTierDefaultsToLow(t *testing.T) {
-	if got := NormalizeMikaTier("unknown"); got != MikaLow {
-		t.Fatalf("NormalizeMikaTier() = %q", got)
+func TestNormalizeAgentTierDefaultsToLow(t *testing.T) {
+	if got := NormalizeAgentTier("unknown"); got != TierLow {
+		t.Fatalf("NormalizeAgentTier() = %q", got)
 	}
 }

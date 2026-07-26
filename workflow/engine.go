@@ -550,7 +550,7 @@ func validateOutput(schema JSONSchema, output json.RawMessage) error {
 	return nil
 }
 
-// ValidateJSON is shared by coordinator-dispatched Mika tool calls and normal
+// ValidateJSON is shared by coordinator-dispatched agent tool calls and normal
 // graph continuation so both paths enforce the provider's published schema.
 func ValidateJSON(schema JSONSchema, value json.RawMessage) error {
 	return validateOutput(schema, value)

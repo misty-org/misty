@@ -159,9 +159,9 @@ func configuredGatewayModels() []GatewayModel {
 		return filterChatModels(configured)
 	}
 	ids := []string{
-		envOrDefault("MISTY_AI_LOW_MODEL", defaultMikaLowGatewayModel),
-		envOrDefault("MISTY_AI_MED_MODEL", defaultMikaMedGatewayModel),
-		envOrDefault("MISTY_AI_HIGH_MODEL", defaultMikaHighGatewayModel),
+		envOrDefault("MISTY_AI_LOW_MODEL", defaultAgentLowGatewayModel),
+		envOrDefault("MISTY_AI_MED_MODEL", defaultAgentMedGatewayModel),
+		envOrDefault("MISTY_AI_HIGH_MODEL", defaultAgentHighGatewayModel),
 	}
 	seen := map[string]bool{}
 	out := []GatewayModel{}

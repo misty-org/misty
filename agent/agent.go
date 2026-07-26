@@ -34,11 +34,11 @@ const MaxToolRounds = 12
 // ErrToolRoundLimit is returned when a run exceeds MaxToolRounds.
 var ErrToolRoundLimit = errors.New("agent run exceeded its tool round limit")
 
-// CompleteWithToolsContext runs the same Mika session/tool protocol used by
+// CompleteWithToolsContext runs the same agent session/tool protocol used by
 // interactive chat, but dispatches each manifest-authorized request through a
 // server-owned executor. This is the bridge used by automated Agent tasks;
 // finite provider/tool limits remain enforced by the Session service.
-func (s *Service) CompleteWithToolsContext(ctx context.Context, userID, billingUserID, prompt string, tier MikaTier, manifest ToolManifest, execute ToolExecutor) (ToolCompletion, error) {
+func (s *Service) CompleteWithToolsContext(ctx context.Context, userID, billingUserID, prompt string, tier AgentTier, manifest ToolManifest, execute ToolExecutor) (ToolCompletion, error) {
 	if execute == nil || len(manifest.Tools) == 0 {
 		text, _, err := s.CompleteWithTierContext(ctx, billingUserID, prompt, "automation_ai", tier)
 		return ToolCompletion{Text: text}, err
@@ -104,15 +104,15 @@ func (s *Service) CompleteWithToolsContext(ctx context.Context, userID, billingU
 }
 
 func (s *Service) Complete(userID, prompt, meterName string) (string, UsageSettlement, error) {
-	return s.CompleteWithTier(userID, prompt, meterName, MikaLow)
+	return s.CompleteWithTier(userID, prompt, meterName, TierLow)
 }
 
-func (s *Service) CompleteWithTier(userID, prompt, meterName string, tier MikaTier) (string, UsageSettlement, error) {
+func (s *Service) CompleteWithTier(userID, prompt, meterName string, tier AgentTier) (string, UsageSettlement, error) {
 	return s.CompleteWithTierContext(context.Background(), userID, prompt, meterName, tier)
 }
 
-func (s *Service) CompleteWithTierContext(ctx context.Context, userID, prompt, meterName string, tier MikaTier) (string, UsageSettlement, error) {
-	return s.completeWithProviderContext(ctx, userID, prompt, meterName, resolveMikaProvider(s.provider, NormalizeMikaTier(tier)), NormalizeMikaTier(tier))
+func (s *Service) CompleteWithTierContext(ctx context.Context, userID, prompt, meterName string, tier AgentTier) (string, UsageSettlement, error) {
+	return s.completeWithProviderContext(ctx, userID, prompt, meterName, resolveAgentProvider(s.provider, NormalizeAgentTier(tier)), NormalizeAgentTier(tier))
 }
 
 func (s *Service) CompleteWithModelContext(ctx context.Context, userID, prompt, meterName, modelID string) (string, UsageSettlement, error) {
@@ -123,10 +123,10 @@ func (s *Service) CompleteWithModelContext(ctx context.Context, userID, prompt, 
 	if err != nil {
 		return "", UsageSettlement{}, err
 	}
-	return s.completeWithProviderContext(ctx, userID, prompt, meterName, provider, MikaLow)
+	return s.completeWithProviderContext(ctx, userID, prompt, meterName, provider, TierLow)
 }
 
-func (s *Service) completeWithProviderContext(ctx context.Context, userID, prompt, meterName string, selectedProvider ModelProvider, tier MikaTier) (string, UsageSettlement, error) {
+func (s *Service) completeWithProviderContext(ctx context.Context, userID, prompt, meterName string, selectedProvider ModelProvider, tier AgentTier) (string, UsageSettlement, error) {
 	prompt = strings.TrimSpace(prompt)
 	if prompt == "" {
 		return "", UsageSettlement{}, ErrInvalidRequest("prompt is required")
@@ -134,7 +134,7 @@ func (s *Service) completeWithProviderContext(ctx context.Context, userID, promp
 	if len(prompt) > MaxUserMessageBytes {
 		return "", UsageSettlement{}, ErrInvalidRequest("prompt is too large")
 	}
-	request := ModelRequest{SessionID: uuid.NewString(), UserID: userID, MikaTier: tier, Mode: ModeAsk, Messages: []Message{{Role: "user", Content: prompt}}}
+	request := ModelRequest{SessionID: uuid.NewString(), UserID: userID, AgentTier: tier, Mode: ModeAsk, Messages: []Message{{Role: "user", Content: prompt}}}
 	provider, model := providerStatus(selectedProvider)
 	idempotencyKey := "completion:" + request.SessionID
 	var reservation *UsageReservation
@@ -151,7 +151,7 @@ func (s *Service) completeWithProviderContext(ctx context.Context, userID, promp
 			_ = s.meter.Release(reservation)
 		}
 		if !errors.Is(err, context.Canceled) {
-			log.Printf("Mika completion provider request failed for tier %s: %v", tier, err)
+			log.Printf("agent completion provider request failed for tier %s: %v", tier, err)
 		}
 		return "", UsageSettlement{}, err
 	}
@@ -195,14 +195,14 @@ func (s *Service) Store() *SessionStore {
 }
 
 func (s *Service) ProviderStatus() (string, string) {
-	return s.ProviderStatusForTier(MikaLow)
+	return s.ProviderStatusForTier(TierLow)
 }
 
-func (s *Service) ProviderStatusForTier(tier MikaTier) (string, string) {
-	return providerStatus(resolveMikaProvider(s.provider, tier))
+func (s *Service) ProviderStatusForTier(tier AgentTier) (string, string) {
+	return providerStatus(resolveAgentProvider(s.provider, tier))
 }
 
-func (s *Service) MikaConfigured(tier MikaTier) bool {
+func (s *Service) AgentConfigured(tier AgentTier) bool {
 	provider, _ := s.ProviderStatusForTier(tier)
 	return provider != ProviderMock
 }
@@ -261,14 +261,14 @@ func (s *Service) SessionBillingScope(sessionID, userID string) (string, error) 
 }
 
 func (s *Service) SendMessage(sessionID, userID string, request AgentMessageRequest) error {
-	return s.SendMessageWithTier(sessionID, userID, request, MikaLow)
+	return s.SendMessageWithTier(sessionID, userID, request, TierLow)
 }
 
-func (s *Service) SendMessageWithTier(sessionID, userID string, request AgentMessageRequest, tier MikaTier) error {
+func (s *Service) SendMessageWithTier(sessionID, userID string, request AgentMessageRequest, tier AgentTier) error {
 	return s.SendMessageWithTierContext(context.Background(), sessionID, userID, request, tier)
 }
 
-func (s *Service) SendMessageWithTierContext(ctx context.Context, sessionID, userID string, request AgentMessageRequest, tier MikaTier) error {
+func (s *Service) SendMessageWithTierContext(ctx context.Context, sessionID, userID string, request AgentMessageRequest, tier AgentTier) error {
 	request.UserMessage = strings.TrimSpace(request.UserMessage)
 	request.Mode = NormalizeMode(request.Mode)
 	request.ActiveRoot = strings.TrimSpace(request.ActiveRoot)
@@ -291,7 +291,7 @@ func (s *Service) SendMessageWithTierContext(ctx context.Context, sessionID, use
 			return ErrInvalidRequest("session is canceled")
 		}
 		session.Mode = request.Mode
-		session.MikaTier = NormalizeMikaTier(tier)
+		session.AgentTier = NormalizeAgentTier(tier)
 		session.ActiveRoot = request.ActiveRoot
 		session.Capabilities = request.Capabilities
 		session.ProviderCallsThisTurn = 0
@@ -317,14 +317,14 @@ func isSafeActiveRoot(value string) bool {
 }
 
 func (s *Service) SubmitToolResults(sessionID, userID string, results []ToolResult) error {
-	return s.SubmitToolResultsWithTier(sessionID, userID, results, MikaLow)
+	return s.SubmitToolResultsWithTier(sessionID, userID, results, TierLow)
 }
 
-func (s *Service) SubmitToolResultsWithTier(sessionID, userID string, results []ToolResult, tier MikaTier) error {
+func (s *Service) SubmitToolResultsWithTier(sessionID, userID string, results []ToolResult, tier AgentTier) error {
 	return s.SubmitToolResultsWithTierContext(context.Background(), sessionID, userID, results, tier)
 }
 
-func (s *Service) SubmitToolResultsWithTierContext(ctx context.Context, sessionID, userID string, results []ToolResult, tier MikaTier) error {
+func (s *Service) SubmitToolResultsWithTierContext(ctx context.Context, sessionID, userID string, results []ToolResult, tier AgentTier) error {
 	if len(results) == 0 {
 		return ErrInvalidRequest("tool results are required")
 	}
@@ -359,7 +359,7 @@ func (s *Service) SubmitToolResultsWithTierContext(ctx context.Context, sessionI
 		for requestID := range seen {
 			delete(session.PendingToolRequests, requestID)
 		}
-		session.MikaTier = NormalizeMikaTier(tier)
+		session.AgentTier = NormalizeAgentTier(tier)
 		if containsPreviewFileResult(results) {
 			for index := range session.ToolResults {
 				if session.ToolResults[index].Name == ToolPreviewFile {
@@ -391,7 +391,7 @@ func (s *Service) Transcript(ctx context.Context, sessionID, userID string) ([]M
 }
 
 // AppendExternalAssistantMessage delivers the terminal result of delegated
-// work back into the originating Mika session without invoking the model.
+// work back into the originating agent session without invoking the model.
 // WithSessionContext persists both the message and its sequenced event.
 func (s *Service) AppendExternalAssistantMessage(ctx context.Context, sessionID, userID, runID, text string) (*AgentEvent, error) {
 	var appended AgentEvent
@@ -425,7 +425,7 @@ func (s *Service) advanceLocked(ctx context.Context, session *Session) error {
 		SessionID:    session.ID,
 		UserID:       session.UserID,
 		SystemPrompt: session.SystemPrompt,
-		MikaTier:     session.MikaTier,
+		AgentTier:     session.AgentTier,
 		Mode:         session.Mode,
 		ActiveRoot:   session.ActiveRoot,
 		Messages:     append([]Message(nil), session.Messages...),
@@ -436,7 +436,7 @@ func (s *Service) advanceLocked(ctx context.Context, session *Session) error {
 	if requestSizeBytes(request) > MaxProviderRequestBytes {
 		return ErrInvalidRequest("Agent request context is too large; start a new conversation")
 	}
-	selectedProvider := resolveMikaProvider(s.provider, session.MikaTier)
+	selectedProvider := resolveAgentProvider(s.provider, session.AgentTier)
 	if session.ModelID != "" {
 		if !GatewayModelAvailable(ctx, session.ModelID) {
 			return ErrModelUnavailable
@@ -476,7 +476,7 @@ func (s *Service) advanceLocked(ctx context.Context, session *Session) error {
 		if errors.Is(err, context.Canceled) {
 			return err
 		}
-		log.Printf("Mika provider request failed for tier %s: %v", session.MikaTier, err)
+		log.Printf("agent provider request failed for tier %s: %v", session.AgentTier, err)
 		session.appendEvent(AgentEvent{Type: EventError, Message: "The agent could not complete this request."})
 		return nil
 	}

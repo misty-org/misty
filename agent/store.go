@@ -40,7 +40,7 @@ type Session struct {
 	SystemPrompt          string
 	AllowTools            bool
 	AllowWriteTools       bool
-	MikaTier              MikaTier
+	AgentTier              AgentTier
 	Mode                  string
 	ActiveRoot            string
 	Capabilities          ToolManifest
@@ -99,7 +99,7 @@ func (s *SessionStore) CreateWithBillingScope(userID, billingUserID, billingScop
 		UserID:              userID,
 		BillingUserID:       billingUserID,
 		BillingScope:        billingScope,
-		MikaTier:            MikaLow,
+		AgentTier:            TierLow,
 		Mode:                ModeAsk,
 		AllowTools:          true,
 		AllowWriteTools:     true,
@@ -242,7 +242,7 @@ func (s *SessionStore) acquireEntry(ctx context.Context, id, userID string) *ses
 	raw, err := s.persist.LoadAgentSession(ctx, id, userID)
 	if err != nil {
 		if !errors.Is(err, ErrPersistedSessionNotFound) {
-			log.Printf("load persisted Mika session %q: %v", id, err)
+			log.Printf("load persisted agent session %q: %v", id, err)
 		}
 		return nil
 	}
@@ -253,7 +253,7 @@ func (s *SessionStore) acquireEntry(ctx context.Context, id, userID string) *ses
 	session, err := unmarshalPersistentSession(raw, id, userID)
 	if err != nil || session.UpdatedAt.Before(s.now().Add(-conversationRetention)) {
 		if err != nil && !errors.Is(err, ErrPersistedSessionNotFound) {
-			log.Printf("decode persisted Mika session %q: %v", id, err)
+			log.Printf("decode persisted agent session %q: %v", id, err)
 		}
 		return nil
 	}
@@ -279,7 +279,7 @@ func (s *SessionStore) persistCreatedSession(session *Session) {
 		err = s.persist.CreateAgentSession(context.Background(), session.ID, session.UserID, state, session.UpdatedAt.Add(s.ttl), session.UpdatedAt.Add(conversationRetention))
 	}
 	if err != nil {
-		log.Printf("persist new Mika session %q: %v", session.ID, err)
+		log.Printf("persist new agent session %q: %v", session.ID, err)
 	}
 }
 
@@ -292,7 +292,7 @@ func (s *SessionStore) persistUpdatedSession(ctx context.Context, session *Sessi
 		err = s.persist.SaveAgentSession(ctx, session.ID, session.UserID, state, events, session.UpdatedAt.Add(s.ttl), session.UpdatedAt.Add(conversationRetention))
 	}
 	if err != nil {
-		log.Printf("persist Mika session %q: %v", session.ID, err)
+		log.Printf("persist agent session %q: %v", session.ID, err)
 	}
 }
 

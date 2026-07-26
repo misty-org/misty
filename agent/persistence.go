@@ -32,16 +32,21 @@ type SessionPersistence interface {
 }
 
 type persistedSessionState struct {
-	ID                    string            `json:"id"`
-	UserID                string            `json:"userId"`
-	BillingUserID         string            `json:"billingUserId"`
-	BillingScope          string            `json:"billingScope"`
-	ModelID               string            `json:"modelId,omitempty"`
-	ReasoningEffort       string            `json:"reasoningEffort,omitempty"`
-	SystemPrompt          string            `json:"systemPrompt,omitempty"`
-	AllowTools            *bool             `json:"allowTools,omitempty"`
-	AllowWriteTools       *bool             `json:"allowWriteTools,omitempty"`
-	MikaTier              MikaTier          `json:"mikaTier"`
+	ID              string    `json:"id"`
+	UserID          string    `json:"userId"`
+	BillingUserID   string    `json:"billingUserId"`
+	BillingScope    string    `json:"billingScope"`
+	ModelID         string    `json:"modelId,omitempty"`
+	ReasoningEffort string    `json:"reasoningEffort,omitempty"`
+	SystemPrompt    string    `json:"systemPrompt,omitempty"`
+	AllowTools      *bool     `json:"allowTools,omitempty"`
+	AllowWriteTools *bool     `json:"allowWriteTools,omitempty"`
+	AgentTier       AgentTier `json:"agentTier"`
+	// LegacyAgentTier reads the pre-rename key so a conversation persisted by an
+	// older binary keeps its tier. Migration and rollout are not atomic, so this
+	// must outlive 20260915000000_rename_agent_session_tier.sql by one release.
+	// Only AgentTier is ever written.
+	LegacyAgentTier       AgentTier         `json:"mikaTier,omitempty"`
 	Mode                  string            `json:"mode"`
 	Capabilities          ToolManifest      `json:"capabilities"`
 	Messages              []Message         `json:"messages"`
@@ -73,7 +78,7 @@ func marshalPersistentSession(session *Session) (json.RawMessage, error) {
 		SystemPrompt:          session.SystemPrompt,
 		AllowTools:            &allowTools,
 		AllowWriteTools:       &allowWrite,
-		MikaTier:              session.MikaTier,
+		AgentTier:             session.AgentTier,
 		Mode:                  session.Mode,
 		Capabilities:          session.Capabilities,
 		Messages:              sanitizeMessages(session.Messages),
@@ -100,9 +105,12 @@ func unmarshalPersistentSession(raw json.RawMessage, expectedID, expectedUserID 
 	if state.Mode == "" {
 		state.Mode = ModeAsk
 	}
-	if state.MikaTier == "" {
-		state.MikaTier = MikaLow
+	if state.AgentTier == "" {
+		state.AgentTier = state.LegacyAgentTier
 	}
+	// NormalizeAgentTier also maps legacy "mika-*" values, so an un-migrated row
+	// resolves to its real tier rather than defaulting to TierLow.
+	state.AgentTier = NormalizeAgentTier(state.AgentTier)
 	if state.BillingUserID == "" {
 		state.BillingUserID = state.UserID
 	}
@@ -124,7 +132,7 @@ func unmarshalPersistentSession(raw json.RawMessage, expectedID, expectedUserID 
 		SystemPrompt:          state.SystemPrompt,
 		AllowTools:            allowTools,
 		AllowWriteTools:       allowWrite,
-		MikaTier:              state.MikaTier,
+		AgentTier:             state.AgentTier,
 		Mode:                  state.Mode,
 		Capabilities:          state.Capabilities,
 		Messages:              state.Messages,

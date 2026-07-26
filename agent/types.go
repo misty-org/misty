@@ -113,7 +113,7 @@ type ModelRequest struct {
 	SessionID    string
 	UserID       string
 	SystemPrompt string
-	MikaTier     MikaTier
+	AgentTier     AgentTier
 	Mode         string
 	ActiveRoot   string
 	Messages     []Message

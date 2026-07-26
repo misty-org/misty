@@ -29,7 +29,7 @@ func (s *SpacesService) AgentCatalog() http.HandlerFunc {
 	}
 }
 
-func (s *SpacesService) MikaDiscovery() http.HandlerFunc {
+func (s *SpacesService) AgentDiscovery() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		userID, ok := authenticatedUser(w, r, s.database)
 		if !ok {
@@ -49,7 +49,7 @@ func (s *SpacesService) MikaDiscovery() http.HandlerFunc {
 	}
 }
 
-func (s *SpacesService) MikaDelegation() http.HandlerFunc {
+func (s *SpacesService) AgentDelegation() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		userID, ok := authenticatedUser(w, r, s.database)
 		if !ok {
@@ -224,7 +224,7 @@ func (s *SpacesService) executeCanonicalAgentRun(r *http.Request, run *db.SpaceR
 	if sources, sourceErr := s.database.SpaceCalendarSources(r.Context(), run.RequestingMemberID, run.SpaceID); sourceErr == nil && len(sources) > 0 && !seenProviders["google"] {
 		manifest.Tools = append(manifest.Tools, serveragent.ToolDefinition{Name: "provider.google_calendar.query", Risk: serveragent.RiskRead, InputSchema: providerAgentToolSchema(false)})
 	}
-	completion, err := s.agent.CompleteWithToolsContext(r.Context(), run.RequestingMemberID, run.BillingUserID, request, serveragent.MikaLow, manifest, func(toolCtx context.Context, tool serveragent.ToolRequest) (json.RawMessage, error) {
+	completion, err := s.agent.CompleteWithToolsContext(r.Context(), run.RequestingMemberID, run.BillingUserID, request, serveragent.TierLow, manifest, func(toolCtx context.Context, tool serveragent.ToolRequest) (json.RawMessage, error) {
 		return s.executeOrdinaryAgentTool(toolCtx, run, tool)
 	})
 	if err != nil {

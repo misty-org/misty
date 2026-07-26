@@ -39,7 +39,7 @@ func TestLibraryPeoplePolicyAssignmentMergeAndIsolation(t *testing.T) {
 	if err != nil || person.Name != "Alex Morgan" || person.CoverItemID != item.ID {
 		t.Fatalf("UpdateLibraryPerson() = %#v, %v", person, err)
 	}
-	pet, err := database.CreateLibraryPerson(ctx, owner.ID, spaceID, "pet", "Mika", []string{item.ID})
+	pet, err := database.CreateLibraryPerson(ctx, owner.ID, spaceID, "pet", "Pixel", []string{item.ID})
 	if err != nil || pet.Kind != "pet" {
 		t.Fatalf("create pet = %#v, %v", pet, err)
 	}
