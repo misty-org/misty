@@ -1,290 +1,4 @@
 {
-  "src/ui/alert-dialog.tsx": [
-    {
-      "length": 423,
-      "hash": "a31df42f8a97c2aa"
-    },
-    {
-      "length": 211,
-      "hash": "fa8359c879e023b1"
-    }
-  ],
-  "src/ui/alert.tsx": [
-    {
-      "length": 318,
-      "hash": "99a36f81b1dcd188"
-    },
-    {
-      "length": 165,
-      "hash": "a664cc2ae011421e"
-    }
-  ],
-  "src/ui/avatar.tsx": [
-    {
-      "length": 355,
-      "hash": "fa30b34687edc47f"
-    },
-    {
-      "length": 270,
-      "hash": "2f20904254665e6a"
-    },
-    {
-      "length": 179,
-      "hash": "cf61b2643d240d4c"
-    }
-  ],
-  "src/ui/badge.tsx": [
-    {
-      "length": 322,
-      "hash": "25c208a32bccccfc"
-    }
-  ],
-  "src/ui/button.tsx": [
-    {
-      "length": 607,
-      "hash": "d5cf1800e94bf850"
-    },
-    {
-      "length": 232,
-      "hash": "dc8e7593fd7695af"
-    },
-    {
-      "length": 219,
-      "hash": "da7676fbe26c9cea"
-    },
-    {
-      "length": 198,
-      "hash": "bfe1086ce0af14c4"
-    },
-    {
-      "length": 187,
-      "hash": "e2fe4c12e66712ad"
-    },
-    {
-      "length": 177,
-      "hash": "47f771c6714fcd43"
-    }
-  ],
-  "src/ui/card.tsx": [
-    {
-      "length": 344,
-      "hash": "c1674695ad08101a"
-    },
-    {
-      "length": 257,
-      "hash": "2a97c70f08a14bd4"
-    }
-  ],
-  "src/ui/checkbox.tsx": [
-    {
-      "length": 384,
-      "hash": "d4709db1c3685b98"
-    }
-  ],
-  "src/ui/command.tsx": [
-    {
-      "length": 393,
-      "hash": "192909787ceae936"
-    },
-    {
-      "length": 320,
-      "hash": "796244045f5b5802"
-    },
-    {
-      "length": 223,
-      "hash": "16671e4543111c84"
-    },
-    {
-      "length": 161,
-      "hash": "86839f7907fdf10c"
-    }
-  ],
-  "src/ui/context-menu.tsx": [
-    {
-      "length": 649,
-      "hash": "a61f2b3873d975ef"
-    },
-    {
-      "length": 570,
-      "hash": "61a1c69509b1a338"
-    },
-    {
-      "length": 312,
-      "hash": "599e15f2c9b242a8"
-    },
-    {
-      "length": 310,
-      "hash": "665c360da06ac0c5"
-    },
-    {
-      "length": 310,
-      "hash": "665c360da06ac0c5"
-    },
-    {
-      "length": 299,
-      "hash": "eb897849e77fee50"
-    }
-  ],
-  "src/ui/dialog.tsx": [
-    {
-      "length": 417,
-      "hash": "4e15f62f430897ee"
-    },
-    {
-      "length": 255,
-      "hash": "e56df5706fb2d7d6"
-    },
-    {
-      "length": 205,
-      "hash": "ab28a86731425b15"
-    }
-  ],
-  "src/ui/drag-layer.tsx": [
-    {
-      "length": 190,
-      "hash": "7081d1e9cf5c6694"
-    }
-  ],
-  "src/ui/dropdown-menu.tsx": [
-    {
-      "length": 1260,
-      "hash": "6311e164246b295e"
-    },
-    {
-      "length": 1103,
-      "hash": "0823c4aeed059041"
-    },
-    {
-      "length": 657,
-      "hash": "9d312c6437d8f453"
-    },
-    {
-      "length": 364,
-      "hash": "79204e5de3f1d8ea"
-    },
-    {
-      "length": 353,
-      "hash": "4460484887ad0e44"
-    },
-    {
-      "length": 353,
-      "hash": "4460484887ad0e44"
-    }
-  ],
-  "src/ui/input.tsx": [
-    {
-      "length": 639,
-      "hash": "0d1a0fc640539430"
-    }
-  ],
-  "src/ui/popover.tsx": [
-    {
-      "length": 557,
-      "hash": "81326dff5aa4bea2"
-    }
-  ],
-  "src/ui/radio-group.tsx": [
-    {
-      "length": 241,
-      "hash": "d7d1f183821a5848"
-    }
-  ],
-  "src/ui/resizable.tsx": [
-    {
-      "length": 656,
-      "hash": "11c3304a3f118b37"
-    }
-  ],
-  "src/ui/select.tsx": [
-    {
-      "length": 643,
-      "hash": "361c299a550b7a0f"
-    },
-    {
-      "length": 643,
-      "hash": "d85ec3c48ec28bcd"
-    },
-    {
-      "length": 271,
-      "hash": "05ab3d09474406e1"
-    }
-  ],
-  "src/ui/sheet.tsx": [
-    {
-      "length": 257,
-      "hash": "352f7b16578d7766"
-    },
-    {
-      "length": 243,
-      "hash": "8d7b8e46c446ed2e"
-    },
-    {
-      "length": 205,
-      "hash": "ab28a86731425b15"
-    }
-  ],
-  "src/ui/slider.tsx": [
-    {
-      "length": 224,
-      "hash": "d288075abc8f0123"
-    }
-  ],
-  "src/ui/switch.tsx": [
-    {
-      "length": 340,
-      "hash": "075f8e1c0ecf5043"
-    },
-    {
-      "length": 180,
-      "hash": "bce13ac375ce3c67"
-    }
-  ],
-  "src/ui/tabs.tsx": [
-    {
-      "length": 808,
-      "hash": "2a36927a59bd4758"
-    },
-    {
-      "length": 397,
-      "hash": "02cdeeceeae12d9d"
-    },
-    {
-      "length": 262,
-      "hash": "f1149f08f3167fdd"
-    },
-    {
-      "length": 236,
-      "hash": "37ee6dab3893b1bf"
-    }
-  ],
-  "src/ui/textarea.tsx": [
-    {
-      "length": 522,
-      "hash": "a83b9b1f13a0a0cc"
-    }
-  ],
-  "src/ui/toggle-group.tsx": [
-    {
-      "length": 980,
-      "hash": "c7037cb5983fee89"
-    },
-    {
-      "length": 202,
-      "hash": "5a0a74f340ed01bb"
-    }
-  ],
-  "src/ui/toggle.tsx": [
-    {
-      "length": 458,
-      "hash": "37b351ef988dbc53"
-    }
-  ],
-  "src/ui/tooltip.tsx": [
-    {
-      "length": 468,
-      "hash": "0c2a1656d9cd8b5c"
-    }
-  ],
   "src/features/explorer/components/DeepSearchOverlay.tsx": [
     {
       "length": 317,
@@ -467,42 +181,10 @@
       "hash": "8ff40d995b9c5ebb"
     }
   ],
-  "src/features/explorer/desktop/ExplorerAssistantMessage.tsx": [
+  "src/features/explorer/desktop/ExplorerAgentMessage.tsx": [
     {
-      "length": 188,
-      "hash": "8cf78b8799db8ded"
-    }
-  ],
-  "src/features/explorer/desktop/ExplorerAssistantShared.ts": [
-    {
-      "length": 193,
-      "hash": "d930bd93b2f635d5"
-    }
-  ],
-  "src/features/explorer/desktop/ExplorerAssistantStyles.ts": [
-    {
-      "length": 429,
-      "hash": "5969e9927bd57a74"
-    },
-    {
-      "length": 287,
-      "hash": "6294c0a2adab750e"
-    },
-    {
-      "length": 273,
-      "hash": "67bde6f7fb5fbcbb"
-    },
-    {
-      "length": 257,
-      "hash": "ccab57145bee6daf"
-    },
-    {
-      "length": 220,
-      "hash": "4eb5a78740aba1f5"
-    },
-    {
-      "length": 182,
-      "hash": "6209ed49581c95dd"
+      "length": 187,
+      "hash": "c555cfc68acf4988"
     }
   ],
   "src/features/explorer/desktop/ExplorerBatchRenameDialog.tsx": [
@@ -617,12 +299,6 @@
     {
       "length": 164,
       "hash": "033b6028363d4d67"
-    }
-  ],
-  "src/features/explorer/desktop/ExplorerMikaPanel.tsx": [
-    {
-      "length": 260,
-      "hash": "51754ed52dcb434d"
     }
   ],
   "src/features/explorer/desktop/ExplorerShellStyles.ts": [
@@ -925,30 +601,18 @@
       "hash": "790832e7ecd23d20"
     }
   ],
-  "src/pages/Agents/AgentCenter.tsx": [
+  "src/pages/Agents/desktop/AgentChatList.tsx": [
     {
-      "length": 221,
-      "hash": "2ccfde62476f77dc"
-    },
-    {
-      "length": 183,
-      "hash": "a04a8d47c39c8ace"
-    },
-    {
-      "length": 167,
-      "hash": "0cf9fd745cbf6592"
+      "length": 235,
+      "hash": "2e298d53cfe53292"
     },
     {
       "length": 166,
-      "hash": "0de65d87f3756bf7"
+      "hash": "e789f791dcf7de35"
     },
     {
-      "length": 164,
-      "hash": "c77d674e485029f4"
-    },
-    {
-      "length": 163,
-      "hash": "f33f6b90adea2db1"
+      "length": 196,
+      "hash": "568f8fe2092850e4"
     }
   ],
   "src/pages/BotOverlay/CloudFolderBotChatOverlay.tsx": [
@@ -1041,82 +705,6 @@
       "hash": "39fa9ee7900f7677"
     }
   ],
-  "src/pages/Studio/AgentArchitecturePanel.tsx": [
-    {
-      "length": 161,
-      "hash": "0829f3a459c0ad04"
-    },
-    {
-      "length": 161,
-      "hash": "0829f3a459c0ad04"
-    }
-  ],
-  "src/pages/Studio/AgentConversation.tsx": [
-    {
-      "length": 161,
-      "hash": "c4d188d930326edc"
-    }
-  ],
-  "src/pages/Studio/index.tsx": [
-    {
-      "length": 185,
-      "hash": "3761d887a17070a6"
-    }
-  ],
-  "src/pages/Studio/UnifiedWorkflowEditor.tsx": [
-    {
-      "length": 699,
-      "hash": "961e4cb59375081e"
-    },
-    {
-      "length": 673,
-      "hash": "a7365af41a4416bf"
-    },
-    {
-      "length": 533,
-      "hash": "3e6ee19b6500cd69"
-    },
-    {
-      "length": 467,
-      "hash": "bfd9915a5f18270b"
-    },
-    {
-      "length": 381,
-      "hash": "d9387bdd13112f52"
-    },
-    {
-      "length": 315,
-      "hash": "7543bc39e9a72d52"
-    },
-    {
-      "length": 254,
-      "hash": "42b4bab1874cd961"
-    },
-    {
-      "length": 239,
-      "hash": "8e6c563a4075ef03"
-    },
-    {
-      "length": 223,
-      "hash": "f93da8a00a1455b4"
-    },
-    {
-      "length": 202,
-      "hash": "4f632dd11aa0e2c6"
-    },
-    {
-      "length": 199,
-      "hash": "1214e126b9af6864"
-    },
-    {
-      "length": 187,
-      "hash": "7a1301f6aa39cd6e"
-    },
-    {
-      "length": 167,
-      "hash": "3868e423ab8700da"
-    }
-  ],
   "src/pages/Transfers/desktop/transferStyles.ts": [
     {
       "length": 406,
@@ -1139,44 +727,304 @@
       "hash": "4bb6b31c0c4f439b"
     }
   ],
-  "src/workspace/MultiPanelWorkspace.tsx": [
-    {
-      "length": 398,
-      "hash": "9f493e95615d86b8"
-    },
-    {
-      "length": 270,
-      "hash": "1d8d650099badcae"
-    },
-    {
-      "length": 245,
-      "hash": "1e0fcff49cc93458"
-    },
-    {
-      "length": 183,
-      "hash": "97307a98052868f6"
-    },
-    {
-      "length": 180,
-      "hash": "d6619144be8d855e"
-    },
-    {
-      "length": 163,
-      "hash": "373a3a1ba498145b"
-    }
-  ],
-  "src/stores/assistant/useMikaSessionStore.ts": [
-    {
-      "length": 185,
-      "hash": "7f8ead6ee6c72fd3"
-    },
+  "src/stores/agent/useAgentSessionStore.ts": [
     {
       "length": 176,
       "hash": "2738ef9f3e9cef70"
     },
     {
+      "length": 185,
+      "hash": "7f8ead6ee6c72fd3"
+    },
+    {
       "length": 162,
       "hash": "d9032def2895053a"
+    }
+  ],
+  "src/ui/alert-dialog.tsx": [
+    {
+      "length": 423,
+      "hash": "a31df42f8a97c2aa"
+    },
+    {
+      "length": 211,
+      "hash": "fa8359c879e023b1"
+    }
+  ],
+  "src/ui/alert.tsx": [
+    {
+      "length": 318,
+      "hash": "99a36f81b1dcd188"
+    },
+    {
+      "length": 165,
+      "hash": "a664cc2ae011421e"
+    }
+  ],
+  "src/ui/avatar.tsx": [
+    {
+      "length": 355,
+      "hash": "fa30b34687edc47f"
+    },
+    {
+      "length": 270,
+      "hash": "2f20904254665e6a"
+    },
+    {
+      "length": 179,
+      "hash": "cf61b2643d240d4c"
+    }
+  ],
+  "src/ui/badge.tsx": [
+    {
+      "length": 322,
+      "hash": "25c208a32bccccfc"
+    }
+  ],
+  "src/ui/button.tsx": [
+    {
+      "length": 607,
+      "hash": "d5cf1800e94bf850"
+    },
+    {
+      "length": 232,
+      "hash": "dc8e7593fd7695af"
+    },
+    {
+      "length": 219,
+      "hash": "da7676fbe26c9cea"
+    },
+    {
+      "length": 198,
+      "hash": "bfe1086ce0af14c4"
+    },
+    {
+      "length": 187,
+      "hash": "e2fe4c12e66712ad"
+    },
+    {
+      "length": 177,
+      "hash": "47f771c6714fcd43"
+    }
+  ],
+  "src/ui/card.tsx": [
+    {
+      "length": 344,
+      "hash": "c1674695ad08101a"
+    },
+    {
+      "length": 257,
+      "hash": "2a97c70f08a14bd4"
+    }
+  ],
+  "src/ui/checkbox.tsx": [
+    {
+      "length": 384,
+      "hash": "d4709db1c3685b98"
+    }
+  ],
+  "src/ui/command.tsx": [
+    {
+      "length": 393,
+      "hash": "192909787ceae936"
+    },
+    {
+      "length": 320,
+      "hash": "796244045f5b5802"
+    },
+    {
+      "length": 223,
+      "hash": "16671e4543111c84"
+    },
+    {
+      "length": 161,
+      "hash": "86839f7907fdf10c"
+    }
+  ],
+  "src/ui/context-menu.tsx": [
+    {
+      "length": 649,
+      "hash": "a61f2b3873d975ef"
+    },
+    {
+      "length": 570,
+      "hash": "61a1c69509b1a338"
+    },
+    {
+      "length": 312,
+      "hash": "599e15f2c9b242a8"
+    },
+    {
+      "length": 310,
+      "hash": "665c360da06ac0c5"
+    },
+    {
+      "length": 310,
+      "hash": "665c360da06ac0c5"
+    },
+    {
+      "length": 299,
+      "hash": "eb897849e77fee50"
+    }
+  ],
+  "src/ui/dialog.tsx": [
+    {
+      "length": 417,
+      "hash": "4e15f62f430897ee"
+    },
+    {
+      "length": 255,
+      "hash": "e56df5706fb2d7d6"
+    },
+    {
+      "length": 205,
+      "hash": "ab28a86731425b15"
+    }
+  ],
+  "src/ui/drag-layer.tsx": [
+    {
+      "length": 190,
+      "hash": "7081d1e9cf5c6694"
+    }
+  ],
+  "src/ui/dropdown-menu.tsx": [
+    {
+      "length": 1260,
+      "hash": "6311e164246b295e"
+    },
+    {
+      "length": 1103,
+      "hash": "0823c4aeed059041"
+    },
+    {
+      "length": 657,
+      "hash": "9d312c6437d8f453"
+    },
+    {
+      "length": 364,
+      "hash": "79204e5de3f1d8ea"
+    },
+    {
+      "length": 353,
+      "hash": "4460484887ad0e44"
+    },
+    {
+      "length": 353,
+      "hash": "4460484887ad0e44"
+    }
+  ],
+  "src/ui/input.tsx": [
+    {
+      "length": 639,
+      "hash": "0d1a0fc640539430"
+    }
+  ],
+  "src/ui/popover.tsx": [
+    {
+      "length": 557,
+      "hash": "81326dff5aa4bea2"
+    }
+  ],
+  "src/ui/radio-group.tsx": [
+    {
+      "length": 241,
+      "hash": "d7d1f183821a5848"
+    }
+  ],
+  "src/ui/resizable.tsx": [
+    {
+      "length": 656,
+      "hash": "11c3304a3f118b37"
+    }
+  ],
+  "src/ui/select.tsx": [
+    {
+      "length": 643,
+      "hash": "361c299a550b7a0f"
+    },
+    {
+      "length": 643,
+      "hash": "d85ec3c48ec28bcd"
+    },
+    {
+      "length": 271,
+      "hash": "05ab3d09474406e1"
+    }
+  ],
+  "src/ui/sheet.tsx": [
+    {
+      "length": 257,
+      "hash": "352f7b16578d7766"
+    },
+    {
+      "length": 243,
+      "hash": "8d7b8e46c446ed2e"
+    },
+    {
+      "length": 205,
+      "hash": "ab28a86731425b15"
+    }
+  ],
+  "src/ui/slider.tsx": [
+    {
+      "length": 224,
+      "hash": "d288075abc8f0123"
+    }
+  ],
+  "src/ui/switch.tsx": [
+    {
+      "length": 340,
+      "hash": "075f8e1c0ecf5043"
+    },
+    {
+      "length": 180,
+      "hash": "bce13ac375ce3c67"
+    }
+  ],
+  "src/ui/tabs.tsx": [
+    {
+      "length": 808,
+      "hash": "2a36927a59bd4758"
+    },
+    {
+      "length": 397,
+      "hash": "02cdeeceeae12d9d"
+    },
+    {
+      "length": 262,
+      "hash": "f1149f08f3167fdd"
+    },
+    {
+      "length": 236,
+      "hash": "37ee6dab3893b1bf"
+    }
+  ],
+  "src/ui/textarea.tsx": [
+    {
+      "length": 522,
+      "hash": "a83b9b1f13a0a0cc"
+    }
+  ],
+  "src/ui/toggle-group.tsx": [
+    {
+      "length": 980,
+      "hash": "c7037cb5983fee89"
+    },
+    {
+      "length": 202,
+      "hash": "5a0a74f340ed01bb"
+    }
+  ],
+  "src/ui/toggle.tsx": [
+    {
+      "length": 458,
+      "hash": "37b351ef988dbc53"
+    }
+  ],
+  "src/ui/tooltip.tsx": [
+    {
+      "length": 468,
+      "hash": "0c2a1656d9cd8b5c"
     }
   ]
 }

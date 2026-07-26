@@ -32,9 +32,9 @@ const part = encodeURIComponent;
 export const agentArchitectureApi = {
   catalog: () => spaceRequest<{ agents: AgentCatalogEntry[] }>("/agents/catalog"),
   discovery: () =>
-    spaceRequest<{ spaces: Space[]; agents: AgentCatalogEntry[] }>("/mika/discovery"),
+    spaceRequest<{ spaces: Space[]; agents: AgentCatalogEntry[] }>("/agents/discovery"),
   delegate: (input: AgentInvocationInput & { space_id?: string; agent_id?: string }) =>
-    spaceRequest<AgentDelegationResult>("/mika/delegations", {
+    spaceRequest<AgentDelegationResult>("/agents/delegations", {
       method: "POST",
       body: JSON.stringify(input),
     }),

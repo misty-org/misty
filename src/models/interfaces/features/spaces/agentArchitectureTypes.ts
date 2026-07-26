@@ -116,7 +116,19 @@ export interface SpaceRun {
   error_code?: string;
   requesting_member_id: string;
   source_conversation_id?: string;
-  source_type: "direct" | "group_mention" | "mika" | "studio_test" | "schedule";
+  // "mika" is the pre-rename value, still present on rows created before
+  // 20260916000000_rename_agent_run_source_type.sql and accepted by that
+  // migration's CHECK during the transition. "connector" and "task" were always
+  // valid server-side but were missing from this union.
+  source_type:
+    | "direct"
+    | "group_mention"
+    | "agent_console"
+    | "studio_test"
+    | "schedule"
+    | "connector"
+    | "task"
+    | "mika";
   agent_id?: string;
   workflow_identifier?: string;
   workflow_version_id?: string;
