@@ -203,7 +203,7 @@ export interface RoutingDecision {
   reason?: string;
 }
 
-export interface MikaDelegationResult {
+export interface AgentDelegationResult {
   status: string;
   trace?: string;
   routing: RoutingDecision;

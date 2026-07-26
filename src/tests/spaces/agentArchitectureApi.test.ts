@@ -8,7 +8,7 @@ import { agentArchitectureApi } from "@/stores/agents/useAgentArchitectureStore"
 describe("agentArchitectureApi", () => {
   beforeEach(() => request.mockReset().mockResolvedValue({}));
 
-  it("delegates Mika requests through the permission-safe router", async () => {
+  it("delegates agent requests through the permission-safe router", async () => {
     await agentArchitectureApi.delegate({
       prompt: "summarize receipts",
       space_id: "space / one",

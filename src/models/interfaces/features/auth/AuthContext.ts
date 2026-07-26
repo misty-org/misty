@@ -23,7 +23,7 @@ import {
 import type { SavedAccountSession } from "@/models/interfaces/stores/account/useAuthTokenStore";
 import { isNativeMobileBuild } from "@/platform/buildTarget";
 import type { CurrentLicense } from "@/models/types/features/installer/types";
-import { resetMikaAccountState } from "@/stores/assistant/useMikaSessionStore";
+import { resetAgentAccountState } from "@/stores/assistant/useAgentSessionStore";
 import { resetSpacesAccountState } from "@/stores/spaces/useSpacesStore";
 import { useSetupStore } from "@/stores/app";
 import { useUserStore } from "@/stores/account/useUserStore";

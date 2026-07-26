@@ -4,7 +4,7 @@ import type {
   AgentInstanceRecord,
   AgentVersionWorkflow,
   InstanceWorkflowConfig,
-  MikaDelegationResult,
+  AgentDelegationResult,
   AgentConversation,
   AgentConversationEvent,
   PublishedAgentVersion,
@@ -27,7 +27,7 @@ import type { AgentInvocationInput } from "@/models/interfaces/stores/agents/use
 
 export type AgentInvocationResult =
   | SpaceRun
-  | MikaDelegationResult
+  | AgentDelegationResult
   | {
       status: "needs_clarification";
       routing: RoutingDecision;

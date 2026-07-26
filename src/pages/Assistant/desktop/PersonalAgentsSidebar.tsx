@@ -31,7 +31,7 @@ import { personalAgentsApi, usePersonalAgentsStore } from "@/stores/agents/usePe
 import { useSpacesStore } from "@/stores/spaces/useSpacesStore";
 import { AgentModelPicker } from "@/features/agents/components/AgentModelPicker";
 import { initialAgentModelId, modelSupportsReasoning } from "@/features/agents/modelSelection";
-import { useMikaSessionStore } from "@/stores/assistant/useMikaSessionStore";
+import { useAgentSessionStore } from "@/stores/assistant/useAgentSessionStore";
 import { AgentChatList } from "./AgentChatList";
 
 const defaultContext = {
@@ -80,7 +80,7 @@ export function PersonalAgentsSidebar({
   const [grants, setGrants] = useState<GrantDraft>({});
   const [saving, setSaving] = useState(false);
   const [editorError, setEditorError] = useState("");
-  const activeChatCount = useMikaSessionStore((state) => state.conversations.length);
+  const activeChatCount = useAgentSessionStore((state) => state.conversations.length);
 
   useEffect(() => {
     void load();

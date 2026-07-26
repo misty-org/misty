@@ -1,4 +1,4 @@
-export interface MikaServerContext {
+export interface AgentServerContext {
   activeRoot?: string;
   selectedPaths: string[];
 }
