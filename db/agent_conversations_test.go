@@ -11,10 +11,10 @@ import (
 	serveragent "github.com/kannachi323/misty/server/agent"
 )
 
-func TestMikaSessionPersistenceSurvivesUnifiedAgentSchema(t *testing.T) {
+func TestAgentSessionPersistenceSurvivesUnifiedAgentSchema(t *testing.T) {
 	database := openTestDatabase(t)
 	ctx := context.Background()
-	user, err := database.CreateUser("Mika Session Owner", "mika-session@example.com", "correct horse battery staple")
+	user, err := database.CreateUser("Agent Session Owner", "agent-session@example.com", "correct horse battery staple")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -46,10 +46,10 @@ func TestMikaSessionPersistenceSurvivesUnifiedAgentSchema(t *testing.T) {
 	}
 }
 
-func TestMikaSessionsAreListableRenamableAndResumableAcrossDevices(t *testing.T) {
+func TestAgentSessionsAreListableRenamableAndResumableAcrossDevices(t *testing.T) {
 	database := openTestDatabase(t)
 	ctx := context.Background()
-	user, err := database.CreateUser("Mika Rail Owner", "mika-rail@example.com", "correct horse battery staple")
+	user, err := database.CreateUser("Agent Rail Owner", "agent-rail@example.com", "correct horse battery staple")
 	if err != nil {
 		t.Fatal(err)
 	}

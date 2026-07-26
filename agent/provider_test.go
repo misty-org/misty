@@ -297,51 +297,51 @@ func TestNewProviderFromEnvSelectsConfiguredProvider(t *testing.T) {
 	}
 }
 
-func TestNewMikaProviderFromEnvUsesPerTierRoutes(t *testing.T) {
+func TestNewAgentProviderFromEnvUsesPerTierRoutes(t *testing.T) {
 	t.Setenv("AI_GATEWAY_API_KEY", "gateway-key")
 	t.Setenv("OPENAI_API_KEY", "openai-key-that-must-not-be-used")
 	t.Setenv("MISTY_AI_LOW_MODEL", "google/gemini-low")
 	t.Setenv("MISTY_AI_MED_MODEL", "anthropic/claude-med")
 	t.Setenv("MISTY_AI_HIGH_MODEL", "openai/gpt-high")
 
-	router, ok := NewMikaProviderFromEnv().(*MikaProviderRouter)
+	router, ok := NewAgentProviderFromEnv().(*AgentProviderRouter)
 	if !ok {
-		t.Fatalf("NewMikaProviderFromEnv() did not return a Mika router")
+		t.Fatalf("NewAgentProviderFromEnv() did not return a agent router")
 	}
-	if provider, model := providerStatus(router.ProviderForTier(MikaLow)); provider != ProviderVercelAI || model != "google/gemini-low" {
+	if provider, model := providerStatus(router.ProviderForTier(TierLow)); provider != ProviderVercelAI || model != "google/gemini-low" {
 		t.Fatalf("low route = %s/%s", provider, model)
 	}
-	if provider, model := providerStatus(router.ProviderForTier(MikaMed)); provider != ProviderVercelAI || model != "anthropic/claude-med" {
+	if provider, model := providerStatus(router.ProviderForTier(TierMed)); provider != ProviderVercelAI || model != "anthropic/claude-med" {
 		t.Fatalf("med route = %s/%s", provider, model)
 	}
-	if provider, model := providerStatus(router.ProviderForTier(MikaHigh)); provider != ProviderVercelAI || model != "openai/gpt-high" {
+	if provider, model := providerStatus(router.ProviderForTier(TierHigh)); provider != ProviderVercelAI || model != "openai/gpt-high" {
 		t.Fatalf("high route = %s/%s", provider, model)
 	}
-	lowProvider, ok := router.ProviderForTier(MikaLow).(*OpenAIProvider)
+	lowProvider, ok := router.ProviderForTier(TierLow).(*OpenAIProvider)
 	if !ok || lowProvider.apiKey != "gateway-key" || lowProvider.baseURL != defaultVercelAIBaseURL {
 		t.Fatalf("low gateway provider = %#v", lowProvider)
 	}
 }
 
-func TestNewMikaProviderFromEnvUsesGatewayDefaultsAndRequiresGatewayAuth(t *testing.T) {
+func TestNewAgentProviderFromEnvUsesGatewayDefaultsAndRequiresGatewayAuth(t *testing.T) {
 	t.Setenv("AI_GATEWAY_API_KEY", "gateway-key")
-	router := NewMikaProviderFromEnv().(*MikaProviderRouter)
-	if _, model := providerStatus(router.ProviderForTier(MikaLow)); model != defaultMikaLowGatewayModel {
+	router := NewAgentProviderFromEnv().(*AgentProviderRouter)
+	if _, model := providerStatus(router.ProviderForTier(TierLow)); model != defaultAgentLowGatewayModel {
 		t.Fatalf("low default model = %q", model)
 	}
-	if _, model := providerStatus(router.ProviderForTier(MikaMed)); model != defaultMikaMedGatewayModel {
+	if _, model := providerStatus(router.ProviderForTier(TierMed)); model != defaultAgentMedGatewayModel {
 		t.Fatalf("med default model = %q", model)
 	}
-	if _, model := providerStatus(router.ProviderForTier(MikaHigh)); model != defaultMikaHighGatewayModel {
+	if _, model := providerStatus(router.ProviderForTier(TierHigh)); model != defaultAgentHighGatewayModel {
 		t.Fatalf("high default model = %q", model)
 	}
 
 	t.Setenv("AI_GATEWAY_API_KEY", "")
 	t.Setenv("VERCEL_OIDC_TOKEN", "")
 	t.Setenv("OPENAI_API_KEY", "direct-provider-key")
-	router = NewMikaProviderFromEnv().(*MikaProviderRouter)
-	if provider, _ := providerStatus(router.ProviderForTier(MikaHigh)); provider != ProviderMock {
-		t.Fatalf("Mika bypassed gateway with provider %q", provider)
+	router = NewAgentProviderFromEnv().(*AgentProviderRouter)
+	if provider, _ := providerStatus(router.ProviderForTier(TierHigh)); provider != ProviderMock {
+		t.Fatalf("agent bypassed gateway with provider %q", provider)
 	}
 }
 

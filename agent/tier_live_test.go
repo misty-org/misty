@@ -10,19 +10,19 @@ import (
 // This opt-in test spends a small amount of gateway credit. It validates the
 // real Vercel route, Misty's full JSON schema, usage parsing, tool requests, and
 // the tool-result-to-file-plan continuation used by the desktop client.
-func TestMikaGatewayLiveAgentCapabilities(t *testing.T) {
+func TestAgentGatewayLiveCapabilities(t *testing.T) {
 	if os.Getenv("MISTY_RUN_LIVE_AI_TEST") != "1" {
 		t.Skip("set MISTY_RUN_LIVE_AI_TEST=1 to exercise Vercel AI Gateway")
 	}
-	provider := resolveMikaProvider(NewMikaProviderFromEnv(), MikaLow)
+	provider := resolveAgentProvider(NewAgentProviderFromEnv(), TierLow)
 	if name, _ := providerStatus(provider); name != ProviderVercelAI {
-		t.Fatalf("Mika gateway is not configured; provider = %q", name)
+		t.Fatalf("agent gateway is not configured; provider = %q", name)
 	}
 
 	request := ModelRequest{
-		SessionID:  "mika-live-smoke",
-		UserID:     "mika-live-smoke",
-		MikaTier:   MikaLow,
+		SessionID:  "agent-live-smoke",
+		UserID:     "agent-live-smoke",
+		AgentTier:   TierLow,
 		Mode:       ModeAuto,
 		ActiveRoot: "Documents",
 		Messages: []Message{{
@@ -34,7 +34,7 @@ func TestMikaGatewayLiveAgentCapabilities(t *testing.T) {
 	first, err := provider.Next(request)
 	if err != nil {
 		if isLiveGatewayRateLimit(err) {
-			t.Skipf("gateway account rate-limited Mika Low: %v", err)
+			t.Skipf("gateway account rate-limited tier Low: %v", err)
 		}
 		t.Fatal(err)
 	}
@@ -64,7 +64,7 @@ func TestMikaGatewayLiveAgentCapabilities(t *testing.T) {
 	second, err := provider.Next(request)
 	if err != nil {
 		if isLiveGatewayRateLimit(err) {
-			t.Skipf("gateway account rate-limited Mika Low continuation: %v", err)
+			t.Skipf("gateway account rate-limited tier Low continuation: %v", err)
 		}
 		t.Fatal(err)
 	}
@@ -78,13 +78,13 @@ func TestMikaGatewayLiveAgentCapabilities(t *testing.T) {
 		t.Fatalf("live file plan failed validation: %v; plan=%#v", problems, second.FilePlan)
 	}
 
-	for _, tier := range []MikaTier{MikaMed, MikaHigh} {
+	for _, tier := range []AgentTier{TierMed, TierHigh} {
 		t.Run(string(tier), func(t *testing.T) {
-			tierProvider := resolveMikaProvider(NewMikaProviderFromEnv(), tier)
+			tierProvider := resolveAgentProvider(NewAgentProviderFromEnv(), tier)
 			response, err := tierProvider.Next(ModelRequest{
-				SessionID: "mika-live-" + string(tier),
-				UserID:    "mika-live-smoke",
-				MikaTier:  tier,
+				SessionID: "agent-live-" + string(tier),
+				UserID:    "agent-live-smoke",
+				AgentTier:  tier,
 				Mode:      ModeAsk,
 				Messages: []Message{{
 					Role:    "user",
@@ -103,9 +103,9 @@ func TestMikaGatewayLiveAgentCapabilities(t *testing.T) {
 		})
 	}
 
-	completionService := NewService(nil, NewMikaProviderFromEnv())
+	completionService := NewService(nil, NewAgentProviderFromEnv())
 	text, _, err := completionService.CompleteWithTier(
-		"mika-live-smoke", "Summarize this in one sentence: Misty organized the files successfully.", "automation_ai", MikaLow,
+		"agent-live-smoke", "Summarize this in one sentence: Misty organized the files successfully.", "automation_ai", TierLow,
 	)
 	if err != nil {
 		if isLiveGatewayRateLimit(err) {

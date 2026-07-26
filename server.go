@@ -65,7 +65,7 @@ func CreateServer() (*Server, error) {
 		// Every paid model call in the process passes through this ceiling, so
 		// no path can run up an unbounded provider bill.
 		serveragent.NewBudgetedProvider(
-			serveragent.NewMikaProviderFromEnv(),
+			serveragent.NewAgentProviderFromEnv(),
 			serveragent.ProviderBudgetFromEnv(),
 		),
 		serveragent.WithUsageMeter(appbilling.NewCreditMeter(s.Database)),
@@ -395,8 +395,8 @@ func (s *Server) mountSpacesRoutes(prefix string, spaces *api.SpacesService, rea
 	s.Router.MethodFunc(http.MethodGet, prefix+"/spaces/{spaceID}/studio/workflows/{workflowID}/versions", spaces.WorkflowVersions())
 	s.Router.MethodFunc(http.MethodPost, prefix+"/spaces/{spaceID}/studio/workflows/{workflowID}/versions", spaces.WorkflowVersions())
 	s.Router.Get(prefix+"/agents/catalog", spaces.AgentCatalog())
-	s.Router.Get(prefix+"/mika/discovery", spaces.MikaDiscovery())
-	s.Router.Post(prefix+"/mika/delegations", spaces.MikaDelegation())
+	s.Router.Get(prefix+"/mika/discovery", spaces.AgentDiscovery())
+	s.Router.Post(prefix+"/mika/delegations", spaces.AgentDelegation())
 	s.Router.MethodFunc(http.MethodGet, prefix+"/agent-conversations", spaces.AgentConversations())
 	s.Router.MethodFunc(http.MethodPost, prefix+"/agent-conversations", spaces.AgentConversations())
 	s.Router.MethodFunc(http.MethodGet, prefix+"/agent-conversations/{conversationID}/events", spaces.AgentConversationEvents())

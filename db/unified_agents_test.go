@@ -50,7 +50,7 @@ func TestUnifiedAgentVersionsAndPerUserInstances(t *testing.T) {
 		t.Fatalf("standalone workflow run err=%v", err)
 	}
 
-	agent, err := database.SaveSpaceStudioResource(ctx, owner.ID, SpaceStudioResource{SpaceID: space.ID, Kind: "agent", Name: "Mika Researcher", Instructions: "Summarize with citations.", Enabled: true, Status: "available", RuntimeKind: "cloud", AccessPolicy: json.RawMessage(`{"mode":"space","allowedUserIds":[]}`)})
+	agent, err := database.SaveSpaceStudioResource(ctx, owner.ID, SpaceStudioResource{SpaceID: space.ID, Kind: "agent", Name: "Research Agent", Instructions: "Summarize with citations.", Enabled: true, Status: "available", RuntimeKind: "cloud", AccessPolicy: json.RawMessage(`{"mode":"space","allowedUserIds":[]}`)})
 	if err != nil {
 		t.Fatal(err)
 	}

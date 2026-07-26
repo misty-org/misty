@@ -19,19 +19,19 @@ const (
 	defaultGeminiBaseURL        = "https://generativelanguage.googleapis.com/v1beta"
 	defaultGeminiModel          = "gemini-3.5-flash"
 	defaultVercelAIBaseURL      = "https://ai-gateway.vercel.sh/v1"
-	defaultMikaLowGatewayModel  = "google/gemini-2.5-flash-lite"
-	defaultMikaMedGatewayModel  = "google/gemini-2.5-flash"
-	defaultMikaHighGatewayModel = "google/gemini-3.5-flash"
+	defaultAgentLowGatewayModel  = "google/gemini-2.5-flash-lite"
+	defaultAgentMedGatewayModel  = "google/gemini-2.5-flash"
+	defaultAgentHighGatewayModel = "google/gemini-3.5-flash"
 )
 
 func NewProviderFromEnv() ModelProvider {
 	return newProviderFromEnv("", "")
 }
 
-func NewMikaProviderFromEnv() ModelProvider {
+func NewAgentProviderFromEnv() ModelProvider {
 	apiKey := firstEnv("AI_GATEWAY_API_KEY", "VERCEL_OIDC_TOKEN")
 	if apiKey == "" {
-		return NewMikaProviderRouter(MockProvider{}, MockProvider{}, MockProvider{})
+		return NewAgentProviderRouter(MockProvider{}, MockProvider{}, MockProvider{})
 	}
 	baseURL := envOrDefault("AI_GATEWAY_BASE_URL", defaultVercelAIBaseURL)
 	provider := func(modelKey, fallback string) ModelProvider {
@@ -42,10 +42,10 @@ func NewMikaProviderFromEnv() ModelProvider {
 			ProviderName: ProviderVercelAI,
 		})
 	}
-	return NewMikaProviderRouter(
-		provider("MISTY_AI_LOW_MODEL", defaultMikaLowGatewayModel),
-		provider("MISTY_AI_MED_MODEL", defaultMikaMedGatewayModel),
-		provider("MISTY_AI_HIGH_MODEL", defaultMikaHighGatewayModel),
+	return NewAgentProviderRouter(
+		provider("MISTY_AI_LOW_MODEL", defaultAgentLowGatewayModel),
+		provider("MISTY_AI_MED_MODEL", defaultAgentMedGatewayModel),
+		provider("MISTY_AI_HIGH_MODEL", defaultAgentHighGatewayModel),
 	)
 }
 

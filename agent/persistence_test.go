@@ -57,6 +57,47 @@ func (p *memorySessionPersistence) SaveAgentSession(_ context.Context, id, userI
 	return nil
 }
 
+// A session persisted before the agent rename stores its tier under "mikaTier"
+// with a "mika-*" value. Both must still resolve, or every resumed conversation
+// silently drops to TierLow.
+func TestUnmarshalPersistentSessionReadsLegacyTierKey(t *testing.T) {
+	for _, testCase := range []struct {
+		name  string
+		state string
+		want  AgentTier
+	}{
+		{"legacy key and value", `{"id":"s1","userId":"u1","mikaTier":"mika-high"}`, TierHigh},
+		{"legacy key med", `{"id":"s1","userId":"u1","mikaTier":"mika-med"}`, TierMed},
+		{"current key wins", `{"id":"s1","userId":"u1","agentTier":"tier-high","mikaTier":"mika-low"}`, TierHigh},
+		{"current key only", `{"id":"s1","userId":"u1","agentTier":"tier-med"}`, TierMed},
+		{"absent defaults low", `{"id":"s1","userId":"u1"}`, TierLow},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			session, err := unmarshalPersistentSession(json.RawMessage(testCase.state), "s1", "u1")
+			if err != nil {
+				t.Fatalf("unmarshalPersistentSession() error = %v", err)
+			}
+			if session.AgentTier != testCase.want {
+				t.Fatalf("AgentTier = %q, want %q", session.AgentTier, testCase.want)
+			}
+		})
+	}
+}
+
+// Only the current key is ever written, so migrated rows stop carrying the alias.
+func TestMarshalPersistentSessionWritesOnlyCurrentTierKey(t *testing.T) {
+	raw, err := marshalPersistentSession(&Session{ID: "s1", UserID: "u1", AgentTier: TierHigh})
+	if err != nil {
+		t.Fatalf("marshalPersistentSession() error = %v", err)
+	}
+	if strings.Contains(string(raw), "mikaTier") {
+		t.Fatalf("persisted state still writes the legacy tier key: %s", raw)
+	}
+	if !strings.Contains(string(raw), `"agentTier":"tier-high"`) {
+		t.Fatalf("persisted state missing current tier key: %s", raw)
+	}
+}
+
 func TestPersistentSessionRestoresAfterRuntimeRestart(t *testing.T) {
 	persistence := newMemorySessionPersistence()
 	first := NewService(NewSessionStoreWithPersistence(time.Hour, persistence), MockProvider{})
