@@ -74,9 +74,14 @@ func CreateServer() (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
-	s.Library, err = api.NewSpaceLibraryService(s.Database, s.LibraryStore, true, 250<<20)
+	s.Library, err = api.NewSpaceLibraryService(s.Database, s.LibraryStore, true, api.UploadLimitsFromEnv())
 	if err != nil {
 		return nil, fmt.Errorf("configure Space Library: %w", err)
+	}
+	// Production must not silently fall back to proxying user file bodies
+	// through the VPS, so a store that cannot sign R2 operations is fatal here.
+	if err := s.Library.EnableDirectTransfers(api.DirectTransferConfigFromEnv()); err != nil {
+		return nil, fmt.Errorf("configure direct R2 transfers: %w", err)
 	}
 	s.Demo, err = api.NewDemoService(s.Database, s.LibraryStore, api.DemoConfigFromEnv())
 	if err != nil {
@@ -134,7 +139,10 @@ func (s *Server) MountHandlers() error {
 		AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-Misty-Platform", "X-Misty-Release-Channel", "X-Misty-Session-Id", "X-Misty-Analytics-Enabled", "X-Misty-Device-Timestamp", "X-Misty-Device-Nonce", "X-Misty-Device-Signature", "X-Misty-Attachment-Upload-Token", "X-Misty-Library-Upload-Token"},
 		AllowCredentials: true,
-		MaxAge:           300,
+		// The client must be able to read the marker that distinguishes a signed
+		// download descriptor from a proxied file body.
+		ExposedHeaders: []string{"X-Misty-Signed-Download"},
+		MaxAge:         300,
 	}))
 	// The abuse guard runs first: a blocked caller is rejected before any
 	// routing or handler work, and repeated per-route rejections escalate

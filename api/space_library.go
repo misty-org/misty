@@ -14,6 +14,7 @@ import (
 	"math"
 	"mime"
 	"net/http"
+	"os"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -30,6 +31,7 @@ import (
 
 const (
 	libraryUploadTokenHeader      = "X-Misty-Library-Upload-Token"
+	librarySignedDownloadHeader   = "X-Misty-Signed-Download"
 	libraryReauthenticationHeader = "X-Misty-Library-Reauthentication"
 	libraryUploadLifetime         = 30 * time.Minute
 )
@@ -57,7 +59,139 @@ type SpaceLibraryService struct {
 	importsEnabled     bool
 	exportsEnabled     bool
 	malwareScanner     LibraryMalwareScanner
-	maxFileBytes       int64
+	uploadLimits       UploadLimits
+	noteAssetsEnabled  bool
+	transfers          DirectTransferConfig
+	// presigner is non-nil only when the configured object store can sign R2
+	// operations. Local development leaves it nil and keeps the proxy route.
+	presigner LibraryObjectPresigner
+}
+
+// DirectTransferConfig controls whether user file bytes move directly between
+// the client and R2 instead of being proxied through the VPS.
+type DirectTransferConfig struct {
+	Enabled        bool
+	UploadURLTTL   time.Duration
+	DownloadURLTTL time.Duration
+}
+
+// DefaultDirectTransferConfig matches the documented beta configuration.
+func DefaultDirectTransferConfig() DirectTransferConfig {
+	return DirectTransferConfig{Enabled: false, UploadURLTTL: 15 * time.Minute, DownloadURLTTL: 2 * time.Minute}
+}
+
+// DirectTransferConfigFromEnv reads MISTY_R2_DIRECT_TRANSFERS and the two URL
+// lifetimes.
+func DirectTransferConfigFromEnv() DirectTransferConfig {
+	config := DefaultDirectTransferConfig()
+	config.Enabled = strings.EqualFold(strings.TrimSpace(os.Getenv("MISTY_R2_DIRECT_TRANSFERS")), "true")
+	config.UploadURLTTL = positiveEnvDuration("MISTY_R2_UPLOAD_URL_TTL", config.UploadURLTTL)
+	config.DownloadURLTTL = positiveEnvDuration("MISTY_R2_DOWNLOAD_URL_TTL", config.DownloadURLTTL)
+	return config
+}
+
+func positiveEnvDuration(name string, fallback time.Duration) time.Duration {
+	value, err := time.ParseDuration(strings.TrimSpace(os.Getenv(name)))
+	if err != nil || value <= 0 {
+		return fallback
+	}
+	return value
+}
+
+// EnableDirectTransfers wires the signed-URL path. Production startup must fail
+// when direct transfers are required but the configured store cannot sign, so
+// this returns an error rather than silently falling back to the proxy.
+func (s *SpaceLibraryService) EnableDirectTransfers(config DirectTransferConfig) error {
+	if !config.Enabled {
+		s.transfers, s.presigner = config, nil
+		return nil
+	}
+	presigner, ok := s.store.(LibraryObjectPresigner)
+	if !ok {
+		return errors.New("direct R2 transfers require an object store that can sign S3 operations")
+	}
+	if _, err := validatePresignTTL(config.UploadURLTTL); err != nil {
+		return fmt.Errorf("upload URL TTL: %w", err)
+	}
+	if _, err := validatePresignTTL(config.DownloadURLTTL); err != nil {
+		return fmt.Errorf("download URL TTL: %w", err)
+	}
+	s.transfers, s.presigner = config, presigner
+	return nil
+}
+
+func (s *SpaceLibraryService) directTransfersActive() bool {
+	return s.transfers.Enabled && s.presigner != nil
+}
+
+// UploadPurpose names the kind of upload being performed. Each purpose has its
+// own authorization rule and its own maximum file size.
+type UploadPurpose = string
+
+const (
+	UploadPurposeLibrary        UploadPurpose = db.UploadPurposeLibrary
+	UploadPurposeChatAttachment UploadPurpose = db.UploadPurposeChatAttachment
+	UploadPurposeNoteAttachment UploadPurpose = db.UploadPurposeNoteAttachment
+)
+
+// UploadLimits holds the configured maximum file size for each upload purpose.
+type UploadLimits struct {
+	Library        int64
+	ChatAttachment int64
+	NoteAttachment int64
+}
+
+// DefaultUploadLimits matches the beta product decision: 100 MB Library files,
+// 15 MB note attachments, 10 MB chat attachments.
+func DefaultUploadLimits() UploadLimits {
+	return UploadLimits{
+		Library:        db.DefaultLibraryMaxFileBytes,
+		ChatAttachment: db.DefaultChatAttachmentMaxFileBytes,
+		NoteAttachment: db.DefaultNoteAttachmentMaxFileBytes,
+	}
+}
+
+// UploadLimitsFromEnv reads the purpose-specific maximums, falling back to the
+// beta defaults. A configured value above the database ceiling is rejected by
+// validate() at service construction rather than silently clamped.
+func UploadLimitsFromEnv() UploadLimits {
+	limits := DefaultUploadLimits()
+	limits.Library = positiveEnvBytes("MISTY_LIBRARY_MAX_FILE_BYTES", limits.Library)
+	limits.ChatAttachment = positiveEnvBytes("MISTY_CHAT_ATTACHMENT_MAX_FILE_BYTES", limits.ChatAttachment)
+	limits.NoteAttachment = positiveEnvBytes("MISTY_NOTE_ATTACHMENT_MAX_FILE_BYTES", limits.NoteAttachment)
+	return limits
+}
+
+// Max returns the configured maximum for a purpose, or 0 when the purpose is
+// unknown. A 0 result must be treated as "reject".
+func (l UploadLimits) Max(purpose UploadPurpose) int64 {
+	switch purpose {
+	case UploadPurposeLibrary:
+		return l.Library
+	case UploadPurposeChatAttachment:
+		return l.ChatAttachment
+	case UploadPurposeNoteAttachment:
+		return l.NoteAttachment
+	default:
+		return 0
+	}
+}
+
+func (l UploadLimits) validate() error {
+	for _, limit := range []struct {
+		purpose UploadPurpose
+		value   int64
+	}{
+		{UploadPurposeLibrary, l.Library},
+		{UploadPurposeChatAttachment, l.ChatAttachment},
+		{UploadPurposeNoteAttachment, l.NoteAttachment},
+	} {
+		ceiling := db.MaxUploadBytesForPurpose(limit.purpose)
+		if limit.value < 1 || limit.value > ceiling {
+			return fmt.Errorf("upload limit for %s must be between 1 and %d bytes", limit.purpose, ceiling)
+		}
+	}
+	return nil
 }
 
 func (s *SpaceLibraryService) SetSubsystems(attachmentsEnabled, groupsEnabled, previewsEnabled, peopleEnabled, editingEnabled, locationsEnabled, duplicatesEnabled, importsEnabled, exportsEnabled bool) {
@@ -85,19 +219,37 @@ func (s *SpaceLibraryService) SetMetadataExtractor(extractor LibraryMetadataExtr
 	s.metadataExtractor = extractor
 }
 
-func (s *SpaceLibraryService) uploadPurposeEnabled(purpose string) bool {
-	return purpose == "library" && s.uploadsEnabled || purpose == "attachment" && s.attachmentsEnabled
+func (s *SpaceLibraryService) uploadPurposeEnabled(purpose UploadPurpose) bool {
+	switch purpose {
+	case UploadPurposeLibrary:
+		return s.uploadsEnabled
+	case UploadPurposeChatAttachment:
+		return s.attachmentsEnabled
+	case UploadPurposeNoteAttachment:
+		// Note assets authorize against the parent note, which only the note
+		// routes can check. The generic Library upload endpoint must never
+		// accept this purpose.
+		return false
+	default:
+		return false
+	}
 }
 
-func NewSpaceLibraryService(database *db.Database, store LibraryObjectStore, uploadsEnabled bool, maxFileBytes int64) (*SpaceLibraryService, error) {
+// SetNoteAssetsEnabled turns on the note-asset upload purpose for the note
+// routes, which perform the parent-note permission check themselves.
+func (s *SpaceLibraryService) SetNoteAssetsEnabled(enabled bool) {
+	s.noteAssetsEnabled = enabled
+}
+
+func NewSpaceLibraryService(database *db.Database, store LibraryObjectStore, uploadsEnabled bool, limits UploadLimits) (*SpaceLibraryService, error) {
 	if database == nil || store == nil {
 		return nil, errors.New("Library database and permanent object store are required")
 	}
-	if maxFileBytes < 1 || maxFileBytes > db.MaxSpaceStorageBytes {
-		return nil, errors.New("Library max file bytes must be between 1 and 1,000,000,000")
+	if err := limits.validate(); err != nil {
+		return nil, err
 	}
 	return &SpaceLibraryService{
-		database: database, store: store, uploadsEnabled: uploadsEnabled, maxFileBytes: maxFileBytes,
+		database: database, store: store, uploadsEnabled: uploadsEnabled, uploadLimits: limits,
 		egress: NewEgressGuard(EgressBudgetFromEnv()),
 	}, nil
 }
@@ -109,7 +261,7 @@ func NewSpaceLibraryService(database *db.Database, store LibraryObjectStore, upl
 func (s *SpaceLibraryService) WriteGeneratedTextArtifact(ctx context.Context, userID, spaceID, filename, content string, provenance map[string]any) (*db.SpaceLibraryItem, error) {
 	filename = sanitizeLibraryFilename(filename)
 	data := []byte(content)
-	if filename == "" || len(data) == 0 || int64(len(data)) > s.maxFileBytes {
+	if filename == "" || len(data) == 0 || int64(len(data)) > s.uploadLimits.Max(UploadPurposeLibrary) {
 		return nil, db.ErrLibraryInvalid
 	}
 	digest := sha256.Sum256(data)
@@ -1041,7 +1193,8 @@ func (s *SpaceLibraryService) InitiateUpload() http.HandlerFunc {
 		body.Filename = sanitizeLibraryFilename(body.Filename)
 		body.SHA256 = strings.ToLower(strings.TrimSpace(body.SHA256))
 		body.MIMEType = strings.TrimSpace(body.MIMEType)
-		if body.ByteSize < 1 || body.ByteSize > s.maxFileBytes || !librarySHA256Pattern.MatchString(body.SHA256) || body.Filename == "" || (body.Purpose != "library" && body.Purpose != "attachment") {
+		maxBytes := s.uploadLimits.Max(body.Purpose)
+		if maxBytes < 1 || body.ByteSize < 1 || body.ByteSize > maxBytes || !librarySHA256Pattern.MatchString(body.SHA256) || body.Filename == "" {
 			writeLibraryError(w, db.ErrLibraryInvalid)
 			return
 		}
@@ -1057,9 +1210,10 @@ func (s *SpaceLibraryService) InitiateUpload() http.HandlerFunc {
 			writeLibraryError(w, err)
 			return
 		}
-		transfer := LibraryObjectUpload{
-			URL: fmt.Sprintf("/spaces/%s/library/uploads/%s/content", upload.SpaceID, upload.ID), Method: http.MethodPut,
-			Headers: map[string]string{libraryUploadTokenHeader: token, "Content-Type": body.MIMEType}, ExpiresAt: expiresAt,
+		transfer, err := s.uploadTransfer(r.Context(), upload, token, expiresAt)
+		if err != nil {
+			writeLibraryError(w, err)
+			return
 		}
 		writeJSON(w, http.StatusCreated, map[string]any{
 			"upload":   upload,
@@ -1067,6 +1221,34 @@ func (s *SpaceLibraryService) InitiateUpload() http.HandlerFunc {
 			"finalize": map[string]any{"headers": map[string]string{libraryUploadTokenHeader: token}},
 		})
 	}
+}
+
+// uploadTransfer describes how the client should move the bytes. With direct
+// transfer it is an absolute presigned R2 PUT that carries no Misty
+// credentials; otherwise it is the relative proxy route used in development.
+func (s *SpaceLibraryService) uploadTransfer(ctx context.Context, upload *db.LibraryUpload, token string, expiresAt time.Time) (LibraryObjectUpload, error) {
+	if s.directTransfersActive() {
+		metadata := LibraryObjectMetadata{
+			ByteSize: upload.RequestedByteSize,
+			SHA256:   upload.ClientSHA256,
+			MIMEType: upload.ClientDeclaredMIMEType,
+		}
+		signed, err := s.presigner.PresignPut(ctx, upload.ObjectKey, metadata, s.transfers.UploadURLTTL)
+		if err != nil {
+			return LibraryObjectUpload{}, err
+		}
+		return LibraryObjectUpload{
+			URL: signed.URL, Method: signed.Method, Headers: signed.Headers, ExpiresAt: signed.ExpiresAt,
+		}, nil
+	}
+	return LibraryObjectUpload{
+		URL:     fmt.Sprintf("/spaces/%s/library/uploads/%s/content", upload.SpaceID, upload.ID),
+		Method:  http.MethodPut,
+		Headers: map[string]string{libraryUploadTokenHeader: token, "Content-Type": upload.ClientDeclaredMIMEType},
+		// The proxy route is bounded by the Misty upload reservation, not by a
+		// signature, so it keeps the reservation lifetime.
+		ExpiresAt: expiresAt,
+	}, nil
 }
 
 func (s *SpaceLibraryService) UploadContent() http.HandlerFunc {
@@ -1084,6 +1266,12 @@ func (s *SpaceLibraryService) UploadContent() http.HandlerFunc {
 		}
 		if !s.uploadPurposeEnabled(pending.Purpose) {
 			writeJSON(w, http.StatusServiceUnavailable, map[string]string{"code": "library_uploads_disabled"})
+			return
+		}
+		// The proxy route exists only for the local development object store.
+		// Once direct transfer is on, large user bodies must never reach the VPS.
+		if s.directTransfersActive() {
+			writeJSON(w, http.StatusConflict, map[string]string{"code": "library_direct_transfer_required"})
 			return
 		}
 		upload, err := s.database.SetLibraryUploadState(r.Context(), userID, spaceID, uploadID, tokenHash, "initiated", "uploading")
@@ -1142,13 +1330,24 @@ func (s *SpaceLibraryService) FinalizeUpload() http.HandlerFunc {
 			writeJSON(w, http.StatusOK, result)
 			return
 		}
-		if upload.State != "uploaded_unverified" {
+		// With direct transfer the client PUTs straight to R2, so the upload is
+		// still "initiated" here: the HEAD below is the only proof the bytes
+		// landed. The proxy path advances to "uploaded_unverified" first.
+		directPending := s.directTransfersActive() && upload.State == "initiated"
+		if upload.State != "uploaded_unverified" && !directPending {
 			writeLibraryError(w, db.ErrLibraryConflict)
 			return
 		}
+		if directPending {
+			if _, err := s.database.SetLibraryUploadState(r.Context(), userID, spaceID, uploadID, tokenHash, "initiated", "uploaded_unverified"); err != nil {
+				writeLibraryError(w, err)
+				return
+			}
+			upload.State = "uploaded_unverified"
+		}
 
-		// Bytes reach R2 through UploadContent. Finalization verifies that the
-		// server-side write produced the expected immutable object metadata.
+		// Finalization verifies that the object actually in R2 matches exactly
+		// what the server authorized: same key, size, and checksum.
 		metadata, headErr := s.store.Head(r.Context(), upload.ObjectKey)
 		if headErr != nil || metadata.ByteSize != upload.RequestedByteSize || metadata.SHA256 != upload.ClientSHA256 {
 			s.rejectAndDelete(r.Context(), upload, tokenHash, "invalid", "object_missing_or_mismatched")
@@ -2097,6 +2296,26 @@ func (s *SpaceLibraryService) writeDownload(w http.ResponseWriter, r *http.Reque
 		WriteQuotaExceeded(w)
 		return
 	}
+	filename := download.Filename
+	if download.Rendition {
+		filename = libraryRenditionFilename(filename, download.MIMEType)
+	}
+	// Authorization already succeeded above. With direct transfer the VPS hands
+	// back a short-lived signed URL instead of streaming the bytes itself.
+	if s.directTransfersActive() {
+		descriptor, err := s.presigner.PresignGet(r.Context(), download.ObjectKey, filename, s.transfers.DownloadURLTTL)
+		if err != nil {
+			writeLibraryError(w, err)
+			return
+		}
+		w.Header().Set("Cache-Control", "private, no-store")
+		// An explicit marker, rather than the content type, tells the client this
+		// is a descriptor. A user's own uploaded .json file would otherwise be
+		// indistinguishable from a descriptor on the proxy path.
+		w.Header().Set(librarySignedDownloadHeader, "1")
+		writeJSON(w, http.StatusOK, descriptor)
+		return
+	}
 	reader, metadata, err := s.store.Open(r.Context(), download.ObjectKey)
 	if err != nil {
 		writeLibraryError(w, err)
@@ -2109,10 +2328,6 @@ func (s *SpaceLibraryService) writeDownload(w http.ResponseWriter, r *http.Reque
 	}
 	w.Header().Set("Content-Type", download.MIMEType)
 	w.Header().Set("Content-Length", strconv.FormatInt(download.ByteSize, 10))
-	filename := download.Filename
-	if download.Rendition {
-		filename = libraryRenditionFilename(filename, download.MIMEType)
-	}
 	w.Header().Set("Content-Disposition", mime.FormatMediaType("attachment", map[string]string{"filename": sanitizeLibraryFilename(filename)}))
 	w.Header().Set("Cache-Control", "private, no-store")
 	w.Header().Set("X-Content-Type-Options", "nosniff")

@@ -38,6 +38,58 @@ Production uses the shared private R2 configuration (`R2_ENDPOINT`,
 `library/` prefix. Lifecycle rules must never expire the permanent Library
 prefix.
 
+## Upload limits by purpose
+
+Every upload declares a purpose, and each purpose has its own maximum file size
+and its own authorization rule. The limits are enforced in the API service and
+again in `db.CreateLibraryUpload`, so a misconfigured service cannot widen them.
+The desktop performs the same check first purely as a convenience.
+
+| Purpose            | Env var                                 | Default |
+| ------------------ | --------------------------------------- | ------- |
+| `library`          | `MISTY_LIBRARY_MAX_FILE_BYTES`          | 100 MB  |
+| `note_attachment`  | `MISTY_NOTE_ATTACHMENT_MAX_FILE_BYTES`  | 15 MB   |
+| `attachment`       | `MISTY_CHAT_ATTACHMENT_MAX_FILE_BYTES`  | 10 MB   |
+
+A configured value above the default is rejected at startup rather than clamped.
+The `note_attachment` purpose is never accepted by the generic Space Library
+upload endpoint: note assets authorize against the parent note, so only the note
+routes may create them.
+
+## Direct R2 transfer
+
+```text
+MISTY_R2_DIRECT_TRANSFERS=true
+MISTY_R2_UPLOAD_URL_TTL=15m
+MISTY_R2_DOWNLOAD_URL_TTL=2m
+```
+
+When enabled, upload initiation returns an absolute presigned `PUT` URL instead
+of the relative `/library/uploads/{uploadID}/content` proxy route, and authorized
+download handlers return a signed descriptor (`url`, `expires_at`, `filename`)
+instead of streaming bytes. User file bodies then never pass through the VPS,
+which remains the authorization and metadata control plane.
+
+The presigned `PUT` signature covers the exact object key, byte length, content
+type, and SHA-256 checksum, so a client cannot substitute different bytes, a
+different size, or a different key than the server authorized. Finalization
+still HEADs the object and rejects size or checksum mismatches before quota is
+committed. The proxy route returns `409 library_direct_transfer_required` while
+direct transfer is on, so large bodies cannot silently fall back to the VPS.
+
+Startup fails if direct transfers are enabled but the configured object store
+cannot sign S3 operations — the in-memory and local development stores cannot,
+which is why local development keeps using the proxy route.
+
+### Required R2 bucket CORS
+
+Direct transfer will fail in the browser and in packaged Tauri builds until the
+bucket allows the exact app origins. Configure the private bucket for `PUT`,
+`GET`, and `HEAD` from only the explicit Misty development and packaged origins,
+allowing only the signed headers (`Content-Type`, `x-amz-checksum-sha256`,
+`x-amz-meta-misty-library-sha256`). Do not use a wildcard origin with
+credentials.
+
 ## Security-domain mapping
 
 The interim approved mapping is implemented: the personal Space uses the owner's

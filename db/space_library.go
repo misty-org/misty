@@ -38,6 +38,54 @@ const (
 	LibraryRecoveryWindow        = 30 * 24 * time.Hour
 )
 
+// Upload purposes decide which Space permission an upload needs and which
+// maximum file size applies. The database enforces the maximum independently of
+// the API service so a misconfigured service cannot widen the limit.
+const (
+	UploadPurposeLibrary        = "library"
+	UploadPurposeChatAttachment = "attachment"
+	UploadPurposeNoteAttachment = "note_attachment"
+)
+
+// Default per-purpose maximums. Deployments may lower these through
+// configuration, but never above the ceiling enforced here.
+const (
+	DefaultLibraryMaxFileBytes        = int64(100 << 20)
+	DefaultChatAttachmentMaxFileBytes = int64(10 << 20)
+	DefaultNoteAttachmentMaxFileBytes = int64(15 << 20)
+)
+
+// MaxUploadBytesForPurpose is the hard database ceiling for a purpose. An
+// unknown purpose has no valid ceiling and returns 0.
+func MaxUploadBytesForPurpose(purpose string) int64 {
+	switch purpose {
+	case UploadPurposeLibrary:
+		return DefaultLibraryMaxFileBytes
+	case UploadPurposeChatAttachment:
+		return DefaultChatAttachmentMaxFileBytes
+	case UploadPurposeNoteAttachment:
+		return DefaultNoteAttachmentMaxFileBytes
+	default:
+		return 0
+	}
+}
+
+// UploadPurposePermission maps a purpose to the Space permission it requires.
+func UploadPurposePermission(purpose string) (string, bool) {
+	switch purpose {
+	case UploadPurposeLibrary:
+		return PermissionLibraryUpload, true
+	case UploadPurposeChatAttachment:
+		return PermissionAttachmentUpload, true
+	case UploadPurposeNoteAttachment:
+		// Note assets authorize against the parent note, not a Space-wide
+		// permission. Callers must check note edit access before reaching here.
+		return PermissionLibraryView, true
+	default:
+		return "", false
+	}
+}
+
 var configurableSpacePermissions = []string{
 	PermissionMessagesRead, PermissionMessagesWrite,
 	PermissionLibraryView, PermissionLibraryUpload, PermissionAttachmentUpload,
@@ -318,12 +366,10 @@ func (db *Database) SpaceStorageUsage(ctx context.Context, userID, spaceID strin
 }
 
 func (db *Database) CreateLibraryUpload(ctx context.Context, userID, spaceID, purpose, filename, declaredMIME string, byteSize int64, clientSHA, objectKey, tokenHash string, expiresAt time.Time) (*LibraryUpload, error) {
-	if purpose != "library" && purpose != "attachment" || byteSize < 1 || byteSize > MaxSpaceStorageBytes || len(clientSHA) != 64 || filename == "" || objectKey == "" || tokenHash == "" {
+	permission, purposeKnown := UploadPurposePermission(purpose)
+	maxBytes := MaxUploadBytesForPurpose(purpose)
+	if !purposeKnown || byteSize < 1 || byteSize > maxBytes || byteSize > MaxSpaceStorageBytes || len(clientSHA) != 64 || filename == "" || objectKey == "" || tokenHash == "" {
 		return nil, ErrLibraryInvalid
-	}
-	permission := PermissionLibraryUpload
-	if purpose == "attachment" {
-		permission = PermissionAttachmentUpload
 	}
 	out := &LibraryUpload{ID: "upload_" + uuid.NewString(), SpaceID: spaceID, UserID: userID, ObjectKey: objectKey, OriginalFilename: filename, Purpose: purpose, ClientDeclaredMIMEType: declaredMIME, RequestedByteSize: byteSize, ClientSHA256: clientSHA, State: "initiated", UploadTokenHash: tokenHash, ExpiresAt: expiresAt, Version: 1}
 	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
