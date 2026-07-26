@@ -197,6 +197,7 @@ type CompleteLibraryUploadResult struct {
 	File             LibraryFile        `json:"file"`
 	Item             *SpaceLibraryItem  `json:"item,omitempty"`
 	Attachment       *MessageAttachment `json:"attachment,omitempty"`
+	NoteAsset        *SpaceNoteAsset    `json:"note_asset,omitempty"`
 	DiscardObjectKey string             `json:"-"`
 }
 
@@ -736,6 +737,21 @@ func (db *Database) CompleteLibraryUpload(ctx context.Context, userID, spaceID, 
 				return err
 			}
 			result.Item, sourceID, sourceKind = item, item.ID, "library_item"
+		} else if upload.Purpose == UploadPurposeNoteAttachment {
+			// A note asset is deliberately not a Library item and not a message
+			// attachment: it is reachable only through its parent note's ACL.
+			var noteID string
+			if err := tx.QueryRowContext(ctx, `SELECT COALESCE(note_id,'') FROM space_library_uploads WHERE id=$1`, upload.ID).Scan(&noteID); err != nil {
+				return err
+			}
+			if noteID == "" {
+				return ErrLibraryInvalid
+			}
+			asset := &SpaceNoteAsset{ID: "noteasset_" + uuid.NewString(), NoteID: noteID, FileID: file.ID, UploaderUserID: userID, DisplayName: upload.OriginalFilename, LifecycleState: "ready"}
+			if err := tx.QueryRowContext(ctx, `INSERT INTO space_note_assets(id,note_id,file_id,uploader_user_id,display_name) VALUES($1,$2,$3,$4,$5) RETURNING created_at`, asset.ID, noteID, file.ID, userID, upload.OriginalFilename).Scan(&asset.CreatedAt); err != nil {
+				return err
+			}
+			result.NoteAsset, sourceID, sourceKind = asset, asset.ID, "note_asset"
 		} else {
 			attachment := &MessageAttachment{ID: "attachment_" + uuid.NewString(), SpaceID: spaceID, FileID: file.ID, UploadID: upload.ID, UploaderUserID: userID, DisplayName: upload.OriginalFilename, LifecycleState: "ready"}
 			if err := tx.QueryRowContext(ctx, `INSERT INTO space_message_attachments(id,space_id,file_id,upload_id,uploader_user_id,display_name) VALUES($1,$2,$3,$4,$5,$6) RETURNING created_at`, attachment.ID, spaceID, file.ID, upload.ID, userID, upload.OriginalFilename).Scan(&attachment.CreatedAt); err != nil {
