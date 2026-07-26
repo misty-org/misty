@@ -1726,6 +1726,13 @@ func spaceEventVisibleToUserTx(ctx context.Context, tx *sql.Tx, userID string, e
 				permission = PermissionStudioView
 			}
 		}
+	case strings.HasPrefix(event.EventType, "note."):
+		// Notes are private to their creator and explicit grantees, so a note
+		// event must never reach the whole Space the way other event families
+		// do. There is no Space permission that grants note visibility: the
+		// answer comes from the note's own ACL, evaluated now rather than when
+		// the event was recorded.
+		return noteEventVisibleToUserTx(ctx, tx, userID, event)
 	case strings.HasPrefix(event.EventType, "agent."), strings.HasPrefix(event.EventType, "workflow."):
 		permission = PermissionStudioView
 	default:

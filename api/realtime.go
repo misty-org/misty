@@ -137,6 +137,12 @@ func (s *RealtimeService) broadcastControl(payload []byte) {
 		Type    string   `json:"type"`
 		SpaceID string   `json:"space_id"`
 		UserIDs []string `json:"user_ids"`
+		NoteID  string   `json:"note_id"`
+		// KeepConnection marks a control message that revokes access to one
+		// resource rather than to the whole Space. Losing a note grant must not
+		// tear down the connection: the user is still a Space member and still
+		// needs chat, tasks, and Library events.
+		KeepConnection bool `json:"keep_connection"`
 	}
 	if json.Unmarshal(payload, &control) != nil {
 		return
@@ -145,7 +151,11 @@ func (s *RealtimeService) broadcastControl(payload []byte) {
 	for _, userID := range control.UserIDs {
 		affected[userID] = true
 	}
-	envelope, _ := json.Marshal(map[string]any{"type": "control", "action": control.Type, "space_id": control.SpaceID})
+	envelopeFields := map[string]any{"type": "control", "action": control.Type, "space_id": control.SpaceID}
+	if control.NoteID != "" {
+		envelopeFields["note_id"] = control.NoteID
+	}
+	envelope, _ := json.Marshal(envelopeFields)
 	s.mu.RLock()
 	clients := make([]*realtimeClient, 0)
 	for client := range s.clients {
@@ -158,6 +168,9 @@ func (s *RealtimeService) broadcastControl(payload []byte) {
 		select {
 		case client.send <- envelope:
 		default:
+		}
+		if control.KeepConnection {
+			continue
 		}
 		go func(target *realtimeClient) {
 			timer := time.NewTimer(150 * time.Millisecond)
