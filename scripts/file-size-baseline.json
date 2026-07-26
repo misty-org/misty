@@ -55,7 +55,7 @@
   "src/stores/backend/useMistyBackendStore.ts": 844,
   "src/stores/media/useSmartLibraryStore.ts": 570,
   "src/stores/providers/useProvidersStore.ts": 1320,
-  "src/stores/spaces/useSpacesBackendStore.ts": 1348,
+  "src/stores/spaces/useSpacesBackendStore.ts": 1351,
   "src/stores/spaces/useSpacesStore.ts": 687,
   "src/stores/transfers/useTransfersStore.ts": 529
 }

@@ -9,6 +9,8 @@ import {
   readAccountAuthToken,
 } from "@/stores/account/useAuthTokenStore";
 import { appSnapshot } from "@/stores/backend";
+import { assertUploadLimit } from "@/features/library/uploadLimits";
+import { readDownloadBlob } from "@/features/library/signedDownload";
 import { safeTauriAssetUrl } from "@/platform/tauri";
 import type { SpaceConversation, SpaceRun } from "@/models/interfaces/features/spaces/types";
 import type {
@@ -1177,6 +1179,7 @@ async function uploadLibraryFile(
   replace?: { itemId: string; itemVersion: number },
 ): Promise<LibraryUploadResult> {
   assertStableSpaceAccount(accountGeneration);
+  assertUploadLimit(purpose, file.size);
   options?.onStage?.("hashing");
   const bytes = await file.arrayBuffer();
   assertStableSpaceAccount(accountGeneration);
@@ -1330,7 +1333,7 @@ async function fetchProtectedBlob(path: string, init?: RequestInit): Promise<Blo
     }
     throw new SpaceRequestError(spaceErrorMessage(code, text), response.status, code);
   }
-  const blob = await response.blob();
+  const blob = await readDownloadBlob(response);
   assertStableSpaceAccount(accountGeneration);
   return blob;
 }
