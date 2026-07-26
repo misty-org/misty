@@ -5,7 +5,7 @@ import { useCallback, useSyncExternalStore } from "react";
  * user-customisable and persisted locally so both the panel and the header stay in sync.
  */
 const STORAGE_KEY = "misty.baseAgentName";
-const DEFAULT_NAME = "Assistant";
+const DEFAULT_NAME = "Agent";
 const EVENT = "misty:base-agent-name";
 
 function read(): string {

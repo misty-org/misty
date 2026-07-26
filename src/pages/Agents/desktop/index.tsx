@@ -19,13 +19,13 @@ import { useMultiPanelStore } from "@/features/workspace";
 import { useExplorerStore } from "@/stores/explorer";
 import { MistyPicker } from "@/features/picker/MistyPicker";
 import { useSpacesStore } from "@/stores/spaces/useSpacesStore";
-import { agentScopeKey, useAgentSessionStore } from "@/stores/assistant/useAgentSessionStore";
+import { agentScopeKey, useAgentSessionStore } from "@/stores/agent/useAgentSessionStore";
 import { usePersonalAgentsStore } from "@/stores/agents/usePersonalAgentsStore";
 import { useAuth } from "@/features/auth/AuthContext";
-import { AssistantMessage } from "@/features/explorer/desktop/ExplorerAssistantMessage";
-import { AssistantComposerActions } from "@/features/explorer/desktop/ExplorerAssistantComposer";
-import { assistantPlaceholder } from "@/features/explorer/desktop/ExplorerAssistantShared";
-import { assistantPanelStyles } from "@/features/explorer/desktop/ExplorerAssistantStyles";
+import { AgentMessage } from "@/features/explorer/desktop/ExplorerAgentMessage";
+import { AgentComposerActions } from "@/features/explorer/desktop/ExplorerAgentComposer";
+import { agentPlaceholder } from "@/features/explorer/desktop/ExplorerAgentShared";
+import { agentPanelStyles } from "@/features/explorer/desktop/ExplorerAgentStyles";
 import { PersonalAgentsSidebar } from "./PersonalAgentsSidebar";
 import {
   initialAgentModelName,
@@ -177,7 +177,7 @@ export default function DesktopAgentsPage() {
     setPrompt("");
     void sendPrompt({
       displayPrompt: trimmed,
-      prompt: buildAssistantPrompt(trimmed, workingDirectory, selectedPaths, spaceName),
+      prompt: buildAgentPrompt(trimmed, workingDirectory, selectedPaths, spaceName),
       cwd: workingDirectory || null,
       selectedPaths,
     });
@@ -264,13 +264,13 @@ export default function DesktopAgentsPage() {
             ) : null}
           </header>
 
-          {error ? <p className={assistantPanelStyles.errorText}>{error}</p> : null}
+          {error ? <p className={agentPanelStyles.errorText}>{error}</p> : null}
 
-          <div ref={logRef} className={assistantPanelStyles.log} aria-live="polite">
+          <div ref={logRef} className={agentPanelStyles.log} aria-live="polite">
             {messages.length === 0
               ? null
               : messages.map((message) => (
-                  <AssistantMessage
+                  <AgentMessage
                     key={message.id}
                     message={message}
                     running={running}
@@ -298,7 +298,7 @@ export default function DesktopAgentsPage() {
                 ].join(" ")}
                 value={prompt}
                 rows={3}
-                placeholder={assistantPlaceholder(configured, "Ask an agent anything...")}
+                placeholder={agentPlaceholder(configured, "Ask an agent anything...")}
                 disabled={!configured || running}
                 onChange={(event) => setPrompt(event.target.value)}
                 onKeyDown={(event) => {
@@ -308,7 +308,7 @@ export default function DesktopAgentsPage() {
                   }
                 }}
               />
-              <AssistantComposerActions
+              <AgentComposerActions
                 mode={mode}
                 modelName={agentChatModelName}
                 configured={configured}
@@ -408,7 +408,7 @@ export default function DesktopAgentsPage() {
   );
 }
 
-function buildAssistantPrompt(
+function buildAgentPrompt(
   userPrompt: string,
   workingDirectory: string,
   selectedPaths: string[],

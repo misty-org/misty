@@ -8,7 +8,7 @@ import {
 } from "@/stores/backend";
 import { errorText } from "@/lib/format";
 import { isNativeMobileBuild } from "@/platform/buildTarget";
-import { selectAssistantPreferences, useSettingsStore } from "@/stores/app";
+import { selectAgentPreferences, useSettingsStore } from "@/stores/app";
 import {
   cancelAgentSession,
   createAgentSession,
@@ -17,15 +17,15 @@ import {
   fetchAgentEvents,
   sendAgentMessage,
   submitToolResults,
-} from "@/stores/assistant/useAiServerStore";
-import type { AiMode } from "@/models/types/stores/assistant/useAiServerStore";
+} from "@/stores/agent/useAiServerStore";
+import type { AiMode } from "@/models/types/stores/agent/useAiServerStore";
 import type {
   AgentStatusResponse,
   FileOperationPlan,
   ToolManifest,
   ToolRequest,
   ToolResult,
-} from "@/models/interfaces/stores/assistant/useAiServerStore";
+} from "@/models/interfaces/stores/agent/useAiServerStore";
 import { agentsPrepareDocument, agentsRegisterFolderScope } from "@/stores/agents/useAgentsStore";
 import type { AgentCitation } from "@/models/interfaces/features/agents/types";
 import {
@@ -43,7 +43,7 @@ import {
   resolvePendingAgentDelegation,
   trackPendingAgentDelegation,
   tryAgentSpaceDelegation,
-} from "@/stores/assistant/useAgentDelegationStore";
+} from "@/stores/agent/useAgentDelegationStore";
 
 import type {
   AiStatus,
@@ -51,11 +51,11 @@ import type {
   AiToolApproval,
   SendAiPromptRequest,
   AiSessionStore,
-} from "@/models/interfaces/stores/assistant/useAgentSessionStore";
+} from "@/models/interfaces/stores/agent/useAgentSessionStore";
 
 export type AiPanelMessage = {
   id: string;
-  role: "user" | "assistant" | "tool" | "error" | "plan";
+  role: "user" | "agent" | "tool" | "error" | "plan";
   text: string;
   planId?: string;
   toolRequestId?: string;
@@ -73,6 +73,6 @@ export type AgentContextSource = {
   href: string;
 };
 
-export type AssistantScope = "files" | "cleanup" | "search";
+export type AgentScope = "files" | "cleanup" | "search";
 
-export type AssistantRequestScope = AssistantScope | "ambiguous" | null;
+export type AgentRequestScope = AgentScope | "ambiguous" | null;

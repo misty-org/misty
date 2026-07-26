@@ -7,12 +7,12 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from "@/ui";
-import type { AiMode } from "@/models/types/stores/assistant/useAiServerStore";
+import type { AiMode } from "@/models/types/stores/agent/useAiServerStore";
 import type { GatewayModel } from "@/models/interfaces/features/agents/personal";
 import { AgentModelPicker } from "@/features/agents/components/AgentModelPicker";
 
 // Shared composer actions for full-page Agent and Space conversations.
-export function AssistantComposerActions(props: {
+export function AgentComposerActions(props: {
   mode: AiMode;
   modelName: string;
   configured: boolean;

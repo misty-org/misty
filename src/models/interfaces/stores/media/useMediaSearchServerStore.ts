@@ -1,5 +1,5 @@
 import type { PreparedMediaChunk } from "@/models/interfaces/services/misty-api";
-import { managedAiRequest } from "@/stores/assistant/useAiServerStore";
+import { managedAiRequest } from "@/stores/agent/useAiServerStore";
 
 export interface MediaSearchHit {
   segmentId: string;

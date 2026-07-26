@@ -26,10 +26,7 @@ import {
 import type { SavedAccountSession } from "@/models/interfaces/stores/account/useAuthTokenStore";
 import { isNativeMobileBuild } from "@/platform/buildTarget";
 import type { CurrentLicense } from "@/models/types/features/installer/types";
-import {
-  resetAgentAccountState,
-  useAgentSessionStore,
-} from "@/stores/assistant/useAgentSessionStore";
+import { resetAgentAccountState, useAgentSessionStore } from "@/stores/agent/useAgentSessionStore";
 import { resetSpacesAccountState, useSpacesStore } from "@/stores/spaces/useSpacesStore";
 import { resetNotesAccountState } from "@/stores/notes/useNotesStore";
 import { useSetupStore } from "@/stores/app";

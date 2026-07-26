@@ -18,7 +18,7 @@ import {
   fetchAgentStatus,
   listAgentSessions,
   renameAgentSession,
-} from "@/stores/assistant/useAiServerStore";
+} from "@/stores/agent/useAiServerStore";
 
 describe("Agent server API", () => {
   beforeEach(() => {

@@ -5,7 +5,7 @@ import { LoadingState } from "@/ui";
 import { useSpacesStore } from "@/stores/spaces/useSpacesStore";
 import { routes } from "./paths";
 
-export function legacyAssistantDestination(
+export function legacyAgentDestination(
   search: string,
   _accessibleSpaceIds?: ReadonlySet<string>,
 ): string {
@@ -15,7 +15,7 @@ export function legacyAssistantDestination(
   return `${routes.agents}${suffix}`;
 }
 
-export function LegacyAssistantRedirect() {
+export function LegacyAgentRedirect() {
   const location = useLocation();
   const { user } = useAuth();
   const spaces = useSpacesStore((state) => state.spaces);
@@ -54,7 +54,7 @@ export function LegacyAssistantRedirect() {
 
   return (
     <Navigate
-      to={legacyAssistantDestination(
+      to={legacyAgentDestination(
         location.search,
         accessVerified ? new Set(spaces.map((space) => space.id)) : new Set(),
       )}
