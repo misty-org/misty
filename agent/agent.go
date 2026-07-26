@@ -281,6 +281,10 @@ func (s *Service) SendMessageWithTierContext(ctx context.Context, sessionID, use
 	if request.ActiveRoot != "" && !isSafeActiveRoot(request.ActiveRoot) {
 		return ErrInvalidRequest("active_root must be an opaque scope ID or a relative display name")
 	}
+	request.SpaceSection = strings.TrimSpace(request.SpaceSection)
+	if request.SpaceSection != "" && !SpaceSections[request.SpaceSection] {
+		return ErrInvalidRequest("space_section must name a Space surface")
+	}
 	for _, selected := range request.SelectedPaths {
 		if _, ok := normalizeRelativePath(selected); !ok {
 			return ErrInvalidRequest("selected_paths must contain only safe relative paths")
@@ -606,6 +610,11 @@ func estimateRequestTokens(request ModelRequest) int64 {
 
 func requestSizeBytes(request ModelRequest) int {
 	characters := 0
+	// The system prompt and the Space blocks are part of the payload the provider
+	// is sent, so they have to be counted here. Omitting them made the
+	// MaxProviderRequestBytes guard blind to context size, and made
+	// estimateRequestTokens under-reserve credits by the whole prompt.
+	characters += len(request.SystemPrompt) + len(request.SpaceCard) + len(request.SpaceRecords)
 	for _, message := range request.Messages {
 		characters += len(message.Content)
 	}

@@ -93,6 +93,57 @@ func TestSendMessageRejectsLocalPaths(t *testing.T) {
 	}
 }
 
+func TestSendMessageValidatesSpaceSection(t *testing.T) {
+	service := NewService(NewSessionStore(0), MockProvider{})
+
+	for _, test := range []struct {
+		name    string
+		section string
+		wantErr bool
+	}{
+		{name: "known surface", section: "library"},
+		{name: "chat surface", section: "chat"},
+		{name: "absent is allowed", section: ""},
+		{name: "whitespace is treated as absent", section: "   "},
+		{name: "unknown surface", section: "studio", wantErr: true},
+		{name: "not a surface at all", section: "../etc/passwd", wantErr: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			session := service.CreateSession("user-1")
+			err := service.SendMessage(session.ID, "user-1", AgentMessageRequest{
+				UserMessage:  "what is open?",
+				SpaceSection: test.section,
+			})
+			if test.wantErr && err == nil {
+				t.Fatalf("SendMessage(section=%q) error = nil, want validation error", test.section)
+			}
+			if !test.wantErr && err != nil {
+				t.Fatalf("SendMessage(section=%q) error = %v", test.section, err)
+			}
+		})
+	}
+}
+
+// The guard on MaxProviderRequestBytes and the credit reservation both read
+// requestSizeBytes, so Space context has to be counted or large contexts bypass
+// the friendly error and are under-billed.
+func TestRequestSizeBytesCountsPromptAndSpaceContext(t *testing.T) {
+	base := requestSizeBytes(ModelRequest{})
+	withPrompt := requestSizeBytes(ModelRequest{SystemPrompt: strings.Repeat("p", 100)})
+	withCard := requestSizeBytes(ModelRequest{SpaceCard: strings.Repeat("c", 100)})
+	withRecords := requestSizeBytes(ModelRequest{SpaceRecords: strings.Repeat("r", 100)})
+
+	for name, got := range map[string]int{
+		"system prompt": withPrompt,
+		"space card":    withCard,
+		"space records": withRecords,
+	} {
+		if got != base+100 {
+			t.Fatalf("requestSizeBytes() ignored the %s: got %d, want %d", name, got, base+100)
+		}
+	}
+}
+
 func TestSendMessageAcceptsOpaqueScopeAndRelativeSelection(t *testing.T) {
 	service := NewService(NewSessionStore(0), MockProvider{})
 	session := service.CreateSession("user-1")

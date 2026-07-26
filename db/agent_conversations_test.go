@@ -145,13 +145,13 @@ func TestAgentSpaceSessionAccessIsRevalidated(t *testing.T) {
 	if err := database.BindAgentSessionContext(ctx, member.ID, agentSessionID, personal.ID, space.ID, "", "test"); err != nil {
 		t.Fatal(err)
 	}
-	if err := database.ValidateAgentSessionAccess(ctx, member.ID, agentSessionID); err != nil {
+	if _, err := database.ValidateAgentSessionAccess(ctx, member.ID, agentSessionID); err != nil {
 		t.Fatalf("ValidateAgentSessionAccess() before revocation = %v", err)
 	}
 	if _, err := database.ReplacePersonalAgentGrants(ctx, owner.ID, personal.ID, nil); err != nil {
 		t.Fatal(err)
 	}
-	if err := database.ValidateAgentSessionAccess(ctx, member.ID, agentSessionID); !errors.Is(err, ErrPersonalAgentNotFound) {
+	if _, err := database.ValidateAgentSessionAccess(ctx, member.ID, agentSessionID); !errors.Is(err, ErrPersonalAgentNotFound) {
 		t.Fatalf("ValidateAgentSessionAccess() after grant revocation = %v, want ErrPersonalAgentNotFound", err)
 	}
 
@@ -162,13 +162,71 @@ func TestAgentSpaceSessionAccessIsRevalidated(t *testing.T) {
 	if err := database.BindAgentSessionContext(ctx, member.ID, directSessionID, "", space.ID, "", "test"); err != nil {
 		t.Fatal(err)
 	}
-	if err := database.ValidateAgentSessionAccess(ctx, member.ID, directSessionID); err != nil {
+	if _, err := database.ValidateAgentSessionAccess(ctx, member.ID, directSessionID); err != nil {
 		t.Fatalf("ValidateAgentSessionAccess() before member removal = %v", err)
 	}
 	if err := database.RemoveSpaceMember(ctx, owner.ID, space.ID, member.ID); err != nil {
 		t.Fatal(err)
 	}
-	if err := database.ValidateAgentSessionAccess(ctx, member.ID, directSessionID); !errors.Is(err, ErrLibraryForbidden) {
+	if _, err := database.ValidateAgentSessionAccess(ctx, member.ID, directSessionID); !errors.Is(err, ErrLibraryForbidden) {
 		t.Fatalf("ValidateAgentSessionAccess() after member removal = %v, want ErrLibraryForbidden", err)
+	}
+}
+
+// The client sends space_id on every message, but a session is bound to its
+// Space when it is created. Callers must use the bound value: if the request
+// were trusted, a member of one Space could read another Space's context by
+// sending a different id on a session bound elsewhere.
+func TestAgentSessionAccessReturnsTheBoundSpace(t *testing.T) {
+	database := openTestDatabase(t)
+	ctx := context.Background()
+	owner, err := database.CreateUser("Bound Space Owner", "bound-space-owner@example.com", "password123")
+	if err != nil {
+		t.Fatal(err)
+	}
+	bound, err := database.CreateSpace(ctx, owner.ID, "Bound Space")
+	if err != nil {
+		t.Fatal(err)
+	}
+	other, err := database.CreateSpace(ctx, owner.ID, "Other Space")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	now := time.Now().UTC()
+	sessionID := "conversation_" + uuid.NewString()
+	if err := database.CreateAgentSession(ctx, sessionID, owner.ID, json.RawMessage(`{}`), now.Add(time.Hour), now.Add(24*time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	if err := database.BindAgentSessionContext(ctx, owner.ID, sessionID, "", bound.ID, "", "test"); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := database.ValidateAgentSessionAccess(ctx, owner.ID, sessionID)
+	if err != nil {
+		t.Fatalf("ValidateAgentSessionAccess() error = %v", err)
+	}
+	if got.SpaceID != bound.ID {
+		t.Fatalf("SpaceID = %q, want the bound Space %q", got.SpaceID, bound.ID)
+	}
+	if got.SpaceID == other.ID {
+		t.Fatal("SpaceID resolved to a Space the session was never bound to")
+	}
+	if got.AgentID != "" {
+		t.Fatalf("AgentID = %q, want empty for a direct session", got.AgentID)
+	}
+
+	// A session with no Space returns an empty context rather than erroring, so
+	// the Files-scoped path keeps working.
+	filesSessionID := "conversation_" + uuid.NewString()
+	if err := database.CreateAgentSession(ctx, filesSessionID, owner.ID, json.RawMessage(`{}`), now.Add(time.Hour), now.Add(24*time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	filesContext, err := database.ValidateAgentSessionAccess(ctx, owner.ID, filesSessionID)
+	if err != nil {
+		t.Fatalf("ValidateAgentSessionAccess() for a Files session error = %v", err)
+	}
+	if filesContext.SpaceID != "" {
+		t.Fatalf("SpaceID = %q, want empty for a session with no Space", filesContext.SpaceID)
 	}
 }

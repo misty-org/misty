@@ -59,6 +59,35 @@ type AgentMessageRequest struct {
 	ActiveRoot    string       `json:"active_root,omitempty"`
 	SelectedPaths []string     `json:"selected_paths,omitempty"`
 	Capabilities  ToolManifest `json:"capabilities"`
+
+	// SpaceID is accepted only so the decoder, which rejects unknown fields,
+	// does not 400 on a client that sends it. It is NOT authoritative: the
+	// session's Space comes from the session row via ValidateAgentSessionAccess,
+	// because trusting this field would let a member read another Space's
+	// context through a session bound elsewhere.
+	SpaceID string `json:"space_id,omitempty"`
+
+	// SpaceSection is which Space surface the member is working in. It is
+	// per-turn state like ActiveRoot, not part of session identity, so walking
+	// between surfaces does not start a new conversation.
+	SpaceSection string `json:"space_section,omitempty"`
+
+	// SpaceCard and SpaceRecords are assembled server-side per turn and are
+	// never accepted from the client; json:"-" keeps the decoder from
+	// populating them.
+	SpaceCard    string `json:"-"`
+	SpaceRecords string `json:"-"`
+}
+
+// SpaceSections are the surfaces a member can be working in when they talk to an
+// agent. Mirrors validSpaceSections in the client's features/spaces/index.tsx.
+var SpaceSections = map[string]bool{
+	"chat":     true,
+	"tasks":    true,
+	"notes":    true,
+	"library":  true,
+	"members":  true,
+	"settings": true,
 }
 
 type ToolManifest struct {
@@ -135,6 +164,17 @@ type ModelRequest struct {
 	ToolResults  []ToolResult
 	Capabilities ToolManifest
 	KnownPaths   []string
+
+	// SpaceCard describes what the Space is, what its surfaces do, and what the
+	// current member may do there. It is stable for a conversation, so it sits in
+	// the cacheable part of the prompt alongside SystemPrompt.
+	SpaceCard string
+	// SpaceRecords is the permission-filtered Space content for this turn. It is
+	// rebuilt as the Space changes, so it sits after the transcript rather than
+	// in front of it, or every turn would invalidate the cached prefix.
+	SpaceRecords string
+	// SpaceSection is the surface the member is working in this turn.
+	SpaceSection string
 }
 
 type ModelResponse struct {
