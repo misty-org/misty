@@ -147,26 +147,44 @@ func (db *Database) ValidateAgentSpaceAccess(ctx context.Context, userID, spaceI
 	})
 }
 
-// ValidateAgentSessionAccess revalidates a persisted session's Space access.
-// This must run before every operation that can read context or continue a run,
-// because Space membership, permissions, and Agent grants can change after the
-// session was created.
-func (db *Database) ValidateAgentSessionAccess(ctx context.Context, userID, conversationID string) error {
-	return db.spaceTx(ctx, func(tx *sql.Tx) error {
-		var agentID, spaceID string
+// AgentSessionContext is the Space and Agent a session was bound to when it was
+// created. It is read from the session row rather than taken from the request,
+// so a caller cannot point an existing session at a different Space.
+type AgentSessionContext struct {
+	SpaceID string
+	AgentID string
+}
+
+// ValidateAgentSessionAccess revalidates a persisted session's Space access and
+// returns the context the session is bound to. This must run before every
+// operation that can read context or continue a run, because Space membership,
+// permissions, and Agent grants can change after the session was created.
+//
+// Callers must use the returned SpaceID rather than any space identifier from
+// the request body. The client sends one, but trusting it would let a member
+// with access to one Space read another Space's context through a session bound
+// elsewhere.
+func (db *Database) ValidateAgentSessionAccess(ctx context.Context, userID, conversationID string) (AgentSessionContext, error) {
+	var bound AgentSessionContext
+	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+		bound = AgentSessionContext{}
 		err := tx.QueryRowContext(ctx, `
 			SELECT COALESCE(personal_agent_id, ''), COALESCE(space_id, '')
 			FROM agent_conversations
 			WHERE id=$1 AND user_id=$2 AND deleted_at IS NULL
-		`, conversationID, userID).Scan(&agentID, &spaceID)
+		`, conversationID, userID).Scan(&bound.AgentID, &bound.SpaceID)
 		if errors.Is(err, sql.ErrNoRows) {
 			return serveragent.ErrPersistedSessionNotFound
 		}
-		if err != nil || spaceID == "" {
+		if err != nil || bound.SpaceID == "" {
 			return err
 		}
-		return validateAgentSpaceAccessTx(ctx, tx, userID, spaceID, agentID)
+		return validateAgentSpaceAccessTx(ctx, tx, userID, bound.SpaceID, bound.AgentID)
 	})
+	if err != nil {
+		return AgentSessionContext{}, err
+	}
+	return bound, nil
 }
 
 func validateAgentSpaceAccessTx(ctx context.Context, tx *sql.Tx, userID, spaceID, agentID string) error {
