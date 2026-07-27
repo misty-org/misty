@@ -34,7 +34,6 @@ const spaceA: Space = {
   role: "owner",
   member_count: 1,
   pending_count: 0,
-  is_personal: true,
   is_shared: false,
   created_at: "2026-07-14T00:00:00Z",
   updated_at: "2026-07-14T00:00:00Z",

@@ -17,7 +17,7 @@ export interface DiscordLinkState {
   /** Undefined means the provider catalog could not be checked. */
   providerConfigured?: boolean;
   providerDiscoveryError: string;
-  link: SpaceDiscordLink | null;
+  links: SpaceDiscordLink[];
   channels: AvailableProviderResource[];
   channelDiscoveryError: string;
   conversations: SpaceConversation[];
@@ -38,7 +38,7 @@ export function useDiscordLink(spaceId: string, canManage: boolean) {
   const [state, setState] = useState<DiscordLinkState>({
     providerConfigured: undefined,
     providerDiscoveryError: "",
-    link: null,
+    links: [],
     channels: [],
     channelDiscoveryError: "",
     conversations: [],
@@ -57,7 +57,7 @@ export function useDiscordLink(spaceId: string, canManage: boolean) {
     patch({ loading: true, error: "" });
     const [integrationResult, linkResult, conversationResult] = await Promise.allSettled([
       spacesApi.integrations(spaceId),
-      spaceDiscordApi.link(spaceId),
+      spaceDiscordApi.links(spaceId),
       spacesApi.conversations(spaceId),
     ]);
     const integration =
@@ -86,7 +86,7 @@ export function useDiscordLink(spaceId: string, canManage: boolean) {
         integrationResult.status === "rejected"
           ? "Misty could not check whether Discord is available."
           : "",
-      link: linkResult.status === "fulfilled" ? linkResult.value.link : null,
+      links: linkResult.status === "fulfilled" ? linkResult.value.links : [],
       channels,
       channelDiscoveryError,
       conversations:
@@ -131,8 +131,8 @@ export function useDiscordLink(spaceId: string, canManage: boolean) {
       await openExternalLink(start.authorization_url);
     });
 
-  const linkChannel = (channelId: string, conversationId: string) =>
-    run("link", async () => {
+  const linkChannel = (channelId: string) =>
+    run(`link:${channelId}`, async () => {
       const channel = state.channels.find((item) => item.external_resource_id === channelId);
       if (!channel || !state.integration) throw new Error("Pick a Discord channel to link.");
       const configuration = channel.configuration as {
@@ -141,7 +141,7 @@ export function useDiscordLink(spaceId: string, canManage: boolean) {
       };
       await spaceDiscordApi.createLink(spaceId, {
         integration_id: state.integration.id,
-        conversation_id: conversationId,
+        conversation_id: "",
         channel_id: channel.external_resource_id,
         channel_name: channel.display_name,
         guild_id: configuration.guild_id ?? "",
@@ -151,25 +151,25 @@ export function useDiscordLink(spaceId: string, canManage: boolean) {
       await load();
     });
 
-  const setDirection = (direction: DiscordLinkDirection) =>
-    run("direction", async () => {
-      if (!state.link) return;
-      const updated = await spaceDiscordApi.updateLink(spaceId, state.link.id, { direction });
-      patch({ link: updated });
+  const setDirection = (linkId: string, direction: DiscordLinkDirection) =>
+    run(`direction:${linkId}`, async () => {
+      const updated = await spaceDiscordApi.updateLink(spaceId, linkId, { direction });
+      patch({ links: state.links.map((link) => (link.id === linkId ? updated : link)) });
     });
 
-  const sync = () =>
-    run("sync", async () => {
-      if (!state.link) return;
-      const result = await spaceDiscordApi.sync(spaceId, state.link.id);
-      patch({ link: result.link, error: result.error ?? "" });
+  const sync = (linkId: string) =>
+    run(`sync:${linkId}`, async () => {
+      const result = await spaceDiscordApi.sync(spaceId, linkId);
+      patch({
+        links: state.links.map((link) => (link.id === linkId ? result.link : link)),
+        error: result.error ?? "",
+      });
     });
 
-  const unlink = () =>
-    run("unlink", async () => {
-      if (!state.link) return;
-      await spaceDiscordApi.deleteLink(spaceId, state.link.id);
-      patch({ link: null });
+  const unlink = (linkId: string) =>
+    run(`unlink:${linkId}`, async () => {
+      await spaceDiscordApi.deleteLink(spaceId, linkId);
+      patch({ links: state.links.filter((link) => link.id !== linkId) });
     });
 
   return { ...state, reload: load, connect, linkChannel, setDirection, sync, unlink };

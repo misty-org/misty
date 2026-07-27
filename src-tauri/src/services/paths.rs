@@ -30,8 +30,21 @@ pub fn misty_home_dir() -> Option<PathBuf> {
     misty_data_root().map(|root| root.join(".misty"))
 }
 
+pub fn misty_assets_dir() -> Option<PathBuf> {
+    #[cfg(not(any(target_os = "ios", target_os = "android")))]
+    {
+        if let Some(path) = env::var_os("MISTY_ASSETS_DIR") {
+            return Some(PathBuf::from(path));
+        }
+    }
+
+    misty_home_dir().map(|home| home.join("assets"))
+}
+
 fn resolve_desktop_home_dir() -> Option<PathBuf> {
-    env::var_os("HOME")
+    env::var_os("MISTY_DESKTOP_DATA_ROOT")
+        .or_else(|| env::var_os("MISTY_DATA_ROOT"))
+        .or_else(|| env::var_os("HOME"))
         .or_else(|| env::var_os("USERPROFILE"))
         .map(PathBuf::from)
 }

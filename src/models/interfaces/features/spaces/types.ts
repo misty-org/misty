@@ -30,7 +30,6 @@ export interface Space {
   role: SpaceRole;
   member_count: number;
   pending_count: number;
-  is_personal: boolean;
   is_shared: boolean;
   permissions?: Record<string, boolean>;
   created_at: string;
@@ -41,12 +40,55 @@ export interface SpaceInvitation {
   id: string;
   space_id: string;
   space_name: string;
-  invited_user_id: string;
-  invited_user_name: string;
+  invited_user_id?: string;
+  invited_user_name?: string;
   invited_email: string;
   invited_by_user_id: string;
+  inviter_name?: string;
+  delivery_status: "pending" | "sent" | "failed";
   expires_at: string;
   created_at: string;
+}
+
+export type SpaceIntegrationProvider = "google" | "discord" | "notion";
+
+export interface SpaceTemplateSeedSummary {
+  task_count: number;
+  note_count: number;
+  collection_count: number;
+}
+
+export interface SpaceTemplate {
+  id: string;
+  name: string;
+  description: string;
+  version: number;
+  recommended_integrations: SpaceIntegrationProvider[];
+  seed_summary: SpaceTemplateSeedSummary;
+}
+
+export interface CreateSpaceRequest {
+  name: string;
+  template_id: string;
+  integration_providers: SpaceIntegrationProvider[];
+}
+
+export interface SpaceSetup {
+  selected_providers: SpaceIntegrationProvider[];
+  completed_providers: SpaceIntegrationProvider[];
+  pending_providers: SpaceIntegrationProvider[];
+}
+
+export interface CreateSpaceResult {
+  space: Space;
+  setup: SpaceSetup;
+}
+
+export interface SpaceInvitationPreview {
+  space_name: string;
+  inviter_name: string;
+  invited_email: string;
+  expires_at: string;
 }
 
 export interface SpaceMember {

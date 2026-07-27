@@ -135,8 +135,13 @@ async fn cancellation_cleanup_removes_partial_destination() {
 async fn drag_preparation_session_can_be_canceled() {
     let service = test_explorer_service();
     service.cancel_drag_preparation("session").await;
-    let cancellation = service.drag_preparation_cancellations.lock().await
-        .get("session").cloned().expect("cancel flag should survive an early cancel request");
+    let cancellation = service
+        .drag_preparation_cancellations
+        .lock()
+        .await
+        .get("session")
+        .cloned()
+        .expect("cancel flag should survive an early cancel request");
     assert!(cancellation.load(Ordering::Relaxed));
 }
 

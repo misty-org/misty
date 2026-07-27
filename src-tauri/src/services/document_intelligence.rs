@@ -44,8 +44,10 @@ pub async fn prepare_document(
     request: PrepareAgentDocumentRequest,
 ) -> ApiResult<PreparedAgentDocument> {
     tokio::task::spawn_blocking(move || prepare_document_sync(&request.path))
-    .await
-    .map_err(|error| ApiError::Message(format!("Document preparation worker failed: {error}")))?
+        .await
+        .map_err(|error| {
+            ApiError::Message(format!("Document preparation worker failed: {error}"))
+        })?
 }
 
 fn prepare_document_sync(path_value: &str) -> ApiResult<PreparedAgentDocument> {
@@ -84,8 +86,11 @@ fn prepare_document_sync(path_value: &str) -> ApiResult<PreparedAgentDocument> {
         "pptx" => prepare_zip_sections(&path, "slide")?,
         "xlsx" | "ods" => prepare_spreadsheet_sections(&path)?,
         "csv" => prepare_csv_sections(&path)?,
-        "png" | "jpg" | "jpeg" | "webp" | "gif" | "bmp" | "tif" | "tiff" =>
-            return Err(ApiError::Message("unsupported_content: image files do not contain supported native text".to_owned())),
+        "png" | "jpg" | "jpeg" | "webp" | "gif" | "bmp" | "tif" | "tiff" => {
+            return Err(ApiError::Message(
+                "unsupported_content: image files do not contain supported native text".to_owned(),
+            ))
+        }
         _ => prepare_text_sections(&path)?,
     };
     truncated |= cap_document_text(&mut sections);
@@ -113,8 +118,13 @@ fn prepare_pdf(path: &Path) -> ApiResult<(Vec<PreparedDocumentSection>, bool)> {
             text: normalized,
         });
     }
-    if sections.iter().all(|section| section.text.trim().is_empty()) {
-        return Err(ApiError::Message("unsupported_content: PDF contains no embedded text".to_owned()));
+    if sections
+        .iter()
+        .all(|section| section.text.trim().is_empty())
+    {
+        return Err(ApiError::Message(
+            "unsupported_content: PDF contains no embedded text".to_owned(),
+        ));
     }
     Ok((sections, truncated))
 }
@@ -469,7 +479,9 @@ mod tests {
         fs::create_dir_all(&root).unwrap();
         let path = root.join("scan.png");
         fs::write(&path, [0x89, b'P', b'N', b'G']).unwrap();
-        let error = prepare_document_sync(path.to_str().unwrap()).unwrap_err().to_string();
+        let error = prepare_document_sync(path.to_str().unwrap())
+            .unwrap_err()
+            .to_string();
         assert!(error.contains("unsupported_content"));
         let _ = fs::remove_dir_all(root);
     }

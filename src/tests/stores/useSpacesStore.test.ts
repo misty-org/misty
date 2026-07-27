@@ -33,6 +33,16 @@ const apiMocks = vi.hoisted(() => ({
 
 vi.mock("@/stores/spaces/useSpacesBackendStore", () => ({
   resolveSpacesApiBase: vi.fn(async () => "http://localhost:8081/api"),
+  SpaceRequestError: class SpaceRequestError extends Error {
+    constructor(
+      message: string,
+      readonly status: number,
+      readonly code?: string,
+    ) {
+      super(message);
+      this.name = "SpaceRequestError";
+    }
+  },
   spacesApi: {
     realtimeTicket: apiMocks.realtimeTicket,
     rename: apiMocks.rename,
@@ -160,6 +170,33 @@ describe("Space loading access boundary", () => {
 
   afterEach(() => resetSpacesAccountState());
 
+  it("coalesces concurrent automatic snapshot loads", async () => {
+    let resolveSnapshot: (value: {
+      spaces: Space[];
+      invitations: never[];
+      entitlements: null;
+    }) => void = () => {};
+    apiMocks.snapshot.mockReturnValue(
+      new Promise((resolve) => {
+        resolveSnapshot = resolve;
+      }),
+    );
+
+    const first = useSpacesStore.getState().load();
+    const second = useSpacesStore.getState().load();
+
+    expect(apiMocks.snapshot).toHaveBeenCalledTimes(1);
+    resolveSnapshot({ spaces: [], invitations: [], entitlements: null });
+    await Promise.all([first, second]);
+
+    await useSpacesStore.getState().load();
+    expect(apiMocks.snapshot).toHaveBeenCalledTimes(1);
+
+    apiMocks.snapshot.mockResolvedValue({ spaces: [], invitations: [], entitlements: null });
+    await useSpacesStore.getState().load({ force: true });
+    expect(apiMocks.snapshot).toHaveBeenCalledTimes(2);
+  });
+
   it("does not fan out protected requests when a fresh snapshot omits the Space", async () => {
     apiMocks.snapshot.mockResolvedValue({ spaces: [], invitations: [], limits: null });
     useSpacesStore.setState({
@@ -194,6 +231,17 @@ describe("Space loading access boundary", () => {
       snapshotReady: false,
       error: "offline",
     });
+  });
+
+  it("releases loading when loadSpace cannot obtain a fresh snapshot", async () => {
+    apiMocks.snapshot.mockResolvedValue({ spaces: [], invitations: [], entitlements: null });
+    await useSpacesStore.getState().load();
+    useSpacesStore.setState({ snapshotReady: false, loading: false });
+
+    await useSpacesStore.getState().loadSpace("stale");
+
+    expect(apiMocks.snapshot).toHaveBeenCalledTimes(1);
+    expect(useSpacesStore.getState().loading).toBe(false);
   });
 });
 
@@ -374,6 +422,21 @@ describe("Spaces realtime account lifecycle", () => {
     expect(String(FakeWebSocket.instances[0].url)).toContain("ticket=new-ticket");
   });
 
+  it("coalesces concurrent realtime ticket requests for one account", async () => {
+    const ticket = deferred<{ ticket: string; expires_in: number }>();
+    apiMocks.realtimeTicket.mockReturnValue(ticket.promise);
+
+    const first = useSpacesStore.getState().connectRealtime("active-account");
+    const second = useSpacesStore.getState().connectRealtime("active-account");
+
+    expect(apiMocks.realtimeTicket).toHaveBeenCalledTimes(1);
+    ticket.resolve({ ticket: "shared-ticket", expires_in: 60 });
+    await Promise.all([first, second]);
+
+    expect(FakeWebSocket.instances).toHaveLength(1);
+    expect(String(FakeWebSocket.instances[0].url)).toContain("ticket=shared-ticket");
+  });
+
   it("reconnects a failed socket with the active account", async () => {
     vi.useFakeTimers();
     apiMocks.realtimeTicket
@@ -489,7 +552,6 @@ function spaceFixture(patch: Partial<Space> = {}): Space {
     role: "owner",
     member_count: 1,
     pending_count: 0,
-    is_personal: true,
     is_shared: false,
     created_at: "2026-07-15T00:00:00Z",
     updated_at: "2026-07-15T00:00:00Z",

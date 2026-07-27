@@ -30,6 +30,7 @@ import { resetAgentAccountState, useAgentSessionStore } from "@/stores/agent/use
 import { resetSpacesAccountState, useSpacesStore } from "@/stores/spaces/useSpacesStore";
 import { resetNotesAccountState } from "@/stores/notes/useNotesStore";
 import { useSetupStore } from "@/stores/app";
+import { useAppRouteMemoryStore } from "@/stores/app/useAppRouteMemoryStore";
 import { resetSearchAccountState, useExplorerStore } from "@/stores/explorer";
 import { useUserStore } from "@/stores/account/useUserStore";
 import { setAnalyticsAuthenticationState } from "@/analytics/lifecycle";
@@ -85,6 +86,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const deactivateToChooser = useCallback(async () => {
     await deactivateActiveAccount();
     await signOut();
+    useAppRouteMemoryStore.getState().resetAppRoute();
     useUserStore.getState().clear();
     setUserState(null);
     setAccounts(listSavedAccountSessions());
@@ -299,6 +301,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Validate only the first restored identity. Sign-in and account switching
     // already fetch /me before setting the user.
   }, [activeUser, beginAccountOperation, finishAccountOperation, deactivateToChooser]);
+
+  useEffect(() => {
+    if (!activeUser) return;
+    let canceled = false;
+    const handleInvalidSession = () => {
+      if (canceled || accountOperationActive.current) return;
+      beginAccountOperation();
+      resetAccountScopedState();
+      void deactivateToChooser().finally(() => {
+        if (!canceled) finishAccountOperation();
+      });
+    };
+    window.addEventListener("misty:account-session-invalid", handleInvalidSession);
+    return () => {
+      canceled = true;
+      window.removeEventListener("misty:account-session-invalid", handleInvalidSession);
+    };
+  }, [activeUser, beginAccountOperation, deactivateToChooser, finishAccountOperation]);
 
   // Signing out no longer hops to another saved account. It deactivates the
   // current one — leaving it (and every other account) listed on the sign-in
