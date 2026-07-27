@@ -11,8 +11,7 @@ func TestLibraryIntelligencePolicyProcessingSearchAndCleanup(t *testing.T) {
 	database := openTestDatabase(t)
 	ctx := context.Background()
 	owner, _ := database.CreateUser("Intelligence Owner", "intelligence-owner@example.com", "password123")
-	spaces, _ := database.ListSpaces(ctx, owner.ID)
-	spaceID := spaces[0].ID
+	spaceID := createTestSpace(t, database, ctx, owner.ID, "Intelligence").ID
 	item := createPeopleTestImage(t, database, owner.ID, spaceID, "bakery-receipt.jpg", "6")
 
 	policy, err := database.UpdateLibraryIntelligencePolicy(ctx, owner.ID, spaceID, 0, false, false, true, true)

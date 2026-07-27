@@ -58,28 +58,37 @@ routes may create them.
 
 ## Direct R2 transfer
 
+Direct transfer has **no on/off switch**. It is active whenever the configured
+object store can sign S3 operations, which in production is always. Routing user
+file bytes through the VPS is never the behaviour we want deployed, so there is
+deliberately no flag that could be left in the wrong position.
+
+The local and in-memory development stores cannot sign, so they transparently
+fall back to the proxy route. That is what lets local development run without R2
+credentials, and it is the only situation in which the proxy is used.
+
+Upload initiation returns an absolute presigned `PUT` URL instead of the relative
+`/library/uploads/{uploadID}/content` proxy route, and authorized download
+handlers return a signed descriptor (`url`, `expires_at`, `filename`) instead of
+streaming bytes. User file bodies never pass through the VPS, which remains the
+authorization and metadata control plane.
+
+Only the URL lifetimes are configurable, and both are bounded:
+
 ```text
-MISTY_R2_DIRECT_TRANSFERS=true
 MISTY_R2_UPLOAD_URL_TTL=15m
 MISTY_R2_DOWNLOAD_URL_TTL=2m
 ```
-
-When enabled, upload initiation returns an absolute presigned `PUT` URL instead
-of the relative `/library/uploads/{uploadID}/content` proxy route, and authorized
-download handlers return a signed descriptor (`url`, `expires_at`, `filename`)
-instead of streaming bytes. User file bodies then never pass through the VPS,
-which remains the authorization and metadata control plane.
 
 The presigned `PUT` signature covers the exact object key, byte length, content
 type, and SHA-256 checksum, so a client cannot substitute different bytes, a
 different size, or a different key than the server authorized. Finalization
 still HEADs the object and rejects size or checksum mismatches before quota is
-committed. The proxy route returns `409 library_direct_transfer_required` while
-direct transfer is on, so large bodies cannot silently fall back to the VPS.
+committed. The proxy route returns `409 library_direct_transfer_required` whenever the
+store can sign, so large bodies cannot silently fall back to the VPS.
 
-Startup fails if direct transfers are enabled but the configured object store
-cannot sign S3 operations — the in-memory and local development stores cannot,
-which is why local development keeps using the proxy route.
+Production already refuses to start with a local object store, so a deployed
+server always has a signing store and therefore always uses direct transfer.
 
 ### Required R2 bucket CORS
 

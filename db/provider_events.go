@@ -86,7 +86,7 @@ func validateSharedResource(item *ProviderSharedResource) error {
 func (db *Database) ProviderSharedResources(ctx context.Context, userID, spaceID string) ([]ProviderSharedResource, error) {
 	out := []ProviderSharedResource{}
 	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
-		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionAgentsRun); err != nil {
+		if _, err := requireSpaceMemberTx(ctx, tx, spaceID, userID); err != nil {
 			return err
 		}
 		rows, err := tx.QueryContext(ctx, `SELECT `+sharedResourceColumns+` FROM provider_shared_resources WHERE space_id=$1 ORDER BY provider,display_name,id`, spaceID)
@@ -102,6 +102,67 @@ func (db *Database) ProviderSharedResources(ctx context.Context, userID, spaceID
 			out = append(out, item)
 		}
 		return rows.Err()
+	})
+	return out, err
+}
+
+func (db *Database) ReplaceProviderSharedResources(
+	ctx context.Context,
+	userID, spaceID, integrationID string,
+	items []ProviderSharedResource,
+) ([]ProviderSharedResource, error) {
+	for index := range items {
+		items[index].SpaceID = spaceID
+		items[index].IntegrationID = integrationID
+		if err := validateSharedResource(&items[index]); err != nil {
+			return nil, err
+		}
+	}
+	out := []ProviderSharedResource{}
+	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionIntegrationsManage); err != nil {
+			return err
+		}
+		var provider string
+		if err := tx.QueryRowContext(ctx, `SELECT provider FROM space_integrations
+			WHERE id=$1 AND space_id=$2 AND status='active'`,
+			integrationID, spaceID).Scan(&provider); err != nil {
+			return ErrSpaceInvalid
+		}
+		for _, item := range items {
+			if item.Provider != provider {
+				return ErrSpaceInvalid
+			}
+		}
+		if _, err := tx.ExecContext(ctx, `UPDATE provider_shared_resources
+			SET status='disabled',updated_at=NOW()
+			WHERE space_id=$1 AND integration_id=$2 AND status<>'disabled'`,
+			spaceID, integrationID); err != nil {
+			return err
+		}
+		for _, item := range items {
+			id := "provider_resource_" + uuid.NewString()
+			query := `INSERT INTO provider_shared_resources
+				(id,space_id,integration_id,published_by_user_id,provider,resource_type,
+				 external_resource_id,display_name,permission_scope,configuration)
+				VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+				ON CONFLICT(space_id,integration_id,provider,resource_type,external_resource_id)
+				DO UPDATE SET display_name=EXCLUDED.display_name,
+				  permission_scope=EXCLUDED.permission_scope,
+				  configuration=EXCLUDED.configuration,status='active',
+				  last_error_code='',updated_at=NOW()
+				RETURNING ` + sharedResourceColumns
+			var stored ProviderSharedResource
+			if err := scanSharedResource(tx.QueryRowContext(ctx, query, id, spaceID, integrationID,
+				userID, item.Provider, item.ResourceType, item.ExternalResourceID, item.DisplayName,
+				item.PermissionScope, item.Configuration), &stored); err != nil {
+				return err
+			}
+			out = append(out, stored)
+		}
+		_, err := recordSpaceEventTx(ctx, tx, spaceID, userID, "integration.resources_replaced",
+			integrationID, map[string]any{"resource_count": len(out)})
+		return err
 	})
 	return out, err
 }
@@ -221,7 +282,7 @@ func (db *Database) ProviderContentRecords(ctx context.Context, userID, spaceID,
 	}
 	out := []ProviderContentRecord{}
 	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
-		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionAgentsRun); err != nil {
+		if _, err := requireSpaceMemberTx(ctx, tx, spaceID, userID); err != nil {
 			return err
 		}
 		rows, err := tx.QueryContext(ctx, `SELECT id,space_id,shared_resource_id,provider,external_record_id,parent_external_id,record_type,fingerprint,display_name,mime_type,occurred_at,content,deleted_at,created_at,updated_at
@@ -245,7 +306,7 @@ func (db *Database) ProviderContentRecords(ctx context.Context, userID, spaceID,
 func (db *Database) ProviderContentRecord(ctx context.Context, userID, spaceID, provider, externalRecordID string) (*ProviderContentRecord, error) {
 	out := &ProviderContentRecord{}
 	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
-		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionAgentsRun); err != nil {
+		if _, err := requireSpaceMemberTx(ctx, tx, spaceID, userID); err != nil {
 			return err
 		}
 		return tx.QueryRowContext(ctx, `SELECT id,space_id,shared_resource_id,provider,external_record_id,parent_external_id,record_type,fingerprint,display_name,mime_type,occurred_at,content,deleted_at,created_at,updated_at FROM provider_content_records WHERE space_id=$1 AND provider=$2 AND external_record_id=$3 AND deleted_at IS NULL ORDER BY updated_at DESC LIMIT 1`, spaceID, provider, externalRecordID).Scan(&out.ID, &out.SpaceID, &out.SharedResourceID, &out.Provider, &out.ExternalRecordID, &out.ParentExternalID, &out.RecordType, &out.Fingerprint, &out.DisplayName, &out.MIMEType, &out.OccurredAt, &out.Content, &out.DeletedAt, &out.CreatedAt, &out.UpdatedAt)
@@ -262,7 +323,7 @@ func (db *Database) ProviderContentRecord(ctx context.Context, userID, spaceID, 
 func (db *Database) ProviderSharedResourceForDestination(ctx context.Context, userID, spaceID, provider, externalResourceID string) (*ProviderSharedResource, error) {
 	out := &ProviderSharedResource{}
 	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
-		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionAgentsRun); err != nil {
+		if _, err := requireSpaceMemberTx(ctx, tx, spaceID, userID); err != nil {
 			return err
 		}
 		return scanSharedResource(tx.QueryRowContext(ctx, `SELECT `+sharedResourceColumns+` FROM provider_shared_resources
@@ -273,4 +334,39 @@ func (db *Database) ProviderSharedResourceForDestination(ctx context.Context, us
 		return nil, ErrSpaceNotFound
 	}
 	return out, err
+}
+
+// ProviderSharedResourceForNotionEntity resolves either a selected Notion
+// source or an entity already discovered beneath that source. It never falls
+// back to an unselected workspace object.
+func (db *Database) ProviderSharedResourceForNotionEntity(
+	ctx context.Context,
+	userID, spaceID, externalResourceID string,
+) (*ProviderSharedResource, error) {
+	out := &ProviderSharedResource{}
+	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+		if _, err := requireSpaceMemberTx(ctx, tx, spaceID, userID); err != nil {
+			return err
+		}
+		return scanSharedResource(tx.QueryRowContext(ctx, `SELECT `+prefixedSharedResourceColumns("r")+`
+			FROM provider_shared_resources r
+			LEFT JOIN provider_content_records c
+			  ON c.shared_resource_id=r.id AND c.deleted_at IS NULL
+			WHERE r.space_id=$1 AND r.provider='notion' AND r.status='active'
+			  AND (r.external_resource_id=$2 OR c.external_record_id=$2)
+			ORDER BY CASE WHEN r.external_resource_id=$2 THEN 0 ELSE 1 END,r.updated_at DESC
+			LIMIT 1`, spaceID, externalResourceID), out)
+	})
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, ErrSpaceNotFound
+	}
+	return out, err
+}
+
+func prefixedSharedResourceColumns(alias string) string {
+	parts := strings.Split(sharedResourceColumns, ",")
+	for index := range parts {
+		parts[index] = alias + "." + parts[index]
+	}
+	return strings.Join(parts, ",")
 }

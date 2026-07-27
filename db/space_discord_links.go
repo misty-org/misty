@@ -68,23 +68,36 @@ func scanSpaceDiscordLink(scanner interface{ Scan(...any) error }, out *SpaceDis
 // SpaceDiscordLinkFor returns the Space's active link, or nil when none exists.
 // A Space with no Discord link is the normal case, not an error.
 func (db *Database) SpaceDiscordLinkFor(ctx context.Context, userID, spaceID string) (*SpaceDiscordLink, error) {
-	out := &SpaceDiscordLink{}
+	items, err := db.SpaceDiscordLinksFor(ctx, userID, spaceID)
+	if err != nil || len(items) == 0 {
+		return nil, err
+	}
+	return &items[0], nil
+}
+
+func (db *Database) SpaceDiscordLinksFor(ctx context.Context, userID, spaceID string) ([]SpaceDiscordLink, error) {
+	items := []SpaceDiscordLink{}
 	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
 		if _, err := requireSpaceMemberTx(ctx, tx, spaceID, userID); err != nil {
 			return err
 		}
-		err := scanSpaceDiscordLink(tx.QueryRowContext(ctx, `SELECT `+spaceDiscordLinkColumns+`
-			FROM space_discord_links WHERE space_id=$1 AND disabled_at IS NULL LIMIT 1`, spaceID), out)
-		if errors.Is(err, sql.ErrNoRows) {
-			out = nil
-			return nil
+		rows, err := tx.QueryContext(ctx, `SELECT `+spaceDiscordLinkColumns+`
+			FROM space_discord_links WHERE space_id=$1 AND disabled_at IS NULL
+			ORDER BY guild_name,channel_name,id`, spaceID)
+		if err != nil {
+			return err
 		}
-		return err
+		defer rows.Close()
+		for rows.Next() {
+			var item SpaceDiscordLink
+			if err := scanSpaceDiscordLink(rows, &item); err != nil {
+				return err
+			}
+			items = append(items, item)
+		}
+		return rows.Err()
 	})
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
+	return items, err
 }
 
 // SpaceDiscordLinkByID reads a link for a service-side operation such as sync.
@@ -145,27 +158,39 @@ func (db *Database) CreateSpaceDiscordLink(ctx context.Context, userID string, i
 		if err := requireSpacePermissionTx(ctx, tx, userID, item.SpaceID, PermissionIntegrationsManage); err != nil {
 			return err
 		}
+		var connectedByUserID string
+		if err := tx.QueryRowContext(ctx, `SELECT connected_by_user_id FROM space_integrations
+			WHERE id=$1 AND space_id=$2 AND provider='discord' AND status='active'`,
+			item.IntegrationID, item.SpaceID).Scan(&connectedByUserID); err != nil {
+			return ErrSpaceInvalid
+		}
 		if item.ConversationID != "" {
 			if err := requireSpaceConversationMemberTx(ctx, tx, userID, item.SpaceID, item.ConversationID); err != nil {
 				return err
 			}
 		}
-		// Beta mirrors one channel per Space. Replacing an existing link is an
-		// explicit unlink, so a second bind must fail loudly rather than
-		// silently redirecting an already-mirrored conversation.
-		var existing string
-		if err := tx.QueryRowContext(ctx, `SELECT COALESCE(MAX(id),'') FROM space_discord_links
-			WHERE space_id=$1 AND disabled_at IS NULL`, item.SpaceID).Scan(&existing); err != nil {
+		conversationID, err := ensureDiscordConversationTx(ctx, tx, userID, item)
+		if err != nil {
 			return err
 		}
-		if existing != "" {
-			return ErrSpaceConflict
-		}
+		item.ConversationID = conversationID
 		return scanSpaceDiscordLink(tx.QueryRowContext(ctx, `INSERT INTO space_discord_links
 			(id,space_id,integration_id,conversation_id,connected_by_user_id,guild_id,guild_name,channel_id,channel_name,direction,status,bot_user_id,webhook_id,webhook_token_ciphertext,webhook_token_nonce)
 			VALUES($1,$2,$3,NULLIF($4,''),$5,$6,$7,$8,$9,$10,'pending',$11,$12,$13,$14)
+			ON CONFLICT(space_id,channel_id) DO UPDATE SET
+				integration_id=EXCLUDED.integration_id,
+				conversation_id=EXCLUDED.conversation_id,
+				connected_by_user_id=EXCLUDED.connected_by_user_id,
+				guild_id=EXCLUDED.guild_id,
+				guild_name=EXCLUDED.guild_name,
+				channel_name=EXCLUDED.channel_name,
+				direction=EXCLUDED.direction,
+				status='pending',
+				last_error_code='',
+				disabled_at=NULL,
+				updated_at=NOW()
 			RETURNING `+spaceDiscordLinkColumns,
-			"discordlink_"+uuid.NewString(), item.SpaceID, item.IntegrationID, item.ConversationID, userID,
+			"discordlink_"+uuid.NewString(), item.SpaceID, item.IntegrationID, item.ConversationID, connectedByUserID,
 			item.GuildID, item.GuildName, item.ChannelID, item.ChannelName, item.Direction,
 			item.BotUserID, item.WebhookID, item.WebhookCiphertext, item.WebhookNonce), out)
 	})
@@ -173,6 +198,54 @@ func (db *Database) CreateSpaceDiscordLink(ctx context.Context, userID string, i
 		return nil, err
 	}
 	return out, nil
+}
+
+func ensureDiscordConversationTx(ctx context.Context, tx *sql.Tx, userID string, item SpaceDiscordLink) (string, error) {
+	title := discordConversationTitle(item.ChannelName)
+	if item.ConversationID != "" {
+		_, err := tx.ExecContext(ctx, `UPDATE space_conversations SET
+			title=$1,origin='discord',integration_id=$2,external_resource_id=$3,
+			external_display_name=$4,integration_status='active',visible_to_space=TRUE,updated_at=NOW()
+			WHERE id=$5 AND space_id=$6`, title, item.IntegrationID, item.ChannelID,
+			item.ChannelName, item.ConversationID, item.SpaceID)
+		return item.ConversationID, err
+	}
+	var conversationID string
+	err := tx.QueryRowContext(ctx, `SELECT id FROM space_conversations
+		WHERE space_id=$1 AND origin='discord' AND external_resource_id=$2
+		FOR UPDATE`, item.SpaceID, item.ChannelID).Scan(&conversationID)
+	if err == nil {
+		_, err = tx.ExecContext(ctx, `UPDATE space_conversations SET title=$1,integration_id=$2,
+			external_display_name=$3,integration_status='active',visible_to_space=TRUE,updated_at=NOW()
+			WHERE id=$4`, title, item.IntegrationID, item.ChannelName, conversationID)
+		return conversationID, err
+	}
+	if !errors.Is(err, sql.ErrNoRows) {
+		return "", err
+	}
+	conversationID = "space_conversation_" + uuid.NewString()
+	_, err = tx.ExecContext(ctx, `INSERT INTO space_conversations
+		(id,space_id,title,created_by_user_id,origin,integration_id,external_resource_id,
+		 external_display_name,integration_status,visible_to_space)
+		VALUES($1,$2,$3,$4,'discord',$5,$6,$7,'active',TRUE)`,
+		conversationID, item.SpaceID, title, userID, item.IntegrationID, item.ChannelID, item.ChannelName)
+	return conversationID, err
+}
+
+func discordConversationTitle(displayName string) string {
+	title := strings.TrimSpace(displayName)
+	if marker := strings.LastIndex(title, "/ #"); marker >= 0 {
+		title = title[marker+3:]
+	}
+	title = strings.TrimPrefix(title, "#")
+	runes := []rune(strings.TrimSpace(title))
+	if len(runes) > 80 {
+		runes = runes[:80]
+	}
+	if len(runes) == 0 {
+		return "Discord"
+	}
+	return string(runes)
 }
 
 // UpdateSpaceDiscordLinkDirection changes the allowed mirror direction without
@@ -207,14 +280,28 @@ func (db *Database) DeleteSpaceDiscordLink(ctx context.Context, userID, spaceID,
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionIntegrationsManage); err != nil {
 			return err
 		}
-		result, err := tx.ExecContext(ctx, `DELETE FROM space_discord_links WHERE id=$1 AND space_id=$2`, linkID, spaceID)
+		var conversationID string
+		if err := tx.QueryRowContext(ctx, `SELECT COALESCE(conversation_id,'') FROM space_discord_links
+			WHERE id=$1 AND space_id=$2`, linkID, spaceID).Scan(&conversationID); err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return ErrSpaceNotFound
+			}
+			return err
+		}
+		result, err := tx.ExecContext(ctx, `UPDATE space_discord_links
+			SET disabled_at=NOW(),status='disabled',updated_at=NOW()
+			WHERE id=$1 AND space_id=$2 AND disabled_at IS NULL`, linkID, spaceID)
 		if err != nil {
 			return err
 		}
 		if affected, _ := result.RowsAffected(); affected == 0 {
 			return ErrSpaceNotFound
 		}
-		return nil
+		if conversationID != "" {
+			_, err = tx.ExecContext(ctx, `UPDATE space_conversations
+				SET integration_status='disconnected',updated_at=NOW() WHERE id=$1`, conversationID)
+		}
+		return err
 	})
 }
 
@@ -227,6 +314,31 @@ func (db *Database) SetSpaceDiscordLinkSync(ctx context.Context, linkID, cursor,
 			    status=$3,last_error_code=$4,
 			    last_synced_at=COALESCE($5,last_synced_at),updated_at=NOW()
 			WHERE id=$1`, linkID, cursor, status, errorCode, syncedAt)
+		return err
+	})
+}
+
+func (db *Database) UpdateSpaceDiscordLinkDisplay(
+	ctx context.Context,
+	linkID, channelName string,
+) error {
+	channelName = strings.TrimSpace(channelName)
+	if channelName == "" {
+		return ErrSpaceInvalid
+	}
+	return db.spaceTx(ctx, func(tx *sql.Tx) error {
+		var conversationID string
+		if err := tx.QueryRowContext(ctx, `UPDATE space_discord_links
+			SET channel_name=$1,updated_at=NOW() WHERE id=$2
+			RETURNING COALESCE(conversation_id,'')`, channelName, linkID).Scan(&conversationID); err != nil {
+			return err
+		}
+		if conversationID == "" {
+			return nil
+		}
+		_, err := tx.ExecContext(ctx, `UPDATE space_conversations
+			SET title=$1,external_display_name=$2,updated_at=NOW() WHERE id=$3`,
+			discordConversationTitle(channelName), channelName, conversationID)
 		return err
 	})
 }

@@ -34,8 +34,7 @@ func TestNoteRoutesRequireAuthentication(t *testing.T) {
 		{http.MethodGet, "/api/spaces/space-1/notes/note-1"},
 		{http.MethodDelete, "/api/spaces/space-1/notes/note-1"},
 		{http.MethodPatch, "/api/spaces/space-1/notes/note-1/metadata"},
-		{http.MethodGet, "/api/spaces/space-1/notes/note-1/permissions"},
-		{http.MethodPut, "/api/spaces/space-1/notes/note-1/permissions"},
+		{http.MethodPatch, "/api/spaces/space-1/notes/note-1"},
 		{http.MethodPost, "/api/spaces/space-1/notes/note-1/collaboration-ticket"},
 	}
 

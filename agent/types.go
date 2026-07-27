@@ -72,11 +72,13 @@ type AgentMessageRequest struct {
 	// between surfaces does not start a new conversation.
 	SpaceSection string `json:"space_section,omitempty"`
 
-	// SpaceCard and SpaceRecords are assembled server-side per turn and are
-	// never accepted from the client; json:"-" keeps the decoder from
-	// populating them.
-	SpaceCard    string `json:"-"`
-	SpaceRecords string `json:"-"`
+	// SpaceCard, SpaceRecords and SpaceContextRevision are assembled server-side
+	// per turn and are never accepted from the client; json:"-" keeps the decoder
+	// from populating them. Empty SpaceRecords means "reuse what the session
+	// already has", which is the common case when nothing in the Space changed.
+	SpaceCard            string `json:"-"`
+	SpaceRecords         string `json:"-"`
+	SpaceContextRevision string `json:"-"`
 }
 
 // SpaceSections are the surfaces a member can be working in when they talk to an

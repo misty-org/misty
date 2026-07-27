@@ -48,6 +48,20 @@ func (s *SpacesService) Conversation() http.HandlerFunc {
 		}
 		spaceID := chi.URLParam(r, "spaceID")
 		conversationID := chi.URLParam(r, "conversationID")
+		if r.Method == http.MethodDelete {
+			if err := s.database.DeleteDisconnectedDiscordConversation(
+				r.Context(), userID, spaceID, conversationID,
+			); err != nil {
+				writeSpaceError(w, err)
+				return
+			}
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+		if r.Method != http.MethodPatch {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
 		var body struct {
 			Title     string   `json:"title"`
 			MemberIDs []string `json:"member_ids"`

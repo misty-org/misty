@@ -11,8 +11,7 @@ func TestLibraryEditRenditionReservationCompletionAndDownload(t *testing.T) {
 	database := openTestDatabase(t)
 	ctx := context.Background()
 	owner, _ := database.CreateUser("Rendition Owner", "rendition-owner@example.com", "password123")
-	spaces, _ := database.ListSpaces(ctx, owner.ID)
-	spaceID := spaces[0].ID
+	spaceID := createTestSpace(t, database, ctx, owner.ID, "Renditions").ID
 	item := createPeopleTestImage(t, database, owner.ID, spaceID, "source.jpg", "7")
 
 	created, err := database.CreateLibraryEditVersion(ctx, owner.ID, spaceID, item.ID, item.Version, LibraryEditDefinition{Rotation: 90, Brightness: 1, Contrast: 1, Saturation: 1})
@@ -91,8 +90,7 @@ func TestExpiredLibraryRenditionReservationReleasesQuota(t *testing.T) {
 	database := openTestDatabase(t)
 	ctx := context.Background()
 	owner, _ := database.CreateUser("Expired Rendition Owner", "expired-rendition@example.com", "password123")
-	spaces, _ := database.ListSpaces(ctx, owner.ID)
-	spaceID := spaces[0].ID
+	spaceID := createTestSpace(t, database, ctx, owner.ID, "Expired renditions").ID
 	item := createPeopleTestImage(t, database, owner.ID, spaceID, "source.jpg", "9")
 	created, err := database.CreateLibraryEditVersion(ctx, owner.ID, spaceID, item.ID, item.Version, DefaultLibraryEditDefinition())
 	if err != nil {

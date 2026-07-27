@@ -1,6 +1,7 @@
 package db
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"os"
@@ -56,6 +57,15 @@ func openTestDatabase(t *testing.T) *Database {
 	})
 
 	return database
+}
+
+func createTestSpace(t *testing.T, database *Database, ctx context.Context, ownerUserID, name string) *Space {
+	t.Helper()
+	space, err := database.CreateSpace(ctx, ownerUserID, name)
+	if err != nil {
+		t.Fatalf("CreateSpace(%q) error = %v", name, err)
+	}
+	return space
 }
 
 func loadIntegrationDBConfig(t *testing.T) integrationDBConfig {

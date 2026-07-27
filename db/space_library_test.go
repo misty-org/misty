@@ -16,11 +16,8 @@ func TestLibraryQuotaUploadDedupAndAttachmentPromotion(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	spaces, err := database.ListSpaces(ctx, owner.ID)
-	if err != nil || len(spaces) != 1 {
-		t.Fatalf("ListSpaces() = %#v, %v", spaces, err)
-	}
-	spaceID := spaces[0].ID
+	space := createTestSpace(t, database, ctx, owner.ID, "Library")
+	spaceID := space.ID
 	digest := strings.Repeat("a", 64)
 
 	upload, err := database.CreateLibraryUpload(ctx, owner.ID, spaceID, "library", "first.txt", "text/plain", 100, digest, "library/firstobject", "token-1", time.Now().Add(time.Hour))
@@ -266,7 +263,7 @@ func TestLibraryQuotaUploadDedupAndAttachmentPromotion(t *testing.T) {
 		t.Fatalf("source LibraryImportHistory() = %#v, %v", sourceHistory, err)
 	}
 	destinationHistory, err := database.LibraryImportHistory(ctx, owner.ID, destination.ID, 10)
-	if err != nil || len(destinationHistory) != 1 || destinationHistory[0].Direction != "incoming" || destinationHistory[0].CounterpartSpaceName != spaces[0].Name || destinationHistory[0].ItemID != imported.Item.ID {
+	if err != nil || len(destinationHistory) != 1 || destinationHistory[0].Direction != "incoming" || destinationHistory[0].CounterpartSpaceName != space.Name || destinationHistory[0].ItemID != imported.Item.ID {
 		t.Fatalf("destination LibraryImportHistory() = %#v, %v", destinationHistory, err)
 	}
 	importedUtility, err := database.LibraryItems(ctx, owner.ID, destination.ID, LibraryItemQuery{Utility: "imports"})
@@ -340,11 +337,7 @@ func TestMissingDeduplicationObjectCanBeReplacedByNewUpload(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	spaces, err := database.ListSpaces(ctx, owner.ID)
-	if err != nil || len(spaces) != 1 {
-		t.Fatalf("ListSpaces() = %#v, %v", spaces, err)
-	}
-	spaceID := spaces[0].ID
+	spaceID := createTestSpace(t, database, ctx, owner.ID, "Library repair").ID
 	digest := strings.Repeat("b", 64)
 
 	first, err := database.CreateLibraryUpload(ctx, owner.ID, spaceID, "library", "first.jpg", "image/jpeg", 128, digest, "library/originalobject", "first-token", time.Now().Add(time.Hour))
@@ -434,8 +427,7 @@ func TestMergeLibraryDuplicatesPreservesMetadataAndTrashesRedundantItems(t *test
 	database := openTestDatabase(t)
 	ctx := context.Background()
 	owner, _ := database.CreateUser("Duplicate Owner", "duplicate-owner@example.com", "password123")
-	spaces, _ := database.ListSpaces(ctx, owner.ID)
-	spaceID := spaces[0].ID
+	spaceID := createTestSpace(t, database, ctx, owner.ID, "Duplicates").ID
 	digest := strings.Repeat("d", 64)
 	items := make([]*SpaceLibraryItem, 0, 2)
 	for index, token := range []string{"duplicate-token-1", "duplicate-token-2"} {
@@ -475,16 +467,12 @@ func TestLibraryQuotaReservationRejectsOversubscriptionAndReleasesFailure(t *tes
 	ctx := context.Background()
 	owner, _ := database.CreateUser("Quota Owner", "quota-owner@example.com", "password123")
 	member, _ := database.CreateUser("Quota Member", "quota-member@example.com", "password123")
-	spaces, _ := database.ListSpaces(ctx, owner.ID)
-	spaceID := spaces[0].ID
+	spaceID := createTestSpace(t, database, ctx, owner.ID, "Quota").ID
 	invite, err := database.InviteToSpace(ctx, owner.ID, spaceID, member.Email)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if _, err := database.RespondToSpaceInvite(ctx, member.ID, invite.ID, true); err != nil {
-		t.Fatal(err)
-	}
-	if err := database.SetSpaceMemberPermission(ctx, owner.ID, spaceID, member.ID, PermissionLibraryUpload, "allow"); err != nil {
 		t.Fatal(err)
 	}
 	digest := strings.Repeat("b", 64)
@@ -550,10 +538,7 @@ func TestOwnedSpacesShareOneStoragePool(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	spaces, err := database.ListSpaces(ctx, owner.ID)
-	if err != nil || len(spaces) == 0 {
-		t.Fatalf("personal Space = %#v, %v", spaces, err)
-	}
+	firstSpace := createTestSpace(t, database, ctx, owner.ID, "First pool consumer")
 	project, err := database.CreateSpace(ctx, owner.ID, "Second pool consumer")
 	if err != nil {
 		t.Fatal(err)
@@ -561,7 +546,7 @@ func TestOwnedSpacesShareOneStoragePool(t *testing.T) {
 	digest := strings.Repeat("c", 64)
 	// Half the pool is consumed from each Space, so overflow can only be
 	// explained by the two Spaces sharing one owner-level pool.
-	first := reserveQuotaBytes(t, database, ctx, owner.ID, spaces[0].ID, "pool-first", FreeStorageBytes/2)
+	first := reserveQuotaBytes(t, database, ctx, owner.ID, firstSpace.ID, "pool-first", FreeStorageBytes/2)
 	second := reserveQuotaBytes(t, database, ctx, owner.ID, project.ID, "pool-second", FreeStorageBytes/2)
 	if _, err := database.CreateLibraryUpload(ctx, owner.ID, project.ID, "library", "overflow.bin", "application/octet-stream", 1, digest, "library/pool-overflow", "pool-overflow-token", time.Now().Add(time.Hour)); !errors.Is(err, ErrLibraryQuota) {
 		t.Fatalf("cross-Space overflow = %v, want ErrLibraryQuota", err)

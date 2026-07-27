@@ -118,9 +118,18 @@ func (db *Database) SaveProviderCredential(ctx context.Context, item ProviderCre
 func (db *Database) ProviderCredential(ctx context.Context, userID, spaceID, integrationID string) (*ProviderCredential, error) {
 	out := &ProviderCredential{}
 	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+		if _, err := requireSpaceMemberTx(ctx, tx, spaceID, userID); err != nil {
+			return err
+		}
 		return tx.QueryRowContext(ctx, `SELECT c.id,c.integration_id,c.space_id,c.user_id,c.provider,c.ciphertext,c.nonce,c.key_version,c.account_id,c.account_display,c.expires_at
 			FROM space_provider_credentials c JOIN space_integrations i ON i.id=c.integration_id
-			WHERE c.integration_id=$1 AND c.user_id=$2 AND c.space_id=$3 AND c.revoked_at IS NULL AND i.status='active'`, integrationID, userID, spaceID).
+			WHERE c.integration_id=$1 AND c.space_id=$3 AND c.revoked_at IS NULL AND i.status='active'
+			  AND (
+			    c.user_id=$2
+			    OR EXISTS(SELECT 1 FROM spaces s WHERE s.id=$3 AND s.owner_user_id=$2)
+			    OR EXISTS(SELECT 1 FROM provider_shared_resources r
+			      WHERE r.integration_id=c.integration_id AND r.space_id=$3 AND r.status='active')
+			  )`, integrationID, userID, spaceID).
 			Scan(&out.ID, &out.IntegrationID, &out.SpaceID, &out.UserID, &out.Provider, &out.Ciphertext, &out.Nonce, &out.KeyVersion, &out.AccountID, &out.AccountDisplay, &out.ExpiresAt)
 	})
 	if err == sql.ErrNoRows {
@@ -145,7 +154,14 @@ func (db *Database) UpdateProviderCredentialSecret(ctx context.Context, item Pro
 
 func (db *Database) DeleteProviderIntegration(ctx context.Context, userID, integrationID string) error {
 	return db.spaceTx(ctx, func(tx *sql.Tx) error {
-		result, err := tx.ExecContext(ctx, `DELETE FROM space_integrations WHERE id=$1 AND connected_by_user_id=$2`, integrationID, userID)
+		var spaceID string
+		if err := tx.QueryRowContext(ctx, `SELECT space_id FROM space_integrations WHERE id=$1`, integrationID).Scan(&spaceID); err != nil {
+			return ErrSpaceNotFound
+		}
+		if err := requireSpaceOwnerTx(ctx, tx, spaceID, userID); err != nil {
+			return err
+		}
+		result, err := tx.ExecContext(ctx, `DELETE FROM space_integrations WHERE id=$1 AND space_id=$2`, integrationID, spaceID)
 		if err != nil {
 			return err
 		}

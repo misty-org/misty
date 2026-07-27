@@ -277,10 +277,11 @@ func (db *Database) ReplaceAgentWorkflow(ctx context.Context, userID, spaceID, a
 func (db *Database) SpaceIntegrations(ctx context.Context, userID, spaceID string) ([]SpaceIntegration, error) {
 	items := []SpaceIntegration{}
 	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
-		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionStudioView); err != nil {
+		if _, err := requireSpaceMemberTx(ctx, tx, spaceID, userID); err != nil {
 			return err
 		}
-		rows, err := tx.QueryContext(ctx, `SELECT id,space_id,provider,display_name,'',granted_permissions,status,connected_by_user_id,created_at,updated_at FROM space_integrations WHERE space_id=$1 AND connected_by_user_id=$2 ORDER BY provider,display_name`, spaceID, userID)
+		rows, err := tx.QueryContext(ctx, `SELECT id,space_id,provider,display_name,'',granted_permissions,status,connected_by_user_id,created_at,updated_at
+			FROM space_integrations WHERE space_id=$1 ORDER BY provider,display_name,id`, spaceID)
 		if err != nil {
 			return err
 		}

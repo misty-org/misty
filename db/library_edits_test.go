@@ -10,8 +10,7 @@ func TestLibraryCopyOnWriteEditVersionsAndRevert(t *testing.T) {
 	database := openTestDatabase(t)
 	ctx := context.Background()
 	owner, _ := database.CreateUser("Edit Owner", "edit-owner@example.com", "password123")
-	spaces, _ := database.ListSpaces(ctx, owner.ID)
-	spaceID := spaces[0].ID
+	spaceID := createTestSpace(t, database, ctx, owner.ID, "Edits").ID
 	item := createPeopleTestImage(t, database, owner.ID, spaceID, "portrait.jpg", "e")
 
 	firstDefinition := DefaultLibraryEditDefinition()

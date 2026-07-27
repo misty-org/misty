@@ -11,8 +11,7 @@ func TestLibraryReauthenticationGrantIsScopedAndExpires(t *testing.T) {
 	database := openTestDatabase(t)
 	ctx := context.Background()
 	owner, _ := database.CreateUser("Sensitive Owner", "sensitive-owner@example.com", "password123")
-	spaces, _ := database.ListSpaces(ctx, owner.ID)
-	spaceID := spaces[0].ID
+	spaceID := createTestSpace(t, database, ctx, owner.ID, "Sensitive files").ID
 	if valid, err := database.VerifyUserPassword(ctx, owner.ID, "password123"); err != nil || !valid {
 		t.Fatalf("VerifyUserPassword(valid) = %v, %v", valid, err)
 	}
@@ -35,8 +34,7 @@ func TestSensitiveLibraryItemScope(t *testing.T) {
 	database := openTestDatabase(t)
 	ctx := context.Background()
 	owner, _ := database.CreateUser("Sensitive Item", "sensitive-item@example.com", "password123")
-	spaces, _ := database.ListSpaces(ctx, owner.ID)
-	spaceID := spaces[0].ID
+	spaceID := createTestSpace(t, database, ctx, owner.ID, "Sensitive items").ID
 	item := createPeopleTestImage(t, database, owner.ID, spaceID, "private.jpg", "9")
 	scope, err := database.SensitiveLibraryItemScope(ctx, owner.ID, spaceID, item.ID)
 	if err != nil || scope != "" {

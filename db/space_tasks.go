@@ -550,13 +550,15 @@ func (db *Database) CreateSpaceCalendarSource(ctx context.Context, userID string
 		if err := requireSpacePermissionTx(ctx, tx, userID, item.SpaceID, PermissionIntegrationsManage); err != nil {
 			return err
 		}
-		var valid bool
-		if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM space_integrations WHERE id=$1 AND space_id=$2 AND connected_by_user_id=$3 AND provider='google' AND status='active')`, item.IntegrationID, item.SpaceID, userID).Scan(&valid); err != nil || !valid {
+		var connectedByUserID string
+		if err := tx.QueryRowContext(ctx, `SELECT connected_by_user_id FROM space_integrations
+			WHERE id=$1 AND space_id=$2 AND provider='google' AND status='active'`,
+			item.IntegrationID, item.SpaceID).Scan(&connectedByUserID); err != nil {
 			return ErrSpaceInvalid
 		}
 		query := `INSERT INTO space_calendar_sources(id,space_id,integration_id,connected_by_user_id,provider,external_calendar_id,display_name,timezone)
 			VALUES($1,$2,$3,$4,'google',$5,$6,$7) ON CONFLICT(space_id,integration_id,external_calendar_id) DO UPDATE SET display_name=EXCLUDED.display_name,timezone=EXCLUDED.timezone,status='pending',disabled_at=NULL,updated_at=NOW() RETURNING ` + calendarSourceColumns
-		if err := scanCalendarSource(tx.QueryRowContext(ctx, query, item.ID, item.SpaceID, item.IntegrationID, userID, item.ExternalCalendarID, item.DisplayName, item.Timezone), out); err != nil {
+		if err := scanCalendarSource(tx.QueryRowContext(ctx, query, item.ID, item.SpaceID, item.IntegrationID, connectedByUserID, item.ExternalCalendarID, item.DisplayName, item.Timezone), out); err != nil {
 			return err
 		}
 		_, err := recordSpaceEventTx(ctx, tx, item.SpaceID, userID, "calendar.source_published", out.ID, map[string]any{"source": out})

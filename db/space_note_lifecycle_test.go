@@ -5,227 +5,124 @@ import (
 	"testing"
 )
 
-func noteLifecycleState(t *testing.T, fixture noteFixture, noteID string) (string, bool) {
+func noteLifecycleState(t *testing.T, fixture noteFixture, noteID string) string {
 	t.Helper()
 	var state string
-	var hasPurge bool
-	err := fixture.database.Conn.QueryRow(
-		`SELECT lifecycle_state,purge_after IS NOT NULL FROM space_notes WHERE id=$1`, noteID).Scan(&state, &hasPurge)
-	if err != nil {
+	if err := fixture.database.Conn.QueryRow(
+		`SELECT lifecycle_state FROM space_notes WHERE id=$1`, noteID).Scan(&state); err != nil {
 		t.Fatalf("reading lifecycle for %s: %v", noteID, err)
 	}
-	return state, hasPurge
+	return state
 }
 
-func rejoinSpace(t *testing.T, fixture noteFixture, userID string) {
-	t.Helper()
-	invite, err := fixture.database.InviteToSpace(fixture.ctx, fixture.owner, fixture.spaceID, userEmail(t, fixture.database, userID))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := fixture.database.RespondToSpaceInvite(fixture.ctx, userID, invite.ID, true); err != nil {
-		t.Fatal(err)
-	}
-}
-
-// A creator leaving archives their notes rather than deleting them, in the same
-// transaction as the membership change.
-func TestCreatorLeavingArchivesTheirNotes(t *testing.T) {
+// Notes belong to the Space, not to the person who typed them first, so a
+// creator leaving must not take the Space's document with them.
+func TestCreatorLeavingKeepsTheNoteForEveryoneElse(t *testing.T) {
 	fixture := newNoteFixture(t, "note-life-leave")
-	if _, _, err := fixture.database.ReplaceNoteGrants(fixture.ctx, fixture.creator, fixture.note.ID,
-		[]NoteGrant{{UserID: fixture.member, Role: NoteRoleEditor}}); err != nil {
-		t.Fatal(err)
-	}
 
 	if err := fixture.database.LeaveSpace(fixture.ctx, fixture.creator, fixture.spaceID); err != nil {
 		t.Fatal(err)
 	}
 
-	state, hasPurge := noteLifecycleState(t, fixture, fixture.note.ID)
-	if state != NoteLifecycleArchivedCreatorLeft || !hasPurge {
-		t.Fatalf("lifecycle = %q purge_after set = %v, want archived with a deadline", state, hasPurge)
+	if state := noteLifecycleState(t, fixture, fixture.note.ID); state != NoteLifecycleActive {
+		t.Fatalf("lifecycle = %q, want the note to stay active", state)
 	}
-	// Archived notes are inaccessible to everyone, including the prior editor.
-	for name, userID := range map[string]string{"prior editor": fixture.member, "space owner": fixture.owner} {
-		access, err := fixture.database.NoteAccessFor(fixture.ctx, userID, fixture.note.ID)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if access.CanView {
-			t.Fatalf("%s could still view an archived note: %#v", name, access)
-		}
+	access, err := fixture.database.NoteAccessFor(fixture.ctx, fixture.member, fixture.note.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !access.CanEdit {
+		t.Fatalf("remaining member lost access when the creator left: %#v", access)
+	}
+	// The departed creator is no longer a member, so they lose access.
+	gone, err := fixture.database.NoteAccessFor(fixture.ctx, fixture.creator, fixture.note.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if gone.CanView {
+		t.Fatalf("departed creator retained access: %#v", gone)
 	}
 }
 
-// Removal by the owner must behave identically to leaving voluntarily.
-func TestCreatorRemovedArchivesTheirNotes(t *testing.T) {
+// Removal by the owner behaves the same as leaving voluntarily.
+func TestCreatorRemovedKeepsTheNote(t *testing.T) {
 	fixture := newNoteFixture(t, "note-life-removed")
 
 	if err := fixture.database.RemoveSpaceMember(fixture.ctx, fixture.owner, fixture.spaceID, fixture.creator); err != nil {
 		t.Fatal(err)
 	}
 
-	state, hasPurge := noteLifecycleState(t, fixture, fixture.note.ID)
-	if state != NoteLifecycleArchivedCreatorLeft || !hasPurge {
-		t.Fatalf("lifecycle = %q purge_after set = %v, want archived with a deadline", state, hasPurge)
+	if state := noteLifecycleState(t, fixture, fixture.note.ID); state != NoteLifecycleActive {
+		t.Fatalf("lifecycle = %q, want the note to stay active", state)
 	}
 }
 
-// Rejoining inside the window restores the notes and their surviving grants.
-func TestCreatorRejoiningRestoresNotes(t *testing.T) {
-	fixture := newNoteFixture(t, "note-life-rejoin")
-	if _, _, err := fixture.database.ReplaceNoteGrants(fixture.ctx, fixture.creator, fixture.note.ID,
-		[]NoteGrant{{UserID: fixture.member, Role: NoteRoleEditor}}); err != nil {
-		t.Fatal(err)
-	}
-	if err := fixture.database.LeaveSpace(fixture.ctx, fixture.creator, fixture.spaceID); err != nil {
-		t.Fatal(err)
+// A departing member's own UI state goes away, since it can never apply again.
+func TestLeavingClearsOnlyThatMembersPreferences(t *testing.T) {
+	fixture := newNoteFixture(t, "note-life-prefs")
+	for _, userID := range []string{fixture.member, fixture.owner} {
+		if _, err := fixture.database.Conn.Exec(
+			`INSERT INTO space_note_preferences(note_id,user_id,is_favorite) VALUES($1,$2,TRUE)`,
+			fixture.note.ID, userID); err != nil {
+			t.Fatal(err)
+		}
 	}
 
-	rejoinSpace(t, fixture, fixture.creator)
-
-	state, hasPurge := noteLifecycleState(t, fixture, fixture.note.ID)
-	if state != NoteLifecycleActive || hasPurge {
-		t.Fatalf("lifecycle = %q purge_after set = %v, want active with no deadline", state, hasPurge)
-	}
-	access, err := fixture.database.NoteAccessFor(fixture.ctx, fixture.creator, fixture.note.ID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !access.CanManageACL {
-		t.Fatalf("restored creator access = %#v, want full capabilities", access)
-	}
-	// The grant to a member who is still present survives.
-	editor, err := fixture.database.NoteAccessFor(fixture.ctx, fixture.member, fixture.note.ID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !editor.CanEdit {
-		t.Fatalf("surviving editor grant = %#v, want edit access", editor)
-	}
-}
-
-// A grantee who left while the note was archived must not silently regain
-// access when the creator returns.
-func TestRestoreDropsGrantsForMembersWhoLeftMeanwhile(t *testing.T) {
-	fixture := newNoteFixture(t, "note-life-prune")
-	if _, _, err := fixture.database.ReplaceNoteGrants(fixture.ctx, fixture.creator, fixture.note.ID,
-		[]NoteGrant{{UserID: fixture.member, Role: NoteRoleEditor}}); err != nil {
-		t.Fatal(err)
-	}
-	if err := fixture.database.LeaveSpace(fixture.ctx, fixture.creator, fixture.spaceID); err != nil {
-		t.Fatal(err)
-	}
 	if err := fixture.database.LeaveSpace(fixture.ctx, fixture.member, fixture.spaceID); err != nil {
 		t.Fatal(err)
 	}
 
-	rejoinSpace(t, fixture, fixture.creator)
-	rejoinSpace(t, fixture, fixture.member)
+	var departed, remaining int
+	if err := fixture.database.Conn.QueryRow(
+		`SELECT COUNT(*) FROM space_note_preferences WHERE note_id=$1 AND user_id=$2`,
+		fixture.note.ID, fixture.member).Scan(&departed); err != nil {
+		t.Fatal(err)
+	}
+	if departed != 0 {
+		t.Fatalf("departed member kept %d preference rows", departed)
+	}
+	if err := fixture.database.Conn.QueryRow(
+		`SELECT COUNT(*) FROM space_note_preferences WHERE note_id=$1 AND user_id=$2`,
+		fixture.note.ID, fixture.owner).Scan(&remaining); err != nil {
+		t.Fatal(err)
+	}
+	if remaining != 1 {
+		t.Fatal("an unrelated member's preferences were cleared")
+	}
+}
 
+// Deleting an account must not delete the Space's notes. Destructive control
+// moves to the Space owner instead.
+func TestAccountDeletionReassignsNotesToTheSpaceOwner(t *testing.T) {
+	fixture := newNoteFixture(t, "note-life-account")
+
+	if err := fixture.database.PurgeNotesForDeletedAccount(fixture.ctx, fixture.creator); err != nil {
+		t.Fatal(err)
+	}
+
+	if state := noteLifecycleState(t, fixture, fixture.note.ID); state != NoteLifecycleActive {
+		t.Fatalf("lifecycle = %q, want the note preserved", state)
+	}
+	var creatorUserID string
+	if err := fixture.database.Conn.QueryRow(
+		`SELECT creator_user_id FROM space_notes WHERE id=$1`, fixture.note.ID).Scan(&creatorUserID); err != nil {
+		t.Fatal(err)
+	}
+	if creatorUserID != fixture.owner {
+		t.Fatalf("creator_user_id = %q, want the Space owner %q", creatorUserID, fixture.owner)
+	}
+	// The note is still readable and editable by the remaining members.
 	access, err := fixture.database.NoteAccessFor(fixture.ctx, fixture.member, fixture.note.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if access.CanView {
-		t.Fatalf("a member who left and rejoined silently regained note access: %#v", access)
+	if !access.CanEdit {
+		t.Fatalf("member lost access after the creator's account was deleted: %#v", access)
 	}
 }
 
-// A non-creator leaving loses their grants outright; the note itself is
-// untouched and stays active for its creator.
-func TestOtherMemberLeavingDropsOnlyTheirGrants(t *testing.T) {
-	fixture := newNoteFixture(t, "note-life-other")
-	if _, _, err := fixture.database.ReplaceNoteGrants(fixture.ctx, fixture.creator, fixture.note.ID,
-		[]NoteGrant{{UserID: fixture.member, Role: NoteRoleEditor}}); err != nil {
-		t.Fatal(err)
-	}
-
-	if err := fixture.database.LeaveSpace(fixture.ctx, fixture.member, fixture.spaceID); err != nil {
-		t.Fatal(err)
-	}
-
-	state, _ := noteLifecycleState(t, fixture, fixture.note.ID)
-	if state != NoteLifecycleActive {
-		t.Fatalf("lifecycle = %q, want the note to stay active", state)
-	}
-	creator, err := fixture.database.NoteAccessFor(fixture.ctx, fixture.creator, fixture.note.ID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !creator.CanEdit {
-		t.Fatalf("creator lost access when an unrelated member left: %#v", creator)
-	}
-	var grants int
-	if err := fixture.database.Conn.QueryRow(
-		`SELECT COUNT(*) FROM space_note_permissions WHERE note_id=$1 AND user_id=$2`,
-		fixture.note.ID, fixture.member).Scan(&grants); err != nil {
-		t.Fatal(err)
-	}
-	if grants != 0 {
-		t.Fatalf("departed member still holds %d grant rows", grants)
-	}
-}
-
-// Leaving queues a room disconnect so a live collaboration session cannot keep
-// reading after access is gone.
-func TestMembershipLossQueuesRoomCommands(t *testing.T) {
-	fixture := newNoteFixture(t, "note-life-outbox")
-
-	if err := fixture.database.LeaveSpace(fixture.ctx, fixture.creator, fixture.spaceID); err != nil {
-		t.Fatal(err)
-	}
-
-	var queued int
-	if err := fixture.database.Conn.QueryRow(
-		`SELECT COUNT(*) FROM space_note_control_outbox WHERE note_id=$1 AND command='disconnect' AND delivered_at IS NULL`,
-		fixture.note.ID).Scan(&queued); err != nil {
-		t.Fatal(err)
-	}
-	if queued == 0 {
-		t.Fatal("no disconnect command was queued for the archived note's room")
-	}
-}
-
-// Retention deletes archived notes only after the window has actually passed.
-func TestPurgeRemovesOnlyExpiredArchivedNotes(t *testing.T) {
-	fixture := newNoteFixture(t, "note-life-purge")
-	if err := fixture.database.LeaveSpace(fixture.ctx, fixture.creator, fixture.spaceID); err != nil {
-		t.Fatal(err)
-	}
-
-	// Still inside the 30-day window.
-	if _, err := fixture.database.PurgeExpiredNotes(fixture.ctx, 100); err != nil {
-		t.Fatal(err)
-	}
-	if state, _ := noteLifecycleState(t, fixture, fixture.note.ID); state != NoteLifecycleArchivedCreatorLeft {
-		t.Fatalf("lifecycle = %q, want the note to survive inside its window", state)
-	}
-
-	// Shorten the window the way the release-gate test would.
-	if _, err := fixture.database.Conn.Exec(
-		`UPDATE space_notes SET purge_after=NOW()-INTERVAL '1 minute' WHERE id=$1`, fixture.note.ID); err != nil {
-		t.Fatal(err)
-	}
-	purged, err := fixture.database.PurgeExpiredNotes(fixture.ctx, 100)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if purged != 1 {
-		t.Fatalf("purged = %d, want 1", purged)
-	}
-	var remaining int
-	if err := fixture.database.Conn.QueryRow(
-		`SELECT COUNT(*) FROM space_notes WHERE id=$1`, fixture.note.ID).Scan(&remaining); err != nil {
-		t.Fatal(err)
-	}
-	if remaining != 0 {
-		t.Fatal("the expired note survived its purge")
-	}
-}
-
-// A note marked deleting must not be removed until its room purge is actually
-// delivered, or the Durable Object would be stranded with no record of it.
+// Deleting a note queues a room purge, and the row is held until that purge is
+// confirmed delivered so the Durable Object is never stranded.
 func TestPurgeWaitsForRoomPurgeDelivery(t *testing.T) {
 	fixture := newNoteFixture(t, "note-life-delivery")
 	if err := fixture.database.DeleteSpaceNote(fixture.ctx, fixture.creator, fixture.note.ID); err != nil {
@@ -235,7 +132,7 @@ func TestPurgeWaitsForRoomPurgeDelivery(t *testing.T) {
 	if _, err := fixture.database.PurgeExpiredNotes(fixture.ctx, 100); err != nil {
 		t.Fatal(err)
 	}
-	if state, _ := noteLifecycleState(t, fixture, fixture.note.ID); state != NoteLifecycleDeleting {
+	if state := noteLifecycleState(t, fixture, fixture.note.ID); state != NoteLifecycleDeleting {
 		t.Fatalf("lifecycle = %q, want the note held until its room purge lands", state)
 	}
 
@@ -279,8 +176,8 @@ func TestPendingControlCommandsAreClaimedOnce(t *testing.T) {
 	if len(first) == 0 {
 		t.Fatal("no commands were claimed")
 	}
-	// The backoff pushes the next attempt out, so an immediate second poll
-	// gets nothing.
+	// The per-attempt backoff pushes the next attempt out, so an immediate
+	// second poll must not hand back the same command.
 	second, err := fixture.database.PendingNoteControlCommands(fixture.ctx, 10)
 	if err != nil {
 		t.Fatal(err)
@@ -291,38 +188,6 @@ func TestPendingControlCommandsAreClaimedOnce(t *testing.T) {
 				t.Fatalf("command %s was claimed twice in a row", command.ID)
 			}
 		}
-	}
-}
-
-// Account deletion is immediate and permanent: no 30-day window, and nothing is
-// transferred to the Space owner.
-func TestAccountDeletionMarksEveryCreatedNoteForPurge(t *testing.T) {
-	fixture := newNoteFixture(t, "note-life-account")
-	second, err := fixture.database.CreateSpaceNote(fixture.ctx, fixture.creator, fixture.spaceID, "Second note")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if err := fixture.database.PurgeNotesForDeletedAccount(fixture.ctx, fixture.creator); err != nil {
-		t.Fatal(err)
-	}
-
-	for _, noteID := range []string{fixture.note.ID, second.ID} {
-		state, hasPurge := noteLifecycleState(t, fixture, noteID)
-		if state != NoteLifecycleDeleting {
-			t.Fatalf("lifecycle for %s = %q, want deleting", noteID, state)
-		}
-		if hasPurge {
-			t.Fatalf("note %s got a retention deadline; account deletion is immediate", noteID)
-		}
-	}
-	// The Space owner must not inherit anything.
-	notes, err := fixture.database.AccessibleSpaceNotes(fixture.ctx, fixture.owner, fixture.spaceID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(notes) != 0 {
-		t.Fatalf("Space owner inherited %d notes from a deleted account", len(notes))
 	}
 }
 

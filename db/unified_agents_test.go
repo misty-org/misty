@@ -16,11 +16,7 @@ func TestUnifiedAgentVersionsAndPerUserInstances(t *testing.T) {
 	owner, _ := database.CreateUser("Unified Owner", "unified-owner@example.com", "correct horse battery staple")
 	member, _ := database.CreateUser("Unified Member", "unified-member@example.com", "correct horse battery staple")
 	other, _ := database.CreateUser("Unified Other", "unified-other@example.com", "correct horse battery staple")
-	spaces, err := database.ListSpaces(ctx, owner.ID)
-	if err != nil || len(spaces) != 1 {
-		t.Fatalf("spaces=%#v err=%v", spaces, err)
-	}
-	space := spaces[0]
+	space := createTestSpace(t, database, ctx, owner.ID, "Unified agents")
 	for _, user := range []*User{member, other} {
 		invite, err := database.InviteToSpace(ctx, owner.ID, space.ID, user.Email)
 		if err != nil {

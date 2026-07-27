@@ -13,8 +13,7 @@ func TestLibraryPeoplePolicyAssignmentMergeAndIsolation(t *testing.T) {
 	ctx := context.Background()
 	owner, _ := database.CreateUser("People Owner", "people-owner@example.com", "password123")
 	member, _ := database.CreateUser("People Member", "people-member@example.com", "password123")
-	spaces, _ := database.ListSpaces(ctx, owner.ID)
-	spaceID := spaces[0].ID
+	spaceID := createTestSpace(t, database, ctx, owner.ID, "People").ID
 	item := createPeopleTestImage(t, database, owner.ID, spaceID, "family.jpg", "c")
 
 	policy, err := database.LibraryPeoplePolicy(ctx, owner.ID, spaceID)
@@ -105,8 +104,7 @@ func TestAutomaticPeopleJobsClusterOnlyInsideSpace(t *testing.T) {
 	database := openTestDatabase(t)
 	ctx := context.Background()
 	owner, _ := database.CreateUser("Automatic People Owner", "automatic-people@example.com", "password123")
-	spaces, _ := database.ListSpaces(ctx, owner.ID)
-	spaceID := spaces[0].ID
+	spaceID := createTestSpace(t, database, ctx, owner.ID, "Automatic people").ID
 	first := createPeopleTestImage(t, database, owner.ID, spaceID, "first-face.jpg", "e")
 	second := createPeopleTestImage(t, database, owner.ID, spaceID, "second-face.jpg", "f")
 	policy, err := database.UpdateLibraryPeoplePolicy(ctx, owner.ID, spaceID, 0, true, false)

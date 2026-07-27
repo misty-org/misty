@@ -12,12 +12,9 @@ func TestProviderCredentialOAuthSaveAndReconnect(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	spaces, err := database.ListSpaces(ctx, owner.ID)
-	if err != nil || len(spaces) != 1 {
-		t.Fatalf("spaces=%#v err=%v", spaces, err)
-	}
+	space := createTestSpace(t, database, ctx, owner.ID, "Provider connections")
 	credential := ProviderCredential{
-		SpaceID:        spaces[0].ID,
+		SpaceID:        space.ID,
 		UserID:         owner.ID,
 		Provider:       "notion",
 		Ciphertext:     []byte("encrypted-token"),
@@ -34,7 +31,7 @@ func TestProviderCredentialOAuthSaveAndReconnect(t *testing.T) {
 	if first.Status != "active" || first.Provider != "notion" {
 		t.Fatalf("first integration = %#v", first)
 	}
-	loaded, err := database.ProviderCredential(ctx, owner.ID, spaces[0].ID, first.ID)
+	loaded, err := database.ProviderCredential(ctx, owner.ID, space.ID, first.ID)
 	if err != nil || loaded.AccountID != credential.AccountID {
 		t.Fatalf("ProviderCredential() = %#v, %v", loaded, err)
 	}

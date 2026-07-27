@@ -61,33 +61,32 @@ type SpaceLibraryService struct {
 	malwareScanner     LibraryMalwareScanner
 	uploadLimits       UploadLimits
 	noteAssetsEnabled  bool
-	transfers          DirectTransferConfig
+	transfers          TransferTTLs
 	// presigner is non-nil only when the configured object store can sign R2
 	// operations. Local development leaves it nil and keeps the proxy route.
 	presigner LibraryObjectPresigner
 }
 
-// DirectTransferConfig controls whether user file bytes move directly between
-// the client and R2 instead of being proxied through the VPS.
-type DirectTransferConfig struct {
-	Enabled        bool
+// TransferTTLs bounds how long a signed R2 URL stays valid. These are tuning
+// knobs, not a feature switch: there is deliberately no way to turn direct
+// transfer off, because routing user file bytes through the VPS is never the
+// behaviour we want in production.
+type TransferTTLs struct {
 	UploadURLTTL   time.Duration
 	DownloadURLTTL time.Duration
 }
 
-// DefaultDirectTransferConfig matches the documented beta configuration.
-func DefaultDirectTransferConfig() DirectTransferConfig {
-	return DirectTransferConfig{Enabled: false, UploadURLTTL: 15 * time.Minute, DownloadURLTTL: 2 * time.Minute}
+// DefaultTransferTTLs matches the documented beta configuration.
+func DefaultTransferTTLs() TransferTTLs {
+	return TransferTTLs{UploadURLTTL: 15 * time.Minute, DownloadURLTTL: 2 * time.Minute}
 }
 
-// DirectTransferConfigFromEnv reads MISTY_R2_DIRECT_TRANSFERS and the two URL
-// lifetimes.
-func DirectTransferConfigFromEnv() DirectTransferConfig {
-	config := DefaultDirectTransferConfig()
-	config.Enabled = strings.EqualFold(strings.TrimSpace(os.Getenv("MISTY_R2_DIRECT_TRANSFERS")), "true")
-	config.UploadURLTTL = positiveEnvDuration("MISTY_R2_UPLOAD_URL_TTL", config.UploadURLTTL)
-	config.DownloadURLTTL = positiveEnvDuration("MISTY_R2_DOWNLOAD_URL_TTL", config.DownloadURLTTL)
-	return config
+// TransferTTLsFromEnv allows tuning the two URL lifetimes.
+func TransferTTLsFromEnv() TransferTTLs {
+	ttls := DefaultTransferTTLs()
+	ttls.UploadURLTTL = positiveEnvDuration("MISTY_R2_UPLOAD_URL_TTL", ttls.UploadURLTTL)
+	ttls.DownloadURLTTL = positiveEnvDuration("MISTY_R2_DOWNLOAD_URL_TTL", ttls.DownloadURLTTL)
+	return ttls
 }
 
 func positiveEnvDuration(name string, fallback time.Duration) time.Duration {
@@ -98,30 +97,31 @@ func positiveEnvDuration(name string, fallback time.Duration) time.Duration {
 	return value
 }
 
-// EnableDirectTransfers wires the signed-URL path. Production startup must fail
-// when direct transfers are required but the configured store cannot sign, so
-// this returns an error rather than silently falling back to the proxy.
-func (s *SpaceLibraryService) EnableDirectTransfers(config DirectTransferConfig) error {
-	if !config.Enabled {
-		s.transfers, s.presigner = config, nil
-		return nil
-	}
-	presigner, ok := s.store.(LibraryObjectPresigner)
-	if !ok {
-		return errors.New("direct R2 transfers require an object store that can sign S3 operations")
-	}
-	if _, err := validatePresignTTL(config.UploadURLTTL); err != nil {
+// configureTransfers turns on direct transfer whenever the object store can
+// sign, which is the only thing that actually determines whether it can work.
+//
+// Deriving it from capability rather than a flag means production cannot be
+// misconfigured into proxying file bytes: the R2 store always signs, so direct
+// transfer is always on there. The local and in-memory development stores
+// cannot sign, so they transparently keep the proxy route.
+func (s *SpaceLibraryService) configureTransfers(ttls TransferTTLs) error {
+	if _, err := validatePresignTTL(ttls.UploadURLTTL); err != nil {
 		return fmt.Errorf("upload URL TTL: %w", err)
 	}
-	if _, err := validatePresignTTL(config.DownloadURLTTL); err != nil {
+	if _, err := validatePresignTTL(ttls.DownloadURLTTL); err != nil {
 		return fmt.Errorf("download URL TTL: %w", err)
 	}
-	s.transfers, s.presigner = config, presigner
+	s.transfers = ttls
+	if presigner, ok := s.store.(LibraryObjectPresigner); ok {
+		s.presigner = presigner
+	}
 	return nil
 }
 
+// directTransfersActive reports whether signed URLs are in use. It is purely a
+// question of whether the store can sign; there is no off switch.
 func (s *SpaceLibraryService) directTransfersActive() bool {
-	return s.transfers.Enabled && s.presigner != nil
+	return s.presigner != nil
 }
 
 // UploadPurpose names the kind of upload being performed. Each purpose has its
@@ -262,10 +262,14 @@ func NewSpaceLibraryService(database *db.Database, store LibraryObjectStore, upl
 	if err := limits.validate(); err != nil {
 		return nil, err
 	}
-	return &SpaceLibraryService{
+	service := &SpaceLibraryService{
 		database: database, store: store, uploadsEnabled: uploadsEnabled, uploadLimits: limits,
 		egress: NewEgressGuard(EgressBudgetFromEnv()),
-	}, nil
+	}
+	if err := service.configureTransfers(TransferTTLsFromEnv()); err != nil {
+		return nil, err
+	}
+	return service, nil
 }
 
 // WriteGeneratedTextArtifact creates a normal, ACL-protected Library item
@@ -2261,45 +2265,6 @@ func (s *SpaceLibraryService) DeleteEditVersion() http.HandlerFunc {
 			return
 		}
 		w.WriteHeader(http.StatusNoContent)
-	}
-}
-
-func (s *SpaceLibraryService) MemberPermissions() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		userID, ok := authenticatedUser(w, r, s.database)
-		if !ok {
-			return
-		}
-		spaceID, memberID := chi.URLParam(r, "spaceID"), chi.URLParam(r, "userID")
-		switch r.Method {
-		case http.MethodGet:
-			permissions, err := s.database.SpaceMemberPermissions(r.Context(), userID, spaceID, memberID)
-			if err != nil {
-				writeLibraryError(w, err)
-				return
-			}
-			writeJSON(w, http.StatusOK, map[string]any{"permissions": permissions})
-		case http.MethodPut:
-			var body struct {
-				Permission string `json:"permission"`
-				Effect     string `json:"effect"`
-			}
-			if decodeJSON(w, r, &body) != nil {
-				return
-			}
-			if err := s.database.SetSpaceMemberPermission(r.Context(), userID, spaceID, memberID, body.Permission, body.Effect); err != nil {
-				writeLibraryError(w, err)
-				return
-			}
-			permissions, err := s.database.SpaceMemberPermissions(r.Context(), userID, spaceID, memberID)
-			if err != nil {
-				writeLibraryError(w, err)
-				return
-			}
-			writeJSON(w, http.StatusOK, map[string]any{"permissions": permissions})
-		default:
-			w.WriteHeader(http.StatusMethodNotAllowed)
-		}
 	}
 }
 

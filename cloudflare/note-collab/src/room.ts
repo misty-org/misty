@@ -41,6 +41,10 @@ const JTI_RETENTION_MS = 5 * 60 * 1000;
 const DOCUMENT_CHUNK_BYTES = 96 * 1024;
 /** Beta ceiling for one note's document. */
 const MAX_DOCUMENT_BYTES = 8 * 1024 * 1024;
+/** Control requests are tiny JSON envelopes, never document snapshots. */
+const MAX_CONTROL_BODY_BYTES = 128 * 1024;
+const CONTROL_CLOCK_SKEW_SECONDS = 5 * 60;
+const BOOTSTRAP_APPLIED_KEY = "bootstrap:applied";
 
 export class NoteRoom extends YServer<Env> {
   /**
@@ -136,9 +140,70 @@ export class NoteRoom extends YServer<Env> {
     await super.onMessage(connection, message);
   }
 
+  /**
+   * Receives service-to-service control commands routed to this room.
+   *
+   * The timestamp is part of the signature and has a short acceptance window,
+   * so a captured request cannot be replayed later. The command body is signed
+   * byte-for-byte before JSON parsing.
+   */
+  override async onRequest(request: Request): Promise<Response> {
+    if (request.method !== "POST") {
+      return jsonResponse({ code: "method_not_allowed" }, 405, { Allow: "POST" });
+    }
+    const body = new Uint8Array(await request.arrayBuffer());
+    if (body.byteLength > MAX_CONTROL_BODY_BYTES) {
+      return jsonResponse({ code: "body_too_large" }, 413);
+    }
+    const timestamp = request.headers.get("X-Misty-Timestamp") ?? "";
+    const signature = request.headers.get("X-Misty-Signature") ?? "";
+    if (!(await verifyControlRequest(this.env.NOTE_COLLAB_CONTROL_SECRET, timestamp, body, signature))) {
+      return jsonResponse({ code: "unauthorized" }, 401);
+    }
+
+    let envelope: unknown;
+    try {
+      envelope = JSON.parse(new TextDecoder().decode(body));
+    } catch {
+      return jsonResponse({ code: "invalid_json" }, 400);
+    }
+    if (!isRecord(envelope) || typeof envelope.command !== "string" || !isRecord(envelope.payload)) {
+      return jsonResponse({ code: "invalid_command" }, 400);
+    }
+    return this.handleControl(envelope.command, envelope.payload);
+  }
+
   /** Handles authenticated control commands from the Go API. */
   async handleControl(command: string, payload: Record<string, unknown>): Promise<Response> {
     switch (command) {
+      case "bootstrap": {
+        const title = typeof payload.title === "string" ? payload.title.trim() : "";
+        const markdown = typeof payload.markdown === "string" ? payload.markdown.trim() : "";
+        if (!title || title.length > 500 || !markdown || markdown.length > 100_000) {
+          return jsonResponse({ code: "invalid_bootstrap" }, 400);
+        }
+        if ((await this.ctx.storage.get<boolean>(BOOTSTRAP_APPLIED_KEY)) === true) {
+          return jsonResponse({ ok: true, initialized: false });
+        }
+
+        // A user may open and begin editing before this retryable command
+        // arrives. Never replace a document that already has shared state.
+        const initialized = this.document.share.size === 0;
+        if (initialized) {
+          this.document.transact(() => {
+            const metadata = this.document.getMap<string>("misty:bootstrap");
+            metadata.set("title", title);
+            metadata.set("markdown", markdown);
+            metadata.set("format", "markdown");
+            this.document.getText("markdown").insert(0, markdown);
+          });
+          await this.onSave();
+        }
+        // Written after the document snapshot: a crash can cause one harmless
+        // retry, but can never claim success before the content is durable.
+        await this.ctx.storage.put(BOOTSTRAP_APPLIED_KEY, true);
+        return jsonResponse({ ok: true, initialized });
+      }
       case "acl": {
         const version = Number(payload.acl_version);
         if (!Number.isInteger(version) || version < 1) {
@@ -320,9 +385,59 @@ export class NoteRoom extends YServer<Env> {
   }
 }
 
-function jsonResponse(body: unknown, status = 200): Response {
+async function verifyControlRequest(
+  encodedSecret: string,
+  timestamp: string,
+  body: Uint8Array,
+  signature: string,
+): Promise<boolean> {
+  const issuedAt = Number(timestamp);
+  if (!Number.isInteger(issuedAt)) return false;
+  if (Math.abs(Math.floor(Date.now() / 1000) - issuedAt) > CONTROL_CLOCK_SKEW_SECONDS) return false;
+
+  let secret: Uint8Array;
+  try {
+    secret = Uint8Array.from(atob(encodedSecret.trim()), (character) => character.charCodeAt(0));
+  } catch {
+    return false;
+  }
+  if (secret.byteLength < 32 || !signature) return false;
+  const key = await crypto.subtle.importKey("raw", secret, { name: "HMAC", hash: "SHA-256" }, false, [
+    "sign",
+  ]);
+  const prefix = new TextEncoder().encode(`${timestamp}\n`);
+  const signed = new Uint8Array(prefix.byteLength + body.byteLength);
+  signed.set(prefix);
+  signed.set(body, prefix.byteLength);
+  const digest = new Uint8Array(await crypto.subtle.sign("HMAC", key, signed));
+  const expected = base64URL(digest);
+  return constantTimeEqual(expected, signature);
+}
+
+function base64URL(bytes: Uint8Array): string {
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/u, "");
+}
+
+function constantTimeEqual(left: string, right: string): boolean {
+  const length = Math.max(left.length, right.length);
+  let mismatch = left.length ^ right.length;
+  for (let index = 0; index < length; index += 1) {
+    mismatch |= (left.charCodeAt(index) || 0) ^ (right.charCodeAt(index) || 0);
+  }
+  return mismatch === 0;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function jsonResponse(body: unknown, status = 200, headers?: HeadersInit): Response {
+  const responseHeaders = new Headers(headers);
+  responseHeaders.set("Content-Type", "application/json");
   return new Response(JSON.stringify(body), {
     status,
-    headers: { "Content-Type": "application/json" },
+    headers: responseHeaders,
   });
 }

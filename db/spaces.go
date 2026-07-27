@@ -42,7 +42,6 @@ type Space struct {
 	Role             string          `json:"role"`
 	MemberCount      int             `json:"member_count"`
 	PendingCount     int             `json:"pending_count"`
-	IsPersonal       bool            `json:"is_personal"`
 	IsShared         bool            `json:"is_shared"`
 	Permissions      map[string]bool `json:"permissions"`
 	CreatedAt        time.Time       `json:"created_at"`
@@ -63,12 +62,21 @@ type SpaceInvitation struct {
 	ID              string    `json:"id"`
 	SpaceID         string    `json:"space_id"`
 	SpaceName       string    `json:"space_name"`
-	InvitedUserID   string    `json:"invited_user_id"`
-	InvitedUserName string    `json:"invited_user_name"`
+	InvitedUserID   *string   `json:"invited_user_id"`
+	InvitedUserName *string   `json:"invited_user_name"`
 	InvitedEmail    string    `json:"invited_email"`
 	InvitedByUserID string    `json:"invited_by_user_id"`
+	InviterName     string    `json:"inviter_name,omitempty"`
+	DeliveryStatus  string    `json:"delivery_status"`
 	ExpiresAt       time.Time `json:"expires_at"`
 	CreatedAt       time.Time `json:"created_at"`
+}
+
+type SpaceInvitationPreview struct {
+	SpaceName    string    `json:"space_name"`
+	InviterName  string    `json:"inviter_name"`
+	InvitedEmail string    `json:"invited_email"`
+	ExpiresAt    time.Time `json:"expires_at"`
 }
 
 type MessageSpan struct {
@@ -213,20 +221,6 @@ func normalizeSpaceName(name string) (string, error) {
 	return name, nil
 }
 
-func defaultPersonalSpaceName(userName string) string {
-	const suffix = "'s Space"
-	name := strings.TrimSpace(userName)
-	if name == "" {
-		return "My Space"
-	}
-	runes := []rune(name)
-	maximumNameRunes := 80 - len([]rune(suffix))
-	if len(runes) > maximumNameRunes {
-		runes = runes[:maximumNameRunes]
-	}
-	return string(runes) + suffix
-}
-
 func requireSpaceMemberTx(ctx context.Context, tx *sql.Tx, spaceID, userID string) (string, error) {
 	var role string
 	err := tx.QueryRowContext(ctx, `SELECT m.role FROM space_members m JOIN spaces s ON s.id=m.space_id WHERE m.space_id=$1 AND m.user_id=$2 AND s.lifecycle_state='active'`, spaceID, userID).Scan(&role)
@@ -293,109 +287,31 @@ func notifySpaceControlTx(ctx context.Context, tx *sql.Tx, payload any) error {
 }
 
 func (db *Database) CreateSpace(ctx context.Context, userID, name string) (*Space, error) {
-	if err := db.ensurePersonalSpace(ctx, userID); err != nil {
-		return nil, err
-	}
-	name, err := normalizeSpaceName(name)
+	result, err := db.CreateSpaceWithTemplate(ctx, userID, name, "blank", nil)
 	if err != nil {
 		return nil, err
 	}
-	out := &Space{ID: "space_" + uuid.NewString(), SecurityDomainID: "sd_" + uuid.NewString(), OwnerUserID: userID, Name: name, Role: "owner", MemberCount: 1}
-	err = db.spaceTx(ctx, func(tx *sql.Tx) error {
-		if _, err := tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock(hashtext($1))`, "spaces:owner:"+userID); err != nil {
-			return err
-		}
-		if _, err := tx.ExecContext(ctx, `INSERT INTO security_domains(id,kind,owner_user_id,space_id) VALUES($1,'space',$2,$3)`, out.SecurityDomainID, userID, out.ID); err != nil {
-			return err
-		}
-		if err := tx.QueryRowContext(ctx, `INSERT INTO spaces(id,owner_user_id,name,security_domain_id) VALUES($1,$2,$3,$4) RETURNING created_at,updated_at`, out.ID, userID, name, out.SecurityDomainID).Scan(&out.CreatedAt, &out.UpdatedAt); err != nil {
-			return err
-		}
-		if _, err := tx.ExecContext(ctx, `INSERT INTO space_storage_usage(space_id) VALUES($1)`, out.ID); err != nil {
-			return err
-		}
-		if _, err := tx.ExecContext(ctx, `INSERT INTO space_members(space_id,user_id,role) VALUES($1,$2,'owner')`, out.ID, userID); err != nil {
-			return err
-		}
-		if _, err := tx.ExecContext(ctx, `INSERT INTO space_roles(id,space_id,name,is_everyone,permissions) VALUES($1,$2,'@everyone',TRUE,'["space.view","messages.read","messages.write","library.view","library.download","storage.view_own_usage","studio.view","studio.manage","agents.run","tasks.view","tasks.manage","integrations.manage"]'::jsonb)`, "role_"+uuid.NewString(), out.ID); err != nil {
-			return err
-		}
-		_, err := recordSpaceEventTx(ctx, tx, out.ID, userID, "space.created", out.ID, map[string]any{"name": name})
-		return err
-	})
-	return out, err
-}
-
-func (db *Database) ensurePersonalSpace(ctx context.Context, userID string) error {
-	return db.spaceTx(ctx, func(tx *sql.Tx) error {
-		if _, err := tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock(hashtext($1))`, "spaces:owner:"+userID); err != nil {
-			return err
-		}
-		var userName string
-		if err := tx.QueryRowContext(ctx, `SELECT name FROM users WHERE id=$1`, userID).Scan(&userName); err != nil {
-			return err
-		}
-		personalName := defaultPersonalSpaceName(userName)
-		var existingID, existingName string
-		err := tx.QueryRowContext(ctx, `SELECT id,name FROM spaces WHERE owner_user_id=$1 AND is_personal LIMIT 1 FOR UPDATE`, userID).Scan(&existingID, &existingName)
-		if err == nil {
-			if existingName != "Default space" && existingName != "Personal" {
-				return nil
-			}
-			if _, err := tx.ExecContext(ctx, `UPDATE spaces SET name=$1,updated_at=NOW() WHERE id=$2`, personalName, existingID); err != nil {
-				return err
-			}
-			_, err = recordSpaceEventTx(ctx, tx, existingID, userID, "space.updated", existingID, map[string]any{"name": personalName, "automatic_default_name": true})
-			return err
-		}
-		if !errors.Is(err, sql.ErrNoRows) {
-			return err
-		}
-		spaceID, domainID := "space_"+uuid.NewString(), "sd_"+uuid.NewString()
-		if _, err := tx.ExecContext(ctx, `INSERT INTO security_domains(id,kind,owner_user_id) VALUES($1,'personal',$2) ON CONFLICT (owner_user_id) WHERE kind='personal' DO NOTHING`, domainID, userID); err != nil {
-			return err
-		}
-		if err := tx.QueryRowContext(ctx, `SELECT id FROM security_domains WHERE kind='personal' AND owner_user_id=$1`, userID).Scan(&domainID); err != nil {
-			return err
-		}
-		if _, err := tx.ExecContext(ctx, `INSERT INTO spaces(id,owner_user_id,name,is_personal,security_domain_id) VALUES($1,$2,$3,TRUE,$4)`, spaceID, userID, personalName, domainID); err != nil {
-			return err
-		}
-		if _, err := tx.ExecContext(ctx, `INSERT INTO space_storage_usage(space_id) VALUES($1)`, spaceID); err != nil {
-			return err
-		}
-		if _, err := tx.ExecContext(ctx, `INSERT INTO space_members(space_id,user_id,role) VALUES($1,$2,'owner')`, spaceID, userID); err != nil {
-			return err
-		}
-		if _, err := tx.ExecContext(ctx, `INSERT INTO space_roles(id,space_id,name,is_everyone,permissions) VALUES($1,$2,'@everyone',TRUE,'["space.view","messages.read","messages.write","library.view","library.download","storage.view_own_usage","studio.view","studio.manage","agents.run","tasks.view","tasks.manage","integrations.manage"]'::jsonb)`, "role_"+uuid.NewString(), spaceID); err != nil {
-			return err
-		}
-		_, err = recordSpaceEventTx(ctx, tx, spaceID, userID, "space.created", spaceID, map[string]any{"name": personalName, "is_personal": true})
-		return err
-	})
+	return &result.Space, nil
 }
 
 func (db *Database) ListSpaces(ctx context.Context, userID string) ([]Space, error) {
-	if err := db.ensurePersonalSpace(ctx, userID); err != nil {
-		return nil, err
-	}
 	spaces := []Space{}
 	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
 		rows, err := tx.QueryContext(ctx, `SELECT s.id,s.security_domain_id,s.owner_user_id,s.name,m.role,
 			(SELECT count(*) FROM space_members sm WHERE sm.space_id=s.id),
-			(SELECT count(*) FROM space_invitations si WHERE si.space_id=s.id AND si.expires_at>NOW()),
-			s.is_personal,
+			(SELECT count(*) FROM space_invitations si WHERE si.space_id=s.id AND si.expires_at>NOW()
+			  AND si.revoked_at IS NULL AND si.consumed_at IS NULL),
 			(EXISTS(SELECT 1 FROM space_members sm WHERE sm.space_id=s.id AND sm.role='member') OR
-			 EXISTS(SELECT 1 FROM space_invitations si WHERE si.space_id=s.id AND si.expires_at>NOW())),
+			 EXISTS(SELECT 1 FROM space_invitations si WHERE si.space_id=s.id AND si.expires_at>NOW() AND si.revoked_at IS NULL AND si.consumed_at IS NULL)),
 			s.created_at,s.updated_at
 			FROM spaces s JOIN space_members m ON m.space_id=s.id
-			WHERE m.user_id=$1 AND s.lifecycle_state='active' ORDER BY s.is_personal DESC,s.updated_at DESC`, userID)
+			WHERE m.user_id=$1 AND s.lifecycle_state='active' ORDER BY s.updated_at DESC`, userID)
 		if err != nil {
 			return err
 		}
 		for rows.Next() {
 			var space Space
-			if err := rows.Scan(&space.ID, &space.SecurityDomainID, &space.OwnerUserID, &space.Name, &space.Role, &space.MemberCount, &space.PendingCount, &space.IsPersonal, &space.IsShared, &space.CreatedAt, &space.UpdatedAt); err != nil {
+			if err := rows.Scan(&space.ID, &space.SecurityDomainID, &space.OwnerUserID, &space.Name, &space.Role, &space.MemberCount, &space.PendingCount, &space.IsShared, &space.CreatedAt, &space.UpdatedAt); err != nil {
 				rows.Close()
 				return err
 			}
@@ -423,13 +339,13 @@ func (db *Database) SpaceByID(ctx context.Context, userID, spaceID string) (*Spa
 	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
 		if err := tx.QueryRowContext(ctx, `SELECT s.id,s.security_domain_id,s.owner_user_id,s.name,m.role,
 			(SELECT count(*) FROM space_members sm WHERE sm.space_id=s.id),
-			(SELECT count(*) FROM space_invitations si WHERE si.space_id=s.id AND si.expires_at>NOW()),
-			s.is_personal,
+			(SELECT count(*) FROM space_invitations si WHERE si.space_id=s.id AND si.expires_at>NOW()
+			  AND si.revoked_at IS NULL AND si.consumed_at IS NULL),
 			(EXISTS(SELECT 1 FROM space_members sm WHERE sm.space_id=s.id AND sm.role='member') OR
-			 EXISTS(SELECT 1 FROM space_invitations si WHERE si.space_id=s.id AND si.expires_at>NOW())),
+			 EXISTS(SELECT 1 FROM space_invitations si WHERE si.space_id=s.id AND si.expires_at>NOW() AND si.revoked_at IS NULL AND si.consumed_at IS NULL)),
 			s.created_at,s.updated_at
 			FROM spaces s JOIN space_members m ON m.space_id=s.id
-			WHERE s.id=$1 AND m.user_id=$2 AND s.lifecycle_state='active'`, spaceID, userID).Scan(&out.ID, &out.SecurityDomainID, &out.OwnerUserID, &out.Name, &out.Role, &out.MemberCount, &out.PendingCount, &out.IsPersonal, &out.IsShared, &out.CreatedAt, &out.UpdatedAt); err != nil {
+			WHERE s.id=$1 AND m.user_id=$2 AND s.lifecycle_state='active'`, spaceID, userID).Scan(&out.ID, &out.SecurityDomainID, &out.OwnerUserID, &out.Name, &out.Role, &out.MemberCount, &out.PendingCount, &out.IsShared, &out.CreatedAt, &out.UpdatedAt); err != nil {
 			return err
 		}
 		return populateSpacePermissionsTx(ctx, tx, userID, out)
@@ -483,12 +399,8 @@ func (db *Database) DeleteSpace(ctx context.Context, userID, spaceID, confirmati
 			return err
 		}
 		var name string
-		var isPersonal bool
-		if err := tx.QueryRowContext(ctx, `SELECT name,is_personal FROM spaces WHERE id=$1 FOR UPDATE`, spaceID).Scan(&name, &isPersonal); err != nil {
+		if err := tx.QueryRowContext(ctx, `SELECT name FROM spaces WHERE id=$1 FOR UPDATE`, spaceID).Scan(&name); err != nil {
 			return err
-		}
-		if isPersonal {
-			return ErrSpaceForbidden
 		}
 		if confirmation != name {
 			return ErrSpaceInvalid
@@ -564,14 +476,25 @@ func (db *Database) SpaceMemberAvatarMeta(ctx context.Context, requestingUserID,
 }
 
 func (db *Database) InviteToSpace(ctx context.Context, ownerID, spaceID, email string) (*SpaceInvitation, error) {
-	if err := db.ensurePersonalSpace(ctx, ownerID); err != nil {
-		return nil, err
-	}
+	return db.InviteToSpaceWithToken(
+		ctx, ownerID, spaceID, email, "legacy-"+strings.ReplaceAll(uuid.NewString(), "-", ""),
+	)
+}
+
+func (db *Database) InviteToSpaceWithToken(
+	ctx context.Context,
+	ownerID, spaceID, email, tokenHash string,
+) (*SpaceInvitation, error) {
 	email = normalizeEmail(email)
-	if email == "" {
+	tokenHash = strings.TrimSpace(tokenHash)
+	if email == "" || tokenHash == "" {
 		return nil, ErrSpaceInvalid
 	}
-	out := &SpaceInvitation{ID: "invite_" + uuid.NewString(), SpaceID: spaceID, InvitedByUserID: ownerID, ExpiresAt: time.Now().UTC().Add(7 * 24 * time.Hour)}
+	out := &SpaceInvitation{
+		ID: "invite_" + uuid.NewString(), SpaceID: spaceID, InvitedByUserID: ownerID,
+		InvitedEmail: email, DeliveryStatus: "pending",
+		ExpiresAt: time.Now().UTC().Add(7 * 24 * time.Hour),
+	}
 	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpaceOwnerTx(ctx, tx, spaceID, ownerID); err != nil {
 			return err
@@ -582,27 +505,48 @@ func (db *Database) InviteToSpace(ctx context.Context, ownerID, spaceID, email s
 		if _, err := tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock(hashtext($1))`, "spaces:people:"+spaceID); err != nil {
 			return err
 		}
-		if _, err := tx.ExecContext(ctx, `DELETE FROM space_invitations WHERE expires_at<=NOW()`); err != nil {
+		if _, err := tx.ExecContext(ctx, `UPDATE space_invitations SET revoked_at=COALESCE(revoked_at,NOW())
+			WHERE expires_at<=NOW() AND consumed_at IS NULL`); err != nil {
 			return err
 		}
-		if err := tx.QueryRowContext(ctx, `SELECT id,name,email FROM users WHERE lower(email)=$1`, email).Scan(&out.InvitedUserID, &out.InvitedUserName, &out.InvitedEmail); errors.Is(err, sql.ErrNoRows) {
-			return ErrSpaceInviteeNotFound
-		} else if err != nil {
+		err := tx.QueryRowContext(ctx, `SELECT id,name,email FROM users WHERE lower(email)=$1`, email).
+			Scan(&out.InvitedUserID, &out.InvitedUserName, &out.InvitedEmail)
+		if err != nil && !errors.Is(err, sql.ErrNoRows) {
 			return err
 		}
 		var already bool
-		if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM space_members WHERE space_id=$1 AND user_id=$2)`, spaceID, out.InvitedUserID).Scan(&already); err != nil {
+		if err := tx.QueryRowContext(ctx, `SELECT EXISTS(
+			SELECT 1 FROM space_members m JOIN users u ON u.id=m.user_id
+			WHERE m.space_id=$1 AND lower(u.email)=$2
+		)`, spaceID, email).Scan(&already); err != nil {
 			return err
 		}
 		if already {
 			return ErrSpaceConflict
 		}
-		if err := tx.QueryRowContext(ctx, `INSERT INTO space_invitations(id,space_id,invited_user_id,invited_by_user_id,expires_at)
-			VALUES($1,$2,$3,$4,$5) ON CONFLICT(space_id,invited_user_id) DO UPDATE SET invited_by_user_id=excluded.invited_by_user_id,expires_at=excluded.expires_at,created_at=NOW()
-			RETURNING created_at`, out.ID, spaceID, out.InvitedUserID, ownerID, out.ExpiresAt).Scan(&out.CreatedAt); err != nil {
+		if err := tx.QueryRowContext(ctx, `SELECT name FROM users WHERE id=$1`, ownerID).Scan(&out.InviterName); err != nil {
 			return err
 		}
-		_, err := recordSpaceEventTx(ctx, tx, spaceID, ownerID, "member.invited", out.InvitedUserID, map[string]any{"invite_id": out.ID})
+		if err := tx.QueryRowContext(ctx, `SELECT name FROM spaces WHERE id=$1`, spaceID).Scan(&out.SpaceName); err != nil {
+			return err
+		}
+		if _, err := tx.ExecContext(ctx, `UPDATE space_invitations SET revoked_at=NOW()
+			WHERE space_id=$1 AND lower(invited_email)=$2 AND revoked_at IS NULL AND consumed_at IS NULL`,
+			spaceID, email); err != nil {
+			return err
+		}
+		if err := tx.QueryRowContext(ctx, `INSERT INTO space_invitations
+			(id,space_id,invited_user_id,invited_email,invited_by_user_id,token_hash,delivery_status,expires_at)
+			VALUES($1,$2,NULLIF($3,''),$4,$5,$6,'pending',$7)
+			RETURNING created_at`, out.ID, spaceID, out.InvitedUserID, email, ownerID, tokenHash, out.ExpiresAt).
+			Scan(&out.CreatedAt); err != nil {
+			return err
+		}
+		invitedUserID := ""
+		if out.InvitedUserID != nil {
+			invitedUserID = *out.InvitedUserID
+		}
+		_, err = recordSpaceEventTx(ctx, tx, spaceID, ownerID, "member.invited", invitedUserID, map[string]any{"invite_id": out.ID})
 		return err
 	})
 	return out, err
@@ -611,19 +555,30 @@ func (db *Database) InviteToSpace(ctx context.Context, ownerID, spaceID, email s
 func (db *Database) IncomingSpaceInvites(ctx context.Context, userID string) ([]SpaceInvitation, error) {
 	items := []SpaceInvitation{}
 	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
-		if _, err := tx.ExecContext(ctx, `DELETE FROM space_invitations WHERE expires_at<=NOW()`); err != nil {
+		if _, err := tx.ExecContext(ctx, `UPDATE space_invitations SET revoked_at=COALESCE(revoked_at,NOW())
+			WHERE expires_at<=NOW() AND consumed_at IS NULL`); err != nil {
 			return err
 		}
-		rows, err := tx.QueryContext(ctx, `SELECT i.id,i.space_id,s.name,i.invited_user_id,u.name,u.email,i.invited_by_user_id,i.expires_at,i.created_at
-			FROM space_invitations i JOIN spaces s ON s.id=i.space_id JOIN users u ON u.id=i.invited_user_id
-			WHERE i.invited_user_id=$1 ORDER BY i.created_at DESC`, userID)
+		rows, err := tx.QueryContext(ctx, `SELECT i.id,i.space_id,s.name,i.invited_user_id,
+			invited.name,i.invited_email,i.invited_by_user_id,inviter.name,
+			i.delivery_status,i.expires_at,i.created_at
+			FROM space_invitations i
+			JOIN spaces s ON s.id=i.space_id
+			JOIN users current_invitee ON current_invitee.id=$1
+			JOIN users inviter ON inviter.id=i.invited_by_user_id
+			LEFT JOIN users invited ON invited.id=i.invited_user_id
+			WHERE (i.invited_user_id=$1 OR lower(i.invited_email)=lower(current_invitee.email))
+			  AND i.revoked_at IS NULL AND i.consumed_at IS NULL AND i.expires_at>NOW()
+			ORDER BY i.created_at DESC`, userID)
 		if err != nil {
 			return err
 		}
 		defer rows.Close()
 		for rows.Next() {
 			var item SpaceInvitation
-			if err := rows.Scan(&item.ID, &item.SpaceID, &item.SpaceName, &item.InvitedUserID, &item.InvitedUserName, &item.InvitedEmail, &item.InvitedByUserID, &item.ExpiresAt, &item.CreatedAt); err != nil {
+			if err := rows.Scan(&item.ID, &item.SpaceID, &item.SpaceName, &item.InvitedUserID,
+				&item.InvitedUserName, &item.InvitedEmail, &item.InvitedByUserID, &item.InviterName,
+				&item.DeliveryStatus, &item.ExpiresAt, &item.CreatedAt); err != nil {
 				return err
 			}
 			items = append(items, item)
@@ -633,21 +588,116 @@ func (db *Database) IncomingSpaceInvites(ctx context.Context, userID string) ([]
 	return items, err
 }
 
+func (db *Database) PendingSpaceInvitations(
+	ctx context.Context,
+	ownerID, spaceID string,
+) ([]SpaceInvitation, error) {
+	items := []SpaceInvitation{}
+	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+		if err := requireSpaceOwnerTx(ctx, tx, spaceID, ownerID); err != nil {
+			return err
+		}
+		rows, err := tx.QueryContext(ctx, `SELECT i.id,i.space_id,s.name,
+			i.invited_user_id,invited.name,i.invited_email,
+			i.invited_by_user_id,inviter.name,i.delivery_status,i.expires_at,i.created_at
+			FROM space_invitations i
+			JOIN spaces s ON s.id=i.space_id
+			JOIN users inviter ON inviter.id=i.invited_by_user_id
+			LEFT JOIN users invited ON invited.id=i.invited_user_id
+			WHERE i.space_id=$1 AND i.revoked_at IS NULL AND i.consumed_at IS NULL
+			  AND i.expires_at>NOW()
+			ORDER BY i.created_at DESC`, spaceID)
+		if err != nil {
+			return err
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var item SpaceInvitation
+			if err := rows.Scan(&item.ID, &item.SpaceID, &item.SpaceName, &item.InvitedUserID,
+				&item.InvitedUserName, &item.InvitedEmail, &item.InvitedByUserID, &item.InviterName,
+				&item.DeliveryStatus, &item.ExpiresAt, &item.CreatedAt); err != nil {
+				return err
+			}
+			items = append(items, item)
+		}
+		return rows.Err()
+	})
+	return items, err
+}
+
+func (db *Database) RefreshSpaceInvitation(
+	ctx context.Context,
+	ownerID, spaceID, inviteID, tokenHash string,
+) (*SpaceInvitation, error) {
+	out := &SpaceInvitation{}
+	expiresAt := time.Now().UTC().Add(7 * 24 * time.Hour)
+	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+		if err := requireSpaceOwnerTx(ctx, tx, spaceID, ownerID); err != nil {
+			return err
+		}
+		err := tx.QueryRowContext(ctx, `UPDATE space_invitations i
+			SET token_hash=$1,delivery_status='pending',expires_at=$2,last_sent_at=NULL
+			FROM spaces s,users inviter
+			WHERE i.id=$3 AND i.space_id=$4 AND i.space_id=s.id
+			  AND inviter.id=i.invited_by_user_id
+			  AND i.revoked_at IS NULL AND i.consumed_at IS NULL
+			RETURNING i.id,i.space_id,s.name,i.invited_user_id,
+			  i.invited_email,i.invited_by_user_id,inviter.name,i.delivery_status,
+			  i.expires_at,i.created_at`, tokenHash, expiresAt, inviteID, spaceID).
+			Scan(&out.ID, &out.SpaceID, &out.SpaceName, &out.InvitedUserID, &out.InvitedEmail,
+				&out.InvitedByUserID, &out.InviterName, &out.DeliveryStatus, &out.ExpiresAt,
+				&out.CreatedAt)
+		if errors.Is(err, sql.ErrNoRows) {
+			return ErrSpaceInviteNotFound
+		}
+		return err
+	})
+	return out, err
+}
+
+func (db *Database) RevokeSpaceInvitation(
+	ctx context.Context,
+	ownerID, spaceID, inviteID string,
+) error {
+	return db.spaceTx(ctx, func(tx *sql.Tx) error {
+		if err := requireSpaceOwnerTx(ctx, tx, spaceID, ownerID); err != nil {
+			return err
+		}
+		result, err := tx.ExecContext(ctx, `UPDATE space_invitations SET revoked_at=NOW()
+			WHERE id=$1 AND space_id=$2 AND revoked_at IS NULL AND consumed_at IS NULL`,
+			inviteID, spaceID)
+		if err != nil {
+			return err
+		}
+		if changed, _ := result.RowsAffected(); changed == 0 {
+			return ErrSpaceInviteNotFound
+		}
+		return nil
+	})
+}
+
 func (db *Database) RespondToSpaceInvite(ctx context.Context, userID, inviteID string, accept bool) (*Space, error) {
 	var spaceID string
 	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
 		var expires time.Time
-		if err := tx.QueryRowContext(ctx, `SELECT space_id,expires_at FROM space_invitations WHERE id=$1 AND invited_user_id=$2 FOR UPDATE`, inviteID, userID).Scan(&spaceID, &expires); errors.Is(err, sql.ErrNoRows) {
+		var invitedEmail, userEmail string
+		if err := tx.QueryRowContext(ctx, `SELECT i.space_id,i.expires_at,i.invited_email,u.email
+			FROM space_invitations i JOIN users u ON u.id=$2
+			WHERE i.id=$1 AND i.revoked_at IS NULL AND i.consumed_at IS NULL
+			FOR UPDATE OF i`, inviteID, userID).Scan(&spaceID, &expires, &invitedEmail, &userEmail); errors.Is(err, sql.ErrNoRows) {
 			return ErrSpaceInviteNotFound
 		} else if err != nil {
 			return err
+		}
+		if normalizeEmail(invitedEmail) != normalizeEmail(userEmail) {
+			return ErrSpaceInviteNotFound
 		}
 		if time.Now().After(expires) {
 			_, _ = tx.ExecContext(ctx, `DELETE FROM space_invitations WHERE id=$1`, inviteID)
 			return ErrSpaceInviteExpired
 		}
 		if !accept {
-			_, err := tx.ExecContext(ctx, `DELETE FROM space_invitations WHERE id=$1`, inviteID)
+			_, err := tx.ExecContext(ctx, `UPDATE space_invitations SET revoked_at=NOW() WHERE id=$1`, inviteID)
 			return err
 		}
 		if _, err := tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock(hashtext($1))`, "spaces:member:"+userID); err != nil {
@@ -656,7 +706,8 @@ func (db *Database) RespondToSpaceInvite(ctx context.Context, userID, inviteID s
 		if _, err := tx.ExecContext(ctx, `INSERT INTO space_members(space_id,user_id,role) VALUES($1,$2,'member')`, spaceID, userID); err != nil {
 			return err
 		}
-		if _, err := tx.ExecContext(ctx, `DELETE FROM space_invitations WHERE id=$1`, inviteID); err != nil {
+		if _, err := tx.ExecContext(ctx, `UPDATE space_invitations
+			SET invited_user_id=$1,consumed_at=NOW() WHERE id=$2`, userID, inviteID); err != nil {
 			return err
 		}
 		// Rejoining the same Space inside the retention window restores the
@@ -671,6 +722,60 @@ func (db *Database) RespondToSpaceInvite(ctx context.Context, userID, inviteID s
 		return nil, err
 	}
 	return db.SpaceByID(ctx, userID, spaceID)
+}
+
+func (db *Database) SpaceInvitationPreview(
+	ctx context.Context,
+	tokenHash string,
+) (*SpaceInvitationPreview, error) {
+	out := &SpaceInvitationPreview{}
+	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+		return tx.QueryRowContext(ctx, `SELECT s.name,u.name,i.invited_email,i.expires_at
+			FROM space_invitations i
+			JOIN spaces s ON s.id=i.space_id
+			JOIN users u ON u.id=i.invited_by_user_id
+			WHERE i.token_hash=$1 AND i.revoked_at IS NULL AND i.consumed_at IS NULL
+			  AND i.expires_at>NOW()`, tokenHash).
+			Scan(&out.SpaceName, &out.InviterName, &out.InvitedEmail, &out.ExpiresAt)
+	})
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, ErrSpaceInviteNotFound
+	}
+	return out, err
+}
+
+func (db *Database) RespondToSpaceInviteToken(
+	ctx context.Context,
+	userID, tokenHash string,
+	accept bool,
+) (*Space, error) {
+	var inviteID string
+	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+		return tx.QueryRowContext(ctx, `SELECT id FROM space_invitations
+			WHERE token_hash=$1 AND revoked_at IS NULL AND consumed_at IS NULL AND expires_at>NOW()`,
+			tokenHash).Scan(&inviteID)
+	})
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, ErrSpaceInviteNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	return db.RespondToSpaceInvite(ctx, userID, inviteID, accept)
+}
+
+func (db *Database) SetSpaceInvitationDelivery(
+	ctx context.Context,
+	inviteID, status string,
+) error {
+	if status != "sent" && status != "failed" {
+		return ErrSpaceInvalid
+	}
+	return db.spaceTx(ctx, func(tx *sql.Tx) error {
+		_, err := tx.ExecContext(ctx, `UPDATE space_invitations
+			SET delivery_status=$1,last_sent_at=NOW() WHERE id=$2`, status, inviteID)
+		return err
+	})
 }
 
 func (db *Database) RemoveSpaceMember(ctx context.Context, ownerID, spaceID, memberID string) error {
@@ -748,12 +853,8 @@ func (db *Database) TransferSpaceOwnership(ctx context.Context, ownerID, spaceID
 		if err := requireSpaceOwnerTx(ctx, tx, spaceID, ownerID); err != nil {
 			return err
 		}
-		var isPersonal bool
-		if err := tx.QueryRowContext(ctx, `SELECT is_personal FROM spaces WHERE id=$1 FOR UPDATE`, spaceID).Scan(&isPersonal); err != nil {
+		if _, err := tx.ExecContext(ctx, `SELECT 1 FROM spaces WHERE id=$1 FOR UPDATE`, spaceID); err != nil {
 			return err
-		}
-		if isPersonal {
-			return ErrSpaceForbidden
 		}
 		var role string
 		if err := tx.QueryRowContext(ctx, `SELECT role FROM space_members WHERE space_id=$1 AND user_id=$2 FOR UPDATE`, spaceID, memberID).Scan(&role); errors.Is(err, sql.ErrNoRows) {
@@ -1526,11 +1627,7 @@ func (db *Database) SpaceInbox(ctx context.Context, userID, tab string, limit in
 			FROM space_inbox_items i JOIN spaces s ON s.id=i.space_id
 			WHERE i.user_id=$1 AND `+where+`
 			AND EXISTS(SELECT 1 FROM space_members current_member WHERE current_member.space_id=i.space_id AND current_member.user_id=$1)
-			AND (i.message_id IS NULL OR s.owner_user_id=$1
-				OR EXISTS(SELECT 1 FROM space_member_permission_overrides mpo WHERE mpo.space_id=i.space_id AND mpo.user_id=$1 AND mpo.permission=$3 AND mpo.effect='allow')
-				OR (NOT EXISTS(SELECT 1 FROM space_member_permission_overrides mpo WHERE mpo.space_id=i.space_id AND mpo.user_id=$1 AND mpo.permission=$3)
-					AND EXISTS(SELECT 1 FROM space_roles role LEFT JOIN space_member_roles mr ON mr.role_id=role.id AND mr.space_id=role.space_id AND mr.user_id=$1 WHERE role.space_id=i.space_id AND (role.is_everyone OR mr.user_id IS NOT NULL) AND role.permissions ? $3)))
-			ORDER BY i.id DESC LIMIT $2`, userID, limit, PermissionMessagesRead)
+			ORDER BY i.id DESC LIMIT $2`, userID, limit)
 		if err != nil {
 			return err
 		}

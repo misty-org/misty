@@ -84,7 +84,10 @@ func normalizePersonalAgent(agent *PersonalAgent) error {
 		return ErrSpaceInvalid
 	}
 	if !validPersonalJSONObject(agent.ContextPermissions) {
-		agent.ContextPermissions = json.RawMessage(`{"space_chat":true,"library":true,"notes":true,"tasks":true,"members":true}`)
+		// "task_notes" is the current name for the notes column on a task. Rows
+		// stored under the old "notes" key still work; see the alias in
+		// PersonalAgentSpaceContextForConversation.
+		agent.ContextPermissions = json.RawMessage(`{"space_chat":true,"library":true,"task_notes":true,"tasks":true,"members":true}`)
 	}
 	if !validPersonalJSONObject(agent.ToolPermissions) {
 		agent.ToolPermissions = json.RawMessage(`{"read":true,"write":false,"integrations":[]}`)
@@ -386,9 +389,23 @@ func (db *Database) PersonalAgentSpaceContext(ctx context.Context, userID, space
 func (db *Database) PersonalAgentSpaceContextForConversation(ctx context.Context, userID, spaceID, conversationID string, permissions json.RawMessage) (string, error) {
 	var allowed map[string]bool
 	_ = json.Unmarshal(permissions, &allowed)
+	// "notes" here has always meant the free-text notes column on a task, not
+	// the Notes surface, which is device-local and unreadable by the server. The
+	// key is now "task_notes"; the old name is still honoured because this value
+	// is a stored user setting in personal_agents.context_permissions and a hard
+	// break would silently flip someone's toggle.
+	if allowed["notes"] && !allowed["task_notes"] {
+		allowed["task_notes"] = true
+	}
 	parts := []string{}
 	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
-		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionMessagesRead); err != nil {
+		// Membership is the entry gate, not messages.read. This used to require
+		// messages.read for the whole function, so a member with Library and
+		// Tasks access but no chat access received zero Space context -- not even
+		// the Library and Tasks they can see. Each section below still checks its
+		// own permission, and the "may this member use agents here" gate is
+		// agents.run, enforced upstream by validateAgentSpaceAccessTx.
+		if _, err := requireSpaceMemberTx(ctx, tx, spaceID, userID); err != nil {
 			return err
 		}
 		var name string
@@ -417,7 +434,17 @@ func (db *Database) PersonalAgentSpaceContextForConversation(ctx context.Context
 				parts = append(parts, "Members: "+strings.Join(names, ", "))
 			}
 		}
+		// messages.read is checked here rather than as the entry gate, so a member
+		// without chat access loses only this section instead of the whole context.
+		canReadChat := false
 		if allowed["space_chat"] {
+			readable, permissionErr := hasSpacePermissionTx(ctx, tx, userID, spaceID, PermissionMessagesRead)
+			if permissionErr != nil {
+				return permissionErr
+			}
+			canReadChat = readable
+		}
+		if canReadChat {
 			if conversationID != "" {
 				if err := requireSpaceConversationMemberTx(ctx, tx, userID, spaceID, conversationID); err != nil {
 					return err
@@ -450,7 +477,7 @@ func (db *Database) PersonalAgentSpaceContextForConversation(ctx context.Context
 				parts = append(parts, "Recent chat:\n- "+strings.Join(messages, "\n- "))
 			}
 		}
-		if allowed["tasks"] || allowed["notes"] {
+		if allowed["tasks"] || allowed["task_notes"] {
 			canViewTasks, permissionErr := hasSpacePermissionTx(ctx, tx, userID, spaceID, PermissionTasksView)
 			if permissionErr != nil {
 				return permissionErr
@@ -476,7 +503,7 @@ func (db *Database) PersonalAgentSpaceContextForConversation(ctx context.Context
 					parts = append(parts, "Tasks:\n- "+strings.Join(tasks, "\n- "))
 				}
 			}
-			if canViewTasks && allowed["notes"] {
+			if canViewTasks && allowed["task_notes"] {
 				rows, queryErr := tx.QueryContext(ctx, `SELECT title,notes FROM space_tasks WHERE space_id=$1 AND archived_at IS NULL AND btrim(notes)<>'' ORDER BY updated_at DESC LIMIT 20`, spaceID)
 				if queryErr != nil {
 					return queryErr
@@ -494,7 +521,7 @@ func (db *Database) PersonalAgentSpaceContextForConversation(ctx context.Context
 					return err
 				}
 				if len(notes) > 0 {
-					parts = append(parts, "Notes:\n- "+strings.Join(notes, "\n- "))
+					parts = append(parts, "Task notes:\n- "+strings.Join(notes, "\n- "))
 				}
 			}
 		}

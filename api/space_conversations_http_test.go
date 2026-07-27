@@ -89,11 +89,10 @@ func TestConversationHTTPAccessControl(t *testing.T) {
 		t.Fatalf("CreateUser(outsider) error = %v", err)
 	}
 
-	spacesList, err := database.ListSpaces(ctx, owner.ID)
-	if err != nil || len(spacesList) != 1 {
-		t.Fatalf("ListSpaces(owner) = %#v, %v", spacesList, err)
+	space, err := database.CreateSpace(ctx, owner.ID, "Conversations")
+	if err != nil {
+		t.Fatalf("CreateSpace(owner) error = %v", err)
 	}
-	space := spacesList[0]
 
 	// member and spacemate both join the Space, but only member is added to
 	// the conversation below. outsider never joins the Space at all.

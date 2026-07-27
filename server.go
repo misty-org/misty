@@ -21,6 +21,7 @@ import (
 	appbilling "github.com/kannachi323/misty/server/billing"
 	"github.com/kannachi323/misty/server/db"
 	"github.com/kannachi323/misty/server/email"
+	"github.com/kannachi323/misty/server/metrics"
 	"github.com/kannachi323/misty/server/telemetry"
 )
 
@@ -39,6 +40,7 @@ type Server struct {
 	WaitlistNotificationEmail string
 	Telemetry                 telemetry.Client
 	HealthMonitor             *healthMonitor
+	Metrics                   *metrics.Registry
 }
 
 func CreateServer() (*Server, error) {
@@ -78,11 +80,6 @@ func CreateServer() (*Server, error) {
 	if err != nil {
 		return nil, fmt.Errorf("configure Space Library: %w", err)
 	}
-	// Production must not silently fall back to proxying user file bodies
-	// through the VPS, so a store that cannot sign R2 operations is fatal here.
-	if err := s.Library.EnableDirectTransfers(api.DirectTransferConfigFromEnv()); err != nil {
-		return nil, fmt.Errorf("configure direct R2 transfers: %w", err)
-	}
 	s.Demo, err = api.NewDemoService(s.Database, s.LibraryStore, api.DemoConfigFromEnv())
 	if err != nil {
 		return nil, fmt.Errorf("configure demo management: %w", err)
@@ -120,6 +117,11 @@ func CreateServer() (*Server, error) {
 	if err != nil {
 		return nil, fmt.Errorf("configure Space link encryption: %w", err)
 	}
+	noteCollab, err := api.NoteCollabConfigFromEnv()
+	if err != nil {
+		return nil, fmt.Errorf("configure note collaboration: %w", err)
+	}
+	s.Spaces.SetNoteCollab(noteCollab)
 	s.Spaces.SetLibraryProvider(s.Library)
 	s.Spaces.SetAvatarStore(s.LibraryStore)
 	s.Realtime = api.NewRealtimeService(s.Database, s.Database.GetDSN())
@@ -129,6 +131,11 @@ func CreateServer() (*Server, error) {
 		return nil, err
 	}
 	s.EmailSender = emailSender
+	invitationBaseURL := strings.TrimSpace(os.Getenv("MISTY_INVITATION_URL_BASE"))
+	if invitationBaseURL == "" {
+		invitationBaseURL = "https://mistysys.com/invite"
+	}
+	s.Spaces.SetInvitationSender(emailSender, invitationBaseURL)
 	s.HealthMonitor = newHealthMonitor(s)
 
 	return s, nil
@@ -138,7 +145,7 @@ func (s *Server) MountHandlers() error {
 	s.Router.Use(cors.Handler(cors.Options{
 		AllowOriginFunc:  func(_ *http.Request, origin string) bool { return isAllowedCORSOrigin(origin) },
 		AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
-		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-Misty-Platform", "X-Misty-Release-Channel", "X-Misty-Session-Id", "X-Misty-Analytics-Enabled", "X-Misty-Device-Timestamp", "X-Misty-Device-Nonce", "X-Misty-Device-Signature", "X-Misty-Attachment-Upload-Token", "X-Misty-Library-Upload-Token"},
+		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "Idempotency-Key", "X-Misty-Platform", "X-Misty-Release-Channel", "X-Misty-Session-Id", "X-Misty-Analytics-Enabled", "X-Misty-Device-Timestamp", "X-Misty-Device-Nonce", "X-Misty-Device-Signature", "X-Misty-Attachment-Upload-Token", "X-Misty-Library-Upload-Token"},
 		AllowCredentials: true,
 		// The client must be able to read the marker that distinguishes a signed
 		// download descriptor from a proxied file body.
@@ -155,6 +162,9 @@ func (s *Server) MountHandlers() error {
 	abuseGuard.StartRefreshLoop(context.Background(), 30*time.Second)
 	s.Router.Use(abuseGuard.Middleware)
 	s.Router.Use(api.NewAPIRateLimiter().WithAbuseGuard(abuseGuard).Middleware)
+	s.Metrics = metrics.New()
+	s.registerDomainGauges(s.Metrics)
+	s.Router.Use(s.Metrics.Middleware)
 
 	passwordResetService, err := api.NewPasswordResetService(s.Database, s.EmailSender, s.PasswordResetStartURL, s.PasswordResetRedirectURL)
 	if err != nil {
@@ -184,6 +194,11 @@ func (s *Server) MountHandlers() error {
 	waitlistJoinHandler := waitlistService.Join()
 	healthHandler := s.HealthMonitor.Handler()
 	s.Router.Get("/health", healthHandler)
+	// Unmounted entirely when no token is configured: the output names every
+	// route, its traffic volume, and its error rate.
+	if token := metricsToken(); token != "" {
+		s.Router.Get("/metrics", s.Metrics.Handler(token))
+	}
 	s.Router.Get("/api/health", healthHandler)
 
 	// Account management
@@ -332,21 +347,27 @@ func (s *Server) mountLibraryRoutes(prefix string, library *api.SpaceLibraryServ
 	s.Router.MethodFunc(http.MethodPut, prefix+"/spaces/{spaceID}/library/items/{itemID}/versions/current", library.SelectEditVersion())
 	s.Router.MethodFunc(http.MethodPost, prefix+"/spaces/{spaceID}/library/items/{itemID}/versions/{editID}/render", library.RenderEditVersion())
 	s.Router.MethodFunc(http.MethodDelete, prefix+"/spaces/{spaceID}/library/items/{itemID}/versions/{editID}", library.DeleteEditVersion())
-	s.Router.MethodFunc(http.MethodGet, prefix+"/spaces/{spaceID}/members/{userID}/permissions", library.MemberPermissions())
-	s.Router.MethodFunc(http.MethodPut, prefix+"/spaces/{spaceID}/members/{userID}/permissions", library.MemberPermissions())
 }
 
 func (s *Server) mountSpacesRoutes(prefix string, spaces *api.SpacesService, realtime *api.RealtimeService) {
 	s.Router.MethodFunc(http.MethodGet, prefix+"/spaces", spaces.Spaces())
 	s.Router.MethodFunc(http.MethodPost, prefix+"/spaces", spaces.Spaces())
+	s.Router.Get(prefix+"/space-templates", spaces.SpaceTemplates())
+	s.Router.MethodFunc(http.MethodGet, prefix+"/spaces/{spaceID}/setup", spaces.SpaceSetup())
+	s.Router.MethodFunc(http.MethodPatch, prefix+"/spaces/{spaceID}/setup", spaces.SpaceSetup())
 	s.Router.MethodFunc(http.MethodGet, prefix+"/spaces/{spaceID}", spaces.Space())
 	s.Router.MethodFunc(http.MethodPatch, prefix+"/spaces/{spaceID}", spaces.Space())
 	s.Router.MethodFunc(http.MethodDelete, prefix+"/spaces/{spaceID}", spaces.Space())
 	s.Router.Get(prefix+"/spaces/{spaceID}/members", spaces.Members())
 	s.Router.Get(prefix+"/spaces/{spaceID}/members/{userID}/avatar", spaces.MemberAvatar())
-	s.Router.Post(prefix+"/spaces/{spaceID}/invitations", spaces.Invite())
+	s.Router.MethodFunc(http.MethodGet, prefix+"/spaces/{spaceID}/invitations", spaces.Invite())
+	s.Router.MethodFunc(http.MethodPost, prefix+"/spaces/{spaceID}/invitations", spaces.Invite())
+	s.Router.MethodFunc(http.MethodPost, prefix+"/spaces/{spaceID}/invitations/{inviteID}/resend", spaces.SpaceInvitationItem())
+	s.Router.MethodFunc(http.MethodDelete, prefix+"/spaces/{spaceID}/invitations/{inviteID}", spaces.SpaceInvitationItem())
 	s.Router.Post(prefix+"/spaces/invitations/{inviteID}/accept", spaces.RespondInvite(true))
 	s.Router.Post(prefix+"/spaces/invitations/{inviteID}/decline", spaces.RespondInvite(false))
+	s.Router.MethodFunc(http.MethodGet, prefix+"/space-invitations/{token}", spaces.SpaceInvitationToken())
+	s.Router.MethodFunc(http.MethodPost, prefix+"/space-invitations/{token}", spaces.SpaceInvitationToken())
 	s.Router.Delete(prefix+"/spaces/{spaceID}/members/{userID}", spaces.RemoveMember())
 	s.Router.Post(prefix+"/spaces/{spaceID}/leave", spaces.LeaveSpace())
 	s.Router.Post(prefix+"/spaces/{spaceID}/transfer", spaces.TransferOwner())
@@ -355,6 +376,7 @@ func (s *Server) mountSpacesRoutes(prefix string, spaces *api.SpacesService, rea
 	s.Router.MethodFunc(http.MethodGet, prefix+"/spaces/{spaceID}/conversations", spaces.Conversations())
 	s.Router.MethodFunc(http.MethodPost, prefix+"/spaces/{spaceID}/conversations", spaces.Conversations())
 	s.Router.MethodFunc(http.MethodPatch, prefix+"/spaces/{spaceID}/conversations/{conversationID}", spaces.Conversation())
+	s.Router.MethodFunc(http.MethodDelete, prefix+"/spaces/{spaceID}/conversations/{conversationID}", spaces.Conversation())
 	s.Router.MethodFunc(http.MethodGet, prefix+"/spaces/{spaceID}/conversations/{conversationID}/messages", spaces.ConversationMessages())
 	s.Router.MethodFunc(http.MethodPost, prefix+"/spaces/{spaceID}/conversations/{conversationID}/messages", spaces.ConversationMessages())
 	s.Router.MethodFunc(http.MethodPut, prefix+"/spaces/{spaceID}/conversations/{conversationID}/messages/{messageID}", spaces.ConversationMessage())
@@ -417,7 +439,8 @@ func (s *Server) mountSpacesRoutes(prefix string, spaces *api.SpacesService, rea
 	s.Router.MethodFunc(http.MethodGet, prefix+"/agent-conversations/{conversationID}/events", spaces.AgentConversationEvents())
 	s.Router.MethodFunc(http.MethodPost, prefix+"/agent-conversations/{conversationID}/events", spaces.AgentConversationEvents())
 	s.Router.MethodFunc(http.MethodGet, prefix+"/spaces/{spaceID}/integrations", spaces.SpaceIntegrations())
-	s.Router.Get(prefix+"/spaces/{spaceID}/integrations/{integrationID}/resources", spaces.AvailableProviderResources())
+	s.Router.MethodFunc(http.MethodGet, prefix+"/spaces/{spaceID}/integrations/{integrationID}/resources", spaces.AvailableProviderResources())
+	s.Router.MethodFunc(http.MethodPut, prefix+"/spaces/{spaceID}/integrations/{integrationID}/resources", spaces.AvailableProviderResources())
 	s.Router.MethodFunc(http.MethodGet, prefix+"/spaces/{spaceID}/provider-resources", spaces.ProviderSharedResources())
 	s.Router.MethodFunc(http.MethodPost, prefix+"/spaces/{spaceID}/provider-resources", spaces.ProviderSharedResources())
 	s.Router.Delete(prefix+"/spaces/{spaceID}/provider-resources/{resourceID}", spaces.ProviderSharedResource())
@@ -432,6 +455,14 @@ func (s *Server) mountSpacesRoutes(prefix string, spaces *api.SpacesService, rea
 	s.Router.Delete(prefix+"/integrations/{integrationID}", spaces.DeleteProviderIntegration())
 
 	// Space ↔ Discord conversation mirroring.
+	s.Router.MethodFunc(http.MethodGet, prefix+"/spaces/{spaceID}/integrations/discord/links", spaces.SpaceDiscordLink())
+	s.Router.MethodFunc(http.MethodPost, prefix+"/spaces/{spaceID}/integrations/discord/links", spaces.SpaceDiscordLink())
+	s.Router.MethodFunc(http.MethodPatch, prefix+"/spaces/{spaceID}/integrations/discord/links/{linkID}", spaces.SpaceDiscordLinkItem())
+	s.Router.MethodFunc(http.MethodDelete, prefix+"/spaces/{spaceID}/integrations/discord/links/{linkID}", spaces.SpaceDiscordLinkItem())
+	s.Router.Post(prefix+"/spaces/{spaceID}/integrations/discord/links/{linkID}/sync", spaces.SyncSpaceDiscordLink())
+	s.Router.Post(prefix+"/spaces/{spaceID}/integrations/discord/links/{linkID}/publish", spaces.PublishSpaceDiscordMessage())
+	// Compatibility aliases for desktop builds shipped before the collection
+	// contract became plural.
 	s.Router.MethodFunc(http.MethodGet, prefix+"/spaces/{spaceID}/integrations/discord/link", spaces.SpaceDiscordLink())
 	s.Router.MethodFunc(http.MethodPost, prefix+"/spaces/{spaceID}/integrations/discord/link", spaces.SpaceDiscordLink())
 	s.Router.MethodFunc(http.MethodPatch, prefix+"/spaces/{spaceID}/integrations/discord/link/{linkID}", spaces.SpaceDiscordLinkItem())
@@ -510,17 +541,17 @@ func (s *Server) mountAgentsRoutes(prefix string, service *api.AgentsService) {
 	s.Router.Post(prefix+"/devices/{deviceID}/workflow-node-jobs/{jobID}/fail", service.DeviceAuthenticated(service.WorkflowNodeLeaseAction("fail")))
 }
 
-// mountNoteRoutes registers the server-backed note API. Every handler
-// authorizes against the note's own ACL rather than a Space permission, so
-// these routes deliberately carry no Space-level permission middleware.
+// mountNoteRoutes registers the server-backed note API. Current Space
+// membership grants read/write access; creator/owner checks protect deletion.
 func (s *Server) mountNoteRoutes(prefix string, spaces *api.SpacesService) {
 	s.Router.MethodFunc(http.MethodGet, prefix+"/spaces/{spaceID}/notes", spaces.SpaceNotes())
 	s.Router.MethodFunc(http.MethodPost, prefix+"/spaces/{spaceID}/notes", spaces.SpaceNotes())
 	s.Router.MethodFunc(http.MethodGet, prefix+"/spaces/{spaceID}/notes/{noteID}", spaces.SpaceNote())
 	s.Router.MethodFunc(http.MethodDelete, prefix+"/spaces/{spaceID}/notes/{noteID}", spaces.SpaceNote())
+	// Archive/unarchive. The handler and SetSpaceNoteArchived already existed;
+	// without this the path was unreachable over HTTP.
+	s.Router.MethodFunc(http.MethodPatch, prefix+"/spaces/{spaceID}/notes/{noteID}", spaces.SpaceNote())
 	s.Router.MethodFunc(http.MethodPatch, prefix+"/spaces/{spaceID}/notes/{noteID}/metadata", spaces.SpaceNoteMetadata())
-	s.Router.MethodFunc(http.MethodGet, prefix+"/spaces/{spaceID}/notes/{noteID}/permissions", spaces.SpaceNotePermissions())
-	s.Router.MethodFunc(http.MethodPut, prefix+"/spaces/{spaceID}/notes/{noteID}/permissions", spaces.SpaceNotePermissions())
 	s.Router.Post(prefix+"/spaces/{spaceID}/notes/{noteID}/collaboration-ticket", spaces.SpaceNoteCollaborationTicket())
 	if s.Library == nil {
 		return

@@ -45,6 +45,12 @@ func main() {
 	go runLibraryPeopleProcessing(workerContext, server)
 	go runLibraryRenditionProcessing(workerContext, server)
 	go runLibraryIntelligenceProcessing(workerContext, server)
+	go runNoteControlProcessing(workerContext, server)
+	// Domain gauges refresh on their own schedule so a scrape never holds a
+	// database connection.
+	if server.Metrics != nil {
+		server.Metrics.StartSampling(workerContext, 15*time.Second)
+	}
 
 	port := os.Getenv("PORT")
 	if port == "" {
@@ -56,6 +62,24 @@ func main() {
 		panic(err)
 	}
 	log.Println("Misty server stopped")
+}
+
+func runNoteControlProcessing(ctx context.Context, server *Server) {
+	if server.Spaces == nil || !server.Spaces.NoteCollab().Enabled {
+		return
+	}
+	ticker := time.NewTicker(3 * time.Second)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			if _, err := server.Spaces.ProcessNoteControlCommands(ctx, 50); err != nil {
+				log.Printf("Note collaboration command processing failed: %v", err)
+			}
+		}
+	}
 }
 
 func runLibraryIntelligenceProcessing(ctx context.Context, server *Server) {

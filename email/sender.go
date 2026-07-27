@@ -25,9 +25,17 @@ type WaitlistSender interface {
 	SendWaitlistNotificationEmail(ctx context.Context, notifyEmail, waitlistName, waitlistEmail string) error
 }
 
+type SpaceInvitationSender interface {
+	SendSpaceInvitationEmail(
+		ctx context.Context,
+		recipientEmail, inviterName, spaceName, invitationLink string,
+	) error
+}
+
 type Sender interface {
 	PasswordResetSender
 	WaitlistSender
+	SpaceInvitationSender
 }
 
 type LogSender struct{}
@@ -44,6 +52,17 @@ func (LogSender) SendWaitlistConfirmationEmail(_ context.Context, recipientName,
 
 func (LogSender) SendWaitlistNotificationEmail(_ context.Context, notifyEmail, waitlistName, waitlistEmail string) error {
 	log.Printf("waitlist notification email to %s about %s (%s)", notifyEmail, waitlistName, waitlistEmail)
+	return nil
+}
+
+func (LogSender) SendSpaceInvitationEmail(
+	_ context.Context,
+	recipientEmail, inviterName, spaceName, invitationLink string,
+) error {
+	log.Printf(
+		"Space invitation email to %s from %s for %s: %s",
+		recipientEmail, inviterName, spaceName, invitationLink,
+	)
 	return nil
 }
 
@@ -139,6 +158,25 @@ func (s *MailjetSender) SendPasswordResetEmail(ctx context.Context, recipientEma
 		passwordResetText(resetLink),
 		passwordResetHTML(resetLink),
 		"password reset",
+	)
+}
+
+func (s *MailjetSender) SendSpaceInvitationEmail(
+	ctx context.Context,
+	recipientEmail, inviterName, spaceName, invitationLink string,
+) error {
+	if strings.TrimSpace(recipientEmail) == "" || strings.TrimSpace(invitationLink) == "" {
+		return fmt.Errorf("Space invitation recipient and link are required")
+	}
+	subject := inviterName + " invited you to " + spaceName + " on Misty"
+	textBody := inviterName + " invited you to join " + spaceName + " on Misty.\n\n" +
+		"Review and join the Space: " + invitationLink + "\n\nThis invitation expires in 7 days."
+	htmlBody := "<p><strong>" + html.EscapeString(inviterName) + "</strong> invited you to join <strong>" +
+		html.EscapeString(spaceName) + "</strong> on Misty.</p><p><a href=\"" +
+		html.EscapeString(invitationLink) + "\">Review invitation</a></p>" +
+		"<p>This invitation expires in 7 days.</p>"
+	return s.sendMessage(
+		ctx, recipientEmail, "", subject, textBody, htmlBody, "Space invitation",
 	)
 }
 

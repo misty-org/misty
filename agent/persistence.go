@@ -58,6 +58,11 @@ type persistedSessionState struct {
 	Canceled              bool              `json:"canceled"`
 	ProviderCallsThisTurn int               `json:"providerCallsThisTurn"`
 	PendingToolRequests   map[string]string `json:"pendingToolRequests"`
+	SpaceID               string            `json:"spaceId,omitempty"`
+	SpaceCard             string            `json:"spaceCard,omitempty"`
+	SpaceRecords          string            `json:"spaceRecords,omitempty"`
+	SpaceContextRevision  string            `json:"spaceContextRevision,omitempty"`
+	SpaceSection          string            `json:"spaceSection,omitempty"`
 }
 
 var (
@@ -90,6 +95,11 @@ func marshalPersistentSession(session *Session) (json.RawMessage, error) {
 		Canceled:              session.Canceled,
 		ProviderCallsThisTurn: session.ProviderCallsThisTurn,
 		PendingToolRequests:   cloneStringMap(session.PendingToolRequests),
+		SpaceID:               session.SpaceID,
+		SpaceCard:             session.SpaceCard,
+		SpaceRecords:          session.SpaceRecords,
+		SpaceContextRevision:  session.SpaceContextRevision,
+		SpaceSection:          session.SpaceSection,
 	}
 	return json.Marshal(state)
 }
@@ -145,6 +155,11 @@ func unmarshalPersistentSession(raw json.RawMessage, expectedID, expectedUserID 
 		Canceled:              state.Canceled,
 		ProviderCallsThisTurn: state.ProviderCallsThisTurn,
 		PendingToolRequests:   cloneStringMap(state.PendingToolRequests),
+		SpaceID:               state.SpaceID,
+		SpaceCard:             state.SpaceCard,
+		SpaceRecords:          state.SpaceRecords,
+		SpaceContextRevision:  state.SpaceContextRevision,
+		SpaceSection:          state.SpaceSection,
 	}, nil
 }
 

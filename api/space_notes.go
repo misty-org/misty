@@ -11,8 +11,7 @@ import (
 	"github.com/kannachi323/misty/server/security"
 )
 
-// SpaceNotes handles the note collection: listing the caller's accessible
-// notes and creating a new private one.
+// SpaceNotes handles membership-wide native Space notes.
 func (s *SpacesService) SpaceNotes() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		userID, ok := authenticatedUser(w, r, s.database)
@@ -77,6 +76,24 @@ func (s *SpacesService) SpaceNote() http.HandlerFunc {
 				return
 			}
 			w.WriteHeader(http.StatusNoContent)
+		case http.MethodPatch:
+			var body struct {
+				Archived *bool `json:"archived"`
+			}
+			if decodeJSON(w, r, &body) != nil {
+				return
+			}
+			if body.Archived == nil {
+				writeSpaceError(w, db.ErrSpaceInvalid)
+				return
+			}
+			if err := s.database.SetSpaceNoteArchived(
+				r.Context(), userID, noteID, *body.Archived,
+			); err != nil {
+				writeSpaceError(w, err)
+				return
+			}
+			w.WriteHeader(http.StatusNoContent)
 		default:
 			w.WriteHeader(http.StatusMethodNotAllowed)
 		}
@@ -109,48 +126,6 @@ func (s *SpacesService) SpaceNoteMetadata() http.HandlerFunc {
 			return
 		}
 		writeJSON(w, http.StatusOK, note)
-	}
-}
-
-// SpaceNotePermissions reads and replaces the full grant set. Both are
-// creator-only; everyone else, including the Space owner, gets not-found.
-//
-// PUT takes the complete desired set rather than a delta, so a client that
-// raced with another change cannot silently re-add a grant the creator just
-// removed.
-func (s *SpacesService) SpaceNotePermissions() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		userID, ok := authenticatedUser(w, r, s.database)
-		if !ok {
-			return
-		}
-		noteID := chi.URLParam(r, "noteID")
-		switch r.Method {
-		case http.MethodGet:
-			grants, err := s.database.NoteGrants(r.Context(), userID, noteID)
-			if err != nil {
-				writeSpaceError(w, err)
-				return
-			}
-			writeJSON(w, http.StatusOK, map[string]any{"grants": grants})
-		case http.MethodPut:
-			var body struct {
-				Grants []db.NoteGrant `json:"grants"`
-			}
-			if decodeJSON(w, r, &body) != nil {
-				return
-			}
-			aclVersion, changed, err := s.database.ReplaceNoteGrants(r.Context(), userID, noteID, body.Grants)
-			if err != nil {
-				writeSpaceError(w, err)
-				return
-			}
-			writeJSON(w, http.StatusOK, map[string]any{
-				"acl_version": aclVersion, "changed": changed, "grants": body.Grants,
-			})
-		default:
-			w.WriteHeader(http.StatusMethodNotAllowed)
-		}
 	}
 }
 
@@ -268,15 +243,38 @@ func (s *SpacesService) SpaceNoteCollaborationTicket() http.HandlerFunc {
 		if !ok {
 			return
 		}
-		access, err := s.database.RequireNoteView(r.Context(), userID, chi.URLParam(r, "noteID"))
+		noteID := chi.URLParam(r, "noteID")
+		access, err := s.database.RequireNoteView(r.Context(), userID, noteID)
 		if err != nil {
 			writeSpaceError(w, err)
 			return
 		}
-		// Authorization is settled; signing is not yet configured. Failing here
-		// keeps the desktop on an explicit unavailable state rather than letting
-		// it fall back to insecure local-only notes.
-		_ = access
-		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"code": "note_collaboration_unavailable"})
+		if !s.noteCollab.Enabled {
+			// Never fall back to local-only notes; the desktop shows an explicit
+			// unavailable state instead.
+			writeJSON(w, http.StatusServiceUnavailable, map[string]string{"code": "note_collaboration_unavailable"})
+			return
+		}
+		// The note is re-read here rather than trusted from an earlier request,
+		// because acl_version must be the one current at signing time. A ticket
+		// carrying a stale version is refused by the room.
+		note, err := s.database.SpaceNoteByID(r.Context(), userID, noteID)
+		if err != nil {
+			writeSpaceError(w, err)
+			return
+		}
+		if note.SpaceID != chi.URLParam(r, "spaceID") {
+			writeSpaceError(w, db.ErrSpaceNotFound)
+			return
+		}
+		ticket, err := s.noteCollab.MintTicket(userID, note.SpaceID, note.ID, access.Role, note.ACLVersion)
+		if err != nil {
+			writeSpaceError(w, err)
+			return
+		}
+		// Tickets are bearer credentials with a 60 second life; no cache may
+		// keep one around.
+		w.Header().Set("Cache-Control", "private, no-store")
+		writeJSON(w, http.StatusCreated, ticket)
 	}
 }

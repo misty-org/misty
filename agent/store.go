@@ -54,6 +54,22 @@ type Session struct {
 	Canceled              bool
 	ProviderCallsThisTurn int
 	PendingToolRequests   map[string]string
+
+	// SpaceID is the Space this session is bound to, copied from the session row
+	// rather than from a request body.
+	SpaceID string
+	// SpaceCard describes the Space and the member's permissions there. Stable
+	// for the conversation, so it lives in the cacheable prompt prefix.
+	SpaceCard string
+	// SpaceRecords is the permission-filtered Space content for the current
+	// turn, rebuilt whenever SpaceContextRevision changes.
+	SpaceRecords string
+	// SpaceContextRevision is the change token the records were built from.
+	// Equal token means nothing the agent can see has changed, so the records
+	// are reused and the prompt bytes stay identical turn to turn.
+	SpaceContextRevision string
+	// SpaceSection is the surface the member was working in on the last turn.
+	SpaceSection string
 }
 
 func NewSessionStore(ttl time.Duration) *SessionStore {

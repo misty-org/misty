@@ -469,3 +469,26 @@ func (s *RealtimeService) writeLoop(client *realtimeClient) {
 		}
 	}
 }
+
+// ConnectionCount reports how many realtime WebSockets are currently held.
+//
+// These connections are long-lived, so an edge proxy sees only the upgrade and
+// never how many are still open. This is the only place that number exists.
+func (s *RealtimeService) ConnectionCount() int {
+	if s == nil {
+		return 0
+	}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return len(s.clients)
+}
+
+// ViewerSpaceCount reports how many Spaces currently have at least one viewer.
+func (s *RealtimeService) ViewerSpaceCount() int {
+	if s == nil {
+		return 0
+	}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return len(s.viewers)
+}

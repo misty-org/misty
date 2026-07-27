@@ -50,7 +50,7 @@ func directTransferService(t *testing.T, presigner LibraryObjectPresigner) *Spac
 		store:        NewMemoryLibraryObjectStore(),
 		uploadLimits: DefaultUploadLimits(),
 		presigner:    presigner,
-		transfers:    DirectTransferConfig{Enabled: true, UploadURLTTL: 15 * time.Minute, DownloadURLTTL: 2 * time.Minute},
+		transfers:    TransferTTLs{UploadURLTTL: 15 * time.Minute, DownloadURLTTL: 2 * time.Minute},
 	}
 }
 
@@ -90,7 +90,9 @@ func TestUploadTransferReturnsAbsoluteSignedPutWithoutMistyCredentials(t *testin
 	}
 }
 
-func TestUploadTransferFallsBackToProxyWhenDirectTransferIsOff(t *testing.T) {
+// A store that cannot sign keeps the relative proxy route, which is what
+// makes local development work without R2 credentials.
+func TestUploadTransferUsesTheProxyWhenTheStoreCannotSign(t *testing.T) {
 	service := &SpaceLibraryService{store: NewMemoryLibraryObjectStore(), uploadLimits: DefaultUploadLimits()}
 	upload := &db.LibraryUpload{ID: "upload_1", SpaceID: "space_1", ObjectKey: "library/proxyfixture001", ClientDeclaredMIMEType: "text/plain"}
 
@@ -140,30 +142,36 @@ func TestWriteDownloadReturnsSignedDescriptorInsteadOfBytes(t *testing.T) {
 	}
 }
 
-func TestEnableDirectTransfersRequiresASigningStore(t *testing.T) {
-	// The in-memory development store cannot sign, so enabling direct transfer
-	// must fail loudly rather than quietly proxying production uploads.
-	service := &SpaceLibraryService{store: NewMemoryLibraryObjectStore(), uploadLimits: DefaultUploadLimits()}
-
-	err := service.EnableDirectTransfers(DirectTransferConfig{Enabled: true, UploadURLTTL: 15 * time.Minute, DownloadURLTTL: 2 * time.Minute})
-	if err == nil {
-		t.Fatal("EnableDirectTransfers() accepted a store that cannot sign R2 operations")
+// Direct transfer has no off switch: it is on exactly when the store can sign.
+// A development store that cannot sign transparently keeps the proxy route,
+// which is what lets local development work without R2 credentials.
+func TestDirectTransferFollowsStoreCapability(t *testing.T) {
+	signing, err := NewSpaceLibraryService(&db.Database{}, &S3LibraryObjectStore{bucket: "misty", presigner: &recordingPresigner{}}, true, DefaultUploadLimits())
+	if err != nil {
+		t.Fatal(err)
 	}
-	if service.directTransfersActive() {
-		t.Fatal("direct transfers became active despite the configuration error")
+	if !signing.directTransfersActive() {
+		t.Fatal("a signing store did not enable direct transfer")
 	}
 
-	// Disabled configuration is always valid and keeps the proxy route.
-	if err := service.EnableDirectTransfers(DirectTransferConfig{Enabled: false}); err != nil {
-		t.Fatalf("EnableDirectTransfers(disabled) = %v", err)
+	local, err := NewSpaceLibraryService(&db.Database{}, NewMemoryLibraryObjectStore(), true, DefaultUploadLimits())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if local.directTransfersActive() {
+		t.Fatal("a store that cannot sign reported direct transfer as active")
 	}
 }
 
-func TestEnableDirectTransfersRejectsUnboundedURLLifetimes(t *testing.T) {
-	service := &SpaceLibraryService{store: &S3LibraryObjectStore{bucket: "misty", presigner: &recordingPresigner{}}, uploadLimits: DefaultUploadLimits()}
+// The TTLs remain tunable, but an unbounded lifetime is still rejected, since
+// a long-lived signed URL is effectively a public one.
+func TestTransferTTLsMustStayBounded(t *testing.T) {
+	service := &SpaceLibraryService{store: NewMemoryLibraryObjectStore(), uploadLimits: DefaultUploadLimits()}
 
-	err := service.EnableDirectTransfers(DirectTransferConfig{Enabled: true, UploadURLTTL: 48 * time.Hour, DownloadURLTTL: 2 * time.Minute})
-	if err == nil {
-		t.Fatal("EnableDirectTransfers() accepted a 48h upload URL lifetime")
+	if err := service.configureTransfers(TransferTTLs{UploadURLTTL: 48 * time.Hour, DownloadURLTTL: 2 * time.Minute}); err == nil {
+		t.Fatal("configureTransfers() accepted a 48h upload URL lifetime")
+	}
+	if err := service.configureTransfers(DefaultTransferTTLs()); err != nil {
+		t.Fatalf("configureTransfers(defaults) = %v", err)
 	}
 }
