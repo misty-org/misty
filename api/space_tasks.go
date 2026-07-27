@@ -199,6 +199,7 @@ func (s *SpacesService) SpaceCalendarSources() http.HandlerFunc {
 			if err := s.syncGoogleCalendarSource(r.Context(), item, true); err != nil {
 				_ = s.database.UpdateCalendarSourceSync(r.Context(), item.ID, "", "", "", "", "needs_attention", providerErrorCode(err), nil)
 			}
+			_ = s.database.SetSpaceSetupProviderStatus(r.Context(), userID, spaceID, "google", "configured")
 			writeJSON(w, http.StatusCreated, item)
 		default:
 			w.WriteHeader(http.StatusMethodNotAllowed)

@@ -9,8 +9,7 @@ func TestLibraryAlbumFoldersAndAlbumPresentation(t *testing.T) {
 	database := openTestDatabase(t)
 	ctx := context.Background()
 	owner, _ := database.CreateUser("Album Folder Owner", "album-folders@example.com", "password123")
-	spaces, _ := database.ListSpaces(ctx, owner.ID)
-	spaceID := spaces[0].ID
+	spaceID := createTestSpace(t, database, ctx, owner.ID, "Album folders").ID
 
 	parent, err := database.CreateLibraryAlbumFolder(ctx, owner.ID, spaceID, "", "Trips")
 	if err != nil || parent.Name != "Trips" || parent.Version != 1 {
@@ -54,8 +53,7 @@ func TestLibraryMediaSubtypeCollections(t *testing.T) {
 	database := openTestDatabase(t)
 	ctx := context.Background()
 	owner, _ := database.CreateUser("Media Types Owner", "media-types@example.com", "password123")
-	spaces, _ := database.ListSpaces(ctx, owner.ID)
-	spaceID := spaces[0].ID
+	spaceID := createTestSpace(t, database, ctx, owner.ID, "Media types").ID
 	item := createPeopleTestImage(t, database, owner.ID, spaceID, "front-camera-selfie.jpg", "5")
 	if _, err := database.Conn.ExecContext(ctx, `UPDATE library_files SET intrinsic_metadata='{"media_subtypes":["selfie","portrait","screenshot"]}'::jsonb WHERE id=$1`, item.FileID); err != nil {
 		t.Fatal(err)
@@ -74,8 +72,7 @@ func TestLibraryDiscoveryUsesIntrinsicCaptureAndLocation(t *testing.T) {
 	database := openTestDatabase(t)
 	ctx := context.Background()
 	owner, _ := database.CreateUser("Capture Metadata Owner", "capture-metadata@example.com", "password123")
-	spaces, _ := database.ListSpaces(ctx, owner.ID)
-	spaceID := spaces[0].ID
+	spaceID := createTestSpace(t, database, ctx, owner.ID, "Capture metadata").ID
 	first := createPeopleTestImage(t, database, owner.ID, spaceID, "coast-one.jpg", "3")
 	second := createPeopleTestImage(t, database, owner.ID, spaceID, "coast-two.jpg", "4")
 	for _, item := range []*SpaceLibraryItem{first, second} {

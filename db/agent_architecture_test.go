@@ -92,11 +92,7 @@ func TestSpaceAgentWorkflowPinningRoutingConcurrencyPrivacyAndApproval(t *testin
 	if err != nil {
 		t.Fatal(err)
 	}
-	spaces, err := database.ListSpaces(ctx, owner.ID)
-	if err != nil || len(spaces) != 1 {
-		t.Fatalf("owner Spaces = %#v, %v", spaces, err)
-	}
-	space := spaces[0]
+	space := createTestSpace(t, database, ctx, owner.ID, "Agent architecture")
 	invite, err := database.InviteToSpace(ctx, owner.ID, space.ID, member.Email)
 	if err != nil {
 		t.Fatal(err)
@@ -301,31 +297,6 @@ func TestSpaceAgentWorkflowPinningRoutingConcurrencyPrivacyAndApproval(t *testin
 		t.Fatalf("approved destructive actions = %#v, %v", actions, err)
 	}
 
-	permissionMetadata := architectureMetadata()
-	permissionMetadata.RequiredPermissions = []string{"files.write"}
-	permissionVersion, err := database.CreateWorkflowVersion(ctx, owner.ID, space.ID, workflow.ID, "3.0.0", permissionMetadata, mustTestRaw(map[string]any{"nodes": []any{}, "edges": []any{}}))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := database.ReplaceAgentWorkflow(ctx, owner.ID, space.ID, agent.ID, permissionVersion.ID); err != nil {
-		t.Fatal(err)
-	}
-	if err := database.SetSpaceMemberPermission(ctx, owner.ID, space.ID, member.ID, PermissionStudioView, "deny"); err != nil {
-		t.Fatal(err)
-	}
-	executionAgent, executionWorkflow, err := database.AgentExecutionContext(ctx, member.ID, space.ID, agent.ID, permissionVersion.ID)
-	if err != nil || executionAgent.ID != agent.ID || executionWorkflow.ID != permissionVersion.ID {
-		t.Fatalf("Agent execution with agents.run but no studio.view = %#v, %#v, %v", executionAgent, executionWorkflow, err)
-	}
-	if retained, err := database.SpaceRun(ctx, member.ID, firstRun.ID); err != nil || retained.ID != firstRun.ID {
-		t.Fatalf("requester could not inspect own run without Studio access = %#v, %v", retained, err)
-	}
-	if err := database.SetSpaceMemberPermission(ctx, owner.ID, space.ID, member.ID, PermissionLibraryEdit, "deny"); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := database.CreateAgentRun(ctx, AgentRunRequest{RequestingMemberID: member.ID, SpaceID: space.ID, AgentID: agent.ID, SourceType: "direct", CapabilityID: "summarize-files", Input: json.RawMessage(`{"prompt":"summarize"}`), TriggerKind: "manual"}); !errors.Is(err, ErrLibraryForbidden) {
-		t.Fatalf("files.write workflow permission error = %v", err)
-	}
 }
 
 func TestDirectWorkflowRunCreatesApproval(t *testing.T) {

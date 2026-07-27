@@ -49,6 +49,9 @@ type providerOAuthAvailability struct {
 func providerOAuthAvailabilityCatalog() []providerOAuthAvailability {
 	providers := make([]providerOAuthAvailability, 0, len(providerOAuthCatalog))
 	for provider, definition := range providerOAuthCatalog {
+		if provider != "google" && provider != "discord" && provider != "notion" {
+			continue
+		}
 		providers = append(providers, providerOAuthAvailability{
 			Provider:   provider,
 			Configured: providerOAuthClientID(definition) != "" && providerOAuthClientSecret(definition) != "",
@@ -209,6 +212,11 @@ func (s *SpacesService) ProviderAuthorizationCallback() http.HandlerFunc {
 			writeSpaceError(w, err)
 			return
 		}
+		// Setup intent is optional. A provider connected later from Settings may
+		// have no setup row, so absence is deliberately ignored.
+		_ = s.database.SetSpaceSetupProviderStatus(
+			r.Context(), stored.UserID, stored.SpaceID, provider, "authorized",
+		)
 		writeProviderCompletionPage(w, definition.Name, accountName)
 	}
 }

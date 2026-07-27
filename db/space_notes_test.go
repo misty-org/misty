@@ -3,7 +3,6 @@ package db
 import (
 	"context"
 	"errors"
-	"strings"
 	"testing"
 )
 
@@ -20,8 +19,9 @@ type noteFixture struct {
 // newNoteFixture builds a Space owned by `owner`, joined by `creator` and
 // `member`, with one note created by `creator`.
 //
-// The owner is deliberately a different user from the note creator so every
-// test can assert that Space ownership grants no note access.
+// The owner is deliberately a different user from the note creator, so tests
+// can tell apart the capabilities that come from Space ownership and the ones
+// that come from having created the note.
 func newNoteFixture(t *testing.T, prefix string) noteFixture {
 	t.Helper()
 	database := openTestDatabase(t)
@@ -70,215 +70,95 @@ func userEmail(t *testing.T, database *Database, userID string) string {
 	return email
 }
 
-func TestNewNoteIsPrivateToItsCreator(t *testing.T) {
-	fixture := newNoteFixture(t, "note-private")
+// Native notes are Space documents: every current member can read and write
+// them, with no per-note grant step.
+func TestEverySpaceMemberCanReadAndEditANote(t *testing.T) {
+	fixture := newNoteFixture(t, "note-shared")
 
-	creatorAccess, err := fixture.database.NoteAccessFor(fixture.ctx, fixture.creator, fixture.note.ID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !creatorAccess.CanView || !creatorAccess.CanEdit || !creatorAccess.CanManageACL || !creatorAccess.CanDelete {
-		t.Fatalf("creator access = %#v, want full capabilities", creatorAccess)
-	}
-	if creatorAccess.Role != NoteRoleCreator {
-		t.Fatalf("creator role = %q, want creator", creatorAccess.Role)
-	}
-
-	memberAccess, err := fixture.database.NoteAccessFor(fixture.ctx, fixture.member, fixture.note.ID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if memberAccess.CanView {
-		t.Fatalf("a Space member without a grant could view a private note: %#v", memberAccess)
+	for name, userID := range map[string]string{
+		"creator": fixture.creator, "other member": fixture.member, "space owner": fixture.owner,
+	} {
+		access, err := fixture.database.NoteAccessFor(fixture.ctx, userID, fixture.note.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !access.CanView || !access.CanEdit {
+			t.Fatalf("%s access = %#v, want view and edit", name, access)
+		}
 	}
 }
 
-// The Space owner is not a note administrator. This is the rule most likely to
-// regress, because Space ownership overrides nearly everything else.
-func TestSpaceOwnerHasNoNoteOverride(t *testing.T) {
-	fixture := newNoteFixture(t, "note-owner")
+// Destructive control is narrower than edit access: the creator and the Space
+// owner may delete, an ordinary member may not.
+func TestOnlyCreatorAndOwnerCanDelete(t *testing.T) {
+	fixture := newNoteFixture(t, "note-delete-rights")
 
-	access, err := fixture.database.NoteAccessFor(fixture.ctx, fixture.owner, fixture.note.ID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if access.CanView || access.CanEdit || access.CanManageACL || access.CanDelete {
-		t.Fatalf("Space owner access = %#v, want no capabilities", access)
-	}
-
-	// The owner must not be able to read or rewrite the grant set either.
-	if _, err := fixture.database.NoteGrants(fixture.ctx, fixture.owner, fixture.note.ID); !errors.Is(err, ErrSpaceNotFound) {
-		t.Fatalf("owner NoteGrants() = %v, want ErrSpaceNotFound", err)
-	}
-	_, _, err = fixture.database.ReplaceNoteGrants(fixture.ctx, fixture.owner, fixture.note.ID,
-		[]NoteGrant{{UserID: fixture.owner, Role: NoteRoleEditor}})
-	if !errors.Is(err, ErrSpaceNotFound) {
-		t.Fatalf("owner ReplaceNoteGrants() = %v, want ErrSpaceNotFound", err)
+	for name, userID := range map[string]string{"creator": fixture.creator, "space owner": fixture.owner} {
+		access, err := fixture.database.NoteAccessFor(fixture.ctx, userID, fixture.note.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !access.CanDelete {
+			t.Fatalf("%s should be able to delete: %#v", name, access)
+		}
 	}
 
-	// And the note must not appear in the owner's list.
-	notes, err := fixture.database.AccessibleSpaceNotes(fixture.ctx, fixture.owner, fixture.spaceID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(notes) != 0 {
-		t.Fatalf("owner sees %d notes, want 0", len(notes))
-	}
-}
-
-func TestViewerReadsAndEditorWrites(t *testing.T) {
-	fixture := newNoteFixture(t, "note-roles")
-
-	if _, _, err := fixture.database.ReplaceNoteGrants(fixture.ctx, fixture.creator, fixture.note.ID,
-		[]NoteGrant{{UserID: fixture.member, Role: NoteRoleViewer}}); err != nil {
-		t.Fatal(err)
-	}
-	viewer, err := fixture.database.NoteAccessFor(fixture.ctx, fixture.member, fixture.note.ID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !viewer.CanView || viewer.CanEdit || viewer.CanManageACL || viewer.CanDelete {
-		t.Fatalf("viewer access = %#v, want view only", viewer)
-	}
-
-	if _, _, err := fixture.database.ReplaceNoteGrants(fixture.ctx, fixture.creator, fixture.note.ID,
-		[]NoteGrant{{UserID: fixture.member, Role: NoteRoleEditor}}); err != nil {
-		t.Fatal(err)
-	}
-	editor, err := fixture.database.NoteAccessFor(fixture.ctx, fixture.member, fixture.note.ID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !editor.CanView || !editor.CanEdit {
-		t.Fatalf("editor access = %#v, want view and edit", editor)
-	}
-	// An editor is still not an administrator.
-	if editor.CanManageACL || editor.CanDelete {
-		t.Fatalf("editor access = %#v, want no ACL or delete capability", editor)
-	}
-}
-
-func TestACLVersionIncrementsOnlyWhenTheEffectiveSetChanges(t *testing.T) {
-	fixture := newNoteFixture(t, "note-aclversion")
-
-	first, changed, err := fixture.database.ReplaceNoteGrants(fixture.ctx, fixture.creator, fixture.note.ID,
-		[]NoteGrant{{UserID: fixture.member, Role: NoteRoleViewer}})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !changed || first <= fixture.note.ACLVersion {
-		t.Fatalf("first grant: version %d changed %v, want an increment above %d", first, changed, fixture.note.ACLVersion)
-	}
-
-	// Saving the identical set must not disconnect live collaborators.
-	second, changed, err := fixture.database.ReplaceNoteGrants(fixture.ctx, fixture.creator, fixture.note.ID,
-		[]NoteGrant{{UserID: fixture.member, Role: NoteRoleViewer}})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if changed || second != first {
-		t.Fatalf("unchanged save: version %d changed %v, want %d and false", second, changed, first)
-	}
-
-	third, changed, err := fixture.database.ReplaceNoteGrants(fixture.ctx, fixture.creator, fixture.note.ID, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !changed || third <= second {
-		t.Fatalf("revocation: version %d changed %v, want an increment above %d", third, changed, second)
-	}
 	access, err := fixture.database.NoteAccessFor(fixture.ctx, fixture.member, fixture.note.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if access.CanView {
-		t.Fatal("a revoked user retained view access")
+	if access.CanDelete {
+		t.Fatalf("an ordinary member could delete a note: %#v", access)
 	}
 }
 
-func TestGrantTargetMustBeACurrentSpaceMember(t *testing.T) {
+// Membership is the whole gate, so someone outside the Space gets nothing.
+func TestNonMemberHasNoNoteAccess(t *testing.T) {
 	fixture := newNoteFixture(t, "note-outsider")
 	outsider, err := fixture.database.CreateUser("Outsider", "note-outsider-stranger@example.com", "password123")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	_, _, err = fixture.database.ReplaceNoteGrants(fixture.ctx, fixture.creator, fixture.note.ID,
-		[]NoteGrant{{UserID: outsider.ID, Role: NoteRoleViewer}})
-	if err == nil {
-		t.Fatal("ReplaceNoteGrants() granted access to a non-member")
-	}
-	if !strings.Contains(err.Error(), "current member") {
-		t.Fatalf("error = %v, want the membership guard to reject it", err)
-	}
-}
-
-// The creator's access is implicit; an explicit row would create a second
-// source of truth that could be revoked.
-func TestCreatorCannotHoldAPermissionRow(t *testing.T) {
-	fixture := newNoteFixture(t, "note-implicit")
-
-	_, _, err := fixture.database.ReplaceNoteGrants(fixture.ctx, fixture.creator, fixture.note.ID,
-		[]NoteGrant{{UserID: fixture.creator, Role: NoteRoleViewer}})
-	if err == nil {
-		t.Fatal("ReplaceNoteGrants() stored a permission row for the creator")
-	}
-	if !strings.Contains(err.Error(), "implicit access") {
-		t.Fatalf("error = %v, want the implicit-access guard to reject it", err)
-	}
-
-	// The creator keeps full access after the rejected write.
-	access, err := fixture.database.NoteAccessFor(fixture.ctx, fixture.creator, fixture.note.ID)
+	access, err := fixture.database.NoteAccessFor(fixture.ctx, outsider.ID, fixture.note.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !access.CanManageACL {
-		t.Fatalf("creator access after rejected write = %#v", access)
+	if access.CanView || access.CanEdit || access.CanDelete {
+		t.Fatalf("non-member access = %#v, want nothing", access)
 	}
 }
 
-// A former member must lose access even if a permission row survives the
-// membership change.
-func TestFormerSpaceMemberLosesAccessDespiteStaleGrant(t *testing.T) {
+// A former member loses access the moment their membership ends.
+func TestFormerSpaceMemberLosesNoteAccess(t *testing.T) {
 	fixture := newNoteFixture(t, "note-former")
 
-	if _, _, err := fixture.database.ReplaceNoteGrants(fixture.ctx, fixture.creator, fixture.note.ID,
-		[]NoteGrant{{UserID: fixture.member, Role: NoteRoleEditor}}); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := fixture.database.Conn.Exec(`DELETE FROM space_members WHERE space_id=$1 AND user_id=$2`,
-		fixture.spaceID, fixture.member); err != nil {
-		t.Fatal(err)
-	}
-
-	// The stale grant row is deliberately left in place.
-	var staleGrants int
-	if err := fixture.database.Conn.QueryRow(`SELECT COUNT(*) FROM space_note_permissions WHERE note_id=$1 AND user_id=$2`,
-		fixture.note.ID, fixture.member).Scan(&staleGrants); err != nil {
-		t.Fatal(err)
-	}
-	if staleGrants != 1 {
-		t.Fatalf("stale grant rows = %d, want the test precondition of 1", staleGrants)
-	}
-
-	access, err := fixture.database.NoteAccessFor(fixture.ctx, fixture.member, fixture.note.ID)
+	before, err := fixture.database.NoteAccessFor(fixture.ctx, fixture.member, fixture.note.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if access.CanView {
-		t.Fatalf("former member kept access through a stale grant: %#v", access)
+	if !before.CanEdit {
+		t.Fatal("test precondition failed: member could not edit before leaving")
+	}
+
+	if err := fixture.database.LeaveSpace(fixture.ctx, fixture.member, fixture.spaceID); err != nil {
+		t.Fatal(err)
+	}
+
+	after, err := fixture.database.NoteAccessFor(fixture.ctx, fixture.member, fixture.note.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if after.CanView || after.CanEdit {
+		t.Fatalf("former member retained access: %#v", after)
 	}
 }
 
-// Archived notes are inaccessible to everyone, including prior viewers and the
-// creator, until they are restored.
+// Archived notes are inaccessible to everyone until restored, including the
+// creator and the Space owner.
 func TestArchivedNoteIsInaccessibleToEveryone(t *testing.T) {
 	fixture := newNoteFixture(t, "note-archived")
 
-	if _, _, err := fixture.database.ReplaceNoteGrants(fixture.ctx, fixture.creator, fixture.note.ID,
-		[]NoteGrant{{UserID: fixture.member, Role: NoteRoleEditor}}); err != nil {
-		t.Fatal(err)
-	}
 	if _, err := fixture.database.Conn.Exec(
 		`UPDATE space_notes SET lifecycle_state='archived_creator_left',archived_at=NOW(),purge_after=NOW()+INTERVAL '30 days' WHERE id=$1`,
 		fixture.note.ID); err != nil {
@@ -286,7 +166,7 @@ func TestArchivedNoteIsInaccessibleToEveryone(t *testing.T) {
 	}
 
 	for name, userID := range map[string]string{
-		"creator": fixture.creator, "editor": fixture.member, "space owner": fixture.owner,
+		"creator": fixture.creator, "member": fixture.member, "space owner": fixture.owner,
 	} {
 		access, err := fixture.database.NoteAccessFor(fixture.ctx, userID, fixture.note.ID)
 		if err != nil {
@@ -298,55 +178,63 @@ func TestArchivedNoteIsInaccessibleToEveryone(t *testing.T) {
 	}
 }
 
-// Unauthorized reads must be indistinguishable from a missing note.
+// An unauthorized read must be indistinguishable from a note that does not
+// exist, so a non-member cannot probe for note ids.
 func TestUnauthorizedNoteLooksExactlyLikeAMissingNote(t *testing.T) {
 	fixture := newNoteFixture(t, "note-indistinct")
+	outsider, err := fixture.database.CreateUser("Prober", "note-indistinct-prober@example.com", "password123")
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	unauthorized, err := fixture.database.RequireNoteView(fixture.ctx, fixture.owner, fixture.note.ID)
+	unauthorized, err := fixture.database.RequireNoteView(fixture.ctx, outsider.ID, fixture.note.ID)
 	if !errors.Is(err, ErrSpaceNotFound) {
 		t.Fatalf("unauthorized RequireNoteView() = %v, want ErrSpaceNotFound", err)
 	}
-	missing, err := fixture.database.RequireNoteView(fixture.ctx, fixture.owner, "note_00000000-0000-0000-0000-000000000000")
+	missing, err := fixture.database.RequireNoteView(fixture.ctx, outsider.ID, "note_00000000-0000-0000-0000-000000000000")
 	if !errors.Is(err, ErrSpaceNotFound) {
 		t.Fatalf("missing RequireNoteView() = %v, want ErrSpaceNotFound", err)
 	}
-	// No field may differ, or the difference itself leaks the note's existence.
+	// Any difference between the two would itself confirm the note exists.
 	if unauthorized != missing {
 		t.Fatalf("unauthorized %#v differs from missing %#v", unauthorized, missing)
 	}
 }
 
-func TestAccessibleNotesListsOnlyAuthorizedNotes(t *testing.T) {
+// Listing returns every active note in the Space, with the caller's own
+// effective role attached.
+func TestAccessibleNotesListsEverySpaceNote(t *testing.T) {
 	fixture := newNoteFixture(t, "note-list")
-	other, err := fixture.database.CreateSpaceNote(fixture.ctx, fixture.member, fixture.spaceID, "Member's own note")
+	second, err := fixture.database.CreateSpaceNote(fixture.ctx, fixture.member, fixture.spaceID, "Member's own note")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	creatorNotes, err := fixture.database.AccessibleSpaceNotes(fixture.ctx, fixture.creator, fixture.spaceID)
+	notes, err := fixture.database.AccessibleSpaceNotes(fixture.ctx, fixture.member, fixture.spaceID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(creatorNotes) != 1 || creatorNotes[0].ID != fixture.note.ID {
-		t.Fatalf("creator list = %#v, want only their own note", creatorNotes)
-	}
-
-	if _, _, err := fixture.database.ReplaceNoteGrants(fixture.ctx, fixture.creator, fixture.note.ID,
-		[]NoteGrant{{UserID: fixture.member, Role: NoteRoleViewer}}); err != nil {
-		t.Fatal(err)
-	}
-	memberNotes, err := fixture.database.AccessibleSpaceNotes(fixture.ctx, fixture.member, fixture.spaceID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(memberNotes) != 2 {
-		t.Fatalf("member list = %#v, want their own note plus the shared one", memberNotes)
+	if len(notes) != 2 {
+		t.Fatalf("member sees %d notes, want both", len(notes))
 	}
 	roles := map[string]string{}
-	for _, note := range memberNotes {
+	for _, note := range notes {
 		roles[note.ID] = note.Role
 	}
-	if roles[other.ID] != NoteRoleCreator || roles[fixture.note.ID] != NoteRoleViewer {
-		t.Fatalf("effective roles = %#v", roles)
+	// The caller is the creator of one and a plain editor on the other.
+	if roles[second.ID] != NoteRoleCreator {
+		t.Fatalf("role on own note = %q, want creator", roles[second.ID])
+	}
+	if roles[fixture.note.ID] != NoteRoleEditor {
+		t.Fatalf("role on another member's note = %q, want editor", roles[fixture.note.ID])
+	}
+
+	// A non-member sees nothing at all.
+	outsider, err := fixture.database.CreateUser("Listing Outsider", "note-list-outsider@example.com", "password123")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := fixture.database.AccessibleSpaceNotes(fixture.ctx, outsider.ID, fixture.spaceID); err == nil {
+		t.Fatal("a non-member listed the Space's notes")
 	}
 }

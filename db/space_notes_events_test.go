@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-// eventTypesFor replays a user's visible events and returns the note event
+// noteEventTypesFor replays a user's visible events and returns the note event
 // types that reached them for one note.
 func noteEventTypesFor(t *testing.T, database *Database, ctx context.Context, userID, noteID string) []string {
 	t.Helper()
@@ -24,29 +24,27 @@ func noteEventTypesFor(t *testing.T, database *Database, ctx context.Context, us
 	return types
 }
 
-// A note.created event must not leak to the Space the way library or task
-// events do. Without an explicit rule the shared visibility switch would fall
-// through to its permissive default.
-func TestNoteEventsDoNotReachTheWholeSpace(t *testing.T) {
-	fixture := newNoteFixture(t, "note-event-private")
+// Notes are Space documents, so their events reach every current member.
+func TestNoteEventsReachEverySpaceMember(t *testing.T) {
+	fixture := newNoteFixture(t, "note-event-shared")
 
-	creatorEvents := noteEventTypesFor(t, fixture.database, fixture.ctx, fixture.creator, fixture.note.ID)
-	if len(creatorEvents) == 0 {
-		t.Fatal("the creator received no note events at all")
-	}
-
-	for name, userID := range map[string]string{"space owner": fixture.owner, "ungranted member": fixture.member} {
-		if got := noteEventTypesFor(t, fixture.database, fixture.ctx, userID, fixture.note.ID); len(got) != 0 {
-			t.Fatalf("%s received note events %v, want none", name, got)
+	for name, userID := range map[string]string{
+		"creator": fixture.creator, "other member": fixture.member, "space owner": fixture.owner,
+	} {
+		if got := noteEventTypesFor(t, fixture.database, fixture.ctx, userID, fixture.note.ID); len(got) == 0 {
+			t.Fatalf("%s received no note events", name)
 		}
 	}
 }
 
 // Live delivery uses EventByIDForUser, replay uses SpaceEventsAfter. Both must
-// apply the same rule, or a user could see through one path what the other
-// hides.
+// apply the same rule, or one path would leak what the other hides.
 func TestNoteEventVisibilityMatchesOnLiveDeliveryAndReplay(t *testing.T) {
 	fixture := newNoteFixture(t, "note-event-paths")
+	outsider, err := fixture.database.CreateUser("Event Outsider", "note-event-outsider@example.com", "password123")
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	events, _, err := fixture.database.SpaceEventsAfter(fixture.ctx, fixture.creator, 0, 500)
 	if err != nil {
@@ -63,102 +61,40 @@ func TestNoteEventVisibilityMatchesOnLiveDeliveryAndReplay(t *testing.T) {
 		t.Fatal("no note event was recorded for the creator")
 	}
 
-	if _, err := fixture.database.EventByIDForUser(fixture.ctx, fixture.creator, noteEventID); err != nil {
-		t.Fatalf("creator live delivery = %v, want the event", err)
-	}
-	for name, userID := range map[string]string{"space owner": fixture.owner, "ungranted member": fixture.member} {
-		if _, err := fixture.database.EventByIDForUser(fixture.ctx, userID, noteEventID); !errors.Is(err, ErrSpaceNotFound) {
-			t.Fatalf("%s live delivery = %v, want ErrSpaceNotFound", name, err)
+	for name, userID := range map[string]string{"creator": fixture.creator, "member": fixture.member} {
+		if _, err := fixture.database.EventByIDForUser(fixture.ctx, userID, noteEventID); err != nil {
+			t.Fatalf("%s live delivery = %v, want the event", name, err)
 		}
+	}
+	// Someone outside the Space gets nothing through either path.
+	if _, err := fixture.database.EventByIDForUser(fixture.ctx, outsider.ID, noteEventID); !errors.Is(err, ErrSpaceNotFound) {
+		t.Fatalf("outsider live delivery = %v, want ErrSpaceNotFound", err)
+	}
+	if got := noteEventTypesFor(t, fixture.database, fixture.ctx, outsider.ID, fixture.note.ID); len(got) != 0 {
+		t.Fatalf("outsider replayed note events %v, want none", got)
 	}
 }
 
-func TestGrantedMemberReceivesNoteEvents(t *testing.T) {
-	fixture := newNoteFixture(t, "note-event-granted")
+// Visibility is resolved from membership as it stands at delivery time, not as
+// it stood when the event was written.
+func TestFormerMemberLosesAccessToPastNoteEvents(t *testing.T) {
+	fixture := newNoteFixture(t, "note-event-former")
 
-	if _, _, err := fixture.database.ReplaceNoteGrants(fixture.ctx, fixture.creator, fixture.note.ID,
-		[]NoteGrant{{UserID: fixture.member, Role: NoteRoleViewer}}); err != nil {
-		t.Fatal(err)
-	}
-
-	got := noteEventTypesFor(t, fixture.database, fixture.ctx, fixture.member, fixture.note.ID)
-	if len(got) == 0 {
-		t.Fatal("a granted viewer received no note events")
-	}
-	// The grant is evaluated at delivery time, so the viewer now also sees the
-	// earlier note.created event.
-	sawPermissionsChanged := false
-	for _, eventType := range got {
-		if eventType == "note.permissions.changed" {
-			sawPermissionsChanged = true
-		}
-	}
-	if !sawPermissionsChanged {
-		t.Fatalf("viewer events = %v, want note.permissions.changed", got)
-	}
-
-	// The Space owner still sees nothing.
-	if owner := noteEventTypesFor(t, fixture.database, fixture.ctx, fixture.owner, fixture.note.ID); len(owner) != 0 {
-		t.Fatalf("Space owner received note events %v after an unrelated grant", owner)
-	}
-}
-
-// Visibility is resolved from the grant that exists now, not the one that
-// existed when the event was written.
-func TestRevokedUserLosesAccessToPastNoteEvents(t *testing.T) {
-	fixture := newNoteFixture(t, "note-event-revoked")
-
-	if _, _, err := fixture.database.ReplaceNoteGrants(fixture.ctx, fixture.creator, fixture.note.ID,
-		[]NoteGrant{{UserID: fixture.member, Role: NoteRoleEditor}}); err != nil {
-		t.Fatal(err)
-	}
 	if got := noteEventTypesFor(t, fixture.database, fixture.ctx, fixture.member, fixture.note.ID); len(got) == 0 {
-		t.Fatal("test precondition failed: granted editor saw no events")
+		t.Fatal("test precondition failed: member saw no events while joined")
 	}
 
-	if _, _, err := fixture.database.ReplaceNoteGrants(fixture.ctx, fixture.creator, fixture.note.ID, nil); err != nil {
+	if err := fixture.database.LeaveSpace(fixture.ctx, fixture.member, fixture.spaceID); err != nil {
 		t.Fatal(err)
 	}
 
 	if got := noteEventTypesFor(t, fixture.database, fixture.ctx, fixture.member, fixture.note.ID); len(got) != 0 {
-		t.Fatalf("revoked user replayed note events %v, want none", got)
+		t.Fatalf("former member replayed note events %v, want none", got)
 	}
 }
 
-// Archiving must still reach the people who had access, or their clients would
-// keep showing a note they can no longer open.
-func TestArchiveEventStillReachesFormerAudience(t *testing.T) {
-	fixture := newNoteFixture(t, "note-event-archive")
-
-	if _, _, err := fixture.database.ReplaceNoteGrants(fixture.ctx, fixture.creator, fixture.note.ID,
-		[]NoteGrant{{UserID: fixture.member, Role: NoteRoleViewer}}); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := fixture.database.Conn.Exec(
-		`UPDATE space_notes SET lifecycle_state='archived_creator_left',archived_at=NOW(),purge_after=NOW()+INTERVAL '30 days' WHERE id=$1`,
-		fixture.note.ID); err != nil {
-		t.Fatal(err)
-	}
-
-	// NoteAccessFor now denies everyone, but the event stream must not go dark
-	// for the creator and the grantee.
-	access, err := fixture.database.NoteAccessFor(fixture.ctx, fixture.creator, fixture.note.ID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if access.CanView {
-		t.Fatal("test precondition failed: archived note is still viewable")
-	}
-	for name, userID := range map[string]string{"creator": fixture.creator, "viewer": fixture.member} {
-		if got := noteEventTypesFor(t, fixture.database, fixture.ctx, userID, fixture.note.ID); len(got) == 0 {
-			t.Fatalf("%s lost note event visibility once the note was archived", name)
-		}
-	}
-	if owner := noteEventTypesFor(t, fixture.database, fixture.ctx, fixture.owner, fixture.note.ID); len(owner) != 0 {
-		t.Fatalf("Space owner received archived-note events %v, want none", owner)
-	}
-}
-
+// Space events are stored durably and replayed, so note content must never
+// ride along in one.
 func TestNoteEventPayloadsCarryNoContent(t *testing.T) {
 	fixture := newNoteFixture(t, "note-event-payload")
 
@@ -173,8 +109,6 @@ func TestNoteEventPayloadsCarryNoContent(t *testing.T) {
 		}
 		found = true
 		payload := string(event.Payload)
-		// The note title is document content and must never ride along in a
-		// Space event, which is stored durably and replayed.
 		if strings.Contains(payload, "Beta launch checklist") {
 			t.Fatalf("note event payload leaked the title: %s", payload)
 		}

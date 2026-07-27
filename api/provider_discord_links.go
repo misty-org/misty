@@ -59,7 +59,8 @@ type discordMessage struct {
 	} `json:"referenced_message"`
 }
 
-// SpaceDiscordLink serves the Space's current link and creates a new one.
+// SpaceDiscordLink serves the Space's Discord links and creates or reconnects
+// one channel link.
 func (s *SpacesService) SpaceDiscordLink() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		userID, ok := authenticatedUser(w, r, s.database)
@@ -69,21 +70,20 @@ func (s *SpacesService) SpaceDiscordLink() http.HandlerFunc {
 		spaceID := chi.URLParam(r, "spaceID")
 		switch r.Method {
 		case http.MethodGet:
-			link, err := s.database.SpaceDiscordLinkFor(r.Context(), userID, spaceID)
+			links, err := s.database.SpaceDiscordLinksFor(r.Context(), userID, spaceID)
 			if err != nil {
 				writeSpaceError(w, err)
 				return
 			}
-			writeJSON(w, http.StatusOK, map[string]any{"link": link})
+			writeJSON(w, http.StatusOK, map[string]any{"links": links})
 		case http.MethodPost:
 			var body struct {
-				IntegrationID  string `json:"integration_id"`
-				ConversationID string `json:"conversation_id"`
-				ChannelID      string `json:"channel_id"`
-				ChannelName    string `json:"channel_name"`
-				GuildID        string `json:"guild_id"`
-				GuildName      string `json:"guild_name"`
-				Direction      string `json:"direction"`
+				IntegrationID string `json:"integration_id"`
+				ChannelID     string `json:"channel_id"`
+				ChannelName   string `json:"channel_name"`
+				GuildID       string `json:"guild_id"`
+				GuildName     string `json:"guild_name"`
+				Direction     string `json:"direction"`
 			}
 			if decodeJSON(w, r, &body) != nil {
 				return
@@ -106,7 +106,7 @@ func (s *SpacesService) SpaceDiscordLink() http.HandlerFunc {
 				body.ChannelName = channel.Name
 			}
 			item := db.SpaceDiscordLink{
-				SpaceID: spaceID, IntegrationID: body.IntegrationID, ConversationID: body.ConversationID,
+				SpaceID: spaceID, IntegrationID: body.IntegrationID,
 				GuildID: body.GuildID, GuildName: body.GuildName, ChannelID: body.ChannelID,
 				ChannelName: body.ChannelName, Direction: body.Direction,
 			}
@@ -126,6 +126,7 @@ func (s *SpacesService) SpaceDiscordLink() http.HandlerFunc {
 				writeSpaceError(w, err)
 				return
 			}
+			_ = s.database.SetSpaceSetupProviderStatus(r.Context(), userID, spaceID, "discord", "configured")
 			// Backfill immediately so a freshly linked channel is not empty.
 			if _, syncErr := s.syncDiscordLink(r.Context(), link); syncErr != nil {
 				_ = s.database.SetSpaceDiscordLinkSync(r.Context(), link.ID, "", "needs_attention", providerErrorCode(syncErr), nil)
@@ -212,10 +213,9 @@ func (s *SpacesService) SyncSpaceDiscordLink() http.HandlerFunc {
 	}
 }
 
-// PublishSpaceDiscordMessage mirrors one Misty message outward.
-//
-// Publishing is per-message and explicit by design: sending in Misty never
-// writes to someone else's Discord server as a side effect.
+// PublishSpaceDiscordMessage mirrors one Misty message outward. The desktop
+// calls it automatically for two-way Discord conversations and may retry a
+// failed individual message without duplicating inbound traffic.
 func (s *SpacesService) PublishSpaceDiscordMessage() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		userID, ok := authenticatedUser(w, r, s.database)
@@ -229,12 +229,19 @@ func (s *SpacesService) PublishSpaceDiscordMessage() http.HandlerFunc {
 		if decodeJSON(w, r, &body) != nil {
 			return
 		}
-		link, err := s.database.SpaceDiscordLinkFor(r.Context(), userID, spaceID)
+		links, err := s.database.SpaceDiscordLinksFor(r.Context(), userID, spaceID)
 		if err != nil {
 			writeSpaceError(w, err)
 			return
 		}
-		if link == nil || link.ID != linkID {
+		var link *db.SpaceDiscordLink
+		for index := range links {
+			if links[index].ID == linkID {
+				link = &links[index]
+				break
+			}
+		}
+		if link == nil {
 			writeSpaceError(w, db.ErrSpaceNotFound)
 			return
 		}
@@ -245,6 +252,10 @@ func (s *SpacesService) PublishSpaceDiscordMessage() http.HandlerFunc {
 		message, err := s.database.SpaceMessageForPublish(r.Context(), userID, spaceID, body.MessageID)
 		if err != nil {
 			writeSpaceError(w, err)
+			return
+		}
+		if message.ConversationID != link.ConversationID {
+			writeSpaceError(w, db.ErrSpaceForbidden)
 			return
 		}
 		if !publishableToDiscord(message, userID) {
@@ -355,11 +366,20 @@ func truncateForDiscord(content string) string {
 
 // syncDiscordLink imports every message after the stored cursor.
 func (s *SpacesService) syncDiscordLink(ctx context.Context, link *db.SpaceDiscordLink) (int, error) {
-	if link == nil || link.Direction == "outbound" {
+	if link == nil {
 		return 0, nil
 	}
 	if discordBotToken() == "" {
 		return 0, errors.New("discord bot is not configured")
+	}
+	if channel, err := s.discordChannel(ctx, link.ChannelID); err == nil &&
+		strings.TrimSpace(channel.Name) != "" && channel.Name != link.ChannelName {
+		if err := s.database.UpdateSpaceDiscordLinkDisplay(ctx, link.ID, channel.Name); err == nil {
+			link.ChannelName = channel.Name
+		}
+	}
+	if link.Direction == "outbound" {
+		return 0, nil
 	}
 	values := url.Values{"limit": {"100"}}
 	if link.LastMessageID != "" {

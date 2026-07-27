@@ -197,4 +197,18 @@ func TestCORSAllowsAppOrigins(t *testing.T) {
 			t.Fatalf("Access-Control-Allow-Credentials = %q, want true", got)
 		}
 	}
+
+	req := httptest.NewRequest(http.MethodOptions, "/api/spaces", nil)
+	req.Header.Set("Origin", "http://127.0.0.1:5173")
+	req.Header.Set("Access-Control-Request-Method", "POST")
+	req.Header.Set("Access-Control-Request-Headers", "authorization,content-type,idempotency-key")
+	rec := httptest.NewRecorder()
+	server.Router.ServeHTTP(rec, req)
+
+	if got := rec.Header().Get("Access-Control-Allow-Origin"); got != "http://127.0.0.1:5173" {
+		t.Fatalf("Space creation Access-Control-Allow-Origin = %q, want loopback origin", got)
+	}
+	if got := rec.Header().Get("Access-Control-Allow-Headers"); !strings.Contains(strings.ToLower(got), "idempotency-key") {
+		t.Fatalf("Space creation Access-Control-Allow-Headers = %q, want Idempotency-Key", got)
+	}
 }

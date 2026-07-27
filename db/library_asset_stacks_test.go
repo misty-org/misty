@@ -12,8 +12,7 @@ func TestLibraryAssetStacksValidateAuthorizeAndPreventOverlap(t *testing.T) {
 	ctx := context.Background()
 	owner, _ := database.CreateUser("Stack Owner", "stack-owner@example.com", "password123")
 	outsider, _ := database.CreateUser("Stack Outsider", "stack-outsider@example.com", "password123")
-	spaces, _ := database.ListSpaces(ctx, owner.ID)
-	spaceID := spaces[0].ID
+	spaceID := createTestSpace(t, database, ctx, owner.ID, "Asset stacks").ID
 	still := createAssetStackTestItem(t, database, owner.ID, spaceID, "IMG_0100.HEIC", "image/heic", "1")
 	motion := createAssetStackTestItem(t, database, owner.ID, spaceID, "IMG_0100.MOV", "video/quicktime", "2")
 
@@ -75,8 +74,7 @@ func TestLibraryAssetStacksSupportRAWPairsAndBursts(t *testing.T) {
 	database := openTestDatabase(t)
 	ctx := context.Background()
 	owner, _ := database.CreateUser("Stack Formats", "stack-formats@example.com", "password123")
-	spaces, _ := database.ListSpaces(ctx, owner.ID)
-	spaceID := spaces[0].ID
+	spaceID := createTestSpace(t, database, ctx, owner.ID, "Stack formats").ID
 	raw := createAssetStackTestItem(t, database, owner.ID, spaceID, "DSC_1000.CR3", "application/octet-stream", "3")
 	jpeg := createAssetStackTestItem(t, database, owner.ID, spaceID, "DSC_1000.JPG", "image/jpeg", "4")
 	if _, err := database.CreateLibraryAssetStack(ctx, owner.ID, spaceID, CreateLibraryAssetStack{

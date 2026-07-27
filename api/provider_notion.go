@@ -20,17 +20,29 @@ import (
 
 const notionVersion = "2026-03-11"
 
-// notionRequest performs one upstream Notion call for a Space.
-func (s *SpacesService) notionRequest(ctx context.Context, userID, spaceID, method, endpoint string, body any) ([]byte, error) {
-	integrationID, err := s.notionIntegrationID(ctx, userID, spaceID)
-	if err != nil {
-		return nil, err
-	}
-	token, tokenType, err := s.providerAccessToken(ctx, userID, spaceID, integrationID)
+// notionRequest performs one upstream call with the credential belonging to an
+// explicitly selected Space resource. Members never receive the credential or
+// gain a path to unselected workspace content.
+func (s *SpacesService) notionRequest(
+	ctx context.Context,
+	resource db.ProviderSharedResource,
+	method, endpoint string,
+	body any,
+) ([]byte, error) {
+	token, tokenType, err := s.providerTokenForSharedResource(ctx, resource)
 	if err != nil {
 		return nil, err
 	}
 	return providerJSONRequest(ctx, token, tokenType, method, endpoint, body, map[string]string{"Notion-Version": notionVersion})
+}
+
+func (s *SpacesService) notionResource(
+	ctx context.Context,
+	userID, spaceID, externalResourceID string,
+) (*db.ProviderSharedResource, error) {
+	return s.database.ProviderSharedResourceForNotionEntity(
+		ctx, userID, spaceID, strings.TrimSpace(externalResourceID),
+	)
 }
 
 func (s *SpacesService) notionIntegrationID(ctx context.Context, userID, spaceID string) (string, error) {
@@ -56,16 +68,20 @@ func (s *SpacesService) NotionStatus() http.HandlerFunc {
 			return
 		}
 		spaceID := chi.URLParam(r, "spaceID")
-		integrationID, err := s.notionIntegrationID(r.Context(), userID, spaceID)
+		resources, err := s.database.ProviderSharedResources(r.Context(), userID, spaceID)
 		if err != nil {
 			writeJSON(w, http.StatusOK, map[string]any{"connected": false})
 			return
 		}
-		if _, _, tokenErr := s.providerAccessToken(r.Context(), userID, spaceID, integrationID); tokenErr != nil {
-			writeJSON(w, http.StatusOK, map[string]any{"connected": false, "needs_reconnect": true})
-			return
+		for _, resource := range resources {
+			if resource.Provider == "notion" && resource.Status == "active" {
+				writeJSON(w, http.StatusOK, map[string]any{
+					"connected": true, "integration_id": resource.IntegrationID,
+				})
+				return
+			}
 		}
-		writeJSON(w, http.StatusOK, map[string]any{"connected": true, "integration_id": integrationID})
+		writeJSON(w, http.StatusOK, map[string]any{"connected": false})
 	}
 }
 
@@ -102,9 +118,8 @@ type notionSourceOption struct {
 	ParentTitle string `json:"parentTitle,omitempty"`
 }
 
-// NotionSources lists the pages and databases the integration can see, so a
-// Space can choose which of them to read as notes. Misty never ingests a whole
-// workspace implicitly.
+// NotionSources lists only sources already selected by the Space owner.
+// Discovery lives in integration management and is owner-only.
 func (s *SpacesService) NotionSources() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		userID, ok := authenticatedUser(w, r, s.database)
@@ -112,36 +127,23 @@ func (s *SpacesService) NotionSources() http.HandlerFunc {
 			return
 		}
 		spaceID := chi.URLParam(r, "spaceID")
+		resources, err := s.database.ProviderSharedResources(r.Context(), userID, spaceID)
+		if err != nil {
+			writeSpaceError(w, err)
+			return
+		}
 		items := []notionSourceOption{}
-		cursor := ""
-		for pages := 0; pages < 20; pages++ {
-			body := map[string]any{"page_size": 100}
-			if cursor != "" {
-				body["start_cursor"] = cursor
+		for _, resource := range resources {
+			if resource.Provider != "notion" || resource.Status != "active" {
+				continue
 			}
-			raw, err := s.notionRequest(r.Context(), userID, spaceID, http.MethodPost, "https://api.notion.com/v1/search", body)
-			if err != nil {
-				writeProviderFailure(w, err)
-				return
+			kind := resource.ResourceType
+			if kind == "data_source" {
+				kind = "database"
 			}
-			var page struct {
-				Results    []json.RawMessage `json:"results"`
-				NextCursor string            `json:"next_cursor"`
-				HasMore    bool              `json:"has_more"`
-			}
-			if json.Unmarshal(raw, &page) != nil {
-				writeJSON(w, http.StatusBadGateway, map[string]string{"code": "invalid_response"})
-				return
-			}
-			for _, result := range page.Results {
-				if option, ok := notionSourceFromObject(result); ok {
-					items = append(items, option)
-				}
-			}
-			if !page.HasMore || page.NextCursor == "" {
-				break
-			}
-			cursor = page.NextCursor
+			items = append(items, notionSourceOption{
+				ID: resource.ExternalResourceID, Kind: kind, Title: resource.DisplayName,
+			})
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"sources": items})
 	}
@@ -183,10 +185,15 @@ func (s *SpacesService) NotionPage() http.HandlerFunc {
 			return
 		}
 		spaceID, pageID := chi.URLParam(r, "spaceID"), chi.URLParam(r, "pageID")
+		resource, err := s.notionResource(r.Context(), userID, spaceID, pageID)
+		if err != nil {
+			writeSpaceError(w, err)
+			return
+		}
 		endpoint := "https://api.notion.com/v1/pages/" + url.PathEscape(pageID)
 		switch r.Method {
 		case http.MethodGet:
-			s.proxyNotion(w, r, userID, spaceID, http.MethodGet, endpoint, nil)
+			s.proxyNotion(w, r, *resource, http.MethodGet, endpoint, nil)
 		case http.MethodPatch:
 			var body struct {
 				Properties map[string]json.RawMessage `json:"properties"`
@@ -198,7 +205,7 @@ func (s *SpacesService) NotionPage() http.HandlerFunc {
 				writeSpaceError(w, db.ErrSpaceInvalid)
 				return
 			}
-			s.proxyNotion(w, r, userID, spaceID, http.MethodPatch, endpoint, map[string]any{"properties": body.Properties})
+			s.proxyNotion(w, r, *resource, http.MethodPatch, endpoint, map[string]any{"properties": body.Properties})
 		default:
 			w.WriteHeader(http.StatusMethodNotAllowed)
 		}
@@ -214,6 +221,11 @@ func (s *SpacesService) NotionPageBlocks() http.HandlerFunc {
 			return
 		}
 		spaceID, pageID := chi.URLParam(r, "spaceID"), chi.URLParam(r, "pageID")
+		resource, err := s.notionResource(r.Context(), userID, spaceID, pageID)
+		if err != nil {
+			writeSpaceError(w, err)
+			return
+		}
 		blocks := []json.RawMessage{}
 		cursor := ""
 		for pages := 0; pages < 20; pages++ {
@@ -221,7 +233,7 @@ func (s *SpacesService) NotionPageBlocks() http.HandlerFunc {
 			if cursor != "" {
 				endpoint += "&start_cursor=" + url.QueryEscape(cursor)
 			}
-			raw, err := s.notionRequest(r.Context(), userID, spaceID, http.MethodGet, endpoint, nil)
+			raw, err := s.notionRequest(r.Context(), *resource, http.MethodGet, endpoint, nil)
 			if err != nil {
 				writeProviderFailure(w, err)
 				return
@@ -274,11 +286,40 @@ func (s *SpacesService) NotionPages() http.HandlerFunc {
 			writeSpaceError(w, db.ErrSpaceInvalid)
 			return
 		}
+		parentID := notionParentID(body.Parent)
+		resource, err := s.notionResource(r.Context(), userID, spaceID, parentID)
+		if err != nil {
+			writeSpaceError(w, err)
+			return
+		}
 		payload := map[string]any{"parent": body.Parent, "properties": body.Properties}
 		if len(body.Children) > 0 {
 			payload["children"] = body.Children
 		}
-		s.proxyNotion(w, r, userID, spaceID, http.MethodPost, "https://api.notion.com/v1/pages", payload)
+		raw, err := s.notionRequest(
+			r.Context(), *resource, http.MethodPost, "https://api.notion.com/v1/pages", payload,
+		)
+		if err != nil {
+			writeProviderFailure(w, err)
+			return
+		}
+		var page struct {
+			ID string `json:"id"`
+		}
+		if json.Unmarshal(raw, &page) == nil && page.ID != "" {
+			var object map[string]any
+			_ = json.Unmarshal(raw, &object)
+			content, _ := json.Marshal(map[string]any{"object": json.RawMessage(raw)})
+			_ = s.database.UpsertProviderContentRecord(r.Context(), db.ProviderContentRecord{
+				SpaceID: resource.SpaceID, SharedResourceID: resource.ID, Provider: "notion",
+				ExternalRecordID: page.ID, ParentExternalID: parentID, RecordType: "page",
+				Fingerprint: providerPayloadFingerprint(raw), DisplayName: notionObjectTitle(object),
+				MIMEType: "application/vnd.notion+json", Content: content,
+			})
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(raw)
 	}
 }
 
@@ -298,6 +339,11 @@ func (s *SpacesService) NotionBlockChildren() http.HandlerFunc {
 			return
 		}
 		spaceID, blockID := chi.URLParam(r, "spaceID"), chi.URLParam(r, "blockID")
+		resource, err := s.notionResource(r.Context(), userID, spaceID, blockID)
+		if err != nil {
+			writeSpaceError(w, err)
+			return
+		}
 		var body struct {
 			Children []json.RawMessage `json:"children"`
 		}
@@ -309,7 +355,7 @@ func (s *SpacesService) NotionBlockChildren() http.HandlerFunc {
 			return
 		}
 		endpoint := "https://api.notion.com/v1/blocks/" + url.PathEscape(blockID) + "/children"
-		s.proxyNotion(w, r, userID, spaceID, http.MethodPatch, endpoint, map[string]any{"children": body.Children})
+		s.proxyNotion(w, r, *resource, http.MethodPatch, endpoint, map[string]any{"children": body.Children})
 	}
 }
 
@@ -322,7 +368,12 @@ func (s *SpacesService) NotionDatabase() http.HandlerFunc {
 			return
 		}
 		spaceID, databaseID := chi.URLParam(r, "spaceID"), chi.URLParam(r, "databaseID")
-		s.proxyNotion(w, r, userID, spaceID, http.MethodGet,
+		resource, err := s.notionResource(r.Context(), userID, spaceID, databaseID)
+		if err != nil {
+			writeSpaceError(w, err)
+			return
+		}
+		s.proxyNotion(w, r, *resource, http.MethodGet,
 			"https://api.notion.com/v1/databases/"+url.PathEscape(databaseID), nil)
 	}
 }
@@ -339,7 +390,12 @@ func (s *SpacesService) NotionDatabaseQuery() http.HandlerFunc {
 			return
 		}
 		spaceID, databaseID := chi.URLParam(r, "spaceID"), chi.URLParam(r, "databaseID")
-		raw, err := s.notionRequest(r.Context(), userID, spaceID, http.MethodPost,
+		resource, err := s.notionResource(r.Context(), userID, spaceID, databaseID)
+		if err != nil {
+			writeSpaceError(w, err)
+			return
+		}
+		raw, err := s.notionRequest(r.Context(), *resource, http.MethodPost,
 			"https://api.notion.com/v1/databases/"+url.PathEscape(databaseID)+"/query",
 			map[string]any{"page_size": 100})
 		if err != nil {
@@ -353,13 +409,29 @@ func (s *SpacesService) NotionDatabaseQuery() http.HandlerFunc {
 			writeJSON(w, http.StatusBadGateway, map[string]string{"code": "invalid_response"})
 			return
 		}
+		for _, row := range page.Results {
+			var value struct {
+				ID             string `json:"id"`
+				LastEditedTime string `json:"last_edited_time"`
+			}
+			if json.Unmarshal(row, &value) != nil || value.ID == "" {
+				continue
+			}
+			var object map[string]any
+			_ = json.Unmarshal(row, &object)
+			content, _ := json.Marshal(map[string]any{"object": json.RawMessage(row)})
+			_ = s.database.UpsertProviderContentRecord(r.Context(), db.ProviderContentRecord{
+				SpaceID: resource.SpaceID, SharedResourceID: resource.ID, Provider: "notion",
+				ExternalRecordID: value.ID, ParentExternalID: databaseID, RecordType: "page",
+				Fingerprint: providerPayloadFingerprint(row), DisplayName: notionObjectTitle(object),
+				MIMEType: "application/vnd.notion+json", Content: content,
+			})
+		}
 		writeJSON(w, http.StatusOK, map[string]any{"pages": page.Results})
 	}
 }
 
-// NotionSearch searches the workspace Misty can see. Search spans everything
-// the integration was shared, not just selected sources: finding a page is how
-// someone decides to subscribe to it.
+// NotionSearch searches only the indexed records beneath selected sources.
 func (s *SpacesService) NotionSearch() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		userID, ok := authenticatedUser(w, r, s.database)
@@ -368,27 +440,39 @@ func (s *SpacesService) NotionSearch() http.HandlerFunc {
 		}
 		spaceID := chi.URLParam(r, "spaceID")
 		query := strings.TrimSpace(r.URL.Query().Get("q"))
-		raw, err := s.notionRequest(r.Context(), userID, spaceID, http.MethodPost,
-			"https://api.notion.com/v1/search", map[string]any{"query": query, "page_size": 50})
+		records, err := s.database.ProviderContentRecords(
+			r.Context(), userID, spaceID, "notion", query, 50,
+		)
 		if err != nil {
-			writeProviderFailure(w, err)
+			writeSpaceError(w, err)
 			return
 		}
-		var page struct {
-			Results []json.RawMessage `json:"results"`
+		pages := []json.RawMessage{}
+		for _, record := range records {
+			if record.RecordType != "page" {
+				continue
+			}
+			var content struct {
+				Object json.RawMessage `json:"object"`
+			}
+			if json.Unmarshal(record.Content, &content) == nil && len(content.Object) > 0 {
+				pages = append(pages, content.Object)
+			}
 		}
-		if json.Unmarshal(raw, &page) != nil {
-			writeJSON(w, http.StatusBadGateway, map[string]string{"code": "invalid_response"})
-			return
-		}
-		writeJSON(w, http.StatusOK, map[string]any{"pages": page.Results})
+		writeJSON(w, http.StatusOK, map[string]any{"pages": pages})
 	}
 }
 
 // proxyNotion performs the call and relays Notion's JSON verbatim, so the
 // client sees the real object rather than a lossy re-encoding.
-func (s *SpacesService) proxyNotion(w http.ResponseWriter, r *http.Request, userID, spaceID, method, endpoint string, body any) {
-	raw, err := s.notionRequest(r.Context(), userID, spaceID, method, endpoint, body)
+func (s *SpacesService) proxyNotion(
+	w http.ResponseWriter,
+	r *http.Request,
+	resource db.ProviderSharedResource,
+	method, endpoint string,
+	body any,
+) {
+	raw, err := s.notionRequest(r.Context(), resource, method, endpoint, body)
 	if err != nil {
 		writeProviderFailure(w, err)
 		return
@@ -396,4 +480,17 @@ func (s *SpacesService) proxyNotion(w http.ResponseWriter, r *http.Request, user
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write(raw)
+}
+
+func notionParentID(raw json.RawMessage) string {
+	var parent map[string]any
+	if json.Unmarshal(raw, &parent) != nil {
+		return ""
+	}
+	for _, key := range []string{"database_id", "data_source_id", "page_id"} {
+		if value, _ := parent[key].(string); strings.TrimSpace(value) != "" {
+			return value
+		}
+	}
+	return ""
 }

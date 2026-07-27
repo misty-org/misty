@@ -133,11 +133,10 @@ func TestRealtimePresenceRejectsNonMembers(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateUser(outsider) error = %v", err)
 	}
-	spaces, err := database.ListSpaces(ctx, owner.ID)
-	if err != nil || len(spaces) != 1 {
-		t.Fatalf("ListSpaces(owner) = %#v, %v", spaces, err)
+	space, err := database.CreateSpace(ctx, owner.ID, "Presence")
+	if err != nil {
+		t.Fatalf("CreateSpace(owner) error = %v", err)
 	}
-	space := spaces[0]
 
 	service := NewRealtimeService(database, "")
 	ownerClient := newTestRealtimeClient(owner.ID)

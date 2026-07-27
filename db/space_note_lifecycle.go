@@ -6,116 +6,36 @@ import (
 	"time"
 )
 
-// NoteArchiveWindow is how long a departed creator's notes survive before
-// permanent deletion. Rejoining the same Space inside this window restores them.
+// NoteArchiveWindow is retained for legacy archived_creator_left rows created
+// before native Space notes became membership-wide.
 const NoteArchiveWindow = 30 * 24 * time.Hour
 
 // handleNoteMembershipLossTx runs inside the same transaction that removes a
 // user from a Space, so a note can never be left reachable by someone who is no
 // longer a member.
 //
-// Two distinct things happen, and they must not be confused:
-//   - Notes the departing user *created* are archived, not deleted. They are
-//     inaccessible to everyone, including prior viewers and editors, and are
-//     restored if the creator rejoins within the window.
-//   - Grants the departing user *held* on other people's notes are deleted
-//     outright. There is nothing to restore: if they come back, the creator
-//     re-grants.
+// Notes belong to the Space, so a creator leaving does not archive or remove
+// them. Only the departing member's own per-note preferences are cleared.
 func handleNoteMembershipLossTx(ctx context.Context, tx *sql.Tx, spaceID, userID string) error {
-	archivedNoteIDs, err := scanNoteIDs(tx.QueryContext(ctx,
-		`UPDATE space_notes SET lifecycle_state=$1,archived_at=NOW(),purge_after=NOW()+$2::interval,
-		        acl_version=acl_version+1,updated_at=NOW()
-		 WHERE space_id=$3 AND creator_user_id=$4 AND lifecycle_state=$5
-		 RETURNING id`,
-		NoteLifecycleArchivedCreatorLeft, NoteArchiveWindow.String(), spaceID, userID, NoteLifecycleActive))
-	if err != nil {
-		return err
-	}
-	for _, noteID := range archivedNoteIDs {
-		// Emitted before the room command so the audience learns the note is
-		// gone even if control delivery is retried for a while.
-		if err := recordNoteEventTx(ctx, tx, spaceID, userID, "note.archived", noteID, nil); err != nil {
-			return err
-		}
-		if err := enqueueNoteControlTx(ctx, tx, noteID, "disconnect", nil); err != nil {
-			return err
-		}
-	}
-
-	// Grants held on notes created by others, in this Space only. A note in a
-	// different Space the user still belongs to is untouched.
-	revokedNoteIDs, err := scanNoteIDs(tx.QueryContext(ctx,
-		`DELETE FROM space_note_permissions p USING space_notes n
-		 WHERE p.note_id=n.id AND n.space_id=$1 AND p.user_id=$2
-		 RETURNING p.note_id`, spaceID, userID))
-	if err != nil {
-		return err
-	}
-	if _, err := tx.ExecContext(ctx,
+	// Notes belong to the Space, so a departing member takes nothing with them.
+	// Only their own per-note UI state is removed.
+	_, err := tx.ExecContext(ctx,
 		`DELETE FROM space_note_preferences pref USING space_notes n
-		 WHERE pref.note_id=n.id AND n.space_id=$1 AND pref.user_id=$2`, spaceID, userID); err != nil {
-		return err
-	}
-	for _, noteID := range revokedNoteIDs {
-		if _, err := tx.ExecContext(ctx,
-			`UPDATE space_notes SET acl_version=acl_version+1,updated_at=NOW() WHERE id=$1`, noteID); err != nil {
-			return err
-		}
-		if err := recordNoteEventTx(ctx, tx, spaceID, userID, "note.permissions.changed", noteID, nil); err != nil {
-			return err
-		}
-		if err := enqueueNoteControlTx(ctx, tx, noteID, "disconnect",
-			map[string]any{"user_ids": []string{userID}}); err != nil {
-			return err
-		}
-	}
-	if len(revokedNoteIDs) == 0 && len(archivedNoteIDs) == 0 {
-		return nil
-	}
-	// One targeted signal covers every note the user just lost, so the client
-	// drops them all without waiting for a refetch.
-	return notifySpaceControlTx(ctx, tx, map[string]any{
-		"type": "note.access.revoked", "space_id": spaceID,
-		"user_ids": []string{userID}, "keep_connection": true,
-	})
+		 WHERE pref.note_id=n.id AND n.space_id=$1 AND pref.user_id=$2`, spaceID, userID)
+	return err
 }
 
 // handleNoteMembershipRestoreTx runs inside the transaction that re-adds a user
 // to a Space.
 //
-// Only notes archived because *this* user left are restored, and only inside
-// the retention window. Grants are preserved, but pruned to users who are still
-// current members: a grantee who left in the meantime must not silently regain
-// access when the creator returns.
-func handleNoteMembershipRestoreTx(ctx context.Context, tx *sql.Tx, spaceID, userID string) error {
-	restored, err := scanNoteIDs(tx.QueryContext(ctx,
-		`UPDATE space_notes SET lifecycle_state=$1,archived_at=NULL,purge_after=NULL,
-		        acl_version=acl_version+1,updated_at=NOW()
-		 WHERE space_id=$2 AND creator_user_id=$3 AND lifecycle_state=$4 AND purge_after>NOW()
-		 RETURNING id`,
-		NoteLifecycleActive, spaceID, userID, NoteLifecycleArchivedCreatorLeft))
-	if err != nil {
-		return err
-	}
-	for _, noteID := range restored {
-		if _, err := tx.ExecContext(ctx,
-			`DELETE FROM space_note_permissions p
-			 WHERE p.note_id=$1 AND NOT EXISTS(
-			     SELECT 1 FROM space_members m WHERE m.space_id=$2 AND m.user_id=p.user_id)`,
-			noteID, spaceID); err != nil {
-			return err
-		}
-		if err := recordNoteEventTx(ctx, tx, spaceID, userID, "note.restored", noteID, nil); err != nil {
-			return err
-		}
-	}
+// Space notes never leave with their creator, so membership restoration needs
+// no note-specific work.
+func handleNoteMembershipRestoreTx(_ context.Context, _ *sql.Tx, _, _ string) error {
 	return nil
 }
 
-// PurgeNotesForDeletedAccount marks every note the account created as deleting
-// and queues room purges. Notes are never transferred to a Space owner, and
-// there is no 30-day window here: account deletion is immediate and permanent,
-// unlike leaving a Space.
+// PurgeNotesForDeletedAccount preserves collaborative Space notes by assigning
+// their destructive controls to the current Space owner.
 //
 // Misty has no account-deletion flow yet. When one is built it must call this
 // in the same transaction that removes or anonymizes the user, before the row
@@ -127,39 +47,11 @@ func (db *Database) PurgeNotesForDeletedAccount(ctx context.Context, userID stri
 }
 
 func handleNoteAccountDeletionTx(ctx context.Context, tx *sql.Tx, userID string) error {
-	type noteRef struct{ id, spaceID string }
-	rows, err := tx.QueryContext(ctx,
-		`UPDATE space_notes SET lifecycle_state=$1,acl_version=acl_version+1,updated_at=NOW()
-		 WHERE creator_user_id=$2 AND lifecycle_state<>$1
-		 RETURNING id,space_id`, NoteLifecycleDeleting, userID)
-	if err != nil {
-		return err
-	}
-	refs := []noteRef{}
-	for rows.Next() {
-		var ref noteRef
-		if err := rows.Scan(&ref.id, &ref.spaceID); err != nil {
-			rows.Close()
-			return err
-		}
-		refs = append(refs, ref)
-	}
-	if err := rows.Err(); err != nil {
-		rows.Close()
-		return err
-	}
-	if err := rows.Close(); err != nil {
-		return err
-	}
-	for _, ref := range refs {
-		if err := recordNoteEventTx(ctx, tx, ref.spaceID, userID, "note.deleted", ref.id, nil); err != nil {
-			return err
-		}
-		if err := enqueueNoteControlTx(ctx, tx, ref.id, "purge", nil); err != nil {
-			return err
-		}
-	}
-	return nil
+	_, err := tx.ExecContext(ctx, `UPDATE space_notes n
+		SET creator_user_id=s.owner_user_id,updated_at=NOW()
+		FROM spaces s
+		WHERE n.space_id=s.id AND n.creator_user_id=$1 AND s.owner_user_id<>$1`, userID)
+	return err
 }
 
 func scanNoteIDs(rows *sql.Rows, queryErr error) ([]string, error) {

@@ -260,7 +260,7 @@ func (s *DemoService) requireDemoOwner(ctx context.Context, userID, spaceID stri
 	var allowed bool
 	err = tx.QueryRowContext(ctx, `SELECT EXISTS(
 		SELECT 1 FROM spaces s JOIN users u ON u.id=s.owner_user_id
-		WHERE s.id=$1 AND s.owner_user_id=$2 AND NOT s.is_personal
+			WHERE s.id=$1 AND s.owner_user_id=$2
 		AND s.lifecycle_state='active' AND lower(u.email) LIKE '%@demo.misty.local'
 	)`, spaceID, userID).Scan(&allowed)
 	if err != nil {

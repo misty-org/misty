@@ -298,6 +298,18 @@ func (s *Service) SendMessageWithTierContext(ctx context.Context, sessionID, use
 		session.AgentTier = NormalizeAgentTier(tier)
 		session.ActiveRoot = request.ActiveRoot
 		session.Capabilities = request.Capabilities
+		session.SpaceSection = request.SpaceSection
+		// Only overwrite the Space blocks when the caller assembled fresh ones.
+		// The handler leaves them empty when the revision token says nothing the
+		// agent can see has changed, and the previous turn's records are reused so
+		// the prompt bytes stay identical and remain cacheable.
+		if request.SpaceCard != "" {
+			session.SpaceCard = request.SpaceCard
+		}
+		if request.SpaceRecords != "" {
+			session.SpaceRecords = request.SpaceRecords
+			session.SpaceContextRevision = request.SpaceContextRevision
+		}
 		session.ProviderCallsThisTurn = 0
 		session.ToolResults = nil
 		clear(session.PendingToolRequests)
@@ -381,6 +393,26 @@ func (s *Service) Events(sessionID, userID string, after int64) ([]AgentEvent, e
 	return s.store.Events(sessionID, userID, after)
 }
 
+// SpaceContextState is what a caller needs to decide whether to rebuild Space
+// context for the next turn.
+type SpaceContextState struct {
+	Revision string
+	HasCard  bool
+}
+
+// SessionSpaceContext reports the change token the session's current Space
+// records were built from. The API layer owns rebuilding context, because only
+// it can reach the database; this lets it skip that work when nothing the agent
+// can see has changed.
+func (s *Service) SessionSpaceContext(ctx context.Context, sessionID, userID string) (SpaceContextState, error) {
+	var state SpaceContextState
+	err := s.store.WithSessionContext(ctx, sessionID, userID, func(_ context.Context, session *Session) error {
+		state = SpaceContextState{Revision: session.SpaceContextRevision, HasCard: session.SpaceCard != ""}
+		return nil
+	})
+	return state, err
+}
+
 // Transcript returns the conversation as plain messages, for a client rebuilding
 // a session it does not hold locally. Replaying the event stream would be wrong
 // for that: events carry tool requests, and a client that replayed them would
@@ -436,6 +468,9 @@ func (s *Service) advanceLocked(ctx context.Context, session *Session) error {
 		ToolResults:  append([]ToolResult(nil), session.ToolResults...),
 		Capabilities: session.Capabilities,
 		KnownPaths:   knownPaths(session),
+		SpaceCard:    session.SpaceCard,
+		SpaceRecords: session.SpaceRecords,
+		SpaceSection: session.SpaceSection,
 	}
 	if requestSizeBytes(request) > MaxProviderRequestBytes {
 		return ErrInvalidRequest("Agent request context is too large; start a new conversation")

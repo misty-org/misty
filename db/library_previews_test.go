@@ -12,8 +12,7 @@ func TestLibraryPreviewDerivativeAuthorizationAndReuse(t *testing.T) {
 	ctx := context.Background()
 	owner, _ := database.CreateUser("Preview Owner", "preview-owner@example.com", "password123")
 	outsider, _ := database.CreateUser("Preview Outsider", "preview-outsider@example.com", "password123")
-	spaces, _ := database.ListSpaces(ctx, owner.ID)
-	spaceID := spaces[0].ID
+	spaceID := createTestSpace(t, database, ctx, owner.ID, "Previews").ID
 	item := createPeopleTestImage(t, database, owner.ID, spaceID, "preview.jpg", "1")
 	baseline, err := database.OwnerStorageUsage(ctx, owner.ID)
 	if err != nil {

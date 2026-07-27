@@ -14,41 +14,25 @@ func noteAssetUpload(t *testing.T, fixture noteFixture, userID string, byteSize 
 		"library/noteasset"+suffix, "note-asset-token-"+suffix, time.Now().Add(time.Hour))
 }
 
-// Uploading an asset requires edit access to the parent note, not a Space
-// permission. The Space owner has library.upload but no note grant.
+// Uploading an asset requires edit access to the parent note, which every
+// current Space member has. Someone outside the Space has none.
 func TestNoteAssetUploadRequiresNoteEditAccess(t *testing.T) {
 	fixture := newNoteFixture(t, "note-asset-auth")
 
-	if _, err := noteAssetUpload(t, fixture, fixture.creator, 1024, "creator"); err != nil {
-		t.Fatalf("creator upload = %v, want success", err)
-	}
-
-	for name, userID := range map[string]string{"space owner": fixture.owner, "ungranted member": fixture.member} {
-		if _, err := noteAssetUpload(t, fixture, userID, 1024, "denied"); !errors.Is(err, ErrLibraryNotFound) {
-			t.Fatalf("%s upload = %v, want ErrLibraryNotFound", name, err)
+	for name, userID := range map[string]string{
+		"creator": fixture.creator, "other member": fixture.member, "space owner": fixture.owner,
+	} {
+		if _, err := noteAssetUpload(t, fixture, userID, 1024, "ok-"+strings.ReplaceAll(name, " ", "-")); err != nil {
+			t.Fatalf("%s upload = %v, want success", name, err)
 		}
 	}
-}
 
-// A viewer may read a note but must not add assets to it.
-func TestViewerCannotUploadNoteAssets(t *testing.T) {
-	fixture := newNoteFixture(t, "note-asset-viewer")
-	if _, _, err := fixture.database.ReplaceNoteGrants(fixture.ctx, fixture.creator, fixture.note.ID,
-		[]NoteGrant{{UserID: fixture.member, Role: NoteRoleViewer}}); err != nil {
+	outsider, err := fixture.database.CreateUser("Asset Outsider", "note-asset-outsider@example.com", "password123")
+	if err != nil {
 		t.Fatal(err)
 	}
-
-	if _, err := noteAssetUpload(t, fixture, fixture.member, 1024, "viewer"); !errors.Is(err, ErrLibraryNotFound) {
-		t.Fatalf("viewer upload = %v, want ErrLibraryNotFound", err)
-	}
-
-	// An editor may.
-	if _, _, err := fixture.database.ReplaceNoteGrants(fixture.ctx, fixture.creator, fixture.note.ID,
-		[]NoteGrant{{UserID: fixture.member, Role: NoteRoleEditor}}); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := noteAssetUpload(t, fixture, fixture.member, 1024, "editor"); err != nil {
-		t.Fatalf("editor upload = %v, want success", err)
+	if _, err := noteAssetUpload(t, fixture, outsider.ID, 1024, "denied"); !errors.Is(err, ErrLibraryNotFound) {
+		t.Fatalf("non-member upload = %v, want ErrLibraryNotFound", err)
 	}
 }
 
@@ -116,29 +100,28 @@ func TestUploadPurposeAndNoteReferenceMustAgree(t *testing.T) {
 	}
 }
 
-// Listing and downloading follow view access, so a viewer can read assets even
-// though they cannot add them.
+// Listing and downloading follow the parent note's access, which is Space
+// membership.
 func TestNoteAssetVisibilityFollowsTheParentNote(t *testing.T) {
 	fixture := newNoteFixture(t, "note-asset-visibility")
 
-	if _, err := fixture.database.NoteAssets(fixture.ctx, fixture.creator, fixture.note.ID); err != nil {
-		t.Fatalf("creator NoteAssets() = %v", err)
-	}
-	for name, userID := range map[string]string{"space owner": fixture.owner, "ungranted member": fixture.member} {
-		if _, err := fixture.database.NoteAssets(fixture.ctx, userID, fixture.note.ID); !errors.Is(err, ErrSpaceNotFound) {
-			t.Fatalf("%s NoteAssets() = %v, want ErrSpaceNotFound", name, err)
-		}
-		if _, err := fixture.database.NoteAssetDownload(fixture.ctx, userID, fixture.note.ID, "noteasset_x"); !errors.Is(err, ErrLibraryNotFound) {
-			t.Fatalf("%s NoteAssetDownload() = %v, want ErrLibraryNotFound", name, err)
+	for name, userID := range map[string]string{
+		"creator": fixture.creator, "other member": fixture.member, "space owner": fixture.owner,
+	} {
+		if _, err := fixture.database.NoteAssets(fixture.ctx, userID, fixture.note.ID); err != nil {
+			t.Fatalf("%s NoteAssets() = %v, want success", name, err)
 		}
 	}
 
-	if _, _, err := fixture.database.ReplaceNoteGrants(fixture.ctx, fixture.creator, fixture.note.ID,
-		[]NoteGrant{{UserID: fixture.member, Role: NoteRoleViewer}}); err != nil {
+	outsider, err := fixture.database.CreateUser("Visibility Outsider", "note-asset-vis-outsider@example.com", "password123")
+	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := fixture.database.NoteAssets(fixture.ctx, fixture.member, fixture.note.ID); err != nil {
-		t.Fatalf("granted viewer NoteAssets() = %v, want success", err)
+	if _, err := fixture.database.NoteAssets(fixture.ctx, outsider.ID, fixture.note.ID); !errors.Is(err, ErrSpaceNotFound) {
+		t.Fatalf("non-member NoteAssets() = %v, want ErrSpaceNotFound", err)
+	}
+	if _, err := fixture.database.NoteAssetDownload(fixture.ctx, outsider.ID, fixture.note.ID, "noteasset_x"); !errors.Is(err, ErrLibraryNotFound) {
+		t.Fatalf("non-member NoteAssetDownload() = %v, want ErrLibraryNotFound", err)
 	}
 }
 
@@ -146,8 +129,12 @@ func TestNoteAssetVisibilityFollowsTheParentNote(t *testing.T) {
 func TestDeleteNoteAssetIsIdempotentAndRequiresEditAccess(t *testing.T) {
 	fixture := newNoteFixture(t, "note-asset-delete")
 
-	if err := fixture.database.DeleteNoteAsset(fixture.ctx, fixture.owner, fixture.note.ID, "noteasset_missing"); !errors.Is(err, ErrLibraryNotFound) {
-		t.Fatalf("Space owner delete = %v, want ErrLibraryNotFound", err)
+	outsider, err := fixture.database.CreateUser("Delete Outsider", "note-asset-del-outsider@example.com", "password123")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := fixture.database.DeleteNoteAsset(fixture.ctx, outsider.ID, fixture.note.ID, "noteasset_missing"); !errors.Is(err, ErrLibraryNotFound) {
+		t.Fatalf("non-member delete = %v, want ErrLibraryNotFound", err)
 	}
 	if err := fixture.database.DeleteNoteAsset(fixture.ctx, fixture.creator, fixture.note.ID, "noteasset_missing"); err != nil {
 		t.Fatalf("creator delete of a missing asset = %v, want idempotent success", err)

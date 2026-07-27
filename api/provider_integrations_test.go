@@ -16,8 +16,8 @@ func TestProviderOAuthAvailabilityCatalogReportsServerConfiguration(t *testing.T
 	t.Setenv("GOOGLE_CLIENT_SECRET", "google-secret")
 
 	providers := providerOAuthAvailabilityCatalog()
-	if len(providers) != len(providerOAuthCatalog) {
-		t.Fatalf("provider availability count = %d, want %d", len(providers), len(providerOAuthCatalog))
+	if len(providers) != 3 {
+		t.Fatalf("beta provider availability count = %d, want 3", len(providers))
 	}
 	for index, provider := range providers {
 		if index > 0 && providers[index-1].Provider > provider.Provider {
@@ -25,6 +25,9 @@ func TestProviderOAuthAvailabilityCatalogReportsServerConfiguration(t *testing.T
 		}
 		if provider.Configured != (provider.Provider == "google") {
 			t.Fatalf("provider %q configured = %v", provider.Provider, provider.Configured)
+		}
+		if provider.Provider != "google" && provider.Provider != "discord" && provider.Provider != "notion" {
+			t.Fatalf("non-beta provider %q was advertised", provider.Provider)
 		}
 	}
 }
