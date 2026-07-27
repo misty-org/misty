@@ -86,15 +86,21 @@ pub(crate) async fn serve_received(
                 false,
             )
             .await?;
-            let mut interval = tokio::time::interval(Duration::from_secs(1));
+            // Rescans are local disk work; only a change reaches the peer.
+            // They run every second after a change and back off to every
+            // eight seconds while the directory stays quiet.
+            let mut delay = Duration::from_secs(1);
             loop {
-                interval.tick().await;
+                tokio::time::sleep(delay).await;
                 peer.check()?;
                 let directory = roots.clone();
                 let requested = path.clone();
                 let (_, current) = disk(move || directory.directory(&requested, true)).await?;
                 peer.check()?;
-                if current != snapshot {
+                if current == snapshot {
+                    delay = (delay * 2).min(Duration::from_secs(8));
+                } else {
+                    delay = Duration::from_secs(1);
                     snapshot = current;
                     reply(
                         &mut send,

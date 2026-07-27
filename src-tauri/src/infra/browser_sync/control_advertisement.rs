@@ -11,6 +11,7 @@ pub(super) async fn advertise<F, E>(
 ) where
     F: Future<Output = Result<(), E>>,
 {
+    let mut failures = 0u32;
     loop {
         let phase = status.borrow_and_update().phase;
         match phase {
@@ -20,7 +21,12 @@ pub(super) async fn advertise<F, E>(
                     return;
                 }
                 // This does not block workspace traffic or status notifications.
-                tokio::time::sleep(retry_delay).await;
+                // Repeated failures back off exponentially, up to ten minutes.
+                let backoff = retry_delay
+                    .saturating_mul(1u32 << failures.min(10))
+                    .min(Duration::from_secs(600));
+                failures = failures.saturating_add(1);
+                tokio::time::sleep(backoff).await;
             }
             _ => {
                 if status.changed().await.is_err() {

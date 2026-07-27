@@ -288,3 +288,37 @@ T26 and T27 in `server/apps/self-host-collab`:
 - A room with no clients and no in-flight connection or control request is flushed and evicted after 60 seconds, and its document and awareness are destroyed. A room whose latest state is not saved stays resident and retries. `/health` reports resident rooms and sockets.
 
 Validation: syntax-checked with `node --check`. The package's `node --test` suite needs `npm ci`, which was not run under the agreed scope.
+
+
+## Implementation progress — native clients and telemetry
+
+- T06, client half: the native sync client sends a heartbeat frame only when its applied cursor, readiness or active epoch changes. Liveness is the transport: the server pings, the client answers with pongs, and the client counts pings as activity (older servers also count pongs). An idle, caught-up device sends no application frames.
+- T19, native: control-advertisement retries back off exponentially to 10 minutes.
+- T25: watched file-sync pairs that fail (unreachable provider or peer) back off from 5 seconds to 5 minutes and reset on success. Peer directory subscriptions rescan every second after a change and back off to every 8 seconds while quiet; only changes reach the peer.
+- T30: frontend telemetry sends identity once per identity and properties, and repeats of the same exception at most once per 10 minutes. Native error reports are deduplicated for 10 minutes per error and operation and coalesced into one `/batch` request per 5-second window (20 at most). Panics are sent at once. Server telemetry only carries registration and subscription events on an async queue, so batching it would add loss risk for no measurable saving; left unchanged.
+- T31: app update checks run once at start, then every 6 hours ±25%. Focus does not check within the interval, and checking stops once an update is found. Settings still checks on demand.
+
+Remaining local timers, with no network unless state changed: the native sync worker's 250 ms queue tick, 2-second cookie capture, 60-second history capture, renderer page-state capture and native UI snapshot polling (T23, T24, T36). Replacing them needs WebKit and filesystem observers that must be verified on device.
+
+Validation: `cargo check --lib` passes with no warnings. Per the agreed scope, Rust and frontend tests were not run.
+
+
+## Measurement — idle sync connections (T34)
+
+The sync load harness (`internal/sync/load_test.go`) runs two server instances on one PostgreSQL with real protocol clients. A new `MISTY_SYNC_LOAD_SETTLE` knob lets connection setup finish before counters are sampled. The same run was made against the commit before the sync batch (`d5840240c`) and this branch, on one Apple M4 Pro with a local unix-socket PostgreSQL 14:
+
+`MISTY_SYNC_LOAD_CLIENTS=2000 MISTY_SYNC_LOAD_ACTIVE=0.001 MISTY_SYNC_LOAD_DURATION=120s MISTY_SYNC_LOAD_SETTLE=20s MISTY_SYNC_LOAD_POOL=40`
+
+That is 1,000 accounts with 2 devices each, on different instances, and about 0.1% of devices publishing an edit every 5 seconds.
+
+| | Before | After |
+|---|---:|---:|
+| Database commits per second (all, including reads) | 794.7 | 24.9 |
+| Edits published in the window | 48 | 144 |
+| Delta latency p50 / p99 | 8.3 / 15.7 ms | 10.2 / 14.9 ms |
+| Ack latency p50 / p99 | 5.6 / 16.2 ms | 8.5 / 15.2 ms |
+| Test process heap | 140 MB | 90 MB |
+
+Idle connection cost fell from about 0.40 database commits per connected device per second to effectively zero. The remaining commits come from edit-driven work, and this run had three times as many edits. At 10,000 devices that is roughly 4,000 commits per second of idle liveness and reconcile work removed. Edit latency is unchanged within noise.
+
+Limits: application database transactions only, not wire bytes. The harness clients send no heartbeat frames; real clients now send them only on change. This is one machine, not a capacity envelope: the 10k/20k/30k matrix, multi-window and outage-storm scenarios still need a staging environment. TLS, tunnel and proxy overhead are excluded.

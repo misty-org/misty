@@ -32,6 +32,10 @@ export class PostHogTelemetryClient implements TelemetryClient {
   );
   private errorEnabled = readBoolean(errorPreferenceKey, TELEMETRY_DEFAULTS.errorReportingEnabled);
   private pendingIdentity: { userId: string; properties: SafeUserProperties } | null = null;
+  // Identity and repeated errors are sent once: re-applying settings or an
+  // error thrown in a loop must not resend the same payload.
+  private identifiedKey = "";
+  private recentErrors = new Map<string, number>();
 
   initialize(): Promise<void> {
     this.initialization ??= this.initializeOnce();
@@ -69,22 +73,28 @@ export class PostHogTelemetryClient implements TelemetryClient {
     posthog.register({ $geoip_disable: true });
     this.instance = posthog;
     this.syncOptState();
-    if (this.pendingIdentity && this.analyticsEnabled) {
-      this.instance.identify(
-        this.pendingIdentity.userId,
-        redactRecord(this.pendingIdentity.properties as Record<string, unknown>),
-      );
-    }
+    if (this.pendingIdentity && this.analyticsEnabled) this.sendIdentity();
+  }
+
+  private sendIdentity(): void {
+    const identity = this.pendingIdentity;
+    if (!identity || !this.instance) return;
+    const properties = redactRecord(identity.properties as Record<string, unknown>);
+    const key = JSON.stringify([identity.userId, properties]);
+    if (key === this.identifiedKey) return;
+    this.identifiedKey = key;
+    this.instance.identify(identity.userId, properties);
   }
 
   identify(userId: string, properties: SafeUserProperties = {}): void {
     if (!userId) return;
     this.pendingIdentity = { userId, properties };
     if (!this.analyticsEnabled) return;
-    this.instance?.identify(userId, redactRecord(properties as Record<string, unknown>));
+    this.sendIdentity();
   }
   resetIdentity(): void {
     this.pendingIdentity = null;
+    this.identifiedKey = "";
     this.instance?.reset();
   }
 
@@ -96,7 +106,17 @@ export class PostHogTelemetryClient implements TelemetryClient {
 
   captureException(error: unknown, context: SafeErrorContext = {}): void {
     if (!this.errorEnabled || !this.instance) return;
-    this.instance.captureException(redactedError(error), {
+    const redacted = redactedError(error);
+    const key = `${redacted.name}:${redacted.message}:${(redacted.stack ?? "").slice(0, 500)}`;
+    const now = Date.now();
+    const sentAt = this.recentErrors.get(key);
+    if (sentAt !== undefined && now - sentAt < 10 * 60_000) return;
+    this.recentErrors.set(key, now);
+    if (this.recentErrors.size > 200) {
+      for (const [entry, at] of this.recentErrors) if (now - at >= 10 * 60_000) this.recentErrors.delete(entry);
+      if (this.recentErrors.size > 200) this.recentErrors.clear();
+    }
+    this.instance.captureException(redacted, {
       ...redactRecord(context as Record<string, unknown>),
       runtime_layer: "react",
     });
@@ -106,12 +126,7 @@ export class PostHogTelemetryClient implements TelemetryClient {
     this.analyticsEnabled = enabled;
     writeBoolean(analyticsPreferenceKey, enabled);
     this.syncOptState();
-    if (enabled && this.instance && this.pendingIdentity) {
-      this.instance.identify(
-        this.pendingIdentity.userId,
-        redactRecord(this.pendingIdentity.properties as Record<string, unknown>),
-      );
-    }
+    if (enabled) this.sendIdentity();
   }
   setErrorReportingEnabled(enabled: boolean): void {
     this.errorEnabled = enabled;
