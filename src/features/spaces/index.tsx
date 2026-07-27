@@ -14,7 +14,7 @@ import { SpaceTasksCalendar } from "./SpaceTasksCalendar";
 import { SpaceMembers } from "./components/SpaceMembers";
 import { SpaceSettings } from "./components/SpaceSettings";
 
-export { default, PersonalSpaceRedirect } from "./components/SpacesShell";
+export { default, SpacesIndexRedirect } from "./components/SpacesShell";
 
 const validSpaceSections = new Set([
   "chat",
@@ -49,6 +49,14 @@ export function SpaceDetail() {
   useEffect(() => {
     if (spaceId && user) void loadSpace(spaceId);
   }, [loadSpace, spaceId, user?.id]);
+  useEffect(() => {
+    if (!space || !user?.id) return;
+    try {
+      window.localStorage.setItem(`misty:last-active-space:${user.id}`, space.id);
+    } catch {
+      /* local route memory can be unavailable in private contexts */
+    }
+  }, [space, user?.id]);
 
   if (section === "files") {
     return <Navigate to={`/spaces/${encodeURIComponent(spaceId)}/library`} replace />;
@@ -122,6 +130,10 @@ export function SpaceDetail() {
     );
   }
 
+  if (!space && spaces.length > 0) {
+    return <Navigate to={`/spaces/${encodeURIComponent(spaces[0].id)}/chat`} replace />;
+  }
+
   if (!space) {
     return (
       <ErrorState
@@ -164,7 +176,7 @@ export function SpaceDetail() {
             key={`tasks:${spaceId}`}
             spaceId={spaceId}
             canManage={space.permissions?.["tasks.manage"] !== false}
-            canManageIntegrations={space.permissions?.["integrations.manage"] !== false}
+            canManageIntegrations={space.role === "owner"}
           />
         )
       ) : section === "notes" ? (

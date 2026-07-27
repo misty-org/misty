@@ -60,7 +60,14 @@ import type {
   ProviderAuthorizationStart,
   ProviderConnectionAvailability,
   AvailableProviderResource,
+  ProviderSharedResource,
+  CreateSpaceRequest,
+  CreateSpaceResult,
   GoogleCalendarChoice,
+  SpaceInvitation,
+  SpaceInvitationPreview,
+  SpaceSetup,
+  SpaceTemplate,
 } from "@/models/interfaces/features/spaces/types";
 import type { GlobalSpaceLibraryHit } from "@/models/interfaces/features/agents/personal";
 import type { TaskSchedule } from "@/models/interfaces/features/spaces/integrations/calendarTasks";
@@ -128,6 +135,22 @@ export async function spaceRequest<T = void>(path: string, init?: RequestInit): 
   return result;
 }
 
+const pendingSpaceCreationKeys = new Map<string, string>();
+
+function createSpaceRequest(request: CreateSpaceRequest): Promise<CreateSpaceResult> {
+  const fingerprint = JSON.stringify(request);
+  const idempotencyKey = pendingSpaceCreationKeys.get(fingerprint) ?? crypto.randomUUID();
+  pendingSpaceCreationKeys.set(fingerprint, idempotencyKey);
+  return spaceRequest<CreateSpaceResult>("/spaces", {
+    method: "POST",
+    headers: { "Idempotency-Key": idempotencyKey },
+    body: JSON.stringify(request),
+  }).then((result) => {
+    pendingSpaceCreationKeys.delete(fingerprint);
+    return result;
+  });
+}
+
 function assertStableSpaceAccount(generation: number): void {
   if (isAccountSessionTransitioning() || generation !== readAccountSessionGeneration()) {
     throw new SpaceRequestError("Wait for the account switch to finish.", 409, "account_changed");
@@ -140,7 +163,6 @@ export function spaceErrorMessage(code: string | undefined, fallback: string): s
       "Your Misty session is unavailable. Sign out, then sign in again before creating a Space.",
     forbidden: "You no longer have access to this Space.",
     not_found: "That Space item no longer exists.",
-    invitee_not_found: "No Misty account was found for that email address.",
     space_limit_reached: "This account has reached its Space limit.",
     space_ownership_limit_reached:
       "You already own three Spaces. Delete one permanently before creating another.",
@@ -153,7 +175,6 @@ export function spaceErrorMessage(code: string | undefined, fallback: string): s
     upload_verification_failed: "Misty could not verify the uploaded file.",
     dangerous_file_type: "This file type cannot be stored safely.",
     malware_detected: "This upload was rejected because it matched a malware signature.",
-    space_people_limit_reached: "This Space already has five members or pending invitations.",
     space_node_limit_reached: "This Space has reached its 5,000-item limit.",
     version_conflict: "Someone else changed this item. Reload it before saving again.",
     library_reauthentication_required: "Unlock this protected Library collection again.",
@@ -179,8 +200,26 @@ export const spacesApi = {
       `/search/spaces?q=${encodeURIComponent(query)}&limit=${limit}`,
     ),
   snapshot: () => spaceRequest<SpacesSnapshot>("/spaces"),
-  create: (name: string) =>
-    spaceRequest<Space>("/spaces", { method: "POST", body: JSON.stringify({ name }) }),
+  templates: () =>
+    spaceRequest<{
+      templates: SpaceTemplate[];
+      providers?: ProviderConnectionAvailability[];
+    }>("/space-templates"),
+  create: createSpaceRequest,
+  setup: (spaceId: string) =>
+    spaceRequest<SpaceSetup>(`/spaces/${encodeURIComponent(spaceId)}/setup`),
+  updateSetup: (spaceId: string, provider: string, status: string) =>
+    spaceRequest<SpaceSetup>(`/spaces/${encodeURIComponent(spaceId)}/setup`, {
+      method: "PATCH",
+      body: JSON.stringify({ provider, status }),
+    }),
+  invitationPreview: (token: string) =>
+    spaceRequest<SpaceInvitationPreview>(`/space-invitations/${encodeURIComponent(token)}`),
+  redeemInvitation: (token: string) =>
+    spaceRequest<Space>(`/space-invitations/${encodeURIComponent(token)}`, {
+      method: "POST",
+      body: JSON.stringify({ accept: true }),
+    }),
   rename: (spaceId: string, name: string) =>
     spaceRequest<Space>(`/spaces/${encodeURIComponent(spaceId)}`, {
       method: "PATCH",
@@ -198,10 +237,24 @@ export const spacesApi = {
       `/spaces/${encodeURIComponent(spaceId)}/members/${encodeURIComponent(userId)}/avatar`,
     ),
   invite: (spaceId: string, email: string) =>
-    spaceRequest(`/spaces/${encodeURIComponent(spaceId)}/invitations`, {
+    spaceRequest<SpaceInvitation>(`/spaces/${encodeURIComponent(spaceId)}/invitations`, {
       method: "POST",
       body: JSON.stringify({ email }),
     }),
+  pendingInvitations: (spaceId: string) =>
+    spaceRequest<{ invitations: SpaceInvitation[] }>(
+      `/spaces/${encodeURIComponent(spaceId)}/invitations`,
+    ),
+  resendInvitation: (spaceId: string, inviteId: string) =>
+    spaceRequest<SpaceInvitation>(
+      `/spaces/${encodeURIComponent(spaceId)}/invitations/${encodeURIComponent(inviteId)}/resend`,
+      { method: "POST" },
+    ),
+  revokeInvitation: (spaceId: string, inviteId: string) =>
+    spaceRequest(
+      `/spaces/${encodeURIComponent(spaceId)}/invitations/${encodeURIComponent(inviteId)}`,
+      { method: "DELETE" },
+    ),
   respondInvite: (inviteId: string, accept: boolean) =>
     spaceRequest(
       `/spaces/invitations/${encodeURIComponent(inviteId)}/${accept ? "accept" : "decline"}`,
@@ -240,6 +293,19 @@ export const spacesApi = {
     spaceRequest<{ resources: AvailableProviderResource[] }>(
       `/spaces/${encodeURIComponent(spaceId)}/integrations/${encodeURIComponent(integrationId)}/resources`,
     ),
+  sharedProviderResources: (spaceId: string) =>
+    spaceRequest<{ resources: ProviderSharedResource[] }>(
+      `/spaces/${encodeURIComponent(spaceId)}/provider-resources`,
+    ),
+  selectProviderResources: (
+    spaceId: string,
+    integrationId: string,
+    resources: Array<Pick<AvailableProviderResource, "resource_type" | "external_resource_id">>,
+  ) =>
+    spaceRequest<{ resources: ProviderSharedResource[] }>(
+      `/spaces/${encodeURIComponent(spaceId)}/integrations/${encodeURIComponent(integrationId)}/resources`,
+      { method: "PUT", body: JSON.stringify({ resources }) },
+    ),
   createConversation: (spaceId: string, title: string, memberIds: string[]) =>
     spaceRequest<SpaceConversation>(`/spaces/${encodeURIComponent(spaceId)}/conversations`, {
       method: "POST",
@@ -254,6 +320,11 @@ export const spacesApi = {
     spaceRequest<SpaceConversation>(
       `/spaces/${encodeURIComponent(spaceId)}/conversations/${encodeURIComponent(conversationId)}`,
       { method: "PATCH", body: JSON.stringify({ title, member_ids: memberIds }) },
+    ),
+  deleteDisconnectedConversation: (spaceId: string, conversationId: string) =>
+    spaceRequest(
+      `/spaces/${encodeURIComponent(spaceId)}/conversations/${encodeURIComponent(conversationId)}`,
+      { method: "DELETE" },
     ),
   conversationMessages: (spaceId: string, conversationId: string, before = 0) =>
     spaceRequest<{ messages: SpaceMessage[] }>(
@@ -1062,20 +1133,6 @@ export const spacesApi = {
     spaceRequest(
       `/spaces/${encodeURIComponent(spaceId)}/library/items/${encodeURIComponent(itemId)}/versions/${encodeURIComponent(editId)}`,
       { method: "DELETE", headers: libraryReauthenticationHeaders(reauthenticationToken) },
-    ),
-  memberPermissions: (spaceId: string, userId: string) =>
-    spaceRequest<{ permissions: Record<string, boolean> }>(
-      `/spaces/${encodeURIComponent(spaceId)}/members/${encodeURIComponent(userId)}/permissions`,
-    ),
-  setMemberPermission: (
-    spaceId: string,
-    userId: string,
-    permission: string,
-    effect: "allow" | "deny" | "inherit",
-  ) =>
-    spaceRequest<{ permissions: Record<string, boolean> }>(
-      `/spaces/${encodeURIComponent(spaceId)}/members/${encodeURIComponent(userId)}/permissions`,
-      { method: "PUT", body: JSON.stringify({ permission, effect }) },
     ),
 };
 

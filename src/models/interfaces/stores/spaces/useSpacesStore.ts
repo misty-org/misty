@@ -8,6 +8,8 @@ import type {
 } from "@/models/types/stores/spaces/useSpacesBackendStore";
 import type { SpaceRun } from "@/models/interfaces/features/spaces/types";
 import type {
+  CreateSpaceRequest,
+  CreateSpaceResult,
   Space,
   SpaceEvent,
   SpaceInboxItem,
@@ -38,7 +40,7 @@ export interface SpacesStore {
   sending: boolean;
   realtimeConnected: boolean;
   error: string | null;
-  load: () => Promise<void>;
+  load: (options?: { force?: boolean }) => Promise<void>;
   loadSpace: (spaceId: string) => Promise<void>;
   loadMessages: (spaceId: string) => Promise<void>;
   loadNodes: (spaceId: string) => Promise<void>;
@@ -46,7 +48,7 @@ export interface SpacesStore {
   loadStudio: (spaceId: string, kind: "agents" | "workflows") => Promise<void>;
   loadChatAgents: (spaceId: string) => Promise<void>;
   loadInbox: () => Promise<void>;
-  createSpace: (name: string) => Promise<Space>;
+  createSpace: (request: CreateSpaceRequest) => Promise<CreateSpaceResult>;
   renameSpace: (spaceId: string, name: string) => Promise<Space>;
   invite: (spaceId: string, email: string) => Promise<void>;
   respondInvite: (inviteId: string, accept: boolean) => Promise<void>;

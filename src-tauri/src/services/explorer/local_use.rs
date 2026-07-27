@@ -63,10 +63,15 @@ impl ExplorerService {
         let session_id = request.session_id.clone();
         let cancellation = if let Some(session_id) = &session_id {
             let mut cancellations = self.drag_preparation_cancellations.lock().await;
-            Some(cancellations.entry(session_id.clone())
-                .or_insert_with(|| Arc::new(AtomicBool::new(false)))
-                .clone())
-        } else { None };
+            Some(
+                cancellations
+                    .entry(session_id.clone())
+                    .or_insert_with(|| Arc::new(AtomicBool::new(false)))
+                    .clone(),
+            )
+        } else {
+            None
+        };
         let mut prepared = Vec::new();
         let mut skipped = Vec::new();
         for item in request.items {
@@ -79,7 +84,10 @@ impl ExplorerService {
             }
         }
         if let Some(session_id) = session_id {
-            self.drag_preparation_cancellations.lock().await.remove(&session_id);
+            self.drag_preparation_cancellations
+                .lock()
+                .await
+                .remove(&session_id);
         }
         Ok(PreparedDragItemsResult {
             items: prepared,

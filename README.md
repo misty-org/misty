@@ -37,6 +37,21 @@ npm run service:archive
 npm run windows:stage-assets
 ```
 
+Use the Tauri desktop runner when you need native app behavior:
+
+```sh
+npm run tauri:desktop
+```
+
+For side-by-side local auth/session testing, start one Tauri instance per profile in separate terminals:
+
+```sh
+npm run tauri:desktop -- --profile owner
+npm run tauri:desktop -- --profile collaborator
+```
+
+Each profile gets a separate app identifier, browser storage, and auth vault entry. The launcher also creates `~/.misty/.profiles/<profile>` for profile-scoped session metadata, while Misty's normal files, assets, remotes, cache, and database stay rooted in `~/.misty`.
+
 The `mobile` build mode is the native iPad packaging target; it uses the same component tree and layout as desktop. Android packages require a 600dp smallest screen width, and the iOS target is restricted to the iPad device family.
 
 For a native Windows NSIS or MSI test build, including the temporary asset-copy workflow, see [docs/windows-build.md](docs/windows-build.md).

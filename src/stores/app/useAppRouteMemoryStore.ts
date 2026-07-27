@@ -4,8 +4,8 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
 const defaultAppRoute = "/files";
-const defaultSpacesRoute = "/spaces/personal";
-const desktopRememberableRoutes = ["/spaces/personal"];
+const defaultSpacesRoute = "/spaces";
+const desktopRememberableRoutes = ["/spaces"];
 const validSpaceSections = new Set([
   "chat",
   "tasks",
@@ -77,7 +77,7 @@ export function isRememberableAppRoute(path: string): boolean {
 function normalizeRememberedRoute(path: string): string | null {
   const pathname = pathnameFromRoute(path);
   if (!isRememberableAppRoute(pathname)) return null;
-  if (pathname === "/library") return "/spaces/personal";
+  if (pathname === "/library") return "/files";
   if (pathname.startsWith("/spaces/")) {
     const spacesRoute = normalizeRememberedSpacesRoute(path);
     return spacesRoute ? pathnameFromRoute(spacesRoute) : null;

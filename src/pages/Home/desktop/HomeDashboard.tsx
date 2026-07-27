@@ -43,10 +43,8 @@ export function HomeDashboard({
   spaces: Space[];
 }) {
   const orderedSpaces = [...spaces].sort(compareSpaces);
-  const contentSpace = orderedSpaces.find((space) => !space.is_personal) ?? orderedSpaces[0];
-  const chatSpace = orderedSpaces.find(
-    (space) => !space.is_personal && space.permissions?.["messages.read"] !== false,
-  );
+  const contentSpace = orderedSpaces[0];
+  const chatSpace = orderedSpaces.find((space) => space.permissions?.["messages.read"] !== false);
   const spacePages = buildSpacePages(contentSpace, chatSpace);
   const spaceManagement = buildSpaceManagement(contentSpace);
 
@@ -110,7 +108,7 @@ export function HomeDashboard({
                       : "Sign in to load your Space pages."
                   }
                   label={signedIn ? "No Spaces yet" : "Sign in to Misty"}
-                  to={signedIn ? routes.spacePersonal : routes.signIn}
+                  to={signedIn ? routes.spaces : routes.signIn}
                 />
               )}
             </DashboardCard>
@@ -126,7 +124,7 @@ export function HomeDashboard({
                 <DashboardEmpty
                   detail="Open a Space to manage members and preferences."
                   label="Choose a Space"
-                  to={routes.spacePersonal}
+                  to={routes.spaces}
                 />
               )}
             </DashboardCard>
@@ -215,10 +213,10 @@ function SpaceRows({
         detail={
           signedIn
             ? "Start with a private Space, then invite people when you're ready."
-            : "Sign in to see your personal and shared Spaces."
+            : "Sign in to see your Spaces."
         }
         label={signedIn ? "Create your first Space" : "Sign in to Misty"}
-        to={signedIn ? routes.spacePersonal : routes.signIn}
+        to={signedIn ? routes.spaces : routes.signIn}
       />
     );
   }
@@ -228,11 +226,7 @@ function SpaceRows({
       {spaces.map((space) => (
         <DashboardRow
           key={space.id}
-          detail={
-            space.is_personal
-              ? "Your personal Library"
-              : `${space.member_count} ${space.member_count === 1 ? "member" : "members"}`
-          }
+          detail={`${space.member_count} ${space.member_count === 1 ? "member" : "members"}`}
           icon={BriefcaseBusiness}
           label={space.name}
           to={spacePath(space)}
@@ -418,13 +412,11 @@ function buildSpaceManagement(contentSpace: Space | undefined) {
 }
 
 function spacePath(space: Space) {
-  const section =
-    space.is_personal || space.permissions?.["messages.read"] === false ? "library" : "chat";
+  const section = space.permissions?.["messages.read"] === false ? "library" : "chat";
   return `/spaces/${encodeURIComponent(space.id)}/${section}`;
 }
 
 function compareSpaces(left: Space, right: Space) {
-  if (left.is_personal !== right.is_personal) return left.is_personal ? 1 : -1;
   return (
     Date.parse(right.updated_at) - Date.parse(left.updated_at) ||
     left.name.localeCompare(right.name)

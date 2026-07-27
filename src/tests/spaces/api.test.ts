@@ -56,6 +56,68 @@ describe("spaceErrorMessage", () => {
 });
 
 describe("spaceRequest account isolation", () => {
+  it("reuses a creation key after a transient failure and clears it after success", async () => {
+    const created = {
+      space: {
+        id: "space-1",
+        security_domain_id: "domain-1",
+        owner_user_id: "owner-1",
+        name: "Research group",
+        role: "owner",
+        member_count: 1,
+        pending_count: 0,
+        is_shared: false,
+        permissions: {},
+        created_at: "2026-07-26T00:00:00Z",
+        updated_at: "2026-07-26T00:00:00Z",
+      },
+      setup: {
+        selected_providers: ["google", "notion"],
+        completed_providers: [],
+        pending_providers: ["google", "notion"],
+      },
+    };
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ code: "temporary_failure" }), {
+          status: 503,
+          headers: { "Content-Type": "application/json" },
+        }),
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify(created), {
+          status: 201,
+          headers: { "Content-Type": "application/json" },
+        }),
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify(created), {
+          status: 201,
+          headers: { "Content-Type": "application/json" },
+        }),
+      );
+    const request: Parameters<typeof spacesApi.create>[0] = {
+      name: "Research group",
+      template_id: "research",
+      integration_providers: ["google", "notion"],
+    };
+
+    await expect(spacesApi.create(request)).rejects.toMatchObject({ status: 503 });
+    await expect(spacesApi.create(request)).resolves.toEqual(created);
+    await expect(spacesApi.create(request)).resolves.toEqual(created);
+
+    const calls = fetchMock.mock.calls;
+    const firstInit = calls[0]?.[1] as RequestInit;
+    const retryInit = calls[1]?.[1] as RequestInit;
+    const afterSuccessInit = calls[2]?.[1] as RequestInit;
+    const firstKey = new Headers(firstInit.headers).get("Idempotency-Key");
+    expect(firstKey).toBeTruthy();
+    expect(new Headers(retryInit.headers).get("Idempotency-Key")).toBe(firstKey);
+    expect(new Headers(afterSuccessInit.headers).get("Idempotency-Key")).not.toBe(firstKey);
+    expect(JSON.parse(String(firstInit.body))).toEqual(request);
+  });
+
   it("blocks Space requests before network usage during an account switch", async () => {
     accountSession.transitioning = true;
     const fetchMock = vi.spyOn(globalThis, "fetch");

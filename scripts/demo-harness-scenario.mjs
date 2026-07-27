@@ -166,8 +166,8 @@ export async function verifyScenario(baseURL, credentials, manifest, report, pro
   const ownerSession = await loginOrRegister(root, manifest.users.owner, credentials.ownerPassword, credentials.ownerToken);
   const owner = root.withToken(ownerSession.token);
   const phase = report.start("verify exact Product Research Hub state");
-  const spaces = (await owner.request("GET", "/spaces")).data.spaces.filter((space) => !space.is_personal);
-  assert(spaces.length === 1 && spaces[0].id === state.space_id, "one shared non-personal Space");
+  const spaces = (await owner.request("GET", "/spaces")).data.spaces;
+  assert(spaces.length === 1 && spaces[0].id === state.space_id, "one shared Space");
   const members = (await owner.request("GET", `/spaces/${state.space_id}/members`)).data.members;
   assert(members.length === manifest.expected.members, "exactly two Space members");
   assert(new Set(members.map((member) => member.email)).size === 2, "both real member identities are present");

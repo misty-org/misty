@@ -11,9 +11,9 @@ pub mod environment;
 pub mod explorer;
 pub mod explorer_library;
 #[cfg(desktop)]
-pub mod extension_runtime;
-#[cfg(desktop)]
 pub mod extension_reporting;
+#[cfg(desktop)]
+pub mod extension_runtime;
 #[cfg(desktop)]
 pub mod extension_tools;
 pub mod file_sync;

@@ -1,1 +1,1 @@
-export { default, PersonalSpaceRedirect, SpaceDetail } from "@/features/spaces";
+export { default, SpacesIndexRedirect, SpaceDetail } from "@/features/spaces";
