@@ -129,6 +129,10 @@ impl AppEnvironmentService {
         self.inner.cache_dir.clone()
     }
 
+    pub fn assets_dir(&self) -> PathBuf {
+        self.inner.assets_dir.clone()
+    }
+
     pub fn workspaces_path(&self) -> PathBuf {
         self.inner.workspaces_path.clone()
     }
@@ -149,7 +153,7 @@ impl AppEnvironment {
         let db_dir = misty_dir.join("db");
         let cache_dir = misty_dir.join(".cache");
         let tmp_dir = misty_dir.join("tmp");
-        let assets_dir = misty_dir.join("assets");
+        let assets_dir = paths::misty_assets_dir().unwrap_or_else(|| misty_dir.join("assets"));
         let plugins_public_dir = misty_dir.join("plugins").join("public");
         let plugins_private_dir = misty_dir.join("plugins").join("private");
         let settings_path = config_dir.join("settings.json");
@@ -198,7 +202,7 @@ impl AppEnvironment {
         let db_dir = misty_dir.join("db");
         let cache_dir = misty_dir.join(".cache");
         let tmp_dir = misty_dir.join("tmp");
-        let assets_dir = misty_dir.join("assets");
+        let assets_dir = paths::misty_assets_dir().unwrap_or_else(|| misty_dir.join("assets"));
         let plugins_public_dir = misty_dir.join("plugins").join("public");
         let plugins_private_dir = misty_dir.join("plugins").join("private");
         let settings_path = config_dir.join("settings.json");

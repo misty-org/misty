@@ -185,7 +185,13 @@ fn register_scope_sync(connection: &mut Connection, raw_path: &str) -> rusqlite:
         .query_row(
             "SELECT id,device_id,display_name FROM local_agent_scopes WHERE local_path=?1",
             [&canonical_text],
-            |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?, row.get::<_, String>(2)?)),
+            |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, String>(2)?,
+                ))
+            },
         )
         .optional()?
     {
@@ -244,15 +250,22 @@ fn scoped_file_path_sync(
     if relative.trim().is_empty()
         || relative_path.is_absolute()
         || relative_path.components().any(|part| {
-            matches!(part, Component::ParentDir | Component::RootDir | Component::Prefix(_))
+            matches!(
+                part,
+                Component::ParentDir | Component::RootDir | Component::Prefix(_)
+            )
         })
     {
-        return Err(validation_error("Document path is outside its device scope."));
+        return Err(validation_error(
+            "Document path is outside its device scope.",
+        ));
     }
     let root = fs::canonicalize(root).map_err(io_error)?;
     let target = fs::canonicalize(root.join(relative_path)).map_err(io_error)?;
     if !target.starts_with(&root) || !target.is_file() {
-        return Err(validation_error("Document path is outside its device scope."));
+        return Err(validation_error(
+            "Document path is outside its device scope.",
+        ));
     }
     Ok(target)
 }
@@ -303,9 +316,10 @@ fn open_path(path: &Path, pdf_page: Option<u64>) -> ApiResult<()> {
     status
         .map_err(|error| ApiError::Message(format!("Could not open citation: {error}")))
         .and_then(|status| {
-            status.success().then_some(()).ok_or_else(|| {
-                ApiError::Message("The citation could not be opened.".to_owned())
-            })
+            status
+                .success()
+                .then_some(())
+                .ok_or_else(|| ApiError::Message("The citation could not be opened.".to_owned()))
         })
 }
 
@@ -318,13 +332,22 @@ mod tests {
         let root = std::env::temp_dir().join(format!("misty-device-scopes-{}", Uuid::new_v4()));
         let folder = root.join("folder");
         fs::create_dir_all(&folder).unwrap();
-        let service = AgentService::new(AppEnvironmentService::new_with_data_root(Some(root.clone())));
-        service.register_folder_scope(RegisterFolderScopeRequest { path: folder.to_string_lossy().into_owned() }).await.unwrap();
+        let service = AgentService::new(AppEnvironmentService::new_with_data_root(Some(
+            root.clone(),
+        )));
+        service
+            .register_folder_scope(RegisterFolderScopeRequest {
+                path: folder.to_string_lossy().into_owned(),
+            })
+            .await
+            .unwrap();
         let snapshot = service.device_snapshot().await.unwrap();
         assert_eq!(snapshot["version"], 2);
         assert_eq!(snapshot["scopes"].as_array().unwrap().len(), 1);
         assert!(snapshot.get("definitions").is_none());
-        assert!(!snapshot.to_string().contains(folder.to_string_lossy().as_ref()));
+        assert!(!snapshot
+            .to_string()
+            .contains(folder.to_string_lossy().as_ref()));
         let _ = fs::remove_dir_all(root);
     }
 
@@ -334,11 +357,30 @@ mod tests {
         let folder = root.join("folder");
         fs::create_dir_all(&folder).unwrap();
         fs::write(folder.join("inside.txt"), "hello").unwrap();
-        let service = AgentService::new(AppEnvironmentService::new_with_data_root(Some(root.clone())));
-        let scope = service.register_folder_scope(RegisterFolderScopeRequest { path: folder.to_string_lossy().into_owned() }).await.unwrap();
+        let service = AgentService::new(AppEnvironmentService::new_with_data_root(Some(
+            root.clone(),
+        )));
+        let scope = service
+            .register_folder_scope(RegisterFolderScopeRequest {
+                path: folder.to_string_lossy().into_owned(),
+            })
+            .await
+            .unwrap();
         let scope_id = scope["id"].as_str().unwrap().to_owned();
-        assert!(service.prepare_scoped_document(PrepareScopedAgentDocumentRequest { scope_id: scope_id.clone(), relative_path: "inside.txt".to_owned() }).await.is_ok());
-        assert!(service.prepare_scoped_document(PrepareScopedAgentDocumentRequest { scope_id, relative_path: "../outside.txt".to_owned() }).await.is_err());
+        assert!(service
+            .prepare_scoped_document(PrepareScopedAgentDocumentRequest {
+                scope_id: scope_id.clone(),
+                relative_path: "inside.txt".to_owned()
+            })
+            .await
+            .is_ok());
+        assert!(service
+            .prepare_scoped_document(PrepareScopedAgentDocumentRequest {
+                scope_id,
+                relative_path: "../outside.txt".to_owned()
+            })
+            .await
+            .is_err());
         let _ = fs::remove_dir_all(root);
     }
 }

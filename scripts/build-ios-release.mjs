@@ -65,9 +65,6 @@ if (preflightOnly) {
   process.exit(0);
 }
 
-const clang = output("xcrun", ["--sdk", "iphoneos", "--find", "clang"]);
-
-run("npm", ["run", "service:archive:ios"]);
 run("npm", [
   "run",
   "tauri",
@@ -76,16 +73,12 @@ run("npm", [
   "build",
   "--target",
   "aarch64",
-  "--features",
-  "embedded-storage-go",
   "--build-number",
   buildNumber,
   "--export-method",
   exportMethod,
   "--ci",
 ], {
-  SWIFT_RS_CLANG: clang,
-  MISTY_SERVICE_GO_LIB_DIR: "src-tauri/target/misty-service/ios-arm64",
   TAURI_IOS_BUNDLE_ID: bundleId,
   APPLE_DEVELOPMENT_TEAM: developmentTeam,
   DEVELOPMENT_TEAM: developmentTeam,

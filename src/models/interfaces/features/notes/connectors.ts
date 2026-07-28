@@ -1,4 +1,5 @@
 import type {
+  NoteBodyFormat,
   NoteProviderStatus,
   NoteSource,
   UnifiedNote,
@@ -11,6 +12,8 @@ import type {
 export interface CreateNoteInput {
   title: string;
   body: string;
+  bodyFormat?: NoteBodyFormat;
+  bodyMarkdown?: string;
   spaceId?: string;
   spaceName?: string;
   tags?: string[];
@@ -19,6 +22,8 @@ export interface CreateNoteInput {
 export interface UpdateNoteInput {
   title?: string;
   body?: string;
+  bodyFormat?: NoteBodyFormat;
+  bodyMarkdown?: string;
   spaceId?: string;
   spaceName?: string;
   tags?: string[];

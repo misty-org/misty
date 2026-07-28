@@ -103,7 +103,7 @@ import type {
   RemoteEditDraft,
   SaveRemoteRequest,
   RemoteTestResult,
-  RcloneConfigPaths,
+  CloudConfigPaths,
   PowerToolEndpoint,
   TransferProfileOptions,
   VerifyOptions,

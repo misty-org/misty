@@ -1,15 +1,14 @@
-import { Blocks, Bot, FolderOpen, House, PanelsTopLeft } from "lucide-react";
+import { Blocks, Bot, FolderOpen, PanelsTopLeft } from "lucide-react";
 import type { DesktopNavItem } from "@/models/types/layouts";
 import type { AppTab } from "@/models/types/routing/types";
 import { routes } from "./paths";
 
 export const desktopNavItems = [
-  { id: "home", label: "Home", path: routes.home, icon: House, exact: true },
   { id: "files", label: "Files", path: routes.files, icon: FolderOpen },
   {
     id: "spaces",
     label: "Spaces",
-    path: routes.spacePersonal,
+    path: routes.spaces,
     icon: PanelsTopLeft,
     active: (pathname: string) => pathname.startsWith(routes.spaces),
   },
@@ -30,7 +29,7 @@ export const desktopNavItems = [
 ] satisfies DesktopNavItem[];
 
 const deepLinkPrefixes = [
-  routes.home,
+  routes.invite,
   routes.transfers,
   routes.files,
   routes.providers,
@@ -50,7 +49,6 @@ const deepLinkPrefixes = [
 
 export function desktopRouteIdFromPath(pathname: string): AppTab {
   // Assistant remains an accepted legacy deep link that redirects into Agents.
-  if (pathname.startsWith(routes.home)) return "home";
   if (pathname.startsWith(routes.extensions)) return "extensions";
   if (pathname.startsWith(routes.assistant) || pathname.startsWith(routes.agents)) return "agents";
   if (pathname.startsWith(routes.spaces) || pathname.startsWith(routes.library)) return "spaces";
@@ -64,7 +62,7 @@ export function desktopRouteIdFromPath(pathname: string): AppTab {
     pathname.startsWith(routes.signIn) ||
     pathname.startsWith(routes.register)
   )
-    return "home";
+    return "files";
   if (pathname.startsWith(routes.settings)) return "settings";
   if (pathname.startsWith(routes.diagnostics)) return "diagnostics";
   return "files";

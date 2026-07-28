@@ -1,12 +1,6 @@
 use super::*;
 
 #[test]
-fn formats_structured_errors_without_product_leaking_engine_name() {
-    let error = storage_error("operations/list", 500, r#"{"error":"denied"}"#);
-    assert_eq!(error, "Storage operation failed (500): denied");
-}
-
-#[test]
 fn provider_allowlist_contains_only_core_three() {
     assert!(supported_provider("drive"));
     assert!(supported_provider("onedrive"));
@@ -47,10 +41,8 @@ fn drive_parameters_use_browser_oauth_defaults_without_requiring_credentials() {
     assert!(parameters.get("token").is_none());
 }
 
-#[cfg(feature = "embedded-storage-go")]
 #[test]
-fn embedded_runtime_starts_and_surfaces_only_curated_workflows() {
-    crate::services::keychain::prime_rclone_config_password_cache_for_test(None);
+fn native_runtime_starts_and_surfaces_only_curated_workflows() {
     let root = std::env::temp_dir().join(format!("misty-storage-smoke-{}", uuid::Uuid::new_v4()));
     let environment = AppEnvironmentService::for_test_home(root.clone());
     let runtime = StorageRuntimeService::start(&environment);

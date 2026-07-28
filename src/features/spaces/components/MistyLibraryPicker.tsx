@@ -192,7 +192,6 @@ export function MistyLibraryPicker({
               <ErrorState title="Library could not be loaded" description={error} />
             ) : filteredItems.length === 0 ? (
               <EmptyState
-                icon={<Search />}
                 title={searching ? "No matching items" : "This Library is empty"}
                 description={
                   searching
@@ -225,7 +224,7 @@ export function MistyLibraryPicker({
                         "group relative h-auto flex-col items-stretch justify-start gap-0 overflow-hidden whitespace-normal rounded-lg p-0 text-left shadow-xs",
                         selected
                           ? "ring-2 ring-primary"
-                          : "bg-card ring-1 ring-foreground/10 hover:bg-accent",
+                          : "bg-card inset-ring-1 inset-ring-foreground/10 hover:bg-accent",
                       )}
                       variant="ghost"
                       type="button"

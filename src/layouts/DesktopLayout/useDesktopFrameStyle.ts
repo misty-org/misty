@@ -106,6 +106,8 @@ export function useDesktopFrameStyle() {
       "--misty-app-tab-bg": appSurfaceBackground,
       "--misty-app-tab-active-bg": appSurfaceBackground,
       "--misty-app-modal-bg": "var(--misty-bg)",
+      "--misty-files-panel-bg": appSurfaceBackground,
+      "--misty-files-content-bg": appSurfaceBackground,
       ...wallpaperFrameVars,
     } as unknown as CSSProperties;
   }, [appWallpaperSrc, appearancePreferences.panelOpacity]);
@@ -122,6 +124,7 @@ export function useDesktopFrameStyle() {
 
   return {
     app,
+    appWallpaperPath: appearancePreferences.wallpaperPath,
     appWallpaperSrc,
     appWallpaperIsVideo,
     mistyLogoSource,

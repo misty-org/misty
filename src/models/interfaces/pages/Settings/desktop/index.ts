@@ -37,7 +37,7 @@ import type {
   SearchStatus,
   ShortcutBinding,
 } from "@/models/interfaces/services/misty-api";
-import { selectAssistantPreferences, useSettingsStore } from "@/stores/app";
+import { selectAgentPreferences, useSettingsStore } from "@/stores/app";
 import { useSearchStore } from "@/stores/explorer";
 import { formatDate } from "@/features/explorer/utils/fileFormat";
 import { userFacingErrorText } from "@/lib/format";

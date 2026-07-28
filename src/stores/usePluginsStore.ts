@@ -363,8 +363,10 @@ function chooseSelectedPluginId(
   marketplacePlugins: PluginEntry[],
   installedPlugins: PluginEntry[],
 ) {
+  // Selection drives the detail dialog, so it stays empty unless the reader
+  // picked an extension. Falling back to the first entry would open it on load.
   const all = [...marketplacePlugins, ...installedPlugins];
-  return all.find((plugin) => plugin.id === previousSelectedId)?.id ?? all[0]?.id ?? "";
+  return all.find((plugin) => plugin.id === previousSelectedId)?.id ?? "";
 }
 
 async function scanLocalPlugins() {

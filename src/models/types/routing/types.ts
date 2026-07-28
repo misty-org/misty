@@ -6,7 +6,6 @@ export type AppTab =
   | "extensions"
   | "transfers"
   | "providers"
-  | "home"
   | "activity"
   | "settings"
   | "account"

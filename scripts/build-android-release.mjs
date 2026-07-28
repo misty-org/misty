@@ -33,12 +33,6 @@ if (preflightOnly) {
   process.exit(0);
 }
 
-for (const target of buildTargets) {
-  run("npm", ["run", "service:archive"], {
-    MISTY_SERVICE_GO_TARGET: target,
-  });
-}
-
 if (release) cleanAndroidOutputs();
 
 const tauriArgs = ["run", "tauri", "--", "android", "build"];
@@ -46,7 +40,7 @@ if (debug) tauriArgs.push("--debug");
 if (apk) tauriArgs.push("--apk");
 if (aab) tauriArgs.push("--aab");
 if (selectedTarget) tauriArgs.push("--target", androidCargoTarget(selectedTarget));
-tauriArgs.push("--features=embedded-storage-go", "--ci");
+tauriArgs.push("--ci");
 
 run("npm", tauriArgs, {
 });

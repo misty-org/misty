@@ -5,7 +5,12 @@ export type { SpacesStore } from "@/models/interfaces/stores/spaces/useSpacesSto
 import { create } from "zustand";
 import { openExternalLink } from "@/platform/openExternalLink";
 import { errorText } from "@/lib/format";
-import { resolveSpacesApiBase, spacesApi } from "@/stores/spaces/useSpacesBackendStore";
+import { notifyAccountScopeReset } from "@/stores/account/accountEvents";
+import {
+  resolveSpacesApiBase,
+  SpaceRequestError,
+  spacesApi,
+} from "@/stores/spaces/useSpacesBackendStore";
 import type { RealtimeEnvelope } from "@/models/types/stores/spaces/useSpacesBackendStore";
 import type { SpaceRun } from "@/models/interfaces/features/spaces/types";
 import type {
@@ -24,10 +29,19 @@ export { buildMessageSpans } from "./useSpaceMessageSpansStore";
 
 const realtimeCursorKey = "misty:spaces:realtime-cursor";
 const realtimeConnectTimeoutMs = 12_000;
+const realtimeTicketRateLimitCooldownMs = 30_000;
+const snapshotAutoMinIntervalMs = 1_500;
+const snapshotRateLimitCooldownMs = 10_000;
+const accountSessionInvalidEvent = "misty:account-session-invalid";
 let realtimeSocket: WebSocket | null = null;
 let realtimeConnecting = false;
 let reconnectTimer: number | null = null;
 let realtimeOpenTimer: number | null = null;
+let realtimeConnectPromise: Promise<void> | null = null;
+let realtimeTicketCooldownUntil = 0;
+let snapshotLoadPromise: Promise<void> | null = null;
+let snapshotLastRequestedAt = 0;
+let snapshotCooldownUntil = 0;
 let reconnectAttempt = 0;
 let realtimeWanted = false;
 let realtimeAccountId = "";
@@ -52,6 +66,7 @@ export const useSpacesStore = create<SpacesStore>((set, get) => ({
   spaces: [],
   invitations: [],
   limits: null,
+  ownerStorage: null,
   membersBySpace: {},
   messagesBySpace: {},
   nodesBySpace: {},
@@ -65,22 +80,50 @@ export const useSpacesStore = create<SpacesStore>((set, get) => ({
   realtimeConnected: false,
   error: null,
 
-  load: async () => {
-    const generation = spacesAccountGeneration;
-    set({ snapshotReady: false, loading: true, error: null });
+  load: async (options) => {
+    const force = options?.force === true;
+    const now = Date.now();
+    if (snapshotLoadPromise) return snapshotLoadPromise;
+    if (!force && now < snapshotCooldownUntil) return;
+    if (
+      !force &&
+      snapshotLastRequestedAt &&
+      now - snapshotLastRequestedAt < snapshotAutoMinIntervalMs
+    )
+      return;
+
+    const request = (async () => {
+      const generation = spacesAccountGeneration;
+      snapshotLastRequestedAt = Date.now();
+      set({ snapshotReady: false, loading: true, error: null });
+      try {
+        const snapshot = await spacesApi.snapshot();
+        if (generation !== spacesAccountGeneration) return;
+        snapshotCooldownUntil = 0;
+        set({
+          spaces: snapshot.spaces,
+          invitations: snapshot.invitations,
+          limits: snapshot.entitlements,
+          ownerStorage: snapshot.owner_storage,
+          snapshotReady: true,
+          loading: false,
+        });
+      } catch (error) {
+        if (generation !== spacesAccountGeneration) return;
+        if (error instanceof SpaceRequestError && error.status === 401) {
+          notifyAccountSessionInvalid();
+        }
+        if (error instanceof SpaceRequestError && error.status === 429) {
+          snapshotCooldownUntil = Date.now() + snapshotRateLimitCooldownMs;
+        }
+        set({ snapshotReady: false, loading: false, error: errorText(error) });
+      }
+    })();
+    snapshotLoadPromise = request;
     try {
-      const snapshot = await spacesApi.snapshot();
-      if (generation !== spacesAccountGeneration) return;
-      set({
-        spaces: snapshot.spaces,
-        invitations: snapshot.invitations,
-        limits: snapshot.entitlements,
-        snapshotReady: true,
-        loading: false,
-      });
-    } catch (error) {
-      if (generation !== spacesAccountGeneration) return;
-      set({ snapshotReady: false, loading: false, error: errorText(error) });
+      await request;
+    } finally {
+      if (snapshotLoadPromise === request) snapshotLoadPromise = null;
     }
   },
 
@@ -88,7 +131,11 @@ export const useSpacesStore = create<SpacesStore>((set, get) => ({
     const generation = spacesAccountGeneration;
     set({ loading: true, error: null });
     await get().load();
-    if (generation !== spacesAccountGeneration || !get().snapshotReady) return;
+    if (generation !== spacesAccountGeneration) return;
+    if (!get().snapshotReady) {
+      set({ loading: false });
+      return;
+    }
     const space = get().spaces.find((item) => item.id === spaceId);
     if (!space) {
       set((state) => {
@@ -173,6 +220,12 @@ export const useSpacesStore = create<SpacesStore>((set, get) => ({
       }));
     } catch (error) {
       if (generation !== spacesAccountGeneration) return;
+      if (error instanceof SpaceRequestError && (error.status === 403 || error.status === 404)) {
+        set((state) => ({
+          agentsBySpace: { ...state.agentsBySpace, [spaceId]: [] },
+        }));
+        return;
+      }
       set({ error: errorText(error) });
     }
   },
@@ -192,12 +245,12 @@ export const useSpacesStore = create<SpacesStore>((set, get) => ({
     }
   },
 
-  createSpace: async (name) => {
+  createSpace: async (request) => {
     set({ error: null });
     try {
-      const space = await spacesApi.create(name);
-      await get().load();
-      return space;
+      const result = await spacesApi.create(request);
+      await get().load({ force: true });
+      return result;
     } catch (error) {
       set({ error: errorText(error) });
       throw error;
@@ -222,7 +275,7 @@ export const useSpacesStore = create<SpacesStore>((set, get) => ({
     set({ error: null });
     try {
       await spacesApi.invite(spaceId, email);
-      await Promise.all([get().loadMembers(spaceId), get().load()]);
+      await Promise.all([get().loadMembers(spaceId), get().load({ force: true })]);
     } catch (error) {
       set({ error: errorText(error) });
       throw error;
@@ -233,7 +286,7 @@ export const useSpacesStore = create<SpacesStore>((set, get) => ({
     set({ error: null });
     try {
       await spacesApi.respondInvite(inviteId, accept);
-      await get().load();
+      await get().load({ force: true });
     } catch (error) {
       set({ error: errorText(error) });
       throw error;
@@ -244,7 +297,7 @@ export const useSpacesStore = create<SpacesStore>((set, get) => ({
     set({ error: null });
     try {
       await spacesApi.removeMember(spaceId, userId);
-      await Promise.all([get().loadMembers(spaceId), get().load()]);
+      await Promise.all([get().loadMembers(spaceId), get().load({ force: true })]);
     } catch (error) {
       set({ error: errorText(error) });
       throw error;
@@ -255,7 +308,7 @@ export const useSpacesStore = create<SpacesStore>((set, get) => ({
     set({ error: null });
     try {
       await spacesApi.leave(spaceId);
-      await get().load();
+      await get().load({ force: true });
     } catch (error) {
       set({ error: errorText(error) });
       throw error;
@@ -266,7 +319,7 @@ export const useSpacesStore = create<SpacesStore>((set, get) => ({
     set({ error: null });
     try {
       await spacesApi.transfer(spaceId, userId);
-      await Promise.all([get().loadMembers(spaceId), get().load()]);
+      await Promise.all([get().loadMembers(spaceId), get().load({ force: true })]);
     } catch (error) {
       set({ error: errorText(error) });
       throw error;
@@ -286,7 +339,7 @@ export const useSpacesStore = create<SpacesStore>((set, get) => ({
         delete membersBySpace[spaceId];
         return { messagesBySpace, nodesBySpace, membersBySpace };
       });
-      await get().load();
+      await get().load({ force: true });
     } catch (error) {
       set({ error: errorText(error) });
       throw error;
@@ -382,6 +435,24 @@ export const useSpacesStore = create<SpacesStore>((set, get) => ({
     }
   },
 
+  toggleMessageReaction: async (spaceId, messageId, emoji, reacted) => {
+    set({ error: null });
+    try {
+      const saved = reacted
+        ? await spacesApi.removeMessageReaction(spaceId, messageId, emoji)
+        : await spacesApi.addMessageReaction(spaceId, messageId, emoji);
+      set((state) => ({
+        messagesBySpace: {
+          ...state.messagesBySpace,
+          [spaceId]: mergeSpaceMessages(state.messagesBySpace[spaceId] ?? [], [saved]),
+        },
+      }));
+    } catch (error) {
+      set({ error: errorText(error) });
+      throw error;
+    }
+  },
+
   markRead: async (spaceId, seq) => {
     await spacesApi.markRead(spaceId, seq);
     await get().loadInbox();
@@ -454,6 +525,8 @@ export const useSpacesStore = create<SpacesStore>((set, get) => ({
     if (realtimeAccountId && realtimeAccountId !== accountId) stopRealtimeConnection();
     realtimeAccountId = accountId;
     realtimeWanted = true;
+    if (realtimeConnectPromise) return realtimeConnectPromise;
+    if (Date.now() < realtimeTicketCooldownUntil) return;
     if (
       realtimeConnecting ||
       realtimeSocket?.readyState === WebSocket.OPEN ||
@@ -462,98 +535,113 @@ export const useSpacesStore = create<SpacesStore>((set, get) => ({
       return;
     realtimeConnecting = true;
     const generation = realtimeGeneration;
-    try {
-      const after = readRealtimeCursor(accountId);
-      const [{ ticket }, base] = await Promise.all([
-        spacesApi.realtimeTicket(after),
-        resolveSpacesApiBase(),
-      ]);
-      if (!realtimeWanted || generation !== realtimeGeneration || realtimeAccountId !== accountId)
-        return;
-      const url = new URL(base);
-      url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
-      url.pathname = `${url.pathname.replace(/\/$/, "")}/realtime`;
-      url.search = new URLSearchParams({ ticket }).toString();
-      // Older WebKit builds accept URL in the type signature but can reject the
-      // URL object at runtime. Pass the serialized URL to keep desktop WebViews
-      // on the well-supported WebSocket constructor path.
-      const socket = new WebSocket(url.toString());
-      realtimeSocket = socket;
-      realtimeOpenTimer = window.setTimeout(() => {
-        realtimeOpenTimer = null;
-        if (realtimeSocket === socket && socket.readyState === WebSocket.CONNECTING) socket.close();
-      }, realtimeConnectTimeoutMs);
-      socket.onopen = () => {
-        if (
-          realtimeSocket !== socket ||
-          generation !== realtimeGeneration ||
-          realtimeAccountId !== accountId
-        ) {
-          socket.close();
+    const request = (async () => {
+      try {
+        const after = readRealtimeCursor(accountId);
+        const [{ ticket }, base] = await Promise.all([
+          spacesApi.realtimeTicket(after),
+          resolveSpacesApiBase(),
+        ]);
+        if (!realtimeWanted || generation !== realtimeGeneration || realtimeAccountId !== accountId)
           return;
-        }
-        clearRealtimeOpenTimer();
-        reconnectAttempt = 0;
-        set({ realtimeConnected: true, error: null });
-        if (currentViewingSpaceId) sendViewingMessage(currentViewingSpaceId, currentViewingActive);
-      };
-      socket.onmessage = (message) => {
-        if (
-          realtimeSocket !== socket ||
-          generation !== realtimeGeneration ||
-          realtimeAccountId !== accountId
-        )
-          return;
-        try {
-          const envelope = JSON.parse(String(message.data)) as RealtimeEnvelope;
-          if (envelope.type === "replay") {
-            for (const event of envelope.events)
-              void applyRealtimeEvent(event, accountId, get, set);
-            if (envelope.resync_required) void Promise.all([get().load(), get().loadInbox()]);
-          } else if (envelope.type === "event") {
-            void applyRealtimeEvent(envelope.event, accountId, get, set);
-          } else if (envelope.type === "presence") {
-            set((state) => ({
-              presenceBySpace: {
-                ...state.presenceBySpace,
-                [envelope.space_id]: envelope.viewers,
-              },
-            }));
-          } else {
-            void Promise.all([get().load(), get().loadInbox()]);
-            if (window.location.pathname.startsWith(`/spaces/${envelope.space_id}/`))
-              window.location.assign("/spaces/personal");
+        realtimeTicketCooldownUntil = 0;
+        const url = new URL(base);
+        url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
+        url.pathname = `${url.pathname.replace(/\/$/, "")}/realtime`;
+        url.search = new URLSearchParams({ ticket }).toString();
+        // Older WebKit builds accept URL in the type signature but can reject the
+        // URL object at runtime. Pass the serialized URL to keep desktop WebViews
+        // on the well-supported WebSocket constructor path.
+        const socket = new WebSocket(url.toString());
+        realtimeSocket = socket;
+        realtimeOpenTimer = window.setTimeout(() => {
+          realtimeOpenTimer = null;
+          if (realtimeSocket === socket && socket.readyState === WebSocket.CONNECTING)
+            socket.close();
+        }, realtimeConnectTimeoutMs);
+        socket.onopen = () => {
+          if (
+            realtimeSocket !== socket ||
+            generation !== realtimeGeneration ||
+            realtimeAccountId !== accountId
+          ) {
+            socket.close();
+            return;
           }
-        } catch {
-          /* malformed server frames are ignored and recovered on reconnect */
+          clearRealtimeOpenTimer();
+          reconnectAttempt = 0;
+          set({ realtimeConnected: true, error: null });
+          if (currentViewingSpaceId)
+            sendViewingMessage(currentViewingSpaceId, currentViewingActive);
+        };
+        socket.onmessage = (message) => {
+          if (
+            realtimeSocket !== socket ||
+            generation !== realtimeGeneration ||
+            realtimeAccountId !== accountId
+          )
+            return;
+          try {
+            const envelope = JSON.parse(String(message.data)) as RealtimeEnvelope;
+            if (envelope.type === "replay") {
+              for (const event of envelope.events)
+                applyRealtimeEventSafely(event, accountId, get, set);
+              if (envelope.resync_required)
+                void Promise.all([get().load({ force: true }), get().loadInbox()]);
+            } else if (envelope.type === "event") {
+              applyRealtimeEventSafely(envelope.event, accountId, get, set);
+            } else if (envelope.type === "presence") {
+              set((state) => ({
+                presenceBySpace: {
+                  ...state.presenceBySpace,
+                  [envelope.space_id]: envelope.viewers,
+                },
+              }));
+            } else {
+              void Promise.all([get().load({ force: true }), get().loadInbox()]);
+              if (window.location.pathname.startsWith(`/spaces/${envelope.space_id}/`))
+                window.location.assign("/spaces");
+            }
+          } catch {
+            /* malformed server frames are ignored and recovered on reconnect */
+          }
+        };
+        socket.onclose = () => {
+          if (
+            realtimeSocket !== socket ||
+            generation !== realtimeGeneration ||
+            realtimeAccountId !== accountId
+          )
+            return;
+          clearRealtimeOpenTimer();
+          realtimeSocket = null;
+          set({ realtimeConnected: false });
+          scheduleReconnect(get, accountId, generation);
+        };
+        socket.onerror = () => {
+          try {
+            socket.close();
+          } catch {
+            /* the close event or timeout will retry */
+          }
+        };
+      } catch (error) {
+        if (generation !== realtimeGeneration || realtimeAccountId !== accountId) return;
+        if (error instanceof SpaceRequestError && error.status === 429) {
+          realtimeTicketCooldownUntil = Date.now() + realtimeTicketRateLimitCooldownMs;
         }
-      };
-      socket.onclose = () => {
-        if (
-          realtimeSocket !== socket ||
-          generation !== realtimeGeneration ||
-          realtimeAccountId !== accountId
-        )
-          return;
-        clearRealtimeOpenTimer();
-        realtimeSocket = null;
-        set({ realtimeConnected: false });
+        set({ realtimeConnected: false, error: errorText(error) });
         scheduleReconnect(get, accountId, generation);
-      };
-      socket.onerror = () => {
-        try {
-          socket.close();
-        } catch {
-          /* the close event or timeout will retry */
-        }
-      };
-    } catch (error) {
-      if (generation !== realtimeGeneration || realtimeAccountId !== accountId) return;
-      set({ realtimeConnected: false, error: errorText(error) });
-      scheduleReconnect(get, accountId, generation);
+      } finally {
+        if (generation === realtimeGeneration && realtimeAccountId === accountId)
+          realtimeConnecting = false;
+      }
+    })();
+    realtimeConnectPromise = request;
+    try {
+      await request;
     } finally {
-      if (generation === realtimeGeneration && realtimeAccountId === accountId)
-        realtimeConnecting = false;
+      if (realtimeConnectPromise === request) realtimeConnectPromise = null;
     }
   },
 
@@ -571,9 +659,20 @@ export const useSpacesStore = create<SpacesStore>((set, get) => ({
   clearError: () => set({ error: null }),
 }));
 
+function notifyAccountSessionInvalid(): void {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent(accountSessionInvalidEvent));
+}
+
 export function resetSpacesAccountState(): void {
+  notifyAccountScopeReset();
   stopRealtimeConnection();
   reconnectAttempt = 0;
+  realtimeConnectPromise = null;
+  realtimeTicketCooldownUntil = 0;
+  snapshotLoadPromise = null;
+  snapshotLastRequestedAt = 0;
+  snapshotCooldownUntil = 0;
   // Bump the generation first so any request already in flight for the
   // account we're leaving can no longer write into the state we're about to
   // clear for the new one, no matter when it resolves.
@@ -582,6 +681,7 @@ export function resetSpacesAccountState(): void {
     spaces: [],
     invitations: [],
     limits: null,
+    ownerStorage: null,
     membersBySpace: {},
     messagesBySpace: {},
     nodesBySpace: {},
@@ -628,10 +728,21 @@ async function applyRealtimeEvent(
     event.type.startsWith("member.") ||
     event.type.startsWith("owner.") ||
     event.type.startsWith("space.")
-  )
-    await Promise.all([get().load(), get().loadMembers(event.space_id)]);
-  else if (event.type.startsWith("library.") && permissions?.["library.view"] !== false)
+  ) {
+    await get().load({ force: true });
+    if (accountId !== realtimeAccountId || generation !== spacesAccountGeneration) return;
+    if (!get().spaces.some((space) => space.id === event.space_id)) return;
+    try {
+      await get().loadMembers(event.space_id);
+    } catch (error) {
+      if (!isInaccessibleSpaceError(error)) throw error;
+    }
+  } else if (event.type.startsWith("library.") && permissions?.["library.view"] !== false)
     window.dispatchEvent(new CustomEvent("misty:space-library-event", { detail: event }));
+  else if (event.type.startsWith("note."))
+    window.dispatchEvent(new CustomEvent("misty:space-note-event", { detail: event }));
+  else if (event.type.startsWith("drawing."))
+    window.dispatchEvent(new CustomEvent("misty:space-drawing-event", { detail: event }));
   else if (
     (event.type.startsWith("task.") || event.type.startsWith("calendar.")) &&
     permissions?.["tasks.view"] !== false
@@ -639,6 +750,23 @@ async function applyRealtimeEvent(
     window.dispatchEvent(new CustomEvent("misty:space-coordination-event", { detail: event }));
   if (accountId !== realtimeAccountId || generation !== spacesAccountGeneration) return;
   set({ realtimeConnected: true });
+}
+
+function applyRealtimeEventSafely(
+  event: SpaceEvent,
+  accountId: string,
+  get: () => SpacesStore,
+  set: (partial: Partial<SpacesStore> | ((state: SpacesStore) => Partial<SpacesStore>)) => void,
+): void {
+  void applyRealtimeEvent(event, accountId, get, set).catch((error) => {
+    if (isInaccessibleSpaceError(error)) return;
+    if (accountId !== realtimeAccountId) return;
+    set({ error: errorText(error) });
+  });
+}
+
+function isInaccessibleSpaceError(error: unknown): boolean {
+  return error instanceof SpaceRequestError && (error.status === 403 || error.status === 404);
 }
 
 function scheduleReconnect(get: () => SpacesStore, accountId: string, generation: number) {
@@ -662,6 +790,8 @@ function scheduleReconnect(get: () => SpacesStore, accountId: string, generation
 function stopRealtimeConnection() {
   realtimeWanted = false;
   realtimeConnecting = false;
+  realtimeConnectPromise = null;
+  realtimeTicketCooldownUntil = 0;
   realtimeAccountId = "";
   realtimeGeneration += 1;
   currentViewingSpaceId = "";

@@ -3321,7 +3321,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn local_folder_upload_uses_one_rclone_operation() {
+    async fn local_folder_upload_uses_one_storage_operation() {
         let environment =
             AppEnvironmentService::for_test_home(unique_test_dir("folder-upload-home"));
         let mount_root = environment.mount_root();
@@ -3384,7 +3384,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn remote_folder_delete_uses_one_rclone_operation() {
+    async fn remote_folder_delete_uses_one_storage_operation() {
         let environment =
             AppEnvironmentService::for_test_home(unique_test_dir("folder-delete-home"));
         let mount_root = environment.mount_root();

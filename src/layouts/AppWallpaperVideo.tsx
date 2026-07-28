@@ -1,9 +1,40 @@
-import { useEffect, useRef } from "react";
+import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
+import { useEffect, useRef, useState } from "react";
+import { hasTauriInternals } from "@/platform/tauri";
+import { setNativeWallpaperVideo } from "@/stores/backend";
 
-export function AppWallpaperVideo(props: { src: string }) {
+export function AppWallpaperVideo(props: { path?: string; src: string }) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const useNativeMacPlayer =
+    hasTauriInternals() &&
+    typeof navigator !== "undefined" &&
+    /Mac|iPhone|iPad|iPod/i.test(navigator.platform);
+  const [nativePlaybackFailed, setNativePlaybackFailed] = useState(false);
 
   useEffect(() => {
+    if (!useNativeMacPlayer) return;
+
+    let canceled = false;
+    document.documentElement.dataset.mistyNativeWallpaperVideo = "true";
+    setNativePlaybackFailed(false);
+    void setNativeWallpaperVideo(getCurrentWebviewWindow(), props.path ?? props.src)
+      .then((enabled) => {
+        if (!enabled && !canceled) setNativePlaybackFailed(true);
+      })
+      .catch(() => {
+        if (!canceled) setNativePlaybackFailed(true);
+      });
+
+    return () => {
+      canceled = true;
+      delete document.documentElement.dataset.mistyNativeWallpaperVideo;
+      void setNativeWallpaperVideo(getCurrentWebviewWindow(), null).catch(() => undefined);
+    };
+  }, [props.path, props.src, useNativeMacPlayer]);
+
+  useEffect(() => {
+    if (useNativeMacPlayer && !nativePlaybackFailed) return;
+
     const video = videoRef.current;
     if (!video) return;
 
@@ -74,7 +105,9 @@ export function AppWallpaperVideo(props: { src: string }) {
         document.removeEventListener(type, onFirstGesture, true);
       }
     };
-  }, [props.src]);
+  }, [nativePlaybackFailed, props.src, useNativeMacPlayer]);
+
+  if (useNativeMacPlayer && !nativePlaybackFailed) return null;
 
   return (
     <video

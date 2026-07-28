@@ -44,6 +44,8 @@ import type {
   LaunchOnLoginSnapshot,
   ListDirectoryRequest,
   NativeWorkspaceDocument,
+  NoteAssetStoreRequest,
+  NoteAssetStoreResult,
   OpenWithAssociation,
   OperationDescriptor,
   OperationQueueSnapshot,
@@ -69,7 +71,7 @@ import type {
   ProviderConfigStep,
   ProvidersSnapshot,
   StorageSnapshot,
-  RcloneConfigPaths,
+  CloudConfigPaths,
   RemoteEditDraft,
   RemoteTestResult,
   RenameItemRequest,
@@ -129,6 +131,10 @@ export function telemetrySetErrorReportingEnabled(enabled: boolean): Promise<voi
 
 export function enableModernWindowStyle(window: unknown): Promise<void> {
   return invoke("enable_modern_window_style", { window, offsetX: -6, offsetY: -12 });
+}
+
+export function setNativeWallpaperVideo(window: unknown, path: string | null): Promise<boolean> {
+  return invoke("set_native_wallpaper_video", { window, path });
 }
 
 export async function fetchPreviewBytes(url: string): Promise<ArrayBuffer> {
@@ -205,6 +211,10 @@ export function clipboardWriteFileBytes(
   items: Array<{ name: string; bytes: number[] }>,
 ): Promise<boolean> {
   return invoke("clipboard_write_file_bytes", { items });
+}
+
+export function notesStoreAsset(request: NoteAssetStoreRequest): Promise<NoteAssetStoreResult> {
+  return invoke("notes_store_asset", { request });
 }
 
 export function devicesSnapshot(): Promise<DeviceSnapshot> {
@@ -593,6 +603,15 @@ export function providersRefresh(): Promise<ProvidersSnapshot> {
   return invoke("providers_refresh");
 }
 
+export function providersImportCloudConnection(request: {
+  name: string;
+  providerType: string;
+  connectionId: string;
+  accessToken: string;
+}): Promise<ProvidersSnapshot> {
+  return invoke("providers_import_cloud_connection", request);
+}
+
 export function providersSelectRemote(name: string): Promise<RemoteEditDraft> {
   return invoke("providers_select_remote", { name });
 }
@@ -605,7 +624,7 @@ export function providersTestRemote(name: string): Promise<RemoteTestResult> {
   return invoke("providers_test_remote", { name });
 }
 
-export function providersConfigPaths(): Promise<RcloneConfigPaths> {
+export function providersConfigPaths(): Promise<CloudConfigPaths> {
   return invoke("providers_config_paths");
 }
 

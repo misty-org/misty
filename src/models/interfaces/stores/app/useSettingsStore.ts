@@ -53,7 +53,7 @@ export interface GeneralPreferences {
   preferredWorkspaceRoot: string;
 }
 
-export interface AssistantPreferences {
+export interface AgentPreferences {
   enabled: boolean;
   scopes: {
     filesAllowed: boolean;

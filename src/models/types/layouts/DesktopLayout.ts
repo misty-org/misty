@@ -44,7 +44,7 @@ import AccountWorkspace from "@/pages/Account/desktop";
 import {
   selectAppearancePreferences,
   selectNotificationPreferences,
-  selectAssistantPreferences,
+  selectAgentPreferences,
   selectSearchMaintenancePreferences,
   settingsBoolean,
   useSettingsStore,

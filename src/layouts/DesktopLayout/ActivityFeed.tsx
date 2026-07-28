@@ -284,7 +284,7 @@ function FeedRow(props: { entry: FeedEntry; last: boolean }) {
           interactive ? "transition-colors hover:bg-foreground/[0.04]" : "",
         ].join(" ")}
       >
-        <span className="grid size-10 place-items-center rounded-full bg-secondary text-xs font-semibold text-foreground ring-1 ring-border">
+        <span className="grid size-10 place-items-center rounded-full bg-secondary text-xs font-semibold text-foreground inset-ring-1 inset-ring-border">
           {initialsForProfile(entry.actor, "")}
         </span>
         <span className="min-w-0">

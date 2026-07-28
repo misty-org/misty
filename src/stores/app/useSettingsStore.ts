@@ -12,7 +12,7 @@ import type {
   AppearancePreferences,
   NotificationPreferences,
   GeneralPreferences,
-  AssistantPreferences,
+  AgentPreferences,
   ShortcutPreferences,
   AdvancedPreferences,
   SearchMaintenancePreferences,
@@ -22,7 +22,7 @@ export type {
   AppearancePreferences,
   NotificationPreferences,
   GeneralPreferences,
-  AssistantPreferences,
+  AgentPreferences,
   ShortcutPreferences,
   AdvancedPreferences,
   SearchMaintenancePreferences,
@@ -263,12 +263,7 @@ export function selectAppearancePreferences(
     compactModeEnabled: settingsBoolean(source, "appearance", "compact_mode_enabled", false),
     fontSize: settingsScaleToken(settingsNumber(source, "appearance", "font_size_index", 1)),
     panelOpacity: clampSettingsNumber(
-      settingsNumber(
-        source,
-        "appearance",
-        "panel_opacity",
-        settingsNumber(source, "appearance", "home_panel_opacity", 0.82),
-      ),
+      settingsNumber(source, "appearance", "panel_opacity", 0.82),
       0,
       1,
     ),
@@ -280,12 +275,7 @@ export function selectAppearancePreferences(
       true,
     ),
     uiScale: settingsScaleToken(settingsNumber(source, "appearance", "ui_scale_index", 1)),
-    wallpaperPath: settingsString(
-      source,
-      "appearance",
-      "wallpaper_path",
-      settingsString(source, "appearance", "home_wallpaper_path", ""),
-    ),
+    wallpaperPath: settingsString(source, "appearance", "wallpaper_path", ""),
   };
 }
 
@@ -347,18 +337,25 @@ export function selectGeneralPreferences(
   };
 }
 
-export function selectAssistantPreferences(
+export function selectAgentPreferences(
   document: Record<string, unknown> | null | undefined,
-): AssistantPreferences {
+): AgentPreferences {
   const source = document ?? {};
-  const assistant = settingsSectionRecord(source, "assistant");
-  const scopesValue = assistant.scopes;
+  // This selector is fail-closed: a missing section reads as enabled: false and
+  // Agents go dark. The settings section was renamed from "assistant" to
+  // "agent", so the stored document for every existing user still uses the old
+  // key until they next save. Read the current key first and fall back, or the
+  // rename silently disables Agents for everyone who already had them on.
+  const current = settingsSectionRecord(source, "agent");
+  const agent =
+    Object.keys(current).length > 0 ? current : settingsSectionRecord(source, "assistant");
+  const scopesValue = agent.scopes;
   const scopes =
     scopesValue && typeof scopesValue === "object" && !Array.isArray(scopesValue)
       ? (scopesValue as Record<string, unknown>)
       : {};
   return {
-    enabled: assistant.enabled === true,
+    enabled: agent.enabled === true,
     scopes: {
       filesAllowed: scopes.files_allowed === true,
       cleanupAllowed: scopes.cleanup_allowed === true,

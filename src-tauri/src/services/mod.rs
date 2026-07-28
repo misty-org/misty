@@ -5,15 +5,16 @@ pub mod autostart;
 pub mod claude;
 pub mod commands;
 pub mod devices;
+mod direct_cloud;
 pub mod directory_size;
 pub mod document_intelligence;
 pub mod environment;
 pub mod explorer;
 pub mod explorer_library;
 #[cfg(desktop)]
-pub mod extension_runtime;
-#[cfg(desktop)]
 pub mod extension_reporting;
+#[cfg(desktop)]
+pub mod extension_runtime;
 #[cfg(desktop)]
 pub mod extension_tools;
 pub mod file_sync;

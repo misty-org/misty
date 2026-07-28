@@ -2,25 +2,30 @@ import { useEffect } from "react";
 import { Navigate, useLocation, useNavigate, useParams } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
 
-import { ErrorState, LoadingState, PermissionState } from "@/ui";
+import { EmptyState, PermissionState } from "@/ui";
 import { Button } from "@/ui";
 import { useAuth } from "@/features/auth/AuthContext";
 import { useSpacesStore } from "@/stores/spaces/useSpacesStore";
 
 import { SpaceNotes } from "@/features/notes/SpaceNotes";
+import { SpaceDrawings } from "@/features/drawings/SpaceDrawings";
 import { SpaceChat } from "./SpaceChat";
 import { SpaceLibrary } from "./SpaceLibrary";
 import { SpaceTasksCalendar } from "./SpaceTasksCalendar";
 import { SpaceMembers } from "./components/SpaceMembers";
 import { SpaceSettings } from "./components/SpaceSettings";
+import { SpacePageLoadingPlaceholder } from "./components/SpacesLoadingPlaceholder";
 
-export { default, PersonalSpaceRedirect } from "./components/SpacesShell";
+export { default, SpacesIndexRedirect } from "./components/SpacesShell";
 
 const validSpaceSections = new Set([
   "chat",
   "tasks",
   "notes",
+  "drawings",
   "library",
+  // Legacy URL segment, kept so saved bookmarks and deep links still resolve.
+  // It renders no surface of its own; it redirects to /agents?spaceId=.
   "assistant",
   "members",
   "settings",
@@ -32,14 +37,14 @@ export function SpaceDetail() {
   const { user, accounts, transitioning } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
-  const { spaces, snapshotReady, loading, error, loadSpace, clearError } = useSpacesStore(
+  const { spaces, snapshotReady, loading, error, load, loadSpace } = useSpacesStore(
     useShallow((state) => ({
       spaces: state.spaces,
       snapshotReady: state.snapshotReady,
       loading: state.loading,
       error: state.error,
+      load: state.load,
       loadSpace: state.loadSpace,
-      clearError: state.clearError,
     })),
   );
   const space = spaces.find((item) => item.id === spaceId);
@@ -47,6 +52,14 @@ export function SpaceDetail() {
   useEffect(() => {
     if (spaceId && user) void loadSpace(spaceId);
   }, [loadSpace, spaceId, user?.id]);
+  useEffect(() => {
+    if (!space || !user?.id) return;
+    try {
+      window.localStorage.setItem(`misty:last-active-space:${user.id}`, space.id);
+    } catch {
+      /* local route memory can be unavailable in private contexts */
+    }
+  }, [space, user?.id]);
 
   if (section === "files") {
     return <Navigate to={`/spaces/${encodeURIComponent(spaceId)}/library`} replace />;
@@ -59,15 +72,7 @@ export function SpaceDetail() {
   }
 
   const returnPath = `${location.pathname}${location.search}${location.hash}`;
-  if (!user && transitioning) {
-    return (
-      <LoadingState
-        className="h-full"
-        title="Switching accounts"
-        description="Restoring your Misty session…"
-      />
-    );
-  }
+  if (transitioning) return <SpacePageLoadingPlaceholder label="Switching accounts" />;
 
   if (!user && accounts.length > 0) {
     return <Navigate to="/signin" state={{ from: returnPath }} replace />;
@@ -97,34 +102,30 @@ export function SpaceDetail() {
 
   if (!snapshotReady && error) {
     return (
-      <ErrorState
-        className="h-full"
-        title="Spaces unavailable"
-        description="Misty could not confirm your Space access. Try again when the service is available."
-        action={
-          <Button type="button" variant="outline" onClick={() => void loadSpace(spaceId)}>
-            Try again
-          </Button>
-        }
+      <SpacePageLoadingPlaceholder
+        label="Loading Space"
+        onRetry={() => {
+          void load({ force: true }).then(() => {
+            if (useSpacesStore.getState().snapshotReady) void loadSpace(spaceId);
+          });
+        }}
       />
     );
   }
 
   if (!snapshotReady || (!space && loading)) {
-    return (
-      <LoadingState
-        className="h-full"
-        title="Loading Space"
-        description="Getting the latest Space details…"
-      />
-    );
+    return <SpacePageLoadingPlaceholder />;
+  }
+
+  if (!space && spaces.length > 0) {
+    return <Navigate to={`/spaces/${encodeURIComponent(spaces[0].id)}/chat`} replace />;
   }
 
   if (!space) {
     return (
-      <ErrorState
+      <EmptyState
         className="h-full"
-        title="Space unavailable"
+        title="This Space isn’t available"
         description="This Space may have been removed, or you may no longer have access."
       />
     );
@@ -132,16 +133,6 @@ export function SpaceDetail() {
 
   return (
     <div className="relative h-full min-h-0 overflow-hidden">
-      {error ? (
-        <Button
-          className="absolute left-1/2 top-3 z-20 max-w-[min(36rem,calc(100%-2rem))] -translate-x-1/2 shadow-md"
-          type="button"
-          variant="destructive"
-          onClick={clearError}
-        >
-          <span className="truncate">{error}</span>
-        </Button>
-      ) : null}
       {section === "library" ? (
         space.permissions?.["library.view"] === false ? (
           <SpacePermissionDenied
@@ -162,7 +153,7 @@ export function SpaceDetail() {
             key={`tasks:${spaceId}`}
             spaceId={spaceId}
             canManage={space.permissions?.["tasks.manage"] !== false}
-            canManageIntegrations={space.permissions?.["integrations.manage"] !== false}
+            canManageIntegrations={space.role === "owner"}
           />
         )
       ) : section === "notes" ? (
@@ -173,6 +164,19 @@ export function SpaceDetail() {
           />
         ) : (
           <SpaceNotes key={`notes:${spaceId}`} spaceId={spaceId} spaceName={space.name} />
+        )
+      ) : section === "drawings" ? (
+        space.permissions?.["library.view"] === false ? (
+          <SpacePermissionDenied
+            title="Drawing access required"
+            detail="You do not have permission to view this Space's drawings."
+          />
+        ) : (
+          <SpaceDrawings
+            key={`drawings:${spaceId}:${studioKind}`}
+            spaceId={spaceId}
+            drawingId={studioKind}
+          />
         )
       ) : section === "assistant" ? (
         <Navigate to={`/agents?spaceId=${encodeURIComponent(spaceId)}`} replace />

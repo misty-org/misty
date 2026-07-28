@@ -18,7 +18,7 @@ import type {
   ProviderRemote,
   ProviderWorkflow,
   ProvidersSnapshot,
-  RcloneConfigPaths,
+  CloudConfigPaths,
   RemoteEditDraft,
 } from "@/models/interfaces/services/misty-api";
 import type { CurrentLicense } from "@/models/types/features/installer/types";

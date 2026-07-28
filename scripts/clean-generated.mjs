@@ -74,7 +74,7 @@ function collectNamedDirectories(directory, name, output) {
 function collectNamedFiles(directory, name, output) {
   if (!existsSync(directory)) return;
   for (const entry of readdirSync(directory, { withFileTypes: true })) {
-    if ([".git", "node_modules", "rclone", "target"].includes(entry.name)) continue;
+    if ([".git", "node_modules", "target"].includes(entry.name)) continue;
     const path = resolve(directory, entry.name);
     if (entry.isDirectory()) collectNamedFiles(path, name, output);
     else if (entry.isFile() && entry.name === name) output.add(path);
@@ -84,7 +84,6 @@ function collectNamedFiles(directory, name, output) {
 function isSafeCandidate(path) {
   const relativePath = relative(root, path);
   if (!relativePath || relativePath.startsWith(`..${sep}`) || relativePath === "..") return false;
-  if (relativePath === "service/rclone" || relativePath.startsWith(`service${sep}rclone${sep}`)) return false;
   if (/(^|[/\\])\.env([^/\\]*)$/.test(relativePath) || /signing/i.test(relativePath)) return false;
   if (relativePath === "node_modules") return false;
   return true;

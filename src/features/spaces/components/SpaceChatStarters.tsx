@@ -5,7 +5,7 @@ import { Button } from "@/ui";
 
 const starterCardClassName = [
   "h-auto flex-col items-start gap-1 whitespace-normal rounded-xl bg-card px-4 py-3.5",
-  "text-left shadow-none ring-1 ring-foreground/10 hover:bg-accent",
+  "text-left shadow-none inset-ring-1 inset-ring-foreground/10 hover:bg-accent",
 ].join(" ");
 
 const chatStarters: Array<{

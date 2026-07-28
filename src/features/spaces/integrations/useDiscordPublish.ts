@@ -7,31 +7,30 @@ import type { SpaceDiscordLink } from "@/models/interfaces/features/spaces/integ
 import type { SpaceMessage } from "@/models/interfaces/features/spaces/types";
 
 /**
- * Publishing a Misty message to Discord, one explicit action at a time.
- *
- * Sending in Misty never mirrors automatically: an outward write leaves the
- * team's workspace, so it stays a deliberate per-message choice the transcript
- * then records via `origin.publish_state`.
+ * Publishing a Misty message to its linked Discord channel. New messages in a
+ * two-way conversation call this automatically; the same method powers a
+ * deliberate retry when Discord reports a failure.
  */
 export function useDiscordPublish(
   spaceId: string,
   conversationId: string | undefined,
   onPublished?: (message: SpaceMessage) => void,
 ) {
-  const [link, setLink] = useState<SpaceDiscordLink | null>(null);
+  const [links, setLinks] = useState<SpaceDiscordLink[]>([]);
+  const link = links.find((item) => item.conversation_id === conversationId) ?? null;
   const [publishingMessageId, setPublishingMessageId] = useState("");
   const [error, setError] = useState("");
 
   useEffect(() => {
     let active = true;
     spaceDiscordApi
-      .link(spaceId)
+      .links(spaceId)
       .then((result) => {
-        if (active) setLink(result.link);
+        if (active) setLinks(result.links);
       })
       .catch(() => {
         // A Space with no Discord link is the normal case, not an error state.
-        if (active) setLink(null);
+        if (active) setLinks([]);
       });
     return () => {
       active = false;

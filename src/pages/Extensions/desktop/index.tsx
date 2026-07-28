@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useNavigate } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
@@ -36,7 +36,7 @@ function toBrowserEntry(plugin: PluginEntry): PluginBrowserEntry {
 
 export default function PluginsPage() {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const routePluginId = searchParams.get("plugin")?.trim() ?? "";
   const pluginPlatform = useSetupStore((state) =>
     state.status ? currentPluginPlatform(state.status.os, state.status.arch) : "",
@@ -104,6 +104,25 @@ export default function PluginsPage() {
     }
   }, [routePluginAvailable, routePluginId, selectPlugin, selectedPluginId]);
 
+  // The detail dialog is driven by the selection, so the deep-link param has to
+  // travel with it. Otherwise closing the dialog would let the effect above
+  // immediately reopen it from the still-present `?plugin=` value.
+  const selectAndSyncRoute = useCallback(
+    (pluginId: string) => {
+      selectPlugin(pluginId);
+      setSearchParams(
+        (previous) => {
+          const next = new URLSearchParams(previous);
+          if (pluginId) next.set("plugin", pluginId);
+          else next.delete("plugin");
+          return next;
+        },
+        { replace: true },
+      );
+    },
+    [selectPlugin, setSearchParams],
+  );
+
   return (
     <PluginBrowser
       error={error}
@@ -128,7 +147,7 @@ export default function PluginsPage() {
           void loadPlugins(pluginPlatform, true);
         }
       }}
-      onSelect={selectPlugin}
+      onSelect={selectAndSyncRoute}
       onToggle={(plugin, enabled) => {
         const match =
           marketplacePlugins.find((entry) => entry.id === plugin.id) ??
@@ -147,7 +166,6 @@ export default function PluginsPage() {
       }}
       query={query}
       selectedPluginId={selectedPluginId}
-      title="Extensions"
     />
   );
 }
