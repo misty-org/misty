@@ -1,5 +1,5 @@
 import { Check, Trash2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -28,10 +28,15 @@ export function DrawingHeader(props: {
   const [deleting, setDeleting] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const cancelTitleSave = useRef(false);
 
   useEffect(() => setTitle(props.drawing.title), [props.drawing.title]);
 
   const saveTitle = async () => {
+    if (cancelTitleSave.current) {
+      cancelTitleSave.current = false;
+      return;
+    }
     const next = title.trim() || "Untitled drawing";
     setTitle(next);
     if (next === props.drawing.title || saving) return;
@@ -75,6 +80,7 @@ export function DrawingHeader(props: {
               event.currentTarget.blur();
             }
             if (event.key === "Escape") {
+              cancelTitleSave.current = true;
               setTitle(props.drawing.title);
               event.currentTarget.blur();
             }
@@ -113,6 +119,11 @@ export function DrawingHeader(props: {
               <AlertDialogDescription>
                 “{props.drawing.title}” and its collaborative history will be permanently removed.
               </AlertDialogDescription>
+              {error ? (
+                <p className="m-0 text-sm text-destructive" role="alert">
+                  {error}
+                </p>
+              ) : null}
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>Cancel</AlertDialogCancel>

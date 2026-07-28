@@ -7,6 +7,7 @@ import { useDrawingRoom } from "./hooks/useDrawingRoom";
 import { DrawingHeader } from "./components/DrawingHeader";
 import { NewDrawingDialog } from "./components/NewDrawingDialog";
 import type { SpaceDrawing } from "./types";
+import { JournalAttribution } from "@/features/journal/components/JournalAttribution";
 
 const CollaborativeDrawingCanvas = lazy(() => import("./components/CollaborativeDrawingCanvas"));
 
@@ -104,7 +105,7 @@ function DrawingWorkspace(props: {
 }) {
   const room = useDrawingRoom(props.drawing.space_id, props.drawing.id, props.user);
   return (
-    <div className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] bg-background">
+    <div className="relative grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] bg-background">
       <DrawingHeader
         drawing={props.drawing}
         connection={room.connection}
@@ -126,6 +127,11 @@ function DrawingWorkspace(props: {
           <DrawingLoading label="Joining live canvas" />
         )}
       </div>
+      <JournalAttribution
+        technology="Excalidraw"
+        href="https://excalidraw.com/"
+        className="absolute bottom-3 right-3 z-20 shadow-sm backdrop-blur-sm"
+      />
     </div>
   );
 }

@@ -2,6 +2,7 @@ import { MessageSquare, Plug, Settings2 } from "lucide-react";
 import { spaceNotesEnabled } from "@/features/notes/availability";
 import { NotesPanelSidebar } from "@/features/notes/components/NotesPanelSidebar";
 import { DrawingPanelSidebar } from "@/features/drawings/components/DrawingPanelSidebar";
+import { JournalSectionSwitcher } from "@/features/journal/components/JournalSectionSwitcher";
 import type { SpaceConversation } from "@/models/interfaces/features/spaces/types";
 import { SpaceChatConversationList } from "../SpaceChatConversationList";
 import { SpaceSidebarSection } from "../SpaceSidebarSection";
@@ -54,12 +55,23 @@ export function SpacePanelSidebarContext(props: SpacePanelSidebarContextProps) {
   }
 
   if (props.section === "notes" && spaceNotesEnabled) {
-    return <NotesPanelSidebar spaceId={props.activeSpaceId} spaceName={props.activeSpaceName} />;
+    return (
+      <div className="grid gap-4">
+        <JournalSectionSwitcher spaceId={props.activeSpaceId} section={props.section} />
+        <NotesPanelSidebar spaceId={props.activeSpaceId} spaceName={props.activeSpaceName} />
+      </div>
+    );
   }
 
   if (props.section === "drawings") {
     return (
-      <DrawingPanelSidebar spaceId={props.activeSpaceId} activeDrawingId={props.activeDrawingId} />
+      <div className="grid gap-4">
+        <JournalSectionSwitcher spaceId={props.activeSpaceId} section={props.section} />
+        <DrawingPanelSidebar
+          spaceId={props.activeSpaceId}
+          activeDrawingId={props.activeDrawingId}
+        />
+      </div>
     );
   }
 

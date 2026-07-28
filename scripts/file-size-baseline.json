@@ -25,8 +25,6 @@
   "src-tauri/src/services/transfers.rs": 1883,
   "src/features/explorer/components/FileInspectorPreview.tsx": 560,
   "src/features/explorer/desktop/ExplorerCommands.ts": 667,
-  "src/features/explorer/desktop/ExplorerCompareDialog.tsx": 670,
-  "src/features/explorer/desktop/ExplorerContextMenu.tsx": 799,
   "src/features/explorer/desktop/index.tsx": 1089,
   "src/features/explorer/drag/ExplorerDragContext.tsx": 596,
   "src/features/explorer/store/helpers/selection.ts": 513,

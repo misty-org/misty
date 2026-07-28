@@ -29,7 +29,7 @@ describe("note collaboration session cache", () => {
     spaceRequestMock.mockImplementation(async () => ({
       ticket: `ticket-${spaceRequestMock.mock.calls.length}`,
       room: "room-note",
-      url: "wss://misty-note-collab-dev.mistysys.workers.dev/parties/note-room/room-note",
+      url: "wss://misty-journal-collab-dev.mistysys.workers.dev/parties/note-room/room-note",
       role: "editor",
       expires_at: "2026-07-27T21:00:00.000Z",
     }));
