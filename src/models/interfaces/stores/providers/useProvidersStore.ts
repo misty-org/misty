@@ -18,7 +18,7 @@ import type {
   ProviderRemote,
   ProviderWorkflow,
   ProvidersSnapshot,
-  RcloneConfigPaths,
+  CloudConfigPaths,
   RemoteEditDraft,
 } from "@/models/interfaces/services/misty-api";
 import type { CurrentLicense } from "@/models/types/features/installer/types";
@@ -59,7 +59,7 @@ export interface ProviderConnectionSession {
 export interface ProvidersWorkspaceState {
   draft: RemoteEditDraft | null;
   originalDraft: RemoteEditDraft | null;
-  configPaths: RcloneConfigPaths | null;
+  configPaths: CloudConfigPaths | null;
   tokenVisible: boolean;
   loadingRemoteName: string | null;
   loadedRemoteRevision: number;

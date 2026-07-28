@@ -28,7 +28,7 @@ export function ProviderDisconnectDialog(props: {
           <DialogTitle>Delete Remote?</DialogTitle>
           <DialogDescription>
             <strong className="font-semibold text-foreground">{props.remoteName}</strong> will be
-            removed from Misty and rclone. Files stored by the provider will not be deleted.
+            removed from Misty. Files stored by the provider will not be deleted.
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>

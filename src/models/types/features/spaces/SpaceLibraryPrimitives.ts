@@ -19,7 +19,6 @@ import { spacesApi } from "@/stores/spaces/useSpacesBackendStore";
 import type {
   LibraryAssetStack,
   LibraryDiscoveryGroup,
-  LibraryMapPoint,
   LibrarySearchFacets,
   SpaceLibraryItem,
 } from "@/models/interfaces/features/spaces/types";

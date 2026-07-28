@@ -4,7 +4,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import type {
   ProviderWorkflow,
   ProviderWorkflowOption,
-  RcloneConfigPaths,
+  CloudConfigPaths,
   RemoteEditDraft,
 } from "@/models/interfaces/services/misty-api";
 import { iconAssets } from "@/assets/icons";
@@ -16,7 +16,7 @@ export interface RemoteConfigFormProps {
   draft: RemoteEditDraft;
   configKeys: string[];
   workflow: ProviderWorkflow | null;
-  configPaths: RcloneConfigPaths | null;
+  configPaths: CloudConfigPaths | null;
   tokenVisible: boolean;
   onDraftName: (name: string) => void;
   onConfigField: (key: string, value: string) => void;

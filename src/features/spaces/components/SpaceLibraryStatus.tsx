@@ -14,6 +14,7 @@ export function SpaceLibraryTopChrome() {
     canEditLibrary,
     usage,
     uploadJobs,
+    setUploadJobs,
     searchInput,
     setSearchInput,
     setSearchFocused,
@@ -42,7 +43,7 @@ export function SpaceLibraryTopChrome() {
   const { appendSearchFacet, copyItemsToClipboard, applyBulkAction } = itemActions;
   const { selectCollection } = collectionActions;
   const { failedUploads, uploadProgress, uploading } = uploadStatus(uploadJobs);
-  const uploadDisabled = uploading || (usage?.remaining_bytes ?? 1) <= 0;
+  const uploadDisabled = (usage?.remaining_bytes ?? 1) <= 0;
 
   return (
     <>
@@ -51,6 +52,8 @@ export function SpaceLibraryTopChrome() {
         uploading={uploading}
         uploadDisabled={uploadDisabled}
         onUpload={() => data.setFilePickerOpen(true)}
+        uploadJobs={uploadJobs}
+        onClearUploads={() => setUploadJobs([])}
         searchInput={searchInput}
         onSearchInput={setSearchInput}
         onSearchFocus={() => setSearchFocused(true)}
@@ -97,16 +100,6 @@ export function SpaceLibraryInlineStatus() {
 
   return (
     <>
-      {uploadJobs.length > 0 ? (
-        <SpaceLibraryUploadStatus
-          failedUploadError={failedUploads[0]?.error}
-          uploadCount={uploadJobs.length}
-          uploadProgress={uploadProgress}
-          uploading={uploading}
-          failedCount={failedUploads.length}
-          onDismiss={() => data.setUploadJobs([])}
-        />
-      ) : null}
       {searchFocused ? (
         <SpaceLibraryFacetSuggestions
           onSelectCollection={selectCollection}
@@ -159,68 +152,13 @@ export function SpaceLibraryUploadEmptyState() {
       searching={Boolean(data.searchQuery || data.mediaType)}
       uploadAvailable={canUploadLibrary}
       uploading={uploading}
-      uploadDisabled={uploading || (usage?.remaining_bytes ?? 1) <= 0}
+      uploadDisabled={(usage?.remaining_bytes ?? 1) <= 0}
       onUpload={() => data.setFilePickerOpen(true)}
       onClearSearch={() => {
         data.setSearchInput("");
         data.setMediaType("");
       }}
     />
-  );
-}
-
-function SpaceLibraryUploadStatus({
-  failedUploadError,
-  uploadCount,
-  uploadProgress,
-  uploading,
-  failedCount,
-  onDismiss,
-}: {
-  failedUploadError?: string;
-  uploadCount: number;
-  uploadProgress: number;
-  uploading: boolean;
-  failedCount: number;
-  onDismiss: () => void;
-}) {
-  return (
-    <div className="mb-4 overflow-hidden rounded-xl bg-muted/35">
-      <div className="flex items-center gap-3 px-3 py-2.5">
-        <Upload className="shrink-0 text-muted-foreground" size={15} />
-        <div className="min-w-0 flex-1">
-          <p className="m-0 truncate text-xs font-medium">
-            {uploading
-              ? `Uploading ${uploadCount} file${uploadCount === 1 ? "" : "s"} in the background`
-              : failedCount > 0
-                ? `${uploadCount - failedCount} uploaded, ${failedCount} failed`
-                : `${uploadCount} file${uploadCount === 1 ? "" : "s"} uploaded`}
-          </p>
-          <p className="m-0 mt-0.5 truncate text-[10px] text-muted-foreground">
-            {uploading
-              ? `${uploadProgress}% · You can keep using Misty while this finishes`
-              : (failedUploadError ?? "Complete")}
-          </p>
-        </div>
-        {!uploading ? (
-          <Button
-            size="icon"
-            variant="outline"
-            type="button"
-            onClick={onDismiss}
-            aria-label="Dismiss upload status"
-          >
-            <X size={14} />
-          </Button>
-        ) : null}
-      </div>
-      <div className="h-0.5 bg-accent">
-        <div
-          className="h-full bg-primary transition-[width]"
-          style={{ width: `${uploadProgress}%` }}
-        />
-      </div>
-    </div>
   );
 }
 

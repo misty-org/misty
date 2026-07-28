@@ -90,7 +90,6 @@ const legacyPhoneUiPaths = [
   "src/pages/Changelog/mobile",
   "src/pages/Extensions/mobile",
   "src/pages/Files/mobile",
-  "src/pages/Home/mobile",
   "src/pages/Providers/mobile",
   "src/pages/Register/mobile",
   "src/pages/Settings/mobile",

@@ -6,7 +6,7 @@ export type {
   NoteListItemProps,
   NoteListPanelProps,
 } from "@/models/interfaces/features/notes/components/NoteListPanel";
-import { FileText, Plus, SearchX, Star } from "lucide-react";
+import { Plus, Star } from "lucide-react";
 import { Button, EmptyState, ScrollArea, Skeleton, cn } from "@/ui";
 import { relativeTime } from "@/features/notes/noteFilters";
 import { SyncErrorNotice } from "./NotesConnectionCards";
@@ -46,7 +46,6 @@ export function NoteListPanel(props: NoteListPanelProps) {
           props.query ? (
             <EmptyState
               compact
-              icon={<SearchX />}
               title="No matching notes"
               description={`Nothing matches “${props.query}” in ${props.spaceName}.`}
               action={
@@ -58,7 +57,6 @@ export function NoteListPanel(props: NoteListPanelProps) {
           ) : (
             <EmptyState
               compact
-              icon={<FileText />}
               title={`No notes in ${props.spaceName} yet`}
               description="Write a note in this Space to keep the thread of work close by."
               action={

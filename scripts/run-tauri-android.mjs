@@ -16,13 +16,6 @@ const targetArg = args
   .find((arg) => arg.startsWith("--target="))
   ?.slice("--target=".length);
 
-const target =
-  targetArg ??
-  process.env.MISTY_SERVICE_GO_TARGET ??
-  (isDevice ? "android-arm64" : "android-x86_64");
-const buildTargets = isBuild && !targetArg
-  ? ["android-arm64", "android-armv7", "android-x86", "android-x86_64"]
-  : [target];
 const androidSdk = resolveAndroidSdk();
 const adbPath = androidSdk ? resolve(androidSdk, "platform-tools/adb") : null;
 const physicalDevice = isDevice ? resolvePhysicalDevice(requestedDeviceId) : null;
@@ -34,12 +27,6 @@ const accountApiProxyTarget = isDevice
 const deviceDevConfig = developmentHost
   ? JSON.stringify({ build: { devUrl: `http://${developmentHost}:${developmentPort}` } })
   : null;
-
-for (const buildTarget of buildTargets) {
-  run(npmCommand, ["run", "service:archive"], {
-    MISTY_SERVICE_GO_TARGET: buildTarget,
-  });
-}
 
 const tauriArgs = isBuild
   ? ["run", "tauri", "--", "android", "build", "--apk"]
@@ -55,7 +42,7 @@ if (isBuild && targetArg) {
   tauriArgs.push("--target", androidCargoTarget(targetArg));
 }
 
-run(npmCommand, [...tauriArgs, "--features=embedded-storage-go"], {
+run(npmCommand, tauriArgs, {
   ...(physicalDevice ? { ANDROID_SERIAL: physicalDevice } : {}),
   ...(developmentHost ? { TAURI_DEV_HOST: developmentHost } : {}),
   ...(isDevice ? { MISTY_DESKTOP_DEV_PORT: String(developmentPort) } : {}),

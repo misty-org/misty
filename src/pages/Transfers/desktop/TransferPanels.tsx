@@ -1,7 +1,7 @@
 import type { DetailHandlers } from "@/models/types/pages/Transfers/desktop/TransferPanels";
 export type { DetailHandlers } from "@/models/types/pages/Transfers/desktop/TransferPanels";
 import { useMemo } from "react";
-import { ListFilter, PanelRight } from "lucide-react";
+import { ListFilter } from "lucide-react";
 import type { TransferType } from "@/models/types/services/misty-api";
 import type { TransferRecord } from "@/models/interfaces/services/misty-api";
 import { EmptyState } from "@/ui";
@@ -207,7 +207,6 @@ export function TransferDetail(
       <div className={transferStyles.detailEmpty}>
         <EmptyState
           compact
-          icon={<PanelRight />}
           title="No transfer selected"
           description="Select a row to inspect its endpoints, progress, and queue state."
         />

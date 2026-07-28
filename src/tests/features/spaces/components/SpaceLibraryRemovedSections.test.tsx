@@ -21,7 +21,7 @@ vi.mock("@/features/spaces/SpaceLibraryContext", () => ({
 }));
 
 import { SpaceLibraryCollectionOverview } from "@/features/spaces/components/SpaceLibraryCollections";
-import { librarySidebarItems } from "@/features/spaces/components/SpacePanelContent";
+import { librarySidebarItems } from "@/features/spaces/components/spacePanel/librarySidebarItems";
 import { libraryCollectionKinds } from "@/features/spaces/useSpaceLibraryData";
 
 describe("removed Library sections", () => {

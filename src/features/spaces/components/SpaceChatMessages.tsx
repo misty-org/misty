@@ -1,546 +1,75 @@
-import type {
-  SpaceChatMessagesProps,
-  SpaceChatStarter,
-} from "@/models/interfaces/features/spaces/components/SpaceChatMessages";
 export type {
   SpaceChatMessagesProps,
   SpaceChatStarter,
 } from "@/models/interfaces/features/spaces/components/SpaceChatMessages";
-import { Fragment, useMemo, type FormEvent, type RefObject } from "react";
-import {
-  AtSign,
-  Ellipsis,
-  ImageIcon,
-  LibraryBig,
-  MessageSquare,
-  Paperclip,
-  Pencil,
-  Reply,
-  Sparkles,
-  Trash2,
-} from "lucide-react";
+export { DeleteMessageDialog } from "../chatMessages/DeleteMessageDialog";
+export { messageReplyPreviewText } from "../chatMessages/messageHelpers";
 
-import { Avatar, AvatarFallback, AvatarImage } from "@/ui";
-import { Skeleton } from "@/ui";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/ui";
-import { Badge } from "@/ui";
-import { Button } from "@/ui";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/ui";
-import { Textarea } from "@/ui";
-import { SiDiscord } from "react-icons/si";
-
-import { MessageOriginBadge } from "@/features/spaces/components/MessageOriginBadge";
+import { useMemo } from "react";
+import type { SpaceChatMessagesProps } from "@/models/interfaces/features/spaces/components/SpaceChatMessages";
 import {
   buildChatDisplayRows,
-  ChatDateDivider,
-  formatChatMessageTime,
   useMemberAvatarUrls,
 } from "@/features/spaces/components/SpaceChatDisplay";
 import { SpaceChatStarters } from "./SpaceChatStarters";
 import { SpaceDirectMessageIntro } from "./SpaceDirectMessageIntro";
-import { copyLibraryItemsToClipboard } from "@/features/spaces/libraryClipboard";
-import { spacesApi } from "@/stores/spaces/useSpacesBackendStore";
-import type { MessageSpan } from "@/models/types/features/spaces/types";
-import type {
-  SpaceLibraryItem,
-  SpaceMessage,
-  SpaceNode,
-} from "@/models/interfaces/features/spaces/types";
+import { ChatMessageRow } from "../chatMessages/ChatMessageRow";
+import { ChatMessagesSkeleton } from "../chatMessages/ChatMessagesSkeleton";
 
 export function SpaceChatMessages(props: SpaceChatMessagesProps) {
   const displayRows = useMemo(() => buildChatDisplayRows(props.messages), [props.messages]);
   const memberAvatarUrls = useMemberAvatarUrls(props.spaceId, props.messages);
 
-  return (
-    <div className="min-h-0 overflow-y-auto px-[clamp(20px,5vw,72px)] py-6">
-      {props.error ? (
-        <div
-          className="mb-4 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive"
-          role="alert"
-        >
-          {props.error}
-        </div>
-      ) : null}
-      {props.loading ? (
-        <div aria-busy="true" role="status">
-          <span className="sr-only">Loading conversation</span>
-          {messageSkeletonWidths.map((widths, index) => (
-            <div className="mb-6 grid grid-cols-[36px_minmax(0,1fr)_32px] gap-3" key={index}>
-              <Skeleton className="size-9 rounded-full" />
-              <div className="grid min-w-0 gap-2">
-                <Skeleton className="h-3.5 rounded" style={{ width: widths.name }} />
-                <Skeleton className="h-4 rounded" style={{ width: widths.line1 }} />
-                {widths.line2 ? (
-                  <Skeleton className="h-4 rounded" style={{ width: widths.line2 }} />
-                ) : null}
-              </div>
-              <div />
-            </div>
-          ))}
-        </div>
-      ) : props.messages.length === 0 ? (
-        props.directRecipient ? (
-          <SpaceDirectMessageIntro spaceId={props.spaceId} recipient={props.directRecipient} />
-        ) : (
-          <SpaceChatStarters
-            spaceName={props.spaceName}
-            onStarter={props.canWrite ? props.onStarter : undefined}
-          />
-        )
-      ) : (
-        displayRows.map(({ message, compact, dateLabel }) => {
-          const avatarUrl =
-            message.origin?.author_avatar_url || memberAvatarUrls.get(message.sender_user_id) || "";
-          const repliedToMessage = message.reply_to_message_id
-            ? props.messages.find((item) => item.id === message.reply_to_message_id)
-            : undefined;
-          const messageRowClass = message.reply_to_message_id ? "row-start-2" : "row-start-1";
-          return (
-            <Fragment key={message.id}>
-              {dateLabel ? <ChatDateDivider label={dateLabel} /> : null}
-              <article
-                className={`group -mx-3 grid grid-cols-[44px_minmax(0,1fr)_32px] gap-x-5 rounded-md px-3 py-0.5 hover:bg-muted/25 ${compact ? "" : "mt-4"}`}
-                id={`message-${message.id}`}
-              >
-                {message.reply_to_message_id ? (
-                  <MessageReplyPreview
-                    avatarUrl={
-                      repliedToMessage?.origin?.author_avatar_url ||
-                      memberAvatarUrls.get(repliedToMessage?.sender_user_id ?? "") ||
-                      ""
-                    }
-                    message={repliedToMessage}
-                    onOpen={() =>
-                      document
-                        .getElementById(`message-${message.reply_to_message_id}`)
-                        ?.scrollIntoView({ block: "center" })
-                    }
-                  />
-                ) : null}
-                <div className={`col-start-1 flex justify-end ${messageRowClass}`}>
-                  {compact ? (
-                    <time className="pt-1 text-[10px] tabular-nums text-muted-foreground opacity-0 group-hover:opacity-100 group-focus-within:opacity-100">
-                      {formatChatMessageTime(message.created_at)}
-                    </time>
-                  ) : (
-                    <Avatar className="mt-0.5 size-10">
-                      {avatarUrl ? <AvatarImage src={avatarUrl} alt="" /> : null}
-                      <AvatarFallback className="text-xs font-semibold">
-                        {message.sender_kind === "agent" ? "AI" : initials(message.sender_name)}
-                      </AvatarFallback>
-                    </Avatar>
-                  )}
-                </div>
-                <div className={`col-start-2 min-w-0 ${messageRowClass}`}>
-                  {!compact ? (
-                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 leading-5">
-                      <strong className="text-[15px] font-semibold text-foreground">
-                        {message.sender_name}
-                      </strong>
-                      {message.sender_kind === "agent" ? (
-                        <Badge
-                          variant="secondary"
-                          className="h-4 gap-1 rounded px-1 text-[9px] uppercase"
-                        >
-                          <Sparkles />
-                          Agent
-                        </Badge>
-                      ) : null}
-                      <MessageOriginBadge origin={message.origin} />
-                      <time className="text-[11px] tabular-nums text-muted-foreground">
-                        {formatChatMessageTime(message.created_at)}
-                      </time>
-                    </div>
-                  ) : null}
-                  {props.editingMessageId === message.id ? (
-                    <form
-                      className="mt-1 rounded-lg bg-muted/35 p-2"
-                      onSubmit={(event) => props.onSaveEdited(event, message)}
-                    >
-                      <Textarea
-                        autoFocus
-                        className="min-h-20 resize-y border-0 bg-transparent shadow-none focus-visible:ring-0"
-                        maxLength={4000}
-                        value={props.editingText}
-                        onChange={(event) => props.onEditingText(event.target.value)}
-                        onKeyDown={(event) => {
-                          if (event.key === "Escape" && !props.editSaving)
-                            props.onCancelEditing(message.id);
-                        }}
-                        aria-label="Edit message"
-                      />
-                      <div className="mt-2 flex justify-end gap-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          type="button"
-                          disabled={props.editSaving}
-                          onClick={() => props.onCancelEditing(message.id)}
-                        >
-                          Cancel
-                        </Button>
-                        <Button
-                          size="sm"
-                          type="submit"
-                          disabled={props.editSaving || !props.editingText.trim()}
-                        >
-                          {props.editSaving ? "Saving…" : "Save"}
-                        </Button>
-                      </div>
-                    </form>
-                  ) : (
-                    <p className="whitespace-pre-wrap text-[15px] leading-6 text-foreground/90">
-                      {message.content.map((span, index) => (
-                        <MessageContent key={index} span={span} />
-                      ))}
-                      {message.edited_at ? (
-                        <span className="ml-1 text-[10px] text-muted-foreground">(edited)</span>
-                      ) : null}
-                    </p>
-                  )}
-                  <MessageAttachments
-                    message={message}
-                    nodes={props.nodes}
-                    libraryItems={props.libraryItems}
-                    canCopyLibrary={props.canCopyLibrary}
-                    canAddToLibrary={props.canAddToLibrary}
-                    spaceId={props.spaceId}
-                    onOpenNode={props.onOpenNode}
-                    onError={props.onError}
-                    onLibraryItem={props.onLibraryItem}
-                    onReload={props.onReload}
-                  />
-                </div>
-                <div className={`col-start-3 ${messageRowClass}`}>
-                  {props.canWrite ? (
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="size-8 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 data-[state=open]:opacity-100"
-                          aria-label="Message actions"
-                        >
-                          <Ellipsis />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onSelect={() => props.onReply(message.id)}>
-                          <Reply />
-                          Reply
-                        </DropdownMenuItem>
-                        {props.onPublishToDiscord && canPublish(message, props.currentUserId) ? (
-                          <DropdownMenuItem
-                            disabled={props.publishingMessageId === message.id}
-                            onSelect={() => props.onPublishToDiscord?.(message)}
-                          >
-                            <SiDiscord />
-                            {message.origin?.publish_state === "published"
-                              ? "Send to Discord again"
-                              : "Send to Discord"}
-                          </DropdownMenuItem>
-                        ) : null}
-                        {message.sender_kind === "person" &&
-                        message.sender_user_id === props.currentUserId ? (
-                          <DropdownMenuItem onSelect={() => props.onBeginEditing(message)}>
-                            <Pencil />
-                            Edit
-                          </DropdownMenuItem>
-                        ) : null}
-                        {message.sender_user_id === props.currentUserId || props.isOwner ? (
-                          <>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem
-                              className="text-destructive focus:text-destructive"
-                              onSelect={() => props.onDelete(message)}
-                            >
-                              <Trash2 />
-                              Delete message
-                            </DropdownMenuItem>
-                          </>
-                        ) : null}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  ) : null}
-                </div>
-              </article>
-            </Fragment>
-          );
-        })
-      )}
-      <div ref={props.endRef} />
-    </div>
-  );
-}
-
-function MessageReplyPreview({
-  avatarUrl,
-  message,
-  onOpen,
-}: {
-  avatarUrl: string;
-  message?: SpaceMessage;
-  onOpen: () => void;
-}) {
-  const hasAttachment = Boolean(
-    message &&
-    (message.file_node_ids.length > 0 ||
-      (message.library_item_ids?.length ?? 0) > 0 ||
-      (message.attachments?.length ?? 0) > 0),
-  );
+  const avatarFor = (message: {
+    origin?: { author_avatar_url?: string };
+    sender_user_id: string;
+  }) => message.origin?.author_avatar_url || memberAvatarUrls.get(message.sender_user_id) || "";
 
   return (
-    <div className="col-span-2 col-start-1 row-start-1 grid h-7 grid-cols-[44px_minmax(0,1fr)] gap-x-5">
-      <div aria-hidden="true" className="relative">
-        <span className="absolute left-[21px] top-3 h-5 w-[37px] rounded-tl-md border-l-2 border-t-2 border-muted-foreground/55" />
-      </div>
-      <button
-        className="flex min-w-0 items-center gap-1.5 self-start overflow-hidden border-0 bg-transparent p-0 text-left text-[13px] leading-5 text-muted-foreground hover:text-foreground"
-        type="button"
-        onClick={onOpen}
-        aria-label={
-          message ? `Jump to ${message.sender_name}'s message` : "Original message unavailable"
-        }
-      >
-        {message ? (
-          <>
-            <Avatar className="size-[18px] shrink-0">
-              {avatarUrl ? <AvatarImage src={avatarUrl} alt="" /> : null}
-              <AvatarFallback className="text-[7px] font-semibold">
-                {message.sender_kind === "agent" ? "AI" : initials(message.sender_name)}
-              </AvatarFallback>
-            </Avatar>
-            <strong className="shrink-0 font-semibold text-primary">@{message.sender_name}</strong>
-            <span className="min-w-0 truncate text-foreground/80">
-              {messageReplyPreviewText(message)}
-            </span>
-            {hasAttachment ? (
-              <ImageIcon className="size-4 shrink-0 rounded-[2px] bg-foreground p-0.5 text-background" />
-            ) : null}
-          </>
-        ) : (
-          <span className="truncate italic">Original message unavailable</span>
-        )}
-      </button>
-    </div>
-  );
-}
-
-export function messageReplyPreviewText(message: SpaceMessage): string {
-  return message.content
-    .map((span) => (span.type === "text" ? span.text : `@${span.label}`))
-    .join("")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-/**
- * Only a person's own Misty message may be mirrored outward. Agent output,
- * system notices, and messages that arrived *from* Discord are never republished
- * — that is what keeps the mirror from looping.
- */
-function canPublish(message: SpaceMessage, currentUserId?: string) {
-  return (
-    message.sender_kind === "person" &&
-    message.sender_user_id === currentUserId &&
-    (message.origin?.system ?? "misty") === "misty"
-  );
-}
-
-export function DeleteMessageDialog({
-  open,
-  onOpenChange,
-  onConfirm,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  onConfirm: () => void;
-}) {
-  return (
-    <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>Delete this message?</AlertDialogTitle>
-          <AlertDialogDescription>
-            This removes the message from the Space conversation for everyone.
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <AlertDialogAction
-            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            onClick={onConfirm}
+    <div className="min-h-0 flex-1 overflow-y-auto px-[clamp(20px,5vw,72px)] py-6">
+      <div className="mx-auto max-w-5xl">
+        {props.error ? (
+          <div
+            className="mb-4 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+            role="alert"
           >
-            Delete message
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
-  );
-}
+            {props.error}
+          </div>
+        ) : null}
 
-function MessageContent({ span }: { span: MessageSpan }) {
-  return span.type === "text" ? (
-    <>{span.text}</>
-  ) : (
-    <span className="rounded bg-primary/10 px-1 py-0.5 font-medium text-primary">
-      @{span.label}
-    </span>
-  );
-}
-
-function MessageAttachments({
-  message,
-  nodes,
-  libraryItems,
-  canCopyLibrary,
-  canAddToLibrary,
-  spaceId,
-  onOpenNode,
-  onError,
-  onLibraryItem,
-  onReload,
-}: {
-  message: SpaceMessage;
-  nodes: SpaceNode[];
-  libraryItems: SpaceLibraryItem[];
-  canCopyLibrary: boolean;
-  canAddToLibrary: boolean;
-  spaceId: string;
-  onOpenNode: (nodeId: string) => void;
-  onError: (message: string) => void;
-  onLibraryItem: (item: SpaceLibraryItem) => void;
-  onReload: () => void;
-}) {
-  return (
-    <>
-      {message.file_node_ids.length > 0 ? (
-        <div className="mt-2 flex flex-wrap gap-1.5">
-          {message.file_node_ids.map((nodeId) => {
-            const node = nodes.find((item) => item.id === nodeId);
+        {props.loading ? (
+          <ChatMessagesSkeleton />
+        ) : props.messages.length === 0 ? (
+          props.directRecipient ? (
+            <SpaceDirectMessageIntro spaceId={props.spaceId} recipient={props.directRecipient} />
+          ) : (
+            <SpaceChatStarters
+              spaceName={props.spaceName}
+              onStarter={props.canWrite ? props.onStarter : undefined}
+            />
+          )
+        ) : (
+          displayRows.map(({ message, compact, dateLabel }) => {
+            const repliedToMessage = message.reply_to_message_id
+              ? props.messages.find((item) => item.id === message.reply_to_message_id)
+              : undefined;
             return (
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-7 text-xs"
-                type="button"
-                key={nodeId}
-                onClick={() => onOpenNode(nodeId)}
-              >
-                <Paperclip />
-                {node?.display_name ?? "Drive file"}
-              </Button>
+              <ChatMessageRow
+                key={message.id}
+                message={message}
+                compact={compact}
+                dateLabel={dateLabel}
+                avatarUrl={avatarFor(message)}
+                repliedToMessage={repliedToMessage}
+                repliedToAvatarUrl={repliedToMessage ? avatarFor(repliedToMessage) : ""}
+                props={props}
+              />
             );
-          })}
-        </div>
-      ) : null}
-      {(message.library_item_ids?.length ?? 0) > 0 ? (
-        <div className="mt-2 flex flex-wrap gap-1.5">
-          {message.library_item_ids?.map((itemId) => {
-            const item = libraryItems.find((candidate) => candidate.id === itemId);
-            return (
-              <Button
-                variant="secondary"
-                size="sm"
-                className="h-7 text-xs"
-                type="button"
-                key={itemId}
-                disabled={!item || !canCopyLibrary}
-                title={canCopyLibrary ? "Copy to clipboard" : "Copy permission required"}
-                onClick={() => {
-                  if (item && canCopyLibrary)
-                    void copyLibraryItemsToClipboard(spaceId, [item]).catch((error) =>
-                      onError(
-                        error instanceof Error
-                          ? error.message
-                          : "The Library item could not be copied.",
-                      ),
-                    );
-                }}
-              >
-                <LibraryBig />
-                {item?.display_name ?? "Unavailable Library item"}
-              </Button>
-            );
-          })}
-        </div>
-      ) : null}
-      {(message.attachments?.length ?? 0) > 0 ? (
-        <div className="mt-2 flex flex-wrap gap-1.5">
-          {message.attachments?.map((attachment) => (
-            <div
-              className="inline-flex items-center gap-1 rounded-md bg-muted/50 p-1 pl-2 text-xs"
-              key={attachment.id}
-            >
-              <Paperclip className="size-3" />
-              <Button
-                variant="link"
-                size="sm"
-                className="h-auto px-1 py-0 text-xs"
-                type="button"
-                onClick={() =>
-                  void spacesApi.downloadAttachment(spaceId, attachment.id, attachment.display_name)
-                }
-              >
-                {attachment.display_name}
-              </Button>
-              {attachment.promoted_item_id ? (
-                <Badge variant="secondary" className="h-5 px-1.5 text-[10px]">
-                  In Library
-                </Badge>
-              ) : canAddToLibrary ? (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-6 px-1.5 text-[10px]"
-                  type="button"
-                  onClick={() =>
-                    void spacesApi.promoteAttachment(spaceId, attachment.id).then((item) => {
-                      onLibraryItem(item);
-                      onReload();
-                    })
-                  }
-                >
-                  Add to Library
-                </Button>
-              ) : null}
-            </div>
-          ))}
-        </div>
-      ) : null}
-    </>
-  );
-}
+          })
+        )}
 
-const messageSkeletonWidths: { name: string; line1: string; line2?: string }[] = [
-  { name: "30%", line1: "70%", line2: "45%" },
-  { name: "22%", line1: "50%" },
-  { name: "26%", line1: "85%", line2: "60%" },
-  { name: "20%", line1: "35%" },
-];
-
-function initials(name: string): string {
-  return (
-    name
-      .trim()
-      .split(/\s+/)
-      .slice(0, 2)
-      .map((part) => part[0]?.toUpperCase() ?? "")
-      .join("") || "?"
+        <div ref={props.endRef} />
+      </div>
+    </div>
   );
 }

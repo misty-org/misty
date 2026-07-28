@@ -68,13 +68,12 @@ impl StorageResponse {
 
 impl StorageService {
     pub fn new(environment: AppEnvironmentService) -> Self {
-        Self::new_with_storage_runtime(environment, None, None)
+        Self::new_with_storage_runtime(environment, None)
     }
 
     pub fn new_with_storage_runtime(
         environment: AppEnvironmentService,
         storage_runtime: Option<StorageRuntimeService>,
-        _legacy_url: Option<String>,
     ) -> Self {
         let _ = environment;
         let snapshot = StorageSnapshot {
@@ -119,12 +118,6 @@ impl StorageService {
                 .map(ToOwned::to_owned);
         }
         Ok(parsed)
-    }
-
-    pub fn url(&self, path: &str) -> ApiResult<String> {
-        Err(ApiError::Unavailable(format!(
-            "Local storage URLs are unavailable; use the embedded storage service for {path}."
-        )))
     }
 
     pub async fn get_with_query<Q>(&self, path: &str, query: &Q) -> ApiResult<StorageResponse>
@@ -207,7 +200,7 @@ impl StorageService {
                     .await
             }
             _ => Err(ApiError::Unavailable(format!(
-                "Embedded storage service does not support GET {path}"
+                "Native storage service does not support GET {path}"
             ))),
         }
     }
@@ -243,7 +236,7 @@ impl StorageService {
                 self.invoke_embedded("file_sync.remote.scan", params).await
             }
             _ => Err(ApiError::Unavailable(format!(
-                "Embedded storage service does not support GET {path} with query"
+                "Native storage service does not support GET {path} with query"
             ))),
         }
     }
@@ -285,7 +278,7 @@ impl StorageService {
             "/api/clipboard/publish" => "clipboard.publish",
             _ => {
                 return Err(ApiError::Unavailable(format!(
-                    "Embedded storage service does not support POST {path}"
+                    "Native storage service does not support POST {path}"
                 )))
             }
         };
@@ -307,7 +300,7 @@ impl StorageService {
                 self.invoke_embedded("remote.file.delete", params).await
             }
             _ => Err(ApiError::Unavailable(format!(
-                "Embedded storage service does not support DELETE {path} with query"
+                "Native storage service does not support DELETE {path} with query"
             ))),
         }
     }
@@ -322,7 +315,7 @@ impl StorageService {
                 .await;
         }
         Err(ApiError::Unavailable(format!(
-            "Embedded storage service does not support DELETE {path}"
+            "Native storage service does not support DELETE {path}"
         )))
     }
 
@@ -441,7 +434,7 @@ impl StorageService {
         let body = response.text().await.unwrap_or_default();
         if !status.is_success() {
             return Err(ApiError::Message(if body.is_empty() {
-                format!("Remote download failed (embedded {})", status.as_u16())
+                format!("Remote download failed (native {})", status.as_u16())
             } else {
                 body
             }));
@@ -459,7 +452,7 @@ impl StorageService {
             .await
             .map_err(|error| {
                 ApiError::Message(format!(
-                    "Failed to copy embedded download result to {}: {error}",
+                    "Failed to copy native download result to {}: {error}",
                     destination.display()
                 ))
             })?;
@@ -546,11 +539,11 @@ mod tests {
     };
 
     #[tokio::test]
-    async fn pre_canceled_upload_returns_canceled_before_proxy_lookup() {
-        let proxy = StorageService::new(AppEnvironmentService::new());
+    async fn pre_canceled_upload_returns_canceled_before_runtime_lookup() {
+        let storage = StorageService::new(AppEnvironmentService::new());
         let cancellation = AtomicBool::new(true);
 
-        let result = proxy
+        let result = storage
             .upload_file_with_cancellation(
                 "drive",
                 "/",

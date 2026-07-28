@@ -13,7 +13,7 @@ fn upload_filter_ignores_provider_disallowed_metadata() {
 }
 
 #[test]
-fn remote_job_progress_adds_partial_rclone_bytes_to_transfer_base() {
+fn remote_job_progress_adds_partial_provider_bytes_to_transfer_base() {
     let status = test_remote_job_status(25, 25);
     let progress = TransferProgress {
         base_bytes: 100,

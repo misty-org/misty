@@ -3,7 +3,7 @@ import { Button } from "@/ui";
 import { Skeleton } from "@/ui";
 import type {
   ProviderWorkflow,
-  RcloneConfigPaths,
+  CloudConfigPaths,
   RemoteEditDraft,
 } from "@/models/interfaces/services/misty-api";
 import { iconAssets } from "@/assets/icons";
@@ -16,7 +16,7 @@ import { StatusBadge } from "@/ui";
 
 export interface RemoteEditPanelProps {
   draft: RemoteEditDraft | null;
-  configPaths: RcloneConfigPaths | null;
+  configPaths: CloudConfigPaths | null;
   configKeys: string[];
   workflow: ProviderWorkflow | null;
   dirty: boolean;

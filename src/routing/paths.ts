@@ -15,7 +15,6 @@ export const routes = {
   dock: "/dock",
   extensions: "/extensions",
   files: "/files",
-  home: "/home",
   invite: "/invite",
   library: "/library",
   spaces: "/spaces",

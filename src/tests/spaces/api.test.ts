@@ -179,4 +179,46 @@ describe("spaceRequest account isolation", () => {
     ).rejects.toThrow("up to 128 MB");
     expect(readBody).not.toHaveBeenCalled();
   });
+
+  it("sends emoji reaction writes to encoded message reaction endpoints", async () => {
+    const saved = {
+      seq: 1,
+      id: "message-a",
+      space_id: "space-a",
+      sender_user_id: "user-a",
+      sender_name: "Misty",
+      sender_kind: "person",
+      content: [{ type: "text", text: "Nice work" }],
+      file_node_ids: [],
+      reactions: [{ emoji: "👍", count: 1, reacted_by_me: true }],
+      created_at: "2026-07-26T00:00:00Z",
+    };
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(() =>
+      Promise.resolve(
+        new Response(JSON.stringify(saved), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      ),
+    );
+
+    await expect(spacesApi.addMessageReaction("space-a", "message-a", "👍")).resolves.toEqual(
+      saved,
+    );
+    await spacesApi.removeConversationMessageReaction(
+      "space-a",
+      "conversation-a",
+      "message-a",
+      "❤️",
+    );
+
+    expect(fetchMock.mock.calls[0]?.[0]).toBe(
+      "http://localhost:8080/api/spaces/space-a/messages/message-a/reactions/%F0%9F%91%8D",
+    );
+    expect((fetchMock.mock.calls[0]?.[1] as RequestInit).method).toBe("PUT");
+    expect(fetchMock.mock.calls[1]?.[0]).toBe(
+      "http://localhost:8080/api/spaces/space-a/conversations/conversation-a/messages/message-a/reactions/%E2%9D%A4%EF%B8%8F",
+    );
+    expect((fetchMock.mock.calls[1]?.[1] as RequestInit).method).toBe("DELETE");
+  });
 });

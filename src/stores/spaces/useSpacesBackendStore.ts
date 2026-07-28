@@ -372,6 +372,26 @@ export const spacesApi = {
       `/spaces/${encodeURIComponent(spaceId)}/conversations/${encodeURIComponent(conversationId)}/messages/${encodeURIComponent(messageId)}`,
       { method: "DELETE" },
     ),
+  addConversationMessageReaction: (
+    spaceId: string,
+    conversationId: string,
+    messageId: string,
+    emoji: string,
+  ) =>
+    spaceRequest<SpaceMessage>(
+      `/spaces/${encodeURIComponent(spaceId)}/conversations/${encodeURIComponent(conversationId)}/messages/${encodeURIComponent(messageId)}/reactions/${encodeURIComponent(emoji)}`,
+      { method: "PUT" },
+    ),
+  removeConversationMessageReaction: (
+    spaceId: string,
+    conversationId: string,
+    messageId: string,
+    emoji: string,
+  ) =>
+    spaceRequest<SpaceMessage>(
+      `/spaces/${encodeURIComponent(spaceId)}/conversations/${encodeURIComponent(conversationId)}/messages/${encodeURIComponent(messageId)}/reactions/${encodeURIComponent(emoji)}`,
+      { method: "DELETE" },
+    ),
   chatAgents: (spaceId: string) =>
     spaceRequest<{ agents: SpaceStudioResource[] }>(
       `/spaces/${encodeURIComponent(spaceId)}/chat/agents`,
@@ -565,6 +585,16 @@ export const spacesApi = {
   deleteMessage: (spaceId: string, messageId: string) =>
     spaceRequest(
       `/spaces/${encodeURIComponent(spaceId)}/messages/${encodeURIComponent(messageId)}`,
+      { method: "DELETE" },
+    ),
+  addMessageReaction: (spaceId: string, messageId: string, emoji: string) =>
+    spaceRequest<SpaceMessage>(
+      `/spaces/${encodeURIComponent(spaceId)}/messages/${encodeURIComponent(messageId)}/reactions/${encodeURIComponent(emoji)}`,
+      { method: "PUT" },
+    ),
+  removeMessageReaction: (spaceId: string, messageId: string, emoji: string) =>
+    spaceRequest<SpaceMessage>(
+      `/spaces/${encodeURIComponent(spaceId)}/messages/${encodeURIComponent(messageId)}/reactions/${encodeURIComponent(emoji)}`,
       { method: "DELETE" },
     ),
   markRead: (spaceId: string, seq: number) =>
@@ -1316,12 +1346,14 @@ async function transferLibraryObject(
         options?.onProgress?.(1);
         resolve();
       } else {
-        reject(new SpaceRequestError("The cloud upload failed.", request.status));
+        reject(
+          new SpaceRequestError(directTransferErrorMessage(direct, request.status), request.status),
+        );
       }
     };
     request.onerror = () => {
       options?.signal?.removeEventListener("abort", abort);
-      reject(new Error("The cloud upload could not be reached. Check the R2 bucket CORS policy."));
+      reject(new Error(directTransferErrorMessage(direct, 0)));
     };
     request.onabort = () => reject(new DOMException("The upload was canceled.", "AbortError"));
     if (options?.signal?.aborted) return abort();
@@ -1329,6 +1361,14 @@ async function transferLibraryObject(
     request.send(file);
   });
   assertStableSpaceAccount(accountGeneration);
+}
+
+function directTransferErrorMessage(direct: boolean, status: number): string {
+  if (!direct) return "The cloud upload failed.";
+  if (status === 403 || status === 0) {
+    return "The direct R2 upload was blocked by the bucket CORS/preflight policy.";
+  }
+  return "The direct R2 upload failed.";
 }
 
 function libraryReauthenticationHeaders(token: string): Record<string, string> {
