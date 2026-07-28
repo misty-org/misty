@@ -60,6 +60,7 @@ export interface SpaceChatMessagesProps {
   onCancelEditing: (messageId: string) => void;
   onSaveEdited: (event: FormEvent, message: SpaceMessage) => void;
   onReply: (messageId: string) => void;
+  onToggleReaction: (message: SpaceMessage, emoji: string, reacted: boolean) => void;
   onBeginEditing: (message: SpaceMessage) => void;
   onDelete: (message: SpaceMessage) => void;
   onOpenNode: (nodeId: string) => void;

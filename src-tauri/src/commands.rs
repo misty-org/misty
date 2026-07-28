@@ -68,10 +68,10 @@ use crate::services::power_pack::{
     FileToolsSymlinkTargetResult, SavedSearch, SavedSearchesSnapshot,
 };
 use crate::services::providers::{
-    BackendAction, BackendActionResult, BackendRunRequest, ConfigSecurityStatus,
+    BackendAction, BackendActionResult, BackendRunRequest, CloudConfigPaths, ConfigSecurityStatus,
     ProviderConfigRequest, ProviderConfigStep, ProviderJobStart, ProviderJobStatus,
-    ProvidersSnapshot, RcloneConfigPaths, RemoteEditDraft, RemoteTestResult, SaveRemoteRequest,
-    VerifyResult, VerifyStartRequest,
+    ProvidersSnapshot, RemoteEditDraft, RemoteTestResult, SaveRemoteRequest, VerifyResult,
+    VerifyStartRequest,
 };
 use crate::services::search::{SearchQueryRequest, SearchResult, SearchScanRequest, SearchStatus};
 use crate::services::settings::{OpenWithAssociation, SaveSettingsRequest, SettingsSnapshot};
@@ -79,8 +79,8 @@ use crate::services::smart_library::{
     ApplySmartLibraryResultsRequest, FolderLibraryStatus, PrepareSmartLibraryPreviewsRequest,
     PreparedSmartLibraryPreview, ResolveSmartLibraryAssetsRequest, ResolvedSmartLibraryAsset,
     SmartLibraryAssetsPage, SmartLibraryAssetsPageRequest, SmartLibraryImportFilesRequest,
-    SmartLibraryImportPreflight, SmartLibraryImportResult, SmartLibraryScanRequest, SmartLibrarySearchRequest,
-    SmartLibrarySnapshot,
+    SmartLibraryImportPreflight, SmartLibraryImportResult, SmartLibraryScanRequest,
+    SmartLibrarySearchRequest, SmartLibrarySnapshot,
 };
 use crate::services::storage::StorageSnapshot;
 use crate::services::storage_runtime::StorageRuntimeSnapshot;
@@ -109,6 +109,28 @@ pub struct ClipboardFileBytes {
     pub bytes: Vec<u8>,
 }
 
+const NOTE_ASSET_MAX_BYTES: usize = 15 * 1024 * 1024;
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NoteAssetStoreRequest {
+    pub account_id: String,
+    pub space_id: String,
+    pub note_id: String,
+    pub file_name: String,
+    pub mime_type: Option<String>,
+    pub bytes: Vec<u8>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NoteAssetStoreResult {
+    pub path: String,
+    pub name: String,
+    pub mime_type: Option<String>,
+    pub byte_size: u64,
+}
+
 #[tauri::command]
 pub async fn app_snapshot(state: State<'_, MistyRuntime>) -> ApiResult<AppSnapshot> {
     Ok(AppSnapshot {
@@ -128,7 +150,9 @@ pub async fn app_environment_snapshot(
 }
 
 #[tauri::command]
-pub async fn agents_device_snapshot(state: State<'_, MistyRuntime>) -> ApiResult<serde_json::Value> {
+pub async fn agents_device_snapshot(
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<serde_json::Value> {
     state.agents.device_snapshot().await
 }
 
@@ -320,7 +344,9 @@ pub fn clipboard_write_file_refs(items: Vec<PasteItem>) -> ApiResult<bool> {
 #[tauri::command]
 pub async fn clipboard_write_file_bytes(items: Vec<ClipboardFileBytes>) -> ApiResult<bool> {
     if items.is_empty() {
-        return Err(ApiError::Message("No Library items were selected to copy.".to_owned()));
+        return Err(ApiError::Message(
+            "No Library items were selected to copy.".to_owned(),
+        ));
     }
     let copy_id = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -330,14 +356,18 @@ pub async fn clipboard_write_file_bytes(items: Vec<ClipboardFileBytes>) -> ApiRe
         .join("misty-library-clipboard")
         .join(copy_id.to_string());
     tokio::fs::create_dir_all(&staging).await.map_err(|error| {
-        ApiError::Message(format!("The Library clipboard staging folder could not be created: {error}"))
+        ApiError::Message(format!(
+            "The Library clipboard staging folder could not be created: {error}"
+        ))
     })?;
 
     let mut references = Vec::with_capacity(items.len());
     let mut used_names = HashSet::with_capacity(items.len());
     for (index, item) in items.into_iter().enumerate() {
         if item.bytes.is_empty() {
-            return Err(ApiError::Message("A selected Library item is empty.".to_owned()));
+            return Err(ApiError::Message(
+                "A selected Library item is empty.".to_owned(),
+            ));
         }
         let original_name = Path::new(item.name.trim())
             .file_name()
@@ -363,9 +393,13 @@ pub async fn clipboard_write_file_bytes(items: Vec<ClipboardFileBytes>) -> ApiRe
             suffix += 1;
         }
         let path = staging.join(file_name);
-        tokio::fs::write(&path, &item.bytes).await.map_err(|error| {
-            ApiError::Message(format!("A Library item could not be prepared for the clipboard: {error}"))
-        })?;
+        tokio::fs::write(&path, &item.bytes)
+            .await
+            .map_err(|error| {
+                ApiError::Message(format!(
+                    "A Library item could not be prepared for the clipboard: {error}"
+                ))
+            })?;
         references.push(PasteItem {
             path: path.to_string_lossy().into_owned(),
             is_directory: false,
@@ -374,6 +408,100 @@ pub async fn clipboard_write_file_bytes(items: Vec<ClipboardFileBytes>) -> ApiRe
         });
     }
     crate::services::native_clipboard::write_native_clipboard_file_refs(&references)
+}
+
+#[tauri::command]
+pub async fn notes_store_asset(
+    request: NoteAssetStoreRequest,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<NoteAssetStoreResult> {
+    if request.bytes.is_empty() {
+        return Err(ApiError::Message(
+            "The selected note file is empty.".to_owned(),
+        ));
+    }
+    if request.bytes.len() > NOTE_ASSET_MAX_BYTES {
+        return Err(ApiError::Message(
+            "Note files must be 15 MB or smaller for this beta.".to_owned(),
+        ));
+    }
+
+    let timestamp = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_millis())
+        .unwrap_or_default();
+    let original_name = safe_file_name(&request.file_name, "note-asset");
+    let original_path = Path::new(&original_name);
+    let stem = original_path
+        .file_stem()
+        .and_then(|name| name.to_str())
+        .filter(|name| !name.is_empty())
+        .unwrap_or("note-asset");
+    let extension = original_path
+        .extension()
+        .and_then(|value| value.to_str())
+        .map(|value| format!(".{}", safe_path_segment(value, "file")))
+        .unwrap_or_default();
+    let file_name = format!("{stem}-{timestamp}{extension}");
+    let directory = state
+        .environment
+        .assets_dir()
+        .join("notes")
+        .join(safe_path_segment(&request.account_id, "account"))
+        .join(safe_path_segment(&request.space_id, "space"))
+        .join(safe_path_segment(&request.note_id, "note"));
+
+    tokio::fs::create_dir_all(&directory)
+        .await
+        .map_err(|error| {
+            ApiError::Message(format!(
+                "Misty could not prepare note asset storage: {error}"
+            ))
+        })?;
+    let path = directory.join(&file_name);
+    tokio::fs::write(&path, &request.bytes)
+        .await
+        .map_err(|error| {
+            ApiError::Message(format!("Misty could not save this note file: {error}"))
+        })?;
+
+    Ok(NoteAssetStoreResult {
+        path: path.to_string_lossy().into_owned(),
+        name: original_name,
+        mime_type: request
+            .mime_type
+            .map(|value| value.trim().to_owned())
+            .filter(|value| !value.is_empty()),
+        byte_size: request.bytes.len() as u64,
+    })
+}
+
+fn safe_file_name(value: &str, fallback: &str) -> String {
+    let name = Path::new(value.trim())
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or(fallback);
+    safe_path_segment(name, fallback)
+}
+
+fn safe_path_segment(value: &str, fallback: &str) -> String {
+    let sanitized: String = value
+        .chars()
+        .map(|character| {
+            if character.is_ascii_alphanumeric() || matches!(character, '.' | '-' | '_' | ' ') {
+                character
+            } else {
+                '-'
+            }
+        })
+        .collect::<String>()
+        .trim_matches([' ', '.', '-'])
+        .to_owned();
+    if sanitized.is_empty() {
+        fallback.to_owned()
+    } else {
+        sanitized
+    }
 }
 
 #[tauri::command]
@@ -870,8 +998,16 @@ pub async fn explorer_open_path(file_path: String) -> ApiResult<()> {
 }
 
 #[tauri::command]
-pub async fn open_terminal_at_path(path: String) -> ApiResult<()> {
-    tokio::task::spawn_blocking(move || open_terminal_default(&path))
+pub async fn open_terminal_at_path(path: String, state: State<'_, MistyRuntime>) -> ApiResult<()> {
+    let settings = state.settings.snapshot().await?;
+    let preferred = settings
+        .document
+        .get("general")
+        .and_then(|section| section.get("preferred_terminal_app"))
+        .and_then(serde_json::Value::as_str)
+        .unwrap_or("System Default")
+        .to_owned();
+    tokio::task::spawn_blocking(move || open_terminal_default(&path, &preferred))
         .await
         .map_err(|err| ApiError::Message(format!("Open terminal worker failed: {err}")))?
 }
@@ -1124,6 +1260,45 @@ pub async fn providers_refresh(state: State<'_, MistyRuntime>) -> ApiResult<Prov
 }
 
 #[tauri::command]
+pub async fn providers_import_cloud_connection(
+    name: String,
+    provider_type: String,
+    connection_id: String,
+    access_token: String,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<ProvidersSnapshot> {
+    let name = name.trim();
+    let provider_type = provider_type.trim();
+    let access_token = access_token.trim();
+    if name.is_empty() || access_token.is_empty() {
+        return Err(ApiError::Message(
+            "Cloud connection name and access token are required.".to_owned(),
+        ));
+    }
+    if !matches!(provider_type, "drive" | "dropbox" | "onedrive") {
+        return Err(ApiError::Message(
+            "That cloud provider is not supported.".to_owned(),
+        ));
+    }
+    state
+        .storage_runtime
+        .call(
+            "config/create",
+            serde_json::json!({
+                "name": name,
+                "type": provider_type,
+                "parameters": {
+                    "access_token": access_token,
+                    "misty_connection_id": connection_id.trim(),
+                },
+                "opt": { "nonInteractive": true }
+            }),
+        )
+        .map_err(ApiError::Message)?;
+    state.providers.refresh().await
+}
+
+#[tauri::command]
 pub async fn providers_select_remote(
     name: String,
     state: State<'_, MistyRuntime>,
@@ -1148,9 +1323,7 @@ pub async fn providers_test_remote(
 }
 
 #[tauri::command]
-pub async fn providers_config_paths(
-    state: State<'_, MistyRuntime>,
-) -> ApiResult<RcloneConfigPaths> {
+pub async fn providers_config_paths(state: State<'_, MistyRuntime>) -> ApiResult<CloudConfigPaths> {
     state.providers.config_paths().await
 }
 
@@ -1310,7 +1483,7 @@ fn open_path_default(file_path: &str) -> ApiResult<()> {
         .map_err(|err| ApiError::Message(format!("Failed to open file: {err}")))
 }
 
-fn open_terminal_default(path: &str) -> ApiResult<()> {
+fn open_terminal_default(path: &str, preferred: &str) -> ApiResult<()> {
     let trimmed = path.trim();
     if trimmed.is_empty() {
         return Err(ApiError::Message("Folder path is required.".to_owned()));
@@ -1322,18 +1495,31 @@ fn open_terminal_default(path: &str) -> ApiResult<()> {
 
     #[cfg(target_os = "macos")]
     {
+        let application = match preferred {
+            "iTerm" => "iTerm",
+            "Warp" => "Warp",
+            "Ghostty" => "Ghostty",
+            "Alacritty" => "Alacritty",
+            _ => "Terminal",
+        };
         return Command::new("open")
             .arg("-a")
-            .arg("Terminal")
+            .arg(application)
             .arg(trimmed)
             .spawn()
             .map(|_| ())
-            .map_err(|err| ApiError::Message(format!("Failed to open Terminal: {err}")));
+            .map_err(|err| ApiError::Message(format!("Failed to open {application}: {err}")));
     }
 
     #[cfg(target_os = "windows")]
     {
-        match Command::new("wt").arg("-d").arg(trimmed).spawn() {
+        let executable = match preferred {
+            "Warp" => "warp",
+            "Ghostty" => "ghostty",
+            "Alacritty" => "alacritty",
+            _ => "wt",
+        };
+        match Command::new(executable).arg("-d").arg(trimmed).spawn() {
             Ok(_) => return Ok(()),
             Err(wt_err) => {
                 return Command::new("cmd")
@@ -1356,6 +1542,12 @@ fn open_terminal_default(path: &str) -> ApiResult<()> {
     ))]
     {
         let mut candidates = Vec::<String>::new();
+        match preferred {
+            "Warp" => candidates.push("warp-terminal".to_owned()),
+            "Ghostty" => candidates.push("ghostty".to_owned()),
+            "Alacritty" => candidates.push("alacritty".to_owned()),
+            _ => {}
+        }
         if let Ok(terminal) = env::var("TERMINAL") {
             let terminal = terminal.trim();
             if !terminal.is_empty() {

@@ -1,6 +1,6 @@
 import type { TaskDraft } from "@/models/types/features/spaces/SpaceTaskPrimitives";
 export type { TaskDraft } from "@/models/types/features/spaces/SpaceTaskPrimitives";
-import { Flag, ListTodo } from "lucide-react";
+import { Flag } from "lucide-react";
 import { EmptyState, ErrorState } from "@/ui";
 import type { SpaceTaskPriority, SpaceTaskStatus } from "@/models/types/features/spaces/types";
 import type { SpaceMember, SpaceTask } from "@/models/interfaces/features/spaces/types";
@@ -109,7 +109,6 @@ export function TaskEmptyState({
     <EmptyState
       className="min-h-56 max-w-none rounded-lg bg-muted/30"
       compact
-      icon={<ListTodo />}
       title={title}
       description={description}
     />

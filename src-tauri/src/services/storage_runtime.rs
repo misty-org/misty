@@ -1,20 +1,12 @@
 use std::{
     collections::HashMap,
-    ffi::{CStr, CString},
-    os::raw::{c_char, c_int},
     path::PathBuf,
     sync::{Arc, Mutex},
 };
 
 use serde_json::Value;
 
-use crate::services::environment::AppEnvironmentService;
-
-#[repr(C)]
-struct RpcResult {
-    output: *mut c_char,
-    status: c_int,
-}
+use crate::services::{direct_cloud::DirectCloudEngine, environment::AppEnvironmentService};
 
 #[derive(Clone)]
 pub struct StorageRuntimeService {
@@ -25,19 +17,10 @@ struct StorageRuntimeInner {
     call_lock: Mutex<()>,
     jobs: Mutex<HashMap<String, StorageJob>>,
     config_path: PathBuf,
+    engine: DirectCloudEngine,
     ready: bool,
     error: Option<String>,
 }
-
-struct LibraryLifecycle {
-    references: usize,
-    initialized: bool,
-}
-
-static LIBRARY_LIFECYCLE: Mutex<LibraryLifecycle> = Mutex::new(LibraryLifecycle {
-    references: 0,
-    initialized: false,
-});
 
 #[derive(Debug, Clone)]
 struct StorageJob {
@@ -66,10 +49,9 @@ pub struct StorageRuntimeSnapshot {
 
 impl StorageRuntimeService {
     pub fn start(environment: &AppEnvironmentService) -> Self {
-        let config_dir = environment.home_dir().join(".misty").join("rclone");
-        let config_path = config_dir.join("rclone.conf");
-        let mut acquired = false;
-        let startup = (|| -> Result<(), String> {
+        let config_dir = environment.home_dir().join(".misty").join("cloud");
+        let config_path = config_dir.join("connections.json");
+        let startup = (|| -> Result<DirectCloudEngine, String> {
             std::fs::create_dir_all(&config_dir).map_err(|error| {
                 format!("Could not create storage configuration directory: {error}")
             })?;
@@ -78,36 +60,22 @@ impl StorageRuntimeService {
                     format!("Could not initialize storage configuration: {error}")
                 })?;
             }
-            std::env::set_var("RCLONE_CONFIG", &config_path);
-            if let Some(password) = crate::services::keychain::rclone_config_password()
-                .filter(|value| !value.trim().is_empty())
-            {
-                std::env::set_var("RCLONE_CONFIG_PASS", password);
-            } else {
-                std::env::remove_var("RCLONE_CONFIG_PASS");
-            }
-            acquire_library()?;
-            acquired = true;
-            raw_rpc(
-                "config/setpath",
-                &serde_json::json!({ "path": config_path }),
-            )?;
-            Ok(())
+            DirectCloudEngine::new(config_path.clone())
         })();
-        let (ready, error) = match startup {
-            Ok(()) => (true, None),
-            Err(error) => {
-                if acquired {
-                    release_library();
-                }
-                (false, Some(error))
-            }
+        let (engine, ready, error) = match startup {
+            Ok(engine) => (engine, true, None),
+            Err(error) => (
+                DirectCloudEngine::unavailable(config_path.clone()),
+                false,
+                Some(error),
+            ),
         };
         Self {
             inner: Arc::new(StorageRuntimeInner {
                 call_lock: Mutex::new(()),
                 jobs: Mutex::new(HashMap::new()),
                 config_path,
+                engine,
                 ready,
                 error,
             }),
@@ -118,7 +86,7 @@ impl StorageRuntimeService {
         StorageRuntimeSnapshot {
             ready: self.inner.ready,
             error: self.inner.error.clone(),
-            version: "v1.74.4",
+            version: "direct-v1",
         }
     }
 
@@ -139,7 +107,7 @@ impl StorageRuntimeService {
             .call_lock
             .lock()
             .map_err(|_| "Storage service call lock is unavailable.".to_owned())?;
-        raw_rpc(method, &input)
+        self.inner.engine.call(method, input)
     }
 
     pub fn invoke(&self, method: &str, params: Value) -> Result<Value, String> {
@@ -268,7 +236,7 @@ impl StorageRuntimeService {
     fn health(&self) -> Result<Value, String> {
         let remotes = self.remotes()?.as_array().map_or(0, Vec::len);
         Ok(
-            serde_json::json!({"ready":self.inner.ready,"version":"v1.74.4","connected_providers":remotes,"available_providers":3}),
+            serde_json::json!({"ready":self.inner.ready,"version":"direct-v1","connected_providers":remotes,"available_providers":3}),
         )
     }
 
@@ -293,9 +261,30 @@ impl StorageRuntimeService {
     }
 
     fn remote_statuses(&self) -> Result<Value, String> {
-        Ok(Value::Array(self.remotes()?.as_array().cloned().unwrap_or_default().into_iter().map(|remote| serde_json::json!({
-            "name":remote.get("name"),"type":remote.get("type"),"status":"connected","status_label":"Connected","needs_reconnect":false
-        })).collect()))
+        let entries = self
+            .config_dump()?
+            .into_iter()
+            .filter_map(|(name, config)| {
+                let provider_type = config.get("type").and_then(Value::as_str)?;
+                if !supported_provider(provider_type) {
+                    return None;
+                }
+                let authorized = ["access_token", "token"].iter().any(|key| {
+                    config
+                        .get(*key)
+                        .and_then(Value::as_str)
+                        .is_some_and(|value| !value.trim().is_empty())
+                });
+                Some(serde_json::json!({
+                    "name": name,
+                    "type": provider_type,
+                    "status": if authorized { "connected" } else { "reauthorization_required" },
+                    "status_label": if authorized { "Connected" } else { "Sign in required" },
+                    "needs_reconnect": !authorized
+                }))
+            })
+            .collect();
+        Ok(Value::Array(entries))
     }
 
     fn remote_usages(&self) -> Result<Value, String> {
@@ -1132,214 +1121,6 @@ fn provider_parameters(provider_type: &str, mut parameters: Value) -> Result<Val
         }
     }
     Ok(parameters)
-}
-
-impl Drop for StorageRuntimeInner {
-    fn drop(&mut self) {
-        if self.ready {
-            release_library();
-        }
-    }
-}
-
-fn acquire_library() -> Result<(), String> {
-    let mut lifecycle = LIBRARY_LIFECYCLE
-        .lock()
-        .map_err(|_| "Storage library lifecycle is unavailable.".to_owned())?;
-    if !lifecycle.initialized {
-        initialize_library()?;
-        lifecycle.initialized = true;
-    }
-    lifecycle.references += 1;
-    Ok(())
-}
-
-fn release_library() {
-    let Ok(mut lifecycle) = LIBRARY_LIFECYCLE.lock() else {
-        return;
-    };
-    lifecycle.references = lifecycle.references.saturating_sub(1);
-    if lifecycle.references == 0 && lifecycle.initialized {
-        finalize_library();
-        lifecycle.initialized = false;
-    }
-}
-
-#[cfg(all(feature = "embedded-storage-go", not(windows)))]
-extern "C" {
-    fn MistyStorageInitialize();
-    fn MistyStorageFinalize();
-    fn MistyStorageCall(method: *const c_char, input: *const c_char) -> RpcResult;
-    fn MistyStorageFreeString(value: *mut c_char);
-}
-
-#[cfg(all(feature = "embedded-storage-go", not(windows)))]
-fn initialize_library() -> Result<(), String> {
-    unsafe { MistyStorageInitialize() };
-    Ok(())
-}
-
-#[cfg(all(feature = "embedded-storage-go", not(windows)))]
-fn finalize_library() {
-    unsafe { MistyStorageFinalize() };
-}
-
-#[cfg(all(feature = "embedded-storage-go", not(windows)))]
-fn raw_rpc(method: &str, input: &Value) -> Result<Value, String> {
-    let method =
-        CString::new(method).map_err(|_| "Storage method contained a NUL byte.".to_owned())?;
-    let input = CString::new(input.to_string())
-        .map_err(|_| "Storage input contained a NUL byte.".to_owned())?;
-    let result = unsafe { MistyStorageCall(method.as_ptr(), input.as_ptr()) };
-    let output = if result.output.is_null() {
-        String::new()
-    } else {
-        let output = unsafe { CStr::from_ptr(result.output) }
-            .to_string_lossy()
-            .into_owned();
-        unsafe { MistyStorageFreeString(result.output) };
-        output
-    };
-    if result.status >= 400 {
-        return Err(storage_error(
-            method.to_string_lossy().as_ref(),
-            result.status,
-            &output,
-        ));
-    }
-    if output.trim().is_empty() {
-        return Ok(serde_json::json!({}));
-    }
-    serde_json::from_str(&output).map_err(|error| format!("Storage response was invalid: {error}"))
-}
-
-#[cfg(all(feature = "embedded-storage-go", windows))]
-mod windows_library {
-    use super::*;
-    use libloading::Library;
-    use std::sync::OnceLock;
-
-    type Initialize = unsafe extern "C" fn();
-    type Finalize = unsafe extern "C" fn();
-    type Rpc = unsafe extern "C" fn(*const c_char, *const c_char) -> RpcResult;
-    type Free = unsafe extern "C" fn(*mut c_char);
-
-    pub struct Symbols {
-        _library: Library,
-        pub initialize: Initialize,
-        pub finalize: Finalize,
-        pub rpc: Rpc,
-        pub free: Free,
-    }
-
-    static SYMBOLS: OnceLock<Result<Symbols, String>> = OnceLock::new();
-
-    pub fn get() -> Result<&'static Symbols, String> {
-        match SYMBOLS.get_or_init(load) {
-            Ok(symbols) => Ok(symbols),
-            Err(error) => Err(error.clone()),
-        }
-    }
-
-    fn load() -> Result<Symbols, String> {
-        let explicit = std::env::var_os("MISTY_SERVICE_GO_LIB_DIR")
-            .map(PathBuf::from)
-            .map(|path| path.join("misty_service.dll"));
-        let path = explicit.unwrap_or_else(|| PathBuf::from("misty_service.dll"));
-        let library = unsafe { Library::new(&path) }.map_err(|error| {
-            format!(
-                "Could not load Misty storage library {}: {error}",
-                path.display()
-            )
-        })?;
-        unsafe {
-            Ok(Symbols {
-                initialize: *library
-                    .get(b"MistyStorageInitialize\0")
-                    .map_err(|e| e.to_string())?,
-                finalize: *library
-                    .get(b"MistyStorageFinalize\0")
-                    .map_err(|e| e.to_string())?,
-                rpc: *library
-                    .get(b"MistyStorageCall\0")
-                    .map_err(|e| e.to_string())?,
-                free: *library
-                    .get(b"MistyStorageFreeString\0")
-                    .map_err(|e| e.to_string())?,
-                _library: library,
-            })
-        }
-    }
-}
-
-#[cfg(all(feature = "embedded-storage-go", windows))]
-fn initialize_library() -> Result<(), String> {
-    unsafe { (windows_library::get()?.initialize)() };
-    Ok(())
-}
-
-#[cfg(all(feature = "embedded-storage-go", windows))]
-fn finalize_library() {
-    if let Ok(symbols) = windows_library::get() {
-        unsafe { (symbols.finalize)() };
-    }
-}
-
-#[cfg(all(feature = "embedded-storage-go", windows))]
-fn raw_rpc(method: &str, input: &Value) -> Result<Value, String> {
-    let symbols = windows_library::get()?;
-    let method_c =
-        CString::new(method).map_err(|_| "Storage method contained a NUL byte.".to_owned())?;
-    let input_c = CString::new(input.to_string())
-        .map_err(|_| "Storage input contained a NUL byte.".to_owned())?;
-    let result = unsafe { (symbols.rpc)(method_c.as_ptr(), input_c.as_ptr()) };
-    let output = if result.output.is_null() {
-        String::new()
-    } else {
-        let value = unsafe { CStr::from_ptr(result.output) }
-            .to_string_lossy()
-            .into_owned();
-        unsafe { (symbols.free)(result.output) };
-        value
-    };
-    if result.status >= 400 {
-        return Err(storage_error(method, result.status, &output));
-    }
-    if output.trim().is_empty() {
-        return Ok(serde_json::json!({}));
-    }
-    serde_json::from_str(&output).map_err(|error| format!("Storage response was invalid: {error}"))
-}
-
-#[cfg(not(feature = "embedded-storage-go"))]
-fn initialize_library() -> Result<(), String> {
-    Err("Misty storage library is not linked. Run npm run service:archive and enable embedded-storage-go.".to_owned())
-}
-
-#[cfg(not(feature = "embedded-storage-go"))]
-fn finalize_library() {}
-
-#[cfg(not(feature = "embedded-storage-go"))]
-fn raw_rpc(_method: &str, _input: &Value) -> Result<Value, String> {
-    Err("Misty storage library is not linked.".to_owned())
-}
-
-fn storage_error(method: &str, status: i32, output: &str) -> String {
-    let message = serde_json::from_str::<Value>(output)
-        .ok()
-        .and_then(|value| {
-            value
-                .get("error")
-                .and_then(Value::as_str)
-                .map(ToOwned::to_owned)
-        })
-        .filter(|value| !value.trim().is_empty())
-        .unwrap_or_else(|| output.trim().to_owned());
-    if message.is_empty() {
-        format!("Storage operation {method} failed ({status}).")
-    } else {
-        format!("Storage operation failed ({status}): {message}")
-    }
 }
 
 #[cfg(test)]

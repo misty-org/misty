@@ -26,10 +26,11 @@ import {
 import type { SavedAccountSession } from "@/models/interfaces/stores/account/useAuthTokenStore";
 import { isNativeMobileBuild } from "@/platform/buildTarget";
 import type { CurrentLicense } from "@/models/types/features/installer/types";
-import { resetMikaAccountState, useMikaSessionStore } from "@/stores/assistant/useMikaSessionStore";
+import { resetAgentAccountState, useAgentSessionStore } from "@/stores/agent/useAgentSessionStore";
 import { resetSpacesAccountState, useSpacesStore } from "@/stores/spaces/useSpacesStore";
 import { resetNotesAccountState } from "@/stores/notes/useNotesStore";
 import { useSetupStore } from "@/stores/app";
+import { useAppRouteMemoryStore } from "@/stores/app/useAppRouteMemoryStore";
 import { resetSearchAccountState, useExplorerStore } from "@/stores/explorer";
 import { useUserStore } from "@/stores/account/useUserStore";
 import { setAnalyticsAuthenticationState } from "@/analytics/lifecycle";
@@ -85,6 +86,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const deactivateToChooser = useCallback(async () => {
     await deactivateActiveAccount();
     await signOut();
+    useAppRouteMemoryStore.getState().resetAppRoute();
     useUserStore.getState().clear();
     setUserState(null);
     setAccounts(listSavedAccountSessions());
@@ -300,6 +302,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // already fetch /me before setting the user.
   }, [activeUser, beginAccountOperation, finishAccountOperation, deactivateToChooser]);
 
+  useEffect(() => {
+    if (!activeUser) return;
+    let canceled = false;
+    const handleInvalidSession = () => {
+      if (canceled || accountOperationActive.current) return;
+      beginAccountOperation();
+      resetAccountScopedState();
+      void deactivateToChooser().finally(() => {
+        if (!canceled) finishAccountOperation();
+      });
+    };
+    window.addEventListener("misty:account-session-invalid", handleInvalidSession);
+    return () => {
+      canceled = true;
+      window.removeEventListener("misty:account-session-invalid", handleInvalidSession);
+    };
+  }, [activeUser, beginAccountOperation, deactivateToChooser, finishAccountOperation]);
+
   // Signing out no longer hops to another saved account. It deactivates the
   // current one — leaving it (and every other account) listed on the sign-in
   // chooser — and never revokes tokens, so the chooser can resume any account
@@ -390,13 +410,13 @@ function resetAccountScopedState(): void {
   useExplorerStore.setState({ notifications: [], notificationHistory: [] });
   resetSearchAccountState();
   resetSpacesAccountState();
-  resetMikaAccountState();
+  resetAgentAccountState();
   resetNotesAccountState();
 }
 
 function refreshAuthenticatedAccountState(): void {
   void useSpacesStore.getState().load();
-  void useMikaSessionStore.getState().refreshStatus();
+  void useAgentSessionStore.getState().refreshStatus();
 }
 
 function authUserFromMe(me: AccountMeResponse, fallback: SavedAccountSession): AuthUser {

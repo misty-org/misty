@@ -18,6 +18,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/ui";
 import { Input } from "@/ui";
 import { Separator } from "@/ui";
 import { DiscordLinkPanel } from "@/features/spaces/integrations/DiscordLinkPanel";
+import { NotionIntegrationPanel } from "@/features/spaces/integrations/NotionIntegrationPanel";
+import { SpaceSetupCards } from "./SpaceSetupCards";
 import { useSpacesStore } from "@/stores/spaces/useSpacesStore";
 
 const validSections = new Set(["general", "chat", "integrations"]);
@@ -65,7 +67,7 @@ export function SpaceSettings({ spaceId, section }: { spaceId: string; section: 
     clearError();
     try {
       await leaveSpace(spaceId);
-      navigate("/spaces/personal", { replace: true });
+      navigate("/spaces", { replace: true });
     } catch {
       /* The shared store error remains visible in the dialog. */
     } finally {
@@ -73,13 +75,12 @@ export function SpaceSettings({ spaceId, section }: { spaceId: string; section: 
     }
   };
   const submitDelete = async () => {
-    if (!space || !isOwner || space.is_personal || deleteConfirmation !== space.name || dangerBusy)
-      return;
+    if (!space || !isOwner || deleteConfirmation !== space.name || dangerBusy) return;
     setDangerBusy(true);
     clearError();
     try {
       await deleteSpace(spaceId, deleteConfirmation);
-      navigate("/spaces/personal", { replace: true });
+      navigate("/spaces", { replace: true });
     } catch {
       /* The shared store error remains visible in the dialog. */
     } finally {
@@ -109,9 +110,7 @@ export function SpaceSettings({ spaceId, section }: { spaceId: string; section: 
                     The name and access model shown across Misty.
                   </p>
                 </div>
-                <Badge variant="outline">
-                  {space.is_personal ? "Personal" : space.is_shared ? "Shared" : "Private"}
-                </Badge>
+                <Badge variant="outline">{space.is_shared ? "Shared" : "Private"}</Badge>
               </CardHeader>
               <CardContent>
                 <form className="flex max-w-lg gap-2" onSubmit={(event) => void saveName(event)}>
@@ -166,11 +165,7 @@ export function SpaceSettings({ spaceId, section }: { spaceId: string; section: 
                 </p>
               </CardHeader>
               <CardContent>
-                {space.is_personal ? (
-                  <p className="m-0 text-xs leading-relaxed text-muted-foreground">
-                    Your default personal Space cannot be left or deleted.
-                  </p>
-                ) : isOwner ? (
+                {isOwner ? (
                   <div className="flex flex-wrap items-center justify-between gap-4">
                     <div className="min-w-0 flex-1">
                       <p className="m-0 text-sm font-medium">Delete this Space</p>
@@ -232,10 +227,9 @@ export function SpaceSettings({ spaceId, section }: { spaceId: string; section: 
 
         {activeSection === "integrations" ? (
           <div className="grid gap-5">
-            <DiscordLinkPanel
-              spaceId={spaceId}
-              canManage={space.permissions?.["integrations.manage"] !== false}
-            />
+            <SpaceSetupCards spaceId={spaceId} isOwner={isOwner} />
+            <NotionIntegrationPanel spaceId={spaceId} canManage={isOwner} />
+            <DiscordLinkPanel spaceId={spaceId} canManage={isOwner} />
           </div>
         ) : null}
       </div>

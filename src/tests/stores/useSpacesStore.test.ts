@@ -4,6 +4,7 @@ import {
   resetSpacesAccountState,
   useSpacesStore,
 } from "@/stores/spaces/useSpacesStore";
+import { SpaceRequestError } from "@/stores/spaces/useSpacesBackendStore";
 import type {
   Space,
   SpaceMember,
@@ -29,10 +30,21 @@ const apiMocks = vi.hoisted(() => ({
   members: vi.fn(),
   messages: vi.fn(),
   nodes: vi.fn(),
+  chatAgents: vi.fn(),
 }));
 
 vi.mock("@/stores/spaces/useSpacesBackendStore", () => ({
   resolveSpacesApiBase: vi.fn(async () => "http://localhost:8081/api"),
+  SpaceRequestError: class SpaceRequestError extends Error {
+    constructor(
+      message: string,
+      readonly status: number,
+      readonly code?: string,
+    ) {
+      super(message);
+      this.name = "SpaceRequestError";
+    }
+  },
   spacesApi: {
     realtimeTicket: apiMocks.realtimeTicket,
     rename: apiMocks.rename,
@@ -51,6 +63,7 @@ vi.mock("@/stores/spaces/useSpacesBackendStore", () => ({
     members: apiMocks.members,
     messages: apiMocks.messages,
     nodes: apiMocks.nodes,
+    chatAgents: apiMocks.chatAgents,
   },
 }));
 
@@ -125,9 +138,11 @@ describe("buildMessageSpans", () => {
     ]);
   });
 
-  it("keeps unsupported shared @Mika text literal instead of sending an invalid Agent span", () => {
-    expect(buildMessageSpans("@Mika summarize these files", [member], [agent])).toEqual([
-      { type: "text", text: "@Mika summarize these files" },
+  // Spans are only ever synthesized from a real member or agent record, never
+  // from raw text that merely looks like a mention.
+  it("keeps an unmatched agent-style mention literal instead of sending an invalid Agent span", () => {
+    expect(buildMessageSpans("@Nonexistent summarize these files", [member], [agent])).toEqual([
+      { type: "text", text: "@Nonexistent summarize these files" },
     ]);
   });
 
@@ -157,6 +172,33 @@ describe("Space loading access boundary", () => {
   });
 
   afterEach(() => resetSpacesAccountState());
+
+  it("coalesces concurrent automatic snapshot loads", async () => {
+    let resolveSnapshot: (value: {
+      spaces: Space[];
+      invitations: never[];
+      entitlements: null;
+    }) => void = () => {};
+    apiMocks.snapshot.mockReturnValue(
+      new Promise((resolve) => {
+        resolveSnapshot = resolve;
+      }),
+    );
+
+    const first = useSpacesStore.getState().load();
+    const second = useSpacesStore.getState().load();
+
+    expect(apiMocks.snapshot).toHaveBeenCalledTimes(1);
+    resolveSnapshot({ spaces: [], invitations: [], entitlements: null });
+    await Promise.all([first, second]);
+
+    await useSpacesStore.getState().load();
+    expect(apiMocks.snapshot).toHaveBeenCalledTimes(1);
+
+    apiMocks.snapshot.mockResolvedValue({ spaces: [], invitations: [], entitlements: null });
+    await useSpacesStore.getState().load({ force: true });
+    expect(apiMocks.snapshot).toHaveBeenCalledTimes(2);
+  });
 
   it("does not fan out protected requests when a fresh snapshot omits the Space", async () => {
     apiMocks.snapshot.mockResolvedValue({ spaces: [], invitations: [], limits: null });
@@ -193,6 +235,17 @@ describe("Space loading access boundary", () => {
       error: "offline",
     });
   });
+
+  it("releases loading when loadSpace cannot obtain a fresh snapshot", async () => {
+    apiMocks.snapshot.mockResolvedValue({ spaces: [], invitations: [], entitlements: null });
+    await useSpacesStore.getState().load();
+    useSpacesStore.setState({ snapshotReady: false, loading: false });
+
+    await useSpacesStore.getState().loadSpace("stale");
+
+    expect(apiMocks.snapshot).toHaveBeenCalledTimes(1);
+    expect(useSpacesStore.getState().loading).toBe(false);
+  });
 });
 
 describe("Spaces mutations", () => {
@@ -202,6 +255,7 @@ describe("Spaces mutations", () => {
     apiMocks.sendMessage.mockReset();
     apiMocks.updateMessage.mockReset();
     apiMocks.deleteMessage.mockReset();
+    apiMocks.chatAgents.mockReset();
     apiMocks.removeMember.mockReset();
     apiMocks.respondInvite.mockReset();
     apiMocks.leave.mockReset();
@@ -267,6 +321,18 @@ describe("Spaces mutations", () => {
     expect(useSpacesStore.getState().error).toBeNull();
   });
 
+  it("treats closed-off chat Agents as optional suggestions", async () => {
+    apiMocks.chatAgents.mockRejectedValue(
+      new SpaceRequestError("You no longer have access to this Space.", 403, "forbidden"),
+    );
+    useSpacesStore.setState({ agentsBySpace: { "space-default": [agent] }, error: null });
+
+    await useSpacesStore.getState().loadChatAgents("space-default");
+
+    expect(useSpacesStore.getState().agentsBySpace["space-default"]).toEqual([]);
+    expect(useSpacesStore.getState().error).toBeNull();
+  });
+
   // Regression coverage: these actions previously had no error handling at all,
   // so a failed request left `error` untouched and the UI's error banner (which
   // every caller's own comments assumed would show something) stayed empty.
@@ -329,6 +395,8 @@ describe("Spaces realtime account lifecycle", () => {
   beforeEach(() => {
     resetSpacesAccountState();
     apiMocks.realtimeTicket.mockReset();
+    apiMocks.snapshot.mockReset();
+    apiMocks.members.mockReset();
     FakeWebSocket.instances = [];
     vi.stubGlobal("WebSocket", FakeWebSocket);
     const values = new Map<string, string>();
@@ -370,6 +438,21 @@ describe("Spaces realtime account lifecycle", () => {
 
     expect(FakeWebSocket.instances).toHaveLength(1);
     expect(String(FakeWebSocket.instances[0].url)).toContain("ticket=new-ticket");
+  });
+
+  it("coalesces concurrent realtime ticket requests for one account", async () => {
+    const ticket = deferred<{ ticket: string; expires_in: number }>();
+    apiMocks.realtimeTicket.mockReturnValue(ticket.promise);
+
+    const first = useSpacesStore.getState().connectRealtime("active-account");
+    const second = useSpacesStore.getState().connectRealtime("active-account");
+
+    expect(apiMocks.realtimeTicket).toHaveBeenCalledTimes(1);
+    ticket.resolve({ ticket: "shared-ticket", expires_in: 60 });
+    await Promise.all([first, second]);
+
+    expect(FakeWebSocket.instances).toHaveLength(1);
+    expect(String(FakeWebSocket.instances[0].url)).toContain("ticket=shared-ticket");
   });
 
   it("reconnects a failed socket with the active account", async () => {
@@ -450,6 +533,29 @@ describe("Spaces realtime account lifecycle", () => {
     },
   );
 
+  it.each(["note.created", "note.projection.updated", "note.deleted"])(
+    "announces %s events to the active Notes view",
+    async (eventType) => {
+      const listener = vi.fn();
+      apiMocks.realtimeTicket.mockResolvedValue({ ticket: "note-ticket", expires_in: 60 });
+      useSpacesStore.setState({
+        spaces: [spaceFixture({ id: "space" })],
+      });
+      window.addEventListener("misty:space-note-event", listener);
+
+      await useSpacesStore.getState().connectRealtime("active-account");
+      FakeWebSocket.instances[0].open();
+      FakeWebSocket.instances[0].message({
+        type: "event",
+        event: spaceEventFixture({ type: eventType }),
+      });
+      await Promise.resolve();
+
+      expect(listener).toHaveBeenCalledOnce();
+      window.removeEventListener("misty:space-note-event", listener);
+    },
+  );
+
   it("does not announce Library events when Library visibility is denied", async () => {
     const listener = vi.fn();
     apiMocks.realtimeTicket.mockResolvedValue({ ticket: "library-denied-ticket", expires_in: 60 });
@@ -469,6 +575,27 @@ describe("Spaces realtime account lifecycle", () => {
     expect(listener).not.toHaveBeenCalled();
     window.removeEventListener("misty:space-library-event", listener);
   });
+
+  it("does not reload members for realtime events from inaccessible spaces", async () => {
+    apiMocks.realtimeTicket.mockResolvedValue({ ticket: "member-ticket", expires_in: 60 });
+    apiMocks.snapshot.mockResolvedValue({ spaces: [], invitations: [], limits: null });
+    useSpacesStore.setState({
+      spaces: [spaceFixture({ id: "space-stale" })],
+    });
+
+    await useSpacesStore.getState().connectRealtime("active-account");
+    FakeWebSocket.instances[0].open();
+    FakeWebSocket.instances[0].message({
+      type: "event",
+      event: spaceEventFixture({ space_id: "space-stale", type: "member.left" }),
+    });
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(apiMocks.snapshot).toHaveBeenCalledOnce();
+    expect(apiMocks.members).not.toHaveBeenCalled();
+    expect(useSpacesStore.getState().error).toBeNull();
+  });
 });
 
 function deferred<T>() {
@@ -487,7 +614,6 @@ function spaceFixture(patch: Partial<Space> = {}): Space {
     role: "owner",
     member_count: 1,
     pending_count: 0,
-    is_personal: true,
     is_shared: false,
     created_at: "2026-07-15T00:00:00Z",
     updated_at: "2026-07-15T00:00:00Z",

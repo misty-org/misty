@@ -9,7 +9,7 @@ export type {
   MediaChunkIndexResponse,
 } from "@/models/interfaces/stores/media/useMediaSearchServerStore";
 import type { PreparedMediaChunk } from "@/models/interfaces/services/misty-api";
-import { managedAiRequest } from "@/stores/assistant/useAiServerStore";
+import { managedAiRequest } from "@/stores/agent/useAiServerStore";
 
 const basePath = "/ai/media-search";
 export function indexMediaChunk(chunk: PreparedMediaChunk): Promise<MediaChunkIndexResponse> {

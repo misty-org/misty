@@ -30,7 +30,6 @@ export interface Space {
   role: SpaceRole;
   member_count: number;
   pending_count: number;
-  is_personal: boolean;
   is_shared: boolean;
   permissions?: Record<string, boolean>;
   created_at: string;
@@ -41,12 +40,55 @@ export interface SpaceInvitation {
   id: string;
   space_id: string;
   space_name: string;
-  invited_user_id: string;
-  invited_user_name: string;
+  invited_user_id?: string;
+  invited_user_name?: string;
   invited_email: string;
   invited_by_user_id: string;
+  inviter_name?: string;
+  delivery_status: "pending" | "sent" | "failed";
   expires_at: string;
   created_at: string;
+}
+
+export type SpaceIntegrationProvider = "google" | "discord" | "notion";
+
+export interface SpaceTemplateSeedSummary {
+  task_count: number;
+  note_count: number;
+  collection_count: number;
+}
+
+export interface SpaceTemplate {
+  id: string;
+  name: string;
+  description: string;
+  version: number;
+  recommended_integrations: SpaceIntegrationProvider[];
+  seed_summary: SpaceTemplateSeedSummary;
+}
+
+export interface CreateSpaceRequest {
+  name: string;
+  template_id: string;
+  integration_providers: SpaceIntegrationProvider[];
+}
+
+export interface SpaceSetup {
+  selected_providers: SpaceIntegrationProvider[];
+  completed_providers: SpaceIntegrationProvider[];
+  pending_providers: SpaceIntegrationProvider[];
+}
+
+export interface CreateSpaceResult {
+  space: Space;
+  setup: SpaceSetup;
+}
+
+export interface SpaceInvitationPreview {
+  space_name: string;
+  inviter_name: string;
+  invited_email: string;
+  expires_at: string;
 }
 
 export interface SpaceMember {
@@ -167,6 +209,7 @@ export interface SpaceMessage {
   file_node_ids: string[];
   library_item_ids?: string[];
   attachments?: MessageAttachment[];
+  reactions?: SpaceMessageReaction[];
   reply_to_message_id?: string;
   edited_at?: string;
   /**
@@ -175,6 +218,12 @@ export interface SpaceMessage {
    */
   origin?: MessageOrigin;
   created_at: string;
+}
+
+export interface SpaceMessageReaction {
+  emoji: string;
+  count: number;
+  reacted_by_me?: boolean;
 }
 
 export interface SpaceNode {
@@ -418,16 +467,6 @@ export interface LibraryDiscovery {
   memories: LibraryDiscoveryGroup[];
   trips: LibraryDiscoveryGroup[];
   duplicates: LibraryDiscoveryGroup[];
-  map_points: LibraryMapPoint[];
-}
-
-export interface LibraryMapPoint {
-  id: string;
-  name: string;
-  latitude: number;
-  longitude: number;
-  item_count: number;
-  cover_item_id?: string;
 }
 
 export interface LibraryPinnedCollection {
@@ -477,6 +516,11 @@ export interface LibrarySharedReference {
 export interface SpaceStorageUsage {
   space_id: string;
   storage_available?: boolean;
+  /** Usage attributed to the selected Space. */
+  space_used_bytes?: number;
+  /** Pending storage attributed to the selected Space. */
+  space_reserved_bytes?: number;
+  /** Usage across the Space owner's shared storage pool. */
   used_bytes?: number;
   reserved_bytes?: number;
   limit_bytes?: number;

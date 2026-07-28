@@ -9,11 +9,10 @@ use crate::services::media_search::MediaSearchService;
 #[cfg(desktop)]
 use crate::services::plugin_commands::PluginCommandService;
 use crate::services::{
-    agents::AgentService, claude::ClaudeService,
-    commands::CommandService, devices::DeviceService, directory_size::DirectorySizeService,
-    environment::AppEnvironmentService, explorer::ExplorerService,
-    explorer_library::ExplorerLibraryService, file_sync::FileSyncService,
-    metadata::MetadataService, operation_queue::OperationQueueService,
+    agents::AgentService, claude::ClaudeService, commands::CommandService, devices::DeviceService,
+    directory_size::DirectorySizeService, environment::AppEnvironmentService,
+    explorer::ExplorerService, explorer_library::ExplorerLibraryService,
+    file_sync::FileSyncService, metadata::MetadataService, operation_queue::OperationQueueService,
     power_pack::PowerPackService, providers::ProviderService, search::SearchService,
     settings::SettingsService, smart_library::SmartLibraryService, storage::StorageService,
     storage_runtime::StorageRuntimeService, transfers::TransferService,
@@ -64,7 +63,6 @@ impl MistyRuntime {
         let storage = StorageService::new_with_storage_runtime(
             environment.clone(),
             Some(storage_runtime.clone()),
-            None,
         );
         let providers = ProviderService::new(storage.clone());
         let transfers = TransferService::new(environment.clone());
@@ -77,7 +75,10 @@ impl MistyRuntime {
         #[cfg(desktop)]
         let plugin_commands = PluginCommandService::new(environment.clone());
         #[cfg(desktop)]
-        let extension_runtime = ExtensionRuntimeService::new(environment.clone());
+        let extension_runtime = ExtensionRuntimeService::new_with_storage_runtime(
+            environment.clone(),
+            storage_runtime.clone(),
+        );
         let explorer_library = ExplorerLibraryService::new(environment.clone());
         let search = SearchService::new(environment.clone(), providers.clone(), storage.clone());
         let explorer = ExplorerService::new(

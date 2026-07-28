@@ -1,3 +1,4 @@
+use crate::runtime::MistyRuntime;
 use crate::services::paths;
 use aes_gcm::{
     aead::{Aead, KeyInit},
@@ -321,59 +322,6 @@ fn release_date_label(published_at: Option<&str>) -> String {
         .filter(|value| !value.is_empty())
         .unwrap_or("Unpublished")
         .to_owned()
-}
-
-#[cfg(target_os = "windows")]
-fn find_misty_rclone_rcd_port() -> Option<u16> {
-    None
-}
-
-#[cfg(not(target_os = "windows"))]
-fn find_misty_rclone_rcd_port() -> Option<u16> {
-    let output = Command::new("ps")
-        .args(["-axo", "command="])
-        .output()
-        .ok()?;
-    if !output.status.success() {
-        return None;
-    }
-
-    String::from_utf8_lossy(&output.stdout)
-        .lines()
-        .map(str::trim)
-        .find(|command| {
-            command.contains("/.misty/rclone/rclone")
-                && command.contains(" rcd")
-                && command.contains("--rc-addr")
-        })
-        .and_then(extract_port_from_command_line)
-}
-
-fn extract_port_from_command_line(command: &str) -> Option<u16> {
-    let parts: Vec<_> = command.split_whitespace().collect();
-
-    for index in 0..parts.len() {
-        let part = parts[index];
-        let value = if let Some(value) = part.strip_prefix("--rc-addr=") {
-            Some(value)
-        } else if part == "--rc-addr" {
-            parts.get(index + 1).copied()
-        } else {
-            None
-        };
-
-        if let Some(addr) = value {
-            return extract_port_from_addr(addr);
-        }
-    }
-
-    None
-}
-
-fn extract_port_from_addr(addr: &str) -> Option<u16> {
-    let trimmed = addr.trim_matches('"').trim_matches('\'');
-    let port = trimmed.rsplit(':').next()?;
-    port.parse::<u16>().ok()
 }
 
 #[tauri::command]
@@ -764,7 +712,7 @@ pub fn set_plugin_enabled(
 }
 
 #[tauri::command]
-pub fn sign_out_misty() -> Result<NativeSystemInfo, String> {
+pub fn sign_out_misty(state: tauri::State<'_, MistyRuntime>) -> Result<NativeSystemInfo, String> {
     ensure_database()?;
     let conn = Connection::open(misty_db_path()?)
         .map_err(|error| format!("Could not open Misty database: {error}"))?;
@@ -787,6 +735,9 @@ pub fn sign_out_misty() -> Result<NativeSystemInfo, String> {
     .map_err(|error| format!("Could not sign out of Misty: {error}"))?;
     tx.commit()
         .map_err(|error| format!("Could not finish Misty sign-out: {error}"))?;
+    let _ = state
+        .storage_runtime
+        .call("misty/clear-session-tokens", serde_json::json!({}));
 
     Ok(system_info)
 }

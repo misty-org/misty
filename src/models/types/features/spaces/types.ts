@@ -31,7 +31,6 @@ import type {
   LibrarySearchFacets,
   LibraryDiscoveryGroup,
   LibraryDiscovery,
-  LibraryMapPoint,
   LibraryPinnedCollection,
   LibraryImportHistoryItem,
   LibrarySharedReference,

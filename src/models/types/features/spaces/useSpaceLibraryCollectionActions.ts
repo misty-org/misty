@@ -5,7 +5,6 @@ import {
   History,
   Image as ImageIcon,
   BookOpenText as LibraryIcon,
-  Map as MapIcon,
   MapPin,
   MessagesSquare,
   Music2,

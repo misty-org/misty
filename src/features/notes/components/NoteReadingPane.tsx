@@ -1,8 +1,11 @@
-import type { NoteReadingPaneProps } from "@/models/interfaces/features/notes/components/NoteReadingPane";
+import type {
+  NoteContentDraft,
+  NoteReadingPaneProps,
+} from "@/models/interfaces/features/notes/components/NoteReadingPane";
 export type { NoteReadingPaneProps } from "@/models/interfaces/features/notes/components/NoteReadingPane";
 import { Suspense, lazy, useEffect, useState } from "react";
-import { Check, FileText, PenLine, Plus, Star, X } from "lucide-react";
-import { Button, EmptyState, ScrollArea, Skeleton, cn } from "@/ui";
+import { Check, PenLine, Plus, Star, X } from "lucide-react";
+import { Button, EmptyState, Skeleton, cn } from "@/ui";
 import { relativeTime } from "@/features/notes/noteFilters";
 import { NoteSyncIndicator } from "./NoteSourceBadge";
 
@@ -12,16 +15,22 @@ const paneClass = "grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] bg-backgro
 
 const headerClass = "shrink-0 border-b border-border px-5 py-3.5";
 
-const noteBodyClass = "mx-auto w-full max-w-[760px] px-5 py-6";
+const noteBodyClass = "w-full px-[clamp(24px,4vw,56px)] py-6";
+
+const editableNoteBodyClass = "w-full min-w-0 py-6 pl-16 pr-5";
 
 export function NoteReadingPane(props: NoteReadingPaneProps) {
   const { note } = props;
-  const [draft, setDraft] = useState("");
+  const [draft, setDraft] = useState<NoteContentDraft>({
+    body: "",
+    bodyFormat: "markdown" as const,
+    bodyMarkdown: undefined as string | undefined,
+  });
   const editing = Boolean(note && props.editingNoteId === note.id);
 
   useEffect(() => {
-    if (!editing) setDraft(note?.body ?? "");
-  }, [editing, note?.body, note?.id]);
+    if (!editing) setDraft(noteContent(note));
+  }, [editing, note?.body, note?.bodyFormat, note?.bodyMarkdown, note?.id]);
 
   if (props.loading) return <ReadingPaneSkeleton />;
 
@@ -30,7 +39,6 @@ export function NoteReadingPane(props: NoteReadingPaneProps) {
       <div className={paneClass}>
         <div className="row-span-2 grid place-items-center">
           <EmptyState
-            icon={<FileText />}
             title="No note selected"
             description="Pick a note from the list, or start a new one in Misty."
             action={
@@ -45,9 +53,9 @@ export function NoteReadingPane(props: NoteReadingPaneProps) {
     );
   }
 
-  // Editability is a connector capability, not a per-source special case: the
-  // pane offers Edit only when the store handed down a save handler.
-  const editable = Boolean(props.onSaveBody);
+  const collaborative = note.source === "misty" && Boolean(note.spaceId);
+  const editable = Boolean(props.onSaveBody || props.onSaveContent);
+  const bodyEditable = collaborative || editable;
 
   return (
     <article className={paneClass} aria-label={note.title}>
@@ -88,7 +96,7 @@ export function NoteReadingPane(props: NoteReadingPaneProps) {
                     size="sm"
                     className="h-8 gap-1.5"
                     onClick={() => {
-                      setDraft(note.body);
+                      setDraft(noteContent(note));
                       props.onEditingNoteChange?.(undefined);
                     }}
                   >
@@ -100,7 +108,11 @@ export function NoteReadingPane(props: NoteReadingPaneProps) {
                     size="sm"
                     className="h-8 gap-1.5"
                     onClick={() => {
-                      props.onSaveBody?.(note.id, draft);
+                      if (props.onSaveContent) {
+                        props.onSaveContent(note.id, draft);
+                      } else {
+                        props.onSaveBody?.(note.id, draft.bodyMarkdown ?? draft.body);
+                      }
                       props.onEditingNoteChange?.(undefined);
                     }}
                   >
@@ -125,23 +137,68 @@ export function NoteReadingPane(props: NoteReadingPaneProps) {
         </div>
       </header>
 
-      <ScrollArea className="min-h-0">
-        {editing ? (
-          <div className={noteBodyClass}>
+      <div className="misty-scrollbar min-h-0 overflow-auto overscroll-contain">
+        {collaborative ? (
+          <div className={editableNoteBodyClass}>
             <Suspense fallback={<Skeleton className="h-[420px] w-full" />}>
-              <NoteBlockEditor editable markdown={draft} onMarkdownChange={setDraft} />
+              <NoteBlockEditor
+                key={note.id}
+                editable={bodyEditable}
+                collaborative
+                autoFocus
+                noteId={note.sourceId}
+                accountId={props.accountId}
+                spaceId={note.spaceId}
+                body={note.body}
+                bodyFormat={note.bodyFormat}
+                bodyMarkdown={note.bodyMarkdown}
+              />
+            </Suspense>
+          </div>
+        ) : editing ? (
+          <div className={editableNoteBodyClass}>
+            <Suspense fallback={<Skeleton className="h-[420px] w-full" />}>
+              <NoteBlockEditor
+                key={note.id}
+                editable
+                autoFocus
+                noteId={note.sourceId}
+                accountId={props.accountId}
+                spaceId={note.spaceId}
+                body={draft.body}
+                bodyFormat={draft.bodyFormat}
+                bodyMarkdown={draft.bodyMarkdown}
+                onContentChange={setDraft}
+              />
             </Suspense>
           </div>
         ) : (
           <div className={noteBodyClass}>
             <Suspense fallback={<Skeleton className="h-48 w-full" />}>
-              <NoteBlockEditor editable={false} markdown={note.body} />
+              <NoteBlockEditor
+                key={note.id}
+                editable={false}
+                noteId={note.sourceId}
+                accountId={props.accountId}
+                spaceId={note.spaceId}
+                body={note.body}
+                bodyFormat={note.bodyFormat}
+                bodyMarkdown={note.bodyMarkdown}
+              />
             </Suspense>
           </div>
         )}
-      </ScrollArea>
+      </div>
     </article>
   );
+}
+
+function noteContent(note: NoteReadingPaneProps["note"]) {
+  return {
+    body: note?.body ?? "",
+    bodyFormat: note?.bodyFormat ?? "markdown",
+    bodyMarkdown: note?.bodyMarkdown,
+  };
 }
 
 function ReadingPaneSkeleton() {
@@ -151,7 +208,7 @@ function ReadingPaneSkeleton() {
         <Skeleton className="h-5 w-1/2" />
         <Skeleton className="mt-2 h-3 w-1/3" />
       </div>
-      <div className="mx-auto w-full max-w-[680px] space-y-3 px-5 py-6">
+      <div className="w-full space-y-3 px-[clamp(24px,4vw,56px)] py-6">
         {[0, 1, 2, 3, 4, 5].map((row) => (
           <Skeleton key={row} className={row % 3 === 2 ? "h-3 w-3/5" : "h-3 w-full"} />
         ))}

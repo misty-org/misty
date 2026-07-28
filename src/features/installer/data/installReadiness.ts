@@ -19,7 +19,6 @@ export const browserTemplateEntries: MistyTemplateEntry[] = [
   templateEntry("dir", "config/sessions"),
   templateEntry("dir", "db"),
   templateEntry("dir", "forms"),
-  templateEntry("dir", "rclone"),
   templateEntry("dir", "tmp"),
   templateEntry("dir", "tmp/transfers"),
   templateEntry("dir", "tmp/downloads"),

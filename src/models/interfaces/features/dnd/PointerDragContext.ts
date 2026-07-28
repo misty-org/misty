@@ -10,7 +10,7 @@ export interface PointerDragPayload {
 export interface PointerDropZoneSpec {
   id: string;
   accepts: (payload: PointerDragPayload) => boolean;
-  onDrop: (payload: PointerDragPayload) => void;
+  onDrop: (payload: PointerDragPayload, pointer: { x: number; y: number }) => void;
 }
 
 export interface PointerDragState {

@@ -42,7 +42,7 @@ const SIDEBAR_COLLAPSE_STORAGE_KEY = "misty.explorer.sidebar.collapsed";
 const QUICK_ACCESS_HIDDEN_STORAGE_KEY = "misty.explorer.sidebar.quickAccessHidden";
 
 export const sidebarStyles = {
-  root: "misty-transient-scrollbar h-full min-h-0 min-w-0 overflow-x-hidden overflow-y-auto bg-[var(--misty-files-panel-bg,var(--sidebar))] px-4 py-4 text-sidebar-foreground [overscroll-behavior:contain] max-[980px]:hidden",
+  root: "misty-transient-scrollbar h-full min-h-0 min-w-0 overflow-x-hidden overflow-y-auto bg-[var(--misty-files-panel-bg,transparent)] px-4 py-4 text-sidebar-foreground [overscroll-behavior:contain] max-[980px]:hidden",
   section: "[&+&]:mt-5",
   sectionTitle: "group/section-title mb-2 flex min-w-0 items-center gap-2",
   sectionToggle:
@@ -50,7 +50,7 @@ export const sidebarStyles = {
   sectionToggleLabel:
     "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-sm font-semibold",
   sectionChevron: "flex-none text-muted-foreground",
-  sectionActions: "ml-auto flex flex-none items-center gap-[3px]",
+  sectionActions: "ml-auto flex flex-none items-center gap-0",
   sectionActionsReveal:
     "opacity-0 transition-opacity group-hover/section-title:opacity-100 group-focus-within/section-title:opacity-100",
   sectionActionButton: "size-8 text-muted-foreground shadow-none",

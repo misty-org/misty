@@ -8,7 +8,7 @@ import type {
 import type { MessageSpan } from "@/models/types/features/spaces/types";
 
 /**
- * One Space ↔ Discord channel binding. Beta allows a single link per Space, but
+ * One Space ↔ Discord channel binding. A Space can contain multiple links, but
  * the record is keyed by conversation so lifting that cap later is additive.
  *
  * No Discord token lives here. The bot token stays server-side behind

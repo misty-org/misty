@@ -13,7 +13,7 @@ fn upload_filter_ignores_provider_disallowed_metadata() {
 }
 
 #[test]
-fn remote_job_progress_adds_partial_rclone_bytes_to_transfer_base() {
+fn remote_job_progress_adds_partial_provider_bytes_to_transfer_base() {
     let status = test_remote_job_status(25, 25);
     let progress = TransferProgress {
         base_bytes: 100,
@@ -135,8 +135,13 @@ async fn cancellation_cleanup_removes_partial_destination() {
 async fn drag_preparation_session_can_be_canceled() {
     let service = test_explorer_service();
     service.cancel_drag_preparation("session").await;
-    let cancellation = service.drag_preparation_cancellations.lock().await
-        .get("session").cloned().expect("cancel flag should survive an early cancel request");
+    let cancellation = service
+        .drag_preparation_cancellations
+        .lock()
+        .await
+        .get("session")
+        .cloned()
+        .expect("cancel flag should survive an early cancel request");
     assert!(cancellation.load(Ordering::Relaxed));
 }
 

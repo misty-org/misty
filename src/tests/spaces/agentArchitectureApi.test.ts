@@ -8,13 +8,13 @@ import { agentArchitectureApi } from "@/stores/agents/useAgentArchitectureStore"
 describe("agentArchitectureApi", () => {
   beforeEach(() => request.mockReset().mockResolvedValue({}));
 
-  it("delegates Mika requests through the permission-safe router", async () => {
+  it("delegates agent requests through the permission-safe router", async () => {
     await agentArchitectureApi.delegate({
       prompt: "summarize receipts",
       space_id: "space / one",
       input: { prompt: "summarize receipts" },
     });
-    expect(request).toHaveBeenCalledWith("/mika/delegations", {
+    expect(request).toHaveBeenCalledWith("/agents/delegations", {
       method: "POST",
       body: JSON.stringify({
         prompt: "summarize receipts",
@@ -26,7 +26,7 @@ describe("agentArchitectureApi", () => {
 
   it("discovers authorized Spaces and Agent capabilities together", async () => {
     await agentArchitectureApi.discovery();
-    expect(request).toHaveBeenCalledWith("/mika/discovery");
+    expect(request).toHaveBeenCalledWith("/agents/discovery");
   });
 
   it("creates isolated direct runs with encoded ownership identifiers", async () => {

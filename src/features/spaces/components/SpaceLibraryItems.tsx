@@ -175,7 +175,9 @@ function LibraryItemCard({
       void reorderAlbumItem(item.id, payload.id);
     },
   });
-  const itemSelectionStyle = selected ? "ring-2 ring-primary" : "ring-1 ring-foreground/10";
+  const itemSelectionStyle = selected
+    ? "inset-ring-2 inset-ring-primary"
+    : "inset-ring-1 inset-ring-foreground/10";
 
   return (
     <article

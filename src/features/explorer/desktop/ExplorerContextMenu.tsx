@@ -66,7 +66,7 @@ import {
 import { selectShortcutPreferences, useSettingsStore } from "@/stores/app";
 import { errorText } from "@/lib/format";
 import { useShallow } from "zustand/react/shallow";
-import { clearSelectionsAcrossPanes, selectedCountAcrossPanes } from "./ExplorerAssistantPanels";
+import { clearSelectionsAcrossPanes, selectedCountAcrossPanes } from "./ExplorerAgentPanels";
 import type { CompareDialogSeed } from "@/models/interfaces/features/explorer/desktop/ExplorerCompareDialog";
 import type { FileEntry } from "@/models/interfaces/services/misty-api";
 import { AddFilesToSpaceDialog } from "@/features/spaces/components/AddFilesToSpaceDialog";

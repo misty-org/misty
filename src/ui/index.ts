@@ -18,6 +18,7 @@ export * from "./dropdown-menu";
 export { IconButton as PrimitiveIconButton } from "./icon-button";
 export type { IconButtonProps as PrimitiveIconButtonProps } from "./icon-button";
 export * from "./input";
+export * from "./input-group";
 export * from "./label";
 export { IconButton } from "./outlined-icon-button";
 export type { IconButtonProps } from "./outlined-icon-button";

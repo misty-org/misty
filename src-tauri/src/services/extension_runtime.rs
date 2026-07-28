@@ -25,8 +25,9 @@ use crate::{
         extension_tools::ExtensionToolResolver,
         keychain::{
             backup_repository_password, generate_backup_repository_password,
-            rclone_config_password, store_backup_repository_password,
+            store_backup_repository_password,
         },
+        storage_runtime::StorageRuntimeService,
     },
 };
 
@@ -67,10 +68,19 @@ pub struct ExtensionRuntimeService {
     cache_dir: PathBuf,
     tools: ExtensionToolResolver,
     backup_state_path: PathBuf,
+    storage_runtime: StorageRuntimeService,
 }
 
 impl ExtensionRuntimeService {
     pub fn new(environment: AppEnvironmentService) -> Self {
+        let storage_runtime = StorageRuntimeService::start(&environment);
+        Self::new_with_storage_runtime(environment, storage_runtime)
+    }
+
+    pub fn new_with_storage_runtime(
+        environment: AppEnvironmentService,
+        storage_runtime: StorageRuntimeService,
+    ) -> Self {
         let tools = ExtensionToolResolver::new(&environment);
         let backup_state_path = environment
             .settings_path()
@@ -83,6 +93,7 @@ impl ExtensionRuntimeService {
             cache_dir: environment.cache_dir().join("extension-jobs"),
             tools,
             backup_state_path,
+            storage_runtime,
         }
     }
 
@@ -375,8 +386,8 @@ impl ExtensionRuntimeService {
     fn backup_repositories(&self) -> ApiResult<Value> {
         let repositories = read_backup_repositories(&self.backup_state_path)?;
         let devices = DeviceService::new().snapshot().devices;
-        let cloud_remotes = connected_rclone_remotes(&self.tools);
-        let rows=repositories.into_iter().map(|repo| { let available=if repo.kind=="cloud" { repo.location.strip_prefix("rclone:").and_then(|value|value.split_once(':')).map(|(remote,_)|cloud_remotes.iter().any(|item|item==remote)).unwrap_or(false) } else { resolved_repository_location(&repo).is_ok() }; json!({"id":repo.id,"name":repo.name,"kind":repo.kind,"location":repo.display_location,"available":available,"initialized":true,"lastBackup":repo.last_backup}) }).collect::<Vec<_>>();
+        let cloud_remotes = connected_cloud_remotes(&self.storage_runtime);
+        let rows=repositories.into_iter().map(|repo| { let available=if repo.kind=="cloud" { cloud_repository_identity(&repo).map(|(remote,_)|cloud_remotes.contains(&remote)).unwrap_or(false) } else { resolved_repository_location(&repo).is_ok() }; json!({"id":repo.id,"name":repo.name,"kind":repo.kind,"location":repo.display_location,"available":available,"initialized":true,"lastBackup":repo.last_backup}) }).collect::<Vec<_>>();
         Ok(
             json!({"ok":true,"repositories":rows,"devices":devices,"cloudRemotes":cloud_remotes,"message":if rows.is_empty(){"Set up a repository to create your first backup."}else{"Backup repositories are ready."}}),
         )
@@ -386,50 +397,59 @@ impl ExtensionRuntimeService {
         let kind = allowed_string(payload, "kind", &["local", "cloud"])?;
         let name = required_string(payload, "name", 64)?;
         let location = required_string(payload, "location", 16_384)?;
-        let normalized = if kind == "local" {
-            validate_local_repository_location(&location)?
-        } else {
-            let normalized = validate_cloud_repository_location(&location)?;
-            let identity = location
-                .split_once(':')
-                .map(|(remote, _)| remote)
-                .unwrap_or_default();
-            if !connected_rclone_remotes(&self.tools)
-                .iter()
-                .any(|remote| remote == identity)
-            {
-                return Err(ApiError::Message(
-                    "Choose a cloud remote already connected through Misty.".to_owned(),
-                ));
-            }
-            normalized
-        };
         let id = Uuid::new_v4().to_string();
+        let (normalized, display_location, volume_id, relative_path, cloud_remote, cloud_path) =
+            if kind == "local" {
+                let normalized = validate_local_repository_location(&location)?;
+                let (volume_id, relative_path) = local_repository_identity(Path::new(&normalized))?;
+                (
+                    normalized.clone(),
+                    normalized,
+                    volume_id,
+                    relative_path,
+                    String::new(),
+                    String::new(),
+                )
+            } else {
+                let (remote, path) = validate_cloud_repository_location(&location)?;
+                if !connected_cloud_remotes(&self.storage_runtime).contains(&remote) {
+                    return Err(ApiError::Message(
+                        "Choose a cloud connection already connected through Misty.".to_owned(),
+                    ));
+                }
+                let cache = cloud_repository_cache(&self.cache_dir, &id);
+                fs::create_dir_all(&cache).map_err(|error| {
+                    ApiError::Message(format!("Could not prepare the cloud backup cache: {error}"))
+                })?;
+                (
+                    cache.display().to_string(),
+                    format!("{remote}:{path}"),
+                    String::new(),
+                    String::new(),
+                    remote,
+                    path,
+                )
+            };
         let password = generate_backup_repository_password();
         let restic = self.tools.resolve("backups", "restic")?;
-        let rclone = if kind == "cloud" {
-            Some(self.tools.resolve("backups", "rclone")?)
-        } else {
-            None
-        };
-        let (volume_id, relative_path) = if kind == "local" {
-            local_repository_identity(Path::new(&normalized))?
-        } else {
-            (String::new(), String::new())
-        };
         let repository = StoredBackupRepository {
             id: id.clone(),
             name,
             kind: kind.clone(),
             location: normalized.clone(),
-            display_location: redact_repository_location(&normalized),
+            display_location,
             last_backup: None,
             volume_id,
             relative_path,
+            cloud_remote,
+            cloud_path,
         };
-        let mut command = restic_command(&restic, &repository, &password, rclone.as_deref());
+        let mut command = restic_command(&restic, &repository, &password);
         command.arg("init");
         run_checked_command(&mut command, "initialize the backup repository")?;
+        if kind == "cloud" {
+            mirror_cloud_repository_to_provider(&self.storage_runtime, &repository)?;
+        }
         store_backup_repository_password(&id, &password)?;
         let mut repositories = read_backup_repositories(&self.backup_state_path)?;
         repositories.push(repository);
@@ -440,17 +460,14 @@ impl ExtensionRuntimeService {
     }
 
     fn backup_snapshots(&self, payload: &Value) -> ApiResult<Value> {
-        let repository = required_backup_repository(&self.backup_state_path, payload)?;
+        let repository =
+            required_backup_repository(&self.backup_state_path, &self.cache_dir, payload)?;
+        mirror_cloud_repository_to_local(&self.storage_runtime, &repository)?;
         let password = backup_repository_password(&repository.id)?.ok_or_else(|| {
             ApiError::Message("Backup credential is missing from the OS vault.".to_owned())
         })?;
         let restic = self.tools.resolve("backups", "restic")?;
-        let rclone = if repository.kind == "cloud" {
-            Some(self.tools.resolve("backups", "rclone")?)
-        } else {
-            None
-        };
-        let mut command = restic_command(&restic, &repository, &password, rclone.as_deref());
+        let mut command = restic_command(&restic, &repository, &password);
         command.args(["snapshots", "--json"]);
         let output = command
             .output()
@@ -472,16 +489,12 @@ impl ExtensionRuntimeService {
         payload: &Value,
         operation: &str,
     ) -> ApiResult<Value> {
-        let repository = required_backup_repository(&self.backup_state_path, payload)?;
+        let repository =
+            required_backup_repository(&self.backup_state_path, &self.cache_dir, payload)?;
         let password = backup_repository_password(&repository.id)?.ok_or_else(|| {
             ApiError::Message("Backup credential is missing from the OS vault.".to_owned())
         })?;
         let restic = self.tools.resolve("backups", "restic")?;
-        let rclone = if repository.kind == "cloud" {
-            Some(self.tools.resolve("backups", "rclone")?)
-        } else {
-            None
-        };
         let sources = if operation == "backup" {
             safe_source_folders(payload)?
         } else {
@@ -519,6 +532,7 @@ impl ExtensionRuntimeService {
         let job_id = id.clone();
         let operation = operation.to_owned();
         let state_path = self.backup_state_path.clone();
+        let storage_runtime = self.storage_runtime.clone();
         thread::spawn(move || {
             run_restic_job(
                 jobs,
@@ -528,11 +542,11 @@ impl ExtensionRuntimeService {
                 repository,
                 password,
                 restic,
-                rclone,
                 sources,
                 snapshot_id,
                 restore_parent,
                 state_path,
+                storage_runtime,
             )
         });
         Ok(json!({"ok":true,"jobId":id,"message":"Backup operation queued."}))
@@ -652,11 +666,7 @@ fn dependency_check(
     payload: &Value,
     tools: &ExtensionToolResolver,
 ) -> ApiResult<Value> {
-    let requested = allowed_string(
-        payload,
-        "name",
-        &["ffmpeg", "ffprobe", "yt-dlp", "restic", "rclone"],
-    )?;
+    let requested = allowed_string(payload, "name", &["ffmpeg", "ffprobe", "yt-dlp", "restic"])?;
     let executable = match tools.resolve(plugin_id, &requested) {
         Ok(value) => value,
         Err(_) => return Ok(json!({ "ok": true, "available": false, "version": "" })),
@@ -1508,6 +1518,10 @@ struct StoredBackupRepository {
     volume_id: String,
     #[serde(default)]
     relative_path: String,
+    #[serde(default)]
+    cloud_remote: String,
+    #[serde(default)]
+    cloud_path: String,
 }
 
 fn read_backup_repositories(path: &Path) -> ApiResult<Vec<StoredBackupRepository>> {
@@ -1540,15 +1554,30 @@ fn write_backup_repositories(
     fs::rename(temporary, path)
         .map_err(|error| ApiError::Message(format!("Could not commit backup settings: {error}")))
 }
-fn required_backup_repository(path: &Path, payload: &Value) -> ApiResult<StoredBackupRepository> {
+fn required_backup_repository(
+    path: &Path,
+    cache_dir: &Path,
+    payload: &Value,
+) -> ApiResult<StoredBackupRepository> {
     let id = required_string(payload, "repositoryId", 128)?;
     let mut repository = read_backup_repositories(path)?
         .into_iter()
         .find(|repo| repo.id == id)
         .ok_or_else(|| ApiError::Message("Backup repository was not found.".to_owned()))?;
-    repository.location = resolved_repository_location(&repository)?
-        .display()
-        .to_string();
+    if repository.kind == "cloud" {
+        let (remote, cloud_path) = cloud_repository_identity(&repository)?;
+        repository.cloud_remote = remote;
+        repository.cloud_path = cloud_path;
+        let cache = cloud_repository_cache(cache_dir, &repository.id);
+        fs::create_dir_all(&cache).map_err(|error| {
+            ApiError::Message(format!("Could not prepare the cloud backup cache: {error}"))
+        })?;
+        repository.location = cache.display().to_string();
+    } else {
+        repository.location = resolved_repository_location(&repository)?
+            .display()
+            .to_string();
+    }
     Ok(repository)
 }
 
@@ -1636,11 +1665,13 @@ fn validate_local_repository_location(raw: &str) -> ApiResult<String> {
     }
     Ok(canonical.display().to_string())
 }
-fn validate_cloud_repository_location(raw: &str) -> ApiResult<String> {
+
+fn validate_cloud_repository_location(raw: &str) -> ApiResult<(String, String)> {
     let value = raw.trim();
-    let (remote, path) = value
-        .split_once(':')
-        .ok_or_else(|| ApiError::Message("Choose a configured Misty cloud remote.".to_owned()))?;
+    let (remote, path) = value.split_once(':').ok_or_else(|| {
+        ApiError::Message("Choose a configured Misty cloud connection.".to_owned())
+    })?;
+    let path = path.trim_matches('/');
     if remote.is_empty()
         || path.is_empty()
         || !remote
@@ -1652,45 +1683,99 @@ fn validate_cloud_repository_location(raw: &str) -> ApiResult<String> {
             "Cloud repository identity or subpath is invalid.".to_owned(),
         ));
     }
-    Ok(format!("rclone:{remote}:{path}"))
-}
-fn redact_repository_location(location: &str) -> String {
-    if let Some(rest) = location.strip_prefix("rclone:") {
-        let remote = rest.split(':').next().unwrap_or("cloud");
-        format!("{remote}:Misty Backups")
-    } else {
-        location.to_owned()
-    }
+    Ok((remote.to_owned(), path.to_owned()))
 }
 
-fn connected_rclone_remotes(tools: &ExtensionToolResolver) -> Vec<String> {
-    let Ok(rclone) = tools.resolve("backups", "rclone") else {
-        return Vec::new();
-    };
-    let mut command = Command::new(rclone);
-    command.arg("listremotes").stdin(Stdio::null());
-    if let Some(password) = rclone_config_password() {
-        command.env("RCLONE_CONFIG_PASS", password);
-    }
-    let Ok(output) = command.output() else {
-        return Vec::new();
-    };
-    if !output.status.success() {
-        return Vec::new();
-    }
-    String::from_utf8_lossy(&output.stdout)
-        .lines()
-        .map(|line| line.trim().trim_end_matches(':'))
-        .filter(|value| {
-            !value.is_empty()
-                && value
-                    .bytes()
-                    .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'-'))
+fn connected_cloud_remotes(storage: &StorageRuntimeService) -> Vec<String> {
+    storage
+        .call("config/dump", json!({}))
+        .ok()
+        .and_then(|value| value.as_object().cloned())
+        .map(|entries| {
+            entries
+                .into_iter()
+                .filter_map(|(name, config)| {
+                    let supported = matches!(
+                        config.get("type").and_then(Value::as_str),
+                        Some("drive" | "dropbox" | "onedrive")
+                    );
+                    let authorized = ["access_token", "token"].iter().any(|key| {
+                        config
+                            .get(*key)
+                            .and_then(Value::as_str)
+                            .is_some_and(|value| !value.trim().is_empty())
+                    });
+                    (supported && authorized).then_some(name)
+                })
+                .take(32)
+                .collect()
         })
-        .take(32)
-        .map(ToOwned::to_owned)
-        .collect()
+        .unwrap_or_default()
 }
+
+fn cloud_repository_identity(repository: &StoredBackupRepository) -> ApiResult<(String, String)> {
+    if !repository.cloud_remote.is_empty() && !repository.cloud_path.is_empty() {
+        return Ok((
+            repository.cloud_remote.clone(),
+            repository.cloud_path.clone(),
+        ));
+    }
+    // Migrate repositories created by the former transport without requiring
+    // that transport to remain installed.
+    let legacy = repository
+        .location
+        .strip_prefix("rclone:")
+        .unwrap_or(&repository.location);
+    validate_cloud_repository_location(legacy)
+}
+
+fn cloud_repository_cache(cache_dir: &Path, repository_id: &str) -> PathBuf {
+    cache_dir.join("backup-repositories").join(repository_id)
+}
+
+fn mirror_cloud_repository_to_local(
+    storage: &StorageRuntimeService,
+    repository: &StoredBackupRepository,
+) -> ApiResult<()> {
+    if repository.kind != "cloud" {
+        return Ok(());
+    }
+    let local = PathBuf::from(&repository.location);
+    if local.exists() {
+        fs::remove_dir_all(&local).map_err(|error| {
+            ApiError::Message(format!("Could not refresh the cloud backup cache: {error}"))
+        })?;
+    }
+    fs::create_dir_all(&local).map_err(|error| {
+        ApiError::Message(format!("Could not prepare the cloud backup cache: {error}"))
+    })?;
+    let (remote, path) = cloud_repository_identity(repository)?;
+    storage
+        .call(
+            "sync/copy",
+            json!({"srcFs":format!("{remote}:{path}"),"dstFs":local.display().to_string(),"createEmptySrcDirs":true}),
+        )
+        .map(|_| ())
+        .map_err(ApiError::Message)
+}
+
+fn mirror_cloud_repository_to_provider(
+    storage: &StorageRuntimeService,
+    repository: &StoredBackupRepository,
+) -> ApiResult<()> {
+    if repository.kind != "cloud" {
+        return Ok(());
+    }
+    let (remote, path) = cloud_repository_identity(repository)?;
+    storage
+        .call(
+            "sync/copy",
+            json!({"srcFs":{"type":"local","_root":repository.location},"dstFs":format!("{remote}:{path}"),"createEmptySrcDirs":true}),
+        )
+        .map(|_| ())
+        .map_err(ApiError::Message)
+}
+
 fn safe_source_folders(payload: &Value) -> ApiResult<Vec<PathBuf>> {
     let values = payload
         .get("sources")
@@ -1723,19 +1808,12 @@ fn restic_command(
     executable: &Path,
     repository: &StoredBackupRepository,
     password: &str,
-    rclone: Option<&Path>,
 ) -> Command {
     let mut command = Command::new(executable);
     command
         .env("RESTIC_PASSWORD", password)
         .arg("-r")
         .arg(&repository.location);
-    if let Some(rclone) = rclone {
-        command.args(["-o", &format!("rclone.program={}", rclone.display())]);
-        if let Some(config_password) = rclone_config_password() {
-            command.env("RCLONE_CONFIG_PASS", config_password);
-        }
-    }
     command.stdin(Stdio::null());
     command
 }
@@ -1798,11 +1876,11 @@ fn run_restic_job(
     repository: StoredBackupRepository,
     password: String,
     restic: PathBuf,
-    rclone: Option<PathBuf>,
     sources: Vec<PathBuf>,
     snapshot_id: Option<String>,
     restore_parent: PathBuf,
     state_path: PathBuf,
+    storage_runtime: StorageRuntimeService,
 ) {
     update_job(&jobs, &id, |job| {
         job.status = "running".to_owned();
@@ -1814,7 +1892,11 @@ fn run_restic_job(
         }
         .to_owned();
     });
-    let mut command = restic_command(&restic, &repository, &password, rclone.as_deref());
+    if let Err(error) = mirror_cloud_repository_to_local(&storage_runtime, &repository) {
+        finish_failed(&jobs, &id, error.to_string(), Vec::new());
+        return;
+    }
+    let mut command = restic_command(&restic, &repository, &password);
     let mut restore_output = None;
     match operation.as_str() {
         "check" => {
@@ -1869,6 +1951,14 @@ fn run_restic_job(
     };
     match result {
         Ok(Some(status)) if status.success() => {
+            if operation == "backup" {
+                if let Err(error) =
+                    mirror_cloud_repository_to_provider(&storage_runtime, &repository)
+                {
+                    finish_failed(&jobs, &id, error.to_string(), Vec::new());
+                    return;
+                }
+            }
             let outputs = restore_output
                 .iter()
                 .map(|path| path.display().to_string())
@@ -2048,11 +2138,11 @@ mod tests {
     }
 
     #[test]
-    fn validates_cloud_repository_identity_and_progress() {
+    fn validates_repository_progress() {
         assert!(validate_local_repository_location("/").is_err());
         assert_eq!(
             validate_cloud_repository_location("drive:Misty Backups/laptop").unwrap(),
-            "rclone:drive:Misty Backups/laptop"
+            ("drive".to_owned(), "Misty Backups/laptop".to_owned())
         );
         assert!(validate_cloud_repository_location("drive:../escape").is_err());
         assert!(validate_cloud_repository_location("bad remote:path").is_err());
