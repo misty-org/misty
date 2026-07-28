@@ -62,8 +62,6 @@ function simulatorAppPath() {
   return appPath;
 }
 
-const clang = output("xcrun", ["--sdk", "iphonesimulator", "--find", "clang"]);
-run("npm", ["run", "service:archive:ios-simulator"]);
 run("npm", [
   "run",
   "tauri",
@@ -73,14 +71,10 @@ run("npm", [
   "--debug",
   "--target",
   "aarch64-sim",
-  "--features",
-  "embedded-storage-go",
   "--no-sign",
   "--archive-only",
 ], {
   env: {
-    SWIFT_RS_CLANG: clang,
-    MISTY_SERVICE_GO_LIB_DIR: "src-tauri/target/misty-service/ios-simulator-arm64",
     VITE_MISTY_IOS_BUILD_NUMBER: buildNumber,
   },
 });

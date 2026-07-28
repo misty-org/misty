@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import type { SpaceMessage } from "@/models/interfaces/features/spaces/types";
 import { spacesApi } from "@/stores/spaces/useSpacesBackendStore";
@@ -10,6 +10,16 @@ export interface ChatDisplayRow {
 }
 
 const MESSAGE_GROUP_WINDOW_MS = 7 * 60 * 1000;
+
+interface MemberAvatarRequest {
+  memberId: string;
+  version: number;
+}
+
+interface MemberAvatarCacheEntry extends MemberAvatarRequest {
+  spaceId: string;
+  url: string;
+}
 
 export function buildChatDisplayRows(messages: SpaceMessage[]): ChatDisplayRow[] {
   return messages.map((message, index) => {
@@ -86,49 +96,131 @@ export function useMemberAvatarUrls(
   spaceId: string,
   messages: SpaceMessage[],
 ): Map<string, string> {
-  const memberIds = useMemo(
-    () =>
-      Array.from(
-        new Set(
-          messages
-            .filter(
-              (message) =>
-                message.sender_kind === "person" &&
-                message.sender_user_id &&
-                (message.sender_avatar_version ?? 0) > 0 &&
-                !message.origin?.author_avatar_url,
-            )
-            .map((message) => message.sender_user_id),
+  const avatarRequests = useMemo(() => {
+    const versionsByMember = new Map<string, number>();
+    messages.forEach((message) => {
+      if (
+        message.sender_kind !== "person" ||
+        !message.sender_user_id ||
+        (message.sender_avatar_version ?? 0) <= 0 ||
+        message.origin?.author_avatar_url
+      ) {
+        return;
+      }
+      versionsByMember.set(
+        message.sender_user_id,
+        Math.max(
+          versionsByMember.get(message.sender_user_id) ?? 0,
+          message.sender_avatar_version ?? 0,
         ),
-      ).sort(),
-    [messages],
+      );
+    });
+    return Array.from(versionsByMember, ([memberId, version]) => ({ memberId, version })).sort(
+      (left, right) => left.memberId.localeCompare(right.memberId),
+    );
+  }, [messages]);
+  const avatarRequestKey = useMemo(
+    () => avatarRequests.map(({ memberId, version }) => `${memberId}:${version}`).join("|"),
+    [avatarRequests],
   );
+  const avatarRequestsRef = useRef<MemberAvatarRequest[]>(avatarRequests);
+  const cacheRef = useRef<Map<string, MemberAvatarCacheEntry>>(new Map());
   const [urls, setUrls] = useState<Map<string, string>>(() => new Map());
+
+  avatarRequestsRef.current = avatarRequests;
+
+  useEffect(
+    () => () => {
+      cacheRef.current.forEach((entry) => URL.revokeObjectURL(entry.url));
+      cacheRef.current.clear();
+    },
+    [],
+  );
 
   useEffect(() => {
     let canceled = false;
-    const objectUrls: string[] = [];
-    setUrls(new Map());
+    const requests = avatarRequestsRef.current;
+    const requestMemberIds = new Set(requests.map((request) => request.memberId));
+    const cachedUrls = new Map<string, string>();
+    const missingRequests = requests.filter((request) => {
+      const cached = cacheRef.current.get(memberAvatarCacheKey(spaceId, request));
+      if (!cached) return true;
+      cachedUrls.set(request.memberId, cached.url);
+      return false;
+    });
+
+    setUrls((current) => {
+      const next = new Map(current);
+      let changed = false;
+      cachedUrls.forEach((url, memberId) => {
+        if (next.get(memberId) !== url) {
+          next.set(memberId, url);
+          changed = true;
+        }
+      });
+      next.forEach((_, memberId) => {
+        if (!requestMemberIds.has(memberId)) {
+          next.delete(memberId);
+          changed = true;
+        }
+      });
+      return changed ? next : current;
+    });
+
+    if (missingRequests.length === 0)
+      return () => {
+        canceled = true;
+      };
+
     void Promise.all(
-      memberIds.map(async (memberId) => {
+      missingRequests.map(async (request) => {
         try {
-          const blob = await spacesApi.memberAvatar(spaceId, memberId);
-          if (canceled) return null;
+          const blob = await spacesApi.memberAvatar(spaceId, request.memberId);
           const url = URL.createObjectURL(blob);
-          objectUrls.push(url);
-          return [memberId, url] as const;
+          return { ...request, spaceId, url };
         } catch {
           return null;
         }
       }),
     ).then((entries) => {
-      if (!canceled) setUrls(new Map(entries.filter((entry) => entry !== null)));
+      const loadedEntries = entries.filter((entry) => entry !== null);
+      if (canceled) {
+        loadedEntries.forEach((entry) => URL.revokeObjectURL(entry.url));
+        return;
+      }
+
+      setUrls((current) => {
+        const next = new Map(current);
+        let changed = false;
+        loadedEntries.forEach((entry) => {
+          cacheRef.current.forEach((cached, key) => {
+            if (
+              cached.spaceId === entry.spaceId &&
+              cached.memberId === entry.memberId &&
+              key !== memberAvatarCacheKey(entry.spaceId, entry)
+            ) {
+              URL.revokeObjectURL(cached.url);
+              cacheRef.current.delete(key);
+            }
+          });
+          cacheRef.current.set(memberAvatarCacheKey(entry.spaceId, entry), entry);
+          if (next.get(entry.memberId) !== entry.url) {
+            next.set(entry.memberId, entry.url);
+            changed = true;
+          }
+        });
+        return changed ? next : current;
+      });
     });
+
     return () => {
       canceled = true;
-      objectUrls.forEach((url) => URL.revokeObjectURL(url));
     };
-  }, [memberIds, spaceId]);
+  }, [avatarRequestKey, spaceId]);
 
   return urls;
+}
+
+function memberAvatarCacheKey(spaceId: string, request: MemberAvatarRequest): string {
+  return [spaceId, request.memberId, request.version].join(":");
 }

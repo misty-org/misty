@@ -68,10 +68,10 @@ use crate::services::power_pack::{
     FileToolsSymlinkTargetResult, SavedSearch, SavedSearchesSnapshot,
 };
 use crate::services::providers::{
-    BackendAction, BackendActionResult, BackendRunRequest, ConfigSecurityStatus,
+    BackendAction, BackendActionResult, BackendRunRequest, CloudConfigPaths, ConfigSecurityStatus,
     ProviderConfigRequest, ProviderConfigStep, ProviderJobStart, ProviderJobStatus,
-    ProvidersSnapshot, RcloneConfigPaths, RemoteEditDraft, RemoteTestResult, SaveRemoteRequest,
-    VerifyResult, VerifyStartRequest,
+    ProvidersSnapshot, RemoteEditDraft, RemoteTestResult, SaveRemoteRequest, VerifyResult,
+    VerifyStartRequest,
 };
 use crate::services::search::{SearchQueryRequest, SearchResult, SearchScanRequest, SearchStatus};
 use crate::services::settings::{OpenWithAssociation, SaveSettingsRequest, SettingsSnapshot};
@@ -998,8 +998,16 @@ pub async fn explorer_open_path(file_path: String) -> ApiResult<()> {
 }
 
 #[tauri::command]
-pub async fn open_terminal_at_path(path: String) -> ApiResult<()> {
-    tokio::task::spawn_blocking(move || open_terminal_default(&path))
+pub async fn open_terminal_at_path(path: String, state: State<'_, MistyRuntime>) -> ApiResult<()> {
+    let settings = state.settings.snapshot().await?;
+    let preferred = settings
+        .document
+        .get("general")
+        .and_then(|section| section.get("preferred_terminal_app"))
+        .and_then(serde_json::Value::as_str)
+        .unwrap_or("System Default")
+        .to_owned();
+    tokio::task::spawn_blocking(move || open_terminal_default(&path, &preferred))
         .await
         .map_err(|err| ApiError::Message(format!("Open terminal worker failed: {err}")))?
 }
@@ -1252,6 +1260,45 @@ pub async fn providers_refresh(state: State<'_, MistyRuntime>) -> ApiResult<Prov
 }
 
 #[tauri::command]
+pub async fn providers_import_cloud_connection(
+    name: String,
+    provider_type: String,
+    connection_id: String,
+    access_token: String,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<ProvidersSnapshot> {
+    let name = name.trim();
+    let provider_type = provider_type.trim();
+    let access_token = access_token.trim();
+    if name.is_empty() || access_token.is_empty() {
+        return Err(ApiError::Message(
+            "Cloud connection name and access token are required.".to_owned(),
+        ));
+    }
+    if !matches!(provider_type, "drive" | "dropbox" | "onedrive") {
+        return Err(ApiError::Message(
+            "That cloud provider is not supported.".to_owned(),
+        ));
+    }
+    state
+        .storage_runtime
+        .call(
+            "config/create",
+            serde_json::json!({
+                "name": name,
+                "type": provider_type,
+                "parameters": {
+                    "access_token": access_token,
+                    "misty_connection_id": connection_id.trim(),
+                },
+                "opt": { "nonInteractive": true }
+            }),
+        )
+        .map_err(ApiError::Message)?;
+    state.providers.refresh().await
+}
+
+#[tauri::command]
 pub async fn providers_select_remote(
     name: String,
     state: State<'_, MistyRuntime>,
@@ -1276,9 +1323,7 @@ pub async fn providers_test_remote(
 }
 
 #[tauri::command]
-pub async fn providers_config_paths(
-    state: State<'_, MistyRuntime>,
-) -> ApiResult<RcloneConfigPaths> {
+pub async fn providers_config_paths(state: State<'_, MistyRuntime>) -> ApiResult<CloudConfigPaths> {
     state.providers.config_paths().await
 }
 
@@ -1438,7 +1483,7 @@ fn open_path_default(file_path: &str) -> ApiResult<()> {
         .map_err(|err| ApiError::Message(format!("Failed to open file: {err}")))
 }
 
-fn open_terminal_default(path: &str) -> ApiResult<()> {
+fn open_terminal_default(path: &str, preferred: &str) -> ApiResult<()> {
     let trimmed = path.trim();
     if trimmed.is_empty() {
         return Err(ApiError::Message("Folder path is required.".to_owned()));
@@ -1450,18 +1495,31 @@ fn open_terminal_default(path: &str) -> ApiResult<()> {
 
     #[cfg(target_os = "macos")]
     {
+        let application = match preferred {
+            "iTerm" => "iTerm",
+            "Warp" => "Warp",
+            "Ghostty" => "Ghostty",
+            "Alacritty" => "Alacritty",
+            _ => "Terminal",
+        };
         return Command::new("open")
             .arg("-a")
-            .arg("Terminal")
+            .arg(application)
             .arg(trimmed)
             .spawn()
             .map(|_| ())
-            .map_err(|err| ApiError::Message(format!("Failed to open Terminal: {err}")));
+            .map_err(|err| ApiError::Message(format!("Failed to open {application}: {err}")));
     }
 
     #[cfg(target_os = "windows")]
     {
-        match Command::new("wt").arg("-d").arg(trimmed).spawn() {
+        let executable = match preferred {
+            "Warp" => "warp",
+            "Ghostty" => "ghostty",
+            "Alacritty" => "alacritty",
+            _ => "wt",
+        };
+        match Command::new(executable).arg("-d").arg(trimmed).spawn() {
             Ok(_) => return Ok(()),
             Err(wt_err) => {
                 return Command::new("cmd")
@@ -1484,6 +1542,12 @@ fn open_terminal_default(path: &str) -> ApiResult<()> {
     ))]
     {
         let mut candidates = Vec::<String>::new();
+        match preferred {
+            "Warp" => candidates.push("warp-terminal".to_owned()),
+            "Ghostty" => candidates.push("ghostty".to_owned()),
+            "Alacritty" => candidates.push("alacritty".to_owned()),
+            _ => {}
+        }
         if let Ok(terminal) = env::var("TERMINAL") {
             let terminal = terminal.trim();
             if !terminal.is_empty() {

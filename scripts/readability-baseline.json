@@ -521,26 +521,6 @@
       "hash": "568f8fe2092850e4"
     }
   ],
-  "src/pages/Home/desktop/DesktopWorkspacePanel.tsx": [
-    {
-      "length": 238,
-      "hash": "9dbeeaf16132848e"
-    }
-  ],
-  "src/pages/Home/desktop/HomeSidebarPanels.tsx": [
-    {
-      "length": 260,
-      "hash": "92c8f72f5f659004"
-    },
-    {
-      "length": 196,
-      "hash": "4048f65f8f673032"
-    },
-    {
-      "length": 177,
-      "hash": "3b503ff09872ce8a"
-    }
-  ],
   "src/pages/Providers/components/RemoteListPanel.tsx": [
     {
       "length": 184,

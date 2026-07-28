@@ -4,6 +4,7 @@ import {
   resetSpacesAccountState,
   useSpacesStore,
 } from "@/stores/spaces/useSpacesStore";
+import { SpaceRequestError } from "@/stores/spaces/useSpacesBackendStore";
 import type {
   Space,
   SpaceMember,
@@ -29,6 +30,7 @@ const apiMocks = vi.hoisted(() => ({
   members: vi.fn(),
   messages: vi.fn(),
   nodes: vi.fn(),
+  chatAgents: vi.fn(),
 }));
 
 vi.mock("@/stores/spaces/useSpacesBackendStore", () => ({
@@ -61,6 +63,7 @@ vi.mock("@/stores/spaces/useSpacesBackendStore", () => ({
     members: apiMocks.members,
     messages: apiMocks.messages,
     nodes: apiMocks.nodes,
+    chatAgents: apiMocks.chatAgents,
   },
 }));
 
@@ -252,6 +255,7 @@ describe("Spaces mutations", () => {
     apiMocks.sendMessage.mockReset();
     apiMocks.updateMessage.mockReset();
     apiMocks.deleteMessage.mockReset();
+    apiMocks.chatAgents.mockReset();
     apiMocks.removeMember.mockReset();
     apiMocks.respondInvite.mockReset();
     apiMocks.leave.mockReset();
@@ -317,6 +321,18 @@ describe("Spaces mutations", () => {
     expect(useSpacesStore.getState().error).toBeNull();
   });
 
+  it("treats closed-off chat Agents as optional suggestions", async () => {
+    apiMocks.chatAgents.mockRejectedValue(
+      new SpaceRequestError("You no longer have access to this Space.", 403, "forbidden"),
+    );
+    useSpacesStore.setState({ agentsBySpace: { "space-default": [agent] }, error: null });
+
+    await useSpacesStore.getState().loadChatAgents("space-default");
+
+    expect(useSpacesStore.getState().agentsBySpace["space-default"]).toEqual([]);
+    expect(useSpacesStore.getState().error).toBeNull();
+  });
+
   // Regression coverage: these actions previously had no error handling at all,
   // so a failed request left `error` untouched and the UI's error banner (which
   // every caller's own comments assumed would show something) stayed empty.
@@ -379,6 +395,8 @@ describe("Spaces realtime account lifecycle", () => {
   beforeEach(() => {
     resetSpacesAccountState();
     apiMocks.realtimeTicket.mockReset();
+    apiMocks.snapshot.mockReset();
+    apiMocks.members.mockReset();
     FakeWebSocket.instances = [];
     vi.stubGlobal("WebSocket", FakeWebSocket);
     const values = new Map<string, string>();
@@ -515,6 +533,29 @@ describe("Spaces realtime account lifecycle", () => {
     },
   );
 
+  it.each(["note.created", "note.projection.updated", "note.deleted"])(
+    "announces %s events to the active Notes view",
+    async (eventType) => {
+      const listener = vi.fn();
+      apiMocks.realtimeTicket.mockResolvedValue({ ticket: "note-ticket", expires_in: 60 });
+      useSpacesStore.setState({
+        spaces: [spaceFixture({ id: "space" })],
+      });
+      window.addEventListener("misty:space-note-event", listener);
+
+      await useSpacesStore.getState().connectRealtime("active-account");
+      FakeWebSocket.instances[0].open();
+      FakeWebSocket.instances[0].message({
+        type: "event",
+        event: spaceEventFixture({ type: eventType }),
+      });
+      await Promise.resolve();
+
+      expect(listener).toHaveBeenCalledOnce();
+      window.removeEventListener("misty:space-note-event", listener);
+    },
+  );
+
   it("does not announce Library events when Library visibility is denied", async () => {
     const listener = vi.fn();
     apiMocks.realtimeTicket.mockResolvedValue({ ticket: "library-denied-ticket", expires_in: 60 });
@@ -533,6 +574,27 @@ describe("Spaces realtime account lifecycle", () => {
 
     expect(listener).not.toHaveBeenCalled();
     window.removeEventListener("misty:space-library-event", listener);
+  });
+
+  it("does not reload members for realtime events from inaccessible spaces", async () => {
+    apiMocks.realtimeTicket.mockResolvedValue({ ticket: "member-ticket", expires_in: 60 });
+    apiMocks.snapshot.mockResolvedValue({ spaces: [], invitations: [], limits: null });
+    useSpacesStore.setState({
+      spaces: [spaceFixture({ id: "space-stale" })],
+    });
+
+    await useSpacesStore.getState().connectRealtime("active-account");
+    FakeWebSocket.instances[0].open();
+    FakeWebSocket.instances[0].message({
+      type: "event",
+      event: spaceEventFixture({ space_id: "space-stale", type: "member.left" }),
+    });
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(apiMocks.snapshot).toHaveBeenCalledOnce();
+    expect(apiMocks.members).not.toHaveBeenCalled();
+    expect(useSpacesStore.getState().error).toBeNull();
   });
 });
 

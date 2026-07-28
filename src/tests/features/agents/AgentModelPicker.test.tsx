@@ -96,7 +96,15 @@ describe("AgentModelPicker", () => {
     await act(async () => {
       root.render(
         <Dialog defaultOpen>
-          <DialogContent>
+          {/*
+            The picker's Popover is modal and portals outside the Dialog, so two
+            Radix focus traps end up fighting over focus. Browsers absorb that,
+            but jsdom dispatches focus synchronously and the two traps recurse
+            until the stack overflows -- which hung this file for ~13 minutes of
+            every full test run. Auto-focus is irrelevant to what this test
+            asserts, so declining it breaks the loop without weakening it.
+          */}
+          <DialogContent onOpenAutoFocus={(event) => event.preventDefault()}>
             <DialogTitle>Configure Agent</DialogTitle>
             <AgentModelPicker models={models} value={models[0].id} onValueChange={vi.fn()} />
           </DialogContent>

@@ -6,13 +6,14 @@ export type {
   SpaceLibraryHeaderProps,
   SpaceLibraryEmptyStateProps,
 } from "@/models/interfaces/features/spaces/components/SpaceLibraryChrome";
-import { Grid2X2, Image as ImageIcon, List, Minus, Plus, Search, Upload, X } from "lucide-react";
+import { Grid2X2, Image as List, Minus, Plus, Search, Upload, X } from "lucide-react";
 import { EmptyState } from "@/ui";
 import { Toolbar, ToolbarGroup } from "@/ui";
 import { Button } from "@/ui";
 import { Input } from "@/ui";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui";
 import { cn } from "@/ui";
+import { SpaceLibraryUploadTray } from "./SpaceLibraryUploadTray";
 import type { LibraryItemQuery } from "@/models/interfaces/features/spaces/types";
 import {
   LIBRARY_ITEM_SCALE_MAX,
@@ -169,6 +170,7 @@ export function SpaceLibraryHeader(props: SpaceLibraryHeaderProps) {
               />
             </>
           ) : null}
+          <SpaceLibraryUploadTray jobs={props.uploadJobs} onClear={props.onClearUploads} />
           {props.uploadAvailable ? (
             <Button
               className="shrink-0"
@@ -178,7 +180,7 @@ export function SpaceLibraryHeader(props: SpaceLibraryHeaderProps) {
               onClick={props.onUpload}
             >
               <Upload size={15} aria-hidden="true" />
-              {props.uploading ? "Uploading…" : "Upload files"}
+              Upload files
             </Button>
           ) : null}
         </ToolbarGroup>
@@ -246,7 +248,6 @@ export function SpaceLibraryEmptyState(props: SpaceLibraryEmptyStateProps) {
       <EmptyState
         title={title}
         description={detail}
-        icon={props.searching ? <Search /> : <ImageIcon />}
         action={
           <>
             {props.searching && props.onClearSearch ? (

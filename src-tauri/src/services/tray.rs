@@ -19,7 +19,7 @@ pub struct MistyTrayState {
     _tray_icon: TrayIcon<Wry>,
     app_status_item: IconMenuItem<Wry>,
     runtime_status_item: IconMenuItem<Wry>,
-    rclone_status_item: IconMenuItem<Wry>,
+    cloud_status_item: IconMenuItem<Wry>,
     stop_services_item: MenuItem<Wry>,
 }
 
@@ -68,8 +68,8 @@ fn build_tray(app: &AppHandle<Wry>) -> Result<MistyTrayState, String> {
             .icon(status_icon(false)?)
             .build(app)
             .map_err(|error| format!("Could not create Misty runtime status item: {error}"))?;
-    let rclone_status_item =
-        IconMenuItemBuilder::with_id("tray_status_rclone", "Remote sync: Checking...")
+    let cloud_status_item =
+        IconMenuItemBuilder::with_id("tray_status_cloud", "Cloud storage: Checking...")
             .enabled(false)
             .icon(status_icon(false)?)
             .build(app)
@@ -98,7 +98,7 @@ fn build_tray(app: &AppHandle<Wry>) -> Result<MistyTrayState, String> {
         &[
             &app_status_item,
             &runtime_status_item,
-            &rclone_status_item,
+            &cloud_status_item,
             &PredefinedMenuItem::separator(app)
                 .map_err(|error| format!("Could not create tray separator: {error}"))?,
             &show_item,
@@ -125,7 +125,7 @@ fn build_tray(app: &AppHandle<Wry>) -> Result<MistyTrayState, String> {
         _tray_icon: tray_icon,
         app_status_item,
         runtime_status_item,
-        rclone_status_item,
+        cloud_status_item,
         stop_services_item,
     })
 }
@@ -143,8 +143,8 @@ fn refresh(app: &AppHandle<Wry>) -> Result<(), String> {
             .map(|error| format!("Storage: {error}"))
             .unwrap_or_else(|| "Storage: Unavailable".to_owned())
     };
-    let rclone_running = runtime.ready;
-    let rclone_label = if rclone_running {
+    let cloud_ready = runtime.ready;
+    let cloud_label = if cloud_ready {
         "Cloud storage: Ready"
     } else {
         "Cloud storage: Unavailable"
@@ -162,11 +162,11 @@ fn refresh(app: &AppHandle<Wry>) -> Result<(), String> {
     tray.runtime_status_item
         .set_icon(Some(status_icon(runtime.ready)?))
         .map_err(|error| format!("Could not update Misty runtime tray icon: {error}"))?;
-    tray.rclone_status_item
-        .set_text(&rclone_label)
+    tray.cloud_status_item
+        .set_text(&cloud_label)
         .map_err(|error| format!("Could not update remote sync tray status: {error}"))?;
-    tray.rclone_status_item
-        .set_icon(Some(status_icon(rclone_running)?))
+    tray.cloud_status_item
+        .set_icon(Some(status_icon(cloud_ready)?))
         .map_err(|error| format!("Could not update remote sync tray icon: {error}"))?;
     tray.stop_services_item
         .set_enabled(false)

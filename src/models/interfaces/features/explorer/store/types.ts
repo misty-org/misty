@@ -272,6 +272,7 @@ export interface ExplorerStore {
     durationMs?: number,
     showInActivity?: boolean,
   ) => number;
+  recordActivity: (message: string, type?: ExplorerNotificationType) => number;
   dismissNotification: (id: number) => void;
   markNotificationsRead: () => void;
   clearNotificationHistory: () => void;

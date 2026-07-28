@@ -1,4 +1,5 @@
 .misty-note-block-editor {
+  position: relative;
   min-height: 0;
   color: var(--foreground);
   --bn-font-family: var(--misty-font-family);
@@ -23,6 +24,17 @@
   --bn-shadow-light: 0 8px 22px color-mix(in srgb, black 18%, transparent);
 }
 
+.misty-note-block-editor .misty-note-block-drop-gutter {
+  position: absolute;
+  z-index: 1;
+  top: 0;
+  bottom: 0;
+  left: -48px;
+  width: 48px;
+  background: transparent;
+  -webkit-app-region: no-drag;
+}
+
 .misty-note-block-editor .bn-container {
   margin: 0;
   background: transparent;
@@ -39,6 +51,67 @@
 
 .misty-note-block-editor.is-readonly .bn-editor {
   min-height: 0;
+}
+
+.misty-note-block-editor .bn-side-menu {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  z-index: 20;
+}
+
+.misty-note-block-editor
+  .bn-side-menu
+  button:is([data-misty-block-drag-handle="true"], :has([data-test="dragHandle"])) {
+  -webkit-user-drag: none !important;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.misty-note-block-editor
+  .bn-block-outer:is(
+    [data-misty-note-drop-position="before"],
+    [data-misty-note-drop-position="after"]
+  ) {
+  position: relative;
+}
+
+.misty-note-block-editor .bn-block-outer[data-misty-note-drop-position="before"]::before,
+.misty-note-block-editor .bn-block-outer[data-misty-note-drop-position="after"]::after {
+  position: absolute;
+  z-index: 30;
+  right: 0;
+  left: 0;
+  height: 3px;
+  border-radius: 999px;
+  background: var(--info);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--info) 24%, transparent);
+  content: "";
+  pointer-events: none;
+}
+
+.misty-note-block-editor .bn-block-outer[data-misty-note-drop-position="before"]::before {
+  top: -2px;
+}
+
+.misty-note-block-editor .bn-block-outer[data-misty-note-drop-position="after"]::after {
+  bottom: -2px;
+}
+
+.misty-note-block-editor .bn-block-outer.misty-note-block-is-dragging {
+  border-radius: var(--bn-border-radius, 4px);
+  background-color: color-mix(in srgb, var(--info) 18%, transparent) !important;
+  box-shadow:
+    -48px 0 0 color-mix(in srgb, var(--info) 18%, transparent),
+    inset 3px 0 0 var(--info),
+    0 0 0 2px color-mix(in srgb, var(--info) 58%, transparent) !important;
+  opacity: 0.72;
+}
+
+.misty-note-block-editor .bn-block-content.misty-note-block-is-dragging {
+  border-radius: var(--bn-border-radius, 4px);
+  background-color: transparent !important;
 }
 
 .misty-note-block-editor .bn-editor [data-content-type="heading"] h1 {
@@ -84,4 +157,29 @@
 .misty-note-block-editor .bn-file-panel,
 .misty-note-block-editor .bn-link-toolbar {
   backdrop-filter: blur(20px) saturate(150%);
+}
+
+.misty-note-block-editor,
+.misty-note-block-editor *,
+.bn-container,
+.bn-container *,
+.bn-editor,
+.bn-editor *,
+.bn-block,
+.bn-block *,
+.bn-block-outer,
+.bn-block-outer *,
+.bn-block-content,
+.bn-block-content *,
+.bn-side-menu,
+.bn-side-menu *,
+.bn-drag-handle,
+.bn-drag-handle *,
+.bn-drag-handle-menu,
+.bn-drag-handle-menu *,
+.bn-table-handle-dragging,
+.bn-table-handle-dragging *,
+[data-drag-handle],
+[data-drag-handle="true"] {
+  -webkit-app-region: no-drag !important;
 }

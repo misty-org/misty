@@ -5,7 +5,6 @@ coverage
 src-tauri/target
 src-tauri/gen
 src-tauri/vendor
-service/rclone
 .codex-qa
 .demo
 .windows-test

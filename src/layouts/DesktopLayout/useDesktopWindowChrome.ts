@@ -22,6 +22,21 @@ export const WINDOW_DRAG_SUPPRESS_SELECTOR = [
   "[data-pointer-drag-source='true']",
   "[data-explorer-drag-source='true']",
   "[data-reorder-drag-source='true']",
+  ".misty-note-block-editor",
+  ".bn-container",
+  ".bn-editor",
+  ".bn-block",
+  ".bn-block-outer",
+  ".bn-block-content",
+  ".bn-side-menu",
+  ".bn-side-menu *",
+  ".bn-drag-handle",
+  ".bn-drag-handle-menu",
+  ".bn-drag-handle-menu *",
+  ".bn-table-handle-dragging",
+  ".bn-table-handle-dragging *",
+  "[data-drag-handle]",
+  "[data-drag-handle='true']",
 ].join(",");
 
 export function shouldSuppressWindowDrag(target: EventTarget | null) {

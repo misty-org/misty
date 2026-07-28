@@ -6,6 +6,7 @@ import { Input } from "@/ui";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui";
 import { ToggleGroup, ToggleGroupItem } from "@/ui";
 import type { LibraryItemQuery } from "@/models/interfaces/features/spaces/types";
+import type { LibraryUploadJob } from "@/models/types/features/spaces/useSpaceLibraryData";
 
 export interface SpaceLibraryHeaderProps {
   uploadAvailable: boolean;
@@ -30,6 +31,9 @@ export interface SpaceLibraryHeaderProps {
   itemScale: number;
   onItemScale: (scale: number) => void;
   visibleItemCount: number;
+  // Upload progress lives in the toolbar so it never displaces Library content.
+  uploadJobs: LibraryUploadJob[];
+  onClearUploads: () => void;
 }
 
 export interface SpaceLibraryEmptyStateProps {

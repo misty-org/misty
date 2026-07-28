@@ -41,6 +41,7 @@ export function SpaceNotes(props: SpaceNotesProps) {
       setEditingNoteId: state.setEditingNoteId,
       toggleFavorite: state.toggleFavorite,
       createNote: state.createNote,
+      refresh: state.refresh,
       updateNoteBody: state.updateNoteBody,
       updateNoteContent: state.updateNoteContent,
     })),
@@ -50,6 +51,23 @@ export function SpaceNotes(props: SpaceNotesProps) {
   useEffect(() => {
     if (user?.id) void actions.load(user.id, props.spaceId, props.spaceName);
   }, [actions.load, props.spaceId, props.spaceName, user?.id]);
+
+  useEffect(() => {
+    let refreshTimer: number | null = null;
+    const scheduleRefresh = (event: Event) => {
+      const detail = (event as CustomEvent<{ space_id?: string }>).detail;
+      if (detail?.space_id !== props.spaceId || refreshTimer != null) return;
+      refreshTimer = window.setTimeout(() => {
+        refreshTimer = null;
+        void actions.refresh();
+      }, 100);
+    };
+    window.addEventListener("misty:space-note-event", scheduleRefresh);
+    return () => {
+      if (refreshTimer != null) window.clearTimeout(refreshTimer);
+      window.removeEventListener("misty:space-note-event", scheduleRefresh);
+    };
+  }, [actions.refresh, props.spaceId]);
 
   const loading = store.phase === "loading" || store.phase === "idle";
 

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { ProviderWorkflow } from "@/models/interfaces/services/misty-api";
 import { providerOptionsForConnection } from "@/pages/Providers/providerUtils";
 
-const noisyRcloneDriveWorkflow: ProviderWorkflow = {
+const noisyDriveWorkflow: ProviderWorkflow = {
   type: "drive",
   name: "Google Drive",
   description: "Google Drive",
@@ -59,14 +59,14 @@ describe("providerOptionsForConnection", () => {
   it("shows only optional OAuth application credentials for a new Google Drive connection", () => {
     const options = providerOptionsForConnection(
       { mode: "add", providerType: "drive", parameters: {}, step: null },
-      noisyRcloneDriveWorkflow,
+      noisyDriveWorkflow,
     );
 
     expect(options.map((option) => option.name)).toEqual(["client_id", "client_secret"]);
     expect(options.some((option) => option.name === "token")).toBe(false);
   });
 
-  it("still displays an explicit rclone state-machine question", () => {
+  it("still displays an explicit provider state-machine question", () => {
     const option = {
       name: "config_is_local",
       label: "Use browser",
@@ -97,7 +97,7 @@ describe("providerOptionsForConnection", () => {
           pollAfterMs: 0,
         },
       },
-      noisyRcloneDriveWorkflow,
+      noisyDriveWorkflow,
     );
 
     expect(options).toEqual([option]);

@@ -263,12 +263,7 @@ export function selectAppearancePreferences(
     compactModeEnabled: settingsBoolean(source, "appearance", "compact_mode_enabled", false),
     fontSize: settingsScaleToken(settingsNumber(source, "appearance", "font_size_index", 1)),
     panelOpacity: clampSettingsNumber(
-      settingsNumber(
-        source,
-        "appearance",
-        "panel_opacity",
-        settingsNumber(source, "appearance", "home_panel_opacity", 0.82),
-      ),
+      settingsNumber(source, "appearance", "panel_opacity", 0.82),
       0,
       1,
     ),
@@ -280,12 +275,7 @@ export function selectAppearancePreferences(
       true,
     ),
     uiScale: settingsScaleToken(settingsNumber(source, "appearance", "ui_scale_index", 1)),
-    wallpaperPath: settingsString(
-      source,
-      "appearance",
-      "wallpaper_path",
-      settingsString(source, "appearance", "home_wallpaper_path", ""),
-    ),
+    wallpaperPath: settingsString(source, "appearance", "wallpaper_path", ""),
   };
 }
 

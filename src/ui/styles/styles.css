@@ -36,8 +36,8 @@
   --misty-row-selected: oklch(1 0 0 / 0.09);
   --misty-row-selected-hover: oklch(1 0 0 / 0.12);
   --misty-text: oklch(0.985 0 0);
-  --misty-text-muted: oklch(0.705 0.015 286.067);
-  --misty-text-subtle: oklch(0.552 0.016 285.938);
+  --misty-text-muted: oklch(0.985 0 0 / 0.72);
+  --misty-text-subtle: oklch(0.985 0 0 / 0.52);
   --misty-primary: oklch(0.92 0.004 286.32);
   --misty-primary-hover: oklch(0.985 0 0);
   --misty-primary-active: oklch(0.871 0.006 286.286);
@@ -348,8 +348,8 @@
   --misty-border-soft: rgba(238, 242, 246, 0.09);
   --misty-content-frame-border: #1d2124;
   --misty-text: #f3f5f7;
-  --misty-text-muted: #c7cdd3;
-  --misty-text-subtle: #8e98a1;
+  --misty-text-muted: rgb(243 245 247 / 0.72);
+  --misty-text-subtle: rgb(243 245 247 / 0.52);
   --misty-primary: #dbe3ea;
   --misty-primary-hover: #f0f4f8;
   --misty-primary-active: #bcc8d1;
@@ -390,8 +390,8 @@
   --misty-border-soft: rgba(211, 255, 247, 0.1);
   --misty-content-frame-border: #1a3338;
   --misty-text: #effdfb;
-  --misty-text-muted: #c6e4df;
-  --misty-text-subtle: #82a6a1;
+  --misty-text-muted: rgb(239 253 251 / 0.72);
+  --misty-text-subtle: rgb(239 253 251 / 0.52);
   --misty-primary: #c9f4ef;
   --misty-primary-hover: #e5fffb;
   --misty-primary-active: #9edbd3;
@@ -432,8 +432,8 @@
   --misty-border-soft: rgba(255, 231, 210, 0.1);
   --misty-content-frame-border: #312621;
   --misty-text: #fff4e8;
-  --misty-text-muted: #dfcbb9;
-  --misty-text-subtle: #a9917d;
+  --misty-text-muted: rgb(255 244 232 / 0.72);
+  --misty-text-subtle: rgb(255 244 232 / 0.52);
   --misty-primary: #f4dcc8;
   --misty-primary-hover: #fff0df;
   --misty-primary-active: #d6bba5;

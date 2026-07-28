@@ -182,6 +182,23 @@ export function createShellActions(set: ExplorerSet, get: ExplorerGet): Partial<
       }
       return id;
     },
+    recordActivity: (message, type = "info") => {
+      const trimmed = message.trim();
+      if (!trimmed) return 0;
+      const id = explorerRuntime.nextExplorerNotificationId++;
+      const notification = {
+        id,
+        message: trimmed,
+        type,
+        createdAtMs: Date.now(),
+        read: false,
+        showInActivity: true,
+      };
+      set((state) => ({
+        notificationHistory: [...state.notificationHistory, notification].slice(-200),
+      }));
+      return id;
+    },
     dismissNotification: (id) =>
       set((state) => ({
         notifications: state.notifications.filter((notification) => notification.id !== id),

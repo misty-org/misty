@@ -5,6 +5,7 @@ export type { SpacesStore } from "@/models/interfaces/stores/spaces/useSpacesSto
 import { create } from "zustand";
 import { openExternalLink } from "@/platform/openExternalLink";
 import { errorText } from "@/lib/format";
+import { notifyAccountScopeReset } from "@/stores/account/accountEvents";
 import {
   resolveSpacesApiBase,
   SpaceRequestError,
@@ -65,6 +66,7 @@ export const useSpacesStore = create<SpacesStore>((set, get) => ({
   spaces: [],
   invitations: [],
   limits: null,
+  ownerStorage: null,
   membersBySpace: {},
   messagesBySpace: {},
   nodesBySpace: {},
@@ -102,6 +104,7 @@ export const useSpacesStore = create<SpacesStore>((set, get) => ({
           spaces: snapshot.spaces,
           invitations: snapshot.invitations,
           limits: snapshot.entitlements,
+          ownerStorage: snapshot.owner_storage,
           snapshotReady: true,
           loading: false,
         });
@@ -217,6 +220,12 @@ export const useSpacesStore = create<SpacesStore>((set, get) => ({
       }));
     } catch (error) {
       if (generation !== spacesAccountGeneration) return;
+      if (error instanceof SpaceRequestError && (error.status === 403 || error.status === 404)) {
+        set((state) => ({
+          agentsBySpace: { ...state.agentsBySpace, [spaceId]: [] },
+        }));
+        return;
+      }
       set({ error: errorText(error) });
     }
   },
@@ -426,6 +435,24 @@ export const useSpacesStore = create<SpacesStore>((set, get) => ({
     }
   },
 
+  toggleMessageReaction: async (spaceId, messageId, emoji, reacted) => {
+    set({ error: null });
+    try {
+      const saved = reacted
+        ? await spacesApi.removeMessageReaction(spaceId, messageId, emoji)
+        : await spacesApi.addMessageReaction(spaceId, messageId, emoji);
+      set((state) => ({
+        messagesBySpace: {
+          ...state.messagesBySpace,
+          [spaceId]: mergeSpaceMessages(state.messagesBySpace[spaceId] ?? [], [saved]),
+        },
+      }));
+    } catch (error) {
+      set({ error: errorText(error) });
+      throw error;
+    }
+  },
+
   markRead: async (spaceId, seq) => {
     await spacesApi.markRead(spaceId, seq);
     await get().loadInbox();
@@ -558,11 +585,11 @@ export const useSpacesStore = create<SpacesStore>((set, get) => ({
             const envelope = JSON.parse(String(message.data)) as RealtimeEnvelope;
             if (envelope.type === "replay") {
               for (const event of envelope.events)
-                void applyRealtimeEvent(event, accountId, get, set);
+                applyRealtimeEventSafely(event, accountId, get, set);
               if (envelope.resync_required)
                 void Promise.all([get().load({ force: true }), get().loadInbox()]);
             } else if (envelope.type === "event") {
-              void applyRealtimeEvent(envelope.event, accountId, get, set);
+              applyRealtimeEventSafely(envelope.event, accountId, get, set);
             } else if (envelope.type === "presence") {
               set((state) => ({
                 presenceBySpace: {
@@ -638,6 +665,7 @@ function notifyAccountSessionInvalid(): void {
 }
 
 export function resetSpacesAccountState(): void {
+  notifyAccountScopeReset();
   stopRealtimeConnection();
   reconnectAttempt = 0;
   realtimeConnectPromise = null;
@@ -653,6 +681,7 @@ export function resetSpacesAccountState(): void {
     spaces: [],
     invitations: [],
     limits: null,
+    ownerStorage: null,
     membersBySpace: {},
     messagesBySpace: {},
     nodesBySpace: {},
@@ -699,10 +728,21 @@ async function applyRealtimeEvent(
     event.type.startsWith("member.") ||
     event.type.startsWith("owner.") ||
     event.type.startsWith("space.")
-  )
-    await Promise.all([get().load({ force: true }), get().loadMembers(event.space_id)]);
-  else if (event.type.startsWith("library.") && permissions?.["library.view"] !== false)
+  ) {
+    await get().load({ force: true });
+    if (accountId !== realtimeAccountId || generation !== spacesAccountGeneration) return;
+    if (!get().spaces.some((space) => space.id === event.space_id)) return;
+    try {
+      await get().loadMembers(event.space_id);
+    } catch (error) {
+      if (!isInaccessibleSpaceError(error)) throw error;
+    }
+  } else if (event.type.startsWith("library.") && permissions?.["library.view"] !== false)
     window.dispatchEvent(new CustomEvent("misty:space-library-event", { detail: event }));
+  else if (event.type.startsWith("note."))
+    window.dispatchEvent(new CustomEvent("misty:space-note-event", { detail: event }));
+  else if (event.type.startsWith("drawing."))
+    window.dispatchEvent(new CustomEvent("misty:space-drawing-event", { detail: event }));
   else if (
     (event.type.startsWith("task.") || event.type.startsWith("calendar.")) &&
     permissions?.["tasks.view"] !== false
@@ -710,6 +750,23 @@ async function applyRealtimeEvent(
     window.dispatchEvent(new CustomEvent("misty:space-coordination-event", { detail: event }));
   if (accountId !== realtimeAccountId || generation !== spacesAccountGeneration) return;
   set({ realtimeConnected: true });
+}
+
+function applyRealtimeEventSafely(
+  event: SpaceEvent,
+  accountId: string,
+  get: () => SpacesStore,
+  set: (partial: Partial<SpacesStore> | ((state: SpacesStore) => Partial<SpacesStore>)) => void,
+): void {
+  void applyRealtimeEvent(event, accountId, get, set).catch((error) => {
+    if (isInaccessibleSpaceError(error)) return;
+    if (accountId !== realtimeAccountId) return;
+    set({ error: errorText(error) });
+  });
+}
+
+function isInaccessibleSpaceError(error: unknown): boolean {
+  return error instanceof SpaceRequestError && (error.status === 403 || error.status === 404);
 }
 
 function scheduleReconnect(get: () => SpacesStore, accountId: string, generation: number) {

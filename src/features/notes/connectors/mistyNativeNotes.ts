@@ -5,30 +5,32 @@ import type {
   UpdateNoteInput,
 } from "@/models/interfaces/features/notes/connectors";
 import type { UnifiedNote } from "@/models/types/features/notes/types";
-import { MISTY_CONNECTOR_ID, mistyNoteSeed } from "@/features/notes/mockData";
-import { delay, matchesQuery, nextId, nowIso, previewFrom } from "@/features/notes/connectorUtils";
+import { MISTY_CONNECTOR_ID } from "@/features/notes/mockData";
+import { nowIso, previewFrom } from "@/features/notes/connectorUtils";
+import { spaceRequest } from "@/stores/spaces/useSpacesBackendStore";
+
+type ServerSpaceNote = {
+  id: string;
+  space_id: string;
+  creator_user_id: string;
+  title: string;
+  plain_text?: string;
+  lifecycle_state: string;
+  collaboration_revision: number;
+  acl_version: number;
+  role: "creator" | "editor" | "viewer";
+  created_at?: string;
+  updated_at?: string;
+};
 
 /**
- * Account-scoped device storage for native Misty notes. An empty account id is
- * reserved for isolated connector tests and retains the deterministic seed.
+ * Native Misty notes are server-backed Space documents. The collaborative Yjs
+ * body lives in Cloudflare; this connector handles the server metadata and list
+ * projection, never device-local note storage.
  */
-export function createMistyNativeNotesConnector(accountId = ""): NotesConnector {
-  const storageKey = accountId ? nativeNotesStorageKey(accountId) : "";
-  let notes = storageKey ? readNativeNotes(storageKey) : mistyNoteSeed.map((note) => ({ ...note }));
-  notes = notes.filter(isSpaceAttachedNote);
-  if (storageKey) writeNativeNotes(storageKey, notes);
+export function createMistyNativeNotesConnector(_accountId = "", spaceId = "", spaceName = ""): NotesConnector {
   let syncedAt = nowIso();
-
-  function commit(next: UnifiedNote[]): void {
-    if (storageKey) writeNativeNotes(storageKey, next);
-    notes = next;
-  }
-
-  function find(sourceId: string): UnifiedNote {
-    const note = notes.find((candidate) => candidate.sourceId === sourceId);
-    if (!note) throw new Error(`Misty note not found: ${sourceId}`);
-    return { ...note };
-  }
+  const noteSpaces = new Map<string, { spaceId: string; spaceName: string }>();
 
   return {
     id: MISTY_CONNECTOR_ID,
@@ -38,9 +40,8 @@ export function createMistyNativeNotesConnector(accountId = ""): NotesConnector 
     capabilities: {
       read: true,
       create: true,
-      append: true,
-      update: true,
-      // Native notes have no external schema to reconcile.
+      append: false,
+      update: false,
       updateProperties: false,
       openInSource: false,
       sync: true,
@@ -54,124 +55,118 @@ export function createMistyNativeNotesConnector(accountId = ""): NotesConnector 
     async disconnect() {},
 
     async listNotes() {
-      await delay(140);
-      return notes.map((note) => ({ ...note }));
+      if (!spaceId) return [];
+      const notes = await listMistySpaceNotes(spaceId, spaceName);
+      rememberNotes(noteSpaces, notes);
+      syncedAt = nowIso();
+      return notes;
     },
 
     async getNote(sourceId: string) {
-      await delay(60);
-      return find(sourceId);
+      const scope = noteSpaces.get(sourceId);
+      const note = await spaceRequest<ServerSpaceNote>(
+        `/spaces/${encodeURIComponent(scope?.spaceId ?? spaceId)}/notes/${encodeURIComponent(sourceId)}`,
+      );
+      const mapped = mapServerNote(note, scope?.spaceName ?? spaceName);
+      rememberNotes(noteSpaces, [mapped]);
+      return mapped;
     },
 
     async searchNotes(query: string) {
-      await delay(80);
-      return notes.filter((note) => matchesQuery(note, query)).map((note) => ({ ...note }));
+      const normalized = query.trim().toLowerCase();
+      const notes = await this.listNotes();
+      return normalized
+        ? notes.filter((note) =>
+            [note.title, note.preview, note.bodyMarkdown ?? note.body]
+              .join(" ")
+              .toLowerCase()
+              .includes(normalized),
+          )
+        : notes;
     },
 
     async createNote(input: CreateNoteInput) {
-      await delay(120);
       if (!input.spaceId || !input.spaceName) {
         throw new Error("Misty notes must belong to a Space.");
       }
-      const sourceId = nextId("note");
-      const timestamp = nowIso();
-      const created: UnifiedNote = {
-        id: `misty:${sourceId}`,
-        source: "misty",
-        sourceId,
-        title: input.title.trim() || "Untitled note",
-        body: input.body,
-        bodyFormat: input.bodyFormat ?? "markdown",
-        bodyMarkdown: input.bodyMarkdown,
-        preview: previewFrom(input.bodyMarkdown ?? input.body),
-        spaceId: input.spaceId,
-        spaceName: input.spaceName,
-        tags: input.tags ?? [],
-        backlinks: [],
-        updatedAt: timestamp,
-        createdAt: timestamp,
-        favorite: false,
-        syncStatus: "local-only",
-        connectorId: MISTY_CONNECTOR_ID,
-        providerStatus: "connected",
-      };
-      commit([created, ...notes]);
-      return { ...created };
+      const created = await spaceRequest<ServerSpaceNote>(
+        `/spaces/${encodeURIComponent(input.spaceId)}/notes`,
+        {
+          method: "POST",
+          body: JSON.stringify({ title: input.title.trim() || "Untitled note" }),
+        },
+      );
+      syncedAt = nowIso();
+      const mapped = mapServerNote(created, input.spaceName);
+      rememberNotes(noteSpaces, [mapped]);
+      return mapped;
     },
 
     async updateNote(sourceId: string, patch: UpdateNoteInput) {
-      await delay(90);
-      const existing = find(sourceId);
-      const updated: UnifiedNote = {
-        ...existing,
-        ...patch,
-        preview:
-          patch.body === undefined && patch.bodyMarkdown === undefined
-            ? existing.preview
-            : previewFrom(patch.bodyMarkdown ?? patch.body ?? existing.bodyMarkdown ?? existing.body),
-        updatedAt: nowIso(),
-      };
-      commit(notes.map((note) => (note.sourceId === sourceId ? updated : note)));
-      return { ...updated };
+      const scope = noteSpaces.get(sourceId);
+      const targetSpaceId = patch.spaceId ?? scope?.spaceId ?? spaceId;
+      if (patch.tags) {
+        const updated = await spaceRequest<ServerSpaceNote>(
+          `/spaces/${encodeURIComponent(targetSpaceId)}/notes/${encodeURIComponent(sourceId)}/metadata`,
+          {
+            method: "PATCH",
+            body: JSON.stringify({ shared_tags: patch.tags }),
+          },
+        );
+        syncedAt = nowIso();
+        const mapped = mapServerNote(updated, patch.spaceName ?? scope?.spaceName ?? spaceName);
+        rememberNotes(noteSpaces, [mapped]);
+        return mapped;
+      }
+      throw new Error("Misty note content is collaborative and must be edited through the live note room.");
     },
 
     async sync(): Promise<SyncResult> {
-      await delay(200);
       syncedAt = nowIso();
+      const notes = spaceId ? await listMistySpaceNotes(spaceId, spaceName) : [];
+      rememberNotes(noteSpaces, notes);
       return { connectorId: MISTY_CONNECTOR_ID, syncedAt, noteCount: notes.length };
     },
   };
 }
 
-function nativeNotesStorageKey(accountId: string): string {
-  return `misty.notes.native.v1.${encodeURIComponent(accountId)}`;
-}
-
-function readNativeNotes(storageKey: string): UnifiedNote[] {
-  try {
-    const raw = window.localStorage.getItem(storageKey);
-    const parsed: unknown = raw ? JSON.parse(raw) : [];
-    return Array.isArray(parsed)
-      ? parsed.filter(isStoredNativeNote).map(normalizeStoredNativeNote)
-      : [];
-  } catch {
-    return [];
-  }
-}
-
-function writeNativeNotes(storageKey: string, notes: UnifiedNote[]): void {
-  try {
-    window.localStorage.setItem(storageKey, JSON.stringify(notes));
-  } catch {
-    throw new Error("Misty could not save this note on this device.");
-  }
-}
-
-function isStoredNativeNote(value: unknown): value is UnifiedNote {
-  if (!value || typeof value !== "object") return false;
-  const note = value as Partial<UnifiedNote>;
-  return (
-    note.source === "misty" &&
-    typeof note.id === "string" &&
-    typeof note.sourceId === "string" &&
-    typeof note.title === "string" &&
-    typeof note.body === "string" &&
-    (note.bodyMarkdown === undefined || typeof note.bodyMarkdown === "string") &&
-    typeof note.preview === "string" &&
-    typeof note.updatedAt === "string" &&
-    typeof note.createdAt === "string" &&
-    Array.isArray(note.tags) &&
-    Array.isArray(note.backlinks)
+export async function listMistySpaceNotes(spaceId: string, spaceName: string): Promise<UnifiedNote[]> {
+  const result = await spaceRequest<{ notes: ServerSpaceNote[] }>(
+    `/spaces/${encodeURIComponent(spaceId)}/notes`,
   );
+  return result.notes.map((note) => mapServerNote(note, spaceName));
 }
 
-function normalizeStoredNativeNote(note: UnifiedNote): UnifiedNote {
+function mapServerNote(note: ServerSpaceNote, spaceName = ""): UnifiedNote {
+  const timestamp = note.updated_at ?? note.created_at ?? nowIso();
+  const bodyMarkdown = note.plain_text ?? "";
   return {
-    ...note,
-    bodyFormat: note.bodyFormat ?? "markdown",
+    id: `misty:${note.id}`,
+    source: "misty",
+    sourceId: note.id,
+    title: note.title.trim() || "Untitled note",
+    body: bodyMarkdown,
+    bodyFormat: "markdown",
+    bodyMarkdown,
+    preview: previewFrom(bodyMarkdown),
+    spaceId: note.space_id,
+    spaceName,
+    tags: [],
+    backlinks: [],
+    updatedAt: timestamp,
+    createdAt: note.created_at ?? timestamp,
+    favorite: false,
+    syncStatus: "synced",
+    connectorId: MISTY_CONNECTOR_ID,
+    providerStatus: "connected",
   };
 }
 
-function isSpaceAttachedNote(note: UnifiedNote): boolean {
-  return Boolean(note.spaceId && note.spaceName);
+function rememberNotes(
+  noteSpaces: Map<string, { spaceId: string; spaceName: string }>,
+  notes: UnifiedNote[],
+): void {
+  for (const note of notes) {
+    if (note.spaceId) noteSpaces.set(note.sourceId, { spaceId: note.spaceId, spaceName: note.spaceName ?? "" });
+  }
 }

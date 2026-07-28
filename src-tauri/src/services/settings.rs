@@ -188,6 +188,7 @@ fn normalize_settings_document(document: &mut Value) -> bool {
             ("default_file_action_index", json!(0)),
             ("open_links_externally", json!(true)),
             ("preferred_workspace_root", json!("")),
+            ("preferred_terminal_app", json!("System Default")),
             ("default_transfer_behavior_index", json!(0)),
             ("last_update_check_label", json!("Never checked")),
         ],
@@ -204,8 +205,6 @@ fn normalize_settings_document(document: &mut Value) -> bool {
             ("font_size_index", json!(1)),
             ("wallpaper_path", json!("")),
             ("panel_opacity", json!(0.82)),
-            ("home_wallpaper_path", json!("")),
-            ("home_panel_opacity", json!(0.82)),
             ("custom_fonts", json!([])),
         ],
     );

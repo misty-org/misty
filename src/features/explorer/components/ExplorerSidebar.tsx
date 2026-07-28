@@ -108,280 +108,56 @@ import type {
   SmartFolderDraft,
 } from "@/models/interfaces/features/explorer/components/ExplorerSidebarSupport";
 import { ExplorerDropTarget } from "../drag/ExplorerDropTarget";
-
-const androidSuggestedLocalFolders = [
-  { label: "Documents", icon: FileText, initialDirectory: "Documents", targetNames: ["documents"] },
-  {
-    label: "Downloads",
-    icon: Download,
-    initialDirectory: "Download",
-    targetNames: ["download", "downloads"],
-  },
-  { label: "Pictures", icon: Image, initialDirectory: "Pictures", targetNames: ["pictures"] },
-  { label: "Camera", icon: Camera, initialDirectory: "DCIM", targetNames: ["dcim", "camera"] },
-  { label: "Movies", icon: Film, initialDirectory: "Movies", targetNames: ["movies", "videos"] },
-  { label: "Music", icon: Music, initialDirectory: "Music", targetNames: ["music"] },
-  { label: "Recordings", icon: Mic2, initialDirectory: "Recordings", targetNames: ["recordings"] },
-  { label: "Ringtones", icon: Music, initialDirectory: "Ringtones", targetNames: ["ringtones"] },
-  {
-    label: "Audiobooks",
-    icon: Headphones,
-    initialDirectory: "Audiobooks",
-    targetNames: ["audiobooks"],
-  },
-  { label: "Podcasts", icon: Headphones, initialDirectory: "Podcasts", targetNames: ["podcasts"] },
-] satisfies Array<{
-  label: string;
-  icon: typeof Folder;
-  initialDirectory: string;
-  targetNames: string[];
-}>;
+import { buildQuickAccessItems } from "./explorerSidebar/quickAccessItems";
+import { useSidebarPreferences } from "./explorerSidebar/useSidebarPreferences";
+import { useSidebarSmartFolders } from "./explorerSidebar/useSidebarSmartFolders";
+import { useSidebarQuickAccess } from "./explorerSidebar/useSidebarQuickAccess";
+import { SidebarQuickAccessSection } from "./explorerSidebar/SidebarQuickAccessSection";
+import { useSidebarWorkspaceMenu } from "./explorerSidebar/useSidebarWorkspaceMenu";
 
 export const ExplorerSidebar = memo(function ExplorerSidebar(props: ExplorerSidebarProps) {
-  const [collapsedSections, setCollapsedSections] =
-    useState<SidebarCollapsedState>(loadSidebarCollapsedState);
-  const [deviceCustomization, setDeviceCustomization] =
-    useState<DeviceCustomizationState>(loadDeviceCustomization);
-  const [workspaceMenuOpen, setWorkspaceMenuOpen] = useState(false);
-  const [workspaceDialog, setWorkspaceDialog] = useState<WorkspaceDialogState>(null);
-  const [workspaceDraft, setWorkspaceDraft] = useState("");
-  const [savedSearches, setSavedSearches] = useState<SavedSearch[]>([]);
-  const [smartFolderDialog, setSmartFolderDialog] = useState<SmartFolderDialogState>(null);
-  const [smartFolderError, setSmartFolderError] = useState<string | null>(null);
-  const [smartFoldersLoading, setSmartFoldersLoading] = useState(false);
-  const [hiddenQuickAccessPaths, setHiddenQuickAccessPaths] = useState<string[]>(
-    loadHiddenQuickAccessPaths,
-  );
-  const quickAccess = useMemo<QuickAccessItem[]>(() => {
-    if (!props.androidLocal) {
-      return [
-        { label: "Home", icon: Home, path: props.homePath },
-        { label: "Desktop", icon: Monitor, path: `${props.homePath}/Desktop` },
-        { label: "Documents", icon: FileText, path: `${props.homePath}/Documents` },
-        { label: "Downloads", icon: Download, path: `${props.homePath}/Downloads` },
-        { label: "Recent", icon: Clock3, path: "misty://recent" },
-        { label: "Starred", icon: Star, path: "misty://starred" },
-        { label: "Trash", icon: Trash2, path: "misty://trash" },
-      ];
-    }
-
-    const storageRoot =
-      props.androidAllFilesAccess?.granted && props.androidAllFilesAccess.storageRoot
-        ? props.androidAllFilesAccess.storageRoot.replace(/\/+$/, "")
-        : null;
-    if (storageRoot) {
-      return [
-        { label: "Local", icon: Folder, path: storageRoot },
-        ...androidSuggestedLocalFolders.map((item) => ({
-          label: item.label,
-          icon: item.icon,
-          path: `${storageRoot}/${item.initialDirectory}`,
-        })),
-        { label: "Recent", icon: Clock3, path: "misty://recent" },
-        { label: "Starred", icon: Star, path: "misty://starred" },
-        { label: "Trash", icon: Trash2, path: "misty://trash" },
-      ];
-    }
-
-    return [
-      {
-        label: "Local",
-        icon: Folder,
-        path: props.homePath,
-        grantRequest: { label: "Local", targetNames: [], initialDirectory: "" },
-      },
-      ...androidSuggestedLocalFolders.map((item) => {
-        const granted = props.androidGrantedFolders.find((folder) =>
-          item.targetNames.includes(normalizeAndroidLocalName(folder.name)),
-        );
-        const path =
-          granted?.path ?? `misty://local/grant/${normalizeAndroidLocalName(item.label)}`;
-        return {
-          label: item.label,
-          icon: item.icon,
-          path,
-          grantRequest: {
-            label: item.label,
-            targetNames: item.targetNames,
-            initialDirectory: item.initialDirectory,
-            grantedPath: granted?.path,
-          },
-        };
-      }),
-      { label: "Recent", icon: Clock3, path: "misty://recent" },
-      { label: "Starred", icon: Star, path: "misty://starred" },
-      { label: "Trash", icon: Trash2, path: "misty://trash" },
-    ];
-  }, [
-    props.androidAllFilesAccess,
-    props.androidGrantedFolders,
-    props.androidLocal,
-    props.homePath,
-  ]);
-  const visiblePinnedPaths = useMemo(
-    () =>
-      dedupePinnedPathsForQuickAccess(
-        props.pinnedPaths,
-        quickAccess
-          .filter((item) => !quickAccessPathHidden(item.path, hiddenQuickAccessPaths))
-          .map((item) => item.path),
-      ),
-    [hiddenQuickAccessPaths, props.pinnedPaths, quickAccess],
-  );
-  const visibleQuickAccess = useMemo(
-    () => quickAccess.filter((item) => !quickAccessPathHidden(item.path, hiddenQuickAccessPaths)),
-    [hiddenQuickAccessPaths, quickAccess],
-  );
+  const {
+    collapsedSections,
+    deviceCustomization,
+    setDeviceCustomization,
+    hiddenQuickAccessPaths,
+    setHiddenQuickAccessPaths,
+    toggleSection,
+    unmountDevice,
+  } = useSidebarPreferences();
+  const {
+    savedSearches,
+    setSavedSearches,
+    smartFolderDialog,
+    setSmartFolderDialog,
+    smartFolderError,
+    setSmartFolderError,
+    smartFoldersLoading,
+    openSmartFolderDialog,
+    saveSmartFolder,
+    deleteSmartFolder,
+    runSmartFolder,
+  } = useSidebarSmartFolders(props);
+  const {
+    workspaceMenuOpen,
+    setWorkspaceMenuOpen,
+    workspaceDialog,
+    setWorkspaceDialog,
+    workspaceDraft,
+    setWorkspaceDraft,
+    openWorkspaceDialog,
+    confirmWorkspaceDialog,
+  } = useSidebarWorkspaceMenu(props);
+  const quickAccessModel = useSidebarQuickAccess({
+    sidebar: props,
+    hiddenQuickAccessPaths,
+    setHiddenQuickAccessPaths,
+  });
   const deviceEntries = useMemo(
     () => buildDeviceEntries(props.devices, deviceCustomization),
     [deviceCustomization, props.devices],
   );
 
-  useEffect(() => {
-    saveDeviceCustomization(deviceCustomization);
-  }, [deviceCustomization]);
-
-  useEffect(() => {
-    saveSidebarCollapsedState(collapsedSections);
-  }, [collapsedSections]);
-
-  useEffect(() => {
-    saveHiddenQuickAccessPaths(hiddenQuickAccessPaths);
-  }, [hiddenQuickAccessPaths]);
-
-  useEffect(() => {
-    let disposed = false;
-    setSmartFoldersLoading(true);
-    void savedSearchesSnapshot()
-      .then((snapshot) => {
-        if (!disposed) {
-          setSavedSearches(sortSavedSearches(snapshot.searches));
-          setSmartFolderError(null);
-        }
-      })
-      .catch((error) => {
-        if (!disposed) setSmartFolderError(errorText(error));
-      })
-      .finally(() => {
-        if (!disposed) setSmartFoldersLoading(false);
-      });
-    return () => {
-      disposed = true;
-    };
-  }, []);
-
-  const unmountDevice = (device: SidebarDeviceEntry) => {
-    setDeviceCustomization((current) => ({
-      ...current,
-      customMountPaths: device.custom
-        ? current.customMountPaths.filter((path) => path !== device.mountPath)
-        : current.customMountPaths,
-      hiddenPaths: device.custom
-        ? current.hiddenPaths.filter((path) => path !== device.mountPath)
-        : uniqueStrings([...current.hiddenPaths, device.mountPath]),
-      nameOverrides: Object.fromEntries(
-        Object.entries(current.nameOverrides).filter(([path]) => path !== device.mountPath),
-      ),
-    }));
-  };
-
-  const toggleSection = (section: keyof SidebarCollapsedState) => {
-    setCollapsedSections((current) => ({ ...current, [section]: !current[section] }));
-  };
-  const removeQuickAccessItem = (item: QuickAccessMenuItem) => {
-    if (item.kind === "builtIn") {
-      setHiddenQuickAccessPaths((paths) => addHiddenQuickAccessPath(paths, item.path));
-    } else {
-      props.onUnpinPinnedPath(item.path);
-    }
-  };
-  const resetQuickAccessDefaults = () => {
-    setHiddenQuickAccessPaths([]);
-  };
-  const toggleQuickAccessDefault = (path: string) => {
-    setHiddenQuickAccessPaths((paths) =>
-      quickAccessPathHidden(path, paths)
-        ? paths.filter(
-            (candidate) => normalizeSidebarPath(candidate) !== normalizeSidebarPath(path),
-          )
-        : addHiddenQuickAccessPath(paths, path),
-    );
-  };
-  const openWorkspaceDialog = (
-    kind: "create" | "rename" | "delete",
-    target?: ExplorerWorkspaceEntry,
-  ) => {
-    const active =
-      target ??
-      props.workspaceEntries.find((workspace) => workspace.id === props.activeWorkspaceId) ??
-      (props.activeWorkspaceId
-        ? { id: props.activeWorkspaceId, title: props.activeWorkspaceTitle }
-        : null);
-    setWorkspaceMenuOpen(false);
-    setWorkspaceDialog(
-      kind === "rename" && active
-        ? { kind, workspaceId: active.id, title: active.title }
-        : kind === "delete" && active
-          ? { kind, workspaceId: active.id, title: active.title }
-          : { kind: "create", workspaceId: "", title: "File layout" },
-    );
-    setWorkspaceDraft(kind === "rename" && active ? active.title : "File layout");
-  };
-  const confirmWorkspaceDialog = () => {
-    if (!workspaceDialog) return;
-    if (workspaceDialog.kind === "create") {
-      props.onCreateWorkspace(workspaceDraft);
-    } else if (workspaceDialog.kind === "rename") {
-      props.onRenameWorkspace(workspaceDialog.workspaceId, workspaceDraft);
-    } else {
-      props.onDeleteWorkspace(workspaceDialog.workspaceId);
-    }
-    setWorkspaceDialog(null);
-    setWorkspaceDraft("");
-  };
-  const openSmartFolderDialog = (search?: SavedSearch) => {
-    setSmartFolderError(null);
-    setSmartFolderDialog(createSmartFolderDialogState(search));
-  };
-  const saveSmartFolder = async (draft: SmartFolderDraft) => {
-    const name = draft.name.trim();
-    if (!name) return;
-    const search: SavedSearch = {
-      id: draft.id || smartFolderId(),
-      name,
-      query: draft.query.trim() || smartFolderQueryFromRules(draft.rules, draft.matchMode),
-      rules: smartFolderRulesWithMode(draft.rules, draft.matchMode),
-      updatedAtMs: Date.now(),
-    };
-    try {
-      const snapshot = await savedSearchesSave(search);
-      setSavedSearches(sortSavedSearches(snapshot.searches));
-      setSmartFolderDialog(null);
-      setSmartFolderError(null);
-    } catch (error) {
-      setSmartFolderError(errorText(error));
-    }
-  };
-  const deleteSmartFolder = async (id: string) => {
-    try {
-      const snapshot = await savedSearchesDelete(id);
-      setSavedSearches(sortSavedSearches(snapshot.searches));
-      setSmartFolderDialog(null);
-      setSmartFolderError(null);
-    } catch (error) {
-      setSmartFolderError(errorText(error));
-    }
-  };
-  const runSmartFolder = async (search: SavedSearch) => {
-    const query =
-      search.query.trim() ||
-      smartFolderQueryFromRules(search.rules, smartFolderMatchMode(search.rules));
-    if (!query) return;
-    const searchStore = useSearchStore.getState();
-    await searchStore.openSearch(props.activePath || props.homePath);
-    searchStore.setScope("everything");
-    searchStore.setQuery(query);
-  };
   return (
     <aside className={sidebarStyles.root} data-explorer-scroll-container>
       <section className={sidebarStyles.section}>
@@ -460,218 +236,12 @@ export const ExplorerSidebar = memo(function ExplorerSidebar(props: ExplorerSide
         </DropdownMenu>
       </section>
 
-      <section className={sidebarStyles.section}>
-        <ContextMenu>
-          <ContextMenuTrigger asChild>
-            <div>
-              <SidebarSectionHeader
-                title="Quick access"
-                collapsed={collapsedSections.quickAccess}
-                onToggle={() => toggleSection("quickAccess")}
-                actions={
-                  props.androidLocal ? (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon-sm"
-                      aria-label="Add local folder"
-                      className={sidebarStyles.sectionActionButton}
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        props.onGrantLocalFolder();
-                      }}
-                    >
-                      <Plus size={15} />
-                    </Button>
-                  ) : undefined
-                }
-              />
-            </div>
-          </ContextMenuTrigger>
-          <ContextMenuContent className="w-56" aria-label="Quick access defaults">
-            {quickAccess.map((item) => (
-              <ContextMenuCheckboxItem
-                key={`quick-menu:${item.path}`}
-                checked={!quickAccessPathHidden(item.path, hiddenQuickAccessPaths)}
-                onCheckedChange={() => toggleQuickAccessDefault(item.path)}
-                onSelect={(event) => event.preventDefault()}
-              >
-                {item.label}
-              </ContextMenuCheckboxItem>
-            ))}
-            <ContextMenuSeparator />
-            <ContextMenuItem onSelect={resetQuickAccessDefaults}>
-              <RefreshCcw size={15} />
-              <span>Reset Defaults</span>
-            </ContextMenuItem>
-          </ContextMenuContent>
-        </ContextMenu>
-        {!collapsedSections.quickAccess ? (
-          <div className={sidebarStyles.list}>
-            {visibleQuickAccess.map((item) => {
-              const Icon = item.icon;
-              const grantedPath = item.grantRequest?.grantedPath;
-              const selected = grantedPath
-                ? props.activePath === grantedPath || props.activePath.startsWith(`${grantedPath}/`)
-                : props.activePath === item.path;
-              return (
-                <ContextMenu key={`quick:${item.path}`}>
-                  <ContextMenuTrigger asChild>
-                    <div
-                      className={`${sidebarStyles.pinnedRow} ${selected ? sidebarStyles.itemSelected : ""}`}
-                    >
-                      <ExplorerDropTarget
-                        id={`sidebar:quick:${item.path}`}
-                        path={grantedPath ?? item.path}
-                        springLoad={!item.grantRequest || Boolean(grantedPath)}
-                        onSpringLoad={() => props.onNavigate(grantedPath ?? item.path)}
-                      >
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          className={sidebarStyles.pinnedButton}
-                          onClick={() => {
-                            if (item.grantRequest) {
-                              props.onGrantLocalFolder(item.grantRequest);
-                            } else {
-                              props.onNavigate(item.path);
-                            }
-                          }}
-                        >
-                          <span className={sidebarStyles.itemIcon} aria-hidden="true">
-                            <Icon />
-                          </span>
-                          <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">
-                            {item.label}
-                          </span>
-                        </Button>
-                      </ExplorerDropTarget>
-                      {item.grantRequest && !grantedPath ? (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon-sm"
-                          className={sidebarStyles.pinnedUnpinButton}
-                          aria-label={`Grant access to ${item.label}`}
-                          onClick={() => props.onGrantLocalFolder(item.grantRequest)}
-                        >
-                          <Plus size={15} />
-                        </Button>
-                      ) : item.grantRequest ? (
-                        <span
-                          className={sidebarStyles.pinnedUnpinButton}
-                          aria-label={`${item.label} access granted`}
-                        >
-                          <Check size={15} />
-                        </span>
-                      ) : (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon-sm"
-                          className={sidebarStyles.pinnedUnpinButton}
-                          aria-label={`Unpin ${item.label} from Quick access`}
-                          onClick={() =>
-                            setHiddenQuickAccessPaths((paths) =>
-                              addHiddenQuickAccessPath(paths, item.path),
-                            )
-                          }
-                        >
-                          <PinOff size={15} />
-                        </Button>
-                      )}
-                    </div>
-                  </ContextMenuTrigger>
-                  <ContextMenuContent className="w-56">
-                    <ContextMenuItem onSelect={() => props.onOpenInNewTab(item.path, item.label)}>
-                      <ExternalLink size={15} />
-                      <span>Open in New Tab</span>
-                    </ContextMenuItem>
-                    <ContextMenuItem
-                      onSelect={() =>
-                        removeQuickAccessItem({
-                          kind: "builtIn",
-                          label: item.label,
-                          path: item.path,
-                        })
-                      }
-                    >
-                      <X size={15} />
-                      <span>Remove from Sidebar</span>
-                    </ContextMenuItem>
-                    <ContextMenuSeparator />
-                    <ContextMenuItem onSelect={resetQuickAccessDefaults}>
-                      <RefreshCcw size={15} />
-                      <span>Reset Defaults</span>
-                    </ContextMenuItem>
-                  </ContextMenuContent>
-                </ContextMenu>
-              );
-            })}
-            {visiblePinnedPaths.map((path) => (
-              <ContextMenu key={`pin:${path}`}>
-                <ContextMenuTrigger asChild>
-                  <div
-                    className={`${sidebarStyles.pinnedRow} ${props.activePath === path ? sidebarStyles.itemSelected : ""}`}
-                  >
-                    <ExplorerDropTarget
-                      id={`sidebar:pinned:${path}`}
-                      path={path}
-                      springLoad
-                      onSpringLoad={() => props.onNavigate(path)}
-                    >
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        className={sidebarStyles.pinnedButton}
-                        onClick={() => props.onNavigate(path)}
-                      >
-                        <span className={sidebarStyles.itemIcon} aria-hidden="true">
-                          <Folder />
-                        </span>
-                        <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">
-                          {pinnedPathLabel(path)}
-                        </span>
-                      </Button>
-                    </ExplorerDropTarget>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon-sm"
-                      className={sidebarStyles.pinnedUnpinButton}
-                      aria-label={`Unpin ${path} from Quick access`}
-                      onClick={() => props.onUnpinPinnedPath(path)}
-                    >
-                      <PinOff size={15} />
-                    </Button>
-                  </div>
-                </ContextMenuTrigger>
-                <ContextMenuContent className="w-56">
-                  <ContextMenuItem
-                    onSelect={() => props.onOpenInNewTab(path, pinnedPathLabel(path))}
-                  >
-                    <ExternalLink size={15} />
-                    <span>Open in New Tab</span>
-                  </ContextMenuItem>
-                  <ContextMenuItem
-                    onSelect={() =>
-                      removeQuickAccessItem({ kind: "pinned", label: pinnedPathLabel(path), path })
-                    }
-                  >
-                    <X size={15} />
-                    <span>Remove from Sidebar</span>
-                  </ContextMenuItem>
-                  <ContextMenuSeparator />
-                  <ContextMenuItem onSelect={resetQuickAccessDefaults}>
-                    <RefreshCcw size={15} />
-                    <span>Reset Defaults</span>
-                  </ContextMenuItem>
-                </ContextMenuContent>
-              </ContextMenu>
-            ))}
-          </div>
-        ) : null}
-      </section>
+      <SidebarQuickAccessSection
+        sidebar={props}
+        collapsed={collapsedSections.quickAccess}
+        onToggle={() => toggleSection("quickAccess")}
+        quick={quickAccessModel}
+      />
 
       <section className="hidden" aria-hidden="true">
         <SidebarSectionHeader
@@ -920,10 +490,3 @@ export const ExplorerSidebar = memo(function ExplorerSidebar(props: ExplorerSide
     </aside>
   );
 });
-
-function normalizeAndroidLocalName(value: string): string {
-  return value
-    .trim()
-    .toLowerCase()
-    .replace(/[\s_-]+/g, "");
-}

@@ -128,7 +128,7 @@ export function PointerDragProvider(props: { children: ReactNode }) {
       if (!payload) return;
       const zone = zoneAt(event.clientX, event.clientY, payload);
       cancel();
-      zone?.onDrop(payload);
+      zone?.onDrop(payload, { x: event.clientX, y: event.clientY });
     };
 
     const keydown = (event: KeyboardEvent) => {

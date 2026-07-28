@@ -4,6 +4,7 @@ import {
   CheckSquare2,
   MessagesSquare,
   NotebookPen,
+  PenTool,
   type LucideIcon,
 } from "lucide-react";
 import { Link } from "react-router-dom";
@@ -17,6 +18,7 @@ const sections = [
   { id: "chat", label: "Chat", icon: MessagesSquare },
   { id: "tasks", label: "Tasks", icon: CheckSquare2 },
   { id: "notes", label: "Notes", icon: NotebookPen },
+  { id: "drawings", label: "Drawings", icon: PenTool },
   { id: "library", label: "Library", icon: BookOpenText },
 ] as const;
 
@@ -39,7 +41,8 @@ export function SpaceSectionNavigation({
     .filter(({ id }) => id !== "library" || permissions?.["library.view"] !== false)
     // Notes are Space content, so they follow the Library permission rather than
     // introducing a permission the backend does not issue yet.
-    .filter(({ id }) => id !== "notes" || permissions?.["library.view"] !== false);
+    .filter(({ id }) => id !== "notes" || permissions?.["library.view"] !== false)
+    .filter(({ id }) => id !== "drawings" || permissions?.["library.view"] !== false);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">

@@ -63,7 +63,6 @@ impl MistyRuntime {
         let storage = StorageService::new_with_storage_runtime(
             environment.clone(),
             Some(storage_runtime.clone()),
-            None,
         );
         let providers = ProviderService::new(storage.clone());
         let transfers = TransferService::new(environment.clone());
@@ -76,7 +75,10 @@ impl MistyRuntime {
         #[cfg(desktop)]
         let plugin_commands = PluginCommandService::new(environment.clone());
         #[cfg(desktop)]
-        let extension_runtime = ExtensionRuntimeService::new(environment.clone());
+        let extension_runtime = ExtensionRuntimeService::new_with_storage_runtime(
+            environment.clone(),
+            storage_runtime.clone(),
+        );
         let explorer_library = ExplorerLibraryService::new(environment.clone());
         let search = SearchService::new(environment.clone(), providers.clone(), storage.clone());
         let explorer = ExplorerService::new(

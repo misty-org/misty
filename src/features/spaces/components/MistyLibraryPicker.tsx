@@ -192,7 +192,6 @@ export function MistyLibraryPicker({
               <ErrorState title="Library could not be loaded" description={error} />
             ) : filteredItems.length === 0 ? (
               <EmptyState
-                icon={<Search />}
                 title={searching ? "No matching items" : "This Library is empty"}
                 description={
                   searching

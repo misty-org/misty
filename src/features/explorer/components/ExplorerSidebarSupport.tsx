@@ -50,7 +50,7 @@ export const sidebarStyles = {
   sectionToggleLabel:
     "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-sm font-semibold",
   sectionChevron: "flex-none text-muted-foreground",
-  sectionActions: "ml-auto flex flex-none items-center gap-[3px]",
+  sectionActions: "ml-auto flex flex-none items-center gap-0",
   sectionActionsReveal:
     "opacity-0 transition-opacity group-hover/section-title:opacity-100 group-focus-within/section-title:opacity-100",
   sectionActionButton: "size-8 text-muted-foreground shadow-none",

@@ -1,6 +1,6 @@
 # Misty
 
-Misty is a Tauri application with one desktop React interface for desktop, iPad, and Android tablets, plus a Rust core and an embedded rclone storage library. Phone-sized iOS and Android devices are not supported.
+Misty is a Tauri application with one desktop React interface for desktop, iPad, and Android tablets, plus a Rust core and an embedded direct cloud-storage library. Phone-sized iOS and Android devices are not supported.
 
 ## Repository layout
 
@@ -13,7 +13,7 @@ Misty is a Tauri application with one desktop React interface for desktop, iPad,
 - `src/services/misty-api/` — frontend API and Tauri bridge types/functions. `src/api/` is a compatibility re-export layer.
 - `src/stores/` — cross-feature Zustand stores only. Feature-specific state should live with its feature.
 - `src-tauri/` — Rust application core and tracked iOS/Android platform projects.
-- `service/rclone/` — pinned upstream rclone submodule. Misty changes live in `service/patches/`.
+- `src-tauri/src/services/direct_cloud.rs` — native Google Drive, Dropbox, and Microsoft OneDrive client runtime.
 - `scripts/` — builds, security checks, smoke tests, size enforcement, and safe cleanup.
 
 ## Setup
@@ -23,7 +23,7 @@ git submodule update --init --recursive
 npm install
 ```
 
-The storage build validates the pinned rclone commit, copies it into the ignored Rust target directory, applies Misty's patches there, and leaves the submodule clean.
+The storage build compiles the narrow direct-provider adapter into the Rust target directory.
 
 ## Common commands
 
@@ -33,7 +33,6 @@ npm run dev:mobile
 npm run build:desktop
 npm run build:mobile
 npm run build:android
-npm run service:archive
 npm run windows:stage-assets
 ```
 
@@ -80,4 +79,4 @@ npm run clean:preview
 npm run clean
 ```
 
-Cleanup targets only generated web, Rust, native-platform, design-QA, cache, and `.DS_Store` files. It skips in-use directories and never removes environment/signing files, dependencies, tracked platform sources, or the rclone submodule.
+Cleanup targets only generated web, Rust, native-platform, design-QA, cache, and `.DS_Store` files. It skips in-use directories and never removes environment/signing files, dependencies, or tracked platform sources.

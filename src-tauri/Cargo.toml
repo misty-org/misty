@@ -49,6 +49,7 @@ tauri-plugin-keystore = { path = "vendor/tauri-plugin-keystore" }
 tauri-plugin-document-tree = { path = "vendor/tauri-plugin-document-tree" }
 tauri-plugin-deep-link = "2"
 posthog-rs = "0.19.1"
+percent-encoding = "2"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 cocoa = "0.26"
@@ -67,4 +68,3 @@ windows-sys = { version = "0.59", features = ["Win32_Foundation", "Win32_Graphic
 
 [features]
 custom-protocol = ["tauri/custom-protocol"]
-embedded-storage-go = []

@@ -203,6 +203,10 @@ import {
   transferRefreshPollMs,
 } from "./ExplorerWorkspaceConstants";
 import { useExplorerDevices } from "./useExplorerDevices";
+import { useExplorerDialogEvents } from "./explorerWorkspace/useExplorerDialogEvents";
+import { usePanelResize } from "./explorerWorkspace/usePanelResize";
+import { usePluginRegistry } from "./explorerWorkspace/usePluginRegistry";
+import { useTransferRefreshPolling } from "./explorerWorkspace/useTransferRefreshPolling";
 
 export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
   const navigate = useNavigate();
@@ -277,17 +281,6 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
   const workspaceRef = useRef<HTMLElement | null>(null);
   useTransientScrollbars(workspaceRef);
   const mainRef = useRef<HTMLElement | null>(null);
-  const resizeFrameRef = useRef<number | null>(null);
-  const pendingResizeXRef = useRef(0);
-  const resizeTargetRef = useRef<ResizeTarget>(null);
-  const pendingResizeSaveRef = useRef(false);
-  const transferRefreshInFlightRef = useRef(false);
-  const [resizeTarget, setResizeTarget] = useState<ResizeTarget>(null);
-  const [pluginCommands, setPluginCommands] = useState<PluginCommandEntry[]>(emptyPluginCommands);
-  const [pluginPanels, setPluginPanels] = useState<PluginPanelEntry[]>(emptyPluginPanels);
-  const pluginCommandsRef = useRef<PluginCommandEntry[]>(emptyPluginCommands);
-  const [duplicateFinderPaneId, setDuplicateFinderPaneId] = useState<string | null>(null);
-  const [compareDialog, setCompareDialog] = useState<CompareDialogSeed | null>(null);
   const { preferredWorkspaceRoot, settingsLoaded, settingsMountPath } = useSettingsStore(
     useShallow((state) => ({
       preferredWorkspaceRoot: selectGeneralPreferences(state.settings?.document)
@@ -349,10 +342,20 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
   }, [extensionsEnabled, homePath, navigate, workspacePathSignature]);
   const activePaneIdRef = useRef(activePaneId);
   const activePathRef = useRef(activePath);
-  const shortcutMapRef = useRef<ShortcutMap>(
-    defaultExplorerShortcutMap(shortcutPreferences.keymapIndex),
-  );
-  const executableCommandIdsRef = useRef<readonly string[]>(executableShortcutCommands);
+  const {
+    pluginCommands,
+    pluginPanels,
+    shortcutMapRef,
+    executableCommandIdsRef,
+    pluginCommandsRef,
+  } = usePluginRegistry({ extensionsEnabled, shortcutPreferences });
+  const { duplicateFinderPaneId, setDuplicateFinderPaneId, compareDialog, setCompareDialog } =
+    useExplorerDialogEvents(activePaneIdRef);
+  useTransferRefreshPolling(mountRoot);
+  const { resizeTarget, startSidebarResize, startPreviewResize } = usePanelResize({
+    workspaceRef,
+    mainRef,
+  });
   const workspacePaths = useMemo(
     () => workspacePathSignature.split("\n").filter(Boolean),
     [workspacePathSignature],
@@ -392,24 +395,6 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
   }, [activePaneId, activePath]);
 
   useEffect(() => {
-    const openDuplicateFinder = (event: Event) => {
-      const detail = (event as CustomEvent<{ paneId?: string }>).detail;
-      setDuplicateFinderPaneId(detail?.paneId || activePaneIdRef.current);
-    };
-    window.addEventListener(explorerDuplicateFinderEvent, openDuplicateFinder);
-    return () => window.removeEventListener(explorerDuplicateFinderEvent, openDuplicateFinder);
-  }, []);
-
-  useEffect(() => {
-    const openCompareWith = (event: Event) => {
-      const detail = (event as CustomEvent<CompareDialogSeed>).detail;
-      setCompareDialog(detail ?? compareSeedForPane(activePaneIdRef.current));
-    };
-    window.addEventListener(explorerCompareWithEvent, openCompareWith);
-    return () => window.removeEventListener(explorerCompareWithEvent, openCompareWith);
-  }, []);
-
-  useEffect(() => {
     if (app?.environment.homeDir && settingsLoaded) {
       void initialize(homePath);
     }
@@ -424,118 +409,6 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
       message.startsWith("Workspace layout could not be restored");
     pushNotification(message, recoveredWorkspace ? "info" : "error", 4500);
   }, [operationError, pushNotification]);
-
-  useEffect(() => {
-    const unsubscribeExplorer = useExplorerStore.subscribe((state, previous) => {
-      if (!explorerWorkspaceNeedsSave(state, previous)) return;
-      if (resizeTargetRef.current) {
-        pendingResizeSaveRef.current = true;
-      } else {
-        scheduleExplorerWorkspaceSave();
-      }
-    });
-    const unsubscribeMulti = useMultiPanelStore.subscribe((state, previous) => {
-      if (multiPanelWorkspaceNeedsSave(state, previous)) scheduleExplorerWorkspaceSave();
-    });
-    return () => {
-      unsubscribeExplorer();
-      unsubscribeMulti();
-    };
-  }, []);
-
-  useEffect(() => {
-    resizeTargetRef.current = resizeTarget;
-    if (!resizeTarget && pendingResizeSaveRef.current) {
-      pendingResizeSaveRef.current = false;
-      scheduleExplorerWorkspaceSave();
-    }
-  }, [resizeTarget]);
-
-  useEffect(() => {
-    if (!extensionsEnabled) {
-      shortcutMapRef.current = defaultExplorerShortcutMap(shortcutPreferences.keymapIndex);
-      executableCommandIdsRef.current = executableShortcutCommands;
-      pluginCommandsRef.current = emptyPluginCommands;
-      setPluginCommands(emptyPluginCommands);
-      setPluginPanels(emptyPluginPanels);
-      return;
-    }
-    let disposed = false;
-    const loadCommandMetadata = async () => {
-      try {
-        const [shortcutSnapshot, pluginSnapshot] = await Promise.all([
-          shortcutsSnapshot(),
-          pluginCommandsSnapshot(),
-        ]);
-        if (!disposed) {
-          const fallbackShortcuts = defaultExplorerShortcutMap(shortcutPreferences.keymapIndex);
-          const shortcutMap = shortcutPreferences.customShortcutsEnabled
-            ? shortcutMapFromBindings(shortcutSnapshot.bindings, fallbackShortcuts)
-            : fallbackShortcuts;
-          for (const command of pluginSnapshot.commands) {
-            if (command.defaultShortcut && !shortcutMap[command.id]) {
-              shortcutMap[command.id] = command.defaultShortcut;
-            }
-          }
-          shortcutMapRef.current = shortcutMap;
-          executableCommandIdsRef.current = [
-            ...executableShortcutCommands,
-            ...pluginSnapshot.commands.map((command) => command.id),
-          ];
-          pluginCommandsRef.current = pluginSnapshot.commands;
-          setPluginCommands((current) =>
-            pluginCommandsEqual(current, pluginSnapshot.commands)
-              ? current
-              : pluginSnapshot.commands,
-          );
-          setPluginPanels((current) =>
-            pluginPanelsEqual(current, pluginSnapshot.panels) ? current : pluginSnapshot.panels,
-          );
-        }
-      } catch {
-        if (!disposed) {
-          shortcutMapRef.current = defaultExplorerShortcutMap(shortcutPreferences.keymapIndex);
-          executableCommandIdsRef.current = executableShortcutCommands;
-          pluginCommandsRef.current = emptyPluginCommands;
-          setPluginCommands((current) => (current.length === 0 ? current : emptyPluginCommands));
-          setPluginPanels((current) => (current.length === 0 ? current : emptyPluginPanels));
-        }
-      }
-    };
-    void loadCommandMetadata();
-    window.addEventListener("focus", loadCommandMetadata);
-    return () => {
-      disposed = true;
-      window.removeEventListener("focus", loadCommandMetadata);
-    };
-  }, [
-    extensionsEnabled,
-    shortcutPreferences.customShortcutsEnabled,
-    shortcutPreferences.keymapIndex,
-  ]);
-
-  useEffect(() => {
-    const poll = async () => {
-      if (
-        document.hidden ||
-        transferRefreshInFlightRef.current ||
-        !useExplorerStore.getState().initialized
-      )
-        return;
-      transferRefreshInFlightRef.current = true;
-      try {
-        await useExplorerStore.getState().pollTransferRefreshes(mountRoot);
-      } finally {
-        transferRefreshInFlightRef.current = false;
-      }
-    };
-    const initialTimer = window.setTimeout(poll, 1000);
-    const interval = window.setInterval(poll, transferRefreshPollMs);
-    return () => {
-      window.clearTimeout(initialTimer);
-      window.clearInterval(interval);
-    };
-  }, [mountRoot]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -578,62 +451,6 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [homePath, navigate]);
 
-  useEffect(() => {
-    if (!resizeTarget) return;
-
-    const previousCursor = document.body.style.cursor;
-    const previousUserSelect = document.body.style.userSelect;
-    document.body.style.cursor = "col-resize";
-    document.body.style.userSelect = "none";
-
-    const applyResize = () => {
-      resizeFrameRef.current = null;
-      const clientX = pendingResizeXRef.current;
-      if (resizeTarget === "sidebar") {
-        const rect = workspaceRef.current?.getBoundingClientRect();
-        if (rect)
-          useExplorerStore
-            .getState()
-            .setSidebarWidth(clamp(clientX - rect.left, minSidebarWidth, maxSidebarWidth));
-      } else if (resizeTarget === "preview") {
-        const rect = mainRef.current?.getBoundingClientRect();
-        if (rect)
-          useExplorerStore
-            .getState()
-            .setPreviewWidth(clamp(rect.right - clientX, minPreviewWidth, maxPreviewWidth));
-      }
-    };
-
-    const onPointerMove = (event: globalThis.PointerEvent) => {
-      pendingResizeXRef.current = event.clientX;
-      if (resizeFrameRef.current === null)
-        resizeFrameRef.current = window.requestAnimationFrame(applyResize);
-    };
-
-    const onPointerUp = () => setResizeTarget(null);
-    window.addEventListener("pointermove", onPointerMove);
-    window.addEventListener("pointerup", onPointerUp, { once: true });
-    return () => {
-      window.removeEventListener("pointermove", onPointerMove);
-      window.removeEventListener("pointerup", onPointerUp);
-      if (resizeFrameRef.current !== null) {
-        window.cancelAnimationFrame(resizeFrameRef.current);
-        resizeFrameRef.current = null;
-      }
-      document.body.style.cursor = previousCursor;
-      document.body.style.userSelect = previousUserSelect;
-    };
-  }, [resizeTarget]);
-
-  const startSidebarResize = useCallback((event: PointerEvent<HTMLDivElement>) => {
-    event.preventDefault();
-    setResizeTarget("sidebar");
-  }, []);
-
-  const startPreviewResize = useCallback((event: PointerEvent<HTMLDivElement>) => {
-    event.preventDefault();
-    setResizeTarget("preview");
-  }, []);
   const navigateSidebar = useCallback((path: string) => {
     const paneId = useMultiPanelStore.getState().activePaneId;
     if (paneId) void useExplorerStore.getState().navigatePane(paneId, path);
@@ -862,6 +679,9 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
   const renderTabActions = useCallback(
     () => (
       <ExplorerTray
+        commands={pluginCommands}
+        panels={pluginPanels}
+        selectedPath={activePath}
         terminalEnabled={
           activeTabSupportsSidePanels &&
           canOpenTerminalPath(activeTabPath) &&
@@ -871,7 +691,7 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
         onOpenTransfers={openTransfersTab}
       />
     ),
-    [activePath, activeTabPath, activeTabSupportsSidePanels],
+    [activePath, activeTabPath, activeTabSupportsSidePanels, pluginCommands, pluginPanels],
   );
   const renderBottomBar = useCallback((tab: MultiPanelTab) => {
     if (isChromeTabPath(tab.path)) return null;

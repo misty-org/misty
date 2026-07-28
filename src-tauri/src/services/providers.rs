@@ -1,7 +1,5 @@
 use std::{
     collections::BTreeMap,
-    env, fs,
-    path::PathBuf,
     sync::Arc,
     time::{SystemTime, UNIX_EPOCH},
 };
@@ -9,10 +7,8 @@ use std::{
 use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
 
-use crate::error::{ApiError, ApiResult};
-use crate::services::paths;
-
 use super::storage::{StorageResponse, StorageService};
+use crate::error::{ApiError, ApiResult};
 
 const PROVIDER_AUTH_CANCEL_RESULT: &str = "cancel";
 
@@ -141,7 +137,7 @@ pub struct RemoteTestResult {
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct RcloneConfigPaths {
+pub struct CloudConfigPaths {
     pub config_path: Option<String>,
     pub cache_path: Option<String>,
     pub temp_path: Option<String>,
@@ -416,6 +412,8 @@ impl ProviderService {
             ));
         }
         let mut config = parse_config_map(&config_body)?;
+        config.remove("access_token");
+        config.remove("token");
         config
             .entry("type".to_string())
             .or_insert_with(|| remote.provider_type.clone());
@@ -536,7 +534,7 @@ impl ProviderService {
         }
     }
 
-    pub async fn config_paths(&self) -> ApiResult<RcloneConfigPaths> {
+    pub async fn config_paths(&self) -> ApiResult<CloudConfigPaths> {
         let response = self
             .inner
             .proxy
@@ -552,7 +550,7 @@ impl ProviderService {
             ));
         }
         let parsed = serde_json::from_str::<serde_json::Value>(&body).unwrap_or_default();
-        Ok(RcloneConfigPaths {
+        Ok(CloudConfigPaths {
             config_path: json_string(&parsed, &["config", "config_path", "ConfigPath"]),
             cache_path: json_string(&parsed, &["cache", "cache_path", "CachePath"]),
             temp_path: json_string(&parsed, &["temp", "temp_path", "TempPath"]),
@@ -623,34 +621,26 @@ impl ProviderService {
     }
 
     pub async fn config_security(&self) -> ApiResult<ConfigSecurityStatus> {
-        self.post_json_value(
-            "/api/remote/config/security",
-            &serde_json::json!({
-                "password_present": crate::services::keychain::has_rclone_config_password(),
-            }),
-        )
-        .await
+        Ok(ConfigSecurityStatus {
+            config_path: None,
+            encrypted: true,
+            unlocked: true,
+            password_present: true,
+            message: Some("Cloud OAuth credentials are encrypted by Misty.".to_owned()),
+        })
     }
 
     pub async fn harden_config(&self) -> ApiResult<ConfigSecurityStatus> {
-        let password = crate::services::keychain::ensure_rclone_config_password()?;
-        self.post_json_value(
-            "/api/remote/config/harden",
-            &serde_json::json!({
-                "current_password": "",
-                "new_password": password,
-            }),
-        )
-        .await
+        self.config_security().await
     }
 
     pub async fn repair_config_security(
         &self,
-        password: String,
+        _password: String,
     ) -> ApiResult<ConfigSecurityStatus> {
-        crate::services::keychain::store_rclone_config_password(password.trim())?;
         let mut status = self.config_security().await?;
-        status.message = Some("Config unlock was repaired in macOS Keychain.".to_owned());
+        status.message =
+            Some("Cloud OAuth credentials are managed by the Misty server.".to_owned());
         Ok(status)
     }
 
@@ -787,10 +777,6 @@ impl ProviderService {
         if name.is_empty() {
             return Err(ApiError::Message("Choose a remote to delete.".to_string()));
         }
-        if self.remote_uses_user_config(&name).await && remove_standard_rclone_config_remote(&name)?
-        {
-            return self.refresh().await;
-        }
         let response = self
             .inner
             .proxy
@@ -806,16 +792,6 @@ impl ProviderService {
             ));
         }
         self.refresh().await
-    }
-
-    async fn remote_uses_user_config(&self, name: &str) -> bool {
-        self.inner
-            .snapshot
-            .read()
-            .await
-            .remotes
-            .iter()
-            .any(|remote| remote.name.eq_ignore_ascii_case(name) && remote.config_source == "user")
     }
 
     async fn refresh_inner(&self) -> ApiResult<ProvidersSnapshot> {
@@ -842,7 +818,7 @@ impl ProviderService {
             .await
             .unwrap_or_default();
 
-        let mut remotes: Vec<ProviderRemote> = raw_remotes
+        let remotes: Vec<ProviderRemote> = raw_remotes
             .into_iter()
             .map(|remote| {
                 let status = raw_statuses
@@ -866,8 +842,6 @@ impl ProviderService {
                 }
             })
             .collect();
-        append_external_config_remotes(&mut remotes);
-
         Ok(ProvidersSnapshot {
             health,
             remotes,
@@ -962,150 +936,6 @@ fn parse_health(value: &serde_json::Value) -> ProviderHealth {
     }
 }
 
-fn append_external_config_remotes(remotes: &mut Vec<ProviderRemote>) {
-    let existing_names = remotes
-        .iter()
-        .map(|remote| remote.name.to_lowercase())
-        .collect::<std::collections::BTreeSet<_>>();
-    for (name, provider_type) in read_standard_rclone_config_remotes() {
-        if !matches!(provider_type.as_str(), "drive" | "onedrive" | "dropbox") {
-            continue;
-        }
-        if existing_names.contains(&name.to_lowercase()) {
-            continue;
-        }
-        remotes.push(ProviderRemote {
-            name,
-            provider_type,
-            status_label: "Import required".to_string(),
-            needs_reconnect: true,
-            error: Some(
-                "This connection exists in an external storage configuration. Configure it in Misty to import it."
-                    .to_string(),
-            ),
-            config_source: "user".to_string(),
-        });
-    }
-}
-
-fn read_standard_rclone_config_remotes() -> Vec<(String, String)> {
-    let Some(path) = standard_rclone_config_path() else {
-        return Vec::new();
-    };
-    let Ok(content) = fs::read_to_string(path) else {
-        return Vec::new();
-    };
-    parse_rclone_config_sections(&content)
-}
-
-fn remove_standard_rclone_config_remote(name: &str) -> ApiResult<bool> {
-    let Some(path) = standard_rclone_config_path() else {
-        return Ok(false);
-    };
-    let content = match fs::read_to_string(&path) {
-        Ok(content) => content,
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(false),
-        Err(error) => {
-            return Err(ApiError::Message(format!(
-                "Failed to read external storage configuration: {error}"
-            )));
-        }
-    };
-    let (updated, removed) = remove_rclone_config_section(&content, name);
-    if !removed {
-        return Ok(false);
-    }
-    fs::write(&path, updated).map_err(|error| {
-        ApiError::Message(format!(
-            "Failed to update external storage configuration: {error}"
-        ))
-    })?;
-    Ok(true)
-}
-
-fn standard_rclone_config_path() -> Option<PathBuf> {
-    env::var_os("HOME")
-        .map(PathBuf::from)
-        .map(|home| home.join(".config").join("rclone").join("rclone.conf"))
-}
-
-fn parse_rclone_config_sections(content: &str) -> Vec<(String, String)> {
-    let mut remotes = Vec::new();
-    let mut current_name = String::new();
-    let mut current_type = String::new();
-    for raw_line in content.lines() {
-        let line = raw_line.trim();
-        if line.is_empty() || line.starts_with('#') || line.starts_with(';') {
-            continue;
-        }
-        if let Some(section) = line
-            .strip_prefix('[')
-            .and_then(|value| value.strip_suffix(']'))
-        {
-            if !current_name.is_empty() {
-                remotes.push((
-                    std::mem::take(&mut current_name),
-                    if current_type.is_empty() {
-                        "unknown".to_string()
-                    } else {
-                        std::mem::take(&mut current_type)
-                    },
-                ));
-            }
-            current_name = section.trim().to_string();
-            current_type.clear();
-            continue;
-        }
-        if current_name.is_empty() {
-            continue;
-        }
-        let Some((key, value)) = line.split_once('=') else {
-            continue;
-        };
-        if key.trim().eq_ignore_ascii_case("type") {
-            current_type = value.trim().to_string();
-        }
-    }
-    if !current_name.is_empty() {
-        remotes.push((
-            current_name,
-            if current_type.is_empty() {
-                "unknown".to_string()
-            } else {
-                current_type
-            },
-        ));
-    }
-    remotes
-}
-
-fn remove_rclone_config_section(content: &str, name: &str) -> (String, bool) {
-    let mut lines = Vec::new();
-    let mut removing = false;
-    let mut removed = false;
-    for raw_line in content.lines() {
-        if let Some(section) = raw_line
-            .trim()
-            .strip_prefix('[')
-            .and_then(|value| value.strip_suffix(']'))
-        {
-            removing = section.trim().eq_ignore_ascii_case(name);
-            if removing {
-                removed = true;
-                continue;
-            }
-        }
-        if !removing {
-            lines.push(raw_line);
-        }
-    }
-    let mut updated = lines.join("\n");
-    if content.ends_with('\n') && !updated.is_empty() {
-        updated.push('\n');
-    }
-    (updated, removed)
-}
-
 fn parse_config_map(body: &str) -> ApiResult<BTreeMap<String, String>> {
     let parsed = serde_json::from_str::<serde_json::Value>(body)?;
     let Some(object) = parsed.as_object() else {
@@ -1188,72 +1018,16 @@ fn provider_config_request_body(request: &ProviderConfigRequest) -> ApiResult<se
 fn provider_config_parameters(
     request: &ProviderConfigRequest,
 ) -> ApiResult<BTreeMap<String, String>> {
-    let mut parameters = request.parameters.clone();
-    if !parameters.contains_key("config_template_file") {
-        if let Some(path) = rclone_oauth_callback_template() {
-            parameters.insert(
-                "config_template_file".to_string(),
-                path.display().to_string(),
-            );
-        }
-    }
-    Ok(parameters)
-}
-
-fn rclone_oauth_callback_template() -> Option<PathBuf> {
-    let Some(assets_dir) = paths::misty_assets_dir() else {
-        return None;
-    };
-    let path = assets_dir.join("rclone").join("oauth-callback.html");
-    path.is_file().then_some(path)
+    Ok(request.parameters.clone())
 }
 
 fn default_provider_workflows() -> Vec<ProviderWorkflow> {
-    return vec![
+    vec![
         provider_workflow(
             "drive",
             "Google Drive",
-            "Google Drive for personal, Workspace, Shared Drive, and service-account storage.",
+            "Google Drive with secure browser sign-in.",
             vec![
-                ProviderWorkflowOption {
-                    name: "scope".into(),
-                    label: "Access scope".into(),
-                    help: "Choose the Google Drive access granted to Misty.".into(),
-                    default_value: "drive".into(),
-                    required: true,
-                    password: false,
-                    choices: vec![ProviderWorkflowChoice {
-                        value: "drive".into(),
-                        help: "Full Google Drive access".into(),
-                    }],
-                },
-                ProviderWorkflowOption {
-                    name: "team_drive".into(),
-                    label: "Shared Drive ID".into(),
-                    help: "Advanced: connect a specific Shared Drive.".into(),
-                    default_value: String::new(),
-                    required: false,
-                    password: false,
-                    choices: vec![],
-                },
-                ProviderWorkflowOption {
-                    name: "root_folder_id".into(),
-                    label: "Root folder ID".into(),
-                    help: "Advanced: limit this connection to a folder.".into(),
-                    default_value: String::new(),
-                    required: false,
-                    password: false,
-                    choices: vec![],
-                },
-                ProviderWorkflowOption {
-                    name: "service_account_file".into(),
-                    label: "Service account file".into(),
-                    help: "Advanced: use Workspace service-account credentials.".into(),
-                    default_value: String::new(),
-                    required: false,
-                    password: false,
-                    choices: vec![],
-                },
                 ProviderWorkflowOption {
                     name: "client_id".into(),
                     label: "OAuth client ID".into(),
@@ -1277,44 +1051,8 @@ fn default_provider_workflows() -> Vec<ProviderWorkflow> {
         provider_workflow(
             "onedrive",
             "Microsoft OneDrive",
-            "OneDrive personal, business, SharePoint sites, and document libraries.",
+            "Microsoft OneDrive with secure browser sign-in.",
             vec![
-                ProviderWorkflowOption {
-                    name: "drive_type".into(),
-                    label: "Account type".into(),
-                    help: "Personal, business, or SharePoint storage.".into(),
-                    default_value: "personal".into(),
-                    required: false,
-                    password: false,
-                    choices: vec![
-                        ProviderWorkflowChoice {
-                            value: "personal".into(),
-                            help: "Personal OneDrive".into(),
-                        },
-                        ProviderWorkflowChoice {
-                            value: "business".into(),
-                            help: "Business or SharePoint".into(),
-                        },
-                    ],
-                },
-                ProviderWorkflowOption {
-                    name: "drive_id".into(),
-                    label: "Drive or library ID".into(),
-                    help: "Advanced: connect a specific drive or document library.".into(),
-                    default_value: String::new(),
-                    required: false,
-                    password: false,
-                    choices: vec![],
-                },
-                ProviderWorkflowOption {
-                    name: "root_folder_id".into(),
-                    label: "Root folder ID".into(),
-                    help: "Advanced: limit this connection to a folder.".into(),
-                    default_value: String::new(),
-                    required: false,
-                    password: false,
-                    choices: vec![],
-                },
                 ProviderWorkflowOption {
                     name: "client_id".into(),
                     label: "OAuth client ID".into(),
@@ -1338,17 +1076,8 @@ fn default_provider_workflows() -> Vec<ProviderWorkflow> {
         provider_workflow(
             "dropbox",
             "Dropbox",
-            "Dropbox personal, business, team spaces, and shared namespaces.",
+            "Dropbox with secure browser sign-in.",
             vec![
-                ProviderWorkflowOption {
-                    name: "root_namespace_id".into(),
-                    label: "Root namespace ID".into(),
-                    help: "Advanced: connect a team-space or shared namespace root.".into(),
-                    default_value: String::new(),
-                    required: false,
-                    password: false,
-                    choices: vec![],
-                },
                 ProviderWorkflowOption {
                     name: "client_id".into(),
                     label: "OAuth app key".into(),
@@ -1368,270 +1097,6 @@ fn default_provider_workflows() -> Vec<ProviderWorkflow> {
                     choices: vec![],
                 },
             ],
-        ),
-    ];
-    #[allow(unreachable_code)]
-    let drive_scope = vec![ProviderWorkflowOption {
-        name: "scope".to_string(),
-        label: "Scope".to_string(),
-        help: "Access scope requested from Google Drive.".to_string(),
-        default_value: "drive".to_string(),
-        required: true,
-        password: false,
-        choices: vec![ProviderWorkflowChoice {
-            value: "drive".to_string(),
-            help: "Full Google Drive access".to_string(),
-        }],
-    }];
-    vec![
-        provider_workflow(
-            "alias",
-            "Alias",
-            "Alias for an existing remote.",
-            Vec::new(),
-        ),
-        provider_workflow(
-            "hdfs",
-            "HDFS",
-            "Hadoop distributed file system.",
-            Vec::new(),
-        ),
-        provider_workflow("local", "Local Disk", "Local disk backend.", Vec::new()),
-        provider_workflow(
-            "storj",
-            "Storj",
-            "Storj decentralized cloud storage.",
-            Vec::new(),
-        ),
-        provider_workflow(
-            "tardigrade",
-            "Tardigrade",
-            "Storj decentralized cloud storage.",
-            Vec::new(),
-        ),
-        provider_workflow(
-            "cloudinary",
-            "Cloudinary",
-            "Cloudinary media storage.",
-            Vec::new(),
-        ),
-        provider_workflow("doi", "DOI datasets", "DOI dataset storage.", Vec::new()),
-        provider_workflow("fichier", "1Fichier", "1Fichier cloud storage.", Vec::new()),
-        provider_workflow("filelu", "FileLu", "FileLu cloud storage.", Vec::new()),
-        provider_workflow("filescom", "Files.com", "Files.com storage.", Vec::new()),
-        provider_workflow("ftp", "FTP", "FTP server.", Vec::new()),
-        provider_workflow("http", "HTTP", "HTTP remote.", Vec::new()),
-        provider_workflow(
-            "imagekit",
-            "ImageKit.io",
-            "ImageKit.io storage.",
-            Vec::new(),
-        ),
-        provider_workflow(
-            "internetarchive",
-            "Internet Archive",
-            "Internet Archive storage.",
-            Vec::new(),
-        ),
-        provider_workflow(
-            "koofr",
-            "Koofr",
-            "Koofr, Digi Storage, and Koofr-compatible storage.",
-            Vec::new(),
-        ),
-        provider_workflow("linkbox", "Linkbox", "Linkbox storage.", Vec::new()),
-        provider_workflow("mega", "Mega", "Mega cloud storage.", Vec::new()),
-        provider_workflow("opendrive", "OpenDrive", "OpenDrive storage.", Vec::new()),
-        provider_workflow(
-            "pixeldrain",
-            "Pixeldrain",
-            "Pixeldrain filesystem.",
-            Vec::new(),
-        ),
-        provider_workflow(
-            "protondrive",
-            "Proton Drive",
-            "Proton Drive storage.",
-            Vec::new(),
-        ),
-        provider_workflow("seafile", "Seafile", "Seafile storage.", Vec::new()),
-        provider_workflow("sftp", "SFTP", "SSH/SFTP remote.", Vec::new()),
-        provider_workflow("sia", "Sia", "Sia decentralized cloud storage.", Vec::new()),
-        provider_workflow("smb", "SMB / CIFS", "SMB / CIFS share.", Vec::new()),
-        provider_workflow("ulozto", "Uloz.to", "Uloz.to storage.", Vec::new()),
-        provider_workflow(
-            "azurefiles",
-            "Azure Files",
-            "Microsoft Azure Files.",
-            Vec::new(),
-        ),
-        provider_workflow(
-            "crypt",
-            "Crypt",
-            "Encrypt or decrypt another remote.",
-            Vec::new(),
-        ),
-        provider_workflow("filen", "Filen", "Filen cloud storage.", Vec::new()),
-        provider_workflow("gofile", "Gofile", "Gofile storage.", Vec::new()),
-        provider_workflow(
-            "iclouddrive",
-            "iCloud Drive",
-            "iCloud Drive and Photos.",
-            Vec::new(),
-        ),
-        provider_workflow("memory", "Memory", "In-memory object storage.", Vec::new()),
-        provider_workflow(
-            "netstorage",
-            "Akamai NetStorage",
-            "Akamai NetStorage.",
-            Vec::new(),
-        ),
-        provider_workflow(
-            "qingstor",
-            "QingStor",
-            "QingCloud Object Storage.",
-            Vec::new(),
-        ),
-        provider_workflow("webdav", "WebDAV", "WebDAV-compatible storage.", Vec::new()),
-        provider_workflow(
-            "filefabric",
-            "Enterprise File Fabric",
-            "Enterprise File Fabric.",
-            Vec::new(),
-        ),
-        provider_workflow(
-            "azureblob",
-            "Azure Blob",
-            "Microsoft Azure Blob Storage.",
-            Vec::new(),
-        ),
-        provider_workflow("drime", "Drime", "Drime storage.", Vec::new()),
-        provider_workflow("quatrix", "Quatrix", "Quatrix by Maytech.", Vec::new()),
-        provider_workflow("shade", "Shade FS", "Shade filesystem.", Vec::new()),
-        provider_workflow("b2", "Backblaze B2", "Backblaze B2 storage.", Vec::new()),
-        provider_workflow("cache", "Cache", "Cache another remote.", Vec::new()),
-        provider_workflow(
-            "chunker",
-            "Chunker",
-            "Transparently chunk or split large files.",
-            Vec::new(),
-        ),
-        provider_workflow(
-            "combine",
-            "Combine",
-            "Combine several remotes into one.",
-            Vec::new(),
-        ),
-        provider_workflow(
-            "hasher",
-            "Hasher",
-            "Better checksums for other remotes.",
-            Vec::new(),
-        ),
-        provider_workflow(
-            "oos",
-            "Oracle Object Storage",
-            "Oracle Cloud Infrastructure Object Storage.",
-            Vec::new(),
-        ),
-        provider_workflow(
-            "s3",
-            "S3",
-            "Amazon S3-compatible object storage.",
-            Vec::new(),
-        ),
-        provider_workflow("sugarsync", "SugarSync", "SugarSync storage.", Vec::new()),
-        provider_workflow(
-            "swift",
-            "OpenStack Swift",
-            "OpenStack Swift and compatible cloud files.",
-            Vec::new(),
-        ),
-        provider_workflow(
-            "union",
-            "Union",
-            "Union merges several upstream filesystems.",
-            Vec::new(),
-        ),
-        provider_workflow(
-            "compress",
-            "Compress",
-            "Compress another remote.",
-            Vec::new(),
-        ),
-        provider_workflow(
-            "dropbox",
-            "Dropbox",
-            "Dropbox storage with browser sign-in.",
-            Vec::new(),
-        ),
-        provider_workflow(
-            "gphotos",
-            "Google Photos",
-            "Google Photos storage.",
-            Vec::new(),
-        ),
-        provider_workflow("hidrive", "HiDrive", "HiDrive storage.", Vec::new()),
-        provider_workflow(
-            "huaweidrive",
-            "Huawei Drive",
-            "Huawei Drive storage.",
-            Vec::new(),
-        ),
-        provider_workflow(
-            "internxt",
-            "Internxt Drive",
-            "Internxt Drive storage.",
-            Vec::new(),
-        ),
-        provider_workflow(
-            "jottacloud",
-            "Jottacloud",
-            "Jottacloud storage.",
-            Vec::new(),
-        ),
-        provider_workflow(
-            "mailru",
-            "Mail.ru Cloud",
-            "Mail.ru Cloud storage.",
-            Vec::new(),
-        ),
-        provider_workflow("onedrive", "OneDrive", "Microsoft OneDrive.", Vec::new()),
-        provider_workflow("pcloud", "pCloud", "pCloud storage.", Vec::new()),
-        provider_workflow("pikpak", "PikPak", "PikPak storage.", Vec::new()),
-        provider_workflow(
-            "premiumizeme",
-            "premiumize.me",
-            "premiumize.me storage.",
-            Vec::new(),
-        ),
-        provider_workflow("putio", "Put.io", "Put.io storage.", Vec::new()),
-        provider_workflow(
-            "sharefile",
-            "Citrix ShareFile",
-            "Citrix ShareFile storage.",
-            Vec::new(),
-        ),
-        provider_workflow("yandex", "Yandex Disk", "Yandex Disk storage.", Vec::new()),
-        provider_workflow("zoho", "Zoho", "Zoho storage.", Vec::new()),
-        provider_workflow("box", "Box", "Box storage.", Vec::new()),
-        provider_workflow(
-            "archive",
-            "Archive",
-            "Read archive files as remotes.",
-            Vec::new(),
-        ),
-        provider_workflow(
-            "drive",
-            "Google Drive",
-            "Google Drive with browser sign-in.",
-            drive_scope,
-        ),
-        provider_workflow(
-            "gcs",
-            "Google Cloud Storage",
-            "Google Cloud Storage.",
-            Vec::new(),
         ),
     ]
 }
@@ -1939,8 +1404,15 @@ mod tests {
             .iter()
             .find(|workflow| workflow.provider_type == "drive")
             .unwrap();
-        assert_eq!(drive.options[0].name, "scope");
-        assert_eq!(drive.options[0].default_value, "drive");
+        assert_eq!(drive.options[0].name, "client_id");
+        assert_eq!(drive.options[1].name, "client_secret");
+        assert!(workflows.iter().all(|workflow| {
+            workflow
+                .options
+                .iter()
+                .map(|option| option.name.as_str())
+                .eq(["client_id", "client_secret"])
+        }));
         assert_eq!(workflows.len(), 3);
         assert!(workflows.iter().all(|workflow| matches!(
             workflow.provider_type.as_str(),
@@ -1976,74 +1448,6 @@ mod tests {
         assert!(workflows
             .iter()
             .any(|workflow| workflow.provider_type == "dropbox"));
-    }
-
-    #[test]
-    fn parses_standard_rclone_config_sections_without_secret_values() {
-        let remotes = parse_rclone_config_sections(
-            r#"
-            # user config
-            [temp]
-            type = onedrive
-            token = {"access_token":"secret"}
-
-            [drop]
-            type=dropbox
-            client_secret = secret
-
-            [legacy]
-            "#,
-        );
-
-        assert_eq!(
-            remotes,
-            vec![
-                ("temp".to_string(), "onedrive".to_string()),
-                ("drop".to_string(), "dropbox".to_string()),
-                ("legacy".to_string(), "unknown".to_string()),
-            ],
-        );
-    }
-
-    #[test]
-    fn removes_standard_rclone_config_section_by_name() {
-        let (updated, removed) = remove_rclone_config_section(
-            r#"# user config
-[keep]
-type = drive
-
-[temp]
-type = onedrive
-token = {"access_token":"secret"}
-
-[drop]
-type = dropbox
-"#,
-            "temp",
-        );
-
-        assert!(removed);
-        assert_eq!(
-            updated,
-            r#"# user config
-[keep]
-type = drive
-
-[drop]
-type = dropbox
-"#,
-        );
-    }
-
-    #[test]
-    fn remove_standard_rclone_config_section_is_case_insensitive() {
-        let (updated, removed) = remove_rclone_config_section(
-            "[Temp Remote]\ntype = onedrive\n[keep]\ntype = drive\n",
-            "temp remote",
-        );
-
-        assert!(removed);
-        assert_eq!(updated, "[keep]\ntype = drive\n");
     }
 
     #[test]
@@ -2094,14 +1498,14 @@ type = dropbox
     fn provider_runtime_non_auth_errors_keep_proxy_message() {
         let error = provider_operation_error(
             500,
-            r#"{"message":"rclone config update failed"}"#,
+            r#"{"message":"cloud config update failed"}"#,
             "Provider operation failed",
         );
         let ApiError::Message(message) = error else {
             panic!("expected message error");
         };
 
-        assert_eq!(message, "rclone config update failed");
+        assert_eq!(message, "cloud config update failed");
     }
 
     #[test]

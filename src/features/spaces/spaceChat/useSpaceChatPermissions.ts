@@ -1,0 +1,38 @@
+import { useSpacesStore } from "@/stores/spaces/useSpacesStore";
+import type { Space } from "@/models/interfaces/features/spaces/types";
+
+export interface SpaceChatPermissions {
+  activeSpace: Space | undefined;
+  permissions: Space["permissions"] | undefined;
+  canReadMessages: boolean;
+  canWriteMessages: boolean;
+  canUploadAttachments: boolean;
+  canBrowseLibrary: boolean;
+  canCopyLibrary: boolean;
+  canAddToLibrary: boolean;
+  isOwner: boolean;
+}
+
+/**
+ * What the current member may do in this Space's chat.
+ *
+ * Permissions are absent until the snapshot lands, so every flag defaults to
+ * allowed and only an explicit `false` from the backend takes it away.
+ */
+export function useSpaceChatPermissions(spaceId: string): SpaceChatPermissions {
+  const activeSpace = useSpacesStore((state) => state.spaces.find((space) => space.id === spaceId));
+  const permissions = activeSpace?.permissions;
+  const canWriteMessages = permissions?.["messages.write"] !== false;
+
+  return {
+    activeSpace,
+    permissions,
+    canReadMessages: permissions?.["messages.read"] !== false,
+    canWriteMessages,
+    canUploadAttachments: canWriteMessages && permissions?.["attachments.upload"] !== false,
+    canBrowseLibrary: canWriteMessages && permissions?.["library.view"] !== false,
+    canCopyLibrary: permissions?.["library.download"] !== false,
+    canAddToLibrary: permissions?.["library.add"] !== false,
+    isOwner: activeSpace?.role === "owner",
+  };
+}

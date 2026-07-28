@@ -1,24 +1,29 @@
 import type { StateViewProps, StateTone, LoadingStateProps } from "@/models/types/ui/state-view";
 export type { StateViewProps, StateTone, LoadingStateProps } from "@/models/types/ui/state-view";
 import * as React from "react";
-import { CircleAlert, Inbox, ShieldAlert } from "lucide-react";
 
 import { Spinner } from "@/ui";
 import { cn } from "@/ui";
 
 const toneClasses: Record<StateTone, string> = {
-  empty: "bg-muted text-muted-foreground",
-  error: "bg-destructive/10 text-destructive",
-  permission: "bg-amber-500/10 text-amber-500",
-  loading: "bg-muted text-muted-foreground",
+  empty: "text-foreground",
+  error: "text-destructive",
+  permission: "text-amber-500",
+  loading: "text-foreground",
 };
 
+/**
+ * Empty, error, and permission states are text only.
+ *
+ * These used to lead with a tinted icon tile above the heading. It carried no
+ * information the heading did not already state, and it pushed the actual
+ * message down the page, so it was removed everywhere rather than per screen.
+ */
 function StateView({
   action,
   className,
   compact = false,
   description,
-  icon,
   title,
   tone,
   ...props
@@ -32,16 +37,7 @@ function StateView({
       )}
       {...props}
     >
-      <div
-        className={cn(
-          "mb-4 flex size-10 items-center justify-center rounded-lg [&>svg]:size-5",
-          compact && "mb-3 size-9",
-          toneClasses[tone],
-        )}
-      >
-        {icon}
-      </div>
-      <h2 className="text-sm font-semibold text-foreground">{title}</h2>
+      <h2 className={cn("text-sm font-semibold", toneClasses[tone])}>{title}</h2>
       {description ? (
         <p className="mt-1.5 max-w-sm text-sm leading-5 text-muted-foreground">{description}</p>
       ) : null}
@@ -50,24 +46,35 @@ function StateView({
   );
 }
 
-function EmptyState({ icon = <Inbox />, ...props }: StateViewProps) {
-  return <StateView icon={icon} tone="empty" {...props} />;
+function EmptyState(props: StateViewProps) {
+  return <StateView tone="empty" {...props} />;
 }
 
-function ErrorState({ icon = <CircleAlert />, ...props }: StateViewProps) {
-  return <StateView icon={icon} role="alert" tone="error" {...props} />;
+function ErrorState(props: StateViewProps) {
+  return <StateView role="alert" tone="error" {...props} />;
 }
 
-function PermissionState({ icon = <ShieldAlert />, ...props }: StateViewProps) {
-  return <StateView icon={icon} tone="permission" {...props} />;
+function PermissionState(props: StateViewProps) {
+  return <StateView tone="permission" {...props} />;
 }
 
+/**
+ * Loading keeps its spinner, inline with the label.
+ *
+ * Unlike the icons removed above, a spinner is not decoration: it is the only
+ * signal that work is still in progress. It sits beside the text rather than
+ * stacked above it.
+ */
 function LoadingState({ label = "Loading", title = "Loading", ...props }: LoadingStateProps) {
   return (
     <StateView
       aria-live="polite"
-      icon={<Spinner label={label} size="lg" />}
-      title={title}
+      title={
+        <span className="inline-flex items-center gap-2">
+          <Spinner label={label} size="sm" />
+          {title}
+        </span>
+      }
       tone="loading"
       {...props}
     />
