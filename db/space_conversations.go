@@ -341,7 +341,7 @@ func (db *Database) SpaceConversationMessages(ctx context.Context, userID, space
 			return err
 		}
 		for index := range items {
-			if err := loadSpaceMessageReferencesTx(ctx, tx, &items[index]); err != nil {
+			if err := loadSpaceMessageReferencesTx(ctx, tx, &items[index], userID); err != nil {
 				return err
 			}
 		}

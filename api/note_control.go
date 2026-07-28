@@ -26,7 +26,7 @@ type noteControlEnvelope struct {
 // note outbox. Individual collaboration-service failures remain queued and do
 // not stop other notes from progressing.
 func (s *SpacesService) ProcessNoteControlCommands(ctx context.Context, limit int) (int, error) {
-	if !s.noteCollab.Enabled {
+	if !s.journalCollab.Enabled {
 		return 0, nil
 	}
 	commands, err := s.database.PendingNoteControlCommands(ctx, limit)
@@ -57,8 +57,22 @@ func (s *SpacesService) deliverNoteControlCommand(
 	noteID, command string,
 	payload []byte,
 ) error {
+	return s.deliverCollaborationControlCommand(
+		ctx,
+		"note-room",
+		s.journalCollab.RoomID(noteID),
+		command,
+		payload,
+	)
+}
+
+func (s *SpacesService) deliverCollaborationControlCommand(
+	ctx context.Context,
+	party, room, command string,
+	payload []byte,
+) error {
 	if !json.Valid(payload) {
-		return errors.New("note control payload is invalid JSON")
+		return errors.New("collaboration control payload is invalid JSON")
 	}
 	body, err := json.Marshal(noteControlEnvelope{Command: command, Payload: json.RawMessage(payload)})
 	if err != nil {
@@ -66,9 +80,10 @@ func (s *SpacesService) deliverNoteControlCommand(
 	}
 	timestamp := strconv.FormatInt(time.Now().UTC().Unix(), 10)
 	endpoint := fmt.Sprintf(
-		"https://%s/parties/note-room/%s",
-		s.noteCollab.Host,
-		s.noteCollab.RoomID(noteID),
+		"https://%s/parties/%s/%s",
+		s.journalCollab.Host,
+		party,
+		room,
 	)
 	request, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
 	if err != nil {
@@ -76,11 +91,11 @@ func (s *SpacesService) deliverNoteControlCommand(
 	}
 	request.Header.Set("Content-Type", "application/json")
 	request.Header.Set("X-Misty-Timestamp", timestamp)
-	request.Header.Set("X-Misty-Signature", s.noteCollab.SignControlRequest(timestamp, body))
+	request.Header.Set("X-Misty-Signature", s.journalCollab.SignControlRequest(timestamp, body))
 
 	response, err := noteControlHTTPClient.Do(request)
 	if err != nil {
-		return fmt.Errorf("send note control command: %w", err)
+		return fmt.Errorf("send collaboration control command: %w", err)
 	}
 	defer response.Body.Close()
 	if response.StatusCode >= http.StatusOK && response.StatusCode < http.StatusMultipleChoices {
@@ -92,5 +107,5 @@ func (s *SpacesService) deliverNoteControlCommand(
 	if reason == "" {
 		reason = http.StatusText(response.StatusCode)
 	}
-	return fmt.Errorf("note collaboration returned %d: %s", response.StatusCode, reason)
+	return fmt.Errorf("collaboration service returned %d: %s", response.StatusCode, reason)
 }

@@ -154,6 +154,11 @@ func (s *SpaceLibraryService) SpaceNoteAssets() http.HandlerFunc {
 			writeJSON(w, http.StatusServiceUnavailable, map[string]string{"code": "note_assets_disabled"})
 			return
 		}
+		if !s.directTransfersActive() {
+			writeJSON(w, http.StatusServiceUnavailable,
+				map[string]string{"code": "journal_asset_direct_transfer_required"})
+			return
+		}
 		var body struct {
 			Filename string `json:"filename"`
 			MIMEType string `json:"mime_type"`
@@ -212,7 +217,7 @@ func (s *SpaceLibraryService) SpaceNoteAssetDownload() http.HandlerFunc {
 			writeLibraryError(w, err)
 			return
 		}
-		s.writeDownload(w, r, download)
+		s.writeJournalAssetDownload(w, r, download)
 	}
 }
 
@@ -249,7 +254,7 @@ func (s *SpacesService) SpaceNoteCollaborationTicket() http.HandlerFunc {
 			writeSpaceError(w, err)
 			return
 		}
-		if !s.noteCollab.Enabled {
+		if !s.journalCollab.Enabled {
 			// Never fall back to local-only notes; the desktop shows an explicit
 			// unavailable state instead.
 			writeJSON(w, http.StatusServiceUnavailable, map[string]string{"code": "note_collaboration_unavailable"})
@@ -267,7 +272,7 @@ func (s *SpacesService) SpaceNoteCollaborationTicket() http.HandlerFunc {
 			writeSpaceError(w, db.ErrSpaceNotFound)
 			return
 		}
-		ticket, err := s.noteCollab.MintTicket(userID, note.SpaceID, note.ID, access.Role, note.ACLVersion)
+		ticket, err := s.journalCollab.MintNoteTicket(userID, note.SpaceID, note.ID, access.Role, note.ACLVersion)
 		if err != nil {
 			writeSpaceError(w, err)
 			return

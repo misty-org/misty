@@ -14,7 +14,7 @@ import (
 	"time"
 )
 
-func testCollabConfig(t *testing.T) NoteCollabConfig {
+func testCollabConfig(t *testing.T) JournalCollabConfig {
 	t.Helper()
 	_, privateKey, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
@@ -28,19 +28,17 @@ func testCollabConfig(t *testing.T) NoteCollabConfig {
 	if _, err := rand.Read(secret); err != nil {
 		t.Fatal(err)
 	}
-	t.Setenv("MISTY_NOTES_COLLAB_ENABLED", "true")
-	t.Setenv("PARTYKIT_HOST", "misty-note-collab.mistysys.workers.dev")
-	t.Setenv("NOTE_COLLAB_TICKET_PRIVATE_KEY", base64.StdEncoding.EncodeToString(pkcs8))
-	t.Setenv("NOTE_COLLAB_CONTROL_SECRET", base64.StdEncoding.EncodeToString(secret))
-	t.Setenv("NOTE_COLLAB_PROJECTION_SECRET", base64.StdEncoding.EncodeToString(secret))
-	config, err := NoteCollabConfigFromEnv()
+	t.Setenv("JOURNAL_COLLAB_TICKET_PRIVATE_KEY", base64.StdEncoding.EncodeToString(pkcs8))
+	t.Setenv("JOURNAL_COLLAB_CONTROL_SECRET", base64.StdEncoding.EncodeToString(secret))
+	t.Setenv("JOURNAL_COLLAB_PROJECTION_SECRET", base64.StdEncoding.EncodeToString(secret))
+	config, err := JournalCollabConfigFromEnv()
 	if err != nil {
 		t.Fatal(err)
 	}
 	return config
 }
 
-func decodeTicketClaims(t *testing.T, ticket string) noteTicketClaims {
+func decodeTicketClaims(t *testing.T, ticket string) journalTicketClaims {
 	t.Helper()
 	parts := strings.Split(ticket, ".")
 	if len(parts) != 3 {
@@ -50,7 +48,7 @@ func decodeTicketClaims(t *testing.T, ticket string) noteTicketClaims {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var claims noteTicketClaims
+	var claims journalTicketClaims
 	if err := json.Unmarshal(raw, &claims); err != nil {
 		t.Fatal(err)
 	}
@@ -62,7 +60,7 @@ func decodeTicketClaims(t *testing.T, ticket string) noteTicketClaims {
 func TestMintedTicketVerifiesWithThePublicKeyAlone(t *testing.T) {
 	config := testCollabConfig(t)
 
-	ticket, err := config.MintTicket("user_1", "space_1", "note_1", "editor", 4)
+	ticket, err := config.MintNoteTicket("user_1", "space_1", "note_1", "editor", 4)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -90,16 +88,18 @@ func TestMintedTicketVerifiesWithThePublicKeyAlone(t *testing.T) {
 func TestTicketClaimsMatchTheWorkerContract(t *testing.T) {
 	config := testCollabConfig(t)
 
-	ticket, err := config.MintTicket("user_1", "space_1", "note_1", "viewer", 7)
+	ticket, err := config.MintNoteTicket("user_1", "space_1", "note_1", "viewer", 7)
 	if err != nil {
 		t.Fatal(err)
 	}
 	claims := decodeTicketClaims(t, ticket.Ticket)
 
-	if claims.Issuer != "misty-api" || claims.Audience != "misty-note-collab" {
+	if claims.Issuer != "misty-api" || claims.Audience != "misty-journal-collab" {
 		t.Fatalf("issuer/audience = %q/%q", claims.Issuer, claims.Audience)
 	}
-	if claims.Subject != "user_1" || claims.NoteID != "note_1" || claims.Role != "viewer" {
+	if claims.Subject != "user_1" || claims.NoteID != "note_1" ||
+		claims.ResourceType != "note" || claims.ResourceID != "note_1" ||
+		claims.Role != "viewer" {
 		t.Fatalf("claims = %#v", claims)
 	}
 	if claims.ACLVersion != 7 {
@@ -115,12 +115,36 @@ func TestTicketClaimsMatchTheWorkerContract(t *testing.T) {
 	}
 }
 
+func TestDrawingTicketUsesDrawingRoomAndClaims(t *testing.T) {
+	config := testCollabConfig(t)
+
+	ticket, err := config.MintDrawingTicket(
+		"user_1", "space_1", "drawing_1", "editor", 2,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	claims := decodeTicketClaims(t, ticket.Ticket)
+	if claims.ResourceType != "drawing" ||
+		claims.ResourceID != "drawing_1" ||
+		claims.DrawingID != "drawing_1" ||
+		claims.NoteID != "" {
+		t.Fatalf("drawing claims = %#v", claims)
+	}
+	if !strings.Contains(ticket.URL, "/parties/drawing-room/") {
+		t.Fatalf("drawing ticket URL = %q", ticket.URL)
+	}
+	if config.DrawingRoomID("drawing_1") == config.RoomID("drawing_1") {
+		t.Fatal("a note and drawing with the same id share a room")
+	}
+}
+
 // 60 seconds, per the plan: long enough to open a socket, short enough that a
 // revoked user cannot sit on a usable ticket.
 func TestTicketExpiresInOneMinute(t *testing.T) {
 	config := testCollabConfig(t)
 
-	ticket, err := config.MintTicket("user_1", "space_1", "note_1", "editor", 1)
+	ticket, err := config.MintNoteTicket("user_1", "space_1", "note_1", "editor", 1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -139,7 +163,7 @@ func TestEveryTicketGetsAFreshJTI(t *testing.T) {
 	seen := map[string]bool{}
 
 	for range 25 {
-		ticket, err := config.MintTicket("user_1", "space_1", "note_1", "editor", 1)
+		ticket, err := config.MintNoteTicket("user_1", "space_1", "note_1", "editor", 1)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -172,8 +196,8 @@ func TestRoomIDIsOpaqueButStable(t *testing.T) {
 }
 
 func TestDisabledConfigRefusesToMint(t *testing.T) {
-	t.Setenv("MISTY_NOTES_COLLAB_ENABLED", "false")
-	config, err := NoteCollabConfigFromEnv()
+	t.Setenv("MISTY_JOURNAL_COLLAB_ENABLED", "false")
+	config, err := JournalCollabConfigFromEnv()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -181,8 +205,19 @@ func TestDisabledConfigRefusesToMint(t *testing.T) {
 	if config.Enabled {
 		t.Fatal("config reports enabled when the flag is off")
 	}
-	if _, err := config.MintTicket("user_1", "space_1", "note_1", "editor", 1); err == nil {
+	if _, err := config.MintNoteTicket("user_1", "space_1", "note_1", "editor", 1); err == nil {
 		t.Fatal("a disabled config minted a ticket")
+	}
+}
+
+func TestJournalCollabConfigDefaultsToEnabledWithMistyWorkerHost(t *testing.T) {
+	config := testCollabConfig(t)
+
+	if !config.Enabled {
+		t.Fatal("config should default to enabled")
+	}
+	if config.Host != "misty-journal-collab.mistysys.workers.dev" {
+		t.Fatalf("host = %q, want Misty worker host", config.Host)
 	}
 }
 
@@ -195,24 +230,22 @@ func TestEnabledConfigRequiresEverySecret(t *testing.T) {
 		pkcs8, _ := x509.MarshalPKCS8PrivateKey(privateKey)
 		secret := make([]byte, 32)
 		_, _ = rand.Read(secret)
-		t.Setenv("MISTY_NOTES_COLLAB_ENABLED", "true")
 		t.Setenv("PARTYKIT_HOST", "example.workers.dev")
-		t.Setenv("NOTE_COLLAB_TICKET_PRIVATE_KEY", base64.StdEncoding.EncodeToString(pkcs8))
-		t.Setenv("NOTE_COLLAB_CONTROL_SECRET", base64.StdEncoding.EncodeToString(secret))
-		t.Setenv("NOTE_COLLAB_PROJECTION_SECRET", base64.StdEncoding.EncodeToString(secret))
+		t.Setenv("JOURNAL_COLLAB_TICKET_PRIVATE_KEY", base64.StdEncoding.EncodeToString(pkcs8))
+		t.Setenv("JOURNAL_COLLAB_CONTROL_SECRET", base64.StdEncoding.EncodeToString(secret))
+		t.Setenv("JOURNAL_COLLAB_PROJECTION_SECRET", base64.StdEncoding.EncodeToString(secret))
 	}
 
 	cases := map[string]string{
-		"PARTYKIT_HOST":                  "",
-		"NOTE_COLLAB_TICKET_PRIVATE_KEY": "",
-		"NOTE_COLLAB_CONTROL_SECRET":     "",
-		"NOTE_COLLAB_PROJECTION_SECRET":  "",
+		"JOURNAL_COLLAB_TICKET_PRIVATE_KEY": "",
+		"JOURNAL_COLLAB_CONTROL_SECRET":     "",
+		"JOURNAL_COLLAB_PROJECTION_SECRET":  "",
 	}
 	for name, value := range cases {
 		t.Run("missing "+name, func(t *testing.T) {
 			base(t)
 			t.Setenv(name, value)
-			if _, err := NoteCollabConfigFromEnv(); err == nil {
+			if _, err := JournalCollabConfigFromEnv(); err == nil {
 				t.Fatalf("config accepted a missing %s", name)
 			}
 		})
@@ -220,8 +253,8 @@ func TestEnabledConfigRequiresEverySecret(t *testing.T) {
 
 	t.Run("weak shared secret", func(t *testing.T) {
 		base(t)
-		t.Setenv("NOTE_COLLAB_CONTROL_SECRET", base64.StdEncoding.EncodeToString([]byte("short")))
-		if _, err := NoteCollabConfigFromEnv(); err == nil {
+		t.Setenv("JOURNAL_COLLAB_CONTROL_SECRET", base64.StdEncoding.EncodeToString([]byte("short")))
+		if _, err := JournalCollabConfigFromEnv(); err == nil {
 			t.Fatal("config accepted a short control secret")
 		}
 	})
@@ -229,7 +262,7 @@ func TestEnabledConfigRequiresEverySecret(t *testing.T) {
 	t.Run("host with a path", func(t *testing.T) {
 		base(t)
 		t.Setenv("PARTYKIT_HOST", "example.workers.dev/parties")
-		if _, err := NoteCollabConfigFromEnv(); err == nil {
+		if _, err := JournalCollabConfigFromEnv(); err == nil {
 			t.Fatal("config accepted a host containing a path")
 		}
 	})
@@ -300,7 +333,7 @@ func TestNoteControlDeliveryUsesOpaqueRoomAndSignedEnvelope(t *testing.T) {
 		}, nil
 	})}
 
-	service := &SpacesService{noteCollab: config}
+	service := &SpacesService{journalCollab: config}
 	payload := []byte(`{"title":"Research plan","markdown":"# Research plan\nQuestion"}`)
 	if err := service.deliverNoteControlCommand(
 		context.Background(),

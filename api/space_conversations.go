@@ -158,3 +158,30 @@ func (s *SpacesService) ConversationMessage() http.HandlerFunc {
 		writeJSON(w, http.StatusOK, message)
 	}
 }
+
+func (s *SpacesService) ConversationMessageReaction() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userID, ok := authenticatedUser(w, r, s.database)
+		if !ok {
+			return
+		}
+		spaceID := chi.URLParam(r, "spaceID")
+		conversationID := chi.URLParam(r, "conversationID")
+		messageID := chi.URLParam(r, "messageID")
+		emoji := chi.URLParam(r, "emoji")
+		var (
+			message *db.SpaceMessage
+			err     error
+		)
+		if r.Method == http.MethodDelete {
+			message, err = s.database.RemoveSpaceConversationMessageReaction(r.Context(), userID, spaceID, conversationID, messageID, emoji)
+		} else {
+			message, err = s.database.AddSpaceConversationMessageReaction(r.Context(), userID, spaceID, conversationID, messageID, emoji)
+		}
+		if err != nil {
+			writeSpaceError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, message)
+	}
+}

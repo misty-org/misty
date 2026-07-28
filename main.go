@@ -14,6 +14,12 @@ func main() {
 	if err := godotenv.Load(); err != nil {
 		log.Println("No .env file found, using environment variables")
 	}
+	if err := godotenv.Load("cloudflare/journal-collab/.secrets/server.env"); err == nil {
+		log.Println("Loaded generated Journal collaboration server secrets")
+	}
+	if err := godotenv.Overload("cloudflare/journal-collab/.secrets/local-dev-server.env"); err == nil {
+		log.Println("Loaded local Journal collaboration development overrides")
+	}
 
 	server, err := CreateServer()
 	if err != nil {
@@ -65,9 +71,11 @@ func main() {
 }
 
 func runNoteControlProcessing(ctx context.Context, server *Server) {
-	if server.Spaces == nil || !server.Spaces.NoteCollab().Enabled {
+	if server.Spaces == nil || !server.Spaces.JournalCollab().Enabled {
+		log.Println("Journal collaboration command processing disabled")
 		return
 	}
+	log.Printf("Journal collaboration command processing enabled for %s", server.Spaces.JournalCollab().Host)
 	ticker := time.NewTicker(3 * time.Second)
 	defer ticker.Stop()
 	for {
@@ -76,7 +84,13 @@ func runNoteControlProcessing(ctx context.Context, server *Server) {
 			return
 		case <-ticker.C:
 			if _, err := server.Spaces.ProcessNoteControlCommands(ctx, 50); err != nil {
-				log.Printf("Note collaboration command processing failed: %v", err)
+				log.Printf("Journal note collaboration command processing failed: %v", err)
+			}
+			if _, err := server.Spaces.ProcessDrawingControlCommands(ctx, 50); err != nil {
+				log.Printf("Drawing collaboration command processing failed: %v", err)
+			}
+			if _, err := server.Database.PurgeDeletedDrawings(ctx, 100); err != nil {
+				log.Printf("Drawing retention purge failed: %v", err)
 			}
 		}
 	}

@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -139,6 +140,88 @@ func TestWriteDownloadReturnsSignedDescriptorInsteadOfBytes(t *testing.T) {
 	}
 	if descriptor.ExpiresAt.IsZero() || !descriptor.ExpiresAt.After(time.Now()) {
 		t.Fatalf("ExpiresAt = %s, want a future expiry", descriptor.ExpiresAt)
+	}
+}
+
+func TestJournalAssetDownloadReturnsVerifiedR2Descriptor(t *testing.T) {
+	presigner := &stubPresigner{}
+	service := directTransferService(t, presigner)
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(
+		http.MethodGet,
+		"/spaces/space_1/drawings/drawing_1/assets/asset_1/download",
+		nil,
+	)
+	download := &db.LibraryDownload{
+		ObjectKey: "library/drawingfixture01",
+		Filename:  "drawing.png",
+		MIMEType:  "image/png",
+		ByteSize:  2048,
+		SHA256:    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+	}
+
+	service.writeJournalAssetDownload(recorder, request, download)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", recorder.Code)
+	}
+	var descriptor PresignedDownload
+	if err := json.Unmarshal(recorder.Body.Bytes(), &descriptor); err != nil {
+		t.Fatal(err)
+	}
+	if descriptor.URL == "" ||
+		descriptor.MIMEType != download.MIMEType ||
+		descriptor.ByteSize != download.ByteSize ||
+		descriptor.SHA256 != download.SHA256 {
+		t.Fatalf("descriptor = %#v", descriptor)
+	}
+	if recorder.Header().Get(librarySignedDownloadHeader) != "1" {
+		t.Fatal("signed download marker is missing")
+	}
+}
+
+func TestJournalAssetDownloadNeverFallsBackToServerBytes(t *testing.T) {
+	service := &SpaceLibraryService{
+		store: NewMemoryLibraryObjectStore(),
+	}
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(
+		http.MethodGet,
+		"/spaces/space_1/notes/note_1/assets/asset_1/download",
+		nil,
+	)
+
+	service.writeJournalAssetDownload(
+		recorder,
+		request,
+		&db.LibraryDownload{
+			ObjectKey: "library/notefixture01",
+			Filename:  "note.png",
+			MIMEType:  "image/png",
+			ByteSize:  10,
+			SHA256:    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+		},
+	)
+
+	if recorder.Code != http.StatusServiceUnavailable {
+		t.Fatalf("status = %d, want 503", recorder.Code)
+	}
+	if !strings.Contains(recorder.Body.String(), "journal_asset_direct_transfer_required") {
+		t.Fatalf("body = %s", recorder.Body.String())
+	}
+}
+
+func TestJournalAssetPurposesNeverUseTheProxy(t *testing.T) {
+	for _, purpose := range []UploadPurpose{
+		UploadPurposeNoteAttachment,
+		UploadPurposeDrawingAsset,
+	} {
+		if !isJournalAssetPurpose(purpose) {
+			t.Fatalf("%q was not recognized as a Journal asset purpose", purpose)
+		}
+	}
+	if isJournalAssetPurpose(UploadPurposeLibrary) {
+		t.Fatal("Library upload was treated as a Journal asset")
 	}
 }
 

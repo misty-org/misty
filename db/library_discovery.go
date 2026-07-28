@@ -38,20 +38,10 @@ type LibraryDiscovery struct {
 	Memories   []LibraryDiscoveryGroup `json:"memories"`
 	Trips      []LibraryDiscoveryGroup `json:"trips"`
 	Duplicates []LibraryDiscoveryGroup `json:"duplicates"`
-	MapPoints  []LibraryMapPoint       `json:"map_points"`
-}
-
-type LibraryMapPoint struct {
-	ID          string  `json:"id"`
-	Name        string  `json:"name"`
-	Latitude    float64 `json:"latitude"`
-	Longitude   float64 `json:"longitude"`
-	ItemCount   int     `json:"item_count"`
-	CoverItemID string  `json:"cover_item_id,omitempty"`
 }
 
 func (db *Database) LibraryDiscovery(ctx context.Context, userID, spaceID string) (*LibraryDiscovery, error) {
-	out := &LibraryDiscovery{RecentDays: []LibraryDiscoveryGroup{}, Months: []LibraryDiscoveryGroup{}, Years: []LibraryDiscoveryGroup{}, Memories: []LibraryDiscoveryGroup{}, Trips: []LibraryDiscoveryGroup{}, Duplicates: []LibraryDiscoveryGroup{}, MapPoints: []LibraryMapPoint{}}
+	out := &LibraryDiscovery{RecentDays: []LibraryDiscoveryGroup{}, Months: []LibraryDiscoveryGroup{}, Years: []LibraryDiscoveryGroup{}, Memories: []LibraryDiscoveryGroup{}, Trips: []LibraryDiscoveryGroup{}, Duplicates: []LibraryDiscoveryGroup{}}
 	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionLibraryView); err != nil {
 			return err
@@ -189,29 +179,6 @@ func (db *Database) LibraryDiscovery(ctx context.Context, userID, spaceID string
 			out.Trips = append(out.Trips, group)
 		}
 		if err := tripRows.Close(); err != nil {
-			return err
-		}
-
-		mapRows, err := tx.QueryContext(ctx, `SELECT round((COALESCE(i.location_override,f.intrinsic_location)->>'latitude')::numeric,2)::float8,round((COALESCE(i.location_override,f.intrinsic_location)->>'longitude')::numeric,2)::float8,COALESCE(NULLIF(max(COALESCE(i.location_override,f.intrinsic_location)->>'name'),''),'Saved location'),(array_agg(i.id ORDER BY COALESCE(i.date_override,f.intrinsic_capture_at,f.original_uploaded_at) DESC,i.id))[1],count(*)
-			FROM space_library_items i JOIN library_files f ON f.id=i.file_id
-			WHERE i.space_id=$1 AND i.lifecycle_state='ready' AND i.hidden=FALSE
-			AND jsonb_typeof(COALESCE(i.location_override,f.intrinsic_location)->'latitude')='number' AND jsonb_typeof(COALESCE(i.location_override,f.intrinsic_location)->'longitude')='number'
-			AND (COALESCE(i.location_override,f.intrinsic_location)->>'latitude')::numeric BETWEEN -90 AND 90 AND (COALESCE(i.location_override,f.intrinsic_location)->>'longitude')::numeric BETWEEN -180 AND 180
-			GROUP BY round((COALESCE(i.location_override,f.intrinsic_location)->>'latitude')::numeric,2),round((COALESCE(i.location_override,f.intrinsic_location)->>'longitude')::numeric,2)
-			ORDER BY count(*) DESC,max(COALESCE(i.date_override,f.intrinsic_capture_at,f.original_uploaded_at)) DESC LIMIT 500`, spaceID)
-		if err != nil {
-			return err
-		}
-		for mapRows.Next() {
-			var point LibraryMapPoint
-			if err := mapRows.Scan(&point.Latitude, &point.Longitude, &point.Name, &point.CoverItemID, &point.ItemCount); err != nil {
-				_ = mapRows.Close()
-				return err
-			}
-			point.ID = fmt.Sprintf("%.2f,%.2f", point.Latitude, point.Longitude)
-			out.MapPoints = append(out.MapPoints, point)
-		}
-		if err := mapRows.Close(); err != nil {
 			return err
 		}
 

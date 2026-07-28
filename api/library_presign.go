@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"mime"
+	"net/http"
 	"net/url"
 	"strings"
 	"time"
@@ -31,6 +32,9 @@ type PresignedDownload struct {
 	URL       string    `json:"url"`
 	ExpiresAt time.Time `json:"expires_at"`
 	Filename  string    `json:"filename"`
+	MIMEType  string    `json:"mime_type,omitempty"`
+	ByteSize  int64     `json:"byte_size,omitempty"`
+	SHA256    string    `json:"sha256,omitempty"`
 }
 
 // LibraryObjectPresigner is the optional capability that lets the server hand
@@ -103,19 +107,36 @@ func (s *S3LibraryObjectStore) PresignPut(ctx context.Context, key string, metad
 	if err != nil {
 		return PresignedTransfer{}, mapLibraryS3Error(err)
 	}
-	// Return only headers the signature covers. Any additional header the
-	// client sends will fail signature verification at R2.
-	headers := map[string]string{
-		"Content-Type":                           metadata.MIMEType,
-		"x-amz-checksum-sha256":                  encodedChecksum,
-		"x-amz-meta-" + librarySHA256MetadataKey: metadata.SHA256,
-	}
+	// Return only headers the presigner kept as signed headers. The AWS signer
+	// may hoist checksum constraints into the URL query instead of requiring a
+	// request header; sending that hoisted value as a header can make R2 reject
+	// the browser preflight or the signed PUT.
+	headers := map[string]string{}
+	addPresignedTransferHeader(headers, presigned.SignedHeader, "Content-Type", metadata.MIMEType)
+	addPresignedTransferHeader(headers, presigned.SignedHeader, "x-amz-checksum-sha256", encodedChecksum)
+	addPresignedTransferHeader(headers, presigned.SignedHeader, "x-amz-meta-"+librarySHA256MetadataKey, metadata.SHA256)
 	return PresignedTransfer{
 		URL:       presigned.URL,
 		Method:    presigned.Method,
 		Headers:   headers,
 		ExpiresAt: time.Now().Add(ttl).UTC(),
 	}, nil
+}
+
+func addPresignedTransferHeader(headers map[string]string, signed http.Header, name, value string) {
+	if value == "" || !presignedTransferHeaderSigned(signed, name) {
+		return
+	}
+	headers[name] = value
+}
+
+func presignedTransferHeaderSigned(signed http.Header, name string) bool {
+	for key := range signed {
+		if strings.EqualFold(key, name) {
+			return true
+		}
+	}
+	return false
 }
 
 // PresignGet signs a single GET for one exact object key with a safe

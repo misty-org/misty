@@ -1,8 +1,8 @@
 /**
- * Collaboration ticket verification.
+ * Journal collaboration ticket verification.
  *
  * A ticket is an Ed25519-signed JWT minted by the Go API immediately after it
- * rechecks note access. It authorizes exactly one WebSocket connection to
+ * rechecks document access. It authorizes exactly one WebSocket connection to
  * exactly one room, and it is the only thing this Worker trusts: the Worker
  * never queries the note ACL itself, so a forged or replayed ticket is the
  * whole attack surface.
@@ -11,7 +11,8 @@
  * public key, so a compromise here cannot mint tickets.
  */
 
-export type NoteRole = "creator" | "editor" | "viewer";
+export type DocumentRole = "creator" | "editor" | "viewer";
+export type CollaborationResourceType = "note" | "drawing";
 
 export interface TicketClaims {
   iss: string;
@@ -19,9 +20,12 @@ export interface TicketClaims {
   jti: string;
   sub: string;
   space_id: string;
-  note_id: string;
+  resource_type: CollaborationResourceType;
+  resource_id: string;
+  note_id?: string;
+  drawing_id?: string;
   room: string;
-  role: NoteRole;
+  role: DocumentRole;
   acl_version: number;
   exp: number;
 }
@@ -32,6 +36,8 @@ export interface TicketVerificationContext {
   audience: string;
   /** The room the socket is actually connecting to. */
   room: string;
+  /** The Durable Object class accepting the connection. */
+  resourceType: CollaborationResourceType;
   /** Seconds since epoch; injectable so expiry is testable without waiting. */
   now?: number;
 }
@@ -39,14 +45,19 @@ export interface TicketVerificationContext {
 export class TicketError extends Error {
   constructor(readonly code: string) {
     // The message is deliberately the code alone. Ticket failures are logged
-    // and must never echo claim values, which identify a private note.
+    // and must never echo claim values, which identify a private document.
     super(code);
     this.name = "TicketError";
   }
 }
 
 const MAX_TICKET_BYTES = 4096;
-const VALID_ROLES: ReadonlySet<string> = new Set(["creator", "editor", "viewer"]);
+const VALID_ROLES: ReadonlySet<string> = new Set([
+  "creator",
+  "editor",
+  "viewer",
+]);
+const VALID_RESOURCE_TYPES: ReadonlySet<string> = new Set(["note", "drawing"]);
 
 function base64UrlToBytes(value: string): Uint8Array {
   const padded = value.replace(/-/g, "+").replace(/_/g, "/");
@@ -75,13 +86,17 @@ async function importVerifyKey(publicKeyBase64: string): Promise<CryptoKey> {
   if (raw.byteLength !== 32) {
     throw new TicketError("ticket_key_misconfigured");
   }
-  return crypto.subtle.importKey("raw", raw, { name: "Ed25519" }, false, ["verify"]);
+  return crypto.subtle.importKey("raw", raw, { name: "Ed25519" }, false, [
+    "verify",
+  ]);
 }
 
 function decodeClaims(payloadSegment: string): TicketClaims {
   let parsed: unknown;
   try {
-    parsed = JSON.parse(new TextDecoder().decode(base64UrlToBytes(payloadSegment)));
+    parsed = JSON.parse(
+      new TextDecoder().decode(base64UrlToBytes(payloadSegment)),
+    );
   } catch {
     throw new TicketError("ticket_malformed");
   }
@@ -92,7 +107,8 @@ function decodeClaims(payloadSegment: string): TicketClaims {
     typeof claims.jti !== "string" ||
     typeof claims.sub !== "string" ||
     typeof claims.space_id !== "string" ||
-    typeof claims.note_id !== "string" ||
+    typeof claims.resource_type !== "string" ||
+    typeof claims.resource_id !== "string" ||
     typeof claims.room !== "string" ||
     typeof claims.role !== "string" ||
     typeof claims.acl_version !== "number" ||
@@ -102,6 +118,21 @@ function decodeClaims(payloadSegment: string): TicketClaims {
   }
   if (!VALID_ROLES.has(claims.role)) {
     throw new TicketError("ticket_role_invalid");
+  }
+  if (
+    !VALID_RESOURCE_TYPES.has(claims.resource_type) ||
+    claims.resource_id.length < 1 ||
+    claims.resource_id.length > 200
+  ) {
+    throw new TicketError("ticket_resource_invalid");
+  }
+  if (
+    (claims.resource_type === "note" &&
+      claims.note_id !== claims.resource_id) ||
+    (claims.resource_type === "drawing" &&
+      claims.drawing_id !== claims.resource_id)
+  ) {
+    throw new TicketError("ticket_resource_invalid");
   }
   if (!Number.isInteger(claims.acl_version) || claims.acl_version < 1) {
     throw new TicketError("ticket_malformed");
@@ -130,11 +161,17 @@ export async function verifyTicket(
   if (segments.length !== 3) {
     throw new TicketError("ticket_malformed");
   }
-  const [headerSegment, payloadSegment, signatureSegment] = segments as [string, string, string];
+  const [headerSegment, payloadSegment, signatureSegment] = segments as [
+    string,
+    string,
+    string,
+  ];
 
   let header: { alg?: unknown; typ?: unknown };
   try {
-    header = JSON.parse(new TextDecoder().decode(base64UrlToBytes(headerSegment)));
+    header = JSON.parse(
+      new TextDecoder().decode(base64UrlToBytes(headerSegment)),
+    );
   } catch {
     throw new TicketError("ticket_malformed");
   }
@@ -147,7 +184,12 @@ export async function verifyTicket(
   const key = await importVerifyKey(context.publicKeyBase64);
   const signed = new TextEncoder().encode(`${headerSegment}.${payloadSegment}`);
   const signature = base64UrlToBytes(signatureSegment);
-  const valid = await crypto.subtle.verify({ name: "Ed25519" }, key, signature, signed);
+  const valid = await crypto.subtle.verify(
+    { name: "Ed25519" },
+    key,
+    signature,
+    signed,
+  );
   if (!valid) {
     throw new TicketError("ticket_signature_invalid");
   }
@@ -162,9 +204,12 @@ export async function verifyTicket(
     throw new TicketError("ticket_audience_invalid");
   }
   // Room equality stops a ticket minted for a note the user *can* read from
-  // being replayed against a different note's room.
+  // being replayed against a different document's room.
   if (claims.room !== context.room) {
     throw new TicketError("ticket_room_mismatch");
+  }
+  if (claims.resource_type !== context.resourceType) {
+    throw new TicketError("ticket_resource_mismatch");
   }
   const now = context.now ?? Math.floor(Date.now() / 1000);
   if (claims.exp <= now) {

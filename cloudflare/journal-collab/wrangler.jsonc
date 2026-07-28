@@ -1,6 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "misty-note-collab",
+  "name": "misty-journal-collab",
   "main": "src/index.ts",
   "compatibility_date": "2026-06-25",
   "compatibility_flags": ["nodejs_compat"],
@@ -13,19 +13,25 @@
   "observability": { "enabled": true },
 
   "durable_objects": {
-    "bindings": [{ "name": "NOTE_ROOM", "class_name": "NoteRoom" }]
+    "bindings": [
+      { "name": "NOTE_ROOM", "class_name": "NoteRoom" },
+      { "name": "DRAWING_ROOM", "class_name": "DrawingRoom" },
+    ],
   },
 
   // SQLite-backed Durable Objects. This is deliberate: the key-value backed
   // classes are the older form, and SQLite storage is what y-partyserver
   // expects for document persistence.
-  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["NoteRoom"] }],
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["NoteRoom"] },
+    { "tag": "v2", "new_sqlite_classes": ["DrawingRoom"] },
+  ],
 
   "vars": {
     // Non-secret configuration. Every secret is set with `wrangler secret put`
     // and never appears in this file.
     "MISTY_INTERNAL_API_BASE": "https://mistysys.com/api",
-    "NOTE_COLLAB_ISSUER": "misty-api",
-    "NOTE_COLLAB_AUDIENCE": "misty-note-collab"
-  }
+    "JOURNAL_COLLAB_ISSUER": "misty-api",
+    "JOURNAL_COLLAB_AUDIENCE": "misty-journal-collab",
+  },
 }

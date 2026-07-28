@@ -49,12 +49,14 @@ The desktop performs the same check first purely as a convenience.
 | ------------------ | --------------------------------------- | ------- |
 | `library`          | `MISTY_LIBRARY_MAX_FILE_BYTES`          | 100 MB  |
 | `note_attachment`  | `MISTY_NOTE_ATTACHMENT_MAX_FILE_BYTES`  | 15 MB   |
+| `drawing_attachment` | `MISTY_DRAWING_ASSET_MAX_FILE_BYTES`  | 15 MB   |
 | `attachment`       | `MISTY_CHAT_ATTACHMENT_MAX_FILE_BYTES`  | 10 MB   |
 
 A configured value above the default is rejected at startup rather than clamped.
-The `note_attachment` purpose is never accepted by the generic Space Library
-upload endpoint: note assets authorize against the parent note, so only the note
-routes may create them.
+The `note_attachment` and `drawing_attachment` purposes are never accepted by
+the generic Space Library upload endpoint. Journal assets authorize against
+their parent note or drawing, so only those resource-scoped routes may create
+them.
 
 ## Direct R2 transfer
 
@@ -65,7 +67,10 @@ deliberately no flag that could be left in the wrong position.
 
 The local and in-memory development stores cannot sign, so they transparently
 fall back to the proxy route. That is what lets local development run without R2
-credentials, and it is the only situation in which the proxy is used.
+credentials for general Library files, and it is the only situation in which
+the proxy is used. Journal assets are stricter: note and drawing routes return
+`503 journal_asset_direct_transfer_required` when signing is unavailable and
+never accept or stream image bytes through the server.
 
 Upload initiation returns an absolute presigned `PUT` URL instead of the relative
 `/library/uploads/{uploadID}/content` proxy route, and authorized download
@@ -98,6 +103,36 @@ bucket allows the exact app origins. Configure the private bucket for `PUT`,
 allowing only the signed headers (`Content-Type`, `x-amz-checksum-sha256`,
 `x-amz-meta-misty-library-sha256`). Do not use a wildcard origin with
 credentials.
+
+## Journal binary assets
+
+BlockNote attachments and Excalidraw images use an R2-only binary path:
+
+1. The client computes SHA-256 and sends only the filename, MIME type, byte
+   length, checksum, and (for Excalidraw) binary file ID to the parent-scoped
+   upload route.
+2. The API rechecks edit access, reserves storage, and signs an exact R2 `PUT`.
+3. The client uploads the file directly to R2 without Misty cookies or
+   authorization headers.
+4. Finalization performs an R2 `HEAD`, verifies the signed size and checksum,
+   commits the immutable file reference, and releases the reservation.
+5. Readers obtain a short-lived signed R2 `GET`, download directly, and verify
+   the response size and SHA-256 before handing it to BlockNote or Excalidraw.
+
+The Excalidraw Yjs document contains only `assetId`, `fileId`, MIME type, and
+creation time. It never contains a data URL or other binary image payload.
+The Durable Object therefore synchronizes lightweight scene/reference state
+only, while R2 carries every image byte.
+
+Relevant drawing endpoints are:
+
+```text
+GET    /spaces/{spaceID}/drawings/{drawingID}/assets
+POST   /spaces/{spaceID}/drawings/{drawingID}/assets/uploads
+POST   /spaces/{spaceID}/drawings/{drawingID}/assets/uploads/{uploadID}/finalize
+GET    /spaces/{spaceID}/drawings/{drawingID}/assets/{assetID}/download
+DELETE /spaces/{spaceID}/drawings/{drawingID}/assets/{assetID}
+```
 
 ## Security-domain mapping
 

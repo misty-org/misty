@@ -18,13 +18,22 @@ import (
 )
 
 type recordingPresigner struct {
-	putInput *s3.PutObjectInput
-	getInput *s3.GetObjectInput
+	putInput     *s3.PutObjectInput
+	getInput     *s3.GetObjectInput
+	signedHeader http.Header
 }
 
 func (p *recordingPresigner) PresignPutObject(_ context.Context, input *s3.PutObjectInput, _ ...func(*s3.PresignOptions)) (*v4.PresignedHTTPRequest, error) {
 	p.putInput = input
-	return &v4.PresignedHTTPRequest{URL: "https://r2.example/signed-put", Method: http.MethodPut}, nil
+	signedHeader := p.signedHeader
+	if signedHeader == nil {
+		signedHeader = http.Header{
+			"Content-Type":                        []string{aws.ToString(input.ContentType)},
+			"X-Amz-Meta-Misty-Library-Sha256":     []string{input.Metadata[librarySHA256MetadataKey]},
+			"X-Amz-Signed-Checksum-Hoisted-Query": []string{aws.ToString(input.ChecksumSHA256)},
+		}
+	}
+	return &v4.PresignedHTTPRequest{URL: "https://r2.example/signed-put", Method: http.MethodPut, SignedHeader: signedHeader}, nil
 }
 
 func (p *recordingPresigner) PresignGetObject(_ context.Context, input *s3.GetObjectInput, _ ...func(*s3.PresignOptions)) (*v4.PresignedHTTPRequest, error) {
@@ -62,17 +71,50 @@ func TestPresignPutBindsKeySizeAndChecksum(t *testing.T) {
 	if aws.ToString(presigner.putInput.ChecksumSHA256) != wantChecksum {
 		t.Fatalf("signed checksum = %q, want %q", aws.ToString(presigner.putInput.ChecksumSHA256), wantChecksum)
 	}
-	// The client must be told exactly the headers the signature covers.
+	// The client must be told exactly the headers the presigned request still
+	// expects as request headers. The checksum can be hoisted into the URL query
+	// by the AWS signer and should not be echoed as a browser header then.
 	if transfer.Headers["Content-Type"] != metadata.MIMEType ||
-		transfer.Headers["x-amz-checksum-sha256"] != wantChecksum ||
 		transfer.Headers["x-amz-meta-"+librarySHA256MetadataKey] != metadata.SHA256 {
 		t.Fatalf("headers = %#v", transfer.Headers)
 	}
-	if len(transfer.Headers) != 3 {
+	if _, ok := transfer.Headers["x-amz-checksum-sha256"]; ok {
+		t.Fatalf("hoisted checksum leaked into transfer headers: %#v", transfer.Headers)
+	}
+	if len(transfer.Headers) != 2 {
 		t.Fatalf("unexpected extra signed headers: %#v", transfer.Headers)
 	}
 	if !transfer.ExpiresAt.After(time.Now()) {
 		t.Fatalf("ExpiresAt = %s, want future", transfer.ExpiresAt)
+	}
+}
+
+func TestPresignPutReturnsChecksumHeaderWhenPresignerSignsIt(t *testing.T) {
+	metadata := testObjectMetadata(t)
+	checksum, _ := hex.DecodeString(metadata.SHA256)
+	wantChecksum := base64.StdEncoding.EncodeToString(checksum)
+	presigner := &recordingPresigner{signedHeader: http.Header{
+		"Content-Type":                    []string{metadata.MIMEType},
+		"X-Amz-Checksum-Sha256":           []string{wantChecksum},
+		"X-Amz-Meta-Misty-Library-Sha256": []string{metadata.SHA256},
+		"Host":                            []string{"r2.example"},
+		"Content-Length":                  []string{"15"},
+	}}
+	store := &S3LibraryObjectStore{bucket: "misty", presigner: presigner}
+
+	transfer, err := store.PresignPut(context.Background(), "library/presignfixture1", metadata, 15*time.Minute)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if transfer.Headers["x-amz-checksum-sha256"] != wantChecksum {
+		t.Fatalf("checksum header = %q, want %q", transfer.Headers["x-amz-checksum-sha256"], wantChecksum)
+	}
+	if _, ok := transfer.Headers["Host"]; ok {
+		t.Fatalf("browser-controlled header leaked into transfer headers: %#v", transfer.Headers)
+	}
+	if _, ok := transfer.Headers["Content-Length"]; ok {
+		t.Fatalf("browser-controlled header leaked into transfer headers: %#v", transfer.Headers)
 	}
 }
 
@@ -127,6 +169,9 @@ func TestUploadLimitsAreEnforcedPerPurpose(t *testing.T) {
 	if limits.Max(UploadPurposeChatAttachment) != 10<<20 {
 		t.Fatalf("chat limit = %d, want 10MB", limits.Max(UploadPurposeChatAttachment))
 	}
+	if limits.Max(UploadPurposeDrawingAsset) != 15<<20 {
+		t.Fatalf("drawing asset limit = %d, want 15MB", limits.Max(UploadPurposeDrawingAsset))
+	}
 	// An unknown purpose must be rejected, not silently given a default.
 	if limits.Max("avatar") != 0 {
 		t.Fatalf("unknown purpose limit = %d, want 0", limits.Max("avatar"))
@@ -148,18 +193,41 @@ func TestUploadLimitsRejectValuesAboveDatabaseCeiling(t *testing.T) {
 	}
 }
 
-func TestUploadPurposeEnabledRejectsNoteAssetsOnGenericEndpoint(t *testing.T) {
-	service := &SpaceLibraryService{uploadsEnabled: true, attachmentsEnabled: true, noteAssetsEnabled: true}
+func TestUploadPurposeEnabledRejectsJournalAssetsOnGenericEndpoint(t *testing.T) {
+	service := &SpaceLibraryService{
+		uploadsEnabled: true, attachmentsEnabled: true,
+		noteAssetsEnabled: true, drawingAssetsEnabled: true,
+	}
 
 	// Note assets authorize against the parent note, so the Space-wide Library
 	// upload endpoint must never accept them even when the feature is on.
 	if service.uploadPurposeEnabled(UploadPurposeNoteAttachment) {
 		t.Fatal("generic Library upload endpoint accepted the note_attachment purpose")
 	}
+	if service.uploadPurposeEnabled(UploadPurposeDrawingAsset) {
+		t.Fatal("generic Library upload endpoint accepted the drawing_attachment purpose")
+	}
 	if !service.uploadPurposeEnabled(UploadPurposeLibrary) || !service.uploadPurposeEnabled(UploadPurposeChatAttachment) {
 		t.Fatal("library and chat attachment purposes should be enabled")
 	}
 	if service.uploadPurposeEnabled("avatar") {
 		t.Fatal("unknown purpose accepted")
+	}
+}
+
+func TestDrawingAssetMIMEAllowlistRejectsActiveAndGenericContent(t *testing.T) {
+	for _, allowed := range []string{"image/png", "image/jpeg", "IMAGE/WEBP"} {
+		if !supportedDrawingAssetMIME(allowed) {
+			t.Fatalf("safe drawing MIME %q was rejected", allowed)
+		}
+	}
+	for _, rejected := range []string{
+		"image/svg+xml",
+		"text/html",
+		"application/octet-stream",
+	} {
+		if supportedDrawingAssetMIME(rejected) {
+			t.Fatalf("unsafe drawing MIME %q was accepted", rejected)
+		}
 	}
 }

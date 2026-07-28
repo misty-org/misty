@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -151,14 +152,16 @@ func recordNoteEventTx(ctx context.Context, tx *sql.Tx, spaceID, actorUserID, ev
 // document body lives only in the collaboration service; the projections here
 // exist for listing and search.
 type SpaceNote struct {
-	ID                    string `json:"id"`
-	SpaceID               string `json:"space_id"`
-	CreatorUserID         string `json:"creator_user_id"`
-	TitleProjection       string `json:"title"`
-	PlainTextProjection   string `json:"plain_text,omitempty"`
-	LifecycleState        string `json:"lifecycle_state"`
-	CollaborationRevision int64  `json:"collaboration_revision"`
-	ACLVersion            int64  `json:"acl_version"`
+	ID                    string    `json:"id"`
+	SpaceID               string    `json:"space_id"`
+	CreatorUserID         string    `json:"creator_user_id"`
+	TitleProjection       string    `json:"title"`
+	PlainTextProjection   string    `json:"plain_text,omitempty"`
+	LifecycleState        string    `json:"lifecycle_state"`
+	CollaborationRevision int64     `json:"collaboration_revision"`
+	ACLVersion            int64     `json:"acl_version"`
+	CreatedAt             time.Time `json:"created_at"`
+	UpdatedAt             time.Time `json:"updated_at"`
 	// Role is the caller's own effective role. A non-creator never receives the
 	// full grant set, only this.
 	Role string `json:"role"`
@@ -177,9 +180,10 @@ func (db *Database) CreateSpaceNote(ctx context.Context, creatorUserID, spaceID,
 		if _, err := requireSpaceMemberTx(ctx, tx, spaceID, creatorUserID); err != nil {
 			return err
 		}
-		if _, err := tx.ExecContext(ctx,
-			`INSERT INTO space_notes(id,space_id,creator_user_id,title_projection) VALUES($1,$2,$3,$4)`,
-			note.ID, spaceID, creatorUserID, title); err != nil {
+		if err := tx.QueryRowContext(ctx,
+			`INSERT INTO space_notes(id,space_id,creator_user_id,title_projection) VALUES($1,$2,$3,$4)
+			 RETURNING created_at,updated_at`,
+			note.ID, spaceID, creatorUserID, title).Scan(&note.CreatedAt, &note.UpdatedAt); err != nil {
 			return err
 		}
 		return recordNoteEventTx(ctx, tx, note.SpaceID, creatorUserID, "note.created", note.ID, nil)
@@ -199,7 +203,7 @@ func (db *Database) AccessibleSpaceNotes(ctx context.Context, userID, spaceID st
 		}
 		rows, err := tx.QueryContext(ctx,
 			`SELECT n.id,n.space_id,n.creator_user_id,n.title_projection,n.lifecycle_state,
-			        n.collaboration_revision,n.acl_version,
+			        n.collaboration_revision,n.acl_version,n.created_at,n.updated_at,
 			        CASE WHEN n.creator_user_id=$1 THEN 'creator' ELSE 'editor' END AS effective_role
 			 FROM space_notes n
 			 WHERE n.space_id=$2 AND n.lifecycle_state='active'
@@ -211,7 +215,8 @@ func (db *Database) AccessibleSpaceNotes(ctx context.Context, userID, spaceID st
 		for rows.Next() {
 			var note SpaceNote
 			if err := rows.Scan(&note.ID, &note.SpaceID, &note.CreatorUserID, &note.TitleProjection,
-				&note.LifecycleState, &note.CollaborationRevision, &note.ACLVersion, &note.Role); err != nil {
+				&note.LifecycleState, &note.CollaborationRevision, &note.ACLVersion,
+				&note.CreatedAt, &note.UpdatedAt, &note.Role); err != nil {
 				return err
 			}
 			notes = append(notes, note)
@@ -236,10 +241,11 @@ func (db *Database) SpaceNoteByID(ctx context.Context, userID, noteID string) (*
 		note.Role = access.Role
 		return tx.QueryRowContext(ctx,
 			`SELECT id,space_id,creator_user_id,title_projection,plain_text_projection,
-			        lifecycle_state,collaboration_revision,acl_version
+			        lifecycle_state,collaboration_revision,acl_version,created_at,updated_at
 			 FROM space_notes WHERE id=$1`, noteID).Scan(
 			&note.ID, &note.SpaceID, &note.CreatorUserID, &note.TitleProjection,
-			&note.PlainTextProjection, &note.LifecycleState, &note.CollaborationRevision, &note.ACLVersion)
+			&note.PlainTextProjection, &note.LifecycleState, &note.CollaborationRevision,
+			&note.ACLVersion, &note.CreatedAt, &note.UpdatedAt)
 	})
 	if err != nil {
 		return nil, err

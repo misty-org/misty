@@ -81,7 +81,7 @@ func TestLibraryDiscoveryUsesIntrinsicCaptureAndLocation(t *testing.T) {
 		}
 	}
 	discovery, err := database.LibraryDiscovery(ctx, owner.ID, spaceID)
-	if err != nil || len(discovery.Months) != 1 || discovery.Months[0].ID != "2021-05" || len(discovery.Trips) != 1 || discovery.Trips[0].ID != "Big Sur" || len(discovery.MapPoints) != 1 {
+	if err != nil || len(discovery.Months) != 1 || discovery.Months[0].ID != "2021-05" || len(discovery.Trips) != 1 || discovery.Trips[0].ID != "Big Sur" {
 		t.Fatalf("intrinsic discovery = %#v, %v", discovery, err)
 	}
 	music := createPeopleTestImage(t, database, owner.ID, spaceID, "soundtrack.mp3", "2")

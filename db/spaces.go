@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/google/uuid"
 	workflowv2 "github.com/kannachi323/misty/server/workflow"
@@ -88,25 +89,32 @@ type MessageSpan struct {
 }
 
 type SpaceMessage struct {
-	Seq                 int64               `json:"seq"`
-	ID                  string              `json:"id"`
-	SpaceID             string              `json:"space_id"`
-	ConversationID      string              `json:"conversation_id,omitempty"`
-	SenderUserID        string              `json:"sender_user_id"`
-	SenderName          string              `json:"sender_name"`
-	SenderAvatarVersion int64               `json:"sender_avatar_version,omitempty"`
-	SenderKind          string              `json:"sender_kind"`
-	SenderAgentID       string              `json:"sender_agent_id,omitempty"`
-	Content             []MessageSpan       `json:"content"`
-	FileNodeIDs         []string            `json:"file_node_ids"`
-	LibraryItemIDs      []string            `json:"library_item_ids"`
-	Attachments         []MessageAttachment `json:"attachments"`
-	ReplyToMessageID    string              `json:"reply_to_message_id,omitempty"`
-	EditedAt            *time.Time          `json:"edited_at,omitempty"`
+	Seq                 int64                  `json:"seq"`
+	ID                  string                 `json:"id"`
+	SpaceID             string                 `json:"space_id"`
+	ConversationID      string                 `json:"conversation_id,omitempty"`
+	SenderUserID        string                 `json:"sender_user_id"`
+	SenderName          string                 `json:"sender_name"`
+	SenderAvatarVersion int64                  `json:"sender_avatar_version,omitempty"`
+	SenderKind          string                 `json:"sender_kind"`
+	SenderAgentID       string                 `json:"sender_agent_id,omitempty"`
+	Content             []MessageSpan          `json:"content"`
+	FileNodeIDs         []string               `json:"file_node_ids"`
+	LibraryItemIDs      []string               `json:"library_item_ids"`
+	Attachments         []MessageAttachment    `json:"attachments"`
+	Reactions           []SpaceMessageReaction `json:"reactions"`
+	ReplyToMessageID    string                 `json:"reply_to_message_id,omitempty"`
+	EditedAt            *time.Time             `json:"edited_at,omitempty"`
 	// Provenance for a mirrored message. Absent means Misty-native chat, so
 	// every existing client stays valid and "no origin" reads as "ours".
 	Origin    json.RawMessage `json:"origin,omitempty"`
 	CreatedAt time.Time       `json:"created_at"`
+}
+
+type SpaceMessageReaction struct {
+	Emoji       string `json:"emoji"`
+	Count       int    `json:"count"`
+	ReactedByMe bool   `json:"reacted_by_me,omitempty"`
 }
 
 type SpaceNode struct {
@@ -420,6 +428,9 @@ func (db *Database) DeleteSpace(ctx context.Context, userID, spaceID, confirmati
 		}
 		rows.Close()
 		if err := notifySpaceControlTx(ctx, tx, map[string]any{"type": "space.deleted", "space_id": spaceID, "user_ids": memberIDs}); err != nil {
+			return err
+		}
+		if err := revokeDrawingAccessForSpaceTx(ctx, tx, spaceID); err != nil {
 			return err
 		}
 		if _, err := recordSpaceEventTx(ctx, tx, spaceID, userID, "space.deletion_requested", spaceID, map[string]any{"recover_days": 30}); err != nil {
@@ -807,6 +818,9 @@ func (db *Database) RemoveSpaceMember(ctx context.Context, ownerID, spaceID, mem
 		if err := handleNoteMembershipLossTx(ctx, tx, spaceID, memberID); err != nil {
 			return err
 		}
+		if err := revokeDrawingAccessForSpaceTx(ctx, tx, spaceID); err != nil {
+			return err
+		}
 		if _, err = recordSpaceEventTx(ctx, tx, spaceID, ownerID, "member.removed", memberID, map[string]any{}); err != nil {
 			return err
 		}
@@ -836,6 +850,9 @@ func (db *Database) LeaveSpace(ctx context.Context, userID, spaceID string) erro
 			return err
 		}
 		if err := handleNoteMembershipLossTx(ctx, tx, spaceID, userID); err != nil {
+			return err
+		}
+		if err := revokeDrawingAccessForSpaceTx(ctx, tx, spaceID); err != nil {
 			return err
 		}
 		if _, err := recordSpaceEventTx(ctx, tx, spaceID, userID, "member.left", userID, map[string]any{}); err != nil {
@@ -990,7 +1007,7 @@ func (db *Database) createSpaceMessageWithReferences(ctx context.Context, userID
 	if err := validateMessageWithReferences(content, len(fileNodeIDs)+len(attachmentIDs)+len(libraryItemIDs)); err != nil {
 		return nil, nil, err
 	}
-	out := &SpaceMessage{ID: "msg_" + uuid.NewString(), SpaceID: spaceID, ConversationID: conversationID, SenderUserID: userID, SenderKind: "person", Content: content, FileNodeIDs: fileNodeIDs, LibraryItemIDs: uniqueSpaceIDs(libraryItemIDs), Attachments: []MessageAttachment{}, ReplyToMessageID: replyToMessageID}
+	out := &SpaceMessage{ID: "msg_" + uuid.NewString(), SpaceID: spaceID, ConversationID: conversationID, SenderUserID: userID, SenderKind: "person", Content: content, FileNodeIDs: fileNodeIDs, LibraryItemIDs: uniqueSpaceIDs(libraryItemIDs), Attachments: []MessageAttachment{}, Reactions: []SpaceMessageReaction{}, ReplyToMessageID: replyToMessageID}
 	attachmentIDs = uniqueSpaceIDs(attachmentIDs)
 	agentMentions := []string{}
 	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
@@ -1217,7 +1234,7 @@ func (db *Database) SpaceMessages(ctx context.Context, userID, spaceID string, b
 			return err
 		}
 		for index := range items {
-			if err := loadSpaceMessageReferencesTx(ctx, tx, &items[index]); err != nil {
+			if err := loadSpaceMessageReferencesTx(ctx, tx, &items[index], userID); err != nil {
 				return err
 			}
 		}
@@ -1226,9 +1243,10 @@ func (db *Database) SpaceMessages(ctx context.Context, userID, spaceID string, b
 	return items, err
 }
 
-func loadSpaceMessageReferencesTx(ctx context.Context, tx *sql.Tx, message *SpaceMessage) error {
+func loadSpaceMessageReferencesTx(ctx context.Context, tx *sql.Tx, message *SpaceMessage, userID string) error {
 	message.LibraryItemIDs = []string{}
 	message.Attachments = []MessageAttachment{}
+	message.Reactions = []SpaceMessageReaction{}
 	rows, err := tx.QueryContext(ctx, `SELECT space_library_item_id FROM space_message_library_references WHERE message_id=$1 ORDER BY created_at`, message.ID)
 	if err != nil {
 		return err
@@ -1256,7 +1274,23 @@ func loadSpaceMessageReferencesTx(ctx context.Context, tx *sql.Tx, message *Spac
 		}
 		message.Attachments = append(message.Attachments, attachment)
 	}
-	return rows.Err()
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	reactionRows, err := tx.QueryContext(ctx, `SELECT emoji,count(*),bool_or(user_id=$2)
+		FROM space_message_reactions WHERE message_id=$1 GROUP BY emoji ORDER BY min(created_at),emoji`, message.ID, userID)
+	if err != nil {
+		return err
+	}
+	defer reactionRows.Close()
+	for reactionRows.Next() {
+		var reaction SpaceMessageReaction
+		if err := reactionRows.Scan(&reaction.Emoji, &reaction.Count, &reaction.ReactedByMe); err != nil {
+			return err
+		}
+		message.Reactions = append(message.Reactions, reaction)
+	}
+	return reactionRows.Err()
 }
 
 func (db *Database) UpdateSpaceMessage(ctx context.Context, userID, spaceID, messageID string, content []MessageSpan, fileNodeIDs []string) (*SpaceMessage, error) {
@@ -1331,12 +1365,103 @@ func (db *Database) updateSpaceMessage(ctx context.Context, userID, spaceID, con
 		if err := scanSpaceMessage(tx.QueryRowContext(ctx, `SELECT `+spaceMessageColumns+` FROM space_messages m LEFT JOIN users u ON u.id=m.sender_user_id LEFT JOIN space_agents a ON a.id=m.sender_agent_id WHERE m.id=$1 AND m.space_id=$2 AND COALESCE(m.conversation_id,'')=$3`, messageID, spaceID, conversationID), out); err != nil {
 			return err
 		}
-		return loadSpaceMessageReferencesTx(ctx, tx, out)
+		return loadSpaceMessageReferencesTx(ctx, tx, out, userID)
 	})
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrSpaceNotFound
 	}
 	return out, err
+}
+
+func (db *Database) AddSpaceMessageReaction(ctx context.Context, userID, spaceID, messageID, emoji string) (*SpaceMessage, error) {
+	return db.setSpaceMessageReaction(ctx, userID, spaceID, "", messageID, emoji, true)
+}
+
+func (db *Database) RemoveSpaceMessageReaction(ctx context.Context, userID, spaceID, messageID, emoji string) (*SpaceMessage, error) {
+	return db.setSpaceMessageReaction(ctx, userID, spaceID, "", messageID, emoji, false)
+}
+
+func (db *Database) AddSpaceConversationMessageReaction(ctx context.Context, userID, spaceID, conversationID, messageID, emoji string) (*SpaceMessage, error) {
+	return db.setSpaceMessageReaction(ctx, userID, spaceID, conversationID, messageID, emoji, true)
+}
+
+func (db *Database) RemoveSpaceConversationMessageReaction(ctx context.Context, userID, spaceID, conversationID, messageID, emoji string) (*SpaceMessage, error) {
+	return db.setSpaceMessageReaction(ctx, userID, spaceID, conversationID, messageID, emoji, false)
+}
+
+func (db *Database) setSpaceMessageReaction(ctx context.Context, userID, spaceID, conversationID, messageID, emoji string, reacted bool) (*SpaceMessage, error) {
+	emoji, err := normalizeMessageReactionEmoji(emoji)
+	if err != nil {
+		return nil, err
+	}
+	err = db.spaceTx(ctx, func(tx *sql.Tx) error {
+		if err := requireSpaceMessageWriteTx(ctx, tx, userID, spaceID); err != nil {
+			return err
+		}
+		if conversationID != "" {
+			if err := requireSpaceConversationMemberTx(ctx, tx, userID, spaceID, conversationID); err != nil {
+				return err
+			}
+		}
+		var exists bool
+		if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM space_messages WHERE id=$1 AND space_id=$2 AND COALESCE(conversation_id,'')=$3)`, messageID, spaceID, conversationID).Scan(&exists); err != nil {
+			return err
+		}
+		if !exists {
+			return ErrSpaceNotFound
+		}
+		if reacted {
+			if _, err := tx.ExecContext(ctx, `INSERT INTO space_message_reactions(message_id,space_id,user_id,emoji)
+				VALUES($1,$2,$3,$4) ON CONFLICT(message_id,user_id,emoji) DO NOTHING`, messageID, spaceID, userID, emoji); err != nil {
+				return err
+			}
+		} else if _, err := tx.ExecContext(ctx, `DELETE FROM space_message_reactions WHERE message_id=$1 AND user_id=$2 AND emoji=$3`, messageID, userID, emoji); err != nil {
+			return err
+		}
+		eventType := "message.reaction_removed"
+		if reacted {
+			eventType = "message.reaction_added"
+		}
+		_, err := recordSpaceEventTx(ctx, tx, spaceID, userID, eventType, messageID, map[string]any{"conversation_id": conversationID, "emoji": emoji})
+		return err
+	})
+	if err != nil {
+		return nil, err
+	}
+	return db.spaceMessageByID(ctx, userID, spaceID, conversationID, messageID)
+}
+
+func (db *Database) spaceMessageByID(ctx context.Context, userID, spaceID, conversationID, messageID string) (*SpaceMessage, error) {
+	out := &SpaceMessage{}
+	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionMessagesRead); err != nil {
+			return err
+		}
+		if conversationID != "" {
+			if err := requireSpaceConversationMemberTx(ctx, tx, userID, spaceID, conversationID); err != nil {
+				return err
+			}
+		}
+		if err := scanSpaceMessage(tx.QueryRowContext(ctx, `SELECT `+spaceMessageColumns+` FROM space_messages m LEFT JOIN users u ON u.id=m.sender_user_id LEFT JOIN space_agents a ON a.id=m.sender_agent_id WHERE m.id=$1 AND m.space_id=$2 AND COALESCE(m.conversation_id,'')=$3`, messageID, spaceID, conversationID), out); err != nil {
+			return err
+		}
+		return loadSpaceMessageReferencesTx(ctx, tx, out, userID)
+	})
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, ErrSpaceNotFound
+	}
+	return out, err
+}
+
+func normalizeMessageReactionEmoji(emoji string) (string, error) {
+	emoji = strings.TrimSpace(emoji)
+	if emoji == "" || !utf8.ValidString(emoji) || len([]byte(emoji)) > 32 || utf8.RuneCountInString(emoji) > 8 {
+		return "", ErrSpaceInvalid
+	}
+	if strings.ContainsAny(emoji, " \t\r\n") {
+		return "", ErrSpaceInvalid
+	}
+	return emoji, nil
 }
 
 func (db *Database) DeleteSpaceMessage(ctx context.Context, userID, spaceID, messageID string) error {
@@ -1391,7 +1516,7 @@ func (db *Database) createSpaceAgentMessage(ctx context.Context, billingUserID, 
 	if err := validateMessage(content, nil); err != nil {
 		return nil, err
 	}
-	out := &SpaceMessage{ID: "msg_" + uuid.NewString(), SpaceID: spaceID, ConversationID: conversationID, SenderUserID: billingUserID, SenderKind: "agent", SenderAgentID: agentID, Content: content, FileNodeIDs: []string{}, LibraryItemIDs: []string{}, Attachments: []MessageAttachment{}}
+	out := &SpaceMessage{ID: "msg_" + uuid.NewString(), SpaceID: spaceID, ConversationID: conversationID, SenderUserID: billingUserID, SenderKind: "agent", SenderAgentID: agentID, Content: content, FileNodeIDs: []string{}, LibraryItemIDs: []string{}, Attachments: []MessageAttachment{}, Reactions: []SpaceMessageReaction{}}
 	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpaceMessageWriteTx(ctx, tx, billingUserID, spaceID); err != nil {
 			return err

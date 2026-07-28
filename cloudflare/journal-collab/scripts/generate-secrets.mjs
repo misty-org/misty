@@ -1,5 +1,5 @@
 /**
- * Generates the note-collaboration secrets.
+ * Generates the Journal collaboration secrets.
  *
  * Run once. Values are written to local gitignored files and printed only as
  * the commands you paste elsewhere -- never to stdout in full.
@@ -30,7 +30,7 @@ const privatePkcs8 = new Uint8Array(await crypto.subtle.exportKey("pkcs8", pair.
 
 // Prove the pair actually round-trips before anything is written. A mismatched
 // pair would fail only at connection time, which is a miserable way to find out.
-const probe = new TextEncoder().encode("misty-note-collab-keycheck");
+const probe = new TextEncoder().encode("misty-journal-collab-keycheck");
 const signature = await crypto.subtle.sign({ name: "Ed25519" }, pair.privateKey, probe);
 const verified = await crypto.subtle.verify({ name: "Ed25519" }, pair.publicKey, signature, probe);
 if (!verified) {
@@ -43,17 +43,17 @@ if (publicRaw.byteLength !== 32) {
 }
 
 const secrets = {
-  NOTE_COLLAB_TICKET_PUBLIC_KEY: base64(publicRaw),
-  NOTE_COLLAB_TICKET_PRIVATE_KEY: base64(privatePkcs8),
-  NOTE_COLLAB_CONTROL_SECRET: randomSecret(),
-  NOTE_COLLAB_PROJECTION_SECRET: randomSecret(),
+  JOURNAL_COLLAB_TICKET_PUBLIC_KEY: base64(publicRaw),
+  JOURNAL_COLLAB_TICKET_PRIVATE_KEY: base64(privatePkcs8),
+  JOURNAL_COLLAB_CONTROL_SECRET: randomSecret(),
+  JOURNAL_COLLAB_PROJECTION_SECRET: randomSecret(),
 };
 
 // .dev.vars is what `wrangler dev` reads for local runs. It is gitignored.
 const devVars = [
-  `NOTE_COLLAB_TICKET_PUBLIC_KEY=${secrets.NOTE_COLLAB_TICKET_PUBLIC_KEY}`,
-  `NOTE_COLLAB_CONTROL_SECRET=${secrets.NOTE_COLLAB_CONTROL_SECRET}`,
-  `NOTE_COLLAB_PROJECTION_SECRET=${secrets.NOTE_COLLAB_PROJECTION_SECRET}`,
+  `JOURNAL_COLLAB_TICKET_PUBLIC_KEY=${secrets.JOURNAL_COLLAB_TICKET_PUBLIC_KEY}`,
+  `JOURNAL_COLLAB_CONTROL_SECRET=${secrets.JOURNAL_COLLAB_CONTROL_SECRET}`,
+  `JOURNAL_COLLAB_PROJECTION_SECRET=${secrets.JOURNAL_COLLAB_PROJECTION_SECRET}`,
   "",
 ].join("\n");
 writeFileSync(resolve(projectRoot, ".dev.vars"), devVars, { mode: 0o600 });
@@ -62,11 +62,11 @@ writeFileSync(resolve(projectRoot, ".dev.vars"), devVars, { mode: 0o600 });
 mkdirSync(resolve(projectRoot, ".secrets"), { recursive: true });
 const goEnv = [
   "# Append to the Misty server environment on the VPS.",
-  "# NOTE_COLLAB_TICKET_PRIVATE_KEY must never be given to Cloudflare.",
-  `NOTE_COLLAB_TICKET_PRIVATE_KEY=${secrets.NOTE_COLLAB_TICKET_PRIVATE_KEY}`,
-  `NOTE_COLLAB_CONTROL_SECRET=${secrets.NOTE_COLLAB_CONTROL_SECRET}`,
-  `NOTE_COLLAB_PROJECTION_SECRET=${secrets.NOTE_COLLAB_PROJECTION_SECRET}`,
-  "MISTY_NOTES_COLLAB_ENABLED=true",
+  "# JOURNAL_COLLAB_TICKET_PRIVATE_KEY must never be given to Cloudflare.",
+  `JOURNAL_COLLAB_TICKET_PRIVATE_KEY=${secrets.JOURNAL_COLLAB_TICKET_PRIVATE_KEY}`,
+  `JOURNAL_COLLAB_CONTROL_SECRET=${secrets.JOURNAL_COLLAB_CONTROL_SECRET}`,
+  `JOURNAL_COLLAB_PROJECTION_SECRET=${secrets.JOURNAL_COLLAB_PROJECTION_SECRET}`,
+  "MISTY_JOURNAL_COLLAB_ENABLED=true",
   "",
 ].join("\n");
 writeFileSync(resolve(projectRoot, ".secrets/server.env"), goEnv, { mode: 0o600 });
@@ -75,7 +75,7 @@ writeFileSync(resolve(projectRoot, ".secrets/server.env"), goEnv, { mode: 0o600 
 // mint tickets before the Go endpoint exists.
 writeFileSync(
   resolve(projectRoot, ".secrets/signing-key.json"),
-  `${JSON.stringify({ privatePkcs8Base64: secrets.NOTE_COLLAB_TICKET_PRIVATE_KEY, publicRawBase64: secrets.NOTE_COLLAB_TICKET_PUBLIC_KEY }, null, 2)}\n`,
+  `${JSON.stringify({ privatePkcs8Base64: secrets.JOURNAL_COLLAB_TICKET_PRIVATE_KEY, publicRawBase64: secrets.JOURNAL_COLLAB_TICKET_PUBLIC_KEY }, null, 2)}\n`,
   { mode: 0o600 },
 );
 
@@ -87,6 +87,6 @@ console.log("");
 console.log("To set the deployed Worker's secrets, run these and paste the value");
 console.log("from .dev.vars / .secrets/server.env when prompted:");
 console.log("");
-console.log("  npx wrangler secret put NOTE_COLLAB_TICKET_PUBLIC_KEY");
-console.log("  npx wrangler secret put NOTE_COLLAB_CONTROL_SECRET");
-console.log("  npx wrangler secret put NOTE_COLLAB_PROJECTION_SECRET");
+console.log("  npx wrangler secret put JOURNAL_COLLAB_TICKET_PUBLIC_KEY");
+console.log("  npx wrangler secret put JOURNAL_COLLAB_CONTROL_SECRET");
+console.log("  npx wrangler secret put JOURNAL_COLLAB_PROJECTION_SECRET");
