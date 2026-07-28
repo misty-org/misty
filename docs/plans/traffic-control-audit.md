@@ -111,6 +111,33 @@ All preferences remain server-owned account settings. Local identity and OS-vaul
 - Relevant implementation checks: frontend Vitest + TypeScript; Go unit/integration tests with isolated Postgres; Rust browser-sync tests and app cargo check; collaboration/runtime tests for changed paths. The audit itself changes only documentation, so no application test suite was run.
 - Every retained polling site must have a code comment explaining the missing event source or required safety property, plus its cadence, scope and removal condition in the final inventory.
 
+## Status overview
+
+Status of each audit group on `codex/traffic-control`. Details follow in the per-batch sections. "Remaining" items are listed with the reason they were not changed.
+
+| Group | Status |
+|---|---|
+| T01 | Done: HTTP bytes per route, sync message bytes, invocation stream read metrics |
+| T02, T16 | Done for account-indexed fanout and reset on reconnect; large shared-Space fanout is still serial |
+| T03, T04, T05 | Done (settings, consent, terminal auth); native producer trace under rejected sign-in remains |
+| T06, T08, T14, T15, T33 | Done: process lease liveness, bounded connection rows, no per-socket reconcile, in-band session revalidation, change-only heartbeats |
+| T07 | Mostly done: setup once, presence as the single liveness call, peers by topic; liveness over the sync socket remains |
+| T09, T28, T29, T37 | Done (Codex batches) |
+| T10 | Done: shared bounded invocation streams |
+| T11, T12, T13 | Done: all API worker scans are deadline queues; retention is a budgeted single-owner pass |
+| T17 | Partly done: coalesced realtime reloads, topic-routed activity sources; included-payload application remains |
+| T18 | Not done: the native sync socket already forwards account events and nothing consumes them. Routing desktop invalidations through it, with SSE fallback and reset on source switch, needs on-device testing |
+| T19 | Done for HTTP, invocation stream, Space socket, Connected Devices and native control advertisement; an account-wide cooldown shared across transports remains |
+| T20, T21 | Done |
+| T22 | Not done: needs client-side instrumentation of unchanged workspace publications before any fix |
+| T23, T24, T36 | Partly done (sync heartbeat); remaining timers are local-only, see the timer inventory |
+| T25 | Partly done: failure backoff and adaptive peer rescans; OS file notifications remain |
+| T26, T27 | Done |
+| T30, T31 | Done |
+| T32 | Retained by design: active-work leases carry fencing and cancellation and run only during work |
+| T34 | Partly done: idle sync measurement recorded; staging matrix (10k/20k/30k, outages) remains |
+| T35 | Deferred: response bytes per route (T01) should first be compared with the edge's compression. In-app compression of secret-bearing JSON needs a BREACH review |
+
 ## Implementation progress — first batch
 
 Work remains active on `codex/traffic-control`. This is not completion of all 37 groups or a capacity claim. No production deployment, push or PR has been performed.
@@ -294,6 +321,7 @@ Validation: syntax-checked with `node --check`. The package's `node --test` suit
 
 - T06, client half: the native sync client sends a heartbeat frame only when its applied cursor, readiness or active epoch changes. Liveness is the transport: the server pings, the client answers with pongs, and the client counts pings as activity (older servers also count pongs). An idle, caught-up device sends no application frames.
 - T19, native: control-advertisement retries back off exponentially to 10 minutes.
+- T14, client half: cold collections (bookmarks, tab groups, history) re-pull on a forwarded `reset` as well as on their hints. The safety pull moves from every 5 minutes to hourly. Hints commit with their writes, so the timer is defense in depth rather than the delivery path.
 - T25: watched file-sync pairs that fail (unreachable provider or peer) back off from 5 seconds to 5 minutes and reset on success. Peer directory subscriptions rescan every second after a change and back off to every 8 seconds while quiet; only changes reach the peer.
 - T30: frontend telemetry sends identity once per identity and properties, and repeats of the same exception at most once per 10 minutes. Native error reports are deduplicated for 10 minutes per error and operation and coalesced into one `/batch` request per 5-second window (20 at most). Panics are sent at once. Server telemetry only carries registration and subscription events on an async queue, so batching it would add loss risk for no measurable saving; left unchanged.
 - T31: app update checks run once at start, then every 6 hours ±25%. Focus does not check within the interval, and checking stops once an update is found. Settings still checks on demand.

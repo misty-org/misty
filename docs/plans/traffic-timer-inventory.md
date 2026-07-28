@@ -151,3 +151,40 @@ Removed the workflow resource lease's 500ms contention poll. Each waiter now sub
 ## Implementation delta (AI invocation streams)
 
 Removed the AI invocation SSE loop's per-viewer database refresh on every event and every 15-second keepalive. Viewers share one per-invocation stream fed by committed PostgreSQL hints and incremental, bounded page reads. Keepalive comments are transport-only. Expiry uses the invocation's own deadline, not a timer poll.
+
+
+## Implementation delta (dispatcher, lifecycle, sync, clients)
+
+Removed:
+
+| Timer | Was | Now |
+|---|---|---|
+| Agent dispatcher (`app/run.go`) | Every 2 s, ~10 scans | `agent-runtime` and `agent-tasks` queues: hints plus the next real deadline |
+| Maintenance loop (`app/run.go`) | Every minute (some jobs every 10 min), every replica | `scheduled`, `ai-cleanup`, `account-deletion`, `rendition-reservations` queues; retention pass below |
+| Sync pong/heartbeat writes (`sync/http_connection.go`) | ~4 statements per device per 15 s | None; process lease below; progress written only on change |
+| Sync per-socket reconcile | Every ~60 s per socket | Removed; listener loss and overflow arrive as reset |
+| Sync socket lifetime | Reconnect every ~10 min | In-band session check every 10 min ±25% (one indexed read), no reconnect |
+| Account SSE lifetime | Reconnect every 10 min | Same in-band session check |
+| Scheduled tasks list | Every 60 s + focus | `scheduled-tasks` topic |
+| Usage panels | Every 5 min | Run/Library events + `usage` topic |
+| Pending rendition | Every 1.5 s | `library-renditions` topic + Library events |
+| Pairing dialog | Every 1.5 s | `device-pairing` topic + one expiry timer |
+| Connected Devices pipeline | Every 30 s: keys, init, register, presence, peers | Presence only every 30 s; setup once; peers on `devices` topic |
+| Agent worker heartbeat | Every 30 s | Skipped while Connected Devices presence confirmed liveness |
+| Native sync heartbeat frame | Every 15 s | Only on change |
+| Cold collection safety pull | Every 5 min per collection | Hourly; reset re-pulls |
+| Update check | Every 30 min + focus (5 min floor) | Start, then every 6 h ±25%, none once found |
+
+Retained, with reason and budget:
+
+| Timer | Cadence | Reason |
+|---|---|---|
+| Sync process lease (`sync/liveness.go`) | One renewal and sweep per API process every 15 s | Bounds how long a crashed process's devices appear online; independent of device count |
+| Retention pass (`app/retention.go`) | Once per 10 min ±50%, one replica | High-churn tables publish no hints; expired rows are excluded by readers |
+| Session revalidation (sync, SSE) | Every 10 min ±25% per stream, one read | Bounds stream lifetime after session revocation without reconnect churn |
+| Sync and Space WebSocket pings, SSE comments | 15 s, 15 s, 25 s | Transport keepalive for proxies/NAT; no database access |
+| Connected Devices presence | 30 s per online desktop | Feeds the 90-second online window for P2P peers and agent eligibility; moving it to the sync socket needs linked identities |
+| Active work leases (T32) | 10 s / 20 s, only while work runs | Fencing and cancellation; not idle discovery |
+| File-sync pair compare | 5 s, failures back off to 5 min | Providers without change feeds; quiet-period backoff needs an executor contract change |
+| Peer directory subscription | 1 s after a change, backing off to 8 s | Local rescan; only changes reach the peer |
+| Native sync queue tick, cookie/history/page-state capture, native UI snapshots | 250 ms, 2 s, 60 s, 3 s, varied | Local only; network sends only on change; replacing them needs WebKit/filesystem observers verified on device |
