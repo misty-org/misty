@@ -109,6 +109,7 @@ func CreateServer() (*Server, error) {
 	}
 	s.Library.SetSubsystems(true, true, mediaProcessingEnabled, peopleProcessingEnabled, mediaProcessingEnabled, true, true, true, true)
 	s.Library.SetNoteAssetsEnabled(true)
+	s.Library.SetDrawingAssetsEnabled(true)
 	spaceKey, err := spaceLinkEncryptionKeyFromEnv()
 	if err != nil {
 		return nil, err
@@ -117,11 +118,11 @@ func CreateServer() (*Server, error) {
 	if err != nil {
 		return nil, fmt.Errorf("configure Space link encryption: %w", err)
 	}
-	noteCollab, err := api.NoteCollabConfigFromEnv()
+	journalCollab, err := api.JournalCollabConfigFromEnv()
 	if err != nil {
-		return nil, fmt.Errorf("configure note collaboration: %w", err)
+		return nil, fmt.Errorf("configure journal collaboration: %w", err)
 	}
-	s.Spaces.SetNoteCollab(noteCollab)
+	s.Spaces.SetJournalCollab(journalCollab)
 	s.Spaces.SetLibraryProvider(s.Library)
 	s.Spaces.SetAvatarStore(s.LibraryStore)
 	s.Realtime = api.NewRealtimeService(s.Database, s.Database.GetDSN())
@@ -145,7 +146,7 @@ func (s *Server) MountHandlers() error {
 	s.Router.Use(cors.Handler(cors.Options{
 		AllowOriginFunc:  func(_ *http.Request, origin string) bool { return isAllowedCORSOrigin(origin) },
 		AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
-		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "Idempotency-Key", "X-Misty-Platform", "X-Misty-Release-Channel", "X-Misty-Session-Id", "X-Misty-Analytics-Enabled", "X-Misty-Device-Timestamp", "X-Misty-Device-Nonce", "X-Misty-Device-Signature", "X-Misty-Attachment-Upload-Token", "X-Misty-Library-Upload-Token"},
+		AllowedHeaders:   allowedCORSRequestHeaders,
 		AllowCredentials: true,
 		// The client must be able to read the marker that distinguishes a signed
 		// download descriptor from a proxied file body.
@@ -350,6 +351,11 @@ func (s *Server) mountLibraryRoutes(prefix string, library *api.SpaceLibraryServ
 }
 
 func (s *Server) mountSpacesRoutes(prefix string, spaces *api.SpacesService, realtime *api.RealtimeService) {
+	s.Router.Get(prefix+"/cloud/connections", spaces.CloudConnections())
+	s.Router.Post(prefix+"/cloud/connections/{provider}/authorize", spaces.BeginCloudAuthorization())
+	s.Router.Get(prefix+"/oauth/cloud/{provider}/callback", spaces.CloudAuthorizationCallback())
+	s.Router.Post(prefix+"/cloud/connections/{connectionID}/token", spaces.CloudConnectionToken())
+	s.Router.Delete(prefix+"/cloud/connections/{connectionID}", spaces.DeleteCloudConnection())
 	s.Router.MethodFunc(http.MethodGet, prefix+"/spaces", spaces.Spaces())
 	s.Router.MethodFunc(http.MethodPost, prefix+"/spaces", spaces.Spaces())
 	s.Router.Get(prefix+"/space-templates", spaces.SpaceTemplates())
@@ -381,6 +387,8 @@ func (s *Server) mountSpacesRoutes(prefix string, spaces *api.SpacesService, rea
 	s.Router.MethodFunc(http.MethodPost, prefix+"/spaces/{spaceID}/conversations/{conversationID}/messages", spaces.ConversationMessages())
 	s.Router.MethodFunc(http.MethodPut, prefix+"/spaces/{spaceID}/conversations/{conversationID}/messages/{messageID}", spaces.ConversationMessage())
 	s.Router.MethodFunc(http.MethodDelete, prefix+"/spaces/{spaceID}/conversations/{conversationID}/messages/{messageID}", spaces.ConversationMessage())
+	s.Router.MethodFunc(http.MethodPut, prefix+"/spaces/{spaceID}/conversations/{conversationID}/messages/{messageID}/reactions/{emoji}", spaces.ConversationMessageReaction())
+	s.Router.MethodFunc(http.MethodDelete, prefix+"/spaces/{spaceID}/conversations/{conversationID}/messages/{messageID}/reactions/{emoji}", spaces.ConversationMessageReaction())
 	s.Router.MethodFunc(http.MethodGet, prefix+"/spaces/{spaceID}/chat/agents", spaces.ChatAgents())
 	s.Router.MethodFunc(http.MethodGet, prefix+"/spaces/{spaceID}/tasks", spaces.SpaceTasks())
 	s.Router.MethodFunc(http.MethodPost, prefix+"/spaces/{spaceID}/tasks", spaces.SpaceTasks())
@@ -388,6 +396,7 @@ func (s *Server) mountSpacesRoutes(prefix string, spaces *api.SpacesService, rea
 	s.Router.MethodFunc(http.MethodDelete, prefix+"/spaces/{spaceID}/tasks/{taskID}", spaces.SpaceTask())
 	s.Router.Post(prefix+"/spaces/{spaceID}/tasks/{taskID}/move", spaces.MoveSpaceTask())
 	s.mountNoteRoutes(prefix, spaces)
+	s.mountDrawingRoutes(prefix, spaces)
 	s.Router.Get(prefix+"/spaces/{spaceID}/calendar/events", spaces.SpaceCalendar())
 	s.Router.MethodFunc(http.MethodGet, prefix+"/spaces/{spaceID}/calendar/sources", spaces.SpaceCalendarSources())
 	s.Router.MethodFunc(http.MethodPost, prefix+"/spaces/{spaceID}/calendar/sources", spaces.SpaceCalendarSources())
@@ -399,6 +408,8 @@ func (s *Server) mountSpacesRoutes(prefix string, spaces *api.SpacesService, rea
 	s.Router.Post(prefix+"/spaces/{spaceID}/tasks/{taskID}/calendar/resolve", spaces.ResolveTaskCalendarConflict())
 	s.Router.MethodFunc(http.MethodPut, prefix+"/spaces/{spaceID}/messages/{messageID}", spaces.Message())
 	s.Router.MethodFunc(http.MethodDelete, prefix+"/spaces/{spaceID}/messages/{messageID}", spaces.Message())
+	s.Router.MethodFunc(http.MethodPut, prefix+"/spaces/{spaceID}/messages/{messageID}/reactions/{emoji}", spaces.MessageReaction())
+	s.Router.MethodFunc(http.MethodDelete, prefix+"/spaces/{spaceID}/messages/{messageID}/reactions/{emoji}", spaces.MessageReaction())
 	s.Router.Post(prefix+"/spaces/{spaceID}/read", spaces.MarkRead())
 	s.Router.MethodFunc(http.MethodGet, prefix+"/spaces/{spaceID}/nodes", spaces.Nodes())
 	s.Router.MethodFunc(http.MethodPost, prefix+"/spaces/{spaceID}/nodes", spaces.Nodes())
@@ -541,6 +552,65 @@ func (s *Server) mountAgentsRoutes(prefix string, service *api.AgentsService) {
 	s.Router.Post(prefix+"/devices/{deviceID}/workflow-node-jobs/{jobID}/fail", service.DeviceAuthenticated(service.WorkflowNodeLeaseAction("fail")))
 }
 
+// mountDrawingRoutes registers metadata and collaboration-ticket endpoints for
+// Space drawings. Scene updates travel directly over DrawingRoom WebSockets.
+func (s *Server) mountDrawingRoutes(prefix string, spaces *api.SpacesService) {
+	s.Router.MethodFunc(
+		http.MethodGet,
+		prefix+"/spaces/{spaceID}/drawings",
+		spaces.SpaceDrawings(),
+	)
+	s.Router.MethodFunc(
+		http.MethodPost,
+		prefix+"/spaces/{spaceID}/drawings",
+		spaces.SpaceDrawings(),
+	)
+	s.Router.MethodFunc(
+		http.MethodGet,
+		prefix+"/spaces/{spaceID}/drawings/{drawingID}",
+		spaces.SpaceDrawing(),
+	)
+	s.Router.MethodFunc(
+		http.MethodPatch,
+		prefix+"/spaces/{spaceID}/drawings/{drawingID}",
+		spaces.SpaceDrawing(),
+	)
+	s.Router.MethodFunc(
+		http.MethodDelete,
+		prefix+"/spaces/{spaceID}/drawings/{drawingID}",
+		spaces.SpaceDrawing(),
+	)
+	s.Router.Post(
+		prefix+"/spaces/{spaceID}/drawings/{drawingID}/collaboration-ticket",
+		spaces.SpaceDrawingCollaborationTicket(),
+	)
+	if s.Library == nil {
+		return
+	}
+	s.Router.MethodFunc(
+		http.MethodGet,
+		prefix+"/spaces/{spaceID}/drawings/{drawingID}/assets",
+		s.Library.SpaceDrawingAssets(),
+	)
+	s.Router.MethodFunc(
+		http.MethodPost,
+		prefix+"/spaces/{spaceID}/drawings/{drawingID}/assets/uploads",
+		s.Library.SpaceDrawingAssets(),
+	)
+	s.Router.Post(
+		prefix+"/spaces/{spaceID}/drawings/{drawingID}/assets/uploads/{uploadID}/finalize",
+		s.Library.FinalizeUpload(),
+	)
+	s.Router.Get(
+		prefix+"/spaces/{spaceID}/drawings/{drawingID}/assets/{assetID}/download",
+		s.Library.SpaceDrawingAssetDownload(),
+	)
+	s.Router.Delete(
+		prefix+"/spaces/{spaceID}/drawings/{drawingID}/assets/{assetID}",
+		s.Library.SpaceDrawingAsset(),
+	)
+}
+
 // mountNoteRoutes registers the server-backed note API. Current Space
 // membership grants read/write access; creator/owner checks protect deletion.
 func (s *Server) mountNoteRoutes(prefix string, spaces *api.SpacesService) {
@@ -668,6 +738,30 @@ func allowedCORSOrigins() []string {
 	return origins
 }
 
+// allowedCORSRequestHeaders is every header the desktop client may send.
+//
+// A header missing here fails at the preflight with a 200 that carries no
+// Access-Control-Allow-Origin, which surfaces in the browser as an opaque
+// "load failed" rather than anything pointing at CORS. Omitting
+// X-Misty-Library-Reauthentication is exactly how Recently Deleted and Hidden
+// became unreachable: only those collections send it.
+var allowedCORSRequestHeaders = []string{
+	"Accept",
+	"Authorization",
+	"Content-Type",
+	"Idempotency-Key",
+	"X-Misty-Platform",
+	"X-Misty-Release-Channel",
+	"X-Misty-Session-Id",
+	"X-Misty-Analytics-Enabled",
+	"X-Misty-Device-Timestamp",
+	"X-Misty-Device-Nonce",
+	"X-Misty-Device-Signature",
+	"X-Misty-Attachment-Upload-Token",
+	"X-Misty-Library-Upload-Token",
+	"X-Misty-Library-Reauthentication",
+}
+
 func isAllowedCORSOrigin(origin string) bool {
 	for _, allowed := range allowedCORSOrigins() {
 		if strings.EqualFold(origin, allowed) {
@@ -679,7 +773,7 @@ func isAllowedCORSOrigin(origin string) bool {
 		return false
 	}
 	port, err := strconv.Atoi(parsed.Port())
-	return err == nil && port >= 5173 && port <= 5199
+	return err == nil && port >= 5173 && port <= 5222
 }
 
 func (s *Server) mountAIRoutes(prefix string, aiService *api.AIService) {

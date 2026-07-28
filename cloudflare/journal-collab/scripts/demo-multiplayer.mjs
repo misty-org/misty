@@ -1,11 +1,11 @@
 /**
  * Proves a real multiplayer session end to end.
  *
- * Two independent Yjs documents connect to the same room as different users,
- * edit concurrently, and must converge on identical text. A third client
- * connects as a viewer and must be refused the ability to write.
+ * Two independent Yjs documents connect to the same Journal room as different
+ * users, edit concurrently, and must converge on identical text. A third
+ * client connects as a viewer and must be refused the ability to write.
  *
- *   node scripts/demo-multiplayer.mjs [worker-origin]
+ *   node scripts/demo-multiplayer.mjs [worker-origin] [note|drawing]
  *
  * Defaults to the local `wrangler dev` origin. Pass the deployed origin to run
  * the same check against Cloudflare.
@@ -23,9 +23,17 @@ import YProvider from "y-partyserver/provider";
 
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const origin = process.argv[2] ?? "http://127.0.0.1:8787";
-const ROOM = "note_demo_room_0001";
+const resourceType = process.argv[3] ?? "note";
+if (resourceType !== "note" && resourceType !== "drawing") {
+  console.error("Resource type must be note or drawing.");
+  process.exit(2);
+}
+const RESOURCE_ID = `${resourceType}_demo`;
+const ROOM = `${resourceType}_demo_room_0001`;
 
-const keys = JSON.parse(readFileSync(resolve(projectRoot, ".secrets/signing-key.json"), "utf8"));
+const keys = JSON.parse(
+  readFileSync(resolve(projectRoot, ".secrets/signing-key.json"), "utf8"),
+);
 
 function base64UrlFromBytes(bytes) {
   return Buffer.from(bytes).toString("base64url");
@@ -42,15 +50,19 @@ async function signingKey() {
 }
 
 async function mintTicket(key, { userID, role, aclVersion = 1 }) {
-  const header = base64UrlFromBytes(Buffer.from(JSON.stringify({ alg: "EdDSA", typ: "JWT" })));
+  const header = base64UrlFromBytes(
+    Buffer.from(JSON.stringify({ alg: "EdDSA", typ: "JWT" })),
+  );
   const claims = {
     iss: "misty-api",
-    aud: "misty-note-collab",
+    aud: "misty-journal-collab",
     // Single-use: every connection needs its own id or the room rejects it.
     jti: `demo-${crypto.randomUUID()}`,
     sub: userID,
     space_id: "space_demo",
-    note_id: "note_demo",
+    resource_type: resourceType,
+    resource_id: RESOURCE_ID,
+    [`${resourceType}_id`]: RESOURCE_ID,
     room: ROOM,
     role,
     acl_version: aclVersion,
@@ -70,7 +82,7 @@ function connect(ticket) {
   const url = new URL(origin);
   // The provider wants host[:port] plus an explicit protocol, not a full URL.
   const provider = new YProvider(url.host, ROOM, doc, {
-    party: "note-room",
+    party: `${resourceType}-room`,
     protocol: url.protocol === "https:" ? "wss" : "ws",
     params: { ticket },
   });
@@ -79,7 +91,10 @@ function connect(ticket) {
 
 function waitForSync(provider, label, timeoutMs = 10000) {
   return new Promise((resolvePromise, rejectPromise) => {
-    const timer = setTimeout(() => rejectPromise(new Error(`${label}: sync timed out`)), timeoutMs);
+    const timer = setTimeout(
+      () => rejectPromise(new Error(`${label}: sync timed out`)),
+      timeoutMs,
+    );
     provider.on("synced", (isSynced) => {
       if (isSynced) {
         clearTimeout(timer);
@@ -88,7 +103,11 @@ function waitForSync(provider, label, timeoutMs = 10000) {
     });
     provider.on("connection-error", (event) => {
       clearTimeout(timer);
-      rejectPromise(new Error(`${label}: refused (${event?.code ?? "unknown"}) ${event?.reason ?? ""}`));
+      rejectPromise(
+        new Error(
+          `${label}: refused (${event?.code ?? "unknown"}) ${event?.reason ?? ""}`,
+        ),
+      );
     });
   });
 }
@@ -97,12 +116,21 @@ const settle = (ms) => new Promise((r) => setTimeout(r, ms));
 
 async function main() {
   const key = await signingKey();
-  console.log(`connecting to ${origin} room=${ROOM}\n`);
+  console.log(
+    `connecting to ${origin} resource=${resourceType} room=${ROOM}\n`,
+  );
 
-  const alice = connect(await mintTicket(key, { userID: "user_alice", role: "editor" }));
-  const bob = connect(await mintTicket(key, { userID: "user_bob", role: "editor" }));
+  const alice = connect(
+    await mintTicket(key, { userID: "user_alice", role: "editor" }),
+  );
+  const bob = connect(
+    await mintTicket(key, { userID: "user_bob", role: "editor" }),
+  );
 
-  await Promise.all([waitForSync(alice.provider, "alice"), waitForSync(bob.provider, "bob")]);
+  await Promise.all([
+    waitForSync(alice.provider, "alice"),
+    waitForSync(bob.provider, "bob"),
+  ]);
   console.log("✓ both editors connected and synced");
 
   // Concurrent edits from both ends of the document.
@@ -119,14 +147,19 @@ async function main() {
     console.error("\n✗ FAILED: the two clients did not converge");
     process.exit(1);
   }
-  if (!aliceText.includes("Alice writes") || !aliceText.includes("Bob writes")) {
+  if (
+    !aliceText.includes("Alice writes") ||
+    !aliceText.includes("Bob writes")
+  ) {
     console.error("\n✗ FAILED: converged text is missing one client's edit");
     process.exit(1);
   }
   console.log("✓ concurrent edits converged to identical text");
 
   // A viewer may read the document but must not be able to change it.
-  const carol = connect(await mintTicket(key, { userID: "user_carol", role: "viewer" }));
+  const carol = connect(
+    await mintTicket(key, { userID: "user_carol", role: "viewer" }),
+  );
   await waitForSync(carol.provider, "carol");
   console.log("✓ viewer connected and received document state");
   if (!carol.doc.getText("body").toString().includes("Alice writes")) {
@@ -143,7 +176,10 @@ async function main() {
   console.log("✓ viewer's edit was rejected and never reached the editors");
 
   // A replayed ticket must be refused.
-  const replayTicket = await mintTicket(key, { userID: "user_dave", role: "editor" });
+  const replayTicket = await mintTicket(key, {
+    userID: "user_dave",
+    role: "editor",
+  });
   const first = connect(replayTicket);
   await waitForSync(first.provider, "dave");
   const replay = connect(replayTicket);
@@ -157,7 +193,8 @@ async function main() {
   }
   console.log("✓ replayed ticket refused");
 
-  for (const client of [alice, bob, carol, first, replay]) client.provider.destroy();
+  for (const client of [alice, bob, carol, first, replay])
+    client.provider.destroy();
   console.log("\nAll multiplayer checks passed.");
   process.exit(0);
 }

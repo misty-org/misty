@@ -59,6 +59,7 @@ func TestPasswordResetURLsRejectNonLocalhostHTTP(t *testing.T) {
 }
 
 func TestCreateServerAndMountHandlers(t *testing.T) {
+	disableJournalCollabForTest(t)
 	t.Setenv("PASSWORD_RESET_URL", "http://localhost:5173/reset")
 	t.Setenv("PASSWORD_RESET_START_URL", "http://localhost:8080/auth/reset/start")
 	t.Setenv("MAILJET_API_KEY", "")
@@ -100,6 +101,7 @@ func TestCreateServerRequiresProductionR2Configuration(t *testing.T) {
 }
 
 func TestCreateServerConfiguresIndependentDevelopmentLibrary(t *testing.T) {
+	disableJournalCollabForTest(t)
 	t.Setenv("PASSWORD_RESET_URL", "http://localhost:5173/reset")
 	t.Setenv("PASSWORD_RESET_START_URL", "http://localhost:8080/auth/reset/start")
 	t.Setenv("MAILJET_API_KEY", "")
@@ -152,12 +154,12 @@ func TestAllowedCORSOriginsRejectsWildcards(t *testing.T) {
 }
 
 func TestAllowedCORSOriginAcceptsViteLoopbackPorts(t *testing.T) {
-	for _, origin := range []string{"http://localhost:5174", "http://127.0.0.1:5199", "http://[::1]:5175"} {
+	for _, origin := range []string{"http://localhost:5174", "http://127.0.0.1:5222", "http://[::1]:5175"} {
 		if !isAllowedCORSOrigin(origin) {
 			t.Fatalf("isAllowedCORSOrigin(%q) = false, want true", origin)
 		}
 	}
-	for _, origin := range []string{"http://127.0.0.1:5200", "https://127.0.0.1:5174", "http://example.com:5174", "http://127.0.0.1:5174?spoofed=true"} {
+	for _, origin := range []string{"http://127.0.0.1:5223", "https://127.0.0.1:5174", "http://example.com:5174", "http://127.0.0.1:5174?spoofed=true"} {
 		if isAllowedCORSOrigin(origin) {
 			t.Fatalf("isAllowedCORSOrigin(%q) = true, want false", origin)
 		}
@@ -165,6 +167,7 @@ func TestAllowedCORSOriginAcceptsViteLoopbackPorts(t *testing.T) {
 }
 
 func TestCORSAllowsAppOrigins(t *testing.T) {
+	disableJournalCollabForTest(t)
 	t.Setenv("PASSWORD_RESET_URL", "http://localhost:5173/reset")
 	t.Setenv("PASSWORD_RESET_START_URL", "http://localhost:8080/auth/reset/start")
 	t.Setenv("MAILJET_API_KEY", "")
@@ -210,5 +213,16 @@ func TestCORSAllowsAppOrigins(t *testing.T) {
 	}
 	if got := rec.Header().Get("Access-Control-Allow-Headers"); !strings.Contains(strings.ToLower(got), "idempotency-key") {
 		t.Fatalf("Space creation Access-Control-Allow-Headers = %q, want Idempotency-Key", got)
+	}
+
+	req = httptest.NewRequest(http.MethodOptions, "/api/realtime/tickets", nil)
+	req.Header.Set("Origin", "http://127.0.0.1:5222")
+	req.Header.Set("Access-Control-Request-Method", "POST")
+	req.Header.Set("Access-Control-Request-Headers", "authorization,content-type")
+	rec = httptest.NewRecorder()
+	server.Router.ServeHTTP(rec, req)
+
+	if got := rec.Header().Get("Access-Control-Allow-Origin"); got != "http://127.0.0.1:5222" {
+		t.Fatalf("Realtime ticket Access-Control-Allow-Origin = %q, want highest desktop dev port", got)
 	}
 }

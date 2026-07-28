@@ -45,6 +45,7 @@ const (
 	UploadPurposeLibrary        = "library"
 	UploadPurposeChatAttachment = "attachment"
 	UploadPurposeNoteAttachment = "note_attachment"
+	UploadPurposeDrawingAsset   = "drawing_attachment"
 )
 
 // Default per-purpose maximums. Deployments may lower these through
@@ -53,6 +54,7 @@ const (
 	DefaultLibraryMaxFileBytes        = int64(100 << 20)
 	DefaultChatAttachmentMaxFileBytes = int64(10 << 20)
 	DefaultNoteAttachmentMaxFileBytes = int64(15 << 20)
+	DefaultDrawingAssetMaxFileBytes   = int64(15 << 20)
 )
 
 // MaxUploadBytesForPurpose is the hard database ceiling for a purpose. An
@@ -65,6 +67,8 @@ func MaxUploadBytesForPurpose(purpose string) int64 {
 		return DefaultChatAttachmentMaxFileBytes
 	case UploadPurposeNoteAttachment:
 		return DefaultNoteAttachmentMaxFileBytes
+	case UploadPurposeDrawingAsset:
+		return DefaultDrawingAssetMaxFileBytes
 	default:
 		return 0
 	}
@@ -80,6 +84,9 @@ func UploadPurposePermission(purpose string) (string, bool) {
 	case UploadPurposeNoteAttachment:
 		// Note assets authorize against the parent note, not a Space-wide
 		// permission. Callers must check note edit access before reaching here.
+		return PermissionLibraryView, true
+	case UploadPurposeDrawingAsset:
+		// Drawing assets authorize against the parent drawing.
 		return PermissionLibraryView, true
 	default:
 		return "", false
@@ -198,6 +205,7 @@ type CompleteLibraryUploadResult struct {
 	Item             *SpaceLibraryItem  `json:"item,omitempty"`
 	Attachment       *MessageAttachment `json:"attachment,omitempty"`
 	NoteAsset        *SpaceNoteAsset    `json:"note_asset,omitempty"`
+	DrawingAsset     *SpaceDrawingAsset `json:"drawing_asset,omitempty"`
 	DiscardObjectKey string             `json:"-"`
 }
 
@@ -308,6 +316,23 @@ func (db *Database) SpaceStorageUsage(ctx context.Context, userID, spaceID strin
 		}
 		if _, err := tx.ExecContext(ctx, `INSERT INTO space_storage_usage(space_id) VALUES($1) ON CONFLICT DO NOTHING`, spaceID); err != nil {
 			return err
+		}
+		if out.OwnerUserID == userID {
+			// Keep the selected Space counter authoritative at read time. Older
+			// deployments can leave the derived cache at zero even though its
+			// contribution and reservation ledgers contain storage.
+			if _, err := tx.ExecContext(ctx, `WITH actual AS (
+				SELECT
+					COALESCE((SELECT sum(logical_bytes) FROM space_storage_contributions WHERE space_id=$1 AND state IN ('active','recovery')),0) used,
+					COALESCE((SELECT sum(reserved_bytes) FROM space_upload_reservations WHERE space_id=$1 AND state='active'),0)
+					+ COALESCE((SELECT sum(reserved_bytes) FROM space_rendition_reservations WHERE space_id=$1 AND state='active'),0) reserved
+			)
+			UPDATE space_storage_usage u
+			SET used_bytes=actual.used,reserved_bytes=actual.reserved,version=u.version+1,updated_at=NOW()
+			FROM actual
+			WHERE u.space_id=$1 AND (u.used_bytes<>actual.used OR u.reserved_bytes<>actual.reserved)`, spaceID); err != nil {
+				return err
+			}
 		}
 		if err := tx.QueryRowContext(ctx, `SELECT used_bytes,reserved_bytes,version FROM space_storage_usage WHERE space_id=$1`, spaceID).Scan(&out.SpaceUsedBytes, &out.SpaceReservedBytes, &out.Version); err != nil {
 			return err
@@ -711,6 +736,45 @@ func (db *Database) CompleteLibraryUpload(ctx context.Context, userID, spaceID, 
 				return err
 			}
 			result.NoteAsset, sourceID, sourceKind = asset, asset.ID, "note_asset"
+		} else if upload.Purpose == UploadPurposeDrawingAsset {
+			// Excalidraw keeps only this stable asset identity in the shared
+			// Yjs document. Image bytes stay in R2.
+			var drawingID, excalidrawFileID string
+			if err := tx.QueryRowContext(
+				ctx,
+				`SELECT COALESCE(drawing_id,''),COALESCE(drawing_file_id,'')
+				 FROM space_library_uploads WHERE id=$1`,
+				upload.ID,
+			).Scan(&drawingID, &excalidrawFileID); err != nil {
+				return err
+			}
+			if drawingID == "" || excalidrawFileID == "" {
+				return ErrLibraryInvalid
+			}
+			asset := &SpaceDrawingAsset{
+				ID: "drawingasset_" + uuid.NewString(), DrawingID: drawingID,
+				FileID: file.ID, UploaderUserID: userID,
+				ExcalidrawFileID: excalidrawFileID,
+				DisplayName:      upload.OriginalFilename,
+				LifecycleState:   "ready",
+				MIMEType:         detectedMIME,
+				ByteSize:         verifiedSize,
+				SHA256:           verifiedSHA,
+			}
+			if err := tx.QueryRowContext(
+				ctx,
+				`INSERT INTO space_drawing_assets(
+				     id,drawing_id,file_id,uploader_user_id,
+				     excalidraw_file_id,display_name
+				 ) VALUES($1,$2,$3,$4,$5,$6)
+				 RETURNING created_at`,
+				asset.ID, drawingID, file.ID, userID,
+				excalidrawFileID, upload.OriginalFilename,
+			).Scan(&asset.CreatedAt); err != nil {
+				return err
+			}
+			result.DrawingAsset, sourceID, sourceKind =
+				asset, asset.ID, "drawing_asset"
 		} else {
 			attachment := &MessageAttachment{ID: "attachment_" + uuid.NewString(), SpaceID: spaceID, FileID: file.ID, UploadID: upload.ID, UploaderUserID: userID, DisplayName: upload.OriginalFilename, LifecycleState: "ready"}
 			if err := tx.QueryRowContext(ctx, `INSERT INTO space_message_attachments(id,space_id,file_id,upload_id,uploader_user_id,display_name) VALUES($1,$2,$3,$4,$5,$6) RETURNING created_at`, attachment.ID, spaceID, file.ID, upload.ID, userID, upload.OriginalFilename).Scan(&attachment.CreatedAt); err != nil {
@@ -1418,6 +1482,41 @@ func loadCompletedLibraryUploadTx(ctx context.Context, tx *sql.Tx, upload *Libra
 			return err
 		}
 		result.Item = item
+	} else if upload.Purpose == UploadPurposeNoteAttachment {
+		asset := &SpaceNoteAsset{}
+		if err := tx.QueryRowContext(
+			ctx,
+			`SELECT id,note_id,file_id,uploader_user_id,display_name,
+			        lifecycle_state,created_at
+			 FROM space_note_assets
+			 WHERE file_id=$1`,
+			upload.FileID,
+		).Scan(
+			&asset.ID, &asset.NoteID, &asset.FileID,
+			&asset.UploaderUserID, &asset.DisplayName,
+			&asset.LifecycleState, &asset.CreatedAt,
+		); err != nil {
+			return err
+		}
+		result.NoteAsset = asset
+	} else if upload.Purpose == UploadPurposeDrawingAsset {
+		asset := &SpaceDrawingAsset{}
+		if err := scanSpaceDrawingAsset(tx.QueryRowContext(
+			ctx,
+			`SELECT a.id,a.drawing_id,a.file_id,a.uploader_user_id,
+			        a.excalidraw_file_id,a.display_name,a.lifecycle_state,
+			        a.created_at,
+			        COALESCE(b.server_detected_mime_type,b.client_declared_mime_type),
+			        b.byte_size,b.sha256
+			 FROM space_drawing_assets a
+			 JOIN library_files f ON f.id=a.file_id
+			 JOIN library_blobs b ON b.id=f.blob_id
+			 WHERE a.file_id=$1`,
+			upload.FileID,
+		), asset); err != nil {
+			return err
+		}
+		result.DrawingAsset = asset
 	} else {
 		attachment := &MessageAttachment{}
 		if err := scanMessageAttachment(tx.QueryRowContext(ctx, `SELECT id,space_id,COALESCE(message_id,''),file_id,upload_id,uploader_user_id,display_name,COALESCE(promoted_item_id,''),lifecycle_state,created_at,deleted_at,recover_until FROM space_message_attachments WHERE upload_id=$1`, upload.ID), attachment); err != nil {

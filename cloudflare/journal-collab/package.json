@@ -1,11 +1,13 @@
 {
-  "name": "@misty/note-collab",
+  "name": "@misty/journal-collab",
   "version": "0.1.0",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
+    "deploy:dev": "node scripts/deploy-dev.mjs",
+    "generate-secrets": "node scripts/generate-secrets.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "build": "wrangler deploy --dry-run --outdir=dist"

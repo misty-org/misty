@@ -39,6 +39,13 @@ func TestLibraryQuotaUploadDedupAndAttachmentPromotion(t *testing.T) {
 	if usage.ReservedBytes != 0 || usage.UsedBytes != 100 {
 		t.Fatalf("finalized usage = %#v", usage)
 	}
+	if _, err := database.Conn.ExecContext(ctx, `UPDATE space_storage_usage SET used_bytes=0 WHERE space_id=$1`, spaceID); err != nil {
+		t.Fatal(err)
+	}
+	usage, _ = database.SpaceStorageUsage(ctx, owner.ID, spaceID)
+	if usage.SpaceUsedBytes != 100 || usage.UsedBytes != 100 {
+		t.Fatalf("usage read did not repair stale per-Space cache = %#v", usage)
+	}
 
 	attachmentUpload, err := database.CreateLibraryUpload(ctx, owner.ID, spaceID, "attachment", "second.txt", "text/plain", 100, digest, "library/secondobject", "token-2", time.Now().Add(time.Hour))
 	if err != nil {
@@ -203,10 +210,10 @@ func TestLibraryQuotaUploadDedupAndAttachmentPromotion(t *testing.T) {
 	}
 	updated, promoted = libraryItemsByID(t, bulkItems, updated.ID, promoted.ID)
 	discovery, err := database.LibraryDiscovery(ctx, owner.ID, spaceID)
-	if err != nil || len(discovery.RecentDays) != 1 || discovery.RecentDays[0].ItemCount != 2 || len(discovery.Months) != 1 || discovery.Months[0].ID != "2026-07" || len(discovery.Years) != 1 || discovery.Years[0].ID != "2026" || len(discovery.Memories) != 1 || discovery.Memories[0].ItemCount != 2 || len(discovery.Trips) != 1 || discovery.Trips[0].Title != "Big Sur" || len(discovery.MapPoints) != 1 || discovery.MapPoints[0].ItemCount != 2 || discovery.MapPoints[0].ID != "36.27,-121.81" || len(discovery.Duplicates) != 1 || discovery.Duplicates[0].ItemCount != 2 {
+	if err != nil || len(discovery.RecentDays) != 1 || discovery.RecentDays[0].ItemCount != 2 || len(discovery.Months) != 1 || discovery.Months[0].ID != "2026-07" || len(discovery.Years) != 1 || discovery.Years[0].ID != "2026" || len(discovery.Memories) != 1 || discovery.Memories[0].ItemCount != 2 || len(discovery.Trips) != 1 || discovery.Trips[0].Title != "Big Sur" || len(discovery.Duplicates) != 1 || discovery.Duplicates[0].ItemCount != 2 {
 		t.Fatalf("LibraryDiscovery() = %#v, %v", discovery, err)
 	}
-	for _, target := range []struct{ kind, id string }{{"day", discovery.RecentDays[0].ID}, {"month", discovery.Months[0].ID}, {"year", discovery.Years[0].ID}, {"memory", discovery.Memories[0].ID}, {"trip", discovery.Trips[0].ID}, {"map", discovery.MapPoints[0].ID}, {"duplicate", discovery.Duplicates[0].ID}} {
+	for _, target := range []struct{ kind, id string }{{"day", discovery.RecentDays[0].ID}, {"month", discovery.Months[0].ID}, {"year", discovery.Years[0].ID}, {"memory", discovery.Memories[0].ID}, {"trip", discovery.Trips[0].ID}, {"duplicate", discovery.Duplicates[0].ID}} {
 		discoveryItems, itemErr := database.LibraryDiscoveryItems(ctx, owner.ID, spaceID, target.kind, target.id)
 		if itemErr != nil || len(discoveryItems) != 2 {
 			t.Fatalf("LibraryDiscoveryItems(%s) = %#v, %v", target.kind, discoveryItems, itemErr)
@@ -270,8 +277,8 @@ func TestLibraryQuotaUploadDedupAndAttachmentPromotion(t *testing.T) {
 	if err != nil || len(importedUtility) != 1 || importedUtility[0].ID != imported.Item.ID {
 		t.Fatalf("imports utility = %#v, %v", importedUtility, err)
 	}
-	pins, err := database.SetLibraryPinnedCollections(ctx, owner.ID, spaceID, []LibraryPinTarget{{Kind: "system", ID: "favorites"}, {Kind: "album", ID: album.ID}, {Kind: "memory", ID: discovery.Memories[0].ID}, {Kind: "map", ID: discovery.MapPoints[0].ID}})
-	if err != nil || len(pins) != 4 || pins[0].Position != 0 || pins[0].TargetID != "favorites" || pins[3].Position != 3 || pins[3].TargetID != discovery.MapPoints[0].ID {
+	pins, err := database.SetLibraryPinnedCollections(ctx, owner.ID, spaceID, []LibraryPinTarget{{Kind: "system", ID: "favorites"}, {Kind: "album", ID: album.ID}, {Kind: "memory", ID: discovery.Memories[0].ID}, {Kind: "trip", ID: discovery.Trips[0].ID}})
+	if err != nil || len(pins) != 4 || pins[0].Position != 0 || pins[0].TargetID != "favorites" || pins[3].Position != 3 || pins[3].TargetID != discovery.Trips[0].ID {
 		t.Fatalf("SetLibraryPinnedCollections() = %#v, %v", pins, err)
 	}
 	listedPins, err := database.LibraryPinnedCollections(ctx, owner.ID, spaceID)

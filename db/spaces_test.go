@@ -91,6 +91,37 @@ func TestAccountsStartWithoutSpacesAndSpacesBecomeSharedOnlyByInvite(t *testing.
 	if len(inbox) != 1 || inbox[0].MessageID != message.ID {
 		t.Fatalf("member inbox = %#v, want unread delivery for %q", inbox, message.ID)
 	}
+	reacted, err := database.AddSpaceMessageReaction(ctx, member.ID, project.ID, message.ID, "😂")
+	if err != nil {
+		t.Fatalf("AddSpaceMessageReaction(member) error = %v", err)
+	}
+	if len(reacted.Reactions) != 1 || reacted.Reactions[0].Emoji != "😂" || reacted.Reactions[0].Count != 1 || !reacted.Reactions[0].ReactedByMe {
+		t.Fatalf("member reacted message = %#v, want one self reaction", reacted.Reactions)
+	}
+	if _, err := database.AddSpaceMessageReaction(ctx, member.ID, project.ID, message.ID, "😂"); err != nil {
+		t.Fatalf("duplicate AddSpaceMessageReaction(member) error = %v", err)
+	}
+	ownerView, err := database.SpaceMessages(ctx, owner.ID, project.ID, 0, 20)
+	if err != nil {
+		t.Fatalf("SpaceMessages(owner after reaction) error = %v", err)
+	}
+	if len(ownerView) == 0 || len(ownerView[0].Reactions) != 1 || ownerView[0].Reactions[0].Count != 1 || ownerView[0].Reactions[0].ReactedByMe {
+		t.Fatalf("owner reaction view = %#v, want count without self flag", ownerView)
+	}
+	unreacted, err := database.RemoveSpaceMessageReaction(ctx, member.ID, project.ID, message.ID, "😂")
+	if err != nil {
+		t.Fatalf("RemoveSpaceMessageReaction(member) error = %v", err)
+	}
+	if len(unreacted.Reactions) != 0 {
+		t.Fatalf("removed reaction message = %#v, want no reactions", unreacted.Reactions)
+	}
+	events, _, err := database.SpaceEventsAfter(ctx, owner.ID, 0, 500)
+	if err != nil {
+		t.Fatalf("SpaceEventsAfter(owner) error = %v", err)
+	}
+	if !containsSpaceEvent(events, "message.reaction_added", message.ID) || !containsSpaceEvent(events, "message.reaction_removed", message.ID) {
+		t.Fatalf("reaction events = %#v, want add and remove events for %q", events, message.ID)
+	}
 
 	if err := database.RemoveSpaceMember(ctx, owner.ID, project.ID, member.ID); err != nil {
 		t.Fatalf("RemoveSpaceMember() error = %v", err)

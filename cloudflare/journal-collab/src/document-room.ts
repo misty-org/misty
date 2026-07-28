@@ -2,33 +2,44 @@ import { YServer } from "y-partyserver";
 import * as Y from "yjs";
 import type { Connection, ConnectionContext } from "partyserver";
 
-import { TicketError, verifyTicket, type NoteRole } from "./ticket";
+import {
+  TicketError,
+  verifyTicket,
+  type CollaborationResourceType,
+  type DocumentRole,
+} from "./ticket";
+import {
+  isRecord,
+  jsonResponse,
+  verifyControlRequest,
+} from "./control-protocol";
 
 /**
- * One Durable Object per note.
+ * One Durable Object per collaborative document.
  *
- * The room is the only place with a serialized view of a single note, which is
- * why two things must happen here rather than in the Worker entrypoint:
+ * The room is the only place with a serialized view of a single document,
+ * which is why two things must happen here rather than in the Worker entrypoint:
  * burning a single-use ticket id, and comparing a ticket's ACL version against
  * the newest version this room has seen.
  */
 
 export interface Env {
   NOTE_ROOM: DurableObjectNamespace;
-  NOTE_COLLAB_TICKET_PUBLIC_KEY: string;
-  NOTE_COLLAB_CONTROL_SECRET: string;
-  NOTE_COLLAB_PROJECTION_SECRET: string;
-  NOTE_COLLAB_ISSUER: string;
-  NOTE_COLLAB_AUDIENCE: string;
+  DRAWING_ROOM: DurableObjectNamespace;
+  JOURNAL_COLLAB_TICKET_PUBLIC_KEY: string;
+  JOURNAL_COLLAB_CONTROL_SECRET: string;
+  JOURNAL_COLLAB_PROJECTION_SECRET: string;
+  JOURNAL_COLLAB_ISSUER: string;
+  JOURNAL_COLLAB_AUDIENCE: string;
   MISTY_INTERNAL_API_BASE: string;
 }
 
-/** Per-connection state, kept in memory only. */
+/** Per-connection state persisted in the WebSocket attachment. */
 interface SocketState {
   userID: string;
-  role: NoteRole;
+  role: DocumentRole;
   aclVersion: number;
-  noteID: string;
+  resourceID: string;
   spaceID: string;
 }
 
@@ -39,14 +50,15 @@ const MAX_MESSAGE_BYTES = 512 * 1024;
 const JTI_RETENTION_MS = 5 * 60 * 1000;
 /** Durable Object storage caps a single value at 128 KiB; stay well under. */
 const DOCUMENT_CHUNK_BYTES = 96 * 1024;
-/** Beta ceiling for one note's document. */
+/** Beta ceiling for one collaborative document. */
 const MAX_DOCUMENT_BYTES = 8 * 1024 * 1024;
 /** Control requests are tiny JSON envelopes, never document snapshots. */
 const MAX_CONTROL_BODY_BYTES = 128 * 1024;
-const CONTROL_CLOCK_SKEW_SECONDS = 5 * 60;
 const BOOTSTRAP_APPLIED_KEY = "bootstrap:applied";
 
-export class NoteRoom extends YServer<Env> {
+export abstract class PersistentDocumentRoom extends YServer<Env> {
+  protected abstract readonly resourceType: CollaborationResourceType;
+  protected readonly supportsMarkdownBootstrap: boolean = false;
   /**
    * Persist shortly after edits stop rather than on every keystroke. A single
    * burst of typing is one write instead of hundreds.
@@ -58,7 +70,6 @@ export class NoteRoom extends YServer<Env> {
 
   /** Newest ACL version this room has been told about. */
   private aclVersion = 0;
-  private readonly sockets = new WeakMap<Connection, SocketState>();
 
   /**
    * Authorizes the socket before it joins.
@@ -66,20 +77,27 @@ export class NoteRoom extends YServer<Env> {
    * Everything here fails closed: any thrown error or non-101 response means
    * the connection is refused, so a bug cannot accidentally admit a client.
    */
-  override async onConnect(connection: Connection, ctx: ConnectionContext): Promise<void> {
+  override async onConnect(
+    connection: Connection,
+    ctx: ConnectionContext,
+  ): Promise<void> {
     const url = new URL(ctx.request.url);
     const token = url.searchParams.get("ticket") ?? "";
 
     let claims;
     try {
       claims = await verifyTicket(token, {
-        publicKeyBase64: this.env.NOTE_COLLAB_TICKET_PUBLIC_KEY,
-        issuer: this.env.NOTE_COLLAB_ISSUER,
-        audience: this.env.NOTE_COLLAB_AUDIENCE,
+        publicKeyBase64: this.env.JOURNAL_COLLAB_TICKET_PUBLIC_KEY,
+        issuer: this.env.JOURNAL_COLLAB_ISSUER,
+        audience: this.env.JOURNAL_COLLAB_AUDIENCE,
         room: this.name,
+        resourceType: this.resourceType,
       });
     } catch (error) {
-      this.refuse(connection, error instanceof TicketError ? error.code : "ticket_invalid");
+      this.refuse(
+        connection,
+        error instanceof TicketError ? error.code : "ticket_invalid",
+      );
       return;
     }
 
@@ -107,11 +125,11 @@ export class NoteRoom extends YServer<Env> {
       return;
     }
 
-    this.sockets.set(connection, {
+    connection.setState({
       userID: claims.sub,
       role: claims.role,
       aclVersion: claims.acl_version,
-      noteID: claims.note_id,
+      resourceID: claims.resource_id,
       spaceID: claims.space_id,
     });
     await super.onConnect(connection, ctx);
@@ -122,7 +140,7 @@ export class NoteRoom extends YServer<Env> {
    * y-partyserver consults this before applying anything to the document.
    */
   override isReadOnly(connection: Connection): boolean {
-    const state = this.sockets.get(connection);
+    const state = socketState(connection);
     // An unknown socket is treated as read-only rather than trusted.
     if (!state) return true;
     if (state.role === "viewer") return true;
@@ -131,8 +149,12 @@ export class NoteRoom extends YServer<Env> {
     return state.aclVersion < this.aclVersion;
   }
 
-  override async onMessage(connection: Connection, message: ArrayBuffer | string): Promise<void> {
-    const size = typeof message === "string" ? message.length : message.byteLength;
+  override async onMessage(
+    connection: Connection,
+    message: ArrayBuffer | string,
+  ): Promise<void> {
+    const size =
+      typeof message === "string" ? message.length : message.byteLength;
     if (size > MAX_MESSAGE_BYTES) {
       this.refuse(connection, "message_too_large");
       return;
@@ -149,7 +171,9 @@ export class NoteRoom extends YServer<Env> {
    */
   override async onRequest(request: Request): Promise<Response> {
     if (request.method !== "POST") {
-      return jsonResponse({ code: "method_not_allowed" }, 405, { Allow: "POST" });
+      return jsonResponse({ code: "method_not_allowed" }, 405, {
+        Allow: "POST",
+      });
     }
     const body = new Uint8Array(await request.arrayBuffer());
     if (body.byteLength > MAX_CONTROL_BODY_BYTES) {
@@ -157,7 +181,14 @@ export class NoteRoom extends YServer<Env> {
     }
     const timestamp = request.headers.get("X-Misty-Timestamp") ?? "";
     const signature = request.headers.get("X-Misty-Signature") ?? "";
-    if (!(await verifyControlRequest(this.env.NOTE_COLLAB_CONTROL_SECRET, timestamp, body, signature))) {
+    if (
+      !(await verifyControlRequest(
+        this.env.JOURNAL_COLLAB_CONTROL_SECRET,
+        timestamp,
+        body,
+        signature,
+      ))
+    ) {
       return jsonResponse({ code: "unauthorized" }, 401);
     }
 
@@ -167,22 +198,41 @@ export class NoteRoom extends YServer<Env> {
     } catch {
       return jsonResponse({ code: "invalid_json" }, 400);
     }
-    if (!isRecord(envelope) || typeof envelope.command !== "string" || !isRecord(envelope.payload)) {
+    if (
+      !isRecord(envelope) ||
+      typeof envelope.command !== "string" ||
+      !isRecord(envelope.payload)
+    ) {
       return jsonResponse({ code: "invalid_command" }, 400);
     }
     return this.handleControl(envelope.command, envelope.payload);
   }
 
   /** Handles authenticated control commands from the Go API. */
-  async handleControl(command: string, payload: Record<string, unknown>): Promise<Response> {
+  async handleControl(
+    command: string,
+    payload: Record<string, unknown>,
+  ): Promise<Response> {
     switch (command) {
       case "bootstrap": {
-        const title = typeof payload.title === "string" ? payload.title.trim() : "";
-        const markdown = typeof payload.markdown === "string" ? payload.markdown.trim() : "";
-        if (!title || title.length > 500 || !markdown || markdown.length > 100_000) {
+        if (!this.supportsMarkdownBootstrap) {
+          return jsonResponse({ code: "unknown_command" }, 400);
+        }
+        const title =
+          typeof payload.title === "string" ? payload.title.trim() : "";
+        const markdown =
+          typeof payload.markdown === "string" ? payload.markdown.trim() : "";
+        if (
+          !title ||
+          title.length > 500 ||
+          !markdown ||
+          markdown.length > 100_000
+        ) {
           return jsonResponse({ code: "invalid_bootstrap" }, 400);
         }
-        if ((await this.ctx.storage.get<boolean>(BOOTSTRAP_APPLIED_KEY)) === true) {
+        if (
+          (await this.ctx.storage.get<boolean>(BOOTSTRAP_APPLIED_KEY)) === true
+        ) {
           return jsonResponse({ ok: true, initialized: false });
         }
 
@@ -219,7 +269,9 @@ export class NoteRoom extends YServer<Env> {
         return jsonResponse({ ok: true, acl_version: this.aclVersion });
       }
       case "disconnect": {
-        const userIDs = Array.isArray(payload.user_ids) ? (payload.user_ids as string[]) : null;
+        const userIDs = Array.isArray(payload.user_ids)
+          ? (payload.user_ids as string[])
+          : null;
         this.disconnectUsers(userIDs);
         return jsonResponse({ ok: true });
       }
@@ -239,7 +291,7 @@ export class NoteRoom extends YServer<Env> {
   /** Closes sockets whose authorization predates the current ACL version. */
   private disconnectSupersededSockets(): void {
     for (const connection of this.getConnections()) {
-      const state = this.sockets.get(connection);
+      const state = socketState(connection);
       if (!state || state.aclVersion < this.aclVersion) {
         this.close(connection, "acl_superseded");
       }
@@ -250,7 +302,7 @@ export class NoteRoom extends YServer<Env> {
   private disconnectUsers(userIDs: string[] | null): void {
     const targeted = userIDs === null ? null : new Set(userIDs);
     for (const connection of this.getConnections()) {
-      const state = this.sockets.get(connection);
+      const state = socketState(connection);
       if (targeted === null || (state && targeted.has(state.userID))) {
         this.close(connection, "access_revoked");
       }
@@ -265,7 +317,7 @@ export class NoteRoom extends YServer<Env> {
 
   private refuse(connection: Connection, code: string): void {
     // 1008 is "policy violation". The code alone is sent; nothing that
-    // identifies the note or its members goes over a refused socket.
+    // identifies the document or its members goes over a refused socket.
     try {
       connection.close(1008, code);
     } catch {
@@ -299,7 +351,10 @@ export class NoteRoom extends YServer<Env> {
   }
 
   private async sweepTicketIDs(now: number): Promise<void> {
-    const entries = await this.ctx.storage.list<number>({ prefix: "jti:", limit: 200 });
+    const entries = await this.ctx.storage.list<number>({
+      prefix: "jti:",
+      limit: 200,
+    });
     const stale: string[] = [];
     for (const [key, storedAt] of entries) {
       if (now - storedAt > JTI_RETENTION_MS) stale.push(key);
@@ -338,25 +393,33 @@ export class NoteRoom extends YServer<Env> {
     if (update.byteLength > MAX_DOCUMENT_BYTES) {
       // Refusing to save a document this large would silently lose edits, so
       // it is logged loudly instead. The note id is deliberately omitted.
-      console.error(`note document exceeds ${MAX_DOCUMENT_BYTES} bytes; not persisted`);
+      console.error(
+        `collaboration document exceeds ${MAX_DOCUMENT_BYTES} bytes; not persisted`,
+      );
       return;
     }
     const chunks: Record<string, ArrayBuffer> = {};
     let chunkCount = 0;
-    for (let offset = 0; offset < update.byteLength; offset += DOCUMENT_CHUNK_BYTES) {
+    for (
+      let offset = 0;
+      offset < update.byteLength;
+      offset += DOCUMENT_CHUNK_BYTES
+    ) {
       const slice = update.slice(offset, offset + DOCUMENT_CHUNK_BYTES);
       // A copy, because slice() on a subarray-backed view can retain the whole
       // buffer and blow past the per-value storage limit.
       chunks[`doc:${chunkCount}`] = new Uint8Array(slice).buffer;
       chunkCount += 1;
     }
-    const previousCount = (await this.ctx.storage.get<number>("doc:chunks")) ?? 0;
+    const previousCount =
+      (await this.ctx.storage.get<number>("doc:chunks")) ?? 0;
     await this.ctx.storage.put(chunks);
     await this.ctx.storage.put("doc:chunks", chunkCount);
     // Drop chunks left over from a larger previous revision.
     if (previousCount > chunkCount) {
       const stale: string[] = [];
-      for (let index = chunkCount; index < previousCount; index += 1) stale.push(`doc:${index}`);
+      for (let index = chunkCount; index < previousCount; index += 1)
+        stale.push(`doc:${index}`);
       await this.ctx.storage.delete(stale);
     }
   }
@@ -385,59 +448,19 @@ export class NoteRoom extends YServer<Env> {
   }
 }
 
-async function verifyControlRequest(
-  encodedSecret: string,
-  timestamp: string,
-  body: Uint8Array,
-  signature: string,
-): Promise<boolean> {
-  const issuedAt = Number(timestamp);
-  if (!Number.isInteger(issuedAt)) return false;
-  if (Math.abs(Math.floor(Date.now() / 1000) - issuedAt) > CONTROL_CLOCK_SKEW_SECONDS) return false;
-
-  let secret: Uint8Array;
-  try {
-    secret = Uint8Array.from(atob(encodedSecret.trim()), (character) => character.charCodeAt(0));
-  } catch {
-    return false;
+function socketState(connection: Connection): SocketState | null {
+  const state = connection.state;
+  if (
+    !isRecord(state) ||
+    typeof state.userID !== "string" ||
+    (state.role !== "creator" &&
+      state.role !== "editor" &&
+      state.role !== "viewer") ||
+    typeof state.aclVersion !== "number" ||
+    typeof state.resourceID !== "string" ||
+    typeof state.spaceID !== "string"
+  ) {
+    return null;
   }
-  if (secret.byteLength < 32 || !signature) return false;
-  const key = await crypto.subtle.importKey("raw", secret, { name: "HMAC", hash: "SHA-256" }, false, [
-    "sign",
-  ]);
-  const prefix = new TextEncoder().encode(`${timestamp}\n`);
-  const signed = new Uint8Array(prefix.byteLength + body.byteLength);
-  signed.set(prefix);
-  signed.set(body, prefix.byteLength);
-  const digest = new Uint8Array(await crypto.subtle.sign("HMAC", key, signed));
-  const expected = base64URL(digest);
-  return constantTimeEqual(expected, signature);
-}
-
-function base64URL(bytes: Uint8Array): string {
-  let binary = "";
-  for (const byte of bytes) binary += String.fromCharCode(byte);
-  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/u, "");
-}
-
-function constantTimeEqual(left: string, right: string): boolean {
-  const length = Math.max(left.length, right.length);
-  let mismatch = left.length ^ right.length;
-  for (let index = 0; index < length; index += 1) {
-    mismatch |= (left.charCodeAt(index) || 0) ^ (right.charCodeAt(index) || 0);
-  }
-  return mismatch === 0;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function jsonResponse(body: unknown, status = 200, headers?: HeadersInit): Response {
-  const responseHeaders = new Headers(headers);
-  responseHeaders.set("Content-Type", "application/json");
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: responseHeaders,
-  });
+  return state as unknown as SocketState;
 }

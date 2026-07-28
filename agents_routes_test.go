@@ -7,6 +7,7 @@ import (
 )
 
 func TestAgentRoutesRequireAuthentication(t *testing.T) {
+	disableJournalCollabForTest(t)
 	t.Setenv("PASSWORD_RESET_URL", "http://localhost:5173/reset")
 	t.Setenv("PASSWORD_RESET_START_URL", "http://localhost:8080/auth/reset/start")
 	t.Setenv("MAILJET_API_KEY", "")

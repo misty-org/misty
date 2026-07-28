@@ -273,6 +273,7 @@ func (s *RealtimeService) Connect() http.HandlerFunc {
 		client := &realtimeClient{userID: userID, conn: conn, send: make(chan []byte, 256), done: make(chan struct{})}
 		events, resync, err := s.database.SpaceEventsAfter(r.Context(), userID, after, 500)
 		if err != nil {
+			log.Printf("Realtime WebSocket replay failed for user %s after %d: %v", userID, after, err)
 			_ = conn.Close()
 			return
 		}

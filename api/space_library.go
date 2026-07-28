@@ -42,26 +42,27 @@ type SpaceLibraryService struct {
 	database *db.Database
 	store    LibraryObjectStore
 	// egress bounds bytes served per account and across the deployment.
-	egress             *EgressGuard
-	uploadsEnabled     bool
-	attachmentsEnabled bool
-	groupsEnabled      bool
-	previewsEnabled    bool
-	peopleEnabled      bool
-	peopleProcessor    LibraryPeopleProcessor
-	intelligence       *serveragent.SmartLibraryAnalyzer
-	aiEnabled          bool
-	editingEnabled     bool
-	mediaProcessor     LibraryMediaProcessor
-	metadataExtractor  LibraryMetadataExtractor
-	locationsEnabled   bool
-	duplicatesEnabled  bool
-	importsEnabled     bool
-	exportsEnabled     bool
-	malwareScanner     LibraryMalwareScanner
-	uploadLimits       UploadLimits
-	noteAssetsEnabled  bool
-	transfers          TransferTTLs
+	egress               *EgressGuard
+	uploadsEnabled       bool
+	attachmentsEnabled   bool
+	groupsEnabled        bool
+	previewsEnabled      bool
+	peopleEnabled        bool
+	peopleProcessor      LibraryPeopleProcessor
+	intelligence         *serveragent.SmartLibraryAnalyzer
+	aiEnabled            bool
+	editingEnabled       bool
+	mediaProcessor       LibraryMediaProcessor
+	metadataExtractor    LibraryMetadataExtractor
+	locationsEnabled     bool
+	duplicatesEnabled    bool
+	importsEnabled       bool
+	exportsEnabled       bool
+	malwareScanner       LibraryMalwareScanner
+	uploadLimits         UploadLimits
+	noteAssetsEnabled    bool
+	drawingAssetsEnabled bool
+	transfers            TransferTTLs
 	// presigner is non-nil only when the configured object store can sign R2
 	// operations. Local development leaves it nil and keeps the proxy route.
 	presigner LibraryObjectPresigner
@@ -132,6 +133,7 @@ const (
 	UploadPurposeLibrary        UploadPurpose = db.UploadPurposeLibrary
 	UploadPurposeChatAttachment UploadPurpose = db.UploadPurposeChatAttachment
 	UploadPurposeNoteAttachment UploadPurpose = db.UploadPurposeNoteAttachment
+	UploadPurposeDrawingAsset   UploadPurpose = db.UploadPurposeDrawingAsset
 )
 
 // UploadLimits holds the configured maximum file size for each upload purpose.
@@ -139,15 +141,17 @@ type UploadLimits struct {
 	Library        int64
 	ChatAttachment int64
 	NoteAttachment int64
+	DrawingAsset   int64
 }
 
 // DefaultUploadLimits matches the beta product decision: 100 MB Library files,
-// 15 MB note attachments, 10 MB chat attachments.
+// 15 MB Journal note/drawing assets, and 10 MB chat attachments.
 func DefaultUploadLimits() UploadLimits {
 	return UploadLimits{
 		Library:        db.DefaultLibraryMaxFileBytes,
 		ChatAttachment: db.DefaultChatAttachmentMaxFileBytes,
 		NoteAttachment: db.DefaultNoteAttachmentMaxFileBytes,
+		DrawingAsset:   db.DefaultDrawingAssetMaxFileBytes,
 	}
 }
 
@@ -159,6 +163,7 @@ func UploadLimitsFromEnv() UploadLimits {
 	limits.Library = positiveEnvBytes("MISTY_LIBRARY_MAX_FILE_BYTES", limits.Library)
 	limits.ChatAttachment = positiveEnvBytes("MISTY_CHAT_ATTACHMENT_MAX_FILE_BYTES", limits.ChatAttachment)
 	limits.NoteAttachment = positiveEnvBytes("MISTY_NOTE_ATTACHMENT_MAX_FILE_BYTES", limits.NoteAttachment)
+	limits.DrawingAsset = positiveEnvBytes("MISTY_DRAWING_ASSET_MAX_FILE_BYTES", limits.DrawingAsset)
 	return limits
 }
 
@@ -172,6 +177,8 @@ func (l UploadLimits) Max(purpose UploadPurpose) int64 {
 		return l.ChatAttachment
 	case UploadPurposeNoteAttachment:
 		return l.NoteAttachment
+	case UploadPurposeDrawingAsset:
+		return l.DrawingAsset
 	default:
 		return 0
 	}
@@ -185,6 +192,7 @@ func (l UploadLimits) validate() error {
 		{UploadPurposeLibrary, l.Library},
 		{UploadPurposeChatAttachment, l.ChatAttachment},
 		{UploadPurposeNoteAttachment, l.NoteAttachment},
+		{UploadPurposeDrawingAsset, l.DrawingAsset},
 	} {
 		ceiling := db.MaxUploadBytesForPurpose(limit.purpose)
 		if limit.value < 1 || limit.value > ceiling {
@@ -230,6 +238,9 @@ func (s *SpaceLibraryService) uploadPurposeEnabled(purpose UploadPurpose) bool {
 		// routes can check. The generic Library upload endpoint must never
 		// accept this purpose.
 		return false
+	case UploadPurposeDrawingAsset:
+		// Drawing assets are bound to a drawing and must use its route.
+		return false
 	default:
 		return false
 	}
@@ -239,6 +250,11 @@ func (s *SpaceLibraryService) uploadPurposeEnabled(purpose UploadPurpose) bool {
 // routes, which perform the parent-note permission check themselves.
 func (s *SpaceLibraryService) SetNoteAssetsEnabled(enabled bool) {
 	s.noteAssetsEnabled = enabled
+}
+
+// SetDrawingAssetsEnabled enables image references for Drawing routes.
+func (s *SpaceLibraryService) SetDrawingAssetsEnabled(enabled bool) {
+	s.drawingAssetsEnabled = enabled
 }
 
 // transferPurposeEnabled gates the routes that move or finalize bytes for an
@@ -252,7 +268,15 @@ func (s *SpaceLibraryService) transferPurposeEnabled(purpose UploadPurpose) bool
 	if purpose == UploadPurposeNoteAttachment {
 		return s.noteAssetsEnabled
 	}
+	if purpose == UploadPurposeDrawingAsset {
+		return s.drawingAssetsEnabled
+	}
 	return s.uploadPurposeEnabled(purpose)
+}
+
+func isJournalAssetPurpose(purpose UploadPurpose) bool {
+	return purpose == UploadPurposeNoteAttachment ||
+		purpose == UploadPurposeDrawingAsset
 }
 
 func NewSpaceLibraryService(database *db.Database, store LibraryObjectStore, uploadsEnabled bool, limits UploadLimits) (*SpaceLibraryService, error) {
@@ -488,7 +512,6 @@ func (s *SpaceLibraryService) Discovery() http.HandlerFunc {
 		}
 		if !s.locationsEnabled {
 			discovery.Trips = []db.LibraryDiscoveryGroup{}
-			discovery.MapPoints = []db.LibraryMapPoint{}
 		}
 		if !s.duplicatesEnabled {
 			discovery.Duplicates = []db.LibraryDiscoveryGroup{}
@@ -1288,7 +1311,7 @@ func (s *SpaceLibraryService) UploadContent() http.HandlerFunc {
 		}
 		// The proxy route exists only for the local development object store.
 		// Once direct transfer is on, large user bodies must never reach the VPS.
-		if s.directTransfersActive() {
+		if s.directTransfersActive() || isJournalAssetPurpose(pending.Purpose) {
 			writeJSON(w, http.StatusConflict, map[string]string{"code": "library_direct_transfer_required"})
 			return
 		}
@@ -2312,6 +2335,44 @@ func (s *SpaceLibraryService) writeDownload(w http.ResponseWriter, r *http.Reque
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.WriteHeader(http.StatusOK)
 	_, _ = io.Copy(w, reader)
+}
+
+// writeJournalAssetDownload always returns a signed R2 descriptor. Journal
+// image bodies are never opened or proxied by the API, including in local
+// development.
+func (s *SpaceLibraryService) writeJournalAssetDownload(
+	w http.ResponseWriter,
+	r *http.Request,
+	download *db.LibraryDownload,
+) {
+	if !s.directTransfersActive() {
+		writeJSON(
+			w,
+			http.StatusServiceUnavailable,
+			map[string]string{"code": "journal_asset_direct_transfer_required"},
+		)
+		return
+	}
+	if s.egress != nil && !s.egress.Allow(rateLimitIdentity(r), download.ByteSize) {
+		WriteQuotaExceeded(w)
+		return
+	}
+	descriptor, err := s.presigner.PresignGet(
+		r.Context(),
+		download.ObjectKey,
+		download.Filename,
+		s.transfers.DownloadURLTTL,
+	)
+	if err != nil {
+		writeLibraryError(w, err)
+		return
+	}
+	descriptor.MIMEType = download.MIMEType
+	descriptor.ByteSize = download.ByteSize
+	descriptor.SHA256 = download.SHA256
+	w.Header().Set("Cache-Control", "private, no-store")
+	w.Header().Set(librarySignedDownloadHeader, "1")
+	writeJSON(w, http.StatusOK, descriptor)
 }
 
 func libraryRenditionFilename(filename, mimeType string) string {
