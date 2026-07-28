@@ -45,8 +45,7 @@ describe("SpaceSectionNavigation", () => {
     expect(links.map((link) => link.textContent?.trim())).toEqual([
       "Chat",
       "Tasks",
-      "Notes",
-      "Drawings",
+      "Journal",
       "Library",
     ]);
     expect(container.textContent).toContain("Library context");
@@ -75,7 +74,7 @@ describe("SpaceSectionNavigation", () => {
     });
 
     const labels = [...container.querySelectorAll("a")].map((link) => link.textContent?.trim());
-    expect(labels).toEqual(["Notes", "Drawings", "Library"]);
+    expect(labels).toEqual(["Journal", "Library"]);
   });
 
   it("keeps Space management out of the primary strip", async () => {
@@ -108,9 +107,24 @@ describe("SpaceSectionNavigation", () => {
     });
 
     const labels = [...container.querySelectorAll("a")].map((link) => link.textContent?.trim());
-    expect(labels).not.toContain("Notes");
-    expect(labels).not.toContain("Drawings");
+    expect(labels).toContain("Journal");
     expect(labels).not.toContain("Library");
+  });
+
+  it("treats Notes and Drawings as Journal destinations", async () => {
+    useSpacesStore.setState({ spaces: [spaceFixture()] });
+
+    await act(async () => {
+      root.render(
+        <MemoryRouter initialEntries={["/spaces/space-1/drawings"]}>
+          <SpaceSectionNavigation spaceId="space-1" section="drawings" />
+        </MemoryRouter>,
+      );
+    });
+
+    const active = container.querySelector('a[aria-current="page"]');
+    expect(active?.textContent).toContain("Journal");
+    expect(active?.getAttribute("href")).toBe("/spaces/space-1/notes");
   });
 
   it("builds the settings destination when switching Spaces", () => {

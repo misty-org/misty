@@ -5,8 +5,8 @@ export function SpacePanelSkeleton() {
     <div className="grid gap-2" aria-busy="true" role="status">
       <span className="sr-only">Loading Spaces</span>
       <Skeleton className="h-11 rounded-md" />
-      <div className="grid grid-cols-5 gap-1.5">
-        {[0, 1, 2, 3, 4].map((index) => (
+      <div className="grid grid-cols-4 gap-1.5">
+        {[0, 1, 2, 3].map((index) => (
           <Skeleton key={index} className="h-10 rounded-lg" />
         ))}
       </div>

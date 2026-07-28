@@ -1,5 +1,7 @@
 import type {
   AppState,
+  BinaryFileData,
+  BinaryFiles,
   Collaborator,
   ExcalidrawImperativeAPI,
   SocketId,
@@ -8,6 +10,7 @@ import type { OrderedExcalidrawElement } from "@excalidraw/excalidraw/element/ty
 import type { RemoteExcalidrawElement } from "@excalidraw/excalidraw/data/reconcile";
 import { CaptureUpdateAction, Excalidraw, reconcileElements } from "@excalidraw/excalidraw";
 import "@excalidraw/excalidraw/index.css";
+import "./collaborativeDrawingCanvas.css";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAppThemeStore } from "@/stores/app";
 import {
@@ -16,6 +19,7 @@ import {
   writeDrawingElements,
 } from "../collaboration/drawingSceneStore";
 import type { DrawingCollaborationSession } from "../collaboration/drawingCollaboration";
+import { hydrateDrawingBinaryFile, uploadDrawingBinaryFile } from "../drawingAssets";
 import type { SpaceDrawing } from "../types";
 
 interface CollaborativeDrawingCanvasProps {
@@ -27,7 +31,34 @@ export default function CollaborativeDrawingCanvas(props: CollaborativeDrawingCa
   const theme = useAppThemeStore((state) => state.resolvedTheme);
   const [api, setApi] = useState<ExcalidrawImperativeAPI | null>(null);
   const selectedElementsRef = useRef("");
+  const fileUploadsRef = useRef(new Map<string, Promise<void>>());
+  const fileHydrationsRef = useRef(new Map<string, Promise<void>>());
   const pointerPublisher = useMemo(() => createPointerPublisher(props.session), [props.session]);
+
+  const shareBinaryFiles = useCallback(
+    async (files: readonly BinaryFileData[]) => {
+      if (props.drawing.role === "viewer") return;
+      await Promise.all(
+        files.map(async (file) => {
+          if (props.session.files.has(file.id)) return;
+          const active = fileUploadsRef.current.get(file.id);
+          if (active) return active;
+          const upload = uploadDrawingBinaryFile(props.drawing.space_id, props.drawing.id, file)
+            .then((reference) => {
+              props.session.doc.transact(() => {
+                props.session.files.set(file.id, reference);
+              }, localDrawingOrigin);
+            })
+            .finally(() => {
+              fileUploadsRef.current.delete(file.id);
+            });
+          fileUploadsRef.current.set(file.id, upload);
+          return upload;
+        }),
+      );
+    },
+    [props.drawing.id, props.drawing.role, props.drawing.space_id, props.session],
+  );
 
   const applySharedScene = useCallback(() => {
     if (!api) return;
@@ -77,8 +108,52 @@ export default function CollaborativeDrawingCanvas(props: CollaborativeDrawingCa
     };
   }, [applyCollaborators, applySharedScene, pointerPublisher, props.session]);
 
+  useEffect(() => {
+    if (!api) return;
+    let active = true;
+    const hydrateFiles = () => {
+      for (const reference of props.session.files.values()) {
+        if (api.getFiles()[reference.fileId] || fileHydrationsRef.current.has(reference.fileId)) {
+          continue;
+        }
+        const hydration = hydrateDrawingBinaryFile(
+          props.drawing.space_id,
+          props.drawing.id,
+          reference,
+        )
+          .then((file) => {
+            if (active) api.addFiles([file]);
+          })
+          .catch((cause) => {
+            if (!active) return;
+            api.setToast({
+              message:
+                cause instanceof Error ? cause.message : "A shared image could not be loaded.",
+              duration: 4000,
+            });
+          })
+          .finally(() => {
+            fileHydrationsRef.current.delete(reference.fileId);
+          });
+        fileHydrationsRef.current.set(reference.fileId, hydration);
+      }
+    };
+    props.session.files.observe(hydrateFiles);
+    hydrateFiles();
+    return () => {
+      active = false;
+      props.session.files.unobserve(hydrateFiles);
+    };
+  }, [api, props.drawing.id, props.drawing.space_id, props.session.files]);
+
   const handleChange = useCallback(
-    (elements: readonly OrderedExcalidrawElement[], appState: AppState) => {
+    (elements: readonly OrderedExcalidrawElement[], appState: AppState, files: BinaryFiles) => {
+      if (appState.openSidebar?.name === "default") {
+        api?.updateScene({
+          appState: { openSidebar: null },
+          captureUpdate: CaptureUpdateAction.NEVER,
+        });
+      }
       const selected = JSON.stringify(appState.selectedElementIds);
       if (selected !== selectedElementsRef.current) {
         selectedElementsRef.current = selected;
@@ -88,6 +163,12 @@ export default function CollaborativeDrawingCanvas(props: CollaborativeDrawingCa
         );
       }
       if (props.drawing.role === "viewer") return;
+      void shareBinaryFiles(Object.values(files)).catch((cause) => {
+        api?.setToast({
+          message: cause instanceof Error ? cause.message : "A shared image could not be uploaded.",
+          duration: 4000,
+        });
+      });
       writeDrawingElements(props.session.elements, elements);
       if (props.session.scene.get("viewBackgroundColor") !== appState.viewBackgroundColor) {
         props.session.doc.transact(() => {
@@ -95,11 +176,11 @@ export default function CollaborativeDrawingCanvas(props: CollaborativeDrawingCa
         }, localDrawingOrigin);
       }
     },
-    [props.drawing.role, props.session],
+    [api, props.drawing.role, props.session, shareBinaryFiles],
   );
 
   return (
-    <div className="h-full min-h-0 w-full" data-misty-window-drag-block="true">
+    <div className="misty-excalidraw h-full min-h-0 w-full" data-misty-window-drag-block="true">
       <Excalidraw
         excalidrawAPI={setApi}
         initialData={{
@@ -115,22 +196,30 @@ export default function CollaborativeDrawingCanvas(props: CollaborativeDrawingCa
         viewModeEnabled={props.drawing.role === "viewer"}
         onChange={handleChange}
         onPointerUpdate={pointerPublisher.publish}
-        onPaste={(data) => {
-          if (
-            Object.keys(data.files ?? {}).length > 0 ||
-            data.mixedContent?.some((item) => item.type === "imageUrl")
-          ) {
+        onPaste={async (data) => {
+          const files = Object.values(data.files ?? {});
+          if (files.length > 0) {
+            try {
+              await shareBinaryFiles(files);
+              return true;
+            } catch (cause) {
+              api?.setToast({
+                message:
+                  cause instanceof Error ? cause.message : "The image could not be uploaded.",
+                duration: 4000,
+              });
+              return false;
+            }
+          }
+          if (data.mixedContent?.some((item) => item.type === "imageUrl")) {
             api?.setToast({
-              message:
-                "Shared image uploads are coming next. Shapes and text are fully collaborative.",
-              duration: 4000,
+              message: "Fetching and securing the shared image…",
+              duration: 2000,
             });
-            return false;
           }
           return true;
         }}
         UIOptions={{
-          tools: { image: false },
           canvasActions: {
             loadScene: false,
             saveToActiveFile: false,

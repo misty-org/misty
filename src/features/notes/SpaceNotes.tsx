@@ -8,9 +8,10 @@ import { NotesTopBar } from "./components/NotesTopBar";
 import { NoteReadingPane } from "./components/NoteReadingPane";
 import { NoteContextPanel } from "./components/NoteContextPanel";
 import { NewNoteDialog } from "./components/NewNoteDialog";
+import { JournalAttribution } from "@/features/journal/components/JournalAttribution";
 
 const shellClass =
-  "grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] bg-background text-foreground";
+  "relative grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] bg-background text-foreground";
 
 const bodyClass = "grid min-h-0 grid-cols-[minmax(0,1fr)] overflow-hidden";
 
@@ -120,6 +121,11 @@ export function SpaceNotes(props: SpaceNotesProps) {
         onCreate={async (input) => {
           await actions.createNote(input);
         }}
+      />
+      <JournalAttribution
+        technology="BlockNote"
+        href="https://www.blocknotejs.org/"
+        className="absolute bottom-3 right-3 z-20 shadow-sm backdrop-blur-sm"
       />
     </div>
   );

@@ -10,6 +10,7 @@ const validSpaceSections = new Set([
   "chat",
   "tasks",
   "notes",
+  "drawings",
   "library",
   "assistant",
   "members",

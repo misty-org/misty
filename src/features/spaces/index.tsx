@@ -166,18 +166,11 @@ export function SpaceDetail() {
           <SpaceNotes key={`notes:${spaceId}`} spaceId={spaceId} spaceName={space.name} />
         )
       ) : section === "drawings" ? (
-        space.permissions?.["library.view"] === false ? (
-          <SpacePermissionDenied
-            title="Drawing access required"
-            detail="You do not have permission to view this Space's drawings."
-          />
-        ) : (
-          <SpaceDrawings
-            key={`drawings:${spaceId}:${studioKind}`}
-            spaceId={spaceId}
-            drawingId={studioKind}
-          />
-        )
+        <SpaceDrawings
+          key={`drawings:${spaceId}:${studioKind}`}
+          spaceId={spaceId}
+          drawingId={studioKind}
+        />
       ) : section === "assistant" ? (
         <Navigate to={`/agents?spaceId=${encodeURIComponent(spaceId)}`} replace />
       ) : section === "members" ? (

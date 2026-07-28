@@ -3,7 +3,7 @@ import YProvider from "y-partyserver/provider";
 import * as Y from "yjs";
 import { accountScopeResetEvent } from "@/stores/account/accountEvents";
 import { drawingsApi } from "../api/drawingsApi";
-import type { DrawingCollaborationTicket } from "../types";
+import type { DrawingAssetReference, DrawingCollaborationTicket } from "../types";
 
 export interface DrawingCollaborationSession {
   key: string;
@@ -13,6 +13,7 @@ export interface DrawingCollaborationSession {
   doc: Y.Doc;
   elements: Y.Map<OrderedExcalidrawElement>;
   scene: Y.Map<unknown>;
+  files: Y.Map<DrawingAssetReference>;
   provider: YProvider;
 }
 
@@ -41,12 +42,13 @@ export async function acquireDrawingSession(
   if (entry.session) return entry.session;
   if (entry.promise) return entry.promise;
 
+  const sessionEntry = entry;
   entry.promise = createSession(spaceId, drawingId, key)
     .then((session) => {
       const current = sessions.get(key);
-      if (!current) {
+      if (current !== sessionEntry) {
         destroySession(session);
-        return session;
+        throw new Error("Drawing collaboration session was closed.");
       }
       current.session = session;
       current.promise = undefined;
@@ -54,7 +56,7 @@ export async function acquireDrawingSession(
       return session;
     })
     .catch((error) => {
-      sessions.delete(key);
+      if (sessions.get(key) === sessionEntry) sessions.delete(key);
       throw error;
     });
   return entry.promise;
@@ -111,6 +113,7 @@ async function createSession(
     doc,
     elements: doc.getMap<OrderedExcalidrawElement>("drawing:elements"),
     scene: doc.getMap("drawing:scene"),
+    files: doc.getMap<DrawingAssetReference>("drawing:files"),
     provider,
   };
 }
