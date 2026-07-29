@@ -1,10 +1,9 @@
 import { useEffect, useState } from "react";
-import { useLocation, useNavigate } from "react-router";
 import { useAuth } from "../../AuthContext";
 import AuthCard from "../Auth/AuthCard";
 import AuthShell from "../Auth/AuthShell";
 import { forgotPasswordRequest, signInRequest, type AuthUser } from "../Auth/api";
-import { fetchMe, type MeResponse } from "../AccountSettings/api";
+import type { MeResponse } from "../AccountSettings/api";
 import ForgotPasswordForm from "./ForgotPasswordForm";
 import SignInForm from "./SignInForm";
 import { marketingCopy } from "@/content/marketingCopy";
@@ -22,10 +21,7 @@ interface SignInProps {
 }
 
 export default function SignIn({ onSignedIn }: SignInProps = {}) {
-  const navigate = useNavigate();
-  const location = useLocation();
-  const { setUser } = useAuth();
-  const from = (location.state as { from?: string })?.from || "/";
+  const { refreshSession } = useAuth();
 
   const [mode, setMode] = useState<SignInMode>("signin");
   const [email, setEmail] = useState("");
@@ -60,10 +56,9 @@ export default function SignIn({ onSignedIn }: SignInProps = {}) {
 
     try {
       const user = await signInRequest(email, password);
-      const me = onSignedIn ? await fetchMe() : null;
+      const me = await refreshSession();
       await onSignedIn?.(user, { email, password, me });
-      setUser(user);
-      navigate(from, { replace: true });
+      window.location.replace("/");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not connect to server");
     } finally {

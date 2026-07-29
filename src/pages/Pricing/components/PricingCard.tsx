@@ -17,6 +17,7 @@ interface PricingCardProps {
   ctaHref?: string;
   ctaLabel: string;
   ctaBusy?: boolean;
+  ctaDisabled?: boolean;
   onCtaClick?: () => void;
 }
 
@@ -32,6 +33,7 @@ export default function PricingCard({
   ctaHref,
   ctaLabel,
   ctaBusy = false,
+  ctaDisabled = false,
   onCtaClick,
 }: PricingCardProps) {
   const externalCta = ctaHref ? /^https:\/\//i.test(ctaHref) : false;
@@ -47,7 +49,7 @@ export default function PricingCard({
     >
       {popular ? (
         <span className="absolute left-1/2 top-0 -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary px-3 py-1 text-[11px] font-medium text-primary-foreground shadow-sm">
-          Recommended
+          Most popular
         </span>
       ) : null}
 
@@ -96,11 +98,11 @@ export default function PricingCard({
       </div>
 
       <div>
-        {onCtaClick ? (
+        {onCtaClick || ctaDisabled ? (
           <Button
             type="button"
             className="h-11 w-full px-4 text-sm"
-            disabled={ctaBusy}
+            disabled={ctaBusy || ctaDisabled}
             aria-busy={ctaBusy}
             onClick={onCtaClick}
           >

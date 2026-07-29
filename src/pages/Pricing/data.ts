@@ -1,5 +1,5 @@
 export type CustomerPlanId = keyof typeof PRICING_MODEL;
-export type PaidTier = "pro";
+export type PaidTier = "pro" | "max";
 export type BillingInterval = "month" | "year";
 export type PricingInterval = BillingInterval;
 
@@ -12,28 +12,33 @@ export type PricingInterval = BillingInterval;
 export const PRICING_MODEL = {
   free: {
     id: "free",
-    name: "Free",
-    monthlyPrice: "$0",
-    yearlyPrice: "$0",
-    spaces: "3 Spaces",
-    collaborators: "5 collaborators per Space",
-    customAgents: "1 custom agent",
+    name: "Basic",
+    monthlyPrice: "Free",
+    yearlyPrice: "Free",
+    spaces: "Up to 3 Spaces",
     storage: "2 GB",
-    agentUsage: "Weekly agent usage",
-    modelRouting: "Same automatic model routing as Pro",
+    agentUsage: "Light AI agent usage",
   },
   pro: {
     id: "pro",
     name: "Pro",
-    monthlyPrice: "$9",
-    yearlyPrice: "$89",
-    spaces: "Unlimited Spaces",
-    collaborators: "Unlimited collaborators",
-    customAgents: "Unlimited custom agents",
+    monthlyPrice: "$8",
+    yearlyPrice: "$79",
+    yearlySavings: "$17",
+    spaces: "Up to 10 Spaces",
     storage: "50 GB",
-    agentUsage: "over 10× more weekly agent usage",
-    modelRouting: "Same automatic model routing as Free",
+    agentUsage: "Approximately 6× Basic agent usage",
     trialDays: 14,
+  },
+  max: {
+    id: "max",
+    name: "Max",
+    monthlyPrice: "$19",
+    yearlyPrice: "$189",
+    yearlySavings: "$39",
+    spaces: "Unlimited Spaces",
+    storage: "250 GB",
+    agentUsage: "2× Pro agent usage",
   },
 } as const;
 
@@ -44,22 +49,21 @@ export const plans = [
     prices: {
       month: {
         price: PRICING_MODEL.free.monthlyPrice,
-        period: "/ month",
+        period: "",
         billingNote: "Free forever",
       },
       year: {
         price: PRICING_MODEL.free.yearlyPrice,
-        period: "/ year",
+        period: "",
         billingNote: "Free forever",
       },
     },
     features: [
       PRICING_MODEL.free.spaces,
-      PRICING_MODEL.free.collaborators,
-      PRICING_MODEL.free.customAgents,
-      `${PRICING_MODEL.free.storage} total storage across Spaces you own`,
       PRICING_MODEL.free.agentUsage,
-      PRICING_MODEL.free.modelRouting,
+      "Agent usage resets weekly",
+      `${PRICING_MODEL.free.storage} storage`,
+      "Misty’s core collaboration experience",
     ],
   },
   {
@@ -69,21 +73,43 @@ export const plans = [
       month: {
         price: PRICING_MODEL.pro.monthlyPrice,
         period: "/ month",
-        billingNote: "14-day trial, then billed monthly.",
+        billingNote: "Billed monthly",
       },
       year: {
         price: PRICING_MODEL.pro.yearlyPrice,
         period: "/ year",
-        billingNote: "14-day trial, then billed yearly.",
+        billingNote: `Save ${PRICING_MODEL.pro.yearlySavings} per year`,
       },
     },
     features: [
       PRICING_MODEL.pro.spaces,
-      PRICING_MODEL.pro.collaborators,
-      PRICING_MODEL.pro.customAgents,
-      `${PRICING_MODEL.pro.storage} total storage across Spaces you own`,
       PRICING_MODEL.pro.agentUsage,
-      PRICING_MODEL.pro.modelRouting,
+      "Agent usage resets weekly",
+      `${PRICING_MODEL.pro.storage} storage`,
+      "Misty’s core collaboration experience",
+    ],
+  },
+  {
+    id: "max",
+    name: PRICING_MODEL.max.name,
+    prices: {
+      month: {
+        price: PRICING_MODEL.max.monthlyPrice,
+        period: "/ month",
+        billingNote: "Billed monthly",
+      },
+      year: {
+        price: PRICING_MODEL.max.yearlyPrice,
+        period: "/ year",
+        billingNote: `Save ${PRICING_MODEL.max.yearlySavings} per year`,
+      },
+    },
+    features: [
+      PRICING_MODEL.max.spaces,
+      PRICING_MODEL.max.agentUsage,
+      "Agent usage resets weekly",
+      `${PRICING_MODEL.max.storage} storage`,
+      "Misty’s core collaboration experience",
     ],
   },
 ] as const;
@@ -91,71 +117,67 @@ export const plans = [
 export const planLimitRows = [
   {
     label: "Price",
-    free: PRICING_MODEL.free.monthlyPrice,
+    basic: PRICING_MODEL.free.monthlyPrice,
     pro: `${PRICING_MODEL.pro.monthlyPrice} monthly / ${PRICING_MODEL.pro.yearlyPrice} yearly`,
+    max: `${PRICING_MODEL.max.monthlyPrice} monthly / ${PRICING_MODEL.max.yearlyPrice} yearly`,
   },
-  { label: "Spaces you own", free: "3", pro: "Unlimited" },
-  { label: "Collaborators per Space", free: "5", pro: "Unlimited" },
-  { label: "Custom agents", free: "1", pro: "Unlimited" },
   {
-    label: "Storage pooled across owned Spaces",
-    free: PRICING_MODEL.free.storage,
-    pro: PRICING_MODEL.pro.storage,
+    label: "Spaces you belong to",
+    basic: "Up to 3",
+    pro: "Up to 10",
+    max: "Unlimited",
   },
   {
     label: "Agent usage",
-    free: "Weekly usage",
+    basic: PRICING_MODEL.free.agentUsage,
     pro: PRICING_MODEL.pro.agentUsage,
+    max: PRICING_MODEL.max.agentUsage,
   },
-  { label: "Automatic model routing", free: "Included", pro: "Included" },
+  {
+    label: "Storage",
+    basic: PRICING_MODEL.free.storage,
+    pro: PRICING_MODEL.pro.storage,
+    max: PRICING_MODEL.max.storage,
+  },
 ] as const;
 
 export const ownerRules = [
   {
-    title: "Storage follows the owner",
+    title: "Your plan stays yours",
     description:
-      "Hosted files count toward the Space owner’s pooled storage, including files uploaded by collaborators.",
+      "Your own plan controls your Space limit and AI agent usage. Joining a Space created by a Pro or Max member does not upgrade your account.",
   },
   {
-    title: "Collaboration does not use your storage",
+    title: "Pending invitations do not count",
     description:
-      "Joining Spaces and collaborating do not use your storage. Only hosted files in Spaces you own count toward your pool.",
+      "A Space counts only after you join it. Pending invitations do not use a Space slot.",
   },
   {
-    title: "Agent usage stays personal",
-    description:
-      "Agent usage resets weekly. Misty shows the percentage used and reset date, never a dollar or usage-unit balance.",
+    title: "Leaving frees a slot",
+    description: "Leaving a Space immediately makes room for another one.",
   },
   {
-    title: "No surprise charges",
+    title: "Upgrade or make room",
     description:
-      "There are no automatic overages or surprise charges. Usage pauses at the limit instead of creating a bill.",
+      "At your limit, leave a Space or upgrade before creating another Space or accepting another invitation.",
   },
 ] as const;
 
 export const pricingFaqs = [
   {
-    q: "How does storage work across Spaces?",
-    a: "Your storage is pooled across every Space you own. Hosted files are charged to the Space owner, including files uploaded by collaborators. Joining someone else’s Space and collaborating there do not use your storage.",
+    q: "What counts toward my Space limit?",
+    a: "Every Space you currently belong to counts, whether you created it or joined it. Pending invitations do not count, and leaving a Space frees a slot.",
   },
   {
-    q: "What happens when I reach my weekly agent limit?",
-    a: "New agent work pauses until your weekly reset or until you upgrade. Files, Spaces, conversations, and collaboration keep working, and there are no automatic overages.",
+    q: "Does joining a paid member’s Space upgrade my plan?",
+    a: "No. Your Space limit and AI agent usage come from your own Misty plan, even when a Pro or Max member created the Space.",
   },
   {
-    q: "Does Pro start with a trial?",
-    a: "Yes. Monthly and yearly Pro subscriptions begin with a one-time 14-day trial. A card is required, and the plan automatically renews unless you cancel.",
+    q: "How is AI agent usage measured?",
+    a: "Misty measures the work agents perform rather than treating every request as identical. A short conversation uses less than analyzing a large collection of files or media. AI agent usage includes agent conversations, Space and Library questions, file or media analysis, Smart Library indexing, and other agent-powered work. Usage resets weekly.",
   },
   {
-    q: "Do Free and Pro use different AI models?",
-    a: "No. Both plans use the same automatic model routing. Pro simply gives you over 10× more weekly agent usage.",
-  },
-  {
-    q: "How does Misty handle my data?",
-    a: "Private files stay local or with the connected provider until copied into a Space. Agents only use context you are permitted to access. If you exceed storage, existing data remains intact and nothing is automatically deleted.",
-  },
-  {
-    q: "Can usage create an extra bill?",
-    a: "No. Misty never charges beyond your plan automatically. Agent usage and new hosted uploads pause at their limits, so there are no automatic overages or surprise charges.",
+    q: "What happens when I reach my Space limit?",
+    a: "You can leave an existing Space to free a slot or upgrade your plan. Until then, you cannot create another Space or accept another invitation.",
   },
 ] as const;

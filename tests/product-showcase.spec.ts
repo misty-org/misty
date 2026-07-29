@@ -63,8 +63,11 @@ test("the hero call to action moves visitors to sign up", async ({ page }) => {
   await getStartedLink.click();
   await expect(page).toHaveURL(/\/register$/);
   await expect(
-    page.getByRole("heading", { level: 1, name: "Join Misty" }),
+    page.getByRole("heading", { level: 1, name: "Create an account" }),
   ).toBeVisible();
+  await expect(page.getByLabel("Name")).toBeVisible();
+  await expect(page.getByLabel("Email")).toBeVisible();
+  await expect(page.getByLabel("Password")).toBeVisible();
 });
 
 test("the footer keeps product resources and community links focused", async ({

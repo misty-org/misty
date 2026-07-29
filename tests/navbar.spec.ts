@@ -25,6 +25,25 @@ test("the navbar theme toggle persists across navigation and reload", async ({ p
   await expect(page.getByRole("button", { name: "Switch to dark theme" })).toBeVisible();
 });
 
+test("page navigation mounts the destination with the entrance transition", async ({
+  page,
+}) => {
+  const homePage = page.locator('[data-page-transition="/"]');
+  await expect(homePage).toBeVisible();
+  await expect(homePage).toHaveClass(/page-transition/);
+
+  await page
+    .getByRole("navigation", { name: "Explore footer links" })
+    .getByRole("link", { name: "Pricing", exact: true })
+    .click();
+
+  await expect(page).toHaveURL(/\/pricing$/);
+  const pricingPage = page.locator('[data-page-transition="/pricing"]');
+  await expect(pricingPage).toBeVisible();
+  await expect(homePage).toHaveCount(0);
+  await expect(pricingPage).toHaveClass(/page-transition/);
+});
+
 test("the mobile menu opens, navigates, and closes", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "mobile-chromium", "Mobile navigation is only rendered at the mobile breakpoint.");
 

@@ -88,15 +88,11 @@ async function prepareAccount(
     : billingUsage,
 ) {
   await page.addInitScript(
-    ({ account, initialTheme }) => {
+    (initialTheme) => {
       window.localStorage.clear();
-      window.localStorage.setItem("misty_user", JSON.stringify(account));
       window.localStorage.setItem("misty-ui-theme", initialTheme);
     },
-    {
-      account: { id: me.id, name: me.name, email: me.email },
-      initialTheme: theme,
-    },
+    theme,
   );
 
   await page.route("**/api/**", async (route) => {
@@ -227,6 +223,7 @@ for (const theme of ["light", "dark"] as const) {
     ).toBeVisible();
     await expect(dialog.getByText("Pro · monthly")).toBeVisible();
     await expect(dialog.getByText("Active")).toBeVisible();
+    await expect(dialog.locator('[data-slot="badge"]')).toHaveCount(0);
     await expect(
       dialog.getByRole("button", { name: "Manage billing" }),
     ).toBeVisible();
@@ -335,9 +332,9 @@ test("free accounts can select the monthly Pro trial", async ({ page }) => {
   await dialog.getByRole("button", { name: "Billing", exact: true }).click();
   await expect(dialog.getByText(/50 GB of pooled owner storage/)).toBeVisible();
   await expect(
-    dialog.getByText(/over 10× more weekly agent usage/),
+    dialog.getByText(/Approximately 6× Basic agent usage/),
   ).toBeVisible();
-  await dialog.getByRole("button", { name: "Start Pro trial · $9/mo" }).click();
+  await dialog.getByRole("button", { name: "Start Pro trial · $8/mo" }).click();
   await expect
     .poll(() =>
       requests.some(({ path }) => path.endsWith("/billing/checkout-session")),
