@@ -5,7 +5,7 @@ describe("telemetry redaction", () => {
   it("removes paths, tokens, email addresses, and sensitive keys", () => {
     const result = redactRecord({
       operation: "opening /Users/alice/private.txt",
-      access_token: "abcdefghijklmnopqrstuvwxyz123456",
+      access_token: "abcdefghijklmnopqrstuvwxyz123456", // gitleaks:allow -- synthetic redaction fixture
       nested: { email: "alice@example.com" },
     });
     expect(JSON.stringify(result)).not.toContain("alice");
