@@ -47,6 +47,7 @@ function requiredCspSources(name, protocols) {
     }
     return parsed.origin;
   });
+
 }
 
 const pubkey = required("TAURI_UPDATER_PUBLIC_KEY");
