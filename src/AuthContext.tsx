@@ -1,6 +1,16 @@
-import { createContext, useContext, useState, useEffect, useCallback } from "react";
-import { useNavigate } from "react-router";
-import { logoutRequest } from "./pages/AccountSettings/api";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
+import {
+  fetchMe,
+  logoutRequest,
+  type MeResponse,
+} from "./pages/AccountSettings/api";
 import { useUserStore } from "./store/userStore";
 
 interface User {
@@ -11,13 +21,17 @@ interface User {
 
 interface AuthContextType {
   user: User | null;
+  sessionReady: boolean;
   setUser: (user: User | null) => void;
+  refreshSession: () => Promise<MeResponse>;
   logout: () => void;
 }
 
 const AuthContext = createContext<AuthContextType>({
   user: null,
+  sessionReady: false,
   setUser: () => {},
+  refreshSession: () => Promise.reject(new Error("AuthProvider is unavailable")),
   logout: () => {},
 });
 
@@ -27,39 +41,71 @@ interface AuthProviderProps {
 }
 
 export function AuthProvider({ children, onLogout }: AuthProviderProps) {
-  const [user, setUser] = useState<User | null>(() => {
+  const [user, setUserState] = useState<User | null>(null);
+  const [sessionReady, setSessionReady] = useState(false);
+  const sessionRevision = useRef(0);
+
+  const setUser = useCallback((nextUser: User | null) => {
+    sessionRevision.current += 1;
+    setUserState(nextUser);
+    setSessionReady(true);
+  }, []);
+
+  const refreshSession = useCallback(async () => {
+    const revision = sessionRevision.current + 1;
+    sessionRevision.current = revision;
+
     try {
-      const stored = localStorage.getItem("misty_user");
-      return stored ? (JSON.parse(stored) as User) : null;
-    } catch {
-      return null;
+      const account = await fetchMe();
+      if (sessionRevision.current === revision) {
+        useUserStore.getState().setMe(account);
+        setUserState({
+          id: account.id,
+          name: account.name,
+          email: account.email,
+        });
+      }
+      return account;
+    } catch (error) {
+      if (sessionRevision.current === revision) {
+        useUserStore.getState().clear();
+        setUserState(null);
+      }
+      throw error;
+    } finally {
+      if (sessionRevision.current === revision) {
+        setSessionReady(true);
+      }
     }
-  });
+  }, []);
 
   useEffect(() => {
-    try {
-      if (user) {
-        localStorage.setItem("misty_user", JSON.stringify(user));
-      } else {
-        localStorage.removeItem("misty_user");
-      }
-    } catch {
-      // Authentication remains usable for the current session without storage.
-    }
-  }, [user]);
-
-  const navigate = useNavigate();
+    void refreshSession().catch(() => {
+      // A missing or expired HttpOnly session cookie means signed out.
+    });
+  }, [refreshSession]);
 
   const logout = useCallback(() => {
-    logoutRequest().catch(() => {});
     useUserStore.getState().clear();
-    void onLogout?.();
     setUser(null);
-    navigate("/");
-  }, [navigate, onLogout]);
+    void (async () => {
+      try {
+        await logoutRequest();
+      } catch {
+        // The local session is still cleared if the server is unavailable.
+      }
+      try {
+        await onLogout?.();
+      } finally {
+        window.location.replace("/");
+      }
+    })();
+  }, [onLogout, setUser]);
 
   return (
-    <AuthContext.Provider value={{ user, setUser, logout }}>
+    <AuthContext.Provider
+      value={{ user, sessionReady, setUser, refreshSession, logout }}
+    >
       {children}
     </AuthContext.Provider>
   );

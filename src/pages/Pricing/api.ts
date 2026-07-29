@@ -14,7 +14,10 @@ export async function createSubscriptionCheckout(
 
   if (!response.ok) {
     const message = (await response.text()).trim();
-    throw new Error(message || "Unable to start checkout");
+    throw Object.assign(
+      new Error(message || "Unable to start checkout"),
+      { status: response.status },
+    );
   }
 
   const result = (await response.json()) as { url?: string };

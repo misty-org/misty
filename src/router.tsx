@@ -51,7 +51,7 @@ export const router = createBrowserRouter([
         path: "pricing",
         element: <Pricing />,
         handle: {
-          title: "Pricing — Free and Pro plans | Misty",
+          title: "Pricing — Basic, Pro, and Max plans | Misty",
           description: marketingCopy.metadata.pricing,
         },
       },
@@ -133,9 +133,8 @@ export const router = createBrowserRouter([
         path: "register",
         element: <Register />,
         handle: {
-          title: "Join Misty — Misty",
-          description:
-            "Sign in to join your group and start working together in Misty.",
+          title: "Create an account — Misty",
+          description: "Sign up to get started with Misty.",
         },
       },
       {

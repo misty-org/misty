@@ -13,7 +13,7 @@ const publicRoutes = [
   {
     name: "pricing",
     path: "/pricing",
-    title: "Pricing — Free and Pro plans | Misty",
+    title: "Pricing — Basic, Pro, and Max plans | Misty",
   },
   {
     name: "features",
@@ -33,7 +33,11 @@ const publicRoutes = [
   },
   { name: "legacy join", path: "/waitlist", title: "Join Misty — Misty" },
   { name: "sign in", path: "/signin", title: "Sign in — Misty" },
-  { name: "register", path: "/register", title: "Join Misty — Misty" },
+  {
+    name: "register",
+    path: "/register",
+    title: "Create an account — Misty",
+  },
   {
     name: "tokenless reset",
     path: "/reset",
@@ -80,6 +84,15 @@ for (const route of publicRoutes) {
       ).toBe(true);
       await expect(page).toHaveTitle(route.title);
       await expect(page.locator("main")).toBeVisible();
+      const footerTop = await page.locator("footer").evaluate((footer) => {
+        const bounds = footer.getBoundingClientRect();
+        return bounds.top + window.scrollY;
+      });
+      const viewportHeight = await page.evaluate(() => window.innerHeight);
+      expect(
+        footerTop,
+        `${route.path} should provide a full viewport before the footer`,
+      ).toBeGreaterThanOrEqual(viewportHeight - 1);
       await expect(page.locator("html")).toHaveClass(
         new RegExp(`(^|\\s)${theme}(\\s|$)`),
       );

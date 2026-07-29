@@ -1,15 +1,29 @@
 import { useState } from "react";
+import { useSearchParams } from "react-router";
 
 import { PublicPage } from "@/components/marketing";
+import CheckoutSuccess from "./components/CheckoutSuccess";
 import PricingFaq from "./components/PricingFaq";
 import PricingHeader from "./components/PricingHeader";
 import type { PricingInterval } from "./data";
 import PlanGrid from "./sections/PlanGrid";
-import { useProCheckout } from "./useProCheckout";
+import { usePaidCheckout } from "./useProCheckout";
 
 export default function Pricing() {
   const [interval, setInterval] = useState<PricingInterval>("month");
-  const { openCheckout, pending, error } = useProCheckout(setInterval);
+  const [searchParams] = useSearchParams();
+  const {
+    openCheckout,
+    pendingTier,
+    error,
+    currentPlanTier,
+    hasManagedSubscription,
+    checkoutReady,
+  } = usePaidCheckout(setInterval);
+
+  if (searchParams.get("checkout") === "success") {
+    return <CheckoutSuccess />;
+  }
 
   return (
     <PublicPage>
@@ -17,10 +31,13 @@ export default function Pricing() {
 
       <PlanGrid
         interval={interval}
-        checkoutPending={pending}
+        checkoutPendingTier={pendingTier}
         checkoutError={error}
+        checkoutReady={checkoutReady}
+        currentPlanTier={currentPlanTier}
+        hasManagedSubscription={hasManagedSubscription}
         onIntervalChange={setInterval}
-        onProCheckout={() => void openCheckout(interval)}
+        onPaidCheckout={(tier) => void openCheckout(tier, interval)}
       />
 
       <div className="mx-auto max-w-3xl border-t border-border pt-12">

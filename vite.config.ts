@@ -18,9 +18,32 @@ function isLocalApiBase(value?: string) {
   }
 }
 
+function apiProxyTarget(value?: string) {
+  const rawTarget = value?.trim();
+  if (!rawTarget) {
+    return undefined;
+  }
+
+  const target = new URL(rawTarget);
+  if (
+    !["http:", "https:"].includes(target.protocol) ||
+    target.username ||
+    target.password ||
+    target.pathname !== "/" ||
+    target.search ||
+    target.hash
+  ) {
+    throw new Error(
+      "VITE_API_PROXY_TARGET must be an HTTP(S) origin without credentials, a path, query, or fragment.",
+    );
+  }
+  return target.origin;
+}
+
 // https://vite.dev/config/
 export default defineConfig(({ command, mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
+  const proxyTarget = apiProxyTarget(env.VITE_API_PROXY_TARGET);
   if (command === "build" && mode === "production" && isLocalApiBase(env.VITE_API_BASE)) {
     throw new Error(
       "Production builds cannot use a localhost VITE_API_BASE. Set VITE_API_BASE to the deployed API URL or omit it to use /api.",
@@ -31,6 +54,14 @@ export default defineConfig(({ command, mode }) => {
     plugins: [react(), tailwindcss(), sites()],
     server: {
       port: 5174,
+      proxy: proxyTarget
+        ? {
+            "/api": {
+              target: proxyTarget,
+              changeOrigin: true,
+            },
+          }
+        : undefined,
     },
     resolve: {
       alias: {

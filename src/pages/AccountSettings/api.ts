@@ -6,7 +6,7 @@ export interface MeResponse {
   name: string;
   email: string;
   created_at: string;
-  tier: "basic" | "pro";
+  tier: "basic" | "pro" | "max";
   status: "active" | "trialing" | "cancelled" | "expired";
   allows_use: boolean;
   expires_at: string | null;
@@ -23,7 +23,7 @@ export interface MeResponse {
 }
 
 export interface BillingUsageResponse {
-  plan: "basic" | "pro";
+  plan: "basic" | "pro" | "max";
   storage: {
     used_bytes: number;
     reserved_bytes: number;

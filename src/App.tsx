@@ -32,10 +32,16 @@ export default function App() {
       .reverse()
       .find((routeMatch) => Boolean(routeMatch.handle as Handle | undefined));
     const handle = match?.handle as Handle | undefined;
-    const title = handle?.title ?? "Misty — One shared Space for everyone";
-    const description =
-      handle?.description ??
-      "Misty combines members, chat, tasks, a shared Library, and AI Agents in one shared Space. Private Files stay private until shared.";
+    const checkoutSucceeded =
+      location.pathname === "/pricing" &&
+      new URLSearchParams(location.search).get("checkout") === "success";
+    const title = checkoutSucceeded
+      ? "Plan upgraded — Misty"
+      : (handle?.title ?? "Misty — One shared Space for everyone");
+    const description = checkoutSucceeded
+      ? "Your Misty plan and billing details have been updated."
+      : (handle?.description ??
+        "Misty combines members, chat, tasks, a shared Library, and AI Agents in one shared Space. Private Files stay private until shared.");
     const canonicalUrl = new URL(location.pathname, SITE_URL).toString();
 
     document.title = title;
@@ -53,7 +59,7 @@ export default function App() {
       document.head.appendChild(canonical);
     }
     canonical.href = canonicalUrl;
-  }, [location.pathname, matches]);
+  }, [location.pathname, location.search, matches]);
 
   // Cross-page anchors (e.g. "/features#spaces" from the home hero). Router
   // navigation does not scroll to the hash on its own, so do it once the target
@@ -121,9 +127,15 @@ export default function App() {
           id="main-content"
           ref={mainRef}
           tabIndex={-1}
-          className="relative z-10 flex-1 outline-none"
+          className="relative z-10 min-h-[100svh] flex-1 outline-none"
         >
-          <Outlet />
+          <div
+            key={location.pathname}
+            data-page-transition={location.pathname}
+            className="page-transition"
+          >
+            <Outlet />
+          </div>
         </main>
 
         <Footer />

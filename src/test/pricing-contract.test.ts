@@ -10,54 +10,32 @@ import {
 } from "@/pages/Pricing/data";
 
 describe("pricing contract", () => {
-  it("publishes only Free and Pro with the advertised plan limits", () => {
-    expect(plans.map((plan) => plan.id)).toEqual(["free", "pro"]);
-    expect(plans[0].features).toContain("3 Spaces");
-    expect(plans[0].features).toContain("5 collaborators per Space");
-    expect(plans[0].features).toContain("1 custom agent");
-    expect(plans[0].features).toContain(
-      "2 GB total storage across Spaces you own",
-    );
-    expect(plans[0].features).toContain("Weekly agent usage");
-    expect(plans[0].features).toContain("Same automatic model routing as Pro");
-    expect(plans[1].features).toContain("Unlimited Spaces");
-    expect(plans[1].features).toContain("Unlimited collaborators");
-    expect(plans[1].features).toContain("Unlimited custom agents");
-    expect(plans[1].features).toContain(
-      "50 GB total storage across Spaces you own",
-    );
-    expect(plans[1].features).toContain("over 10× more weekly agent usage");
-    expect(plans[1].features).toContain("Same automatic model routing as Free");
-    expect(plans[1].prices).toEqual({
-      month: {
-        price: "$9",
-        period: "/ month",
-        billingNote: "14-day trial, then billed monthly.",
-      },
-      year: {
-        price: "$89",
-        period: "/ year",
-        billingNote: "14-day trial, then billed yearly.",
-      },
-    });
+  it("publishes Basic, Pro, and Max with the finalized limits", () => {
+    expect(plans.map((plan) => plan.id)).toEqual(["free", "pro", "max"]);
+    expect(plans.map((plan) => plan.name)).toEqual(["Basic", "Pro", "Max"]);
+    expect(PRICING_MODEL.free.spaces).toBe("Up to 3 Spaces");
+    expect(PRICING_MODEL.pro.spaces).toBe("Up to 10 Spaces");
+    expect(PRICING_MODEL.max.spaces).toBe("Unlimited Spaces");
+    expect(PRICING_MODEL.max.storage).toBe("250 GB");
+    expect(PRICING_MODEL.free.agentUsage).toBe("Light AI agent usage");
     expect(PRICING_MODEL.pro.agentUsage).toBe(
-      "over 10× more weekly agent usage",
+      "Approximately 6× Basic agent usage",
     );
+    expect(PRICING_MODEL.max.agentUsage).toBe("2× Pro agent usage");
   });
 
-  // The Pro card used to carry "One-time 14-day trial" and "Card required ·
-  // automatically renews" as feature bullets. Those bullets are gone, so this
-  // pins the same disclosure to wherever it now lives on the pricing page.
-  it("discloses the trial, card requirement, and automatic renewal", () => {
-    expect(plans[1].prices.month.billingNote).toMatch(/14-day trial/i);
-    expect(plans[1].prices.year.billingNote).toMatch(/14-day trial/i);
-
-    const faq = JSON.stringify(pricingFaqs);
-    expect(faq).toMatch(/card is required/i);
-    expect(faq).toMatch(/automatically renews/i);
+  it("publishes exact monthly and annual prices and savings", () => {
+    expect(plans[0].prices.month.price).toBe("Free");
+    expect(plans[0].prices.year.price).toBe("Free");
+    expect(plans[1].prices.month.price).toBe("$8");
+    expect(plans[1].prices.year.price).toBe("$79");
+    expect(plans[1].prices.year.billingNote).toBe("Save $17 per year");
+    expect(plans[2].prices.month.price).toBe("$19");
+    expect(plans[2].prices.year.price).toBe("$189");
+    expect(plans[2].prices.year.billingNote).toBe("Save $39 per year");
   });
 
-  it("keeps retired terminology out of customer-facing pricing and homepage copy", () => {
+  it("keeps internal usage and per-seat terminology out of customer copy", () => {
     const customerCopy = JSON.stringify({
       plans,
       planLimitRows,
@@ -70,17 +48,33 @@ describe("pricing contract", () => {
         pricing: marketingCopy.metadata.pricing,
       },
     });
-    expect(customerCopy).not.toMatch(/\b(?:max|mika|credits?)\b/i);
     expect(customerCopy).not.toMatch(
-      /(?:paid overages|automatic refills|model-quality paywalls?)/i,
+      /(?:hosted ai|credits?|tokens?|micro-usd|provider costs?|per-seat)/i,
     );
   });
 
-  it("makes storage ownership and billing safety explicit", () => {
+  it("publishes only verified storage amounts", () => {
+    expect(plans[0].features).toContain("2 GB storage");
+    expect(plans[1].features).toContain("50 GB storage");
+    expect(plans[2].features).toContain("250 GB storage");
+    expect(planLimitRows).toContainEqual({
+      label: "Storage",
+      basic: "2 GB",
+      pro: "50 GB",
+      max: "250 GB",
+    });
+  });
+
+  it("explains personal Space limits and weekly AI agent usage", () => {
     const customerCopy = JSON.stringify({ ownerRules, pricingFaqs });
-    expect(customerCopy).toMatch(/pooled across every Space you own/i);
-    expect(customerCopy).toMatch(/joining .*Spaces.*do not use your storage/i);
-    expect(customerCopy).toMatch(/nothing is automatically deleted/i);
-    expect(customerCopy).toMatch(/no automatic overages/i);
+    expect(customerCopy).toMatch(/every Space you currently belong to/i);
+    expect(customerCopy).toMatch(/pending invitations do not count/i);
+    expect(customerCopy).toMatch(/leaving a Space frees a slot/i);
+    expect(customerCopy).toMatch(/your own Misty plan/i);
+    expect(customerCopy).toMatch(/cannot create another Space/i);
+    expect(customerCopy).toMatch(/accept another invitation/i);
+    expect(customerCopy).toMatch(/usage resets weekly/i);
+    expect(customerCopy).toMatch(/short conversation uses less/i);
+    expect(customerCopy).toMatch(/Smart Library indexing/i);
   });
 });

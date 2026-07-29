@@ -23,7 +23,7 @@ export function useAccountSettings({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
-  const { user, logout, setUser } = useAuth();
+  const { user, sessionReady, logout, setUser } = useAuth();
   const navigate = useNavigate();
   const { me, loading, setMe, setLoading, patchMe } = useUserStore();
   const [loadError, setLoadError] = useState("");
@@ -35,14 +35,14 @@ export function useAccountSettings({
   const [billingError, setBillingError] = useState("");
 
   useEffect(() => {
-    if (!open) return;
+    if (!open || !sessionReady) return;
     if (user) return;
 
     void Promise.resolve().then(() => {
       onOpenChange(false);
       navigate("/signin");
     });
-  }, [open, user, navigate, onOpenChange]);
+  }, [open, user, sessionReady, navigate, onOpenChange]);
 
   useEffect(() => {
     if (!open || !user || me) return;

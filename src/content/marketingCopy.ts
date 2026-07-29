@@ -94,7 +94,7 @@ export const marketingCopy: MarketingCopy = {
       {
         title: "Invite the group",
         description:
-          "Collaborate freely without per-seat limits or separate storage charges.",
+          "Bring everyone into the same work without separate storage charges.",
       },
       {
         title: "Add Agents",
@@ -125,9 +125,9 @@ export const marketingCopy: MarketingCopy = {
     ],
   },
   pricing: {
-    title: "Simple pricing for shared work.",
+    title: "Start together for free. Upgrade when your work grows.",
     description:
-      "Free covers a small group with 3 Spaces, 5 collaborators per Space, and 1 custom agent. Pro removes those limits and adds more pooled owner storage with over 10× more weekly agent usage.",
+      "Every plan includes Misty’s core collaboration experience. Choose a plan based on how many Spaces you need and how much you use AI agents.",
   },
   download: {
     title: "Lorem ipsum dolor sit amet.",
@@ -159,9 +159,8 @@ export const marketingCopy: MarketingCopy = {
       "Lorem ipsum dolor sit amet, consectetur adipiscing elit.",
     forgotDescription:
       "Lorem ipsum dolor sit amet, consectetur adipiscing elit sed do eiusmod.",
-    registerTitle: "Lorem ipsum dolor sit amet.",
-    registerDescription:
-      "Consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore.",
+    registerTitle: "Create an account",
+    registerDescription: "Sign up to get started with Misty.",
     resetDescription:
       "Lorem ipsum dolor sit amet, consectetur adipiscing elit.",
     notFoundDescription:
@@ -172,7 +171,7 @@ export const marketingCopy: MarketingCopy = {
     features:
       "Keep files, conversations, tasks, tools, and custom Agents together in one shared Misty Space.",
     pricing:
-      "Compare Misty Free and Pro: Spaces, collaborators, custom agents, pooled owner storage, and weekly agent usage.",
+      "Compare Misty Basic, Pro, and Max plans by Space limits, AI agent usage, and monthly or annual pricing.",
     download:
       "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Integer posuere erat a ante venenatis.",
     blog: "Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur.",

@@ -7,12 +7,7 @@ import {
   type BillingUsageResponse,
   type MeResponse,
 } from "../api";
-import { AccountBadge } from "../components/AccountBadge";
-import {
-  STATUS_TONE,
-  TIER_LABEL,
-  TIER_TONE,
-} from "../components/accountTone";
+import { TIER_LABEL } from "../components/accountTone";
 import {
   customRowClass,
   ErrorRow,
@@ -34,12 +29,7 @@ function PlanRows({
 
   return (
     <>
-      <Row label="Plan">
-        <AccountBadge
-          label={TIER_LABEL[plan] ?? plan}
-          tone={TIER_TONE[plan] ?? "neutral"}
-        />
-      </Row>
+      <Row label="Plan">{TIER_LABEL[plan] ?? plan}</Row>
       {trial ? (
         <>
           <Row label="Trial status">{formatStatus(trial.status)}</Row>
@@ -66,12 +56,7 @@ function PlanRows({
           </Row>
         </>
       ) : (
-        <Row label="Status">
-          <AccountBadge
-            label={formatStatus(me.status)}
-            tone={STATUS_TONE[me.status] ?? "neutral"}
-          />
-        </Row>
+        <Row label="Status">{formatStatus(me.status)}</Row>
       )}
     </>
   );
