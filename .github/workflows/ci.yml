@@ -16,7 +16,7 @@ concurrency:
 
 jobs:
   secrets:
-    name: Secret scan
+    name: Security checks
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -30,7 +30,7 @@ jobs:
           detect --source=/repo --no-git --redact --config=/repo/.gitleaks.toml
 
   web:
-    name: Web quality and production build
+    name: Desktop web checks
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
@@ -56,7 +56,7 @@ jobs:
           if-no-files-found: error
 
   native:
-    name: Rust and ad-hoc-signed macOS bundle
+    name: macOS test app
     runs-on: macos-14
     timeout-minutes: 60
     env:
@@ -70,6 +70,12 @@ jobs:
       - run: npm ci
       - name: Install pinned Rust toolchain
         run: rustup show
+      - name: Restore Rust build cache
+        uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+        with:
+          workspaces: src-tauri -> target
+          shared-key: desktop-${{ runner.os }}-${{ runner.arch }}
+          add-job-id-key: "false"
       - name: Check Rust formatting
         run: cargo fmt --manifest-path src-tauri/Cargo.toml --all -- --check
       - name: Lint Rust
@@ -81,7 +87,7 @@ jobs:
           cargo install cargo-cyclonedx --version 0.5.9 --locked
           cargo cyclonedx --manifest-path src-tauri/Cargo.toml --format json
           test -n "$(find src-tauri -maxdepth 1 -name '*.cdx.json' -print -quit)"
-      - name: Build ad-hoc-signed macOS test bundle
+      - name: Build ad-hoc-signed macOS test app
         run: npm run build:mac:test
       - name: Generate macOS artifact checksums
         run: node scripts/generate-release-metadata.mjs src-tauri/target/release/bundle
@@ -94,7 +100,7 @@ jobs:
           if-no-files-found: error
 
   windows:
-    name: Windows beta bundle
+    name: Windows test installer
     runs-on: windows-latest
     timeout-minutes: 60
     env:
@@ -108,7 +114,13 @@ jobs:
       - run: npm ci
       - name: Install pinned Rust toolchain
         run: rustup show
-      - name: Build unsigned Windows test bundle
+      - name: Restore Rust build cache
+        uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+        with:
+          workspaces: src-tauri -> target
+          shared-key: desktop-${{ runner.os }}-${{ runner.arch }}
+          add-job-id-key: "false"
+      - name: Build unsigned Windows test installer
         run: npm run build:windows:test -- -SkipAssets -SkipDependencies
       - name: Generate Windows artifact checksums
         run: node scripts/generate-release-metadata.mjs src-tauri/target/release/bundle
