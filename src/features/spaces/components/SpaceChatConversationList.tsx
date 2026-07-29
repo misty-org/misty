@@ -84,9 +84,10 @@ function DiscordConversationGroup({
   return (
     <section className="grid gap-1">
       <div className="flex min-h-7 items-center px-2">
-        <button
+        <Button
           type="button"
-          className="flex min-w-0 flex-1 items-center gap-1.5 rounded-md text-left text-xs font-semibold text-muted-foreground hover:text-sidebar-accent-foreground"
+          variant="ghost"
+          className="h-auto min-w-0 flex-1 justify-start gap-1.5 px-0 py-0 text-left text-xs font-semibold text-muted-foreground shadow-none hover:bg-transparent hover:text-sidebar-accent-foreground"
           onClick={() => setExpanded((current) => !current)}
           aria-expanded={expanded}
         >
@@ -98,7 +99,7 @@ function DiscordConversationGroup({
             size={13}
             className={cn("shrink-0 transition-transform", expanded && "rotate-90")}
           />
-        </button>
+        </Button>
       </div>
       {expanded ? (
         <nav className="grid gap-1" aria-label="Discord conversations">
@@ -151,10 +152,11 @@ function ConversationGroup({
   return (
     <section className="grid gap-1">
       <div className="group/header flex min-h-7 items-center gap-1 px-2">
-        <button
+        <Button
           type="button"
+          variant="ghost"
           className={[
-            "flex min-w-0 flex-1 items-center gap-1.5 rounded-md text-left text-xs",
+            "h-auto min-w-0 flex-1 justify-start gap-1.5 px-0 py-0 text-left text-xs shadow-none hover:bg-transparent",
             "font-semibold text-muted-foreground hover:text-sidebar-accent-foreground",
           ].join(" ")}
           onClick={() => setExpanded((current) => !current)}
@@ -170,7 +172,7 @@ function ConversationGroup({
             size={13}
             className={cn("ml-auto shrink-0 transition-transform", expanded && "rotate-90")}
           />
-        </button>
+        </Button>
         <Button
           variant="ghost"
           size="icon"

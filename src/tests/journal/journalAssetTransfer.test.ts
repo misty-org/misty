@@ -115,6 +115,39 @@ describe("Journal binary asset transfer", () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
+  it("retries transient R2 and finalize failures without creating another reservation", async () => {
+    spaceRequestMock
+      .mockResolvedValueOnce({
+        upload: { id: "upload-retry" },
+        transfer: {
+          url: "https://account.r2.cloudflarestorage.com/signed-put-retry",
+          method: "PUT",
+          headers: { "Content-Type": "image/png" },
+        },
+        finalize: { headers: { "X-Misty-Library-Upload-Token": "retry-token" } },
+      })
+      .mockRejectedValueOnce(new Error("offline"))
+      .mockResolvedValueOnce({ note_asset: { id: "noteasset-retry" } });
+    vi.mocked(fetch)
+      .mockRejectedValueOnce(new TypeError("network unavailable"))
+      .mockResolvedValueOnce(new Response(null, { status: 200 }));
+
+    const asset = await uploadJournalAsset({
+      kind: "note",
+      spaceId: "space-1",
+      resourceId: "note-1",
+      file: new File(["abc"], "note.png", { type: "image/png" }),
+    });
+
+    expect(asset.id).toBe("noteasset-retry");
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(spaceRequestMock).toHaveBeenCalledTimes(3);
+    expect(spaceRequestMock.mock.calls.slice(1).map(([path]) => path)).toEqual([
+      "/spaces/space-1/notes/note-1/assets/uploads/upload-retry/finalize",
+      "/spaces/space-1/notes/note-1/assets/uploads/upload-retry/finalize",
+    ]);
+  });
+
   it("downloads from R2 directly and verifies size and SHA-256 before rendering", async () => {
     spaceRequestMock.mockResolvedValue({
       url: "https://account.r2.cloudflarestorage.com/signed-get",

@@ -113,6 +113,16 @@ function DrawingWorkspace(props: {
         onDelete={props.onDelete}
       />
       <div className="relative min-h-0 overflow-hidden">
+        {room.notice ? (
+          <div
+            className={[
+              "absolute left-1/2 top-3 z-30 max-w-xl -translate-x-1/2 rounded-md border",
+              "border-amber-500/30 bg-background/95 px-3 py-2 text-sm shadow-md",
+            ].join(" ")}
+          >
+            {room.notice}
+          </div>
+        ) : null}
         {room.error ? (
           <EmptyState
             className="h-full"

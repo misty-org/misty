@@ -62,7 +62,9 @@ export function createDefaultNotesRegistry(
   spaceId = "",
   spaceName = "",
 ): NotesConnectorRegistry {
-  return new NotesConnectorRegistry([createMistyNativeNotesConnector(accountId, spaceId, spaceName)]);
+  return new NotesConnectorRegistry([
+    createMistyNativeNotesConnector(accountId, spaceId, spaceName),
+  ]);
 }
 
 /**

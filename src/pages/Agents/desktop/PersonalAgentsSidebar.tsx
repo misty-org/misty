@@ -188,11 +188,12 @@ export function PersonalAgentsSidebar({
               <ContextMenu>
                 <ContextMenuTrigger asChild>
                   <div className="group/agent flex min-h-7 min-w-0 items-center gap-1 px-2">
-                    <button
+                    <Button
                       type="button"
+                      variant="ghost"
                       aria-expanded={expanded}
                       className={cn(
-                        "flex min-w-0 flex-1 items-center gap-1.5 rounded-md text-left text-xs font-semibold outline-none",
+                        "h-auto min-w-0 flex-1 justify-start gap-1.5 rounded-md px-0 py-0 text-left text-xs font-semibold shadow-none hover:bg-transparent",
                         expanded
                           ? "text-sidebar-accent-foreground"
                           : "text-muted-foreground hover:text-sidebar-accent-foreground",
@@ -212,7 +213,7 @@ export function PersonalAgentsSidebar({
                           expanded && "rotate-90",
                         )}
                       />
-                    </button>
+                    </Button>
                     <Button
                       size="icon"
                       variant="ghost"

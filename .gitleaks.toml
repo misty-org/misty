@@ -1,0 +1,14 @@
+[extend]
+useDefault = true
+
+# The legacy `service/` tree is a vendored rclone distribution with upstream
+# public OAuth identifiers and test-only certificates. It is not linked into
+# Misty's desktop or server. Scan Misty's first-party code and configuration;
+# audit the pinned upstream distribution separately when it is updated.
+[allowlist]
+description = "Vendored upstream fixtures and local-only ignored configuration"
+paths = [
+  '''^service/''',
+  '''^vendor/''',
+  '''^\.env\.desktop$''',
+]

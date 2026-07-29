@@ -186,11 +186,13 @@ export default function VideoAnnotator({
             <>
               <div className="flex items-center gap-1">
                 {COLORS.map((swatch) => (
-                  <button
+                  <Button
                     key={swatch}
                     type="button"
+                    variant="ghost"
+                    size="icon"
                     aria-label={`Pen color ${swatch}`}
-                    className={`size-5 rounded-full border transition ${
+                    className={`size-5 rounded-full border p-0 transition ${
                       color === swatch ? "border-white ring-2 ring-white/40" : "border-white/20"
                     }`}
                     style={{ backgroundColor: swatch }}

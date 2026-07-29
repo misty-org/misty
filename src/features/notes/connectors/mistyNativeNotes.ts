@@ -28,7 +28,11 @@ type ServerSpaceNote = {
  * body lives in Cloudflare; this connector handles the server metadata and list
  * projection, never device-local note storage.
  */
-export function createMistyNativeNotesConnector(_accountId = "", spaceId = "", spaceName = ""): NotesConnector {
+export function createMistyNativeNotesConnector(
+  _accountId = "",
+  spaceId = "",
+  spaceName = "",
+): NotesConnector {
   let syncedAt = nowIso();
   const noteSpaces = new Map<string, { spaceId: string; spaceName: string }>();
 
@@ -118,7 +122,9 @@ export function createMistyNativeNotesConnector(_accountId = "", spaceId = "", s
         rememberNotes(noteSpaces, [mapped]);
         return mapped;
       }
-      throw new Error("Misty note content is collaborative and must be edited through the live note room.");
+      throw new Error(
+        "Misty note content is collaborative and must be edited through the live note room.",
+      );
     },
 
     async sync(): Promise<SyncResult> {
@@ -130,7 +136,10 @@ export function createMistyNativeNotesConnector(_accountId = "", spaceId = "", s
   };
 }
 
-export async function listMistySpaceNotes(spaceId: string, spaceName: string): Promise<UnifiedNote[]> {
+export async function listMistySpaceNotes(
+  spaceId: string,
+  spaceName: string,
+): Promise<UnifiedNote[]> {
   const result = await spaceRequest<{ notes: ServerSpaceNote[] }>(
     `/spaces/${encodeURIComponent(spaceId)}/notes`,
   );
@@ -167,6 +176,7 @@ function rememberNotes(
   notes: UnifiedNote[],
 ): void {
   for (const note of notes) {
-    if (note.spaceId) noteSpaces.set(note.sourceId, { spaceId: note.spaceId, spaceName: note.spaceName ?? "" });
+    if (note.spaceId)
+      noteSpaces.set(note.sourceId, { spaceId: note.spaceId, spaceName: note.spaceName ?? "" });
   }
 }

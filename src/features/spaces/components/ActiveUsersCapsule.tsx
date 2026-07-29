@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
-import { Avatar, AvatarFallback } from "@/ui";
+import { Avatar, AvatarFallback, Button } from "@/ui";
 import { Popover, PopoverContent, PopoverTrigger } from "@/ui";
 import { cn } from "@/ui";
 import type { SpaceMember } from "@/models/interfaces/features/spaces/types";
@@ -66,9 +66,11 @@ export function ActiveUsersCapsule({
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <button
+        <Button
           type="button"
-          className="flex shrink-0 items-center rounded-full border border-border/60 bg-muted/40 p-1 transition-colors hover:bg-muted/70"
+          variant="outline"
+          size="icon"
+          className="h-auto w-auto shrink-0 rounded-full border-border/60 bg-muted/40 p-1 hover:bg-muted/70"
           aria-label={`${presentMembers.length} people in this Space, click to see everyone`}
         >
           <span className="flex -space-x-2" aria-hidden="true">
@@ -81,7 +83,7 @@ export function ActiveUsersCapsule({
               />
             ))}
           </span>
-        </button>
+        </Button>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-64 p-1.5">
         <p className="mb-1 px-2 py-1 text-xs font-semibold text-muted-foreground">

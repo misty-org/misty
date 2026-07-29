@@ -15,4 +15,9 @@ interface ImportMetaEnv {
   readonly VITE_MISTY_SERVER_URL?: string;
   /** Legacy alias; accepts the same complete API-base semantics. */
   readonly VITE_API_BASE?: string;
+  readonly VITE_PRIVACY_POLICY_URL?: string;
+  readonly VITE_TERMS_URL?: string;
+  readonly VITE_DESKTOP_LICENSE_URL?: string;
+  readonly VITE_SUPPORT_URL?: string;
+  readonly VITE_SECURITY_URL?: string;
 }

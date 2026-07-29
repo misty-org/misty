@@ -1,6 +1,10 @@
 import type { NotesConnectorRegistry } from "@/features/notes/connectors/registry";
 import type { CreateNoteInput } from "@/models/interfaces/features/notes/connectors";
-import type { NoteBodyFormat, NotesLoadPhase, UnifiedNote } from "@/models/types/features/notes/types";
+import type {
+  NoteBodyFormat,
+  NotesLoadPhase,
+  UnifiedNote,
+} from "@/models/types/features/notes/types";
 
 export interface UpdateNoteContentInput {
   body: string;

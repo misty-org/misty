@@ -147,13 +147,18 @@ impl AppEnvironmentService {
 
 impl AppEnvironment {
     fn load(data_root: Option<PathBuf>) -> Self {
+        let has_explicit_data_root = data_root.is_some();
         let home_dir = data_root.or_else(resolve_home_dir).unwrap_or_default();
         let misty_dir = home_dir.join(".misty");
         let config_dir = misty_dir.join("config");
         let db_dir = misty_dir.join("db");
         let cache_dir = misty_dir.join(".cache");
         let tmp_dir = misty_dir.join("tmp");
-        let assets_dir = paths::misty_assets_dir().unwrap_or_else(|| misty_dir.join("assets"));
+        let assets_dir = if has_explicit_data_root {
+            misty_dir.join("assets")
+        } else {
+            paths::misty_assets_dir().unwrap_or_else(|| misty_dir.join("assets"))
+        };
         let plugins_public_dir = misty_dir.join("plugins").join("public");
         let plugins_private_dir = misty_dir.join("plugins").join("private");
         let settings_path = config_dir.join("settings.json");
@@ -202,7 +207,7 @@ impl AppEnvironment {
         let db_dir = misty_dir.join("db");
         let cache_dir = misty_dir.join(".cache");
         let tmp_dir = misty_dir.join("tmp");
-        let assets_dir = paths::misty_assets_dir().unwrap_or_else(|| misty_dir.join("assets"));
+        let assets_dir = misty_dir.join("assets");
         let plugins_public_dir = misty_dir.join("plugins").join("public");
         let plugins_private_dir = misty_dir.join("plugins").join("private");
         let settings_path = config_dir.join("settings.json");

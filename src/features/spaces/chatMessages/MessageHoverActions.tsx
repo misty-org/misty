@@ -31,7 +31,9 @@ export function MessageHoverActions(props: MessageHoverActionsProps) {
         const reacted =
           message.reactions?.find((item) => item.emoji === emoji)?.reacted_by_me === true;
         return (
-          <button
+          <Button
+            variant="ghost"
+            size="icon"
             className={`flex size-7 items-center justify-center rounded text-sm leading-none transition-colors ${
               reacted ? "bg-primary/10" : "hover:bg-muted"
             }`}
@@ -43,7 +45,7 @@ export function MessageHoverActions(props: MessageHoverActionsProps) {
             title={`${reacted ? "Remove" : "Add"} ${emoji}`}
           >
             {emoji}
-          </button>
+          </Button>
         );
       })}
       <span className="mx-0.5 h-5 w-px bg-border/80" aria-hidden="true" />

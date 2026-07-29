@@ -1,4 +1,5 @@
 import type { SpaceMessage } from "@/models/interfaces/features/spaces/types";
+import { Button } from "@/ui";
 
 /** The reaction pills under a message. Read-only members see counts but cannot toggle. */
 export function MessageReactions({
@@ -16,7 +17,9 @@ export function MessageReactions({
   return (
     <div className="mt-2 flex flex-wrap gap-1.5">
       {reactions.map((reaction) => (
-        <button
+        <Button
+          variant="outline"
+          size="sm"
           className={`inline-flex h-7 items-center gap-1 rounded-md border px-2 text-xs transition-colors ${
             reaction.reacted_by_me
               ? "border-primary/35 bg-primary/10 text-primary hover:bg-primary/15"
@@ -31,7 +34,7 @@ export function MessageReactions({
         >
           <span className="text-sm leading-none">{reaction.emoji}</span>
           <span className="tabular-nums">{reaction.count}</span>
-        </button>
+        </Button>
       ))}
     </div>
   );

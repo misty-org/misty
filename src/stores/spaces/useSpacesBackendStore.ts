@@ -8,10 +8,11 @@ import {
   readAccountSessionGeneration,
   readAccountAuthToken,
 } from "@/stores/account/useAuthTokenStore";
-import { appSnapshot } from "@/stores/backend";
+import { appSnapshot, normalizeApiBaseUrl, withDefaultApiPath } from "@/stores/backend";
 import { assertUploadLimit } from "@/features/library/uploadLimits";
 import { readDownloadBlob } from "@/features/library/signedDownload";
 import { safeTauriAssetUrl } from "@/platform/tauri";
+import { addRequestCorrelation } from "@/platform/requestCorrelation";
 import type { SpaceConversation, SpaceRun } from "@/models/interfaces/features/spaces/types";
 import type {
   AgentMentionFailure,
@@ -72,7 +73,6 @@ import type {
 import type { GlobalSpaceLibraryHit } from "@/models/interfaces/features/agents/personal";
 import type { TaskSchedule } from "@/models/interfaces/features/spaces/integrations/calendarTasks";
 import type { ConflictResolution } from "@/models/types/features/spaces/integrations/calendarTasks";
-import { normalizeApiBaseUrl, withDefaultApiPath } from "@/stores/backend";
 
 export class SpaceRequestError extends Error {
   constructor(
@@ -107,7 +107,7 @@ export async function spaceRequest<T = void>(path: string, init?: RequestInit): 
   assertStableSpaceAccount(accountGeneration);
   const [base, token] = await Promise.all([resolveSpacesApiBase(), readAccountAuthToken()]);
   assertStableSpaceAccount(accountGeneration);
-  const headers = new Headers(init?.headers);
+  const headers = addRequestCorrelation(new Headers(init?.headers));
   if (init?.body && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");
   if (token) headers.set("Authorization", `Bearer ${token}`);
   let response: Response;
@@ -1409,7 +1409,7 @@ async function fetchProtectedBlob(path: string, init?: RequestInit): Promise<Blo
   assertStableSpaceAccount(accountGeneration);
   const [base, token] = await Promise.all([resolveSpacesApiBase(), readAccountAuthToken()]);
   assertStableSpaceAccount(accountGeneration);
-  const headers = new Headers(init?.headers);
+  const headers = addRequestCorrelation(new Headers(init?.headers));
   if (token) headers.set("Authorization", `Bearer ${token}`);
   let response: Response;
   try {
