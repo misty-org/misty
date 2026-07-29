@@ -83,11 +83,7 @@ export function AgentMessage(props: {
         />
       ) : null}
       {message.planId ? (
-        <AgentPlanActions
-          planId={message.planId}
-          plans={props.plans}
-          onApply={props.onApplyPlan}
-        />
+        <AgentPlanActions planId={message.planId} plans={props.plans} onApply={props.onApplyPlan} />
       ) : null}
     </>
   );
@@ -108,10 +104,7 @@ export function AgentMessage(props: {
               {agentMessageTitle(message.role)}
             </strong>
             {message.role === "agent" ? (
-              <Badge
-                variant="secondary"
-                className="h-4 gap-1 rounded px-1 text-[9px] uppercase"
-              >
+              <Badge variant="secondary" className="h-4 gap-1 rounded px-1 text-[9px] uppercase">
                 <Sparkles />
                 Agent
               </Badge>
@@ -133,9 +126,7 @@ export function AgentMessage(props: {
 
   return (
     <article className={agentMessageClass(message.role)}>
-      <strong className={agentPanelStyles.messageTitle}>
-        {agentMessageTitle(message.role)}
-      </strong>
+      <strong className={agentPanelStyles.messageTitle}>{agentMessageTitle(message.role)}</strong>
       <pre className={agentPanelStyles.messageText}>{text}</pre>
       {extras}
     </article>

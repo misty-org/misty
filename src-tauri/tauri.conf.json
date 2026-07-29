@@ -30,7 +30,6 @@
       "assetProtocol": {
         "enable": true,
         "scope": [
-          "$HOME/**",
           "$DESKTOP/**",
           "$DOCUMENT/**",
           "$DOWNLOAD/**",
@@ -86,6 +85,10 @@
           "appLink": false
         }
       ]
+    },
+    "updater": {
+      "pubkey": "",
+      "endpoints": []
     }
   }
 }

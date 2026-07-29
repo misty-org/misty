@@ -33,8 +33,14 @@ describe("MistyNativeNotesConnector", () => {
   });
 
   it("creates notes through the Space API as synced collaborative notes", async () => {
-    spaceRequestMock.mockResolvedValueOnce(serverNote({ title: "Draft", plain_text: "hello world" }));
-    const connector = createMistyNativeNotesConnector("account", spaceInput.spaceId, spaceInput.spaceName);
+    spaceRequestMock.mockResolvedValueOnce(
+      serverNote({ title: "Draft", plain_text: "hello world" }),
+    );
+    const connector = createMistyNativeNotesConnector(
+      "account",
+      spaceInput.spaceId,
+      spaceInput.spaceName,
+    );
     const created = await connector.createNote!({
       title: "Draft",
       body: "hello world",
@@ -53,7 +59,11 @@ describe("MistyNativeNotesConnector", () => {
 
   it("falls back to a placeholder title", async () => {
     spaceRequestMock.mockResolvedValueOnce(serverNote({ title: "Untitled note" }));
-    const connector = createMistyNativeNotesConnector("account", spaceInput.spaceId, spaceInput.spaceName);
+    const connector = createMistyNativeNotesConnector(
+      "account",
+      spaceInput.spaceId,
+      spaceInput.spaceName,
+    );
     const created = await connector.createNote!({ title: "   ", body: "", ...spaceInput });
     expect(created.title).toBe("Untitled note");
   });
@@ -69,7 +79,11 @@ describe("MistyNativeNotesConnector", () => {
     spaceRequestMock.mockResolvedValueOnce({
       notes: [serverNote({ id: "note_server", title: "Server note", plain_text: "shared" })],
     });
-    const connector = createMistyNativeNotesConnector("account", spaceInput.spaceId, spaceInput.spaceName);
+    const connector = createMistyNativeNotesConnector(
+      "account",
+      spaceInput.spaceId,
+      spaceInput.spaceName,
+    );
     const notes = await connector.listNotes();
 
     expect(spaceRequestMock).toHaveBeenCalledWith("/spaces/space-product/notes");
@@ -136,7 +150,11 @@ describe("NotesConnectorRegistry", () => {
     spaceRequestMock.mockResolvedValueOnce({
       notes: [serverNote({ id: "note_misty", title: "Misty note" })],
     });
-    const healthy = createMistyNativeNotesConnector("account", spaceInput.spaceId, spaceInput.spaceName);
+    const healthy = createMistyNativeNotesConnector(
+      "account",
+      spaceInput.spaceId,
+      spaceInput.spaceName,
+    );
     const broken = createNotionConnector(createFakeNotionClient().client);
     broken.listNotes = async () => {
       throw new Error("token expired");

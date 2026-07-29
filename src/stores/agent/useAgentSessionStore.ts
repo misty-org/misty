@@ -35,10 +35,7 @@ import {
   searchQuery,
 } from "@/stores/backend";
 import { errorText } from "@/lib/format";
-import {
-  hydrateServerSessions,
-  loadConversationTranscript,
-} from "@/stores/agent/agentSessionSync";
+import { hydrateServerSessions, loadConversationTranscript } from "@/stores/agent/agentSessionSync";
 import { isNativeMobileBuild } from "@/platform/buildTarget";
 import { selectAgentPreferences, useSettingsStore } from "@/stores/app";
 import {
@@ -156,12 +153,7 @@ export function spaceAgentScopeKey(accountId: string, spaceId: string): string {
   return `account:${encodeURIComponent(accountId)}:space:${encodeURIComponent(spaceId)}`;
 }
 
-export function agentScopeKey(
-  accountId: string,
-  agentId = "",
-  spaceId = "",
-  modelId = "",
-): string {
+export function agentScopeKey(accountId: string, agentId = "", spaceId = "", modelId = ""): string {
   const params = new URLSearchParams();
   if (agentId) params.set("agent", agentId);
   if (spaceId) params.set("space", spaceId);
@@ -809,7 +801,10 @@ export const useAgentSessionStore = create<AiSessionStore>((set, get) => ({
       ensureAiPolling(set, get);
       await drainAiEvents(set, get);
     } catch (error) {
-      if (error instanceof AgentRuntimeChangedError || !agentRuntimeIsCurrent(generation, sessionId))
+      if (
+        error instanceof AgentRuntimeChangedError ||
+        !agentRuntimeIsCurrent(generation, sessionId)
+      )
         return;
       const message = errorText(error);
       recordAiDebug("error", "Agent approved tool failed.", message);
@@ -1046,8 +1041,7 @@ export const useAgentSessionStore = create<AiSessionStore>((set, get) => ({
     // For the active chat the live session id may not be written into the snapshot yet
     // (that happens on suspend), so fall back to the running session.
     const sessionId =
-      snapshot.runtime.sessionId ??
-      (id === get().activeConversationId ? activeSessionId : null);
+      snapshot.runtime.sessionId ?? (id === get().activeConversationId ? activeSessionId : null);
     if (sessionId) {
       await renameAgentSession(sessionId, next).catch((error: unknown) =>
         recordAiDebug("warn", "Agent chat rename could not be saved.", errorText(error)),
@@ -1094,7 +1088,7 @@ export const useAgentSessionStore = create<AiSessionStore>((set, get) => ({
       set({
         activeConversationId: next.id,
         activeModelId: target.modelId ?? "",
-      activeReasoningEffort: target.reasoningEffort ?? "",
+        activeReasoningEffort: target.reasoningEffort ?? "",
         status: target.status,
         mode: target.mode,
         messages: target.messages,
@@ -1405,10 +1399,7 @@ function isSessionNotFoundError(error: unknown): boolean {
   return errorText(error).toLowerCase().includes("session not found");
 }
 
-async function runToolRequest(
-  request: ToolRequest,
-  scope: AgentScope | null,
-): Promise<ToolResult> {
+async function runToolRequest(request: ToolRequest, scope: AgentScope | null): Promise<ToolResult> {
   try {
     const preferences = selectAgentPreferences(useSettingsStore.getState().settings?.document);
     if (!scope || !agentScopeAllowed(preferences, scope)) {

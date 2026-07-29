@@ -1,7 +1,7 @@
 import type { ComponentType } from "react";
 import { CalendarDays, Check, FileText } from "lucide-react";
 import { SiDiscord } from "react-icons/si";
-import { Input } from "@/ui";
+import { Button, Input } from "@/ui";
 import type {
   ProviderConnectionAvailability,
   SpaceIntegrationProvider,
@@ -30,7 +30,7 @@ const integrationChoices: Array<{
 ];
 
 const cardClass = (selected: boolean) =>
-  `rounded-lg border p-3 text-left transition-colors ${
+  `h-auto justify-start whitespace-normal rounded-lg border p-3 text-left transition-colors ${
     selected ? "border-primary bg-primary/5" : "border-border hover:bg-muted/55"
   }`;
 
@@ -74,8 +74,9 @@ export function CreateSpaceTemplateStep({
       </p>
       <div className="grid max-h-72 grid-cols-2 gap-2 overflow-y-auto pr-1">
         {(templates.length ? templates : blankTemplateFallback).map((template) => (
-          <button
+          <Button
             key={template.id}
+            variant="outline"
             className={cardClass(templateId === template.id)}
             type="button"
             onClick={() => onTemplate(template.id)}
@@ -84,7 +85,7 @@ export function CreateSpaceTemplateStep({
             <span className="mt-1 block text-xs leading-relaxed text-muted-foreground">
               {template.description}
             </span>
-          </button>
+          </Button>
         ))}
       </div>
       {templateError ? (
@@ -115,8 +116,9 @@ export function CreateSpaceIntegrationsStep({
           const unavailable =
             availability.find((provider) => provider.provider === id)?.configured === false;
           return (
-            <button
+            <Button
               key={id}
+              variant="outline"
               className={`flex items-center gap-3 ${cardClass(selected)}`}
               type="button"
               aria-pressed={selected}
@@ -139,7 +141,7 @@ export function CreateSpaceIntegrationsStep({
               >
                 {selected ? <Check size={12} /> : null}
               </span>
-            </button>
+            </Button>
           );
         })}
       </div>

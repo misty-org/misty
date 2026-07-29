@@ -1,7 +1,10 @@
 import { type PointerEvent as ReactPointerEvent } from "react";
 import { useExplorerStore } from "@/stores/explorer";
 import { edgeScrollDelta } from "../geometry";
-import type { ExplorerDragItem, ExplorerDragModifiers } from "@/models/interfaces/features/explorer/drag/types";
+import type {
+  ExplorerDragItem,
+  ExplorerDragModifiers,
+} from "@/models/interfaces/features/explorer/drag/types";
 
 export const DRAG_THRESHOLD = 6;
 export const SPRING_LOAD_MS = 700;

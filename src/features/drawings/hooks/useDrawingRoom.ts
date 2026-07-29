@@ -6,12 +6,17 @@ import {
   type DrawingCollaborationSession,
 } from "../collaboration/drawingCollaboration";
 import type { DrawingConnectionState } from "../types";
+import {
+  journalDocumentStatusMessage,
+  parseJournalDocumentStatus,
+} from "@/features/journal/collaborationStatus";
 
 export function useDrawingRoom(spaceId: string, drawingId: string, user: AuthUser) {
   const [session, setSession] = useState<DrawingCollaborationSession | null>(null);
   const [connection, setConnection] = useState<DrawingConnectionState>("connecting");
   const [synced, setSynced] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const acquiredRef = useRef(false);
 
   useEffect(() => {
@@ -22,17 +27,20 @@ export function useDrawingRoom(spaceId: string, drawingId: string, user: AuthUse
     setConnection("connecting");
     setSynced(false);
     setError(null);
+    setNotice(null);
 
     acquireDrawingSession(spaceId, drawingId)
       .then((nextSession) => {
         if (!active) return;
         setSession(nextSession);
         const awareness = nextSession.provider.awareness;
-        awareness.setLocalStateField("user", {
+        const userPresence = {
           id: user.id,
           name: user.name || user.email,
           color: collaborationColor(user.id),
-        });
+        };
+        const publishUserPresence = () => awareness.setLocalStateField("user", userPresence);
+        publishUserPresence();
 
         const onSynced = (ready: boolean) => {
           if (!active) return;
@@ -41,22 +49,31 @@ export function useDrawingRoom(spaceId: string, drawingId: string, user: AuthUse
         };
         const onStatus = ({ status }: { status: string }) => {
           if (!active) return;
-          if (status === "connected") setConnection("connected");
-          else if (status === "disconnected") setConnection("disconnected");
+          if (status === "connected") {
+            publishUserPresence();
+            setConnection("connected");
+          } else if (status === "disconnected") setConnection("disconnected");
           else setConnection("connecting");
         };
         const onConnectionError = () => {
           if (active) setConnection("error");
         };
+        const onCustomMessage = (message: string) => {
+          if (!active) return;
+          const status = parseJournalDocumentStatus(message);
+          if (status) setNotice(journalDocumentStatusMessage(status));
+        };
         nextSession.provider.on("synced", onSynced);
         nextSession.provider.on("status", onStatus);
         nextSession.provider.on("connection-error", onConnectionError);
+        nextSession.provider.on("custom-message", onCustomMessage);
         if (nextSession.provider.synced) onSynced(true);
 
         detachProviderListeners = () => {
           nextSession.provider.off("synced", onSynced);
           nextSession.provider.off("status", onStatus);
           nextSession.provider.off("connection-error", onConnectionError);
+          nextSession.provider.off("custom-message", onCustomMessage);
         };
       })
       .catch((cause) => {
@@ -75,7 +92,7 @@ export function useDrawingRoom(spaceId: string, drawingId: string, user: AuthUse
     };
   }, [drawingId, spaceId, user.email, user.id, user.name]);
 
-  return { session, connection, synced, error };
+  return { session, connection, synced, error, notice };
 }
 
 function collaborationColor(id: string) {

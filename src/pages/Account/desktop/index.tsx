@@ -22,6 +22,7 @@ import { LoadingState } from "@/ui";
 import { StatusBadge } from "@/ui";
 import { useAuth } from "@/features/auth/AuthContext";
 import {
+  accountBeginDeletion as beginAccountDeletion,
   accountCreateCheckout as createCheckout,
   accountCreatePortalSession as createPortalSession,
   accountFetchBillingUsage as fetchBillingUsage,
@@ -35,17 +36,9 @@ import type {
 } from "@/models/interfaces/stores/account/useAccountStore";
 import { useUserStore } from "@/stores/account/useUserStore";
 import { readAccountSessionGeneration } from "@/stores/account/useAuthTokenStore";
+import { openExternalLink } from "@/platform/openExternalLink";
 import { useSetupStore } from "@/stores/app";
 import type { CurrentLicense } from "@/models/types/features/installer/types";
-import { useAppStore } from "@/stores/app";
-import {
-  clearClientDebugEvents,
-  clientDebugPanelEnabled,
-  readClientDebugEvents,
-} from "@/platform/clientDebug";
-import type { ClientDebugEvent } from "@/models/interfaces/platform/clientDebug";
-import { openExternalLink } from "@/platform/openExternalLink";
-import { normalizeApiBaseUrl, withDefaultApiPath } from "@/stores/backend";
 import { Bug, Lock, Rows3, UserCircle, type LucideIcon } from "lucide-react";
 import { formatBytes } from "@/features/spaces/libraryFormat";
 import {
@@ -54,6 +47,9 @@ import {
   DesktopSettingsSection,
 } from "../../Settings/DesktopSettingsUI";
 import { ProfileAvatarEditor } from "./ProfileAvatarEditor";
+import { DesktopUpdaterSettings } from "@/features/updater/DesktopUpdaterSettings";
+import { exportAccountData } from "@/features/account/exportAccountData";
+import { DiagnosticsPanel, PrivacyPanel } from "./PrivacyDiagnosticsPanels";
 const TIER_LABEL: Record<string, string> = {
   basic: "Free",
   pro: "Pro",
@@ -164,12 +160,7 @@ function GeneralPanel() {
       </Section>
 
       <Section title="App">
-        <Row label="Version">
-          <span className="font-mono text-xs text-muted-foreground">v0.1.0-beta</span>
-        </Row>
-        <Row label="Release channel">Stable</Row>
-        <GhostRow label="Check for updates" value="Coming soon" />
-        <GhostRow label="Auto-update" value="Coming soon" />
+        <DesktopUpdaterSettings />
       </Section>
 
       <Section title="Notifications">
@@ -202,6 +193,13 @@ function AccountPanel({
   const [billingUsage, setBillingUsage] = useState<BillingUsageResponse | null>(null);
   const [billingWorking, setBillingWorking] = useState(false);
   const [billingError, setBillingError] = useState("");
+  const [deletionPassword, setDeletionPassword] = useState("");
+  const [deletionConfirmation, setDeletionConfirmation] = useState("");
+  const [deletionWorking, setDeletionWorking] = useState(false);
+  const [deletionError, setDeletionError] = useState("");
+  const [exportPassword, setExportPassword] = useState("");
+  const [exportWorking, setExportWorking] = useState(false);
+  const [exportError, setExportError] = useState("");
   const {
     saving: savingProfile,
     error: profileError,
@@ -243,6 +241,33 @@ function AccountPanel({
       setBillingError(error instanceof Error ? error.message : "Could not start billing.");
     } finally {
       if (readAccountSessionGeneration() === generation) setBillingWorking(false);
+    }
+  }
+
+  async function deleteAccount() {
+    if (deletionWorking || deletionConfirmation !== "DELETE" || !deletionPassword) return;
+    setDeletionWorking(true);
+    setDeletionError("");
+    try {
+      await beginAccountDeletion(deletionPassword, deletionConfirmation);
+      await onLogout();
+    } catch (error) {
+      setDeletionError(error instanceof Error ? error.message : "Could not request deletion.");
+      setDeletionWorking(false);
+    }
+  }
+
+  async function downloadAccountData() {
+    if (exportWorking || !exportPassword) return;
+    setExportWorking(true);
+    setExportError("");
+    try {
+      await exportAccountData(exportPassword);
+      setExportPassword("");
+    } catch (error) {
+      setExportError(error instanceof Error ? error.message : "Could not export account data.");
+    } finally {
+      setExportWorking(false);
     }
   }
   const {
@@ -552,6 +577,64 @@ function AccountPanel({
         <GhostRow label="Active sessions" value="Coming soon" />
       </Section>
 
+      <Section title="Your data">
+        <div
+          className={`${accountSettingsCustomRowClass} flex flex-col gap-3 md:flex-row md:items-center md:justify-between md:gap-6`}
+        >
+          <div>
+            <p className="text-sm text-foreground">Portable account export</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              Download your profile, authored messages, Journal documents, uploaded Library files,
+              message attachments, and Journal assets as a ZIP file.
+            </p>
+          </div>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="outline" disabled={transitioning}>
+                Export data
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Export your account data</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Enter your current password. Misty will fetch Journal documents from the
+                  collaboration service and binary assets directly from private R2 links on this
+                  device.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <div className="space-y-3">
+                <Input
+                  type="password"
+                  autoComplete="current-password"
+                  value={exportPassword}
+                  onChange={(event) => setExportPassword(event.target.value)}
+                  placeholder="Current password"
+                  aria-label="Current password for account export"
+                />
+                {exportError ? (
+                  <p className="text-sm text-destructive" role="alert">
+                    {exportError}
+                  </p>
+                ) : null}
+              </div>
+              <AlertDialogFooter>
+                <AlertDialogCancel disabled={exportWorking}>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  disabled={exportWorking || !exportPassword || transitioning}
+                  onClick={(event) => {
+                    event.preventDefault();
+                    void downloadAccountData();
+                  }}
+                >
+                  {exportWorking ? "Building export…" : "Download ZIP"}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </div>
+      </Section>
+
       <Section title="Danger Zone">
         <div
           className={`${accountSettingsCustomRowClass} flex flex-col gap-3 md:flex-row md:items-center md:justify-between md:gap-6`}
@@ -592,146 +675,67 @@ function AccountPanel({
           </AlertDialog>
         </div>
         <div
-          className={`${accountSettingsCustomRowClass} flex flex-col gap-3 opacity-40 md:flex-row md:items-center md:justify-between md:gap-6`}
+          className={`${accountSettingsCustomRowClass} flex flex-col gap-3 md:flex-row md:items-center md:justify-between md:gap-6`}
         >
           <div>
             <p className="text-sm text-foreground">Delete account</p>
             <p className="mt-0.5 text-xs text-muted-foreground">
-              Permanently remove your account and all data.
+              Revoke access now and anonymize the account after the 30-day retention period.
             </p>
           </div>
-          <Button variant="outline" disabled>
-            Delete
-          </Button>
-        </div>
-      </Section>
-    </div>
-  );
-}
-
-// ─── Privacy ─────────────────────────────────────────────────────────────────
-
-function PrivacyPanel() {
-  return (
-    <div>
-      <Section title="Privacy">
-        <div className={`${accountSettingsCustomRowClass} flex flex-col gap-2`}>
-          <p className="text-sm font-medium text-foreground">
-            Private by default, explicit when shared.
-          </p>
-          <p className="text-sm leading-relaxed text-muted-foreground">
-            Files and local provider access stay private until you choose an action that uploads or
-            shares content. Space Library copies, Chat attachments, account data, agent prompts and
-            selected context, and supported integration credentials may be sent to the configured
-            Misty service or provider to perform that action. Misty shows the destination before a
-            private file becomes shared Space content.
-          </p>
-        </div>
-      </Section>
-
-      <Section title="Legal">
-        <GhostRow label="Privacy Policy" value="Coming soon" />
-        <GhostRow label="Terms of Service" value="Coming soon" />
-        <GhostRow label="License Agreement" value="Coming soon" />
-      </Section>
-
-      <Section title="Data">
-        <div
-          className={`${accountSettingsCustomRowClass} flex flex-col gap-3 opacity-40 md:flex-row md:items-center md:justify-between md:gap-6`}
-        >
-          <div>
-            <p className="text-sm text-foreground">Export your data</p>
-            <p className="mt-0.5 text-xs text-muted-foreground">
-              Download a copy of your account data.
-            </p>
-          </div>
-          <Button variant="outline" disabled>
-            Export
-          </Button>
-        </div>
-      </Section>
-    </div>
-  );
-}
-
-// ─── Diagnostics ─────────────────────────────────────────────────────────────
-
-function DiagnosticsPanel() {
-  const app = useAppStore((state) => state.app);
-  const [events, setEvents] = useState<ClientDebugEvent[]>(() => readClientDebugEvents());
-  const serverBase = accountDebugBase(
-    import.meta.env.VITE_MISTY_PUBLIC_API_URL ||
-      import.meta.env.VITE_MISTY_SERVER_URL ||
-      import.meta.env.VITE_API_BASE ||
-      app?.environment.serverUrl ||
-      null,
-  );
-
-  useEffect(() => {
-    function refresh() {
-      setEvents(readClientDebugEvents());
-    }
-    window.addEventListener("misty-client-debug", refresh);
-    window.addEventListener("storage", refresh);
-    return () => {
-      window.removeEventListener("misty-client-debug", refresh);
-      window.removeEventListener("storage", refresh);
-    };
-  }, []);
-
-  return (
-    <div>
-      <Section title="Runtime">
-        <Row label="Misty server API">{serverBase || "Not set"}</Row>
-        <Row label="Server env">
-          {import.meta.env.VITE_MISTY_PUBLIC_API_URL ||
-            import.meta.env.VITE_MISTY_SERVER_URL ||
-            import.meta.env.VITE_API_BASE ||
-            "Not set"}
-        </Row>
-        <Row label="Debug logging">{clientDebugPanelEnabled() ? "Enabled" : "Disabled"}</Row>
-      </Section>
-
-      <Section title="Client Events">
-        {events.length > 0 ? (
-          <div className="divide-y divide-border/60 px-7">
-            {events.slice(0, 12).map((event) => (
-              <article key={event.id} className="grid gap-1 py-4">
-                <div className="flex min-w-0 items-center justify-between gap-3">
-                  <strong
-                    className={`text-sm ${event.level === "error" ? "text-destructive" : event.level === "warn" ? "text-[var(--misty-warning)]" : "text-foreground"}`}
-                  >
-                    {event.scope}
-                  </strong>
-                  <time className="shrink-0 text-xs text-muted-foreground">
-                    {new Date(event.createdAt).toLocaleTimeString()}
-                  </time>
-                </div>
-                <p className="m-0 text-sm text-muted-foreground">{event.message}</p>
-                {event.detail ? (
-                  <pre className="max-h-40 overflow-auto whitespace-pre-wrap rounded-lg bg-muted px-3 py-2 text-[11px] leading-relaxed text-muted-foreground [overflow-wrap:anywhere]">
-                    {event.detail}
-                  </pre>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="destructive">Delete account</Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete your Misty account?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  You will be signed out immediately. Transfer or delete every Space you own first;
+                  Misty will not delete teammates&apos; work automatically.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <div className="space-y-3">
+                <Input
+                  type="password"
+                  autoComplete="current-password"
+                  value={deletionPassword}
+                  onChange={(event) => setDeletionPassword(event.target.value)}
+                  placeholder="Current password"
+                  aria-label="Current password"
+                />
+                <Input
+                  value={deletionConfirmation}
+                  onChange={(event) => setDeletionConfirmation(event.target.value)}
+                  placeholder="Type DELETE"
+                  aria-label="Type DELETE to confirm account deletion"
+                />
+                {deletionError ? (
+                  <p className="text-sm text-destructive" role="alert">
+                    {deletionError}
+                  </p>
                 ) : null}
-              </article>
-            ))}
-          </div>
-        ) : (
-          <div className={accountSettingsCustomRowClass}>
-            <p className="m-0 text-sm text-muted-foreground">No client events recorded yet.</p>
-          </div>
-        )}
-        <div className={`${accountSettingsCustomRowClass} flex justify-end`}>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => {
-              clearClientDebugEvents();
-              setEvents([]);
-            }}
-          >
-            Clear debug events
-          </Button>
+              </div>
+              <AlertDialogFooter>
+                <AlertDialogCancel disabled={deletionWorking}>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  disabled={
+                    deletionWorking ||
+                    !deletionPassword ||
+                    deletionConfirmation !== "DELETE" ||
+                    transitioning
+                  }
+                  onClick={(event) => {
+                    event.preventDefault();
+                    void deleteAccount();
+                  }}
+                >
+                  {deletionWorking ? "Requesting deletion…" : "Delete account"}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
       </Section>
     </div>
@@ -883,10 +887,6 @@ export default function DesktopAccountPage(props: {
       {activePanel}
     </DesktopSettingsFrame>
   );
-}
-
-function accountDebugBase(base: string | null | undefined) {
-  return withDefaultApiPath(normalizeApiBaseUrl(base));
 }
 
 function meFromLocalAccount(

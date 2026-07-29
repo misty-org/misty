@@ -62,13 +62,15 @@ export async function uploadJournalAsset(input: {
     }),
   });
 
-  await putDirectlyToR2(reservation.transfer, input.file);
-  const completed = await spaceRequest<UploadResult>(
-    `${basePath}/uploads/${encodeURIComponent(reservation.upload.id)}/finalize`,
-    {
-      method: "POST",
-      headers: reservation.finalize?.headers ?? {},
-    },
+  await withTransientRetry(() => putDirectlyToR2(reservation.transfer, input.file));
+  const completed = await withTransientRetry(() =>
+    spaceRequest<UploadResult>(
+      `${basePath}/uploads/${encodeURIComponent(reservation.upload.id)}/finalize`,
+      {
+        method: "POST",
+        headers: reservation.finalize?.headers ?? {},
+      },
+    ),
   );
   const asset = input.kind === "note" ? completed.note_asset : completed.drawing_asset;
   if (!asset?.id) throw new Error("Misty did not return the uploaded Journal asset.");
@@ -117,8 +119,30 @@ async function putDirectlyToR2(transfer: UploadReservation["transfer"], file: Fi
     credentials: "omit",
   });
   if (!response.ok) {
-    throw new Error(`Cloudflare R2 rejected the Journal asset (${response.status}).`);
+    const error = new Error(
+      `Cloudflare R2 rejected the Journal asset (${response.status}).`,
+    ) as Error & { status: number };
+    error.status = response.status;
+    throw error;
   }
+}
+
+async function withTransientRetry<T>(operation: () => Promise<T>): Promise<T> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      return await operation();
+    } catch (error) {
+      lastError = error;
+      const status = (error as { status?: unknown })?.status;
+      if (typeof status === "number" && status < 500) throw error;
+      if (attempt < 2) {
+        const delay = import.meta.env.MODE === "test" ? 0 : 250 * 2 ** attempt;
+        await new Promise((resolve) => window.setTimeout(resolve, delay));
+      }
+    }
+  }
+  throw lastError;
 }
 
 async function downloadAndVerifyJournalAsset(downloadPath: string): Promise<string> {

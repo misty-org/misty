@@ -2,9 +2,7 @@ import type {
   AppState,
   BinaryFileData,
   BinaryFiles,
-  Collaborator,
   ExcalidrawImperativeAPI,
-  SocketId,
 } from "@excalidraw/excalidraw/types";
 import type { OrderedExcalidrawElement } from "@excalidraw/excalidraw/element/types";
 import type { RemoteExcalidrawElement } from "@excalidraw/excalidraw/data/reconcile";
@@ -18,6 +16,7 @@ import {
   readDrawingElements,
   writeDrawingElements,
 } from "../collaboration/drawingSceneStore";
+import { collaboratorsFromAwareness, DrawingFollowTracker } from "../collaboration/drawingPresence";
 import type { DrawingCollaborationSession } from "../collaboration/drawingCollaboration";
 import { hydrateDrawingBinaryFile, uploadDrawingBinaryFile } from "../drawingAssets";
 import type { SpaceDrawing } from "../types";
@@ -34,6 +33,7 @@ export default function CollaborativeDrawingCanvas(props: CollaborativeDrawingCa
   const fileUploadsRef = useRef(new Map<string, Promise<void>>());
   const fileHydrationsRef = useRef(new Map<string, Promise<void>>());
   const pointerPublisher = useMemo(() => createPointerPublisher(props.session), [props.session]);
+  const followTracker = useMemo(() => new DrawingFollowTracker(), [props.session]);
 
   const shareBinaryFiles = useCallback(
     async (files: readonly BinaryFileData[]) => {
@@ -81,11 +81,20 @@ export default function CollaborativeDrawingCanvas(props: CollaborativeDrawingCa
 
   const applyCollaborators = useCallback(() => {
     if (!api) return;
+    const collaborators = collaboratorsFromAwareness(
+      props.session.provider.awareness,
+      props.session.doc.clientID,
+    );
+    const followToRestore = followTracker.followToRestore(
+      collaborators,
+      api.getAppState().userToFollow,
+    );
     api.updateScene({
-      collaborators: collaboratorsFromAwareness(props.session),
+      collaborators,
+      appState: followToRestore ? { userToFollow: followToRestore } : undefined,
       captureUpdate: CaptureUpdateAction.NEVER,
     });
-  }, [api, props.session]);
+  }, [api, followTracker, props.session]);
 
   useEffect(() => {
     const onElementsChanged = (_events: unknown, transaction: { origin: unknown }) => {
@@ -195,6 +204,9 @@ export default function CollaborativeDrawingCanvas(props: CollaborativeDrawingCa
         isCollaborating
         viewModeEnabled={props.drawing.role === "viewer"}
         onChange={handleChange}
+        onUserFollow={(payload) => {
+          followTracker.record(payload, api?.getAppState().collaborators ?? new Map());
+        }}
         onPointerUpdate={pointerPublisher.publish}
         onPaste={async (data) => {
           const files = Object.values(data.files ?? {});
@@ -230,34 +242,6 @@ export default function CollaborativeDrawingCanvas(props: CollaborativeDrawingCa
   );
 }
 
-function collaboratorsFromAwareness(
-  session: DrawingCollaborationSession,
-): Map<SocketId, Collaborator> {
-  const collaborators = new Map<SocketId, Collaborator>();
-  for (const [clientId, state] of session.provider.awareness.getStates()) {
-    if (clientId === session.doc.clientID) continue;
-    const user = isRecord(state.user) ? state.user : {};
-    const pointer = isRecord(state.pointer) ? state.pointer : undefined;
-    collaborators.set(String(clientId) as SocketId, {
-      id: typeof user.id === "string" ? user.id : String(clientId),
-      username: typeof user.name === "string" ? user.name : "Collaborator",
-      color: isCollaboratorColor(user.color) ? user.color : undefined,
-      pointer:
-        pointer &&
-        typeof pointer.x === "number" &&
-        typeof pointer.y === "number" &&
-        (pointer.tool === "pointer" || pointer.tool === "laser")
-          ? { x: pointer.x, y: pointer.y, tool: pointer.tool }
-          : undefined,
-      button: state.button === "down" ? "down" : "up",
-      selectedElementIds: isSelectedElementIds(state.selectedElementIds)
-        ? state.selectedElementIds
-        : undefined,
-    });
-  }
-  return collaborators;
-}
-
 function createPointerPublisher(session: DrawingCollaborationSession) {
   let timer: number | null = null;
   let pending:
@@ -285,18 +269,4 @@ function createPointerPublisher(session: DrawingCollaborationSession) {
       if (timer != null) window.clearTimeout(timer);
     },
   };
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function isCollaboratorColor(value: unknown): value is { background: string; stroke: string } {
-  return (
-    isRecord(value) && typeof value.background === "string" && typeof value.stroke === "string"
-  );
-}
-
-function isSelectedElementIds(value: unknown): value is Readonly<Record<string, true>> {
-  return isRecord(value) && Object.values(value).every((selected) => selected === true);
 }
