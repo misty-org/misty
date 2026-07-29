@@ -25,7 +25,9 @@ function validateHttpsEndpoint(raw) {
 }
 
 function requiredCspSources(name, protocols) {
-  const sources = required(name).split(/[\s,]+/).filter(Boolean);
+  const sources = required(name)
+    .split(/[\s,]+/)
+    .filter(Boolean);
   return sources.map((source) => {
     if (source.includes("*")) {
       throw new Error(`${name} cannot contain wildcard sources.`);
@@ -48,7 +50,26 @@ function requiredCspSources(name, protocols) {
 }
 
 const pubkey = required("TAURI_UPDATER_PUBLIC_KEY");
-const keyLines = pubkey.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+const directKeyLines = pubkey
+  .split(/\r?\n/)
+  .map((line) => line.trim())
+  .filter(Boolean);
+let keyLines = directKeyLines;
+if (!keyLines.at(-1)?.startsWith("RW")) {
+  try {
+    const compactKey = pubkey.replace(/\s+/g, "");
+    const decodedKey = Buffer.from(compactKey, "base64").toString("utf8");
+    const canonicalInput = compactKey.replace(/=+$/, "");
+    const canonicalDecoded = Buffer.from(decodedKey, "utf8").toString("base64").replace(/=+$/, "");
+    if (canonicalInput !== canonicalDecoded) throw new Error("non-canonical base64");
+    keyLines = decodedKey
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean);
+  } catch {
+    keyLines = directKeyLines;
+  }
+}
 if (
   keyLines.length > 2 ||
   !keyLines.at(-1)?.startsWith("RW") ||
