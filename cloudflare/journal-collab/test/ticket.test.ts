@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { TicketError, verifyTicket, type TicketClaims } from "../src/ticket";
+import {
+  TicketError,
+  verifyTicket,
+  verifyTicketWithRotation,
+  type TicketClaims,
+} from "../src/ticket";
 
 function bytesToBase64(bytes: Uint8Array): string {
   let binary = "";
@@ -83,6 +88,27 @@ async function expectRejection(promise: Promise<unknown>, code: string) {
 }
 
 describe("collaboration ticket verification", () => {
+  it("accepts the retained previous public key only during rotation", async () => {
+    const current = await issuer();
+    const previous = await issuer();
+    const token = await previous.mint();
+
+    await expect(
+      verifyTicketWithRotation(
+        token,
+        verificationContext(current.publicKeyBase64),
+        previous.publicKeyBase64,
+      ),
+    ).resolves.toMatchObject({ sub: "user_1" });
+    await expectRejection(
+      verifyTicketWithRotation(
+        token,
+        verificationContext(current.publicKeyBase64),
+      ),
+      "ticket_signature_invalid",
+    );
+  });
+
   it("accepts a well-formed ticket for the right room", async () => {
     const api = await issuer();
     const token = await api.mint();

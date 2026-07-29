@@ -231,3 +231,17 @@ func TestDrawingAssetMIMEAllowlistRejectsActiveAndGenericContent(t *testing.T) {
 		}
 	}
 }
+
+func TestJournalAssetMIMEAllowlistIsRasterOnly(t *testing.T) {
+	for _, rejected := range []string{
+		"image/svg+xml",
+		"text/html",
+		"application/pdf",
+		"application/octet-stream",
+		"video/mp4",
+	} {
+		if supportedDrawingAssetMIME(rejected) {
+			t.Fatalf("active or non-image Journal MIME %q was accepted", rejected)
+		}
+	}
+}

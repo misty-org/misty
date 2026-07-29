@@ -81,7 +81,7 @@ func (s *SpacesService) CloudConnections() http.HandlerFunc {
 			"limit": map[string]any{
 				"used": len(result),
 				"maximum": func() any {
-					if entitlements.Plan == db.TierPro {
+					if entitlements.Plan != db.TierBasic {
 						return nil
 					}
 					return 1
@@ -155,8 +155,8 @@ func (s *SpacesService) BeginCloudAuthorization() http.HandlerFunc {
 				break
 			}
 		}
-		if entitlements.Plan != db.TierPro && len(connections) >= 1 && !replacingExisting {
-			writeJSON(w, http.StatusForbidden, map[string]string{"code": "cloud_connection_limit", "message": "Free accounts can connect one cloud account."})
+		if entitlements.Plan == db.TierBasic && len(connections) >= 1 && !replacingExisting {
+			writeJSON(w, http.StatusForbidden, map[string]string{"code": "cloud_connection_limit", "message": "Basic accounts can connect one cloud account."})
 			return
 		}
 
@@ -250,7 +250,7 @@ func (s *SpacesService) CloudAuthorizationCallback() http.HandlerFunc {
 			return
 		}
 		maximum := 1
-		if entitlements.Plan == db.TierPro {
+		if entitlements.Plan != db.TierBasic {
 			maximum = 0
 		}
 		item, err := s.database.SaveCloudConnection(r.Context(), db.CloudConnection{
@@ -260,7 +260,7 @@ func (s *SpacesService) CloudAuthorizationCallback() http.HandlerFunc {
 			UsesCustomOAuthClient: secret.Custom, ExpiresAt: expiresAt,
 		}, maximum)
 		if errors.Is(err, db.ErrCloudConnectionLimit) {
-			writeJSON(w, http.StatusForbidden, map[string]string{"code": "cloud_connection_limit", "message": "Free accounts can connect one cloud account."})
+			writeJSON(w, http.StatusForbidden, map[string]string{"code": "cloud_connection_limit", "message": "Basic accounts can connect one cloud account."})
 			return
 		}
 		if err != nil {
@@ -327,10 +327,21 @@ func (s *SpacesService) DeleteCloudConnection() http.HandlerFunc {
 		if !ok {
 			return
 		}
-		if err := s.database.DeleteCloudConnection(r.Context(), userID, chi.URLParam(r, "connectionID")); err != nil {
+		connectionID := chi.URLParam(r, "connectionID")
+		item, err := s.database.CloudConnection(r.Context(), userID, connectionID)
+		if err != nil {
 			writeSpaceError(w, err)
 			return
 		}
+		status, revokeErr := s.revokeCloudConnection(r.Context(), *item)
+		if err := s.database.DeleteCloudConnection(r.Context(), userID, connectionID); err != nil {
+			writeSpaceError(w, err)
+			return
+		}
+		if revokeErr != nil {
+			status = "revocation_failed_local_credentials_erased"
+		}
+		w.Header().Set("X-Misty-Provider-Revocation", status)
 		w.WriteHeader(http.StatusNoContent)
 	}
 }

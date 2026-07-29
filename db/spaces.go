@@ -711,10 +711,7 @@ func (db *Database) RespondToSpaceInvite(ctx context.Context, userID, inviteID s
 			_, err := tx.ExecContext(ctx, `UPDATE space_invitations SET revoked_at=NOW() WHERE id=$1`, inviteID)
 			return err
 		}
-		if _, err := tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock(hashtext($1))`, "spaces:member:"+userID); err != nil {
-			return err
-		}
-		if _, err := tx.ExecContext(ctx, `INSERT INTO space_members(space_id,user_id,role) VALUES($1,$2,'member')`, spaceID, userID); err != nil {
+		if err := addSpaceMembershipTx(ctx, tx, spaceID, userID, "member"); err != nil {
 			return err
 		}
 		if _, err := tx.ExecContext(ctx, `UPDATE space_invitations

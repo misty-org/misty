@@ -287,7 +287,8 @@ func fixedMemberPermission(permission string) bool {
 	case PermissionMessagesRead, PermissionMessagesWrite, PermissionAttachmentUpload,
 		PermissionLibraryView, PermissionLibraryUpload, PermissionLibraryAdd,
 		PermissionLibraryEdit, PermissionLibraryDownload, PermissionLibraryImport,
-		PermissionStorageViewOwn, PermissionTasksView, PermissionTasksManage:
+		PermissionStorageViewOwn, PermissionStudioView, PermissionAgentsRun,
+		PermissionTasksView, PermissionTasksManage:
 		return true
 	default:
 		return false
@@ -682,7 +683,12 @@ func (db *Database) CompleteLibraryUpload(ctx context.Context, userID, spaceID, 
 		err := tx.QueryRowContext(ctx, `SELECT id,r2_object_key FROM library_blobs WHERE security_domain_id=$1 AND sha256=$2 AND byte_size=$3 AND lifecycle_state='ready' LIMIT 1`, upload.SecurityDomainID, verifiedSHA, verifiedSize).Scan(&blobID, &objectKey)
 		if errors.Is(err, sql.ErrNoRows) {
 			blobID = "blob_" + uuid.NewString()
-			if _, err = tx.ExecContext(ctx, `INSERT INTO library_blobs(id,security_domain_id,r2_object_key,sha256,byte_size,client_declared_mime_type,server_detected_mime_type,scan_status,processing_status,lifecycle_state) VALUES($1,$2,$3,$4,$5,$6,$7,'clean','ready','ready')`, blobID, upload.SecurityDomainID, upload.ObjectKey, verifiedSHA, verifiedSize, upload.ClientDeclaredMIMEType, detectedMIME); err != nil {
+			scanStatus := "clean"
+			if upload.Purpose == UploadPurposeNoteAttachment ||
+				upload.Purpose == UploadPurposeDrawingAsset {
+				scanStatus = "skipped"
+			}
+			if _, err = tx.ExecContext(ctx, `INSERT INTO library_blobs(id,security_domain_id,r2_object_key,sha256,byte_size,client_declared_mime_type,server_detected_mime_type,scan_status,processing_status,lifecycle_state) VALUES($1,$2,$3,$4,$5,$6,$7,$8,'ready','ready')`, blobID, upload.SecurityDomainID, upload.ObjectKey, verifiedSHA, verifiedSize, upload.ClientDeclaredMIMEType, detectedMIME, scanStatus); err != nil {
 				return err
 			}
 		} else if err != nil {

@@ -169,6 +169,31 @@ func TestProviderRoutesNormalizeToTheirPolicy(t *testing.T) {
 	}
 }
 
+func TestPublicBetaSensitiveRoutesHaveExplicitRateLimits(t *testing.T) {
+	limiter := NewAPIRateLimiter()
+	cases := []struct {
+		path  string
+		limit int
+	}{
+		{"/spaces/space_abcdefabcdefabcdef/notes/note_abcdefabcdefabcdef/collaboration-ticket", 30},
+		{"/spaces/space_abcdefabcdefabcdef/drawings/drawing_abcdefabcdefabcdef/collaboration-ticket", 30},
+		{"/spaces/space_abcdefabcdefabcdef/notes/note_abcdefabcdefabcdef/assets/uploads", 20},
+		{"/spaces/space_abcdefabcdefabcdef/drawings/drawing_abcdefabcdefabcdef/assets/uploads", 20},
+		{"/spaces/space_abcdefabcdefabcdef/notes/note_abcdefabcdefabcdef/assets/uploads/upload_abcdefabcdefabcdef/finalize", 30},
+		{"/spaces/space_abcdefabcdefabcdef/drawings/drawing_abcdefabcdefabcdef/assets/uploads/upload_abcdefabcdefabcdef/finalize", 30},
+	}
+	for _, item := range cases {
+		path := normalizeRateLimitPath(item.path)
+		policy, exists := limiter.routePolicies[http.MethodPost+" "+path]
+		if !exists || policy.Limit != item.limit {
+			t.Fatalf(
+				"route %q normalized to %q with policy %#v, want explicit limit %d",
+				item.path, path, policy, item.limit,
+			)
+		}
+	}
+}
+
 func TestAbuseGuardBlocksSustainedAbuse(t *testing.T) {
 	policy := AbusePolicy{
 		TotalLimit: 5, TotalWindow: time.Minute,

@@ -10,9 +10,11 @@
     "generate-secrets": "node scripts/generate-secrets.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "test:runtime": "npm run build && node --test test/runtime-lifecycle.test.mjs",
     "build": "wrangler deploy --dry-run --outdir=dist"
   },
   "dependencies": {
+    "lib0": "^0.2.117",
     "partyserver": "0.5.8",
     "y-partyserver": "2.2.0",
     "y-protocols": "1.0.6",
@@ -20,6 +22,7 @@
   },
   "devDependencies": {
     "@cloudflare/workers-types": "4.20260625.1",
+    "miniflare": "4.20260625.0",
     "typescript": "5.9.3",
     "vitest": "3.2.4",
     "wrangler": "4.105.0"

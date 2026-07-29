@@ -39,6 +39,22 @@ export async function verifyControlRequest(
   return constantTimeEqual(base64URL(digest), signature);
 }
 
+export async function verifyControlRequestWithRotation(
+  currentSecret: string,
+  previousSecret: string | undefined,
+  timestamp: string,
+  body: Uint8Array,
+  signature: string,
+): Promise<boolean> {
+  if (await verifyControlRequest(currentSecret, timestamp, body, signature)) {
+    return true;
+  }
+  return Boolean(
+    previousSecret?.trim() &&
+      (await verifyControlRequest(previousSecret, timestamp, body, signature)),
+  );
+}
+
 export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }

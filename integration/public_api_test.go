@@ -2,6 +2,7 @@ package integration
 
 import (
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/kannachi323/misty/server/api"
@@ -66,6 +67,37 @@ func TestPublicAccountResponsesHideLicenseID(t *testing.T) {
 	}
 	if got, ok := meBody["tier"].(string); !ok || got != "basic" {
 		t.Fatalf("/me tier = %#v, want basic", meBody["tier"])
+	}
+}
+
+func TestBillingUsageExposesOnlyCustomerSafeAgentUsage(t *testing.T) {
+	database := openIntegrationDatabase(t)
+	registerRec := performJSONRequest(t, api.Register(database), http.MethodPost, "/register", map[string]string{
+		"name": "Usage User", "username": "usage_user", "email": "usage@example.com", "password": "password123",
+	})
+	if registerRec.Code != http.StatusCreated {
+		t.Fatalf("register status = %d: %s", registerRec.Code, registerRec.Body.String())
+	}
+	sessionCookie := requireCookie(t, registerRec, sessionCookieName)
+	recorder := performJSONRequest(t, api.GetBillingUsage(database), http.MethodGet, "/billing/usage", nil, sessionCookie)
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("billing usage status = %d: %s", recorder.Code, recorder.Body.String())
+	}
+	body := decodeJSONResponse(t, recorder)
+	usage, ok := body["agent_usage"].(map[string]any)
+	if !ok {
+		t.Fatalf("agent_usage = %#v", body["agent_usage"])
+	}
+	for _, key := range []string{"percentage_used", "available", "paused", "reset_at", "plan"} {
+		if _, exists := usage[key]; !exists {
+			t.Fatalf("agent_usage missing %q: %#v", key, usage)
+		}
+	}
+	raw := strings.ToLower(recorder.Body.String())
+	for _, forbidden := range []string{"microusd", "weekly_allowance", "weekly_remaining", "provider_cost", "charged_microusd", "credits"} {
+		if strings.Contains(raw, forbidden) {
+			t.Fatalf("billing usage exposed internal field %q: %s", forbidden, recorder.Body.String())
+		}
 	}
 }
 

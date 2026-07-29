@@ -8,7 +8,7 @@ not migrated into the new Library.
 
 - Personal and Space-owned security domains
 - Immutable blobs, canonical files, and Space-scoped Library items
-- One owner-pooled storage allowance across all owned Spaces (2 GB Free or 50 GB Pro), with atomic upload reservations
+- One owner-pooled storage allowance across all owned Spaces (2 GB Basic, 50 GB Pro, or 250 GB Max), with atomic upload reservations
 - A separate 1 GB per-file technical safeguard that is not a pricing entitlement
 - Three owned Spaces total, including the owner-named personal Space
 - Private permanent R2/S3 storage contract and persistent local development store
@@ -103,6 +103,26 @@ bucket allows the exact app origins. Configure the private bucket for `PUT`,
 allowing only the signed headers (`Content-Type`, `x-amz-checksum-sha256`,
 `x-amz-meta-misty-library-sha256`). Do not use a wildcard origin with
 credentials.
+
+From the server repository, configure and then read back the exact policy with:
+
+```text
+R2_BUCKET=... \
+MISTY_R2_ALLOWED_ORIGINS=https://app.example.com,tauri://localhost,http://tauri.localhost \
+node scripts/configure-r2-cors.mjs
+```
+
+Wrangler uses the operator's Cloudflare login or scoped API token. The script
+rejects wildcard, credential-bearing, path-bearing, and insecure remote
+origins, writes its temporary policy with owner-only permissions, applies it,
+reads the bucket policy back, and removes the temporary file.
+
+Do not add a blanket bucket expiration rule for `library/` or `avatars/`.
+Those prefixes contain permanent data. The API expires abandoned reservations
+every minute and, every ten minutes, reconciles PostgreSQL with R2 metadata. It
+deletes only unreferenced `library/` objects older than 24 hours, detects
+missing or mismatched permanent objects, and reports valid interrupted
+finalizations for retry. It never downloads object bodies during this work.
 
 ## Journal binary assets
 

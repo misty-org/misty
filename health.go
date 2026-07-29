@@ -103,7 +103,17 @@ func (monitor *healthMonitor) evaluate(ctx context.Context) (healthSnapshot, int
 	// it keeps reporting while it is repointed at agent_gateway.
 	checks["mika"] = agentGatewayCheck
 	checks["email"] = environmentConfigurationCheck("MAILJET_API_KEY", "MAILJET_SECRET_KEY", "MAILJET_FROM_EMAIL")
-	checks["billing"] = environmentConfigurationCheck("STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET")
+	checks["billing"] = environmentConfigurationCheck(
+		"STRIPE_SECRET_KEY",
+		"STRIPE_WEBHOOK_SECRET",
+		"STRIPE_PRICE_PRO_MONTHLY",
+		"STRIPE_PRICE_PRO_YEARLY",
+		"STRIPE_PRICE_MAX_MONTHLY",
+		"STRIPE_PRICE_MAX_YEARLY",
+		"STRIPE_CHECKOUT_SUCCESS_URL",
+		"STRIPE_CHECKOUT_CANCEL_URL",
+		"STRIPE_PORTAL_RETURN_URL",
+	)
 	checks["google"] = environmentConfigurationCheck("GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET")
 	checks["slack"] = environmentConfigurationCheck("SLACK_CLIENT_ID", "SLACK_CLIENT_SECRET", "SLACK_SIGNING_SECRET")
 	checks["notion"] = environmentConfigurationCheck("NOTION_CLIENT_ID", "NOTION_CLIENT_SECRET", "NOTION_WEBHOOK_VERIFICATION_TOKEN")

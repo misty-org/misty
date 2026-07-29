@@ -1,9 +1,13 @@
 package db
 
 import (
+	"database/sql"
+	"os"
+	"strings"
 	"testing"
 
 	"github.com/kannachi323/misty/server/security"
+	"github.com/lib/pq"
 )
 
 func TestSessionCRUDAndExpiry(t *testing.T) {
@@ -42,4 +46,68 @@ func TestSessionCRUDAndExpiry(t *testing.T) {
 	if err := database.DeleteSession(tokenHash); err != nil {
 		t.Fatalf("DeleteSession() error = %v", err)
 	}
+}
+
+func TestSessionLookupWorksWithRuntimeRLSRole(t *testing.T) {
+	database := openTestDatabase(t)
+
+	user, err := database.CreateUser("Runtime Session User", "runtime-session@example.com", "password123")
+	if err != nil {
+		t.Fatalf("CreateUser() error = %v", err)
+	}
+	tokenHash := security.HashToken("runtime-session-token")
+	if err := database.CreateSession(tokenHash, user.ID); err != nil {
+		t.Fatalf("CreateSession() error = %v", err)
+	}
+
+	runtimeDatabase := openRuntimeRoleDatabase(t, database)
+	userID, err := runtimeDatabase.GetSessionUserID(tokenHash)
+	if err != nil {
+		t.Fatalf("GetSessionUserID() with runtime RLS role error = %v", err)
+	}
+	if userID != user.ID {
+		t.Fatalf("GetSessionUserID() with runtime RLS role = %q, want %q", userID, user.ID)
+	}
+}
+
+func openRuntimeRoleDatabase(t *testing.T, adminDatabase *Database) *Database {
+	t.Helper()
+
+	cfg := loadIntegrationDBConfig(t)
+	cfg.user = strings.TrimSpace(os.Getenv("DB_USER"))
+	cfg.password = strings.TrimSpace(os.Getenv("DB_PASSWORD"))
+	if cfg.user == "" || cfg.password == "" {
+		t.Skip("DB_USER and DB_PASSWORD are required to exercise the runtime RLS role")
+	}
+	if _, err := adminDatabase.Conn.Exec(
+		"GRANT SELECT ON sessions TO " + pq.QuoteIdentifier(cfg.user),
+	); err != nil {
+		t.Fatalf("grant runtime role session access error = %v", err)
+	}
+
+	conn, err := sql.Open("postgres", cfg.dsn())
+	if err != nil {
+		t.Fatalf("sql.Open() runtime role error = %v", err)
+	}
+	if err := conn.Ping(); err != nil {
+		_ = conn.Close()
+		t.Fatalf("runtime role database ping failed: %v", err)
+	}
+
+	var bypassesRLS bool
+	if err := conn.QueryRow(
+		`SELECT rolsuper OR rolbypassrls FROM pg_roles WHERE rolname=current_user`,
+	).Scan(&bypassesRLS); err != nil {
+		_ = conn.Close()
+		t.Fatalf("inspect runtime role error = %v", err)
+	}
+	if bypassesRLS {
+		_ = conn.Close()
+		t.Skip("DB_USER bypasses row-level security")
+	}
+
+	t.Cleanup(func() {
+		_ = conn.Close()
+	})
+	return &Database{Conn: conn}
 }

@@ -170,10 +170,11 @@ func (s *SpaceLibraryService) SpaceNoteAssets() http.HandlerFunc {
 		}
 		body.Filename = sanitizeLibraryFilename(body.Filename)
 		body.SHA256 = strings.ToLower(strings.TrimSpace(body.SHA256))
-		body.MIMEType = strings.TrimSpace(body.MIMEType)
+		body.MIMEType = strings.ToLower(strings.TrimSpace(body.MIMEType))
 		maxBytes := s.uploadLimits.Max(UploadPurposeNoteAttachment)
 		if maxBytes < 1 || body.ByteSize < 1 || body.ByteSize > maxBytes ||
-			!librarySHA256Pattern.MatchString(body.SHA256) || body.Filename == "" {
+			!librarySHA256Pattern.MatchString(body.SHA256) || body.Filename == "" ||
+			!supportedDrawingAssetMIME(body.MIMEType) {
 			writeLibraryError(w, db.ErrLibraryInvalid)
 			return
 		}
@@ -252,12 +253,6 @@ func (s *SpacesService) SpaceNoteCollaborationTicket() http.HandlerFunc {
 		access, err := s.database.RequireNoteView(r.Context(), userID, noteID)
 		if err != nil {
 			writeSpaceError(w, err)
-			return
-		}
-		if !s.journalCollab.Enabled {
-			// Never fall back to local-only notes; the desktop shows an explicit
-			// unavailable state instead.
-			writeJSON(w, http.StatusServiceUnavailable, map[string]string{"code": "note_collaboration_unavailable"})
 			return
 		}
 		// The note is re-read here rather than trusted from an earlier request,

@@ -47,6 +47,7 @@ const secrets = {
   JOURNAL_COLLAB_TICKET_PRIVATE_KEY: base64(privatePkcs8),
   JOURNAL_COLLAB_CONTROL_SECRET: randomSecret(),
   JOURNAL_COLLAB_PROJECTION_SECRET: randomSecret(),
+  JOURNAL_COLLAB_ROOM_SALT: randomSecret(),
 };
 
 // .dev.vars is what `wrangler dev` reads for local runs. It is gitignored.
@@ -66,7 +67,8 @@ const goEnv = [
   `JOURNAL_COLLAB_TICKET_PRIVATE_KEY=${secrets.JOURNAL_COLLAB_TICKET_PRIVATE_KEY}`,
   `JOURNAL_COLLAB_CONTROL_SECRET=${secrets.JOURNAL_COLLAB_CONTROL_SECRET}`,
   `JOURNAL_COLLAB_PROJECTION_SECRET=${secrets.JOURNAL_COLLAB_PROJECTION_SECRET}`,
-  "MISTY_JOURNAL_COLLAB_ENABLED=true",
+  "# Keep JOURNAL_COLLAB_ROOM_SALT stable across signing-secret rotations.",
+  `JOURNAL_COLLAB_ROOM_SALT=${secrets.JOURNAL_COLLAB_ROOM_SALT}`,
   "",
 ].join("\n");
 writeFileSync(resolve(projectRoot, ".secrets/server.env"), goEnv, { mode: 0o600 });

@@ -25,44 +25,38 @@ import (
 const (
 	// Short enough that a revoked user cannot hold a usable ticket for long,
 	// long enough to survive a slow client opening a WebSocket.
-	journalTicketLifetime     = 60 * time.Second
-	journalTicketIssuer       = "misty-api"
-	journalTicketAudience     = "misty-journal-collab"
-	defaultJournalCollabHost  = "misty-journal-collab.mistysys.workers.dev"
-	journalCollabDisabledFlag = "false"
+	journalTicketLifetime    = 60 * time.Second
+	journalTicketIssuer      = "misty-api"
+	journalTicketAudience    = "misty-journal-collab"
+	defaultJournalCollabHost = "misty-journal-collab.mistysys.workers.dev"
 )
 
 // JournalCollabConfig holds everything needed to talk to the shared note and
 // drawing collaboration service. It is only usable once every field validates.
 type JournalCollabConfig struct {
-	Enabled          bool
-	Host             string
-	Issuer           string
-	Audience         string
-	privateKey       ed25519.PrivateKey
-	controlSecret    []byte
-	projectionSecret []byte
-	roomSalt         []byte
+	Host                     string
+	Issuer                   string
+	Audience                 string
+	privateKey               ed25519.PrivateKey
+	controlSecret            []byte
+	projectionSecret         []byte
+	previousProjectionSecret []byte
+	roomSalt                 []byte
 }
 
 // JournalCollabConfigFromEnv reads the collaboration configuration.
 //
-// It returns a disabled config with no error when the feature is off, and an
-// error only when it is switched on but cannot work. Notes must never fall back
-// to an insecure local-only mode, so a misconfiguration is loud.
+// Journal collaboration is an invariant, not a feature flag. A missing or
+// invalid setting fails startup rather than quietly degrading to local-only
+// notes.
 func JournalCollabConfigFromEnv() (JournalCollabConfig, error) {
-	enabledValue := strings.TrimSpace(os.Getenv("MISTY_JOURNAL_COLLAB_ENABLED"))
 	config := JournalCollabConfig{
-		Enabled:  !strings.EqualFold(enabledValue, journalCollabDisabledFlag),
 		Host:     envOrDefault("PARTYKIT_HOST", defaultJournalCollabHost),
 		Issuer:   journalTicketIssuer,
 		Audience: journalTicketAudience,
 	}
-	if !config.Enabled {
-		return config, nil
-	}
 	if config.Host == "" {
-		return JournalCollabConfig{}, errors.New("PARTYKIT_HOST is required when journal collaboration is enabled")
+		return JournalCollabConfig{}, errors.New("PARTYKIT_HOST is required for journal collaboration")
 	}
 	if strings.Contains(config.Host, "/") || strings.Contains(config.Host, ":") {
 		return JournalCollabConfig{}, errors.New("PARTYKIT_HOST must be a bare hostname")
@@ -78,9 +72,12 @@ func JournalCollabConfigFromEnv() (JournalCollabConfig, error) {
 	if config.projectionSecret, err = decodeServiceSecret("JOURNAL_COLLAB_PROJECTION_SECRET"); err != nil {
 		return JournalCollabConfig{}, err
 	}
-	// Room ids are derived from the control secret rather than configured
-	// separately: one fewer secret to rotate, and both sides already share it.
-	config.roomSalt = config.controlSecret
+	if config.previousProjectionSecret, err = decodeOptionalServiceSecret("JOURNAL_COLLAB_PROJECTION_SECRET_PREVIOUS"); err != nil {
+		return JournalCollabConfig{}, err
+	}
+	if config.roomSalt, err = decodeServiceSecret("JOURNAL_COLLAB_ROOM_SALT"); err != nil {
+		return JournalCollabConfig{}, err
+	}
 	return config, nil
 }
 
@@ -110,13 +107,20 @@ func parseEd25519PrivateKey(encoded string) (ed25519.PrivateKey, error) {
 func decodeServiceSecret(name string) ([]byte, error) {
 	value := strings.TrimSpace(os.Getenv(name))
 	if value == "" {
-		return nil, fmt.Errorf("%s is required when note collaboration is enabled", name)
+		return nil, fmt.Errorf("%s is required for journal collaboration", name)
 	}
 	secret, err := base64.StdEncoding.DecodeString(value)
 	if err != nil || len(secret) < 32 {
 		return nil, fmt.Errorf("%s must be at least 32 base64-encoded random bytes", name)
 	}
 	return secret, nil
+}
+
+func decodeOptionalServiceSecret(name string) ([]byte, error) {
+	if strings.TrimSpace(os.Getenv(name)) == "" {
+		return nil, nil
+	}
+	return decodeServiceSecret(name)
 }
 
 // RoomID derives the opaque room identifier for a note.
@@ -154,7 +158,14 @@ func signServicePayload(secret []byte, timestamp string, body []byte) string {
 // VerifyProjectionSignature checks a projection callback from the Worker.
 func (c JournalCollabConfig) VerifyProjectionSignature(timestamp string, body []byte, signature string) bool {
 	expected := signServicePayload(c.projectionSecret, timestamp, body)
-	return hmac.Equal([]byte(expected), []byte(signature))
+	if hmac.Equal([]byte(expected), []byte(signature)) {
+		return true
+	}
+	if len(c.previousProjectionSecret) == 0 {
+		return false
+	}
+	previous := signServicePayload(c.previousProjectionSecret, timestamp, body)
+	return hmac.Equal([]byte(previous), []byte(signature))
 }
 
 // SignControlRequest signs a control command sent to the Worker.
@@ -228,15 +239,27 @@ func (c JournalCollabConfig) mintResourceTicket(
 	role string,
 	aclVersion int64,
 ) (JournalTicket, error) {
-	if !c.Enabled {
-		return JournalTicket{}, errors.New("journal collaboration is not enabled")
-	}
+	return c.mintResourceTicketWithLifetime(
+		userID, spaceID, resource, role, aclVersion, journalTicketLifetime,
+	)
+}
+
+func (c JournalCollabConfig) mintResourceTicketWithLifetime(
+	userID, spaceID string,
+	resource collaborationResource,
+	role string,
+	aclVersion int64,
+	lifetime time.Duration,
+) (JournalTicket, error) {
 	if userID == "" || spaceID == "" || resource.ID == "" ||
 		resource.Type == "" || resource.Party == "" || role == "" || aclVersion < 1 {
 		return JournalTicket{}, errors.New("incomplete ticket claims")
 	}
 	room := c.resourceRoomID(resource.Type, resource.ID)
-	expiresAt := time.Now().Add(journalTicketLifetime).UTC()
+	if lifetime < journalTicketLifetime || lifetime > 15*time.Minute {
+		return JournalTicket{}, errors.New("invalid ticket lifetime")
+	}
+	expiresAt := time.Now().Add(lifetime).UTC()
 	claims := journalTicketClaims{
 		Issuer: c.Issuer, Audience: c.Audience, JTI: "tkt_" + uuid.NewString(),
 		Subject: userID, SpaceID: spaceID,
@@ -267,6 +290,30 @@ func (c JournalCollabConfig) mintResourceTicket(
 		Role:      role,
 		ExpiresAt: expiresAt,
 	}, nil
+}
+
+// MintJournalExportTicket creates a longer-lived, single-use viewer ticket for
+// the account export client. It can read exactly one raw Yjs update and cannot
+// submit edits.
+func (c JournalCollabConfig) MintJournalExportTicket(
+	userID, spaceID, resourceType, resourceID string, aclVersion int64,
+) (JournalTicket, error) {
+	party := "note-room"
+	if resourceType == "drawing" {
+		party = "drawing-room"
+	} else if resourceType != "note" {
+		return JournalTicket{}, errors.New("invalid export resource type")
+	}
+	return c.mintResourceTicketWithLifetime(
+		userID,
+		spaceID,
+		collaborationResource{
+			Type: resourceType, ID: resourceID, Party: party,
+		},
+		"viewer",
+		aclVersion,
+		15*time.Minute,
+	)
 }
 
 // SetJournalCollab installs the shared Journal collaboration configuration.

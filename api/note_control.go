@@ -26,9 +26,6 @@ type noteControlEnvelope struct {
 // note outbox. Individual collaboration-service failures remain queued and do
 // not stop other notes from progressing.
 func (s *SpacesService) ProcessNoteControlCommands(ctx context.Context, limit int) (int, error) {
-	if !s.journalCollab.Enabled {
-		return 0, nil
-	}
 	commands, err := s.database.PendingNoteControlCommands(ctx, limit)
 	if err != nil {
 		return 0, err

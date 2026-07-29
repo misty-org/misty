@@ -189,9 +189,6 @@ func (db *Database) CreateSpaceWithTemplateIdempotent(
 	fingerprint := hex.EncodeToString(fingerprintDigest[:])
 	existingSpaceID := ""
 	err = db.spaceTx(ctx, func(tx *sql.Tx) error {
-		if _, err := tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock(hashtext($1))`, "spaces:owner:"+userID); err != nil {
-			return err
-		}
 		if idempotencyKey != "" {
 			if _, err := tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock(hashtext($1))`,
 				"spaces:create:"+userID+":"+idempotencyKey); err != nil {
@@ -217,17 +214,11 @@ func (db *Database) CreateSpaceWithTemplateIdempotent(
 		if err := tx.QueryRowContext(ctx, `INSERT INTO spaces(id,owner_user_id,name,security_domain_id) VALUES($1,$2,$3,$4) RETURNING created_at,updated_at`, result.Space.ID, userID, name, result.Space.SecurityDomainID).Scan(&result.Space.CreatedAt, &result.Space.UpdatedAt); err != nil {
 			return err
 		}
-		for _, statement := range []string{
-			`INSERT INTO space_storage_usage(space_id) VALUES($1)`,
-			`INSERT INTO space_members(space_id,user_id,role) VALUES($1,$2,'owner')`,
-		} {
-			args := []any{result.Space.ID}
-			if strings.Contains(statement, "$2") {
-				args = append(args, userID)
-			}
-			if _, err := tx.ExecContext(ctx, statement, args...); err != nil {
-				return err
-			}
+		if _, err := tx.ExecContext(ctx, `INSERT INTO space_storage_usage(space_id) VALUES($1)`, result.Space.ID); err != nil {
+			return err
+		}
+		if err := addSpaceMembershipTx(ctx, tx, result.Space.ID, userID, "owner"); err != nil {
+			return err
 		}
 		memberPermissions := `["space.view","messages.read","messages.write","attachments.upload","library.view","library.upload","library.add","library.edit","library.download","library.import","storage.view_own_usage","tasks.view","tasks.manage"]`
 		if _, err := tx.ExecContext(ctx, `INSERT INTO space_roles(id,space_id,name,is_everyone,permissions) VALUES($1,$2,'@everyone',TRUE,$3::jsonb)`, "role_"+uuid.NewString(), result.Space.ID, memberPermissions); err != nil {

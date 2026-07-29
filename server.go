@@ -37,6 +37,7 @@ type Server struct {
 	Realtime                  *api.RealtimeService
 	PasswordResetStartURL     string
 	PasswordResetRedirectURL  string
+	StripeWebhookPath         string
 	WaitlistNotificationEmail string
 	Telemetry                 telemetry.Client
 	HealthMonitor             *healthMonitor
@@ -44,6 +45,9 @@ type Server struct {
 }
 
 func CreateServer() (*Server, error) {
+	if err := validateProductionEnvironment(); err != nil {
+		return nil, fmt.Errorf("validate production environment: %w", err)
+	}
 	warnOnInsecureBillingConfiguration()
 	passwordResetRedirectURL, err := passwordResetRedirectURLFromEnv()
 	if err != nil {
@@ -53,12 +57,17 @@ func CreateServer() (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
+	stripeWebhookPath, err := stripeWebhookPathFromEnv()
+	if err != nil {
+		return nil, err
+	}
 
 	s := &Server{
 		Router:                    chi.NewRouter(),
 		Database:                  &db.Database{},
 		PasswordResetStartURL:     passwordResetStartURL,
 		PasswordResetRedirectURL:  passwordResetRedirectURL,
+		StripeWebhookPath:         stripeWebhookPath,
 		WaitlistNotificationEmail: strings.TrimSpace(os.Getenv("WAITLIST_NOTIFY_EMAIL")),
 		Telemetry:                 telemetry.NewFromEnv(),
 	}
@@ -150,9 +159,10 @@ func (s *Server) MountHandlers() error {
 		AllowCredentials: true,
 		// The client must be able to read the marker that distinguishes a signed
 		// download descriptor from a proxied file body.
-		ExposedHeaders: []string{"X-Misty-Signed-Download"},
+		ExposedHeaders: []string{"X-Misty-Signed-Download", "X-Request-ID"},
 		MaxAge:         300,
 	}))
+	s.Router.Use(requestObservabilityMiddleware)
 	// The abuse guard runs first: a blocked caller is rejected before any
 	// routing or handler work, and repeated per-route rejections escalate
 	// into a block through the shared guard.
@@ -215,6 +225,9 @@ func (s *Server) MountHandlers() error {
 	// Dashboard — authenticated endpoints
 	s.Router.Get("/me", api.GetMe(s.Database))
 	s.Router.Put("/me/profile", api.UpdateProfile(s.Database))
+	s.Router.Post("/me/export", s.Spaces.AccountExportManifest())
+	s.Router.Post("/me/deletion", s.Spaces.BeginAccountDeletion())
+	s.Router.Post("/account/deletion/status", s.Spaces.AccountDeletionStatus())
 	s.Router.MethodFunc(http.MethodGet, "/me/avatar", api.UserAvatar(s.Database, s.LibraryStore))
 	s.Router.MethodFunc(http.MethodPut, "/me/avatar", api.UserAvatar(s.Database, s.LibraryStore))
 	s.Router.Put("/me/device", api.UpdateDevice(s.Database))
@@ -272,7 +285,7 @@ func (s *Server) MountHandlers() error {
 	}
 
 	// Stripe webhook — called by Stripe on payment events
-	s.Router.Post("/stripe/webhook", api.StripeWebhookWithService(os.Getenv("STRIPE_WEBHOOK_SECRET"), appbilling.NewStripeService(s.Database, appbilling.WithTelemetry(s.Telemetry))))
+	s.Router.Post(s.StripeWebhookPath, api.StripeWebhookWithService(os.Getenv("STRIPE_WEBHOOK_SECRET"), appbilling.NewStripeService(s.Database, appbilling.WithTelemetry(s.Telemetry))))
 	s.Spaces.StartProviderWorkers(context.Background())
 
 	return nil
@@ -530,6 +543,17 @@ func (s *Server) CleanupExpiredLibraryData(ctx context.Context, limit int) (int,
 	return s.Library.CleanupExpired(ctx, limit)
 }
 
+func (s *Server) CleanupExpiredJournalAssets(
+	ctx context.Context,
+	safetyWindow time.Duration,
+	limit int,
+) (int, error) {
+	if s.Library == nil {
+		return 0, nil
+	}
+	return s.Library.CleanupExpiredJournalAssets(ctx, safetyWindow, limit)
+}
+
 func (s *Server) mountAgentsRoutes(prefix string, service *api.AgentsService) {
 	s.Router.MethodFunc(http.MethodGet, prefix+"/agents", service.PersonalAgents())
 	s.Router.MethodFunc(http.MethodPost, prefix+"/agents", service.PersonalAgents())
@@ -750,6 +774,7 @@ var allowedCORSRequestHeaders = []string{
 	"Authorization",
 	"Content-Type",
 	"Idempotency-Key",
+	"X-Request-ID",
 	"X-Misty-Platform",
 	"X-Misty-Release-Channel",
 	"X-Misty-Session-Id",
@@ -843,6 +868,30 @@ func isLocalhostHostname(host string) bool {
 	default:
 		return false
 	}
+}
+
+const defaultStripeWebhookPath = "/stripe/webhook"
+
+func stripeWebhookPathFromEnv() (string, error) {
+	rawPath := strings.TrimSpace(os.Getenv("STRIPE_WEBHOOK_PATH"))
+	if rawPath == "" {
+		return defaultStripeWebhookPath, nil
+	}
+
+	parsedPath, err := url.ParseRequestURI(rawPath)
+	if err != nil ||
+		!strings.HasPrefix(rawPath, "/") ||
+		strings.HasPrefix(rawPath, "//") ||
+		parsedPath.IsAbs() ||
+		parsedPath.Host != "" ||
+		parsedPath.RawQuery != "" ||
+		parsedPath.Fragment != "" ||
+		rawPath == "/" ||
+		strings.ContainsAny(rawPath, "{}*") {
+		return "", fmt.Errorf("STRIPE_WEBHOOK_PATH must be a static absolute path such as %s", defaultStripeWebhookPath)
+	}
+
+	return rawPath, nil
 }
 
 // warnOnInsecureBillingConfiguration surfaces a missing webhook secret at boot

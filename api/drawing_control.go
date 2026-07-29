@@ -12,9 +12,6 @@ func (s *SpacesService) ProcessDrawingControlCommands(
 	ctx context.Context,
 	limit int,
 ) (int, error) {
-	if !s.journalCollab.Enabled {
-		return 0, nil
-	}
 	commands, err := s.database.PendingDrawingControlCommands(ctx, limit)
 	if err != nil {
 		return 0, err
