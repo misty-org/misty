@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   gate:
-    name: Release quality gate
+    name: Release readiness checks
     runs-on: ubuntu-latest
     timeout-minutes: 35
     env:
@@ -44,7 +44,7 @@ jobs:
       - run: npm run release:metadata
 
   publish:
-    name: Release ${{ matrix.name }}
+    name: Build and upload · ${{ matrix.name }}
     needs: gate
     environment: production
     permissions:
@@ -53,15 +53,15 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name: macOS Apple Silicon
+          - name: macOS (Apple Silicon)
             platform: macos-14
-            args: "--target aarch64-apple-darwin --bundles app,dmg"
-          - name: macOS Intel
+            args: "--bundles app,dmg"
+          - name: macOS (Intel)
             platform: macos-15-intel
-            args: "--target x86_64-apple-darwin --bundles app,dmg"
-          - name: Windows x64 (unsigned beta)
+            args: "--bundles app,dmg"
+          - name: Windows (x64, unsigned)
             platform: windows-latest
-            args: "--target x86_64-pc-windows-msvc --bundles nsis"
+            args: "--bundles nsis"
     runs-on: ${{ matrix.platform }}
     timeout-minutes: 90
     env:
@@ -79,6 +79,14 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
+      - name: Install pinned Rust toolchain
+        run: rustup show
+      - name: Restore Rust build cache
+        uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+        with:
+          workspaces: src-tauri -> target
+          shared-key: desktop-${{ runner.os }}-${{ runner.arch }}
+          add-job-id-key: "false"
       - name: Verify tag and application versions
         run: npm run release:verify-version
         env:
@@ -114,7 +122,24 @@ jobs:
               exit 1
             fi
           done
-      - uses: tauri-apps/tauri-action@v1
+
+          certificate_subject="$(
+            node -e 'process.stdout.write(Buffer.from(process.env.APPLE_CERTIFICATE, "base64"))' |
+              openssl pkcs12 -clcerts -nokeys -passin env:APPLE_CERTIFICATE_PASSWORD |
+              openssl x509 -noout -subject -nameopt RFC2253
+          )"
+
+          if [[ "$certificate_subject" != *"CN=${APPLE_SIGNING_IDENTITY}"* ]]; then
+            echo "::error::APPLE_CERTIFICATE contains the wrong identity. Expected ${APPLE_SIGNING_IDENTITY}; found ${certificate_subject#subject=}."
+            exit 1
+          fi
+
+          if [[ "$APPLE_SIGNING_IDENTITY" != *"(${APPLE_TEAM_ID})" ]]; then
+            echo "::error::APPLE_TEAM_ID does not match APPLE_SIGNING_IDENTITY."
+            exit 1
+          fi
+      - name: Build and upload release artifacts
+        uses: tauri-apps/tauri-action@v1
         id: build
         env:
           GITHUB_TOKEN: ${{ secrets.MISTY_RELEASE_TOKEN }}
