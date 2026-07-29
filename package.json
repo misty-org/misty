@@ -10,7 +10,7 @@
     "dev:android": "vite --mode android --host 0.0.0.0",
     "build": "npm run build:desktop",
     "build:desktop": "tsc && vite build --mode desktop",
-    "build:mac:test": "npm run tauri -- build --bundles app dmg --no-sign",
+    "build:mac:test": "npm run tauri -- build --bundles app dmg --config src-tauri/tauri.ci.macos.conf.json",
     "build:windows:test": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/build-windows.ps1",
     "windows:stage-assets": "node scripts/stage-windows-test-assets.mjs",
     "build:mobile": "tsc && vite build --mode mobile",

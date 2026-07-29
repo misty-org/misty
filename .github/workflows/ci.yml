@@ -56,7 +56,7 @@ jobs:
           if-no-files-found: error
 
   native:
-    name: Rust and macOS bundle
+    name: Rust and ad-hoc-signed macOS bundle
     runs-on: macos-14
     timeout-minutes: 60
     env:
@@ -81,13 +81,13 @@ jobs:
           cargo install cargo-cyclonedx --version 0.5.9 --locked
           cargo cyclonedx --manifest-path src-tauri/Cargo.toml --format json
           test -n "$(find src-tauri -maxdepth 1 -name '*.cdx.json' -print -quit)"
-      - name: Build unsigned macOS beta bundle
+      - name: Build ad-hoc-signed macOS test bundle
         run: npm run build:mac:test
       - name: Generate macOS artifact checksums
         run: node scripts/generate-release-metadata.mjs src-tauri/target/release/bundle
       - uses: actions/upload-artifact@v6
         with:
-          name: macos-unsigned-beta
+          name: macos-ad-hoc-test-only
           path: |
             src-tauri/target/release/bundle
             src-tauri/*.cdx.json
@@ -108,8 +108,8 @@ jobs:
       - run: npm ci
       - name: Install pinned Rust toolchain
         run: rustup show
-      - name: Build unsigned Windows beta bundle
-        run: npm run build:windows:test
+      - name: Build unsigned Windows test bundle
+        run: npm run build:windows:test -- -SkipAssets -SkipDependencies
       - name: Generate Windows artifact checksums
         run: node scripts/generate-release-metadata.mjs src-tauri/target/release/bundle
       - uses: actions/upload-artifact@v6

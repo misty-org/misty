@@ -7,11 +7,13 @@ Misty desktop releases use semantic versions shared by `package.json`,
 
 - Public beta releases use `0.x.y` versions and `misty-v0.x.y` Git tags.
 - The tag must point to a commit on the protected release branch with green CI.
-- The signed release workflow repeats the release gate, builds Apple Silicon,
-  Intel macOS, and Windows x64 artifacts, and creates a draft GitHub prerelease.
+- The release workflow repeats the release gate, builds signed and notarized
+  Apple Silicon and Intel macOS artifacts plus an unsigned Windows x64 NSIS
+  installer, and creates a draft GitHub prerelease.
 - Draft releases are never visible to the updater. The owner publishes a draft
-  only after macOS notarization, Authenticode, checksums, `latest.json`, and the
-  packaged acceptance smoke tests have been reviewed.
+  only after macOS notarization, checksums, `latest.json`, and the packaged
+  acceptance smoke tests have been reviewed. Early-beta Windows downloads must
+  be clearly labeled unsigned until Authenticode signing is added.
 - Stable `1.x.y` promotion is a separate owner decision after the beta exit
   criteria are met. Beta clients never accept downgrades.
 
@@ -41,10 +43,13 @@ unredacted incident details.
 ## Promotion and rollback
 
 1. Promote the exact tested commit and immutable artifacts; do not rebuild.
-2. Publish the draft only after both platform signatures and update metadata
-   have been verified.
+2. Publish the draft only after the macOS platform signatures and update
+   metadata have been verified and the Windows installer has been smoke-tested.
 3. Pause the updater by returning `204 No Content` or withdrawing the release
    if a defect is found.
 4. Tauri does not permit an unsigned update or downgrade. Ship a higher
    forward-fix version; direct reinstall of a previous signed version is an
    owner-assisted recovery path and must preserve user data.
+
+Windows Authenticode signing is deferred for the early beta. Until it is added,
+users may see a Microsoft Defender SmartScreen warning when installing Misty.

@@ -130,7 +130,7 @@ export function telemetrySetErrorReportingEnabled(enabled: boolean): Promise<voi
 }
 
 export function enableModernWindowStyle(window: unknown): Promise<void> {
-  return invoke("enable_modern_window_style", { window, offsetX: -6, offsetY: -12 });
+  return invoke("enable_modern_window_style", { window, offsetX: -6, offsetY: 0 });
 }
 
 export function setNativeWallpaperVideo(window: unknown, path: string | null): Promise<boolean> {
