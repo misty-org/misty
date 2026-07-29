@@ -6,7 +6,7 @@
 // agrees with itself; this proves they agree on the wire format.
 //
 //	JOURNAL_COLLAB_TICKET_PRIVATE_KEY=... JOURNAL_COLLAB_CONTROL_SECRET=... \
-//	JOURNAL_COLLAB_PROJECTION_SECRET=... \
+//	JOURNAL_COLLAB_PROJECTION_SECRET=... JOURNAL_COLLAB_ROOM_SALT=... \
 //	go run ./cmd/journal-collab-ticket -drawing drawing_demo -user user_go -role editor
 package main
 
@@ -38,11 +38,6 @@ func main() {
 		fmt.Fprintf(os.Stderr, "configuration: %v\n", err)
 		os.Exit(1)
 	}
-	if !config.Enabled {
-		fmt.Fprintln(os.Stderr, "journal collaboration is disabled")
-		os.Exit(1)
-	}
-
 	var ticket api.JournalTicket
 	if *noteID != "" {
 		ticket, err = config.MintNoteTicket(

@@ -10,7 +10,7 @@ import (
 // The endpoint must be mounted only when a token is configured, and must be
 // reachable through the real router with all its middleware in place.
 func TestMetricsEndpointThroughTheRealRouter(t *testing.T) {
-	disableJournalCollabForTest(t)
+	configureJournalCollabForTest(t)
 	t.Setenv("PASSWORD_RESET_URL", "http://localhost:5173/reset")
 	t.Setenv("PASSWORD_RESET_START_URL", "http://localhost:8080/auth/reset/start")
 	t.Setenv("MAILJET_API_KEY", "")

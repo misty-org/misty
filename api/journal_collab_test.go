@@ -31,6 +31,7 @@ func testCollabConfig(t *testing.T) JournalCollabConfig {
 	t.Setenv("JOURNAL_COLLAB_TICKET_PRIVATE_KEY", base64.StdEncoding.EncodeToString(pkcs8))
 	t.Setenv("JOURNAL_COLLAB_CONTROL_SECRET", base64.StdEncoding.EncodeToString(secret))
 	t.Setenv("JOURNAL_COLLAB_PROJECTION_SECRET", base64.StdEncoding.EncodeToString(secret))
+	t.Setenv("JOURNAL_COLLAB_ROOM_SALT", base64.StdEncoding.EncodeToString(secret))
 	config, err := JournalCollabConfigFromEnv()
 	if err != nil {
 		t.Fatal(err)
@@ -156,6 +157,26 @@ func TestTicketExpiresInOneMinute(t *testing.T) {
 	}
 }
 
+func TestExportTicketIsViewerOnlySingleUseAndShortLived(t *testing.T) {
+	config := testCollabConfig(t)
+	ticket, err := config.MintJournalExportTicket(
+		"user_1", "space_1", "drawing", "drawing_1", 8,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	claims := decodeTicketClaims(t, ticket.Ticket)
+	if claims.Role != "viewer" || claims.ResourceType != "drawing" ||
+		claims.ResourceID != "drawing_1" || claims.ACLVersion != 8 ||
+		claims.JTI == "" {
+		t.Fatalf("export claims = %#v", claims)
+	}
+	lifetime := time.Until(ticket.ExpiresAt)
+	if lifetime < 14*time.Minute || lifetime > 16*time.Minute {
+		t.Fatalf("export ticket lifetime = %s, want about 15 minutes", lifetime)
+	}
+}
+
 // Every connection needs a distinct jti or the room's single-use check would
 // reject the second one.
 func TestEveryTicketGetsAFreshJTI(t *testing.T) {
@@ -195,27 +216,9 @@ func TestRoomIDIsOpaqueButStable(t *testing.T) {
 	}
 }
 
-func TestDisabledConfigRefusesToMint(t *testing.T) {
-	t.Setenv("MISTY_JOURNAL_COLLAB_ENABLED", "false")
-	config, err := JournalCollabConfigFromEnv()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if config.Enabled {
-		t.Fatal("config reports enabled when the flag is off")
-	}
-	if _, err := config.MintNoteTicket("user_1", "space_1", "note_1", "editor", 1); err == nil {
-		t.Fatal("a disabled config minted a ticket")
-	}
-}
-
-func TestJournalCollabConfigDefaultsToEnabledWithMistyWorkerHost(t *testing.T) {
+func TestJournalCollabConfigUsesMistyWorkerHost(t *testing.T) {
 	config := testCollabConfig(t)
 
-	if !config.Enabled {
-		t.Fatal("config should default to enabled")
-	}
 	if config.Host != "misty-journal-collab.mistysys.workers.dev" {
 		t.Fatalf("host = %q, want Misty worker host", config.Host)
 	}
@@ -223,7 +226,7 @@ func TestJournalCollabConfigDefaultsToEnabledWithMistyWorkerHost(t *testing.T) {
 
 // A half-configured deployment must fail at startup rather than at connect
 // time, and must never quietly downgrade to local-only notes.
-func TestEnabledConfigRequiresEverySecret(t *testing.T) {
+func TestJournalCollabConfigRequiresEverySecret(t *testing.T) {
 	base := func(t *testing.T) {
 		t.Helper()
 		_, privateKey, _ := ed25519.GenerateKey(rand.Reader)
@@ -234,12 +237,14 @@ func TestEnabledConfigRequiresEverySecret(t *testing.T) {
 		t.Setenv("JOURNAL_COLLAB_TICKET_PRIVATE_KEY", base64.StdEncoding.EncodeToString(pkcs8))
 		t.Setenv("JOURNAL_COLLAB_CONTROL_SECRET", base64.StdEncoding.EncodeToString(secret))
 		t.Setenv("JOURNAL_COLLAB_PROJECTION_SECRET", base64.StdEncoding.EncodeToString(secret))
+		t.Setenv("JOURNAL_COLLAB_ROOM_SALT", base64.StdEncoding.EncodeToString(secret))
 	}
 
 	cases := map[string]string{
 		"JOURNAL_COLLAB_TICKET_PRIVATE_KEY": "",
 		"JOURNAL_COLLAB_CONTROL_SECRET":     "",
 		"JOURNAL_COLLAB_PROJECTION_SECRET":  "",
+		"JOURNAL_COLLAB_ROOM_SALT":          "",
 	}
 	for name, value := range cases {
 		t.Run("missing "+name, func(t *testing.T) {
@@ -259,6 +264,17 @@ func TestEnabledConfigRequiresEverySecret(t *testing.T) {
 		}
 	})
 
+	t.Run("weak previous projection secret", func(t *testing.T) {
+		base(t)
+		t.Setenv(
+			"JOURNAL_COLLAB_PROJECTION_SECRET_PREVIOUS",
+			base64.StdEncoding.EncodeToString([]byte("short")),
+		)
+		if _, err := JournalCollabConfigFromEnv(); err == nil {
+			t.Fatal("config accepted a short previous projection secret")
+		}
+	})
+
 	t.Run("host with a path", func(t *testing.T) {
 		base(t)
 		t.Setenv("PARTYKIT_HOST", "example.workers.dev/parties")
@@ -266,6 +282,36 @@ func TestEnabledConfigRequiresEverySecret(t *testing.T) {
 			t.Fatal("config accepted a host containing a path")
 		}
 	})
+}
+
+func TestProjectionSecretRotationAcceptsOnlyCurrentAndPrevious(t *testing.T) {
+	config := testCollabConfig(t)
+	previous := make([]byte, 32)
+	if _, err := rand.Read(previous); err != nil {
+		t.Fatal(err)
+	}
+	config.previousProjectionSecret = previous
+	body := []byte(`{"note_id":"note_1"}`)
+	timestamp := "1770000000"
+
+	if !config.VerifyProjectionSignature(
+		timestamp,
+		body,
+		signServicePayload(previous, timestamp, body),
+	) {
+		t.Fatal("previous projection secret was not accepted during rotation")
+	}
+	unrelated := make([]byte, 32)
+	if _, err := rand.Read(unrelated); err != nil {
+		t.Fatal(err)
+	}
+	if config.VerifyProjectionSignature(
+		timestamp,
+		body,
+		signServicePayload(unrelated, timestamp, body),
+	) {
+		t.Fatal("unrelated projection secret was accepted")
+	}
 }
 
 func TestServiceSignaturesCoverTimestampAndBody(t *testing.T) {

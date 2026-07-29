@@ -39,14 +39,14 @@ func TestAccountsStartWithoutSpacesAndSpacesBecomeSharedOnlyByInvite(t *testing.
 	if err != nil {
 		t.Fatalf("CreateSpace(second additional) = %#v, %v, want success", secondAdditional, err)
 	}
-	if _, err := database.CreateSpace(ctx, owner.ID, "Fourth total"); err != nil {
-		t.Fatalf("CreateSpace(fourth total) error = %v, want unlimited owned Spaces", err)
+	if _, err := database.CreateSpace(ctx, owner.ID, "Third total"); err != nil {
+		t.Fatalf("CreateSpace(third total) error = %v, want Basic limit to allow three", err)
 	}
 	if err := database.DeleteSpace(ctx, owner.ID, secondAdditional.ID, secondAdditional.Name); err != nil {
 		t.Fatalf("DeleteSpace(second additional) error = %v", err)
 	}
-	if _, err := database.CreateSpace(ctx, owner.ID, "Still another Space"); err != nil {
-		t.Fatalf("CreateSpace while deletion pending error = %v, want unlimited owned Spaces", err)
+	if _, err := database.CreateSpace(ctx, owner.ID, "Still another Space"); !errors.Is(err, ErrSpaceLimit) {
+		t.Fatalf("CreateSpace while deletion pending error = %v, want ErrSpaceLimit because inactive memberships still count", err)
 	}
 
 	memberSpaces, err := database.ListSpaces(ctx, member.ID)

@@ -217,3 +217,30 @@ export async function verifyTicket(
   }
   return claims;
 }
+
+/**
+ * Verifies with the active public key, then the explicitly retained previous
+ * key only when the signature does not match. Claim failures never fall
+ * through to another key, so rotation cannot weaken validation.
+ */
+export async function verifyTicketWithRotation(
+  token: string,
+  context: TicketVerificationContext,
+  previousPublicKeyBase64?: string,
+): Promise<TicketClaims> {
+  try {
+    return await verifyTicket(token, context);
+  } catch (error) {
+    if (
+      !(error instanceof TicketError) ||
+      error.code !== "ticket_signature_invalid" ||
+      !previousPublicKeyBase64?.trim()
+    ) {
+      throw error;
+    }
+    return verifyTicket(token, {
+      ...context,
+      publicKeyBase64: previousPublicKeyBase64,
+    });
+  }
+}

@@ -1,0 +1,72 @@
+services:
+  postgres:
+    image: pgvector/pgvector:0.8.2-pg17
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?set POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER:?set POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+    volumes:
+      - misty_staging_postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks: [private]
+
+  migrate:
+    image: ${MISTY_API_IMAGE:?set immutable MISTY_API_IMAGE digest}
+    user: "10001:10001"
+    env_file: ${MISTY_ENV_FILE:-.env.staging}
+    environment:
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_NAME: ${POSTGRES_DB:?set POSTGRES_DB}
+      DB_USER: ${POSTGRES_USER:?set POSTGRES_USER}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      GOOSE_DRIVER: postgres
+      GOOSE_DBSTRING: host=postgres port=5432 user=${POSTGRES_USER:?set POSTGRES_USER} password=${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD} dbname=${POSTGRES_DB:?set POSTGRES_DB} sslmode=disable
+      GOOSE_MIGRATION_DIR: /app/migrations
+    depends_on:
+      postgres:
+        condition: service_healthy
+    entrypoint: ["/usr/local/bin/goose"]
+    command: ["up"]
+    restart: "no"
+    networks: [private]
+
+  api:
+    image: ${MISTY_API_IMAGE:?set immutable MISTY_API_IMAGE digest}
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp:size=256m,mode=1777
+    env_file: ${MISTY_ENV_FILE:-.env.staging}
+    environment:
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_NAME: ${POSTGRES_DB:?set POSTGRES_DB}
+      DB_USER: ${POSTGRES_USER:?set POSTGRES_USER}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+    ports:
+      - "127.0.0.1:${MISTY_STAGING_PORT:-8081}:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "curl --fail --silent http://127.0.0.1:8080/health >/dev/null"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    networks: [private, edge]
+
+networks:
+  private:
+    internal: true
+  edge:
+
+volumes:
+  misty_staging_postgres:

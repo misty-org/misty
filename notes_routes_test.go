@@ -8,7 +8,7 @@ import (
 
 func noteRouteTestServer(t *testing.T) *Server {
 	t.Helper()
-	disableJournalCollabForTest(t)
+	configureJournalCollabForTest(t)
 	t.Setenv("PASSWORD_RESET_URL", "http://localhost:5173/reset")
 	t.Setenv("PASSWORD_RESET_START_URL", "http://localhost:8080/auth/reset/start")
 	t.Setenv("MAILJET_API_KEY", "")

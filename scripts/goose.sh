@@ -4,31 +4,24 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
-# Values explicitly supplied by the caller must win over local dotenv values.
-# This is especially important for isolated demo/test databases: sourcing the
-# repository's normal development .env must never silently redirect a migration.
-misty_goose_db_host_set=${DB_HOST+x}; misty_goose_db_host=${DB_HOST-}
-misty_goose_db_port_set=${DB_PORT+x}; misty_goose_db_port=${DB_PORT-}
-misty_goose_db_user_set=${DB_USER+x}; misty_goose_db_user=${DB_USER-}
-misty_goose_db_password_set=${DB_PASSWORD+x}; misty_goose_db_password=${DB_PASSWORD-}
-misty_goose_db_name_set=${DB_NAME+x}; misty_goose_db_name=${DB_NAME-}
-misty_goose_migration_user_set=${DB_MIGRATION_USER+x}; misty_goose_migration_user=${DB_MIGRATION_USER-}
-misty_goose_migration_password_set=${DB_MIGRATION_PASSWORD+x}; misty_goose_migration_password=${DB_MIGRATION_PASSWORD-}
-misty_goose_migrations_dir_set=${MIGRATIONS_DIR+x}; misty_goose_migrations_dir=${MIGRATIONS_DIR-}
-if [[ -f .env ]]; then
+# A caller-supplied database setting means the entire connection contract comes
+# from the caller. Never mix an isolated CI/staging connection with migration
+# credentials silently loaded from a developer's normal .env file.
+misty_goose_has_explicit_config=false
+for misty_goose_name in \
+  DB_HOST DB_PORT DB_USER DB_PASSWORD DB_NAME DB_SSLMODE \
+  DB_MIGRATION_USER DB_MIGRATION_PASSWORD MIGRATIONS_DIR; do
+  if declare -p "$misty_goose_name" >/dev/null 2>&1; then
+    misty_goose_has_explicit_config=true
+    break
+  fi
+done
+if [[ "$misty_goose_has_explicit_config" == false && -f .env ]]; then
   set -a
   # shellcheck disable=SC1091
   source .env
   set +a
 fi
-[[ -n "$misty_goose_db_host_set" ]] && DB_HOST=$misty_goose_db_host
-[[ -n "$misty_goose_db_port_set" ]] && DB_PORT=$misty_goose_db_port
-[[ -n "$misty_goose_db_user_set" ]] && DB_USER=$misty_goose_db_user
-[[ -n "$misty_goose_db_password_set" ]] && DB_PASSWORD=$misty_goose_db_password
-[[ -n "$misty_goose_db_name_set" ]] && DB_NAME=$misty_goose_db_name
-[[ -n "$misty_goose_migration_user_set" ]] && DB_MIGRATION_USER=$misty_goose_migration_user
-[[ -n "$misty_goose_migration_password_set" ]] && DB_MIGRATION_PASSWORD=$misty_goose_migration_password
-[[ -n "$misty_goose_migrations_dir_set" ]] && MIGRATIONS_DIR=$misty_goose_migrations_dir
 
 DB_HOST="${DB_HOST:-localhost}"
 DB_PORT="${DB_PORT:-5432}"
@@ -37,9 +30,18 @@ DB_PASSWORD="${DB_PASSWORD:-misty}"
 DB_NAME="${DB_NAME:-misty_server}"
 DB_MIGRATION_USER="${DB_MIGRATION_USER:-$DB_USER}"
 DB_MIGRATION_PASSWORD="${DB_MIGRATION_PASSWORD:-$DB_PASSWORD}"
-case "${DB_HOST}" in
-  localhost|127.0.0.1|::1|postgres|/*) DB_SSLMODE="disable" ;;
-  *) DB_SSLMODE="require" ;;
+if [[ -z "${DB_SSLMODE:-}" ]]; then
+  case "${DB_HOST}" in
+    localhost|127.0.0.1|::1|postgres|/*) DB_SSLMODE="disable" ;;
+    *) DB_SSLMODE="require" ;;
+  esac
+fi
+case "$DB_SSLMODE" in
+  disable|allow|prefer|require|verify-ca|verify-full) ;;
+  *)
+    echo "DB_SSLMODE must be one of disable, allow, prefer, require, verify-ca, or verify-full." >&2
+    exit 2
+    ;;
 esac
 MIGRATIONS_DIR="${MIGRATIONS_DIR:-db/migrations}"
 

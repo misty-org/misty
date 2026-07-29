@@ -15,7 +15,9 @@ func (db *Database) CreateSession(tokenHash, userID string) error {
 	err := db.withRLSContext(context.Background(), sessionCreateRLSSettings(tokenHash, userID), func(tx *sql.Tx) error {
 		_, err := tx.ExecContext(
 			context.Background(),
-			`INSERT INTO sessions (token_hash, user_id, expires_at) VALUES ($1, $2, $3)`,
+			`INSERT INTO sessions (token_hash, user_id, expires_at)
+			 SELECT $1,$2,$3 FROM users
+			 WHERE id=$2 AND lifecycle_state='active'`,
 			tokenHash, userID, expiresAt,
 		)
 		return err
@@ -31,7 +33,8 @@ func (db *Database) GetSessionUserID(tokenHash string) (string, error) {
 	err := db.withRLSContext(context.Background(), sessionRLSSettings(tokenHash), func(tx *sql.Tx) error {
 		return tx.QueryRowContext(
 			context.Background(),
-			`SELECT user_id FROM sessions WHERE token_hash = $1 AND expires_at > NOW()`,
+			`SELECT user_id FROM sessions
+			 WHERE token_hash=$1 AND expires_at>NOW()`,
 			tokenHash,
 		).Scan(&userID)
 	})

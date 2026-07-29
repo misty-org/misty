@@ -30,9 +30,9 @@ type User struct {
 }
 
 type UserSettings struct {
-	EmailUpdatesEnabled   bool
-	AnalyticsEnabled      bool
-	ErrorReportingEnabled bool
+	EmailUpdatesEnabled   bool `json:"email_updates_enabled"`
+	AnalyticsEnabled      bool `json:"analytics_enabled"`
+	ErrorReportingEnabled bool `json:"error_reporting_enabled"`
 }
 
 func (db *Database) CreateUser(name, email, password string) (*User, error) {
@@ -92,7 +92,8 @@ func (db *Database) GetUserByEmail(email string) (*User, string, error) {
 	err := db.withRLSContext(context.Background(), anonymousRLSSettings(normalizedEmail), func(tx *sql.Tx) error {
 		return tx.QueryRowContext(
 			context.Background(),
-			`SELECT id, license_id, name, username, email, password_hash, created_at FROM users WHERE LOWER(email) = $1`,
+			`SELECT id, license_id, name, username, email, password_hash, created_at
+			 FROM users WHERE LOWER(email)=$1 AND lifecycle_state='active'`,
 			normalizedEmail,
 		).Scan(&u.ID, &u.LicenseID, &u.Name, &u.Username, &u.Email, &hash, &u.CreatedAt)
 	})
@@ -162,7 +163,9 @@ func (db *Database) GetUserByID(id string) (*User, error) {
 	err := db.withRLSContext(context.Background(), userRLSSettings(id), func(tx *sql.Tx) error {
 		return tx.QueryRowContext(
 			context.Background(),
-			`SELECT id, license_id, name, username, email, avatar_version, email_updates_enabled, created_at FROM users WHERE id = $1`,
+			`SELECT id, license_id, name, username, email, avatar_version,
+			        email_updates_enabled, created_at
+			 FROM users WHERE id=$1 AND lifecycle_state='active'`,
 			id,
 		).Scan(&u.ID, &u.LicenseID, &u.Name, &u.Username, &u.Email, &u.AvatarVersion, &u.EmailUpdatesEnabled, &u.CreatedAt)
 	})

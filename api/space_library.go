@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"math"
 	"mime"
 	"net/http"
@@ -19,6 +20,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -65,7 +67,9 @@ type SpaceLibraryService struct {
 	transfers            TransferTTLs
 	// presigner is non-nil only when the configured object store can sign R2
 	// operations. Local development leaves it nil and keeps the proxy route.
-	presigner LibraryObjectPresigner
+	presigner            LibraryObjectPresigner
+	reconciliationMu     sync.Mutex
+	reconciliationCursor string
 }
 
 // TransferTTLs bounds how long a signed R2 URL stays valid. These are tuning
@@ -1113,6 +1117,35 @@ func (s *SpaceLibraryService) CleanupExpired(ctx context.Context, limit int) (in
 	return len(uploads), err
 }
 
+// CleanupExpiredJournalAssets removes note/drawing asset references after the
+// collaboration undo window. Deduplicated blobs are deleted from R2 only when
+// the database atomically confirms that no other live reference remains.
+func (s *SpaceLibraryService) CleanupExpiredJournalAssets(
+	ctx context.Context,
+	safetyWindow time.Duration,
+	limit int,
+) (int, error) {
+	claims, err := s.database.ClaimExpiredJournalAssets(ctx, safetyWindow, limit)
+	if err != nil {
+		return 0, err
+	}
+	completed := 0
+	for _, claim := range claims {
+		if claim.DeleteBlob {
+			if err := s.store.Delete(ctx, claim.ObjectKey); err != nil &&
+				!errors.Is(err, ErrLibraryObjectNotFound) {
+				return completed, err
+			}
+		}
+		if err := s.database.CompleteJournalAssetPurge(ctx, claim); err != nil {
+			return completed, err
+		}
+		completed++
+	}
+	_, err = s.database.ReconcileLibraryStorageUsage(ctx, limit)
+	return completed, err
+}
+
 func (s *SpaceLibraryService) Usage() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		userID, ok := authenticatedUser(w, r, s.database)
@@ -1391,8 +1424,30 @@ func (s *SpaceLibraryService) FinalizeUpload() http.HandlerFunc {
 		// what the server authorized: same key, size, and checksum.
 		metadata, headErr := s.store.Head(r.Context(), upload.ObjectKey)
 		if headErr != nil || metadata.ByteSize != upload.RequestedByteSize || metadata.SHA256 != upload.ClientSHA256 {
+			event, _ := json.Marshal(map[string]any{
+				"byte_size_match": metadata.ByteSize == upload.RequestedByteSize,
+				"checksum_match":  metadata.SHA256 == upload.ClientSHA256,
+				"event":           "library_upload_verification_failed",
+				"level":           "error",
+				"request_id":      r.Header.Get("X-Request-ID"),
+				"store_error":     headErr != nil,
+			})
+			log.Print(string(event))
 			s.rejectAndDelete(r.Context(), upload, tokenHash, "invalid", "object_missing_or_mismatched")
 			writeLibraryError(w, db.ErrLibraryUploadMismatch)
+			return
+		}
+		// Journal assets are intentionally never streamed through this process,
+		// so they cannot be content-sniffed or synchronously scanned here.
+		// Restrict them to passive raster formats at both initiation and
+		// finalization; the database records the resulting blob as "skipped",
+		// never falsely as malware-scanned clean.
+		if isJournalAssetPurpose(upload.Purpose) &&
+			!supportedDrawingAssetMIME(upload.ClientDeclaredMIMEType) {
+			s.rejectAndDelete(
+				r.Context(), upload, tokenHash, "invalid", "unsupported_journal_asset_mime",
+			)
+			writeLibraryError(w, db.ErrLibraryInvalid)
 			return
 		}
 		deduplicationKey, deduplicationErr := s.database.LibraryUploadDeduplicationObjectKey(r.Context(), userID, spaceID, uploadID)

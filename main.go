@@ -4,10 +4,12 @@ import (
 	"context"
 	"log"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/joho/godotenv"
+	appbilling "github.com/kannachi323/misty/server/billing"
 )
 
 func main() {
@@ -52,6 +54,7 @@ func main() {
 	go runLibraryRenditionProcessing(workerContext, server)
 	go runLibraryIntelligenceProcessing(workerContext, server)
 	go runNoteControlProcessing(workerContext, server)
+	go runSubscriptionReconciliation(workerContext, server)
 	// Domain gauges refresh on their own schedule so a scrape never holds a
 	// database connection.
 	if server.Metrics != nil {
@@ -70,9 +73,45 @@ func main() {
 	log.Println("Misty server stopped")
 }
 
+func runSubscriptionReconciliation(ctx context.Context, server *Server) {
+	if strings.TrimSpace(os.Getenv("STRIPE_SECRET_KEY")) == "" {
+		return
+	}
+	service := appbilling.NewStripeService(
+		server.Database,
+		appbilling.WithTelemetry(server.Telemetry),
+	)
+	reconcile := func() {
+		report, err := service.ReconcileSubscriptions(ctx, time.Now().UTC(), 100)
+		if err != nil {
+			log.Printf("Stripe subscription reconciliation failed: %v", err)
+			return
+		}
+		if report.Failed > 0 || report.EntitlementsExpired > 0 {
+			log.Printf(
+				"Stripe subscription reconciliation: checked=%d updated=%d failed=%d stale_entitlements_expired=%d",
+				report.Checked,
+				report.Updated,
+				report.Failed,
+				report.EntitlementsExpired,
+			)
+		}
+	}
+	reconcile()
+	ticker := time.NewTicker(15 * time.Minute)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			reconcile()
+		}
+	}
+}
+
 func runNoteControlProcessing(ctx context.Context, server *Server) {
-	if server.Spaces == nil || !server.Spaces.JournalCollab().Enabled {
-		log.Println("Journal collaboration command processing disabled")
+	if server.Spaces == nil {
 		return
 	}
 	log.Printf("Journal collaboration command processing enabled for %s", server.Spaces.JournalCollab().Host)
@@ -162,8 +201,18 @@ func runAgentRetention(ctx context.Context, server *Server) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
+			if server.Spaces != nil {
+				if _, err := server.Spaces.ProcessAccountDeletions(ctx, 10); err != nil {
+					log.Printf("Account deletion cleanup failed: %v", err)
+				}
+			}
 			if _, err := server.CleanupExpiredLibraryData(ctx, 100); err != nil {
 				log.Printf("Library reservation cleanup failed: %v", err)
+			}
+			if _, err := server.CleanupExpiredJournalAssets(
+				ctx, 24*time.Hour, 100,
+			); err != nil {
+				log.Printf("Journal asset cleanup failed: %v", err)
 			}
 			if server.Library != nil {
 				if _, err := server.Database.ReleaseExpiredLibraryRenditionReservations(ctx, 100); err != nil {
@@ -183,6 +232,32 @@ func runAgentRetention(ctx context.Context, server *Server) {
 			}
 			retentionCounter++
 			if retentionCounter%10 == 0 {
+				if server.Spaces != nil {
+					if _, err := server.Spaces.PurgeDueAccountDeletions(ctx, 25); err != nil {
+						log.Printf("Account deletion retention purge failed: %v", err)
+					}
+				}
+				if server.Library != nil {
+					report, reconcileErr := server.Library.ReconcileLibraryObjects(
+						ctx, 24*time.Hour, 250,
+					)
+					if reconcileErr != nil {
+						log.Printf("Library R2 reconciliation failed: %v", reconcileErr)
+					} else if report.OrphanObjectsDeleted > 0 ||
+						report.MissingPermanentObjects > 0 ||
+						report.MismatchedObjects > 0 ||
+						report.InterruptedFinalizations > 0 {
+						log.Printf(
+							"Library R2 reconciliation: checked=%d expired=%d orphan_deleted=%d missing=%d mismatched=%d retryable_finalizations=%d",
+							report.InventoryObjectsChecked,
+							report.ExpiredUploads,
+							report.OrphanObjectsDeleted,
+							report.MissingPermanentObjects,
+							report.MismatchedObjects,
+							report.InterruptedFinalizations,
+						)
+					}
+				}
 				if _, err := server.Database.PurgeExpiredAgentConversations(ctx); err != nil {
 					log.Printf("Agent conversation purge failed: %v", err)
 				}

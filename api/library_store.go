@@ -17,6 +17,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -70,6 +71,24 @@ type LibraryObjectStore interface {
 	Delete(context.Context, string) error
 }
 
+// LibraryObjectInventory is implemented by production object stores that can
+// page through a prefix without opening object bodies. Reconciliation uses it
+// to find old objects that are no longer referenced by PostgreSQL.
+type LibraryObjectInventory interface {
+	List(context.Context, string, string, int) (LibraryObjectPage, error)
+}
+
+type LibraryObjectPage struct {
+	Objects    []LibraryObjectEntry
+	NextCursor string
+}
+
+type LibraryObjectEntry struct {
+	Key          string
+	ByteSize     int64
+	LastModified time.Time
+}
+
 type LibraryObjectUpload struct {
 	URL       string            `json:"url"`
 	Method    string            `json:"method"`
@@ -80,6 +99,7 @@ type LibraryObjectUpload struct {
 type memoryLibraryObject struct {
 	data     []byte
 	metadata LibraryObjectMetadata
+	created  time.Time
 }
 
 type MemoryLibraryObjectStore struct {
@@ -237,7 +257,9 @@ func (s *MemoryLibraryObjectStore) Put(_ context.Context, key string, body io.Re
 		return errors.New("library object does not match upload constraints")
 	}
 	s.mu.Lock()
-	s.objects[key] = memoryLibraryObject{data: append([]byte(nil), data...), metadata: metadata}
+	s.objects[key] = memoryLibraryObject{
+		data: append([]byte(nil), data...), metadata: metadata, created: time.Now().UTC(),
+	}
 	s.mu.Unlock()
 	return nil
 }
@@ -269,6 +291,37 @@ func (s *MemoryLibraryObjectStore) Delete(_ context.Context, key string) error {
 	return nil
 }
 
+func (s *MemoryLibraryObjectStore) List(
+	_ context.Context, prefix, cursor string, limit int,
+) (LibraryObjectPage, error) {
+	if limit < 1 || limit > 1000 {
+		limit = 250
+	}
+	s.mu.RLock()
+	keys := make([]string, 0, len(s.objects))
+	for key := range s.objects {
+		if strings.HasPrefix(key, prefix) && key > cursor {
+			keys = append(keys, key)
+		}
+	}
+	sort.Strings(keys)
+	if len(keys) > limit {
+		keys = keys[:limit]
+	}
+	page := LibraryObjectPage{Objects: make([]LibraryObjectEntry, 0, len(keys))}
+	for _, key := range keys {
+		object := s.objects[key]
+		page.Objects = append(page.Objects, LibraryObjectEntry{
+			Key: key, ByteSize: object.metadata.ByteSize, LastModified: object.created,
+		})
+	}
+	s.mu.RUnlock()
+	if len(keys) == limit {
+		page.NextCursor = keys[len(keys)-1]
+	}
+	return page, nil
+}
+
 type S3LibraryObjectStoreConfig struct {
 	Endpoint           string
 	Region             string
@@ -288,6 +341,7 @@ type libraryS3API interface {
 	HeadObject(context.Context, *s3.HeadObjectInput, ...func(*s3.Options)) (*s3.HeadObjectOutput, error)
 	GetObject(context.Context, *s3.GetObjectInput, ...func(*s3.Options)) (*s3.GetObjectOutput, error)
 	DeleteObject(context.Context, *s3.DeleteObjectInput, ...func(*s3.Options)) (*s3.DeleteObjectOutput, error)
+	ListObjectsV2(context.Context, *s3.ListObjectsV2Input, ...func(*s3.Options)) (*s3.ListObjectsV2Output, error)
 }
 
 // libraryS3Presigner is satisfied by *s3.PresignClient. It is separate from
@@ -422,6 +476,43 @@ func (s *S3LibraryObjectStore) Delete(ctx context.Context, key string) error {
 	defer cancel()
 	_, err := s.client.DeleteObject(ctx, &s3.DeleteObjectInput{Bucket: aws.String(s.bucket), Key: aws.String(key)})
 	return mapLibraryS3Error(err)
+}
+
+func (s *S3LibraryObjectStore) List(
+	ctx context.Context, prefix, cursor string, limit int,
+) (LibraryObjectPage, error) {
+	if prefix != "library/" {
+		return LibraryObjectPage{}, errors.New("unsupported object inventory prefix")
+	}
+	if limit < 1 || limit > 1000 {
+		limit = 250
+	}
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	input := &s3.ListObjectsV2Input{
+		Bucket: aws.String(s.bucket), Prefix: aws.String(prefix), MaxKeys: aws.Int32(int32(limit)),
+	}
+	if cursor != "" {
+		input.ContinuationToken = aws.String(cursor)
+	}
+	result, err := s.client.ListObjectsV2(ctx, input)
+	if err != nil {
+		return LibraryObjectPage{}, mapLibraryS3Error(err)
+	}
+	page := LibraryObjectPage{Objects: make([]LibraryObjectEntry, 0, len(result.Contents))}
+	for _, object := range result.Contents {
+		key := aws.ToString(object.Key)
+		if !libraryObjectKeyPattern.MatchString(key) {
+			continue
+		}
+		page.Objects = append(page.Objects, LibraryObjectEntry{
+			Key: key, ByteSize: aws.ToInt64(object.Size), LastModified: aws.ToTime(object.LastModified),
+		})
+	}
+	if result.IsTruncated != nil && *result.IsTruncated {
+		page.NextCursor = aws.ToString(result.NextContinuationToken)
+	}
+	return page, nil
 }
 
 func validateLibraryObject(key string, metadata LibraryObjectMetadata) error {

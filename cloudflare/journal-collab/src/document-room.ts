@@ -4,15 +4,29 @@ import type { Connection, ConnectionContext } from "partyserver";
 
 import {
   TicketError,
-  verifyTicket,
+  verifyTicketWithRotation,
   type CollaborationResourceType,
-  type DocumentRole,
 } from "./ticket";
 import {
   isRecord,
   jsonResponse,
-  verifyControlRequest,
+  verifyControlRequestWithRotation,
 } from "./control-protocol";
+import {
+  claimTicketID,
+  messageIsTooLarge,
+  roomIsFull,
+  socketBelongsToUser,
+  socketIsReadOnly,
+  socketIsSuperseded,
+} from "./room-policy";
+import {
+  DOCUMENT_WARNING_BYTES,
+  MAX_DOCUMENT_BYTES,
+  projectedDocumentBytes,
+  readDocumentSnapshot,
+  writeDocumentSnapshot,
+} from "./document-persistence";
 
 /**
  * One Durable Object per collaborative document.
@@ -27,31 +41,18 @@ export interface Env {
   NOTE_ROOM: DurableObjectNamespace;
   DRAWING_ROOM: DurableObjectNamespace;
   JOURNAL_COLLAB_TICKET_PUBLIC_KEY: string;
+  JOURNAL_COLLAB_TICKET_PUBLIC_KEY_PREVIOUS?: string;
   JOURNAL_COLLAB_CONTROL_SECRET: string;
+  JOURNAL_COLLAB_CONTROL_SECRET_PREVIOUS?: string;
   JOURNAL_COLLAB_PROJECTION_SECRET: string;
+  JOURNAL_COLLAB_PROJECTION_SECRET_PREVIOUS?: string;
   JOURNAL_COLLAB_ISSUER: string;
   JOURNAL_COLLAB_AUDIENCE: string;
   MISTY_INTERNAL_API_BASE: string;
 }
 
-/** Per-connection state persisted in the WebSocket attachment. */
-interface SocketState {
-  userID: string;
-  role: DocumentRole;
-  aclVersion: number;
-  resourceID: string;
-  spaceID: string;
-}
-
-const MAX_CONNECTIONS_PER_ROOM = 40;
-/** Yjs updates are small; anything larger is not a legitimate edit. */
-const MAX_MESSAGE_BYTES = 512 * 1024;
 /** Used ticket ids are kept a little past ticket expiry, then swept. */
 const JTI_RETENTION_MS = 5 * 60 * 1000;
-/** Durable Object storage caps a single value at 128 KiB; stay well under. */
-const DOCUMENT_CHUNK_BYTES = 96 * 1024;
-/** Beta ceiling for one collaborative document. */
-const MAX_DOCUMENT_BYTES = 8 * 1024 * 1024;
 /** Control requests are tiny JSON envelopes, never document snapshots. */
 const MAX_CONTROL_BODY_BYTES = 128 * 1024;
 const BOOTSTRAP_APPLIED_KEY = "bootstrap:applied";
@@ -70,6 +71,8 @@ export abstract class PersistentDocumentRoom extends YServer<Env> {
 
   /** Newest ACL version this room has been told about. */
   private aclVersion = 0;
+  /** Per-object-instance id for joining privacy-safe Worker log events. */
+  private readonly correlationID = `room_${crypto.randomUUID()}`;
 
   /**
    * Authorizes the socket before it joins.
@@ -86,13 +89,17 @@ export abstract class PersistentDocumentRoom extends YServer<Env> {
 
     let claims;
     try {
-      claims = await verifyTicket(token, {
-        publicKeyBase64: this.env.JOURNAL_COLLAB_TICKET_PUBLIC_KEY,
-        issuer: this.env.JOURNAL_COLLAB_ISSUER,
-        audience: this.env.JOURNAL_COLLAB_AUDIENCE,
-        room: this.name,
-        resourceType: this.resourceType,
-      });
+      claims = await verifyTicketWithRotation(
+        token,
+        {
+          publicKeyBase64: this.env.JOURNAL_COLLAB_TICKET_PUBLIC_KEY,
+          issuer: this.env.JOURNAL_COLLAB_ISSUER,
+          audience: this.env.JOURNAL_COLLAB_AUDIENCE,
+          room: this.name,
+          resourceType: this.resourceType,
+        },
+        this.env.JOURNAL_COLLAB_TICKET_PUBLIC_KEY_PREVIOUS,
+      );
     } catch (error) {
       this.refuse(
         connection,
@@ -120,7 +127,7 @@ export abstract class PersistentDocumentRoom extends YServer<Env> {
       return;
     }
 
-    if (this.connectionCount() >= MAX_CONNECTIONS_PER_ROOM) {
+    if (roomIsFull(this.connectionCount())) {
       this.refuse(connection, "room_full");
       return;
     }
@@ -140,13 +147,7 @@ export abstract class PersistentDocumentRoom extends YServer<Env> {
    * y-partyserver consults this before applying anything to the document.
    */
   override isReadOnly(connection: Connection): boolean {
-    const state = socketState(connection);
-    // An unknown socket is treated as read-only rather than trusted.
-    if (!state) return true;
-    if (state.role === "viewer") return true;
-    // A socket that authorized under an older ACL version has been superseded
-    // by a permission change and must reconnect before writing again.
-    return state.aclVersion < this.aclVersion;
+    return socketIsReadOnly(connection.state, this.aclVersion);
   }
 
   override async onMessage(
@@ -155,9 +156,21 @@ export abstract class PersistentDocumentRoom extends YServer<Env> {
   ): Promise<void> {
     const size =
       typeof message === "string" ? message.length : message.byteLength;
-    if (size > MAX_MESSAGE_BYTES) {
+    if (messageIsTooLarge(size)) {
       this.refuse(connection, "message_too_large");
       return;
+    }
+    if (typeof message !== "string") {
+      const bytes = message instanceof ArrayBuffer ? new Uint8Array(message) : new Uint8Array(message);
+      const projectedBytes = projectedDocumentBytes(this.document, bytes);
+      if (projectedBytes !== null && projectedBytes > MAX_DOCUMENT_BYTES) {
+        this.sendDocumentStatus(connection, "blocked", projectedBytes);
+        this.log("document_limit_blocked", { projected_bytes: projectedBytes });
+        return;
+      }
+      if (projectedBytes !== null && projectedBytes >= DOCUMENT_WARNING_BYTES) {
+        this.sendDocumentStatus(connection, "warning", projectedBytes);
+      }
     }
     await super.onMessage(connection, message);
   }
@@ -170,9 +183,12 @@ export abstract class PersistentDocumentRoom extends YServer<Env> {
    * byte-for-byte before JSON parsing.
    */
   override async onRequest(request: Request): Promise<Response> {
+    if (request.method === "GET") {
+      return this.handleDocumentExport(request);
+    }
     if (request.method !== "POST") {
       return jsonResponse({ code: "method_not_allowed" }, 405, {
-        Allow: "POST",
+        Allow: "GET, POST",
       });
     }
     const body = new Uint8Array(await request.arrayBuffer());
@@ -182,8 +198,9 @@ export abstract class PersistentDocumentRoom extends YServer<Env> {
     const timestamp = request.headers.get("X-Misty-Timestamp") ?? "";
     const signature = request.headers.get("X-Misty-Signature") ?? "";
     if (
-      !(await verifyControlRequest(
+      !(await verifyControlRequestWithRotation(
         this.env.JOURNAL_COLLAB_CONTROL_SECRET,
+        this.env.JOURNAL_COLLAB_CONTROL_SECRET_PREVIOUS,
         timestamp,
         body,
         signature,
@@ -206,6 +223,60 @@ export abstract class PersistentDocumentRoom extends YServer<Env> {
       return jsonResponse({ code: "invalid_command" }, 400);
     }
     return this.handleControl(envelope.command, envelope.payload);
+  }
+
+  /**
+   * Returns a portable raw Yjs update directly to an authenticated client.
+   * The Go API mints the ordinary short-lived, single-use viewer ticket only
+   * after rechecking access; image bodies remain in R2 and are never embedded.
+   */
+  private async handleDocumentExport(request: Request): Promise<Response> {
+    const url = new URL(request.url);
+    if (url.searchParams.get("export") !== "1") {
+      return jsonResponse({ code: "not_found" }, 404);
+    }
+    let claims;
+    try {
+      claims = await verifyTicketWithRotation(
+        url.searchParams.get("ticket") ?? "",
+        {
+          publicKeyBase64: this.env.JOURNAL_COLLAB_TICKET_PUBLIC_KEY,
+          issuer: this.env.JOURNAL_COLLAB_ISSUER,
+          audience: this.env.JOURNAL_COLLAB_AUDIENCE,
+          room: this.name,
+          resourceType: this.resourceType,
+        },
+        this.env.JOURNAL_COLLAB_TICKET_PUBLIC_KEY_PREVIOUS,
+      );
+    } catch (error) {
+      return jsonResponse(
+        {
+          code:
+            error instanceof TicketError ? error.code : "ticket_invalid",
+        },
+        401,
+      );
+    }
+    if (claims.acl_version < this.aclVersion) {
+      return jsonResponse({ code: "ticket_acl_stale" }, 401);
+    }
+    if (!(await this.burnTicketID(claims.jti))) {
+      return jsonResponse({ code: "ticket_replayed" }, 401);
+    }
+    const update = Y.encodeStateAsUpdate(this.document);
+    if (update.byteLength > MAX_DOCUMENT_BYTES) {
+      return jsonResponse({ code: "document_too_large" }, 413);
+    }
+    return new Response(update, {
+      status: 200,
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Cache-Control": "private, no-store",
+        "Content-Type": "application/vnd.yjs.update",
+        "Content-Length": String(update.byteLength),
+        "X-Content-Type-Options": "nosniff",
+      },
+    });
   }
 
   /** Handles authenticated control commands from the Go API. */
@@ -275,12 +346,26 @@ export abstract class PersistentDocumentRoom extends YServer<Env> {
         this.disconnectUsers(userIDs);
         return jsonResponse({ ok: true });
       }
+      case "status": {
+        const persisted = await readDocumentSnapshot(this.ctx.storage);
+        return jsonResponse({
+          ok: true,
+          acl_version: this.aclVersion,
+          document_bytes: Y.encodeStateAsUpdate(this.document).byteLength,
+          persisted_bytes: persisted?.update.byteLength ?? 0,
+          persistence_source: persisted?.source ?? "empty",
+        });
+      }
       case "purge": {
         // Idempotent: purging an already-empty room succeeds, which is what
         // lets the Go retention worker retry safely.
         this.disconnectUsers(null);
         await this.ctx.storage.deleteAll();
         this.aclVersion = 0;
+        // The active Y.Doc still contains the deleted content. Abort this
+        // object after the response so no later request or debounced save can
+        // serve or recreate it; the next request starts with empty storage.
+        setTimeout(() => this.ctx.abort("room_purged"), 25);
         return jsonResponse({ ok: true, purged: true });
       }
       default:
@@ -291,8 +376,7 @@ export abstract class PersistentDocumentRoom extends YServer<Env> {
   /** Closes sockets whose authorization predates the current ACL version. */
   private disconnectSupersededSockets(): void {
     for (const connection of this.getConnections()) {
-      const state = socketState(connection);
-      if (!state || state.aclVersion < this.aclVersion) {
+      if (socketIsSuperseded(connection.state, this.aclVersion)) {
         this.close(connection, "acl_superseded");
       }
     }
@@ -302,8 +386,7 @@ export abstract class PersistentDocumentRoom extends YServer<Env> {
   private disconnectUsers(userIDs: string[] | null): void {
     const targeted = userIDs === null ? null : new Set(userIDs);
     for (const connection of this.getConnections()) {
-      const state = socketState(connection);
-      if (targeted === null || (state && targeted.has(state.userID))) {
+      if (socketBelongsToUser(connection.state, targeted)) {
         this.close(connection, "access_revoked");
       }
     }
@@ -323,6 +406,7 @@ export abstract class PersistentDocumentRoom extends YServer<Env> {
     } catch {
       /* already closing */
     }
+    this.log("connection_refused", { code });
   }
 
   private close(connection: Connection, code: string): void {
@@ -331,6 +415,7 @@ export abstract class PersistentDocumentRoom extends YServer<Env> {
     } catch {
       /* already closing */
     }
+    this.log("connection_revoked", { code });
   }
 
   /**
@@ -340,11 +425,8 @@ export abstract class PersistentDocumentRoom extends YServer<Env> {
    * cannot interleave with another connection to the same room.
    */
   private async burnTicketID(jti: string): Promise<boolean> {
-    const key = `jti:${jti}`;
-    const existing = await this.ctx.storage.get<number>(key);
-    if (existing !== undefined) return false;
     const now = Date.now();
-    await this.ctx.storage.put(key, now);
+    if (!(await claimTicketID(this.ctx.storage, jti, now))) return false;
     // Opportunistic sweep so used ids do not accumulate forever.
     if (Math.random() < 0.05) await this.sweepTicketIDs(now);
     return true;
@@ -375,9 +457,12 @@ export abstract class PersistentDocumentRoom extends YServer<Env> {
    * moment the object is evicted.
    */
   override async onLoad(): Promise<void> {
-    const update = await this.readDocumentUpdate();
-    if (update) {
-      Y.applyUpdate(this.document, update);
+    const snapshot = await readDocumentSnapshot(this.ctx.storage);
+    if (snapshot) {
+      Y.applyUpdate(this.document, snapshot.update);
+      if (snapshot.source !== "current") {
+        this.log("document_snapshot_recovered", { source: snapshot.source });
+      }
     }
   }
 
@@ -390,77 +475,66 @@ export abstract class PersistentDocumentRoom extends YServer<Env> {
    */
   override async onSave(): Promise<void> {
     const update = Y.encodeStateAsUpdate(this.document);
-    if (update.byteLength > MAX_DOCUMENT_BYTES) {
-      // Refusing to save a document this large would silently lose edits, so
-      // it is logged loudly instead. The note id is deliberately omitted.
-      console.error(
-        `collaboration document exceeds ${MAX_DOCUMENT_BYTES} bytes; not persisted`,
+    try {
+      const manifest = await writeDocumentSnapshot(this.ctx.storage, update);
+      this.broadcastDocumentStatus(
+        manifest.byteLength >= DOCUMENT_WARNING_BYTES ? "warning" : "saved",
+        manifest.byteLength,
       );
-      return;
-    }
-    const chunks: Record<string, ArrayBuffer> = {};
-    let chunkCount = 0;
-    for (
-      let offset = 0;
-      offset < update.byteLength;
-      offset += DOCUMENT_CHUNK_BYTES
-    ) {
-      const slice = update.slice(offset, offset + DOCUMENT_CHUNK_BYTES);
-      // A copy, because slice() on a subarray-backed view can retain the whole
-      // buffer and blow past the per-value storage limit.
-      chunks[`doc:${chunkCount}`] = new Uint8Array(slice).buffer;
-      chunkCount += 1;
-    }
-    const previousCount =
-      (await this.ctx.storage.get<number>("doc:chunks")) ?? 0;
-    await this.ctx.storage.put(chunks);
-    await this.ctx.storage.put("doc:chunks", chunkCount);
-    // Drop chunks left over from a larger previous revision.
-    if (previousCount > chunkCount) {
-      const stale: string[] = [];
-      for (let index = chunkCount; index < previousCount; index += 1)
-        stale.push(`doc:${index}`);
-      await this.ctx.storage.delete(stale);
+    } catch (error) {
+      const code =
+        error instanceof Error && error.message === "document_limit_exceeded"
+          ? "document_limit_exceeded"
+          : "document_persistence_failed";
+      this.broadcastDocumentStatus("error", update.byteLength, code);
+      this.log(code, { document_bytes: update.byteLength });
+      throw error;
     }
   }
 
-  private async readDocumentUpdate(): Promise<Uint8Array | null> {
-    const chunkCount = (await this.ctx.storage.get<number>("doc:chunks")) ?? 0;
-    if (chunkCount < 1) return null;
-    const parts: Uint8Array[] = [];
-    let total = 0;
-    for (let index = 0; index < chunkCount; index += 1) {
-      const chunk = await this.ctx.storage.get<ArrayBuffer>(`doc:${index}`);
-      // A missing chunk means a partially written snapshot; applying the rest
-      // would corrupt the document, so nothing is restored.
-      if (!chunk) return null;
-      const part = new Uint8Array(chunk);
-      parts.push(part);
-      total += part.byteLength;
-    }
-    const update = new Uint8Array(total);
-    let offset = 0;
-    for (const part of parts) {
-      update.set(part, offset);
-      offset += part.byteLength;
-    }
-    return update;
+  private sendDocumentStatus(
+    connection: Connection,
+    status: "warning" | "blocked",
+    documentBytes: number,
+    code?: string,
+  ): void {
+    this.sendCustomMessage(
+      connection,
+      JSON.stringify({
+        type: "document_status",
+        status,
+        code,
+        document_bytes: documentBytes,
+        maximum_bytes: MAX_DOCUMENT_BYTES,
+      }),
+    );
   }
-}
 
-function socketState(connection: Connection): SocketState | null {
-  const state = connection.state;
-  if (
-    !isRecord(state) ||
-    typeof state.userID !== "string" ||
-    (state.role !== "creator" &&
-      state.role !== "editor" &&
-      state.role !== "viewer") ||
-    typeof state.aclVersion !== "number" ||
-    typeof state.resourceID !== "string" ||
-    typeof state.spaceID !== "string"
-  ) {
-    return null;
+  private broadcastDocumentStatus(
+    status: "saved" | "warning" | "error",
+    documentBytes: number,
+    code?: string,
+  ): void {
+    this.broadcastCustomMessage(
+      JSON.stringify({
+        type: "document_status",
+        status,
+        code,
+        document_bytes: documentBytes,
+        maximum_bytes: MAX_DOCUMENT_BYTES,
+      }),
+    );
   }
-  return state as unknown as SocketState;
+
+  private log(event: string, details: Record<string, unknown>): void {
+    console.error(
+      JSON.stringify({
+        level: event.endsWith("failed") || event.endsWith("exceeded") ? "error" : "warn",
+        event,
+        correlation_id: this.correlationID,
+        resource_type: this.resourceType,
+        ...details,
+      }),
+    );
+  }
 }

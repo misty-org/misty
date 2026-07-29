@@ -1,0 +1,101 @@
+name: Build and deploy beta services
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Protected GitHub environment
+        required: true
+        type: choice
+        options: [staging, production]
+      deploy_worker:
+        description: Deploy the Journal Worker after build
+        required: true
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: services-${{ inputs.environment }}
+  cancel-in-progress: false
+
+jobs:
+  gate:
+    uses: ./.github/workflows/ci.yml
+
+  image:
+    name: Publish immutable API image
+    needs: gate
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    outputs:
+      digest: ${{ steps.build.outputs.digest }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/setup-buildx-action@v4
+      - name: Build and push API image
+        id: build
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          push: true
+          tags: ghcr.io/${{ github.repository }}:${{ inputs.environment }}-${{ github.sha }}
+          labels: |
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+      - name: Record immutable deployment input
+        run: echo "API image digest ${{ steps.build.outputs.digest }}" >> "$GITHUB_STEP_SUMMARY"
+
+  worker:
+    name: Deploy Journal Worker
+    if: inputs.deploy_worker
+    needs: [gate, image]
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    defaults:
+      run:
+        working-directory: cloudflare/journal-collab
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+      JOURNAL_WORKER_NAME: ${{ vars.JOURNAL_WORKER_NAME }}
+      MISTY_INTERNAL_API_BASE: ${{ vars.MISTY_INTERNAL_API_BASE }}
+      JOURNAL_COLLAB_ISSUER: ${{ vars.JOURNAL_COLLAB_ISSUER }}
+      JOURNAL_COLLAB_AUDIENCE: ${{ vars.JOURNAL_COLLAB_AUDIENCE }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: cloudflare/journal-collab/.nvmrc
+          cache: npm
+          cache-dependency-path: cloudflare/journal-collab/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run test:runtime
+      - name: Require environment-specific Worker configuration
+        run: |
+          test -n "$CLOUDFLARE_ACCOUNT_ID"
+          test -n "$JOURNAL_WORKER_NAME"
+          test -n "$MISTY_INTERNAL_API_BASE"
+          test -n "$JOURNAL_COLLAB_ISSUER"
+          test -n "$JOURNAL_COLLAB_AUDIENCE"
+      - name: Deploy version
+        run: >-
+          npx wrangler deploy
+          --name "$JOURNAL_WORKER_NAME"
+          --var "MISTY_INTERNAL_API_BASE:$MISTY_INTERNAL_API_BASE"
+          --var "JOURNAL_COLLAB_ISSUER:$JOURNAL_COLLAB_ISSUER"
+          --var "JOURNAL_COLLAB_AUDIENCE:$JOURNAL_COLLAB_AUDIENCE"

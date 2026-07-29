@@ -137,14 +137,6 @@ func (s *SpacesService) SpaceDrawingCollaborationTicket() http.HandlerFunc {
 			writeSpaceError(w, err)
 			return
 		}
-		if !s.journalCollab.Enabled {
-			writeJSON(
-				w,
-				http.StatusServiceUnavailable,
-				map[string]string{"code": "drawing_collaboration_unavailable"},
-			)
-			return
-		}
 		ticket, err := s.journalCollab.MintDrawingTicket(
 			userID,
 			drawing.SpaceID,

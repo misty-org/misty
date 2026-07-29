@@ -39,8 +39,8 @@ func TestUnifiedAgentVersionsAndPerUserInstances(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := database.SaveSpaceStudioResource(ctx, member.ID, *workflowDraft); !errors.Is(err, ErrSpaceForbidden) {
-		t.Fatalf("non-creator workflow edit err=%v", err)
+	if _, err := database.SaveSpaceStudioResource(ctx, member.ID, *workflowDraft); !errors.Is(err, ErrLibraryForbidden) {
+		t.Fatalf("member workflow edit err=%v", err)
 	}
 	if _, err := database.CreateSpaceRun(ctx, member.ID, space.ID, "workflow", workflowDraft.ID, "test", "summarize", json.RawMessage(`{"prompt":"no"}`)); !errors.Is(err, ErrSpaceInvalid) {
 		t.Fatalf("standalone workflow run err=%v", err)
@@ -89,8 +89,8 @@ func TestUnifiedAgentVersionsAndPerUserInstances(t *testing.T) {
 	if _, err := database.UpdateAgentInstanceConnections(ctx, other.ID, otherInstance.ID, map[string]string{"slack": connection.ID}); !errors.Is(err, ErrSpaceInvalid) {
 		t.Fatalf("cross-user connection binding err=%v", err)
 	}
-	if connections, err := database.SpaceIntegrations(ctx, other.ID, space.ID); err != nil || len(connections) != 0 {
-		t.Fatalf("other user connections=%#v err=%v", connections, err)
+	if connections, err := database.SpaceIntegrations(ctx, other.ID, space.ID); err != nil || len(connections) != 1 || connections[0].CredentialReference != "" || connections[0].ConnectedByUserID != member.ID {
+		t.Fatalf("sanitized Space connections=%#v err=%v", connections, err)
 	}
 
 	chatRun, err := database.CreateAgentRun(ctx, AgentRunRequest{RequestingMemberID: member.ID, SpaceID: space.ID, AgentID: agent.ID, SourceType: "direct", CapabilityID: "chat", Input: json.RawMessage(`{"prompt":"hello"}`), TriggerKind: "manual"})

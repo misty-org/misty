@@ -15,6 +15,27 @@ import (
 // tells you why, and tells you before the requests start failing.
 func (s *Server) registerDomainGauges(registry *metrics.Registry) {
 	registry.WatchGauge(
+		"misty_db_connections_open",
+		"PostgreSQL connections currently open from this API process.",
+		func(context.Context) (float64, error) {
+			return float64(s.Database.Conn.Stats().OpenConnections), nil
+		},
+	)
+	registry.WatchGauge(
+		"misty_db_connections_in_use",
+		"PostgreSQL connections currently checked out by API work.",
+		func(context.Context) (float64, error) {
+			return float64(s.Database.Conn.Stats().InUse), nil
+		},
+	)
+	registry.WatchGauge(
+		"misty_db_connections_max",
+		"Configured PostgreSQL connection ceiling for this API process.",
+		func(context.Context) (float64, error) {
+			return float64(s.Database.Conn.Stats().MaxOpenConnections), nil
+		},
+	)
+	registry.WatchGauge(
 		"misty_realtime_connections",
 		"Realtime WebSockets currently held open. An edge proxy sees only the upgrade, never the live count.",
 		func(context.Context) (float64, error) {
