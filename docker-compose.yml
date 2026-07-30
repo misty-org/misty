@@ -1,26 +1,12 @@
 name: misty-server
 
-x-api-image: &api-image
-  image: misty-server:local
-  build:
-    context: .
-    dockerfile: Dockerfile
+# This file is the environment-independent Misty stack. Development and
+# production add only their environment-specific inputs through overlays.
 
-x-cloudflare-image: &cloudflare-image
-  image: misty-journal-collab-dev:local
-  build:
-    context: cloudflare/journal-collab
-    dockerfile: Dockerfile.dev
+x-api-image: &api-image
+  image: ${MISTY_API_IMAGE:-misty-server:local}
 
 services:
-  dev-init:
-    <<: *cloudflare-image
-    restart: "no"
-    entrypoint: ["/bin/sh", "/usr/local/bin/misty-cloudflare-init"]
-    volumes:
-      - ./cloudflare/journal-collab:/workspace
-      - dev_runtime:/run/misty
-
   postgres:
     image: pgvector/pgvector:pg16@sha256:1d533553fefe4f12e5d80c7b80622ba0c382abb5758856f52983d8789179f0fb
     restart: unless-stopped
@@ -30,8 +16,6 @@ services:
       POSTGRES_DB: ${DB_NAME:-misty_server}
       MISTY_APP_DB_USER: ${DB_USER:-misty_app}
       MISTY_APP_DB_PASSWORD: ${DB_PASSWORD:-misty}
-    ports:
-      - "${DB_PORT:-5435}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./scripts/docker/postgres-init-app-role.sh:/docker-entrypoint-initdb.d/10-misty-app-role.sh:ro
@@ -40,6 +24,7 @@ services:
       interval: 3s
       timeout: 5s
       retries: 20
+    networks: [database]
 
   migrate:
     <<: *api-image
@@ -58,6 +43,7 @@ services:
         condition: service_healthy
     entrypoint: ["/usr/local/bin/goose"]
     command: ["up"]
+    networks: [database]
 
   database-permissions:
     image: pgvector/pgvector:pg16@sha256:1d533553fefe4f12e5d80c7b80622ba0c382abb5758856f52983d8789179f0fb
@@ -75,33 +61,13 @@ services:
       migrate:
         condition: service_completed_successfully
     entrypoint: ["/bin/sh", "/usr/local/bin/misty-grant-app-role"]
-
-  stripe:
-    image: stripe/stripe-cli:v1.44.0@sha256:f46433445867b7f47526b7588d49c79a336d74a22ee548c18513e3b9c8d40f31
-    restart: unless-stopped
-    environment:
-      STRIPE_API_KEY: ${STRIPE_SECRET_KEY:-}
-      STRIPE_FORWARD_TO: http://api:8081${STRIPE_WEBHOOK_PATH:-/stripe/webhook}
-    volumes:
-      - ./scripts/docker/stripe-listen.sh:/usr/local/bin/misty-stripe-listen:ro
-      - dev_runtime:/run/misty
-    depends_on:
-      dev-init:
-        condition: service_completed_successfully
-    entrypoint: ["/bin/sh", "/usr/local/bin/misty-stripe-listen"]
-    healthcheck:
-      test: ["CMD-SHELL", "test -s /run/misty/stripe-webhook-secret"]
-      interval: 2s
-      timeout: 2s
-      retries: 30
+    networks: [database]
 
   api:
     <<: *api-image
     restart: unless-stopped
-    env_file:
-      - .env
     environment:
-      PORT: "8081"
+      PORT: "8080"
       DB_HOST: postgres
       DB_PORT: "5432"
       DB_USER: ${DB_USER:-misty_app}
@@ -110,60 +76,20 @@ services:
       DB_MIGRATION_USER: ""
       DB_MIGRATION_PASSWORD: ""
       CLOUDFLARE_API_TOKEN: ""
-      PARTYKIT_HOST: ${MISTY_CLOUDFLARE_WORKER_HOST:-misty-journal-collab-dev.mistysys.workers.dev}
-      MISTY_JOURNAL_SERVER_ENV_FILE: /run/misty/journal-server.env
-      STRIPE_WEBHOOK_SECRET_FILE: /run/misty/stripe-webhook-secret
-    ports:
-      - "${PORT:-8081}:8081"
-    volumes:
-      - dev_runtime:/run/misty:ro
     depends_on:
-      dev-init:
-        condition: service_completed_successfully
       database-permissions:
         condition: service_completed_successfully
-      stripe:
-        condition: service_healthy
-    entrypoint: ["/bin/sh", "/usr/local/bin/misty-dev-api-entrypoint"]
     healthcheck:
-      test: ["CMD-SHELL", "curl --fail --silent http://127.0.0.1:8081/health >/dev/null"]
+      test: ["CMD-SHELL", "curl --fail --silent http://127.0.0.1:8080/health >/dev/null"]
       interval: 3s
       timeout: 5s
       retries: 30
-
-  tunnel:
-    image: misty-cloudflared-dev:local
-    build:
-      context: .
-      dockerfile: Dockerfile.cloudflared-dev
-    restart: unless-stopped
-    environment:
-      MISTY_TUNNEL_ORIGIN: http://api:8081
-    volumes:
-      - dev_runtime:/run/misty
-    depends_on:
-      api:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD-SHELL", "test -s /run/misty/tunnel-url"]
-      interval: 2s
-      timeout: 2s
-      retries: 30
-
-  cloudflare-deploy:
-    <<: *cloudflare-image
-    restart: "no"
-    environment:
-      CLOUDFLARE_API_TOKEN: ${CLOUDFLARE_API_TOKEN:-}
-      MISTY_CLOUDFLARE_WORKER_NAME: ${MISTY_CLOUDFLARE_WORKER_NAME:-misty-journal-collab-dev}
-    volumes:
-      - ./cloudflare/journal-collab:/workspace:ro
-      - dev_runtime:/run/misty:ro
-    depends_on:
-      tunnel:
-        condition: service_healthy
-    entrypoint: ["/bin/sh", "/usr/local/bin/misty-cloudflare-deploy"]
+    networks: [edge, database]
 
 volumes:
   pgdata:
-  dev_runtime:
+
+networks:
+  edge:
+  database:
+    internal: true
