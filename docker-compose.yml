@@ -1,7 +1,7 @@
 name: misty-server
 
 x-api-image: &api-image
-  image: misty-server-dev:local
+  image: misty-server:local
   build:
     context: .
     dockerfile: Dockerfile
