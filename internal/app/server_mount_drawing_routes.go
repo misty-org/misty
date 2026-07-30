@@ -120,7 +120,6 @@ func (config r2Config) empty() bool {
 func TestingLibraryStoreFromEnv() (api.LibraryObjectStore, error) {
 	config := r2ConfigFromEnv()
 	environment := strings.TrimSpace(envconfig.Getenv("MISTY_ENVIRONMENT"))
-	demoMode := strings.TrimSpace(envconfig.Getenv("MISTY_DEMO_MODE"))
 	if localRoot := strings.TrimSpace(envconfig.Getenv("MISTY_LIBRARY_LOCAL_DIR")); localRoot != "" {
 		if strings.EqualFold(environment, "production") {
 			return nil, fmt.Errorf("MISTY_LIBRARY_LOCAL_DIR cannot be used in production")
@@ -130,12 +129,6 @@ func TestingLibraryStoreFromEnv() (api.LibraryObjectStore, error) {
 			return nil, fmt.Errorf("configure local Library store: %w", err)
 		}
 		return store, nil
-	}
-	if demoMode == "local" {
-		return nil, fmt.Errorf("MISTY_LIBRARY_LOCAL_DIR is required for local demo mode")
-	}
-	if demoMode == "staging" && config.empty() {
-		return nil, fmt.Errorf("dedicated R2 storage is required for staging demo mode")
 	}
 	if config.empty() && !strings.EqualFold(environment, "production") {
 		return api.NewMemoryLibraryObjectStore(), nil

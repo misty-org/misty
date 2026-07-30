@@ -1,0 +1,112 @@
+x-cloudflare-image: &cloudflare-image
+  image: misty-journal-collab-dev:local
+  build:
+    context: cloudflare/journal-collab
+    dockerfile: Dockerfile.dev
+
+services:
+  dev-init:
+    <<: *cloudflare-image
+    restart: "no"
+    entrypoint: ["/bin/sh", "/usr/local/bin/misty-cloudflare-init"]
+    volumes:
+      - ./cloudflare/journal-collab:/workspace
+      - dev_runtime:/run/misty
+    networks: [edge]
+
+  postgres:
+    ports:
+      - "127.0.0.1:${DB_PORT:-5435}:5432"
+    # A container attached only to an internal network cannot publish a host
+    # port on Docker Desktop. Development adds edge for local test access;
+    # production keeps PostgreSQL private on the database network.
+    networks: [database, edge]
+
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+
+  database-permissions:
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  stripe:
+    image: stripe/stripe-cli:v1.44.0@sha256:f46433445867b7f47526b7588d49c79a336d74a22ee548c18513e3b9c8d40f31
+    restart: unless-stopped
+    environment:
+      STRIPE_API_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_FORWARD_TO: http://api:8080${STRIPE_WEBHOOK_PATH:-/stripe/webhook}
+    volumes:
+      - ./scripts/docker/stripe-listen.sh:/usr/local/bin/misty-stripe-listen:ro
+      - dev_runtime:/run/misty
+    depends_on:
+      dev-init:
+        condition: service_completed_successfully
+    entrypoint: ["/bin/sh", "/usr/local/bin/misty-stripe-listen"]
+    healthcheck:
+      test: ["CMD-SHELL", "test -s /run/misty/stripe-webhook-secret"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+    networks: [edge]
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file:
+      - .env
+    environment:
+      PARTYKIT_HOST: ${MISTY_CLOUDFLARE_WORKER_HOST:-misty-journal-collab-dev.mistysys.workers.dev}
+      MISTY_JOURNAL_SERVER_ENV_FILE: /run/misty/journal-server.env
+      STRIPE_WEBHOOK_SECRET_FILE: /run/misty/stripe-webhook-secret
+    ports:
+      - "127.0.0.1:${MISTY_HOST_PORT:-8081}:8080"
+    volumes:
+      - dev_runtime:/run/misty:ro
+    depends_on:
+      dev-init:
+        condition: service_completed_successfully
+      stripe:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "/usr/local/bin/misty-dev-api-entrypoint"]
+
+  tunnel:
+    image: misty-cloudflared-dev:local
+    build:
+      context: .
+      dockerfile: Dockerfile.cloudflared-dev
+    restart: unless-stopped
+    environment:
+      MISTY_TUNNEL_ORIGIN: http://api:8080
+    volumes:
+      - dev_runtime:/run/misty
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "test -s /run/misty/tunnel-url"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+    networks: [edge]
+
+  cloudflare-deploy:
+    <<: *cloudflare-image
+    restart: "no"
+    environment:
+      CLOUDFLARE_API_TOKEN: ${CLOUDFLARE_API_TOKEN:-}
+      MISTY_CLOUDFLARE_WORKER_NAME: ${MISTY_CLOUDFLARE_WORKER_NAME:-misty-journal-collab-dev}
+    volumes:
+      - ./cloudflare/journal-collab:/workspace:ro
+      - dev_runtime:/run/misty:ro
+    depends_on:
+      tunnel:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "/usr/local/bin/misty-cloudflare-deploy"]
+    networks: [edge]
+
+volumes:
+  dev_runtime:

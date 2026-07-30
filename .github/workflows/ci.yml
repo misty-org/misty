@@ -1,11 +1,7 @@
 name: CI
 
 on:
-  workflow_call:
   pull_request:
-  push:
-    branches:
-      - main
   workflow_dispatch:
 
 permissions:
@@ -16,24 +12,10 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  secrets:
-    name: Security checks
+  verify:
+    name: Verify
     runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          persist-credentials: false
-      - name: Scan current release source
-        run: >-
-          docker run --rm -v "$PWD:/repo"
-          zricethezav/gitleaks@sha256:e1b35e12a8c6fa8901f060459cfb6b2fc4c484d3afbe3b029733a3bbfab07055
-          detect --source=/repo --no-git --redact --config=/repo/.gitleaks.toml
-
-  backend:
-    name: API and database checks
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 35
     services:
       postgres:
         image: pgvector/pgvector:0.8.2-pg17
@@ -64,6 +46,13 @@ jobs:
       STRIPE_WEBHOOK_SECRET: whsec_ci_test_secret_123
     steps:
       - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Scan source for secrets
+        run: >-
+          docker run --rm -v "$PWD:/repo"
+          zricethezav/gitleaks@sha256:e1b35e12a8c6fa8901f060459cfb6b2fc4c484d3afbe3b029733a3bbfab07055
+          detect --source=/repo --no-git --redact --config=/repo/.gitleaks.toml
       - uses: actions/setup-go@v6
         with:
           go-version: 1.25.12
@@ -76,33 +65,25 @@ jobs:
             exit 1
           fi
       - run: go vet ./...
+      - run: ./scripts/check-go-file-sizes.sh
       - name: Install pinned migration tool
         run: go install github.com/pressly/goose/v3/cmd/goose@v3.27.3
-      - name: Apply database migrations
-        run: ./scripts/goose.sh up
-      - name: Test backend and database integration
-        # Database packages share one destructive test database. Keep package
-        # execution serial so one package cannot reset another package's data.
+      - run: ./scripts/goose.sh up
+      - name: Test backend and database integration serially
         run: go test -p 1 ./... -count=1
-
-  journal-worker:
-    name: Collaboration Worker checks
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    defaults:
-      run:
-        working-directory: cloudflare/journal-collab
-    steps:
-      - uses: actions/checkout@v6
+      - run: ./scripts/check-container-contract.sh
       - uses: actions/setup-node@v7
         with:
           node-version-file: cloudflare/journal-collab/.nvmrc
           cache: npm
           cache-dependency-path: cloudflare/journal-collab/package-lock.json
       - run: npm ci
+        working-directory: cloudflare/journal-collab
       - run: npm run typecheck
+        working-directory: cloudflare/journal-collab
       - run: npm test
-      - name: Audit production dependencies
-        run: npm audit --omit=dev --audit-level=high
-      - name: Validate deploy bundle
-        run: npm run test:runtime
+        working-directory: cloudflare/journal-collab
+      - run: npm run test:runtime
+        working-directory: cloudflare/journal-collab
+      - run: npm run audit:production
+        working-directory: cloudflare/journal-collab
