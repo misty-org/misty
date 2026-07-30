@@ -2,11 +2,12 @@ package api
 
 import (
 	"net/http"
-	"os"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	envconfig "github.com/kannachi323/misty/server/internal/platform/config"
 )
 
 // Egress accounting.
@@ -41,7 +42,7 @@ func EgressBudgetFromEnv() EgressBudget {
 }
 
 func positiveEnvBytes(name string, fallback int64) int64 {
-	value, err := strconv.ParseInt(strings.TrimSpace(os.Getenv(name)), 10, 64)
+	value, err := strconv.ParseInt(strings.TrimSpace(envconfig.Getenv(name)), 10, 64)
 	if err != nil || value <= 0 {
 		return fallback
 	}

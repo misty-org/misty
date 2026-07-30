@@ -6,9 +6,10 @@ import (
 	"fmt"
 	"log"
 	"net"
-	"os"
 	"strconv"
 	"strings"
+
+	envconfig "github.com/kannachi323/misty/server/internal/platform/config"
 
 	_ "github.com/lib/pq"
 )
@@ -21,11 +22,11 @@ type Database struct {
 }
 
 func (db *Database) GetDSN() string {
-	host := os.Getenv("DB_HOST")
-	port := os.Getenv("DB_PORT")
-	user := os.Getenv("DB_USER")
-	password := os.Getenv("DB_PASSWORD")
-	name := os.Getenv("DB_NAME")
+	host := envconfig.Getenv("DB_HOST")
+	port := envconfig.Getenv("DB_PORT")
+	user := envconfig.Getenv("DB_USER")
+	password := envconfig.Getenv("DB_PASSWORD")
+	name := envconfig.Getenv("DB_NAME")
 
 	if port == "" {
 		port = "5432"

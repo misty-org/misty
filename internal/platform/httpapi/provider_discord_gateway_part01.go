@@ -5,11 +5,12 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
-	"os"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	envconfig "github.com/kannachi323/misty/server/internal/platform/config"
 
 	"github.com/gorilla/websocket"
 	db "github.com/kannachi323/misty/server/internal/platform/postgres"
@@ -20,7 +21,7 @@ const discordGatewayIntents = 1 | 512 | 1024 | 32768 // guilds, messages, reacti
 func (s *SpacesService) StartProviderWorkers(ctx context.Context) {
 	s.workers.Do(func() {
 		go s.runWorkflowCoordinator(ctx)
-		if strings.TrimSpace(os.Getenv("DISCORD_BOT_TOKEN")) != "" {
+		if strings.TrimSpace(envconfig.Getenv("DISCORD_BOT_TOKEN")) != "" {
 			go s.runDiscordGateway(ctx)
 		}
 	})
@@ -86,7 +87,7 @@ func (s *SpacesService) runDiscordGateway(ctx context.Context) {
 }
 
 func (s *SpacesService) discordGatewaySession(ctx context.Context, state *db.ProviderGatewayState) error {
-	token := strings.TrimSpace(os.Getenv("DISCORD_BOT_TOKEN"))
+	token := strings.TrimSpace(envconfig.Getenv("DISCORD_BOT_TOKEN"))
 	endpoint := "wss://gateway.discord.gg/?v=10&encoding=json"
 	if state.ResumeURL != "" && state.SessionID != "" {
 		endpoint = strings.TrimRight(state.ResumeURL, "/") + "/?v=10&encoding=json"

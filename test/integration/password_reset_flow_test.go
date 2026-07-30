@@ -5,7 +5,7 @@ import (
 	"net/url"
 	"testing"
 
-	api "github.com/kannachi323/misty/server/internal/app/httpapi"
+	api "github.com/kannachi323/misty/server/internal/platform/httpapi"
 	"github.com/kannachi323/misty/server/internal/platform/security"
 )
 

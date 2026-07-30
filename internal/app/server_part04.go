@@ -4,11 +4,12 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"os"
 	"strconv"
 	"strings"
 
-	api "github.com/kannachi323/misty/server/internal/app/httpapi"
+	envconfig "github.com/kannachi323/misty/server/internal/platform/config"
+
+	api "github.com/kannachi323/misty/server/internal/platform/httpapi"
 )
 
 // mountDrawingRoutes registers metadata and collaboration-ticket endpoints for
@@ -96,7 +97,7 @@ func (s *Server) mountNoteRoutes(prefix string, spaces *api.SpacesService) {
 }
 
 func serverFeatureEnabled(name string) bool {
-	return strings.EqualFold(strings.TrimSpace(os.Getenv(name)), "true")
+	return strings.EqualFold(strings.TrimSpace(envconfig.Getenv(name)), "true")
 }
 
 type r2Config struct {
@@ -105,10 +106,10 @@ type r2Config struct {
 
 func r2ConfigFromEnv() r2Config {
 	return r2Config{
-		endpoint:  strings.TrimSpace(os.Getenv("R2_ENDPOINT")),
-		bucket:    strings.TrimSpace(os.Getenv("R2_BUCKET")),
-		accessKey: strings.TrimSpace(os.Getenv("R2_ACCESS_KEY")),
-		secretKey: strings.TrimSpace(os.Getenv("R2_SECRET_KEY")),
+		endpoint:  strings.TrimSpace(envconfig.Getenv("R2_ENDPOINT")),
+		bucket:    strings.TrimSpace(envconfig.Getenv("R2_BUCKET")),
+		accessKey: strings.TrimSpace(envconfig.Getenv("R2_ACCESS_KEY")),
+		secretKey: strings.TrimSpace(envconfig.Getenv("R2_SECRET_KEY")),
 	}
 }
 
@@ -118,9 +119,9 @@ func (config r2Config) empty() bool {
 
 func TestingLibraryStoreFromEnv() (api.LibraryObjectStore, error) {
 	config := r2ConfigFromEnv()
-	environment := strings.TrimSpace(os.Getenv("MISTY_ENVIRONMENT"))
-	demoMode := strings.TrimSpace(os.Getenv("MISTY_DEMO_MODE"))
-	if localRoot := strings.TrimSpace(os.Getenv("MISTY_LIBRARY_LOCAL_DIR")); localRoot != "" {
+	environment := strings.TrimSpace(envconfig.Getenv("MISTY_ENVIRONMENT"))
+	demoMode := strings.TrimSpace(envconfig.Getenv("MISTY_DEMO_MODE"))
+	if localRoot := strings.TrimSpace(envconfig.Getenv("MISTY_LIBRARY_LOCAL_DIR")); localRoot != "" {
 		if strings.EqualFold(environment, "production") {
 			return nil, fmt.Errorf("MISTY_LIBRARY_LOCAL_DIR cannot be used in production")
 		}
@@ -188,7 +189,7 @@ func TestingAllowedCORSOrigins() []string {
 		"http://localhost:5173",
 		"http://127.0.0.1:5173",
 	}
-	for _, origin := range strings.Split(os.Getenv("MISTY_ALLOWED_ORIGINS"), ",") {
+	for _, origin := range strings.Split(envconfig.Getenv("MISTY_ALLOWED_ORIGINS"), ",") {
 		origin = strings.TrimSpace(origin)
 		if origin != "" && !strings.Contains(origin, "*") {
 			origins = append(origins, origin)

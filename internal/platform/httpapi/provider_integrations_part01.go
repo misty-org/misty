@@ -9,10 +9,11 @@ import (
 	"log"
 	"net/http"
 	"net/url"
-	"os"
 	"sort"
 	"strings"
 	"time"
+
+	envconfig "github.com/kannachi323/misty/server/internal/platform/config"
 
 	db "github.com/kannachi323/misty/server/internal/platform/postgres"
 
@@ -57,11 +58,11 @@ func TestingProviderOAuthAvailabilityCatalog() []providerOAuthAvailability {
 }
 
 func TestingProviderOAuthClientID(definition providerOAuthDefinition) string {
-	return strings.TrimSpace(os.Getenv(definition.ClientIDEnv))
+	return strings.TrimSpace(envconfig.Getenv(definition.ClientIDEnv))
 }
 
 func TestingProviderOAuthClientSecret(definition providerOAuthDefinition) string {
-	return strings.TrimSpace(os.Getenv(definition.ClientSecretEnv))
+	return strings.TrimSpace(envconfig.Getenv(definition.ClientSecretEnv))
 }
 
 func googleProvider(id, name string, scopes ...string) providerOAuthDefinition {

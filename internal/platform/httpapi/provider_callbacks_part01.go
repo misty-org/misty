@@ -10,10 +10,11 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"os"
 	"strconv"
 	"strings"
 	"time"
+
+	envconfig "github.com/kannachi323/misty/server/internal/platform/config"
 
 	db "github.com/kannachi323/misty/server/internal/platform/postgres"
 )
@@ -23,7 +24,7 @@ const providerCallbackBodyLimit = 2 << 20
 func (s *SpacesService) SlackEventsCallback() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		raw, err := readProviderCallbackBody(r)
-		if err != nil || !TestingVerifySlackRequest(raw, r.Header, time.Now().UTC(), strings.TrimSpace(os.Getenv("SLACK_SIGNING_SECRET"))) {
+		if err != nil || !TestingVerifySlackRequest(raw, r.Header, time.Now().UTC(), strings.TrimSpace(envconfig.Getenv("SLACK_SIGNING_SECRET"))) {
 			writeJSON(w, http.StatusUnauthorized, map[string]string{"code": "invalid_signature"})
 			return
 		}
@@ -191,7 +192,7 @@ func (s *SpacesService) NotionEventsCallback() http.HandlerFunc {
 			w.WriteHeader(http.StatusOK)
 			return
 		}
-		secret := strings.TrimSpace(os.Getenv("NOTION_WEBHOOK_VERIFICATION_TOKEN"))
+		secret := strings.TrimSpace(envconfig.Getenv("NOTION_WEBHOOK_VERIFICATION_TOKEN"))
 		if !TestingVerifyNotionRequest(raw, r.Header.Get("X-Notion-Signature"), secret) {
 			writeJSON(w, http.StatusUnauthorized, map[string]string{"code": "invalid_signature"})
 			return
@@ -212,7 +213,7 @@ func (s *SpacesService) NotionEventsCallback() http.HandlerFunc {
 }
 
 func TestingLogNotionVerificationToken() bool {
-	switch strings.ToLower(strings.TrimSpace(os.Getenv("NOTION_WEBHOOK_LOG_VERIFICATION_TOKEN"))) {
+	switch strings.ToLower(strings.TrimSpace(envconfig.Getenv("NOTION_WEBHOOK_LOG_VERIFICATION_TOKEN"))) {
 	case "1", "true", "yes", "on":
 		return true
 	default:

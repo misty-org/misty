@@ -10,9 +10,10 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"os"
 	"strings"
 	"time"
+
+	envconfig "github.com/kannachi323/misty/server/internal/platform/config"
 
 	"github.com/go-chi/chi/v5"
 	db "github.com/kannachi323/misty/server/internal/platform/postgres"
@@ -98,7 +99,7 @@ func discoverSlackChannels(ctx context.Context, token string) ([]availableProvid
 }
 
 func discoverDiscordChannels(ctx context.Context) ([]availableProviderResource, error) {
-	token := strings.TrimSpace(os.Getenv("DISCORD_BOT_TOKEN"))
+	token := strings.TrimSpace(envconfig.Getenv("DISCORD_BOT_TOKEN"))
 	if token == "" {
 		return nil, errors.New("discord bot is not configured")
 	}

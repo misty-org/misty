@@ -2,9 +2,11 @@ package db
 
 import (
 	"database/sql"
-	"os"
 	"strings"
 	"testing"
+
+	envconfig "github.com/kannachi323/misty/server/internal/platform/config"
+	"github.com/kannachi323/misty/server/test/testkit"
 
 	. "github.com/kannachi323/misty/server/internal/platform/postgres"
 
@@ -75,19 +77,18 @@ func TestSessionLookupWorksWithRuntimeRLSRole(t *testing.T) {
 func openRuntimeRoleDatabase(t *testing.T, adminDatabase *Database) *Database {
 	t.Helper()
 
-	cfg := loadIntegrationDBConfig(t)
-	cfg.user = strings.TrimSpace(os.Getenv("DB_USER"))
-	cfg.password = strings.TrimSpace(os.Getenv("DB_PASSWORD"))
-	if cfg.user == "" || cfg.password == "" {
+	runtimeUser := strings.TrimSpace(envconfig.Getenv("DB_USER"))
+	runtimePassword := strings.TrimSpace(envconfig.Getenv("DB_PASSWORD"))
+	if runtimeUser == "" || runtimePassword == "" {
 		t.Skip("DB_USER and DB_PASSWORD are required to exercise the runtime RLS role")
 	}
 	if _, err := adminDatabase.Conn.Exec(
-		"GRANT SELECT ON sessions TO " + pq.QuoteIdentifier(cfg.user),
+		"GRANT SELECT ON sessions TO " + pq.QuoteIdentifier(runtimeUser),
 	); err != nil {
 		t.Fatalf("grant runtime role session access error = %v", err)
 	}
 
-	conn, err := sql.Open("postgres", cfg.dsn())
+	conn, err := sql.Open("postgres", testkit.DatabaseDSN(t, runtimeUser, runtimePassword))
 	if err != nil {
 		t.Fatalf("sql.Open() runtime role error = %v", err)
 	}

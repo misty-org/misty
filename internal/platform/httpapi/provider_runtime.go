@@ -11,9 +11,10 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"os"
 	"strings"
 	"time"
+
+	envconfig "github.com/kannachi323/misty/server/internal/platform/config"
 
 	db "github.com/kannachi323/misty/server/internal/platform/postgres"
 	workflowv2 "github.com/kannachi323/misty/server/internal/workflows"
@@ -152,7 +153,7 @@ func (s *SpacesService) providerWriteNode(ctx context.Context, run *db.SpaceRun,
 
 func (s *SpacesService) providerTokenForSharedResource(ctx context.Context, resource db.ProviderSharedResource) (string, string, error) {
 	if resource.Provider == "discord" {
-		token := strings.TrimSpace(os.Getenv("DISCORD_BOT_TOKEN"))
+		token := strings.TrimSpace(envconfig.Getenv("DISCORD_BOT_TOKEN"))
 		if token == "" {
 			return "", "", workflowv2.ErrProviderMissing
 		}

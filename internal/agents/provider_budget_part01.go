@@ -2,11 +2,12 @@ package agent
 
 import (
 	"errors"
-	"os"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	envconfig "github.com/kannachi323/misty/server/internal/platform/config"
 )
 
 // A process-wide ceiling on paid model calls.
@@ -65,7 +66,7 @@ func ProviderBudgetFromEnv() ProviderBudget {
 }
 
 func positiveEnvInt64(name string, fallback int64) int64 {
-	value, err := strconv.ParseInt(strings.TrimSpace(os.Getenv(name)), 10, 64)
+	value, err := strconv.ParseInt(strings.TrimSpace(envconfig.Getenv(name)), 10, 64)
 	if err != nil || value <= 0 {
 		return fallback
 	}
@@ -73,7 +74,7 @@ func positiveEnvInt64(name string, fallback int64) int64 {
 }
 
 func positiveEnvInt(name string, fallback int) int {
-	value, err := strconv.Atoi(strings.TrimSpace(os.Getenv(name)))
+	value, err := strconv.Atoi(strings.TrimSpace(envconfig.Getenv(name)))
 	if err != nil || value <= 0 {
 		return fallback
 	}

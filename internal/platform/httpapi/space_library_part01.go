@@ -2,11 +2,12 @@ package api
 
 import (
 	"fmt"
-	"os"
 	"regexp"
 	"strings"
 	"sync"
 	"time"
+
+	envconfig "github.com/kannachi323/misty/server/internal/platform/config"
 
 	db "github.com/kannachi323/misty/server/internal/platform/postgres"
 
@@ -77,7 +78,7 @@ func TransferTTLsFromEnv() TransferTTLs {
 }
 
 func positiveEnvDuration(name string, fallback time.Duration) time.Duration {
-	value, err := time.ParseDuration(strings.TrimSpace(os.Getenv(name)))
+	value, err := time.ParseDuration(strings.TrimSpace(envconfig.Getenv(name)))
 	if err != nil || value <= 0 {
 		return fallback
 	}
