@@ -55,7 +55,7 @@ func (db *Database) LibraryTransferItems(ctx context.Context, userID, spaceID st
 		return nil, ErrLibraryInvalid
 	}
 	items := []LibraryTransferItem{}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionLibraryDownload); err != nil {
 			return err
 		}
@@ -92,7 +92,7 @@ func (db *Database) RecordLibraryImport(ctx context.Context, userID, sourceSpace
 		return nil, ErrLibraryInvalid
 	}
 	out := &LibraryImportRecord{ID: "import_" + uuid.NewString(), SourceSpaceID: sourceSpaceID, SourceItemID: sourceItemID, DestinationSpaceID: destinationSpaceID, DestinationItemID: destinationItemID, LogicalBytes: logicalBytes, State: "ready"}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, sourceSpaceID, PermissionLibraryDownload); err != nil {
 			return err
 		}
@@ -126,7 +126,7 @@ func (db *Database) LibraryImportHistory(ctx context.Context, userID, spaceID st
 		limit = 100
 	}
 	out := []LibraryImportHistoryItem{}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionLibraryView); err != nil {
 			return err
 		}

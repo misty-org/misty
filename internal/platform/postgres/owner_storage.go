@@ -70,7 +70,7 @@ func ownerStorageUsageTx(ctx context.Context, tx *sql.Tx, ownerID string, lock b
 
 func (db *Database) OwnerStorageUsage(ctx context.Context, userID string) (*OwnerStorageUsage, error) {
 	var out OwnerStorageUsage
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		var err error
 		out, err = ownerStorageUsageTx(ctx, tx, userID, false)
 		if err != nil {

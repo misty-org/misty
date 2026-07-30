@@ -18,7 +18,7 @@ func (db *Database) CreateLibraryGroup(ctx context.Context, userID, spaceID, nam
 	}
 	raw, _ := json.Marshal(rules)
 	out := &LibraryGroup{ID: "group_" + uuid.NewString(), SpaceID: spaceID, Name: name, Rules: rules, CreatedByUserID: userID, Version: 1}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionLibraryEdit); err != nil {
 			return err
 		}
@@ -39,7 +39,7 @@ func (db *Database) LibraryGroupItems(ctx context.Context, userID, spaceID, grou
 		limit = 200
 	}
 	items := []SpaceLibraryItem{}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionLibraryView); err != nil {
 			return err
 		}

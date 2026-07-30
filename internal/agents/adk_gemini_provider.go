@@ -109,7 +109,7 @@ func (p *ADKGeminiProvider) Next(request ModelRequest) (ModelResponse, error) {
 	if len(candidates) == 0 {
 		return ModelResponse{}, fmt.Errorf("gemini ADK response did not contain text")
 	}
-	response, err := parseFirstProviderJSONResponse(candidates)
+	response, err := TestingParseFirstProviderJSONResponse(candidates)
 	if err != nil {
 		return ModelResponse{}, err
 	}
@@ -179,7 +179,7 @@ func eventText(content *genai.Content) string {
 	return builder.String()
 }
 
-func parseFirstProviderJSONResponse(candidates []string) (ModelResponse, error) {
+func TestingParseFirstProviderJSONResponse(candidates []string) (ModelResponse, error) {
 	var lastErr error
 	for _, candidate := range candidates {
 		if strings.TrimSpace(candidate) == "" {

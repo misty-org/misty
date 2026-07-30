@@ -24,7 +24,7 @@ type WorkflowRunStep struct {
 
 func (db *Database) WorkflowWritePreauthorized(ctx context.Context, userID, instanceID, workflowVersionID, nodeID, provider, connectionID, destination string) (bool, error) {
 	var allowed bool
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		return tx.QueryRowContext(ctx, `SELECT EXISTS(
 			SELECT 1 FROM space_agent_instance_workflows w JOIN space_agent_instances i ON i.id=w.instance_id,
 			LATERAL jsonb_array_elements(COALESCE(w.consent->'preauthorizedWrites','[]'::jsonb)) grant
@@ -36,7 +36,7 @@ func (db *Database) WorkflowWritePreauthorized(ctx context.Context, userID, inst
 
 func (db *Database) WorkflowRunSteps(ctx context.Context, userID, runID string) ([]WorkflowRunStep, error) {
 	items := []WorkflowRunStep{}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		rows, err := tx.QueryContext(ctx, `SELECT s.id,s.run_id,s.node_id,s.state,s.attempt,s.input,s.output,COALESCE(s.error_code,''),COALESCE(s.error_message,''),s.started_at,s.completed_at,s.updated_at
 			FROM space_run_steps s JOIN space_runs r ON r.id=s.run_id WHERE s.run_id=$1 AND r.requesting_member_id=$2 ORDER BY s.updated_at,s.node_id`, runID, userID)
 		if err != nil {
@@ -57,7 +57,7 @@ func (db *Database) WorkflowRunSteps(ctx context.Context, userID, runID string) 
 
 func (db *Database) CompletedWorkflowStepOutputs(ctx context.Context, userID, runID string) (map[string]json.RawMessage, error) {
 	outputs := map[string]json.RawMessage{}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		rows, err := tx.QueryContext(ctx, `SELECT s.node_id,s.output FROM space_run_steps s JOIN space_runs r ON r.id=s.run_id WHERE s.run_id=$1 AND r.requesting_member_id=$2 AND s.state IN ('completed','completed_with_errors')`, runID, userID)
 		if err != nil {
 			return err
@@ -80,7 +80,7 @@ func (db *Database) EnsureWorkflowNodeApproval(ctx context.Context, runID, nodeI
 	digestBytes := sha256.Sum256(append([]byte(nodeID+":"+actionKind+":"), input...))
 	digest := hex.EncodeToString(digestBytes[:])
 	approved := false
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		var userID, spaceID string
 		if err := tx.QueryRowContext(ctx, `SELECT requesting_member_id,space_id FROM space_runs WHERE id=$1 AND state IN ('running','awaiting_approval') FOR UPDATE`, runID).Scan(&userID, &spaceID); err != nil {
 			return err
@@ -123,7 +123,7 @@ func (db *Database) NotifyWorkflowResult(ctx context.Context, runID, nodeID stri
 		payload = json.RawMessage(`{}`)
 	}
 	eventID := "workflow_node_" + uuid.NewString()
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		result, err := tx.ExecContext(ctx, `INSERT INTO space_inbox_items(user_id,space_id,kind,event_id,payload)
 			SELECT requesting_member_id,space_id,'workflow',$1,jsonb_build_object('run_id',id,'node_id',$2,'output',$3::jsonb)
 			FROM space_runs WHERE id=$4 AND requesting_member_id=misty_rls_user_id()`, eventID, nodeID, payload, runID)
@@ -144,7 +144,7 @@ func (db *Database) WriteAgentMemoryEvent(ctx context.Context, instanceID, kind 
 		return 0, ErrSpaceInvalid
 	}
 	var id int64
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		return tx.QueryRowContext(ctx, `INSERT INTO space_agent_memory_events(instance_id,kind,data)
 			SELECT id,$2,$3 FROM space_agent_instances WHERE id=$1 AND user_id=misty_rls_user_id() RETURNING id`, instanceID, kind, data).Scan(&id)
 	})
@@ -166,7 +166,7 @@ func (db *Database) CheckpointWorkflowStep(ctx context.Context, runID string, ev
 	if event.Error != nil {
 		errorCode, errorMessage = workflowErrorCode(event.Error), event.Error.Error()
 	}
-	return db.spaceTx(ctx, func(tx *sql.Tx) error {
+	return db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if _, err := tx.ExecContext(ctx, `INSERT INTO space_run_steps(id,run_id,node_id,state,attempt,input,output,error_code,error_message,started_at,completed_at,updated_at)
 			VALUES('step_'||md5($1||':'||$2),$1,$2,$3,$4,$5,$6,NULLIF($7,''),NULLIF($8,''),CASE WHEN $3='running' THEN NOW() END,CASE WHEN $3 IN ('completed','completed_with_errors','failed','canceled','rejected') THEN NOW() END,NOW())
 			ON CONFLICT(run_id,node_id) DO UPDATE SET state=EXCLUDED.state,attempt=EXCLUDED.attempt,input=EXCLUDED.input,output=EXCLUDED.output,error_code=EXCLUDED.error_code,error_message=EXCLUDED.error_message,started_at=COALESCE(space_run_steps.started_at,EXCLUDED.started_at),completed_at=EXCLUDED.completed_at,updated_at=NOW()`, runID, event.NodeID, event.State, event.Attempt, input, output, errorCode, errorMessage); err != nil {
@@ -212,7 +212,7 @@ func (db *Database) JournalWorkflowAction(ctx context.Context, runID, nodeID, id
 		request = json.RawMessage(`{}`)
 	}
 	var existing json.RawMessage
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		var state string
 		err := tx.QueryRowContext(ctx, `SELECT state,result FROM space_workflow_action_journal WHERE idempotency_key=$1`, idempotencyKey).Scan(&state, &existing)
 		if err == nil && state == "completed" {
@@ -235,7 +235,7 @@ func (db *Database) JournalWorkflowAction(ctx context.Context, runID, nodeID, id
 	if executeErr != nil {
 		state, code = "failed", workflowErrorCode(executeErr)
 	}
-	err = db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err = db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		_, err := tx.ExecContext(ctx, `UPDATE space_workflow_action_journal SET state=$1,result=$2,error_code=NULLIF($3,''),updated_at=NOW() WHERE idempotency_key=$4`, state, result, code, idempotencyKey)
 		return err
 	})
@@ -247,7 +247,7 @@ func (db *Database) JournalWorkflowAction(ctx context.Context, runID, nodeID, id
 
 func (db *Database) ClaimWorkflowEvent(ctx context.Context, instanceID, workflowVersionID, provider, eventID, fingerprint, runID string) (bool, error) {
 	claimed := false
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		result, err := tx.ExecContext(ctx, `INSERT INTO space_workflow_event_claims(instance_id,workflow_version_id,provider,event_id,fingerprint,run_id,state) VALUES($1,$2,$3,$4,$5,NULLIF($6,''),'claimed') ON CONFLICT DO NOTHING`, instanceID, workflowVersionID, provider, eventID, fingerprint, runID)
 		if err != nil {
 			return err
@@ -261,7 +261,7 @@ func (db *Database) ClaimWorkflowEvent(ctx context.Context, instanceID, workflow
 
 func (db *Database) ReclaimFailedWorkflowEvent(ctx context.Context, instanceID, workflowVersionID, provider, eventID, fingerprint, runID string) (bool, error) {
 	claimed := false
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		result, err := tx.ExecContext(ctx, `UPDATE space_workflow_event_claims SET state='claimed',fingerprint=$1,run_id=NULLIF($2,''),updated_at=NOW()
 			WHERE instance_id=$3 AND workflow_version_id=$4 AND provider=$5 AND event_id=$6 AND state='failed'`, fingerprint, runID, instanceID, workflowVersionID, provider, eventID)
 		if err != nil {
@@ -279,7 +279,7 @@ func (db *Database) AcquireWorkflowResourceLease(ctx context.Context, runID, nod
 		return false, ErrSpaceInvalid
 	}
 	acquired := false
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		result, err := tx.ExecContext(ctx, `INSERT INTO space_workflow_resource_leases(resource_key,run_id,node_id,fingerprint,expires_at) VALUES($1,$2,$3,$4,NOW()+$5::interval) ON CONFLICT(resource_key) DO UPDATE SET run_id=EXCLUDED.run_id,node_id=EXCLUDED.node_id,fingerprint=EXCLUDED.fingerprint,expires_at=EXCLUDED.expires_at,created_at=NOW() WHERE space_workflow_resource_leases.expires_at<=NOW() OR space_workflow_resource_leases.run_id=EXCLUDED.run_id`, resourceKey, runID, nodeID, fingerprint, duration.String())
 		if err != nil {
 			return err
@@ -292,7 +292,7 @@ func (db *Database) AcquireWorkflowResourceLease(ctx context.Context, runID, nod
 }
 
 func (db *Database) ReleaseWorkflowResourceLease(ctx context.Context, runID, nodeID, resourceKey string) error {
-	return db.spaceTx(ctx, func(tx *sql.Tx) error {
+	return db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		_, err := tx.ExecContext(ctx, `DELETE FROM space_workflow_resource_leases WHERE resource_key=$1 AND run_id=$2 AND node_id=$3`, resourceKey, runID, nodeID)
 		return err
 	})

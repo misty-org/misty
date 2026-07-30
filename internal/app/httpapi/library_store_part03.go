@@ -28,7 +28,7 @@ func (s *S3LibraryObjectStore) List(
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 	input := &s3.ListObjectsV2Input{
-		Bucket: aws.String(s.bucket), Prefix: aws.String(prefix), MaxKeys: aws.Int32(int32(limit)),
+		Bucket: aws.String(s.TestingBucket), Prefix: aws.String(prefix), MaxKeys: aws.Int32(int32(limit)),
 	}
 	if cursor != "" {
 		input.ContinuationToken = aws.String(cursor)
@@ -64,7 +64,7 @@ func libraryS3Metadata(contentLength *int64, contentType *string, values map[str
 	if contentLength == nil || *contentLength < 1 {
 		return LibraryObjectMetadata{}, errors.New("Library object has invalid size metadata")
 	}
-	checksum := strings.ToLower(strings.TrimSpace(values[librarySHA256MetadataKey]))
+	checksum := strings.ToLower(strings.TrimSpace(values[TestingLibrarySHA256MetadataKey]))
 	if !sha256Pattern.MatchString(checksum) {
 		return LibraryObjectMetadata{}, errors.New("Library object is missing verified checksum metadata")
 	}

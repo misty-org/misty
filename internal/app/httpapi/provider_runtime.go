@@ -37,7 +37,7 @@ func decodeProviderNodeConfig(raw json.RawMessage) providerNodeConfig {
 
 func (s *SpacesService) providerQueryNode(ctx context.Context, run *db.SpaceRun, invocation workflowv2.Invocation) (json.RawMessage, error) {
 	config := decodeProviderNodeConfig(invocation.Config)
-	if _, exists := providerOAuthCatalog[config.Provider]; !exists {
+	if _, exists := TestingProviderOAuthCatalog[config.Provider]; !exists {
 		return nil, workflowv2.ErrProviderMissing
 	}
 	if config.Limit < 1 || config.Limit > 100 {
@@ -46,7 +46,7 @@ func (s *SpacesService) providerQueryNode(ctx context.Context, run *db.SpaceRun,
 	if config.Query == "" {
 		var value any
 		_ = json.Unmarshal(invocation.Input, &value)
-		config.Query = findWorkflowString(value, "query", "search", "text")
+		config.Query = TestingFindWorkflowString(value, "query", "search", "text")
 	}
 	if config.Provider == "google" {
 		from, to := time.Now().UTC().AddDate(0, -1, 0), time.Now().UTC().AddDate(1, 0, 0)
@@ -64,19 +64,19 @@ func (s *SpacesService) providerQueryNode(ctx context.Context, run *db.SpaceRun,
 				}
 			}
 		}
-		return mustAPIRawJSON(map[string]any{"provider": config.Provider, "query": config.Query, "items": filtered, "count": len(filtered), "readOnly": true}), nil
+		return TestingMustAPIRawJSON(map[string]any{"provider": config.Provider, "query": config.Query, "items": filtered, "count": len(filtered), "readOnly": true}), nil
 	}
 	items, err := s.database.ProviderContentRecords(ctx, run.RequestingMemberID, run.SpaceID, config.Provider, config.Query, config.Limit)
 	if err != nil {
 		return nil, err
 	}
-	return mustAPIRawJSON(map[string]any{"provider": config.Provider, "query": config.Query, "items": items, "count": len(items)}), nil
+	return TestingMustAPIRawJSON(map[string]any{"provider": config.Provider, "query": config.Query, "items": items, "count": len(items)}), nil
 }
 
 func (s *SpacesService) providerWriteNode(ctx context.Context, run *db.SpaceRun, invocation workflowv2.Invocation) (json.RawMessage, error) {
 	config := decodeProviderNodeConfig(invocation.Config)
 	if config.Mode == "draft" {
-		return mustAPIRawJSON(map[string]any{"executed": false, "draft": json.RawMessage(invocation.Input), "provider": config.Provider}), nil
+		return TestingMustAPIRawJSON(map[string]any{"executed": false, "draft": json.RawMessage(invocation.Input), "provider": config.Provider}), nil
 	}
 	if config.Provider != "slack" && config.Provider != "discord" {
 		return nil, workflowv2.ErrCapabilityDenied
@@ -85,7 +85,7 @@ func (s *SpacesService) providerWriteNode(ctx context.Context, run *db.SpaceRun,
 	if destination == "" {
 		var input map[string]any
 		_ = json.Unmarshal(invocation.Input, &input)
-		destination = findWorkflowString(input, "destination", "channel", "channelId", "channel_id")
+		destination = TestingFindWorkflowString(input, "destination", "channel", "channelId", "channel_id")
 	}
 	if destination == "" {
 		return nil, db.ErrSpaceInvalid
@@ -98,7 +98,7 @@ func (s *SpacesService) providerWriteNode(ctx context.Context, run *db.SpaceRun,
 	if len(config.Payload) > 0 {
 		var payload map[string]any
 		if json.Unmarshal(config.Payload, &payload) == nil {
-			if candidate := findWorkflowString(payload, "text", "content", "message"); candidate != "" {
+			if candidate := TestingFindWorkflowString(payload, "text", "content", "message"); candidate != "" {
 				text = candidate
 			}
 		}
@@ -109,7 +109,7 @@ func (s *SpacesService) providerWriteNode(ctx context.Context, run *db.SpaceRun,
 	threadID := ""
 	var input map[string]any
 	_ = json.Unmarshal(invocation.Input, &input)
-	threadID = findWorkflowString(input, "thread", "threadId", "thread_ts", "messageReference")
+	threadID = TestingFindWorkflowString(input, "thread", "threadId", "thread_ts", "messageReference")
 
 	token, tokenType, err := s.providerTokenForSharedResource(ctx, *resource)
 	if err != nil {
@@ -147,7 +147,7 @@ func (s *SpacesService) providerWriteNode(ctx context.Context, run *db.SpaceRun,
 		}
 	}
 	messageID := firstProviderString(response, "ts", "id")
-	return mustAPIRawJSON(map[string]any{"executed": true, "provider": config.Provider, "destination": destination, "messageId": messageID, "botIdentity": "Misty", "approvedBy": run.RequestingMemberID}), nil
+	return TestingMustAPIRawJSON(map[string]any{"executed": true, "provider": config.Provider, "destination": destination, "messageId": messageID, "botIdentity": "Misty", "approvedBy": run.RequestingMemberID}), nil
 }
 
 func (s *SpacesService) providerTokenForSharedResource(ctx context.Context, resource db.ProviderSharedResource) (string, string, error) {
@@ -192,14 +192,14 @@ func (s *SpacesService) providerReadContent(ctx context.Context, run *db.SpaceRu
 	}
 	var input map[string]any
 	_ = json.Unmarshal(invocation.Input, &input)
-	target := findContentInput(input)
+	target := TestingFindContentInput(input)
 	if target == nil {
 		target = input
 	}
 	target["text"] = extractNormalizedProviderText(record.Content)
 	target["contentRef"] = ref
 	target["citation"] = map[string]any{"provider": provider, "resourceId": record.ExternalRecordID, "fingerprint": record.Fingerprint, "displayName": record.DisplayName}
-	invocation.Input = mustAPIRawJSON(input)
+	invocation.Input = TestingMustAPIRawJSON(input)
 	return invocation, nil
 }
 
@@ -208,7 +208,7 @@ func extractNormalizedProviderText(content json.RawMessage) string {
 	if json.Unmarshal(content, &value) != nil {
 		return ""
 	}
-	if text := findWorkflowString(value, "text", "content", "plain_text", "title", "name"); text != "" {
+	if text := TestingFindWorkflowString(value, "text", "content", "plain_text", "title", "name"); text != "" {
 		return text
 	}
 	raw, _ := json.Marshal(value)

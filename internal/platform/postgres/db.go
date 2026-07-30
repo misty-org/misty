@@ -31,7 +31,7 @@ func (db *Database) GetDSN() string {
 		port = "5432"
 	}
 
-	sslmode := databaseSSLMode(host)
+	sslmode := TestingDatabaseSSLMode(host)
 
 	return fmt.Sprintf(
 		"host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
@@ -39,7 +39,7 @@ func (db *Database) GetDSN() string {
 	)
 }
 
-func databaseSSLMode(host string) string {
+func TestingDatabaseSSLMode(host string) string {
 	host = strings.TrimSpace(host)
 	if strings.HasPrefix(host, "/") || strings.EqualFold(host, "localhost") || strings.EqualFold(host, "postgres") {
 		return "disable"
@@ -64,7 +64,7 @@ func (db *Database) Start() error {
 	warnIfRoleBypassesRLS(conn)
 
 	db.Conn = conn
-	if err := db.checkSchemaVersion(); err != nil {
+	if err := db.TestingCheckSchemaVersion(); err != nil {
 		return err
 	}
 	return nil
@@ -75,8 +75,8 @@ func (db *Database) Start() error {
 // stale schema — which manifests later as scattered, hard-to-diagnose
 // failures (400s on requests that touch changed tables, dropped WebSocket
 // connections, etc.) rather than one obvious error at boot.
-func (db *Database) checkSchemaVersion() error {
-	expected, err := latestMigrationVersion()
+func (db *Database) TestingCheckSchemaVersion() error {
+	expected, err := TestingLatestMigrationVersion()
 	if err != nil {
 		return fmt.Errorf("determine expected schema version: %w", err)
 	}
@@ -97,7 +97,7 @@ func (db *Database) checkSchemaVersion() error {
 	return nil
 }
 
-func latestMigrationVersion() (int64, error) {
+func TestingLatestMigrationVersion() (int64, error) {
 	entries, err := migrationFiles.ReadDir("migrations")
 	if err != nil {
 		return 0, err

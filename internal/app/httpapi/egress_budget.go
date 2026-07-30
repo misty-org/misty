@@ -55,13 +55,13 @@ type egressRecord struct {
 
 // EgressGuard tracks bytes served and refuses once a ceiling is reached.
 type EgressGuard struct {
-	mu       sync.Mutex
-	now      func() time.Time
-	budget   EgressBudget
-	perKey   map[string]*egressRecord
-	global   egressRecord
-	maxKeys  int
-	refusals int64
+	TestingMu      sync.Mutex
+	TestingNow     func() time.Time
+	budget         EgressBudget
+	TestingPerKey  map[string]*egressRecord
+	global         egressRecord
+	TestingMaxKeys int
+	refusals       int64
 }
 
 func NewEgressGuard(budget EgressBudget) *EgressGuard {
@@ -69,10 +69,10 @@ func NewEgressGuard(budget EgressBudget) *EgressGuard {
 		budget = DefaultEgressBudget()
 	}
 	return &EgressGuard{
-		now:     time.Now,
-		budget:  budget,
-		perKey:  make(map[string]*egressRecord),
-		maxKeys: defaultLimiterMaxKeys,
+		TestingNow:     time.Now,
+		budget:         budget,
+		TestingPerKey:  make(map[string]*egressRecord),
+		TestingMaxKeys: defaultLimiterMaxKeys,
 	}
 }
 
@@ -85,9 +85,9 @@ func (g *EgressGuard) Allow(key string, size int64) bool {
 	if size < 0 {
 		size = 0
 	}
-	g.mu.Lock()
-	defer g.mu.Unlock()
-	now := g.now()
+	g.TestingMu.Lock()
+	defer g.TestingMu.Unlock()
+	now := g.TestingNow()
 
 	if g.global.windowEnd.Before(now) {
 		g.global = egressRecord{windowEnd: now.Add(24 * time.Hour)}
@@ -97,20 +97,20 @@ func (g *EgressGuard) Allow(key string, size int64) bool {
 		return false
 	}
 
-	record := g.perKey[key]
+	record := g.TestingPerKey[key]
 	if record == nil || record.windowEnd.Before(now) {
 		if record == nil {
-			if len(g.perKey) >= g.maxKeys {
+			if len(g.TestingPerKey) >= g.TestingMaxKeys {
 				g.purgeLocked(now)
 			}
-			if len(g.perKey) >= g.maxKeys {
+			if len(g.TestingPerKey) >= g.TestingMaxKeys {
 				// Tracking is saturated; the global ceiling still applies.
 				g.global.bytes += size
 				return true
 			}
 		}
 		record = &egressRecord{windowEnd: now.Add(24 * time.Hour)}
-		g.perKey[key] = record
+		g.TestingPerKey[key] = record
 	}
 	if record.bytes >= g.budget.PerIdentityDailyBytes {
 		g.refusals++
@@ -123,19 +123,19 @@ func (g *EgressGuard) Allow(key string, size int64) bool {
 }
 
 func (g *EgressGuard) purgeLocked(now time.Time) {
-	for key, record := range g.perKey {
+	for key, record := range g.TestingPerKey {
 		if record.windowEnd.Before(now) {
-			delete(g.perKey, key)
+			delete(g.TestingPerKey, key)
 		}
 	}
 }
 
 // BytesServed reports what one identity has been charged in the current window.
 func (g *EgressGuard) BytesServed(key string) int64 {
-	g.mu.Lock()
-	defer g.mu.Unlock()
-	record := g.perKey[key]
-	if record == nil || record.windowEnd.Before(g.now()) {
+	g.TestingMu.Lock()
+	defer g.TestingMu.Unlock()
+	record := g.TestingPerKey[key]
+	if record == nil || record.windowEnd.Before(g.TestingNow()) {
 		return 0
 	}
 	return record.bytes
@@ -143,8 +143,8 @@ func (g *EgressGuard) BytesServed(key string) int64 {
 
 // Refusals reports how many transfers the ceiling has rejected, for monitoring.
 func (g *EgressGuard) Refusals() int64 {
-	g.mu.Lock()
-	defer g.mu.Unlock()
+	g.TestingMu.Lock()
+	defer g.TestingMu.Unlock()
 	return g.refusals
 }
 

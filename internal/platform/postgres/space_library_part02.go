@@ -11,7 +11,7 @@ import (
 
 func (db *Database) SpaceMemberPermissions(ctx context.Context, actorUserID, spaceID, memberUserID string) (map[string]bool, error) {
 	out := map[string]bool{}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		actorRole, err := requireSpaceMemberTx(ctx, tx, spaceID, actorUserID)
 		if err != nil {
 			return err
@@ -84,7 +84,7 @@ func requireSpacePermissionTx(ctx context.Context, tx *sql.Tx, userID, spaceID, 
 
 func (db *Database) SpaceStorageUsage(ctx context.Context, userID, spaceID string) (*SpaceStorageUsage, error) {
 	out := &SpaceStorageUsage{SpaceID: spaceID}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionStorageViewOwn); err != nil {
 			return err
 		}
@@ -134,7 +134,7 @@ func (db *Database) CreateLibraryUpload(ctx context.Context, userID, spaceID, pu
 		return nil, ErrLibraryInvalid
 	}
 	out := &LibraryUpload{ID: "upload_" + uuid.NewString(), SpaceID: spaceID, UserID: userID, ObjectKey: objectKey, OriginalFilename: filename, Purpose: purpose, ClientDeclaredMIMEType: declaredMIME, RequestedByteSize: byteSize, ClientSHA256: clientSHA, State: "initiated", UploadTokenHash: tokenHash, ExpiresAt: expiresAt, Version: 1}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, permission); err != nil {
 			return err
 		}
@@ -183,7 +183,7 @@ func (db *Database) CreateLibraryUpload(ctx context.Context, userID, spaceID, pu
 
 func (db *Database) LibraryUpload(ctx context.Context, userID, spaceID, uploadID string) (*LibraryUpload, error) {
 	out := &LibraryUpload{}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if _, err := requireSpaceMemberTx(ctx, tx, spaceID, userID); err != nil {
 			return ErrLibraryForbidden
 		}
@@ -201,7 +201,7 @@ func (db *Database) LibraryUpload(ctx context.Context, userID, spaceID, uploadID
 // immutable object still exists in R2.
 func (db *Database) LibraryUploadDeduplicationObjectKey(ctx context.Context, userID, spaceID, uploadID string) (string, error) {
 	var objectKey string
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionLibraryUpload); err != nil {
 			return err
 		}

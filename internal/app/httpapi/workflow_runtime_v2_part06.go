@@ -2,7 +2,7 @@ package api
 
 import "encoding/json"
 
-func workflowEventIdentity(raw json.RawMessage) (string, string) {
+func TestingWorkflowEventIdentity(raw json.RawMessage) (string, string) {
 	var item map[string]any
 	if json.Unmarshal(raw, &item) != nil {
 		return "", ""

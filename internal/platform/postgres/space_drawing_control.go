@@ -102,7 +102,7 @@ func (db *Database) PendingDrawingControlCommands(
 		limit = 50
 	}
 	commands := []DrawingControlCommand{}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		rows, err := tx.QueryContext(ctx,
 			`UPDATE space_drawing_control_outbox
 			 SET attempts=attempts+1,
@@ -136,7 +136,7 @@ func (db *Database) MarkDrawingControlDelivered(
 	ctx context.Context,
 	commandID string,
 ) error {
-	return db.spaceTx(ctx, func(tx *sql.Tx) error {
+	return db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		_, err := tx.ExecContext(ctx,
 			`UPDATE space_drawing_control_outbox
 			 SET delivered_at=NOW(),last_error=''
@@ -152,7 +152,7 @@ func (db *Database) MarkDrawingControlFailed(
 	if len(reason) > 500 {
 		reason = reason[:500]
 	}
-	return db.spaceTx(ctx, func(tx *sql.Tx) error {
+	return db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		_, err := tx.ExecContext(ctx,
 			`UPDATE space_drawing_control_outbox SET last_error=$1
 			 WHERE id=$2 AND delivered_at IS NULL`,
@@ -171,7 +171,7 @@ func (db *Database) PurgeDeletedDrawings(
 		limit = 100
 	}
 	var purged int64
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		result, err := tx.ExecContext(ctx,
 			`DELETE FROM space_drawings WHERE id IN (
 			     SELECT d.id FROM space_drawings d

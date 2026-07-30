@@ -13,7 +13,7 @@ import (
 // effective role attached. Any caller who cannot view it gets ErrSpaceNotFound.
 func (db *Database) SpaceNoteByID(ctx context.Context, userID, noteID string) (*SpaceNote, error) {
 	note := &SpaceNote{}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		access, err := noteAccessForTx(ctx, tx, userID, noteID)
 		if err != nil {
 			return err
@@ -57,7 +57,7 @@ func (db *Database) UpdateNoteSharedTags(ctx context.Context, userID, noteID str
 	if err != nil {
 		return err
 	}
-	return db.spaceTx(ctx, func(tx *sql.Tx) error {
+	return db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		access, err := noteAccessForTx(ctx, tx, userID, noteID)
 		if err != nil {
 			return err
@@ -80,7 +80,7 @@ func (db *Database) UpdateNoteSharedTags(ctx context.Context, userID, noteID str
 // SetSpaceNoteArchived archives or restores a note. Only its creator or the
 // Space owner may change this lifecycle state.
 func (db *Database) SetSpaceNoteArchived(ctx context.Context, userID, noteID string, archived bool) error {
-	return db.spaceTx(ctx, func(tx *sql.Tx) error {
+	return db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		var creatorUserID, spaceID, lifecycle string
 		if err := tx.QueryRowContext(ctx,
 			`SELECT creator_user_id,space_id,lifecycle_state FROM space_notes WHERE id=$1 FOR UPDATE`,
@@ -121,7 +121,7 @@ func (db *Database) SetSpaceNoteArchived(ctx context.Context, userID, noteID str
 // room and R2 assets must be purged first, and keeping the row until then is
 // also what lets the note.deleted event resolve its audience.
 func (db *Database) DeleteSpaceNote(ctx context.Context, userID, noteID string) error {
-	return db.spaceTx(ctx, func(tx *sql.Tx) error {
+	return db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		access, err := noteAccessForTx(ctx, tx, userID, noteID)
 		if err != nil {
 			return err

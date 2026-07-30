@@ -31,14 +31,14 @@ const (
 // JournalCollabConfig holds everything needed to talk to the shared note and
 // drawing collaboration service. It is only usable once every field validates.
 type JournalCollabConfig struct {
-	Host                     string
-	Issuer                   string
-	Audience                 string
-	privateKey               ed25519.PrivateKey
-	controlSecret            []byte
-	projectionSecret         []byte
-	previousProjectionSecret []byte
-	roomSalt                 []byte
+	Host                            string
+	Issuer                          string
+	Audience                        string
+	TestingPrivateKey               ed25519.PrivateKey
+	controlSecret                   []byte
+	projectionSecret                []byte
+	TestingPreviousProjectionSecret []byte
+	roomSalt                        []byte
 }
 
 // JournalCollabConfigFromEnv reads the collaboration configuration.
@@ -62,14 +62,14 @@ func JournalCollabConfigFromEnv() (JournalCollabConfig, error) {
 	if err != nil {
 		return JournalCollabConfig{}, fmt.Errorf("JOURNAL_COLLAB_TICKET_PRIVATE_KEY: %w", err)
 	}
-	config.privateKey = privateKey
+	config.TestingPrivateKey = privateKey
 	if config.controlSecret, err = decodeServiceSecret("JOURNAL_COLLAB_CONTROL_SECRET"); err != nil {
 		return JournalCollabConfig{}, err
 	}
 	if config.projectionSecret, err = decodeServiceSecret("JOURNAL_COLLAB_PROJECTION_SECRET"); err != nil {
 		return JournalCollabConfig{}, err
 	}
-	if config.previousProjectionSecret, err = decodeOptionalServiceSecret("JOURNAL_COLLAB_PROJECTION_SECRET_PREVIOUS"); err != nil {
+	if config.TestingPreviousProjectionSecret, err = decodeOptionalServiceSecret("JOURNAL_COLLAB_PROJECTION_SECRET_PREVIOUS"); err != nil {
 		return JournalCollabConfig{}, err
 	}
 	if config.roomSalt, err = decodeServiceSecret("JOURNAL_COLLAB_ROOM_SALT"); err != nil {
@@ -144,7 +144,7 @@ func (c JournalCollabConfig) resourceRoomID(resourceType, resourceID string) str
 // SignServicePayload produces the HMAC a service-to-service call carries.
 // Timestamp and body are both covered so a captured call cannot be replayed
 // later or have its body swapped.
-func signServicePayload(secret []byte, timestamp string, body []byte) string {
+func TestingSignServicePayload(secret []byte, timestamp string, body []byte) string {
 	mac := hmac.New(sha256.New, secret)
 	mac.Write([]byte(timestamp))
 	mac.Write([]byte("\n"))
@@ -154,20 +154,20 @@ func signServicePayload(secret []byte, timestamp string, body []byte) string {
 
 // VerifyProjectionSignature checks a projection callback from the Worker.
 func (c JournalCollabConfig) VerifyProjectionSignature(timestamp string, body []byte, signature string) bool {
-	expected := signServicePayload(c.projectionSecret, timestamp, body)
+	expected := TestingSignServicePayload(c.projectionSecret, timestamp, body)
 	if hmac.Equal([]byte(expected), []byte(signature)) {
 		return true
 	}
-	if len(c.previousProjectionSecret) == 0 {
+	if len(c.TestingPreviousProjectionSecret) == 0 {
 		return false
 	}
-	previous := signServicePayload(c.previousProjectionSecret, timestamp, body)
+	previous := TestingSignServicePayload(c.TestingPreviousProjectionSecret, timestamp, body)
 	return hmac.Equal([]byte(previous), []byte(signature))
 }
 
 // SignControlRequest signs a control command sent to the Worker.
 func (c JournalCollabConfig) SignControlRequest(timestamp string, body []byte) string {
-	return signServicePayload(c.controlSecret, timestamp, body)
+	return TestingSignServicePayload(c.controlSecret, timestamp, body)
 }
 
 // JournalTicket is what the desktop needs in order to open a collaboration socket.
@@ -179,7 +179,7 @@ type JournalTicket struct {
 	ExpiresAt time.Time `json:"expires_at"`
 }
 
-type journalTicketClaims struct {
+type TestingJournalTicketClaims struct {
 	Issuer       string `json:"iss"`
 	Audience     string `json:"aud"`
 	JTI          string `json:"jti"`

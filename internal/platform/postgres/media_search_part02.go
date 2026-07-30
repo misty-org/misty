@@ -32,7 +32,7 @@ func pruneMediaSearchHits(hits []MediaSearchHit) []MediaSearchHit {
 
 func (db *Database) MediaSearchAsset(userID, deviceID, assetID string) (*MediaSearchAsset, error) {
 	var a MediaSearchAsset
-	err := db.withRLSContext(context.Background(), serviceRLSSettings(), func(tx *sql.Tx) error {
+	err := db.TestingWithRLSContext(context.Background(), TestingServiceRLSSettings(), func(tx *sql.Tx) error {
 		return tx.QueryRow(`SELECT user_id,device_id,asset_id,fingerprint,media_type,mime_type,duration_ms,status,indexed_through_ms FROM media_search_assets WHERE user_id=$1 AND device_id=$2 AND asset_id=$3`, userID, deviceID, assetID).Scan(&a.UserID, &a.DeviceID, &a.AssetID, &a.Fingerprint, &a.MediaType, &a.MimeType, &a.DurationMS, &a.Status, &a.IndexedThroughMS)
 	})
 	if errors.Is(err, sql.ErrNoRows) {
@@ -43,7 +43,7 @@ func (db *Database) MediaSearchAsset(userID, deviceID, assetID string) (*MediaSe
 
 func (db *Database) MediaSearchAssets(userID, deviceID string) ([]MediaSearchAsset, error) {
 	assets := []MediaSearchAsset{}
-	err := db.withRLSContext(context.Background(), serviceRLSSettings(), func(tx *sql.Tx) error {
+	err := db.TestingWithRLSContext(context.Background(), TestingServiceRLSSettings(), func(tx *sql.Tx) error {
 		rows, err := tx.Query(`SELECT user_id,device_id,asset_id,fingerprint,media_type,mime_type,duration_ms,status,indexed_through_ms FROM media_search_assets WHERE user_id=$1 AND device_id=$2 ORDER BY updated_at DESC`, userID, deviceID)
 		if err != nil {
 			return err
@@ -63,7 +63,7 @@ func (db *Database) MediaSearchAssets(userID, deviceID string) ([]MediaSearchAss
 
 func (db *Database) DeleteMediaSearchAsset(userID, deviceID, assetID string) (bool, error) {
 	deleted := false
-	err := db.withRLSContext(context.Background(), serviceRLSSettings(), func(tx *sql.Tx) error {
+	err := db.TestingWithRLSContext(context.Background(), TestingServiceRLSSettings(), func(tx *sql.Tx) error {
 		result, err := tx.Exec(`DELETE FROM media_search_assets WHERE user_id=$1 AND device_id=$2 AND asset_id=$3`, userID, deviceID, assetID)
 		if err == nil {
 			count, _ := result.RowsAffected()
@@ -76,7 +76,7 @@ func (db *Database) DeleteMediaSearchAsset(userID, deviceID, assetID string) (bo
 
 func (db *Database) DeleteMediaSearchDevice(userID, deviceID string) (bool, error) {
 	deleted := false
-	err := db.withRLSContext(context.Background(), serviceRLSSettings(), func(tx *sql.Tx) error {
+	err := db.TestingWithRLSContext(context.Background(), TestingServiceRLSSettings(), func(tx *sql.Tx) error {
 		result, err := tx.Exec(`DELETE FROM media_search_devices WHERE user_id=$1 AND device_id=$2`, userID, deviceID)
 		if err == nil {
 			count, _ := result.RowsAffected()
@@ -91,7 +91,7 @@ func (db *Database) DeleteMediaSearchDevice(userID, deviceID string) (bool, erro
 // catalog to one real device. Only the first upgraded device can adopt it;
 // later devices receive ready=false and must explicitly re-index local media.
 func (db *Database) AdoptLegacyMediaSearchDevice(userID, deviceID string) (ready, adopted bool, err error) {
-	err = db.withRLSContext(context.Background(), serviceRLSSettings(), func(tx *sql.Tx) error {
+	err = db.TestingWithRLSContext(context.Background(), TestingServiceRLSSettings(), func(tx *sql.Tx) error {
 		if err := tx.QueryRow(`SELECT EXISTS(SELECT 1 FROM media_search_devices WHERE user_id=$1 AND device_id=$2)`, userID, deviceID).Scan(&ready); err != nil {
 			return err
 		}

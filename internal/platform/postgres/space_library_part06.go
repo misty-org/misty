@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-func parseLibrarySearch(input string) (parsedLibrarySearch, error) {
+func TestingParseLibrarySearch(input string) (parsedLibrarySearch, error) {
 	parsed := parsedLibrarySearch{}
 	textTokens := []string{}
 	for _, token := range splitLibrarySearchTokens(input) {

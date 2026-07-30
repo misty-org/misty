@@ -146,7 +146,7 @@ func (db *Database) CreateCalendarSpaceTask(ctx context.Context, userID string, 
 // and publish both need to record provider state without a member's request.
 func (db *Database) SetSpaceTaskCalendar(ctx context.Context, spaceID, taskID string, schedule *TaskSchedule, link *TaskCalendarLink, conflicts []string) (*SpaceTask, error) {
 	out := &SpaceTask{}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		var scheduleRaw, linkRaw any
 		if schedule != nil {
 			encoded, _ := json.Marshal(schedule)
@@ -177,7 +177,7 @@ func (db *Database) SetSpaceTaskCalendar(ctx context.Context, spaceID, taskID st
 // SpaceTaskByID reads one task for a service-side calendar operation.
 func (db *Database) SpaceTaskByID(ctx context.Context, spaceID, taskID string) (*SpaceTask, error) {
 	out := &SpaceTask{}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		return scanSpaceTask(tx.QueryRowContext(ctx, `SELECT `+spaceTaskColumns+`
 			FROM space_tasks WHERE id=$1 AND space_id=$2`, taskID, spaceID), out)
 	})
@@ -194,7 +194,7 @@ func (db *Database) SpaceTaskByID(ctx context.Context, spaceID, taskID string) (
 // pass can reconcile them against the events Google returned.
 func (db *Database) CalendarBackedTasks(ctx context.Context, spaceID, sourceID string) ([]SpaceTask, error) {
 	items := []SpaceTask{}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		rows, err := tx.QueryContext(ctx, `SELECT `+spaceTaskColumns+` FROM space_tasks
 			WHERE space_id=$1 AND calendar->>'source_id'=$2 AND archived_at IS NULL`, spaceID, sourceID)
 		if err != nil {
@@ -268,7 +268,7 @@ func TaskScheduleFromTimes(title, description, location string, startsAt, endsAt
 // marked canceled rather than silently drifting out of sync.
 func (db *Database) SpaceCalendarEventsForSource(ctx context.Context, spaceID, sourceID string, from, to time.Time) ([]SpaceCalendarEvent, error) {
 	out := []SpaceCalendarEvent{}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		rows, err := tx.QueryContext(ctx, `SELECT id,space_id,source_id,provider,external_event_id,fingerprint,title,description,location,meeting_url,organizer,starts_at,ends_at,all_day,timezone,status,provider_created_at,provider_updated_at,removed_at,created_at,updated_at
 			FROM space_calendar_events WHERE space_id=$1 AND source_id=$2 AND starts_at<$3 AND ends_at>$4 ORDER BY starts_at,id`, spaceID, sourceID, to, from)
 		if err != nil {

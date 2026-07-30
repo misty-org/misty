@@ -13,7 +13,7 @@ import (
 
 func (db *Database) CompleteLibraryUpload(ctx context.Context, userID, spaceID, uploadID, tokenHash string, verifiedSize int64, verifiedSHA, detectedMIME string, intrinsic json.RawMessage) (*CompleteLibraryUploadResult, error) {
 	result := &CompleteLibraryUploadResult{}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		upload := &result.Upload
 		if err := scanLibraryUpload(tx.QueryRowContext(ctx, `SELECT id,space_id,security_domain_id,user_id,object_key,original_filename,purpose,client_declared_mime_type,requested_byte_size,client_sha256,verified_byte_size,COALESCE(verified_sha256,''),COALESCE(detected_mime_type,''),state,COALESCE(file_id,''),upload_token_hash,COALESCE(error_code,''),expires_at,version,created_at,updated_at FROM space_library_uploads WHERE id=$1 AND space_id=$2 AND user_id=$3 FOR UPDATE`, uploadID, spaceID, userID), upload); err != nil {
 			return err

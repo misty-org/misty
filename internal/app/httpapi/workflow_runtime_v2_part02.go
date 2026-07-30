@@ -23,9 +23,9 @@ func (s *SpacesService) executeWorkflowNodeV2(ctx context.Context, run *db.Space
 			if json.Unmarshal(invocation.Input, &value) != nil {
 				return nil, workflowv2.ErrOutputInvalid
 			}
-			return mustAPIRawJSON(map[string]any{"value": value, "node": descriptor.Kind}), nil
+			return TestingMustAPIRawJSON(map[string]any{"value": value, "node": descriptor.Kind}), nil
 		case "condition", "switch":
-			return evaluateControlBranch(descriptor.Kind, invocation)
+			return TestingEvaluateControlBranch(descriptor.Kind, invocation)
 		case "delay":
 			var config struct {
 				Seconds int `json:"seconds"`
@@ -43,7 +43,7 @@ func (s *SpacesService) executeWorkflowNodeV2(ctx context.Context, run *db.Space
 				case <-timer.C:
 				}
 			}
-			return mustAPIRawJSON(map[string]any{"value": json.RawMessage(invocation.Input), "delayedSeconds": config.Seconds}), nil
+			return TestingMustAPIRawJSON(map[string]any{"value": json.RawMessage(invocation.Input), "delayedSeconds": config.Seconds}), nil
 		case "source_query":
 			providerConfig := decodeProviderNodeConfig(invocation.Config)
 			if providerConfig.Provider != "" {
@@ -66,7 +66,7 @@ func (s *SpacesService) executeWorkflowNodeV2(ctx context.Context, run *db.Space
 				}
 				return nil, err
 			}
-			return normalizeContentPage(run, prepared)
+			return TestingNormalizeContentPage(run, prepared)
 		case "agent_task":
 			if s.agent == nil {
 				return nil, errors.New("Agent runtime is unavailable")
@@ -84,7 +84,7 @@ func (s *SpacesService) executeWorkflowNodeV2(ctx context.Context, run *db.Space
 			sort.Strings(toolNames)
 			for _, name := range toolNames {
 				provider := toolProviders[name]
-				manifest.Tools = append(manifest.Tools, serveragent.ToolDefinition{Name: name, Risk: agentToolRisk(provider.Risk), InputSchema: mustAPIRawJSON(provider.ToolSchema)})
+				manifest.Tools = append(manifest.Tools, serveragent.ToolDefinition{Name: name, Risk: agentToolRisk(provider.Risk), InputSchema: TestingMustAPIRawJSON(provider.ToolSchema)})
 			}
 			completion, err := s.agent.CompleteWithToolsContext(ctx, run.RequestingMemberID, run.BillingUserID, request, serveragent.TierLow, manifest, func(toolCtx context.Context, tool serveragent.ToolRequest) (json.RawMessage, error) {
 				provider, ok := toolProviders[tool.Name]
@@ -106,16 +106,16 @@ func (s *SpacesService) executeWorkflowNodeV2(ctx context.Context, run *db.Space
 			if err != nil {
 				return nil, err
 			}
-			if structured := decodeJSONObject(completion.Text); structured != nil {
+			if structured := TestingDecodeJSONObject(completion.Text); structured != nil {
 				return structured, nil
 			}
-			return mustAPIRawJSON(map[string]any{"text": strings.TrimSpace(completion.Text), "citations": completion.Citations, "toolCalls": completion.ToolCalls}), nil
+			return TestingMustAPIRawJSON(map[string]any{"text": strings.TrimSpace(completion.Text), "citations": completion.Citations, "toolCalls": completion.ToolCalls}), nil
 		case "notify_private":
 			eventID, err := s.database.NotifyWorkflowResult(ctx, run.ID, invocation.NodeID, invocation.Input)
-			return mustAPIRawJSON(map[string]any{"notified": err == nil, "eventId": eventID}), err
+			return TestingMustAPIRawJSON(map[string]any{"notified": err == nil, "eventId": eventID}), err
 		case "memory_write":
 			id, err := s.database.WriteAgentMemoryEvent(ctx, run.AgentInstanceID, "workflow", invocation.Input)
-			return mustAPIRawJSON(map[string]any{"written": err == nil, "memoryEventId": id}), err
+			return TestingMustAPIRawJSON(map[string]any{"written": err == nil, "memoryEventId": id}), err
 		case "create_task":
 			return s.createTaskNode(ctx, run, agent, invocation)
 		case "update_task":
@@ -140,7 +140,7 @@ func (s *SpacesService) executeWorkflowNodeV2(ctx context.Context, run *db.Space
 			if err != nil {
 				return nil, err
 			}
-			return mustAPIRawJSON(map[string]any{"written": true, "itemId": item.ID, "displayName": item.DisplayName, "version": item.Version}), nil
+			return TestingMustAPIRawJSON(map[string]any{"written": true, "itemId": item.ID, "displayName": item.DisplayName, "version": item.Version}), nil
 		case "update_metadata":
 			return s.updateMetadataNode(ctx, run, invocation)
 		case "exact_tool":
@@ -152,7 +152,7 @@ func (s *SpacesService) executeWorkflowNodeV2(ctx context.Context, run *db.Space
 			// Proposal-only tools intentionally do not mutate a provider. Any exact
 			// operation that can change state must be backed by a registered adapter.
 			if config.Operation == "propose_organization" {
-				return mustAPIRawJSON(map[string]any{"executed": false, "proposal": json.RawMessage(invocation.Input), "approvalRequired": true}), nil
+				return TestingMustAPIRawJSON(map[string]any{"executed": false, "proposal": json.RawMessage(invocation.Input), "approvalRequired": true}), nil
 			}
 			if config.Provider != "" {
 				return s.providerWriteNode(ctx, run, invocation)
@@ -165,7 +165,7 @@ func (s *SpacesService) executeWorkflowNodeV2(ctx context.Context, run *db.Space
 			}
 			_ = json.Unmarshal(invocation.Config, &config)
 			if config.Mode == "draft" || config.Destination == "private" {
-				return mustAPIRawJSON(map[string]any{"posted": false, "messageId": "", "draft": extractWorkflowText(invocation.Input)}), nil
+				return TestingMustAPIRawJSON(map[string]any{"posted": false, "messageId": "", "draft": extractWorkflowText(invocation.Input)}), nil
 			}
 			if config.Destination != "space_chat" {
 				return nil, workflowv2.ErrProviderMissing
@@ -174,7 +174,7 @@ func (s *SpacesService) executeWorkflowNodeV2(ctx context.Context, run *db.Space
 			if err != nil {
 				return nil, err
 			}
-			return mustAPIRawJSON(map[string]any{"posted": true, "messageId": message.ID}), nil
+			return TestingMustAPIRawJSON(map[string]any{"posted": true, "messageId": message.ID}), nil
 		default:
 			if descriptor.Location == workflowv2.LocationDevice {
 				return s.executeLeasedDeviceNode(ctx, run, descriptor, invocation)
@@ -185,14 +185,14 @@ func (s *SpacesService) executeWorkflowNodeV2(ctx context.Context, run *db.Space
 			if descriptor.Risk != workflowv2.RiskRead {
 				return nil, workflowv2.ErrProviderMissing
 			}
-			return mustAPIRawJSON(map[string]any{"accepted": true, "node": descriptor.Kind, "input": json.RawMessage(invocation.Input)}), nil
+			return TestingMustAPIRawJSON(map[string]any{"accepted": true, "node": descriptor.Kind, "input": json.RawMessage(invocation.Input)}), nil
 		}
 	}
 	if descriptor.Risk == workflowv2.RiskRead {
 		return readResult()
 	}
 	if descriptor.Risk == workflowv2.RiskDestructive {
-		approvalInput := workflowApprovalEnvelope(run, descriptor.Kind, "", "", "", invocation.Input)
+		approvalInput := TestingWorkflowApprovalEnvelope(run, descriptor.Kind, "", "", "", invocation.Input)
 		approved, err := s.database.EnsureWorkflowNodeApproval(ctx, run.ID, invocation.NodeID, descriptor.Kind, approvalInput)
 		if err != nil {
 			return nil, err
@@ -230,7 +230,7 @@ func (s *SpacesService) executeWorkflowNodeV2(ctx context.Context, run *db.Space
 			}
 		}
 		if !authorized {
-			approvalInput := workflowApprovalEnvelope(run, descriptor.Kind, config.Provider, config.ConnectionID, config.Destination, invocation.Input)
+			approvalInput := TestingWorkflowApprovalEnvelope(run, descriptor.Kind, config.Provider, config.ConnectionID, config.Destination, invocation.Input)
 			approved, approvalErr := s.database.EnsureWorkflowNodeApproval(ctx, run.ID, invocation.NodeID, descriptor.Kind, approvalInput)
 			if approvalErr != nil {
 				return nil, approvalErr
@@ -240,7 +240,7 @@ func (s *SpacesService) executeWorkflowNodeV2(ctx context.Context, run *db.Space
 			}
 		}
 	}
-	resourceKey, fingerprint := workflowResourceIdentity(invocation.Config, invocation.Input)
+	resourceKey, fingerprint := TestingWorkflowResourceIdentity(invocation.Config, invocation.Input)
 	if resourceKey != "" {
 		for {
 			acquired, err := s.database.AcquireWorkflowResourceLease(ctx, run.ID, invocation.NodeID, resourceKey, fingerprint, 2*time.Minute)

@@ -104,7 +104,7 @@ func (s *SpacesService) runMentionedAgent(ctx context.Context, billingUserID, sp
 	if err != nil {
 		return nil, err
 	}
-	_ = s.database.RecordRunAction(ctx, run.ID, "shared_reply", "Posted Agent reply in shared Space chat", mustAPIRawJSON(map[string]string{"message_id": reply.ID}), false, "completed")
+	_ = s.database.RecordRunAction(ctx, run.ID, "shared_reply", "Posted Agent reply in shared Space chat", TestingMustAPIRawJSON(map[string]string{"message_id": reply.ID}), false, "completed")
 	return reply, nil
 }
 
@@ -128,7 +128,7 @@ func (s *SpacesService) prepareSpaceAgentFiles(ctx context.Context, userID, spac
 		if err != nil {
 			return "", err
 		}
-		target, err := s.decryptTarget(node.TargetCipher, node.TargetNonce)
+		target, err := s.TestingDecryptTarget(node.TargetCipher, node.TargetNonce)
 		if err != nil {
 			return "", err
 		}
@@ -155,7 +155,7 @@ func fetchTemporaryGoogleText(ctx context.Context, target string) (string, error
 			if len(via) >= 5 {
 				return errors.New("too many Google Drive redirects")
 			}
-			if _, err := validGoogleDriveTarget(next.URL.String()); err != nil {
+			if _, err := TestingValidGoogleDriveTarget(next.URL.String()); err != nil {
 				return errors.New("Google Drive redirected to an untrusted host")
 			}
 			next.Header.Del("Authorization")
@@ -191,7 +191,7 @@ func fetchTemporaryGoogleText(ctx context.Context, target string) (string, error
 }
 
 func googleTextDownloadURL(target string) (string, error) {
-	parsed, err := validGoogleDriveTarget(target)
+	parsed, err := TestingValidGoogleDriveTarget(target)
 	if err != nil {
 		return "", err
 	}

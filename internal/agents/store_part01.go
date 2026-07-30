@@ -13,11 +13,11 @@ import (
 var ErrSessionNotFound = errors.New("ai session not found")
 
 type SessionStore struct {
-	mu       sync.Mutex
-	now      func() time.Time
-	ttl      time.Duration
-	sessions map[string]*sessionEntry
-	persist  SessionPersistence
+	mu         sync.Mutex
+	TestingNow func() time.Time
+	ttl        time.Duration
+	sessions   map[string]*sessionEntry
+	persist    SessionPersistence
 }
 
 type sessionEntry struct {
@@ -80,10 +80,10 @@ func NewSessionStoreWithPersistence(ttl time.Duration, persistence SessionPersis
 		ttl = 2 * time.Hour
 	}
 	return &SessionStore{
-		now:      time.Now,
-		ttl:      ttl,
-		sessions: make(map[string]*sessionEntry),
-		persist:  persistence,
+		TestingNow: time.Now,
+		ttl:        ttl,
+		sessions:   make(map[string]*sessionEntry),
+		persist:    persistence,
 	}
 }
 
@@ -108,7 +108,7 @@ func (s *SessionStore) CreateWithModel(userID, billingUserID, modelID string) *S
 func (s *SessionStore) CreateWithBillingScope(userID, billingUserID, billingScope string) *Session {
 	s.mu.Lock()
 	s.cleanupLocked()
-	now := s.now()
+	now := s.TestingNow()
 	session := &Session{
 		ID:                  "conversation_" + uuid.NewString(),
 		UserID:              userID,
@@ -162,7 +162,7 @@ func (s *SessionStore) WithSessionContext(ctx context.Context, id, userID string
 	if err := fn(requestCtx, entry.session); err != nil {
 		return err
 	}
-	entry.session.UpdatedAt = s.now()
+	entry.session.UpdatedAt = s.TestingNow()
 	s.persistUpdatedSession(ctx, entry.session, persistentEvents(beforeMessages, beforeResults, beforeEvents, entry.session))
 	return nil
 }
@@ -217,7 +217,7 @@ func (s *SessionStore) Cancel(id, userID string) error {
 		entry.session.Canceled = true
 		entry.session.appendEvent(AgentEvent{Type: EventError, Message: "session canceled"})
 	}
-	entry.session.UpdatedAt = s.now()
+	entry.session.UpdatedAt = s.TestingNow()
 	s.persistUpdatedSession(context.Background(), entry.session, persistentEvents(len(entry.session.Messages), len(entry.session.ToolResults), beforeEvents, entry.session))
 	return nil
 }

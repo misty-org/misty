@@ -53,7 +53,7 @@ func (db *Database) BulkUpdateLibraryItems(ctx context.Context, userID, spaceID 
 	}
 
 	items := []SpaceLibraryItem{}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionLibraryEdit); err != nil {
 			return err
 		}
@@ -180,7 +180,7 @@ func (db *Database) UpdateLibraryItem(ctx context.Context, userID, spaceID, item
 		return nil, ErrLibraryInvalid
 	}
 	encodedTags, _ := json.Marshal(normalizeLibraryTags(tags))
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionLibraryEdit); err != nil {
 			return err
 		}
@@ -201,7 +201,7 @@ func (db *Database) UpdateLibraryItem(ctx context.Context, userID, spaceID, item
 
 func (db *Database) LibraryItem(ctx context.Context, userID, spaceID, itemID string) (*SpaceLibraryItem, error) {
 	out := &SpaceLibraryItem{}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionLibraryView); err != nil {
 			return err
 		}
@@ -216,7 +216,7 @@ func (db *Database) LibraryItem(ctx context.Context, userID, spaceID, itemID str
 
 func (db *Database) PromoteMessageAttachment(ctx context.Context, userID, spaceID, attachmentID string) (*SpaceLibraryItem, error) {
 	item := &SpaceLibraryItem{}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionLibraryAdd); err != nil {
 			return err
 		}

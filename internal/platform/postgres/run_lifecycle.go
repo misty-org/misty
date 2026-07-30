@@ -12,7 +12,7 @@ import (
 
 func (db *Database) CancelSpaceRun(ctx context.Context, userID, runID string) (*SpaceRun, error) {
 	out := &SpaceRun{}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		var spaceID, requester string
 		if err := tx.QueryRowContext(ctx, `SELECT space_id,requesting_member_id FROM space_runs WHERE id=$1`, runID).Scan(&spaceID, &requester); err != nil {
 			return err
@@ -49,7 +49,7 @@ func (db *Database) RetrySpaceRun(ctx context.Context, userID, runID string) (*S
 	out.Result, out.Outputs, out.Artifacts = json.RawMessage(`{}`), json.RawMessage(`{}`), json.RawMessage(`[]`)
 	out.ErrorCode, out.ErrorMessage, out.RetryOfRunID = "", "", previous.ID
 	out.CompletedAt, out.CanceledAt = nil, nil
-	err = db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err = db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, previous.SpaceID, PermissionAgentsRun); err != nil {
 			return err
 		}
@@ -67,7 +67,7 @@ func (db *Database) RetrySpaceRun(ctx context.Context, userID, runID string) (*S
 				return err
 			}
 			capability, err = selectWorkflowCapability(workflow.Metadata, out.CapabilityID)
-			if err != nil || validateCapabilityInput(*capability, out.Input) != nil {
+			if err != nil || TestingValidateCapabilityInput(*capability, out.Input) != nil {
 				return ErrSpaceInvalid
 			}
 			if capability.ConfirmationRequired && !capability.Destructive {
@@ -112,7 +112,7 @@ func (db *Database) RunApprovals(ctx context.Context, userID, runID string) ([]R
 		return nil, err
 	}
 	items := []RunApproval{}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		rows, err := tx.QueryContext(ctx, `SELECT id,run_id,requested_from_user_id,COALESCE(decided_by_user_id,''),action_summary,proposed_actions,state,created_at,decided_at,expires_at FROM space_run_approvals WHERE run_id=$1 AND requested_from_user_id=$2 ORDER BY created_at`, runID, userID)
 		if err != nil {
 			return err
@@ -135,7 +135,7 @@ func (db *Database) RunActions(ctx context.Context, userID, runID string) ([]Run
 		return nil, err
 	}
 	items := []RunAction{}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		rows, err := tx.QueryContext(ctx, `SELECT id,run_id,action_kind,summary,details,destructive,state,performed_at,created_at FROM space_run_actions WHERE run_id=$1 ORDER BY created_at`, runID)
 		if err != nil {
 			return err
@@ -160,7 +160,7 @@ func (db *Database) RecordRunAction(ctx context.Context, runID, kind, summary st
 	if state == "" {
 		state = "completed"
 	}
-	return db.spaceTx(ctx, func(tx *sql.Tx) error {
+	return db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		var performed any
 		if state == "completed" || state == "failed" {
 			performed = time.Now().UTC()
@@ -176,7 +176,7 @@ func (db *Database) RecordRunAction(ctx context.Context, runID, kind, summary st
 func (db *Database) ClaimRunResponsePublication(ctx context.Context, runID string) (string, bool, error) {
 	actionID := ""
 	claimed := false
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if _, err := tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock(hashtext($1))`, "run-response:"+runID); err != nil {
 			return err
 		}
@@ -212,7 +212,7 @@ func (db *Database) FinishRunResponsePublication(ctx context.Context, actionID, 
 	if actionID == "" || state != "completed" && state != "failed" || !validJSONObject(details) {
 		return ErrSpaceInvalid
 	}
-	return db.spaceTx(ctx, func(tx *sql.Tx) error {
+	return db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		_, err := tx.ExecContext(ctx, `UPDATE space_run_actions SET state=$1,details=$2,performed_at=NOW() WHERE id=$3 AND action_kind='conversation_response' AND state='approved'`, state, details, actionID)
 		return err
 	})
@@ -220,7 +220,7 @@ func (db *Database) FinishRunResponsePublication(ctx context.Context, actionID, 
 
 func (db *Database) AgentConversations(ctx context.Context, userID string) ([]AgentConversation, error) {
 	items := []AgentConversation{}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		rows, err := tx.QueryContext(ctx, `SELECT c.id,c.space_id,c.owner_user_id,c.agent_id,a.name,c.title,c.created_at,c.updated_at FROM space_agent_conversations c JOIN space_agents a ON a.id=c.agent_id JOIN space_members m ON m.space_id=c.space_id AND m.user_id=$1 WHERE c.owner_user_id=$1 AND c.deleted_at IS NULL ORDER BY c.updated_at DESC`, userID)
 		if err != nil {
 			return err
@@ -240,7 +240,7 @@ func (db *Database) AgentConversations(ctx context.Context, userID string) ([]Ag
 
 func (db *Database) AgentConversationByID(ctx context.Context, userID, conversationID string) (*AgentConversation, error) {
 	out := &AgentConversation{}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := tx.QueryRowContext(ctx, `SELECT c.id,c.space_id,c.owner_user_id,c.agent_id,a.name,c.title,c.created_at,c.updated_at FROM space_agent_conversations c JOIN space_agents a ON a.id=c.agent_id WHERE c.id=$1 AND c.owner_user_id=$2 AND c.deleted_at IS NULL`, conversationID, userID).Scan(&out.ID, &out.SpaceID, &out.OwnerUserID, &out.AgentID, &out.AgentName, &out.Title, &out.CreatedAt, &out.UpdatedAt); err != nil {
 			return err
 		}

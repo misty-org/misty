@@ -44,7 +44,7 @@ func (s *SpacesService) CreateCalendarTask() http.HandlerFunc {
 			writeSpaceError(w, err)
 			return
 		}
-		if err := validateTaskSchedule(&body.Schedule, source.Timezone); err != nil {
+		if err := TestingValidateTaskSchedule(&body.Schedule, source.Timezone); err != nil {
 			writeSpaceError(w, err)
 			return
 		}

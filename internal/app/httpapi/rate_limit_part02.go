@@ -9,21 +9,21 @@ import (
 func (l *APIRateLimiter) limiterFor(method, path string, policy RateLimitPolicy) *SlidingWindowLimiter {
 	key := method + " " + path
 
-	l.mu.Lock()
-	defer l.mu.Unlock()
+	l.TestingMu.Lock()
+	defer l.TestingMu.Unlock()
 
-	limiter, ok := l.limiters[key]
+	limiter, ok := l.TestingLimiters[key]
 	if ok {
 		return limiter
 	}
-	if len(l.limiters) >= maxTrackedRoutes {
+	if len(l.TestingLimiters) >= TestingMaxTrackedRoutes {
 		key = method + " " + overflowRouteKey
-		if overflow, exists := l.limiters[key]; exists {
+		if overflow, exists := l.TestingLimiters[key]; exists {
 			return overflow
 		}
 	}
 	limiter = NewSlidingWindowLimiter(policy.Limit, policy.Window)
-	l.limiters[key] = limiter
+	l.TestingLimiters[key] = limiter
 	return limiter
 }
 
@@ -62,7 +62,7 @@ var costBearingRoutes = map[string]bool{
 	"/spaces/{spaceID}/drawings/{id}/assets/uploads/{id}/finalize": true,
 }
 
-func normalizeRateLimitPath(path string) string {
+func TestingNormalizeRateLimitPath(path string) string {
 	trimmed := strings.TrimSpace(path)
 	if trimmed == "" {
 		return "/"
@@ -146,6 +146,6 @@ func retryAfterSeconds(duration time.Duration) int {
 	return seconds
 }
 
-func forgotPasswordRateLimitKey(r *http.Request, email string) string {
-	return clientIPFromRequest(r) + "|" + strings.ToLower(strings.TrimSpace(email))
+func TestingForgotPasswordRateLimitKey(r *http.Request, email string) string {
+	return TestingClientIPFromRequest(r) + "|" + strings.ToLower(strings.TrimSpace(email))
 }

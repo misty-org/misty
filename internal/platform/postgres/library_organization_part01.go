@@ -72,7 +72,7 @@ type LibraryGroup struct {
 
 func (db *Database) LibraryAlbums(ctx context.Context, userID, spaceID string) ([]LibraryAlbum, error) {
 	items := []LibraryAlbum{}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionLibraryView); err != nil {
 			return err
 		}
@@ -99,7 +99,7 @@ func (db *Database) CreateLibraryAlbum(ctx context.Context, userID, spaceID, nam
 		return nil, ErrLibraryInvalid
 	}
 	out := &LibraryAlbum{ID: "album_" + uuid.NewString(), SpaceID: spaceID, Name: name, Description: description, CreatedByUserID: userID, Version: 1}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionLibraryEdit); err != nil {
 			return err
 		}
@@ -123,7 +123,7 @@ func (db *Database) CreateLibraryAlbum(ctx context.Context, userID, spaceID, nam
 
 func (db *Database) LibraryAlbum(ctx context.Context, userID, spaceID, albumID string) (*LibraryAlbum, error) {
 	out := &LibraryAlbum{}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionLibraryView); err != nil {
 			return err
 		}
@@ -140,7 +140,7 @@ func (db *Database) UpdateLibraryAlbum(ctx context.Context, userID, spaceID, alb
 	if version < 1 || name == "" || len([]rune(name)) > 120 || len([]rune(description)) > 2000 {
 		return nil, ErrLibraryInvalid
 	}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionLibraryEdit); err != nil {
 			return err
 		}
@@ -173,7 +173,7 @@ func (db *Database) DeleteLibraryAlbum(ctx context.Context, userID, spaceID, alb
 	if version < 1 {
 		return ErrLibraryInvalid
 	}
-	return db.spaceTx(ctx, func(tx *sql.Tx) error {
+	return db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionLibraryEdit); err != nil {
 			return err
 		}
@@ -193,7 +193,7 @@ func (db *Database) OrganizeLibraryAlbum(ctx context.Context, userID, spaceID, a
 	if version < 1 || position < 0 || viewMode != "grid" && viewMode != "list" || sortMode != "custom" && sortMode != "oldest" && sortMode != "newest" {
 		return nil, ErrLibraryInvalid
 	}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionLibraryEdit); err != nil {
 			return err
 		}
@@ -222,7 +222,7 @@ func (db *Database) OrganizeLibraryAlbum(ctx context.Context, userID, spaceID, a
 
 func (db *Database) LibraryAlbumFolders(ctx context.Context, userID, spaceID string) ([]LibraryAlbumFolder, error) {
 	folders := []LibraryAlbumFolder{}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionLibraryView); err != nil {
 			return err
 		}

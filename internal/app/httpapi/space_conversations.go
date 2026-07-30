@@ -117,7 +117,7 @@ func (s *SpacesService) ConversationMessages() http.HandlerFunc {
 		for _, agentID := range uniqueStrings(agentIDs) {
 			reply, runErr := s.runMentionedAgent(r.Context(), userID, spaceID, conversationID, agentID, message.ID, body.Content, body.FileNodeIDs)
 			if runErr != nil {
-				agentFailures = append(agentFailures, agentMentionFailureFromError(agentID, runErr))
+				agentFailures = append(agentFailures, TestingAgentMentionFailureFromError(agentID, runErr))
 			} else if reply != nil {
 				agentReplies = append(agentReplies, reply)
 			}

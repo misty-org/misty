@@ -99,7 +99,7 @@ func (p *GeminiProvider) Next(request ModelRequest) (ModelResponse, error) {
 		"response_format": map[string]any{
 			"type":      "text",
 			"mime_type": "application/json",
-			"schema":    agentResponseJSONSchema(),
+			"schema":    TestingAgentResponseJSONSchema(),
 		},
 	}
 	payload, err := json.Marshal(body)
@@ -131,11 +131,11 @@ func (p *GeminiProvider) Next(request ModelRequest) (ModelResponse, error) {
 	if err != nil {
 		return ModelResponse{}, err
 	}
-	response.Usage = extractGeminiUsage(responseBody)
+	response.Usage = TestingExtractGeminiUsage(responseBody)
 	return response, nil
 }
 
-func extractGeminiUsage(body []byte) ModelUsage {
+func TestingExtractGeminiUsage(body []byte) ModelUsage {
 	var payload struct {
 		InteractionUsage struct {
 			InputTokens   int64 `json:"total_input_tokens"`

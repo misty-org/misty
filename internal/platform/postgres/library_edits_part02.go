@@ -15,7 +15,7 @@ func (db *Database) CreateLibraryEditVersion(ctx context.Context, userID, spaceI
 		return nil, ErrLibraryInvalid
 	}
 	edit := &LibraryEditVersion{ID: "edit_" + uuid.NewString(), SpaceLibraryID: itemID, CreatedByUserID: userID, Definition: definition, LifecycleState: "ready", RenditionState: "none"}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionLibraryEdit); err != nil {
 			return err
 		}
@@ -74,7 +74,7 @@ func (db *Database) SelectLibraryEditVersion(ctx context.Context, userID, spaceI
 	if itemVersion < 1 {
 		return nil, ErrLibraryInvalid
 	}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionLibraryEdit); err != nil {
 			return err
 		}
@@ -108,7 +108,7 @@ func (db *Database) SelectLibraryEditVersion(ctx context.Context, userID, spaceI
 }
 
 func (db *Database) DeleteLibraryEditVersion(ctx context.Context, userID, spaceID, itemID, editID string) error {
-	return db.spaceTx(ctx, func(tx *sql.Tx) error {
+	return db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionLibraryEdit); err != nil {
 			return err
 		}

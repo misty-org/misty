@@ -88,7 +88,7 @@ func (s *SpaceLibraryService) ProcessPeopleJobs(ctx context.Context, workerID st
 			processed++
 			continue
 		}
-		reader, metadata, err := s.store.Open(ctx, job.ObjectKey)
+		reader, metadata, err := s.TestingStore.Open(ctx, job.ObjectKey)
 		if err != nil || metadata.ByteSize != job.ByteSize {
 			_ = s.database.FailLibraryPeopleJob(ctx, job, "people_source_unavailable")
 			processed++

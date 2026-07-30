@@ -170,7 +170,7 @@ func (s *SpaceLibraryService) ExportItems() http.HandlerFunc {
 		var total int64
 		for _, item := range items {
 			total += item.ByteSize
-			metadata, headErr := s.store.Head(r.Context(), item.ObjectKey)
+			metadata, headErr := s.TestingStore.Head(r.Context(), item.ObjectKey)
 			if headErr != nil || metadata.ByteSize != item.ByteSize || metadata.SHA256 != item.SHA256 {
 				writeJSON(w, http.StatusConflict, map[string]string{"code": "library_object_mismatch"})
 				return
@@ -187,7 +187,7 @@ func (s *SpaceLibraryService) ExportItems() http.HandlerFunc {
 		archive := zip.NewWriter(w)
 		usedNames := map[string]int{}
 		for _, item := range items {
-			reader, _, openErr := s.store.Open(r.Context(), item.ObjectKey)
+			reader, _, openErr := s.TestingStore.Open(r.Context(), item.ObjectKey)
 			if openErr != nil {
 				_ = archive.Close()
 				return

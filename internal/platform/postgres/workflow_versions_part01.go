@@ -169,7 +169,7 @@ func validWorkflowToken(value string, maximum int) bool {
 
 func (db *Database) WorkflowVersions(ctx context.Context, userID, spaceID, workflowID string) ([]WorkflowVersion, error) {
 	items := []WorkflowVersion{}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionStudioView); err != nil {
 			return err
 		}
@@ -183,7 +183,7 @@ func (db *Database) WorkflowVersions(ctx context.Context, userID, spaceID, workf
 			if err := scanWorkflowVersion(rows, &item); err != nil {
 				return err
 			}
-			if !workflowChecksumValid(&item) {
+			if !TestingWorkflowChecksumValid(&item) {
 				return ErrSpaceInvalid
 			}
 			items = append(items, item)
@@ -195,14 +195,14 @@ func (db *Database) WorkflowVersions(ctx context.Context, userID, spaceID, workf
 
 func (db *Database) WorkflowVersion(ctx context.Context, userID, spaceID, versionID string) (*WorkflowVersion, error) {
 	out := &WorkflowVersion{}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionStudioView); err != nil {
 			return err
 		}
 		if err := scanWorkflowVersion(tx.QueryRowContext(ctx, `SELECT `+workflowVersionColumns+` FROM space_workflow_versions v WHERE v.id=$1 AND v.space_id=$2`, versionID, spaceID), out); err != nil {
 			return err
 		}
-		if !workflowChecksumValid(out) {
+		if !TestingWorkflowChecksumValid(out) {
 			return ErrSpaceInvalid
 		}
 		return nil
@@ -227,7 +227,7 @@ func (db *Database) CreateWorkflowVersion(ctx context.Context, userID, spaceID, 
 	digest := sha256.Sum256(append(append([]byte{}, metadataRaw...), canonicalDefinition...))
 	checksum := hex.EncodeToString(digest[:])
 	out := &WorkflowVersion{ID: "wfver_" + uuid.NewString(), SpaceID: spaceID, WorkflowID: workflowID, Version: version, Metadata: metadata, Definition: canonicalDefinition, ChecksumSHA256: checksum, CreatedByUserID: userID}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionStudioManage); err != nil {
 			return err
 		}

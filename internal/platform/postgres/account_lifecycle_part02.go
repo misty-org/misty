@@ -16,7 +16,7 @@ func (db *Database) RecordAccountDeletionFailure(
 	if strings.TrimSpace(code) == "" {
 		code = "cleanup_failed"
 	}
-	return db.withRLSContext(ctx, serviceRLSSettings(), func(tx *sql.Tx) error {
+	return db.TestingWithRLSContext(ctx, TestingServiceRLSSettings(), func(tx *sql.Tx) error {
 		_, err := tx.ExecContext(ctx, `
 			UPDATE account_deletion_requests
 			SET last_error_code=$1,updated_at=NOW()
@@ -32,7 +32,7 @@ func (db *Database) ScheduleAccountDeletion(
 	if err != nil {
 		return err
 	}
-	return db.withRLSContext(ctx, serviceRLSSettings(), func(tx *sql.Tx) error {
+	return db.TestingWithRLSContext(ctx, TestingServiceRLSSettings(), func(tx *sql.Tx) error {
 		var userID string
 		if err := tx.QueryRowContext(ctx, `
 			SELECT user_id FROM account_deletion_requests
@@ -147,7 +147,7 @@ func (db *Database) DueAccountDeletions(
 		limit = 25
 	}
 	out := []AccountDeletionRequest{}
-	err := db.withRLSContext(ctx, serviceRLSSettings(), func(tx *sql.Tx) error {
+	err := db.TestingWithRLSContext(ctx, TestingServiceRLSSettings(), func(tx *sql.Tx) error {
 		rows, err := tx.QueryContext(ctx, `
 			SELECT id,user_id,status,purge_after,provider_revocation_status,
 			       last_error_code,created_at,updated_at,completed_at
@@ -173,7 +173,7 @@ func (db *Database) DueAccountDeletions(
 func (db *Database) CompleteAccountDeletion(
 	ctx context.Context, requestID string,
 ) error {
-	return db.withRLSContext(ctx, serviceRLSSettings(), func(tx *sql.Tx) error {
+	return db.TestingWithRLSContext(ctx, TestingServiceRLSSettings(), func(tx *sql.Tx) error {
 		var userID string
 		if err := tx.QueryRowContext(ctx, `
 			SELECT user_id FROM account_deletion_requests

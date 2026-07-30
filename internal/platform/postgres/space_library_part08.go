@@ -14,7 +14,7 @@ import (
 
 func (db *Database) LibraryItemDownload(ctx context.Context, userID, spaceID, itemID string) (*LibraryDownload, error) {
 	out := &LibraryDownload{}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionLibraryDownload); err != nil {
 			return err
 		}
@@ -36,7 +36,7 @@ func (db *Database) LibraryItemDownload(ctx context.Context, userID, spaceID, it
 
 func (db *Database) LibraryOriginalItemDownload(ctx context.Context, userID, spaceID, itemID string) (*LibraryDownload, error) {
 	out := &LibraryDownload{}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionLibraryDownload); err != nil {
 			return err
 		}
@@ -62,7 +62,7 @@ func recordLibraryItemViewTx(ctx context.Context, tx *sql.Tx, userID, spaceID, i
 
 func (db *Database) MessageAttachmentDownload(ctx context.Context, userID, spaceID, attachmentID string) (*LibraryDownload, error) {
 	out := &LibraryDownload{}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionMessagesRead); err != nil {
 			return ErrLibraryForbidden
 		}

@@ -46,14 +46,14 @@ func (db *Database) beginSmartLibraryTx() (*sql.Tx, error) {
 }
 
 func (db *Database) smartLibraryScan(query string, args []any, destinations ...any) error {
-	return db.withRLSContext(context.Background(), serviceRLSSettings(), func(tx *sql.Tx) error {
+	return db.TestingWithRLSContext(context.Background(), TestingServiceRLSSettings(), func(tx *sql.Tx) error {
 		return tx.QueryRow(query, args...).Scan(destinations...)
 	})
 }
 
 func (db *Database) smartLibraryExec(query string, args ...any) (sql.Result, error) {
 	var result sql.Result
-	err := db.withRLSContext(context.Background(), serviceRLSSettings(), func(tx *sql.Tx) error {
+	err := db.TestingWithRLSContext(context.Background(), TestingServiceRLSSettings(), func(tx *sql.Tx) error {
 		var err error
 		result, err = tx.Exec(query, args...)
 		return err
@@ -62,7 +62,7 @@ func (db *Database) smartLibraryExec(query string, args ...any) (sql.Result, err
 }
 
 func (db *Database) smartLibraryRows(query string, args []any, visit func(*sql.Rows) error) error {
-	return db.withRLSContext(context.Background(), serviceRLSSettings(), func(tx *sql.Tx) error {
+	return db.TestingWithRLSContext(context.Background(), TestingServiceRLSSettings(), func(tx *sql.Tx) error {
 		rows, err := tx.Query(query, args...)
 		if err != nil {
 			return err

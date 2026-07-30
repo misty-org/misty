@@ -29,7 +29,7 @@ type LibrarySharedReference struct {
 
 func (db *Database) LibraryOutgoingGrants(ctx context.Context, userID, sourceSpaceID string) ([]LibrarySharedReference, error) {
 	items := []LibrarySharedReference{}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, sourceSpaceID, PermissionLibraryEdit); err != nil {
 			return err
 		}
@@ -55,7 +55,7 @@ func (db *Database) CreateLibraryGrant(ctx context.Context, userID, sourceSpaceI
 		return nil, ErrLibraryInvalid
 	}
 	grantID, referenceID := "grant_"+uuid.NewString(), "reference_"+uuid.NewString()
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, sourceSpaceID, PermissionLibraryDownload); err != nil {
 			return err
 		}
@@ -86,7 +86,7 @@ func (db *Database) CreateLibraryGrant(ctx context.Context, userID, sourceSpaceI
 
 func (db *Database) LibrarySharedReferences(ctx context.Context, userID, destinationSpaceID string) ([]LibrarySharedReference, error) {
 	items := []LibrarySharedReference{}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, destinationSpaceID, PermissionLibraryView); err != nil {
 			return err
 		}
@@ -109,7 +109,7 @@ func (db *Database) LibrarySharedReferences(ctx context.Context, userID, destina
 
 func (db *Database) LibrarySharedReference(ctx context.Context, userID, destinationSpaceID, referenceID string) (*LibrarySharedReference, error) {
 	out := &LibrarySharedReference{}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, destinationSpaceID, PermissionLibraryView); err != nil {
 			return err
 		}
@@ -123,7 +123,7 @@ func (db *Database) LibrarySharedReference(ctx context.Context, userID, destinat
 
 func (db *Database) LibrarySharedReferenceDownload(ctx context.Context, userID, destinationSpaceID, referenceID string) (*LibraryDownload, error) {
 	out := &LibraryDownload{}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, destinationSpaceID, PermissionLibraryDownload); err != nil {
 			return err
 		}
@@ -144,7 +144,7 @@ func (db *Database) RevokeLibraryGrant(ctx context.Context, userID, sourceSpaceI
 	if version < 1 {
 		return ErrLibraryInvalid
 	}
-	return db.spaceTx(ctx, func(tx *sql.Tx) error {
+	return db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, sourceSpaceID, PermissionLibraryEdit); err != nil {
 			return err
 		}

@@ -14,7 +14,7 @@ func (db *Database) ReplacePersonalAgentGrants(ctx context.Context, userID, agen
 	if len(inputs) > 100 {
 		return nil, ErrSpaceInvalid
 	}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		var owner string
 		if err := tx.QueryRowContext(ctx, `SELECT owner_user_id FROM personal_agents WHERE id=$1 AND deleted_at IS NULL FOR UPDATE`, agentID).Scan(&owner); errors.Is(err, sql.ErrNoRows) {
 			return ErrPersonalAgentNotFound
@@ -99,7 +99,7 @@ func personalAgentAllowedTx(ctx context.Context, tx *sql.Tx, userID, spaceID, ag
 
 func (db *Database) PersonalAgentForSpace(ctx context.Context, userID, spaceID, agentID string) (*PersonalAgent, error) {
 	var out *PersonalAgent
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		var err error
 		out, err = personalAgentAllowedTx(ctx, tx, userID, spaceID, agentID)
 		return err
@@ -109,7 +109,7 @@ func (db *Database) PersonalAgentForSpace(ctx context.Context, userID, spaceID, 
 
 func (db *Database) AccessiblePersonalAgents(ctx context.Context, userID, spaceID string) ([]PersonalAgent, error) {
 	items := []PersonalAgent{}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionMessagesRead); err != nil {
 			return err
 		}

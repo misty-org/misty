@@ -11,14 +11,14 @@ import (
 	workflowv2 "github.com/kannachi323/misty/server/internal/workflows"
 )
 
-func workflowApprovalEnvelope(run *db.SpaceRun, actionKind, provider, connectionID, destination string, input json.RawMessage) json.RawMessage {
+func TestingWorkflowApprovalEnvelope(run *db.SpaceRun, actionKind, provider, connectionID, destination string, input json.RawMessage) json.RawMessage {
 	var decoded any
 	_ = json.Unmarshal(input, &decoded)
-	reason := findWorkflowString(decoded, "reason", "rationale", "completionCriteria", "completion_criteria")
+	reason := TestingFindWorkflowString(decoded, "reason", "rationale", "completionCriteria", "completion_criteria")
 	if reason == "" {
 		reason = "The Agent needs this action to continue the pinned workflow run."
 	}
-	return mustAPIRawJSON(map[string]any{
+	return TestingMustAPIRawJSON(map[string]any{
 		"agent_id":            run.AgentID,
 		"agent_version_id":    run.AgentVersionID,
 		"workflow_version_id": run.WorkflowVersionID,
@@ -63,7 +63,7 @@ func (s *SpacesService) prepareContentInvocation(ctx context.Context, run *db.Sp
 	if json.Unmarshal(invocation.Input, &input) != nil {
 		return invocation, workflowv2.ErrOutputInvalid
 	}
-	target := findContentInput(input)
+	target := TestingFindContentInput(input)
 	if target == nil {
 		target = input
 	}
@@ -103,24 +103,24 @@ func (s *SpacesService) prepareContentInvocation(ctx context.Context, run *db.Sp
 	refValue["fingerprint"] = download.SHA256
 	refValue["version"] = download.SHA256
 	target["contentRef"] = refValue
-	invocation.Input = mustAPIRawJSON(input)
+	invocation.Input = TestingMustAPIRawJSON(input)
 	return invocation, nil
 }
 
-func findContentInput(value any) map[string]any {
+func TestingFindContentInput(value any) map[string]any {
 	switch item := value.(type) {
 	case map[string]any:
 		if _, ok := item["contentRef"]; ok {
 			return item
 		}
 		for _, child := range item {
-			if found := findContentInput(child); found != nil {
+			if found := TestingFindContentInput(child); found != nil {
 				return found
 			}
 		}
 	case []any:
 		for _, child := range item {
-			if found := findContentInput(child); found != nil {
+			if found := TestingFindContentInput(child); found != nil {
 				return found
 			}
 		}
@@ -141,7 +141,7 @@ func (s *SpacesService) sourceQueryNode(ctx context.Context, run *db.SpaceRun, i
 	if config.Query == "" {
 		var value any
 		_ = json.Unmarshal(invocation.Input, &value)
-		config.Query = findWorkflowString(value, "query", "search", "text")
+		config.Query = TestingFindWorkflowString(value, "query", "search", "text")
 	}
 	if config.Source == "" {
 		config.Source = "all"
@@ -182,7 +182,7 @@ func (s *SpacesService) sourceQueryNode(ctx context.Context, run *db.SpaceRun, i
 			}
 		}
 	}
-	return mustAPIRawJSON(map[string]any{"items": results, "count": len(results), "query": config.Query, "source": config.Source}), nil
+	return TestingMustAPIRawJSON(map[string]any{"items": results, "count": len(results), "query": config.Query, "source": config.Source}), nil
 }
 
 func (s *SpacesService) readMetadataNode(ctx context.Context, run *db.SpaceRun, invocation workflowv2.Invocation) (json.RawMessage, error) {
@@ -190,16 +190,16 @@ func (s *SpacesService) readMetadataNode(ctx context.Context, run *db.SpaceRun, 
 	if json.Unmarshal(invocation.Input, &value) != nil {
 		return nil, workflowv2.ErrOutputInvalid
 	}
-	provider := findWorkflowString(value, "providerId")
-	resourceID := findWorkflowString(value, "resourceId", "itemId")
+	provider := TestingFindWorkflowString(value, "providerId")
+	resourceID := TestingFindWorkflowString(value, "resourceId", "itemId")
 	if provider != "library" || resourceID == "" {
-		return mustAPIRawJSON(map[string]any{"metadata": value}), nil
+		return TestingMustAPIRawJSON(map[string]any{"metadata": value}), nil
 	}
 	item, err := s.database.LibraryItem(ctx, run.RequestingMemberID, run.SpaceID, resourceID)
 	if err != nil {
 		return nil, err
 	}
-	return mustAPIRawJSON(map[string]any{"contentRef": map[string]any{"sourceKind": "library", "providerId": "library", "resourceId": item.ID, "version": strconv.FormatInt(item.Version, 10), "displayName": item.DisplayName, "permissionScope": "space:" + run.SpaceID}, "metadata": map[string]any{"caption": item.Caption, "tags": item.Tags, "favorite": item.Favorite, "hidden": item.Hidden, "updatedAt": item.UpdatedAt}}), nil
+	return TestingMustAPIRawJSON(map[string]any{"contentRef": map[string]any{"sourceKind": "library", "providerId": "library", "resourceId": item.ID, "version": strconv.FormatInt(item.Version, 10), "displayName": item.DisplayName, "permissionScope": "space:" + run.SpaceID}, "metadata": map[string]any{"caption": item.Caption, "tags": item.Tags, "favorite": item.Favorite, "hidden": item.Hidden, "updatedAt": item.UpdatedAt}}), nil
 }
 
 func (s *SpacesService) updateMetadataNode(ctx context.Context, run *db.SpaceRun, invocation workflowv2.Invocation) (json.RawMessage, error) {
@@ -207,7 +207,7 @@ func (s *SpacesService) updateMetadataNode(ctx context.Context, run *db.SpaceRun
 	if json.Unmarshal(invocation.Input, &value) != nil {
 		return nil, workflowv2.ErrOutputInvalid
 	}
-	itemID := findWorkflowString(value, "resourceId", "itemId")
+	itemID := TestingFindWorkflowString(value, "resourceId", "itemId")
 	if itemID == "" {
 		return nil, workflowv2.ErrOutputInvalid
 	}
@@ -228,7 +228,7 @@ func (s *SpacesService) updateMetadataNode(ctx context.Context, run *db.SpaceRun
 			seen[strings.ToLower(tag)] = true
 		}
 	}
-	caption := findWorkflowString(value, "caption", "summary")
+	caption := TestingFindWorkflowString(value, "caption", "summary")
 	if caption == "" {
 		caption = item.Caption
 	}
@@ -236,5 +236,5 @@ func (s *SpacesService) updateMetadataNode(ctx context.Context, run *db.SpaceRun
 	if err != nil {
 		return nil, err
 	}
-	return mustAPIRawJSON(map[string]any{"updated": true, "itemId": updated.ID, "version": updated.Version, "tags": updated.Tags}), nil
+	return TestingMustAPIRawJSON(map[string]any{"updated": true, "itemId": updated.ID, "version": updated.Version, "tags": updated.Tags}), nil
 }

@@ -18,7 +18,7 @@ func (s *SpacesService) SpaceTemplates() http.HandlerFunc {
 			return
 		}
 		providers := []providerOAuthAvailability{}
-		for _, provider := range providerOAuthAvailabilityCatalog() {
+		for _, provider := range TestingProviderOAuthAvailabilityCatalog() {
 			if provider.Provider != "google" && provider.Provider != "discord" && provider.Provider != "notion" {
 				continue
 			}

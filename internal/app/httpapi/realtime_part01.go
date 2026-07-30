@@ -20,12 +20,12 @@ const (
 	realtimePingPeriod = 30 * time.Second
 )
 
-type realtimeClient struct {
-	userID string
-	conn   *websocket.Conn
-	send   chan []byte
-	done   chan struct{}
-	once   sync.Once
+type TestingRealtimeClient struct {
+	TestingUserID string
+	conn          *websocket.Conn
+	TestingSend   chan []byte
+	TestingDone   chan struct{}
+	once          sync.Once
 	// viewingSpaceID is the space this client last told us it's actively
 	// viewing (empty when not viewing any space's chat). Mutated only while
 	// holding RealtimeService.mu.
@@ -38,25 +38,25 @@ type realtimeClient struct {
 }
 
 type RealtimeService struct {
-	database *db.Database
-	dsn      string
-	listener *pq.Listener
-	mu       sync.RWMutex
-	clients  map[*realtimeClient]struct{}
+	database  *db.Database
+	dsn       string
+	listener  *pq.Listener
+	TestingMu sync.RWMutex
+	clients   map[*TestingRealtimeClient]struct{}
 	// viewers maps a space ID to the set of clients currently viewing that
 	// space's chat, for the "active users" presence capsule. Guarded by mu.
-	viewers   map[string]map[*realtimeClient]struct{}
-	closed    chan struct{}
-	closeOnce sync.Once
+	TestingViewers map[string]map[*TestingRealtimeClient]struct{}
+	closed         chan struct{}
+	closeOnce      sync.Once
 }
 
 func NewRealtimeService(database *db.Database, dsn string) *RealtimeService {
 	return &RealtimeService{
-		database: database,
-		dsn:      dsn,
-		clients:  map[*realtimeClient]struct{}{},
-		viewers:  map[string]map[*realtimeClient]struct{}{},
-		closed:   make(chan struct{}),
+		database:       database,
+		dsn:            dsn,
+		clients:        map[*TestingRealtimeClient]struct{}{},
+		TestingViewers: map[string]map[*TestingRealtimeClient]struct{}{},
+		closed:         make(chan struct{}),
 	}
 }
 
@@ -85,13 +85,13 @@ func (s *RealtimeService) Close() error {
 		if s.listener != nil {
 			err = s.listener.Close()
 		}
-		s.mu.Lock()
+		s.TestingMu.Lock()
 		for client := range s.clients {
 			_ = client.conn.Close()
 		}
-		s.clients = map[*realtimeClient]struct{}{}
-		s.viewers = map[string]map[*realtimeClient]struct{}{}
-		s.mu.Unlock()
+		s.clients = map[*TestingRealtimeClient]struct{}{}
+		s.TestingViewers = map[string]map[*TestingRealtimeClient]struct{}{}
+		s.TestingMu.Unlock()
 	})
 	return err
 }
@@ -153,46 +153,46 @@ func (s *RealtimeService) broadcastControl(payload []byte) {
 		envelopeFields["note_id"] = control.NoteID
 	}
 	envelope, _ := json.Marshal(envelopeFields)
-	s.mu.RLock()
-	clients := make([]*realtimeClient, 0)
+	s.TestingMu.RLock()
+	clients := make([]*TestingRealtimeClient, 0)
 	for client := range s.clients {
-		if affected[client.userID] {
+		if affected[client.TestingUserID] {
 			clients = append(clients, client)
 		}
 	}
-	s.mu.RUnlock()
+	s.TestingMu.RUnlock()
 	for _, client := range clients {
 		select {
-		case client.send <- envelope:
+		case client.TestingSend <- envelope:
 		default:
 		}
 		if control.KeepConnection {
 			continue
 		}
-		go func(target *realtimeClient) {
+		go func(target *TestingRealtimeClient) {
 			timer := time.NewTimer(150 * time.Millisecond)
 			defer timer.Stop()
 			select {
 			case <-timer.C:
-			case <-target.done:
+			case <-target.TestingDone:
 				return
 			}
 			_ = target.conn.WriteControl(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.ClosePolicyViolation, "Space access changed"), time.Now().Add(time.Second))
 			_ = target.conn.Close()
-			s.unregister(target)
+			s.TestingUnregister(target)
 		}(client)
 	}
 }
 
 func (s *RealtimeService) BroadcastEvent(eventID int64) {
-	s.mu.RLock()
-	clients := make([]*realtimeClient, 0, len(s.clients))
+	s.TestingMu.RLock()
+	clients := make([]*TestingRealtimeClient, 0, len(s.clients))
 	for client := range s.clients {
 		clients = append(clients, client)
 	}
-	s.mu.RUnlock()
+	s.TestingMu.RUnlock()
 	for _, client := range clients {
-		event, err := s.database.EventByIDForUser(context.Background(), client.userID, eventID)
+		event, err := s.database.EventByIDForUser(context.Background(), client.TestingUserID, eventID)
 		if err != nil {
 			continue
 		}
@@ -201,11 +201,11 @@ func (s *RealtimeService) BroadcastEvent(eventID int64) {
 			continue
 		}
 		select {
-		case client.send <- payload:
+		case client.TestingSend <- payload:
 		default:
 			_ = client.conn.WriteControl(websocket.CloseMessage, websocket.FormatCloseMessage(1013, "reconnect and resync"), time.Now().Add(time.Second))
 			_ = client.conn.Close()
-			s.unregister(client)
+			s.TestingUnregister(client)
 		}
 	}
 }

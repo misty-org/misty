@@ -73,7 +73,7 @@ func (db *Database) SearchSmartLibraryHybrid(userID, folderID, query string, emb
 		SELECT folder_id,asset_id,asset_kind,mime_type,COALESCE(description,''),tags,collections,metadata,score,semantic_score,lexical_score
 		FROM scored ORDER BY score DESC, analyzed_at DESC LIMIT $6`
 	hits := []SmartLibrarySearchHit{}
-	err := db.withRLSContext(context.Background(), serviceRLSSettings(), func(tx *sql.Tx) error {
+	err := db.TestingWithRLSContext(context.Background(), TestingServiceRLSSettings(), func(tx *sql.Tx) error {
 		// Strict iterative scans improve filtered HNSW recall without ever relaxing
 		// the tenant predicate. Older pgvector releases simply reject this setting.
 		_, _ = tx.Exec(`SET LOCAL hnsw.iterative_scan = 'strict_order'`)
@@ -102,7 +102,7 @@ func (db *Database) SearchSmartLibraryHybrid(userID, folderID, query string, emb
 		return rows.Err()
 	})
 	if err == nil {
-		hits = pruneWeakSemanticMatches(hits)
+		hits = TestingPruneWeakSemanticMatches(hits)
 	}
 	return hits, err
 }
@@ -111,7 +111,7 @@ func (db *Database) SearchSmartLibraryHybrid(userID, folderID, query string, emb
 // usually visual lookalikes rather than useful answers. Preserve every lexical
 // hit and only nearby semantic results; pure semantic searches retain their
 // normal breadth.
-func pruneWeakSemanticMatches(hits []SmartLibrarySearchHit) []SmartLibrarySearchHit {
+func TestingPruneWeakSemanticMatches(hits []SmartLibrarySearchHit) []SmartLibrarySearchHit {
 	if len(hits) < 2 {
 		return hits
 	}

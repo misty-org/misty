@@ -15,9 +15,9 @@ import (
 )
 
 const (
-	demoScenarioVersion = "product-research-hub@2"
-	demoResetConfirm    = "RESET MISTY DEMO"
-	demoResetLockID     = int64(621043)
+	TestingDemoScenarioVersion = "product-research-hub@2"
+	TestingDemoResetConfirm    = "RESET MISTY DEMO"
+	demoResetLockID            = int64(621043)
 )
 
 // DemoService exposes destructive management operations only for isolated
@@ -82,7 +82,7 @@ func NewDemoService(database *db.Database, store LibraryObjectStore, config Demo
 
 func (s *DemoService) Status() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if !s.authorized(r) {
+		if !s.TestingAuthorized(r) {
 			http.Error(w, "not found", http.StatusNotFound)
 			return
 		}
@@ -92,7 +92,7 @@ func (s *DemoService) Status() http.HandlerFunc {
 			return
 		}
 		writeJSON(w, http.StatusOK, map[string]any{
-			"ready": true, "mode": s.mode, "scenario_version": demoScenarioVersion,
+			"ready": true, "mode": s.mode, "scenario_version": TestingDemoScenarioVersion,
 			"schema_version": schemaVersion,
 		})
 	}
@@ -100,7 +100,7 @@ func (s *DemoService) Status() http.HandlerFunc {
 
 func (s *DemoService) Reset() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if !s.authorized(r) {
+		if !s.TestingAuthorized(r) {
 			http.Error(w, "not found", http.StatusNotFound)
 			return
 		}
@@ -111,7 +111,7 @@ func (s *DemoService) Reset() http.HandlerFunc {
 		if decodeJSON(w, r, &body) != nil {
 			return
 		}
-		if body.ScenarioVersion != demoScenarioVersion || body.Confirmation != demoResetConfirm {
+		if body.ScenarioVersion != TestingDemoScenarioVersion || body.Confirmation != TestingDemoResetConfirm {
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid demo reset confirmation"})
 			return
 		}
@@ -125,7 +125,7 @@ func (s *DemoService) Reset() http.HandlerFunc {
 			return
 		}
 		writeJSON(w, http.StatusOK, map[string]any{
-			"scenario_version":        demoScenarioVersion,
+			"scenario_version":        TestingDemoScenarioVersion,
 			"deleted_library_objects": deletedObjects,
 			"accounts_preserved":      true,
 			"account_ids":             accountIDs,
@@ -135,7 +135,7 @@ func (s *DemoService) Reset() http.HandlerFunc {
 
 func (s *DemoService) AgentMessages() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if !s.authorized(r) {
+		if !s.TestingAuthorized(r) {
 			http.Error(w, "not found", http.StatusNotFound)
 			return
 		}
@@ -272,7 +272,7 @@ func (s *DemoService) requireDemoOwner(ctx context.Context, userID, spaceID stri
 	return nil
 }
 
-func (s *DemoService) authorized(r *http.Request) bool {
+func (s *DemoService) TestingAuthorized(r *http.Request) bool {
 	presented := strings.TrimSpace(strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer "))
 	if len(presented) != len(s.adminToken) {
 		return false
@@ -280,7 +280,7 @@ func (s *DemoService) authorized(r *http.Request) bool {
 	return subtle.ConstantTimeCompare([]byte(presented), []byte(s.adminToken)) == 1
 }
 
-func demoResetRequestBody() json.RawMessage {
-	value, _ := json.Marshal(map[string]string{"scenario_version": demoScenarioVersion, "confirmation": demoResetConfirm})
+func TestingDemoResetRequestBody() json.RawMessage {
+	value, _ := json.Marshal(map[string]string{"scenario_version": TestingDemoScenarioVersion, "confirmation": TestingDemoResetConfirm})
 	return value
 }

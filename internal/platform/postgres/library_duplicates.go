@@ -9,7 +9,7 @@ func (db *Database) RecordLibraryDuplicate(ctx context.Context, userID, spaceID,
 	if sourceItemID == "" || destinationItemID == "" || sourceItemID == destinationItemID || logicalBytes < 1 {
 		return ErrLibraryInvalid
 	}
-	return db.spaceTx(ctx, func(tx *sql.Tx) error {
+	return db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionLibraryEdit); err != nil {
 			return err
 		}

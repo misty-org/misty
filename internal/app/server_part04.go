@@ -116,7 +116,7 @@ func (config r2Config) empty() bool {
 	return config.endpoint == "" && config.bucket == "" && config.accessKey == "" && config.secretKey == ""
 }
 
-func libraryStoreFromEnv() (api.LibraryObjectStore, error) {
+func TestingLibraryStoreFromEnv() (api.LibraryObjectStore, error) {
 	config := r2ConfigFromEnv()
 	environment := strings.TrimSpace(os.Getenv("MISTY_ENVIRONMENT"))
 	demoMode := strings.TrimSpace(os.Getenv("MISTY_DEMO_MODE"))
@@ -180,7 +180,7 @@ func (s *Server) mountSmartLibraryRoutes(prefix string, service *api.SmartLibrar
 	s.Router.Delete(prefix+"/folders/{folderID}", service.Delete())
 }
 
-func allowedCORSOrigins() []string {
+func TestingAllowedCORSOrigins() []string {
 	origins := []string{
 		"tauri://localhost",
 		"http://tauri.localhost",
@@ -222,14 +222,14 @@ var allowedCORSRequestHeaders = []string{
 	"X-Misty-Library-Reauthentication",
 }
 
-func isAllowedCORSOrigin(origin string) bool {
-	for _, allowed := range allowedCORSOrigins() {
+func TestingIsAllowedCORSOrigin(origin string) bool {
+	for _, allowed := range TestingAllowedCORSOrigins() {
 		if strings.EqualFold(origin, allowed) {
 			return true
 		}
 	}
 	parsed, err := url.Parse(origin)
-	if err != nil || parsed.Scheme != "http" || !isLocalhostHostname(parsed.Hostname()) || parsed.Path != "" || parsed.User != nil || parsed.RawQuery != "" || parsed.Fragment != "" {
+	if err != nil || parsed.Scheme != "http" || !TestingIsLocalhostHostname(parsed.Hostname()) || parsed.Path != "" || parsed.User != nil || parsed.RawQuery != "" || parsed.Fragment != "" {
 		return false
 	}
 	port, err := strconv.Atoi(parsed.Port())

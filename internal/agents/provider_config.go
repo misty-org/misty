@@ -14,14 +14,14 @@ const (
 	ProviderGeminiREST = "gemini_rest"
 	ProviderVercelAI   = "vercel_ai_gateway"
 
-	defaultOpenAIBaseURL         = "https://api.openai.com/v1"
-	defaultOpenAIModel           = "gpt-5.5"
-	defaultGeminiBaseURL         = "https://generativelanguage.googleapis.com/v1beta"
-	defaultGeminiModel           = "gemini-3.5-flash"
-	defaultVercelAIBaseURL       = "https://ai-gateway.vercel.sh/v1"
-	defaultAgentLowGatewayModel  = "google/gemini-2.5-flash-lite"
-	defaultAgentMedGatewayModel  = "google/gemini-2.5-flash"
-	defaultAgentHighGatewayModel = "google/gemini-3.5-flash"
+	defaultOpenAIBaseURL                = "https://api.openai.com/v1"
+	defaultOpenAIModel                  = "gpt-5.5"
+	defaultGeminiBaseURL                = "https://generativelanguage.googleapis.com/v1beta"
+	defaultGeminiModel                  = "gemini-3.5-flash"
+	TestingDefaultVercelAIBaseURL       = "https://ai-gateway.vercel.sh/v1"
+	TestingDefaultAgentLowGatewayModel  = "google/gemini-2.5-flash-lite"
+	TestingDefaultAgentMedGatewayModel  = "google/gemini-2.5-flash"
+	TestingDefaultAgentHighGatewayModel = "google/gemini-3.5-flash"
 )
 
 func NewProviderFromEnv() ModelProvider {
@@ -33,7 +33,7 @@ func NewAgentProviderFromEnv() ModelProvider {
 	if apiKey == "" {
 		return NewAgentProviderRouter(MockProvider{}, MockProvider{}, MockProvider{})
 	}
-	baseURL := envOrDefault("AI_GATEWAY_BASE_URL", defaultVercelAIBaseURL)
+	baseURL := envOrDefault("AI_GATEWAY_BASE_URL", TestingDefaultVercelAIBaseURL)
 	provider := func(modelKey, fallback string) ModelProvider {
 		return NewOpenAIProvider(OpenAIProviderConfig{
 			APIKey:       apiKey,
@@ -43,9 +43,9 @@ func NewAgentProviderFromEnv() ModelProvider {
 		})
 	}
 	return NewAgentProviderRouter(
-		provider("MISTY_AI_LOW_MODEL", defaultAgentLowGatewayModel),
-		provider("MISTY_AI_MED_MODEL", defaultAgentMedGatewayModel),
-		provider("MISTY_AI_HIGH_MODEL", defaultAgentHighGatewayModel),
+		provider("MISTY_AI_LOW_MODEL", TestingDefaultAgentLowGatewayModel),
+		provider("MISTY_AI_MED_MODEL", TestingDefaultAgentMedGatewayModel),
+		provider("MISTY_AI_HIGH_MODEL", TestingDefaultAgentHighGatewayModel),
 	)
 }
 

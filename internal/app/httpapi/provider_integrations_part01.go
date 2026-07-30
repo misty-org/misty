@@ -26,7 +26,7 @@ type providerOAuthDefinition struct {
 	PKCE                                                           bool
 }
 
-var providerOAuthCatalog = map[string]providerOAuthDefinition{
+var TestingProviderOAuthCatalog = map[string]providerOAuthDefinition{
 	// Google is one account-level OAuth connection. Product capabilities such as
 	// Calendar, Gmail, and Drive remain separate adapters and add scopes through
 	// incremental consent instead of creating separate credentials.
@@ -41,26 +41,26 @@ type providerOAuthAvailability struct {
 	Configured bool   `json:"configured"`
 }
 
-func providerOAuthAvailabilityCatalog() []providerOAuthAvailability {
-	providers := make([]providerOAuthAvailability, 0, len(providerOAuthCatalog))
-	for provider, definition := range providerOAuthCatalog {
+func TestingProviderOAuthAvailabilityCatalog() []providerOAuthAvailability {
+	providers := make([]providerOAuthAvailability, 0, len(TestingProviderOAuthCatalog))
+	for provider, definition := range TestingProviderOAuthCatalog {
 		if provider != "google" && provider != "discord" && provider != "notion" {
 			continue
 		}
 		providers = append(providers, providerOAuthAvailability{
 			Provider:   provider,
-			Configured: providerOAuthClientID(definition) != "" && providerOAuthClientSecret(definition) != "",
+			Configured: TestingProviderOAuthClientID(definition) != "" && TestingProviderOAuthClientSecret(definition) != "",
 		})
 	}
 	sort.Slice(providers, func(i, j int) bool { return providers[i].Provider < providers[j].Provider })
 	return providers
 }
 
-func providerOAuthClientID(definition providerOAuthDefinition) string {
+func TestingProviderOAuthClientID(definition providerOAuthDefinition) string {
 	return strings.TrimSpace(os.Getenv(definition.ClientIDEnv))
 }
 
-func providerOAuthClientSecret(definition providerOAuthDefinition) string {
+func TestingProviderOAuthClientSecret(definition providerOAuthDefinition) string {
 	return strings.TrimSpace(os.Getenv(definition.ClientSecretEnv))
 }
 
@@ -87,13 +87,13 @@ func (s *SpacesService) BeginProviderAuthorization() http.HandlerFunc {
 			return
 		}
 		provider := chi.URLParam(r, "provider")
-		definition, ok := providerOAuthCatalog[provider]
+		definition, ok := TestingProviderOAuthCatalog[provider]
 		if !ok {
 			writeSpaceError(w, db.ErrSpaceInvalid)
 			return
 		}
-		clientID := providerOAuthClientID(definition)
-		if clientID == "" || providerOAuthClientSecret(definition) == "" {
+		clientID := TestingProviderOAuthClientID(definition)
+		if clientID == "" || TestingProviderOAuthClientSecret(definition) == "" {
 			writeJSON(w, http.StatusServiceUnavailable, map[string]string{"code": "provider_not_configured", "provider": provider})
 			return
 		}
@@ -103,7 +103,7 @@ func (s *SpacesService) BeginProviderAuthorization() http.HandlerFunc {
 		if decodeJSON(w, r, &body) != nil {
 			return
 		}
-		if !validProviderReturnPath(body.ReturnTo) {
+		if !TestingValidProviderReturnPath(body.ReturnTo) {
 			writeSpaceError(w, db.ErrSpaceInvalid)
 			return
 		}
@@ -119,7 +119,7 @@ func (s *SpacesService) BeginProviderAuthorization() http.HandlerFunc {
 			writeSpaceError(w, err)
 			return
 		}
-		callback := providerCallbackURL(r, provider)
+		callback := TestingProviderCallbackURL(r, provider)
 		params := url.Values{"client_id": {clientID}, "redirect_uri": {callback}, "response_type": {"code"}, "state": {state}}
 		if len(definition.Scopes) > 0 {
 			params.Set("scope", strings.Join(definition.Scopes, " "))
@@ -143,7 +143,7 @@ func (s *SpacesService) BeginProviderAuthorization() http.HandlerFunc {
 	}
 }
 
-func validProviderReturnPath(value string) bool {
+func TestingValidProviderReturnPath(value string) bool {
 	if value == "" {
 		return true
 	}
@@ -153,7 +153,7 @@ func validProviderReturnPath(value string) bool {
 func (s *SpacesService) ProviderAuthorizationCallback() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		provider, code, state := chi.URLParam(r, "provider"), r.URL.Query().Get("code"), r.URL.Query().Get("state")
-		definition, exists := providerOAuthCatalog[provider]
+		definition, exists := TestingProviderOAuthCatalog[provider]
 		if !exists || code == "" || state == "" {
 			writeSpaceError(w, db.ErrSpaceInvalid)
 			return
@@ -168,7 +168,7 @@ func (s *SpacesService) ProviderAuthorizationCallback() http.HandlerFunc {
 			writeSpaceError(w, err)
 			return
 		}
-		token, raw, err := exchangeProviderCode(r.Context(), definition, code, string(verifier), providerCallbackURL(r, provider))
+		token, raw, err := exchangeProviderCode(r.Context(), definition, code, string(verifier), TestingProviderCallbackURL(r, provider))
 		if err != nil {
 			writeJSON(w, http.StatusBadGateway, map[string]string{"code": "provider_exchange_failed"})
 			return
@@ -212,7 +212,7 @@ func (s *SpacesService) ProviderAuthorizationCallback() http.HandlerFunc {
 		_ = s.database.SetSpaceSetupProviderStatus(
 			r.Context(), stored.UserID, stored.SpaceID, provider, "authorized",
 		)
-		writeProviderCompletionPage(w, definition.Name, accountName)
+		TestingWriteProviderCompletionPage(w, definition.Name, accountName)
 	}
 }
 

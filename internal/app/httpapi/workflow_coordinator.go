@@ -20,7 +20,7 @@ func (s *SpacesService) ProcessDueAgentWorkflows(ctx context.Context, now time.T
 	}
 	processed := 0
 	for _, schedule := range due {
-		input := mustAPIRawJSON(map[string]any{"trigger": map[string]any{"kind": "cron", "eventId": schedule.EventID, "scheduledFor": schedule.ScheduledFor.Format(time.RFC3339Nano)}})
+		input := TestingMustAPIRawJSON(map[string]any{"trigger": map[string]any{"kind": "cron", "eventId": schedule.EventID, "scheduledFor": schedule.ScheduledFor.Format(time.RFC3339Nano)}})
 		run, runErr := s.database.CreateAgentRun(ctx, db.AgentRunRequest{RequestingMemberID: schedule.UserID, SpaceID: schedule.SpaceID, AgentID: schedule.AgentID, SourceType: "schedule", CapabilityID: schedule.CapabilityID, Input: input, TriggerKind: "schedule"})
 		if runErr != nil {
 			_ = s.database.FinishWorkflowEventClaim(ctx, schedule.InstanceID, schedule.WorkflowVersionID, "cron", schedule.EventID, "", "failed")
@@ -59,7 +59,7 @@ func (s *SpacesService) ProcessNormalizedProviderEvent(ctx context.Context, spac
 	}
 	processed := 0
 	for _, target := range claimed {
-		input := mustAPIRawJSON(map[string]any{"trigger": map[string]any{"kind": "connector_event", "provider": provider, "eventId": eventID, "resourceId": resourceID, "fingerprint": fingerprint}, "event": payload})
+		input := TestingMustAPIRawJSON(map[string]any{"trigger": map[string]any{"kind": "connector_event", "provider": provider, "eventId": eventID, "resourceId": resourceID, "fingerprint": fingerprint}, "event": payload})
 		run, runErr := s.database.CreateAgentRun(ctx, db.AgentRunRequest{RequestingMemberID: target.UserID, SpaceID: target.SpaceID, AgentID: target.AgentID, SourceType: "connector", CapabilityID: target.CapabilityID, Input: input, TriggerKind: "connector_event"})
 		if runErr != nil {
 			_ = s.database.FinishWorkflowEventClaim(ctx, target.InstanceID, target.WorkflowVersionID, provider, eventID, "", "failed")
@@ -86,7 +86,7 @@ func (s *SpacesService) ProcessNormalizedProviderEvent(ctx context.Context, spac
 }
 
 func (s *SpacesService) ProcessSpaceTaskEvent(ctx context.Context, task db.SpaceTask, eventKind string) (int, error) {
-	payload := mustAPIRawJSON(map[string]any{"task": task, "eventKind": eventKind})
+	payload := TestingMustAPIRawJSON(map[string]any{"task": task, "eventKind": eventKind})
 	fingerprint := providerPayloadFingerprint(payload)
 	eventID := eventKind + ":" + task.ID + ":v" + fmt.Sprint(task.Version)
 	claimed, err := s.database.ClaimTaskWorkflows(ctx, task.SpaceID, task.ID, eventID, fingerprint, task.CreatedByAgentID != "", 200)
@@ -95,7 +95,7 @@ func (s *SpacesService) ProcessSpaceTaskEvent(ctx context.Context, task db.Space
 	}
 	processed := 0
 	for _, target := range claimed {
-		input := mustAPIRawJSON(map[string]any{"trigger": map[string]any{"kind": "task_change", "provider": "space_tasks", "eventId": eventID, "resourceId": task.ID, "fingerprint": fingerprint}, "event": json.RawMessage(payload)})
+		input := TestingMustAPIRawJSON(map[string]any{"trigger": map[string]any{"kind": "task_change", "provider": "space_tasks", "eventId": eventID, "resourceId": task.ID, "fingerprint": fingerprint}, "event": json.RawMessage(payload)})
 		run, runErr := s.database.CreateAgentRun(ctx, db.AgentRunRequest{RequestingMemberID: target.UserID, SpaceID: target.SpaceID, AgentID: target.AgentID, SourceType: "task", CapabilityID: target.CapabilityID, Input: input, TriggerKind: "task_change"})
 		if runErr != nil {
 			_ = s.database.FinishWorkflowEventClaim(ctx, target.InstanceID, target.WorkflowVersionID, "space_tasks", eventID, "", "failed")

@@ -12,7 +12,7 @@ import (
 
 func (db *Database) UpdateAgentInstance(ctx context.Context, userID, instanceID string) (*AgentInstanceRecord, error) {
 	out := &AgentInstanceRecord{ConnectionBindings: map[string]string{}}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if _, err := tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock(hashtext($1))`, "agent-instance:"+instanceID); err != nil {
 			return err
 		}
@@ -59,7 +59,7 @@ func (db *Database) ConfigureInstanceWorkflow(ctx context.Context, userID, insta
 		return nil, ErrSpaceInvalid
 	}
 	out := &InstanceWorkflowConfig{WorkflowVersionID: workflowVersionID, Enabled: enabled, TriggerConfig: triggerConfig, Consent: consent, Cursor: json.RawMessage(`{}`)}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		var agentVersionID string
 		if err := tx.QueryRowContext(ctx, `SELECT agent_version_id FROM space_agent_instances WHERE id=$1 AND user_id=$2`, instanceID, userID).Scan(&agentVersionID); err != nil {
 			return err
@@ -86,7 +86,7 @@ func (db *Database) UpdateAgentInstanceConnections(ctx context.Context, userID, 
 		}
 	}
 	raw, _ := json.Marshal(bindings)
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		var spaceID string
 		if err := tx.QueryRowContext(ctx, `SELECT space_id FROM space_agent_instances WHERE id=$1 AND user_id=$2`, instanceID, userID).Scan(&spaceID); err != nil {
 			return err
@@ -111,7 +111,7 @@ func (db *Database) UpdateAgentInstanceConnections(ctx context.Context, userID, 
 
 func (db *Database) agentInstanceByID(ctx context.Context, userID, instanceID string) (*AgentInstanceRecord, error) {
 	out := &AgentInstanceRecord{ConnectionBindings: map[string]string{}}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		var bindingsRaw []byte
 		if err := tx.QueryRowContext(ctx, `SELECT id,space_id,agent_id,user_id,agent_version_id,connection_bindings,capability_grants,created_at,updated_at FROM space_agent_instances WHERE id=$1 AND user_id=$2`, instanceID, userID).Scan(&out.ID, &out.SpaceID, &out.AgentID, &out.UserID, &out.AgentVersionID, &bindingsRaw, &out.CapabilityGrants, &out.CreatedAt, &out.UpdatedAt); err != nil {
 			return err
@@ -127,7 +127,7 @@ func (db *Database) agentInstanceByID(ctx context.Context, userID, instanceID st
 
 func (db *Database) PublishedAgentVersions(ctx context.Context, userID, spaceID, agentID string) ([]PublishedAgentVersion, error) {
 	items := []PublishedAgentVersion{}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if _, err := requireSpaceMemberTx(ctx, tx, spaceID, userID); err != nil {
 			return err
 		}

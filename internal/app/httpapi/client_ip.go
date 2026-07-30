@@ -87,7 +87,7 @@ func isTrustedProxyAddress(address string) bool {
 }
 
 // clientIPFromRequest returns the address rate limits are keyed on.
-func clientIPFromRequest(r *http.Request) string {
+func TestingClientIPFromRequest(r *http.Request) string {
 	remote := remoteHostFromRequest(r)
 	if !trustProxyHeaders() {
 		return remote

@@ -135,7 +135,7 @@ func (s *SpacesService) RunDecision() http.HandlerFunc {
 			writeJSON(w, http.StatusOK, run)
 			return
 		}
-		prompt := promptFromRun(run)
+		prompt := TestingPromptFromRun(run)
 		finished, err := s.executeCanonicalAgentRun(r, run, prompt)
 		if err != nil {
 			writeSpaceError(w, err)
@@ -189,7 +189,7 @@ func (s *SpacesService) RunRetry() http.HandlerFunc {
 			writeJSON(w, http.StatusAccepted, run)
 			return
 		}
-		finished, err := s.executeCanonicalAgentRun(r, run, promptFromRun(run))
+		finished, err := s.executeCanonicalAgentRun(r, run, TestingPromptFromRun(run))
 		if err != nil {
 			writeSpaceError(w, err)
 			return

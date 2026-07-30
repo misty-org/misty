@@ -110,7 +110,7 @@ func (s *Service) CompleteWithTier(userID, prompt, meterName string, tier AgentT
 }
 
 func (s *Service) CompleteWithTierContext(ctx context.Context, userID, prompt, meterName string, tier AgentTier) (string, UsageSettlement, error) {
-	return s.completeWithProviderContext(ctx, userID, prompt, meterName, resolveAgentProvider(s.provider, NormalizeAgentTier(tier)), NormalizeAgentTier(tier))
+	return s.completeWithProviderContext(ctx, userID, prompt, meterName, TestingResolveAgentProvider(s.provider, NormalizeAgentTier(tier)), NormalizeAgentTier(tier))
 }
 
 func (s *Service) CompleteWithModelContext(ctx context.Context, userID, prompt, meterName, modelID string) (string, UsageSettlement, error) {
@@ -133,7 +133,7 @@ func (s *Service) completeWithProviderContext(ctx context.Context, userID, promp
 		return "", UsageSettlement{}, ErrInvalidRequest("prompt is too large")
 	}
 	request := ModelRequest{SessionID: uuid.NewString(), UserID: userID, AgentTier: tier, Mode: ModeAsk, Messages: []Message{{Role: RoleUser, Content: prompt}}}
-	provider, model := providerStatus(selectedProvider)
+	provider, model := TestingProviderStatus(selectedProvider)
 	idempotencyKey := "completion:" + request.SessionID
 	var reservation *UsageReservation
 	var err error
@@ -197,7 +197,7 @@ func (s *Service) ProviderStatus() (string, string) {
 }
 
 func (s *Service) ProviderStatusForTier(tier AgentTier) (string, string) {
-	return providerStatus(resolveAgentProvider(s.provider, tier))
+	return TestingProviderStatus(TestingResolveAgentProvider(s.provider, tier))
 }
 
 func (s *Service) AgentConfigured(tier AgentTier) bool {
@@ -205,7 +205,7 @@ func (s *Service) AgentConfigured(tier AgentTier) bool {
 	return provider != ProviderMock
 }
 
-func providerStatus(provider ModelProvider) (string, string) {
+func TestingProviderStatus(provider ModelProvider) (string, string) {
 	if info, ok := provider.(ProviderInfo); ok {
 		return info.ProviderName(), info.ModelName()
 	}

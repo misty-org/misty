@@ -11,7 +11,7 @@ import (
 )
 
 func (db *Database) deleteSpaceMessage(ctx context.Context, userID, spaceID, conversationID, messageID string) error {
-	return db.spaceTx(ctx, func(tx *sql.Tx) error {
+	return db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpaceMessageWriteTx(ctx, tx, userID, spaceID); err != nil {
 			return err
 		}
@@ -51,11 +51,11 @@ func (db *Database) CreateSpaceConversationAgentMessage(ctx context.Context, bil
 
 func (db *Database) createSpaceAgentMessage(ctx context.Context, billingUserID, spaceID, conversationID, agentID, text string) (*SpaceMessage, error) {
 	content := []MessageSpan{{Type: "text", Text: strings.TrimSpace(text)}}
-	if err := validateMessage(content, nil); err != nil {
+	if err := TestingValidateMessage(content, nil); err != nil {
 		return nil, err
 	}
 	out := &SpaceMessage{ID: "msg_" + uuid.NewString(), SpaceID: spaceID, ConversationID: conversationID, SenderUserID: billingUserID, SenderKind: "agent", SenderAgentID: agentID, Content: content, FileNodeIDs: []string{}, LibraryItemIDs: []string{}, Attachments: []MessageAttachment{}, Reactions: []SpaceMessageReaction{}}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpaceMessageWriteTx(ctx, tx, billingUserID, spaceID); err != nil {
 			return err
 		}
@@ -139,7 +139,7 @@ func (db *Database) UpsertSpaceNode(ctx context.Context, userID string, node Spa
 	if len(node.Metadata) == 0 {
 		node.Metadata = json.RawMessage(`{}`)
 	}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpaceMessageWriteTx(ctx, tx, userID, node.SpaceID); err != nil {
 			return err
 		}
@@ -204,7 +204,7 @@ func nullableBytes(value []byte) any {
 
 func (db *Database) SpaceNodes(ctx context.Context, userID, spaceID string) ([]SpaceNode, error) {
 	items := []SpaceNode{}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionMessagesRead); err != nil {
 			return err
 		}
@@ -228,7 +228,7 @@ func (db *Database) SpaceNodes(ctx context.Context, userID, spaceID string) ([]S
 
 func (db *Database) SpaceNodeSecret(ctx context.Context, userID, spaceID, nodeID string) (*SpaceNode, error) {
 	out := &SpaceNode{}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionMessagesRead); err != nil {
 			return err
 		}

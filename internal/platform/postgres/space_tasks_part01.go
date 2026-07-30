@@ -134,7 +134,7 @@ func scanSpaceTask(row interface{ Scan(...any) error }, out *SpaceTask) error {
 	return nil
 }
 
-func validateSpaceTask(item *SpaceTask) error {
+func TestingValidateSpaceTask(item *SpaceTask) error {
 	item.Title = strings.TrimSpace(item.Title)
 	item.Notes = strings.TrimSpace(item.Notes)
 	item.Status = strings.TrimSpace(item.Status)
@@ -182,7 +182,7 @@ func (db *Database) SpaceTaskPage(ctx context.Context, userID, spaceID string, q
 	if query.Limit < 1 || query.Limit > 200 {
 		query.Limit = 100
 	}
-	offset, err := decodeTaskCursor(query.Cursor)
+	offset, err := TestingDecodeTaskCursor(query.Cursor)
 	if err != nil {
 		return out, ErrSpaceInvalid
 	}
@@ -200,7 +200,7 @@ func (db *Database) SpaceTaskPage(ctx context.Context, userID, spaceID string, q
 	default:
 		return out, ErrSpaceInvalid
 	}
-	err = db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err = db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionTasksView); err != nil {
 			return err
 		}
@@ -222,7 +222,7 @@ func (db *Database) SpaceTaskPage(ctx context.Context, userID, spaceID string, q
 		}
 		if len(out.Tasks) > query.Limit {
 			out.Tasks = out.Tasks[:query.Limit]
-			out.NextCursor = encodeTaskCursor(offset + query.Limit)
+			out.NextCursor = TestingEncodeTaskCursor(offset + query.Limit)
 		}
 		countRows, err := tx.QueryContext(ctx, `SELECT status,COUNT(*) FROM space_tasks WHERE space_id=$1 AND archived_at IS NULL GROUP BY status`, spaceID)
 		if err != nil {
@@ -242,6 +242,6 @@ func (db *Database) SpaceTaskPage(ctx context.Context, userID, spaceID string, q
 	return out, err
 }
 
-func encodeTaskCursor(offset int) string {
+func TestingEncodeTaskCursor(offset int) string {
 	return base64.RawURLEncoding.EncodeToString([]byte(strconv.Itoa(offset)))
 }

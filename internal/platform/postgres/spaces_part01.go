@@ -212,8 +212,8 @@ type SpaceRun struct {
 	NextRetryAt          *time.Time      `json:"next_retry_at,omitempty"`
 }
 
-func (db *Database) spaceTx(ctx context.Context, fn func(*sql.Tx) error) error {
-	return db.withRLSContext(ctx, serviceRLSSettings(), fn)
+func (db *Database) TestingSpaceTx(ctx context.Context, fn func(*sql.Tx) error) error {
+	return db.TestingWithRLSContext(ctx, TestingServiceRLSSettings(), fn)
 }
 
 func normalizeSpaceName(name string) (string, error) {

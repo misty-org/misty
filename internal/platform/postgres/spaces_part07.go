@@ -68,10 +68,10 @@ func (db *Database) UpdateSpaceConversationMessage(ctx context.Context, userID, 
 }
 
 func (db *Database) updateSpaceMessage(ctx context.Context, userID, spaceID, conversationID, messageID string, content []MessageSpan, fileNodeIDs []string) (*SpaceMessage, error) {
-	if err := validateMessage(content, fileNodeIDs); err != nil {
+	if err := TestingValidateMessage(content, fileNodeIDs); err != nil {
 		return nil, err
 	}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpaceMessageWriteTx(ctx, tx, userID, spaceID); err != nil {
 			return err
 		}
@@ -124,7 +124,7 @@ func (db *Database) updateSpaceMessage(ctx context.Context, userID, spaceID, con
 		return nil, err
 	}
 	out := &SpaceMessage{}
-	err = db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err = db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionMessagesRead); err != nil {
 			return err
 		}
@@ -160,7 +160,7 @@ func (db *Database) setSpaceMessageReaction(ctx context.Context, userID, spaceID
 	if err != nil {
 		return nil, err
 	}
-	err = db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err = db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpaceMessageWriteTx(ctx, tx, userID, spaceID); err != nil {
 			return err
 		}
@@ -199,7 +199,7 @@ func (db *Database) setSpaceMessageReaction(ctx context.Context, userID, spaceID
 
 func (db *Database) spaceMessageByID(ctx context.Context, userID, spaceID, conversationID, messageID string) (*SpaceMessage, error) {
 	out := &SpaceMessage{}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionMessagesRead); err != nil {
 			return err
 		}

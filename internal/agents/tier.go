@@ -85,7 +85,7 @@ type agentProviderResolver interface {
 	ProviderForTier(AgentTier) ModelProvider
 }
 
-func resolveAgentProvider(provider ModelProvider, tier AgentTier) ModelProvider {
+func TestingResolveAgentProvider(provider ModelProvider, tier AgentTier) ModelProvider {
 	if resolver, ok := provider.(agentProviderResolver); ok {
 		return resolver.ProviderForTier(tier)
 	}

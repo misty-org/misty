@@ -13,7 +13,7 @@ func (db *Database) FailLibraryRenditionJob(ctx context.Context, job *LibraryRen
 	if job == nil || job.ID == "" || job.LeaseToken == "" || code == "" {
 		return ErrLibraryInvalid
 	}
-	return db.spaceTx(ctx, func(tx *sql.Tx) error {
+	return db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		var attempts, maxAttempts int
 		if err := tx.QueryRowContext(ctx, `SELECT attempt_count,max_attempts FROM library_processing_jobs WHERE id=$1 AND lease_token=$2 AND state IN ('leased','running') FOR UPDATE`, job.ID, job.LeaseToken).Scan(&attempts, &maxAttempts); errors.Is(err, sql.ErrNoRows) {
 			return ErrLibraryConflict
@@ -53,7 +53,7 @@ func (db *Database) ReleaseExpiredLibraryRenditionReservations(ctx context.Conte
 		limit = 100
 	}
 	releasedCount := 0
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		rows, err := tx.QueryContext(ctx, `SELECT id,space_id,source_id,reserved_bytes FROM space_rendition_reservations WHERE state='active' AND expires_at<=NOW() ORDER BY expires_at FOR UPDATE SKIP LOCKED LIMIT $1`, limit)
 		if err != nil {
 			return err
@@ -102,7 +102,7 @@ func (db *Database) ClaimExpiredLibraryRenditionPurge(ctx context.Context, lease
 		return nil, ErrLibraryInvalid
 	}
 	out := &LibraryRenditionPurge{LeaseToken: "delete_lease_" + uuid.NewString()}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		var blobID sql.NullString
 		if err := tx.QueryRowContext(ctx, `SELECT t.id,t.target_id,COALESCE(t.space_id,''),v.rendition_blob_id,COALESCE(c.logical_bytes,0)
 			FROM library_recovery_tombstones t JOIN library_item_versions v ON v.id=t.target_id
@@ -153,7 +153,7 @@ func (db *Database) CompleteLibraryRenditionPurge(ctx context.Context, purge *Li
 	if purge == nil || purge.TombstoneID == "" || purge.EditID == "" || purge.LeaseToken == "" {
 		return ErrLibraryInvalid
 	}
-	return db.spaceTx(ctx, func(tx *sql.Tx) error {
+	return db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		var valid bool
 		if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM library_recovery_tombstones WHERE id=$1 AND target_id=$2 AND lifecycle_state='purging' AND delete_lease_token=$3 AND delete_lease_expires_at>NOW())`, purge.TombstoneID, purge.EditID, purge.LeaseToken).Scan(&valid); err != nil || !valid {
 			return ErrLibraryConflict
@@ -190,7 +190,7 @@ func (db *Database) FailLibraryRenditionPurge(ctx context.Context, purge *Librar
 	if purge == nil || purge.TombstoneID == "" || purge.EditID == "" || purge.LeaseToken == "" {
 		return ErrLibraryInvalid
 	}
-	return db.spaceTx(ctx, func(tx *sql.Tx) error {
+	return db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if purge.ObjectKey != "" {
 			if _, err := tx.ExecContext(ctx, `UPDATE library_blobs SET lifecycle_state='ready',version=version+1,updated_at=NOW() WHERE id=$1 AND lifecycle_state='purging'`, purge.BlobID); err != nil {
 				return err

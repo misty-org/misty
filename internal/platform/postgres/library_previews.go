@@ -33,7 +33,7 @@ type CompleteLibraryPreviewResult struct {
 
 func (db *Database) LibraryItemPreviewSource(ctx context.Context, userID, spaceID, itemID string, original bool) (*LibraryPreviewSource, error) {
 	out := &LibraryPreviewSource{}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionLibraryView); err != nil {
 			return err
 		}
@@ -106,7 +106,7 @@ func (db *Database) ReleaseLibraryPreviewReservation(ctx context.Context, userID
 	if itemID == "" {
 		return ErrLibraryInvalid
 	}
-	return db.spaceTx(ctx, func(tx *sql.Tx) error {
+	return db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionLibraryView); err != nil {
 			return err
 		}
@@ -128,7 +128,7 @@ func (db *Database) CompleteLibraryPreview(ctx context.Context, userID, spaceID,
 		return nil, ErrLibraryInvalid
 	}
 	out := &CompleteLibraryPreviewResult{ObjectKey: objectKey, MIMEType: mimeType, ByteSize: byteSize, SHA256: sha}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionLibraryView); err != nil {
 			return err
 		}
@@ -216,7 +216,7 @@ func (db *Database) ReplaceMissingLibraryPreviewDeduplicationObject(ctx context.
 		return "", ErrLibraryInvalid
 	}
 	selectedKey := ""
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionLibraryView); err != nil {
 			return err
 		}

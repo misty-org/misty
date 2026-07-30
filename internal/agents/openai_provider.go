@@ -20,8 +20,8 @@ type OpenAIProviderConfig struct {
 }
 
 type OpenAIProvider struct {
-	apiKey          string
-	baseURL         string
+	TestingApiKey   string
+	TestingBaseURL  string
 	model           string
 	providerName    string
 	reasoningEffort string
@@ -44,8 +44,8 @@ func NewOpenAIProvider(config OpenAIProviderConfig) *OpenAIProvider {
 		client = noRedirectHTTPClient(client)
 	}
 	return &OpenAIProvider{
-		apiKey:          strings.TrimSpace(config.APIKey),
-		baseURL:         baseURL,
+		TestingApiKey:   strings.TrimSpace(config.APIKey),
+		TestingBaseURL:  baseURL,
 		model:           model,
 		providerName:    strings.TrimSpace(config.ProviderName),
 		reasoningEffort: normalizeReasoningEffort(config.ReasoningEffort),
@@ -80,7 +80,7 @@ func (p *OpenAIProvider) Next(request ModelRequest) (ModelResponse, error) {
 }
 
 func (p *OpenAIProvider) NextContext(ctx context.Context, request ModelRequest) (ModelResponse, error) {
-	if p.apiKey == "" {
+	if p.TestingApiKey == "" {
 		return ModelResponse{}, fmt.Errorf("%s API key is required", p.ProviderName())
 	}
 	prompt, promptImages := buildAgentPromptWithImages(request)
@@ -111,7 +111,7 @@ func (p *OpenAIProvider) NextContext(ctx context.Context, request ModelRequest) 
 				"type":   "json_schema",
 				"name":   "misty_agent_response",
 				"strict": true,
-				"schema": agentResponseJSONSchema(),
+				"schema": TestingAgentResponseJSONSchema(),
 			},
 		},
 		"max_output_tokens": MaxModelOutputTokens,
@@ -123,11 +123,11 @@ func (p *OpenAIProvider) NextContext(ctx context.Context, request ModelRequest) 
 	if err != nil {
 		return ModelResponse{}, err
 	}
-	httpRequest, err := http.NewRequestWithContext(ctx, http.MethodPost, p.baseURL+"/responses", bytes.NewReader(payload))
+	httpRequest, err := http.NewRequestWithContext(ctx, http.MethodPost, p.TestingBaseURL+"/responses", bytes.NewReader(payload))
 	if err != nil {
 		return ModelResponse{}, err
 	}
-	httpRequest.Header.Set("Authorization", "Bearer "+p.apiKey)
+	httpRequest.Header.Set("Authorization", "Bearer "+p.TestingApiKey)
 	httpRequest.Header.Set("Content-Type", "application/json")
 	httpResponse, err := p.client.Do(httpRequest)
 	if err != nil {
@@ -146,11 +146,11 @@ func (p *OpenAIProvider) NextContext(ctx context.Context, request ModelRequest) 
 	if err != nil {
 		return ModelResponse{}, err
 	}
-	response.Usage = extractOpenAIUsage(responseBody)
+	response.Usage = TestingExtractOpenAIUsage(responseBody)
 	return response, nil
 }
 
-func extractOpenAIUsage(body []byte) ModelUsage {
+func TestingExtractOpenAIUsage(body []byte) ModelUsage {
 	var payload struct {
 		Usage struct {
 			InputTokens  int64 `json:"input_tokens"`

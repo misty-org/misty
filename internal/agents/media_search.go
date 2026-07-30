@@ -44,7 +44,7 @@ func (a *SmartLibraryAnalyzer) TranscribeMedia(ctx context.Context, audio []byte
 	}
 	segments, usage, err := a.transcribeMediaWithModel(ctx, audio, mimeType, chunkDurationMS, model)
 	if err == nil && len(segments) > 0 {
-		return coalesceTranscriptSegments(segments), usage, nil
+		return TestingCoalesceTranscriptSegments(segments), usage, nil
 	}
 	fallback := strings.TrimSpace(os.Getenv("MEDIA_SEARCH_TRANSCRIPTION_FALLBACK_MODEL"))
 	if fallback == "" {
@@ -59,7 +59,7 @@ func (a *SmartLibraryAnalyzer) TranscribeMedia(ctx context.Context, audio []byte
 	if fallbackErr != nil {
 		return nil, usage, errors.Join(err, fallbackErr)
 	}
-	return coalesceTranscriptSegments(fallbackSegments), usage, nil
+	return TestingCoalesceTranscriptSegments(fallbackSegments), usage, nil
 }
 
 func (a *SmartLibraryAnalyzer) transcribeMediaWithModel(ctx context.Context, audio []byte, mimeType string, chunkDurationMS int64, model string) ([]MediaTranscriptSegment, ModelUsage, error) {
@@ -115,7 +115,7 @@ func (a *SmartLibraryAnalyzer) transcribeMediaWithModel(ctx context.Context, aud
 	return segments, ModelUsage{InputTokens: int64(float64(chunkDurationMS) / 1000.0 * 3.0)}, nil
 }
 
-func coalesceTranscriptSegments(input []MediaTranscriptSegment) []MediaTranscriptSegment {
+func TestingCoalesceTranscriptSegments(input []MediaTranscriptSegment) []MediaTranscriptSegment {
 	if len(input) < 2 {
 		return input
 	}

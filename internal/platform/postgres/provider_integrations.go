@@ -11,7 +11,7 @@ import (
 
 func (db *Database) ResolveAgentProviderConnection(ctx context.Context, userID, spaceID, instanceID, provider string) (string, error) {
 	var connectionID string
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		var bindings []byte
 		if err := tx.QueryRowContext(ctx, `SELECT connection_bindings FROM space_agent_instances WHERE id=$1 AND user_id=$2 AND space_id=$3`, instanceID, userID, spaceID).Scan(&bindings); err != nil {
 			return err
@@ -58,7 +58,7 @@ type ProviderCredential struct {
 }
 
 func (db *Database) CreateProviderOAuthState(ctx context.Context, stateHash string, item ProviderOAuthState) error {
-	return db.spaceTx(ctx, func(tx *sql.Tx) error {
+	return db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, item.UserID, item.SpaceID, PermissionIntegrationsManage); err != nil {
 			return err
 		}
@@ -72,7 +72,7 @@ func (db *Database) CreateProviderOAuthState(ctx context.Context, stateHash stri
 // states deliberately look like missing records.
 func (db *Database) ConsumeProviderOAuthState(ctx context.Context, stateHash string) (*ProviderOAuthState, error) {
 	out := &ProviderOAuthState{}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		return tx.QueryRowContext(ctx, `UPDATE provider_oauth_states SET consumed_at=NOW()
 			WHERE state_hash=$1 AND consumed_at IS NULL AND expires_at>NOW()
 			RETURNING user_id,space_id,provider,verifier_ciphertext,verifier_nonce,return_to,expires_at`, stateHash).
@@ -93,7 +93,7 @@ func (db *Database) SaveProviderCredential(ctx context.Context, item ProviderCre
 	}
 	permissions := mustJSON(scopes)
 	out := &SpaceIntegration{ID: item.IntegrationID, SpaceID: item.SpaceID, Provider: item.Provider, DisplayName: displayName, GrantedPermissions: scopes, Status: "active", ConnectedByUserID: item.UserID}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, item.UserID, item.SpaceID, PermissionIntegrationsManage); err != nil {
 			return err
 		}
@@ -117,7 +117,7 @@ func (db *Database) SaveProviderCredential(ctx context.Context, item ProviderCre
 
 func (db *Database) ProviderCredential(ctx context.Context, userID, spaceID, integrationID string) (*ProviderCredential, error) {
 	out := &ProviderCredential{}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if _, err := requireSpaceMemberTx(ctx, tx, spaceID, userID); err != nil {
 			return err
 		}
@@ -139,7 +139,7 @@ func (db *Database) ProviderCredential(ctx context.Context, userID, spaceID, int
 }
 
 func (db *Database) UpdateProviderCredentialSecret(ctx context.Context, item ProviderCredential) error {
-	return db.spaceTx(ctx, func(tx *sql.Tx) error {
+	return db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		result, err := tx.ExecContext(ctx, `UPDATE space_provider_credentials SET ciphertext=$1,nonce=$2,key_version=$3,expires_at=$4,last_refreshed_at=NOW(),updated_at=NOW()
 			WHERE id=$5 AND integration_id=$6 AND user_id=$7 AND space_id=$8 AND revoked_at IS NULL`, item.Ciphertext, item.Nonce, item.KeyVersion, item.ExpiresAt, item.ID, item.IntegrationID, item.UserID, item.SpaceID)
 		if err != nil {
@@ -153,7 +153,7 @@ func (db *Database) UpdateProviderCredentialSecret(ctx context.Context, item Pro
 }
 
 func (db *Database) DeleteProviderIntegration(ctx context.Context, userID, integrationID string) error {
-	return db.spaceTx(ctx, func(tx *sql.Tx) error {
+	return db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		var spaceID string
 		if err := tx.QueryRowContext(ctx, `SELECT space_id FROM space_integrations WHERE id=$1`, integrationID).Scan(&spaceID); err != nil {
 			return ErrSpaceNotFound

@@ -14,7 +14,7 @@ import (
 // lightweight membership check without an otherwise-unused mutation.
 func (db *Database) IsSpaceMember(ctx context.Context, userID, spaceID string) (bool, error) {
 	var isMember bool
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		_, memberErr := requireSpaceMemberTx(ctx, tx, spaceID, userID)
 		if errors.Is(memberErr, ErrSpaceForbidden) {
 			isMember = false
@@ -74,7 +74,7 @@ func (db *Database) CreateSpace(ctx context.Context, userID, name string) (*Spac
 
 func (db *Database) ListSpaces(ctx context.Context, userID string) ([]Space, error) {
 	spaces := []Space{}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		rows, err := tx.QueryContext(ctx, `SELECT s.id,s.security_domain_id,s.owner_user_id,s.name,m.role,
 			(SELECT count(*) FROM space_members sm WHERE sm.space_id=s.id),
 			(SELECT count(*) FROM space_invitations si WHERE si.space_id=s.id AND si.expires_at>NOW()
@@ -114,7 +114,7 @@ func (db *Database) ListSpaces(ctx context.Context, userID string) ([]Space, err
 
 func (db *Database) SpaceByID(ctx context.Context, userID, spaceID string) (*Space, error) {
 	out := &Space{}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := tx.QueryRowContext(ctx, `SELECT s.id,s.security_domain_id,s.owner_user_id,s.name,m.role,
 			(SELECT count(*) FROM space_members sm WHERE sm.space_id=s.id),
 			(SELECT count(*) FROM space_invitations si WHERE si.space_id=s.id AND si.expires_at>NOW()
@@ -155,7 +155,7 @@ func (db *Database) RenameSpace(ctx context.Context, userID, spaceID, name strin
 	if err != nil {
 		return nil, err
 	}
-	err = db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err = db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpaceOwnerTx(ctx, tx, spaceID, userID); err != nil {
 			return err
 		}
@@ -172,7 +172,7 @@ func (db *Database) RenameSpace(ctx context.Context, userID, spaceID, name strin
 }
 
 func (db *Database) DeleteSpace(ctx context.Context, userID, spaceID, confirmation string) error {
-	return db.spaceTx(ctx, func(tx *sql.Tx) error {
+	return db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpaceOwnerTx(ctx, tx, spaceID, userID); err != nil {
 			return err
 		}
@@ -213,7 +213,7 @@ func (db *Database) DeleteSpace(ctx context.Context, userID, spaceID, confirmati
 
 func (db *Database) SpaceMembers(ctx context.Context, userID, spaceID string) ([]SpaceMember, error) {
 	members := []SpaceMember{}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if _, err := requireSpaceMemberTx(ctx, tx, spaceID, userID); err != nil {
 			return err
 		}

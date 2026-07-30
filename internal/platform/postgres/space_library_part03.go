@@ -11,7 +11,7 @@ import (
 // whose R2 object disappeared. The caller must first verify that missingKey is
 // absent and that the upload's new object exists with the reserved metadata.
 func (db *Database) ReplaceMissingLibraryUploadDeduplicationObject(ctx context.Context, userID, spaceID, uploadID, missingKey string) error {
-	return db.spaceTx(ctx, func(tx *sql.Tx) error {
+	return db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionLibraryUpload); err != nil {
 			return err
 		}
@@ -51,7 +51,7 @@ func (db *Database) ReplaceMissingLibraryUploadDeduplicationObject(ctx context.C
 
 func (db *Database) SetLibraryUploadState(ctx context.Context, userID, spaceID, uploadID, tokenHash, from, to string) (*LibraryUpload, error) {
 	out := &LibraryUpload{}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		return scanLibraryUpload(tx.QueryRowContext(ctx, `UPDATE space_library_uploads SET state=$1,version=version+1,updated_at=NOW()
 			WHERE id=$2 AND space_id=$3 AND user_id=$4 AND upload_token_hash=$5 AND state=$6 AND expires_at>NOW()
 			RETURNING id,space_id,security_domain_id,user_id,object_key,original_filename,purpose,client_declared_mime_type,requested_byte_size,client_sha256,verified_byte_size,COALESCE(verified_sha256,''),COALESCE(detected_mime_type,''),state,COALESCE(file_id,''),upload_token_hash,COALESCE(error_code,''),expires_at,version,created_at,updated_at`, to, uploadID, spaceID, userID, tokenHash, from), out)
@@ -66,7 +66,7 @@ func (db *Database) RejectLibraryUpload(ctx context.Context, userID, spaceID, up
 	if state != "rejected" && state != "infected" && state != "invalid" && state != "processing_failed" && state != "expired" {
 		return ErrLibraryInvalid
 	}
-	return db.spaceTx(ctx, func(tx *sql.Tx) error {
+	return db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		var upload LibraryUpload
 		if err := scanLibraryUpload(tx.QueryRowContext(ctx, `SELECT id,space_id,security_domain_id,user_id,object_key,original_filename,purpose,client_declared_mime_type,requested_byte_size,client_sha256,verified_byte_size,COALESCE(verified_sha256,''),COALESCE(detected_mime_type,''),state,COALESCE(file_id,''),upload_token_hash,COALESCE(error_code,''),expires_at,version,created_at,updated_at FROM space_library_uploads WHERE id=$1 AND space_id=$2 AND user_id=$3 FOR UPDATE`, uploadID, spaceID, userID), &upload); err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
@@ -104,7 +104,7 @@ func (db *Database) ExpireLibraryUploads(ctx context.Context, limit int) ([]Expi
 		limit = 100
 	}
 	out := []ExpiredLibraryUpload{}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		rows, err := tx.QueryContext(ctx, `SELECT u.id,u.object_key,u.space_id,u.security_domain_id,u.user_id,r.reserved_bytes
 			FROM space_library_uploads u JOIN space_upload_reservations r ON r.upload_id=u.id
 			WHERE r.state='active' AND u.expires_at<=NOW() AND u.state NOT IN ('ready','deleted','expired')
@@ -153,7 +153,7 @@ func (db *Database) ReconcileLibraryStorageUsage(ctx context.Context, limit int)
 		limit = 250
 	}
 	updated := 0
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		result, err := tx.ExecContext(ctx, `WITH candidates AS (
 			SELECT space_id FROM space_storage_usage ORDER BY updated_at LIMIT $1 FOR UPDATE SKIP LOCKED
 		), actual AS (
@@ -176,7 +176,7 @@ func (db *Database) ReconcileLibraryStorageUsage(ctx context.Context, limit int)
 }
 
 func (db *Database) TrashLibraryItem(ctx context.Context, userID, spaceID, itemID string) (*SpaceLibraryItem, error) {
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionLibraryEdit); err != nil {
 			return err
 		}
@@ -199,7 +199,7 @@ func (db *Database) TrashLibraryItem(ctx context.Context, userID, spaceID, itemI
 }
 
 func (db *Database) RestoreLibraryItem(ctx context.Context, userID, spaceID, itemID string) (*SpaceLibraryItem, error) {
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionLibraryEdit); err != nil {
 			return err
 		}

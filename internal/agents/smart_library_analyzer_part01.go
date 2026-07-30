@@ -217,7 +217,7 @@ func (a *SmartLibraryAnalyzer) EmbedAssets(ctx context.Context, assets []SmartLi
 		if err := ValidateSmartLibraryAsset(asset); err != nil {
 			return nil, total, err
 		}
-		value := embeddingDocument(asset, metadata[asset.AssetID])
+		value := TestingEmbeddingDocument(asset, metadata[asset.AssetID])
 		var vectors [][]float64
 		var usage ModelUsage
 		var err error

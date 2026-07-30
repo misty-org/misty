@@ -40,7 +40,7 @@ type LibraryPerson struct {
 
 func (db *Database) LibraryPeoplePolicy(ctx context.Context, userID, spaceID string) (*LibraryIntelligencePolicy, error) {
 	out := &LibraryIntelligencePolicy{SpaceID: spaceID}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionLibraryView); err != nil {
 			return err
 		}
@@ -69,7 +69,7 @@ func (db *Database) UpdateLibraryIntelligencePolicy(ctx context.Context, userID,
 		return nil, ErrLibraryInvalid
 	}
 	aiEnabled = aiEnabled || semanticSearch
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpaceOwnerTx(ctx, tx, spaceID, userID); err != nil {
 			return ErrLibraryForbidden
 		}
@@ -165,7 +165,7 @@ func (db *Database) UpdateLibraryIntelligencePolicy(ctx context.Context, userID,
 
 func (db *Database) LibraryPeople(ctx context.Context, userID, spaceID string) ([]LibraryPerson, error) {
 	people := []LibraryPerson{}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionLibraryView); err != nil {
 			return err
 		}
@@ -193,7 +193,7 @@ func (db *Database) CreateLibraryPerson(ctx context.Context, userID, spaceID, ki
 		return nil, ErrLibraryInvalid
 	}
 	personID := "person_" + uuid.NewString()
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionLibraryEdit); err != nil {
 			return err
 		}
@@ -216,7 +216,7 @@ func (db *Database) CreateLibraryPerson(ctx context.Context, userID, spaceID, ki
 
 func (db *Database) LibraryPerson(ctx context.Context, userID, spaceID, personID string) (*LibraryPerson, error) {
 	out := &LibraryPerson{}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionLibraryView); err != nil {
 			return err
 		}

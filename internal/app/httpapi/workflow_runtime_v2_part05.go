@@ -12,7 +12,7 @@ import (
 	workflowv2 "github.com/kannachi323/misty/server/internal/workflows"
 )
 
-func findWorkflowItems(value any) []any {
+func TestingFindWorkflowItems(value any) []any {
 	switch item := value.(type) {
 	case []any:
 		return item
@@ -23,7 +23,7 @@ func findWorkflowItems(value any) []any {
 			}
 		}
 		for _, child := range item {
-			if values := findWorkflowItems(child); values != nil {
+			if values := TestingFindWorkflowItems(child); values != nil {
 				return values
 			}
 		}
@@ -31,7 +31,7 @@ func findWorkflowItems(value any) []any {
 	return nil
 }
 
-func normalizeContentPage(run *db.SpaceRun, invocation workflowv2.Invocation) (json.RawMessage, error) {
+func TestingNormalizeContentPage(run *db.SpaceRun, invocation workflowv2.Invocation) (json.RawMessage, error) {
 	var input map[string]any
 	if json.Unmarshal(invocation.Input, &input) != nil {
 		return nil, workflowv2.ErrOutputInvalid
@@ -76,7 +76,7 @@ func normalizeContentPage(run *db.SpaceRun, invocation workflowv2.Invocation) (j
 		next = strconv.Itoa(end)
 	}
 	page := workflowv2.ContentPage{Content: ref, Sections: sections, Citations: citations, NextCursor: next, Truncated: next != "", SourceChanged: ref.Fingerprint != "" && ref.Fingerprint != digest}
-	return mustAPIRawJSON(page), nil
+	return TestingMustAPIRawJSON(page), nil
 }
 
 func findContentRefAndText(input map[string]any) (workflowv2.ContentRef, string) {
@@ -122,7 +122,7 @@ func chunkWorkflowText(value string, maximum int) []string {
 	return out
 }
 
-func decodeJSONObject(value string) json.RawMessage {
+func TestingDecodeJSONObject(value string) json.RawMessage {
 	trimmed := strings.TrimSpace(value)
 	trimmed = strings.TrimPrefix(trimmed, "```json")
 	trimmed = strings.TrimPrefix(trimmed, "```JSON")
@@ -213,7 +213,7 @@ func workflowToolArguments(raw json.RawMessage) (json.RawMessage, json.RawMessag
 	return config, input
 }
 
-func workflowResourceIdentity(config, input json.RawMessage) (string, string) {
+func TestingWorkflowResourceIdentity(config, input json.RawMessage) (string, string) {
 	var configValue, inputValue any
 	_ = json.Unmarshal(config, &configValue)
 	_ = json.Unmarshal(input, &inputValue)

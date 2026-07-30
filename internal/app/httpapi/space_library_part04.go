@@ -195,7 +195,7 @@ func (s *SpaceLibraryService) SharedReferenceDownload() http.HandlerFunc {
 			writeLibraryError(w, err)
 			return
 		}
-		s.writeDownload(w, r, download)
+		s.TestingWriteDownload(w, r, download)
 	}
 }
 

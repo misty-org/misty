@@ -240,7 +240,7 @@ func (s *SpacesService) backfillProviderResource(ctx context.Context, resource d
 		event := notionWebhookEvent{ID: "initial:" + resource.ID, Timestamp: time.Now().UTC().Format(time.RFC3339Nano), Type: resource.ResourceType + ".initial_sync"}
 		event.Entity.ID, event.Entity.Type = resource.ExternalResourceID, resource.ResourceType
 		if event.Entity.Type == "data_source" || event.Entity.Type == "database" || event.Entity.Type == "page" {
-			if err := s.fetchAndStoreNotionEntity(ctx, resource, event, mustAPIRawJSON(event)); err != nil {
+			if err := s.fetchAndStoreNotionEntity(ctx, resource, event, TestingMustAPIRawJSON(event)); err != nil {
 				return err
 			}
 			break

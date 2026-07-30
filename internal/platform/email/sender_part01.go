@@ -64,15 +64,15 @@ func (LogSender) SendSpaceInvitationEmail(
 }
 
 type MailjetSender struct {
-	apiBaseURL string
-	apiKey     string
-	secretKey  string
-	fromEmail  string
-	fromName   string
-	httpClient *http.Client
+	TestingApiBaseURL string
+	TestingApiKey     string
+	TestingSecretKey  string
+	TestingFromEmail  string
+	TestingFromName   string
+	TestingHttpClient *http.Client
 }
 
-type mailjetSendRequest struct {
+type TestingMailjetSendRequest struct {
 	Messages []mailjetMessage `json:"Messages"`
 }
 
@@ -126,12 +126,12 @@ func NewSenderFromEnv() (Sender, error) {
 	}
 
 	return &MailjetSender{
-		apiBaseURL: apiBaseURL,
-		apiKey:     apiKey,
-		secretKey:  secretKey,
-		fromEmail:  fromEmail,
-		fromName:   strings.TrimSpace(os.Getenv("MAILJET_FROM_NAME")),
-		httpClient: &http.Client{Timeout: 10 * time.Second},
+		TestingApiBaseURL: apiBaseURL,
+		TestingApiKey:     apiKey,
+		TestingSecretKey:  secretKey,
+		TestingFromEmail:  fromEmail,
+		TestingFromName:   strings.TrimSpace(os.Getenv("MAILJET_FROM_NAME")),
+		TestingHttpClient: &http.Client{Timeout: 10 * time.Second},
 	}, nil
 }
 

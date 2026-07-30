@@ -137,7 +137,7 @@ func (s *SpacesService) SpaceDrawingCollaborationTicket() http.HandlerFunc {
 			writeSpaceError(w, err)
 			return
 		}
-		ticket, err := s.journalCollab.MintDrawingTicket(
+		ticket, err := s.TestingJournalCollab.MintDrawingTicket(
 			userID,
 			drawing.SpaceID,
 			drawing.ID,

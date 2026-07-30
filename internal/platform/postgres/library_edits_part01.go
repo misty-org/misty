@@ -206,7 +206,7 @@ func finiteRange(value, minimum, maximum float64) bool {
 
 func (db *Database) LibraryEditVersions(ctx context.Context, userID, spaceID, itemID string) ([]LibraryEditVersion, error) {
 	versions := []LibraryEditVersion{}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionLibraryView); err != nil {
 			return err
 		}

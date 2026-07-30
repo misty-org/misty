@@ -81,7 +81,7 @@ func (db *Database) AccountPortableExport(
 		Messages:      []AccountExportMessage{},
 		Connections:   []map[string]any{},
 	}
-	err := db.withRLSContext(ctx, serviceRLSSettings(), func(tx *sql.Tx) error {
+	err := db.TestingWithRLSContext(ctx, TestingServiceRLSSettings(), func(tx *sql.Tx) error {
 		if err := tx.QueryRowContext(ctx, `
 			SELECT id,name,username,email,avatar_version,created_at
 			FROM users WHERE id=$1 AND lifecycle_state='active'`, userID,

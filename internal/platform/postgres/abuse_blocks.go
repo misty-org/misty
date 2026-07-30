@@ -23,7 +23,7 @@ func (db *Database) SaveAbuseBlock(ctx context.Context, block AbuseBlock) error 
 	if block.Key == "" || block.BlockSeconds <= 0 {
 		return ErrSpaceInvalid
 	}
-	return db.spaceTx(ctx, func(tx *sql.Tx) error {
+	return db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		_, err := tx.ExecContext(ctx, `INSERT INTO abuse_blocks(block_key,blocked_until,block_seconds,reason)
 			VALUES($1,$2,$3,$4)
 			ON CONFLICT (block_key) DO UPDATE SET
@@ -42,7 +42,7 @@ func (db *Database) SaveAbuseBlock(ctx context.Context, block AbuseBlock) error 
 // whole keeps the request path free of database work entirely.
 func (db *Database) ActiveAbuseBlocks(ctx context.Context) ([]AbuseBlock, error) {
 	blocks := []AbuseBlock{}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		// Expired rows are cleaned here rather than by a separate job: the
 		// refresh already runs on a timer and needs the write anyway.
 		if _, err := tx.ExecContext(ctx,
@@ -70,7 +70,7 @@ func (db *Database) ActiveAbuseBlocks(ctx context.Context) ([]AbuseBlock, error)
 // ClearAbuseBlock lifts a block, for operator intervention when a legitimate
 // caller is caught.
 func (db *Database) ClearAbuseBlock(ctx context.Context, key string) error {
-	return db.spaceTx(ctx, func(tx *sql.Tx) error {
+	return db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		_, err := tx.ExecContext(ctx, `DELETE FROM abuse_blocks WHERE block_key=$1`, key)
 		return err
 	})

@@ -92,12 +92,12 @@ func (s *SpacesService) Nodes() http.HandlerFunc {
 		}
 		node := db.SpaceNode{SpaceID: spaceID, ParentID: body.ParentID, Kind: body.Kind, DisplayName: body.DisplayName, MIMEType: body.MIMEType, SizeBytes: body.SizeBytes, Metadata: body.Metadata}
 		if body.Kind == "link" {
-			parsed, err := validGoogleDriveTarget(body.DriveURL)
+			parsed, err := TestingValidGoogleDriveTarget(body.DriveURL)
 			if err != nil {
 				writeSpaceError(w, err)
 				return
 			}
-			node.TargetCipher, node.TargetNonce, err = s.encryptTarget(parsed.String())
+			node.TargetCipher, node.TargetNonce, err = s.TestingEncryptTarget(parsed.String())
 			if err != nil {
 				writeSpaceError(w, err)
 				return
@@ -208,12 +208,12 @@ func (s *SpacesService) Resolve() http.HandlerFunc {
 			writeSpaceError(w, err)
 			return
 		}
-		target, err := s.decryptTarget(node.TargetCipher, node.TargetNonce)
+		target, err := s.TestingDecryptTarget(node.TargetCipher, node.TargetNonce)
 		if err != nil {
 			writeSpaceError(w, err)
 			return
 		}
-		parsed, err := validGoogleDriveTarget(target)
+		parsed, err := TestingValidGoogleDriveTarget(target)
 		if err != nil {
 			writeSpaceError(w, err)
 			return

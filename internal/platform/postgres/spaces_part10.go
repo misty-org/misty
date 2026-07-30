@@ -88,7 +88,7 @@ func (db *Database) CreateResolveTicket(ctx context.Context, userID, spaceID, no
 	if disposition != "open" && disposition != "download" {
 		return ErrSpaceInvalid
 	}
-	return db.spaceTx(ctx, func(tx *sql.Tx) error {
+	return db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionMessagesRead); err != nil {
 			return err
 		}
@@ -103,7 +103,7 @@ func (db *Database) CreateResolveTicket(ctx context.Context, userID, spaceID, no
 
 func (db *Database) ConsumeResolveTicket(ctx context.Context, tokenHash string) (string, string, string, error) {
 	var userID, spaceID, nodeID string
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		return tx.QueryRowContext(ctx, `UPDATE space_resolve_tickets SET consumed_at=NOW() WHERE token_hash=$1 AND consumed_at IS NULL AND expires_at>NOW()
 			AND EXISTS(SELECT 1 FROM space_members m WHERE m.space_id=space_resolve_tickets.space_id AND m.user_id=space_resolve_tickets.user_id)
 			RETURNING user_id,space_id,node_id`, tokenHash).Scan(&userID, &spaceID, &nodeID)
@@ -116,7 +116,7 @@ func (db *Database) ConsumeResolveTicket(ctx context.Context, tokenHash string) 
 
 func (db *Database) SpaceStudioResources(ctx context.Context, userID, spaceID, kind string) ([]SpaceStudioResource, error) {
 	items := []SpaceStudioResource{}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionStudioView); err != nil {
 			return err
 		}
@@ -186,7 +186,7 @@ func (db *Database) SpaceStudioResources(ctx context.Context, userID, spaceID, k
 
 func (db *Database) SpaceChatAgents(ctx context.Context, userID, spaceID string) ([]SpaceStudioResource, error) {
 	items := []SpaceStudioResource{}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionMessagesRead); err != nil {
 			return err
 		}

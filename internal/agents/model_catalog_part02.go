@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-func gatewayCapabilities(raw json.RawMessage) []string {
+func TestingGatewayCapabilities(raw json.RawMessage) []string {
 	var list []string
 	if json.Unmarshal(raw, &list) == nil {
 		return list
@@ -50,7 +50,7 @@ func firstPricingValue(pricing map[string]json.RawMessage, keys ...string) json.
 	return nil
 }
 
-func gatewayTokenRate(raw json.RawMessage) (int64, bool) {
+func TestingGatewayTokenRate(raw json.RawMessage) (int64, bool) {
 	if len(raw) == 0 {
 		return 0, false
 	}
@@ -72,7 +72,7 @@ func gatewayTokenRate(raw json.RawMessage) (int64, bool) {
 	return rate, true
 }
 
-func filterChatModels(models []GatewayModel) []GatewayModel {
+func TestingFilterChatModels(models []GatewayModel) []GatewayModel {
 	seen := map[string]bool{}
 	out := []GatewayModel{}
 	for _, model := range models {

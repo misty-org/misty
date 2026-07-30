@@ -30,7 +30,7 @@ func (s *SpacesService) revokeCloudConnection(
 		if token == "" {
 			return "no_token_local_revocation", nil
 		}
-		if err := postProviderRevocation(
+		if err := TestingPostProviderRevocation(
 			ctx,
 			"https://oauth2.googleapis.com/revoke",
 			url.Values{"token": {token}},
@@ -43,7 +43,7 @@ func (s *SpacesService) revokeCloudConnection(
 		if secret.Token.AccessToken == "" {
 			return "no_token_local_revocation", nil
 		}
-		if err := postProviderRevocation(
+		if err := TestingPostProviderRevocation(
 			ctx,
 			"https://api.dropboxapi.com/2/auth/token/revoke",
 			nil,
@@ -63,7 +63,7 @@ func (s *SpacesService) revokeCloudConnection(
 	}
 }
 
-func postProviderRevocation(
+func TestingPostProviderRevocation(
 	ctx context.Context, endpoint string, values url.Values, bearer string,
 ) error {
 	body := ""

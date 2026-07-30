@@ -116,12 +116,12 @@ func writeAuthSession(
 
 	secure := r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https"
 	http.SetCookie(w, &http.Cookie{
-		Name:     sessionCookieName,
+		Name:     TestingSessionCookieName,
 		Value:    token,
 		Path:     "/",
 		HttpOnly: true,
 		Secure:   secure,
-		SameSite: sessionCookieSameSite(r, secure),
+		SameSite: TestingSessionCookieSameSite(r, secure),
 		MaxAge:   int(db.SessionTTL.Seconds()),
 	})
 
@@ -141,14 +141,14 @@ func Logout(database *db.Database) http.HandlerFunc {
 			_ = database.DeleteSession(tokenHash)
 		}
 
-		secure := isSecureRequest(r)
+		secure := TestingIsSecureRequest(r)
 		http.SetCookie(w, &http.Cookie{
-			Name:     sessionCookieName,
+			Name:     TestingSessionCookieName,
 			Value:    "",
 			Path:     "/",
 			HttpOnly: true,
 			Secure:   secure,
-			SameSite: sessionCookieSameSite(r, secure),
+			SameSite: TestingSessionCookieSameSite(r, secure),
 			MaxAge:   -1,
 		})
 
@@ -156,11 +156,11 @@ func Logout(database *db.Database) http.HandlerFunc {
 	}
 }
 
-func isSecureRequest(r *http.Request) bool {
+func TestingIsSecureRequest(r *http.Request) bool {
 	return r.TLS != nil || strings.EqualFold(r.Header.Get("X-Forwarded-Proto"), "https")
 }
 
-func sessionCookieSameSite(r *http.Request, secure bool) http.SameSite {
+func TestingSessionCookieSameSite(r *http.Request, secure bool) http.SameSite {
 	if secure && r.Header.Get("Origin") != "" {
 		return http.SameSiteNoneMode
 	}

@@ -23,16 +23,16 @@ import (
 )
 
 type SpacesService struct {
-	journalCollab     JournalCollabConfig
-	database          *db.Database
-	agent             *serveragent.Service
-	library           *SpaceLibraryService
-	avatarStore       LibraryObjectStore
-	aead              cipher.AEAD
-	keyVer            int16
-	workers           sync.Once
-	invitationSender  mistyemail.SpaceInvitationSender
-	invitationBaseURL string
+	TestingJournalCollab JournalCollabConfig
+	database             *db.Database
+	agent                *serveragent.Service
+	library              *SpaceLibraryService
+	avatarStore          LibraryObjectStore
+	aead                 cipher.AEAD
+	keyVer               int16
+	workers              sync.Once
+	invitationSender     mistyemail.SpaceInvitationSender
+	invitationBaseURL    string
 }
 
 func (s *SpacesService) SetInvitationSender(
@@ -89,7 +89,7 @@ func parseSpaceEncryptionKey(value string) ([]byte, error) {
 	return nil, errors.New("space link encryption key must be 32 bytes, base64, or hexadecimal")
 }
 
-func (s *SpacesService) encryptTarget(target string) ([]byte, []byte, error) {
+func (s *SpacesService) TestingEncryptTarget(target string) ([]byte, []byte, error) {
 	nonce := make([]byte, s.aead.NonceSize())
 	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
 		return nil, nil, err
@@ -97,7 +97,7 @@ func (s *SpacesService) encryptTarget(target string) ([]byte, []byte, error) {
 	return s.aead.Seal(nil, nonce, []byte(target), []byte("misty-space-link-v1")), nonce, nil
 }
 
-func (s *SpacesService) decryptTarget(ciphertext, nonce []byte) (string, error) {
+func (s *SpacesService) TestingDecryptTarget(ciphertext, nonce []byte) (string, error) {
 	plaintext, err := s.aead.Open(nil, nonce, ciphertext, []byte("misty-space-link-v1"))
 	if err != nil {
 		return "", err
@@ -105,7 +105,7 @@ func (s *SpacesService) decryptTarget(ciphertext, nonce []byte) (string, error) 
 	return string(plaintext), nil
 }
 
-func validGoogleDriveTarget(raw string) (*url.URL, error) {
+func TestingValidGoogleDriveTarget(raw string) (*url.URL, error) {
 	parsed, err := url.Parse(strings.TrimSpace(raw))
 	if err != nil || parsed.Scheme != "https" || parsed.User != nil || parsed.Host == "" {
 		return nil, db.ErrSpaceInvalid

@@ -17,7 +17,7 @@ func (db *Database) AgentExecutionContext(ctx context.Context, userID, spaceID, 
 	} else {
 		return nil, nil, ErrSpaceInvalid
 	}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionAgentsRun); err != nil {
 			return err
 		}
@@ -50,7 +50,7 @@ func (db *Database) AgentExecutionContext(ctx context.Context, userID, spaceID, 
 
 func authorizeWorkflowRequirementsTx(ctx context.Context, tx *sql.Tx, userID, spaceID string, metadata WorkflowMetadata) error {
 	for _, permission := range metadata.RequiredPermissions {
-		spacePermission, ok := workflowPermissionSpacePermission(permission)
+		spacePermission, ok := TestingWorkflowPermissionSpacePermission(permission)
 		if ok {
 			if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, spacePermission); err != nil {
 				return err
@@ -69,7 +69,7 @@ func authorizeWorkflowRequirementsTx(ctx context.Context, tx *sql.Tx, userID, sp
 	return nil
 }
 
-func workflowPermissionSpacePermission(permission string) (string, bool) {
+func TestingWorkflowPermissionSpacePermission(permission string) (string, bool) {
 	switch permission {
 	case "files.read":
 		return PermissionLibraryView, true
@@ -158,7 +158,7 @@ func (db *Database) SpaceRuns(ctx context.Context, userID, spaceID, agentID stri
 		limit = 100
 	}
 	items := []SpaceRun{}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionStudioView); err != nil {
 			return err
 		}
@@ -184,7 +184,7 @@ func (db *Database) SpaceWorkflowRuns(ctx context.Context, userID, spaceID, work
 		limit = 100
 	}
 	items := []SpaceRun{}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionStudioView); err != nil {
 			return err
 		}
@@ -207,7 +207,7 @@ func (db *Database) SpaceWorkflowRuns(ctx context.Context, userID, spaceID, work
 
 func (db *Database) SpaceRun(ctx context.Context, userID, runID string) (*SpaceRun, error) {
 	out := &SpaceRun{}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := scanSpaceRun(tx.QueryRowContext(ctx, `SELECT `+spaceRunColumns+` FROM space_runs WHERE id=$1`, runID), out); err != nil {
 			return err
 		}

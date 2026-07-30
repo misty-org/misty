@@ -59,7 +59,7 @@ func (s *SpacesService) PublishSpaceDiscordMessage() http.HandlerFunc {
 			writeSpaceError(w, db.ErrSpaceForbidden)
 			return
 		}
-		if !publishableToDiscord(message, userID) {
+		if !TestingPublishableToDiscord(message, userID) {
 			writeSpaceError(w, db.ErrSpaceForbidden)
 			return
 		}
@@ -84,7 +84,7 @@ func (s *SpacesService) PublishSpaceDiscordMessage() http.HandlerFunc {
 // publishableToDiscord mirrors the client's rule set exactly. Agent output and
 // system notices stay inside the Space, and a Discord-sourced message is never
 // bounced back — that is what keeps the mirror from looping.
-func publishableToDiscord(message *db.SpaceMessage, userID string) bool {
+func TestingPublishableToDiscord(message *db.SpaceMessage, userID string) bool {
 	if message.SenderKind != "person" || message.SenderUserID != userID {
 		return false
 	}
@@ -94,10 +94,10 @@ func publishableToDiscord(message *db.SpaceMessage, userID string) bool {
 			return false
 		}
 	}
-	return strings.TrimSpace(spansToPlainText(message.Content)) != ""
+	return strings.TrimSpace(TestingSpansToPlainText(message.Content)) != ""
 }
 
-func spansToPlainText(spans []db.MessageSpan) string {
+func TestingSpansToPlainText(spans []db.MessageSpan) string {
 	var builder strings.Builder
 	for _, span := range spans {
 		if span.Type == "text" {
@@ -113,7 +113,7 @@ func spansToPlainText(spans []db.MessageSpan) string {
 // message carries its Misty author's name, and falls back to the bot identity
 // with an attributed prefix otherwise.
 func (s *SpacesService) postDiscordMessage(ctx context.Context, link *db.SpaceDiscordLink, message *db.SpaceMessage) (string, error) {
-	content := truncateForDiscord(strings.TrimSpace(spansToPlainText(message.Content)))
+	content := TestingTruncateForDiscord(strings.TrimSpace(TestingSpansToPlainText(message.Content)))
 	if content == "" {
 		return "", db.ErrSpaceInvalid
 	}
@@ -143,7 +143,7 @@ func (s *SpacesService) postDiscordMessage(ctx context.Context, link *db.SpaceDi
 		}
 	}
 
-	payload["content"] = truncateForDiscord("**" + author + "**: " + content)
+	payload["content"] = TestingTruncateForDiscord("**" + author + "**: " + content)
 	delete(payload, "username")
 	endpoint := "https://discord.com/api/v10/channels/" + url.PathEscape(link.ChannelID) + "/messages"
 	raw, err := providerJSONRequest(ctx, discordBotToken(), "Bot", http.MethodPost, endpoint, payload, nil)
@@ -157,12 +157,12 @@ func (s *SpacesService) postDiscordMessage(ctx context.Context, link *db.SpaceDi
 	return created.ID, nil
 }
 
-func truncateForDiscord(content string) string {
+func TestingTruncateForDiscord(content string) string {
 	runes := []rune(content)
-	if len(runes) <= discordContentLimit {
+	if len(runes) <= TestingDiscordContentLimit {
 		return content
 	}
-	return string(runes[:discordContentLimit-1]) + "…"
+	return string(runes[:TestingDiscordContentLimit-1]) + "…"
 }
 
 // syncDiscordLink imports every message after the stored cursor.
@@ -191,7 +191,7 @@ func (s *SpacesService) syncDiscordLink(ctx context.Context, link *db.SpaceDisco
 	if err != nil {
 		return 0, err
 	}
-	var messages []discordMessage
+	var messages []TestingDiscordMessage
 	if json.Unmarshal(raw, &messages) != nil {
 		return 0, errors.New("discord message history was invalid")
 	}
@@ -200,10 +200,10 @@ func (s *SpacesService) syncDiscordLink(ctx context.Context, link *db.SpaceDisco
 	imported, cursor := 0, link.LastMessageID
 	for index := len(messages) - 1; index >= 0; index-- {
 		message := messages[index]
-		if snowflakeAfter(message.ID, cursor) {
+		if TestingSnowflakeAfter(message.ID, cursor) {
 			cursor = message.ID
 		}
-		if !shouldMirrorDiscordMessage(message, link) {
+		if !TestingShouldMirrorDiscordMessage(message, link) {
 			continue
 		}
 		if _, mirrorErr := s.mirrorDiscordMessage(ctx, *link, message); mirrorErr == nil {
@@ -217,7 +217,7 @@ func (s *SpacesService) syncDiscordLink(ctx context.Context, link *db.SpaceDisco
 // shouldMirrorDiscordMessage decides whether a Discord message becomes a Misty
 // message. The bot-and-webhook rule is what stops an infinite mirror loop:
 // anything Misty itself posted comes back down the same channel read.
-func shouldMirrorDiscordMessage(message discordMessage, link *db.SpaceDiscordLink) bool {
+func TestingShouldMirrorDiscordMessage(message TestingDiscordMessage, link *db.SpaceDiscordLink) bool {
 	if link.Direction == "outbound" {
 		return false
 	}

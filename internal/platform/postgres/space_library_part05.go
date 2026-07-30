@@ -16,7 +16,7 @@ func (db *Database) LibraryItems(ctx context.Context, userID, spaceID string, qu
 	if len([]rune(query.Search)) > 240 {
 		return nil, ErrLibraryInvalid
 	}
-	structuredSearch, err := parseLibrarySearch(query.Search)
+	structuredSearch, err := TestingParseLibrarySearch(query.Search)
 	if err != nil {
 		return nil, err
 	}
@@ -63,7 +63,7 @@ func (db *Database) LibraryItems(ctx context.Context, userID, spaceID string, qu
 		query.Sort = "recently-added"
 	}
 	items := []SpaceLibraryItem{}
-	err = db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err = db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionLibraryView); err != nil {
 			return err
 		}

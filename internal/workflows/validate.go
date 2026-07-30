@@ -67,7 +67,7 @@ func validate(definition Definition, registry *Registry, dependencies Dependency
 				return fmt.Errorf("%w: call_workflow %s must pin a declared dependency", ErrInvalidDefinition, node.ID)
 			}
 		case "for_each":
-			var config forEachConfig
+			var config TestingForEachConfig
 			if json.Unmarshal(node.Config, &config) != nil || (config.ChildGraph == nil) == (config.WorkflowVersionID == "") {
 				return fmt.Errorf("%w: for_each %s requires exactly one child graph or pinned subflow", ErrInvalidDefinition, node.ID)
 			}
