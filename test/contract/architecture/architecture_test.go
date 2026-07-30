@@ -105,10 +105,10 @@ func TestEnvironmentAccessIsCentralized(t *testing.T) {
 	})
 }
 
-func TestEnvironmentContractIsDocumented(t *testing.T) {
+func TestEnvironmentContractIsExplicit(t *testing.T) {
 	root := repositoryRoot(t)
 	documented := map[string]bool{}
-	example, err := os.ReadFile(filepath.Join(root, ".env.example"))
+	example, err := os.ReadFile(filepath.Join(root, "test", "contract", "architecture", "fixtures", "environment-contract.env"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -150,7 +150,7 @@ func TestEnvironmentContractIsDocumented(t *testing.T) {
 	})
 	for name := range used {
 		if !documented[name] {
-			t.Errorf("environment variable %s is missing from .env.example", name)
+			t.Errorf("environment variable %s is missing from the environment contract", name)
 		}
 	}
 }

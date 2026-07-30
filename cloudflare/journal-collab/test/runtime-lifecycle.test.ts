@@ -1,3 +1,6 @@
+// This file intentionally exercises the emitted Worker bundle as a black box.
+// Miniflare's runtime objects are more dynamic than the Worker source types.
+// @ts-nocheck
 import assert from "node:assert/strict";
 import {
   createHmac,
@@ -8,7 +11,7 @@ import {
 import { mkdtemp, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import test from "node:test";
+import { test } from "vitest";
 
 import { Miniflare } from "miniflare";
 import YProvider from "y-partyserver/provider";
