@@ -53,6 +53,7 @@ pub(super) fn platform(
         workspace.misty.join("src-tauri/target/release/bundle")
     };
     if platform == "macos-universal" {
+        notarize_macos_bundle(workspace, &bundle)?;
         verify_macos_bundle(workspace, &bundle)?;
     }
     let destination = state::release_root(workspace, &release.version).join(platform);
@@ -76,8 +77,36 @@ pub(super) fn platform(
         signature,
     )?;
     manifest.write(&destination.join(format!("release-{platform}.json")))?;
-    artifacts::write_checksums(&destination)?;
+    let checksums = artifacts::write_checksums(&destination)?;
+    std::fs::rename(
+        checksums,
+        destination.join(format!("SHA256SUMS-{platform}")),
+    )?;
     println!("Built {platform} artifacts in {}", destination.display());
+    Ok(())
+}
+
+fn notarize_macos_bundle(workspace: &Workspace, bundle: &Path) -> Result<()> {
+    let profile = std::env::var("MISTY_NOTARY_KEYCHAIN_PROFILE")
+        .unwrap_or_default()
+        .trim()
+        .to_owned();
+    if profile.is_empty() {
+        bail!("MISTY_NOTARY_KEYCHAIN_PROFILE is required for a macOS release");
+    }
+    let app = find_app(bundle).context("macOS app bundle was not produced")?;
+    let dmg = find_extension(bundle, "dmg").context("macOS DMG was not produced")?;
+    CommandSpec::new("xcrun")
+        .args(["notarytool", "submit"])
+        .arg(dmg.as_os_str())
+        .args(["--keychain-profile", &profile, "--wait"])
+        .run(&workspace.misty)?;
+    for path in [&app, &dmg] {
+        CommandSpec::new("xcrun")
+            .args(["stapler", "staple"])
+            .arg(path.as_os_str())
+            .run(&workspace.misty)?;
+    }
     Ok(())
 }
 
@@ -196,6 +225,17 @@ fn find_extension(root: &Path, extension: &str) -> Option<PathBuf> {
                     .path()
                     .extension()
                     .is_some_and(|value| value == extension)
+        })
+        .map(|entry| entry.into_path())
+}
+
+fn find_app(root: &Path) -> Option<PathBuf> {
+    WalkDir::new(root)
+        .into_iter()
+        .filter_map(Result::ok)
+        .find(|entry| {
+            entry.file_type().is_dir()
+                && entry.path().extension().is_some_and(|value| value == "app")
         })
         .map(|entry| entry.into_path())
 }

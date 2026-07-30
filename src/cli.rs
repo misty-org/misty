@@ -289,6 +289,9 @@ fn doctor(settings: &Settings) -> Result<()> {
     crate::process::CommandSpec::new(crate::process::npm())
         .args(["exec", "tauri", "--", "--version"])
         .run(&settings.workspace.misty)?;
+    crate::process::CommandSpec::new("cargo")
+        .args(["cyclonedx", "--version"])
+        .run(&settings.workspace.misty)?;
     report_release_inputs();
     report_repository_status(settings)?;
     println!("workspace  {}", settings.workspace.root.display());
