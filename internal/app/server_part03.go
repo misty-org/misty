@@ -1,0 +1,227 @@
+package app
+
+import (
+	"context"
+	"crypto/sha256"
+	"encoding/base64"
+	"fmt"
+	"net/http"
+	"os"
+	"strings"
+	"time"
+
+	api "github.com/kannachi323/misty/server/internal/app/httpapi"
+)
+
+func (s *Server) mountSpacesRoutes(prefix string, spaces *api.SpacesService, realtime *api.RealtimeService) {
+	s.Router.Get(prefix+"/cloud/connections", spaces.CloudConnections())
+	s.Router.Post(prefix+"/cloud/connections/{provider}/authorize", spaces.BeginCloudAuthorization())
+	s.Router.Get(prefix+"/oauth/cloud/{provider}/callback", spaces.CloudAuthorizationCallback())
+	s.Router.Post(prefix+"/cloud/connections/{connectionID}/token", spaces.CloudConnectionToken())
+	s.Router.Delete(prefix+"/cloud/connections/{connectionID}", spaces.DeleteCloudConnection())
+	s.Router.MethodFunc(http.MethodGet, prefix+"/spaces", spaces.Spaces())
+	s.Router.MethodFunc(http.MethodPost, prefix+"/spaces", spaces.Spaces())
+	s.Router.Get(prefix+"/space-templates", spaces.SpaceTemplates())
+	s.Router.MethodFunc(http.MethodGet, prefix+"/spaces/{spaceID}/setup", spaces.SpaceSetup())
+	s.Router.MethodFunc(http.MethodPatch, prefix+"/spaces/{spaceID}/setup", spaces.SpaceSetup())
+	s.Router.MethodFunc(http.MethodGet, prefix+"/spaces/{spaceID}", spaces.Space())
+	s.Router.MethodFunc(http.MethodPatch, prefix+"/spaces/{spaceID}", spaces.Space())
+	s.Router.MethodFunc(http.MethodDelete, prefix+"/spaces/{spaceID}", spaces.Space())
+	s.Router.Get(prefix+"/spaces/{spaceID}/members", spaces.Members())
+	s.Router.Get(prefix+"/spaces/{spaceID}/members/{userID}/avatar", spaces.MemberAvatar())
+	s.Router.MethodFunc(http.MethodGet, prefix+"/spaces/{spaceID}/invitations", spaces.Invite())
+	s.Router.MethodFunc(http.MethodPost, prefix+"/spaces/{spaceID}/invitations", spaces.Invite())
+	s.Router.MethodFunc(http.MethodPost, prefix+"/spaces/{spaceID}/invitations/{inviteID}/resend", spaces.SpaceInvitationItem())
+	s.Router.MethodFunc(http.MethodDelete, prefix+"/spaces/{spaceID}/invitations/{inviteID}", spaces.SpaceInvitationItem())
+	s.Router.Post(prefix+"/spaces/invitations/{inviteID}/accept", spaces.RespondInvite(true))
+	s.Router.Post(prefix+"/spaces/invitations/{inviteID}/decline", spaces.RespondInvite(false))
+	s.Router.MethodFunc(http.MethodGet, prefix+"/space-invitations/{token}", spaces.SpaceInvitationToken())
+	s.Router.MethodFunc(http.MethodPost, prefix+"/space-invitations/{token}", spaces.SpaceInvitationToken())
+	s.Router.Delete(prefix+"/spaces/{spaceID}/members/{userID}", spaces.RemoveMember())
+	s.Router.Post(prefix+"/spaces/{spaceID}/leave", spaces.LeaveSpace())
+	s.Router.Post(prefix+"/spaces/{spaceID}/transfer", spaces.TransferOwner())
+	s.Router.MethodFunc(http.MethodGet, prefix+"/spaces/{spaceID}/messages", spaces.Messages())
+	s.Router.MethodFunc(http.MethodPost, prefix+"/spaces/{spaceID}/messages", spaces.Messages())
+	s.Router.MethodFunc(http.MethodGet, prefix+"/spaces/{spaceID}/conversations", spaces.Conversations())
+	s.Router.MethodFunc(http.MethodPost, prefix+"/spaces/{spaceID}/conversations", spaces.Conversations())
+	s.Router.MethodFunc(http.MethodPatch, prefix+"/spaces/{spaceID}/conversations/{conversationID}", spaces.Conversation())
+	s.Router.MethodFunc(http.MethodDelete, prefix+"/spaces/{spaceID}/conversations/{conversationID}", spaces.Conversation())
+	s.Router.MethodFunc(http.MethodGet, prefix+"/spaces/{spaceID}/conversations/{conversationID}/messages", spaces.ConversationMessages())
+	s.Router.MethodFunc(http.MethodPost, prefix+"/spaces/{spaceID}/conversations/{conversationID}/messages", spaces.ConversationMessages())
+	s.Router.MethodFunc(http.MethodPut, prefix+"/spaces/{spaceID}/conversations/{conversationID}/messages/{messageID}", spaces.ConversationMessage())
+	s.Router.MethodFunc(http.MethodDelete, prefix+"/spaces/{spaceID}/conversations/{conversationID}/messages/{messageID}", spaces.ConversationMessage())
+	s.Router.MethodFunc(http.MethodPut, prefix+"/spaces/{spaceID}/conversations/{conversationID}/messages/{messageID}/reactions/{emoji}", spaces.ConversationMessageReaction())
+	s.Router.MethodFunc(http.MethodDelete, prefix+"/spaces/{spaceID}/conversations/{conversationID}/messages/{messageID}/reactions/{emoji}", spaces.ConversationMessageReaction())
+	s.Router.MethodFunc(http.MethodGet, prefix+"/spaces/{spaceID}/chat/agents", spaces.ChatAgents())
+	s.Router.MethodFunc(http.MethodGet, prefix+"/spaces/{spaceID}/tasks", spaces.SpaceTasks())
+	s.Router.MethodFunc(http.MethodPost, prefix+"/spaces/{spaceID}/tasks", spaces.SpaceTasks())
+	s.Router.MethodFunc(http.MethodPatch, prefix+"/spaces/{spaceID}/tasks/{taskID}", spaces.SpaceTask())
+	s.Router.MethodFunc(http.MethodDelete, prefix+"/spaces/{spaceID}/tasks/{taskID}", spaces.SpaceTask())
+	s.Router.Post(prefix+"/spaces/{spaceID}/tasks/{taskID}/move", spaces.MoveSpaceTask())
+	s.mountNoteRoutes(prefix, spaces)
+	s.mountDrawingRoutes(prefix, spaces)
+	s.Router.Get(prefix+"/spaces/{spaceID}/calendar/events", spaces.SpaceCalendar())
+	s.Router.MethodFunc(http.MethodGet, prefix+"/spaces/{spaceID}/calendar/sources", spaces.SpaceCalendarSources())
+	s.Router.MethodFunc(http.MethodPost, prefix+"/spaces/{spaceID}/calendar/sources", spaces.SpaceCalendarSources())
+	s.Router.Delete(prefix+"/spaces/{spaceID}/calendar/sources/{sourceID}", spaces.SpaceCalendarSource())
+	s.Router.Get(prefix+"/spaces/{spaceID}/calendar/google/calendars", spaces.AvailableGoogleCalendars())
+	s.Router.Post(prefix+"/spaces/{spaceID}/calendar/sync", spaces.SyncCalendarTasks())
+	s.Router.Post(prefix+"/spaces/{spaceID}/tasks/calendar", spaces.CreateCalendarTask())
+	s.Router.Post(prefix+"/spaces/{spaceID}/tasks/{taskID}/calendar/publish", spaces.PublishTaskToCalendar())
+	s.Router.Post(prefix+"/spaces/{spaceID}/tasks/{taskID}/calendar/resolve", spaces.ResolveTaskCalendarConflict())
+	s.Router.MethodFunc(http.MethodPut, prefix+"/spaces/{spaceID}/messages/{messageID}", spaces.Message())
+	s.Router.MethodFunc(http.MethodDelete, prefix+"/spaces/{spaceID}/messages/{messageID}", spaces.Message())
+	s.Router.MethodFunc(http.MethodPut, prefix+"/spaces/{spaceID}/messages/{messageID}/reactions/{emoji}", spaces.MessageReaction())
+	s.Router.MethodFunc(http.MethodDelete, prefix+"/spaces/{spaceID}/messages/{messageID}/reactions/{emoji}", spaces.MessageReaction())
+	s.Router.Post(prefix+"/spaces/{spaceID}/read", spaces.MarkRead())
+	s.Router.MethodFunc(http.MethodGet, prefix+"/spaces/{spaceID}/nodes", spaces.Nodes())
+	s.Router.MethodFunc(http.MethodPost, prefix+"/spaces/{spaceID}/nodes", spaces.Nodes())
+	s.Router.MethodFunc(http.MethodPut, prefix+"/spaces/{spaceID}/nodes/{nodeID}", spaces.Node())
+	s.Router.MethodFunc(http.MethodDelete, prefix+"/spaces/{spaceID}/nodes/{nodeID}", spaces.Node())
+	s.Router.Post(prefix+"/spaces/{spaceID}/nodes/{nodeID}/resolve", spaces.ResolveTicket())
+	s.Router.Get(prefix+"/spaces/resolve/{ticket}", spaces.Resolve())
+	s.Router.Get(prefix+"/activity/inbox", spaces.Inbox())
+	s.Router.Post(prefix+"/activity/inbox/seen", spaces.InboxSeen())
+	s.Router.Post(prefix+"/activity/inbox/clear", spaces.InboxClear())
+	s.Router.MethodFunc(http.MethodGet, prefix+"/spaces/{spaceID}/studio/agents", spaces.StudioResources("agent"))
+	s.Router.MethodFunc(http.MethodPost, prefix+"/spaces/{spaceID}/studio/agents", spaces.StudioResources("agent"))
+	s.Router.Delete(prefix+"/spaces/{spaceID}/studio/agents/{resourceID}", spaces.DeleteStudioResource("agent"))
+	s.Router.Post(prefix+"/spaces/{spaceID}/studio/agents/{resourceID}/runs", spaces.RunStudioResource("agent"))
+	s.Router.MethodFunc(http.MethodGet, prefix+"/spaces/{spaceID}/agents/{agentID}/runs", spaces.DirectAgentRun())
+	s.Router.MethodFunc(http.MethodPost, prefix+"/spaces/{spaceID}/agents/{agentID}/runs", spaces.DirectAgentRun())
+	s.Router.MethodFunc(http.MethodGet, prefix+"/spaces/{spaceID}/studio/agents/{agentID}/versions", spaces.AgentVersions())
+	s.Router.MethodFunc(http.MethodPost, prefix+"/spaces/{spaceID}/studio/agents/{agentID}/versions", spaces.AgentVersions())
+	s.Router.MethodFunc(http.MethodGet, prefix+"/spaces/{spaceID}/agents/{agentID}/instance", spaces.AgentInstance())
+	s.Router.MethodFunc(http.MethodPost, prefix+"/spaces/{spaceID}/agents/{agentID}/instance", spaces.AgentInstance())
+	s.Router.Put(prefix+"/agent-instances/{instanceID}/workflows/{workflowVersionID}", spaces.AgentInstanceWorkflow())
+	s.Router.Put(prefix+"/agent-instances/{instanceID}/connections", spaces.AgentInstanceConnections())
+	s.Router.MethodFunc(http.MethodGet, prefix+"/spaces/{spaceID}/studio/workflows", spaces.StudioResources("workflow"))
+	s.Router.MethodFunc(http.MethodPost, prefix+"/spaces/{spaceID}/studio/workflows", spaces.StudioResources("workflow"))
+	s.Router.Delete(prefix+"/spaces/{spaceID}/studio/workflows/{resourceID}", spaces.DeleteStudioResource("workflow"))
+	s.Router.MethodFunc(http.MethodGet, prefix+"/spaces/{spaceID}/studio/workflows/{workflowID}/versions", spaces.WorkflowVersions())
+	s.Router.MethodFunc(http.MethodPost, prefix+"/spaces/{spaceID}/studio/workflows/{workflowID}/versions", spaces.WorkflowVersions())
+	s.Router.Get(prefix+"/agents/catalog", spaces.AgentCatalog())
+	s.Router.Get(prefix+"/agents/discovery", spaces.AgentDiscovery())
+	s.Router.Post(prefix+"/agents/delegations", spaces.AgentDelegation())
+	// Pre-rename aliases. Unlike an internal identifier, a route is a contract
+	// with desktop binaries that are already shipped, so both paths serve the
+	// same handlers until those clients have updated.
+	s.Router.Get(prefix+"/mika/discovery", spaces.AgentDiscovery())
+	s.Router.Post(prefix+"/mika/delegations", spaces.AgentDelegation())
+	s.Router.MethodFunc(http.MethodGet, prefix+"/agent-conversations", spaces.AgentConversations())
+	s.Router.MethodFunc(http.MethodPost, prefix+"/agent-conversations", spaces.AgentConversations())
+	s.Router.MethodFunc(http.MethodGet, prefix+"/agent-conversations/{conversationID}/events", spaces.AgentConversationEvents())
+	s.Router.MethodFunc(http.MethodPost, prefix+"/agent-conversations/{conversationID}/events", spaces.AgentConversationEvents())
+	s.Router.MethodFunc(http.MethodGet, prefix+"/spaces/{spaceID}/integrations", spaces.SpaceIntegrations())
+	s.Router.MethodFunc(http.MethodGet, prefix+"/spaces/{spaceID}/integrations/{integrationID}/resources", spaces.AvailableProviderResources())
+	s.Router.MethodFunc(http.MethodPut, prefix+"/spaces/{spaceID}/integrations/{integrationID}/resources", spaces.AvailableProviderResources())
+	s.Router.MethodFunc(http.MethodGet, prefix+"/spaces/{spaceID}/provider-resources", spaces.ProviderSharedResources())
+	s.Router.MethodFunc(http.MethodPost, prefix+"/spaces/{spaceID}/provider-resources", spaces.ProviderSharedResources())
+	s.Router.Delete(prefix+"/spaces/{spaceID}/provider-resources/{resourceID}", spaces.ProviderSharedResource())
+	// Connections are created only through branded OAuth/install flows. The
+	// legacy PUT route is intentionally not mounted because callers must never
+	// supply their own credential/vault reference.
+	s.Router.Post(prefix+"/spaces/{spaceID}/integrations/{provider}/authorize", spaces.BeginProviderAuthorization())
+	s.Router.Get(prefix+"/oauth/providers/{provider}/callback", spaces.ProviderAuthorizationCallback())
+	s.Router.Post(prefix+"/provider-callbacks/google/calendar", spaces.GoogleCalendarCallback())
+	s.Router.Post(prefix+"/provider-callbacks/slack-events", spaces.SlackEventsCallback())
+	s.Router.Post(prefix+"/provider-callbacks/notion-events", spaces.NotionEventsCallback())
+	s.Router.Delete(prefix+"/integrations/{integrationID}", spaces.DeleteProviderIntegration())
+
+	// Space ↔ Discord conversation mirroring.
+	s.Router.MethodFunc(http.MethodGet, prefix+"/spaces/{spaceID}/integrations/discord/links", spaces.SpaceDiscordLink())
+	s.Router.MethodFunc(http.MethodPost, prefix+"/spaces/{spaceID}/integrations/discord/links", spaces.SpaceDiscordLink())
+	s.Router.MethodFunc(http.MethodPatch, prefix+"/spaces/{spaceID}/integrations/discord/links/{linkID}", spaces.SpaceDiscordLinkItem())
+	s.Router.MethodFunc(http.MethodDelete, prefix+"/spaces/{spaceID}/integrations/discord/links/{linkID}", spaces.SpaceDiscordLinkItem())
+	s.Router.Post(prefix+"/spaces/{spaceID}/integrations/discord/links/{linkID}/sync", spaces.SyncSpaceDiscordLink())
+	s.Router.Post(prefix+"/spaces/{spaceID}/integrations/discord/links/{linkID}/publish", spaces.PublishSpaceDiscordMessage())
+	// Compatibility aliases for desktop builds shipped before the collection
+	// contract became plural.
+	s.Router.MethodFunc(http.MethodGet, prefix+"/spaces/{spaceID}/integrations/discord/link", spaces.SpaceDiscordLink())
+	s.Router.MethodFunc(http.MethodPost, prefix+"/spaces/{spaceID}/integrations/discord/link", spaces.SpaceDiscordLink())
+	s.Router.MethodFunc(http.MethodPatch, prefix+"/spaces/{spaceID}/integrations/discord/link/{linkID}", spaces.SpaceDiscordLinkItem())
+	s.Router.MethodFunc(http.MethodDelete, prefix+"/spaces/{spaceID}/integrations/discord/link/{linkID}", spaces.SpaceDiscordLinkItem())
+	s.Router.Post(prefix+"/spaces/{spaceID}/integrations/discord/link/{linkID}/sync", spaces.SyncSpaceDiscordLink())
+	s.Router.Post(prefix+"/spaces/{spaceID}/integrations/discord/link/{linkID}/publish", spaces.PublishSpaceDiscordMessage())
+
+	// Notion read/write proxy. The Notion token stays server-side.
+	s.Router.Get(prefix+"/spaces/{spaceID}/integrations/notion/status", spaces.NotionStatus())
+	s.Router.Delete(prefix+"/spaces/{spaceID}/integrations/notion/connection", spaces.NotionConnection())
+	s.Router.Get(prefix+"/spaces/{spaceID}/integrations/notion/sources", spaces.NotionSources())
+	s.Router.Get(prefix+"/spaces/{spaceID}/integrations/notion/search", spaces.NotionSearch())
+	s.Router.Post(prefix+"/spaces/{spaceID}/integrations/notion/pages", spaces.NotionPages())
+	s.Router.MethodFunc(http.MethodGet, prefix+"/spaces/{spaceID}/integrations/notion/pages/{pageID}", spaces.NotionPage())
+	s.Router.MethodFunc(http.MethodPatch, prefix+"/spaces/{spaceID}/integrations/notion/pages/{pageID}", spaces.NotionPage())
+	s.Router.Get(prefix+"/spaces/{spaceID}/integrations/notion/pages/{pageID}/blocks", spaces.NotionPageBlocks())
+	s.Router.Patch(prefix+"/spaces/{spaceID}/integrations/notion/blocks/{blockID}/children", spaces.NotionBlockChildren())
+	s.Router.Get(prefix+"/spaces/{spaceID}/integrations/notion/databases/{databaseID}", spaces.NotionDatabase())
+	s.Router.Post(prefix+"/spaces/{spaceID}/integrations/notion/databases/{databaseID}/query", spaces.NotionDatabaseQuery())
+	s.Router.Get(prefix+"/runs/{runID}", spaces.RunDetail())
+	s.Router.Post(prefix+"/runs/{runID}/approval", spaces.RunDecision())
+	s.Router.Post(prefix+"/runs/{runID}/cancel", spaces.RunCancel())
+	s.Router.Post(prefix+"/runs/{runID}/retry", spaces.RunRetry())
+	s.Router.Post(prefix+"/realtime/tickets", realtime.Ticket())
+	s.Router.Get(prefix+"/realtime", realtime.Connect())
+}
+
+func (s *Server) StartRealtime() error {
+	if s.Realtime == nil {
+		return nil
+	}
+	return s.Realtime.Start()
+}
+
+func spaceLinkEncryptionKeyFromEnv() (string, error) {
+	if key := strings.TrimSpace(os.Getenv("SPACE_LINK_ENCRYPTION_KEY")); key != "" {
+		return key, nil
+	}
+	seed := strings.TrimSpace(os.Getenv("DOCUMENT_SIGNING_KEY"))
+	if seed == "" {
+		if strings.EqualFold(strings.TrimSpace(os.Getenv("MISTY_ENVIRONMENT")), "production") {
+			return "", fmt.Errorf("SPACE_LINK_ENCRYPTION_KEY is required in production")
+		}
+		seed = "misty-development-space-link-key"
+	}
+	sum := sha256.Sum256([]byte("misty-space-links:" + seed))
+	return base64.StdEncoding.EncodeToString(sum[:]), nil
+}
+
+func (s *Server) CleanupExpiredLibraryData(ctx context.Context, limit int) (int, error) {
+	if s.Library == nil {
+		return 0, nil
+	}
+	return s.Library.CleanupExpired(ctx, limit)
+}
+
+func (s *Server) CleanupExpiredJournalAssets(
+	ctx context.Context,
+	safetyWindow time.Duration,
+	limit int,
+) (int, error) {
+	if s.Library == nil {
+		return 0, nil
+	}
+	return s.Library.CleanupExpiredJournalAssets(ctx, safetyWindow, limit)
+}
+
+func (s *Server) mountAgentsRoutes(prefix string, service *api.AgentsService) {
+	s.Router.MethodFunc(http.MethodGet, prefix+"/agents", service.PersonalAgents())
+	s.Router.MethodFunc(http.MethodPost, prefix+"/agents", service.PersonalAgents())
+	s.Router.MethodFunc(http.MethodGet, prefix+"/agents/{agentID}", service.PersonalAgent())
+	s.Router.MethodFunc(http.MethodPatch, prefix+"/agents/{agentID}", service.PersonalAgent())
+	s.Router.MethodFunc(http.MethodDelete, prefix+"/agents/{agentID}", service.PersonalAgent())
+	s.Router.MethodFunc(http.MethodGet, prefix+"/agents/{agentID}/space-grants", service.PersonalAgentGrants())
+	s.Router.MethodFunc(http.MethodPut, prefix+"/agents/{agentID}/space-grants", service.PersonalAgentGrants())
+	s.Router.MethodFunc(http.MethodGet, prefix+"/ai/models", service.Models())
+	if !serverFeatureEnabled("MISTY_DEVICE_JOBS_ENABLED") {
+		return
+	}
+	s.Router.Post(prefix+"/devices", service.RegisterDevice())
+	s.Router.Get(prefix+"/devices", service.ListDevices())
+	s.Router.Post(prefix+"/devices/{deviceID}/heartbeat", service.DeviceAuthenticated(service.HeartbeatDevice()))
+	s.Router.Post(prefix+"/devices/{deviceID}/revoke", service.RevokeDevice())
+	s.Router.Post(prefix+"/devices/{deviceID}/workflow-node-jobs/claim", service.DeviceAuthenticated(service.ClaimWorkflowNodeJob()))
+	s.Router.Post(prefix+"/devices/{deviceID}/workflow-node-jobs/{jobID}/lease", service.DeviceAuthenticated(service.WorkflowNodeLeaseAction("renew")))
+	s.Router.Post(prefix+"/devices/{deviceID}/workflow-node-jobs/{jobID}/complete", service.DeviceAuthenticated(service.WorkflowNodeLeaseAction("complete")))
+	s.Router.Post(prefix+"/devices/{deviceID}/workflow-node-jobs/{jobID}/fail", service.DeviceAuthenticated(service.WorkflowNodeLeaseAction("fail")))
+}

@@ -16,7 +16,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/kannachi323/misty/server/api"
+	api "github.com/kannachi323/misty/server/internal/app/httpapi"
 )
 
 func main() {

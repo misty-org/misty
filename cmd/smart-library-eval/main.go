@@ -12,7 +12,7 @@ import (
 	"strings"
 
 	"github.com/joho/godotenv"
-	serveragent "github.com/kannachi323/misty/server/agent"
+	serveragent "github.com/kannachi323/misty/server/internal/agents"
 )
 
 type manifest struct {

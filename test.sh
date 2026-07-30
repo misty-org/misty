@@ -104,7 +104,7 @@ DROP DATABASE IF EXISTS "${TEST_DB_NAME}";
 CREATE DATABASE "${TEST_DB_NAME}";
 SQL
 
-  for migration in db/migrations/*.sql; do
+  for migration in internal/platform/postgres/migrations/*.sql; do
     awk '
       /^-- \+goose Up$/ { in_up = 1; next }
       /^-- \+goose Down$/ { in_up = 0 }
@@ -120,11 +120,12 @@ SQL
     echo "CREATE TABLE IF NOT EXISTS goose_db_version (id SERIAL PRIMARY KEY, version_id BIGINT NOT NULL, is_applied BOOLEAN NOT NULL, tstamp TIMESTAMP NULL DEFAULT now());"
     echo "TRUNCATE goose_db_version RESTART IDENTITY;"
     echo "INSERT INTO goose_db_version (version_id, is_applied) VALUES (0, true);"
-    for migration in db/migrations/*.sql; do
+    for migration in internal/platform/postgres/migrations/*.sql; do
       version="$(basename "$migration" | cut -d_ -f1)"
       echo "INSERT INTO goose_db_version (version_id, is_applied) VALUES (${version}, true);"
     done
   } | docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$ADMIN_DB_USER" -d "$TEST_DB_NAME" >/dev/null
 fi
 
+./scripts/check-go-file-sizes.sh
 go test ./... -count=1 "$@"
