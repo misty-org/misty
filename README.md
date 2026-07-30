@@ -8,6 +8,8 @@ that will ship the artifacts.
 ## Install
 
 ```bash
+rustup target add x86_64-apple-darwin # on Apple Silicon Macs
+cargo install cargo-cyclonedx --version 0.5.9 --locked
 cargo install --path ~/misty-org/misty-cli --locked --force
 misty-cli configure --workspace ~/misty-org
 misty-cli doctor
