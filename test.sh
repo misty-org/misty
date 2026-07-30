@@ -52,6 +52,13 @@ if [[ "$SHOULD_BOOTSTRAP_TEST_DB" == "true" ]]; then
   fi
 
   export TEST_DB_HOST="${TEST_DB_HOST:-localhost}"
+  case "$TEST_DB_HOST" in
+    "localhost"|"::1")
+      # The development Postgres port is intentionally IPv4 loopback-only.
+      # Avoid macOS resolving localhost to ::1 for the bootstrapped container.
+      export TEST_DB_HOST="127.0.0.1"
+      ;;
+  esac
   export TEST_DB_PORT="${TEST_DB_PORT:-5432}"
   export TEST_DB_USER="${TEST_DB_USER:-misty}"
   export TEST_DB_PASSWORD="${TEST_DB_PASSWORD:-misty}"

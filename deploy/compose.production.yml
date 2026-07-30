@@ -1,0 +1,48 @@
+name: misty-server-production
+
+# Use with the shared root file:
+# docker compose --env-file /etc/misty-server/production.env \
+#   -f docker-compose.yml -f deploy/compose.production.yml up -d
+
+services:
+  postgres:
+    environment:
+      POSTGRES_USER: ${DB_MIGRATION_USER:?set DB_MIGRATION_USER}
+      POSTGRES_PASSWORD: ${DB_MIGRATION_PASSWORD:?set DB_MIGRATION_PASSWORD}
+      POSTGRES_DB: ${DB_NAME:?set DB_NAME}
+      MISTY_APP_DB_USER: ${DB_USER:?set DB_USER}
+      MISTY_APP_DB_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD}
+
+  migrate:
+    image: ${MISTY_API_IMAGE:?set immutable MISTY_API_IMAGE}
+    environment:
+      GOOSE_DBSTRING: >-
+        host=postgres port=5432
+        user=${DB_MIGRATION_USER:?set DB_MIGRATION_USER}
+        password=${DB_MIGRATION_PASSWORD:?set DB_MIGRATION_PASSWORD}
+        dbname=${DB_NAME:?set DB_NAME}
+        sslmode=disable
+
+  database-permissions:
+    environment:
+      PGDATABASE: ${DB_NAME:?set DB_NAME}
+      PGUSER: ${DB_MIGRATION_USER:?set DB_MIGRATION_USER}
+      PGPASSWORD: ${DB_MIGRATION_PASSWORD:?set DB_MIGRATION_PASSWORD}
+      MISTY_APP_DB_USER: ${DB_USER:?set DB_USER}
+
+  api:
+    image: ${MISTY_API_IMAGE:?set immutable MISTY_API_IMAGE}
+    env_file:
+      - ${MISTY_ENV_FILE:-/etc/misty-server/production.env}
+    environment:
+      PORT: "8080"
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_NAME: ${DB_NAME:?set DB_NAME}
+      DB_USER: ${DB_USER:?set DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD}
+      DB_MIGRATION_USER: ""
+      DB_MIGRATION_PASSWORD: ""
+      CLOUDFLARE_API_TOKEN: ""
+    ports:
+      - "127.0.0.1:${MISTY_HOST_PORT:-8081}:8080"

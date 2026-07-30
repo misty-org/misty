@@ -15,7 +15,9 @@ FROM debian:bookworm-slim@sha256:7b140f374b289a7c2befc338f42ebe6441b7ea838a042bb
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates curl ffmpeg poppler-utils \
     && rm -rf /var/lib/apt/lists/* \
-    && useradd --system --uid 10001 --no-create-home --shell /usr/sbin/nologin misty
+    && useradd --system --uid 10001 --no-create-home --shell /usr/sbin/nologin misty \
+    && mkdir -p /var/lib/misty/library \
+    && chown -R 10001:10001 /var/lib/misty
 
 COPY --from=builder --chown=10001:10001 /out/misty-server /usr/local/bin/misty-server
 COPY --from=builder --chown=10001:10001 /out/goose /usr/local/bin/goose
