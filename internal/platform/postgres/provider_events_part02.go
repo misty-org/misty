@@ -14,7 +14,7 @@ func (db *Database) FinishProviderEvent(ctx context.Context, integrationID, exte
 	if state != "processed" && state != "failed" {
 		return ErrSpaceInvalid
 	}
-	return db.spaceTx(ctx, func(tx *sql.Tx) error {
+	return db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		_, err := tx.ExecContext(ctx, `UPDATE provider_event_inbox SET state=$1,processed_at=NOW() WHERE integration_id=$2 AND external_event_id=$3`, state, integrationID, externalEventID)
 		return err
 	})
@@ -30,7 +30,7 @@ func (db *Database) UpsertProviderContentRecord(ctx context.Context, item Provid
 	if len(item.Content) == 0 {
 		item.Content = json.RawMessage(`{}`)
 	}
-	return db.spaceTx(ctx, func(tx *sql.Tx) error {
+	return db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		_, err := tx.ExecContext(ctx, `INSERT INTO provider_content_records(id,space_id,shared_resource_id,provider,external_record_id,parent_external_id,record_type,fingerprint,display_name,mime_type,occurred_at,content,deleted_at)
 			VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) ON CONFLICT(shared_resource_id,external_record_id) DO UPDATE SET parent_external_id=EXCLUDED.parent_external_id,record_type=EXCLUDED.record_type,fingerprint=EXCLUDED.fingerprint,display_name=EXCLUDED.display_name,mime_type=EXCLUDED.mime_type,occurred_at=EXCLUDED.occurred_at,content=EXCLUDED.content,deleted_at=EXCLUDED.deleted_at,updated_at=NOW()`, item.ID, item.SpaceID, item.SharedResourceID, item.Provider, item.ExternalRecordID, item.ParentExternalID, item.RecordType, item.Fingerprint, item.DisplayName, item.MIMEType, item.OccurredAt, item.Content, item.DeletedAt)
 		return err
@@ -42,7 +42,7 @@ func (db *Database) ProviderContentRecords(ctx context.Context, userID, spaceID,
 		limit = 50
 	}
 	out := []ProviderContentRecord{}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if _, err := requireSpaceMemberTx(ctx, tx, spaceID, userID); err != nil {
 			return err
 		}
@@ -66,7 +66,7 @@ func (db *Database) ProviderContentRecords(ctx context.Context, userID, spaceID,
 
 func (db *Database) ProviderContentRecord(ctx context.Context, userID, spaceID, provider, externalRecordID string) (*ProviderContentRecord, error) {
 	out := &ProviderContentRecord{}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if _, err := requireSpaceMemberTx(ctx, tx, spaceID, userID); err != nil {
 			return err
 		}
@@ -83,7 +83,7 @@ func (db *Database) ProviderContentRecord(ctx context.Context, userID, spaceID, 
 // still owned by the installer; callers never receive its credential.
 func (db *Database) ProviderSharedResourceForDestination(ctx context.Context, userID, spaceID, provider, externalResourceID string) (*ProviderSharedResource, error) {
 	out := &ProviderSharedResource{}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if _, err := requireSpaceMemberTx(ctx, tx, spaceID, userID); err != nil {
 			return err
 		}
@@ -105,7 +105,7 @@ func (db *Database) ProviderSharedResourceForNotionEntity(
 	userID, spaceID, externalResourceID string,
 ) (*ProviderSharedResource, error) {
 	out := &ProviderSharedResource{}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if _, err := requireSpaceMemberTx(ctx, tx, spaceID, userID); err != nil {
 			return err
 		}

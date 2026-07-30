@@ -116,7 +116,7 @@ func (s *SpacesService) RunStudioResource(kind string) http.HandlerFunc {
 	}
 }
 
-func isPublicWorkflowIP(ip net.IP) bool {
+func TestingIsPublicWorkflowIP(ip net.IP) bool {
 	if ip == nil || !ip.IsGlobalUnicast() || ip.IsLoopback() || ip.IsPrivate() || ip.IsUnspecified() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() || ip.IsMulticast() {
 		return false
 	}

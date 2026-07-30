@@ -13,7 +13,7 @@ import (
 var ErrPasswordResetTokenInvalid = errors.New("password reset token is invalid or expired")
 
 func (db *Database) UpsertPasswordResetToken(userID, hashedToken string, expiresAt time.Time) error {
-	err := db.withRLSContext(context.Background(), serviceRLSSettings(), func(tx *sql.Tx) error {
+	err := db.TestingWithRLSContext(context.Background(), TestingServiceRLSSettings(), func(tx *sql.Tx) error {
 		_, err := tx.ExecContext(
 			context.Background(),
 			`INSERT INTO password_reset_tokens (user_id, hashed_token, expires_at)
@@ -36,7 +36,7 @@ func (db *Database) ValidatePasswordResetToken(hashedToken string, now time.Time
 	var userID string
 	var expiresAt time.Time
 
-	err := db.withRLSContext(context.Background(), serviceRLSSettings(), func(tx *sql.Tx) error {
+	err := db.TestingWithRLSContext(context.Background(), TestingServiceRLSSettings(), func(tx *sql.Tx) error {
 		return tx.QueryRowContext(
 			context.Background(),
 			`SELECT user_id, expires_at
@@ -54,7 +54,7 @@ func (db *Database) ValidatePasswordResetToken(hashedToken string, now time.Time
 	}
 
 	if !expiresAt.After(now) {
-		if err := db.withRLSContext(context.Background(), serviceRLSSettings(), func(tx *sql.Tx) error {
+		if err := db.TestingWithRLSContext(context.Background(), TestingServiceRLSSettings(), func(tx *sql.Tx) error {
 			_, err := tx.ExecContext(context.Background(), `DELETE FROM password_reset_tokens WHERE user_id = $1`, userID)
 			return err
 		}); err != nil {
@@ -69,7 +69,7 @@ func (db *Database) ValidatePasswordResetToken(hashedToken string, now time.Time
 
 func (db *Database) ResetPasswordWithToken(hashedToken, newPassword string, now time.Time) error {
 	var invalidTokenErr error
-	err := db.withRLSContext(context.Background(), serviceRLSSettings(), func(tx *sql.Tx) error {
+	err := db.TestingWithRLSContext(context.Background(), TestingServiceRLSSettings(), func(tx *sql.Tx) error {
 		var userID string
 		var expiresAt time.Time
 		err := tx.QueryRowContext(

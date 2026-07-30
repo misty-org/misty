@@ -16,7 +16,7 @@ import (
 // predicate: archiving is last-write-wins and idempotent.
 func (db *Database) ArchiveSpaceTask(ctx context.Context, actorUserID, spaceID, taskID string, _ int64) (*SpaceTask, error) {
 	out := &SpaceTask{}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, actorUserID, spaceID, PermissionTasksManage); err != nil {
 			return err
 		}
@@ -48,7 +48,7 @@ func scanCalendarSource(row interface{ Scan(...any) error }, out *SpaceCalendarS
 
 func (db *Database) SpaceCalendarSources(ctx context.Context, userID, spaceID string) ([]SpaceCalendarSource, error) {
 	out := []SpaceCalendarSource{}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionTasksView); err != nil {
 			return err
 		}
@@ -85,7 +85,7 @@ func (db *Database) CreateSpaceCalendarSource(ctx context.Context, userID string
 		return nil, ErrSpaceInvalid
 	}
 	out := &SpaceCalendarSource{}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, item.SpaceID, PermissionIntegrationsManage); err != nil {
 			return err
 		}
@@ -107,7 +107,7 @@ func (db *Database) CreateSpaceCalendarSource(ctx context.Context, userID string
 }
 
 func (db *Database) DisableSpaceCalendarSource(ctx context.Context, userID, spaceID, sourceID string) error {
-	return db.spaceTx(ctx, func(tx *sql.Tx) error {
+	return db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionIntegrationsManage); err != nil {
 			return err
 		}
@@ -125,7 +125,7 @@ func (db *Database) DisableSpaceCalendarSource(ctx context.Context, userID, spac
 
 func (db *Database) SpaceCalendarEvents(ctx context.Context, userID, spaceID string, from, to time.Time) ([]SpaceCalendarEvent, error) {
 	out := []SpaceCalendarEvent{}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionTasksView); err != nil {
 			return err
 		}
@@ -149,7 +149,7 @@ func (db *Database) SpaceCalendarEvents(ctx context.Context, userID, spaceID str
 
 func (db *Database) CalendarSourceByWatchChannel(ctx context.Context, channelID string) (*SpaceCalendarSource, error) {
 	out := &SpaceCalendarSource{}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		return scanCalendarSource(tx.QueryRowContext(ctx, `SELECT `+calendarSourceColumns+` FROM space_calendar_sources WHERE watch_channel_id=$1 AND status IN ('active','syncing')`, channelID), out)
 	})
 	if errors.Is(err, sql.ErrNoRows) {
@@ -159,7 +159,7 @@ func (db *Database) CalendarSourceByWatchChannel(ctx context.Context, channelID 
 }
 
 func (db *Database) UpdateCalendarSourceSync(ctx context.Context, sourceID, syncToken, channelID, resourceID, tokenHash, status, errorCode string, expiresAt *time.Time) error {
-	return db.spaceTx(ctx, func(tx *sql.Tx) error {
+	return db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		result, err := tx.ExecContext(ctx, `UPDATE space_calendar_sources SET sync_token=$1,watch_channel_id=COALESCE(NULLIF($2,''),watch_channel_id),watch_resource_id=COALESCE(NULLIF($3,''),watch_resource_id),watch_token_hash=COALESCE(NULLIF($4,''),watch_token_hash),watch_expires_at=COALESCE($5,watch_expires_at),status=$6,last_error_code=$7,last_reconciled_at=CASE WHEN $6='active' THEN NOW() ELSE last_reconciled_at END,updated_at=NOW() WHERE id=$8`, syncToken, channelID, resourceID, tokenHash, expiresAt, status, errorCode, sourceID)
 		if err != nil {
 			return err
@@ -178,7 +178,7 @@ func (db *Database) UpsertSpaceCalendarEvent(ctx context.Context, item SpaceCale
 	if len(item.Organizer) == 0 {
 		item.Organizer = json.RawMessage(`{}`)
 	}
-	return db.spaceTx(ctx, func(tx *sql.Tx) error {
+	return db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		_, err := tx.ExecContext(ctx, `INSERT INTO space_calendar_events(id,space_id,source_id,provider,external_event_id,fingerprint,title,description,location,meeting_url,organizer,starts_at,ends_at,all_day,timezone,status,provider_created_at,provider_updated_at,removed_at)
 			VALUES($1,$2,$3,'google',$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
 			ON CONFLICT(source_id,external_event_id) DO UPDATE SET fingerprint=EXCLUDED.fingerprint,title=EXCLUDED.title,description=EXCLUDED.description,location=EXCLUDED.location,meeting_url=EXCLUDED.meeting_url,organizer=EXCLUDED.organizer,starts_at=EXCLUDED.starts_at,ends_at=EXCLUDED.ends_at,all_day=EXCLUDED.all_day,timezone=EXCLUDED.timezone,status=EXCLUDED.status,provider_created_at=EXCLUDED.provider_created_at,provider_updated_at=EXCLUDED.provider_updated_at,removed_at=EXCLUDED.removed_at,updated_at=NOW()`, item.ID, item.SpaceID, item.SourceID, item.ExternalEventID, item.Fingerprint, item.Title, item.Description, item.Location, item.MeetingURL, item.Organizer, item.StartsAt, item.EndsAt, item.AllDay, item.Timezone, item.Status, item.ProviderCreatedAt, item.ProviderUpdatedAt, item.RemovedAt)
@@ -187,7 +187,7 @@ func (db *Database) UpsertSpaceCalendarEvent(ctx context.Context, item SpaceCale
 }
 
 func (db *Database) MarkSpaceCalendarEventRemoved(ctx context.Context, sourceID, externalEventID string, removedAt time.Time) error {
-	return db.spaceTx(ctx, func(tx *sql.Tx) error {
+	return db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		_, err := tx.ExecContext(ctx, `UPDATE space_calendar_events SET status='canceled',removed_at=$1,updated_at=NOW() WHERE source_id=$2 AND external_event_id=$3`, removedAt, sourceID, externalEventID)
 		return err
 	})
@@ -197,7 +197,7 @@ func (db *Database) MarkSpaceCalendarEventRemoved(ctx context.Context, sourceID,
 // token is invalid, the local projection can no longer be trusted and must be
 // rebuilt by a full synchronization.
 func (db *Database) InvalidateSpaceCalendarEvents(ctx context.Context, sourceID string, removedAt time.Time) error {
-	return db.spaceTx(ctx, func(tx *sql.Tx) error {
+	return db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		_, err := tx.ExecContext(ctx, `UPDATE space_calendar_events SET status='canceled',removed_at=$1,updated_at=NOW() WHERE source_id=$2 AND removed_at IS NULL`, removedAt, sourceID)
 		return err
 	})
@@ -208,7 +208,7 @@ func (db *Database) CalendarSourcesNeedingReconciliation(ctx context.Context, li
 		limit = 100
 	}
 	out := []SpaceCalendarSource{}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		rows, err := tx.QueryContext(ctx, `SELECT `+calendarSourceColumns+` FROM space_calendar_sources
 			WHERE status IN ('pending','active','needs_attention') AND disabled_at IS NULL AND
 			(last_reconciled_at IS NULL OR last_reconciled_at<NOW()-INTERVAL '15 minutes' OR watch_expires_at IS NULL OR watch_expires_at<NOW()+INTERVAL '24 hours')

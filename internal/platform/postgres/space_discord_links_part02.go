@@ -18,7 +18,7 @@ func (db *Database) UpdateSpaceDiscordLinkDirection(ctx context.Context, userID,
 		return nil, ErrSpaceInvalid
 	}
 	out := &SpaceDiscordLink{}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionIntegrationsManage); err != nil {
 			return err
 		}
@@ -39,7 +39,7 @@ func (db *Database) UpdateSpaceDiscordLinkDirection(ctx context.Context, userID,
 // DeleteSpaceDiscordLink unlinks a channel. Already-mirrored messages stay in
 // the Space: unlinking stops future mirroring, it does not rewrite history.
 func (db *Database) DeleteSpaceDiscordLink(ctx context.Context, userID, spaceID, linkID string) error {
-	return db.spaceTx(ctx, func(tx *sql.Tx) error {
+	return db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionIntegrationsManage); err != nil {
 			return err
 		}
@@ -71,7 +71,7 @@ func (db *Database) DeleteSpaceDiscordLink(ctx context.Context, userID, spaceID,
 // SetSpaceDiscordLinkSync records the outcome of a sync pass. The cursor only
 // ever moves forward, so a retry or an out-of-order page cannot replay history.
 func (db *Database) SetSpaceDiscordLinkSync(ctx context.Context, linkID, cursor, status, errorCode string, syncedAt *time.Time) error {
-	return db.spaceTx(ctx, func(tx *sql.Tx) error {
+	return db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		_, err := tx.ExecContext(ctx, `UPDATE space_discord_links
 			SET last_message_id=CASE WHEN $2<>'' THEN $2 ELSE last_message_id END,
 			    status=$3,last_error_code=$4,
@@ -89,7 +89,7 @@ func (db *Database) UpdateSpaceDiscordLinkDisplay(
 	if channelName == "" {
 		return ErrSpaceInvalid
 	}
-	return db.spaceTx(ctx, func(tx *sql.Tx) error {
+	return db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		var conversationID string
 		if err := tx.QueryRowContext(ctx, `UPDATE space_discord_links
 			SET channel_name=$1,updated_at=NOW() WHERE id=$2
@@ -112,13 +112,13 @@ func (db *Database) UpdateSpaceDiscordLinkDisplay(
 // manual sync, and a retry can all deliver the same message, and a mirrored
 // transcript that duplicates lines is worse than one that lags.
 func (db *Database) CreateMirroredSpaceMessage(ctx context.Context, link SpaceDiscordLink, content []MessageSpan, origin MessageOrigin) (*SpaceMessage, error) {
-	if err := validateMessage(content, nil); err != nil {
+	if err := TestingValidateMessage(content, nil); err != nil {
 		return nil, err
 	}
 	out := &SpaceMessage{ID: "msg_" + uuid.NewString(), SpaceID: link.SpaceID, ConversationID: link.ConversationID,
 		SenderUserID: link.ConnectedByUserID, SenderKind: "person", SenderName: origin.AuthorName,
 		Content: content, FileNodeIDs: []string{}, LibraryItemIDs: []string{}, Attachments: []MessageAttachment{}}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		var duplicate bool
 		if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM space_messages
 			WHERE space_id=$1 AND origin->>'system'='discord' AND origin->>'external_id'=$2)`,
@@ -153,7 +153,7 @@ var errDiscordMessageAlreadyMirrored = errors.New("discord message is already mi
 // SpaceMessageForPublish reads one message the caller owns, for mirroring out.
 func (db *Database) SpaceMessageForPublish(ctx context.Context, userID, spaceID, messageID string) (*SpaceMessage, error) {
 	out := &SpaceMessage{}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if _, err := requireSpaceMemberTx(ctx, tx, spaceID, userID); err != nil {
 			return err
 		}
@@ -174,7 +174,7 @@ func (db *Database) SpaceMessageForPublish(ctx context.Context, userID, spaceID,
 // message, so the transcript shows what actually reached Discord.
 func (db *Database) SetSpaceMessageOrigin(ctx context.Context, spaceID, messageID string, origin MessageOrigin) (*SpaceMessage, error) {
 	out := &SpaceMessage{}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		originRaw, _ := json.Marshal(origin)
 		if _, err := tx.ExecContext(ctx, `UPDATE space_messages SET origin=$1 WHERE id=$2 AND space_id=$3`,
 			originRaw, messageID, spaceID); err != nil {

@@ -21,7 +21,7 @@ type cloudOAuthDefinition struct {
 	PKCE                                                           bool
 }
 
-var cloudOAuthCatalog = map[string]cloudOAuthDefinition{
+var TestingCloudOAuthCatalog = map[string]cloudOAuthDefinition{
 	"drive": {
 		ID: "drive", Name: "Google Drive",
 		AuthorizeURL: "https://accounts.google.com/o/oauth2/v2/auth",
@@ -104,7 +104,7 @@ func (s *SpacesService) BeginCloudAuthorization() http.HandlerFunc {
 			return
 		}
 		provider := chi.URLParam(r, "provider")
-		definition, exists := cloudOAuthCatalog[provider]
+		definition, exists := TestingCloudOAuthCatalog[provider]
 		if !exists {
 			writeJSON(w, http.StatusBadRequest, map[string]string{"code": "cloud_provider_invalid"})
 			return
@@ -119,7 +119,7 @@ func (s *SpacesService) BeginCloudAuthorization() http.HandlerFunc {
 			return
 		}
 		body.Name, body.ClientID, body.ClientSecret = strings.TrimSpace(body.Name), strings.TrimSpace(body.ClientID), strings.TrimSpace(body.ClientSecret)
-		if body.Name == "" || !validProviderReturnPath(body.ReturnTo) {
+		if body.Name == "" || !TestingValidProviderReturnPath(body.ReturnTo) {
 			writeJSON(w, http.StatusBadRequest, map[string]string{"code": "cloud_connection_invalid"})
 			return
 		}
@@ -172,7 +172,7 @@ func (s *SpacesService) BeginCloudAuthorization() http.HandlerFunc {
 			writeSpaceError(w, err)
 			return
 		}
-		callback := cloudCallbackURL(r, provider)
+		callback := TestingCloudCallbackURL(r, provider)
 		params := url.Values{
 			"client_id": {clientID}, "redirect_uri": {callback}, "response_type": {"code"}, "state": {state},
 		}

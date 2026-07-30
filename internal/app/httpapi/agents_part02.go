@@ -47,7 +47,7 @@ func (s *AgentsService) DeviceAuthenticated(next http.HandlerFunc) http.HandlerF
 		}
 		publicKey, keyErr := decodeDeviceBase64(publicKeyText)
 		signature, signatureErr := decodeDeviceBase64(signatureText)
-		canonical := deviceSignaturePayload(r.Method, r.URL.EscapedPath(), timestampText, nonce, body)
+		canonical := TestingDeviceSignaturePayload(r.Method, r.URL.EscapedPath(), timestampText, nonce, body)
 		if keyErr != nil || signatureErr != nil || len(publicKey) != ed25519.PublicKeySize || len(signature) != ed25519.SignatureSize || !ed25519.Verify(ed25519.PublicKey(publicKey), []byte(canonical), signature) {
 			http.Error(w, "invalid device authentication", http.StatusUnauthorized)
 			return
@@ -60,7 +60,7 @@ func (s *AgentsService) DeviceAuthenticated(next http.HandlerFunc) http.HandlerF
 	}
 }
 
-func deviceSignaturePayload(method, path, timestamp, nonce string, body []byte) string {
+func TestingDeviceSignaturePayload(method, path, timestamp, nonce string, body []byte) string {
 	bodyDigest := sha256.Sum256(body)
 	return fmt.Sprintf("%s\n%s\n%s\n%s\n%x", strings.ToUpper(method), path, timestamp, nonce, bodyDigest)
 }
@@ -77,7 +77,7 @@ func (s *AgentsService) RegisterDevice() http.HandlerFunc {
 			KeyAlgorithm string          `json:"keyAlgorithm"`
 			Capabilities json.RawMessage `json:"capabilities"`
 		}
-		if decodeAIJSON(w, r, &body) != nil || !validDeviceRegistration(body.Name, body.PublicKey, body.KeyAlgorithm, body.Capabilities) {
+		if decodeAIJSON(w, r, &body) != nil || !TestingValidDeviceRegistration(body.Name, body.PublicKey, body.KeyAlgorithm, body.Capabilities) {
 			http.Error(w, "invalid request", http.StatusBadRequest)
 			return
 		}
@@ -193,7 +193,7 @@ func validJSONObject(raw json.RawMessage) bool {
 	return ok
 }
 
-func validDeviceRegistration(name, key, algorithm string, capabilities json.RawMessage) bool {
+func TestingValidDeviceRegistration(name, key, algorithm string, capabilities json.RawMessage) bool {
 	decodedKey, err := decodeDeviceBase64(key)
 	return validText(name, 1, 100) && err == nil && len(decodedKey) == ed25519.PublicKeySize && (algorithm == "" || algorithm == "ed25519") && validJSONObject(capabilities) && !containsLocalPath(capabilities)
 }

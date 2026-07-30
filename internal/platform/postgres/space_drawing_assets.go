@@ -69,7 +69,7 @@ func (db *Database) CreateDrawingAssetUpload(
 		ExpiresAt:              expiresAt,
 		Version:                1,
 	}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		access, err := drawingAccessForTx(ctx, tx, userID, drawingID)
 		if err != nil {
 			return err
@@ -167,7 +167,7 @@ func (db *Database) DrawingAssets(
 	userID, drawingID string,
 ) ([]SpaceDrawingAsset, error) {
 	assets := []SpaceDrawingAsset{}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		access, err := drawingAccessForTx(ctx, tx, userID, drawingID)
 		if err != nil {
 			return err
@@ -211,7 +211,7 @@ func (db *Database) DrawingAssetDownload(
 	userID, drawingID, assetID string,
 ) (*LibraryDownload, error) {
 	download := &LibraryDownload{}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		access, err := drawingAccessForTx(ctx, tx, userID, drawingID)
 		if err != nil {
 			return err
@@ -251,7 +251,7 @@ func (db *Database) DeleteDrawingAsset(
 	ctx context.Context,
 	userID, drawingID, assetID string,
 ) error {
-	return db.spaceTx(ctx, func(tx *sql.Tx) error {
+	return db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		access, err := drawingAccessForTx(ctx, tx, userID, drawingID)
 		if err != nil {
 			return err

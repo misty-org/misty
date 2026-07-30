@@ -13,7 +13,7 @@ import (
 )
 
 func (db *Database) ReplaceAgentWorkflow(ctx context.Context, userID, spaceID, agentID, versionID string) (*SpaceStudioResource, error) {
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionStudioManage); err != nil {
 			return err
 		}
@@ -36,7 +36,7 @@ func (db *Database) ReplaceAgentWorkflow(ctx context.Context, userID, spaceID, a
 
 func (db *Database) SpaceIntegrations(ctx context.Context, userID, spaceID string) ([]SpaceIntegration, error) {
 	items := []SpaceIntegration{}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if _, err := requireSpaceMemberTx(ctx, tx, spaceID, userID); err != nil {
 			return err
 		}
@@ -83,7 +83,7 @@ func (db *Database) SaveSpaceIntegration(ctx context.Context, userID string, ite
 		item.ID = "integration_" + uuid.NewString()
 	}
 	permissions := mustJSON(item.GrantedPermissions)
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, item.SpaceID, PermissionAgentsRun); err != nil {
 			return err
 		}
@@ -108,13 +108,13 @@ func loadWorkflowVersionTx(ctx context.Context, tx *sql.Tx, versionID string) (*
 	if err := scanWorkflowVersion(tx.QueryRowContext(ctx, `SELECT `+workflowVersionColumns+` FROM space_workflow_versions v WHERE v.id=$1`, versionID), out); err != nil {
 		return nil, err
 	}
-	if !workflowChecksumValid(out) {
+	if !TestingWorkflowChecksumValid(out) {
 		return nil, ErrSpaceInvalid
 	}
 	return out, nil
 }
 
-func workflowChecksumValid(version *WorkflowVersion) bool {
+func TestingWorkflowChecksumValid(version *WorkflowVersion) bool {
 	if version == nil {
 		return false
 	}

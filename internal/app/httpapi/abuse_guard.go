@@ -19,11 +19,11 @@ import (
 type AbuseGuard struct {
 	mu sync.Mutex
 
-	now     func() time.Time
-	total   *SlidingWindowLimiter
-	strikes map[string]*abuseRecord
-	maxKeys int
-	policy  AbusePolicy
+	TestingNow     func() time.Time
+	total          *SlidingWindowLimiter
+	strikes        map[string]*abuseRecord
+	TestingMaxKeys int
+	policy         AbusePolicy
 	// store persists blocks so they survive a restart and apply to every
 	// instance. Counters stay in memory: they change on every request and are
 	// cheap to rebuild, whereas a lost block is a reopened door.
@@ -76,11 +76,11 @@ func NewAbuseGuard(policy AbusePolicy) *AbuseGuard {
 		policy = DefaultAbusePolicy()
 	}
 	return &AbuseGuard{
-		now:     time.Now,
-		total:   NewSlidingWindowLimiter(policy.TotalLimit, policy.TotalWindow),
-		strikes: make(map[string]*abuseRecord),
-		maxKeys: defaultLimiterMaxKeys,
-		policy:  policy,
+		TestingNow:     time.Now,
+		total:          NewSlidingWindowLimiter(policy.TotalLimit, policy.TotalWindow),
+		strikes:        make(map[string]*abuseRecord),
+		TestingMaxKeys: defaultLimiterMaxKeys,
+		policy:         policy,
 	}
 }
 
@@ -92,7 +92,7 @@ func (g *AbuseGuard) Blocked(key string) (bool, time.Duration) {
 	if record == nil {
 		return false, 0
 	}
-	now := g.now()
+	now := g.TestingNow()
 	if record.blockedUntil.After(now) {
 		return true, record.blockedUntil.Sub(now)
 	}
@@ -101,7 +101,7 @@ func (g *AbuseGuard) Blocked(key string) (bool, time.Duration) {
 
 // AllowTotal charges one request against the caller's overall ceiling.
 func (g *AbuseGuard) AllowTotal(key string) (bool, time.Duration) {
-	return g.total.Allow(key, g.now())
+	return g.total.Allow(key, g.TestingNow())
 }
 
 // RecordRejection notes that a caller was refused. Enough refusals inside the
@@ -110,14 +110,14 @@ func (g *AbuseGuard) AllowTotal(key string) (bool, time.Duration) {
 func (g *AbuseGuard) RecordRejection(key string) {
 	g.mu.Lock()
 	defer g.mu.Unlock()
-	now := g.now()
+	now := g.TestingNow()
 
 	record := g.strikes[key]
 	if record == nil {
-		if len(g.strikes) >= g.maxKeys {
+		if len(g.strikes) >= g.TestingMaxKeys {
 			g.purgeLocked(now)
 		}
-		if len(g.strikes) >= g.maxKeys {
+		if len(g.strikes) >= g.TestingMaxKeys {
 			// Tracking is saturated; the per-route limits still apply.
 			return
 		}
@@ -217,10 +217,10 @@ func (g *AbuseGuard) Refresh(ctx context.Context) {
 	for _, block := range blocks {
 		record := g.strikes[block.Key]
 		if record == nil {
-			if len(g.strikes) >= g.maxKeys {
+			if len(g.strikes) >= g.TestingMaxKeys {
 				continue
 			}
-			record = &abuseRecord{firstStrike: g.now()}
+			record = &abuseRecord{firstStrike: g.TestingNow()}
 			g.strikes[block.Key] = record
 		}
 		if block.BlockedUntil.After(record.blockedUntil) {
@@ -261,7 +261,7 @@ func (g *AbuseGuard) Middleware(next http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 			return
 		}
-		key := clientIPFromRequest(r)
+		key := TestingClientIPFromRequest(r)
 
 		if blocked, retryAfter := g.Blocked(key); blocked {
 			writeAbuseRejection(w, retryAfter, "temporarily blocked")

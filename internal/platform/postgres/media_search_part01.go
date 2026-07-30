@@ -55,7 +55,7 @@ var ErrMediaChunkBusy = errors.New("media chunk is already processing")
 
 func (db *Database) ClaimMediaSearchChunk(userID string, asset MediaSearchAsset, chunkIndex int, startMS, endMS int64) (bool, error) {
 	claimed := false
-	err := db.withRLSContext(context.Background(), serviceRLSSettings(), func(tx *sql.Tx) error {
+	err := db.TestingWithRLSContext(context.Background(), TestingServiceRLSSettings(), func(tx *sql.Tx) error {
 		if _, err := tx.Exec(`INSERT INTO media_search_devices(user_id,device_id,last_seen_at) VALUES($1,$2,NOW()) ON CONFLICT(user_id,device_id) DO UPDATE SET last_seen_at=NOW()`, userID, asset.DeviceID); err != nil {
 			return err
 		}
@@ -108,14 +108,14 @@ func (db *Database) ClaimMediaSearchChunk(userID string, asset MediaSearchAsset,
 }
 
 func (db *Database) PruneIncompleteMediaSearchAssets(userID, deviceID string) error {
-	return db.withRLSContext(context.Background(), serviceRLSSettings(), func(tx *sql.Tx) error {
+	return db.TestingWithRLSContext(context.Background(), TestingServiceRLSSettings(), func(tx *sql.Tx) error {
 		_, err := tx.Exec(`DELETE FROM media_search_assets WHERE user_id=$1 AND device_id=$2 AND status<>'indexed' AND updated_at < NOW()-INTERVAL '30 days'`, userID, deviceID)
 		return err
 	})
 }
 
 func (db *Database) CompleteMediaSearchChunk(userID, deviceID, assetID string, chunkIndex int, endMS int64, segments []MediaSearchSegment) error {
-	return db.withRLSContext(context.Background(), serviceRLSSettings(), func(tx *sql.Tx) error {
+	return db.TestingWithRLSContext(context.Background(), TestingServiceRLSSettings(), func(tx *sql.Tx) error {
 		if _, err := tx.Exec(`DELETE FROM media_search_segments WHERE user_id=$1 AND device_id=$2 AND asset_id=$3 AND chunk_index=$4`, userID, deviceID, assetID, chunkIndex); err != nil {
 			return err
 		}
@@ -174,7 +174,7 @@ func (db *Database) CompleteMediaSearchChunk(userID, deviceID, assetID string, c
 }
 
 func (db *Database) FailMediaSearchChunk(userID, deviceID, assetID string, chunkIndex int, code string) error {
-	return db.withRLSContext(context.Background(), serviceRLSSettings(), func(tx *sql.Tx) error {
+	return db.TestingWithRLSContext(context.Background(), TestingServiceRLSSettings(), func(tx *sql.Tx) error {
 		if _, err := tx.Exec(`UPDATE media_search_chunks SET status='failed',failure_code=$1,updated_at=NOW() WHERE user_id=$2 AND device_id=$3 AND asset_id=$4 AND chunk_index=$5`, code, userID, deviceID, assetID, chunkIndex); err != nil {
 			return err
 		}
@@ -204,7 +204,7 @@ func (db *Database) SearchMedia(userID, deviceID, query string, embedding []floa
 	}
 	sqlQuery := `WITH lexical AS (SELECT id,LEAST(1.0,ts_rank_cd(search_tsv,websearch_to_tsquery('simple',$3))*4.0+CASE WHEN lower(content) LIKE '%'||lower($3)||'%' THEN .45 ELSE 0 END) score FROM media_search_segments WHERE user_id=$1 AND device_id=$2 AND search_tsv@@websearch_to_tsquery('simple',$3) ORDER BY score DESC LIMIT $5), semantic AS (SELECT id,GREATEST(0.0,1.0-(embedding<=>$4::vector)) score FROM media_search_segments WHERE user_id=$1 AND device_id=$2 AND $4 IS NOT NULL AND embedding IS NOT NULL ORDER BY embedding<=>$4::vector LIMIT $5), candidates AS (SELECT id FROM lexical UNION SELECT id FROM semantic) SELECT s.id,s.asset_id,a.media_type,s.segment_kind,s.start_ms,s.end_ms,s.content,s.transcript,s.visual_description,s.visible_text,COALESCE(l.score,0),COALESCE(v.score,0),(CASE WHEN $4 IS NULL THEN COALESCE(l.score,0) ELSE .68*COALESCE(v.score,0)+.32*COALESCE(l.score,0) END) final_score FROM candidates c JOIN media_search_segments s ON s.id=c.id AND s.user_id=$1 AND s.device_id=$2 JOIN media_search_assets a ON a.user_id=s.user_id AND a.device_id=s.device_id AND a.asset_id=s.asset_id LEFT JOIN lexical l ON l.id=s.id LEFT JOIN semantic v ON v.id=s.id ORDER BY final_score DESC,s.start_ms LIMIT $6`
 	hits := []MediaSearchHit{}
-	err := db.withRLSContext(context.Background(), serviceRLSSettings(), func(tx *sql.Tx) error {
+	err := db.TestingWithRLSContext(context.Background(), TestingServiceRLSSettings(), func(tx *sql.Tx) error {
 		_, _ = tx.Exec(`SET LOCAL hnsw.iterative_scan='strict_order'`)
 		rows, err := tx.Query(sqlQuery, userID, deviceID, query, vector, max(80, limit*8), limit)
 		if err != nil {

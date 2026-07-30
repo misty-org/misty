@@ -75,7 +75,7 @@ func (s *SpacesService) AgentConversationEvents() http.HandlerFunc {
 			writeSpaceError(w, db.ErrSpaceInvalid)
 			return
 		}
-		_, err = s.database.AppendAgentConversationEvent(r.Context(), userID, conversationID, "user_message", mustAPIRawJSON(map[string]string{"text": body.Prompt}))
+		_, err = s.database.AppendAgentConversationEvent(r.Context(), userID, conversationID, "user_message", TestingMustAPIRawJSON(map[string]string{"text": body.Prompt}))
 		if err != nil {
 			writeSpaceError(w, err)
 			return
@@ -86,19 +86,19 @@ func (s *SpacesService) AgentConversationEvents() http.HandlerFunc {
 			return
 		}
 		if decision.NeedsClarification || decision.Selected == nil {
-			event, _ := s.database.AppendAgentConversationEvent(r.Context(), userID, conversationID, "agent_message", mustAPIRawJSON(map[string]string{"text": decision.Question}))
+			event, _ := s.database.AppendAgentConversationEvent(r.Context(), userID, conversationID, "agent_message", TestingMustAPIRawJSON(map[string]string{"text": decision.Question}))
 			writeJSON(w, http.StatusOK, map[string]any{"status": "needs_clarification", "routing": decision, "event": event})
 			return
 		}
 		if len(body.Input) == 0 {
-			body.Input = mustAPIRawJSON(map[string]string{"prompt": body.Prompt})
+			body.Input = TestingMustAPIRawJSON(map[string]string{"prompt": body.Prompt})
 		}
 		run, err := s.database.CreateAgentRun(r.Context(), db.AgentRunRequest{RequestingMemberID: userID, SpaceID: conversation.SpaceID, AgentID: conversation.AgentID, SourceConversationID: conversationID, SourceType: "direct", CapabilityID: decision.Selected.CapabilityID, Input: body.Input, TriggerKind: "manual"})
 		if err != nil {
 			writeSpaceError(w, err)
 			return
 		}
-		_, _ = s.database.AppendAgentConversationEvent(r.Context(), userID, conversationID, "run", mustAPIRawJSON(map[string]string{"run_id": run.ID}))
+		_, _ = s.database.AppendAgentConversationEvent(r.Context(), userID, conversationID, "run", TestingMustAPIRawJSON(map[string]string{"run_id": run.ID}))
 		if run.State == "awaiting_approval" {
 			writeJSON(w, http.StatusAccepted, map[string]any{"run": run})
 			return
@@ -108,8 +108,8 @@ func (s *SpacesService) AgentConversationEvents() http.HandlerFunc {
 			writeSpaceError(w, err)
 			return
 		}
-		eventType, text := canonicalRunResponse(finished)
-		event, _ := s.database.AppendAgentConversationEvent(r.Context(), userID, conversationID, eventType, mustAPIRawJSON(map[string]any{"text": text, "run_id": finished.ID}))
+		eventType, text := TestingCanonicalRunResponse(finished)
+		event, _ := s.database.AppendAgentConversationEvent(r.Context(), userID, conversationID, eventType, TestingMustAPIRawJSON(map[string]any{"text": text, "run_id": finished.ID}))
 		writeJSON(w, http.StatusOK, map[string]any{"run": finished, "event": event})
 	}
 }
@@ -129,7 +129,7 @@ func (s *SpacesService) SpaceIntegrations() http.HandlerFunc {
 			}
 			writeJSON(w, http.StatusOK, map[string]any{
 				"integrations": items,
-				"providers":    providerOAuthAvailabilityCatalog(),
+				"providers":    TestingProviderOAuthAvailabilityCatalog(),
 			})
 			return
 		}

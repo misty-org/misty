@@ -48,14 +48,14 @@ func (s *SpacesService) executeOrdinaryAgentTool(ctx context.Context, run *db.Sp
 			return nil, db.ErrSpaceInvalid
 		}
 		config["provider"], config["operation"] = provider, operation
-		invocation := workflowv2.Invocation{RunID: run.ID, NodeID: "chat_tool_" + tool.ID, Attempt: 1, IdempotencyKey: "chat:" + run.ID + ":" + tool.ID, UserID: run.RequestingMemberID, SpaceID: run.SpaceID, Config: mustAPIRawJSON(config), Input: tool.Arguments}
+		invocation := workflowv2.Invocation{RunID: run.ID, NodeID: "chat_tool_" + tool.ID, Attempt: 1, IdempotencyKey: "chat:" + run.ID + ":" + tool.ID, UserID: run.RequestingMemberID, SpaceID: run.SpaceID, Config: TestingMustAPIRawJSON(config), Input: tool.Arguments}
 		if operation == "query" {
 			return s.providerQueryNode(ctx, run, invocation)
 		}
 		if operation != "write" || !providerSupportsWrite(provider) {
 			return nil, workflowv2.ErrCapabilityDenied
 		}
-		approvalInput := workflowApprovalEnvelope(run, "provider."+provider+".write", provider, findWorkflowString(config, "connectionId", "connection_id"), findWorkflowString(config, "destination", "channel", "channelId", "channel_id"), tool.Arguments)
+		approvalInput := TestingWorkflowApprovalEnvelope(run, "provider."+provider+".write", provider, TestingFindWorkflowString(config, "connectionId", "connection_id"), TestingFindWorkflowString(config, "destination", "channel", "channelId", "channel_id"), tool.Arguments)
 		approved, approvalErr := s.database.EnsureWorkflowNodeApproval(ctx, run.ID, invocation.NodeID, "provider."+provider+".write", approvalInput)
 		if approvalErr != nil {
 			return nil, approvalErr
@@ -93,13 +93,13 @@ func (s *SpacesService) executeOrdinaryAgentTool(ctx context.Context, run *db.Sp
 				}
 			}
 		}
-		return mustAPIRawJSON(map[string]any{"messages": matches, "count": len(matches)}), nil
+		return TestingMustAPIRawJSON(map[string]any{"messages": matches, "count": len(matches)}), nil
 	case "library.search":
 		items, err := s.database.LibraryItems(ctx, run.RequestingMemberID, run.SpaceID, db.LibraryItemQuery{Search: arguments.Query, Limit: arguments.Limit, Visibility: "visible"})
 		if err != nil {
 			return nil, err
 		}
-		return mustAPIRawJSON(map[string]any{"items": items, "count": len(items)}), nil
+		return TestingMustAPIRawJSON(map[string]any{"items": items, "count": len(items)}), nil
 	default:
 		return nil, workflowv2.ErrCapabilityDenied
 	}
@@ -112,7 +112,7 @@ func providerAgentToolSchema(write bool) json.RawMessage {
 		properties["payload"] = map[string]any{"type": "object"}
 		properties["mode"] = map[string]any{"type": "string", "enum": []string{"draft", "send"}}
 	}
-	return mustAPIRawJSON(map[string]any{"type": "object", "properties": properties})
+	return TestingMustAPIRawJSON(map[string]any{"type": "object", "properties": properties})
 }
 
 func providerSupportsWrite(provider string) bool {
@@ -133,12 +133,12 @@ func taskAgentToolSchema(write bool) json.RawMessage {
 		properties["dueTimezone"] = map[string]any{"type": "string"}
 		properties["version"] = map[string]any{"type": "integer"}
 	}
-	return mustAPIRawJSON(map[string]any{"type": "object", "properties": properties})
+	return TestingMustAPIRawJSON(map[string]any{"type": "object", "properties": properties})
 }
 
 func (s *SpacesService) finishFailedCanonicalRun(ctx context.Context, run *db.SpaceRun, runErr error) (*db.SpaceRun, error) {
 	code, message := spaceRunFailureFromError(runErr)
-	failed, err := s.database.FinishSpaceRun(ctx, run.ID, "failed", mustAPIRawJSON(map[string]string{"message": message}), code)
+	failed, err := s.database.FinishSpaceRun(ctx, run.ID, "failed", TestingMustAPIRawJSON(map[string]string{"message": message}), code)
 	if err != nil {
 		return nil, err
 	}

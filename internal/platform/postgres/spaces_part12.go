@@ -7,7 +7,7 @@ import (
 
 func (db *Database) PurgeExpiredSpaceData(ctx context.Context) (int64, error) {
 	var purged int64
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		for _, query := range []string{
 			`DELETE FROM space_messages WHERE expires_at<=NOW()`,
 			`DELETE FROM space_invitations WHERE expires_at<=NOW()`,

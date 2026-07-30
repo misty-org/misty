@@ -15,7 +15,7 @@ func (db *Database) UpdateLibraryPerson(ctx context.Context, userID, spaceID, pe
 	if version < 1 || len([]rune(name)) > 120 {
 		return nil, ErrLibraryInvalid
 	}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionLibraryEdit); err != nil {
 			return err
 		}
@@ -49,7 +49,7 @@ func (db *Database) AddLibraryPersonItems(ctx context.Context, userID, spaceID, 
 	if len(itemIDs) < 1 || len(itemIDs) > 200 {
 		return nil, ErrLibraryInvalid
 	}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionLibraryEdit); err != nil {
 			return err
 		}
@@ -70,7 +70,7 @@ func (db *Database) RemoveLibraryPersonItems(ctx context.Context, userID, spaceI
 	if len(itemIDs) < 1 || len(itemIDs) > 200 {
 		return nil, ErrLibraryInvalid
 	}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionLibraryEdit); err != nil {
 			return err
 		}
@@ -95,7 +95,7 @@ func (db *Database) LibraryPersonItems(ctx context.Context, userID, spaceID, per
 		limit = 200
 	}
 	items := []SpaceLibraryItem{}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionLibraryView); err != nil {
 			return err
 		}
@@ -120,7 +120,7 @@ func (db *Database) MergeLibraryPeople(ctx context.Context, userID, spaceID, sou
 	if sourceID == targetID || sourceVersion < 1 || targetVersion < 1 {
 		return nil, ErrLibraryInvalid
 	}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionLibraryEdit); err != nil {
 			return err
 		}
@@ -156,7 +156,7 @@ func (db *Database) MergeLibraryPeople(ctx context.Context, userID, spaceID, sou
 }
 
 func (db *Database) DeleteLibraryPerson(ctx context.Context, userID, spaceID, personID string, version int64) error {
-	return db.spaceTx(ctx, func(tx *sql.Tx) error {
+	return db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionLibraryEdit); err != nil {
 			return err
 		}

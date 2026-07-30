@@ -31,7 +31,7 @@ func (db *Database) LibraryFacets(ctx context.Context, userID, spaceID, prefix s
 		return nil, ErrLibraryInvalid
 	}
 	out := &LibrarySearchFacets{Tags: []LibrarySearchFacet{}, MediaTypes: []LibrarySearchFacet{}, Years: []LibrarySearchFacet{}, Albums: []LibrarySearchFacet{}, Utilities: []LibrarySearchFacet{}}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionLibraryView); err != nil {
 			return err
 		}

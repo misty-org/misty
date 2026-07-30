@@ -13,7 +13,7 @@ import (
 // PendingLibraryJobs counts queued or leased background jobs by kind.
 func (db *Database) PendingLibraryJobs(ctx context.Context) (map[string]int64, error) {
 	counts := map[string]int64{}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		rows, err := tx.QueryContext(ctx,
 			`SELECT job_kind,COUNT(*) FROM library_processing_jobs
 			 WHERE state IN ('queued','leased','running') GROUP BY job_kind`)
@@ -39,7 +39,7 @@ func (db *Database) PendingLibraryJobs(ctx context.Context) (map[string]int64, e
 // the cleanup worker is not keeping up.
 func (db *Database) ActiveUploadReservations(ctx context.Context) (int64, error) {
 	var count int64
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		return tx.QueryRowContext(ctx,
 			`SELECT COUNT(*) FROM space_upload_reservations WHERE state='active'`).Scan(&count)
 	})
@@ -51,7 +51,7 @@ func (db *Database) ActiveUploadReservations(ctx context.Context) (int64, error)
 // IP-and-user-agent heuristic.
 func (db *Database) ActiveUserCount(ctx context.Context) (int64, error) {
 	var count int64
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		return tx.QueryRowContext(ctx,
 			`SELECT COUNT(DISTINCT user_id) FROM sessions WHERE expires_at>NOW()`).Scan(&count)
 	})

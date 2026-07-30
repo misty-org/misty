@@ -19,7 +19,7 @@ func publishCanonicalRunResponse(ctx context.Context, database *db.Database, run
 	if err != nil || !claimed {
 		return err
 	}
-	eventType, text := canonicalRunResponse(run)
+	eventType, text := TestingCanonicalRunResponse(run)
 	details := map[string]string{"source_type": run.SourceType, "source_conversation_id": run.SourceConversationID}
 	finish := func(deliveryErr error) error {
 		state := "completed"
@@ -27,14 +27,14 @@ func publishCanonicalRunResponse(ctx context.Context, database *db.Database, run
 			state = "failed"
 			details["error"] = deliveryErr.Error()
 		}
-		if updateErr := database.FinishRunResponsePublication(ctx, actionID, state, mustAPIRawJSON(details)); updateErr != nil && deliveryErr == nil {
+		if updateErr := database.FinishRunResponsePublication(ctx, actionID, state, TestingMustAPIRawJSON(details)); updateErr != nil && deliveryErr == nil {
 			return updateErr
 		}
 		return deliveryErr
 	}
 	switch run.SourceType {
 	case "direct":
-		_, err = database.AppendAgentConversationEvent(ctx, userID, run.SourceConversationID, eventType, mustAPIRawJSON(map[string]any{"text": text, "run_id": run.ID}))
+		_, err = database.AppendAgentConversationEvent(ctx, userID, run.SourceConversationID, eventType, TestingMustAPIRawJSON(map[string]any{"text": text, "run_id": run.ID}))
 		if errors.Is(err, db.ErrSpaceNotFound) {
 			err = nil // Caller-owned correlation IDs are valid direct sources.
 		}
@@ -66,7 +66,7 @@ func publishCanonicalRunResponse(ctx context.Context, database *db.Database, run
 	return finish(err)
 }
 
-func canonicalRunResponse(run *db.SpaceRun) (string, string) {
+func TestingCanonicalRunResponse(run *db.SpaceRun) (string, string) {
 	if run.State == "failed" {
 		message := strings.TrimSpace(run.ErrorMessage)
 		if message == "" {
@@ -94,11 +94,11 @@ func canonicalRunResponse(run *db.SpaceRun) (string, string) {
 	return "agent_message", "The isolated run completed. Open run " + run.ID + " in Studio to inspect its output and actions."
 }
 
-func promptFromRun(run *db.SpaceRun) string {
+func TestingPromptFromRun(run *db.SpaceRun) string {
 	var input map[string]any
 	_ = json.Unmarshal(run.Input, &input)
 	prompt, _ := input["prompt"].(string)
 	return prompt
 }
 
-func mustAPIRawJSON(value any) json.RawMessage { raw, _ := json.Marshal(value); return raw }
+func TestingMustAPIRawJSON(value any) json.RawMessage { raw, _ := json.Marshal(value); return raw }

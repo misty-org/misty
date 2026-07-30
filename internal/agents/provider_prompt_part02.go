@@ -107,7 +107,7 @@ func trimJSONFence(value string) string {
 	return strings.TrimSpace(value)
 }
 
-func agentResponseJSONSchema() map[string]any {
+func TestingAgentResponseJSONSchema() map[string]any {
 	operationSchema := map[string]any{
 		"type":                 "object",
 		"additionalProperties": false,

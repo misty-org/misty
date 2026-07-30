@@ -27,7 +27,7 @@ func (c JournalCollabConfig) mintResourceTicketWithLifetime(
 		return JournalTicket{}, errors.New("invalid ticket lifetime")
 	}
 	expiresAt := time.Now().Add(lifetime).UTC()
-	claims := journalTicketClaims{
+	claims := TestingJournalTicketClaims{
 		Issuer: c.Issuer, Audience: c.Audience, JTI: "tkt_" + uuid.NewString(),
 		Subject: userID, SpaceID: spaceID,
 		ResourceType: resource.Type, ResourceID: resource.ID, Room: room,
@@ -48,7 +48,7 @@ func (c JournalCollabConfig) mintResourceTicketWithLifetime(
 	}
 	signingInput := base64.RawURLEncoding.EncodeToString(header) + "." +
 		base64.RawURLEncoding.EncodeToString(payload)
-	signature := ed25519.Sign(c.privateKey, []byte(signingInput))
+	signature := ed25519.Sign(c.TestingPrivateKey, []byte(signingInput))
 	return JournalTicket{
 		Ticket: signingInput + "." + base64.RawURLEncoding.EncodeToString(signature),
 		Room:   room,
@@ -85,8 +85,8 @@ func (c JournalCollabConfig) MintJournalExportTicket(
 
 // SetJournalCollab installs the shared Journal collaboration configuration.
 func (s *SpacesService) SetJournalCollab(config JournalCollabConfig) {
-	s.journalCollab = config
+	s.TestingJournalCollab = config
 }
 
 // JournalCollab exposes the configuration for control commands and callbacks.
-func (s *SpacesService) JournalCollab() JournalCollabConfig { return s.journalCollab }
+func (s *SpacesService) JournalCollab() JournalCollabConfig { return s.TestingJournalCollab }

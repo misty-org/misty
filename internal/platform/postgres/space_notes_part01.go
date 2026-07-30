@@ -46,7 +46,7 @@ var noteAccessDenied = NoteAccess{}
 // Space owner may archive/delete it. There is no per-note ACL in beta.
 func (db *Database) NoteAccessFor(ctx context.Context, userID, noteID string) (NoteAccess, error) {
 	var access NoteAccess
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		var innerErr error
 		access, innerErr = noteAccessForTx(ctx, tx, userID, noteID)
 		return innerErr
@@ -175,7 +175,7 @@ func (db *Database) CreateSpaceNote(ctx context.Context, creatorUserID, spaceID,
 		ID: "note_" + uuid.NewString(), SpaceID: spaceID, CreatorUserID: creatorUserID,
 		TitleProjection: title, LifecycleState: NoteLifecycleActive, ACLVersion: 1, Role: NoteRoleCreator,
 	}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if _, err := requireSpaceMemberTx(ctx, tx, spaceID, creatorUserID); err != nil {
 			return err
 		}
@@ -196,7 +196,7 @@ func (db *Database) CreateSpaceNote(ctx context.Context, creatorUserID, spaceID,
 // AccessibleSpaceNotes lists the active notes a caller may view in one Space.
 func (db *Database) AccessibleSpaceNotes(ctx context.Context, userID, spaceID string) ([]SpaceNote, error) {
 	notes := []SpaceNote{}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if _, err := requireSpaceMemberTx(ctx, tx, spaceID, userID); err != nil {
 			return err
 		}

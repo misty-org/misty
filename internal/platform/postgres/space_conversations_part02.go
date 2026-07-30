@@ -24,7 +24,7 @@ func (db *Database) UpdateSpaceConversation(ctx context.Context, userID, spaceID
 		return nil, ErrSpaceInvalid
 	}
 	out := &SpaceConversation{ID: conversationID, SpaceID: spaceID, Title: title}
-	err = db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err = db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpaceMessageWriteTx(ctx, tx, userID, spaceID); err != nil {
 			return err
 		}
@@ -92,7 +92,7 @@ func (db *Database) DeleteDisconnectedDiscordConversation(
 	ctx context.Context,
 	userID, spaceID, conversationID string,
 ) error {
-	return db.spaceTx(ctx, func(tx *sql.Tx) error {
+	return db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpaceOwnerTx(ctx, tx, spaceID, userID); err != nil {
 			return err
 		}
@@ -116,7 +116,7 @@ func (db *Database) SpaceConversationMessages(ctx context.Context, userID, space
 		limit = 50
 	}
 	items := []SpaceMessage{}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionMessagesRead); err != nil {
 			return err
 		}

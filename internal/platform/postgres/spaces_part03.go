@@ -15,7 +15,7 @@ import (
 // streamed from the object store (R2).
 func (db *Database) SpaceMemberAvatarMeta(ctx context.Context, requestingUserID, spaceID, memberID string) (int64, error) {
 	var version int64
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if _, err := requireSpaceMemberTx(ctx, tx, spaceID, requestingUserID); err != nil {
 			return err
 		}
@@ -51,7 +51,7 @@ func (db *Database) InviteToSpaceWithToken(
 		InvitedEmail: email, DeliveryStatus: "pending",
 		ExpiresAt: time.Now().UTC().Add(7 * 24 * time.Hour),
 	}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpaceOwnerTx(ctx, tx, spaceID, ownerID); err != nil {
 			return err
 		}
@@ -110,7 +110,7 @@ func (db *Database) InviteToSpaceWithToken(
 
 func (db *Database) IncomingSpaceInvites(ctx context.Context, userID string) ([]SpaceInvitation, error) {
 	items := []SpaceInvitation{}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if _, err := tx.ExecContext(ctx, `UPDATE space_invitations SET revoked_at=COALESCE(revoked_at,NOW())
 			WHERE expires_at<=NOW() AND consumed_at IS NULL`); err != nil {
 			return err
@@ -149,7 +149,7 @@ func (db *Database) PendingSpaceInvitations(
 	ownerID, spaceID string,
 ) ([]SpaceInvitation, error) {
 	items := []SpaceInvitation{}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpaceOwnerTx(ctx, tx, spaceID, ownerID); err != nil {
 			return err
 		}
@@ -187,7 +187,7 @@ func (db *Database) RefreshSpaceInvitation(
 ) (*SpaceInvitation, error) {
 	out := &SpaceInvitation{}
 	expiresAt := time.Now().UTC().Add(7 * 24 * time.Hour)
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpaceOwnerTx(ctx, tx, spaceID, ownerID); err != nil {
 			return err
 		}
@@ -215,7 +215,7 @@ func (db *Database) RevokeSpaceInvitation(
 	ctx context.Context,
 	ownerID, spaceID, inviteID string,
 ) error {
-	return db.spaceTx(ctx, func(tx *sql.Tx) error {
+	return db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpaceOwnerTx(ctx, tx, spaceID, ownerID); err != nil {
 			return err
 		}

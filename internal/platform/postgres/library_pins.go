@@ -29,7 +29,7 @@ type LibraryPinTarget struct {
 
 func (db *Database) LibraryPinnedCollections(ctx context.Context, userID, spaceID string) ([]LibraryPinnedCollection, error) {
 	out := []LibraryPinnedCollection{}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionLibraryView); err != nil {
 			return err
 		}
@@ -64,7 +64,7 @@ func (db *Database) SetLibraryPinnedCollections(ctx context.Context, userID, spa
 		}
 		seen[key] = true
 	}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionLibraryEdit); err != nil {
 			return err
 		}

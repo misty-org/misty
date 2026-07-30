@@ -37,7 +37,7 @@ type TrustedDevice struct {
 }
 
 func (db *Database) agentTx(userID string, fn func(*sql.Tx) error) error {
-	return db.withRLSContext(context.Background(), userRLSSettings(userID), fn)
+	return db.TestingWithRLSContext(context.Background(), userRLSSettings(userID), fn)
 }
 
 func (db *Database) RegisterTrustedDevice(userID, name, publicKey string, capabilities json.RawMessage) (*TrustedDevice, error) {
@@ -149,7 +149,7 @@ func scanDevice(row scanner, device *TrustedDevice) error {
 	return row.Scan(&device.ID, &device.UserID, &device.Name, &device.PublicKey, &device.KeyAlgorithm, &device.Capabilities, &device.LastSeenAt, &device.RevokedAt, &device.CreatedAt, &device.UpdatedAt)
 }
 
-func secureToken() (string, error) {
+func TestingSecureToken() (string, error) {
 	value := make([]byte, 32)
 	if _, err := rand.Read(value); err != nil {
 		return "", err
@@ -157,7 +157,7 @@ func secureToken() (string, error) {
 	return base64.RawURLEncoding.EncodeToString(value), nil
 }
 
-func hashToken(value string) string {
+func TestingHashToken(value string) string {
 	sum := sha256.Sum256([]byte(value))
 	return hex.EncodeToString(sum[:])
 }

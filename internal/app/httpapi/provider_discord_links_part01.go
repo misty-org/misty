@@ -13,7 +13,7 @@ import (
 
 // Discord's hard limit on message content. Mirrored text is trimmed, never
 // dropped: losing the tail of someone's message is worse than an ellipsis.
-const discordContentLimit = 2000
+const TestingDiscordContentLimit = 2000
 
 // Discord message types Misty mirrors. 0 = default, 19 = inline reply.
 var mirroredDiscordMessageTypes = map[int]bool{0: true, 19: true}
@@ -27,7 +27,7 @@ var discordRoleMentionPattern = regexp.MustCompile(`<@&(\d+)>`)
 func discordBotToken() string { return strings.TrimSpace(os.Getenv("DISCORD_BOT_TOKEN")) }
 
 // discordMessage is the subset of Discord's REST/Gateway message Misty reads.
-type discordMessage struct {
+type TestingDiscordMessage struct {
 	ID        string `json:"id"`
 	ChannelID string `json:"channel_id"`
 	GuildID   string `json:"guild_id"`

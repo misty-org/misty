@@ -14,9 +14,9 @@ import (
 )
 
 const (
-	maxAIJSONBodyBytes     = 2 << 20
-	maxAIToolJSONBodyBytes = 8 << 20
-	maxAISessionTitleRunes = 120
+	TestingMaxAIJSONBodyBytes = 2 << 20
+	maxAIToolJSONBodyBytes    = 8 << 20
+	maxAISessionTitleRunes    = 120
 )
 
 type AIService struct {
@@ -63,7 +63,7 @@ func (s *AIService) CreateSession() http.HandlerFunc {
 			return
 		}
 		if allowed, retryAfter := s.guard.AllowSession(userID); !allowed {
-			writeAIRateLimit(w, retryAfter)
+			TestingWriteAIRateLimit(w, retryAfter)
 			return
 		}
 		var body struct {
@@ -164,7 +164,7 @@ func (s *AIService) CreateSession() http.HandlerFunc {
 			_ = s.runtime.SetSessionReasoningEffort(session.ID, userID, reasoningEffort)
 		}
 		if err := s.database.BindAgentSessionContext(r.Context(), userID, session.ID, body.AgentID, body.SpaceID, body.ModelID, agent.GatewayModelCatalogVersion); err != nil {
-			writeAIError(w, err)
+			TestingWriteAIError(w, err)
 			return
 		}
 		writeJSON(w, http.StatusCreated, map[string]any{
@@ -207,7 +207,7 @@ func (s *AIService) Transcript() http.HandlerFunc {
 		}
 		messages, err := s.runtime.Transcript(r.Context(), sessionID, userID)
 		if err != nil {
-			writeAIError(w, err)
+			TestingWriteAIError(w, err)
 			return
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"messages": messages})
@@ -226,7 +226,7 @@ func (s *AIService) RenameSession() http.HandlerFunc {
 		var body struct {
 			Title string `json:"title"`
 		}
-		if err := json.NewDecoder(io.LimitReader(r.Body, maxAIJSONBodyBytes)).Decode(&body); err != nil {
+		if err := json.NewDecoder(io.LimitReader(r.Body, TestingMaxAIJSONBodyBytes)).Decode(&body); err != nil {
 			http.Error(w, "invalid request body", http.StatusBadRequest)
 			return
 		}

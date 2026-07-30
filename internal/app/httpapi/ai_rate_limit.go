@@ -6,38 +6,38 @@ import (
 )
 
 const (
-	aiProviderRequestsPerMinute = 12
-	aiProviderRequestsPerHour   = 120
-	aiSessionsPerHour           = 20
-	aiMaxConcurrentPerUser      = 1
-	aiGlobalRequestsPerMinute   = 60
-	aiGlobalRequestsPerHour     = 1000
-	aiGlobalMaxConcurrent       = 8
+	aiProviderRequestsPerMinute  = 12
+	aiProviderRequestsPerHour    = 120
+	aiSessionsPerHour            = 20
+	aiMaxConcurrentPerUser       = 1
+	aiGlobalRequestsPerMinute    = 60
+	aiGlobalRequestsPerHour      = 1000
+	TestingAiGlobalMaxConcurrent = 8
 )
 
 type AIRequestGuard struct {
-	mu            sync.Mutex
-	now           func() time.Time
-	perMinute     *SlidingWindowLimiter
-	perHour       *SlidingWindowLimiter
-	globalMinute  *SlidingWindowLimiter
-	globalHour    *SlidingWindowLimiter
-	sessions      *SlidingWindowLimiter
-	inFlight      map[string]int
-	inFlightTotal int
-	maxInFlight   int
+	mu               sync.Mutex
+	TestingNow       func() time.Time
+	TestingPerMinute *SlidingWindowLimiter
+	TestingPerHour   *SlidingWindowLimiter
+	globalMinute     *SlidingWindowLimiter
+	globalHour       *SlidingWindowLimiter
+	sessions         *SlidingWindowLimiter
+	inFlight         map[string]int
+	inFlightTotal    int
+	maxInFlight      int
 }
 
 func NewAIRequestGuard() *AIRequestGuard {
 	return &AIRequestGuard{
-		now:          time.Now,
-		perMinute:    NewSlidingWindowLimiter(aiProviderRequestsPerMinute, time.Minute),
-		perHour:      NewSlidingWindowLimiter(aiProviderRequestsPerHour, time.Hour),
-		globalMinute: NewSlidingWindowLimiter(aiGlobalRequestsPerMinute, time.Minute),
-		globalHour:   NewSlidingWindowLimiter(aiGlobalRequestsPerHour, time.Hour),
-		sessions:     NewSlidingWindowLimiter(aiSessionsPerHour, time.Hour),
-		inFlight:     make(map[string]int),
-		maxInFlight:  aiMaxConcurrentPerUser,
+		TestingNow:       time.Now,
+		TestingPerMinute: NewSlidingWindowLimiter(aiProviderRequestsPerMinute, time.Minute),
+		TestingPerHour:   NewSlidingWindowLimiter(aiProviderRequestsPerHour, time.Hour),
+		globalMinute:     NewSlidingWindowLimiter(aiGlobalRequestsPerMinute, time.Minute),
+		globalHour:       NewSlidingWindowLimiter(aiGlobalRequestsPerHour, time.Hour),
+		sessions:         NewSlidingWindowLimiter(aiSessionsPerHour, time.Hour),
+		inFlight:         make(map[string]int),
+		maxInFlight:      aiMaxConcurrentPerUser,
 	}
 }
 
@@ -50,14 +50,14 @@ func (g *AIRequestGuard) AcquireProviderCall(userID string) (release func(), ret
 	if g.inFlight[userID] >= g.maxInFlight {
 		return nil, time.Second, false
 	}
-	if g.inFlightTotal >= aiGlobalMaxConcurrent {
+	if g.inFlightTotal >= TestingAiGlobalMaxConcurrent {
 		return nil, time.Second, false
 	}
-	now := g.now()
-	if ok, retry := g.perMinute.Allow(userID, now); !ok {
+	now := g.TestingNow()
+	if ok, retry := g.TestingPerMinute.Allow(userID, now); !ok {
 		return nil, retry, false
 	}
-	if ok, retry := g.perHour.Allow(userID, now); !ok {
+	if ok, retry := g.TestingPerHour.Allow(userID, now); !ok {
 		return nil, retry, false
 	}
 	if ok, retry := g.globalMinute.Allow("global", now); !ok {
@@ -83,5 +83,5 @@ func (g *AIRequestGuard) AcquireProviderCall(userID string) (release func(), ret
 }
 
 func (g *AIRequestGuard) AllowSession(userID string) (bool, time.Duration) {
-	return g.sessions.Allow(userID, g.now())
+	return g.sessions.Allow(userID, g.TestingNow())
 }

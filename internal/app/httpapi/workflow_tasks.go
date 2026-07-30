@@ -36,7 +36,7 @@ func (s *SpacesService) taskQueryNode(ctx context.Context, run *db.SpaceRun, inv
 	if err != nil {
 		return nil, err
 	}
-	return mustAPIRawJSON(map[string]any{"tasks": items}), nil
+	return TestingMustAPIRawJSON(map[string]any{"tasks": items}), nil
 }
 
 func (s *SpacesService) calendarQueryNode(ctx context.Context, run *db.SpaceRun, invocation workflowv2.Invocation) (json.RawMessage, error) {
@@ -71,7 +71,7 @@ func (s *SpacesService) calendarQueryNode(ctx context.Context, run *db.SpaceRun,
 	if err != nil {
 		return nil, err
 	}
-	return mustAPIRawJSON(map[string]any{"events": items}), nil
+	return TestingMustAPIRawJSON(map[string]any{"events": items}), nil
 }
 
 func (s *SpacesService) createTaskNode(ctx context.Context, run *db.SpaceRun, agent *db.SpaceStudioResource, invocation workflowv2.Invocation) (json.RawMessage, error) {
@@ -92,7 +92,7 @@ func (s *SpacesService) createTaskNode(ctx context.Context, run *db.SpaceRun, ag
 		return nil, err
 	}
 	_, _ = s.ProcessSpaceTaskEvent(ctx, *created, "created")
-	return mustAPIRawJSON(map[string]any{"task": created}), nil
+	return TestingMustAPIRawJSON(map[string]any{"task": created}), nil
 }
 
 func (s *SpacesService) updateTaskNode(ctx context.Context, run *db.SpaceRun, invocation workflowv2.Invocation) (json.RawMessage, error) {
@@ -110,7 +110,7 @@ func (s *SpacesService) updateTaskNode(ctx context.Context, run *db.SpaceRun, in
 		return nil, err
 	}
 	_, _ = s.ProcessSpaceTaskEvent(ctx, *updated, "updated")
-	return mustAPIRawJSON(map[string]any{"task": updated}), nil
+	return TestingMustAPIRawJSON(map[string]any{"task": updated}), nil
 }
 
 func workflowTaskInput(raw json.RawMessage) map[string]any {

@@ -8,7 +8,7 @@ import (
 )
 
 func (db *Database) DeleteSpaceNode(ctx context.Context, userID, spaceID, nodeID string) error {
-	return db.spaceTx(ctx, func(tx *sql.Tx) error {
+	return db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpaceMessageWriteTx(ctx, tx, userID, spaceID); err != nil {
 			return err
 		}
@@ -27,7 +27,7 @@ func (db *Database) DeleteSpaceNode(ctx context.Context, userID, spaceID, nodeID
 }
 
 func (db *Database) MarkSpaceNodeStale(ctx context.Context, userID, spaceID, nodeID string) error {
-	return db.spaceTx(ctx, func(tx *sql.Tx) error {
+	return db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpaceMessageWriteTx(ctx, tx, userID, spaceID); err != nil {
 			return err
 		}
@@ -44,7 +44,7 @@ func (db *Database) SpaceInbox(ctx context.Context, userID, tab string, limit in
 		limit = 100
 	}
 	items := []SpaceInboxItem{}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		where := "i.kind='unread'"
 		if tab == "mentions" {
 			where = "i.kind IN ('mention','agent','approval','workflow')"
@@ -71,14 +71,14 @@ func (db *Database) SpaceInbox(ctx context.Context, userID, tab string, limit in
 }
 
 func (db *Database) MarkSpaceInboxSeen(ctx context.Context, userID string) error {
-	return db.spaceTx(ctx, func(tx *sql.Tx) error {
+	return db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		_, err := tx.ExecContext(ctx, `UPDATE space_inbox_items SET seen_at=NOW() WHERE user_id=$1 AND seen_at IS NULL`, userID)
 		return err
 	})
 }
 
 func (db *Database) ClearSpaceInbox(ctx context.Context, userID, tab string) error {
-	return db.spaceTx(ctx, func(tx *sql.Tx) error {
+	return db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		where := "kind='unread'"
 		if tab == "mentions" {
 			where = "kind IN ('mention','agent','approval','workflow')"
@@ -94,7 +94,7 @@ func (db *Database) ClearSpaceInbox(ctx context.Context, userID, tab string) err
 }
 
 func (db *Database) MarkSpaceRead(ctx context.Context, userID, spaceID string, seq int64) error {
-	return db.spaceTx(ctx, func(tx *sql.Tx) error {
+	return db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionMessagesRead); err != nil {
 			return err
 		}
@@ -107,7 +107,7 @@ func (db *Database) MarkSpaceRead(ctx context.Context, userID, spaceID string, s
 }
 
 func (db *Database) CreateRealtimeTicket(ctx context.Context, userID, tokenHash string, after int64, expires time.Time) error {
-	return db.spaceTx(ctx, func(tx *sql.Tx) error {
+	return db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		_, err := tx.ExecContext(ctx, `INSERT INTO realtime_tickets(token_hash,user_id,after_cursor,expires_at) VALUES($1,$2,$3,$4)`, tokenHash, userID, after, expires)
 		return err
 	})
@@ -116,7 +116,7 @@ func (db *Database) CreateRealtimeTicket(ctx context.Context, userID, tokenHash 
 func (db *Database) ConsumeRealtimeTicket(ctx context.Context, tokenHash string) (string, int64, error) {
 	var userID string
 	var after int64
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		return tx.QueryRowContext(ctx, `UPDATE realtime_tickets SET consumed_at=NOW() WHERE token_hash=$1 AND consumed_at IS NULL AND expires_at>NOW() RETURNING user_id,after_cursor`, tokenHash).Scan(&userID, &after)
 	})
 	if errors.Is(err, sql.ErrNoRows) {
@@ -131,7 +131,7 @@ func (db *Database) SpaceEventsAfter(ctx context.Context, userID string, after i
 	}
 	events := []SpaceEvent{}
 	resync := false
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if after > 0 {
 			var oldest sql.NullInt64
 			if err := tx.QueryRowContext(ctx, `SELECT min(id) FROM space_events WHERE created_at>NOW()-INTERVAL '7 days'`).Scan(&oldest); err != nil {
@@ -190,7 +190,7 @@ func (db *Database) SpaceEventsAfter(ctx context.Context, userID string, after i
 
 func (db *Database) EventByIDForUser(ctx context.Context, userID string, eventID int64) (*SpaceEvent, error) {
 	out := &SpaceEvent{}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := tx.QueryRowContext(ctx, `SELECT e.id,e.space_id,e.event_type,COALESCE(e.actor_user_id,''),COALESCE(e.entity_id,''),e.payload,e.created_at
 			FROM space_events e JOIN space_members m ON m.space_id=e.space_id
 			WHERE e.id=$1 AND m.user_id=$2`, eventID, userID).Scan(&out.ID, &out.SpaceID, &out.EventType, &out.ActorUserID, &out.EntityID, &out.Payload, &out.CreatedAt); err != nil {

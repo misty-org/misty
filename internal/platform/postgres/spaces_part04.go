@@ -9,7 +9,7 @@ import (
 
 func (db *Database) RespondToSpaceInvite(ctx context.Context, userID, inviteID string, accept bool) (*Space, error) {
 	var spaceID string
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		var expires time.Time
 		var invitedEmail, userEmail string
 		if err := tx.QueryRowContext(ctx, `SELECT i.space_id,i.expires_at,i.invited_email,u.email
@@ -57,7 +57,7 @@ func (db *Database) SpaceInvitationPreview(
 	tokenHash string,
 ) (*SpaceInvitationPreview, error) {
 	out := &SpaceInvitationPreview{}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		return tx.QueryRowContext(ctx, `SELECT s.name,u.name,i.invited_email,i.expires_at
 			FROM space_invitations i
 			JOIN spaces s ON s.id=i.space_id
@@ -78,7 +78,7 @@ func (db *Database) RespondToSpaceInviteToken(
 	accept bool,
 ) (*Space, error) {
 	var inviteID string
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		return tx.QueryRowContext(ctx, `SELECT id FROM space_invitations
 			WHERE token_hash=$1 AND revoked_at IS NULL AND consumed_at IS NULL AND expires_at>NOW()`,
 			tokenHash).Scan(&inviteID)
@@ -99,7 +99,7 @@ func (db *Database) SetSpaceInvitationDelivery(
 	if status != "sent" && status != "failed" {
 		return ErrSpaceInvalid
 	}
-	return db.spaceTx(ctx, func(tx *sql.Tx) error {
+	return db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		_, err := tx.ExecContext(ctx, `UPDATE space_invitations
 			SET delivery_status=$1,last_sent_at=NOW() WHERE id=$2`, status, inviteID)
 		return err
@@ -107,7 +107,7 @@ func (db *Database) SetSpaceInvitationDelivery(
 }
 
 func (db *Database) RemoveSpaceMember(ctx context.Context, ownerID, spaceID, memberID string) error {
-	return db.spaceTx(ctx, func(tx *sql.Tx) error {
+	return db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpaceOwnerTx(ctx, tx, spaceID, ownerID); err != nil {
 			return err
 		}
@@ -146,7 +146,7 @@ func (db *Database) RemoveSpaceMember(ctx context.Context, ownerID, spaceID, mem
 }
 
 func (db *Database) LeaveSpace(ctx context.Context, userID, spaceID string) error {
-	return db.spaceTx(ctx, func(tx *sql.Tx) error {
+	return db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		role, err := requireSpaceMemberTx(ctx, tx, spaceID, userID)
 		if err != nil {
 			return err

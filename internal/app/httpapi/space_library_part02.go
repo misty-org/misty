@@ -30,15 +30,15 @@ import (
 // generic initiation endpoint rejects it.
 func (s *SpaceLibraryService) transferPurposeEnabled(purpose UploadPurpose) bool {
 	if purpose == UploadPurposeNoteAttachment {
-		return s.noteAssetsEnabled
+		return s.TestingNoteAssetsEnabled
 	}
 	if purpose == UploadPurposeDrawingAsset {
-		return s.drawingAssetsEnabled
+		return s.TestingDrawingAssetsEnabled
 	}
-	return s.uploadPurposeEnabled(purpose)
+	return s.TestingUploadPurposeEnabled(purpose)
 }
 
-func isJournalAssetPurpose(purpose UploadPurpose) bool {
+func TestingIsJournalAssetPurpose(purpose UploadPurpose) bool {
 	return purpose == UploadPurposeNoteAttachment ||
 		purpose == UploadPurposeDrawingAsset
 }
@@ -47,14 +47,14 @@ func NewSpaceLibraryService(database *db.Database, store LibraryObjectStore, upl
 	if database == nil || store == nil {
 		return nil, errors.New("Library database and permanent object store are required")
 	}
-	if err := limits.validate(); err != nil {
+	if err := limits.TestingValidate(); err != nil {
 		return nil, err
 	}
 	service := &SpaceLibraryService{
-		database: database, store: store, uploadsEnabled: uploadsEnabled, uploadLimits: limits,
+		database: database, TestingStore: store, TestingUploadsEnabled: uploadsEnabled, TestingUploadLimits: limits,
 		egress: NewEgressGuard(EgressBudgetFromEnv()),
 	}
-	if err := service.configureTransfers(TransferTTLsFromEnv()); err != nil {
+	if err := service.TestingConfigureTransfers(TransferTTLsFromEnv()); err != nil {
 		return nil, err
 	}
 	return service, nil
@@ -67,7 +67,7 @@ func NewSpaceLibraryService(database *db.Database, store LibraryObjectStore, upl
 func (s *SpaceLibraryService) WriteGeneratedTextArtifact(ctx context.Context, userID, spaceID, filename, content string, provenance map[string]any) (*db.SpaceLibraryItem, error) {
 	filename = sanitizeLibraryFilename(filename)
 	data := []byte(content)
-	if filename == "" || len(data) == 0 || int64(len(data)) > s.uploadLimits.Max(UploadPurposeLibrary) {
+	if filename == "" || len(data) == 0 || int64(len(data)) > s.TestingUploadLimits.Max(UploadPurposeLibrary) {
 		return nil, db.ErrLibraryInvalid
 	}
 	digest := sha256.Sum256(data)
@@ -86,22 +86,22 @@ func (s *SpaceLibraryService) WriteGeneratedTextArtifact(ctx context.Context, us
 		return nil, err
 	}
 	metadata := LibraryObjectMetadata{ByteSize: int64(len(data)), SHA256: digestHex, MIMEType: "text/markdown; charset=utf-8"}
-	if err = s.store.Put(ctx, objectKey, bytes.NewReader(data), metadata); err != nil {
+	if err = s.TestingStore.Put(ctx, objectKey, bytes.NewReader(data), metadata); err != nil {
 		s.rejectAndDelete(ctx, upload, tokenHash, "invalid", "object_write_failed")
 		return nil, err
 	}
 	if _, err = s.database.SetLibraryUploadState(ctx, userID, spaceID, upload.ID, tokenHash, "uploading", "uploaded_unverified"); err != nil {
-		_ = s.store.Delete(ctx, objectKey)
+		_ = s.TestingStore.Delete(ctx, objectKey)
 		return nil, err
 	}
 	intrinsic, _ := json.Marshal(map[string]any{"generated": true, "provenance": provenance})
 	completed, err := s.database.CompleteLibraryUpload(ctx, userID, spaceID, upload.ID, tokenHash, int64(len(data)), digestHex, metadata.MIMEType, intrinsic)
 	if err != nil {
-		_ = s.store.Delete(ctx, objectKey)
+		_ = s.TestingStore.Delete(ctx, objectKey)
 		return nil, err
 	}
 	if completed.DiscardObjectKey != "" {
-		_ = s.store.Delete(ctx, completed.DiscardObjectKey)
+		_ = s.TestingStore.Delete(ctx, completed.DiscardObjectKey)
 	}
 	return completed.Item, nil
 }
@@ -125,7 +125,7 @@ func (s *SpaceLibraryService) ReadTextItem(ctx context.Context, userID, spaceID,
 	if download.ByteSize > maximumBytes {
 		return nil, download, db.ErrLibraryInvalid
 	}
-	reader, metadata, err := s.store.Open(ctx, download.ObjectKey)
+	reader, metadata, err := s.TestingStore.Open(ctx, download.ObjectKey)
 	if err != nil {
 		return nil, download, err
 	}

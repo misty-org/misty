@@ -14,7 +14,7 @@ const (
 	// The decoded previews are capped at 4 MiB below. Base64 adds roughly 33%,
 	// so Media Search needs a narrowly scoped limit above the generic AI JSON
 	// limit without increasing it for every other AI endpoint.
-	mediaMaxJSONBytes = int64(6 << 20)
+	TestingMediaMaxJSONBytes = int64(6 << 20)
 )
 
 type MediaSearchService struct {
@@ -35,7 +35,7 @@ func NewMediaSearchService(database *db.Database, analyzer *serveragent.SmartLib
 	}
 }
 
-type mediaIndexRequest struct {
+type TestingMediaIndexRequest struct {
 	DeviceID      string  `json:"deviceId"`
 	AssetID       string  `json:"assetId"`
 	Fingerprint   string  `json:"fingerprint"`

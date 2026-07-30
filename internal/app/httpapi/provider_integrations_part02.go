@@ -32,7 +32,7 @@ func (s *SpacesService) providerAccessToken(ctx context.Context, userID, spaceID
 		if token.RefreshToken == "" {
 			return "", "", errors.New("provider connection requires reauthorization")
 		}
-		definition, exists := providerOAuthCatalog[credential.Provider]
+		definition, exists := TestingProviderOAuthCatalog[credential.Provider]
 		if !exists {
 			return "", "", errors.New("provider configuration is missing")
 		}
@@ -62,7 +62,7 @@ func (s *SpacesService) providerAccessToken(ctx context.Context, userID, spaceID
 }
 
 func exchangeProviderCode(ctx context.Context, definition providerOAuthDefinition, code, verifier, redirect string) (providerTokenEnvelope, []byte, error) {
-	values := url.Values{"grant_type": {"authorization_code"}, "code": {code}, "redirect_uri": {redirect}, "client_id": {providerOAuthClientID(definition)}, "client_secret": {providerOAuthClientSecret(definition)}}
+	values := url.Values{"grant_type": {"authorization_code"}, "code": {code}, "redirect_uri": {redirect}, "client_id": {TestingProviderOAuthClientID(definition)}, "client_secret": {TestingProviderOAuthClientSecret(definition)}}
 	if definition.PKCE {
 		values.Set("code_verifier", verifier)
 	}
@@ -119,7 +119,7 @@ var providerCompletionPage = template.Must(template.New("provider-completion").P
 </body>
 </html>`))
 
-func writeProviderCompletionPage(w http.ResponseWriter, providerName, accountName string) {
+func TestingWriteProviderCompletionPage(w http.ResponseWriter, providerName, accountName string) {
 	if strings.TrimSpace(accountName) == "" {
 		accountName = providerName + " account"
 	}
@@ -131,7 +131,7 @@ func writeProviderCompletionPage(w http.ResponseWriter, providerName, accountNam
 }
 
 func refreshProviderToken(ctx context.Context, definition providerOAuthDefinition, refreshToken string) (providerTokenEnvelope, []byte, error) {
-	values := url.Values{"grant_type": {"refresh_token"}, "refresh_token": {refreshToken}, "client_id": {providerOAuthClientID(definition)}, "client_secret": {providerOAuthClientSecret(definition)}}
+	values := url.Values{"grant_type": {"refresh_token"}, "refresh_token": {refreshToken}, "client_id": {TestingProviderOAuthClientID(definition)}, "client_secret": {TestingProviderOAuthClientSecret(definition)}}
 	var request *http.Request
 	if definition.ID == "notion" {
 		encoded, _ := json.Marshal(map[string]string{"grant_type": "refresh_token", "refresh_token": refreshToken})
@@ -223,7 +223,7 @@ func providerAccountIdentity(provider string, token providerTokenEnvelope, raw [
 	return "", ""
 }
 
-func providerCallbackURL(r *http.Request, provider string) string {
+func TestingProviderCallbackURL(r *http.Request, provider string) string {
 	base := configuredPublicAPIBase()
 	if base == "" {
 		scheme := "https"

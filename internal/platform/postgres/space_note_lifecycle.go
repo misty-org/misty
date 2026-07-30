@@ -41,7 +41,7 @@ func handleNoteMembershipRestoreTx(_ context.Context, _ *sql.Tx, _, _ string) er
 // in the same transaction that removes or anonymizes the user, before the row
 // goes away — the creator id is what identifies the notes to purge.
 func (db *Database) PurgeNotesForDeletedAccount(ctx context.Context, userID string) error {
-	return db.spaceTx(ctx, func(tx *sql.Tx) error {
+	return db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		return handleNoteAccountDeletionTx(ctx, tx, userID)
 	})
 }
@@ -80,7 +80,7 @@ func (db *Database) PurgeExpiredNotes(ctx context.Context, limit int) (int64, er
 		limit = 100
 	}
 	var purged int64
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		// Only notes whose purge command actually reached the collaboration
 		// service are removed. Deleting the row first would strand the Durable
 		// Object with no record of what to clean up.
@@ -118,7 +118,7 @@ func (db *Database) PendingNoteControlCommands(ctx context.Context, limit int) (
 		limit = 50
 	}
 	commands := []NoteControlCommand{}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		rows, err := tx.QueryContext(ctx,
 			`UPDATE space_note_control_outbox SET attempts=attempts+1,
 			        next_attempt_at=NOW()+(LEAST(attempts+1,6)*INTERVAL '10 seconds')
@@ -145,7 +145,7 @@ func (db *Database) PendingNoteControlCommands(ctx context.Context, limit int) (
 
 // MarkNoteControlDelivered records a successful delivery. It is idempotent.
 func (db *Database) MarkNoteControlDelivered(ctx context.Context, commandID string) error {
-	return db.spaceTx(ctx, func(tx *sql.Tx) error {
+	return db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		_, err := tx.ExecContext(ctx,
 			`UPDATE space_note_control_outbox SET delivered_at=NOW(),last_error=''
 			 WHERE id=$1 AND delivered_at IS NULL`, commandID)
@@ -159,7 +159,7 @@ func (db *Database) MarkNoteControlFailed(ctx context.Context, commandID, reason
 	if len(reason) > 500 {
 		reason = reason[:500]
 	}
-	return db.spaceTx(ctx, func(tx *sql.Tx) error {
+	return db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		_, err := tx.ExecContext(ctx,
 			`UPDATE space_note_control_outbox SET last_error=$1 WHERE id=$2 AND delivered_at IS NULL`,
 			reason, commandID)
@@ -171,7 +171,7 @@ func (db *Database) MarkNoteControlFailed(ctx context.Context, commandID, reason
 // readiness metrics. A small transient backlog is normal.
 func (db *Database) NoteControlBacklog(ctx context.Context) (int64, error) {
 	var backlog int64
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		return tx.QueryRowContext(ctx,
 			`SELECT COUNT(*) FROM space_note_control_outbox WHERE delivered_at IS NULL AND next_attempt_at<=NOW()`).
 			Scan(&backlog)
@@ -190,7 +190,7 @@ func (db *Database) ExpiredNoteAssets(ctx context.Context, safetyWindow time.Dur
 		safetyWindow = 24 * time.Hour
 	}
 	assets := []ExpiredLibraryUpload{}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		rows, err := tx.QueryContext(ctx,
 			`SELECT a.id,b.r2_object_key FROM space_note_assets a
 			 JOIN library_files f ON f.id=a.file_id
@@ -216,7 +216,7 @@ func (db *Database) ExpiredNoteAssets(ctx context.Context, safetyWindow time.Dur
 
 // MarkNoteAssetDeleted finalizes one asset after its object is gone.
 func (db *Database) MarkNoteAssetDeleted(ctx context.Context, assetID string) error {
-	return db.spaceTx(ctx, func(tx *sql.Tx) error {
+	return db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		_, err := tx.ExecContext(ctx,
 			`UPDATE space_note_assets SET lifecycle_state='deleted',deleted_at=NOW() WHERE id=$1`, assetID)
 		return err

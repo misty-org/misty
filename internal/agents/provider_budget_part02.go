@@ -9,28 +9,28 @@ func (p *BudgetedProvider) Next(request ModelRequest) (ModelResponse, error) {
 	}
 	defer release()
 	response, err := p.inner.Next(request)
-	p.recordSpend(response)
+	p.TestingRecordSpend(response)
 	return response, err
 }
 
 // recordSpend charges the tokens a completed call actually consumed.
-func (p *BudgetedProvider) recordSpend(response ModelResponse) {
+func (p *BudgetedProvider) TestingRecordSpend(response ModelResponse) {
 	tokens := response.Usage.InputTokens + response.Usage.OutputTokens + response.Usage.ReasoningTokens
 	if tokens <= 0 {
 		return
 	}
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	now := p.now()
+	p.TestingMu.Lock()
+	defer p.TestingMu.Unlock()
+	now := p.TestingNow()
 	p.tokenHour.record(now, tokens)
-	p.tokenDay.record(now, tokens)
+	p.TestingTokenDay.record(now, tokens)
 	p.spentTokens += tokens
 }
 
 // SpentTokens reports billable tokens observed since start, for monitoring.
 func (p *BudgetedProvider) SpentTokens() int64 {
-	p.mu.Lock()
-	defer p.mu.Unlock()
+	p.TestingMu.Lock()
+	defer p.TestingMu.Unlock()
 	return p.spentTokens
 }
 
@@ -43,11 +43,11 @@ func (p *BudgetedProvider) NextContext(ctx context.Context, request ModelRequest
 	defer release()
 	if contextual, ok := p.inner.(ContextModelProvider); ok {
 		response, err := contextual.NextContext(ctx, request)
-		p.recordSpend(response)
+		p.TestingRecordSpend(response)
 		return response, err
 	}
 	response, err := p.inner.Next(request)
-	p.recordSpend(response)
+	p.TestingRecordSpend(response)
 	return response, err
 }
 

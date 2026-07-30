@@ -40,7 +40,7 @@ func (db *Database) CreateUser(name, email, password string) (*User, error) {
 }
 
 func (db *Database) CreateUserWithUsername(name, username, email, password string) (*User, error) {
-	normalizedUsername, err := normalizeUsername(username)
+	normalizedUsername, err := TestingNormalizeUsername(username)
 	if err != nil {
 		return nil, err
 	}
@@ -59,7 +59,7 @@ func (db *Database) createUser(name, username, email, password string) (*User, e
 	licenseID := uuid.New().String()
 
 	var license *License
-	err = db.withRLSContext(context.Background(), registrationRLSSettings(id, licenseID, normalizedEmail), func(tx *sql.Tx) error {
+	err = db.TestingWithRLSContext(context.Background(), registrationRLSSettings(id, licenseID, normalizedEmail), func(tx *sql.Tx) error {
 		_, err := tx.ExecContext(
 			context.Background(),
 			`INSERT INTO users (id, license_id, name, username, email, password_hash) VALUES ($1, $2, $3, $4, $5, $6)`,
@@ -89,7 +89,7 @@ func (db *Database) GetUserByEmail(email string) (*User, string, error) {
 	var hash string
 	normalizedEmail := normalizeEmail(email)
 
-	err := db.withRLSContext(context.Background(), anonymousRLSSettings(normalizedEmail), func(tx *sql.Tx) error {
+	err := db.TestingWithRLSContext(context.Background(), anonymousRLSSettings(normalizedEmail), func(tx *sql.Tx) error {
 		return tx.QueryRowContext(
 			context.Background(),
 			`SELECT id, license_id, name, username, email, password_hash, created_at
@@ -109,7 +109,7 @@ func (db *Database) GetUserByEmail(email string) (*User, string, error) {
 }
 
 func (db *Database) UpdateUserName(id, name string) error {
-	err := db.withRLSContext(context.Background(), userRLSSettings(id), func(tx *sql.Tx) error {
+	err := db.TestingWithRLSContext(context.Background(), userRLSSettings(id), func(tx *sql.Tx) error {
 		_, err := tx.ExecContext(context.Background(), `UPDATE users SET name = $1 WHERE id = $2`, name, id)
 		return err
 	})
@@ -124,7 +124,7 @@ func (db *Database) UpdateUserName(id, name string) error {
 // successful avatar upload so clients cache-bust the new image.
 func (db *Database) BumpUserAvatarVersion(id string) (int64, error) {
 	var version int64
-	err := db.withRLSContext(context.Background(), userRLSSettings(id), func(tx *sql.Tx) error {
+	err := db.TestingWithRLSContext(context.Background(), userRLSSettings(id), func(tx *sql.Tx) error {
 		return tx.QueryRowContext(
 			context.Background(),
 			`UPDATE users SET avatar_version = avatar_version + 1, avatar_updated_at = NOW() WHERE id = $1 RETURNING avatar_version`,
@@ -141,7 +141,7 @@ func (db *Database) BumpUserAvatarVersion(id string) (int64, error) {
 // never set an avatar), used to build the ETag and decide whether to serve.
 func (db *Database) GetUserAvatarVersion(id string) (int64, error) {
 	var version int64
-	err := db.withRLSContext(context.Background(), userRLSSettings(id), func(tx *sql.Tx) error {
+	err := db.TestingWithRLSContext(context.Background(), userRLSSettings(id), func(tx *sql.Tx) error {
 		return tx.QueryRowContext(
 			context.Background(),
 			`SELECT avatar_version FROM users WHERE id = $1`,
@@ -160,7 +160,7 @@ func (db *Database) GetUserAvatarVersion(id string) (int64, error) {
 
 func (db *Database) GetUserByID(id string) (*User, error) {
 	var u User
-	err := db.withRLSContext(context.Background(), userRLSSettings(id), func(tx *sql.Tx) error {
+	err := db.TestingWithRLSContext(context.Background(), userRLSSettings(id), func(tx *sql.Tx) error {
 		return tx.QueryRowContext(
 			context.Background(),
 			`SELECT id, license_id, name, username, email, avatar_version,
@@ -181,7 +181,7 @@ func (db *Database) GetUserByID(id string) (*User, error) {
 
 func (db *Database) GetUserSettingsByID(id string) (*UserSettings, error) {
 	var settings UserSettings
-	err := db.withRLSContext(context.Background(), userRLSSettings(id), func(tx *sql.Tx) error {
+	err := db.TestingWithRLSContext(context.Background(), userRLSSettings(id), func(tx *sql.Tx) error {
 		return tx.QueryRowContext(
 			context.Background(),
 			`SELECT email_updates_enabled, analytics_enabled, error_reporting_enabled FROM users WHERE id = $1`,
@@ -199,7 +199,7 @@ func (db *Database) GetUserSettingsByID(id string) (*UserSettings, error) {
 }
 
 func (db *Database) UpdateUserSettings(id string, settings UserSettings) error {
-	err := db.withRLSContext(context.Background(), userRLSSettings(id), func(tx *sql.Tx) error {
+	err := db.TestingWithRLSContext(context.Background(), userRLSSettings(id), func(tx *sql.Tx) error {
 		_, err := tx.ExecContext(
 			context.Background(),
 			`UPDATE users SET email_updates_enabled = $1, analytics_enabled = $2, error_reporting_enabled = $3 WHERE id = $4`,
@@ -217,7 +217,7 @@ func (db *Database) UpdateUserSettings(id string, settings UserSettings) error {
 }
 
 func (db *Database) UpdateTelemetryPreferences(id string, analyticsEnabled, errorReportingEnabled bool) error {
-	err := db.withRLSContext(context.Background(), userRLSSettings(id), func(tx *sql.Tx) error {
+	err := db.TestingWithRLSContext(context.Background(), userRLSSettings(id), func(tx *sql.Tx) error {
 		_, err := tx.ExecContext(context.Background(), `UPDATE users SET analytics_enabled = $1, error_reporting_enabled = $2 WHERE id = $3`, analyticsEnabled, errorReportingEnabled, id)
 		return err
 	})
@@ -231,7 +231,7 @@ func normalizeEmail(email string) string {
 	return strings.ToLower(strings.TrimSpace(email))
 }
 
-func normalizeUsername(username string) (string, error) {
+func TestingNormalizeUsername(username string) (string, error) {
 	username = strings.ToLower(strings.TrimSpace(username))
 	if len(username) < 3 || len(username) > 30 {
 		return "", ErrInvalidUsername

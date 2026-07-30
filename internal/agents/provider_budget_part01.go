@@ -81,9 +81,9 @@ func positiveEnvInt(name string, fallback int) int {
 }
 
 type budgetWindow struct {
-	limit  int
-	window time.Duration
-	events []time.Time
+	TestingLimit  int
+	window        time.Duration
+	TestingEvents []time.Time
 }
 
 // hasRoom prunes elapsed events and reports whether another call fits. It
@@ -91,46 +91,46 @@ type budgetWindow struct {
 // consume budget in an earlier one.
 func (w *budgetWindow) hasRoom(now time.Time) bool {
 	cutoff := now.Add(-w.window)
-	live := w.events[:0]
-	for _, event := range w.events {
+	live := w.TestingEvents[:0]
+	for _, event := range w.TestingEvents {
 		if event.After(cutoff) {
 			live = append(live, event)
 		}
 	}
-	w.events = live
-	return len(w.events) < w.limit
+	w.TestingEvents = live
+	return len(w.TestingEvents) < w.TestingLimit
 }
 
 func (w *budgetWindow) record(now time.Time) {
-	w.events = append(w.events, now)
+	w.TestingEvents = append(w.TestingEvents, now)
 }
 
 // BudgetedProvider wraps a ModelProvider with the global ceiling.
 type BudgetedProvider struct {
 	inner ModelProvider
 
-	mu          sync.Mutex
-	now         func() time.Time
-	minute      *budgetWindow
-	hour        *budgetWindow
-	day         *budgetWindow
-	inFlight    int
-	maxFlight   int
-	refusals    int64
-	lastRefusal time.Time
-	tokenHour   *tokenWindow
-	tokenDay    *tokenWindow
-	spentTokens int64
+	TestingMu       sync.Mutex
+	TestingNow      func() time.Time
+	TestingMinute   *budgetWindow
+	hour            *budgetWindow
+	day             *budgetWindow
+	inFlight        int
+	maxFlight       int
+	refusals        int64
+	lastRefusal     time.Time
+	tokenHour       *tokenWindow
+	TestingTokenDay *tokenWindow
+	spentTokens     int64
 }
 
 // tokenWindow tracks billable tokens spent inside a rolling window. Tokens are
 // only known after a call returns, so the ceiling is enforced on the running
 // total: one request may overshoot, but the next is refused.
 type tokenWindow struct {
-	limit  int64
-	window time.Duration
-	events []tokenEvent
-	total  int64
+	TestingLimit int64
+	window       time.Duration
+	events       []tokenEvent
+	total        int64
 }
 
 type tokenEvent struct {
@@ -153,7 +153,7 @@ func (w *tokenWindow) prune(now time.Time) {
 
 func (w *tokenWindow) hasRoom(now time.Time) bool {
 	w.prune(now)
-	return w.total < w.limit
+	return w.total < w.TestingLimit
 }
 
 func (w *tokenWindow) record(now time.Time, tokens int64) {
@@ -189,22 +189,22 @@ func NewBudgetedProvider(provider ModelProvider, budget ProviderBudget) *Budgete
 		budget.TokensPerDay = defaults.TokensPerDay
 	}
 	return &BudgetedProvider{
-		inner:     provider,
-		now:       time.Now,
-		minute:    &budgetWindow{limit: budget.PerMinute, window: time.Minute},
-		hour:      &budgetWindow{limit: budget.PerHour, window: time.Hour},
-		day:       &budgetWindow{limit: budget.PerDay, window: 24 * time.Hour},
-		maxFlight: budget.MaxConcurrent,
-		tokenHour: &tokenWindow{limit: budget.TokensPerHour, window: time.Hour},
-		tokenDay:  &tokenWindow{limit: budget.TokensPerDay, window: 24 * time.Hour},
+		inner:           provider,
+		TestingNow:      time.Now,
+		TestingMinute:   &budgetWindow{TestingLimit: budget.PerMinute, window: time.Minute},
+		hour:            &budgetWindow{TestingLimit: budget.PerHour, window: time.Hour},
+		day:             &budgetWindow{TestingLimit: budget.PerDay, window: 24 * time.Hour},
+		maxFlight:       budget.MaxConcurrent,
+		tokenHour:       &tokenWindow{TestingLimit: budget.TokensPerHour, window: time.Hour},
+		TestingTokenDay: &tokenWindow{TestingLimit: budget.TokensPerDay, window: 24 * time.Hour},
 	}
 }
 
 // acquire charges one call against every window, or refuses.
 func (p *BudgetedProvider) acquire() (func(), error) {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	now := p.now()
+	p.TestingMu.Lock()
+	defer p.TestingMu.Unlock()
+	now := p.TestingNow()
 
 	if p.inFlight >= p.maxFlight {
 		p.refuse(now)
@@ -212,24 +212,24 @@ func (p *BudgetedProvider) acquire() (func(), error) {
 	}
 	// Every window is checked before any is charged, so a call refused by the
 	// day limit does not also consume minute budget.
-	if !p.minute.hasRoom(now) || !p.hour.hasRoom(now) || !p.day.hasRoom(now) {
+	if !p.TestingMinute.hasRoom(now) || !p.hour.hasRoom(now) || !p.day.hasRoom(now) {
 		p.refuse(now)
 		return nil, ErrProviderBudgetExceeded
 	}
-	if !p.tokenHour.hasRoom(now) || !p.tokenDay.hasRoom(now) {
+	if !p.tokenHour.hasRoom(now) || !p.TestingTokenDay.hasRoom(now) {
 		p.refuse(now)
 		return nil, ErrProviderTokenBudgetExceeded
 	}
-	p.minute.record(now)
+	p.TestingMinute.record(now)
 	p.hour.record(now)
 	p.day.record(now)
 	p.inFlight++
 	return func() {
-		p.mu.Lock()
+		p.TestingMu.Lock()
 		if p.inFlight > 0 {
 			p.inFlight--
 		}
-		p.mu.Unlock()
+		p.TestingMu.Unlock()
 	}, nil
 }
 
@@ -240,7 +240,7 @@ func (p *BudgetedProvider) refuse(now time.Time) {
 
 // Refusals reports how many calls the ceiling has rejected, for monitoring.
 func (p *BudgetedProvider) Refusals() int64 {
-	p.mu.Lock()
-	defer p.mu.Unlock()
+	p.TestingMu.Lock()
+	defer p.TestingMu.Unlock()
 	return p.refusals
 }

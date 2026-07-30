@@ -29,7 +29,7 @@ func validJSONObject(raw json.RawMessage) bool {
 	return json.Unmarshal(raw, &value) == nil && value != nil
 }
 
-func validateCapabilityInput(capability WorkflowCapability, raw json.RawMessage) error {
+func TestingValidateCapabilityInput(capability WorkflowCapability, raw json.RawMessage) error {
 	var input map[string]any
 	if json.Unmarshal(raw, &input) != nil || input == nil {
 		return ErrSpaceInvalid
@@ -52,7 +52,7 @@ func validateCapabilityInput(capability WorkflowCapability, raw json.RawMessage)
 	return nil
 }
 
-func validateWorkflowVersionDefinition(metadata WorkflowMetadata, definition json.RawMessage) error {
+func TestingValidateWorkflowVersionDefinition(metadata WorkflowMetadata, definition json.RawMessage) error {
 	var parsed workflowv2.Definition
 	if json.Unmarshal(definition, &parsed) != nil || len(parsed.Dependencies) > 0 {
 		return ErrSpaceInvalid

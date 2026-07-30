@@ -32,8 +32,8 @@ func (s *SessionStore) acquireEntry(ctx context.Context, id, userID string) *ses
 	// only decides how long a session stays cached in this process, while a
 	// persisted session stays resumable — including from another device — for as
 	// long as it is retained.
-	session, err := unmarshalPersistentSession(raw, id, userID)
-	if err != nil || session.UpdatedAt.Before(s.now().Add(-conversationRetention)) {
+	session, err := TestingUnmarshalPersistentSession(raw, id, userID)
+	if err != nil || session.UpdatedAt.Before(s.TestingNow().Add(-conversationRetention)) {
 		if err != nil && !errors.Is(err, ErrPersistedSessionNotFound) {
 			log.Printf("decode persisted agent session %q: %v", id, err)
 		}
@@ -56,7 +56,7 @@ func (s *SessionStore) persistCreatedSession(session *Session) {
 	if s.persist == nil {
 		return
 	}
-	state, err := marshalPersistentSession(session)
+	state, err := TestingMarshalPersistentSession(session)
 	if err == nil {
 		err = s.persist.CreateAgentSession(context.Background(), session.ID, session.UserID, state, session.UpdatedAt.Add(s.ttl), session.UpdatedAt.Add(conversationRetention))
 	}
@@ -69,7 +69,7 @@ func (s *SessionStore) persistUpdatedSession(ctx context.Context, session *Sessi
 	if s.persist == nil {
 		return
 	}
-	state, err := marshalPersistentSession(session)
+	state, err := TestingMarshalPersistentSession(session)
 	if err == nil {
 		err = s.persist.SaveAgentSession(ctx, session.ID, session.UserID, state, events, session.UpdatedAt.Add(s.ttl), session.UpdatedAt.Add(conversationRetention))
 	}
@@ -79,7 +79,7 @@ func (s *SessionStore) persistUpdatedSession(ctx context.Context, session *Sessi
 }
 
 func (s *SessionStore) cleanupLocked() {
-	cutoff := s.now().Add(-s.ttl)
+	cutoff := s.TestingNow().Add(-s.ttl)
 	for id, entry := range s.sessions {
 		if entry.active > 0 {
 			continue

@@ -82,7 +82,7 @@ func (s *SpacesService) AgentDelegation() http.HandlerFunc {
 			return
 		}
 		if len(body.Input) == 0 {
-			body.Input = mustAPIRawJSON(map[string]string{"prompt": body.Prompt})
+			body.Input = TestingMustAPIRawJSON(map[string]string{"prompt": body.Prompt})
 		}
 		run, err := s.database.CreateAgentRun(r.Context(), db.AgentRunRequest{
 			RequestingMemberID: userID, SpaceID: decision.Selected.SpaceID, AgentID: decision.Selected.AgentID,
@@ -147,7 +147,7 @@ func (s *SpacesService) DirectAgentRun() http.HandlerFunc {
 			return
 		}
 		if len(body.Input) == 0 {
-			body.Input = mustAPIRawJSON(map[string]string{"prompt": body.Prompt})
+			body.Input = TestingMustAPIRawJSON(map[string]string{"prompt": body.Prompt})
 		}
 		run, err := s.database.CreateAgentRun(r.Context(), db.AgentRunRequest{RequestingMemberID: userID, SpaceID: spaceID, AgentID: agentID, SourceConversationID: body.SourceConversationID, SourceType: "direct", CapabilityID: decision.Selected.CapabilityID, Input: body.Input, TriggerKind: "manual"})
 		if err != nil {
@@ -202,8 +202,8 @@ func (s *SpacesService) executeCanonicalAgentRun(r *http.Request, run *db.SpaceR
 		request = fmt.Sprintf("You are %s, an Agent in a Space. Follow these version-pinned instructions:\n%s\n\nExecute the pinned workflow capability %s. Use only its capability envelope.\n\nUser request:\n%s", resource.Name, resource.Instructions, capabilityDescription, strings.TrimSpace(prompt))
 	}
 	manifest := serveragent.ToolManifest{Tools: []serveragent.ToolDefinition{
-		{Name: "space.search_messages", Risk: serveragent.RiskRead, InputSchema: mustAPIRawJSON(map[string]any{"type": "object", "properties": map[string]any{"query": map[string]any{"type": "string"}, "limit": map[string]any{"type": "integer"}}})},
-		{Name: "library.search", Risk: serveragent.RiskRead, InputSchema: mustAPIRawJSON(map[string]any{"type": "object", "properties": map[string]any{"query": map[string]any{"type": "string"}, "limit": map[string]any{"type": "integer"}}})},
+		{Name: "space.search_messages", Risk: serveragent.RiskRead, InputSchema: TestingMustAPIRawJSON(map[string]any{"type": "object", "properties": map[string]any{"query": map[string]any{"type": "string"}, "limit": map[string]any{"type": "integer"}}})},
+		{Name: "library.search", Risk: serveragent.RiskRead, InputSchema: TestingMustAPIRawJSON(map[string]any{"type": "object", "properties": map[string]any{"query": map[string]any{"type": "string"}, "limit": map[string]any{"type": "integer"}}})},
 		{Name: "tasks.query", Risk: serveragent.RiskRead, InputSchema: taskAgentToolSchema(false)},
 		{Name: "calendar.query", Risk: serveragent.RiskRead, InputSchema: taskAgentToolSchema(false)},
 		{Name: "tasks.create", Risk: serveragent.RiskWrite, InputSchema: taskAgentToolSchema(true)},
@@ -234,11 +234,11 @@ func (s *SpacesService) executeCanonicalAgentRun(r *http.Request, run *db.SpaceR
 		}
 		code, message := spaceRunFailureFromError(err)
 		destructive := selectedCapability != nil && selectedCapability.Destructive
-		_ = s.database.RecordRunAction(r.Context(), run.ID, "capability", "Failed "+run.CapabilityID, mustAPIRawJSON(map[string]string{"workflow_version": run.WorkflowVersion, "error_code": code, "message": message}), destructive, "failed")
+		_ = s.database.RecordRunAction(r.Context(), run.ID, "capability", "Failed "+run.CapabilityID, TestingMustAPIRawJSON(map[string]string{"workflow_version": run.WorkflowVersion, "error_code": code, "message": message}), destructive, "failed")
 		return s.finishFailedCanonicalRun(r.Context(), run, err)
 	}
-	result := mustAPIRawJSON(map[string]any{"text": strings.TrimSpace(completion.Text), "citations": completion.Citations, "tool_calls": completion.ToolCalls})
+	result := TestingMustAPIRawJSON(map[string]any{"text": strings.TrimSpace(completion.Text), "citations": completion.Citations, "tool_calls": completion.ToolCalls})
 	destructive := selectedCapability != nil && selectedCapability.Destructive
-	_ = s.database.RecordRunAction(r.Context(), run.ID, "capability", "Executed "+run.CapabilityID, mustAPIRawJSON(map[string]string{"workflow_version": run.WorkflowVersion}), destructive, "completed")
+	_ = s.database.RecordRunAction(r.Context(), run.ID, "capability", "Executed "+run.CapabilityID, TestingMustAPIRawJSON(map[string]string{"workflow_version": run.WorkflowVersion}), destructive, "completed")
 	return s.database.FinishSpaceRun(r.Context(), run.ID, "completed", result, "")
 }

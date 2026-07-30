@@ -41,7 +41,7 @@ type LibraryDiscovery struct {
 
 func (db *Database) LibraryDiscovery(ctx context.Context, userID, spaceID string) (*LibraryDiscovery, error) {
 	out := &LibraryDiscovery{RecentDays: []LibraryDiscoveryGroup{}, Months: []LibraryDiscoveryGroup{}, Years: []LibraryDiscoveryGroup{}, Memories: []LibraryDiscoveryGroup{}, Trips: []LibraryDiscoveryGroup{}, Duplicates: []LibraryDiscoveryGroup{}}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionLibraryView); err != nil {
 			return err
 		}

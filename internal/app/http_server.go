@@ -37,7 +37,7 @@ var streamingRoutePrefixes = []string{"/api/realtime", "/api/spaces"}
 // isWebSocketRequest reports whether the client asked to upgrade the
 // connection. Upgraded connections take over the socket, so any write deadline
 // the HTTP layer set would eventually kill an otherwise healthy session.
-func isWebSocketRequest(r *http.Request) bool {
+func TestingIsWebSocketRequest(r *http.Request) bool {
 	return strings.EqualFold(r.Header.Get("Upgrade"), "websocket") &&
 		strings.Contains(strings.ToLower(r.Header.Get("Connection")), "upgrade")
 }
@@ -45,7 +45,7 @@ func isWebSocketRequest(r *http.Request) bool {
 // isTransferRequest reports whether the request moves object bytes through the
 // server. In production with direct R2 transfer this is rare, but the local
 // proxy route and server-generated previews still stream.
-func isTransferRequest(r *http.Request) bool {
+func TestingIsTransferRequest(r *http.Request) bool {
 	path := r.URL.Path
 	if !strings.HasPrefix(path, "/api/") {
 		return false
@@ -59,9 +59,9 @@ func isTransferRequest(r *http.Request) bool {
 // writeDeadlineMiddleware applies a per-request write deadline. WebSocket
 // upgrades get none; transfers get a generous one; everything else gets the
 // short JSON deadline.
-func writeDeadlineMiddleware(next http.Handler) http.Handler {
+func TestingWriteDeadlineMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if isWebSocketRequest(r) {
+		if TestingIsWebSocketRequest(r) {
 			// Clear any inherited deadline so the upgraded socket lives as long
 			// as the realtime service's own ping/pong policy allows.
 			if controller := http.NewResponseController(w); controller != nil {
@@ -72,7 +72,7 @@ func writeDeadlineMiddleware(next http.Handler) http.Handler {
 			return
 		}
 		timeout := httpJSONWriteTimeout
-		if isTransferRequest(r) {
+		if TestingIsTransferRequest(r) {
 			timeout = httpTransferWriteTimeout
 		}
 		if controller := http.NewResponseController(w); controller != nil {
@@ -85,10 +85,10 @@ func writeDeadlineMiddleware(next http.Handler) http.Handler {
 // newHTTPServer builds the configured server. WriteTimeout is intentionally
 // left at zero: the per-request middleware above owns write deadlines so that
 // WebSocket connections are not subject to a short one.
-func newHTTPServer(address string, handler http.Handler) *http.Server {
+func TestingNewHTTPServer(address string, handler http.Handler) *http.Server {
 	return &http.Server{
 		Addr:              address,
-		Handler:           writeDeadlineMiddleware(handler),
+		Handler:           TestingWriteDeadlineMiddleware(handler),
 		ReadHeaderTimeout: httpReadHeaderTimeout,
 		ReadTimeout:       httpReadTimeout,
 		IdleTimeout:       httpIdleTimeout,

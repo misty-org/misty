@@ -22,7 +22,7 @@ var drawingAssetMIMETypes = map[string]bool{
 	"image/vnd.microsoft.icon": true,
 }
 
-func supportedDrawingAssetMIME(value string) bool {
+func TestingSupportedDrawingAssetMIME(value string) bool {
 	value = strings.ToLower(strings.TrimSpace(strings.Split(value, ";")[0]))
 	return drawingAssetMIMETypes[value]
 }
@@ -53,7 +53,7 @@ func (s *SpaceLibraryService) SpaceDrawingAssets() http.HandlerFunc {
 			writeJSON(w, http.StatusOK, map[string]any{"assets": assets})
 			return
 		}
-		if !s.drawingAssetsEnabled {
+		if !s.TestingDrawingAssetsEnabled {
 			writeJSON(
 				w,
 				http.StatusServiceUnavailable,
@@ -61,7 +61,7 @@ func (s *SpaceLibraryService) SpaceDrawingAssets() http.HandlerFunc {
 			)
 			return
 		}
-		if !s.directTransfersActive() {
+		if !s.TestingDirectTransfersActive() {
 			writeJSON(
 				w,
 				http.StatusServiceUnavailable,
@@ -83,9 +83,9 @@ func (s *SpaceLibraryService) SpaceDrawingAssets() http.HandlerFunc {
 		body.Filename = sanitizeLibraryFilename(body.Filename)
 		body.MIMEType = strings.ToLower(strings.TrimSpace(body.MIMEType))
 		body.SHA256 = strings.ToLower(strings.TrimSpace(body.SHA256))
-		maxBytes := s.uploadLimits.Max(UploadPurposeDrawingAsset)
+		maxBytes := s.TestingUploadLimits.Max(UploadPurposeDrawingAsset)
 		if body.FileID == "" || len(body.FileID) > 160 ||
-			body.Filename == "" || !supportedDrawingAssetMIME(body.MIMEType) ||
+			body.Filename == "" || !TestingSupportedDrawingAssetMIME(body.MIMEType) ||
 			body.ByteSize < 1 || body.ByteSize > maxBytes ||
 			!librarySHA256Pattern.MatchString(body.SHA256) {
 			writeLibraryError(w, db.ErrLibraryInvalid)
@@ -115,7 +115,7 @@ func (s *SpaceLibraryService) SpaceDrawingAssets() http.HandlerFunc {
 			writeLibraryError(w, err)
 			return
 		}
-		transfer, err := s.uploadTransfer(r.Context(), upload, token, expiresAt)
+		transfer, err := s.TestingUploadTransfer(r.Context(), upload, token, expiresAt)
 		if err != nil {
 			writeLibraryError(w, err)
 			return
@@ -124,7 +124,7 @@ func (s *SpaceLibraryService) SpaceDrawingAssets() http.HandlerFunc {
 			"upload":   upload,
 			"transfer": transfer,
 			"finalize": map[string]any{
-				"headers": map[string]string{libraryUploadTokenHeader: token},
+				"headers": map[string]string{TestingLibraryUploadTokenHeader: token},
 			},
 		})
 	}
@@ -157,7 +157,7 @@ func (s *SpaceLibraryService) SpaceDrawingAssetDownload() http.HandlerFunc {
 			writeLibraryError(w, err)
 			return
 		}
-		s.writeJournalAssetDownload(w, r, download)
+		s.TestingWriteJournalAssetDownload(w, r, download)
 	}
 }
 

@@ -10,7 +10,7 @@ import (
 )
 
 func (engine Engine) executeForEach(ctx context.Context, parent ExecutionRequest, invocation Invocation) (json.RawMessage, bool, error) {
-	var config forEachConfig
+	var config TestingForEachConfig
 	if json.Unmarshal(invocation.Config, &config) != nil {
 		return nil, false, ErrInvalidDefinition
 	}
@@ -102,7 +102,7 @@ func (engine Engine) executeForEach(ctx context.Context, parent ExecutionRequest
 	return output, partial, nil
 }
 
-func (engine Engine) childDefinition(config forEachConfig) (Definition, error) {
+func (engine Engine) childDefinition(config TestingForEachConfig) (Definition, error) {
 	if config.ChildGraph != nil && config.WorkflowVersionID != "" {
 		return Definition{}, ErrInvalidDefinition
 	}

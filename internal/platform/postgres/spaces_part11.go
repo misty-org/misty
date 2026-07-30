@@ -24,7 +24,7 @@ func (db *Database) SaveSpaceStudioResource(ctx context.Context, userID string, 
 	if len(item.Definition) == 0 {
 		item.Definition = json.RawMessage(`{}`)
 	}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, item.SpaceID, PermissionStudioManage); err != nil {
 			return err
 		}
@@ -100,7 +100,7 @@ func (db *Database) SaveSpaceStudioResource(ctx context.Context, userID string, 
 	if err != nil {
 		return nil, err
 	}
-	_ = db.spaceTx(ctx, func(tx *sql.Tx) error {
+	_ = db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		_, e := recordSpaceEventTx(ctx, tx, item.SpaceID, userID, item.Kind+".updated", item.ID, item)
 		return e
 	})
@@ -112,7 +112,7 @@ func (db *Database) SaveSpaceStudioResource(ctx context.Context, userID string, 
 
 func (db *Database) SpaceStudioResourceByID(ctx context.Context, userID, spaceID, kind, id string) (*SpaceStudioResource, error) {
 	out := &SpaceStudioResource{Kind: kind}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionStudioView); err != nil {
 			return err
 		}
@@ -173,7 +173,7 @@ func (db *Database) FinishSpaceRun(ctx context.Context, runID, state string, res
 		result = json.RawMessage(`{}`)
 	}
 	out := &SpaceRun{}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		progress := 0
 		if state == "completed" || state == "completed_with_errors" {
 			progress = 100
@@ -198,7 +198,7 @@ func (db *Database) FinishSpaceRun(ctx context.Context, runID, state string, res
 }
 
 func (db *Database) DeleteSpaceStudioResource(ctx context.Context, userID, spaceID, kind, id string) error {
-	return db.spaceTx(ctx, func(tx *sql.Tx) error {
+	return db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionStudioManage); err != nil {
 			return err
 		}
@@ -228,7 +228,7 @@ func (db *Database) DeleteSpaceStudioResource(ctx context.Context, userID, space
 
 func (db *Database) SpaceAgentPrompt(ctx context.Context, userID, spaceID, agentID string) (string, string, error) {
 	var name, instructions string
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionAgentsRun); err != nil {
 			return err
 		}

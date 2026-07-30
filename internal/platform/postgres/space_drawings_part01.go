@@ -42,7 +42,7 @@ type SpaceDrawing struct {
 	CanDelete             bool      `json:"can_delete"`
 }
 
-func normalizeDrawingTitle(title string) (string, error) {
+func TestingNormalizeDrawingTitle(title string) (string, error) {
 	title = strings.TrimSpace(title)
 	if title == "" {
 		title = "Untitled drawing"
@@ -75,7 +75,7 @@ func (db *Database) CreateSpaceDrawing(
 	ctx context.Context,
 	creatorUserID, spaceID, title string,
 ) (*SpaceDrawing, error) {
-	title, err := normalizeDrawingTitle(title)
+	title, err := TestingNormalizeDrawingTitle(title)
 	if err != nil || creatorUserID == "" || spaceID == "" {
 		return nil, ErrSpaceInvalid
 	}
@@ -85,7 +85,7 @@ func (db *Database) CreateSpaceDrawing(
 		LifecycleState: DrawingLifecycleActive, ACLVersion: 1,
 		Role: DrawingRoleCreator, CanDelete: true,
 	}
-	err = db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err = db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if _, err := requireSpaceMemberTx(ctx, tx, spaceID, creatorUserID); err != nil {
 			return err
 		}
@@ -117,7 +117,7 @@ func (db *Database) AccessibleSpaceDrawings(
 	userID, spaceID string,
 ) ([]SpaceDrawing, error) {
 	drawings := []SpaceDrawing{}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if _, err := requireSpaceMemberTx(ctx, tx, spaceID, userID); err != nil {
 			return err
 		}
@@ -157,7 +157,7 @@ func (db *Database) DrawingAccessFor(
 	userID, drawingID string,
 ) (DrawingAccess, error) {
 	var access DrawingAccess
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		var err error
 		access, err = drawingAccessForTx(ctx, tx, userID, drawingID)
 		return err
@@ -207,7 +207,7 @@ func (db *Database) SpaceDrawingByID(
 	userID, drawingID string,
 ) (*SpaceDrawing, error) {
 	drawing := &SpaceDrawing{}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		access, err := drawingAccessForTx(ctx, tx, userID, drawingID)
 		if err != nil {
 			return err

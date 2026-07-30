@@ -14,42 +14,42 @@ import (
 )
 
 const (
-	libraryUploadTokenHeader      = "X-Misty-Library-Upload-Token"
-	librarySignedDownloadHeader   = "X-Misty-Signed-Download"
-	libraryReauthenticationHeader = "X-Misty-Library-Reauthentication"
-	libraryUploadLifetime         = 30 * time.Minute
+	TestingLibraryUploadTokenHeader    = "X-Misty-Library-Upload-Token"
+	TestingLibrarySignedDownloadHeader = "X-Misty-Signed-Download"
+	libraryReauthenticationHeader      = "X-Misty-Library-Reauthentication"
+	libraryUploadLifetime              = 30 * time.Minute
 )
 
 var librarySHA256Pattern = regexp.MustCompile(`^[0-9a-f]{64}$`)
 
 type SpaceLibraryService struct {
-	database *db.Database
-	store    LibraryObjectStore
+	database     *db.Database
+	TestingStore LibraryObjectStore
 	// egress bounds bytes served per account and across the deployment.
-	egress               *EgressGuard
-	uploadsEnabled       bool
-	attachmentsEnabled   bool
-	groupsEnabled        bool
-	previewsEnabled      bool
-	peopleEnabled        bool
-	peopleProcessor      LibraryPeopleProcessor
-	intelligence         *serveragent.SmartLibraryAnalyzer
-	aiEnabled            bool
-	editingEnabled       bool
-	mediaProcessor       LibraryMediaProcessor
-	metadataExtractor    LibraryMetadataExtractor
-	locationsEnabled     bool
-	duplicatesEnabled    bool
-	importsEnabled       bool
-	exportsEnabled       bool
-	malwareScanner       LibraryMalwareScanner
-	uploadLimits         UploadLimits
-	noteAssetsEnabled    bool
-	drawingAssetsEnabled bool
-	transfers            TransferTTLs
+	egress                      *EgressGuard
+	TestingUploadsEnabled       bool
+	TestingAttachmentsEnabled   bool
+	groupsEnabled               bool
+	previewsEnabled             bool
+	peopleEnabled               bool
+	peopleProcessor             LibraryPeopleProcessor
+	intelligence                *serveragent.SmartLibraryAnalyzer
+	aiEnabled                   bool
+	editingEnabled              bool
+	mediaProcessor              LibraryMediaProcessor
+	metadataExtractor           LibraryMetadataExtractor
+	locationsEnabled            bool
+	duplicatesEnabled           bool
+	importsEnabled              bool
+	exportsEnabled              bool
+	malwareScanner              LibraryMalwareScanner
+	TestingUploadLimits         UploadLimits
+	TestingNoteAssetsEnabled    bool
+	TestingDrawingAssetsEnabled bool
+	TestingTransfers            TransferTTLs
 	// presigner is non-nil only when the configured object store can sign R2
 	// operations. Local development leaves it nil and keeps the proxy route.
-	presigner            LibraryObjectPresigner
+	TestingPresigner     LibraryObjectPresigner
 	reconciliationMu     sync.Mutex
 	reconciliationCursor string
 }
@@ -91,24 +91,24 @@ func positiveEnvDuration(name string, fallback time.Duration) time.Duration {
 // misconfigured into proxying file bytes: the R2 store always signs, so direct
 // transfer is always on there. The local and in-memory development stores
 // cannot sign, so they transparently keep the proxy route.
-func (s *SpaceLibraryService) configureTransfers(ttls TransferTTLs) error {
+func (s *SpaceLibraryService) TestingConfigureTransfers(ttls TransferTTLs) error {
 	if _, err := validatePresignTTL(ttls.UploadURLTTL); err != nil {
 		return fmt.Errorf("upload URL TTL: %w", err)
 	}
 	if _, err := validatePresignTTL(ttls.DownloadURLTTL); err != nil {
 		return fmt.Errorf("download URL TTL: %w", err)
 	}
-	s.transfers = ttls
-	if presigner, ok := s.store.(LibraryObjectPresigner); ok {
-		s.presigner = presigner
+	s.TestingTransfers = ttls
+	if presigner, ok := s.TestingStore.(LibraryObjectPresigner); ok {
+		s.TestingPresigner = presigner
 	}
 	return nil
 }
 
 // directTransfersActive reports whether signed URLs are in use. It is purely a
 // question of whether the store can sign; there is no off switch.
-func (s *SpaceLibraryService) directTransfersActive() bool {
-	return s.presigner != nil
+func (s *SpaceLibraryService) TestingDirectTransfersActive() bool {
+	return s.TestingPresigner != nil
 }
 
 // UploadPurpose names the kind of upload being performed. Each purpose has its
@@ -170,7 +170,7 @@ func (l UploadLimits) Max(purpose UploadPurpose) int64 {
 	}
 }
 
-func (l UploadLimits) validate() error {
+func (l UploadLimits) TestingValidate() error {
 	for _, limit := range []struct {
 		purpose UploadPurpose
 		value   int64
@@ -189,7 +189,7 @@ func (l UploadLimits) validate() error {
 }
 
 func (s *SpaceLibraryService) SetSubsystems(attachmentsEnabled, groupsEnabled, previewsEnabled, peopleEnabled, editingEnabled, locationsEnabled, duplicatesEnabled, importsEnabled, exportsEnabled bool) {
-	s.attachmentsEnabled = attachmentsEnabled
+	s.TestingAttachmentsEnabled = attachmentsEnabled
 	s.groupsEnabled = groupsEnabled
 	s.previewsEnabled = previewsEnabled
 	s.peopleEnabled = peopleEnabled
@@ -213,12 +213,12 @@ func (s *SpaceLibraryService) SetMetadataExtractor(extractor LibraryMetadataExtr
 	s.metadataExtractor = extractor
 }
 
-func (s *SpaceLibraryService) uploadPurposeEnabled(purpose UploadPurpose) bool {
+func (s *SpaceLibraryService) TestingUploadPurposeEnabled(purpose UploadPurpose) bool {
 	switch purpose {
 	case UploadPurposeLibrary:
-		return s.uploadsEnabled
+		return s.TestingUploadsEnabled
 	case UploadPurposeChatAttachment:
-		return s.attachmentsEnabled
+		return s.TestingAttachmentsEnabled
 	case UploadPurposeNoteAttachment:
 		// Note assets authorize against the parent note, which only the note
 		// routes can check. The generic Library upload endpoint must never
@@ -235,10 +235,10 @@ func (s *SpaceLibraryService) uploadPurposeEnabled(purpose UploadPurpose) bool {
 // SetNoteAssetsEnabled turns on the note-asset upload purpose for the note
 // routes, which perform the parent-note permission check themselves.
 func (s *SpaceLibraryService) SetNoteAssetsEnabled(enabled bool) {
-	s.noteAssetsEnabled = enabled
+	s.TestingNoteAssetsEnabled = enabled
 }
 
 // SetDrawingAssetsEnabled enables image references for Drawing routes.
 func (s *SpaceLibraryService) SetDrawingAssetsEnabled(enabled bool) {
-	s.drawingAssetsEnabled = enabled
+	s.TestingDrawingAssetsEnabled = enabled
 }

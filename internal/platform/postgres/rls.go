@@ -24,7 +24,7 @@ const (
 	rlsModeWaitlist     = "waitlist"
 )
 
-func (db *Database) withRLSContext(ctx context.Context, settings map[string]string, fn func(*sql.Tx) error) error {
+func (db *Database) TestingWithRLSContext(ctx context.Context, settings map[string]string, fn func(*sql.Tx) error) error {
 	if db.Conn == nil {
 		return errors.New("database connection is not initialized")
 	}
@@ -74,7 +74,7 @@ func registrationRLSSettings(userID, licenseID, email string) map[string]string 
 	}
 }
 
-func serviceRLSSettings() map[string]string {
+func TestingServiceRLSSettings() map[string]string {
 	return map[string]string{
 		rlsModeSetting: rlsModeService,
 	}

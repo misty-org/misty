@@ -8,7 +8,7 @@ import (
 )
 
 func (db *Database) TransferSpaceOwnership(ctx context.Context, ownerID, spaceID, memberID string) error {
-	return db.spaceTx(ctx, func(tx *sql.Tx) error {
+	return db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if _, err := tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock(hashtext($1))`, "spaces:owner:"+memberID); err != nil {
 			return err
 		}
@@ -84,7 +84,7 @@ func (db *Database) TransferSpaceOwnership(ctx context.Context, ownerID, spaceID
 	})
 }
 
-func validateMessage(content []MessageSpan, fileNodeIDs []string) error {
+func TestingValidateMessage(content []MessageSpan, fileNodeIDs []string) error {
 	return validateMessageWithReferences(content, len(fileNodeIDs))
 }
 

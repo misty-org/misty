@@ -57,7 +57,7 @@ func (s *SmartLibraryService) RegisterFolder() http.HandlerFunc {
 			SourceKind      string `json:"sourceKind"`
 			PilotLimit      int    `json:"pilotLimit"`
 		}
-		if decodeAIJSON(w, r, &body) != nil || !validOpaqueID(body.ClientLibraryID, "lib_") || (body.SourceKind != "local" && body.SourceKind != "cloud") || body.PilotLimit != smartLibraryLimit {
+		if decodeAIJSON(w, r, &body) != nil || !TestingValidOpaqueID(body.ClientLibraryID, "lib_") || (body.SourceKind != "local" && body.SourceKind != "cloud") || body.PilotLimit != smartLibraryLimit {
 			http.Error(w, "invalid request", http.StatusBadRequest)
 			return
 		}
@@ -118,7 +118,7 @@ func (s *SmartLibraryService) CreateSample() http.HandlerFunc {
 			return
 		}
 		for _, candidate := range body.Candidates {
-			if !validOpaqueID(candidate.AssetID, "asset_") || len(candidate.Fingerprint) != 64 || candidate.SizeBytes < 0 || !validAssetDescriptor(candidate.AssetKind, candidate.MimeType) {
+			if !TestingValidOpaqueID(candidate.AssetID, "asset_") || len(candidate.Fingerprint) != 64 || candidate.SizeBytes < 0 || !validAssetDescriptor(candidate.AssetKind, candidate.MimeType) {
 				http.Error(w, "invalid request", 400)
 				return
 			}

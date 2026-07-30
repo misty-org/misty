@@ -92,7 +92,7 @@ func (db *Database) CreateAgentRun(ctx context.Context, request AgentRunRequest)
 		AgentID: request.AgentID, AgentInstanceID: instance.ID, AgentVersionID: instance.AgentVersionID, Attempt: 1,
 		Input: request.Input, Result: json.RawMessage(`{}`), Outputs: json.RawMessage(`{}`), Artifacts: json.RawMessage(`[]`),
 	}
-	err = db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err = db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, request.RequestingMemberID, request.SpaceID, PermissionAgentsRun); err != nil {
 			return err
 		}
@@ -115,7 +115,7 @@ func (db *Database) CreateAgentRun(ctx context.Context, request AgentRunRequest)
 			if err != nil {
 				return err
 			}
-			if err := validateCapabilityInput(*capability, request.Input); err != nil {
+			if err := TestingValidateCapabilityInput(*capability, request.Input); err != nil {
 				return err
 			}
 			if err := authorizeAgentWorkflowRequirementsTx(ctx, tx, request.RequestingMemberID, request.SpaceID, instance.ID, workflow.Metadata); err != nil {
@@ -159,7 +159,7 @@ func (db *Database) CreateAgentRun(ctx context.Context, request AgentRunRequest)
 
 func authorizeAgentWorkflowRequirementsTx(ctx context.Context, tx *sql.Tx, userID, spaceID, instanceID string, metadata WorkflowMetadata) error {
 	for _, permission := range metadata.RequiredPermissions {
-		spacePermission, ok := workflowPermissionSpacePermission(permission)
+		spacePermission, ok := TestingWorkflowPermissionSpacePermission(permission)
 		if ok {
 			if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, spacePermission); err != nil {
 				return err

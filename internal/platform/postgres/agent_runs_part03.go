@@ -12,7 +12,7 @@ import (
 
 func (db *Database) DecideRunApproval(ctx context.Context, userID, runID string, approved bool) (*SpaceRun, error) {
 	out := &SpaceRun{}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := scanSpaceRun(tx.QueryRowContext(ctx, `SELECT `+spaceRunColumns+` FROM space_runs WHERE id=$1 FOR UPDATE`, runID), out); err != nil {
 			return err
 		}
@@ -73,7 +73,7 @@ func (db *Database) CreateAgentConversation(ctx context.Context, userID, spaceID
 		return nil, err
 	}
 	out := &AgentConversation{ID: "spaceconversation_" + uuid.NewString(), SpaceID: spaceID, OwnerUserID: userID, AgentID: agentID, Title: strings.TrimSpace(title)}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionAgentsRun); err != nil {
 			return err
 		}
@@ -90,7 +90,7 @@ func (db *Database) AppendAgentConversationEvent(ctx context.Context, userID, co
 		return nil, ErrSpaceInvalid
 	}
 	out := &AgentConversationEvent{ConversationID: conversationID, UserID: userID, EventType: eventType, Data: data}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		var spaceID string
 		if err := tx.QueryRowContext(ctx, `SELECT space_id FROM space_agent_conversations WHERE id=$1 AND owner_user_id=$2 AND deleted_at IS NULL`, conversationID, userID).Scan(&spaceID); err != nil {
 			return err
@@ -112,7 +112,7 @@ func (db *Database) AppendAgentConversationEvent(ctx context.Context, userID, co
 
 func (db *Database) AgentConversationEvents(ctx context.Context, userID, conversationID string) ([]AgentConversationEvent, error) {
 	items := []AgentConversationEvent{}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		var spaceID string
 		if err := tx.QueryRowContext(ctx, `SELECT space_id FROM space_agent_conversations WHERE id=$1 AND owner_user_id=$2 AND deleted_at IS NULL`, conversationID, userID).Scan(&spaceID); err != nil {
 			return err

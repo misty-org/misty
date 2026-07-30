@@ -83,7 +83,7 @@ func (engine Engine) Execute(ctx context.Context, definition Definition, request
 			outputs[node.ID] = checkpointed
 			continue
 		}
-		input, err := resolveNodeInput(definition, node, request.Input, outputs, partials, skipped)
+		input, err := TestingResolveNodeInput(definition, node, request.Input, outputs, partials, skipped)
 		if err != nil {
 			if errors.Is(err, errBranchNotSelected) {
 				skipped[node.ID] = true
@@ -196,7 +196,7 @@ func (engine Engine) Execute(ctx context.Context, definition Definition, request
 	return ExecutionResult{State: state, Outputs: outputs, Errors: failures}, nil
 }
 
-type forEachConfig struct {
+type TestingForEachConfig struct {
 	WorkflowVersionID string      `json:"workflowVersionId"`
 	ChildGraph        *Definition `json:"childGraph"`
 	Concurrency       int         `json:"concurrency"`

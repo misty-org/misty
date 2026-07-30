@@ -108,17 +108,17 @@ type libraryS3Presigner interface {
 }
 
 type S3LibraryObjectStore struct {
-	bucket string
-	client libraryS3API
+	TestingBucket string
+	client        libraryS3API
 	// presigner is nil only when a test injects a bare client; production
 	// construction always sets it, and PresignPut/PresignGet fail closed.
-	presigner libraryS3Presigner
+	TestingPresigner libraryS3Presigner
 }
 
 func (s *S3LibraryObjectStore) Health(ctx context.Context) error {
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
-	_, err := s.client.HeadBucket(ctx, &s3.HeadBucketInput{Bucket: aws.String(s.bucket)})
+	_, err := s.client.HeadBucket(ctx, &s3.HeadBucketInput{Bucket: aws.String(s.TestingBucket)})
 	return err
 }
 
@@ -142,9 +142,9 @@ func NewS3LibraryObjectStore(config S3LibraryObjectStoreConfig) (*S3LibraryObjec
 	}
 	client := s3.New(options)
 	return &S3LibraryObjectStore{
-		bucket:    strings.TrimSpace(config.Bucket),
-		client:    client,
-		presigner: s3.NewPresignClient(client),
+		TestingBucket:    strings.TrimSpace(config.Bucket),
+		client:           client,
+		TestingPresigner: s3.NewPresignClient(client),
 	}, nil
 }
 
@@ -184,10 +184,10 @@ func (s *S3LibraryObjectStore) Put(ctx context.Context, key string, body io.Read
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
 	defer cancel()
 	_, err := s.client.PutObject(ctx, &s3.PutObjectInput{
-		Bucket: aws.String(s.bucket), Key: aws.String(key), Body: body,
+		Bucket: aws.String(s.TestingBucket), Key: aws.String(key), Body: body,
 		ContentLength: aws.Int64(metadata.ByteSize), ContentType: aws.String(metadata.MIMEType),
 		ChecksumSHA256: aws.String(base64.StdEncoding.EncodeToString(checksum)),
-		Metadata:       map[string]string{librarySHA256MetadataKey: metadata.SHA256},
+		Metadata:       map[string]string{TestingLibrarySHA256MetadataKey: metadata.SHA256},
 	})
 	return mapLibraryS3Error(err)
 }
@@ -198,7 +198,7 @@ func (s *S3LibraryObjectStore) Head(ctx context.Context, key string) (LibraryObj
 	}
 	ctx, cancel := context.WithTimeout(ctx, 20*time.Second)
 	defer cancel()
-	result, err := s.client.HeadObject(ctx, &s3.HeadObjectInput{Bucket: aws.String(s.bucket), Key: aws.String(key)})
+	result, err := s.client.HeadObject(ctx, &s3.HeadObjectInput{Bucket: aws.String(s.TestingBucket), Key: aws.String(key)})
 	if err != nil {
 		return LibraryObjectMetadata{}, mapLibraryS3Error(err)
 	}
@@ -210,7 +210,7 @@ func (s *S3LibraryObjectStore) Open(ctx context.Context, key string) (io.ReadClo
 		return nil, LibraryObjectMetadata{}, ErrLibraryObjectNotFound
 	}
 	ctx, cancel := context.WithCancel(ctx)
-	result, err := s.client.GetObject(ctx, &s3.GetObjectInput{Bucket: aws.String(s.bucket), Key: aws.String(key)})
+	result, err := s.client.GetObject(ctx, &s3.GetObjectInput{Bucket: aws.String(s.TestingBucket), Key: aws.String(key)})
 	if err != nil {
 		cancel()
 		return nil, LibraryObjectMetadata{}, mapLibraryS3Error(err)
@@ -230,6 +230,6 @@ func (s *S3LibraryObjectStore) Delete(ctx context.Context, key string) error {
 	}
 	ctx, cancel := context.WithTimeout(ctx, 20*time.Second)
 	defer cancel()
-	_, err := s.client.DeleteObject(ctx, &s3.DeleteObjectInput{Bucket: aws.String(s.bucket), Key: aws.String(key)})
+	_, err := s.client.DeleteObject(ctx, &s3.DeleteObjectInput{Bucket: aws.String(s.TestingBucket), Key: aws.String(key)})
 	return mapLibraryS3Error(err)
 }

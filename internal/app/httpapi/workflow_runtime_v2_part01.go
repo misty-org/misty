@@ -65,7 +65,7 @@ func (s *SpacesService) executeWorkflowV2(ctx context.Context, run *db.SpaceRun,
 			}
 		},
 		ItemCheckpoint: func(itemCtx context.Context, _ string, item json.RawMessage, result workflowv2.ExecutionResult, itemErr error) error {
-			provider, eventID := workflowEventIdentity(item)
+			provider, eventID := TestingWorkflowEventIdentity(item)
 			if provider == "" || eventID == "" {
 				return nil
 			}
@@ -92,7 +92,7 @@ func (s *SpacesService) executeWorkflowV2(ctx context.Context, run *db.SpaceRun,
 		}
 		return s.finishFailedCanonicalRun(ctx, run, err)
 	}
-	serialized := mustAPIRawJSON(map[string]any{"nodes": result.Outputs, "errors": result.Errors})
+	serialized := TestingMustAPIRawJSON(map[string]any{"nodes": result.Outputs, "errors": result.Errors})
 	return s.database.FinishSpaceRun(ctx, run.ID, string(result.State), serialized, "")
 }
 

@@ -18,7 +18,7 @@ import (
 func (s *SpacesService) CloudAuthorizationCallback() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		provider, code, state := chi.URLParam(r, "provider"), r.URL.Query().Get("code"), r.URL.Query().Get("state")
-		definition, exists := cloudOAuthCatalog[provider]
+		definition, exists := TestingCloudOAuthCatalog[provider]
 		if !exists || code == "" || state == "" {
 			writeSpaceError(w, db.ErrSpaceInvalid)
 			return
@@ -34,7 +34,7 @@ func (s *SpacesService) CloudAuthorizationCallback() http.HandlerFunc {
 			writeSpaceError(w, errors.New("cloud authorization state is invalid"))
 			return
 		}
-		token, err := exchangeCloudCode(r.Context(), definition, secret, code, cloudCallbackURL(r, provider))
+		token, err := exchangeCloudCode(r.Context(), definition, secret, code, TestingCloudCallbackURL(r, provider))
 		if err != nil || token.AccessToken == "" {
 			writeJSON(w, http.StatusBadGateway, map[string]string{"code": "cloud_exchange_failed"})
 			return
@@ -79,7 +79,7 @@ func (s *SpacesService) CloudAuthorizationCallback() http.HandlerFunc {
 			writeSpaceError(w, err)
 			return
 		}
-		writeProviderCompletionPage(w, definition.Name, item.AccountDisplay)
+		TestingWriteProviderCompletionPage(w, definition.Name, item.AccountDisplay)
 	}
 }
 
@@ -101,7 +101,7 @@ func (s *SpacesService) CloudConnectionToken() http.HandlerFunc {
 			return
 		}
 		if item.ExpiresAt != nil && item.ExpiresAt.Before(time.Now().UTC().Add(5*time.Minute)) {
-			definition := cloudOAuthCatalog[item.Provider]
+			definition := TestingCloudOAuthCatalog[item.Provider]
 			token, err := refreshCloudToken(r.Context(), definition, secret)
 			if err != nil {
 				writeJSON(w, http.StatusUnauthorized, map[string]string{"code": "cloud_reauthorization_required"})
@@ -128,7 +128,7 @@ func (s *SpacesService) CloudConnectionToken() http.HandlerFunc {
 		writeJSON(w, http.StatusOK, map[string]any{
 			"connection_id": item.ID, "provider": item.Provider,
 			"access_token": secret.Token.AccessToken, "token_type": firstNonempty(secret.Token.TokenType, "Bearer"),
-			"expires_at": item.ExpiresAt, "api_base": cloudAPIBase(item.Provider),
+			"expires_at": item.ExpiresAt, "api_base": TestingCloudAPIBase(item.Provider),
 		})
 	}
 }
@@ -228,7 +228,7 @@ func fetchCloudIdentity(ctx context.Context, provider string, token providerToke
 	return id, name
 }
 
-func cloudCallbackURL(r *http.Request, provider string) string {
+func TestingCloudCallbackURL(r *http.Request, provider string) string {
 	base := configuredPublicAPIBase()
 	if base == "" {
 		scheme := "https"
@@ -240,7 +240,7 @@ func cloudCallbackURL(r *http.Request, provider string) string {
 	return base + "/oauth/cloud/" + url.PathEscape(provider) + "/callback"
 }
 
-func cloudAPIBase(provider string) string {
+func TestingCloudAPIBase(provider string) string {
 	switch provider {
 	case "drive":
 		return "https://www.googleapis.com"

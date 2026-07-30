@@ -40,7 +40,7 @@ func (db *Database) ClaimExpiredJournalAssets(
 	}
 
 	claims := make([]JournalAssetPurge, 0, limit)
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		for _, source := range []struct {
 			kind, table string
 		}{
@@ -248,7 +248,7 @@ func (db *Database) CompleteJournalAssetPurge(
 	ctx context.Context,
 	claim JournalAssetPurge,
 ) error {
-	return db.spaceTx(ctx, func(tx *sql.Tx) error {
+	return db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		table := "space_note_assets"
 		if claim.Kind == JournalAssetKindDrawing {
 			table = "space_drawing_assets"

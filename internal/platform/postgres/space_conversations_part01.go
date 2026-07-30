@@ -91,7 +91,7 @@ func loadSpaceConversationMembersTx(ctx context.Context, tx *sql.Tx, conversatio
 
 func (db *Database) SpaceConversations(ctx context.Context, userID, spaceID string) ([]SpaceConversation, error) {
 	items := []SpaceConversation{}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionMessagesRead); err != nil {
 			return err
 		}
@@ -142,7 +142,7 @@ func (db *Database) IsSpaceConversationForMember(ctx context.Context, userID, sp
 		return false, nil
 	}
 	selectedGroup := false
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionMessagesWrite); err != nil {
 			return err
 		}
@@ -172,7 +172,7 @@ func (db *Database) CreateSpaceConversation(ctx context.Context, userID, spaceID
 		ID: "space_conversation_" + uuid.NewString(), SpaceID: spaceID, Title: title,
 		CreatedByUserID: userID, Origin: "misty", IntegrationStatus: "active",
 	}
-	err = db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err = db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpaceMessageWriteTx(ctx, tx, userID, spaceID); err != nil {
 			return err
 		}

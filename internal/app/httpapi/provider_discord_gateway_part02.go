@@ -107,12 +107,12 @@ func (s *SpacesService) mirrorDiscordDispatch(ctx context.Context, envelope disc
 	if err != nil || len(links) == 0 {
 		return
 	}
-	var message discordMessage
+	var message TestingDiscordMessage
 	if json.Unmarshal(envelope.Data, &message) != nil || message.ID == "" {
 		return
 	}
 	for _, link := range links {
-		if !shouldMirrorDiscordMessage(message, &link) {
+		if !TestingShouldMirrorDiscordMessage(message, &link) {
 			continue
 		}
 		if _, mirrorErr := s.mirrorDiscordMessage(ctx, link, message); mirrorErr != nil {
@@ -120,7 +120,7 @@ func (s *SpacesService) mirrorDiscordDispatch(ctx context.Context, envelope disc
 		}
 		now := time.Now().UTC()
 		cursor := ""
-		if snowflakeAfter(message.ID, link.LastMessageID) {
+		if TestingSnowflakeAfter(message.ID, link.LastMessageID) {
 			cursor = message.ID
 		}
 		_ = s.database.SetSpaceDiscordLinkSync(ctx, link.ID, cursor, "active", "", &now)

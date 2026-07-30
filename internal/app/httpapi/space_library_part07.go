@@ -21,7 +21,7 @@ func (s *SpaceLibraryService) UploadContent() http.HandlerFunc {
 			return
 		}
 		spaceID, uploadID := chi.URLParam(r, "spaceID"), chi.URLParam(r, "uploadID")
-		tokenHash := security.HashToken(strings.TrimSpace(r.Header.Get(libraryUploadTokenHeader)))
+		tokenHash := security.HashToken(strings.TrimSpace(r.Header.Get(TestingLibraryUploadTokenHeader)))
 		pending, err := s.database.LibraryUpload(r.Context(), userID, spaceID, uploadID)
 		if err != nil {
 			writeLibraryError(w, err)
@@ -33,7 +33,7 @@ func (s *SpaceLibraryService) UploadContent() http.HandlerFunc {
 		}
 		// The proxy route exists only for the local development object store.
 		// Once direct transfer is on, large user bodies must never reach the VPS.
-		if s.directTransfersActive() || isJournalAssetPurpose(pending.Purpose) {
+		if s.TestingDirectTransfersActive() || TestingIsJournalAssetPurpose(pending.Purpose) {
 			writeJSON(w, http.StatusConflict, map[string]string{"code": "library_direct_transfer_required"})
 			return
 		}
@@ -48,14 +48,14 @@ func (s *SpaceLibraryService) UploadContent() http.HandlerFunc {
 			return
 		}
 		metadata := LibraryObjectMetadata{ByteSize: upload.RequestedByteSize, SHA256: upload.ClientSHA256, MIMEType: upload.ClientDeclaredMIMEType}
-		if err := s.store.Put(r.Context(), upload.ObjectKey, io.LimitReader(r.Body, upload.RequestedByteSize+1), metadata); err != nil {
+		if err := s.TestingStore.Put(r.Context(), upload.ObjectKey, io.LimitReader(r.Body, upload.RequestedByteSize+1), metadata); err != nil {
 			s.rejectAndDelete(r.Context(), upload, tokenHash, "invalid", "object_write_failed")
 			writeLibraryError(w, err)
 			return
 		}
 		upload, err = s.database.SetLibraryUploadState(r.Context(), userID, spaceID, uploadID, tokenHash, "uploading", "uploaded_unverified")
 		if err != nil {
-			_ = s.store.Delete(r.Context(), upload.ObjectKey)
+			_ = s.TestingStore.Delete(r.Context(), upload.ObjectKey)
 			writeLibraryError(w, err)
 			return
 		}
@@ -70,7 +70,7 @@ func (s *SpaceLibraryService) FinalizeUpload() http.HandlerFunc {
 			return
 		}
 		spaceID, uploadID := chi.URLParam(r, "spaceID"), chi.URLParam(r, "uploadID")
-		tokenHash := security.HashToken(strings.TrimSpace(r.Header.Get(libraryUploadTokenHeader)))
+		tokenHash := security.HashToken(strings.TrimSpace(r.Header.Get(TestingLibraryUploadTokenHeader)))
 		upload, err := s.database.LibraryUpload(r.Context(), userID, spaceID, uploadID)
 		if err != nil {
 			writeLibraryError(w, err)
@@ -96,7 +96,7 @@ func (s *SpaceLibraryService) FinalizeUpload() http.HandlerFunc {
 		// With direct transfer the client PUTs straight to R2, so the upload is
 		// still "initiated" here: the HEAD below is the only proof the bytes
 		// landed. The proxy path advances to "uploaded_unverified" first.
-		directPending := s.directTransfersActive() && upload.State == "initiated"
+		directPending := s.TestingDirectTransfersActive() && upload.State == "initiated"
 		if upload.State != "uploaded_unverified" && !directPending {
 			writeLibraryError(w, db.ErrLibraryConflict)
 			return
@@ -111,7 +111,7 @@ func (s *SpaceLibraryService) FinalizeUpload() http.HandlerFunc {
 
 		// Finalization verifies that the object actually in R2 matches exactly
 		// what the server authorized: same key, size, and checksum.
-		metadata, headErr := s.store.Head(r.Context(), upload.ObjectKey)
+		metadata, headErr := s.TestingStore.Head(r.Context(), upload.ObjectKey)
 		if headErr != nil || metadata.ByteSize != upload.RequestedByteSize || metadata.SHA256 != upload.ClientSHA256 {
 			event, _ := json.Marshal(map[string]any{
 				"byte_size_match": metadata.ByteSize == upload.RequestedByteSize,
@@ -131,8 +131,8 @@ func (s *SpaceLibraryService) FinalizeUpload() http.HandlerFunc {
 		// Restrict them to passive raster formats at both initiation and
 		// finalization; the database records the resulting blob as "skipped",
 		// never falsely as malware-scanned clean.
-		if isJournalAssetPurpose(upload.Purpose) &&
-			!supportedDrawingAssetMIME(upload.ClientDeclaredMIMEType) {
+		if TestingIsJournalAssetPurpose(upload.Purpose) &&
+			!TestingSupportedDrawingAssetMIME(upload.ClientDeclaredMIMEType) {
 			s.rejectAndDelete(
 				r.Context(), upload, tokenHash, "invalid", "unsupported_journal_asset_mime",
 			)
@@ -145,7 +145,7 @@ func (s *SpaceLibraryService) FinalizeUpload() http.HandlerFunc {
 			return
 		}
 		if deduplicationKey != "" {
-			if _, existingErr := s.store.Head(r.Context(), deduplicationKey); errors.Is(existingErr, ErrLibraryObjectNotFound) {
+			if _, existingErr := s.TestingStore.Head(r.Context(), deduplicationKey); errors.Is(existingErr, ErrLibraryObjectNotFound) {
 				if repairErr := s.database.ReplaceMissingLibraryUploadDeduplicationObject(r.Context(), userID, spaceID, uploadID, deduplicationKey); repairErr != nil {
 					writeLibraryError(w, repairErr)
 					return
@@ -166,7 +166,7 @@ func (s *SpaceLibraryService) FinalizeUpload() http.HandlerFunc {
 			return
 		}
 		if result.DiscardObjectKey != "" {
-			_ = s.store.Delete(r.Context(), result.DiscardObjectKey)
+			_ = s.TestingStore.Delete(r.Context(), result.DiscardObjectKey)
 		}
 		writeJSON(w, http.StatusOK, result)
 	}
@@ -194,6 +194,6 @@ func (s *SpaceLibraryService) DownloadItem() http.HandlerFunc {
 			writeLibraryError(w, err)
 			return
 		}
-		s.writeDownload(w, r, download)
+		s.TestingWriteDownload(w, r, download)
 	}
 }

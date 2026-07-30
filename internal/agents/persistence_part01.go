@@ -69,7 +69,7 @@ var (
 	windowsLocalPathPattern = regexp.MustCompile(`(?i)[a-z]:\\(?:[^\s"'<>]+\\)+[^\s"'<>]*`)
 )
 
-func marshalPersistentSession(session *Session) (json.RawMessage, error) {
+func TestingMarshalPersistentSession(session *Session) (json.RawMessage, error) {
 	allowWrite := session.AllowWriteTools
 	allowTools := session.AllowTools
 	state := persistedSessionState{
@@ -103,7 +103,7 @@ func marshalPersistentSession(session *Session) (json.RawMessage, error) {
 	return json.Marshal(state)
 }
 
-func unmarshalPersistentSession(raw json.RawMessage, expectedID, expectedUserID string) (*Session, error) {
+func TestingUnmarshalPersistentSession(raw json.RawMessage, expectedID, expectedUserID string) (*Session, error) {
 	var state persistedSessionState
 	if err := json.Unmarshal(raw, &state); err != nil {
 		return nil, err

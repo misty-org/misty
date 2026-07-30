@@ -34,7 +34,7 @@ func (db *Database) AccountDeletionBlockers(
 	ctx context.Context, userID string,
 ) ([]AccountDeletionBlocker, error) {
 	out := []AccountDeletionBlocker{}
-	err := db.withRLSContext(ctx, serviceRLSSettings(), func(tx *sql.Tx) error {
+	err := db.TestingWithRLSContext(ctx, TestingServiceRLSSettings(), func(tx *sql.Tx) error {
 		rows, err := tx.QueryContext(ctx, `
 			SELECT s.id,s.name,COUNT(m.user_id)
 			FROM spaces s
@@ -69,7 +69,7 @@ func (db *Database) BeginAccountDeletion(
 	}
 	purgeAfter := time.Now().UTC().Add(retention)
 	out := &AccountDeletionRequest{}
-	err := db.withRLSContext(ctx, serviceRLSSettings(), func(tx *sql.Tx) error {
+	err := db.TestingWithRLSContext(ctx, TestingServiceRLSSettings(), func(tx *sql.Tx) error {
 		var state string
 		if err := tx.QueryRowContext(
 			ctx, `SELECT lifecycle_state FROM users WHERE id=$1 FOR UPDATE`, userID,
@@ -128,7 +128,7 @@ func (db *Database) AccountDeletionStatus(
 	ctx context.Context, requestID, statusTokenHash string,
 ) (*AccountDeletionRequest, error) {
 	out := &AccountDeletionRequest{}
-	err := db.withRLSContext(ctx, serviceRLSSettings(), func(tx *sql.Tx) error {
+	err := db.TestingWithRLSContext(ctx, TestingServiceRLSSettings(), func(tx *sql.Tx) error {
 		return scanAccountDeletionRequest(tx.QueryRowContext(ctx, `
 			SELECT id,user_id,status,purge_after,provider_revocation_status,
 			       last_error_code,created_at,updated_at,completed_at
@@ -145,7 +145,7 @@ func (db *Database) AccountDeletionConnections(
 	ctx context.Context, userID string,
 ) ([]CloudConnection, error) {
 	out := []CloudConnection{}
-	err := db.withRLSContext(ctx, serviceRLSSettings(), func(tx *sql.Tx) error {
+	err := db.TestingWithRLSContext(ctx, TestingServiceRLSSettings(), func(tx *sql.Tx) error {
 		rows, err := tx.QueryContext(ctx, `
 			SELECT id,user_id,provider,name,account_id,account_display,
 			       credential_ciphertext,credential_nonce,key_version,
@@ -178,7 +178,7 @@ func (db *Database) AccountDeletionProviderCredentials(
 	ctx context.Context, userID string,
 ) ([]ProviderCredential, error) {
 	out := []ProviderCredential{}
-	err := db.withRLSContext(ctx, serviceRLSSettings(), func(tx *sql.Tx) error {
+	err := db.TestingWithRLSContext(ctx, TestingServiceRLSSettings(), func(tx *sql.Tx) error {
 		rows, err := tx.QueryContext(ctx, `
 			SELECT id,integration_id,space_id,user_id,provider,ciphertext,nonce,
 			       key_version,account_id,account_display,expires_at
@@ -212,7 +212,7 @@ func (db *Database) ProcessingAccountDeletions(
 		limit = 25
 	}
 	out := []AccountDeletionRequest{}
-	err := db.withRLSContext(ctx, serviceRLSSettings(), func(tx *sql.Tx) error {
+	err := db.TestingWithRLSContext(ctx, TestingServiceRLSSettings(), func(tx *sql.Tx) error {
 		rows, err := tx.QueryContext(ctx, `
 			SELECT id,user_id,status,purge_after,provider_revocation_status,
 			       last_error_code,created_at,updated_at,completed_at

@@ -12,7 +12,7 @@ import (
 	workflowv2 "github.com/kannachi323/misty/server/internal/workflows"
 )
 
-func findWorkflowString(value any, keys ...string) string {
+func TestingFindWorkflowString(value any, keys ...string) string {
 	wanted := map[string]bool{}
 	for _, key := range keys {
 		wanted[key] = true
@@ -76,7 +76,7 @@ func findWorkflowStrings(value any, key string) []string {
 	return find(value)
 }
 
-func evaluateControlBranch(kind string, invocation workflowv2.Invocation) (json.RawMessage, error) {
+func TestingEvaluateControlBranch(kind string, invocation workflowv2.Invocation) (json.RawMessage, error) {
 	var input any
 	if json.Unmarshal(invocation.Input, &input) != nil {
 		return nil, workflowv2.ErrOutputInvalid
@@ -111,7 +111,7 @@ func evaluateControlBranch(kind string, invocation workflowv2.Invocation) (json.
 				break
 			}
 		}
-		return mustAPIRawJSON(map[string]any{"selected": port, port: input}), nil
+		return TestingMustAPIRawJSON(map[string]any{"selected": port, port: input}), nil
 	}
 	operator := config.Operator
 	if operator == "" {
@@ -151,7 +151,7 @@ func evaluateControlBranch(kind string, invocation workflowv2.Invocation) (json.
 	if matched {
 		port = "true"
 	}
-	return mustAPIRawJSON(map[string]any{"matched": matched, port: input}), nil
+	return TestingMustAPIRawJSON(map[string]any{"matched": matched, port: input}), nil
 }
 
 func workflowPath(root any, path string) (any, bool) {
@@ -219,7 +219,7 @@ func (s *SpacesService) changedFilesNode(ctx context.Context, run *db.SpaceRun, 
 	if json.Unmarshal(invocation.Input, &input) != nil {
 		return nil, workflowv2.ErrOutputInvalid
 	}
-	rawItems := findWorkflowItems(input)
+	rawItems := TestingFindWorkflowItems(input)
 	claimed := make([]any, 0, len(rawItems))
 	for _, raw := range rawItems {
 		item, ok := raw.(map[string]any)
@@ -249,5 +249,5 @@ func (s *SpacesService) changedFilesNode(ctx context.Context, run *db.SpaceRun, 
 			claimed = append(claimed, item)
 		}
 	}
-	return mustAPIRawJSON(map[string]any{"items": claimed, "claimed": len(claimed), "provenance": map[string]any{"instanceId": run.AgentInstanceID, "workflowVersionId": run.WorkflowVersionID}}), nil
+	return TestingMustAPIRawJSON(map[string]any{"items": claimed, "claimed": len(claimed), "provenance": map[string]any{"instanceId": run.AgentInstanceID, "workflowVersionId": run.WorkflowVersionID}}), nil
 }

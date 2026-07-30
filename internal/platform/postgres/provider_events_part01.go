@@ -84,7 +84,7 @@ func validateSharedResource(item *ProviderSharedResource) error {
 
 func (db *Database) ProviderSharedResources(ctx context.Context, userID, spaceID string) ([]ProviderSharedResource, error) {
 	out := []ProviderSharedResource{}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if _, err := requireSpaceMemberTx(ctx, tx, spaceID, userID); err != nil {
 			return err
 		}
@@ -118,7 +118,7 @@ func (db *Database) ReplaceProviderSharedResources(
 		}
 	}
 	out := []ProviderSharedResource{}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionIntegrationsManage); err != nil {
 			return err
 		}
@@ -172,7 +172,7 @@ func (db *Database) PublishProviderSharedResource(ctx context.Context, userID st
 	}
 	item.ID = "provider_resource_" + uuid.NewString()
 	out := &ProviderSharedResource{}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, item.SpaceID, PermissionIntegrationsManage); err != nil {
 			return err
 		}
@@ -192,7 +192,7 @@ func (db *Database) PublishProviderSharedResource(ctx context.Context, userID st
 }
 
 func (db *Database) DisableProviderSharedResource(ctx context.Context, userID, spaceID, resourceID string) error {
-	return db.spaceTx(ctx, func(tx *sql.Tx) error {
+	return db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionIntegrationsManage); err != nil {
 			return err
 		}
@@ -213,7 +213,7 @@ func (db *Database) DisableProviderSharedResource(ctx context.Context, userID, s
 // an empty value is allowed for the global Discord bot installation.
 func (db *Database) MatchingProviderResources(ctx context.Context, provider, accountID, externalResourceID string) ([]ProviderSharedResource, error) {
 	out := []ProviderSharedResource{}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		rows, err := tx.QueryContext(ctx, `SELECT `+sharedResourceColumns+` FROM provider_shared_resources r
 			JOIN space_integrations i ON i.id=r.integration_id JOIN space_provider_credentials c ON c.integration_id=i.id
 			WHERE r.provider=$1 AND r.external_resource_id=$2 AND r.status='active' AND i.status='active' AND c.revoked_at IS NULL
@@ -236,7 +236,7 @@ func (db *Database) MatchingProviderResources(ctx context.Context, provider, acc
 
 func (db *Database) EnqueueProviderEvent(ctx context.Context, resource ProviderSharedResource, externalEventID string, payload json.RawMessage) (bool, error) {
 	inserted := false
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		result, err := tx.ExecContext(ctx, `INSERT INTO provider_event_inbox(integration_id,user_id,provider,external_event_id,payload) VALUES($1,$2,$3,$4,$5) ON CONFLICT(integration_id,external_event_id) DO NOTHING`, resource.IntegrationID, resource.PublishedByUserID, resource.Provider, externalEventID, payload)
 		if err != nil {
 			return err

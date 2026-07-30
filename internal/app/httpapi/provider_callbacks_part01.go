@@ -23,7 +23,7 @@ const providerCallbackBodyLimit = 2 << 20
 func (s *SpacesService) SlackEventsCallback() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		raw, err := readProviderCallbackBody(r)
-		if err != nil || !verifySlackRequest(raw, r.Header, time.Now().UTC(), strings.TrimSpace(os.Getenv("SLACK_SIGNING_SECRET"))) {
+		if err != nil || !TestingVerifySlackRequest(raw, r.Header, time.Now().UTC(), strings.TrimSpace(os.Getenv("SLACK_SIGNING_SECRET"))) {
 			writeJSON(w, http.StatusUnauthorized, map[string]string{"code": "invalid_signature"})
 			return
 		}
@@ -146,7 +146,7 @@ func (s *SpacesService) storeSlackEvent(ctx context.Context, resource db.Provide
 	return s.database.UpsertProviderContentRecord(ctx, db.ProviderContentRecord{SpaceID: resource.SpaceID, SharedResourceID: resource.ID, Provider: "slack", ExternalRecordID: externalID, ParentExternalID: event.ThreadTS, RecordType: "message", Fingerprint: providerPayloadFingerprint(raw), DisplayName: resource.DisplayName + " · " + event.User, MIMEType: "application/vnd.slack.message+json", OccurredAt: occurredAt, Content: encoded, DeletedAt: deletedAt})
 }
 
-func verifySlackRequest(raw []byte, headers http.Header, now time.Time, secret string) bool {
+func TestingVerifySlackRequest(raw []byte, headers http.Header, now time.Time, secret string) bool {
 	if secret == "" {
 		return false
 	}
@@ -185,14 +185,14 @@ func (s *SpacesService) NotionEventsCallback() http.HandlerFunc {
 			// Notion requires the owner to paste this one-time value back into its
 			// provider console. Logging is an explicit bootstrap-only escape hatch;
 			// it is disabled by default and must be removed after setup.
-			if logNotionVerificationToken() {
+			if TestingLogNotionVerificationToken() {
 				log.Printf("MISTY_NOTION_WEBHOOK_VERIFICATION_TOKEN=%s", verification)
 			}
 			w.WriteHeader(http.StatusOK)
 			return
 		}
 		secret := strings.TrimSpace(os.Getenv("NOTION_WEBHOOK_VERIFICATION_TOKEN"))
-		if !verifyNotionRequest(raw, r.Header.Get("X-Notion-Signature"), secret) {
+		if !TestingVerifyNotionRequest(raw, r.Header.Get("X-Notion-Signature"), secret) {
 			writeJSON(w, http.StatusUnauthorized, map[string]string{"code": "invalid_signature"})
 			return
 		}
@@ -211,7 +211,7 @@ func (s *SpacesService) NotionEventsCallback() http.HandlerFunc {
 	}
 }
 
-func logNotionVerificationToken() bool {
+func TestingLogNotionVerificationToken() bool {
 	switch strings.ToLower(strings.TrimSpace(os.Getenv("NOTION_WEBHOOK_LOG_VERIFICATION_TOKEN"))) {
 	case "1", "true", "yes", "on":
 		return true
@@ -237,7 +237,7 @@ type notionWebhookEvent struct {
 	} `json:"data"`
 }
 
-func verifyNotionRequest(raw []byte, signature, secret string) bool {
+func TestingVerifyNotionRequest(raw []byte, signature, secret string) bool {
 	if secret == "" || !strings.HasPrefix(signature, "sha256=") {
 		return false
 	}

@@ -30,7 +30,7 @@ func (db *Database) SpaceContextRevision(ctx context.Context, userID, spaceID st
 		memberCount      int64
 		memberJoinedAt   sql.NullTime
 	)
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if _, err := requireSpaceMemberTx(ctx, tx, spaceID, userID); err != nil {
 			return err
 		}

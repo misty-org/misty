@@ -46,7 +46,7 @@ type CreateLibraryAssetStack struct {
 
 func (db *Database) LibraryAssetStacks(ctx context.Context, userID, spaceID string) ([]LibraryAssetStack, error) {
 	out := []LibraryAssetStack{}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionLibraryView); err != nil {
 			return err
 		}
@@ -97,7 +97,7 @@ func (db *Database) CreateLibraryAssetStack(ctx context.Context, userID, spaceID
 		return nil, ErrLibraryInvalid
 	}
 	stackID := "asset_stack_" + uuid.NewString()
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionLibraryEdit); err != nil {
 			return err
 		}
@@ -134,7 +134,7 @@ func (db *Database) DeleteLibraryAssetStack(ctx context.Context, userID, spaceID
 	if stackID == "" || version < 1 {
 		return ErrLibraryInvalid
 	}
-	return db.spaceTx(ctx, func(tx *sql.Tx) error {
+	return db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionLibraryEdit); err != nil {
 			return err
 		}
@@ -155,7 +155,7 @@ func (db *Database) UpdateLibraryAssetStack(ctx context.Context, userID, spaceID
 	if stackID == "" || version < 1 || coverItemID == "" || len([]rune(title)) > 160 || !map[string]bool{"still": true, "loop": true, "bounce": true, "long_exposure": true}[effect] {
 		return nil, ErrLibraryInvalid
 	}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionLibraryEdit); err != nil {
 			return err
 		}
@@ -186,7 +186,7 @@ func (db *Database) UpdateLibraryAssetStack(ctx context.Context, userID, spaceID
 
 func (db *Database) libraryAssetStack(ctx context.Context, userID, spaceID, stackID string) (*LibraryAssetStack, error) {
 	var out LibraryAssetStack
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionLibraryView); err != nil {
 			return err
 		}

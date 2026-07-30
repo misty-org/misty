@@ -27,7 +27,7 @@ func (db *Database) ClaimProviderWorkflows(ctx context.Context, spaceID, provide
 		limit = 100
 	}
 	claimed := []ClaimedProviderWorkflow{}
-	err := db.withRLSContext(ctx, serviceRLSSettings(), func(tx *sql.Tx) error {
+	err := db.TestingWithRLSContext(ctx, TestingServiceRLSSettings(), func(tx *sql.Tx) error {
 		rows, err := tx.QueryContext(ctx, `SELECT i.id,i.user_id,i.space_id,i.agent_id,w.workflow_version_id,w.trigger_config
 			FROM space_agent_instance_workflows w JOIN space_agent_instances i ON i.id=w.instance_id
 			WHERE i.space_id=$1 AND w.enabled AND w.consent->>'granted'='true'
@@ -76,7 +76,7 @@ func (db *Database) ClaimTaskWorkflows(ctx context.Context, spaceID, taskID, eve
 		limit = 100
 	}
 	claimed := []ClaimedProviderWorkflow{}
-	err := db.withRLSContext(ctx, serviceRLSSettings(), func(tx *sql.Tx) error {
+	err := db.TestingWithRLSContext(ctx, TestingServiceRLSSettings(), func(tx *sql.Tx) error {
 		rows, err := tx.QueryContext(ctx, `SELECT i.id,i.user_id,i.space_id,i.agent_id,w.workflow_version_id,w.trigger_config
 			FROM space_agent_instance_workflows w JOIN space_agent_instances i ON i.id=w.instance_id
 			WHERE i.space_id=$1 AND w.enabled AND w.consent->>'granted'='true' AND w.trigger_config->>'kind'='task_change'

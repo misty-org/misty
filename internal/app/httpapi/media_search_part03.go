@@ -38,7 +38,7 @@ func (s *MediaSearchService) Search() http.HandlerFunc {
 		if body.Limit == 0 {
 			body.Limit = 20
 		}
-		vector, semanticOperation, err := s.cachedEmbedding(r.Context(), userID, body.DeviceID, body.Query)
+		vector, semanticOperation, err := s.TestingCachedEmbedding(r.Context(), userID, body.DeviceID, body.Query)
 		if semanticOperation != nil {
 			defer semanticOperation.Release(s.database)
 		}
@@ -144,7 +144,7 @@ func (s *MediaSearchService) AdoptLegacyDevice() http.HandlerFunc {
 	}
 }
 
-func (s *MediaSearchService) cachedEmbedding(ctx context.Context, userID, deviceID, query string) ([]float64, *hostedSemanticQueryOperation, error) {
+func (s *MediaSearchService) TestingCachedEmbedding(ctx context.Context, userID, deviceID, query string) ([]float64, *hostedSemanticQueryOperation, error) {
 	if s.analyzer == nil || strings.TrimSpace(s.analyzer.APIKey) == "" {
 		return nil, nil, errors.New("media semantic search is unavailable")
 	}
@@ -184,7 +184,7 @@ func (s *MediaSearchService) requireUser(w http.ResponseWriter, r *http.Request)
 	return userID, true
 }
 
-func validMediaIndexRequest(v mediaIndexRequest) bool {
+func TestingValidMediaIndexRequest(v TestingMediaIndexRequest) bool {
 	if !validMediaDeviceID(v.DeviceID) || !validMediaOpaqueID(v.AssetID) || len(v.Fingerprint) != 64 || !isLowerHex(v.Fingerprint) || (v.MediaType != "audio" && v.MediaType != "video") || !strings.HasPrefix(v.MimeType, v.MediaType+"/") || v.DurationMS <= 0 || v.DurationMS > mediaMaxDurationMS || v.ChunkIndex < 0 || v.ChunkIndex >= mediaChunkCount(v.DurationMS) || v.StartMS != int64(v.ChunkIndex)*mediaChunkMS || len(v.Frames) > mediaMaxFrames {
 		return false
 	}

@@ -50,7 +50,7 @@ func (s *SpacesService) AccountExportManifest() http.HandlerFunc {
 		}
 		documents := make([]accountExportDocument, 0, len(export.Journal))
 		for _, resource := range export.Journal {
-			ticket, ticketErr := s.journalCollab.MintJournalExportTicket(
+			ticket, ticketErr := s.TestingJournalCollab.MintJournalExportTicket(
 				userID, resource.SpaceID, resource.Kind, resource.ID,
 				resource.ACLVersion,
 			)
@@ -67,14 +67,14 @@ func (s *SpacesService) AccountExportManifest() http.HandlerFunc {
 			})
 		}
 		assets := make([]accountExportAsset, 0, len(export.Assets))
-		if len(export.Assets) > 0 && (s.library == nil || s.library.presigner == nil) {
+		if len(export.Assets) > 0 && (s.library == nil || s.library.TestingPresigner == nil) {
 			writeJSON(w, http.StatusServiceUnavailable, map[string]string{
 				"code": "account_export_assets_unavailable",
 			})
 			return
 		}
 		for _, asset := range export.Assets {
-			download, downloadErr := s.library.presigner.PresignGet(
+			download, downloadErr := s.library.TestingPresigner.PresignGet(
 				r.Context(), asset.ObjectKey, asset.Filename, 15*time.Minute,
 			)
 			if downloadErr != nil {

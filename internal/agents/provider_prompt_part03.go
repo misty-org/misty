@@ -8,7 +8,7 @@ import (
 
 // groundedAgentCitations drops any model citation that is not anchored to a
 // location the device explicitly supplied in a successful preview_file result.
-func groundedAgentCitations(request ModelRequest, citations []AgentCitation) []AgentCitation {
+func TestingGroundedAgentCitations(request ModelRequest, citations []AgentCitation) []AgentCitation {
 	sources := make([]agentCitationSource, 0, len(request.ToolResults))
 	for _, result := range request.ToolResults {
 		if result.Name != ToolPreviewFile || !result.OK || len(result.Result) == 0 {

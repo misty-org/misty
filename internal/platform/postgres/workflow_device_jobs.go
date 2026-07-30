@@ -65,7 +65,7 @@ func (db *Database) ClaimWorkflowDeviceNodeJob(userID, deviceID string, lease ti
 	if lease != time.Minute {
 		lease = time.Minute
 	}
-	token, err := secureToken()
+	token, err := TestingSecureToken()
 	if err != nil {
 		return nil, "", err
 	}
@@ -78,7 +78,7 @@ func (db *Database) ClaimWorkflowDeviceNodeJob(userID, deviceID string, lease ti
 			SELECT j.id FROM workflow_device_node_jobs j JOIN trusted_devices d ON d.id=$1 AND d.user_id=$2 AND d.revoked_at IS NULL AND d.last_seen_at>NOW()-INTERVAL '90 seconds'
 			WHERE j.user_id=$2 AND j.state='queued' ORDER BY j.created_at FOR UPDATE OF j SKIP LOCKED LIMIT 1)
 			UPDATE workflow_device_node_jobs j SET state='leased',leased_device_id=$1,lease_token_hash=$3,lease_expires_at=NOW()+INTERVAL '60 seconds',last_heartbeat_at=NOW()
-			FROM candidate c WHERE j.id=c.id RETURNING `+workflowDeviceJobColumns, deviceID, userID, hashToken(token)), item)
+			FROM candidate c WHERE j.id=c.id RETURNING `+workflowDeviceJobColumns, deviceID, userID, TestingHashToken(token)), item)
 	})
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, "", ErrAgentJobNotFound
@@ -90,7 +90,7 @@ func (db *Database) RenewWorkflowDeviceNodeJob(userID, deviceID, jobID, token st
 	item := &WorkflowDeviceNodeJob{}
 	err := db.agentTx(userID, func(tx *sql.Tx) error {
 		return scanWorkflowDeviceJob(tx.QueryRow(`UPDATE workflow_device_node_jobs SET lease_expires_at=NOW()+INTERVAL '60 seconds',last_heartbeat_at=NOW()
-			WHERE id=$1 AND user_id=$2 AND leased_device_id=$3 AND lease_token_hash=$4 AND state='leased' AND lease_expires_at>NOW() RETURNING `+workflowDeviceJobColumns, jobID, userID, deviceID, hashToken(token)), item)
+			WHERE id=$1 AND user_id=$2 AND leased_device_id=$3 AND lease_token_hash=$4 AND state='leased' AND lease_expires_at>NOW() RETURNING `+workflowDeviceJobColumns, jobID, userID, deviceID, TestingHashToken(token)), item)
 	})
 	if errors.Is(err, sql.ErrNoRows) {
 		err = ErrInvalidLease
@@ -105,12 +105,12 @@ func (db *Database) FinishWorkflowDeviceNodeJob(userID, deviceID, jobID, token, 
 	item := &WorkflowDeviceNodeJob{}
 	err := db.agentTx(userID, func(tx *sql.Tx) error {
 		return scanWorkflowDeviceJob(tx.QueryRow(`UPDATE workflow_device_node_jobs SET state=$1,output=$2,error_code=NULLIF($3,''),completed_at=NOW(),lease_expires_at=NULL
-			WHERE id=$4 AND user_id=$5 AND leased_device_id=$6 AND lease_token_hash=$7 AND state='leased' AND lease_expires_at>NOW() RETURNING `+workflowDeviceJobColumns, state, output, errorCode, jobID, userID, deviceID, hashToken(token)), item)
+			WHERE id=$4 AND user_id=$5 AND leased_device_id=$6 AND lease_token_hash=$7 AND state='leased' AND lease_expires_at>NOW() RETURNING `+workflowDeviceJobColumns, state, output, errorCode, jobID, userID, deviceID, TestingHashToken(token)), item)
 	})
 	if errors.Is(err, sql.ErrNoRows) {
 		// A duplicate completion is idempotent only for the same terminal state.
 		err = db.agentTx(userID, func(tx *sql.Tx) error {
-			return scanWorkflowDeviceJob(tx.QueryRow(`SELECT `+workflowDeviceJobColumns+` FROM workflow_device_node_jobs WHERE id=$1 AND user_id=$2 AND leased_device_id=$3 AND lease_token_hash=$4 AND state=$5`, jobID, userID, deviceID, hashToken(token), state), item)
+			return scanWorkflowDeviceJob(tx.QueryRow(`SELECT `+workflowDeviceJobColumns+` FROM workflow_device_node_jobs WHERE id=$1 AND user_id=$2 AND leased_device_id=$3 AND lease_token_hash=$4 AND state=$5`, jobID, userID, deviceID, TestingHashToken(token), state), item)
 		})
 	}
 	if errors.Is(err, sql.ErrNoRows) {

@@ -109,7 +109,7 @@ func BuiltInSpaceTemplates() []SpaceTemplate {
 	return out
 }
 
-func templateByID(id string) (*templateDefinition, bool) {
+func TestingTemplateByID(id string) (*templateDefinition, bool) {
 	id = strings.TrimSpace(id)
 	if id == "" {
 		id = "blank"
@@ -122,7 +122,7 @@ func templateByID(id string) (*templateDefinition, bool) {
 	return nil, false
 }
 
-func normalizeSetupProviders(providers []string) ([]string, error) {
+func TestingNormalizeSetupProviders(providers []string) ([]string, error) {
 	allowed := map[string]bool{"google": true, "discord": true, "notion": true}
 	unique := map[string]bool{}
 	for _, raw := range providers {

@@ -61,7 +61,7 @@ func (db *Database) QueueLibraryEditRendition(ctx context.Context, userID, space
 		return nil, ErrLibraryInvalid
 	}
 	out := &LibraryRenditionRequest{EditID: editID}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionLibraryEdit); err != nil {
 			return err
 		}
@@ -165,7 +165,7 @@ func (db *Database) ClaimLibraryRenditionJob(ctx context.Context, workerID strin
 	}
 	out := &LibraryRenditionJob{LeaseToken: "lease_" + uuid.NewString()}
 	var raw []byte
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := tx.QueryRowContext(ctx, `WITH candidate AS (
 			SELECT id FROM library_processing_jobs WHERE job_kind='edit' AND (state='queued' AND available_at<=NOW() OR state IN ('leased','running') AND lease_expires_at<=NOW())
 			ORDER BY priority DESC,created_at FOR UPDATE SKIP LOCKED LIMIT 1
@@ -197,7 +197,7 @@ func (db *Database) CompleteLibraryRenditionJob(ctx context.Context, job *Librar
 		return nil, ErrLibraryInvalid
 	}
 	out := &CompleteLibraryRenditionResult{}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		result, err := tx.ExecContext(ctx, `UPDATE library_processing_jobs SET state='running',updated_at=NOW() WHERE id=$1 AND state='leased' AND lease_token=$2 AND lease_expires_at>NOW()`, job.ID, job.LeaseToken)
 		if err != nil {
 			return err

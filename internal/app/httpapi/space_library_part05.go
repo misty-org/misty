@@ -36,12 +36,12 @@ func (s *SpaceLibraryService) copyLibraryItem(ctx context.Context, userID, sourc
 	if _, err = s.database.SetLibraryUploadState(ctx, userID, destinationSpaceID, upload.ID, tokenHash, "initiated", "uploading"); err != nil {
 		return nil, err
 	}
-	reader, _, err := s.store.Open(ctx, source.ObjectKey)
+	reader, _, err := s.TestingStore.Open(ctx, source.ObjectKey)
 	if err != nil {
 		s.rejectAndDelete(ctx, upload, tokenHash, "invalid", "import_source_missing")
 		return nil, err
 	}
-	putErr := s.store.Put(ctx, objectKey, io.LimitReader(reader, source.ByteSize+1), LibraryObjectMetadata{ByteSize: source.ByteSize, SHA256: source.SHA256, MIMEType: source.MIMEType})
+	putErr := s.TestingStore.Put(ctx, objectKey, io.LimitReader(reader, source.ByteSize+1), LibraryObjectMetadata{ByteSize: source.ByteSize, SHA256: source.SHA256, MIMEType: source.MIMEType})
 	_ = reader.Close()
 	if putErr != nil {
 		s.rejectAndDelete(ctx, upload, tokenHash, "invalid", "import_copy_failed")
@@ -61,7 +61,7 @@ func (s *SpaceLibraryService) copyLibraryItem(ctx context.Context, userID, sourc
 		return nil, err
 	}
 	if completed.DiscardObjectKey != "" {
-		_ = s.store.Delete(ctx, completed.DiscardObjectKey)
+		_ = s.TestingStore.Delete(ctx, completed.DiscardObjectKey)
 	}
 	if completed.Item == nil {
 		return nil, db.ErrLibraryConflict
@@ -231,7 +231,7 @@ func (s *SpaceLibraryService) CleanupExpired(ctx context.Context, limit int) (in
 		return 0, err
 	}
 	for _, upload := range uploads {
-		if err := s.store.Delete(ctx, upload.ObjectKey); err != nil && !errors.Is(err, ErrLibraryObjectNotFound) {
+		if err := s.TestingStore.Delete(ctx, upload.ObjectKey); err != nil && !errors.Is(err, ErrLibraryObjectNotFound) {
 			return len(uploads), err
 		}
 	}

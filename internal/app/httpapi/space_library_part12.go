@@ -62,17 +62,17 @@ func metadataNumber(value any) (float64, bool) {
 
 func (s *SpaceLibraryService) rejectAndDelete(ctx context.Context, upload *db.LibraryUpload, tokenHash, state, code string) {
 	_ = s.database.RejectLibraryUpload(ctx, upload.UserID, upload.SpaceID, upload.ID, tokenHash, state, code)
-	_ = s.store.Delete(ctx, upload.ObjectKey)
+	_ = s.TestingStore.Delete(ctx, upload.ObjectKey)
 }
 
-var errLibraryMalware = errors.New("malware detected")
+var TestingErrLibraryMalware = errors.New("malware detected")
 
 type libraryInspectionError struct{ code string }
 
 func (e libraryInspectionError) Error() string { return e.code }
 
-func libraryInspectionCode(err error) string {
-	if errors.Is(err, errLibraryMalware) {
+func TestingLibraryInspectionCode(err error) string {
+	if errors.Is(err, TestingErrLibraryMalware) {
 		return "malware_detected"
 	}
 	var typed libraryInspectionError
@@ -82,7 +82,7 @@ func libraryInspectionCode(err error) string {
 	return "content_rejected"
 }
 
-func inspectLibraryContent(reader io.Reader, byteSize int64, filename, declaredMIME string) (string, map[string]any, error) {
+func TestingInspectLibraryContent(reader io.Reader, byteSize int64, filename, declaredMIME string) (string, map[string]any, error) {
 	if byteSize < 1 || byteSize > db.MaxSpaceStorageBytes {
 		return "", nil, libraryInspectionError{code: "invalid_size"}
 	}
@@ -139,7 +139,7 @@ func inspectLibraryContent(reader io.Reader, byteSize int64, filename, declaredM
 		return "", nil, libraryInspectionError{code: "verification_mismatch"}
 	}
 	if foundEICAR {
-		return "", nil, errLibraryMalware
+		return "", nil, TestingErrLibraryMalware
 	}
 	return detected, map[string]any{
 		"sha256":                    hex.EncodeToString(hasher.Sum(nil)),

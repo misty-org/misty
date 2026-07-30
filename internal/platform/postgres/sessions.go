@@ -12,7 +12,7 @@ const SessionTTL = 30 * 24 * time.Hour
 
 func (db *Database) CreateSession(tokenHash, userID string) error {
 	expiresAt := time.Now().Add(SessionTTL)
-	err := db.withRLSContext(context.Background(), sessionCreateRLSSettings(tokenHash, userID), func(tx *sql.Tx) error {
+	err := db.TestingWithRLSContext(context.Background(), sessionCreateRLSSettings(tokenHash, userID), func(tx *sql.Tx) error {
 		_, err := tx.ExecContext(
 			context.Background(),
 			`INSERT INTO sessions (token_hash, user_id, expires_at)
@@ -30,7 +30,7 @@ func (db *Database) CreateSession(tokenHash, userID string) error {
 
 func (db *Database) GetSessionUserID(tokenHash string) (string, error) {
 	var userID string
-	err := db.withRLSContext(context.Background(), sessionRLSSettings(tokenHash), func(tx *sql.Tx) error {
+	err := db.TestingWithRLSContext(context.Background(), sessionRLSSettings(tokenHash), func(tx *sql.Tx) error {
 		return tx.QueryRowContext(
 			context.Background(),
 			`SELECT user_id FROM sessions
@@ -49,7 +49,7 @@ func (db *Database) GetSessionUserID(tokenHash string) (string, error) {
 }
 
 func (db *Database) DeleteSession(tokenHash string) error {
-	err := db.withRLSContext(context.Background(), sessionRLSSettings(tokenHash), func(tx *sql.Tx) error {
+	err := db.TestingWithRLSContext(context.Background(), sessionRLSSettings(tokenHash), func(tx *sql.Tx) error {
 		_, err := tx.ExecContext(context.Background(), `DELETE FROM sessions WHERE token_hash = $1`, tokenHash)
 		return err
 	})

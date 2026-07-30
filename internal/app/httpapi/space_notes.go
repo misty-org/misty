@@ -150,11 +150,11 @@ func (s *SpaceLibraryService) SpaceNoteAssets() http.HandlerFunc {
 			writeJSON(w, http.StatusOK, map[string]any{"assets": assets})
 			return
 		}
-		if !s.noteAssetsEnabled {
+		if !s.TestingNoteAssetsEnabled {
 			writeJSON(w, http.StatusServiceUnavailable, map[string]string{"code": "note_assets_disabled"})
 			return
 		}
-		if !s.directTransfersActive() {
+		if !s.TestingDirectTransfersActive() {
 			writeJSON(w, http.StatusServiceUnavailable,
 				map[string]string{"code": "journal_asset_direct_transfer_required"})
 			return
@@ -171,10 +171,10 @@ func (s *SpaceLibraryService) SpaceNoteAssets() http.HandlerFunc {
 		body.Filename = sanitizeLibraryFilename(body.Filename)
 		body.SHA256 = strings.ToLower(strings.TrimSpace(body.SHA256))
 		body.MIMEType = strings.ToLower(strings.TrimSpace(body.MIMEType))
-		maxBytes := s.uploadLimits.Max(UploadPurposeNoteAttachment)
+		maxBytes := s.TestingUploadLimits.Max(UploadPurposeNoteAttachment)
 		if maxBytes < 1 || body.ByteSize < 1 || body.ByteSize > maxBytes ||
 			!librarySHA256Pattern.MatchString(body.SHA256) || body.Filename == "" ||
-			!supportedDrawingAssetMIME(body.MIMEType) {
+			!TestingSupportedDrawingAssetMIME(body.MIMEType) {
 			writeLibraryError(w, db.ErrLibraryInvalid)
 			return
 		}
@@ -191,7 +191,7 @@ func (s *SpaceLibraryService) SpaceNoteAssets() http.HandlerFunc {
 			writeLibraryError(w, err)
 			return
 		}
-		transfer, err := s.uploadTransfer(r.Context(), upload, token, expiresAt)
+		transfer, err := s.TestingUploadTransfer(r.Context(), upload, token, expiresAt)
 		if err != nil {
 			writeLibraryError(w, err)
 			return
@@ -199,7 +199,7 @@ func (s *SpaceLibraryService) SpaceNoteAssets() http.HandlerFunc {
 		writeJSON(w, http.StatusCreated, map[string]any{
 			"upload":   upload,
 			"transfer": transfer,
-			"finalize": map[string]any{"headers": map[string]string{libraryUploadTokenHeader: token}},
+			"finalize": map[string]any{"headers": map[string]string{TestingLibraryUploadTokenHeader: token}},
 		})
 	}
 }
@@ -218,7 +218,7 @@ func (s *SpaceLibraryService) SpaceNoteAssetDownload() http.HandlerFunc {
 			writeLibraryError(w, err)
 			return
 		}
-		s.writeJournalAssetDownload(w, r, download)
+		s.TestingWriteJournalAssetDownload(w, r, download)
 	}
 }
 
@@ -267,7 +267,7 @@ func (s *SpacesService) SpaceNoteCollaborationTicket() http.HandlerFunc {
 			writeSpaceError(w, db.ErrSpaceNotFound)
 			return
 		}
-		ticket, err := s.journalCollab.MintNoteTicket(userID, note.SpaceID, note.ID, access.Role, note.ACLVersion)
+		ticket, err := s.TestingJournalCollab.MintNoteTicket(userID, note.SpaceID, note.ID, access.Role, note.ACLVersion)
 		if err != nil {
 			writeSpaceError(w, err)
 			return

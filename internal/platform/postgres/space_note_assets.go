@@ -39,7 +39,7 @@ func (db *Database) CreateNoteAssetUpload(ctx context.Context, userID, noteID, f
 		ClientDeclaredMIMEType: declaredMIME, RequestedByteSize: byteSize, ClientSHA256: clientSHA,
 		State: "initiated", UploadTokenHash: tokenHash, ExpiresAt: expiresAt, Version: 1,
 	}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		access, err := noteAccessForTx(ctx, tx, userID, noteID)
 		if err != nil {
 			return err
@@ -98,7 +98,7 @@ func (db *Database) CreateNoteAssetUpload(ctx context.Context, userID, noteID, f
 // NoteAssets lists a note's ready assets for a caller who may view it.
 func (db *Database) NoteAssets(ctx context.Context, userID, noteID string) ([]SpaceNoteAsset, error) {
 	assets := []SpaceNoteAsset{}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		access, err := noteAccessForTx(ctx, tx, userID, noteID)
 		if err != nil {
 			return err
@@ -130,7 +130,7 @@ func (db *Database) NoteAssets(ctx context.Context, userID, noteID string) ([]Sp
 // view the parent note. Viewers may download; only editing is restricted.
 func (db *Database) NoteAssetDownload(ctx context.Context, userID, noteID, assetID string) (*LibraryDownload, error) {
 	download := &LibraryDownload{}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		access, err := noteAccessForTx(ctx, tx, userID, noteID)
 		if err != nil {
 			return err
@@ -162,7 +162,7 @@ func (db *Database) NoteAssetDownload(ctx context.Context, userID, noteID, asset
 // reference from the document marks it unreferenced instead, so the retention
 // window still applies and a concurrent collaborator's view does not break.
 func (db *Database) DeleteNoteAsset(ctx context.Context, userID, noteID, assetID string) error {
-	return db.spaceTx(ctx, func(tx *sql.Tx) error {
+	return db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		access, err := noteAccessForTx(ctx, tx, userID, noteID)
 		if err != nil {
 			return err

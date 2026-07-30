@@ -22,12 +22,12 @@ import (
 const identityKeyPrefixLength = 24
 
 // rateLimitIdentity returns the key a request is charged against.
-func rateLimitIdentity(r *http.Request) string {
+func TestingRateLimitIdentity(r *http.Request) string {
 	if credential := requestCredential(r); credential != "" {
 		digest := sha256.Sum256([]byte(credential))
 		return "acct:" + hex.EncodeToString(digest[:])[:identityKeyPrefixLength]
 	}
-	return "ip:" + clientIPFromRequest(r)
+	return "ip:" + TestingClientIPFromRequest(r)
 }
 
 // requestCredential extracts whatever identifies the caller's account, without
@@ -44,7 +44,7 @@ func requestCredential(r *http.Request) string {
 		return authorization
 	}
 	// Session cookies are the other way a browser client authenticates.
-	if cookie, err := r.Cookie(sessionCookieName); err == nil && strings.TrimSpace(cookie.Value) != "" {
+	if cookie, err := r.Cookie(TestingSessionCookieName); err == nil && strings.TrimSpace(cookie.Value) != "" {
 		return cookie.Value
 	}
 	return ""
@@ -52,6 +52,6 @@ func requestCredential(r *http.Request) string {
 
 // identityIsAccount reports whether a key came from a credential rather than an
 // address, so callers can apply account-scoped policy only where it is real.
-func identityIsAccount(key string) bool {
+func TestingIdentityIsAccount(key string) bool {
 	return strings.HasPrefix(key, "acct:")
 }

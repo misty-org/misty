@@ -31,7 +31,7 @@ func (s *SpaceLibraryService) CleanupExpiredJournalAssets(
 	completed := 0
 	for _, claim := range claims {
 		if claim.DeleteBlob {
-			if err := s.store.Delete(ctx, claim.ObjectKey); err != nil &&
+			if err := s.TestingStore.Delete(ctx, claim.ObjectKey); err != nil &&
 				!errors.Is(err, ErrLibraryObjectNotFound) {
 				return completed, err
 			}
@@ -159,14 +159,14 @@ func (s *SpaceLibraryService) InitiateUpload() http.HandlerFunc {
 		if decodeJSON(w, r, &body) != nil {
 			return
 		}
-		if !s.uploadPurposeEnabled(body.Purpose) {
+		if !s.TestingUploadPurposeEnabled(body.Purpose) {
 			writeJSON(w, http.StatusServiceUnavailable, map[string]string{"code": "library_uploads_disabled"})
 			return
 		}
 		body.Filename = sanitizeLibraryFilename(body.Filename)
 		body.SHA256 = strings.ToLower(strings.TrimSpace(body.SHA256))
 		body.MIMEType = strings.TrimSpace(body.MIMEType)
-		maxBytes := s.uploadLimits.Max(body.Purpose)
+		maxBytes := s.TestingUploadLimits.Max(body.Purpose)
 		if maxBytes < 1 || body.ByteSize < 1 || body.ByteSize > maxBytes || !librarySHA256Pattern.MatchString(body.SHA256) || body.Filename == "" {
 			writeLibraryError(w, db.ErrLibraryInvalid)
 			return
@@ -183,7 +183,7 @@ func (s *SpaceLibraryService) InitiateUpload() http.HandlerFunc {
 			writeLibraryError(w, err)
 			return
 		}
-		transfer, err := s.uploadTransfer(r.Context(), upload, token, expiresAt)
+		transfer, err := s.TestingUploadTransfer(r.Context(), upload, token, expiresAt)
 		if err != nil {
 			writeLibraryError(w, err)
 			return
@@ -191,7 +191,7 @@ func (s *SpaceLibraryService) InitiateUpload() http.HandlerFunc {
 		writeJSON(w, http.StatusCreated, map[string]any{
 			"upload":   upload,
 			"transfer": transfer,
-			"finalize": map[string]any{"headers": map[string]string{libraryUploadTokenHeader: token}},
+			"finalize": map[string]any{"headers": map[string]string{TestingLibraryUploadTokenHeader: token}},
 		})
 	}
 }
@@ -199,14 +199,14 @@ func (s *SpaceLibraryService) InitiateUpload() http.HandlerFunc {
 // uploadTransfer describes how the client should move the bytes. With direct
 // transfer it is an absolute presigned R2 PUT that carries no Misty
 // credentials; otherwise it is the relative proxy route used in development.
-func (s *SpaceLibraryService) uploadTransfer(ctx context.Context, upload *db.LibraryUpload, token string, expiresAt time.Time) (LibraryObjectUpload, error) {
-	if s.directTransfersActive() {
+func (s *SpaceLibraryService) TestingUploadTransfer(ctx context.Context, upload *db.LibraryUpload, token string, expiresAt time.Time) (LibraryObjectUpload, error) {
+	if s.TestingDirectTransfersActive() {
 		metadata := LibraryObjectMetadata{
 			ByteSize: upload.RequestedByteSize,
 			SHA256:   upload.ClientSHA256,
 			MIMEType: upload.ClientDeclaredMIMEType,
 		}
-		signed, err := s.presigner.PresignPut(ctx, upload.ObjectKey, metadata, s.transfers.UploadURLTTL)
+		signed, err := s.TestingPresigner.PresignPut(ctx, upload.ObjectKey, metadata, s.TestingTransfers.UploadURLTTL)
 		if err != nil {
 			return LibraryObjectUpload{}, err
 		}
@@ -217,7 +217,7 @@ func (s *SpaceLibraryService) uploadTransfer(ctx context.Context, upload *db.Lib
 	return LibraryObjectUpload{
 		URL:     fmt.Sprintf("/spaces/%s/library/uploads/%s/content", upload.SpaceID, upload.ID),
 		Method:  http.MethodPut,
-		Headers: map[string]string{libraryUploadTokenHeader: token, "Content-Type": upload.ClientDeclaredMIMEType},
+		Headers: map[string]string{TestingLibraryUploadTokenHeader: token, "Content-Type": upload.ClientDeclaredMIMEType},
 		// The proxy route is bounded by the Misty upload reservation, not by a
 		// signature, so it keeps the reservation lifetime.
 		ExpiresAt: expiresAt,

@@ -76,7 +76,7 @@ func (db *Database) SpaceDiscordLinkFor(ctx context.Context, userID, spaceID str
 
 func (db *Database) SpaceDiscordLinksFor(ctx context.Context, userID, spaceID string) ([]SpaceDiscordLink, error) {
 	items := []SpaceDiscordLink{}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if _, err := requireSpaceMemberTx(ctx, tx, spaceID, userID); err != nil {
 			return err
 		}
@@ -102,7 +102,7 @@ func (db *Database) SpaceDiscordLinksFor(ctx context.Context, userID, spaceID st
 // SpaceDiscordLinkByID reads a link for a service-side operation such as sync.
 func (db *Database) SpaceDiscordLinkByID(ctx context.Context, spaceID, linkID string) (*SpaceDiscordLink, error) {
 	out := &SpaceDiscordLink{}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		return scanSpaceDiscordLink(tx.QueryRowContext(ctx, `SELECT `+spaceDiscordLinkColumns+`
 			FROM space_discord_links WHERE id=$1 AND space_id=$2`, linkID, spaceID), out)
 	})
@@ -119,7 +119,7 @@ func (db *Database) SpaceDiscordLinkByID(ctx context.Context, spaceID, linkID st
 // the Gateway can fan one Discord message out to each mirroring Space.
 func (db *Database) SpaceDiscordLinksForChannel(ctx context.Context, guildID, channelID string) ([]SpaceDiscordLink, error) {
 	items := []SpaceDiscordLink{}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		rows, err := tx.QueryContext(ctx, `SELECT `+spaceDiscordLinkColumns+`
 			FROM space_discord_links WHERE guild_id=$1 AND channel_id=$2 AND disabled_at IS NULL
 			AND direction IN ('two_way','inbound')`, guildID, channelID)
@@ -153,7 +153,7 @@ func (db *Database) CreateSpaceDiscordLink(ctx context.Context, userID string, i
 		return nil, ErrSpaceInvalid
 	}
 	out := &SpaceDiscordLink{}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, item.SpaceID, PermissionIntegrationsManage); err != nil {
 			return err
 		}

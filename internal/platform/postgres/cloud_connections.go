@@ -28,7 +28,7 @@ type CloudOAuthState struct {
 
 func (db *Database) CloudConnections(ctx context.Context, userID string) ([]CloudConnection, error) {
 	var out []CloudConnection
-	err := db.withRLSContext(ctx, userRLSSettings(userID), func(tx *sql.Tx) error {
+	err := db.TestingWithRLSContext(ctx, userRLSSettings(userID), func(tx *sql.Tx) error {
 		rows, err := tx.QueryContext(ctx, `SELECT id,user_id,provider,name,account_id,account_display,
 			uses_custom_oauth_client,expires_at,created_at,updated_at
 			FROM cloud_connections WHERE user_id=$1 AND revoked_at IS NULL ORDER BY created_at`, userID)
@@ -52,7 +52,7 @@ func (db *Database) CloudConnections(ctx context.Context, userID string) ([]Clou
 
 func (db *Database) CloudConnection(ctx context.Context, userID, id string) (*CloudConnection, error) {
 	out := &CloudConnection{}
-	err := db.withRLSContext(ctx, userRLSSettings(userID), func(tx *sql.Tx) error {
+	err := db.TestingWithRLSContext(ctx, userRLSSettings(userID), func(tx *sql.Tx) error {
 		return tx.QueryRowContext(ctx, `SELECT id,user_id,provider,name,account_id,account_display,
 			credential_ciphertext,credential_nonce,key_version,uses_custom_oauth_client,expires_at,
 			created_at,updated_at FROM cloud_connections
@@ -71,7 +71,7 @@ func (db *Database) SaveCloudConnection(ctx context.Context, item CloudConnectio
 	if item.ID == "" {
 		item.ID = "cloud_" + uuid.NewString()
 	}
-	err := db.withRLSContext(ctx, userRLSSettings(item.UserID), func(tx *sql.Tx) error {
+	err := db.TestingWithRLSContext(ctx, userRLSSettings(item.UserID), func(tx *sql.Tx) error {
 		if _, err := tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock(hashtextextended($1,0))`, item.UserID); err != nil {
 			return err
 		}
@@ -109,7 +109,7 @@ func (db *Database) SaveCloudConnection(ctx context.Context, item CloudConnectio
 }
 
 func (db *Database) UpdateCloudConnectionCredential(ctx context.Context, item CloudConnection) error {
-	return db.withRLSContext(ctx, userRLSSettings(item.UserID), func(tx *sql.Tx) error {
+	return db.TestingWithRLSContext(ctx, userRLSSettings(item.UserID), func(tx *sql.Tx) error {
 		result, err := tx.ExecContext(ctx, `UPDATE cloud_connections SET credential_ciphertext=$1,
 			credential_nonce=$2,key_version=$3,expires_at=$4,updated_at=NOW()
 			WHERE id=$5 AND user_id=$6 AND revoked_at IS NULL`, item.CredentialCiphertext,
@@ -125,7 +125,7 @@ func (db *Database) UpdateCloudConnectionCredential(ctx context.Context, item Cl
 }
 
 func (db *Database) DeleteCloudConnection(ctx context.Context, userID, id string) error {
-	return db.withRLSContext(ctx, userRLSSettings(userID), func(tx *sql.Tx) error {
+	return db.TestingWithRLSContext(ctx, userRLSSettings(userID), func(tx *sql.Tx) error {
 		result, err := tx.ExecContext(ctx, `UPDATE cloud_connections SET revoked_at=NOW(),updated_at=NOW()
 			WHERE id=$1 AND user_id=$2 AND revoked_at IS NULL`, id, userID)
 		if err != nil {
@@ -139,7 +139,7 @@ func (db *Database) DeleteCloudConnection(ctx context.Context, userID, id string
 }
 
 func (db *Database) CreateCloudOAuthState(ctx context.Context, stateHash string, item CloudOAuthState) error {
-	return db.withRLSContext(ctx, userRLSSettings(item.UserID), func(tx *sql.Tx) error {
+	return db.TestingWithRLSContext(ctx, userRLSSettings(item.UserID), func(tx *sql.Tx) error {
 		_, err := tx.ExecContext(ctx, `INSERT INTO cloud_oauth_states
 			(state_hash,user_id,provider,connection_name,secret_ciphertext,secret_nonce,return_to,expires_at)
 			VALUES($1,$2,$3,$4,$5,$6,$7,$8)`, stateHash, item.UserID, item.Provider,
@@ -150,7 +150,7 @@ func (db *Database) CreateCloudOAuthState(ctx context.Context, stateHash string,
 
 func (db *Database) ConsumeCloudOAuthState(ctx context.Context, stateHash string) (*CloudOAuthState, error) {
 	out := &CloudOAuthState{}
-	err := db.withRLSContext(ctx, serviceRLSSettings(), func(tx *sql.Tx) error {
+	err := db.TestingWithRLSContext(ctx, TestingServiceRLSSettings(), func(tx *sql.Tx) error {
 		return tx.QueryRowContext(ctx, `UPDATE cloud_oauth_states SET consumed_at=NOW()
 			WHERE state_hash=$1 AND consumed_at IS NULL AND expires_at>NOW()
 			RETURNING user_id,provider,connection_name,secret_ciphertext,secret_nonce,return_to,expires_at`,

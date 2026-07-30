@@ -46,7 +46,7 @@ func (s *WaitlistService) Join() http.HandlerFunc {
 		}
 
 		name := strings.TrimSpace(body.Name)
-		emailAddress, err := normalizeWaitlistEmail(body.Email)
+		emailAddress, err := TestingNormalizeWaitlistEmail(body.Email)
 		if err != nil {
 			http.Error(w, "valid email is required", http.StatusBadRequest)
 			return
@@ -77,7 +77,7 @@ func (s *WaitlistService) Join() http.HandlerFunc {
 	}
 }
 
-func normalizeWaitlistEmail(raw string) (string, error) {
+func TestingNormalizeWaitlistEmail(raw string) (string, error) {
 	address, err := mail.ParseAddress(strings.TrimSpace(raw))
 	if err != nil {
 		return "", err

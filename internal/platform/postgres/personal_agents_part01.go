@@ -60,7 +60,7 @@ func scanPersonalAgent(row scanner, out *PersonalAgent) error {
 		&out.Version, &out.CreatedAt, &out.UpdatedAt)
 }
 
-func normalizePersonalAgent(agent *PersonalAgent) error {
+func TestingNormalizePersonalAgent(agent *PersonalAgent) error {
 	agent.Name = strings.TrimSpace(agent.Name)
 	agent.Description = strings.TrimSpace(agent.Description)
 	agent.Icon = strings.TrimSpace(agent.Icon)
@@ -101,7 +101,7 @@ func validPersonalJSONObject(raw json.RawMessage) bool {
 
 func (db *Database) ListPersonalAgents(ctx context.Context, userID string) ([]PersonalAgent, error) {
 	items := []PersonalAgent{}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		rows, err := tx.QueryContext(ctx, `SELECT `+personalAgentColumns+` FROM personal_agents WHERE owner_user_id=$1 AND deleted_at IS NULL ORDER BY lower(name),id`, userID)
 		if err != nil {
 			return err
@@ -121,7 +121,7 @@ func (db *Database) ListPersonalAgents(ctx context.Context, userID string) ([]Pe
 
 func (db *Database) PersonalAgentByID(ctx context.Context, userID, agentID string) (*PersonalAgent, error) {
 	out := &PersonalAgent{}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		err := scanPersonalAgent(tx.QueryRowContext(ctx, `SELECT `+personalAgentColumns+` FROM personal_agents WHERE id=$1 AND owner_user_id=$2 AND deleted_at IS NULL`, agentID, userID), out)
 		if errors.Is(err, sql.ErrNoRows) {
 			return ErrPersonalAgentNotFound
@@ -134,13 +134,13 @@ func (db *Database) PersonalAgentByID(ctx context.Context, userID, agentID strin
 func (db *Database) CreatePersonalAgent(ctx context.Context, userID string, item PersonalAgent) (*PersonalAgent, error) {
 	item.OwnerUserID = userID
 	item.ID = "personal_" + uuid.NewString()
-	if err := normalizePersonalAgent(&item); err != nil {
+	if err := TestingNormalizePersonalAgent(&item); err != nil {
 		return nil, err
 	}
 	if !item.Enabled {
 		item.Enabled = true
 	}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		return scanPersonalAgent(tx.QueryRowContext(ctx, `INSERT INTO personal_agents(id,owner_user_id,name,description,icon,instructions,model_mode,model_id,reasoning_effort,context_permissions,tool_permissions,enabled)
 			VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING `+personalAgentColumns,
 			item.ID, userID, item.Name, item.Description, item.Icon, item.Instructions, item.ModelMode, item.ModelID, item.ReasoningEffort, item.ContextPermissions, item.ToolPermissions, item.Enabled), &item)
@@ -152,10 +152,10 @@ func (db *Database) UpdatePersonalAgent(ctx context.Context, userID string, item
 	if item.ID == "" || item.Version < 1 {
 		return nil, ErrSpaceInvalid
 	}
-	if err := normalizePersonalAgent(&item); err != nil {
+	if err := TestingNormalizePersonalAgent(&item); err != nil {
 		return nil, err
 	}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		err := scanPersonalAgent(tx.QueryRowContext(ctx, `UPDATE personal_agents SET name=$1,description=$2,icon=$3,instructions=$4,model_mode=$5,model_id=$6,reasoning_effort=$7,context_permissions=$8,tool_permissions=$9,enabled=$10,version=version+1,updated_at=NOW()
 			WHERE id=$11 AND owner_user_id=$12 AND version=$13 AND deleted_at IS NULL RETURNING `+personalAgentColumns,
 			item.Name, item.Description, item.Icon, item.Instructions, item.ModelMode, item.ModelID, item.ReasoningEffort, item.ContextPermissions, item.ToolPermissions, item.Enabled, item.ID, userID, item.Version), &item)
@@ -175,7 +175,7 @@ func (db *Database) UpdatePersonalAgent(ctx context.Context, userID string, item
 }
 
 func (db *Database) DeletePersonalAgent(ctx context.Context, userID, agentID string) error {
-	return db.spaceTx(ctx, func(tx *sql.Tx) error {
+	return db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		result, err := tx.ExecContext(ctx, `UPDATE personal_agents SET enabled=FALSE,deleted_at=NOW(),version=version+1,updated_at=NOW() WHERE id=$1 AND owner_user_id=$2 AND deleted_at IS NULL`, agentID, userID)
 		if err != nil {
 			return err
@@ -193,7 +193,7 @@ func (db *Database) DeletePersonalAgent(ctx context.Context, userID, agentID str
 
 func (db *Database) PersonalAgentGrants(ctx context.Context, userID, agentID string) ([]PersonalAgentSpaceGrant, error) {
 	items := []PersonalAgentSpaceGrant{}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		var owner string
 		if err := tx.QueryRowContext(ctx, `SELECT owner_user_id FROM personal_agents WHERE id=$1 AND deleted_at IS NULL`, agentID).Scan(&owner); errors.Is(err, sql.ErrNoRows) {
 			return ErrPersonalAgentNotFound

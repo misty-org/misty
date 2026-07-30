@@ -217,7 +217,7 @@ type ExpiredLibraryUpload struct {
 
 func (db *Database) HasSpacePermission(ctx context.Context, userID, spaceID, permission string) (bool, error) {
 	allowed := false
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		var err error
 		allowed, err = hasSpacePermissionTx(ctx, tx, userID, spaceID, permission)
 		return err

@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-func resolveNodeInput(definition Definition, node Node, runInput json.RawMessage, outputs map[string]json.RawMessage, partials, skipped map[string]bool) (json.RawMessage, error) {
+func TestingResolveNodeInput(definition Definition, node Node, runInput json.RawMessage, outputs map[string]json.RawMessage, partials, skipped map[string]bool) (json.RawMessage, error) {
 	value := map[string]any{}
 	for name, binding := range node.Inputs {
 		switch {

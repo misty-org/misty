@@ -117,7 +117,7 @@ func (s *SpacesService) executeOutboundHTTPNode(ctx context.Context, run *db.Spa
 				return nil, resolveErr
 			}
 			for _, candidate := range ips {
-				if isPublicWorkflowIP(candidate.IP) {
+				if TestingIsPublicWorkflowIP(candidate.IP) {
 					return (&net.Dialer{Timeout: 8 * time.Second}).DialContext(dialCtx, network, net.JoinHostPort(candidate.IP.String(), port))
 				}
 			}
@@ -162,7 +162,7 @@ func (s *SpacesService) executeOutboundHTTPNode(ctx context.Context, run *db.Spa
 		}
 	}
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		return mustAPIRawJSON(result), fmt.Errorf("HTTP request returned %s", response.Status)
+		return TestingMustAPIRawJSON(result), fmt.Errorf("HTTP request returned %s", response.Status)
 	}
-	return mustAPIRawJSON(result), nil
+	return TestingMustAPIRawJSON(result), nil
 }

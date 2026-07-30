@@ -15,7 +15,7 @@ func (db *Database) UpdateLibraryMemoryPreference(ctx context.Context, userID, s
 		return ErrLibraryInvalid
 	}
 	start, _ := time.Parse("2006-01", memoryID)
-	return db.spaceTx(ctx, func(tx *sql.Tx) error {
+	return db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionLibraryEdit); err != nil {
 			return err
 		}
@@ -64,7 +64,7 @@ func (db *Database) LibraryDiscoveryItems(ctx context.Context, userID, spaceID, 
 		return nil, ErrLibraryInvalid
 	}
 	items := []SpaceLibraryItem{}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionLibraryView); err != nil {
 			return err
 		}
@@ -170,7 +170,7 @@ func (db *Database) MergeLibraryDuplicates(ctx context.Context, userID, spaceID 
 		versions[item.ID], ids = item.Version, append(ids, item.ID)
 	}
 	duplicateIDs := ids[1:]
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionLibraryEdit); err != nil {
 			return err
 		}

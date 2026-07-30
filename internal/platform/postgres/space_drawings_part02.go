@@ -12,12 +12,12 @@ func (db *Database) RenameSpaceDrawing(
 	ctx context.Context,
 	userID, drawingID, title string,
 ) (*SpaceDrawing, error) {
-	title, err := normalizeDrawingTitle(title)
+	title, err := TestingNormalizeDrawingTitle(title)
 	if err != nil {
 		return nil, err
 	}
 	drawing := &SpaceDrawing{}
-	err = db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err = db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		access, err := drawingAccessForTx(ctx, tx, userID, drawingID)
 		if err != nil {
 			return err
@@ -62,7 +62,7 @@ func (db *Database) DeleteSpaceDrawing(
 	ctx context.Context,
 	userID, drawingID string,
 ) error {
-	return db.spaceTx(ctx, func(tx *sql.Tx) error {
+	return db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		access, err := drawingAccessForTx(ctx, tx, userID, drawingID)
 		if err != nil {
 			return err

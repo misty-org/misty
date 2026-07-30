@@ -78,7 +78,7 @@ func (s *SpacesService) publishTaskToGoogle(ctx context.Context, userID, spaceID
 	if err != nil {
 		return nil, err
 	}
-	payload := googleEventPayload(*schedule)
+	payload := TestingGoogleEventPayload(*schedule)
 	endpoint := "https://www.googleapis.com/calendar/v3/calendars/" + url.PathEscape(source.ExternalCalendarID) + "/events"
 	method := http.MethodPost
 	if link.GoogleEventID != "" {
@@ -109,7 +109,7 @@ func (s *SpacesService) publishTaskToGoogle(ctx context.Context, userID, spaceID
 //
 // Google's all-day `end.date` is exclusive, so a single-day task must send the
 // following day or the event renders as zero-length.
-func googleEventPayload(schedule db.TaskSchedule) map[string]any {
+func TestingGoogleEventPayload(schedule db.TaskSchedule) map[string]any {
 	summary := strings.TrimSpace(schedule.Title)
 	if summary == "" {
 		summary = "Untitled"
@@ -118,8 +118,8 @@ func googleEventPayload(schedule db.TaskSchedule) map[string]any {
 		"summary": summary, "description": schedule.Description, "location": schedule.Location,
 	}
 	if schedule.AllDay {
-		start := dateOnly(schedule.StartsAt)
-		end := dateOnly(schedule.EndsAt)
+		start := TestingDateOnly(schedule.StartsAt)
+		end := TestingDateOnly(schedule.EndsAt)
 		if end == "" || end == start {
 			end = nextCalendarDay(start)
 		}
@@ -136,7 +136,7 @@ func googleEventPayload(schedule db.TaskSchedule) map[string]any {
 	return payload
 }
 
-func dateOnly(value string) string {
+func TestingDateOnly(value string) string {
 	value = strings.TrimSpace(value)
 	if len(value) == 10 {
 		return value
@@ -157,7 +157,7 @@ func nextCalendarDay(date string) string {
 
 // validateTaskSchedule rejects a schedule Google would refuse, before any write
 // leaves Misty.
-func validateTaskSchedule(schedule *db.TaskSchedule, fallbackTimezone string) error {
+func TestingValidateTaskSchedule(schedule *db.TaskSchedule, fallbackTimezone string) error {
 	schedule.Title = strings.TrimSpace(schedule.Title)
 	schedule.Timezone = strings.TrimSpace(schedule.Timezone)
 	if schedule.Timezone == "" {

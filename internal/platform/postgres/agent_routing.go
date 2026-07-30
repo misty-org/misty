@@ -43,7 +43,7 @@ type RoutingDecision struct {
 
 func (db *Database) DiscoverAgentCatalog(ctx context.Context, userID string) ([]AgentCatalogEntry, error) {
 	items := []AgentCatalogEntry{}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		rows, err := tx.QueryContext(ctx, `SELECT a.id,v.name,v.description,v.icon,a.status,a.runtime_kind,a.space_id,s.name,v.id,a.creator_user_id,v.access_policy
 			FROM space_agents a JOIN spaces s ON s.id=a.space_id LEFT JOIN space_agent_instances i ON i.agent_id=a.id AND i.user_id=$1 JOIN space_agent_versions v ON v.id=COALESCE(i.agent_version_id,a.published_agent_version_id)
 			JOIN space_members m ON m.space_id=a.space_id AND m.user_id=$1
@@ -121,7 +121,7 @@ func (db *Database) RouteAgentRequest(ctx context.Context, userID, prompt, reque
 		option RoutingOption
 		score  int
 	}
-	words := routingWords(prompt)
+	words := TestingRoutingWords(prompt)
 	candidates := []scored{}
 	for _, agent := range catalog {
 		if requestedSpaceID != "" && agent.SpaceID != requestedSpaceID || requestedAgentID != "" && agent.AgentID != requestedAgentID {
@@ -144,7 +144,7 @@ func (db *Database) RouteAgentRequest(ctx context.Context, userID, prompt, reque
 			if strings.Contains(strings.ToLower(prompt), strings.ToLower(agent.SpaceName)) {
 				score += 30
 			}
-			score += routingScore(words, capability)
+			score += TestingRoutingScore(words, capability)
 			candidates = append(candidates, scored{option: RoutingOption{SpaceID: agent.SpaceID, SpaceName: agent.SpaceName, AgentID: agent.AgentID, AgentName: agent.AgentName, CapabilityID: capability.ID, CapabilityName: capability.Name}, score: score})
 		}
 	}
@@ -175,7 +175,7 @@ func (db *Database) RouteAgentRequest(ctx context.Context, userID, prompt, reque
 	return &RoutingDecision{Selected: &candidates[0].option, Options: []RoutingOption{}, Reason: "Matched structured workflow capability metadata."}, nil
 }
 
-func routingWords(value string) map[string]bool {
+func TestingRoutingWords(value string) map[string]bool {
 	words := map[string]bool{}
 	for _, field := range strings.FieldsFunc(strings.ToLower(value), func(character rune) bool {
 		return !(character >= 'a' && character <= 'z' || character >= '0' && character <= '9')
@@ -187,12 +187,12 @@ func routingWords(value string) map[string]bool {
 	return words
 }
 
-func routingScore(words map[string]bool, capability WorkflowCapability) int {
+func TestingRoutingScore(words map[string]bool, capability WorkflowCapability) int {
 	values := []string{capability.ID, capability.Name, capability.Description}
 	values = append(values, capability.Tags...)
 	score := 0
 	for _, value := range values {
-		for word := range routingWords(value) {
+		for word := range TestingRoutingWords(value) {
 			if words[word] {
 				score++
 			}

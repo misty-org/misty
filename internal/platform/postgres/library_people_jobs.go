@@ -37,7 +37,7 @@ func (db *Database) ClaimLibraryPeopleJob(ctx context.Context, workerID string, 
 		return nil, ErrLibraryInvalid
 	}
 	out := &LibraryPeopleJob{LeaseToken: "lease_" + uuid.NewString()}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		return tx.QueryRowContext(ctx, `WITH candidate AS (
 			SELECT id FROM library_processing_jobs WHERE job_kind='faces' AND state='queued' AND available_at<=NOW() ORDER BY priority DESC,created_at FOR UPDATE SKIP LOCKED LIMIT 1
 		), claimed AS (
@@ -61,7 +61,7 @@ func (db *Database) CompleteLibraryPeopleJob(ctx context.Context, job *LibraryPe
 			return ErrLibraryInvalid
 		}
 	}
-	return db.spaceTx(ctx, func(tx *sql.Tx) error {
+	return db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		var facesEnabled, petsEnabled bool
 		if err := tx.QueryRowContext(ctx, `SELECT faces_enabled,pets_enabled FROM space_library_intelligence_policies WHERE space_id=$1`, job.SpaceID).Scan(&facesEnabled, &petsEnabled); err != nil {
 			return err
@@ -120,7 +120,7 @@ func (db *Database) FailLibraryPeopleJob(ctx context.Context, job *LibraryPeople
 	if job == nil || job.ID == "" || job.LeaseToken == "" || code == "" {
 		return ErrLibraryInvalid
 	}
-	return db.spaceTx(ctx, func(tx *sql.Tx) error {
+	return db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		_, err := tx.ExecContext(ctx, `UPDATE library_processing_jobs SET state=CASE WHEN attempt_count>=max_attempts THEN 'dead' ELSE 'queued' END,error_code=$1,available_at=NOW()+make_interval(secs=>LEAST(300,attempt_count*attempt_count*5)),lease_token=NULL,lease_owner=NULL,lease_expires_at=NULL,updated_at=NOW() WHERE id=$2 AND lease_token=$3 AND state IN ('leased','running')`, code, job.ID, job.LeaseToken)
 		return err
 	})

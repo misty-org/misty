@@ -63,7 +63,7 @@ type InstanceWorkflowConfig struct {
 
 func (db *Database) PublishAgentVersion(ctx context.Context, userID, spaceID, agentID string, workflows []AgentVersionWorkflow) (*PublishedAgentVersion, error) {
 	out := &PublishedAgentVersion{ID: "agentver_" + uuid.NewString(), AgentID: agentID, SpaceID: spaceID, CreatorID: userID, Workflows: workflows}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		var accessRaw []byte
 		if err := tx.QueryRowContext(ctx, `SELECT name,description,icon,instructions,access_policy FROM space_agents WHERE id=$1 AND space_id=$2 AND creator_user_id=$3`, agentID, spaceID, userID).Scan(&out.Name, &out.Description, &out.Icon, &out.Instructions, &accessRaw); err != nil {
 			return err
@@ -134,7 +134,7 @@ func validAgentAccess(access workflowv2.AgentAccessPolicy) bool {
 
 func (db *Database) EnsureAgentInstance(ctx context.Context, userID, spaceID, agentID string) (*AgentInstanceRecord, error) {
 	out := &AgentInstanceRecord{ConnectionBindings: map[string]string{}, CapabilityGrants: json.RawMessage(`[]`)}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionAgentsRun); err != nil {
 			return err
 		}

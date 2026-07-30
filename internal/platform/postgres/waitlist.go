@@ -19,7 +19,7 @@ func (db *Database) CreateWaitlistSignup(name, email string) (bool, error) {
 	normalizedEmail := normalizeEmail(email)
 
 	var rowsAffected int64
-	err := db.withRLSContext(context.Background(), waitlistRLSSettings(normalizedEmail), func(tx *sql.Tx) error {
+	err := db.TestingWithRLSContext(context.Background(), waitlistRLSSettings(normalizedEmail), func(tx *sql.Tx) error {
 		result, err := tx.ExecContext(
 			context.Background(),
 			`INSERT INTO waitlist_signups (id, name, email) VALUES ($1, $2, $3)

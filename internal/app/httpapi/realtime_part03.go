@@ -5,7 +5,7 @@ func (s *RealtimeService) ViewerSpaceCount() int {
 	if s == nil {
 		return 0
 	}
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	return len(s.viewers)
+	s.TestingMu.RLock()
+	defer s.TestingMu.RUnlock()
+	return len(s.TestingViewers)
 }

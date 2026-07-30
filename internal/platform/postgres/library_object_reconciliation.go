@@ -27,7 +27,7 @@ func (db *Database) LibraryObjectExpectations(
 	if len(objectKeys) == 0 {
 		return out, nil
 	}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		rows, err := tx.QueryContext(ctx, `
 			SELECT r2_object_key,byte_size,sha256,'blob'
 			FROM library_blobs
@@ -75,7 +75,7 @@ func (db *Database) LibraryReadyBlobExpectations(
 		limit = 250
 	}
 	out := make([]LibraryObjectExpectation, 0, limit)
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		rows, err := tx.QueryContext(ctx, `
 			SELECT r2_object_key,byte_size,sha256
 			FROM library_blobs
@@ -109,7 +109,7 @@ func (db *Database) LibraryInterruptedFinalizations(
 		limit = 250
 	}
 	out := make([]LibraryObjectExpectation, 0, limit)
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		rows, err := tx.QueryContext(ctx, `
 			SELECT object_key,requested_byte_size,client_sha256
 			FROM space_library_uploads

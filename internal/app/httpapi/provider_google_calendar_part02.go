@@ -47,7 +47,7 @@ func parseGoogleEventTimes(start, end googleEventTime, fallbackTimezone string) 
 func (s *SpacesService) createGoogleCalendarWatch(ctx context.Context, source *db.SpaceCalendarSource, token, tokenType, syncToken string) error {
 	channelID, channelToken := "gcal_"+randomProviderValue(24), randomProviderValue(32)
 	expiresAt := time.Now().UTC().Add(6 * 24 * time.Hour)
-	body := map[string]any{"id": channelID, "type": "web_hook", "address": providerInfrastructureURL("google", "calendar"), "token": channelToken, "expiration": expiresAt.UnixMilli()}
+	body := map[string]any{"id": channelID, "type": "web_hook", "address": TestingProviderInfrastructureURL("google", "calendar"), "token": channelToken, "expiration": expiresAt.UnixMilli()}
 	endpoint := "https://www.googleapis.com/calendar/v3/calendars/" + url.PathEscape(source.ExternalCalendarID) + "/events/watch"
 	payload, err := googleCalendarRequest(ctx, token, tokenType, http.MethodPost, endpoint, body)
 	if err != nil {
@@ -143,7 +143,7 @@ func googleCalendarRequest(ctx context.Context, token, tokenType, method, endpoi
 	return payload, nil
 }
 
-func providerInfrastructureURL(parts ...string) string {
+func TestingProviderInfrastructureURL(parts ...string) string {
 	base := configuredPublicAPIBase()
 	if base == "" {
 		base = "http://127.0.0.1:8080/api"

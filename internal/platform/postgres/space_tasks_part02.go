@@ -11,7 +11,7 @@ import (
 	"github.com/google/uuid"
 )
 
-func decodeTaskCursor(cursor string) (int, error) {
+func TestingDecodeTaskCursor(cursor string) (int, error) {
 	if cursor == "" {
 		return 0, nil
 	}
@@ -36,11 +36,11 @@ func (db *Database) CreateSpaceTask(ctx context.Context, actorUserID string, ite
 	if item.CreatedByUserID == "" && item.CreatedByAgentID == "" {
 		item.CreatedByUserID = actorUserID
 	}
-	if err := validateSpaceTask(&item); err != nil {
+	if err := TestingValidateSpaceTask(&item); err != nil {
 		return nil, err
 	}
 	out := &SpaceTask{}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, actorUserID, item.SpaceID, PermissionTasksManage); err != nil {
 			return err
 		}
@@ -106,11 +106,11 @@ func (db *Database) UpdateSpaceTask(ctx context.Context, actorUserID string, ite
 	if item.ID == "" || item.SpaceID == "" || item.Version < 1 {
 		return nil, ErrSpaceInvalid
 	}
-	if err := validateSpaceTask(&item); err != nil {
+	if err := TestingValidateSpaceTask(&item); err != nil {
 		return nil, err
 	}
 	out := &SpaceTask{}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, actorUserID, item.SpaceID, PermissionTasksManage); err != nil {
 			return err
 		}
@@ -152,7 +152,7 @@ func (db *Database) MoveSpaceTask(ctx context.Context, actorUserID, spaceID, tas
 		return nil, ErrSpaceInvalid
 	}
 	result := &SpaceTaskMoveResult{Reordered: []SpaceTask{}}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, actorUserID, spaceID, PermissionTasksManage); err != nil {
 			return err
 		}

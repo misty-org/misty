@@ -28,7 +28,7 @@ func (db *Database) PersonalAgentSpaceContextForConversation(ctx context.Context
 		allowed["task_notes"] = true
 	}
 	parts := []string{}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		// Membership is the entry gate, not messages.read. This used to require
 		// messages.read for the whole function, so a member with Library and
 		// Tasks access but no chat access received zero Space context -- not even
@@ -191,7 +191,7 @@ func (db *Database) AppendPersonalAgentMemory(ctx context.Context, userID, space
 		return nil
 	}
 	event, _ := json.Marshal(map[string]any{"prompt": prompt, "response": response, "created_at": time.Now().UTC()})
-	return db.spaceTx(ctx, func(tx *sql.Tx) error {
+	return db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if _, err := personalAgentAllowedTx(ctx, tx, userID, spaceID, agentID); err != nil {
 			return err
 		}
@@ -213,7 +213,7 @@ func (db *Database) PersonalAgentMemoryContext(ctx context.Context, userID, spac
 		Created  time.Time `json:"created_at"`
 	}
 	events := []memoryEvent{}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if _, err := personalAgentAllowedTx(ctx, tx, userID, spaceID, agentID); err != nil {
 			return err
 		}

@@ -22,11 +22,11 @@ func (db *Database) CreateSpaceWithTemplateIdempotent(
 	if err != nil {
 		return nil, err
 	}
-	template, ok := templateByID(templateID)
+	template, ok := TestingTemplateByID(templateID)
 	if !ok {
 		return nil, ErrSpaceInvalid
 	}
-	providers, err = normalizeSetupProviders(providers)
+	providers, err = TestingNormalizeSetupProviders(providers)
 	if err != nil {
 		return nil, err
 	}
@@ -49,7 +49,7 @@ func (db *Database) CreateSpaceWithTemplateIdempotent(
 	fingerprintDigest := sha256.Sum256(fingerprintInput)
 	fingerprint := hex.EncodeToString(fingerprintDigest[:])
 	existingSpaceID := ""
-	err = db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err = db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if idempotencyKey != "" {
 			if _, err := tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock(hashtext($1))`,
 				"spaces:create:"+userID+":"+idempotencyKey); err != nil {
@@ -169,7 +169,7 @@ func jsonNumber(value int) string {
 
 func (db *Database) SpaceSetup(ctx context.Context, userID, spaceID string) (*SpaceSetup, error) {
 	setup := &SpaceSetup{SelectedProviders: []string{}, CompletedProviders: []string{}, PendingProviders: []string{}}
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if _, err := requireSpaceMemberTx(ctx, tx, spaceID, userID); err != nil {
 			return err
 		}
@@ -196,13 +196,13 @@ func (db *Database) SpaceSetup(ctx context.Context, userID, spaceID string) (*Sp
 }
 
 func (db *Database) SetSpaceSetupProviderStatus(ctx context.Context, userID, spaceID, provider, status string) error {
-	if _, err := normalizeSetupProviders([]string{provider}); err != nil {
+	if _, err := TestingNormalizeSetupProviders([]string{provider}); err != nil {
 		return err
 	}
 	if status != "selected" && status != "authorized" && status != "configured" && status != "skipped" {
 		return ErrSpaceInvalid
 	}
-	return db.spaceTx(ctx, func(tx *sql.Tx) error {
+	return db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpaceOwnerTx(ctx, tx, spaceID, userID); err != nil {
 			return err
 		}

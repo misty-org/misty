@@ -22,7 +22,7 @@ var (
 	sha256Pattern            = regexp.MustCompile(`^[0-9a-f]{64}$`)
 )
 
-const librarySHA256MetadataKey = "misty-library-sha256"
+const TestingLibrarySHA256MetadataKey = "misty-library-sha256"
 
 func isLoopbackLibraryHost(host string) bool {
 	return strings.EqualFold(host, "localhost") || net.ParseIP(host) != nil && net.ParseIP(host).IsLoopback()

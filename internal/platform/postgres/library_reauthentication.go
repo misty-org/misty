@@ -16,7 +16,7 @@ func (db *Database) VerifyUserPassword(ctx context.Context, userID, password str
 		return false, nil
 	}
 	var hash string
-	err := db.withRLSContext(ctx, userRLSSettings(userID), func(tx *sql.Tx) error {
+	err := db.TestingWithRLSContext(ctx, userRLSSettings(userID), func(tx *sql.Tx) error {
 		return tx.QueryRowContext(ctx, `SELECT password_hash FROM users WHERE id=$1`, userID).Scan(&hash)
 	})
 	if errors.Is(err, sql.ErrNoRows) {
@@ -34,7 +34,7 @@ func (db *Database) CreateLibraryReauthenticationGrant(ctx context.Context, user
 		return time.Time{}, ErrLibraryInvalid
 	}
 	expiresAt := time.Now().Add(lifetime).UTC()
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionLibraryView); err != nil {
 			return err
 		}
@@ -53,7 +53,7 @@ func (db *Database) ValidateLibraryReauthenticationGrant(ctx context.Context, us
 	if tokenHash == "" {
 		return ErrLibraryReauthentication
 	}
-	return db.spaceTx(ctx, func(tx *sql.Tx) error {
+	return db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionLibraryView); err != nil {
 			return err
 		}
@@ -72,7 +72,7 @@ func (db *Database) RecordLibraryReauthenticationDenied(ctx context.Context, use
 	if !map[string]bool{"hidden": true, "recently_deleted": true, "bulk_export": true}[scope] {
 		scope = "invalid"
 	}
-	return db.spaceTx(ctx, func(tx *sql.Tx) error {
+	return db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionLibraryView); err != nil {
 			return err
 		}
@@ -82,7 +82,7 @@ func (db *Database) RecordLibraryReauthenticationDenied(ctx context.Context, use
 
 func (db *Database) SensitiveLibraryItemScope(ctx context.Context, userID, spaceID, itemID string) (string, error) {
 	scope := ""
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionLibraryView); err != nil {
 			return err
 		}
@@ -106,7 +106,7 @@ func (db *Database) SensitiveLibraryItemScope(ctx context.Context, userID, space
 
 func (db *Database) SensitiveLibraryAssetStackScope(ctx context.Context, userID, spaceID, stackID string) (string, error) {
 	scope := ""
-	err := db.spaceTx(ctx, func(tx *sql.Tx) error {
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionLibraryView); err != nil {
 			return err
 		}

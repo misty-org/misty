@@ -211,7 +211,7 @@ func (s *SpacesService) revokeProviderCredential(
 	if token == "" {
 		return "no_token_local_revocation", nil
 	}
-	if err := postProviderRevocation(
+	if err := TestingPostProviderRevocation(
 		ctx, "https://oauth2.googleapis.com/revoke",
 		url.Values{"token": {token}}, "",
 	); err != nil {

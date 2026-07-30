@@ -13,7 +13,7 @@ import (
 )
 
 // mirrorDiscordMessage writes one Discord message into the linked Space.
-func (s *SpacesService) mirrorDiscordMessage(ctx context.Context, link db.SpaceDiscordLink, message discordMessage) (*db.SpaceMessage, error) {
+func (s *SpacesService) mirrorDiscordMessage(ctx context.Context, link db.SpaceDiscordLink, message TestingDiscordMessage) (*db.SpaceMessage, error) {
 	labels := map[string]string{}
 	for _, mention := range message.Mentions {
 		name := strings.TrimSpace(mention.GlobalName)
@@ -22,10 +22,10 @@ func (s *SpacesService) mirrorDiscordMessage(ctx context.Context, link db.SpaceD
 		}
 		labels[mention.ID] = name
 	}
-	content := discordContentToSpans(message, labels)
+	content := TestingDiscordContentToSpans(message, labels)
 	origin := db.MessageOrigin{
 		System: "discord", ExternalID: message.ID, ExternalChannelID: message.ChannelID,
-		AuthorName: discordDisplayName(message), AuthorHandle: message.Author.Username,
+		AuthorName: TestingDiscordDisplayName(message), AuthorHandle: message.Author.Username,
 		AuthoredAt: message.Timestamp,
 	}
 	if message.Author.Avatar != "" {
@@ -39,7 +39,7 @@ func (s *SpacesService) mirrorDiscordMessage(ctx context.Context, link db.SpaceD
 
 // discordContentToSpans rewrites Discord's id-based mention tokens into text a
 // person can read, rather than leaking `<@980…>` into the transcript.
-func discordContentToSpans(message discordMessage, labels map[string]string) []db.MessageSpan {
+func TestingDiscordContentToSpans(message TestingDiscordMessage, labels map[string]string) []db.MessageSpan {
 	text := message.Content
 	replaceMention := func(pattern *regexp.Regexp, prefix string) {
 		text = pattern.ReplaceAllStringFunc(text, func(token string) string {
@@ -72,16 +72,16 @@ func discordContentToSpans(message discordMessage, labels map[string]string) []d
 	// Misty caps a message at 4000 characters. A Discord message plus its
 	// attachment summary can exceed that, and a rejected insert would drop the
 	// message entirely — trimming keeps the transcript complete.
-	if runes := []rune(text); len(runes) > mistyMessageCharLimit {
-		text = string(runes[:mistyMessageCharLimit-1]) + "…"
+	if runes := []rune(text); len(runes) > TestingMistyMessageCharLimit {
+		text = string(runes[:TestingMistyMessageCharLimit-1]) + "…"
 	}
 	return []db.MessageSpan{{Type: "text", Text: text}}
 }
 
 // Mirrors db.MaxMessageChars, which mirrored content must also respect.
-const mistyMessageCharLimit = 4000
+const TestingMistyMessageCharLimit = 4000
 
-func discordDisplayName(message discordMessage) string {
+func TestingDiscordDisplayName(message TestingDiscordMessage) string {
 	if name := strings.TrimSpace(message.Author.GlobalName); name != "" {
 		return name
 	}
@@ -93,7 +93,7 @@ func discordDisplayName(message discordMessage) string {
 
 // snowflakeAfter compares Discord ids numerically. A plain string comparison
 // would order "9" after "10" and silently rewind the cursor.
-func snowflakeAfter(candidate, reference string) bool {
+func TestingSnowflakeAfter(candidate, reference string) bool {
 	if reference == "" {
 		return true
 	}

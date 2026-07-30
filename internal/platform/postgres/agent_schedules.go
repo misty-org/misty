@@ -37,7 +37,7 @@ func (db *Database) ClaimDueAgentWorkflowSchedules(ctx context.Context, now time
 		updatedAt                                               time.Time
 	}
 	claimed := []DueAgentWorkflowSchedule{}
-	err := db.withRLSContext(ctx, serviceRLSSettings(), func(tx *sql.Tx) error {
+	err := db.TestingWithRLSContext(ctx, TestingServiceRLSSettings(), func(tx *sql.Tx) error {
 		rows, err := tx.QueryContext(ctx, `SELECT i.id,i.user_id,i.space_id,i.agent_id,w.workflow_version_id,w.trigger_config,w.cursor,w.updated_at
 			FROM space_agent_instance_workflows w JOIN space_agent_instances i ON i.id=w.instance_id
 			WHERE w.enabled AND w.consent->>'granted'='true' AND w.trigger_config->>'kind'='cron'
@@ -76,7 +76,7 @@ func (db *Database) ClaimDueAgentWorkflowSchedules(ctx context.Context, now time
 			if !cursor.LastScheduledAt.IsZero() {
 				baseline = cursor.LastScheduledAt
 			}
-			due, ok := nextAgentSchedule(config.Expression, config.Timezone, baseline, now)
+			due, ok := TestingNextAgentSchedule(config.Expression, config.Timezone, baseline, now)
 			if !ok {
 				continue
 			}
@@ -104,7 +104,7 @@ func (db *Database) FinishWorkflowEventClaim(ctx context.Context, instanceID, wo
 	if state != "completed" && state != "failed" {
 		return ErrSpaceInvalid
 	}
-	return db.withRLSContext(ctx, serviceRLSSettings(), func(tx *sql.Tx) error {
+	return db.TestingWithRLSContext(ctx, TestingServiceRLSSettings(), func(tx *sql.Tx) error {
 		result, err := tx.ExecContext(ctx, `UPDATE space_workflow_event_claims SET state=$1,run_id=NULLIF($2,''),updated_at=NOW()
 			WHERE instance_id=$3 AND workflow_version_id=$4 AND provider=$5 AND event_id=$6 AND state='claimed'`, state, runID, instanceID, workflowVersionID, provider, eventID)
 		if err != nil {
@@ -119,7 +119,7 @@ func (db *Database) FinishWorkflowEventClaim(ctx context.Context, instanceID, wo
 }
 
 func (db *Database) BindWorkflowEventClaim(ctx context.Context, instanceID, workflowVersionID, provider, eventID, runID string) error {
-	return db.withRLSContext(ctx, serviceRLSSettings(), func(tx *sql.Tx) error {
+	return db.TestingWithRLSContext(ctx, TestingServiceRLSSettings(), func(tx *sql.Tx) error {
 		result, err := tx.ExecContext(ctx, `UPDATE space_workflow_event_claims SET run_id=$1,updated_at=NOW()
 			WHERE instance_id=$2 AND workflow_version_id=$3 AND provider=$4 AND event_id=$5 AND state='claimed'`, runID, instanceID, workflowVersionID, provider, eventID)
 		if err != nil {
@@ -137,13 +137,13 @@ func (db *Database) FinalizeWorkflowEventClaimsForRun(ctx context.Context, runID
 	if state != "completed" && state != "failed" {
 		return ErrSpaceInvalid
 	}
-	return db.withRLSContext(ctx, serviceRLSSettings(), func(tx *sql.Tx) error {
+	return db.TestingWithRLSContext(ctx, TestingServiceRLSSettings(), func(tx *sql.Tx) error {
 		_, err := tx.ExecContext(ctx, `UPDATE space_workflow_event_claims SET state=$1,updated_at=NOW() WHERE run_id=$2 AND state='claimed'`, state, runID)
 		return err
 	})
 }
 
-func nextAgentSchedule(expression, timezone string, baseline, now time.Time) (time.Time, bool) {
+func TestingNextAgentSchedule(expression, timezone string, baseline, now time.Time) (time.Time, bool) {
 	location, err := time.LoadLocation(strings.TrimSpace(timezone))
 	if err != nil || strings.TrimSpace(timezone) == "" || timezone == "local" {
 		return time.Time{}, false
@@ -156,7 +156,7 @@ func nextAgentSchedule(expression, timezone string, baseline, now time.Time) (ti
 	return next, !next.After(now.In(location))
 }
 
-func agentScheduleDue(expression string, baseline, now time.Time) bool {
+func TestingAgentScheduleDue(expression string, baseline, now time.Time) bool {
 	spec, err := standardAgentCronParser.Parse(expression)
 	return err == nil && !spec.Next(baseline).After(now)
 }
