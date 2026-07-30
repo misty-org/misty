@@ -17,7 +17,7 @@ concurrency:
 
 jobs:
   secrets:
-    name: Secret scan
+    name: Security checks
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -31,7 +31,7 @@ jobs:
           detect --source=/repo --no-git --redact --config=/repo/.gitleaks.toml
 
   backend:
-    name: Go and PostgreSQL
+    name: API and database checks
     runs-on: ubuntu-latest
     timeout-minutes: 30
     services:
@@ -86,7 +86,7 @@ jobs:
         run: go test -p 1 ./... -count=1
 
   journal-worker:
-    name: Journal Worker
+    name: Collaboration Worker checks
     runs-on: ubuntu-latest
     timeout-minutes: 20
     defaults:
