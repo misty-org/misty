@@ -2,9 +2,10 @@ package api
 
 import (
 	"net/http"
-	"os"
 	"regexp"
 	"strings"
+
+	envconfig "github.com/kannachi323/misty/server/internal/platform/config"
 
 	db "github.com/kannachi323/misty/server/internal/platform/postgres"
 
@@ -24,7 +25,7 @@ var discordChannelMentionPattern = regexp.MustCompile(`<#(\d+)>`)
 
 var discordRoleMentionPattern = regexp.MustCompile(`<@&(\d+)>`)
 
-func discordBotToken() string { return strings.TrimSpace(os.Getenv("DISCORD_BOT_TOKEN")) }
+func discordBotToken() string { return strings.TrimSpace(envconfig.Getenv("DISCORD_BOT_TOKEN")) }
 
 // discordMessage is the subset of Discord's REST/Gateway message Misty reads.
 type TestingDiscordMessage struct {

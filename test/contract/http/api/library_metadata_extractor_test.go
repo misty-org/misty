@@ -9,7 +9,7 @@ import (
 	"os/exec"
 	"testing"
 
-	. "github.com/kannachi323/misty/server/internal/app/httpapi"
+	. "github.com/kannachi323/misty/server/internal/platform/httpapi"
 )
 
 func TestFFprobeLibraryMetadataExtractor(t *testing.T) {

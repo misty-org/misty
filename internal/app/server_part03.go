@@ -6,11 +6,12 @@ import (
 	"encoding/base64"
 	"fmt"
 	"net/http"
-	"os"
 	"strings"
 	"time"
 
-	api "github.com/kannachi323/misty/server/internal/app/httpapi"
+	envconfig "github.com/kannachi323/misty/server/internal/platform/config"
+
+	api "github.com/kannachi323/misty/server/internal/platform/httpapi"
 )
 
 func (s *Server) mountSpacesRoutes(prefix string, spaces *api.SpacesService, realtime *api.RealtimeService) {
@@ -172,12 +173,12 @@ func (s *Server) StartRealtime() error {
 }
 
 func spaceLinkEncryptionKeyFromEnv() (string, error) {
-	if key := strings.TrimSpace(os.Getenv("SPACE_LINK_ENCRYPTION_KEY")); key != "" {
+	if key := strings.TrimSpace(envconfig.Getenv("SPACE_LINK_ENCRYPTION_KEY")); key != "" {
 		return key, nil
 	}
-	seed := strings.TrimSpace(os.Getenv("DOCUMENT_SIGNING_KEY"))
+	seed := strings.TrimSpace(envconfig.Getenv("DOCUMENT_SIGNING_KEY"))
 	if seed == "" {
-		if strings.EqualFold(strings.TrimSpace(os.Getenv("MISTY_ENVIRONMENT")), "production") {
+		if strings.EqualFold(strings.TrimSpace(envconfig.Getenv("MISTY_ENVIRONMENT")), "production") {
 			return "", fmt.Errorf("SPACE_LINK_ENCRYPTION_KEY is required in production")
 		}
 		seed = "misty-development-space-link-key"

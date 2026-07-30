@@ -10,7 +10,7 @@ import (
 	"sync/atomic"
 	"testing"
 
-	. "github.com/kannachi323/misty/server/internal/app/httpapi"
+	. "github.com/kannachi323/misty/server/internal/platform/httpapi"
 
 	serveragent "github.com/kannachi323/misty/server/internal/agents"
 	db "github.com/kannachi323/misty/server/internal/platform/postgres"

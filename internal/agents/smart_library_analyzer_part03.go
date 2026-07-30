@@ -8,9 +8,10 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"os"
 	"strings"
 	"time"
+
+	envconfig "github.com/kannachi323/misty/server/internal/platform/config"
 )
 
 func (a *SmartLibraryAnalyzer) requestAt(ctx context.Context, url string, body any, headers map[string]string, dst any) error {
@@ -59,7 +60,7 @@ func (a *SmartLibraryAnalyzer) chatBaseURL() string {
 }
 
 func (a *SmartLibraryAnalyzer) embeddingBaseURL() string {
-	if override := strings.TrimRight(strings.TrimSpace(os.Getenv("AI_GATEWAY_EMBEDDING_BASE_URL")), "/"); override != "" {
+	if override := strings.TrimRight(strings.TrimSpace(envconfig.Getenv("AI_GATEWAY_EMBEDDING_BASE_URL")), "/"); override != "" {
 		return override
 	}
 	base := a.chatBaseURL()
@@ -73,7 +74,7 @@ func (a *SmartLibraryAnalyzer) primaryModel() string {
 	if value := strings.TrimSpace(a.PrimaryModel); value != "" {
 		return value
 	}
-	if value := strings.TrimSpace(os.Getenv("SMART_LIBRARY_PRIMARY_MODEL")); value != "" {
+	if value := strings.TrimSpace(envconfig.Getenv("SMART_LIBRARY_PRIMARY_MODEL")); value != "" {
 		return value
 	}
 	return SmartLibraryPrimaryModel
@@ -83,7 +84,7 @@ func (a *SmartLibraryAnalyzer) fallbackModel() string {
 	if value := strings.TrimSpace(a.FallbackModel); value != "" {
 		return value
 	}
-	if value := strings.TrimSpace(os.Getenv("SMART_LIBRARY_FALLBACK_MODEL")); value != "" {
+	if value := strings.TrimSpace(envconfig.Getenv("SMART_LIBRARY_FALLBACK_MODEL")); value != "" {
 		return value
 	}
 	return SmartLibraryFallbackModel
@@ -93,7 +94,7 @@ func (a *SmartLibraryAnalyzer) embeddingModel() string {
 	if value := strings.TrimSpace(a.EmbeddingModel); value != "" {
 		return value
 	}
-	if value := strings.TrimSpace(os.Getenv("SMART_LIBRARY_EMBEDDING_MODEL")); value != "" {
+	if value := strings.TrimSpace(envconfig.Getenv("SMART_LIBRARY_EMBEDDING_MODEL")); value != "" {
 		return value
 	}
 	return SmartLibraryEmbeddingModel

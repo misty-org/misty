@@ -2,9 +2,10 @@ package agent
 
 import (
 	"net/http"
-	"os"
 	"strings"
 	"time"
+
+	envconfig "github.com/kannachi323/misty/server/internal/platform/config"
 )
 
 const (
@@ -52,14 +53,14 @@ func NewAgentProviderFromEnv() ModelProvider {
 func newProviderFromEnv(providerKey, modelKey string) ModelProvider {
 	providerName := ""
 	if providerKey != "" {
-		providerName = strings.ToLower(strings.TrimSpace(os.Getenv(providerKey)))
+		providerName = strings.ToLower(strings.TrimSpace(envconfig.Getenv(providerKey)))
 	}
 	if providerName == "" {
-		providerName = strings.ToLower(strings.TrimSpace(os.Getenv("MISTY_AI_PROVIDER")))
+		providerName = strings.ToLower(strings.TrimSpace(envconfig.Getenv("MISTY_AI_PROVIDER")))
 	}
-	openAIKey := strings.TrimSpace(os.Getenv("OPENAI_API_KEY"))
+	openAIKey := strings.TrimSpace(envconfig.Getenv("OPENAI_API_KEY"))
 	geminiKey := firstEnv("GEMINI_API_KEY", "GOOGLE_API_KEY")
-	geminiAuthMode := strings.ToLower(strings.TrimSpace(os.Getenv("GEMINI_AUTH_MODE")))
+	geminiAuthMode := strings.ToLower(strings.TrimSpace(envconfig.Getenv("GEMINI_AUTH_MODE")))
 	if providerName == "" {
 		switch {
 		case openAIKey != "":
@@ -110,7 +111,7 @@ func newProviderFromEnv(providerKey, modelKey string) ModelProvider {
 
 func routeModel(modelKey, fallback string) string {
 	if modelKey != "" {
-		if value := strings.TrimSpace(os.Getenv(modelKey)); value != "" {
+		if value := strings.TrimSpace(envconfig.Getenv(modelKey)); value != "" {
 			return value
 		}
 	}
@@ -133,7 +134,7 @@ func noRedirectHTTPClient(client *http.Client) *http.Client {
 }
 
 func envOrDefault(key, fallback string) string {
-	value := strings.TrimSpace(os.Getenv(key))
+	value := strings.TrimSpace(envconfig.Getenv(key))
 	if value == "" {
 		return fallback
 	}
@@ -142,7 +143,7 @@ func envOrDefault(key, fallback string) string {
 
 func firstEnv(keys ...string) string {
 	for _, key := range keys {
-		if value := strings.TrimSpace(os.Getenv(key)); value != "" {
+		if value := strings.TrimSpace(envconfig.Getenv(key)); value != "" {
 			return value
 		}
 	}

@@ -8,9 +8,10 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"os"
 	"strings"
 	"time"
+
+	envconfig "github.com/kannachi323/misty/server/internal/platform/config"
 )
 
 // Journal collaboration tickets for notes and drawings.
@@ -58,7 +59,7 @@ func JournalCollabConfigFromEnv() (JournalCollabConfig, error) {
 	if strings.Contains(config.Host, "/") || strings.Contains(config.Host, ":") {
 		return JournalCollabConfig{}, errors.New("PARTYKIT_HOST must be a bare hostname")
 	}
-	privateKey, err := parseEd25519PrivateKey(os.Getenv("JOURNAL_COLLAB_TICKET_PRIVATE_KEY"))
+	privateKey, err := parseEd25519PrivateKey(envconfig.Getenv("JOURNAL_COLLAB_TICKET_PRIVATE_KEY"))
 	if err != nil {
 		return JournalCollabConfig{}, fmt.Errorf("JOURNAL_COLLAB_TICKET_PRIVATE_KEY: %w", err)
 	}
@@ -79,7 +80,7 @@ func JournalCollabConfigFromEnv() (JournalCollabConfig, error) {
 }
 
 func envOrDefault(name, fallback string) string {
-	if value := strings.TrimSpace(os.Getenv(name)); value != "" {
+	if value := strings.TrimSpace(envconfig.Getenv(name)); value != "" {
 		return value
 	}
 	return fallback
@@ -102,7 +103,7 @@ func parseEd25519PrivateKey(encoded string) (ed25519.PrivateKey, error) {
 }
 
 func decodeServiceSecret(name string) ([]byte, error) {
-	value := strings.TrimSpace(os.Getenv(name))
+	value := strings.TrimSpace(envconfig.Getenv(name))
 	if value == "" {
 		return nil, fmt.Errorf("%s is required for journal collaboration", name)
 	}
@@ -114,7 +115,7 @@ func decodeServiceSecret(name string) ([]byte, error) {
 }
 
 func decodeOptionalServiceSecret(name string) ([]byte, error) {
-	if strings.TrimSpace(os.Getenv(name)) == "" {
+	if strings.TrimSpace(envconfig.Getenv(name)) == "" {
 		return nil, nil
 	}
 	return decodeServiceSecret(name)

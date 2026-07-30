@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	api "github.com/kannachi323/misty/server/internal/app/httpapi"
+	api "github.com/kannachi323/misty/server/internal/platform/httpapi"
 	db "github.com/kannachi323/misty/server/internal/platform/postgres"
 )
 

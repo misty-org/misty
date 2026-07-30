@@ -3,9 +3,10 @@ package api
 import (
 	"net"
 	"net/http"
-	"os"
 	"strings"
 	"sync"
+
+	envconfig "github.com/kannachi323/misty/server/internal/platform/config"
 )
 
 // Client IP resolution for rate limiting and abuse blocking.
@@ -39,7 +40,7 @@ var (
 func trustedProxyNetworks() []*net.IPNet {
 	trustedProxyOnce.Do(func() {
 		entries := append([]string{}, defaultTrustedProxyCIDRs...)
-		if configured := strings.TrimSpace(os.Getenv("TRUSTED_PROXY_CIDRS")); configured != "" {
+		if configured := strings.TrimSpace(envconfig.Getenv("TRUSTED_PROXY_CIDRS")); configured != "" {
 			entries = append(entries, strings.Split(configured, ",")...)
 		}
 		for _, entry := range entries {
@@ -146,7 +147,7 @@ func remoteHostFromRequest(r *http.Request) string {
 }
 
 func trustProxyHeaders() bool {
-	value := strings.ToLower(strings.TrimSpace(os.Getenv("TRUST_PROXY_HEADERS")))
+	value := strings.ToLower(strings.TrimSpace(envconfig.Getenv("TRUST_PROXY_HEADERS")))
 	return value == "1" || value == "true" || value == "yes"
 }
 

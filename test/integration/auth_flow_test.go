@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"testing"
 
-	api "github.com/kannachi323/misty/server/internal/app/httpapi"
+	api "github.com/kannachi323/misty/server/internal/platform/httpapi"
 )
 
 func TestAuthLifecycle(t *testing.T) {

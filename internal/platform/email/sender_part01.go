@@ -6,9 +6,10 @@ import (
 	"html"
 	"log"
 	"net/http"
-	"os"
 	"strings"
 	"time"
+
+	envconfig "github.com/kannachi323/misty/server/internal/platform/config"
 )
 
 const defaultMailjetAPIBaseURL = "https://api.mailjet.com"
@@ -109,9 +110,9 @@ type mailjetMessageResult struct {
 }
 
 func NewSenderFromEnv() (Sender, error) {
-	apiKey := strings.TrimSpace(os.Getenv("MAILJET_API_KEY"))
-	secretKey := strings.TrimSpace(os.Getenv("MAILJET_SECRET_KEY"))
-	fromEmail := strings.TrimSpace(os.Getenv("MAILJET_FROM_EMAIL"))
+	apiKey := strings.TrimSpace(envconfig.Getenv("MAILJET_API_KEY"))
+	secretKey := strings.TrimSpace(envconfig.Getenv("MAILJET_SECRET_KEY"))
+	fromEmail := strings.TrimSpace(envconfig.Getenv("MAILJET_FROM_EMAIL"))
 
 	if apiKey == "" && secretKey == "" && fromEmail == "" {
 		return LogSender{}, nil
@@ -120,7 +121,7 @@ func NewSenderFromEnv() (Sender, error) {
 		return nil, fmt.Errorf("MAILJET_API_KEY, MAILJET_SECRET_KEY, and MAILJET_FROM_EMAIL must all be set")
 	}
 
-	apiBaseURL := strings.TrimRight(strings.TrimSpace(os.Getenv("MAILJET_API_BASE_URL")), "/")
+	apiBaseURL := strings.TrimRight(strings.TrimSpace(envconfig.Getenv("MAILJET_API_BASE_URL")), "/")
 	if apiBaseURL == "" {
 		apiBaseURL = defaultMailjetAPIBaseURL
 	}
@@ -130,7 +131,7 @@ func NewSenderFromEnv() (Sender, error) {
 		TestingApiKey:     apiKey,
 		TestingSecretKey:  secretKey,
 		TestingFromEmail:  fromEmail,
-		TestingFromName:   strings.TrimSpace(os.Getenv("MAILJET_FROM_NAME")),
+		TestingFromName:   strings.TrimSpace(envconfig.Getenv("MAILJET_FROM_NAME")),
 		TestingHttpClient: &http.Client{Timeout: 10 * time.Second},
 	}, nil
 }

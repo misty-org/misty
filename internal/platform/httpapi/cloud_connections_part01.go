@@ -7,9 +7,10 @@ import (
 	"errors"
 	"net/http"
 	"net/url"
-	"os"
 	"strings"
 	"time"
+
+	envconfig "github.com/kannachi323/misty/server/internal/platform/config"
 
 	"github.com/go-chi/chi/v5"
 	db "github.com/kannachi323/misty/server/internal/platform/postgres"
@@ -129,7 +130,7 @@ func (s *SpacesService) BeginCloudAuthorization() http.HandlerFunc {
 		}
 		clientID, clientSecret, custom := body.ClientID, body.ClientSecret, body.ClientID != ""
 		if !custom {
-			clientID, clientSecret = strings.TrimSpace(os.Getenv(definition.ClientIDEnv)), strings.TrimSpace(os.Getenv(definition.ClientSecretEnv))
+			clientID, clientSecret = strings.TrimSpace(envconfig.Getenv(definition.ClientIDEnv)), strings.TrimSpace(envconfig.Getenv(definition.ClientSecretEnv))
 		}
 		if clientID == "" || clientSecret == "" {
 			writeJSON(w, http.StatusServiceUnavailable, map[string]string{"code": "cloud_provider_not_configured"})

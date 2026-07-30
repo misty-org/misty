@@ -2,9 +2,10 @@ package agent
 
 import (
 	"encoding/json"
-	"os"
 	"strings"
 	"testing"
+
+	envconfig "github.com/kannachi323/misty/server/internal/platform/config"
 
 	. "github.com/kannachi323/misty/server/internal/agents"
 )
@@ -13,7 +14,7 @@ import (
 // real Vercel route, Misty's full JSON schema, usage parsing, tool requests, and
 // the tool-result-to-file-plan continuation used by the desktop client.
 func TestAgentGatewayLiveCapabilities(t *testing.T) {
-	if os.Getenv("MISTY_RUN_LIVE_AI_TEST") != "1" {
+	if envconfig.Getenv("MISTY_RUN_LIVE_AI_TEST") != "1" {
 		t.Skip("set MISTY_RUN_LIVE_AI_TEST=1 to exercise Vercel AI Gateway")
 	}
 	provider := TestingResolveAgentProvider(NewAgentProviderFromEnv(), TierLow)

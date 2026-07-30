@@ -12,7 +12,7 @@ import (
 	"strings"
 	"testing"
 
-	. "github.com/kannachi323/misty/server/internal/app/httpapi"
+	. "github.com/kannachi323/misty/server/internal/platform/httpapi"
 )
 
 // A half-configured deployment must fail at startup rather than at connect

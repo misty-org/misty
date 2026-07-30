@@ -9,7 +9,7 @@ import (
 
 	. "github.com/kannachi323/misty/server/internal/app"
 
-	api "github.com/kannachi323/misty/server/internal/app/httpapi"
+	api "github.com/kannachi323/misty/server/internal/platform/httpapi"
 	db "github.com/kannachi323/misty/server/internal/platform/postgres"
 )
 

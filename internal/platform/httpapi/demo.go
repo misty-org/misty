@@ -8,8 +8,9 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"os"
 	"strings"
+
+	envconfig "github.com/kannachi323/misty/server/internal/platform/config"
 
 	db "github.com/kannachi323/misty/server/internal/platform/postgres"
 )
@@ -39,15 +40,15 @@ type DemoConfig struct {
 }
 
 func DemoConfigFromEnv() DemoConfig {
-	storageName := strings.TrimSpace(os.Getenv("MISTY_LIBRARY_LOCAL_DIR"))
-	if strings.TrimSpace(os.Getenv("MISTY_DEMO_MODE")) == "staging" {
-		storageName = strings.TrimSpace(os.Getenv("R2_BUCKET"))
+	storageName := strings.TrimSpace(envconfig.Getenv("MISTY_LIBRARY_LOCAL_DIR"))
+	if strings.TrimSpace(envconfig.Getenv("MISTY_DEMO_MODE")) == "staging" {
+		storageName = strings.TrimSpace(envconfig.Getenv("R2_BUCKET"))
 	}
 	return DemoConfig{
-		Mode:         strings.TrimSpace(os.Getenv("MISTY_DEMO_MODE")),
-		AdminToken:   strings.TrimSpace(os.Getenv("MISTY_DEMO_ADMIN_TOKEN")),
-		Environment:  strings.TrimSpace(os.Getenv("MISTY_ENVIRONMENT")),
-		DatabaseName: strings.TrimSpace(os.Getenv("DB_NAME")),
+		Mode:         strings.TrimSpace(envconfig.Getenv("MISTY_DEMO_MODE")),
+		AdminToken:   strings.TrimSpace(envconfig.Getenv("MISTY_DEMO_ADMIN_TOKEN")),
+		Environment:  strings.TrimSpace(envconfig.Getenv("MISTY_ENVIRONMENT")),
+		DatabaseName: strings.TrimSpace(envconfig.Getenv("DB_NAME")),
 		StorageName:  storageName,
 	}
 }

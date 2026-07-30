@@ -4,12 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
 	"strings"
 	"testing"
 	"time"
 
-	. "github.com/kannachi323/misty/server/internal/app/httpapi"
+	envconfig "github.com/kannachi323/misty/server/internal/platform/config"
+
+	. "github.com/kannachi323/misty/server/internal/platform/httpapi"
 
 	db "github.com/kannachi323/misty/server/internal/platform/postgres"
 )
@@ -23,12 +24,12 @@ const testDatabaseLockID int64 = 621042
 func openPresenceTestDatabase(t *testing.T) *db.Database {
 	t.Helper()
 
-	host := firstNonEmpty(os.Getenv("TEST_DB_HOST"), os.Getenv("DB_HOST"))
-	port := firstNonEmpty(os.Getenv("TEST_DB_PORT"), os.Getenv("DB_PORT"))
-	user := firstNonEmpty(os.Getenv("TEST_DB_USER"), os.Getenv("DB_USER"))
-	password := firstNonEmpty(os.Getenv("TEST_DB_PASSWORD"), os.Getenv("DB_PASSWORD"))
-	name := firstNonEmpty(os.Getenv("TEST_DB_NAME"), os.Getenv("DB_NAME"))
-	sslmode := firstNonEmpty(os.Getenv("TEST_DB_SSLMODE"), os.Getenv("DB_SSLMODE"))
+	host := firstNonEmpty(envconfig.Getenv("TEST_DB_HOST"), envconfig.Getenv("DB_HOST"))
+	port := firstNonEmpty(envconfig.Getenv("TEST_DB_PORT"), envconfig.Getenv("DB_PORT"))
+	user := firstNonEmpty(envconfig.Getenv("TEST_DB_USER"), envconfig.Getenv("DB_USER"))
+	password := firstNonEmpty(envconfig.Getenv("TEST_DB_PASSWORD"), envconfig.Getenv("DB_PASSWORD"))
+	name := firstNonEmpty(envconfig.Getenv("TEST_DB_NAME"), envconfig.Getenv("DB_NAME"))
+	sslmode := firstNonEmpty(envconfig.Getenv("TEST_DB_SSLMODE"), envconfig.Getenv("DB_SSLMODE"))
 	if host == "" || user == "" || password == "" || name == "" {
 		t.Skip("missing TEST_DB_*/DB_* environment; skipping realtime presence test")
 	}

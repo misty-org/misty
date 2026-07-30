@@ -9,9 +9,10 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"os"
 	"strings"
 	"time"
+
+	envconfig "github.com/kannachi323/misty/server/internal/platform/config"
 )
 
 const (
@@ -38,7 +39,7 @@ func (a *SmartLibraryAnalyzer) TranscribeMedia(ctx context.Context, audio []byte
 	if len(audio) == 0 || len(audio) > 2<<20 || chunkDurationMS <= 0 || chunkDurationMS > 35_000 {
 		return nil, ModelUsage{}, errors.New("invalid media audio chunk")
 	}
-	model := strings.TrimSpace(os.Getenv("MEDIA_SEARCH_TRANSCRIPTION_MODEL"))
+	model := strings.TrimSpace(envconfig.Getenv("MEDIA_SEARCH_TRANSCRIPTION_MODEL"))
 	if model == "" {
 		model = MediaSearchTranscriptionModel
 	}
@@ -46,7 +47,7 @@ func (a *SmartLibraryAnalyzer) TranscribeMedia(ctx context.Context, audio []byte
 	if err == nil && len(segments) > 0 {
 		return TestingCoalesceTranscriptSegments(segments), usage, nil
 	}
-	fallback := strings.TrimSpace(os.Getenv("MEDIA_SEARCH_TRANSCRIPTION_FALLBACK_MODEL"))
+	fallback := strings.TrimSpace(envconfig.Getenv("MEDIA_SEARCH_TRANSCRIPTION_FALLBACK_MODEL"))
 	if fallback == "" {
 		fallback = MediaSearchTranscriptionFallbackModel
 	}

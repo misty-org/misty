@@ -10,9 +10,10 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"os"
 	"strings"
 	"time"
+
+	envconfig "github.com/kannachi323/misty/server/internal/platform/config"
 )
 
 func (s *SpacesService) providerAccessToken(ctx context.Context, userID, spaceID, integrationID string) (string, string, error) {
@@ -236,7 +237,7 @@ func TestingProviderCallbackURL(r *http.Request, provider string) string {
 }
 
 func configuredPublicAPIBase() string {
-	base := strings.TrimRight(strings.TrimSpace(os.Getenv("MISTY_PUBLIC_API_URL")), "/")
+	base := strings.TrimRight(strings.TrimSpace(envconfig.Getenv("MISTY_PUBLIC_API_URL")), "/")
 	if base == "" {
 		return ""
 	}
