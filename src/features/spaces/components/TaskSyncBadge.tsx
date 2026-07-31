@@ -1,10 +1,7 @@
 import { CalendarClock, CircleAlert, CloudOff, TriangleAlert, Upload } from "lucide-react";
 
 import { Badge } from "@/ui";
-import {
-  syncStateLabel,
-  taskSyncState,
-} from "@/features/spaces/connections/googleCalendarMapping";
+import { syncStateLabel, taskSyncState } from "@/features/spaces/connections/googleCalendarMapping";
 import type { SpaceTask } from "@/models/interfaces/features/spaces/types";
 import type { TaskSyncState } from "@/models/types/features/spaces/connections/calendarTasks";
 

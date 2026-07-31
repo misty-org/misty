@@ -45,7 +45,6 @@ import type {
   Space,
   SpaceEvent,
   SpaceInboxItem,
-  SpaceMember,
   SpaceMessage,
   SpaceLibraryItem,
   SpaceStorageUsage,
@@ -65,7 +64,6 @@ import type {
   CreateSpaceRequest,
   CreateSpaceResult,
   GoogleCalendarChoice,
-  SpaceInvitation,
   SpaceInvitationPreview,
   SpaceSetup,
   SpaceTemplate,
@@ -73,6 +71,7 @@ import type {
 import type { GlobalSpaceLibraryHit } from "@/models/interfaces/features/agents/personal";
 import type { TaskSchedule } from "@/models/interfaces/features/spaces/connections/calendarTasks";
 import type { ConflictResolution } from "@/models/types/features/spaces/connections/calendarTasks";
+import { createSpaceMembersApi } from "./spaceMembersApi";
 
 export class SpaceRequestError extends Error {
   constructor(
@@ -230,64 +229,7 @@ export const spacesApi = {
       method: "DELETE",
       body: JSON.stringify({ confirmation }),
     }),
-  members: (spaceId: string) =>
-    spaceRequest<{ members: SpaceMember[] }>(`/spaces/${encodeURIComponent(spaceId)}/members`),
-  memberAvatar: (spaceId: string, userId: string) =>
-    fetchProtectedBlob(
-      `/spaces/${encodeURIComponent(spaceId)}/members/${encodeURIComponent(userId)}/avatar`,
-    ),
-  invite: (spaceId: string, email: string) =>
-    spaceRequest<SpaceInvitation>(`/spaces/${encodeURIComponent(spaceId)}/invitations`, {
-      method: "POST",
-      body: JSON.stringify({ email }),
-    }),
-  pendingInvitations: (spaceId: string) =>
-    spaceRequest<{ invitations: SpaceInvitation[] }>(
-      `/spaces/${encodeURIComponent(spaceId)}/invitations`,
-    ),
-  resendInvitation: (spaceId: string, inviteId: string) =>
-    spaceRequest<SpaceInvitation>(
-      `/spaces/${encodeURIComponent(spaceId)}/invitations/${encodeURIComponent(inviteId)}/resend`,
-      { method: "POST" },
-    ),
-  revokeInvitation: (spaceId: string, inviteId: string) =>
-    spaceRequest(
-      `/spaces/${encodeURIComponent(spaceId)}/invitations/${encodeURIComponent(inviteId)}`,
-      { method: "DELETE" },
-    ),
-  respondInvite: (inviteId: string, accept: boolean) =>
-    spaceRequest(
-      `/spaces/invitations/${encodeURIComponent(inviteId)}/${accept ? "accept" : "decline"}`,
-      { method: "POST" },
-    ),
-  removeMember: (spaceId: string, userId: string) =>
-    spaceRequest(`/spaces/${encodeURIComponent(spaceId)}/members/${encodeURIComponent(userId)}`, {
-      method: "DELETE",
-    }),
-  leave: (spaceId: string) =>
-    spaceRequest(`/spaces/${encodeURIComponent(spaceId)}/leave`, { method: "POST" }),
-  transfer: (spaceId: string, userId: string) =>
-    spaceRequest(`/spaces/${encodeURIComponent(spaceId)}/transfer`, {
-      method: "POST",
-      body: JSON.stringify({ user_id: userId }),
-    }),
-  memberPermissions: (spaceId: string, userId: string) =>
-    spaceRequest<{ permissions: Record<string, boolean> }>(
-      `/spaces/${encodeURIComponent(spaceId)}/members/${encodeURIComponent(userId)}/permissions`,
-    ),
-  setMemberPermission: (
-    spaceId: string,
-    userId: string,
-    permission: string,
-    effect: "allow" | "deny" | "inherit",
-  ) =>
-    spaceRequest<{ permissions: Record<string, boolean> }>(
-      `/spaces/${encodeURIComponent(spaceId)}/members/${encodeURIComponent(userId)}/permissions`,
-      {
-        method: "PUT",
-        body: JSON.stringify({ permission, effect }),
-      },
-    ),
+  ...createSpaceMembersApi(spaceRequest, fetchProtectedBlob),
   messages: (spaceId: string, before = 0) =>
     spaceRequest<{ messages: SpaceMessage[] }>(
       `/spaces/${encodeURIComponent(spaceId)}/messages?before=${before}&limit=50`,

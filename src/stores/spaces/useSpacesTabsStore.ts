@@ -159,9 +159,7 @@ export const useSpacesTabsStore = create<SpacesTabsStore>()(
 );
 
 export function activeSpacesTab(session: SpacesTabsSession | undefined): SpacesTab | null {
-  return (
-    session?.tabs.find((tab) => tab.id === session.activeTabId) ?? session?.tabs[0] ?? null
-  );
+  return session?.tabs.find((tab) => tab.id === session.activeTabId) ?? session?.tabs[0] ?? null;
 }
 
 export function normalizeSpacesTabRoute(route: string): string {

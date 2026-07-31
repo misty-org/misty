@@ -6,20 +6,18 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
-use rusqlite::{params, Connection, OptionalExtension};
-use serde::{Deserialize, Serialize};
-use serde_json::Value;
-use tokio::sync::Mutex as AsyncMutex;
-use walkdir::WalkDir;
-
 use crate::{
     core::file_master::RemoteBrowseTarget,
     error::{ApiError, ApiResult},
     services::{
-        environment::AppEnvironmentService, macos_privacy::is_background_scan_excluded,
+        directory_size_local::local_directory_size, environment::AppEnvironmentService,
         storage::StorageService,
     },
 };
+use rusqlite::{params, Connection, OptionalExtension};
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
+use tokio::sync::Mutex as AsyncMutex;
 
 const DIRECTORY_SIZE_CACHE_TTL_MS: i64 = 24 * 60 * 60 * 1000;
 
@@ -469,31 +467,6 @@ fn sql_error(error: rusqlite::Error) -> ApiError {
     ApiError::Message(format!("SQLite directory size store failed: {error}"))
 }
 
-fn local_directory_size(path: &Path, home_dir: &Path) -> Result<u64, String> {
-    let metadata = fs::symlink_metadata(path)
-        .map_err(|error| format!("Failed to inspect {}: {error}", path.display()))?;
-    if metadata.file_type().is_symlink() || !metadata.is_dir() {
-        return Err(format!("{} is not a directory.", path.display()));
-    }
-    if is_background_scan_excluded(path, home_dir) {
-        return Err("Folder size is unavailable for protected macOS app data.".to_owned());
-    }
-    let mut total = 0u64;
-    for entry in WalkDir::new(path)
-        .follow_links(false)
-        .into_iter()
-        .filter_entry(|entry| !is_background_scan_excluded(entry.path(), home_dir))
-        .skip(1)
-    {
-        let entry = entry.map_err(|error| error.to_string())?;
-        if entry.file_type().is_file() {
-            total =
-                total.saturating_add(entry.metadata().map_err(|error| error.to_string())?.len());
-        }
-    }
-    Ok(total)
-}
-
 fn remote_size_from_value(value: &Value) -> Option<u64> {
     if let Some(number) = value.as_u64() {
         return Some(number);
@@ -525,42 +498,6 @@ fn display_path(path: &Path) -> String {
 mod tests {
     use super::*;
     use uuid::Uuid;
-
-    #[test]
-    fn directory_size_local_walk_ignores_symlinks() {
-        let root = std::env::temp_dir().join(format!("misty-directory-size-{}", Uuid::new_v4()));
-        let nested = root.join("nested");
-        fs::create_dir_all(&nested).expect("create test dirs");
-        fs::write(root.join("a.txt"), vec![0u8; 7]).expect("write file");
-        fs::write(nested.join("b.txt"), vec![0u8; 11]).expect("write nested file");
-        #[cfg(unix)]
-        std::os::unix::fs::symlink(root.join("a.txt"), root.join("link.txt")).expect("symlink");
-
-        let size = local_directory_size(&root, &root).expect("directory size");
-        assert_eq!(size, 18);
-
-        let _ = fs::remove_dir_all(root);
-    }
-
-    #[cfg(target_os = "macos")]
-    #[test]
-    fn directory_size_local_walk_skips_protected_app_data() {
-        let home =
-            std::env::temp_dir().join(format!("misty-directory-size-privacy-{}", Uuid::new_v4()));
-        let protected = home
-            .join("Library")
-            .join("Containers")
-            .join("com.example.private")
-            .join("Data");
-        fs::create_dir_all(&protected).expect("create protected test dirs");
-        fs::write(home.join("visible.txt"), vec![0u8; 7]).expect("write visible file");
-        fs::write(protected.join("private.txt"), vec![0u8; 11]).expect("write private file");
-
-        let size = local_directory_size(&home, &home).expect("directory size");
-        assert_eq!(size, 7);
-
-        let _ = fs::remove_dir_all(home);
-    }
 
     #[test]
     fn directory_size_remote_response_accepts_common_byte_fields() {

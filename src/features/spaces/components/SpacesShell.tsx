@@ -158,7 +158,11 @@ export default function SpacesShell() {
   return (
     <MotionConfig reducedMotion="user" transition={{ duration: 0.14, ease: [0.16, 1, 0.3, 1] }}>
       <div
-        className="misty-spaces-workbench grid h-full min-h-0 grid-rows-[46px_minmax(0,1fr)_32px] overflow-hidden transition-[grid-template-columns] duration-300 ease-[var(--misty-ease-out)]"
+        className={[
+          "misty-spaces-workbench grid h-full min-h-0",
+          "grid-rows-[46px_minmax(0,1fr)_32px] overflow-hidden",
+          "transition-[grid-template-columns] duration-300 ease-[var(--misty-ease-out)]",
+        ].join(" ")}
         style={{
           gridTemplateColumns: panelVisible
             ? "var(--misty-spaces-rail-width) minmax(0, 1fr)"
@@ -224,7 +228,11 @@ export default function SpacesShell() {
               initial={{ opacity: 0, x: -12 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -12 }}
-              className="misty-spaces-panel col-start-1 row-start-2 flex min-h-0 min-w-[var(--misty-spaces-rail-width)] flex-col overflow-hidden border-r border-sidebar-border/60 px-3 pb-2 pt-3 text-sm text-sidebar-foreground"
+              className={[
+                "misty-spaces-panel col-start-1 row-start-2 flex min-h-0",
+                "min-w-[var(--misty-spaces-rail-width)] flex-col overflow-hidden",
+                "border-r border-sidebar-border/60 px-3 pb-2 pt-3 text-sm text-sidebar-foreground",
+              ].join(" ")}
             >
               <SpacePanelContent
                 key={activeTab?.id}

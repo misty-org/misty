@@ -23,6 +23,7 @@ export * from "./label";
 export { IconButton } from "./outlined-icon-button";
 export type { IconButtonProps } from "./outlined-icon-button";
 export * from "./popover";
+export * from "./portal";
 export * from "./progress";
 export * from "./radio-group";
 export * from "./resizable";

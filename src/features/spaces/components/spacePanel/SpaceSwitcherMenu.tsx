@@ -38,7 +38,12 @@ export function SpaceSwitcherMenu({
     <DropdownMenu open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger asChild>
         <Button
-          className="misty-spaces-interactive mb-1 h-10 w-full min-w-0 justify-start gap-2 rounded-md border-sidebar-border/55 bg-sidebar-accent/20 px-2 text-left text-sidebar-accent-foreground shadow-none hover:border-sidebar-border/80 hover:bg-sidebar-accent/30"
+          className={[
+            "misty-spaces-interactive mb-1 h-10 w-full min-w-0 justify-start gap-2 rounded-md",
+            "border-sidebar-border/55 bg-sidebar-accent/20 px-2 text-left",
+            "text-sidebar-accent-foreground shadow-none",
+            "hover:border-sidebar-border/80 hover:bg-sidebar-accent/30",
+          ].join(" ")}
           variant="outline"
           type="button"
           aria-label={activeSpace?.name ? `Space menu: ${activeSpace.name}` : "Space menu"}

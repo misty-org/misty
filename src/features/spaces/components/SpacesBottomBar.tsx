@@ -1,17 +1,10 @@
-import { useEffect, useState, type ReactNode } from "react";
-import { createPortal } from "react-dom";
-import { Button, cn } from "@/ui";
+import type { ReactNode } from "react";
+import { Button, cn, PortalToId } from "@/ui";
 
 export const spacesBottomBarActionsId = "misty-spaces-bottom-bar-actions";
 
 export function SpacesBottomBarActionsPortal({ children }: { children: ReactNode }) {
-  const [target, setTarget] = useState<HTMLElement | null>(null);
-
-  useEffect(() => {
-    setTarget(document.getElementById(spacesBottomBarActionsId));
-  }, []);
-
-  return target ? createPortal(children, target) : null;
+  return <PortalToId targetId={spacesBottomBarActionsId}>{children}</PortalToId>;
 }
 
 export function SpacesBottomBarToggle({

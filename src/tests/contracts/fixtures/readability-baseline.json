@@ -357,20 +357,10 @@
       "hash": "13b9ee0c55460599"
     }
   ],
-  "src/features/spaces/components/SpaceChatConversationList.tsx": [
-    {
-      "length": 199,
-      "hash": "855f8805826a3bce"
-    }
-  ],
   "src/features/spaces/components/SpaceLibraryChrome.tsx": [
     {
       "length": 161,
       "hash": "27b56d902eebe765"
-    },
-    {
-      "length": 240,
-      "hash": "41dbc0f192750aa3"
     }
   ],
   "src/features/spaces/components/SpaceMembers.tsx": [
@@ -379,52 +369,10 @@
       "hash": "be1d1f5ea7a589f6"
     }
   ],
-  "src/features/spaces/components/spacePanel/SpaceSidebarLink.tsx": [
-    {
-      "length": 168,
-      "hash": "16c754d830c39af5"
-    }
-  ],
-  "src/features/spaces/components/spacePanel/SpaceSwitcherMenu.tsx": [
-    {
-      "length": 196,
-      "hash": "14da2565f3dab529"
-    }
-  ],
-  "src/features/spaces/components/SpaceSectionNavigation.tsx": [
-    {
-      "length": 228,
-      "hash": "fbc4b4b5023b30b5"
-    }
-  ],
-  "src/features/spaces/components/SpaceSettings.tsx": [
-    {
-      "length": 232,
-      "hash": "28f93c7ae66349a2"
-    }
-  ],
   "src/features/spaces/components/SpacesLoadingPlaceholder.tsx": [
-    {
-      "length": 174,
-      "hash": "64a19eae6282389a"
-    },
     {
       "length": 178,
       "hash": "fd5009ea1f81de49"
-    },
-    {
-      "length": 178,
-      "hash": "ffa1d18286a042fa"
-    }
-  ],
-  "src/features/spaces/components/SpacesShell.tsx": [
-    {
-      "length": 202,
-      "hash": "6897f961315edd61"
-    },
-    {
-      "length": 226,
-      "hash": "851969a4e597ce47"
     }
   ],
   "src/features/spaces/libraryCollections/useLibraryMaintenance.ts": [
@@ -862,10 +810,6 @@
     }
   ],
   "src/ui/tabs.tsx": [
-    {
-      "length": 397,
-      "hash": "02cdeeceeae12d9d"
-    },
     {
       "length": 808,
       "hash": "2a36927a59bd4758"

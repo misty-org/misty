@@ -1,9 +1,4 @@
-import {
-  CalendarClock,
-  ListTodo,
-  UserRound,
-  UserRoundX,
-} from "lucide-react";
+import { CalendarClock, ListTodo, UserRound, UserRoundX } from "lucide-react";
 import { useLocation } from "react-router-dom";
 import { spaceNotesEnabled } from "@/features/notes/availability";
 import { NotesPanelSidebar } from "@/features/notes/components/NotesPanelSidebar";

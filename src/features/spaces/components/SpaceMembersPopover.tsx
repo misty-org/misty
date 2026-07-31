@@ -101,9 +101,7 @@ export function SpaceMembersPopover({ space }: { space: Space }) {
             </p>
           </div>
           {onlineCount > 0 ? (
-            <span className="shrink-0 text-[11px] text-muted-foreground">
-              {onlineCount} online
-            </span>
+            <span className="shrink-0 text-[11px] text-muted-foreground">{onlineCount} online</span>
           ) : null}
         </div>
 

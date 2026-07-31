@@ -71,10 +71,7 @@ export function GoogleCalendarConnectionPanel({
     <Card size="sm" aria-labelledby="google-calendar-connection-heading">
       <CardHeader className="flex flex-row items-center justify-between gap-3">
         <div className="min-w-0">
-          <CardTitle
-            id="google-calendar-connection-heading"
-            className="flex items-center gap-2"
-          >
+          <CardTitle id="google-calendar-connection-heading" className="flex items-center gap-2">
             <SiGooglecalendar className="size-5 shrink-0" aria-hidden />
             <span className="truncate">Google Calendar</span>
           </CardTitle>

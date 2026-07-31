@@ -36,6 +36,7 @@ import { useUserStore } from "@/stores/account/useUserStore";
 import { setAnalyticsAuthenticationState } from "@/analytics/lifecycle";
 import { TelemetryIdentityManager } from "@/analytics/identity";
 import { analytics } from "@/analytics/client";
+import { restoreSavedSession, tryRestoreSavedSession } from "./sessionRecovery";
 
 const AuthContext = createContext<AuthContextValue>({
   user: null,
@@ -434,23 +435,6 @@ function authUserFromMe(me: AccountMeResponse, fallback: SavedAccountSession): A
     accountCreatedAt: me.created_at || fallback.accountCreatedAt,
     currentPlan: me.tier || fallback.currentPlan,
   };
-}
-
-async function restoreSavedSession(accountId: string): Promise<void> {
-  if (!accountId) return;
-  if (!listSavedAccountSessions().some((account) => account.id === accountId)) return;
-  await activateAccountSession(accountId);
-}
-
-async function tryRestoreSavedSession(accountId: string): Promise<boolean> {
-  if (!accountId) return false;
-  if (!listSavedAccountSessions().some((account) => account.id === accountId)) return false;
-  try {
-    await activateAccountSession(accountId);
-    return true;
-  } catch {
-    return false;
-  }
 }
 
 function assertAccountIdentity(me: AccountMeResponse, expectedAccountId: string): void {

@@ -105,10 +105,9 @@ describe("MistyNativeNotesConnector", () => {
     await connector.listNotes();
     await connector.deleteNote!("note_delete");
 
-    expect(spaceRequestMock).toHaveBeenLastCalledWith(
-      "/spaces/space-product/notes/note_delete",
-      { method: "DELETE" },
-    );
+    expect(spaceRequestMock).toHaveBeenLastCalledWith("/spaces/space-product/notes/note_delete", {
+      method: "DELETE",
+    });
   });
 });
 
