@@ -1,4 +1,6 @@
 .DS_Store
 .env
 /target/
+/docs/dist/
+/docs/node_modules/
 *.tmp
