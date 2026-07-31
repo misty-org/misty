@@ -109,7 +109,9 @@ function NavigationIcon({ active, icon: Icon }: { active: boolean; icon: LucideI
 
 function navigationItemClass(active: boolean) {
   return cn(
-    "misty-hover-marker-bottom group relative flex h-8 min-w-0 items-center justify-center gap-1.5 rounded-md px-3 text-[12.5px] font-medium no-underline outline-none focus-visible:ring-2 focus-visible:ring-ring",
+    "misty-hover-marker-bottom group relative flex h-8 min-w-0 items-center justify-center",
+    "gap-1.5 rounded-md px-3 text-[12.5px] font-medium no-underline outline-none",
+    "focus-visible:ring-2 focus-visible:ring-ring",
     active
       ? "misty-active-marker-bottom text-foreground"
       : "text-muted-foreground hover:text-foreground",

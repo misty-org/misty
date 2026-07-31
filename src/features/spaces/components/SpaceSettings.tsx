@@ -195,7 +195,11 @@ export function SpaceSettings({ spaceId, section }: { spaceId: string; section: 
                   ) : null}
                   {error && !leaveOpen && !deleteOpen ? (
                     <Button
-                      className="mt-4 h-auto w-full justify-start whitespace-normal rounded-lg border border-destructive/25 bg-destructive/10 px-3 py-2 text-left text-xs text-destructive hover:bg-destructive/15 hover:text-destructive"
+                      className={[
+                        "mt-4 h-auto w-full justify-start whitespace-normal rounded-lg border",
+                        "border-destructive/25 bg-destructive/10 px-3 py-2 text-left text-xs",
+                        "text-destructive hover:bg-destructive/15 hover:text-destructive",
+                      ].join(" ")}
                       variant="ghost"
                       type="button"
                       onClick={clearError}
@@ -281,76 +285,76 @@ export function SpaceSettings({ spaceId, section }: { spaceId: string; section: 
           ) : null}
         </DesktopSettingsFrame>
 
-      <AlertDialog
-        open={leaveOpen}
-        onOpenChange={(open) => !open && !dangerBusy && setLeaveOpen(false)}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Leave {space.name}?</AlertDialogTitle>
-            <AlertDialogDescription>
-              You will immediately lose access. Another member must invite you to regain it.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          {error ? <DangerError message={error} /> : null}
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={dangerBusy}>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              disabled={dangerBusy}
-              onClick={(event) => {
-                event.preventDefault();
-                void submitLeave();
-              }}
-            >
-              {dangerBusy ? "Leaving…" : "Leave Space"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+        <AlertDialog
+          open={leaveOpen}
+          onOpenChange={(open) => !open && !dangerBusy && setLeaveOpen(false)}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Leave {space.name}?</AlertDialogTitle>
+              <AlertDialogDescription>
+                You will immediately lose access. Another member must invite you to regain it.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            {error ? <DangerError message={error} /> : null}
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={dangerBusy}>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                disabled={dangerBusy}
+                onClick={(event) => {
+                  event.preventDefault();
+                  void submitLeave();
+                }}
+              >
+                {dangerBusy ? "Leaving…" : "Leave Space"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
-      <AlertDialog
-        open={deleteOpen}
-        onOpenChange={(open) => {
-          if (!open && !dangerBusy) {
-            setDeleteOpen(false);
-            setDeleteConfirmation("");
-          }
-        }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle className="text-destructive">Delete {space.name}?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This removes member access immediately and schedules permanent deletion. Type the
-              Space name exactly to continue.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <label className="grid gap-2 text-xs font-medium text-muted-foreground">
-            Space name
-            <Input
-              autoFocus
-              autoComplete="off"
-              value={deleteConfirmation}
-              onChange={(event) => setDeleteConfirmation(event.target.value)}
-            />
-          </label>
-          {error ? <DangerError message={error} /> : null}
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={dangerBusy}>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              disabled={dangerBusy || deleteConfirmation !== space.name}
-              onClick={(event) => {
-                event.preventDefault();
-                void submitDelete();
-              }}
-            >
-              {dangerBusy ? "Deleting…" : "Delete Space"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+        <AlertDialog
+          open={deleteOpen}
+          onOpenChange={(open) => {
+            if (!open && !dangerBusy) {
+              setDeleteOpen(false);
+              setDeleteConfirmation("");
+            }
+          }}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle className="text-destructive">Delete {space.name}?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This removes member access immediately and schedules permanent deletion. Type the
+                Space name exactly to continue.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <label className="grid gap-2 text-xs font-medium text-muted-foreground">
+              Space name
+              <Input
+                autoFocus
+                autoComplete="off"
+                value={deleteConfirmation}
+                onChange={(event) => setDeleteConfirmation(event.target.value)}
+              />
+            </label>
+            {error ? <DangerError message={error} /> : null}
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={dangerBusy}>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                disabled={dangerBusy || deleteConfirmation !== space.name}
+                onClick={(event) => {
+                  event.preventDefault();
+                  void submitDelete();
+                }}
+              >
+                {dangerBusy ? "Deleting…" : "Delete Space"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </>
     </WorkspaceOverlay>
   );

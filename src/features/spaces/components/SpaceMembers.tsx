@@ -35,9 +35,7 @@ export function SpaceMembers({
             {!embedded ? (
               <h2 className="m-0 text-sm font-semibold text-foreground">Members</h2>
             ) : null}
-            <p
-              className={`${embedded ? "m-0" : "mb-0 mt-1"} text-xs text-muted-foreground`}
-            >
+            <p className={`${embedded ? "m-0" : "mb-0 mt-1"} text-xs text-muted-foreground`}>
               {members.length} active member{members.length === 1 ? "" : "s"}
               {space?.pending_count ? ` · ${space.pending_count} pending` : ""}
             </p>

@@ -64,7 +64,13 @@ export function SpaceLibraryHeader(props: SpaceLibraryHeaderProps) {
   return (
     <div className="shrink-0">
       <Toolbar label="Library tools" wrap className="misty-spaces-toolbar min-h-11 px-3 py-1.5">
-        <label className="!flex h-8 min-w-[220px] flex-1 items-center gap-2 overflow-hidden rounded-md border border-border/70 bg-muted/30 px-2.5 text-muted-foreground shadow-none transition-colors focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/20">
+        <label
+          className={cn(
+            "!flex h-8 min-w-[220px] flex-1 items-center gap-2 overflow-hidden rounded-md",
+            "border border-border/70 bg-muted/30 px-2.5 text-muted-foreground shadow-none",
+            "transition-colors focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/20",
+          )}
+        >
           <Search size={15} aria-hidden="true" />
           <Input
             className="!m-0 !h-full !min-h-0 min-w-0 flex-1 !rounded-none !border-0 !bg-transparent !p-0 !shadow-none text-sm leading-none focus-visible:!ring-0"
