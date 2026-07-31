@@ -42,6 +42,7 @@ export function SpaceNotes(props: SpaceNotesProps) {
       setEditingNoteId: state.setEditingNoteId,
       toggleFavorite: state.toggleFavorite,
       createNote: state.createNote,
+      deleteNote: state.deleteNote,
       refresh: state.refresh,
       updateNoteBody: state.updateNoteBody,
       updateNoteContent: state.updateNoteContent,
@@ -73,6 +74,7 @@ export function SpaceNotes(props: SpaceNotesProps) {
   const loading = store.phase === "loading" || store.phase === "idle";
 
   const selectedNote = store.notes.find((note) => note.id === store.selectedNoteId);
+  const contextPanelOpen = Boolean(selectedNote) && store.contextPanelOpen;
   const selectedConnector = selectedNote
     ? store.registry.forSource(selectedNote.source)
     : undefined;
@@ -81,15 +83,17 @@ export function SpaceNotes(props: SpaceNotesProps) {
     <div className={shellClass}>
       <NotesTopBar
         query={store.query}
-        contextPanelOpen={store.contextPanelOpen}
+        contextPanelOpen={contextPanelOpen}
+        contextPanelAvailable={Boolean(selectedNote)}
         onQueryChange={actions.setQuery}
         onNewNote={() => setNewNoteOpen(true)}
         onToggleContextPanel={actions.toggleContextPanel}
       />
 
-      <div className={store.contextPanelOpen ? bodyWithContextClass : bodyClass}>
+      <div className={contextPanelOpen ? bodyWithContextClass : bodyClass}>
         <NoteReadingPane
           note={selectedNote}
+          hasNotes={store.notes.length > 0}
           accountId={store.accountId}
           loading={loading}
           editingNoteId={store.editingNoteId}
@@ -105,10 +109,15 @@ export function SpaceNotes(props: SpaceNotesProps) {
               : undefined
           }
           onToggleFavorite={(noteId) => void actions.toggleFavorite(noteId)}
+          onDelete={
+            selectedConnector?.capabilities.delete && selectedNote?.canDelete
+              ? actions.deleteNote
+              : undefined
+          }
           onNewNote={() => setNewNoteOpen(true)}
         />
 
-        {store.contextPanelOpen ? (
+        {contextPanelOpen ? (
           <div className="min-h-0 max-[1100px]:hidden">
             <NoteContextPanel note={selectedNote} />
           </div>

@@ -3,7 +3,6 @@ import type { LibraryCollectionKind } from "@/models/types/features/spaces/useSp
 /** Collections that may appear in `?collection=`; anything else falls back to Recent. */
 export const libraryCollectionKinds = new Set<LibraryCollectionKind>([
   "recent",
-  "smart",
   "months",
   "years",
   "recent-days",

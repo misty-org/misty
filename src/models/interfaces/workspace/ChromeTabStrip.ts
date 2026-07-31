@@ -11,6 +11,7 @@ export interface ChromeTabStripProps {
   tabs: ChromeTabStripTab[];
   activeTabId: string;
   actions?: ReactNode;
+  ariaLabel?: string;
   canCloseTab?: (tab: ChromeTabStripTab) => boolean;
   onAddTab: () => void;
   onCloseTab: (tab: ChromeTabStripTab) => void;

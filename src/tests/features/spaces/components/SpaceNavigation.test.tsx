@@ -44,7 +44,7 @@ describe("SpaceSectionNavigation", () => {
     const links = [...container.querySelectorAll("a")];
     expect(links.map((link) => link.textContent?.trim())).toEqual([
       "Chat",
-      "Tasks",
+      "Planner",
       "Journal",
       "Library",
     ]);

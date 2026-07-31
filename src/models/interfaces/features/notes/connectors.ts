@@ -108,6 +108,7 @@ export interface NotesConnector {
 
   createNote?(input: CreateNoteInput): Promise<UnifiedNote>;
   updateNote?(sourceId: string, patch: UpdateNoteInput): Promise<UnifiedNote>;
+  deleteNote?(sourceId: string): Promise<void>;
 
   /** Adds content to the end of an existing note without rewriting it. */
   appendToNote?(sourceId: string, input: AppendNoteInput): Promise<UnifiedNote>;

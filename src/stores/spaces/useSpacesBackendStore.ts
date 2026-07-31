@@ -71,8 +71,8 @@ import type {
   SpaceTemplate,
 } from "@/models/interfaces/features/spaces/types";
 import type { GlobalSpaceLibraryHit } from "@/models/interfaces/features/agents/personal";
-import type { TaskSchedule } from "@/models/interfaces/features/spaces/integrations/calendarTasks";
-import type { ConflictResolution } from "@/models/types/features/spaces/integrations/calendarTasks";
+import type { TaskSchedule } from "@/models/interfaces/features/spaces/connections/calendarTasks";
+import type { ConflictResolution } from "@/models/types/features/spaces/connections/calendarTasks";
 
 export class SpaceRequestError extends Error {
   constructor(
@@ -271,6 +271,23 @@ export const spacesApi = {
       method: "POST",
       body: JSON.stringify({ user_id: userId }),
     }),
+  memberPermissions: (spaceId: string, userId: string) =>
+    spaceRequest<{ permissions: Record<string, boolean> }>(
+      `/spaces/${encodeURIComponent(spaceId)}/members/${encodeURIComponent(userId)}/permissions`,
+    ),
+  setMemberPermission: (
+    spaceId: string,
+    userId: string,
+    permission: string,
+    effect: "allow" | "deny" | "inherit",
+  ) =>
+    spaceRequest<{ permissions: Record<string, boolean> }>(
+      `/spaces/${encodeURIComponent(spaceId)}/members/${encodeURIComponent(userId)}/permissions`,
+      {
+        method: "PUT",
+        body: JSON.stringify({ permission, effect }),
+      },
+    ),
   messages: (spaceId: string, before = 0) =>
     spaceRequest<{ messages: SpaceMessage[] }>(
       `/spaces/${encodeURIComponent(spaceId)}/messages?before=${before}&limit=50`,

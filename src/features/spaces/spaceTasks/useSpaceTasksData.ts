@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { errorText } from "@/lib/format";
 import { spacesApi } from "@/stores/spaces/useSpacesBackendStore";
-import type { TaskViewMode } from "@/models/types/features/spaces/SpaceTasksCalendar";
+import type { TaskViewMode } from "@/models/types/features/spaces/SpacePlanner";
 import type {
   SpaceCalendarEvent,
   SpaceCalendarSource,

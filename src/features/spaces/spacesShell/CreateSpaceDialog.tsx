@@ -9,7 +9,7 @@ import {
   DialogTitle,
 } from "@/ui";
 import {
-  CreateSpaceIntegrationsStep,
+  CreateSpaceConnectionsStep,
   CreateSpaceNameStep,
   CreateSpaceTemplateStep,
 } from "./CreateSpaceSteps";
@@ -62,7 +62,7 @@ export function CreateSpaceDialog({
             />
           ) : null}
           {dialog.step === 2 ? (
-            <CreateSpaceIntegrationsStep
+            <CreateSpaceConnectionsStep
               providers={dialog.providers}
               availability={dialog.providerAvailability}
               onToggle={(provider) =>

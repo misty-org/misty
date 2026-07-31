@@ -8,6 +8,7 @@ export interface NoteContentDraft {
 
 export interface NoteReadingPaneProps {
   note?: UnifiedNote;
+  hasNotes?: boolean;
   accountId?: string;
   loading: boolean;
   editingNoteId?: string;
@@ -15,6 +16,7 @@ export interface NoteReadingPaneProps {
   /** Undefined for read-only sources; presence enables the Edit affordance. */
   onSaveBody?: (noteId: string, body: string) => void;
   onSaveContent?: (noteId: string, content: NoteContentDraft) => void;
+  onDelete?: (noteId: string) => Promise<void>;
   onToggleFavorite?: (noteId: string) => void;
   onNewNote: () => void;
 }

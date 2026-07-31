@@ -10,11 +10,7 @@ import type {
   SpaceMember,
   SpacesSnapshot,
 } from "@/models/interfaces/features/spaces/types";
-import {
-  CreateEditConversationDialog,
-  type ConversationDialogKind,
-} from "./CreateEditConversationDialog";
-import { SpaceSectionNavigation } from "./SpaceSectionNavigation";
+import { CreateEditConversationDialog } from "./CreateEditConversationDialog";
 import { SpacePanelSidebarContext } from "./spacePanel/SpacePanelSidebarContext";
 import { SpacePanelSkeleton } from "./spacePanel/SpacePanelSkeleton";
 import { SpaceStorageFooter } from "./spacePanel/SpaceStorageFooter";
@@ -43,7 +39,6 @@ export function SpacePanelContent(props: {
   const activeSpace = props.spaces.find((space) => space.id === activeSpaceId);
   const [spacesListSkeletonVisible] = useMinimumSpin(props.loading && props.spaces.length === 0);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [dialogKind, setDialogKind] = useState<ConversationDialogKind>("group");
   const [editingConversation, setEditingConversation] = useState<SpaceConversation | null>(null);
 
   const { members, snapshotReady, loadMembers } = useSpacesStore(
@@ -63,9 +58,9 @@ export function SpacePanelContent(props: {
 
   // Land on the first Space when the route points at one that is not loaded.
   useEffect(() => {
-    if (props.loading || activeSpace || props.spaces.length === 0) return;
+    if (!activeSpaceId || props.loading || activeSpace || props.spaces.length === 0) return;
     navigate(spaceSectionPath(props.spaces[0].id, section, settingsSection), { replace: true });
-  }, [activeSpace, navigate, props.loading, props.spaces, section, settingsSection]);
+  }, [activeSpace, activeSpaceId, navigate, props.loading, props.spaces, section, settingsSection]);
 
   useEffect(() => {
     if (!user || !snapshotReady || !activeSpaceId || !activeSpace) return;
@@ -91,42 +86,38 @@ export function SpacePanelContent(props: {
         }}
       />
 
-      {spacesListSkeletonVisible ? <SpacePanelSkeleton /> : null}
       {props.notices ? (
         <div className="misty-transient-scrollbar mb-3 max-h-40 shrink-0 overflow-y-auto">
           {props.notices}
         </div>
       ) : null}
 
-      {activeSpaceId ? (
+      {spacesListSkeletonVisible ? (
+        <SpacePanelSkeleton />
+      ) : activeSpaceId ? (
         <>
-          <SpaceSectionNavigation
-            spaceId={activeSpaceId}
-            section={section}
-            context={
-              <SpacePanelSidebarContext
-                section={section}
-                activeSpaceId={activeSpaceId}
-                activeSpaceName={activeSpace?.name ?? "Journal"}
-                settingsSection={settingsSection}
-                libraryCollection={route.libraryCollection}
-                conversations={conversations}
-                activeConversationId={route.conversationId}
-                currentUserId={user?.id}
-                activeDrawingId={route.drawingId}
-                onCreateConversation={(kind) => {
-                  setEditingConversation(null);
-                  setDialogKind(kind);
-                  setDialogOpen(true);
-                }}
-                onEditConversation={(conversation) => {
-                  setEditingConversation(conversation);
-                  setDialogKind(conversation.members.length > 2 ? "group" : "direct");
-                  setDialogOpen(true);
-                }}
-              />
-            }
-          />
+          <div className="misty-transient-scrollbar min-h-0 flex-1 overflow-x-hidden overflow-y-auto pb-2 [overscroll-behavior:contain]">
+            <SpacePanelSidebarContext
+              section={section}
+              taskView={route.taskView}
+              activeSpaceId={activeSpaceId}
+              activeSpaceName={activeSpace?.name ?? "Journal"}
+              settingsSection={settingsSection}
+              libraryCollection={route.libraryCollection}
+              conversations={conversations}
+              activeConversationId={route.conversationId}
+              currentUserId={user?.id}
+              activeDrawingId={route.drawingId}
+              onCreateConversation={() => {
+                setEditingConversation(null);
+                setDialogOpen(true);
+              }}
+              onEditConversation={(conversation) => {
+                setEditingConversation(conversation);
+                setDialogOpen(true);
+              }}
+            />
+          </div>
           <SpaceStorageFooter
             usage={libraryUsage}
             showsOwnerStorage={activeSpace?.owner_user_id === user?.id}
@@ -141,7 +132,6 @@ export function SpacePanelContent(props: {
         members={members}
         currentUserId={user?.id}
         conversation={editingConversation}
-        kindHint={dialogKind}
         onSaved={handleConversationSaved}
       />
     </div>

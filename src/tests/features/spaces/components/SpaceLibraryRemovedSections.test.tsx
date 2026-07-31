@@ -47,6 +47,11 @@ describe("removed Library sections", () => {
     expect(libraryCollectionKinds.has("people")).toBe(false);
   });
 
+  it("omits Smart Library from navigation and public collection routes", () => {
+    expect(librarySidebarItems.map((item) => item.label)).not.toContain("Smart Library");
+    expect(libraryCollectionKinds.has("smart")).toBe(false);
+  });
+
   it("omits Smart Groups from the Collections overview and legacy routes", async () => {
     await act(async () => root.render(<SpaceLibraryCollectionOverview />));
 

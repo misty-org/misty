@@ -11,7 +11,6 @@ import { LibraryCollectionHeader } from "./librarySurfaces/LibraryCollectionHead
 import { LibraryItemsRegion } from "./librarySurfaces/LibraryItemsRegion";
 import { MemoryControls } from "./librarySurfaces/MemoryControls";
 import { SharedReferencesIndex } from "./librarySurfaces/SharedReferencesIndex";
-import { SmartLibraryBanner } from "./librarySurfaces/SmartLibraryBanner";
 import { useSpaceLibraryCollectionActions } from "./useSpaceLibraryCollectionActions";
 import { useSpaceLibraryData } from "./useSpaceLibraryData";
 import { useSpaceLibraryItemActions } from "./useSpaceLibraryItemActions";
@@ -33,8 +32,7 @@ export function SpaceLibrary({ spaceId }: { spaceId: string }) {
       <LibraryCanEditContext.Provider value={data.canEditLibrary}>
         <div className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] bg-transparent">
           <SpaceLibraryTopChrome />
-          <div className="min-h-0 overflow-auto bg-transparent px-6 pb-6 pt-5">
-            <SmartLibraryBanner />
+          <div className="min-h-0 overflow-auto bg-transparent px-5 pb-6 pt-5">
             <DateGroupIndex />
             {data.collection === "collections" ? <SpaceLibraryCollectionOverview /> : null}
             <AlbumsIndex />
