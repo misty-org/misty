@@ -151,7 +151,16 @@ export async function activateAccountSession(accountId: string): Promise<SavedAc
   }
   const vault = await loadSecureVault();
   const session = vault.sessions.find((item) => item.account.id === accountId);
-  if (!session) throw new Error("That saved Misty session is no longer available.");
+  if (!session) {
+    const activeAccountId = vault.sessions.some((item) => item.account.id === vault.activeAccountId)
+      ? vault.activeAccountId
+      : "";
+    writeAccountIndex(
+      vault.sessions.map((item) => item.account),
+      activeAccountId,
+    );
+    throw new Error("That saved Misty session is no longer available.");
+  }
 
   session.account = { ...session.account, lastUsedAt: new Date().toISOString() };
   vault.activeAccountId = accountId;
