@@ -7,6 +7,7 @@ pub mod protocol;
 pub mod seal;
 pub mod signin;
 pub mod state;
+pub(crate) mod stats;
 pub mod sync;
 
 #[cfg(test)]
