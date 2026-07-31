@@ -85,9 +85,7 @@ describe("app route memory", () => {
   });
 
   it("migrates legacy Tasks routes to Planner", () => {
-    useAppRouteMemoryStore
-      .getState()
-      .rememberAppRoute("/spaces/space-7/tasks/list?mine=1");
+    useAppRouteMemoryStore.getState().rememberAppRoute("/spaces/space-7/tasks/list?mine=1");
 
     expect(useAppRouteMemoryStore.getState()).toMatchObject({
       lastAppRoute: "/spaces/space-7/planner/list",

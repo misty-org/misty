@@ -38,10 +38,7 @@ describe("SpaceStorageFooter", () => {
     await act(async () => {
       root.render(
         <MemoryRouter>
-          <SpaceStorageFooter
-            usage={space1Usage}
-            showsOwnerStorage={true}
-          />
+          <SpaceStorageFooter usage={space1Usage} showsOwnerStorage={true} />
         </MemoryRouter>,
       );
     });
@@ -55,10 +52,7 @@ describe("SpaceStorageFooter", () => {
     await act(async () => {
       root.render(
         <MemoryRouter>
-          <SpaceStorageFooter
-            usage={null}
-            showsOwnerStorage={true}
-          />
+          <SpaceStorageFooter usage={null} showsOwnerStorage={true} />
         </MemoryRouter>,
       );
     });

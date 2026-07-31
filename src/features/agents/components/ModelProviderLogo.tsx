@@ -9,7 +9,6 @@ import {
   SiMistralai,
   SiNvidia,
   SiOllama,
-  SiOpenai,
   SiPerplexity,
   SiVercel,
 } from "react-icons/si";
@@ -43,7 +42,7 @@ const providerLogoMap: Record<string, ModelProviderLogoSpec> = {
   morph: { kind: "lucide", icon: Wand2, color: "#10B981" },
   nvidia: { kind: "react", icon: SiNvidia, color: "#76B900" },
   ollama: { kind: "react", icon: SiOllama, color: "#000000" },
-  openai: { kind: "react", icon: SiOpenai, color: "#000000" },
+  openai: { kind: "lucide", icon: Bot, color: "#000000" },
   perplexity: { kind: "react", icon: SiPerplexity, color: "#1FB8CD" },
   stepfun: { kind: "lucide", icon: Bot, color: "#0EA5E9" },
   vercel: { kind: "react", icon: SiVercel, color: "#000000" },

@@ -35,7 +35,7 @@ use crate::{
     error::{ApiError, ApiResult},
     services::{
         environment::AppEnvironmentService,
-        macos_privacy::is_background_scan_excluded,
+        macos_privacy::is_background_scan_excluded as privacy_excluded,
         providers::{ProviderRemote, ProviderService},
         storage::{StorageResponse, StorageService},
     },
@@ -759,7 +759,7 @@ impl SearchService {
             .into_iter()
             .filter_entry(|entry| {
                 !is_ignored(entry.path(), ignored)
-                    && !is_background_scan_excluded(entry.path(), &self.inner.home_dir)
+                    && !privacy_excluded(entry.path(), &self.inner.home_dir)
             })
         {
             if self.inner.cancel_flag.load(Ordering::SeqCst) {
@@ -1874,7 +1874,6 @@ fn now_ms() -> u64 {
 fn display_path(path: &Path) -> String {
     path.to_string_lossy().to_string()
 }
-
 #[cfg(test)]
 mod rule_tests {
     use super::*;
@@ -1896,7 +1895,6 @@ mod rule_tests {
             hidden: false,
         }
     }
-
     #[test]
     fn structured_rules_apply_all_and_any_modes() {
         let rules = vec![
@@ -1958,7 +1956,6 @@ mod incremental_tests {
             hidden: false,
         }
     }
-
     #[test]
     fn manifest_refresh_reuses_unchanged_docs_and_removes_missing_docs() {
         let root = std::env::temp_dir().join(format!(
@@ -2011,7 +2008,6 @@ mod incremental_tests {
         drop(index);
         let _ = fs::remove_dir_all(root);
     }
-
     #[test]
     fn existing_pre_manifest_catalog_is_reused_on_the_first_incremental_refresh() {
         let root = std::env::temp_dir().join(format!(
