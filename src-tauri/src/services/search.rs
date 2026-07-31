@@ -35,6 +35,7 @@ use crate::{
     error::{ApiError, ApiResult},
     services::{
         environment::AppEnvironmentService,
+        macos_privacy::is_background_scan_excluded,
         providers::{ProviderRemote, ProviderService},
         storage::{StorageResponse, StorageService},
     },
@@ -756,7 +757,10 @@ impl SearchService {
             .follow_links(false)
             .max_depth(max_depth.unwrap_or(DEFAULT_MAX_DEPTH).max(1))
             .into_iter()
-            .filter_entry(|entry| !is_ignored(entry.path(), ignored))
+            .filter_entry(|entry| {
+                !is_ignored(entry.path(), ignored)
+                    && !is_background_scan_excluded(entry.path(), &self.inner.home_dir)
+            })
         {
             if self.inner.cancel_flag.load(Ordering::SeqCst) {
                 return Err(ApiError::Message("Search scan canceled.".to_string()));

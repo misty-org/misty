@@ -127,14 +127,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         accountReady = true;
       } catch (error) {
         if (isInvalidAccountSessionError(error)) await clearAccountAuthToken();
-        if (
-          previousAccountId &&
-          listSavedAccountSessions().some((account) => account.id === previousAccountId)
-        ) {
-          await activateAccountSession(previousAccountId);
+        const restoredPreviousAccount = await tryRestoreSavedSession(previousAccountId);
+        if (restoredPreviousAccount) {
           if (previousMe?.id === previousAccountId) useUserStore.getState().setMe(previousMe);
           if (previousUser?.id === previousAccountId) setUserState(previousUser);
           accountReady = true;
+        } else {
+          useUserStore.getState().clear();
+          setUserState(null);
         }
         setAccounts(listSavedAccountSessions());
         throw error;
@@ -178,18 +178,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (authenticated && isInvalidAccountSessionError(error)) {
           await clearAccountAuthToken();
         }
-        if (
-          previousAccountId &&
-          listSavedAccountSessions().some((account) => account.id === previousAccountId)
-        ) {
-          await activateAccountSession(previousAccountId);
-          if (previousUser && previousLicense) {
-            await saveAuthenticatedUser(previousUser, previousLicense);
+        let restoredPreviousAccount = false;
+        if (await tryRestoreSavedSession(previousAccountId)) {
+          try {
+            if (previousUser && previousLicense) {
+              await saveAuthenticatedUser(previousUser, previousLicense);
+            }
+            if (previousMe?.id === previousAccountId) useUserStore.getState().setMe(previousMe);
+            if (previousUser?.id === previousAccountId) setUserState(previousUser);
+            restoredPreviousAccount = true;
+            accountReady = true;
+          } catch {
+            // Restoring the previous native identity is best-effort. Preserve
+            // the original sign-in error instead of replacing it with a
+            // secondary rollback failure.
           }
-          if (previousMe?.id === previousAccountId) useUserStore.getState().setMe(previousMe);
-          if (previousUser?.id === previousAccountId) setUserState(previousUser);
-          accountReady = true;
-        } else {
+        }
+        if (!restoredPreviousAccount) {
           useUserStore.getState().clear();
           setUserState(null);
         }
@@ -435,6 +440,17 @@ async function restoreSavedSession(accountId: string): Promise<void> {
   if (!accountId) return;
   if (!listSavedAccountSessions().some((account) => account.id === accountId)) return;
   await activateAccountSession(accountId);
+}
+
+async function tryRestoreSavedSession(accountId: string): Promise<boolean> {
+  if (!accountId) return false;
+  if (!listSavedAccountSessions().some((account) => account.id === accountId)) return false;
+  try {
+    await activateAccountSession(accountId);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function assertAccountIdentity(me: AccountMeResponse, expectedAccountId: string): void {
