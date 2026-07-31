@@ -7,6 +7,7 @@ pub mod commands;
 pub mod devices;
 mod direct_cloud;
 pub mod directory_size;
+mod directory_size_local;
 pub mod document_intelligence;
 pub mod environment;
 pub mod explorer;

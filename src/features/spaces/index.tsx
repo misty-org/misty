@@ -83,9 +83,7 @@ export function SpaceDetail() {
     return <Navigate to={`/spaces/${encodeURIComponent(spaceId)}/settings/general`} replace />;
   }
   if (section === "members") {
-    return (
-      <Navigate to={`/spaces/${encodeURIComponent(spaceId)}/settings/members`} replace />
-    );
+    return <Navigate to={`/spaces/${encodeURIComponent(spaceId)}/settings/members`} replace />;
   }
 
   const returnPath = `${location.pathname}${location.search}${location.hash}`;

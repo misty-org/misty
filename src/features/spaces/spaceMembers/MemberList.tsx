@@ -87,12 +87,7 @@ function MemberActionsMenu({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button
-          size="icon"
-          variant="ghost"
-          type="button"
-          aria-label={`Actions for ${member.name}`}
-        >
+        <Button size="icon" variant="ghost" type="button" aria-label={`Actions for ${member.name}`}>
           <Ellipsis className="size-4" />
         </Button>
       </DropdownMenuTrigger>

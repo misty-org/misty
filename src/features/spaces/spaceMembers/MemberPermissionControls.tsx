@@ -72,9 +72,8 @@ export function MemberPermissionControls({
       let latest = permissions;
       for (const group of permissionGroups) {
         for (const item of group.items) {
-          latest = (
-            await spacesApi.setMemberPermission(spaceId, userId, item.id, "inherit")
-          ).permissions;
+          latest = (await spacesApi.setMemberPermission(spaceId, userId, item.id, "inherit"))
+            .permissions;
         }
       }
       setPermissions(latest);

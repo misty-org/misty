@@ -216,7 +216,10 @@ function BoardColumn({
 
         {!tasks.length && !creating ? (
           <Button
-            className="misty-spaces-interactive min-h-28 flex-col gap-2 rounded-md border-0 bg-transparent text-xs text-muted-foreground shadow-none hover:bg-muted/35"
+            className={[
+              "misty-spaces-interactive min-h-28 flex-col gap-2 rounded-md border-0 bg-transparent",
+              "text-xs text-muted-foreground shadow-none hover:bg-muted/35",
+            ].join(" ")}
             variant="ghost"
             type="button"
             disabled={!canManage}
