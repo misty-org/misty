@@ -10,8 +10,8 @@ export type SelectCollection = (next: LibraryCollectionKind, id?: string) => voi
 /**
  * Keeps the selected collection and the `?collection=` URL in step.
  *
- * "people" and "groups" are no longer browsable collections of their own, so
- * both redirect to Recently Added rather than rendering an empty surface.
+ * Beta-only collections are not browsable, so their legacy URLs redirect to
+ * Recently Added rather than rendering an empty or hidden surface.
  * Opening a specific album also switches the sort to the album's own order.
  */
 export function useLibraryCollectionRoute(data: SpaceLibraryData): SelectCollection {
@@ -28,7 +28,7 @@ export function useLibraryCollectionRoute(data: SpaceLibraryData): SelectCollect
   } = data;
 
   const selectCollection: SelectCollection = (next, id = "") => {
-    if (next === "people" || next === "groups") {
+    if (next === "smart" || next === "people" || next === "groups") {
       next = "recent";
       id = "";
     }
@@ -52,7 +52,11 @@ export function useLibraryCollectionRoute(data: SpaceLibraryData): SelectCollect
   };
 
   useEffect(() => {
-    if (requestedCollection === "people" || requestedCollection === "groups") {
+    if (
+      requestedCollection === "smart" ||
+      requestedCollection === "people" ||
+      requestedCollection === "groups"
+    ) {
       selectCollection("recent");
       return;
     }

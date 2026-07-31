@@ -1,5 +1,5 @@
 import { ImageIcon } from "lucide-react";
-import { Avatar, AvatarFallback, AvatarImage } from "@/ui";
+import { Avatar, AvatarFallback, AvatarImage, Button } from "@/ui";
 import type { SpaceMessage } from "@/models/interfaces/features/spaces/types";
 import { hasAnyAttachment, initials, messageReplyPreviewText } from "./messageHelpers";
 
@@ -23,8 +23,9 @@ export function MessageReplyPreview({
       <div aria-hidden="true" className="relative">
         <span className="absolute left-[21px] top-3 h-5 w-[37px] rounded-tl-md border-l-2 border-t-2 border-muted-foreground/55" />
       </div>
-      <button
-        className="flex min-w-0 items-center gap-1.5 self-start overflow-hidden border-0 bg-transparent p-0 text-left text-[13px] leading-5 text-muted-foreground hover:text-foreground"
+      <Button
+        variant="ghost"
+        className="h-auto min-w-0 justify-start gap-1.5 self-start overflow-hidden border-0 bg-transparent p-0 text-left text-[13px] leading-5 text-muted-foreground shadow-none hover:bg-transparent hover:text-foreground"
         type="button"
         onClick={onOpen}
         aria-label={
@@ -50,7 +51,7 @@ export function MessageReplyPreview({
         ) : (
           <span className="truncate italic">Original message unavailable</span>
         )}
-      </button>
+      </Button>
     </div>
   );
 }

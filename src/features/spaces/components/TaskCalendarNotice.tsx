@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { CalendarClock, CloudOff, TriangleAlert, Upload } from "lucide-react";
 
 import { Button } from "@/ui";
-import { taskSyncState } from "@/features/spaces/integrations/googleCalendarMapping";
+import { taskSyncState } from "@/features/spaces/connections/googleCalendarMapping";
 import type { SpaceTask } from "@/models/interfaces/features/spaces/types";
 
 /**

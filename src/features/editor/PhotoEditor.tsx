@@ -4,7 +4,14 @@ export type { PhotoEditorProps } from "@/models/interfaces/features/editor/Photo
 // never pulled into the module graph until it is actually rendered.
 import type { FilerobotImageEditorConfig } from "react-filerobot-image-editor";
 import { Copy, Loader2, X } from "lucide-react";
-import { lazy, Suspense, useCallback, useState, type FunctionComponent, type ReactNode } from "react";
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useState,
+  type FunctionComponent,
+  type ReactNode,
+} from "react";
 import { Button } from "@/ui";
 import "./photoEditor.css";
 
@@ -157,7 +164,11 @@ export function PhotoEditor(props: PhotoEditorProps) {
   return (
     <EditorShell name={props.name}>
       <Suspense
-        fallback={<div className="grid h-full place-items-center text-white/60"><Loader2 className="animate-spin" size={28} /></div>}
+        fallback={
+          <div className="grid h-full place-items-center text-white/60">
+            <Loader2 className="animate-spin" size={28} />
+          </div>
+        }
       >
         <FilerobotImageEditor
           key={props.sourceKey}

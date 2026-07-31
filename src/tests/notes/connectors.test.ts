@@ -29,12 +29,20 @@ describe("MistyNativeNotesConnector", () => {
     const connector = createMistyNativeNotesConnector();
     expect(connector.status()).toBe("connected");
     expect(connector.createNote).toBeTypeOf("function");
+    expect(connector.deleteNote).toBeTypeOf("function");
+    expect(connector.capabilities.delete).toBe(true);
     expect(connector.capabilities.update).toBe(false);
   });
 
   it("creates notes through the Space API as synced collaborative notes", async () => {
-    spaceRequestMock.mockResolvedValueOnce(serverNote({ title: "Draft", plain_text: "hello world" }));
-    const connector = createMistyNativeNotesConnector("account", spaceInput.spaceId, spaceInput.spaceName);
+    spaceRequestMock.mockResolvedValueOnce(
+      serverNote({ title: "Draft", plain_text: "hello world" }),
+    );
+    const connector = createMistyNativeNotesConnector(
+      "account",
+      spaceInput.spaceId,
+      spaceInput.spaceName,
+    );
     const created = await connector.createNote!({
       title: "Draft",
       body: "hello world",
@@ -53,7 +61,11 @@ describe("MistyNativeNotesConnector", () => {
 
   it("falls back to a placeholder title", async () => {
     spaceRequestMock.mockResolvedValueOnce(serverNote({ title: "Untitled note" }));
-    const connector = createMistyNativeNotesConnector("account", spaceInput.spaceId, spaceInput.spaceName);
+    const connector = createMistyNativeNotesConnector(
+      "account",
+      spaceInput.spaceId,
+      spaceInput.spaceName,
+    );
     const created = await connector.createNote!({ title: "   ", body: "", ...spaceInput });
     expect(created.title).toBe("Untitled note");
   });
@@ -69,12 +81,34 @@ describe("MistyNativeNotesConnector", () => {
     spaceRequestMock.mockResolvedValueOnce({
       notes: [serverNote({ id: "note_server", title: "Server note", plain_text: "shared" })],
     });
-    const connector = createMistyNativeNotesConnector("account", spaceInput.spaceId, spaceInput.spaceName);
+    const connector = createMistyNativeNotesConnector(
+      "account",
+      spaceInput.spaceId,
+      spaceInput.spaceName,
+    );
     const notes = await connector.listNotes();
 
     expect(spaceRequestMock).toHaveBeenCalledWith("/spaces/space-product/notes");
     expect(notes.map((note) => note.title)).toEqual(["Server note"]);
     expect(notes[0].syncStatus).toBe("synced");
+  });
+
+  it("deletes native notes through their Space API route", async () => {
+    spaceRequestMock
+      .mockResolvedValueOnce({ notes: [serverNote({ id: "note_delete" })] })
+      .mockResolvedValueOnce(undefined);
+    const connector = createMistyNativeNotesConnector(
+      "account",
+      spaceInput.spaceId,
+      spaceInput.spaceName,
+    );
+    await connector.listNotes();
+    await connector.deleteNote!("note_delete");
+
+    expect(spaceRequestMock).toHaveBeenLastCalledWith(
+      "/spaces/space-product/notes/note_delete",
+      { method: "DELETE" },
+    );
   });
 });
 
@@ -83,6 +117,7 @@ describe("NotionConnector", () => {
     const connector = createNotionConnector(createFakeNotionClient().client);
     expect(connector.capabilities.read).toBe(true);
     expect(connector.capabilities.create).toBe(true);
+    expect(connector.capabilities.delete).toBe(false);
     expect(connector.createNote).toBeTypeOf("function");
     expect(connector.updateNote).toBeTypeOf("function");
     expect(connector.openInSource).toBeTypeOf("function");
@@ -136,7 +171,11 @@ describe("NotesConnectorRegistry", () => {
     spaceRequestMock.mockResolvedValueOnce({
       notes: [serverNote({ id: "note_misty", title: "Misty note" })],
     });
-    const healthy = createMistyNativeNotesConnector("account", spaceInput.spaceId, spaceInput.spaceName);
+    const healthy = createMistyNativeNotesConnector(
+      "account",
+      spaceInput.spaceId,
+      spaceInput.spaceName,
+    );
     const broken = createNotionConnector(createFakeNotionClient().client);
     broken.listNotes = async () => {
       throw new Error("token expired");

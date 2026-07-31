@@ -19,6 +19,7 @@ pub mod extension_runtime;
 pub mod extension_tools;
 pub mod file_sync;
 pub mod keychain;
+mod macos_privacy;
 #[cfg(desktop)]
 pub mod media_search;
 pub mod metadata;

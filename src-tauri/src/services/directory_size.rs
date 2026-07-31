@@ -15,7 +15,10 @@ use walkdir::WalkDir;
 use crate::{
     core::file_master::RemoteBrowseTarget,
     error::{ApiError, ApiResult},
-    services::{environment::AppEnvironmentService, storage::StorageService},
+    services::{
+        environment::AppEnvironmentService, macos_privacy::is_background_scan_excluded,
+        storage::StorageService,
+    },
 };
 
 const DIRECTORY_SIZE_CACHE_TTL_MS: i64 = 24 * 60 * 60 * 1000;
@@ -28,6 +31,7 @@ pub struct DirectorySizeService {
 struct DirectorySizeInner {
     db_path: PathBuf,
     db_lock: Arc<Mutex<()>>,
+    home_dir: PathBuf,
     mount_root: PathBuf,
     proxy: StorageService,
     calculating: AsyncMutex<HashSet<String>>,
@@ -86,6 +90,7 @@ impl DirectorySizeService {
             inner: Arc::new(DirectorySizeInner {
                 db_path: environment.misty_db_path(),
                 db_lock: Arc::new(Mutex::new(())),
+                home_dir: environment.home_dir(),
                 mount_root: environment.mount_root(),
                 proxy,
                 calculating: AsyncMutex::new(HashSet::new()),
@@ -211,7 +216,8 @@ impl DirectorySizeService {
     async fn calculate_target(&self, target: DirectorySizeTarget) -> Result<u64, String> {
         match target {
             DirectorySizeTarget::Local(path) => {
-                tokio::task::spawn_blocking(move || local_directory_size(&path))
+                let home_dir = self.inner.home_dir.clone();
+                tokio::task::spawn_blocking(move || local_directory_size(&path, &home_dir))
                     .await
                     .map_err(|error| format!("Directory size worker failed: {error}"))
                     .and_then(|result| result)
@@ -463,14 +469,22 @@ fn sql_error(error: rusqlite::Error) -> ApiError {
     ApiError::Message(format!("SQLite directory size store failed: {error}"))
 }
 
-fn local_directory_size(path: &Path) -> Result<u64, String> {
+fn local_directory_size(path: &Path, home_dir: &Path) -> Result<u64, String> {
     let metadata = fs::symlink_metadata(path)
         .map_err(|error| format!("Failed to inspect {}: {error}", path.display()))?;
     if metadata.file_type().is_symlink() || !metadata.is_dir() {
         return Err(format!("{} is not a directory.", path.display()));
     }
+    if is_background_scan_excluded(path, home_dir) {
+        return Err("Folder size is unavailable for protected macOS app data.".to_owned());
+    }
     let mut total = 0u64;
-    for entry in WalkDir::new(path).follow_links(false).into_iter().skip(1) {
+    for entry in WalkDir::new(path)
+        .follow_links(false)
+        .into_iter()
+        .filter_entry(|entry| !is_background_scan_excluded(entry.path(), home_dir))
+        .skip(1)
+    {
         let entry = entry.map_err(|error| error.to_string())?;
         if entry.file_type().is_file() {
             total =
@@ -522,10 +536,30 @@ mod tests {
         #[cfg(unix)]
         std::os::unix::fs::symlink(root.join("a.txt"), root.join("link.txt")).expect("symlink");
 
-        let size = local_directory_size(&root).expect("directory size");
+        let size = local_directory_size(&root, &root).expect("directory size");
         assert_eq!(size, 18);
 
         let _ = fs::remove_dir_all(root);
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn directory_size_local_walk_skips_protected_app_data() {
+        let home =
+            std::env::temp_dir().join(format!("misty-directory-size-privacy-{}", Uuid::new_v4()));
+        let protected = home
+            .join("Library")
+            .join("Containers")
+            .join("com.example.private")
+            .join("Data");
+        fs::create_dir_all(&protected).expect("create protected test dirs");
+        fs::write(home.join("visible.txt"), vec![0u8; 7]).expect("write visible file");
+        fs::write(protected.join("private.txt"), vec![0u8; 11]).expect("write private file");
+
+        let size = local_directory_size(&home, &home).expect("directory size");
+        assert_eq!(size, 7);
+
+        let _ = fs::remove_dir_all(home);
     }
 
     #[test]

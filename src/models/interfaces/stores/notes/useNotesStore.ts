@@ -1,6 +1,10 @@
 import type { NotesConnectorRegistry } from "@/features/notes/connectors/registry";
 import type { CreateNoteInput } from "@/models/interfaces/features/notes/connectors";
-import type { NoteBodyFormat, NotesLoadPhase, UnifiedNote } from "@/models/types/features/notes/types";
+import type {
+  NoteBodyFormat,
+  NotesLoadPhase,
+  UnifiedNote,
+} from "@/models/types/features/notes/types";
 
 export interface UpdateNoteContentInput {
   body: string;
@@ -47,6 +51,7 @@ export interface NotesStoreActions {
   setIntegrationsOpen: (open: boolean) => void;
   toggleFavorite: (noteId: string) => Promise<void>;
   createNote: (input: CreateNoteInput) => Promise<UnifiedNote | undefined>;
+  deleteNote: (noteId: string) => Promise<void>;
   updateNoteBody: (noteId: string, body: string) => Promise<void>;
   updateNoteContent: (noteId: string, content: UpdateNoteContentInput) => Promise<void>;
   assignSpace: (noteId: string, spaceId?: string, spaceName?: string) => Promise<void>;

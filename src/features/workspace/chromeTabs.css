@@ -45,7 +45,7 @@
 .misty-chrome-tabs .chrome-tab[data-active="true"] {
   flex-shrink: 0.85;
   border-color: color-mix(in srgb, var(--misty-text) 28%, transparent);
-  background: var(--misty-app-tab-active-bg, var(--misty-surface-2));
+  background: var(--misty-app-tab-bg, var(--misty-bg-soft));
   color: var(--misty-text);
 }
 

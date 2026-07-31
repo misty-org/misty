@@ -26,8 +26,8 @@ export function SpaceChatMessages(props: SpaceChatMessagesProps) {
   }) => message.origin?.author_avatar_url || memberAvatarUrls.get(message.sender_user_id) || "";
 
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto px-[clamp(20px,5vw,72px)] py-6">
-      <div className="mx-auto max-w-5xl">
+    <div className="min-h-0 flex-1 overflow-y-auto px-[clamp(22px,5vw,72px)] py-8">
+      <div className="mx-auto max-w-4xl">
         {props.error ? (
           <div
             className="mb-4 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive"

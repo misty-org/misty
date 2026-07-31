@@ -4,8 +4,22 @@ import type {
 } from "@/models/interfaces/features/notes/components/NoteReadingPane";
 export type { NoteReadingPaneProps } from "@/models/interfaces/features/notes/components/NoteReadingPane";
 import { Suspense, lazy, useEffect, useState } from "react";
-import { Check, PenLine, Plus, Star, X } from "lucide-react";
-import { Button, EmptyState, Skeleton, cn } from "@/ui";
+import { Check, PenLine, Star, Trash2, X } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+  Button,
+  EmptyState,
+  Skeleton,
+  cn,
+} from "@/ui";
 import { relativeTime } from "@/features/notes/noteFilters";
 import { NoteSyncIndicator } from "./NoteSourceBadge";
 
@@ -26,11 +40,19 @@ export function NoteReadingPane(props: NoteReadingPaneProps) {
     bodyFormat: "markdown" as const,
     bodyMarkdown: undefined as string | undefined,
   });
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
   const editing = Boolean(note && props.editingNoteId === note.id);
 
   useEffect(() => {
     if (!editing) setDraft(noteContent(note));
   }, [editing, note?.body, note?.bodyFormat, note?.bodyMarkdown, note?.id]);
+  useEffect(() => {
+    setDeleteOpen(false);
+    setDeleting(false);
+    setDeleteError("");
+  }, [note?.id]);
 
   if (props.loading) return <ReadingPaneSkeleton />;
 
@@ -39,14 +61,13 @@ export function NoteReadingPane(props: NoteReadingPaneProps) {
       <div className={paneClass}>
         <div className="row-span-2 grid place-items-center">
           <EmptyState
-            title="No note selected"
-            description="Pick a note from the list, or start a new one in Misty."
-            action={
-              <Button type="button" size="sm" className="gap-1.5" onClick={props.onNewNote}>
-                <Plus size={14} strokeWidth={2.2} />
-                New note
-              </Button>
+            title={props.hasNotes ? "Select a note" : "No notes yet"}
+            description={
+              props.hasNotes
+                ? "Choose a note from the list to open it."
+                : "Create a note to keep this Space's work close by."
             }
+            className="max-w-sm px-6 py-8"
           />
         </div>
       </div>
@@ -85,6 +106,68 @@ export function NoteReadingPane(props: NoteReadingPaneProps) {
               >
                 <Star size={14} className={cn(note.favorite && "fill-amber-500 text-amber-500")} />
               </Button>
+            ) : null}
+
+            {props.onDelete && !editing ? (
+              <AlertDialog
+                open={deleteOpen}
+                onOpenChange={(open) => {
+                  setDeleteOpen(open);
+                  if (!open) setDeleteError("");
+                }}
+              >
+                <AlertDialogTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="size-8 text-muted-foreground hover:text-destructive"
+                    title="Delete note"
+                    aria-label="Delete note"
+                  >
+                    <Trash2 size={14} />
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Delete this note?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      “{note.title}” and its collaborative history will be permanently removed.
+                    </AlertDialogDescription>
+                    {deleteError ? (
+                      <p className="m-0 text-sm text-destructive" role="alert">
+                        {deleteError}
+                      </p>
+                    ) : null}
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      disabled={deleting}
+                      onClick={(event) => {
+                        event.preventDefault();
+                        if (deleting) return;
+                        setDeleting(true);
+                        setDeleteError("");
+                        void props
+                          .onDelete?.(note.id)
+                          .then(() => setDeleteOpen(false))
+                          .catch((reason: unknown) => {
+                            setDeleteError(
+                              reason instanceof Error && reason.message
+                                ? reason.message
+                                : "Could not delete this note.",
+                            );
+                          })
+                          .finally(() => setDeleting(false));
+                      }}
+                    >
+                      {deleting ? "Deleting…" : "Delete note"}
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             ) : null}
 
             {editable ? (

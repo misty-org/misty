@@ -46,13 +46,11 @@ let reconnectAttempt = 0;
 let realtimeWanted = false;
 let realtimeAccountId = "";
 let realtimeGeneration = 0;
-// The space we last told the server we're "viewing", for the active-users
-// presence capsule. Re-sent on every reconnect since the server only knows
-// about it for the lifetime of a single WebSocket connection.
+// The Space we last told the server we're viewing. Re-sent on every reconnect
+// since the server only knows about it for the lifetime of a WebSocket.
 let currentViewingSpaceId = "";
-// Whether the viewed space's chat is currently in focus (vs. still connected
-// but tabbed/alt-tabbed away — "idle"). Tracked globally rather than per
-// mount so it stays correct across reconnects and re-renders.
+// Whether Misty is currently in focus (vs. tabbed/alt-tabbed away — "idle").
+// Tracked globally so presence stays correct across every Space section.
 let currentViewingActive = computeViewingActivity();
 
 // Bumped whenever the authenticated account context changes (see
@@ -812,10 +810,8 @@ function sendViewingMessage(spaceId: string, active: boolean): void {
   }
 }
 
-// "Active" means the space's chat is actually in view — the window has focus
-// and the tab/webview isn't hidden. Anything else (alt-tabbed away, another
-// app in front, minimized) counts as idle even though the WebSocket is still
-// connected.
+// "Active" means the Space is in view and the window has focus. Anything else
+// counts as idle even though the WebSocket is still connected.
 function computeViewingActivity(): boolean {
   if (typeof document === "undefined") return true;
   return document.visibilityState === "visible" && document.hasFocus();

@@ -86,7 +86,7 @@ export const ChromeTabStrip = memo(function ChromeTabStrip(props: ChromeTabStrip
         ref={tabsRef}
         className="misty-chrome-tabs"
         role="tablist"
-        aria-label="Open locations"
+        aria-label={props.ariaLabel ?? "Open locations"}
         onWheel={handleWheel}
       >
         {props.tabs.map((tab) => {

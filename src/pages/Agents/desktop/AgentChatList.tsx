@@ -81,9 +81,10 @@ export function AgentChatList() {
               </div>
             ) : (
               <>
-                <button
+                <Button
                   type="button"
-                  className="grid min-h-11 min-w-0 flex-1 grid-cols-[32px_minmax(0,1fr)] items-center gap-2.5 rounded-md bg-transparent px-2.5 text-sm outline-none transition-colors focus-visible:ring-1 focus-visible:ring-sidebar-ring"
+                  variant="ghost"
+                  className="grid h-auto min-h-11 min-w-0 flex-1 grid-cols-[32px_minmax(0,1fr)] items-center gap-2.5 rounded-md bg-transparent px-2.5 text-sm shadow-none hover:bg-transparent focus-visible:ring-1 focus-visible:ring-sidebar-ring"
                   aria-current={active ? "true" : undefined}
                   onClick={() => void switchConversation(conversation.id)}
                   onDoubleClick={() => startRename(conversation.id, conversation.title)}
@@ -94,7 +95,7 @@ export function AgentChatList() {
                   <span className="min-w-0 truncate text-left font-medium">
                     {conversation.title}
                   </span>
-                </button>
+                </Button>
                 <Button
                   variant="ghost"
                   size="icon"

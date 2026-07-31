@@ -2,6 +2,7 @@ import { FilePenLine, Plus } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button, Skeleton, cn } from "@/ui";
+import { SpaceSidebarSection } from "@/features/spaces/components/SpaceSidebarSection";
 import { useSpaceDrawings } from "../hooks/useSpaceDrawings";
 import { NewDrawingDialog } from "./NewDrawingDialog";
 
@@ -12,22 +13,23 @@ export function DrawingPanelSidebar(props: { spaceId: string; activeDrawingId: s
 
   return (
     <>
-      <section className="grid gap-2">
-        <div className="flex items-center justify-between px-1">
-          <h2 className="text-xs font-medium text-sidebar-foreground">Drawings</h2>
+      <SpaceSidebarSection
+        title="Drawings"
+        count={drawings.drawings.length}
+        action={
           <Button
             type="button"
             size="icon"
             variant="ghost"
-            className="size-7"
+            className="size-6 shrink-0 opacity-0 shadow-none group-hover/sidebar-header:opacity-100 focus-visible:opacity-100"
             title="New drawing"
             aria-label="New drawing"
             onClick={() => setNewDrawingOpen(true)}
           >
-            <Plus size={15} />
+            <Plus size={13} />
           </Button>
-        </div>
-
+        }
+      >
         <nav className="grid gap-1" aria-label="Space drawings">
           {drawings.loading && drawings.drawings.length === 0
             ? Array.from({ length: 3 }, (_, index) => (
@@ -39,10 +41,10 @@ export function DrawingPanelSidebar(props: { spaceId: string; activeDrawingId: s
                   type="button"
                   variant="ghost"
                   className={cn(
-                    "h-9 min-w-0 justify-start gap-2 rounded-lg px-2 text-left text-xs font-normal",
+                    "misty-hover-marker-side relative h-9 min-w-0 justify-start gap-2 rounded-md px-3 text-left text-xs font-normal",
                     props.activeDrawingId === drawing.id
-                      ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                      : "text-muted-foreground hover:bg-sidebar-accent/65 hover:text-sidebar-accent-foreground",
+                      ? "misty-active-marker-side text-sidebar-accent-foreground"
+                      : "text-muted-foreground hover:text-sidebar-accent-foreground",
                   )}
                   onClick={() =>
                     navigate(
@@ -57,11 +59,9 @@ export function DrawingPanelSidebar(props: { spaceId: string; activeDrawingId: s
         </nav>
 
         {!drawings.loading && drawings.drawings.length === 0 ? (
-          <p className="px-1 text-xs text-muted-foreground">
-            Create a drawing to sketch ideas together.
-          </p>
+          <p className="px-2 py-1 text-[11px] text-muted-foreground">None yet</p>
         ) : null}
-      </section>
+      </SpaceSidebarSection>
 
       <NewDrawingDialog
         open={newDrawingOpen}
