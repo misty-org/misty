@@ -6,34 +6,39 @@ export type {
   NoteListItemProps,
   NoteListPanelProps,
 } from "@/models/interfaces/features/notes/components/NoteListPanel";
-import { Plus, Star } from "lucide-react";
+import { Star } from "lucide-react";
 import { Button, EmptyState, ScrollArea, Skeleton, cn } from "@/ui";
 import { relativeTime } from "@/features/notes/noteFilters";
 import { SyncErrorNotice } from "./NotesConnectionCards";
 
-const listPanelClass =
-  "grid h-full min-h-[280px] grid-rows-[auto_minmax(0,1fr)] overflow-hidden rounded-lg border border-sidebar-border/60 bg-sidebar-accent/15";
+const listPanelClass = "grid h-full min-h-[200px] overflow-hidden";
 
-const listHeaderClass =
-  "flex h-9 shrink-0 items-center justify-between gap-2 border-b border-sidebar-border/60 px-3";
+const listHeaderClass = "flex h-9 shrink-0 items-center justify-between gap-2 px-2";
 
 const rowClass =
-  "block w-full cursor-pointer border-b border-sidebar-border/60 px-3 py-2.5 text-left transition-colors hover:bg-sidebar-accent/45";
+  "misty-hover-marker-side relative block w-full cursor-pointer rounded-md px-3 py-2.5 text-left transition-colors";
 
-const rowSelectedClass =
-  "bg-sidebar-accent/70 shadow-[inset_2px_0_0_var(--primary)] hover:bg-sidebar-accent/70";
+const rowSelectedClass = "misty-active-marker-side text-sidebar-accent-foreground";
 
 export function NoteListPanel(props: NoteListPanelProps) {
+  const showHeader = props.showHeader !== false;
   return (
-    <section className={listPanelClass} aria-label="Note list">
-      <div className={listHeaderClass}>
-        <h2 className="truncate text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-          {props.spaceName}
-        </h2>
-        <span className="text-[11px] tabular-nums text-muted-foreground/70">
-          {props.notes.length}
-        </span>
-      </div>
+    <section
+      className={`${listPanelClass} ${
+        showHeader ? "grid-rows-[auto_minmax(0,1fr)]" : "grid-rows-[minmax(0,1fr)]"
+      }`}
+      aria-label="Note list"
+    >
+      {showHeader ? (
+        <div className={listHeaderClass}>
+          <h2 className="truncate text-sm font-semibold text-muted-foreground">
+            {props.spaceName}
+          </h2>
+          <span className="text-[11px] tabular-nums text-muted-foreground/70">
+            {props.notes.length}
+          </span>
+        </div>
+      ) : null}
 
       <ScrollArea className="min-h-0">
         {Object.entries(props.connectorErrors).map(([connectorId, message]) => (
@@ -55,17 +60,7 @@ export function NoteListPanel(props: NoteListPanelProps) {
               }
             />
           ) : (
-            <EmptyState
-              compact
-              title={`No notes in ${props.spaceName} yet`}
-              description="Write a note in this Space to keep the thread of work close by."
-              action={
-                <Button type="button" size="sm" className="gap-1.5" onClick={props.onNewNote}>
-                  <Plus size={14} strokeWidth={2.2} />
-                  New note
-                </Button>
-              }
-            />
+            <p className="m-0 px-2 py-1 text-[11px] text-muted-foreground">None yet</p>
           )
         ) : null}
 
@@ -92,11 +87,7 @@ function NoteListItem(props: NoteListItemProps) {
       type="button"
       variant="ghost"
       aria-current={props.selected ? "true" : undefined}
-      className={cn(
-        rowClass,
-        "h-auto rounded-none font-normal",
-        props.selected && rowSelectedClass,
-      )}
+      className={cn(rowClass, "h-auto font-normal", props.selected && rowSelectedClass)}
       onClick={props.onSelect}
     >
       <span className="flex min-w-0 flex-col gap-1">

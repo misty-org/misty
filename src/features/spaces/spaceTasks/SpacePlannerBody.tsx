@@ -1,15 +1,15 @@
 import { LoaderCircle } from "lucide-react";
 import { Button } from "@/ui";
-import type { TaskViewMode } from "@/models/types/features/spaces/SpaceTasksCalendar";
+import type { TaskViewMode } from "@/models/types/features/spaces/SpacePlanner";
 import type { SpaceCalendarEvent, SpaceMember } from "@/models/interfaces/features/spaces/types";
 import { TaskErrorState } from "../SpaceTaskPrimitives";
-import { SpaceTaskBoard, SpaceTaskCalendar, SpaceTaskList } from "../SpaceTasksViews";
+import { SpaceTaskBoard, SpaceTaskCalendar, SpaceTaskList } from "../SpacePlannerViews";
 import type { SpaceTasksData } from "./useSpaceTasksData";
 import type { SpaceTaskActions } from "./useSpaceTaskActions";
 import { matchesDueFilter } from "./taskFiltering";
-import type { DueFilter } from "@/models/types/features/spaces/SpaceTasksCalendar";
+import type { DueFilter } from "@/models/types/features/spaces/SpacePlanner";
 
-export interface SpaceTasksBodyProps {
+export interface SpacePlannerBodyProps {
   view: TaskViewMode;
   members: SpaceMember[];
   canManage: boolean;
@@ -21,7 +21,7 @@ export interface SpaceTasksBodyProps {
 }
 
 /** The task surface itself — board, list or calendar — plus its loading and error states. */
-export function SpaceTasksBody(props: SpaceTasksBodyProps) {
+export function SpacePlannerBody(props: SpacePlannerBodyProps) {
   const { view, data, actions, members } = props;
   const visibleTasks = data.tasks.filter(
     (task) =>
@@ -32,7 +32,9 @@ export function SpaceTasksBody(props: SpaceTasksBodyProps) {
 
   return (
     // The board owns its own scrolling (horizontal columns, vertical cards); the list does not.
-    <section className={`min-h-0 p-4 ${view === "board" ? "overflow-hidden" : "overflow-auto"}`}>
+    <section
+      className={`min-h-0 ${view === "board" ? "overflow-hidden p-0" : "overflow-auto p-3"}`}
+    >
       {data.error ? (
         <TaskErrorState message={data.error} onDismiss={() => data.setError("")} />
       ) : null}

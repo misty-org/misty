@@ -45,7 +45,7 @@ import {
   SpaceTaskDrawer,
   SpaceTaskList,
   type TaskDraft,
-} from "@/features/spaces/SpaceTasksViews";
+} from "@/features/spaces/SpacePlannerViews";
 
 export type TaskViewMode = "board" | "list" | "calendar";
 

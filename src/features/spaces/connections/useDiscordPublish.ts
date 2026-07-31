@@ -2,8 +2,8 @@ import { useCallback, useEffect, useState } from "react";
 
 import { errorText } from "@/lib/format";
 import { spaceDiscordApi } from "@/stores/spaces/useSpaceDiscordStore";
-import { shouldPublishToDiscord } from "@/features/spaces/integrations/discordMessageMapping";
-import type { SpaceDiscordLink } from "@/models/interfaces/features/spaces/integrations/discord";
+import { shouldPublishToDiscord } from "@/features/spaces/connections/discordMessageMapping";
+import type { SpaceDiscordLink } from "@/models/interfaces/features/spaces/connections/discord";
 import type { SpaceMessage } from "@/models/interfaces/features/spaces/types";
 
 /**

@@ -1,5 +1,6 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
+import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { SpaceStorageUsage } from "@/models/interfaces/features/spaces/types";
 import {
@@ -35,12 +36,36 @@ describe("SpaceStorageFooter", () => {
     };
 
     await act(async () => {
-      root.render(<SpaceStorageFooter usage={space1Usage} showsOwnerStorage={true} />);
+      root.render(
+        <MemoryRouter>
+          <SpaceStorageFooter
+            usage={space1Usage}
+            showsOwnerStorage={true}
+          />
+        </MemoryRouter>,
+      );
     });
 
     const summaryText = container.querySelector("section")?.textContent;
     expect(summaryText).toContain("2.38 MB in space");
     expect(summaryText).toContain("pool left");
+  });
+
+  it("renders quota bar skeletons while loading for owners to prevent layout shifts", async () => {
+    await act(async () => {
+      root.render(
+        <MemoryRouter>
+          <SpaceStorageFooter
+            usage={null}
+            showsOwnerStorage={true}
+          />
+        </MemoryRouter>,
+      );
+    });
+
+    const section = container.querySelector("section");
+    expect(section?.textContent).toContain("Checking...");
+    expect(container.querySelectorAll(".animate-pulse").length).toBeGreaterThan(0);
   });
 
   it("formats storage bytes accurately using binary 1024 base with precision", () => {

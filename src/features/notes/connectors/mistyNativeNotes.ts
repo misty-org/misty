@@ -46,6 +46,7 @@ export function createMistyNativeNotesConnector(
       create: true,
       append: false,
       update: false,
+      delete: true,
       updateProperties: false,
       openInSource: false,
       sync: true,
@@ -127,6 +128,18 @@ export function createMistyNativeNotesConnector(
       );
     },
 
+    async deleteNote(sourceId: string) {
+      const scope = noteSpaces.get(sourceId);
+      const targetSpaceId = scope?.spaceId ?? spaceId;
+      if (!targetSpaceId) throw new Error("Open the note's Space before deleting it.");
+      await spaceRequest(
+        `/spaces/${encodeURIComponent(targetSpaceId)}/notes/${encodeURIComponent(sourceId)}`,
+        { method: "DELETE" },
+      );
+      noteSpaces.delete(sourceId);
+      syncedAt = nowIso();
+    },
+
     async sync(): Promise<SyncResult> {
       syncedAt = nowIso();
       const notes = spaceId ? await listMistySpaceNotes(spaceId, spaceName) : [];
@@ -168,6 +181,7 @@ function mapServerNote(note: ServerSpaceNote, spaceName = ""): UnifiedNote {
     syncStatus: "synced",
     connectorId: MISTY_CONNECTOR_ID,
     providerStatus: "connected",
+    canDelete: note.role === "creator",
   };
 }
 

@@ -33,9 +33,9 @@ vi.mock("@/stores/spaces/useSpacesBackendStore", () => ({
 }));
 
 import { useSpacesStore } from "@/stores/spaces/useSpacesStore";
-import { SpaceTasksCalendar } from "@/features/spaces/SpaceTasksCalendar";
+import { SpacePlanner } from "@/features/spaces/SpacePlanner";
 
-describe("SpaceTasksCalendar", () => {
+describe("SpacePlanner", () => {
   let container: HTMLDivElement;
   let root: Root;
 
@@ -61,8 +61,8 @@ describe("SpaceTasksCalendar", () => {
   it("renders with a stable empty member snapshot while coordination data loads", async () => {
     await act(async () => {
       root.render(
-        <MemoryRouter initialEntries={["/spaces/space-new/tasks/board"]}>
-          <SpaceTasksCalendar spaceId="space-new" canManage canManageIntegrations />
+        <MemoryRouter initialEntries={["/spaces/space-new/planner/board"]}>
+          <SpacePlanner spaceId="space-new" canManage canManageIntegrations />
         </MemoryRouter>,
       );
       await Promise.resolve();
@@ -71,8 +71,8 @@ describe("SpaceTasksCalendar", () => {
     expect(container.textContent).toContain("Board");
     expect(container.textContent).toContain("List");
     expect(container.textContent).toContain("Calendar");
-    expect(container.textContent).toContain("Tasks");
-    expect(container.textContent).toContain("Sync");
+    expect(container.textContent).toContain("Planner");
+    expect(container.querySelector('button[aria-label="Sync planner"]')).not.toBeNull();
     expect(container.textContent).toContain("To do");
     expect(container.textContent).toContain("In progress");
     expect(container.textContent).toContain("Done");
@@ -100,8 +100,8 @@ describe("SpaceTasksCalendar", () => {
 
     await act(async () => {
       root.render(
-        <MemoryRouter initialEntries={["/spaces/space-new/tasks/list"]}>
-          <SpaceTasksCalendar spaceId="space-new" canManage canManageIntegrations />
+        <MemoryRouter initialEntries={["/spaces/space-new/planner/list"]}>
+          <SpacePlanner spaceId="space-new" canManage canManageIntegrations />
         </MemoryRouter>,
       );
       await Promise.resolve();
@@ -136,8 +136,8 @@ describe("SpaceTasksCalendar", () => {
 
     await act(async () => {
       root.render(
-        <MemoryRouter initialEntries={["/spaces/space-new/tasks/list"]}>
-          <SpaceTasksCalendar spaceId="space-new" canManage canManageIntegrations />
+        <MemoryRouter initialEntries={["/spaces/space-new/planner/list"]}>
+          <SpacePlanner spaceId="space-new" canManage canManageIntegrations />
         </MemoryRouter>,
       );
       await Promise.resolve();
@@ -155,8 +155,8 @@ describe("SpaceTasksCalendar", () => {
   it("does not send blank optional date and assignee fields when quick-adding a task", async () => {
     await act(async () => {
       root.render(
-        <MemoryRouter initialEntries={["/spaces/space-new/tasks/board"]}>
-          <SpaceTasksCalendar spaceId="space-new" canManage canManageIntegrations />
+        <MemoryRouter initialEntries={["/spaces/space-new/planner/board"]}>
+          <SpacePlanner spaceId="space-new" canManage canManageIntegrations />
         </MemoryRouter>,
       );
       await Promise.resolve();
@@ -196,8 +196,8 @@ describe("SpaceTasksCalendar", () => {
   it("includes notes when saving a task from the drawer", async () => {
     await act(async () => {
       root.render(
-        <MemoryRouter initialEntries={["/spaces/space-new/tasks/board"]}>
-          <SpaceTasksCalendar spaceId="space-new" canManage canManageIntegrations />
+        <MemoryRouter initialEntries={["/spaces/space-new/planner/board"]}>
+          <SpacePlanner spaceId="space-new" canManage canManageIntegrations />
         </MemoryRouter>,
       );
       await Promise.resolve();

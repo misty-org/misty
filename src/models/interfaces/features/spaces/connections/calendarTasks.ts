@@ -1,4 +1,4 @@
-import type { ScheduleField } from "@/models/types/features/spaces/integrations/calendarTasks";
+import type { ScheduleField } from "@/models/types/features/spaces/connections/calendarTasks";
 
 /**
  * The schedule fields Google Calendar owns. Misty edits these locally, but a

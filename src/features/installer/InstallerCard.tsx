@@ -193,9 +193,10 @@ export function InstallerCard({
           </div>
           <Button
             aria-label="Refresh install checks"
-            className="shrink-0"
+            className="shrink-0 text-muted-foreground/70 shadow-none hover:text-foreground"
             size="icon"
-            variant="outline"
+            title="Refresh install checks"
+            variant="ghost"
             disabled={busy}
             onClick={() => {
               startRefreshSpin();

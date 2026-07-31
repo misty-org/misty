@@ -15,8 +15,12 @@ export function SpaceSidebarLink({
 }) {
   return (
     <Link className={sidebarLinkClass(active)} to={to} aria-current={active ? "page" : undefined}>
-      <span className="grid size-5 place-items-center text-muted-foreground">
-        <Icon size={14} />
+      <span
+        className={`grid size-7 shrink-0 place-items-center transition-colors ${
+          active ? "text-foreground" : "text-muted-foreground"
+        }`}
+      >
+        <Icon size={16} strokeWidth={1.75} />
       </span>
       <span className="min-w-0 flex-1 truncate font-medium">{label}</span>
     </Link>
@@ -25,9 +29,13 @@ export function SpaceSidebarLink({
 
 function sidebarLinkClass(isActive: boolean) {
   return cn(
-    "flex h-10 min-w-0 items-center gap-2.5 rounded-md px-2.5 text-sm no-underline outline-none transition-colors focus-visible:ring-1 focus-visible:ring-sidebar-ring",
+    [
+      "misty-hover-marker-side misty-spaces-interactive relative flex h-9 min-w-0",
+      "items-center gap-2 rounded-md px-2.5 text-sm no-underline outline-none",
+      "focus-visible:ring-2 focus-visible:ring-sidebar-ring",
+    ].join(" "),
     isActive
-      ? "bg-sidebar-accent text-sidebar-accent-foreground"
-      : "text-sidebar-foreground hover:bg-sidebar-accent/65 hover:text-sidebar-accent-foreground",
+      ? "misty-active-marker-side text-sidebar-accent-foreground"
+      : "text-muted-foreground hover:text-foreground",
   );
 }

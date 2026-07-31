@@ -4,9 +4,9 @@ import { Badge } from "@/ui";
 import {
   syncStateLabel,
   taskSyncState,
-} from "@/features/spaces/integrations/googleCalendarMapping";
+} from "@/features/spaces/connections/googleCalendarMapping";
 import type { SpaceTask } from "@/models/interfaces/features/spaces/types";
-import type { TaskSyncState } from "@/models/types/features/spaces/integrations/calendarTasks";
+import type { TaskSyncState } from "@/models/types/features/spaces/connections/calendarTasks";
 
 /**
  * The one place a task admits where it lives and whether Google agrees.

@@ -4,7 +4,7 @@ import type {
   MessageOrigin,
   MirroredMessageInput,
   SpaceDiscordLink,
-} from "@/models/interfaces/features/spaces/integrations/discord";
+} from "@/models/interfaces/features/spaces/connections/discord";
 import type { SpaceMessage } from "@/models/interfaces/features/spaces/types";
 import type { MessageSpan } from "@/models/types/features/spaces/types";
 

@@ -330,7 +330,7 @@ export function PersonalAgentsSidebar({
                 space_chat: "Chat",
                 library: "Library",
                 notes: "Notes",
-                tasks: "Tasks",
+                tasks: "Planner",
                 members: "Members",
               }).map(([key, label]) => (
                 <Label className="flex items-center gap-2 font-normal" key={key}>

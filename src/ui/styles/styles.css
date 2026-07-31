@@ -509,3 +509,144 @@
   --misty-mobile-page-top: 10px;
   --misty-mobile-page-bottom: 12px;
 }
+
+/* Spaces is a workbench rather than another flat route. These shared layers
+   keep Chat, Tasks, Journal, and Library visually connected without changing
+   their individual data or interaction models. */
+.misty-spaces-workbench {
+  --misty-spaces-rail-width: clamp(248px, 18vw, 268px);
+  background: var(--background);
+}
+
+.misty-spaces-panel {
+  background: var(--sidebar);
+}
+
+.misty-spaces-canvas {
+  background: var(--background);
+}
+
+.misty-spaces-toolbar {
+  border-bottom: 1px solid color-mix(in oklch, var(--border) 72%, transparent);
+  background: var(--background);
+}
+
+.misty-spaces-floating {
+  border: 1px solid color-mix(in oklch, var(--border) 78%, transparent);
+  background: var(--background);
+}
+
+.misty-spaces-interactive {
+  transition:
+    transform var(--misty-transition-fast),
+    background-color var(--misty-transition-fast),
+    border-color var(--misty-transition-fast),
+    box-shadow var(--misty-transition-fast),
+    color var(--misty-transition-fast);
+}
+
+.misty-spaces-interactive:hover {
+  transform: none;
+}
+
+/* Side navigation uses one full-height line for both preview and selection:
+   hover/focus previews the destination, while the active class keeps it visible. */
+.misty-hover-marker-side,
+.misty-hover-marker-bottom,
+.misty-active-marker-side,
+.misty-active-marker-bottom {
+  position: relative;
+}
+
+.misty-hover-marker-side::before,
+.misty-hover-marker-bottom::after,
+.misty-active-marker-side::before,
+.misty-active-marker-bottom::after {
+  position: absolute;
+  z-index: 1;
+  display: block;
+  border-radius: 999px;
+  background: var(--misty-divider-active, var(--primary));
+  content: "";
+  pointer-events: none;
+}
+
+.misty-hover-marker-side::before,
+.misty-active-marker-side::before {
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 2px;
+}
+
+.misty-hover-marker-side::before {
+  opacity: 0;
+  transition: opacity var(--misty-transition-fast);
+}
+
+.misty-hover-marker-side:hover,
+.misty-hover-marker-side:focus-visible,
+.misty-hover-marker-side:focus-within {
+  background: transparent !important;
+}
+
+.misty-hover-marker-side:hover::before,
+.misty-hover-marker-side:focus-visible::before,
+.misty-hover-marker-side:focus-within::before {
+  opacity: 0.58;
+}
+
+.misty-hover-marker-side.misty-active-marker-side::before {
+  opacity: 1;
+}
+
+.misty-hover-marker-bottom::after {
+  opacity: 0;
+  transition: opacity var(--misty-transition-fast);
+}
+
+.misty-hover-marker-bottom:hover,
+.misty-hover-marker-bottom:focus-visible {
+  background: transparent !important;
+}
+
+.misty-hover-marker-bottom:hover::after,
+.misty-hover-marker-bottom:focus-visible::after {
+  opacity: 0.58;
+}
+
+.misty-hover-marker-bottom.misty-active-marker-bottom::after {
+  opacity: 1;
+}
+
+.misty-navbar-marker-side::before {
+  top: 9px;
+  right: auto;
+  bottom: auto;
+  left: 5px;
+  height: 32px;
+}
+
+.misty-hover-marker-bottom::after,
+.misty-active-marker-bottom::after {
+  right: 8px;
+  bottom: 0;
+  left: 8px;
+  height: 2px;
+}
+
+@media (max-width: 900px) {
+  .misty-spaces-workbench {
+    --misty-spaces-rail-width: 248px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .misty-spaces-interactive,
+  .misty-spaces-workbench * {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}

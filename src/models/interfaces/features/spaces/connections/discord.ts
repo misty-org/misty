@@ -4,7 +4,7 @@ import type {
   DiscordLinkStatus,
   MessageOriginSystem,
   MessagePublishState,
-} from "@/models/types/features/spaces/integrations/discord";
+} from "@/models/types/features/spaces/connections/discord";
 import type { MessageSpan } from "@/models/types/features/spaces/types";
 
 /**

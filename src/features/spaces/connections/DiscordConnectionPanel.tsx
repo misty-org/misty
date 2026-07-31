@@ -7,19 +7,26 @@ import { Button } from "@/ui";
 import { Card, CardContent, CardHeader, CardTitle } from "@/ui";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui";
 import { formatTime } from "@/features/spaces/libraryFormat";
-import { useDiscordLink } from "@/features/spaces/integrations/useDiscordLink";
+import { useDiscordLink } from "@/features/spaces/connections/useDiscordLink";
 import { spacesApi } from "@/stores/spaces/useSpacesBackendStore";
-import type { SpaceDiscordLink } from "@/models/interfaces/features/spaces/integrations/discord";
-import type { DiscordLinkDirection } from "@/models/types/features/spaces/integrations/discord";
+import type { SpaceDiscordLink } from "@/models/interfaces/features/spaces/connections/discord";
+import type { DiscordLinkDirection } from "@/models/types/features/spaces/connections/discord";
 
 /**
  * Space ↔ Discord link management. Each selected channel gets an ordinary
  * Misty conversation, automatically grouped under Discord in Chat.
  */
-export function DiscordLinkPanel({ spaceId, canManage }: { spaceId: string; canManage: boolean }) {
+export function DiscordConnectionPanel({
+  spaceId,
+  canManage,
+}: {
+  spaceId: string;
+  canManage: boolean;
+}) {
   const discord = useDiscordLink(spaceId, canManage);
   const [channelId, setChannelId] = useState("");
   const [deletingConversationId, setDeletingConversationId] = useState("");
+  const [expanded, setExpanded] = useState(false);
   const availableChannels = discord.channels.filter(
     (channel) =>
       !discord.links.some(
@@ -28,160 +35,145 @@ export function DiscordLinkPanel({ spaceId, canManage }: { spaceId: string; canM
   );
 
   return (
-    <Card aria-labelledby="discord-link-heading">
-      <CardHeader className="flex flex-row items-start justify-between gap-5">
-        <div>
+    <Card
+      size="sm"
+      className={expanded ? "sm:col-span-2 xl:col-span-3" : ""}
+      aria-labelledby="discord-link-heading"
+    >
+      <CardHeader className="flex flex-row items-center justify-between gap-3">
+        <div className="min-w-0">
           <CardTitle id="discord-link-heading" className="flex items-center gap-2">
-            <SiDiscord aria-hidden />
-            Discord
+            <span className="grid size-5 shrink-0 place-items-center" aria-hidden>
+              <SiDiscord className="size-4 overflow-visible" />
+            </span>
+            <span className="truncate">Discord</span>
           </CardTitle>
-          <p className="mb-0 mt-1 text-sm text-muted-foreground">
-            Add any channels your team needs. Each one appears under Discord in Chat with two-way
-            sync by default.
-          </p>
         </div>
-        {discord.links.length ? (
-          <Badge variant="secondary">{discord.links.length} linked</Badge>
-        ) : null}
-      </CardHeader>
-      <CardContent className="grid gap-4">
-        {discord.error ? (
-          <p
-            className="m-0 rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive"
-            role="alert"
-          >
-            {discord.error}
-          </p>
-        ) : null}
-
         {discord.loading ? (
-          <p className="m-0 flex items-center gap-2 text-sm text-muted-foreground">
-            <LoaderCircle className="size-4 animate-spin" aria-hidden />
-            Checking Discord…
-          </p>
+          <LoaderCircle
+            className="size-4 shrink-0 animate-spin text-muted-foreground"
+            aria-label="Checking Discord"
+          />
         ) : discord.providerDiscoveryError ? (
-          <div className="grid justify-items-start gap-3">
-            <p className="m-0 text-sm text-muted-foreground">{discord.providerDiscoveryError}</p>
-            <Button variant="outline" type="button" onClick={() => void discord.reload()}>
-              <RefreshCcw className="size-4" aria-hidden />
-              Try again
+          <Button size="sm" variant="outline" type="button" onClick={() => void discord.reload()}>
+            Retry
+          </Button>
+        ) : discord.providerConfigured === false ? (
+          <Badge variant="outline">Unavailable</Badge>
+        ) : !discord.integration ? (
+          canManage ? (
+            <Button
+              size="sm"
+              type="button"
+              disabled={discord.busy === "connect"}
+              onClick={discord.connect}
+            >
+              {discord.busy === "connect" ? (
+                <LoaderCircle className="size-4 animate-spin" aria-hidden />
+              ) : null}
+              Connect
+            </Button>
+          ) : (
+            <Badge variant="outline">Not connected</Badge>
+          )
+        ) : (
+          <div className="flex shrink-0 items-center gap-1.5">
+            <Badge className="hidden lg:inline-flex" variant="secondary">
+              {discord.links.length ? `${discord.links.length} linked` : "Connected"}
+            </Badge>
+            <Button
+              size="sm"
+              variant="outline"
+              type="button"
+              onClick={() => setExpanded((current) => !current)}
+            >
+              {expanded ? "Done" : "Manage"}
             </Button>
           </div>
-        ) : discord.providerConfigured === false ? (
-          <p className="m-0 text-sm text-muted-foreground">
-            Discord sign-in is not available on this Misty server yet.
-          </p>
-        ) : !discord.integration ? (
-          <ConnectPrompt
-            busy={discord.busy === "connect"}
-            canManage={canManage}
-            onConnect={discord.connect}
-          />
-        ) : (
-          <>
-            {discord.links.map((link) => (
-              <LinkedChannel
-                key={link.id}
-                link={link}
-                busy={discord.busy}
-                canManage={canManage}
-                conversationTitle={
-                  discord.conversations.find((item) => item.id === link.conversation_id)?.title
-                }
-                onDirection={(direction) => discord.setDirection(link.id, direction)}
-                onSync={() => discord.sync(link.id)}
-                onUnlink={() => discord.unlink(link.id)}
-              />
-            ))}
-            {discord.conversations
-              .filter(
-                (conversation) =>
-                  conversation.origin === "discord" &&
-                  conversation.integration_status === "disconnected",
-              )
-              .map((conversation) => (
-                <div
-                  className="flex items-center gap-3 rounded-lg border border-dashed border-border p-3"
-                  key={conversation.id}
-                >
-                  <div className="min-w-0 flex-1">
-                    <p className="m-0 truncate text-sm font-medium">
-                      #{conversation.external_display_name || conversation.title}
-                    </p>
-                    <p className="mb-0 mt-0.5 text-xs text-muted-foreground">
-                      Disconnected · Misty history preserved
-                    </p>
-                  </div>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    type="button"
-                    disabled={!canManage || Boolean(deletingConversationId)}
-                    onClick={() => {
-                      setDeletingConversationId(conversation.id);
-                      void spacesApi
-                        .deleteDisconnectedConversation(spaceId, conversation.id)
-                        .then(() => discord.reload())
-                        .finally(() => setDeletingConversationId(""));
-                    }}
-                  >
-                    {deletingConversationId === conversation.id ? (
-                      <LoaderCircle className="size-3.5 animate-spin" />
-                    ) : (
-                      <Trash2 className="size-3.5" />
-                    )}
-                    Delete history
-                  </Button>
-                </div>
-              ))}
-            <ChannelPicker
-              channels={availableChannels}
-              discoveryError={discord.channelDiscoveryError}
-              channelId={channelId}
-              busy={discord.busy === `link:${channelId}`}
-              canManage={canManage}
-              hasLinks={discord.links.length > 0}
-              onChannel={setChannelId}
-              onLink={() => {
-                void discord.linkChannel(channelId).then(() => setChannelId(""));
-              }}
-              onRetry={() => void discord.reload()}
-            />
-          </>
         )}
-      </CardContent>
-    </Card>
-  );
-}
+      </CardHeader>
 
-function ConnectPrompt({
-  busy,
-  canManage,
-  onConnect,
-}: {
-  busy: boolean;
-  canManage: boolean;
-  onConnect: () => void;
-}) {
-  return (
-    <div className="grid gap-3">
-      <p className="m-0 text-sm text-muted-foreground">
-        Connect Discord to this Space, then choose a channel to mirror.
-      </p>
-      <Button
-        className="justify-self-start"
-        type="button"
-        disabled={!canManage || busy}
-        onClick={onConnect}
-      >
-        {busy ? (
-          <LoaderCircle className="size-4 animate-spin" aria-hidden />
-        ) : (
-          <SiDiscord aria-hidden />
-        )}
-        Connect Discord
-      </Button>
-    </div>
+      {discord.error || discord.providerDiscoveryError ? (
+        <CardContent>
+          <p className="m-0 text-xs text-destructive" role="alert">
+            {discord.error || discord.providerDiscoveryError}
+          </p>
+        </CardContent>
+      ) : null}
+
+      {expanded && discord.integration ? (
+        <CardContent className="grid gap-4 border-t border-border/60 pt-4">
+          {discord.links.map((link) => (
+            <LinkedChannel
+              key={link.id}
+              link={link}
+              busy={discord.busy}
+              canManage={canManage}
+              conversationTitle={
+                discord.conversations.find((item) => item.id === link.conversation_id)?.title
+              }
+              onDirection={(direction) => discord.setDirection(link.id, direction)}
+              onSync={() => discord.sync(link.id)}
+              onUnlink={() => discord.unlink(link.id)}
+            />
+          ))}
+          {discord.conversations
+            .filter(
+              (conversation) =>
+                conversation.origin === "discord" &&
+                conversation.integration_status === "disconnected",
+            )
+            .map((conversation) => (
+              <div
+                className="flex items-center gap-3 rounded-lg border border-dashed border-border p-3"
+                key={conversation.id}
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="m-0 truncate text-sm font-medium">
+                    #{conversation.external_display_name || conversation.title}
+                  </p>
+                  <p className="mb-0 mt-0.5 text-xs text-muted-foreground">
+                    Disconnected · Misty history preserved
+                  </p>
+                </div>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  type="button"
+                  disabled={!canManage || Boolean(deletingConversationId)}
+                  onClick={() => {
+                    setDeletingConversationId(conversation.id);
+                    void spacesApi
+                      .deleteDisconnectedConversation(spaceId, conversation.id)
+                      .then(() => discord.reload())
+                      .finally(() => setDeletingConversationId(""));
+                  }}
+                >
+                  {deletingConversationId === conversation.id ? (
+                    <LoaderCircle className="size-3.5 animate-spin" />
+                  ) : (
+                    <Trash2 className="size-3.5" />
+                  )}
+                  Delete history
+                </Button>
+              </div>
+            ))}
+          <ChannelPicker
+            channels={availableChannels}
+            discoveryError={discord.channelDiscoveryError}
+            channelId={channelId}
+            busy={discord.busy === `link:${channelId}`}
+            canManage={canManage}
+            hasLinks={discord.links.length > 0}
+            onChannel={setChannelId}
+            onLink={() => {
+              void discord.linkChannel(channelId).then(() => setChannelId(""));
+            }}
+            onRetry={() => void discord.reload()}
+          />
+        </CardContent>
+      ) : null}
+    </Card>
   );
 }
 
@@ -299,7 +291,11 @@ function LinkedChannel({
       </div>
       <div className="flex flex-wrap gap-2">
         <Button
-          variant="outline"
+          aria-label={`Sync #${link.channel_name}`}
+          className="size-8 text-muted-foreground/70 shadow-none hover:text-foreground"
+          size="icon"
+          title={`Sync #${link.channel_name}`}
+          variant="ghost"
           type="button"
           disabled={!canManage || Boolean(busy)}
           onClick={onSync}
@@ -308,7 +304,6 @@ function LinkedChannel({
             className={`size-4 ${busy === `sync:${link.id}` ? "animate-spin" : ""}`}
             aria-hidden
           />
-          Sync now
         </Button>
         <Button
           variant="ghost"

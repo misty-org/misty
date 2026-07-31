@@ -8,12 +8,10 @@ import type {
   SpaceNode,
   SpaceStudioResource,
 } from "@/models/interfaces/features/spaces/types";
-import type { SpacePresenceViewer } from "@/models/types/stores/spaces/useSpacesBackendStore";
 
 const emptyMessages: SpaceMessage[] = [];
 const emptyMembers: SpaceMember[] = [];
 const emptyNodes: SpaceNode[] = [];
-const emptyPresence: SpacePresenceViewer[] = [];
 const emptyAgents: SpaceStudioResource[] = [];
 
 export function useSpaceChatStore() {
@@ -22,7 +20,6 @@ export function useSpaceChatStore() {
       messagesBySpace: state.messagesBySpace,
       membersBySpace: state.membersBySpace,
       nodesBySpace: state.nodesBySpace,
-      presenceBySpace: state.presenceBySpace,
       agentsBySpace: state.agentsBySpace,
       loading: state.loading,
       sending: state.sending,
@@ -34,7 +31,6 @@ export function useSpaceChatStore() {
       loadMessages: state.loadMessages,
       loadChatAgents: state.loadChatAgents,
       openNode: state.openNode,
-      setViewingSpace: state.setViewingSpace,
       clearSpacesError: state.clearError,
     })),
   );
@@ -84,7 +80,6 @@ export function useSpaceChatScope(options: {
     directRecipient,
     nodes,
     agents: store.agentsBySpace[spaceId] ?? emptyAgents,
-    activeViewers: store.presenceBySpace[spaceId] ?? emptyPresence,
     members: conversationId
       ? allMembers.filter((member) => allowedMemberIds.has(member.user_id))
       : allMembers,

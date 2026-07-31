@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
-import type { DueFilter, TaskViewMode } from "@/models/types/features/spaces/SpaceTasksCalendar";
+import type { DueFilter, TaskViewMode } from "@/models/types/features/spaces/SpacePlanner";
 import type { SpaceTaskPriority, SpaceTaskStatus } from "@/models/types/features/spaces/types";
 import { FILTER_PARAM_KEYS, activeFilterCount, filterDueRange } from "./taskFiltering";
 

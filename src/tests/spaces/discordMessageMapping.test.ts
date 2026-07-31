@@ -8,11 +8,11 @@ import {
   shouldPublishToDiscord,
   spaceMessageToDiscordPayload,
   spansToText,
-} from "@/features/spaces/integrations/discordMessageMapping";
+} from "@/features/spaces/connections/discordMessageMapping";
 import type {
   DiscordMessage,
   SpaceDiscordLink,
-} from "@/models/interfaces/features/spaces/integrations/discord";
+} from "@/models/interfaces/features/spaces/connections/discord";
 import type { SpaceMessage } from "@/models/interfaces/features/spaces/types";
 
 function discordMessage(overrides: Partial<DiscordMessage> = {}): DiscordMessage {
