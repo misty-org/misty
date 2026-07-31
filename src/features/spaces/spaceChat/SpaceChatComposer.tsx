@@ -69,9 +69,9 @@ export function SpaceChatComposer(props: SpaceChatComposerProps) {
   };
 
   return (
-    <div className="shrink-0 border-t border-border/60 bg-background px-[clamp(16px,4vw,56px)] py-4">
-      <form className="mx-auto max-w-5xl" onSubmit={props.onSubmit}>
-        <InputGroup className="bg-card">
+    <div className="shrink-0 bg-background px-[clamp(18px,4vw,56px)] pb-5 pt-2">
+      <form className="mx-auto max-w-4xl" onSubmit={props.onSubmit}>
+        <InputGroup className="misty-spaces-floating rounded-2xl border-border/65 bg-card/90 focus-within:-translate-y-px">
           {draft.replyToMessageId ? (
             <ChatReplyBanner
               senderName={props.replyToSenderName}
@@ -82,7 +82,7 @@ export function SpaceChatComposer(props: SpaceChatComposerProps) {
           <Popover open={suggestions.open} onOpenChange={suggestions.setOpen}>
             <PopoverAnchor asChild>
               <InputGroupTextarea
-                className="min-h-20"
+                className="min-h-20 px-4 py-3.5"
                 aria-label={props.isConversation ? "Message this group" : "Message this Space"}
                 aria-autocomplete="list"
                 aria-controls={suggestions.open ? listId : undefined}
@@ -134,7 +134,7 @@ export function SpaceChatComposer(props: SpaceChatComposerProps) {
             }
           />
 
-          <InputGroupAddon align="block-end" className="border-t">
+          <InputGroupAddon align="block-end" className="min-h-11 border-t border-border/60 px-3">
             {props.canUploadAttachments || props.canBrowseLibrary ? (
               <InputGroupButton
                 variant="ghost"
@@ -155,7 +155,7 @@ export function SpaceChatComposer(props: SpaceChatComposerProps) {
               {draft.text.length}/{MAX_MESSAGE_LENGTH}
             </InputGroupText>
             <InputGroupButton
-              className="ml-2"
+              className="ml-2 rounded-lg px-3"
               size="sm"
               disabled={props.sending || draft.isEmpty}
               type="submit"

@@ -1,4 +1,4 @@
-import type { DueFilter, TaskViewMode } from "@/models/types/features/spaces/SpaceTasksCalendar";
+import type { DueFilter, TaskViewMode } from "@/models/types/features/spaces/SpacePlanner";
 import type { SpaceTask } from "@/models/interfaces/features/spaces/types";
 
 export const FILTER_PARAM_KEYS = ["status", "assignee", "priority", "due", "mine"] as const;

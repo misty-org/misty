@@ -166,6 +166,38 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
     }
   },
 
+  async deleteNote(noteId: string) {
+    const note = findNote(get().notes, noteId);
+    if (!note) return;
+    const generation = notesLoadGeneration;
+    const activeRegistry = registry;
+    const connector = activeRegistry.forSource(note.source);
+    if (!connector?.capabilities.delete || !connector.deleteNote) {
+      throw new Error("This note source does not support deletion.");
+    }
+    try {
+      await connector.deleteNote(note.sourceId);
+      if (!notesActionIsCurrent(generation, activeRegistry)) return;
+      closeOpenNoteCollaborationSessions();
+      set((state) => {
+        const deletedIndex = state.notes.findIndex((candidate) => candidate.id === noteId);
+        const notes = state.notes.filter((candidate) => candidate.id !== noteId);
+        const nextSelectedNoteId =
+          state.selectedNoteId === noteId
+            ? (notes[deletedIndex] ?? notes[deletedIndex - 1] ?? notes[0])?.id
+            : state.selectedNoteId;
+        return {
+          notes,
+          selectedNoteId: nextSelectedNoteId,
+          editingNoteId: state.editingNoteId === noteId ? undefined : state.editingNoteId,
+        };
+      });
+    } catch (reason) {
+      reportConnectorError(set, connector.id, reason);
+      throw reason;
+    }
+  },
+
   async updateNoteBody(noteId: string, body: string) {
     await get().updateNoteContent(noteId, { body, bodyFormat: "markdown" });
   },

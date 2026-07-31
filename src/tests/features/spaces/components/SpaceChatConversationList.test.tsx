@@ -21,7 +21,7 @@ describe("SpaceChatConversationList", () => {
     container.remove();
   });
 
-  it("keeps every Discord channel in one provider section outside Direct and Group", async () => {
+  it("keeps Misty conversations together and Discord channels in their provider section", async () => {
     await act(async () => {
       root.render(
         <MemoryRouter>
@@ -42,8 +42,9 @@ describe("SpaceChatConversationList", () => {
       );
     });
 
-    expect(container.textContent).toContain("Direct - 1");
-    expect(container.textContent).toContain("Group - 1");
+    expect(container.textContent).toContain("Conversations - 2");
+    expect(container.textContent).not.toContain("Direct");
+    expect(container.textContent).not.toContain("Group");
     expect(container.textContent).toContain("Discord - 2");
     expect(
       container.querySelector('a[href="/spaces/space-1/chat?conversation=discord-art"]'),

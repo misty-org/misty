@@ -18,12 +18,9 @@ import { useCallback, useEffect, useRef, useState, type PointerEvent, type React
 import { useAppThemeStore } from "@/stores/app/useAppThemeStore";
 import { cn } from "@/ui";
 import type { NoteCollaborationSession } from "@/features/notes/noteCollaboration";
-import {
-  acquireNoteCollaborationSession,
-  releaseNoteCollaborationSession,
-} from "@/features/notes/noteCollaboration";
 import { resolveNoteAssetUrl, uploadNoteAsset } from "@/features/notes/noteAssets";
 import { usePointerDrag, type PointerDragPayload } from "@/features/dnd/PointerDragContext";
+import { useNoteCollaborationRoom } from "@/features/notes/hooks/useNoteCollaborationRoom";
 
 const mistyNotesSchema = BlockNoteSchema.create({
   blockSpecs: {
@@ -140,28 +137,7 @@ function LocalNoteBlockEditor(props: NoteBlockEditorProps) {
 }
 
 function CollaborativeNoteBlockEditor(props: NoteBlockEditorProps & { spaceId: string }) {
-  const [session, setSession] = useState<NoteCollaborationSession | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let active = true;
-    setSession(null);
-    setError(null);
-
-    acquireNoteCollaborationSession(props.spaceId, props.noteId)
-      .then((nextSession) => {
-        if (active) setSession(nextSession);
-      })
-      .catch((cause) => {
-        if (!active) return;
-        setError(cause instanceof Error ? cause.message : "Could not connect to this note.");
-      });
-
-    return () => {
-      active = false;
-      releaseNoteCollaborationSession(props.spaceId, props.noteId);
-    };
-  }, [props.noteId, props.spaceId]);
+  const { session, error, notice } = useNoteCollaborationRoom(props.spaceId, props.noteId);
 
   if (error) {
     return (
@@ -176,11 +152,18 @@ function CollaborativeNoteBlockEditor(props: NoteBlockEditorProps & { spaceId: s
   }
 
   return (
-    <CollaborativeBlockNoteRoom
-      key={`${props.noteId}:${session.ticket.room}`}
-      {...props}
-      session={session}
-    />
+    <div className="relative h-full">
+      {notice ? (
+        <div className="sticky top-2 z-20 mx-auto mb-2 max-w-xl rounded-md border border-amber-500/30 bg-background/95 px-3 py-2 text-sm shadow-md">
+          {notice}
+        </div>
+      ) : null}
+      <CollaborativeBlockNoteRoom
+        key={`${props.noteId}:${session.ticket.room}`}
+        {...props}
+        session={session}
+      />
+    </div>
   );
 }
 

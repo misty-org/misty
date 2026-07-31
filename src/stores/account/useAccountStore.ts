@@ -1,11 +1,15 @@
 import type {
   AccountAuthUser,
+  AccountDeletionResponse,
+  AccountExportManifest,
   AccountMeResponse,
   BillingUsageResponse,
   LoginResponse,
 } from "@/models/interfaces/stores/account/useAccountStore";
 export type {
   AccountAuthUser,
+  AccountDeletionResponse,
+  AccountExportManifest,
   AccountMeResponse,
   BillingUsageResponse,
   LoginResponse,
@@ -21,6 +25,7 @@ import {
 } from "./useAuthTokenStore";
 import type { SavedAccountSession } from "@/models/interfaces/stores/account/useAuthTokenStore";
 import { analytics } from "@/analytics/client";
+import { addRequestCorrelation } from "@/platform/requestCorrelation";
 
 async function postJson<T>(path: string, body?: unknown): Promise<T> {
   return requestJson<T>("POST", path, body);
@@ -42,7 +47,7 @@ async function requestJson<T>(
   try {
     const token = shouldAttachAuthToken(path) ? await readAccountAuthToken() : null;
     assertAccountGeneration(accountGeneration);
-    const headers = requestHeaders(body, token);
+    const headers = addRequestCorrelation(requestHeaders(body, token) ?? new Headers());
     const response = await fetch(url, {
       method,
       headers,
@@ -245,6 +250,17 @@ export function accountCreatePortalSession(): Promise<{ url: string }> {
   return postJson("/billing/portal-session");
 }
 
+export function accountBeginDeletion(
+  password: string,
+  confirmation: string,
+): Promise<AccountDeletionResponse> {
+  return postJson("/me/deletion", { password, confirmation });
+}
+
+export function accountRequestExportManifest(password: string): Promise<AccountExportManifest> {
+  return postJson("/me/export", { password });
+}
+
 export async function accountUpdateProfile(name: string): Promise<void> {
   await requestJson("PUT", "/me/profile", { name });
 }
@@ -267,7 +283,7 @@ async function accountAvatarRequest(method: "GET" | "PUT", body?: Blob): Promise
   assertAccountGeneration(accountGeneration);
   const token = await readAccountAuthToken();
   assertAccountGeneration(accountGeneration);
-  const headers = requestHeaders(undefined, token) ?? new Headers();
+  const headers = addRequestCorrelation(requestHeaders(undefined, token) ?? new Headers());
   if (body) headers.set("Content-Type", "image/png");
   const response = await fetch(`${apiBase}/me/avatar`, {
     method,

@@ -18,6 +18,7 @@ scripts/.signing.env
 **/dist-web/
 **/node_modules/
 **/target/
+artifacts/
 **/src-tauri/gen/*
 !**/src-tauri/gen/apple/
 !**/src-tauri/gen/apple/**

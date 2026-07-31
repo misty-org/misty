@@ -10,7 +10,13 @@ import { PendingInvitationsCard } from "../spaceMembers/PendingInvitationsCard";
 import { useMemberDialogs } from "../spaceMembers/useMemberDialogs";
 import { useSpaceMembers } from "../spaceMembers/useSpaceMembers";
 
-export function SpaceMembers({ spaceId }: { spaceId: string }) {
+export function SpaceMembers({
+  spaceId,
+  embedded = false,
+}: {
+  spaceId: string;
+  embedded?: boolean;
+}) {
   const { user } = useAuth();
   const state = useSpaceMembers(spaceId);
   const dialogs = useMemberDialogs(spaceId, state);
@@ -18,12 +24,20 @@ export function SpaceMembers({ spaceId }: { spaceId: string }) {
   const bannerError = error && !dialogs.inviteOpen && !dialogs.memberAction ? error : "";
 
   return (
-    <div className="h-full min-h-0 overflow-auto bg-background px-5 py-5 sm:px-6">
-      <div className="mx-auto w-full max-w-5xl">
+    <div
+      className={
+        embedded ? "min-w-0" : "h-full min-h-0 overflow-auto bg-background px-5 py-5 sm:px-6"
+      }
+    >
+      <div className={embedded ? "w-full" : "mx-auto w-full max-w-5xl"}>
         <div className="mb-4 flex min-w-0 flex-wrap items-center justify-between gap-3">
           <div>
-            <h2 className="m-0 text-sm font-semibold text-foreground">People with access</h2>
-            <p className="mb-0 mt-1 text-xs text-muted-foreground">
+            {!embedded ? (
+              <h2 className="m-0 text-sm font-semibold text-foreground">Members</h2>
+            ) : null}
+            <p
+              className={`${embedded ? "m-0" : "mb-0 mt-1"} text-xs text-muted-foreground`}
+            >
               {members.length} active member{members.length === 1 ? "" : "s"}
               {space?.pending_count ? ` · ${space.pending_count} pending` : ""}
             </p>

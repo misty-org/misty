@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { CalendarDays, FileText, LoaderCircle, Plug, UserPlus, X } from "lucide-react";
-import { SiDiscord } from "react-icons/si";
+import { LoaderCircle, Plug, UserPlus, X } from "lucide-react";
+import { SiDiscord, SiGooglecalendar, SiNotion } from "react-icons/si";
 import { Link } from "react-router-dom";
 
 import type {
@@ -58,7 +58,7 @@ export function SpaceSetupCards({
       const start = await spacesApi.beginProviderConnection(
         spaceId,
         provider,
-        `/spaces/${spaceId}/settings/integrations`,
+        `/spaces/${spaceId}/settings/connections`,
       );
       await openExternalLink(start.authorization_url);
     } catch {
@@ -74,7 +74,7 @@ export function SpaceSetupCards({
         <div className="min-w-0 flex-1">
           <p className="m-0 text-sm font-medium">Your Space is ready</p>
           <p className="mb-0 mt-1 text-xs text-muted-foreground">
-            Start chatting now. Invitations and integrations can be finished whenever you want.
+            Start chatting now. Invitations and connections can be finished whenever you want.
           </p>
         </div>
         {dismissible ? (
@@ -93,7 +93,7 @@ export function SpaceSetupCards({
       <div className="flex flex-wrap gap-2">
         {showInvitation && isOwner ? (
           <Button asChild size="sm" variant="outline">
-            <Link to={`/spaces/${encodeURIComponent(spaceId)}/members?invite=1`}>
+            <Link to={`/spaces/${encodeURIComponent(spaceId)}/settings/members?invite=1`}>
               <UserPlus size={14} /> Invite people
             </Link>
           </Button>
@@ -156,17 +156,17 @@ function providerName(provider: SpaceIntegrationProvider) {
 }
 
 function providerIcon(provider: SpaceIntegrationProvider) {
-  if (provider === "google") return CalendarDays;
+  if (provider === "google") return SiGooglecalendar;
   if (provider === "discord") return SiDiscord;
-  if (provider === "notion") return FileText;
+  if (provider === "notion") return SiNotion;
   return Plug;
 }
 
 function providerManagementPath(spaceId: string, provider: SpaceIntegrationProvider) {
   const encoded = encodeURIComponent(spaceId);
-  if (provider === "google") return `/spaces/${encoded}/tasks`;
-  if (provider === "notion") return `/spaces/${encoded}/settings/integrations`;
-  return `/spaces/${encoded}/settings/integrations`;
+  if (provider === "google") return `/spaces/${encoded}/planner`;
+  if (provider === "notion") return `/spaces/${encoded}/settings/connections`;
+  return `/spaces/${encoded}/settings/connections`;
 }
 
 function providerManagementLabel(provider: SpaceIntegrationProvider) {

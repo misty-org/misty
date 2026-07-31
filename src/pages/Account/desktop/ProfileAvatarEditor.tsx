@@ -11,6 +11,7 @@ import {
   DialogContent,
   DialogDescription,
   DialogTitle,
+  Input,
   Slider,
 } from "@/ui";
 import { accountFetchAvatar, accountUpdateAvatar } from "@/stores/account/useAccountStore";
@@ -120,7 +121,7 @@ export function ProfileAvatarEditor({
         <p className="text-sm font-medium text-foreground">{name}</p>
         <p className="mt-0.5 text-xs text-muted-foreground">{email}</p>
         <div className="mt-2 flex flex-wrap items-center gap-2">
-          <input
+          <Input
             ref={inputRef}
             className="sr-only"
             type="file"

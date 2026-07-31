@@ -235,6 +235,43 @@ describe("AuthProvider account switching", () => {
     ]);
   });
 
+  it("preserves the original sign-in error when the previous saved session is stale", async () => {
+    function Probe() {
+      auth = useAuth();
+      return null;
+    }
+
+    await act(async () => {
+      root!.render(
+        <MemoryRouter>
+          <AuthProvider>
+            <Probe />
+          </AuthProvider>
+        </MemoryRouter>,
+      );
+      await Promise.resolve();
+    });
+
+    mocks.activateAccountSession.mockRejectedValueOnce(
+      new Error("That saved Misty session is no longer available."),
+    );
+
+    let signInError: unknown;
+    await act(async () => {
+      try {
+        await auth!.authenticateAccount(async () => {
+          throw new Error("Invalid email or password.");
+        });
+      } catch (error) {
+        signInError = error;
+      }
+    });
+
+    expect(signInError).toEqual(new Error("Invalid email or password."));
+    expect(mocks.userStore.clear).toHaveBeenCalled();
+    expect(auth?.user).toBeNull();
+  });
+
   it("clears every account-scoped surface when the visible identity is removed", async () => {
     function Probe() {
       auth = useAuth();

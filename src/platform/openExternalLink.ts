@@ -7,7 +7,7 @@ import type { MouseEvent } from "react";
 import { hasTauriInternals } from "./tauri";
 
 export async function openExternalLink(url: string): Promise<void> {
-  const href = url.trim();
+  const href = normalizeExternalUrl(url);
   if (!href) return;
 
   const { openLinksExternally } = selectGeneralPreferences(
@@ -24,7 +24,7 @@ export async function openExternalLink(url: string): Promise<void> {
 }
 
 export async function openSystemExternalLink(url: string): Promise<void> {
-  const href = url.trim();
+  const href = normalizeExternalUrl(url);
   if (!href) return;
 
   try {
@@ -42,7 +42,7 @@ export async function openSystemExternalLink(url: string): Promise<void> {
 export async function openProviderAuthorizationLink(
   url: string,
 ): Promise<ProviderAuthorizationOpenResult> {
-  const href = url.trim();
+  const href = normalizeExternalUrl(url);
   const attemptedAt = Date.now();
   if (!href) {
     throw new Error("Provider authorization URL is empty.");
@@ -106,6 +106,29 @@ export function handleExternalLinkClick(
 
 function isExternalUrl(url: string): boolean {
   return url.startsWith("https://") || url.startsWith("http://") || url.startsWith("mailto:");
+}
+
+export function normalizeExternalUrl(value: string): string {
+  const href = value.trim();
+  if (!href) return "";
+  if (href.length > 4096) throw new Error("External URL is too long.");
+
+  let parsed: URL;
+  try {
+    parsed = new URL(href);
+  } catch {
+    throw new Error("External URL is invalid.");
+  }
+  if (!["https:", "http:", "mailto:"].includes(parsed.protocol)) {
+    throw new Error("External URL protocol is not allowed.");
+  }
+  if (
+    (parsed.protocol === "https:" || parsed.protocol === "http:") &&
+    (parsed.username || parsed.password)
+  ) {
+    throw new Error("External URLs cannot contain credentials.");
+  }
+  return href;
 }
 
 async function openNativeUrl(url: string): Promise<void> {

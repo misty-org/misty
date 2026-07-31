@@ -1,0 +1,6 @@
+{
+  "high": true,
+  "allowlist": ["GHSA-qwww-vcr4-c8h2", "GHSA-r5fr-rjxr-66jc"],
+  "skip-dev": true,
+  "show-not-found": true
+}

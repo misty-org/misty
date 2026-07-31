@@ -2,9 +2,9 @@ import { spaceRequest } from "@/stores/spaces/useSpacesBackendStore";
 import type {
   DiscordSyncResult,
   SpaceDiscordLink,
-} from "@/models/interfaces/features/spaces/integrations/discord";
+} from "@/models/interfaces/features/spaces/connections/discord";
 import type { SpaceMessage } from "@/models/interfaces/features/spaces/types";
-import type { DiscordLinkDirection } from "@/models/types/features/spaces/integrations/discord";
+import type { DiscordLinkDirection } from "@/models/types/features/spaces/connections/discord";
 
 const part = encodeURIComponent;
 

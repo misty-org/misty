@@ -399,7 +399,7 @@ full note content.
 ## Phase 5: Cloudflare PartyKit/Yjs service
 
 Create the Cloudflare project under
-`/Users/mtccool668/misty-org/misty-server/cloudflare/note-collab`.
+`/Users/mtccool668/misty-org/misty-server/cloudflare/journal-collab`.
 
 Use current PartyKit/Y-PartyKit packages compatible with Cloudflare Durable
 Objects and the desktop's installed BlockNote/Yjs versions. Pin exact versions
@@ -411,12 +411,12 @@ Required configuration:
 
 ```text
 PARTYKIT_HOST
-NOTE_COLLAB_TICKET_PRIVATE_KEY       Go server only
-NOTE_COLLAB_TICKET_PUBLIC_KEY        Cloudflare only
-NOTE_COLLAB_CONTROL_SECRET           Go and Cloudflare
-NOTE_COLLAB_PROJECTION_SECRET        Go and Cloudflare
+JOURNAL_COLLAB_TICKET_PRIVATE_KEY    Go server only
+JOURNAL_COLLAB_TICKET_PUBLIC_KEY     Cloudflare only
+JOURNAL_COLLAB_CONTROL_SECRET        Go and Cloudflare
+JOURNAL_COLLAB_PROJECTION_SECRET     Go and Cloudflare
 MISTY_INTERNAL_API_BASE              Cloudflare only
-MISTY_NOTES_COLLAB_ENABLED
+MISTY_JOURNAL_COLLAB_ENABLED
 ```
 
 Use Ed25519-signed collaboration tickets. Do not share the signing private key
@@ -430,7 +430,7 @@ Tickets expire after 60 seconds and are scoped to one connection:
 ```json
 {
   "iss": "misty-api",
-  "aud": "misty-note-collab",
+  "aud": "misty-journal-collab",
   "jti": "single-use identifier",
   "sub": "user id",
   "space_id": "space id",
@@ -725,14 +725,14 @@ Document and verify:
 Preserve the existing database, object-store, and realtime checks. Add:
 
 - R2 presigner/configuration readiness when direct transfer is required;
-- PartyKit host/signing/control configuration readiness when Notes are enabled;
+- PartyKit host/signing/control configuration readiness when Journal collaboration is enabled;
 - a shallow collaboration-service health check with a strict timeout; and
 - cleanup/outbox backlog metrics without making readiness fail for a small
   transient backlog.
 
 ### Feature gating
 
-`MISTY_NOTES_COLLAB_ENABLED` is off unless all required Go and PartyKit
+`MISTY_JOURNAL_COLLAB_ENABLED` is off unless all required Go and PartyKit
 configuration is valid. When disabled, the desktop shows a clear unavailable
 state and must not fall back to insecure local-only notes.
 

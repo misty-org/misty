@@ -38,8 +38,8 @@ describe("app route memory", () => {
       .rememberAppRoute("/spaces/space-7/settings/integrations#permissions");
 
     expect(useAppRouteMemoryStore.getState()).toMatchObject({
-      lastAppRoute: "/spaces/space-7/settings/integrations",
-      lastSpacesRoute: "/spaces/space-7/settings/integrations",
+      lastAppRoute: "/spaces/space-7/settings/connections",
+      lastSpacesRoute: "/spaces/space-7/settings/connections",
     });
   });
 
@@ -69,18 +69,29 @@ describe("app route memory", () => {
     });
   });
 
-  it("remembers restored Space surfaces including Assistant and Calendar", () => {
+  it("remembers restored Space surfaces including Assistant and Planner", () => {
     useAppRouteMemoryStore
       .getState()
-      .rememberAppRoute("/spaces/space-7/tasks/calendar?priority=high");
+      .rememberAppRoute("/spaces/space-7/planner/calendar?priority=high");
     expect(useAppRouteMemoryStore.getState().lastSpacesRoute).toBe(
-      "/spaces/space-7/tasks/calendar?priority=high",
+      "/spaces/space-7/planner/calendar?priority=high",
     );
 
     useAppRouteMemoryStore.getState().rememberAppRoute("/spaces/space-7/assistant");
     expect(useAppRouteMemoryStore.getState()).toMatchObject({
       lastAppRoute: "/spaces/space-7/assistant",
       lastSpacesRoute: "/spaces/space-7/assistant",
+    });
+  });
+
+  it("migrates legacy Tasks routes to Planner", () => {
+    useAppRouteMemoryStore
+      .getState()
+      .rememberAppRoute("/spaces/space-7/tasks/list?mine=1");
+
+    expect(useAppRouteMemoryStore.getState()).toMatchObject({
+      lastAppRoute: "/spaces/space-7/planner/list",
+      lastSpacesRoute: "/spaces/space-7/planner/list?mine=1",
     });
   });
 });

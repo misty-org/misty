@@ -39,6 +39,7 @@ const NOTION_CAPABILITIES: NoteConnectorCapabilities = {
   create: true,
   append: true,
   update: false,
+  delete: false,
   updateProperties: true,
   openInSource: true,
   sync: true,

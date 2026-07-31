@@ -12,6 +12,8 @@ export interface NoteConnectorCapabilities {
   append: boolean;
   /** Can replace a note's title/body in place. */
   update: boolean;
+  /** Can permanently delete a note in the source. */
+  delete: boolean;
   /** Can update known, simple structured properties. */
   updateProperties: boolean;
   /** Can open the note in its native app. */

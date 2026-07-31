@@ -104,7 +104,7 @@ export function PluginBrowser({
           value={browserTab}
           onValueChange={(value) => setBrowserTab(value as PluginBrowserTab)}
         >
-          <TabsList>
+          <TabsList variant="line">
             <TabsTrigger value="marketplace">Marketplace</TabsTrigger>
             <TabsTrigger value="installed">Installed</TabsTrigger>
           </TabsList>
@@ -116,16 +116,16 @@ export function PluginBrowser({
 
         {onRefresh ? (
           <Button
-            className="ml-auto"
+            aria-label="Reload extensions"
+            className="ml-auto size-8 text-muted-foreground/70 shadow-none hover:text-foreground"
             disabled={loading}
             onClick={onRefresh}
-            size="sm"
+            size="icon"
             title="Reload extensions"
             type="button"
-            variant="outline"
+            variant="ghost"
           >
             <RefreshCcw className={loading ? "animate-spin" : undefined} size={15} />
-            Refresh
           </Button>
         ) : null}
       </div>

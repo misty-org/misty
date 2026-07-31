@@ -28,7 +28,11 @@ type ServerSpaceNote = {
  * body lives in Cloudflare; this connector handles the server metadata and list
  * projection, never device-local note storage.
  */
-export function createMistyNativeNotesConnector(_accountId = "", spaceId = "", spaceName = ""): NotesConnector {
+export function createMistyNativeNotesConnector(
+  _accountId = "",
+  spaceId = "",
+  spaceName = "",
+): NotesConnector {
   let syncedAt = nowIso();
   const noteSpaces = new Map<string, { spaceId: string; spaceName: string }>();
 
@@ -42,6 +46,7 @@ export function createMistyNativeNotesConnector(_accountId = "", spaceId = "", s
       create: true,
       append: false,
       update: false,
+      delete: true,
       updateProperties: false,
       openInSource: false,
       sync: true,
@@ -118,7 +123,21 @@ export function createMistyNativeNotesConnector(_accountId = "", spaceId = "", s
         rememberNotes(noteSpaces, [mapped]);
         return mapped;
       }
-      throw new Error("Misty note content is collaborative and must be edited through the live note room.");
+      throw new Error(
+        "Misty note content is collaborative and must be edited through the live note room.",
+      );
+    },
+
+    async deleteNote(sourceId: string) {
+      const scope = noteSpaces.get(sourceId);
+      const targetSpaceId = scope?.spaceId ?? spaceId;
+      if (!targetSpaceId) throw new Error("Open the note's Space before deleting it.");
+      await spaceRequest(
+        `/spaces/${encodeURIComponent(targetSpaceId)}/notes/${encodeURIComponent(sourceId)}`,
+        { method: "DELETE" },
+      );
+      noteSpaces.delete(sourceId);
+      syncedAt = nowIso();
     },
 
     async sync(): Promise<SyncResult> {
@@ -130,7 +149,10 @@ export function createMistyNativeNotesConnector(_accountId = "", spaceId = "", s
   };
 }
 
-export async function listMistySpaceNotes(spaceId: string, spaceName: string): Promise<UnifiedNote[]> {
+export async function listMistySpaceNotes(
+  spaceId: string,
+  spaceName: string,
+): Promise<UnifiedNote[]> {
   const result = await spaceRequest<{ notes: ServerSpaceNote[] }>(
     `/spaces/${encodeURIComponent(spaceId)}/notes`,
   );
@@ -159,6 +181,7 @@ function mapServerNote(note: ServerSpaceNote, spaceName = ""): UnifiedNote {
     syncStatus: "synced",
     connectorId: MISTY_CONNECTOR_ID,
     providerStatus: "connected",
+    canDelete: note.role === "creator",
   };
 }
 
@@ -167,6 +190,7 @@ function rememberNotes(
   notes: UnifiedNote[],
 ): void {
   for (const note of notes) {
-    if (note.spaceId) noteSpaces.set(note.sourceId, { spaceId: note.spaceId, spaceName: note.spaceName ?? "" });
+    if (note.spaceId)
+      noteSpaces.set(note.sourceId, { spaceId: note.spaceId, spaceName: note.spaceName ?? "" });
   }
 }

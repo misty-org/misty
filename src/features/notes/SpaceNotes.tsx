@@ -8,9 +8,10 @@ import { NotesTopBar } from "./components/NotesTopBar";
 import { NoteReadingPane } from "./components/NoteReadingPane";
 import { NoteContextPanel } from "./components/NoteContextPanel";
 import { NewNoteDialog } from "./components/NewNoteDialog";
+import { JournalAttribution } from "@/features/journal/components/JournalAttribution";
 
 const shellClass =
-  "grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] bg-background text-foreground";
+  "relative grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] bg-background text-foreground";
 
 const bodyClass = "grid min-h-0 grid-cols-[minmax(0,1fr)] overflow-hidden";
 
@@ -41,6 +42,7 @@ export function SpaceNotes(props: SpaceNotesProps) {
       setEditingNoteId: state.setEditingNoteId,
       toggleFavorite: state.toggleFavorite,
       createNote: state.createNote,
+      deleteNote: state.deleteNote,
       refresh: state.refresh,
       updateNoteBody: state.updateNoteBody,
       updateNoteContent: state.updateNoteContent,
@@ -72,6 +74,7 @@ export function SpaceNotes(props: SpaceNotesProps) {
   const loading = store.phase === "loading" || store.phase === "idle";
 
   const selectedNote = store.notes.find((note) => note.id === store.selectedNoteId);
+  const contextPanelOpen = Boolean(selectedNote) && store.contextPanelOpen;
   const selectedConnector = selectedNote
     ? store.registry.forSource(selectedNote.source)
     : undefined;
@@ -80,15 +83,17 @@ export function SpaceNotes(props: SpaceNotesProps) {
     <div className={shellClass}>
       <NotesTopBar
         query={store.query}
-        contextPanelOpen={store.contextPanelOpen}
+        contextPanelOpen={contextPanelOpen}
+        contextPanelAvailable={Boolean(selectedNote)}
         onQueryChange={actions.setQuery}
         onNewNote={() => setNewNoteOpen(true)}
         onToggleContextPanel={actions.toggleContextPanel}
       />
 
-      <div className={store.contextPanelOpen ? bodyWithContextClass : bodyClass}>
+      <div className={contextPanelOpen ? bodyWithContextClass : bodyClass}>
         <NoteReadingPane
           note={selectedNote}
+          hasNotes={store.notes.length > 0}
           accountId={store.accountId}
           loading={loading}
           editingNoteId={store.editingNoteId}
@@ -104,10 +109,15 @@ export function SpaceNotes(props: SpaceNotesProps) {
               : undefined
           }
           onToggleFavorite={(noteId) => void actions.toggleFavorite(noteId)}
+          onDelete={
+            selectedConnector?.capabilities.delete && selectedNote?.canDelete
+              ? actions.deleteNote
+              : undefined
+          }
           onNewNote={() => setNewNoteOpen(true)}
         />
 
-        {store.contextPanelOpen ? (
+        {contextPanelOpen ? (
           <div className="min-h-0 max-[1100px]:hidden">
             <NoteContextPanel note={selectedNote} />
           </div>
@@ -120,6 +130,11 @@ export function SpaceNotes(props: SpaceNotesProps) {
         onCreate={async (input) => {
           await actions.createNote(input);
         }}
+      />
+      <JournalAttribution
+        technology="BlockNote"
+        href="https://www.blocknotejs.org/"
+        className="absolute bottom-3 right-3 z-20 shadow-sm backdrop-blur-sm"
       />
     </div>
   );

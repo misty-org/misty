@@ -3,12 +3,12 @@ import type {
   GlobalImageEditDefinition,
   GlobalImageMarkupElement,
 } from "@/models/interfaces/features/editor/imageEditor";
-import type { MessageOrigin } from "@/models/interfaces/features/spaces/integrations/discord";
+import type { MessageOrigin } from "@/models/interfaces/features/spaces/connections/discord";
 import type {
   TaskCalendarLink,
   TaskSchedule,
-} from "@/models/interfaces/features/spaces/integrations/calendarTasks";
-import type { ScheduleField } from "@/models/types/features/spaces/integrations/calendarTasks";
+} from "@/models/interfaces/features/spaces/connections/calendarTasks";
+import type { ScheduleField } from "@/models/types/features/spaces/connections/calendarTasks";
 
 import type {
   SpaceRole,
