@@ -4,11 +4,13 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$ROOT_DIR"
 
-if [[ -f .env ]]; then
+DEV_COMPOSE=(docker compose -f compose.dev.yml)
+if [[ -f .env.dev ]]; then
   set -a
   # shellcheck disable=SC1091
-  source .env
+  source .env.dev
   set +a
+  DEV_COMPOSE=(docker compose --env-file .env.dev -f compose.dev.yml)
 fi
 
 EXPLICIT_TEST_DB_HOST="${TEST_DB_HOST:-}"
@@ -73,7 +75,7 @@ if [[ "$SHOULD_BOOTSTRAP_TEST_DB" == "true" ]]; then
   ADMIN_DB_USER="$TEST_DB_USER"
 
   # The bootstrapped container has no TLS, so a production DB_SSLMODE inherited
-  # from .env would fail every connection.
+  # from .env.dev would fail every connection.
   if [[ -z "$EXPLICIT_TEST_DB_SSLMODE" ]]; then
     export TEST_DB_SSLMODE="disable"
   fi
@@ -85,9 +87,9 @@ if [[ "$SHOULD_BOOTSTRAP_TEST_DB" == "true" ]]; then
   export DB_NAME="${DB_NAME:-misty_server}"
   export DB_PORT="${DB_PORT:-$TEST_DB_PORT}"
 
-  docker compose up -d postgres
+  "${DEV_COMPOSE[@]}" up -d postgres
 
-  until docker compose exec -T postgres pg_isready -U "$ADMIN_DB_USER" -d "$DB_NAME" >/dev/null 2>&1; do
+  until "${DEV_COMPOSE[@]}" exec -T postgres pg_isready -U "$ADMIN_DB_USER" -d "$DB_NAME" >/dev/null 2>&1; do
     sleep 1
   done
 
@@ -103,7 +105,7 @@ if [[ "$SHOULD_BOOTSTRAP_TEST_DB" == "true" ]]; then
       ;;
   esac
 
-  docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$ADMIN_DB_USER" -d postgres <<SQL
+  "${DEV_COMPOSE[@]}" exec -T postgres psql -v ON_ERROR_STOP=1 -U "$ADMIN_DB_USER" -d postgres <<SQL
 SELECT pg_terminate_backend(pid)
 FROM pg_stat_activity
 WHERE datname = '${TEST_DB_NAME}' AND pid <> pg_backend_pid();
@@ -117,7 +119,7 @@ SQL
       /^-- \+goose Down$/ { in_up = 0 }
       in_up && /^-- \+goose/ { next }
       in_up { print }
-    ' "$migration" | docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$ADMIN_DB_USER" -d "$TEST_DB_NAME"
+    ' "$migration" | "${DEV_COMPOSE[@]}" exec -T postgres psql -v ON_ERROR_STOP=1 -U "$ADMIN_DB_USER" -d "$TEST_DB_NAME"
   done
 
   # Migrations are applied with psql rather than goose, so record them in the
@@ -131,7 +133,7 @@ SQL
       version="$(basename "$migration" | cut -d_ -f1)"
       echo "INSERT INTO goose_db_version (version_id, is_applied) VALUES (${version}, true);"
     done
-  } | docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$ADMIN_DB_USER" -d "$TEST_DB_NAME" >/dev/null
+  } | "${DEV_COMPOSE[@]}" exec -T postgres psql -v ON_ERROR_STOP=1 -U "$ADMIN_DB_USER" -d "$TEST_DB_NAME" >/dev/null
 fi
 
 ./scripts/check-go-file-sizes.sh
