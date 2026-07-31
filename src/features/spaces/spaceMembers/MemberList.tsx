@@ -14,6 +14,7 @@ import {
 } from "@/ui";
 import type { MemberAction } from "@/models/types/features/spaces/components/SpaceMembers";
 import type { SpaceMember } from "@/models/interfaces/features/spaces/types";
+import { MemberPermissionControls } from "./MemberPermissionControls";
 import { personInitials } from "../personInitials";
 
 const rowClass = "flex min-h-[72px] min-w-0 items-center gap-3 px-4 py-3";
@@ -59,7 +60,14 @@ export function MemberList({
               {member.role}
             </Badge>
             {owner && member.role !== "owner" ? (
-              <MemberActionsMenu member={member} onAction={onAction} />
+              <div className="flex shrink-0 items-center gap-1">
+                <MemberPermissionControls
+                  spaceId={member.space_id}
+                  userId={member.user_id}
+                  memberName={member.name}
+                />
+                <MemberActionsMenu member={member} onAction={onAction} />
+              </div>
             ) : null}
           </div>
         ))
@@ -77,32 +85,30 @@ function MemberActionsMenu({
   onAction: (action: MemberAction) => void;
 }) {
   return (
-    <div className="flex shrink-0 items-center gap-1">
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
-            size="icon"
-            variant="ghost"
-            type="button"
-            aria-label={`Actions for ${member.name}`}
-          >
-            <Ellipsis className="size-4" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          <DropdownMenuItem onSelect={() => onAction({ kind: "transfer", member })}>
-            <ShieldCheck className="mr-2 size-4" /> Transfer ownership
-          </DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem
-            className="text-destructive focus:text-destructive"
-            onSelect={() => onAction({ kind: "remove", member })}
-          >
-            <Trash2 className="mr-2 size-4" /> Remove member
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-    </div>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          size="icon"
+          variant="ghost"
+          type="button"
+          aria-label={`Actions for ${member.name}`}
+        >
+          <Ellipsis className="size-4" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuItem onSelect={() => onAction({ kind: "transfer", member })}>
+          <ShieldCheck className="mr-2 size-4" /> Transfer ownership
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem
+          className="text-destructive focus:text-destructive"
+          onSelect={() => onAction({ kind: "remove", member })}
+        >
+          <Trash2 className="mr-2 size-4" /> Remove member
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 

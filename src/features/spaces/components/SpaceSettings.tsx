@@ -1,6 +1,6 @@
-import { useEffect, useState, type FormEvent, type ReactNode } from "react";
-import { ArrowRight, MessageSquare, Trash2 } from "lucide-react";
-import { Link, useNavigate } from "react-router-dom";
+import { useEffect, useState, type FormEvent } from "react";
+import { Cable, Settings2, Trash2, UsersRound } from "lucide-react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
 import {
   AlertDialog,
@@ -17,16 +17,37 @@ import { Button } from "@/ui";
 import { Card, CardContent, CardHeader, CardTitle } from "@/ui";
 import { Input } from "@/ui";
 import { Separator } from "@/ui";
-import { DiscordLinkPanel } from "@/features/spaces/integrations/DiscordLinkPanel";
-import { NotionIntegrationPanel } from "@/features/spaces/integrations/NotionIntegrationPanel";
-import { SpaceSetupCards } from "./SpaceSetupCards";
+import {
+  DiscordConnectionPanel,
+  GoogleCalendarConnectionPanel,
+  NotionConnectionPanel,
+} from "@/features/spaces/connections";
+import { WorkspaceOverlay } from "@/layouts/DesktopLayout/WorkspaceOverlay";
+import {
+  DesktopSettingsFrame,
+  type DesktopSettingsNavEntry,
+} from "@/pages/Settings/DesktopSettingsUI";
 import { useSpacesStore } from "@/stores/spaces/useSpacesStore";
+import { SpaceMembers } from "./SpaceMembers";
 
-const validSections = new Set(["general", "chat", "integrations"]);
+type SpaceSettingsSection = "general" | "members" | "connections";
+
+const settingsItems: readonly DesktopSettingsNavEntry<SpaceSettingsSection>[] = [
+  { id: "general", label: "General", icon: Settings2 },
+  { id: "members", label: "Members", icon: UsersRound },
+  { id: "connections", label: "Connections", icon: Cable },
+];
+
+const sectionDescriptions: Record<SpaceSettingsSection, string> = {
+  general: "Name, access, ownership, and Space lifecycle.",
+  members: "Manage member access, invitations, and permissions.",
+  connections: "Services connected to this Space.",
+};
 
 export function SpaceSettings({ spaceId, section }: { spaceId: string; section: string }) {
   const navigate = useNavigate();
-  const activeSection = validSections.has(section) ? section : "general";
+  const location = useLocation();
+  const activeSection = isSpaceSettingsSection(section) ? section : "general";
   const { space, error, renameSpace, leaveSpace, deleteSpace, clearError } = useSpacesStore(
     useShallow((state) => ({
       space: state.spaces.find((item) => item.id === spaceId),
@@ -44,6 +65,22 @@ export function SpaceSettings({ spaceId, section }: { spaceId: string; section: 
   const [deleteConfirmation, setDeleteConfirmation] = useState("");
   const [dangerBusy, setDangerBusy] = useState(false);
   const isOwner = space?.role === "owner";
+  const encodedSpaceId = encodeURIComponent(spaceId);
+  const locationState = location.state as { spaceSettingsReturnTo?: string } | null;
+  const fallbackReturnPath = `/spaces/${encodedSpaceId}/chat`;
+  const closeSettings = () => {
+    const destination = locationState?.spaceSettingsReturnTo;
+    navigate(
+      destination?.startsWith(`/spaces/${encodedSpaceId}/`) && !destination.includes("/settings/")
+        ? destination
+        : fallbackReturnPath,
+      { replace: true },
+    );
+  };
+  const dismissSettings = () => {
+    if (leaveOpen || deleteOpen || dangerBusy) return;
+    closeSettings();
+  };
 
   useEffect(() => {
     setName(space?.name ?? "");
@@ -96,143 +133,153 @@ export function SpaceSettings({ spaceId, section }: { spaceId: string; section: 
     );
 
   return (
-    <div className="h-full overflow-auto bg-background px-6 py-7 sm:px-8 sm:py-9">
-      <div className="mx-auto w-full max-w-3xl">
-        <h2 className="sr-only">{sectionTitle(activeSection)}</h2>
-
-        {activeSection === "general" ? (
-          <div className="grid gap-5">
-            <Card aria-labelledby="space-name-heading">
-              <CardHeader className="flex flex-row items-start justify-between gap-5">
-                <div>
-                  <CardTitle id="space-name-heading">Space details</CardTitle>
-                  <p className="mb-0 mt-1 text-xs text-muted-foreground">
-                    The name and access model shown across Misty.
-                  </p>
-                </div>
-                <Badge variant="outline">{space.is_shared ? "Shared" : "Private"}</Badge>
-              </CardHeader>
-              <CardContent>
-                <form className="flex max-w-lg gap-2" onSubmit={(event) => void saveName(event)}>
-                  <Input
-                    aria-label="Space name"
-                    maxLength={80}
-                    disabled={!isOwner || saving}
-                    value={name}
-                    onChange={(event) => setName(event.target.value)}
-                  />
-                  {isOwner ? (
+    <WorkspaceOverlay
+      open
+      style={{}}
+      ariaLabel={`${space.name} settings`}
+      onClose={dismissSettings}
+    >
+      <>
+        <DesktopSettingsFrame
+          activeId={activeSection}
+          ariaLabel={`${space.name} settings`}
+          description={sectionDescriptions[activeSection]}
+          items={settingsItems}
+          navigationLabel="Space settings sections"
+          navigationTitle={space.name}
+          onClose={dismissSettings}
+          onSelect={(nextSection) =>
+            navigate(`/spaces/${encodedSpaceId}/settings/${nextSection}`, {
+              replace: true,
+              state: location.state,
+            })
+          }
+          presentation="overlay"
+          title={settingsItems.find((item) => item.id === activeSection)?.label ?? "General"}
+        >
+          {activeSection === "general" ? (
+            <div className="grid gap-5">
+              <Card aria-labelledby="space-name-heading">
+                <CardHeader className="flex flex-row items-start justify-between gap-5">
+                  <div>
+                    <CardTitle id="space-name-heading">Space details</CardTitle>
+                    <p className="mb-0 mt-1 text-xs text-muted-foreground">
+                      The name and access model shown across Misty.
+                    </p>
+                  </div>
+                  <Badge variant="outline">{space.is_shared ? "Shared" : "Private"}</Badge>
+                </CardHeader>
+                <CardContent>
+                  <form className="flex max-w-lg gap-2" onSubmit={(event) => void saveName(event)}>
+                    <Input
+                      aria-label="Space name"
+                      maxLength={80}
+                      disabled={!isOwner || saving}
+                      value={name}
+                      onChange={(event) => setName(event.target.value)}
+                    />
+                    {isOwner ? (
+                      <Button
+                        className="shrink-0"
+                        type="submit"
+                        disabled={saving || !name.trim() || name.trim() === space.name}
+                      >
+                        {saving ? "Saving…" : "Save"}
+                      </Button>
+                    ) : null}
+                  </form>
+                  {!isOwner ? (
+                    <p className="mb-0 mt-3 text-xs text-muted-foreground">
+                      Only the Space owner can change its name.
+                    </p>
+                  ) : null}
+                  {error && !leaveOpen && !deleteOpen ? (
                     <Button
-                      className="shrink-0"
-                      type="submit"
-                      disabled={saving || !name.trim() || name.trim() === space.name}
+                      className="mt-4 h-auto w-full justify-start whitespace-normal rounded-lg border border-destructive/25 bg-destructive/10 px-3 py-2 text-left text-xs text-destructive hover:bg-destructive/15 hover:text-destructive"
+                      variant="ghost"
+                      type="button"
+                      onClick={clearError}
                     >
-                      {saving ? "Saving…" : "Save"}
+                      {error}
                     </Button>
                   ) : null}
-                </form>
-                {!isOwner ? (
-                  <p className="mb-0 mt-3 text-xs text-muted-foreground">
-                    Only the Space owner can change its name.
+                  <Separator className="my-5" />
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                    <Fact label="Members" value={String(space.member_count)} />
+                    <Fact label="Your role" value={isOwner ? "Owner" : "Member"} />
+                    <Fact label="Access" value={space.is_shared ? "Shared" : "Private"} />
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="ring-destructive/20" aria-labelledby="space-danger-heading">
+                <CardHeader>
+                  <CardTitle className="text-destructive" id="space-danger-heading">
+                    Danger zone
+                  </CardTitle>
+                  <p className="mb-0 mt-1 text-xs text-muted-foreground">
+                    Actions here can remove access or permanently delete this Space.
                   </p>
-                ) : null}
-                {error && !leaveOpen && !deleteOpen ? (
-                  <Button
-                    className="mt-4 h-auto w-full justify-start whitespace-normal rounded-lg border border-destructive/25 bg-destructive/10 px-3 py-2 text-left text-xs text-destructive hover:bg-destructive/15 hover:text-destructive"
-                    variant="ghost"
-                    type="button"
-                    onClick={clearError}
-                  >
-                    {error}
-                  </Button>
-                ) : null}
-                <Separator className="my-5" />
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                  <Fact label="Members" value={String(space.member_count)} />
-                  <Fact label="Your role" value={isOwner ? "Owner" : "Member"} />
-                  <Fact label="Access" value={space.is_shared ? "Shared" : "Private"} />
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="ring-destructive/20" aria-labelledby="space-danger-heading">
-              <CardHeader>
-                <CardTitle className="text-destructive" id="space-danger-heading">
-                  Danger zone
-                </CardTitle>
-                <p className="mb-0 mt-1 text-xs text-muted-foreground">
-                  Actions here can remove access or permanently delete this Space.
-                </p>
-              </CardHeader>
-              <CardContent>
-                {isOwner ? (
-                  <div className="flex flex-wrap items-center justify-between gap-4">
-                    <div className="min-w-0 flex-1">
-                      <p className="m-0 text-sm font-medium">Delete this Space</p>
-                      <p className="mb-0 mt-1 text-xs leading-relaxed text-muted-foreground">
-                        Member access is removed immediately. Permanent deletion follows recovery
-                        and storage safety checks.
-                      </p>
+                </CardHeader>
+                <CardContent>
+                  {isOwner ? (
+                    <div className="flex flex-wrap items-center justify-between gap-4">
+                      <div className="min-w-0 flex-1">
+                        <p className="m-0 text-sm font-medium">Delete this Space</p>
+                        <p className="mb-0 mt-1 text-xs leading-relaxed text-muted-foreground">
+                          Member access is removed immediately. Permanent deletion follows recovery
+                          and storage safety checks.
+                        </p>
+                      </div>
+                      <Button
+                        variant="destructive"
+                        type="button"
+                        onClick={() => {
+                          clearError();
+                          setDeleteConfirmation("");
+                          setDeleteOpen(true);
+                        }}
+                      >
+                        <Trash2 className="size-4" />
+                        Delete Space
+                      </Button>
                     </div>
-                    <Button
-                      variant="destructive"
-                      type="button"
-                      onClick={() => {
-                        clearError();
-                        setDeleteConfirmation("");
-                        setDeleteOpen(true);
-                      }}
-                    >
-                      <Trash2 className="size-4" />
-                      Delete Space
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="flex flex-wrap items-center justify-between gap-4">
-                    <div className="min-w-0 flex-1">
-                      <p className="m-0 text-sm font-medium">Leave this Space</p>
-                      <p className="mb-0 mt-1 text-xs leading-relaxed text-muted-foreground">
-                        You will immediately lose access to chat, tasks, and protected Library
-                        items.
-                      </p>
+                  ) : (
+                    <div className="flex flex-wrap items-center justify-between gap-4">
+                      <div className="min-w-0 flex-1">
+                        <p className="m-0 text-sm font-medium">Leave this Space</p>
+                        <p className="mb-0 mt-1 text-xs leading-relaxed text-muted-foreground">
+                          You will immediately lose access to chat, Planner, and protected Library
+                          items.
+                        </p>
+                      </div>
+                      <Button
+                        variant="outline"
+                        type="button"
+                        onClick={() => {
+                          clearError();
+                          setLeaveOpen(true);
+                        }}
+                      >
+                        Leave Space
+                      </Button>
                     </div>
-                    <Button
-                      variant="outline"
-                      type="button"
-                      onClick={() => {
-                        clearError();
-                        setLeaveOpen(true);
-                      }}
-                    >
-                      Leave Space
-                    </Button>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        ) : null}
-
-        {activeSection === "chat" ? (
-          <SettingsCard icon={<MessageSquare className="size-5" />} title="Space chat">
-            <div className="mt-5 grid gap-2">
-              <Fact
-                label="People"
-                value={`${space.member_count} member${space.member_count === 1 ? "" : "s"}`}
-              />
+                  )}
+                </CardContent>
+              </Card>
             </div>
-            <ActionLink to={`/spaces/${encodeURIComponent(spaceId)}/chat`} label="Open Chat" />
-          </SettingsCard>
-        ) : null}
+          ) : null}
 
-        {activeSection === "integrations" ? (
-          <div className="grid gap-5">
-            <SpaceSetupCards spaceId={spaceId} isOwner={isOwner} />
-            <NotionIntegrationPanel spaceId={spaceId} canManage={isOwner} />
-            <DiscordLinkPanel spaceId={spaceId} canManage={isOwner} />
-          </div>
-        ) : null}
-      </div>
+          {activeSection === "members" ? <SpaceMembers embedded spaceId={spaceId} /> : null}
+
+          {activeSection === "connections" ? (
+            <div className="grid items-start gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              <GoogleCalendarConnectionPanel spaceId={spaceId} canManage={isOwner} />
+              <NotionConnectionPanel spaceId={spaceId} canManage={isOwner} />
+              <DiscordConnectionPanel spaceId={spaceId} canManage={isOwner} />
+            </div>
+          ) : null}
+        </DesktopSettingsFrame>
 
       <AlertDialog
         open={leaveOpen}
@@ -304,43 +351,11 @@ export function SpaceSettings({ spaceId, section }: { spaceId: string; section: 
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+      </>
+    </WorkspaceOverlay>
   );
 }
 
-function SettingsCard({
-  icon,
-  title,
-  children,
-}: {
-  icon: ReactNode;
-  title: string;
-  children: ReactNode;
-}) {
-  return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center gap-3">
-          <span className="grid size-9 shrink-0 place-items-center rounded-md bg-muted/60 text-muted-foreground">
-            {icon}
-          </span>
-          <CardTitle>{title}</CardTitle>
-        </div>
-      </CardHeader>
-      <CardContent>{children}</CardContent>
-    </Card>
-  );
-}
-function ActionLink({ to, label }: { to: string; label: string }) {
-  return (
-    <Button asChild className="mt-5" variant="outline">
-      <Link to={to}>
-        {label}
-        <ArrowRight className="size-3.5" />
-      </Link>
-    </Button>
-  );
-}
 function Fact({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-w-0 rounded-lg bg-muted/45 px-3 py-2.5">
@@ -359,8 +374,7 @@ function DangerError({ message }: { message: string }) {
     </p>
   );
 }
-function sectionTitle(section: string) {
-  if (section === "chat") return "Chat settings";
-  if (section === "integrations") return "Integrations";
-  return "Space settings";
+
+function isSpaceSettingsSection(value: string): value is SpaceSettingsSection {
+  return settingsItems.some((item) => item.id === value);
 }

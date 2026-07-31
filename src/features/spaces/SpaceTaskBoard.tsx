@@ -63,7 +63,7 @@ export function SpaceTaskBoard({
 
   return (
     <div
-      className="flex h-full min-h-0 gap-3 overflow-x-auto overflow-y-hidden"
+      className="flex h-full min-h-0 gap-0 overflow-x-auto overflow-y-hidden"
       aria-label="Task board"
     >
       {boardStatuses.map((column) => (
@@ -143,11 +143,13 @@ function BoardColumn({
   return (
     <section
       ref={dropZone.ref}
-      className={`flex h-full min-h-0 w-[min(340px,86vw)] min-w-[290px] shrink-0 flex-col rounded-xl p-2 transition-colors ${
-        dropZone.active ? "bg-accent/60 ring-1 ring-primary/40" : "bg-muted/35"
+      className={`flex h-full min-h-0 min-w-[264px] flex-1 basis-0 flex-col border-r border-border/55 px-3 py-2 transition-colors last:border-r-0 ${
+        dropZone.active
+          ? "bg-accent/45 shadow-[inset_0_2px_0_color-mix(in_srgb,var(--primary)_45%,transparent)]"
+          : "bg-transparent"
       }`}
     >
-      <header className="flex min-h-10 items-center gap-2 px-2">
+      <header className="flex min-h-11 items-center gap-2 px-2">
         <span className={`size-2 rounded-full ${statusDot(column.id)}`} />
         <h2 className="m-0 text-xs font-semibold text-foreground">{column.label}</h2>
         <span className="text-[11px] tabular-nums text-muted-foreground">
@@ -214,12 +216,15 @@ function BoardColumn({
 
         {!tasks.length && !creating ? (
           <Button
-            className="min-h-28 bg-muted/45 text-xs text-muted-foreground shadow-none hover:bg-muted/65"
+            className="misty-spaces-interactive min-h-28 flex-col gap-2 rounded-md border-0 bg-transparent text-xs text-muted-foreground shadow-none hover:bg-muted/35"
             variant="ghost"
             type="button"
             disabled={!canManage}
             onClick={onStartCreate}
           >
+            <span className="grid size-7 place-items-center text-muted-foreground">
+              <Plus className="size-3.5" />
+            </span>
             Drop or create
           </Button>
         ) : null}
@@ -280,7 +285,7 @@ function TaskCard({
       ref={dropZone.ref}
       data-misty-window-drag-block={canManage ? "true" : undefined}
       data-pointer-drag-source={canManage ? "true" : undefined}
-      className={`group gap-0 py-0 shadow-none ring-foreground/8 transition-opacity ${
+      className={`misty-spaces-interactive group gap-0 py-0 shadow-sm ring-foreground/8 hover:shadow-md ${
         canManage ? "cursor-grab" : "cursor-default"
       } ${dragging ? "opacity-40" : ""} ${dropZone.active ? "ring-2 ring-primary" : ""}`}
       onPointerDown={beginDrag}

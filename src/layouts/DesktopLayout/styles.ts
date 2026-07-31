@@ -27,19 +27,17 @@ export const navbarGroupClass =
 export const navbarBottomClass = "mt-auto flex w-full shrink-0 flex-col items-center gap-4";
 
 export const navLinkBaseClass = [
-  "grid h-[70px] w-16 shrink-0 grid-rows-[50px_18px] place-items-center border-0 !bg-transparent p-0",
+  "misty-hover-marker-side misty-navbar-marker-side grid h-[70px] w-16 shrink-0 grid-rows-[50px_18px] place-items-center border-0 !bg-transparent p-0",
   "text-[var(--misty-text-muted)] no-underline shadow-none transition-colors hover:!bg-transparent",
   "hover:text-[var(--misty-text)] active:translate-y-0 aria-expanded:!bg-transparent",
 ].join(" ");
-export const navLinkActiveClass = "text-[var(--misty-text)]";
+export const navLinkActiveClass = "misty-active-marker-side text-[var(--misty-text)]";
 
 export const navIconTileBaseClass = [
   "relative grid h-[50px] w-[54px] place-items-center rounded-[13px] text-[var(--misty-text)] transition-colors",
-  "group-hover/nav-item:bg-[var(--misty-neutral-hover-bg,var(--misty-surface-2))]",
 ].join(" ");
 
-export const navIconTileActiveClass =
-  "bg-[var(--misty-neutral-selected-bg,var(--misty-surface-3))]";
+export const navIconTileActiveClass = "text-[var(--misty-text)]";
 
 export const navIconClass = "size-[27px]";
 

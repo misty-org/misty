@@ -47,7 +47,7 @@ export function ChatMessageRow({
     <Fragment>
       {dateLabel ? <ChatDateDivider label={dateLabel} /> : null}
       <article
-        className={`group relative -mx-3 grid grid-cols-[44px_minmax(0,1fr)] gap-x-5 rounded-md px-3 py-0.5 hover:bg-muted/25 ${compact ? "" : "mt-4"}`}
+        className={`group relative -mx-3 grid grid-cols-[44px_minmax(0,1fr)] gap-x-4 rounded-xl px-3 py-1 transition-colors duration-150 hover:bg-muted/25 ${compact ? "" : "mt-4"}`}
         id={`message-${message.id}`}
       >
         {message.reply_to_message_id ? (

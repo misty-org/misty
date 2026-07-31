@@ -1,0 +1,74 @@
+import { Settings2, type LucideIcon } from "lucide-react";
+import { Link, useLocation } from "react-router-dom";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger, cn } from "@/ui";
+import type { Space } from "@/models/interfaces/features/spaces/types";
+import { SpaceMembersPopover } from "./SpaceMembersPopover";
+
+export function SpaceManagementNavigation({
+  space,
+  section,
+}: {
+  space: Space | undefined;
+  section: string;
+}) {
+  const location = useLocation();
+  if (!space) return null;
+  const encodedSpaceId = encodeURIComponent(space.id);
+
+  const settingsPath = `/spaces/${encodedSpaceId}/settings/general`;
+
+  return (
+    <div className="ml-auto flex shrink-0 items-center gap-1 pl-3">
+      <TooltipProvider delayDuration={400}>
+        <nav className="flex items-center gap-1" aria-label="Space management">
+          <SpaceMembersPopover space={space} />
+          <ManagementLink
+            active={section === "settings"}
+            icon={Settings2}
+            label="Settings"
+            state={{
+              spaceSettingsReturnTo: `${location.pathname}${location.search}${location.hash}`,
+            }}
+            to={settingsPath}
+          />
+        </nav>
+      </TooltipProvider>
+    </div>
+  );
+}
+
+function ManagementLink({
+  active,
+  icon: Icon,
+  label,
+  state,
+  to,
+}: {
+  active: boolean;
+  icon: LucideIcon;
+  label: string;
+  state?: { spaceSettingsReturnTo: string };
+  to: string;
+}) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Link
+          className={cn(
+            "relative grid size-8 place-items-center rounded-md no-underline outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring",
+            active
+              ? "misty-active-marker-bottom text-foreground"
+              : "text-muted-foreground hover:bg-accent/65 hover:text-foreground",
+          )}
+          to={to}
+          state={state}
+          aria-label={label}
+          aria-current={active ? "page" : undefined}
+        >
+          <Icon size={16} strokeWidth={1.75} aria-hidden="true" />
+        </Link>
+      </TooltipTrigger>
+      <TooltipContent>{label}</TooltipContent>
+    </Tooltip>
+  );
+}

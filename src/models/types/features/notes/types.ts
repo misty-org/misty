@@ -32,6 +32,8 @@ export type UnifiedNote = {
   sourceUrl?: string;
   connectorId?: string;
   providerStatus?: NoteProviderStatus;
+  /** Server-authoritative delete access for the current user. */
+  canDelete?: boolean;
 };
 
 /**

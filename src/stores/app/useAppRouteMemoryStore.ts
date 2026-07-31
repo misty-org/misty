@@ -8,7 +8,7 @@ const defaultSpacesRoute = "/spaces";
 const desktopRememberableRoutes = ["/spaces"];
 const validSpaceSections = new Set([
   "chat",
-  "tasks",
+  "planner",
   "notes",
   "drawings",
   "library",
@@ -16,7 +16,7 @@ const validSpaceSections = new Set([
   "members",
   "settings",
 ]);
-const validSettingsSections = new Set(["general", "chat", "integrations"]);
+const validSettingsSections = new Set(["general", "members", "chat", "connections"]);
 const validTaskViews = new Set(["board", "list", "calendar"]);
 
 export const useAppRouteMemoryStore = create<AppRouteMemoryStore>()(
@@ -93,15 +93,21 @@ export function normalizeRememberedSpacesRoute(path: string): string | null {
   if (parts[0] !== "spaces" || !parts[1]) return null;
 
   const base = `/spaces/${parts[1]}`;
-  const requestedSection = parts[2] === "files" ? "library" : parts[2];
+  const requestedSection =
+    parts[2] === "files" ? "library" : parts[2] === "tasks" ? "planner" : parts[2];
   if (!requestedSection || !validSpaceSections.has(requestedSection)) return base;
 
   let normalizedPath = `${base}/${requestedSection}`;
-  if (requestedSection === "tasks" && validTaskViews.has(parts[3] ?? "")) {
+  if (requestedSection === "planner" && validTaskViews.has(parts[3] ?? "")) {
     normalizedPath += `/${parts[3]}`;
   }
   if (requestedSection === "settings") {
-    normalizedPath += `/${validSettingsSections.has(parts[3] ?? "") ? parts[3] : "general"}`;
+    const requestedSettingsSection = parts[3] === "integrations" ? "connections" : parts[3];
+    normalizedPath += `/${
+      validSettingsSections.has(requestedSettingsSection ?? "")
+        ? requestedSettingsSection
+        : "general"
+    }`;
   }
 
   const query = safeSpaceQuery(path, requestedSection);
@@ -122,7 +128,7 @@ function safeSpaceQuery(path: string, section: string): string {
   const allowed =
     section === "chat"
       ? new Set(["conversation", "message", ...agentPanelParams])
-      : section === "tasks"
+      : section === "planner"
         ? new Set([
             "q",
             "status",

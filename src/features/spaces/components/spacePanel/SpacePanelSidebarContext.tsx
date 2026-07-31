@@ -1,4 +1,10 @@
-import { MessageSquare, Plug, Settings2 } from "lucide-react";
+import {
+  CalendarClock,
+  ListTodo,
+  UserRound,
+  UserRoundX,
+} from "lucide-react";
+import { useLocation } from "react-router-dom";
 import { spaceNotesEnabled } from "@/features/notes/availability";
 import { NotesPanelSidebar } from "@/features/notes/components/NotesPanelSidebar";
 import { DrawingPanelSidebar } from "@/features/drawings/components/DrawingPanelSidebar";
@@ -8,16 +14,10 @@ import { SpaceChatConversationList } from "../SpaceChatConversationList";
 import { SpaceSidebarSection } from "../SpaceSidebarSection";
 import { SpaceSidebarLink } from "./SpaceSidebarLink";
 import { librarySidebarItems } from "./librarySidebarItems";
-import type { ConversationDialogKind } from "../CreateEditConversationDialog";
-
-const settingsSidebarItems = [
-  { id: "general", label: "General", icon: Settings2 },
-  { id: "chat", label: "Chat", icon: MessageSquare },
-  { id: "integrations", label: "Integrations", icon: Plug },
-] as const;
 
 export interface SpacePanelSidebarContextProps {
   section: string;
+  taskView: string;
   activeSpaceId: string;
   activeSpaceName: string;
   settingsSection: string;
@@ -26,7 +26,7 @@ export interface SpacePanelSidebarContextProps {
   activeConversationId: string | null;
   currentUserId: string | undefined;
   activeDrawingId: string;
-  onCreateConversation: (kind: ConversationDialogKind) => void;
+  onCreateConversation: () => void;
   onEditConversation: (conversation: SpaceConversation) => void;
 }
 
@@ -38,6 +38,8 @@ export interface SpacePanelSidebarContextProps {
  */
 export function SpacePanelSidebarContext(props: SpacePanelSidebarContextProps) {
   const spacePath = `/spaces/${encodeURIComponent(props.activeSpaceId)}`;
+  const location = useLocation();
+  const search = new URLSearchParams(location.search);
 
   if (props.section === "chat") {
     return (
@@ -51,6 +53,52 @@ export function SpacePanelSidebarContext(props: SpacePanelSidebarContextProps) {
           onEditConversation={props.onEditConversation}
         />
       </div>
+    );
+  }
+
+  if (props.section === "planner") {
+    const taskPath = `${spacePath}/planner/${props.taskView}`;
+    const hasTaskFilter = ["mine", "assignee", "due", "status", "priority"].some((key) =>
+      search.has(key),
+    );
+
+    return (
+      <SpaceSidebarSection title="Planner">
+        <nav className="grid gap-1" aria-label="Task shortcuts">
+          {[
+            {
+              id: "all",
+              label: "All tasks",
+              icon: ListTodo,
+              active: !hasTaskFilter,
+              to: taskPath,
+            },
+            {
+              id: "mine",
+              label: "Assigned to me",
+              icon: UserRound,
+              active: search.get("mine") === "1",
+              to: `${taskPath}?mine=1`,
+            },
+            {
+              id: "unassigned",
+              label: "Unassigned",
+              icon: UserRoundX,
+              active: search.get("assignee") === "unassigned",
+              to: `${taskPath}?assignee=unassigned`,
+            },
+            {
+              id: "week",
+              label: "Due this week",
+              icon: CalendarClock,
+              active: search.get("due") === "week",
+              to: `${taskPath}?due=week`,
+            },
+          ].map(({ id, label, icon, active, to }) => (
+            <SpaceSidebarLink key={id} active={active} icon={icon} label={label} to={to} />
+          ))}
+        </nav>
+      </SpaceSidebarSection>
     );
   }
 
@@ -92,24 +140,6 @@ export function SpacePanelSidebarContext(props: SpacePanelSidebarContextProps) {
           </nav>
         </SpaceSidebarSection>
       </div>
-    );
-  }
-
-  if (props.section === "settings") {
-    return (
-      <SpaceSidebarSection title="Preferences">
-        <nav className="grid gap-1" aria-label="Space settings sections">
-          {settingsSidebarItems.map(({ id, label, icon }) => (
-            <SpaceSidebarLink
-              key={id}
-              active={props.settingsSection === id}
-              icon={icon}
-              label={label}
-              to={`${spacePath}/settings/${id}`}
-            />
-          ))}
-        </nav>
-      </SpaceSidebarSection>
     );
   }
 

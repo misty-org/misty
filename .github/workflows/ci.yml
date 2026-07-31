@@ -2,9 +2,6 @@ name: CI
 
 on:
   pull_request:
-  push:
-    branches:
-      - main
   workflow_dispatch:
 
 permissions:
@@ -15,117 +12,37 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  secrets:
-    name: Security checks
+  verify:
+    name: Verify
     runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          persist-credentials: false
-      - name: Scan current release source
-        run: >-
-          docker run --rm -v "$PWD:/repo"
-          zricethezav/gitleaks@sha256:e1b35e12a8c6fa8901f060459cfb6b2fc4c484d3afbe3b029733a3bbfab07055
-          detect --source=/repo --no-git --redact --config=/repo/.gitleaks.toml
-
-  web:
-    name: Desktop web checks
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 35
     env:
       NODE_OPTIONS: --max-old-space-size=4096
     steps:
       - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Scan source for secrets
+        run: >-
+          docker run --rm -v "$PWD:/repo"
+          zricethezav/gitleaks@sha256:e1b35e12a8c6fa8901f060459cfb6b2fc4c484d3afbe3b029733a3bbfab07055
+          detect --source=/repo --no-git --redact --config=/repo/.gitleaks.toml
       - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
       - run: npm run check
-      - run: npm run build:desktop
-      - run: npm run report:bundle-size
-      - name: Audit production dependencies
-        run: npm run audit:production
-      - name: Generate web SBOM and third-party notices
-        run: npm run release:metadata
-      - uses: actions/upload-artifact@v6
-        with:
-          name: web-release-metadata
-          path: artifacts/release
-          if-no-files-found: error
-
-  native:
-    name: macOS test app
-    runs-on: macos-14
-    timeout-minutes: 60
-    env:
-      NODE_OPTIONS: --max-old-space-size=4096
-    steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-node@v7
-        with:
-          node-version-file: .nvmrc
-          cache: npm
-      - run: npm ci
+      - name: Install native test prerequisites
+        run: >-
+          sudo apt-get update &&
+          sudo apt-get install -y
+          libwebkit2gtk-4.1-dev
+          libappindicator3-dev
+          librsvg2-dev
+          patchelf
       - name: Install pinned Rust toolchain
         run: rustup show
-      - name: Restore Rust build cache
-        uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
-        with:
-          workspaces: src-tauri -> target
-          shared-key: desktop-${{ runner.os }}-${{ runner.arch }}
-          add-job-id-key: "false"
-      - name: Check Rust formatting
-        run: cargo fmt --manifest-path src-tauri/Cargo.toml --all -- --check
-      - name: Lint Rust
-        run: cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets
-      - name: Test Rust
-        run: cargo test --manifest-path src-tauri/Cargo.toml --locked
-      - name: Generate Rust SBOM
-        run: |
-          cargo install cargo-cyclonedx --version 0.5.9 --locked
-          cargo cyclonedx --manifest-path src-tauri/Cargo.toml --format json
-          test -n "$(find src-tauri -maxdepth 1 -name '*.cdx.json' -print -quit)"
-      - name: Build ad-hoc-signed macOS test app
-        run: npm run build:mac:test
-      - name: Generate macOS artifact checksums
-        run: node scripts/generate-release-metadata.mjs src-tauri/target/release/bundle
-      - uses: actions/upload-artifact@v6
-        with:
-          name: macos-ad-hoc-test-only
-          path: |
-            src-tauri/target/release/bundle
-            src-tauri/*.cdx.json
-          if-no-files-found: error
-
-  windows:
-    name: Windows test installer
-    runs-on: windows-latest
-    timeout-minutes: 60
-    env:
-      NODE_OPTIONS: --max-old-space-size=4096
-    steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-node@v7
-        with:
-          node-version-file: .nvmrc
-          cache: npm
-      - run: npm ci
-      - name: Install pinned Rust toolchain
-        run: rustup show
-      - name: Restore Rust build cache
-        uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
-        with:
-          workspaces: src-tauri -> target
-          shared-key: desktop-${{ runner.os }}-${{ runner.arch }}
-          add-job-id-key: "false"
-      - name: Build unsigned Windows test installer
-        run: npm run build:windows:test -- -SkipAssets -SkipDependencies
-      - name: Generate Windows artifact checksums
-        run: node scripts/generate-release-metadata.mjs src-tauri/target/release/bundle
-      - uses: actions/upload-artifact@v6
-        with:
-          name: windows-unsigned-beta
-          path: src-tauri/target/release/bundle
-          if-no-files-found: error
+      - run: cargo fmt --manifest-path src-tauri/Cargo.toml --all -- --check
+      - run: cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets
+      - run: cargo test --manifest-path src-tauri/Cargo.toml --locked

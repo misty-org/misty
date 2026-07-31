@@ -6,6 +6,7 @@ export interface NoteListPanelProps {
   loading: boolean;
   spaceName: string;
   selectedNoteId?: string;
+  showHeader?: boolean;
   connectorErrors: Record<string, string>;
   onSelectNote: (noteId: string) => void;
   onNewNote: () => void;

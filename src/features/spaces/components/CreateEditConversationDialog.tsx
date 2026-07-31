@@ -13,8 +13,6 @@ import { Button } from "@/ui";
 import type { SpaceConversation, SpaceMember } from "@/models/interfaces/features/spaces/types";
 import { spacesApi } from "@/stores/spaces/useSpacesBackendStore";
 
-export type ConversationDialogKind = "direct" | "group";
-
 export function CreateEditConversationDialog({
   spaceId,
   open,
@@ -22,7 +20,6 @@ export function CreateEditConversationDialog({
   members,
   currentUserId,
   conversation,
-  kindHint,
   onSaved,
 }: {
   spaceId: string;
@@ -32,17 +29,8 @@ export function CreateEditConversationDialog({
   currentUserId?: string;
   /** Present when editing an existing conversation; absent when creating one. */
   conversation?: SpaceConversation | null;
-  /** Only meaningful when creating: picks single-select vs multi-select. */
-  kindHint: ConversationDialogKind;
   onSaved: (conversation: SpaceConversation) => void;
 }) {
-  const editing = Boolean(conversation);
-  // Editing always allows full membership changes (a Direct conversation can
-  // grow into a Group simply by adding people, and the sidebar re-buckets it
-  // automatically based on member count) — only a brand-new Direct
-  // conversation gets the streamlined single-select flow.
-  const singleSelect = !editing && kindHint === "direct";
-
   const [title, setTitle] = useState("");
   const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
@@ -60,9 +48,7 @@ export function CreateEditConversationDialog({
   }, [open, conversation, currentUserId]);
 
   const otherMembers = members.filter((member) => member.user_id !== currentUserId);
-  const canSave = singleSelect
-    ? selectedMemberIds.length === 1 && !saving
-    : title.trim().length > 0 && selectedMemberIds.length > 0 && !saving;
+  const canSave = selectedMemberIds.length > 0 && !saving;
 
   const close = () => {
     if (saving) return;
@@ -70,12 +56,6 @@ export function CreateEditConversationDialog({
   };
 
   const toggleMember = (memberId: string, checked: boolean) => {
-    if (singleSelect) {
-      setSelectedMemberIds(checked ? [memberId] : []);
-      const picked = otherMembers.find((member) => member.user_id === memberId);
-      if (checked && picked) setTitle(picked.name);
-      return;
-    }
     setSelectedMemberIds((current) =>
       checked ? [...current, memberId] : current.filter((id) => id !== memberId),
     );
@@ -87,10 +67,13 @@ export function CreateEditConversationDialog({
     setSaving(true);
     setError("");
     try {
-      const resolvedTitle = singleSelect
-        ? (otherMembers.find((member) => member.user_id === selectedMemberIds[0])?.name ??
-          title.trim())
-        : title.trim();
+      const selectedNames = selectedMemberIds
+        .map((memberId) => otherMembers.find((member) => member.user_id === memberId)?.name)
+        .filter((name): name is string => Boolean(name));
+      const resolvedTitle = (title.trim() || selectedNames.join(", ") || "Conversation").slice(
+        0,
+        80,
+      );
       const saved = conversation
         ? await spacesApi.updateConversation(
             spaceId,
@@ -113,25 +96,20 @@ export function CreateEditConversationDialog({
       <DialogContent className="max-w-sm">
         <form onSubmit={(event) => void submit(event)}>
           <DialogHeader>
-            <DialogTitle>{editing ? "Edit" : "Create"}</DialogTitle>
+            <DialogTitle>{conversation ? "Edit conversation" : "New conversation"}</DialogTitle>
             <DialogDescription>
-              {singleSelect
-                ? "Only you and the person you pick can see this conversation."
-                : "Only selected members can see this conversation."}
+              Choose one or more members. You can change the people in this conversation later.
             </DialogDescription>
           </DialogHeader>
-          {singleSelect ? null : (
-            <label className="mt-5 grid gap-2 text-xs font-medium text-muted-foreground">
-              Name
-              <Input
-                autoFocus
-                maxLength={80}
-                placeholder="Launch crew"
-                value={title}
-                onChange={(event) => setTitle(event.target.value)}
-              />
-            </label>
-          )}
+          <label className="mt-5 grid gap-2 text-xs font-medium text-muted-foreground">
+            Name <span className="font-normal text-muted-foreground/75">(optional)</span>
+            <Input
+              maxLength={80}
+              placeholder="Uses member names when left blank"
+              value={title}
+              onChange={(event) => setTitle(event.target.value)}
+            />
+          </label>
           <fieldset className="misty-transient-scrollbar mt-4 grid max-h-56 gap-1 overflow-y-auto border-0 p-0">
             <legend className="mb-2 text-xs font-medium text-muted-foreground">Members</legend>
             {otherMembers.map((member) => (
@@ -165,7 +143,7 @@ export function CreateEditConversationDialog({
               Cancel
             </Button>
             <Button type="submit" disabled={!canSave}>
-              {saving ? "Saving..." : editing ? "Save" : "Create"}
+              {saving ? "Saving..." : conversation ? "Save" : "Create"}
             </Button>
           </DialogFooter>
         </form>

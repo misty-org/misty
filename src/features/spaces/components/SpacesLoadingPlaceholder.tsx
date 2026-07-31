@@ -21,14 +21,10 @@ export function SpacePageLoadingPlaceholder(props: { label?: string; onRetry?: (
     >
       <span className="sr-only">{props.label ?? "Loading Space"}</span>
 
-      <header className="flex h-16 shrink-0 items-center justify-between border-b border-border/60 px-6">
-        <div className="grid gap-2">
-          <Skeleton className="h-4 w-40 rounded-md" />
-          <Skeleton className="h-3 w-24 rounded-md" />
-        </div>
+      <header className="flex h-11 shrink-0 items-center justify-between border-b border-border/60 px-3">
+        <Skeleton className="h-8 min-w-44 max-w-xl flex-1 rounded-md" />
         <div className="flex items-center gap-2">
-          <Skeleton className="size-8 rounded-full" />
-          <Skeleton className="size-8 rounded-full" />
+          <Skeleton className="size-8 rounded-md" />
           <Skeleton className="h-8 w-20 rounded-md" />
         </div>
       </header>
@@ -63,7 +59,7 @@ export function SpacePageLoadingPlaceholder(props: { label?: string; onRetry?: (
       </div>
 
       {retryVisible && props.onRetry ? (
-        <div className="absolute inset-x-0 bottom-20 flex justify-center px-4">
+        <div className="absolute inset-x-0 top-20 z-10 flex justify-center px-4">
           <div className="flex items-center gap-3 rounded-full border border-border/70 bg-background/95 py-1.5 pl-4 pr-1.5 text-xs text-muted-foreground shadow-sm backdrop-blur">
             <span>Still getting things ready</span>
             <Button size="sm" variant="ghost" type="button" onClick={props.onRetry}>
@@ -78,32 +74,29 @@ export function SpacePageLoadingPlaceholder(props: { label?: string; onRetry?: (
 
 export function SpacesAppLoadingPlaceholder() {
   return (
-    <div className="grid h-full min-h-0 grid-cols-[280px_minmax(0,1fr)] grid-rows-[minmax(0,1fr)_32px] overflow-hidden bg-background max-[900px]:grid-cols-[252px_minmax(0,1fr)]">
-      <aside className="col-start-1 row-start-1 flex min-h-0 flex-col gap-4 overflow-hidden border-r border-sidebar-border/60 bg-[var(--misty-app-panel-bg,transparent)] p-4">
-        <div className="flex items-center gap-3">
-          <Skeleton className="size-9 rounded-lg" />
-          <div className="grid flex-1 gap-2">
-            <Skeleton className="h-3.5 w-28 rounded-md" />
-            <Skeleton className="h-3 w-16 rounded-md" />
-          </div>
-          <Skeleton className="size-8 rounded-md" />
+    <div className="misty-spaces-workbench grid h-full min-h-0 grid-cols-[var(--misty-spaces-rail-width)_minmax(0,1fr)] grid-rows-[minmax(0,1fr)_32px] overflow-hidden bg-background">
+      <aside className="col-start-1 row-start-1 flex min-h-0 flex-col overflow-hidden border-r border-sidebar-border/60 bg-sidebar px-3 pb-2 pt-3">
+        <Skeleton className="h-10 rounded-md" />
+        <div className="mt-5 grid gap-2">
+          <Skeleton className="h-5 w-24 rounded-md" />
+          <Skeleton className="h-10 rounded-md" />
+          <Skeleton className="h-10 w-5/6 rounded-md" />
+          <Skeleton className="h-10 w-4/5 rounded-md" />
         </div>
-        <div className="grid grid-cols-4 gap-1.5">
-          {[0, 1, 2, 3].map((index) => (
-            <Skeleton className="h-10 rounded-lg" key={index} />
-          ))}
-        </div>
-        <div className="mt-2 grid gap-2">
-          <Skeleton className="h-3 w-20 rounded-md" />
+        <div className="mt-auto border-t border-sidebar-border/55 pt-3">
           <Skeleton className="h-9 rounded-md" />
-          <Skeleton className="h-9 w-5/6 rounded-md" />
-          <Skeleton className="h-9 w-3/4 rounded-md" />
         </div>
-        <Skeleton className="mt-auto h-12 rounded-lg" />
       </aside>
 
-      <main className="col-start-2 row-start-1 min-h-0 min-w-0 overflow-hidden">
-        <SpacePageLoadingPlaceholder label="Switching Spaces account" />
+      <main className="col-start-2 row-start-1 grid min-h-0 min-w-0 grid-rows-[48px_minmax(0,1fr)] overflow-hidden">
+        <header className="flex items-center gap-1 border-b border-border/60 px-3">
+          {[72, 78, 88, 82].map((width) => (
+            <Skeleton className="h-8 rounded-md" style={{ width }} key={width} />
+          ))}
+        </header>
+        <div className="min-h-0">
+          <SpacePageLoadingPlaceholder label="Switching Spaces account" />
+        </div>
       </main>
 
       <footer className="col-span-full row-start-2 flex items-center border-t border-border/60 px-2">

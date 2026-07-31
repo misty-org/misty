@@ -11,8 +11,7 @@ import { SpaceNotes } from "@/features/notes/SpaceNotes";
 import { SpaceDrawings } from "@/features/drawings/SpaceDrawings";
 import { SpaceChat } from "./SpaceChat";
 import { SpaceLibrary } from "./SpaceLibrary";
-import { SpaceTasksCalendar } from "./SpaceTasksCalendar";
-import { SpaceMembers } from "./components/SpaceMembers";
+import { SpacePlanner } from "./SpacePlanner";
 import { SpaceSettings } from "./components/SpaceSettings";
 import { SpacePageLoadingPlaceholder } from "./components/SpacesLoadingPlaceholder";
 
@@ -20,7 +19,7 @@ export { default, SpacesIndexRedirect } from "./components/SpacesShell";
 
 const validSpaceSections = new Set([
   "chat",
-  "tasks",
+  "planner",
   "notes",
   "drawings",
   "library",
@@ -30,7 +29,8 @@ const validSpaceSections = new Set([
   "members",
   "settings",
 ]);
-const validSettingsSections = new Set(["general", "chat", "integrations"]);
+const validSettingsSections = new Set(["general", "members", "connections"]);
+const validPlannerViews = new Set(["board", "list", "calendar"]);
 
 export function SpaceDetail() {
   const { spaceId = "", section = "chat", studioKind = "" } = useParams();
@@ -64,11 +64,28 @@ export function SpaceDetail() {
   if (section === "files") {
     return <Navigate to={`/spaces/${encodeURIComponent(spaceId)}/library`} replace />;
   }
+  if (section === "tasks") {
+    const view = validPlannerViews.has(studioKind) ? `/${studioKind}` : "";
+    return (
+      <Navigate
+        to={`/spaces/${encodeURIComponent(spaceId)}/planner${view}${location.search}${location.hash}`}
+        replace
+      />
+    );
+  }
   if (!validSpaceSections.has(section)) {
     return <Navigate to={`/spaces/${encodeURIComponent(spaceId)}/chat`} replace />;
   }
+  if (section === "settings" && studioKind === "integrations") {
+    return <Navigate to={`/spaces/${encodeURIComponent(spaceId)}/settings/connections`} replace />;
+  }
   if (section === "settings" && studioKind && !validSettingsSections.has(studioKind)) {
     return <Navigate to={`/spaces/${encodeURIComponent(spaceId)}/settings/general`} replace />;
+  }
+  if (section === "members") {
+    return (
+      <Navigate to={`/spaces/${encodeURIComponent(spaceId)}/settings/members`} replace />
+    );
   }
 
   const returnPath = `${location.pathname}${location.search}${location.hash}`;
@@ -142,15 +159,15 @@ export function SpaceDetail() {
         ) : (
           <SpaceLibrary key={`library:${spaceId}`} spaceId={spaceId} />
         )
-      ) : section === "tasks" ? (
+      ) : section === "planner" ? (
         space.permissions?.["tasks.view"] === false ? (
           <SpacePermissionDenied
-            title="Task access required"
-            detail="Ask a Space owner to grant task access."
+            title="Planner access required"
+            detail="Ask a Space owner to grant Planner access."
           />
         ) : (
-          <SpaceTasksCalendar
-            key={`tasks:${spaceId}`}
+          <SpacePlanner
+            key={`planner:${spaceId}`}
             spaceId={spaceId}
             canManage={space.permissions?.["tasks.manage"] !== false}
             canManageIntegrations={space.role === "owner"}
@@ -173,8 +190,6 @@ export function SpaceDetail() {
         />
       ) : section === "assistant" ? (
         <Navigate to={`/agents?spaceId=${encodeURIComponent(spaceId)}`} replace />
-      ) : section === "members" ? (
-        <SpaceMembers key={`members:${spaceId}`} spaceId={spaceId} />
       ) : section === "settings" ? (
         <SpaceSettings
           key={`settings:${spaceId}:${studioKind}`}

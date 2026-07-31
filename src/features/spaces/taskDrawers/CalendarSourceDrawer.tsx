@@ -1,4 +1,5 @@
-import { CalendarDays, Check, CircleAlert, LoaderCircle } from "lucide-react";
+import { Check, CircleAlert, LoaderCircle } from "lucide-react";
+import { SiGooglecalendar } from "react-icons/si";
 import {
   Badge,
   Button,
@@ -81,7 +82,7 @@ export function CalendarSourceDrawer(props: CalendarSourceDrawerProps) {
                 const active = published.has(`${selectedIntegration}:${choice.id}`);
                 return (
                   <div className="flex items-center gap-3 p-3" key={choice.id}>
-                    <CalendarDays className="size-4 shrink-0 text-muted-foreground" />
+                    <SiGooglecalendar className="size-4 shrink-0 text-muted-foreground" />
                     <span className="min-w-0 flex-1 truncate text-sm">{choice.summary}</span>
                     <Button
                       size="sm"

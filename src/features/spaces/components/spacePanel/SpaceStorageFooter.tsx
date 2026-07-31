@@ -1,5 +1,5 @@
 import { HardDrive } from "lucide-react";
-import { Progress, Separator } from "@/ui";
+import { Progress, Skeleton } from "@/ui";
 import type { SpaceStorageUsage } from "@/models/interfaces/features/spaces/types";
 
 /**
@@ -19,8 +19,11 @@ export function SpaceStorageFooter({
 }) {
   const usedBytes = usage?.used_bytes;
   const limitBytes = usage?.limit_bytes;
+  const isLoading = !usage;
   const showsBar =
-    showsOwnerStorage && usedBytes !== undefined && limitBytes !== undefined && limitBytes > 0;
+    showsOwnerStorage &&
+    (isLoading ||
+      (usedBytes !== undefined && usedBytes > 0 && limitBytes !== undefined && limitBytes > 0));
 
   const percent =
     usedBytes !== undefined && limitBytes !== undefined && limitBytes > 0
@@ -29,29 +32,38 @@ export function SpaceStorageFooter({
   const barValue = usedBytes && usedBytes > 0 ? Math.max(1, Math.min(100, percent)) : 0;
 
   return (
-    <div className="mt-auto shrink-0 pt-3">
-      <Separator className="mb-3 bg-sidebar-border" />
-      <section className="rounded-md bg-sidebar-accent/35 p-3" aria-label="Space storage quota">
-        <div className="flex items-center gap-2.5">
-          <span className="grid size-7 shrink-0 place-items-center rounded-md bg-sidebar-accent text-muted-foreground">
-            <HardDrive size={14} />
+    <div className="mt-auto shrink-0">
+      <section
+        className="border-t border-sidebar-border/55 px-1 py-3"
+        aria-label="Space storage quota"
+      >
+        <div className="flex items-center gap-2">
+          <span className="grid size-6 shrink-0 place-items-center text-muted-foreground">
+            <HardDrive size={13} strokeWidth={1.75} />
           </span>
-          <span className="min-w-0">
-            <strong className="block text-sm font-medium text-sidebar-accent-foreground">
+          <span className="min-w-0 flex-1">
+            <strong className="block text-[11px] font-semibold text-sidebar-accent-foreground">
               Storage
             </strong>
-            <span className="block text-xs text-muted-foreground">
+            <span className="block truncate text-[9.5px] text-muted-foreground">
               {storageSummary(usage, showsOwnerStorage)}
             </span>
           </span>
         </div>
-        {showsBar && usedBytes !== undefined && limitBytes !== undefined ? (
-          <>
-            <Progress className="mt-3 h-1.5 transition-all duration-300" value={barValue} />
-            <p className="mb-0 mt-2 text-[11px] text-muted-foreground">
-              {formatStorageBytes(usedBytes)} of {formatStorageBytes(limitBytes)} used
-            </p>
-          </>
+        {showsBar ? (
+          isLoading ? (
+            <>
+              <Skeleton className="mt-2 h-1 w-full rounded-full" />
+              <Skeleton className="mt-1 h-2.5 w-20 rounded-md" />
+            </>
+          ) : usedBytes !== undefined && limitBytes !== undefined ? (
+            <>
+              <Progress className="mt-2 h-1 transition-all duration-300" value={barValue} />
+              <p className="mb-0 mt-1 text-[9.5px] text-muted-foreground">
+                {formatStorageBytes(usedBytes)} of {formatStorageBytes(limitBytes)} used
+              </p>
+            </>
+          ) : null
         ) : null}
       </section>
     </div>
