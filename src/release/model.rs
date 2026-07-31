@@ -8,6 +8,8 @@ use crate::artifacts;
 
 pub const PUBLIC_REPOSITORY: &str = "misty-org/misty-public";
 pub const RELEASE_MANIFEST_NAME: &str = "misty-release-manifest.json";
+pub const MACOS_PLATFORM: &str = "macos-universal";
+pub const WINDOWS_PLATFORM: &str = "windows-x86_64";
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ReleaseManifest {

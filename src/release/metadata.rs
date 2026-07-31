@@ -201,7 +201,8 @@ fn rust_sbom(workspace: &Workspace, output: &Path) -> Result<()> {
                     .is_some_and(|name| name.to_string_lossy().contains(".cdx."))
         })
         .context("cargo cyclonedx did not create a Rust SBOM")?;
-    fs::copy(generated, output.join("misty-rust.cdx.json"))?;
+    fs::copy(&generated, output.join("misty-rust.cdx.json"))?;
+    fs::remove_file(generated)?;
     Ok(())
 }
 

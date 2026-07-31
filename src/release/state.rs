@@ -9,7 +9,10 @@ use serde_json::Value;
 
 use crate::{process::CommandSpec, workspace::Workspace};
 
-use super::model::{PlatformManifest, ReleaseManifest, PUBLIC_REPOSITORY, RELEASE_MANIFEST_NAME};
+use super::model::{
+    PlatformManifest, ReleaseManifest, MACOS_PLATFORM, PUBLIC_REPOSITORY, RELEASE_MANIFEST_NAME,
+    WINDOWS_PLATFORM,
+};
 
 pub(super) fn normalize_version(raw: &str) -> Result<String> {
     let version = raw
@@ -75,16 +78,15 @@ pub(super) fn require_release_checkout(workspace: &Workspace, fetch: bool) -> Re
     Ok(())
 }
 
+pub(super) fn require_clean_cli_checkout(workspace: &Workspace) -> Result<()> {
+    if !git(workspace, &workspace.cli, ["status", "--porcelain"])?.is_empty() {
+        bail!("release commands require a clean misty-cli checkout");
+    }
+    Ok(())
+}
+
 pub(super) fn ensure_source_tag(workspace: &Workspace, manifest: &ReleaseManifest) -> Result<()> {
-    let existing = CommandSpec::new("git")
-        .args([
-            "rev-parse",
-            "--verify",
-            &format!("refs/tags/{}", manifest.tag),
-        ])
-        .capture(&workspace.misty)
-        .ok()
-        .map(|value| value.trim().to_owned());
+    let existing = source_tag_commit(&workspace.misty, &manifest.tag);
     if let Some(existing) = existing {
         if existing != manifest.source_commit {
             bail!("{} already points to another commit", manifest.tag);
@@ -103,6 +105,18 @@ pub(super) fn ensure_source_tag(workspace: &Workspace, manifest: &ReleaseManifes
     CommandSpec::new("git")
         .args(["push", "origin", &manifest.tag])
         .run(&workspace.misty)
+}
+
+fn source_tag_commit(repository: &Path, tag: &str) -> Option<String> {
+    CommandSpec::new("git")
+        .args([
+            "rev-parse",
+            "--verify",
+            &format!("refs/tags/{tag}^{{commit}}"),
+        ])
+        .capture(repository)
+        .ok()
+        .map(|value| value.trim().to_owned())
 }
 
 pub(super) fn create_or_update_draft(
@@ -166,7 +180,24 @@ pub(super) fn load_manifest(
             .arg(path.parent().unwrap().as_os_str())
             .run(&workspace.root)?;
     }
-    ReleaseManifest::read(&path)
+    let manifest = ReleaseManifest::read(&path)?;
+    validate_release_platforms(&manifest)?;
+    Ok(manifest)
+}
+
+pub(super) fn validate_release_platforms(release: &ReleaseManifest) -> Result<()> {
+    if release.platforms.is_empty() {
+        bail!("release must include at least one desktop platform");
+    }
+    for (index, platform) in release.platforms.iter().enumerate() {
+        if !matches!(platform.as_str(), MACOS_PLATFORM | WINDOWS_PLATFORM) {
+            bail!("release contains unsupported platform: {platform}");
+        }
+        if release.platforms[..index].contains(platform) {
+            bail!("release contains duplicate platform: {platform}");
+        }
+    }
+    Ok(())
 }
 
 pub(super) fn verify_build_identity(
@@ -185,6 +216,7 @@ pub(super) fn verify_build_identity(
     if !git(workspace, &workspace.misty, ["status", "--porcelain"])?.is_empty() {
         bail!("release builds require a clean Misty checkout");
     }
+    require_clean_cli_checkout(workspace)?;
     Ok(())
 }
 
@@ -219,6 +251,20 @@ pub(super) fn gh_upload(workspace: &Workspace, tag: &str, files: &[PathBuf]) -> 
         command = command.arg(file.as_os_str());
     }
     command.run(&workspace.root)
+}
+
+pub(super) fn gh_delete_asset(workspace: &Workspace, tag: &str, name: &str) -> Result<()> {
+    CommandSpec::new("gh")
+        .args([
+            "release",
+            "delete-asset",
+            tag,
+            name,
+            "--repo",
+            PUBLIC_REPOSITORY,
+            "--yes",
+        ])
+        .run(&workspace.root)
 }
 
 pub(super) fn release_root(workspace: &Workspace, version: &str) -> PathBuf {
@@ -272,5 +318,69 @@ mod tests {
         assert!(verify_platform_identity(&release, &platform).is_ok());
         platform.cli_commit = "cli-b".to_owned();
         assert!(verify_platform_identity(&release, &platform).is_err());
+    }
+
+    #[test]
+    fn release_requires_a_supported_unique_platform_set() {
+        let release = |platforms: Vec<&str>| ReleaseManifest {
+            version: "0.2.1".to_owned(),
+            tag: "misty-v0.2.1".to_owned(),
+            source_commit: "source-a".to_owned(),
+            cli_commit: "cli-a".to_owned(),
+            cli_version: "0.1.0".to_owned(),
+            config_sha256: "config".to_owned(),
+            created_at: Utc::now(),
+            platforms: platforms.into_iter().map(str::to_owned).collect(),
+        };
+
+        assert!(validate_release_platforms(&release(vec![MACOS_PLATFORM])).is_ok());
+        assert!(validate_release_platforms(&release(vec![WINDOWS_PLATFORM])).is_ok());
+        assert!(
+            validate_release_platforms(&release(vec![MACOS_PLATFORM, WINDOWS_PLATFORM])).is_ok()
+        );
+        assert!(validate_release_platforms(&release(vec![])).is_err());
+        assert!(
+            validate_release_platforms(&release(vec![MACOS_PLATFORM, MACOS_PLATFORM])).is_err()
+        );
+        assert!(validate_release_platforms(&release(vec!["linux-x86_64"])).is_err());
+    }
+
+    #[test]
+    fn annotated_source_tags_resolve_to_their_commit() {
+        let directory = tempfile::tempdir().unwrap();
+        CommandSpec::new("git")
+            .args(["init", "--quiet"])
+            .run(directory.path())
+            .unwrap();
+        CommandSpec::new("git")
+            .args(["config", "user.name", "Misty Test"])
+            .run(directory.path())
+            .unwrap();
+        CommandSpec::new("git")
+            .args(["config", "user.email", "misty-test@example.invalid"])
+            .run(directory.path())
+            .unwrap();
+        fs::write(directory.path().join("README.md"), "test\n").unwrap();
+        CommandSpec::new("git")
+            .args(["add", "README.md"])
+            .run(directory.path())
+            .unwrap();
+        CommandSpec::new("git")
+            .args(["commit", "--quiet", "-m", "test"])
+            .run(directory.path())
+            .unwrap();
+        CommandSpec::new("git")
+            .args(["tag", "-a", "misty-v0.1.0", "-m", "Misty 0.1.0"])
+            .run(directory.path())
+            .unwrap();
+
+        let head = CommandSpec::new("git")
+            .args(["rev-parse", "HEAD"])
+            .capture(directory.path())
+            .unwrap();
+        assert_eq!(
+            source_tag_commit(directory.path(), "misty-v0.1.0").unwrap(),
+            head.trim()
+        );
     }
 }

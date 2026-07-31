@@ -104,6 +104,7 @@ enum ServerCommand {
         #[arg(long)]
         no_build: bool,
     },
+    Url,
     Down {
         #[arg(long)]
         volumes: bool,
@@ -133,7 +134,27 @@ enum ImageCommand {
 
 #[derive(Debug, Subcommand)]
 enum WorkerCommand {
-    GenerateSecrets,
+    GenerateSecrets {
+        #[arg(long, value_enum, default_value = "development")]
+        target: WorkerSecretTarget,
+    },
+    Deploy {
+        #[arg(long, value_enum)]
+        target: WorkerDeployTarget,
+        #[arg(long)]
+        dry_run: bool,
+    },
+}
+
+#[derive(Debug, Clone, Copy, ValueEnum)]
+enum WorkerSecretTarget {
+    Development,
+    Production,
+}
+
+#[derive(Debug, Clone, Copy, ValueEnum)]
+enum WorkerDeployTarget {
+    Production,
 }
 
 #[derive(Debug, Subcommand)]
@@ -156,6 +177,10 @@ enum ReleaseCommand {
         version: String,
         #[arg(long)]
         dry_run: bool,
+        #[arg(long)]
+        no_macos: bool,
+        #[arg(long)]
+        no_windows: bool,
     },
     Build {
         version: String,
@@ -223,15 +248,26 @@ pub fn dispatch(arguments: Cli, settings: Settings) -> Result<()> {
             ServerCommand::Up { detach, no_build } => {
                 server::up(&settings.workspace, detach, !no_build)
             }
+            ServerCommand::Url => server::url(&settings.workspace),
             ServerCommand::Down { volumes } => server::down(&settings.workspace, volumes),
             ServerCommand::Logs => server::logs(&settings.workspace),
             ServerCommand::Image { command } => match command {
                 ImageCommand::Build { tag } => server::build_image(&settings.workspace, &tag),
             },
             ServerCommand::Worker { command } => match command {
-                WorkerCommand::GenerateSecrets => {
-                    server::generate_worker_secrets(&settings.workspace)
-                }
+                WorkerCommand::GenerateSecrets { target } => match target {
+                    WorkerSecretTarget::Development => {
+                        server::generate_worker_secrets(&settings.workspace)
+                    }
+                    WorkerSecretTarget::Production => {
+                        server::generate_production_worker_secrets(&settings.workspace)
+                    }
+                },
+                WorkerCommand::Deploy { target, dry_run } => match target {
+                    WorkerDeployTarget::Production => {
+                        server::deploy_production_worker(&settings.workspace, dry_run)
+                    }
+                },
             },
             ServerCommand::R2 { command } => match command {
                 R2Command::ConfigureCors { apply } => {
@@ -240,9 +276,12 @@ pub fn dispatch(arguments: Cli, settings: Settings) -> Result<()> {
             },
         },
         Command::Release(command) => match command.command {
-            ReleaseCommand::Start { version, dry_run } => {
-                release::start(&settings.workspace, &version, dry_run)
-            }
+            ReleaseCommand::Start {
+                version,
+                dry_run,
+                no_macos,
+                no_windows,
+            } => release::start(&settings.workspace, &version, dry_run, no_macos, no_windows),
             ReleaseCommand::Build { version, dry_run } => {
                 release::build(&settings.workspace, &version, dry_run)
             }
@@ -386,10 +425,30 @@ mod tests {
             vec!["misty-cli", "desktop", "icons", "sync"],
             vec!["misty-cli", "desktop", "windows", "stage-assets"],
             vec!["misty-cli", "server", "up", "--detach", "--no-build"],
+            vec!["misty-cli", "server", "url"],
             vec!["misty-cli", "server", "down", "--volumes"],
             vec!["misty-cli", "server", "image", "build", "--tag", "local"],
             vec!["misty-cli", "server", "worker", "generate-secrets"],
+            vec![
+                "misty-cli",
+                "server",
+                "worker",
+                "generate-secrets",
+                "--target",
+                "production",
+            ],
+            vec![
+                "misty-cli",
+                "server",
+                "worker",
+                "deploy",
+                "--target",
+                "production",
+                "--dry-run",
+            ],
             vec!["misty-cli", "server", "r2", "configure-cors", "--apply"],
+            vec!["misty-cli", "release", "start", "0.1.0", "--no-windows"],
+            vec!["misty-cli", "release", "start", "0.1.0", "--no-macos"],
             vec!["misty-cli", "release", "verify", "0.1.0", "--dry-run"],
         ] {
             Cli::try_parse_from(arguments).unwrap();

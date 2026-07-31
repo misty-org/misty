@@ -101,6 +101,12 @@ pub fn write_private(path: &Path, contents: &[u8]) -> Result<()> {
         .open(path)
         .with_context(|| format!("could not write {}", path.display()))?;
     file.write_all(contents)?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        file.set_permissions(fs::Permissions::from_mode(0o600))
+            .with_context(|| format!("could not secure {}", path.display()))?;
+    }
     Ok(())
 }
 
