@@ -1,13 +1,13 @@
-export type { TaskViewMode, DueFilter } from "@/models/types/features/spaces/SpaceTasksCalendar";
+export type { TaskViewMode, DueFilter } from "@/models/types/features/spaces/SpacePlanner";
 import { useCallback, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/features/auth/AuthContext";
 import { useSpacesStore } from "@/stores/spaces/useSpacesStore";
-import type { TaskViewMode } from "@/models/types/features/spaces/SpaceTasksCalendar";
+import type { TaskViewMode } from "@/models/types/features/spaces/SpacePlanner";
 import type { SpaceCalendarEvent, SpaceMember } from "@/models/interfaces/features/spaces/types";
-import { SpaceTasksHeader } from "./components/SpaceTasksHeader";
-import { CalendarSourceDrawer, SpaceTaskDrawer, SpaceTaskEventDrawer } from "./SpaceTasksViews";
-import { SpaceTasksBody } from "./spaceTasks/SpaceTasksBody";
+import { SpacePlannerHeader } from "./components/SpacePlannerHeader";
+import { CalendarSourceDrawer, SpaceTaskDrawer, SpaceTaskEventDrawer } from "./SpacePlannerViews";
+import { SpacePlannerBody } from "./spaceTasks/SpacePlannerBody";
 import { TaskFilters } from "./spaceTasks/TaskFilters";
 import { normalizeView } from "./spaceTasks/taskFiltering";
 import { useCalendarPublishing } from "./spaceTasks/useCalendarPublishing";
@@ -18,7 +18,7 @@ import { useTaskFilterParams } from "./spaceTasks/useTaskFilterParams";
 
 const emptyMembers: SpaceMember[] = [];
 
-export function SpaceTasksCalendar({
+export function SpacePlanner({
   spaceId,
   canManage,
   canManageIntegrations,
@@ -45,14 +45,14 @@ export function SpaceTasksCalendar({
 
   const changeView = (next: TaskViewMode) =>
     navigate(
-      `/spaces/${encodeURIComponent(spaceId)}/tasks/${next}${
+      `/spaces/${encodeURIComponent(spaceId)}/planner/${next}${
         filters.searchParams.size ? `?${filters.searchParams}` : ""
       }`,
     );
 
   return (
     <div className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] bg-background">
-      <SpaceTasksHeader
+      <SpacePlannerHeader
         view={view}
         query={filters.query}
         activeFilterCount={filters.activeFilterCount}
@@ -84,7 +84,7 @@ export function SpaceTasksCalendar({
         }
       />
 
-      <SpaceTasksBody
+      <SpacePlannerBody
         view={view}
         members={members}
         canManage={canManage}

@@ -1,6 +1,6 @@
 import type { ComponentType } from "react";
-import { CalendarDays, Check, FileText } from "lucide-react";
-import { SiDiscord } from "react-icons/si";
+import { Check } from "lucide-react";
+import { SiDiscord, SiGooglecalendar, SiNotion } from "react-icons/si";
 import { Button, Input } from "@/ui";
 import type {
   ProviderConnectionAvailability,
@@ -24,9 +24,9 @@ const integrationChoices: Array<{
   name: string;
   icon: ComponentType<{ className?: string }>;
 }> = [
-  { id: "google", name: "Google Calendar", icon: CalendarDays },
+  { id: "google", name: "Google Calendar", icon: SiGooglecalendar },
   { id: "discord", name: "Discord", icon: SiDiscord },
-  { id: "notion", name: "Notion", icon: FileText },
+  { id: "notion", name: "Notion", icon: SiNotion },
 ];
 
 const cardClass = (selected: boolean) =>
@@ -95,7 +95,7 @@ export function CreateSpaceTemplateStep({
   );
 }
 
-export function CreateSpaceIntegrationsStep({
+export function CreateSpaceConnectionsStep({
   providers,
   availability,
   onToggle,

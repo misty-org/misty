@@ -4,12 +4,12 @@ import type {
   GoogleEventPayload,
   TaskCalendarLink,
   TaskSchedule,
-} from "@/models/interfaces/features/spaces/integrations/calendarTasks";
+} from "@/models/interfaces/features/spaces/connections/calendarTasks";
 import type {
   ScheduleField,
   TaskCalendarKind,
   TaskSyncState,
-} from "@/models/types/features/spaces/integrations/calendarTasks";
+} from "@/models/types/features/spaces/connections/calendarTasks";
 
 /**
  * Google Calendar ↔ Misty task translation.

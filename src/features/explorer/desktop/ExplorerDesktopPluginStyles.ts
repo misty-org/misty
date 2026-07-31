@@ -42,7 +42,8 @@ const extensionsPanelStyles = {
   body: "grid min-h-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden",
   list: "flex min-w-0 gap-0 overflow-x-auto border-b border-border/60 bg-background px-2 pt-2",
   item: "relative -mb-px grid min-h-11 w-[164px] shrink-0 grid-cols-[24px_minmax(0,1fr)_22px] items-center gap-2 rounded-t-md border border-transparent border-b-border/60 px-2 py-1.5 text-left text-muted-foreground hover:bg-transparent hover:text-foreground",
-  itemSelected: "z-[1] border-border/60 border-b-transparent bg-accent text-accent-foreground",
+  itemSelected:
+    "misty-active-marker-bottom z-[1] border-border/60 border-b-transparent bg-transparent text-accent-foreground",
   itemText:
     "grid min-w-0 gap-0.5 [&>small]:min-w-0 [&>small]:overflow-hidden [&>small]:text-ellipsis [&>small]:whitespace-nowrap [&>small]:text-[11px] [&>small]:font-medium [&>small]:text-muted-foreground [&>strong]:min-w-0 [&>strong]:overflow-hidden [&>strong]:text-ellipsis [&>strong]:whitespace-nowrap [&>strong]:text-[13px]",
   tabClose:

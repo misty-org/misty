@@ -75,6 +75,22 @@ describe("PluginBrowser", () => {
     expect(container.querySelector("h1")).toBeNull();
   });
 
+  it("keeps the manual reload fallback quiet and icon-only", async () => {
+    await render(
+      <PluginBrowser
+        marketplacePlugins={marketplace}
+        onQueryChange={() => {}}
+        onRefresh={() => {}}
+        onSelect={() => {}}
+        query=""
+      />,
+    );
+
+    const reload = container.querySelector('button[aria-label="Reload extensions"]');
+    expect(reload).not.toBeNull();
+    expect(reload?.textContent).toBe("");
+  });
+
   it("opens the detail dialog only for the selected extension", async () => {
     await render(
       <PluginBrowser

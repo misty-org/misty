@@ -196,6 +196,49 @@ describe("SpaceNotes beta simplification", () => {
     ).toBe("note_beta");
   });
 
+  it("deletes a creator-owned native note and clears it from the Journal", async () => {
+    spaceRequestMock
+      .mockResolvedValueOnce({
+        notes: [
+          {
+            id: "note_delete",
+            space_id: "space-product",
+            creator_user_id: "account-beta",
+            title: "Delete me",
+            plain_text: "",
+            lifecycle_state: "active",
+            collaboration_revision: 0,
+            acl_version: 1,
+            role: "creator",
+            created_at: "2026-07-20T12:00:00.000Z",
+            updated_at: "2026-07-20T12:00:00.000Z",
+          },
+        ],
+      })
+      .mockResolvedValueOnce(undefined);
+
+    await act(async () => {
+      root.render(<SpaceNotes spaceId="space-product" spaceName="Product" />);
+    });
+    await wait(180);
+
+    const deleteTrigger = document.body.querySelector<HTMLButtonElement>(
+      'button[aria-label="Delete note"]',
+    );
+    expect(deleteTrigger).toBeTruthy();
+    await act(async () => deleteTrigger?.click());
+    await wait();
+    await act(async () => buttonByText("Delete note").click());
+    await wait();
+
+    expect(spaceRequestMock).toHaveBeenLastCalledWith(
+      "/spaces/space-product/notes/note_delete",
+      { method: "DELETE" },
+    );
+    expect(useNotesStore.getState().notes).toEqual([]);
+    expect(useNotesStore.getState().selectedNoteId).toBeUndefined();
+  });
+
   it("refreshes the mounted Space notes when realtime announces a note change", async () => {
     spaceRequestMock
       .mockResolvedValueOnce({

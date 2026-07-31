@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { FileText, LoaderCircle, RefreshCcw } from "lucide-react";
+import { SiNotion } from "react-icons/si";
 
 import type {
   AvailableProviderResource,
@@ -11,7 +12,7 @@ import { openExternalLink } from "@/platform/openExternalLink";
 import { spacesApi } from "@/stores/spaces/useSpacesBackendStore";
 import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Checkbox } from "@/ui";
 
-export function NotionIntegrationPanel({
+export function NotionConnectionPanel({
   spaceId,
   canManage,
 }: {
@@ -26,6 +27,7 @@ export function NotionIntegrationPanel({
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
+  const [expanded, setExpanded] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -75,7 +77,7 @@ export function NotionIntegrationPanel({
       const start = await spacesApi.beginProviderConnection(
         spaceId,
         "notion",
-        `/spaces/${spaceId}/settings/integrations`,
+        `/spaces/${spaceId}/settings/connections`,
       );
       await openExternalLink(start.authorization_url);
     } catch {
@@ -133,99 +135,99 @@ export function NotionIntegrationPanel({
   );
 
   return (
-    <Card aria-labelledby="notion-integration-heading">
-      <CardHeader className="flex flex-row items-start justify-between gap-5">
-        <div>
-          <CardTitle id="notion-integration-heading" className="flex items-center gap-2">
-            <FileText className="size-5" aria-hidden />
-            Notion
+    <Card
+      size="sm"
+      className={expanded ? "sm:col-span-2 xl:col-span-3" : ""}
+      aria-labelledby="notion-connection-heading"
+    >
+      <CardHeader className="flex flex-row items-center justify-between gap-3">
+        <div className="min-w-0">
+          <CardTitle id="notion-connection-heading" className="flex items-center gap-2">
+            <SiNotion className="size-5 shrink-0" aria-hidden />
+            <span className="truncate">Notion</span>
           </CardTitle>
-          <p className="mb-0 mt-1 text-sm text-muted-foreground">
-            Share only the pages, databases, and data sources this team needs.
-          </p>
         </div>
-        {selectedCount ? <Badge variant="secondary">{selectedCount} selected</Badge> : null}
+        {loading ? (
+          <LoaderCircle
+            className="size-4 shrink-0 animate-spin text-muted-foreground"
+            aria-label="Checking Notion"
+          />
+        ) : availability?.configured === false ? (
+          <Badge variant="outline">Unavailable</Badge>
+        ) : !integrations.length ? (
+          canManage ? (
+            <Button size="sm" type="button" disabled={Boolean(busy)} onClick={() => void connect()}>
+              {busy === "connect" ? (
+                <LoaderCircle className="size-4 animate-spin" aria-hidden />
+              ) : null}
+              Connect
+            </Button>
+          ) : (
+            <Badge variant="outline">Not connected</Badge>
+          )
+        ) : (
+          <div className="flex shrink-0 items-center gap-1.5">
+            <Badge className="hidden lg:inline-flex" variant="secondary">
+              {selectedCount ? `${selectedCount} selected` : "Connected"}
+            </Badge>
+            <Button
+              size="sm"
+              variant="outline"
+              type="button"
+              onClick={() => setExpanded((current) => !current)}
+            >
+              {expanded ? "Done" : "Manage"}
+            </Button>
+          </div>
+        )}
       </CardHeader>
-      <CardContent className="grid gap-4">
-        {error ? (
-          <p className="m-0 rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
+
+      {error ? (
+        <CardContent>
+          <p className="m-0 text-xs text-destructive" role="alert">
             {error}
           </p>
-        ) : null}
-        {loading ? (
-          <p className="m-0 flex items-center gap-2 text-sm text-muted-foreground">
-            <LoaderCircle className="size-4 animate-spin" aria-hidden />
-            Checking Notion…
-          </p>
-        ) : availability?.configured === false ? (
-          <p className="m-0 text-sm text-muted-foreground">
-            Notion sign-in is not available on this Misty server yet.
-          </p>
-        ) : !integrations.length ? (
-          <div className="grid justify-items-start gap-3">
-            <p className="m-0 text-sm text-muted-foreground">
-              {canManage
-                ? "Connect a Notion account for this Space. Nothing is shared until you select it."
-                : "The Space owner has not connected Notion."}
-            </p>
-            {canManage ? (
-              <Button type="button" disabled={Boolean(busy)} onClick={() => void connect()}>
-                {busy === "connect" ? (
-                  <LoaderCircle className="size-4 animate-spin" aria-hidden />
-                ) : (
-                  <FileText className="size-4" aria-hidden />
-                )}
-                Connect Notion
-              </Button>
-            ) : null}
-          </div>
-        ) : canManage ? (
-          integrations.map((integration) => (
-            <NotionAccount
-              key={integration.id}
-              integration={integration}
-              resources={available[integration.id]}
-              selected={desired[integration.id] ?? new Set()}
-              busy={busy}
-              onLoad={() => void discover(integration.id)}
-              onToggle={(resource) =>
-                setDesired((current) => {
-                  const next = new Set(current[integration.id] ?? []);
-                  const key = resourceKey(resource);
-                  if (next.has(key)) next.delete(key);
-                  else next.add(key);
-                  return { ...current, [integration.id]: next };
-                })
-              }
-              onSave={() => void save(integration.id)}
-            />
-          ))
-        ) : shared.length ? (
-          <div className="grid gap-2">
-            {shared.map((resource) => (
-              <ResourceRow key={resource.id} resource={resource} />
-            ))}
-            <p className="m-0 text-xs text-muted-foreground">
-              Everyone in this Space can use these shared sources. Only the owner can change them.
-            </p>
-          </div>
-        ) : (
-          <p className="m-0 text-sm text-muted-foreground">
-            No Notion sources have been shared with this Space.
-          </p>
-        )}
-        {!loading && canManage && integrations.length ? (
-          <Button
-            className="justify-self-start"
-            variant="outline"
-            type="button"
-            disabled={Boolean(busy)}
-            onClick={() => void connect()}
-          >
-            Connect another Notion account
-          </Button>
-        ) : null}
-      </CardContent>
+        </CardContent>
+      ) : null}
+
+      {expanded && integrations.length ? (
+        <CardContent className="grid gap-4 border-t border-border/60 pt-4">
+          {canManage
+            ? integrations.map((integration) => (
+                <NotionAccount
+                  key={integration.id}
+                  integration={integration}
+                  resources={available[integration.id]}
+                  selected={desired[integration.id] ?? new Set()}
+                  busy={busy}
+                  onLoad={() => void discover(integration.id)}
+                  onToggle={(resource) =>
+                    setDesired((current) => {
+                      const next = new Set(current[integration.id] ?? []);
+                      const key = resourceKey(resource);
+                      if (next.has(key)) next.delete(key);
+                      else next.add(key);
+                      return { ...current, [integration.id]: next };
+                    })
+                  }
+                  onSave={() => void save(integration.id)}
+                />
+              ))
+            : shared.map((resource) => <ResourceRow key={resource.id} resource={resource} />)}
+          {canManage ? (
+            <Button
+              className="justify-self-start"
+              size="sm"
+              variant="outline"
+              type="button"
+              disabled={Boolean(busy)}
+              onClick={() => void connect()}
+            >
+              Add account
+            </Button>
+          ) : null}
+        </CardContent>
+      ) : null}
     </Card>
   );
 }
@@ -256,13 +258,26 @@ function NotionAccount({
             {selected.size} source{selected.size === 1 ? "" : "s"} selected
           </p>
         </div>
-        <Button variant="outline" size="sm" type="button" disabled={Boolean(busy)} onClick={onLoad}>
+        <Button
+          aria-label={resources ? "Refresh Notion sources" : undefined}
+          className={
+            resources
+              ? "size-8 text-muted-foreground/70 shadow-none hover:text-foreground"
+              : undefined
+          }
+          variant={resources ? "ghost" : "outline"}
+          size={resources ? "icon" : "sm"}
+          title={resources ? "Refresh Notion sources" : undefined}
+          type="button"
+          disabled={Boolean(busy)}
+          onClick={onLoad}
+        >
           {busy === `discover:${integration.id}` ? (
             <LoaderCircle className="size-4 animate-spin" aria-hidden />
           ) : (
             <RefreshCcw className="size-4" aria-hidden />
           )}
-          {resources ? "Refresh" : "Choose sources"}
+          {resources ? null : "Choose sources"}
         </Button>
       </div>
       {resources ? (

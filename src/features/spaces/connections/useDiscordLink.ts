@@ -4,13 +4,13 @@ import { errorText } from "@/lib/format";
 import { openExternalLink } from "@/platform/openExternalLink";
 import { spaceDiscordApi } from "@/stores/spaces/useSpaceDiscordStore";
 import { spacesApi } from "@/stores/spaces/useSpacesBackendStore";
-import type { SpaceDiscordLink } from "@/models/interfaces/features/spaces/integrations/discord";
+import type { SpaceDiscordLink } from "@/models/interfaces/features/spaces/connections/discord";
 import type { SpaceConversation } from "@/models/interfaces/features/spaces/conversationTypes";
 import type {
   AvailableProviderResource,
   SpaceIntegration,
 } from "@/models/interfaces/features/spaces/agentArchitectureTypes";
-import type { DiscordLinkDirection } from "@/models/types/features/spaces/integrations/discord";
+import type { DiscordLinkDirection } from "@/models/types/features/spaces/connections/discord";
 
 export interface DiscordLinkState {
   integration?: SpaceIntegration;
@@ -126,7 +126,7 @@ export function useDiscordLink(spaceId: string, canManage: boolean) {
       const start = await spacesApi.beginProviderConnection(
         spaceId,
         "discord",
-        `/spaces/${spaceId}/settings/integrations`,
+        `/spaces/${spaceId}/settings/connections`,
       );
       await openExternalLink(start.authorization_url);
     });

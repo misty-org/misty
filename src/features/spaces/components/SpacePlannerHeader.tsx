@@ -1,7 +1,6 @@
 import { useState, type ReactNode } from "react";
 import {
   CalendarDays,
-  CalendarPlus,
   KanbanSquare,
   List,
   LoaderCircle,
@@ -11,6 +10,7 @@ import {
   SlidersHorizontal,
   X,
 } from "lucide-react";
+import { SiGooglecalendar } from "react-icons/si";
 
 import { Badge } from "@/ui";
 import { Button } from "@/ui";
@@ -25,13 +25,13 @@ import {
 } from "@/ui";
 import { Tabs, TabsList, TabsTrigger } from "@/ui";
 import type { SpaceCalendarSource } from "@/models/interfaces/features/spaces/types";
-import type { TaskViewMode } from "@/models/types/features/spaces/SpaceTasksCalendar";
+import type { TaskViewMode } from "@/models/types/features/spaces/SpacePlanner";
 
 /**
- * The Tasks header stays compact while keeping all three established task
+ * The Planner header stays compact while keeping all three established task
  * views directly reachable.
  */
-export function SpaceTasksHeader({
+export function SpacePlannerHeader({
   view,
   query,
   activeFilterCount,
@@ -70,20 +70,19 @@ export function SpaceTasksHeader({
   const needsAttention = sources.some((source) => source.status !== "active");
 
   return (
-    <header className="flex min-h-13 flex-wrap items-center gap-2 border-b border-border/60 bg-card px-4 py-2">
-      <h2 className="m-0 mr-1 text-sm font-semibold">Tasks</h2>
-
+    <header className="misty-spaces-toolbar flex min-h-11 flex-wrap items-center gap-2 px-3 py-1.5">
+      <h1 className="sr-only">Planner</h1>
       <Tabs value={view} onValueChange={(next) => onView(next as TaskViewMode)}>
-        <TabsList className="h-8" aria-label="Task views">
-          <TabsTrigger className="gap-1.5 px-2.5 text-xs" value="board">
+        <TabsList variant="line" className="h-8 p-0" aria-label="Task views">
+          <TabsTrigger className="gap-1.5 rounded-sm px-2.5 text-xs" value="board">
             <KanbanSquare className="size-3.5" />
             Board
           </TabsTrigger>
-          <TabsTrigger className="gap-1.5 px-2.5 text-xs" value="list">
+          <TabsTrigger className="gap-1.5 rounded-sm px-2.5 text-xs" value="list">
             <List className="size-3.5" />
             List
           </TabsTrigger>
-          <TabsTrigger className="gap-1.5 px-2.5 text-xs" value="calendar">
+          <TabsTrigger className="gap-1.5 rounded-sm px-2.5 text-xs" value="calendar">
             <CalendarDays className="size-3.5" />
             Calendar
           </TabsTrigger>
@@ -156,15 +155,24 @@ export function SpaceTasksHeader({
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button className="h-8 gap-1.5 text-xs" variant="outline" type="button">
+            <Button
+              aria-label="Sync planner"
+              className="relative size-8 text-muted-foreground/70 shadow-none hover:text-foreground"
+              size="icon"
+              title="Sync planner"
+              variant="ghost"
+              type="button"
+            >
               {loading ? (
-                <LoaderCircle className="size-3.5 animate-spin" aria-hidden />
+                <LoaderCircle className="size-4 animate-spin" aria-hidden />
               ) : (
-                <RefreshCcw className="size-3.5" aria-hidden />
+                <RefreshCcw className="size-4" aria-hidden />
               )}
-              Sync
               {needsAttention ? (
-                <span className="size-1.5 rounded-full bg-amber-500" aria-hidden />
+                <span
+                  className="absolute right-1 top-1 size-1.5 rounded-full bg-amber-500"
+                  aria-hidden
+                />
               ) : null}
             </Button>
           </DropdownMenuTrigger>
@@ -177,7 +185,7 @@ export function SpaceTasksHeader({
               <>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onSelect={onImport}>
-                  <CalendarPlus />
+                  <SiGooglecalendar />
                   {sources.length ? "Manage calendars" : "Import from Google Calendar"}
                 </DropdownMenuItem>
               </>

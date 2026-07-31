@@ -6,7 +6,7 @@ import { remoteDisplayName } from "@/stores/backend";
 import type { ProviderRemote } from "@/models/interfaces/services/misty-api";
 import { iconAssets } from "@/assets/icons";
 import { AssetIcon } from "@/ui";
-import { IconButton } from "@/ui";
+import { PrimitiveIconButton } from "@/ui";
 import { Panel, PanelHeader } from "@/pages/Providers/components/ProviderPanel";
 import { useMinimumSpin } from "@/hooks/useMinimumSpin";
 import { ProviderLogo } from "./ProviderLogo";
@@ -41,20 +41,22 @@ export function RemoteListPanel(props: RemoteListPanelProps) {
         subtitle={`${props.remotes.length} remotes`}
         actions={
           <div className={remoteListActionsClass}>
-            <IconButton
+            <PrimitiveIconButton
+              className="text-muted-foreground/70 hover:text-foreground"
               onClick={() => {
                 startRefreshSpin();
                 props.onRefresh();
               }}
               disabled={props.loading || props.working}
-              title="Refresh remotes"
+              label="Refresh remotes"
+              size="sm"
             >
               <AssetIcon
                 className={refreshSpinning ? "animate-spin" : undefined}
                 src={iconAssets.sync16}
                 size={16}
               />
-            </IconButton>
+            </PrimitiveIconButton>
             <Button
               variant="secondary"
               size="sm"

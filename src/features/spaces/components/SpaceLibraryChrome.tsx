@@ -63,8 +63,8 @@ export function SpaceLibraryHeader(props: SpaceLibraryHeaderProps) {
 
   return (
     <div className="shrink-0">
-      <Toolbar label="Library tools" wrap className="px-5 sm:px-6">
-        <label className="!flex h-9 min-w-[220px] flex-1 items-center gap-2 overflow-hidden rounded-md border border-border/80 bg-background px-3 text-muted-foreground shadow-xs transition-colors focus-within:ring-1 focus-within:ring-ring">
+      <Toolbar label="Library tools" wrap className="misty-spaces-toolbar min-h-11 px-3 py-1.5">
+        <label className="!flex h-8 min-w-[220px] flex-1 items-center gap-2 overflow-hidden rounded-md border border-border/70 bg-muted/30 px-2.5 text-muted-foreground shadow-none transition-colors focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/20">
           <Search size={15} aria-hidden="true" />
           <Input
             className="!m-0 !h-full !min-h-0 min-w-0 flex-1 !rounded-none !border-0 !bg-transparent !p-0 !shadow-none text-sm leading-none focus-visible:!ring-0"
@@ -245,26 +245,28 @@ export function SpaceLibraryEmptyState(props: SpaceLibraryEmptyStateProps) {
 
   return (
     <div className="grid h-full min-h-[300px] place-items-center px-4 py-8">
-      <EmptyState
-        title={title}
-        description={detail}
-        action={
-          <>
-            {props.searching && props.onClearSearch ? (
-              <Button variant="outline" type="button" onClick={props.onClearSearch}>
-                Clear search
-              </Button>
-            ) : null}
-            {props.uploadAvailable && (!props.searching || props.collection === "recent") ? (
-              <Button type="button" disabled={props.uploadDisabled} onClick={props.onUpload}>
-                <Upload size={15} />
-                {props.uploading ? "Uploading..." : "Upload files"}
-              </Button>
-            ) : null}
-          </>
-        }
-        aria-label={title}
-      />
+      <div className="w-full max-w-lg">
+        <EmptyState
+          title={title}
+          description={detail}
+          action={
+            <>
+              {props.searching && props.onClearSearch ? (
+                <Button variant="outline" type="button" onClick={props.onClearSearch}>
+                  Clear search
+                </Button>
+              ) : null}
+              {props.uploadAvailable && (!props.searching || props.collection === "recent") ? (
+                <Button type="button" disabled={props.uploadDisabled} onClick={props.onUpload}>
+                  <Upload size={15} />
+                  {props.uploading ? "Uploading..." : "Upload files"}
+                </Button>
+              ) : null}
+            </>
+          }
+          aria-label={title}
+        />
+      </div>
     </div>
   );
 }
