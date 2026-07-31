@@ -13,7 +13,7 @@ RUN GOBIN=/out go install github.com/pressly/goose/v3/cmd/goose@v3.27.3
 FROM debian:bookworm-slim@sha256:7b140f374b289a7c2befc338f42ebe6441b7ea838a042bbd5acbfca6ec875818
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ca-certificates curl ffmpeg poppler-utils \
+    && apt-get install -y --no-install-recommends ca-certificates curl \
     && rm -rf /var/lib/apt/lists/* \
     && useradd --system --uid 10001 --no-create-home --shell /usr/sbin/nologin misty \
     && mkdir -p /var/lib/misty/library \

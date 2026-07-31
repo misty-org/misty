@@ -3,7 +3,7 @@ set -eu
 
 if [ -z "${CLOUDFLARE_API_TOKEN:-}" ]; then
   echo "CLOUDFLARE_API_TOKEN is required for the containerized Worker deployment." >&2
-  echo "Add a Workers Scripts:Edit API token to the root .env file." >&2
+  echo "Add a Workers Scripts:Edit API token to the root .env.dev file." >&2
   exit 1
 fi
 
