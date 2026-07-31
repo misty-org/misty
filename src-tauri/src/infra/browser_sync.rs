@@ -966,6 +966,11 @@ async fn open_vault(
     let mut workspace_changes = handle.workspaces.clone();
     let notify_workspace = scope.vault_id.clone();
     let notify_app = app.clone();
+    // The sync socket already carries this account's content-free invalidations.
+    // The main window uses them instead of opening its own event stream while
+    // this connection is up (see `browser_sync_account_feed`).
+    let mut account_events = handle.account_events();
+    let feed_account = scope.account_id.clone();
     let notifications = tokio::spawn(async move {
         let advertisement = control_advertisement::advertise(
             advertise_status,
@@ -981,6 +986,20 @@ async fn open_vault(
                 result = presence.changed() => result.is_ok(),
                 result = devices.changed() => result.is_ok(),
                 result = workspace_changes.changed() => result.is_ok(),
+                event = account_events.recv() => {
+                    let (topic, id) = match event {
+                        Ok(event) => (event.topic, event.id),
+                        // Dropped invalidations: the page re-reads everything.
+                        Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => ("reset".to_owned(), None),
+                        Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
+                    };
+                    let _ = notify_app.emit_to(
+                        "main",
+                        "misty:account-event",
+                        serde_json::json!({ "accountId": feed_account, "topic": topic, "id": id }),
+                    );
+                    continue;
+                },
             };
             if !alive {
                 break;
@@ -1018,6 +1037,28 @@ async fn open_vault(
     });
     let _ = app.emit_to("main", "misty:browser-sync-changed", "");
     view(current.as_mut().expect("session was installed")).await
+}
+
+/// Whether the sync socket currently delivers this account's invalidations to
+/// the main window. The page re-asks on `misty:browser-sync-changed`.
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AccountFeed {
+    account_id: String,
+    connected: bool,
+}
+
+#[tauri::command]
+pub async fn browser_sync_account_feed(webview: tauri::Webview) -> Result<Option<AccountFeed>, String> {
+    require_main(&webview)?;
+    let current = session().lock().await;
+    Ok(current.as_ref().map(|active| AccountFeed {
+        account_id: active.scope.account_id.clone(),
+        connected: matches!(
+            active.handle.status.borrow().phase,
+            misty_browser_sync::worker::Phase::CatchingUp | misty_browser_sync::worker::Phase::Ready
+        ),
+    }))
 }
 
 #[tauri::command]
