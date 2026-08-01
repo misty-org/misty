@@ -1,6 +1,6 @@
 import { afterEach, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({ http: vi.fn(), generation: 1, invalid: vi.fn() }));
-vi.mock("./client/http", () => ({ httpRequest: mocks.http }));
+vi.mock("./client/http", () => ({ httpRequest: mocks.http, httpOutageRemainingMs: () => 0 }));
 vi.mock("./deployment/api", () => ({
   readDeploymentScope: () => "test",
   resolveApiBase: async () => "https://events.example/api",

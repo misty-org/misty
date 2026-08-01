@@ -148,6 +148,12 @@ export async function httpBlob(input: RequestInfo | URL, init?: RequestInit): Pr
   return response.blob();
 }
 
+/** How long other transports (event stream, Space socket) should still wait
+ * before reconnecting to a server this client found unavailable. */
+export function httpOutageRemainingMs(): number {
+  return Math.max(0, outageUntil - Date.now());
+}
+
 /** Clears outage memory, for tests. */
 export function resetHttpOutageForTests(): void {
   noteAvailable();
