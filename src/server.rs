@@ -1,4 +1,11 @@
-use std::{collections::BTreeMap, env, fs, path::Path, thread, time::Duration};
+use std::{
+    collections::BTreeMap,
+    env, fs,
+    net::Ipv4Addr,
+    path::Path,
+    thread,
+    time::{Duration, Instant},
+};
 
 use anyhow::{bail, Context, Result};
 use base64::{engine::general_purpose::STANDARD, Engine};
@@ -23,7 +30,7 @@ pub fn up(workspace: &Workspace, detach: bool, build: bool) -> Result<()> {
     if detach {
         println!(
             "Server running at {}",
-            wait_for_development_api_url(workspace)?
+            ensure_active_development_api_url(workspace)?
         );
     }
     Ok(())
@@ -34,7 +41,7 @@ pub fn down(workspace: &Workspace, volumes: bool) -> Result<()> {
 }
 
 pub fn url(workspace: &Workspace) -> Result<()> {
-    println!("{}", development_api_url(workspace)?);
+    println!("{}", ensure_active_development_api_url(workspace)?);
     Ok(())
 }
 
@@ -77,6 +84,31 @@ fn development_tunnel_url_command() -> CommandSpec {
     development_compose().args(["exec", "--no-TTY", "tunnel", "cat", "/run/misty/tunnel-url"])
 }
 
+fn development_tunnel_connection_command() -> CommandSpec {
+    development_compose().args([
+        "exec",
+        "--no-TTY",
+        "tunnel",
+        "sh",
+        "-c",
+        "test -s /run/misty/tunnel-url && wget -q -O - http://127.0.0.1:20241/metrics | grep -Eq '^cloudflared_tunnel_ha_connections [1-9][0-9]*(\\.[0-9]+)?$'",
+    ])
+}
+
+fn development_tunnel_refresh_command() -> CommandSpec {
+    development_compose().args(["up", "--detach", "--force-recreate", "--no-deps", "tunnel"])
+}
+
+fn development_worker_refresh_command() -> CommandSpec {
+    development_compose().args([
+        "up",
+        "--detach",
+        "--force-recreate",
+        "--no-deps",
+        "cloudflare-deploy",
+    ])
+}
+
 fn development_api_url(workspace: &Workspace) -> Result<String> {
     let output = development_tunnel_url_command()
         .capture(&workspace.server)
@@ -84,18 +116,73 @@ fn development_api_url(workspace: &Workspace) -> Result<String> {
     normalize_development_api_url(&output)
 }
 
-fn wait_for_development_api_url(workspace: &Workspace) -> Result<String> {
-    let mut last_error = String::new();
-    for attempt in 0..60 {
-        match development_api_url(workspace) {
-            Ok(url) => return Ok(url),
-            Err(error) => last_error = format!("{error:#}"),
+fn ensure_active_development_api_url(workspace: &Workspace) -> Result<String> {
+    let url = development_api_url(workspace)?;
+    if development_tunnel_connection_command()
+        .capture(&workspace.server)
+        .is_ok()
+    {
+        if development_tunnel_dns_is_published(workspace, &url).is_ok() {
+            return Ok(url);
         }
-        if attempt < 59 {
-            thread::sleep(Duration::from_millis(250));
-        }
+        eprintln!("Tunnel connected; waiting for Cloudflare DNS...");
+        return wait_for_development_tunnel(workspace);
     }
-    bail!("development stack started, but its tunnel URL was not ready: {last_error}")
+
+    eprintln!("Development tunnel is unreachable; creating a fresh URL...");
+    development_tunnel_refresh_command().run(&workspace.server)?;
+    eprintln!("Waiting for cloudflared and Cloudflare DNS...");
+    let url = wait_for_development_tunnel(workspace)?;
+    development_worker_refresh_command().run(&workspace.server)?;
+    Ok(url)
+}
+
+fn wait_for_development_tunnel(workspace: &Workspace) -> Result<String> {
+    let started = Instant::now();
+    let timeout = Duration::from_secs(30);
+    let mut next_progress = Duration::from_secs(5);
+    let last_error = loop {
+        let error = match development_api_url(workspace) {
+            Ok(url)
+                if development_tunnel_connection_command()
+                    .capture(&workspace.server)
+                    .is_ok()
+                    && development_tunnel_dns_is_published(workspace, &url).is_ok() =>
+            {
+                return Ok(url);
+            }
+            Ok(_) => "cloudflared or Cloudflare DNS is not ready yet".to_owned(),
+            Err(error) => format!("{error:#}"),
+        };
+        let elapsed = started.elapsed();
+        if elapsed >= timeout {
+            break format!("{error:#}");
+        }
+        if elapsed >= next_progress {
+            eprintln!("Still waiting for Cloudflare... ({}s)", elapsed.as_secs());
+            next_progress += Duration::from_secs(5);
+        }
+        thread::sleep(Duration::from_millis(500));
+    };
+    bail!("cloudflared did not establish a connection within 30 seconds: {last_error}")
+}
+
+fn development_tunnel_dns_is_published(workspace: &Workspace, api_url: &str) -> Result<()> {
+    let url = Url::parse(api_url).context("development API returned an invalid URL")?;
+    let host = url
+        .host_str()
+        .context("development API URL has no hostname")?;
+    let output = CommandSpec::new("dig")
+        .args(["+short", "+time=1", "+tries=1", host, "A"])
+        .capture(&workspace.server)
+        .context("could not query the configured DNS resolver")?;
+    if output
+        .lines()
+        .any(|line| line.trim().parse::<Ipv4Addr>().is_ok())
+    {
+        return Ok(());
+    }
+    bail!("Cloudflare DNS has not published the development tunnel yet")
 }
 
 fn normalize_development_api_url(raw: &str) -> Result<String> {
@@ -715,6 +802,17 @@ mod tests {
         assert_eq!(
             development_tunnel_url_command().display(),
             "docker compose --env-file .env.dev --file compose.dev.yml exec --no-TTY tunnel cat /run/misty/tunnel-url"
+        );
+        assert!(development_tunnel_connection_command()
+            .display()
+            .contains("cloudflared_tunnel_ha_connections"));
+        assert_eq!(
+            development_tunnel_refresh_command().display(),
+            "docker compose --env-file .env.dev --file compose.dev.yml up --detach --force-recreate --no-deps tunnel"
+        );
+        assert_eq!(
+            development_worker_refresh_command().display(),
+            "docker compose --env-file .env.dev --file compose.dev.yml up --detach --force-recreate --no-deps cloudflare-deploy"
         );
     }
 
