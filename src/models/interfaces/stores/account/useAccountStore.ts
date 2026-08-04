@@ -23,7 +23,9 @@ export interface AccountMeResponse {
   email: string;
   avatar_version?: number;
   created_at: string;
-  tier: "basic" | "pro";
+  // "max" is a real server tier. Omitting it here made Max subscribers read as
+  // Pro everywhere the desktop gates on the plan.
+  tier: "basic" | "pro" | "max";
   status: "active" | "trialing" | "cancelled" | "expired";
   allows_use: boolean;
   expires_at: string | null;
@@ -39,29 +41,12 @@ export interface AccountMeResponse {
   };
 }
 
-export interface BillingUsageResponse {
-  plan: "basic" | "pro";
-  storage: {
-    used_bytes: number;
-    reserved_bytes: number;
-    limit_bytes: number;
-    remaining_bytes: number;
-    over_quota: boolean;
-    over_quota_since?: string;
-    cleanup_notice_until?: string;
-  };
-  hosted_ai: {
-    used_ratio: number;
-    reset_at: string;
-  };
-  trial?: { status: string; ends_at: string | null };
-  subscription?: {
-    status: string;
-    current_period_end: string | null;
-    cancel_at_period_end: boolean;
-    billing_interval: "month" | "year";
-  };
-}
+/**
+ * The account surfaces the desktop app can hand off to. The server keeps its
+ * own allowlist; this union just stops typos reaching it.
+ */
+export type AccountHandoffPath =
+  "/settings" | "/settings/account" | "/settings/usage" | "/settings/billing" | "/settings/privacy";
 
 export interface LoginResponse {
   id?: string;
@@ -70,48 +55,4 @@ export interface LoginResponse {
   name: string;
   username: string;
   email: string;
-}
-
-export interface AccountDeletionResponse {
-  request: {
-    id: string;
-    status: "processing" | "scheduled" | "completed" | "failed";
-    purge_after: string;
-    created_at: string;
-    updated_at: string;
-  };
-  status_token: string;
-}
-
-export interface AccountExportManifest {
-  account_data: Record<string, unknown>;
-  documents: Array<{
-    kind: "note" | "drawing";
-    id: string;
-    space_id: string;
-    title: string;
-    acl_version: number;
-    created_at: string;
-    updated_at: string;
-    download_url: string;
-    expires_at: string;
-  }>;
-  assets: Array<{
-    kind: "note" | "drawing" | "library" | "message_attachment";
-    id: string;
-    parent_id: string;
-    filename: string;
-    mime_type: string;
-    byte_size: number;
-    sha256: string;
-    created_at: string;
-    download: {
-      url: string;
-      expires_at: string;
-      filename: string;
-      mime_type: string;
-      byte_size: number;
-      sha256: string;
-    };
-  }>;
 }

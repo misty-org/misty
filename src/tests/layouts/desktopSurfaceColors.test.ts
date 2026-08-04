@@ -6,6 +6,10 @@ import {
   desktopWallpaperLayerClass,
   navbarBottomClass,
   navbarGroupClass,
+  navButtonActiveClass,
+  navItemBaseClass,
+  navLinkActiveClass,
+  navLinkBaseClass,
 } from "@/layouts/DesktopLayout/styles";
 
 describe("desktop surface colors", () => {
@@ -42,6 +46,19 @@ describe("desktop surface colors", () => {
     expect(navbarGroupClass).toContain("overflow-y-auto");
     expect(navbarGroupClass).toContain("[scrollbar-width:none]");
     expect(navbarGroupClass).toContain("[&::-webkit-scrollbar]:hidden");
+    expect(navbarGroupClass).not.toContain("py-1");
     expect(navbarBottomClass).toContain("shrink-0");
+  });
+
+  it("anchors the navigation state marker to the left edge of the rail", () => {
+    expect(navLinkBaseClass).toContain("w-full");
+    expect(navLinkBaseClass).toContain("misty-hover-marker-side");
+    expect(navLinkBaseClass).toContain("misty-navbar-marker-side");
+    expect(navLinkActiveClass).toContain("misty-active-marker-side");
+  });
+
+  it("keeps action buttons in the navbar free of navigation markers", () => {
+    expect(navItemBaseClass).not.toContain("misty-hover-marker-side");
+    expect(navButtonActiveClass).not.toContain("misty-active-marker-side");
   });
 });

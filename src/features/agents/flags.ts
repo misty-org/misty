@@ -17,3 +17,9 @@ export function mistyDeviceJobsEnabled(): boolean {
 export function mistyFolderAgentsEnabled(): boolean {
   return mistyAgentsEnabled() && enabled(import.meta.env.VITE_MISTY_FOLDER_AGENTS_ENABLED);
 }
+
+/** Production builds opt in only after the backward-compatible server migration lands. */
+export function agentTeammatesV1Enabled(): boolean {
+  const configured = import.meta.env.VITE_AGENT_TEAMMATES_V1;
+  return configured === undefined || configured === "" ? import.meta.env.DEV : enabled(configured);
+}

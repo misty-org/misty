@@ -12,26 +12,30 @@ export const tabletFrameClass = [
 ].join(" ");
 
 export const desktopNavbarClass =
-  "relative z-10 col-start-1 row-start-2 flex min-h-0 flex-col items-center overflow-hidden px-2 py-2";
+  "relative z-10 col-start-1 row-start-2 flex min-h-0 flex-col items-center overflow-hidden pb-2 pt-0";
 export const tabletNavbarClass =
-  "relative z-10 col-start-1 row-start-1 flex min-h-0 flex-col items-center overflow-hidden px-2 py-2";
+  "relative z-10 col-start-1 row-start-1 flex min-h-0 flex-col items-center overflow-hidden pb-2 pt-0";
 
 export const desktopRouteShellClass =
   "relative z-10 col-start-2 row-start-2 min-h-0 overflow-hidden bg-[var(--misty-app-route-bg,var(--misty-bg))]";
 export const tabletRouteShellClass =
   "relative z-10 col-start-2 row-start-1 min-h-0 overflow-hidden bg-[var(--misty-app-route-bg,var(--misty-bg))]";
 
-export const navbarGroupClass =
-  "flex min-h-0 w-full flex-1 flex-col items-center gap-3 overflow-x-hidden overflow-y-auto overscroll-contain py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden";
+export const navbarGroupClass = [
+  "flex min-h-0 w-full flex-1 flex-col items-center gap-3 overflow-x-hidden overflow-y-auto",
+  "overscroll-contain pt-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+].join(" ");
 
 export const navbarBottomClass = "mt-auto flex w-full shrink-0 flex-col items-center gap-4";
 
-export const navLinkBaseClass = [
-  "misty-hover-marker-side misty-navbar-marker-side grid h-[70px] w-16 shrink-0 grid-rows-[50px_18px] place-items-center border-0 !bg-transparent p-0",
+export const navItemBaseClass = [
+  "grid h-[70px] w-full shrink-0 grid-rows-[50px_18px] place-items-center border-0 !bg-transparent p-0",
   "text-[var(--misty-text-muted)] no-underline shadow-none transition-colors hover:!bg-transparent",
   "hover:text-[var(--misty-text)] active:translate-y-0 aria-expanded:!bg-transparent",
 ].join(" ");
+export const navLinkBaseClass = `misty-hover-marker-side misty-navbar-marker-side ${navItemBaseClass}`;
 export const navLinkActiveClass = "misty-active-marker-side text-[var(--misty-text)]";
+export const navButtonActiveClass = "text-[var(--misty-text)]";
 
 export const navIconTileBaseClass = [
   "relative grid h-[50px] w-[54px] place-items-center rounded-[13px] text-[var(--misty-text)] transition-colors",

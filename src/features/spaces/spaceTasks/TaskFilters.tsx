@@ -7,7 +7,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/ui";
-import type { SpaceMember } from "@/models/interfaces/features/spaces/types";
+import type { SpaceAgentMembership, SpaceMember } from "@/models/interfaces/features/spaces/types";
 
 type Option = [value: string, label: string];
 
@@ -39,6 +39,7 @@ const sortOptions: Option[] = [
 
 export interface TaskFiltersProps {
   members: SpaceMember[];
+  agents: SpaceAgentMembership[];
   status: string;
   assignee: string;
   priority: string;
@@ -53,7 +54,10 @@ export function TaskFilters(props: TaskFiltersProps) {
   const assigneeOptions: Option[] = [
     ["all", "Any assignee"],
     ["unassigned", "Unassigned"],
-    ...props.members.map((member): Option => [member.user_id, member.name]),
+    ...props.members.map((member): Option => [`person:${member.user_id}`, member.name]),
+    ...props.agents
+      .filter((agent) => agent.enabled)
+      .map((agent): Option => [`agent:${agent.agent_id}`, `${agent.name} · Agent`]),
   ];
 
   return (

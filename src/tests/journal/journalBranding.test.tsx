@@ -1,9 +1,14 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter } from "react-router-dom";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { JournalAttribution } from "@/features/journal/components/JournalAttribution";
-import { JournalSectionSwitcher } from "@/features/journal/components/JournalSectionSwitcher";
+import { NotesPanelSidebar } from "@/features/notes/components/NotesPanelSidebar";
+import { DrawingPanelSidebar } from "@/features/drawings/components/DrawingPanelSidebar";
+
+vi.mock("@/features/drawings/hooks/useSpaceDrawings", () => ({
+  useSpaceDrawings: () => ({ drawings: [], loading: false, create: vi.fn() }),
+}));
 
 describe("Journal branding", () => {
   let container: HTMLDivElement;
@@ -23,16 +28,24 @@ describe("Journal branding", () => {
     container.remove();
   });
 
-  it("groups Notes and Drawings beneath Journal", async () => {
+  it("renders Notes and Drawings as separate sidebar dropdowns", async () => {
     await act(async () => {
       root.render(
         <MemoryRouter>
-          <JournalSectionSwitcher spaceId="space-1" section="drawings" />
+          <NotesPanelSidebar
+            spaceId="space-1"
+            spaceName="Design team"
+            section={{ active: false, to: "/spaces/space-1/notes" }}
+          />
+          <DrawingPanelSidebar
+            spaceId="space-1"
+            activeDrawingId=""
+            section={{ active: true, to: "/spaces/space-1/drawings" }}
+          />
         </MemoryRouter>,
       );
     });
 
-    expect(container.textContent).toContain("Journal");
     expect(container.querySelector('a[href="/spaces/space-1/notes"]')?.textContent).toContain(
       "Notes",
     );
@@ -40,6 +53,8 @@ describe("Journal branding", () => {
       container.querySelector('a[href="/spaces/space-1/drawings"][aria-current="page"]')
         ?.textContent,
     ).toContain("Drawings");
+    expect(container.querySelector('[aria-label="Expand Notes"]')).not.toBeNull();
+    expect(container.querySelector('[aria-label="Collapse Drawings"]')).not.toBeNull();
   });
 
   it("credits the editor technology alongside Misty Journal", async () => {

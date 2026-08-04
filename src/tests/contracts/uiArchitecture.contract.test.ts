@@ -9,7 +9,6 @@ const uiImplementationRoots = ["src/ui/", "src/models/interfaces/ui/", "src/mode
 const protectedRoots = [
   "src/features/explorer/",
   "src/features/spaces/",
-  "src/pages/Account/",
   "src/pages/Agents/",
   "src/pages/Files/",
   "src/pages/Providers/",

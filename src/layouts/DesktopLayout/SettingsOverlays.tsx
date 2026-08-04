@@ -1,6 +1,5 @@
 import type { CSSProperties } from "react";
 import SettingsWorkspace from "@/pages/Settings/desktop";
-import AccountWorkspace from "@/pages/Account/desktop";
 import { ProvidersWorkspace } from "@/pages/Providers/desktop";
 import { ActivityFeed } from "./ActivityFeed";
 import { WorkspaceOverlay } from "./WorkspaceOverlay";
@@ -19,14 +18,6 @@ export function SettingsOverlay(props: OverlayProps) {
   return (
     <WorkspaceOverlay {...props} ariaLabel="Settings">
       <SettingsWorkspace presentation="overlay" onClose={props.onClose} />
-    </WorkspaceOverlay>
-  );
-}
-
-export function AccountSettingsOverlay(props: OverlayProps) {
-  return (
-    <WorkspaceOverlay {...props} ariaLabel="Account settings">
-      <AccountWorkspace presentation="overlay" onClose={props.onClose} />
     </WorkspaceOverlay>
   );
 }

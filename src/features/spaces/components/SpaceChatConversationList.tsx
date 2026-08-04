@@ -18,8 +18,8 @@ export function SpaceChatConversationList({
   conversations: SpaceConversation[];
   activeConversationId: string | null;
   currentUserId?: string;
-  onCreateConversation: () => void;
-  onEditConversation: (conversation: SpaceConversation) => void;
+  onCreateConversation?: () => void;
+  onEditConversation?: (conversation: SpaceConversation) => void;
 }) {
   const mistyConversations = conversations.filter(
     (conversation) => conversation.origin !== "discord",
@@ -115,24 +115,26 @@ function ConversationGroup({
   conversations: SpaceConversation[];
   activeConversationId: string | null;
   currentUserId?: string;
-  onCreate: () => void;
-  onEdit: (conversation: SpaceConversation) => void;
+  onCreate?: () => void;
+  onEdit?: (conversation: SpaceConversation) => void;
 }) {
   return (
     <SpaceSidebarSection
       title={title}
       count={conversations.length}
       action={
-        <Button
-          variant="ghost"
-          size="icon"
-          className="size-6 shrink-0 opacity-0 shadow-none group-hover/sidebar-header:opacity-100 focus-visible:opacity-100"
-          type="button"
-          aria-label={`Create a new ${title.toLowerCase()} conversation`}
-          onClick={onCreate}
-        >
-          <Plus size={13} />
-        </Button>
+        onCreate ? (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-6 shrink-0 opacity-0 shadow-none group-hover/sidebar-header:opacity-100 focus-visible:opacity-100"
+            type="button"
+            aria-label={`Create a new ${title.toLowerCase()} conversation`}
+            onClick={onCreate}
+          >
+            <Plus size={13} />
+          </Button>
+        ) : undefined
       }
     >
       <nav className="grid gap-1" aria-label={`${title} conversations`}>
@@ -148,13 +150,15 @@ function ConversationGroup({
               <span className="min-w-0 pr-6">
                 <span className="block truncate font-medium">{conversation.title}</span>
                 <span className="block truncate text-[11px] text-muted-foreground">
-                  {conversation.members
-                    .map((member) => (member.user_id === currentUserId ? "You" : member.name))
+                  {conversation.participants
+                    .map((participant) =>
+                      participant.user_id === currentUserId ? "You" : participant.name,
+                    )
                     .join(", ")}
                 </span>
               </span>
             </Link>
-            {conversation.created_by_user_id === currentUserId ? (
+            {onEdit && conversation.created_by_user_id === currentUserId ? (
               <Button
                 variant="ghost"
                 size="icon"

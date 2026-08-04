@@ -61,21 +61,70 @@ describe("SpacePlanner", () => {
   it("renders with a stable empty member snapshot while coordination data loads", async () => {
     await act(async () => {
       root.render(
-        <MemoryRouter initialEntries={["/spaces/space-new/planner/board"]}>
+        <MemoryRouter initialEntries={["/spaces/space-new/planner/tasks/board"]}>
           <SpacePlanner spaceId="space-new" canManage canManageIntegrations />
         </MemoryRouter>,
       );
       await Promise.resolve();
     });
 
-    expect(container.textContent).toContain("Board");
-    expect(container.textContent).toContain("List");
-    expect(container.textContent).toContain("Calendar");
-    expect(container.textContent).toContain("Planner");
+    expect(container.textContent).toContain("Tasks");
+    expect(container.textContent).not.toContain("board view");
+    expect(container.textContent).not.toContain("Calendar");
     expect(container.querySelector('button[aria-label="Sync planner"]')).not.toBeNull();
     expect(container.textContent).toContain("To do");
     expect(container.textContent).toContain("In progress");
     expect(container.textContent).toContain("Done");
+  });
+
+  it("opens the existing task drawer from a task creation query", async () => {
+    await act(async () => {
+      root.render(
+        <MemoryRouter initialEntries={["/spaces/space-new/planner/tasks/board?create=task"]}>
+          <SpacePlanner spaceId="space-new" canManage canManageIntegrations />
+        </MemoryRouter>,
+      );
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(document.body.textContent).toContain("New task");
+    expect(document.querySelector("#space-task-title")).not.toBeNull();
+    expect(document.querySelector('[data-slot="sheet-content"]')?.className).toContain(
+      "bg-[var(--misty-app-modal-bg,var(--popover))]",
+    );
+  });
+
+  it("shows task notes without an unassigned placeholder avatar", async () => {
+    loadTasks.mockResolvedValue({
+      tasks: [
+        {
+          id: "task-detailed",
+          task_key: "MST-4",
+          title: "Finish taking screenshots for website",
+          notes: "Capture the final light and dark production states.",
+          status: "todo",
+          priority: "medium",
+          rank: 1024,
+          source_refs: [],
+          due_timezone: "UTC",
+          version: 1,
+        },
+      ],
+    });
+
+    await act(async () => {
+      root.render(
+        <MemoryRouter initialEntries={["/spaces/space-new/planner/tasks/board"]}>
+          <SpacePlanner spaceId="space-new" canManage canManageIntegrations />
+        </MemoryRouter>,
+      );
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(container.textContent).toContain("Capture the final light and dark production states.");
+    expect(container.querySelector('[title="Unassigned"]')).toBeNull();
   });
 
   it("keeps core tasks available when optional calendar endpoints fail", async () => {
@@ -100,7 +149,7 @@ describe("SpacePlanner", () => {
 
     await act(async () => {
       root.render(
-        <MemoryRouter initialEntries={["/spaces/space-new/planner/list"]}>
+        <MemoryRouter initialEntries={["/spaces/space-new/planner/tasks/list"]}>
           <SpacePlanner spaceId="space-new" canManage canManageIntegrations />
         </MemoryRouter>,
       );
@@ -136,7 +185,7 @@ describe("SpacePlanner", () => {
 
     await act(async () => {
       root.render(
-        <MemoryRouter initialEntries={["/spaces/space-new/planner/list"]}>
+        <MemoryRouter initialEntries={["/spaces/space-new/planner/tasks/list"]}>
           <SpacePlanner spaceId="space-new" canManage canManageIntegrations />
         </MemoryRouter>,
       );
@@ -155,7 +204,7 @@ describe("SpacePlanner", () => {
   it("does not send blank optional date and assignee fields when quick-adding a task", async () => {
     await act(async () => {
       root.render(
-        <MemoryRouter initialEntries={["/spaces/space-new/planner/board"]}>
+        <MemoryRouter initialEntries={["/spaces/space-new/planner/tasks/board"]}>
           <SpacePlanner spaceId="space-new" canManage canManageIntegrations />
         </MemoryRouter>,
       );
@@ -196,7 +245,7 @@ describe("SpacePlanner", () => {
   it("includes notes when saving a task from the drawer", async () => {
     await act(async () => {
       root.render(
-        <MemoryRouter initialEntries={["/spaces/space-new/planner/board"]}>
+        <MemoryRouter initialEntries={["/spaces/space-new/planner/tasks/board"]}>
           <SpacePlanner spaceId="space-new" canManage canManageIntegrations />
         </MemoryRouter>,
       );

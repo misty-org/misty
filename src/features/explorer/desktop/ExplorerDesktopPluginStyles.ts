@@ -7,7 +7,7 @@ const pluginTabMenuStyles = {
     "grid size-7 flex-none place-items-center rounded-md border-0 bg-transparent text-muted-foreground hover:bg-transparent hover:text-foreground",
   searchLabel: "block px-1.5 py-2",
   searchInput:
-    "h-8 w-full rounded-md border border-input bg-background px-2.5 text-[13px] text-foreground outline-none placeholder:text-muted-foreground focus:border-ring",
+    "h-8 w-full rounded-md border border-input bg-background px-2.5 text-[13px] text-foreground outline-none placeholder:text-muted-foreground",
   sections: "grid gap-1 py-1",
   section: "grid gap-0.5",
   sectionLabel: "px-2.5 pb-1 pt-1.5 text-[10px] font-bold capitalize text-muted-foreground",
@@ -38,7 +38,7 @@ const extensionsPanelStyles = {
     "grid size-8 flex-none place-items-center rounded-md border border-border/60 bg-secondary text-muted-foreground hover:bg-secondary hover:text-foreground",
   searchLabel: "block border-b border-border/60 px-3 py-2.5",
   searchInput:
-    "h-8 w-full rounded-md border border-input bg-secondary px-2.5 text-[13px] text-foreground outline-none placeholder:text-muted-foreground focus:border-ring",
+    "h-8 w-full rounded-md border border-input bg-secondary px-2.5 text-[13px] text-foreground outline-none placeholder:text-muted-foreground",
   body: "grid min-h-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden",
   list: "flex min-w-0 gap-0 overflow-x-auto border-b border-border/60 bg-background px-2 pt-2",
   item: "relative -mb-px grid min-h-11 w-[164px] shrink-0 grid-cols-[24px_minmax(0,1fr)_22px] items-center gap-2 rounded-t-md border border-transparent border-b-border/60 px-2 py-1.5 text-left text-muted-foreground hover:bg-transparent hover:text-foreground",
@@ -84,7 +84,7 @@ const pluginTabHostStyles = {
   button:
     "inline-flex min-h-8 items-center justify-center gap-1.5 rounded-md border border-border bg-secondary px-2.5 py-1.5 text-xs font-semibold text-foreground disabled:cursor-progress disabled:opacity-60",
   input:
-    "min-h-9 min-w-[min(280px,100%)] rounded-md border border-input bg-background px-2.5 text-foreground outline-none focus:border-ring disabled:opacity-60",
+    "min-h-9 min-w-[min(280px,100%)] rounded-md border border-input bg-background px-2.5 text-foreground outline-none disabled:opacity-60",
   elements: "flex min-h-20 flex-wrap items-center gap-2.5",
   text: "m-0 basis-full text-sm leading-[1.45] text-foreground/85",
   separator: "my-1 w-full basis-full border-0 border-t border-border/60",

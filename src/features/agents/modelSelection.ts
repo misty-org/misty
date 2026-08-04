@@ -1,6 +1,18 @@
 export const initialAgentModelId = "google/gemini-2.5-flash-lite";
 export const initialAgentModelName = "Gemini 2.5 Flash-Lite";
 
+/**
+ * The model a new chat starts on when neither the agent nor the chat overrides
+ * it. Reads the user's configured default and falls back to the built-in, so an
+ * unset or cleared setting behaves exactly as before.
+ */
+export function defaultAgentModelId(document: Record<string, unknown> | null | undefined): string {
+  const agent = document?.agent;
+  if (!agent || typeof agent !== "object" || Array.isArray(agent)) return initialAgentModelId;
+  const configured = (agent as Record<string, unknown>).default_model_id;
+  return typeof configured === "string" && configured.trim() ? configured : initialAgentModelId;
+}
+
 export function selectedAgentModelName(modelId: string): string {
   if (modelId === initialAgentModelId) return initialAgentModelName;
   const parts = modelId.trim().split("/");

@@ -45,9 +45,7 @@ import { isAndroidBuild } from "@/platform/buildTarget";
 import {
   defaultTransferProfileId,
   transferProfileRecords,
-  transferProfileSettingsPayload,
 } from "@/pages/Settings/transferProfiles";
-import type { TransferProfileRecord } from "@/models/interfaces/pages/Settings/transferProfiles";
 import {
   DesktopSettingsFrame,
   DesktopSettingsRow as SettingsRow,

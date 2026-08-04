@@ -12,6 +12,7 @@ export interface NoteReadingPaneProps {
   accountId?: string;
   loading: boolean;
   editingNoteId?: string;
+  referenceOnly?: boolean;
   onEditingNoteChange?: (noteId: string | undefined) => void;
   /** Undefined for read-only sources; presence enables the Edit affordance. */
   onSaveBody?: (noteId: string, body: string) => void;

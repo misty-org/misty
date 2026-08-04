@@ -19,10 +19,15 @@ export interface SpaceChatPermissions {
  * Permissions are absent until the snapshot lands, so every flag defaults to
  * allowed and only an explicit `false` from the backend takes it away.
  */
-export function useSpaceChatPermissions(spaceId: string): SpaceChatPermissions {
+export function useSpaceChatPermissions(
+  spaceId: string,
+  _conversationId = "",
+  _conversationKind?: "standard" | "direct",
+): SpaceChatPermissions {
   const activeSpace = useSpacesStore((state) => state.spaces.find((space) => space.id === spaceId));
+  const referenceOnly = useSpacesStore((state) => state.referenceOnly);
   const permissions = activeSpace?.permissions;
-  const canWriteMessages = permissions?.["messages.write"] !== false;
+  const canWriteMessages = !referenceOnly && permissions?.["messages.write"] !== false;
 
   return {
     activeSpace,

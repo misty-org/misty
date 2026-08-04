@@ -76,7 +76,6 @@ export interface AdvancedPreferences {
 
 export interface SearchMaintenancePreferences {
   automaticFileDiscoveryEnabled: boolean;
-  automaticImageDiscoveryEnabled: boolean;
   discoveryIntervalMinutes: number;
 }
 

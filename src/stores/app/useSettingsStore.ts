@@ -53,6 +53,16 @@ import { telemetryPreferencesChanged } from "@/analytics/lifecycle";
 const defaultAdvancedServerAddress = isNativeMobileBuild ? "" : "localhost:50051";
 const deviceNotificationsKey = "device_notifications_enabled";
 const legacyDesktopNotificationsKey = ["desktop", "notifications", "enabled"].join("_");
+/**
+ * The key the device-notifications switch must read and write.
+ *
+ * The selector resolves a different key per platform; the settings UI used to
+ * hardcode the desktop one, so on a native mobile build the toggle wrote a key
+ * nothing read back. Both sides now share this constant.
+ */
+export const notificationsDeviceKey = isNativeMobileBuild
+  ? deviceNotificationsKey
+  : legacyDesktopNotificationsKey;
 
 let settingsSaveSequence = 0;
 
@@ -400,12 +410,6 @@ export function selectSearchMaintenancePreferences(
       source,
       "search",
       "automatic_file_discovery_enabled",
-      true,
-    ),
-    automaticImageDiscoveryEnabled: settingsBoolean(
-      source,
-      "search",
-      "automatic_image_discovery_enabled",
       true,
     ),
     discoveryIntervalMinutes: clampSettingsNumber(

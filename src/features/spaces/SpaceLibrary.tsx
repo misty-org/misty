@@ -1,3 +1,5 @@
+import { useEffect, useRef } from "react";
+import { useSearchParams } from "react-router-dom";
 import { SpaceLibraryCollectionOverview } from "./components/SpaceLibraryCollections";
 import { SpaceLibraryOverlays } from "./components/SpaceLibraryOverlays";
 import { SpaceLibraryTopChrome } from "./components/SpaceLibraryStatus";
@@ -24,8 +26,23 @@ import { useSpaceLibraryItemActions } from "./useSpaceLibraryItemActions";
  */
 export function SpaceLibrary({ spaceId }: { spaceId: string }) {
   const data = useSpaceLibraryData(spaceId);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const uploadQueryConsumedRef = useRef(false);
   const itemActions = useSpaceLibraryItemActions(data);
   const collectionActions = useSpaceLibraryCollectionActions(data, itemActions);
+
+  useEffect(() => {
+    if (searchParams.get("upload") !== "1") {
+      uploadQueryConsumedRef.current = false;
+      return;
+    }
+    if (uploadQueryConsumedRef.current) return;
+    uploadQueryConsumedRef.current = true;
+    const next = new URLSearchParams(searchParams);
+    next.delete("upload");
+    setSearchParams(next, { replace: true });
+    if (data.canUploadLibrary) data.setFilePickerOpen(true);
+  }, [data.canUploadLibrary, data.setFilePickerOpen, searchParams, setSearchParams]);
 
   return (
     <SpaceLibraryProvider value={{ data, itemActions, collectionActions }}>

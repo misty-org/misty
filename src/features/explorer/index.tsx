@@ -8,10 +8,14 @@ export function preloadDesktopFilesPage(): Promise<unknown> {
   return loadDesktopFilesPage();
 }
 
-export default function FilesPage() {
+export default function FilesPage(props: {
+  embedded?: boolean;
+  workspaceId?: string;
+  workspaceTitle?: string;
+}) {
   return (
     <Suspense fallback={<ExplorerLoadingShell />}>
-      <DesktopFilesPage />
+      <DesktopFilesPage {...props} />
     </Suspense>
   );
 }
