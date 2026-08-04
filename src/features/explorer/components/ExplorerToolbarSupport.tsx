@@ -13,14 +13,14 @@ export const toolbarStyles = {
   navigationButton: "size-8 rounded-md text-muted-foreground shadow-none",
   pathBar:
     "flex h-9 min-w-0 items-center gap-0.5 overflow-x-auto overflow-y-hidden rounded-md border border-input bg-muted/30 px-1.5 shadow-none [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
-  pathBarEditing: "border-ring ring-2 ring-ring/20",
+  pathBarEditing: "border-input",
   pathButton:
     "h-7 min-w-fit flex-none gap-0 rounded-sm px-1.5 text-sm font-normal text-foreground shadow-none",
   pathInput:
     "h-full min-w-0 w-full appearance-none rounded-none border-0 bg-transparent p-0 font-[inherit] leading-none text-foreground shadow-none outline-none ring-0 focus-visible:ring-0 placeholder:text-muted-foreground",
   breadcrumbCaret: "mr-1.5 flex-none text-muted-foreground/70",
   commandSearch:
-    "flex h-9 w-full min-w-0 items-center gap-2 rounded-md border border-input bg-muted/30 px-1.5 text-muted-foreground shadow-none focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/20 max-[980px]:w-full max-[720px]:min-w-40",
+    "flex h-9 w-full min-w-0 items-center gap-2 rounded-md border border-input bg-muted/30 px-1.5 text-muted-foreground shadow-none max-[980px]:w-full max-[720px]:min-w-40",
   searchButton: "size-8 shrink-0 rounded-md text-muted-foreground",
   commandInput:
     "h-full min-w-0 flex-1 appearance-none rounded-none border-0 bg-transparent p-0 text-foreground shadow-none outline-none ring-0 focus-visible:ring-0 placeholder:text-muted-foreground",

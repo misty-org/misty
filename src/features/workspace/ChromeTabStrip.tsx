@@ -140,14 +140,16 @@ export const ChromeTabStrip = memo(function ChromeTabStrip(props: ChromeTabStrip
           );
         })}
         <div className="misty-chrome-tabs-toolbar">
-          <Button
-            type="button"
-            className="misty-chrome-tabs-add"
-            title="New tab"
-            onClick={props.onAddTab}
-          >
-            <Plus size={17} strokeWidth={2.4} />
-          </Button>
+          {props.addTabControl ?? (
+            <Button
+              type="button"
+              className="misty-chrome-tabs-add"
+              title="New tab"
+              onClick={props.onAddTab}
+            >
+              <Plus size={17} strokeWidth={2.4} />
+            </Button>
+          )}
         </div>
       </div>
       {props.actions ? <div className={chromeTabTrayClass}>{props.actions}</div> : null}

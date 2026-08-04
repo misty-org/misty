@@ -48,7 +48,7 @@ import { useShallow } from "zustand/react/shallow";
 import { MultiPanelWorkspace } from "@/features/workspace";
 import { useTransientScrollbars } from "@/hooks/useTransientScrollbars";
 import { isAndroidBuild } from "@/platform/buildTarget";
-import { useAppStore } from "@/stores/app";
+import { useAppRouteMemoryStore, useAppStore } from "@/stores/app";
 import {
   clipboardApplyShared,
   clipboardPublishImageBytes,
@@ -161,7 +161,6 @@ import {
 import {
   buildExplorerLocationResults,
   clamp,
-  ExplorerBottomBar,
   multiPanelWorkspaceNeedsSave,
   pluginCommandsEqual,
   pluginPanelsEqual,
@@ -207,12 +206,18 @@ import { useExplorerDialogEvents } from "./explorerWorkspace/useExplorerDialogEv
 import { usePanelResize } from "./explorerWorkspace/usePanelResize";
 import { usePluginRegistry } from "./explorerWorkspace/usePluginRegistry";
 import { useTransferRefreshPolling } from "./explorerWorkspace/useTransferRefreshPolling";
+import { useExplorerAgentDock } from "./ExplorerAgentDockIntegration";
+import { renderExplorerBottomBar } from "./ExplorerWorkspaceChrome";
+import {
+  scopedWorkspaceEntries,
+  useScopedExplorerWorkspace,
+  type ExplorerWorkspaceProps,
+} from "./explorerWorkspace/useScopedExplorerWorkspace";
 
-export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
+export const ExplorerWorkspace = memo(function ExplorerWorkspace(props: ExplorerWorkspaceProps) {
   const navigate = useNavigate();
   const app = useAppStore((state) => state.app);
   const {
-    initialize,
     sidebarWidth,
     previewWidth,
     pinnedPaths,
@@ -231,7 +236,6 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
     dismissNotification,
   } = useExplorerStore(
     useShallow((state) => ({
-      initialize: state.initialize,
       sidebarWidth: state.sidebarWidth,
       previewWidth: state.previewWidth,
       pinnedPaths: state.pinnedPaths,
@@ -394,11 +398,7 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
     activePathRef.current = activePath;
   }, [activePaneId, activePath]);
 
-  useEffect(() => {
-    if (app?.environment.homeDir && settingsLoaded) {
-      void initialize(homePath);
-    }
-  }, [app?.environment.homeDir, homePath, initialize, settingsLoaded]);
+  useScopedExplorerWorkspace(props, homePath, settingsLoaded);
 
   useEffect(() => {
     if (!operationError) return;
@@ -539,10 +539,11 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
     },
     [activePaneId, extensionsEnabled, homePath, pluginCommands, pluginPanels],
   );
-  const inspector = useMemo(
-    () => (previewVisible ? <ConnectedFileInspector /> : undefined),
-    [previewVisible],
-  );
+  const { inspector } = useExplorerAgentDock({
+    activePaneId,
+    activePath,
+    fallbackInspector: previewVisible ? <ConnectedFileInspector /> : undefined,
+  });
   const openSidebarPathInNewTab = useCallback((path: string, title?: string) => {
     useMultiPanelStore.getState().addTab(path, title);
   }, []);
@@ -629,9 +630,10 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
           devices={mountedDevices}
           devicesLoading={devicesLoading}
           pinnedPaths={pinnedPaths}
-          workspaceEntries={workspaceEntries}
+          workspaceEntries={scopedWorkspaceEntries(workspaceEntries, props.workspaceId)}
           activeWorkspaceId={activeWorkspaceId}
           activeWorkspaceTitle={activeWorkspaceTitle}
+          workspaceLocked={Boolean(props.workspaceId)}
           onNavigate={navigateSidebar}
           onRefreshDevices={refreshDevices}
           onSelectWorkspace={handleSelectWorkspace}
@@ -677,42 +679,34 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
     ],
   );
   const renderTabActions = useCallback(
-    () => (
-      <ExplorerTray
-        commands={pluginCommands}
-        panels={pluginPanels}
-        selectedPath={activePath}
-        terminalEnabled={
-          activeTabSupportsSidePanels &&
-          canOpenTerminalPath(activeTabPath) &&
-          canOpenTerminalPath(activePath)
-        }
-        terminalPath={activePath}
-        onOpenTransfers={openTransfersTab}
-      />
-    ),
-    [activePath, activeTabPath, activeTabSupportsSidePanels, pluginCommands, pluginPanels],
+    () =>
+      props.workspaceId ? null : (
+        <ExplorerTray
+          commands={pluginCommands}
+          panels={pluginPanels}
+          selectedPath={activePath}
+          onToggleFileManagerMode={() =>
+            navigate(useAppRouteMemoryStore.getState().lastSpacesRoute)
+          }
+          terminalEnabled={
+            activeTabSupportsSidePanels &&
+            canOpenTerminalPath(activeTabPath) &&
+            canOpenTerminalPath(activePath)
+          }
+          terminalPath={activePath}
+          onOpenTransfers={openTransfersTab}
+        />
+      ),
+    [
+      activePath,
+      activeTabPath,
+      activeTabSupportsSidePanels,
+      navigate,
+      pluginCommands,
+      pluginPanels,
+      props.workspaceId,
+    ],
   );
-  const renderBottomBar = useCallback((tab: MultiPanelTab) => {
-    if (isChromeTabPath(tab.path)) return null;
-    return (
-      <ExplorerBottomBar
-        sidebarVisible={tab.sidebarVisible ?? true}
-        previewVisible={tab.previewVisible ?? true}
-        onToggleSidebar={() =>
-          useMultiPanelStore
-            .getState()
-            .setTabPanelVisibility(tab.id, { sidebarVisible: !(tab.sidebarVisible ?? true) })
-        }
-        onTogglePreview={() =>
-          useMultiPanelStore
-            .getState()
-            .setTabPanelVisibility(tab.id, { previewVisible: !(tab.previewVisible ?? true) })
-        }
-      />
-    );
-  }, []);
-
   if (!explorerInitialized || !hasExplorerTabs) return <ExplorerLoadingShell />;
 
   return (
@@ -729,9 +723,10 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
           <MultiPanelWorkspace
             className="explorer-multipanel"
             canCloseTab={(tab) => canCloseExplorerTab(tab, useMultiPanelStore.getState().tabs)}
-            renderBottomBar={renderBottomBar}
+            renderBottomBar={renderExplorerBottomBar}
             renderTabActions={renderTabActions}
             renderToolbar={renderToolbar}
+            showTabStrip={!props.embedded}
             showDefaultPaneControls={false}
             renderNavigationAside={explorerSidebar}
             onNavigationAsideResizeStart={startSidebarResize}

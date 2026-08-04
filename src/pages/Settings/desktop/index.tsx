@@ -38,7 +38,10 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { InstallerCard } from "../../../features/installer/InstallerCard";
+import { DesktopUpdaterSettings } from "@/features/updater/DesktopUpdaterSettings";
 import { useAppStore } from "@/stores/app";
+import { usePersonalAgentsStore } from "@/stores/agents/usePersonalAgentsStore";
+import { defaultAgentModelId, selectedAgentModelName } from "@/features/agents/modelSelection";
 import { settingsIndexToThemeMode, themeModeToSettingsIndex, useAppThemeStore } from "@/stores/app";
 import type {
   LaunchOnLoginSnapshot,
@@ -46,18 +49,13 @@ import type {
   SearchStatus,
   ShortcutBinding,
 } from "@/models/interfaces/services/misty-api";
-import { selectAgentPreferences, useSettingsStore } from "@/stores/app";
-import { useSearchStore } from "@/stores/explorer";
+import { notificationsDeviceKey, selectAgentPreferences, useSettingsStore } from "@/stores/app";
+import { useOperationQueueStore, useSearchStore } from "@/stores/explorer";
 import { formatDate } from "@/features/explorer/utils/fileFormat";
 import { userFacingErrorText } from "@/lib/format";
 import { hasTauriInternals } from "@/platform/tauri";
 import { isAndroidBuild } from "@/platform/buildTarget";
-import {
-  defaultTransferProfileId,
-  transferProfileRecords,
-  transferProfileSettingsPayload,
-} from "../transferProfiles";
-import type { TransferProfileRecord } from "@/models/interfaces/pages/Settings/transferProfiles";
+import { defaultTransferProfileId, transferProfileRecords } from "../transferProfiles";
 import {
   DesktopSettingsFrame,
   DesktopSettingsRow as SettingsRow,
@@ -98,6 +96,10 @@ const themeOptions = ["System", "Dark", "Light"];
 const scaleOptions = ["Small", "Default", "Large"];
 const keymapOptions = ["System", "VS Code", "Finder"];
 const terminalOptions = ["System Default", "Terminal", "iTerm", "Warp", "Ghostty", "Alacritty"];
+// The store already consumes and clamps this to 5-240; these are the values the
+// UI offers.
+const discoveryIntervalOptions = [5, 15, 30, 60, 240];
+const discoveryIntervalLabels = ["5 minutes", "15 minutes", "30 minutes", "1 hour", "4 hours"];
 
 const settingsControlButtonClass = "w-[220px] max-w-full gap-1.5";
 
@@ -330,6 +332,24 @@ function AppSettings(props: SettingsContentProps) {
   return (
     <>
       <SettingsSectionBlock title="Updates">
+        {/* Relocated from the old Account surface, which was this component's
+            only consumer. App updates are a desktop concern, not an account
+            one. */}
+        <DesktopUpdaterSettings />
+        <SettingsRow
+          label="Check for updates automatically"
+          description="Look for a new Misty version on launch. You can always check manually above."
+          last
+        >
+          <SwitchControl
+            checked={booleanSetting(props.document, "general", "auto_update_enabled", true)}
+            disabled={props.working}
+            onChange={(value) => props.onSettingChange("general", "auto_update_enabled", value)}
+          />
+        </SettingsRow>
+      </SettingsSectionBlock>
+
+      <SettingsSectionBlock title="Runtime">
         <div className="bg-muted/30 p-4">
           <InstallerCard embedded variant="compact" />
         </div>
@@ -351,12 +371,6 @@ function AppSettings(props: SettingsContentProps) {
         </SettingsRow>
         <SettingsRow label="App version" description="The installed Misty build version.">
           <ValueText value={props.app?.version ?? "Loading"} muted={!props.app?.version} />
-        </SettingsRow>
-        <SettingsRow
-          label="Build info"
-          description="Helpful runtime details for troubleshooting and support."
-        >
-          <ValueText value="Tauri desktop shell" muted />
         </SettingsRow>
         <SettingsRow
           label="Config path"
@@ -440,7 +454,46 @@ function AgentSettings(props: SettingsContentProps) {
           />
         </SettingsRow>
       </SettingsSectionBlock>
+
+      <AgentDefaultModelSettings {...props} />
     </>
+  );
+}
+
+/**
+ * The model a new chat starts on. Per-agent and per-chat overrides already
+ * existed; only the global default was hardcoded.
+ */
+function AgentDefaultModelSettings(props: SettingsContentProps) {
+  const models = usePersonalAgentsStore((state) => state.models);
+  const configured = defaultAgentModelId(props.document);
+  const options = models.length > 0 ? models : [];
+  const selectedIndex = Math.max(
+    0,
+    options.findIndex((model) => model.id === configured),
+  );
+
+  if (options.length === 0) return null;
+
+  return (
+    <SettingsSectionBlock title="Model">
+      <SettingsRow
+        label="Default model"
+        description="Used for new chats that do not pick their own model. Agents with a configured model are unaffected."
+        last
+      >
+        <SelectControl
+          value={selectedIndex}
+          options={options.map((model) => selectedAgentModelName(model.id))}
+          disabled={props.working}
+          onChange={(value) => {
+            const model = options[value];
+            if (!model) return;
+            props.onSettingChange("agent", "default_model_id", model.id);
+          }}
+        />
+      </SettingsRow>
+    </SettingsSectionBlock>
   );
 }
 
@@ -622,180 +675,49 @@ function PrivacySettings(props: SettingsContentProps) {
           />
         </SettingsRow>
       </SettingsSectionBlock>
-
-      <SettingsSectionBlock title="Legal">
-        <SettingsRow
-          label="Privacy Policy"
-          description="Review how Misty handles account and runtime data."
-        >
-          <ValueText value="Available soon" muted />
-        </SettingsRow>
-        <SettingsRow
-          label="Terms of Service"
-          description="Review product terms before release packaging."
-          last
-        >
-          <ValueText value="Available soon" muted />
-        </SettingsRow>
-      </SettingsSectionBlock>
     </>
   );
 }
 
-function TransferProfilesSettings(props: SettingsContentProps) {
-  const transferProfiles = transferProfileRecords(props.document);
+/**
+ * Transfer performance is a real capability: the Rust queue reads the selected
+ * profile for its concurrency and bandwidth limit. What was missing was any
+ * call site — the settings UI wrote the profile to disk and nothing applied it.
+ *
+ * This exposes the built-in presets and actually applies the choice. The old
+ * per-field profile editor is gone: it was a lot of surface for values almost
+ * nobody tunes, and none of it was wired.
+ */
+function TransferPerformanceSettings(props: SettingsContentProps) {
+  const profiles = transferProfileRecords(props.document);
   const defaultProfileId = defaultTransferProfileId(props.document);
-  const defaultProfileIndex = Math.max(
+  const selectedIndex = Math.max(
     0,
-    transferProfiles.findIndex((profile) => profile.id === defaultProfileId),
+    profiles.findIndex((profile) => profile.id === defaultProfileId),
   );
-  const saveProfiles = (profiles: TransferProfileRecord[]) => {
-    props.onSettingChange(
-      "transfer_profiles",
-      "profiles",
-      profiles.map(transferProfileSettingsPayload),
-    );
-  };
-  const updateProfile = (id: string, patch: Partial<TransferProfileRecord>) => {
-    saveProfiles(
-      transferProfiles.map((profile) => (profile.id === id ? { ...profile, ...patch } : profile)),
-    );
-  };
-  const addProfile = () => {
-    const id = `profile-${Date.now().toString(36)}`;
-    const base =
-      transferProfiles.find((profile) => profile.id === defaultProfileId) ?? transferProfiles[0];
-    saveProfiles([
-      ...transferProfiles,
-      {
-        id,
-        name: "Custom Profile",
-        transfers: base?.transfers ?? 4,
-        checkers: base?.checkers ?? 8,
-        bandwidthLimit: base?.bandwidthLimit ?? "",
-        retries: base?.retries ?? 3,
-        lowLevelRetries: base?.lowLevelRetries ?? 10,
-        checksum: base?.checksum ?? false,
-        builtIn: false,
-      },
-    ]);
-    props.onSettingChange("transfer_profiles", "default_profile_id", id);
-  };
-  const removeProfile = (id: string) => {
-    const next = transferProfiles.filter((profile) => profile.id !== id);
-    saveProfiles(next);
-    if (defaultProfileId === id) {
-      props.onSettingChange("transfer_profiles", "default_profile_id", next[0]?.id ?? "balanced");
-    }
-  };
+  const setTransferProfile = useOperationQueueStore((state) => state.setTransferProfile);
+
+  if (profiles.length === 0) return null;
+
   return (
-    <SettingsSectionBlock title="Transfer profiles">
+    <SettingsSectionBlock title="Performance">
       <SettingsRow
-        label="Default profile"
-        description="Choose the saved transfer behavior Misty should preselect."
+        label="Transfer performance"
+        description="How many files move at once, and whether transfers are bandwidth-limited or checksum-verified."
+        last
       >
         <SelectControl
-          value={defaultProfileIndex}
-          options={transferProfiles.map((profile) => profile.name)}
+          value={selectedIndex}
+          options={profiles.map((profile) => profile.name)}
           disabled={props.working}
-          onChange={(value) =>
-            props.onSettingChange(
-              "transfer_profiles",
-              "default_profile_id",
-              transferProfiles[value]?.id ?? "balanced",
-            )
-          }
+          onChange={(value) => {
+            const profile = profiles[value];
+            if (!profile) return;
+            props.onSettingChange("transfer_profiles", "default_profile_id", profile.id);
+            void setTransferProfile(profile);
+          }}
         />
       </SettingsRow>
-      <div className={settingsReferenceListClass}>
-        <div className={`${settingsReferenceRowClass} ${settingsReferenceHeaderClass}`}>
-          <span>Name</span>
-          <span>Behavior</span>
-        </div>
-        {transferProfiles.map((profile) => (
-          <div className={settingsReferenceRowClass} key={profile.id}>
-            <span className={settingsReferenceSpanClass}>
-              {profile.builtIn ? (
-                profile.name
-              ) : (
-                <TextControl
-                  value={profile.name}
-                  disabled={props.working}
-                  onCommit={(value) =>
-                    updateProfile(profile.id, {
-                      name: value.trim() || "Custom Profile",
-                    })
-                  }
-                />
-              )}
-            </span>
-            <span className="grid justify-items-end gap-2 text-right text-muted-foreground">
-              <span>
-                {profile.transfers} transfers / {profile.checkers} checks
-                {profile.bandwidthLimit ? ` · ${profile.bandwidthLimit}` : ""}
-                {profile.checksum ? " · checksum" : ""}
-              </span>
-              {!profile.builtIn ? (
-                <span className="flex flex-wrap justify-end gap-2">
-                  <ProfileNumberInput
-                    label="Transfers"
-                    value={profile.transfers}
-                    disabled={props.working}
-                    onCommit={(value) => updateProfile(profile.id, { transfers: value })}
-                  />
-                  <ProfileNumberInput
-                    label="Checkers"
-                    value={profile.checkers}
-                    disabled={props.working}
-                    onCommit={(value) => updateProfile(profile.id, { checkers: value })}
-                  />
-                  <ProfileTextInput
-                    label="Limit"
-                    value={profile.bandwidthLimit}
-                    disabled={props.working}
-                    onCommit={(value) => updateProfile(profile.id, { bandwidthLimit: value })}
-                  />
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className={settingsControlButtonCompactClass}
-                    type="button"
-                    disabled={props.working}
-                    onClick={() =>
-                      updateProfile(profile.id, {
-                        checksum: !profile.checksum,
-                      })
-                    }
-                  >
-                    {profile.checksum ? "Checksum" : "Fast"}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className={settingsIconDangerClass}
-                    type="button"
-                    disabled={props.working}
-                    aria-label={`Remove ${profile.name}`}
-                    onClick={() => removeProfile(profile.id)}
-                  >
-                    <Trash2 size={15} strokeWidth={1.8} />
-                  </Button>
-                </span>
-              ) : null}
-            </span>
-          </div>
-        ))}
-      </div>
-      <div className={settingsInlineActionsClass}>
-        <Button
-          className={settingsPrimaryButtonClass}
-          type="button"
-          disabled={props.working}
-          onClick={addProfile}
-        >
-          Add Profile
-        </Button>
-      </div>
     </SettingsSectionBlock>
   );
 }
@@ -820,7 +742,7 @@ function TransfersSettings(props: SettingsContentProps) {
         </SettingsRow>
       </SettingsSectionBlock>
 
-      <TransferProfilesSettings {...props} />
+      <TransferPerformanceSettings {...props} />
     </>
   );
 }
@@ -879,13 +801,35 @@ function SearchSettings(props: SettingsContentProps) {
         <SettingsRow
           label="Keep file search ready"
           description="Misty checks for added, renamed, moved, or removed files while the app is open. Existing results stay searchable during updates."
-          last
         >
           <SwitchControl
             checked={automaticFileDiscovery}
             disabled={props.working}
             onChange={(value) =>
               props.onSettingChange("search", "automatic_file_discovery_enabled", value)
+            }
+          />
+        </SettingsRow>
+        <SettingsRow
+          label="Check for changes every"
+          description="How often Misty looks for file changes while it is open."
+          last
+        >
+          <SelectControl
+            value={Math.max(
+              0,
+              discoveryIntervalOptions.indexOf(
+                numberSetting(props.document, "search", "discovery_interval_minutes", 15),
+              ),
+            )}
+            options={discoveryIntervalLabels}
+            disabled={props.working || !automaticFileDiscovery}
+            onChange={(value) =>
+              props.onSettingChange(
+                "search",
+                "discovery_interval_minutes",
+                discoveryIntervalOptions[value] ?? 15,
+              )
             }
           />
         </SettingsRow>
@@ -1083,15 +1027,10 @@ function NotificationsSettings(props: SettingsContentProps) {
           description="Show system-level notifications for important events."
         >
           <SwitchControl
-            checked={booleanSetting(
-              props.document,
-              "notifications",
-              "desktop_notifications_enabled",
-              true,
-            )}
+            checked={booleanSetting(props.document, "notifications", notificationsDeviceKey, true)}
             disabled={props.working}
             onChange={(value) =>
-              props.onSettingChange("notifications", "desktop_notifications_enabled", value)
+              props.onSettingChange("notifications", notificationsDeviceKey, value)
             }
           />
         </SettingsRow>
@@ -1276,12 +1215,6 @@ function AdvancedSettings(props: SettingsContentProps) {
   return (
     <>
       <SettingsSectionBlock title="Diagnostics">
-        <SettingsRow
-          label="Loaded views"
-          description="Top-level views currently instantiated in memory."
-        >
-          <ValueText value="Tauri route shell" muted />
-        </SettingsRow>
         <SettingsRow
           label="Frame pacing overlay"
           description="Show the live idle, light, and heavy pacing state in the top-right corner."

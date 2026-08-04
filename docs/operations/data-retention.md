@@ -11,6 +11,8 @@ Published legal wording must match it before public beta.
 | Journal/Library binary object | While any active database reference exists | Reference-aware cleanup removes the R2 object only after its last reference and safety window; legal holds prevent deletion |
 | Abandoned upload | Until reservation expiry plus reconciliation safety window | Reservation is released and an old unreferenced object is deleted without opening its body |
 | Shared Space messages/files | While the Space retains them | Leaving or deleting an account removes access but does not silently erase data other members rely on; authored content is anonymized where the schema permits |
+| Personal Agents, private Agent memory, and conversations | Agent definitions and approved versions remain while the owner account is active; private conversations expire after 30 days | A deletion request immediately disables owned Agents, Space memberships, and active runs. At purge, private conversations and member-scoped memory are deleted, behavioral instructions and versions are redacted, and shared Task/audit records retain only historical attribution |
+| Agent Task runs and durable jobs | Retained with their Space Task and audit history | Reassignment, Agent removal, or account deletion cancels active work. Private run input/output belonging to a deleted requester is redacted at account purge |
 | Collaboration ticket/JTI | Ticket lifetime plus five minutes | Durable Object replay marker is opportunistically swept |
 | Support bundle | Local only | Created only on user action; never uploaded automatically |
 

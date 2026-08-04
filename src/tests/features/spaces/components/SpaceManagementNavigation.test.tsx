@@ -34,7 +34,7 @@ describe("SpaceManagementNavigation", () => {
 
     const management = container.querySelector('nav[aria-label="Space management"]');
     const links = [...(management?.querySelectorAll("a") ?? [])];
-    expect(container.querySelector('button[aria-label="Space members"]')).not.toBeNull();
+    expect(container.querySelector('button[aria-label="Space team"]')).not.toBeNull();
     expect(links.map((link) => link.getAttribute("aria-label"))).toEqual(["Settings"]);
     expect(links.map((link) => link.textContent?.trim())).toEqual([""]);
     expect(links[0]?.getAttribute("href")).toBe("/spaces/space-1/settings/general");

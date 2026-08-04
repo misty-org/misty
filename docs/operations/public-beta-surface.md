@@ -1,10 +1,17 @@
 # Public beta product surface
 
 The public beta includes account/profile/authentication, Spaces and membership,
-Chat, Journal notes/drawings, direct R2-backed Journal/Library assets, the
-shipping Agent/runtime paths, the three user-controlled cloud connections,
-billing/entitlements when live mode is configured, updates, diagnostics, data
-export, and account deletion.
+Chat, Journal notes/drawings, direct R2-backed Journal/Library assets, Agents,
+the three user-controlled cloud connections, billing/entitlements when live
+mode is configured, updates, diagnostics, data export, and account deletion.
+
+Agents in beta are contextual teammates in Files and Spaces. The
+`agent_teammates_v1` client rollout is controlled by
+`VITE_AGENT_TEAMMATES_V1=true`; production must deploy the backward-compatible
+server migration before enabling the client flag. Legacy `/agents` and
+`/assistant` links remain compatible and open the contextual Agent dock.
+Device job execution, folder agents, and document intelligence remain separate
+`VITE_MISTY_*` capabilities in `src/features/agents/flags.ts`.
 
 The API is the feature boundary:
 

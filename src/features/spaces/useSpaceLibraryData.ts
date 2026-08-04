@@ -28,7 +28,8 @@ export { libraryCollectionKinds } from "./libraryData/libraryCollectionKinds";
 export function useSpaceLibraryData(spaceId: string) {
   const activeSpace = useSpacesStore((state) => state.spaces.find((space) => space.id === spaceId));
   const permissions = activeSpace?.permissions;
-  const canEditLibrary = permissions?.["library.edit"] !== false;
+  const referenceOnly = useSpacesStore((state) => state.referenceOnly);
+  const canEditLibrary = !referenceOnly && permissions?.["library.edit"] !== false;
 
   const [reloadKey, setReloadKey] = useState(0);
   const [localError, setLocalError] = useState("");
@@ -91,7 +92,7 @@ export function useSpaceLibraryData(spaceId: string) {
   return {
     spaceId,
     activeSpace,
-    canUploadLibrary: permissions?.["library.upload"] !== false,
+    canUploadLibrary: !referenceOnly && permissions?.["library.upload"] !== false,
     canEditLibrary,
     canCopyLibrary: permissions?.["library.download"] !== false,
     reloadKey,

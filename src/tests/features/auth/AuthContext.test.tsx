@@ -50,6 +50,10 @@ const mocks = vi.hoisted(() => {
   const useAgentSessionStore = Object.assign(vi.fn(), {
     getState: () => ({ refreshStatus: agentRefresh }),
   });
+  const personalAgentsLoad = vi.fn().mockResolvedValue(undefined);
+  const usePersonalAgentsStore = Object.assign(vi.fn(), {
+    getState: () => ({ load: personalAgentsLoad }),
+  });
   return {
     accountA,
     accountB,
@@ -60,8 +64,10 @@ const mocks = vi.hoisted(() => {
     useUserStore,
     useSpacesStore,
     useAgentSessionStore,
+    usePersonalAgentsStore,
     spacesLoad,
     agentRefresh,
+    personalAgentsLoad,
     activeAccountId: accountA.id,
     readActiveSavedAccountSession: vi.fn(),
     activateAccountSession: vi.fn(),
@@ -74,6 +80,7 @@ const mocks = vi.hoisted(() => {
     signOut: vi.fn().mockResolvedValue(undefined),
     resetSpacesAccountState: vi.fn(),
     resetAgentAccountState: vi.fn(),
+    resetPersonalAgentsAccountState: vi.fn(),
     resetNotesAccountState: vi.fn(),
     resetSearchAccountState: vi.fn(),
     explorerSetState: vi.fn(),
@@ -83,8 +90,6 @@ const mocks = vi.hoisted(() => {
 vi.mock("@/platform/buildTarget", () => ({ isNativeMobileBuild: false }));
 vi.mock("@/stores/account/useAccountStore", () => ({
   accountFetchMe: mocks.accountFetchMe,
-  accountLogout: vi.fn().mockResolvedValue(null),
-  accountRevokeCurrentSession: vi.fn().mockResolvedValue(undefined),
   isAccountUnauthorizedError: () => false,
 }));
 vi.mock("@/stores/account/useAuthTokenStore", () => ({
@@ -122,6 +127,20 @@ vi.mock("@/stores/spaces/useSpacesStore", () => ({
 vi.mock("@/stores/agent/useAgentSessionStore", () => ({
   resetAgentAccountState: mocks.resetAgentAccountState,
   useAgentSessionStore: mocks.useAgentSessionStore,
+}));
+vi.mock("@/stores/agent/agentAccountLifecycle", () => ({
+  resetAllAgentAccountState: () => {
+    mocks.resetAgentAccountState();
+    mocks.resetPersonalAgentsAccountState();
+  },
+  refreshAllAgentAccountState: () => {
+    void mocks.agentRefresh();
+    void mocks.personalAgentsLoad();
+  },
+}));
+vi.mock("@/stores/agents/usePersonalAgentsStore", () => ({
+  resetPersonalAgentsAccountState: mocks.resetPersonalAgentsAccountState,
+  usePersonalAgentsStore: mocks.usePersonalAgentsStore,
 }));
 vi.mock("@/stores/notes/useNotesStore", () => ({
   resetNotesAccountState: mocks.resetNotesAccountState,
@@ -300,6 +319,7 @@ describe("AuthProvider account switching", () => {
     expect(mocks.resetSearchAccountState).toHaveBeenCalled();
     expect(mocks.resetSpacesAccountState).toHaveBeenCalled();
     expect(mocks.resetAgentAccountState).toHaveBeenCalled();
+    expect(mocks.resetPersonalAgentsAccountState).toHaveBeenCalled();
     expect(mocks.resetNotesAccountState).toHaveBeenCalled();
   });
 

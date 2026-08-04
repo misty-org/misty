@@ -29,6 +29,10 @@ const multiPanelStyles = {
     "grid-rows-[46px_auto_minmax(0,1fr)] max-[720px]:grid-rows-[38px_auto_minmax(0,1fr)]",
   workspaceWithToolbarAndBottom:
     "grid-rows-[46px_auto_minmax(0,1fr)_auto] max-[720px]:grid-rows-[38px_auto_minmax(0,1fr)_auto]",
+  workspaceRowsWithoutTabs: "grid-rows-[minmax(0,1fr)]",
+  workspaceRowsWithBottomWithoutTabs: "grid-rows-[minmax(0,1fr)_auto]",
+  workspaceWithToolbarWithoutTabs: "grid-rows-[auto_minmax(0,1fr)]",
+  workspaceWithToolbarAndBottomWithoutTabs: "grid-rows-[auto_minmax(0,1fr)_auto]",
   tools:
     "relative z-[2] grid min-h-[92px] min-w-0 border-b border-border/60 bg-[var(--misty-files-panel-bg,var(--background))]",
   body: "grid min-h-0 min-w-0 grid-cols-[minmax(0,1fr)] overflow-hidden",
@@ -95,6 +99,7 @@ export const MultiPanelWorkspace = memo(function MultiPanelWorkspace(
     renderPane,
     renderTabActions,
     renderToolbar,
+    showTabStrip = true,
     showDefaultPaneControls = true,
     store: providedStore,
   } = props;
@@ -216,13 +221,21 @@ export const MultiPanelWorkspace = memo(function MultiPanelWorkspace(
   const bottomBarContent = renderBottomBar ? renderBottomBar(activeTab) : null;
   const hasTools = Boolean(toolbarContent || contextHeaderContent);
   const hasBottomBar = Boolean(bottomBarContent);
-  const workspaceRowsClass = hasTools
-    ? hasBottomBar
-      ? multiPanelStyles.workspaceWithToolbarAndBottom
-      : multiPanelStyles.workspaceWithToolbar
-    : hasBottomBar
-      ? multiPanelStyles.workspaceRowsWithBottom
-      : multiPanelStyles.workspaceRows;
+  const workspaceRowsClass = showTabStrip
+    ? hasTools
+      ? hasBottomBar
+        ? multiPanelStyles.workspaceWithToolbarAndBottom
+        : multiPanelStyles.workspaceWithToolbar
+      : hasBottomBar
+        ? multiPanelStyles.workspaceRowsWithBottom
+        : multiPanelStyles.workspaceRows
+    : hasTools
+      ? hasBottomBar
+        ? multiPanelStyles.workspaceWithToolbarAndBottomWithoutTabs
+        : multiPanelStyles.workspaceWithToolbarWithoutTabs
+      : hasBottomBar
+        ? multiPanelStyles.workspaceRowsWithBottomWithoutTabs
+        : multiPanelStyles.workspaceRowsWithoutTabs;
   const tabStripActions =
     renderTabActions || showDefaultPaneControls ? (
       <div className={multiPanelStyles.paneActions}>
@@ -265,29 +278,31 @@ export const MultiPanelWorkspace = memo(function MultiPanelWorkspace(
     <section
       className={`${multiPanelStyles.workspace} ${workspaceRowsClass}${className ? ` ${className}` : ""}`}
     >
-      <ChromeTabStrip
-        tabs={tabs.map((tab) => ({
-          id: tab.id,
-          title: tab.title,
-          path: tab.path,
-          paneId: tab.activePaneId,
-        }))}
-        activeTabId={activeTabId}
-        canCloseTab={(tab) => {
-          const matchingTab = tabs.find((candidate) => candidate.id === tab.id);
-          return Boolean(
-            tabs.length > 1 && matchingTab && (!canCloseTab || canCloseTab(matchingTab)),
-          );
-        }}
-        onSelectTab={selectTab}
-        onCloseTab={(tab) => {
-          const matchingTab = tabs.find((candidate) => candidate.id === tab.id);
-          if (matchingTab) handleCloseTab(matchingTab);
-        }}
-        onReorderTab={reorderTabs}
-        onAddTab={() => addTab(activeTab.path, activeTab.title)}
-        actions={tabStripActions}
-      />
+      {showTabStrip ? (
+        <ChromeTabStrip
+          tabs={tabs.map((tab) => ({
+            id: tab.id,
+            title: tab.title,
+            path: tab.path,
+            paneId: tab.activePaneId,
+          }))}
+          activeTabId={activeTabId}
+          canCloseTab={(tab) => {
+            const matchingTab = tabs.find((candidate) => candidate.id === tab.id);
+            return Boolean(
+              tabs.length > 1 && matchingTab && (!canCloseTab || canCloseTab(matchingTab)),
+            );
+          }}
+          onSelectTab={selectTab}
+          onCloseTab={(tab) => {
+            const matchingTab = tabs.find((candidate) => candidate.id === tab.id);
+            if (matchingTab) handleCloseTab(matchingTab);
+          }}
+          onReorderTab={reorderTabs}
+          onAddTab={() => addTab(activeTab.path, activeTab.title)}
+          actions={tabStripActions}
+        />
+      ) : null}
 
       {hasTools ? (
         <div className={multiPanelStyles.tools}>

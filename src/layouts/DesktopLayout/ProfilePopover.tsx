@@ -2,7 +2,16 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react
 import type { CSSProperties, RefObject } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
-import { Check, ChevronRight, LogOut, Plus, Repeat2, UserCircle, X } from "lucide-react";
+import {
+  Check,
+  ChevronRight,
+  ExternalLink,
+  LogOut,
+  Plus,
+  Repeat2,
+  UserCircle,
+  X,
+} from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
 import { Button } from "@/ui";
 import { useAuth } from "@/features/auth/AuthContext";
@@ -250,6 +259,14 @@ export function ProfilePopover(props: {
           >
             <UserCircle size={17} />
             <span>Account settings</span>
+            {/* This leaves the app for the browser, so say so rather than
+                surprising people with a new window. */}
+            <ExternalLink
+              size={13}
+              className="ml-auto text-[var(--misty-text-subtle)]"
+              aria-hidden="true"
+            />
+            <span className="sr-only">(opens in your browser)</span>
           </Button>
           <Button
             ref={switchAccountsRef}

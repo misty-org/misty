@@ -6,7 +6,11 @@ import { Card } from "@/ui";
 import { Input } from "@/ui";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/ui";
 import type { SpaceTaskPriority, SpaceTaskStatus } from "@/models/types/features/spaces/types";
-import type { SpaceMember, SpaceTask } from "@/models/interfaces/features/spaces/types";
+import type {
+  SpaceAgentMembership,
+  SpaceMember,
+  SpaceTask,
+} from "@/models/interfaces/features/spaces/types";
 import {
   TaskEmptyState,
   TaskInlineSelect,
@@ -19,6 +23,7 @@ import { TaskSyncBadge } from "@/features/spaces/components/TaskSyncBadge";
 export function SpaceTaskList({
   tasks,
   members,
+  agents,
   busy,
   canManage,
   onOpen,
@@ -26,6 +31,7 @@ export function SpaceTaskList({
 }: {
   tasks: SpaceTask[];
   members: SpaceMember[];
+  agents: SpaceAgentMembership[];
   busy: string;
   canManage: boolean;
   onOpen: (task: SpaceTask) => void;
@@ -95,11 +101,33 @@ export function SpaceTaskList({
                   <TaskInlineSelect
                     label={`Assignee for ${task.title}`}
                     disabled={!canManage || taskBusy}
-                    value={task.assignee_user_id ?? ""}
-                    onChange={(value) => onUpdate(task, { assignee_user_id: value })}
+                    value={
+                      task.assignee_agent_id
+                        ? `agent:${task.assignee_agent_id}`
+                        : task.assignee_user_id
+                          ? `person:${task.assignee_user_id}`
+                          : ""
+                    }
+                    onChange={(value) =>
+                      onUpdate(task, {
+                        assignee_user_id: value.startsWith("person:") ? value.slice(7) : undefined,
+                        assignee_agent_id: value.startsWith("agent:") ? value.slice(6) : undefined,
+                      })
+                    }
                     options={[
                       ["", "Unassigned"],
-                      ...members.map((member) => [member.user_id, member.name] as [string, string]),
+                      ...members.map(
+                        (member) => [`person:${member.user_id}`, member.name] as [string, string],
+                      ),
+                      ...agents
+                        .filter((agent) => agent.enabled)
+                        .map(
+                          (agent) =>
+                            [`agent:${agent.agent_id}`, `${agent.name} · Agent`] as [
+                              string,
+                              string,
+                            ],
+                        ),
                     ]}
                   />
                 </TableCell>

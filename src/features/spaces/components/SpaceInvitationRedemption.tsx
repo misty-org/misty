@@ -3,6 +3,7 @@ import { LoaderCircle, Users } from "lucide-react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
 import { useAuth } from "@/features/auth/AuthContext";
+import { spaceNotesEnabled } from "@/features/notes/availability";
 import type { SpaceInvitationPreview } from "@/models/interfaces/features/spaces/types";
 import { spacesApi } from "@/stores/spaces/useSpacesBackendStore";
 import { useSpacesStore } from "@/stores/spaces/useSpacesStore";
@@ -44,7 +45,10 @@ export function SpaceInvitationRedemption() {
     try {
       const space = await spacesApi.redeemInvitation(token);
       await loadSpaces();
-      navigate(`/spaces/${encodeURIComponent(space.id)}/chat`, { replace: true });
+      navigate(
+        `/spaces/${encodeURIComponent(space.id)}/${spaceNotesEnabled ? "notes" : "drawings"}`,
+        { replace: true },
+      );
     } catch {
       setError(
         "Misty could not accept this invitation. Make sure you are signed in with the invited email.",

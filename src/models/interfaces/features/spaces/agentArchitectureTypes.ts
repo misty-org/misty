@@ -74,10 +74,54 @@ export interface AgentInstanceRecord {
   status: "idle" | "running";
   update_available: boolean;
   connection_bindings: Record<string, string>;
-  capability_grants: Array<Record<string, unknown>>;
+  capability_grants: AgentCapabilityGrant[];
   workflows: InstanceWorkflowConfig[];
   created_at: string;
   updated_at: string;
+}
+
+export interface AgentCapabilityGrant {
+  capability: string;
+  risk: "read" | "write" | "dangerous";
+  scopes?: Record<string, string>;
+}
+
+export interface AgentToolboxAvailabilityReason {
+  code: string;
+  message: string;
+}
+
+export interface AgentToolboxAction {
+  name: string;
+  description: string;
+  risk: "read" | "write" | "dangerous";
+  approval: "none" | "explicit_intent" | "interactive";
+  locality: "server" | "device" | "provider";
+  idempotent: boolean;
+  audit_event?: string;
+  required_permission?: string;
+  granted: boolean;
+  available: boolean;
+  reasons: AgentToolboxAvailabilityReason[];
+}
+
+export interface AgentToolboxActivity {
+  tool_name: string;
+  audit_event: string;
+  risk: "write" | "dangerous";
+  source: string;
+  state: "started" | "completed" | "failed";
+  error_code?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AgentToolboxResponse {
+  actions: AgentToolboxAction[];
+  recent_activity: AgentToolboxActivity[];
+  instance?: AgentInstanceRecord;
+  /** Public, effective context labels; private instructions are never included. */
+  context?: string[];
 }
 
 export interface InstanceWorkflowConfig {
@@ -116,6 +160,7 @@ export interface SpaceRun {
   error_code?: string;
   requesting_member_id: string;
   source_conversation_id?: string;
+  source_task_id?: string;
   // "mika" is the pre-rename value, still present on rows created before
   // 20260916000000_rename_agent_run_source_type.sql and accepted by that
   // migration's CHECK during the transition. "connector" and "task" were always
@@ -143,6 +188,13 @@ export interface SpaceRun {
   updated_at: string;
   created_at: string;
   completed_at?: string;
+}
+
+export interface SpaceRunDetail {
+  run: SpaceRun;
+  actions: RunAction[];
+  approvals: RunApproval[];
+  steps: WorkflowRunStep[];
 }
 
 export interface RunAction {

@@ -25,14 +25,16 @@ import type {
   SpacesSnapshot,
 } from "@/models/interfaces/features/spaces/types";
 import { buildMessageSpans, mergeSpaceMessages } from "./useSpaceMessageSpansStore";
+import { readRealtimeCursor, writeRealtimeCursor } from "./spaceRealtimeCursor";
+import * as referenceCache from "./spaceReferenceCache";
+import * as referenceMode from "./spaceReferenceMode";
+import * as accessErrors from "./spaceAccessErrors";
 export { buildMessageSpans } from "./useSpaceMessageSpansStore";
 
-const realtimeCursorKey = "misty:spaces:realtime-cursor";
 const realtimeConnectTimeoutMs = 12_000;
 const realtimeTicketRateLimitCooldownMs = 30_000;
 const snapshotAutoMinIntervalMs = 1_500;
 const snapshotRateLimitCooldownMs = 10_000;
-const accountSessionInvalidEvent = "misty:account-session-invalid";
 let realtimeSocket: WebSocket | null = null;
 let realtimeConnecting = false;
 let reconnectTimer: number | null = null;
@@ -66,6 +68,7 @@ export const useSpacesStore = create<SpacesStore>((set, get) => ({
   limits: null,
   ownerStorage: null,
   membersBySpace: {},
+  agentMembershipsBySpace: {},
   messagesBySpace: {},
   nodesBySpace: {},
   agentsBySpace: {},
@@ -73,12 +76,15 @@ export const useSpacesStore = create<SpacesStore>((set, get) => ({
   inbox: { unreads: [], mentions: [] },
   presenceBySpace: {},
   snapshotReady: false,
+  referenceOnly: false,
+  lastSyncedAt: null,
   loading: false,
   sending: false,
   realtimeConnected: false,
   error: null,
 
   load: async (options) => {
+    if (options?.accountId) referenceMode.setSpaceReferenceModeAccount(options.accountId);
     const force = options?.force === true;
     const now = Date.now();
     if (snapshotLoadPromise) return snapshotLoadPromise;
@@ -98,21 +104,20 @@ export const useSpacesStore = create<SpacesStore>((set, get) => ({
         const snapshot = await spacesApi.snapshot();
         if (generation !== spacesAccountGeneration) return;
         snapshotCooldownUntil = 0;
-        set({
-          spaces: snapshot.spaces,
-          invitations: snapshot.invitations,
-          limits: snapshot.entitlements,
-          ownerStorage: snapshot.owner_storage,
-          snapshotReady: true,
-          loading: false,
-        });
+        set(referenceMode.liveSpaceSnapshotState(snapshot));
       } catch (error) {
         if (generation !== spacesAccountGeneration) return;
         if (error instanceof SpaceRequestError && error.status === 401) {
-          notifyAccountSessionInvalid();
+          accessErrors.notifyAccountSessionInvalid();
         }
         if (error instanceof SpaceRequestError && error.status === 429) {
           snapshotCooldownUntil = Date.now() + snapshotRateLimitCooldownMs;
+        }
+        const fallback = await referenceMode.referenceSpaceSnapshotState(error, get());
+        if (generation !== spacesAccountGeneration) return;
+        if (fallback) {
+          set(fallback);
+          return;
         }
         set({ snapshotReady: false, loading: false, error: errorText(error) });
       }
@@ -138,15 +143,24 @@ export const useSpacesStore = create<SpacesStore>((set, get) => ({
     if (!space) {
       set((state) => {
         const membersBySpace = { ...state.membersBySpace };
+        const agentMembershipsBySpace = { ...state.agentMembershipsBySpace };
         const messagesBySpace = { ...state.messagesBySpace };
         const nodesBySpace = { ...state.nodesBySpace };
         delete membersBySpace[spaceId];
+        delete agentMembershipsBySpace[spaceId];
         delete messagesBySpace[spaceId];
         delete nodesBySpace[spaceId];
-        return { membersBySpace, messagesBySpace, nodesBySpace, loading: false };
+        return {
+          membersBySpace,
+          agentMembershipsBySpace,
+          messagesBySpace,
+          nodesBySpace,
+          loading: false,
+        };
       });
       return;
     }
+    if (get().referenceOnly) return void set({ loading: false });
     const canReadMessages = space.permissions?.["messages.read"] !== false;
     if (!canReadMessages) {
       set((state) => {
@@ -172,9 +186,9 @@ export const useSpacesStore = create<SpacesStore>((set, get) => ({
     const generation = spacesAccountGeneration;
     const { messages } = await spacesApi.messages(spaceId);
     if (generation !== spacesAccountGeneration) return;
-    set((state) => ({
-      messagesBySpace: { ...state.messagesBySpace, [spaceId]: [...messages].reverse() },
-    }));
+    const ordered = [...messages].reverse();
+    set((state) => ({ messagesBySpace: { ...state.messagesBySpace, [spaceId]: ordered } }));
+    referenceCache.cacheSpaceMessages(spaceId, ordered);
   },
 
   loadNodes: async (spaceId) => {
@@ -182,13 +196,18 @@ export const useSpacesStore = create<SpacesStore>((set, get) => ({
     const { nodes } = await spacesApi.nodes(spaceId);
     if (generation !== spacesAccountGeneration) return;
     set((state) => ({ nodesBySpace: { ...state.nodesBySpace, [spaceId]: nodes } }));
+    referenceCache.cacheSpaceNodes(spaceId, nodes);
   },
 
   loadMembers: async (spaceId) => {
     const generation = spacesAccountGeneration;
-    const { members } = await spacesApi.members(spaceId);
+    const { members, agents } = await spacesApi.members(spaceId);
     if (generation !== spacesAccountGeneration) return;
-    set((state) => ({ membersBySpace: { ...state.membersBySpace, [spaceId]: members } }));
+    set((state) => ({
+      membersBySpace: { ...state.membersBySpace, [spaceId]: members },
+      agentMembershipsBySpace: { ...state.agentMembershipsBySpace, [spaceId]: agents ?? [] },
+    }));
+    referenceCache.cacheSpaceMembers(spaceId, members);
   },
 
   loadStudio: async (spaceId, kind) => {
@@ -335,7 +354,9 @@ export const useSpacesStore = create<SpacesStore>((set, get) => ({
         delete nodesBySpace[spaceId];
         const membersBySpace = { ...state.membersBySpace };
         delete membersBySpace[spaceId];
-        return { messagesBySpace, nodesBySpace, membersBySpace };
+        const agentMembershipsBySpace = { ...state.agentMembershipsBySpace };
+        delete agentMembershipsBySpace[spaceId];
+        return { messagesBySpace, nodesBySpace, membersBySpace, agentMembershipsBySpace };
       });
       await get().load({ force: true });
     } catch (error) {
@@ -520,6 +541,7 @@ export const useSpacesStore = create<SpacesStore>((set, get) => ({
   connectRealtime: async (accountId) => {
     accountId = accountId.trim();
     if (!accountId) return;
+    referenceMode.setSpaceReferenceModeAccount(accountId);
     if (realtimeAccountId && realtimeAccountId !== accountId) stopRealtimeConnection();
     realtimeAccountId = accountId;
     realtimeWanted = true;
@@ -569,6 +591,7 @@ export const useSpacesStore = create<SpacesStore>((set, get) => ({
           clearRealtimeOpenTimer();
           reconnectAttempt = 0;
           set({ realtimeConnected: true, error: null });
+          if (get().referenceOnly) void get().load({ force: true, accountId });
           if (currentViewingSpaceId)
             sendViewingMessage(currentViewingSpaceId, currentViewingActive);
         };
@@ -657,10 +680,7 @@ export const useSpacesStore = create<SpacesStore>((set, get) => ({
   clearError: () => set({ error: null }),
 }));
 
-function notifyAccountSessionInvalid(): void {
-  if (typeof window === "undefined") return;
-  window.dispatchEvent(new CustomEvent(accountSessionInvalidEvent));
-}
+referenceMode.bindSpaceReferenceMode((state) => useSpacesStore.setState(state));
 
 export function resetSpacesAccountState(): void {
   notifyAccountScopeReset();
@@ -675,12 +695,14 @@ export function resetSpacesAccountState(): void {
   // account we're leaving can no longer write into the state we're about to
   // clear for the new one, no matter when it resolves.
   spacesAccountGeneration += 1;
+  referenceMode.resetSpaceReferenceMode();
   useSpacesStore.setState({
     spaces: [],
     invitations: [],
     limits: null,
     ownerStorage: null,
     membersBySpace: {},
+    agentMembershipsBySpace: {},
     messagesBySpace: {},
     nodesBySpace: {},
     agentsBySpace: {},
@@ -688,6 +710,8 @@ export function resetSpacesAccountState(): void {
     inbox: { unreads: [], mentions: [] },
     presenceBySpace: {},
     snapshotReady: false,
+    referenceOnly: false,
+    lastSyncedAt: null,
     // Stay in a loading state rather than flashing an empty "no Spaces yet"
     // view — the caller is expected to re-trigger a load for the new
     // account, and until that resolves there's nothing confirmed to show.
@@ -733,7 +757,7 @@ async function applyRealtimeEvent(
     try {
       await get().loadMembers(event.space_id);
     } catch (error) {
-      if (!isInaccessibleSpaceError(error)) throw error;
+      if (!accessErrors.isInaccessibleSpaceError(error)) throw error;
     }
   } else if (event.type.startsWith("library.") && permissions?.["library.view"] !== false)
     window.dispatchEvent(new CustomEvent("misty:space-library-event", { detail: event }));
@@ -741,12 +765,14 @@ async function applyRealtimeEvent(
     window.dispatchEvent(new CustomEvent("misty:space-note-event", { detail: event }));
   else if (event.type.startsWith("drawing."))
     window.dispatchEvent(new CustomEvent("misty:space-drawing-event", { detail: event }));
-  else if (
+  else if (event.type.startsWith("roadmap.") && permissions?.["tasks.view"] !== false) {
+    window.dispatchEvent(new CustomEvent("misty:space-roadmap-event", { detail: event }));
+    window.dispatchEvent(new CustomEvent("misty:space-coordination-event", { detail: event }));
+  } else if (
     (event.type.startsWith("task.") || event.type.startsWith("calendar.")) &&
     permissions?.["tasks.view"] !== false
   )
     window.dispatchEvent(new CustomEvent("misty:space-coordination-event", { detail: event }));
-  if (accountId !== realtimeAccountId || generation !== spacesAccountGeneration) return;
   set({ realtimeConnected: true });
 }
 
@@ -757,14 +783,10 @@ function applyRealtimeEventSafely(
   set: (partial: Partial<SpacesStore> | ((state: SpacesStore) => Partial<SpacesStore>)) => void,
 ): void {
   void applyRealtimeEvent(event, accountId, get, set).catch((error) => {
-    if (isInaccessibleSpaceError(error)) return;
+    if (accessErrors.isInaccessibleSpaceError(error)) return;
     if (accountId !== realtimeAccountId) return;
     set({ error: errorText(error) });
   });
-}
-
-function isInaccessibleSpaceError(error: unknown): boolean {
-  return error instanceof SpaceRequestError && (error.status === 403 || error.status === 404);
 }
 
 function scheduleReconnect(get: () => SpacesStore, accountId: string, generation: number) {
@@ -833,24 +855,4 @@ if (typeof document !== "undefined") {
 function clearRealtimeOpenTimer() {
   if (realtimeOpenTimer != null) window.clearTimeout(realtimeOpenTimer);
   realtimeOpenTimer = null;
-}
-
-function accountRealtimeCursorKey(accountId: string): string {
-  return `${realtimeCursorKey}:${accountId}`;
-}
-
-function readRealtimeCursor(accountId: string): number {
-  try {
-    return Number(window.localStorage.getItem(accountRealtimeCursorKey(accountId))) || 0;
-  } catch {
-    return 0;
-  }
-}
-
-function writeRealtimeCursor(accountId: string, cursor: number) {
-  try {
-    window.localStorage.setItem(accountRealtimeCursorKey(accountId), String(cursor));
-  } catch {
-    /* cursor replay falls back to a snapshot */
-  }
 }

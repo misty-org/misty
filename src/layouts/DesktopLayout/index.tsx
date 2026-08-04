@@ -27,15 +27,17 @@ import type { AppTab } from "@/models/types/routing/types";
 import {
   selectNotificationPreferences,
   settingsBoolean,
-  useAppRouteMemoryStore,
+  useAppStore,
   useSettingsStore,
 } from "@/stores/app";
+import { openAccountSettingsInBrowser } from "@/features/account/openAccountSettings";
 import { useExplorerStore } from "@/stores/explorer";
 import { useSpacesStore } from "@/stores/spaces/useSpacesStore";
 import { AppWallpaperVideo } from "../AppWallpaperVideo";
 import { DeepSearchOverlay } from "@/features/explorer/components/DeepSearchOverlay";
 import { MediaSearchViewer } from "@/features/explorer/components/MediaSearchViewer";
 import { SpacesRealtimeBridge } from "@/features/spaces/SpacesRealtimeBridge";
+import { SpaceNavRail } from "@/features/spaces/components/SpaceNavRail";
 import {
   desktopNavbarClass,
   desktopFrameClass,
@@ -63,12 +65,7 @@ import { ActivityNavButton, NavGroup, ProfileNavButton, SettingsNavButton } from
 import { ProfilePopover } from "./ProfilePopover";
 import { AppNoticePublisher, RouteNotice } from "./RouteNotices";
 import { TransferCompletionNotifier, WorkStatusPopup } from "./TransferStatus";
-import {
-  AccountSettingsOverlay,
-  ActivityOverlay,
-  RemotesOverlay,
-  SettingsOverlay,
-} from "./SettingsOverlays";
+import { ActivityOverlay, RemotesOverlay, SettingsOverlay } from "./SettingsOverlays";
 import { FramePacingOverlay } from "./FramePacingOverlay";
 import { useAuth } from "@/features/auth/AuthContext";
 
@@ -139,8 +136,6 @@ export function DesktopLayout(props: {
       false,
     ),
   );
-  const lastSpacesRoute = useAppRouteMemoryStore((state) => state.lastSpacesRoute);
-
   useUnreadBadgeSync({
     badgeCountEnabled: notificationPreferences.badgeCountEnabled,
     unreadActivityCount,
@@ -151,14 +146,12 @@ export function DesktopLayout(props: {
   const [activityOpen, setActivityOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [accountSettingsOpen, setAccountSettingsOpen] = useState(false);
   const [remotesOpen, setRemotesOpen] = useState(false);
   const navItems = props.navItems;
   const refreshUserAfterSettings = useCallback(() => {
     void refreshUser().catch(() => undefined);
   }, [refreshUser]);
   const openSettingsOverlay = useCallback(() => {
-    setAccountSettingsOpen(false);
     setSettingsOpen(true);
     void settingsLoad();
   }, [settingsLoad]);
@@ -166,17 +159,24 @@ export function DesktopLayout(props: {
     setSettingsOpen(false);
     refreshUserAfterSettings();
   }, [refreshUserAfterSettings]);
-  const openAccountSettingsOverlay = useCallback(() => {
+  // Account management lives on the website. Opening it hands the current
+  // session off to the browser rather than rendering anything locally.
+  const openAccountSettings = useCallback(() => {
     setSettingsOpen(false);
-    setAccountSettingsOpen(true);
+    void openAccountSettingsInBrowser().catch((error: unknown) => {
+      // The hand-off needs the network, so an offline click has to say so
+      // rather than silently opening nothing.
+      useAppStore
+        .getState()
+        .setError(
+          error instanceof Error
+            ? error.message
+            : "Could not open account settings. Check your connection and try again.",
+        );
+    });
   }, []);
-  const closeAccountSettingsOverlay = useCallback(() => {
-    setAccountSettingsOpen(false);
-    refreshUserAfterSettings();
-  }, [refreshUserAfterSettings]);
   const openRemotesOverlay = useCallback(() => {
     setSettingsOpen(false);
-    setAccountSettingsOpen(false);
     setRemotesOpen(true);
   }, []);
   const closeRemotesOverlay = useCallback(() => {
@@ -198,20 +198,6 @@ export function DesktopLayout(props: {
       replace: true,
     });
   }, [lastAppRoute, lastNonSettingsRouteRef, location.pathname, navigate, openRemotesOverlay]);
-
-  useEffect(() => {
-    if (location.pathname !== "/account") return;
-    openAccountSettingsOverlay();
-    navigate(settingsFallbackRoute(lastNonSettingsRouteRef.current, lastAppRoute), {
-      replace: true,
-    });
-  }, [
-    lastAppRoute,
-    lastNonSettingsRouteRef,
-    location.pathname,
-    navigate,
-    openAccountSettingsOverlay,
-  ]);
 
   const shouldShowWindowsControls = shouldShowWindowsTitlebarControls;
   const frameClass = usesNativeWindowChrome ? desktopFrameClass : tabletFrameClass;
@@ -312,11 +298,8 @@ export function DesktopLayout(props: {
           ) : null}
         </div>
         <div className={navbarGroupClass}>
-          <NavGroup
-            currentPath={location.pathname}
-            items={navItems}
-            routeOverrides={{ spaces: lastSpacesRoute }}
-          />
+          <SpaceNavRail />
+          {navItems.length ? <NavGroup currentPath={location.pathname} items={navItems} /> : null}
         </div>
         <div className={navbarBottomClass}>
           <ActivityNavButton
@@ -359,12 +342,7 @@ export function DesktopLayout(props: {
         currentPath={location.pathname}
         open={profileOpen}
         onClose={() => setProfileOpen(false)}
-        onOpenAccountSettings={openAccountSettingsOverlay}
-      />
-      <AccountSettingsOverlay
-        open={accountSettingsOpen}
-        style={desktopFrameStyle}
-        onClose={closeAccountSettingsOverlay}
+        onOpenAccountSettings={openAccountSettings}
       />
       <RemotesOverlay open={remotesOpen} style={desktopFrameStyle} onClose={closeRemotesOverlay} />
       <SettingsOverlay

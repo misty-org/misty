@@ -177,6 +177,44 @@ export function createWorkspaceActions(set: ExplorerSet, get: ExplorerGet): Part
       explorerRuntime.initializationInFlight = false;
     },
 
+    ensureWorkspace: async (workspaceId, title, homePath) => {
+      if (!workspaceId.trim()) return;
+      try {
+        await get().initialize(homePath);
+        await H.persistExplorerWorkspace();
+        const document = explorerRuntime.workspaceDocumentCache ?? (await workspacesSnapshot());
+        if (document.workspaces.some((workspace) => workspace.id === workspaceId)) {
+          if (document.active_workspace_id !== workspaceId) {
+            const nextDocument = await H.saveWorkspaceDocument({
+              ...document,
+              active_workspace_id: workspaceId,
+            });
+            await H.applyWorkspaceDocument(nextDocument, homePath);
+          }
+          return;
+        }
+        const workspace = H.defaultNativeWorkspace(
+          workspaceId,
+          title.trim() || "File Manager",
+          homePath,
+          get(),
+        );
+        const nextDocument = await H.saveWorkspaceDocument({
+          ...document,
+          schema_version: 1,
+          active_workspace_id: workspaceId,
+          next_workspace_idx: Math.max(
+            document.next_workspace_idx,
+            H.workspaceIndex(workspaceId) + 1,
+          ),
+          workspaces: [...document.workspaces, workspace],
+        });
+        await H.applyWorkspaceDocument(nextDocument, homePath);
+      } catch (error) {
+        set({ operationError: `Workspace open failed: ${errorText(error)}` });
+      }
+    },
+
     selectWorkspace: async (workspaceId, homePath) => {
       if (!workspaceId || workspaceId === get().activeWorkspaceId) return;
       try {

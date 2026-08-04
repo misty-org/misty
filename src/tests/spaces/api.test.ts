@@ -20,10 +20,12 @@ import {
   spaceErrorMessage,
   spaceRequest,
 } from "@/stores/spaces/useSpacesBackendStore";
+import { isSpaceReferenceOnly, setSpaceReferenceOnly } from "@/stores/spaces/spaceConnectivity";
 
 beforeEach(() => {
   accountSession.transitioning = false;
   accountSession.generation = 0;
+  setSpaceReferenceOnly(false);
 });
 
 describe("fileNameFromPath", () => {
@@ -56,6 +58,68 @@ describe("spaceErrorMessage", () => {
 });
 
 describe("spaceRequest account isolation", () => {
+  it("blocks writes without touching the network while a saved copy is open", async () => {
+    setSpaceReferenceOnly(true);
+    const fetchMock = vi.spyOn(globalThis, "fetch");
+
+    await expect(
+      spaceRequest("/spaces/space-1/messages", { method: "POST", body: "{}" }),
+    ).rejects.toMatchObject({
+      status: 503,
+      code: "offline_reference_only",
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("enters saved-copy mode after a network failure", async () => {
+    vi.spyOn(globalThis, "fetch").mockRejectedValueOnce(new TypeError("Failed to fetch"));
+
+    await expect(spaceRequest("/spaces")).rejects.toThrow("Failed to fetch");
+    expect(isSpaceReferenceOnly()).toBe(true);
+  });
+
+  it("uses encoded Planner expansion routes and optimistic versions", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(() =>
+      Promise.resolve(
+        new Response(JSON.stringify({ graph_version: 8 }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      ),
+    );
+
+    await spacesApi.agenda("space / one", "2026-08-01T00:00:00.000Z", "2026-09-01T00:00:00.000Z");
+    await spacesApi.updateRoadmapLayout(
+      "space / one",
+      "map / one",
+      { milestones: [], goals: [] },
+      7,
+    );
+    await spacesApi.createRoadmapNodeDefinition("space / one", {
+      name: "Experiment",
+      icon: "sparkles",
+      color: "cyan",
+      field_schema: [],
+    });
+
+    expect(fetchMock.mock.calls[0]?.[0]).toContain(
+      "/spaces/space%20%2F%20one/agenda?from=2026-08-01T00%3A00%3A00.000Z&to=2026-09-01T00%3A00%3A00.000Z",
+    );
+    expect(fetchMock.mock.calls[1]?.[0]).toBe(
+      "http://localhost:8080/api/spaces/space%20%2F%20one/roadmaps/map%20%2F%20one/layout",
+    );
+    expect((fetchMock.mock.calls[1]?.[1] as RequestInit).method).toBe("PATCH");
+    expect(JSON.parse(String((fetchMock.mock.calls[1]?.[1] as RequestInit).body))).toEqual({
+      milestones: [],
+      goals: [],
+      expected_version: 7,
+    });
+    expect(fetchMock.mock.calls[2]?.[0]).toBe(
+      "http://localhost:8080/api/spaces/space%20%2F%20one/roadmap-node-definitions",
+    );
+    expect((fetchMock.mock.calls[2]?.[1] as RequestInit).method).toBe("POST");
+  });
+
   it("reuses a creation key after a transient failure and clears it after success", async () => {
     const created = {
       space: {

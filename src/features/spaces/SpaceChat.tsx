@@ -33,12 +33,12 @@ export function SpaceChat({ spaceId }: { spaceId: string }) {
   const conversationId = searchParams.get("conversation") ?? "";
   const endRef = useRef<HTMLDivElement | null>(null);
 
-  const access = useSpaceChatPermissions(spaceId);
+  const initialAccess = useSpaceChatPermissions(spaceId, conversationId);
   const store = useSpaceChatStore();
   const conversationChat = useSpaceConversationChat(
     spaceId,
     conversationId,
-    access.canReadMessages,
+    initialAccess.canReadMessages,
   );
   const scope = useSpaceChatScope({
     spaceId,
@@ -48,6 +48,7 @@ export function SpaceChat({ spaceId }: { spaceId: string }) {
     conversationMessages: conversationChat.messages,
     store,
   });
+  const access = useSpaceChatPermissions(spaceId, conversationId, scope.activeConversation?.kind);
 
   const draft = useSpaceChatDraft(spaceId);
   const editing = useMessageEditing();
@@ -109,7 +110,7 @@ export function SpaceChat({ spaceId }: { spaceId: string }) {
     suggestions.setOpen(false);
     setPickerOpen(false);
     store.clearSpacesError();
-    void store.loadChatAgents(spaceId);
+    if (!store.referenceOnly) void store.loadChatAgents(spaceId);
   }, [spaceId, user?.id]);
 
   useEffect(() => {
@@ -117,7 +118,7 @@ export function SpaceChat({ spaceId }: { spaceId: string }) {
     const target = messageId ? document.getElementById(`message-${messageId}`) : endRef.current;
     target?.scrollIntoView({ block: messageId ? "center" : "end" });
     const last = scope.messages[scope.messages.length - 1];
-    if (last && !conversationId) void store.markRead(spaceId, last.seq);
+    if (last && !conversationId && !store.referenceOnly) void store.markRead(spaceId, last.seq);
   }, [conversationId, scope.messages, searchParams, spaceId]);
 
   return (

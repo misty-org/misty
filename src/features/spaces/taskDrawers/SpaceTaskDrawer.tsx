@@ -1,5 +1,14 @@
-import type { Dispatch, FormEvent, SetStateAction } from "react";
-import { Archive, Check, LoaderCircle, MoreHorizontal } from "lucide-react";
+import { useEffect, useState, type Dispatch, type FormEvent, type SetStateAction } from "react";
+import {
+  Archive,
+  Bot,
+  Check,
+  FileText,
+  LoaderCircle,
+  MoreHorizontal,
+  Paperclip,
+  X,
+} from "lucide-react";
 import {
   Button,
   DropdownMenu,
@@ -17,15 +26,25 @@ import {
   Textarea,
 } from "@/ui";
 import { TaskCalendarNotice } from "@/features/spaces/components/TaskCalendarNotice";
-import type { SpaceMember, SpaceTask } from "@/models/interfaces/features/spaces/types";
+import { MistyPicker } from "@/features/picker/MistyPicker";
+import { spacesApi } from "@/stores/spaces/useSpacesBackendStore";
+import type {
+  SpaceAgentMembership,
+  SpaceMember,
+  SpaceTask,
+  SpaceTaskActivity,
+  SpaceTaskSourceRef,
+} from "@/models/interfaces/features/spaces/types";
 import type { TaskDraft } from "@/models/types/features/spaces/SpaceTaskPrimitives";
 import { TaskDrawerProperties } from "./TaskDrawerProperties";
 
 export interface SpaceTaskDrawerProps {
+  spaceId: string;
   draft: TaskDraft;
   setDraft: Dispatch<SetStateAction<TaskDraft>> | ((draft: TaskDraft) => void);
   editing: SpaceTask | null;
   members: SpaceMember[];
+  agents: SpaceAgentMembership[];
   busy: boolean;
   canManage: boolean;
   onClose: () => void;
@@ -39,9 +58,74 @@ export interface SpaceTaskDrawerProps {
 
 export function SpaceTaskDrawer(props: SpaceTaskDrawerProps) {
   const { draft, setDraft, editing, busy, canManage, onClose } = props;
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [attachmentUploading, setAttachmentUploading] = useState(false);
+  const [activity, setActivity] = useState<SpaceTaskActivity[]>([]);
+  const [activityLoading, setActivityLoading] = useState(false);
   const hasProvenance = Boolean(
     editing && (editing.created_by_agent_id || editing.source_run_id || editing.source_refs.length),
   );
+
+  useEffect(() => {
+    if (!editing) {
+      setActivity([]);
+      return;
+    }
+    let current = true;
+    setActivityLoading(true);
+    const loadActivity = async () => {
+      try {
+        const result = await spacesApi.taskActivity(props.spaceId, editing.id);
+        if (current) setActivity(result.activity);
+      } catch {
+        if (current) setActivity([]);
+      } finally {
+        if (current) setActivityLoading(false);
+      }
+    };
+    void loadActivity();
+    const poll = window.setInterval(() => void loadActivity(), 6000);
+    return () => {
+      current = false;
+      window.clearInterval(poll);
+    };
+  }, [editing, props.spaceId]);
+
+  const replaceLibraryRefs = (itemIds: string[]) => {
+    const retained = draft.source_refs.filter((ref) => ref.kind !== "library_item");
+    setDraft({
+      ...draft,
+      source_refs: [
+        ...retained,
+        ...itemIds.map((resourceId): SpaceTaskSourceRef => ({
+          kind: "library_item",
+          resource_id: resourceId,
+          display_name: "Library item",
+        })),
+      ],
+    });
+  };
+
+  const uploadTaskAttachments = async (paths: string[]) => {
+    if (!canManage || paths.length === 0) return;
+    setAttachmentUploading(true);
+    try {
+      const refs: SpaceTaskSourceRef[] = [];
+      for (const path of paths.slice(0, Math.max(0, 20 - draft.source_refs.length))) {
+        const result = await spacesApi.uploadLibraryPath(props.spaceId, path, "attachment");
+        if (result.attachment) {
+          refs.push({
+            kind: "task_attachment",
+            resource_id: result.attachment.id,
+            display_name: result.attachment.display_name,
+          });
+        }
+      }
+      if (refs.length) setDraft({ ...draft, source_refs: [...draft.source_refs, ...refs] });
+    } finally {
+      setAttachmentUploading(false);
+    }
+  };
 
   return (
     <Sheet open onOpenChange={(open) => !open && !busy && onClose()}>
@@ -113,6 +197,26 @@ export function SpaceTaskDrawer(props: SpaceTaskDrawerProps) {
                   onChange={(event) => setDraft({ ...draft, notes: event.target.value })}
                 />
               </div>
+              <TaskSources
+                refs={draft.source_refs}
+                disabled={!canManage || attachmentUploading}
+                uploading={attachmentUploading}
+                onAdd={() => setPickerOpen(true)}
+                onRemove={(resourceId) =>
+                  setDraft({
+                    ...draft,
+                    source_refs: draft.source_refs.filter((ref) => ref.resource_id !== resourceId),
+                  })
+                }
+              />
+              {editing ? (
+                <TaskActivity
+                  activity={activity}
+                  loading={activityLoading}
+                  agents={props.agents}
+                  members={props.members}
+                />
+              ) : null}
               {hasProvenance && editing ? <TaskProvenance task={editing} /> : null}
             </div>
 
@@ -120,6 +224,7 @@ export function SpaceTaskDrawer(props: SpaceTaskDrawerProps) {
               draft={draft}
               setDraft={setDraft}
               members={props.members}
+              agents={props.agents}
               canManage={canManage}
             />
           </div>
@@ -128,7 +233,10 @@ export function SpaceTaskDrawer(props: SpaceTaskDrawerProps) {
             <Button variant="outline" type="button" disabled={busy} onClick={onClose}>
               Cancel
             </Button>
-            <Button disabled={busy || !canManage || !draft.title.trim()} type="submit">
+            <Button
+              disabled={busy || attachmentUploading || !canManage || !draft.title.trim()}
+              type="submit"
+            >
               {busy ? (
                 <LoaderCircle className="size-4 animate-spin" />
               ) : (
@@ -139,7 +247,148 @@ export function SpaceTaskDrawer(props: SpaceTaskDrawerProps) {
           </SheetFooter>
         </form>
       </SheetContent>
+      {pickerOpen ? (
+        <MistyPicker
+          spaceId={props.spaceId}
+          initialSource="files"
+          multiple
+          title="Attach context to this task"
+          librarySelectedIds={draft.source_refs
+            .filter((ref) => ref.kind === "library_item")
+            .map((ref) => ref.resource_id)}
+          libraryMaximum={20}
+          onCancel={() => setPickerOpen(false)}
+          onChooseFiles={(paths) => {
+            setPickerOpen(false);
+            void uploadTaskAttachments(paths);
+          }}
+          onChooseLibraryItems={(ids) => {
+            replaceLibraryRefs(ids);
+            setPickerOpen(false);
+          }}
+        />
+      ) : null}
     </Sheet>
+  );
+}
+
+function TaskSources({
+  refs,
+  disabled,
+  uploading,
+  onAdd,
+  onRemove,
+}: {
+  refs: SpaceTaskSourceRef[];
+  disabled: boolean;
+  uploading: boolean;
+  onAdd: () => void;
+  onRemove: (resourceId: string) => void;
+}) {
+  return (
+    <section className="grid gap-2" aria-label="Task file context">
+      <div className="flex items-center justify-between gap-2">
+        <div>
+          <p className="m-0 text-sm font-medium">File context</p>
+          <p className="mb-0 mt-0.5 text-xs text-muted-foreground">
+            Agents can read only items explicitly attached here.
+          </p>
+        </div>
+        <Button size="sm" variant="outline" type="button" disabled={disabled} onClick={onAdd}>
+          {uploading ? (
+            <LoaderCircle className="size-4 animate-spin" />
+          ) : (
+            <Paperclip className="size-4" />
+          )}
+          Attach
+        </Button>
+      </div>
+      {refs.length ? (
+        <div className="grid gap-1.5">
+          {refs.map((ref) => (
+            <div
+              key={`${ref.kind}:${ref.resource_id}`}
+              className="flex items-center gap-2 rounded-md border border-border/70 px-2.5 py-2"
+            >
+              <FileText className="size-4 shrink-0 text-muted-foreground" />
+              <span className="min-w-0 flex-1 truncate text-xs">
+                {ref.display_name || ref.resource_id}
+              </span>
+              <span className="text-[10px] text-muted-foreground">
+                {ref.kind === "library_item" ? "Library link" : "Task attachment"}
+              </span>
+              <Button
+                size="icon"
+                variant="ghost"
+                type="button"
+                className="size-7"
+                disabled={disabled}
+                aria-label={`Remove ${ref.display_name || "attachment"}`}
+                onClick={() => onRemove(ref.resource_id)}
+              >
+                <X className="size-3.5" />
+              </Button>
+            </div>
+          ))}
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+function TaskActivity({
+  activity,
+  loading,
+  agents,
+  members,
+}: {
+  activity: SpaceTaskActivity[];
+  loading: boolean;
+  agents: SpaceAgentMembership[];
+  members: SpaceMember[];
+}) {
+  return (
+    <section className="grid gap-2" aria-label="Task activity">
+      <div className="flex items-center gap-2">
+        <Bot className="size-4 text-muted-foreground" />
+        <p className="m-0 text-sm font-medium">Activity</p>
+      </div>
+      {loading ? (
+        <p className="m-0 text-xs text-muted-foreground">Loading activity…</p>
+      ) : activity.length ? (
+        <div className="grid gap-2 border-l border-border pl-3">
+          {activity.map((item) => {
+            const actor =
+              item.actor_kind === "agent"
+                ? agents.find((agent) => agent.agent_id === item.actor_agent_id)?.name || "Agent"
+                : item.actor_kind === "person"
+                  ? members.find((member) => member.user_id === item.actor_user_id)?.name ||
+                    "Member"
+                  : "Misty";
+            const warning =
+              typeof item.metadata?.file_warnings === "string"
+                ? item.metadata.file_warnings.trim()
+                : "";
+            return (
+              <div key={item.id} className="grid gap-0.5 text-xs">
+                <div className="flex items-center gap-2">
+                  <span className="font-medium">{actor}</span>
+                  <span className="capitalize text-muted-foreground">{item.kind}</span>
+                </div>
+                {item.message ? <p className="m-0 whitespace-pre-wrap">{item.message}</p> : null}
+                {warning ? (
+                  <p className="m-0 whitespace-pre-wrap rounded bg-amber-500/10 p-2 text-amber-800 dark:text-amber-300">
+                    {warning}
+                  </p>
+                ) : null}
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <p className="m-0 text-xs text-muted-foreground">No Agent activity yet.</p>
+      )}
+    </section>
   );
 }
 

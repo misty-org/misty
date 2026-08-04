@@ -1,18 +1,18 @@
-import { CalendarClock, ListTodo, UserRound, UserRoundX } from "lucide-react";
-import { useLocation } from "react-router-dom";
 import { spaceNotesEnabled } from "@/features/notes/availability";
 import { NotesPanelSidebar } from "@/features/notes/components/NotesPanelSidebar";
 import { DrawingPanelSidebar } from "@/features/drawings/components/DrawingPanelSidebar";
-import { JournalSectionSwitcher } from "@/features/journal/components/JournalSectionSwitcher";
 import type { SpaceConversation } from "@/models/interfaces/features/spaces/types";
 import { SpaceChatConversationList } from "../SpaceChatConversationList";
 import { SpaceSidebarSection } from "../SpaceSidebarSection";
-import { SpaceSidebarLink } from "./SpaceSidebarLink";
+import { rememberedJournalRoute } from "../../spacesShell/spaceSubpageMemory";
+import { PlannerPanelSidebar } from "./PlannerPanelSidebar";
 import { librarySidebarItems } from "./librarySidebarItems";
+import { SpaceSidebarLink } from "./SpaceSidebarLink";
 
 export interface SpacePanelSidebarContextProps {
   section: string;
-  taskView: string;
+  plannerSection: "tasks" | "agenda" | "roadmaps";
+  roadmapId: string;
   activeSpaceId: string;
   activeSpaceName: string;
   settingsSection: string;
@@ -21,21 +21,19 @@ export interface SpacePanelSidebarContextProps {
   activeConversationId: string | null;
   currentUserId: string | undefined;
   activeDrawingId: string;
-  onCreateConversation: () => void;
-  onEditConversation: (conversation: SpaceConversation) => void;
+  supportOnly?: boolean;
+  onCreateConversation?: () => void;
+  onEditConversation?: (conversation: SpaceConversation) => void;
 }
 
 /**
- * The section-specific half of the Space panel, below the section navigation.
+ * The contextual half of the Space panel, below the Space switcher.
  *
- * Each section owns one branch here so adding a section never means reading
- * through the panel's data loading or the Space switcher.
+ * Journal and Planner expose their pages as independent dropdowns here; other
+ * work surfaces keep a single contextual branch.
  */
 export function SpacePanelSidebarContext(props: SpacePanelSidebarContextProps) {
   const spacePath = `/spaces/${encodeURIComponent(props.activeSpaceId)}`;
-  const location = useLocation();
-  const search = new URLSearchParams(location.search);
-
   if (props.section === "chat") {
     return (
       <div className="grid gap-3">
@@ -44,6 +42,7 @@ export function SpacePanelSidebarContext(props: SpacePanelSidebarContextProps) {
           conversations={props.conversations}
           activeConversationId={props.activeConversationId}
           currentUserId={props.currentUserId}
+          supportOnly={props.supportOnly}
           onCreateConversation={props.onCreateConversation}
           onEditConversation={props.onEditConversation}
         />
@@ -52,67 +51,36 @@ export function SpacePanelSidebarContext(props: SpacePanelSidebarContextProps) {
   }
 
   if (props.section === "planner") {
-    const taskPath = `${spacePath}/planner/${props.taskView}`;
-    const hasTaskFilter = ["mine", "assignee", "due", "status", "priority"].some((key) =>
-      search.has(key),
-    );
-
     return (
-      <SpaceSidebarSection title="Planner">
-        <nav className="grid gap-1" aria-label="Task shortcuts">
-          {[
-            {
-              id: "all",
-              label: "All tasks",
-              icon: ListTodo,
-              active: !hasTaskFilter,
-              to: taskPath,
-            },
-            {
-              id: "mine",
-              label: "Assigned to me",
-              icon: UserRound,
-              active: search.get("mine") === "1",
-              to: `${taskPath}?mine=1`,
-            },
-            {
-              id: "unassigned",
-              label: "Unassigned",
-              icon: UserRoundX,
-              active: search.get("assignee") === "unassigned",
-              to: `${taskPath}?assignee=unassigned`,
-            },
-            {
-              id: "week",
-              label: "Due this week",
-              icon: CalendarClock,
-              active: search.get("due") === "week",
-              to: `${taskPath}?due=week`,
-            },
-          ].map(({ id, label, icon, active, to }) => (
-            <SpaceSidebarLink key={id} active={active} icon={icon} label={label} to={to} />
-          ))}
-        </nav>
-      </SpaceSidebarSection>
+      <PlannerPanelSidebar
+        spaceId={props.activeSpaceId}
+        section={props.plannerSection}
+        roadmapId={props.roadmapId}
+      />
     );
   }
 
-  if (props.section === "notes" && spaceNotesEnabled) {
+  if ((props.section === "notes" && spaceNotesEnabled) || props.section === "drawings") {
+    const accountId = props.currentUserId ?? "";
     return (
-      <div className="grid gap-4">
-        <JournalSectionSwitcher spaceId={props.activeSpaceId} section={props.section} />
-        <NotesPanelSidebar spaceId={props.activeSpaceId} spaceName={props.activeSpaceName} />
-      </div>
-    );
-  }
-
-  if (props.section === "drawings") {
-    return (
-      <div className="grid gap-4">
-        <JournalSectionSwitcher spaceId={props.activeSpaceId} section={props.section} />
+      <div className="grid gap-2">
+        {spaceNotesEnabled ? (
+          <NotesPanelSidebar
+            spaceId={props.activeSpaceId}
+            spaceName={props.activeSpaceName}
+            section={{
+              active: props.section === "notes",
+              to: rememberedJournalRoute(accountId, props.activeSpaceId, "notes"),
+            }}
+          />
+        ) : null}
         <DrawingPanelSidebar
           spaceId={props.activeSpaceId}
           activeDrawingId={props.activeDrawingId}
+          section={{
+            active: props.section === "drawings",
+            to: rememberedJournalRoute(accountId, props.activeSpaceId, "drawings"),
+          }}
         />
       </div>
     );

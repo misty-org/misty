@@ -1,15 +1,5 @@
 import { useState, type ReactNode } from "react";
-import {
-  CalendarDays,
-  KanbanSquare,
-  List,
-  LoaderCircle,
-  Plus,
-  RefreshCcw,
-  Search,
-  SlidersHorizontal,
-  X,
-} from "lucide-react";
+import { LoaderCircle, Plus, RefreshCcw, Search, SlidersHorizontal, X } from "lucide-react";
 import { SiGooglecalendar } from "react-icons/si";
 
 import { Badge } from "@/ui";
@@ -23,13 +13,13 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/ui";
-import { Tabs, TabsList, TabsTrigger } from "@/ui";
 import type { SpaceCalendarSource } from "@/models/interfaces/features/spaces/types";
 import type { TaskViewMode } from "@/models/types/features/spaces/SpacePlanner";
+import { SpaceViewModeToggle } from "./SpaceViewModeToggle";
 
 /**
- * The Planner header stays compact while keeping all three established task
- * views directly reachable.
+ * Compact task controls. Board/List are local presentation modes, so they stay
+ * in this toolbar rather than competing with Planner pages in the Space rail.
  */
 export function SpacePlannerHeader({
   view,
@@ -41,7 +31,7 @@ export function SpacePlannerHeader({
   canManageIntegrations,
   calendarImportAvailable,
   filters,
-  onView,
+  onViewChange,
   onQuery,
   onSync,
   onImport,
@@ -57,7 +47,7 @@ export function SpacePlannerHeader({
   calendarImportAvailable: boolean;
   /** Filter controls, shown only when the user opens the popover. */
   filters: ReactNode;
-  onView: (view: TaskViewMode) => void;
+  onViewChange: (view: TaskViewMode) => void;
   onQuery: (value: string) => void;
   onSync: () => void;
   onImport: () => void;
@@ -71,23 +61,19 @@ export function SpacePlannerHeader({
 
   return (
     <header className="misty-spaces-toolbar flex min-h-11 flex-wrap items-center gap-2 px-3 py-1.5">
-      <h1 className="sr-only">Planner</h1>
-      <Tabs value={view} onValueChange={(next) => onView(next as TaskViewMode)}>
-        <TabsList variant="line" className="h-8 p-0" aria-label="Task views">
-          <TabsTrigger className="gap-1.5 rounded-sm px-2.5 text-xs" value="board">
-            <KanbanSquare className="size-3.5" />
-            Board
-          </TabsTrigger>
-          <TabsTrigger className="gap-1.5 rounded-sm px-2.5 text-xs" value="list">
-            <List className="size-3.5" />
-            List
-          </TabsTrigger>
-          <TabsTrigger className="gap-1.5 rounded-sm px-2.5 text-xs" value="calendar">
-            <CalendarDays className="size-3.5" />
-            Calendar
-          </TabsTrigger>
-        </TabsList>
-      </Tabs>
+      <div>
+        <h1 className="m-0 text-sm font-semibold">Tasks</h1>
+        <p className="m-0 text-[11px] capitalize text-muted-foreground">{view} view</p>
+      </div>
+      <SpaceViewModeToggle
+        label="Task view"
+        value={view}
+        options={[
+          { value: "board", label: "Board" },
+          { value: "list", label: "List" },
+        ]}
+        onChange={onViewChange}
+      />
 
       <div className="ml-auto flex items-center gap-2">
         {showSearch ? (

@@ -26,30 +26,30 @@ describe("SpaceSectionNavigation", () => {
     container.remove();
   });
 
-  it("renders the complete Space work surface strip", async () => {
+  it("renders the complete Space work surface menu vertically", async () => {
     useSpacesStore.setState({ spaces: [spaceFixture()] });
 
     await act(async () => {
       root.render(
         <MemoryRouter initialEntries={["/spaces/space-1/library"]}>
-          <SpaceSectionNavigation
-            spaceId="space-1"
-            section="library"
-            context={<p>Library context</p>}
-          />
+          <SpaceSectionNavigation spaceId="space-1" section="library" />
         </MemoryRouter>,
       );
     });
 
     const links = [...container.querySelectorAll("a")];
     expect(links.map((link) => link.textContent?.trim())).toEqual([
-      "Chat",
-      "Planner",
       "Journal",
+      "Planner",
+      "Chat",
       "Library",
     ]);
-    expect(container.textContent).toContain("Library context");
+    expect(container.querySelector("nav")?.className).toContain("grid");
+    expect(container.querySelector("nav")?.className).not.toContain("overflow-x-auto");
     expect(container.querySelector('a[aria-current="page"]')?.textContent).toContain("Library");
+    expect(links.find((link) => link.textContent?.trim() === "Planner")?.getAttribute("href")).toBe(
+      "/spaces/space-1/planner/tasks/board",
+    );
   });
 
   it("hides inaccessible sections", async () => {
@@ -77,7 +77,7 @@ describe("SpaceSectionNavigation", () => {
     expect(labels).toEqual(["Journal", "Library"]);
   });
 
-  it("keeps Space management out of the primary strip", async () => {
+  it("keeps Space management out of the section menu", async () => {
     useSpacesStore.setState({ spaces: [spaceFixture()] });
 
     await act(async () => {

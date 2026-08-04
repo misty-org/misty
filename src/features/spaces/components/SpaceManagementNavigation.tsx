@@ -3,6 +3,9 @@ import { Link, useLocation } from "react-router-dom";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger, cn } from "@/ui";
 import type { Space } from "@/models/interfaces/features/spaces/types";
 import { SpaceMembersPopover } from "./SpaceMembersPopover";
+import { isMistySpace } from "../mistySpace";
+
+export { SpacesUtilityTray } from "./SpacesUtilityTray";
 
 export function SpaceManagementNavigation({
   space,
@@ -12,7 +15,7 @@ export function SpaceManagementNavigation({
   section: string;
 }) {
   const location = useLocation();
-  if (!space) return null;
+  if (!space || isMistySpace(space)) return null;
   const encodedSpaceId = encodeURIComponent(space.id);
 
   const settingsPath = `/spaces/${encodedSpaceId}/settings/general`;

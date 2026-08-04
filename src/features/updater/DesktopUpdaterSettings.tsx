@@ -4,6 +4,7 @@ import { relaunch } from "@tauri-apps/plugin-process";
 import { check, type Update } from "@tauri-apps/plugin-updater";
 
 import { hasTauriInternals } from "@/platform/tauri";
+import { settingsBoolean, useSettingsStore } from "@/stores/app";
 import { Button, Progress } from "@/ui";
 import { DesktopSettingsRow } from "@/pages/Settings/DesktopSettingsUI";
 import {
@@ -26,6 +27,9 @@ export function DesktopUpdaterSettings() {
   const [error, setError] = useState("");
   const [progress, setProgress] = useState<UpdateProgress>(EMPTY_UPDATE_PROGRESS);
   const supported = hasTauriInternals();
+  const autoUpdateEnabled = useSettingsStore((state) =>
+    settingsBoolean(state.settings?.document ?? {}, "general", "auto_update_enabled", true),
+  );
 
   const releaseUpdate = useCallback(async () => {
     const update = updateRef.current;
@@ -62,14 +66,17 @@ export function DesktopUpdaterSettings() {
     void getVersion()
       .then(setVersion)
       .catch(() => undefined);
-    if (!checkedThisSession) {
+    // Only the *automatic* check is gated; the manual "Check for updates"
+    // button always works, so turning this off never strands anyone on an old
+    // build.
+    if (!checkedThisSession && autoUpdateEnabled) {
       checkedThisSession = true;
       void checkForUpdates();
     }
     return () => {
       void releaseUpdate();
     };
-  }, [checkForUpdates, releaseUpdate, supported]);
+  }, [autoUpdateEnabled, checkForUpdates, releaseUpdate, supported]);
 
   async function installUpdate() {
     const update = updateRef.current;

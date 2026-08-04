@@ -117,6 +117,7 @@ export interface ExplorerSidebarProps {
   workspaceEntries: ExplorerWorkspaceEntry[];
   activeWorkspaceId: string;
   activeWorkspaceTitle: string;
+  workspaceLocked?: boolean;
   onNavigate: (path: string) => void;
   onRefreshDevices: () => void;
   onSelectWorkspace: (workspaceId: string) => void;

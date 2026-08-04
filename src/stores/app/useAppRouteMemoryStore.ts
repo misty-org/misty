@@ -3,7 +3,7 @@ export type { AppRouteMemoryStore } from "@/models/interfaces/stores/app/useAppR
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
-const defaultAppRoute = "/files";
+const defaultAppRoute = "/spaces";
 const defaultSpacesRoute = "/spaces";
 const desktopRememberableRoutes = ["/spaces"];
 const validSpaceSections = new Set([
@@ -124,7 +124,7 @@ function safeSpaceQuery(path: string, section: string): string {
   // "mika" is the pre-rename name for the agent panel query parameter. It stays
   // allowed so a route persisted before the rename still round-trips instead of
   // being silently stripped; "agent" is what is written now.
-  const agentPanelParams = ["agent", "mika"];
+  const agentPanelParams = ["agent", "agentDock", "mika"];
   const allowed =
     section === "chat"
       ? new Set(["conversation", "message", ...agentPanelParams])

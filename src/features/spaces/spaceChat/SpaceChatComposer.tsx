@@ -1,5 +1,5 @@
 import { useId, type FormEvent, type KeyboardEvent } from "react";
-import { AtSign, Plus, Send } from "lucide-react";
+import { Plus, Send } from "lucide-react";
 import {
   InputGroup,
   InputGroupAddon,
@@ -94,6 +94,7 @@ export function SpaceChatComposer(props: SpaceChatComposerProps) {
                     : undefined
                 }
                 role="combobox"
+                wrap="soft"
                 maxLength={MAX_MESSAGE_LENGTH}
                 placeholder="Write a message… Use @ to mention or add"
                 value={draft.text}
@@ -147,21 +148,25 @@ export function SpaceChatComposer(props: SpaceChatComposerProps) {
                 <Plus />
               </InputGroupButton>
             ) : null}
-            <InputGroupButton variant="ghost" size="sm" type="button" onClick={input.beginMention}>
-              <AtSign className="size-3.5" />
-              Mention
+            <InputGroupButton
+              variant="ghost"
+              size="icon-xs"
+              type="button"
+              onClick={input.beginMention}
+              aria-label="Mention someone"
+            >
+              <span aria-hidden="true">@</span>
             </InputGroupButton>
             <InputGroupText className="ml-auto tabular-nums">
               {draft.text.length}/{MAX_MESSAGE_LENGTH}
             </InputGroupText>
             <InputGroupButton
-              className="ml-2 rounded-lg px-3"
-              size="sm"
+              className="ml-2 rounded-lg"
+              size="icon-sm"
               disabled={props.sending || draft.isEmpty}
               type="submit"
               aria-label="Send message"
             >
-              Send
               <Send />
             </InputGroupButton>
           </InputGroupAddon>

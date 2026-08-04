@@ -5,6 +5,8 @@ import type { UnifiedNote } from "@/models/types/features/notes/types";
 import { createDefaultNotesRegistry } from "@/features/notes/connectors/registry";
 import { NOTION_CONNECTOR_ID } from "@/features/notes/mockData";
 import { nowIso } from "@/features/notes/connectorUtils";
+import { isSpaceReferenceOnly } from "@/stores/spaces/spaceConnectivity";
+import { cacheSpaceNotes, readSpaceReferenceCache } from "@/stores/spaces/spaceReferenceCache";
 
 let registry = createDefaultNotesRegistry();
 let notesLoadGeneration = 0;
@@ -51,7 +53,13 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
     }));
     const { notes, errors } = await activeRegistry.listAllNotes();
     if (generation !== notesLoadGeneration || registry !== activeRegistry) return;
-    const scoped = scopeNotes(notes, spaceId, spaceName);
+    const cached =
+      Object.keys(errors).length > 0 && isSpaceReferenceOnly()
+        ? (await readSpaceReferenceCache())?.notesBySpace?.[spaceId]
+        : undefined;
+    if (generation !== notesLoadGeneration || registry !== activeRegistry) return;
+    const scoped = cached ?? scopeNotes(notes, spaceId, spaceName);
+    if (Object.keys(errors).length === 0) cacheSpaceNotes(spaceId, scoped);
     set({
       phase: "ready",
       notes: scoped,

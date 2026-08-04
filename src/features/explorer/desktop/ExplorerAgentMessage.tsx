@@ -21,6 +21,7 @@ import type { AiPanelMessage } from "@/models/types/stores/agent/useAgentSession
 import type {
   AiPlanReview,
   AiToolApproval,
+  AiActionPlan,
 } from "@/models/interfaces/stores/agent/useAgentSessionStore";
 import { cx } from "./ExplorerDesktopShared";
 import { agentPanelStyles } from "./ExplorerAgentStyles";
@@ -29,9 +30,12 @@ export function AgentMessage(props: {
   message: AiPanelMessage;
   running: boolean;
   plans: AiPlanReview[];
+  actionPlans: AiActionPlan[];
   toolApprovals: AiToolApproval[];
   onApplyPlan: (planId: string) => Promise<void>;
   onApproveTool: (requestId: string) => Promise<void>;
+  onApproveAction: (planId: string) => Promise<void>;
+  onReviseAction: (planId: string) => void;
   /** Full-width conversation styling (avatar + name rows) to match Space chat. */
   spacious?: boolean;
 }) {
@@ -85,6 +89,14 @@ export function AgentMessage(props: {
       {message.planId ? (
         <AgentPlanActions planId={message.planId} plans={props.plans} onApply={props.onApplyPlan} />
       ) : null}
+      {message.actionPlanId ? (
+        <AgentActionPlanActions
+          planId={message.actionPlanId}
+          plans={props.actionPlans}
+          onApprove={props.onApproveAction}
+          onRevise={props.onReviseAction}
+        />
+      ) : null}
     </>
   );
 
@@ -130,6 +142,50 @@ export function AgentMessage(props: {
       <pre className={agentPanelStyles.messageText}>{text}</pre>
       {extras}
     </article>
+  );
+}
+
+function AgentActionPlanActions(props: {
+  planId: string;
+  plans: AiActionPlan[];
+  onApprove: (planId: string) => Promise<void>;
+  onRevise: (planId: string) => void;
+}) {
+  const plan = props.plans.find((candidate) => candidate.id === props.planId);
+  if (!plan) return null;
+  const pending = plan.status === "pending";
+  return (
+    <div className={agentPanelStyles.planActions}>
+      <span className={agentPanelStyles.runningBadge}>
+        {plan.status === "running"
+          ? "Running approved plan"
+          : plan.status === "approved"
+            ? "Approved"
+            : plan.status === "dismissed"
+              ? "Changing plan"
+              : plan.status === "failed"
+                ? "Plan failed"
+                : "Needs your approval"}
+      </span>
+      <Button
+        variant="outline"
+        size="sm"
+        type="button"
+        disabled={!pending}
+        onClick={() => void props.onApprove(props.planId)}
+      >
+        Approve & run
+      </Button>
+      <Button
+        variant="ghost"
+        size="sm"
+        type="button"
+        disabled={!pending}
+        onClick={() => props.onRevise(props.planId)}
+      >
+        Change
+      </Button>
+    </div>
   );
 }
 

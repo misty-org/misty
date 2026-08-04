@@ -40,7 +40,6 @@ import { useSetupStore } from "@/stores/app";
 import { useUserStore } from "@/stores/account/useUserStore";
 import { useProvidersStore } from "@/stores/providers";
 import SettingsWorkspace from "@/pages/Settings/desktop";
-import AccountWorkspace from "@/pages/Account/desktop";
 import {
   selectAppearancePreferences,
   selectNotificationPreferences,

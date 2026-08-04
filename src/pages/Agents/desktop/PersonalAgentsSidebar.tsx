@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState } from "react";
 import { ChevronRight, Plus, Settings2, Trash2 } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
 import {
@@ -22,7 +22,6 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-  Switch,
   Textarea,
   cn,
 } from "@/ui";
@@ -33,6 +32,10 @@ import { AgentModelPicker } from "@/features/agents/components/AgentModelPicker"
 import { initialAgentModelId, modelSupportsReasoning } from "@/features/agents/modelSelection";
 import { useAgentSessionStore } from "@/stores/agent/useAgentSessionStore";
 import { AgentChatList } from "./AgentChatList";
+import { PersonalAgentToolboxFieldset } from "./PersonalAgentToolboxFieldset";
+import { usePersonalAgentToolbox } from "./usePersonalAgentToolbox";
+import { AgentEditorField as Field } from "./AgentEditorField";
+import type { AgentSidebarItem } from "./agentSidebarTypes";
 
 const defaultContext = {
   space_chat: true,
@@ -51,10 +54,14 @@ export function PersonalAgentsSidebar({
   selectedAgentId,
   onSelect,
   onNewChat,
+  availableAgents,
+  spaceName,
 }: {
   selectedAgentId: string;
   onSelect: (agentId: string) => void;
   onNewChat: (agentId: string) => void;
+  availableAgents?: AgentSidebarItem[];
+  spaceName?: string | null;
 }) {
   const { agents, models, loading, load, save, remove } = usePersonalAgentsStore(
     useShallow((state) => ({
@@ -76,15 +83,19 @@ export function PersonalAgentsSidebar({
   const [modelId, setModelId] = useState(initialAgentModelId);
   const [reasoningEffort, setReasoningEffort] = useState<ReasoningEffort>("");
   const [contextPermissions, setContextPermissions] = useState(defaultContext);
-  const [writeAllowed, setWriteAllowed] = useState(false);
+  const toolbox = usePersonalAgentToolbox();
   const [grants, setGrants] = useState<GrantDraft>({});
   const [saving, setSaving] = useState(false);
   const [editorError, setEditorError] = useState("");
   const activeChatCount = useAgentSessionStore((state) => state.conversations.length);
+  const displayedAgents =
+    availableAgents ??
+    agents.map((agent) => ({ id: agent.id, name: agent.name, personalAgent: agent }));
+  const showingSpaceRoster = availableAgents !== undefined;
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    if (!showingSpaceRoster) void load();
+  }, [load, showingSpaceRoster]);
 
   const selectedModel = models.find((model) => model.id === modelId);
   const selectedSupportsReasoning = modelSupportsReasoning(selectedModel?.capabilities);
@@ -103,9 +114,9 @@ export function PersonalAgentsSidebar({
     setContextPermissions(
       agent === "new" ? defaultContext : { ...defaultContext, ...agent.context_permissions },
     );
-    setWriteAllowed(agent === "new" ? false : Boolean(agent.tool_permissions?.write));
     setGrants({});
     setEditorError("");
+    toolbox.load(agent === "new" ? null : agent.id, setEditorError);
     if (agent !== "new") {
       void personalAgentsApi
         .grants(agent.id)
@@ -135,6 +146,17 @@ export function PersonalAgentsSidebar({
     setEditorError("");
     try {
       const current = editing === "new" ? null : editing;
+      const selectedToolGrants = toolbox.actions
+        .filter((action) => action.granted)
+        .map((action) => ({ capability: action.name, risk: action.risk }));
+      const toolPermissions = toolbox.loaded
+        ? {
+            read: selectedToolGrants.some((grant) => grant.risk === "read"),
+            write: selectedToolGrants.some((grant) => grant.risk !== "read"),
+            integrations: current?.tool_permissions.integrations ?? [],
+            grants: selectedToolGrants,
+          }
+        : (current?.tool_permissions ?? { read: true, write: false, integrations: [] });
       const saved = await save(current?.id ?? null, {
         name: name.trim(),
         description: description.trim(),
@@ -144,7 +166,7 @@ export function PersonalAgentsSidebar({
         model_id: modelId,
         reasoning_effort: selectedSupportsReasoning ? reasoningEffort || "medium" : "",
         context_permissions: contextPermissions,
-        tool_permissions: { read: true, write: writeAllowed, integrations: [] },
+        tool_permissions: toolPermissions,
         enabled: current?.enabled ?? true,
         version: current?.version,
       });
@@ -174,14 +196,18 @@ export function PersonalAgentsSidebar({
   return (
     <section className="flex min-h-0 flex-1 flex-col" aria-label="Agents">
       <div className="flex shrink-0 items-center justify-between gap-2 px-2 pb-3">
-        <h2 className="m-0 text-sm font-semibold text-muted-foreground">Agents</h2>
-        <Button size="icon" variant="ghost" className="size-8" onClick={() => openEditor("new")}>
-          <Plus size={14} />
-          <span className="sr-only">Create Agent</span>
-        </Button>
+        <h2 className="m-0 truncate text-sm font-semibold text-muted-foreground">
+          {spaceName ? `${spaceName} Agents` : "Agents"}
+        </h2>
+        {!showingSpaceRoster ? (
+          <Button size="icon" variant="ghost" className="size-8" onClick={() => openEditor("new")}>
+            <Plus size={14} />
+            <span className="sr-only">Create Agent</span>
+          </Button>
+        ) : null}
       </div>
       <nav className="misty-transient-scrollbar grid min-h-0 flex-1 content-start gap-1 overflow-y-auto">
-        {agents.map((agent) => {
+        {displayedAgents.map((agent) => {
           const expanded = agent.id === selectedAgentId;
           return (
             <section key={agent.id} className="grid min-w-0 gap-1">
@@ -214,15 +240,17 @@ export function PersonalAgentsSidebar({
                         )}
                       />
                     </Button>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className="size-6 shrink-0 opacity-0 shadow-none group-hover/agent:opacity-100 focus-visible:opacity-100"
-                      onClick={() => openEditor(agent)}
-                    >
-                      <Settings2 size={13} />
-                      <span className="sr-only">Agent preferences for {agent.name}</span>
-                    </Button>
+                    {agent.personalAgent ? (
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="size-6 shrink-0 opacity-0 shadow-none group-hover/agent:opacity-100 focus-visible:opacity-100"
+                        onClick={() => openEditor(agent.personalAgent!)}
+                      >
+                        <Settings2 size={13} />
+                        <span className="sr-only">Agent preferences for {agent.name}</span>
+                      </Button>
+                    ) : null}
                     <Button
                       size="icon"
                       variant="ghost"
@@ -238,29 +266,35 @@ export function PersonalAgentsSidebar({
                   <ContextMenuItem onSelect={() => onNewChat(agent.id)}>
                     <Plus size={14} /> New chat
                   </ContextMenuItem>
-                  <ContextMenuItem onSelect={() => openEditor(agent)}>
-                    <Settings2 size={14} /> Preferences…
-                  </ContextMenuItem>
-                  <ContextMenuSeparator />
-                  <ContextMenuItem
-                    className="text-destructive focus:text-destructive"
-                    onSelect={() =>
-                      void remove(agent.id).then(() => {
-                        if (selectedAgentId === agent.id) onSelect("");
-                      })
-                    }
-                  >
-                    <Trash2 size={14} /> Delete
-                  </ContextMenuItem>
+                  {agent.personalAgent ? (
+                    <>
+                      <ContextMenuItem onSelect={() => openEditor(agent.personalAgent!)}>
+                        <Settings2 size={14} /> Preferences…
+                      </ContextMenuItem>
+                      <ContextMenuSeparator />
+                      <ContextMenuItem
+                        className="text-destructive focus:text-destructive"
+                        onSelect={() =>
+                          void remove(agent.id).then(() => {
+                            if (selectedAgentId === agent.id) onSelect("");
+                          })
+                        }
+                      >
+                        <Trash2 size={14} /> Delete
+                      </ContextMenuItem>
+                    </>
+                  ) : null}
                 </ContextMenuContent>
               </ContextMenu>
               {expanded ? <AgentChatList /> : null}
             </section>
           );
         })}
-        {!loading && agents.length === 0 ? (
+        {!loading && displayedAgents.length === 0 ? (
           <p className="px-2.5 py-3 text-xs text-muted-foreground">
-            Create an Agent for repeat work.
+            {showingSpaceRoster
+              ? "No Agents are installed in this Space yet."
+              : "Create an Agent for repeat work."}
           </p>
         ) : null}
       </nav>
@@ -329,7 +363,7 @@ export function PersonalAgentsSidebar({
               {Object.entries({
                 space_chat: "Chat",
                 library: "Library",
-                notes: "Notes",
+                notes: "Task notes",
                 tasks: "Planner",
                 members: "Members",
               }).map(([key, label]) => (
@@ -344,15 +378,12 @@ export function PersonalAgentsSidebar({
                 </Label>
               ))}
             </fieldset>
-            <div className="flex items-center justify-between rounded-lg border border-border p-3">
-              <div>
-                <p className="m-0 text-sm font-medium">Allow write tools</p>
-                <p className="m-0 text-xs text-muted-foreground">
-                  Risky actions still require approval.
-                </p>
-              </div>
-              <Switch checked={writeAllowed} onCheckedChange={setWriteAllowed} />
-            </div>
+            <PersonalAgentToolboxFieldset
+              actions={toolbox.actions}
+              activity={toolbox.activity}
+              loaded={toolbox.loaded}
+              onActionsChange={toolbox.setActions}
+            />
             <fieldset className="grid gap-3 rounded-lg border border-border p-3">
               <legend className="px-1 text-sm font-medium">Share in Spaces</legend>
               {spaces.map((space) => {
@@ -464,14 +495,5 @@ export function PersonalAgentsSidebar({
         </DialogContent>
       </Dialog>
     </section>
-  );
-}
-
-function Field({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <Label className="grid gap-1.5">
-      <span>{label}</span>
-      {children}
-    </Label>
   );
 }

@@ -9,7 +9,7 @@ const InputGroup = React.forwardRef<HTMLDivElement, React.ComponentProps<"div">>
       ref={ref}
       data-slot="input-group"
       className={cn(
-        "flex w-full flex-col overflow-hidden rounded-lg border border-input bg-transparent shadow-xs transition-[color,box-shadow] focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/50 dark:bg-input/30",
+        "flex w-full flex-col overflow-hidden rounded-lg border border-input bg-transparent shadow-xs transition-[color,box-shadow] dark:bg-input/30",
         className,
       )}
       {...props}
@@ -24,7 +24,7 @@ const InputGroupTextarea = React.forwardRef<HTMLTextAreaElement, React.Component
       ref={ref}
       data-slot="input-group-textarea"
       className={cn(
-        "field-sizing-content max-h-40 min-h-20 w-full resize-none border-0 bg-transparent px-3 py-3 text-base outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50 md:text-sm dark:bg-transparent",
+        "field-sizing-content max-h-40 min-h-20 min-w-0 max-w-full w-full resize-none overflow-x-hidden whitespace-pre-wrap break-words border-0 bg-transparent px-3 py-3 text-base outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50 md:text-sm dark:bg-transparent",
         className,
       )}
       {...props}

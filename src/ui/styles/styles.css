@@ -619,14 +619,6 @@
   opacity: 1;
 }
 
-.misty-navbar-marker-side::before {
-  top: 9px;
-  right: auto;
-  bottom: auto;
-  left: 5px;
-  height: 32px;
-}
-
 .misty-hover-marker-bottom::after,
 .misty-active-marker-bottom::after {
   right: 8px;

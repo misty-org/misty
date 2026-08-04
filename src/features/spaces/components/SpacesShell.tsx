@@ -1,30 +1,44 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { AnimatePresence, MotionConfig, motion } from "motion/react";
 import { useShallow } from "zustand/react/shallow";
 import { Button, PermissionState } from "@/ui";
 import { useAuth } from "@/features/auth/AuthContext";
-import { ChromeTabStrip } from "@/features/workspace";
 import { useSpacesStore } from "@/stores/spaces/useSpacesStore";
+import { useAppStore } from "@/stores/app";
+import { useExplorerStore } from "@/stores/explorer";
 import {
   activeSpacesTab,
   normalizeSpacesTabRoute,
+  spacesTabsSessionKey,
   useSpacesTabsStore,
+  type WorkspaceTabKind,
 } from "@/stores/spaces/useSpacesTabsStore";
-import type { Space } from "@/models/interfaces/features/spaces/types";
 import { SpacePanelContent } from "./SpacePanelContent";
 import { spacesBottomBarActionsId, SpacesBottomBarToggle } from "./SpacesBottomBar";
-import { SpaceManagementNavigation } from "./SpaceManagementNavigation";
+import { SpacesHeader } from "./SpacesHeader";
+import { SpacesWorkspaceSurface } from "./SpacesWorkspaceSurface";
 import { SpacePageFrame } from "./SpacePageLayout";
-import { SpaceSectionNavigation } from "./SpaceSectionNavigation";
+import { SpaceReferenceStatus } from "./SpaceReferenceStatus";
 import { SpacesAppLoadingPlaceholder } from "./SpacesLoadingPlaceholder";
 import { CreateSpaceDialog } from "../spacesShell/CreateSpaceDialog";
 import { SpaceInvitationsNotice } from "../spacesShell/SpaceInvitationsNotice";
 import { useCreateSpaceDialog } from "../spacesShell/useCreateSpaceDialog";
+import { useCreateSpaceRouteRequest } from "../spacesShell/useCreateSpaceRouteRequest";
 import { readPanelVisible, writePanelVisible } from "../spacesShell/spacesShellStorage";
+import { rememberSpaceSubpageRoute } from "../spacesShell/spaceSubpageMemory";
 import { useSpacePanelRoute } from "./spacePanel/spacePanelRoute";
 import type { SpacesShellOutletContext } from "../spacesShell/outletContext";
+import { AgentDock } from "@/features/agents/AgentDock";
+import { agentTeammatesV1Enabled } from "@/features/agents/flags";
+import {
+  agentDockMaxWidth,
+  agentDockMinWidth,
+  agentDockWidthStorageKey,
+  clampAgentDockWidth,
+  isCompactAgentDock,
+} from "@/features/agents/agentDockState";
 
 export { SpacesIndexRedirect } from "../spacesShell/SpacesIndexRedirect";
 
@@ -35,12 +49,20 @@ export default function SpacesShell() {
   const accountId = user?.id ?? "";
   const currentSpacesRoute = `${location.pathname}${location.search}${location.hash}`;
   const pendingTabRouteRef = useRef<string | null>(null);
+  const agentDockOpen =
+    agentTeammatesV1Enabled() && new URLSearchParams(location.search).get("agentDock") === "1";
   const [panelVisible, setPanelVisible] = useState(readPanelVisible);
+  const [agentDockWidth, setAgentDockWidth] = useState(420);
+  const [compactAgentDock, setCompactAgentDock] = useState(() =>
+    isCompactAgentDock(window.innerWidth),
+  );
   const {
     spaces,
     invitations,
-    limits,
     loading,
+    snapshotReady,
+    referenceOnly,
+    lastSyncedAt,
     error,
     load,
     createSpace,
@@ -51,8 +73,10 @@ export default function SpacesShell() {
     useShallow((state) => ({
       spaces: state.spaces,
       invitations: state.invitations,
-      limits: state.limits,
       loading: state.loading,
+      snapshotReady: state.snapshotReady,
+      referenceOnly: state.referenceOnly,
+      lastSyncedAt: state.lastSyncedAt,
       error: state.error,
       load: state.load,
       createSpace: state.createSpace,
@@ -61,36 +85,97 @@ export default function SpacesShell() {
       clearError: state.clearError,
     })),
   );
-  const { tabSession, ensureTabSession, addBlankTab, closeTab, reorderTabs, selectTab, updateTab } =
-    useSpacesTabsStore(
-      useShallow((state) => ({
-        tabSession: accountId ? state.sessions[accountId] : undefined,
-        ensureTabSession: state.ensureSession,
-        addBlankTab: state.addBlankTab,
-        closeTab: state.closeTab,
-        reorderTabs: state.reorderTabs,
-        selectTab: state.selectTab,
-        updateTab: state.updateActiveTabRoute,
-      })),
-    );
   const dialog = useCreateSpaceDialog({ createSpace, clearError });
+  useCreateSpaceRouteRequest(dialog.start);
   const panelRoute = useSpacePanelRoute();
   const activeSpace = spaces.find((space) => space.id === panelRoute.activeSpaceId);
+  const sessionKey = spacesTabsSessionKey(accountId, panelRoute.activeSpaceId);
+  const tabSession = useSpacesTabsStore((state) => state.sessions[sessionKey]);
   const activeTab = activeSpacesTab(tabSession);
-  const visibleTabs = useMemo(
-    () => spacesTabDescriptors(tabSession?.tabs ?? [], spaces),
-    [spaces, tabSession?.tabs],
+  const {
+    ensureTabSession,
+    addWorkspaceTab,
+    closeWorkspaceTab,
+    reorderWorkspaceTabs,
+    selectWorkspaceTab,
+    updateActiveSpaceRoute,
+    pruneTabSessions,
+  } = useSpacesTabsStore(
+    useShallow((state) => ({
+      ensureTabSession: state.ensureSession,
+      addWorkspaceTab: state.addTab,
+      closeWorkspaceTab: state.closeTab,
+      reorderWorkspaceTabs: state.reorderTabs,
+      selectWorkspaceTab: state.selectTab,
+      updateActiveSpaceRoute: state.updateActiveSpaceRoute,
+      pruneTabSessions: state.pruneSessions,
+    })),
   );
 
   const routeParts = location.pathname.split("/").filter(Boolean);
   const detailRouteActive = routeParts[0] === "spaces" && routeParts.length >= 3;
+  const reconnect = () => void load({ force: true, accountId });
+
+  const closeAgentDock = () => {
+    const params = new URLSearchParams(location.search);
+    params.delete("agentDock");
+    navigate(`${location.pathname}${params.size ? `?${params.toString()}` : ""}${location.hash}`, {
+      replace: true,
+    });
+    window.requestAnimationFrame(() =>
+      document.querySelector<HTMLElement>('[aria-label="Space team"]')?.focus(),
+    );
+  };
+
+  useEffect(() => {
+    const query = window.matchMedia("(max-width: 1099px)");
+    const update = () => setCompactAgentDock(query.matches);
+    update();
+    query.addEventListener("change", update);
+    return () => query.removeEventListener("change", update);
+  }, []);
+  useEffect(() => {
+    if (!accountId || !activeSpace?.id) return;
+    const key = agentDockWidthStorageKey(accountId, activeSpace.id);
+    const saved = Number(window.localStorage.getItem(key));
+    if (Number.isFinite(saved) && saved >= agentDockMinWidth && saved <= agentDockMaxWidth) {
+      setAgentDockWidth(saved);
+    }
+  }, [accountId, activeSpace?.id]);
+  useEffect(() => {
+    if (!accountId || !activeSpace?.id) return;
+    window.localStorage.setItem(
+      agentDockWidthStorageKey(accountId, activeSpace.id),
+      String(agentDockWidth),
+    );
+  }, [accountId, activeSpace?.id, agentDockWidth]);
+  const beginAgentDockResize = (event: React.PointerEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    const startX = event.clientX;
+    const startWidth = agentDockWidth;
+    const onMove = (moveEvent: PointerEvent) => {
+      setAgentDockWidth(clampAgentDockWidth(startWidth + startX - moveEvent.clientX));
+    };
+    const onUp = () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+  };
 
   useEffect(() => {
     if (!user) return;
-    void load();
+    void load({ accountId: user.id });
     // Re-fires on account switch so Spaces reloads for the new account
     // instead of leaving whatever was last fetched (or was in flight) for
     // the previous one sitting in the shared store.
+  }, [load, user?.id]);
+  useEffect(() => {
+    if (!user?.id) return;
+    const refresh = () => void load({ force: true, accountId: user.id });
+    window.addEventListener("online", refresh);
+    return () => window.removeEventListener("online", refresh);
   }, [load, user?.id]);
   useEffect(() => {
     if (!user) clearError();
@@ -105,28 +190,107 @@ export default function SpacesShell() {
   }, [activeSpace?.id, setViewingSpace, user?.id]);
   useEffect(() => writePanelVisible(panelVisible), [panelVisible]);
   useEffect(() => {
-    if (!accountId) return;
-    const normalizedRoute = normalizeSpacesTabRoute(currentSpacesRoute);
-    const currentSession = useSpacesTabsStore.getState().sessions[accountId];
-    if (!currentSession?.tabs.length) {
-      ensureTabSession(accountId, normalizedRoute);
-      return;
+    if (!accountId || !snapshotReady) return;
+    const removed = pruneTabSessions(
+      accountId,
+      spaces.map((space) => space.id),
+    );
+    const homePath = useAppStore.getState().app?.environment.homeDir;
+    if (!homePath) return;
+    for (const tab of removed) {
+      if (tab.kind === "file-manager")
+        void useExplorerStore.getState().deleteWorkspace(tab.workspaceId, homePath);
     }
-
-    const currentActiveTab = activeSpacesTab(currentSession);
+  }, [accountId, pruneTabSessions, snapshotReady, spaces]);
+  useEffect(() => {
+    if (!accountId || !activeSpace?.id) return;
+    ensureTabSession(accountId, activeSpace.id, currentSpacesRoute);
+  }, [accountId, activeSpace?.id, currentSpacesRoute, ensureTabSession]);
+  useEffect(() => {
+    if (!accountId || !activeSpace?.id || !tabSession) return;
+    const normalizedRoute = normalizeSpacesTabRoute(currentSpacesRoute, activeSpace.id);
     const pendingRoute = pendingTabRouteRef.current;
     if (pendingRoute) {
       if (normalizedRoute !== pendingRoute) return;
       pendingTabRouteRef.current = null;
     }
-
-    if (normalizedRoute === "/spaces" && currentActiveTab?.route !== "/spaces") {
-      pendingTabRouteRef.current = currentActiveTab?.route ?? null;
-      if (currentActiveTab) navigate(currentActiveTab.route, { replace: true });
+    if (activeTab?.kind === "space") {
+      updateActiveSpaceRoute(accountId, activeSpace.id, normalizedRoute);
       return;
     }
-    updateTab(accountId, normalizedRoute);
-  }, [accountId, currentSpacesRoute, ensureTabSession, navigate, updateTab]);
+    const state = location.state as { mistySpaceSwitch?: boolean } | null;
+    if (state?.mistySpaceSwitch) return;
+    const newTabId = addWorkspaceTab(accountId, activeSpace.id, "space", normalizedRoute);
+    if (newTabId) selectWorkspaceTab(accountId, activeSpace.id, newTabId);
+  }, [
+    accountId,
+    activeSpace?.id,
+    activeTab?.kind,
+    addWorkspaceTab,
+    currentSpacesRoute,
+    location.state,
+    selectWorkspaceTab,
+    tabSession,
+    updateActiveSpaceRoute,
+  ]);
+  useEffect(() => {
+    if (activeTab?.kind !== "space") return;
+    rememberSpaceSubpageRoute(accountId, panelRoute.activeSpaceId, currentSpacesRoute);
+  }, [accountId, activeTab?.kind, currentSpacesRoute, panelRoute.activeSpaceId]);
+
+  const openTool = (kind: WorkspaceTabKind) => {
+    if (!accountId || !activeSpace?.id) return;
+    const tabId = addWorkspaceTab(
+      accountId,
+      activeSpace.id,
+      kind,
+      kind === "space" ? currentSpacesRoute : undefined,
+    );
+    if (!tabId) {
+      useAppStore.getState().setMessage("This Space already has 16 open tabs.");
+      return;
+    }
+    if (kind === "space") {
+      const next = useSpacesTabsStore
+        .getState()
+        .sessions[spacesTabsSessionKey(accountId, activeSpace.id)]?.tabs.find(
+          (tab) => tab.id === tabId && tab.kind === "space",
+        );
+      if (next?.kind === "space" && next.route !== currentSpacesRoute) {
+        pendingTabRouteRef.current = next.route;
+        navigate(next.route);
+      }
+    }
+  };
+
+  const selectTopLevelTab = (tabId: string) => {
+    if (!accountId || !activeSpace?.id || tabId === activeTab?.id) return;
+    const selected = tabSession?.tabs.find((tab) => tab.id === tabId);
+    if (!selected) return;
+    selectWorkspaceTab(accountId, activeSpace.id, tabId);
+    if (selected.kind === "space" && selected.route !== currentSpacesRoute) {
+      pendingTabRouteRef.current = selected.route;
+      navigate(selected.route);
+    }
+  };
+
+  const closeTopLevelTab = (tabId: string) => {
+    if (!accountId || !activeSpace?.id) return;
+    const wasActive = activeTab?.id === tabId;
+    const closed = closeWorkspaceTab(accountId, activeSpace.id, tabId);
+    if (closed?.kind === "file-manager") {
+      const homePath = useAppStore.getState().app?.environment.homeDir;
+      if (homePath) void useExplorerStore.getState().deleteWorkspace(closed.workspaceId, homePath);
+    }
+    if (!wasActive) return;
+    const next = activeSpacesTab(
+      useSpacesTabsStore.getState().sessions[spacesTabsSessionKey(accountId, activeSpace.id)],
+    );
+    if (next?.kind === "space" && next.route !== currentSpacesRoute) {
+      pendingTabRouteRef.current = next.route;
+      navigate(next.route);
+    }
+  };
 
   if (transitioning) return <SpacesAppLoadingPlaceholder />;
 
@@ -164,66 +328,27 @@ export default function SpacesShell() {
           "transition-[grid-template-columns] duration-300 ease-[var(--misty-ease-out)]",
         ].join(" ")}
         style={{
-          gridTemplateColumns: panelVisible
-            ? "var(--misty-spaces-rail-width) minmax(0, 1fr)"
-            : "0px minmax(0, 1fr)",
+          gridTemplateColumns:
+            panelVisible && activeTab?.kind === "space"
+              ? `var(--misty-spaces-rail-width) minmax(0, 1fr) ${agentDockOpen && activeSpace && !compactAgentDock ? `${agentDockWidth}px` : "0px"}`
+              : `0px minmax(0, 1fr) ${agentDockOpen && activeSpace && !compactAgentDock ? `${agentDockWidth}px` : "0px"}`,
         }}
       >
-        <div className="col-span-full row-start-1 min-w-0 border-b border-border/45 bg-background">
-          <ChromeTabStrip
-            tabs={visibleTabs}
-            activeTabId={activeTab?.id ?? ""}
-            ariaLabel="Open Spaces"
-            canCloseTab={() => true}
-            onAddTab={() => {
-              if (!accountId) return;
-              const beforeCount =
-                useSpacesTabsStore.getState().sessions[accountId]?.tabs.length ?? 0;
-              addBlankTab(accountId);
-              const nextSession = useSpacesTabsStore.getState().sessions[accountId];
-              if (!nextSession || nextSession.tabs.length === beforeCount) return;
-              if (currentSpacesRoute === "/spaces") {
-                pendingTabRouteRef.current = null;
-                return;
-              }
-              pendingTabRouteRef.current = "/spaces";
-              navigate("/spaces");
-            }}
-            onCloseTab={(tab) => {
-              if (!accountId) return;
-              const before = useSpacesTabsStore.getState().sessions[accountId];
-              const wasActive = before?.activeTabId === tab.id;
-              closeTab(accountId, tab.id);
-              if (!wasActive) return;
-              const nextActive = activeSpacesTab(useSpacesTabsStore.getState().sessions[accountId]);
-              if (!nextActive) return;
-              if (nextActive.route === currentSpacesRoute) {
-                pendingTabRouteRef.current = null;
-                return;
-              }
-              pendingTabRouteRef.current = nextActive.route;
-              navigate(nextActive.route);
-            }}
+        <div className="col-span-full row-start-1 min-w-0">
+          <SpacesHeader
+            session={tabSession}
+            onOpenTool={openTool}
+            onCloseTab={closeTopLevelTab}
             onReorderTab={(tabId, fromIndex, toIndex) => {
-              if (accountId) reorderTabs(accountId, tabId, fromIndex, toIndex);
+              if (accountId && activeSpace?.id)
+                reorderWorkspaceTabs(accountId, activeSpace.id, tabId, fromIndex, toIndex);
             }}
-            onSelectTab={(tabId) => {
-              if (!accountId || tabId === activeTab?.id) return;
-              const selected = tabSession?.tabs.find((tab) => tab.id === tabId);
-              if (!selected) return;
-              selectTab(accountId, tabId);
-              if (selected.route === currentSpacesRoute) {
-                pendingTabRouteRef.current = null;
-                return;
-              }
-              pendingTabRouteRef.current = selected.route;
-              navigate(selected.route);
-            }}
+            onSelectTab={selectTopLevelTab}
           />
         </div>
 
         <AnimatePresence initial={false}>
-          {panelVisible ? (
+          {panelVisible && activeTab?.kind === "space" ? (
             <motion.aside
               initial={{ opacity: 0, x: -12 }}
               animate={{ opacity: 1, x: 0 }}
@@ -235,11 +360,9 @@ export default function SpacesShell() {
               ].join(" ")}
             >
               <SpacePanelContent
-                key={activeTab?.id}
+                key={activeSpace?.id}
                 spaces={spaces}
-                limits={limits}
                 loading={loading}
-                onAddSpace={dialog.start}
                 notices={
                   <SpaceInvitationsNotice
                     invitations={invitations}
@@ -255,23 +378,70 @@ export default function SpacesShell() {
           key={activeTab?.id}
           className="misty-spaces-canvas relative col-start-2 row-start-2 min-h-0 min-w-0 overflow-hidden"
         >
-          {detailRouteActive ? (
-            <div className="grid h-full min-h-0 grid-rows-[48px_minmax(0,1fr)]">
-              <header className="flex min-w-0 items-center border-b border-border/60 bg-background px-3">
-                <SpaceSectionNavigation
-                  spaceId={panelRoute.activeSpaceId}
-                  section={panelRoute.section}
-                />
-                <SpaceManagementNavigation space={activeSpace} section={panelRoute.section} />
-              </header>
+          {activeTab?.kind === "space" ? (
+            detailRouteActive ? (
               <SpacePageFrame>
                 <Outlet context={outletContext} />
               </SpacePageFrame>
-            </div>
-          ) : (
-            <Outlet context={outletContext} />
-          )}
+            ) : (
+              <Outlet context={outletContext} />
+            )
+          ) : activeTab ? (
+            <SpacesWorkspaceSurface tab={activeTab} />
+          ) : null}
         </main>
+
+        <AnimatePresence initial={false}>
+          {agentDockOpen && activeSpace && activeTab?.kind === "space" && !referenceOnly ? (
+            <motion.aside
+              initial={{ opacity: 0, x: 16 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 16 }}
+              className={[
+                compactAgentDock
+                  ? "fixed bottom-8 right-0 top-[46px] z-40 max-w-[calc(100vw-32px)]"
+                  : "relative col-start-3 row-start-2 min-h-0 min-w-0",
+                "overflow-hidden",
+                "border-l border-border/60 bg-background",
+                "shadow-[-12px_0_28px_-24px_rgba(0,0,0,0.45)]",
+              ].join(" ")}
+              style={compactAgentDock ? { width: agentDockWidth } : undefined}
+            >
+              <div
+                className="absolute inset-y-0 left-0 z-20 w-1 cursor-col-resize touch-none hover:bg-primary/20"
+                role="separator"
+                aria-label="Resize Agent panel"
+                aria-orientation="vertical"
+                tabIndex={0}
+                onPointerDown={beginAgentDockResize}
+                onKeyDown={(event) => {
+                  if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+                  event.preventDefault();
+                  setAgentDockWidth((width) =>
+                    clampAgentDockWidth(width + (event.key === "ArrowLeft" ? 20 : -20)),
+                  );
+                }}
+              />
+              <AgentDock
+                context={{
+                  surface: "space",
+                  label: [
+                    activeSpace.name,
+                    spaceContextLabel(panelRoute),
+                    new URLSearchParams(location.search).get("task") ? "Task open" : "",
+                  ]
+                    .filter(Boolean)
+                    .join(" · "),
+                  spaceId: activeSpace.id,
+                  spaceName: activeSpace.name,
+                  section: panelRoute.section,
+                  taskId: new URLSearchParams(location.search).get("task") ?? undefined,
+                }}
+                onClose={closeAgentDock}
+              />
+            </motion.aside>
+          ) : null}
+        </AnimatePresence>
 
         <footer className="col-span-full row-start-3 flex min-h-8 items-center border-t border-border/45 bg-background/70 px-2">
           <SpacesBottomBarToggle
@@ -281,6 +451,9 @@ export default function SpacesShell() {
           >
             {panelVisible ? <PanelLeftClose size={15} /> : <PanelLeftOpen size={15} />}
           </SpacesBottomBarToggle>
+          {referenceOnly ? (
+            <SpaceReferenceStatus {...{ lastSyncedAt, loading }} onReconnect={reconnect} />
+          ) : null}
           <div
             id={spacesBottomBarActionsId}
             className="ml-auto flex min-w-0 items-center justify-end gap-1"
@@ -293,54 +466,12 @@ export default function SpacesShell() {
   );
 }
 
-function spacesTabDescriptors(tabs: Array<{ id: string; route: string }>, spaces: Space[]) {
-  const spaceIds = tabs.map((tab) => spaceIdFromTabRoute(tab.route));
-  const duplicateCounts = new Map<string, number>();
-  spaceIds.forEach((spaceId) => {
-    if (spaceId) duplicateCounts.set(spaceId, (duplicateCounts.get(spaceId) ?? 0) + 1);
-  });
-
-  return tabs.map((tab, index) => {
-    const spaceId = spaceIds[index];
-    const space = spaces.find((candidate) => candidate.id === spaceId);
-    const section = sectionFromTabRoute(tab.route);
-    const title =
-      tab.route === "/spaces"
-        ? "New tab"
-        : space
-          ? duplicateCounts.get(space.id)! > 1
-            ? `${space.name} · ${spaceSectionLabel(section)}`
-            : space.name
-          : "Space";
-    return {
-      id: tab.id,
-      title,
-      path: tab.route,
-      paneId: tab.id,
-    };
-  });
-}
-
-function spaceIdFromTabRoute(route: string): string {
-  const parts = route.split(/[/?#]/).filter(Boolean);
-  if (parts[0] !== "spaces" || !parts[1]) return "";
-  try {
-    return decodeURIComponent(parts[1]);
-  } catch {
-    return "";
+function spaceContextLabel(route: ReturnType<typeof useSpacePanelRoute>): string {
+  if (route.section === "planner") {
+    if (route.plannerSection === "agenda") return "Agenda";
+    if (route.plannerSection === "roadmaps") return "Roadmap";
+    return "Planner";
   }
-}
-
-function sectionFromTabRoute(route: string): string {
-  const section = route.split(/[/?#]/).filter(Boolean)[2] ?? "chat";
-  return section === "tasks" ? "planner" : section;
-}
-
-function spaceSectionLabel(section: string): string {
-  if (section === "notes" || section === "drawings") return "Journal";
-  if (section === "library") return "Library";
-  if (section === "planner") return "Planner";
-  if (section === "members") return "Members";
-  if (section === "settings") return "Settings";
-  return "Chat";
+  if (route.section === "notes" || route.section === "drawings") return "Journal";
+  return route.section.charAt(0).toUpperCase() + route.section.slice(1);
 }

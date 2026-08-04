@@ -181,7 +181,9 @@ export async function managedAiRequest<T = unknown>(path: string, init?: Request
       if (payload.code === "hosted_ai_limit_reached") {
         const reset = payload.reset_at ? new Date(payload.reset_at).toLocaleDateString() : "Monday";
         throw new ManagedAiRequestError(
-          `Weekly hosted AI usage is fully used. Try again after the reset on ${reset} or upgrade to Pro.`,
+          // Upgrading happens on the website; the desktop app cannot take a
+          // payment, so point at the reset rather than a dead-end CTA.
+          `Weekly hosted AI usage is fully used. Try again after the reset on ${reset}, or upgrade to Pro from Account settings.`,
           response.status,
           payload.code,
         );

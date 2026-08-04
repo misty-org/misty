@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
 import { Bot, Sparkles } from "lucide-react";
-import { Badge } from "@/ui";
 import { Progress } from "@/ui";
 import { Textarea } from "@/ui";
 import {
@@ -15,11 +14,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/ui";
-import { useMultiPanelStore } from "@/features/workspace";
-import { useExplorerStore } from "@/stores/explorer";
-import { MistyPicker } from "@/features/picker/MistyPicker";
 import { useSpacesStore } from "@/stores/spaces/useSpacesStore";
-import { agentScopeKey, useAgentSessionStore } from "@/stores/agent/useAgentSessionStore";
+import {
+  agentScopeKey,
+  spaceAgentScopeKey,
+  useAgentSessionStore,
+} from "@/stores/agent/useAgentSessionStore";
 import { usePersonalAgentsStore } from "@/stores/agents/usePersonalAgentsStore";
 import { useAuth } from "@/features/auth/AuthContext";
 import { AgentMessage } from "@/features/explorer/desktop/ExplorerAgentMessage";
@@ -27,52 +27,104 @@ import { AgentComposerActions } from "@/features/explorer/desktop/ExplorerAgentC
 import { agentPlaceholder } from "@/features/explorer/desktop/ExplorerAgentShared";
 import { agentPanelStyles } from "@/features/explorer/desktop/ExplorerAgentStyles";
 import { PersonalAgentsSidebar } from "./PersonalAgentsSidebar";
+import type { AgentSidebarItem } from "./agentSidebarTypes";
+import { AgentTypingIndicator } from "./AgentTypingIndicator";
 import {
   initialAgentModelName,
   modelSupportsReasoning,
   selectedAgentModelName,
 } from "@/features/agents/modelSelection";
+import type { SpaceAgentMembership } from "@/models/interfaces/features/spaces/types";
 
-function defaultWorkingDirectory(pathParam: string | null): string {
-  if (pathParam) return pathParam;
-  const activePaneId = useMultiPanelStore.getState().activePaneId;
-  return useExplorerStore.getState().panes[activePaneId]?.listing?.path ?? "";
-}
+const emptySpaceAgentMemberships: SpaceAgentMembership[] = [];
+const builtInSpaceAgentId = "misty";
 
 export default function DesktopAgentsPage() {
+  return <AgentWorkspace />;
+}
+
+export interface AgentWorkspaceProps {
+  embedded?: boolean;
+  hideHeader?: boolean;
+  spaceId?: string;
+  contextLabel?: string;
+  spaceSection?: string;
+  taskId?: string;
+  cwd?: string | null;
+  selectedPaths?: string[];
+  draftPrompt?: string;
+  onDraftConsumed?: () => void;
+}
+
+export function AgentWorkspace({
+  embedded = false,
+  hideHeader = false,
+  spaceId: requestedSpaceId,
+  contextLabel,
+  spaceSection,
+  taskId,
+  cwd = null,
+  selectedPaths = [],
+  draftPrompt = "",
+  onDraftConsumed,
+}: AgentWorkspaceProps = {}) {
   const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuth();
-  const [workingDirectory] = useState(() => defaultWorkingDirectory(searchParams.get("path")));
-  const [contextPickerOpen, setContextPickerOpen] = useState(false);
-  const [manualContextPaths, setManualContextPaths] = useState<string[]>([]);
-  const paramPaths = useMemo(() => {
-    const raw = searchParams.get("paths");
-    return raw
-      ? raw
-          .split(",")
-          .map((value) => value.trim())
-          .filter(Boolean)
-      : [];
-  }, [searchParams]);
-  const selectedPaths = useMemo(
-    () => [...new Set([...paramPaths, ...manualContextPaths])],
-    [paramPaths, manualContextPaths],
-  );
-  const spaceId = searchParams.get("spaceId") ?? "";
+  const spaceId = requestedSpaceId ?? searchParams.get("spaceId") ?? "";
   const selectedAgentId = searchParams.get("agent") ?? "";
   const directModelId = searchParams.get("model") ?? "";
-  const spaceName = useSpacesStore((state) =>
-    spaceId ? (state.spaces.find((space) => space.id === spaceId)?.name ?? spaceId) : null,
+  const { spaceName, spaceAgentMemberships, spaceRosterLoaded, loadMembers } = useSpacesStore(
+    useShallow((state) => ({
+      spaceName: spaceId
+        ? (state.spaces.find((space) => space.id === spaceId)?.name ?? spaceId)
+        : null,
+      spaceAgentMemberships: spaceId
+        ? (state.agentMembershipsBySpace[spaceId] ?? emptySpaceAgentMemberships)
+        : emptySpaceAgentMemberships,
+      spaceRosterLoaded: spaceId
+        ? Object.prototype.hasOwnProperty.call(state.agentMembershipsBySpace, spaceId)
+        : true,
+      loadMembers: state.loadMembers,
+    })),
   );
-  const agents = usePersonalAgentsStore((state) => state.agents);
+  const personalAgents = usePersonalAgentsStore((state) => state.agents);
   const models = usePersonalAgentsStore((state) => state.models);
-  const selectedAgent = agents.find((agent) => agent.id === selectedAgentId) ?? null;
+  const loadPersonalAgents = usePersonalAgentsStore((state) => state.load);
+  const availableAgents = useMemo(
+    () =>
+      spaceId
+        ? [
+            {
+              id: builtInSpaceAgentId,
+              name: "Misty",
+              model_id: undefined,
+              reasoning_effort: undefined,
+            },
+            ...spaceAgentMemberships
+              .filter((membership) => membership.enabled)
+              .map((membership) => ({
+                id: membership.agent_id,
+                name: membership.name,
+                model_id: membership.model_id,
+                reasoning_effort: membership.reasoning_effort,
+              })),
+          ]
+        : personalAgents,
+    [personalAgents, spaceAgentMemberships, spaceId],
+  );
+  const selectedAgent = availableAgents.find((agent) => agent.id === selectedAgentId) ?? null;
+  const sidebarAgents = useMemo<AgentSidebarItem[] | undefined>(
+    () =>
+      spaceId ? availableAgents.map((agent) => ({ id: agent.id, name: agent.name })) : undefined,
+    [availableAgents, spaceId],
+  );
 
   const {
     status,
     mode,
     messages,
     plans,
+    actionPlans,
     toolApprovals,
     error,
     activeModelId,
@@ -85,6 +137,8 @@ export default function DesktopAgentsPage() {
     sendPrompt,
     abortPrompt,
     approvePlan,
+    approveActionPlan,
+    reviseActionPlan,
     approveToolRequest,
     activateConversationScope,
     startNewConversation,
@@ -94,6 +148,7 @@ export default function DesktopAgentsPage() {
       mode: state.mode,
       messages: state.messages,
       plans: state.plans,
+      actionPlans: state.actionPlans,
       toolApprovals: state.toolApprovals,
       error: state.error,
       activeModelId: state.activeModelId,
@@ -106,6 +161,8 @@ export default function DesktopAgentsPage() {
       sendPrompt: state.sendPrompt,
       abortPrompt: state.abortPrompt,
       approvePlan: state.approvePlan,
+      approveActionPlan: state.approveActionPlan,
+      reviseActionPlan: state.reviseActionPlan,
       approveToolRequest: state.approveToolRequest,
       activateConversationScope: state.activateConversationScope,
       startNewConversation: state.startNewConversation,
@@ -116,8 +173,6 @@ export default function DesktopAgentsPage() {
   const logRef = useRef<HTMLDivElement | null>(null);
   const running = status?.running ?? false;
   const configured = status?.configured ?? false;
-  // The model this chat is actually using: its per-chat override if set, else the
-  // agent's configured model. The agent's own model is never changed from here.
   const agentChatModelId = selectedAgent
     ? activeModelId || selectedAgent.model_id || ""
     : directModelId;
@@ -129,12 +184,16 @@ export default function DesktopAgentsPage() {
   const agentChatModelName = selectedAgent
     ? modelNameFor(agentChatModelId)
     : (status?.modelName ?? initialAgentModelName);
-  // Reasoning effort for this chat: its per-chat override, else the agent's default.
   const agentChatSupportsReasoning = modelSupportsReasoning(
     models.find((model) => model.id === agentChatModelId)?.capabilities,
   );
   const agentChatReasoningEffort =
     activeReasoningEffort || selectedAgent?.reasoning_effort || "medium";
+  useEffect(() => {
+    if (!draftPrompt) return;
+    setPrompt(draftPrompt);
+    onDraftConsumed?.();
+  }, [draftPrompt, onDraftConsumed]);
   const requestModelChange = useCallback(
     (modelId: string) => {
       if (!modelId || modelId === agentChatModelId) return;
@@ -159,13 +218,22 @@ export default function DesktopAgentsPage() {
   useEffect(() => {
     void refreshStatus();
   }, [refreshStatus]);
-  // Sessions live on the account, so a device that has never seen them still lists them.
   useEffect(() => {
     void hydrateConversations();
   }, [hydrateConversations]);
   useEffect(() => {
+    if (!spaceId) void loadPersonalAgents();
+  }, [loadPersonalAgents, spaceId]);
+  useEffect(() => {
+    if (spaceId) void loadMembers(spaceId).catch(() => undefined);
+  }, [loadMembers, spaceId]);
+  useEffect(() => {
     if (!user?.id || !selectedAgentId) return;
-    void activateConversationScope(agentScopeKey(user.id, selectedAgentId, spaceId, ""));
+    const scopeKey =
+      spaceId && selectedAgentId === builtInSpaceAgentId
+        ? spaceAgentScopeKey(user.id, spaceId)
+        : agentScopeKey(user.id, selectedAgentId, spaceId, "");
+    void activateConversationScope(scopeKey);
   }, [activateConversationScope, selectedAgentId, spaceId, user?.id]);
   useEffect(() => {
     logRef.current?.scrollTo({ top: logRef.current.scrollHeight });
@@ -177,11 +245,16 @@ export default function DesktopAgentsPage() {
     setPrompt("");
     void sendPrompt({
       displayPrompt: trimmed,
-      prompt: buildAgentPrompt(trimmed, workingDirectory, selectedPaths, spaceName),
-      cwd: workingDirectory || null,
+      // Custom Agents are grounded and equipped by the server. Sending the old
+      // Files-assistant wrapper here made both global and Space Agents deny the
+      // server-owned actions they can actually perform.
+      prompt: trimmed,
+      cwd,
       selectedPaths,
+      spaceSection: spaceId ? spaceSection || "agents" : undefined,
+      contextTaskId: spaceId ? taskId : undefined,
     });
-  }, [prompt, running, selectedPaths, sendPrompt, spaceName, workingDirectory]);
+  }, [cwd, prompt, running, selectedPaths, sendPrompt, spaceId, spaceSection, taskId]);
 
   const selectAgent = useCallback(
     (agentId: string) => {
@@ -194,75 +267,98 @@ export default function DesktopAgentsPage() {
     [searchParams, setSearchParams],
   );
 
+  useEffect(() => {
+    if ((!spaceId && !embedded) || !spaceRosterLoaded) return;
+    if (selectedAgentId && availableAgents.some((agent) => agent.id === selectedAgentId)) return;
+    selectAgent(availableAgents[0]?.id ?? "");
+  }, [availableAgents, embedded, selectAgent, selectedAgentId, spaceId, spaceRosterLoaded]);
+
   const startAgentChat = useCallback(
     async (agentId: string) => {
       selectAgent(agentId);
       if (!user?.id) return;
       // Ensure the agent's scope is live before creating the chat there. Both
       // calls are idempotent, so this is safe even when the agent is already open.
-      await activateConversationScope(agentScopeKey(user.id, agentId, spaceId, ""));
+      const scopeKey =
+        spaceId && agentId === builtInSpaceAgentId
+          ? spaceAgentScopeKey(user.id, spaceId)
+          : agentScopeKey(user.id, agentId, spaceId, "");
+      await activateConversationScope(scopeKey);
       await startNewConversation();
     },
     [activateConversationScope, selectAgent, spaceId, startNewConversation, user?.id],
   );
 
   return (
-    <div className="grid h-full min-h-0 grid-cols-[280px_minmax(0,1fr)] overflow-hidden max-[900px]:grid-cols-[minmax(0,1fr)]">
-      <aside className="flex h-full min-h-0 flex-col border-r border-border bg-[var(--misty-app-panel-bg,transparent)] p-4 max-[900px]:hidden">
-        <div className="misty-transient-scrollbar flex min-h-0 flex-1 flex-col overflow-hidden [overscroll-behavior:contain]">
-          <PersonalAgentsSidebar
-            selectedAgentId={selectedAgentId}
-            onSelect={selectAgent}
-            onNewChat={(agentId) => void startAgentChat(agentId)}
-          />
-        </div>
+    <div
+      className={
+        embedded
+          ? "grid h-full min-h-0 grid-cols-[minmax(0,1fr)] overflow-hidden"
+          : "grid h-full min-h-0 grid-cols-[280px_minmax(0,1fr)] overflow-hidden max-[900px]:grid-cols-[minmax(0,1fr)]"
+      }
+    >
+      {!embedded ? (
+        <aside className="flex h-full min-h-0 flex-col border-r border-border bg-[var(--misty-app-panel-bg,transparent)] p-4 max-[900px]:hidden">
+          <div className="misty-transient-scrollbar flex min-h-0 flex-1 flex-col overflow-hidden [overscroll-behavior:contain]">
+            <PersonalAgentsSidebar
+              selectedAgentId={selectedAgentId}
+              onSelect={selectAgent}
+              onNewChat={(agentId) => void startAgentChat(agentId)}
+              availableAgents={sidebarAgents}
+              spaceName={spaceName}
+            />
+          </div>
 
-        {hostedAiUsedPercent !== null ? (
-          <section
-            className="mt-4 shrink-0 rounded-md bg-sidebar-accent/35 p-3"
-            aria-label="Hosted AI usage"
-          >
-            <div className="flex items-center gap-2.5">
-              <span className="grid size-7 shrink-0 place-items-center rounded-md bg-sidebar-accent text-muted-foreground">
-                <Sparkles size={14} />
-              </span>
-              <span className="min-w-0">
-                <strong className="block text-sm font-medium text-sidebar-accent-foreground">
-                  Hosted AI
-                </strong>
-                <span className="block text-xs text-muted-foreground">
-                  {Math.max(0, 100 - hostedAiUsedPercent)}% left this week
+          {hostedAiUsedPercent !== null ? (
+            <section
+              className="mt-4 shrink-0 rounded-md bg-sidebar-accent/35 p-3"
+              aria-label="Hosted AI usage"
+            >
+              <div className="flex items-center gap-2.5">
+                <span className="grid size-7 shrink-0 place-items-center rounded-md bg-sidebar-accent text-muted-foreground">
+                  <Sparkles size={14} />
                 </span>
-              </span>
-            </div>
-            <Progress className="mt-3 h-1.5" value={hostedAiUsedPercent} />
-            <p className="mb-0 mt-2 text-[11px] text-muted-foreground">
-              {hostedAiUsedPercent}% used
-              {hostedAiUsage?.hostedAiResetAt
-                ? ` · resets ${new Date(hostedAiUsage.hostedAiResetAt).toLocaleDateString(
-                    undefined,
-                    {
-                      weekday: "short",
-                    },
-                  )}`
-                : ""}
-            </p>
-          </section>
-        ) : null}
-      </aside>
+                <span className="min-w-0">
+                  <strong className="block text-sm font-medium text-sidebar-accent-foreground">
+                    Hosted AI
+                  </strong>
+                  <span className="block text-xs text-muted-foreground">
+                    {Math.max(0, 100 - hostedAiUsedPercent)}% left this week
+                  </span>
+                </span>
+              </div>
+              <Progress className="mt-3 h-1.5" value={hostedAiUsedPercent} />
+              <p className="mb-0 mt-2 text-[11px] text-muted-foreground">
+                {hostedAiUsedPercent}% used
+                {hostedAiUsage?.hostedAiResetAt
+                  ? ` · resets ${new Date(hostedAiUsage.hostedAiResetAt).toLocaleDateString(
+                      undefined,
+                      {
+                        weekday: "short",
+                      },
+                    )}`
+                  : ""}
+              </p>
+            </section>
+          ) : null}
+        </aside>
+      ) : null}
       {selectedAgent ? (
-        <div className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)_auto] gap-3 overflow-hidden p-6">
-          <header className="flex min-w-0 items-center gap-2.5">
-            <Bot className="size-5 shrink-0 text-muted-foreground" aria-hidden="true" />
-            <h1 className="min-w-0 truncate text-lg font-semibold text-foreground">
-              {selectedAgent.name}
-            </h1>
-            {running ? (
-              <Badge variant="secondary" className="shrink-0">
-                Running
-              </Badge>
-            ) : null}
-          </header>
+        <div
+          className={
+            embedded
+              ? "grid h-full min-h-0 grid-rows-[minmax(0,1fr)_auto] gap-3 overflow-hidden p-3"
+              : "grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)_auto] gap-3 overflow-hidden p-6"
+          }
+        >
+          {!hideHeader ? (
+            <header className="flex min-w-0 items-center gap-2.5">
+              <Bot className="size-5 shrink-0 text-muted-foreground" aria-hidden="true" />
+              <h1 className="min-w-0 truncate text-lg font-semibold text-foreground">
+                {selectedAgent.name}
+              </h1>
+            </header>
+          ) : null}
 
           {error ? <p className={agentPanelStyles.errorText}>{error}</p> : null}
 
@@ -275,12 +371,19 @@ export default function DesktopAgentsPage() {
                     message={message}
                     running={running}
                     plans={plans}
+                    actionPlans={actionPlans}
                     toolApprovals={toolApprovals}
                     onApplyPlan={approvePlan}
                     onApproveTool={approveToolRequest}
-                    spacious
+                    onApproveAction={approveActionPlan}
+                    onReviseAction={(planId) => {
+                      const request = reviseActionPlan(planId);
+                      if (request) setPrompt(request.displayPrompt);
+                    }}
+                    spacious={!embedded}
                   />
                 ))}
+            {running ? <AgentTypingIndicator /> : null}
           </div>
 
           <form
@@ -316,37 +419,37 @@ export default function DesktopAgentsPage() {
                 prompt={prompt}
                 setMode={setMode}
                 abortPrompt={abortPrompt}
-                onAddContext={() => setContextPickerOpen(true)}
-                modelOptions={models}
+                showAccessControls={false}
+                contextLabel={
+                  contextLabel ||
+                  (spaceName
+                    ? `Tools scoped to ${spaceName}`
+                    : selectedPaths.length
+                      ? `${selectedPaths.length} selected`
+                      : "Server-managed tools")
+                }
+                modelOptions={spaceId ? undefined : models}
                 selectedModelId={agentChatModelId}
                 reasoningEffort={agentChatReasoningEffort}
                 reasoningSupported={agentChatSupportsReasoning}
-                onSelectReasoning={(effort) => void setConversationReasoning(effort)}
+                onSelectReasoning={
+                  spaceId ? undefined : (effort) => void setConversationReasoning(effort)
+                }
                 onSelectModel={
-                  selectedAgent
-                    ? requestModelChange
-                    : (modelId) => {
-                        const next = new URLSearchParams(searchParams);
-                        if (modelId) next.set("model", modelId);
-                        else next.delete("model");
-                        setSearchParams(next);
-                      }
+                  spaceId
+                    ? undefined
+                    : selectedAgent
+                      ? requestModelChange
+                      : (modelId) => {
+                          const next = new URLSearchParams(searchParams);
+                          if (modelId) next.set("model", modelId);
+                          else next.delete("model");
+                          setSearchParams(next);
+                        }
                 }
               />
             </div>
           </form>
-
-          {contextPickerOpen ? (
-            <MistyPicker
-              multiple
-              title="Add files as agent context"
-              onCancel={() => setContextPickerOpen(false)}
-              onChooseFiles={(paths) => {
-                setManualContextPaths((current) => [...new Set([...current, ...paths])]);
-                setContextPickerOpen(false);
-              }}
-            />
-          ) : null}
 
           <AlertDialog
             open={pendingModelSwitch !== null}
@@ -406,31 +509,4 @@ export default function DesktopAgentsPage() {
       )}
     </div>
   );
-}
-
-function buildAgentPrompt(
-  userPrompt: string,
-  workingDirectory: string,
-  selectedPaths: string[],
-  spaceName: string | null,
-): string {
-  const selectedContext =
-    selectedPaths.length > 0
-      ? [`Selected items (${selectedPaths.length}):`, ...selectedPaths.map((path) => `- ${path}`)]
-      : ["Selected items: none"];
-  const context = [
-    "You are helping inside Misty from the global Agents surface.",
-    "Agents are beta and experimental.",
-    [
-      "Your main goal is to help reorganize files. You may chat freely, but tool-assisted work",
-      "should stay focused on listing, searching, validating, and proposing safe file organization plans.",
-    ].join(" "),
-    "Do not inspect file contents or ask for preview tools. For changes, propose a file plan with folders, moves, and renames for the user to review.",
-    spaceName ? `Current Space: ${spaceName}` : null,
-    workingDirectory ? `Current folder: ${workingDirectory}` : "Current folder: none",
-    ...selectedContext,
-  ]
-    .filter((line): line is string => Boolean(line))
-    .join("\n");
-  return `${context}\n\nUser request:\n${userPrompt}`;
 }

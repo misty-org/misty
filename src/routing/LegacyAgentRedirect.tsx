@@ -7,12 +7,18 @@ import { routes } from "./paths";
 
 export function legacyAgentDestination(
   search: string,
-  _accessibleSpaceIds?: ReadonlySet<string>,
+  accessibleSpaceIds?: ReadonlySet<string>,
 ): string {
   const params = new URLSearchParams(search);
+  const requestedSpaceId = params.get("spaceId")?.trim() ?? "";
+  params.delete("spaceId");
   params.delete("mika");
+  params.set("agentDock", "1");
   const suffix = params.size > 0 ? `?${params.toString()}` : "";
-  return `${routes.agents}${suffix}`;
+  if (requestedSpaceId && accessibleSpaceIds?.has(requestedSpaceId)) {
+    return `${routes.spaces}/${encodeURIComponent(requestedSpaceId)}/chat${suffix}`;
+  }
+  return routes.spaces;
 }
 
 export function LegacyAgentRedirect() {

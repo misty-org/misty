@@ -1,12 +1,14 @@
 export type { TaskViewMode, DueFilter } from "@/models/types/features/spaces/SpacePlanner";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/features/auth/AuthContext";
 import { useSpacesStore } from "@/stores/spaces/useSpacesStore";
-import type { TaskViewMode } from "@/models/types/features/spaces/SpacePlanner";
-import type { SpaceCalendarEvent, SpaceMember } from "@/models/interfaces/features/spaces/types";
+import type { SpaceAgentMembership, SpaceMember } from "@/models/interfaces/features/spaces/types";
 import { SpacePlannerHeader } from "./components/SpacePlannerHeader";
-import { CalendarSourceDrawer, SpaceTaskDrawer, SpaceTaskEventDrawer } from "./SpacePlannerViews";
+import { useSpacePanelRoute } from "./components/spacePanel/spacePanelRoute";
+import { CalendarSourceDrawer, SpaceTaskDrawer } from "./SpacePlannerViews";
+import { SpaceAgenda } from "./SpaceAgenda";
+import { SpaceRoadmapWorkspace } from "./SpaceRoadmapWorkspace";
 import { SpacePlannerBody } from "./spaceTasks/SpacePlannerBody";
 import { TaskFilters } from "./spaceTasks/TaskFilters";
 import { normalizeView } from "./spaceTasks/taskFiltering";
@@ -17,8 +19,43 @@ import { useSpaceTasksData } from "./spaceTasks/useSpaceTasksData";
 import { useTaskFilterParams } from "./spaceTasks/useTaskFilterParams";
 
 const emptyMembers: SpaceMember[] = [];
+const emptyAgents: SpaceAgentMembership[] = [];
 
 export function SpacePlanner({
+  spaceId,
+  canManage,
+  canManageIntegrations,
+}: {
+  spaceId: string;
+  canManage: boolean;
+  canManageIntegrations: boolean;
+}) {
+  const route = useSpacePanelRoute();
+  if (route.plannerSection === "agenda") {
+    return (
+      <SpaceAgenda
+        spaceId={spaceId}
+        view={route.agendaView}
+        canManage={canManage}
+        canManageIntegrations={canManageIntegrations}
+      />
+    );
+  }
+  if (route.plannerSection === "roadmaps") {
+    return (
+      <SpaceRoadmapWorkspace spaceId={spaceId} roadmapId={route.roadmapId} canManage={canManage} />
+    );
+  }
+  return (
+    <SpaceTasksPlanner
+      spaceId={spaceId}
+      canManage={canManage}
+      canManageIntegrations={canManageIntegrations}
+    />
+  );
+}
+
+function SpaceTasksPlanner({
   spaceId,
   canManage,
   canManageIntegrations,
@@ -31,6 +68,7 @@ export function SpacePlanner({
   const navigate = useNavigate();
   const location = useLocation();
   const members = useSpacesStore((state) => state.membersBySpace[spaceId] ?? emptyMembers);
+  const agents = useSpacesStore((state) => state.agentMembershipsBySpace[spaceId] ?? emptyAgents);
   const routeParts = location.pathname.split("/").filter(Boolean);
   const view = normalizeView(routeParts[routeParts.length - 1]);
 
@@ -38,17 +76,40 @@ export function SpacePlanner({
   const data = useSpaceTasksData({ spaceId, view, filters });
   const actions = useSpaceTaskActions({ spaceId, canManage, data });
   const calendar = useCalendarPublishing({ spaceId, data, actions });
-  const [eventOpen, setEventOpen] = useState<SpaceCalendarEvent>();
+  const createQueryConsumedRef = useRef(false);
 
   const openCreate = useCallback(() => actions.openCreate(), [actions.openCreate]);
   useCreateTaskShortcut(canManage, openCreate);
 
-  const changeView = (next: TaskViewMode) =>
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    if (params.get("create") !== "task") {
+      createQueryConsumedRef.current = false;
+      return;
+    }
+    if (createQueryConsumedRef.current) return;
+    createQueryConsumedRef.current = true;
+    params.delete("create");
     navigate(
-      `/spaces/${encodeURIComponent(spaceId)}/planner/${next}${
-        filters.searchParams.size ? `?${filters.searchParams}` : ""
-      }`,
+      { pathname: location.pathname, search: params.size ? `?${params}` : "" },
+      { replace: true },
     );
+    if (canManage) openCreate();
+  }, [canManage, location.pathname, location.search, navigate, openCreate]);
+
+  useEffect(() => {
+    const taskId = new URLSearchParams(location.search).get("task");
+    if (!taskId || data.loading) return;
+    const task = data.tasks.find((item) => item.id === taskId);
+    if (!task) return;
+    actions.openEdit(task);
+    const params = new URLSearchParams(location.search);
+    params.delete("task");
+    navigate(
+      { pathname: location.pathname, search: params.size ? `?${params}` : "" },
+      { replace: true },
+    );
+  }, [actions.openEdit, data.loading, data.tasks, location.pathname, location.search, navigate]);
 
   return (
     <div className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] bg-background">
@@ -64,7 +125,12 @@ export function SpacePlanner({
           data.sources.length > 0 ||
           data.integrations.some((integration) => integration.status === "active")
         }
-        onView={changeView}
+        onViewChange={(next) =>
+          navigate({
+            pathname: `/spaces/${encodeURIComponent(spaceId)}/planner/tasks/${next}`,
+            search: location.search,
+          })
+        }
         onQuery={(value: string) => filters.updateParam("q", value)}
         onSync={() => void data.load(false)}
         onImport={() => calendar.setSourceOpen(true)}
@@ -72,6 +138,7 @@ export function SpacePlanner({
         filters={
           <TaskFilters
             members={members}
+            agents={agents}
             status={filters.status}
             assignee={filters.assignee}
             priority={filters.priority}
@@ -87,20 +154,22 @@ export function SpacePlanner({
       <SpacePlannerBody
         view={view}
         members={members}
+        agents={agents}
         canManage={canManage}
         assignee={filters.assignee}
         due={filters.due}
         data={data}
         actions={actions}
-        onOpenEvent={setEventOpen}
       />
 
       {actions.editing !== undefined ? (
         <SpaceTaskDrawer
+          spaceId={spaceId}
           draft={actions.draft}
           setDraft={actions.setDraft}
           editing={actions.editing}
           members={members}
+          agents={agents}
           busy={actions.busy === "task" || actions.busy === actions.editing?.id}
           canManage={canManage}
           onClose={() => actions.setEditing(undefined)}
@@ -116,14 +185,6 @@ export function SpacePlanner({
               ? () => void calendar.discardTaskChanges(actions.editing!)
               : undefined
           }
-        />
-      ) : null}
-
-      {eventOpen ? (
-        <SpaceTaskEventDrawer
-          event={eventOpen}
-          source={data.sources.find((item) => item.id === eventOpen.source_id)}
-          onClose={() => setEventOpen(undefined)}
         />
       ) : null}
 

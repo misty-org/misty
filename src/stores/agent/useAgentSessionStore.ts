@@ -14,6 +14,7 @@ import type {
   AiStatus,
   AiPlanReview,
   AiToolApproval,
+  AiActionPlan,
   SendAiPromptRequest,
   AiConversationSummary,
   AiSessionStore,
@@ -38,6 +39,8 @@ import { errorText } from "@/lib/format";
 import { hydrateServerSessions, loadConversationTranscript } from "@/stores/agent/agentSessionSync";
 import { isNativeMobileBuild } from "@/platform/buildTarget";
 import { selectAgentPreferences, useSettingsStore } from "@/stores/app";
+
+const settingsDocument = () => useSettingsStore.getState().settings?.document;
 import {
   cancelAgentSession,
   createAgentSession,
@@ -68,11 +71,15 @@ import {
 } from "@/features/agents/pathPrivacy";
 import { mistyDocumentsEnabled } from "@/features/agents/flags";
 import { publicAgentDisplayName, publicAgentModel } from "./useAgentDelegationStore";
-import { initialAgentModelId, initialAgentModelName } from "@/features/agents/modelSelection";
+import { defaultAgentModelId, selectedAgentModelName } from "@/features/agents/modelSelection";
+import { filesAgentScopeKey, parseAgentScopeKey, spaceIdFromAgentScopeKey } from "./agentScopeKeys";
+
+export { agentScopeKey, filesAgentScopeKey, spaceAgentScopeKey } from "./agentScopeKeys";
 
 let pollTimer: number | null = null;
 let nextMessageId = 1;
 let nextPlanId = 1;
+let nextActionPlanId = 1;
 let activeSessionId: string | null = null;
 let lastEventSequence = 0;
 let activeRoot: string | null = null;
@@ -89,6 +96,7 @@ let activeAgentReasoningOverride: string | null = null;
 const pendingReseedConversationIds = new Set<string>();
 let drainInFlight: Promise<void> | null = null;
 let abortRequested = false;
+let activeActionPlanId: string | null = null;
 let agentRuntimeGeneration = 0;
 const processedEventSequences = new Set<number>();
 const processedToolRequestIds = new Set<string>();
@@ -131,6 +139,7 @@ interface StoredConversation {
   mode: AiMode;
   messages: AiPanelMessage[];
   plans: AiPlanReview[];
+  actionPlans: AiActionPlan[];
   toolApprovals: AiToolApproval[];
   error: string | null;
   /** False for a session hydrated from the server whose messages are not loaded yet. */
@@ -144,22 +153,9 @@ interface StoredConversation {
 
 const conversationSnapshots = new Map<string, StoredConversation>();
 let nextConversationSeq = 1;
-export const filesAgentScopeKey = "files";
 let activeConversationScopeKey = filesAgentScopeKey;
 let scopeActivationGeneration = 0;
 const initialConversationId = newConversationId();
-
-export function spaceAgentScopeKey(accountId: string, spaceId: string): string {
-  return `account:${encodeURIComponent(accountId)}:space:${encodeURIComponent(spaceId)}`;
-}
-
-export function agentScopeKey(accountId: string, agentId = "", spaceId = "", modelId = ""): string {
-  const params = new URLSearchParams();
-  if (agentId) params.set("agent", agentId);
-  if (spaceId) params.set("space", spaceId);
-  if (modelId) params.set("model", modelId);
-  return `account:${encodeURIComponent(accountId)}:agents?${params.toString()}`;
-}
 
 function newConversationId(): string {
   return `agent-local-${Date.now()}-${nextConversationSeq++}`;
@@ -180,6 +176,7 @@ function emptyStoredConversation(
     mode: "auto",
     messages: [],
     plans: [],
+    actionPlans: [],
     toolApprovals: [],
     error: null,
     transcriptLoaded: true,
@@ -309,6 +306,7 @@ function snapshotActiveConversation(
     mode: state.mode,
     messages: state.messages,
     plans: state.plans,
+    actionPlans: state.actionPlans,
     toolApprovals: state.toolApprovals,
     error: state.error,
     transcriptLoaded: existing?.transcriptLoaded ?? true,
@@ -367,6 +365,7 @@ function applyConversationRuntime(snapshot: StoredConversation): void {
   processedToolRequestIds.clear();
   drainInFlight = null;
   abortRequested = false;
+  activeActionPlanId = null;
 }
 
 // Only one conversation is ever actively polling at a time. Switching away from a
@@ -473,6 +472,28 @@ function isDocumentAgentRequest(prompt: string): boolean {
   );
 }
 
+export function requiresAgentActionPreview(prompt: string): boolean {
+  const normalized = prompt
+    .toLowerCase()
+    .replace(/\b(?:don't|dont)\b/g, "do not")
+    .replace(/\b(?:can't|cant)\b/g, "cannot");
+  if (
+    /\b(?:do not|never|cannot)\s+(?:send|post|tell|notify|message|create|update|rename|delete|remove|move|assign|complete)\b/.test(
+      normalized,
+    )
+  ) {
+    return false;
+  }
+  if (/\blet\s+.{1,60}\s+know\b/.test(normalized)) return true;
+  if (/\b(?:send|post|notify|message)\b/.test(normalized)) return true;
+  if (/\btell\s+(?!me\b|us\b)\S+/.test(normalized)) return true;
+  return (
+    /\b(?:create|add|make|update|change|mark|set|assign|complete|rename|delete|remove|move|reschedule|reassign)\b/.test(
+      normalized,
+    ) && /\b(?:task|tasks|space|message|chat|file|folder|member|event|calendar)\b/.test(normalized)
+  );
+}
+
 function agentScopeAllowed(
   preferences: ReturnType<typeof selectAgentPreferences>,
   scope: AgentScope,
@@ -493,7 +514,7 @@ function scopedAgentPrompt(prompt: string, scope: AgentScope | null): string {
   if (scope === "files") {
     return `${prompt}\n\nPermission boundary: Files actions are enabled. Stay within normal file operations and do not perform cleanup or search-only workflows.`;
   }
-  return `${prompt}\n\nPermission boundary: No capability scope is active. Respond conversationally without using tools or modifying data.`;
+  return prompt;
 }
 
 function agentScopeLabel(scope: AgentScope): string {
@@ -523,6 +544,7 @@ export const useAgentSessionStore = create<AiSessionStore>((set, get) => ({
   mode: "auto",
   messages: [],
   plans: [],
+  actionPlans: [],
   toolApprovals: [],
   error: null,
   conversations: [
@@ -534,16 +556,21 @@ export const useAgentSessionStore = create<AiSessionStore>((set, get) => ({
   activeReasoningEffort: "",
 
   refreshStatus: async () => {
-    const generation = agentRuntimeGeneration;
     try {
       const status = await fetchAgentStatus();
-      if (!agentRuntimeIsCurrent(generation)) return;
       set({ status: serverStatusFromResponse(status), error: status.error });
     } catch (error) {
-      if (!agentRuntimeIsCurrent(generation)) return;
       const message = errorText(error);
       recordAiDebug("error", "Agent status check failed.", message);
-      set({ status: serverStatus(false, message, false), error: message });
+      // A failed health/status request does not prove hosted Agents are
+      // unconfigured. Preserve the last known capability state so a transient
+      // gateway limit or network blip cannot disable every Agent composer.
+      set((state) => ({
+        status: {
+          ...(state.status ?? serverStatus(false)),
+          error: message,
+        },
+      }));
     }
   },
 
@@ -590,6 +617,7 @@ export const useAgentSessionStore = create<AiSessionStore>((set, get) => ({
           modelId: nextModelId,
           messages: [],
           plans: [],
+          actionPlans: [],
           toolApprovals: [],
           transcriptLoaded: true,
           runtime: clearedRuntime,
@@ -599,6 +627,7 @@ export const useAgentSessionStore = create<AiSessionStore>((set, get) => ({
         activeModelId: nextModelId,
         messages: [],
         plans: [],
+        actionPlans: [],
         toolApprovals: [],
         error: null,
         status: serverStatus(false),
@@ -638,7 +667,16 @@ export const useAgentSessionStore = create<AiSessionStore>((set, get) => ({
     set({ activeReasoningEffort: nextEffort, error: null });
   },
 
-  sendPrompt: async ({ displayPrompt, prompt, cwd, selectedPaths, contextSources }) => {
+  sendPrompt: async ({
+    displayPrompt,
+    prompt,
+    cwd,
+    selectedPaths,
+    contextSources,
+    spaceSection,
+    contextTaskId,
+    skipActionPreview,
+  }) => {
     const trimmed = displayPrompt.trim();
     if (!trimmed || get().status?.running) return;
     const generation = agentRuntimeGeneration;
@@ -652,7 +690,19 @@ export const useAgentSessionStore = create<AiSessionStore>((set, get) => ({
     if (!settingsStore.loaded) await settingsStore.load();
     if (!agentRuntimeIsCurrent(generation) || conversationId !== get().activeConversationId) return;
     const preferences = selectAgentPreferences(useSettingsStore.getState().settings?.document);
-    if (!preferences.enabled) {
+    const agentConversation = parseAgentScopeKey(activeConversationScopeKey) !== null;
+    const activeSpaceId = spaceIdFromAgentScopeKey(activeConversationScopeKey);
+    const inSpace = Boolean(activeSpaceId);
+    const serverOwnedConversation = agentConversation || inSpace;
+    const shouldPreviewAction =
+      serverOwnedConversation && !skipActionPreview && requiresAgentActionPreview(prompt);
+    const actionPlanId = shouldPreviewAction
+      ? `action-plan-${Date.now()}-${nextActionPlanId++}`
+      : null;
+    // The device-level Agents toggle controls local Files access. Space and
+    // custom-Agent conversations are server-owned and already constrained by
+    // membership, context grants, Toolbox permissions, and approvals.
+    if (!preferences.enabled && !serverOwnedConversation) {
       appendBlockedRequest(
         set,
         trimmed,
@@ -660,7 +710,9 @@ export const useAgentSessionStore = create<AiSessionStore>((set, get) => ({
       );
       return;
     }
-    const inSpace = activeConversationScopeKey !== filesAgentScopeKey;
+    if (inSpace && !get().status?.spaceScopedSessions) {
+      await get().refreshStatus();
+    }
     if (inSpace && !get().status?.spaceScopedSessions) {
       appendBlockedRequest(
         set,
@@ -677,7 +729,9 @@ export const useAgentSessionStore = create<AiSessionStore>((set, get) => ({
       );
       return;
     }
-    const classifiedScope = inSpace ? null : classifyAgentRequest(trimmed);
+    // Custom Agents use server-owned tools in both global and Space chats.
+    // Local Files scopes apply only to the built-in Files conversation.
+    const classifiedScope = serverOwnedConversation ? null : classifyAgentRequest(trimmed);
     if (classifiedScope === "ambiguous") {
       appendBlockedRequest(
         set,
@@ -690,7 +744,7 @@ export const useAgentSessionStore = create<AiSessionStore>((set, get) => ({
     // bare path) continues whatever scope this conversation already established, instead
     // of dropping to no-tool-access and causing the model to attempt a now-disallowed
     // tool call as it continues its own train of thought from the previous turn.
-    const requestScope = classifiedScope ?? activeRequestScope;
+    const requestScope = serverOwnedConversation ? null : (classifiedScope ?? activeRequestScope);
     if (requestScope && !agentScopeAllowed(preferences, requestScope)) {
       appendBlockedRequest(
         set,
@@ -703,6 +757,7 @@ export const useAgentSessionStore = create<AiSessionStore>((set, get) => ({
     activeSelectedPaths = selectedPaths ?? [];
     activeRequestScope = requestScope;
     activeContextSources = contextSources ?? [];
+    activeActionPlanId = actionPlanId;
     abortRequested = false;
     // The opening message of an untitled agent chat is a good moment to let the model
     // name the thread. Runs in the background so it never delays the reply, and only
@@ -720,6 +775,25 @@ export const useAgentSessionStore = create<AiSessionStore>((set, get) => ({
     }
     set((state) => ({
       messages: [...state.messages, { id: aiMessageId("user"), role: "user", text: trimmed }],
+      actionPlans: actionPlanId
+        ? [
+            ...state.actionPlans,
+            {
+              id: actionPlanId,
+              request: {
+                displayPrompt,
+                prompt,
+                cwd,
+                selectedPaths,
+                contextSources,
+                spaceSection,
+                contextTaskId,
+              },
+              status: "planning",
+              error: null,
+            },
+          ]
+        : state.actionPlans,
       error: null,
       status: statusWithRunning(state.status, true),
     }));
@@ -740,11 +814,22 @@ export const useAgentSessionStore = create<AiSessionStore>((set, get) => ({
       await sendAgentMessageOnce(
         {
           mode: get().mode,
-          user_message: scopedAgentPrompt(outboundPrompt, requestScope),
+          plan_only: shouldPreviewAction || undefined,
+          // Space and custom-Agent conversations use the server-owned Toolbox.
+          // Appending the Files permission boundary here incorrectly disables
+          // valid server actions such as messages.send.
+          user_message: serverOwnedConversation
+            ? outboundPrompt
+            : scopedAgentPrompt(outboundPrompt, requestScope),
           active_root: serverContext.activeRoot,
           selected_paths: serverContext.selectedPaths,
-          capabilities: toolManifestForScope(requestScope),
-          space_id: inSpace ? activeSpaceIdFromScopeKey(activeConversationScopeKey) : undefined,
+          tool_scope: requestScope ?? undefined,
+          // The server owns the model manifest. This local allow-list remains
+          // only as a second check before the desktop executes a returned tool.
+          capabilities: { tools: [] },
+          space_id: activeSpaceId,
+          space_section: inSpace ? spaceSection : undefined,
+          context_task_id: inSpace ? contextTaskId : undefined,
         },
         generation,
       );
@@ -764,10 +849,47 @@ export const useAgentSessionStore = create<AiSessionStore>((set, get) => ({
       recordAiDebug("error", "Agent send failed.", message);
       set((state) => ({
         error: message,
+        actionPlans: actionPlanId
+          ? state.actionPlans.map((plan) =>
+              plan.id === actionPlanId ? { ...plan, status: "failed", error: message } : plan,
+            )
+          : state.actionPlans,
         status: statusWithRunning(state.status, false, message),
         messages: [...state.messages, { id: aiMessageId("error"), role: "error", text: message }],
       }));
     }
+  },
+
+  approveActionPlan: async (planId) => {
+    const plan = get().actionPlans.find((candidate) => candidate.id === planId);
+    if (!plan || plan.status !== "pending" || get().status?.running) return;
+    set((state) => ({
+      actionPlans: state.actionPlans.map((candidate) =>
+        candidate.id === planId ? { ...candidate, status: "running", error: null } : candidate,
+      ),
+    }));
+    await get().sendPrompt({
+      ...plan.request,
+      displayPrompt: "Approved plan",
+      prompt: `The member approved the plan. Execute this original request now:\n${plan.request.prompt}`,
+      skipActionPreview: true,
+    });
+    set((state) => ({
+      actionPlans: state.actionPlans.map((candidate) =>
+        candidate.id === planId ? { ...candidate, status: "approved" } : candidate,
+      ),
+    }));
+  },
+
+  reviseActionPlan: (planId) => {
+    const plan = get().actionPlans.find((candidate) => candidate.id === planId);
+    if (!plan || plan.status !== "pending") return null;
+    set((state) => ({
+      actionPlans: state.actionPlans.map((candidate) =>
+        candidate.id === planId ? { ...candidate, status: "dismissed" } : candidate,
+      ),
+    }));
+    return plan.request;
   },
 
   approveToolRequest: async (requestId) => {
@@ -916,13 +1038,32 @@ export const useAgentSessionStore = create<AiSessionStore>((set, get) => ({
     activeScopeId = null;
     activeSelectedPaths = [];
     activeContextSources = [];
-    set({ messages: [], plans: [], toolApprovals: [], error: null, status: serverStatus(false) });
+    set({
+      messages: [],
+      plans: [],
+      actionPlans: [],
+      toolApprovals: [],
+      error: null,
+      status: serverStatus(false),
+    });
   },
 
   activateConversationScope: async (scopeKey) => {
     const nextScopeKey = scopeKey.trim() || filesAgentScopeKey;
     const generation = ++scopeActivationGeneration;
-    if (nextScopeKey === activeConversationScopeKey) return;
+    if (nextScopeKey === activeConversationScopeKey) {
+      const current = conversationSnapshots.get(get().activeConversationId);
+      if (current?.runtime.sessionId && !current.transcriptLoaded) {
+        await loadConversationTranscript(
+          current.id,
+          current.runtime.sessionId,
+          agentSyncDeps(nextScopeKey),
+          (messages) => set({ messages }),
+          () => get().activeConversationId,
+        );
+      }
+      return;
+    }
     await suspendActiveConversation(set, get);
     if (generation !== scopeActivationGeneration) return;
     activeConversationScopeKey = nextScopeKey;
@@ -954,6 +1095,7 @@ export const useAgentSessionStore = create<AiSessionStore>((set, get) => ({
       mode: target.mode,
       messages: target.messages,
       plans: target.plans,
+      actionPlans: target.actionPlans,
       toolApprovals: target.toolApprovals,
       error: target.error,
       conversations: candidates.length
@@ -972,6 +1114,15 @@ export const useAgentSessionStore = create<AiSessionStore>((set, get) => ({
             },
           ],
     });
+    if (target.runtime.sessionId && !target.transcriptLoaded) {
+      await loadConversationTranscript(
+        target.id,
+        target.runtime.sessionId,
+        agentSyncDeps(nextScopeKey),
+        (messages) => set({ messages }),
+        () => get().activeConversationId,
+      );
+    }
   },
 
   startNewConversation: async () => {
@@ -989,6 +1140,7 @@ export const useAgentSessionStore = create<AiSessionStore>((set, get) => ({
       mode: fresh.mode,
       messages: fresh.messages,
       plans: fresh.plans,
+      actionPlans: fresh.actionPlans,
       toolApprovals: fresh.toolApprovals,
       error: fresh.error,
       conversations: [
@@ -1012,6 +1164,7 @@ export const useAgentSessionStore = create<AiSessionStore>((set, get) => ({
       mode: target.mode,
       messages: target.messages,
       plans: target.plans,
+      actionPlans: target.actionPlans,
       toolApprovals: target.toolApprovals,
       error: target.error,
     });
@@ -1093,6 +1246,7 @@ export const useAgentSessionStore = create<AiSessionStore>((set, get) => ({
         mode: target.mode,
         messages: target.messages,
         plans: target.plans,
+        actionPlans: target.actionPlans,
         toolApprovals: target.toolApprovals,
         error: target.error,
         conversations: remaining,
@@ -1121,6 +1275,7 @@ export function resetAgentAccountState(): void {
     mode: "auto",
     messages: [],
     plans: [],
+    actionPlans: [],
     toolApprovals: [],
     error: null,
     conversations: [
@@ -1207,18 +1362,25 @@ async function drainAiEventsOnce(
   const nextMessages: AiPanelMessage[] = [];
   const nextPlans: AiPlanReview[] = [];
   const nextToolApprovals: AiToolApproval[] = [];
+  const completedActionPlanIds: string[] = [];
   for (const event of nextEvents) {
     lastEventSequence = Math.max(lastEventSequence, event.sequence);
     if (isAgentMessageEvent(event.type) && event.text) {
+      const actionPlanId = activeActionPlanId ?? undefined;
       nextMessages.push({
         id: aiMessageId("agent"),
         role: "agent",
         text: event.text,
+        actionPlanId,
         citations: event.citations,
         contextSources: activeContextSources,
         hostedAiUsedRatio: event.hosted_ai_used_ratio,
         hostedAiResetAt: event.hosted_ai_reset_at,
       });
+      if (actionPlanId) {
+        completedActionPlanIds.push(actionPlanId);
+        activeActionPlanId = null;
+      }
     } else if (event.type === "error" && event.message) {
       nextMessages.push({ id: aiMessageId("error"), role: "error", text: event.message });
     } else if (event.type === "tool_request") {
@@ -1278,6 +1440,9 @@ async function drainAiEventsOnce(
   set((state) => ({
     messages: [...state.messages, ...nextMessages],
     plans: [...state.plans, ...nextPlans],
+    actionPlans: state.actionPlans.map((plan) =>
+      completedActionPlanIds.includes(plan.id) ? { ...plan, status: "pending" } : plan,
+    ),
     toolApprovals: [...state.toolApprovals, ...nextToolApprovals],
     status: statusWithRunning(state.status, toolResults.length > 0),
   }));
@@ -1326,12 +1491,13 @@ async function ensureSession(generation = agentRuntimeGeneration): Promise<strin
   const scopeKey = activeConversationScopeKey;
   const agentScope = parseAgentScopeKey(scopeKey);
   const sessionInput = agentScope ?? {
-    spaceId: scopeKey === filesAgentScopeKey ? undefined : activeSpaceIdFromScopeKey(scopeKey),
+    spaceId: scopeKey === filesAgentScopeKey ? undefined : spaceIdFromAgentScopeKey(scopeKey),
   };
   // A per-chat model override wins over the agent's configured model. The server
   // treats a supplied model_id as this session's model without touching the agent.
   if (activeAgentModelOverride) sessionInput.modelId = activeAgentModelOverride;
-  if (!sessionInput.agentId && !sessionInput.modelId) sessionInput.modelId = initialAgentModelId;
+  if (!sessionInput.agentId && !sessionInput.modelId)
+    sessionInput.modelId = defaultAgentModelId(settingsDocument());
   // A per-chat effort override wins over the agent's configured effort for this session.
   if (activeAgentReasoningOverride) sessionInput.reasoningEffort = activeAgentReasoningOverride;
   const session = await createAgentSession(sessionInput);
@@ -1341,20 +1507,6 @@ async function ensureSession(generation = agentRuntimeGeneration): Promise<strin
   lastEventSequence = 0;
   recordAiDebug("info", "Created agent session.", activeSessionId);
   return activeSessionId;
-}
-
-function parseAgentScopeKey(
-  scopeKey: string,
-): { agentId?: string; spaceId?: string; modelId?: string; reasoningEffort?: string } | null {
-  const marker = ":agents?";
-  const offset = scopeKey.indexOf(marker);
-  if (offset < 0) return null;
-  const params = new URLSearchParams(scopeKey.slice(offset + marker.length));
-  return {
-    agentId: params.get("agent") || undefined,
-    spaceId: params.get("space") || undefined,
-    modelId: params.get("model") || undefined,
-  };
 }
 
 async function sendAgentMessageOnce(
@@ -1407,7 +1559,7 @@ async function runToolRequest(request: ToolRequest, scope: AgentScope | null): P
         request,
         scope
           ? `The ${agentScopeLabel(scope)} scope is disabled.`
-          : "This request has no allowed capability scope.",
+          : "This local file action was not enabled for the request.",
       );
     }
     if (!toolAllowedForScope(request.name, scope)) {
@@ -1668,11 +1820,12 @@ function pluralize(count: number, singular: string, plural: string): string {
 }
 
 function serverStatus(running: boolean, error: string | null = null, configured = true): AiStatus {
+  const model = defaultAgentModelId(settingsDocument());
   return {
     configured,
     spaceScopedSessions: false,
-    model: initialAgentModelId,
-    modelName: initialAgentModelName,
+    model,
+    modelName: selectedAgentModelName(model),
     running,
     sessionId: activeSessionId,
     error,
@@ -1704,17 +1857,6 @@ function serverStatusFromResponse(response: AgentStatusResponse): AiStatus {
     sessionId: response.session_id ?? activeSessionId,
     error: response.error,
   };
-}
-
-function activeSpaceIdFromScopeKey(scopeKey: string): string | undefined {
-  const marker = ":space:";
-  const index = scopeKey.lastIndexOf(marker);
-  if (index < 0) return undefined;
-  try {
-    return decodeURIComponent(scopeKey.slice(index + marker.length)) || undefined;
-  } catch {
-    return undefined;
-  }
 }
 
 function aiMessageId(prefix: string): string {

@@ -21,9 +21,13 @@ import type {
   LibraryEditDefinition,
   LibraryMarkupElement,
 } from "@/models/types/features/spaces/types";
+import type { SpaceTaskSourceRef } from "./agentTaskTypes";
+export type * from "./agentTaskTypes";
 
 export interface Space {
   id: string;
+  kind?: "standard" | "misty";
+  support_conversation_id?: string;
   security_domain_id?: string;
   owner_user_id: string;
   name: string;
@@ -91,16 +95,6 @@ export interface SpaceInvitationPreview {
   expires_at: string;
 }
 
-export interface SpaceMember {
-  space_id: string;
-  user_id: string;
-  name: string;
-  email: string;
-  role: SpaceRole;
-  joined_at: string;
-  read_message_seq: number;
-}
-
 export interface SpaceTask {
   id: string;
   space_id: string;
@@ -112,9 +106,10 @@ export interface SpaceTask {
   priority: SpaceTaskPriority;
   rank: number;
   assignee_user_id?: string;
+  assignee_agent_id?: string;
   due_at?: string;
   due_timezone: string;
-  source_refs: Array<Record<string, unknown>>;
+  source_refs: SpaceTaskSourceRef[];
   created_by_user_id?: string;
   created_by_agent_id?: string;
   source_run_id?: string;
@@ -292,6 +287,7 @@ export interface SpacesSnapshot {
   spaces: Space[];
   invitations: SpaceInvitation[];
   entitlements: {
+    space_limit: number;
     unlimited_spaces: boolean;
     unlimited_collaborators: boolean;
   };

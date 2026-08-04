@@ -1,13 +1,38 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { spaceNotesEnabled } from "@/features/notes/availability";
 
-const blankSpacesRoute = "/spaces";
 const maximumOpenTabs = 16;
+const pendingSpaceId = "__pending__";
 
-export interface SpacesTab {
+export type WorkspaceTabKind = "space" | "file-manager" | "extensions" | "transfers";
+
+interface WorkspaceTabBase {
   id: string;
+  kind: WorkspaceTabKind;
+  title: string;
+}
+
+export interface SpaceWorkspaceTab extends WorkspaceTabBase {
+  kind: "space";
   route: string;
 }
+
+export interface FileManagerWorkspaceTab extends WorkspaceTabBase {
+  kind: "file-manager";
+  workspaceId: string;
+}
+
+export interface ExtensionsWorkspaceTab extends WorkspaceTabBase {
+  kind: "extensions";
+}
+
+export interface TransfersWorkspaceTab extends WorkspaceTabBase {
+  kind: "transfers";
+}
+
+export type SpacesTab =
+  SpaceWorkspaceTab | FileManagerWorkspaceTab | ExtensionsWorkspaceTab | TransfersWorkspaceTab;
 
 export interface SpacesTabsSession {
   tabs: SpacesTab[];
@@ -17,12 +42,25 @@ export interface SpacesTabsSession {
 
 interface SpacesTabsStore {
   sessions: Record<string, SpacesTabsSession>;
-  ensureSession: (accountId: string, initialRoute?: string) => void;
-  addBlankTab: (accountId: string) => string;
-  closeTab: (accountId: string, tabId: string) => void;
-  reorderTabs: (accountId: string, tabId: string, fromIndex: number, toIndex: number) => void;
-  selectTab: (accountId: string, tabId: string) => void;
-  updateActiveTabRoute: (accountId: string, route: string) => void;
+  ensureSession: (accountId: string, spaceId: string, initialRoute?: string) => void;
+  addTab: (
+    accountId: string,
+    spaceId: string,
+    kind: WorkspaceTabKind,
+    initialRoute?: string,
+  ) => string | null;
+  closeTab: (accountId: string, spaceId: string, tabId: string) => SpacesTab | null;
+  reorderTabs: (
+    accountId: string,
+    spaceId: string,
+    tabId: string,
+    fromIndex: number,
+    toIndex: number,
+  ) => void;
+  selectTab: (accountId: string, spaceId: string, tabId: string) => void;
+  updateActiveSpaceRoute: (accountId: string, spaceId: string, route: string) => void;
+  removeSession: (accountId: string, spaceId: string) => SpacesTab[];
+  pruneSessions: (accountId: string, validSpaceIds: string[]) => SpacesTab[];
 }
 
 export const useSpacesTabsStore = create<SpacesTabsStore>()(
@@ -30,24 +68,33 @@ export const useSpacesTabsStore = create<SpacesTabsStore>()(
     (set, get) => ({
       sessions: {},
 
-      ensureSession: (accountId, initialRoute = blankSpacesRoute) => {
-        if (!accountId || get().sessions[accountId]?.tabs.length) return;
-        const session = createSession(initialRoute);
-        set((state) => ({
-          sessions: { ...state.sessions, [accountId]: session },
-        }));
+      ensureSession: (accountId, spaceId, initialRoute) => {
+        if (!accountId || !spaceId) return;
+        const key = spacesTabsSessionKey(accountId, spaceId);
+        if (get().sessions[key]?.tabs.length) return;
+
+        const pendingKey = spacesTabsSessionKey(accountId, pendingSpaceId);
+        const pending = get().sessions[pendingKey];
+        const session = pending?.tabs.length
+          ? normalizeSession(pending, spaceId)
+          : createSession(spaceId, initialRoute);
+        set((state) => {
+          const sessions = { ...state.sessions, [key]: session };
+          delete sessions[pendingKey];
+          return { sessions };
+        });
       },
 
-      addBlankTab: (accountId) => {
-        const current = get().sessions[accountId] ?? createSession();
-        if (current.tabs.length >= maximumOpenTabs) {
-          return current.activeTabId;
-        }
-        const tab = createTab(current.nextTabIndex, blankSpacesRoute);
+      addTab: (accountId, spaceId, kind, initialRoute) => {
+        if (!accountId || !spaceId) return null;
+        const key = spacesTabsSessionKey(accountId, spaceId);
+        const current = get().sessions[key] ?? createSession(spaceId, initialRoute);
+        if (current.tabs.length >= maximumOpenTabs) return null;
+        const tab = createTab(kind, spaceId, current.nextTabIndex, initialRoute);
         set((state) => ({
           sessions: {
             ...state.sessions,
-            [accountId]: {
+            [key]: {
               ...current,
               tabs: [...current.tabs, tab],
               activeTabId: tab.id,
@@ -58,25 +105,27 @@ export const useSpacesTabsStore = create<SpacesTabsStore>()(
         return tab.id;
       },
 
-      closeTab: (accountId, tabId) => {
-        const current = get().sessions[accountId];
-        if (!current) return;
+      closeTab: (accountId, spaceId, tabId) => {
+        const key = spacesTabsSessionKey(accountId, spaceId);
+        const current = get().sessions[key];
+        if (!current) return null;
         const closedIndex = current.tabs.findIndex((tab) => tab.id === tabId);
-        if (closedIndex < 0) return;
+        if (closedIndex < 0) return null;
+        const closed = current.tabs[closedIndex];
 
         if (current.tabs.length === 1) {
-          const blankTab = createTab(current.nextTabIndex, blankSpacesRoute);
+          const fallback = createTab("space", spaceId, current.nextTabIndex);
           set((state) => ({
             sessions: {
               ...state.sessions,
-              [accountId]: {
-                tabs: [blankTab],
-                activeTabId: blankTab.id,
+              [key]: {
+                tabs: [fallback],
+                activeTabId: fallback.id,
                 nextTabIndex: current.nextTabIndex + 1,
               },
             },
           }));
-          return;
+          return closed;
         }
 
         const tabs = current.tabs.filter((tab) => tab.id !== tabId);
@@ -87,17 +136,15 @@ export const useSpacesTabsStore = create<SpacesTabsStore>()(
         set((state) => ({
           sessions: {
             ...state.sessions,
-            [accountId]: {
-              ...current,
-              tabs,
-              activeTabId: activeTab.id,
-            },
+            [key]: { ...current, tabs, activeTabId: activeTab.id },
           },
         }));
+        return closed;
       },
 
-      reorderTabs: (accountId, tabId, fromIndex, toIndex) => {
-        const current = get().sessions[accountId];
+      reorderTabs: (accountId, spaceId, tabId, fromIndex, toIndex) => {
+        const key = spacesTabsSessionKey(accountId, spaceId);
+        const current = get().sessions[key];
         if (!current || fromIndex === toIndex || fromIndex < 0 || toIndex < 0) return;
         const sourceIndex = current.tabs.findIndex((tab) => tab.id === tabId);
         if (sourceIndex < 0) return;
@@ -105,125 +152,266 @@ export const useSpacesTabsStore = create<SpacesTabsStore>()(
         const tabs = current.tabs.filter((tab) => tab.id !== tabId);
         tabs.splice(boundedIndex, 0, current.tabs[sourceIndex]);
         set((state) => ({
-          sessions: {
-            ...state.sessions,
-            [accountId]: { ...current, tabs },
-          },
+          sessions: { ...state.sessions, [key]: { ...current, tabs } },
         }));
       },
 
-      selectTab: (accountId, tabId) => {
-        const current = get().sessions[accountId];
+      selectTab: (accountId, spaceId, tabId) => {
+        const key = spacesTabsSessionKey(accountId, spaceId);
+        const current = get().sessions[key];
         if (!current || current.activeTabId === tabId) return;
         if (!current.tabs.some((tab) => tab.id === tabId)) return;
         set((state) => ({
           sessions: {
             ...state.sessions,
-            [accountId]: { ...current, activeTabId: tabId },
+            [key]: { ...current, activeTabId: tabId },
           },
         }));
       },
 
-      updateActiveTabRoute: (accountId, route) => {
-        const current = get().sessions[accountId];
+      updateActiveSpaceRoute: (accountId, spaceId, route) => {
+        const key = spacesTabsSessionKey(accountId, spaceId);
+        const current = get().sessions[key];
         if (!current) return;
-        const normalizedRoute = normalizeSpacesTabRoute(route);
+        const normalizedRoute = normalizeSpacesTabRoute(route, spaceId);
         let changed = false;
         const tabs = current.tabs.map((tab) => {
-          if (tab.id !== current.activeTabId || tab.route === normalizedRoute) return tab;
+          if (
+            tab.id !== current.activeTabId ||
+            tab.kind !== "space" ||
+            tab.route === normalizedRoute
+          )
+            return tab;
           changed = true;
           return { ...tab, route: normalizedRoute };
         });
         if (!changed) return;
         set((state) => ({
-          sessions: {
-            ...state.sessions,
-            [accountId]: { ...current, tabs },
-          },
+          sessions: { ...state.sessions, [key]: { ...current, tabs } },
         }));
+      },
+
+      removeSession: (accountId, spaceId) => {
+        const key = spacesTabsSessionKey(accountId, spaceId);
+        const tabs = get().sessions[key]?.tabs ?? [];
+        set((state) => {
+          const sessions = { ...state.sessions };
+          delete sessions[key];
+          return { sessions };
+        });
+        return tabs;
+      },
+
+      pruneSessions: (accountId, validSpaceIds) => {
+        if (!accountId) return [];
+        const valid = new Set(validSpaceIds);
+        const prefix = `${accountId}::`;
+        const removed: SpacesTab[] = [];
+        set((state) => {
+          const sessions = { ...state.sessions };
+          for (const [key, session] of Object.entries(sessions)) {
+            if (!key.startsWith(prefix)) continue;
+            const spaceId = key.slice(prefix.length);
+            if (spaceId === pendingSpaceId || valid.has(spaceId)) continue;
+            removed.push(...session.tabs);
+            delete sessions[key];
+          }
+          return { sessions };
+        });
+        return removed;
       },
     }),
     {
       name: "misty:spaces-tabs",
-      version: 1,
+      version: 2,
       partialize: (state) => ({ sessions: state.sessions }),
-      merge: (persistedState, currentState) => {
-        const persisted = persistedState as Partial<SpacesTabsStore> | undefined;
-        return {
-          ...currentState,
-          sessions: sanitizeSessions(persisted?.sessions),
-        };
-      },
+      migrate: (persistedState, version) => migratePersistedTabs(persistedState, version),
+      merge: (persistedState, currentState) => ({
+        ...currentState,
+        sessions: sanitizeSessions(
+          (persistedState as Partial<SpacesTabsStore> | undefined)?.sessions,
+        ),
+      }),
     },
   ),
 );
+
+export function spacesTabsSessionKey(accountId: string, spaceId: string): string {
+  return `${accountId}::${spaceId}`;
+}
 
 export function activeSpacesTab(session: SpacesTabsSession | undefined): SpacesTab | null {
   return session?.tabs.find((tab) => tab.id === session.activeTabId) ?? session?.tabs[0] ?? null;
 }
 
-export function normalizeSpacesTabRoute(route: string): string {
+export function defaultSpaceRoute(spaceId: string): string {
+  return `/spaces/${encodeURIComponent(spaceId)}/${spaceNotesEnabled ? "notes" : "drawings"}`;
+}
+
+export function normalizeSpacesTabRoute(route: string, spaceId?: string): string {
+  const fallback = spaceId ? defaultSpaceRoute(spaceId) : "/spaces";
   const trimmed = route.trim();
-  if (!trimmed) return blankSpacesRoute;
+  if (!trimmed) return fallback;
   try {
     const parsed = new URL(trimmed, "https://misty.local");
-    if (parsed.pathname !== blankSpacesRoute && !parsed.pathname.startsWith(`${blankSpacesRoute}/`))
-      return blankSpacesRoute;
+    if (parsed.pathname !== "/spaces" && !parsed.pathname.startsWith("/spaces/")) return fallback;
     const pathParts = parsed.pathname.split("/");
-    if (pathParts[1] === "spaces" && pathParts[3] === "tasks") {
-      pathParts[3] = "planner";
+    if (spaceId && pathParts[2] && decodeURIComponent(pathParts[2]) !== spaceId) return fallback;
+    if (pathParts[1] === "spaces" && pathParts[2] && !pathParts[3]) {
+      pathParts[3] = spaceNotesEnabled ? "notes" : "drawings";
+    }
+    if (pathParts[1] === "spaces" && pathParts[3] === "home") {
+      pathParts[3] = spaceNotesEnabled ? "notes" : "drawings";
+    }
+    if (pathParts[1] === "spaces" && pathParts[3] === "tasks") pathParts[3] = "planner";
+    if (pathParts[1] === "spaces" && pathParts[3] === "planner") {
+      if (!pathParts[4]) pathParts.push("tasks", "board");
+      else if (pathParts[4] === "board" || pathParts[4] === "list")
+        pathParts.splice(4, 1, "tasks", pathParts[4]);
+      else if (pathParts[4] === "calendar") pathParts.splice(4, 1, "agenda", "month");
     }
     return `${pathParts.join("/")}${parsed.search}${parsed.hash}`;
   } catch {
-    return blankSpacesRoute;
+    return fallback;
   }
 }
 
-function createSession(initialRoute = blankSpacesRoute): SpacesTabsSession {
-  const tab = createTab(0, initialRoute);
+function createSession(spaceId: string, initialRoute?: string): SpacesTabsSession {
+  const tab = createTab("space", spaceId, 0, initialRoute);
+  return { tabs: [tab], activeTabId: tab.id, nextTabIndex: 1 };
+}
+
+function createTab(
+  kind: WorkspaceTabKind,
+  spaceId: string,
+  index: number,
+  initialRoute?: string,
+): SpacesTab {
+  const id = `space-workspace-tab-${index}`;
+  if (kind === "space") {
+    return {
+      id,
+      kind,
+      title: "Space",
+      route: normalizeSpacesTabRoute(initialRoute ?? defaultSpaceRoute(spaceId), spaceId),
+    };
+  }
+  if (kind === "file-manager") {
+    return {
+      id,
+      kind,
+      title: "File Manager",
+      workspaceId: `space-files-${encodeURIComponent(spaceId)}-${index}`,
+    };
+  }
+  return { id, kind, title: kind === "extensions" ? "Extensions" : "Transfers" };
+}
+
+function normalizeSession(session: SpacesTabsSession, spaceId: string): SpacesTabsSession {
+  const tabs = session.tabs.map((tab, index) => sanitizeTab(tab, spaceId, index));
   return {
-    tabs: [tab],
-    activeTabId: tab.id,
-    nextTabIndex: 1,
+    tabs,
+    activeTabId: tabs.some((tab) => tab.id === session.activeTabId)
+      ? session.activeTabId
+      : (tabs[0]?.id ?? ""),
+    nextTabIndex: Math.max(session.nextTabIndex || 0, tabs.length),
   };
 }
 
-function createTab(index: number, route: string): SpacesTab {
-  return {
-    id: `spaces-tab-${index}`,
-    route: normalizeSpacesTabRoute(route),
+function sanitizeSessions(value: unknown): Record<string, SpacesTabsSession> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  const result: Record<string, SpacesTabsSession> = {};
+  for (const [key, raw] of Object.entries(value)) {
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) continue;
+    const [accountId, spaceId = pendingSpaceId] = key.split("::");
+    if (!accountId) continue;
+    const candidate = raw as Partial<SpacesTabsSession>;
+    const sourceTabs = Array.isArray(candidate.tabs) ? candidate.tabs : [];
+    const tabs = sourceTabs
+      .slice(0, maximumOpenTabs)
+      .map((tab, index) => sanitizeTab(tab, spaceId, index));
+    if (tabs.length === 0) continue;
+    result[key] = {
+      tabs,
+      activeTabId: tabs.some((tab) => tab.id === candidate.activeTabId)
+        ? String(candidate.activeTabId)
+        : tabs[0].id,
+      nextTabIndex: Math.max(Number(candidate.nextTabIndex) || 0, tabs.length),
+    };
+  }
+  return result;
+}
+
+function sanitizeTab(value: unknown, spaceId: string, index: number): SpacesTab {
+  const candidate = (value && typeof value === "object" ? value : {}) as Partial<SpacesTab> & {
+    route?: string;
   };
+  const id =
+    typeof candidate.id === "string" && candidate.id
+      ? candidate.id
+      : `space-workspace-tab-${index}`;
+  const kind: WorkspaceTabKind = ["space", "file-manager", "extensions", "transfers"].includes(
+    String(candidate.kind),
+  )
+    ? (candidate.kind as WorkspaceTabKind)
+    : "space";
+  if (kind === "space")
+    return {
+      id,
+      kind,
+      title: "Space",
+      route: normalizeSpacesTabRoute(candidate.route ?? defaultSpaceRoute(spaceId), spaceId),
+    };
+  if (kind === "file-manager")
+    return {
+      id,
+      kind,
+      title: "File Manager",
+      workspaceId:
+        "workspaceId" in candidate && typeof candidate.workspaceId === "string"
+          ? candidate.workspaceId
+          : `space-files-${encodeURIComponent(spaceId)}-${index}`,
+    };
+  return { id, kind, title: kind === "extensions" ? "Extensions" : "Transfers" };
 }
 
-function sanitizeSessions(
-  value: Record<string, SpacesTabsSession> | undefined,
-): Record<string, SpacesTabsSession> {
-  if (!value || typeof value !== "object") return {};
-  return Object.fromEntries(
-    Object.entries(value).flatMap(([accountId, session]) => {
-      if (!accountId || !session || !Array.isArray(session.tabs)) return [];
-      const tabs = session.tabs
-        .filter((tab): tab is SpacesTab => Boolean(tab && typeof tab.id === "string"))
-        .slice(0, maximumOpenTabs)
-        .map((tab) => ({ id: tab.id, route: normalizeSpacesTabRoute(tab.route) }));
-      if (tabs.length === 0) return [[accountId, createSession()]];
-      const activeTabId = tabs.some((tab) => tab.id === session.activeTabId)
-        ? session.activeTabId
-        : tabs[0].id;
-      const requestedNextTabIndex =
-        Number.isInteger(session.nextTabIndex) && session.nextTabIndex > 0
-          ? session.nextTabIndex
-          : tabs.length;
-      const nextTabIndex = Math.max(
-        requestedNextTabIndex,
-        ...tabs.map((tab) => tabIndexFromId(tab.id) + 1),
-      );
-      return [[accountId, { tabs, activeTabId, nextTabIndex }]];
-    }),
-  );
+function migratePersistedTabs(
+  value: unknown,
+  version: number,
+): { sessions: Record<string, SpacesTabsSession> } {
+  if (version >= 2) {
+    const current = value as { sessions?: Record<string, SpacesTabsSession> } | undefined;
+    return { sessions: current?.sessions ?? {} };
+  }
+  const legacy = value as { sessions?: Record<string, SpacesTabsSession> } | undefined;
+  const sessions: Record<string, SpacesTabsSession> = {};
+  for (const [accountId, session] of Object.entries(legacy?.sessions ?? {})) {
+    const groups = new Map<string, SpacesTab[]>();
+    for (const [index, legacyTab] of (session.tabs ?? []).entries()) {
+      const route = "route" in legacyTab ? String(legacyTab.route) : "/spaces";
+      const spaceId = spaceIdFromRoute(route) || pendingSpaceId;
+      const group = groups.get(spaceId) ?? [];
+      group.push(sanitizeTab({ ...legacyTab, kind: "space" }, spaceId, index));
+      groups.set(spaceId, group);
+    }
+    for (const [spaceId, tabs] of groups) {
+      const active = tabs.find((tab) => tab.id === session.activeTabId) ?? tabs[0];
+      sessions[spacesTabsSessionKey(accountId, spaceId)] = {
+        tabs,
+        activeTabId: active.id,
+        nextTabIndex: Math.max(session.nextTabIndex || 0, tabs.length),
+      };
+    }
+  }
+  return { sessions };
 }
 
-function tabIndexFromId(tabId: string): number {
-  const match = tabId.match(/(\d+)$/);
-  return match ? Number(match[1]) : 0;
+function spaceIdFromRoute(route: string): string {
+  try {
+    const parsed = new URL(route, "https://misty.local");
+    const segment = parsed.pathname.split("/").filter(Boolean)[1];
+    return segment ? decodeURIComponent(segment) : "";
+  } catch {
+    return "";
+  }
 }
