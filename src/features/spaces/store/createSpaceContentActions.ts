@@ -1,4 +1,3 @@
-import { activityApi } from "@/api/activity/api";
 import { resolveSpacesApiBase, spacesApi } from "@/api/spaces/api";
 import { errorText } from "@/shared/lib/format";
 import { openExternalLink } from "@/shared/platform/openExternalLink";
@@ -22,8 +21,6 @@ export function createSpaceContentActions(
   | "saveStudio"
   | "deleteStudio"
   | "runStudio"
-  | "markInboxSeen"
-  | "clearInbox"
 > {
   return {
     sendMessage: async (
@@ -165,7 +162,6 @@ export function createSpaceContentActions(
     },
     markRead: async (spaceId, seq) => {
       await spacesApi.markRead(spaceId, seq);
-      await get().loadInbox();
     },
     openNode: async (spaceId, nodeId, disposition = "open") => {
       const [ticket, base] = await Promise.all([
@@ -212,30 +208,6 @@ export function createSpaceContentActions(
         });
         throw error;
       }
-    },
-    markInboxSeen: async () => {
-      await activityApi.markSeen();
-      set((state) => ({
-        inbox: {
-          unreads: state.inbox.unreads.map((item) => ({
-            ...item,
-            seen_at: item.seen_at ?? new Date().toISOString(),
-          })),
-          mentions: state.inbox.mentions.map((item) => ({
-            ...item,
-            seen_at: item.seen_at ?? new Date().toISOString(),
-          })),
-        },
-      }));
-    },
-    clearInbox: async (tab) => {
-      await activityApi.clearInbox(tab);
-      set((state) => ({
-        inbox: {
-          ...state.inbox,
-          [tab]: [],
-        },
-      }));
     },
   };
 }

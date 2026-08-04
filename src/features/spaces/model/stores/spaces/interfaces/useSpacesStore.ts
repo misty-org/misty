@@ -2,7 +2,6 @@ import type {
   CreateSpaceRequest,
   CreateSpaceResult,
   Space,
-  SpaceInboxItem,
   SpaceInvitation,
   SpaceMember,
   SpaceMessage,
@@ -12,8 +11,6 @@ import type {
   SpacesSnapshot,
 } from "@/api/spaces/dto/interfaces/types";
 import type { SpacePresenceViewer } from "../types/useSpacesBackendStore";
-
-import type { ActivityTab } from "../../../../store/useSpacesStore";
 
 export interface SpacesStore {
   spaces: Space[];
@@ -26,10 +23,8 @@ export interface SpacesStore {
   messageErrorsBySpace: Record<string, string>;
   nodesBySpace: Record<string, SpaceNode[]>;
   workflowsBySpace: Record<string, SpaceStudioResource[]>;
-  inbox: Record<ActivityTab, SpaceInboxItem[]>;
   presenceBySpace: Record<string, SpacePresenceViewer[]>;
   snapshotReady: boolean;
-  inboxError?: string | null;
   referenceOnly: boolean;
   lastSyncedAt: string | null;
   loading: boolean;
@@ -42,7 +37,6 @@ export interface SpacesStore {
   loadNodes: (spaceId: string) => Promise<void>;
   loadMembers: (spaceId: string) => Promise<void>;
   loadStudio: (spaceId: string, kind: "workflows") => Promise<void>;
-  loadInbox: () => Promise<void>;
   createSpace: (request: CreateSpaceRequest) => Promise<CreateSpaceResult>;
   renameSpace: (spaceId: string, name: string) => Promise<Space>;
   invite: (spaceId: string, email: string) => Promise<void>;
@@ -88,8 +82,6 @@ export interface SpacesStore {
     prompt?: string,
     capabilityId?: string,
   ) => Promise<SpaceRun>;
-  markInboxSeen: () => Promise<void>;
-  clearInbox: (tab: ActivityTab) => Promise<void>;
   connectRealtime: (accountId: string) => Promise<void>;
   disconnectRealtime: () => void;
   setViewingSpace: (spaceId: string) => void;
