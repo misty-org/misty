@@ -1,4 +1,8 @@
-import type { SpaceInvitation, SpaceMember } from "@/models/interfaces/features/spaces/types";
+import type {
+  SpaceAgentMembership,
+  SpaceInvitation,
+  SpaceMember,
+} from "@/models/interfaces/features/spaces/types";
 
 type SpaceRequest = <T = void>(path: string, init?: RequestInit) => Promise<T>;
 type ProtectedBlobRequest = (path: string, init?: RequestInit) => Promise<Blob>;
@@ -12,7 +16,9 @@ export function createSpaceMembersApi(
 
   return {
     members: (spaceId: string) =>
-      request<{ members: SpaceMember[] }>(`/spaces/${encodeURIComponent(spaceId)}/members`),
+      request<{ members: SpaceMember[]; agents: SpaceAgentMembership[] }>(
+        `/spaces/${encodeURIComponent(spaceId)}/members`,
+      ),
     memberAvatar: (spaceId: string, userId: string) =>
       fetchProtectedBlob(`${memberPath(spaceId, userId)}/avatar`),
     invite: (spaceId: string, email: string) =>

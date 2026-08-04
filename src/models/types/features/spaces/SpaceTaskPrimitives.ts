@@ -13,6 +13,8 @@ export type TaskDraft = {
   status: SpaceTaskStatus;
   priority: SpaceTaskPriority;
   assignee_user_id: string;
+  assignee_agent_id: string;
   due_at: string;
   due_timezone: string;
+  source_refs: SpaceTask["source_refs"];
 };

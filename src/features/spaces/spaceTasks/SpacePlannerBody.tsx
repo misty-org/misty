@@ -1,9 +1,9 @@
 import { LoaderCircle } from "lucide-react";
 import { Button } from "@/ui";
 import type { TaskViewMode } from "@/models/types/features/spaces/SpacePlanner";
-import type { SpaceCalendarEvent, SpaceMember } from "@/models/interfaces/features/spaces/types";
+import type { SpaceAgentMembership, SpaceMember } from "@/models/interfaces/features/spaces/types";
 import { TaskErrorState } from "../SpaceTaskPrimitives";
-import { SpaceTaskBoard, SpaceTaskCalendar, SpaceTaskList } from "../SpacePlannerViews";
+import { SpaceTaskBoard, SpaceTaskList } from "../SpacePlannerViews";
 import type { SpaceTasksData } from "./useSpaceTasksData";
 import type { SpaceTaskActions } from "./useSpaceTaskActions";
 import { matchesDueFilter } from "./taskFiltering";
@@ -12,12 +12,12 @@ import type { DueFilter } from "@/models/types/features/spaces/SpacePlanner";
 export interface SpacePlannerBodyProps {
   view: TaskViewMode;
   members: SpaceMember[];
+  agents: SpaceAgentMembership[];
   canManage: boolean;
   assignee: string;
   due: DueFilter;
   data: SpaceTasksData;
   actions: SpaceTaskActions;
-  onOpenEvent: (event: SpaceCalendarEvent) => void;
 }
 
 /** The task surface itself — board, list or calendar — plus its loading and error states. */
@@ -25,10 +25,10 @@ export function SpacePlannerBody(props: SpacePlannerBodyProps) {
   const { view, data, actions, members } = props;
   const visibleTasks = data.tasks.filter(
     (task) =>
-      !(props.assignee === "unassigned" && task.assignee_user_id) &&
+      !(props.assignee === "unassigned" && (task.assignee_user_id || task.assignee_agent_id)) &&
       matchesDueFilter(task, props.due),
   );
-  const isEmptyLoad = data.loading && !data.tasks.length && !data.events.length;
+  const isEmptyLoad = data.loading && !data.tasks.length;
 
   return (
     // The board owns its own scrolling (horizontal columns, vertical cards); the list does not.
@@ -55,6 +55,7 @@ export function SpacePlannerBody(props: SpacePlannerBodyProps) {
         <SpaceTaskBoard
           tasks={visibleTasks.filter((task) => task.status !== "canceled")}
           members={members}
+          agents={props.agents}
           totals={data.statusTotals}
           busy={actions.busy}
           canManage={props.canManage}
@@ -62,24 +63,15 @@ export function SpacePlannerBody(props: SpacePlannerBodyProps) {
           onMove={actions.moveTask}
           onCreate={actions.quickCreate}
         />
-      ) : view === "list" ? (
+      ) : (
         <SpaceTaskList
           tasks={visibleTasks}
           members={members}
+          agents={props.agents}
           busy={actions.busy}
           canManage={props.canManage}
           onOpen={actions.openEdit}
           onUpdate={actions.updateTask}
-        />
-      ) : (
-        <SpaceTaskCalendar
-          month={data.month}
-          tasks={visibleTasks}
-          events={data.events}
-          members={members}
-          onMonth={data.setMonth}
-          onOpenTask={actions.openEdit}
-          onOpenEvent={props.onOpenEvent}
         />
       )}
 

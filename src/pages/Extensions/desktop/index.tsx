@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useNavigate } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
@@ -34,10 +34,13 @@ function toBrowserEntry(plugin: PluginEntry): PluginBrowserEntry {
   };
 }
 
-export default function PluginsPage() {
+export default function PluginsPage(props: { embedded?: boolean }) {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const routePluginId = searchParams.get("plugin")?.trim() ?? "";
+  const [embeddedPluginId, setEmbeddedPluginId] = useState("");
+  const routePluginId = props.embedded
+    ? embeddedPluginId
+    : (searchParams.get("plugin")?.trim() ?? "");
   const pluginPlatform = useSetupStore((state) =>
     state.status ? currentPluginPlatform(state.status.os, state.status.arch) : "",
   );
@@ -110,6 +113,10 @@ export default function PluginsPage() {
   const selectAndSyncRoute = useCallback(
     (pluginId: string) => {
       selectPlugin(pluginId);
+      if (props.embedded) {
+        setEmbeddedPluginId(pluginId);
+        return;
+      }
       setSearchParams(
         (previous) => {
           const next = new URLSearchParams(previous);
@@ -120,7 +127,7 @@ export default function PluginsPage() {
         { replace: true },
       );
     },
-    [selectPlugin, setSearchParams],
+    [props.embedded, selectPlugin, setSearchParams],
   );
 
   return (

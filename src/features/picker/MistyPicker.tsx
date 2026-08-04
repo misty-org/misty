@@ -9,9 +9,23 @@ export type {
 import { useState } from "react";
 import { FolderOpen, LibraryBig } from "lucide-react";
 
-import { ToggleGroup, ToggleGroupItem } from "@/ui";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  ToggleGroup,
+  ToggleGroupItem,
+} from "@/ui";
 import { MistyLibraryPicker } from "@/features/spaces/components/MistyLibraryPicker";
 import { MistyFilePicker } from "./FilePicker";
+
+const sharedPickerDialogClassName = [
+  "grid h-[min(640px,calc(100vh-64px))] w-[min(760px,calc(100vw-32px))] max-w-none",
+  "grid-rows-[auto_auto_minmax(0,1fr)_auto] gap-0 overflow-hidden p-0",
+  "max-[560px]:size-full max-[560px]:rounded-none",
+].join(" ");
 
 /**
  * One picker for both sources. Callers open this rather than choosing between a file
@@ -56,29 +70,62 @@ export function MistyPicker({
     </ToggleGroup>
   ) : null;
 
-  if (source === "library" && spaceId && onChooseLibraryItems) {
-    return (
-      <MistyLibraryPicker
-        spaceId={spaceId}
-        selectedIds={librarySelectedIds}
-        maximumSelected={libraryMaximum}
-        sourceToggle={sourceToggle}
-        onCancel={onCancel}
-        onChoose={onChooseLibraryItems}
-      />
-    );
-  }
-
   return (
-    <MistyFilePicker
-      mode={fileMode}
-      multiple={multiple}
-      title={title}
-      allowedExtensions={allowedExtensions}
-      sourceToggle={sourceToggle}
-      onCancel={onCancel}
-      onSelect={(path) => onChooseFiles([path])}
-      onSelectMany={(paths) => onChooseFiles(paths)}
-    />
+    <Dialog
+      open
+      onOpenChange={(open) => {
+        if (!open) onCancel();
+      }}
+    >
+      <DialogContent className={sharedPickerDialogClassName}>
+        <DialogHeader className="flex-row items-center justify-between gap-4 border-b border-border px-5 py-3 pr-14 text-left">
+          <div className="min-w-0">
+            <DialogTitle className="text-base">
+              {source === "library"
+                ? "Choose from Library"
+                : title || (fileMode === "folder" ? "Choose a folder" : "Choose a file")}
+            </DialogTitle>
+            <DialogDescription>
+              {source === "library"
+                ? `Select up to ${libraryMaximum} items to reference.`
+                : fileMode === "folder"
+                  ? "Pick a destination folder."
+                  : multiple
+                    ? "Pick one or more files."
+                    : "Pick a file."}
+            </DialogDescription>
+          </div>
+          {sourceToggle}
+        </DialogHeader>
+
+        <div style={{ display: source === "files" ? "contents" : "none" }}>
+          <MistyFilePicker
+            embedded
+            active={source === "files"}
+            mode={fileMode}
+            multiple={multiple}
+            title={title}
+            allowedExtensions={allowedExtensions}
+            onCancel={onCancel}
+            onSelect={(path) => onChooseFiles([path])}
+            onSelectMany={(paths) => onChooseFiles(paths)}
+          />
+        </div>
+
+        {libraryAvailable && spaceId && onChooseLibraryItems ? (
+          <div style={{ display: source === "library" ? "contents" : "none" }}>
+            <MistyLibraryPicker
+              embedded
+              active={source === "library"}
+              spaceId={spaceId}
+              selectedIds={librarySelectedIds}
+              maximumSelected={libraryMaximum}
+              onCancel={onCancel}
+              onChoose={onChooseLibraryItems}
+            />
+          </div>
+        ) : null}
+      </DialogContent>
+    </Dialog>
   );
 }

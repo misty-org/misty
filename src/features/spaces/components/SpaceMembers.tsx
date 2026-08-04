@@ -3,9 +3,13 @@ export type { MemberAction } from "@/models/types/features/spaces/components/Spa
 import { UserPlus } from "lucide-react";
 import { Button } from "@/ui";
 import { useAuth } from "@/features/auth/AuthContext";
+import { useSpacesStore } from "@/stores/spaces/useSpacesStore";
 import { InviteMemberDialog } from "../spaceMembers/InviteMemberDialog";
 import { MemberActionDialog } from "../spaceMembers/MemberActionDialog";
+import { TeamList } from "../spaceMembers/TeamList";
 import { MemberList } from "../spaceMembers/MemberList";
+import { AgentMembershipList } from "../spaceMembers/AgentMembershipList";
+import { agentTeammatesV1Enabled } from "@/features/agents/flags";
 import { PendingInvitationsCard } from "../spaceMembers/PendingInvitationsCard";
 import { useMemberDialogs } from "../spaceMembers/useMemberDialogs";
 import { useSpaceMembers } from "../spaceMembers/useSpaceMembers";
@@ -20,8 +24,9 @@ export function SpaceMembers({
   const { user } = useAuth();
   const state = useSpaceMembers(spaceId);
   const dialogs = useMemberDialogs(spaceId, state);
-  const { space, members, error, clearError } = state;
+  const { space, members, agents, error, clearError } = state;
   const bannerError = error && !dialogs.inviteOpen && !dialogs.memberAction ? error : "";
+  const teammatesEnabled = agentTeammatesV1Enabled();
 
   return (
     <div
@@ -33,10 +38,14 @@ export function SpaceMembers({
         <div className="mb-4 flex min-w-0 flex-wrap items-center justify-between gap-3">
           <div>
             {!embedded ? (
-              <h2 className="m-0 text-sm font-semibold text-foreground">Members</h2>
+              <h2 className="m-0 text-sm font-semibold text-foreground">
+                {teammatesEnabled ? "Team" : "Members"}
+              </h2>
             ) : null}
             <p className={`${embedded ? "m-0" : "mb-0 mt-1"} text-xs text-muted-foreground`}>
-              {members.length} active member{members.length === 1 ? "" : "s"}
+              {teammatesEnabled
+                ? `${members.length + agents.length + 1} teammates`
+                : `${members.length} active member${members.length === 1 ? "" : "s"}`}
               {space?.pending_count ? ` · ${space.pending_count} pending` : ""}
             </p>
           </div>
@@ -58,13 +67,37 @@ export function SpaceMembers({
           </Button>
         ) : null}
 
-        <MemberList
-          members={members}
-          loading={state.membersLoading}
-          owner={state.owner}
-          currentUserId={user?.id}
-          onAction={dialogs.setMemberAction}
-        />
+        {teammatesEnabled ? (
+          <TeamList
+            spaceId={spaceId}
+            members={members}
+            agents={agents}
+            loading={state.membersLoading}
+            owner={state.owner}
+            canManageAgents={state.canManageAgents}
+            currentUserId={user?.id}
+            onMemberAction={dialogs.setMemberAction}
+            onReload={() => useSpacesStore.getState().loadMembers(spaceId)}
+            onError={(message) => useSpacesStore.setState({ error: message || null })}
+          />
+        ) : (
+          <>
+            <MemberList
+              members={members}
+              loading={state.membersLoading}
+              owner={state.owner}
+              currentUserId={user?.id}
+              onAction={dialogs.setMemberAction}
+            />
+            <AgentMembershipList
+              spaceId={spaceId}
+              agents={agents}
+              canManage={state.canManageAgents}
+              onReload={() => useSpacesStore.getState().loadMembers(spaceId)}
+              onError={(message) => useSpacesStore.setState({ error: message || null })}
+            />
+          </>
+        )}
 
         {state.owner ? (
           <PendingInvitationsCard

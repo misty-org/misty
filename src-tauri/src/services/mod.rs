@@ -35,6 +35,7 @@ pub mod power_pack;
 pub mod providers;
 pub mod search;
 pub mod settings;
+mod settings_migration;
 pub mod smart_library;
 mod smart_library_ingestion;
 pub mod storage;

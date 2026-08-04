@@ -161,79 +161,86 @@ export const ExplorerSidebar = memo(function ExplorerSidebar(props: ExplorerSide
   return (
     <aside className={sidebarStyles.root} data-explorer-scroll-container>
       <section className={sidebarStyles.section}>
-        <DropdownMenu open={workspaceMenuOpen} onOpenChange={setWorkspaceMenuOpen}>
-          <DropdownMenuTrigger asChild>
-            <Button type="button" variant="ghost" className={sidebarStyles.workspaceSelect}>
-              <Briefcase size={20} />
-              <span className={sidebarStyles.workspaceSelectLabel}>
-                {props.activeWorkspaceTitle}
-              </span>
-              <ChevronDown size={15} />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="w-60">
-            {(props.workspaceEntries.length > 0
-              ? props.workspaceEntries
-              : [
-                  {
-                    id: props.activeWorkspaceId || "workspace_0",
-                    title: props.activeWorkspaceTitle,
-                  },
-                ]
-            ).map((workspace) => (
-              <DropdownMenuItem
-                key={workspace.id}
-                className="group/workspace gap-2 pr-1"
-                role="menuitemradio"
-                aria-checked={workspace.id === props.activeWorkspaceId}
-                onSelect={() => props.onSelectWorkspace(workspace.id)}
-              >
-                <span className="w-[17px] flex-none">
-                  {workspace.id === props.activeWorkspaceId ? <Check size={15} /> : null}
+        {props.workspaceLocked ? (
+          <div className={sidebarStyles.workspaceSelect} aria-label="File Manager workspace">
+            <Briefcase size={20} />
+            <span className={sidebarStyles.workspaceSelectLabel}>{props.activeWorkspaceTitle}</span>
+          </div>
+        ) : (
+          <DropdownMenu open={workspaceMenuOpen} onOpenChange={setWorkspaceMenuOpen}>
+            <DropdownMenuTrigger asChild>
+              <Button type="button" variant="ghost" className={sidebarStyles.workspaceSelect}>
+                <Briefcase size={20} />
+                <span className={sidebarStyles.workspaceSelectLabel}>
+                  {props.activeWorkspaceTitle}
                 </span>
-                <span className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap">
-                  {workspace.title}
-                </span>
-                <span className="flex flex-none items-center gap-px opacity-0 group-hover/workspace:opacity-100 group-focus-within/workspace:opacity-100">
-                  <Button
-                    variant="ghost"
-                    size="icon-xs"
-                    type="button"
-                    aria-label={`Rename ${workspace.title}`}
-                    onPointerDown={(event) => event.stopPropagation()}
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      event.preventDefault();
-                      openWorkspaceDialog("rename", workspace);
-                    }}
-                  >
-                    <Pencil size={14} />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon-xs"
-                    type="button"
-                    aria-label={`Delete ${workspace.title}`}
-                    disabled={props.workspaceEntries.length <= 1}
-                    onPointerDown={(event) => event.stopPropagation()}
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      event.preventDefault();
-                      openWorkspaceDialog("delete", workspace);
-                    }}
-                  >
-                    <Trash2 size={14} />
-                  </Button>
-                </span>
+                <ChevronDown size={15} />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-60">
+              {(props.workspaceEntries.length > 0
+                ? props.workspaceEntries
+                : [
+                    {
+                      id: props.activeWorkspaceId || "workspace_0",
+                      title: props.activeWorkspaceTitle,
+                    },
+                  ]
+              ).map((workspace) => (
+                <DropdownMenuItem
+                  key={workspace.id}
+                  className="group/workspace gap-2 pr-1"
+                  role="menuitemradio"
+                  aria-checked={workspace.id === props.activeWorkspaceId}
+                  onSelect={() => props.onSelectWorkspace(workspace.id)}
+                >
+                  <span className="w-[17px] flex-none">
+                    {workspace.id === props.activeWorkspaceId ? <Check size={15} /> : null}
+                  </span>
+                  <span className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap">
+                    {workspace.title}
+                  </span>
+                  <span className="flex flex-none items-center gap-px opacity-0 group-hover/workspace:opacity-100 group-focus-within/workspace:opacity-100">
+                    <Button
+                      variant="ghost"
+                      size="icon-xs"
+                      type="button"
+                      aria-label={`Rename ${workspace.title}`}
+                      onPointerDown={(event) => event.stopPropagation()}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        event.preventDefault();
+                        openWorkspaceDialog("rename", workspace);
+                      }}
+                    >
+                      <Pencil size={14} />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon-xs"
+                      type="button"
+                      aria-label={`Delete ${workspace.title}`}
+                      disabled={props.workspaceEntries.length <= 1}
+                      onPointerDown={(event) => event.stopPropagation()}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        event.preventDefault();
+                        openWorkspaceDialog("delete", workspace);
+                      }}
+                    >
+                      <Trash2 size={14} />
+                    </Button>
+                  </span>
+                </DropdownMenuItem>
+              ))}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onSelect={() => openWorkspaceDialog("create")}>
+                <Plus size={15} />
+                <span>New</span>
               </DropdownMenuItem>
-            ))}
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onSelect={() => openWorkspaceDialog("create")}>
-              <Plus size={15} />
-              <span>New</span>
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
       </section>
 
       <SidebarQuickAccessSection

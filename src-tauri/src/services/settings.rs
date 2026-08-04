@@ -6,6 +6,8 @@ use std::{
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Map, Value};
 
+use super::settings_migration::{prune_retired_settings, SETTINGS_SCHEMA_VERSION};
+
 use crate::error::{ApiError, ApiResult};
 use crate::services::environment::AppEnvironmentService;
 #[cfg(desktop)]
@@ -164,8 +166,15 @@ fn normalize_settings_document(document: &mut Value) -> bool {
     }
 
     let root = document.as_object_mut().expect("settings document object");
-    if root.get("schema_version").and_then(Value::as_i64) != Some(1) {
-        root.insert("schema_version".to_owned(), json!(1));
+    // Monotonic: a document already at 2 is left alone, and a *newer* document
+    // (a user who downgraded) is not mangled by this build's idea of retired.
+    let stored_version = root.get("schema_version").and_then(Value::as_i64).unwrap_or(0);
+    if stored_version < SETTINGS_SCHEMA_VERSION {
+        // Prune before backfilling, or the defaults pass would re-add keys this
+        // pass is about to remove. The return value is ignored because bumping
+        // the version below already marks the document dirty.
+        prune_retired_settings(root);
+        root.insert("schema_version".to_owned(), json!(SETTINGS_SCHEMA_VERSION));
         changed = true;
     }
 
@@ -177,20 +186,14 @@ fn normalize_settings_document(document: &mut Value) -> bool {
         root,
         "general",
         &[
-            ("startup_view_index", json!(0)),
-            ("reopen_last_session", json!(true)),
             ("launch_on_login", json!(false)),
             ("auto_update_enabled", json!(true)),
-            ("release_channel_index", json!(0)),
-            ("update_available", json!(false)),
-            ("available_version_label", json!("v0.1.1")),
             ("confirm_destructive_actions", json!(true)),
             ("default_file_action_index", json!(0)),
             ("open_links_externally", json!(true)),
             ("preferred_workspace_root", json!("")),
             ("preferred_terminal_app", json!("System Default")),
             ("default_transfer_behavior_index", json!(0)),
-            ("last_update_check_label", json!("Never checked")),
         ],
     );
     changed |= ensure_section_defaults(
@@ -205,23 +208,12 @@ fn normalize_settings_document(document: &mut Value) -> bool {
             ("font_size_index", json!(1)),
             ("wallpaper_path", json!("")),
             ("panel_opacity", json!(0.82)),
-            ("custom_fonts", json!([])),
-        ],
-    );
-    changed |= ensure_section_defaults(
-        root,
-        "account",
-        &[
-            ("email", json!("")),
-            ("subscription_plan_label", json!("Free")),
-            ("connected_provider_count", json!(0)),
         ],
     );
     changed |= ensure_section_defaults(
         root,
         "privacy",
         &[
-            ("data_stays_local", json!(true)),
             ("anonymous_usage_analytics_enabled", json!(false)),
             ("anonymous_error_reporting_enabled", json!(false)),
         ],
@@ -231,7 +223,6 @@ fn normalize_settings_document(document: &mut Value) -> bool {
         "search",
         &[
             ("automatic_file_discovery_enabled", json!(true)),
-            ("automatic_image_discovery_enabled", json!(true)),
             ("discovery_interval_minutes", json!(15)),
         ],
     );
@@ -316,18 +307,6 @@ fn normalize_settings_document(document: &mut Value) -> bool {
             ("mount_path", json!(".misty/mnt")),
             ("extension_tools_path", json!(default_extension_tools_path)),
             ("frame_pacing_overlay_enabled", json!(false)),
-        ],
-    );
-    changed |= ensure_section_defaults(
-        root,
-        "ai",
-        &[
-            (
-                "api_url",
-                json!("https://api.openai.com/v1/chat/completions"),
-            ),
-            ("model", json!("")),
-            ("api_key", json!("")),
         ],
     );
     changed |= ensure_object(root, "open_with");
@@ -566,7 +545,7 @@ mod tests {
             &settings_path,
             &json!({
                 "general": {
-                    "startup_view_index": 2,
+                    "preferred_terminal_app": "Ghostty",
                     "custom_general_value": "kept"
                 },
                 "appearance": {
@@ -583,15 +562,25 @@ mod tests {
         let document = snapshot.document;
         assert_eq!(
             document.get("schema_version").and_then(Value::as_i64),
-            Some(1)
+            Some(SETTINGS_SCHEMA_VERSION)
         );
         assert_eq!(
             document
                 .get("general")
                 .and_then(Value::as_object)
-                .and_then(|general| general.get("startup_view_index"))
-                .and_then(Value::as_i64),
-            Some(2),
+                .and_then(|general| general.get("preferred_terminal_app"))
+                .and_then(Value::as_str),
+            Some("Ghostty"),
+        );
+        // Unknown keys must survive the prune, or an extension's settings would
+        // vanish on upgrade.
+        assert_eq!(
+            document
+                .get("general")
+                .and_then(Value::as_object)
+                .and_then(|general| general.get("custom_general_value"))
+                .and_then(Value::as_str),
+            Some("kept"),
         );
         assert_eq!(
             document
@@ -633,14 +622,10 @@ mod tests {
                 .and_then(Value::as_bool),
             Some(true),
         );
-        assert_eq!(
-            document
-                .get("search")
-                .and_then(Value::as_object)
-                .and_then(|search| search.get("automatic_image_discovery_enabled"))
-                .and_then(Value::as_bool),
-            Some(true),
-        );
+        assert!(!document
+            .get("search")
+            .and_then(Value::as_object)
+            .is_some_and(|search| search.contains_key("automatic_image_discovery_enabled")));
 
         let _ = fs::remove_dir_all(
             settings_path

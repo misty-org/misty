@@ -1,11 +1,14 @@
 export type { ChatComposerSuggestion } from "@/models/types/features/spaces/SpaceChat";
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { MessagesSquare } from "lucide-react";
+import { Lightbulb, LightbulbOff, MessagesSquare, Trash2 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { Button } from "@/ui";
 
 import { useAuth } from "@/features/auth/AuthContext";
 import { useMinimumSpin } from "@/hooks/useMinimumSpin";
 import { useSetupStore } from "@/stores/app";
+import { spacesApi } from "@/stores/spaces/useSpacesBackendStore";
 import { mergeSpaceMessages } from "@/stores/spaces/useSpaceMessageSpansStore";
 import type { MistyPickerSource } from "@/models/interfaces/features/picker/MistyPicker";
 import type { SpaceMessage } from "@/models/interfaces/features/spaces/types";
@@ -24,8 +27,10 @@ import { useSpaceChatDraft } from "./spaceChat/useSpaceChatDraft";
 import { useSpaceChatMessageActions } from "./spaceChat/useSpaceChatMessageActions";
 import { useSpaceChatPermissions } from "./spaceChat/useSpaceChatPermissions";
 import { useSpaceChatScope, useSpaceChatStore } from "./spaceChat/useSpaceChatData";
+import { useSpaceActionSuggestions } from "./spaceChat/useSpaceActionSuggestions";
 
 export function SpaceChat({ spaceId }: { spaceId: string }) {
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { user: authUser } = useAuth();
   const setupUser = useSetupStore((state) => state.status?.current_user ?? null);
@@ -33,12 +38,12 @@ export function SpaceChat({ spaceId }: { spaceId: string }) {
   const conversationId = searchParams.get("conversation") ?? "";
   const endRef = useRef<HTMLDivElement | null>(null);
 
-  const access = useSpaceChatPermissions(spaceId);
+  const initialAccess = useSpaceChatPermissions(spaceId, conversationId);
   const store = useSpaceChatStore();
   const conversationChat = useSpaceConversationChat(
     spaceId,
     conversationId,
-    access.canReadMessages,
+    initialAccess.canReadMessages,
   );
   const scope = useSpaceChatScope({
     spaceId,
@@ -48,8 +53,10 @@ export function SpaceChat({ spaceId }: { spaceId: string }) {
     conversationMessages: conversationChat.messages,
     store,
   });
+  const access = useSpaceChatPermissions(spaceId, conversationId, scope.activeConversation?.kind);
+  const actionSuggestions = useSpaceActionSuggestions(spaceId, conversationId);
 
-  const draft = useSpaceChatDraft(spaceId);
+  const draft = useSpaceChatDraft(spaceId, conversationId);
   const editing = useMessageEditing();
   const suggestions = useChatSuggestions({
     spaceId,
@@ -64,6 +71,30 @@ export function SpaceChat({ spaceId }: { spaceId: string }) {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickerSource, setPickerSource] = useState<MistyPickerSource>("files");
   const [messageToDelete, setMessageToDelete] = useState<SpaceMessage | null>(null);
+  const [suggestionVeto, setSuggestionVeto] = useState(false);
+  useEffect(() => {
+    if (!conversationId || scope.activeConversation?.direct_agent_id) {
+      setSuggestionVeto(false);
+      return;
+    }
+    let active = true;
+    void spacesApi
+      .conversationSuggestionVeto(spaceId, conversationId)
+      .then(({ veto }) => {
+        if (active) setSuggestionVeto(veto);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [conversationId, scope.activeConversation?.direct_agent_id, spaceId]);
+  const toggleSuggestionVeto = async () => {
+    if (!conversationId) return;
+    const next = !suggestionVeto;
+    await spacesApi.setConversationSuggestionVeto(spaceId, conversationId, next);
+    setSuggestionVeto(next);
+    if (next) void actionSuggestions.refresh();
+  };
   const openPicker = (source: MistyPickerSource) => {
     setPickerSource(source);
     setPickerOpen(true);
@@ -109,7 +140,7 @@ export function SpaceChat({ spaceId }: { spaceId: string }) {
     suggestions.setOpen(false);
     setPickerOpen(false);
     store.clearSpacesError();
-    void store.loadChatAgents(spaceId);
+    if (!store.referenceOnly) void store.loadChatAgents(spaceId);
   }, [spaceId, user?.id]);
 
   useEffect(() => {
@@ -117,8 +148,29 @@ export function SpaceChat({ spaceId }: { spaceId: string }) {
     const target = messageId ? document.getElementById(`message-${messageId}`) : endRef.current;
     target?.scrollIntoView({ block: messageId ? "center" : "end" });
     const last = scope.messages[scope.messages.length - 1];
-    if (last && !conversationId) void store.markRead(spaceId, last.seq);
+    if (last && !conversationId && !store.referenceOnly) void store.markRead(spaceId, last.seq);
+    if (last && conversationId && !store.referenceOnly) {
+      void spacesApi.markConversationRead(spaceId, conversationId, last.seq);
+    }
   }, [conversationId, scope.messages, searchParams, spaceId]);
+
+  const canClearConversation = Boolean(
+    conversationId && (scope.activeConversation?.created_by_user_id === user?.id || access.isOwner),
+  );
+  const canClearEveryone = !conversationId && access.isOwner;
+  const clearChat = async () => {
+    const description = conversationId
+      ? "Permanently delete this conversation and all of its messages?"
+      : "Permanently delete every message in Everyone?";
+    if (!window.confirm(description)) return;
+    if (conversationId) {
+      await spacesApi.deleteOrClearConversation(spaceId, conversationId);
+      navigate(`/spaces/${encodeURIComponent(spaceId)}/chat`, { replace: true });
+    } else {
+      await spacesApi.clearEveryoneConversation(spaceId);
+      await store.loadMessages(spaceId);
+    }
+  };
 
   return (
     <div className="relative flex h-full min-h-0 flex-col overflow-hidden bg-background text-foreground">
@@ -131,6 +183,35 @@ export function SpaceChat({ spaceId }: { spaceId: string }) {
             {conversationId ? scope.activeConversation?.title || "Conversation" : "Everyone"}
           </h1>
         </span>
+        {canClearConversation || canClearEveryone ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="size-8 text-muted-foreground"
+            aria-label={conversationId ? "Delete or clear conversation" : "Clear Everyone history"}
+            onClick={() => void clearChat()}
+          >
+            <Trash2 size={15} />
+          </Button>
+        ) : null}
+        {conversationId && !scope.activeConversation?.direct_agent_id ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="size-8 text-muted-foreground"
+            aria-label={
+              suggestionVeto
+                ? "Resume action suggestions"
+                : "Pause action suggestions in this conversation"
+            }
+            title={suggestionVeto ? "Resume suggestions" : "Pause suggestions"}
+            onClick={() => void toggleSuggestionVeto()}
+          >
+            {suggestionVeto ? <LightbulbOff size={15} /> : <Lightbulb size={15} />}
+          </Button>
+        ) : null}
       </header>
 
       {!conversationId ? (
@@ -160,6 +241,8 @@ export function SpaceChat({ spaceId }: { spaceId: string }) {
         onBeginMention={input.beginMention}
         onReply={draft.setReplyToMessageId}
         onDelete={setMessageToDelete}
+        actionSuggestions={actionSuggestions.items}
+        onActionSuggestionsChanged={() => void actionSuggestions.refresh()}
       />
 
       {access.canWriteMessages ? (

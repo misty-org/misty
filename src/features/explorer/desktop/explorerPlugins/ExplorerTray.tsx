@@ -1,5 +1,5 @@
 import { Button } from "@/ui";
-import { ArrowRightLeft, Terminal } from "lucide-react";
+import { ArrowRightLeft, PanelsTopLeft, Terminal } from "lucide-react";
 import { useCallback } from "react";
 import { openTerminalAtPath } from "@/stores/backend";
 import type { PluginCommandEntry, PluginPanelEntry } from "@/models/interfaces/services/misty-api";
@@ -29,6 +29,7 @@ export function ExplorerTray(props: {
   commands: PluginCommandEntry[];
   panels: PluginPanelEntry[];
   selectedPath: string;
+  onToggleFileManagerMode: () => void;
   onOpenTransfers: () => void;
 }) {
   const openTerminal = useCallback(() => {
@@ -42,6 +43,16 @@ export function ExplorerTray(props: {
 
   return (
     <>
+      <Button
+        className={explorerTrayStyles.trigger}
+        type="button"
+        title="Open Spaces"
+        aria-label="Open Spaces"
+        onClick={props.onToggleFileManagerMode}
+      >
+        <PanelsTopLeft size={16} />
+      </Button>
+      <span className="mx-0.5 h-4 w-px bg-border/70" aria-hidden="true" />
       <ExplorerPluginTabMenu
         commands={props.commands}
         panels={props.panels}

@@ -22,7 +22,6 @@ import { Tabs, TabsList, TabsTrigger } from "@/ui";
 import { useAuth } from "@/features/auth/AuthContext";
 import { confirmAction } from "@/lib/confirmAction";
 import { errorText } from "@/lib/format";
-import { agentArchitectureApi } from "@/stores/agents/useAgentArchitectureStore";
 import { spacesApi } from "@/stores/spaces/useSpacesBackendStore";
 import type { SpaceIntegration } from "@/models/interfaces/features/spaces/types";
 import type { SpaceTaskPriority, SpaceTaskStatus } from "@/models/types/features/spaces/types";

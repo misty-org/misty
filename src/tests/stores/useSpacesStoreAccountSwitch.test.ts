@@ -54,6 +54,7 @@ function snapshotWith(spaces: Space[]): SpacesSnapshot {
     spaces,
     invitations: [],
     entitlements: {
+      space_limit: 0,
       unlimited_spaces: true,
       unlimited_collaborators: true,
     },

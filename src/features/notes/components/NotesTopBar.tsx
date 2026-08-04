@@ -38,7 +38,14 @@ export function NotesTopBar(props: NotesTopBarProps) {
         </div>
 
         <div className="ml-auto flex items-center gap-2">
-          <Button type="button" size="sm" className="h-8 gap-1.5" onClick={props.onNewNote}>
+          <Button
+            type="button"
+            size="sm"
+            className="h-8 gap-1.5"
+            onClick={props.onNewNote}
+            disabled={props.readOnly}
+            title={props.readOnly ? "Reconnect to create a note" : undefined}
+          >
             <Plus size={14} strokeWidth={2.2} />
             New note
           </Button>

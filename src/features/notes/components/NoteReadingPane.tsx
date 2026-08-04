@@ -74,7 +74,7 @@ export function NoteReadingPane(props: NoteReadingPaneProps) {
     );
   }
 
-  const collaborative = note.source === "misty" && Boolean(note.spaceId);
+  const collaborative = !props.referenceOnly && note.source === "misty" && Boolean(note.spaceId);
   const editable = Boolean(props.onSaveBody || props.onSaveContent);
   const bodyEditable = collaborative || editable;
 

@@ -221,7 +221,7 @@ describe("Space loading access boundary", () => {
     });
   });
 
-  it("fails closed when refreshing a stale Space snapshot fails", async () => {
+  it("locks Spaces and clears stale content when refreshing fails", async () => {
     apiMocks.snapshot.mockRejectedValue(new Error("offline"));
     useSpacesStore.setState({ spaces: [spaceFixture({ id: "stale" })] });
 
@@ -231,8 +231,12 @@ describe("Space loading access boundary", () => {
     expect(apiMocks.messages).not.toHaveBeenCalled();
     expect(apiMocks.nodes).not.toHaveBeenCalled();
     expect(useSpacesStore.getState()).toMatchObject({
+      spaces: [],
       snapshotReady: false,
-      error: "offline",
+      referenceOnly: true,
+      membersBySpace: {},
+      messagesBySpace: {},
+      nodesBySpace: {},
     });
   });
 
@@ -301,7 +305,7 @@ describe("Spaces mutations", () => {
     });
     apiMocks.sendMessage.mockResolvedValue({
       message: sent,
-      agent_replies: [],
+      triggered_runs: [],
       agent_failures: [
         {
           agent_id: agent.id,

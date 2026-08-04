@@ -330,6 +330,21 @@ const permissionGroups = [
     ],
   },
   {
+    title: "Agents",
+    items: [
+      {
+        id: "agents.run",
+        label: "Run Agents",
+        description: "Mention, message, or assign active Agents in this Space.",
+      },
+      {
+        id: "agents.manage",
+        label: "Manage Agents",
+        description: "Add, disable, configure, remove, and approve Agent versions.",
+      },
+    ],
+  },
+  {
     title: "Storage",
     items: [
       {
