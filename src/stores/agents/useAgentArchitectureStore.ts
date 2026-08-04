@@ -5,6 +5,8 @@ export type { AgentInvocationInput } from "@/models/interfaces/stores/agents/use
 import { spaceRequest } from "@/stores/spaces/useSpacesBackendStore";
 import type {
   AgentCatalogEntry,
+  AgentCapabilityGrant,
+  AgentToolboxResponse,
   AgentInstanceRecord,
   AgentVersionWorkflow,
   InstanceWorkflowConfig,
@@ -13,11 +15,9 @@ import type {
   AgentConversationEvent,
   PublishedAgentVersion,
   RoutingDecision,
-  RunAction,
-  RunApproval,
-  WorkflowRunStep,
   SpaceIntegration,
   SpaceRun,
+  SpaceRunDetail,
   WorkflowMetadata,
   WorkflowVersion,
   ProviderAuthorizationStart,
@@ -45,13 +45,7 @@ export const agentArchitectureApi = {
       method: "POST",
       body: JSON.stringify(input),
     }),
-  runDetail: (runId: string) =>
-    spaceRequest<{
-      run: SpaceRun;
-      actions: RunAction[];
-      approvals: RunApproval[];
-      steps: WorkflowRunStep[];
-    }>(`/runs/${part(runId)}`),
+  runDetail: (runId: string) => spaceRequest<SpaceRunDetail>(`/runs/${part(runId)}`),
   decideRun: (runId: string, approved: boolean) =>
     spaceRequest<SpaceRun>(`/runs/${part(runId)}/approval`, {
       method: "POST",
@@ -109,6 +103,13 @@ export const agentArchitectureApi = {
       method: "PUT",
       body: JSON.stringify({ bindings }),
     }),
+  updateInstanceCapabilities: (instanceId: string, grants: AgentCapabilityGrant[]) =>
+    spaceRequest<AgentInstanceRecord>(`/agent-instances/${part(instanceId)}/capabilities`, {
+      method: "PUT",
+      body: JSON.stringify({ grants }),
+    }),
+  instanceToolbox: (instanceId: string) =>
+    spaceRequest<AgentToolboxResponse>(`/agent-instances/${part(instanceId)}/toolbox`),
   conversations: () => spaceRequest<{ conversations: AgentConversation[] }>("/agent-conversations"),
   createConversation: (spaceId: string, agentId: string, title = "") =>
     spaceRequest<AgentConversation>("/agent-conversations", {

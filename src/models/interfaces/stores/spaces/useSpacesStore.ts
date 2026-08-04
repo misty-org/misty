@@ -11,6 +11,7 @@ import type {
   CreateSpaceRequest,
   CreateSpaceResult,
   Space,
+  SpaceAgentMembership,
   SpaceEvent,
   SpaceInboxItem,
   SpaceInvitation,
@@ -30,6 +31,7 @@ export interface SpacesStore {
   limits: SpacesSnapshot["entitlements"] | null;
   ownerStorage: SpacesSnapshot["owner_storage"] | null;
   membersBySpace: Record<string, SpaceMember[]>;
+  agentMembershipsBySpace: Record<string, SpaceAgentMembership[]>;
   messagesBySpace: Record<string, SpaceMessage[]>;
   nodesBySpace: Record<string, SpaceNode[]>;
   agentsBySpace: Record<string, SpaceStudioResource[]>;
@@ -37,11 +39,13 @@ export interface SpacesStore {
   inbox: Record<ActivityTab, SpaceInboxItem[]>;
   presenceBySpace: Record<string, SpacePresenceViewer[]>;
   snapshotReady: boolean;
+  referenceOnly: boolean;
+  lastSyncedAt: string | null;
   loading: boolean;
   sending: boolean;
   realtimeConnected: boolean;
   error: string | null;
-  load: (options?: { force?: boolean }) => Promise<void>;
+  load: (options?: { force?: boolean; accountId?: string }) => Promise<void>;
   loadSpace: (spaceId: string) => Promise<void>;
   loadMessages: (spaceId: string) => Promise<void>;
   loadNodes: (spaceId: string) => Promise<void>;

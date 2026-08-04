@@ -8,12 +8,14 @@ import { useAuth } from "@/features/auth/AuthContext";
 import { useSpacesStore } from "@/stores/spaces/useSpacesStore";
 
 import { SpaceNotes } from "@/features/notes/SpaceNotes";
+import { spaceNotesEnabled } from "@/features/notes/availability";
 import { SpaceDrawings } from "@/features/drawings/SpaceDrawings";
 import { SpaceChat } from "./SpaceChat";
 import { SpaceLibrary } from "./SpaceLibrary";
 import { SpacePlanner } from "./SpacePlanner";
 import { SpaceSettings } from "./components/SpaceSettings";
 import { SpacePageLoadingPlaceholder } from "./components/SpacesLoadingPlaceholder";
+import { isMistySpace } from "./mistySpace";
 
 export { default, SpacesIndexRedirect } from "./components/SpacesShell";
 
@@ -33,14 +35,19 @@ const validSettingsSections = new Set(["general", "members", "connections"]);
 const validPlannerViews = new Set(["board", "list", "calendar"]);
 
 export function SpaceDetail() {
-  const { spaceId = "", section = "chat", studioKind = "" } = useParams();
+  const {
+    spaceId = "",
+    section = spaceNotesEnabled ? "notes" : "drawings",
+    studioKind = "",
+  } = useParams();
   const { user, accounts, transitioning } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
-  const { spaces, snapshotReady, loading, error, load, loadSpace } = useSpacesStore(
+  const { spaces, snapshotReady, referenceOnly, loading, error, load, loadSpace } = useSpacesStore(
     useShallow((state) => ({
       spaces: state.spaces,
       snapshotReady: state.snapshotReady,
+      referenceOnly: state.referenceOnly,
       loading: state.loading,
       error: state.error,
       load: state.load,
@@ -64,6 +71,9 @@ export function SpaceDetail() {
   if (section === "files") {
     return <Navigate to={`/spaces/${encodeURIComponent(spaceId)}/library`} replace />;
   }
+  if (section === "notes" && !spaceNotesEnabled) {
+    return <Navigate to={`/spaces/${encodeURIComponent(spaceId)}/drawings`} replace />;
+  }
   if (section === "tasks") {
     const view = validPlannerViews.has(studioKind) ? `/${studioKind}` : "";
     return (
@@ -73,8 +83,60 @@ export function SpaceDetail() {
       />
     );
   }
+  if (section === "planner") {
+    const routeParts = location.pathname.split("/").filter(Boolean);
+    const plannerPart = routeParts[3] ?? "";
+    if (!plannerPart) {
+      return (
+        <Navigate
+          to={`/spaces/${encodeURIComponent(spaceId)}/planner/tasks/board${location.search}${location.hash}`}
+          replace
+        />
+      );
+    }
+    if (plannerPart === "board" || plannerPart === "list") {
+      return (
+        <Navigate
+          to={`/spaces/${encodeURIComponent(spaceId)}/planner/tasks/${plannerPart}${location.search}${location.hash}`}
+          replace
+        />
+      );
+    }
+    if (plannerPart === "calendar") {
+      return (
+        <Navigate
+          to={`/spaces/${encodeURIComponent(spaceId)}/planner/agenda/month${location.search}${location.hash}`}
+          replace
+        />
+      );
+    }
+    if (plannerPart === "tasks" && !["board", "list"].includes(routeParts[4] ?? "")) {
+      return (
+        <Navigate
+          to={`/spaces/${encodeURIComponent(spaceId)}/planner/tasks/board${location.search}${location.hash}`}
+          replace
+        />
+      );
+    }
+    if (plannerPart === "agenda" && !["month", "week", "list"].includes(routeParts[4] ?? "")) {
+      return (
+        <Navigate
+          to={`/spaces/${encodeURIComponent(spaceId)}/planner/agenda/month${location.search}${location.hash}`}
+          replace
+        />
+      );
+    }
+    if (!["tasks", "agenda", "roadmaps"].includes(plannerPart)) {
+      return (
+        <Navigate
+          to={`/spaces/${encodeURIComponent(spaceId)}/planner/tasks/board${location.search}${location.hash}`}
+          replace
+        />
+      );
+    }
+  }
   if (!validSpaceSections.has(section)) {
-    return <Navigate to={`/spaces/${encodeURIComponent(spaceId)}/chat`} replace />;
+    return <Navigate to={defaultJournalPath(spaceId)} replace />;
   }
   if (section === "settings" && studioKind === "integrations") {
     return <Navigate to={`/spaces/${encodeURIComponent(spaceId)}/settings/connections`} replace />;
@@ -133,7 +195,8 @@ export function SpaceDetail() {
   }
 
   if (!space && spaces.length > 0) {
-    return <Navigate to={`/spaces/${encodeURIComponent(spaces[0].id)}/chat`} replace />;
+    const fallback = spaces.find(isMistySpace) ?? spaces[0];
+    return <Navigate to={defaultJournalPath(fallback.id)} replace />;
   }
 
   if (!space) {
@@ -144,6 +207,13 @@ export function SpaceDetail() {
         description="This Space may have been removed, or you may no longer have access."
       />
     );
+  }
+
+  if (isMistySpace(space) && section !== "chat") {
+    const conversation = space.support_conversation_id
+      ? `?conversation=${encodeURIComponent(space.support_conversation_id)}`
+      : "";
+    return <Navigate to={`/spaces/${encodeURIComponent(space.id)}/chat${conversation}`} replace />;
   }
 
   return (
@@ -167,19 +237,12 @@ export function SpaceDetail() {
           <SpacePlanner
             key={`planner:${spaceId}`}
             spaceId={spaceId}
-            canManage={space.permissions?.["tasks.manage"] !== false}
-            canManageIntegrations={space.role === "owner"}
+            canManage={!referenceOnly && space.permissions?.["tasks.manage"] !== false}
+            canManageIntegrations={!referenceOnly && space.role === "owner"}
           />
         )
       ) : section === "notes" ? (
-        space.permissions?.["library.view"] === false ? (
-          <SpacePermissionDenied
-            title="Notes access required"
-            detail="You do not have permission to view this Space's Notes."
-          />
-        ) : (
-          <SpaceNotes key={`notes:${spaceId}`} spaceId={spaceId} spaceName={space.name} />
-        )
+        <SpaceNotes key={`notes:${spaceId}`} spaceId={spaceId} spaceName={space.name} />
       ) : section === "drawings" ? (
         <SpaceDrawings
           key={`drawings:${spaceId}:${studioKind}`}
@@ -204,6 +267,10 @@ export function SpaceDetail() {
       )}
     </div>
   );
+}
+
+function defaultJournalPath(spaceId: string) {
+  return `/spaces/${encodeURIComponent(spaceId)}/${spaceNotesEnabled ? "notes" : "drawings"}`;
 }
 
 function SpacePermissionDenied({ title, detail }: { title: string; detail: string }) {

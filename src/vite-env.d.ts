@@ -1,6 +1,7 @@
 /// <reference types="vite/client" />
 
 interface ImportMetaEnv {
+  readonly VITE_AGENT_TEAMMATES_V1?: string;
   readonly VITE_POSTHOG_PROJECT_TOKEN?: string;
   readonly VITE_POSTHOG_HOST?: string;
   readonly VITE_APP_ENVIRONMENT?: string;

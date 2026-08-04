@@ -31,7 +31,7 @@ const pickerStyles = {
   ].join(" "),
   searchField: [
     "flex h-9 min-w-0 flex-1 items-center gap-2 rounded-md border border-border/80 bg-background",
-    "px-3 text-muted-foreground shadow-xs transition-colors focus-within:ring-1 focus-within:ring-ring",
+    "px-3 text-muted-foreground shadow-xs transition-colors",
   ].join(" "),
   searchInput: [
     "!m-0 !h-full !min-h-0 min-w-0 flex-1 !rounded-none !border-0 !bg-transparent !p-0",

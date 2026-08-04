@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
+import { spaceNotesEnabled } from "@/features/notes/availability";
 import { openExternalLink } from "@/platform/openExternalLink";
 import { spacesApi } from "@/stores/spaces/useSpacesBackendStore";
 import type {
@@ -94,7 +95,9 @@ export function useCreateSpaceDialog(options: {
       setOpen(false);
       restoreDocumentInteractivityAfterModalClose();
       resetDraft();
-      navigate(`/spaces/${encodeURIComponent(created.space.id)}/chat?created=1`);
+      navigate(
+        `/spaces/${encodeURIComponent(created.space.id)}/${spaceNotesEnabled ? "notes" : "drawings"}`,
+      );
       if (firstProvider) beginProviderConnection(created.space.id, firstProvider);
     } catch {
       /* the dialog renders the store error */

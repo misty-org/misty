@@ -16,6 +16,13 @@ import {
 export type TaskPatch = Partial<
   Pick<
     SpaceTask,
-    "title" | "notes" | "status" | "priority" | "assignee_user_id" | "due_at" | "due_timezone"
+    | "title"
+    | "notes"
+    | "status"
+    | "priority"
+    | "assignee_user_id"
+    | "assignee_agent_id"
+    | "due_at"
+    | "due_timezone"
   >
 >;

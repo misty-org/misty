@@ -7,6 +7,7 @@ import type { AiMode, FileOperation } from "@/models/types/stores/agent/useAiSer
 
 export interface ToolDefinition {
   name: string;
+  description?: string;
   risk: "read" | "write" | "dangerous";
 }
 
@@ -17,10 +18,14 @@ export interface ToolManifest {
 export interface AgentMessageRequest {
   mode: AiMode;
   user_message: string;
+  plan_only?: boolean;
   active_root?: string;
   selected_paths?: string[];
+  tool_scope?: "files" | "cleanup" | "search";
   capabilities: ToolManifest;
   space_id?: string;
+  space_section?: string;
+  context_task_id?: string;
 }
 
 export interface ToolRequest {

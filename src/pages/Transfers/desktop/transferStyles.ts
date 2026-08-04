@@ -10,7 +10,7 @@ export const transferStyles = {
   toolbar:
     "flex min-h-11 min-w-0 items-center gap-2 border-b border-border/70 bg-background px-3 py-1.5",
   searchBox:
-    "flex h-8 w-[min(360px,38vw)] min-w-48 items-center gap-2 rounded-md border border-input bg-background px-2.5 text-muted-foreground transition-[border-color,box-shadow] focus-within:ring-2 focus-within:ring-ring/50 [&>input]:h-full [&>input]:min-w-0 [&>input]:flex-1 [&>input]:rounded-none [&>input]:border-0 [&>input]:bg-transparent [&>input]:p-0 [&>input]:shadow-none [&>input]:focus-visible:ring-0",
+    "flex h-8 w-[min(360px,38vw)] min-w-48 items-center gap-2 rounded-md border border-input bg-background px-2.5 text-muted-foreground transition-[border-color,box-shadow] [&>input]:h-full [&>input]:min-w-0 [&>input]:flex-1 [&>input]:rounded-none [&>input]:border-0 [&>input]:bg-transparent [&>input]:p-0 [&>input]:shadow-none [&>input]:focus-visible:ring-0",
   actionFeedback: "mr-auto min-w-0 truncate rounded-md px-2 py-1 text-xs",
   actionFeedbackBusy: "bg-primary/10 text-primary",
   actionFeedbackSuccess:

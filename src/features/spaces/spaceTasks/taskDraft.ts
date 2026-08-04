@@ -16,8 +16,10 @@ export const emptyDraft = (): TaskDraft => ({
   status: "todo",
   priority: "medium",
   assignee_user_id: "",
+  assignee_agent_id: "",
   due_at: "",
   due_timezone: localTimezone(),
+  source_refs: [],
 });
 
 export function taskDraft(task: SpaceTask): TaskDraft {
@@ -27,8 +29,10 @@ export function taskDraft(task: SpaceTask): TaskDraft {
     status: task.status,
     priority: task.priority,
     assignee_user_id: task.assignee_user_id ?? "",
+    assignee_agent_id: task.assignee_agent_id ?? "",
     due_at: task.due_at ? toLocalInput(task.due_at) : "",
     due_timezone: task.due_timezone || "UTC",
+    source_refs: task.source_refs,
   };
 }
 
@@ -41,8 +45,12 @@ export function dueAtForRequest(value: string) {
 }
 
 /** Create omits empty assignee and due date entirely rather than sending blanks. */
-export function createTaskInput(draft: TaskDraft, sourceRefs: SpaceTask["source_refs"] = []) {
+export function createTaskInput(
+  draft: TaskDraft,
+  sourceRefs: SpaceTask["source_refs"] = draft.source_refs,
+) {
   const assigneeUserId = draft.assignee_user_id.trim();
+  const assigneeAgentId = draft.assignee_agent_id.trim();
   const dueAt = dueAtForRequest(draft.due_at);
   return {
     title: draft.title.trim(),
@@ -52,6 +60,7 @@ export function createTaskInput(draft: TaskDraft, sourceRefs: SpaceTask["source_
     due_timezone: draft.due_timezone.trim() || "UTC",
     source_refs: sourceRefs,
     ...(assigneeUserId ? { assignee_user_id: assigneeUserId } : {}),
+    ...(assigneeAgentId ? { assignee_agent_id: assigneeAgentId } : {}),
     ...(dueAt ? { due_at: dueAt } : {}),
   };
 }

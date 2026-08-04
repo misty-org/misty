@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Settings2, UserPlus, UsersRound } from "lucide-react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
 import {
   Avatar,
@@ -14,12 +14,18 @@ import {
 } from "@/ui";
 import { useAuth } from "@/features/auth/AuthContext";
 import { useSpacesStore } from "@/stores/spaces/useSpacesStore";
-import type { Space, SpaceMember } from "@/models/interfaces/features/spaces/types";
+import type {
+  Space,
+  SpaceAgentMembership,
+  SpaceMember,
+} from "@/models/interfaces/features/spaces/types";
 import type { SpacePresenceViewer } from "@/models/types/stores/spaces/useSpacesBackendStore";
 import { personInitials } from "../personInitials";
+import { AgentAvatar } from "@/features/agents/AgentAvatar";
 
 const emptyMembers: SpaceMember[] = [];
 const emptyViewers: SpacePresenceViewer[] = [];
+const emptyAgents: SpaceAgentMembership[] = [];
 
 type PresenceStatus = "online" | "idle" | "offline";
 type PresentMember = SpaceMember & { presenceStatus: PresenceStatus };
@@ -27,11 +33,13 @@ type PresentMember = SpaceMember & { presenceStatus: PresenceStatus };
 export function SpaceMembersPopover({ space }: { space: Space }) {
   const { user } = useAuth();
   const location = useLocation();
+  const [, setSearchParams] = useSearchParams();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
-  const { members, viewers, loadMembers } = useSpacesStore(
+  const { members, agents, viewers, loadMembers } = useSpacesStore(
     useShallow((state) => ({
       members: state.membersBySpace[space.id] ?? emptyMembers,
+      agents: state.agentMembershipsBySpace[space.id] ?? emptyAgents,
       viewers: state.presenceBySpace[space.id] ?? emptyViewers,
       loadMembers: state.loadMembers,
     })),
@@ -56,6 +64,11 @@ export function SpaceMembersPopover({ space }: { space: Space }) {
     [members, user?.id, viewers],
   );
   const onlineCount = groupedMembers.online.length;
+  const orderedMembers = [
+    ...groupedMembers.online,
+    ...groupedMembers.idle,
+    ...groupedMembers.offline,
+  ];
   const managePath = `/spaces/${encodeURIComponent(space.id)}/settings/members`;
   const settingsState = {
     spaceSettingsReturnTo: `${location.pathname}${location.search}${location.hash}`,
@@ -73,8 +86,8 @@ export function SpaceMembersPopover({ space }: { space: Space }) {
           variant="ghost"
           size="icon"
           type="button"
-          title="Members"
-          aria-label="Space members"
+          title="Team"
+          aria-label="Space team"
           aria-haspopup="dialog"
           aria-expanded={open}
         >
@@ -95,9 +108,9 @@ export function SpaceMembersPopover({ space }: { space: Space }) {
       >
         <div className="flex items-center justify-between border-b border-border/60 px-3 py-2.5">
           <div className="min-w-0">
-            <p className="m-0 truncate text-sm font-semibold">Members</p>
+            <p className="m-0 truncate text-sm font-semibold">Team</p>
             <p className="mb-0 mt-0.5 text-[11px] text-muted-foreground">
-              {members.length || space.member_count} in {space.name}
+              {(members.length || space.member_count) + agents.length + 1} teammates in {space.name}
             </p>
           </div>
           {onlineCount > 0 ? (
@@ -109,15 +122,23 @@ export function SpaceMembersPopover({ space }: { space: Space }) {
           {loading && members.length === 0 ? (
             <MembersSkeleton />
           ) : (
-            <>
-              <PresenceGroup label="Online" members={groupedMembers.online} />
-              <PresenceGroup label="Idle" members={groupedMembers.idle} />
-              <PresenceGroup label="Offline" members={groupedMembers.offline} />
-            </>
+            <TeamRows
+              members={orderedMembers}
+              agents={agents}
+              onOpenAgent={(agentId) => {
+                setSearchParams((current) => {
+                  const next = new URLSearchParams(current);
+                  next.set("agentDock", "1");
+                  next.set("agent", agentId);
+                  return next;
+                });
+                setOpen(false);
+              }}
+            />
           )}
         </div>
 
-        {space.role === "owner" ? (
+        {space.role === "owner" || space.permissions?.["agents.manage"] === true ? (
           <div className="grid grid-cols-2 gap-1 border-t border-border/60 p-1.5">
             <Button
               asChild
@@ -148,43 +169,87 @@ export function SpaceMembersPopover({ space }: { space: Space }) {
   );
 }
 
-function PresenceGroup({ label, members }: { label: string; members: PresentMember[] }) {
-  if (members.length === 0) return null;
+function TeamRows({
+  members,
+  agents,
+  onOpenAgent,
+}: {
+  members: PresentMember[];
+  agents: SpaceAgentMembership[];
+  onOpenAgent: (agentId: string) => void;
+}) {
   return (
-    <section className="mb-1 last:mb-0">
-      <p className="mb-1 mt-0 px-2 pt-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-        {label} — {members.length}
-      </p>
-      <div className="grid gap-0.5">
-        {members.map((member) => (
-          <div
-            className="flex min-h-10 items-center gap-2.5 rounded-md px-2 py-1.5 hover:bg-accent/65"
-            key={member.user_id}
-          >
-            <span className="relative inline-flex shrink-0">
-              <Avatar className={cn("size-7", member.presenceStatus === "offline" && "opacity-55")}>
-                <AvatarFallback className="text-[9px] font-semibold">
-                  {personInitials(member.name)}
-                </AvatarFallback>
-              </Avatar>
-              <PresenceDot status={member.presenceStatus} />
-            </span>
-            <span
-              className={cn(
-                "min-w-0 flex-1 truncate text-xs font-medium",
-                member.presenceStatus === "offline" && "text-muted-foreground",
-              )}
-            >
-              {member.name}
-            </span>
-            <span className="shrink-0 text-[10px] capitalize text-muted-foreground">
-              {member.role}
-            </span>
-          </div>
-        ))}
-      </div>
-    </section>
+    <div className="grid gap-0.5">
+      {members.map((member) => (
+        <div
+          className="flex min-h-10 items-center gap-2.5 rounded-md px-2 py-1.5 hover:bg-accent/65"
+          key={`person:${member.user_id}`}
+        >
+          <span className="relative inline-flex shrink-0">
+            <Avatar className={cn("size-7", member.presenceStatus === "offline" && "opacity-55")}>
+              <AvatarFallback className="text-[9px] font-semibold">
+                {personInitials(member.name)}
+              </AvatarFallback>
+            </Avatar>
+            <PresenceDot status={member.presenceStatus} />
+          </span>
+          <span className="min-w-0 flex-1 truncate text-xs font-medium">{member.name}</span>
+          <span className="shrink-0 text-[10px] capitalize text-muted-foreground">
+            {member.role}
+          </span>
+        </div>
+      ))}
+      <Button
+        type="button"
+        variant="ghost"
+        className="h-auto min-h-10 justify-start gap-2.5 rounded-md px-2 py-1.5 text-left"
+        onClick={() => onOpenAgent("misty")}
+      >
+        <AgentAvatar
+          name="Misty"
+          avatar={{ kind: "preset", preset_id: "sparkles", accent: "violet" }}
+          className="size-7"
+          iconClassName="size-3.5"
+        />
+        <span className="min-w-0 flex-1 truncate text-xs font-medium">Misty</span>
+        <span className="shrink-0 text-[10px] text-muted-foreground">Agent · Ready</span>
+      </Button>
+      {agents.map((agent) => (
+        <Button
+          type="button"
+          variant="ghost"
+          className="h-auto min-h-10 justify-start gap-2.5 rounded-md px-2 py-1.5 text-left"
+          key={`agent:${agent.agent_id}`}
+          onClick={() => onOpenAgent(agent.agent_id)}
+        >
+          <AgentAvatar
+            agentId={agent.agent_id}
+            avatar={agent.avatar}
+            legacyIcon={agent.icon}
+            name={agent.name}
+            className="size-7"
+            iconClassName="size-3.5"
+          />
+          <span className="min-w-0 flex-1 truncate text-xs font-medium">{agent.name}</span>
+          <span className="shrink-0 text-[10px] text-muted-foreground">
+            Agent · {agentWorkStateLabel(agent)}
+          </span>
+        </Button>
+      ))}
+    </div>
   );
+}
+
+function agentWorkStateLabel(agent: SpaceAgentMembership): string {
+  const state = agent.work_state || (agent.enabled ? "ready" : "disabled");
+  return {
+    ready: "Ready",
+    working: "Working",
+    needs_approval: "Needs approval",
+    failed: "Failed",
+    disabled: "Disabled",
+    update_available: "Update available",
+  }[state];
 }
 
 function PresenceDot({ status }: { status: PresenceStatus }) {

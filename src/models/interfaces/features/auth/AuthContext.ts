@@ -8,11 +8,7 @@ import {
   type ReactNode,
 } from "react";
 import { useNavigate } from "react-router-dom";
-import {
-  accountFetchMe,
-  accountLogout,
-  isAccountUnauthorizedError,
-} from "@/stores/account/useAccountStore";
+import { accountFetchMe, isAccountUnauthorizedError } from "@/stores/account/useAccountStore";
 import type { AccountMeResponse } from "@/models/interfaces/stores/account/useAccountStore";
 import {
   activateAccountSession,

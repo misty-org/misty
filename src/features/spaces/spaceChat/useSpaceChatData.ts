@@ -23,6 +23,7 @@ export function useSpaceChatStore() {
       agentsBySpace: state.agentsBySpace,
       loading: state.loading,
       sending: state.sending,
+      referenceOnly: state.referenceOnly,
       sendMessage: state.sendMessage,
       updateMessage: state.updateMessage,
       deleteMessage: state.deleteMessage,

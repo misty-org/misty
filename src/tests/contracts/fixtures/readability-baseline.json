@@ -449,16 +449,6 @@
       "hash": "4d314090e61c352d"
     }
   ],
-  "src/pages/Account/desktop/index.tsx": [
-    {
-      "length": 184,
-      "hash": "510d93fae8022ba2"
-    },
-    {
-      "length": 162,
-      "hash": "b4555000cd88fef8"
-    }
-  ],
   "src/pages/Agents/desktop/AgentChatList.tsx": [
     {
       "length": 196,

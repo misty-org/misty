@@ -7,6 +7,7 @@ export interface SpaceConversationMember {
 
 export interface SpaceConversation {
   id: string;
+  kind?: "standard" | "misty_support";
   space_id: string;
   title: string;
   created_by_user_id: string;

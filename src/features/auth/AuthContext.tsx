@@ -26,8 +26,12 @@ import {
 import type { SavedAccountSession } from "@/models/interfaces/stores/account/useAuthTokenStore";
 import { isNativeMobileBuild } from "@/platform/buildTarget";
 import type { CurrentLicense } from "@/models/types/features/installer/types";
-import { resetAgentAccountState, useAgentSessionStore } from "@/stores/agent/useAgentSessionStore";
+import {
+  resetAllAgentAccountState,
+  refreshAllAgentAccountState,
+} from "@/stores/agent/agentAccountLifecycle";
 import { resetSpacesAccountState, useSpacesStore } from "@/stores/spaces/useSpacesStore";
+import { removeSpaceReferenceCache } from "@/stores/spaces/spaceReferenceCache";
 import { resetNotesAccountState } from "@/stores/notes/useNotesStore";
 import { useSetupStore } from "@/stores/app";
 import { useAppRouteMemoryStore } from "@/stores/app/useAppRouteMemoryStore";
@@ -385,9 +389,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [beginAccountOperation, finishAccountOperation, saveAuthenticatedUser],
   );
 
-  // Forget a saved account from this device (from the chooser's remove control).
   const removeAccount = useCallback(async (accountId: string) => {
     await removeSavedAccountSession(accountId);
+    await removeSpaceReferenceCache(accountId);
     setAccounts(listSavedAccountSessions());
   }, []);
 
@@ -416,13 +420,13 @@ function resetAccountScopedState(): void {
   useExplorerStore.setState({ notifications: [], notificationHistory: [] });
   resetSearchAccountState();
   resetSpacesAccountState();
-  resetAgentAccountState();
+  resetAllAgentAccountState();
   resetNotesAccountState();
 }
 
 function refreshAuthenticatedAccountState(): void {
   void useSpacesStore.getState().load();
-  void useAgentSessionStore.getState().refreshStatus();
+  refreshAllAgentAccountState();
 }
 
 function authUserFromMe(me: AccountMeResponse, fallback: SavedAccountSession): AuthUser {
@@ -497,15 +501,11 @@ function writeStoredUser(user: AuthUser | null): void {
     } else {
       clearStoredUser();
     }
-  } catch {
-    // Browser privacy modes can disable localStorage; auth state remains in memory.
-  }
+  } catch {}
 }
 
 function clearStoredUser(): void {
   try {
     window.localStorage.removeItem(authUserStorageKey);
-  } catch {
-    // Browser privacy modes can disable localStorage; auth state remains in memory.
-  }
+  } catch {}
 }

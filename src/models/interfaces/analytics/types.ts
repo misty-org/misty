@@ -61,6 +61,23 @@ export interface AnalyticsEventProperties {
   subscription_renewed: SubscriptionProperties;
   subscription_canceled: SubscriptionProperties;
   subscription_expired: SubscriptionProperties;
+  agent_dock_opened: {
+    surface: "files" | "space";
+    context_kind: "surface" | "selection" | "task";
+  };
+  agent_creation_completed: {
+    placed_space_count: number;
+    enabled_action_count: number;
+    avatar_kind: "preset" | "upload";
+  };
+  agent_work_outcome_observed: {
+    outcome: "completed" | "needs_approval" | "failed";
+    source_type: string;
+  };
+  agent_capability_denial_observed: {
+    surface: "files" | "space";
+    reason_code: string;
+  };
 }
 
 export interface SafeUserProperties {

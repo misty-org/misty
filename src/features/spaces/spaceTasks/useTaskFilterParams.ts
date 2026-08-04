@@ -52,7 +52,9 @@ export function useTaskFilterParams(options: {
     sort,
     dueRange: useMemo(() => filterDueRange(due), [due]),
     effectiveAssignee: mine
-      ? options.currentUserId || ""
+      ? options.currentUserId
+        ? `person:${options.currentUserId}`
+        : ""
       : assignee !== "all" && assignee !== "unassigned"
         ? assignee
         : "",

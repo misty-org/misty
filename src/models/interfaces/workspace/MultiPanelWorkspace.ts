@@ -14,6 +14,7 @@ export interface MultiPanelWorkspaceProps {
   renderToolbar?: (paneId: string, path: string) => ReactNode;
   renderBottomBar?: (tab: MultiPanelTab) => ReactNode;
   renderTabActions?: () => ReactNode;
+  showTabStrip?: boolean;
   showDefaultPaneControls?: boolean;
   renderContextHeader?: (tab: MultiPanelTab) => ReactNode;
   renderNavigationAside?: ReactNode;

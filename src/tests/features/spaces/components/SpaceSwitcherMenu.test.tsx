@@ -61,6 +61,37 @@ describe("SpaceSwitcherMenu", () => {
     expect(onSwitchSpace).toHaveBeenCalledWith("space-2");
     expect(onAddSpace).not.toHaveBeenCalled();
   });
+
+  it("opens Space creation from the menu", async () => {
+    const onAddSpace = vi.fn();
+
+    await act(async () => {
+      root.render(
+        <MemoryRouter>
+          <SpaceSwitcherMenu
+            spaces={[]}
+            activeSpace={undefined}
+            activeSpaceId=""
+            canAddSpace
+            onAddSpace={onAddSpace}
+            onSwitchSpace={() => {}}
+          />
+        </MemoryRouter>,
+      );
+    });
+
+    const trigger = container.querySelector<HTMLButtonElement>('[aria-label="Space menu"]');
+    await act(async () => {
+      trigger?.dispatchEvent(new MouseEvent("pointerdown", { bubbles: true, button: 0 }));
+    });
+
+    const addSpace = [...document.body.querySelectorAll<HTMLElement>('[role="menuitem"]')].find(
+      (item) => item.textContent?.trim() === "Add Space",
+    );
+    await act(async () => addSpace?.click());
+
+    expect(onAddSpace).toHaveBeenCalledOnce();
+  });
 });
 
 function spaceFixture(patch: Partial<Space> = {}): Space {

@@ -58,6 +58,7 @@ export type AiPanelMessage = {
   role: "user" | "agent" | "tool" | "error" | "plan";
   text: string;
   planId?: string;
+  actionPlanId?: string;
   toolRequestId?: string;
   hostedAiUsedRatio?: number;
   hostedAiResetAt?: string;

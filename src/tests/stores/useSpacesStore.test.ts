@@ -221,7 +221,7 @@ describe("Space loading access boundary", () => {
     });
   });
 
-  it("fails closed when refreshing a stale Space snapshot fails", async () => {
+  it("falls back to a read-only in-memory Space snapshot when refreshing fails", async () => {
     apiMocks.snapshot.mockRejectedValue(new Error("offline"));
     useSpacesStore.setState({ spaces: [spaceFixture({ id: "stale" })] });
 
@@ -231,8 +231,8 @@ describe("Space loading access boundary", () => {
     expect(apiMocks.messages).not.toHaveBeenCalled();
     expect(apiMocks.nodes).not.toHaveBeenCalled();
     expect(useSpacesStore.getState()).toMatchObject({
-      snapshotReady: false,
-      error: "offline",
+      snapshotReady: true,
+      referenceOnly: true,
     });
   });
 

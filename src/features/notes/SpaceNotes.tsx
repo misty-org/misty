@@ -1,6 +1,7 @@
 import type { SpaceNotesProps } from "@/models/interfaces/features/notes/SpaceNotes";
 export type { SpaceNotesProps } from "@/models/interfaces/features/notes/SpaceNotes";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
 import { useAuth } from "@/features/auth/AuthContext";
 import { useNotesStore } from "@/stores/notes";
@@ -9,6 +10,7 @@ import { NoteReadingPane } from "./components/NoteReadingPane";
 import { NoteContextPanel } from "./components/NoteContextPanel";
 import { NewNoteDialog } from "./components/NewNoteDialog";
 import { JournalAttribution } from "@/features/journal/components/JournalAttribution";
+import { useSpacesStore } from "@/stores/spaces/useSpacesStore";
 
 const shellClass =
   "relative grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] bg-background text-foreground";
@@ -20,6 +22,7 @@ const bodyWithContextClass =
 
 export function SpaceNotes(props: SpaceNotesProps) {
   const { user } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const store = useNotesStore(
     useShallow((state) => ({
@@ -48,8 +51,22 @@ export function SpaceNotes(props: SpaceNotesProps) {
       updateNoteContent: state.updateNoteContent,
     })),
   );
+  const referenceOnly = useSpacesStore((state) => state.referenceOnly);
 
   const [newNoteOpen, setNewNoteOpen] = useState(false);
+  const createQueryConsumedRef = useRef(false);
+  useEffect(() => {
+    if (searchParams.get("create") !== "note") {
+      createQueryConsumedRef.current = false;
+      return;
+    }
+    if (createQueryConsumedRef.current) return;
+    createQueryConsumedRef.current = true;
+    const next = new URLSearchParams(searchParams);
+    next.delete("create");
+    setSearchParams(next, { replace: true });
+    if (!referenceOnly) setNewNoteOpen(true);
+  }, [referenceOnly, searchParams, setSearchParams]);
   useEffect(() => {
     if (user?.id) void actions.load(user.id, props.spaceId, props.spaceName);
   }, [actions.load, props.spaceId, props.spaceName, user?.id]);
@@ -85,8 +102,11 @@ export function SpaceNotes(props: SpaceNotesProps) {
         query={store.query}
         contextPanelOpen={contextPanelOpen}
         contextPanelAvailable={Boolean(selectedNote)}
+        readOnly={referenceOnly}
         onQueryChange={actions.setQuery}
-        onNewNote={() => setNewNoteOpen(true)}
+        onNewNote={() => {
+          if (!referenceOnly) setNewNoteOpen(true);
+        }}
         onToggleContextPanel={actions.toggleContextPanel}
       />
 
@@ -97,6 +117,7 @@ export function SpaceNotes(props: SpaceNotesProps) {
           accountId={store.accountId}
           loading={loading}
           editingNoteId={store.editingNoteId}
+          referenceOnly={referenceOnly}
           onEditingNoteChange={actions.setEditingNoteId}
           onSaveBody={
             selectedConnector?.capabilities.update
@@ -108,13 +129,17 @@ export function SpaceNotes(props: SpaceNotesProps) {
               ? (noteId, content) => void actions.updateNoteContent(noteId, content)
               : undefined
           }
-          onToggleFavorite={(noteId) => void actions.toggleFavorite(noteId)}
+          onToggleFavorite={
+            referenceOnly ? undefined : (noteId) => void actions.toggleFavorite(noteId)
+          }
           onDelete={
-            selectedConnector?.capabilities.delete && selectedNote?.canDelete
+            !referenceOnly && selectedConnector?.capabilities.delete && selectedNote?.canDelete
               ? actions.deleteNote
               : undefined
           }
-          onNewNote={() => setNewNoteOpen(true)}
+          onNewNote={() => {
+            if (!referenceOnly) setNewNoteOpen(true);
+          }}
         />
 
         {contextPanelOpen ? (

@@ -13,7 +13,11 @@ import { assertUploadLimit } from "@/features/library/uploadLimits";
 import { readDownloadBlob } from "@/features/library/signedDownload";
 import { safeTauriAssetUrl } from "@/platform/tauri";
 import { addRequestCorrelation } from "@/platform/requestCorrelation";
-import type { SpaceConversation, SpaceRun } from "@/models/interfaces/features/spaces/types";
+import type {
+  SpaceConversation,
+  SpaceRun,
+  SpaceTaskActivity,
+} from "@/models/interfaces/features/spaces/types";
 import type {
   AgentMentionFailure,
   MessageSpan,
@@ -72,6 +76,13 @@ import type { GlobalSpaceLibraryHit } from "@/models/interfaces/features/agents/
 import type { TaskSchedule } from "@/models/interfaces/features/spaces/connections/calendarTasks";
 import type { ConflictResolution } from "@/models/types/features/spaces/connections/calendarTasks";
 import { createSpaceMembersApi } from "./spaceMembersApi";
+import { createSpaceAgentMembershipsApi } from "./spaceAgentMembershipsApi";
+import { createSpacePlannerExpansionApi } from "./spacePlannerExpansionApi";
+import {
+  isSpaceReferenceOnly,
+  isSpaceWriteRequest,
+  setSpaceReferenceOnly,
+} from "./spaceConnectivity";
 
 export class SpaceRequestError extends Error {
   constructor(
@@ -101,19 +112,35 @@ export async function resolveSpacesApiBase(): Promise<string> {
   return withDefaultApiPath(base);
 }
 
-export async function spaceRequest<T = void>(path: string, init?: RequestInit): Promise<T> {
+type SpaceRequestInit = RequestInit & { allowWhileReferenceOnly?: boolean };
+
+export async function spaceRequest<T = void>(path: string, init?: SpaceRequestInit): Promise<T> {
+  if (
+    isSpaceReferenceOnly() &&
+    isSpaceWriteRequest(init?.method) &&
+    !init?.allowWhileReferenceOnly
+  ) {
+    throw new SpaceRequestError(
+      "This is a saved copy. Reconnect to Misty before making changes.",
+      503,
+      "offline_reference_only",
+    );
+  }
   const accountGeneration = readAccountSessionGeneration();
   assertStableSpaceAccount(accountGeneration);
   const [base, token] = await Promise.all([resolveSpacesApiBase(), readAccountAuthToken()]);
   assertStableSpaceAccount(accountGeneration);
-  const headers = addRequestCorrelation(new Headers(init?.headers));
-  if (init?.body && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");
+  const { allowWhileReferenceOnly: _allowWhileReferenceOnly, ...requestInit } = init ?? {};
+  const headers = addRequestCorrelation(new Headers(requestInit.headers));
+  if (requestInit.body && !headers.has("Content-Type"))
+    headers.set("Content-Type", "application/json");
   if (token) headers.set("Authorization", `Bearer ${token}`);
   let response: Response;
   try {
-    response = await fetch(`${base}${path}`, { credentials: "include", ...init, headers });
+    response = await fetch(`${base}${path}`, { credentials: "include", ...requestInit, headers });
   } catch (error) {
     assertStableSpaceAccount(accountGeneration);
+    setSpaceReferenceOnly(true);
     throw error;
   }
   assertStableSpaceAccount(accountGeneration);
@@ -177,6 +204,7 @@ export function spaceErrorMessage(code: string | undefined, fallback: string): s
     space_node_limit_reached: "This Space has reached its 5,000-item limit.",
     version_conflict: "Someone else changed this item. Reload it before saving again.",
     library_reauthentication_required: "Unlock this protected Library collection again.",
+    offline_reference_only: "Reconnect to Misty before making changes.",
     integration_required:
       "Connect the workflow’s required provider in this Space before running it.",
     agent_model_unavailable: "This Agent’s selected model is unavailable. Choose another model.",
@@ -199,6 +227,7 @@ export const spacesApi = {
       `/search/spaces?q=${encodeURIComponent(query)}&limit=${limit}`,
     ),
   snapshot: () => spaceRequest<SpacesSnapshot>("/spaces"),
+  ...createSpacePlannerExpansionApi(spaceRequest),
   templates: () =>
     spaceRequest<{
       templates: SpaceTemplate[];
@@ -230,6 +259,7 @@ export const spacesApi = {
       body: JSON.stringify({ confirmation }),
     }),
   ...createSpaceMembersApi(spaceRequest, fetchProtectedBlob),
+  ...createSpaceAgentMembershipsApi(spaceRequest),
   messages: (spaceId: string, before = 0) =>
     spaceRequest<{ messages: SpaceMessage[] }>(
       `/spaces/${encodeURIComponent(spaceId)}/messages?before=${before}&limit=50`,
@@ -360,6 +390,7 @@ export const spacesApi = {
     filters: {
       status?: SpaceTaskStatus;
       assigneeUserId?: string;
+      assigneeAgentId?: string;
       priority?: SpaceTaskPriority;
       search?: string;
       dueFrom?: string;
@@ -373,6 +404,7 @@ export const spacesApi = {
     const query = new URLSearchParams();
     if (filters.status) query.set("status", filters.status);
     if (filters.assigneeUserId) query.set("assignee_user_id", filters.assigneeUserId);
+    if (filters.assigneeAgentId) query.set("assignee_agent_id", filters.assigneeAgentId);
     if (filters.priority) query.set("priority", filters.priority);
     if (filters.search) query.set("q", filters.search);
     if (filters.dueFrom) query.set("due_from", filters.dueFrom);
@@ -388,7 +420,7 @@ export const spacesApi = {
   createTask: (
     spaceId: string,
     task: Pick<SpaceTask, "title" | "notes" | "status" | "priority" | "due_timezone"> &
-      Partial<Pick<SpaceTask, "assignee_user_id" | "due_at" | "source_refs">>,
+      Partial<Pick<SpaceTask, "assignee_user_id" | "assignee_agent_id" | "due_at" | "source_refs">>,
   ) =>
     spaceRequest<SpaceTask>(`/spaces/${encodeURIComponent(spaceId)}/tasks`, {
       method: "POST",
@@ -405,6 +437,7 @@ export const spacesApi = {
         | "status"
         | "priority"
         | "assignee_user_id"
+        | "assignee_agent_id"
         | "due_at"
         | "due_timezone"
         | "source_refs"
@@ -414,6 +447,10 @@ export const spacesApi = {
     spaceRequest<SpaceTask>(
       `/spaces/${encodeURIComponent(spaceId)}/tasks/${encodeURIComponent(task.id)}`,
       { method: "PATCH", body: JSON.stringify({ ...task, ...patch }) },
+    ),
+  taskActivity: (spaceId: string, taskId: string) =>
+    spaceRequest<{ activity: SpaceTaskActivity[] }>(
+      `/spaces/${encodeURIComponent(spaceId)}/tasks/${encodeURIComponent(taskId)}/activity`,
     ),
   moveTask: (spaceId: string, task: SpaceTask, status: SpaceTaskStatus, beforeTaskId?: string) =>
     spaceRequest<SpaceTaskMoveResult>(
@@ -609,6 +646,7 @@ export const spacesApi = {
     spaceRequest<{ ticket: string; expires_in: number }>("/realtime/tickets", {
       method: "POST",
       body: JSON.stringify({ after }),
+      allowWhileReferenceOnly: true,
     }),
   libraryItems: (spaceId: string, query: LibraryItemQuery = {}, reauthenticationToken = "") => {
     const values = new URLSearchParams();

@@ -81,12 +81,22 @@ export interface AiToolApproval {
   scope: AgentScope | null;
 }
 
+export interface AiActionPlan {
+  id: string;
+  request: SendAiPromptRequest;
+  status: "planning" | "pending" | "running" | "approved" | "dismissed" | "failed";
+  error: string | null;
+}
+
 export interface SendAiPromptRequest {
   displayPrompt: string;
   prompt: string;
   cwd: string | null;
   selectedPaths?: string[];
   contextSources?: AgentContextSource[];
+  spaceSection?: string;
+  contextTaskId?: string;
+  skipActionPreview?: boolean;
 }
 
 export interface AiConversationSummary {
@@ -102,6 +112,7 @@ export interface AiSessionStore {
   mode: AiMode;
   messages: AiPanelMessage[];
   plans: AiPlanReview[];
+  actionPlans: AiActionPlan[];
   toolApprovals: AiToolApproval[];
   error: string | null;
   conversations: AiConversationSummary[];
@@ -125,6 +136,8 @@ export interface AiSessionStore {
   sendPrompt: (request: SendAiPromptRequest) => Promise<void>;
   approveToolRequest: (requestId: string) => Promise<void>;
   approvePlan: (planId: string) => Promise<void>;
+  approveActionPlan: (planId: string) => Promise<void>;
+  reviseActionPlan: (planId: string) => SendAiPromptRequest | null;
   abortPrompt: () => Promise<void>;
   clearConversation: () => void;
   activateConversationScope: (scopeKey: string) => Promise<void>;

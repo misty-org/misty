@@ -1,9 +1,13 @@
 import type { TaskDraft } from "@/models/types/features/spaces/SpaceTaskPrimitives";
 export type { TaskDraft } from "@/models/types/features/spaces/SpaceTaskPrimitives";
-import { Flag } from "lucide-react";
+import { Bot, Flag } from "lucide-react";
 import { EmptyState, ErrorState } from "@/ui";
 import type { SpaceTaskPriority, SpaceTaskStatus } from "@/models/types/features/spaces/types";
-import type { SpaceMember, SpaceTask } from "@/models/interfaces/features/spaces/types";
+import type {
+  SpaceAgentMembership,
+  SpaceMember,
+  SpaceTask,
+} from "@/models/interfaces/features/spaces/types";
 import { Avatar, AvatarFallback } from "@/ui";
 import { Badge } from "@/ui";
 import { Button } from "@/ui";
@@ -63,15 +67,26 @@ export function TaskInlineSelect({
 
 export function TaskMemberAvatar({
   member,
+  agent,
   size = "sm",
 }: {
   member?: SpaceMember;
+  agent?: SpaceAgentMembership;
   size?: "sm" | "md";
 }) {
   return (
-    <Avatar className={size === "md" ? "size-9" : "size-6"} title={member?.name ?? "Unassigned"}>
+    <Avatar
+      className={size === "md" ? "size-9" : "size-6"}
+      title={agent?.name ?? member?.name ?? "Unassigned"}
+    >
       <AvatarFallback className={size === "md" ? "text-xs" : "text-[9px]"}>
-        {member ? memberInitials(member.name) : "—"}
+        {agent ? (
+          <Bot className={size === "md" ? "size-4" : "size-3"} />
+        ) : member ? (
+          memberInitials(member.name)
+        ) : (
+          "—"
+        )}
       </AvatarFallback>
     </Avatar>
   );
@@ -145,6 +160,19 @@ export function memberName(members: SpaceMember[], id?: string) {
   return id
     ? (members.find((member) => member.user_id === id)?.name ?? "Former member")
     : "Unassigned";
+}
+
+export function taskAssigneeName(
+  members: SpaceMember[],
+  agents: SpaceAgentMembership[],
+  task: SpaceTask,
+) {
+  if (task.assignee_agent_id) {
+    return (
+      agents.find((agent) => agent.agent_id === task.assignee_agent_id)?.name ?? "Former Agent"
+    );
+  }
+  return memberName(members, task.assignee_user_id);
 }
 
 export function toLocalInput(value: string) {

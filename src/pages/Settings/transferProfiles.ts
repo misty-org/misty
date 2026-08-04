@@ -58,21 +58,6 @@ export function transferProfileOptions(profile: TransferProfileRecord): Transfer
   };
 }
 
-export function transferProfileSettingsPayload(
-  profile: TransferProfileRecord,
-): Record<string, unknown> {
-  return {
-    id: profile.id,
-    name: profile.name,
-    transfers: profile.transfers,
-    checkers: profile.checkers,
-    bandwidth_limit: profile.bandwidthLimit,
-    retries: profile.retries,
-    low_level_retries: profile.lowLevelRetries,
-    checksum: profile.checksum,
-  };
-}
-
 function numberField(record: Record<string, unknown>, key: string, fallback: number): number {
   const value = record[key];
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;

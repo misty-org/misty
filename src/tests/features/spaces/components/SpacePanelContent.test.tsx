@@ -25,6 +25,32 @@ describe("SpacePanelContent", () => {
     container.remove();
   });
 
+  it("shows the selected Space as a static sidebar header", async () => {
+    const space = spaceFixture();
+
+    await act(async () => {
+      root.render(
+        <MemoryRouter initialEntries={["/spaces/space-1/library"]}>
+          <Routes>
+            <Route
+              path="/spaces/:spaceId/:section"
+              element={<SpacePanelContent spaces={[space]} loading={false} />}
+            />
+          </Routes>
+        </MemoryRouter>,
+      );
+    });
+
+    expect(container.textContent).toContain("Design team");
+    expect(
+      container.querySelector('[aria-label="Design team default profile picture"]'),
+    ).not.toBeNull();
+    expect(container.querySelector('[aria-label^="Space menu"]')).toBeNull();
+    expect(container.querySelector("header > div")?.className).not.toContain("bg-sidebar-accent");
+    expect(container.querySelector("nav[aria-label='Space sections']")).not.toBeNull();
+    expect(container.querySelector("nav[aria-label='Space management']")).not.toBeNull();
+  });
+
   it("does not render skeleton and active space navigation stacked together", async () => {
     vi.useFakeTimers();
     const space1: Space = {
@@ -45,16 +71,14 @@ describe("SpacePanelContent", () => {
           <Routes>
             <Route
               path="/spaces/:spaceId/:section"
-              element={
-                <SpacePanelContent spaces={[]} limits={null} loading={true} onAddSpace={() => {}} />
-              }
+              element={<SpacePanelContent spaces={[]} loading={true} />}
             />
           </Routes>
         </MemoryRouter>,
       );
     });
 
-    // While loading spaces = [], skeleton is visible instead of section navigation
+    // While loading spaces = [], the rail shows its loading state.
     expect(container.querySelector('[role="status"]')).not.toBeNull();
     expect(container.querySelector("nav[aria-label='Space sections']")).toBeNull();
 
@@ -64,14 +88,7 @@ describe("SpacePanelContent", () => {
           <Routes>
             <Route
               path="/spaces/:spaceId/:section"
-              element={
-                <SpacePanelContent
-                  spaces={[space1]}
-                  limits={null}
-                  loading={false}
-                  onAddSpace={() => {}}
-                />
-              }
+              element={<SpacePanelContent spaces={[space1]} loading={false} />}
             />
           </Routes>
         </MemoryRouter>,
@@ -82,11 +99,26 @@ describe("SpacePanelContent", () => {
       vi.advanceTimersByTime(700);
     });
 
-    // Once spin timer finishes, the mode-specific sidebar replaces the skeleton.
-    // Primary mode navigation lives in the shell header.
+    // Once spin timer finishes, the vertical Space menu and its contextual branch
+    // replace the skeleton together in the sidebar.
     expect(container.querySelector('[role="status"]')).toBeNull();
-    expect(container.querySelector("nav[aria-label='Space sections']")).toBeNull();
+    expect(container.querySelector("nav[aria-label='Space sections']")).not.toBeNull();
     expect(container.querySelector("nav[aria-label='Library collections']")).not.toBeNull();
     vi.useRealTimers();
   });
 });
+
+function spaceFixture(patch: Partial<Space> = {}): Space {
+  return {
+    id: "space-1",
+    owner_user_id: "owner",
+    name: "Design team",
+    role: "owner",
+    member_count: 2,
+    pending_count: 0,
+    is_shared: true,
+    created_at: "2026-07-19T00:00:00Z",
+    updated_at: "2026-07-19T00:00:00Z",
+    ...patch,
+  };
+}

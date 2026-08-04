@@ -68,7 +68,7 @@ export function SpaceLibraryHeader(props: SpaceLibraryHeaderProps) {
           className={cn(
             "!flex h-8 min-w-[220px] flex-1 items-center gap-2 overflow-hidden rounded-md",
             "border border-border/70 bg-muted/30 px-2.5 text-muted-foreground shadow-none",
-            "transition-colors focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/20",
+            "transition-colors",
           )}
         >
           <Search size={15} aria-hidden="true" />

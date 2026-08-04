@@ -11,6 +11,7 @@ export function SpaceChatConversationList({
   conversations,
   activeConversationId,
   currentUserId,
+  supportOnly,
   onCreateConversation,
   onEditConversation,
 }: {
@@ -18,13 +19,33 @@ export function SpaceChatConversationList({
   conversations: SpaceConversation[];
   activeConversationId: string | null;
   currentUserId?: string;
-  onCreateConversation: () => void;
-  onEditConversation: (conversation: SpaceConversation) => void;
+  supportOnly?: boolean;
+  onCreateConversation?: () => void;
+  onEditConversation?: (conversation: SpaceConversation) => void;
 }) {
   const mistyConversations = conversations.filter(
     (conversation) => conversation.origin !== "discord",
   );
   const discord = conversations.filter((conversation) => conversation.origin === "discord");
+
+  if (supportOnly) {
+    return (
+      <nav className="grid gap-1" aria-label="Misty support conversation">
+        {mistyConversations.map((conversation) => (
+          <Link
+            key={conversation.id}
+            className={conversationLinkClass(activeConversationId === conversation.id)}
+            to={`/spaces/${encodeURIComponent(activeSpaceId)}/chat?conversation=${encodeURIComponent(conversation.id)}`}
+          >
+            <span className="grid size-7 place-items-center rounded-md bg-sidebar-accent text-muted-foreground">
+              <MessagesSquare size={15} strokeWidth={1.75} />
+            </span>
+            <span className="min-w-0 truncate font-medium">Ask Misty</span>
+          </Link>
+        ))}
+      </nav>
+    );
+  }
 
   return (
     <div className="grid gap-3">
@@ -45,8 +66,8 @@ export function SpaceChatConversationList({
         conversations={mistyConversations}
         activeConversationId={activeConversationId}
         currentUserId={currentUserId}
-        onCreate={onCreateConversation}
-        onEdit={onEditConversation}
+        onCreate={onCreateConversation ?? (() => undefined)}
+        onEdit={onEditConversation ?? (() => undefined)}
       />
       {discord.length ? (
         <DiscordConversationGroup

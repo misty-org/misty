@@ -6,6 +6,10 @@ if (typeof globalThis.ResizeObserver === "undefined") {
   } as typeof globalThis.ResizeObserver;
 }
 
+if (typeof Element !== "undefined" && typeof Element.prototype.scrollTo !== "function") {
+  Element.prototype.scrollTo = function scrollTo() {};
+}
+
 if (!globalThis.localStorage) {
   const values = new Map<string, string>();
   const storage: Storage = {

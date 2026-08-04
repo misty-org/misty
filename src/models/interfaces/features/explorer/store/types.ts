@@ -190,6 +190,7 @@ export interface ExplorerStore {
   recordLibraryRecent: (entry: FileEntry) => Promise<void>;
   recordLastOpenedPath: (path: string) => Promise<void>;
   initialize: (homePath: string) => Promise<void>;
+  ensureWorkspace: (workspaceId: string, title: string, homePath: string) => Promise<void>;
   selectWorkspace: (workspaceId: string, homePath: string) => Promise<void>;
   createWorkspace: (title: string, homePath: string) => Promise<void>;
   renameWorkspace: (workspaceId: string, title: string) => Promise<void>;

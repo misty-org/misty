@@ -6,6 +6,8 @@ import {
   desktopWallpaperLayerClass,
   navbarBottomClass,
   navbarGroupClass,
+  navLinkActiveClass,
+  navLinkBaseClass,
 } from "@/layouts/DesktopLayout/styles";
 
 describe("desktop surface colors", () => {
@@ -43,5 +45,20 @@ describe("desktop surface colors", () => {
     expect(navbarGroupClass).toContain("[scrollbar-width:none]");
     expect(navbarGroupClass).toContain("[&::-webkit-scrollbar]:hidden");
     expect(navbarBottomClass).toContain("shrink-0");
+  });
+
+  it("anchors the navigation state marker to the left edge of the rail", () => {
+    expect(navLinkBaseClass).toContain("w-full");
+    expect(navLinkBaseClass).toContain("before:left-0");
+    expect(navLinkBaseClass).toContain("before:h-10");
+    expect(navLinkBaseClass).toContain("before:w-1");
+    expect(navLinkBaseClass).toContain("hover:before:scale-y-50");
+    expect(navLinkBaseClass).toContain("before:transition-[scale,opacity]");
+    expect(navLinkBaseClass).toContain("before:duration-200");
+    expect(navLinkBaseClass).toContain("before:ease-[cubic-bezier(0.4,0,0.2,1)]");
+    expect(navLinkBaseClass).toContain("motion-reduce:before:transition-none");
+    expect(navLinkActiveClass).toContain("before:!scale-y-100");
+    expect(navLinkActiveClass).toContain("before:!opacity-100");
+    expect(navLinkActiveClass).toContain("before:!duration-300");
   });
 });

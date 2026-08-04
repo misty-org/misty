@@ -70,3 +70,9 @@ windows-sys = { version = "0.59", features = ["Win32_Foundation", "Win32_Graphic
 
 [features]
 custom-protocol = ["tauri/custom-protocol"]
+
+# Keep local desktop builds useful for debugging without retaining Cargo's
+# largest symbol and incremental caches. Release builds are unaffected.
+[profile.dev]
+debug = 1
+incremental = false

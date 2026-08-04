@@ -29,6 +29,7 @@ import {
 } from "@/pages/Settings/DesktopSettingsUI";
 import { useSpacesStore } from "@/stores/spaces/useSpacesStore";
 import { SpaceMembers } from "./SpaceMembers";
+import { canManageSpaceLifecycle, isMistySpace } from "../mistySpace";
 
 type SpaceSettingsSection = "general" | "members" | "connections";
 
@@ -65,6 +66,9 @@ export function SpaceSettings({ spaceId, section }: { spaceId: string; section: 
   const [deleteConfirmation, setDeleteConfirmation] = useState("");
   const [dangerBusy, setDangerBusy] = useState(false);
   const isOwner = space?.role === "owner";
+  const canRename = isOwner && canManageSpaceLifecycle(space, "rename");
+  const canLeave = !isOwner && canManageSpaceLifecycle(space, "leave");
+  const canDelete = isOwner && canManageSpaceLifecycle(space, "delete");
   const encodedSpaceId = encodeURIComponent(spaceId);
   const locationState = location.state as { spaceSettingsReturnTo?: string } | null;
   const fallbackReturnPath = `/spaces/${encodedSpaceId}/chat`;
@@ -89,7 +93,7 @@ export function SpaceSettings({ spaceId, section }: { spaceId: string; section: 
   const saveName = async (event: FormEvent) => {
     event.preventDefault();
     const nextName = name.trim();
-    if (!space || !isOwner || !nextName || nextName === space.name || saving) return;
+    if (!space || !canRename || !nextName || nextName === space.name || saving) return;
     clearError();
     setSaving(true);
     try {
@@ -99,7 +103,7 @@ export function SpaceSettings({ spaceId, section }: { spaceId: string; section: 
     }
   };
   const submitLeave = async () => {
-    if (!space || isOwner || dangerBusy) return;
+    if (!space || !canLeave || dangerBusy) return;
     setDangerBusy(true);
     clearError();
     try {
@@ -112,7 +116,7 @@ export function SpaceSettings({ spaceId, section }: { spaceId: string; section: 
     }
   };
   const submitDelete = async () => {
-    if (!space || !isOwner || deleteConfirmation !== space.name || dangerBusy) return;
+    if (!space || !canDelete || deleteConfirmation !== space.name || dangerBusy) return;
     setDangerBusy(true);
     clearError();
     try {
@@ -131,6 +135,22 @@ export function SpaceSettings({ spaceId, section }: { spaceId: string; section: 
         Loading Space settings…
       </div>
     );
+
+  if (isMistySpace(space)) {
+    return (
+      <WorkspaceOverlay open style={{}} ariaLabel="Misty Space settings" onClose={dismissSettings}>
+        <div className="grid h-full place-items-center px-6 text-center">
+          <div className="max-w-md">
+            <h1 className="m-0 text-lg font-semibold">Managed by Misty</h1>
+            <p className="mb-0 mt-2 text-sm leading-6 text-muted-foreground">
+              This guide Space is published for everyone and its membership and settings cannot be
+              changed.
+            </p>
+          </div>
+        </div>
+      </WorkspaceOverlay>
+    );
+  }
 
   return (
     <WorkspaceOverlay
@@ -174,11 +194,11 @@ export function SpaceSettings({ spaceId, section }: { spaceId: string; section: 
                     <Input
                       aria-label="Space name"
                       maxLength={80}
-                      disabled={!isOwner || saving}
+                      disabled={!canRename || saving}
                       value={name}
                       onChange={(event) => setName(event.target.value)}
                     />
-                    {isOwner ? (
+                    {canRename ? (
                       <Button
                         className="shrink-0"
                         type="submit"
@@ -188,7 +208,7 @@ export function SpaceSettings({ spaceId, section }: { spaceId: string; section: 
                       </Button>
                     ) : null}
                   </form>
-                  {!isOwner ? (
+                  {!canRename ? (
                     <p className="mb-0 mt-3 text-xs text-muted-foreground">
                       Only the Space owner can change its name.
                     </p>
@@ -226,7 +246,7 @@ export function SpaceSettings({ spaceId, section }: { spaceId: string; section: 
                   </p>
                 </CardHeader>
                 <CardContent>
-                  {isOwner ? (
+                  {canDelete ? (
                     <div className="flex flex-wrap items-center justify-between gap-4">
                       <div className="min-w-0 flex-1">
                         <p className="m-0 text-sm font-medium">Delete this Space</p>
@@ -248,7 +268,7 @@ export function SpaceSettings({ spaceId, section }: { spaceId: string; section: 
                         Delete Space
                       </Button>
                     </div>
-                  ) : (
+                  ) : canLeave ? (
                     <div className="flex flex-wrap items-center justify-between gap-4">
                       <div className="min-w-0 flex-1">
                         <p className="m-0 text-sm font-medium">Leave this Space</p>
@@ -268,7 +288,7 @@ export function SpaceSettings({ spaceId, section }: { spaceId: string; section: 
                         Leave Space
                       </Button>
                     </div>
-                  )}
+                  ) : null}
                 </CardContent>
               </Card>
             </div>

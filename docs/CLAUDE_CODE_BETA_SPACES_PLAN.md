@@ -79,17 +79,36 @@ PostgreSQL is authoritative for note identity, metadata projections,
 permissions, lifecycle, membership, quota, and audit history. The Durable
 Object is authoritative for the Yjs collaborative document.
 
-## Phase 1: Simplify Agents safely
+## Phase 1: Simplify Agents safely — completed, then reversed
 
-1. Replace the desktop Agents page body with one centered text element:
-   `Agents are coming soon...`
-2. Preserve the Agents route and navigation item.
-3. Do not initialize agent stores, request `/agents`, request `/ai/models`, open
-   agent sessions, or render configuration dialogs from this route.
-4. Leave existing agent implementation files in place unless removing an import
-   is required. This is a beta UI gate, not deletion of the feature.
-5. Add a component test that renders the route, checks the exact copy, and
-   confirms no agent/model backend request occurs.
+**Status: superseded on 2026-07-31. Agents are in beta scope.**
+
+This phase gated the desktop Agents page behind `Agents are coming soon...`
+(commit `d24fe706`, 2026-07-26). The direction changed four days later:
+`BUSINESS.md` was updated on 2026-07-25 to make agents a first-class part of
+the product with their own destination, and `backlog/beta-2026-07-27/README.md`
+records the same reversal. The gate was removed on 2026-07-31.
+
+The gate was also load-bearing in a way that was not intended. `@agent`
+mentions in Chat run server-side and were never gated, but the mention picker
+reads from `personal_agents` joined to `personal_agent_space_grants`, and the
+only UI that creates an agent or grants it to a Space is
+`src/pages/Agents/desktop/PersonalAgentsSidebar.tsx` — on the gated page. With
+the gate in place the picker was empty for every user, so shipping the gate
+would have shipped a dead `@agent`.
+
+What actually shipped instead:
+
+1. `src/pages/Agents/index.tsx` lazy-loads the real `./desktop` implementation,
+   matching the Settings/Extensions/Account page idiom.
+2. The route, navigation item, and `LegacyAgentRedirect` are unchanged.
+3. `src/tests/pages/Agents/AgentsPage.test.tsx` now asserts the real surface
+   renders and no longer asserts the coming-soon copy.
+
+Still out of beta scope, and still in `backlog/beta-2026-07-27/`: Studio
+editors, the workflow data model, and per-Space custom agent management. The
+`VITE_MISTY_*` flags in `src/features/agents/flags.ts` stay **off**, which
+keeps device jobs, folder agents, and document intelligence disabled.
 
 ## Phase 2: Direct R2 transfer and purpose-specific limits
 

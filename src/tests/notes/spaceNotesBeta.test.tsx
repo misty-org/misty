@@ -1,5 +1,6 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
+import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const spaceRequestMock = vi.hoisted(() => vi.fn());
@@ -98,9 +99,15 @@ describe("SpaceNotes beta simplification", () => {
     vi.useRealTimers();
   });
 
+  const notesSurface = (entry = "/spaces/space-product/notes") => (
+    <MemoryRouter initialEntries={[entry]}>
+      <SpaceNotes spaceId="space-product" spaceName="Product" />
+    </MemoryRouter>
+  );
+
   it("does not render Notion or source-management UI in the beta notes surface", async () => {
     await act(async () => {
-      root.render(<SpaceNotes spaceId="space-product" spaceName="Product" />);
+      root.render(notesSurface());
     });
     await wait(180);
 
@@ -113,6 +120,16 @@ describe("SpaceNotes beta simplification", () => {
     expect(document.body.textContent).not.toContain(
       "Misty notes are saved privately on this desktop and belong to this Space.",
     );
+  });
+
+  it("opens the existing note dialog from a note creation query", async () => {
+    await act(async () => {
+      root.render(notesSurface("/spaces/space-product/notes?create=note"));
+    });
+    await wait();
+
+    expect(document.body.textContent).toContain("New note");
+    expect(document.body.querySelector("#new-note-title")).not.toBeNull();
   });
 
   it("renders the active Space note list in the Space panel sidebar", async () => {
@@ -149,7 +166,7 @@ describe("SpaceNotes beta simplification", () => {
       updated_at: "2026-07-20T12:00:00.000Z",
     });
     await act(async () => {
-      root.render(<SpaceNotes spaceId="space-product" spaceName="Product" />);
+      root.render(notesSurface());
     });
     await wait(180);
 
@@ -218,7 +235,7 @@ describe("SpaceNotes beta simplification", () => {
       .mockResolvedValueOnce(undefined);
 
     await act(async () => {
-      root.render(<SpaceNotes spaceId="space-product" spaceName="Product" />);
+      root.render(notesSurface());
     });
     await wait(180);
 
@@ -289,7 +306,7 @@ describe("SpaceNotes beta simplification", () => {
       });
 
     await act(async () => {
-      root.render(<SpaceNotes spaceId="space-product" spaceName="Product" />);
+      root.render(notesSurface());
     });
     await wait(180);
 

@@ -4,23 +4,11 @@ import type { SpaceTask } from "@/models/interfaces/features/spaces/types";
 export const FILTER_PARAM_KEYS = ["status", "assignee", "priority", "due", "mine"] as const;
 
 export function normalizeView(value?: string): TaskViewMode {
-  return value === "list" || value === "calendar" ? value : "board";
+  return value === "list" ? value : "board";
 }
 
 export function activeFilterCount(params: URLSearchParams) {
   return FILTER_PARAM_KEYS.filter((key) => params.has(key)).length;
-}
-
-export function startOfMonth(date: Date) {
-  return new Date(date.getFullYear(), date.getMonth(), 1);
-}
-
-/** A month either side of the visible one, so scrolling does not refetch. */
-export function calendarRange(month: Date) {
-  return {
-    from: new Date(month.getFullYear(), month.getMonth() - 1, 1),
-    to: new Date(month.getFullYear(), month.getMonth() + 2, 1),
-  };
 }
 
 /** The server-side slice of a due filter; undefined means "do not narrow". */
