@@ -49,7 +49,7 @@ func (s *SpacesService) Conversation() http.HandlerFunc {
 		spaceID := chi.URLParam(r, "spaceID")
 		conversationID := chi.URLParam(r, "conversationID")
 		if r.Method == http.MethodDelete {
-			if err := s.database.DeleteDisconnectedDiscordConversation(
+			if err := s.database.DeleteOrClearSpaceConversation(
 				r.Context(), userID, spaceID, conversationID,
 			); err != nil {
 				writeSpaceError(w, err)
@@ -115,7 +115,7 @@ func (s *SpacesService) ConversationMessages() http.HandlerFunc {
 		agentReplies := make([]*db.SpaceMessage, 0, len(agentIDs))
 		agentFailures := make([]agentMentionFailure, 0)
 		for _, agentID := range uniqueStrings(agentIDs) {
-			reply, runErr := s.runMentionedAgent(r.Context(), userID, spaceID, conversationID, agentID, message.ID, body.Content, body.FileNodeIDs)
+			reply, runErr := s.runMentionedAgent(r.Context(), userID, spaceID, conversationID, agentID, message.ID, body.Content, body.FileNodeIDs, body.AttachmentIDs, body.LibraryItemIDs)
 			if runErr != nil {
 				agentFailures = append(agentFailures, TestingAgentMentionFailureFromError(agentID, runErr))
 			} else if reply != nil {

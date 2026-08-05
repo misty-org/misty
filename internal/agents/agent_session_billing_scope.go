@@ -201,6 +201,22 @@ func (s *Service) AppendExternalAgentMessage(ctx context.Context, sessionID, use
 	return &appended, err
 }
 
+// AppendExternalUserMessage persists a user turn that a server-coordinated
+// Agent run will answer, without invoking the generic client-tool loop.
+func (s *Service) AppendExternalUserMessage(ctx context.Context, sessionID, userID, text string) error {
+	return s.store.WithSessionContext(ctx, sessionID, userID, func(_ context.Context, session *Session) error {
+		message := strings.TrimSpace(text)
+		if message == "" {
+			return ErrInvalidRequest("user_message is required")
+		}
+		if len(message) > MaxUserMessageBytes {
+			return ErrInvalidRequest("user_message is too large")
+		}
+		session.Messages = append(session.Messages, Message{Role: RoleUser, Content: message})
+		return nil
+	})
+}
+
 func (s *Service) Cancel(sessionID, userID string) error {
 	return s.store.Cancel(sessionID, userID)
 }

@@ -21,3 +21,13 @@ func createTestSpace(t *testing.T, database *Database, ctx context.Context, owne
 	}
 	return space
 }
+
+func standardSpaces(spaces []Space) []Space {
+	out := []Space{}
+	for _, space := range spaces {
+		if space.Kind != "misty" {
+			out = append(out, space)
+		}
+	}
+	return out
+}

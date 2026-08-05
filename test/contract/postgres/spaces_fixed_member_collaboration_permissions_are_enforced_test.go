@@ -175,26 +175,32 @@ func TestSpaceGroupConversationsStayScopedToSelectedMembers(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SpaceEventsAfter(owner) error = %v", err)
 	}
-	var groupMessageEventID int64
+	var groupMessageEventID, groupConversationEventID int64
 	for _, event := range ownerEvents {
 		if event.EventType == "message.created" && event.EntityID == message.ID {
 			groupMessageEventID = event.ID
 		}
+		if event.EventType == "conversation.created" && event.EntityID == conversation.ID {
+			groupConversationEventID = event.ID
+		}
 	}
-	if groupMessageEventID == 0 {
-		t.Fatalf("owner events = %#v, want group message event", ownerEvents)
+	if groupMessageEventID == 0 || groupConversationEventID == 0 {
+		t.Fatalf("owner events = %#v, want private conversation and message events", ownerEvents)
 	}
 	excludedEvents, _, err := database.SpaceEventsAfter(ctx, excluded.ID, 0, 500)
 	if err != nil {
 		t.Fatalf("SpaceEventsAfter(excluded) error = %v", err)
 	}
 	for _, event := range excludedEvents {
-		if event.ID == groupMessageEventID {
-			t.Fatalf("excluded member received private group event %#v", event)
+		if event.ID == groupMessageEventID || event.ID == groupConversationEventID {
+			t.Fatalf("excluded member received private conversation event %#v", event)
 		}
 	}
 	if event, eventErr := database.EventByIDForUser(ctx, excluded.ID, groupMessageEventID); !errors.Is(eventErr, ErrSpaceNotFound) || event != nil {
 		t.Fatalf("EventByIDForUser(excluded) = %#v, %v, want ErrSpaceNotFound", event, eventErr)
+	}
+	if event, eventErr := database.EventByIDForUser(ctx, excluded.ID, groupConversationEventID); !errors.Is(eventErr, ErrSpaceNotFound) || event != nil {
+		t.Fatalf("EventByIDForUser(excluded conversation) = %#v, %v, want ErrSpaceNotFound", event, eventErr)
 	}
 	groupMessages, err := database.SpaceConversationMessages(ctx, owner.ID, space.ID, conversation.ID, 0, 20)
 	if err != nil || len(groupMessages) != 1 || groupMessages[0].ID != message.ID {

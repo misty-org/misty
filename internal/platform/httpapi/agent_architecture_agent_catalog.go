@@ -196,37 +196,22 @@ func (s *SpacesService) executeCanonicalAgentRun(r *http.Request, run *db.SpaceR
 	if s.agent == nil {
 		return s.finishFailedCanonicalRun(r.Context(), run, errors.New("Space Agent runtime is unavailable"))
 	}
+	spaceContext, err := s.database.PersonalAgentSpaceContext(r.Context(), run.RequestingMemberID, run.SpaceID, defaultSpaceContextSections)
+	if err != nil {
+		return s.finishFailedCanonicalRun(r.Context(), run, err)
+	}
 	request := fmt.Sprintf("You are %s, an Agent in a Space. Follow these version-pinned instructions:\n%s\n\nUser request:\n%s", resource.Name, resource.Instructions, strings.TrimSpace(prompt))
 	if selectedCapability != nil {
 		capabilityDescription := selectedCapability.Name + ": " + selectedCapability.Description
 		request = fmt.Sprintf("You are %s, an Agent in a Space. Follow these version-pinned instructions:\n%s\n\nExecute the pinned workflow capability %s. Use only its capability envelope.\n\nUser request:\n%s", resource.Name, resource.Instructions, capabilityDescription, strings.TrimSpace(prompt))
 	}
-	manifest := serveragent.ToolManifest{Tools: []serveragent.ToolDefinition{
-		{Name: "space.search_messages", Risk: serveragent.RiskRead, InputSchema: TestingMustAPIRawJSON(map[string]any{"type": "object", "properties": map[string]any{"query": map[string]any{"type": "string"}, "limit": map[string]any{"type": "integer"}}})},
-		{Name: "library.search", Risk: serveragent.RiskRead, InputSchema: TestingMustAPIRawJSON(map[string]any{"type": "object", "properties": map[string]any{"query": map[string]any{"type": "string"}, "limit": map[string]any{"type": "integer"}}})},
-		{Name: "tasks.query", Risk: serveragent.RiskRead, InputSchema: taskAgentToolSchema(false)},
-		{Name: "calendar.query", Risk: serveragent.RiskRead, InputSchema: taskAgentToolSchema(false)},
-		{Name: "tasks.create", Risk: serveragent.RiskWrite, InputSchema: taskAgentToolSchema(true)},
-		{Name: "tasks.update", Risk: serveragent.RiskWrite, InputSchema: taskAgentToolSchema(true)},
-	}}
-	seenProviders := map[string]bool{}
-	if resources, resourceErr := s.database.ProviderSharedResources(r.Context(), run.RequestingMemberID, run.SpaceID); resourceErr == nil {
-		for _, resource := range resources {
-			if resource.Status != "active" || seenProviders[resource.Provider] {
-				continue
-			}
-			seenProviders[resource.Provider] = true
-			manifest.Tools = append(manifest.Tools, serveragent.ToolDefinition{Name: "provider." + resource.Provider + ".query", Risk: serveragent.RiskRead, InputSchema: providerAgentToolSchema(false)})
-			if providerSupportsWrite(resource.Provider) {
-				manifest.Tools = append(manifest.Tools, serveragent.ToolDefinition{Name: "provider." + resource.Provider + ".write", Risk: serveragent.RiskWrite, InputSchema: providerAgentToolSchema(true)})
-			}
-		}
+	toolbox, invocation, manifest, err := s.resolveCanonicalAgentToolbox(r.Context(), run, prompt)
+	if err != nil {
+		return s.finishFailedCanonicalRun(r.Context(), run, err)
 	}
-	if sources, sourceErr := s.database.SpaceCalendarSources(r.Context(), run.RequestingMemberID, run.SpaceID); sourceErr == nil && len(sources) > 0 && !seenProviders["google"] {
-		manifest.Tools = append(manifest.Tools, serveragent.ToolDefinition{Name: "provider.google_calendar.query", Risk: serveragent.RiskRead, InputSchema: providerAgentToolSchema(false)})
-	}
+	request += "\n\nPermission-checked Misty Space context:\n" + spaceContext + "\n\n" + agentToolboxPromptContext(manifest, manifestToolNames(manifest))
 	completion, err := s.agent.CompleteWithToolsContext(r.Context(), run.RequestingMemberID, run.BillingUserID, request, serveragent.TierLow, manifest, func(toolCtx context.Context, tool serveragent.ToolRequest) (json.RawMessage, error) {
-		return s.executeOrdinaryAgentTool(toolCtx, run, tool)
+		return executeCanonicalAgentToolbox(toolCtx, toolbox, invocation, s.database, tool)
 	})
 	if err != nil {
 		if errors.Is(err, workflowv2.ErrAwaitingApproval) {

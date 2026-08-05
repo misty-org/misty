@@ -74,6 +74,19 @@ func TestUnifiedAgentVersionsAndPerUserInstances(t *testing.T) {
 	if memberInstance.ID == otherInstance.ID || memberInstance.UserID == otherInstance.UserID {
 		t.Fatalf("instances leaked: %#v %#v", memberInstance, otherInstance)
 	}
+	if allowed, err := database.AgentInstanceCapabilityAllowed(ctx, member.ID, memberInstance.ID, "tasks.update", "write"); err != nil || !allowed {
+		t.Fatalf("default Task grant = %v, %v", allowed, err)
+	}
+	memberInstance, err = database.UpdateAgentInstanceCapabilityGrants(ctx, member.ID, memberInstance.ID, json.RawMessage(`[{"capability":"tasks.query","risk":"read"}]`))
+	if err != nil || !AgentCapabilityGranted(memberInstance.CapabilityGrants, "tasks.query", "read") {
+		t.Fatalf("updated grants = %#v, %v", memberInstance, err)
+	}
+	if allowed, err := database.AgentInstanceCapabilityAllowed(ctx, member.ID, memberInstance.ID, "tasks.update", "write"); err != nil || allowed {
+		t.Fatalf("revoked Task grant = %v, %v", allowed, err)
+	}
+	if _, err := database.UpdateAgentInstanceCapabilityGrants(ctx, member.ID, otherInstance.ID, json.RawMessage(`[]`)); !errors.Is(err, ErrSpaceNotFound) {
+		t.Fatalf("cross-user capability update err=%v", err)
+	}
 	if _, err := database.ConfigureInstanceWorkflow(ctx, member.ID, otherInstance.ID, version.ID, true, json.RawMessage(`{}`), json.RawMessage(`{"granted":true}`)); !errors.Is(err, ErrSpaceNotFound) {
 		t.Fatalf("cross-user config err=%v", err)
 	}

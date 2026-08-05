@@ -21,6 +21,8 @@ type SpaceConversation struct {
 	ID                  string                    `json:"id"`
 	SpaceID             string                    `json:"space_id"`
 	Title               string                    `json:"title"`
+	Kind                string                    `json:"kind"`
+	SupportUserID       string                    `json:"support_user_id,omitempty"`
 	CreatedByUserID     string                    `json:"created_by_user_id"`
 	Origin              string                    `json:"origin"`
 	IntegrationID       string                    `json:"integration_id,omitempty"`
@@ -60,6 +62,16 @@ func requireSpaceConversationMemberTx(ctx context.Context, tx *sql.Tx, userID, s
 	return nil
 }
 
+func isMistySupportConversationTx(ctx context.Context, tx *sql.Tx, spaceID, conversationID string) (bool, error) {
+	var supported bool
+	err := tx.QueryRowContext(ctx, `SELECT EXISTS(
+		SELECT 1 FROM space_conversations c
+		JOIN spaces s ON s.id=c.space_id
+		WHERE c.id=$1 AND c.space_id=$2 AND c.kind='misty_support' AND s.kind='misty'
+	)`, conversationID, spaceID).Scan(&supported)
+	return supported, err
+}
+
 func loadSpaceConversationMembersTx(ctx context.Context, tx *sql.Tx, conversation *SpaceConversation) error {
 	conversation.Members = []SpaceConversationMember{}
 	query := `SELECT cm.user_id,u.name,u.email,cm.joined_at
@@ -95,7 +107,7 @@ func (db *Database) SpaceConversations(ctx context.Context, userID, spaceID stri
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionMessagesRead); err != nil {
 			return err
 		}
-		rows, err := tx.QueryContext(ctx, `SELECT c.id,c.space_id,c.title,c.created_by_user_id,
+		rows, err := tx.QueryContext(ctx, `SELECT c.id,c.space_id,c.title,c.kind,COALESCE(c.support_user_id,''),c.created_by_user_id,
 			c.origin,COALESCE(c.integration_id,''),c.external_resource_id,c.external_display_name,
 			c.integration_status,c.visible_to_space,c.created_at,c.updated_at
 			FROM space_conversations c
@@ -107,7 +119,7 @@ func (db *Database) SpaceConversations(ctx context.Context, userID, spaceID stri
 		}
 		for rows.Next() {
 			var item SpaceConversation
-			if err := rows.Scan(&item.ID, &item.SpaceID, &item.Title, &item.CreatedByUserID,
+			if err := rows.Scan(&item.ID, &item.SpaceID, &item.Title, &item.Kind, &item.SupportUserID, &item.CreatedByUserID,
 				&item.Origin, &item.IntegrationID, &item.ExternalResourceID, &item.ExternalDisplayName,
 				&item.IntegrationStatus, &item.VisibleToSpace, &item.CreatedAt, &item.UpdatedAt); err != nil {
 				rows.Close()
@@ -170,7 +182,7 @@ func (db *Database) CreateSpaceConversation(ctx context.Context, userID, spaceID
 	}
 	out := &SpaceConversation{
 		ID: "space_conversation_" + uuid.NewString(), SpaceID: spaceID, Title: title,
-		CreatedByUserID: userID, Origin: "misty", IntegrationStatus: "active",
+		Kind: "standard", CreatedByUserID: userID, Origin: "misty", IntegrationStatus: "active",
 	}
 	err = db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpaceMessageWriteTx(ctx, tx, userID, spaceID); err != nil {

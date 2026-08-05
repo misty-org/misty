@@ -12,6 +12,7 @@ const (
 	PermissionLibraryView        = "library.view"
 	PermissionMessagesRead       = "messages.read"
 	PermissionMessagesWrite      = "messages.write"
+	PermissionMistySupportWrite  = "misty.support.write"
 	PermissionLibraryUpload      = "library.upload"
 	PermissionAttachmentUpload   = "attachments.upload"
 	PermissionLibraryAdd         = "library.add"
@@ -24,6 +25,7 @@ const (
 	PermissionStudioView         = "studio.view"
 	PermissionStudioManage       = "studio.manage"
 	PermissionAgentsRun          = "agents.run"
+	PermissionAgentsManage       = "agents.manage"
 	PermissionTasksView          = "tasks.view"
 	PermissionTasksManage        = "tasks.manage"
 	PermissionIntegrationsManage = "integrations.manage"
@@ -91,6 +93,7 @@ var configurableSpacePermissions = []string{
 	PermissionLibraryAdd, PermissionLibraryEdit, PermissionLibraryDownload,
 	PermissionLibraryImport, PermissionStorageViewOwn, PermissionStorageViewMembers,
 	PermissionStorageManage, PermissionStudioView, PermissionStudioManage, PermissionAgentsRun,
+	PermissionAgentsManage,
 	PermissionTasksView, PermissionTasksManage, PermissionIntegrationsManage,
 }
 

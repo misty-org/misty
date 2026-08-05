@@ -61,6 +61,7 @@ func TestSpaceMembershipLimitCountsOwnedAndJoinedButNotPendingInvitations(t *tes
 		t.Fatalf("accept after leaving a Space: %v", err)
 	}
 	spaces, err := database.ListSpaces(ctx, member.ID)
+	spaces = standardSpaces(spaces)
 	if err != nil || len(spaces) != BasicSpaceLimit {
 		t.Fatalf("Basic memberships = %d, %v; want %d", len(spaces), err, BasicSpaceLimit)
 	}
@@ -85,6 +86,7 @@ func TestSpaceMembershipDowngradePreservesExistingAndBlocksGrowth(t *testing.T) 
 		t.Fatal(err)
 	}
 	spaces, err := database.ListSpaces(ctx, user.ID)
+	spaces = standardSpaces(spaces)
 	if err != nil || len(spaces) != BasicSpaceLimit+1 {
 		t.Fatalf("memberships after downgrade = %d, %v", len(spaces), err)
 	}
@@ -136,6 +138,7 @@ func TestConcurrentSpaceMembershipOperationsCannotExceedLimit(t *testing.T) {
 		t.Fatalf("concurrent results: successes=%d limited=%d", successes, limited)
 	}
 	spaces, err := database.ListSpaces(ctx, user.ID)
+	spaces = standardSpaces(spaces)
 	if err != nil || len(spaces) != BasicSpaceLimit {
 		t.Fatalf("memberships after concurrent creates = %d, %v", len(spaces), err)
 	}

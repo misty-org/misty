@@ -194,6 +194,10 @@ func (s *SpacesService) Spaces() http.HandlerFunc {
 		}
 		switch r.Method {
 		case http.MethodGet:
+			if err := s.database.EnsureMistySpace(r.Context(), userID); err != nil {
+				writeSpaceError(w, fmt.Errorf("ensure default Misty Space: %w", err))
+				return
+			}
 			entitlements, err := s.database.EntitlementsForUser(r.Context(), userID)
 			if err != nil {
 				writeSpaceError(w, fmt.Errorf("load entitlements: %w", err))

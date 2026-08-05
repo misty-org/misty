@@ -3,6 +3,8 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"strings"
 
 	agent "github.com/kannachi323/misty/server/internal/agents"
 	db "github.com/kannachi323/misty/server/internal/platform/postgres"
@@ -54,18 +56,20 @@ func (s *AIService) applySpaceContext(
 	if err != nil {
 		return err
 	}
-	if state.Revision == revision && state.HasCard {
+	contextRevision := revision
+	request.ContextTaskID = strings.TrimSpace(request.ContextTaskID)
+	if request.ContextTaskID != "" {
+		contextRevision += ":task:" + request.ContextTaskID
+	}
+	if state.Revision == contextRevision && state.HasCard {
 		return nil // Nothing the agent can see has changed since the last turn.
 	}
 
 	sections := defaultSpaceContextSections
 	if bound.AgentID != "" {
-		personal, err := s.database.PersonalAgentForSpace(ctx, userID, bound.SpaceID, bound.AgentID)
+		sections, err = s.database.EffectivePersonalAgentContextPermissions(ctx, userID, bound.SpaceID, bound.AgentID)
 		if err != nil {
 			return err
-		}
-		if len(personal.ContextPermissions) > 0 {
-			sections = personal.ContextPermissions
 		}
 	}
 
@@ -73,7 +77,39 @@ func (s *AIService) applySpaceContext(
 	if err != nil {
 		return err
 	}
+	currentTask, err := resolvedCurrentTaskContext(ctx, s.database, userID, bound.SpaceID, request.ContextTaskID)
+	if err != nil {
+		return err
+	}
+	if currentTask != "" {
+		records = strings.TrimSpace(records + "\n\n" + currentTask)
+	}
 	request.SpaceRecords = records
-	request.SpaceContextRevision = revision
+	request.SpaceContextRevision = contextRevision
 	return nil
+}
+
+func resolvedCurrentTaskContext(ctx context.Context, database *db.Database, userID, spaceID, taskID string) (string, error) {
+	taskID = strings.TrimSpace(taskID)
+	if taskID == "" {
+		return "", nil
+	}
+	task, err := database.SpaceTaskForMember(ctx, userID, spaceID, taskID)
+	if err != nil {
+		return "", err
+	}
+	lines := []string{fmt.Sprintf("Current Task: %s — %s (%s)", task.TaskKey, task.Title, task.Status)}
+	if notes := strings.TrimSpace(task.Notes); notes != "" {
+		lines = append(lines, "Current Task notes: "+notes)
+	}
+	if task.AssigneeUserID != "" {
+		lines = append(lines, "Current Task assignee: member "+task.AssigneeUserID)
+	} else if task.AssigneeAgentID != "" {
+		lines = append(lines, "Current Task assignee: Agent "+task.AssigneeAgentID)
+	}
+	return strings.Join(lines, "\n"), nil
+}
+
+func TestingResolvedCurrentTaskContext(ctx context.Context, database *db.Database, userID, spaceID, taskID string) (string, error) {
+	return resolvedCurrentTaskContext(ctx, database, userID, spaceID, taskID)
 }

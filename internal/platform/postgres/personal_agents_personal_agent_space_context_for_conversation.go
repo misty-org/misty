@@ -44,18 +44,18 @@ func (db *Database) PersonalAgentSpaceContextForConversation(ctx context.Context
 		}
 		parts = append(parts, "Space: "+name)
 		if allowed["members"] {
-			rows, err := tx.QueryContext(ctx, `SELECT u.name FROM space_members m JOIN users u ON u.id=m.user_id WHERE m.space_id=$1 ORDER BY lower(u.name) LIMIT 50`, spaceID)
+			rows, err := tx.QueryContext(ctx, `SELECT u.name,m.role FROM space_members m JOIN users u ON u.id=m.user_id WHERE m.space_id=$1 ORDER BY lower(u.name) LIMIT 50`, spaceID)
 			if err != nil {
 				return err
 			}
 			names := []string{}
 			for rows.Next() {
-				var value string
-				if err := rows.Scan(&value); err != nil {
+				var value, role string
+				if err := rows.Scan(&value, &role); err != nil {
 					rows.Close()
 					return err
 				}
-				names = append(names, value)
+				names = append(names, fmt.Sprintf("%s (%s)", value, role))
 			}
 			if err := rows.Close(); err != nil {
 				return err

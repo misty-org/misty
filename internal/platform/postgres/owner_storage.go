@@ -78,7 +78,8 @@ func (db *Database) OwnerStorageUsage(ctx context.Context, userID string) (*Owne
 		}
 		rows, err := tx.QueryContext(ctx, `SELECT s.id,s.name,COALESCE(u.used_bytes,0),COALESCE(u.reserved_bytes,0)
 			FROM spaces s LEFT JOIN space_storage_usage u ON u.space_id=s.id
-			WHERE s.owner_user_id=$1 AND s.lifecycle_state='active' ORDER BY s.created_at`, userID)
+			WHERE s.owner_user_id=$1 AND s.lifecycle_state='active' AND s.kind='standard'
+			ORDER BY s.created_at`, userID)
 		if err != nil {
 			return err
 		}

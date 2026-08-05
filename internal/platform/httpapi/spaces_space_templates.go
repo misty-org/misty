@@ -131,7 +131,12 @@ func (s *SpacesService) Members() http.HandlerFunc {
 			writeSpaceError(w, err)
 			return
 		}
-		writeJSON(w, http.StatusOK, map[string]any{"members": members})
+		agents, err := s.database.SpaceAgentMemberships(r.Context(), userID, spaceID)
+		if err != nil {
+			writeSpaceError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"members": members, "agents": agents})
 	}
 }
 

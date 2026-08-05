@@ -33,7 +33,7 @@ func (db *Database) CreateSpaceWithTemplateIdempotent(
 	result := &CreateSpaceResult{
 		Space: Space{
 			ID: "space_" + uuid.NewString(), SecurityDomainID: "sd_" + uuid.NewString(),
-			OwnerUserID: userID, Name: name, Role: "owner", MemberCount: 1,
+			OwnerUserID: userID, Name: name, Kind: "standard", Role: "owner", MemberCount: 1,
 		},
 		Setup: SpaceSetup{SelectedProviders: providers, PendingProviders: append([]string(nil), providers...), CompletedProviders: []string{}},
 	}

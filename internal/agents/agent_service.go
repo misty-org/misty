@@ -101,6 +101,21 @@ func (s *Service) CompleteWithToolsContext(ctx context.Context, userID, billingU
 	}
 }
 
+// CompleteWithModelToolsContext executes a bounded tool run using an explicitly
+// pinned gateway model. Agent memberships pin immutable profile versions, so a
+// Space run must not silently fall back to the service's default provider.
+func (s *Service) CompleteWithModelToolsContext(ctx context.Context, userID, billingUserID, prompt, modelID string, tier AgentTier, manifest ToolManifest, execute ToolExecutor) (ToolCompletion, error) {
+	if !GatewayModelAvailable(ctx, modelID) {
+		return ToolCompletion{}, ErrModelUnavailable
+	}
+	provider, err := NewGatewayProviderForModel(modelID)
+	if err != nil {
+		return ToolCompletion{}, err
+	}
+	selected := &Service{store: s.store, provider: provider, policy: s.policy, meter: s.meter}
+	return selected.CompleteWithToolsContext(ctx, userID, billingUserID, prompt, tier, manifest, execute)
+}
+
 func (s *Service) Complete(userID, prompt, meterName string) (string, UsageSettlement, error) {
 	return s.CompleteWithTier(userID, prompt, meterName, TierLow)
 }

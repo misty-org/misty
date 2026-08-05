@@ -23,6 +23,7 @@ type SpaceTask struct {
 	Priority         string          `json:"priority"`
 	Rank             int64           `json:"rank"`
 	AssigneeUserID   string          `json:"assignee_user_id,omitempty"`
+	AssigneeAgentID  string          `json:"assignee_agent_id,omitempty"`
 	DueAt            *time.Time      `json:"due_at,omitempty"`
 	DueTimezone      string          `json:"due_timezone"`
 	SourceRefs       json.RawMessage `json:"source_refs"`
@@ -43,6 +44,7 @@ type SpaceTask struct {
 type SpaceTaskQuery struct {
 	Status          string
 	AssigneeUserID  string
+	AssigneeAgentID string
 	Priority        string
 	Search          string
 	DueFrom         *time.Time
@@ -68,6 +70,55 @@ type SpaceTaskMove struct {
 type SpaceTaskMoveResult struct {
 	Task      SpaceTask   `json:"task"`
 	Reordered []SpaceTask `json:"reordered"`
+}
+
+type typedTaskSourceRef struct {
+	Kind       string `json:"kind"`
+	ResourceID string `json:"resource_id"`
+}
+
+func validateTaskSourceRefsTx(ctx context.Context, tx *sql.Tx, actorUserID, spaceID, taskID string, raw json.RawMessage) error {
+	var refs []typedTaskSourceRef
+	if json.Unmarshal(raw, &refs) != nil {
+		return ErrSpaceInvalid
+	}
+	for _, ref := range refs {
+		switch ref.Kind {
+		case "": // Legacy provenance remains readable and wire-compatible.
+			continue
+		case "library_item":
+			allowed, err := hasSpacePermissionTx(ctx, tx, actorUserID, spaceID, PermissionLibraryView)
+			if err != nil || !allowed {
+				return ErrLibraryForbidden
+			}
+			var exists bool
+			if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM space_library_items
+				WHERE id=$1 AND space_id=$2 AND lifecycle_state='ready' AND hidden=FALSE)`, ref.ResourceID, spaceID).Scan(&exists); err != nil || !exists {
+				return ErrLibraryNotFound
+			}
+		case "task_attachment":
+			var exists bool
+			if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM space_message_attachments a
+				WHERE a.id=$1 AND a.space_id=$2 AND a.message_id IS NULL AND a.lifecycle_state='ready' AND
+				(a.uploader_user_id=$3 OR EXISTS(SELECT 1 FROM space_tasks t WHERE t.id=$4 AND t.space_id=$2 AND
+					t.source_refs @> jsonb_build_array(jsonb_build_object('kind','task_attachment','resource_id',$1::text)))))`, ref.ResourceID, spaceID, actorUserID, taskID).Scan(&exists); err != nil || !exists {
+				return ErrLibraryNotFound
+			}
+		case "chat_attachment":
+			allowed, err := hasSpacePermissionTx(ctx, tx, actorUserID, spaceID, PermissionMessagesRead)
+			if err != nil || !allowed {
+				return ErrLibraryForbidden
+			}
+			var exists bool
+			if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM space_message_attachments
+				WHERE id=$1 AND space_id=$2 AND message_id IS NOT NULL AND lifecycle_state='ready')`, ref.ResourceID, spaceID).Scan(&exists); err != nil || !exists {
+				return ErrLibraryNotFound
+			}
+		default:
+			return ErrSpaceInvalid
+		}
+	}
+	return nil
 }
 
 type SpaceCalendarSource struct {
@@ -116,12 +167,12 @@ type SpaceCalendarEvent struct {
 	UpdatedAt         time.Time       `json:"updated_at"`
 }
 
-const spaceTaskColumns = `id,space_id,task_number,task_key,title,notes,status,priority,rank,COALESCE(assignee_user_id,''),due_at,due_timezone,source_refs,COALESCE(created_by_user_id,''),COALESCE(created_by_agent_id,''),COALESCE(source_run_id,''),version,completed_at,archived_at,created_at,updated_at,schedule,calendar,conflicted_fields`
+const spaceTaskColumns = `id,space_id,task_number,task_key,title,notes,status,priority,rank,COALESCE(assignee_user_id,''),COALESCE(assignee_agent_id,''),due_at,due_timezone,source_refs,COALESCE(created_by_user_id,''),COALESCE(created_by_agent_id,''),COALESCE(source_run_id,''),version,completed_at,archived_at,created_at,updated_at,schedule,calendar,conflicted_fields`
 
 func scanSpaceTask(row interface{ Scan(...any) error }, out *SpaceTask) error {
 	var schedule, calendar []byte
 	var conflicts pq.StringArray
-	if err := row.Scan(&out.ID, &out.SpaceID, &out.TaskNumber, &out.TaskKey, &out.Title, &out.Notes, &out.Status, &out.Priority, &out.Rank, &out.AssigneeUserID, &out.DueAt, &out.DueTimezone, &out.SourceRefs, &out.CreatedByUserID, &out.CreatedByAgentID, &out.SourceRunID, &out.Version, &out.CompletedAt, &out.ArchivedAt, &out.CreatedAt, &out.UpdatedAt, &schedule, &calendar, &conflicts); err != nil {
+	if err := row.Scan(&out.ID, &out.SpaceID, &out.TaskNumber, &out.TaskKey, &out.Title, &out.Notes, &out.Status, &out.Priority, &out.Rank, &out.AssigneeUserID, &out.AssigneeAgentID, &out.DueAt, &out.DueTimezone, &out.SourceRefs, &out.CreatedByUserID, &out.CreatedByAgentID, &out.SourceRunID, &out.Version, &out.CompletedAt, &out.ArchivedAt, &out.CreatedAt, &out.UpdatedAt, &schedule, &calendar, &conflicts); err != nil {
 		return err
 	}
 	if len(schedule) > 0 {
@@ -165,8 +216,24 @@ func TestingValidateSpaceTask(item *SpaceTask) error {
 	if len(item.SourceRefs) == 0 {
 		item.SourceRefs = json.RawMessage(`[]`)
 	}
-	var refs []any
-	if json.Unmarshal(item.SourceRefs, &refs) != nil {
+	var refs []map[string]any
+	if json.Unmarshal(item.SourceRefs, &refs) != nil || len(refs) > 20 {
+		return ErrSpaceInvalid
+	}
+	for _, ref := range refs {
+		kind, _ := ref["kind"].(string)
+		if kind == "" {
+			continue // legacy source references remain wire-compatible.
+		}
+		if kind != "library_item" && kind != "task_attachment" && kind != "chat_attachment" {
+			return ErrSpaceInvalid
+		}
+		resourceID, _ := ref["resource_id"].(string)
+		if strings.TrimSpace(resourceID) == "" {
+			return ErrSpaceInvalid
+		}
+	}
+	if item.AssigneeUserID != "" && item.AssigneeAgentID != "" {
 		return ErrSpaceInvalid
 	}
 	return nil
@@ -175,6 +242,20 @@ func TestingValidateSpaceTask(item *SpaceTask) error {
 func (db *Database) SpaceTasks(ctx context.Context, userID, spaceID string, query SpaceTaskQuery) ([]SpaceTask, error) {
 	page, err := db.SpaceTaskPage(ctx, userID, spaceID, query)
 	return page.Tasks, err
+}
+
+func (db *Database) SpaceTaskForMember(ctx context.Context, userID, spaceID, taskID string) (*SpaceTask, error) {
+	out := &SpaceTask{}
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
+		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionTasksView); err != nil {
+			return err
+		}
+		return scanSpaceTask(tx.QueryRowContext(ctx, `SELECT `+spaceTaskColumns+` FROM space_tasks WHERE id=$1 AND space_id=$2 AND archived_at IS NULL`, taskID, spaceID), out)
+	})
+	if err == sql.ErrNoRows {
+		return nil, ErrSpaceNotFound
+	}
+	return out, err
 }
 
 func (db *Database) SpaceTaskPage(ctx context.Context, userID, spaceID string, query SpaceTaskQuery) (SpaceTaskPage, error) {
@@ -186,7 +267,7 @@ func (db *Database) SpaceTaskPage(ctx context.Context, userID, spaceID string, q
 	if err != nil {
 		return out, ErrSpaceInvalid
 	}
-	query.Status, query.AssigneeUserID, query.Priority, query.Search = strings.TrimSpace(query.Status), strings.TrimSpace(query.AssigneeUserID), strings.TrimSpace(query.Priority), strings.TrimSpace(query.Search)
+	query.Status, query.AssigneeUserID, query.AssigneeAgentID, query.Priority, query.Search = strings.TrimSpace(query.Status), strings.TrimSpace(query.AssigneeUserID), strings.TrimSpace(query.AssigneeAgentID), strings.TrimSpace(query.Priority), strings.TrimSpace(query.Search)
 	if query.Priority != "" && query.Priority != "high" && query.Priority != "medium" && query.Priority != "low" {
 		return out, ErrSpaceInvalid
 	}
@@ -204,8 +285,8 @@ func (db *Database) SpaceTaskPage(ctx context.Context, userID, spaceID string, q
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionTasksView); err != nil {
 			return err
 		}
-		filters := `space_id=$1 AND ($2='' OR status=$2) AND ($3='' OR assignee_user_id=$3) AND ($4='' OR priority=$4) AND ($5='' OR title ILIKE '%'||$5||'%' OR notes ILIKE '%'||$5||'%' OR task_key ILIKE '%'||$5||'%') AND ($6::timestamptz IS NULL OR due_at >= $6) AND ($7::timestamptz IS NULL OR due_at < $7) AND ($8 OR archived_at IS NULL)`
-		rows, err := tx.QueryContext(ctx, `SELECT `+spaceTaskColumns+` FROM space_tasks WHERE `+filters+` ORDER BY `+order+` LIMIT $9 OFFSET $10`, spaceID, query.Status, query.AssigneeUserID, query.Priority, query.Search, query.DueFrom, query.DueTo, query.IncludeArchived, query.Limit+1, offset)
+		filters := `space_id=$1 AND ($2='' OR status=$2) AND ($3='' OR assignee_user_id=$3) AND ($4='' OR assignee_agent_id=$4) AND ($5='' OR priority=$5) AND ($6='' OR title ILIKE '%'||$6||'%' OR notes ILIKE '%'||$6||'%' OR task_key ILIKE '%'||$6||'%') AND ($7::timestamptz IS NULL OR due_at >= $7) AND ($8::timestamptz IS NULL OR due_at < $8) AND ($9 OR archived_at IS NULL)`
+		rows, err := tx.QueryContext(ctx, `SELECT `+spaceTaskColumns+` FROM space_tasks WHERE `+filters+` ORDER BY `+order+` LIMIT $10 OFFSET $11`, spaceID, query.Status, query.AssigneeUserID, query.AssigneeAgentID, query.Priority, query.Search, query.DueFrom, query.DueTo, query.IncludeArchived, query.Limit+1, offset)
 		if err != nil {
 			return err
 		}

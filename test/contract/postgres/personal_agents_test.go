@@ -2,6 +2,7 @@ package db
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"strings"
 	"testing"
@@ -84,6 +85,33 @@ func TestPersonalAgentOwnershipSharingAndMemoryIsolation(t *testing.T) {
 	}
 	if memberAgents[0].Instructions != "" || len(memberAgents[0].ContextPermissions) != 0 || len(memberAgents[0].ToolPermissions) != 0 {
 		t.Fatalf("shared Agent exposed private configuration: %#v", memberAgents[0])
+	}
+	effectiveContext, err := database.EffectivePersonalAgentContextPermissions(ctx, member.ID, space.ID, created.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var effective map[string]bool
+	if json.Unmarshal(effectiveContext, &effective) != nil || !effective["members"] || !effective["library"] || !effective["tasks"] {
+		t.Fatalf("effective Agent context did not preserve configured readable sections: %s", effectiveContext)
+	}
+	snapshot, err := database.PersonalAgentSpaceContext(ctx, member.ID, space.ID, effectiveContext)
+	if err != nil || !strings.Contains(snapshot, "Members:") || !strings.Contains(snapshot, "Agent Owner (owner)") {
+		t.Fatalf("Agent context omitted permitted Space members: %q, %v", snapshot, err)
+	}
+	membership, err := database.SpaceAgentMembership(ctx, owner.ID, space.ID, created.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	enabled := true
+	if _, err := database.UpdateSpaceAgentMembership(ctx, owner.ID, space.ID, created.ID, SpaceAgentMembershipInput{
+		Enabled: &enabled, MembershipVersion: membership.MembershipVersion,
+		Permissions: json.RawMessage(`{"messages.read":true,"messages.write":true,"tasks.view":false,"tasks.manage":false,"attached_files.read":true}`),
+	}); err != nil {
+		t.Fatal(err)
+	}
+	effectiveContext, err = database.EffectivePersonalAgentContextPermissions(ctx, member.ID, space.ID, created.ID)
+	if err != nil || json.Unmarshal(effectiveContext, &effective) != nil || effective["tasks"] || effective["task_notes"] || effective["notes"] {
+		t.Fatalf("Agent membership did not remove Task context: %s, %v", effectiveContext, err)
 	}
 
 	if err := database.AppendPersonalAgentMemory(ctx, member.ID, space.ID, created.ID, "member question", "member answer"); err != nil {

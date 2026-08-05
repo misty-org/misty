@@ -26,11 +26,18 @@ loopback-only host ports:
 Use `MISTY_HOST_PORT` to change the API host port. `DB_PORT` changes the
 development PostgreSQL host port.
 
+The tunnel service logs the temporary public API base as
+`https://<name>.trycloudflare.com/api` once it is ready. That HTTPS URL and
+`http://127.0.0.1:8081/api` reach the same API container; the tunnel hostname
+changes whenever the tunnel container is recreated.
+
 ## Production
 
 Copy `deploy/production.env.example` to `.env.prod`, fill every placeholder,
 make it owner-readable only, and set `MISTY_API_IMAGE` to the exact tested
-image digest.
+image digest. Resolve the active `mattdev727` account in the production
+database and set its immutable ID as `MISTY_OPERATOR_USER_ID` before running
+the canonical Misty Space migration.
 
 ```sh
 chmod 600 .env.prod

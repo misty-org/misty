@@ -88,51 +88,45 @@ func (s *AIService) CreateSession() http.HandlerFunc {
 		allowTools := true
 		allowWriteTools := true
 		if body.AgentID != "" {
-			var personal *db.PersonalAgent
-			var lookupErr error
 			if body.SpaceID != "" {
-				personal, lookupErr = s.database.PersonalAgentForSpace(r.Context(), userID, body.SpaceID, body.AgentID)
+				if _, lookupErr := s.database.PersonalAgentForSpace(r.Context(), userID, body.SpaceID, body.AgentID); lookupErr != nil {
+					writeAgentError(w, lookupErr)
+					return
+				}
+				membership, lookupErr := s.database.SpaceAgentMembership(r.Context(), userID, body.SpaceID, body.AgentID)
+				if lookupErr != nil {
+					writeAgentError(w, lookupErr)
+					return
+				}
+				// Space Agents always run the immutable version approved by this
+				// Space. Per-chat model and reasoning overrides cannot bypass it.
+				body.ModelID = membership.ModelID
+				reasoningEffort = membership.ReasoningEffort
+				allowTools, allowWriteTools = false, false
+				systemPrompt = "You are " + membership.Name + ". Follow these approved, version-pinned instructions:\n" + membership.Instructions + "\n" + membership.SpaceInstructions
 			} else {
-				personal, lookupErr = s.database.PersonalAgentByID(r.Context(), userID, body.AgentID)
-			}
-			if lookupErr != nil {
-				writeAgentError(w, lookupErr)
-				return
-			}
-			if requestedModelID != "" {
-				// Per-chat override: run this session on the requested model
-				// regardless of the agent's own model mode.
-				body.ModelID = requestedModelID
-			} else {
-				if personal.ModelMode != "pinned" || strings.TrimSpace(personal.ModelID) == "" {
-					writeJSON(w, http.StatusUnprocessableEntity, map[string]string{"code": "agent_model_required"})
+				personal, lookupErr := s.database.PersonalAgentByID(r.Context(), userID, body.AgentID)
+				if lookupErr != nil {
+					writeAgentError(w, lookupErr)
 					return
 				}
-				body.ModelID = personal.ModelID
-			}
-			var toolPolicy struct {
-				Write bool `json:"write"`
-			}
-			if json.Unmarshal(personal.ToolPermissions, &toolPolicy) == nil {
-				allowWriteTools = toolPolicy.Write
-			}
-			reasoningEffort = personal.ReasoningEffort
-			systemPrompt = "You are " + personal.Name + ". Follow these owner-provided instructions:\n" + personal.Instructions
-			if body.SpaceID != "" {
-				contextText, contextErr := s.database.PersonalAgentSpaceContext(r.Context(), userID, body.SpaceID, personal.ContextPermissions)
-				if contextErr != nil {
-					writeSpaceError(w, contextErr)
-					return
+				if requestedModelID != "" {
+					body.ModelID = requestedModelID
+				} else {
+					if personal.ModelMode != "pinned" || strings.TrimSpace(personal.ModelID) == "" {
+						writeJSON(w, http.StatusUnprocessableEntity, map[string]string{"code": "agent_model_required"})
+						return
+					}
+					body.ModelID = personal.ModelID
 				}
-				systemPrompt += "\n\nUse only this permission-filtered Space context when relevant:\n" + contextText
-				memoryText, memoryErr := s.database.PersonalAgentMemoryContext(r.Context(), userID, body.SpaceID, personal.ID)
-				if memoryErr != nil {
-					writeAgentError(w, memoryErr)
-					return
+				var toolPolicy struct {
+					Write bool `json:"write"`
 				}
-				if memoryText != "" {
-					systemPrompt += "\n\nPrivate memory for this user, agent, and Space. Do not expose it to other members:\n" + memoryText
+				if json.Unmarshal(personal.ToolPermissions, &toolPolicy) == nil {
+					allowWriteTools = toolPolicy.Write
 				}
+				reasoningEffort = personal.ReasoningEffort
+				systemPrompt = "You are " + personal.Name + ". Follow these owner-provided instructions:\n" + personal.Instructions
 			}
 		} else if body.SpaceID != "" {
 			if err := s.database.ValidateAgentSpaceAccess(r.Context(), userID, body.SpaceID, ""); err != nil {

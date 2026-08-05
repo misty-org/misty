@@ -162,7 +162,7 @@ func (db *Database) EnsureAgentInstance(ctx context.Context, userID, spaceID, ag
 		}
 		out.ID = "agentinst_" + uuid.NewString()
 		var bindingsRaw []byte
-		if err := tx.QueryRowContext(ctx, `INSERT INTO space_agent_instances(id,space_id,agent_id,user_id,agent_version_id) VALUES($1,$2,$3,$4,$5) ON CONFLICT(agent_id,user_id) DO UPDATE SET updated_at=space_agent_instances.updated_at RETURNING id,space_id,agent_id,user_id,agent_version_id,connection_bindings,capability_grants,created_at,updated_at`, out.ID, spaceID, agentID, userID, versionID).Scan(&out.ID, &out.SpaceID, &out.AgentID, &out.UserID, &out.AgentVersionID, &bindingsRaw, &out.CapabilityGrants, &out.CreatedAt, &out.UpdatedAt); err != nil {
+		if err := tx.QueryRowContext(ctx, `INSERT INTO space_agent_instances(id,space_id,agent_id,user_id,agent_version_id,capability_grants) VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT(agent_id,user_id) DO UPDATE SET updated_at=space_agent_instances.updated_at RETURNING id,space_id,agent_id,user_id,agent_version_id,connection_bindings,capability_grants,created_at,updated_at`, out.ID, spaceID, agentID, userID, versionID, DefaultAgentCapabilityGrants()).Scan(&out.ID, &out.SpaceID, &out.AgentID, &out.UserID, &out.AgentVersionID, &bindingsRaw, &out.CapabilityGrants, &out.CreatedAt, &out.UpdatedAt); err != nil {
 			return err
 		}
 		_ = json.Unmarshal(bindingsRaw, &out.ConnectionBindings)
