@@ -27,11 +27,11 @@ describe("useRecentToolsStore", () => {
     useRecentToolsStore.getState().recordToolUsage("terminal");
     expect(useRecentToolsStore.getState().recentTools[0]).toBe("terminal");
 
-    useRecentToolsStore.getState().recordToolUsage("inbox");
-    expect(useRecentToolsStore.getState().recentTools[0]).toBe("inbox");
+    useRecentToolsStore.getState().recordToolUsage("agents");
+    expect(useRecentToolsStore.getState().recentTools[0]).toBe("agents");
     expect(useRecentToolsStore.getState().recentTools[1]).toBe("terminal");
     expect(mocks.recordAppActivity).toHaveBeenNthCalledWith(1, "terminal");
-    expect(mocks.recordAppActivity).toHaveBeenNthCalledWith(2, "inbox");
+    expect(mocks.recordAppActivity).toHaveBeenNthCalledWith(2, "agents");
   });
 
   it("hydrates account recents ahead of defaults", () => {

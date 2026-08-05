@@ -12,7 +12,6 @@ export type WorkspaceToolId =
   | "planner"
   | "social"
   | "library"
-  | "inbox"
   | "browser"
   | "code"
   | "files"
@@ -41,7 +40,6 @@ export const WORKSPACE_TOOLS_META: Record<WorkspaceToolId, WorkspaceToolMeta> = 
     surfaceId: "space",
     icon: appIcon("library", "space")!,
   },
-  inbox: { id: "inbox", label: "Inbox", surfaceId: "inbox", icon: appIcons.inbox },
   browser: { id: "browser", label: "Browser", surfaceId: "browser", icon: appIcons.browser },
   code: { id: "code", label: "Code", surfaceId: "code", icon: appIcons.code },
   files: { id: "files", label: "Files", surfaceId: "files", icon: appIcons.files },
@@ -121,20 +119,23 @@ export const useRecentToolsStore = create<RecentToolsState>()(
       },
       hydrateRecentTools: (toolIds: WorkspaceToolId[]) =>
         set({
-          recentTools: [...new Set([...toolIds, ...DEFAULT_RECENT_TOOLS])].slice(0, 10),
+          recentTools: [...new Set([...toolIds.filter(isWorkspaceToolId), ...DEFAULT_RECENT_TOOLS])].slice(
+            0,
+            10,
+          ),
         }),
       resetRecentTools: () => set({ recentTools: DEFAULT_RECENT_TOOLS }),
     }),
     {
       name: "misty-recent-tools",
-      version: 2,
+      version: 3,
       migrate: (persisted) => {
         const state = persisted as Partial<RecentToolsState> | undefined;
         return {
           ...state,
-          recentTools: (state?.recentTools ?? DEFAULT_RECENT_TOOLS).map((id) =>
-            (id as string) === "chat" ? "social" : id,
-          ),
+          recentTools: (state?.recentTools ?? DEFAULT_RECENT_TOOLS)
+            .map((id) => ((id as string) === "chat" ? "social" : id))
+            .filter(isWorkspaceToolId),
         } as RecentToolsState;
       },
     },

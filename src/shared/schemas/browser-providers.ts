@@ -24,23 +24,6 @@ export const mistyBrowserProviders = {
     auth: ["login.live.com", "login.microsoftonline.com", "account.live.com"],
   },
 
-  google: {
-    owner: "inbox",
-    url: "https://mail.google.com/mail/u/0/#inbox",
-    domains: ["mail.google.com"],
-    auth: ["accounts.google.com"],
-  },
-  microsoft: {
-    owner: "inbox",
-    url: "https://outlook.live.com/mail/",
-    domains: [
-      "outlook.live.com",
-      "outlook.office.com",
-      "outlook.office365.com",
-      "outlook.cloud.microsoft",
-    ],
-    auth: ["login.live.com", "login.microsoftonline.com", "account.live.com"],
-  },
   instagram: {
     owner: "chat",
     url: "https://www.instagram.com/direct/inbox/",
@@ -82,18 +65,6 @@ export const mistyBrowserProviders = {
     url: "https://teams.microsoft.com/",
     domains: ["teams.microsoft.com", "teams.live.com", "teams.cloud.microsoft"],
     auth: ["login.microsoftonline.com", "login.live.com", "account.live.com"],
-  },
-  icloud: {
-    owner: "inbox",
-    url: "https://www.icloud.com/mail/",
-    domains: ["icloud.com"],
-    auth: ["idmsa.apple.com", "appleid.apple.com", "account.apple.com"],
-  },
-  yahoo: {
-    owner: "inbox",
-    url: "https://mail.yahoo.com/",
-    domains: ["mail.yahoo.com"],
-    auth: ["login.yahoo.com"],
   },
   "google-docs": {
     owner: "journal",

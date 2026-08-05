@@ -31,7 +31,7 @@ import { contributionDays, OverviewContributions } from "./HomeContributions";
 import { HomeLink } from "./HomeLink";
 import { useHomeActivity } from "./useHomeActivity";
 import { useHomeAgenda, type HomeAgendaEntry } from "./useHomeAgenda";
-const fallbackTools: WorkspaceToolId[] = ["journal", "planner", "social", "inbox", "files"];
+const fallbackTools: WorkspaceToolId[] = ["journal", "planner", "social", "files"];
 type HomeDashboardProps =
   | {
       global: true;
@@ -405,7 +405,7 @@ function routeForTool(toolId: WorkspaceToolId, space: Space, accountId: string):
   if (toolId === "social") return socialProviderPath(space.id, "misty");
   if (toolId === "library") return `/spaces/${encodedId}/library`;
   if (toolId === "home") return `/spaces/${encodedId}/home`;
-  if (["inbox", "browser", "code", "files", "terminal", "agents"].includes(toolId)) {
+  if (["browser", "code", "files", "terminal", "agents"].includes(toolId)) {
     return `/${toolId}`;
   }
   return null;
@@ -419,7 +419,6 @@ function toolDescription(toolId: WorkspaceToolId): string {
     planner: "Tasks and agenda",
     social: "Conversations",
     library: "Saved resources",
-    inbox: "Messages and updates",
     files: "Local and connected files",
     browser: "Web workspace",
     code: "Projects and source",

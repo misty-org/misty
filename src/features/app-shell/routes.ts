@@ -19,7 +19,6 @@ export const routes = {
   dock: "/dock",
   files: "/files",
   home: "/home",
-  inbox: "/inbox",
   invite: "/invite",
   library: "/library",
   newTab: "/new",

@@ -78,7 +78,6 @@ export * from "./navigation/NavigationTree";
 // icons
 export * from "./icons/AssetIcon";
 export * from "./icons/BrandIcon";
-export * from "./icons/MailProviderIcon";
 export * from "./icons/appIcons";
 export * from "./icons/brandIcons";
 

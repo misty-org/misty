@@ -3,7 +3,6 @@ import {
   MistyCommunicationReadResultSchema,
   MistyCommunicationSendInputSchema,
   MistyCommunicationSendResultSchema,
-  mistyInboxCapabilities,
   mistySocialCapabilities,
 } from "@/shared/schemas";
 
@@ -36,7 +35,9 @@ describe("communication capability conformance", () => {
         recipients: [{ address: "alex@example.com" }],
       }).success,
     ).toBe(false);
-    const send = mistyInboxCapabilities.find((capability) => capability.name === "inbox.send")!;
+    const send = mistySocialCapabilities.find(
+      (capability) => capability.name === "social.send_message",
+    )!;
     expect(send.effects).toMatchObject({
       kind: "send",
       approval: "scoped",

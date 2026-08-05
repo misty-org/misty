@@ -8,7 +8,6 @@ const coreToolCommandIds = new Set([
   "tool.journal",
   "tool.planner",
   "tool.social",
-  "tool.inbox",
   "tool.library",
   "tool.browser",
   "tool.files",

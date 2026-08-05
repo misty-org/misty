@@ -61,14 +61,14 @@ func TestUnifiedCloudBindingEnforcesAccountOwnershipAndCapability(t *testing.T) 
 	account, err := database.SaveConnectedAccount(ctx, ConnectedAccount{
 		UserID: owner.ID, Provider: "google", AccountID: "owned-google-account",
 		AccountDisplay: "binding-owner@example.com", CredentialCiphertext: []byte("sealed-token"),
-		CredentialNonce: []byte("nonce"), KeyVersion: 1, Capabilities: []string{"mail"},
-		GrantedScopes: []string{"gmail.modify"},
+		CredentialNonce: []byte("nonce"), KeyVersion: 1, Capabilities: []string{"calendar_read"},
+		GrantedScopes: []string{"calendar.readonly"},
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if _, err := database.BindConnectedAccountCloudConnection(ctx, owner.ID, *account, "drive", "No Files", 0); !errors.Is(err, ErrSpaceForbidden) {
-		t.Fatalf("mail-only binding error = %v, want ErrSpaceForbidden", err)
+		t.Fatalf("calendar-only binding error = %v, want ErrSpaceForbidden", err)
 	}
 	account.Capabilities = []string{"files"}
 	if _, err := database.BindConnectedAccountCloudConnection(ctx, other.ID, *account, "drive", "Stolen", 0); !errors.Is(err, ErrSpaceForbidden) {

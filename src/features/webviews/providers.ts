@@ -1,8 +1,7 @@
 import { websiteIntegrations, type WebsiteIntegrationId } from "./websiteIntegrations";
 import { mistyBrowserProviders, type MistyBrowserProvider } from "@/shared/schemas";
 import { providerLoginUrls } from "./providerLoginUrls";
-export type ProviderFamily =
-  "inbox" | "chat" | "journal" | "planner" | "library" | "music" | "media";
+export type ProviderFamily = "chat" | "journal" | "planner" | "library" | "music" | "media";
 export type ProviderId = MistyBrowserProvider["id"];
 export const providers: Record<ProviderId, { label: string; url: string; family: ProviderFamily }> =
   {
@@ -25,26 +24,6 @@ export const providers: Record<ProviderId, { label: string; url: string; family:
       label: "Microsoft Teams",
       url: providerLoginUrls["microsoft-teams"],
       family: "chat",
-    },
-    icloud: {
-      label: "iCloud Mail",
-      url: providerLoginUrls.icloud,
-      family: "inbox",
-    },
-    yahoo: {
-      label: "Yahoo Mail",
-      url: providerLoginUrls.yahoo,
-      family: "inbox",
-    },
-    google: {
-      label: "Gmail",
-      url: providerLoginUrls.google,
-      family: "inbox",
-    },
-    microsoft: {
-      label: "Outlook",
-      url: providerLoginUrls.microsoft,
-      family: "inbox",
     },
     instagram: {
       label: "Instagram",
@@ -131,12 +110,7 @@ export function providerWebsiteFromRoute(route: string, family: ProviderFamily):
   const provider = providerFromRoute(route, family);
   const experience = new URL(route, "https://misty.local").searchParams.get("experience");
   if (!provider) return null;
-  if (
-    family !== "inbox" &&
-    experience === "api" &&
-    !["slack", "microsoft-teams", "icloud", "yahoo"].includes(provider)
-  )
-    return null;
+  if (experience === "api" && !["slack", "microsoft-teams"].includes(provider)) return null;
   return provider;
 }
 export interface WebsiteAccount {
@@ -145,7 +119,6 @@ export interface WebsiteAccount {
   label: string;
   connectionId?: string;
   email?: string;
-  websiteUrl?: string;
 }
 export function parseWebsiteAccounts(value: unknown): WebsiteAccount[] {
   if (typeof value !== "string") return [];
@@ -168,56 +141,13 @@ export function parseWebsiteAccounts(value: unknown): WebsiteAccount[] {
           return false;
         if (item.connectionId !== undefined && typeof item.connectionId !== "string") return false;
         if (item.email !== undefined && typeof item.email !== "string") return false;
-        if (
-          item.websiteUrl !== undefined &&
-          (item.provider !== "microsoft" ||
-            ![
-              providerLoginUrls.microsoft,
-              "https://outlook.live.com/mail/",
-              "https://outlook.live.com/mail/?prompt=select_account",
-              "https://outlook.office365.com/mail/",
-              "https://outlook.cloud.microsoft/mail/",
-              "https://outlook.live.com/mail/0/inbox",
-              "https://outlook.office.com/mail/",
-            ].includes(item.websiteUrl))
-        )
-          return false;
+        // Website landing addresses were only kept for the retired mail providers.
+        if ("websiteUrl" in item) return false;
         seen.add(item.id);
         return true;
       })
-      .slice(0, 100)
-      .map((account) =>
-        account.websiteUrl === "https://outlook.live.com/mail/0/inbox" ||
-        account.websiteUrl === "https://outlook.live.com/mail/?prompt=select_account"
-          ? { ...account, websiteUrl: providers.microsoft.url }
-          : account,
-      );
+      .slice(0, 100);
   } catch {
     return [];
-  }
-}
-
-/** Remember only mailbox landing addresses, never SSO URLs, tokens, or message IDs.
- * This is navigation continuity, not proof of an authenticated account. */
-export function outlookMailboxDestination(value: string): string | undefined {
-  try {
-    const url = new URL(value);
-    if (
-      url.protocol !== "https:" ||
-      url.username ||
-      url.password ||
-      url.port ||
-      ![
-        "outlook.live.com",
-        "outlook.office.com",
-        "outlook.office365.com",
-        "outlook.cloud.microsoft",
-      ].includes(url.hostname) ||
-      !/^\/mail(?:\/|$)/.test(url.pathname)
-    )
-      return;
-    return `${url.origin}/mail/`;
-  } catch {
-    return;
   }
 }

@@ -14,7 +14,6 @@ const identityState = {
 
 const defaults: Record<WorkspaceSurfaceId, DockWidgetDescriptor> = {
   home: descriptor("home", "singleton", "suspend", 360, 240),
-  inbox: descriptor("inbox", "singleton", "suspend", 520, 280),
   space: descriptor("space", "per-space", "suspend", 360, 240),
   browser: {
     ...descriptor("browser", "multiple", "keep-alive", 360, 240),
