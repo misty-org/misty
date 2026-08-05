@@ -23,22 +23,25 @@ func (db *Database) UpdateSpaceConversation(ctx context.Context, userID, spaceID
 	if len(members) < 2 {
 		return nil, ErrSpaceInvalid
 	}
-	out := &SpaceConversation{ID: conversationID, SpaceID: spaceID, Title: title}
+	out := &SpaceConversation{ID: conversationID, SpaceID: spaceID, Title: title, Kind: "standard"}
 	err = db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpaceMessageWriteTx(ctx, tx, userID, spaceID); err != nil {
 			return err
 		}
-		var createdByUserID string
+		var createdByUserID, conversationKind string
 		if err := tx.QueryRowContext(ctx,
-			`SELECT created_by_user_id FROM space_conversations WHERE id=$1 AND space_id=$2 FOR UPDATE`,
+			`SELECT created_by_user_id,kind FROM space_conversations WHERE id=$1 AND space_id=$2 FOR UPDATE`,
 			conversationID, spaceID,
-		).Scan(&createdByUserID); err != nil {
+		).Scan(&createdByUserID, &conversationKind); err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
 				return ErrSpaceNotFound
 			}
 			return err
 		}
 		if createdByUserID != userID {
+			return ErrSpaceForbidden
+		}
+		if conversationKind != "standard" {
 			return ErrSpaceForbidden
 		}
 		out.CreatedByUserID = createdByUserID

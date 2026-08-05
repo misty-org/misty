@@ -58,6 +58,46 @@ func (s *SpacesService) AgentInstanceConnections() http.HandlerFunc {
 	}
 }
 
+func (s *SpacesService) AgentInstanceCapabilities() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userID, ok := authenticatedUser(w, r, s.database)
+		if !ok {
+			return
+		}
+		var body struct {
+			Grants []db.AgentCapabilityGrant `json:"grants"`
+		}
+		if decodeJSON(w, r, &body) != nil {
+			return
+		}
+		if !canonicalCapabilityGrantsKnown(body.Grants) {
+			writeSpaceError(w, db.ErrSpaceInvalid)
+			return
+		}
+		raw, _ := json.Marshal(body.Grants)
+		item, err := s.database.UpdateAgentInstanceCapabilityGrants(r.Context(), userID, chi.URLParam(r, "instanceID"), raw)
+		if err != nil {
+			writeSpaceError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, item)
+	}
+}
+
+func canonicalCapabilityGrantsKnown(grants []db.AgentCapabilityGrant) bool {
+	descriptors := canonicalAgentToolboxCatalogDescriptors()
+	known := make(map[string]string, len(descriptors))
+	for _, descriptor := range descriptors {
+		known[descriptor.Name] = descriptor.Risk
+	}
+	for _, grant := range grants {
+		if known[grant.Capability] != grant.Risk {
+			return false
+		}
+	}
+	return true
+}
+
 func (s *SpacesService) WorkflowRuns() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		userID, ok := authenticatedUser(w, r, s.database)

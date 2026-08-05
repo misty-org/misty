@@ -150,11 +150,12 @@ func (s *SpaceLibraryService) InitiateUpload() http.HandlerFunc {
 			return
 		}
 		var body struct {
-			Filename string `json:"filename"`
-			MIMEType string `json:"mime_type"`
-			ByteSize int64  `json:"byte_size"`
-			SHA256   string `json:"sha256"`
-			Purpose  string `json:"purpose"`
+			Filename       string `json:"filename"`
+			MIMEType       string `json:"mime_type"`
+			ByteSize       int64  `json:"byte_size"`
+			SHA256         string `json:"sha256"`
+			Purpose        string `json:"purpose"`
+			ConversationID string `json:"conversation_id"`
 		}
 		if decodeJSON(w, r, &body) != nil {
 			return
@@ -178,7 +179,7 @@ func (s *SpaceLibraryService) InitiateUpload() http.HandlerFunc {
 		}
 		objectKey := "library/" + strings.ReplaceAll(uuid.NewString(), "-", "")
 		expiresAt := time.Now().Add(libraryUploadLifetime).UTC()
-		upload, err := s.database.CreateLibraryUpload(r.Context(), userID, chi.URLParam(r, "spaceID"), body.Purpose, body.Filename, body.MIMEType, body.ByteSize, body.SHA256, objectKey, security.HashToken(token), expiresAt)
+		upload, err := s.database.CreateLibraryUploadForConversation(r.Context(), userID, chi.URLParam(r, "spaceID"), body.ConversationID, body.Purpose, body.Filename, body.MIMEType, body.ByteSize, body.SHA256, objectKey, security.HashToken(token), expiresAt)
 		if err != nil {
 			writeLibraryError(w, err)
 			return

@@ -125,6 +125,10 @@ func (db *Database) agentInstanceByID(ctx context.Context, userID, instanceID st
 	return out, err
 }
 
+func (db *Database) AgentInstanceByID(ctx context.Context, userID, instanceID string) (*AgentInstanceRecord, error) {
+	return db.agentInstanceByID(ctx, userID, instanceID)
+}
+
 func (db *Database) PublishedAgentVersions(ctx context.Context, userID, spaceID, agentID string) ([]PublishedAgentVersion, error) {
 	items := []PublishedAgentVersion{}
 	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {

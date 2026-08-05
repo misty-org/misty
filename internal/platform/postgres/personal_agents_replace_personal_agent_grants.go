@@ -35,8 +35,17 @@ func (db *Database) ReplacePersonalAgentGrants(ctx context.Context, userID, agen
 				return err
 			}
 			grantID := "agentgrant_" + uuid.NewString()
-			if err := tx.QueryRowContext(ctx, `INSERT INTO personal_agent_space_grants(id,agent_id,space_id,all_members,created_by_user_id) VALUES($1,$2,$3,$4,$5)
-				ON CONFLICT(agent_id,space_id) DO UPDATE SET all_members=EXCLUDED.all_members,updated_at=NOW() RETURNING id`, grantID, agentID, input.SpaceID, input.AllMembers, userID).Scan(&grantID); err != nil {
+			var latestVersionID string
+			var latestRole string
+			if err := tx.QueryRowContext(ctx, `SELECT id,role FROM personal_agent_versions WHERE agent_id=$1 ORDER BY version DESC LIMIT 1`, agentID).Scan(&latestVersionID, &latestRole); err != nil {
+				return err
+			}
+			if err := tx.QueryRowContext(ctx, `INSERT INTO personal_agent_space_grants(
+				id,agent_id,space_id,all_members,created_by_user_id,approved_version_id,space_role,managed_by_user_id,enabled,removed_at
+			) VALUES($1,$2,$3,$4,$5,$6,$7,$5,TRUE,NULL)
+				ON CONFLICT(agent_id,space_id) DO UPDATE SET all_members=EXCLUDED.all_members,approved_version_id=EXCLUDED.approved_version_id,
+					managed_by_user_id=EXCLUDED.managed_by_user_id,enabled=TRUE,removed_at=NULL,version=personal_agent_space_grants.version+1,updated_at=NOW()
+				RETURNING id`, grantID, agentID, input.SpaceID, input.AllMembers, userID, latestVersionID, latestRole).Scan(&grantID); err != nil {
 				return err
 			}
 			if _, err := tx.ExecContext(ctx, `DELETE FROM personal_agent_member_grants WHERE grant_id=$1`, grantID); err != nil {
@@ -64,7 +73,8 @@ func (db *Database) ReplacePersonalAgentGrants(ctx context.Context, userID, agen
 				}
 			}
 		}
-		_, err := tx.ExecContext(ctx, `DELETE FROM personal_agent_space_grants WHERE agent_id=$1 AND NOT (space_id = ANY($2::text[]))`, agentID, pqStringArray(mapKeys(seen)))
+		_, err := tx.ExecContext(ctx, `UPDATE personal_agent_space_grants SET enabled=FALSE,removed_at=NOW(),managed_by_user_id=$2,
+			version=version+1,updated_at=NOW() WHERE agent_id=$1 AND removed_at IS NULL AND NOT (space_id = ANY($3::text[]))`, agentID, userID, pqStringArray(mapKeys(seen)))
 		return err
 	})
 	if err != nil {
@@ -89,8 +99,9 @@ func personalAgentAllowedTx(ctx context.Context, tx *sql.Tx, userID, spaceID, ag
 		return nil, err
 	}
 	out := &PersonalAgent{}
-	err := scanPersonalAgent(tx.QueryRowContext(ctx, `SELECT `+personalAgentColumns+` FROM personal_agents a WHERE a.id=$1 AND a.enabled AND a.deleted_at IS NULL AND (
-		a.owner_user_id=$2 OR EXISTS(SELECT 1 FROM personal_agent_space_grants g WHERE g.agent_id=a.id AND g.space_id=$3 AND (g.all_members OR EXISTS(SELECT 1 FROM personal_agent_member_grants mg WHERE mg.grant_id=g.id AND mg.user_id=$2))))`, agentID, userID, spaceID), out)
+	err := scanPersonalAgent(tx.QueryRowContext(ctx, `SELECT `+personalAgentColumns+` FROM personal_agents a WHERE a.id=$1 AND a.enabled AND a.deleted_at IS NULL AND
+		EXISTS(SELECT 1 FROM personal_agent_space_grants g WHERE g.agent_id=a.id AND g.space_id=$2 AND g.enabled AND g.removed_at IS NULL AND
+			(g.all_members OR a.owner_user_id=$3 OR EXISTS(SELECT 1 FROM personal_agent_member_grants mg WHERE mg.grant_id=g.id AND mg.user_id=$3)))`, agentID, spaceID, userID), out)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrPersonalAgentNotFound
 	}
@@ -116,8 +127,9 @@ func (db *Database) AccessiblePersonalAgents(ctx context.Context, userID, spaceI
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionAgentsRun); err != nil {
 			return err
 		}
-		rows, err := tx.QueryContext(ctx, `SELECT `+personalAgentColumns+` FROM personal_agents a WHERE a.enabled AND a.deleted_at IS NULL AND (a.owner_user_id=$1 OR EXISTS(
-			SELECT 1 FROM personal_agent_space_grants g WHERE g.agent_id=a.id AND g.space_id=$2 AND (g.all_members OR EXISTS(SELECT 1 FROM personal_agent_member_grants mg WHERE mg.grant_id=g.id AND mg.user_id=$1)))) ORDER BY lower(a.name),a.id`, userID, spaceID)
+		rows, err := tx.QueryContext(ctx, `SELECT `+personalAgentColumns+` FROM personal_agents a WHERE a.enabled AND a.deleted_at IS NULL AND EXISTS(
+			SELECT 1 FROM personal_agent_space_grants g WHERE g.agent_id=a.id AND g.space_id=$1 AND g.enabled AND g.removed_at IS NULL AND
+				(g.all_members OR a.owner_user_id=$2 OR EXISTS(SELECT 1 FROM personal_agent_member_grants mg WHERE mg.grant_id=g.id AND mg.user_id=$2))) ORDER BY lower(a.name),a.id`, spaceID, userID)
 		if err != nil {
 			return err
 		}

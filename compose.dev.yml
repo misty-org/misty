@@ -127,6 +127,7 @@ services:
       DB_USER: ${DB_USER:-misty_app}
       DB_PASSWORD: ${DB_PASSWORD:-misty}
       DB_NAME: ${DB_NAME:-misty_server}
+      MISTY_OPERATOR_USER_ID: ${MISTY_OPERATOR_USER_ID:-8e66b16c-f644-49a7-9730-d62eeae46021}
       DB_MIGRATION_USER: ""
       DB_MIGRATION_PASSWORD: ""
       CLOUDFLARE_API_TOKEN: ""
@@ -176,10 +177,11 @@ services:
       api:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "test -s /run/misty/tunnel-url"]
-      interval: 2s
-      timeout: 2s
-      retries: 30
+      test: ["CMD-SHELL", "test -s /run/misty/tunnel-url && wget -q -O - http://127.0.0.1:20241/metrics | grep -Eq '^cloudflared_tunnel_ha_connections [1-9][0-9]*(\\.[0-9]+)?$'"]
+      interval: 15s
+      timeout: 7s
+      retries: 3
+      start_period: 10s
     networks: [edge]
 
   cloudflare-deploy:

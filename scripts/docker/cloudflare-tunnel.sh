@@ -26,7 +26,7 @@ while IFS= read -r line; do
     printf '%s\n' "$tunnel_url" >"$url_file.tmp"
     chmod 0444 "$url_file.tmp"
     mv "$url_file.tmp" "$url_file"
-    echo "Misty development tunnel: $tunnel_url"
+    echo "Server running at ${tunnel_url%/}/api"
   fi
 done <"$fifo"
 

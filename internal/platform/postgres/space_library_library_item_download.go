@@ -67,8 +67,54 @@ func (db *Database) MessageAttachmentDownload(ctx context.Context, userID, space
 			return ErrLibraryForbidden
 		}
 		return tx.QueryRowContext(ctx, `SELECT b.r2_object_key,a.display_name,b.server_detected_mime_type,b.byte_size,b.sha256
+			FROM space_message_attachments a
+			JOIN library_files f ON f.id=a.file_id JOIN library_blobs b ON b.id=f.blob_id
+			LEFT JOIN space_messages m ON m.id=a.message_id
+			WHERE a.id=$1 AND a.space_id=$2 AND a.lifecycle_state='ready' AND f.lifecycle_state='ready' AND b.lifecycle_state='ready'
+			  AND ((a.message_id IS NULL AND a.uploader_user_id=$3) OR m.conversation_id IS NULL OR EXISTS(
+				SELECT 1 FROM space_conversation_members cm WHERE cm.conversation_id=m.conversation_id AND cm.user_id=$3
+			  ))`, attachmentID, spaceID, userID).
+			Scan(&out.ObjectKey, &out.Filename, &out.MIMEType, &out.ByteSize, &out.SHA256)
+	})
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, ErrLibraryNotFound
+	}
+	return out, err
+}
+
+// ExplicitAgentLibraryItemDownload resolves a Library item selected by a human
+// for Agent context. It requires current Library visibility but does not grant
+// the Agent general download or enumeration access.
+func (db *Database) ExplicitAgentLibraryItemDownload(ctx context.Context, userID, spaceID, itemID string) (*LibraryDownload, error) {
+	out := &LibraryDownload{}
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
+		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionLibraryView); err != nil {
+			return ErrLibraryForbidden
+		}
+		return tx.QueryRowContext(ctx, `SELECT COALESCE(rb.r2_object_key,b.r2_object_key),i.display_name,
+			COALESCE(rb.server_detected_mime_type,b.server_detected_mime_type),COALESCE(rb.byte_size,b.byte_size),
+			COALESCE(rb.sha256,b.sha256),(rb.id IS NOT NULL)
+			FROM space_library_items i JOIN library_files f ON f.id=i.file_id JOIN library_blobs b ON b.id=f.blob_id
+			LEFT JOIN library_item_versions v ON v.id=i.current_edit_version_id AND v.lifecycle_state='ready' AND v.rendition_state='ready'
+			LEFT JOIN library_blobs rb ON rb.id=v.rendition_blob_id AND rb.lifecycle_state='ready'
+			WHERE i.id=$1 AND i.space_id=$2 AND i.hidden=FALSE AND i.lifecycle_state='ready' AND f.lifecycle_state='ready' AND b.lifecycle_state='ready'`, itemID, spaceID).
+			Scan(&out.ObjectKey, &out.Filename, &out.MIMEType, &out.ByteSize, &out.SHA256, &out.Rendition)
+	})
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, ErrLibraryNotFound
+	}
+	return out, err
+}
+
+func (db *Database) ExplicitAgentTaskAttachmentDownload(ctx context.Context, userID, spaceID, attachmentID string) (*LibraryDownload, error) {
+	out := &LibraryDownload{}
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
+		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionTasksView); err != nil {
+			return ErrLibraryForbidden
+		}
+		return tx.QueryRowContext(ctx, `SELECT b.r2_object_key,a.display_name,b.server_detected_mime_type,b.byte_size,b.sha256
 			FROM space_message_attachments a JOIN library_files f ON f.id=a.file_id JOIN library_blobs b ON b.id=f.blob_id
-			WHERE a.id=$1 AND a.space_id=$2 AND a.lifecycle_state='ready' AND f.lifecycle_state='ready' AND b.lifecycle_state='ready'`, attachmentID, spaceID).
+			WHERE a.id=$1 AND a.space_id=$2 AND a.message_id IS NULL AND a.lifecycle_state='ready' AND f.lifecycle_state='ready' AND b.lifecycle_state='ready'`, attachmentID, spaceID).
 			Scan(&out.ObjectKey, &out.Filename, &out.MIMEType, &out.ByteSize, &out.SHA256)
 	})
 	if errors.Is(err, sql.ErrNoRows) {

@@ -44,14 +44,28 @@ func (db *Database) CreateSpaceTask(ctx context.Context, actorUserID string, ite
 		if err := requireSpacePermissionTx(ctx, tx, actorUserID, item.SpaceID, PermissionTasksManage); err != nil {
 			return err
 		}
+		if err := validateTaskSourceRefsTx(ctx, tx, actorUserID, item.SpaceID, item.ID, item.SourceRefs); err != nil {
+			return err
+		}
 		if item.AssigneeUserID != "" {
 			if _, err := requireSpaceMemberTx(ctx, tx, item.SpaceID, item.AssigneeUserID); err != nil {
 				return ErrSpaceInvalid
 			}
 		}
+		if item.AssigneeAgentID != "" {
+			if _, err := activePersonalAgentMembershipTx(ctx, tx, actorUserID, item.SpaceID, item.AssigneeAgentID); err != nil {
+				return ErrSpaceInvalid
+			}
+			if item.Status == "todo" {
+				item.Status = "in_progress"
+			}
+		}
 		if item.CreatedByAgentID != "" {
 			var allowed bool
-			if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM space_agents WHERE id=$1 AND space_id=$2)`, item.CreatedByAgentID, item.SpaceID).Scan(&allowed); err != nil || !allowed {
+			if err := tx.QueryRowContext(ctx, `SELECT EXISTS(
+				SELECT 1 FROM space_agents WHERE id=$1 AND space_id=$2
+				UNION ALL SELECT 1 FROM personal_agent_space_grants WHERE agent_id=$1 AND space_id=$2 AND enabled AND removed_at IS NULL
+			)`, item.CreatedByAgentID, item.SpaceID).Scan(&allowed); err != nil || !allowed {
 				return ErrSpaceInvalid
 			}
 		}
@@ -67,10 +81,15 @@ func (db *Database) CreateSpaceTask(ctx context.Context, actorUserID string, ite
 			return err
 		}
 		completed := item.Status == "done"
-		query := `INSERT INTO space_tasks(id,space_id,task_number,task_key,title,notes,status,priority,rank,assignee_user_id,due_at,due_timezone,source_refs,created_by_user_id,created_by_agent_id,source_run_id,completed_at)
-			VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,NULLIF($10,''),$11,$12,$13,NULLIF($14,''),NULLIF($15,''),NULLIF($16,''),CASE WHEN $17 THEN NOW() END) RETURNING ` + spaceTaskColumns
-		if err := scanSpaceTask(tx.QueryRowContext(ctx, query, item.ID, item.SpaceID, item.TaskNumber, item.TaskKey, item.Title, item.Notes, item.Status, item.Priority, item.Rank, item.AssigneeUserID, item.DueAt, item.DueTimezone, item.SourceRefs, item.CreatedByUserID, item.CreatedByAgentID, item.SourceRunID, completed), out); err != nil {
+		query := `INSERT INTO space_tasks(id,space_id,task_number,task_key,title,notes,status,priority,rank,assignee_user_id,assignee_agent_id,due_at,due_timezone,source_refs,created_by_user_id,created_by_agent_id,source_run_id,completed_at)
+			VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,NULLIF($10,''),NULLIF($11,''),$12,$13,$14,NULLIF($15,''),NULLIF($16,''),NULLIF($17,''),CASE WHEN $18 THEN NOW() END) RETURNING ` + spaceTaskColumns
+		if err := scanSpaceTask(tx.QueryRowContext(ctx, query, item.ID, item.SpaceID, item.TaskNumber, item.TaskKey, item.Title, item.Notes, item.Status, item.Priority, item.Rank, item.AssigneeUserID, item.AssigneeAgentID, item.DueAt, item.DueTimezone, item.SourceRefs, item.CreatedByUserID, item.CreatedByAgentID, item.SourceRunID, completed), out); err != nil {
 			return err
+		}
+		if item.AssigneeAgentID != "" {
+			if _, err := insertTaskActivityTx(ctx, tx, SpaceTaskActivity{SpaceID: item.SpaceID, TaskID: item.ID, ActorKind: "person", ActorUserID: actorUserID, Kind: "assigned", Message: "Assigned to Agent", Metadata: mustJSON(map[string]any{"agent_id": item.AssigneeAgentID, "task_version": out.Version})}); err != nil {
+				return err
+			}
 		}
 		_, err := recordSpaceEventTx(ctx, tx, item.SpaceID, actorUserID, "task.created", item.ID, map[string]any{"task": out})
 		return err
@@ -114,8 +133,16 @@ func (db *Database) UpdateSpaceTask(ctx context.Context, actorUserID string, ite
 		if err := requireSpacePermissionTx(ctx, tx, actorUserID, item.SpaceID, PermissionTasksManage); err != nil {
 			return err
 		}
+		if err := validateTaskSourceRefsTx(ctx, tx, actorUserID, item.SpaceID, item.ID, item.SourceRefs); err != nil {
+			return err
+		}
 		if item.AssigneeUserID != "" {
 			if _, err := requireSpaceMemberTx(ctx, tx, item.SpaceID, item.AssigneeUserID); err != nil {
+				return ErrSpaceInvalid
+			}
+		}
+		if item.AssigneeAgentID != "" {
+			if _, err := activePersonalAgentMembershipTx(ctx, tx, actorUserID, item.SpaceID, item.AssigneeAgentID); err != nil {
 				return ErrSpaceInvalid
 			}
 		}
@@ -128,11 +155,23 @@ func (db *Database) UpdateSpaceTask(ctx context.Context, actorUserID string, ite
 		if err := lockActiveSpaceTaskTx(ctx, tx, item.SpaceID, item.ID); err != nil {
 			return err
 		}
-		query := `UPDATE space_tasks SET title=$1,notes=$2,status=$3,priority=$4,assignee_user_id=NULLIF($5,''),due_at=$6,due_timezone=$7,source_refs=$8,
-			rank=CASE WHEN status<>$3 THEN (SELECT COALESCE(MAX(other.rank),0)+1024 FROM space_tasks other WHERE other.space_id=$10 AND other.status=$3 AND other.archived_at IS NULL) ELSE rank END,
+		var previousAgentID string
+		if err := tx.QueryRowContext(ctx, `SELECT COALESCE(assignee_agent_id,'') FROM space_tasks WHERE id=$1`, item.ID).Scan(&previousAgentID); err != nil {
+			return err
+		}
+		assignmentChanged := previousAgentID != item.AssigneeAgentID
+		if assignmentChanged && previousAgentID != "" {
+			_, _ = tx.ExecContext(ctx, `UPDATE space_runs SET state='canceled',canceled_at=NOW(),completed_at=NOW(),updated_at=NOW()
+				WHERE source_task_id=$1 AND agent_id=$2 AND state IN ('queued','running','cooldown','awaiting_approval')`, item.ID, previousAgentID)
+		}
+		if assignmentChanged && item.AssigneeAgentID != "" && item.Status == "todo" {
+			item.Status = "in_progress"
+		}
+		query := `UPDATE space_tasks SET title=$1,notes=$2,status=$3,priority=$4,assignee_user_id=NULLIF($5,''),assignee_agent_id=NULLIF($6,''),due_at=$7,due_timezone=$8,source_refs=$9,
+			rank=CASE WHEN status<>$3 THEN (SELECT COALESCE(MAX(other.rank),0)+1024 FROM space_tasks other WHERE other.space_id=$11 AND other.status=$3 AND other.archived_at IS NULL) ELSE rank END,
 			completed_at=CASE WHEN $3='done' THEN COALESCE(completed_at,NOW()) ELSE NULL END,version=version+1,updated_at=NOW()
-			WHERE id=$9 AND space_id=$10 AND archived_at IS NULL RETURNING ` + spaceTaskColumns
-		err := scanSpaceTask(tx.QueryRowContext(ctx, query, item.Title, item.Notes, item.Status, item.Priority, item.AssigneeUserID, item.DueAt, item.DueTimezone, item.SourceRefs, item.ID, item.SpaceID), out)
+			WHERE id=$10 AND space_id=$11 AND archived_at IS NULL RETURNING ` + spaceTaskColumns
+		err := scanSpaceTask(tx.QueryRowContext(ctx, query, item.Title, item.Notes, item.Status, item.Priority, item.AssigneeUserID, item.AssigneeAgentID, item.DueAt, item.DueTimezone, item.SourceRefs, item.ID, item.SpaceID), out)
 		if errors.Is(err, sql.ErrNoRows) {
 			// The archived_at guard above means the row was archived between the
 			// lock and the write. A tombstone must never be resurrected.
@@ -140,6 +179,11 @@ func (db *Database) UpdateSpaceTask(ctx context.Context, actorUserID string, ite
 		}
 		if err != nil {
 			return err
+		}
+		if assignmentChanged && item.AssigneeAgentID != "" {
+			if _, err := insertTaskActivityTx(ctx, tx, SpaceTaskActivity{SpaceID: item.SpaceID, TaskID: item.ID, ActorKind: "person", ActorUserID: actorUserID, Kind: "assigned", Message: "Assigned to Agent", Metadata: mustJSON(map[string]any{"agent_id": item.AssigneeAgentID, "task_version": out.Version})}); err != nil {
+				return err
+			}
 		}
 		_, err = recordSpaceEventTx(ctx, tx, item.SpaceID, actorUserID, "task.updated", item.ID, map[string]any{"task": out})
 		return err

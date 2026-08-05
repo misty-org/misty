@@ -11,6 +11,7 @@ import (
 	"time"
 
 	serveragent "github.com/kannachi323/misty/server/internal/agents"
+	"github.com/kannachi323/misty/server/internal/agenttools"
 	db "github.com/kannachi323/misty/server/internal/platform/postgres"
 	workflowv2 "github.com/kannachi323/misty/server/internal/workflows"
 )
@@ -76,32 +77,52 @@ func (s *SpacesService) executeWorkflowNodeV2(ctx context.Context, run *db.Space
 			}
 			_ = json.Unmarshal(invocation.Config, &config)
 			request := fmt.Sprintf("You are %s. Follow the pinned Agent instructions:\n%s\n\nComplete workflow node %s. Required outcome:\n%s\n\nThe available capabilities are limited to the published workflow envelope. Return a concise result grounded in the supplied input.\n\nInput:\n%s\n\nOriginal user request:\n%s", agent.Name, agent.Instructions, invocation.NodeID, config.Instructions, string(invocation.Input), strings.TrimSpace(prompt))
-			manifest := serveragent.ToolManifest{Tools: make([]serveragent.ToolDefinition, 0, len(toolProviders))}
 			toolNames := make([]string, 0, len(toolProviders))
 			for name := range toolProviders {
 				toolNames = append(toolNames, name)
 			}
 			sort.Strings(toolNames)
+			registrations := make([]agenttools.Registration, 0, len(toolNames))
 			for _, name := range toolNames {
 				provider := toolProviders[name]
-				manifest.Tools = append(manifest.Tools, serveragent.ToolDefinition{Name: name, Risk: agentToolRisk(provider.Risk), InputSchema: TestingMustAPIRawJSON(provider.ToolSchema)})
+				approval := agenttools.ApprovalNone
+				if provider.Risk != workflowv2.RiskRead {
+					approval = agenttools.ApprovalInteractive
+				}
+				locality := agenttools.LocalityServer
+				if provider.Location == workflowv2.LocationDevice {
+					locality = agenttools.LocalityDevice
+				}
+				registrations = append(registrations, agenttools.Registration{Descriptor: agenttools.Descriptor{
+					Name: name, Version: 1, Description: "Execute the published workflow action " + provider.Kind + ".",
+					Risk: agentToolRisk(provider.Risk), InputSchema: TestingMustAPIRawJSON(provider.ToolSchema), OutputSchema: TestingMustAPIRawJSON(provider.OutputSchema),
+					Approval: approval, Locality: locality, Idempotent: true, AuditEvent: "workflow." + provider.Kind,
+					Sources: []string{"workflow_agent_task"},
+				}, Handler: func(toolCtx context.Context, _ agenttools.Invocation, tool serveragent.ToolRequest) (json.RawMessage, error) {
+					config, input := workflowToolArguments(tool.Arguments)
+					digest := sha256.Sum256(append([]byte(tool.Name+":"), tool.Arguments...))
+					toolInvocation := workflowv2.Invocation{RunID: run.ID, NodeID: invocation.NodeID + ".tool_" + fmt.Sprintf("%x", digest[:8]), Attempt: invocation.Attempt, IdempotencyKey: fmt.Sprintf("%x", digest[:]), UserID: run.RequestingMemberID, SpaceID: run.SpaceID, Config: config, Input: input}
+					return provider.Execute(toolCtx, toolInvocation)
+				}})
+			}
+			toolbox, err := agenttools.New(registrations...)
+			if err != nil {
+				return nil, err
+			}
+			toolboxInvocation := agenttools.Invocation{
+				UserID: run.RequestingMemberID, SpaceID: run.SpaceID, AgentID: run.AgentID, AgentInstanceID: run.AgentInstanceID, RunID: run.ID,
+				Source: "workflow_agent_task", Trigger: run.TriggerKind, OriginalInput: prompt, DelegatedApproval: true,
+			}
+			manifest, err := toolbox.Resolve(ctx, toolboxInvocation, toolNames, nil)
+			if err != nil {
+				return nil, err
 			}
 			completion, err := s.agent.CompleteWithToolsContext(ctx, run.RequestingMemberID, run.BillingUserID, request, serveragent.TierLow, manifest, func(toolCtx context.Context, tool serveragent.ToolRequest) (json.RawMessage, error) {
-				provider, ok := toolProviders[tool.Name]
-				if !ok {
+				output, toolErr := toolbox.ExecuteWithMiddleware(toolCtx, toolboxInvocation, tool, nil, agentToolboxExecutionJournal(s.database))
+				if errors.Is(toolErr, agenttools.ErrToolNotFound) || errors.Is(toolErr, agenttools.ErrCapabilityDenied) || errors.Is(toolErr, agenttools.ErrApprovalRequired) {
 					return nil, workflowv2.ErrCapabilityDenied
 				}
-				config, input := workflowToolArguments(tool.Arguments)
-				if err := workflowv2.ValidateJSON(provider.ToolSchema, tool.Arguments); err != nil {
-					return nil, err
-				}
-				digest := sha256.Sum256(append([]byte(tool.Name+":"), tool.Arguments...))
-				toolInvocation := workflowv2.Invocation{RunID: run.ID, NodeID: invocation.NodeID + ".tool_" + fmt.Sprintf("%x", digest[:8]), Attempt: invocation.Attempt, IdempotencyKey: fmt.Sprintf("%x", digest[:]), UserID: run.RequestingMemberID, SpaceID: run.SpaceID, Config: config, Input: input}
-				output, err := provider.Execute(toolCtx, toolInvocation)
-				if err == nil {
-					err = workflowv2.ValidateJSON(provider.OutputSchema, output)
-				}
-				return output, err
+				return output, toolErr
 			})
 			if err != nil {
 				return nil, err

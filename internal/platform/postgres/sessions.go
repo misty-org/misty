@@ -11,7 +11,13 @@ import (
 const SessionTTL = 30 * 24 * time.Hour
 
 func (db *Database) CreateSession(tokenHash, userID string) error {
-	expiresAt := time.Now().Add(SessionTTL)
+	return db.CreateSessionWithTTL(tokenHash, userID, SessionTTL)
+}
+
+// CreateSessionWithTTL backs CreateSession and lets callers that did not verify
+// a password — the desktop-to-browser handoff — mint a shorter-lived session.
+func (db *Database) CreateSessionWithTTL(tokenHash, userID string, ttl time.Duration) error {
+	expiresAt := time.Now().Add(ttl)
 	err := db.TestingWithRLSContext(context.Background(), sessionCreateRLSSettings(tokenHash, userID), func(tx *sql.Tx) error {
 		_, err := tx.ExecContext(
 			context.Background(),

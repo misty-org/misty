@@ -12,7 +12,15 @@ import (
 
 func (db *Database) deleteSpaceMessage(ctx context.Context, userID, spaceID, conversationID, messageID string) error {
 	return db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
-		if err := requireSpaceMessageWriteTx(ctx, tx, userID, spaceID); err != nil {
+		mistySupport, err := isMistySupportConversationTx(ctx, tx, spaceID, conversationID)
+		if err != nil {
+			return err
+		}
+		if mistySupport {
+			if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionMistySupportWrite); err != nil {
+				return err
+			}
+		} else if err := requireSpaceMessageWriteTx(ctx, tx, userID, spaceID); err != nil {
 			return err
 		}
 		if conversationID != "" {
@@ -33,23 +41,19 @@ func (db *Database) deleteSpaceMessage(ctx context.Context, userID, spaceID, con
 		if sender != userID && role != "owner" {
 			return ErrSpaceForbidden
 		}
-		if _, err := recordSpaceEventTx(ctx, tx, spaceID, userID, "message.deleted", messageID, map[string]any{"conversation_id": conversationID}); err != nil {
-			return err
-		}
-		_, err = tx.ExecContext(ctx, `DELETE FROM space_messages WHERE id=$1`, messageID)
-		return err
+		return cleanupSpaceMessagesTx(ctx, tx, spaceID, []string{messageID})
 	})
 }
 
 func (db *Database) CreateSpaceAgentMessage(ctx context.Context, billingUserID, spaceID, agentID, text string) (*SpaceMessage, error) {
-	return db.createSpaceAgentMessage(ctx, billingUserID, spaceID, "", agentID, text)
+	return db.createSpaceAgentMessageWithMembership(ctx, billingUserID, spaceID, "", agentID, text, false)
 }
 
 func (db *Database) CreateSpaceConversationAgentMessage(ctx context.Context, billingUserID, spaceID, conversationID, agentID, text string) (*SpaceMessage, error) {
-	return db.createSpaceAgentMessage(ctx, billingUserID, spaceID, conversationID, agentID, text)
+	return db.createSpaceAgentMessageWithMembership(ctx, billingUserID, spaceID, conversationID, agentID, text, false)
 }
 
-func (db *Database) createSpaceAgentMessage(ctx context.Context, billingUserID, spaceID, conversationID, agentID, text string) (*SpaceMessage, error) {
+func (db *Database) createSpaceAgentMessageWithMembership(ctx context.Context, billingUserID, spaceID, conversationID, agentID, text string, enforceMembership bool) (*SpaceMessage, error) {
 	content := []MessageSpan{{Type: "text", Text: strings.TrimSpace(text)}}
 	if err := TestingValidateMessage(content, nil); err != nil {
 		return nil, err
@@ -58,6 +62,15 @@ func (db *Database) createSpaceAgentMessage(ctx context.Context, billingUserID, 
 	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpaceMessageWriteTx(ctx, tx, billingUserID, spaceID); err != nil {
 			return err
+		}
+		if enforceMembership {
+			membership, err := activePersonalAgentMembershipTx(ctx, tx, billingUserID, spaceID, agentID)
+			if err != nil {
+				return err
+			}
+			if !agentMembershipPermission(membership.Permissions, PermissionMessagesRead) || !agentMembershipPermission(membership.Permissions, PermissionMessagesWrite) {
+				return ErrSpaceForbidden
+			}
 		}
 		if conversationID != "" {
 			if err := requireSpaceConversationMemberTx(ctx, tx, billingUserID, spaceID, conversationID); err != nil {
@@ -69,7 +82,9 @@ func (db *Database) createSpaceAgentMessage(ctx context.Context, billingUserID, 
 			VALUES($1,$2,NULLIF($3,''),$4,'agent',$5,$6) RETURNING seq,created_at`, out.ID, spaceID, conversationID, billingUserID, agentID, raw).Scan(&out.Seq, &out.CreatedAt); err != nil {
 			return err
 		}
-		if err := tx.QueryRowContext(ctx, `SELECT name FROM personal_agents WHERE id=$1 AND deleted_at IS NULL UNION ALL SELECT name FROM space_agents WHERE id=$1 AND space_id=$2 LIMIT 1`, agentID, spaceID).Scan(&out.SenderName); err != nil {
+		if err := tx.QueryRowContext(ctx, `SELECT v.name FROM personal_agent_space_grants g JOIN personal_agent_versions v ON v.id=g.approved_version_id WHERE g.agent_id=$1 AND g.space_id=$2
+			UNION ALL SELECT name FROM space_agents WHERE id=$1 AND space_id=$2
+			UNION ALL SELECT 'Misty' WHERE $1='misty' LIMIT 1`, agentID, spaceID).Scan(&out.SenderName); err != nil {
 			return err
 		}
 		eventID, err := recordSpaceEventTx(ctx, tx, spaceID, billingUserID, "message.created", out.ID, out)

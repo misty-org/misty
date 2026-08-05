@@ -153,6 +153,7 @@ func (db *Database) ValidateAgentSpaceAccess(ctx context.Context, userID, spaceI
 type AgentSessionContext struct {
 	SpaceID string
 	AgentID string
+	ModelID string
 }
 
 // ValidateAgentSessionAccess revalidates a persisted session's Space access and
@@ -169,10 +170,10 @@ func (db *Database) ValidateAgentSessionAccess(ctx context.Context, userID, conv
 	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		bound = AgentSessionContext{}
 		err := tx.QueryRowContext(ctx, `
-			SELECT COALESCE(personal_agent_id, ''), COALESCE(space_id, '')
+			SELECT COALESCE(personal_agent_id, ''), COALESCE(space_id, ''), model_id
 			FROM agent_conversations
 			WHERE id=$1 AND user_id=$2 AND deleted_at IS NULL
-		`, conversationID, userID).Scan(&bound.AgentID, &bound.SpaceID)
+		`, conversationID, userID).Scan(&bound.AgentID, &bound.SpaceID, &bound.ModelID)
 		if errors.Is(err, sql.ErrNoRows) {
 			return serveragent.ErrPersistedSessionNotFound
 		}

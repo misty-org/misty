@@ -12,12 +12,15 @@ import (
 func spaceEventVisibleToUserTx(ctx context.Context, tx *sql.Tx, userID string, event SpaceEvent, permissionCache map[string]bool) (bool, error) {
 	permission := ""
 	switch {
-	case strings.HasPrefix(event.EventType, "message."):
+	case strings.HasPrefix(event.EventType, "message."), strings.HasPrefix(event.EventType, "conversation."):
 		var payload struct {
 			ConversationID string `json:"conversation_id"`
 		}
 		if err := json.Unmarshal(event.Payload, &payload); err != nil {
 			return false, err
+		}
+		if payload.ConversationID == "" && strings.HasPrefix(event.EventType, "conversation.") {
+			payload.ConversationID = event.EntityID
 		}
 		if payload.ConversationID != "" {
 			var member bool
@@ -37,6 +40,8 @@ func spaceEventVisibleToUserTx(ctx context.Context, tx *sql.Tx, userID string, e
 		permission = PermissionMessagesRead
 	case strings.HasPrefix(event.EventType, "library."):
 		permission = PermissionLibraryView
+	case strings.HasPrefix(event.EventType, "task."), strings.HasPrefix(event.EventType, "calendar."), strings.HasPrefix(event.EventType, "roadmap."):
+		permission = PermissionTasksView
 	case strings.HasPrefix(event.EventType, "agent.run."), strings.HasPrefix(event.EventType, "workflow.run."):
 		run := &SpaceRun{}
 		if err := scanSpaceRun(tx.QueryRowContext(ctx, `SELECT `+spaceRunColumns+` FROM space_runs WHERE id=$1`, event.EntityID), run); errors.Is(err, sql.ErrNoRows) {
@@ -193,14 +198,18 @@ func (db *Database) SpaceChatAgents(ctx context.Context, userID, spaceID string)
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionAgentsRun); err != nil {
 			return err
 		}
-		personalRows, err := tx.QueryContext(ctx, `SELECT `+personalAgentColumns+` FROM personal_agents a WHERE a.enabled AND a.deleted_at IS NULL AND (a.owner_user_id=$1 OR EXISTS(
-			SELECT 1 FROM personal_agent_space_grants g WHERE g.agent_id=a.id AND g.space_id=$2 AND (g.all_members OR EXISTS(SELECT 1 FROM personal_agent_member_grants mg WHERE mg.grant_id=g.id AND mg.user_id=$1)))) ORDER BY lower(a.name),a.id`, userID, spaceID)
+		personalRows, err := tx.QueryContext(ctx, `SELECT a.id,a.owner_user_id,v.name,v.description,v.icon,a.model_mode,a.model_id,
+			a.enabled,v.version,a.created_at,g.updated_at FROM personal_agent_space_grants g
+			JOIN personal_agents a ON a.id=g.agent_id AND a.enabled AND a.deleted_at IS NULL
+			JOIN personal_agent_versions v ON v.id=g.approved_version_id
+			WHERE g.space_id=$1 AND g.enabled AND g.removed_at IS NULL ORDER BY lower(v.name),a.id`, spaceID)
 		if err != nil {
 			return err
 		}
 		for personalRows.Next() {
 			var personal PersonalAgent
-			if err := scanPersonalAgent(personalRows, &personal); err != nil {
+			if err := personalRows.Scan(&personal.ID, &personal.OwnerUserID, &personal.Name, &personal.Description, &personal.Icon,
+				&personal.ModelMode, &personal.ModelID, &personal.Enabled, &personal.Version, &personal.CreatedAt, &personal.UpdatedAt); err != nil {
 				personalRows.Close()
 				return err
 			}

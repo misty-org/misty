@@ -54,15 +54,18 @@ type AccountExportMessage struct {
 }
 
 type AccountPortableExport struct {
-	FormatVersion int                    `json:"format_version"`
-	ExportedAt    time.Time              `json:"exported_at"`
-	Account       AccountExportProfile   `json:"account"`
-	Settings      UserSettings           `json:"settings"`
-	Spaces        []AccountExportSpace   `json:"spaces"`
-	Journal       []AccountExportJournal `json:"journal"`
-	Assets        []AccountExportAsset   `json:"assets"`
-	Messages      []AccountExportMessage `json:"authored_messages"`
-	Connections   []map[string]any       `json:"cloud_connections"`
+	FormatVersion      int                              `json:"format_version"`
+	ExportedAt         time.Time                        `json:"exported_at"`
+	Account            AccountExportProfile             `json:"account"`
+	Settings           UserSettings                     `json:"settings"`
+	Spaces             []AccountExportSpace             `json:"spaces"`
+	Journal            []AccountExportJournal           `json:"journal"`
+	Assets             []AccountExportAsset             `json:"assets"`
+	Messages           []AccountExportMessage           `json:"authored_messages"`
+	Agents             []AccountExportAgent             `json:"agents"`
+	AgentConversations []AccountExportAgentConversation `json:"agent_conversations"`
+	AgentMemories      []AccountExportAgentMemory       `json:"agent_memories"`
+	Connections        []map[string]any                 `json:"cloud_connections"`
 }
 
 // AccountPortableExport returns user-supplied and account-owned data without
@@ -73,13 +76,16 @@ func (db *Database) AccountPortableExport(
 	ctx context.Context, userID string,
 ) (*AccountPortableExport, error) {
 	out := &AccountPortableExport{
-		FormatVersion: 1,
-		ExportedAt:    time.Now().UTC(),
-		Spaces:        []AccountExportSpace{},
-		Journal:       []AccountExportJournal{},
-		Assets:        []AccountExportAsset{},
-		Messages:      []AccountExportMessage{},
-		Connections:   []map[string]any{},
+		FormatVersion:      2,
+		ExportedAt:         time.Now().UTC(),
+		Spaces:             []AccountExportSpace{},
+		Journal:            []AccountExportJournal{},
+		Assets:             []AccountExportAsset{},
+		Messages:           []AccountExportMessage{},
+		Agents:             []AccountExportAgent{},
+		AgentConversations: []AccountExportAgentConversation{},
+		AgentMemories:      []AccountExportAgentMemory{},
+		Connections:        []map[string]any{},
 	}
 	err := db.TestingWithRLSContext(ctx, TestingServiceRLSSettings(), func(tx *sql.Tx) error {
 		if err := tx.QueryRowContext(ctx, `
@@ -221,6 +227,9 @@ func (db *Database) AccountPortableExport(
 			out.Messages = append(out.Messages, item)
 			return nil
 		}); err != nil {
+			return err
+		}
+		if err := appendAccountAgentExport(ctx, tx, userID, out); err != nil {
 			return err
 		}
 		return scanExportQuery(ctx, tx, `

@@ -39,7 +39,8 @@ func applySpacePermissionDependencies(permissions map[string]bool) {
 	if !permissions[PermissionMessagesRead] {
 		permissions[PermissionMessagesWrite] = false
 	}
-	if !permissions[PermissionMessagesRead] || !permissions[PermissionMessagesWrite] {
+	if !permissions[PermissionMessagesRead] ||
+		(!permissions[PermissionMessagesWrite] && !permissions[PermissionMistySupportWrite]) {
 		permissions[PermissionAttachmentUpload] = false
 	}
 	if !permissions[PermissionTasksView] {
@@ -137,6 +138,27 @@ func hasSpacePermissionTx(ctx context.Context, tx *sql.Tx, userID, spaceID, perm
 	if err != nil {
 		return false, ErrLibraryForbidden
 	}
+	var spaceKind string
+	if err := tx.QueryRowContext(ctx, `SELECT kind FROM spaces WHERE id=$1`, spaceID).Scan(&spaceKind); err != nil {
+		return false, err
+	}
+	if spaceKind == "misty" {
+		var isOperator bool
+		if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM misty_space_operators WHERE user_id=$1)`, userID).Scan(&isOperator); err != nil {
+			return false, err
+		}
+		switch permission {
+		case PermissionMessagesRead, PermissionMistySupportWrite, PermissionAttachmentUpload, PermissionTasksView:
+			return true, nil
+		case PermissionTasksManage:
+			return isOperator, nil
+		default:
+			return false, nil
+		}
+	}
+	if permission == PermissionMistySupportWrite {
+		return false, nil
+	}
 	if role == "owner" {
 		return true, nil
 	}
@@ -228,6 +250,10 @@ func (db *Database) SpaceStorageUsage(ctx context.Context, userID, spaceID strin
 }
 
 func (db *Database) CreateLibraryUpload(ctx context.Context, userID, spaceID, purpose, filename, declaredMIME string, byteSize int64, clientSHA, objectKey, tokenHash string, expiresAt time.Time) (*LibraryUpload, error) {
+	return db.CreateLibraryUploadForConversation(ctx, userID, spaceID, "", purpose, filename, declaredMIME, byteSize, clientSHA, objectKey, tokenHash, expiresAt)
+}
+
+func (db *Database) CreateLibraryUploadForConversation(ctx context.Context, userID, spaceID, conversationID, purpose, filename, declaredMIME string, byteSize int64, clientSHA, objectKey, tokenHash string, expiresAt time.Time) (*LibraryUpload, error) {
 	permission, purposeKnown := UploadPurposePermission(purpose)
 	maxBytes := MaxUploadBytesForPurpose(purpose)
 	if !purposeKnown || byteSize < 1 || byteSize > maxBytes || byteSize > MaxSpaceStorageBytes || len(clientSHA) != 64 || filename == "" || objectKey == "" || tokenHash == "" {
@@ -238,24 +264,57 @@ func (db *Database) CreateLibraryUpload(ctx context.Context, userID, spaceID, pu
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, permission); err != nil {
 			return err
 		}
+		var spaceKind string
+		var ownerID string
+		if err := tx.QueryRowContext(ctx, `SELECT kind,security_domain_id,owner_user_id FROM spaces WHERE id=$1 FOR SHARE`, spaceID).Scan(&spaceKind, &out.SecurityDomainID, &ownerID); err != nil {
+			return err
+		}
 		if purpose == "attachment" {
-			if err := requireSpaceMessageWriteTx(ctx, tx, userID, spaceID); err != nil {
-				return err
+			if spaceKind == "misty" {
+				if conversationID == "" {
+					return ErrLibraryInvalid
+				}
+				if err := requireSpaceConversationMemberTx(ctx, tx, userID, spaceID, conversationID); err != nil {
+					return err
+				}
+				if supported, err := isMistySupportConversationTx(ctx, tx, spaceID, conversationID); err != nil || !supported {
+					if err != nil {
+						return err
+					}
+					return ErrLibraryInvalid
+				}
+			} else {
+				if err := requireSpaceMessageWriteTx(ctx, tx, userID, spaceID); err != nil {
+					return err
+				}
+				if conversationID != "" {
+					if err := requireSpaceConversationMemberTx(ctx, tx, userID, spaceID, conversationID); err != nil {
+						return err
+					}
+				}
 			}
 		}
-		var ownerID string
-		if err := tx.QueryRowContext(ctx, `SELECT security_domain_id,owner_user_id FROM spaces WHERE id=$1 FOR SHARE`, spaceID).Scan(&out.SecurityDomainID, &ownerID); err != nil {
-			return err
-		}
-		if _, err := tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock(hashtext($1))`, "owner-storage:"+ownerID); err != nil {
-			return err
-		}
-		ownerUsage, err := ownerStorageUsageTx(ctx, tx, ownerID, true)
-		if err != nil {
-			return err
-		}
-		if ownerUsage.UsedBytes+ownerUsage.ReservedBytes+byteSize > ownerUsage.LimitBytes {
-			return ErrLibraryQuota
+		if spaceKind == "misty" {
+			var used, reserved, limit int64
+			if err := tx.QueryRowContext(ctx, `SELECT u.used_bytes,u.reserved_bytes,c.support_storage_limit_bytes
+				FROM misty_support_storage_usage u CROSS JOIN misty_space_config c
+				WHERE u.singleton=1 AND c.singleton=1 FOR UPDATE OF u`).Scan(&used, &reserved, &limit); err != nil {
+				return err
+			}
+			if used+reserved+byteSize > limit {
+				return ErrLibraryQuota
+			}
+		} else {
+			if _, err := tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock(hashtext($1))`, "owner-storage:"+ownerID); err != nil {
+				return err
+			}
+			ownerUsage, err := ownerStorageUsageTx(ctx, tx, ownerID, true)
+			if err != nil {
+				return err
+			}
+			if ownerUsage.UsedBytes+ownerUsage.ReservedBytes+byteSize > ownerUsage.LimitBytes {
+				return ErrLibraryQuota
+			}
 		}
 		if _, err := tx.ExecContext(ctx, `INSERT INTO space_storage_usage(space_id) VALUES($1) ON CONFLICT DO NOTHING`, spaceID); err != nil {
 			return err
@@ -266,8 +325,8 @@ func (db *Database) CreateLibraryUpload(ctx context.Context, userID, spaceID, pu
 		}
 		_ = used
 		_ = reserved
-		if err := tx.QueryRowContext(ctx, `INSERT INTO space_library_uploads(id,space_id,security_domain_id,user_id,object_key,original_filename,purpose,client_declared_mime_type,requested_byte_size,client_sha256,state,upload_token_hash,expires_at)
-			VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'initiated',$11,$12) RETURNING created_at,updated_at`, out.ID, spaceID, out.SecurityDomainID, userID, objectKey, filename, purpose, declaredMIME, byteSize, clientSHA, tokenHash, expiresAt).Scan(&out.CreatedAt, &out.UpdatedAt); err != nil {
+		if err := tx.QueryRowContext(ctx, `INSERT INTO space_library_uploads(id,space_id,security_domain_id,user_id,object_key,original_filename,purpose,client_declared_mime_type,requested_byte_size,client_sha256,state,upload_token_hash,expires_at,conversation_id)
+			VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'initiated',$11,$12,NULLIF($13,'')) RETURNING created_at,updated_at`, out.ID, spaceID, out.SecurityDomainID, userID, objectKey, filename, purpose, declaredMIME, byteSize, clientSHA, tokenHash, expiresAt, conversationID).Scan(&out.CreatedAt, &out.UpdatedAt); err != nil {
 			return err
 		}
 		if _, err := tx.ExecContext(ctx, `INSERT INTO space_upload_reservations(upload_id,space_id,user_id,reserved_bytes,state,expires_at) VALUES($1,$2,$3,$4,'active',$5)`, out.ID, spaceID, userID, byteSize, expiresAt); err != nil {
@@ -275,6 +334,11 @@ func (db *Database) CreateLibraryUpload(ctx context.Context, userID, spaceID, pu
 		}
 		if _, err := tx.ExecContext(ctx, `UPDATE space_storage_usage SET reserved_bytes=reserved_bytes+$1,version=version+1,updated_at=NOW() WHERE space_id=$2`, byteSize, spaceID); err != nil {
 			return err
+		}
+		if spaceKind == "misty" {
+			if _, err := tx.ExecContext(ctx, `UPDATE misty_support_storage_usage SET reserved_bytes=reserved_bytes+$1,version=version+1,updated_at=NOW() WHERE singleton=1`, byteSize); err != nil {
+				return err
+			}
 		}
 		return insertLibraryAuditTx(ctx, tx, spaceID, out.SecurityDomainID, userID, "library.upload.initiated", "upload", out.ID, "success", map[string]any{"purpose": purpose, "reserved_bytes": byteSize})
 	})
@@ -302,10 +366,18 @@ func (db *Database) LibraryUpload(ctx context.Context, userID, spaceID, uploadID
 func (db *Database) LibraryUploadDeduplicationObjectKey(ctx context.Context, userID, spaceID, uploadID string) (string, error) {
 	var objectKey string
 	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
-		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionLibraryUpload); err != nil {
+		canUploadLibrary, err := hasSpacePermissionTx(ctx, tx, userID, spaceID, PermissionLibraryUpload)
+		if err != nil {
 			return err
 		}
-		err := tx.QueryRowContext(ctx, `SELECT b.r2_object_key
+		canUploadAttachment, err := hasSpacePermissionTx(ctx, tx, userID, spaceID, PermissionAttachmentUpload)
+		if err != nil {
+			return err
+		}
+		if !canUploadLibrary && !canUploadAttachment {
+			return ErrLibraryForbidden
+		}
+		err = tx.QueryRowContext(ctx, `SELECT b.r2_object_key
 			FROM space_library_uploads u
 			JOIN library_blobs b ON b.security_domain_id=u.security_domain_id AND b.sha256=u.client_sha256 AND b.byte_size=u.requested_byte_size AND b.lifecycle_state='ready'
 			WHERE u.id=$1 AND u.space_id=$2 AND u.user_id=$3 AND u.state='uploaded_unverified' AND b.r2_object_key<>u.object_key

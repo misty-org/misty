@@ -14,6 +14,51 @@ import (
 )
 
 func (s *SpacesService) executeOrdinaryAgentTool(ctx context.Context, run *db.SpaceRun, tool serveragent.ToolRequest) (json.RawMessage, error) {
+	if tool.Name == globalAgentSendTool {
+		var input struct {
+			Message string `json:"message"`
+		}
+		if json.Unmarshal(tool.Arguments, &input) != nil {
+			return nil, db.ErrSpaceInvalid
+		}
+		input.Message = strings.TrimSpace(input.Message)
+		var runInput struct {
+			Prompt string `json:"prompt"`
+		}
+		if json.Unmarshal(run.Input, &runInput) != nil ||
+			!TestingSpaceAgentSendIsGrounded(runInput.Prompt, input.Message) {
+			return nil, workflowv2.ErrCapabilityDenied
+		}
+		invocation := workflowv2.Invocation{
+			RunID: run.ID, NodeID: "chat_tool_" + tool.ID, Attempt: 1,
+			IdempotencyKey: "chat:" + run.ID + ":" + tool.ID,
+			UserID:         run.RequestingMemberID, SpaceID: run.SpaceID, Input: tool.Arguments,
+		}
+		approved, err := s.database.EnsureWorkflowNodeApproval(
+			ctx, run.ID, invocation.NodeID, tool.Name, tool.Arguments,
+		)
+		if err != nil {
+			return nil, err
+		}
+		if !approved {
+			return nil, workflowv2.ErrAwaitingApproval
+		}
+		return s.database.JournalWorkflowAction(
+			ctx, run.ID, invocation.NodeID, invocation.IdempotencyKey,
+			"space_messages", workflowv2.RiskWrite, tool.Arguments,
+			func() (json.RawMessage, error) {
+				message, sendErr := s.database.CreateSpaceAgentMessage(
+					ctx, run.RequestingMemberID, run.SpaceID, run.AgentID, input.Message,
+				)
+				if sendErr != nil {
+					return nil, sendErr
+				}
+				return TestingMustAPIRawJSON(map[string]any{
+					"message_id": message.ID, "space_id": run.SpaceID,
+				}), nil
+			},
+		)
+	}
 	if strings.HasPrefix(tool.Name, "tasks.") || tool.Name == "calendar.query" {
 		invocation := workflowv2.Invocation{RunID: run.ID, NodeID: "chat_tool_" + tool.ID, Attempt: 1, IdempotencyKey: "chat:" + run.ID + ":" + tool.ID, UserID: run.RequestingMemberID, SpaceID: run.SpaceID, Input: tool.Arguments}
 		switch tool.Name {
@@ -77,7 +122,7 @@ func (s *SpacesService) executeOrdinaryAgentTool(ctx context.Context, run *db.Sp
 		arguments.Limit = 20
 	}
 	switch tool.Name {
-	case "space.search_messages":
+	case toolboxMessagesSearch, "space.search_messages":
 		messages, err := s.database.SpaceMessages(ctx, run.RequestingMemberID, run.SpaceID, 0, 100)
 		if err != nil {
 			return nil, err
@@ -121,6 +166,10 @@ func providerSupportsWrite(provider string) bool {
 		return true
 	}
 	return false
+}
+
+func spaceSearchAgentToolSchema() json.RawMessage {
+	return TestingMustAPIRawJSON(map[string]any{"type": "object", "properties": map[string]any{"query": map[string]any{"type": "string"}, "limit": map[string]any{"type": "integer"}}})
 }
 
 func taskAgentToolSchema(write bool) json.RawMessage {

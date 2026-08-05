@@ -31,17 +31,20 @@ var (
 )
 
 type Space struct {
-	ID               string          `json:"id"`
-	SecurityDomainID string          `json:"security_domain_id"`
-	OwnerUserID      string          `json:"owner_user_id"`
-	Name             string          `json:"name"`
-	Role             string          `json:"role"`
-	MemberCount      int             `json:"member_count"`
-	PendingCount     int             `json:"pending_count"`
-	IsShared         bool            `json:"is_shared"`
-	Permissions      map[string]bool `json:"permissions"`
-	CreatedAt        time.Time       `json:"created_at"`
-	UpdatedAt        time.Time       `json:"updated_at"`
+	ID                    string          `json:"id"`
+	SecurityDomainID      string          `json:"security_domain_id"`
+	OwnerUserID           string          `json:"owner_user_id"`
+	Name                  string          `json:"name"`
+	Kind                  string          `json:"kind"`
+	MistyRole             string          `json:"misty_role,omitempty"`
+	SupportConversationID string          `json:"support_conversation_id,omitempty"`
+	Role                  string          `json:"role"`
+	MemberCount           int             `json:"member_count"`
+	PendingCount          int             `json:"pending_count"`
+	IsShared              bool            `json:"is_shared"`
+	Permissions           map[string]bool `json:"permissions"`
+	CreatedAt             time.Time       `json:"created_at"`
+	UpdatedAt             time.Time       `json:"updated_at"`
 }
 
 type SpaceMember struct {
@@ -210,6 +213,8 @@ type SpaceRun struct {
 	AgentVersionID       string          `json:"agent_version_id,omitempty"`
 	Attempt              int             `json:"attempt"`
 	NextRetryAt          *time.Time      `json:"next_retry_at,omitempty"`
+	SourceTaskID         string          `json:"source_task_id,omitempty"`
+	ActionEnvelope       json.RawMessage `json:"action_envelope,omitempty"`
 }
 
 func (db *Database) TestingSpaceTx(ctx context.Context, fn func(*sql.Tx) error) error {

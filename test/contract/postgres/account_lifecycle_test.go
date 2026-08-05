@@ -38,6 +38,26 @@ func TestAccountDeletionBlocksOwnersAndAnonymizesMembersAfterRetention(t *testin
 	if _, err := database.RespondToSpaceInvite(ctx, member.ID, invite.ID, true); err != nil {
 		t.Fatal(err)
 	}
+	if err := database.SetSpaceMemberPermission(ctx, owner.ID, space.ID, member.ID, PermissionAgentsManage, "allow"); err != nil {
+		t.Fatal(err)
+	}
+	agent, err := database.CreatePersonalAgent(ctx, member.ID, PersonalAgent{
+		Name: "Private deletion Agent", Instructions: "Sensitive owner instructions",
+		ModelMode: "pinned", ModelID: "google/gemini-2.5-flash-lite",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := database.AddSpaceAgentMembership(ctx, member.ID, space.ID, SpaceAgentMembershipInput{AgentID: agent.ID}); err != nil {
+		t.Fatal(err)
+	}
+	if err := database.AppendPersonalAgentMemory(ctx, member.ID, space.ID, agent.ID, "private prompt", "private response"); err != nil {
+		t.Fatal(err)
+	}
+	conversationID := "conversation_87654321-4321-4321-4321-210987654321"
+	if err := database.CreateAgentSession(ctx, conversationID, member.ID, []byte(`{"messages":[{"text":"private"}]}`), time.Now().Add(time.Hour), time.Now().Add(30*24*time.Hour)); err != nil {
+		t.Fatal(err)
+	}
 
 	blockers, err := database.AccountDeletionBlockers(ctx, owner.ID)
 	if err != nil || len(blockers) != 1 || blockers[0].SpaceID != space.ID {
@@ -69,6 +89,16 @@ func TestAccountDeletionBlocksOwnersAndAnonymizesMembersAfterRetention(t *testin
 	}
 	if user, err := database.GetUserByID(member.ID); err != nil || user != nil {
 		t.Fatalf("pending user remained login-visible = %#v, %v", user, err)
+	}
+	var agentEnabled, membershipEnabled bool
+	if err := database.Conn.QueryRow(`SELECT enabled FROM personal_agents WHERE id=$1`, agent.ID).Scan(&agentEnabled); err != nil {
+		t.Fatal(err)
+	}
+	if err := database.Conn.QueryRow(`SELECT enabled FROM personal_agent_space_grants WHERE agent_id=$1`, agent.ID).Scan(&membershipEnabled); err != nil {
+		t.Fatal(err)
+	}
+	if agentEnabled || membershipEnabled {
+		t.Fatal("pending deletion left owned Agent invokable")
 	}
 	if err := database.ScheduleAccountDeletion(
 		ctx, request.ID, map[string]string{"drive:test": "revoked"},
@@ -105,6 +135,22 @@ func TestAccountDeletionBlocksOwnersAndAnonymizesMembersAfterRetention(t *testin
 	if state != "deleted" || name != "Deleted user" ||
 		!strings.HasSuffix(email, "@misty.invalid") {
 		t.Fatalf("anonymized user = state:%q name:%q email:%q", state, name, email)
+	}
+	var agentName, instructions, versionInstructions string
+	if err := database.Conn.QueryRow(`SELECT name,instructions FROM personal_agents WHERE id=$1`, agent.ID).Scan(&agentName, &instructions); err != nil {
+		t.Fatal(err)
+	}
+	if err := database.Conn.QueryRow(`SELECT instructions FROM personal_agent_versions WHERE agent_id=$1 LIMIT 1`, agent.ID).Scan(&versionInstructions); err != nil {
+		t.Fatal(err)
+	}
+	var privateRows int
+	if err := database.Conn.QueryRow(`SELECT
+		(SELECT COUNT(*) FROM agent_conversations WHERE user_id=$1)+
+		(SELECT COUNT(*) FROM personal_agent_instances WHERE invoker_user_id=$1 OR agent_id=$2)`, member.ID, agent.ID).Scan(&privateRows); err != nil {
+		t.Fatal(err)
+	}
+	if agentName != "Deleted Agent" || instructions != "" || versionInstructions != "" || privateRows != 0 {
+		t.Fatalf("Agent deletion redaction failed: name=%q instructions=%q version=%q private_rows=%d", agentName, instructions, versionInstructions, privateRows)
 	}
 	status, err := database.AccountDeletionStatus(
 		ctx, request.ID, strings.Repeat("c", 64),

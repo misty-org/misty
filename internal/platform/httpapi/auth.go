@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 	"strings"
+	"time"
 
 	db "github.com/kannachi323/misty/server/internal/platform/postgres"
 	"github.com/kannachi323/misty/server/internal/platform/security"
@@ -114,16 +115,7 @@ func writeAuthSession(
 		return
 	}
 
-	secure := r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https"
-	http.SetCookie(w, &http.Cookie{
-		Name:     TestingSessionCookieName,
-		Value:    token,
-		Path:     "/",
-		HttpOnly: true,
-		Secure:   secure,
-		SameSite: TestingSessionCookieSameSite(r, secure),
-		MaxAge:   int(db.SessionTTL.Seconds()),
-	})
+	writeSessionCookie(w, r, token, db.SessionTTL)
 
 	writeJSON(w, status, map[string]string{
 		"user_id":  user.ID,
@@ -131,6 +123,22 @@ func writeAuthSession(
 		"username": user.Username,
 		"email":    user.Email,
 		"token":    token,
+	})
+}
+
+// writeSessionCookie is the single definition of the session cookie shape. The
+// cookie carries no Domain attribute on purpose: website and API are the same
+// host in production, so a host-only cookie reaches both.
+func writeSessionCookie(w http.ResponseWriter, r *http.Request, token string, ttl time.Duration) {
+	secure := TestingIsSecureRequest(r)
+	http.SetCookie(w, &http.Cookie{
+		Name:     TestingSessionCookieName,
+		Value:    token,
+		Path:     "/",
+		HttpOnly: true,
+		Secure:   secure,
+		SameSite: TestingSessionCookieSameSite(r, secure),
+		MaxAge:   int(ttl.Seconds()),
 	})
 }
 

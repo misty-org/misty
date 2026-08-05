@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 
@@ -28,11 +29,19 @@ const (
 // AgentsService now exposes trusted-device identity and exact v2 workflow
 // node leases only. Shared Agent definitions and runs live in SpacesService.
 type AgentsService struct {
-	database *db.Database
+	database    *db.Database
+	avatarStore LibraryObjectStore
 }
 
 func NewAgentsService(database *db.Database) *AgentsService {
 	return &AgentsService{database: database}
+}
+
+// SetAvatarStore installs the same durable object store used by member avatars.
+// Agent avatar objects are immutable because an approved Space version can stay
+// pinned after the owner changes the Agent's core identity.
+func (s *AgentsService) SetAvatarStore(store LibraryObjectStore) {
+	s.avatarStore = store
 }
 
 func (s *AgentsService) PersonalAgents() http.HandlerFunc {
@@ -52,6 +61,10 @@ func (s *AgentsService) PersonalAgents() http.HandlerFunc {
 		case http.MethodPost:
 			var body db.PersonalAgent
 			if decodeAIJSON(w, r, &body) != nil {
+				return
+			}
+			if !personalAgentToolGrantsKnown(body.ToolPermissions) {
+				writeAgentError(w, db.ErrSpaceInvalid)
 				return
 			}
 			if strings.TrimSpace(body.ModelID) == "" {
@@ -96,6 +109,10 @@ func (s *AgentsService) PersonalAgent() http.HandlerFunc {
 				return
 			}
 			body.ID = agentID
+			if !personalAgentToolGrantsKnown(body.ToolPermissions) {
+				writeAgentError(w, db.ErrSpaceInvalid)
+				return
+			}
 			if strings.TrimSpace(body.ModelID) == "" {
 				writeJSON(w, http.StatusUnprocessableEntity, map[string]string{"code": "agent_model_required"})
 				return
@@ -121,6 +138,79 @@ func (s *AgentsService) PersonalAgent() http.HandlerFunc {
 			w.WriteHeader(http.StatusMethodNotAllowed)
 		}
 	}
+}
+
+func (s *AgentsService) PersonalAgentToolbox() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userID, ok := s.requireUser(w, r)
+		if !ok {
+			return
+		}
+		agentID := strings.TrimSpace(chi.URLParam(r, "agentID"))
+		personal, err := s.database.PersonalAgentByID(r.Context(), userID, agentID)
+		if err != nil {
+			writeAgentError(w, err)
+			return
+		}
+		items := personalAgentToolboxItems(personal.ToolPermissions)
+		audits, err := s.database.PersonalAgentToolboxActionAudits(r.Context(), userID, agentID, 50)
+		if err != nil {
+			writeAgentError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"agent": personal, "actions": items, "recent_activity": audits})
+	}
+}
+
+func (s *AgentsService) PersonalAgentToolboxCatalog() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if _, ok := s.requireUser(w, r); !ok {
+			return
+		}
+		defaults := json.RawMessage(`{"read":true,"write":false,"integrations":[]}`)
+		writeJSON(w, http.StatusOK, map[string]any{"actions": personalAgentToolboxItems(defaults), "recent_activity": []db.AgentToolboxActionAudit{}})
+	}
+}
+
+func personalAgentToolboxItems(policy json.RawMessage) []agentToolboxCatalogItem {
+	descriptors := personalAgentToolboxCatalogDescriptors()
+	items := make([]agentToolboxCatalogItem, 0, len(descriptors))
+	for _, descriptor := range descriptors {
+		granted := personalAgentToolPolicyAllows(policy, descriptor)
+		item := agentToolboxCatalogItem{
+			Name: descriptor.Name, Description: descriptor.Description, Risk: descriptor.Risk,
+			Approval: descriptor.Approval, Locality: descriptor.Locality, Idempotent: descriptor.Idempotent,
+			AuditEvent: descriptor.AuditEvent, RequiredPermission: descriptor.RequiredPermission,
+			Granted: granted, Available: granted, Reasons: []agentToolboxAvailabilityReason{},
+		}
+		if !granted {
+			item.Reasons = append(item.Reasons, agentToolboxAvailabilityReason{Code: "grant_required", Message: "This action is not enabled for this Agent."})
+		}
+		items = append(items, item)
+	}
+	sort.Slice(items, func(i, j int) bool { return items[i].Name < items[j].Name })
+	return items
+}
+
+func personalAgentToolGrantsKnown(raw json.RawMessage) bool {
+	var policy struct {
+		Grants *[]db.AgentCapabilityGrant `json:"grants"`
+	}
+	if json.Unmarshal(raw, &policy) != nil || policy.Grants == nil {
+		return true
+	}
+	known := map[string]string{}
+	for _, descriptor := range personalAgentToolboxCatalogDescriptors() {
+		known[descriptor.Name] = descriptor.Risk
+	}
+	seen := map[string]bool{}
+	for _, grant := range *policy.Grants {
+		if known[grant.Capability] != grant.Risk || seen[grant.Capability] {
+			return false
+		}
+		seen[grant.Capability] = true
+	}
+	return true
 }
 
 func (s *AgentsService) PersonalAgentGrants() http.HandlerFunc {

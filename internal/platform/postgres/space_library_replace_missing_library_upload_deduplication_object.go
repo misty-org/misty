@@ -88,6 +88,9 @@ func (db *Database) RejectLibraryUpload(ctx context.Context, userID, spaceID, up
 			if _, err := tx.ExecContext(ctx, `UPDATE space_storage_usage SET reserved_bytes=GREATEST(0,reserved_bytes-$1),version=version+1,updated_at=NOW() WHERE space_id=$2`, released, spaceID); err != nil {
 				return err
 			}
+			if err := adjustMistySupportStorageTx(ctx, tx, spaceID, 0, -released); err != nil {
+				return err
+			}
 		}
 		if _, err := tx.ExecContext(ctx, `UPDATE space_library_uploads SET state=$1,error_code=$2,version=version+1,updated_at=NOW() WHERE id=$3`, state, errorCode, upload.ID); err != nil {
 			return err
@@ -133,6 +136,9 @@ func (db *Database) ExpireLibraryUploads(ctx context.Context, limit int) ([]Expi
 				return err
 			}
 			if _, err := tx.ExecContext(ctx, `UPDATE space_storage_usage SET reserved_bytes=GREATEST(0,reserved_bytes-$1),version=version+1,updated_at=NOW() WHERE space_id=$2`, item.reserved, item.spaceID); err != nil {
+				return err
+			}
+			if err := adjustMistySupportStorageTx(ctx, tx, item.spaceID, 0, -item.reserved); err != nil {
 				return err
 			}
 			if _, err := tx.ExecContext(ctx, `UPDATE space_library_uploads SET state='expired',error_code='upload_expired',version=version+1,updated_at=NOW() WHERE id=$1`, item.id); err != nil {

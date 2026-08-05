@@ -22,6 +22,8 @@ type AgentRunRequest struct {
 	CapabilityID         string          `json:"capability_id,omitempty"`
 	Input                json.RawMessage `json:"input"`
 	TriggerKind          string          `json:"trigger_kind"`
+	SourceTaskID         string          `json:"source_task_id,omitempty"`
+	ActionEnvelope       json.RawMessage `json:"action_envelope,omitempty"`
 }
 
 type RunAction struct {
@@ -69,7 +71,7 @@ type AgentConversationEvent struct {
 	CreatedAt      time.Time       `json:"created_at"`
 }
 
-const spaceRunColumns = `id,space_id,resource_kind,resource_id,initiated_by_user_id,billing_user_id,trigger_kind,state,input,result,COALESCE(error_code,''),created_at,completed_at,requesting_member_id,COALESCE(source_conversation_id,''),source_type,COALESCE(agent_id,''),COALESCE(workflow_identifier,''),COALESCE(workflow_version_id,''),COALESCE(workflow_version,''),COALESCE(capability_id,''),progress,outputs,artifacts,COALESCE(error_message,''),COALESCE(retry_of_run_id,''),canceled_at,updated_at,COALESCE(agent_instance_id,''),COALESCE(agent_version_id,''),attempt,next_retry_at`
+const spaceRunColumns = `id,space_id,resource_kind,resource_id,initiated_by_user_id,billing_user_id,trigger_kind,state,input,result,COALESCE(error_code,''),created_at,completed_at,requesting_member_id,COALESCE(source_conversation_id,''),source_type,COALESCE(agent_id,''),COALESCE(workflow_identifier,''),COALESCE(workflow_version_id,''),COALESCE(workflow_version,''),COALESCE(capability_id,''),progress,outputs,artifacts,COALESCE(error_message,''),COALESCE(retry_of_run_id,''),canceled_at,updated_at,COALESCE(agent_instance_id,''),COALESCE(agent_version_id,''),attempt,next_retry_at,COALESCE(source_task_id,''),action_envelope`
 
 func (db *Database) CreateAgentRun(ctx context.Context, request AgentRunRequest) (*SpaceRun, error) {
 	if !validRunSource(request.SourceType) || strings.TrimSpace(request.RequestingMemberID) == "" || strings.TrimSpace(request.AgentID) == "" {
