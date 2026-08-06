@@ -29,17 +29,19 @@ type DrawingAccess struct {
 // SpaceDrawing is server-owned drawing metadata. The Excalidraw scene is
 // persisted by the collaboration Durable Object, never duplicated here.
 type SpaceDrawing struct {
-	ID                    string    `json:"id"`
-	SpaceID               string    `json:"space_id"`
-	CreatorUserID         string    `json:"creator_user_id"`
-	Title                 string    `json:"title"`
-	LifecycleState        string    `json:"lifecycle_state"`
-	CollaborationRevision int64     `json:"collaboration_revision"`
-	ACLVersion            int64     `json:"acl_version"`
-	CreatedAt             time.Time `json:"created_at"`
-	UpdatedAt             time.Time `json:"updated_at"`
-	Role                  string    `json:"role"`
-	CanDelete             bool      `json:"can_delete"`
+	ID                     string    `json:"id"`
+	SpaceID                string    `json:"space_id"`
+	CreatorUserID          string    `json:"creator_user_id"`
+	Title                  string    `json:"title"`
+	LifecycleState         string    `json:"lifecycle_state"`
+	CollaborationRevision  int64     `json:"collaboration_revision"`
+	ACLVersion             int64     `json:"acl_version"`
+	CreatedAt              time.Time `json:"created_at"`
+	UpdatedAt              time.Time `json:"updated_at"`
+	Role                   string    `json:"role"`
+	CanDelete              bool      `json:"can_delete"`
+	AudienceKind           string    `json:"audience_kind"`
+	AudienceConversationID string    `json:"audience_conversation_id,omitempty"`
 }
 
 func TestingNormalizeDrawingTitle(title string) (string, error) {
@@ -125,10 +127,12 @@ func (db *Database) AccessibleSpaceDrawings(
 			`SELECT d.id,d.space_id,d.creator_user_id,d.title,d.lifecycle_state,
 			        d.collaboration_revision,d.acl_version,d.created_at,d.updated_at,
 			        CASE WHEN d.creator_user_id=$1 THEN 'creator' ELSE 'editor' END,
-			        (d.creator_user_id=$1 OR s.owner_user_id=$1)
+			        (d.creator_user_id=$1 OR s.owner_user_id=$1),d.audience_kind,
+			        COALESCE(d.audience_conversation_id,'')
 			 FROM space_drawings d
 			 JOIN spaces s ON s.id=d.space_id
 			 WHERE d.space_id=$2 AND d.lifecycle_state='active'
+			   AND `+resourceAudienceSQL("d", "$1")+`
 			 ORDER BY d.updated_at DESC`, userID, spaceID)
 		if err != nil {
 			return err
@@ -140,7 +144,8 @@ func (db *Database) AccessibleSpaceDrawings(
 				&drawing.ID, &drawing.SpaceID, &drawing.CreatorUserID, &drawing.Title,
 				&drawing.LifecycleState, &drawing.CollaborationRevision,
 				&drawing.ACLVersion, &drawing.CreatedAt, &drawing.UpdatedAt,
-				&drawing.Role, &drawing.CanDelete,
+				&drawing.Role, &drawing.CanDelete, &drawing.AudienceKind,
+				&drawing.AudienceConversationID,
 			); err != nil {
 				return err
 			}
@@ -170,17 +175,24 @@ func drawingAccessForTx(
 	tx *sql.Tx,
 	userID, drawingID string,
 ) (DrawingAccess, error) {
-	var creatorID, spaceID, lifecycle string
+	var creatorID, spaceID, lifecycle, audienceKind, conversationID string
 	err := tx.QueryRowContext(ctx,
-		`SELECT creator_user_id,space_id,lifecycle_state
+		`SELECT creator_user_id,space_id,lifecycle_state,audience_kind,
+		        COALESCE(audience_conversation_id,'')
 		 FROM space_drawings WHERE id=$1`,
 		drawingID,
-	).Scan(&creatorID, &spaceID, &lifecycle)
+	).Scan(&creatorID, &spaceID, &lifecycle, &audienceKind, &conversationID)
 	if errors.Is(err, sql.ErrNoRows) {
 		return DrawingAccess{}, nil
 	}
 	if err != nil {
 		return DrawingAccess{}, err
+	}
+	if audienceKind == SpaceAudienceConversation {
+		visible, err := humanConversationParticipantTx(ctx, tx, userID, spaceID, conversationID)
+		if err != nil || !visible {
+			return DrawingAccess{}, err
+		}
 	}
 	memberRole, err := requireSpaceMemberTx(ctx, tx, spaceID, userID)
 	if errors.Is(err, ErrSpaceForbidden) || lifecycle != DrawingLifecycleActive {
@@ -219,12 +231,14 @@ func (db *Database) SpaceDrawingByID(
 		drawing.CanDelete = access.CanDelete
 		return tx.QueryRowContext(ctx,
 			`SELECT id,space_id,creator_user_id,title,lifecycle_state,
-			        collaboration_revision,acl_version,created_at,updated_at
+			        collaboration_revision,acl_version,created_at,updated_at,
+			        audience_kind,COALESCE(audience_conversation_id,'')
 			 FROM space_drawings WHERE id=$1`, drawingID,
 		).Scan(
 			&drawing.ID, &drawing.SpaceID, &drawing.CreatorUserID, &drawing.Title,
 			&drawing.LifecycleState, &drawing.CollaborationRevision,
 			&drawing.ACLVersion, &drawing.CreatedAt, &drawing.UpdatedAt,
+			&drawing.AudienceKind, &drawing.AudienceConversationID,
 		)
 	})
 	if err != nil {

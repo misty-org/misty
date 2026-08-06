@@ -57,6 +57,11 @@ func (db *Database) BulkUpdateLibraryItems(ctx context.Context, userID, spaceID 
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionLibraryEdit); err != nil {
 			return err
 		}
+		for _, id := range ids {
+			if err := requireLibraryItemAudienceTx(ctx, tx, userID, spaceID, id); err != nil {
+				return err
+			}
+		}
 		rows, err := tx.QueryContext(ctx, `SELECT id,version,lifecycle_state FROM space_library_items WHERE space_id=$1 AND id=ANY($2) FOR UPDATE`, spaceID, pq.Array(ids))
 		if err != nil {
 			return err
@@ -184,6 +189,9 @@ func (db *Database) UpdateLibraryItem(ctx context.Context, userID, spaceID, item
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionLibraryEdit); err != nil {
 			return err
 		}
+		if err := requireLibraryItemAudienceTx(ctx, tx, userID, spaceID, itemID); err != nil {
+			return err
+		}
 		result, err := tx.ExecContext(ctx, `UPDATE space_library_items SET display_name=$1,caption=$2,tags=$3,favorite=$4,hidden=$5,version=version+1,updated_at=NOW() WHERE id=$6 AND space_id=$7 AND version=$8 AND lifecycle_state='ready'`, displayName, caption, encodedTags, favorite, hidden, itemID, spaceID, version)
 		if err != nil {
 			return err
@@ -203,6 +211,9 @@ func (db *Database) LibraryItem(ctx context.Context, userID, spaceID, itemID str
 	out := &SpaceLibraryItem{}
 	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionLibraryView); err != nil {
+			return err
+		}
+		if err := requireLibraryItemAudienceTx(ctx, tx, userID, spaceID, itemID); err != nil {
 			return err
 		}
 		return scanSpaceLibraryItem(tx.QueryRowContext(ctx, `SELECT i.id,i.space_id,i.file_id,i.contributing_user_id,i.display_name,i.caption,i.tags,i.favorite,i.hidden,i.date_override,COALESCE(i.location_override,'null'::jsonb),i.contributor_information,COALESCE(i.current_edit_version_id,''),i.added_by_user_id,i.lifecycle_state,i.added_at,i.trashed_at,i.recover_until,i.version,i.updated_at,

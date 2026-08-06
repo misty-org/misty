@@ -41,6 +41,7 @@ func (db *Database) AccountDeletionBlockers(
 			LEFT JOIN space_members m ON m.space_id=s.id
 			WHERE s.owner_user_id=$1 AND s.lifecycle_state='active' AND s.kind='standard'
 			GROUP BY s.id,s.name
+			HAVING COUNT(m.user_id)>1
 			ORDER BY s.created_at`, userID)
 		if err != nil {
 			return err
@@ -79,43 +80,15 @@ func (db *Database) BeginAccountDeletion(
 		if state != "active" {
 			return ErrAccountDeletionBlocked
 		}
-		var isMistyOperator bool
-		if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM misty_space_operators WHERE user_id=$1)`, userID).Scan(&isMistyOperator); err != nil {
-			return err
-		}
-		if isMistyOperator {
-			var replacementUserID, mistySpaceID string
-			if err := tx.QueryRowContext(ctx, `SELECT o.user_id,c.space_id FROM misty_space_operators o
-				CROSS JOIN misty_space_config c JOIN users u ON u.id=o.user_id
-				WHERE o.user_id<>$1 AND u.lifecycle_state='active'
-				ORDER BY o.added_at,o.user_id LIMIT 1`, userID).Scan(&replacementUserID, &mistySpaceID); err != nil {
-				if errors.Is(err, sql.ErrNoRows) {
-					return ErrAccountDeletionBlocked
-				}
-				return err
-			}
-			if _, err := tx.ExecContext(ctx, `UPDATE spaces SET owner_user_id=$1,updated_at=NOW() WHERE id=$2`, replacementUserID, mistySpaceID); err != nil {
-				return err
-			}
-			if _, err := tx.ExecContext(ctx, `UPDATE security_domains SET owner_user_id=$1,updated_at=NOW() WHERE space_id=$2`, replacementUserID, mistySpaceID); err != nil {
-				return err
-			}
-			if _, err := tx.ExecContext(ctx, `UPDATE space_members SET role=CASE WHEN user_id=$1 THEN 'owner' ELSE 'member' END
-				WHERE space_id=$2 AND user_id IN ($1,$3)`, replacementUserID, mistySpaceID, userID); err != nil {
-				return err
-			}
-			if _, err := tx.ExecContext(ctx, `DELETE FROM misty_space_operators WHERE user_id=$1`, userID); err != nil {
-				return err
-			}
-		}
-		var owned int
+		var sharedOwned int
 		if err := tx.QueryRowContext(ctx, `
-			SELECT COUNT(*) FROM spaces
-			WHERE owner_user_id=$1 AND lifecycle_state='active' AND kind='standard'`, userID,
-		).Scan(&owned); err != nil {
+			SELECT COUNT(*) FROM spaces s
+			WHERE s.owner_user_id=$1 AND s.lifecycle_state='active' AND s.kind='standard'
+			  AND EXISTS(SELECT 1 FROM space_members m WHERE m.space_id=s.id AND m.user_id<>$1)`, userID,
+		).Scan(&sharedOwned); err != nil {
 			return err
 		}
-		if owned > 0 {
+		if sharedOwned > 0 {
 			return ErrAccountDeletionBlocked
 		}
 		if _, err := tx.ExecContext(ctx, `

@@ -96,14 +96,7 @@ func selectWorkflowCapability(metadata WorkflowMetadata, requested string) (*Wor
 	return nil, ErrSpaceInvalid
 }
 
-const (
-	// RunSourceAgentConsole replaces the pre-rename "mika" value. The legacy
-	// value stays accepted, and permitted by the space_runs CHECK, until
-	// 20260916000000_rename_agent_run_source_type.sql has run everywhere and no
-	// old binary is still writing it. Only the current value is written.
-	RunSourceAgentConsole       = "agent_console"
-	RunSourceAgentConsoleLegacy = "mika"
-)
+const RunSourceAgentConsole = "agent_console"
 
 // Every value here must also appear in the space_runs source_type CHECK, or the
 // run passes validation and then fails at insert time. "connector" and "task"
@@ -114,11 +107,12 @@ func validRunSource(value string) bool {
 	case "direct",
 		"group_mention",
 		RunSourceAgentConsole,
-		RunSourceAgentConsoleLegacy,
 		"studio_test",
 		"schedule",
 		"connector",
-		"task":
+		"task",
+		"suggestion",
+		"follow_up":
 		return true
 	default:
 		return false
@@ -129,9 +123,18 @@ func sharedSpaceRunVisibleToUserTx(ctx context.Context, tx *sql.Tx, run *SpaceRu
 	if run.RequestingMemberID == userID {
 		return true, nil
 	}
+	if run.ConversationScopeKind == ConversationScopePrivate && run.ScopeConversationID != "" {
+		var member bool
+		if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM space_conversation_members cm JOIN space_conversations c ON c.id=cm.conversation_id WHERE cm.conversation_id=$1 AND cm.actor_kind='person' AND cm.user_id=$2 AND c.space_id=$3)`, run.ScopeConversationID, userID, run.SpaceID).Scan(&member); err != nil {
+			return false, err
+		}
+		return member, nil
+	}
 	switch run.SourceType {
 	case "schedule":
 		return true, nil
+	case "suggestion", "follow_up":
+		return run.ConversationScopeKind == ConversationScopeEveryone, nil
 	case "group_mention":
 		var conversationExists, member bool
 		if err := tx.QueryRowContext(ctx, `SELECT
@@ -148,10 +151,12 @@ func sharedSpaceRunVisibleToUserTx(ctx context.Context, tx *sql.Tx, run *SpaceRu
 	}
 }
 
-const sharedSpaceRunListVisibility = `(requesting_member_id=$3 OR source_type='schedule' OR (source_type='group_mention' AND (
-	NOT EXISTS(SELECT 1 FROM space_conversations c WHERE c.id=space_runs.source_conversation_id AND c.space_id=space_runs.space_id)
-	OR EXISTS(SELECT 1 FROM space_conversation_members cm JOIN space_conversations c ON c.id=cm.conversation_id WHERE cm.conversation_id=space_runs.source_conversation_id AND cm.user_id=$3 AND c.space_id=space_runs.space_id)
-)))`
+const sharedSpaceRunListVisibility = `(requesting_member_id=$3 OR source_type='schedule' OR
+	(conversation_scope_kind='everyone' AND source_type IN ('group_mention','suggestion','follow_up')) OR
+	(conversation_scope_kind='conversation' AND EXISTS(
+		SELECT 1 FROM space_conversation_members cm JOIN space_conversations c ON c.id=cm.conversation_id
+		WHERE cm.conversation_id=space_runs.scope_conversation_id AND cm.actor_kind='person' AND cm.user_id=$3 AND c.space_id=space_runs.space_id
+	)))`
 
 func (db *Database) SpaceRuns(ctx context.Context, userID, spaceID, agentID string, limit int) ([]SpaceRun, error) {
 	if limit < 1 || limit > 200 {

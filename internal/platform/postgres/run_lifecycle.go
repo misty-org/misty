@@ -44,6 +44,11 @@ func (db *Database) RetrySpaceRun(ctx context.Context, userID, runID string) (*S
 	if previous.RequestingMemberID != userID || previous.State != "failed" && previous.State != "canceled" && previous.State != "completed_with_errors" {
 		return nil, ErrSpaceForbidden
 	}
+	// Suggestion and reminder runs are exact-payload executions. They must be
+	// retried through their source item, never through the free-form Agent runner.
+	if previous.SourceType == "suggestion" || previous.SourceType == "follow_up" {
+		return nil, ErrSpaceInvalid
+	}
 	out := *previous
 	out.ID, out.State, out.Progress, out.Attempt = "run_"+uuid.NewString(), "running", 0, 1
 	out.Result, out.Outputs, out.Artifacts = json.RawMessage(`{}`), json.RawMessage(`{}`), json.RawMessage(`[]`)
@@ -74,8 +79,8 @@ func (db *Database) RetrySpaceRun(ctx context.Context, userID, runID string) (*S
 				out.State = "awaiting_approval"
 			}
 		}
-		if err := tx.QueryRowContext(ctx, `INSERT INTO space_runs(id,space_id,resource_kind,resource_id,initiated_by_user_id,billing_user_id,trigger_kind,state,input,requesting_member_id,source_conversation_id,source_type,agent_id,workflow_identifier,workflow_version_id,workflow_version,capability_id,outputs,artifacts,retry_of_run_id,agent_instance_id,agent_version_id,attempt)
-			VALUES($1,$2,'agent',$3,$4,$4,'retry',$5,$6,$4,NULLIF($7,''),$8,$3,NULLIF($9,''),NULLIF($10,''),NULLIF($11,''),$12,'{}'::jsonb,'[]'::jsonb,$13,$14,$15,1) RETURNING created_at,updated_at`, out.ID, out.SpaceID, out.ResourceID, userID, out.State, out.Input, out.SourceConversationID, out.SourceType, out.WorkflowIdentifier, out.WorkflowVersionID, out.WorkflowVersion, out.CapabilityID, previous.ID, previous.AgentInstanceID, previous.AgentVersionID).Scan(&out.CreatedAt, &out.UpdatedAt); err != nil {
+		if err := tx.QueryRowContext(ctx, `INSERT INTO space_runs(id,space_id,resource_kind,resource_id,initiated_by_user_id,billing_user_id,trigger_kind,state,input,requesting_member_id,source_conversation_id,source_type,agent_id,workflow_identifier,workflow_version_id,workflow_version,capability_id,outputs,artifacts,retry_of_run_id,agent_instance_id,agent_version_id,attempt,conversation_scope_kind,scope_conversation_id,source_message_id)
+			VALUES($1,$2,'agent',$3,$4,$4,'retry',$5,$6,$4,NULLIF($7,''),$8,$3,NULLIF($9,''),NULLIF($10,''),NULLIF($11,''),$12,'{}'::jsonb,'[]'::jsonb,$13,$14,$15,1,$16,NULLIF($17,''),NULLIF($18,'')) RETURNING created_at,updated_at`, out.ID, out.SpaceID, out.ResourceID, userID, out.State, out.Input, out.SourceConversationID, out.SourceType, out.WorkflowIdentifier, out.WorkflowVersionID, out.WorkflowVersion, out.CapabilityID, previous.ID, previous.AgentInstanceID, previous.AgentVersionID, previous.ConversationScopeKind, previous.ScopeConversationID, previous.SourceMessageID).Scan(&out.CreatedAt, &out.UpdatedAt); err != nil {
 			return err
 		}
 		if out.State == "awaiting_approval" && capability != nil && workflow != nil {
@@ -91,7 +96,7 @@ func requireRunResourceEnabledTx(ctx context.Context, tx *sql.Tx, run *SpaceRun)
 	var err error
 	switch run.ResourceKind {
 	case "agent":
-		err = tx.QueryRowContext(ctx, `SELECT enabled AND status='available' FROM space_agents WHERE id=$1 AND space_id=$2`, run.ResourceID, run.SpaceID).Scan(&enabled)
+		err = tx.QueryRowContext(ctx, `SELECT g.enabled AND g.removed_at IS NULL AND g.approved_version_id=$3 AND a.enabled AND a.deleted_at IS NULL FROM personal_agent_space_grants g JOIN personal_agents a ON a.id=g.agent_id WHERE g.agent_id=$1 AND g.space_id=$2`, run.ResourceID, run.SpaceID, run.AgentVersionID).Scan(&enabled)
 	default:
 		return ErrSpaceInvalid
 	}

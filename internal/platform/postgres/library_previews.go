@@ -37,6 +37,9 @@ func (db *Database) LibraryItemPreviewSource(ctx context.Context, userID, spaceI
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionLibraryView); err != nil {
 			return err
 		}
+		if err := requireLibraryItemAudienceTx(ctx, tx, userID, spaceID, itemID); err != nil {
+			return err
+		}
 		if original {
 			if err := tx.QueryRowContext(ctx, `SELECT f.id,f.security_domain_id,b.id,b.r2_object_key,b.server_detected_mime_type,b.byte_size,b.sha256 FROM space_library_items i JOIN library_files f ON f.id=i.file_id JOIN library_blobs b ON b.id=f.blob_id WHERE i.id=$1 AND i.space_id=$2 AND i.lifecycle_state='ready' AND f.lifecycle_state='ready' AND b.lifecycle_state='ready'`, itemID, spaceID).Scan(&out.FileID, &out.SecurityDomainID, &out.SourceIdentity, &out.ObjectKey, &out.MIMEType, &out.ByteSize, &out.SHA256); err != nil {
 				return err
@@ -130,6 +133,9 @@ func (db *Database) CompleteLibraryPreview(ctx context.Context, userID, spaceID,
 	out := &CompleteLibraryPreviewResult{ObjectKey: objectKey, MIMEType: mimeType, ByteSize: byteSize, SHA256: sha}
 	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionLibraryView); err != nil {
+			return err
+		}
+		if err := requireLibraryItemAudienceTx(ctx, tx, userID, spaceID, itemID); err != nil {
 			return err
 		}
 		var fileID, domainID, currentIdentity string

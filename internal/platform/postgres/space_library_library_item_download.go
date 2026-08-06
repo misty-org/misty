@@ -18,6 +18,9 @@ func (db *Database) LibraryItemDownload(ctx context.Context, userID, spaceID, it
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionLibraryDownload); err != nil {
 			return err
 		}
+		if err := requireLibraryItemAudienceTx(ctx, tx, userID, spaceID, itemID); err != nil {
+			return err
+		}
 		if err := tx.QueryRowContext(ctx, `SELECT COALESCE(rb.r2_object_key,b.r2_object_key),i.display_name,COALESCE(rb.server_detected_mime_type,b.server_detected_mime_type),COALESCE(rb.byte_size,b.byte_size),COALESCE(rb.sha256,b.sha256),(rb.id IS NOT NULL)
 			FROM space_library_items i JOIN library_files f ON f.id=i.file_id JOIN library_blobs b ON b.id=f.blob_id
 			LEFT JOIN library_item_versions v ON v.id=i.current_edit_version_id AND v.lifecycle_state='ready' AND v.rendition_state='ready'
@@ -38,6 +41,9 @@ func (db *Database) LibraryOriginalItemDownload(ctx context.Context, userID, spa
 	out := &LibraryDownload{}
 	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionLibraryDownload); err != nil {
+			return err
+		}
+		if err := requireLibraryItemAudienceTx(ctx, tx, userID, spaceID, itemID); err != nil {
 			return err
 		}
 		if err := tx.QueryRowContext(ctx, `SELECT b.r2_object_key,f.original_filename,b.server_detected_mime_type,b.byte_size,b.sha256
@@ -90,6 +96,9 @@ func (db *Database) ExplicitAgentLibraryItemDownload(ctx context.Context, userID
 	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionLibraryView); err != nil {
 			return ErrLibraryForbidden
+		}
+		if err := requireLibraryItemAudienceTx(ctx, tx, userID, spaceID, itemID); err != nil {
+			return err
 		}
 		return tx.QueryRowContext(ctx, `SELECT COALESCE(rb.r2_object_key,b.r2_object_key),i.display_name,
 			COALESCE(rb.server_detected_mime_type,b.server_detected_mime_type),COALESCE(rb.byte_size,b.byte_size),

@@ -39,9 +39,74 @@ func spaceEventVisibleToUserTx(ctx context.Context, tx *sql.Tx, userID string, e
 	case strings.HasPrefix(event.EventType, "node."):
 		permission = PermissionMessagesRead
 	case strings.HasPrefix(event.EventType, "library."):
+		visible, err := resourceEntityAudienceVisibleTx(ctx, tx, userID, event.SpaceID, "space_library_items", event.EntityID)
+		if err != nil || !visible {
+			return false, err
+		}
 		permission = PermissionLibraryView
-	case strings.HasPrefix(event.EventType, "task."), strings.HasPrefix(event.EventType, "calendar."), strings.HasPrefix(event.EventType, "roadmap."):
+	case strings.HasPrefix(event.EventType, "task."):
+		visible, err := resourceEntityAudienceVisibleTx(ctx, tx, userID, event.SpaceID, "space_tasks", event.EntityID)
+		if err != nil || !visible {
+			return false, err
+		}
 		permission = PermissionTasksView
+	case strings.HasPrefix(event.EventType, "roadmap."):
+		roadmapID := event.EntityID
+		var payload struct {
+			RoadmapID string `json:"roadmap_id"`
+		}
+		if json.Unmarshal(event.Payload, &payload) == nil && payload.RoadmapID != "" {
+			roadmapID = payload.RoadmapID
+		}
+		visible, err := resourceEntityAudienceVisibleTx(ctx, tx, userID, event.SpaceID, "space_roadmaps", roadmapID)
+		if err != nil || !visible {
+			return false, err
+		}
+		permission = PermissionTasksView
+	case strings.HasPrefix(event.EventType, "calendar."):
+		visible, err := resourceEntityAudienceVisibleTx(ctx, tx, userID, event.SpaceID, "space_native_calendar_events", event.EntityID)
+		if err != nil || !visible {
+			return false, err
+		}
+		permission = PermissionTasksView
+	case strings.HasPrefix(event.EventType, "drawing."):
+		visible, err := resourceEntityAudienceVisibleTx(ctx, tx, userID, event.SpaceID, "space_drawings", event.EntityID)
+		if err != nil || !visible {
+			return false, err
+		}
+		permission = PermissionMessagesRead
+	case strings.HasPrefix(event.EventType, "action_suggestion."):
+		var scopeKind, conversationID string
+		err := tx.QueryRowContext(ctx, `SELECT scope_kind,COALESCE(conversation_id,'') FROM space_action_suggestion_batches WHERE id=$1 AND space_id=$2`, event.EntityID, event.SpaceID).Scan(&scopeKind, &conversationID)
+		if errors.Is(err, sql.ErrNoRows) {
+			return false, nil
+		}
+		if err != nil {
+			return false, err
+		}
+		if scopeKind == ConversationScopePrivate {
+			visible, err := humanConversationParticipantTx(ctx, tx, userID, event.SpaceID, conversationID)
+			if err != nil || !visible {
+				return false, err
+			}
+		}
+		permission = PermissionMessagesRead
+	case strings.HasPrefix(event.EventType, "conversation_follow_up."):
+		var scopeKind, conversationID string
+		err := tx.QueryRowContext(ctx, `SELECT source_scope_kind,COALESCE(source_conversation_id,'') FROM space_conversation_follow_ups WHERE id=$1 AND space_id=$2`, event.EntityID, event.SpaceID).Scan(&scopeKind, &conversationID)
+		if errors.Is(err, sql.ErrNoRows) {
+			return false, nil
+		}
+		if err != nil {
+			return false, err
+		}
+		if scopeKind == ConversationScopePrivate {
+			visible, err := humanConversationParticipantTx(ctx, tx, userID, event.SpaceID, conversationID)
+			if err != nil || !visible {
+				return false, err
+			}
+		}
+		permission = PermissionMessagesRead
 	case strings.HasPrefix(event.EventType, "agent.run."), strings.HasPrefix(event.EventType, "workflow.run."):
 		run := &SpaceRun{}
 		if err := scanSpaceRun(tx.QueryRowContext(ctx, `SELECT `+spaceRunColumns+` FROM space_runs WHERE id=$1`, event.EntityID), run); errors.Is(err, sql.ErrNoRows) {
@@ -87,6 +152,35 @@ func spaceEventVisibleToUserTx(ctx context.Context, tx *sql.Tx, userID string, e
 	}
 	permissionCache[key] = allowed
 	return allowed, nil
+}
+
+func humanConversationParticipantTx(ctx context.Context, tx *sql.Tx, userID, spaceID, conversationID string) (bool, error) {
+	var visible bool
+	err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM space_conversation_members cm JOIN space_conversations c ON c.id=cm.conversation_id WHERE cm.conversation_id=$1 AND cm.actor_kind='person' AND cm.user_id=$2 AND c.space_id=$3)`, conversationID, userID, spaceID).Scan(&visible)
+	return visible, err
+}
+
+func resourceEntityAudienceVisibleTx(ctx context.Context, tx *sql.Tx, userID, spaceID, table, entityID string) (bool, error) {
+	// Table names are an internal closed set; values never come from requests.
+	switch table {
+	case "space_tasks", "space_roadmaps", "space_native_calendar_events", "space_library_items", "space_drawings":
+	default:
+		return false, ErrSpaceInvalid
+	}
+	var audienceKind, conversationID string
+	err := tx.QueryRowContext(ctx, `SELECT audience_kind,COALESCE(audience_conversation_id,'') FROM `+table+` WHERE id=$1 AND space_id=$2`, entityID, spaceID).Scan(&audienceKind, &conversationID)
+	if errors.Is(err, sql.ErrNoRows) {
+		// Some event families use upload/source IDs, and connected-calendar rows
+		// do not live in the native table. They are Space-wide by definition.
+		return true, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	if audienceKind == SpaceAudienceSpace {
+		return true, nil
+	}
+	return humanConversationParticipantTx(ctx, tx, userID, spaceID, conversationID)
 }
 
 func (db *Database) CreateResolveTicket(ctx context.Context, userID, spaceID, nodeID, disposition, tokenHash string, expires time.Time) error {

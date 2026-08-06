@@ -22,7 +22,7 @@ func (s *SpacesService) executeLeasedDeviceNode(ctx context.Context, run *db.Spa
 	}
 	inputSchema, _ := json.Marshal(descriptor.InputSchema)
 	outputSchema, _ := json.Marshal(descriptor.OutputSchema)
-	job, err := s.database.QueueWorkflowDeviceNodeJob(ctx, run.RequestingMemberID, run.ID, invocation.NodeID, invocation.Attempt, scopeID, descriptor.Kind, invocation.Input, invocation.Config, inputSchema, outputSchema)
+	job, err := s.database.QueueWorkflowDeviceNodeJob(ctx, run.RequestingMemberID, run.ID, invocation.NodeID, invocation.Attempt, scopeID, descriptor.Kind, descriptor.Capability, invocation.Input, invocation.Config, inputSchema, outputSchema)
 	if errors.Is(err, db.ErrDeviceNotFound) {
 		return nil, workflowv2.ErrDeviceUnavailable
 	}

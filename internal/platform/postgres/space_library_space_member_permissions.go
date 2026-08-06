@@ -39,8 +39,7 @@ func applySpacePermissionDependencies(permissions map[string]bool) {
 	if !permissions[PermissionMessagesRead] {
 		permissions[PermissionMessagesWrite] = false
 	}
-	if !permissions[PermissionMessagesRead] ||
-		(!permissions[PermissionMessagesWrite] && !permissions[PermissionMistySupportWrite]) {
+	if !permissions[PermissionMessagesRead] || !permissions[PermissionMessagesWrite] {
 		permissions[PermissionAttachmentUpload] = false
 	}
 	if !permissions[PermissionTasksView] {
@@ -136,28 +135,7 @@ func (db *Database) SetSpaceMemberPermission(
 func hasSpacePermissionTx(ctx context.Context, tx *sql.Tx, userID, spaceID, permission string) (bool, error) {
 	role, err := requireSpaceMemberTx(ctx, tx, spaceID, userID)
 	if err != nil {
-		return false, ErrLibraryForbidden
-	}
-	var spaceKind string
-	if err := tx.QueryRowContext(ctx, `SELECT kind FROM spaces WHERE id=$1`, spaceID).Scan(&spaceKind); err != nil {
 		return false, err
-	}
-	if spaceKind == "misty" {
-		var isOperator bool
-		if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM misty_space_operators WHERE user_id=$1)`, userID).Scan(&isOperator); err != nil {
-			return false, err
-		}
-		switch permission {
-		case PermissionMessagesRead, PermissionMistySupportWrite, PermissionAttachmentUpload, PermissionTasksView:
-			return true, nil
-		case PermissionTasksManage:
-			return isOperator, nil
-		default:
-			return false, nil
-		}
-	}
-	if permission == PermissionMistySupportWrite {
-		return false, nil
 	}
 	if role == "owner" {
 		return true, nil
@@ -264,57 +242,29 @@ func (db *Database) CreateLibraryUploadForConversation(ctx context.Context, user
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, permission); err != nil {
 			return err
 		}
-		var spaceKind string
 		var ownerID string
-		if err := tx.QueryRowContext(ctx, `SELECT kind,security_domain_id,owner_user_id FROM spaces WHERE id=$1 FOR SHARE`, spaceID).Scan(&spaceKind, &out.SecurityDomainID, &ownerID); err != nil {
+		if err := tx.QueryRowContext(ctx, `SELECT security_domain_id,owner_user_id FROM spaces WHERE id=$1 FOR SHARE`, spaceID).Scan(&out.SecurityDomainID, &ownerID); err != nil {
 			return err
 		}
 		if purpose == "attachment" {
-			if spaceKind == "misty" {
-				if conversationID == "" {
-					return ErrLibraryInvalid
-				}
+			if err := requireSpaceMessageWriteTx(ctx, tx, userID, spaceID); err != nil {
+				return err
+			}
+			if conversationID != "" {
 				if err := requireSpaceConversationMemberTx(ctx, tx, userID, spaceID, conversationID); err != nil {
 					return err
 				}
-				if supported, err := isMistySupportConversationTx(ctx, tx, spaceID, conversationID); err != nil || !supported {
-					if err != nil {
-						return err
-					}
-					return ErrLibraryInvalid
-				}
-			} else {
-				if err := requireSpaceMessageWriteTx(ctx, tx, userID, spaceID); err != nil {
-					return err
-				}
-				if conversationID != "" {
-					if err := requireSpaceConversationMemberTx(ctx, tx, userID, spaceID, conversationID); err != nil {
-						return err
-					}
-				}
 			}
 		}
-		if spaceKind == "misty" {
-			var used, reserved, limit int64
-			if err := tx.QueryRowContext(ctx, `SELECT u.used_bytes,u.reserved_bytes,c.support_storage_limit_bytes
-				FROM misty_support_storage_usage u CROSS JOIN misty_space_config c
-				WHERE u.singleton=1 AND c.singleton=1 FOR UPDATE OF u`).Scan(&used, &reserved, &limit); err != nil {
-				return err
-			}
-			if used+reserved+byteSize > limit {
-				return ErrLibraryQuota
-			}
-		} else {
-			if _, err := tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock(hashtext($1))`, "owner-storage:"+ownerID); err != nil {
-				return err
-			}
-			ownerUsage, err := ownerStorageUsageTx(ctx, tx, ownerID, true)
-			if err != nil {
-				return err
-			}
-			if ownerUsage.UsedBytes+ownerUsage.ReservedBytes+byteSize > ownerUsage.LimitBytes {
-				return ErrLibraryQuota
-			}
+		if _, err := tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock(hashtext($1))`, "owner-storage:"+ownerID); err != nil {
+			return err
+		}
+		ownerUsage, err := ownerStorageUsageTx(ctx, tx, ownerID, true)
+		if err != nil {
+			return err
+		}
+		if ownerUsage.UsedBytes+ownerUsage.ReservedBytes+byteSize > ownerUsage.LimitBytes {
+			return ErrLibraryQuota
 		}
 		if _, err := tx.ExecContext(ctx, `INSERT INTO space_storage_usage(space_id) VALUES($1) ON CONFLICT DO NOTHING`, spaceID); err != nil {
 			return err
@@ -334,11 +284,6 @@ func (db *Database) CreateLibraryUploadForConversation(ctx context.Context, user
 		}
 		if _, err := tx.ExecContext(ctx, `UPDATE space_storage_usage SET reserved_bytes=reserved_bytes+$1,version=version+1,updated_at=NOW() WHERE space_id=$2`, byteSize, spaceID); err != nil {
 			return err
-		}
-		if spaceKind == "misty" {
-			if _, err := tx.ExecContext(ctx, `UPDATE misty_support_storage_usage SET reserved_bytes=reserved_bytes+$1,version=version+1,updated_at=NOW() WHERE singleton=1`, byteSize); err != nil {
-				return err
-			}
 		}
 		return insertLibraryAuditTx(ctx, tx, spaceID, out.SecurityDomainID, userID, "library.upload.initiated", "upload", out.ID, "success", map[string]any{"purpose": purpose, "reserved_bytes": byteSize})
 	})

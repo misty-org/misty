@@ -54,18 +54,16 @@ type AccountExportMessage struct {
 }
 
 type AccountPortableExport struct {
-	FormatVersion      int                              `json:"format_version"`
-	ExportedAt         time.Time                        `json:"exported_at"`
-	Account            AccountExportProfile             `json:"account"`
-	Settings           UserSettings                     `json:"settings"`
-	Spaces             []AccountExportSpace             `json:"spaces"`
-	Journal            []AccountExportJournal           `json:"journal"`
-	Assets             []AccountExportAsset             `json:"assets"`
-	Messages           []AccountExportMessage           `json:"authored_messages"`
-	Agents             []AccountExportAgent             `json:"agents"`
-	AgentConversations []AccountExportAgentConversation `json:"agent_conversations"`
-	AgentMemories      []AccountExportAgentMemory       `json:"agent_memories"`
-	Connections        []map[string]any                 `json:"cloud_connections"`
+	FormatVersion int                    `json:"format_version"`
+	ExportedAt    time.Time              `json:"exported_at"`
+	Account       AccountExportProfile   `json:"account"`
+	Settings      UserSettings           `json:"settings"`
+	Spaces        []AccountExportSpace   `json:"spaces"`
+	Journal       []AccountExportJournal `json:"journal"`
+	Assets        []AccountExportAsset   `json:"assets"`
+	Messages      []AccountExportMessage `json:"authored_messages"`
+	Agents        []AccountExportAgent   `json:"agents"`
+	Connections   []map[string]any       `json:"cloud_connections"`
 }
 
 // AccountPortableExport returns user-supplied and account-owned data without
@@ -76,16 +74,14 @@ func (db *Database) AccountPortableExport(
 	ctx context.Context, userID string,
 ) (*AccountPortableExport, error) {
 	out := &AccountPortableExport{
-		FormatVersion:      2,
-		ExportedAt:         time.Now().UTC(),
-		Spaces:             []AccountExportSpace{},
-		Journal:            []AccountExportJournal{},
-		Assets:             []AccountExportAsset{},
-		Messages:           []AccountExportMessage{},
-		Agents:             []AccountExportAgent{},
-		AgentConversations: []AccountExportAgentConversation{},
-		AgentMemories:      []AccountExportAgentMemory{},
-		Connections:        []map[string]any{},
+		FormatVersion: 2,
+		ExportedAt:    time.Now().UTC(),
+		Spaces:        []AccountExportSpace{},
+		Journal:       []AccountExportJournal{},
+		Assets:        []AccountExportAsset{},
+		Messages:      []AccountExportMessage{},
+		Agents:        []AccountExportAgent{},
+		Connections:   []map[string]any{},
 	}
 	err := db.TestingWithRLSContext(ctx, TestingServiceRLSSettings(), func(tx *sql.Tx) error {
 		if err := tx.QueryRowContext(ctx, `
@@ -130,6 +126,11 @@ func (db *Database) AccountPortableExport(
 			      SELECT 1 FROM space_members m
 			      WHERE m.space_id=n.space_id AND m.user_id=$1
 			  )
+			  AND (n.audience_kind='space' OR EXISTS(
+			      SELECT 1 FROM space_conversation_members cm
+			      WHERE cm.conversation_id=n.audience_conversation_id
+			        AND cm.actor_kind='person' AND cm.user_id=$1
+			  ))
 			UNION ALL
 			SELECT 'drawing',id,space_id,title,acl_version,created_at,updated_at
 			FROM space_drawings d
@@ -138,6 +139,11 @@ func (db *Database) AccountPortableExport(
 			      SELECT 1 FROM space_members m
 			      WHERE m.space_id=d.space_id AND m.user_id=$1
 			  )
+			  AND (d.audience_kind='space' OR EXISTS(
+			      SELECT 1 FROM space_conversation_members cm
+			      WHERE cm.conversation_id=d.audience_conversation_id
+			        AND cm.actor_kind='person' AND cm.user_id=$1
+			  ))
 			ORDER BY created_at`, userID, func(rows *sql.Rows) error {
 			var item AccountExportJournal
 			if err := rows.Scan(
@@ -161,6 +167,11 @@ func (db *Database) AccountPortableExport(
 			JOIN library_blobs b ON b.id=f.blob_id
 			WHERE n.creator_user_id=$1 AND a.lifecycle_state='ready'
 			  AND f.lifecycle_state='ready' AND b.lifecycle_state='ready'
+			  AND (n.audience_kind='space' OR EXISTS(
+			      SELECT 1 FROM space_conversation_members cm
+			      WHERE cm.conversation_id=n.audience_conversation_id
+			        AND cm.actor_kind='person' AND cm.user_id=$1
+			  ))
 			UNION ALL
 			SELECT 'drawing',a.id,a.drawing_id,a.display_name,b.r2_object_key,
 			       COALESCE(b.server_detected_mime_type,b.client_declared_mime_type),
@@ -171,6 +182,11 @@ func (db *Database) AccountPortableExport(
 			JOIN library_blobs b ON b.id=f.blob_id
 			WHERE d.creator_user_id=$1 AND a.lifecycle_state='ready'
 			  AND f.lifecycle_state='ready' AND b.lifecycle_state='ready'
+			  AND (d.audience_kind='space' OR EXISTS(
+			      SELECT 1 FROM space_conversation_members cm
+			      WHERE cm.conversation_id=d.audience_conversation_id
+			        AND cm.actor_kind='person' AND cm.user_id=$1
+			  ))
 			UNION ALL
 			SELECT 'library',i.id,i.space_id,i.display_name,b.r2_object_key,
 			       COALESCE(b.server_detected_mime_type,b.client_declared_mime_type),
@@ -184,6 +200,11 @@ func (db *Database) AccountPortableExport(
 			      SELECT 1 FROM space_members m
 			      WHERE m.space_id=i.space_id AND m.user_id=$1
 			  )
+			  AND (i.audience_kind='space' OR EXISTS(
+			      SELECT 1 FROM space_conversation_members cm
+			      WHERE cm.conversation_id=i.audience_conversation_id
+			        AND cm.actor_kind='person' AND cm.user_id=$1
+			  ))
 			UNION ALL
 			SELECT 'message_attachment',a.id,COALESCE(a.message_id,a.space_id),
 			       a.display_name,b.r2_object_key,
@@ -198,6 +219,14 @@ func (db *Database) AccountPortableExport(
 			      SELECT 1 FROM space_members m
 			      WHERE m.space_id=a.space_id AND m.user_id=$1
 			  )
+			  AND (a.message_id IS NULL OR EXISTS(
+			      SELECT 1 FROM space_messages message
+			      WHERE message.id=a.message_id AND (message.conversation_id IS NULL OR EXISTS(
+			          SELECT 1 FROM space_conversation_members cm
+			          WHERE cm.conversation_id=message.conversation_id
+			            AND cm.actor_kind='person' AND cm.user_id=$1
+			      ))
+			  ))
 			ORDER BY created_at`, userID, func(rows *sql.Rows) error {
 			var item AccountExportAsset
 			if err := rows.Scan(
@@ -216,6 +245,11 @@ func (db *Database) AccountPortableExport(
 			SELECT id,space_id,content,created_at,COALESCE(edited_at,created_at)
 			FROM space_messages
 			WHERE sender_user_id=$1 AND sender_kind='person'
+			  AND (conversation_id IS NULL OR EXISTS(
+			      SELECT 1 FROM space_conversation_members cm
+			      WHERE cm.conversation_id=space_messages.conversation_id
+			        AND cm.actor_kind='person' AND cm.user_id=$1
+			  ))
 			ORDER BY created_at`, userID, func(rows *sql.Rows) error {
 			var item AccountExportMessage
 			if err := rows.Scan(

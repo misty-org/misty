@@ -40,8 +40,7 @@ func (s *WaitlistService) Join() http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		var body request
-		if err := decodeJSON(w, r, &body); err != nil {
-			http.Error(w, "email is required", http.StatusBadRequest)
+		if decodeJSON(w, r, &body) != nil {
 			return
 		}
 

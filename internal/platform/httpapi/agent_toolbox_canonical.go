@@ -19,7 +19,7 @@ func (s *SpacesService) resolveCanonicalAgentToolbox(ctx context.Context, run *d
 		return s.executeOrdinaryAgentTool(toolCtx, run, tool)
 	}
 	registrations := canonicalAgentToolRegistrations(handler)
-	requested := []string{toolboxMessagesSearch, globalAgentSendTool, toolboxLibrarySearch, toolboxTasksQuery, "calendar.query", toolboxTasksCreate, toolboxTasksUpdate}
+	requested := []string{toolboxMessagesSearch, toolboxMessagesSend, toolboxLibrarySearch, toolboxTasksQuery, "calendar.query", toolboxTasksCreate, toolboxTasksUpdate}
 	seenProviders := map[string]bool{}
 	if resources, err := s.database.ProviderSharedResources(ctx, run.RequestingMemberID, run.SpaceID); err == nil {
 		for _, resource := range resources {
@@ -48,7 +48,8 @@ func (s *SpacesService) resolveCanonicalAgentToolbox(ctx context.Context, run *d
 		UserID: run.RequestingMemberID, SpaceID: run.SpaceID, AgentID: run.AgentID, AgentInstanceID: run.AgentInstanceID, RunID: run.ID,
 		Source: canonicalAgentToolSource, Trigger: run.TriggerKind, OriginalInput: prompt,
 		// executeOrdinaryAgentTool persists approval requests and resumes the run.
-		DelegatedApproval: true,
+		DelegatedApproval:     true,
+		ConversationScopeKind: run.ConversationScopeKind, ConversationID: run.ScopeConversationID,
 	}
 	manifest, err := toolbox.Resolve(ctx, invocation, requested, authorizeCanonicalAgentTool(s.database))
 	return toolbox, invocation, manifest, err
@@ -85,6 +86,9 @@ func canonicalProviderToolDescriptor(provider string, write bool) agenttools.Des
 
 func authorizeCanonicalAgentTool(database *db.Database) agenttools.Authorizer {
 	return func(ctx context.Context, invocation agenttools.Invocation, descriptor agenttools.Descriptor) (bool, error) {
+		if invocation.ConversationScopeKind == db.ConversationScopePrivate && descriptor.Locality == agenttools.LocalityProvider && descriptor.Risk != serveragent.RiskRead {
+			return false, nil
+		}
 		if descriptor.RequiredPermission != "" {
 			allowed, err := database.HasSpacePermission(ctx, invocation.UserID, invocation.SpaceID, descriptor.RequiredPermission)
 			if err != nil || !allowed {

@@ -14,7 +14,7 @@ import (
 )
 
 func (s *SpacesService) executeOrdinaryAgentTool(ctx context.Context, run *db.SpaceRun, tool serveragent.ToolRequest) (json.RawMessage, error) {
-	if tool.Name == globalAgentSendTool {
+	if tool.Name == toolboxMessagesSend {
 		var input struct {
 			Message string `json:"message"`
 		}
@@ -47,9 +47,13 @@ func (s *SpacesService) executeOrdinaryAgentTool(ctx context.Context, run *db.Sp
 			ctx, run.ID, invocation.NodeID, invocation.IdempotencyKey,
 			"space_messages", workflowv2.RiskWrite, tool.Arguments,
 			func() (json.RawMessage, error) {
-				message, sendErr := s.database.CreateSpaceAgentMessage(
-					ctx, run.RequestingMemberID, run.SpaceID, run.AgentID, input.Message,
-				)
+				var message *db.SpaceMessage
+				var sendErr error
+				if run.ConversationScopeKind == db.ConversationScopePrivate && run.ScopeConversationID != "" {
+					message, sendErr = s.database.CreateSpaceConversationAgentMessage(ctx, run.RequestingMemberID, run.SpaceID, run.ScopeConversationID, run.AgentID, input.Message)
+				} else {
+					message, sendErr = s.database.CreateSpaceAgentMessage(ctx, run.RequestingMemberID, run.SpaceID, run.AgentID, input.Message)
+				}
 				if sendErr != nil {
 					return nil, sendErr
 				}
@@ -123,7 +127,13 @@ func (s *SpacesService) executeOrdinaryAgentTool(ctx context.Context, run *db.Sp
 	}
 	switch tool.Name {
 	case toolboxMessagesSearch, "space.search_messages":
-		messages, err := s.database.SpaceMessages(ctx, run.RequestingMemberID, run.SpaceID, 0, 100)
+		var messages []db.SpaceMessage
+		var err error
+		if run.ConversationScopeKind == db.ConversationScopePrivate && run.ScopeConversationID != "" {
+			messages, err = s.database.SpaceConversationMessages(ctx, run.RequestingMemberID, run.SpaceID, run.ScopeConversationID, 0, 100)
+		} else {
+			messages, err = s.database.SpaceMessages(ctx, run.RequestingMemberID, run.SpaceID, 0, 100)
+		}
 		if err != nil {
 			return nil, err
 		}

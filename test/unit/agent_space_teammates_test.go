@@ -65,7 +65,7 @@ func TestCompileAgentIntentOnlyGrantsExplicitTaskWrites(t *testing.T) {
 		{"Can you create a task called Review brief?", []string{"tasks.query", "tasks.create"}},
 		{"Can you help me create tasks inside this Space?", []string{"tasks.query"}},
 		{"Update Task MST-42 to done", []string{"tasks.query", "tasks.update"}},
-		{"Rename this Space to Launch Operations", []string{"tasks.query", "spaces.rename"}},
+		{"Rename this Space to Launch Operations", []string{"tasks.query"}},
 		{"Can you rename Spaces?", []string{"tasks.query"}},
 		{"Do not rename this Space to Launch Operations", []string{"tasks.query"}},
 		{"Ask the Agent to summarize the launch risks", []string{"tasks.query", "agents.delegate"}},
@@ -98,75 +98,12 @@ func TestPrivateSpaceConversationReceivesServerOwnedTaskTools(t *testing.T) {
 	}
 }
 
-func TestMistyAgentPersonaExplainsTheAppAndDoesNotDefaultToFiles(t *testing.T) {
+func TestAgentRuntimeRulesHaveNoBuiltInPersonaOrCrossConversationContext(t *testing.T) {
 	persona := serveragent.TestingAgentPersona()
-	for _, want := range []string{"collaborative workspace app", "Planner tasks", "Library", "membership and roles", "Agent lobby", "Do not describe yourself as primarily a file organizer"} {
+	for _, want := range []string{"explicitly selected agent identity", "There is no built-in assistant", "approved version", "current conversation", "Never reuse content from another direct or limited-group conversation"} {
 		if !strings.Contains(persona, want) {
-			t.Fatalf("Misty Agent product context is missing %q:\n%s", want, persona)
+			t.Fatalf("Agent runtime rules are missing %q:\n%s", want, persona)
 		}
-	}
-}
-
-func TestPersonalSpaceAgentPromptCarriesMembersContextAndConfiguredActions(t *testing.T) {
-	policy := json.RawMessage(`{"grants":[{"capability":"tasks.query","risk":"read"},{"capability":"tasks.create","risk":"write"}]}`)
-	manifest := serveragent.ToolManifest{Tools: []serveragent.ToolDefinition{{Name: "tasks.query", Description: "Query Tasks"}}}
-	prompt := api.TestingBuildPersonalSpaceAgentPrompt(&db.SpaceAgentMembership{
-		Name: "Launch Agent", Instructions: "Be concise.", SpaceInstructions: "Prefer launch work.",
-	}, policy, manifest, "Space: Launch\n\nMembers: Alex, Sam\n\nLibrary:\n- Brief.pdf", "Earlier decision", "Who is here and can you create tasks?")
-	for _, want := range []string{"Members: Alex, Sam", "Brief.pdf", "tasks.create", "Internal execution candidates for this specific request", "Do not describe the Agent as chat-only", "Earlier decision", "Who is here"} {
-		if !strings.Contains(prompt, want) {
-			t.Fatalf("personal Space prompt is missing %q:\n%s", want, prompt)
-		}
-	}
-}
-
-func TestGlobalAgentIntentExposesCrossSpaceTaskActionsOnlyForConcreteWrites(t *testing.T) {
-	capabilityQuestion := api.TestingCompileGlobalAgentIntent("Can you help me create tasks inside Design Space?")
-	if !slices.Contains(capabilityQuestion, "spaces.list_accessible") || !slices.Contains(capabilityQuestion, "tasks.query") || slices.Contains(capabilityQuestion, "tasks.create") {
-		t.Fatalf("capability question actions = %v", capabilityQuestion)
-	}
-	concrete := api.TestingCompileGlobalAgentIntent("Create a task called Review brief inside Design Space")
-	if !slices.Contains(concrete, "tasks.create") {
-		t.Fatalf("concrete cross-Space Task action missing: %v", concrete)
-	}
-	for _, descriptor := range api.TestingPersonalAgentToolboxDescriptors() {
-		if descriptor.Name != "tasks.query" {
-			continue
-		}
-		var schema struct {
-			Required []string `json:"required"`
-		}
-		if json.Unmarshal(descriptor.InputSchema, &schema) != nil || !slices.Contains(schema.Required, "space_id") {
-			t.Fatalf("global tasks.query must require an explicit Space target: %s", descriptor.InputSchema)
-		}
-		return
-	}
-	t.Fatal("personal Agent Toolbox is missing tasks.query")
-}
-
-func TestGlobalPersonalAgentPromptNamesAccessibleSpacesAndMistySurfaces(t *testing.T) {
-	personal := &db.PersonalAgent{
-		Name: "Operator", Instructions: "Help run launches.",
-		ToolPermissions: json.RawMessage(`{"grants":[{"capability":"spaces.list_accessible","risk":"read"},{"capability":"tasks.create","risk":"write"}]}`),
-	}
-	manifest := serveragent.ToolManifest{Tools: []serveragent.ToolDefinition{{Name: "spaces.list_accessible", Description: "List or inspect Spaces"}}}
-	prompt := api.TestingBuildGlobalPersonalAgentPrompt(personal, manifest, []db.PersonalAgentAccessibleSpace{{ID: "space-design", Name: "Design Space", CanSend: true}}, "Member: We are launching Tuesday.\nAgent: I will remember that.", "When are we launching?")
-	for _, want := range []string{"account-level Misty Agent chat", "Planner Tasks", "Library", "Members", "Design Space", "tasks.create", "inspect that Space", "We are launching Tuesday", "When are we launching?"} {
-		if !strings.Contains(prompt, want) {
-			t.Fatalf("global Agent prompt is missing %q:\n%s", want, prompt)
-		}
-	}
-}
-
-func TestDelegatedAgentConversationHistoryIsChronologicalAndRoleLabelled(t *testing.T) {
-	history := api.TestingRenderRecentAgentConversation([]serveragent.Message{
-		{Role: serveragent.RoleUser, Content: "The launch is Tuesday."},
-		{Role: serveragent.RoleAgent, Content: "I understand."},
-		{Role: serveragent.RoleUser, Content: "What day is it?"},
-	})
-	want := "Member: The launch is Tuesday.\nAgent: I understand.\nMember: What day is it?"
-	if history != want {
-		t.Fatalf("conversation history = %q, want %q", history, want)
 	}
 }
 
@@ -182,7 +119,7 @@ func TestPrivateSpaceToolboxRegistrationsAreCompleteAndGuardWrites(t *testing.T)
 			t.Fatalf("write tool lacks approval or audit policy: %#v", descriptor)
 		}
 	}
-	want := []string{"messages.search", "messages.send", "library.search", "tasks.query", "tasks.create", "tasks.update", "agents.delegate", "spaces.rename"}
+	want := []string{"messages.search", "messages.send", "library.search", "tasks.query", "calendar.query", "tasks.create", "tasks.update", "agents.delegate"}
 	if !reflect.DeepEqual(names, want) {
 		t.Fatalf("Toolbox tools = %v, want %v", names, want)
 	}
@@ -327,28 +264,6 @@ func TestDeviceManifestIsDerivedFromServerScope(t *testing.T) {
 	}
 }
 
-func TestCompileGlobalAgentIntentUnderstandsNaturalMessageRequests(t *testing.T) {
-	tests := []struct {
-		prompt  string
-		canSend bool
-	}{
-		{"check which Spaces you can access again", false},
-		{"Text the launch is today in Design Space", true},
-		{"Tell Design Space that the launch is today", true},
-		{"Can you post launch is today in Design Space?", true},
-		{"Let Design Space know the launch is today", true},
-		{"How do I send a message to a Space?", false},
-		{"Do not post anything in Design Space", false},
-	}
-	for _, test := range tests {
-		got := api.TestingCompileGlobalAgentIntent(test.prompt)
-		canSend := slices.Contains(got, "messages.send")
-		if got[0] != "spaces.list_accessible" || canSend != test.canSend {
-			t.Fatalf("%q: got %v, canSend=%v", test.prompt, got, canSend)
-		}
-	}
-}
-
 func TestCompileSpaceAgentIntentExposesOnlyGroundedMessageWrites(t *testing.T) {
 	tests := []struct {
 		prompt  string
@@ -379,18 +294,6 @@ func TestCompileSpaceAgentIntentExposesOnlyGroundedMessageWrites(t *testing.T) {
 	}
 }
 
-func TestLegacyFilesBoundaryCannotDisableSpaceAgentToolbox(t *testing.T) {
-	prompt := "yooo can you let stone know im sick today"
-	legacy := prompt + "\n\nPermission boundary: No capability scope is active. Respond conversationally without using tools or modifying data."
-	stripped := api.TestingStripLegacyClientAgentPermissionBoundary(legacy)
-	if stripped != prompt {
-		t.Fatalf("stripped prompt = %q, want %q", stripped, prompt)
-	}
-	if got := api.TestingCompileAgentIntent(stripped); !slices.Contains(got, "messages.send") {
-		t.Fatalf("send intent missing after legacy boundary stripping: %v", got)
-	}
-}
-
 func TestSpaceActionPlanningTurnCannotExecuteWrites(t *testing.T) {
 	got := api.TestingSpaceConversationPlanningToolNames("Tell everyone Stone is off for today")
 	if slices.Contains(got, "messages.send") || slices.Contains(got, "tasks.create") || slices.Contains(got, "tasks.update") {
@@ -398,22 +301,6 @@ func TestSpaceActionPlanningTurnCannotExecuteWrites(t *testing.T) {
 	}
 	if !slices.Contains(got, "messages.search") || !slices.Contains(got, "library.search") {
 		t.Fatalf("planning turn lost safe context actions: %v", got)
-	}
-}
-
-func TestGlobalAgentSendMustBeGroundedInOriginalRequest(t *testing.T) {
-	prompt := `Tell Design Space that the launch is today.`
-	if !api.TestingGlobalAgentSendIsGrounded(prompt, "space-design", "Design Space", "the launch is today") {
-		t.Fatal("expected naturally phrased exact message to be grounded")
-	}
-	if api.TestingGlobalAgentSendIsGrounded(prompt, "space-sales", "Sales Space", "the launch is today") {
-		t.Fatal("model must not redirect a message to an unmentioned Space")
-	}
-	if api.TestingGlobalAgentSendIsGrounded(prompt, "space-design", "Design Space", "the launch is delayed") {
-		t.Fatal("model must not invent or paraphrase message content")
-	}
-	if api.TestingGlobalAgentSendIsGrounded(prompt, "space-a", "A", "the launch is today") {
-		t.Fatal("a short Space name must match a whole phrase, not a letter in the request")
 	}
 }
 

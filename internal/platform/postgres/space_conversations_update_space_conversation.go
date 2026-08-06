@@ -14,13 +14,13 @@ import (
 // ErrSpaceForbidden, not a silently-ignored zero-row update) regardless of
 // which role is connected, including in tests that run as a superuser and
 // would otherwise bypass RLS entirely.
-func (db *Database) UpdateSpaceConversation(ctx context.Context, userID, spaceID, conversationID, title string, memberIDs []string) (*SpaceConversation, error) {
+func (db *Database) UpdateSpaceConversation(ctx context.Context, userID, spaceID, conversationID, title string, participantRefs []SpaceActorRef) (*SpaceConversation, error) {
 	title, err := normalizeConversationTitle(title)
 	if err != nil {
 		return nil, err
 	}
-	members := uniqueSpaceIDs(append(memberIDs, userID))
-	if len(members) < 2 {
+	participants := normalizeSpaceActorRefs(append(participantRefs, SpaceActorRef{Kind: "person", UserID: userID}))
+	if len(participants) < 2 {
 		return nil, ErrSpaceInvalid
 	}
 	out := &SpaceConversation{ID: conversationID, SpaceID: spaceID, Title: title, Kind: "standard"}
@@ -45,15 +45,8 @@ func (db *Database) UpdateSpaceConversation(ctx context.Context, userID, spaceID
 			return ErrSpaceForbidden
 		}
 		out.CreatedByUserID = createdByUserID
-		var validCount int
-		if err := tx.QueryRowContext(ctx,
-			`SELECT count(*) FROM space_members WHERE space_id=$1 AND user_id=ANY($2::text[])`,
-			spaceID, pqStringArray(members),
-		).Scan(&validCount); err != nil {
+		if err := validateSpaceActorRefsTx(ctx, tx, userID, spaceID, participants); err != nil {
 			return err
-		}
-		if validCount != len(members) {
-			return ErrSpaceInvalid
 		}
 		if _, err := tx.ExecContext(ctx,
 			`UPDATE space_conversations SET title=$1, updated_at=NOW() WHERE id=$2 AND space_id=$3`,
@@ -61,18 +54,11 @@ func (db *Database) UpdateSpaceConversation(ctx context.Context, userID, spaceID
 		); err != nil {
 			return err
 		}
-		if _, err := tx.ExecContext(ctx,
-			`DELETE FROM space_conversation_members WHERE conversation_id=$1 AND user_id<>ALL($2::text[])`,
-			conversationID, pqStringArray(members),
-		); err != nil {
+		if _, err := tx.ExecContext(ctx, `DELETE FROM space_conversation_members WHERE conversation_id=$1`, conversationID); err != nil {
 			return err
 		}
-		for _, memberID := range members {
-			if _, err := tx.ExecContext(ctx,
-				`INSERT INTO space_conversation_members(conversation_id,user_id) VALUES($1,$2)
-					ON CONFLICT (conversation_id,user_id) DO NOTHING`,
-				conversationID, memberID,
-			); err != nil {
+		for _, participant := range participants {
+			if _, err := tx.ExecContext(ctx, `INSERT INTO space_conversation_members(conversation_id,user_id,agent_id,actor_kind) VALUES($1,NULLIF($2,''),NULLIF($3,''),$4)`, conversationID, participant.UserID, participant.AgentID, participant.Kind); err != nil {
 				return err
 			}
 		}
@@ -82,11 +68,11 @@ func (db *Database) UpdateSpaceConversation(ctx context.Context, userID, spaceID
 			return err
 		}
 		if _, err := recordSpaceEventTx(ctx, tx, spaceID, userID, "conversation.updated", conversationID,
-			map[string]any{"conversation_id": conversationID, "title": title, "member_ids": members},
+			map[string]any{"conversation_id": conversationID, "title": title, "participants": participants},
 		); err != nil {
 			return err
 		}
-		return loadSpaceConversationMembersTx(ctx, tx, out)
+		return loadSpaceConversationParticipantsTx(ctx, tx, out)
 	})
 	return out, err
 }

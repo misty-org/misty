@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -58,10 +59,10 @@ func noteAccessForTx(ctx context.Context, tx *sql.Tx, userID, noteID string) (No
 	if userID == "" || noteID == "" {
 		return noteAccessDenied, nil
 	}
-	var creatorUserID, spaceID, lifecycle string
+	var creatorUserID, spaceID, lifecycle, audienceKind, audienceConversationID string
 	err := tx.QueryRowContext(ctx,
-		`SELECT creator_user_id,space_id,lifecycle_state FROM space_notes WHERE id=$1`,
-		noteID).Scan(&creatorUserID, &spaceID, &lifecycle)
+		`SELECT creator_user_id,space_id,lifecycle_state,audience_kind,COALESCE(audience_conversation_id,'') FROM space_notes WHERE id=$1`,
+		noteID).Scan(&creatorUserID, &spaceID, &lifecycle, &audienceKind, &audienceConversationID)
 	if errors.Is(err, sql.ErrNoRows) {
 		return noteAccessDenied, nil
 	}
@@ -77,6 +78,15 @@ func noteAccessForTx(ctx context.Context, tx *sql.Tx, userID, noteID string) (No
 	}
 	isCreator := userID == creatorUserID
 	isOwner := role == "owner"
+	if audienceKind == SpaceAudienceConversation {
+		var participant bool
+		if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM space_conversation_members WHERE conversation_id=$1 AND actor_kind='person' AND user_id=$2)`, audienceConversationID, userID).Scan(&participant); err != nil {
+			return noteAccessDenied, err
+		}
+		if !participant {
+			return noteAccessDenied, nil
+		}
+	}
 	if lifecycle != NoteLifecycleActive {
 		if lifecycle == NoteLifecycleArchived && (isCreator || isOwner) {
 			return NoteAccess{CanDelete: true, Role: NoteRoleCreator}, nil
@@ -151,16 +161,18 @@ func recordNoteEventTx(ctx context.Context, tx *sql.Tx, spaceID, actorUserID, ev
 // document body lives only in the collaboration service; the projections here
 // exist for listing and search.
 type SpaceNote struct {
-	ID                    string    `json:"id"`
-	SpaceID               string    `json:"space_id"`
-	CreatorUserID         string    `json:"creator_user_id"`
-	TitleProjection       string    `json:"title"`
-	PlainTextProjection   string    `json:"plain_text,omitempty"`
-	LifecycleState        string    `json:"lifecycle_state"`
-	CollaborationRevision int64     `json:"collaboration_revision"`
-	ACLVersion            int64     `json:"acl_version"`
-	CreatedAt             time.Time `json:"created_at"`
-	UpdatedAt             time.Time `json:"updated_at"`
+	ID                     string    `json:"id"`
+	SpaceID                string    `json:"space_id"`
+	CreatorUserID          string    `json:"creator_user_id"`
+	TitleProjection        string    `json:"title"`
+	PlainTextProjection    string    `json:"plain_text,omitempty"`
+	LifecycleState         string    `json:"lifecycle_state"`
+	CollaborationRevision  int64     `json:"collaboration_revision"`
+	ACLVersion             int64     `json:"acl_version"`
+	AudienceKind           string    `json:"audience_kind"`
+	AudienceConversationID string    `json:"audience_conversation_id,omitempty"`
+	CreatedAt              time.Time `json:"created_at"`
+	UpdatedAt              time.Time `json:"updated_at"`
 	// Role is the caller's own effective role. A non-creator never receives the
 	// full grant set, only this.
 	Role string `json:"role"`
@@ -168,6 +180,10 @@ type SpaceNote struct {
 
 // CreateSpaceNote creates a note shared with every current Space member.
 func (db *Database) CreateSpaceNote(ctx context.Context, creatorUserID, spaceID, title string) (*SpaceNote, error) {
+	return db.CreateSpaceNoteWithAudience(ctx, creatorUserID, spaceID, title, SpaceResourceAudience{Kind: SpaceAudienceSpace}, "")
+}
+
+func (db *Database) CreateSpaceNoteWithAudience(ctx context.Context, creatorUserID, spaceID, title string, audience SpaceResourceAudience, markdown string) (*SpaceNote, error) {
 	if creatorUserID == "" || spaceID == "" {
 		return nil, ErrSpaceInvalid
 	}
@@ -179,11 +195,24 @@ func (db *Database) CreateSpaceNote(ctx context.Context, creatorUserID, spaceID,
 		if _, err := requireSpaceMemberTx(ctx, tx, spaceID, creatorUserID); err != nil {
 			return err
 		}
-		if err := tx.QueryRowContext(ctx,
-			`INSERT INTO space_notes(id,space_id,creator_user_id,title_projection) VALUES($1,$2,$3,$4)
-			 RETURNING created_at,updated_at`,
-			note.ID, spaceID, creatorUserID, title).Scan(&note.CreatedAt, &note.UpdatedAt); err != nil {
+		normalized, err := NormalizeResourceAudience(audience.Kind, audience.ConversationID)
+		if err != nil {
 			return err
+		}
+		if err := validateResourceAudienceTx(ctx, tx, creatorUserID, spaceID, normalized); err != nil {
+			return err
+		}
+		note.AudienceKind, note.AudienceConversationID = normalized.Kind, normalized.ConversationID
+		if err := tx.QueryRowContext(ctx,
+			`INSERT INTO space_notes(id,space_id,creator_user_id,title_projection,audience_kind,audience_conversation_id) VALUES($1,$2,$3,$4,$5,NULLIF($6,''))
+			 RETURNING created_at,updated_at`,
+			note.ID, spaceID, creatorUserID, title, normalized.Kind, normalized.ConversationID).Scan(&note.CreatedAt, &note.UpdatedAt); err != nil {
+			return err
+		}
+		if strings.TrimSpace(markdown) != "" {
+			if err := enqueueNoteControlTx(ctx, tx, note.ID, "bootstrap", map[string]any{"title": title, "markdown": markdown}); err != nil {
+				return err
+			}
 		}
 		return recordNoteEventTx(ctx, tx, note.SpaceID, creatorUserID, "note.created", note.ID, nil)
 	})
@@ -202,10 +231,11 @@ func (db *Database) AccessibleSpaceNotes(ctx context.Context, userID, spaceID st
 		}
 		rows, err := tx.QueryContext(ctx,
 			`SELECT n.id,n.space_id,n.creator_user_id,n.title_projection,n.lifecycle_state,
-			        n.collaboration_revision,n.acl_version,n.created_at,n.updated_at,
+			        n.collaboration_revision,n.acl_version,n.audience_kind,COALESCE(n.audience_conversation_id,''),n.created_at,n.updated_at,
 			        CASE WHEN n.creator_user_id=$1 THEN 'creator' ELSE 'editor' END AS effective_role
 			 FROM space_notes n
 			 WHERE n.space_id=$2 AND n.lifecycle_state='active'
+			   AND (n.audience_kind='space' OR EXISTS(SELECT 1 FROM space_conversation_members cm WHERE cm.conversation_id=n.audience_conversation_id AND cm.actor_kind='person' AND cm.user_id=$1))
 			 ORDER BY n.updated_at DESC`, userID, spaceID)
 		if err != nil {
 			return err
@@ -214,7 +244,7 @@ func (db *Database) AccessibleSpaceNotes(ctx context.Context, userID, spaceID st
 		for rows.Next() {
 			var note SpaceNote
 			if err := rows.Scan(&note.ID, &note.SpaceID, &note.CreatorUserID, &note.TitleProjection,
-				&note.LifecycleState, &note.CollaborationRevision, &note.ACLVersion,
+				&note.LifecycleState, &note.CollaborationRevision, &note.ACLVersion, &note.AudienceKind, &note.AudienceConversationID,
 				&note.CreatedAt, &note.UpdatedAt, &note.Role); err != nil {
 				return err
 			}

@@ -47,7 +47,7 @@ func scanCalendarSource(row interface{ Scan(...any) error }, out *SpaceCalendarS
 }
 
 func (db *Database) SpaceCalendarSources(ctx context.Context, userID, spaceID string) ([]SpaceCalendarSource, error) {
-	out := []SpaceCalendarSource{}
+	out := []SpaceCalendarSource{{ID: "misty", SpaceID: spaceID, Provider: "misty", ExternalCalendarID: "misty", DisplayName: "Misty", Timezone: "UTC", Status: "active"}}
 	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionTasksView); err != nil {
 			return err
@@ -62,6 +62,7 @@ func (db *Database) SpaceCalendarSources(ctx context.Context, userID, spaceID st
 			if err := scanCalendarSource(rows, &item); err != nil {
 				return err
 			}
+			item.Provider = "google"
 			out = append(out, item)
 		}
 		return rows.Err()
@@ -142,7 +143,11 @@ func (db *Database) SpaceCalendarEvents(ctx context.Context, userID, spaceID str
 			}
 			out = append(out, item)
 		}
-		return rows.Err()
+		if err := rows.Err(); err != nil {
+			return err
+		}
+		out, err = appendNativeCalendarEventsTx(ctx, tx, userID, spaceID, from, to, out)
+		return err
 	})
 	return out, err
 }

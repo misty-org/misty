@@ -76,12 +76,6 @@ func cleanupSpaceMessagesTx(ctx context.Context, tx *sql.Tx, spaceID string, mes
 		if _, err := tx.ExecContext(ctx, `UPDATE space_storage_usage SET used_bytes=GREATEST(0,used_bytes-$1),version=version+1,updated_at=NOW() WHERE space_id=$2`, released, spaceID); err != nil {
 			return err
 		}
-		if err := adjustMistySupportStorageTx(ctx, tx, spaceID, -released, 0); err != nil {
-			return err
-		}
-	}
-	if err := reconcileMistySupportStorageTx(ctx, tx, spaceID); err != nil {
-		return err
 	}
 	if _, err := tx.ExecContext(ctx, `DELETE FROM space_inbox_items WHERE message_id=ANY($1::text[])`, pqStringArray(messageIDs)); err != nil {
 		return err
@@ -110,8 +104,8 @@ func messageIDsForConversationTx(ctx context.Context, tx *sql.Tx, spaceID, conve
 	return ids, rows.Err()
 }
 
-// DeleteOrClearSpaceConversation deletes ordinary named conversations. Misty
-// support is permanent, so either participant clears its history instead.
+// DeleteOrClearSpaceConversation clears canonical direct-message history while
+// preserving its identity, and deletes ordinary named conversations.
 func (db *Database) DeleteOrClearSpaceConversation(ctx context.Context, userID, spaceID, conversationID string) error {
 	return db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpaceConversationMemberTx(ctx, tx, userID, spaceID, conversationID); err != nil {
@@ -130,7 +124,7 @@ func (db *Database) DeleteOrClearSpaceConversation(ctx context.Context, userID, 
 		if err != nil {
 			return err
 		}
-		if kind == "misty_support" {
+		if kind == "direct" {
 			ids, err := messageIDsForConversationTx(ctx, tx, spaceID, conversationID)
 			if err != nil {
 				return err

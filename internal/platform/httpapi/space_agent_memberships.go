@@ -51,44 +51,12 @@ func (s *SpacesService) SpaceAgentToolbox() http.HandlerFunc {
 			return
 		}
 		spaceID, agentID := chi.URLParam(r, "spaceID"), strings.TrimSpace(chi.URLParam(r, "agentID"))
-		if agentID == "misty" {
-			if _, err := s.database.SpaceByID(r.Context(), userID, spaceID); err != nil {
-				writeSpaceError(w, err)
-				return
-			}
-			items := make([]agentToolboxCatalogItem, 0)
-			for _, descriptor := range TestingSpaceAgentToolboxDescriptors() {
-				item := agentToolboxCatalogItem{
-					Name: descriptor.Name, Description: descriptor.Description, Risk: descriptor.Risk,
-					Approval: descriptor.Approval, Locality: descriptor.Locality, Idempotent: descriptor.Idempotent,
-					AuditEvent: descriptor.AuditEvent, RequiredPermission: descriptor.RequiredPermission,
-					Granted: true, Available: true, Reasons: []agentToolboxAvailabilityReason{},
-				}
-				if descriptor.RequiredPermission != "" {
-					allowed, permissionErr := s.database.HasSpacePermission(r.Context(), userID, spaceID, descriptor.RequiredPermission)
-					if permissionErr != nil {
-						writeSpaceError(w, permissionErr)
-						return
-					}
-					if !allowed {
-						item.Available = false
-						item.Reasons = append(item.Reasons, agentToolboxAvailabilityReason{Code: "member_permission_required", Message: "Your Space role does not allow this action."})
-					}
-				}
-				items = append(items, item)
-			}
-			writeJSON(w, http.StatusOK, map[string]any{
-				"actions": items, "recent_activity": []db.AgentToolboxActionAudit{},
-				"context": []string{"Current Space", "Space chat", "Planner tasks and task notes", "Library", "Team roster"},
-			})
-			return
-		}
 		membership, err := s.database.SpaceAgentMembership(r.Context(), userID, spaceID, agentID)
 		if err != nil {
 			writeSpaceError(w, err)
 			return
 		}
-		policy, err := s.database.PersonalAgentToolPermissionsForSpace(r.Context(), userID, spaceID, agentID)
+		policy, err := s.database.EffectivePersonalAgentToolPermissions(r.Context(), userID, spaceID, agentID)
 		if err != nil {
 			writeSpaceError(w, err)
 			return
@@ -96,7 +64,7 @@ func (s *SpacesService) SpaceAgentToolbox() http.HandlerFunc {
 		items := personalAgentToolboxItems(policy)
 		for index := range items {
 			item := &items[index]
-			if item.Name == globalAgentSendTool {
+			if item.Name == toolboxMessagesSend {
 				item.RequiredPermission = db.PermissionMessagesWrite
 			}
 			if !membership.Enabled {

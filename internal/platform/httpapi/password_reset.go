@@ -57,8 +57,7 @@ func (s *PasswordResetService) Forgot() http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		var body request
-		if err := decodeJSON(w, r, &body); err != nil {
-			http.Error(w, "email is required", http.StatusBadRequest)
+		if decodeJSON(w, r, &body) != nil {
 			return
 		}
 
@@ -88,8 +87,7 @@ func (s *PasswordResetService) Reset() http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		var body request
-		if err := decodeJSON(w, r, &body); err != nil {
-			http.Error(w, "new_password is required", http.StatusBadRequest)
+		if decodeJSON(w, r, &body) != nil {
 			return
 		}
 

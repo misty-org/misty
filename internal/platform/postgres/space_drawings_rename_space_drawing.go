@@ -31,12 +31,14 @@ func (db *Database) RenameSpaceDrawing(
 			`UPDATE space_drawings SET title=$1,updated_at=NOW()
 			 WHERE id=$2 AND lifecycle_state='active'
 			 RETURNING id,space_id,creator_user_id,title,lifecycle_state,
-			           collaboration_revision,acl_version,created_at,updated_at`,
+			           collaboration_revision,acl_version,created_at,updated_at,
+			           audience_kind,COALESCE(audience_conversation_id,'')`,
 			title, drawingID,
 		).Scan(
 			&drawing.ID, &drawing.SpaceID, &drawing.CreatorUserID, &drawing.Title,
 			&drawing.LifecycleState, &drawing.CollaborationRevision,
 			&drawing.ACLVersion, &drawing.CreatedAt, &drawing.UpdatedAt,
+			&drawing.AudienceKind, &drawing.AudienceConversationID,
 		)
 		if err != nil {
 			return err

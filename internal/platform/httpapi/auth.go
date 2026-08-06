@@ -24,7 +24,10 @@ func RegisterWithTelemetry(database *db.Database, analytics telemetry.Client) ht
 			Email    string `json:"email"`
 			Password string `json:"password"`
 		}
-		if err := decodeJSON(w, r, &body); err != nil || body.Username == "" || body.Email == "" || body.Password == "" {
+		if decodeJSON(w, r, &body) != nil {
+			return
+		}
+		if body.Username == "" || body.Email == "" || body.Password == "" {
 			http.Error(w, "username, email, and password required", http.StatusBadRequest)
 			return
 		}
@@ -73,8 +76,7 @@ func Login(database *db.Database) http.HandlerFunc {
 			Email    string `json:"email"`
 			Password string `json:"password"`
 		}
-		if err := decodeJSON(w, r, &body); err != nil {
-			http.Error(w, "invalid request", http.StatusBadRequest)
+		if decodeJSON(w, r, &body) != nil {
 			return
 		}
 		body.Email = strings.TrimSpace(body.Email)

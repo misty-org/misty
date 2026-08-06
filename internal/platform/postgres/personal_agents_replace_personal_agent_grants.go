@@ -37,40 +37,28 @@ func (db *Database) ReplacePersonalAgentGrants(ctx context.Context, userID, agen
 			grantID := "agentgrant_" + uuid.NewString()
 			var latestVersionID string
 			var latestRole string
-			if err := tx.QueryRowContext(ctx, `SELECT id,role FROM personal_agent_versions WHERE agent_id=$1 ORDER BY version DESC LIMIT 1`, agentID).Scan(&latestVersionID, &latestRole); err != nil {
+			var requestedCapabilities json.RawMessage
+			if err := tx.QueryRowContext(ctx, `SELECT id,role,tool_permissions FROM personal_agent_versions WHERE agent_id=$1 ORDER BY version DESC LIMIT 1`, agentID).Scan(&latestVersionID, &latestRole, &requestedCapabilities); err != nil {
+				return err
+			}
+			roleID, err := ensureAgentMemberRoleTx(ctx, tx, input.SpaceID)
+			if err != nil {
+				return err
+			}
+			capabilityGrants, err := normalizeMembershipCapabilityGrants(nil, requestedCapabilities)
+			if err != nil {
 				return err
 			}
 			if err := tx.QueryRowContext(ctx, `INSERT INTO personal_agent_space_grants(
-				id,agent_id,space_id,all_members,created_by_user_id,approved_version_id,space_role,managed_by_user_id,enabled,removed_at
-			) VALUES($1,$2,$3,$4,$5,$6,$7,$5,TRUE,NULL)
+				id,agent_id,space_id,all_members,created_by_user_id,approved_version_id,space_role,managed_by_user_id,enabled,role_id,capability_grants,removed_at
+			) VALUES($1,$2,$3,TRUE,$4,$5,$6,$4,TRUE,$7,$8,NULL)
 				ON CONFLICT(agent_id,space_id) DO UPDATE SET all_members=EXCLUDED.all_members,approved_version_id=EXCLUDED.approved_version_id,
-					managed_by_user_id=EXCLUDED.managed_by_user_id,enabled=TRUE,removed_at=NULL,version=personal_agent_space_grants.version+1,updated_at=NOW()
-				RETURNING id`, grantID, agentID, input.SpaceID, input.AllMembers, userID, latestVersionID, latestRole).Scan(&grantID); err != nil {
+					managed_by_user_id=EXCLUDED.managed_by_user_id,enabled=TRUE,role_id=EXCLUDED.role_id,capability_grants=EXCLUDED.capability_grants,removed_at=NULL,version=personal_agent_space_grants.version+1,updated_at=NOW()
+				RETURNING id`, grantID, agentID, input.SpaceID, userID, latestVersionID, latestRole, roleID, capabilityGrants).Scan(&grantID); err != nil {
 				return err
 			}
 			if _, err := tx.ExecContext(ctx, `DELETE FROM personal_agent_member_grants WHERE grant_id=$1`, grantID); err != nil {
 				return err
-			}
-			if input.AllMembers {
-				continue
-			}
-			memberSeen := map[string]bool{}
-			for _, memberID := range input.MemberUserIDs {
-				memberID = strings.TrimSpace(memberID)
-				if memberID == "" || memberSeen[memberID] {
-					continue
-				}
-				memberSeen[memberID] = true
-				var member bool
-				if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM space_members WHERE space_id=$1 AND user_id=$2)`, input.SpaceID, memberID).Scan(&member); err != nil {
-					return err
-				}
-				if !member {
-					return ErrSpaceInvalid
-				}
-				if _, err := tx.ExecContext(ctx, `INSERT INTO personal_agent_member_grants(grant_id,user_id) VALUES($1,$2)`, grantID, memberID); err != nil {
-					return err
-				}
 			}
 		}
 		_, err := tx.ExecContext(ctx, `UPDATE personal_agent_space_grants SET enabled=FALSE,removed_at=NOW(),managed_by_user_id=$2,
@@ -151,9 +139,9 @@ func (db *Database) AccessiblePersonalAgents(ctx context.Context, userID, spaceI
 	return items, err
 }
 
-// PersonalAgentSpaceContext returns a bounded, permission-checked textual snapshot.
-// It deliberately retrieves only shared Space material; private agent memory is kept
-// in the invoker-scoped instance and is never mixed across members.
+// PersonalAgentSpaceContext returns a bounded, permission-checked snapshot of
+// shared Space material. Conversation-scoped runs use the conversation-aware
+// variant so limited-group and direct content cannot cross context boundaries.
 func (db *Database) PersonalAgentSpaceContext(ctx context.Context, userID, spaceID string, permissions json.RawMessage) (string, error) {
 	return db.PersonalAgentSpaceContextForConversation(ctx, userID, spaceID, "", permissions)
 }

@@ -233,13 +233,4 @@ func TestingIsAllowedCORSOrigin(origin string) bool {
 func (s *Server) mountAIRoutes(prefix string, aiService *api.AIService) {
 	s.Router.Get(prefix+"/status", aiService.Status())
 	s.Router.Post(prefix+"/complete", aiService.Complete())
-	s.Router.Get(prefix+"/sessions", aiService.Sessions())
-	s.Router.Post(prefix+"/sessions", aiService.CreateSession())
-	s.Router.Patch(prefix+"/sessions/{sessionID}", aiService.RenameSession())
-	s.Router.Post(prefix+"/sessions/{sessionID}/messages", aiService.SendMessage())
-	s.Router.Get(prefix+"/sessions/{sessionID}/events", aiService.Events())
-	s.Router.Get(prefix+"/sessions/{sessionID}/transcript", aiService.Transcript())
-	s.Router.Post(prefix+"/sessions/{sessionID}/tool-results", aiService.SubmitToolResults())
-	s.Router.Post(prefix+"/sessions/{sessionID}/cancel", aiService.Cancel())
-	s.Router.Delete(prefix+"/sessions/{sessionID}", aiService.DeleteConversation())
 }

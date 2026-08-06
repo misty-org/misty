@@ -17,23 +17,7 @@ func (db *Database) createSpaceMessageWithReferences(ctx context.Context, userID
 	attachmentIDs = uniqueSpaceIDs(attachmentIDs)
 	agentMentions := []string{}
 	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
-		mistySupport, err := isMistySupportConversationTx(ctx, tx, spaceID, conversationID)
-		if err != nil {
-			return err
-		}
-		if mistySupport {
-			if len(fileNodeIDs)+len(libraryItemIDs) > 0 {
-				return ErrSpaceForbidden
-			}
-			if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionMistySupportWrite); err != nil {
-				return err
-			}
-			if len(attachmentIDs) > 0 {
-				if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionAttachmentUpload); err != nil {
-					return err
-				}
-			}
-		} else if err := requireSpaceMessageWriteTx(ctx, tx, userID, spaceID); err != nil {
+		if err := requireSpaceMessageWriteTx(ctx, tx, userID, spaceID); err != nil {
 			return err
 		}
 		if conversationID != "" {
@@ -69,8 +53,8 @@ func (db *Database) createSpaceMessageWithReferences(ctx context.Context, userID
 			if err := scanMessageAttachment(tx.QueryRowContext(ctx, `SELECT a.id,a.space_id,COALESCE(a.message_id,''),a.file_id,a.upload_id,a.uploader_user_id,a.display_name,COALESCE(a.promoted_item_id,''),a.lifecycle_state,a.created_at,a.deleted_at,a.recover_until
 				FROM space_message_attachments a JOIN space_library_uploads u ON u.id=a.upload_id
 				WHERE a.id=$1 AND a.space_id=$2 AND a.uploader_user_id=$3 AND a.message_id IS NULL AND a.lifecycle_state='ready'
-				  AND (($5 AND u.conversation_id=NULLIF($4,'')) OR (NOT $5 AND (u.conversation_id IS NULL OR u.conversation_id=NULLIF($4,''))))
-				FOR UPDATE OF a`, attachmentID, spaceID, userID, conversationID, mistySupport), &attachment); err != nil {
+				  AND (u.conversation_id IS NULL OR u.conversation_id=NULLIF($4,''))
+				FOR UPDATE OF a`, attachmentID, spaceID, userID, conversationID), &attachment); err != nil {
 				return ErrSpaceInvalid
 			}
 			out.Attachments = append(out.Attachments, attachment)
@@ -91,9 +75,14 @@ func (db *Database) createSpaceMessageWithReferences(ctx context.Context, userID
 				mentionUsers[span.UserID] = true
 			}
 			if span.AgentID != "" {
-				if _, personalErr := personalAgentAllowedTx(ctx, tx, userID, spaceID, span.AgentID); personalErr != nil {
-					var ok bool
-					if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM space_agents WHERE space_id=$1 AND id=$2 AND enabled AND (creator_user_id=$3 OR access_policy->>'mode'='space' OR access_policy->'allowedUserIds' ? $3))`, spaceID, span.AgentID, userID).Scan(&ok); err != nil || !ok {
+				membership, personalErr := activePersonalAgentMembershipTx(ctx, tx, userID, spaceID, span.AgentID)
+				if personalErr != nil || !agentRolePermission(membership, PermissionMessagesWrite) {
+					return ErrSpaceInvalid
+				}
+				if conversationID != "" {
+					var participating bool
+					if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM space_conversation_members
+						WHERE conversation_id=$1 AND actor_kind='agent' AND agent_id=$2)`, conversationID, span.AgentID).Scan(&participating); err != nil || !participating {
 						return ErrSpaceInvalid
 					}
 				}
@@ -102,7 +91,7 @@ func (db *Database) createSpaceMessageWithReferences(ctx context.Context, userID
 		}
 		raw, _ := json.Marshal(content)
 		if err := tx.QueryRowContext(ctx, `INSERT INTO space_messages(id,space_id,conversation_id,sender_user_id,content,file_node_ids,reply_to_message_id,expires_at)
-			VALUES($1,$2,NULLIF($3,''),$4,$5,$6,NULLIF($7,''),CASE WHEN $8 THEN NULL ELSE NOW()+INTERVAL '30 days' END) RETURNING seq,created_at`, out.ID, spaceID, conversationID, userID, raw, pqStringArray(fileNodeIDs), replyToMessageID, mistySupport).Scan(&out.Seq, &out.CreatedAt); err != nil {
+			VALUES($1,$2,NULLIF($3,''),$4,$5,$6,NULLIF($7,''),NULL) RETURNING seq,created_at`, out.ID, spaceID, conversationID, userID, raw, pqStringArray(fileNodeIDs), replyToMessageID).Scan(&out.Seq, &out.CreatedAt); err != nil {
 			return err
 		}
 		if conversationID != "" {
@@ -135,6 +124,7 @@ func (db *Database) createSpaceMessageWithReferences(ctx context.Context, userID
 		if err := tx.QueryRowContext(ctx, `SELECT name,avatar_version FROM users WHERE id=$1`, userID).Scan(&out.SenderName, &out.SenderAvatarVersion); err != nil {
 			return err
 		}
+		out.Sender = SpaceMessageSender{Kind: "person", UserID: userID, DisplayName: out.SenderName, AvatarVersion: out.SenderAvatarVersion}
 		eventID, err := recordSpaceEventTx(ctx, tx, spaceID, userID, "message.created", out.ID, out)
 		if err != nil {
 			return err
@@ -219,6 +209,12 @@ func scanSpaceMessage(scanner interface{ Scan(...any) error }, out *SpaceMessage
 		return err
 	}
 	out.SenderAgentID = agentID.String
+	out.Sender = SpaceMessageSender{Kind: out.SenderKind, DisplayName: out.SenderName, AvatarVersion: out.SenderAvatarVersion}
+	if out.SenderKind == "agent" {
+		out.Sender.AgentID = out.SenderAgentID
+	} else if out.SenderKind == "person" {
+		out.Sender.UserID = out.SenderUserID
+	}
 	if len(origin) > 0 {
 		out.Origin = append(json.RawMessage(nil), origin...)
 	}
@@ -237,7 +233,7 @@ func parsePGTextArray(raw string) []string {
 	return strings.Split(strings.TrimSuffix(strings.TrimPrefix(raw, "{"), "}"), ",")
 }
 
-const spaceMessageColumns = `m.seq,m.id,m.space_id,COALESCE(m.conversation_id,''),m.sender_user_id,CASE WHEN m.origin->>'author_name' IS NOT NULL AND m.origin->>'author_name'<>'' THEN m.origin->>'author_name' WHEN m.sender_kind='agent' THEN COALESCE(a.name,(SELECT v.name FROM personal_agent_space_grants g JOIN personal_agent_versions v ON v.id=g.approved_version_id WHERE g.agent_id=m.sender_agent_id AND g.space_id=m.space_id LIMIT 1),'Misty Agent') ELSE COALESCE(u.name,'Misty') END,CASE WHEN m.sender_kind='person' AND COALESCE(m.origin->>'author_name','')='' THEN COALESCE(u.avatar_version,0) ELSE 0 END,m.sender_kind,m.sender_agent_id,m.content,m.file_node_ids::text,m.edited_at,m.created_at,COALESCE(m.reply_to_message_id,''),m.origin`
+const spaceMessageColumns = `m.seq,m.id,m.space_id,COALESCE(m.conversation_id,''),m.sender_user_id,CASE WHEN m.origin->>'author_name' IS NOT NULL AND m.origin->>'author_name'<>'' THEN m.origin->>'author_name' WHEN m.sender_kind='agent' THEN COALESCE(a.name,(SELECT v.name FROM personal_agent_space_grants g JOIN personal_agent_versions v ON v.id=g.approved_version_id WHERE g.agent_id=m.sender_agent_id AND g.space_id=m.space_id LIMIT 1),'Former agent') ELSE COALESCE(u.name,'System') END,CASE WHEN m.sender_kind='person' AND COALESCE(m.origin->>'author_name','')='' THEN COALESCE(u.avatar_version,0) ELSE 0 END,m.sender_kind,m.sender_agent_id,m.content,m.file_node_ids::text,m.edited_at,m.created_at,COALESCE(m.reply_to_message_id,''),m.origin`
 
 func (db *Database) SpaceMessages(ctx context.Context, userID, spaceID string, before int64, limit int) ([]SpaceMessage, error) {
 	if limit < 1 || limit > 100 {

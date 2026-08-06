@@ -88,9 +88,6 @@ func (db *Database) RejectLibraryUpload(ctx context.Context, userID, spaceID, up
 			if _, err := tx.ExecContext(ctx, `UPDATE space_storage_usage SET reserved_bytes=GREATEST(0,reserved_bytes-$1),version=version+1,updated_at=NOW() WHERE space_id=$2`, released, spaceID); err != nil {
 				return err
 			}
-			if err := adjustMistySupportStorageTx(ctx, tx, spaceID, 0, -released); err != nil {
-				return err
-			}
 		}
 		if _, err := tx.ExecContext(ctx, `UPDATE space_library_uploads SET state=$1,error_code=$2,version=version+1,updated_at=NOW() WHERE id=$3`, state, errorCode, upload.ID); err != nil {
 			return err
@@ -138,9 +135,6 @@ func (db *Database) ExpireLibraryUploads(ctx context.Context, limit int) ([]Expi
 			if _, err := tx.ExecContext(ctx, `UPDATE space_storage_usage SET reserved_bytes=GREATEST(0,reserved_bytes-$1),version=version+1,updated_at=NOW() WHERE space_id=$2`, item.reserved, item.spaceID); err != nil {
 				return err
 			}
-			if err := adjustMistySupportStorageTx(ctx, tx, item.spaceID, 0, -item.reserved); err != nil {
-				return err
-			}
 			if _, err := tx.ExecContext(ctx, `UPDATE space_library_uploads SET state='expired',error_code='upload_expired',version=version+1,updated_at=NOW() WHERE id=$1`, item.id); err != nil {
 				return err
 			}
@@ -186,6 +180,9 @@ func (db *Database) TrashLibraryItem(ctx context.Context, userID, spaceID, itemI
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionLibraryEdit); err != nil {
 			return err
 		}
+		if err := requireLibraryItemAudienceTx(ctx, tx, userID, spaceID, itemID); err != nil {
+			return err
+		}
 		result, err := tx.ExecContext(ctx, `UPDATE space_library_items SET lifecycle_state='trash',trashed_at=NOW(),recover_until=NOW()+$1::interval,version=version+1,updated_at=NOW() WHERE id=$2 AND space_id=$3 AND lifecycle_state='ready'`, "30 days", itemID, spaceID)
 		if err != nil {
 			return err
@@ -207,6 +204,9 @@ func (db *Database) TrashLibraryItem(ctx context.Context, userID, spaceID, itemI
 func (db *Database) RestoreLibraryItem(ctx context.Context, userID, spaceID, itemID string) (*SpaceLibraryItem, error) {
 	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionLibraryEdit); err != nil {
+			return err
+		}
+		if err := requireLibraryItemAudienceTx(ctx, tx, userID, spaceID, itemID); err != nil {
 			return err
 		}
 		result, err := tx.ExecContext(ctx, `UPDATE space_library_items SET lifecycle_state='ready',trashed_at=NULL,recover_until=NULL,version=version+1,updated_at=NOW() WHERE id=$1 AND space_id=$2 AND lifecycle_state='trash' AND recover_until>NOW()`, itemID, spaceID)

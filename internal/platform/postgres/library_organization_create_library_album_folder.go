@@ -197,7 +197,7 @@ func (db *Database) LibraryAlbumItems(ctx context.Context, userID, spaceID, albu
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionLibraryView); err != nil {
 			return err
 		}
-		rows, err := tx.QueryContext(ctx, libraryItemSelect+` JOIN space_album_items ai ON ai.space_library_item_id=i.id JOIN space_albums a ON a.id=ai.album_id WHERE a.id=$1 AND a.space_id=$2 AND i.lifecycle_state='ready' AND i.hidden=FALSE ORDER BY CASE a.sort_mode WHEN 'oldest' THEN extract(epoch FROM COALESCE(i.date_override,f.intrinsic_capture_at,f.original_uploaded_at)) WHEN 'newest' THEN -extract(epoch FROM COALESCE(i.date_override,f.intrinsic_capture_at,f.original_uploaded_at)) ELSE ai.position::double precision END,ai.added_at DESC LIMIT $3`, albumID, spaceID, limit)
+		rows, err := tx.QueryContext(ctx, libraryItemSelect+` JOIN space_album_items ai ON ai.space_library_item_id=i.id JOIN space_albums a ON a.id=ai.album_id WHERE a.id=$1 AND a.space_id=$2 AND i.lifecycle_state='ready' AND i.hidden=FALSE AND `+resourceAudienceSQL("i", "$4")+` ORDER BY CASE a.sort_mode WHEN 'oldest' THEN extract(epoch FROM COALESCE(i.date_override,f.intrinsic_capture_at,f.original_uploaded_at)) WHEN 'newest' THEN -extract(epoch FROM COALESCE(i.date_override,f.intrinsic_capture_at,f.original_uploaded_at)) ELSE ai.position::double precision END,ai.added_at DESC LIMIT $3`, albumID, spaceID, limit, userID)
 		if err != nil {
 			return err
 		}

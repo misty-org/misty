@@ -3,7 +3,6 @@ package api
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"strings"
 
 	db "github.com/kannachi323/misty/server/internal/platform/postgres"
@@ -19,7 +18,7 @@ func publishCanonicalRunResponse(ctx context.Context, database *db.Database, run
 	if err != nil || !claimed {
 		return err
 	}
-	eventType, text := TestingCanonicalRunResponse(run)
+	_, text := TestingCanonicalRunResponse(run)
 	details := map[string]string{"source_type": run.SourceType, "source_conversation_id": run.SourceConversationID}
 	finish := func(deliveryErr error) error {
 		state := "completed"
@@ -33,12 +32,7 @@ func publishCanonicalRunResponse(ctx context.Context, database *db.Database, run
 		return deliveryErr
 	}
 	switch run.SourceType {
-	case "direct":
-		_, err = database.AppendAgentConversationEvent(ctx, userID, run.SourceConversationID, eventType, TestingMustAPIRawJSON(map[string]any{"text": text, "run_id": run.ID}))
-		if errors.Is(err, db.ErrSpaceNotFound) {
-			err = nil // Caller-owned correlation IDs are valid direct sources.
-		}
-	case "group_mention":
+	case "direct", "group_mention":
 		runes := []rune(text)
 		if len(runes) > db.MaxMessageChars {
 			runes = runes[:db.MaxMessageChars]
@@ -53,12 +47,6 @@ func publishCanonicalRunResponse(ctx context.Context, database *db.Database, run
 		}
 		if err == nil {
 			details["message_id"] = reply.ID
-		}
-	case db.RunSourceAgentConsole, db.RunSourceAgentConsoleLegacy:
-		if runtime == nil {
-			err = errors.New("Agent runtime is unavailable")
-		} else {
-			_, err = runtime.AppendExternalAgentMessage(ctx, run.SourceConversationID, userID, run.ID, text)
 		}
 	default:
 		details["status"] = "no_conversation_delivery_required"

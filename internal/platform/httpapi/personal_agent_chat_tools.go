@@ -13,20 +13,58 @@ import (
 	workflowv2 "github.com/kannachi323/misty/server/internal/workflows"
 )
 
+const toolboxMessagesSend = "messages.send"
+
+func explicitMessageSendIntent(prompt string) bool {
+	lower := strings.ToLower(strings.TrimSpace(prompt))
+	for _, prefix := range []string{"how do ", "how can ", "how would ", "what does ", "what happens ", "why ", "whether ", "can agents ", "can an agent ", "do agents ", "are agents "} {
+		if strings.HasPrefix(lower, prefix) {
+			return false
+		}
+	}
+	lower = strings.NewReplacer("don't", "do not", "dont", "do not", "can't", "cannot", "cant", "cannot").Replace(lower)
+	tokens := strings.FieldsFunc(lower, func(r rune) bool {
+		return !unicode.IsLetter(r) && !unicode.IsDigit(r) && r != '_' && r != '-'
+	})
+	for index, token := range tokens {
+		if token == "tell" && index+1 < len(tokens) && (tokens[index+1] == "me" || tokens[index+1] == "us") {
+			continue
+		}
+		action := token == "send" || token == "text" || token == "tell" || token == "post" || token == "message" || token == "notify"
+		if token == "let" {
+			for next := index + 1; next < len(tokens) && next <= index+4; next++ {
+				if tokens[next] == "know" {
+					action = true
+				}
+			}
+		}
+		if !action {
+			continue
+		}
+		negated := false
+		for previous := max(0, index-3); previous < index; previous++ {
+			if tokens[previous] == "not" || tokens[previous] == "never" || tokens[previous] == "without" || tokens[previous] == "cannot" {
+				negated = true
+			}
+		}
+		if !negated {
+			return true
+		}
+	}
+	return false
+}
+
 func TestingCompileAgentIntent(prompt string) []string {
 	lower := strings.ToLower(strings.TrimSpace(prompt))
 	allowed := []string{"tasks.query"}
-	if explicitGlobalMessageIntent(prompt) {
-		allowed = append(allowed, globalAgentSendTool)
+	if explicitMessageSendIntent(prompt) {
+		allowed = append(allowed, toolboxMessagesSend)
 	}
 	if explicitTaskWriteIntent(lower, "create", "add", "make", "open") {
 		allowed = append(allowed, "tasks.create")
 	}
 	if explicitTaskWriteIntent(lower, "update", "change", "mark", "set", "assign", "complete") {
 		allowed = append(allowed, "tasks.update")
-	}
-	if explicitSpaceRenameIntent(lower) {
-		allowed = append(allowed, toolboxSpacesRename)
 	}
 	if explicitAgentDelegationIntent(lower) {
 		allowed = append(allowed, toolboxAgentsDelegate)
@@ -132,15 +170,6 @@ func genericTaskCapabilityQuestion(value string) bool {
 	return true
 }
 
-func explicitSpaceRenameIntent(value string) bool {
-	value = strings.NewReplacer("don't", "do not", "dont", "do not", "can't", "cannot", "cant", "cannot").Replace(value)
-	if strings.Contains(value, "do not rename") || strings.Contains(value, "cannot rename") {
-		return false
-	}
-	mentionsRename := strings.Contains(value, "rename") || strings.Contains(value, "change the space name") || strings.Contains(value, "change this space name")
-	return mentionsRename && requestedSpaceRenameName(value) != ""
-}
-
 func permittedSpaceConversationRead(ctx context.Context, database *db.Database, userID, spaceID, agentID, permission string) (bool, error) {
 	allowed, err := database.HasSpacePermission(ctx, userID, spaceID, permission)
 	if err != nil || !allowed || agentID == "" {
@@ -188,16 +217,17 @@ func TestingExecuteSpaceConversationTool(ctx context.Context, database *db.Datab
 }
 
 type spaceConversationToolActor struct {
-	userID    string
-	spaceID   string
-	agentID   string
-	runID     string
-	sessionID string
-	planOnly  bool
+	userID         string
+	spaceID        string
+	agentID        string
+	runID          string
+	sessionID      string
+	conversationID string
+	planOnly       bool
 }
 
 func executeSpaceConversationTool(ctx context.Context, database *db.Database, actor spaceConversationToolActor, originalPrompt string, tool serveragent.ToolRequest) (json.RawMessage, error) {
-	if tool.Name == globalAgentSendTool {
+	if tool.Name == toolboxMessagesSend {
 		var input struct {
 			Message string `json:"message"`
 		}
@@ -210,8 +240,8 @@ func executeSpaceConversationTool(ctx context.Context, database *db.Database, ac
 		}
 		var message *db.SpaceMessage
 		var err error
-		if actor.agentID == "" {
-			message, err = database.CreateSpaceAgentMessage(ctx, actor.userID, actor.spaceID, "misty", input.Message)
+		if actor.conversationID != "" {
+			message, err = database.CreateSpaceConversationAgentMessage(ctx, actor.userID, actor.spaceID, actor.conversationID, actor.agentID, input.Message)
 		} else {
 			message, err = database.CreatePersonalAgentSpaceMessage(ctx, actor.userID, actor.spaceID, actor.agentID, input.Message)
 		}
@@ -224,9 +254,6 @@ func executeSpaceConversationTool(ctx context.Context, database *db.Database, ac
 		permission := db.PermissionMessagesRead
 		if tool.Name == "library.search" {
 			permission = db.PermissionLibraryView
-			if actor.agentID != "" {
-				return nil, workflowv2.ErrCapabilityDenied
-			}
 		}
 		allowed, err := permittedSpaceConversationRead(ctx, database, actor.userID, actor.spaceID, actor.agentID, permission)
 		if err != nil || !allowed {
@@ -253,7 +280,12 @@ func executeSpaceConversationTool(ctx context.Context, database *db.Database, ac
 			}
 			return TestingMustAPIRawJSON(map[string]any{"items": items, "count": len(items)}), nil
 		}
-		messages, err := database.SpaceMessages(ctx, actor.userID, actor.spaceID, 0, 100)
+		var messages []db.SpaceMessage
+		if actor.conversationID != "" {
+			messages, err = database.SpaceConversationMessages(ctx, actor.userID, actor.spaceID, actor.conversationID, 0, 100)
+		} else {
+			messages, err = database.SpaceMessages(ctx, actor.userID, actor.spaceID, 0, 100)
+		}
 		if err != nil {
 			return nil, err
 		}
@@ -286,6 +318,26 @@ func executeSpaceConversationTool(ctx context.Context, database *db.Database, ac
 		return nil, workflowv2.ErrCapabilityDenied
 	}
 	switch tool.Name {
+	case "calendar.query":
+		var input struct {
+			From *time.Time `json:"from"`
+			To   *time.Time `json:"to"`
+		}
+		if json.Unmarshal(tool.Arguments, &input) != nil {
+			return nil, db.ErrSpaceInvalid
+		}
+		from, to := time.Now().UTC().AddDate(0, -1, 0), time.Now().UTC().AddDate(0, 3, 0)
+		if input.From != nil {
+			from = input.From.UTC()
+		}
+		if input.To != nil {
+			to = input.To.UTC()
+		}
+		events, err := database.SpaceCalendarEvents(ctx, actor.userID, actor.spaceID, from, to)
+		if err != nil {
+			return nil, err
+		}
+		return TestingMustAPIRawJSON(map[string]any{"events": events}), nil
 	case "tasks.query":
 		var input struct {
 			Query  string `json:"query"`
@@ -321,7 +373,11 @@ func executeSpaceConversationTool(ctx context.Context, database *db.Database, ac
 		if input.DueTimezone == "" {
 			input.DueTimezone = "UTC"
 		}
-		created, err := database.CreateSpaceTask(ctx, actor.userID, db.SpaceTask{SpaceID: actor.spaceID, Title: input.Title, Notes: input.Notes, Status: input.Status, Priority: input.Priority, AssigneeUserID: input.AssigneeUserID, DueAt: input.DueAt, DueTimezone: input.DueTimezone, SourceRefs: json.RawMessage(`[]`), CreatedByAgentID: actor.agentID, SourceRunID: actor.runID})
+		audience := db.SpaceResourceAudience{Kind: db.SpaceAudienceSpace}
+		if actor.conversationID != "" {
+			audience = db.SpaceResourceAudience{Kind: db.SpaceAudienceConversation, ConversationID: actor.conversationID}
+		}
+		created, err := database.CreateSpaceTask(ctx, actor.userID, db.SpaceTask{SpaceID: actor.spaceID, Title: input.Title, Notes: input.Notes, Status: input.Status, Priority: input.Priority, AssigneeUserID: input.AssigneeUserID, DueAt: input.DueAt, DueTimezone: input.DueTimezone, SourceRefs: json.RawMessage(`[]`), CreatedByUserID: actor.userID, CreatedByAgentID: actor.agentID, SourceRunID: actor.runID, AudienceKind: audience.Kind, AudienceConversationID: audience.ConversationID, AudienceCreatorUserID: actor.userID})
 		if err != nil {
 			return nil, err
 		}
@@ -384,7 +440,7 @@ func executeSpaceConversationTool(ctx context.Context, database *db.Database, ac
 func TestingSpaceAgentSendIsGrounded(prompt, message string) bool {
 	prompt, message = normalizeGroundingText(prompt), normalizeGroundingText(message)
 	return prompt != "" && message != "" && len([]rune(message)) <= db.MaxMessageChars &&
-		explicitGlobalMessageIntent(prompt) && strings.Contains(prompt, message)
+		explicitMessageSendIntent(prompt) && strings.Contains(prompt, message)
 }
 
 func (s *SpacesService) explicitMessageFileContext(ctx context.Context, userID string, membership *db.SpaceAgentMembership, spaceID string, attachmentIDs, libraryItemIDs []string) (string, string, []workflowv2.ContentRef) {

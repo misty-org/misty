@@ -24,11 +24,11 @@ func (db *Database) SpaceNoteByID(ctx context.Context, userID, noteID string) (*
 		note.Role = access.Role
 		return tx.QueryRowContext(ctx,
 			`SELECT id,space_id,creator_user_id,title_projection,plain_text_projection,
-			        lifecycle_state,collaboration_revision,acl_version,created_at,updated_at
+			        lifecycle_state,collaboration_revision,acl_version,audience_kind,COALESCE(audience_conversation_id,''),created_at,updated_at
 			 FROM space_notes WHERE id=$1`, noteID).Scan(
 			&note.ID, &note.SpaceID, &note.CreatorUserID, &note.TitleProjection,
 			&note.PlainTextProjection, &note.LifecycleState, &note.CollaborationRevision,
-			&note.ACLVersion, &note.CreatedAt, &note.UpdatedAt)
+			&note.ACLVersion, &note.AudienceKind, &note.AudienceConversationID, &note.CreatedAt, &note.UpdatedAt)
 	})
 	if err != nil {
 		return nil, err

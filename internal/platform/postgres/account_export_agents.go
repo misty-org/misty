@@ -87,22 +87,7 @@ type AccountExportAgentMemory struct {
 }
 
 func appendAccountAgentExport(ctx context.Context, tx *sql.Tx, userID string, out *AccountPortableExport) error {
-	if err := exportOwnedAgents(ctx, tx, userID, out); err != nil {
-		return err
-	}
-	if err := exportAgentConversations(ctx, tx, userID, out); err != nil {
-		return err
-	}
-	return scanExportQuery(ctx, tx, `
-		SELECT agent_id,COALESCE(space_id,''),scope_key,memory,legacy_memory,created_at,updated_at
-		FROM personal_agent_instances WHERE invoker_user_id=$1 ORDER BY created_at`, userID, func(rows *sql.Rows) error {
-		var item AccountExportAgentMemory
-		if err := rows.Scan(&item.AgentID, &item.SpaceID, &item.ScopeKey, &item.Memory, &item.LegacyMemory, &item.CreatedAt, &item.UpdatedAt); err != nil {
-			return err
-		}
-		out.AgentMemories = append(out.AgentMemories, item)
-		return nil
-	})
+	return exportOwnedAgents(ctx, tx, userID, out)
 }
 
 func exportOwnedAgents(ctx context.Context, tx *sql.Tx, userID string, out *AccountPortableExport) error {
@@ -169,46 +154,4 @@ func exportAgentVersionsAndMemberships(ctx context.Context, tx *sql.Tx, agent *A
 		agent.Memberships = append(agent.Memberships, item)
 	}
 	return memberships.Err()
-}
-
-func exportAgentConversations(ctx context.Context, tx *sql.Tx, userID string, out *AccountPortableExport) error {
-	rows, err := tx.QueryContext(ctx, `SELECT id,COALESCE(personal_agent_id,''),COALESCE(space_id,''),model_id,state,
-		created_at,updated_at,deleted_at FROM agent_conversations WHERE user_id=$1 ORDER BY created_at`, userID)
-	if err != nil {
-		return err
-	}
-	items := []AccountExportAgentConversation{}
-	for rows.Next() {
-		var item AccountExportAgentConversation
-		if err := rows.Scan(&item.ID, &item.PersonalAgentID, &item.SpaceID, &item.ModelID, &item.State,
-			&item.CreatedAt, &item.UpdatedAt, &item.DeletedAt); err != nil {
-			return err
-		}
-		items = append(items, item)
-	}
-	if err := rows.Close(); err != nil {
-		return err
-	}
-	for index := range items {
-		item := &items[index]
-		item.Events = []AccountExportAgentEvent{}
-		events, err := tx.QueryContext(ctx, `SELECT id,event_type,data,created_at FROM agent_conversation_events
-			WHERE conversation_id=$1 AND user_id=$2 ORDER BY id`, item.ID, userID)
-		if err != nil {
-			return err
-		}
-		for events.Next() {
-			var event AccountExportAgentEvent
-			if err := events.Scan(&event.ID, &event.Type, &event.Data, &event.CreatedAt); err != nil {
-				events.Close()
-				return err
-			}
-			item.Events = append(item.Events, event)
-		}
-		if err := events.Close(); err != nil {
-			return err
-		}
-		out.AgentConversations = append(out.AgentConversations, *item)
-	}
-	return nil
 }

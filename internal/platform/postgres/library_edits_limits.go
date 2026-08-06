@@ -210,6 +210,9 @@ func (db *Database) LibraryEditVersions(ctx context.Context, userID, spaceID, it
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionLibraryView); err != nil {
 			return err
 		}
+		if err := requireLibraryItemAudienceTx(ctx, tx, userID, spaceID, itemID); err != nil {
+			return err
+		}
 		var currentID string
 		if err := tx.QueryRowContext(ctx, `SELECT COALESCE(current_edit_version_id,'') FROM space_library_items WHERE id=$1 AND space_id=$2`, itemID, spaceID).Scan(&currentID); errors.Is(err, sql.ErrNoRows) {
 			return ErrLibraryNotFound

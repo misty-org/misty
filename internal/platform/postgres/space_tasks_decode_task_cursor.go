@@ -36,6 +36,14 @@ func (db *Database) CreateSpaceTask(ctx context.Context, actorUserID string, ite
 	if item.CreatedByUserID == "" && item.CreatedByAgentID == "" {
 		item.CreatedByUserID = actorUserID
 	}
+	audience, audienceErr := NormalizeResourceAudience(item.AudienceKind, item.AudienceConversationID)
+	if audienceErr != nil {
+		return nil, audienceErr
+	}
+	item.AudienceKind, item.AudienceConversationID = audience.Kind, audience.ConversationID
+	if item.AudienceKind == SpaceAudienceConversation && item.AudienceCreatorUserID == "" {
+		item.AudienceCreatorUserID = actorUserID
+	}
 	if err := TestingValidateSpaceTask(&item); err != nil {
 		return nil, err
 	}
@@ -45,6 +53,9 @@ func (db *Database) CreateSpaceTask(ctx context.Context, actorUserID string, ite
 			return err
 		}
 		if err := validateTaskSourceRefsTx(ctx, tx, actorUserID, item.SpaceID, item.ID, item.SourceRefs); err != nil {
+			return err
+		}
+		if err := validateResourceAudienceTx(ctx, tx, actorUserID, item.SpaceID, audience); err != nil {
 			return err
 		}
 		if item.AssigneeUserID != "" {
@@ -81,9 +92,9 @@ func (db *Database) CreateSpaceTask(ctx context.Context, actorUserID string, ite
 			return err
 		}
 		completed := item.Status == "done"
-		query := `INSERT INTO space_tasks(id,space_id,task_number,task_key,title,notes,status,priority,rank,assignee_user_id,assignee_agent_id,due_at,due_timezone,source_refs,created_by_user_id,created_by_agent_id,source_run_id,completed_at)
-			VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,NULLIF($10,''),NULLIF($11,''),$12,$13,$14,NULLIF($15,''),NULLIF($16,''),NULLIF($17,''),CASE WHEN $18 THEN NOW() END) RETURNING ` + spaceTaskColumns
-		if err := scanSpaceTask(tx.QueryRowContext(ctx, query, item.ID, item.SpaceID, item.TaskNumber, item.TaskKey, item.Title, item.Notes, item.Status, item.Priority, item.Rank, item.AssigneeUserID, item.AssigneeAgentID, item.DueAt, item.DueTimezone, item.SourceRefs, item.CreatedByUserID, item.CreatedByAgentID, item.SourceRunID, completed), out); err != nil {
+		query := `INSERT INTO space_tasks(id,space_id,task_number,task_key,title,notes,status,priority,rank,assignee_user_id,assignee_agent_id,due_at,due_timezone,source_refs,created_by_user_id,created_by_agent_id,source_run_id,audience_kind,audience_conversation_id,audience_creator_user_id,completed_at)
+			VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,NULLIF($10,''),NULLIF($11,''),$12,$13,$14,NULLIF($15,''),NULLIF($16,''),NULLIF($17,''),$18,NULLIF($19,''),NULLIF($20,''),CASE WHEN $21 THEN NOW() END) RETURNING ` + spaceTaskColumns
+		if err := scanSpaceTask(tx.QueryRowContext(ctx, query, item.ID, item.SpaceID, item.TaskNumber, item.TaskKey, item.Title, item.Notes, item.Status, item.Priority, item.Rank, item.AssigneeUserID, item.AssigneeAgentID, item.DueAt, item.DueTimezone, item.SourceRefs, item.CreatedByUserID, item.CreatedByAgentID, item.SourceRunID, item.AudienceKind, item.AudienceConversationID, item.AudienceCreatorUserID, completed), out); err != nil {
 			return err
 		}
 		if item.AssigneeAgentID != "" {

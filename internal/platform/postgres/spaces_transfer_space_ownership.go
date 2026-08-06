@@ -109,6 +109,11 @@ func validateMessageWithReferences(content []MessageSpan, referenceCount int) er
 				return ErrSpaceInvalid
 			}
 			chars += len([]rune(span.Label))
+		case "link":
+			if strings.TrimSpace(span.Label) == "" || !strings.HasPrefix(span.URL, "/spaces/") {
+				return ErrSpaceInvalid
+			}
+			chars += len([]rune(span.Label))
 		default:
 			return ErrSpaceInvalid
 		}
@@ -124,8 +129,10 @@ func messagePreview(content []MessageSpan) string {
 	for _, span := range content {
 		if span.Type == "text" {
 			builder.WriteString(span.Text)
-		} else {
+		} else if span.Type == "mention" {
 			builder.WriteString("@")
+			builder.WriteString(span.Label)
+		} else if span.Type == "link" {
 			builder.WriteString(span.Label)
 		}
 	}

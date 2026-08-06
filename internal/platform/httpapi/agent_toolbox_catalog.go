@@ -26,7 +26,7 @@ func messagesSearchToolDescriptor() agenttools.Descriptor {
 
 func messagesSendToolDescriptor() agenttools.Descriptor {
 	return agenttools.Descriptor{
-		Name: globalAgentSendTool, Version: 1,
+		Name: toolboxMessagesSend, Version: 1,
 		Description: "Send an exact member-provided message to the current Space-wide chat.",
 		Risk:        serveragent.RiskWrite,
 		InputSchema: TestingMustAPIRawJSON(map[string]any{
@@ -49,7 +49,7 @@ func librarySearchToolDescriptor() agenttools.Descriptor {
 	return agenttools.Descriptor{
 		Name: toolboxLibrarySearch, Version: 1, Description: "Search visible Library items in the current Space.",
 		Risk: serveragent.RiskRead, InputSchema: spaceSearchAgentToolSchema(), OutputSchema: agentToolObjectOutputSchema(), RequiredPermission: db.PermissionLibraryView,
-		AllowCustomAgent: false, Approval: agenttools.ApprovalNone, Locality: agenttools.LocalityServer, Idempotent: true,
+		AgentPermission: db.PermissionLibraryView, AllowCustomAgent: true, Approval: agenttools.ApprovalNone, Locality: agenttools.LocalityServer, Idempotent: true,
 		Sources: agentToolboxSpaceSources,
 	}
 }
@@ -87,7 +87,7 @@ func calendarQueryToolDescriptor() agenttools.Descriptor {
 	return agenttools.Descriptor{
 		Name: "calendar.query", Version: 1, Description: "Query the current Space calendar.",
 		Risk: serveragent.RiskRead, InputSchema: taskAgentToolSchema(false), OutputSchema: agentToolObjectOutputSchema(), RequiredPermission: db.PermissionTasksView,
-		Approval: agenttools.ApprovalNone, Locality: agenttools.LocalityServer, Idempotent: true, Sources: []string{canonicalAgentToolSource},
+		AgentPermission: db.PermissionTasksView, AllowCustomAgent: true, Approval: agenttools.ApprovalNone, Locality: agenttools.LocalityServer, Idempotent: true, Sources: agentToolboxSpaceSources,
 	}
 }
 
@@ -106,11 +106,8 @@ func canonicalAgentToolboxCatalogDescriptors() []agenttools.Descriptor {
 }
 
 func personalAgentToolboxCatalogDescriptors() []agenttools.Descriptor {
-	return []agenttools.Descriptor{
-		globalAgentSpacesToolDescriptor(), globalAgentSendToolDescriptor(), messagesSearchToolDescriptor(),
-		globalAgentTaskToolDescriptor(tasksQueryToolDescriptor()), globalAgentTaskToolDescriptor(tasksCreateToolDescriptor()), globalAgentTaskToolDescriptor(tasksUpdateToolDescriptor()),
-		assignedTasksUpdateToolDescriptor(), assignedTaskActivityToolDescriptor(),
-	}
+	descriptors := canonicalAgentToolboxCatalogDescriptors()
+	return append(descriptors, assignedTasksUpdateToolDescriptor(), assignedTaskActivityToolDescriptor(), agentDelegationToolDescriptor())
 }
 
 func TestingPersonalAgentToolboxDescriptors() []agenttools.Descriptor {
