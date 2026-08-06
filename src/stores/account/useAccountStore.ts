@@ -142,7 +142,7 @@ function textPreview(value: string): string {
 }
 
 function firstJsonValueText(value: string): string | null {
-  const start = value.search(/[\[{]/);
+  const start = value.search(/[[{]/);
   if (start < 0) return null;
   let depth = 0;
   let inString = false;
